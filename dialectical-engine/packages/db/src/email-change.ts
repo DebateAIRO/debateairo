@@ -176,7 +176,7 @@ export class PostgresEmailChangeRepository {
     return Object.freeze({ status: row?.result_status === "COOLDOWN" ? "COOLDOWN" : "NONE" });
   }
 
-  // NV-12 (0125): the new release's request and resend go through the bounded entry points, which share one
+  // NV-12 (0131): the new release's request and resend go through the bounded entry points, which share one
   // per-account budget of confirmation mails (LIMIT when it is full) and never move a change past issued_at + the
   // link TTL. `request` and `resend` above stay for the release before's 0079 path.
   async requestBounded(input: Parameters<PostgresEmailChangeRepository["request"]>[0]

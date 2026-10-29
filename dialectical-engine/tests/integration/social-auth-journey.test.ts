@@ -14,7 +14,7 @@ import { createPool, migrate, PostgresSocialIdentityRepository, PostgresConsumer
 import { Argon2WorkerPool, createEmailBlindIndex, hashPassword, hashToken, decrypt, decodeBase32, totpCodeAtStep, verifyPassword, type AuditContextHasher } from '@debateai/crypto';
 import { AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS, authPolicyFromRegisterRows, MFA_POLICY_REGISTER_ROW, mfaPolicyFromValue, SESSION_POLICY_DEPLOYMENT_REGISTER_ROW, sessionPolicyFromValue, CONSUMER_RECOVERY_POLICY_REGISTER_ROW, consumerRecoveryPolicyFromValue } from '@debateai/register';
 import { currentDocument } from '@debateai/legal-manifest';
-import { parseDeclaredRegion } from '@debateai/kernel';
+import { ITALY_APPROVAL_CLAUSES, ITALY_APPROVAL_KIND, parseDeclaredRegion, type ItalyApprovalLeg } from '@debateai/kernel';
 import { RegistrationService, InProcessAuthRateLimiter } from '../../apps/api/src/registration.js';
 import { SessionService } from '../../apps/api/src/sessions.js';
 import { SocialAuthService } from '../../apps/api/src/social-auth.js';
@@ -23,6 +23,7 @@ import { socialHash } from '../../apps/api/src/social-providers/hashes.js';
 import { ConsumerWebAuthnService } from '../../apps/api/src/consumer-webauthn.js';
 import { consumerFixture, origin } from '../support/consumerWebAuthnFixtures.js';
 import { startTestDatabase, type TestDatabase } from '../support/testDatabase.js';
+import { apiTestPools, provisionRlsLogins } from '../support/rls-logins.js';
 let db: TestDatabase, runtime: Pool, registrationRuntime: Pool, erasureRuntime: Pool, argon2: Argon2WorkerPool, dummy: string;
 const audit = { hashSourceIp: async () => 'ab'.repeat(32), hashUserAgent: async () => 'cd'.repeat(32) } as unknown as AuditContextHasher;
 const authPolicy = authPolicyFromRegisterRows(AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS), mfaPolicy = mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value), blindKey = Buffer.alloc(32, 7), recordsKey = Buffer.alloc(32, 9);
@@ -39,16 +40,19 @@ beforeAll(async () => {
     const url = new URL(db.connectionString);
     url.username = 'social_journey';
     url.password = 'journey-test-only';
-    runtime = createPool(url.toString());
+    const journeyUrl = url.toString();
     url.username = 'social_registration';
-    registrationRuntime = createPool(url.toString());
+    const registrationUrl = url.toString();
+    // R21 (PLAN S5.3, D67): the file's own logins, wired as main.ts wires `authorizationPool` and `pool` (each with its
+    // system target), in both modes; the erasure login keeps its own pool.
+    ({ authorization: runtime, runtime: registrationRuntime } = await apiTestPools(db, import.meta.url, { authorization: journeyUrl, runtime: registrationUrl }));
     url.username = 'social_erasure';
     erasureRuntime = createPool(url.toString());
     argon2 = new Argon2WorkerPool({ workers: 1 });
     await argon2.ready();
     dummy = await hashPassword(argon2, 'Strong dummy password 123!', authPolicy.password.argon2id);
 }, 120000);
-afterAll(async () => { await argon2?.close(); await runtime?.end(); await registrationRuntime?.end(); await erasureRuntime?.end(); await db?.stop(); });
+afterAll(async () => { await argon2?.close(); if (db) await (await provisionRlsLogins(db)).end(); await erasureRuntime?.end(); await db?.stop(); });
 async function harness() {
     const keys = new Map<string, Buffer>(), sent: {
         token: string;
@@ -92,14 +96,14 @@ async function harness() {
         return social.callback('google', prepared.input, prepared.begin.flowCookie, source);
     };
     const finishFlow=async(begin:{authorization_url:string;flowCookie:string},extra:Record<string,unknown>={},metadata:Record<string,string>={})=>{const url=new URL(begin.authorization_url);assertion={...assertion,nonce:url.searchParams.get('nonce')!,...extra};return social.callback('google',{state:url.searchParams.get('state'),code:'link-code',...metadata},begin.flowCookie,source);};
-    const signup = async (email?: string, region:{country:string;usState?:string}={country:'RO'}, phone: string | null = '+40212345678') => {
+    const signup = async (email?: string, region:{country:string;usState?:string}={country:'RO'}, phone: string | null = '+40212345678', sourceExtra: Readonly<{ italyLeg?: ItalyApprovalLeg }> = {}) => {
         const cb = await callback();
         const input = { continuation_token: cb.token, email: email ?? assertion.email, ...(phone === null ? {} : { phone }), country:region.country,
             ...(region.usState===undefined?{}:{us_state:region.usState}), date_of_birth: '1990-01-01', terms, privacy,
             locale: 'en', ui_locale: 'en', time_zone: 'Europe/Bucharest', turnstile_token: 'isolated-test-proof' };
         const declaredRegion=parseDeclaredRegion(input);
         if(declaredRegion===null)throw new Error('SYNTHETIC_SOCIAL_REGION_INVALID');
-        const bound = { ...source, socialBrowserHash: socialHash('browser', cb.browserCookie), legal: { terms, privacy, locale: 'en' as const }, region:declaredRegion };
+        const bound = { ...source, socialBrowserHash: socialHash('browser', cb.browserCookie), legal: { terms, privacy, locale: 'en' as const }, region:declaredRegion, ...sourceExtra };
         const admission = await registration.admitSource({ route: 'social', input: { email: input.email, phone: 'phone' in input ? input.phone : null, adultAffirmed: true }, source: bound });
         return { cb, bound, input, result: await social.completeSignup(input, bound, admission) };
     };
@@ -161,6 +165,24 @@ describe('actual signed-provider and restricted-database journeys', () => {
             const row=(await db.pool.query('SELECT user_id FROM identity."user" WHERE email_blind_index=$1',[createEmailBlindIndex(blindKey,signup.input.email)])).rows[0];
             expect((await db.pool.query('SELECT country_code,us_state FROM identity.registration_region WHERE user_id=$1',[row.user_id])).rows)
                 .toEqual([{country_code:'US',us_state:'TX'}]);
+        }finally{await h.registration.drainMailDispatches();}
+    });
+    // Italy clause approval S01 (PLAN P13, J-IT): the leg the API decided rides on the source; the social adapter writes
+    // the approval in the account's own transaction, after the region row, its pair and time copied from TERMS.
+    it('persists one ITALY_SPECIFIC_APPROVAL row for a trusted-provider sign-up whose source carries italyLeg',async()=>{
+        const h=await harness();
+        try{
+            const signup=await h.signup(undefined,{country:'RO'},'+40212345678',{italyLeg:'IP'});
+            expect(signup.result).toHaveProperty('status','mfa_required');
+            const user=(await db.pool.query('SELECT user_id,owner_ref,state FROM identity."user" WHERE email_blind_index=$1',[createEmailBlindIndex(blindKey,signup.input.email)])).rows[0];
+            expect(user.state).toBe('pending_mfa');
+            const rows=(await db.pool.query(`SELECT kind,document_version,document_sha256::text AS document_sha256,locale,surface,accepted_at,clauses,leg
+                FROM legal.acceptance WHERE owner_ref=$1 ORDER BY kind`,[user.owner_ref])).rows;
+            expect(rows.map(row=>row.kind)).toEqual(['ADULT',ITALY_APPROVAL_KIND,'PRIVACY_SHOWN','TERMS']);
+            const termsRow=rows.find(row=>row.kind==='TERMS')!, italy=rows.find(row=>row.kind===ITALY_APPROVAL_KIND)!;
+            expect(italy).toEqual({kind:ITALY_APPROVAL_KIND,document_version:termsRow.document_version,document_sha256:termsRow.document_sha256,
+                locale:termsRow.locale,surface:'SIGN_UP',accepted_at:termsRow.accepted_at,clauses:[...ITALY_APPROVAL_CLAUSES],leg:'IP'});
+            expect(rows.filter(row=>row.kind!==ITALY_APPROVAL_KIND).map(row=>[row.clauses,row.leg])).toEqual([[null,null],[null,null],[null,null]]);
         }finally{await h.registration.drainMailDispatches();}
     });
     it('rolls back social account, provider and region rows if the API signup capability loses the region join',async()=>{

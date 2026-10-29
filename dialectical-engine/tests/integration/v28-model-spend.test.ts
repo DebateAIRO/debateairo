@@ -360,11 +360,11 @@ describe("M1 migration 0075 — ledger.model_spend.spend_phase", () => {
 });
 
 /**
- * NV-50 (security audit run 3), migration 0125 — AN ATTEMPT THE GATEWAY SENT AND NEVER GOT AN ANSWER FOR is a row of
+ * NV-50 (security audit run 3), migration 0131 — AN ATTEMPT THE GATEWAY SENT AND NEVER GOT AN ANSWER FOR is a row of
  * its own source: `RUN_UNANSWERED` (a debate call) or `STORY_UNANSWERED` (a story call). Its run's (or story's) envelope
  * and the site's day count it; it always names its run and its attempt, and never carries a phase.
  */
-describe("NV-50 migration 0125 — unanswered attempts", () => {
+describe("NV-50 migration 0131 — unanswered attempts", () => {
   const unanswered = (source: "RUN_UNANSWERED" | "STORY_UNANSWERED", runId: string, chargeMicros: number, chargedOn: string) => ({
     spendId: randomUUID(), spendSource: source, runId, providerRef: "provider-1", chargedOn,
     chargeMicros, inputTokens: 1, outputTokens: 1, attemptId: randomUUID()

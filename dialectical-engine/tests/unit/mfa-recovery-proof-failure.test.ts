@@ -1,6 +1,6 @@
 // NV-15 (security audit run 3): failed email-link password proofs feed the sealed MFA-recovery adverse rule. The service
 // reads the account's risk before it checks a password, records a wrong one through identity.mfa_recovery_record_failure
-// (migrations/0125_security_fixes_run3.sql) with an encrypted account-risk context, and answers a refusal the same way
+// (migrations/0131_security_fixes_run3.sql) with an encrypted account-risk context, and answers a refusal the same way
 // for a right and a wrong password.
 import { randomUUID } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";

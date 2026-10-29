@@ -1,5 +1,17 @@
 export type ContentStatus = "READABLE" | "UNRECOVERABLE";
 export type Row = Readonly<Record<string, unknown>>;
+export type SynthesisCheckEntry = Readonly<{
+  answer_version: number;
+  verdict: "FLAGGED" | "CLEAR" | "NO_SYNTHESIS" | "UNAVAILABLE";
+  categories: readonly ("TERRORISM" | "HATE_SPEECH" | "SUICIDE_OR_HARM_TO_OTHERS" | "WEAPONS_OR_DRUGS")[];
+  checked_at: string;
+}>;
+export type PublicationReviewEntry = Readonly<{
+  asked_at: string;
+  outcome: "APPROVE" | "REFUSE" | null;
+  decided_at: string | null;
+  reason: string | null;
+}>;
 
 /** SPEC-v11 row C7 (V-42): origin/dev's core.run_role_rotation row of a C1 run, every column but run_id. */
 export type RoleRotationRole = Readonly<{ provider_ref: string; model_id: string; maker: string }>;
@@ -32,6 +44,8 @@ export type DebateEntry = Readonly<{
     ledger_digest: unknown;
     story: unknown;
     disclosure: unknown;
+    synthesis_checks?: readonly SynthesisCheckEntry[];
+    publication_reviews?: readonly PublicationReviewEntry[];
     versions: Readonly<{
       version: number;
       answer: unknown;
@@ -61,7 +75,7 @@ export type ExportSnapshot = Readonly<{
   locale: string;
   requestedAt: Date;
   generatedAt: Date;
-  account: Readonly<{ account: Row; channels: Row[]; registration_region: Row | null; age_checks: Row[]; erasure_requests: Row[] }>;
+  account: Readonly<{ account: Row; channels: Row[]; registration_region: Row | null; age_checks: Row[]; erasure_requests: Row[]; kept_questions: Row[] }>;
   security: Readonly<{ mfa_factors: Row[]; passkeys: Row[]; recovery_codes: Row | null; sessions: Row[]; social_identities: Row[]; email_changes: Row[]; recovery_email_changes: Row[]; recovery_requests: Row[] }>;
   consents: Readonly<{ legal_acceptances: Row[]; sensitive_data_consents: Row[] }>;
   debates: Readonly<{ debates: DebateEntry[] }>;

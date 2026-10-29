@@ -256,6 +256,36 @@ describe("N13 the card page's details and NETOPIA's 0 check (spec §2.11)", () =
     expect(run.payments.hosted.at(-1)?.payer).toMatchObject({ phone: "+40712345678" });
     await run.api.close();
   });
+
+  it("refuses names longer than 120 with a 400 before anything is saved (first + last must fit the profile's 256)", async () => {
+    const run = await start("card-name-too-long");
+    const profileBefore = (await repository.latestProfile(run.seeded.customerId))!;
+    const chargesBefore = await repository.chargesForSubscription(run.seeded.subscriptionId);
+    // 128 + " " + 128 is 257, one more than the stored name holds; 121 is one over the quote form's own cap.
+    for (const names of [{ first_name: "A".repeat(128), last_name: "B".repeat(128) }, { first_name: "A".repeat(121) }]) {
+      const response = await run.change(names);
+      expect([response.statusCode, response.json().error], response.body).toEqual([400, "MALFORMED_REQUEST"]);
+    }
+    expect(await repository.chargesForSubscription(run.seeded.subscriptionId)).toEqual(chargesBefore);
+    expect((await repository.latestProfile(run.seeded.customerId))!.profileCiphertext).toEqual(profileBefore.profileCiphertext);
+    const accepted = await database.pool.query("SELECT 1 FROM legal.acceptance WHERE owner_ref = $1", [run.identity.authenticated.ownerRef]);
+    expect(accepted.rowCount).toBe(0);
+    expect(run.payments.startCalls).toBe(0);
+    expect(run.audit.events.map((entry) => entry.event)).not.toContain("billing.card.change.started");
+    await run.api.close();
+  });
+
+  it("takes two 120-character names, the longest the form allows, and stores them joined as one name", async () => {
+    const run = await start("card-name-longest");
+    const [firstName, lastName] = ["A".repeat(120), "B".repeat(120)];
+    const response = await run.change({ first_name: firstName, last_name: lastName });
+    expect(response.statusCode, response.body).toBe(200);
+    const latest = (await repository.latestProfile(run.seeded.customerId))!;
+    expect(openBillingProfile(TEST_RECORDS_KEY, run.seeded.customerId, latest.profileCiphertext))
+      .toMatchObject({ name: `${firstName} ${lastName}`, firstName, lastName });
+    expect(run.payments.hosted.at(-1)?.payer).toMatchObject({ firstName, lastName });
+    await run.api.close();
+  });
 });
 
 describe("N13 VERIFY_PAYMENT on a 0 card check (spec §2.11)", () => {

@@ -145,11 +145,11 @@ describe("where the seal row is written (INTERFACE §2.4: code-owned, as mapCont
     expect(rows.find((row) => row.rowKey === "mapContractHash")?.sourceRef).toBe(DEVELOPMENT_RUNNER_SOURCE_REF);
   });
 
-  it("kit v1 filters it out (its reviewed closure stays the 66 keys it was written for); kit v2 carries it as a required key", async () => {
+  it("kit v1 filters it out (its reviewed closure is the 66 keys it was written for plus S04's questionCheckPolicy); kit v2 carries it as a required key", async () => {
     const bootstrap = await loadBootstrapRegister();
     const v1 = await buildPreviewSourceRows(bootstrap, runtime);
     expect(v1.map((row) => row.rowKey)).not.toContain("engineContractHash");
-    expect(v1).toHaveLength(66);
+    expect(v1).toHaveLength(67);
     const v2 = await buildPreviewSourceRowsV2(bootstrap, runtime);
     expect(PREVIEW_SOURCE_ROW_KEYS_V2).toContain("engineContractHash");
     expect(JSON.parse(v2.find((row) => row.rowKey === "engineContractHash")!.valueJsonText)).toBe(engineContractHash());

@@ -106,6 +106,7 @@ import { positionTitlesFrom } from "@/lib/v3/mapView";
 import {
   PublicationControl,type PrivateDeletionStatus
 } from "@/components/PublicationControl";
+import { CheckRemovalNotice, useCrisisCountryHint } from "@/components/CheckRemovalNotice";
 import { ScoringErrorBoundary } from "@/components/ScoringErrorBoundary";
 import { computeLean, countClaims, renderStateOf, treeDepth } from "@/lib/debatePresentation";
 import type { PopoverState } from "@/lib/scrutiny";
@@ -126,6 +127,10 @@ import type {
 import { formatScoringConfidenceCopy, formatScoringStatusCopy } from "@/lib/scoringStatusCopy";
 import { useDialogSurface } from "@/components/dialogSurface";
 import { useSelectionChallenge } from "@/lib/useSelectionChallenge";
+
+function DebateLocaleAndModeControls() {
+  return <><LanguageSwitcher /><ModeToggle compact /></>;
+}
 
 export function debateAfterRunTerminalFailure(debate: DebateDetail, reason: string): DebateDetail {
   return {
@@ -243,6 +248,10 @@ type AdaptiveDepthDryRunAsyncState =
   | { status: "loaded"; data: DebateAdaptiveDepthDryRunResponse; error: null }
   | { status: "unavailable"; data: DebateAdaptiveDepthDryRunResponse | null; error: string | null }
   | { status: "error"; data: DebateAdaptiveDepthDryRunResponse | null; error: string };
+
+// The run-events tail's own poll (1.5 s); forty reads cover a minute after run.terminal.
+const POST_TERMINAL_READ_MS = 1_500;
+const POST_TERMINAL_READS = 40;
 
 const SCORE_AWARE_FILTERS = [
   { id: "all", key: "debateChrome.filter.all" },
@@ -717,7 +726,16 @@ export default function DebatePageClient({
   publicMapView?: DebateMapView | null;
 }) {
   const { catalog: chromeCatalog, locale } = useChromeI18n();
+  const crisisCountryHint = useCrisisCountryHint();
   const [debate, setDebate] = useState<DebateDetail | null>(initialDebate);
+  const [held, setHeld] = useState(
+    initialPending && initialDebate?.run_state === "SETTLED" && initialDebate?.synthesis_check === "CHECKING"
+  );
+  const [removedByCheck, setRemovedByCheck] = useState(false);
+  const heldRef = useRef(held);
+  const removedByCheckRef = useRef(false);
+  const seenRunRef = useRef(initialDebate !== null);
+  const noticeTakingRef = useRef(false);
   const [answer, setAnswer] = useState<Answer | null>(initialAnswer);
   const [floor, setFloor] = useState<AnswerFloor | null>(initialFloor);
   const [mapView, setMapView] = useState<DebateMapView | null>(initialMapView);
@@ -791,8 +809,23 @@ export default function DebatePageClient({
   // 2026-09-26 §14.3); null until that read answers.
   const [readQuestionLocale, setReadQuestionLocale] = useState<LocaleCode | null>(null);
 
+  const showRemovalNotice = useCallback(() => {
+    if (removedByCheckRef.current) return;
+    removedByCheckRef.current = true;
+    heldRef.current = false;
+    setHeld(false);
+    setRemovedByCheck(true);
+    answerRef.current = null;
+    liveRef.current = createLiveRunState();
+    setAnswer(null);
+    setDebate(null);
+    setLive(createLiveRunState());
+    setSynthesisDraft(null);
+    setError(null);
+  }, []);
+
   const refresh = useCallback(async (answerExpected = false) => {
-    if (privateDeletionRef.current!==null) return;
+    if (privateDeletionRef.current!==null || removedByCheckRef.current) return;
     try {
       const bundle = await getDebateBundle(id, COOKIE_SESSION_MARKER, contractClient, {
         answerExpected,
@@ -800,9 +833,24 @@ export default function DebatePageClient({
         catalog: composeCatalog,
         locale
       });
-      if (privateDeletionRef.current!==null) return;
+      if (privateDeletionRef.current!==null || removedByCheckRef.current) return;
+      seenRunRef.current = true;
       if (bundle.run !== null) setProjectionRunRef(Object.freeze({ forId: id, runRef: bundle.run.run_ref }));
       setReadQuestionLocale(questionLocaleOf(bundle.questionLanguage?.tag, locale));
+      const checking = bundle.kind === "loading" && bundle.run.state === "SETTLED"
+        && bundle.run.synthesis_check === "CHECKING";
+      heldRef.current = checking;
+      setHeld(checking);
+      if (checking) {
+        answerRef.current = null;
+        liveRef.current = createLiveRunState();
+        setAnswer(null);
+        setLive(createLiveRunState());
+        setSynthesisDraft(null);
+        setDebate(bundle.detail);
+        setError(null);
+        return;
+      }
       if (bundle.kind === "served") {
         // The floor is read with the answer (spec §14.4.4). A read that failed
         // keeps the floor the page already shows for this same answer version;
@@ -838,7 +886,22 @@ export default function DebatePageClient({
         ? fundingFailureMessage(bundle.run.terminal_reason, debateChromeCatalog) ?? runFailureMessage(bundle.run.terminal_reason, debateChromeCatalog)
         : null);
     } catch (exc) {
-      if (privateDeletionRef.current!==null) return;
+      if (privateDeletionRef.current!==null || removedByCheckRef.current) return;
+      if (seenRunRef.current && exc instanceof ContractHttpError && exc.code === "NOT_FOUND") {
+        if (noticeTakingRef.current) return;
+        noticeTakingRef.current = true;
+        try {
+          if ((await contractClient.takeRemovalNotice()).notice) {
+            showRemovalNotice();
+            return;
+          }
+        } catch {
+          // The ordinary not-found screen remains the fallback.
+        } finally {
+          noticeTakingRef.current = false;
+        }
+        if (removedByCheckRef.current) return;
+      }
       // Side-by-side spec §7 (final fix wave W1): an answer this build cannot read (INVALID_RESPONSE) or one a newer
       // release made (MADE_BY_NEWER_RELEASE) is the reload note's to tell: no DEBATE_READ banner beside it, and the
       // page keeps what it already shows. Announced here too, so the note shows whichever client made the read.
@@ -846,6 +909,13 @@ export default function DebatePageClient({
       if (newerVersion !== null) {
         announceNewerVersion(newerVersion);
         return;
+      }
+      // S01: a held debate never shows through a failure, and a debate no longer found leaves the screen. Any other
+      // failure keeps what the page already shows, under the banner (side-by-side W1, as before S01).
+      if (heldRef.current || (exc instanceof ContractHttpError && exc.code === "NOT_FOUND")) {
+        heldRef.current = false;
+        setHeld(false);
+        setDebate(null);
       }
       // Existing in-flight runs resolve through the loading bundle above.
       // A remaining NOT_FOUND therefore means neither a visible run nor a
@@ -855,7 +925,7 @@ export default function DebatePageClient({
       // own sentence (lib/v3/requestFailure.ts).
       setError(requestFailureMessage("DEBATE_READ", exc, debateChromeCatalog));
     }
-  }, [composeCatalog, debateChromeCatalog, id, locale]);
+  }, [composeCatalog, debateChromeCatalog, id, locale, showRemovalNotice]);
 
   const purgePrivateDebate=useCallback((status:PrivateDeletionStatus)=>{
     privateDeletionRef.current=status;
@@ -886,6 +956,30 @@ export default function DebatePageClient({
     if (privateDeletionStatus!==null) return;
     refresh();
   }, [publicMode,privateDeletionStatus,refresh]);
+
+  useEffect(() => {
+    if (removedByCheck || (!held && (debate === null || debateTerminal))) return;
+    // A settled run can enter the check without a new visible event while the
+    // existing stream stays open. A bounded owner read discovers that hold.
+    const timer = setInterval(() => { void refresh(false); }, held ? 5_000 : 15_000);
+    return () => clearInterval(timer);
+  }, [debate, debateTerminal, held, removedByCheck, refresh]);
+
+  // S01-R3 (REV-S01-p3 correctness N1, t_7baea3dd): a run.terminal can beat the settle, so its read still finds the
+  // run RUNNING and the stream does not reconnect. Re-read the run at the stream's tail cadence until it reads settled
+  // or held, for at most a minute, instead of leaving the streamed debate up until the 15 s poll.
+  const runPhaseTerminal = live.runPhase === "terminal";
+  const hasDebate = debate !== null;
+  useEffect(() => {
+    if (removedByCheck || held || !hasDebate || debateTerminal || !runPhaseTerminal) return;
+    let reads = 0;
+    const timer = setInterval(() => {
+      reads += 1;
+      if (reads > POST_TERMINAL_READS) { clearInterval(timer); return; }
+      void refresh(false);
+    }, POST_TERMINAL_READ_MS);
+    return () => clearInterval(timer);
+  }, [debateTerminal, hasDebate, held, removedByCheck, refresh, runPhaseTerminal]);
 
   useEffect(() => {
     setScoringState({ status: "idle", data: null, error: null });
@@ -970,6 +1064,7 @@ export default function DebatePageClient({
   useEffect(() => {
     if (publicMode) return;
     if (privateDeletionStatus!==null) return;
+    if (held || removedByCheck) return;
     const runRef = actingRunRef;
 
     const consume = createDebatePageRunEventConsumer({
@@ -1047,7 +1142,7 @@ export default function DebatePageClient({
       },
       gate: liveGateRef.current
     });
-  }, [actingRunRef,answer?.run_ref,composeCatalog,debateChromeCatalog,debateTerminal,privateDeletionStatus,refresh]);
+  }, [actingRunRef,answer?.run_ref,composeCatalog,debateChromeCatalog,debateTerminal,held,privateDeletionStatus,refresh,removedByCheck]);
 
   // Honesty surfaces: the execution-ledger digest rides every settled answer.
   useEffect(() => {
@@ -1514,6 +1609,28 @@ export default function DebatePageClient({
       </div></div>
     );
   }
+  if (held || removedByCheck) {
+    return <div className="debateView">
+      {removedByCheck ? null : <h1 className="srOnly" lang={readQuestionLocale ?? storyLocale}
+        dir={localeDirection(readQuestionLocale ?? storyLocale)}>{debate?.topic}</h1>}
+      <header className="debateTopBar" data-debate-reference-chrome>
+        <div className="debateTopIdentityRow">
+          <BrandMark />
+          <span className="debateTopDivider" aria-hidden />
+          {removedByCheck ? null : <div className="debateTopClaim"><span className="debateTopTitle">{debate?.topic}</span></div>}
+        </div>
+        <div className="debateTopControlRow"><AccountMenu catalog={chromeCatalog} /><DebateLocaleAndModeControls /></div>
+      </header>
+      <div className="debateAiDisclosure">
+        <AiNotice catalog={{ ...homeCatalog, ...chromeCatalog }} body={t(debateChromeCatalog, "debateChrome.aiNotice")} />
+      </div>
+      {removedByCheck ? null : <p className="heldMobileQuestion" lang={readQuestionLocale ?? storyLocale}
+        dir={localeDirection(readQuestionLocale ?? storyLocale)}>{debate?.topic}</p>}
+      {removedByCheck
+        ? <CheckRemovalNotice catalog={homeCatalog} locale={locale} countryHint={crisisCountryHint} onClose={() => window.location.assign("/?tab=yours")} />
+        : <p role="status" className="checkingNotice">{t(publicCatalog, "public.publication.checkingDebate")}</p>}
+    </div>;
+  }
   if (error && !debate) {
     return (
       <div className="screen scroll">
@@ -1640,8 +1757,7 @@ export default function DebatePageClient({
             </div>
           ) : null}
           <AccountMenu catalog={chromeCatalog} />
-          <LanguageSwitcher />
-          <ModeToggle compact />
+          <DebateLocaleAndModeControls />
           <div className="debateUtilityActions" ref={debateHeaderInlineActionsRef}>
             <Link className="btnGhost debateOverflowAction" href="/" aria-label={t(chromeCatalog, "chrome.library")}>
               <span aria-hidden>←</span><span className="debateActionLabel">{t(chromeCatalog, "chrome.library")}</span>
@@ -2089,6 +2205,12 @@ export default function DebatePageClient({
       {debate && !publicMode ? <PublicationControl
         runId={actingRunRef}
         onPrivateDeletion={purgePrivateDebate}
+        onRemovedByCheck={() => { void contractClient.takeRemovalNotice().then((taken) => {
+          if (taken.notice) showRemovalNotice();
+        }).catch((failure) => {
+          setDebate(null);
+          setError(requestFailureMessage("DEBATE_READ", failure, debateChromeCatalog));
+        }); }}
         catalog={publicCatalog}
       /> : null}
       {guideOpen ? <GuideModal onClose={() => setGuideOpen(false)} catalog={debateDrawersCatalog} /> : null}

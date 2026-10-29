@@ -999,7 +999,7 @@ describe('settings activation: the guide (side-by-side spec §13)', async () => 
     // Owner 2026-10-23 (OA2): Privacy Policy 3.5 §14 and §5 stay, so an upload that adds a new AI company tells people
     // first and notes the change in the Register, before its switch; every other upload skips the step.
     for (const text of ['**A new AI company: tell people first, and note it in the Register (only an upload that adds one).**',
-      'The Privacy Policy (version 3.5) makes two promises the owner keeps (2026-10-23), so before that upload\'s switch:',
+      'The Privacy Policy (version 3.6) makes two promises the owner keeps (2026-10-23), so before that upload\'s switch:',
       '**Privacy Policy §14: tell people before.** Before a new recipient starts receiving data, people are told by email and in the product, and given time to object.',
       'the switch (SB13; on the drained path, the downtime at DR2) waits until the notice has gone out and that time has passed.',
       'There is no tool for this in the release kit: the owner sends the notice.',

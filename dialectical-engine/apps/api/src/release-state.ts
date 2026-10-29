@@ -361,7 +361,9 @@ export function siteCapBootLine(input: Readonly<{ hosted: boolean; roomComposed:
  * - `ownerActiveDebates` (NV-48, security audit run 3) counts the same runs of ONE person, by the run's owner as
  *   core.run_waiting_v reads it (the latest core.run_ownership_event, else an `owner:<uuid>` asker id, compared as
  *   text so no stored value is cast), against `ownerConcurrentDebates` (`OWNER_CONCURRENT_DEBATES`, at most the site's
- *   cap). It reads core.work_item, core.run and core.run_ownership_event, all SELECT-granted to debateai_runtime.
+ *   cap). It reads core.work_item, core.run and core.run_ownership_event, all SELECT-granted to debateai_runtime, on the
+ *   room decision's own transaction: since row security (0130, X19) that pool is api-system (API_SYSTEM_DATABASE_URL),
+ *   which sees the person's runs whoever's request or waker tick decides.
  * - `activeSettingsVersion` (side-by-side spec §13, C14, Task S13; only when built with `siteVersion`, as main.ts and
  *   the practice build it): the activation pointer read on the decision's own transaction
  *   (`readActiveSettingsVersionOn`, the one SQL constant of ./active-settings-version.ts; NULL = `siteVersion`). A

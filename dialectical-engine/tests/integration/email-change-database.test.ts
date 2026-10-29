@@ -416,7 +416,7 @@ describe("Turn 14 change email on real PostgreSQL", () => {
   });
 });
 
-// NV-12 (0125): one per-account budget of confirmation mails shared by request and resend, a resend that never moves
+// NV-12 (0131): one per-account budget of confirmation mails shared by request and resend, a resend that never moves
 // the change past its issue time + the link TTL, and thresholds the database checks itself.
 describe("NV-12 bounded change-email entry points on real PostgreSQL", () => {
   const LIMITS = Object.freeze({ maximumSends: 3, windowMs: 3_600_000 });

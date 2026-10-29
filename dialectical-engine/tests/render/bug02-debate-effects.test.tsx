@@ -17,7 +17,8 @@ const mocks = vi.hoisted(() => ({
   readEvents: vi.fn(),
   readDeployment: vi.fn(),
   readLedgerDigest: vi.fn(),
-  readRunVisibility: vi.fn()
+  readRunVisibility: vi.fn(),
+  readPublicationReview: vi.fn()
 }));
 
 vi.mock("@/lib/api", async (importOriginal) => {
@@ -37,7 +38,8 @@ vi.mock("@/lib/api", async (importOriginal) => {
       readEvents: mocks.readEvents,
       readDeployment: mocks.readDeployment,
       readLedgerDigest: mocks.readLedgerDigest,
-      readRunVisibility: mocks.readRunVisibility
+      readRunVisibility: mocks.readRunVisibility,
+      readPublicationReview: mocks.readPublicationReview
     },
     getDebateBundle: (id: string, token: string, _client?: unknown, options?: unknown) =>
       actual.getDebateBundle(id, token, readClient as never, options as never)
@@ -128,6 +130,7 @@ describe("BUG-02 rendered refresh behaviour", () => {
     });
     mocks.readLedgerDigest.mockReset().mockRejectedValue(new Error("not needed by this render test"));
     mocks.readRunVisibility.mockReset().mockResolvedValue({ state: "PRIVATE", public_ref: null });
+    mocks.readPublicationReview.mockReset().mockResolvedValue({ flagged: false, state: "NONE", categories: [], asks_used: 0, may_ask: false, refusal: null });
     mocks.streamEvents.mockReset().mockImplementation(async (_runRef, emit: (event: RunEvent) => void) => {
       mocks.emit = emit;
       await new Promise<void>(() => {});

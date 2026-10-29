@@ -2,9 +2,9 @@
   "DISCLOSURE": "Dzień dobry — jestem asystentem pomocy technicznej Dialectical Engine, czyli AI. Mogę wyjaśnić działanie produktu i wskazać właściwą stronę. Nie mogę zalogować Państwa, zmienić Państwa konta ani niczego zresetować. W tym celu należy skorzystać z podanych przeze mnie łączy lub poprosić o rozmowę z człowiekiem.",
   "NO_SOURCE": "Nie mam źródła tej informacji, więc nie będę zgadywać. Proszę zapytać o coś innego związanego z działaniem debat lub wybrać opcję „Porozmawiaj z człowiekiem”.",
   "REFUSE_ZONE": "Nie mogę pomagać w logowaniu ani w sprawach dotyczących haseł, kodów weryfikacyjnych, uwierzytelniania dwuskładnikowego, odzyskiwania konta, zmiany adresu e-mail lub usuwania konta — nawet w celu ich sprawdzenia. Te czynności są dostępne wyłącznie na stronach Państwa konta: {link}. Jeśli ta strona nie działa, proszę wybrać opcję „Porozmawiaj z człowiekiem”.",
-  "REFUSE_INJECTION": "Wykonuję wyłącznie instrukcje samego produktu, dlatego pominę tę prośbę. Państwa wiadomość została zarejestrowana. Proszę zapytać o produkt lub wybrać opcję „Porozmawiaj z człowiekiem”.",
-  "REFUSE_SAFETY": "Ta sprawa wymaga pomocy człowieka, a nie asystenta. Proszę wybrać opcję „Porozmawiaj z człowiekiem”, a człowiek przeczyta Państwa wiadomość.",
-  "DEGRADED": "Model asystenta jest obecnie niedostępny. Nadal mogą Państwo zostawić wiadomość dla człowieka: proszę wybrać opcję „Porozmawiaj z człowiekiem”.",
+  "REFUSE_INJECTION": "Wykonuję wyłącznie instrukcje samego produktu, dlatego pominę tę prośbę. Proszę zapytać o produkt lub wybrać opcję „Porozmawiaj z człowiekiem”.",
+  "REFUSE_SAFETY": "Ta sprawa wymaga pomocy człowieka, a nie asystenta. Proszę wybrać opcję „Porozmawiaj z człowiekiem” i napisać na wyświetlany przez nią adres; człowiek to przeczyta.",
+  "DEGRADED": "Model asystenta jest obecnie niedostępny. Aby skontaktować się z człowiekiem, proszę wybrać opcję „Porozmawiaj z człowiekiem”.",
   "DISABLED": "Asystent pomocy technicznej jest obecnie wyłączony.",
   "RATE_LIMITED": "Wysłali Państwo wiele wiadomości w krótkim czasie. Proszę poczekać kilka minut.",
   "RATING": "Czy ta odpowiedź była pomocna? Tak · Nie · Porozmawiaj z człowiekiem",
@@ -25,5 +25,10 @@
   "INCIDENT_SURFACE_PUBLISHING": "publikowanie",
   "INCIDENT_SURFACE_SIGN_IN": "logowanie",
   "INCIDENT_SURFACE_WHOLE_SITE": "całą witrynę",
-  "COUNTRY_UNAVAILABLE": "Dialectical Engine nie jest jeszcze dostępny w Twoim kraju."
+  "COUNTRY_UNAVAILABLE": "Dialectical Engine nie jest jeszcze dostępny w Twoim kraju.",
+  "OFF_TOPIC": "Mogę pomagać wyłącznie w sprawach dotyczących Dialectical Engine: Państwa konta, planów, debat, publikowania i naszych zasad. Nie mogę Państwu w tym pomóc.",
+  "OFF_TOPIC_PART": "Mogę pomagać wyłącznie w sprawach dotyczących Dialectical Engine, dlatego pozostała część Państwa wiadomości została bez odpowiedzi.",
+  "CRISIS_SUPPORT": "To, co piszesz, brzmi bardzo boleśnie i nie musisz mierzyć się z tym w pojedynkę. Tutaj możesz już teraz skontaktować się z kimś.",
+  "THREAT_LINE": "Nie mogę Ci w tym pomóc. Jeśli komuś może stać się krzywda, proszę Cię, natychmiast poszukaj pomocy.",
+  "TOO_LONG": "Państwa wiadomość jest zbyt długa jak na czat. Proszę ją skrócić i wysłać ponownie."
 }

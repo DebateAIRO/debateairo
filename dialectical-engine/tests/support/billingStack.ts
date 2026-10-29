@@ -23,7 +23,9 @@ import {
 import { AGE_RULE_VERSION, MIN_AGE } from "@debateai/kernel";
 import { currentDocument } from "@debateai/legal-manifest";
 import { createNetopiaPayments, iso2ToNetopiaCountry, loadTrustedKeys } from "@debateai/payments-netopia";
-import { TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW, taxAuthoritiesFromValue, type PlanId } from "@debateai/register";
+import {
+  TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW, taxAuthoritiesFromValue, type CountryPolicy, type PlanId
+} from "@debateai/register";
 import { PostgresAccountErasureApplication } from "../../apps/api/src/account-erasure.js";
 import { buildApi } from "../../apps/api/src/index.js";
 import type { BillingConnectors } from "../../apps/api/src/billing/connectors.js";
@@ -101,6 +103,11 @@ export interface BillingStack {
   readonly tax: FakeTaxEngine;
   now(): Date;
   advanceDays(days: number): void;
+  /**
+   * The countryPolicy every route decides with from now on, as the API reads it after a restart on a new register
+   * version over the same database (main.ts reads the row once at boot). The stack starts on `testCountryPolicy`.
+   */
+  useCountryPolicy(policy: CountryPolicy): void;
   /**
    * An active account with a live session, as a person has after sign-up (with its age check), email check and 2-step
    * enrolment. `age: "OWED"` leaves out the age record, as for an account made before the age gate.
@@ -266,6 +273,17 @@ export async function startBillingStack(): Promise<BillingStack> {
     { baseUrl: netopia.baseUrl, apiKey: netopia.apiKey, posSignature: netopia.posSignature }, { now }
   );
   const acceptances = new AcceptanceRepository(database.pool);
+  // The runtime holds this one object; each of its fields reads the policy in force (`useCountryPolicy`).
+  let policyInForce: CountryPolicy = testCountryPolicy;
+  const countryPolicy: CountryPolicy = Object.freeze({
+    get defaultRule() { return policyInForce.defaultRule; },
+    get countries() { return policyInForce.countries; },
+    get usStates() { return policyInForce.usStates; },
+    get regions() { return policyInForce.regions; },
+    get unknownIp() { return policyInForce.unknownIp; },
+    get tor() { return policyInForce.tor; },
+    get sourceRef() { return policyInForce.sourceRef; }
+  });
 
   // Turn 14's change-email service on the stack's own database, DEKs and blind-index key. Its mail is kept apart from
   // billing's, so a test reads the confirmation link from here.
@@ -372,7 +390,7 @@ export async function startBillingStack(): Promise<BillingStack> {
     connectors,
     policy: testBillingPolicy,
     plans: testBillingPlans,
-    countryPolicy: testCountryPolicy,
+    countryPolicy,
     geo,
     dekStore: deks,
     // R-7 / A22: no publicAppUrl here. The one source of the public origin is `connectors.publicAppUrl` above (the
@@ -455,6 +473,7 @@ export async function startBillingStack(): Promise<BillingStack> {
     database, runtime, netopia, notifyUrl, mail, invoices, tax,
     now,
     advanceDays(days) { advancedMs += days * 86_400_000; },
+    useCountryPolicy(policy) { policyInForce = policy; },
 
     async signUp(email, ipCountry, terms = "CURRENT", age = "PASSED") {
       const account = await createActiveAccount(database.pool, deks, blindIndexKey, email, ipCountry, now(), age);

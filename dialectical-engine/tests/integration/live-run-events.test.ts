@@ -23,6 +23,7 @@ import { ReleaseWatcher, type ReleaseStateReader } from "../../apps/api/src/rele
 import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 import {
   TEST_APP_ORIGIN,
+  persistLiveSession,
   testHttpIdentity,
   testSessionApplication,
   testSessionHeaders,
@@ -30,17 +31,35 @@ import {
 } from "../support/httpSession.js";
 import { createTestAskAdmissionPoolFacades, startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
+import { apiTestPools, provisionRlsLogins, type ApiTestPools } from "../support/rls-logins.js";
 
 const POLL_MS = 25;
 const HEARTBEAT_MS = 150;
 
 let database: TestDatabase;
+let pools: ApiTestPools | undefined;
 
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
+  // R21 (PLAN S5.3): the API's pools are the mode's (the product's logins in API-login mode); seeding stays on the
+  // harness superuser.
+  pools = await apiTestPools(database, import.meta.url);
 });
-afterAll(async () => database?.stop());
+afterAll(async () => {
+  if (database !== undefined && pools !== undefined && pools.runtime !== database.pool) await (await provisionRlsLogins(database)).end();
+  await database?.stop();
+});
+
+/**
+ * The two ask-admission pools main.ts hands PostgresAskApplication. Superuser mode hands one pool in every field, which
+ * the constructor refuses in two places, so it gets the harness's two facades over it, as at base.
+ */
+function askAdmissionPools(api: ApiTestPools): Readonly<{ server: ApiTestPools["runtime"]; legacy: ApiTestPools["runtime"] }> {
+  return api.serverAskAdmission === api.runtime
+    ? createTestAskAdmissionPoolFacades(api.runtime)
+    : Object.freeze({ server: api.serverAskAdmission, legacy: api.legacyAskAdmission });
+}
 
 async function ownedRunningRun(identity: TestHttpIdentity, label: string): Promise<string> {
   await database.pool.query(`
@@ -56,6 +75,8 @@ async function ownedRunningRun(identity: TestHttpIdentity, label: string): Promi
     `live-run-events-${label}-${identity.authenticated.userId}`,
     randomUUID(), identity.authenticated.ownerRef
   ]);
+  // D55: the identity's live session row, so the database accepts the token the session application accepts.
+  await persistLiveSession(database.pool, identity);
   const runId = await new RunRepository(database.pool).startRun({
     questionLine: `Does the live stream follow the ${label} debate?`,
     principal: { kind: "legacy", legacyAskerId: `asker:live-run-events:${label}` },
@@ -89,9 +110,10 @@ async function appendProgress(runId: string, kind: "node.retrying" | "TERMINAL",
 }
 
 function countingApplication() {
+  if (pools === undefined) throw new Error("LIVE_RUN_EVENTS_POOLS_UNBUILT");
   const application = new PostgresAskApplication(
-    database.pool, {} as never, { releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never, undefined, database.pool,
-    createTestAskAdmissionPoolFacades(database.pool)
+    pools.runtime, {} as never, { releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never, undefined,
+    pools.contentProvision, askAdmissionPools(pools)
   );
   const calls = { snapshot: 0, mark: 0 };
   // The signal the stream hands to each mark read. It aborts when the server sees the client leave.

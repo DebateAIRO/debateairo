@@ -1,4 +1,4 @@
-// NV-38 (security audit run 3): the backup-email and MFA-recovery repositories claim through 0125's pending-notice
+// NV-38 (security audit run 3): the backup-email and MFA-recovery repositories claim through 0131's pending-notice
 // claims, whose lease starts when the claim ends, in ONE statement each. The MFA claim no longer reads its locale in a
 // second, lease-refusing statement (identity.mail_locale_of_mfa_claim): the claim returns mail_locale itself, and the
 // repository fails closed on a missing or unknown one.

@@ -2,9 +2,9 @@
   "DISCLOSURE": "Hallo — ich bin der Support-Assistent von Dialectical Engine, ein AI-System. Ich kann erklären, wie das Produkt funktioniert, und Sie zur richtigen Seite führen. Ich kann Sie nicht anmelden, Ihr Konto ändern oder etwas zurücksetzen. Verwenden Sie dafür die von mir angegebenen Links oder bitten Sie um einen Menschen.",
   "NO_SOURCE": "Dafür habe ich keine Quelle, daher werde ich nicht raten. Fragen Sie mich etwas anderes zur Funktionsweise von Debatten oder wählen Sie „Mit einem Menschen sprechen“.",
   "REFUSE_ZONE": "Ich kann nicht bei Anmeldung, Passwörtern, Bestätigungscodes, Zwei-Faktor-Authentifizierung, Kontowiederherstellung, Änderung der E-Mail-Adresse oder Kontolöschung helfen — auch nicht, um diese zu prüfen. Dies ist ausschließlich auf Ihren Kontoseiten möglich: {link}. Wenn diese Seite nicht funktioniert, wählen Sie „Mit einem Menschen sprechen“.",
-  "REFUSE_INJECTION": "Ich befolge nur die eigenen Anweisungen des Produkts und überspringe diese Anfrage daher. Ihre Nachricht wurde aufgezeichnet. Fragen Sie mich nach dem Produkt oder wählen Sie „Mit einem Menschen sprechen“.",
-  "REFUSE_SAFETY": "Hierfür ist ein Mensch erforderlich, kein Assistent. Wählen Sie „Mit einem Menschen sprechen“, damit ein Mensch Ihre Nachricht liest.",
-  "DEGRADED": "Das Modell des Assistenten ist derzeit nicht verfügbar. Sie können trotzdem eine Nachricht für einen Menschen hinterlassen: Wählen Sie „Mit einem Menschen sprechen“.",
+  "REFUSE_INJECTION": "Ich befolge nur die eigenen Anweisungen des Produkts und überspringe diese Anfrage daher. Fragen Sie mich nach dem Produkt oder wählen Sie „Mit einem Menschen sprechen“.",
+  "REFUSE_SAFETY": "Hierfür ist ein Mensch erforderlich, kein Assistent. Wählen Sie „Mit einem Menschen sprechen“ und schreiben Sie an die angezeigte Adresse; ein Mensch liest, was dort ankommt.",
+  "DEGRADED": "Das Modell des Assistenten ist derzeit nicht verfügbar. Um einen Menschen zu erreichen, wählen Sie „Mit einem Menschen sprechen“.",
   "DISABLED": "Der Support-Assistent ist derzeit ausgeschaltet.",
   "RATE_LIMITED": "Sie haben in kurzer Zeit viele Nachrichten gesendet. Bitte warten Sie einige Minuten.",
   "RATING": "Hat dies Ihre Frage beantwortet? Ja · Nein · Mit einem Menschen sprechen",
@@ -25,5 +25,10 @@
   "INCIDENT_SURFACE_PUBLISHING": "Veröffentlichungen",
   "INCIDENT_SURFACE_SIGN_IN": "die Anmeldung",
   "INCIDENT_SURFACE_WHOLE_SITE": "die gesamte Website",
-  "COUNTRY_UNAVAILABLE": "Dialectical Engine ist in Ihrem Land noch nicht verfügbar."
+  "COUNTRY_UNAVAILABLE": "Dialectical Engine ist in Ihrem Land noch nicht verfügbar.",
+  "OFF_TOPIC": "Ich kann nur bei Dialectical Engine helfen: bei Ihrem Konto, den Tarifen, Debatten, Veröffentlichungen und unseren Richtlinien. Dabei kann ich Ihnen nicht helfen.",
+  "OFF_TOPIC_PART": "Ich kann nur bei Dialectical Engine helfen, daher habe ich den Rest Ihrer Nachricht nicht beantwortet.",
+  "CRISIS_SUPPORT": "Was Sie geschrieben haben, klingt sehr schmerzhaft, und Sie müssen das nicht allein durchstehen. Hier können Sie jetzt jemanden erreichen.",
+  "THREAT_LINE": "Dabei kann ich Ihnen nicht helfen. Wenn jemand verletzt werden könnte, holen Sie sich bitte sofort Hilfe.",
+  "TOO_LONG": "Ihre Nachricht ist für den Chat zu lang. Kürzen Sie sie und senden Sie sie erneut."
 }

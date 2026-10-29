@@ -1,0 +1,30 @@
+"use client";
+import { useEffect, useMemo, useState } from "react";
+import { createThreatReportsClient, type ThreatReportsClient } from "../lib/threatReportsApi.js";
+import { t, tPlural, type MessageCatalog } from "../lib/i18n/translate.js";
+import staffEnglish from "../messages/en/staff.json";
+
+export function ThreatReportsLink({ client, catalog = staffEnglish, locale }: { client?: ThreatReportsClient; catalog?: MessageCatalog; locale?: string }) {
+  const api = useMemo(() => client ?? createThreatReportsClient(), [client]);
+  const [unread, setUnread] = useState<number | null>(null);
+  useEffect(() => {
+    let active = true;
+    let revision = 0;
+    const refresh = () => {
+      const current = ++revision;
+      void api.summary().then(value => { if (active && current === revision) setUnread(value.unread); }, () => { if (active && current === revision) setUnread(null); });
+    };
+    const authorityChanged = (event: Event) => {
+      const capabilities = (event as CustomEvent<{ capabilities: string[] }>).detail.capabilities;
+      if (capabilities.includes("THREAT_REPORT")) refresh();
+      else { revision++; setUnread(null); }
+    };
+    window.addEventListener("debateai:staff-authority-changed", authorityChanged);
+    refresh();
+    return () => { active = false; revision++; window.removeEventListener("debateai:staff-authority-changed", authorityChanged); api.cancel(); };
+  }, [api]);
+  if (unread === null) return null;
+  const language = locale ?? document.documentElement.lang ?? "en";
+  const countLabel = tPlural(catalog, "staff.threatReports.unread", unread, language);
+  return <div className="threatReportsLinkRow"><a className="setBtn threatReportsLink" href="/admin/threat-reports">{t(catalog, "staff.threatReports.link")}<span className="threatReportsCount" data-part="unread-count">{countLabel}</span></a></div>;
+}

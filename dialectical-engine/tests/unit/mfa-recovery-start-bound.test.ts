@@ -1,5 +1,5 @@
 // NV-16 (security audit run 3): an MFA-recovery start is bounded per account and destination in the database
-// (migrations/0125_security_fixes_run3.sql, identity.mfa_recovery_start_bounded). The new release's repository calls
+// (migrations/0131_security_fixes_run3.sql, identity.mfa_recovery_start_bounded). The new release's repository calls
 // the bounded function; the sealed identity.mfa_recovery_start stays for the release before.
 import { describe, expect, it, vi } from "vitest";
 import { PostgresMfaRecoveryRepository } from "../../packages/db/src/email-mfa-recovery.js";

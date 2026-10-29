@@ -134,6 +134,7 @@ export function PublicDebateOverview({
   storyCatalog,
   storyLocale,
   composeCatalog = composeEnglish,
+  viewingNote = "PUBLIC",
   onDetails,
   onRead
 }: {
@@ -148,6 +149,7 @@ export function PublicDebateOverview({
   storyLocale: LocaleCode;
   /** The interface locale's `compose` catalogue: V3 score copy and model family names. */
   composeCatalog?: MessageCatalog;
+  viewingNote?: "PUBLIC" | "NONE";
   onDetails: () => void;
   onRead: (nodeId: string) => void;
 }) {
@@ -246,10 +248,10 @@ export function PublicDebateOverview({
         {/* Debate shape P2c: what came up but was not debated, in the question's language. */}
         <AlsoRaisedList view={debate.map_view} catalog={storyCatalog} locale={storyLocale} />
 
-        <p className="publicUnlockNote">
+        {viewingNote === "PUBLIC" ? <p className="publicUnlockNote">
           <span aria-hidden>🔒</span> {t(catalog, "public.overview.publicViewingNotice")} {" "}
           <Link href={signInHref}>{t(catalog, "public.overview.unlockActions")} <span aria-hidden>→</span></Link>
-        </p>
+        </p> : null}
         </div>
       </div>
     </div>

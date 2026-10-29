@@ -1,42 +1,23 @@
-import { createHash, randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { SupportConfigurationPort, SupportConfigurationState } from "@debateai/register";
 import type { LoadedHelpCorpus } from "@debateai/support-kb";
-import { isSupportLanguage,type SupportLanguage } from "@debateai/support-kb/catalog";
-import { clientIpNetworkScope,normalizeClientIp } from "../client-ip.js";
+import { isSupportLanguage, type SupportLanguage } from "@debateai/support-kb/catalog";
+import { clientIpNetworkScope, normalizeClientIp } from "../client-ip.js";
 import { SupportC3AdmissionWindow } from "./c3-admission.js";
 import type { SupportAnswerPort } from "./answer.js";
-import { classifySupportMessage,supportIntentSurface } from "./classify.js";
-import { evaluateEscalation } from "./escalation.js";
-import { classifyPublicGuideBoundary,privateRecordRefusal } from "./public-guide-boundary.js";
-import { SupportCaseError,type SupportCaseAccessPort } from "./cases.js";
-import {
-  applyIncidentNotice,formatIncidentAnswer,type SupportIncidentRepositoryPort
-} from "./incidents.js";
-import {
-  createSupportSessionCapability,
-  hashSupportCapability,
-  type SupportCasePort,
-  type SupportMessageCipherPort,
-  type SupportSessionPort,
-  type SupportSessionRecord
-} from "./session.js";
+import { classifySupportMessage } from "./classify.js";
+import { recognisedSupportCrisis } from "./crisis-first.js";
+import { classifyPublicGuideBoundary, privateRecordRefusal } from "./public-guide-boundary.js";
+import { formatIncidentAnswer, type SupportIncidentRepositoryPort } from "./incidents.js";
+import { SupportMessageLimiter, supportMessageLimitsFrom } from "./memory-limits.js";
+import type { SupportDegradedPort } from "./degraded.js";
 import { supportTemplate } from "./templates.js";
-import { recoverySecurityGuidance,type SupportSecurityRecoveryKind } from "./security-guidance.js";
+import { recoverySecurityGuidance, type SupportSecurityRecoveryKind } from "./security-guidance.js";
 
 export const SUPPORT_ROUTE_PATHS = Object.freeze([
-  "POST /v1/support/sessions",
-  "GET /v1/support/sessions/{id}",
-  "POST /v1/support/sessions/{id}/messages",
-  "POST /v1/support/messages/{id}/rating",
-  "POST /v1/support/sessions/{id}/escalate",
-  "GET /v1/support/cases",
-  // DL1-F5c/DL3-F4: the case bearer rides `x-support-case-token`, never a path.
-  "GET /v1/support/case",
-  "POST /v1/support/case/messages",
+  "POST /v1/support/messages",
   "GET /v1/support/status"
 ] as const);
-
 export type SupportRoutePath = typeof SUPPORT_ROUTE_PATHS[number];
 
 export interface SupportKnowledgeStatusPort {
@@ -44,46 +25,23 @@ export interface SupportKnowledgeStatusPort {
   snapshot?(version: string): LoadedHelpCorpus | undefined;
 }
 
-export type SupportDiagnostic = "SUPPORT_RATE_LIMIT_EVIDENCE_WRITE_FAILED";
-
+/** No conversation, case, or message repository is composed for the chat. */
 export interface SupportApplication {
   readonly configuration: Pick<SupportConfigurationPort, "current">;
-  readonly sessions: SupportSessionPort;
-  readonly messages: SupportMessageCipherPort;
+  readonly limiter: SupportMessageLimiter;
+  readonly degraded: Pick<SupportDegradedPort, "isDegraded">;
   readonly answer?: SupportAnswerPort;
-  readonly cases?: SupportCasePort;
-  readonly caseAccess?: SupportCaseAccessPort;
-  readonly incidents?: Pick<SupportIncidentRepositoryPort,"readActiveIncidents">;
+  readonly incidents?: Pick<SupportIncidentRepositoryPort, "readActiveIncidents">;
   readonly knowledge: SupportKnowledgeStatusPort;
-  /**
-   * DL5-F3. Turns one caller's network into the pseudonym the two append-only
-   * support tables store. Required, never optional: an absent seam here would
-   * mean writing a reversible digest of a visitor's address, which is exactly
-   * the finding. `apps/api/src/main.ts` passes the support key port's keyed
-   * derivation; a composition that has no key port cannot serve support at all.
-   */
-  readonly sourcePseudonym: (value: string) => string;
+  readonly sourcePseudonym: (network: string) => string;
   readonly clock?: () => Date;
-  readonly reportDiagnostic?: (diagnostic: SupportDiagnostic) => void;
 }
 
-/** The sealed budgets the support surface charges (DL1-F2, DL1-F7). */
 export type SupportAdmissionScope = "supportReads" | "supportSessions" | "supportModelCalls";
-
-/**
- * DL1-F2. The API's own admission bridge. A deployment whose resolved register
- * version publishes no budget for a scope always admits, so support behaves
- * exactly as it does today until the superseding row is published.
- */
 export type SupportAdmission = Readonly<{
-  /** Charges the budget and, when it is spent, sends the API's own typed 429. */
-  gate(
-    reply: FastifyReply, scope: SupportAdmissionScope, route: SupportRoutePath, key: string
-  ): boolean;
-  /** Charges the budget and only reports: the caller owns the refusal it sends. */
+  gate(reply: FastifyReply, scope: SupportAdmissionScope, route: SupportRoutePath, key: string): boolean;
   charge(scope: SupportAdmissionScope, route: SupportRoutePath, key: string): boolean;
 }>;
-
 export type SupportRoutePolicy = (route: SupportRoutePath) => Readonly<{
   config: Readonly<{
     auth: "public" | "user" | "operator";
@@ -92,1030 +50,172 @@ export type SupportRoutePolicy = (route: SupportRoutePath) => Readonly<{
   }>;
 }>;
 
+const SUPPORT_MESSAGE_BYTE_CEILING = 16 * 1_024;
+const SUPPORT_STATUS_CACHE_MS = 1_000;
+const POST_MESSAGE = "POST /v1/support/messages" as const;
+const GET_STATUS = "GET /v1/support/status" as const;
+
 function languageFrom(value: unknown): SupportLanguage | null {
   return isSupportLanguage(value) ? value : null;
 }
-
-function capabilityFrom(request: FastifyRequest): string | null {
-  const raw = request.headers["x-support-session-token"];
-  return typeof raw === "string" ? hashSupportCapability("support-session",raw) : null;
-}
-
-/**
- * DL1-F5c/DL3-F4. The case bearer, out of the URL. It used to be a path
- * segment, `/v1/support/cases/<token>`, which puts the sole capability to read
- * a whole support case — and to reply as the reporter — into every access log,
- * proxy log and referrer a request passes. A header reaches none of those by
- * default. A missing or malformed value is null and the route answers the same
- * unknown-token 404 a wrong token gets, so nothing about the header's shape is
- * an oracle.
- */
-function caseCapabilityFrom(request: FastifyRequest): string | null {
-  const raw = request.headers["x-support-case-token"];
-  return typeof raw === "string" ? hashSupportCapability("support-case",raw) : null;
-}
-
-function publicSession(record: SupportSessionRecord): Readonly<Record<string, unknown>> {
-  return Object.freeze({
-    session_id: record.sessionId,
-    identity_bound: record.identityOwnerRef !== null,
-    language: record.language,
-    state: record.state,
-    kb_version: record.kbVersion,
-    created_at: record.createdAt.toISOString()
-  });
-}
-
-function sessionOwnerMatches(request: FastifyRequest,record: SupportSessionRecord): boolean {
-  return record.identityOwnerRef === (request.authenticatedSession?.ownerRef ?? null);
-}
-
 function unavailable(reply: FastifyReply) {
   return reply.status(503).send({ error: "SUPPORT_NOT_COMPOSED" });
 }
-
-/**
- * DL1-F1. Every support `{id}` and `body.session_id` lands in a `uuid` column,
- * where a non-UUID raises Postgres `22P02`; the generic handler then turned a
- * pure client fault into a 500 plus one `api.request.failed` line. The routes
- * mirror the API's `ResourceIdSchema` here and answer the branch's constant
- * typed 404 before the repository is ever asked.
- */
-const SUPPORT_RESOURCE_ID =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
-
-function isResourceId(value: unknown): value is string {
-  return typeof value === "string" && SUPPORT_RESOURCE_ID.test(value);
+function disabledCode(state: SupportConfigurationState): string | null {
+  if (state.kind === "DISABLED") return state.code;
+  return state.snapshot.values.supportEnabled ? null : "SUPPORT_DISABLED";
 }
-
-function notFound(reply: FastifyReply) {
-  return reply.status(404).send({ error: "NOT_FOUND",message: "NOT_FOUND" });
-}
-
-/**
- * DL1-F9. A message body may not exceed 16 KiB of UTF-8. The register's
- * code-point limit stays authoritative for what a session may say; this
- * ceiling only keeps the hash, the classifier and two round-trips away from a
- * body that cannot be lawful at any setting.
- */
-const SUPPORT_MESSAGE_BYTE_CEILING = 16 * 1_024;
-
-/**
- * DL1-F2. How long one composed `/v1/support/status` answer serves every
- * caller. One second, matching the support configuration port's own cache, so
- * an operator watching the widget sees a change within the same beat while a
- * flood costs one aggregate per second instead of one per request.
- */
-const SUPPORT_STATUS_CACHE_MS = 1_000;
-
-/**
- * DL3-F4. The link the API writes into its own acknowledgement sentence. The
- * FRAGMENT form: a fragment is never sent to a server or a proxy, so the bearer
- * cannot be logged upstream, and `apps/ui/components/support/caseLink.ts` takes
- * it out of navigation state before the first request. It used to put the same
- * token in the QUERY string instead, which sits in the address bar, in browser
- * history and in every shared screenshot for the case's whole lifetime.
- */
-function supportCaseLink(token: string): string {
-  return `/help#case=${token}`;
-}
-
-function sha256(value: string): string {
-  return createHash("sha256").update(value, "utf8").digest("hex");
-}
-
 function clientIp(request: FastifyRequest): string {
   return normalizeClientIp(request.ip)
     ?? normalizeClientIp(request.raw.socket.remoteAddress)
     ?? "unknown";
 }
-
-/**
- * DL1-F2. The key every per-source support budget counts against: the caller's
- * NETWORK, not its address. An IPv6 /64 is one ordinary allocation holding
- * 2^64 addresses, so keying on the address gave its holder an unlimited number
- * of budgets and let it fill the limiter's key table — after which the limiter
- * refuses every genuinely new source for CAPACITY, which turns a fairness
- * control into an outage for whoever arrives next.
- */
-function sourceNetwork(request: FastifyRequest): string {
-  return clientIpNetworkScope(clientIp(request));
+function sourceOf(application: SupportApplication, request: FastifyRequest): string {
+  return application.sourcePseudonym(clientIpNetworkScope(clientIp(request)));
 }
-
-/**
- * DL5-F3. The value the support tables record for a caller's network: keyed, so
- * it cannot be inverted back to an address, and scoped to the same /64, so one
- * allocation is one source rather than 2^64 of them.
- */
-function sourceOf(application: SupportApplication,request: FastifyRequest): string {
-  return application.sourcePseudonym(sourceNetwork(request));
-}
-
 function rateLimited(reply: FastifyReply, language: SupportLanguage) {
   return reply.status(429).send({
-    outcome: "RATE_LIMITED",
-    text: supportTemplate("RATE_LIMITED", language)
+    outcome: "RATE_LIMITED", text: supportTemplate("RATE_LIMITED", language)
   });
 }
-
-/**
- * The country gate in front of the support assistant: the same sentence the sign-up page shows,
- * as a DISABLED envelope the widget renders like any other terminal answer. Code only — never the
- * country the server saw.
- */
-function countryClosed(reply: FastifyReply,language: SupportLanguage) {
+function countryClosed(reply: FastifyReply, language: SupportLanguage) {
   return reply.status(403).send({
-    outcome: "DISABLED",
-    code: "COUNTRY_SERVICE_UNAVAILABLE",
-    text: supportTemplate("COUNTRY_UNAVAILABLE",language)
+    outcome: "DISABLED", code: "COUNTRY_SERVICE_UNAVAILABLE",
+    text: supportTemplate("COUNTRY_UNAVAILABLE", language)
   });
 }
-
-function shredded(reply: FastifyReply,language: SupportLanguage) {
-  return reply.send({
-    kind: "SHREDDED",outcome: "SHREDDED",text: supportTemplate("SHREDDED_NOTICE",language)
-  });
-}
-
-async function recordRateLimitEvidence(
-  application: SupportApplication,
-  input: Parameters<SupportSessionPort["recordRateLimit"]>[0]
-): Promise<void> {
-  try {
-    await application.sessions.recordRateLimit(input);
-  } catch {
-    const diagnostic: SupportDiagnostic = "SUPPORT_RATE_LIMIT_EVIDENCE_WRITE_FAILED";
-    try {
-      (application.reportDiagnostic ?? console.error)(diagnostic);
-    } catch {
-      console.error(diagnostic);
-    }
-  }
-}
-
-function disabledCode(state: SupportConfigurationState): string | null {
-  if (state.kind === "DISABLED") return state.code;
-  return state.snapshot.values.supportEnabled ? null : "SUPPORT_DISABLED";
-}
-
-async function openEscalatedCase(
-  application: SupportApplication,
-  session: SupportSessionRecord,
-  language: SupportLanguage,
-  predicate: Parameters<NonNullable<SupportApplication["cases"]>["open"]>[0]["triggerPredicate"],
-  createdAt: Date,
-  /**
-   * DL1-F7. Charges this source's share of the daily model budget and reports
-   * whether it had one. A THUNK, so it is spent only when a case really opens:
-   * this funnel returns early when the composition has no case port or the
-   * predicate is absent, and a budget must not be charged for a call nobody
-   * makes. A spent share NEVER refuses the case — escalation to a person is the
-   * safety valve — it only drops the model-backed advisory summary.
-   */
-  chargeModelShare: () => boolean,
-  triggerGeneration = `predicate:${predicate ?? "E1"}`
-): Promise<
-  | Readonly<{ kind: "OPENED";record: Awaited<ReturnType<NonNullable<SupportApplication["cases"]>["open"]>>["record"];token: string }>
-  | Readonly<{ kind: "ALREADY_OPENED";record: Awaited<ReturnType<NonNullable<SupportApplication["cases"]>["open"]>>["record"] }>
-  | null
-> {
-  if (application.cases === undefined || predicate === undefined) return Promise.resolve(null);
-  const request = {
-    sessionId: session.sessionId,
-    language,
-    createdAt,
-    identityOwnerRef: session.identityOwnerRef,
-    triggerPredicate: predicate,
-    toolCalls: Object.freeze([]),
-    kbVersion: session.kbVersion,
-    slaHours: 48,
-    summarize: chargeModelShare()
-  } as const;
-  if (application.cases.openOnce !== undefined) {
-    return application.cases.openOnce({ ...request,triggerGeneration });
-  }
-  return Object.freeze({ kind: "OPENED" as const,...await application.cases.open(request) });
-}
-
-function openedCaseReceipt(
-  opened: Awaited<ReturnType<typeof openEscalatedCase>>,
-  language: SupportLanguage
-) {
-  if (opened?.kind !== "OPENED") return Object.freeze({});
-  const link = supportCaseLink(opened.token);
-  const acknowledgement = supportTemplate("CASE_OPENED",language)
-    .replace("{token}",opened.token)
-    .replace("{sla}",String(opened.record.slaHours))
-    .replace("{link}",link);
-  return Object.freeze({
-    case_token: opened.token,sla_hours: opened.record.slaHours,link,
-    case_acknowledgement: acknowledgement
-  });
+function tooLong(reply: FastifyReply, language: SupportLanguage) {
+  return reply.send({ outcome: "TOO_LONG", text: supportTemplate("TOO_LONG", language) });
 }
 
 export function installSupportRoutes(
   api: FastifyInstance,
   application: SupportApplication | undefined,
   policy: SupportRoutePolicy,
-  /**
-   * Required, never defaulted. A security control whose default is "allow" is
-   * one forgotten argument away from being absent, and nothing would fail to
-   * say so. A composition with no sealed budget passes a bridge that admits —
-   * which is a decision it states, not one it omits.
-   */
   admit: SupportAdmission,
-  /**
-   * Paid plans G3a: true when the caller's address may not use the support assistant (the
-   * country gate's sign-up rule). Absent — local mode, or a hosted register with no country
-   * policy — nothing is gated. Reads, and an already-opened case's thread, are never gated.
-   */
   countryClosedFor?: (request: FastifyRequest) => boolean
 ): void {
   const admission = new SupportC3AdmissionWindow();
   const closedHere = (request: FastifyRequest): boolean => countryClosedFor?.(request) === true;
-  /**
-   * DL1-F2. `/v1/support/status` composed a multi-CTE aggregate over
-   * `support.message`/`session`/`rating`/`case`, a configuration read and a
-   * knowledge read on EVERY anonymous call. The body is four fixed fields
-   * (DL1-F4) that no caller can influence, so one answer serves every caller
-   * for a second — the same freshness the configuration port already caches at.
-   */
-  let statusCache: Readonly<{ at: number;body: Readonly<Record<string,unknown>> }> | null = null;
-  /**
-   * DL1-F7. One unit of this source's share of the daily model cap. Every model
-   * call the support surface makes goes through here: the relay answer below,
-   * and — through `openEscalatedCase` — the model-backed advisory summary a
-   * newly opened case fires. Without the second door four or five addresses
-   * could still take the whole 500/day, which is the finding's own scenario.
-   */
-  const modelShare = (route: SupportRoutePath,sourceKey: string): boolean =>
-    admit.charge("supportModelCalls",route,sourceKey);
+  const modelShare = (sourceKey: string): boolean =>
+    admit.charge("supportModelCalls", POST_MESSAGE, sourceKey);
+  let statusCache: Readonly<{ at: number; body: Readonly<Record<string, unknown>> }> | null = null;
 
-  api.post("/v1/support/sessions", policy("POST /v1/support/sessions"), async (request, reply) => {
-    if (application === undefined) return unavailable(reply);
-    /**
-     * DL1-F2. An authenticated create skipped `admitIpSession` and had no cap of
-     * its own, so one account could loop a KEK wrap plus two inserts without
-     * bound. Charged before the language check so nothing is done on the way.
-     */
-    const ownerRef = request.authenticatedSession?.ownerRef;
-    if (ownerRef !== undefined
-      && !admit.gate(reply, "supportSessions", "POST /v1/support/sessions", ownerRef)) {
-      return reply;
-    }
+  api.post("/v1/support/messages", policy(POST_MESSAGE), async (request, reply) => {
     const body = typeof request.body === "object" && request.body !== null
-      ? request.body as Readonly<Record<string, unknown>> : {};
-    const language = languageFrom(body.language ?? "en");
-    if (language === null) return reply.status(400).send({ error: "SUPPORT_LANGUAGE_INVALID" });
-    if (closedHere(request)) return countryClosed(reply,language);
+      && !Array.isArray(request.body) ? request.body as Readonly<Record<string, unknown>> : {};
+    const candidateLanguage = languageFrom(body.language) ?? "en";
+    if (closedHere(request)) return countryClosed(reply, candidateLanguage);
+    if (typeof body.text === "string"
+      && Buffer.byteLength(body.text, "utf8") > SUPPORT_MESSAGE_BYTE_CEILING) {
+      return tooLong(reply, candidateLanguage);
+    }
+    const language = languageFrom(body.language);
+    if (Object.keys(body).sort().join(",") !== "language,text"
+      || typeof body.text !== "string" || language === null) {
+      return reply.status(400).send({ error: "SUPPORT_MESSAGE_INVALID" });
+    }
+    if (recognisedSupportCrisis(body.text) !== null) {
+      return reply.send({ outcome: "CRISIS", text: supportTemplate("CRISIS_SUPPORT", language),
+        can_escalate: true, sources: [], actions: [] });
+    }
+    if (application === undefined) return unavailable(reply);
     const state = await application.configuration.current();
-    if (state.kind === "DISABLED") return reply.status(503).send({ error: state.code });
-    if (!state.snapshot.values.supportEnabled) {
-      return reply.send({
-        outcome: "DISABLED",
-        code: "SUPPORT_DISABLED",
-        text: supportTemplate("DISABLED", language)
-      });
+    const code = disabledCode(state);
+    if (code !== null) {
+      return reply.send({ outcome: "DISABLED", code, text: supportTemplate("DISABLED", language) });
+    }
+    if (state.kind !== "AVAILABLE") {
+      return reply.send({ outcome: "DISABLED", code: state.code,
+        text: supportTemplate("DISABLED", language) });
     }
     const now = (application.clock ?? (() => new Date()))();
     const timeDecision = admission.observeTime(now.getTime());
     if (!timeDecision.admitted) return rateLimited(reply, language);
-    if (request.authenticatedSession === undefined) {
-      const ipSha256 = sourceOf(application,request);
-      if (application.sessions.admitIpSession !== undefined
-        && await application.sessions.admitIpSession({
-          ipSha256,at: now,
-          cooldownMinutes: state.snapshot.values.supportIpCooldownMinutes,
-          sessionLimit: state.snapshot.values.supportLimitAnonSessions1h
-        }) !== "ADMITTED") {
-        return rateLimited(reply,language);
-      }
+    if ([...body.text].length > state.snapshot.values.supportLimitMessageCharacters) {
+      return tooLong(reply, language);
     }
+    const classification = classifySupportMessage(body.text);
+    const publicGuideBoundary = classifyPublicGuideBoundary(body.text, language);
+    const source = sourceOf(application, request);
+    const admitted = application.limiter.admit({
+      source, ownerRef: request.authenticatedSession?.ownerRef ?? null,
+      injection: classification.outcome === "REFUSE_INJECTION", atMs: now.getTime(),
+      limits: supportMessageLimitsFrom(state.snapshot.values)
+    });
+    if (admitted === "RATE_LIMITED") return rateLimited(reply, language);
+
+    if (publicGuideBoundary.kind === "PRIVATE_RECORD_REQUEST"
+      && classification.outcome !== "REFUSE_INJECTION"
+      && classification.outcome !== "REFUSE_SAFETY") {
+      return reply.send({ outcome: "REFUSE_ZONE", text: privateRecordRefusal(language),
+        sources: [], actions: [] });
+    }
+    if (classification.securityNavigation === "FORGOT_PASSWORD"
+      || classification.securityOperation === "CREDENTIAL_OPERATION") {
+      const recoveryKind: SupportSecurityRecoveryKind =
+        classification.securityNavigation === "FORGOT_PASSWORD"
+        && classification.securityOperation === "CREDENTIAL_OPERATION"
+          ? "CREDENTIAL_OPERATION_AND_FORGOT_PASSWORD"
+          : classification.securityNavigation === "FORGOT_PASSWORD"
+            ? "FORGOT_PASSWORD" : "CREDENTIAL_OPERATION";
+      return reply.send({ outcome: "REFUSE_ZONE",
+        text: recoverySecurityGuidance(recoveryKind, language),
+        sources: [], actions: [],
+        ...(classification.securityNavigation === "FORGOT_PASSWORD"
+          ? { refusal_link: "/recover" } : {}) });
+    }
+    if (classification.outcome === "INCIDENT") {
+      if (application.incidents === undefined) return unavailable(reply);
+      return reply.send(formatIncidentAnswer(
+        await application.incidents.readActiveIncidents(), language
+      ));
+    }
+    if (classification.outcome === "REFUSE_ZONE"
+      || classification.outcome === "REFUSE_INJECTION"
+      || classification.outcome === "REFUSE_SAFETY") {
+      const text = classification.outcome === "REFUSE_ZONE" && classification.link !== null
+        ? supportTemplate("REFUSE_ZONE", language).replace("{link}", classification.link)
+        : supportTemplate(classification.outcome, language);
+      return reply.send({ outcome: classification.outcome, text,
+        ...(classification.outcome === "REFUSE_ZONE" && classification.link !== null
+          ? { link: classification.link } : {}) });
+    }
+    if (!modelShare(source)) return rateLimited(reply, language);
     const knowledge = await application.knowledge.status();
-    if (!/^[0-9a-f]{64}$/u.test(knowledge.kbVersion)) {
-      return reply.status(503).send({ error: "SUPPORT_KB_UNAVAILABLE" });
+    const snapshot = application.knowledge.snapshot?.(knowledge.kbVersion);
+    if (snapshot === undefined) {
+      return reply.status(503).send({ outcome: "DEGRADED",
+        code: "SUPPORT_KB_SNAPSHOT_UNAVAILABLE", text: supportTemplate("DEGRADED", language) });
     }
-    const capability = createSupportSessionCapability();
-    const created = await application.sessions.create({
-      sessionId: capability.sessionId,
-      tokenSha256: capability.tokenSha256,
-      identityOwnerRef: request.authenticatedSession?.ownerRef ?? null,
-      language,
-      kbVersion: knowledge.kbVersion,
-      createdAt: now
-    });
-    return reply.status(201).send({
-      session: publicSession(created),
-      session_token: capability.token,
-      first_message: {
-        role: "assistant",
-        text: supportTemplate("DISCLOSURE", language)
-      }
-    });
+    if (application.answer !== undefined) {
+      const result = await application.answer.respond({
+        text: body.text, language, detectedLanguage: classification.language,
+        overrideLanguage: null, modelRef: state.snapshot.values.supportModelRef,
+        kbVersion: knowledge.kbVersion, snapshot,
+        signedIn: request.authenticatedSession !== undefined, receivedAt: now
+      });
+      return reply.send({ outcome: result.outcome, text: result.text,
+        can_escalate: result.canEscalate, sources: result.sources ?? [], actions: result.actions ?? [] });
+    }
+    return reply.status(503).send({ outcome: "DEGRADED", code: "SUPPORT_RELAY_NOT_COMPOSED",
+      text: supportTemplate("DEGRADED", language) });
   });
 
-  api.get<{ Params: { id: string } }>(
-    "/v1/support/sessions/:id",
-    policy("GET /v1/support/sessions/{id}"),
-    async (request, reply) => {
-      if (application === undefined) return unavailable(reply);
-      if (!admit.gate(reply, "supportReads", "GET /v1/support/sessions/{id}", sourceNetwork(request))) {
-        return reply;
-      }
-      const tokenSha256 = capabilityFrom(request);
-      if (tokenSha256 === null) return reply.status(404).send({ error: "NOT_FOUND" });
-      if (!isResourceId(request.params.id)) return notFound(reply);
-      const state = await application.configuration.current();
-      if (state.kind === "DISABLED") return reply.status(503).send({ error: state.code });
-      const found = await application.sessions.read({
-        sessionId: request.params.id,
-        tokenSha256,
-        lockAfterInjections: state.snapshot.values.supportLockAfterInjections
-      });
-      if (found === null || !sessionOwnerMatches(request,found)) {
-        return reply.status(404).send({ error: "NOT_FOUND" });
-      }
-      if (found.shreddedAt !== undefined && found.shreddedAt !== null) {
-        return reply.send({
-          kind: "SHREDDED",text: supportTemplate("SHREDDED_NOTICE",found.language)
-        });
-      }
-      return reply.send({ kind: "READABLE",session: publicSession(found) });
-    }
-  );
-
-  api.post<{ Params: { id: string } }>(
-    "/v1/support/sessions/:id/messages",
-    policy("POST /v1/support/sessions/{id}/messages"),
-    async (request, reply) => {
-      if (application === undefined) return unavailable(reply);
-      const tokenSha256 = capabilityFrom(request);
-      if (tokenSha256 === null) return reply.status(404).send({ error: "NOT_FOUND" });
-      if (!isResourceId(request.params.id)) return notFound(reply);
-      const body = typeof request.body === "object" && request.body !== null
-        ? request.body as Readonly<Record<string, unknown>> : {};
-      /**
-       * DL1-F9. The register's 2,000-code-point rule sits behind a session read,
-       * a configuration read, a sha256 and the classifier's code-point spread —
-       * all of which used to run over a body of up to the 256 KiB transport
-       * ceiling. The cheap byte refusal comes first; everything below keeps its
-       * order, including the code-point rule that carries the RATE_LIMITED
-       * evidence.
-       */
-      if (typeof body.text === "string"
-        && Buffer.byteLength(body.text,"utf8") > SUPPORT_MESSAGE_BYTE_CEILING) {
-        return reply.status(400).send({
-          error: "MALFORMED_REQUEST",message: "MALFORMED_REQUEST"
-        });
-      }
-      const found = await application.sessions.read({ sessionId: request.params.id, tokenSha256 });
-      if (found === null || !sessionOwnerMatches(request,found)) {
-        return reply.status(404).send({ error: "NOT_FOUND" });
-      }
-      if (found.shreddedAt !== undefined && found.shreddedAt !== null) {
-        return shredded(reply,found.language);
-      }
-      if (closedHere(request)) return countryClosed(reply,found.language);
-      const state = await application.configuration.current();
-      const code = disabledCode(state);
-      if (code !== null) {
-        return reply.send({
-          outcome: "DISABLED",
-          code,
-          text: supportTemplate("DISABLED", found.language)
-        });
-      }
-      if (state.kind !== "AVAILABLE") {
-        return reply.send({
-          outcome: "DISABLED",
-          code: state.code,
-          text: supportTemplate("DISABLED", found.language)
-        });
-      }
-      if (Object.keys(body).length !== 1 || typeof body.text !== "string") {
-        return reply.status(400).send({ error: "SUPPORT_MESSAGE_INVALID" });
-      }
-      const now = (application.clock ?? (() => new Date()))();
-      const timeDecision = admission.observeTime(now.getTime());
-      if (!timeDecision.admitted) return rateLimited(reply,found.language);
-      const ipSha256 = sourceOf(application,request);
-      const messageSha256 = sha256(body.text);
-      const classification = classifySupportMessage(body.text);
-      const publicGuideBoundary = classifyPublicGuideBoundary(body.text,found.language);
-      const overrideLanguage = null;
-      const responseLanguage = found.language;
-      const knowledgeSnapshot = application.answer === undefined
-        ? undefined : application.knowledge.snapshot?.(found.kbVersion);
-      if (application.answer !== undefined && knowledgeSnapshot === undefined) {
-        return reply.status(409).send({
-          error: "SUPPORT_KB_SNAPSHOT_UNAVAILABLE",
-          restart_session: true
-        });
-      }
-      if (now.getTime() < found.createdAt.getTime()
-        || now.getTime() - found.createdAt.getTime() > 24 * 60 * 60 * 1_000
-        || [...body.text].length > state.snapshot.values.supportLimitMessageCharacters) {
-        await recordRateLimitEvidence(application,{
-          sessionId: found.sessionId,messageSha256,ipSha256,at: now
-        });
-        return rateLimited(reply,responseLanguage);
-      }
-      const persistentAdmission = await application.sessions.admitMessage({
-        sessionId: found.sessionId,
-        tokenSha256,
-        injection: classification.outcome === "REFUSE_INJECTION",
-        messageSha256,
-        ipSha256,
-        at: now,
-        lockAfterInjections: state.snapshot.values.supportLockAfterInjections,
-        identityOwnerRef: found.identityOwnerRef,
-        characterCount: [...body.text].length,
-        limits: state.snapshot.values
-      });
-      if (persistentAdmission === "NOT_FOUND") {
-        return reply.status(404).send({ error: "NOT_FOUND" });
-      }
-      if (persistentAdmission === "SHREDDED") {
-        return shredded(reply,found.language);
-      }
-      if (persistentAdmission === "LOCKED" || persistentAdmission === "RATE_LIMITED") {
-        await recordRateLimitEvidence(application, {
-          sessionId: found.sessionId,
-          messageSha256,
-          ipSha256,
-          at: now
-        });
-        return rateLimited(reply, responseLanguage);
-      }
-      if (publicGuideBoundary.kind === "PRIVATE_RECORD_REQUEST"
-        && classification.outcome !== "REFUSE_INJECTION"
-        && classification.outcome !== "REFUSE_SAFETY") {
-        const text = privateRecordRefusal(responseLanguage);
-        await application.messages.write({
-          messageId: randomUUID(),sessionId: found.sessionId,role: "user",
-          text: body.text,outcome: "REFUSE_ZONE",language: responseLanguage,
-          detectedLanguage: classification.language,overrideLanguage,
-          receivedAt: now,firstTokenAt: null,completedAt: now
-        });
-        const messageId = randomUUID();
-        const stored = await application.messages.write({
-          messageId,sessionId: found.sessionId,role: "assistant",
-          text,outcome: "REFUSE_ZONE",language: responseLanguage,
-          detectedLanguage: classification.language,overrideLanguage,
-          receivedAt: now,firstTokenAt: null,completedAt: now
-        });
-        return reply.send({
-          message_id: messageId,outcome: "REFUSE_ZONE",text: stored.text,
-          sources: Object.freeze([]),actions: Object.freeze([])
-        });
-      }
-      if (classification.securityNavigation === "FORGOT_PASSWORD"
-        || classification.securityOperation === "CREDENTIAL_OPERATION") {
-        const recoveryKind: SupportSecurityRecoveryKind =
-          classification.securityNavigation === "FORGOT_PASSWORD"
-          && classification.securityOperation === "CREDENTIAL_OPERATION"
-            ? "CREDENTIAL_OPERATION_AND_FORGOT_PASSWORD"
-            : classification.securityNavigation === "FORGOT_PASSWORD"
-              ? "FORGOT_PASSWORD" : "CREDENTIAL_OPERATION";
-        const text = recoverySecurityGuidance(recoveryKind,responseLanguage);
-        await application.messages.write({
-          messageId: randomUUID(),sessionId: found.sessionId,role: "user",
-          text: body.text,outcome: "REFUSE_ZONE",language: responseLanguage,
-          detectedLanguage: classification.language,overrideLanguage,
-          receivedAt: now,firstTokenAt: null,completedAt: now
-        });
-        const messageId = randomUUID();
-        const stored = await application.messages.write({
-          messageId,sessionId: found.sessionId,role: "assistant",
-          text,outcome: "REFUSE_ZONE",language: responseLanguage,
-          detectedLanguage: classification.language,overrideLanguage,
-          receivedAt: now,firstTokenAt: null,completedAt: now
-        });
-        return reply.send({
-          message_id: messageId,outcome: "REFUSE_ZONE",text: stored.text,
-          sources: Object.freeze([]),actions: Object.freeze([]),
-          ...(classification.securityNavigation === "FORGOT_PASSWORD" ? {refusal_link:"/recover"} : {})
-        });
-      }
-      const previousMessages = application.cases === undefined
-        ? []
-        : await application.messages.listSession({ sessionId: found.sessionId });
-      const priorOutcomes = previousMessages
-        .filter((message) => message.role === "assistant")
-        .map((message) => message.outcome);
-      const escalationBeforeResponse = evaluateEscalation({
-        message: body.text,classification: classification.outcome,
-        outcomes: priorOutcomes,previousOutcomes: priorOutcomes,
-        ratings: [],toolCalls: [],requestedHuman: false
-      });
-      if (classification.outcome === "INCIDENT") {
-        if (application.incidents === undefined) return unavailable(reply);
-        const incident = formatIncidentAnswer(
-          await application.incidents.readActiveIncidents(),responseLanguage
-        );
-        await application.messages.write({
-          messageId: randomUUID(),sessionId: found.sessionId,role: "user",
-          text: body.text,outcome: incident.outcome,language: responseLanguage,
-          detectedLanguage: classification.language,overrideLanguage,
-          receivedAt: now,firstTokenAt: null,completedAt: now
-        });
-        const messageId = randomUUID();
-        await application.messages.write({
-          messageId,sessionId: found.sessionId,role: "assistant",
-          text: incident.text,outcome: incident.outcome,language: responseLanguage,
-          detectedLanguage: classification.language,overrideLanguage,
-          receivedAt: now,firstTokenAt: null,completedAt: now
-        });
-        const opened = escalationBeforeResponse === null ? null
-          : await openEscalatedCase(
-            application,found,responseLanguage,escalationBeforeResponse.predicate,now,
-            () => modelShare("POST /v1/support/sessions/{id}/messages",ipSha256)
-          );
-        return reply.send({
-          message_id: messageId,...incident,...openedCaseReceipt(opened,responseLanguage)
-        });
-      }
-      if (classification.outcome === "REFUSE_ZONE"
-        || classification.outcome === "REFUSE_INJECTION"
-        || classification.outcome === "REFUSE_SAFETY") {
-        const text = classification.outcome === "REFUSE_ZONE" && classification.link !== null
-          ? supportTemplate("REFUSE_ZONE",responseLanguage).replace("{link}",classification.link)
-          : supportTemplate(classification.outcome,responseLanguage);
-        await application.messages.write({
-          messageId: randomUUID(),sessionId: found.sessionId,role: "user",
-          text: body.text,outcome: classification.outcome,language: responseLanguage,
-          detectedLanguage: classification.language,overrideLanguage,
-          receivedAt: now,firstTokenAt: null,completedAt: now
-        });
-        await application.messages.write({
-          messageId: randomUUID(),sessionId: found.sessionId,role: "assistant",
-          text,outcome: classification.outcome,language: responseLanguage,
-          detectedLanguage: classification.language,overrideLanguage,
-          receivedAt: now,firstTokenAt: null,completedAt: now
-        });
-        const opened = escalationBeforeResponse === null ? null
-          : await openEscalatedCase(
-            application,found,responseLanguage,escalationBeforeResponse.predicate,now,
-            () => modelShare("POST /v1/support/sessions/{id}/messages",ipSha256)
-          );
-        return reply.send({
-          outcome: classification.outcome,text,
-          ...(classification.outcome === "REFUSE_ZONE" && classification.link !== null
-            ? opened?.kind === "OPENED"
-              ? { refusal_link: classification.link } : { link: classification.link }
-            : {}),
-          ...openedCaseReceipt(opened,responseLanguage)
-        });
-      }
-      const escalationBeforeAnswer = escalationBeforeResponse;
-      if (escalationBeforeAnswer?.predicate === "E1") {
-        const userMessageId = randomUUID();
-        await application.messages.write({
-          messageId: userMessageId,sessionId: found.sessionId,role: "user",
-          text: body.text,outcome: "CASE_OPENED",language: responseLanguage,
-          detectedLanguage: classification.language,overrideLanguage,
-          receivedAt: now,firstTokenAt: null,completedAt: now
-        });
-        const opened = await openEscalatedCase(
-          application,found,responseLanguage,escalationBeforeAnswer.predicate,now,
-          () => modelShare("POST /v1/support/sessions/{id}/messages",ipSha256),
-          `message:${userMessageId}`
-        );
-        if (opened === null) return unavailable(reply);
-        if (opened.kind === "ALREADY_OPENED") {
-          return reply.status(409).send({
-            outcome: "CASE_ALREADY_OPENED",case_id: opened.record.caseId
-          });
-        }
-        const link = supportCaseLink(opened.token);
-        const text = supportTemplate("CASE_OPENED",responseLanguage)
-          .replace("{token}",opened.token)
-          .replace("{sla}",String(opened.record.slaHours))
-          .replace("{link}",link);
-        const assistantMessageId = randomUUID();
-        await application.messages.write({
-          messageId: assistantMessageId,sessionId: found.sessionId,role: "assistant",
-          text,outcome: "CASE_OPENED",language: responseLanguage,
-          detectedLanguage: classification.language,overrideLanguage,
-          receivedAt: now,firstTokenAt: null,completedAt: now
-        });
-        return reply.send({
-          outcome: "CASE_OPENED",text,message_id: assistantMessageId,
-          case_token: opened.token,link
-        });
-      }
-      if (classification.outcome === "REFUSE_ZONE" && classification.link !== null) {
-        const text = supportTemplate("REFUSE_ZONE", responseLanguage)
-          .replace("{link}", classification.link);
-        await application.messages.write({
-          messageId: randomUUID(),
-          sessionId: found.sessionId,
-          role: "user",
-          text: body.text,
-          outcome: classification.outcome,
-          language: responseLanguage,
-          detectedLanguage: classification.language,
-          overrideLanguage,
-          receivedAt: now,
-          firstTokenAt: null,
-          completedAt: now
-        });
-        await application.messages.write({
-          messageId: randomUUID(),
-          sessionId: found.sessionId,
-          role: "assistant",
-          text,
-          outcome: classification.outcome,
-          language: responseLanguage,
-          detectedLanguage: classification.language,
-          overrideLanguage,
-          receivedAt: now,
-          firstTokenAt: null,
-          completedAt: now
-        });
-        if (escalationBeforeAnswer !== null) {
-          await openEscalatedCase(
-            application,found,responseLanguage,escalationBeforeAnswer.predicate,now,
-            () => modelShare("POST /v1/support/sessions/{id}/messages",ipSha256)
-          );
-        }
-        return reply.send({
-          outcome: classification.outcome,
-          text,
-          link: classification.link
-        });
-      }
-      if (classification.outcome === "REFUSE_INJECTION"
-        || classification.outcome === "REFUSE_SAFETY") {
-        const text = supportTemplate(classification.outcome, responseLanguage);
-        await application.messages.write({
-          messageId: randomUUID(),
-          sessionId: found.sessionId,
-          role: "user",
-          text: body.text,
-          outcome: classification.outcome,
-          language: responseLanguage,
-          detectedLanguage: classification.language,
-          overrideLanguage,
-          receivedAt: now,
-          firstTokenAt: null,
-          completedAt: now
-        });
-        await application.messages.write({
-          messageId: randomUUID(),
-          sessionId: found.sessionId,
-          role: "assistant",
-          text,
-          outcome: classification.outcome,
-          language: responseLanguage,
-          detectedLanguage: classification.language,
-          overrideLanguage,
-          receivedAt: now,
-          firstTokenAt: null,
-          completedAt: now
-        });
-        if (escalationBeforeAnswer !== null) {
-          await openEscalatedCase(
-            application,found,responseLanguage,escalationBeforeAnswer.predicate,now,
-            () => modelShare("POST /v1/support/sessions/{id}/messages",ipSha256)
-          );
-        }
-        return reply.send({
-          outcome: classification.outcome,
-          text
-        });
-      }
-      if (application.answer !== undefined) {
-        /**
-         * DL1-F7. The model budget is one global daily bucket, so a few sources
-         * could take a whole day's calls and leave everyone else DEGRADED. The
-         * per-source share is charged HERE — after the classifier has decided
-         * this message really does need the model, so a refusal, an incident, a
-         * private-record or credential-recovery guide costs a source nothing — and
-         * the refusal is the ordinary rate-limit refusal with its evidence, so a
-         * spent share looks to that source like every other window it can hit,
-         * and to every other source like nothing at all.
-         */
-        if (!modelShare("POST /v1/support/sessions/{id}/messages",ipSha256)) {
-          await recordRateLimitEvidence(application,{
-            sessionId: found.sessionId,messageSha256,ipSha256,at: now
-          });
-          return rateLimited(reply,responseLanguage);
-        }
-        const result = await application.answer.respond({
-          sessionId: found.sessionId,
-          text: body.text,
-          language: responseLanguage,
-          detectedLanguage: classification.language,
-          overrideLanguage,
-          modelRef: state.snapshot.values.supportModelRef,
-          kbVersion: found.kbVersion,
-          ...(knowledgeSnapshot === undefined ? {} : { snapshot: knowledgeSnapshot }),
-          signedIn: found.identityOwnerRef !== null,
-          receivedAt: now
-        });
-        const escalationAfterAnswer = escalationBeforeAnswer ?? evaluateEscalation({
-          message: body.text,
-          classification: classification.outcome,
-          outcomes: [...priorOutcomes,result.outcome],
-          previousOutcomes: priorOutcomes,
-          ratings: [],
-          toolCalls: [],
-          requestedHuman: false
-        });
-        const opened = escalationAfterAnswer === null ? null
-          : await openEscalatedCase(
-            application,found,responseLanguage,escalationAfterAnswer.predicate,now,
-            () => modelShare("POST /v1/support/sessions/{id}/messages",ipSha256)
-          );
-        return reply.send({
-          message_id: result.messageId,
-          outcome: result.outcome,
-          text: result.text,
-          can_escalate: result.canEscalate,
-          sources: result.sources ?? Object.freeze([]),
-          actions: result.actions ?? Object.freeze([]),
-          ...openedCaseReceipt(opened,responseLanguage)
-        });
-      }
-      return reply.status(503).send({
-        outcome: "DEGRADED",
-        code: "SUPPORT_RELAY_NOT_COMPOSED",
-        text: supportTemplate("DEGRADED", responseLanguage)
-      });
-    }
-  );
-
-  api.post<{ Params: { id: string } }>(
-    "/v1/support/messages/:id/rating",
-    policy("POST /v1/support/messages/{id}/rating"),
-    async (request, reply) => {
-      if (application === undefined || application.sessions.rateMessage === undefined) {
-        return unavailable(reply);
-      }
-      const tokenSha256 = capabilityFrom(request);
-      const body = typeof request.body === "object" && request.body !== null
-        ? request.body as Readonly<Record<string,unknown>> : {};
-      if (tokenSha256 === null
-        || typeof body.session_id !== "string"
-        || (body.rating !== "yes" && body.rating !== "no" && body.rating !== "human")) {
-        return reply.status(404).send({ error: "NOT_FOUND" });
-      }
-      if (!isResourceId(request.params.id) || !isResourceId(body.session_id)) {
-        return notFound(reply);
-      }
-      const found = await application.sessions.read({
-        sessionId: body.session_id,tokenSha256
-      });
-      if (found === null || !sessionOwnerMatches(request,found)) {
-        return reply.status(404).send({ error: "NOT_FOUND" });
-      }
-      if (found.shreddedAt !== undefined && found.shreddedAt !== null) {
-        return shredded(reply,found.language);
-      }
-      if (closedHere(request)) return countryClosed(reply,found.language);
-      if (found.state === "LOCKED") return rateLimited(reply,found.language);
-      const ratings = await application.sessions.rateMessage({
-        sessionId: found.sessionId,tokenSha256,messageId: request.params.id,rating: body.rating,
-        at: (application.clock ?? (() => new Date()))()
-      });
-      if (ratings === null) return reply.status(404).send({ error: "NOT_FOUND" });
-      const escalation = evaluateEscalation({
-        message: "",classification: null,outcomes: [],ratings,toolCalls: [],
-        requestedHuman: body.rating === "human"
-      });
-      const opened = escalation === null ? null
-        : await openEscalatedCase(
-          application,found,found.language,escalation.predicate,
-          (application.clock ?? (() => new Date()))(),
-          () => modelShare("POST /v1/support/messages/{id}/rating",sourceOf(application,request))
-        );
-      return reply.send({
-        rating: body.rating,case_opened: opened?.kind === "OPENED",
-        ...openedCaseReceipt(opened,found.language)
-      });
-    }
-  );
-  api.post<{ Params: { id: string } }>(
-    "/v1/support/sessions/:id/escalate",
-    policy("POST /v1/support/sessions/{id}/escalate"),
-    async (request, reply) => {
-      if (application?.cases === undefined) return unavailable(reply);
-      // NV-32: the case-open door is metered like the case doors (DL1-F2): one per-network budget, charged before any
-      // pooled connection. A refusal costs neither the session read nor the case transaction.
-      if (!admit.gate(reply, "supportReads", "POST /v1/support/sessions/{id}/escalate", sourceNetwork(request))) {
-        return reply;
-      }
-      const tokenSha256 = capabilityFrom(request);
-      if (tokenSha256 === null) return reply.status(404).send({ error: "NOT_FOUND" });
-      if (!isResourceId(request.params.id)) return notFound(reply);
-      const found = await application.sessions.read({ sessionId: request.params.id,tokenSha256 });
-      if (found === null || !sessionOwnerMatches(request,found)) {
-        return reply.status(404).send({ error: "NOT_FOUND" });
-      }
-      if (found.shreddedAt !== undefined && found.shreddedAt !== null) {
-        return shredded(reply,found.language);
-      }
-      if (closedHere(request)) return countryClosed(reply,found.language);
-      if (found.state === "LOCKED") return rateLimited(reply,found.language);
-      const body = typeof request.body === "object" && request.body !== null
-        ? request.body as Readonly<Record<string,unknown>> : {};
-      const language = body.language === undefined ? found.language : languageFrom(body.language);
-      if (language === null) return reply.status(400).send({ error: "SUPPORT_LANGUAGE_INVALID" });
-      const opened = await openEscalatedCase(
-        application,found,language,"E1",
-        (application.clock ?? (() => new Date()))(),
-        () => modelShare("POST /v1/support/sessions/{id}/escalate",sourceOf(application,request)),
-        "manual"
-      );
-      if (opened === null) return unavailable(reply);
-      if (opened.kind === "ALREADY_OPENED") {
-        return reply.status(409).send({
-          outcome: "CASE_ALREADY_OPENED",case_id: opened.record.caseId
-        });
-      }
-      const link = supportCaseLink(opened.token);
-      const text = supportTemplate("CASE_OPENED",language)
-        .replace("{token}",opened.token)
-        .replace("{sla}",String(opened.record.slaHours ?? 48))
-        .replace("{link}",link);
-      return reply.status(201).send({
-        case: {
-          case_id: opened.record.caseId,
-          state: opened.record.state,
-          language: opened.record.language,
-          created_at: opened.record.createdAt.toISOString()
-        },
-        case_token: opened.token,
-        sla_hours: opened.record.slaHours,
-        link,
-        text
-      });
-    }
-  );
-  api.get(
-    "/v1/support/cases",
-    policy("GET /v1/support/cases"),
-    async (request,reply) => {
-      if (application?.caseAccess === undefined) return unavailable(reply);
-      if (request.authenticatedSession === undefined) {
-        return reply.status(401).send({ error: "AUTHENTICATION_REQUIRED" });
-      }
-      const cases = await application.caseAccess.listOwn(
-        request.authenticatedSession.ownerRef
-      );
-      return reply.send({ cases: cases.map((opened) => Object.freeze({
-        case_id: opened.caseId,state: opened.state,language: opened.language,
-        created_at: opened.createdAt.toISOString()
-      })) });
-    }
-  );
-  api.get<{ Querystring: { limit?: string;cursor?: string } }>(
-    "/v1/support/case",
-    policy("GET /v1/support/case"),
-    async (request, reply) => {
-      if (application?.caseAccess === undefined) return unavailable(reply);
-      if (!admit.gate(reply, "supportReads", "GET /v1/support/case", sourceNetwork(request))) {
-        return reply;
-      }
-      const configuration = await application.configuration.current();
-      if (configuration.kind !== "AVAILABLE") {
-        return reply.status(503).send({ error: configuration.code });
-      }
-      const tokenSha256 = caseCapabilityFrom(request);
-      if (tokenSha256 === null) return reply.status(404).send({ error: "NOT_FOUND" });
-      const rawLimit = request.query.limit;
-      const limit = rawLimit === undefined
-        ? configuration.snapshot.values.supportLimitSessionMessages : Number(rawLimit);
-      if (!Number.isSafeInteger(limit) || limit < 1
-        || limit > configuration.snapshot.values.supportLimitSessionMessages) {
-        return reply.status(400).send({ error: "SUPPORT_CASE_PAGE_INVALID" });
-      }
-      let found;
-      try {
-        /**
-         * DL1-F5. The token alone no longer decides: the case service also sees
-         * when it was presented (the thirty-day ceiling) and who presented it
-         * (the owner binding the row already carries). A refusal is the same
-         * typed 404 an unknown token gets — a 403 here would confirm the case.
-         */
-        found = await application.caseAccess.readByToken(tokenSha256,{
-          limit,
-          at: (application.clock ?? (() => new Date()))(),
-          callerOwnerRef: request.authenticatedSession?.ownerRef ?? null,
-          ...(request.query.cursor === undefined ? {} : { cursor: request.query.cursor })
-        });
-      } catch (error) {
-        if (error instanceof SupportCaseError && error.code === "SUPPORT_CASE_CURSOR_INVALID") {
-          return reply.status(400).send({ error: error.code });
-        }
-        throw error;
-      }
-      if (found === null) {
-        return reply.status(404).send({
-          error: "NOT_FOUND",text: supportTemplate("NOT_FOUND","en")
-        });
-      }
-      if (found.kind === "SHREDDED") {
-        return reply.send({
-          kind: "SHREDDED",text: found.notice,
-          case: {
-            case_id: found.caseId,state: found.state,language: found.language,
-            sla_hours: found.slaHours,summary: null
-          },
-          messages: [],next_cursor: null
-        });
-      }
-      return reply.send({
-        kind: "READABLE",
-        case: {
-          case_id: found.caseId,state: found.state,language: found.language,
-          sla_hours: found.slaHours,summary: found.summary
-        },
-        messages: found.messages,next_cursor: found.nextCursor
-      });
-    }
-  );
-  api.post(
-    "/v1/support/case/messages",
-    policy("POST /v1/support/case/messages"),
-    async (request,reply) => {
-      if (application?.caseAccess === undefined) return unavailable(reply);
-      /**
-       * DL1-F2, final review. The same per-source budget its GET twin charges
-       * (`:GET /v1/support/case`): one case bearer, one capability, one budget.
-       * This door had none, so a wrong-token flood simply moved to it — a
-       * configuration read plus an indexed unique lookup per request, with the
-       * whole reply path behind it. Charged first, so a refusal costs neither.
-       */
-      if (!admit.gate(
-        reply, "supportReads", "POST /v1/support/case/messages", sourceNetwork(request)
-      )) {
-        return reply;
-      }
-      const configuration = await application.configuration.current();
-      if (configuration.kind !== "AVAILABLE") {
-        return reply.status(503).send({ error: configuration.code });
-      }
-      const tokenSha256 = caseCapabilityFrom(request);
-      const body = typeof request.body === "object" && request.body !== null
-        ? request.body as Readonly<Record<string,unknown>> : {};
-      if (tokenSha256 === null || typeof body.text !== "string" || body.text.trim() === "") {
-        return reply.status(404).send({ error: "NOT_FOUND" });
-      }
-      let state;
-      try {
-        state = await application.caseAccess.replyByToken({
-          tokenSha256,text: body.text,at: (application.clock ?? (() => new Date()))(),
-          callerOwnerRef: request.authenticatedSession?.ownerRef ?? null,
-          messageByteLimit: configuration.snapshot.values.supportLimitMessageCharacters,
-          caseMessageLimit: configuration.snapshot.values.supportLimitSessionMessages
-        });
-      } catch (error) {
-        if (error instanceof SupportCaseError
-          && (error.code === "SUPPORT_CASE_MESSAGE_TOO_LARGE"
-            || error.code === "SUPPORT_CASE_MESSAGE_LIMIT")) {
-          return reply.status(error.code === "SUPPORT_CASE_MESSAGE_TOO_LARGE" ? 413 : 429)
-            .send({ error: error.code });
-        }
-        throw error;
-      }
-      if (state !== null && typeof state === "object" && state.kind === "SHREDDED") {
-        return reply.send({ kind: "SHREDDED",text: state.notice });
-      }
-      return state === null
-        ? reply.status(404).send({ error: "NOT_FOUND" })
-        : reply.send({ state });
-    }
-  );
-
-  /**
-   * DL1-F4. This route is anonymous by design, for the help widget. It used to
-   * echo `configuration` verbatim — the internal model ref, every limiter
-   * threshold, the snapshot sha and the register version — beside daily spend,
-   * token totals, open sessions, new cases and the deflection ratios, handing
-   * an unauthenticated caller the exact tuning of the subsystem's own controls.
-   * The body is now the four fields the widget reads
-   * (`apps/ui/components/support/Assistant.tsx`); the operator view stays whole
-   * in `apps/runner/src/support-status-cli.ts`, which reads the database
-   * directly and needs no HTTP route.
-   */
-  api.get("/v1/support/status", policy("GET /v1/support/status"), async (request, reply) => {
+  api.get("/v1/support/status", policy(GET_STATUS), async (request, reply) => {
+    if (closedHere(request)) return countryClosed(reply, "en");
     if (application === undefined) return unavailable(reply);
-    if (!admit.gate(reply, "supportReads", "GET /v1/support/status", sourceNetwork(request))) return reply;
+    if (!admit.gate(reply, "supportReads", GET_STATUS, sourceOf(application, request))) return reply;
     const now = (application.clock ?? (() => new Date()))().getTime();
-    if (statusCache !== null && now - statusCache.at < SUPPORT_STATUS_CACHE_MS
-      && now >= statusCache.at) {
-      return reply.send(statusCache.body);
-    }
-    const [configuration, support, knowledge] = await Promise.all([
-      application.configuration.current(),
-      application.sessions.status(),
-      application.knowledge.status()
+    if (statusCache !== null && now >= statusCache.at
+      && now - statusCache.at < SUPPORT_STATUS_CACHE_MS) return reply.send(statusCache.body);
+    const [configuration, knowledge] = await Promise.all([
+      application.configuration.current(), application.knowledge.status()
     ]);
+    const degraded = application.degraded.isDegraded();
     const body = Object.freeze({
       configuration: { kind: configuration.kind },
-      relay_state: support.relayState ?? "AVAILABLE",
+      relay_state: degraded.degraded && degraded.reason === "relay" ? "UNAVAILABLE" : "AVAILABLE",
       kb_version: knowledge.kbVersion,
       kb_loaded: { shipped: knowledge.shipped }
     });

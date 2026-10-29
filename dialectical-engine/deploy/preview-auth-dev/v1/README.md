@@ -63,13 +63,13 @@ The proposal emits each changed key, comparable old/new canonical value and sour
 
 **Verify never applies a database step.** `verifyNativeState` reads the ledger and the resolution table's logical names first (a lineage without that table counts as having none) and, when any numbered migration the source holds is recorded in neither (the list `loadMigrationPlan` checks for its source inventory: the recipe's sources, 0108, dev's 0110, which `migrate()` applies after 0108, and the chain after it: 0111, NETOPIA's billing tables, then 0112, the auth DB batch, 0113, Part C's prices per currency, and 0114, role rotation's pin table), refuses with `PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP` before `migrate()` runs, so nothing is written. A release that adds such a step needs the native operator's `apply-and-plan`, with the owner's yes, before that release's next start; until then `verify`, `publish` and every start (the lifecycle prestart runs `verify`) refuse. The native operator then prints that one line, `PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP: not applied yet: <steps>. …` (every other failure stays `PREVIEW_NATIVE_OPERATION_REFUSED`), and `publish` refuses before it writes a register version; after a refused start, run the native operator's `verify` to read it.
 
-**The recovery notice due indexes (0126-0128, security audit run 3 NV-38).** `apply-and-plan` applies them after 0125:
+**The recovery notice due indexes (0132-0134, security audit run 3 NV-38).** `apply-and-plan` applies them after 0131:
 three outside-transaction steps that build one index each concurrently (`CREATE INDEX CONCURRENTLY`) on the recovery
-mail outboxes while the serving release keeps writing; on a large table a build takes time. 0129 (NV-15, NV-16), the
+mail outboxes while the serving release keeps writing; on a large table a build takes time. 0135 (NV-15, NV-16), the
 MFA-recovery control table's per-account index `identity.mfa_recovery_control_user_started`, is one more such step after
 them and behaves the same way. Each build waits for every
 transaction that holds an older snapshot: a backup, or a long or idle-in-transaction session, makes it run out of its
-2 s wait five times, and the run ends `MIGRATION_LOCK_TIMEOUT 0126_…` (or `0127_…`, `0128_…`, `0129_…`); rerun it after that
+2 s wait five times, and the run ends `MIGRATION_LOCK_TIMEOUT 0132_…` (or `0133_…`, `0134_…`, `0135_…`); rerun it after that
 transaction ends (the INVALID index is dropped and rebuilt). Two runs of this release's migrator no longer deadlock:
 each tries the migration lock every 50 ms and holds no snapshot between tries. The older release's migrator still waits
 inside its lock statement holding a snapshot, and its prestart `verify` runs `migrate()`, so do not restart the older
@@ -155,6 +155,7 @@ Team rule at start: on the preview, before the worker exists, every claimable ru
   rule widened so they accept `SPLIT` and the judges' rule before any code writes them. Run the native operator's
   `apply-and-plan` with the owner's yes before that release's first start (see "Verify never applies a database step"). It
   changes nothing a debate does: engine 2 stays off while no register version carries the engine row.
+- This release adds `migrations/0129_support_answer_scope.sql` (after `0128_threat_reports.sql`): it empties the support conversation and model-call tables and revokes the support role's INSERT on them (V-111).
 - A release with R3 (engine redesign, the map's answer step) adds the database step `0122_engine_map_check.sql`:
   two append-only code tables, what each engine-2 map point rests on and the answer check's codes. Every map read
   of the new code joins the first one (engine 1 included), so run the native operator's `apply-and-plan` with the
@@ -171,6 +172,13 @@ Team rule at start: on the preview, before the worker exists, every claimable ru
   cluster's socket (the principal `release-table.mjs` uses), never a runtime login. The API's runtime login may only
   read the active version, the runner's may only ask what its release passed (the runner never reads the pointer).
   Until the first activation (the first T+1 switch makes one), each release runs on its own site version, as before.
+- A release with the Italy-specific approval (mission italy-clause-approval, S01) adds the database step
+  `0125_italy_specific_approval.sql` (`n1: expand`): two nullable columns on `legal.acceptance` (`clauses`, `leg`), the
+  kind `ITALY_SPECIFIC_APPROVAL`, the sign-up writer `identity.record_signup_italy_approval` and the export reader
+  `identity.read_data_export_snapshot_v2`. Run the native operator's `apply-and-plan` with the owner's yes before that
+  release's first start (see "Verify never applies a database step"). Without it the API's boot step `database-roles`
+  refuses the whole API with `DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED` wherever the data-export pool is configured
+  (`DATA_EXPORT_STORE_PATH` set), and every sign-up that owes the Italy approval fails on the missing writer.
 - A call runs at its step's level if the table sets one, else its AI's `level` if the table sets one, else the row's default (its first menu word, which is today's request). A model the table leaves out runs at its default.
 - The API and the runner read the same value. A bad table (an unknown model, step or level, an empty entry, or any other key) makes both refuse to start, but their launchers print only `PREVIEW_API_STARTUP_REFUSED` and `PREVIEW_RUNNER_STARTUP_REFUSED`, never why. So run the checker below first; it prints the detail.
 - An entry for a reviewed model that is not on this config's `free_model_ids` or `premium_model_ids` is accepted but unused (no call goes to that AI); the checker's row for it says so.

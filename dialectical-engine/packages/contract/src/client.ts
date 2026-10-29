@@ -1,5 +1,7 @@
 import { ContractHttpError, type ContractErrorCode, type ContractWaitingRefusal } from "./http-error.js";
 import type { VerdictState } from "./verdict-state.js";
+import { PublicationReviewAskRequestSchema, PublicationReviewAskResponseSchema, PublicationReviewStateSchema,
+  type PublicationReviewState } from "./publication-review.js";
 import { SocialStepUpStatusResponseSchema,type SocialStepUpStatusResponse,type CompleteSocialStepUpRequest } from './index.js';
 import { SocialLoginStatusResponseSchema, type SocialLoginStatusResponse, AuthProvidersResponseSchema, BeginSocialLoginResponseSchema, SocialSignupStatusResponseSchema, CompleteSocialSignupResponseSchema, SocialLinksResponseSchema, type AuthProvidersResponse, type SocialSignupStatusResponse, type CompleteSocialSignupRequest, type CompleteSocialSignupResponse, type SocialLinksResponse } from './social-auth.js';
 import {ConsumerRecoveryProofResponseSchema,RecoveryEnrollmentOptionsResponseSchema,OnboardingRequirementsResponseSchema,
@@ -57,6 +59,7 @@ import {
   DebateMapViewSchema,
   AskAcceptedSchema,
   AskAlreadyWaitingSchema,
+  QuestionNotStartedSchema,
   QuestionLanguageChoiceNeededSchema,
   type AskSubmitOutcome,
   AskRoomResponseSchema,
@@ -97,6 +100,7 @@ import {
   PublicDebateSchema,
   RunEventSchema,
   RunProjectionSchema,
+  RemovalNoticeTakeSchema,
   RevokeAllSessionsSchema,
   SessionListSchema,
   SessionSchema,
@@ -137,6 +141,7 @@ import {
   type Node,
   type PlanTier,
   type PublicDebate,
+  type RemovalNoticeTake,
   type RunEvent,
   type RunProjection,
   type Session,
@@ -161,6 +166,7 @@ async function contractErrorForResponse(response: Response): Promise<ContractHtt
   let serverMessage: string | null = null;
   let statement: PublicationRefusalStatement | null = null;
   let waiting: ContractWaitingRefusal | null = null;
+  let questionNotStarted: import("./question-check.js").QuestionNotStarted | null = null;
   try {
     const candidate: unknown = await response.json();
     if (response.status === 409) {
@@ -179,6 +185,11 @@ async function contractErrorForResponse(response: Response): Promise<ContractHtt
           ...(refusal.data.waits_for === undefined ? {} : { waitsFor: refusal.data.waits_for })
         });
       }
+      const questionRefusal = response.status === 422 ? QuestionNotStartedSchema.safeParse(body) : null;
+      if (questionRefusal?.success === true) {
+        questionNotStarted = Object.freeze({ kind: questionRefusal.data.kind, screen: questionRefusal.data.screen,
+          emergencyNumber: questionRefusal.data.emergency_number });
+      }
     }
   } catch {
     // A non-JSON failure still retains its transport status below.
@@ -188,7 +199,7 @@ async function contractErrorForResponse(response: Response): Promise<ContractHtt
     : serverCode ?? serverMessage ?? `Contract request failed with ${response.status}`;
   return new ContractHttpError(
     codeForStatus(response.status), response.status, detail, serverCode, statement, waiting,
-    retryAfterMs(response.headers.get("retry-after"))
+    retryAfterMs(response.headers.get("retry-after")), questionNotStarted
   );
 }
 
@@ -419,6 +430,8 @@ export interface ContractClient {
   readRunVisibility(runId: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
   publishRun(runId: string, stepUpGrant: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
   unpublishRun(runId: string, stepUpGrant: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
+  requestPublicationReview(runId: string, stepUpGrant: string): Promise<{ state: "UNDER_REVIEW" }>;
+  readPublicationReview(runId: string): Promise<PublicationReviewState>;
   scheduleAccountErasure(stepUpGrant:string,deletePublicDebates?:boolean):Promise<{
     status:"SCHEDULED"|"DUE"|"PROCESSING";execute_at:string;cancellation_ref:string;delete_public_debates:boolean;
   }>;
@@ -506,6 +519,7 @@ export interface ContractClient {
   readAnswerIndex(limit: number, offset: number): Promise<AnswerIndex>;
   readAnswer(answerId: string, version?: number): Promise<Answer>;
   readRunAnswer(runId: string): Promise<Answer>;
+  takeRemovalNotice(): Promise<RemovalNoticeTake>;
   readRun(runId: string): Promise<RunProjection>;
   readInspection(answerId: string, version?: number): Promise<Inspection>;
   readLedgerDigest(answerId: string): Promise<ExecutionLedgerDigest>;
@@ -740,6 +754,17 @@ export function createContractClient(
           copies_may_persist_acknowledged: true
         }) }
     ),
+    requestPublicationReview: (runId: string, stepUpGrant: string) => request(
+      `/v1/runs/${encodeURIComponent(runId)}/publication-review`,
+      PublicationReviewAskResponseSchema,
+      { method: "POST", body: JSON.stringify(PublicationReviewAskRequestSchema.parse({
+        step_up_grant: stepUpGrant, team_read_acknowledged: true
+      })) }
+    ),
+    readPublicationReview: (runId: string) => request(
+      `/v1/runs/${encodeURIComponent(runId)}/publication-review`,
+      PublicationReviewStateSchema
+    ),
     scheduleAccountErasure:(stepUpGrant:string,deletePublicDebates?:boolean)=>request(
       "/v1/account",AccountErasureStatusSchema,
       { method:"DELETE",body:JSON.stringify({
@@ -909,6 +934,7 @@ export function createContractClient(
     readAnswerIndex: (limit: number, offset: number) => request(`/v1/answers?limit=${encodeURIComponent(String(limit))}&offset=${encodeURIComponent(String(offset))}`, AnswerIndexSchema),
     readAnswer: (answerId: string, version?: number) => request(`/v1/answers/${encodeURIComponent(answerId)}${versionQuery(version)}`, AnswerSchema),
     readRunAnswer: (runId: string) => request(`/v1/runs/${encodeURIComponent(runId)}/answer`, AnswerSchema),
+    takeRemovalNotice: () => request("/v1/account/removal-notice/take", RemovalNoticeTakeSchema, { method: "POST" }),
     readRun: (runId: string) => request(`/v1/runs/${encodeURIComponent(runId)}`, RunProjectionSchema),
     readInspection: (answerId: string, version?: number) => request(`/v1/answers/${encodeURIComponent(answerId)}/inspection${versionQuery(version)}`, InspectionSchema),
     readLedgerDigest: (answerId: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/ledger-digest`, ExecutionLedgerDigestSchema),

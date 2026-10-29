@@ -7,6 +7,7 @@ import type { PaymentMarks } from "@/lib/billing/paymentMarks";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
 import { t } from "@/lib/i18n/translate";
 import { COMPANY, LEGAL_PAGES } from "@/lib/legal/pages";
+import { useSupportOffered } from "@/components/support/availability";
 
 const PRODUCT_NAME = "Dialectical Engine";
 
@@ -94,6 +95,7 @@ export function PaymentMarksGroup({ marks }: { marks: PaymentMarks }) {
  */
 export function SiteFooter({ variant, billing = null }: { variant: "full" | "line"; billing?: SiteFooterBilling | null }) {
   const { catalog } = useChromeI18n();
+  const offered = useSupportOffered();
   const copyright = `© ${new Date().getFullYear()} ${COMPANY.legalName}`;
   const cookiePreferences = t(catalog, "chrome.footer.cookiePreferences");
   const legalLinks = LEGAL_PAGES.map(({ href, labelKey }) => (
@@ -123,9 +125,10 @@ export function SiteFooter({ variant, billing = null }: { variant: "full" | "lin
 
   const billingOn = billing?.billingOn === true;
   const marks = billing !== null && billing.billingOn ? billing.marks : NO_MARKS;
+  const visibleProductLinks = PRODUCT_LINKS.filter(({ href }) => href !== "/help" || offered === "offered");
   const productLinks: ReadonlyArray<Readonly<{ href: string; labelKey: string }>> = billingOn
-    ? [...PRODUCT_LINKS, ...BILLING_PRODUCT_LINKS]
-    : PRODUCT_LINKS;
+    ? [...visibleProductLinks, ...BILLING_PRODUCT_LINKS]
+    : visibleProductLinks;
   const billingLegalLinks = billingOn
     ? BILLING_LEGAL_LINKS.map(({ href, labelKey }) => (
       <li key={href}>

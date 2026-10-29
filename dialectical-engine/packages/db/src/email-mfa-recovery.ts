@@ -28,7 +28,7 @@ class EmailRecoveryRepository{
  async prepareSource(source:AuthSourceContext,admissionScope?:string):Promise<EmailRecoverySource>{const norm=(v:unknown,max:number)=>(typeof v==="string"&&v.trim()?v.trim():"unknown").slice(0,max);const ipInput=norm(source.ip,64),scopeInput=admissionScope===undefined?undefined:norm(admissionScope,64);const[ip,ua,scope]=await Promise.all([this.audit.hashSourceIp(ipInput),this.audit.hashUserAgent(norm(source.userAgent,256)),scopeInput!==undefined&&scopeInput!==ipInput?this.audit.hashSourceIp(scopeInput):undefined]);if(!/^[0-9a-f]{64}$/.test(ip)||!/^[0-9a-f]{64}$/.test(ua)||(scope!==undefined&&!/^[0-9a-f]{64}$/.test(scope)))throw TypeError("EMAIL_RECOVERY_SOURCE_INVALID");const prepared:EmailRecoverySource={ipArgon2id:`argon2id-audit:v1:${ip}`,userAgentArgon2id:`argon2id-audit:v1:${ua}`};sourceMailLocales.set(prepared,resolvedMailLocale(source.mailLocale));if(scope!==undefined)sourceAdmissionDigests.set(prepared,`argon2id-audit:v1:${scope}`);return prepared;}
  async assertRole(){const row=(await this.pool.query<{ok:boolean}>(`SELECT pg_has_role(current_user,$1,'USAGE') AND NOT pg_has_role(current_user,$2,'MEMBER') AND NOT has_table_privilege(current_user,$3,'SELECT,INSERT,UPDATE,DELETE') AND NOT has_any_column_privilege(current_user,$3,'SELECT,INSERT,UPDATE,REFERENCES') AND NOT(SELECT rolsuper FROM pg_roles WHERE rolname=current_user) AS ok`,[`debateai_${this.prefix}_runtime`,`debateai_${this.prefix}_owner`,`identity.${this.prefix}_control`])).rows[0];if(!row?.ok)throw TypeError("EMAIL_RECOVERY_DATABASE_ROLE_INVALID");}
  expire(n:number){return this.call<number>("expire",[n]);}
- // NV-38: 0125's pending-notice claim, whose lease starts when the claim ends and whose stale-notice sweep never waits on a held row.
+ // NV-38: 0131's pending-notice claim, whose lease starts when the claim ends and whose stale-notice sweep never waits on a held row.
  async claimNotice(ms:number):Promise<EmailRecoveryNotice|null>{const notice=await this.call<(EmailRecoveryNotice&Readonly<{mail_locale?:string}>)|null>("claim_pending_notice",[ms]);if(!notice)return null;const{mail_locale:mailLocale,...rest}=notice;return mailLocale===undefined?rest:{...rest,mailLocale};}finishNotice(id:string,lease:string,sent:boolean,retry:number,max:number){return this.call<boolean>("finish_notice",[id,lease,sent,retry,max]);}
 }
 export class PostgresBackupEmailRepository extends EmailRecoveryRepository{
@@ -42,7 +42,7 @@ export class PostgresMfaRecoveryRepository extends EmailRecoveryRepository{
  constructor(pool:Pool,audit:AuditContextHasher,version:number){super(pool,audit,version,"mfa_recovery");}
  admit(source:EmailRecoverySource){return this.call<boolean>("admit_evicting",[admissionSource(source),this.version]);}
  prepare(index:Buffer,destination:"primary"|"backup"){return this.call<Readonly<{userId:string;channels:readonly EmailRecoveryChannel[]}>|null>("prepare",[index,destination]);}
- // NV-16: the bounded start (0125), at most three per account and destination in any rolling hour; it delegates to the sealed start.
+ // NV-16: the bounded start (0131), at most three per account and destination in any rolling hour; it delegates to the sealed start.
  start(input:Readonly<{index:Buffer;destination:"primary"|"backup";candidateId:string|null;channels:readonly string[];linkHash:string;cancelHash:string;notices:readonly unknown[];source:EmailRecoverySource;id:string}>){return this.call<boolean>("start_bounded",[input.index,input.destination,input.candidateId,input.channels,input.linkHash,input.cancelHash,JSON.stringify(input.notices),input.source,this.version,input.id],mailLocaleOf(input.source));}
  prepareExchange(hash:string){return this.call<MfaRecoveryExchangeCandidate|null>("prepare_exchange",[hash]);}
  // True when this email link's account already has a replacement waiting its 24 hours (stale waiting rows are closed).
@@ -63,6 +63,6 @@ export class PostgresMfaRecoveryRepository extends EmailRecoveryRepository{
  finish(finish:string,password:string,risk:string,source:EmailRecoverySource){return this.call<"COMPLETED"|"TOO_EARLY"|"INVALID">("finish",[finish,password,risk,source],mailLocaleOf(source));}
  cancel(hash:string,source:EmailRecoverySource){return this.call<"CANCELLED"|"INVALID">("cancel",[hash,source],mailLocaleOf(source));}cancelSession(hash:string,source:EmailRecoverySource){return this.call<"CANCELLED"|"INVALID">("cancel_session",[hash,source],mailLocaleOf(source));}
  failure(hash:string,kind:MfaRecoverySelectorKind,source:EmailRecoverySource){return this.call<void>("failure",[hash,kind,source],mailLocaleOf(source));}
- // NV-15: a wrong exchange or finish password (0125's recorder): the per-challenge counter, then the account-level limit that writes RECOVERY_PROOF_FAILED.
+ // NV-15: a wrong exchange or finish password (0131's recorder): the per-challenge counter, then the account-level limit that writes RECOVERY_PROOF_FAILED.
  recordFailure(hash:string,kind:"link"|"finish",source:EmailRecoverySource,context:CryptoEnvelope|null){return this.call<"PROOF_INVALID"|"REFUSED"|"INVALID">("record_failure",[hash,kind,source,context],mailLocaleOf(source));}
 }

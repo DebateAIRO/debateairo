@@ -209,7 +209,7 @@ describe("S6 content-encryption architecture contract", () => {
   });
 
   it("checks a private delete's grant before it tries the named run's lease, and never waits (NV-30)", async () => {
-    const migration = await read("migrations/0125_security_fixes_run3.sql");
+    const migration = await read("migrations/0131_security_fixes_run3.sql");
     const start = migration.indexOf("-- ==== [NV-30]");
     expect(start).toBeGreaterThan(-1);
     const next = migration.indexOf("\n-- ==== [", start + 1);

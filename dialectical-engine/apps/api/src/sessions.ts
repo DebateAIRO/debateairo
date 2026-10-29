@@ -237,7 +237,7 @@ const CEREMONY_RATE_FAMILY: Readonly<Record<ConsumerCeremonyOperation, SessionRa
 });
 
 /**
- * NV-04: the longest single cooldown of the durable login TOTP budget (identity.totp_login_admit, 0125 [NV-04]).
+ * NV-04: the longest single cooldown of the durable login TOTP budget (identity.totp_login_admit, 0131 [NV-04]).
  * Rounds of `verificationLimits.perEnrollment` attempts; each completed round raises the factor's level, and its
  * cooldown is `temporaryLockMs` doubled per level up to this cap, so no lock is permanent.
  */
@@ -587,7 +587,7 @@ export class SessionService implements SessionApplication {
             }
             throw new AuthFlowError("MFA_RATE_LIMITED");
           }
-          // Layer 1, durable (identity.totp_login_admit, 0125 [NV-04]): rounds of perEnrollment attempts, an
+          // Layer 1, durable (identity.totp_login_admit, 0131 [NV-04]): rounds of perEnrollment attempts, an
           // escalation level a success keeps, cooldowns from temporaryLockMs doubling to TOTP_LOGIN_MAX_LOCK_MS.
           const limits = this.dependencies.mfaPolicy.verificationLimits;
           let admission: Readonly<{ admitted: boolean; retryAfterMs: number }>;

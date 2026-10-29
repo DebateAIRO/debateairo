@@ -29,6 +29,7 @@ import {
   type StoryPolicy
 } from "@debateai/register";
 import type { Pool, PoolClient } from "pg";
+import { crossAccount } from "@debateai/db";
 import {
   COST_ENVELOPE_CHARGE_UNREPRESENTABLE,
   chargeMicrosForUsage,
@@ -65,10 +66,14 @@ export type ModelSpendSource =
   | "RUN"
   | "SUPPORT"
   | "STORY"
+  /** post-settle synthesis inspection: site cost only, never the run's envelope */
+  | "SYNTHESIS_CHECK"
   /** the fast language check before a debate: a run-less site cost (0118), written only by ledger.record_language_check_spend */
   | "LANGUAGE_CHECK"
+  /** the pre-start question check: a run-less site cost (0128), written only by ledger.record_question_check_spend */
+  | "QUESTION_CHECK"
   /**
-   * NV-50 (security audit run 3, migration 0125): an attempt the gateway SENT that was never charged by `recordCall`
+   * NV-50 (security audit run 3, migration 0131): an attempt the gateway SENT that was never charged by `recordCall`
    * (it timed out, its connection dropped, or its reply could not be stored), charged by `recordUnanswered` at its
    * reported usage or else its projected maximum. Its run's (or its story's) envelope and the site's day count it; no
    * person's window, hold or withdrawal does. It always names its run and its attempt, and carries no phase.
@@ -82,6 +87,7 @@ export type ModelSpendSource =
  * reads it: the hosted API's boot probe asks only whether it exists, and keeps the fast check off until it does.
  */
 export const LANGUAGE_CHECK_SPEND_WRITER = "ledger.record_language_check_spend(uuid,text,date,bigint,bigint,bigint)" as const;
+export const QUESTION_CHECK_SPEND_WRITER = "ledger.record_question_check_spend(uuid,text,date,bigint,bigint,bigint)" as const;
 
 /** One fast language check's site cost, as the writer takes it: no run, no phase, no attempt. */
 export type LanguageCheckSpendEntry = Readonly<{
@@ -111,6 +117,22 @@ export async function languageCheckSpendWriterPresent(pool: Pick<Pool, "query">)
 /** One language check's site cost, through the one writer (0118). The database's CHECKs refuse a negative count. */
 export async function recordLanguageCheckSpend(pool: Pick<Pool, "query">, entry: LanguageCheckSpendEntry): Promise<void> {
   await pool.query("SELECT ledger.record_language_check_spend($1::uuid,$2::text,$3::date,$4::bigint,$5::bigint,$6::bigint)",
+    [entry.spendId, entry.providerRef, entry.chargedOn, entry.chargeMicros, entry.inputTokens, entry.outputTokens]);
+}
+
+/** The question check carries the same site-cost fields, with a distinct database writer. */
+export type QuestionCheckSpendEntry = LanguageCheckSpendEntry;
+
+export async function questionCheckSpendWriterPresent(pool: Pick<Pool, "query">): Promise<boolean> {
+  const result = await pool.query<{ present: unknown }>(
+    `SELECT CASE WHEN NOT has_schema_privilege(current_user, 'ledger', 'USAGE') THEN false
+       ELSE coalesce(to_regprocedure($1) IS NOT NULL AND has_function_privilege(current_user, to_regprocedure($1), 'EXECUTE'), false) END AS present`,
+    [QUESTION_CHECK_SPEND_WRITER]);
+  return result.rows[0]?.present === true;
+}
+
+export async function recordQuestionCheckSpend(pool: Pick<Pool, "query">, entry: QuestionCheckSpendEntry): Promise<void> {
+  await pool.query("SELECT ledger.record_question_check_spend($1::uuid,$2::text,$3::date,$4::bigint,$5::bigint,$6::bigint)",
     [entry.spendId, entry.providerRef, entry.chargedOn, entry.chargeMicros, entry.inputTokens, entry.outputTokens]);
 }
 
@@ -1058,11 +1080,15 @@ export class PostgresModelSpendStore implements ModelSpendStore {
         "A language check's site cost is written only by ledger.record_language_check_spend"
       );
     }
-    const unanswered = entry.spendSource === "RUN_UNANSWERED" || entry.spendSource === "STORY_UNANSWERED";
-    if ((entry.spendSource === "RUN" || entry.spendSource === "STORY" || unanswered) && entry.runId === null) {
-      throw new TypedDomainError("MODEL_SPEND_RUN_REQUIRED", "A run or story charge must name its run");
+    if (entry.spendSource === "QUESTION_CHECK") {
+      throw new TypedDomainError("MODEL_SPEND_QUESTION_CHECK_FUNCTION_ONLY", "A question check's site cost is written only by ledger.record_question_check_spend");
     }
-    // NV-50 (migration 0125): an unanswered attempt's charge names the attempt it pays for. The CHECK
+    const unanswered = entry.spendSource === "RUN_UNANSWERED" || entry.spendSource === "STORY_UNANSWERED";
+    if ((entry.spendSource === "RUN" || entry.spendSource === "STORY" || entry.spendSource === "SYNTHESIS_CHECK" || unanswered)
+      && entry.runId === null) {
+      throw new TypedDomainError("MODEL_SPEND_RUN_REQUIRED", "A run, story or synthesis check charge must name its run");
+    }
+    // NV-50 (migration 0131): an unanswered attempt's charge names the attempt it pays for. The CHECK
     // `model_spend_unanswered_names_its_attempt` says the same one layer lower.
     if (unanswered && (typeof entry.attemptId !== "string" || entry.attemptId === "")) {
       throw new TypedDomainError("MODEL_SPEND_ATTEMPT_REQUIRED", "An unanswered attempt's charge must name its attempt");
@@ -1092,7 +1118,7 @@ export class PostgresModelSpendStore implements ModelSpendStore {
     const result = await this.pool.query<{ total: string }>(
       // NV-50: a story's unanswered attempts are the story's (readRunStorySpentMicros), never the debate's.
       `SELECT coalesce(sum(charge_micros),0)::text AS total FROM ledger.model_spend
-       WHERE run_id = $1 AND spend_source NOT IN ('STORY','STORY_UNANSWERED')`,
+       WHERE run_id = $1 AND spend_source NOT IN ('STORY', 'STORY_UNANSWERED', 'SYNTHESIS_CHECK')`,
       [runId]
     );
     return this.#total(result.rows[0]?.total);
@@ -1108,11 +1134,13 @@ export class PostgresModelSpendStore implements ModelSpendStore {
   }
 
   async readDaySpentMicros(day: string): Promise<number> {
-    const result = await this.pool.query<{ total: string }>(
-      "SELECT coalesce(sum(charge_micros),0)::text AS total FROM ledger.model_spend WHERE charged_on = $1::date",
-      [day]
-    );
-    return this.#total(result.rows[0]?.total);
+    return crossAccount("X23", async () => {
+      const result = await this.pool.query<{ total: string }>(
+        "SELECT coalesce(sum(charge_micros),0)::text AS total FROM ledger.model_spend WHERE charged_on = $1::date",
+        [day]
+      );
+      return this.#total(result.rows[0]?.total);
+    });
   }
 
   /**
@@ -1146,23 +1174,27 @@ export class PostgresModelSpendStore implements ModelSpendStore {
    * UTC day, the part of its hold it has not yet spent (RUN + STORY, and NV-50's
    * RUN_UNANSWERED + STORY_UNANSWERED, which the site's day already counts as spend),
    * never less than zero. Read from the live jobs outward (`work_item_live_run_idx`).
+   * Row-level security S01 (X23, with `readDaySpentMicros`): every account's holds, so inside a request (the room's
+   * measure, NV-47's language-check room) it reads on the pool's cross-account target, not the asker's rows only.
    */
   async readSiteCountedHoldsMicros(day: string): Promise<number> {
-    const result = await this.pool.query<{ total: string }>(
-      `SELECT coalesce(sum(greatest(0, hold.held_micros - coalesce(spent.total, 0))), 0)::text AS total
-       FROM (
-         SELECT DISTINCT work.run_id FROM core.work_item AS work
-         WHERE work.run_id IS NOT NULL AND work.state IN ('READY','CLAIMED')
-       ) AS live
-       JOIN ledger.model_spend_hold AS hold ON hold.run_id = live.run_id
-       LEFT JOIN LATERAL (
-         SELECT sum(spend.charge_micros) AS total FROM ledger.model_spend AS spend
-         WHERE spend.run_id = hold.run_id AND spend.spend_source IN ('RUN','STORY','RUN_UNANSWERED','STORY_UNANSWERED')
-       ) AS spent ON true
-       WHERE hold.opened_at < (($1::date + 1)::timestamp AT TIME ZONE 'UTC')`,
-      [day]
-    );
-    return this.#total(result.rows[0]?.total);
+    return crossAccount("X23", async () => {
+      const result = await this.pool.query<{ total: string }>(
+        `SELECT coalesce(sum(greatest(0, hold.held_micros - coalesce(spent.total, 0))), 0)::text AS total
+         FROM (
+           SELECT DISTINCT work.run_id FROM core.work_item AS work
+           WHERE work.run_id IS NOT NULL AND work.state IN ('READY','CLAIMED')
+         ) AS live
+         JOIN ledger.model_spend_hold AS hold ON hold.run_id = live.run_id
+         LEFT JOIN LATERAL (
+           SELECT sum(spend.charge_micros) AS total FROM ledger.model_spend AS spend
+           WHERE spend.run_id = hold.run_id AND spend.spend_source IN ('RUN','STORY','RUN_UNANSWERED','STORY_UNANSWERED')
+         ) AS spent ON true
+         WHERE hold.opened_at < (($1::date + 1)::timestamp AT TIME ZONE 'UTC')`,
+        [day]
+      );
+      return this.#total(result.rows[0]?.total);
+    });
   }
 
   /**
@@ -1241,11 +1273,20 @@ export class PostgresModelSpendStore implements ModelSpendStore {
         [ownerRef,from,to,funding.grantId,funding.grantEventId,scope === "PERSON_GRANT"]);
       return this.#total(result.rows[0]?.total);
     }
+    // Most runs have no synthesis check. CASE keeps the definer lookup off their spend path.
     const result = await this.pool.query<{ total: string }>(
       `SELECT coalesce(sum(spend.charge_micros),0)::text AS total
        FROM billing.run_charge_scope AS scope
        JOIN ledger.model_spend AS spend ON spend.run_id = scope.run_id
        WHERE scope.owner_ref = $1::uuid AND scope.funding_kind='SUBSCRIPTION'
+         AND NOT EXISTS (
+           SELECT 1 FROM core.run AS run
+           WHERE run.run_id = scope.run_id AND run.plan_tier = 'premium'
+             AND CASE WHEN EXISTS (
+               SELECT 1 FROM serve.synthesis_check_result AS checked
+               WHERE checked.run_id = run.run_id
+             ) THEN serve.run_removed_by_synthesis_check(run.run_id) ELSE false END
+         )
          AND scope.admitted_at < $3
          AND spend.spend_source IN ('RUN','STORY')
          AND spend.recorded_at >= $2 AND spend.recorded_at < $3
@@ -1274,6 +1315,14 @@ export class PostgresModelSpendStore implements ModelSpendStore {
          WHERE spend.run_id = hold.run_id AND spend.spend_source IN ('RUN','STORY')
        ) AS spent ON true
        WHERE scope.owner_ref = $1::uuid AND scope.funding_kind='SUBSCRIPTION'
+         AND NOT EXISTS (
+           SELECT 1 FROM core.run AS run
+           WHERE run.run_id = scope.run_id AND run.plan_tier = 'premium'
+             AND CASE WHEN EXISTS (
+               SELECT 1 FROM serve.synthesis_check_result AS checked
+               WHERE checked.run_id = run.run_id
+             ) THEN serve.run_removed_by_synthesis_check(run.run_id) ELSE false END
+         )
          AND EXISTS (
            SELECT 1 FROM core.work_item AS work
            WHERE work.run_id = hold.run_id AND work.state IN ('READY','CLAIMED')
@@ -1291,7 +1340,8 @@ export class PostgresModelSpendStore implements ModelSpendStore {
    * story (a hold, no story row yet, and a charge in the last hour). Only runs admitted in the day before `withdrewAt`
    * are tested for that: no debate still sends a day after it started, and one that did would only be under-deducted,
    * in the person's favour. Waived runs (set aside because of an upload) count for neither. Like `readOwnerSpentMicros`, this includes runs pinned while on Free and runs admitted before
-   * the period: both sides read the same set on purpose.
+   * the period: both sides read the same set on purpose. So, as there (synthesis-flag S01), a premium debate the
+   * synthesis check removed counts for neither: it leaves the owner's windows, and so the withdrawal's credit used.
    */
   async readWithdrawalSpend(
     ownerRef: string, from: Date, withdrewAt: Date
@@ -1302,6 +1352,14 @@ export class PostgresModelSpendStore implements ModelSpendStore {
          FROM billing.run_charge_scope AS scope
          WHERE scope.owner_ref = $1::uuid AND scope.funding_kind='SUBSCRIPTION' AND scope.admitted_at < $3
            AND NOT EXISTS (SELECT 1 FROM ledger.model_spend_waiver AS waiver WHERE waiver.run_id = scope.run_id)
+           AND NOT EXISTS (
+             SELECT 1 FROM core.run AS run
+             WHERE run.run_id = scope.run_id AND run.plan_tier = 'premium'
+               AND CASE WHEN EXISTS (
+                 SELECT 1 FROM serve.synthesis_check_result AS checked
+                 WHERE checked.run_id = run.run_id
+               ) THEN serve.run_removed_by_synthesis_check(run.run_id) ELSE false END
+           )
        )
        SELECT
          (SELECT coalesce(sum(spend.charge_micros), 0)
@@ -1366,52 +1424,54 @@ export class PostgresModelSpendStore implements ModelSpendStore {
     expiresAt: Date;
     decide: (committedMicros: number) => boolean;
   }>): Promise<Readonly<{ admitted: boolean; committedMicros: number }>> {
-    const client = await this.pool.connect();
-    try {
-      await client.query("BEGIN");
-      /**
-       * A stable 64-bit key for this UTC day: two API processes admitting on the
-       * same day take the same lock, and different days never contend.
-       *
-       * The SINGLE-key `bigint` form, over `hashtextextended(<text>, 0)` — the
-       * shape `migrations/0040_account_erasure.sql` uses a dozen times.
-       * PostgreSQL's two-key overload is `(integer, integer)` and `hashtext`
-       * returns integer, so a two-key call built from bigints resolves to NO
-       * function and raises 42883 on every ask. `tests/architecture/
-       * v28-advisory-lock-shape.test.ts` pins this text, because the engine is
-       * down here and nothing can execute it.
-       */
-      await client.query(
-        "SELECT pg_advisory_xact_lock("
-        + "pg_catalog.hashtextextended('debateai.cost_envelope.day:' || $1, 0))",
-        [input.day]
-      );
-      const committed = await client.query<{ total: string }>(
-        `SELECT (
-           coalesce((SELECT sum(charge_micros) FROM ledger.model_spend WHERE charged_on = $1::date), 0)
-           + coalesce((SELECT sum(reserved_micros) FROM ledger.model_spend_reservation
-                        WHERE reserved_on = $1::date AND expires_at > $2), 0)
-         )::text AS total`,
-        [input.day, input.now]
-      );
-      const committedMicros = this.#total(committed.rows[0]?.total);
-      const admitted = input.decide(committedMicros);
-      if (admitted) {
+    return crossAccount("X23", async () => {
+      const client = await this.pool.connect();
+      try {
+        await client.query("BEGIN");
+        /**
+         * A stable 64-bit key for this UTC day: two API processes admitting on the
+         * same day take the same lock, and different days never contend.
+         *
+         * The SINGLE-key `bigint` form, over `hashtextextended(<text>, 0)` — the
+         * shape `migrations/0040_account_erasure.sql` uses a dozen times.
+         * PostgreSQL's two-key overload is `(integer, integer)` and `hashtext`
+         * returns integer, so a two-key call built from bigints resolves to NO
+         * function and raises 42883 on every ask. `tests/architecture/
+         * v28-advisory-lock-shape.test.ts` pins this text, because the engine is
+         * down here and nothing can execute it.
+         */
         await client.query(
-          `INSERT INTO ledger.model_spend_reservation
-             (reservation_id, reserved_on, reserved_micros, opened_at, expires_at)
-           VALUES (gen_random_uuid(), $1::date, $2, $3, $4)`,
-          [input.day, input.reservedMicros, input.now, input.expiresAt]
+          "SELECT pg_advisory_xact_lock("
+          + "pg_catalog.hashtextextended('debateai.cost_envelope.day:' || $1, 0))",
+          [input.day]
         );
+        const committed = await client.query<{ total: string }>(
+          `SELECT (
+             coalesce((SELECT sum(charge_micros) FROM ledger.model_spend WHERE charged_on = $1::date), 0)
+             + coalesce((SELECT sum(reserved_micros) FROM ledger.model_spend_reservation
+                          WHERE reserved_on = $1::date AND expires_at > $2), 0)
+           )::text AS total`,
+          [input.day, input.now]
+        );
+        const committedMicros = this.#total(committed.rows[0]?.total);
+        const admitted = input.decide(committedMicros);
+        if (admitted) {
+          await client.query(
+            `INSERT INTO ledger.model_spend_reservation
+               (reservation_id, reserved_on, reserved_micros, opened_at, expires_at)
+             VALUES (gen_random_uuid(), $1::date, $2, $3, $4)`,
+            [input.day, input.reservedMicros, input.now, input.expiresAt]
+          );
+        }
+        await client.query("COMMIT");
+        return Object.freeze({ admitted, committedMicros });
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
       }
-      await client.query("COMMIT");
-      return Object.freeze({ admitted, committedMicros });
-    } catch (error) {
-      await client.query("ROLLBACK").catch(() => undefined);
-      throw error;
-    } finally {
-      client.release();
-    }
+    });
   }
 
   /**

@@ -7,6 +7,7 @@ export * from "./date-of-birth.js";
 export type * from "./staff-access.js";
 export type * from "./provider-funding.js";
 export * from "./region.js";
+export * from "./italy-approval.js";
 export * from "./mail-address.js";
 export * from "./payment-regions.js";
 export * from "./engine.js";

@@ -8,7 +8,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 /**
  * NV-38 (security audit run 3): the three recovery outboxes keep every finished notice, so a claim that scans them reads
  * the whole retained history, and the MFA and backup claims took their lease from a clock read before their scans and
- * lock waits. With the pending-only due indexes (0126-0128) a claim reads only pending rows, and 0125's pending-notice
+ * lock waits. With the pending-only due indexes (0132-0134) a claim reads only pending rows, and 0131's pending-notice
  * claims take the lease when the claim ends and never wait on a row another claim or finish holds. CI skips this
  * directory; run it alone.
  *

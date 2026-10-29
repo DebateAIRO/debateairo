@@ -590,6 +590,27 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // readRunRegisterVersion (both cast register_version in SQL). migrate() is byte-identical.
 // Side-by-side Phase 2, S9 fix round 1 (2026-10-22, spec §13, ruling R31): isDatabaseFailure and settingsRefusalCode
 // (the one rule both settings caches use) moved here beside isDatabasePoolBusy. migrate() is byte-identical.
+// synthesis-flag S01 (0126): the reviewed module after it re-exported the synthesis check's erasure module
+// (export * from "./synthesis-check-erasure.js", after the publication check's). migrate() is byte-identical.
+// synthesis-flag S04 (0128): the reviewed module after it exported the threat-report repository adapter;
+// migrate() is byte-identical, and the full module is re-sealed without stripping that export in the audit test.
+// synthesis-flag S05 r5: the reviewed module drops retired support repository exports; migrate() is unchanged.
+// synthesis-flag integration with origin/dev d78d58b4f (2026-10-26): the merged module of the side-by-side and
+// synthesis-flag lines above, pinned once. migrate() is origin/dev's.
+// Italy clause approval S01-C1 (2026-10-24, mission italy-clause-approval): the reviewed module after its legal-acceptance
+// re-export gained ItalyApprovalAcceptanceRow (migration 0125's row type, one type-only line). migrate() is byte-identical.
+// synthesis-flag integration with origin/dev b1005606c (2026-10-28): the merged module of the synthesis-flag and
+// Italy-approval lines above, pinned once. migrate() is origin/dev's.
+// Row-level security S01, C3 (2026-10-24, 47e673787; PLAN §0.3, DECISIONS D55, D58, D72): the module after it re-exported
+// ./account-context.js, createPool gained the crossAccount option and the request-scope routing (the credential sent at
+// checkout, release rule v3), wrapClientQueries looked a client's query up per call, and readRoleRotationCounts ran
+// inside crossAccount("X24"). migrate() is byte-identical (its 13,111-byte slice, sha256 d1495dbe4bbf…, at ca61cbe00 and
+// b6a70bc0c). Re-pinned by BUILD-S01-C10 (Ruling R-15), not by the module's writer; REV(S01) reviews the module.
+// Row-level security S01 merged into dev (2026-10-28): the module carries both changes above. migrate() is byte-identical
+// (its 13,114-byte slice, sha256 d1495dbe4bbf…, at ca61cbe00, origin/dev b1005606c and the slice head 235bd65df).
+// Row-level security S01 merged onto origin/dev 76b76f4ba (2026-10-28): the module carries the synthesis-flag lines and
+// row security's lines above. migrate() is byte-identical (its 13,114-byte slice, sha256 d1495dbe4bbf…, at ca61cbe00,
+// b1005606c, 76b76f4ba and 20808ee31).
 // Security fixes run 3 (2026-10, K02 NV-08): the content-provision attestation attests the erasure_reconcile schema by
 // OID. migrate() is byte-identical.
 // Security fixes run 3, K10 (NV-31, 2026-10-28): the run content lease records its live lease, a bare lease's key load
@@ -597,7 +618,16 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // Security fixes run 3 (K12, NV-38): migrate() CHANGED. It tries the schema-migrations session lock every 50 ms
 // (pg_try_advisory_lock) instead of waiting in a blocking lock statement, so a waiting migrator holds no snapshot
 // while an outside-transaction index step builds. The lock controls below follow it.
-const NATIVE_MIGRATE_MODULE_SHA256 = "249c767a9f98868c52c6b512981152f798caf49a9d7d7adb9a3c92afd4218d9a";
+// Security fixes run 3 merged with origin/dev 64ef40c21 (2026-10-29): the module carries dev's lines above (synthesis-flag,
+// Italy approval, row-level security) and the run-3 lines above (NV-08, NV-31, NV-38), pinned once. migrate() is the
+// run-3 one (NV-38's try-lock loop; its 13,717-byte slice, sha256 ceb877cc96cb…, as at 6497db330): dev left migrate() as
+// at d78d58b4f.
+// Same merge, after the renumbering: K02's comment names the security fixes' step by its new number (0131, was 0125).
+// migrate() is unchanged.
+// Same merge, NV-31 with row security (2026-10-30): each run content lease records the account-context source of its
+// checkout, and routeLeaseBodyQueries sends a body statement to a lease's client only while its own source is the
+// lease's (a crossAccount frame in a request's lease reaches the target). migrate() is unchanged.
+const NATIVE_MIGRATE_MODULE_SHA256 = "870e1403fbc43dae0a25d5caf3d6dfb1507f7807b20c057295df921389244372";
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
 // ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK and the rethrow after it, then the one retried
 // SQLSTATE). A6 review (2026-10-22): its doc gained one sentence (a step holds its locks until COMMIT; 2 s bounds each

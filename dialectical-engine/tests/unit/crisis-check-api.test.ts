@@ -11,6 +11,7 @@ import {
   testSessionApplication,
   testSessionHeaders
 } from "../support/httpSession.js";
+import { questionCheckPass } from "../support/questionCheckPass.js";
 
 /* Crisis check — the API half (V, 2026-09-30): a question that reads as a person in crisis is
    refused with CRISIS_SUPPORT_OFFERED before any other rule, so the person is sent to help
@@ -139,7 +140,7 @@ describe("crisis check before a debate starts", () => {
     const identity = testHttpIdentity("policy");
     const { sessions } = sessionsWithConsent(identity, "given");
     const asks = askSpy();
-    const api = buildApi({ application: asks.app, sessions, allowedOrigin: TEST_APP_ORIGIN });
+    const api = buildApi({ application: asks.app, questionCheck: questionCheckPass, sessions, allowedOrigin: TEST_APP_ORIGIN });
     try {
       const response = await api.inject({
         method: "POST", url: "/v1/asks", headers: testSessionHeaders(identity, true),
@@ -261,7 +262,8 @@ describe("crisis check before a debate starts", () => {
     const identity = testHttpIdentity("long-ordinary");
     const { sessions } = sessionsWithConsent(identity, "given");
     const asks = askSpy();
-    const api = buildApi({ application: asks.app, sessions, allowedOrigin: TEST_APP_ORIGIN });
+    // synthesis-flag S04: an ask that becomes a debate passes the question check first, as dev's own debate cases do.
+    const api = buildApi({ application: asks.app, questionCheck: questionCheckPass, sessions, allowedOrigin: TEST_APP_ORIGIN });
     try {
       const question = longBulgarianQuestion("");
       expect(Buffer.byteLength(question, "utf8")).toBeGreaterThanOrEqual(8_000);

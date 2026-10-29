@@ -5,8 +5,13 @@ export * from "./mfa-recovery.js";
 import { socialAuthContractSchemas } from './social-auth.js';
 export * from './social-auth.js';
 import { staffContractInventory, fundedStaffContractInventory } from "./staff-access.js";
+import { ThreatReportSchema as StaffThreatReportSchema } from "./staff-access.js";
 export * from "./staff-access.js";
 import { z } from "zod";
+/** A kept question from an unsigned ask has no account to identify (S04-R18). */
+export const ThreatReportSchema = StaffThreatReportSchema.extend({
+  account: StaffThreatReportSchema.shape.account.nullable()
+}).strict();
 import { CatalogLocaleCodeSchema } from "./locale.js";
 import { SessionSchema, LegalDocumentPairSchema } from "./auth-shared.js";
 export * from "./auth-shared.js";
@@ -20,6 +25,12 @@ import { AnswerDisclosureSchema, AnswerFloorSchema } from "./disclosure.js"; exp
 import { VerdictStateSchema } from "./verdict-state.js"; export * from "./verdict-state.js";
 import { DebateMapViewSchema } from "./map-view.js"; export * from "./map-view.js";
 export * from "./crisis.js";
+export * from "./question-check.js";
+export * from "./harm-helpline.js";
+import { SynthesisCheckHoldSchema, SynthesisFlagSchema, RemovalNoticeTakeSchema } from "./synthesis-check.js";
+export * from "./synthesis-check.js";
+import { PublicationReviewSummarySchema } from "./publication-review.js";
+export * from "./publication-review.js";
 export * from "./romania-address.js";
 export * from "./billing-address.js";
 
@@ -744,12 +755,15 @@ export const BillingCardDetailsResponseSchema = z.object({
   postal_code: z.string().max(16).nullable()
 }).strict();
 export type BillingCardDetailsResponse = z.infer<typeof BillingCardDetailsResponseSchema>;
-/** N13: the card-saving agreement and the corrected payer (spec §2.5.3: the country and the region are never sent). */
+/**
+ * N13: the card-saving agreement and the corrected payer (spec §2.5.3: the country and the region are never sent). The
+ * names are the quote's 120 each, so the profile's joined "first last" name fits its 256.
+ */
 export const BillingCardChangeRequestSchema = z.object({
   locale: z.string().regex(/^[a-z]{2}$/),
   renewal_terms: BillingDocumentPairSchema,
-  first_name: z.string().trim().min(1).max(128),
-  last_name: z.string().trim().min(1).max(128),
+  first_name: z.string().trim().min(1).max(120),
+  last_name: z.string().trim().min(1).max(120),
   phone: z.string().trim().min(8).max(20),
   street: z.string().trim().min(1).max(256),
   city: z.string().trim().min(1).max(128),
@@ -787,6 +801,7 @@ export const RunProjectionSchema = z.object({
   state: z.enum(["QUEUED", "WAITING", "CLAIMED", "RUNNING", "HOLDING", "SETTLED", "FAILED"]),
   terminal_reason: z.string().trim().min(1).nullable(),
   hold_until: z.iso.datetime().nullable(),
+  synthesis_check: SynthesisCheckHoldSchema.optional(),
   // R2 (spec 2026-09-26 §14.3): null on a database without dev's migration
   // 0072; optional, so a reader built before the field still parses.
   argument_language: ArgumentLanguageSchema.nullable().optional(),
@@ -1246,6 +1261,9 @@ export const AnswerSummarySchema = z.object({
   staleness_state: StalenessStateSchema,
   builds_on_previous: z.boolean(),
   created_at_sequence: z.number().int().positive(),
+  synthesis_flag: SynthesisFlagSchema.nullable().optional(),
+  synthesis_check: SynthesisCheckHoldSchema.optional(),
+  publication_review: PublicationReviewSummarySchema.nullable().optional(),
   // DL3-F2: the library row states the model lineage that made it, exactly as
   // PublicDebateSummarySchema.models does for a published debate. The index
   // query already reads every answer projection it summarises, so this costs
@@ -1707,6 +1725,7 @@ export const contractInventory = Object.freeze({
     "GET /v1/account/export",
     "POST /v1/account/export",
     "POST /v1/account/export/download",
+    "POST /v1/account/removal-notice/take",
     "GET /v1/account/legal-status",
     "POST /v1/account/legal-accept",
     "POST /v1/account/legacy-runs/claim",
@@ -1729,15 +1748,7 @@ export const contractInventory = Object.freeze({
     // Addition D24: the companies the declared provider targets reach, for the "AI providers" page.
     "GET /v1/public/ai-providers",
     "GET /v1/geo/availability",
-    "POST /v1/support/sessions",
-    "GET /v1/support/sessions/{id}",
-    "POST /v1/support/sessions/{id}/messages",
-    "POST /v1/support/messages/{id}/rating",
-    "POST /v1/support/sessions/{id}/escalate",
-    "GET /v1/support/cases",
-    // DL1-F5c/DL3-F4: the case bearer rides `x-support-case-token`, never a path.
-    "GET /v1/support/case",
-    "POST /v1/support/case/messages",
+    "POST /v1/support/messages",
     "GET /v1/support/status",
     "POST /v1/asks",
     "GET /v1/asks/room",
@@ -1764,6 +1775,8 @@ export const contractInventory = Object.freeze({
     "GET /v1/runs/{id}/answer",
     "POST /v1/runs/{id}/publish",
     "POST /v1/runs/{id}/unpublish",
+    "POST /v1/runs/{id}/publication-review",
+    "GET /v1/runs/{id}/publication-review",
     "GET /v1/billing/usage",
     "GET /v1/billing/plans",
     "POST /v1/billing/quote",
@@ -1810,6 +1823,7 @@ export const contractInventory = Object.freeze({
     EmailChangeConfirmedSchema,EmailChangeCancelledSchema,
     PublicationTransitionSchema, PublicDebateSummarySchema, PublicDebateSchema, PublicDebateListSchema,
     DeploymentSchema, AnswerSummarySchema, OpenRunSummarySchema, AnswerIndexSchema,
+    SynthesisFlagSchema, SynthesisCheckHoldSchema, RemovalNoticeTakeSchema,
     AnswerSchema, InspectionSchema, NodeSchema,
     RunEventSchema, ComposedSegmentSchema, NumberSlotSchema, BandCeilingSchema, StalenessStateSchema,
     ShadowSuppressionSchema, AbstentionSchema, InvestigationGapSchema, InvestigationRequestSchema,

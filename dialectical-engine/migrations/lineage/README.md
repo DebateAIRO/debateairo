@@ -10,12 +10,13 @@ base verifier).
 
 Every migration after 0110 is a forward step in an ordered chain anchored on 0110; 0111 (NETOPIA, PR-54, PR-58) is the
 first, the auth DB batch (0112, below) the second, Part C's prices (0113, below) the third, role rotation (0114,
-below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth, the settings activation (0124, below) the fourteenth, the security fixes of audit run 3 (0125, below) the fifteenth, the three recovery notice due indexes (0126, 0127 and 0128, below) the sixteenth to eighteenth, and the MFA recovery control user index (0129, below) the nineteenth. A step is added with new files only; NNNN is its number, the step before's number plus one:
+below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth, the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, the synthesis check (0126, below) the sixteenth, the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth, the support answer scope (0129, below) the nineteenth, row-level security (0130, below) the twentieth, the security fixes of audit run 3 (0131, below) the twenty-first, the three recovery notice due indexes (0132, 0133 and 0134, below) the twenty-second to twenty-fourth, and the MFA recovery control user index (0135, below) the twenty-fifth. A step is added with new files only; NNNN is its number, the step before's number plus one:
 
 1. `migrations/NNNN_<name>.sql`: the SQL, forward-only and replayable.
 2. A manifest in `lineage/`, shaped like `billing-netopia-forward111.json`: its version, the recipe's SHA-256,
-   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0129: 0129,
-   `mfa-recovery-control-user-started-forward0129.json`, and `verify-effective-capabilities-111.sql`, which 0112 to 0129 keep),
+   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0135: 0135,
+   `mfa-recovery-control-user-started-forward0135.json`, and `verify-effective-capabilities-130.sql`, which supersedes
+   0111's, which 0112 to 0129 keep, and which 0131 to 0135 keep),
    and its own migration and verifier. (0111's own `previous` is 0110: `auth-dev-preview-20261006-forward110.json`
    and the sealed `verify-effective-capabilities.sql`.)
 3. A new verifier `lineage/verify-effective-capabilities-NNNN.sql` only when the step adds billing relations or
@@ -324,24 +325,145 @@ supplemental verifier, so no `replayVerifierSql`: its postcondition is the three
 whole. If `origin/dev` takes 0124 first, renumber this step (rename every file and constant that carries the number,
 recompute the manifest, re-pin the chain lists).
 
-## The security fixes of audit run 3 (0125)
+## The Italy-specific approval (0125)
 
-The fifteenth chain step, after the settings activation's 0124 (security audit run 3, the fix branch's one database
-step): `0125_security_fixes_run3.sql`, `security-fixes-run3-forward0125.json`,
-`packages/db/src/migration-forward0125.ts` (`loadForward0125`, appended last to `STEPS`, `MIGRATION_FORWARD0125_*`
+The fifteenth chain step, after the settings activation's 0124 (mission italy-clause-approval, slice S01; the second,
+unticked sign-up checkbox of the Italian Civil Code arts. 1341-1342, `docs/missions/italy-clause-approval/slices/S01/`):
+`0125_italy_specific_approval.sql`, `italy-specific-approval-forward0125.json`, `packages/db/src/migration-forward0125.ts`
+(`loadForward0125`, appended last to `STEPS`, `MIGRATION_FORWARD0125_*` refusals). The second `-- n1: expand` step
+(with `-- n1: keeps-verifier`): two nullable columns without a default, `legal.acceptance.clauses` (smallint[], the
+Terms clauses approved, 11, 12, 14, 15 and 18 in that order) and `legal.acceptance.leg` (text: `PICKED`, `IP` or
+`BOTH`, which test placed the sign-up in Italy); three CHECKs, added `NOT VALID` behind a reviewed line each:
+`acceptance_kind_check` (0080's inline kind list) and `acceptance_document_version_shape` (0080) widened with the kind
+`ITALY_SPECIFIC_APPROVAL` (which carries the Terms' `N.M` version), and the new `acceptance_italy_fields` (the two
+columns are set exactly on that kind, to that one list and a known leg, and are NULL on every other kind; null-safe);
+and two new functions: `identity.record_signup_italy_approval(uuid,jsonb)` (the sign-up writer, EXECUTE for
+`debateai_billing_runtime` only: inside the sign-up transaction it refuses `ITALY_APPROVAL_INVALID`,
+`ITALY_APPROVAL_ACCOUNT_INVALID`, `ITALY_APPROVAL_TERMS_MISSING` and `ITALY_APPROVAL_DUPLICATE` in that order, then
+writes one row whose document version, digest, locale and time are the account's sign-up TERMS row's) and
+`identity.read_data_export_snapshot_v2(uuid,uuid)` (EXECUTE for `debateai_data_export_worker` only, owned by 0115's
+export owner: it calls 0115's frozen `identity.read_data_export_snapshot`, lease check included, and adds `clauses` and
+`leg` to every `legal_acceptances` element). The release before writes only kinds both CHECK versions accept and neither
+new column, so it keeps running beside the step. No billing relation or function, so
+`verify-effective-capabilities-111.sql` stays the verifier in force; no supplemental verifier, so no
+`replayVerifierSql`: its postcondition is the two columns (type, NOT NULL, default) and the two functions whole. The
+three CHECKs are checked by the file's closing block and by tests, not digested, so a later step may widen the kind list
+again without a postcondition drift on 0125. If `origin/dev` takes 0125 first, renumber this step (rename every file and
+constant that carries the number, recompute the manifest, re-pin the chain lists).
+
+## The synthesis check (0126)
+
+The sixteenth chain step, after the Italy-specific approval's 0125, is `0126_synthesis_check.sql` with
+`synthesis-check-forward0126.json` and `packages/db/src/migration-forward0126.ts`. Its loader is appended to
+`STEPS` and refuses altered inputs with `MIGRATION_FORWARD0126_` codes. It has no supplemental
+`replayVerifierSql`; the effective `verify-effective-capabilities-111.sql` stays in force. Its postcondition
+records its own seven tables: `serve.synthesis_check_request`, `serve.synthesis_check_attempt`,
+`serve.synthesis_check_result`, `serve.synthesis_check_inheritance`,
+`serve.synthesis_check_removal_request`, `serve.synthesis_check_removal_notice` and
+`identity.synthesis_check_erasure_binding`, plus its own functions, triggers and constraint. It widens the
+model-spend source list with `SYNTHESIS_CHECK` and grants the three erasure functions only to
+`debateai_erasure_runtime`. If an earlier pending step takes 0126 first, renumber this step and recompute
+its manifest and chain pins before merge.
+
+## The publication review (0127)
+
+The seventeenth step adds the request, decision and transient reviewer-copy tables in serve, plus the staff review event table.
+It extends the staff capability and staff-action lists and installs two sever triggers so key destruction removes the run-linked review rows.
+The Ask consumes a PUBLISH grant; no identity step-up object changes.
+Its manifest is `publication-review-forward0127.json`, and its loader is `packages/db/src/migration-forward0127.ts`.
+It keeps the previous effective verifier because it adds no billing relation or function.
+A hosted deploy applies it with `pnpm db:migrate`.
+
+## The threat reports (0128)
+
+The eighteenth chain step, after the publication review's 0127 (synthesis-flag S04, `docs/missions/synthesis-flag/slices/S04/SPEC-v8.md` §5a): `0128_threat_reports.sql`, `threat-reports-forward0128.json`, `packages/db/src/migration-forward0128.ts` (`loadForward0128`, appended last to `STEPS`, `MIGRATION_FORWARD0128_` refusals).
+It creates `staff.threat_report`, `staff.threat_report_event`, `staff.threat_report_alert`, eleven staff and export functions, and two ledger functions for the question-check spend writer and its invoker trigger.
+The eight shared objects it changes are `model_spend_spend_source_check`, `subject_capabilities_check`, `staff.valid_capabilities`, `staff.authorize_action`, `staff.owned_action_allowed`, `staff.begin_owned_webauthn`, `staff.commit_owner_command` and `staff.read_audit_page`; it pins none of them (W-0117).
+`verify-effective-capabilities-111.sql` stays the verifier in force; there is no `replayVerifierSql`.
+If an earlier pending step takes 0128 first, renumber this step, recompute its manifest and re-pin the chain lists before merge.
+
+## The support answer scope (0129)
+
+The nineteenth step, after the threat reports (0128), is `0129_support_answer_scope.sql` with
+`support-answer-scope-forward0129.json` and `packages/db/src/migration-forward0129.ts`.
+It revokes `INSERT` on the fourteen support conversation and model-call tables from `debateai_support`.
+It deletes every row in those tables and `support.shred_audit` in dependency order, with the thirteen
+0065 mutation and delete guards temporarily disabled, then makes `support.support_shred_row_guard`
+immediate and restores all thirteen guards. The terminal block checks the guards, the seventeen
+truncate guards, the revoked privileges and empty tables. Its catalog-only postcondition binds
+the support relation grants and guard definitions without retaining a row count: a later owner
+seed followed by `migrate()` does not drift. The effective verifier remains
+`verify-effective-capabilities-111.sql`; there is no `replayVerifierSql`. If an earlier pending
+step takes 0129 first, renumber it and recompute the manifest and `STEPS` chain pins.
+
+## Row-level security (0130)
+
+The twentieth chain step, after the support answer scope's 0129 (mission row-level-security, slice S01:
+`docs/missions/row-level-security/slices/S01/SPEC-v4.md`, `PLAN.md` steps S1.3-S1.6, `DECISIONS.md` D27-D33 and D38;
+ADR-0033): `0130_row_level_security.sql`, `row-level-security-forward0130.json`,
+`packages/db/src/migration-forward0130.ts` (`loadForward0130`, appended last to `STEPS`, `MIGRATION_FORWARD0130_*`
+refusals). It enables row security (never forced) on the 115 in-scope tables, each with two permissive `FOR ALL`
+policies: `rls_account` `TO debateai_runtime` (the per-account predicate of D32, `USING` = `WITH CHECK`) and
+`rls_all_accounts` `TO` the eleven cross-account roles of D29 (`true`); it sets `security_invoker = true` on the three
+in-scope views and moves `core.run_waiting_v`'s SELECT from `debateai_runtime` to `debateai_billing_runtime` (D33); and
+it adds the schema `rls` (USAGE for `debateai_runtime` only) with five `STABLE SECURITY DEFINER` functions on
+`search_path = pg_catalog` (`rls.session_credential_hash()`, callable by no role; `rls.context_user_id()`,
+`rls.context_owner_ref()`, `rls.owns_run(uuid)`, `rls.owns_execution_ref(text)`, EXECUTE for `debateai_runtime`), which
+derive the account from the session token in the setting `debateai.session_credential` by looking its hash up in
+`identity.session`, and the NOLOGIN NOINHERIT marker role `debateai_rls_all_accounts` (no member until the provisioners
+grant it to the system logins). Its postcondition digests, for every in-scope table, `relrowsecurity`,
+`relforcerowsecurity` and every policy (name, command, roles, permissive flag, `USING`, `WITH CHECK`), the views'
+options and ACLs, the five functions whole and the marker's attributes, so any unrecorded change refuses
+`MIGRATION_FORWARD_CHAIN_POSTCONDITION_DRIFT 0130_row_level_security.sql`. No supplemental verifier, so no
+`replayVerifierSql`.
+
+Two earlier promises change by design, each by a recorded mechanism (D38; Ruling R-10, F-C1-1). (1) Seven earlier
+postconditions digest the row-security flag of twenty-three tables (0111: its eight in-scope NETOPIA tables
+`billing.card_token`, `billing.card_token_revocation`, `billing.hosted_payment`, `billing.notice_quarantine`,
+`billing.payment_notice`, `billing.payment_notice_outcome`, `billing.payment_notice_raw`, `billing.status_read`; 0117: `core.map_choice`, `core.map_item`, `core.map_position`; 0119:
+`core.map_position_repoint`; 0121: `ledger.point_investigation`, `ledger.verdict_vote`; 0122: `core.map_answer_check`,
+`core.map_item_rests_on`; 0123: `core.run_supersession`, `ledger.model_spend_waiver`; 0126: the five `serve.synthesis_check_*` tables below). The step declares them in
+`amendsPostconditionsOf` (loader and manifest, which must agree, else `MIGRATION_FORWARD0130_MANIFEST`), and
+`applyForwardStep` stores one row per amended step in the migrator-private table
+`public.debateai_schema_migration_step_amendment` (`source_name`, `amended_by`, `amendment` jsonb,
+`postcondition_evidence_digest`, `recorded_at`; primary key `(source_name, amended_by)`; created on first use by
+`replayForwardChain` and checked like the declaration table, `MIGRATION_FORWARD_CHAIN_AMENDMENT_ACL`) with that step's
+digest re-measured right after 0130's SQL; from then on each amended step is compared against its latest amendment,
+so any later unrecorded change to its objects, the flag included, still refuses `POSTCONDITION_DRIFT <step>`. An
+amendment of a step not yet applied refuses `MIGRATION_FORWARD_CHAIN_AMENDMENT_ORDER`, and a row whose `amended_by` is
+not an applied step refuses `MIGRATION_FORWARD_CHAIN_AMENDMENT_BINDING_DRIFT`. (2) 0111's verifier refused row security
+on its NETOPIA tables; `verify-effective-capabilities-130.sql` supersedes it (R34), a byte copy except line 217 (its
+comment) and line 221, where `OR c.relrowsecurity` becomes `OR c.relrowsecurity IS DISTINCT FROM (v_name <> 'tool_order')
+OR c.relforcerowsecurity`: the eight in-scope NETOPIA tables must have row security on and not forced, and
+`billing.tool_order` (out of scope, R3) must keep none. So the header declares `-- n1: drained` (uploaded with no debate
+waiting or running, V-1: an expand step may not change row security) and no `-- n1: keeps-verifier`. `origin/dev`
+took 0124 and 0125 first, so this step was renumbered from 0124 to 0126 at its merge (every file and constant that
+carries the number, the manifest recomputed, the chain lists re-pinned); mission synthesis-flag then took 0126 to 0129,
+so it was renumbered again, to 0130, at its merge onto that dev (2026-10-28). That merge added the five
+`serve.synthesis_check_*` tables 0126 grants `debateai_runtime` SELECT on to the in-scope set (113 to 118 relations; each
+keyed on its run, K4) and V-18's guard on `serve.synthesis_check_attempt.request_id`.
+
+## The security fixes of audit run 3 (0131)
+
+The twenty-first chain step, after row-level security's 0130 (security audit run 3, the fix branch's one database
+step): `0131_security_fixes_run3.sql`, `security-fixes-run3-forward0131.json`,
+`packages/db/src/migration-forward0131.ts` (`loadForward0131`, appended last to `STEPS`, `MIGRATION_FORWARD0131_*`
 refusals). Every SQL change of the branch goes into this one file, in one section per issue, each opened by a line
 `-- ==== [<issue id>] <short title> ====` and holding only that issue's statements. Its header declares
 `-- n1: expand` and `-- n1: keeps-verifier`: every section only adds (new functions as `CREATE OR REPLACE FUNCTION` of
 names no earlier file defines, `REVOKE` only on objects this file creates, a reviewed `-- n1: reviewed <reason>` line
 above any of the four admitted exceptions), and no section adds a billing relation or function, so
-`verify-effective-capabilities-111.sql` stays the verifier in force. No supplemental verifier, so no
+`verify-effective-capabilities-130.sql` stays the verifier in force. No supplemental verifier, so no
 `replayVerifierSql`: its postcondition is one group per section, in section order (the loader's `SECTIONS` list: the
 section's id, its functions whole and its tables whole, plus, only in a section that names them, its `tablePrivileges`
 answers of `has_table_privilege` for grants it adds on an earlier step's table, its `schemas`: owner and ACL of a
 schema it creates, its `triggers`: the enabled flag and definition of a trigger it re-creates on an earlier step's
 table, and its `constraints`: the name, type and definition, without a trailing `NOT VALID`, of a constraint it adds
 on an earlier step's table, never that table whole), and the loader refuses
-`MIGRATION_FORWARD0125_SECTIONS` when the file's section headers and that list disagree. The sections:
+`MIGRATION_FORWARD0131_SECTIONS` when the file's section headers and that list disagree. The fix branch built this step
+and the four index steps after it as 0125 to 0129; `origin/dev` took 0125 to 0130 first, so they were renumbered to
+0131 to 0135 at the merge onto that dev (2026-10-29: every file and constant that carries the number, the manifests
+re-chained from 0130's, which also hands them 0130's verifier, and the chain lists re-pinned). The sections:
 
 - `[NV-16]` `identity.mfa_recovery_start_bounded(bytea,text,uuid,uuid[],text,text,jsonb,jsonb,bigint,uuid)`, owned by
   `debateai_mfa_recovery_owner` (SECURITY DEFINER, `search_path=pg_catalog, pg_temp`, EXECUTE for
@@ -508,42 +630,43 @@ on an earlier step's table, never that table whole), and the loader refuses
   only when all 64 are locked at that instant. The v1 admits keep their grants for the release before, which still
   refuses a new digest at capacity.
 - `[NV-50]`, the LAST section: no function and no relation. On `ledger.model_spend` it replaces 0074's shared
-  `model_spend_spend_source_check` (last widened by 0118) in place, wider, by name, with the two new sources
-  `RUN_UNANSWERED` and `STORY_UNANSWERED`, and adds `model_spend_unanswered_names_its_attempt` (an unanswered row names
+  `model_spend_spend_source_check` (last widened by 0128, which 0126 widened before it) in place, wider, by name: every
+  source 0126 and 0128 allow (`SYNTHESIS_CHECK`, `QUESTION_CHECK`) stays, and the two new sources `RUN_UNANSWERED` and
+  `STORY_UNANSWERED` are added after them; it also adds `model_spend_unanswered_names_its_attempt` (an unanswered row names
   its run and its attempt and carries no phase). Each is a reviewed `DROP CONSTRAINT IF EXISTS` / `ADD … NOT VALID`
   pair, and a `DO` block checks both constraints and 0066's two append-only guards. The new release's gateway charges
   an attempt that was sent and never answered as one of these sources, at its reported usage or else its projected
   maximum; the run's or story's envelope and the site's day count it, and no person reader does. The loader's
   `constraints` entry digests the new restriction only: the shared list stays unpinned (W-0117), and a later
   contract step validates both. It stays last because the pair takes ACCESS EXCLUSIVE on `ledger.model_spend` until
-  0125 commits, so every spend read and write of the release before waits for the rest of the step.
+  0131 commits, so every spend read and write of the release before waits for the rest of the step.
 
 While the branch is open, each issue inserts its section, its entry in `SECTIONS` (keeping every earlier entry) and
 its bullet above just before `[NV-50]`'s, which stays last, recomputes `migration.sha256` with the one-liner at the end of this file, and extends the
-chain's tests; once the step is applied anywhere, 0125 is never edited again. If `origin/dev` takes 0125 first,
+chain's tests; once the step is applied anywhere, 0131 is never edited again. If `origin/dev` takes 0131 first,
 renumber this step (rename every file and constant that carries the number, recompute the manifest, re-pin the chain
 lists).
 
-## Recovery notice due indexes (0126-0128)
+## Recovery notice due indexes (0132-0134)
 
-The sixteenth, seventeenth and eighteenth chain steps, after the security fixes of audit run 3 (0125; security audit run
+The twenty-second, twenty-third and twenty-fourth chain steps, after the security fixes of audit run 3 (0131; security audit run
 3, NV-38): the pending-only due indexes of the three recovery mail outboxes, in the shape 0103 gives
 `identity.password_recovery_notice` (`(available_at, created_at, notice_id) WHERE sent_at IS NULL AND dead_at IS NULL`),
 so that every claim on them, the release before's and this release's alike, reads only pending rows instead of the
 whole retained history:
 
-- `0126_password_reset_notice_due.sql`, `password-reset-notice-due-forward0126.json`,
-  `packages/db/src/migration-forward0126.ts` (`loadForward0126`, `MIGRATION_FORWARD0126_*` refusals):
+- `0132_password_reset_notice_due.sql`, `password-reset-notice-due-forward0132.json`,
+  `packages/db/src/migration-forward0132.ts` (`loadForward0132`, `MIGRATION_FORWARD0132_*` refusals):
   `identity.password_reset_notice_due`;
-- `0127_backup_email_notice_due.sql`, `backup-email-notice-due-forward0127.json`,
-  `packages/db/src/migration-forward0127.ts` (`loadForward0127`, `MIGRATION_FORWARD0127_*`):
+- `0133_backup_email_notice_due.sql`, `backup-email-notice-due-forward0133.json`,
+  `packages/db/src/migration-forward0133.ts` (`loadForward0133`, `MIGRATION_FORWARD0133_*`):
   `identity.backup_email_notice_due`;
-- `0128_mfa_recovery_notice_due.sql`, `mfa-recovery-notice-due-forward0128.json`,
-  `packages/db/src/migration-forward0128.ts` (`loadForward0128`, `MIGRATION_FORWARD0128_*`):
+- `0134_mfa_recovery_notice_due.sql`, `mfa-recovery-notice-due-forward0134.json`,
+  `packages/db/src/migration-forward0134.ts` (`loadForward0134`, `MIGRATION_FORWARD0134_*`):
   `identity.mfa_recovery_notice_due`.
 
 Each header declares `-- n1: expand`, `-- n1: keeps-verifier` and `-- n1: outside-transaction`, and each body is ONE
-`CREATE INDEX CONCURRENTLY IF NOT EXISTS <name> ON identity.<table> …`. They cannot be sections of 0125: `CREATE INDEX`
+`CREATE INDEX CONCURRENTLY IF NOT EXISTS <name> ON identity.<table> …`. They cannot be sections of 0131: `CREATE INDEX`
 without `CONCURRENTLY` on an existing table is refused in an expand step (step 7 above), and PostgreSQL refuses a
 concurrent build inside a transaction block, which every other step runs in. `CONCURRENTLY` takes SHARE UPDATE
 EXCLUSIVE only, so the release before keeps reading and writing the tables during a build. `migrate()` builds each
@@ -553,32 +676,32 @@ lock waits leaves an INVALID index, which the next run drops concurrently and bu
 loader, `packages/db/src/migration-forward-concurrent-index.ts` (`loadConcurrentIndexStep`): it checks the manifest as
 `loadForward0124` does, refuses `MIGRATION_FORWARD01NN_INDEX_DECLARATION` unless the header's index is the step's own,
 and has no `replayVerifierSql`: the postcondition is the index row whole (its definition, valid, ready, not unique, its
-owner). Each step keeps the verifier 0125 names (`verify-effective-capabilities-111.sql`), so its manifest names it as
+owner). Each step keeps the verifier 0131 names (`verify-effective-capabilities-130.sql`), so its manifest names it as
 both `previous.verifierSha256` and its own. A later index step on an existing table is one more such file, manifest and
-three-line loader on the shared one (NV-15's `mfa_recovery_control_user_started`, 0129 below, is the next).
+three-line loader on the shared one (NV-15's `mfa_recovery_control_user_started`, 0135 below, is the next).
 
 A test seed that applies steps with `applyForwardStep` inside one transaction (`tests/support/devLineage108.ts`,
-`seedDevLineageThroughStep`) cannot seed through 0126 or later: nothing builds the index, so the step is refused
-`MIGRATION_OUTSIDE_TRANSACTION_INDEX_INVALID`. Such a seed stops at 0125, or runs `runOutsideTransactionStep` first.
+`seedDevLineageThroughStep`) cannot seed through 0132 or later: nothing builds the index, so the step is refused
+`MIGRATION_OUTSIDE_TRANSACTION_INDEX_INVALID`. Such a seed stops at 0131, or runs `runOutsideTransactionStep` first.
 
-**Re-sealing after a 0125 change.** Each manifest's `previous.manifestSha256` is the SHA-256 of the manifest of the
-step before it, so any change to 0125 (a new section, then its `migration.sha256`) changes 0125's manifest and refuses
-0126 (`MIGRATION_FORWARD0126_MANIFEST`), and with it 0127, 0128 and 0129. After the last 0125 edit, recompute 0125's
-`migration.sha256`, then `previous.manifestSha256` of 0126, then of 0127, then of 0128, then of 0129 (NV-15's index
+**Re-sealing after a 0131 change.** Each manifest's `previous.manifestSha256` is the SHA-256 of the manifest of the
+step before it, so any change to 0131 (a new section, then its `migration.sha256`) changes 0131's manifest and refuses
+0132 (`MIGRATION_FORWARD0132_MANIFEST`), and with it 0133, 0134 and 0135. After the last 0131 edit, recompute 0131's
+`migration.sha256`, then `previous.manifestSha256` of 0132, then of 0133, then of 0134, then of 0135 (NV-15's index
 step, below; and of any later step after it), in that order. From the project root, this one command does all of it and prints
 each manifest it re-chained:
 
 ```
-node -e 'const fs=require("node:fs"),h=b=>require("node:crypto").createHash("sha256").update(b).digest("hex"),L="migrations/lineage/",all=fs.readdirSync(L).filter(f=>f.endsWith(".json")).map(f=>({f,m:JSON.parse(fs.readFileSync(L+f,"utf8"))})),put=e=>fs.writeFileSync(L+e.f,JSON.stringify(e.m,null,2)+"\n");let e=all.find(x=>x.m.migration?.name==="0125_security_fixes_run3.sql");e.m.migration.sha256=h(fs.readFileSync("migrations/"+e.m.migration.name));put(e);for(let n;(n=all.find(x=>x.m.previous?.name===e.m.migration.name));e=n){n.m.previous.manifestSha256=h(fs.readFileSync(L+e.f));put(n);console.log("re-chained",n.f);}'
+node -e 'const fs=require("node:fs"),h=b=>require("node:crypto").createHash("sha256").update(b).digest("hex"),L="migrations/lineage/",all=fs.readdirSync(L).filter(f=>f.endsWith(".json")).map(f=>({f,m:JSON.parse(fs.readFileSync(L+f,"utf8"))})),put=e=>fs.writeFileSync(L+e.f,JSON.stringify(e.m,null,2)+"\n");let e=all.find(x=>x.m.migration?.name==="0131_security_fixes_run3.sql");e.m.migration.sha256=h(fs.readFileSync("migrations/"+e.m.migration.name));put(e);for(let n;(n=all.find(x=>x.m.previous?.name===e.m.migration.name));e=n){n.m.previous.manifestSha256=h(fs.readFileSync(L+e.f));put(n);console.log("re-chained",n.f);}'
 ```
 
-If 0125 ever names a verifier of its own, set each later manifest's `previous.verifierSha256` and `verifier` to it too.
-If `origin/dev` takes 0126, 0127 or 0128 first, renumber these steps (rename every file and constant that carries the
+If 0131 ever names a verifier of its own, set each later manifest's `previous.verifierSha256` and `verifier` to it too.
+If `origin/dev` takes 0132, 0133 or 0134 first, renumber these steps (rename every file and constant that carries the
 number, recompute the manifests, re-pin the chain lists).
 
-## The MFA recovery control user index (0129)
+## The MFA recovery control user index (0135)
 
-The nineteenth chain step, after the recovery notice due indexes (0126-0128; security audit run 3, NV-15 and NV-16):
+The twenty-fifth chain step, after the recovery notice due indexes (0132-0134; security audit run 3, NV-15 and NV-16):
 `identity.mfa_recovery_control_user_started` on `identity.mfa_recovery_control (user_id, email_expires_at)`. NV-15's
 account-level count of unpaired link-password failures and its latest pairing (`identity.mfa_recovery_record_failure`)
 and NV-16's per-destination start count (`identity.mfa_recovery_start_bounded`) read the table by `user_id`, which no
@@ -586,17 +709,17 @@ other index leads with (the only one is 0112's partial `mfa_recovery_control_one
 (rows go only with erasure and the FK cascade). The second column bounds both counts' `email_expires_at` test. Neither
 plan's SQL changes: the index only serves their reads.
 
-- `0129_mfa_recovery_control_user_started.sql`, `mfa-recovery-control-user-started-forward0129.json`,
-  `packages/db/src/migration-forward0129.ts` (`loadForward0129`, `MIGRATION_FORWARD0129_*` refusals):
+- `0135_mfa_recovery_control_user_started.sql`, `mfa-recovery-control-user-started-forward0135.json`,
+  `packages/db/src/migration-forward0135.ts` (`loadForward0135`, `MIGRATION_FORWARD0135_*` refusals):
   `identity.mfa_recovery_control_user_started`.
 
-It is shaped like 0126-0128 (above): its header declares `-- n1: expand`, `-- n1: keeps-verifier` and
+It is shaped like 0132-0134 (above): its header declares `-- n1: expand`, `-- n1: keeps-verifier` and
 `-- n1: outside-transaction`, its body is ONE `CREATE INDEX CONCURRENTLY IF NOT EXISTS …`, its three-line loader runs on
 the shared `packages/db/src/migration-forward-concurrent-index.ts` (the postcondition is the index row whole, and there
-is no `replayVerifierSql`), and its manifest names 0111's verifier (`verify-effective-capabilities-111.sql`) as both
-`previous.verifierSha256` and its own. Its `previous` is 0128, so its `previous.manifestSha256` is the SHA-256 of
-`mfa-recovery-notice-due-forward0128.json`: a change to 0125 re-chains it too, and the one-liner of "Re-sealing after a
-0125 change" (above) walks to it by `previous.name`. If `origin/dev` takes 0129 first, renumber this step (rename every
+is no `replayVerifierSql`), and its manifest names 0130's verifier (`verify-effective-capabilities-130.sql`) as both
+`previous.verifierSha256` and its own. Its `previous` is 0134, so its `previous.manifestSha256` is the SHA-256 of
+`mfa-recovery-notice-due-forward0134.json`: a change to 0131 re-chains it too, and the one-liner of "Re-sealing after a
+0131 change" (above) walks to it by `previous.name`. If `origin/dev` takes 0135 first, renumber this step (rename every
 file and constant that carries the number, recompute the manifest, re-pin the chain lists).
 
 
@@ -611,9 +734,10 @@ changes something an earlier step's verifier pins must change that verifier thro
 cannot silently pass. The effective-capability verifier of the last applied step (after 0129: 0111's, which the batch,
 Part C's step, role rotation, the data export, the mail locale, the debate shape map, the language check's site cost,
 the reclaim resume, the reply measures, the engine verdict, the engine's map answer step, the side-by-side releases,
-the settings activation, the security fixes of audit run 3, the three recovery notice due indexes and the MFA recovery
-control user index keep) still runs
-at the end of every `migrate()`.
+the settings activation, the Italy-specific approval, the synthesis check, the publication review, the threat reports and the support answer scope keep; after 0130: `verify-effective-capabilities-130.sql`, which the security fixes of audit run 3, the three recovery notice due indexes and the MFA recovery control user index keep) still
+runs at the end of every `migrate()`. A step that changes by design a field an earlier step's postcondition digests
+declares it (`amendsPostconditionsOf`, 0130 below): the earlier step is then compared against its latest recorded
+amendment instead of its receipt.
 
 ## One transaction per step (side-by-side §5)
 

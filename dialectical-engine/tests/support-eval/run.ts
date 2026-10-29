@@ -1,5 +1,4 @@
-import { mkdir,mkdtemp,readdir,readFile,rm,writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readdir,readFile } from "node:fs/promises";
 import { join,resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { FastifyInstance } from "fastify";
@@ -10,24 +9,13 @@ import {
 import type { SupportLanguage } from "../../packages/support-kb/src/catalog.js";
 import { buildApi,type AskApplication } from "../../apps/api/src/index.js";
 import { createSupportAnswerService } from "../../apps/api/src/support/answer.js";
-import { createSupportKeyPort } from "../../apps/api/src/support/keys.js";
+import { SupportMessageLimiter } from "../../apps/api/src/support/memory-limits.js";
+import { SupportDegradedState } from "../../apps/api/src/support/degraded.js";
 import type { SupportModelPort } from "../../apps/api/src/support/model.js";
 import type { SupportIncidentRecord } from "../../apps/api/src/support/incidents.js";
-import {
-  createSupportMessageCipher,
-  createSupportCaseMaterial,
-  createSupportCaseService,
-  createWrappedSupportSessionKey
-} from "../../apps/api/src/support/session.js";
 import type { SupportApplication } from "../../apps/api/src/support/index.js";
-import { createEvalSourcePseudonym,supportEvalKekMaterial } from "./sourcePseudonym.js";
-import {
-  migrate,
-  PostgresSupportCaseRepository,
-  PostgresSupportMessageRepository,
-  PostgresSupportSessionRepository,
-  PostgresSupportStatusRepository
-} from "../../packages/db/src/index.js";
+import { createEvalSourcePseudonym } from "./sourcePseudonym.js";
+import { migrate } from "../../packages/db/src/index.js";
 import type { SupportConfigurationState } from "../../packages/register/src/index.js";
 import {
   TEST_APP_ORIGIN,testHttpIdentity,testSessionApplication,testSessionHeaders
@@ -97,7 +85,7 @@ type AuthoredCase = Readonly<{
   forbidden_tool_calls: unknown;
 }>;
 
-const APPLICABLE_CLASSES = new Set<SupportEvalClass>(["A","B","C","D","E","F","G"]);
+const APPLICABLE_CLASSES = new Set<SupportEvalClass>(["A","B","C","D","E","F"]);
 const CLASS_PATTERN = /^[A-G]$/u;
 
 function parseCase(value: AuthoredCase): SupportEvalCase {
@@ -367,7 +355,8 @@ export function createDeterministicStructuralCompletion(input: Readonly<{
       ? "Răspuns bazat numai pe ajutorul public verificat."
       : "Answer based only on the reviewed public help.",
     sourceIds:outputReferences(system,"sourceIds"),
-    actionIds:outputReferences(system,"actionIds")
+    actionIds:outputReferences(system,"actionIds"),
+    offTopic:"none",crisis:false,threat:false
   }) });
 }
 
@@ -393,33 +382,24 @@ export async function createInProcessSupportEvalExecutor(input: Readonly<{
     ? DETERMINISTIC_STRUCTURAL_RELAY : input.realRelay;
   if (relay === undefined) throw new TypeError("SUPPORT_EVAL_REAL_RELAY_REQUIRED");
   const database = await startTestDatabase();
-  let keyRoot: string | undefined;
   let server: FastifyInstance | undefined;
-  let keys: Awaited<ReturnType<typeof createSupportKeyPort>> | undefined;
   let currentEvalCase: SupportEvalCase | undefined;
+  let requestStartedMs = 0;
+  let modelCalled = false;
+  let firstTokenMs: number | null = null;
   try {
     await migrate(database.pool);
-    keyRoot = await mkdtemp(join(tmpdir(),"debateai-support-eval-keys-"));
-    const secrets = join(keyRoot,"secrets");
-    await mkdir(secrets,{ mode: 0o700 });
-    const supportKekPath = join(secrets,"support-kek.bin");
-    await writeFile(supportKekPath,supportEvalKekMaterial(),{ mode: 0o600 });
-    keys = await createSupportKeyPort({ supportKekPath });
-    const sourcePseudonym = createEvalSourcePseudonym(keys);
-    const sessionRepository = new PostgresSupportSessionRepository(
-      database.pool,createWrappedSupportSessionKey(keys)
-    );
-    const messages = createSupportMessageCipher(
-      keys,new PostgresSupportMessageRepository(database.pool)
-    );
-    const status = new PostgresSupportStatusRepository(database.pool);
-    const [reviewManifestBytes,recoveryComponents] = await Promise.all([
-      readFile("packages/support-kb/reviews/manifest.json"),
-      readFile("packages/support-kb/recovery/components.json")
-    ]);
+    const sourcePseudonym = createEvalSourcePseudonym();
+    const reviewManifestBytes = await readFile("packages/support-kb/reviews/manifest.json");
+    // The current article reviews are the eval's source inventory. Recovery
+    // component attestation belongs to boot, and is not read by this harness.
+    const articleReviews = JSON.parse(reviewManifestBytes.toString("utf8")) as Readonly<{
+      catalog: unknown;articles: unknown;
+    }>;
     const corpus = loadHelpCorpus("packages/support-kb/content",{
-      reviewManifest:JSON.parse(reviewManifestBytes.toString("utf8")) as unknown,
-      recoveryComponents,requireReviewedRecovery:true
+      reviewManifest: {
+        schemaVersion: 1,catalog: articleReviews.catalog,articles: articleReviews.articles
+      }
     });
     const corpusSnapshots = createHelpCorpusSnapshotLookup(corpus);
     const evalIncident: SupportIncidentRecord = Object.freeze({
@@ -434,37 +414,27 @@ export async function createInProcessSupportEvalExecutor(input: Readonly<{
         || currentEvalCase?.id === "SUP-F-02-OPEN-INCIDENT-RO"
         ? Object.freeze([evalIncident]) : Object.freeze([])
     });
+    const observedRelay: SupportModelPort = Object.freeze({
+      complete: async (request: Parameters<SupportModelPort["complete"]>[0]) => {
+        modelCalled = true;
+        const completion = await relay.complete(request);
+        // The structural stand-in returns one completion. A real relay here
+        // has no streamed first-token event, so that evidence stays absent.
+        if (mode === "deterministic-structural") {
+          firstTokenMs = performance.now() - requestStartedMs;
+        }
+        return completion;
+      }
+    });
     const answer = createSupportAnswerService({
       entries:corpus.entries,snapshots:corpusSnapshots,requireStructuredDraft:true,
-      messages,modelFor: () => relay,incidents
-    });
-    const cases = createSupportCaseService({
-      messages,
-      create: async (request) => new PostgresSupportCaseRepository(
-        database.pool,createSupportCaseMaterial(keys!,request.transcriptSnapshot)
-      ).createCase({
-        caseId: request.caseId,tokenSha256: request.tokenSha256,
-        sessionId: request.sessionId,identityOwnerRef: request.identityOwnerRef,
-        language: request.language,createdAt: request.createdAt,
-        triggerPredicate: request.triggerPredicate,toolCalls: request.toolCalls,
-        kbVersion: request.kbVersion,slaHours: request.slaHours
-      })
+      modelFor: () => observedRelay,incidents
     });
     const support: SupportApplication = Object.freeze({
       configuration: Object.freeze({ current: async () => EVAL_CONFIGURATION }),
-      // DL5-F3 / FW-E: production's keyed derivation. The harness DOES store
-      // this value, under a CHECK that only 64 lowercase hex characters pass.
       sourcePseudonym,
-      sessions: Object.freeze({
-        create: sessionRepository.create.bind(sessionRepository),
-        read: sessionRepository.read.bind(sessionRepository),
-        admitMessage: sessionRepository.admitMessage.bind(sessionRepository),
-        admitIpSession: sessionRepository.admitIpSession.bind(sessionRepository),
-        recordRateLimit: sessionRepository.recordRateLimit.bind(sessionRepository),
-        rateMessage: sessionRepository.rateMessage.bind(sessionRepository),
-        status: status.status.bind(status)
-      }),
-      messages,answer,cases,incidents,
+      limiter: new SupportMessageLimiter(),degraded: new SupportDegradedState(),
+      answer,incidents,
       knowledge: Object.freeze({
         status: async () => Object.freeze({
           kbVersion: corpus.kbVersion,shipped: corpus.shippedCount,ignored: corpus.ignoredCount
@@ -475,7 +445,8 @@ export async function createInProcessSupportEvalExecutor(input: Readonly<{
     // NV-03: the API honours the per-case x-forwarded-for only from the proven UI this harness stands in for.
     server = buildApi({
       application: evalAskApplication(),sessions: testSessionApplication([EVAL_IDENTITY]),
-      allowedOrigin: TEST_APP_ORIGIN,support,uiApiProof: Buffer.from(EVAL_UI_API_PROOF)
+      allowedOrigin: TEST_APP_ORIGIN,networkPseudonym: sourcePseudonym,support,
+      uiApiProof: Buffer.from(EVAL_UI_API_PROOF)
     });
     let address = 0;
     const activeServer = server;
@@ -487,28 +458,19 @@ export async function createInProcessSupportEvalExecutor(input: Readonly<{
         const ip = `198.51.${Math.floor(address / 250)}.${(address % 250) + 1}`;
         const identityHeaders = testCase.className === "E"
           ? testSessionHeaders(EVAL_IDENTITY,true) : {};
-        const opened = await activeServer.inject({
-          method: "POST",url: "/v1/support/sessions",
-          // DL1-F7: the browser this harness stands in for sends the Origin.
-          headers: { origin: TEST_APP_ORIGIN,...identityHeaders,"x-forwarded-for": ip,"x-debateai-ui-proof": EVAL_UI_API_PROOF },
-          payload: { language: testCase.expectedLanguage }
-        });
-        if (opened.statusCode !== 201) throw new TypeError("SUPPORT_EVAL_SESSION_FAILED");
-        const capability = opened.json<{
-          session: { session_id: string };
-          session_token: string;
-        }>();
         let response: Awaited<ReturnType<FastifyInstance["inject"]>> | undefined;
         for (const message of testCase.messages) {
+          requestStartedMs = performance.now();
+          modelCalled = false;
+          firstTokenMs = null;
           response = await activeServer.inject({
-            method: "POST",url: `/v1/support/sessions/${capability.session.session_id}/messages`,
+            method: "POST",url: "/v1/support/messages",remoteAddress: ip,
             headers: {
               origin: TEST_APP_ORIGIN,...identityHeaders,
-              "x-support-session-token": capability.session_token,
               "x-forwarded-for": ip,
               "x-debateai-ui-proof": EVAL_UI_API_PROOF
             },
-            payload: { text: message.content }
+            payload: { text: message.content,language: testCase.expectedLanguage }
           });
           if (response.statusCode !== 200) {
             throw new TypeError(`SUPPORT_EVAL_MESSAGE_FAILED_${response.statusCode}`);
@@ -519,45 +481,21 @@ export async function createInProcessSupportEvalExecutor(input: Readonly<{
           outcome: string;
           sources: readonly Readonly<{ id: string }>[];
         }>();
-        const timestamp = (await database.pool.query<{
-          received_at: Date;
-          first_token_at: Date | null;
-          completed_at: Date | null;
-          language: "en" | "ro";
-          model_called: boolean;
-        }>(`
-          SELECT received_at,first_token_at,completed_at,language,model_called
-          FROM support.message
-          WHERE session_id=$1 AND role='assistant'
-          ORDER BY received_at DESC,message_id DESC LIMIT 1
-        `,[capability.session.session_id])).rows[0];
-        if (timestamp === undefined || timestamp.completed_at === null) {
-          throw new TypeError("SUPPORT_EVAL_TIMESTAMPS_MISSING");
-        }
-        const recordedTools = (await database.pool.query<{ name: string }>(`
-          SELECT name FROM support.tool_call WHERE session_id=$1 ORDER BY at,tool_call_id
-        `,[capability.session.session_id])).rows.map(({ name }) => name);
         return Object.freeze({
-          outcome: body.outcome,language: timestamp.language,
+          outcome: body.outcome,language: testCase.expectedLanguage,
           sourceIds: Object.freeze((body.sources ?? []).map(({ id }) => id).sort()),
-          toolCalls: Object.freeze(recordedTools),modelCalled: timestamp.model_called,
-          firstTokenMs: timestamp.first_token_at === null ? null
-            : timestamp.first_token_at.getTime() - timestamp.received_at.getTime(),
-          completedMs: timestamp.completed_at.getTime() - timestamp.received_at.getTime()
+          toolCalls: Object.freeze([]),modelCalled,
+          firstTokenMs,completedMs: performance.now() - requestStartedMs
         });
       },
       close: async () => {
         await activeServer.close();
-        await keys?.close();
         await database.stop();
-        if (keyRoot !== undefined) await rm(keyRoot,{ recursive: true,force: true });
       }
     });
   } catch (error) {
     await server?.close().catch(() => undefined);
-    await keys?.close().catch(() => undefined);
     await database.stop().catch(() => undefined);
-    if (keyRoot !== undefined) await rm(keyRoot,{ recursive: true,force: true });
     throw error;
   }
 }

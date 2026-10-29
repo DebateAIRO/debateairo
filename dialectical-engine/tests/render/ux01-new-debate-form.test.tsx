@@ -59,6 +59,11 @@ const hooks = vi.hoisted(() => {
       slots[index] = { callback, dependencies };
       return callback;
     },
+    // synthesis-flag S05 (V-125): SupportWidget reads whether the chat is offered from an external store.
+    // This walker renders once per pass, so the store's current snapshot is what React would read too.
+    useSyncExternalStore<T>(_subscribe: (onChange: () => void) => () => void, getSnapshot: () => T) {
+      return getSnapshot();
+    },
     useEffect(effect: () => void | (() => void), dependencies?: readonly unknown[]) {
       const index = cursor++;
       const previous = slots[index] as readonly unknown[] | undefined;
@@ -81,7 +86,8 @@ vi.mock("react", async (importOriginal) => ({
   useCallback: hooks.useCallback,
   useEffect: hooks.useEffect,
   useRef: hooks.useRef,
-  useState: hooks.useState
+  useState: hooks.useState,
+  useSyncExternalStore: hooks.useSyncExternalStore
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pageMocks.push }),

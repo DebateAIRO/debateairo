@@ -52,10 +52,6 @@
     "dev:auth:up": "tsx apps/runner/src/dev-auth-stack-cli.ts",
     "support:switch": "tsx apps/runner/src/support-switch-cli.ts",
     "support:shred": "tsx apps/runner/src/support-shred-cli.ts",
-    "support:inbox": "tsx apps/runner/src/support-inbox-cli.ts inbox",
-    "support:case": "tsx apps/runner/src/support-inbox-cli.ts case",
-    "support:reply": "tsx apps/runner/src/support-inbox-cli.ts reply",
-    "support:close": "tsx apps/runner/src/support-inbox-cli.ts close",
     "support:status": "tsx apps/runner/src/support-status-cli.ts",
     "support:incident": "tsx apps/runner/src/support-incident-cli.ts",
     "support:limits": "tsx apps/runner/src/support-limits-cli.ts",
@@ -70,6 +66,8 @@
     "billing:check": "tsx apps/api/src/billing/check-cli.ts",
     "billing:renewal-resume": "tsx apps/api/src/billing/renewal-resume-cli.ts",
     "billing:netopia-sandbox": "tsx tools/billing/netopia-sandbox.ts",
+    "rls:proof": "tsx tools/rls/proof.ts",
+    "rls:test-accounts": "tsx tools/rls/test-accounts-cli.ts",
     "compose:env": "tsx packages/register/src/compose-env.ts",
     "job:replay-self-test": "tsx apps/scheduler/src/cli.ts replay-self-test",
     "job:liveness-sweep": "tsx apps/scheduler/src/cli.ts liveness-sweep",
@@ -87,10 +85,10 @@
     "moment:replay": "tsx acceptance/replay-moment.ts"
   },
   "dependencies": {
-    "drizzle-orm": "0.45.2",
-    "fastify": "5.12.5",
-    "pg": "8.22.0",
-    "zod": "4.4.3"
+    "drizzle-orm": "0.45.4",
+    "fastify": "5.12.7",
+    "pg": "8.23.1",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@debateai/api": "workspace:*",
@@ -126,15 +124,16 @@
     "@debateai/story": "workspace:*",
     "@debateai/tax-quaderno": "workspace:*",
     "@debateai/valuation": "workspace:*",
-    "@types/node": "26.2.0",
-    "@types/pg": "8.21.0",
+    "@types/node": "26.6.5",
+    "@types/pg": "8.23.1",
+    "ajv": "8.20.0",
     "embedded-postgres": "18.4.0-beta.17",
-    "fast-check": "4.9.0",
-    "jsdom": "^30.0.1",
-    "testcontainers": "12.1.0",
-    "tsx": "4.23.11",
+    "fast-check": "4.10.2",
+    "jsdom": "^30.1.3",
+    "testcontainers": "12.2.1",
+    "tsx": "4.23.15",
     "typescript": "7.0.2",
     "typescript-classic": "npm:typescript@5.9.3",
-    "vitest": "5.0.3"
+    "vitest": "5.0.5"
   }
 }

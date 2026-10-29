@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import type { Pool } from "pg";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   generateDek,
   hashToken,
@@ -14,8 +14,6 @@ import {
   createPool,
   migrate,
   PostgresAccountErasureRepository,
-  PostgresSupportCaseSummaryRepository,
-  PostgresSupportSessionRepository,
   PostgresSupportShredRepository
 } from "@debateai/db";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
@@ -27,8 +25,15 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * destroys the user DEK, with the same barrier, locks, classifier, zeroing and owner audit as
  * `pnpm support:shred --owner`, and FINALIZE waits for a readback on the support credential that finds none live.
  *
+ * Since synthesis-flag S05, 0129_support_answer_scope.sql empties the support tables and revokes debateai_support's
+ * INSERT on them, and the session, case and stored-transcript writers are retired, so no release writes a support row
+ * and the shred is NONE for every owner. It stays as the erasure's guard for any support row a later release might
+ * persist again, and this file proves that guard on the kept code (PostgresSupportShredRepository): seeded rows are
+ * shredded and read back as 0, and an owner with none is NONE.
+ *
  * Harness copied and trimmed from tests/integration/s8-publication-database.test.ts (identity, grant, schedule, due,
- * ACK) and tests/integration/support-shred.test.ts (seeding under debateai_support, the support-principal pool).
+ * ACK) and tests/integration/support-shred.test.ts (seeding as the embedded superuser, as its seedShredTarget does
+ * since 0129; the shred and readback on the support-principal pool).
  */
 
 const source = Object.freeze({ ip: "192.0.2.9", userAgent: "C-1 Browser", requestId: "request:c-1" });
@@ -159,12 +164,14 @@ function contentV2(fill: number): Buffer {
   return envelope;
 }
 
-/** A session, its key and two content-v2 messages, and optionally a case and its key, written as debateai_support. */
+/**
+ * A session, its key and two content-v2 messages, and optionally a case and its key, written as the embedded superuser
+ * (database.pool): 0129 revoked debateai_support's INSERT on these tables (support-shred.test.ts seedShredTarget).
+ */
 async function seedSupport(input: Readonly<{ ownerRef: string | null; sessionId: string; caseId?: string }>) {
   const client = await database.pool.connect();
   try {
     await client.query("BEGIN");
-    await client.query("SET LOCAL ROLE debateai_support");
     await client.query(`
       INSERT INTO support.session(
         session_id,session_token_sha256,identity_owner_ref,language,state,kb_version,created_at
@@ -188,7 +195,7 @@ async function seedSupport(input: Readonly<{ ownerRef: string | null; sessionId:
         ($5,$2,'assistant',$6,'ANSWER_GROUNDED','en','en',false,$4)
     `, [randomUUID(), input.sessionId, contentV2(2), at, randomUUID(), contentV2(5)]);
     if (input.caseId !== undefined) {
-      // The API copies the session's owner onto the case (apps/api/src/support/index.ts).
+      // The retired case writer copied the session's owner onto the case; set it so the readback's UNION branch runs.
       await client.query(`
         INSERT INTO support."case"(
           case_id,token_sha256,session_id,identity_owner_ref,language,created_at,
@@ -286,7 +293,7 @@ afterAll(async () => {
 }, 120_000);
 
 describe("C-1 · account erasure shreds the owner's support keys", () => {
-  it("erasure shreds the owner's signed-in support session and case keys before FINALIZE", async () => {
+  it("erasure shreds the owner's support session and case keys before FINALIZE", async () => {
     const identity = await createIdentity("owner");
     const ownerSession = randomUUID();
     const ownerCase = randomUUID();
@@ -329,11 +336,6 @@ describe("C-1 · account erasure shreds the owner's support keys", () => {
     expect(await ownerAudits(identity.ownerRef)).toEqual([{
       target_kind: "owner", target_ref: identity.ownerRef, os_user: "account-erasure", keys_destroyed: 2
     }]);
-    // The exact refusal predicate of `pnpm support:case` (apps/runner/src/support-inbox-cli.ts).
-    const read = await new PostgresSupportCaseSummaryRepository(supportRolePool).readCaseEncrypted({ caseId: ownerCase });
-    expect(read).not.toBeNull();
-    expect(read!.shredded_at).not.toBeNull();
-    expect(read!.destroyed_at).not.toBeNull();
     const shreds = new PostgresSupportShredRepository(supportRolePool);
     expect(await shreds.liveOwnerKeyCount(identity.ownerRef)).toBe(0);
     expect(await shreds.liveOwnerKeyCount(otherOwner)).toBe(2);
@@ -341,16 +343,6 @@ describe("C-1 · account erasure shreds the owner's support keys", () => {
     expect(anonymous.session.destroyed_at).toBeNull();
     expect(anonymous.session.wrapped_key.equals(liveWrappedKey(1))).toBe(true);
     await expect(assertSupportKeyCoverage(database.pool)).resolves.toBeUndefined();
-    const forbiddenCreate = vi.fn(async () => liveWrappedKey(9));
-    await expect(new PostgresSupportSessionRepository(database.pool, forbiddenCreate).create({
-      sessionId: randomUUID(),
-      tokenSha256: "5".repeat(64),
-      identityOwnerRef: identity.ownerRef,
-      language: "en",
-      kbVersion: "6".repeat(64),
-      createdAt: new Date()
-    })).rejects.toThrow("SUPPORT_OWNER_SHREDDED");
-    expect(forbiddenCreate).not.toHaveBeenCalled();
   });
 
   it("repository: NONE, SHREDDED, ALREADY_SHREDDED and the readback, under debateai_support", async () => {

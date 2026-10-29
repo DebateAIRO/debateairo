@@ -164,7 +164,9 @@
       "locale": "en",
       "surface": "WEB",
       "accepted_at": "2026-10-01T00:00:00.000Z",
-      "evidence_ciphertext": "Ynl0ZXM="
+      "evidence_ciphertext": "Ynl0ZXM=",
+      "clauses": null,
+      "leg": null
     }
   ],
   "sensitive_data_consents": [
@@ -419,5 +421,6 @@
       "event_type": "LOGIN",
       "occurred_at": "2026-10-02T00:00:00.000Z"
     }
-  ]
+  ],
+  "threat_reports": []
 }

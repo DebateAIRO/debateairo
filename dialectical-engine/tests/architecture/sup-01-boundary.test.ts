@@ -74,7 +74,7 @@ describe("SUP-01 support capability boundary", () => {
     ].map((table_name) => ({
       table_name,
       can_select: table_name !== "_shred_integrity_guard",
-      can_insert: table_name !== "_shred_integrity_guard",
+      can_insert: table_name === "public_incident" || table_name === "shred_audit",
       can_update: false,
       can_delete: false
     })));
@@ -204,10 +204,11 @@ describe("SUP-01 support capability boundary", () => {
       "createSupportKeyPort({ supportKekPath: environment.KEK_PATH })"
     );
     expect(main).toContain("assertSupportDatabaseRole");
-    expect(main).toContain("PostgresSupportSessionRepository");
-    expect(main).toContain("PostgresSupportMessageRepository");
-    expect(main).toContain("PostgresSupportStatusRepository");
-    expect(main).toContain("createSupportMessageCipher");
+    expect(main).not.toContain("PostgresSupportSessionRepository");
+    expect(main).not.toContain("PostgresSupportMessageRepository");
+    expect(main).not.toContain("PostgresSupportCaseRepository");
+    expect(main).not.toContain("PostgresSupportStatusRepository");
+    expect(main).not.toContain("createSupportMessageCipher");
     expect(main).toContain("assertSupportKeyCoverage(supportPool)");
     expect(main).toContain("createSupportConfigurationPort");
     expect(main).toContain("support: {");
@@ -235,14 +236,7 @@ describe("SUP-01 support capability boundary", () => {
 
   it("exposes exactly the support routes and no zone route", () => {
     expect(SUPPORT_ROUTE_PATHS).toEqual([
-      "POST /v1/support/sessions",
-      "GET /v1/support/sessions/{id}",
-      "POST /v1/support/sessions/{id}/messages",
-      "POST /v1/support/messages/{id}/rating",
-      "POST /v1/support/sessions/{id}/escalate",
-      "GET /v1/support/cases",
-      "GET /v1/support/case",
-      "POST /v1/support/case/messages",
+      "POST /v1/support/messages",
       "GET /v1/support/status"
     ]);
     expect(SUPPORT_ROUTE_PATHS.some((route) =>

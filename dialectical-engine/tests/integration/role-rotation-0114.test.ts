@@ -215,14 +215,17 @@ describe("0114: a forward step, applied once", () => {
     // the debate shape's map 0117 after 0116, the language check's site cost 0118 after 0117, the reclaim resume
     // 0119 after 0118, then the reply measures (0120, spec 2026-10-15), then the engine verdict (0121, spec 2026-10-15
     // engine redesign R2), then the engine's map answer step (0122, spec 2026-10-15 engine redesign R3), then the
-    // side-by-side releases (0123, spec 2026-10-21 side-by-side uploads), then the settings activation (0124, side-by-side
-    // spec §13), then the security fixes of audit run 3 (0125), then the three recovery notice due indexes (0126 to
-    // 0128, NV-38), then the MFA recovery control user index (0129, NV-15 and NV-16), last.
-    expect(steps.slice(-17)).toEqual(["0113_billing_price_currencies.sql", STEP, "0115_data_export.sql", "0116_mail_locale.sql",
+    // side-by-side releases (0123, spec 2026-10-21 side-by-side uploads), then the settings activation (0124)
+    // (side-by-side spec §13), then the Italy-specific approval (0125), then synthesis-flag's 0126-0129, then row-level
+    // security (0130, mission row-level-security, SPEC-v4 R26), then the security fixes of audit run 3 (0131), then the
+    // three recovery notice due indexes (0132 to 0134, NV-38), then the MFA recovery control user index (0135, NV-15 and
+    // NV-16), last.
+    expect(steps.slice(-23)).toEqual(["0113_billing_price_currencies.sql", STEP, "0115_data_export.sql", "0116_mail_locale.sql",
       "0117_debate_shape_map.sql", "0118_language_check_spend.sql", "0119_reclaim_resume.sql", "0120_reply_measures.sql",
       "0121_engine_verdict.sql", "0122_engine_map_check.sql", "0123_side_by_side_releases.sql", "0124_settings_activation.sql",
-      "0125_security_fixes_run3.sql", "0126_password_reset_notice_due.sql", "0127_backup_email_notice_due.sql", "0128_mfa_recovery_notice_due.sql",
-      "0129_mfa_recovery_control_user_started.sql"]);
+      "0125_italy_specific_approval.sql", "0126_synthesis_check.sql", "0127_publication_review.sql", "0128_threat_reports.sql", "0129_support_answer_scope.sql",
+      "0130_row_level_security.sql", "0131_security_fixes_run3.sql", "0132_password_reset_notice_due.sql", "0133_backup_email_notice_due.sql",
+      "0134_mfa_recovery_notice_due.sql", "0135_mfa_recovery_control_user_started.sql"]);
     const ledger = async () => (await db().query("SELECT name, applied_at FROM public.debateai_schema_migration ORDER BY name")).rows;
     const before = await ledger();
     expect(before.filter((row) => row.name === STEP)).toHaveLength(1);

@@ -362,6 +362,29 @@ describe("N19 CheckoutFlow on NETOPIA's page", () => {
     expect(goToPayment).not.toHaveBeenCalled();
   });
 
+  // NETOPIA's check of the public main site (the owner's choice of 24 October 2026): billing on, every country closed,
+  // so every quote answers 403 COUNTRY_PAYMENT_UNAVAILABLE (tests/integration/billing-every-country-closed.test.ts).
+  it("billing on with every country closed: the checkout shows the country sentence when the quote answers COUNTRY_PAYMENT_UNAVAILABLE, and never reaches a payment page", async () => {
+    client.createBillingQuote.mockRejectedValue(new ContractHttpError("FORBIDDEN", 403, "x", "COUNTRY_PAYMENT_UNAVAILABLE"));
+    const SENTENCE = "Paid plans aren't available in your country yet. You can keep using the Free plan.";
+    expect(EN["billing.checkout.countryUnavailable"]).toBe(SENTENCE);
+    await render();
+    // The connection's first quote (no country sent) is refused at once.
+    expect(client.createBillingQuote).toHaveBeenCalledWith({ plan_id: "PLUS" });
+    expect(text()).toContain(SENTENCE);
+    expect(text()).not.toContain(EN["billing.checkout.genericError"]);
+    // The person's own country and details are refused alike, with the same sentence and no price.
+    await choose(select("checkout-country"), "DE");
+    await fillDetails();
+    await click(button("billing.checkout.showPrice")!);
+    expect(client.createBillingQuote).toHaveBeenCalledTimes(2);
+    expect(text()).toContain(SENTENCE);
+    const continueButton = button("billing.checkout.continueToCard");
+    expect(continueButton === undefined || isLocked(continueButton)).toBe(true);
+    expect(client.startBillingCheckout).not.toHaveBeenCalled();
+    expect(goToPayment).not.toHaveBeenCalled();
+  });
+
   // N19b (A3 (a)): a failed start leaves a FAILED charge holding the quote's one use, so the next try needs a new price.
   for (const [code, status, key] of [
     ["PAYMENT_PROVIDER_UNAVAILABLE", 503, "billing.checkout.formUnavailable"],

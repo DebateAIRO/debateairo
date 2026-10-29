@@ -54,6 +54,26 @@
 .staffAccess .staffAuditList li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 5px 16px; padding: 13px 0; border-top: 1px solid var(--line); font-size: 12px; }
 .staffAccess .staffAuditList strong { font-weight: 600; }
 .staffAccess .staffAuditList time { color: var(--muted); font-size: 11px; }
+.staffAccess .rvQueue { list-style: none; padding: 0; margin: 16px 0 0; }
+.staffAccess .rvQueue > li { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 13px 0; border-top: 1px solid var(--line); font-size: 12px; }
+.staffAccess .rvQueue .rvRowBody { min-width: 0; }
+.staffAccess .rvRowHead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.staffAccess .rvRowHead time { color: var(--ink); font-size: 12px; font-weight: 600; }
+.staffAccess .rvQueue .rvCats { margin: 8px 0 0; }
+.staffAccess .rvQueue > li > .setBtn { flex: 0 0 auto; }
+.staffAccess .rvQuestion { margin: 0 0 6px; overflow-wrap: anywhere; }
+.staffAccess.rvReadScreen { max-width: 960px; }
+.staffAccess.rvReadScreen .publicOverview { padding: 0; }
+.staffAccess.rvReadScreen .publicOverviewInner { max-width: none; }
+.staffAccess .rvChips { margin: 0 0 18px; }
+.staffAccess .rvActions { margin-top: 26px; }
+.staffAccess .rvReason { margin-top: 26px; max-width: 640px; }
+.staffAccess .rvReason textarea { width: 100%; min-width: 0; min-height: 96px; resize: vertical; border: 1px solid var(--line-strong); border-radius: 8px; padding: 10px 12px; color: var(--ink); background: var(--core); font: 12px/1.55 var(--font-sans); }
+.staffAccess .rvReason textarea:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.staffAccess .rvCount { margin: 0; font-size: 11px; color: var(--muted); text-align: right; }
+.staffAccess .rvDetail { margin: 18px 0; padding: 18px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--core); color: var(--ink); font-size: 12px; line-height: 1.5; }
+.staffAccess .rvDetail h2 { margin: 0 0 10px; font-family: var(--font-display); font-size: 18px; }
+.staffAccess .rvDetail p { overflow-wrap: anywhere; }
 .staffAccess .staffNotice { margin-top: 18px; padding: 12px 14px; font-size: 12px; line-height: 1.5; color: var(--ok-text); border: 1px solid var(--ok-border); background: var(--ok-bg); border-radius: 9px; }
 .staffAccess .staffAdvanced > summary { color: var(--muted); font-size: 12px; }
 .staffAccess .staffAdvanced[open] > summary { margin-bottom: 10px; }
@@ -67,4 +87,5 @@
   .staffAccess .staffMemberFooter .setBtn { flex: 1 1 140px; }
   .staffAccess .staffMutation { padding: 15px; }
   .staffAccess .staffAuditList li { grid-template-columns: minmax(0, 1fr); }
+  .staffAccess .rvQueue > li { align-items: flex-start; flex-direction: column; }
 }

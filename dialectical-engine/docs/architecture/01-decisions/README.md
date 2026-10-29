@@ -89,7 +89,11 @@ rule.
 | [**0018**](ADR-0018-deployment-topology.md) | **Deployment topology: Docker Compose on Hetzner behind Cloudflare, with vLLM as a provider adapter** | *not in the planned set* — minted by **DR-117** |
 | [**0021**](ADR-0021-consent-storage-contract.md) | **The browser-local consent record: one key, one versioned object, re-ask on anything else** | *not in the planned set* — minted by the **`consent-ui`** mission (slice S01) |
 | [**0032**](ADR-0032-cookie-notice-acknowledgement-and-storage-inventory.md) | **The cookie notice records an acknowledgement, not a consent; and every stored name is listed, by test** | *not in the planned set* — minted by the **`cookie-compliance`** mission (slice S01) |
+| [**0033**](ADR-0033-post-settle-content-checks-run-in-the-api.md) | **A model check of a finished debate's text runs in the API, fed by a content-free request from the runner** | *not in the planned set* — minted by the **`synthesis-flag`** mission (slice S01) |
+| [**0034**](ADR-0034-staff-review-window-and-erasure-severed-records.md) | **Staff review window and erasure-severed records** | *not in the planned set* — minted by the **`synthesis-flag`** mission (slice S02) |
+| [**0039**](ADR-0039-support-replies-are-code-chosen.md) | **The support assistant's model reports judgements; code chooses every refusal, crisis reply and threat line** | *not in the planned set* — minted by the **`synthesis-flag`** mission (slice S05) |
 | [**0022**](ADR-0022-shared-modal-semantics.md) | **One shared modal-semantics module, and the Esc stack** | *not in the planned set* — minted by the **`consent-ui`** mission (slice S02) |
+| [**0038**](ADR-0038-one-geo-lookup-per-api-process.md) | **One geo lookup per API process, opened in hosted mode whether or not the country gate is published** | *not in the planned set* — minted by the **`italy-clause-approval`** mission (slice S01) |
 
 ---
 

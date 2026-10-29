@@ -108,7 +108,7 @@
   "settings.transparency.downloadsTail": "décrivant le contenu généré et l’absence de contrôle éditorial humain. Les données de réponse enregistrées, la provenance des modèles et les relevés opérationnels conservent leurs valeurs d’origine.",
   "settings.transparency.markingsLimit": "Ces marquages décrivent le contenu de notre interface et de nos téléchargements. Ils ne constituent ni un filigrane ni un certificat d’authenticité ; la copie du texte brut peut les supprimer.",
   "settings.transparency.supportTitle": "Assistance et aide humaine",
-  "settings.transparency.supportLead": "L’assistant d’aide est un système d’IA. Utilisez « Parler à une personne » ou « Transmettre à une personne » dans",
+  "settings.transparency.supportLead": "L’assistant d’aide est un système d’IA. Utilisez « Parler à une personne » dans",
   "settings.transparency.help": "Aide",
   "settings.transparency.supportTail": "pour demander une assistance humaine.",
   "settings.transparency.back": "Retour à {brand}",

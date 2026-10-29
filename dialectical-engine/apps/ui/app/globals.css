@@ -1246,6 +1246,47 @@ select {
 .supportEscalateCompact:hover { background: var(--surface-2); }
 .supportEscalateCompact:disabled { opacity: .5; cursor: wait; }
 
+.supportNotice {
+  margin: 0;
+  color: var(--muted);
+  font: 500 10px/1.5 var(--font-sans);
+}
+
+.supportHelpNumbers {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  color: var(--text-2);
+}
+
+.supportHelpNumbers .crisisSupportLines { gap: 12px; }
+.supportHelpNumbers .crisisSupportEmergency { margin-top: 4px; }
+
+.supportHelpHuman {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--link);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.supportHumanAddress {
+  margin: 6px 0 0;
+  color: var(--text-2);
+  font: 500 10px/1.5 var(--font-sans);
+}
+.supportHumanAddress a { color: var(--link); text-decoration: underline; }
+
+.supportHelpUnavailable {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface-1);
+  color: var(--text-2);
+}
+
 .supportComposerBar--compact { justify-content: flex-end; }
 
 .supportAssistantCompact .supportSend {
@@ -7558,7 +7599,9 @@ a:focus-visible {
    the heavier weight and a shadow the inactive tab does not have. */
 .libTab[aria-current="page"] {
   border-color: var(--ink);
-  background: var(--ink);
+  /* background-color, not the background shorthand: the same in browsers (.libTab already sets the rest), and the
+     test DOM (jsdom 30.1) drops a shorthand that holds var(). */
+  background-color: var(--ink);
   color: var(--bg);
   font-weight: 700;
   box-shadow: var(--shadow-tab);
@@ -7668,6 +7711,57 @@ a:focus-visible {
   color: var(--muted);
   font-size: 12px;
 }
+.libRow[data-flagged="true"] .libRowCore {
+  border-color: var(--dispute);
+  box-shadow: 0 0 0 1px var(--dispute);
+}
+.libFlag { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+.libFlagMark { width: 6px; height: 6px; transform: rotate(45deg); background: var(--dispute); }
+.libFlagLabel {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--dispute-text);
+}
+.libTakeDownGroup { display: flex; flex-direction: column; gap: 6px; }
+.libTakeDown { align-self: flex-start; margin-inline-start: 4px; padding: 4px 11px; border-radius: 999px; border: 1px solid var(--dispute-border); background: var(--dispute-bg); color: var(--dispute-text); font-family: var(--font-sans); font-size: 11px; font-weight: 700; cursor: pointer; }
+.libTakeDown:hover { border-color: var(--dispute); }
+.tdPanel { margin-inline: 4px; padding: 14px 18px; display: flex; flex-direction: column; gap: 10px; background: var(--core); border: 1px solid var(--dispute-border); border-radius: 13px; }
+.tdPanel > p { margin: 0; font-size: 12px; line-height: 1.5; color: var(--text); }
+.tdPanel .authSecurityConfirmation { padding: 4px 0 0; }
+.tdActions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.tdStatus { margin: 0; margin-inline-start: 4px; font-size: 11px; line-height: 1.5; color: var(--dispute-text); }
+.publicationReviewStatement blockquote { overflow-wrap: anywhere; }
+.checkingNotice {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--gen-bg);
+  color: var(--gen-text);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.heldMobileQuestion { display: none; }
+@media (max-width: 920px) {
+  .heldMobileQuestion {
+    display: block;
+    margin: 0;
+    padding: 8px 20px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-family: var(--font-serif);
+    font-size: 13.5px;
+    font-style: italic;
+    color: var(--muted);
+  }
+}
+@media (max-width: 600px) { .checkingNotice, .heldMobileQuestion { padding: 8px 12px; } }
+.removalNoticeReasons { margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--line); }
+.removalNoticeReasons p { margin: 0 0 8px; font-size: 12px; line-height: 1.5; color: var(--text-2); }
+.removalNoticeReasons p:last-child { margin-bottom: 0; }
 .libPublicNote {
   margin: 12px 0 0;
   font-size: 10.5px;
@@ -9968,6 +10062,59 @@ a:focus-visible {
 }
 /* === end crisis support === */
 
+/* Refusal and check-unavailable screens use the crisis modal's calm frame. */
+.questionRefusal {
+  width: min(680px, calc(100vw - 32px));
+  color: var(--ink);
+}
+
+.questionRefusal .policyTitle:focus {
+  outline: none;
+}
+
+.questionRefusalRule {
+  margin: 0;
+  border-left: 2px solid var(--line-strong);
+  padding-left: 12px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+
+.questionRefusalComplain {
+  margin: 14px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
+.harmHelpLine {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-btn);
+  color: var(--ink);
+}
+
+/* S04 threat reports staff console; colors follow Terracotta and Chamber tokens. */
+.threatReportsLinkRow { max-width: 720px; margin: 0 auto 18px; }
+.threatReportsLink { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
+.threatReportsCount { display: inline-flex; align-items: center; border: 1px solid var(--dispute-border); border-radius: var(--r-pill); background: var(--dispute-bg); color: var(--dispute-text); padding: 2px 8px; font-size: 10px; font-weight: 700; }
+.staffAccess .staffBadge[data-state="unread"] { color: var(--dispute-text); background: var(--dispute-bg); border-color: var(--dispute-border); }
+.staffAccess .staffBadge[data-state="unread"]::before { background: var(--dispute); }
+.threatReportsBackTop { display: inline-block; text-decoration: none; margin: 0 0 18px; }
+.threatReportsList { list-style: none; margin: 16px 0 0; padding: 0; }
+.threatReportsRow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 5px 16px; padding: 13px 0; border-top: 1px solid var(--line); font-size: 12px; }
+.threatReportsKeptAt { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink); }
+.threatReportsQuestion { margin: 16px 0 0; padding: 18px; border: 1px solid var(--line-strong); border-radius: var(--r-btn); background: var(--surface-2); color: var(--ink); font-family: var(--font-display); font-size: 17px; line-height: 1.5; overflow-wrap: anywhere; }
+.threatReportsFacts { display: grid; gap: 9px; margin: 16px 0 0; }
+.threatReportsFacts > div { display: grid; grid-template-columns: 140px minmax(0, 1fr); align-items: baseline; gap: 12px; }
+.threatReportsFacts dt { color: var(--text-2); font-size: 11px; }
+.threatReportsFacts dd { margin: 0; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: 12px; color: var(--ink); }
+.threatReportsDecideHint { margin-top: 18px; }
+.threatReportsBackList { margin-top: 18px; }
+@media (max-width: 560px) { .threatReportsRow { grid-template-columns: minmax(0, 1fr) auto; } .threatReportsRow .setBtn { grid-column: 1 / -1; justify-self: start; } }
+
 /* ============================================================
    Phone layout — 2026-09-30 responsiveness pass.
    Placed after every layout rule (only the delimited consent-ui blocks,
@@ -10657,6 +10804,28 @@ a:focus-visible {
 .consentText {
   font-size: 11.5px;
   line-height: 1.5;
+}
+
+/* The Italy approval box's clause list (mission italy-clause-approval S01; MOCK.md "The Italy row, measured",
+   V's DONE.md 2026-10-24): one clause per line, 5px under the box sentence, the number in its own bold column with
+   tabular figures and no "§" (V's one change to the canvas), the title in a regular column it wraps inside. Each
+   clause is `display: contents`, so its number and title are the grid's two cells; the list is spans because a
+   <label> holds phrasing content only. */
+.consentClauseList {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 6px;
+  row-gap: 0;
+  margin-top: 5px;
+}
+
+.consentClause {
+  display: contents;
+}
+
+.consentClauseNumber {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 /* The design draws `Privacy Policy` as an <a>; ARCH-S02 ruled it a <button type="button">

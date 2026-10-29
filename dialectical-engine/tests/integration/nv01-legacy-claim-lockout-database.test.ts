@@ -1,6 +1,6 @@
 /**
  * NV-01 (security audit run 3): the legacy-run claim was an unbounded guessing oracle. The new release charges every
- * claim to a durable per-account attempt budget (0125's core.legacy_claim_admit) before any hashing or SQL claim work:
+ * claim to a durable per-account attempt budget (0131's core.legacy_claim_admit) before any hashing or SQL claim work:
  * at most `maxAttempts` per window, then a refusal for the lock, a fresh window afterwards, and a CLAIMED outcome
  * clears the count. Real PostgreSQL, the full migration chain, the real repository on a debateai_runtime login.
  */

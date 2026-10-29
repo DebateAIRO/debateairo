@@ -59,6 +59,8 @@
   "mail.M10.subject": "Jūsų mokamos funkcijos sustabdytos",
   "mail.M10.paused": "Jūsų bankas mums pranešė, kad mokėjimas už jūsų planą {plan} ginčijamas. Mokamos funkcijos sustabdytos, kol ginčas neišspręstas. Jūsų debatai išsaugomi.",
   "mail.M10.contact": "Jei tai klaida, parašykite mums adresu {merchantEmail}.",
+  "mail.M10_ENDED.subject": "Jūsų planas {plan} baigėsi",
+  "mail.M10_ENDED.ended": "Jūsų mokėjimas už planą {plan} po ginčo dėl jo buvo grąžintas jums per jūsų banką. Todėl planas baigėsi, o jūsų paskyra dabar naudoja planą Nemokamas. Jūsų debatai išsaugomi.",
   "mail.M11.subject": "Negalėjome priimti jūsų kortelės",
   "mail.M11.refunded": "Negalime priimti kortelių, išduotų tos kortelės šalyje, todėl iš jos nuskaičiuota arba rezervuota {refundAmount} suma visiškai grąžinama į jūsų kortelę.",
   "mail.M11.planEnded": "Dėl šios priežasties jūsų planas {endedPlan} baigėsi, o jūsų paskyra dabar naudoja planą Nemokamas. Jūsų debatai išsaugomi.",

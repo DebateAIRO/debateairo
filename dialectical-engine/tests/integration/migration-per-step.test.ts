@@ -29,6 +29,10 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * directory; run it alone.
  */
 const SIDE_BY_SIDE = "0123_side_by_side_releases.sql";
+/** Row-level security (mission row-level-security, SPEC-v4 R26): a chain step after 0123, before the run-3 steps. */
+const RLS = "0130_row_level_security.sql";
+/** The security fixes of audit run 3's last index step (0135, NV-15 and NV-16): the chain's head, after row-level security. */
+const HEAD_STEP = "0135_mfa_recovery_control_user_started.sql";
 const EXPAND: N1Declaration = Object.freeze({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false, concurrentIndex: null });
 /** A later step with constant digests, as forward-chain-replay-verifiers.test.ts builds its probes, plus its n1 header. */
 function probe(previous: ChainStep, name: string, sql: string, n1: N1Declaration = EXPAND): ChainStep {
@@ -61,13 +65,15 @@ describe("Review Focus 1: a step that fails (or a kill) between steps", () => {
 
   it("a failing step leaves every earlier step committed", async () => {
     const real = (await loadMigrationPlan()).forwardChain.map((step) => step.name);
-    expect(real).toHaveLength(19);
+    expect(real).toHaveLength(25);
+    expect(real.at(-1)).toBe(HEAD_STEP);
+    expect(real).toContain(RLS);
     chain.shape = extendedBy((last) => probe(last, "0199_probe_fail.sql", "SELECT 1/0"));
     await expect(migrate(db.pool)).rejects.toMatchObject({ code: "22012" });
     chain.shape = undefined;
-    // All nineteen real steps were applied by that same run and stay committed; the probe left nothing.
+    // All twenty-five real steps were applied by that same run and stay committed; the probe left nothing.
     expect(await receipts()).toEqual(real);
-    expect((await db.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration_step")).rows[0].n).toBe(19);
+    expect((await db.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration_step")).rows[0].n).toBe(25);
     expect(await ledger()).toEqual(expect.arrayContaining(real));
     expect(await ledger()).not.toContain("0199_probe_fail.sql");
     // The next run continues where the last one stopped: everything replays, nothing is left to apply.
@@ -79,13 +85,13 @@ describe("Review Focus 1: a step that fails (or a kill) between steps", () => {
 describe("Review Focus 2: a page read holding a lock on core.run while 0123's ALTER waits", () => {
   beforeAll(async () => {
     db = await startTestDatabase();
-    // The database a release before 0123 leaves: the chain cut before 0123 (0123, then the settings activation 0124, the
-    // security fixes 0125, the due indexes 0126 to 0128 and the control user index 0129, which migrate() applies after
-    // 0123 and which take no lock on
-    // core.run).
-    chain.shape = (steps) => steps.slice(0, (steps as readonly { name: string }[]).findIndex((s) => s.name === SIDE_BY_SIDE));
+    // The database a release before 0123 leaves: the chain up to 0123 (then the settings activation 0124, the
+    // Italy-specific approval 0125, synthesis-flag's 0126 to 0129, row-level security's 0130, the security fixes 0131,
+    // the due indexes 0132 to 0134 and the control user index 0135, which migrate() applies after 0123).
+    chain.shape = (steps) => steps.slice(0, (steps as readonly ChainStep[]).findIndex((step) => step.name === SIDE_BY_SIDE));
     try { await migrate(db.pool); } finally { chain.shape = undefined; }
     expect(await ledger()).not.toContain(SIDE_BY_SIDE);
+    expect(await ledger()).not.toContain(RLS);
   }, 300_000);
   afterAll(async () => { await db?.stop(); });
 

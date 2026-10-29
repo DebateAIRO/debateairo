@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   readEvents: vi.fn(),
   readDeployment: vi.fn(),
   readLedgerDigest: vi.fn(),
+  readPublicationReview: vi.fn(),
   readRunVisibility: vi.fn()
 }));
 
@@ -54,6 +55,7 @@ const mockApi = async (importOriginal: <T>() => Promise<T>) => {
       readEvents: mocks.readEvents,
       readDeployment: mocks.readDeployment,
       readLedgerDigest: mocks.readLedgerDigest,
+      readPublicationReview: mocks.readPublicationReview,
       readRunVisibility: mocks.readRunVisibility
     }),
     getDebateBundle: (id: string, token: string, _client?: unknown, options?: unknown) =>
@@ -161,6 +163,7 @@ describe("side-by-side W1: an old open page lets the reload note speak", () => {
     mocks.readDeployment.mockReset().mockRejectedValue(new Error("not needed by this render test"));
     mocks.readLedgerDigest.mockReset().mockRejectedValue(new Error("not needed by this render test"));
     mocks.readRunVisibility.mockReset().mockResolvedValue({ state: "PRIVATE", public_ref: null });
+    mocks.readPublicationReview.mockReset().mockResolvedValue({ flagged: false, state: "NONE", categories: [], asks_used: 0, may_ask: false, refusal: null });
     mocks.streamEvents.mockReset().mockImplementation(async (_runRef: string, _emit: (event: RunEvent) => void) => {
       await new Promise<void>(() => {});
     });

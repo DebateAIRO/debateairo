@@ -110,7 +110,7 @@
   "settings.transparency.supportTitle": "Поддержка и помощь человека",
   "settings.transparency.supportLead": "Ассистент службы поддержки — система ИИ. Чтобы запросить помощь человека, откройте раздел",
   "settings.transparency.help": "Помощь",
-  "settings.transparency.supportTail": "и выберите «Поговорить с человеком» или «Передать человеку».",
+  "settings.transparency.supportTail": "и выберите «Поговорить с человеком».",
   "settings.transparency.back": "Вернуться к {brand}",
   "settings.workers.eyebrow": "РАБОЧИЕ ПРОЦЕССЫ",
   "settings.workers.title": "Состояние выполнения",

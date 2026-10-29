@@ -118,7 +118,7 @@ describe("P2-04 enumeration-resistant recovery start", () => {
 });
 
 // NV-18: the maintenance pass closes recovery bindings left open past one hour, in rounds of at most `limit`, each round
-// its own short transaction with a bounded lock wait (identity.expire_stale_account_recovery_bindings, 0125).
+// its own short transaction with a bounded lock wait (identity.expire_stale_account_recovery_bindings, 0131).
 describe("PostgresRecoveryStartRepository.expireStaleBindings", () => {
   const SWEEP = "SELECT identity.expire_stale_account_recovery_bindings($1) AS expired";
   function pool(results: readonly unknown[]) {

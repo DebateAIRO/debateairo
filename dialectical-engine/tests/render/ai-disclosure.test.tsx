@@ -3,7 +3,7 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LandingPage } from "../../apps/ui/components/landing/LandingPage.js";
 import { DebateCanvas } from "../../apps/ui/components/DebateCanvas.js";
 import { NodeDetailDrawer } from "../../apps/ui/components/NodeDetailDrawer.js";
@@ -13,15 +13,38 @@ import { Assistant, type SupportAssistantClient } from "../../apps/ui/components
 import { debateDetailFromAnswer } from "../../apps/ui/lib/v3/adapter.js";
 import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
 import settingsEnglish from "../../apps/ui/messages/en/settings.json" with { type: "json" };
+import supportEnglish from "../../apps/ui/messages/en/support.json" with { type: "json" };
+import { resetSupportOfferedForTests, SUPPORT_OFFERED_STORAGE_KEY } from "../../apps/ui/components/support/availability.js";
 
 describe("AI disclosure at the point of use", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    sessionStorage.setItem(SUPPORT_OFFERED_STORAGE_KEY, "true");
+    resetSupportOfferedForTests();
+  });
+
+  afterEach(() => {
+    sessionStorage.clear();
+    resetSupportOfferedForTests();
+  });
+
   it("makes the linked explanation available without signing in", async () => {
-    const html = renderToStaticMarkup(await AiTransparencyPage());
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const container = document.body.appendChild(document.createElement("div"));
+    const root = createRoot(container);
+    try {
+      await act(async () => root.render(await AiTransparencyPage()));
+      const html = container.innerHTML;
     expect(html).toContain(settingsEnglish["settings.transparency.title"]);
     expect(settingsEnglish["settings.transparency.title"]).toBe("How we label AI content");
     expect(html).toContain("How we label AI content");
     expect(html).toContain("ai_disclosure");
     expect(html).toContain('href="/help"');
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      vi.unstubAllGlobals();
+    }
   });
 
   it("keeps AI markings on the scores when an argument is opened in the drawer", () => {
@@ -84,20 +107,14 @@ describe("AI disclosure at the point of use", () => {
     const conversation = container.querySelector('[aria-label="Support conversation"]')!;
     expect(notice?.textContent).toContain("This conversation is with an AI support agent.");
     expect(notice?.textContent).toContain("can be wrong");
-    // Dev's exact support-banner sentence (AI_NOTICE.banner); localization keeps the English bytes.
-    expect(notice?.textContent).toContain(
-      "Replies are AI-generated, machine-readably marked, and can be wrong. Ask for a human at any point."
-    );
+    expect(notice?.textContent).toContain(supportEnglish["support.aiBanner"]);
     expect(notice!.compareDocumentPosition(conversation) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
   });
 
   it("marks a model reply but keeps user messages and fixed support notices distinct", async () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     const client: SupportAssistantClient = {
-      createSession: async () => ({ sessionId: "session-1", token: "token-1", identityBound: false }),
-      sendMessage: async () => ({ messageId: "reply-1", outcome: "ANSWER_GROUNDED", text: "A generated reply", link: "/new" }),
-      rate: async () => {},
-      escalate: async () => ({ token: "case-1", text: "Case opened" })
+      sendMessage: async () => ({ outcome: "ANSWER_GROUNDED", text: "A generated reply", link: "/new" })
     };
     const container = document.createElement("div");
     document.body.append(container);

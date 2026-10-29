@@ -3,7 +3,7 @@ import type { AuthenticatedSession } from "./sessions.js";
 import type { AuthSourceContext } from "@debateai/db";
 import type { MfaPolicy } from "@debateai/register";
 
-/** NV-01: the durable per-account attempt budget of the legacy-run claim (0125's core.legacy_claim_admit). */
+/** NV-01: the durable per-account attempt budget of the legacy-run claim (0131's core.legacy_claim_admit). */
 export type LegacyRunClaimPolicy = Readonly<{ maxAttempts:number; windowMs:number; lockMs:number }>;
 
 /** At most five claim attempts per account per hour; the attempt past them is refused, and so is every claim for an hour. */
@@ -39,7 +39,7 @@ export class PostgresLegacyRunClaimApplication implements LegacyRunClaimApplicat
     private readonly repository: PostgresLegacyRunClaimRepository,
     private readonly policy: LegacyRunClaimPolicy
   ) {
-    // lockMs >= windowMs keeps a racing admit's later window start below locked_until in practice (0125's CHECK);
+    // lockMs >= windowMs keeps a racing admit's later window start below locked_until in practice (0131's CHECK);
     // the SQL admit refuses the same values.
     const positive = (value: number) => Number.isSafeInteger(value) && value > 0;
     if (!positive(policy.maxAttempts) || !positive(policy.windowMs) || !positive(policy.lockMs)

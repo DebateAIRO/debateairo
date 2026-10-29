@@ -89,12 +89,12 @@ never required, so restarting it never stops a release's API or a draining runne
 its own release's API (`BindsTo=`). `debateai-ingress-guard.service` runs before Docker itself,
 and Hatchet does not start without it.
 
-**One API serves at a time.** The support chat's admission windows (visitor message and session
-limits) are held in the API process: a restart resets them and two serving APIs would double
-them. During an upgrade the newer release's API starts in the spare slot but stays not-ready, and
-the switch is break-before-make: the older pair stops taking requests first, the newer pair takes
-them a few seconds later, and Caddy holds any request in between (§6). The older pair is then
-stopped. Keep it that way until those windows are database-backed (go-live checklist line 4).
+**One API serves at a time.** The support chat's counts live in the API process's memory only
+(message and session limits, pauses and the daily model-call count): a restart clears them and two
+serving APIs would count separately. During an upgrade the newer release's API starts in the spare
+slot but stays not-ready, and the switch is break-before-make: the older pair stops taking
+requests first, the newer pair takes them a few seconds later, and Caddy holds any request in
+between (§6). The older pair is then stopped. Keep it that way (go-live checklist line 4).
 
 ---
 
@@ -292,10 +292,12 @@ observation agent's is set separately (§12).
 
 | `EnvironmentFile` key | Principal (P3-01) | Role | Purpose |
 |---|---|---|---|
-| `api.env` `DATABASE_URL` | `api-runtime` | `debateai_prod_api_runtime` | the API's product runtime, and the owner's six billing commands (among them the resume command `pnpm billing:renewal-resume`), the dispute command `pnpm billing:dispute`, the withdrawal command `pnpm billing:withdraw`, the tax summary `pnpm billing:tax-summary` (read-only), the e-Factura status command `pnpm billing:efactura-status` and the invoice command `pnpm billing:invoice`, all run as the API |
+| `api.env` `DATABASE_URL` | `api-runtime` | `debateai_prod_api_runtime` | the API's product runtime: signed-in requests, each seeing only its own account's rows |
 | `api.env` `CONTENT_PROVISION_DATABASE_URL` | `api-content-provision` | `debateai_prod_api_content_provision` | run content keys, server-side ask admission |
 | `api.env` `SUPPORT_DATABASE_URL` | `api-support` | `debateai_prod_api_support` | **the support database principal**: the support chat's data plane, and the ONLY database the master-key rotation opens (it alone may rewrite the two support key columns) |
 | `api.env` `AUTHORIZATION_DATABASE_URL` | `api-authorization` | `debateai_prod_api_authorization` | step-up session rotation |
+| `api.env` `API_SYSTEM_DATABASE_URL` | `api-system` | `debateai_prod_api_system` | cross-account work outside a request (D29): the API's background jobs, boot checks and room-decision pool, and the owner's billing commands (among them the resume command `pnpm billing:renewal-resume`), the dispute command `pnpm billing:dispute`, the withdrawal command `pnpm billing:withdraw`, the tax summary `pnpm billing:tax-summary` (read-only), the e-Factura status command `pnpm billing:efactura-status` and the invoice command `pnpm billing:invoice`, all run as the API with this URL from the same file |
+| `api.env` `API_AUTHORIZATION_SYSTEM_DATABASE_URL` | `api-authorization-system` | `debateai_prod_api_authorization_system` | cross-account work outside a request (D29) on the authorization pool |
 | `api.env` `PUBLICATION_CLEANUP_DATABASE_URL` | `api-publication-cleanup` | `debateai_prod_api_publication_cleanup` | publication-key cleanup |
 | `api.env` `ERASURE_DATABASE_URL` | `api-erasure` | `debateai_prod_api_erasure` | account and private-run erasure |
 | `api.env` `DATA_EXPORT_DATABASE_URL` | `api-data-export` | `debateai_prod_api_data_export` | the data-export worker: claim, snapshot read, complete, fail, sweep — never a request route (V-25) |
@@ -1736,6 +1738,8 @@ The runner's journal gains one line kind, `DEBATEAI_COMPARING_JUDGE` (engine 2 o
 
 A register version for this code carries the code-owned `engineContractHash` row with `ba2f15d5d89b2f7b4c3168e2f7908f5d3130aa55fc4929ad0825b15028500a4d` (was `8298e1b36638369d2e1bd58111eec69d1c997f9475965ed183c8750491053473` after R2b): R3 appends the map's eight engine-2 contracts and the fixed-words position contracts. Nothing reads the row without an `engineVersionPolicy` row, so the runner boots either way; publish the new version from this release as for any release. A practice register saved with an engine row before this seal must be rebuilt: the runner refuses a stale seal at boot. Rebuild it by running the practice with `--register-next` (tools/preview-practice/README.md, "Optional flags"), which composes this code's next version, with this code's own seal, in the throwaway database.
 
+This release adds `migrations/0129_support_answer_scope.sql` (after `0122_engine_map_check.sql`): it empties the support tables and revokes INSERT from the support database role; no chat conversation or model-call row is written afterwards.
+
 This release adds one migration, `migrations/0122_engine_map_check.sql` (after `0121_engine_verdict.sql`): two
 append-only code tables, what each engine-2 map point rests on and the answer check's codes. Apply it BEFORE the new
 code runs (every map read of the new code joins the first table, engine 1 included), as step 1 of the debate-shape
@@ -1763,17 +1767,50 @@ socket here, never a runtime login); the API's runtime login may only read the a
 what passed. No new environment key. Until an activation exists, every release runs on its own site version, as before;
 on this server nothing activates anything before Phase 3.
 
-### Upgrading to the security fixes of audit run 3 (migrations 0125-0129)
+### Upgrading to the Italy-specific approval (migration 0125)
 
 > Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
 
-This release adds five migrations after `0124_settings_activation.sql`, all `n1: expand`, so §5's migration step
-applies them while the older release keeps serving: `migrations/0125_security_fixes_run3.sql` (the run's new functions,
-one section per issue) and four index steps: `0126_password_reset_notice_due.sql`, `0127_backup_email_notice_due.sql`
-and `0128_mfa_recovery_notice_due.sql`, the pending-only due indexes of the three recovery mail outboxes (NV-38), and
-`0129_mfa_recovery_control_user_started.sql`, the per-account index of the MFA-recovery control table (NV-15, NV-16).
+This release adds one migration, `migrations/0125_italy_specific_approval.sql` (after `0124_settings_activation.sql`;
+`n1: expand`, so §5's migration step applies it while the older release keeps serving). It is the database half of the
+second, unticked sign-up box for the Italian Civil Code arts. 1341-1342, owed when Italy is picked in Region or the
+request IP resolves to Italy: two nullable columns on `legal.acceptance`, `clauses` (the Terms clauses approved: 11, 12,
+14, 15 and 18) and `leg` (`PICKED`, `IP` or `BOTH`: which test placed the sign-up in Italy); the new acceptance kind
+`ITALY_SPECIFIC_APPROVAL` in the two widened CHECKs `acceptance_kind_check` and `acceptance_document_version_shape`, and
+the new CHECK `acceptance_italy_fields`; and two functions, `identity.record_signup_italy_approval` (the sign-up writer,
+inside the sign-up transaction; EXECUTE for `debateai_billing_runtime`, the API's role, only) and
+`identity.read_data_export_snapshot_v2` (0115's export snapshot with `clauses` and `leg` on every acceptance; EXECUTE for
+`debateai_data_export_worker` only). Apply it BEFORE the new code runs, as step 1 of the debate-shape upgrade above does
+(open the migrator window, `pnpm db:migrate`, then `hardening.sql`, close the window), then restart the API. On a
+database without it the new API fails in two ways. Wherever the data-export pool is configured (`DATA_EXPORT_STORE_PATH`
+set, as `env/api.env.example` has it), its boot step `database-roles` (`assertDataExportDatabaseRoles`) refuses the
+WHOLE API with `DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED`, because the export worker's function list now names the v2
+reader, which only 0125 creates. And every sign-up that owes the Italy approval fails: its transaction calls the missing
+writer and is rolled back, account included.
 
-- **Apply 0125 in a quiet window, or with the API, the runner and any scheduler job stopped.** 0125 is one
+The DB-IP and Tor files (§5 "Country data") now feed the Italy approval's IP leg on every hosted boot, whether or not
+the register version in force publishes `countryPolicy`: the API opens them at boot (boot step `geo-lookup`). With a
+`countryPolicy` row a missing file still refuses the boot, as before. Without one the API still starts: it writes one
+`italy_approval.ip_leg_off` line (its `code` names the refusal, for example `GEOIP_COUNTRY_DB_UNAVAILABLE`), each
+sign-up then writes `italy_approval.ip_leg_skipped` with `reason` `NO_LOOKUP`, and the picked Region alone decides. The
+IP leg stays off until the API is restarted after the files appear.
+
+No new environment key. This release publishes Terms of Service 2.5 and Privacy Policy 3.6, and re-asks nobody. Rolling
+back the code needs no database step: the two columns, the three CHECKs and the two functions stay; the older code never
+writes the new kind or the two columns, and its export still calls 0115's `identity.read_data_export_snapshot`, which
+0125 calls and does not replace.
+
+### Upgrading to the security fixes of audit run 3 (migrations 0131-0135)
+
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
+
+This release adds five migrations after `0130_row_level_security.sql`, all `n1: expand`, so §5's migration step
+applies them while the older release keeps serving: `migrations/0131_security_fixes_run3.sql` (the run's new functions,
+one section per issue) and four index steps: `0132_password_reset_notice_due.sql`, `0133_backup_email_notice_due.sql`
+and `0134_mfa_recovery_notice_due.sql`, the pending-only due indexes of the three recovery mail outboxes (NV-38), and
+`0135_mfa_recovery_control_user_started.sql`, the per-account index of the MFA-recovery control table (NV-15, NV-16).
+
+- **Apply 0131 in a quiet window, or with the API, the runner and any scheduler job stopped.** 0131 is one
   transaction, and it holds every lock it takes until its COMMIT. That COMMIT comes only after all of its sections,
   its verifier and postcondition, and every applied step's replay verifier and postcondition. Three sections take
   strong locks on tables the serving release uses all the time:
@@ -1783,24 +1820,24 @@ and `0128_mfa_recovery_notice_due.sql`, the pending-only due indexes of the thre
     `NOT VALID`), which takes ACCESS EXCLUSIVE on `ledger.model_spend`.
 
   Sign-in, sign-up, every money check and every charge wait behind these until the COMMIT. Each lock wait of the step
-  lasts at most 2 s and is tried five times; then the run fails with `MIGRATION_LOCK_TIMEOUT 0125_security_fixes_run3.sql`.
+  lasts at most 2 s and is tried five times; then the run fails with `MIGRATION_LOCK_TIMEOUT 0131_security_fixes_run3.sql`.
   A transaction of the serving release that already holds `ledger.model_spend` (a charge or a money check) and then
   touches `identity."user"` can deadlock with the step. PostgreSQL then ends one side with SQLSTATE 40P01, which is
   not retried (`packages/db/src/migration-transaction.ts` retries only 55P03). Either way the step rolls back whole
-  and nothing of 0125 remains: rerun `db:migrate` when traffic is quiet, or stop the API and the runner for the run.
+  and nothing of 0131 remains: rerun `db:migrate` when traffic is quiet, or stop the API and the runner for the run.
 - The four index steps build their indexes concurrently (`CREATE INDEX CONCURRENTLY`) while the serving release keeps
   writing. On a large table a build takes time.
 - Each build waits for every transaction that holds an older snapshot. A backup running at the same time, or a long or
   idle-in-transaction session, makes the build run out of its 2 s wait five times. The backup can be the nightly
   `deploy/vps/backup.sh`, or the online backup from §9 "The online backup before side-by-side migrations" if it starts
-  late. The run then ends with `MIGRATION_LOCK_TIMEOUT 0126_…` (or `0127_…`, `0128_…`, `0129_…`). Start the migrations after
+  late. The run then ends with `MIGRATION_LOCK_TIMEOUT 0132_…` (or `0133_…`, `0134_…`, `0135_…`). Start the migrations after
   `ONLINE_BACKUP_OK` and outside the nightly backup's window. If the run fails, rerun it after that transaction ends:
   the INVALID index is dropped and rebuilt.
 - Two runs of this release's `db:migrate` no longer deadlock, because each waits for the migration lock by trying it
   every 50 ms and holds no snapshot between tries. The older release's migrator still waits inside its lock statement,
   holding a snapshot, until this release's run releases the lock after its last step. So do not restart the older
-  release while this release's `db:migrate` runs, from its prologue to its last step, not only while 0126-0129 build.
-  An older migrator that starts waiting during the prologue, during 0125 or during an earlier build is still waiting
+  release while this release's `db:migrate` runs, from its prologue to its last step, not only while 0132-0135 build.
+  An older migrator that starts waiting during the prologue, during 0131 or during an earlier build is still waiting
   when the next build reaches its snapshot wait, so it is in that build's cycle. If the older release restarts anyway,
   the deadlock detector ends one side with SQLSTATE 40P01, which is not retried
   (`packages/db/src/migration-transaction.ts` retries only 55P03). For each build, the older migrator is in the cycle
@@ -1813,7 +1850,7 @@ and `0128_mfa_recovery_notice_due.sql`, the pending-only due indexes of the thre
     Its restart fails; restart it after this release's run ends.
 
   An older migrator that starts waiting after one build's snapshot wait has begun is not in that build's cycle. It is
-  in the next build's cycle (0127, 0128 or 0129), and by then it has waited longer than `deadlock_timeout`, so that build
+  in the next build's cycle (0133, 0134 or 0135), and by then it has waited longer than `deadlock_timeout`, so that build
   fails. In every case, rerun the side that failed.
 - After the run (read-only, as `postgres`): `SELECT indexrelid::regclass, indisvalid FROM pg_index WHERE indexrelid IN
   ('identity.password_reset_notice_due'::regclass,'identity.backup_email_notice_due'::regclass,'identity.mfa_recovery_notice_due'::regclass,'identity.mfa_recovery_control_user_started'::regclass);`
@@ -1843,8 +1880,9 @@ checkout in place, with its dependencies installed: this release adds the `mmdb-
 3. **Add the two country-data paths to `api.env`**, as `env/api.env.example` has them:
    `GEOIP_COUNTRY_DB_PATH=/var/lib/debateai-geoip/dbip-country-lite.mmdb` and
    `TOR_EXIT_LIST_PATH=/var/lib/debateai-geoip/tor-exit-list.txt`. Only the paths are needed now: a
-   hosted API without them refuses with `GEOIP_PATHS_REQUIRED`. The files themselves are needed
-   once a register version carrying `countryPolicy` is in force (§5 "Country data").
+   hosted API without them refuses with `GEOIP_PATHS_REQUIRED`. For this release the files themselves
+   were needed only once a register version carrying `countryPolicy` is in force; from the
+   Italy-specific approval (migration 0125) on, every hosted server needs them (§5 "Country data").
 4. **Add `RECORDS_KEY_PATH=/etc/debateai/api/records-key.bin` to `/etc/debateai/backup.conf`**, as
    `backup.conf.example` has it. Without it `backup.sh` stops before it writes anything — the whole
    nightly backup, not only the key — and the restore drill refuses too.
@@ -1882,6 +1920,7 @@ checkout in place, with its dependencies installed: this release adds the `mmdb-
 
 The API adds `ERASURE_DATABASE_URL_MUST_BE_SEPARATE`,
 `CONTENT_PROVISION_DATABASE_URL_MUST_BE_SEPARATE`, `AUTHORIZATION_DATABASE_URL_MUST_BE_SEPARATE`,
+`API_SYSTEM_DATABASE_URL_MUST_BE_SEPARATE`, `API_AUTHORIZATION_SYSTEM_DATABASE_URL_MUST_BE_SEPARATE`,
 `PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE` and `EVALUATOR_DEV_MENU_PRODUCTION_FORBIDDEN`. None of
 these are advisory: the process exits.
 
@@ -1892,16 +1931,22 @@ appears in any file under `/etc/debateai`, and the architecture test pins that.
 
 ### Country data — the GeoIP and Tor refresh (paid plans G4)
 
-The country gate reads two public data files: DB-IP's Lite country database and the Tor exit list.
+The country gate and the Italy approval's IP leg (§5 "Upgrading to the Italy-specific approval
+(migration 0125)") read two public data files: DB-IP's Lite country database and the Tor exit list.
 Their PATHS are required in every hosted `api.env` (`GEOIP_COUNTRY_DB_PATH`, `TOR_EXIT_LIST_PATH`;
-without them the API refuses with `GEOIP_PATHS_REQUIRED`). The FILES must exist from the moment the
-register version in force publishes a `countryPolicy` row: the API then opens them at boot, and a
+without them the API refuses with `GEOIP_PATHS_REQUIRED`). The FILES are needed on every hosted
+server, whatever the register version in force publishes, because the IP leg reads them. The API
+opens them only at boot (a file it opened is re-read within a minute of being replaced, below; one
+missing at boot is not looked for again): without a `countryPolicy` row, a file missing at boot
+leaves the IP leg off, with one `italy_approval.ip_leg_off` line, until the API is restarted after
+the file appears. From the moment the register version in force publishes a `countryPolicy` row, a
 missing file refuses the boot with `GEOIP_COUNTRY_DB_UNAVAILABLE` or `TOR_EXIT_LIST_UNAVAILABLE` (a
 malformed one with `GEOIP_COUNTRY_DB_INVALID` or `TOR_EXIT_LIST_INVALID`; what the refresh checks
 before it renames a file into place, and where that falls short of the API's own check, is at the
 end of this section). A Tor list with no address in it — an
-empty file, or only blank lines and `#` comments — counts as malformed: the boot refuses it with
-`TOR_EXIT_LIST_INVALID`, and a running API keeps its last good list and logs the code
+empty file, or only blank lines and `#` comments — counts as malformed: with a `countryPolicy` row
+the boot refuses it with `TOR_EXIT_LIST_INVALID` (without one it turns the IP leg off, as a missing
+file does), and a running API keeps its last good list and logs the code
 (`geo.reload.failed`), because an empty list would let every Tor exit through. So never create the
 file by hand to get past a first boot's `TOR_EXIT_LIST_UNAVAILABLE`: run the refresh (below) until
 it prints `GEOIP_REFRESH_OK tor-list`. `debateai-geoip-refresh.service` writes
@@ -2133,23 +2178,22 @@ manifest forbids minting one a long-lived superuser credential (audit L5-F8).
    `audit-source-ip-salt`, `support-kek`, `records-key`), written only when their sha256 changed. Held by V,
    offline, on different media from the data key: whoever holds one envelope alone restores
    nothing. The audit source-IP salt is a key, not metadata: bundling it with the dump would let
-   one envelope re-identify every hashed source IP in it. The support KEK (`DL2-F5`) wraps the
-   support session and case keys, which live IN the dump — without it in escrow a restore opens no
-   support conversation, and beside the dump it would open every one. The records key is the
+   one envelope re-identify every hashed source IP in it. The support KEK (`DL2-F5`) remains the
+   fifth escrowed secret after migration 0129, but wraps no new key: the chat keeps no
+   conversation. The records key is the
    sixth escrowed secret, in this same envelope (paid plans ruling Q-12). It seals the acceptance
    and billing evidence kept for years after an account is erased; without it those rows cannot be
    read, and beside the dump it would open every one, so it rides here and never in the data
    envelope.
 
-**What erasure means for a backup.** Deleting a support conversation (or a private debate)
-destroys its key in place, and from then on the live system cannot open it. The key bytes as they
-were before the deletion survive in every backup taken earlier, until that backup ages out of
-retention (14 daily / 8 weekly, then whatever the off-host remote keeps). Whoever holds such a
-backup AND the matching escrowed master key could still open the deleted conversation. Erasure is
-therefore complete only when the last backup older than the deletion has been pruned, and the
-privacy notice must not promise more than that (`DL2-F5`). A restore brings erased accounts and
-unpublished debates back until the owner re-applies them, and the public hold keeps the library
-closed until then: "After any restore — before any API starts" below.
+**What erasure means for a backup.** A dump taken after migration 0129 holds no support conversations.
+Older backups may still hold encrypted chat rows and readable metadata until V destroys those
+backups after a restore drill. The post-0129 operator step below rotates the support KEK. Once
+step (5) has destroyed every earlier copy of the old key, those old rows cannot be opened; step
+(6) then destroys every backup taken before the migration. A private debate still follows its own
+key-erasure and backup-retention rules (`DL2-F5`).
+A restore brings erased accounts and unpublished debates back until the owner re-applies them, and the
+public hold keeps the library closed until then: "After any restore — before any API starts" below.
 
 Retention 14 daily / 8 weekly, then an off-host copy (`rclone copy`, or `scp` — configure exactly
 one in `backup.conf`). Encrypted before it leaves the box, so the remote is untrusted by
@@ -2343,7 +2387,7 @@ Limits:
   it.
 - Erased keys come back with the custody tree until they are re-erased; see "What erasure means for a
   backup".
-- **An artefact from before migration 0125 sets no hold.** The block prints `RESTORE_FENCE_CLEARED`,
+- **An artefact from before migration 0131 sets no hold.** The block prints `RESTORE_FENCE_CLEARED`,
   and the next release carrying NV-07 initialises without a hold. The custody restore can still bring
   back the keys of debates unpublished after the artefact time. So with such an artefact, the owner
   reconciles unpublishes and erasures **before any API starts**, and starts the API only once that is
@@ -2407,12 +2451,6 @@ Each is a fact about the tree at this commit, not a plan. Several are go-live it
   serves is refused with `ASK_PLAN_TIER_MODEL_UNAVAILABLE`. Until a per-deployment tier mapping
   exists, the hosted site cannot serve a debate unless its vendor targets' `model` values are
   exactly the roster's names.
-- **Accounts erased before the support-shred release kept their support conversations (V-26).** From
-  that release on, an account erasure shreds every support session and case key bound to the account
-  before the user key is destroyed, and does not finish until a read on the support data credential
-  finds none live; the rows stay, unreadable. An erasure finished by an earlier release, by an older
-  release still current beside it, or by an older release made current again (a rollback) is not
-  reached; §13 "Accounts erased before V-26 shipped" lists them and shreds them once.
 - **A hosted register carries development source refs on its code-owned rows.** `pnpm
   register:publish-hosted` (§11) reuses the development seeder's row builder byte for byte, because
   the runner's start-up reader (`readDevelopmentRunnerPolicy`) refuses runner and algorithm rows
@@ -2423,9 +2461,8 @@ Each is a fact about the tree at this commit, not a plan. Several are go-live it
   cap and per-visitor share (go-live checklist line 2).
 - **One API instance only** (§1, go-live checklist line 4).
 - **The observation agent does not run on this host** (§12).
-- **`support:inbox` and `support:incident` have no production credential path**, and
-  `support:shred` reads its production credential from `secrets/api-support.json` relative to its
-  working directory (§13).
+- **`support:status` still asks for a support-data credential file**, though after migration 0129
+  it reads no support conversation or model-call data (§13).
 - **No units for the scheduler's three jobs** (replay self-test, liveness sweep, settlement
   watch), although their principals are provisioned live.
 - **Not claimed by this kit:** a test that the schema mirror cannot drift from the database
@@ -2908,6 +2945,7 @@ version must carry, besides the algorithm's own rows:
 |---|---|
 | `costEnvelopePolicy` | both services refuse: `COST_ENVELOPE_POLICY_UNRESOLVED` |
 | `publicationCheckPolicy` | the API refuses: `PUBLICATION_CHECK_POLICY_UNRESOLVED`. Every version `pnpm register:publish-hosted` seals from the publication-check deadline release on carries it (the code-owned 60000 ms, or the file's member); a version sealed before that release does not |
+| `questionCheckPolicy` | the API refuses: `QUESTION_CHECK_POLICY_UNRESOLVED`. Every version `pnpm register:publish-hosted` seals from S04's release on carries it (the code-owned 15000 ms, or the file's member); a version sealed before that release does not |
 | `billingPlans`, `billingPolicy` | optional: without them in the file, the engine's own rows are sealed (billing OFF); a file that supplies either supersedes it, and a version with `enabled: true` also needs `billingPlans` and the three budget members of `costEnvelopePolicy` |
 | `answerRoleRotationPolicy` | optional: without it the engine keeps its fixed roles. The file's `answerRoleRotation` member seals it (`"Upgrading to role rotation"` below); the API reads it at start-up, and a malformed row refuses the boot (`ANSWER_ROLE_ROTATION_POLICY_INVALID`) |
 | `lengthGuidancePolicy` | optional: without it every request keeps today's bytes; the API reads it at start-up, and a malformed row refuses the boot (`LENGTH_GUIDANCE_POLICY_INVALID:<path>`) |
@@ -2974,6 +3012,7 @@ vendor, the real ceilings after the owner's first paid run — opens a migrator 
 | `BILLING_REQUIRES_ENVELOPE_MEMBERS` / `BILLING_PLANS_UNRESOLVED` | billing is switched on without the three budget members in `costEnvelopePolicy`, or without plans |
 | `ASK_ROOM_ADMISSION_UNSEALED` | the file seals the band (the budget rule's three members in `costEnvelopePolicy`) without `askRoomReads`, the room read's budget. Refused by the plan (a dry run included), by the publish's boot check as `HOSTED_REGISTER_BOOT_CHECK_FAILED:ASK_ROOM_ADMISSION_UNSEALED`, and when the API starts. Add `askRoomReads` to the same file (go-live line 13, "Publishing them" under the cost envelopes above) |
 | `PUBLICATION_CHECK_POLICY_INVALID` | the file's optional `publicationCheckPolicy` is not `{"kind": "PUBLICATION_CHECK_POLICY", "deadline_ms": N}` with N whole milliseconds from 1000 to 60000, or the member is `null` |
+| `QUESTION_CHECK_POLICY_INVALID` | the file's optional `questionCheckPolicy` is not `{"kind": "QUESTION_CHECK_POLICY", "deadline_ms": N}` with N whole milliseconds from 1000 to 15000, or the member is `null` |
 | `HOSTED_REGISTER_ROLE_ROTATION_INVALID` | the file's optional `answerRoleRotation` (role rotation, spec 2026-10-11) is not exactly `{"enabled": true}` or `{"enabled": false}`: another member, a value that is not `true` or `false`, or the member is `null`. Nothing is sealed |
 | `ANSWER_ROLE_ROTATION_POLICY_INVALID` | the sealed `answerRoleRotationPolicy` row does not parse (a hand-made or damaged row). Refused by the publish's boot check as `HOSTED_REGISTER_BOOT_CHECK_FAILED:ANSWER_ROLE_ROTATION_POLICY_INVALID`, and the API refuses to start on that version: pin nothing, publish a corrected file |
 | `HOSTED_REGISTER_DEBATE_SHAPE_INVALID` | the file's optional `debateShapePolicy` is not an object, carries `kind`, or the register's own parser refuses it (a size outside its bounds, a missing plan, an unknown field). Nothing was sealed. |
@@ -2995,14 +3034,14 @@ vendor, the real ceilings after the owner's first paid run — opens a migrator 
 with "malformed debate shape": fail that run's job (its work item), which drops it from `PREVIEW_UNFINISHED_RUNS_SQL`;
 nothing else is needed.
 
-Before restarting anything on a new version, check that the newest version carries the four
+Before restarting anything on a new version, check that the newest version carries the five
 rows a hosted start-up refuses without:
 
 ```sh
-sudo -u postgres psql -d debateai -c "SELECT register_version, row_key FROM register.register_row WHERE register_version = (SELECT max(register_version) FROM register.register_row) AND row_key IN ('costEnvelopePolicy', 'admissionPolicy', 'configuredProviderSet', 'publicationCheckPolicy') ORDER BY row_key"
+sudo -u postgres psql -d debateai -c "SELECT register_version, row_key FROM register.register_row WHERE register_version = (SELECT max(register_version) FROM register.register_row) AND row_key IN ('costEnvelopePolicy', 'admissionPolicy', 'configuredProviderSet', 'publicationCheckPolicy', 'questionCheckPolicy') ORDER BY row_key"
 ```
 
-Four rows is the pass. Then make that version a new release (§5 "A new register version is a new release").
+Five rows is the pass. Then make that version a new release (§5 "A new register version is a new release").
 
 ### Settings activation (Phase 3)
 
@@ -3143,11 +3182,40 @@ The support chat is part of the API: there is no separate unit. Its settings are
 | the register's support configuration rows | on or off, which model ref, and the limits — published by the operator commands below |
 | the register's `admissionPolicy` row | the three support budgets a hosted API refuses to start without (§11) |
 
+**After migration 0129 — once, by V**. Run this after the hosted deploy of 0129 and before
+recording the support-data cutover. These steps destroy old copies; keep the go-live record.
+
+(1) Inspect all fifteen tables and see zero rows; run `VACUUM FULL`, then `CHECKPOINT`, outside a
+transaction. On this host use these commands, in this order:
+
+```sh
+sudo -u postgres psql -XAt -v ON_ERROR_STOP=1 -d debateai -c "SELECT 'rating' AS t, count(*) FROM support.rating UNION ALL SELECT 'case_message', count(*) FROM support.case_message UNION ALL SELECT 'case_event', count(*) FROM support.case_event UNION ALL SELECT 'case_key', count(*) FROM support.case_key UNION ALL SELECT 'case', count(*) FROM support.\"case\" UNION ALL SELECT 'tool_call', count(*) FROM support.tool_call UNION ALL SELECT 'abuse_event', count(*) FROM support.abuse_event UNION ALL SELECT 'message', count(*) FROM support.message UNION ALL SELECT 'session_key', count(*) FROM support.session_key UNION ALL SELECT 'admission_event', count(*) FROM support.admission_event UNION ALL SELECT 'session', count(*) FROM support.session UNION ALL SELECT 'shred_audit', count(*) FROM support.shred_audit UNION ALL SELECT 'relay_waiter_event', count(*) FROM support.relay_waiter_event UNION ALL SELECT 'relay_waiter', count(*) FROM support.relay_waiter UNION ALL SELECT 'relay_call', count(*) FROM support.relay_call"
+sudo -u postgres psql -v ON_ERROR_STOP=1 -d debateai -c "VACUUM FULL support.rating, support.case_message, support.case_event, support.case_key, support.\"case\", support.tool_call, support.abuse_event, support.message, support.session_key, support.admission_event, support.session, support.shred_audit, support.relay_waiter_event, support.relay_waiter, support.relay_call"
+sudo -u postgres psql -v ON_ERROR_STOP=1 -d debateai -c "CHECKPOINT"
+```
+
+(2) Use the procedure in §3 to rotate the support KEK. With empty tables, it re-wraps no key.
+
+(3) Use §3's previous-key procedure to shred its previous copy on the host.
+
+(4) After the next nightly backup, run a restore drill with that backup and its new escrow
+envelope; proceed only after the drill has opened it.
+
+(5) Compare each older envelope's other secrets with the new envelope, file by file by SHA-256,
+using the escrow identity. Destroy each older envelope on the host, off-host remote and any drill
+or rehearsal medium. Where another secret differs, first make and open a replacement envelope
+holding that secret but not the old support KEK.
+
+(6) Destroy every backup taken before 0129's hosted deploy, on the host (daily and weekly), on
+the off-host remote and on any drill or rehearsal medium, only after step (4)'s restore drill.
+
+(7) Enter the date and the numbers of envelopes and backups destroyed in the go-live record.
+
 **The operator commands need two credentials.** Configuration changes run as the JIT
 support-config operator, whose credential the provisioner publishes to
 `/run/debateai/support-config/operator.json` and which is valid for at most fifteen minutes (§4;
-how to open a new window is P3-02's "Support configuration rollout"). `support:status` also reads
-support data, as `debateai_prod_api_support`, from a one-entry credential file. Both URLs must
+how to open a new window is P3-02's "Support configuration rollout"). `support:status` still asks
+for a one-entry support-data credential file, but reads no support data after 0129. Both URLs must
 carry one of the two shapes the host's `pg_hba` admits — the socket or verified TLS (§4,
 `DL7-F6`); the URL in `api.env` already does. Run as root from `/opt/debateai/dialectical-engine`.
 
@@ -3172,32 +3240,6 @@ If `support:status` refuses, the credential stays in `/run/debateai/support-data
 `0600`); read the refusal, then destroy it by hand.
 
 `support:switch off` is the emergency stop and takes the same arguments.
-
-**Not available on this host yet:** `support:inbox` and `support:incident` (the case inbox and
-incident notes) have no production credential path at all, and `support:shred` looks for its
-production credential at `secrets/api-support.json` under its working directory. Answering a
-case on this host is not possible until those are given production paths; a one-off shred is
-possible with the working-directory credential below.
-
-**Accounts erased before V-26 shipped (once per host, after any restore, §9, and after the host has
-run an older release again).** An account erasure now shreds the account's support keys before it
-completes; one finished by an earlier release did not. List the owners whose account is closed but
-who still hold an unshredded support session or case:
-
-```sh
-sudo -u postgres psql -XAt -d debateai -c 'SELECT DISTINCT live.owner_ref FROM (SELECT identity_owner_ref AS owner_ref FROM support.session WHERE shredded_at IS NULL UNION ALL SELECT identity_owner_ref FROM support."case" WHERE shredded_at IS NULL) AS live JOIN legal.account_closure AS closure ON closure.owner_ref = live.owner_ref ORDER BY 1'
-```
-
-If it prints nothing, there is nothing to do. Otherwise, as root from
-`/opt/debateai/dialectical-engine`:
-- write the support data credential the way the status check above does, but to
-  `secrets/api-support.json`. That is the only path `support:shred` reads. The `secrets` folder
-  must be mode `0700` and the file `0600`, both owned by the user running the command. Unlike
-  `/run/debateai/support-data`, that folder is on disk, and `shred -u` is not a guaranteed wipe on
-  a journaling file system or an SSD, so keep the file there only for these commands;
-- run `NODE_ENV=production pnpm support:shred --owner <owner_ref> --yes` once for each printed
-  owner;
-- `shred -u secrets/api-support.json`, then run the query again. It must print nothing.
 
 ### Staff independent alerts (v2 source only; activation blocked)
 
@@ -4054,21 +4096,38 @@ being on a command line. Change `2026-Q4` to the quarter you want:
 systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:tax-summary --quarter 2026-Q4
 ```
 
-**Disputes (chargebacks).** A disputed payment pauses the paid features. NETOPIA reports a dispute as a status of the
-payment itself, and says nothing the site can rely on when a dispute ends, so when NETOPIA tells you the outcome,
-record it with `pnpm billing:dispute`, giving the charge reference (find it with the command below: the list shows
-NETOPIA's payment number of the payment the dispute is about) with `--charge` and the outcome with
-`--outcome won` or `--outcome lost`:
+**Disputes (chargebacks).** NETOPIA reports a dispute as a status of the payment itself, and it sends a message
+only when a dispute is LOST (status 10, "chargeback accepted"). A lost dispute needs no command from you: the site
+ends the plan by itself, at once, exactly as `pnpm billing:dispute --outcome lost` would. The person is on Free and
+gets one email that the plan has ended because their bank gave the payment back to them (M10_ENDED), and you get one
+email (O3 `CHARGEBACK_LOST`) saying what happened. That email also asks you to check with your accountant whether a
+cancelling invoice (storno) is needed for that payment. If the payment bought nothing, or its plan had already ended,
+no plan changes and only your email is sent. A refund the dispute held stays held: nothing is left to refund. If you
+had already refunded that payment in NETOPIA's admin before the dispute, the person got the money twice: the email
+gives the `pnpm billing:refund-done … --despite-chargeback` command to record your refund, and you tell NETOPIA. If you
+had recorded the dispute as won earlier, the plan is not ended: the email asks you to check the payment in NETOPIA's
+admin before making the released refund, and to end the plan by hand if the bank kept the money (no owner command
+ends it then).
+
+A dispute NETOPIA reports as opened (status 9) or defended (status 16), if one ever arrives, pauses the paid
+features until its outcome is recorded. The command is for the outcomes NETOPIA does not send: a dispute won (you hear
+it from NETOPIA, or see it in NETOPIA's admin), or a paused one you learn was lost. Record it with
+`pnpm billing:dispute`, giving the charge reference (find it with the command below: the list shows NETOPIA's payment
+number of the payment the dispute is about) with `--charge` and the outcome with `--outcome won` or `--outcome lost`:
 
 - `won` gives the plan back; a plan its person cancelled while it was paused comes back only until its period end,
   then ends; nobody is emailed;
-- `lost` ends it.
+- `lost` ends it; after the site has ended it by itself (status 10), `lost` answers that it is already settled and
+  changes nothing;
+- `won` after a lost dispute ended the plan records the money as won back (`RESOLVED_AFTER_END`); the plan stays
+  ended, and the person subscribes again to use a paid plan.
 
 The command below lists the chargebacks not recorded as won, each with its charge reference, the kind of charge,
 NETOPIA's payment number, its `error_code`, when it arrived, and the subscription's state now. A charge-back counts as
 won only by a `CHARGEBACK_RESOLVED` on its own payment. It is not a list of open disputes: a lost dispute writes
 no charge event, so it stays on the list. The state tells you which are still waiting (`SUSPENDED`) and which have
-ended (`ENDED`: either recorded as lost, or ended by the period-end sweep, when a won outcome can still be recorded).
+ended (`ENDED`: ended by the site on NETOPIA's lost status 10, recorded as lost, or ended by the period-end sweep;
+a won outcome can still be recorded for each).
 `CANCEL_REQUESTED` (the person cancelled while the plan was paused) is still waiting for its outcome: record it as
 you would a `SUSPENDED` one. The command:
 
@@ -4096,8 +4155,6 @@ It prints one line saying what it did. Two answers need a word:
   more than one open charge-back, so the command cannot tell which one you mean. Nothing is written. Check both
   disputes in NETOPIA's admin and report the case: it is settled by hand, not by running the command again.
 
-NETOPIA's status 10 ("chargeback accepted") pauses the plan as a new dispute does and emails you (O3 `OWNER_REVIEW`),
-but never ends it by itself: NETOPIA has not confirmed what it means. Record `lost` (or `won`) once NETOPIA tells you.
 Status 16 records that the payment was defended (pausing the plan first if no dispute was recorded for it yet), and
 changes nothing else.
 
@@ -4111,19 +4168,19 @@ went back (M8) follows once the refund is done; when nothing is due back, M8 goe
 email. A withdrawal made in Settings sends the same emails. When the 14th day is a Saturday or a Sunday, the person
 still has until the end of the next Monday; the command counts it the same way.
 
-First find the person's owner reference. If they wrote through the support chat while signed in, it is the
-`identity_owner_ref` of their case. `pnpm support:inbox` has no production credential on this host yet (§13), so
-match the case by when they wrote. Never guess: run `pnpm billing:withdraw` only when exactly one case matches the
-time the person gives, because the command ends that owner's plan and queues the refund. If two cases are close
-together, ask the person for the exact time they wrote from the chat:
+First find the person's owner reference from the account address. Send the address on stdin to
+`pnpm billing:withdraw --owner-of-email`; it prints `owner_ref: <uuid>` or `owner_ref: none`.
+On the host, enter the account address at the prompt; the command runs as the API user with its
+environment file:
 
 ```sh
-sudo -u postgres psql -d debateai -c "SELECT case_id, identity_owner_ref, created_at, state FROM support.\"case\" WHERE identity_owner_ref IS NOT NULL ORDER BY created_at DESC LIMIT 20"
+read -r ADDRESS && printf '%s\n' "$ADDRESS" | sudo systemd-run --pipe --wait --quiet --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:withdraw --owner-of-email
 ```
 
-If they wrote only by email, reply and ask them to send the same statement from the support chat while signed in.
-The time you record is still the arrival of their first email. Then record the withdrawal; the command asks for the
-two values at the prompt:
+If it prints `owner_ref: none`, ask the person to send the statement again from their account's
+address. Record the arrival time of the first statement, even when the account-address reply comes
+later. Never guess an owner reference. Then record the withdrawal; the command asks for the two
+values at the prompt:
 
 ```sh
 # Paste the owner reference and press Enter; then the time the first statement arrived, in UTC (for example 2026-10-12T08:30:00Z), and press Enter.
@@ -4196,7 +4253,8 @@ records it (needed for a part of a payment): run as given, it only shows what it
 refund of that amount, an earlier refund went through: never refund it again. If it shows a dispute (a chargeback) on
 that payment, do not refund it: the site holds that refund while the dispute lasts and has emailed you once (O3
 `REFUND_HELD_BY_CHARGEBACK`). If the dispute ends for us, record that with `pnpm billing:dispute --outcome won`, and the
-refund comes back into the reminder; if it ends for the person, nothing is left to refund. If you had already refunded
+refund comes back into the reminder; if it ends for the person, nothing is left to refund (NETOPIA reports that itself,
+status 10: the site ends the plan, and its O3 `CHARGEBACK_LOST` names the held refund). If you had already refunded
 it before the dispute, record that refund with `pnpm billing:refund-done … --despite-chargeback`.
 If not, refund exactly the amount the email names, on that payment, in one refund. A whole refund is recorded by the
 site itself as soon as NETOPIA reports it: the person's email (M8 or M11) and the credit note follow by themselves.
@@ -4317,12 +4375,13 @@ signals that matter:
 | `"event":"billing.notice.parse_failed"` (no other field) | A message that passed could not be read: it is stored as it came, and you get O3. Its payment is still found by the status reads. | Report it at once: NETOPIA's message may have changed shape. |
 | `"event":"billing.notice.unknown_order"` (no other field) | A message that passed names an order the site does not know (neither a charge nor a test order). It is stored with no effect. | A single line: nothing. Several: report them; NETOPIA may be sending another shop's messages to this address. |
 | `"event":"billing.payment.status_unexpected"`, with `status` | NETOPIA reported a status whose meaning it has not confirmed (for example `17`). Nothing is recorded on the charge; you get O3 naming the status (with a `billing.payment.owner_review` line). | Look the payment up in NETOPIA's admin and decide with the existing commands (`billing:dispute`, a refund); report the status. |
-| `"event":"billing.payment.owner_review"`, with `state` | A payment was handed to you, and you got O3. `state` names NETOPIA's state. For `UNCLEAR`, nothing was recorded on the charge. For `CHARGEBACK_LOST` (status 10, "chargeback accepted"), the site has recorded the dispute; unless the payment bought nothing, an active or past-due plan is paused (`SUSPENDED`) and the person gets an email (M10). Nothing ends by itself. | Do what the O3 says: look the payment up in NETOPIA's admin; record a dispute's outcome with `pnpm billing:dispute`. |
+| `"event":"billing.payment.owner_review"`, with `state` | A payment was handed to you, and you got O3. `state` names NETOPIA's state. For `UNCLEAR`, nothing was recorded on the charge. (A lost dispute, status 10, writes `billing.chargeback.lost` instead.) | Do what the O3 says: look the payment up in NETOPIA's admin, then record what happened with the owner commands this section names. |
 | `"event":"billing.setting.retired"`, with `key` | At its start the API found a setting of the previous card processor in `api.env` (`key` names it; its value is never printed). The API ignores it and starts normally. | Delete that line from `/etc/debateai/api.env`, and the key file it named if there is one, then restart `debateai-api` at a quiet moment. |
 | `"event":"billing.quote.refused"`, with `code` `TAX_SERVICE_REFUSED` and `reason` | The tax service (Quaderno) refused to price a purchase. That is not an outage: most often the Quaderno key is wrong or revoked (`reason` `QUADERNO_HTTP_401` or `QUADERNO_HTTP_403`), or Quaderno rejects the request (`QUADERNO_HTTP_422`). The person is told to try again in a minute, and nothing is charged. The same event with `code` `TAX_SERVICE_UNAVAILABLE` is an outage of the tax service; with any other code it is one person's own refusal (for example `ALREADY_SUBSCRIBED` or `TAX_ID_INVALID`). | `TAX_SERVICE_REFUSED`: every purchase fails until it is fixed. Check the Quaderno key file and the Quaderno account at once; fix the key and restart `debateai-api`. `TAX_SERVICE_UNAVAILABLE`: nothing, unless it lasts; then check Quaderno's status page. |
 | `"event":"billing.invoice.unknown"`, with `issuer`, `kind` and `code` | A legal document the site could not settle itself. `INVOICE_UNKNOWN`: SmartBill did not say whether it issued a Romanian invoice or credit note, and cannot be asked afterwards, so it may exist. `CREDIT_NOTE_MANUAL`: a credit note the site cannot issue itself (a second refund of one sale, or a refund made in NETOPIA's admin whose amount the site does not know). The owner summary lists it under "Invoices and credit notes to check by hand". | `INVOICE_UNKNOWN`: look in SmartBill the same day, because a Romanian document must reach e-Factura in time (your accountant knows the deadline). If it was issued, record it with `pnpm billing:invoice --record`; if not, re-queue it with `--requeue --confirm-not-issued` (**An invoice, a credit note or an email that was never sent**, below). `CREDIT_NOTE_MANUAL`: issue it by hand in SmartBill or Quaderno and record it with `--record`; for a `DASHBOARD_REFUND` line, record it with `--record` and the amount you refunded, `--amount` (**An invoice, a credit note or an email that was never sent**, below). |
 | `"event":"billing.payment.mismatch"`, with `code` or `chargeKind` | A payment check found a payment that does not match its charge, so nothing was recorded and nothing moved: `PAYMENT_AMOUNT_MISMATCH` (the amount or the currency NETOPIA reports differs from the charge's) or `PAYMENT_CUSTOMER_MISMATCH` (NETOPIA echoes another client id than our customer's). The card **is** charged, and nothing refunds it by itself. The check ends there (a `billing.outbox.dead` line with the same code) and you get O3. | Look the payment up in NETOPIA's admin by the charge reference the O3 names (it is NETOPIA's order id) and, if no plan was given for it, refund it there by hand. Report every such line: a mismatch on every first payment means NETOPIA reports amounts differently than the site reads them; stop sales (**Stopping sales, and switching billing off**, above) and report it at once. |
-| `"event":"billing.chargeback"`, with `chargeKind` | NETOPIA reported a card dispute (status 9, 10 or 16) on a payment. An active or past-due plan is paused (`SUSPENDED`): its paid features stop, and the person gets an email (M10). With `code` `DUPLICATE_PAYMENT`, the dispute is on a payment that bought nothing (a second or refused payment of the same person, a card check, or a payment the site never saw paid), which never pauses the plan. NETOPIA sends no signal the site relies on when a dispute ends. | When NETOPIA tells you the outcome, record it with `pnpm billing:dispute` (**Disputes (chargebacks)**, above). |
+| `"event":"billing.chargeback"`, with `chargeKind` | NETOPIA reported a card dispute (status 9, 10 or 16) on a payment, and the site recorded it. For status 9 or 16, an active or past-due plan is paused (`SUSPENDED`): its paid features stop, and the person gets an email (M10). For status 10 (a lost dispute), the plan ends at once (see `billing.chargeback.lost`). With `code` `DUPLICATE_PAYMENT`, the dispute is on a payment that bought nothing (a second or refused payment of the same person, a card check, or a payment the site never saw paid), which never changes the plan. | For status 9 or 16: when NETOPIA tells you the outcome, record it with `pnpm billing:dispute` (**Disputes (chargebacks)**, above). For status 10: nothing. |
+| `"event":"billing.chargeback.lost"`, with `chargeKind` and `ended` | NETOPIA reported a dispute as lost (status 10): the person's bank took the payment back. With `ended` `true`, the site has just ended the plan by itself, exactly as `pnpm billing:dispute --outcome lost` would: the person is on Free and was emailed that the plan has ended (M10_ENDED). With `ended` `false`, no plan changed: the payment bought nothing, its plan had already ended or was not active, its dispute was already recorded, or NETOPIA sent the same message again. You get one O3 `CHARGEBACK_LOST` for the payment. | No command is needed. Ask your accountant whether a cancelling invoice (storno) is needed for that payment. If NETOPIA later tells you the dispute was won after all, record that with `pnpm billing:dispute --outcome won`. |
 | `"event":"billing.withdrawal.owner_review"`, with `source` | A withdrawal was recorded and the plan ended, but its refund cannot be worked out from our records (a refund made in NETOPIA's admin, or an earlier refund request, already touched one of the payments), so nothing was refunded. You get O2_WITHDRAWAL at once, and the owner summary lists it as `WITHDRAWAL_BY_OWNER` until you settle it. | Within 14 days of the withdrawal, work out what is due and settle it as **A withdrawal sent by email or on the model form**, above, says. |
 | `"event":"billing.card.reminder"`, with `line` | Ten days before a renewal, a plan had no usable saved card, and the person was emailed M12 (`line` `EXPIRING`: the card expires first; `MISSING`: no card was kept from the last payment). | Nothing: the person changes the card in Settings. Many `MISSING` lines after first payments: report it; NETOPIA may not be sending the saved card (go-live row N-4). |
 | `"event":"billing.cancel_link.failed"`, with `code` | Someone asked on `/cancel` for an emailed cancel link, and finding their plan or queuing the email failed, most often because the database did not answer. The page had already said a link is on its way, so the person gets no email (M9). | One: nothing; the person can ask again. Several, or the same code again and again: check the database and the API's other lines from the same minutes, and report the code. |

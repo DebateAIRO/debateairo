@@ -8,6 +8,7 @@ import {
 import { guardedAuthorityQuery } from "./staff-access.js";
 import type { AuthSourceContext } from "./identity.js";
 import { withMailLocale } from "./mail-locale.js";
+import { crossAccount } from "./account-context.js";
 
 export interface LoginIdentityRecord {
   readonly userId: string;
@@ -291,7 +292,7 @@ export class PostgresSessionRepository {
 
   /**
    * NV-04: charge one login TOTP attempt to the (account, factor) budget before the code is checked
-   * (identity.totp_login_admit, 0125 [NV-04]). PostgreSQL errors propagate unchanged; the service maps a 23503
+   * (identity.totp_login_admit, 0131 [NV-04]). PostgreSQL errors propagate unchanged; the service maps a 23503
    * (the account removed after its challenge was read).
    */
   async admitTotpLoginAttempt(input: Readonly<{
@@ -326,23 +327,25 @@ export class PostgresSessionRepository {
     codeHash: string;
     codeSlot: number;
   }> | null> {
-    const challenge = await this.readLoginChallenge(challengeTokenHash);
-    if (challenge === null) return null;
-    const result = await this.pool.query<{
-      recovery_code_id: string;
-      code_hash: string;
-      code_slot: number;
-    }>(`
-      SELECT recovery_code_id,code_hash,code_slot
-      FROM identity.recovery_code
-      WHERE user_id=$1 AND code_slot=$2 AND consumed_at IS NULL AND revoked_at IS NULL
-    `, [challenge.userId, slot]);
-    const row = result.rows[0];
-    return row === undefined ? null : Object.freeze({
-      challenge,
-      recoveryCodeId: row.recovery_code_id,
-      codeHash: row.code_hash,
-      codeSlot: Number(row.code_slot)
+    return crossAccount("X18a", async () => {
+      const challenge = await this.readLoginChallenge(challengeTokenHash);
+      if (challenge === null) return null;
+      const result = await this.pool.query<{
+        recovery_code_id: string;
+        code_hash: string;
+        code_slot: number;
+      }>(`
+        SELECT recovery_code_id,code_hash,code_slot
+        FROM identity.recovery_code
+        WHERE user_id=$1 AND code_slot=$2 AND consumed_at IS NULL AND revoked_at IS NULL
+      `, [challenge.userId, slot]);
+      const row = result.rows[0];
+      return row === undefined ? null : Object.freeze({
+        challenge,
+        recoveryCodeId: row.recovery_code_id,
+        codeHash: row.code_hash,
+        codeSlot: Number(row.code_slot)
+      });
     });
   }
 

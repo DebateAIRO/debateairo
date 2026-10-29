@@ -1,4 +1,5 @@
 import type { Pool } from "pg";
+import { crossAccount } from "@debateai/db";
 import { AnswerLengthSchema, DepthModeSchema, ScrutinySchema, type AnswerLength, type DepthMode, type Scrutiny } from "@debateai/contract";
 import { DEBATE_SHAPE_PLAN_KEYS, type CostEstimateStartPolicy, type DebateShapePlanKey } from "@debateai/register";
 import { chargeMicrosForUsage, type ProviderTargetPrice } from "./cost-envelope.js";
@@ -288,107 +289,111 @@ export class PostgresRecentRunUsageSource implements RecentRunUsageSource {
     limit: number;
     maxPerOwner?: number;
   }>): Promise<ReadonlyArray<RecentRunUsage>> {
-    settingsClassKey(input.settings);
-    if (!Number.isSafeInteger(input.limit) || input.limit < 1 || input.limit > 1_000) {
-      throw new TypeError("COST_ESTIMATE_SAMPLE_SIZE_INVALID");
-    }
-    const perOwner = input.maxPerOwner ?? MAX_SAMPLES_PER_OWNER;
-    if (!Number.isSafeInteger(perOwner) || perOwner < 1 || perOwner > input.limit) {
-      throw new TypeError("COST_ESTIMATE_SAMPLE_SIZE_INVALID");
-    }
-    const result = await this.pool.query<{
-      run_id: string;
-      provider_ref: string;
-      input_tokens: string;
-      output_tokens: string;
-    }>(
-      `WITH candidate AS (
-         SELECT run.run_id, run.asker_id, max(spend.recorded_at) AS last_charged_at
-         FROM core.run AS run
+    // Row-level security S01 (X20): the recent runs of every account, so inside a request it reads on the pool's
+    // cross-account target.
+    return crossAccount("X20", async () => {
+      settingsClassKey(input.settings);
+      if (!Number.isSafeInteger(input.limit) || input.limit < 1 || input.limit > 1_000) {
+        throw new TypeError("COST_ESTIMATE_SAMPLE_SIZE_INVALID");
+      }
+      const perOwner = input.maxPerOwner ?? MAX_SAMPLES_PER_OWNER;
+      if (!Number.isSafeInteger(perOwner) || perOwner < 1 || perOwner > input.limit) {
+        throw new TypeError("COST_ESTIMATE_SAMPLE_SIZE_INVALID");
+      }
+      const result = await this.pool.query<{
+        run_id: string;
+        provider_ref: string;
+        input_tokens: string;
+        output_tokens: string;
+      }>(
+        `WITH candidate AS (
+           SELECT run.run_id, run.asker_id, max(spend.recorded_at) AS last_charged_at
+           FROM core.run AS run
+           JOIN ledger.model_spend AS spend
+             ON spend.run_id = run.run_id AND spend.spend_source IN ('RUN','STORY')
+           WHERE run.plan_tier = $1
+             AND run.composition_budget_tier = $2
+             AND run.depth_params->>'depth' = $3
+             AND jsonb_array_length(run.discovered_panel) = $4
+             AND COALESCE(run.depth_params->>'depthMode', '') = $7
+             AND COALESCE(run.depth_params->>'scrutiny', '') = $8
+             AND COALESCE(run.depth_params->>'answerLength', '') = $9
+             AND COALESCE(run.envelope_basis->'shape'->>'plan', '') = $10
+             AND EXISTS (SELECT 1 FROM core.work_item AS work WHERE work.run_id = run.run_id)
+             AND NOT EXISTS (
+               SELECT 1 FROM core.work_item AS work
+               WHERE work.run_id = run.run_id AND work.state IN ('READY','CLAIMED','FAILED')
+             )
+             AND NOT EXISTS (
+               SELECT 1 FROM serve.answer AS answer
+               JOIN serve.condition_mark AS mark
+                 ON mark.answer_id = answer.answer_id AND mark.answer_version = answer.answer_version
+               WHERE answer.run_id = run.run_id AND mark.reason = ANY($12::text[])
+             )
+             AND NOT EXISTS (
+               SELECT 1 FROM serve.serve_disclosure AS disclosure
+               WHERE disclosure.run_id = run.run_id
+                 AND (disclosure.body_stop = ANY($13::text[]) OR disclosure.serve_stop = ANY($13::text[]))
+             )
+           GROUP BY run.run_id
+           HAVING max(spend.recorded_at) >= $5
+         ), ranked AS (
+           SELECT candidate.run_id, candidate.last_charged_at,
+                  row_number() OVER (
+                    PARTITION BY CASE
+                      WHEN latest.owner_ref IS NOT NULL THEN latest.owner_ref::text
+                      WHEN candidate.asker_id LIKE 'owner:%' THEN substr(candidate.asker_id, 7)
+                      ELSE 'asker:' || candidate.asker_id
+                    END
+                    ORDER BY candidate.last_charged_at DESC, candidate.run_id
+                  ) AS owner_rank
+           FROM candidate
+           LEFT JOIN LATERAL (
+             SELECT event.owner_ref FROM core.run_ownership_event AS event
+             WHERE event.run_id = candidate.run_id
+             ORDER BY event.at_seq DESC
+             LIMIT 1
+           ) AS latest ON true
+         ), sample AS (
+           SELECT ranked.run_id, ranked.last_charged_at
+           FROM ranked
+           WHERE ranked.owner_rank <= $11
+           ORDER BY ranked.last_charged_at DESC, ranked.run_id
+           LIMIT $6
+         )
+         SELECT sample.run_id, spend.provider_ref,
+                spend.input_tokens::text AS input_tokens, spend.output_tokens::text AS output_tokens
+         FROM sample
          JOIN ledger.model_spend AS spend
-           ON spend.run_id = run.run_id AND spend.spend_source IN ('RUN','STORY')
-         WHERE run.plan_tier = $1
-           AND run.composition_budget_tier = $2
-           AND run.depth_params->>'depth' = $3
-           AND jsonb_array_length(run.discovered_panel) = $4
-           AND COALESCE(run.depth_params->>'depthMode', '') = $7
-           AND COALESCE(run.depth_params->>'scrutiny', '') = $8
-           AND COALESCE(run.depth_params->>'answerLength', '') = $9
-           AND COALESCE(run.envelope_basis->'shape'->>'plan', '') = $10
-           AND EXISTS (SELECT 1 FROM core.work_item AS work WHERE work.run_id = run.run_id)
-           AND NOT EXISTS (
-             SELECT 1 FROM core.work_item AS work
-             WHERE work.run_id = run.run_id AND work.state IN ('READY','CLAIMED','FAILED')
-           )
-           AND NOT EXISTS (
-             SELECT 1 FROM serve.answer AS answer
-             JOIN serve.condition_mark AS mark
-               ON mark.answer_id = answer.answer_id AND mark.answer_version = answer.answer_version
-             WHERE answer.run_id = run.run_id AND mark.reason = ANY($12::text[])
-           )
-           AND NOT EXISTS (
-             SELECT 1 FROM serve.serve_disclosure AS disclosure
-             WHERE disclosure.run_id = run.run_id
-               AND (disclosure.body_stop = ANY($13::text[]) OR disclosure.serve_stop = ANY($13::text[]))
-           )
-         GROUP BY run.run_id
-         HAVING max(spend.recorded_at) >= $5
-       ), ranked AS (
-         SELECT candidate.run_id, candidate.last_charged_at,
-                row_number() OVER (
-                  PARTITION BY CASE
-                    WHEN latest.owner_ref IS NOT NULL THEN latest.owner_ref::text
-                    WHEN candidate.asker_id LIKE 'owner:%' THEN substr(candidate.asker_id, 7)
-                    ELSE 'asker:' || candidate.asker_id
-                  END
-                  ORDER BY candidate.last_charged_at DESC, candidate.run_id
-                ) AS owner_rank
-         FROM candidate
-         LEFT JOIN LATERAL (
-           SELECT event.owner_ref FROM core.run_ownership_event AS event
-           WHERE event.run_id = candidate.run_id
-           ORDER BY event.at_seq DESC
-           LIMIT 1
-         ) AS latest ON true
-       ), sample AS (
-         SELECT ranked.run_id, ranked.last_charged_at
-         FROM ranked
-         WHERE ranked.owner_rank <= $11
-         ORDER BY ranked.last_charged_at DESC, ranked.run_id
-         LIMIT $6
-       )
-       SELECT sample.run_id, spend.provider_ref,
-              spend.input_tokens::text AS input_tokens, spend.output_tokens::text AS output_tokens
-       FROM sample
-       JOIN ledger.model_spend AS spend
-         ON spend.run_id = sample.run_id AND spend.spend_source IN ('RUN','STORY')
-       ORDER BY sample.last_charged_at DESC, sample.run_id, spend.recorded_at, spend.spend_id`,
-      [
-        input.settings.planTier,
-        input.settings.compositionBudgetTier,
-        String(input.settings.depth),
-        input.settings.makerCount,
-        input.since,
-        input.limit,
-        input.settings.shape?.depthMode ?? "",
-        input.settings.shape?.scrutiny ?? "",
-        input.settings.shape?.answerLength ?? "",
-        input.settings.shape?.plan ?? "",
-        perOwner,
-        [...BUDGET_WALL_STOP_REASONS],
-        [...BUDGET_WALL_STOP_KINDS]
-      ]
-    );
-    const runs = new Map<string, RecentRunCharge[]>();
-    for (const row of result.rows) {
-      const charges = runs.get(row.run_id) ?? [];
-      charges.push(Object.freeze({
-        providerRef: row.provider_ref,
-        inputTokens: countedTokens(row.input_tokens),
-        outputTokens: countedTokens(row.output_tokens)
-      }));
-      runs.set(row.run_id, charges);
-    }
-    return Object.freeze([...runs].map(([runId, charges]) => Object.freeze({ runId, charges: Object.freeze(charges) })));
+           ON spend.run_id = sample.run_id AND spend.spend_source IN ('RUN','STORY')
+         ORDER BY sample.last_charged_at DESC, sample.run_id, spend.recorded_at, spend.spend_id`,
+        [
+          input.settings.planTier,
+          input.settings.compositionBudgetTier,
+          String(input.settings.depth),
+          input.settings.makerCount,
+          input.since,
+          input.limit,
+          input.settings.shape?.depthMode ?? "",
+          input.settings.shape?.scrutiny ?? "",
+          input.settings.shape?.answerLength ?? "",
+          input.settings.shape?.plan ?? "",
+          perOwner,
+          [...BUDGET_WALL_STOP_REASONS],
+          [...BUDGET_WALL_STOP_KINDS]
+        ]
+      );
+      const runs = new Map<string, RecentRunCharge[]>();
+      for (const row of result.rows) {
+        const charges = runs.get(row.run_id) ?? [];
+        charges.push(Object.freeze({
+          providerRef: row.provider_ref,
+          inputTokens: countedTokens(row.input_tokens),
+          outputTokens: countedTokens(row.output_tokens)
+        }));
+        runs.set(row.run_id, charges);
+      }
+      return Object.freeze([...runs].map(([runId, charges]) => Object.freeze({ runId, charges: Object.freeze(charges) })));
+    });
   }
 }

@@ -2477,6 +2477,7 @@ export function createPostgresReviewCatchUpDependencies(input: {
         stillSetAside: standing.hiddenNodeIds.length,
         persist: async () => serve.persist({
           runId, workItemId: source.workItemId,
+          synthesisCheckRequest: true,
           factBundleVersion: source.factBundleVersion,
           factBundleContentHash: hash(result.factBundle),
           factBundle: result.factBundle,
@@ -11487,6 +11488,7 @@ export class WalkingSkeletonRunner {
     const persisted = await runnerStage("ANSWER_PERSIST_FAILED", () => this.#serve.persist({
       runId: run.runId,
       workItemId: claimed.workItemId,
+      synthesisCheckRequest: true,
       factBundleVersion: settings.factBundleVersion,
       factBundleContentHash: hash(factBundle),
       factBundle,
@@ -12465,6 +12467,10 @@ const KNOWN_FAILURE_CONSTANTS: readonly string[] = Object.freeze([
   "ACCOUNT_NOT_ACTIVE",
   "ACCOUNT_RECOVERY_BINDING_IMMUTABLE",
   "ADDON_GRADING_LINEAGE_UNRESOLVED",
+  "API_AUTHORIZATION_SYSTEM_DATABASE_URL_MUST_BE_SEPARATE",
+  "API_AUTHORIZATION_SYSTEM_DATABASE_URL_REQUIRED",
+  "API_SYSTEM_DATABASE_URL_MUST_BE_SEPARATE",
+  "API_SYSTEM_DATABASE_URL_REQUIRED",
   "ARGON2_POOL_CAPACITY_INVALID",
   "ARGON2_POOL_WORKER_COUNT_INVALID",
   "ASK_ADMISSION_DATABASE_POOLS_MUST_BE_SEPARATE",

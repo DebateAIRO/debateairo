@@ -12,11 +12,14 @@
 - **Status:** written spec, revised after an independent review (34 findings, all resolved here); approved by the owner
   on 6 October 2026; Part N built and merged into `dev` (pull request #103, 9 October 2026). **Part C revised on 10
   October 2026** (rulings PR-60 and PR-61): RON, EUR and USD at once, by the buyer's tax country (§2.16), and NETOPIA's
-  answers of 9 October in §2.24; the decision log is §2.25.
+  answers of 9 October in §2.24; the decision log is §2.25. **NETOPIA's answers of 21 and 22 October 2026 and its
+  answer of 24 October** are written into the sections they change and closed in §2.24 (change B7); the retry rules
+  they caused are §2.26. **A lost charge-back now ends the plan by itself** (the owner's decision of 24 October 2026,
+  change B6, §2.13).
 - **Research behind it:** a NETOPIA API v2 reference, an xMoney coupling map and the review, in the session's SDD
   folder (`.superpowers/sdd/2026-10-05-netopia-switch/`, private working notes, not committed). Facts marked
-  **[N-x]** are open NETOPIA questions (§2.24); everything else is confirmed by NETOPIA's published OpenAPI file, its
-  official SDKs and plugins, or our own code.
+  **[N-x]** are NETOPIA questions (§2.24, which says which are answered and when); everything else is confirmed by
+  NETOPIA's published OpenAPI file, its official SDKs and plugins, NETOPIA's own answers, or our own code.
 
 This document has two parts. **Part 1** is for the owner and uses plain words. **Part 2** is for the people and agents
 who build it.
@@ -40,7 +43,7 @@ emails, cancelling and withdrawal rules. Billing stays switched off until you sw
 |---|---|---|
 | Checkout | card form inside our page | billing details on our page, then NETOPIA's payment page |
 | Billing details | country; name and address only for Romania and companies | first and last name, phone and full address for everyone (NETOPIA requires them for the monthly payments) |
-| Paying | card | a card on NETOPIA's page: NETOPIA never offers a wallet, Click to Pay or instalments on a recurring payment (N-17, answered 9 October 2026). If a payment still leaves no saved card (a lost message), the site asks for a card before the first renewal |
+| Paying | card | a card on NETOPIA's page: NETOPIA never offers a wallet, Click to Pay or instalments on a recurring payment (N-17, answered 9 October 2026). Visa and Mastercard only: no American Express; NETOPIA refuses cards issued in Russia and takes Ukrainian cards only with the bank's security check (22 October 2026). If a payment still leaves no saved card (a lost message), the site asks for a card before the first renewal |
 | Upgrade | charged at once to the saved card | pays the difference on NETOPIA's page; the new plan starts as soon as it is paid |
 | Change of card | a $1.00 hold, released at once | a check for 0 on NETOPIA's page: no money is held. It must leave a saved card (N-11) |
 | Monthly renewal | our server charged the saved card | the same |
@@ -50,14 +53,20 @@ emails, cancelling and withdrawal rules. Billing stays switched off until you sw
 
 The plans and their credit, the daily, weekly and monthly limits with the 110% leeway, the models chosen to fit, the
 tax worked out by Quaderno, one legal invoice per payment (SmartBill for Romania, Quaderno for everyone else), the
-retries after a failed payment (after 1, 3 and 7 days), every email, cancelling, the 14-day withdrawal and its formula,
-the dispute pause, account deletion, the quarterly tax summary and the owner commands.
+reminders after a failed payment (after 1, 3 and 7 days), every email, cancelling, the 14-day withdrawal and its
+formula, the dispute pause, account deletion, the quarterly tax summary and the owner commands.
 
-### 1.4 Refunds, while NETOPIA's refund feature is unconfirmed
+Two things changed after NETOPIA's answers of 21 October 2026. The site charges a card again by itself only after
+refusal 20 (not enough money) or our own failure, never more than twice in 24 hours (§2.26). And a dispute the bank decides against us
+(NETOPIA status 10) ends the plan by itself: the person gets one email, you get one email, and no command is needed
+(your decision of 24 October 2026, §2.13).
+
+### 1.4 Refunds, while refunds by API are not built
 
 NETOPIA's API lists a refund call, but marks it "available at a future date", and none of NETOPIA's own plugins uses
-it. NETOPIA said on 9 October 2026 that refunds also work by API, whole or part (N-10). Until the call's address and
-fields are known and tested in the sandbox, **you make refunds in NETOPIA's admin**:
+it. NETOPIA said on 9 October 2026 that refunds also work by API, whole or part, and its technical team named the call
+on 21 October 2026: the "credit" operation (N-10). It is not built yet (task B5): it waits for one whole and one
+partial refund recorded in the sandbox. Until then **you make refunds in NETOPIA's admin**:
 
 1. When a refund is owed (for example, a withdrawal within 14 days), the site emails you at once: which payment,
    exactly how much, why, the deadline when there is one, and the one command to run once you have refunded.
@@ -69,6 +78,9 @@ fields are known and tested in the sandbox, **you make refunds in NETOPIA's admi
 4. The site reminds you of every refund still open, and every day once a withdrawal's deadline is three days away.
 
 Once the refund call is proven in the sandbox, the site makes refunds by itself, the way it did with xMoney.
+
+A refund still open on a payment whose dispute the bank decided against us is never due: the bank already took the
+money back, so nothing is left to refund. The site says so in its email to you; do not refund it in NETOPIA's admin.
 
 ### 1.5 Your private settings: one guided command
 
@@ -92,9 +104,9 @@ value. No agent ever sees a key.
 |---|---|---|
 | 1 | Send NETOPIA the email drafted for you in Romanian (kept outside this public repository, with your business papers). It asks them to switch on recurring payments for your account and asks the questions in §2.24. | now |
 | 2 | Tell me NETOPIA's answers as they come. Each one closes a row of §2.24. | as they come |
-| 3 | Fill in and sign NETOPIA's settlement form for RON, EUR and USD (NETOPIA settles each payment in the currency it was asked in, N-14), and set your price list: each plan's price in RON, EUR and USD, in whole bani or cents, published in the register (§2.16.2, README §14.4). Until you publish it, the EUR and RON prices are the engine's placeholders. | before billing goes on |
+| 3 | Fill in and sign NETOPIA's settlement form for RON, EUR and USD (NETOPIA settles each payment in the currency it was asked in, N-14; one POS takes all three, 22 October 2026; the company has an account in each), and set your price list: each plan's price in RON, EUR and USD, in whole bani or cents, published in the register (§2.16.2, README §14.4). Until you publish it, the EUR and RON prices are the engine's placeholders. | before billing goes on |
 | 4 | On a separate test server, run the guided command with NETOPIA's sandbox values and do the sandbox test run in the runbook. Let NETOPIA test our flow there, as they asked. | after the build |
-| 5 | NETOPIA answered on 9 October 2026 (N-26): its shop check (the POS validation) is done only on the live site, and card payments become active only after both sides sign the contract; NETOPIA recommends switching card payments off between the validation and the contract. Your reply asks what the validation checks; the go-live sequence is redesigned with that answer. | when NETOPIA answers the follow-up |
+| 5 | NETOPIA answered on 9 October 2026 (N-26): its shop check (the POS validation) is done only on the live site, and card payments become active only after both sides sign the contract; NETOPIA recommends switching card payments off between the validation and the contract. **Answered 22 October 2026:** NETOPIA checks the site's content (its eligibility page) and then makes a test payment on the official live site, public, with no password; **24 October 2026:** NETOPIA prefers the main site (dezbatere.ro), with purchases off until the contract. So V3 replaces V2 on dezbatere.ro before the check, and the check runs with billing on and every country closed for payment (to be proven on the test site first). | before the contract |
 | 6 | Do the small live test, with billing still switched off: one real 1.00 payment with your own card, one saved-card charge of 1.00, then refund both in NETOPIA's admin (§2.21). NETOPIA says the monthly payments can only be tested this way. | after NETOPIA switches on recurring payments and both sides have signed the contract (N-26) |
 | 7 | The website items NETOPIA checks before approving a shop: NETOPIA's logo and the card marks, the consumer-protection (ANPC) links, Terms, privacy, cancellation rules (§2.21, go-live rows). | before billing goes on |
 | 8 | Your colleague and the lawyer: the Privacy Policy must name NETOPIA and the details it receives (name, email, phone, address, internet address at each payment), and confirm the card-saving wording (§2.22). | before billing goes on |
@@ -106,7 +118,12 @@ NETOPIA's public documents leave 26 points open. For each one the build makes th
 table of §2.24, with what it assumes until NETOPIA answers and whether it keeps billing off until then. Most answers
 change one named place in the code; a few (N-8, N-12, N-15) change a rule, and the table says which. The email in §1.6
 item 1 asks all of them. NETOPIA answered six on 9 October 2026, through the sales contact (N-10, N-14, N-17, N-22,
-N-25, N-26; ruling PR-61); §2.24 records each answer and what it changes.
+N-25, N-26; ruling PR-61). Its technical team answered most of the rest on 21 October 2026, and its contact added the
+currencies, the card rules and the shop check on 22 October and the choice of site on 24 October; §2.24 records each
+answer, its date and what it changes. Still open on 24 October: the sandbox setting that sends saved cards, the
+internet address to send on a saved-card payment, how to cause refusal 20 and a hard refusal in the sandbox,
+NETOPIA's logo file, who makes the test payment before activation, and whether saved-card renewals work on Ukrainian
+cards.
 
 ### 1.8 Your decisions (5 October 2026)
 
@@ -124,10 +141,10 @@ Rulings made by the controller (this design's author), which you can overturn:
 | C-1 | Upgrades are paid on NETOPIA's page, not charged silently to the saved card | an upgrade is started by the person, so the bank may ask for its security check, which only NETOPIA's page can show |
 | C-2 | The card change is a 0 check on NETOPIA's page, and it succeeds only once a saved card has arrived | NETOPIA's API describes amount 0 as "account verification"; no money is held. A wallet that leaves no saved card fails with a sentence asking for a card |
 | C-3 | Refunds by you in NETOPIA's admin until the refund call is confirmed (§1.4) | NETOPIA marks the call "future" and none of its own plugins uses it |
-| C-4 | A message whose signature does not check is answered "try again later", never "OK", and it is kept, sealed, for 14 days | NETOPIA sends the saved-card code only once. If our key were wrong, an "OK" would lose every card for good; "try again" keeps NETOPIA sending, and the kept copy is checked again as soon as you fix the key |
+| C-4 | A message whose signature does not check is answered "try again later", never "OK", and it is kept, sealed, for 14 days | NETOPIA sends the saved-card code only once (confirmed 21 October 2026: its 5 resends, 5 minutes apart, carry no card). If our key were wrong, an "OK" would stop the resends that still bring the payment's status; the kept first copy is what keeps the card, and it is checked again as soon as you fix the key |
 | C-5 | A saved-card code is deleted the day after it stops being the card of a live plan | data minimisation; refunds and disputes use NETOPIA's payment number, never the card code |
 | C-6 | Each subscription keeps the currency it was sold in, for good; renewals, retries, upgrades and downgrades use that currency's price; a person who moves country keeps it until they subscribe again. Revised by your choice of 9–10 October (PR-60): three currencies are sold at once, so "one currency at a time" and the refusal of a plan change between two currencies are gone (every plan has every price, so a plan change never crosses currencies) | a live plan keeps the price it was sold at (Terms §12) |
-| C-7 | NETOPIA statuses whose meaning is not confirmed (17 "reversed", 10 "charge-back accepted") never act on their own: they record what is safe and email you | a wrong guess would issue a credit note or end a plan for good |
+| C-7 | NETOPIA statuses whose meaning is not confirmed never act on their own: they record what is safe and email you. **Revised 24 October 2026:** NETOPIA confirmed on 21 October that 10 is a lost charge-back and that 17 is for SMS payments only; by your decision of 24 October a 10 ends the plan by itself (§2.13), and 17 and every other unclear status still go to you | a wrong guess would issue a credit note or end a plan for good |
 | C-8 | A NETOPIA refusal caused by our own setup (merchant settings, recurring payments off, an unknown code) never starts the failed-payment emails: the renewal waits and you are emailed | otherwise one setup mistake would end every subscriber's plan |
 | C-9 | The small live test runs with billing switched off: NETOPIA's message reaches the server for the test tool's own orders only | so the live checkout never opens to the public before you switch billing on |
 
@@ -306,7 +323,12 @@ package count change with it.
   | `https://secure.sandbox.netopia-payments.com` | sandbox |
 
   Any other value refuses the boot with `BILLING_CONFIGURATION_INVALID:NETOPIA_API_BASE_URL`. Both pairs answer today
-  (probed 5 October 2026); NETOPIA's newer code uses the first of each pair (N-1).
+  (probed 5 October 2026); NETOPIA's newer code uses the first of each pair (N-1). **NETOPIA named its live payment
+  address on 21 October 2026:** `https://secure.mobilpay.ro/pay/payment/card/start`, that is the base
+  `https://secure.mobilpay.ro/pay`, already in the table. A probe without a key the same day showed both live bases
+  serving `operation/status` and `operation/credit` (401, the path exists; a made-up path answers 404), so either live
+  base works. The guided setup still writes `https://secure.netopia-payments.com/api`; changing its default to NETOPIA's
+  address is the optional task B4, not built.
 - Requests carry `Authorization: <API key>` (the raw key, no `Bearer`), `Content-Type: application/json` and
   `Accept: application/json`. The key is a custody text file read as a string (`readCustodyAuthorizationHeader`'s
   precedent), held for the process's life.
@@ -350,7 +372,14 @@ package count change with it.
 - `emailTemplate: ""` selects no custom NETOPIA email template. NETOPIA emails the payer on every payment and renewal
   (N-22, answered 9 October 2026); our own emails stay as they are.
 - `currency` is the charge's (USD, EUR or RON, §2.16); NETOPIA settles each payment in the currency of its request, on
-  the owner's signed form (N-14).
+  the owner's signed form (N-14). **One POS takes RON, EUR and USD** as long as each request names its currency
+  (NETOPIA, 22 October 2026).
+- **The cards NETOPIA takes** (22 October 2026): Visa and Mastercard only, no American Express; cards issued in Russia
+  are refused (Russia is also closed by `countryPolicy`); Ukrainian cards only with 3-D Secure. Nothing in the request
+  changes: NETOPIA's page refuses such a card, and our flow handles a refused first payment (§2.8).
+- **Saved cards** (21 October 2026): a token comes for a payment made with a `clientID`. On live NETOPIA sends one for
+  every such payment; in the sandbox only once NETOPIA has set a flag on our POS (asked for in our reply, not yet set on
+  24 October; it explains the payments of 13 and 20 October that left no saved card).
 - `installments` comes from one constant (§2.4.7), `0` until the recording shows which value keeps the payment in one
   go and leaves a saved card (N-24).
 
@@ -366,11 +395,20 @@ package count change with it.
 }
 ```
 
-- No `clientID` (the sales contact's instruction). `scaExemptionInd: "MIT"` inside `order`. A fresh `orderID` for every
-  charge: it is our charge id, and every renewal, retry and upgrade is its own charge row already (A2's UNIQUE
-  `(subscription_id, kind, period_start, attempt)`).
-- The full payer is mandatory here ([SALES]); the package refuses to send a charge whose payer has an empty required
-  field (`PAYMENT_PAYER_INCOMPLETE`, a programming error the caller must have prevented).
+- No `clientID` (the sales contact's instruction). `scaExemptionInd: "MIT"` inside `order`: NETOPIA's technical team
+  confirmed on 21 October 2026 that `"MIT"` is the only value (N-3). A fresh `orderID` for every charge: it is our
+  charge id, and every renewal, retry and upgrade is its own charge row already (A2's UNIQUE
+  `(subscription_id, kind, period_start, attempt)`). NETOPIA confirmed on 21 October that orderIDs must be unique and
+  that a saved-card payment always gets an answer.
+- The full payer is mandatory here: first name, last name, email, address and phone (confirmed by NETOPIA's technical
+  team on 21 October 2026, N-12; checkout already requires each). The package refuses to send a charge whose payer has
+  an empty required field (`PAYMENT_PAYER_INCOMPLETE`, a programming error the caller must have prevented).
+- **No 3-D Secure** on a saved-card payment (21 October 2026); the `ACTION_REQUIRED` handling of §2.9.2 stays as a
+  guard. Which address to send in `IP_ADDRESS` when the payer is not present is still asked (N-12).
+- **At most 3 saved-card tries a day** per card (21 October 2026); we send at most 2 (§2.26 N1). **Only refusal 20**
+  (insufficient funds) is worth retrying (§2.26 N3).
+- **The new token** comes in the notification of the saved-card payment (21 October 2026); the package still reads
+  one from the charge's answer and the status read as well (N-4).
 
 **Status read** — `POST {base}/operation/status` with `{"posID": "<POS>", "ntpID": "<id or empty>", "orderID": "<orderId>"}`.
 NETOPIA's OpenAPI file calls the route "available at a future date", yet every official client calls it and it
@@ -396,7 +434,9 @@ HTTP 200 carries business outcomes. `error.code` is a string; `payment.status`, 
 - **A saved card** in an answer: the first present of `payment.binding.token`, `payment.instrument.token`,
   `payment.token` (N-4), with `binding.expireMonth`/`expireYear` (0 means unknown) and the last four digits of
   `payment.instrument.panMasked` (only those four are kept). The token is an opaque string of 5–1,024 printable
-  characters, wrapped at once in a `SecretToken`.
+  characters, wrapped at once in a `SecretToken`. NETOPIA's technical team said on 21 October 2026 that the token comes
+  only in the **first** notification of a payment (its resends carry none) and that a saved-card payment's new token
+  comes in that payment's notification (N-4). Whether a status read carries the token is for the sandbox recording.
 - **The card's country:** `payment.instrument.country` (ISO numeric), else `payment.data.ISSUER_COUNTRY` (numeric or
   alpha-2), mapped by the static table; unknown or 0 is `null`.
 - **The payment time** (`occurredAt`): `payment.operationDate` only when it is an ISO date-time with `Z` or an offset,
@@ -418,14 +458,14 @@ HTTP 200 carries business outcomes. `error.code` is a string; `payment.status`, 
 | 6 | PENDING | `PENDING` |
 | 8 | CREDIT (refunded) | `REFUNDED` |
 | 9 | CHARGEBACK_INIT | `CHARGEBACK_OPENED` |
-| 10 | CHARGEBACK_ACCEPT | `CHARGEBACK_LOST` |
+| 10 | CHARGEBACK_ACCEPT (a lost charge-back, confirmed 21 October 2026) | `CHARGEBACK_LOST` |
 | 11 | ERROR | `FAILED` |
 | 12 | DECLINED | `DECLINED` |
 | 13 | FRAUD (in review) | `PENDING` |
 | 14 | PENDING_AUTH | `PENDING` |
 | 15 | 3D_AUTH | `ACTION_REQUIRED` |
 | 16 | CHARGEBACK_REPRESENTMENT | `CHARGEBACK_REPRESENTED` |
-| 17 | REVERSED | `UNCLEAR` (ruling C-7) |
+| 17 | REVERSED (SMS payments only, 21 October 2026: never expected on a card payment) | `UNCLEAR` (ruling C-7) |
 | 18 | PENDING_ANY | `PENDING` |
 | 23 | EXPIRED | `EXPIRED` |
 | 7, 19–22, any other | SMS, legacy recurrence, trial | `UNCLEAR`, plus the audit line `billing.payment.status_unexpected {status}` |
@@ -434,6 +474,8 @@ HTTP 200 carries business outcomes. `error.code` is a string; `payment.status`, 
 - Whether NETOPIA sends both 3 and 5 for one payment, and which comes last, is N-9. The table makes both `PAID`, and
   VERIFY_PAYMENT records one SUCCEEDED per charge whatever the order (A3 (d)'s index).
 - A `VOIDED` payment that we had recorded SUCCEEDED is a full refund (A9's `void-ok` rule, kept).
+- **Charge-backs** (21 October 2026): NETOPIA sends a notification only for a **lost** charge-back (status 10). A 9
+  or a 16 can still be seen by a status read (§2.14) and is handled as §2.13 says if it ever arrives.
 
 #### 2.4.5 Decline codes
 
@@ -444,7 +486,10 @@ HTTP 200 carries business outcomes. `error.code` is a string; `payment.status`, 
   names the card or the bank: 17, 18, 19, 20, 21, 22, 26, 34, 35, 37. It is false for 16, 36 and 39.
 - **Merchant-side** refusals (32, 33, 99, unknown codes, HTTP 400) are `PAYMENT_CONFIGURATION_REFUSED`, never a decline
   (ruling C-8, §2.9.2).
-- Whether NETOPIA classes these the same way is N-12; the tables are constants.
+- Whether NETOPIA classes these the same way is N-12; the tables are constants. NETOPIA answered the retry half on 21
+  October 2026: on a saved-card payment only code **20** (insufficient funds) is worth retrying. The failed renewal
+  keeps the code, and only a 20 (or our own failure) is retried by itself (§2.26 N3); every other card-side decline
+  still starts the dunning's emails, without a new charge until the card changes.
 
 #### 2.4.6 Verifying NETOPIA's message (the IPN)
 
@@ -477,10 +522,16 @@ parts, our POS signature in the (unverified) `aud`, and a JSON body whose `order
 form.
 
 **Which key.** NETOPIA's official WooCommerce and OpenCart plugins carry one RSA-2048 key for sandbox and live (SPKI
-SHA-256 `eeba3b065067fb01c2389850c7a888456dfd31332d67ed9b630dae24753478d7`); third parties report that the certificate
-under a POS's security settings does not verify v2 messages. N-5 asks NETOPIA for the official key or keys. The guided
-setup (§2.17.2) offers that published key as a choice, shows its fingerprint, and accepts any other key the owner
-pastes; the trust list may hold several keys, so a key change by NETOPIA needs no downtime.
+SHA-256 `eeba3b065067fb01c2389850c7a888456dfd31332d67ed9b630dae24753478d7`); third parties report that the certificate under a POS's security settings does not verify v2
+messages. **Confirmed by NETOPIA's technical team on 21 October 2026 (N-5):** messages are a JWT signed RS512 with
+that plugin key, the same key in sandbox and live; the key NETOPIA sent us has the same fingerprint (checked 21
+October), and NETOPIA will email us if it changes. The guided setup (§2.17.2) offers that published key as a choice,
+shows its fingerprint, and accepts any other key the owner pastes; the trust list may hold several keys, so a key
+change by NETOPIA needs no downtime.
+
+**Where messages come from.** NETOPIA sends its messages from 217.156.103.68 and 217.156.103.69 (21 October 2026). We
+use **no IP filter**: the JWT already proves the sender, and a filter would turn an unannounced address change into
+refused messages and lost cards.
 
 #### 2.4.7 Facts the sandbox recording pins
 
@@ -671,6 +722,8 @@ or when they press "Back to shop". Two changes:
 - **Verification before admission.** The route verifies first. A verified message is never refused for volume. Only a
   message that fails verification is charged to the `billingNotify` budget (120 a minute per source network), and is
   answered 429 when over it.
+- **Any source address.** NETOPIA's messages come from 217.156.103.68 and .69 (21 October 2026), but the route
+  filters no address: the signature proves the sender (§2.4.6).
 - **No redirect on the way.** NETOPIA does not follow redirects for its message (third-party reports, N-18), so
   `PUBLIC_APP_URL` must be the exact public origin; the check command (§2.17.3) tests that the notify address answers
   a GET without a redirect.
@@ -686,10 +739,17 @@ or when they press "Back to shop". Two changes:
 
 - `Content-Type: application/json` on every answer. NETOPIA's official SDK answers with the three keys; NETOPIA's
   support told two integrators the body must hold `"errorCode": 0`; the success body satisfies both (N-7).
-- **Why an unverified message is "try again", never "OK" (ruling C-4).** The saved card comes only once. If our trusted
-  key were wrong or out of date, an "OK" would make NETOPIA stop sending, and every card of that period would be lost.
-  A "try again" keeps NETOPIA sending while the owner fixes the key, and the quarantine (§2.7.4) keeps a copy in case
-  NETOPIA stops first. A forged message gains nothing either way.
+  **Confirmed by NETOPIA's technical team on 21 October 2026:** our "OK" answer is right; after an error answer NETOPIA
+  resends **5 times, 5 minutes apart** (about 25 minutes in all); a resent first-payment notification carries **no
+  token**.
+- **Why an unverified message is "try again", never "OK" (ruling C-4).** The saved card comes only once, in the first
+  copy (confirmed 21 October 2026). If our trusted key were wrong or out of date, an "OK" would make NETOPIA stop
+  sending. A "try again" keeps the resends coming, and they still bring the payment's status; the card itself is
+  kept by the quarantine (§2.7.4), which seals the first copy, token included, until the key is fixed. A forged
+  message gains nothing either way.
+- **A database outage longer than the resends.** The resends last about 25 minutes and carry no token, so a verified
+  first message that cannot be written is sealed into the file spool and replayed (§2.26 N4), and a status read stores
+  any token it carries (§2.26 N5).
 
 #### 2.7.3 The intake (`notice-intake.ts`) for a verified message
 
@@ -711,7 +771,10 @@ In **one** database transaction, before the answer:
 5. Commit, then answer 200 and kick the outbox.
 
 The intake changes no subscription state. Storing the token before answering is the whole point of the
-transaction: the sales contact says NETOPIA never sends it again.
+transaction: the token comes only in the first notification and its resends carry none (the sales contact's word,
+confirmed by NETOPIA's technical team on 21 October 2026). A lost charge-back's message (status 10) is the only
+dispute message NETOPIA sends (21 October 2026); the intake treats it like any other, and VERIFY_PAYMENT acts on it
+(§2.13).
 
 **Provider-only mode (ruling C-9).** When the deployment is hosted, the NETOPIA settings are complete and billing is
 off, the API builds the NETOPIA connector and serves only this route. The intake then handles tool orders only; every
@@ -757,8 +820,10 @@ the same page).
    - `FAILED`: FAILED(`PAYMENT_FAILED`). `EXPIRED`: FAILED(`PAYMENT_EXPIRED`).
    - `VOIDED`: FAILED(`VOIDED`) before SUCCEEDED; a full REFUNDED after it (A9).
    - `REFUNDED`: §2.12.4. `CHARGEBACK_*`: §2.13.
-   - `UNCLEAR` (ruling C-7): nothing is recorded on the charge; the outcome `OWNER_REVIEW`, the audit line and an O3
-     naming the status. The owner decides with the existing commands.
+   - `UNCLEAR` (ruling C-7): nothing is recorded on the charge; the outcome `OWNER_REVIEW`, the audit line
+     `billing.payment.owner_review` and an O3 naming the status. The owner decides with the existing commands. Status
+     17 is one of these: NETOPIA said on 21 October 2026 that it is for SMS payments only. A lost charge-back (10) is not:
+     since 24 October 2026 it ends the plan by itself, with no owner review (§2.13).
 4. Matching is simple now: NETOPIA's `orderID` is our charge id for every charge, so A1's order-id lookup, A29 (a)/(b)'s
    customer checks on an order, MAYBE_REBILL/DUPLICATE on one order and the separate refund and dispute transactions
    (A29 (f)) go. A second PAID charge of the same person (two orders paid in two tabs) is today's
@@ -774,7 +839,9 @@ the same page).
 The renewal timer, the price (the subscriber's net plus a fresh tax quote), A7's notice and postponement, the Q-1
 72-hour hold, the dunning `[1, 3, 7]` with M5A–C and M6, retries as new charge rows at the failed attempt's total
 (A29 (g)), and every hold of `renewal-rules.ts` are unchanged. Only the call inside `RenewalService.submit`
-(`renewal.ts:601-629`) and the recovery of §2.9.3 change.
+(`renewal.ts:601-629`) and the recovery of §2.9.3 change. **Since 21 October 2026** (§2.26, from NETOPIA's answers of
+that day) two rules sit on top: at most 2 saved-card sends per card in 24 hours (NETOPIA allows 3), and a new charge
+by itself only after refusal 20 or our own failure; the dunning's days and emails stay.
 
 #### 2.9.2 The charge
 
@@ -782,23 +849,30 @@ The renewal timer, the price (the subscriber's net plus a fresh tax quote), A7's
    the attempt fails with no call: FAILED(`CARD_NOT_SAVED`), which is not the bank (no "your bank refused" sentence),
    and the dunning begins, with M5's "update your card" line. §2.15.3's reminder normally prevents this.
 2. The REQUESTED row and the call-started marker, fenced on the lease, as today.
-3. `chargeSavedCard` with the token, `payerIp` = the profile's `paymentIp` (else the checkout quote's address) (N-12),
-   the payer, and `orderId` = the new charge id.
+3. `chargeSavedCard` with the token, `payerIp` = the profile's `paymentIp` (else the checkout quote's address) (N-12:
+   which address to send is still asked on 24 October 2026), the payer (all five required fields, confirmed 21 October
+   2026), and `orderId` = the new charge id. The send counts against the 2-a-day limit (§2.26 N1).
 4. The answer, in one transaction:
    - **A report:** SUBMITTED with its `ntpID`; **a saved card in the answer is stored at once** as a `card_token` row
-     (`source_charge_id` = this charge), because NETOPIA issues a new token with each token payment; then
-     VERIFY_PAYMENT for the charge. A `DECLINED` report also writes FAILED at once (with `bankDeclined`), as a 402 does
-     today.
+     (`source_charge_id` = this charge), because NETOPIA issues a new token with each token payment (NETOPIA sends it
+     in that payment's notification, 21 October 2026; the intake stores it from there too); then VERIFY_PAYMENT for
+     the charge. A `DECLINED` report also writes FAILED at once (with `bankDeclined`), as a 402 does today; NETOPIA's
+     refusal code travels with the failed attempt (§2.26 N3).
    - **`ACTION_REQUIRED`** (the bank wants its security check on a merchant-initiated payment), from this answer or from
      any later status or message: FAILED(`AUTHENTICATION_REQUIRED`), not the bank's refusal. Nobody is present to
      finish the check, so a renewal never waits for it. M5 then says "Your bank asked you to confirm this payment. Please
      confirm your card in Settings, and we'll try again." (`mail.M5.confirmCard`, 35 locales). The card change (§2.11)
-     is that confirmation, and the next retry uses its new card.
+     is that confirmation, and the next retry uses its new card. NETOPIA said on 21 October 2026 that saved-card
+     payments have no 3-D Secure, so this is a guard, not an expected path. Ukrainian cards take only payments with
+     3-D Secure (22 October 2026); whether their renewals are refused is asked (§2.24 N-23), and a refused one follows
+     the dunning like any declined card.
    - **`PAYMENT_PROVIDER_UNAVAILABLE`, `PAYMENT_CREDENTIALS_REFUSED`, `PAYMENT_CONFIGURATION_REFUSED`** (ruling C-8):
      nothing was charged and the cause is not the person's card. REQUESTED with `CHARGE_NOT_SENT`,
      `CHARGE_CREDENTIALS_REFUSED` or `CHARGE_CONFIGURATION_REFUSED`, retried after 1, 5, 15 and 60 minutes and then
      hourly within the Q-1 hold (the plan stays paid, no email to the person). A credentials or configuration refusal
-     also emails the owner at once (O3), once per code and hour.
+     also emails the owner at once (O3), once per code and hour. **Superseded on 21 October 2026 for a refusal NETOPIA
+     sent** (§2.26 N2, NETOPIA's 3-a-day limit): nothing is sent again by itself; the owner gets one O3 and runs
+     `billing:renewal-resume`. A call that never reached NETOPIA keeps the 1/5/15-minute backoff.
    - **`PAYMENT_OUTCOME_UNKNOWN`:** SUBMIT_UNKNOWN, then §2.9.3.
 
 #### 2.9.3 An unknown outcome
@@ -820,7 +894,11 @@ renewal can never become two payments:
    again; one found PAID settles the period (RECOVERED) and no retry is made.
 
 The safety of step 2 rests on NETOPIA's documented error 56 holding for token payments, including while the first
-payment is still being processed (N-15). Until NETOPIA confirms it, go-live row N-15 keeps billing off.
+payment is still being processed (N-15). NETOPIA's technical team said on 21 October 2026 that orderIDs must be unique
+and that a saved-card payment always gets an answer, so an unknown outcome is only ever our side's (a timeout or a
+lost connection). It did not say what a repeat answers while the first is still processing; until the sandbox
+recording shows it, go-live row N-15 keeps billing off. Every probe's resend counts against the 2-a-day limit (§2.26
+N1).
 
 #### 2.9.4 A renewal that stays pending
 
@@ -838,7 +916,10 @@ Q-1 hold, and the owner knows.
   from the profile, `clientId`, and `returnUrl` = `/checkout/return?charge=<ref>`. It answers
   `{redirect_url, charge_ref}`; Settings sends the browser there.
 - VERIFY_PAYMENT's `PAID` runs today's upgrade settlement (UPGRADED with A6's credit and the same anchor). The upgrade's
-  saved card becomes the subscription's card (§2.15.2). A declined upgrade stays payable on NETOPIA's page.
+  saved card becomes the subscription's card (§2.15.2). A declined upgrade stays payable on NETOPIA's page. The upgrade
+  is a hosted payment with `clientID`, not a saved-card charge: on live NETOPIA sends its token in the upgrade's first
+  notification (21 October 2026), the bank may ask for 3-D Secure, and the 2-a-day saved-card limit does not hold it
+  (§2.26 N1 gates the renewal, the resend and the dunning retry only).
 - **One open upgrade at a time.** A second request for the same quote while the first is reusable (the quote still
   valid, its page opened less than 15 minutes ago (`reuseWindowMs()`, N-25), not final) returns the same payment URL; an
   older page is closed like any unpaid upgrade, and the quote answers 409 `QUOTE_EXPIRED`, so the person gets a fresh
@@ -899,11 +980,14 @@ its own transaction, the refund-sum guard (0086), the split newest-first (A4 (b)
    person's email will say, and records only with `--confirm`. An amount below the request records that part and keeps
    the rest open (and reminded). It refuses a charge of another system and one with no open refund request.
 
-#### 2.12.3 The API mode (once NETOPIA confirms its refund call, N-10)
+#### 2.12.3 The API mode (task B5, not built)
 
-NETOPIA said on 9 October 2026 that refunds work by API, whole or part (N-10); the owner mode stays until the call's
-endpoint and fields are known and recorded in the sandbox. The package then offers `refund` (`POST
-{base}/operation/credit` with `{ntpID, amount}`, or what the recording shows), RefundDesk calls it, and
+NETOPIA said on 9 October 2026 that refunds work by API, whole or part (N-10), and its technical team confirmed on 21
+October 2026 that a refund is the **"credit" operation**, for the whole payment or a part. A probe without a key the
+same day showed `operation/credit` on both live bases (401, the path exists). The owner mode stays until the call's
+fields are recorded in the sandbox: one whole and one partial credit on a tool payment (task B5). The package then
+offers `refund` (`POST {base}/operation/credit` with `{ntpID, amount}`, or what the recording shows), RefundDesk calls
+it, and
 today's look-before-retry rule (A4 (c)) uses the status read: a payment already `REFUNDED` is recorded, never refunded
 again. Turning the API mode on is a code change made after the sandbox recording proves the call, never a setting.
 
@@ -916,23 +1000,58 @@ again. Turning the API mode on is a code change made after the sandbox recording
 - A `REFUNDED` status with no request of ours is a refund made in NETOPIA's admin by hand: today's `PROVIDER_REFUND`
   path (A9, A29 (q), A31 (l), (o)), with the remaining amount as the upper bound, the owner's credit note recorded with
   `pnpm billing:invoice --amount`, and `REFUNDED_BEFORE_START` for a checkout that never started.
-- N-8 (which statuses NETOPIA reports for refunds, and whether it reports the amount) is a gate: the automatic record
-  of a whole refund relies on it.
+- N-8's refund half (which statuses NETOPIA reports for refunds, and whether it reports the amount) is still open on
+  24 October 2026 and is a gate: the automatic record of a whole refund relies on it. The sandbox's partial then whole
+  credit (task B5) answers it. Its dispute half was answered on 21 October 2026 (§2.13).
 
-### 2.13 Charge-backs (ruling C-7)
+### 2.13 Charge-backs (ruling C-7, revised 24 October 2026)
+
+**What NETOPIA sends** (its technical team, 21 October 2026): a notification only for a **lost** charge-back, status
+10. Status 17 is for SMS payments only (§2.4.4). Statuses 9 ("opened") and 16 ("represented") send no notification;
+a status read (§2.14) can still show them, and they are handled as below if they ever arrive.
 
 - `CHARGEBACK_OPENED` (status 9): CHARGEBACK, then today's SUSPENDED + FREE entitlement + M10 for a live plan, and no
   plan change for a second payment.
-- `CHARGEBACK_LOST` (status 10, "chargeback accepted"): when no CHARGEBACK is recorded yet, CHARGEBACK and SUSPENDED
-  first, as for status 9; then the outcome `OWNER_REVIEW` and an O3 saying NETOPIA reports the dispute lost. The owner
-  ends the plan with `pnpm billing:dispute --outcome lost` (or `won`), as today. It is never automatic until NETOPIA
-  confirms the status's meaning (N-8).
+- `CHARGEBACK_LOST` (status 10, a lost charge-back): **the plan ends by itself** (the owner's decision of 24 October
+  2026, change B6). VERIFY_PAYMENT ends it in the same transaction, exactly as `pnpm billing:dispute --outcome lost`
+  would: both call one code path, `endForLostDispute` (`apps/api/src/billing/dispute-cli.ts`).
+  - The CHARGEBACK row is written once per payment, as before.
+  - A live plan (ACTIVE or PAST_DUE) is SUSPENDED with the FREE entitlement, as for a 9 but with no M10, then
+    ENDED(DISPUTE) at once. A plan already SUSPENDED (a 9 came first) is ENDED(DISPUTE). A 10 with no earlier 9 ends
+    the plan directly.
+  - **The customer** gets one new email, **M10_ENDED** ("Your {plan} plan has ended"; the owner's wording of 24
+    October 2026: "Your payment for the {plan} plan was given back to you through your bank, after the dispute on it.
+    So the plan has ended, and your account is now on the Free plan; your debates are kept." and "If this is a
+    mistake, write to us at {merchantEmail}."). It is queued only when this transaction ended the plan, so a repeated notification
+    sends nothing more. M10 stays the email for a pause (9 or 16).
+  - **The owner** gets one O3 with the reason code **`CHARGEBACK_LOST`** (deduplicated once per charge). It says what
+    happened, that no command is needed, and: "ask your accountant whether a cancelling invoice (storno) is needed for
+    this payment." With a refund the dispute held, it says nothing is left to refund, and that if the owner had
+    already refunded the payment in NETOPIA's admin before the dispute, the person got the money twice: record that
+    refund with `billing:refund-done … --despite-chargeback` (host form, preview first, then `--confirm`) and tell
+    NETOPIA; "No command is needed unless you had already refunded it." After a dispute recorded won (its refund
+    released), it says the plan was not ended, to check the payment before making the released refund and to end the
+    plan by hand if the bank kept the money; no owner command ends it then (`--outcome lost` answers
+    `ALREADY_SETTLED`).
+  - When the payment bought nothing (a payment coded `DUPLICATE_PAYMENT`), or its plan had already ended, was not
+    active, or already had its dispute recorded, no plan changes and only the O3 is sent.
+  - The stored notice no longer gets the outcome `OWNER_REVIEW` for a 10. The journal line is
+    **`billing.chargeback.lost`** with `chargeKind` and `ended` (true when this notification ended the plan), in place
+    of `billing.payment.owner_review`, which stays for `UNCLEAR` statuses (§2.8).
+  - Afterwards, `pnpm billing:dispute --outcome won` still records the money (CHARGEBACK_RESOLVED) and answers
+    `RESOLVED_AFTER_END`: the plan is not resumed. `--outcome lost` answers `ALREADY_SETTLED` and changes nothing.
 - `CHARGEBACK_REPRESENTED` (status 16): when no CHARGEBACK is recorded yet, CHARGEBACK and SUSPENDED first; then
   CHARGEBACK_REPRESENTED, no further change.
-- `billing:dispute` keys on `provider_payment_id`.
-- An owner refund still open on a charged-back payment is held while the charge-back stands (ruling PR-41): not
-  reminded, not read daily, refused by `billing:refund-done` without `--despite-chargeback`; due again when the dispute
-  is won; never due when it is lost. The owner gets one O3 `REFUND_HELD_BY_CHARGEBACK`.
+- `billing:dispute` keys on `provider_payment_id`. It remains the owner's way to record a won dispute (NETOPIA sends no
+  message for one).
+- An owner refund still open on a charged-back payment is held while the charge-back stands (ruling PR-41,
+  `heldByChargeback`): not reminded, not read daily, refused by `billing:refund-done` without `--despite-chargeback`;
+  due again when the dispute is won; never due when it is lost. The owner gets one O3 `REFUND_HELD_BY_CHARGEBACK` for
+  a 9 or a 16. **After a 10** the refund stays held for good, the way `--outcome lost` leaves it ("if it ends for the
+  person, nothing is left to refund"): no charge event is written and it never comes back into the reminder. No
+  separate `REFUND_HELD_BY_CHARGEBACK` is queued for a 10, nor later: the refund's PAYMENT_REFUND job, run after the
+  10, queues none once the charge has its O3 `CHARGEBACK_LOST`, which says nothing is left to refund and not to refund
+  it in NETOPIA's admin (and the command for a refund already made before the dispute).
 
 ### 2.14 The checks that replace the transaction listing
 
@@ -945,7 +1064,7 @@ not yet record. Each read writes a `billing.status_read` row, and each charge's 
 | open (REQUESTED with a stored payment URL, SUBMITTED, SUBMIT_UNKNOWN), not final | 10 min, 30 min, 1 h, 3 h after the submit, then daily up to 30 days |
 | closed unpaid hosted payments (FAILED `NO_TRANSACTION` or ABANDONED checkouts and upgrades) | daily for 30 days, so a late payment or a late message is never missed (N-25: a page lasts 20 minutes; the 30 days stay as a cheap margin) |
 | renewals held under §2.9.3 or §2.9.4 | hourly until decided |
-| SUCCEEDED | at 1, 7, 30, 60, 90 and 120 days after the payment, to catch refunds and charge-backs whose message was missed |
+| SUCCEEDED | at 1, 7, 30, 60, 90 and 120 days after the payment, to catch refunds and charge-backs whose message was missed (and the only way to see a charge-back's 9 or 16, which NETOPIA sends no message for, 21 October 2026) |
 | with an open owner refund (§2.12.2) | daily until recorded |
 
 A declined 0.00 card check (CARD_CHECK) is not read on this schedule: its card comes only with NETOPIA's message
@@ -957,7 +1076,8 @@ message is only late (task F5).
 - Each read is isolated: one that fails writes `billing.reconcile.status_failed {code}` and the pass goes on;
   `BILLING_RECONCILIATION_PENDING` still means only that the pass itself failed. A29 (o)'s listing failures and the
   hourly retry of refused listings go.
-- At about 1,000 payments a month the reads stay near 300 a day; NETOPIA documents no limit (N-18).
+- At about 1,000 payments a month the reads stay near 300 a day; NETOPIA documents no limit on status reads (N-18).
+  The only limit NETOPIA has named is on saved-card payments: 3 tries a card a day (21 October 2026, §2.26 N1).
 
 ### 2.15 The saved card
 
@@ -1117,8 +1237,9 @@ changes a price or the rule by publishing a new register version; a published ve
   no quote, in the subscription's. `billing.charge.currency`'s CHECK becomes `IN ('USD','EUR','RON')`.
 - **NETOPIA.** The hosted start (checkout, upgrade, card check) and the saved-card charge are requested in the charge's
   currency, which is also the settlement currency (N-14). VERIFY_PAYMENT already compares the report's currency with
-  the charge's (`PAYMENT_AMOUNT_MISMATCH`). The build uses **one POS** for the three currencies.
-  **Where a POS per currency would go (named, not built):** `NetopiaConfig.posSignature`
+  the charge's (`PAYMENT_AMOUNT_MISMATCH`). The build uses **one POS** for the three currencies, which NETOPIA
+  confirmed on 22 October 2026 (one POS takes RON, EUR and USD when each request names its currency), so the POS per
+  currency below is not needed. **Where a POS per currency would go (named, not built):** `NetopiaConfig.posSignature`
   (`packages/payments-netopia/src/client.ts`) would become a choice by the request's currency for the hosted start and
   the saved-card charge, and by the charge's currency for the status read (`buildStatusBody`'s `posID`);
   `NoticeTrust.posSignature` (`packages/payments-netopia/src/notice.ts`, the `aud` check and `quarantinable`) would hold
@@ -1316,10 +1437,13 @@ one line per item, a tick or a cross and a plain sentence, and **never a secret*
   translations for go-live row 36. The translators' note says "NETOPIA Payments is a brand name; keep it."
 - **Owner emails (English):** O2's xMoney-dashboard wording becomes NETOPIA's admin; new O2_REFUND_DUE,
   O2_REFUND_REMINDER, O4, and the O3 codes `RENEWAL_OUTCOME_OPEN`, `PAYMENT_AMOUNT_MISMATCH`,
-  `PAYMENT_CUSTOMER_MISMATCH`, `OWNER_REVIEW`, `CHARGE_CONFIGURATION_REFUSED`; the daily summary's count of rejected
-  messages.
+  `PAYMENT_CUSTOMER_MISMATCH`, `OWNER_REVIEW`, `CHARGE_CONFIGURATION_REFUSED`, and (24 October 2026) `CHARGEBACK_LOST`
+  (§2.13); the daily summary's count of rejected messages.
+- **Customer email (24 October 2026):** M10_ENDED, "Your {plan} plan has ended", for a lost charge-back (§2.13); M10
+  stays the pause email.
 - **The marks** NETOPIA's shop approval requires (its logo, Visa and Mastercard) sit in the footer and on the checkout;
-  the owner supplies the official artwork (go-live rows 17 and N-23).
+  the owner supplies the official artwork (go-live rows 17 and N-23). NETOPIA takes Visa and Mastercard only, no
+  American Express (22 October 2026), so no other card mark is shown.
 - **The signed support catalogue:** the `/checkout`, `/checkout/return` and `/settings/card` entries change their label
   and search words ("Subscription checkout", "billing details", "NETOPIA payment page"), so `catalog.sha256` changes and
   the owner signs again before billing goes on (§1.6 item 9).
@@ -1428,7 +1552,7 @@ the owner commits them, as the xMoney one was.
 and 46 are rewritten or closed for NETOPIA, and the 29 September open items that only xMoney raised are closed as
 "void: card processor changed to NETOPIA". New rows hold every question §2.24 marks as a gate (N-2, N-4, N-5, N-7, N-8,
 N-11, N-14, N-15, N-17, N-23, N-24, N-26), the sandbox recording committed, NETOPIA's test of our flow, and the small
-live test.
+live test. NETOPIA's answers of 21–24 October 2026 close N-5 and N-7 and part of N-8, N-14, N-23 and N-26 (§2.24).
 
 ### 2.22 For the colleague and the lawyer
 
@@ -1461,36 +1585,42 @@ These are go-live row 24's; the build does not edit the legal drafts.
 
 The email (§1.6 item 1) asks every one. "Gate" means a go-live row keeps billing off until it is answered. "Changes"
 says what a different answer would change. NETOPIA answered N-10, N-14, N-17, N-22, N-25 and N-26 on 9 October 2026,
-through the sales contact (ruling PR-61); their rows say **Answered** and what the build does now.
+through the sales contact (ruling PR-61). NETOPIA's technical team answered on 21 October 2026 (N-3, N-4, N-5, N-7,
+N-8's dispute half, N-10's call, N-12 in part, N-15 in part, N-18's sources, N-21), and its contact on 22 October
+(N-14's POS, N-23 in part, N-26's validation) and 24 October (N-26's site). Answered rows say **Answered** with the
+date and what the build does now; a row answered only in part says what is still open. Still unanswered on 24 October
+2026: the sandbox token flag on our POS, the IP address to send on a saved-card payment, how to cause refusal 20 and a
+hard refusal in the sandbox, NETOPIA's logo file, who makes the pre-activation test payment, and whether saved-card
+renewals work on Ukrainian cards.
 
 | # | Question | What the build assumes until answered | Gate | Changes |
 |---|---|---|---|---|
-| N-1 | Canonical base URLs; POS signature format | both pairs accepted; five groups of four | — | the host table, one pattern |
-| N-2 | Where `clientID` goes; its format | `order.clientID`; 32 lower-case hex | yes | one constant |
-| N-3 | `scaExemptionInd` values; anything else on the first payment | `"MIT"` on saved-card charges only | — | one constant |
-| N-4 | Where the token is in the first message; is the new one in the charge's answer, its message, the status read | §2.4.3's three paths, in that order; every source stored | yes | one constant |
-| N-5 | The official key(s) for the messages, sandbox and live; rotation | a trust list; the published plugin key offered | yes | the setup's default |
+| N-1 | Canonical base URLs; POS signature format | both pairs accepted; five groups of four | — | the host table, one pattern. **Answered in part 21 October 2026:** the live payment page is `https://secure.mobilpay.ro/pay/payment/card/start` (a base already in the table); a probe the same day showed both live bases serving status and credit. The setup's default stays the other live base (optional task B4) |
+| N-2 | Where `clientID` goes; its format | `order.clientID`; 32 lower-case hex | yes | one constant. 21 October 2026: live sends a token for every payment with `clientID` (the sandbox needs NETOPIA's flag, not yet set on 24 October); the location and format are still for the recording |
+| N-3 | `scaExemptionInd` values; anything else on the first payment | **Answered 21 October 2026:** `"MIT"` is the only value; sent on saved-card charges only, as built | — | nothing |
+| N-4 | Where the token is in the first message; is the new one in the charge's answer, its message, the status read | §2.4.3's three paths, in that order; every source stored. **Answered in part 21 October 2026:** the token comes only in the first notification (resends carry none), and a saved-card payment's new token comes in its notification. Whether a status read carries it, and the exact path, are for the recording | yes | one constant |
+| N-5 | The official key(s) for the messages, sandbox and live; rotation | **Answered 21 October 2026:** a JWT RS512 signed with the plugin key (SPKI SHA-256 `eeba3b06…78d7`), the same in sandbox and live; NETOPIA emails us if it changes. The trust list and the setup's offered key stay as built | — | nothing |
 | N-6 | JWT time units | no time check (§2.4.6) | — | nothing |
-| N-7 | The exact answer to a message; the resend policy; does a resent first message still carry the token | §2.7.2's bodies; 503 for "try again"; the quarantine | yes | the answer bodies |
-| N-8 | Which status changes send a message; refunds: the status of a whole and of a partial refund, the amount reported; the meaning of 10 and 17 | statuses read daily (§2.14); a whole refund recorded by status, a partial one by command; 10 and 17 to the owner | yes | the refund and dispute rules |
+| N-7 | The exact answer to a message; the resend policy; does a resent first message still carry the token | **Answered 21 October 2026:** our "OK" body is right; after an error NETOPIA resends 5 times, 5 minutes apart; a resent first-payment notification carries **no** token. §2.7.2's bodies stay; the spool, the status-read token and the no-card alert were built from it (§2.26 N4–N6) | — | nothing |
+| N-8 | Which status changes send a message; refunds: the status of a whole and of a partial refund, the amount reported; the meaning of 10 and 17 | statuses read on §2.14's schedule; a whole refund recorded by status, a partial one by command. **Dispute half answered 21 October 2026:** NETOPIA sends a message only for a lost charge-back (10); 17 is for SMS payments only. Since the owner's decision of 24 October 2026 a 10 ends the plan by itself (§2.13); 17 stays with the owner. The refund half is still open | yes (the refund half) | the refund rules |
 | N-9 | Status 3 versus 5 | both are PAID | — | one constant |
-| N-10 | Is the refund call available | **Answered 9 October 2026:** refunds also work by API, whole or part. The owner mode (§2.12.2) is kept until the call's endpoint and fields are known and tested in the sandbox | — | the API mode (§2.12.3), a code change after the sandbox recording proves the call |
+| N-10 | Is the refund call available | **Answered 9 October 2026:** refunds also work by API, whole or part. **21 October 2026:** the call is the "credit" operation, whole or partial (a probe found `operation/credit` on both live bases). The owner mode (§2.12.2) is kept until one whole and one partial credit are recorded in the sandbox (task B5, not built) | — | the API mode (§2.12.3), a code change after the sandbox recording proves the call |
 | N-11 | Does a 0 check with `clientID` give a saved card | yes | yes | the card change (owner rules again) |
-| N-12 | Saved-card charges: mandatory fields; which IP; the answer when the bank wants 3-D Secure; which codes are card-side and retryable | the full payer; the latest in-person IP; 100/15 → `ACTION_REQUIRED`; §2.4.5's tables | — | the decline tables, the renewal's outcome rules |
-| N-13 | `orderID` length and characters | 32 lower-case hex is accepted | — | the charge id form |
-| N-14 | Currencies; settlement; one POS or one per currency | **Answered 9 October 2026:** RON, EUR and USD are each settled in the currency of the request, on the owner's signed form. Each request is made in the subscription's currency (§2.16.4). Whether one POS takes all three is asked again; until then the build uses one POS (`NETOPIA_POS_SIGNATURE`) | yes (the signed form; the POS answer) | a POS per currency, at the place §2.16.4 names |
-| N-15 | Is a repeated `orderID` refused (56) for token payments, also while the first is still processing; can a declined orderID be reused | yes; no | yes | the unknown-outcome rule (§2.9.3) |
+| N-12 | Saved-card charges: mandatory fields; which IP; the answer when the bank wants 3-D Secure; which codes are card-side and retryable | the latest in-person IP; §2.4.5's tables. **Answered in part 21 October 2026:** first name, last name, email, address and phone are required (as built); no 3-D Secure on saved-card payments (`ACTION_REQUIRED` stays as a guard); only code 20 is worth retrying (§2.26 N3); at most 3 tries a day (§2.26 N1). Still open: which IP to send | — | the IP's source |
+| N-13 | `orderID` length and characters | 32 lower-case hex is accepted. 21 October 2026: orderIDs must be unique (each charge id is); length and characters not stated | — | the charge id form |
+| N-14 | Currencies; settlement; one POS or one per currency | **Answered 9 October 2026:** RON, EUR and USD are each settled in the currency of the request, on the owner's signed form. Each request is made in the subscription's currency (§2.16.4). **22 October 2026:** one POS takes RON, EUR and USD as long as each request names its currency; the build's one POS (`NETOPIA_POS_SIGNATURE`) stays, and the company has an account in each currency | yes (the signed form) | nothing |
+| N-15 | Is a repeated `orderID` refused (56) for token payments, also while the first is still processing; can a declined orderID be reused | yes; no. **In part 21 October 2026:** orderIDs must be unique, and a saved-card payment always gets an answer; the answer to a repeat while the first is processing is for the recording | yes | the unknown-outcome rule (§2.9.3) |
 | N-16 | A status read by `orderID` alone; how "no such order" is said | tried; the recorded answer | — | §2.9.3 step 1 |
 | N-17 | Do wallets, Click to Pay, BT Pay or instalment plans on a payment leave a saved card; can a payment be limited to card entry | **Answered 9 October 2026:** wallets, Click to Pay and instalments are never offered on recurring payments. §2.11 and §2.15.3 keep handling a payment without a saved card (a lost message still leaves none) | yes (until the owner rewords the card page) | the card page's "instead of a wallet" wording (`billing.card.notSaved`), the owner's choice |
-| N-18 | Parameters added to the return address; `cancelUrl`; rate limits; message sources; TLS; redirects | none trusted; no `cancelUrl`; no limit; no redirects | — | nothing |
+| N-18 | Parameters added to the return address; `cancelUrl`; rate limits; message sources; TLS; redirects | none trusted; no `cancelUrl`; no limit on status reads; no redirects. **21 October 2026:** messages come from 217.156.103.68 and .69 (no IP filter: the JWT proves the sender); saved-card payments are limited to 3 a card a day (§2.26 N1) | — | nothing |
 | N-19 | A reporting or listing API | none (§2.14) | — | the checks could use it |
 | N-20 | Sandbox test cards | the two in NETOPIA's OpenAPI file | — | the runbook |
-| N-21 | What the recurring flag switches on | token payments | — | nothing |
+| N-21 | What the recurring flag switches on | token payments. **21 October 2026:** in the sandbox a token comes only once NETOPIA sets a flag on our POS (asked for, not yet set on 24 October); live sends a token for every payment with `clientID` | — | nothing |
 | N-22 | Does NETOPIA email the payer; can it be turned off | **Answered 9 October 2026:** NETOPIA emails the payer on every payment and renewal. Kept; `emailTemplate: ""` and our own emails stay | — | nothing |
-| N-23 | Merchant rules for subscriptions: notice before an amount change, site content, AI services accepted, refused card countries | A7's 7 business days kept; §2.21's site items | yes (site items) | the site items |
+| N-23 | Merchant rules for subscriptions: notice before an amount change, site content, AI services accepted, refused card countries | A7's 7 business days kept; §2.21's site items. **Answered in part 22 October 2026:** no NETOPIA rule on the notice (ours to decide; counsel confirms the days); site content per NETOPIA's eligibility page; Visa and Mastercard only, no American Express; cards issued in Russia refused; Ukrainian cards only with 3-D Secure. Still open: whether saved-card renewals work on a Ukrainian card, and NETOPIA's logo file | yes (site items) | the site items |
 | N-24 | How to keep a payment in one go (instalments off); does an instalment payment leave a saved card | `installments: 0`; recorded both ways | yes | one constant |
 | N-25 | How long a payment page stays payable | **Answered 9 October 2026:** 20 minutes. Fix (task C0): the checkout's reuse window goes from 30 minutes to 15 (`reuseWindowMs()`), and an upgrade's page is reused only within 15 minutes of its start. §2.14 still reads closed charges for 30 days | — | nothing further |
-| N-26 | Can NETOPIA's shop check and their test of our flow be done on the test server, or with the paid plans hidden on the live site | **Answered 9 October 2026:** the POS validation is possible only on the live site; payments become active only after both sides sign the contract, and NETOPIA recommends switching card payments off between the validation and the contract. The go-live sequence is redesigned once NETOPIA says what the validation checks (the follow-up is in the owner's reply) | yes | the go-live sequence (§2.21, go-live rows 66, 68 and 69) |
+| N-26 | Can NETOPIA's shop check and their test of our flow be done on the test server, or with the paid plans hidden on the live site | **Answered 9 October 2026:** the POS validation is possible only on the live site; payments become active only after both sides sign the contract, and NETOPIA recommends switching card payments off between the validation and the contract. **22 October 2026:** NETOPIA checks the site's content, then makes a test payment before activation on the official live site, public, with no password; card payments may be switched off afterwards until the contract. **24 October 2026:** NETOPIA prefers the main site (dezbatere.ro), with purchases off until the contract. So V3 replaces V2 on dezbatere.ro first, and the check runs with billing on and every country closed for payment (to be proven on the test site). Still open: who makes the test payment | yes | the go-live sequence (§2.21, go-live rows 66, 68 and 69) |
 
 ### 2.25 Part C decision log (10 October 2026)
 
@@ -1553,6 +1683,6 @@ failed renewal is retried at +1/+3/+7 days".
 | N4 | A verified notification whose database write fails is sealed into a file spool (`BILLING_NOTICE_SPOOL_PATH`, optional) and replayed at start and every 10 minutes, for 14 days; NETOPIA still gets "retry" (503) | the token comes only once; the resends cost nothing and are deduplicated by body hash | answering 200 after the spool (loses NETOPIA's resends as a second source) |
 | N5 | A token in a status read (PAID or AUTHORIZED) is stored for its charge before VERIFY_PAYMENT decides | a first notice that never arrived no longer has to mean a lost card, if NETOPIA's status answer carries it (question (a) to NETOPIA) | storing only from notices |
 | N6 | The owner gets one O3 `FIRST_PAYMENT_NO_CARD` per subscription when a plan 30 minutes to 7 days old holds no card | the plan works, but its first renewal will need the person; the owner should know at once, not 10 days before the renewal | alerting at the decision (a token may still arrive) |
-| N7 | Not built: an uptime alarm on the notify address (nothing here watches the site from outside); the live base address (B4), refunds by API (B5), status 10 (B6) | wait for NETOPIA or the owner | — |
+| N7 | Not built: an uptime alarm on the notify address (nothing here watches the site from outside); the live base address (B4), refunds by API (B5), status 10 (B6). **Update 24 October 2026:** B6 is built on the owner's decision of that day (a lost charge-back ends the plan by itself, §2.13), and NETOPIA's facts are written into this design (B7); B4 and B5 are still not built | wait for NETOPIA or the owner | — |
 | N8 | Owner ruling 2026-10-21: an M5B or M5C whose day (its retry day, or its "add a card by" day) has already passed when its attempt is decided is not sent; the next step follows on the next maintenance pass, and that step's email says what happened. M5A is never late (a first failure is dated when it is decided) | a reminder that names a day already gone misleads, and the next step comes within about 10 minutes (up to a day when the card was already tried twice that day) | "shortly" in place of the date (new sentences in 35 locales, and 2–3 emails within half an hour); keeping the past date |
 | N9 | While a renewal is held for the owner (N2), the daily owner job sends O3 `RENEWAL_HELD` on every third day since its refusal and every day in the last 3 days of the resume command's 30-day reach, at most once a day, naming each held charge (40 at most) and the last time it can still be sent | the refusal's O3 comes once; after 30 days neither the renewal pass nor the resume command reaches the charge, and nothing else would remind the owner | widening the 30-day reach (a renewal charged weeks late, for a month whose paid features were paused); a line in the quarterly summary alone (it can come after the reach has ended; a held renewal older than 30 days is already listed there as `PAYMENT_UNSETTLED`) |

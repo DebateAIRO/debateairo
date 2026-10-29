@@ -56,7 +56,7 @@ describe("Turn 14 change-email timings", () => {
     expect(() => service({ tokenTtlMs: 25 * 3_600_000 + 1 })).toThrow("EMAIL_CHANGE_POLICY_INVALID");
   });
 
-  it("passes a caller's send limit to the database, and refuses one out of the bounds 0125 checks (NV-12)", async () => {
+  it("passes a caller's send limit to the database, and refuses one out of the bounds 0131 checks (NV-12)", async () => {
     const { built, resends } = service({ sendLimit: { maximumSends: 1, windowMs: 60_000 } });
     await expect(built.resend(session, source)).rejects.toMatchObject({ code: "RESEND_COOLDOWN" });
     expect(resends).toMatchObject([{ maximumSends: 1, windowMs: 60_000 }]);

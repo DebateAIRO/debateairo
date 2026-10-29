@@ -481,6 +481,19 @@ describe("S3 ruled authentication policy", () => {
       "sample(0);",
       "for(const target of [25,50,100]){for(const route of routes){const wanted=Math.ceil(policy.rateLimitBucketCapacity*target/100);while(limiter.memoryOccupancy().occupiedSlotsByRoute[route]<wanted){const n=++counters[route];limiter.consume({route,ip:source(route,n),addressKey:'ignored',now});if(n>12000000)throw new Error('S3C_OCCUPANCY_DID_NOT_CONVERGE:'+route);}}sample(target);}"
     ].join("\n");
+    // Warm tsx's disk cache for the child's two entry files before measuring.
+    // With an empty cache (every run under its own fresh TMPDIR, the house rule
+    // since 2026-10-17) tsx starts esbuild's compiler worker thread, which stays
+    // resident for the child's whole life: 2026-10-25 on this Mac, five rounds
+    // read 289.9-290.8 MiB cold against 263.5-264.0 MiB warm. The published
+    // 288 was measured warm (the 09-22 commit still reads 237.9-250.4 warm and
+    // ~270 cold), so the curve is compared under the condition it was measured
+    // in. Fail-safe: a warm-up that warmed nothing would read ~290 again.
+    await execFileAsync(process.execPath, [
+      "--import", "tsx", "--input-type=module", "-e",
+      "await import('./apps/api/src/registration.ts');"
+      + " await import('./packages/register/src/auth-policy.ts');"
+    ], { cwd: process.cwd(), timeout: 30_000 });
     const { stdout } = await execFileAsync(process.execPath, [
       "--expose-gc", "--import", "tsx", "--input-type=module", "-e", childProgram
     ], {

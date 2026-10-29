@@ -1,4 +1,4 @@
-import type { ExportSnapshot, DebateEntry, RoleRotation, Row, SupportCaseEntry, SupportSessionEntry } from "./types.js";
+import type { ExportSnapshot, DebateEntry, RoleRotation, Row, SupportCaseEntry, SupportSessionEntry, SynthesisCheckEntry, PublicationReviewEntry } from "./types.js";
 import type { RecordAad } from "../../../../packages/crypto/src/records.js";
 import { TypedDomainError } from "@debateai/kernel";
 
@@ -13,7 +13,7 @@ export const RAW_SECTIONS = [
   "email_change_requests", "recovery_email_requests", "recovery_requests", "runs",
   "erasure_tombstones", "visibility_events", "legal_acceptances", "sensitive_data_consents",
   "billing", "support_sessions", "support_messages", "support_cases", "support_case_events",
-  "support_case_messages", "support_ratings", "support_key_states", "audit_events",
+  "support_case_messages", "support_ratings", "support_key_states", "audit_events", "threat_reports",
 ] as const;
 export type RawSection = typeof RAW_SECTIONS[number];
 export type RawExportRows = Readonly<Record<RawSection, unknown>>;
@@ -24,6 +24,9 @@ export interface DataExportSourcePort {
 
 export interface OwnerViewPort {
   runKeyPresent(runId: string): Promise<boolean>;
+  runRemovedByCheck(runId: string): Promise<boolean>;
+  readSynthesisChecks(ownerRef: string, answerId: string): Promise<readonly SynthesisCheckEntry[]>;
+  readPublicationReviews(ownerRef: string, runId: string, answerId: string): Promise<readonly PublicationReviewEntry[]>;
   readRun(ownerRef: string, runId: string): Promise<unknown>;
   readRunAnswer(ownerRef: string, runId: string): Promise<unknown | null>;
   readAnswer(ownerRef: string, answerId: string, version: number): Promise<unknown>;
@@ -71,7 +74,7 @@ export const KEEP_COLUMNS = {
   runs: ["as_of", "composition_budget_tier", "depth_params", "plan_tier", "role_rotation"],
   erasure_tombstones: ["completed_at"],
   visibility_events: ["state", "occurred_at"],
-  legal_acceptances: ["kind", "document_version", "document_sha256", "locale", "surface", "accepted_at", "evidence_ciphertext"],
+  legal_acceptances: ["kind", "document_version", "document_sha256", "locale", "surface", "accepted_at", "evidence_ciphertext", "clauses", "leg"],
   sensitive_data_consents: ["notice_version", "locale", "consented_at"],
   billing: {
     customers: ["customer_id", "created_at", "created_locale"],
@@ -98,6 +101,7 @@ export const KEEP_COLUMNS = {
   support_ratings: ["rating", "at"],
   support_key_states: ["kind", "ref", "destroyed_at"],
   audit_events: ["event_type", "occurred_at"],
+  threat_reports: ["question", "kept_at"],
 } as const;
 
 type RawRow = Record<string, unknown>;
@@ -235,7 +239,7 @@ async function collectDebates(raw: RawExportRows, ownerView: OwnerViewPort, owne
       state: null as unknown, visibility_history: history,
       role_rotation: roleRotation(Object.hasOwn(run, "role_rotation") ? run.role_rotation : undefined),
     };
-    if (deletedAt !== null || !await ownerView.runKeyPresent(reference)) {
+    if (deletedAt !== null || await ownerView.runRemovedByCheck(reference) || !await ownerView.runKeyPresent(reference)) {
       entries.push({ ...base, content_status: "UNRECOVERABLE" });
       continue;
     }
@@ -259,6 +263,11 @@ async function collectDebates(raw: RawExportRows, ownerView: OwnerViewPort, owne
       }
       answers.push({
         answer_id: id, versions,
+        synthesis_checks: (await ownerView.readSynthesisChecks(ownerRef, id)).map((check) => ({
+          answer_version: check.answer_version, verdict: check.verdict,
+          categories: [...check.categories], checked_at: check.checked_at,
+        })),
+        publication_reviews: await ownerView.readPublicationReviews(ownerRef, reference, id),
         ledger_digest: await ownerView.readLedgerDigest(ownerRef, id),
         story: await ownerView.readStory(ownerRef, id),
         disclosure: await ownerView.readDisclosure(ownerRef, id),
@@ -409,6 +418,7 @@ export async function collectSnapshot(input: {
         account, channels,
         registration_region: raw.registration_region == null ? null : project(row(raw.registration_region), KEEP_COLUMNS.registration_region),
         age_checks: simple("age_checks"), erasure_requests: simple("erasure_requests"),
+        kept_questions: simple("threat_reports"),
       },
       security: {
         mfa_factors: simple("mfa_factors"), passkeys: simple("passkey_credentials"),

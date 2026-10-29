@@ -43,7 +43,7 @@ const PLACEHOLDER = /^(?:todo|tbd|tbc|tba|fixme|xxx+|lorem|ipsum|placeholder|tra
 // (2) a locale-code TAG: a code (any case) that opens the name before ":" or a spaced dash, or stands in brackets
 //     anywhere — "DE: …", "de : …", "[de] …", "(DE) …", "de – …". A code joined to a word ("IT-Support", "ET-tugi",
 //     "DE-Nutzer") is not a tag. A code of any case also never counts as a word of the locale's own language, so
-//     "de Support conversations and human cases" is refused by the own-word rule.
+//     "de Support conversations and the support email address" is refused by the own-word rule.
 const PLACEHOLDER_LETTERS = new Set(["", "na", "nd", "nv", "nc", "tba", "tbd", "tbc", "todo", "fixme", "null", "undefined",
   "none", "nil", "empty", "missing", "placeholder", "lorem", "ipsum", "loremipsum", "translate", "translation", "untranslated", "dummy", "wip"]);
 const letters = (text: string): string => text.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^\p{L}]/gu, "");
@@ -53,12 +53,12 @@ const CODE = `(?:${[...LOCALE_CODES].join("|")})`;
 const LOCALE_TAG = new RegExp(`^\\s*[\\[(]?\\s*${CODE}\\s*[\\])]?\\s*(?::|\\s[-–—|]\\s)|[\\[(]\\s*${CODE}\\s*[\\])]`, "iu");
 // The member table the two rules are written against (asserted below, so a rule that loosens fails on the table itself).
 const REFUSE = ["N/A", "N / A", "n.a.", "N.A.", "NA", "N/D", "n.d.", "N.V.", "x", "XX", "xxx", "TBA", "TBD", "TODO", "null",
-  "undefined", "None", "—", "???", "...", "DE: Support conversations and human cases", "de: Support conversations and human cases",
-  "de : Support conversations and human cases", "[de] Support conversations and human cases",
-  "(DE) Support conversations and human cases", "DE - Support conversations and human cases",
-  "de – Support conversations and human cases", "de Support conversations and human cases",
-  "DE Support conversations and human cases", "de: Support-Gespräche und Fälle mit menschlicher Betreuung",
-  "Human help cases", "Support (TBD)", "lorem ipsum", "MFA"];
+  "undefined", "None", "—", "???", "...", "DE: Support conversations and the support email address", "de: Support conversations and the support email address",
+  "de : Support conversations and the support email address", "[de] Support conversations and the support email address",
+  "(DE) Support conversations and the support email address", "DE - Support conversations and the support email address",
+  "de – Support conversations and the support email address", "de Support conversations and the support email address",
+  "DE Support conversations and the support email address", "de: Support-Gespräche und Fälle mit menschlicher Betreuung",
+  "Account security settings", "Support (TBD)", "lorem ipsum", "MFA"];
 const ACCEPT = ["IT-Support-Gespräche mit menschlicher Betreuung", "ET-tugi ja inimeste käsitletud juhtumid",
   "Support-Gespräche für DE-Nutzer", "Spás oibre úinéir na díospóireachta", "Comhráite tacaíochta agus cásanna le duine",
   "O Dialectical Engine", "Om Dialectical Engine", "Acerca de Dialectical Engine", "Estado da verificação do e-mail",
@@ -115,13 +115,13 @@ describe("S05 capability names in the model's capability line (SPEC-v5 R13, V-22
   it("writes a TRANSLATE-row name in all 33 locales: present, not empty, not the en name, no digit, not a control's label", () => {
     // D-ORCH-S05-2 (N3): each locale's names are compared with its FULL label set — the generated pairs hold only the
     // labels that differ from en, so the en labels a locale shows unchanged ("Account", "Privacy" in it/nl) are added
-    // back from the other locales' pairs; the union names all 52 current lexicon controls after the retired legacy-claim
+    // back from the other locales' pairs; the union names all 51 current lexicon controls after the retired legacy-claim
     // control was removed (asserted, so a control that
     // becomes identical in every locale fails here instead of slipping out of the set).
     for (const name of REFUSE) expect(refusal(name), `refuse ${JSON.stringify(name)}`).not.toBe("");     // RECHECK-S05 N2 class
     for (const name of ACCEPT) expect(refusal(name), `accept ${JSON.stringify(name)}`).toBe("");
     const allEn = new Set(OTHER.flatMap((loc) => SUPPORT_CONTROL_NAMES[loc].map(([en]) => en)));
-    expect(allEn.size).toBe(52);
+    expect(allEn.size).toBe(51);
     for (const loc of OTHER) {
       const differing = new Set(SUPPORT_CONTROL_NAMES[loc].map(([en]) => en));
       const labels = [...SUPPORT_CONTROL_NAMES[loc].map(([, local]) => local), ...[...allEn].filter((en) => !differing.has(en))];

@@ -18,6 +18,7 @@ import {
   BILLING_POLICY_DEPLOYMENT_REGISTER_ROW,
   TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW,
   PUBLICATION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW,
+  QUESTION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW,
   COST_ESTIMATE_START_POLICY_DEPLOYMENT_REGISTER_ROW,
   ALGORITHM_REGISTER_ROW_KEYS,
   AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS,
@@ -736,6 +737,7 @@ function developmentRows(
     // hate-speech S02 (owner's ruling 2026-10-04): the pre-publish check's deadline D. Code-owned, so every
     // publication carries it and the API can refuse a version without it; a hosted file may supersede it.
     PUBLICATION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW,
+    QUESTION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW,
     // Fresh-site estimate (owner rulings 2026-10-22): the estimate's trusted minimum of settled runs and per-depth starting
     // figures. Code-owned and sealed by every HOSTED publication (the hosted publish and the preview kit v3), like the
     // story's money row: only a hosted API estimates (the room), so local mode has no reader and no row. A version

@@ -18,7 +18,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * NV-09 (security-audit run 3, K02). A pre-0077 account could schedule its erasure and then refuse the one-time age
  * check: 0077's freeze revokes every session and sets age_frozen without reading the pending request. 0040's preview
  * and 0110's PREPARE admit only an active owner, so the coordinator answered NOT_FOUND for ever and the person could
- * not cancel. 0125's erasure_reconcile.account_erasure_preview and erasure_reconcile.prepare_account_erasure are
+ * not cancel. 0131's erasure_reconcile.account_erasure_preview and erasure_reconcile.prepare_account_erasure are
  * copies that also admit age_frozen; PREPARE skips a frozen owner's expired orphan run-key intents and queues no
  * COMPLETION notice for it (0040's outbox parent trigger admits active owners only). The identity pair is unchanged.
  *

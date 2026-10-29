@@ -24,7 +24,7 @@ import {
   type AskAccepted,
   type AskRequest
 } from "@debateai/contract";
-import { EntitlementRepository, RunWaitRepository, migrate } from "@debateai/db";
+import { EntitlementRepository, RunWaitRepository, configureContentEncryption, contentCipherFor, migrate } from "@debateai/db";
 import { argumentLanguageDirective } from "@debateai/kernel";
 import {
   BILLING_PLANS_DEPLOYMENT_REGISTER_ROW,
@@ -38,11 +38,13 @@ import type { AskBilling } from "../../apps/api/src/ask-billing.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import {
   TEST_APP_ORIGIN,
+  persistLiveSession,
   testHttpIdentity,
   testSessionApplication,
   testSessionHeaders,
   type TestHttpIdentity
 } from "../support/httpSession.js";
+import { questionCheckPass } from "../support/questionCheckPass.js";
 import { reviewArtifact, withRequestDerivedBearings } from "../support/reviewBearings.js";
 import {
   provisionStoryEncryptedOwner,
@@ -51,6 +53,7 @@ import {
 } from "../support/storyEncryptedOwner.js";
 import { createTestAskAdmissionPoolFacades, startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
+import { apiTestPools, provisionRlsLogins, type ApiTestPools } from "../support/rls-logins.js";
 
 /**
  * Budget spec 2026-09-28 §2.14, "End to end": one hosted-mode debate under a
@@ -62,6 +65,8 @@ import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
  * CI skips this directory; it is on the Part 1 pull request's hand-run list (B11d).
  */
 let database: TestDatabase;
+/** The API's pools (R21, PLAN S5.3): the product's logins in API-login mode, the harness superuser otherwise. */
+let pools: ApiTestPools | undefined;
 /**
  * The pool's one encrypted owner. `provisionStoryEncryptedOwner` configures the
  * pool's content cipher, which a pool takes once (CONTENT_CIPHER_ALREADY_CONFIGURED),
@@ -399,23 +404,37 @@ function hostedRunner(endpoint: string): WalkingSkeletonRunner {
   });
 }
 
-/** The API side as the hosted boot composes it (B6b's `ask-room` step, B7b's line, B8's billing when on). */
+/**
+ * The two ask-admission pools main.ts hands PostgresAskApplication. Superuser mode hands one pool in every field, which
+ * the constructor refuses in two places, so it gets the harness's two facades over it, as at base.
+ */
+function askAdmissionPools(api: ApiTestPools): Readonly<{ server: ApiTestPools["runtime"]; legacy: ApiTestPools["runtime"] }> {
+  return api.serverAskAdmission === api.runtime
+    ? createTestAskAdmissionPoolFacades(api.runtime)
+    : Object.freeze({ server: api.serverAskAdmission, legacy: api.legacyAskAdmission });
+}
+
+/**
+ * The API side as the hosted boot composes it (B6b's `ask-room` step, B7b's line, B8's billing when on), on the pools
+ * apps/api/src/main.ts gives it: the runtime pool, and the room decision pool for the room's lock.
+ */
 function hostedApplication(input: Readonly<{ billing: boolean; dispatcher: Dispatcher }>): PostgresAskApplication {
-  const spend = new PostgresModelSpendStore(database.pool);
+  if (pools === undefined) throw new Error("BUDGET_E2E_POOLS_UNBUILT");
+  const spend = new PostgresModelSpendStore(pools.runtime);
   const estimator = new RecentRunsCostEstimator({
-    source: new PostgresRecentRunUsageSource(database.pool),
+    source: new PostgresRecentRunUsageSource(pools.runtime),
     prices: PRICES,
     maximumMicros: RUN_MAXIMUM,
     clock: () => now
   });
-  const entitlements = input.billing ? new EntitlementRepository(database.pool) : null;
+  const entitlements = input.billing ? new EntitlementRepository(pools.runtime) : null;
   const personAllowance = entitlements === null
     ? NO_PERSON_ALLOWANCE
     : new BillingPersonAllowanceSource({ entitlements, plans: PLANS, closeBasisPoints: BAND.closeBasisPoints });
   const room = new AskRoom({
-    lockPool: database.pool,
+    lockPool: pools.roomDecision,
     spend,
-    line: new RunWaitRepository(database.pool),
+    line: new RunWaitRepository(pools.runtime),
     estimator,
     personAllowance,
     entitlements,
@@ -447,25 +466,29 @@ function hostedApplication(input: Readonly<{ billing: boolean; dispatcher: Dispa
     ...(billing === undefined ? {} : { billing })
   };
   return new PostgresAskApplication(
-    database.pool, input.dispatcher, settings, undefined, database.pool, createTestAskAdmissionPoolFacades(database.pool)
+    pools.runtime, input.dispatcher, settings, undefined, pools.contentProvision, askAdmissionPools(pools)
   );
 }
 
-/** The owner's cookie session over the database's own account and session rows (encrypted runs need both). */
-function signedIn(owner: StoryEncryptedOwner, label: string): TestHttpIdentity {
+/**
+ * The owner's cookie session over the database's own account row and a live session row of its own (encrypted runs
+ * need both): D55 — the row persistLiveSession writes for this identity, so the database accepts the token the session
+ * application accepts. Its own session id: the provisioned owner session holds no hash of this token.
+ */
+async function signedIn(owner: StoryEncryptedOwner, label: string): Promise<TestHttpIdentity> {
   const generated = testHttpIdentity(label);
-  return Object.freeze({
+  const identity: TestHttpIdentity = Object.freeze({
     rawSessionToken: generated.rawSessionToken,
     rawCsrfToken: generated.rawCsrfToken,
     authenticated: Object.freeze({
       ...generated.authenticated,
-      session: Object.freeze({
-        ...generated.authenticated.session, asker_id: `owner:${owner.ownerRef}`, session_id: owner.sessionId
-      }),
+      session: Object.freeze({ ...generated.authenticated.session, asker_id: `owner:${owner.ownerRef}` }),
       userId: owner.userId,
       ownerRef: owner.ownerRef
     })
   });
+  await persistLiveSession(database.pool, identity);
+  return identity;
 }
 
 /** One support charge fills the day: spend no debate made, as the B6b and B7b suites fill it. */
@@ -536,14 +559,14 @@ async function waitWakeAndAnswer(input: Readonly<{
   afterAnswer: (context: Readonly<{ runId: string; owner: StoryEncryptedOwner }>) => Promise<void>;
 }>): Promise<void> {
   now = new Date(input.reset.askedAt);
-  const identity = signedIn(owner, input.label);
+  const identity = await signedIn(owner, input.label);
   const provider = await startProviderDouble();
   const dispatched: Array<Readonly<{ runId: string; workItemId: string }>> = [];
   const application = hostedApplication({
     billing: input.billing,
     dispatcher: { dispatch: async (job) => { dispatched.push(Object.freeze({ runId: job.runId, workItemId: job.workItemId })); } }
   });
-  const api = buildApi({ application, sessions: testSessionApplication([identity]), allowedOrigin: TEST_APP_ORIGIN });
+  const api = buildApi({ application, questionCheck: questionCheckPass, sessions: testSessionApplication([identity]), allowedOrigin: TEST_APP_ORIGIN });
   const read = (path: string) => api.inject({ method: "GET", url: path, headers: testSessionHeaders(identity) });
   try {
     // The site's day is spent: one support charge fills it to the ceiling.
@@ -608,10 +631,14 @@ beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
   owner = await provisionStoryEncryptedOwner(database.pool);
+  // R21 (PLAN S5.3): the API side's pools are the mode's; main.ts gives the runtime pool the content cipher.
+  pools = await apiTestPools(database, import.meta.url);
+  if (contentCipherFor(pools.runtime) === undefined) configureContentEncryption(pools.runtime, contentCipherFor(database.pool)!);
 }, 600_000);
 
 afterAll(async () => {
   if (owner !== undefined) await releaseStoryEncryptedOwner(owner);
+  if (database !== undefined && pools !== undefined && pools.runtime !== database.pool) await (await provisionRlsLogins(database)).end();
   await database?.stop();
 });
 

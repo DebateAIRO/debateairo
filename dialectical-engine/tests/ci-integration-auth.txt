@@ -23,6 +23,8 @@ tests/integration/pending-onboarding-database.test.ts
 tests/integration/identity-database.test.ts
 tests/integration/age-gate-database.test.ts
 tests/integration/legal-acceptance.test.ts
+tests/integration/italy-approval-database.test.ts
+tests/integration/italy-approval-signup-database.test.ts
 tests/integration/sensitive-data-consent-database.test.ts
 
 # Sessions and sign-in
@@ -65,7 +67,7 @@ tests/integration/owner-one-key.test.ts
 # Spawns one tsx child under a 5 s commit deadline (kill-ceremony case): the only timing-bounded case on this list.
 tests/integration/owner-bootstrap-recovery.test.ts
 tests/integration/s9-dev-token-retirement-database.test.ts
-# NV-01: the legacy-run claim's per-account attempt budget (0125), concurrency included.
+# NV-01: the legacy-run claim's per-account attempt budget (0131), concurrency included.
 tests/integration/nv01-legacy-claim-lockout-database.test.ts
 # The signed-in debate page's live stream (2026-10-11): one admission buys one open, session-checked stream.
 tests/integration/live-run-events.test.ts

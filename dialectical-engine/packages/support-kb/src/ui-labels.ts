@@ -4288,10 +4288,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "كيف نوسم محتوى الذكاء الاصطناعي"
     ],
     [
-      "Escalate to a human",
-      "التصعيد إلى شخص"
-    ],
-    [
       "Use a recovery code",
       "استخدام رمز استرداد"
     ],
@@ -4496,10 +4492,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "How we label AI content",
       "Как обозначаваме съдържанието от ИИ"
-    ],
-    [
-      "Escalate to a human",
-      "Ескалиране към човек"
     ],
     [
       "Use a recovery code",
@@ -4708,10 +4700,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "Jak označujeme obsah AI"
     ],
     [
-      "Escalate to a human",
-      "Předat člověku"
-    ],
-    [
       "Use a recovery code",
       "Použít kód pro obnovení"
     ],
@@ -4914,10 +4902,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "Sådan mærker vi AI-indhold"
     ],
     [
-      "Escalate to a human",
-      "Eskaler til et menneske"
-    ],
-    [
       "Use a recovery code",
       "Brug en gendannelseskode"
     ],
@@ -5116,10 +5100,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "So kennzeichnen wir KI-Inhalte"
     ],
     [
-      "Escalate to a human",
-      "An einen Menschen weiterleiten"
-    ],
-    [
       "Use a recovery code",
       "Wiederherstellungscode verwenden"
     ],
@@ -5316,10 +5296,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "How we label AI content",
       "Πώς επισημαίνουμε το περιεχόμενο ΤΝ"
-    ],
-    [
-      "Escalate to a human",
-      "Κλιμάκωση σε άνθρωπο"
     ],
     [
       "Use a recovery code",
@@ -5525,10 +5501,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "Cómo etiquetamos el contenido generado por IA"
     ],
     [
-      "Escalate to a human",
-      "Derivar a una persona"
-    ],
-    [
       "Use a recovery code",
       "Usar un código de recuperación"
     ],
@@ -5729,10 +5701,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "How we label AI content",
       "Kuidas märgistame tehisintellekti loodud sisu"
-    ],
-    [
-      "Escalate to a human",
-      "Edastage inimesele"
     ],
     [
       "Use a recovery code",
@@ -5937,10 +5905,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "Näin merkitsemme tekoälyn tuottaman sisällön"
     ],
     [
-      "Escalate to a human",
-      "Siirrä henkilölle"
-    ],
-    [
       "Use a recovery code",
       "Käytä palautuskoodia"
     ],
@@ -6143,10 +6107,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "Comment nous signalons le contenu généré par l’IA"
     ],
     [
-      "Escalate to a human",
-      "Transmettre à une personne"
-    ],
-    [
       "Use a recovery code",
       "Utiliser un code de récupération"
     ],
@@ -6343,10 +6303,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "How we label AI content",
       "An chaoi a lipéadaímid ábhar IS"
-    ],
-    [
-      "Escalate to a human",
-      "Ardaigh chuig duine"
     ],
     [
       "Use a recovery code",
@@ -6555,10 +6511,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "כיצד אנו מסמנים תוכן שנוצר בידי בינה מלאכותית"
     ],
     [
-      "Escalate to a human",
-      "העברה לנציג אנושי"
-    ],
-    [
       "Use a recovery code",
       "שימוש בקוד שחזור"
     ],
@@ -6763,10 +6715,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "How we label AI content",
       "हम AI सामग्री को कैसे चिह्नित करते हैं"
-    ],
-    [
-      "Escalate to a human",
-      "किसी व्यक्ति को भेजें"
     ],
     [
       "Use a recovery code",
@@ -6975,10 +6923,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "Kako označavamo sadržaj umjetne inteligencije"
     ],
     [
-      "Escalate to a human",
-      "Proslijedite osobi"
-    ],
-    [
       "Use a recovery code",
       "Upotrijebite kod za oporavak"
     ],
@@ -7179,10 +7123,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "How we label AI content",
       "Hogyan jelöljük az MI-tartalmat"
-    ],
-    [
-      "Escalate to a human",
-      "Továbbítás munkatárshoz"
     ],
     [
       "Use a recovery code",
@@ -7391,10 +7331,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "Cara kami memberi label pada konten AI"
     ],
     [
-      "Escalate to a human",
-      "Teruskan ke petugas"
-    ],
-    [
       "Use a recovery code",
       "Gunakan kode pemulihan"
     ],
@@ -7597,10 +7533,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "Come etichettiamo i contenuti generati dall’IA"
     ],
     [
-      "Escalate to a human",
-      "Richiedi l’intervento di una persona"
-    ],
-    [
       "Use a recovery code",
       "Usa un codice di recupero"
     ],
@@ -7789,10 +7721,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "How we label AI content",
       "AI生成コンテンツの表示方法"
-    ],
-    [
-      "Escalate to a human",
-      "担当者に引き継ぐ"
     ],
     [
       "Use a recovery code",
@@ -8001,10 +7929,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "AI 콘텐츠 표시 방식"
     ],
     [
-      "Escalate to a human",
-      "상담원에게 전달"
-    ],
-    [
       "Use a recovery code",
       "복구 코드 사용"
     ],
@@ -8211,10 +8135,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "Kaip žymime DI sukurtą turinį"
     ],
     [
-      "Escalate to a human",
-      "Perduoti pokalbį žmogui"
-    ],
-    [
       "Use a recovery code",
       "Naudoti atkūrimo kodą"
     ],
@@ -8415,10 +8335,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "How we label AI content",
       "Kā mēs marķējam MI saturu"
-    ],
-    [
-      "Escalate to a human",
-      "Nodot sarunu cilvēkam"
     ],
     [
       "Use a recovery code",
@@ -8623,10 +8539,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "Kif nimmarkaw il-kontenut tal-IA"
     ],
     [
-      "Escalate to a human",
-      "Għaddi l-każ lil persuna"
-    ],
-    [
       "Use a recovery code",
       "Uża kodiċi ta’ rkupru"
     ],
@@ -8825,10 +8737,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "Hoe wij AI-inhoud aanduiden"
     ],
     [
-      "Escalate to a human",
-      "Doorzetten naar een medewerker"
-    ],
-    [
       "Use a recovery code",
       "Een herstelcode gebruiken"
     ],
@@ -9021,10 +8929,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "How we label AI content",
       "Jak oznaczamy treści AI"
-    ],
-    [
-      "Escalate to a human",
-      "Przekaż sprawę człowiekowi"
     ],
     [
       "Use a recovery code",
@@ -9229,10 +9133,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "Como identificamos o conteúdo de IA"
     ],
     [
-      "Escalate to a human",
-      "Encaminhar para uma pessoa"
-    ],
-    [
       "Use a recovery code",
       "Utilizar um código de recuperação"
     ],
@@ -9434,10 +9334,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "How we label AI content",
       "Как мы маркируем контент ИИ"
-    ],
-    [
-      "Escalate to a human",
-      "Передать человеку"
     ],
     [
       "Use a recovery code",
@@ -9646,10 +9542,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "Ako označujeme obsah vytvorený AI"
     ],
     [
-      "Escalate to a human",
-      "Postúpiť človeku"
-    ],
-    [
       "Use a recovery code",
       "Použiť obnovovací kód"
     ],
@@ -9846,10 +9738,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "How we label AI content",
       "Kako označujemo vsebino UI"
-    ],
-    [
-      "Escalate to a human",
-      "Predaj osebi"
     ],
     [
       "Use a recovery code",
@@ -10054,10 +9942,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "Så märker vi AI-innehåll"
     ],
     [
-      "Escalate to a human",
-      "Eskalera till en person"
-    ],
-    [
       "Use a recovery code",
       "Använd en återställningskod"
     ],
@@ -10254,10 +10138,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "How we label AI content",
       "Yapay zekâ içeriğini nasıl etiketliyoruz"
-    ],
-    [
-      "Escalate to a human",
-      "Bir yetkiliye aktar"
     ],
     [
       "Use a recovery code",
@@ -10460,10 +10340,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "How we label AI content",
       "Як ми позначаємо вміст ШІ"
-    ],
-    [
-      "Escalate to a human",
-      "Передати людині"
     ],
     [
       "Use a recovery code",
@@ -10672,10 +10548,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "Cách chúng tôi gắn nhãn nội dung AI"
     ],
     [
-      "Escalate to a human",
-      "Chuyển cho nhân viên hỗ trợ"
-    ],
-    [
       "Use a recovery code",
       "Dùng mã khôi phục"
     ],
@@ -10880,10 +10752,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "How we label AI content",
       "我们如何标识 AI 内容"
-    ],
-    [
-      "Escalate to a human",
-      "转交人工客服"
     ],
     [
       "Use a recovery code",

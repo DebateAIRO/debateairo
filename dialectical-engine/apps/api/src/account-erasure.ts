@@ -130,12 +130,12 @@ export class PostgresAccountErasureApplication implements AccountErasureApplicat
 
 export type AccountErasureNotificationOutcome =
   | "ACKNOWLEDGED" | "CONTENDED" | "FAILED" | "DEAD_LETTERED";
-/** NV-02 (0125): why a notice was dead-lettered: its stored address is undeliverable, or it hit the attempt cap after PREPARE. */
+/** NV-02 (0131): why a notice was dead-lettered: its stored address is undeliverable, or it hit the attempt cap after PREPARE. */
 export type AccountErasureNotificationDeadLetter = "recipient" | "attempt-cap";
 type AccountErasureNotificationResult = Readonly<{
   outcome:AccountErasureNotificationOutcome;diagnosticStage?:AccountErasureNotificationDeadLetter;
 }>;
-/** NV-02: raised only by the reconciler's own pre-send address check; 0125's fail dead-letters it at once. */
+/** NV-02: raised only by the reconciler's own pre-send address check; 0131's fail dead-letters it at once. */
 const RECIPIENT_UNDELIVERABLE = "MAIL_RECIPIENT_UNDELIVERABLE";
 
 export function createSingleFlightErasureReconciler(
@@ -178,7 +178,7 @@ export class AccountErasureNotificationReconciler {
       dek=await this.users.load(claim.userId);
       plaintext=decrypt(dek,claim.addressCiphertext,addressAad(claim));
       const recipient=plaintext.toString("utf8");
-      // NV-02 (0125): the stored address is fixed by its ciphertext, so one the shared rule refuses can never be sent;
+      // NV-02 (0131): the stored address is fixed by its ciphertext, so one the shared rule refuses can never be sent;
       // it is refused here, before any send, and the fail dead-letters it at once.
       if (!/^[^\s@]+@[^\s@]+$/.test(recipient) || /[\r\n]/.test(recipient)
         || !isSingleDeliverableRecipient(recipient)) {

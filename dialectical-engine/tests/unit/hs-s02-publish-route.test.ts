@@ -29,6 +29,7 @@ import {
   type PublicationJudgePort
 } from "../../apps/api/src/publication-check/check.js";
 import { createPublicationJudgeSwitch } from "../../apps/api/src/publication-check/judge-transport.js";
+import type { SynthesisPublishGate } from "../../apps/api/src/synthesis-check/publish-gate.js";
 import { extractCheckedText } from "../../apps/api/src/publication-check/material.js";
 import {
   PUBLICATION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW,
@@ -230,6 +231,7 @@ const mutationHeaders = Object.freeze({
 function routeApi(input: {
   answer?: Answer;
   publicationContentCheck?: PublicationContentCheck;
+  synthesisPublishGate?: SynthesisPublishGate | null;
   preflight?: boolean;
   leases?: LeaseProbe;
   visibility?: "PRIVATE" | "PUBLISHED";
@@ -245,6 +247,9 @@ function routeApi(input: {
     sessions: sessions(),
     publications: fakes.application,
     allowedOrigin: ORIGIN,
+    ...(input.synthesisPublishGate === null ? {} : {
+      synthesisPublishGate: input.synthesisPublishGate ?? { decide: async () => "PROCEED" as const }
+    }),
     ...(input.publicationContentCheck === undefined ? {} : { publicationContentCheck: input.publicationContentCheck }),
     ...(input.admission === undefined ? {} : { admission: input.admission }),
     ...(input.admissionClock === undefined ? {} : { admissionClock: input.admissionClock })
@@ -272,6 +277,33 @@ function expectNoTextOrIdentifier(body: string, answer: Answer, publicRefs: read
 }
 
 describe("hate-speech S02 publish path", () => {
+  it("a route composed without the synthesis gate refuses before the publication judge", async () => {
+    // Property: missing synthesis gate configuration cannot publish an unchecked debate.
+    const judge = createPartJudgeStub({});
+    const { check } = contentCheck(judge);
+    const { api, publish, counts } = routeApi({ publicationContentCheck: check, synthesisPublishGate: null });
+    const response = await publish();
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toEqual(UNAVAILABLE_BODY);
+    expect(judge.packets).toHaveLength(0);
+    expect(counts.publish).toBe(0);
+    await api.close();
+    for (const [decision, status, error] of [
+      ["APPROVAL_REQUIRED", 409, "PUBLICATION_APPROVAL_REQUIRED"],
+      ["REMOVED", 410, "DEBATE_REMOVED_BY_CHECK"],
+      ["UNAVAILABLE", 503, "PUBLICATION_CHECK_UNAVAILABLE"]
+    ] as const) {
+      const blocked = routeApi({
+        publicationContentCheck: check,
+        synthesisPublishGate: { decide: async () => decision }
+      });
+      const result = await blocked.publish();
+      expect(result.statusCode).toBe(status);
+      expect(result.json()).toEqual({ error, message: error });
+      expect(blocked.counts.publish).toBe(0);
+      await blocked.api.close();
+    }
+  });
   describe("application", () => {
     const refusals: readonly [string, Record<string, JudgeStubStep>, object][] = [
       ["BLOCK", BLOCK_ILLEGAL, {
@@ -781,7 +813,7 @@ describe("hate-speech S02 publish path", () => {
     }
     const IMPORTS_CHECK = /from\s+["'][^"']*publication-check\/[^"']*["']|import\(\s*["'][^"']*publication-check\//u;
 
-    it("only the publish path, its composition and the evaluation CLI import the check", () => {
+    it("only the publish path, its composition, the synthesis check and the evaluation CLI import the check", () => {
       const importers = ["apps", "packages", "acceptance", "scripts", "deploy"]
         .flatMap((root) => {
           try { return sourceFiles(join(REPOSITORY_ROOT, root)); } catch { return []; }
@@ -795,7 +827,12 @@ describe("hate-speech S02 publish path", () => {
         "acceptance/hs-eval-s02.ts",
         "apps/api/src/index.ts",
         "apps/api/src/main.ts",
-        "apps/api/src/publications.ts"
+        "apps/api/src/publications.ts",
+        "apps/api/src/question-check/compose.ts",
+        "apps/api/src/question-check/transport.ts",
+        "apps/api/src/question-check/verdict.ts",
+        "apps/api/src/synthesis-check/check.ts",
+        "apps/api/src/synthesis-check/transport.ts"
       ]);
       expect(importers.filter((path) =>
         path.startsWith("apps/api/src/support/") || path.startsWith("apps/runner/") || path.startsWith("packages/")

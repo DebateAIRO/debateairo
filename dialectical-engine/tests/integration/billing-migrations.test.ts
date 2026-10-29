@@ -6,11 +6,18 @@ import { BillingRepository, RunRepository, migrate } from "@debateai/db";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { createBillingTestAccount, eraseBillingTestAccount } from "../support/billingAccountFixture.js";
+import { createSystemTwin } from "../support/rls-logins.js";
 
 let database: TestDatabase;
+/**
+ * Row-level security (0126, D29): the API's statements outside a request (billing jobs, the waker) run on api-system,
+ * the billing role and the cross-account marker; this is its system twin.
+ */
+const API_SYSTEM_TWIN = "billing_migrations_api_system_twin";
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
+  await createSystemTwin(database, API_SYSTEM_TWIN, ["debateai_billing_runtime"]);
 }, 600_000);
 afterAll(async () => { await database?.stop(); });
 
@@ -34,13 +41,15 @@ const RECENT = `${thisYear}-01-15T10:00:00Z`;
 
 /**
  * As the API: since 0093 (go-live row 41) its login holds debateai_billing_runtime, which inherits
- * debateai_runtime, so this role writes both the billing rows and the core rows the API writes.
+ * debateai_runtime, so this role writes both the billing rows and the core rows the API writes. Since 0126 the login
+ * is api-system's twin (the billing role and the cross-account marker); `role` names the bare billing role for the
+ * row-level security controls.
  */
-async function asRuntime<T>(run: (client: PoolClient) => Promise<T>): Promise<T> {
+async function asRuntime<T>(run: (client: PoolClient) => Promise<T>, role: string = API_SYSTEM_TWIN): Promise<T> {
   const client = await database.pool.connect();
   try {
     await client.query("BEGIN");
-    await client.query("SET LOCAL ROLE debateai_billing_runtime");
+    await client.query(`SET LOCAL ROLE ${role}`);
     const result = await run(client);
     await client.query("COMMIT");
     return result;
@@ -196,6 +205,12 @@ describe("P1a — billing tables are append-only and guarded", () => {
     await expect(asRuntime((client) => client.query("UPDATE billing.outbox SET kind = 'EMAIL'")))
       .rejects.toMatchObject({ code: "42501" });
     await expect(database.pool.query("DELETE FROM billing.outbox")).rejects.toMatchObject({ code: "55000" });
+    // The bare billing role with no account context may not queue a job (row-level security, 0126).
+    await expect(asRuntime((client) => client.query(`INSERT INTO billing.outbox (job_id, kind, ref, payload, created_at, not_before)
+      VALUES ($1, 'EMAIL', $2, '{}'::jsonb, clock_timestamp(), clock_timestamp())`, [randomUUID(), `m1:${randomUUID()}`]),
+      "debateai_billing_runtime")).rejects.toMatchObject({
+      code: "42501", message: 'new row violates row-level security policy for table "outbox"'
+    });
   });
 
   // Go-live row 41: 0093's closing contract, replayed against a drifted grant, refuses each drift it names. Each case
@@ -667,6 +682,13 @@ describe("P1a — the waiting line refuses a row its reader could not read (B11d
     await asRuntime((client) => client.query(
       "INSERT INTO core.run_wait (run_id, waiting_since) VALUES ($1, clock_timestamp())", [asWriter]
     ));
+    // The bare billing role with no account context may not enter a run in the line (row-level security, 0126).
+    const asBare = await legacyRun();
+    await expect(asRuntime((client) => client.query(
+      "INSERT INTO core.run_wait (run_id, waiting_since) VALUES ($1, clock_timestamp())", [asBare]
+    ), "debateai_billing_runtime")).rejects.toMatchObject({
+      code: "42501", message: 'new row violates row-level security policy for table "run_wait"'
+    });
     // A legacy run with no depth reads as depth 1 (the view's COALESCE), so it may still wait.
     expect((await enterLine(await runLike(good, { depth_params: {} }))).rowCount).toBe(1);
     const line = await database.pool.query<{ run_id: string; depth: number }>(

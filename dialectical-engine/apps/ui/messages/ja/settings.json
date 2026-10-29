@@ -110,7 +110,7 @@
   "settings.transparency.supportTitle": "サポートと人による支援",
   "settings.transparency.supportLead": "サポートアシスタントはAIシステムです。人による支援を希望する場合は、",
   "settings.transparency.help": "ヘルプ",
-  "settings.transparency.supportTail": "で「担当者と話す」または「担当者に引き継ぐ」を選択してください。",
+  "settings.transparency.supportTail": "で「担当者と話す」を選択してください。",
   "settings.transparency.back": "{brand}に戻る",
   "settings.workers.eyebrow": "実行基盤",
   "settings.workers.title": "実行状態",

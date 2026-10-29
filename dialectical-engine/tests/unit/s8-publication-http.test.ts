@@ -198,7 +198,8 @@ describe("S8 publication HTTP boundary", () => {
     }));
     const api = buildApi({
       application: application(), sessions: sessions(), publications: publications({ publish }),
-      allowedOrigin: ORIGIN
+      allowedOrigin: ORIGIN,
+      synthesisPublishGate: { decide: async () => "PROCEED" }
     });
     const request = (headers: Record<string, string>, warning_acknowledged: boolean) => api.inject({
       method: "POST", url: `/v1/runs/${RUN_ID}/publish`, headers,

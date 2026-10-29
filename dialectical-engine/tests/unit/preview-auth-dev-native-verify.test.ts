@@ -54,8 +54,8 @@ describe('native verify and pending forward steps',()=>{
 // Side-by-side spec §5 ("database ahead", G6): an older release's verify accepts a database a newer release moved forward
 // by n1-expand steps only against the newer release's root-pinned database-ahead file, and says so in its proof.
 const H='e'.repeat(64),S1='1'.repeat(64),S2='2'.repeat(64);
-// Probe names after this source's chain head (0129, NV-15's MFA recovery control user index): a
-// newer release's steps.
+// Probe names after this source's chain head (0135, NV-15's MFA recovery control user index, after dev's row-level
+// security 0130): a newer release's steps, numbered past the chain so a later step never collides with them.
 const NEXT='0197_side_next.sql',MORE='0198_more.sql';
 const ROW={rowKey:'fixtureRow',valueJsonText:'1',sourceRef:'native verify fixture'};
 const SNAPSHOT=computeRegisterSnapshotSha256([ROW] as unknown as Parameters<typeof computeRegisterSnapshotSha256>[0]);

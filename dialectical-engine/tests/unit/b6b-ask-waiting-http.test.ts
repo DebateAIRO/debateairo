@@ -4,6 +4,7 @@ import { AskAcceptedSchema, AskAlreadyWaitingSchema, SENSITIVE_DATA_CONSENT_REQU
 import { TypedDomainError } from "@debateai/kernel";
 import { AskAlreadyWaitingError } from "../../apps/api/src/ask-room.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
+import { questionCheckPass } from "../support/questionCheckPass.js";
 
 const RUN_ID = "11111111-1111-4111-8111-111111111111";
 const WAITING_RUN = "77777777-7777-4777-8777-777777777777";
@@ -48,6 +49,7 @@ function fixtureApplication(submit: AskApplication["submit"]): AskApplication {
 async function ask(submit: AskApplication["submit"]) {
   const api = buildApi({
     application: fixtureApplication(submit),
+    questionCheck: questionCheckPass,
     sessions: testSessionApplication([OWNER]),
     allowedOrigin: TEST_APP_ORIGIN
   });

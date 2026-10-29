@@ -1,10 +1,11 @@
 import { withMailLocale } from '../../packages/db/src/mail-locale.js';
+import { AsyncResource } from 'node:async_hooks';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, vi, expect, it } from 'vitest';
 import { buildApi } from '@debateai/api';
 import * as contract from '@debateai/contract';
 import { Argon2WorkerPool, createEmailBlindIndex, encrypt, generateDek, generateTotpSecret, hashPassword, totpCodeAtStep, type ReadableUserDekStore, type AuditContextHasher } from '@debateai/crypto';
-import { createPool, migrate, PostgresStaffRepository, PostgresStaffPrerequisiteProducer, PostgresSessionRepository, PostgresStaffAlertRepository, type Pool } from '@debateai/db';
+import { createPool, crossAccountPool, migrate, PostgresStaffRepository, PostgresStaffPrerequisiteProducer, PostgresSessionRepository, PostgresStaffAlertRepository, type Pool } from '@debateai/db';
 import { AUTH_POLICY_REGISTER_ROWS, authPolicyFromRegisterRows, MFA_POLICY_REGISTER_ROW, mfaPolicyFromValue, SESSION_POLICY_REGISTER_ROW, sessionPolicyFromValue } from '@debateai/register';
 import { SessionService } from '../../apps/api/src/sessions.js';
 import { StaffAccessService } from '../../apps/api/src/staff/access.js';
@@ -17,6 +18,14 @@ import { staffHttpAskApplication } from '../support/staffHttpApplication.js';
 import { authorizeStaffAlertFixture } from '../support/staffAlertReadiness.js';
 import { initializeOwnerRecoveryFixture, prepareOwnerRecoveryFixture } from '../support/staffOwnerRecoveryFixture.js';
 import { b64, digest, fixture, key, origin, rpId } from '../support/staffWebAuthnFixtures.js';
+import { apiTestPools, provisionRlsLogins } from '../support/rls-logins.js';
+
+/**
+ * Row-level security S01 (PLAN S5.3, D55): the root readiness publication is the operator's act, not the API's, so it
+ * runs in this file's own async context, outside the request scope the API opened — the harness superuser never
+ * answers a statement of a request (R21_SUPERUSER_POOL_IN_REQUEST in API-login mode).
+ */
+const outsideRequest = AsyncResource.bind(<T,>(work: () => Promise<T>): Promise<T> => work());
 
 let database: TestDatabase, runtime: Pool, authorization: Pool, argon2: Argon2WorkerPool, sessions: SessionService;
 let passwordHash: string;
@@ -75,8 +84,10 @@ const applicationLogs: unknown[][] = [];
 let errorLog: ReturnType<typeof vi.spyOn>;
 const captured: {deliveryId: string;recipient: string;invitationUrl: string}[] = [];
 function composition() {
-    const repository = new PostgresStaffRepository(runtime), alertRepository = new PostgresStaffAlertRepository(runtime), access = new StaffAccessService(repository,sessions);
-    const intents = new StaffAlertIntentProducer({keys: users,mappings: alertRepository,readiness: {require: operationId => authorizeStaffAlertFixture(database.pool,operationId)}});
+    // As apps/api/src/main.ts composes staff HTTP: the staff repository reads across accounts (X14), the alert mappings
+    // are the runtime pool's (createStaffRuntime).
+    const repository = new PostgresStaffRepository(crossAccountPool(runtime,'X14')), alertRepository = new PostgresStaffAlertRepository(runtime), access = new StaffAccessService(repository,sessions);
+    const intents = new StaffAlertIntentProducer({keys: users,mappings: alertRepository,readiness: {require: operationId => outsideRequest(() => authorizeStaffAlertFixture(database.pool,operationId))}});
     const targetInvitationTransport = new VerifiedStaffTargetInvitationTransport({channels: repository,keys: users,publicAppUrl: origin,
         delivery: {send: async mail => {captured.push(mail);return 'ACK';}}});
     const staff: StaffHttpApplication = {access,sessions,repository,intents,targetInvitationTransport,webauthn: new StaffWebAuthnService(repository,{publicAppUrl: origin})};
@@ -108,8 +119,11 @@ beforeAll(async () => {
     database = await startTestDatabase(); await migrate(database.pool); await initializeOwnerRecoveryFixture(database.pool,database.connectionString);
     await database.pool.query("CREATE ROLE task7_native_runtime LOGIN PASSWORD 'task7-native-only' IN ROLE debateai_runtime");
     await database.pool.query("CREATE ROLE task7_native_authorization LOGIN PASSWORD 'task7-auth-only' IN ROLE debateai_authorization_runtime");
-    const url = new URL(database.connectionString);url.username='task7_native_runtime';url.password='task7-native-only';runtime=createPool(url.toString());
-    url.username='task7_native_authorization';url.password='task7-auth-only';authorization=createPool(url.toString());
+    const url = new URL(database.connectionString);url.username='task7_native_runtime';url.password='task7-native-only';const runtimeUrl=url.toString();
+    url.username='task7_native_authorization';url.password='task7-auth-only';const authorizationUrl=url.toString();
+    // R21 (PLAN S5.3, D67): the file's own logins, wired as main.ts wires `pool` and `authorizationPool` (each with its
+    // system target), in both modes; every other field is the mode's.
+    ({runtime,authorization}=await apiTestPools(database,import.meta.url,{runtime:runtimeUrl,authorization:authorizationUrl}));
     argon2 = new Argon2WorkerPool({workers:1});passwordHash=await hashPassword(argon2,password,authPolicy.password.argon2id);
 });
 beforeEach(async () => {
@@ -117,7 +131,7 @@ beforeEach(async () => {
         riskSignals:{recordForSession: async () => null} as never,onRiskSignalFailure: () => {},dekStore:users,argon2,authPolicy,mfaPolicy,
         sessionPolicy:sessionPolicyFromValue(SESSION_POLICY_REGISTER_ROW.value,SESSION_POLICY_REGISTER_ROW.sourceRef),blindIndexKey,dummyPasswordHash:passwordHash});
 });
-afterAll(async () => {await argon2?.close();await authorization?.end();await runtime?.end();await database?.stop();for (const dek of deks.values()) dek.fill(0);errorLog?.mockRestore();
+afterAll(async () => {await argon2?.close();if (database) await (await provisionRlsLogins(database)).end();await database?.stop();for (const dek of deks.values()) dek.fill(0);errorLog?.mockRestore();
     for (const sentinel of STAFF_PRIVATE_SENTINELS) {
         expect(JSON.stringify(responses)).not.toContain(sentinel);
         expect(JSON.stringify(applicationLogs)).not.toContain(sentinel);

@@ -10,9 +10,7 @@ import {
   lockSupportOwners,
   lockSupportSessions,
   migrate,
-  PostgresSupportCaseRepository,
-  PostgresSupportShredRepository,
-  PostgresSupportSessionRepository
+  PostgresSupportShredRepository
 } from "../../packages/db/src/index.js";
 import { createSupportKeyPort } from "../../apps/api/src/support/keys.js";
 import {
@@ -30,6 +28,16 @@ let database: TestDatabase;
 let migrationSource: string;
 
 const at = new Date("2026-09-07T10:00:00.000Z");
+const HISTORICAL_SUPPORT_INSERT_TABLES = `support.session, support.session_key,
+  support.message, support.abuse_event, support."case", support.case_key,
+  support.case_event, support.case_message, support.rating, support.tool_call,
+  support.admission_event, support.relay_call, support.relay_waiter,
+  support.relay_waiter_event`;
+
+async function grantHistoricalSupportInserts(client: PoolClient): Promise<void> {
+  // 0054 predates 0129's revocation; restore its catalog only inside replay transactions.
+  await client.query(`GRANT INSERT ON ${HISTORICAL_SUPPORT_INSERT_TABLES} TO debateai_support`);
+}
 
 function liveWrappedKey(fill: number): Buffer {
   return Buffer.concat([Buffer.from([1]), Buffer.alloc(60, fill)]);
@@ -46,12 +54,17 @@ async function beginSupport(client: PoolClient): Promise<void> {
   await client.query("SET LOCAL ROLE debateai_support");
 }
 
+async function beginOwner(client: PoolClient): Promise<void> {
+  await client.query("BEGIN");
+}
+
 async function insertSessionPair(
   client: PoolClient,
   input: Readonly<{
     sessionId: string;
     ownerRef?: string | null;
     fill?: number;
+    wrappedKey?: Uint8Array;
   }>
 ): Promise<void> {
   await client.query(`
@@ -68,7 +81,7 @@ async function insertSessionPair(
   await client.query(`
     INSERT INTO support.session_key(session_id,wrapped_key,created_at)
     VALUES($1,$2,$3)
-  `, [input.sessionId, liveWrappedKey(input.fill ?? 1), at]);
+  `, [input.sessionId, input.wrappedKey ?? liveWrappedKey(input.fill ?? 1), at]);
 }
 
 async function createSessionPair(input: Readonly<{
@@ -78,7 +91,7 @@ async function createSessionPair(input: Readonly<{
 }>): Promise<void> {
   const client = await database.pool.connect();
   try {
-    await beginSupport(client);
+    await beginOwner(client);
     await insertSessionPair(client, input);
     await client.query("COMMIT");
   } catch (error) {
@@ -91,7 +104,13 @@ async function createSessionPair(input: Readonly<{
 
 async function insertCasePair(
   client: PoolClient,
-  input: Readonly<{ caseId: string; sessionId: string; fill?: number }>
+  input: Readonly<{
+    caseId: string;
+    sessionId: string;
+    fill?: number;
+    wrappedKey?: Uint8Array;
+    ciphertext?: Uint8Array;
+  }>
 ): Promise<void> {
   await client.query(`
     INSERT INTO support."case"(
@@ -103,12 +122,12 @@ async function insertCasePair(
     Buffer.from(`case:${input.caseId}`).toString("hex").slice(0, 64).padEnd(64, "0"),
     input.sessionId,
     at,
-    contentV2(input.fill ?? 7)
+    input.ciphertext ?? contentV2(input.fill ?? 7)
   ]);
   await client.query(`
     INSERT INTO support.case_key(case_id,wrapped_key,created_at)
     VALUES($1,$2,$3)
-  `, [input.caseId, liveWrappedKey(input.fill ?? 7), at]);
+  `, [input.caseId, input.wrappedKey ?? liveWrappedKey(input.fill ?? 7), at]);
 }
 
 async function seedShredTarget(input: Readonly<{
@@ -118,7 +137,7 @@ async function seedShredTarget(input: Readonly<{
 }>): Promise<void> {
   const client = await database.pool.connect();
   try {
-    await beginSupport(client);
+    await beginOwner(client);
     await insertSessionPair(client, input);
     await client.query(`
       INSERT INTO support.message(
@@ -150,6 +169,7 @@ async function expectReplayFailure(sql: string, code: RegExp): Promise<void> {
   const client = await database.pool.connect();
   try {
     await client.query("BEGIN");
+    await grantHistoricalSupportInserts(client);
     await client.query(migrationSource);
     await client.query(sql);
     await expect(client.query(migrationSource)).rejects.toThrow(code);
@@ -179,6 +199,13 @@ async function beginSupportAt(
 ): Promise<void> {
   await client.query(`BEGIN ISOLATION LEVEL ${isolation}`);
   await client.query("SET LOCAL ROLE debateai_support");
+}
+
+async function beginOwnerAt(
+  client: PoolClient,
+  isolation: "READ COMMITTED" | "REPEATABLE READ" | "SERIALIZABLE"
+): Promise<void> {
+  await client.query(`BEGIN ISOLATION LEVEL ${isolation}`);
 }
 
 beforeAll(async () => {
@@ -285,7 +312,7 @@ describe("SUP-07 support key schema and transaction-bound integrity", () => {
     ].map((table_name) => ({
       table_name,
       can_select: table_name !== "_shred_integrity_guard",
-      can_insert: table_name !== "_shred_integrity_guard",
+      can_insert: table_name === "shred_audit" || table_name === "public_incident",
       can_update: false,
       can_delete: false,
       can_truncate: false,
@@ -477,7 +504,7 @@ describe("SUP-07 support key schema and transaction-bound integrity", () => {
     const missingKeySession = randomUUID();
     const client = await database.pool.connect();
     try {
-      await beginSupport(client);
+      await beginOwner(client);
       await client.query(`
         INSERT INTO support.session(
           session_id,session_token_sha256,identity_owner_ref,language,state,kb_version,created_at
@@ -573,7 +600,7 @@ describe("SUP-07 support key schema and transaction-bound integrity", () => {
         const insert = await database.pool.connect();
         try {
           await beginSupportAt(shred, isolation);
-          await beginSupportAt(insert, isolation);
+          await beginOwnerAt(insert, isolation);
           const shredWork = () => settle(shred, async () => {
             await shred.query(`UPDATE support.session_key AS key
               SET wrapped_key=decode(repeat('00',61),'hex'),destroyed_at=$2
@@ -618,7 +645,7 @@ describe("SUP-07 support key schema and transaction-bound integrity", () => {
     const second = randomUUID();
     const client = await database.pool.connect();
     try {
-      await beginSupport(client);
+      await beginOwner(client);
       await client.query("SELECT set_config('debateai.support_shred_validation_count','0',true)");
       await insertSessionPair(client, { sessionId: first, fill: 7 });
       await insertSessionPair(client, { sessionId: second, fill: 8 });
@@ -629,6 +656,7 @@ describe("SUP-07 support key schema and transaction-bound integrity", () => {
         SELECT current_setting('debateai.support_shred_validation_count') AS count
       `)).rows[0]?.count).toBe("4");
       await client.query("SET CONSTRAINTS ALL DEFERRED");
+      await client.query("SET LOCAL ROLE debateai_support");
       await client.query(`UPDATE support.session_key
         SET wrapped_key=decode(repeat('00',61),'hex'),destroyed_at=$1
         WHERE session_id=ANY($2::uuid[])`, [at, [first, second]]);
@@ -706,14 +734,14 @@ describe("SUP-07 support key schema and transaction-bound integrity", () => {
     const source = await readFile("packages/db/src/support.ts", "utf8");
     expect(source).toContain("lockSupportDomain(client, 19370701, ownerRefs)");
     expect(source).toContain("lockSupportDomain(client, 19370702, sessionIds)");
-    expect(source).toContain("await lockSupportOwners(client, [input.identityOwnerRef])");
-    expect(source).toContain("await lockSupportSessions(client, [input.sessionId])");
+    expect(source).toContain("await lockSupportOwners(client, [ownerRef])");
+    expect(source).toContain("await lockSupportSessions(client, [sessionId])");
     expect(source).toContain("SELECT DISTINCT ref FROM pg_catalog.unnest($2::uuid[])");
     expect(source).toContain("ORDER BY ref");
     expect(source).not.toContain("ORDER BY ref DESC");
     expect(source).not.toMatch(/createHash|murmur|fnv|advisory.*Number/iu);
-    expect(source.match(/await lockSupportOwners\(/gu)).toHaveLength(3);
-    expect(source.match(/await lockSupportSessions\(/gu)?.length ?? 0).toBeGreaterThanOrEqual(6);
+    expect(source.match(/await lockSupportOwners\(/gu)).toHaveLength(1);
+    expect(source.match(/await lockSupportSessions\(/gu)?.length ?? 0).toBeGreaterThanOrEqual(2);
   });
 
   it("fails startup coverage for an unkeyed session", async () => {
@@ -745,18 +773,17 @@ describe("SUP-07 support key schema and transaction-bound integrity", () => {
     const sessionId = randomUUID();
     const caseId = randomUUID();
     try {
-      const sessions = new PostgresSupportSessionRepository(
-        database.pool,
-        createWrappedSupportSessionKey(keys)
-      );
-      await sessions.create({
-        sessionId,
-        tokenSha256: "1".repeat(64),
-        identityOwnerRef: null,
-        language: "en",
-        kbVersion: "2".repeat(64),
-        createdAt: at
-      });
+      const owner = await database.pool.connect();
+      try {
+        await beginOwner(owner);
+        await insertSessionPair(owner, {
+          sessionId,
+          wrappedKey: await createWrappedSupportSessionKey(keys)(sessionId)
+        });
+        await owner.query("COMMIT");
+      } finally {
+        owner.release();
+      }
       const sessionWrapped = (await database.pool.query<{ wrapped_key: Buffer }>(
         "SELECT wrapped_key FROM support.session_key WHERE session_id=$1",
         [sessionId]
@@ -765,17 +792,20 @@ describe("SUP-07 support key schema and transaction-bound integrity", () => {
         { kind: "session", ref: sessionId },sessionWrapped
       );
       sessionDataKey.fill(0);
-      const cases = new PostgresSupportCaseRepository(
-        database.pool,
-        createSupportCaseMaterial(keys, plaintext)
-      );
-      await cases.createCase({
-        caseId,
-        tokenSha256: "3".repeat(64),
-        sessionId,
-        language: "en",
-        createdAt: at
-      });
+      const caseMaterial = await createSupportCaseMaterial(keys, plaintext)(caseId);
+      const caseOwner = await database.pool.connect();
+      try {
+        await beginOwner(caseOwner);
+        await insertCasePair(caseOwner, {
+          caseId,
+          sessionId,
+          wrappedKey: caseMaterial.wrappedKey,
+          ciphertext: caseMaterial.transcriptSnapshotCiphertext
+        });
+        await caseOwner.query("COMMIT");
+      } finally {
+        caseOwner.release();
+      }
       const stored = (await database.pool.query<{
         wrapped_key: Buffer;
         transcript_snapshot_ciphertext: Buffer;
@@ -824,25 +854,6 @@ describe("SUP-07 support key schema and transaction-bound integrity", () => {
       );
       await expect(keys.unwrapDataKey({ kind: "case", ref: caseId }, after.wrapped_key))
         .rejects.toMatchObject({ code: "SUPPORT_KEY_DESTROYED" });
-      const forbiddenMaterial = vi.fn(async () => ({
-        wrappedKey: Buffer.concat([Buffer.from([1]), Buffer.alloc(60, 1)]),
-        transcriptSnapshotCiphertext: Buffer.from([1])
-      }));
-      const forbiddenCaseId = randomUUID();
-      await expect(new PostgresSupportCaseRepository(
-        database.pool,forbiddenMaterial
-      ).createCase({
-        caseId: forbiddenCaseId,
-        tokenSha256: "4".repeat(64),
-        sessionId,
-        language: "en",
-        createdAt: at
-      })).rejects.toThrow("SUPPORT_CASE_PARENT_INVALID");
-      expect(forbiddenMaterial).not.toHaveBeenCalled();
-      expect((await database.pool.query(
-        "SELECT case_id FROM support.\"case\" WHERE case_id=$1",
-        [forbiddenCaseId]
-      )).rowCount).toBe(0);
     } finally {
       plaintext.fill(0);
       await keys.close();
@@ -853,7 +864,9 @@ describe("SUP-07 support key schema and transaction-bound integrity", () => {
   it("replays after 0055 is already recorded and rejects hostile catalog lookalikes", async () => {
     // 0054's own SQL again, over a database whose ledger already records 0055, rolled back
     // (migrate() refuses a ledger with 0054's row removed, by design: tests/support/migrationReplay.ts).
-    expect(await replayMigrationRolledBack(database.pool, "0054_support_keys_audit.sql")).toBe("APPLIED");
+    expect(await replayMigrationRolledBack(database.pool, "0054_support_keys_audit.sql", {
+      before: grantHistoricalSupportInserts
+    })).toBe("APPLIED");
     expect((await database.pool.query<{ name: string }>(`
       SELECT name FROM public.debateai_schema_migration
       WHERE name IN ('0054_support_keys_audit.sql','0055_register_support_publication.sql')
@@ -996,18 +1009,6 @@ describe("SUP-07 transactional shred boundary", () => {
       "SELECT 1 FROM support.shred_audit WHERE target_kind='owner' AND target_ref=$1",
       [ownerRef]
     )).rowCount).toBe(1);
-    const forbiddenCreate = vi.fn(async () => liveWrappedKey(9));
-    await expect(new PostgresSupportSessionRepository(
-      database.pool, forbiddenCreate
-    ).create({
-      sessionId: randomUUID(),
-      tokenSha256: "5".repeat(64),
-      identityOwnerRef: ownerRef,
-      language: "en",
-      kbVersion: "6".repeat(64),
-      createdAt: at
-    })).rejects.toThrow("SUPPORT_OWNER_SHREDDED");
-    expect(forbiddenCreate).not.toHaveBeenCalled();
   });
 
   it("shreds only anonymous sessions and returns typed target errors", async () => {
@@ -1057,17 +1058,21 @@ describe("SUP-07 transactional shred boundary", () => {
     const blocker = await database.pool.connect();
     await blocker.query("BEGIN");
     await lockSupportOwners(blocker, [ownerRef]);
-    const creator = new PostgresSupportSessionRepository(
-      database.pool, async () => liveWrappedKey(8)
-    );
-    const createPromise = creator.create({
-      sessionId: createdSession,
-      tokenSha256: "7".repeat(64),
-      identityOwnerRef: ownerRef,
-      language: "en",
-      kbVersion: "8".repeat(64),
-      createdAt: at
-    });
+    const createPromise = (async () => {
+      const client = await database.pool.connect();
+      try {
+        await beginOwner(client);
+        await lockSupportOwners(client, [ownerRef]);
+        await insertSessionPair(client, { sessionId: createdSession, ownerRef, fill: 8 });
+        await client.query("COMMIT");
+        return { sessionId: createdSession };
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
+      }
+    })();
     await new Promise((resolve) => setTimeout(resolve, 20));
     const shredPromise = new PostgresSupportShredRepository(database.pool)
       .shredOwner(ownerRef, "vitest", at);
@@ -1264,7 +1269,7 @@ describe("SUP-07 shred under the attested support principal (DL2-F1)", () => {
         if (named === undefined || named.includes(alias)) locked.add(relation);
       }
     }
-    expect(found).toBeGreaterThanOrEqual(6);
+    expect(found).toBeGreaterThanOrEqual(4);
     const grants = await database.pool.query<{ relation: string }>(`
       SELECT DISTINCT 'support.' || relation.relname AS relation
       FROM pg_catalog.pg_class AS relation

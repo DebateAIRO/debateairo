@@ -181,7 +181,7 @@ it("re-checks the very notice it claims, whatever order the queue is in",async()
  expect((await drainNotices(target.user)).filter(m=>m.event==="WAITING"||m.event==="FINISH")).toEqual([]);expect(await stage(target.user)).toBe("EXPIRED");
 });
 
-// NV-16 (security audit run 3, migrations/0125_security_fixes_run3.sql): the new release starts through
+// NV-16 (security audit run 3, migrations/0131_security_fixes_run3.sql): the new release starts through
 // identity.mfa_recovery_start_bounded, at most three starts per account and destination in any rolling hour.
 async function startBounded(a:Fixture,destination="primary"){const candidate=(await withMailLocale(db.pool, 'en', (c) => c.query(`SELECT identity.mfa_recovery_prepare($1,$2) AS value`,[a.index,destination]))).rows[0].value;return(await withMailLocale(db.pool, 'en', (c) => c.query(`SELECT identity.mfa_recovery_start_bounded($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) AS result`,[a.index,destination,a.user,[a.primary,a.backup].sort(),a.link,a.cancel,JSON.stringify([a.primary,a.backup].sort().map(channelId=>({channelId,envelope:box(a.user),...(candidate?.channels.find((c:{channelId:string;cancelAuthorized:boolean})=>c.channelId===channelId)?.cancelAuthorized?{cancelEnvelope:box(a.user)}:{}),...(channelId===(destination==="primary"?a.primary:a.backup)?{proofEnvelope:box(a.user)}:{})}))),source,3,a.challenge]))).rows[0].result;}
 const fresh=(a:Fixture):Fixture=>({...a,link:hash(),cancel:hash(),challenge:randomUUID()});
@@ -215,7 +215,7 @@ it("two concurrent starts at the cap's edge admit exactly one",async()=>{const a
   expect((await db.pool.query(`SELECT count(*)::int AS n FROM identity.mfa_recovery_control WHERE user_id=$1`,[a.user])).rows[0].n).toBe(3);
  }finally{await lock.query("ROLLBACK");lock.release();}});
 
-// NV-15 (security audit run 3, 0125): failed email-link password proofs, summed over the account's never-paired
+// NV-15 (security audit run 3, 0131): failed email-link password proofs, summed over the account's never-paired
 // challenges whose link was still valid after its latest sign-in or successful pairing, write one RECOVERY_PROOF_FAILED
 // at the sealed proof_failures_per_attempt (5); the sealed adverse rule then refuses pairing until a newer sign-in.
 const RECORDER="identity.mfa_recovery_record_failure(text,text,jsonb,jsonb)";
@@ -269,10 +269,10 @@ it("the recorder belongs to the recovery family only",async()=>{
  expect((await db.pool.query(`SELECT failures FROM identity.mfa_recovery_control WHERE challenge_id=$1`,[a.challenge])).rows[0].failures).toBe(0);
  expect(await recordFailure(`sha256:${"0".repeat(64)}`,"link",riskContext(a.user))).toBe("INVALID");
 });
-// NV-15, NV-16 (security audit run 3, 0129): NV-15's account-level failure count and its pairing boundary, and NV-16's
-// per-destination start count, all read identity.mfa_recovery_control by user_id. The outside-transaction step 0129
+// NV-15, NV-16 (security audit run 3, 0135): NV-15's account-level failure count and its pairing boundary, and NV-16's
+// per-destination start count, all read identity.mfa_recovery_control by user_id. The outside-transaction step 0135
 // builds the one index they share, valid, ready and not unique, and the planner can answer that lookup from it.
-it("the control table's user index serves the account-level reads by user_id (0129)",async()=>{
+it("the control table's user index serves the account-level reads by user_id (0135)",async()=>{
  expect((await db.pool.query(`SELECT pg_get_indexdef(i.indexrelid) AS definition,i.indisvalid AS valid,i.indisready AS ready,i.indisunique AS "unique" FROM pg_index i WHERE i.indexrelid=to_regclass('identity.mfa_recovery_control_user_started') AND i.indrelid='identity.mfa_recovery_control'::regclass`)).rows)
   .toEqual([{definition:"CREATE INDEX mfa_recovery_control_user_started ON identity.mfa_recovery_control USING btree (user_id, email_expires_at)",valid:true,ready:true,unique:false}]);
  const client=await db.pool.connect();
@@ -281,11 +281,11 @@ it("the control table's user index serves the account-level reads by user_id (01
   expect(JSON.stringify(plan)).toContain('"Index Name":"mfa_recovery_control_user_started"');
  }finally{await client.query("ROLLBACK");client.release();}
 });
-// NV-38 (security audit run 3, 0125): the pending-notice MFA claim hand-copies the sealed 0112 claim's result; for a
+// NV-38 (security audit run 3, 0131): the pending-notice MFA claim hand-copies the sealed 0112 claim's result; for a
 // WAITING notice both claims return the same object (cancelAllowed, payload, expiresAt and notBefore included), the
 // new one with mail_locale added. Each claim runs in a rolled-back transaction that retires every other pending notice.
 it("the pending-notice MFA claim returns the 0112 claim's object for a WAITING notice",async()=>{const w=await readyWaiting();const claim=async(sql:string)=>{const client=await db.pool.connect();try{await client.query("BEGIN");await client.query(`UPDATE identity.mfa_recovery_notice SET dead_at=clock_timestamp() WHERE sent_at IS NULL AND dead_at IS NULL AND NOT (event_kind='WAITING' AND user_id=$1)`,[w.a.user]);return(await client.query(sql)).rows[0].value as Record<string,unknown>;}finally{await client.query("ROLLBACK");client.release();}};const without=(value:Record<string,unknown>,...keys:string[])=>Object.fromEntries(Object.entries(value).filter(([key])=>!keys.includes(key)));const fresh=await claim("SELECT identity.mfa_recovery_claim_pending_notice(60000) AS value"),sealed=await claim("SELECT identity.mfa_recovery_claim_notice(60000) AS value");expect(fresh.event).toBe("WAITING");expect(sealed.event).toBe("WAITING");expect(fresh.mail_locale).toBe("en");expect(without(fresh,"leaseId","mail_locale")).toEqual(without(sealed,"leaseId"));expect(Object.keys(without(sealed,"leaseId")).sort()).toEqual(["cancelAllowed","channelId","event","expiresAt","notBefore","noticeId","payload","userId"]);});
-// NV-39 (security audit run 3, 0125): the window starts empty and holds exactly 65,536 rows in a strict eviction order:
+// NV-39 (security audit run 3, 0131): the window starts empty and holds exactly 65,536 rows in a strict eviction order:
 // E (expired), then L (budget left, uses 1), then the fillers (uses 2), with S (spent) last. One admit gives up 64 rows
 // and takes the new digest; the v1 admit the release before calls still refuses at capacity.
 it("NV-39: at capacity the evicting MFA admit gives up 64 rows, expired first and the spent one last; v1 still refuses",async()=>{const digest=(seed:string)=>`argon2id-audit:v1:${createHash("sha256").update(seed).digest("hex")}`,[E,L,S]=["nv39-e","nv39-l","nv39-s"].map(digest);

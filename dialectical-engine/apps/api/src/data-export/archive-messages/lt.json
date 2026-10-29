@@ -17,5 +17,18 @@
   "archive.visibilityPrivate": "Privatu",
   "archive.unreadable": "Šių debatų turinio nebegalima perskaityti, nes jų raktas sunaikintas.",
   "archive.noDebates": "Neturite debatų.",
-  "archive.filesNote": "Šio ZIP archyvo JSON failuose tie patys duomenys pateikti kompiuterio skaitomu formatu; jie išvardyti README.txt."
+  "archive.filesNote": "Šio ZIP archyvo JSON failuose tie patys duomenys pateikti kompiuterio skaitomu formatu; jie išvardyti README.txt.",
+  "archive.contentCheck": "Turinio patikra",
+  "archive.verdict.flagged": "Pažymėta",
+  "archive.verdict.clear": "Be problemų",
+  "archive.verdict.noSynthesis": "Nėra apibendrinimo",
+  "archive.verdict.unavailable": "Nepasiekiama",
+  "archive.category.terrorism": "Galimas terorizmas",
+  "archive.category.hateSpeech": "bet kokios rūšies neapykantos kalba",
+  "archive.category.suicideOrHarm": "polinkiai į savižudybę arba kenkimą kitiems žmonėms",
+  "archive.category.weaponsOrDrugs": "ginklų ar narkotikų gaminimas",
+  "archive.publicationReview": "Publikavimo peržiūra",
+  "archive.reviewAsked": "Paprašyta",
+  "archive.reviewApproved": "Pritarta",
+  "archive.reviewRefused": "Atmesta"
 }

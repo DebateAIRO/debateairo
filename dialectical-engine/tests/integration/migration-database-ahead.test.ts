@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 // Test-only: loadMigrationPlan returns the real plan with its forward chain cut while `chain.shape` is set (the database
-// the release before 0125 leaves), as migration-per-step.test.ts does. The mocked module instance is the one migrate()
+// the release before this code's last step leaves), as migration-per-step.test.ts does. The mocked module instance is the one migrate()
 // and the database-ahead readers import, because they come from the same source module below.
 const chain = vi.hoisted(() => ({ shape: undefined as undefined | ((steps: readonly unknown[]) => readonly unknown[]) }));
 vi.mock("../../packages/db/src/migration-lineage.js", async (original) => {
@@ -26,20 +26,34 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * DATABASE_AHEAD_NOT_ACCEPTED <DETAIL> <name>. CI skips this directory; run it alone.
  */
 const SIDE_BY_SIDE = "0123_side_by_side_releases.sql";
-/** The settings activation (side-by-side spec §13), the first `-- n1: expand` step. */
-const SETTINGS_ACTIVATION = "0124_settings_activation.sql";
-/** The security fixes of audit run 3, an `-- n1: expand` step. */
-const SECURITY_FIXES = "0125_security_fixes_run3.sql";
+/** Synthesis-flag S05's support records step, drained (uploaded the old way): the step before row-level security. */
+const SUPPORT_STEP = "0129_support_answer_scope.sql";
+/** The steps after 0122 before row-level security, each with its n1 header: 0124, the settings activation (side-by-side
+ *  spec §13), and 0125, the Italy-specific approval (mission italy-clause-approval), are `-- n1: expand` steps; 0123 and
+ *  synthesis-flag's 0126 to 0129 are drained. Every one keeps the verifier. */
+const DECLARED = [[SIDE_BY_SIDE, false], ["0124_settings_activation.sql", true],
+  ["0125_italy_specific_approval.sql", true], ["0126_synthesis_check.sql", false],
+  ["0127_publication_review.sql", false], ["0128_threat_reports.sql", false], [SUPPORT_STEP, false]] as const;
+/** Row-level security (mission row-level-security, SPEC-v4 R26): `-- n1: drained`, superseding the verifier (no
+ *  keeps-verifier). The release before the security fixes of audit run 3 ends here. */
+const RLS = "0130_row_level_security.sql";
+/** The security fixes of audit run 3, an `-- n1: expand` step after row-level security. */
+const SECURITY_FIXES = "0131_security_fixes_run3.sql";
 /** The three recovery notice due indexes (NV-38), `-- n1: outside-transaction` steps after the security fixes. */
-const DUE_INDEXES = ["0126_password_reset_notice_due.sql", "0127_backup_email_notice_due.sql", "0128_mfa_recovery_notice_due.sql"] as const;
+const DUE_INDEXES = ["0132_password_reset_notice_due.sql", "0133_backup_email_notice_due.sql", "0134_mfa_recovery_notice_due.sql"] as const;
 /** The MFA recovery control user index (NV-15, NV-16), the outside-transaction step after the due indexes. */
-const CONTROL_INDEX = "0129_mfa_recovery_control_user_started.sql";
+const CONTROL_INDEX = "0135_mfa_recovery_control_user_started.sql";
 /** This code's chain head: the MFA recovery control user index, an outside-transaction step. */
 const HEAD_STEP = CONTROL_INDEX;
+/** This code's steps after row-level security, each `-- n1: expand` and keeps-verifier, with its outside-transaction flag. */
+const OURS = [[SECURITY_FIXES, false], [DUE_INDEXES[0], true], [DUE_INDEXES[1], true], [DUE_INDEXES[2], true], [CONTROL_INDEX, true]] as const;
+// A newer release's steps come after this code's chain head (0135), numbered far past it so a later step never collides.
 const FIRST = "0198_probe_ahead.sql";
 const SECOND = "0199_probe_ahead.sql";
-/** The head's verifier: 0111's effective-capability verifier, which 0112 to 0129 keep in force. */
+/** 0111's effective-capability verifier, which 0112 to 0129 keep in force. */
 const VERIFIER = "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a";
+/** 0130's verifier, which supersedes 0111's (SPEC-v4 R34): the one in force at this code's head, which extra steps keep. */
+const IN_FORCE_VERIFIER = "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57";
 const HEAD = "e".repeat(64);
 const hex = (digit: string): string => digit.repeat(64);
 
@@ -62,7 +76,7 @@ async function seed(probe: Probe): Promise<void> {
     await db.pool.query(`INSERT INTO public.debateai_schema_migration_step(source_name,base_recipe_sha256,previous_manifest_sha256,
       forward_manifest_sha256,source_sha256,verifier_sha256,precondition_evidence_digest,postcondition_evidence_digest,executed_at)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8,statement_timestamp())`,
-    [probe.name, probe.base ?? plan.recipeSha256, probe.previous, probe.manifest, probe.source, probe.verifier ?? VERIFIER, hex("a"), hex("b")]);
+    [probe.name, probe.base ?? plan.recipeSha256, probe.previous, probe.manifest, probe.source, probe.verifier ?? IN_FORCE_VERIFIER, hex("a"), hex("b")]);
   }
   if (probe.declared !== false) {
     await db.pool.query(`INSERT INTO public.debateai_schema_migration_step_n1(source_name,n1_expand,keeps_verifier,outside_transaction,
@@ -72,7 +86,7 @@ async function seed(probe: Probe): Promise<void> {
 }
 /** The newer release's own description of a probe step, as describeForwardSteps() prints it into its plan. */
 const declaration = (probe: Probe): ForwardStepDeclaration => Object.freeze({
-  name: probe.name, manifestSha256: probe.manifest, sourceSha256: probe.source, verifierSha256: probe.verifier ?? VERIFIER,
+  name: probe.name, manifestSha256: probe.manifest, sourceSha256: probe.source, verifierSha256: probe.verifier ?? IN_FORCE_VERIFIER,
   n1Expand: probe.expand ?? true, keepsVerifier: probe.keepsVerifier ?? true, outsideTransaction: false
 });
 /** Both entry points refuse with the exact message, and migrate()'s prologue leaves the ledger as it was. */
@@ -89,8 +103,13 @@ describe("an older release on a database a newer release moved forward (Review F
     db = await startTestDatabase();
     await migrate(db.pool);
     plan = await loadMigrationPlan();
-    expect(plan.forwardChain.map((step) => step.name).slice(-7)).toEqual([SIDE_BY_SIDE, SETTINGS_ACTIVATION, SECURITY_FIXES, ...DUE_INDEXES, CONTROL_INDEX]);
-    expect(plan.forwardChain.at(-1)!.verifierSha256).toBe(VERIFIER);
+    const names = plan.forwardChain.map((step) => step.name);
+    expect(names.slice(names.indexOf(SIDE_BY_SIDE), names.indexOf(RLS))).toEqual(DECLARED.map(([name]) => name));
+    expect(names.slice(names.indexOf(RLS) + 1)).toEqual(OURS.map(([name]) => name));
+    expect(plan.forwardChain[names.indexOf(RLS) - 1]!.verifierSha256).toBe(VERIFIER);
+    expect(plan.forwardChain[names.indexOf(RLS)]!.verifierSha256).toBe(IN_FORCE_VERIFIER);
+    expect(plan.forwardChain.at(-1)!.name).toBe(HEAD_STEP);
+    expect(plan.forwardChain.at(-1)!.verifierSha256).toBe(IN_FORCE_VERIFIER);
   }, 300_000);
   afterAll(async () => { await db?.stop(); });
   afterEach(async () => {
@@ -99,17 +118,17 @@ describe("an older release on a database a newer release moved forward (Review F
     await db.pool.query("DELETE FROM public.debateai_schema_migration_step_n1 WHERE source_name=ANY($1::text[])", [[FIRST, SECOND]]);
   });
 
-  it("a fresh migrate records the declarations of 0123 to 0129", async () => {
+  it("a fresh migrate records the declarations of 0123 and every later step", async () => {
     // Steps up to 0122 predate the n1 header and record nothing; 0123 (drained) is the first step with a declaration
-    // row, 0124 (expand) the second, 0125 (expand) the third, the three due indexes (expand, outside-transaction) the
-    // fourth to sixth and the MFA recovery control user index (expand, outside-transaction) the seventh. One migrate()
-    // applied all seven, so all name its chain head.
+    // row and 0124 (expand) the second; row-level security's 0130 (drained, superseding the verifier) is followed by the
+    // security fixes 0131 (expand), the three due indexes and the MFA recovery control user index (expand,
+    // outside-transaction). One migrate() applied them all, so all name its chain head.
     expect((await db.pool.query(`SELECT source_name,n1_expand,keeps_verifier,outside_transaction,chain_head_manifest_sha256,recorded_at
-      FROM public.debateai_schema_migration_step_n1 ORDER BY source_name`)).rows).toEqual([{
-      source_name: SIDE_BY_SIDE, n1_expand: false, keeps_verifier: true, outside_transaction: false,
+      FROM public.debateai_schema_migration_step_n1 ORDER BY source_name`)).rows).toEqual([...DECLARED.map(([source_name, n1_expand]) => ({
+      source_name, n1_expand, keeps_verifier: true, outside_transaction: false,
       chain_head_manifest_sha256: plan.forwardChain.at(-1)!.manifestSha256, recorded_at: expect.any(Date)
-    }, {
-      source_name: SETTINGS_ACTIVATION, n1_expand: true, keeps_verifier: true, outside_transaction: false,
+    })), {
+      source_name: RLS, n1_expand: false, keeps_verifier: false, outside_transaction: false,
       chain_head_manifest_sha256: plan.forwardChain.at(-1)!.manifestSha256, recorded_at: expect.any(Date)
     }, {
       source_name: SECURITY_FIXES, n1_expand: true, keeps_verifier: true, outside_transaction: false,
@@ -148,15 +167,15 @@ describe("an older release on a database a newer release moved forward (Review F
   it("a database one release ahead is accepted", async () => {
     await seed(first());
     expect(await migrate(db.pool)).toEqual({ appliedSteps: [], extraSteps: [FIRST] });
-    expect(await verifyDatabaseAhead(db.pool)).toEqual({ mode: "AHEAD", knownSteps: 19, extraSteps: [FIRST] });
+    expect(await verifyDatabaseAhead(db.pool)).toEqual({ mode: "AHEAD", knownSteps: 25, extraSteps: [FIRST] });
     // Two steps of the same newer release, chained one after the other.
     await seed(second());
     expect(await migrate(db.pool)).toEqual({ appliedSteps: [], extraSteps: [FIRST, SECOND] });
-    expect(await ledger()).toEqual(expect.arrayContaining([SIDE_BY_SIDE, FIRST, SECOND]));
+    expect(await ledger()).toEqual(expect.arrayContaining([SIDE_BY_SIDE, RLS, FIRST, SECOND]));
   });
 
   it("exactly current reports CURRENT", async () => {
-    expect(await verifyDatabaseAhead(db.pool)).toEqual({ mode: "CURRENT", knownSteps: 19, extraSteps: [] });
+    expect(await verifyDatabaseAhead(db.pool)).toEqual({ mode: "CURRENT", knownSteps: 25, extraSteps: [] });
     expect(await migrate(db.pool)).toEqual({ appliedSteps: [], extraSteps: [] });
   });
 
@@ -164,13 +183,22 @@ describe("an older release on a database a newer release moved forward (Review F
     const steps = await describeForwardSteps();
     expect(steps.map((step) => step.name)).toEqual(plan.forwardChain.map((step) => step.name));
     const named = (name: string) => [steps.find((step) => step.name === name), plan.forwardChain.find((step) => step.name === name)!] as const;
-    for (const [name, n1Expand, outsideTransaction] of [[HEAD_STEP, true, true], [DUE_INDEXES[2], true, true], [DUE_INDEXES[1], true, true], [DUE_INDEXES[0], true, true],
-      [SECURITY_FIXES, true, false], [SETTINGS_ACTIVATION, true, false], [SIDE_BY_SIDE, false, false]] as const) {
+    // This code's own steps after row-level security: expand and keeps-verifier, on 0130's verifier.
+    for (const [name, outsideTransaction] of OURS) {
       const [step, own] = named(name);
-      expect(step, name).toEqual({ name, manifestSha256: own.manifestSha256, sourceSha256: own.sourceSha256, verifierSha256: VERIFIER, n1Expand,
-        keepsVerifier: true, outsideTransaction });
+      expect(step, name).toEqual({ name, manifestSha256: own.manifestSha256, sourceSha256: own.sourceSha256, verifierSha256: IN_FORCE_VERIFIER,
+        n1Expand: true, keepsVerifier: true, outsideTransaction });
     }
     expect(steps.at(-1)!.name).toBe(HEAD_STEP);
+    // 0130 is drained and supersedes the verifier, so its header omits keeps-verifier (SPEC-v4 R26, R34).
+    const [rls, ownRls] = named(RLS);
+    expect(rls).toEqual({ name: RLS, manifestSha256: ownRls.manifestSha256, sourceSha256: ownRls.sourceSha256, verifierSha256: IN_FORCE_VERIFIER,
+      n1Expand: false, keepsVerifier: false, outsideTransaction: false });
+    for (const [name, n1Expand] of DECLARED) {
+      const [step, own] = named(name);
+      expect(step, name).toEqual({ name, manifestSha256: own.manifestSha256, sourceSha256: own.sourceSha256, verifierSha256: VERIFIER, n1Expand,
+        keepsVerifier: true, outsideTransaction: false });
+    }
     // 0122 and earlier declare nothing (all false).
     expect(steps.filter((step) => step.name <= "0122_engine_map_check.sql").every((step) => !step.n1Expand && !step.keepsVerifier && !step.outsideTransaction)).toBe(true);
   });
@@ -179,7 +207,7 @@ describe("an older release on a database a newer release moved forward (Review F
     await seed(first());
     const newerChain = [...await describeForwardSteps(), declaration(first()), declaration(second())];
     expect(await migrate(db.pool, { newerChain })).toEqual({ appliedSteps: [], extraSteps: [FIRST] });
-    expect(await verifyDatabaseAhead(db.pool, { newerChain })).toEqual({ mode: "AHEAD", knownSteps: 19, extraSteps: [FIRST] });
+    expect(await verifyDatabaseAhead(db.pool, { newerChain })).toEqual({ mode: "AHEAD", knownSteps: 25, extraSteps: [FIRST] });
   });
 
   it("refuses NOT_DECLARED: an extra step with no declaration row", async () => {
@@ -235,7 +263,7 @@ describe("an older release on a database a newer release moved forward (Review F
     const own = await describeForwardSteps();
     const newerChain = [...own, declaration(first()), declaration(second())];
     expect(await migrate(db.pool, { newerChain })).toEqual({ appliedSteps: [], extraSteps: [FIRST, SECOND] });
-    expect(await verifyDatabaseAhead(db.pool, { newerChain })).toEqual({ mode: "AHEAD", knownSteps: 19, extraSteps: [FIRST, SECOND] });
+    expect(await verifyDatabaseAhead(db.pool, { newerChain })).toEqual({ mode: "AHEAD", knownSteps: 25, extraSteps: [FIRST, SECOND] });
     await refused("MORE_THAN_ONE_RELEASE", SECOND);
     // Rule 7 still binds without rule 6: the fix release's step must be in its list as the database recorded it, and
     // the aborted release's own list (which ends at FIRST) does not reach SECOND.
@@ -248,13 +276,18 @@ describe("an older release on a database a newer release moved forward (Review F
     const own = await describeForwardSteps();
     // The extra step's manifest differs from the newer release's list.
     await refused("NEWER_CHAIN_MISMATCH", FIRST, { newerChain: [...own, declaration(first({ manifest: hex("7") }))] });
-    // A list that is missing this code's head: this code's chain is not a prefix of it.
+    // A list that is missing 0123: this code's chain is not a prefix of it.
+    await refused("NEWER_CHAIN_MISMATCH", SIDE_BY_SIDE, { newerChain: [...own.filter((step) => step.name !== SIDE_BY_SIDE), declaration(first())] });
+    // A list that is missing this code's head (0135): this code's chain is not a prefix of it.
     await refused("NEWER_CHAIN_MISMATCH", HEAD_STEP, { newerChain: [...own.slice(0, -1), declaration(first())] });
     // A list that declares the extra step drained.
     await refused("NEWER_CHAIN_MISMATCH", FIRST, { newerChain: [...own, declaration(first({ expand: false }))] });
   });
 
   it("refuses PENDING_KNOWN_STEP: one of this code's own steps is not applied while a newer step is", async () => {
+    // This code's last step (0135, an outside-transaction index step after row-level security) is the one left
+    // unapplied: its ledger row and receipt are removed (its index and every earlier step's objects stay, so the replay
+    // of the applied prefix holds) and restored after the refusal.
     const ledgerRow = (await db.pool.query("SELECT * FROM public.debateai_schema_migration WHERE name=$1", [HEAD_STEP])).rows[0];
     const receiptRow = (await db.pool.query("SELECT * FROM public.debateai_schema_migration_step WHERE source_name=$1", [HEAD_STEP])).rows[0];
     expect(ledgerRow).toBeDefined();
@@ -290,7 +323,8 @@ describe("the newer code's view of a database a release behind", () => {
   let behind: TestDatabase;
   beforeAll(async () => {
     behind = await startTestDatabase();
-    // The database the release before 0125 leaves (the settings activation's): the chain cut before the security fixes.
+    // The database the release before the security fixes of audit run 3 leaves (dev's, whose head is row-level
+    // security's 0130): the chain cut before the security fixes.
     chain.shape = (steps) => steps.slice(0, (steps as readonly { name: string }[]).findIndex((s) => s.name === SECURITY_FIXES));
     try { await migrate(behind.pool); } finally { chain.shape = undefined; }
   }, 300_000);
@@ -299,13 +333,13 @@ describe("the newer code's view of a database a release behind", () => {
   it("readPendingForwardSteps lists what a newer code would apply", async () => {
     const real = await loadMigrationPlan();
     const pending = real.forwardChain.slice(real.forwardChain.findIndex((step) => step.name === SECURITY_FIXES));
-    expect(pending.map((step) => step.name)).toEqual([SECURITY_FIXES, ...DUE_INDEXES, CONTROL_INDEX]);
+    expect(pending.map((step) => step.name)).toEqual(OURS.map(([name]) => name));
     expect(await readPendingForwardSteps(behind.pool)).toEqual(pending.map((step) => ({ name: step.name, manifestSha256: step.manifestSha256,
-      sourceSha256: step.sourceSha256, verifierSha256: VERIFIER, n1Expand: true, keepsVerifier: true, outsideTransaction: step.name !== SECURITY_FIXES })));
-    // Steps up to 0122 record no declaration row; 0123 and 0124 record the two rows that release leaves.
+      sourceSha256: step.sourceSha256, verifierSha256: IN_FORCE_VERIFIER, n1Expand: true, keepsVerifier: true, outsideTransaction: step.name !== SECURITY_FIXES })));
+    // Steps up to 0122 record no declaration row; 0123 to 0130 record the rows that release leaves.
     expect((await behind.pool.query("SELECT source_name FROM public.debateai_schema_migration_step_n1 ORDER BY source_name")).rows)
-      .toEqual([{ source_name: SIDE_BY_SIDE }, { source_name: SETTINGS_ACTIVATION }]);
+      .toEqual([...DECLARED.map(([source_name]) => ({ source_name })), { source_name: RLS }]);
     // Read-only: nothing was applied.
-    expect((await behind.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration WHERE name=ANY($1::text[])", [[SECURITY_FIXES, ...DUE_INDEXES, CONTROL_INDEX]])).rows[0].n).toBe(0);
+    expect((await behind.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration WHERE name=ANY($1::text[])", [OURS.map(([name]) => name)])).rows[0].n).toBe(0);
   });
 });

@@ -82,7 +82,7 @@ describe("the claim maps the stored mail_locale column (C09.7)", () => {
     expect(await repo.claimNotice(1000)).toBeNull();
   });
 
-  // NV-40: the new release claims through 0125's sweeping function; 0116's sealed claim stays for the release before.
+  // NV-40: the new release claims through 0131's sweeping function; 0116's sealed claim stays for the release before.
   it("claims through the pending-notice function", async () => {
     const calls: Array<Readonly<{ text: string; args: unknown }>> = [];
     const pool = { query: async (text: string, args: unknown) => {

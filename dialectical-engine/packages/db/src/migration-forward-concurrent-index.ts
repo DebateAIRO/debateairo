@@ -6,7 +6,7 @@ import { parseN1Header } from './migration-n1.js';
 
 /**
  * The shared loader of an outside-transaction chain step (security audit run 3, NV-38; migrations/lineage/README.md
- * "Recovery notice due indexes (0126-0128)"): one SQL file whose n1 header declares `-- n1: expand`,
+ * "Recovery notice due indexes (0132-0134)"): one SQL file whose n1 header declares `-- n1: expand`,
  * `-- n1: keeps-verifier` and `-- n1: outside-transaction` and whose whole body is ONE
  * `CREATE INDEX CONCURRENTLY IF NOT EXISTS <index> ON <schema>.<table> …` (migration-n1.ts parseN1Header). migrate()
  * builds the index on its session first and then records the step in a step transaction that refuses unless the index
@@ -15,11 +15,11 @@ import { parseN1Header } from './migration-n1.js';
  * verifier, the migration's name and digest, the verifier's digest); the step keeps the verifier in force, so its
  * manifest names the verifier of the step before. Its checks are its postcondition, the index row whole (definition,
  * valid, ready, not unique, owner), compared on every later migrate(); no supplemental verifier, so no
- * replayVerifierSql. A step's own loader (migration-forward0126.ts and the next ones) only names its constants.
+ * replayVerifierSql. A step's own loader (migration-forward0132.ts and the next ones) only names its constants.
  */
 export type ConcurrentIndexStepSpec=Readonly<{
  name:string; version:string; manifestPath:string; previous:string;
- /** The refusal prefix, for example `MIGRATION_FORWARD0126_`. */
+ /** The refusal prefix, for example `MIGRATION_FORWARD0132_`. */
  refusal:string;
  schema:string; table:string; index:string;
 }>;

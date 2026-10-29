@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { inflateRawSync } from "node:zlib";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { CONTENT_CIPHERTEXT_SENTINEL, configureContentEncryption, createPool, migrate, PostgresConsumerSecurityRepository, PostgresDataExportRepository, PostgresDataExportSource, PostgresSessionRepository, PostgresSocialIdentityRepository, RunRepository, ServeDisclosureRepository } from "@debateai/db";
+import { CONTENT_CIPHERTEXT_SENTINEL, configureContentEncryption, createPool, migrate, PostgresConsumerSecurityRepository, PostgresDataExportRepository, PostgresDataExportSource, PostgresSessionRepository, PostgresSocialIdentityRepository, RunRepository, runInRequestScope, ServeDisclosureRepository, type Pool } from "@debateai/db";
 import { StoryRepository } from "@debateai/story";
 import { WorkItemRepository } from "@debateai/battery";
 import { Argon2WorkerPool, ContentCipher, decrypt, encrypt, FileRunContentKeyStore, FileUserDekStore,
@@ -30,6 +30,7 @@ import { SOCIAL_BROWSER_COOKIE } from "../../apps/api/src/social-auth.js";
 import { SocialProviders } from "../../apps/api/src/social-providers/provider.js";
 import { socialHash } from "../../apps/api/src/social-providers/hashes.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { apiTestPools, provisionRlsLogins, type ApiTestPools, type RlsLogins } from "../support/rls-logins.js";
 import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 import { persistTerminalRun } from "../support/settledRun.js";
 import { consumerFixture } from "../support/consumerWebAuthnFixtures.js";
@@ -58,8 +59,25 @@ const riskSignalInsert = `WITH fixture_time AS MATERIALIZED (SELECT clock_timest
       INSERT INTO identity.authentication_risk_signal(risk_signal_id,user_id,signal_kind,context_ciphertext,observed_at,expires_at)
       SELECT $1,$2,'LOGIN_SUCCESS',$3::jsonb,fixture_time.at,fixture_time.at+interval '7776000 seconds' FROM fixture_time`;
 
+/**
+ * Row-level security S01 (PLAN S5.2, DECISIONS D67): a distinct Pool object over `pool`, its methods bound to it, so
+ * statements keep `pool`'s own routing. Content encryption is configured once per Pool object
+ * (CONTENT_CIPHER_ALREADY_CONFIGURED), and apiTestPools hands every test the same pools, so each test that configures a
+ * cipher configures it on a facade of its own; in superuser mode every field is the harness pool itself, and the facades
+ * also keep the ask application's admission pools distinct objects (ASK_ADMISSION_DATABASE_POOLS_MUST_BE_SEPARATE).
+ */
+function poolFacade(pool: Pool): Pool {
+  return new Proxy(pool, {
+    get(target, property) {
+      const value = Reflect.get(target, property, target);
+      return typeof value === "function" ? value.bind(target) : value;
+    }
+  });
+}
+
 describe("data export over a real database and encrypted file store", () => {
-  let db: TestDatabase, runtime: ReturnType<typeof createPool>, workerRuntime: ReturnType<typeof createPool>, root: string;
+  let db: TestDatabase, runtime: Pool, workerRuntime: ReturnType<typeof createPool>, root: string;
+  let pools: ApiTestPools, logins: RlsLogins | undefined;
   const sent: TemplatedMail[] = [];
   const lines: string[] = [];
   beforeAll(async () => {
@@ -68,14 +86,19 @@ describe("data export over a real database and encrypted file store", () => {
     await db.pool.query("CREATE ROLE data_export_e2e_auth LOGIN PASSWORD 'data-export-e2e-only' IN ROLE debateai_authorization_runtime");
     await db.pool.query("CREATE ROLE data_export_e2e_worker LOGIN PASSWORD 'data-export-e2e-worker-only' IN ROLE debateai_data_export_worker");
     const url = new URL(db.connectionString); url.username = "data_export_e2e_auth"; url.password = "data-export-e2e-only";
-    runtime = createPool(url.toString());
+    // R21 (PLAN S5.2 (3)): the file's own authorization login is wired as main.ts wires authorizationPool, with the
+    // authorization system login as its cross-account target, in both modes; every other API pool is apiTestPools'.
+    pools = await apiTestPools(db, import.meta.url, { authorization: url.toString() });
+    logins = await provisionRlsLogins(db);
+    runtime = pools.authorization;
     url.username = "data_export_e2e_worker"; url.password = "data-export-e2e-worker-only";
     workerRuntime = createPool(url.toString());
-    expect((await runtime.query("SELECT current_user name")).rows[0].name).toBe("data_export_e2e_auth");
+    // Outside a request scope the authorization pool runs on its cross-account target; its own connections are the login.
+    expect((await runInRequestScope(() => runtime.query("SELECT current_user name"))).rows[0].name).toBe("data_export_e2e_auth");
     expect((await workerRuntime.query("SELECT current_user name")).rows[0].name).toBe("data_export_e2e_worker");
     root = await mkdtemp(join(tmpdir(), "data-export-e2e-"));
   }, 180_000);
-  afterAll(async () => { await runtime?.end(); await workerRuntime?.end(); await db?.stop(); if (root) await rm(root, { recursive: true, force: true }); });
+  afterAll(async () => { await logins?.end(); await workerRuntime?.end(); await db?.stop(); if (root) await rm(root, { recursive: true, force: true }); });
   afterEach(async () => {
     if (db) await db.pool.query("UPDATE identity.data_export SET status='CANCELLED',closed_at=clock_timestamp() WHERE status='PREPARING'");
   });
@@ -103,7 +126,7 @@ describe("data export over a real database and encrypted file store", () => {
     const source = new PostgresDataExportSource(workerRuntime);
     const store = new FileDataExportStore({ directory, users: { load: async () => Buffer.alloc(32, 7) } });
     const ownerView = new OwnerViewAdapter({ application: {} as never },
-      { exists: async () => false });
+      { exists: async () => false }, { readStates: async () => [] });
     const mail = new TemplatedDataExportMail({
       sendTemplated: async (message: (typeof sent)[number]) => { sent.push(message); }
     } as never);
@@ -396,7 +419,10 @@ describe("data export over a real database and encrypted file store", () => {
     const readableAnswer = await persistTerminalRun({ pool: db.pool, runId: readableRun, fixtureKey: "matrix",
       factBundle: { facts: ["matrix-answer-fact"], residualObjections: [], badges: [], conditionMarks: ["DEFECT"],
         reversalPoint: "matrix-reversal", buildsOnPrevious: { value: false, answerRef: null }, memoryDisclosure: null } });
-    const ownerPool = createPool(db.connectionString), serverAdmission = createPool(db.connectionString), legacyAdmission = createPool(db.connectionString);
+    // R21: the ask application's pools are the API's (main.ts: pool, serverAskAdmissionPool, legacyAskAdmissionPool);
+    // encryptedPool only seeds the published run below, outside every request, so it stays on the harness superuser.
+    const ownerPool = poolFacade(pools.runtime), serverAdmission = poolFacade(pools.serverAskAdmission),
+      legacyAdmission = poolFacade(pools.legacyAskAdmission);
     const encryptedPool = createPool(db.connectionString);
     try {
     const ask = new PostgresAskApplication(ownerPool, {} as never, { releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never, undefined, ownerPool,
@@ -488,7 +514,7 @@ describe("data export over a real database and encrypted file store", () => {
     [oldId, a.userId, a.sessionId, oldHash, "a".repeat(64)]);
     await db.pool.query("INSERT INTO identity.password_recovery_retry_lock(user_id,locked_until) VALUES($1,clock_timestamp()+interval '1 hour')", [a.userId]);
     const f = application(join(root, randomUUID()), a.email, leaseOwner, undefined, undefined, undefined,
-      new OwnerViewAdapter({ application: ask }, { exists: async () => true }, a.sessionId));
+      new OwnerViewAdapter({ application: ask }, { exists: async () => true }, { readStates: async () => [] }, a.sessionId));
     await accepted(a, f.app);
     await f.app.runOnce();
     const row = (await db.pool.query("SELECT * FROM identity.data_export WHERE user_id=$1 AND status='SENT' ORDER BY requested_at DESC LIMIT 1", [a.userId])).rows[0];
@@ -531,12 +557,15 @@ describe("data export over a real database and encrypted file store", () => {
     expect(JSON.parse(archive["security.json"]!).recovery_requests).toEqual(expect.arrayContaining([
       expect.objectContaining({ kind: "password_recovery_retry_lock", state: "LOCKED" })
     ]));
-    } finally { await encryptedPool.end(); await serverAdmission.end(); await legacyAdmission.end(); await ownerPool.end(); }
+    } finally { await encryptedPool.end(); }
   });
 
   it("E3 projects a readable encrypted run through the same owner route", async () => {
-    const a = await account(), secretDir = join(root, randomUUID()), contentPool = createPool(db.connectionString);
-    const serverAdmission = createPool(db.connectionString), legacyAdmission = createPool(db.connectionString);
+    // R21: the API reads through the runtime pool (main.ts: pool) and its admission and run-provision pools; the run
+    // and its content are seeded outside every request on seedPool, the harness superuser, with the same cipher.
+    const a = await account(), secretDir = join(root, randomUUID()), contentPool = poolFacade(pools.runtime);
+    const seedPool = createPool(db.connectionString);
+    const serverAdmission = poolFacade(pools.serverAskAdmission), legacyAdmission = poolFacade(pools.legacyAskAdmission);
     let api: ReturnType<typeof buildApi> | undefined;
     try {
       const users = new FileUserDekStore(secretDir, loadKek(generateDek()));
@@ -547,10 +576,11 @@ describe("data export over a real database and encrypted file store", () => {
       });
       const cipher = new ContentCipher(keys);
       configureContentEncryption(contentPool, cipher);
-      const ask = new PostgresAskApplication(contentPool, {} as never, { releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never, undefined, contentPool,
-        { server: serverAdmission, legacy: legacyAdmission });
+      configureContentEncryption(seedPool, cipher);
+      const ask = new PostgresAskApplication(contentPool, {} as never, { releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never, undefined,
+        pools.contentProvision, { server: serverAdmission, legacy: legacyAdmission });
       const question = `encrypted-owner-question-${randomUUID()}`;
-      const runId = await new RunRepository(contentPool).startRun({
+      const runId = await new RunRepository(seedPool).startRun({
         questionLine: question, askContract: { audience: "data-export-test" },
         principal: { kind: "server", userId: a.userId, ownerRef: a.ownerRef },
         sessionId: a.sessionId, callerScope: "ASKER", asOf: new Date(),
@@ -569,28 +599,28 @@ describe("data export over a real database and encrypted file store", () => {
       const restatementEnvelope = prepared.encrypt("core.stranger_restatement", restatementId, { restatementText: "node restated" });
       const restatementAttestation = prepared.attestEnvelope("core.stranger_restatement", restatementId, "content_ciphertext", restatementEnvelope);
       prepared.close();
-      await contentPool.query(`INSERT INTO ledger.raw_artifact(raw_artifact_id,attempt_id,run_id,provider_ref,provider,model_id,maker,
+      await seedPool.query(`INSERT INTO ledger.raw_artifact(raw_artifact_id,attempt_id,run_id,provider_ref,provider,model_id,maker,
         raw_text,metadata_json,parse_status,content_hash,contract_hash,at_seq,content_ciphertext,content_attestation)
         VALUES($1,$2,$3,'fixture-ref','fixture-provider','fixture-model','fixture-maker',$4,'{}','PARSED',$5,'fixture-contract',
           ledger.allocate_sequence(),$6::jsonb,$7)`,
       [artifactId, randomUUID(), runId, CONTENT_CIPHERTEXT_SENTINEL, "a".repeat(64), JSON.stringify(artifactEnvelope), artifactAttestation]);
-      await contentPool.query(`INSERT INTO core.node(node_id,run_id,claim_text,claim_type,parent_node_id,child_kind,depth,sibling_ordinal,
+      await seedPool.query(`INSERT INTO core.node(node_id,run_id,claim_text,claim_type,parent_node_id,child_kind,depth,sibling_ordinal,
         materialized_path,generation_status,path_status,exploration_decision,provenance_ref,way_of_knowing,locator,
         value_laden,position_label,is_folder,created_at_seq,relevant_as_of,content_ciphertext,content_attestation)
         VALUES($1,$2,$3,'unknown',NULL,NULL,0,0,'0','complete','active','continue',$6,'REASONING',NULL,
           false,NULL,false,ledger.allocate_sequence(),clock_timestamp(),$4::jsonb,$5)`,
       [nodeId, runId, CONTENT_CIPHERTEXT_SENTINEL, JSON.stringify(nodeEnvelope), nodeAttestation, artifactId]);
-      await contentPool.query(`INSERT INTO ledger.reduced_judgement(run_id,node_id,raw_artifact_ref,tau,number_kind,source_ref,
+      await seedPool.query(`INSERT INTO ledger.reduced_judgement(run_id,node_id,raw_artifact_ref,tau,number_kind,source_ref,
         producer,replay_handle,way_of_knowing,at_seq)
         VALUES($1,$2,$3,0.8,'fixture','fixture-source','fixture-producer','fixture-replay','REASONING',ledger.allocate_sequence())`,
       [runId, nodeId, artifactId]);
-      await contentPool.query(`INSERT INTO core.stranger_restatement(restatement_id,run_id,subject_kind,subject_id,restatement_text,
+      await seedPool.query(`INSERT INTO core.stranger_restatement(restatement_id,run_id,subject_kind,subject_id,restatement_text,
         check_status,at_seq,content_ciphertext,content_attestation)
         VALUES($1,$2,'node',$3,$4,'PASS',ledger.allocate_sequence(),$5::jsonb,$6)`,
       [restatementId, runId, nodeId, CONTENT_CIPHERTEXT_SENTINEL, JSON.stringify(restatementEnvelope), restatementAttestation]);
-      const workItemId = await new WorkItemRepository(contentPool).enqueue({ runId, batteryRowId: "Q1",
+      const workItemId = await new WorkItemRepository(seedPool).enqueue({ runId, batteryRowId: "Q1",
         nodeSet: [nodeId], commandKey: `test-layer:data-export:${runId}` });
-      const terminal = await persistTerminalRun({ pool: contentPool, runId, fixtureKey: "data-export", workItemId,
+      const terminal = await persistTerminalRun({ pool: seedPool, runId, fixtureKey: "data-export", workItemId,
         factBundle: { facts: ["encrypted-export-fact"], residualObjections: [], badges: [],
           conditionMarks: ["DEFECT"], reversalPoint: "encrypted-export-reversal",
           buildsOnPrevious: { value: false, answerRef: null }, memoryDisclosure: null } });
@@ -598,14 +628,14 @@ describe("data export over a real database and encrypted file store", () => {
       const secondAnswerEnvelope = answerCipher.encrypt("serve.answer", `${terminal.answerId}:2`, { answerForm: null });
       const secondAnswerAttestation = answerCipher.attestEnvelope("serve.answer", `${terminal.answerId}:2`, "content_ciphertext", secondAnswerEnvelope);
       answerCipher.close();
-      const versionColumns = (await contentPool.query(`SELECT a.attname FROM pg_attribute a
+      const versionColumns = (await seedPool.query(`SELECT a.attname FROM pg_attribute a
         WHERE a.attrelid='serve.answer'::regclass AND a.attnum>0 AND NOT a.attisdropped AND a.attgenerated=''
           AND a.attidentity='' ORDER BY a.attnum`)).rows.map(item => item.attname as string);
       const names = versionColumns.map(name => `"${name}"`).join(",");
       const values = versionColumns.map(name => name === "answer_version" ? '"answer_version"+1'
         : name === "sealed_at_seq" ? "ledger.allocate_sequence()"
         : name === "content_ciphertext" ? "$2::jsonb" : name === "content_attestation" ? "$3" : `"${name}"`).join(",");
-      await contentPool.query(`INSERT INTO serve.answer(${names}) SELECT ${values} FROM serve.answer
+      await seedPool.query(`INSERT INTO serve.answer(${names}) SELECT ${values} FROM serve.answer
         WHERE answer_id=$1 AND answer_version=1`, [terminal.answerId, JSON.stringify(secondAnswerEnvelope), secondAnswerAttestation]);
       await db.pool.query(`INSERT INTO serve.serve_disclosure(answer_id,answer_version,run_id,writer_planned_ref,checker_planned_ref,
         writer_fallback,checker_fallback,checker_same_as_writer)
@@ -614,7 +644,7 @@ describe("data export over a real database and encrypted file store", () => {
       const disclosures = new RepositoryAnswerDisclosureApplication(new ServeDisclosureRepository(contentPool));
       const ownerDeps = { application: ask, stories, disclosures };
       const fixture = application(join(root, randomUUID()), a.email, randomUUID(), undefined, undefined, undefined,
-        new OwnerViewAdapter(ownerDeps, keys, a.sessionId));
+        new OwnerViewAdapter(ownerDeps, keys, { readStates: async () => [] }, a.sessionId));
       const ownerToken = randomBytes(32).toString("base64url");
       api = buildApi({ ...ownerDeps, allowedOrigin: "https://example.test",
         sessions: { authenticate: async (token: string) => token === ownerToken ? {
@@ -624,6 +654,11 @@ describe("data export over a real database and encrypted file store", () => {
         } : null, verifyCsrf: () => false } as never });
       await accepted(a, fixture.app);
       await fixture.app.runOnce();
+      // D55: the inline application accepts ownerToken for a.sessionId, so that session row holds ownerToken's hash and
+      // the database's rls.* functions derive account A from the credential the request carries. Set after the export
+      // request: its step-up grant is bound to the session's token hash at issue (identity.bind_consumer_grant_generation,
+      // migrations/0100_consumer_security_recovery.sql:629-643), so a new hash before consumption refuses the grant.
+      await db.pool.query("UPDATE identity.session SET token_hash=$2 WHERE session_id=$1", [a.sessionId, hashToken("session", ownerToken)]);
       const row = (await db.pool.query("SELECT * FROM identity.data_export WHERE user_id=$1 ORDER BY requested_at DESC LIMIT 1", [a.userId])).rows[0];
       expect(row.status, lines.join("\n")).toBe("SENT");
       const debate = JSON.parse(entries(await fixture.store.read(row.export_id, a.userId))["debates.json"]!).debates[0];
@@ -654,7 +689,7 @@ describe("data export over a real database and encrypted file store", () => {
         expect(answer.story).toEqual(await get(`/v1/answers/${terminal.answerId}/story`));
         expect(answer.disclosure).toEqual(await get(`/v1/answers/${terminal.answerId}/disclosure`));
       }
-    } finally { if (api) await api.close(); await serverAdmission.end(); await legacyAdmission.end(); await contentPool.end(); }
+    } finally { if (api) await api.close(); await seedPool.end(); }
   });
 
   it("E4 excludes credential hashes and link token from the archive", async () => {

@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import type { Pool,PoolClient } from "pg";
 import { TypedDomainError } from "@debateai/kernel";
 import { LEASE_LOCK_WAITS } from "./pool-budget.js";
+import { accountContextSource, sameAccountContextSource, type AccountContextSource } from "./account-context.js";
 
 const PUBLICATION_LEASE_NAMESPACE = "debateai:publication-content-lease:v1:" as const;
 const publicationLeaseScope = new AsyncLocalStorage<Readonly<{
@@ -12,6 +13,9 @@ const publicationLeaseScope = new AsyncLocalStorage<Readonly<{
 // every publication lease is taken through the API's own @debateai/db instance (main.ts); a duplicate instance
 // would only fail open to a second connection, never route to another lease's session.
 const livePublicationLeases = new WeakMap<PoolClient, PublicationContentLease>();
+// NV-31 with row security: the account-context source of the checkout that gave each lease its client (index.ts
+// routeLeaseBodyQueries compares a body statement's own source with it).
+const publicationLeaseSources = new WeakMap<PublicationContentLease, AccountContextSource>();
 
 /**
  * Security fixes run 3, K10 (NV-21): readers (the public page, the evaluator) take the lease SHARED; only key
@@ -45,6 +49,7 @@ export async function acquirePublicationContentLease(
   if (publicationRefs.length === 0) throw new TypeError("PUBLICATION_LEASE_REF_REQUIRED");
   const deadline = performance.now() + LEASE_LOCK_WAITS.sharedMs;
   for (;;) {
+    const source = accountContextSource(pool);
     const client = await pool.connect();
     const acquired: string[] = [];
     let released = false;
@@ -97,6 +102,7 @@ export async function acquirePublicationContentLease(
         }
         if (!contended) {
           const lease = Object.freeze({ publicationRefs,mode,client,release:unlock });
+          publicationLeaseSources.set(lease,source);
           livePublicationLeases.set(client,lease);
           return lease;
         }
@@ -123,6 +129,7 @@ export async function acquirePublicationContentLease(
           ? leaseContended() : error;
       }
       const lease = Object.freeze({ publicationRefs,mode,client,release:unlock });
+      publicationLeaseSources.set(lease,source);
       livePublicationLeases.set(client,lease);
       return lease;
     } catch (error) {
@@ -168,9 +175,14 @@ export async function withPublicationContentLease<T>(
   }
 }
 
-/** The live publication lease client the calling async context holds on `pool`, if any (NV-31's query router). */
-export function publicationLeaseClientFor(pool: Pool): PoolClient | undefined {
+/**
+ * The live publication lease client the calling async context holds, if its checkout had `source` (NV-31's query
+ * router, with row security): the lease of the pool the statement is on, or of that pool's cross-account target when
+ * the statement is routed there (a shared lease is taken on the target, X10), and only under the same account context.
+ */
+export function publicationLeaseClientFor(source: AccountContextSource): PoolClient | undefined {
   const current = publicationLeaseScope.getStore();
-  return current?.pool === pool && livePublicationLeases.get(current.lease.client) === current.lease
+  return current !== undefined && livePublicationLeases.get(current.lease.client) === current.lease
+    && sameAccountContextSource(publicationLeaseSources.get(current.lease), source)
     ? current.lease.client : undefined;
 }

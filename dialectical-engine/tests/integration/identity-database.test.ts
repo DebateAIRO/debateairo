@@ -68,7 +68,7 @@ describe("S2 identity schema on real PostgreSQL", () => {
       "password_reset_control", "password_reset_notice", "password_reset_notice_binding", "password_reset_retry_lock", "password_reset_source_window",
       "private_erasure_audit_binding",
       "publication_event_binding", "recovery_code", "recovery_email_request", "registration_region", "restore_fence", "run_execution_binding", "runtime_audit_attempt",
-      "sensitive_data_consent", "session", "social_enrollment", "social_flow", "social_identity", "staff_webauthn_metadata", "step_up_grant",
+      "sensitive_data_consent", "session", "social_enrollment", "social_flow", "social_identity", "staff_webauthn_metadata", "step_up_grant", "synthesis_check_erasure_binding",
       "totp_login_lockout", "user",
       "verification_delivery_reservation", "verification_token_credential"
     ]);

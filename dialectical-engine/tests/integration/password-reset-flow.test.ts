@@ -1,9 +1,6 @@
 import { createPreviewRecoveryApiFixture } from "../support/previewRecoveryPrincipal.js";
 import { canonicalRegisterJson, registerVersionToSafeLegacyNumber, PASSWORD_RESET_POLICY_REGISTER_ROW as resetFacet, BACKUP_EMAIL_POLICY_REGISTER_ROW as backupFacet, MFA_RECOVERY_POLICY_REGISTER_ROW as mfaFacet } from "@debateai/register";
 import { randomUUID } from "node:crypto";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Argon2WorkerPool, AuditContextHasher, createEmailBlindIndex, encrypt, generateTotpSecret, hashPassword, hashRecoveryCode, generateRecoveryCodes, totpCodeAtStep, verifyPassword, type ReadableUserDekStore } from "@debateai/crypto";
 import { migrate, createPool, PostgresAuthenticationRiskSignalRepository, PostgresSessionRepository } from "@debateai/db";
@@ -14,11 +11,11 @@ import { PasswordResetService } from "../../apps/api/src/password-reset.js";
 import { PasswordResetNotificationWorker, type PasswordResetMail } from "../../apps/api/src/password-reset-mail.js";
 import { SessionService } from "../../apps/api/src/sessions.js";
 import { buildApi, type AskApplication } from "../../apps/api/src/index.js";
-import { provisionDevelopmentDatabasePrincipals } from "../../apps/runner/src/dev-database-principals.js";
 import { buildDevelopmentDeploymentRegisterPublicationRows } from "../../apps/runner/src/dev-deployment-register.js";
 import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
-let db: TestDatabase, root: string, argon: Argon2WorkerPool, audit: AuditContextHasher, apiPool: ReturnType<typeof createPool>, authPool: ReturnType<typeof createPool>, repo: PostgresPasswordResetRepository, service: PasswordResetService;
+import { apiTestPools, createSystemTwin, provisionRlsLogins } from "../support/rls-logins.js";
+let db: TestDatabase, argon: Argon2WorkerPool, audit: AuditContextHasher, apiPool: ReturnType<typeof createPool>, authPool: ReturnType<typeof createPool>, repo: PostgresPasswordResetRepository, service: PasswordResetService;
 let credentialUrls: Map<string, string>;
 const auth = authPolicyFromRegisterRows(AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS), mfa = mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value), recovery = recoveryPolicyFromRegisterRows([RECOVERY_POLICY_REGISTER_ROW]), policy = passwordResetPolicyFromValue(PASSWORD_RESET_POLICY_REGISTER_ROW.value, PASSWORD_RESET_POLICY_REGISTER_ROW.sourceRef);
 const keys = new Map<string, Buffer>(), blind = Buffer.alloc(32, 41), messages: PasswordResetMail[] = [], source = { ip: "203.0.113.77", userAgent: "genuine-password-reset-test", requestId: "fixture" }, origin = "https://preview.example.test";
@@ -67,21 +64,22 @@ const retirePending = () => db.pool.query("UPDATE identity.password_reset_notice
 beforeAll(async () => {
   db = await startTestDatabase();
   await migrate(db.pool);
-  root = await mkdtemp(join(tmpdir(), "password-reset-native-"));
   const bootstrap = await loadBootstrapRegister();
   await persistBootstrapRegister(db.pool, bootstrap);
   expect(await readPasswordResetPolicy(db.pool, bootstrap.registerVersion)).toBeNull();
   const rows = [...await buildDevelopmentDeploymentRegisterPublicationRows(bootstrap, TEST_DEVELOPMENT_PROVIDER_PANEL),...[resetFacet,backupFacet,mfaFacet].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef}))];
   const publication = await createPostgresRegisterPublicationPort(db.pool).publishGeneral({ publicationId: randomUUID(), baseRegisterVersion: parseRegisterVersionText(String(bootstrap.registerVersion)), rows, sourceRef: "password-only reset native General fixture", deployment: "local" });
   expect(await readPasswordResetPolicy(db.pool, registerVersionToSafeLegacyNumber(publication.registerVersion))).toMatchObject({ maximumElapsedMs: 1800000 });
-  await provisionDevelopmentDatabasePrincipals({ adminPool: db.pool, adminDatabaseUrl: db.connectionString, credentialFilePath: join(root, "database-principals.env") });
-  const credentials = new Map((await readFile(join(root, "database-principals.env"), "utf8")).split(/\r?\n/).filter(line => line && !line.startsWith("#")).map(line => {
-    const i = line.indexOf("=");
-    return [line.slice(0, i), line.slice(i + 1)];
+  // R21 (PLAN S5.3, D67): one dev provisioning run (provisionRlsLogins) serves every URL; the recovery fixture login is
+  // the runtime pool and its system twin, holding the same four capability roles, the target its background statements
+  // and role checks run on, in both modes.
+  const credentials = new Map<string, string>((await provisionRlsLogins(db)).credentials());
+  credentials.set("DATABASE_URL", await createPreviewRecoveryApiFixture(db.pool, credentials.get("DATABASE_URL")!));
+  credentialUrls = credentials;
+  ({ runtime: apiPool, authorization: authPool } = await apiTestPools(db, import.meta.url, {
+    runtime: credentials.get("DATABASE_URL")!,
+    system: await createSystemTwin(db, "password_reset_flow_recovery_system", ["debateai_billing_runtime", "debateai_password_reset_runtime", "debateai_backup_email_runtime", "debateai_mfa_recovery_runtime"])
   }));
-credentials.set("DATABASE_URL",await createPreviewRecoveryApiFixture(db.pool,credentials.get("DATABASE_URL")!));  credentialUrls = credentials;
-  apiPool = createPool(credentials.get("DATABASE_URL")!);
-  authPool = createPool(credentials.get("AUTHORIZATION_DATABASE_URL")!);
   argon = new Argon2WorkerPool();
   await argon.ready();
   audit = new AuditContextHasher(argon, Buffer.alloc(32, 61), auth.auditSourceIpKdf);
@@ -91,13 +89,11 @@ credentials.set("DATABASE_URL",await createPreviewRecoveryApiFixture(db.pool,cre
     } });
 }, 120000);
 afterAll(async () => {
-  await apiPool?.end();
-  await authPool?.end();
+  if (db)
+    await (await provisionRlsLogins(db)).end();
   audit?.close();
   await argon?.close();
   await db?.stop();
-  if (root)
-    await rm(root, { recursive: true, force: true });
   for (const key of keys.values())
     key.fill(0);
 });

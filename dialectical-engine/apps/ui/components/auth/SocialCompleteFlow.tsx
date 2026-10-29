@@ -5,7 +5,7 @@ import {announceSessionChange} from "../support/sessionChange";
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ContractClient, LocaleCode, CatalogLocaleCode, StepUpResponse, SocialStepUpStatusResponse, SocialLoginStatusResponse, AuthenticationResponse } from '@debateai/contract';
-import { dobToIso, declaredRegionFromPick, type DobParts } from '@debateai/kernel';
+import { dobToIso, declaredRegionFromPick, ITALY_APPROVAL_REQUIRED, ITALY_COUNTRY, type DobParts } from '@debateai/kernel';
 import { contractClient } from '@/lib/api';
 import { createConsumerWebAuthnBrowser } from '@/lib/consumerWebAuthn';
 import { ownedPhoneCompletionDraft } from '@/lib/phoneCompletionDraft';
@@ -23,6 +23,7 @@ import { SecurityEnrollment } from './SecurityEnrollment';
 import { LockoutPrompt } from './LockoutPrompt';
 import { PhoneField } from './PhoneField';
 import { InlineFieldMessage, useFormAnnouncer } from './InlineFieldMessage';
+import { ItalyApprovalBox } from './ItalyApprovalBox';
 import { RegionField, EMPTY_REGION_PICK, type RegionPick } from '../RegionField';
 import { DateOfBirthField, EMPTY_DOB } from '../DateOfBirthField';
 import { dobErrorMessage, resolveDobLocale } from '@/lib/dob/dobLocale';
@@ -96,6 +97,17 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
     const [termsAccepted, setTermsAccepted] = useState(false);
     const [policyOpen, setPolicyOpen] = useState(false);
     const [termsOpen, setTermsOpen] = useState(false);
+    /* The Italy approval box (mission italy-clause-approval S01), as on email sign-up: shown while Region says Italy
+       (decided here at once, with no request) or after the server refused with ITALY_APPROVAL_REQUIRED (the request
+       came from Italy), and then kept shown. It starts unticked and is never stored. */
+    const [italyApproved, setItalyApproved] = useState(false);
+    const [italyRevealed, setItalyRevealed] = useState(false);
+    const [italyError, setItalyError] = useState<string | null>(null);
+    const [italyFocusRequest, setItalyFocusRequest] = useState(0);
+    const italyFocusHandled = useRef(0);
+    const italyInputRef = useRef<HTMLInputElement | null>(null);
+    const italyShown = region.country === ITALY_COUNTRY || italyRevealed;
+    const italyMissing = italyShown && !italyApproved;
     const privacyDocument = useLegalDocument('privacy');
     const termsDocument = useLegalDocument('terms');
     const chrome = useChromeI18n();
@@ -204,6 +216,13 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         }, Math.max(0, Date.parse(flowExpiry) - Date.now()));
         return () => clearTimeout(timer);
     }, [flowExpiry, token, browser, catalog]);
+    /* The refusal that reveals the box also re-enables the form, so focus waits for that render; once per request. */
+    useEffect(() => {
+        if (italyFocusRequest === italyFocusHandled.current || busy)
+            return;
+        italyFocusHandled.current = italyFocusRequest;
+        italyInputRef.current?.focus();
+    }, [italyFocusRequest, busy]);
     function finish(result: AuthenticationResponse, sessionAlreadyAnnounced = false, enrolled = false) {
         if (result.status !== 'authenticated')
             return;
@@ -240,11 +259,13 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         // No region is an error like any other (a11y repair, 2026-10-15): said, shown under the picker, and focused in page order.
         const noRegion = declaredRegion === null;
         setRegionMissing(noRegion);
-        if (Object.keys(checked).length || noRegion) {
+        // The Italy box, while shown and unticked, is an error like its Terms box: said, shown under it, last in focus order.
+        setItalyError(italyMissing ? t(catalog, "auth.signUp.italyApprovalHint") : null);
+        if (Object.keys(checked).length || noRegion || italyMissing) {
             const regionControl = region.country === 'US' ? '#signup-region-state' : '#signup-region-trigger';
-            form.querySelector<HTMLElement>(checked.email ? '[name=email]' : checked.phone ? '[name=phone]' : noRegion ? regionControl : checked.dateOfBirth ? '[name=dob-d]' : checked.privacy ? '[name=privacy]' : '[name=terms]')?.focus();
+            form.querySelector<HTMLElement>(checked.email ? '[name=email]' : checked.phone ? '[name=phone]' : noRegion ? regionControl : checked.dateOfBirth ? '[name=dob-d]' : checked.privacy ? '[name=privacy]' : checked.terms ? '[name=terms]' : '[name=italy-approval]')?.focus();
             // The first error, in the order focus takes; the date of birth says what its own field says.
-            const first = checked.email ?? checked.phone ?? (noRegion ? "auth.signUp.regionHint" : undefined) ?? (checked.dateOfBirth === undefined ? checked.privacy ?? checked.terms : undefined);
+            const first = checked.email ?? checked.phone ?? (noRegion ? "auth.signUp.regionHint" : undefined) ?? (checked.dateOfBirth === undefined ? checked.privacy ?? checked.terms ?? (italyMissing ? "auth.signUp.italyApprovalHint" : undefined) : undefined);
             signupAnnouncer.announce(first !== undefined ? t(catalog, first) : dobErrorMessage(catalog, 'incomplete', resolveDobLocale(uiLocale).order));
             return;
         }
@@ -260,7 +281,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         const ownedToken = token;
         const ownedKind = kind;
         try {
-            const response = await client.completeSocialSignup({ continuation_token: ownedToken, email: address, ...(rawPhone.trim() === '' ? {} : { phone: rawPhone }), country: declaredRegion.country, ...(declaredRegion.country === "US" ? { us_state: declaredRegion.usState! } : {}), date_of_birth: dobToIso(birth), terms: { version: termsDocument.version, sha256: termsDocument.sha256 }, privacy: { version: privacyDocument.version, sha256: privacyDocument.sha256 }, locale: catalogLocale(chrome.locale), ui_locale: chrome.locale, time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null, turnstile_token: proof });
+            const response = await client.completeSocialSignup({ continuation_token: ownedToken, email: address, ...(rawPhone.trim() === '' ? {} : { phone: rawPhone }), country: declaredRegion.country, ...(declaredRegion.country === "US" ? { us_state: declaredRegion.usState! } : {}), date_of_birth: dobToIso(birth), terms: { version: termsDocument.version, sha256: termsDocument.sha256 }, privacy: { version: privacyDocument.version, sha256: privacyDocument.sha256 }, ...(italyShown && italyApproved ? { italy_approval: true as const } : {}), locale: catalogLocale(chrome.locale), ui_locale: chrome.locale, time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null, turnstile_token: proof });
             if (!owns(owner, ownedToken, ownedKind))
                 return;
             startup.current = null;
@@ -269,6 +290,9 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
             setPhone('');
             setPrivacyAccepted(false);
             setTermsAccepted(false);
+            setItalyApproved(false);
+            setItalyRevealed(false);
+            setItalyError(null);
             if ('status' in response) {
                 replaceAuthority(response.enrollment_token, 'enroll');
                 setFlowExpiry(response.expires_at);
@@ -281,9 +305,20 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         }
         catch (failure) {
             if (dispatched.current && ownedKind !== 'stepup' && !(failure instanceof ContractHttpError && failure.status >= 400 && failure.status < 500)) clearStoredSupportConversation();
-            if (owns(owner, ownedToken, ownedKind))
-                setError(failure instanceof ContractHttpError && failure.serverCode === 'STATE_SIGNUP_UNAVAILABLE'
-                    ? t(catalog, "auth.signUp.stateUnavailable") : t(catalog, "auth.signUp.creationFailed"));
+            if (owns(owner, ownedToken, ownedKind)) {
+                if (failure instanceof ContractHttpError && failure.serverCode === ITALY_APPROVAL_REQUIRED) {
+                    /* The IP leg, which only the server can see: the box appears unticked and stays shown, the
+                       continuation token and every field are kept, and focus goes to the box. `finally` resets the
+                       bot check as after every attempt, so the resubmit carries a fresh token. */
+                    setItalyRevealed(true);
+                    setItalyApproved(false);
+                    setError(t(catalog, "auth.signUp.italyApprovalRequired"));
+                    setItalyFocusRequest(request => request + 1);
+                }
+                else
+                    setError(failure instanceof ContractHttpError && failure.serverCode === 'STATE_SIGNUP_UNAVAILABLE'
+                        ? t(catalog, "auth.signUp.stateUnavailable") : t(catalog, "auth.signUp.creationFailed"));
+            }
         }
         finally {
             if (owner === sequence.current) {
@@ -402,10 +437,19 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
  <RegionField catalog={catalog} locale={chrome.locale} value={region} onChange={next => {
                 setRegion(next);
                 setRegionMissing(false);
+                // Leaving Italy before any refusal revealed the box unmounts it, and its tick goes with it.
+                if (next.country !== ITALY_COUNTRY && !italyRevealed) {
+                    setItalyApproved(false);
+                    setItalyError(null);
+                }
             }} disabled={busy} errorId={regionMissing ? "social-region-error" : undefined}/><InlineFieldMessage id="social-region-error" message={regionMissing ? t(catalog, "auth.signUp.regionHint") : null}/>
  <DateOfBirthField catalog={catalog} locale={resolveDobLocale(uiLocale)} value={birth} onChange={setBirth} error={errors.dateOfBirth ? 'incomplete' : null} disabled={busy} minimumAgeMessage={t(catalog, "auth.dob.underAge")}/>
  <div className="consentGroup"><div className="consentRow"><input className="consentBox" name="privacy" type="checkbox" checked={privacyAccepted} disabled={busy} aria-labelledby="social-privacy-label" aria-invalid={!!errors.privacy} aria-describedby={errors.privacy ? "social-privacy-error" : undefined} onChange={() => privacyAccepted ? setPrivacyAccepted(false) : setPolicyOpen(true)}/><span className="consentText" id="social-privacy-label">{t(catalog, "auth.signUp.privacyAgreementPrefix")} <button type="button" className="consentPolicyLink" onClick={() => setPolicyOpen(true)}>{t(catalog, "auth.signUp.privacyPolicy")}</button>{t(catalog, "auth.signUp.privacyAgreementSuffix")}</span></div><InlineFieldMessage id="social-privacy-error" message={fieldError('privacy')}/>
- <div className="consentRow"><input className="consentBox" name="terms" type="checkbox" checked={termsAccepted} disabled={busy} aria-labelledby="social-terms-label" aria-invalid={!!errors.terms} aria-describedby={errors.terms ? "social-terms-error" : undefined} onChange={() => termsAccepted ? setTermsAccepted(false) : setTermsOpen(true)}/><span className="consentText" id="social-terms-label">{t(catalog, "auth.signUp.termsAgreementPrefix")} <button type="button" className="consentPolicyLink" onClick={() => setTermsOpen(true)}>{t(catalog, "auth.signUp.termsOfService")}</button>{t(catalog, "auth.signUp.privacyAgreementSuffix")}</span></div><InlineFieldMessage id="social-terms-error" message={fieldError('terms')}/></div>
+ <div className="consentRow"><input className="consentBox" name="terms" type="checkbox" checked={termsAccepted} disabled={busy} aria-labelledby="social-terms-label" aria-invalid={!!errors.terms} aria-describedby={errors.terms ? "social-terms-error" : undefined} onChange={() => termsAccepted ? setTermsAccepted(false) : setTermsOpen(true)}/><span className="consentText" id="social-terms-label">{t(catalog, "auth.signUp.termsAgreementPrefix")} <button type="button" className="consentPolicyLink" onClick={() => setTermsOpen(true)}>{t(catalog, "auth.signUp.termsOfService")}</button>{t(catalog, "auth.signUp.privacyAgreementSuffix")}</span></div><InlineFieldMessage id="social-terms-error" message={fieldError('terms')}/>
+ {italyShown ? <ItalyApprovalBox idPrefix="social" catalog={catalog} terms={termsDocument} checked={italyApproved} onChange={next => {
+                setItalyApproved(next);
+                setItalyError(null);
+            }} disabled={busy} error={italyError} inputRef={italyInputRef}/> : null}</div>
  {turnstile ? <TurnstileChallenge siteKey={turnstile.siteKey} nonce={turnstile.nonce} action="signup" locale={uiLocale} resetKey={reset} onToken={setProof} onError={() => {
                     setProof(null);
                     setError(t(catalog, "auth.pending.proofUnavailable"));

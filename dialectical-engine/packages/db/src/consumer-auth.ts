@@ -158,7 +158,7 @@ export class PostgresConsumerAuthRepository {
     async beginEnrollment<T>(input: ConsumerEnrollmentSeed, currentLegal: readonly ConsumerLegalPair[], source: AuthSourceContext, validateOptions: (candidate: ConsumerEnrollmentOptions) => Promise<T>): Promise<T> {
         // A separate transaction prevents cleanup challenge-row locks from being
         // retained while preflight waits for an account held by a completion.
-        // NV-41 (0125): the cleanup also gives up the heaviest anonymous source's oldest rows when the store is full.
+        // NV-41 (0131): the cleanup also gives up the heaviest anonymous source's oldest rows when the store is full.
         await this.pool.query('SELECT identity.prune_consumer_passkey_challenges_evicting($1)', [input.challengeCapacity]);
         return this.audited(source, async (client, prepared) => {
             const preflight = await client.query<{

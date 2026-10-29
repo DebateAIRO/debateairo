@@ -21,6 +21,7 @@ import {
   PublicationCipher
 } from "@debateai/crypto";
 import {
+  crossAccount,
   isRunContentLeaseHeld,
   PostgresPublicationRepository,
   type AuthSourceContext
@@ -158,14 +159,14 @@ function logStoryNotPublished(requestId: string, diagnostic: string): void {
  */
 async function readPublishableStory(
   stories: PublicationStoryReader,
-  input: Readonly<{ answer: Answer; authenticated: AuthenticatedSession; source: AuthSourceContext }>
+  input: Readonly<{ answer: Answer; owner: { userId: string; ownerRef: string }; source: AuthSourceContext }>
 ): Promise<PublicStoryShort | null> {
   let story: PublicStoryShort | null;
   try {
     story = await stories.readStoryShort({
       answerId: input.answer.answer_id,
       answerVersion: input.answer.answer_version,
-      ownerRef: input.authenticated.ownerRef
+      ownerRef: input.owner.ownerRef
     });
   } catch (error) {
     logStoryNotPublished(input.source.requestId, storyReadDiagnostic(error));
@@ -187,11 +188,11 @@ async function readPublishableStory(
  */
 async function readPublishableLanguage(
   repository: PostgresPublicationRepository,
-  input: Readonly<{ runId: string; authenticated: AuthenticatedSession; source: AuthSourceContext }>
+  input: Readonly<{ runId: string; owner: { userId: string; ownerRef: string }; source: AuthSourceContext }>
 ): Promise<string | null> {
   let tag: string | null;
   try {
-    tag = await repository.readArgumentLanguageTag(input.runId, input.authenticated.userId, input.authenticated.ownerRef);
+    tag = await repository.readArgumentLanguageTag(input.runId, input.owner.userId, input.owner.ownerRef);
   } catch (error) {
     logLanguageNotPublished(input.source.requestId, storyReadDiagnostic(error));
     return null;
@@ -224,7 +225,7 @@ function logLanguageNotPublished(requestId: string, diagnostic: string): void {
  */
 async function readPublishableFloor(
   repository: PostgresPublicationRepository,
-  input: Readonly<{ runId: string; answer: Answer; authenticated: AuthenticatedSession; source: AuthSourceContext }>
+  input: Readonly<{ runId: string; answer: Answer; owner: { userId: string; ownerRef: string }; source: AuthSourceContext }>
 ): Promise<AnswerFloor | null> {
   if (input.answer.terminal !== "COMPONENTS_ONLY") return null;
   let floor: Readonly<{ verdictState: string; leadingNodeId: string; basisIncomplete: boolean | null }> | null;
@@ -232,8 +233,8 @@ async function readPublishableFloor(
     floor = await repository.readAnswerFloor({
       runId: input.runId,
       answerId: input.answer.answer_id,
-      userId: input.authenticated.userId,
-      ownerRef: input.authenticated.ownerRef
+      userId: input.owner.userId,
+      ownerRef: input.owner.ownerRef
     });
   } catch (error) {
     logFloorNotPublished(input.source.requestId, storyReadDiagnostic(error));
@@ -275,13 +276,13 @@ function logFloorNotPublished(requestId: string, diagnostic: string): void {
  */
 export async function readPublishableMapView(
   mapViews: MapViewReader,
-  input: Readonly<{ runId: string; answer: Answer; authenticated: AuthenticatedSession; source: AuthSourceContext }>
+  input: Readonly<{ runId: string; answer: Answer; owner: { userId: string; ownerRef: string }; source: AuthSourceContext }>
 ): Promise<DebateMapView | null> {
   try {
     return await mapViews.readMapView({
       runId: input.runId,
       nodeIds: answerNodeIds(input.answer),
-      ownership: { ownerRef: input.authenticated.ownerRef, legacyAskerId: null }
+      ownership: { ownerRef: input.owner.ownerRef, legacyAskerId: null }
     });
   } catch (error) {
     console.error(JSON.stringify(Object.freeze({
@@ -291,6 +292,43 @@ export async function readPublishableMapView(
     })));
     return null;
   }
+}
+
+export type PublicDebateBody = Omit<PublicDebate, "public_ref" | "author_pseudonym" | "published_at">;
+
+/** The same owner-scoped body is used for a published copy and a staff review snapshot. */
+export async function buildPublicDebateBody(input: Readonly<{
+  runId: string;
+  answer: Answer;
+  owner: { userId: string; ownerRef: string };
+  readers: { stories: PublicationStoryReader; repository: PostgresPublicationRepository; mapViews: MapViewReader };
+  source: AuthSourceContext;
+}>): Promise<PublicDebateBody> {
+  const storyShort = await readPublishableStory(input.readers.stories, input);
+  const language = await readPublishableLanguage(input.readers.repository, input);
+  const floor = await readPublishableFloor(input.readers.repository, input);
+  const mapView = await readPublishableMapView(input.readers.mapViews, input);
+  return PublicDebateSchema.omit({ public_ref: true, author_pseudonym: true, published_at: true }).parse({
+    question: input.answer.question_line,
+    answer: {
+      terminal: input.answer.terminal,
+      verdict: input.answer.verdict_state,
+      verdict_available: input.answer.verdict_state !== null,
+      confidence_band: input.answer.confidence_band,
+      summary_segments: input.answer.composed_text.map((segment) => ({ text: segment.text })),
+      badges: input.answer.badges,
+      residual_objections: input.answer.residual_objections,
+      reversal_point: input.answer.reversal_point,
+      as_of: input.answer.as_of,
+      nodes: input.answer.nodes.map(redactNodeForPublic),
+      edges: input.answer.edges.map(redactEdgeForPublic),
+      tree_included: true
+    },
+    ...(storyShort === null ? {} : { story_short: storyShort }),
+    ...(language === null ? {} : { language }),
+    ...(floor === null ? {} : { floor }),
+    ...(mapView === null ? {} : { map_view: mapView })
+  });
 }
 
 /**
@@ -514,35 +552,19 @@ export class PostgresPublicationApplication implements PublicationApplication {
       input.authenticated.ownerRef
     );
     if (pseudonym === null) return null;
-    const storyShort = await readPublishableStory(this.stories, input);
-    const language = await readPublishableLanguage(this.repository, input);
-    const floor = await readPublishableFloor(this.repository, input);
-    const mapView = await readPublishableMapView(this.mapViews, input);
+    const body = await buildPublicDebateBody({
+      runId: input.runId, answer: input.answer,
+      owner: { userId: input.authenticated.userId, ownerRef: input.authenticated.ownerRef },
+      readers: { stories: this.stories, repository: this.repository, mapViews: this.mapViews },
+      source: input.source
+    });
     const publicationRef = randomUUID();
     const occurredAt = this.clock();
     const publicDebate = PublicDebateSchema.parse({
       public_ref: publicationRef,
       author_pseudonym: pseudonym,
-      question: input.answer.question_line,
       published_at: occurredAt.toISOString(),
-      answer: {
-        terminal: input.answer.terminal,
-        verdict: input.answer.verdict_state,
-        verdict_available: input.answer.verdict_state !== null,
-        confidence_band: input.answer.confidence_band,
-        summary_segments: input.answer.composed_text.map((segment) => ({ text: segment.text })),
-        badges: input.answer.badges,
-        residual_objections: input.answer.residual_objections,
-        reversal_point: input.answer.reversal_point,
-        as_of: input.answer.as_of,
-        nodes: input.answer.nodes.map(redactNodeForPublic),
-        edges: input.answer.edges.map(redactEdgeForPublic),
-        tree_included: true
-      },
-      ...(storyShort === null ? {} : { story_short: storyShort }),
-      ...(language === null ? {} : { language }),
-      ...(floor === null ? {} : { floor }),
-      ...(mapView === null ? {} : { map_view: mapView })
+      ...body
     });
     return Object.freeze({ publicDebate, publicationRef, occurredAt, pseudonym });
   }
@@ -757,11 +779,16 @@ export class PostgresPublicationApplication implements PublicationApplication {
     });
   }
 
-  /** The snapshot run's release key, or null when none is wired, there is no such run, or the read fails (P5). */
+  /**
+   * The snapshot run's release key, or null when none is wired, there is no such run, or the read fails (P5).
+   * Row-level security (X10, merge of security fixes run 3): the run is the author's, another account than the public
+   * reader's, so the read runs in the X10 frame, on the runtime pool's cross-account target; there NV-31's router runs
+   * it on the shared lease's own connection (taken on that target), so the read still holds one connection.
+   */
   async #runReleaseKey(runId: string): Promise<string | null> {
     const releases = this.releases;
     if (releases === null) return null;
-    return Promise.resolve().then(() => releases.readRunReleaseKey(runId)).catch(() => null);
+    return Promise.resolve().then(() => crossAccount("X10", () => releases.readRunReleaseKey(runId))).catch(() => null);
   }
 
   async list(limit: number, offset: number): Promise<Readonly<{

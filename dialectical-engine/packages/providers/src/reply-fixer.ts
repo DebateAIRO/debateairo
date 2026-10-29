@@ -174,12 +174,26 @@ function setAt(root: unknown, path: Path, value: unknown): boolean {
   return true;
 }
 
+/** An empty registry: no schema carries an `id` in it, so `z.toJSONSchema` keeps the list itself at the root (no `$ref`). */
+const NO_SCHEMA_IDS = z.registry<Record<string, unknown>>();
+
+/**
+ * Whether a schema admits exactly one value, the empty list: a list (`z.array`) whose size limit is 0 (`.max(0)` or
+ * `.length(0)`) and that accepts []. A list that may hold an entry is never "only empty": what it would hold is not known.
+ *
+ * The limit is read through zod's public JSON Schema output (`maxItems`), not through zod's internals: zod 4.6 stopped
+ * copying a list's limit into the internal `_zod.bag` this used to read, so `.max(0)` silently stopped counting as pinned.
+ * `tests/unit/only-empty-list.test.ts` pins this answer for each form, so a future zod change fails loudly there.
+ */
+export function admitsOnlyTheEmptyList(schema: z.ZodType): boolean {
+  if (!(schema instanceof z.ZodArray) || !schema.safeParse([]).success) return false;
+  // Only the list's own limit is read; an element zod cannot write as JSON Schema (a date, a transform) is written as {}.
+  return z.toJSONSchema(schema, { metadata: NO_SCHEMA_IDS, unrepresentable: "any" }).maxItems === 0;
+}
+
 /** The one value a schema admits, when it admits exactly one: a list pinned to 0 entries, a one-value literal or enum, null. */
 function onlyValueOf(schema: z.ZodType): { readonly value: unknown } | null {
-  if (schema instanceof z.ZodArray) {
-    const bag = (schema as unknown as { _zod?: { bag?: { maximum?: unknown } } })._zod?.bag;
-    return bag?.maximum === 0 && schema.safeParse([]).success ? { value: [] } : null;
-  }
+  if (schema instanceof z.ZodArray) return admitsOnlyTheEmptyList(schema) ? { value: [] } : null;
   if (schema instanceof z.ZodLiteral) {
     const values = [...schema.values];
     return values.length === 1 ? { value: values[0] } : null;

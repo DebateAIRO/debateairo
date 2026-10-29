@@ -4,9 +4,10 @@ import {
   type AuditContextHasher,
   type CryptoEnvelope
 } from "@debateai/crypto";
-import type { SignUpAcceptanceRow } from "./legal-acceptance.js";
+import type { ItalyApprovalAcceptanceRow, SignUpAcceptanceRow } from "./legal-acceptance.js";
 import type { DeclaredRegion } from "@debateai/kernel";
 import { MAIL_LOCALE_SETTING } from "./mail-locale.js";
+import { crossAccount } from "./account-context.js";
 
 export interface AuthSourceContext {
   readonly ip: string;
@@ -50,6 +51,8 @@ export interface PendingAccountInput {
    * transaction. Absent only in test compositions that predate the acceptance record.
    */
   readonly acceptances?: ReadonlyArray<SignUpAcceptanceRow>;
+  /** Italy clause approval: written by identity.record_signup_italy_approval in the same transaction (migration 0125). */
+  readonly italyApproval?: ItalyApprovalAcceptanceRow;
 }
 
 export interface RegistrationAgeCheck {
@@ -129,6 +132,30 @@ export interface PreparedAuditContext {
 function versionedAuditDigest(value: string): string {
   if (!/^[0-9a-f]{64}$/.test(value)) throw new TypeError("AUDIT_CONTEXT_DIGEST_INVALID");
   return `argon2id-audit:v1:${value}`;
+}
+
+/**
+ * Italy clause approval S01 (R12): the ITALY_SPECIFIC_APPROVAL row, written by identity.record_signup_italy_approval
+ * (migration 0125) inside the caller's sign-up transaction, after the account and its three sign-up rows exist; the
+ * database copies the TERMS row's pair and time into it. Shared by the email (createPendingAccount) and social
+ * (PostgresSocialIdentityRepository.createAccount) adapters. No approval: nothing is written. An approval without the
+ * three rows is refused, and the throw rolls the account back with it.
+ */
+export async function recordSignupItalyApproval(
+  client: PoolClient,
+  userId: string,
+  input: Readonly<Pick<PendingAccountInput, "acceptances" | "italyApproval">>
+): Promise<void> {
+  const approval = input.italyApproval;
+  if (approval === undefined) return;
+  if (input.acceptances === undefined) throw new Error("ITALY_APPROVAL_WITHOUT_ACCEPTANCES");
+  await client.query("SELECT identity.record_signup_italy_approval($1::uuid,$2::jsonb)", [userId, JSON.stringify({
+    acceptance_id: approval.acceptanceId,
+    clauses: approval.clauses,
+    leg: approval.leg,
+    evidence_ciphertext: approval.evidenceCiphertext.toString("base64"),
+    key_id: approval.keyId
+  })]);
 }
 
 export class PostgresIdentityRepository {
@@ -290,6 +317,8 @@ export class PostgresIdentityRepository {
           row.user_id, input.declaredRegion.country, input.declaredRegion.usState
         ]);
       }
+      // Italy clause approval S01 (R12): the approval row, in this transaction, after the account's three rows.
+      await recordSignupItalyApproval(client, row.user_id, input);
       await beforeCommit();
       return Object.freeze({
         status: "created" as const,
@@ -305,14 +334,16 @@ export class PostgresIdentityRepository {
     readonly auditToken: string;
     readonly addressKey: string;
   } | null> {
-    const result = await this.pool.query<{ audit_token: string; address_key: string }>(`
-      SELECT audit_token,encode(email_blind_index,'hex') AS address_key
-      FROM identity."user" WHERE email_blind_index=$1
-    `, [emailBlindIndex]);
-    const row = result.rows[0];
-    return row === undefined ? null : Object.freeze({
-      auditToken: row.audit_token,
-      addressKey: row.address_key
+    return crossAccount("X18b", async () => {
+      const result = await this.pool.query<{ audit_token: string; address_key: string }>(`
+        SELECT audit_token,encode(email_blind_index,'hex') AS address_key
+        FROM identity."user" WHERE email_blind_index=$1
+      `, [emailBlindIndex]);
+      const row = result.rows[0];
+      return row === undefined ? null : Object.freeze({
+        auditToken: row.audit_token,
+        addressKey: row.address_key
+      });
     });
   }
 
@@ -322,10 +353,12 @@ export class PostgresIdentityRepository {
    * (pending_verification, pending_mfa, suspended, deleted, and 0077's age_frozen) answers null.
    */
   async ownerRefByEmailBlindIndex(emailBlindIndex: Buffer): Promise<string | null> {
-    const result = await this.pool.query<{ owner_ref: string }>(
-      `SELECT owner_ref FROM identity."user" WHERE email_blind_index=$1 AND state='active'`, [emailBlindIndex]
-    );
-    return result.rows[0]?.owner_ref ?? null;
+    return crossAccount("X18c", async () => {
+      const result = await this.pool.query<{ owner_ref: string }>(
+        `SELECT owner_ref FROM identity."user" WHERE email_blind_index=$1 AND state='active'`, [emailBlindIndex]
+      );
+      return result.rows[0]?.owner_ref ?? null;
+    });
   }
 
   async findAuditIdentityByVerificationHash(tokenHash: string): Promise<{
@@ -416,7 +449,7 @@ export class PostgresIdentityRepository {
   }
 
   /**
-   * NV-14 (0125): the same consume, which on every valid consume also writes the token holder's password hash and, on
+   * NV-14 (0131): the same consume, which on every valid consume also writes the token holder's password hash and, on
    * the pending_verification transition, deletes the account's provider links, in this one transaction.
    */
   async consumeVerificationSetPassword(input: {
@@ -577,20 +610,22 @@ export class PostgresIdentityRepository {
     userId: string;
     pseudonym: string;
   }> | null> {
-    const result = await this.pool.query<{ user_id: string; pseudonym: string }>(`
-      SELECT u.user_id,u.pseudonym
-      FROM identity.channel_binding binding
-      JOIN identity."user" u ON u.user_id=binding.user_id
-      WHERE binding.verification_token_hash=$1
-        AND binding.verification_consumed_at IS NOT NULL
-        AND binding.verification_expires_at >= statement_timestamp()
-        AND binding.channel_type='email'
-        AND u.state='pending_mfa'
-    `, [enrollmentTokenHash]);
-    const row = result.rows[0];
-    return row === undefined ? null : Object.freeze({
-      userId: row.user_id,
-      pseudonym: row.pseudonym
+    return crossAccount("X18d", async () => {
+      const result = await this.pool.query<{ user_id: string; pseudonym: string }>(`
+        SELECT u.user_id,u.pseudonym
+        FROM identity.channel_binding binding
+        JOIN identity."user" u ON u.user_id=binding.user_id
+        WHERE binding.verification_token_hash=$1
+          AND binding.verification_consumed_at IS NOT NULL
+          AND binding.verification_expires_at >= statement_timestamp()
+          AND binding.channel_type='email'
+          AND u.state='pending_mfa'
+      `, [enrollmentTokenHash]);
+      const row = result.rows[0];
+      return row === undefined ? null : Object.freeze({
+        userId: row.user_id,
+        pseudonym: row.pseudonym
+      });
     });
   }
 
@@ -620,39 +655,41 @@ export class PostgresIdentityRepository {
   }
 
   async readTotpEnrollment(enrollmentTokenHash: string): Promise<TotpEnrollmentRecord | null> {
-    const result = await this.pool.query<{
-      user_id: string;
-      pseudonym: string;
-      mfa_factor_id: string;
-      secret_ciphertext: CryptoEnvelope;
-      last_accepted_step: string | number | null;
-      factor_state: TotpEnrollmentRecord["factorState"];
-    }>(`
-      SELECT u.user_id,u.pseudonym,factor.mfa_factor_id,factor.secret_ciphertext,
-        factor.last_accepted_step,factor.state AS factor_state
-      FROM identity.channel_binding binding
-      JOIN identity."user" u ON u.user_id=binding.user_id
-      JOIN LATERAL (
-        SELECT mfa_factor_id,secret_ciphertext,last_accepted_step,state,created_at
-        FROM identity.mfa_factor
-        WHERE user_id=u.user_id AND factor_type='totp'
-          AND state IN ('pending','verified_pending_recovery','recovery_pending')
-        ORDER BY created_at DESC,mfa_factor_id DESC LIMIT 1
-      ) factor ON true
-      WHERE binding.verification_token_hash=$1
-        AND binding.verification_consumed_at IS NOT NULL
-        AND binding.verification_expires_at >= statement_timestamp()
-        AND binding.channel_type='email'
-        AND u.state='pending_mfa'
-    `, [enrollmentTokenHash]);
-    const row = result.rows[0];
-    return row === undefined ? null : Object.freeze({
-      userId: row.user_id,
-      pseudonym: row.pseudonym,
-      factorId: row.mfa_factor_id,
-      secretCiphertext: row.secret_ciphertext,
-      lastAcceptedStep: row.last_accepted_step === null ? null : Number(row.last_accepted_step),
-      factorState: row.factor_state
+    return crossAccount("X18e", async () => {
+      const result = await this.pool.query<{
+        user_id: string;
+        pseudonym: string;
+        mfa_factor_id: string;
+        secret_ciphertext: CryptoEnvelope;
+        last_accepted_step: string | number | null;
+        factor_state: TotpEnrollmentRecord["factorState"];
+      }>(`
+        SELECT u.user_id,u.pseudonym,factor.mfa_factor_id,factor.secret_ciphertext,
+          factor.last_accepted_step,factor.state AS factor_state
+        FROM identity.channel_binding binding
+        JOIN identity."user" u ON u.user_id=binding.user_id
+        JOIN LATERAL (
+          SELECT mfa_factor_id,secret_ciphertext,last_accepted_step,state,created_at
+          FROM identity.mfa_factor
+          WHERE user_id=u.user_id AND factor_type='totp'
+            AND state IN ('pending','verified_pending_recovery','recovery_pending')
+          ORDER BY created_at DESC,mfa_factor_id DESC LIMIT 1
+        ) factor ON true
+        WHERE binding.verification_token_hash=$1
+          AND binding.verification_consumed_at IS NOT NULL
+          AND binding.verification_expires_at >= statement_timestamp()
+          AND binding.channel_type='email'
+          AND u.state='pending_mfa'
+      `, [enrollmentTokenHash]);
+      const row = result.rows[0];
+      return row === undefined ? null : Object.freeze({
+        userId: row.user_id,
+        pseudonym: row.pseudonym,
+        factorId: row.mfa_factor_id,
+        secretCiphertext: row.secret_ciphertext,
+        lastAcceptedStep: row.last_accepted_step === null ? null : Number(row.last_accepted_step),
+        factorState: row.factor_state
+      });
     });
   }
 
@@ -726,30 +763,32 @@ export class PostgresIdentityRepository {
     enrollmentTokenHash: string,
     slot: number
   ): Promise<RecoveryCodeRecord | null> {
-    const result = await this.pool.query<{
-      user_id: string;
-      recovery_code_id: string;
-      code_hash: string;
-      code_slot: number;
-    }>(`
-      SELECT u.user_id,code.recovery_code_id,code.code_hash,code.code_slot
-      FROM identity.channel_binding binding
-      JOIN identity."user" u ON u.user_id=binding.user_id
-      JOIN identity.mfa_factor factor ON factor.user_id=u.user_id AND factor.factor_type='totp'
-      JOIN identity.recovery_code code ON code.user_id=u.user_id
-      WHERE binding.verification_token_hash=$1 AND code.code_slot=$2
-        AND binding.verification_consumed_at IS NOT NULL
-        AND binding.verification_expires_at >= statement_timestamp()
-        AND binding.channel_type='email'
-        AND u.state='pending_mfa' AND factor.state='recovery_pending'
-        AND code.consumed_at IS NULL AND code.revoked_at IS NULL
-    `, [enrollmentTokenHash, slot]);
-    const row = result.rows[0];
-    return row === undefined ? null : Object.freeze({
-      userId: row.user_id,
-      recoveryCodeId: row.recovery_code_id,
-      codeHash: row.code_hash,
-      codeSlot: Number(row.code_slot)
+    return crossAccount("X18f", async () => {
+      const result = await this.pool.query<{
+        user_id: string;
+        recovery_code_id: string;
+        code_hash: string;
+        code_slot: number;
+      }>(`
+        SELECT u.user_id,code.recovery_code_id,code.code_hash,code.code_slot
+        FROM identity.channel_binding binding
+        JOIN identity."user" u ON u.user_id=binding.user_id
+        JOIN identity.mfa_factor factor ON factor.user_id=u.user_id AND factor.factor_type='totp'
+        JOIN identity.recovery_code code ON code.user_id=u.user_id
+        WHERE binding.verification_token_hash=$1 AND code.code_slot=$2
+          AND binding.verification_consumed_at IS NOT NULL
+          AND binding.verification_expires_at >= statement_timestamp()
+          AND binding.channel_type='email'
+          AND u.state='pending_mfa' AND factor.state='recovery_pending'
+          AND code.consumed_at IS NULL AND code.revoked_at IS NULL
+      `, [enrollmentTokenHash, slot]);
+      const row = result.rows[0];
+      return row === undefined ? null : Object.freeze({
+        userId: row.user_id,
+        recoveryCodeId: row.recovery_code_id,
+        codeHash: row.code_hash,
+        codeSlot: Number(row.code_slot)
+      });
     });
   }
 
@@ -773,25 +812,27 @@ export class PostgresIdentityRepository {
   }
 
   async readRecoveryCodeForUse(userId: string, slot: number): Promise<RecoveryCodeRecord | null> {
-    const result = await this.pool.query<{
-      recovery_code_id: string;
-      code_hash: string;
-      code_slot: number;
-    }>(`
-      SELECT code.recovery_code_id,code.code_hash,code.code_slot
-      FROM identity.recovery_code code
-      JOIN identity."user" u ON u.user_id=code.user_id AND u.state='active'
-      JOIN identity.mfa_factor factor
-        ON factor.user_id=u.user_id AND factor.factor_type='totp' AND factor.state='active'
-      WHERE code.user_id=$1 AND code.code_slot=$2
-        AND code.consumed_at IS NULL AND code.revoked_at IS NULL
-    `, [userId, slot]);
-    const row = result.rows[0];
-    return row === undefined ? null : Object.freeze({
-      userId,
-      recoveryCodeId: row.recovery_code_id,
-      codeHash: row.code_hash,
-      codeSlot: Number(row.code_slot)
+    return crossAccount("X18g", async () => {
+      const result = await this.pool.query<{
+        recovery_code_id: string;
+        code_hash: string;
+        code_slot: number;
+      }>(`
+        SELECT code.recovery_code_id,code.code_hash,code.code_slot
+        FROM identity.recovery_code code
+        JOIN identity."user" u ON u.user_id=code.user_id AND u.state='active'
+        JOIN identity.mfa_factor factor
+          ON factor.user_id=u.user_id AND factor.factor_type='totp' AND factor.state='active'
+        WHERE code.user_id=$1 AND code.code_slot=$2
+          AND code.consumed_at IS NULL AND code.revoked_at IS NULL
+      `, [userId, slot]);
+      const row = result.rows[0];
+      return row === undefined ? null : Object.freeze({
+        userId,
+        recoveryCodeId: row.recovery_code_id,
+        codeHash: row.code_hash,
+        codeSlot: Number(row.code_slot)
+      });
     });
   }
 

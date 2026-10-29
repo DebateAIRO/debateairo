@@ -6,7 +6,7 @@ import { LEGAL_BROWSER_STORAGE, LEGAL_COOKIES, type LegalInventoryItem } from ".
 /**
  * S01 PP13 side of R18, and R12-R13 (SPEC-v2; PLAN "PP13 shape", D-34, D-38). Every locale's Privacy Policy §13 —
  * the lines between its `## 13.` and `## 14.` headings in `apps/ui/legal/<loc>/privacy-policy.md` — is six blocks:
- * an intro paragraph, one markdown table of the twenty items of record, the paragraph on the language of queued
+ * an intro paragraph, one markdown table of the twenty-one items of record, the paragraph on the language of queued
  * emails (SPEC-v3 R-37, block index 2), and three paragraphs. The table names exactly
  * the items `/cookies` lists (LISTED = LEGAL_COOKIES then LEGAL_BROWSER_STORAGE), and each row's kind and lifetime cells
  * are that locale's own `/cookies` strings (`apps/ui/messages/<loc>/legal.json`), character for character.
@@ -21,7 +21,9 @@ const LOCALES = readdirSync(LEGAL_DIR, { withFileTypes: true })
   .sort();
 
 /** The ASCII digit runs each lifetime cell carries, in LISTED order (SPEC-v2 R12 iv). */
-const DIGIT_RUNS: readonly (readonly string[])[] = [["14"], ["14"], ["30"], ["1"], ["8", "15"], ["8", "15"], ["30"], ["30"], ["299"], ["299"], ["5"], ["5"], ["5"], [], [], [], [], ["15"], [], []];
+// TEXT-SF-S03-p4 (D-S05-67, S05-L8): index 17 is the tab-kept country answer, `debateai.support.offered.v1`, whose
+// storage key S05's code adds to LEGAL_BROWSER_STORAGE right after debateai.support.conversation.v2.
+const DIGIT_RUNS: readonly (readonly string[])[] = [["14"], ["14"], ["30"], ["1"], ["8", "15"], ["8", "15"], ["30"], ["30"], ["299"], ["299"], ["5"], ["5"], ["5"], [], [], [], [], [], ["15"], [], []];
 
 type Block = { kind: "p" | "table"; text: string };
 
@@ -86,7 +88,7 @@ function catalog(locale: string): Record<string, unknown> {
   return JSON.parse(readFileSync(join(ROOT, "apps/ui/messages", locale, "legal.json"), "utf8")) as Record<string, unknown>;
 }
 
-describe("Privacy Policy §13 — the twenty actual stored items in every locale (R12, R13, R18)", () => {
+describe("Privacy Policy §13 — the twenty-one actual stored items in every locale (R12, R13, R18)", () => {
   it("every locale's §13 table names exactly the LISTED items, both ways", () => {
     expect(LOCALES).toHaveLength(35);
     expect(compareNames(LISTED.map(({ name }) => name))).toEqual([]);
@@ -99,7 +101,7 @@ describe("Privacy Policy §13 — the twenty actual stored items in every locale
     for (const locale of LOCALES) {
       const line = report.find((entry) => entry.startsWith(`${locale}: `));
       expect(line, `${locale} not reported`).toBeDefined();
-      expect(line).toContain(`in §13 but not listed [${removed}]`);
+      expect((line ?? "").split("in §13 but not listed [")[1]?.split("]")[0]?.split(", ") ?? []).toContain(removed);
     }
   });
 
@@ -139,7 +141,7 @@ describe("Privacy Policy §13 — the twenty actual stored items in every locale
     const found = blocks(section);
     expect(found.map(({ kind }) => kind)).toEqual(["p", "table", "p", "p", "p", "p"]);
     const phrases: Record<number, readonly string[]> = {
-      0: ["20 items", "13 cookies", "7 entries", "strictly necessary", "only by Dialectical Engine", "Cookie Policy", "dezbatere.ro/cookies"],
+      0: ["21 items", "13 cookies", "8 entries", "strictly necessary", "only by Dialectical Engine", "Cookie Policy", "dezbatere.ro/cookies"],
       2: ["keeps the language you had selected until we send it"],
       3: ["no other party", "across websites"],
       4: ["Do Not Track", "with or without"],
@@ -154,15 +156,36 @@ describe("Privacy Policy §13 — the twenty actual stored items in every locale
     }
   });
 
-  it("the English 3.5 summary names the 3.5 changes and no 3.4-only change", () => {
+  it("the English 3.8 summary names the 3.8 changes and none of origin/dev's 3.5 to 3.7 changes", () => {
     const line = /^This policy was last updated on .*$/m.exec(readFileSync(join(LEGAL_DIR, "en", "privacy-policy.md"), "utf8"))?.[0] ?? "";
-    const summary = line.split("Version 3.5 replaced version 3.4:")[1] ?? "";
-    expect(summary, "the version 3.5 summary follows the version line").not.toBe("");
-    for (const phrase of ["debateai.locale", "queue"]) {
-      expect(summary, `the 3.5 summary still names the 3.4 change "${phrase}"`).not.toContain(phrase);
+    const summary = line.split("Version 3.8 replaced version 3.7:")[1]?.split("Version 3.7 replaced")[0] ?? "";
+    expect(summary, "the version 3.8 summary follows the version line").not.toBe("");
+    // origin/dev's 3.5 (card payments), 3.6 (Italy) and 3.7 (Perplexity) come after it on the line; 3.8 is synthesis-flag's.
+    for (const phrase of ["card", "payment provider", "debateai.locale", "queue", "Perplexity", "Italy"]) {
+      expect(summary, `the 3.8 summary names the earlier change "${phrase}"`).not.toContain(phrase);
     }
-    for (const keyword of ["section 2", "card", "section 7", "payment provider"]) {
-      expect(summary, `the 3.5 summary does not name the 3.5 change "${keyword}"`).toContain(keyword);
+    for (const keyword of ["question", "synthesis", "approval", "support chat", "section 7", "section 10"]) {
+      expect(summary, `the 3.8 summary does not name the 3.8 change "${keyword}"`).toContain(keyword);
+    }
+  });
+
+  it("the English 3.6 summary names the 3.6 change and no 3.5-only change", () => {
+    const line = /^This policy was last updated on .*$/m.exec(readFileSync(join(LEGAL_DIR, "en", "privacy-policy.md"), "utf8"))?.[0] ?? "";
+    const summary = line.split("Version 3.6 replaced version 3.5:")[1] ?? "";
+    expect(summary, "the version 3.6 summary follows the version line").not.toBe("");
+    for (const phrase of ["card", "section 7", "payment provider"]) {
+      expect(summary, `the 3.6 summary still names the 3.5 change "${phrase}"`).not.toContain(phrase);
+    }
+    for (const keyword of ["section 2", "IP country", "Region", "Italy"]) {
+      expect(summary, `the 3.6 summary does not name the 3.6 change "${keyword}"`).toContain(keyword);
+    }
+  });
+
+  it("the English 3.7 summary names the Perplexity change, before the 3.6 summary", () => {
+    const line = /^This policy was last updated on .*$/m.exec(readFileSync(join(LEGAL_DIR, "en", "privacy-policy.md"), "utf8"))?.[0] ?? "";
+    const latest = line.split("Version 3.7 replaced version 3.6:")[1]?.split("Version 3.6 replaced")[0] ?? "";
+    for (const keyword of ["section 5", "Perplexity"]) {
+      expect(latest, `the 3.7 summary does not name the 3.7 change "${keyword}"`).toContain(keyword);
     }
   });
 

@@ -19,10 +19,18 @@ import {
   type Argon2Executor,
   type UserDekStore
 } from "@debateai/crypto";
-import { AGE_RULE_VERSION, MIN_AGE, isDeclaredRegion, isMailAddress, type DeclaredRegion } from "@debateai/kernel";
+import {
+  AGE_RULE_VERSION,
+  MIN_AGE,
+  isDeclaredRegion,
+  isItalyApprovalLeg,
+  isMailAddress,
+  type DeclaredRegion,
+  type ItalyApprovalLeg
+} from "@debateai/kernel";
 import type { RegisterLegalDocuments } from "@debateai/contract";
 import { LocaleCodeSchema } from "@debateai/contract/locale";
-import { resolveSignUpDocuments, signUpAcceptanceRows, type SignUpDocuments } from "./legal.js";
+import { italyApprovalRow, resolveSignUpDocuments, signUpAcceptanceRows, type SignUpDocuments } from "./legal.js";
 import { normalizeManualPhone } from "./phone-profile.js";
 import { MailDeliveryError, type MailSender } from "./mail-channel.js";
 import { mailDomainRefused, type MailDomainCheck } from "./mail-domain-check.js";
@@ -62,7 +70,15 @@ export type VerificationMailSource = AuthSourceContext & Readonly<{
   /** Validated UI language/time zone for delivery only; carries no identity authority. */
   mailDisplay?: Readonly<{ locale: string; timeZone: string | null }>;
 }>;
-export type RegistrationSource = VerificationMailSource & Readonly<{ legal?: RegisterLegalDocuments; region?: DeclaredRegion }>;
+export type RegistrationSource = VerificationMailSource & Readonly<{
+  legal?: RegisterLegalDocuments;
+  region?: DeclaredRegion;
+  /**
+   * Italy clause approval (S01): the leg the register preHandler decided, present only when one fired and the request
+   * carried the approval. A server decision, never read from the body.
+   */
+  italyLeg?: ItalyApprovalLeg;
+}>;
 
 export type SocialRegisterInput = Omit<RegisterInput, "password" | "recoveryEmail">;
 export type SocialRegistrationResult = typeof REGISTRATION_PUBLIC_RESPONSE | Readonly<{status:"mfa_required";enrollment_token:string;expires_at:string}>;
@@ -513,6 +529,7 @@ interface PendingRegistration {
   readonly countryCode: string | null;
   readonly documents: SignUpDocuments | null;
   readonly region: DeclaredRegion | null;
+  readonly italyLeg: ItalyApprovalLeg | null;
   readonly source: VerificationMailSource;
 }
 
@@ -740,7 +757,9 @@ export class RegistrationService implements RegistrationApplication {
     const source = sourceContext(rawSource);
     if (rawSource.region !== undefined && !isDeclaredRegion(rawSource.region)) throw new AuthFlowError("AUTH_INPUT_INVALID");
     const region = rawSource.region ?? null;
-    return { phone, countryCode, documents, source, region };
+    if (rawSource.italyLeg !== undefined && !isItalyApprovalLeg(rawSource.italyLeg)) throw new AuthFlowError("AUTH_INPUT_INVALID");
+    const italyLeg = rawSource.italyLeg ?? null;
+    return { phone, countryCode, documents, source, region, italyLeg };
   }
 
   async admitSource(request: AuthSourceAdmissionRequest): Promise<AuthSourceAdmission> {
@@ -1650,6 +1669,14 @@ export class RegistrationService implements RegistrationApplication {
             documents: input.documents,
             source: input.source
           });
+        // Italy clause approval (S01): its row rides beside the three sign-up rows, under the same records key.
+        const italyApproval = input.italyLeg === null || acceptances === undefined
+          ? undefined
+          : italyApprovalRow({
+            recordsKey: this.dependencies.legalAcceptance!.recordsKey,
+            leg: input.italyLeg,
+            source: input.source
+          });
         const accountInput = {
           userId,
           emailBlindIndex: input.emailBlindIndex,
@@ -1673,6 +1700,7 @@ export class RegistrationService implements RegistrationApplication {
           occurredAt: input.requestedAt,
           source: input.source,
           ...(acceptances === undefined ? {} : { acceptances }),
+          ...(italyApproval === undefined ? {} : { italyApproval }),
           ...(input.region === null ? {} : { declaredRegion: input.region })
         };
         const created = input.social === undefined
@@ -1783,7 +1811,7 @@ export class RegistrationService implements RegistrationApplication {
       const granted = admission === undefined ? undefined : this.takeSourceAdmission(admission);
       releaseAdmission = granted?.releaseStructural;
       try {
-        const { phone, countryCode, documents, source, region } = this.validateRegistration(input, rawSource, social !== undefined);
+        const { phone, countryCode, documents, source, region, italyLeg } = this.validateRegistration(input, rawSource, social !== undefined);
         if (admission !== undefined) this.assertSourceAdmission("register", source, granted);
         // THE ADMISSION GATE. After the input and source-context validation,
         // which must never consume budget, and before the first repository
@@ -1862,7 +1890,7 @@ export class RegistrationService implements RegistrationApplication {
         mailDispatchActivatedAt = activationReceipt.activatedAt;
         try {
           pendingPostwork = await this.provisionPendingAccount(Object.freeze({
-            email, recoveryEmail, phone, emailBlindIndex, passwordHash, requestedAt, countryCode, source, documents, region, ...(social===undefined?{}:{social})
+            email, recoveryEmail, phone, emailBlindIndex, passwordHash, requestedAt, countryCode, source, documents, region, italyLeg, ...(social===undefined?{}:{social})
           }));
           const preTransportWorkMs = performance.now() - mailDispatchActivatedAt;
           if (preTransportWorkMs

@@ -48,7 +48,7 @@ async function complete(a: Awaited<ReturnType<typeof account>>, step?: number, e
 async function startCurrentRecovery(a:Awaited<ReturnType<typeof account>>,token=hash()){
  const client=await currentRecovery.connect();try{await client.query('BEGIN');await client.query('SELECT identity.begin_runtime_audit_attempt()');const result=(await client.query('SELECT identity.start_consumer_recovery($1,$2,$3) value',[a.index,token,source])).rows[0].value;await client.query('COMMIT');return result;}catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
 }
-// NV-17: the new release's guarded entry points (0125). start/open/complete above stay the record of the 0104/0108 path.
+// NV-17: the new release's guarded entry points (0131). start/open/complete above stay the record of the 0104/0108 path.
 type Reset = Awaited<ReturnType<typeof account>>;
 async function startGuarded(a: Reset, from: typeof source = source) {
   return (await withMailLocale(db.pool, 'en', (c) => c.query(`SELECT identity.password_reset_start_guarded($1,$2,$3,$4,$5,$6,$7,$8,$9) AS outcome`, [a.index, a.id, [a.channel, a.backup].sort(), box(a.id), a.link, a.cancel, JSON.stringify([a.channel, a.backup].sort().map(channelId => ({ channelId, envelope: box(a.id), ...(channelId === a.channel ? { proofEnvelope: box(a.id) } : {}) }))), from, 3]))).rows[0].outcome;

@@ -89,20 +89,12 @@ describe("SUP-01 support control CLIs", () => {
     expect(published).toEqual([]);
   });
 
-  it("combines register status and support-repository counts without leaking credentials or identities", async () => {
+  it("combines register status and knowledge counts without leaking credentials or identities", async () => {
     const support: SupportStatusRepositoryPort = {
       readStatus: async () => ({
-        callsToday: 7,
-        openSessions: 3,
-        newCases: 2,
         kbVersion: "a".repeat(64),
         kbShipped: 12,
-        kbIgnored: 1,
-        relayState: "AVAILABLE",
-        deflection7Days: null,
-        deflection30Days: 0.625,
-        ratingResolution7Days: 0.5,
-        ratingResolution30Days: null
+        kbIgnored: 1
       })
     };
     const output = await renderSupportStatus({
@@ -112,18 +104,9 @@ describe("SUP-01 support control CLIs", () => {
     expect(output).toContain("REGISTER_VERSION: 4");
     expect(output).toContain("support register version: 9007199254740992");
     expect(output).toContain("support_enabled: true (deployment:test)");
-    expect(output).toContain("calls today: 7");
     expect(output).toContain(`kb_version: ${"a".repeat(64)}`);
     expect(output).toContain("kb loaded: 12 shipped, 1 ignored");
-    expect(output).toContain("relay: available");
-    expect(output).toContain("deflection last 7 days: UNVERIFIED");
-    expect(output).toContain("deflection last 30 days: 62.5%");
-    expect(output).toContain("rating resolution last 7 days: 50.0%");
-    expect(output).toContain("rating resolution last 30 days: UNVERIFIED");
-    expect(output).toContain("retention: unavailable — support register not initialized");
-    expect(output).toContain(
-      "erasures: account erasure shreds the account's support keys before it completes (V-26); an account erased before that release needs pnpm support:shred --owner <owner_ref> --yes once"
-    );
+    expect(output).toContain("support conversations: none kept — the support chat keeps no conversation");
     expect(output).not.toMatch(/(?:databaseUrl|password|token|identity|transcript)/iu);
   });
 });

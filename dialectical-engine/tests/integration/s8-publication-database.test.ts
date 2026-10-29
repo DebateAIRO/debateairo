@@ -33,6 +33,9 @@ import {
   prepareLeasedContentEncryptionForRun,
   routeLeaseBodyQueries,
   withRunContentLease,
+  crossAccount,
+  requestScopeActive,
+  runInRequestScope,
   type LoginIdentityRecord
 } from "@debateai/db";
 import {
@@ -44,6 +47,7 @@ import {
 import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { apiTestPools, createSystemTwin, inAccountRequest, provisionRlsLogins, type RlsLogins } from "../support/rls-logins.js";
 import { PostgresPublicationApplication } from "../../apps/api/src/publications.js";
 import { MadeByNewerReleaseError } from "../../apps/api/src/made-by-newer-release.js";
 import { MemoryRepository } from "@debateai/memory";
@@ -73,12 +77,59 @@ type Identity = Readonly<{
 }>;
 
 let database: TestDatabase;
+/** The dev logins apiTestPools provisioned (login mode only), ended after the suite. */
+let apiLogins: RlsLogins | undefined;
 let repository: PostgresPublicationRepository;
+let cleanupRepository: PostgresPublicationRepository;
 let publicationCipher: PublicationCipher;
 let contentCipher: ContentCipher;
 let runKeys: MemoryRunContentKeyStore;
 const userDeks = new Map<string, Buffer>();
 const userIdsByOwnerRef = new Map<string, string>();
+/** Each createIdentity session's raw token, by session id and by the account's user id (PRD-N2). */
+const sessionTokensBySession = new Map<string, string>();
+const sessionTokensByUser = new Map<string, string>();
+
+/**
+ * The credential of the request a call stands for: the raw token of the session the call names (`sessionId`, or
+ * `session.session_id`), else the token of the account it names (`userId`, or a user id passed as a plain argument —
+ * the account a session id the file forged stands for); null when the call names no account of this file: a public
+ * read, served inside an anonymous request.
+ */
+function requestCredentialOf(args: readonly unknown[]): string | null {
+  for (const arg of args) {
+    if (typeof arg === "string" && sessionTokensByUser.has(arg)) return sessionTokensByUser.get(arg)!;
+    if (typeof arg !== "object" || arg === null) continue;
+    const named = arg as Readonly<{ sessionId?: unknown; session?: Readonly<{ session_id?: unknown }>; userId?: unknown }>;
+    for (const sessionId of [named.sessionId, named.session?.session_id]) {
+      if (typeof sessionId === "string" && sessionTokensBySession.has(sessionId)) return sessionTokensBySession.get(sessionId)!;
+    }
+    if (typeof named.userId === "string" && sessionTokensByUser.has(named.userId)) return sessionTokensByUser.get(named.userId)!;
+  }
+  return null;
+}
+
+/**
+ * Row-level security S01, PRD-N2 (t_283643c4): the product calls the publication repository and application on the
+ * runtime pool inside a request — publish, unpublish, the grant preflight and the key provision inside the publisher's
+ * own request (POST /v1/runs/{id}/publish, …/unpublish), the public reads inside an anonymous one (GET
+ * /v1/public/debates…). So each method the file calls on them runs inside a request scope carrying the credential
+ * `requestCredentialOf` names. In login mode the runtime pool then sends the call on its own T1 login with that
+ * account's context, not to its system target. A call made while a scope is active (a repository call the application
+ * makes inside a request) keeps that scope. In superuser mode the pool has no target and the scope changes nothing.
+ */
+function asRequests<T extends object>(target: T): T {
+  return new Proxy(target, {
+    get(object, property, receiver) {
+      const value = Reflect.get(object, property, receiver) as unknown;
+      if (typeof value !== "function") return value;
+      const method = (value as (...args: unknown[]) => unknown).bind(object);
+      return (...args: unknown[]) => requestScopeActive()
+        ? method(...args)
+        : inAccountRequest(requestCredentialOf(args), async () => method(...args));
+    }
+  });
+}
 
 const users: ReadableUserDekStore = Object.freeze({
   async store(userId: string, dek: Uint8Array): Promise<void> {
@@ -191,7 +242,11 @@ async function createIdentity(label: string): Promise<Identity> {
     ) VALUES ($1,$2,'totp','{}'::jsonb,NULL,NULL,'active',now(),now(),10)
   `, [factorId, userId]);
   const sessionId = randomUUID();
-  const sessionTokenHash = `sha256:${randomBytes(32).toString("hex")}`;
+  // PRD-N2: a real raw token behind the stored hash, so a request scope can carry this session's credential.
+  const sessionToken = randomBytes(32).toString("base64url");
+  const sessionTokenHash = hashToken("session", sessionToken);
+  sessionTokensBySession.set(sessionId, sessionToken);
+  sessionTokensByUser.set(userId, sessionToken);
   const csrfTokenHash = `sha256:${randomBytes(32).toString("hex")}`;
   const now = new Date();
   await database.pool.query(`
@@ -339,13 +394,27 @@ beforeAll(async () => {
   );
   contentCipher = new ContentCipher(runKeys);
   configureContentEncryption(database.pool, contentCipher);
-  repository = new PostgresPublicationRepository(database.pool, fakeAuditHasher);
+  // Row-level security S01, R21 (PLAN S5.2): the publication repository the API's publication routes use sits on the
+  // runtime pool, as apps/api/src/main.ts builds it. In login mode that pool is a login pool of its own and carries the
+  // same content cipher; in superuser mode it is database.pool. Seeding stays on database.pool.
+  const pools = await apiTestPools(database, import.meta.url);
+  if (pools.runtime !== database.pool) {
+    apiLogins = await provisionRlsLogins(database);
+    configureContentEncryption(pools.runtime, contentCipher);
+  }
+  repository = asRequests(new PostgresPublicationRepository(pools.runtime, fakeAuditHasher));
+  // main.ts hands PostgresPublicationApplication a second repository on publicationCleanupPool for the key cleanups
+  // (claim/complete key cleanup and key provision cleanup); the file's direct cleanup calls use it too.
+  cleanupRepository = new PostgresPublicationRepository(pools.publicationCleanup, fakeAuditHasher);
   publicationCipher = new PublicationCipher(
     new MemoryPublicationKeyStore(loadKek(Buffer.alloc(32, 0xc8)))
   );
 }, 120_000);
 
-afterAll(async () => database?.stop());
+afterAll(async () => {
+  await apiLogins?.end();
+  await database?.stop();
+});
 
 describe("S8 publication on real PostgreSQL", () => {
   it("evaluates three current public snapshots after account erasure without private keys", async () => {
@@ -665,7 +734,7 @@ describe("S8 publication on real PostgreSQL", () => {
       grantTokenHash:hashToken("step-up-grant", unpublishGrant),occurredAt:unpublishedAt,source
     })).resolves.toBe(evaluatorWins.publicationRef);
     const cleanup = new PostgresPublicationApplication(
-      repository,publicationCipher
+      repository,publicationCipher,undefined,cleanupRepository
     ).reconcileKeyCleanup();
     await expectStillPending(cleanup);
     expect(await publicationCipher.exists(evaluatorWins.publicationRef)).toBe(true);
@@ -687,7 +756,7 @@ describe("S8 publication on real PostgreSQL", () => {
       grantTokenHash:hashToken("step-up-grant", cleanupWinsGrant),occurredAt:cleanupWinsAt,source
     })).resolves.toBe(cleanupWins.publicationRef);
     await expect(new PostgresPublicationApplication(
-      repository,publicationCipher
+      repository,publicationCipher,undefined,cleanupRepository
     ).reconcileKeyCleanup()).resolves.toBe(1);
     let decrypted = false;
     await expect(consumer.withPublicSampleLease({
@@ -761,7 +830,7 @@ describe("S8 publication on real PostgreSQL", () => {
       `,[pid])).rows[0]?.held).toBe(true);
 
       const cleanup=new PostgresPublicationApplication(
-        repository,publicationCipher
+        repository,publicationCipher,undefined,cleanupRepository
       ).reconcileKeyCleanup();
       await expectStillPending(cleanup);
       expect(await publicationCipher.exists(publicationRef)).toBe(true);
@@ -775,7 +844,7 @@ describe("S8 publication on real PostgreSQL", () => {
       expect((await database.pool.query<{ count:string }>(
         "SELECT count(*)::text AS count FROM evaluator.consumer_output"
       )).rows[0]?.count).toBe(outputCountBefore);
-      expect(await repository.claimKeyCleanup()).toEqual([]);
+      expect(await cleanupRepository.claimKeyCleanup()).toEqual([]);
     } finally {
       releaseProvider?.();
       await evaluating.catch(()=>undefined);
@@ -903,7 +972,7 @@ describe("S8 publication on real PostgreSQL", () => {
     expect(JSON.stringify(raw.rows)).not.toContain("public answer survive");
     const beforeDelete = await repository.readPublic(publicationRef);
     expect(beforeDelete).not.toBeNull();
-    const application = new PostgresPublicationApplication(repository, publicationCipher);
+    const application = new PostgresPublicationApplication(repository, publicationCipher, undefined, cleanupRepository);
     await expect(application.readPublicDebate(publicationRef)).resolves.toMatchObject({
       public_ref: publicationRef,
       question: "public question survive"
@@ -952,7 +1021,7 @@ describe("S8 publication on real PostgreSQL", () => {
   });
 
   it("R2 (B12): a SPLIT answer and a SPLIT floor are published, read back by the public page, and listed as SPLIT", async () => {
-    const application = new PostgresPublicationApplication(repository, publicationCipher);
+    const application = new PostgresPublicationApplication(repository, publicationCipher, undefined, cleanupRepository);
     const leading = randomUUID();
     const cases = [
       ["split-served", { verdict: "SPLIT" }],
@@ -1037,7 +1106,7 @@ describe("S8 publication on real PostgreSQL", () => {
       runtime.release();
     }
 
-    const firstClaim = (await repository.claimKeyCleanup()).find(
+    const firstClaim = (await cleanupRepository.claimKeyCleanup()).find(
       (claim) => claim.publicationRef === publicationRef
     );
     expect(firstClaim).toBeDefined();
@@ -1046,22 +1115,22 @@ describe("S8 publication on real PostgreSQL", () => {
       SET cleanup_claim_expires_at=clock_timestamp()-interval '1 second'
       WHERE publication_ref=$1
     `, [publicationRef]);
-    const cleanupClaim = (await repository.claimKeyCleanup()).find(
+    const cleanupClaim = (await cleanupRepository.claimKeyCleanup()).find(
       (claim) => claim.publicationRef === publicationRef
     );
     expect(cleanupClaim).toBeDefined();
     expect(cleanupClaim!.claimToken).not.toBe(firstClaim!.claimToken);
-    expect(await repository.completeKeyCleanup(
+    expect(await cleanupRepository.completeKeyCleanup(
       publicationRef,firstClaim!.claimToken,"DESTROYED"
     )).toBe(false);
     const destroyResult = await publicationCipher.destroy(publicationRef);
-    expect(await repository.completeKeyCleanup(
+    expect(await cleanupRepository.completeKeyCleanup(
       publicationRef,cleanupClaim!.claimToken,destroyResult
     )).toBe(true);
-    expect(await repository.completeKeyCleanup(
+    expect(await cleanupRepository.completeKeyCleanup(
       publicationRef,cleanupClaim!.claimToken,destroyResult
     )).toBe(true);
-    expect(await repository.claimKeyCleanup()).toEqual([]);
+    expect(await cleanupRepository.claimKeyCleanup()).toEqual([]);
     expect(await repository.readPublic(publicationRef)).toBeNull();
     expect((await database.pool.query("SELECT 1 FROM core.run WHERE run_id=$1", [runId])).rowCount).toBe(1);
     await expect(database.pool.query(
@@ -1118,14 +1187,14 @@ describe("S8 publication on real PostgreSQL", () => {
     });
     expect(await publicationCipher.exists(publicationRef)).toBe(true);
 
-    const cleanupClaim = (await repository.claimKeyCleanup()).find(
+    const cleanupClaim = (await cleanupRepository.claimKeyCleanup()).find(
       (claim) => claim.publicationRef === publicationRef
     );
     expect(cleanupClaim).toBeDefined();
     const destroyResult = await publicationCipher.destroy(publicationRef);
     expect(destroyResult).toBe("DESTROYED");
     expect(await publicationCipher.exists(publicationRef)).toBe(false);
-    expect(await repository.completeKeyCleanup(
+    expect(await cleanupRepository.completeKeyCleanup(
       publicationRef,cleanupClaim!.claimToken,destroyResult
     )).toBe(true);
     const secondDeleteToken = "x".repeat(43);
@@ -1186,13 +1255,13 @@ describe("S8 publication on real PostgreSQL", () => {
     };
     expect(await prepare()).toBe("CONTENDED");
     expect(await publicationCipher.exists(publicationRef)).toBe(true);
-    const cleanupClaim = (await repository.claimKeyCleanup()).find(
+    const cleanupClaim = (await cleanupRepository.claimKeyCleanup()).find(
       (claim) => claim.publicationRef === publicationRef
     );
     expect(cleanupClaim).toBeDefined();
     const destroyResult = await publicationCipher.destroy(publicationRef);
     expect(destroyResult).toBe("DESTROYED");
-    expect(await repository.completeKeyCleanup(
+    expect(await cleanupRepository.completeKeyCleanup(
       publicationRef,cleanupClaim!.claimToken,destroyResult
     )).toBe(true);
     expect(await prepare()).toBe("PREPARED");
@@ -1241,13 +1310,13 @@ describe("S8 publication on real PostgreSQL", () => {
         grantTokenHash: hashToken("step-up-grant", unpublishGrant),
         occurredAt: new Date(),source
       })).toBe(publicationRef);
-      const cleanupClaim = (await repository.claimKeyCleanup()).find(
+      const cleanupClaim = (await cleanupRepository.claimKeyCleanup()).find(
         (claim) => claim.publicationRef === publicationRef
       );
       expect(cleanupClaim).toBeDefined();
       const destroyResult = await publicationCipher.destroy(publicationRef);
       expect(destroyResult).toBe("DESTROYED");
-      expect(await repository.completeKeyCleanup(
+      expect(await cleanupRepository.completeKeyCleanup(
         publicationRef,cleanupClaim!.claimToken,destroyResult
       )).toBe(true);
       historicalRefs.push(publicationRef);
@@ -1300,7 +1369,7 @@ describe("S8 publication on real PostgreSQL", () => {
       run_count: "1",snapshot_count: "1",visibility_count: "5",published: true
     });
     expect(await new PostgresPublicationApplication(
-      repository,publicationCipher
+      repository,publicationCipher,undefined,cleanupRepository
     ).readPublicDebate(currentRef)).toMatchObject({
       public_ref: currentRef,question: "public question account-erasure-current"
     });
@@ -1367,7 +1436,7 @@ describe("S8 publication on real PostgreSQL", () => {
       .rows[0]!.outcome;
     expect(await prepareAccount()).toBe("CONTENDED");
     expect(await repository.abandonKeyProvision(publicationRef,identity.userId)).toBe(true);
-    const application = new PostgresPublicationApplication(repository,publicationCipher);
+    const application = new PostgresPublicationApplication(repository,publicationCipher,undefined,cleanupRepository);
     expect(await application.reconcileKeyProvisionCleanup()).toBe(1);
     expect(await publicationCipher.exists(publicationRef)).toBe(false);
     expect((await database.pool.query(
@@ -1397,7 +1466,7 @@ describe("S8 publication on real PostgreSQL", () => {
     });
     preparedKey.close();
     expect(await repository.abandonKeyProvision(publicationRef,identity.userId)).toBe(true);
-    const claim = await repository.claimKeyProvisionCleanup(100);
+    const claim = await cleanupRepository.claimKeyProvisionCleanup(100);
     expect(claim).toHaveLength(1);
     expect(claim[0]).toMatchObject({ publicationRef,runId,userId: identity.userId });
     expect(await repository.publish({
@@ -1410,7 +1479,7 @@ describe("S8 publication on real PostgreSQL", () => {
     )).rowCount).toBe(0);
     expect(await publicationCipher.destroy(publicationRef)).toBe("DESTROYED");
     expect(await publicationCipher.exists(publicationRef)).toBe(false);
-    expect(await repository.completeKeyProvisionCleanup(
+    expect(await cleanupRepository.completeKeyProvisionCleanup(
       publicationRef,claim[0]!.claimToken
     )).toBe(true);
   });
@@ -1617,14 +1686,14 @@ describe("S8 publication on real PostgreSQL", () => {
       grantTokenHash: hashToken("step-up-grant", reversePublishToken)
     })).toBe(true);
     expect(await repository.abandonKeyProvision(reverseRef,identity.userId)).toBe(true);
-    const application = new PostgresPublicationApplication(repository,publicationCipher);
+    const application = new PostgresPublicationApplication(repository,publicationCipher,undefined,cleanupRepository);
     expect(await application.reconcileKeyProvisionCleanup()).toBe(1);
     let historicalCleanupCount = 0;
-    for (const cleanup of await repository.claimKeyCleanup()) {
+    for (const cleanup of await cleanupRepository.claimKeyCleanup()) {
       if (cleanup.publicationRef!==firstRef && cleanup.publicationRef!==deniedRef) continue;
       historicalCleanupCount += 1;
       const destroyResult = await publicationCipher.destroy(cleanup.publicationRef);
-      expect(await repository.completeKeyCleanup(
+      expect(await cleanupRepository.completeKeyCleanup(
         cleanup.publicationRef,cleanup.claimToken,destroyResult
       )).toBe(true);
     }
@@ -1750,7 +1819,7 @@ describe("S8 publication on real PostgreSQL", () => {
       }
     }) as PostgresPublicationRepository;
     const application = new PostgresPublicationApplication(
-      ambiguousRepository,publicationCipher
+      ambiguousRepository,publicationCipher,undefined,cleanupRepository
     );
     const asOf = new Date().toISOString();
     await expect(application.publish({
@@ -2183,12 +2252,16 @@ describe("S8 publication on real PostgreSQL", () => {
     const runtime = await database.pool.connect();
     try {
       await runtime.query("SET ROLE debateai_runtime");
+      // COR-N3 (t_b5865189): serve.publication_snapshot has row security (0126), whose WITH CHECK refuses this bare role's
+      // row with 42501 too (measured with INSERT granted: it does, before any trigger), so the missing INSERT grant is
+      // pinned by the ACL message, not by the code alone. The visibility-event INSERT below needs no message: granted,
+      // a BEFORE trigger refuses it first with its own error.
       await expect(runtime.query(`
         INSERT INTO serve.publication_snapshot (
           publication_ref,run_id,format_version,content_ciphertext,created_at
         ) VALUES ($1,$2,1,$3::jsonb,now())
       `, [publicationRef, runId, JSON.stringify(contentCiphertext)]))
-        .rejects.toMatchObject({ code: "42501" });
+        .rejects.toMatchObject({ code: "42501", message: "permission denied for table publication_snapshot" });
       await expect(runtime.query(`
         INSERT INTO core.run_visibility_event (
           run_visibility_event_id,run_id,publication_ref,state,actor_audit_token,
@@ -2216,7 +2289,9 @@ describe("S8 publication on real PostgreSQL", () => {
         new Date(), randomUUID(), randomUUID(), randomUUID()
       ]);
       expect(attempted.rows[0]?.publication_ref).toBeNull();
-      expect((await runtime.query(
+      // COR-N3 (t_b5865189): counted on the superuser pool, which sees every row. As the bare runtime role, with no
+      // account context, row security (0126) hides every snapshot, so a 0 there held whether or not one was written.
+      expect((await database.pool.query(
         "SELECT 1 FROM serve.publication_snapshot WHERE publication_ref=$1", [publicationRef]
       )).rowCount).toBe(0);
     } finally {
@@ -2362,7 +2437,7 @@ describe("S8 publication on real PostgreSQL", () => {
 describe("DPD-S01 delete public debates at account erasure", () => {
   let erasurePool: Pool;
   let erasureRepository: PostgresAccountErasureRepository;
-  const publications = () => new PostgresPublicationApplication(repository,publicationCipher);
+  const publications = () => new PostgresPublicationApplication(repository,publicationCipher,undefined,cleanupRepository);
   const askApplication: AskApplication = {
     withContentLease:async (_runId,use)=>use(),
     submit:async ()=>({ run_ref:randomUUID(),status:"QUEUED" }),
@@ -3392,6 +3467,116 @@ describe("NV-31 lease-body queries run on the lease's own connection (routed poo
       }, "shared");
       expect(second).toBe(first);
       expect(await stale).not.toBe(second);
+    });
+  });
+
+  /**
+   * Row-level security with NV-31: a routed pool on a T1-shaped login (debateai_runtime) whose cross-account target is
+   * that login's system twin (debateai_runtime and debateai_rls_all_accounts), as main.ts wires the API's runtime pool
+   * to systemPool. Neither is the superuser, so a request scope opened here is one the product could open.
+   */
+  async function withTargetedPool<T>(
+    label: string, sizing: Sizing, use: (pools: Readonly<{ routed: Pool; t1: string; system: string }>) => Promise<T>
+  ): Promise<T> {
+    const t1 = `${label}_t1`;
+    const system = `${label}_system`;
+    const password = randomBytes(24).toString("hex");
+    await database.pool.query(`CREATE ROLE ${t1} LOGIN PASSWORD '${password}' IN ROLE debateai_runtime`);
+    const url = new URL(database.connectionString);
+    url.username = t1;
+    url.password = password;
+    const target = createPool(await createSystemTwin(database, system, ["debateai_runtime"]), { ...sizing, name: "test:system" });
+    const routed = createPool(url.toString(), { ...sizing, name: "test:runtime", crossAccount: target });
+    try {
+      routeLeaseBodyQueries(routed);
+      return await use({ routed, t1, system });
+    } finally {
+      await routed.end();
+      await target.end();
+    }
+  }
+
+  async function who(executor: Pool | PoolClient): Promise<Readonly<{ login: string; pid: number }>> {
+    return (await (executor as Pool).query<{ login: string; pid: number }>(
+      "SELECT current_user::text AS login, pg_backend_pid() AS pid")).rows[0]!;
+  }
+
+  it("(j) sends a crossAccount statement in the body of a lease a request took to the frame's target, and the body's own statements to the lease", async () => {
+    const identity = await createIdentity("nv31-j");
+    const run = await createRun(identity, "nv31-j");
+    // One connection each: a body statement that asked either pool for a second connection would fail busy.
+    await withTargetedPool("nv31_j", { max: 1, connectionTimeoutMillis: 1_000 }, async ({ routed, t1, system }) => {
+      const probe = async (client: PoolClient) => ({
+        lease: await who(client),
+        body: await who(routed),
+        frame: await crossAccount("X18h", () => who(routed))
+      });
+      // In the owner's request the lease is a connection of the request's own login, under the owner's context: its
+      // body statements stay on it, and a crossAccount frame's statement runs as the target's login (X18h: the key
+      // store's owner lookup in a key load).
+      const token = sessionTokensBySession.get(identity.sessionId)!;
+      const leases = [
+        await inAccountRequest(token, () => withRunContentLease(routed, [run], (lease) => probe(lease.client))),
+        ...await inAccountRequest(token, async () => [
+          await withPublicationContentLease(routed, [randomUUID()], (lease) => probe(lease.client), "shared"),
+          await withPublicationContentLease(routed, [randomUUID()], (lease) => probe(lease.client), "exclusive")
+        ])
+      ];
+      for (const seen of leases) {
+        expect(seen.lease.login).toBe(t1);
+        expect(seen.body).toEqual(seen.lease);
+        expect(seen.frame.login).toBe(system);
+      }
+      // Outside a request the lease is a connection of the target, and both kinds of statement run on it.
+      const background = await withRunContentLease(routed, [run], (lease) => probe(lease.client));
+      expect(background.lease.login).toBe(system);
+      expect(background.body).toEqual(background.lease);
+      expect(background.frame).toEqual(background.lease);
+    });
+  });
+
+  it("(k) reads an unparsable public snapshot's run release key as the target's login, on the shared lease the target holds, inside an anonymous request", async () => {
+    const OWN = ["r19", "a".repeat(12)].join("-");
+    const NEWER = ["r20", "b".repeat(12)].join("-");
+    const identity = await createIdentity("nv31-k");
+    const runId = await createRun(identity, "nv31-k");
+    const publicationRef = randomUUID();
+    const occurredAt = new Date("2026-08-24T00:00:00.000Z");
+    const grantToken = await grant(identity, runId, "PUBLISH", "k", occurredAt);
+    expect(await repository.publish({
+      runId, userId: identity.userId, ownerRef: identity.ownerRef, sessionId: identity.sessionId,
+      grantTokenHash: hashToken("step-up-grant", grantToken), occurredAt, source, publicationRef,
+      expectedPseudonym: identity.pseudonym,
+      contentCiphertext: await encryptedSnapshot(publicationRef, runId, "nv31-k",
+        { extra: { future_member: { kind: "next" } } })
+    })).toBe(true);
+    // The target has one connection, which the shared lease holds (X10: taken on the cross-account target).
+    await withTargetedPool("nv31_k", { max: 1, connectionTimeoutMillis: 500 }, async ({ routed, system }) => {
+      const read: Readonly<{ login: string; visible: boolean }>[] = [];
+      const application = new PostgresPublicationApplication(
+        new PostgresPublicationRepository(routed, fakeAuditHasher), publicationCipher,
+        undefined, undefined, undefined, undefined,
+        {
+          ownReleaseKey: OWN,
+          // As PostgresAskApplication.readRunReleaseKey: core.run on the runtime pool, which RLS limits to the
+          // reader's own rows on the T1 login (an anonymous reader's: none).
+          readRunReleaseKey: async (id) => {
+            const row = (await routed.query<{ login: string; visible: boolean }>(
+              "SELECT current_user::text AS login, EXISTS (SELECT 1 FROM core.run WHERE run_id = $1::uuid) AS visible", [id]
+            )).rows[0]!;
+            read.push(row);
+            return row.visible ? NEWER : null;
+          }
+        }
+      );
+      const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      try {
+        await expect(runInRequestScope(() => application.readPublicDebate(publicationRef)))
+          .rejects.toBeInstanceOf(MadeByNewerReleaseError);
+      } finally {
+        errors.mockRestore();
+      }
+      expect(read).toEqual([{ login: system, visible: true }]);
     });
   });
 });

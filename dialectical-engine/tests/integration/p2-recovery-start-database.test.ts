@@ -204,7 +204,7 @@ describe("P2-04 recovery start on real PostgreSQL", () => {
     });
   });
 
-  // NV-18 (security audit run 3, 0125): the API's one-minute maintenance pass closes every binding left open past one
+  // NV-18 (security audit run 3, 0131): the API's one-minute maintenance pass closes every binding left open past one
   // hour. Last in this describe: the first case counts every request and every audit row in the database.
   it("closes a recovery binding left open past one hour, keeps younger ones, and is callable through the runtime only", async () => {
     const SWEEPER = "identity.expire_stale_account_recovery_bindings(integer)";

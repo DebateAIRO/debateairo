@@ -95,7 +95,7 @@ export class PostgresPasswordResetRepository {
     }>[];
     source: Source;
   }>) {
-    // NV-17: 0125's guarded start refuses while the account's proof lock is live, then delegates to 0108's sealed start.
+    // NV-17: 0131's guarded start refuses while the account's proof lock is live, then delegates to 0108's sealed start.
     return withMailLocale(this.pool, input.source.mailLocale, client => this.call<boolean>("password_reset_start_guarded", [input.index, input.candidateId, input.channels, JSON.stringify(input.refs), input.linkHash, input.cancelHash, JSON.stringify(input.notices), sourceJson(input.source), this.registerVersion], client));
   }
   exchange(link: string, session: string, csrf: string, source: Source) {
@@ -104,7 +104,7 @@ export class PostgresPasswordResetRepository {
   read(session: string) {
     return this.call<PasswordResetRecord | null>("password_reset_read", [session]);
   }
-  /** NV-17: charges the account's proof counter before the code is matched (0125); READY carries what complete needs. */
+  /** NV-17: charges the account's proof counter before the code is matched (0131); READY carries what complete needs. */
   reserveProof(session: string, source: Source, lockMs: number) {
     return withMailLocale(this.pool, source.mailLocale, client => this.call<Readonly<{ status: "INVALID" | "REFUSED" }> | Readonly<{ status: "READY"; userId: string; factorId: string; factorSecret: CryptoEnvelope; lastAcceptedStep: number | null; nowMs: number }>>("password_reset_proof_reserve", [session, sourceJson(source), lockMs], client));
   }
@@ -132,7 +132,7 @@ export class PostgresPasswordResetRepository {
     return withMailLocale(this.pool, source.mailLocale, client => this.call<"CANCELLED" | "INVALID">("password_reset_cancel_session", [hash, sourceJson(source)], client));
   }
   admit(source: Source) {
-    // NV-39: the 0125 admit, keyed by the admission digest, gives up a bounded batch of rows when the window is full.
+    // NV-39: the 0131 admit, keyed by the admission digest, gives up a bounded batch of rows when the window is full.
     return this.call<boolean>("password_reset_admit_evicting", [JSON.stringify({ ipArgon2id: admissionDigests.get(source) ?? source.ipArgon2id, userAgentArgon2id: source.userAgentArgon2id }), this.registerVersion]);
   }
   failure(hash: string, source: Source) {
@@ -142,7 +142,7 @@ export class PostgresPasswordResetRepository {
     return this.call<number>("expire_password_reset", [batch]);
   }
   async claimNotice(leaseMs: number): Promise<PasswordResetNotice | null> {
-    // NV-40: 0125's claim dead-letters every stale unleased PROOF first, so null means nothing deliverable is due.
+    // NV-40: 0131's claim dead-letters every stale unleased PROOF first, so null means nothing deliverable is due.
     const row = await this.call<(Omit<PasswordResetNotice, "mailLocale"> & Readonly<{ mail_locale: string }>) | null>("password_reset_claim_pending_notice", [leaseMs]);
     if (row === null)
       return null;

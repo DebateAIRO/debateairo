@@ -147,7 +147,7 @@ async function linkMail(profileLocale: string, mailLocale?: string): Promise<Bil
 function linkService(profileLocale: string) {
   const sent: BillingMail[] = [];
   const jobs: Enqueued[] = [];
-  const tokens = new Map<string, { subscriptionId: string; expiresAt: Date; used: boolean }>();
+  const tokens = new Map<string, { subscriptionId: string; ownerRef: string | null; expiresAt: Date; used: boolean }>();
   const events = activeSubscriptionEvents(OWNER, NOW, "PLUS");
   const state = foldSubscription(events);
   const billing = {
@@ -159,14 +159,14 @@ function linkService(profileLocale: string) {
     appendSubscriptionEvent: async () => undefined,
     withTransaction: async (fn: (c: PoolClient) => Promise<unknown>) => fn(client),
     cancelTokensIssuedForOwnerSince: async () => 0,
-    insertCancelToken: async (_c: PoolClient, row: { tokenSha256: string; subscriptionId: string; expiresAt: Date }) => {
-      tokens.set(row.tokenSha256, { subscriptionId: row.subscriptionId, expiresAt: row.expiresAt, used: false });
+    insertCancelToken: async (_c: PoolClient, row: { tokenSha256: string; subscriptionId: string; expiresAt: Date; ownerRef?: string }) => {
+      tokens.set(row.tokenSha256, { subscriptionId: row.subscriptionId, ownerRef: row.ownerRef ?? null, expiresAt: row.expiresAt, used: false });
     },
     useCancelToken: async (_c: PoolClient, sha256: string, now: Date) => {
       const row = tokens.get(sha256);
       if (row === undefined || row.used || row.expiresAt.getTime() <= now.getTime()) return null;
       row.used = true;
-      return { subscriptionId: row.subscriptionId };
+      return { subscriptionId: row.subscriptionId, ownerRef: row.ownerRef };
     },
     enqueue: async (_c: PoolClient, job: Enqueued) => { jobs.push(job); return randomUUID(); }
   };

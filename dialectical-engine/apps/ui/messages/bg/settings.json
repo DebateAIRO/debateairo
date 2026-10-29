@@ -110,7 +110,7 @@
   "settings.transparency.supportTitle": "Поддръжка и помощ от човек",
   "settings.transparency.supportLead": "Асистентът за поддръжка е система с ИИ. За да поискате помощ от човек, отворете раздела",
   "settings.transparency.help": "Помощ",
-  "settings.transparency.supportTail": "и изберете „Разговор с човек“ или „Ескалиране към човек“.",
+  "settings.transparency.supportTail": "и изберете „Разговор с човек“.",
   "settings.transparency.back": "Назад към {brand}",
   "settings.workers.eyebrow": "РАБОТНИ ПРОЦЕСИ",
   "settings.workers.title": "Състояние на изпълнението",

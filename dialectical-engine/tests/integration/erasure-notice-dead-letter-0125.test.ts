@@ -27,7 +27,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * NV-02 (security-audit run 3, K02). The erasure-notice outbox had no terminal state: 0040's
  * identity.fail_account_erasure_notification re-queued every failure 30 s later with no ceiling, and the readiness
  * gate that key destruction and FINALIZE ask is false while any unacknowledged row of the user exists, so one notice
- * refused on every attempt kept the account PREPARED (suspended, DEK and records kept) for ever. 0125's
+ * refused on every attempt kept the account PREPARED (suspended, DEK and records kept) for ever. 0131's
  * erasure_reconcile.fail_account_erasure_notification dead-letters a row at once when the reconciler's own pre-send
  * check finds the stored address undeliverable (MAIL_RECIPIENT_UNDELIVERABLE), and otherwise only after 10 attempts
  * while the user's erasure is PREPARED; every other row re-queues with backoff (30 s doubling, at most 1 h). A dead

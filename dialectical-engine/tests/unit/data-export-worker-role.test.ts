@@ -13,6 +13,9 @@ function apiSource(): Record<string, string> {
     USER_DEK_STORE_PATH: "/tmp/dx-user-deks",
     CONTENT_PROVISION_DATABASE_URL: "postgresql://localhost/content",
     AUTHORIZATION_DATABASE_URL: "postgresql://localhost/authorization",
+    // Row-level security S01 (PLAN S2.5): the API's two system logins.
+    API_SYSTEM_DATABASE_URL: "postgresql://localhost/api-system",
+    API_AUTHORIZATION_SYSTEM_DATABASE_URL: "postgresql://localhost/authorization-system",
     ERASURE_DATABASE_URL: "postgresql://localhost/erasure",
     DATABASE_URL: "postgresql://localhost/main",
     SUPPORT_DATABASE_URL: "postgresql://localhost/support",
@@ -35,13 +38,15 @@ describe("data export worker principal contract", () => {
     expect(disabled.DATA_EXPORT_DATABASE_URL).toBeUndefined();
   });
 
-  it("DW2 separates the worker URL from all seven other database URLs and enforces TLS", () => {
+  it("DW2 separates the worker URL from all nine other database URLs and enforces TLS", () => {
     const source = apiSource();
     source.PUBLICATION_CLEANUP_DATABASE_URL = "postgresql://localhost/publication";
     source.EVALUATOR_DEV_MENU_DATABASE_URL = "postgresql://localhost/evaluator";
     const distinct = "postgresql://localhost/data-export";
     for (const key of ["DATABASE_URL", "AUTHORIZATION_DATABASE_URL", "CONTENT_PROVISION_DATABASE_URL",
-      "PUBLICATION_CLEANUP_DATABASE_URL", "ERASURE_DATABASE_URL", "SUPPORT_DATABASE_URL", "EVALUATOR_DEV_MENU_DATABASE_URL"]) {
+      "PUBLICATION_CLEANUP_DATABASE_URL", "ERASURE_DATABASE_URL", "SUPPORT_DATABASE_URL", "EVALUATOR_DEV_MENU_DATABASE_URL",
+      // Row-level security S01 (PLAN S2.5, B6 (b)): both system logins read every account, so neither may be the worker's.
+      "API_SYSTEM_DATABASE_URL", "API_AUTHORIZATION_SYSTEM_DATABASE_URL"]) {
       expect(() => parseApiEnvironment({ ...source, DATA_EXPORT_STORE_PATH: "/tmp/export", DATA_EXPORT_DATABASE_URL: source[key]! }), key)
         .toThrow("DATA_EXPORT_DATABASE_URL_MUST_BE_SEPARATE");
     }
@@ -52,7 +57,9 @@ describe("data export worker principal contract", () => {
   });
 
   it("DW3 maps the last local dev principal to the worker capability and API key", () => {
-    expect(DEVELOPMENT_DATABASE_PRINCIPALS.at(-1)).toEqual({
+    // Row-level security S01 (Ruling R-12 F-C2-4; D46): principals added after it are appended last, so the worker's is
+    // found by its key, not its position.
+    expect(DEVELOPMENT_DATABASE_PRINCIPALS.find(({ environmentKey }) => environmentKey === "DATA_EXPORT_DATABASE_URL")).toEqual({
       roleName: "debateai_dev_data_export", capabilityRole: "debateai_data_export_worker", environmentKey: "DATA_EXPORT_DATABASE_URL"
     });
     expect(DEVELOPMENT_API_ENVIRONMENT_KEYS).toContain("DATA_EXPORT_DATABASE_URL");

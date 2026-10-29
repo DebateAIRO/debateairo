@@ -231,7 +231,7 @@ describe("every auth screen styles its own controls", () => {
     ["CHANGE_EMAIL", {}]
   ])("a resumed %s action after a provider check", async (action, target) => {
     const proof = { status: "step_up_complete", csrf_token: "c".repeat(43), step_up_grant: { action, ...target, token: "g".repeat(43), expires_at: new Date(Date.now() + 300_000).toISOString() } };
-    const client = { authMethods: vi.fn().mockResolvedValue({ methods: [], recovery_codes_remaining: 10, available_step_up_methods: ["passkey"], step_up_providers: [] }) } as never;
+    const client = { readPublicationReview: vi.fn().mockResolvedValue({ flagged: false, state: "NONE", categories: [], asks_used: 0, may_ask: false, refusal: null }), authMethods: vi.fn().mockResolvedValue({ methods: [], recovery_codes_remaining: 10, available_step_up_methods: ["passkey"], step_up_providers: [] }) } as never;
     const host = await render(<SecurityActionResume catalog={auth} settingsCatalog={settings} publicCatalog={publicCatalog} locale="en" client={client} takeProof={() => proof as never} />);
     expect(host.querySelector("input")).not.toBeNull();
     expect(unstyled(host)).toEqual([]);

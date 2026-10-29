@@ -1,7 +1,7 @@
 import type { Pool } from "pg";
 
 /**
- * NV-07: the database half of the restore fence (0125 [NV-07], identity.restore_fence and its two functions). The host
+ * NV-07: the database half of the restore fence (0131 [NV-07], identity.restore_fence and its two functions). The host
  * half is a file outside every captured store (apps/api/src/restore-fence.ts). Not exported from index.ts, whose bytes
  * are sealed (NATIVE_MIGRATE_MODULE_SHA256): callers import this module by its path.
  */

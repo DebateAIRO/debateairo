@@ -2,9 +2,9 @@
   "DISCLOSURE": "Hej — jeg er AI-supportassistenten for Dialectical Engine. Jeg kan forklare, hvordan produktet fungerer, og henvise dig til den rette side. Jeg kan ikke logge dig ind, ændre din konto eller nulstille noget. Brug de links, jeg giver dig, eller bed om et menneske til disse opgaver.",
   "NO_SOURCE": "Jeg har ingen kilde til det, så jeg vil ikke gætte. Spørg mig om noget andet vedrørende debatternes funktion, eller vælg 'Tal med et menneske'.",
   "REFUSE_ZONE": "Jeg kan ikke hjælpe med login, adgangskoder, bekræftelseskoder, tofaktorgodkendelse, gendannelse af konto, ændring af e-mailadresse eller sletning af konto — heller ikke med at kontrollere dem. Disse muligheder findes kun på dine kontosider: {link}. Hvis den side ikke virker for dig, skal du vælge 'Tal med et menneske'.",
-  "REFUSE_INJECTION": "Jeg følger kun produktets egne instruktioner, så jeg springer den anmodning over. Din besked er blevet registreret. Spørg mig om produktet, eller vælg 'Tal med et menneske'.",
-  "REFUSE_SAFETY": "Dette kræver et menneske, ikke en assistent. Vælg 'Tal med et menneske', så vil et menneske læse din besked.",
-  "DEGRADED": "Assistentens model er ikke tilgængelig lige nu. Du kan stadig efterlade en besked til et menneske: vælg 'Tal med et menneske'.",
+  "REFUSE_INJECTION": "Jeg følger kun produktets egne instruktioner, så jeg springer den anmodning over. Spørg mig om produktet, eller vælg 'Tal med et menneske'.",
+  "REFUSE_SAFETY": "Dette kræver et menneske, ikke en assistent. Vælg 'Tal med et menneske', og skriv til den adresse, der vises; et menneske læser det.",
+  "DEGRADED": "Assistentens model er ikke tilgængelig lige nu. For at komme i kontakt med et menneske skal du vælge 'Tal med et menneske'.",
   "DISABLED": "Supportassistenten er slået fra i øjeblikket.",
   "RATE_LIMITED": "Du har sendt mange beskeder på kort tid. Vent et par minutter.",
   "RATING": "Besvarede dette dit spørgsmål? Ja · Nej · Tal med et menneske",
@@ -25,5 +25,10 @@
   "INCIDENT_SURFACE_PUBLISHING": "udgivelse",
   "INCIDENT_SURFACE_SIGN_IN": "login",
   "INCIDENT_SURFACE_WHOLE_SITE": "hele webstedet",
-  "COUNTRY_UNAVAILABLE": "Dialectical Engine er endnu ikke tilgængelig i dit land."
+  "COUNTRY_UNAVAILABLE": "Dialectical Engine er endnu ikke tilgængelig i dit land.",
+  "OFF_TOPIC": "Jeg kan kun hjælpe med Dialectical Engine: din konto, abonnementer, debatter, udgivelse og vores politikker. Det kan jeg ikke hjælpe med.",
+  "OFF_TOPIC_PART": "Jeg kan kun hjælpe med Dialectical Engine, så jeg har ikke besvaret resten af din besked.",
+  "CRISIS_SUPPORT": "Det, du skrev, lyder meget smertefuldt, og du behøver ikke stå med det alene. Her kan du få fat i nogen lige nu.",
+  "THREAT_LINE": "Det kan jeg ikke hjælpe med. Hvis nogen kan komme til skade, så søg venligst hjælp med det samme.",
+  "TOO_LONG": "Din besked er for lang til chatten. Forkort den, og send den igen."
 }

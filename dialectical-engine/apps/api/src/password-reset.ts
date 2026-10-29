@@ -14,7 +14,7 @@ export class PasswordResetError extends Error {
   }
 }
 const bearer = /^[A-Za-z0-9_-]{43}$/;
-// NV-17: the first round's cooldown after five reserved proofs (0125 doubles it per round to 24 h and accepts 60 s to
+// NV-17: the first round's cooldown after five reserved proofs (0131 doubles it per round to 24 h and accepts 60 s to
 // 1 h here); the siblings' failure_cooldown_ms, the 300 s T2 and MFA recovery lock on a REFUSED close.
 const PASSWORD_RESET_PROOF_LOCK_MS = 300_000;
 export function passwordResetNoticeAad(userId: string, channelId: string): AeadAad {

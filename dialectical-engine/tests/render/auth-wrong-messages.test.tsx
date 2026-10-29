@@ -38,6 +38,10 @@ const settingsClient = () => ({
 const wait = (ms: number) => act(async () => { await new Promise((resolve) => setTimeout(resolve, ms)); });
 const ENROLMENT_LINK = "enrolment link";
 const EXPIRED = "This confirmation expired. Please try again.";
+// The grant must still be valid when the resumed confirmation first renders (a slow CI runner with React 19.3 took
+// over 60 ms to mount SecuritySettings in StrictMode), and expired by the time the test looks again.
+const EXPIRES_MS = 400;
+const PAST_EXPIRY_MS = 600;
 
 const mounted: Array<Awaited<ReturnType<typeof mount>>> = [];
 async function render(view: React.ReactNode) { const result = await mount(view); mounted.push(result); return result.host; }
@@ -45,25 +49,25 @@ afterEach(async () => { while (mounted.length) { const { root, host } = mounted.
 
 describe("a timed-out confirmation says the confirmation expired", () => {
   it("in the security settings", async () => {
-    const host = await render(<StrictMode><SecuritySettings client={settingsClient() as never} catalog={settings} authCatalog={auth} publicCatalog={publicCatalog} locale="en" resume={{ authorization: { action: "REMOVE_AUTH_METHOD", target_factor_id: factor }, initialProof: grant("REMOVE_AUTH_METHOD", 60, { target_factor_id: factor }) as never }} /></StrictMode>);
+    const host = await render(<StrictMode><SecuritySettings client={settingsClient() as never} catalog={settings} authCatalog={auth} publicCatalog={publicCatalog} locale="en" resume={{ authorization: { action: "REMOVE_AUTH_METHOD", target_factor_id: factor }, initialProof: grant("REMOVE_AUTH_METHOD", EXPIRES_MS, { target_factor_id: factor }) as never }} /></StrictMode>);
     expect(host.querySelector("[data-resumed-confirm]")).not.toBeNull();
-    await wait(120);
+    await wait(PAST_EXPIRY_MS);
     expect(host.querySelector("[role=alert]")?.textContent).toBe(EXPIRED);
     expect(host.textContent).not.toContain(ENROLMENT_LINK);
   });
 
   it("on the phone card", async () => {
-    const host = await render(<PhoneProfileCard catalog={settings} authCatalog={auth} client={settingsClient() as never} resume={{ authorization: { action: "READ_PHONE_PROFILE" }, initialProof: grant("READ_PHONE_PROFILE", 60) as never }} />);
+    const host = await render(<PhoneProfileCard catalog={settings} authCatalog={auth} client={settingsClient() as never} resume={{ authorization: { action: "READ_PHONE_PROFILE" }, initialProof: grant("READ_PHONE_PROFILE", EXPIRES_MS) as never }} />);
     expect(host.querySelector("[data-resumed-confirm]")).not.toBeNull();
-    await wait(120);
+    await wait(PAST_EXPIRY_MS);
     expect(host.querySelector("[role=alert]")?.textContent).toBe(EXPIRED);
   });
 
   it("on a resumed debate action", async () => {
-    const proof = grant("PUBLISH", 60, { target_run_id: "33333333-3333-4333-8333-333333333333" });
-    const client = { authMethods: vi.fn().mockResolvedValue({ methods: [], recovery_codes_remaining: 10, available_step_up_methods: ["passkey"], step_up_providers: [] }) } as never;
+    const proof = grant("PUBLISH", EXPIRES_MS, { target_run_id: "33333333-3333-4333-8333-333333333333" });
+    const client = { readPublicationReview: vi.fn().mockResolvedValue({ flagged: false, state: "NONE", categories: [], asks_used: 0, may_ask: false, refusal: null }), authMethods: vi.fn().mockResolvedValue({ methods: [], recovery_codes_remaining: 10, available_step_up_methods: ["passkey"], step_up_providers: [] }) } as never;
     const host = await render(<SecurityActionResume catalog={auth} settingsCatalog={settings} publicCatalog={publicCatalog} locale="en" client={client} takeProof={() => proof as never} />);
-    await wait(120);
+    await wait(PAST_EXPIRY_MS);
     expect(host.querySelector("[role=status]")?.textContent).toBe(EXPIRED);
   });
 });

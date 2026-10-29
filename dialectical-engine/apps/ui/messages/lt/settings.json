@@ -110,7 +110,7 @@
   "settings.transparency.supportTitle": "Pagalba ir žmogaus konsultacija",
   "settings.transparency.supportLead": "Pagalbos asistentas yra DI sistema. Norėdami paprašyti žmogaus pagalbos, skiltyje",
   "settings.transparency.help": "Pagalba",
-  "settings.transparency.supportTail": "pasirinkite „Kalbėtis su žmogumi“ arba „Perduoti pokalbį žmogui“.",
+  "settings.transparency.supportTail": "pasirinkite „Kalbėtis su žmogumi“.",
   "settings.transparency.back": "Grįžti į {brand}",
   "settings.workers.eyebrow": "VYKDYTOJŲ GRUPĖ",
   "settings.workers.title": "Vykdymo būsena",

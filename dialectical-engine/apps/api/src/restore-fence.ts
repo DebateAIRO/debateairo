@@ -12,7 +12,7 @@ import type {
  * NV-07: the host half of the restore fence. A 32-byte random token lives in two places: one row in the database
  * (identity.restore_fence, carried by every dump and cold copy) and this file (RESTORE_FENCE_PATH), which no backup
  * captures. Every settle advances both; a restore brings back an older row, so the two disagree and the settle revokes
- * every long-lived bearer and holds public reads before the API answers anything (0125 [NV-07]).
+ * every long-lived bearer and holds public reads before the API answers anything (0131 [NV-07]).
  */
 
 const TOKEN = /^[A-Za-z0-9_-]{43}$/u;

@@ -119,7 +119,7 @@ export class PostgresRecoveryStartRepository {
   }
 
   /**
-   * NV-18 (0125): closes recovery bindings left open past one hour, in up to `rounds` rounds of at most `limit`, and
+   * NV-18 (0131): closes recovery bindings left open past one hour, in up to `rounds` rounds of at most `limit`, and
    * stops at the first short round. Each round is its own short transaction, so no transaction holds more than `limit`
    * subject locks, and its lock wait is bounded (`SET LOCAL` ends with the round; the pooled connection goes back with
    * its default). Returns the number closed.

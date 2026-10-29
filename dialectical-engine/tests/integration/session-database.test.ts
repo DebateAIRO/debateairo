@@ -1109,7 +1109,7 @@ describe('exact elapsed consumer lifetimes across DST',()=>{
 // the code is checked, five per round; a round closes at the next attempt with a cooldown of 300 s doubling to a
 // 24 h cap, anchored at the round's last failure; a TOTP success clears only the round's count, and the escalation
 // level falls one step per full 24 h with no failure. Elapsed time is simulated by moving the row's times back.
-describe("NV-04 login TOTP attempts per factor (identity.totp_login_admit, migrations/0125 [NV-04])", () => {
+describe("NV-04 login TOTP attempts per factor (identity.totp_login_admit, migrations/0131 [NV-04])", () => {
   const LIMITS = [5, 300_000, 86_400_000] as const;
   async function admit(userId: string, factorId: string, limits: readonly [number, number, number] = LIMITS) {
     const client = await database.pool.connect();

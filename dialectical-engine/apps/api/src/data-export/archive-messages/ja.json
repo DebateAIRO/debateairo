@@ -17,5 +17,18 @@
   "archive.visibilityPrivate": "非公開",
   "archive.unreadable": "このディベートの鍵は破棄されたため、内容を読み取ることはできません。",
   "archive.noDebates": "ディベートはありません。",
-  "archive.filesNote": "この ZIP 内の JSON ファイルには同じデータが機械で読み取れる形式で保存されています。ファイルの一覧は README.txt にあります。"
+  "archive.filesNote": "この ZIP 内の JSON ファイルには同じデータが機械で読み取れる形式で保存されています。ファイルの一覧は README.txt にあります。",
+  "archive.contentCheck": "コンテンツチェック",
+  "archive.verdict.flagged": "フラグ付き",
+  "archive.verdict.clear": "問題なし",
+  "archive.verdict.noSynthesis": "総合評価なし",
+  "archive.verdict.unavailable": "利用不可",
+  "archive.category.terrorism": "テロの可能性",
+  "archive.category.hateSpeech": "あらゆる種類のヘイトスピーチ",
+  "archive.category.suicideOrHarm": "自殺や他者を傷つける傾向",
+  "archive.category.weaponsOrDrugs": "武器や薬物の製造",
+  "archive.publicationReview": "公開審査",
+  "archive.reviewAsked": "申請",
+  "archive.reviewApproved": "承認",
+  "archive.reviewRefused": "却下"
 }

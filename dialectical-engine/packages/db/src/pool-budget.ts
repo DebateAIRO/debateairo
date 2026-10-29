@@ -22,6 +22,13 @@
  * DATABASE_UNREACHABLE. One API is 80 at most; two releases 2 × (80 + 34) = 228,
  * 291 in all, so 26 spare. max_connections stays 320.
  *
+ * Row-level security S01 (DECISIONS D50): every statement the API makes outside
+ * a signed-in request runs on one of two system logins, each with its own pool
+ * (`system` 6, `authorizationSystem` 2; the room decision keeps its 4 and moves
+ * to the `system` login). With the support relay lease pool gone (synthesis-flag
+ * S05), one API is 70 at most; two releases 2 × (70 + 34) = 208, 271 in all, so
+ * 46 spare. max_connections stays 320.
+ *
  * The plan, the per-pool audit and the arithmetic:
  * docs/operations/2026-10-10-database-connection-budget.md; the guard that keeps
  * main.ts and these numbers in step: tests/architecture/database-connection-budget.test.ts.
@@ -69,12 +76,12 @@ export const API_DATABASE_POOLS = Object.freeze({
   erasure: budget("api:erasure", 4, 5_000),
   // Development only: the runtime environment refuses it anywhere else.
   evaluatorDevMenu: budget("api:evaluator-dev-menu", 2, 5_000),
-  // Opening a support case holds one connection and reads the messages on it (NV-32); the erasure
-  // timer's support shred and readback take one more, one at a time (C-1).
+  // No support flow holds two connections since synthesis-flag S05 (0129 retired case opens and the stored
+  // transcript): an incident answer is one statement, and the erasure timer's support shred and its readback take
+  // one connection, one at a time (C-1).
   support: budget("api:support", 6, 5_000),
-  // Every relay slot the register may allow (16, live, no restart) holds one
-  // for the whole AI call, plus 2 for the queue's bookkeeping.
-  supportRelayLease: budget("api:support-relay-lease", 18, 5_000),
+  // (synthesis-flag S05, V-111/V-114: the relay queue and its call count live in the API's memory, so the
+  // 18-connection api:support-relay-lease pool is gone.)
   // The data export worker (mission data-export S01; opened only when DATA_EXPORT_STORE_PATH is set): one build at a
   // time (single-flight timer) on one connection (V-43). Its 15 s lease renewal queues behind the snapshot read and
   // waits the full 15 s, so a read of up to ~30 s keeps its lease.
@@ -83,7 +90,12 @@ export const API_DATABASE_POOLS = Object.freeze({
   // runtime pool a burst of page reads could hold it past the 5 s stale bound, making /readyz DATABASE_UNREACHABLE and
   // the front pair look down. Its reads chain (never two at once), so one connection; a read that cannot get it within
   // 1 s fails and the next poll tries again.
-  releaseWatch: budget("api:release-watch", 1, 1_000)
+  releaseWatch: budget("api:release-watch", 1, 1_000),
+  // Row-level security S01 (DECISIONS D29, D50): the runtime pool's cross-account target (api-system: background
+  // loops, billing jobs, boot checks, every statement outside a request) and the authorization pool's
+  // (api-authorization-system). No flow audit yet; sized for the background loops that move here.
+  system: budget("api:system", 6, 5_000),
+  authorizationSystem: budget("api:authorization-system", 2, 5_000)
 });
 
 /** The support settings reader (API and the support commands): it gives up after 200 ms by design. */

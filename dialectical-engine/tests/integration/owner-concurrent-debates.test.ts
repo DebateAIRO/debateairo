@@ -8,20 +8,23 @@ import { AskRoom, nextWholeMinute, type AskRoomOptions, type RoomDecisionContext
 import { PostgresAskAdmissionGate } from "../../apps/api/src/release-state.js";
 import { startContentRunFixture, type ContentRunFixture } from "../support/contentRunFixture.js";
 import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
+import { createSystemTwin } from "../support/rls-logins.js";
 
 /**
  * NV-48 (security audit run 3) — ONE ACCOUNT HOLDS AT MOST TWO OF THE SITE'S EIGHT PLACES, over embedded Postgres. The
- * production gate's count of a person's live debates (a READY or CLAIMED job, one per run) on the API's runtime login,
- * by the run's owner as core.run_waiting_v reads it: the latest ownership event (as core.create_encrypted_run writes
+ * production gate's count of a person's live debates (a READY or CLAIMED job, one per run) on the room decision pool's
+ * login, by the run's owner as core.run_waiting_v reads it: the latest ownership event (as core.create_encrypted_run writes
  * one), else an `owner:` asker id. Then the real room and the real line: a person at their share waits as their own
  * wait (PERSON, holding nobody back until its recheck instant), the waker leaves it in line and records every one of
  * the person's waiting runs again, and starts it once one of theirs ends. The superuser pool only arranges rows. CI
  * skips this directory; run it before merging.
  */
 const R = TEST_RELEASE_KEY;
-const LOGIN = "owner_share_runtime";
-// Joined, so no line pairs a secret-like name with a literal (gitleaks), as tests/integration/side-by-side-site-cap.test.ts does.
-const SECRET = ["owner", "share", "private", "fixture", "only"].join("-");
+// Row-level security (0130, X19): the room decision pool is API_SYSTEM_DATABASE_URL (apps/api/src/main.ts, roomDecisionPool),
+// the api-system login, so the count runs on the system twin of debateai_runtime (the role and the cross-account marker
+// debateai_rls_all_accounts), as tests/integration/side-by-side-site-cap.test.ts reads the site's count. A login holding
+// debateai_runtime alone carries no account context and sees no run at all.
+const LOGIN = "owner_share_system";
 const CLASS = Object.freeze({ planTier: "free" as const, compositionBudgetTier: "low" as const, makerCount: 2, depth: 1 });
 const QUESTION = "Should one account hold more than its share of the site's debates?";
 
@@ -30,11 +33,7 @@ let runtime: Pool;
 
 beforeAll(async () => {
   fixture = await startContentRunFixture("owner-share");
-  await fixture.database.pool.query(`CREATE ROLE ${LOGIN} LOGIN PASSWORD '${SECRET}' IN ROLE debateai_runtime`);
-  const url = new URL(fixture.database.connectionString);
-  url.username = LOGIN;
-  url.password = SECRET;
-  runtime = createPool(url.toString());
+  runtime = createPool(await createSystemTwin(fixture.database, LOGIN, ["debateai_runtime"]));
 }, 600_000);
 
 afterAll(async () => {
@@ -189,7 +188,7 @@ async function jobsOf(runId: string) {
 }
 
 describe("NV-48 the production gate counts a person's live debates", () => {
-  it("the count reads a person's live runs by the run's owner, on the runtime login", async () => {
+  it("the count reads a person's live runs by the run's owner, on the room decision pool's login", async () => {
     const A = fixture.ownerRef;
     const a1 = await fixture.createEncryptedRun(QUESTION, { releaseKey: R });
     await liveJob(a1);

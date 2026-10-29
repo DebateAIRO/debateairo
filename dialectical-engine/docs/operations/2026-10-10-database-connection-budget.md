@@ -44,12 +44,14 @@ guard that keeps the code and the numbers in step is
 | `api:room-decision` | 4 | 4 | 10 s | Unchanged; one decision holds the site's day lock and the others queue here by design |
 | `api:erasure` | 10 | 4 | 5 s | The erasure timer holds 2; deletes need the rest |
 | `api:evaluator-dev-menu` | 10 | 2 | 5 s | Development only: the server refuses to start it anywhere else |
-| `api:support` | 10 | 6 | 5 s | Opening a support case holds one connection (NV-32) |
-| `api:support-relay-lease` | 18 | 18 | 5 s | Unchanged: up to 16 AI support chats at once (a live register setting the owner can raise without a restart) plus 2 for the queue |
+| `api:support` | 10 | 6 | 5 s | No support flow holds two connections since synthesis-flag S05 (2026-10-25, migration 0129): the support chat keeps no conversation, so case opens and their transcript read are gone. An incident answer reads in one statement, the erasure timer's support shred and its readback take one connection, one at a time (security fixes run 3, C-1), and the boot checks use it once |
+| `api:support-relay-lease` | 18 | removed | — | Removed by synthesis-flag S05 (V-111, V-114, 2026-10-25): the relay queue and its daily call count now live in the API's memory, so the pool is no longer opened. The totals below are after this removal |
 | `support:control` | 2 | 2 | 0.2 s | Unchanged; the support settings reader |
 | `api:data-export` (only when the export store is set; mission data-export S01) | — | 1 | 15 s | One export build at a time on one connection: its lease renewal (every 15 s) waits for the snapshot read to free it, so a read of up to about 30 s keeps its lease |
 | `api:release-watch` (since 2026-10-22, side by side; section 8) | — | 1 | 1 s | The release watcher's read of the current release, once a second, never two at once. Its own pool, so a burst of page reads on `api:runtime` can never make `/readyz` say the database is unreachable |
-| **Total on the server** (dev menu off) | **104** | **80** (79 before 2026-10-22) | | |
+| `api:system` (since 2026-10-23, row-level security; section 9) | — | 6 | 5 s | The `api-system` login: every statement the API makes outside a signed-in request (background loops, billing jobs, boot checks) |
+| `api:authorization-system` (since 2026-10-23, row-level security; section 9) | — | 2 | 5 s | The `api-authorization-system` login: the same for the authorization pool |
+| **Total on the server** (dev menu off) | **104** | **70** (88 before the relay lease pool's removal on 2026-10-25, 80 before 2026-10-23, 79 before 2026-10-22) | | |
 
 ### Debate runner
 
@@ -63,17 +65,17 @@ guard that keeps the code and the numbers in step is
 
 | Who | Connections at most |
 |---|---|
-| Website (API), one process | 80 (79 before 2026-10-22) |
+| Website (API), one process | 70 (88 before 2026-10-25, 80 before 2026-10-23, 79 before 2026-10-22) |
 | Debate runner (32 + 2 for claim renewal) | 34 |
 | Hatchet (its role's limit, `deploy/postgres/bootstrap.sql`) | 50 |
 | Migrator (its role's limit) | 3 |
 | Owner's commands (billing, support, owner CLI; by hand, one at a time) | about 10 |
-| **Sum of ceilings** | **177 of 197** (176 before 2026-10-22, 162 before 2026-10-12) |
-| Left free | 20 (21 before 2026-10-22, 35 before 2026-10-12): room for cancellation connections (a cancelled query briefly opens one more, up to 4 per pool), the owner logging in during an incident, and slack |
+| **Sum of ceilings** | **167 of 197** (185 before 2026-10-25, 177 before 2026-10-23, 176 before 2026-10-22, 162 before 2026-10-12) |
+| Left free | 30 (12 before 2026-10-25, 20 before 2026-10-23, 21 before 2026-10-22, 35 before 2026-10-12): room for cancellation connections (a cancelled query briefly opens one more, up to 4 per pool), the owner logging in during an incident, and slack |
 
 Backups (`pg_dump` as the `postgres` user) use the 3 administrator slots.
 
-A second API process does **not** fit at 200: 177 + 80 is more than 197. Two releases, each with its own API, do fit at
+A second API process does **not** fit at 200: 167 + 70 is more than 197. Two releases, each with its own API, do fit at
 the transition's 320 (section 8). Before running a further API process (for example to restart without a gap, or to
 grow), put PgBouncer in front (section 4) or raise `max_connections` together with the memory settings (section 3).
 
@@ -242,9 +244,10 @@ a freeze), but each still deserves its own fix:
 7. **Billing leases** hold one connection idle across NETOPIA calls (up to 30 s) and take a second for the write
    (`apps/api/src/billing/renewal.ts`, `refunds.ts`). `upgrade.ts` already does it right with `withTransactionOn`.
    Billing is off today.
-8. **Fixed (security fixes run 3, NV-32)**: the transcript is read on the case transaction's connection. **Opening a
-   support case** read the messages on a second connection while holding the first
-   (`packages/db/src/support.ts` `createCaseOnce`); **the publication cleanup timer** has no overlap guard
+8. **Gone (synthesis-flag S05, 2026-10-25).** **Opening a support case** read the messages on a second connection while
+   holding the first (`packages/db/src/support.ts` `createCaseOnce`). Security fixes run 3 (NV-32) moved that read onto
+   the case transaction's connection; S05 then retired support cases and the stored transcript (migration 0129), so
+   neither the case open nor the read exists any more. **The publication cleanup timer** has no overlap guard
    (`apps/api/src/main.ts`).
 9. **A pool that sees one broken idle connection refuses everything until the process restarts**, by design
    (`tests/integration/pol03-pool-resilience.test.ts`). systemd restarts the API only when it crashes, not when a pool
@@ -300,3 +303,27 @@ and the next poll, a second later, tries again). One API is 80 at most, and the 
 * **After the transition.** When the old release retires, one release's numbers from section 1 apply again (177 of 197 at
   200). Whether the limit goes back to 200 is the owner's decision, and changing the limit also needs a restart.
 * **The alert in section 5** fires above 240 connections while the limit is 320.
+
+## 9. Row-level security (2026-10-23)
+
+Mission row-level security S01 (`docs/missions/row-level-security/slices/S01/DECISIONS.md` D29, D50) turns row security
+on for every table that holds an account's rows. The two everyday API logins then see only the signed-in account's rows,
+so every statement the API makes outside a signed-in request (background loops, billing jobs and webhooks, boot checks)
+runs on one of two new logins instead, each on a pool of its own: `api:system` (6, the `api-system` login) and
+`api:authorization-system` (2, the `api-authorization-system` login). The room-decision pool keeps its 4 and connects as
+`api-system`. One API is 70 at most (62 without row-level security, now that synthesis-flag S05 removed the
+18-connection `api:support-relay-lease` pool).
+
+| Who | Connections at most |
+|---|---|
+| Website program (API), two releases at 70 each | 140 |
+| Debate runner, two releases at 34 each | 68 |
+| Hatchet (its role's limit) | 50 |
+| Migrator (its role's limit) | 3 |
+| Owner's commands | about 10 |
+| **Sum of ceilings** | **271** (255 without row-level security) |
+| Left free | 46 (317 = 320 less the administrator's 3; 62 without row-level security) |
+
+`max_connections` stays 320. One release at the old 200 is 167 of 197, 30 free (section 1). One API and one runner are
+now 15 pools that can cancel (13 API pools with the dev menu off, plus the runner's 2), 30 for two releases, and the 46
+free connections cover one cancellation for each of them at the same moment. No other pool size changed.

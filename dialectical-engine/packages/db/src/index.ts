@@ -17,6 +17,29 @@ import type {
 import { MODEL_STRENGTHS, TypedDomainError, parseReleaseKey, type ActivationState, type CompositionBudgetTier, type ModelStrength, type RiskTier, type TierSource } from "@debateai/kernel";
 
 export * from "./publication-check.js";
+export * from "./synthesis-check-erasure.js";
+export { PostgresThreatReportRepository, type ThreatReportDecision, type ThreatReportListRow, type ThreatReportReadRow, type ThreatReportAlertClaim } from "./threat-reports.js";
+// Row-level security S01 (PLAN §0.3): the request scope and the cross-account routing createPool applies.
+export {
+  ACCOUNT_CREDENTIAL_SETTING,
+  crossAccount,
+  crossAccountPool,
+  requestScopeActive,
+  runInRequestScope,
+  setCrossAccountTarget,
+  setRequestCredential,
+  type CrossAccountReader
+} from "./account-context.js";
+import {
+  ACCOUNT_CREDENTIAL_SETTING,
+  accountContextRoute,
+  accountContextSource,
+  crossAccount,
+  onCrossAccountTarget,
+  registerAccountContextPool,
+  sameAccountContextSource,
+  type AccountContextSource
+} from "./account-context.js";
 export { PostgresDataExportRepository, PostgresDataExportSource } from "./data-export.js";
 export * from "./pool-budget.js";
 export * from "./release-state.js";
@@ -164,14 +187,8 @@ export {
   assertSupportPrincipalRole,
   lockSupportOwners,
   lockSupportSessions,
-  PostgresSupportCaseRepository,
-  PostgresSupportCaseSummaryRepository,
-  PostgresSupportMessageRepository,
   PostgresSupportKeyRotationRepository,
-  PostgresSupportRelayReservationRepository,
   PostgresSupportShredRepository,
-  PostgresSupportSessionRepository,
-  PostgresSupportStatusRepository,
   type CreateCaseMaterial,
   type CreateWrappedSessionKey,
   type SupportCaseRecord,
@@ -222,6 +239,7 @@ type DebateAiDatabaseGlobals = typeof globalThis & {
   __debateaiRunContentLeaseScopeV1?: AsyncLocalStorage<ContentLeaseScopeState>;
   __debateaiRunContentLeaseLiveV1?: WeakMap<PoolClient, RunContentLease>;
   __debateaiRoutedLeasePoolsV1?: WeakSet<Pool>;
+  __debateaiRunContentLeaseSourceV1?: WeakMap<RunContentLease, AccountContextSource>;
 };
 const databaseGlobals = globalThis as DebateAiDatabaseGlobals;
 // Workspace packages can load distinct @debateai/db module instances under tsx.
@@ -234,6 +252,10 @@ const contentLeaseScope = databaseGlobals.__debateaiRunContentLeaseScopeV1
 const liveRunContentLeases = databaseGlobals.__debateaiRunContentLeaseLiveV1
   ??= new WeakMap<PoolClient, RunContentLease>();
 const routedLeasePools = databaseGlobals.__debateaiRoutedLeasePoolsV1 ??= new WeakSet<Pool>();
+// NV-31 with row security: the account-context source (account-context.ts) of the checkout that gave each run content
+// lease its client, process-global like the map above. The router compares it with each body statement's own source.
+const runContentLeaseSources = databaseGlobals.__debateaiRunContentLeaseSourceV1
+  ??= new WeakMap<RunContentLease, AccountContextSource>();
 const ownerAskAdmissionScope = new AsyncLocalStorage<Readonly<{
   lease: OwnerAskAdmissionLease;
 }>>();
@@ -271,7 +293,7 @@ const CONTENT_PROVISION_SIGNATURES = Object.freeze([
   // Side-by-side spec §4 (0123 §4, plan C11): a waiting owner's run re-admitted under the current release.
   "core.prepare_readmitted_run_key_provision(uuid,uuid)"
 ] as const);
-/** K02 (NV-08, 0125): provision capabilities in the erasure_reconcile schema, which the N-1 release (counting core only) does not attest. Resolved by OID, never by text, on the attested pool. */
+/** K02 (NV-08, 0131): provision capabilities in the erasure_reconcile schema, which the N-1 release (counting core only) does not attest. Resolved by OID, never by text, on the attested pool. */
 const CONTENT_PROVISION_RECONCILE_SIGNATURES = Object.freeze([
   "erasure_reconcile.claim_run_key_provision_cleanup(integer)"
 ] as const);
@@ -501,6 +523,8 @@ export async function acquireRunContentLease(
   const runIds = Object.freeze([...new Set(requestedRunIds)].sort());
   if (runIds.length === 0) throw new TypeError("CONTENT_LEASE_RUN_REQUIRED");
   for (;;) {
+    // Where pool.connect() below checks out, read in this same context (the router's comparison, NV-31).
+    const source = accountContextSource(pool);
     const client = await abortablePrivateWork(() => pool.connect(), signal, late => late.release(true));
     const acquired: string[] = [];
     let released = false;
@@ -594,6 +618,7 @@ export async function acquireRunContentLease(
         },
         release: unlock
       });
+      runContentLeaseSources.set(lease, source);
       liveRunContentLeases.set(client, lease);
       return lease;
     } catch (error) {
@@ -646,9 +671,9 @@ export async function withRunContentLease<T>(
 
 /**
  * Security fixes run 3 (K10, NV-31): a lease body's queries run on the lease's own client. On a routed pool, a
- * `pool.query` made inside a live run content lease scope or a live publication lease scope held on THIS pool runs
- * on that lease's client instead of asking the pool for a second connection while the first is held (hold-and-wait,
- * budget audit 2026-10-10 items 2-4). A lease is live from just before it is returned until its release begins, and
+ * `pool.query` made inside a live run content lease scope or a live publication lease scope runs on that lease's
+ * client while its source is the lease's (below), instead of asking for a second connection while the first is held
+ * (hold-and-wait, budget audit 2026-10-10 items 2-4). A lease is live from just before it is returned until its release begins, and
  * only the lease the calling context holds counts, never a later lease on the same client. `pool.connect()` is never
  * routed (a transaction keeps its own client). A bare lease (prepareLeasedContentEncryptionForRuns outside a scope)
  * routes only its own key loads; its holder's later `pool.query` calls are outside every scope and go to the pool. A
@@ -657,6 +682,13 @@ export async function withRunContentLease<T>(
  * routed. Never route a pool whose statements try-lock the lease namespaces, such as the erasure pool: 0123's core
  * erasure prepare try-locks a run's lease key, and a session never conflicts with its own advisory locks, so on a
  * lease's session that try-lock would succeed where it must answer CONTENDED.
+ * Row-level security (merge of security fixes run 3 with origin/dev): a lease's client runs as the login, and under the
+ * account context, of the checkout that gave it (createPool's account-context routing). A body statement goes to it
+ * only while that statement's own source (accountContextSource) is the lease's: a `crossAccount(...)` frame entered in
+ * the body of a lease a request took goes to the pool's target as the routing says, and a statement on this pool whose
+ * route is the target rides a lease held on that target (the public read's shared lease, X10). A statement whose
+ * source is not the lease's runs where the routing sends it; on the API that is the other login's pool (a request's
+ * lease and its frames' target), so the lease's own pool is never asked for a second connection by it.
  */
 export function routeLeaseBodyQueries(pool: Pool): void {
   if (routedLeasePools.has(pool)) throw new TypeError("LEASE_BODY_QUERIES_ALREADY_ROUTED");
@@ -664,9 +696,11 @@ export function routeLeaseBodyQueries(pool: Pool): void {
   const mutablePool = pool as unknown as { query: UntypedMethod };
   const query = mutablePool.query.bind(pool);
   mutablePool.query = (...args: unknown[]): unknown => {
+    const source = accountContextSource(pool);
     const scope = contentLeaseScope.getStore();
-    const client = scope?.pool === pool && liveRunContentLeases.get(scope.lease.client) === scope.lease
-      ? scope.lease.client : publicationLeaseClientFor(pool);
+    const client = scope !== undefined && liveRunContentLeases.get(scope.lease.client) === scope.lease
+      && sameAccountContextSource(runContentLeaseSources.get(scope.lease), source)
+      ? scope.lease.client : publicationLeaseClientFor(source);
     return client === undefined ? query(...args) : (client as unknown as { query: UntypedMethod }).query(...args);
   };
 }
@@ -1057,7 +1091,13 @@ function rejectKnownFailure(args: readonly unknown[], failure: TypedDomainError)
 function wrapClientQueries(client: PoolClient): PoolClient {
   if (wrappedPoolClients.has(client)) return client;
   const mutableClient = client as unknown as { query: UntypedMethod };
-  const query = mutableClient.query.bind(client);
+  // Row-level security S01 (PLAN §0.3, D55): the client's own `query` is looked up at each call, not bound at its
+  // first checkout, so a method installed on pg.Client.prototype later (the R21 test guard) reaches a client checked
+  // out before it. An own `query` the client already carried is kept, as before. No product code patches pg.
+  const ownQuery = Object.prototype.hasOwnProperty.call(client, "query") ? mutableClient.query : undefined;
+  const query = (...args: unknown[]): unknown =>
+    (ownQuery ?? (Reflect.get(Object.getPrototypeOf(client) as object, "query", client) as UntypedMethod))
+      .apply(client, args);
   mutableClient.query = (...args: unknown[]): unknown => {
     const callback = args.at(-1);
     if (typeof callback === "function") {
@@ -1080,9 +1120,66 @@ function wrapClientQueries(client: PoolClient): PoolClient {
   return client;
 }
 
+const ACCOUNT_CONTEXT_RELEASE_IN_TRANSACTION = "ACCOUNT_CONTEXT_RELEASE_IN_TRANSACTION";
+
+/**
+ * Row-level security S01, release rule v3 (PLAN §0.3; DECISIONS D58, D72): a client that carries a request's credential
+ * goes back to the pool only idle and cleared. Released with an error by its caller, or not idle (`getTransactionStatus()`
+ * pg 8.22.0: "I" idle, "T" in a block, "E" aborted, null unknown) — it is released WITH an error, so pg destroys it and
+ * its session, the credential with it. Otherwise the credential is cleared first; a failed clear destroys it; and the
+ * status is read AGAIN once the clear resolved, because a BEGIN the caller sent and did not await ran before the clear
+ * and left the clear inside its block (a ROLLBACK there would restore the credential).
+ */
+function releaseAfterClearing(client: PoolClient, release: (error?: Error | boolean) => void,
+  callerError: Error | boolean | undefined): void {
+  if (callerError) {
+    release(callerError);
+    return;
+  }
+  if (client.getTransactionStatus() !== "I") {
+    release(new Error(ACCOUNT_CONTEXT_RELEASE_IN_TRANSACTION));
+    return;
+  }
+  // pg-pool listens for a checked-out client's errors only once it is back; the clear's own rejection reports them.
+  const ignoreClientError = (): void => undefined;
+  client.on("error", ignoreClientError);
+  client.query("SELECT set_config($1,'',false)", [ACCOUNT_CREDENTIAL_SETTING]).then(() => {
+    client.removeListener("error", ignoreClientError);
+    release(client.getTransactionStatus() === "I" ? undefined : new Error(ACCOUNT_CONTEXT_RELEASE_IN_TRANSACTION));
+  }, (failure: unknown) => {
+    client.removeListener("error", ignoreClientError);
+    release(failure instanceof Error ? failure : new Error(String(failure)));
+  });
+}
+
+/** Sends the request's credential on a fresh checkout (a bind parameter, never query text) and arms the release rule. */
+async function sendAccountCredential(client: PoolClient, credential: string): Promise<PoolClient> {
+  const release = client.release.bind(client);
+  try {
+    await client.query("SELECT set_config($1,$2,false)", [ACCOUNT_CREDENTIAL_SETTING, credential]);
+  } catch (error) {
+    release(error instanceof Error ? error : new Error(String(error)));
+    throw error;
+  }
+  let released = false;
+  client.release = (error?: Error | boolean): void => {
+    if (released) throw new Error("Release called on client which has already been released to the pool.");
+    released = true;
+    releaseAfterClearing(client, release, error);
+  };
+  return client;
+}
+
+/**
+ * Row-level security S01 (PLAN §0.3, DECISIONS D28, D29): `crossAccount` names the pool's cross-account target (or
+ * `setCrossAccountTarget` gives it one later). A statement goes to the pool's own connections iff a request scope is
+ * active and no `crossAccount(...)` frame is; otherwise to the target. On its own connections, inside a scope whose
+ * credential is set, each checkout (pool.query checks out internally) sends the credential first and the release rule
+ * above clears it. A pool with no target behaves as before: no routing, no credential.
+ */
 export function createPool(
   connectionString: string,
-  options: Readonly<{ max?: number; connectionTimeoutMillis?: number; name?: string }> = {}
+  options: Readonly<{ max?: number; connectionTimeoutMillis?: number; name?: string; crossAccount?: Pool }> = {}
 ): Pool {
   if (options.max !== undefined
     && (!Number.isSafeInteger(options.max) || options.max < 1 || options.max > 100)) {
@@ -1096,7 +1193,7 @@ export function createPool(
   if (options.name !== undefined && !/^[a-z][a-z0-9:-]{0,47}$/u.test(options.name)) {
     throw new TypeError("DATABASE_POOL_NAME_INVALID");
   }
-  const { name, ...sizing } = options;
+  const { name, crossAccount: crossAccountTarget, ...sizing } = options;
   const pool = new PgPool({ connectionString, ...sizing, ...(name === undefined ? {} : { application_name: name }) });
   const reportBusy = busyReporter(pool, name ?? "unnamed");
   let terminalFailure: TypedDomainError | undefined;
@@ -1108,53 +1205,88 @@ export function createPool(
 
   const mutablePool = pool as unknown as { query: UntypedMethod; connect: UntypedMethod };
   const query = mutablePool.query.bind(pool);
-  mutablePool.query = (...args: unknown[]): unknown => {
+  // pg-pool's query checks out through `this.connect` synchronously: that checkout belongs to the statement already
+  // routed, so it takes this credential instead of being routed a second time (undefined: no such statement running).
+  let statementCredential: string | null | undefined;
+  const ownQuery = (credential: string | null, args: unknown[]): unknown => {
     if (terminalFailure !== undefined) return rejectKnownFailure(args, terminalFailure);
-    const callback = args.at(-1);
-    if (typeof callback === "function") {
-      const wrappedArgs = [...args];
-      wrappedArgs[wrappedArgs.length - 1] = (error: unknown, ...values: unknown[]) => {
-        callback(error === undefined || error === null ? error : typedQueryFailure(error), ...values);
-      };
-      return query(...wrappedArgs);
-    }
+    const enclosing = statementCredential;
+    statementCredential = credential;
     try {
-      const result = query(...args);
-      return result instanceof Promise
-        ? result.catch((error: unknown) => Promise.reject(typedQueryFailure(error)))
-        : result;
-    } catch (error) {
-      throw typedQueryFailure(error);
+      const callback = args.at(-1);
+      if (typeof callback === "function") {
+        const wrappedArgs = [...args];
+        wrappedArgs[wrappedArgs.length - 1] = (error: unknown, ...values: unknown[]) => {
+          callback(error === undefined || error === null ? error : typedQueryFailure(error), ...values);
+        };
+        return query(...wrappedArgs);
+      }
+      try {
+        const result = query(...args);
+        return result instanceof Promise
+          ? result.catch((error: unknown) => Promise.reject(typedQueryFailure(error)))
+          : result;
+      } catch (error) {
+        throw typedQueryFailure(error);
+      }
+    } finally {
+      statementCredential = enclosing;
     }
   };
 
   const connect = mutablePool.connect.bind(pool);
-  mutablePool.connect = (...args: unknown[]): unknown => {
+  const ownConnect = (credential: string | null, args: unknown[]): unknown => {
     if (terminalFailure !== undefined) return rejectKnownFailure(args, terminalFailure);
     const callback = args.at(-1);
     if (typeof callback === "function") {
       return connect((error: unknown, client: PoolClient | undefined, release: unknown) => {
         if (error !== undefined && error !== null) reportBusy(error);
-        callback(
-          error === undefined || error === null ? error : typedPoolFailure(error),
-          client === undefined ? undefined : wrapClientQueries(client),
-          release
+        if (credential === null || client === undefined || (error !== undefined && error !== null)) {
+          callback(
+            error === undefined || error === null ? error : typedPoolFailure(error),
+            client === undefined ? undefined : wrapClientQueries(client),
+            release
+          );
+          return;
+        }
+        sendAccountCredential(wrapClientQueries(client), credential).then(
+          (carrying) => { callback(error, carrying, carrying.release); },
+          (failure: unknown) => { callback(failure, undefined, () => undefined); }
         );
       });
     }
     try {
       const result = connect();
-      return result instanceof Promise
-        ? result.then((client: PoolClient) => wrapClientQueries(client))
-          .catch((error: unknown) => {
-            reportBusy(error);
-            return Promise.reject(typedPoolFailure(error));
-          })
-        : result;
+      if (!(result instanceof Promise)) return result;
+      const checkedOut = result.then((client: PoolClient) => wrapClientQueries(client))
+        .catch((error: unknown) => {
+          reportBusy(error);
+          return Promise.reject(typedPoolFailure(error));
+        });
+      return credential === null ? checkedOut : checkedOut.then((client) => sendAccountCredential(client, credential));
     } catch (error) {
       throw typedPoolFailure(error);
     }
   };
+
+  mutablePool.query = (...args: unknown[]): unknown => {
+    const route = accountContextRoute(pool);
+    return route.kind === "target"
+      ? onCrossAccountTarget(route.target, "query", args)
+      : ownQuery(route.credential, args);
+  };
+  mutablePool.connect = (...args: unknown[]): unknown => {
+    if (statementCredential !== undefined) return ownConnect(statementCredential, args);
+    const route = accountContextRoute(pool);
+    return route.kind === "target"
+      ? onCrossAccountTarget(route.target, "connect", args)
+      : ownConnect(route.credential, args);
+  };
+  registerAccountContextPool(pool, {
+    target: crossAccountTarget,
+    ownQuery: (...args: unknown[]) => ownQuery(null, args),
+    ownConnect: (...args: unknown[]) => ownConnect(null, args)
+  });
 
   return pool;
 }
@@ -1703,30 +1835,32 @@ export async function readRunRoleRotation(executor: Pick<Pool, "query"> | PoolCl
  * (A per-role tally table is a later optimisation, spec Part 3.)
  */
 export async function readRoleRotationCounts(pool: Pick<Pool, "connect">): Promise<RunRoleRotationCounts> {
-  const client = await pool.connect();
-  let destroy: unknown;
-  let rows: { role: RoleRotationCountRole; model_id: string; picked: number; eligible: number }[];
-  try {
-    await client.query("BEGIN");
-    await client.query("SET LOCAL statement_timeout = '5s'");
-    rows = await queryRoleRotationCounts(client);
-    await client.query("COMMIT");
-  } catch (error) {
-    try { await client.query("ROLLBACK"); } catch (rollbackFailure) { destroy = rollbackFailure; }
-    throw error;
-  } finally {
-    client.release(destroy as Error | undefined);
-  }
-  const counts = new Map(ROLE_ROTATION_COUNT_ROLES.map((role) => [role, new Map<string, RunRoleRotationTally>()]));
-  for (const row of rows) {
-    const byModel = counts.get(row.role);
-    if (byModel === undefined || !Number.isSafeInteger(row.picked) || !Number.isSafeInteger(row.eligible)) {
-      throw new TypeError("RUN_ROLE_ROTATION_INVALID");
+  return crossAccount("X24", async () => {
+    const client = await pool.connect();
+    let destroy: unknown;
+    let rows: { role: RoleRotationCountRole; model_id: string; picked: number; eligible: number }[];
+    try {
+      await client.query("BEGIN");
+      await client.query("SET LOCAL statement_timeout = '5s'");
+      rows = await queryRoleRotationCounts(client);
+      await client.query("COMMIT");
+    } catch (error) {
+      try { await client.query("ROLLBACK"); } catch (rollbackFailure) { destroy = rollbackFailure; }
+      throw error;
+    } finally {
+      client.release(destroy as Error | undefined);
     }
-    byModel.set(row.model_id, Object.freeze({ picked: row.picked, eligible: row.eligible }));
-  }
-  return Object.freeze(Object.fromEntries([...counts].map(([role, byModel]) =>
-    [role, Object.freeze(Object.fromEntries(byModel))]))) as RunRoleRotationCounts;
+    const counts = new Map(ROLE_ROTATION_COUNT_ROLES.map((role) => [role, new Map<string, RunRoleRotationTally>()]));
+    for (const row of rows) {
+      const byModel = counts.get(row.role);
+      if (byModel === undefined || !Number.isSafeInteger(row.picked) || !Number.isSafeInteger(row.eligible)) {
+        throw new TypeError("RUN_ROLE_ROTATION_INVALID");
+      }
+      byModel.set(row.model_id, Object.freeze({ picked: row.picked, eligible: row.eligible }));
+    }
+    return Object.freeze(Object.fromEntries([...counts].map(([role, byModel]) =>
+      [role, Object.freeze(Object.fromEntries(byModel))]))) as RunRoleRotationCounts;
+  });
 }
 
 async function queryRoleRotationCounts(client: PoolClient) {
@@ -3057,6 +3191,7 @@ export {
   type AcceptanceInput,
   type AcceptanceKind,
   type AcceptanceSurface,
+  type ItalyApprovalAcceptanceRow,
   type SignUpAcceptanceRow
 } from "./legal-acceptance.js";
 export * from "./obs-schema.js";
