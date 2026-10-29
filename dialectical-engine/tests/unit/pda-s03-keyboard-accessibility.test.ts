@@ -217,7 +217,7 @@ describe("public debate navigation keyboard accessibility", () => {
       expect.soft(inactiveStyle.fontWeight, "inactive link control weight").toBe("600");
       expect.soft(inactiveStyle.padding, "inactive link control padding").not.toBe("0");
       expect.soft(inactiveStyle.borderRadius, "inactive link control shape").not.toBe("");
-      expect.soft(activeStyle.background, "current-state background").not.toBe(inactiveStyle.background);
+      expect.soft(activeStyle.backgroundColor, "current-state background").not.toBe(inactiveStyle.backgroundColor);
       expect.soft(activeStyle.color, "current-state foreground").not.toBe(inactiveStyle.color);
       expect.soft(activeStyle.boxShadow, "current-state non-colour channel").not.toBe(inactiveStyle.boxShadow);
       expect.soft(activeStyle.boxShadow, "current-state shadow exists").not.toBe("");
