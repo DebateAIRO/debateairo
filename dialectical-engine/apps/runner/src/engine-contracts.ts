@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import {
   COMPARING_JUDGE_PROMPT_CONTRACT, COMPARING_JUDGE_SOURCES_PROMPT_CONTRACT, POINT_INVESTIGATION_PROMPT_CONTRACT, WEB_STEP_PROMPT_CONTRACTS,
-  judgeAssignedRootV2PromptContract, judgeSourcesSealedContracts
+  WEB_WORDING_V2_SEALED_CONTRACTS, judgeAssignedRootV2PromptContract, judgeSourcesSealedContracts
 } from "@debateai/judgement";
 import { MAP_ENGINE_CONTRACT_NAMES, mapEnginePromptContracts } from "@debateai/map";
 import { promptContractFingerprintText, type PromptContract } from "@debateai/providers";
@@ -19,7 +19,8 @@ export const ENGINE_CONTRACT_FINGERPRINT_HEADER = "debateai.engine-contracts.v1"
  * Every engine-2 sealed contract, append-only in phase order, never reordered (INTERFACE §2.2, §2.5). R1d: none, so the
  * fingerprint text is the header alone (deviation 2: the story v4 contracts are test-pinned, not sealed). R2a appends
  * verdict.investigate.v1 and R2b verdict.judge.v1 (R2 plan deviation 1); R3 the map v2 contracts and the assigned-root
- * v2 pair; R4 the writer's and checker's engine pair; W1-5 (web search, 2026-10-30) the web wording. A phase that
+ * v2 pair; R4 the writer's and checker's engine pair; W1-5 (web search, 2026-10-30) the web wording; W1-5b its second
+ * wording as new ids (the v1s it supersedes stay sealed, unused). A phase that
  * appends moves ENGINE_SEALED_IDS and ENGINE_CONTRACT_HASH_SEALED in tests/unit/engine-contract-hash.test.ts.
  */
 export function engineSealedContracts(): readonly PromptContract[] {
@@ -40,7 +41,11 @@ export function engineSealedContracts(): readonly PromptContract[] {
     ...judgeSourcesSealedContracts(),
     COMPARING_JUDGE_SOURCES_PROMPT_CONTRACT,
     SYNTHESIZER_LENGTH_SOURCES_PROMPT_CONTRACT,
-    SYNTHESIZER_LENGTH_READER_SOURCES_PROMPT_CONTRACT
+    SYNTHESIZER_LENGTH_READER_SOURCES_PROMPT_CONTRACT,
+    // W1-5b (owner approvals of 2026-10-30): the planner v2 (the local pair), the pick v2 and readers 2 and 3 v2 (3 or 5
+    // pages, from code), and the dig-suggestion call (W0-1 drafts §2.1). web.plan.v1, web.pick.v1 and web.read-top.v1
+    // above are never removed or edited: sealed, unused.
+    ...WEB_WORDING_V2_SEALED_CONTRACTS
   ]);
 }
 

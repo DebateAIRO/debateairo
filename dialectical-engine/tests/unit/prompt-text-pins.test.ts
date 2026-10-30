@@ -4,6 +4,7 @@ import {
   COMPARING_JUDGE_SOURCES_PROMPT_CONTRACT,
   PANEL_PROMPT_CONTRACT,
   WEB_STEP_PROMPT_CONTRACTS,
+  WEB_WORDING_V2_SEALED_CONTRACTS,
   judgeSourcesSealedContracts,
   judgeConsiderationPromptContract,
   judgePromptContract,
@@ -874,8 +875,9 @@ describe("REVIEW ITEM 4 — no prompt anywhere still carries the retired sentenc
     ["story-storyteller-v4", buildStorytellerContract(STORY_PACK, false, { shapeId: "general" })],
     ["story-checker-v4", buildStoryCheckerContract(STORY_PACK, false, { shapeId: "general" })],
     // Web search (W1-5, 2026-10-30): every new sealed contract; their texts are pinned in tests/unit/web-prompts.test.ts.
+    // W1-5b (2026-10-30): the second web wording's four new contracts.
     ...[...WEB_STEP_PROMPT_CONTRACTS, ...judgeSourcesSealedContracts(), COMPARING_JUDGE_SOURCES_PROMPT_CONTRACT,
-      SYNTHESIZER_LENGTH_SOURCES_PROMPT_CONTRACT, SYNTHESIZER_LENGTH_READER_SOURCES_PROMPT_CONTRACT]
+      SYNTHESIZER_LENGTH_SOURCES_PROMPT_CONTRACT, SYNTHESIZER_LENGTH_READER_SOURCES_PROMPT_CONTRACT, ...WEB_WORDING_V2_SEALED_CONTRACTS]
       .map((contract): [string, typeof contract] => [contract.contractId, contract])
   ])("%s", (_name, contract) => {
     const whole = `${contract.instruction} ${contract.answerForm}`;
