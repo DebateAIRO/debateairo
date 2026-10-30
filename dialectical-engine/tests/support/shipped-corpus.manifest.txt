@@ -1080,6 +1080,7 @@ packages/evaluator/src/public-aggregate-provider.ts
 packages/evidence/src/host-filter.ts
 packages/evidence/src/index.ts
 packages/evidence/src/query-guard.ts
+packages/evidence/src/verbatim.ts
 packages/evidence/src/web-query-set.ts
 packages/evidence/src/window.ts
 packages/geo/src/decide.ts
