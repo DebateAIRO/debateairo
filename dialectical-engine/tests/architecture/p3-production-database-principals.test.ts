@@ -936,6 +936,43 @@ describe("P3-01 production database-principal manifest", () => {
   "roleName": "debateai_data_export_worker",
   "source": "migrations/0133_investigations.sql",
   "grants": ["EXECUTE ON FUNCTION identity.read_data_export_investigations(uuid,uuid)"]
+},
+// The dig model and the month pause (0134; dig-model revision task W2-8): the nested join, the level, rewrite and pause
+// readers and Continue for the API's own role, the rewrite turn, writer and readers, the web plan's writer and reader and the
+// pause writer and reader for the
+// shared runtime role (the runner; the API's roles inherit them), and one export reader. No table grant.
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0134_dig_model_and_month_pause.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.join_investigation_nested(uuid,uuid,uuid,text[],text)",
+    "EXECUTE ON FUNCTION identity.read_dig_level(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.read_investigation_dig_levels(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.read_path_rewrites(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.resume_paused_run(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.read_run_pause(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.read_paused_runs(uuid)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0134_dig_model_and_month_pause.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_dig_level_of_run(uuid)",
+    "EXECUTE ON FUNCTION identity.take_path_rewrite_turn(uuid,uuid,text)",
+    "EXECUTE ON FUNCTION identity.read_path_rewrite_turn(uuid)",
+    "EXECUTE ON FUNCTION identity.record_path_rewrite(uuid,uuid,integer,uuid,text,text,text,text,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_path_rewrites_of_run(uuid)",
+    "EXECUTE ON FUNCTION identity.record_web_plan_path(uuid,text,text,smallint,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_web_plan(uuid)",
+    "EXECUTE ON FUNCTION identity.record_run_pause(uuid,text,timestamptz,integer,integer,bigint)",
+    "EXECUTE ON FUNCTION identity.read_run_pause_of_run(uuid)"
+  ]
+},
+{
+  "roleName": "debateai_data_export_worker",
+  "source": "migrations/0134_dig_model_and_month_pause.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.read_data_export_dig_model(uuid,uuid)"]
 }
 ]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))
@@ -1316,6 +1353,23 @@ it("discloses exactly 0133's grants to the runtime role, the API's own role and 
   expect(actual).toEqual(declared);
   // Function grants only: no role holds a table right on these tables.
   expect(declared).toHaveLength(12);
+  expect(declared.some(grant => !/^GRANT EXECUTE ON FUNCTION /u.test(grant))).toBe(false);
+});
+
+it("discloses exactly 0134's grants to the runtime role, the API's own role and the export worker (dig-model revision W2-8)", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const sql = await readFile("migrations/0134_dig_model_and_month_pause.sql", "utf8");
+  const disclosed = "debateai_runtime|debateai_staff_security_owner|debateai_billing_runtime|debateai_data_export_worker";
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)].map(([statement]) => statement)
+    .filter(statement => new RegExp(`\\bTO\\b.*\\b(?:${disclosed})\\b`, "u").test(statement)
+      && !new RegExp(` TO (?:${disclosed});$`, "u").test(statement))).toEqual([]);
+  const actual = [...sql.matchAll(new RegExp(`^GRANT [^\\n]+ TO (?:${disclosed});$`, "gm"))]
+    .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0134_dig_model_and_month_pause.sql")
+    .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
+  expect(actual).toEqual(declared);
+  // Function grants only: no role holds a table right on these tables.
+  expect(declared).toHaveLength(17);
   expect(declared.some(grant => !/^GRANT EXECUTE ON FUNCTION /u.test(grant))).toBe(false);
 });
 

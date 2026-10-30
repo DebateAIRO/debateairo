@@ -30,6 +30,8 @@ export const WEB_EVIDENCE_CARRIERS = Object.freeze({
   extract: "identity.web_extract",
   pack: "identity.web_pack"
 } as const);
+/** 0134's carrier beside them: the planner's reason for a path with no search, bound to its path_ref (not a row id). */
+export const WEB_PLAN_CARRIER = "identity.web_plan_path" as const;
 
 /** 0132's runner-side functions (debateai_runtime), the API's one, and the erasure and export readers. */
 export const WEB_EVIDENCE_RUNNER_FUNCTIONS = Object.freeze([
@@ -160,12 +162,55 @@ export class PostgresWebEvidenceRepository {
     return Object.freeze(rows.map((row) => Object.freeze({ pageId: row.page_id, textDigest: row.text_digest, envelope: row.content_ciphertext })));
   }
 
+  /**
+   * 0134: the planner's decision for each path of the map (W3-1, before any search), one row per run and path, written
+   * once: a replay rewrites nothing. RECORDED when a row was written, ALREADY when every path was there, NOT_LIVE when the
+   * debate is not a live private debate (nothing written after it).
+   */
+  async recordPlanStatuses(runId: string, paths: readonly WebPlanPathRecord[], executor: Executor = this.pool):
+    Promise<WebWriteOutcome> {
+    let recorded = false;
+    for (const path of paths) {
+      const written = await outcome<WebWriteOutcome>(executor,
+        "SELECT identity.record_web_plan_path($1,$2,$3,$4,$5::jsonb,$6) AS outcome",
+        [runId, path.pathRef, path.status, path.searchesToSend, envelope(path.reason), attestation(path.reason)]);
+      if (written === "NOT_LIVE") return "NOT_LIVE";
+      recorded ||= written === "RECORDED";
+    }
+    return recorded ? "RECORDED" : "ALREADY";
+  }
+
+  /** 0134: the run's stored web plan by path (empty before the planner ran), or null when the debate is not live. */
+  async readPlanStatuses(runId: string): Promise<readonly WebPlanPathRead[] | null> {
+    const plan = (await this.pool.query<{ plan: Array<{ path_ref: string; status: WebPlanPathRead["status"]; searches_to_send: number;
+      decided_at: string; content: CryptoEnvelope | null }> | null }>("SELECT identity.read_web_plan($1) AS plan", [runId])).rows[0]?.plan ?? null;
+    return plan === null ? null : Object.freeze(plan.map((row) => Object.freeze({ pathRef: row.path_ref, status: row.status,
+      searchesToSend: row.searches_to_send, decidedAt: row.decided_at, reason: row.content })));
+  }
+
   /** The readers' outcome of a page the person added to "researched" (W4-4), set once. */
   settleResearched(runId: string, pageId: string, settled: "ADDS" | "DOES_NOT_ADD" | "FAILED"):
     Promise<"SETTLED" | "ALREADY" | "NOT_CHOSEN" | "NOT_LIVE"> {
     return outcome(this.pool, "SELECT identity.settle_web_researched($1,$2,$3) AS outcome", [runId, pageId, settled]);
   }
 }
+
+/** One path's web decision as the runner's webPlanPathStatuses gives it, its reason sealed (NO_SEARCH_PLANNED only). */
+export type WebPlanPathRecord = Readonly<{
+  pathRef: string;
+  status: "PLANNED" | "NO_SEARCH_PLANNED" | "NOT_ON_PLAN" | "SWITCHED_OFF" | "FAILED";
+  searchesToSend: number;
+  /** The reason sealed under the run's key, carrier WEB_PLAN_CARRIER, the path_ref as its key; null unless NO_SEARCH_PLANNED. */
+  reason: WebSealed | null;
+}>;
+/** One path's stored decision; `reason` is the envelope to open under the run's key (null but on NO_SEARCH_PLANNED). */
+export type WebPlanPathRead = Readonly<{
+  pathRef: string;
+  status: WebPlanPathRecord["status"];
+  searchesToSend: number;
+  decidedAt: string;
+  reason: CryptoEnvelope | null;
+}>;
 
 /** The API's side of 0132 (debateai_billing_runtime): the person adds an other page of a path to "researched". */
 export class PostgresWebResearchedRepository {

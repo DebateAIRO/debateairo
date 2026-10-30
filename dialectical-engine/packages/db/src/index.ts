@@ -41,6 +41,8 @@ export { PostgresDataExportRepository, PostgresDataExportSource } from "./data-e
 // The Perplexity plan's stores (migrations 0132 and 0133, task W1-3): a debate's web evidence and the investigations.
 export * from "./web-evidence.js";
 export * from "./investigations.js";
+// The new dig model and the month pause (migration 0134, dig-model revision task W2-8).
+export * from "./dig-model.js";
 export * from "./pool-budget.js";
 export * from "./release-state.js";
 export { recordRunSupersession, resolveRunRef } from "./run-supersession.js";

@@ -126,6 +126,10 @@ const WORKER_FUNCTIONS = [
   // (debates.json web_sources; account.json investigations and reserve_events).
   "identity.read_data_export_web_evidence(uuid,uuid)",
   "identity.read_data_export_investigations(uuid,uuid)",
+  // The new dig model and the month pause (0134): the dig levels, the path rewrites (sealed under each dig's run key)
+  // and the pauses. Its archive section is not wired yet (apps/api/src/data-export); the boot check already pins that
+  // the worker reaches it.
+  "identity.read_data_export_dig_model(uuid,uuid)",
   "identity.complete_data_export(uuid,uuid,text,text,bigint,timestamp with time zone)",
   "identity.fail_data_export(uuid,uuid,text)",
   "identity.sweep_data_exports()",
@@ -152,7 +156,7 @@ export async function assertDataExportDatabaseRoles(requestPool: Pool, workerPoo
     const [request, worker] = await Promise.all([roleWitness(requestPool), roleWitness(workerPool)]);
     if (request === undefined || worker === undefined || request.principal === worker.principal
       || !request.authorization_member || request.worker_member || request.request_count !== 4 || request.worker_count !== 0
-      || !worker.worker_member || worker.authorization_member || worker.request_count !== 0 || worker.worker_count !== 12
+      || !worker.worker_member || worker.authorization_member || worker.request_count !== 0 || worker.worker_count !== 13
       || request.privileged || worker.privileged) {
       throw new TypeError("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
     }

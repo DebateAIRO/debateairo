@@ -140,7 +140,7 @@ describe("0133 an investigation and its digs", () => {
     expect(await investigations.open(person.ownerRef, root)).toBe(joined.investigationId);
     expect(await investigations.open(person.ownerRef, dig)).toBe(joined.investigationId);
     expect((await investigations.join({ ownerRef: person.ownerRef, parentRunId: dig, childRunId: deeper, places: [], mode: "thorough" })))
-      .toEqual({ outcome: "JOINED", investigationId: joined.investigationId });
+      .toEqual({ outcome: "JOINED", investigationId: joined.investigationId, digLevel: 2 });
     expect((await investigations.join({ ownerRef: person.ownerRef, parentRunId: root, childRunId: dig, places: ["w"], mode: "thorough" })).outcome).toBe("ALREADY");
     expect((await investigations.join({ ownerRef: person.ownerRef, parentRunId: root, childRunId: deeper, places: [], mode: "quick" })).outcome).toBe("CONFLICT");
     const read = (await investigations.read(person.ownerRef, deeper))!;
@@ -161,7 +161,7 @@ describe("0133 an investigation and its digs", () => {
     const theirs = await run(stranger);
     const investigations = new PostgresInvestigationRepository(api);
     expect(await investigations.join({ ownerRef: person.ownerRef, parentRunId: root, childRunId: theirs, places: [], mode: "quick" }))
-      .toEqual({ outcome: "NOT_OWNED", investigationId: null });
+      .toEqual({ outcome: "NOT_OWNED", investigationId: null, digLevel: null });
     expect(await investigations.open(stranger.ownerRef, root)).toBeNull();
     expect(await investigations.read(stranger.ownerRef, root)).toBeNull();
     for (const [places, mode] of [[["has space"], "quick"], [[], "deep"], [Array.from({ length: 17 }, () => "w"), "quick"]] as const) {

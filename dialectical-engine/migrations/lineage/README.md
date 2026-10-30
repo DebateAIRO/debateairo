@@ -10,13 +10,13 @@ base verifier).
 
 Every migration after 0110 is a forward step in an ordered chain anchored on 0110; 0111 (NETOPIA, PR-54, PR-58) is the
 first, the auth DB batch (0112, below) the second, Part C's prices (0113, below) the third, role rotation (0114,
-below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth, the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, the synthesis check (0126, below) the sixteenth, the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth, the support answer scope (0129, below) the nineteenth, row-level security (0130, below) the twentieth, the V4 account memory (0131, below) the twenty-first, the web evidence store (0132, below) the twenty-second and the investigations (0133, below) the twenty-third. A step is added with new files only; NNNN is its number, the step before's number plus one:
+below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth, the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, the synthesis check (0126, below) the sixteenth, the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth, the support answer scope (0129, below) the nineteenth, row-level security (0130, below) the twentieth, the V4 account memory (0131, below) the twenty-first, the web evidence store (0132, below) the twenty-second, the investigations (0133, below) the twenty-third and the dig model with the month pause (0134, below) the twenty-fourth. A step is added with new files only; NNNN is its number, the step before's number plus one:
 
 1. `migrations/NNNN_<name>.sql`: the SQL, forward-only and replayable.
 2. A manifest in `lineage/`, shaped like `billing-netopia-forward111.json`: its version, the recipe's SHA-256,
-   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0133: 0133,
-   `investigations-forward0133.json`, and `verify-effective-capabilities-130.sql`, which supersedes 0111's, which
-   0112 to 0129 keep; 0131, 0132 and 0133 keep 0130's),
+   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0134: 0134,
+   `dig-model-forward0134.json`, and `verify-effective-capabilities-130.sql`, which supersedes 0111's, which
+   0112 to 0129 keep; 0131 to 0134 keep 0130's),
    and its own migration and verifier. (0111's own `previous` is 0110: `auth-dev-preview-20261006-forward110.json`
    and the sealed `verify-effective-capabilities.sql`.)
 3. A new verifier `lineage/verify-effective-capabilities-NNNN.sql` only when the step adds billing relations or
@@ -504,6 +504,38 @@ outside its scope rule and the steps stay expand-only. If an earlier pending ste
 these steps by the same recipe before merge (C1's: every file and constant that carries the number, `previous`, the
 manifest digests, the chain lists).
 
+## The dig model and the month pause (0134)
+
+The twenty-fourth step, after the investigations (0133), carries the new dig model's storage and the money rule's
+month pause (`docs/superpowers/plans/2026-10-30-dig-model-revision.md`, task W2-8 and "The money rule (owner, 31 Oct
+2026)"): `0134_dig_model_and_month_pause.sql` with `dig-model-forward0134.json` and
+`packages/db/src/migration-forward0134.ts` (`loadForward0134`, `MIGRATION_FORWARD0134_` refusals), appended last to
+`STEPS`. It declares `-- n1: expand` (new tables and functions; `ledger.model_spend`'s shared source list re-added NOT
+VALID with `PATH_REWRITE`, and that source's own run rule NOT VALID; the erasure role's one new function changes the
+count its boot check expects, which R22's drained upload makes moot) and `-- n1: keeps-verifier`: no billing relation
+or function, so `verify-effective-capabilities-130.sql` stays in force and it has no `replayVerifierSql`.
+
+It keeps `identity.investigation_dig_level` (each dig's level, 1..10; the first debate is 0 and has no row; the members
+0133 already held are filled in by walking their parents), `identity.path_rewrite_turn` (a settled dig's place in the
+line of rewrites of the path it was dug from), `identity.path_rewrite` (one rewrite per dig, insert-once: outcome,
+fates, the verdict's codes and lineage in clear; the path's new text, "What the dig changed", the verdict's reason and the
+dig's own paths only in an envelope under the dig's run key, a `CONTENT_CARRIERS` entry) and
+`identity.web_plan_path` (the search planner's decision for each path of a run, written once: PLANNED,
+NO_SEARCH_PLANNED with its reason sealed under the run's key and checked by 0132's content trigger, NOT_ON_PLAN,
+SWITCHED_OFF or FAILED, and the searches it sends) and `identity.run_pause_event` (PAUSED at the month wall with its reset and the planned work left, RESUMED on the person's
+Continue). 0133's member table and join function are NOT altered or revoked: 0133's postcondition digests that table's
+columns and the join's grants, so the level is a table of its own and `identity.join_investigation_nested` supersedes
+the join (TOO_DEEP at level 11, under 0133's two locks); no source calls 0133's join any more. Day and week borrowing
+keeps no record: it is derived from the spend windows (`packages/db/src/dig-model.ts`).
+
+Every row names its account's `owner_ref` with `ON DELETE CASCADE`; deleting one private debate calls
+`identity.forget_erased_debate_dig_model(uuid)` in the finalize transaction after 0133's (an erased dig takes its own
+rewrite and turn; an erased debate the rewrites of its paths; a dig's level goes with its 0133 member row). The export
+worker reads `identity.read_data_export_dig_model(uuid,uuid)` through 0128's lease gate. Tables and definers take
+0115's export owner; no role holds a table right, so row-level security (0130) leaves them outside its scope rule. If
+an earlier pending step takes 0134 first, renumber this step by the same recipe before merge (C1's: every file and
+constant that carries the number, `previous`, the manifest digests, the chain lists).
+
 ## Replay: every applied step keeps its own checks
 
 On a later `migrate()` EVERY applied step is checked by its receipt and by its postcondition digest (not only the
@@ -515,7 +547,7 @@ changes something an earlier step's verifier pins must change that verifier thro
 cannot silently pass. The effective-capability verifier of the last applied step (after 0129: 0111's, which the batch,
 Part C's step, role rotation, the data export, the mail locale, the debate shape map, the language check's site cost,
 the reclaim resume, the reply measures, the engine verdict, the engine's map answer step, the side-by-side releases,
-the settings activation, the Italy-specific approval, the synthesis check, the publication review, the threat reports and the support answer scope keep; after 0130: `verify-effective-capabilities-130.sql`, which the V4 account memory (0131), the web evidence store (0132) and the investigations (0133) keep) still
+the settings activation, the Italy-specific approval, the synthesis check, the publication review, the threat reports and the support answer scope keep; after 0130: `verify-effective-capabilities-130.sql`, which the V4 account memory (0131), the web evidence store (0132), the investigations (0133) and the dig model (0134) keep) still
 runs at the end of every `migrate()`. A step that changes by design a field an earlier step's postcondition digests
 declares it (`amendsPostconditionsOf`, 0130 below): the earlier step is then compared against its latest recorded
 amendment instead of its receipt.
