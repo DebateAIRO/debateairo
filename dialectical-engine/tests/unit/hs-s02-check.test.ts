@@ -23,6 +23,8 @@ const paths = [
     .map(p => [`answer.nodes[].${p}`, "ARGUMENTS"]),
   // Debate shape P2c: the map view's public text, judged with the arguments.
   ["map_view.positions[].answer", "ARGUMENTS"], ["map_view.also_raised[]", "ARGUMENTS"],
+  // Plan 2026-10-30 W1-6: a point's web sources, judged with the arguments.
+  ...["quote", "title", "site", "link", "explanation.text"].map(p => [`answer.nodes[].sources[].${p}`, "ARGUMENTS"]),
   ["answer.nodes[].review.reasons[]", "REVIEWS"],
   ...["headline", "summary", "confidence", "paths[].line", "change.text", "reviewer_note.text"]
     .map(p => [`story_short.${p}`, "STORY"])
@@ -104,12 +106,14 @@ describe("R2", () => {
   // transport + provider_ref from the two public lineages — 4 string leaves, both subtrees R2-excluded: 62 → 58, 36 → 32.
   // Debate shape P2c: map_view adds 3 string leaves — positions[].answer and also_raised[] checked,
   // positions[].node_id excluded: 58 → 61, 32 → 33, 26 → 28 checked paths.
-  it("covers the schema with 28 checked paths and 33 excluded strings", async () => {
+  // Plan 2026-10-30 W1-6: a point's web sources add 7 string leaves — quote, title, site, link and explanation.text
+  // checked, extract_id and published_on excluded: 61 → 68, 33 → 35, 28 → 33 checked paths.
+  it("covers the schema with 33 checked paths and 35 excluded strings", async () => {
     const m = await import("../../apps/api/src/publication-check/material.js");
     expect(m.CHECKED_TEXT_PATHS).toEqual(paths.map(([path, kind]) => ({ path, kind })));
     const leaves = walk(PublicDebateSchema).filter(l => l.type === "string");
-    expect(leaves).toHaveLength(61);
-    expect(leaves.filter(l => m.isExcludedTextPath(l.path, l.type))).toHaveLength(33);
+    expect(leaves).toHaveLength(68);
+    expect(leaves.filter(l => m.isExcludedTextPath(l.path, l.type))).toHaveLength(35);
     for (const leaf of walk(PublicDebateSchema)) {
       const checked = m.CHECKED_TEXT_PATHS.some(p => p.path === leaf.path);
       expect(Number(checked) + Number(m.isExcludedTextPath(leaf.path, leaf.type)), leaf.path).toBe(1);
@@ -122,8 +126,8 @@ describe("R2", () => {
     const m = await import("../../apps/api/src/publication-check/material.js");
     const leaves = m.extractCheckedText(snapshot(true));
     const expected = paths.flatMap(([path, kind]) => tuples(path, 2).map(t => ({ kind, text: markerOf(path, t) })));
-    // 28 paths: 8 without an array, 19 with one array (2 members each), 1 with two nested arrays (4 members).
-    expect(expected).toHaveLength(8 + 19 * 2 + 1 * 4);
+    // 33 paths: 8 without an array, 19 with one array (2 members each), 6 with two nested arrays (4 members).
+    expect(expected).toHaveLength(8 + 19 * 2 + 6 * 4);
     expect(leaves).toEqual(expected);
     const calls = m.packJudgeCalls(leaves);
     // FIX-HS2-t: one part kind per call — five kinds, five calls, one field each.
