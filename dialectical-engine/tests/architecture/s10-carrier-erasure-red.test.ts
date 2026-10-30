@@ -266,6 +266,10 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // wraps, and counts it until it settles (the backstop never retires under a call in flight). It opens no lease
       // and reads no content of its own.
       "apps/runner/src/runner-retirement.ts",
+      // Web search W2-3: the planner sends its one call (and a backup's) through the member gateway the web step hands
+      // it (the run's lane-wrapped, leased gateway), naming the run. It opens no lease and reads no content of its own;
+      // the searches and pages it plans are stored through packages/db/src/web-evidence.ts by the web step.
+      "apps/runner/src/web-planner.ts",
       "packages/evaluator/src/index.ts",
       // Engine redesign R2b (B1): the comparing judges' call is sent through the gateway the runner hands it (the judge
       // seat's own lane-wrapped member gateway, never the arguing judge's, inside the leased runner, naming the run). It

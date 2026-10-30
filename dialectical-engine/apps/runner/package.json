@@ -13,6 +13,7 @@
     "@debateai/critique": "workspace:*",
     "@debateai/kernel": "workspace:*",
     "@debateai/db": "workspace:*",
+    "@debateai/evidence": "workspace:*",
     "@debateai/register": "workspace:*",
     "@debateai/ledger": "workspace:*",
     "@debateai/providers": "workspace:*",

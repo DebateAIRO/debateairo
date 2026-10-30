@@ -330,6 +330,9 @@ importers:
       '@debateai/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@debateai/evidence':
+        specifier: workspace:*
+        version: link:../../packages/evidence
       '@debateai/graph':
         specifier: workspace:*
         version: link:../../packages/graph
