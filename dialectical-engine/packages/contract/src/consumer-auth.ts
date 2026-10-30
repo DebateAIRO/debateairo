@@ -33,6 +33,19 @@ export const RegisterRequestSchema = RegisterRequestFieldsSchema.refine(input =>
 export type RegisterRequest = z.infer<typeof RegisterRequestSchema>;
 export const ResendVerificationRequestSchema = z.object({ email: EmailSchema, ...LocalePreferenceShape }).strict();
 export type ResendVerificationRequest = z.infer<typeof ResendVerificationRequestSchema>;
+/**
+ * NV-14 Revision 3: the body of POST /v1/auth/verify-email/password: the mailed token plus the password the token
+ * holder chooses, which replaces any password a registrant set at sign-up. Required here; POST /v1/auth/verify-email
+ * (the release before's page) stays token-only. The server applies the registration policy; the contract keeps
+ * register's request bound. The schema documents the accepted shape and is not enforced at the route: the route
+ * requires a string password within 1024 UTF-8 bytes, ignores extra keys, passes an empty password to the service's
+ * policy (AUTH_INPUT_INVALID), and leaves a malformed token to the service (VERIFICATION_TOKEN_INVALID).
+ */
+export const VerifyEmailRequestSchema = z.object({
+  token: z.string().regex(/^[A-Za-z0-9_-]{43}$/u),
+  password: z.string().min(1).max(1024)
+}).strict();
+export type VerifyEmailRequest = z.infer<typeof VerifyEmailRequestSchema>;
 
 export const REGISTRATION_PUBLIC_MESSAGE =
   "If this address can be registered, verification instructions will arrive. Check your spam folder." as const;
@@ -218,7 +231,7 @@ export const consumerAuthContractSchemas = Object.freeze({
   BeginTotpEnrollmentRequestSchema, CompleteTotpEnrollmentRequestSchema, TotpEnrollmentOptionsResponseSchema, TotpEnrollmentResponseSchema, LoginContinuationResponseSchema,
   LoginBeginRequestSchema, LoginCompleteRequestSchema, RecoveryStartRequestSchema,
   BeginPasskeyEnrollmentRequestSchema, CompletePasskeyEnrollmentRequestSchema, BeginPasskeyLoginRequestSchema, CompletePasskeyLoginRequestSchema, PasskeyEnrollmentResponseSchema,
-  CatalogLocaleCodeSchema, LocaleCodeSchema, RegisterRequestSchema, ResendVerificationRequestSchema,
+  CatalogLocaleCodeSchema, LocaleCodeSchema, RegisterRequestSchema, ResendVerificationRequestSchema, VerifyEmailRequestSchema,
   RegistrationVerificationAckSchema, ResendVerificationAckSchema, VerificationAckSchema, AuthenticationResponseSchema,
   ConsumerRegistrationCredentialSchema, ConsumerAuthenticationCredentialSchema,
   ConsumerRegistrationOptionsSchema, ConsumerAuthenticationOptionsSchema,

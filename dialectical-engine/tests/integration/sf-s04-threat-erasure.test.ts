@@ -11,6 +11,9 @@ const ownerRef = randomUUID();
 const key = Buffer.alloc(32, 7);
 const aad = ["identity", "user.email_ciphertext", userId, "run:none", userId, `user-dek:${userId}`, "1"] as const;
 const ciphertext = encrypt(key, Buffer.from("asker@example.test"), aad);
+// C-1 (security fixes run 3): the coordinator's support port comes before these options; an owner with no support
+// session shreds nothing and reads back none.
+const noSupport = { shredOwnerForErasure: async () => "NONE", liveOwnerKeyCount: async () => 0 };
 
 function fixture(beforeKeyDestruction: (input: { erasureId: string; userId: string; email: string }) => Promise<void>) {
   const order: string[] = [];
@@ -27,7 +30,7 @@ function fixture(beforeKeyDestruction: (input: { erasureId: string; userId: stri
     exists: async () => userKeyExists };
   const runs = { listByOwner: async () => [], exists: async () => false, ownerRef: async () => ownerRef,
     destroy: async () => "ALREADY_ABSENT" };
-  const coordinator = new AccountErasureCoordinator(repository as never, users as never, runs as never, undefined,
+  const coordinator = new AccountErasureCoordinator(repository as never, users as never, runs as never, undefined, noSupport,
     { readEmailCiphertext: async () => ciphertext,
       beforeKeyDestruction: async input => { order.push("hold"); await beforeKeyDestruction(input); } });
   return { coordinator, order };
@@ -77,7 +80,7 @@ describe("S04 threat report account erasure", () => {
     };
     const runs = { listByOwner: async () => [], exists: async () => false, ownerRef: async () => ownerRef,
       destroy: async () => "ALREADY_ABSENT" as const };
-    const coordinator = new AccountErasureCoordinator(repository as never, users as never, runs as never, undefined, {
+    const coordinator = new AccountErasureCoordinator(repository as never, users as never, runs as never, undefined, noSupport, {
       readEmailCiphertext: async () => { calls.push("read"); return ciphertext; },
       beforeKeyDestruction: async () => { calls.push("hold"); }
     });

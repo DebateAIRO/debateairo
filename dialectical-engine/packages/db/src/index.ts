@@ -33,9 +33,12 @@ export {
 import {
   ACCOUNT_CREDENTIAL_SETTING,
   accountContextRoute,
+  accountContextSource,
   crossAccount,
   onCrossAccountTarget,
-  registerAccountContextPool
+  registerAccountContextPool,
+  sameAccountContextSource,
+  type AccountContextSource
 } from "./account-context.js";
 export { PostgresDataExportRepository, PostgresDataExportSource } from "./data-export.js";
 export * from "./pool-budget.js";
@@ -234,6 +237,9 @@ type ContentLeaseScopeState = Readonly<{
 }>;
 type DebateAiDatabaseGlobals = typeof globalThis & {
   __debateaiRunContentLeaseScopeV1?: AsyncLocalStorage<ContentLeaseScopeState>;
+  __debateaiRunContentLeaseLiveV1?: WeakMap<PoolClient, RunContentLease>;
+  __debateaiRoutedLeasePoolsV1?: WeakSet<Pool>;
+  __debateaiRunContentLeaseSourceV1?: WeakMap<RunContentLease, AccountContextSource>;
 };
 const databaseGlobals = globalThis as DebateAiDatabaseGlobals;
 // Workspace packages can load distinct @debateai/db module instances under tsx.
@@ -241,6 +247,15 @@ const databaseGlobals = globalThis as DebateAiDatabaseGlobals;
 // its own session lock and deadlock against the outer copy on another client.
 const contentLeaseScope = databaseGlobals.__debateaiRunContentLeaseScopeV1
   ??= new AsyncLocalStorage<ContentLeaseScopeState>();
+// NV-31: which client each live run content lease holds (keyed by client, compared by lease), process-global like
+// the scope, so a lease taken by another module instance is still seen by the query router.
+const liveRunContentLeases = databaseGlobals.__debateaiRunContentLeaseLiveV1
+  ??= new WeakMap<PoolClient, RunContentLease>();
+const routedLeasePools = databaseGlobals.__debateaiRoutedLeasePoolsV1 ??= new WeakSet<Pool>();
+// NV-31 with row security: the account-context source (account-context.ts) of the checkout that gave each run content
+// lease its client, process-global like the map above. The router compares it with each body statement's own source.
+const runContentLeaseSources = databaseGlobals.__debateaiRunContentLeaseSourceV1
+  ??= new WeakMap<RunContentLease, AccountContextSource>();
 const ownerAskAdmissionScope = new AsyncLocalStorage<Readonly<{
   lease: OwnerAskAdmissionLease;
 }>>();
@@ -278,6 +293,12 @@ const CONTENT_PROVISION_SIGNATURES = Object.freeze([
   // Side-by-side spec §4 (0123 §4, plan C11): a waiting owner's run re-admitted under the current release.
   "core.prepare_readmitted_run_key_provision(uuid,uuid)"
 ] as const);
+/** K02 (NV-08, 0131): provision capabilities in the erasure_reconcile schema, which the N-1 release (counting core only) does not attest. Resolved by OID, never by text, on the attested pool. */
+const CONTENT_PROVISION_RECONCILE_SIGNATURES = Object.freeze([
+  "erasure_reconcile.claim_run_key_provision_cleanup(integer)"
+] as const);
+const CONTENT_PROVISION_ATTESTED_FUNCTION_COUNT =
+  CONTENT_PROVISION_SIGNATURES.length + CONTENT_PROVISION_RECONCILE_SIGNATURES.length;
 const CONTENT_PROVISION_FORBIDDEN_ROLES = Object.freeze([
   "public",
   "debateai_runtime",
@@ -302,6 +323,8 @@ type ContentProvisionRoleWitness = Readonly<{
   anyTablePrivilege: boolean;
   exactFunctionCount: number;
   forbiddenFunctionPrivilege: boolean;
+  forbiddenReconcilePrivilege: boolean;
+  reconcileFunctionCount: number;
 }>;
 
 async function readContentProvisionRoleWitness(pool: Pool): Promise<ContentProvisionRoleWitness> {
@@ -320,7 +343,16 @@ async function readContentProvisionRoleWitness(pool: Pool): Promise<ContentProvi
     any_table_privilege: boolean;
     exact_function_count: string;
     forbidden_function_privilege: boolean;
+    forbidden_reconcile_privilege: boolean;
+    reconcile_function_count: string;
   }>(`
+    WITH reconcile AS (
+      SELECT procedure.oid,namespace.nspname||'.'||procedure.proname||'('
+        ||replace(pg_catalog.oidvectortypes(procedure.proargtypes),', ',',')||')' AS signature
+      FROM pg_catalog.pg_proc AS procedure
+      JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid=procedure.pronamespace
+      WHERE namespace.nspname='erasure_reconcile'
+    )
     SELECT session_user AS session_principal,current_user AS principal,
       role.rolsuper,role.rolcreaterole,role.rolcreatedb,role.rolreplication,
       role.rolbypassrls,
@@ -341,20 +373,22 @@ async function readContentProvisionRoleWitness(pool: Pool): Promise<ContentProvi
           WHERE database.datname=current_database() AND database.datdba=role.oid)
         OR EXISTS (SELECT 1 FROM pg_catalog.pg_namespace AS namespace
           WHERE namespace.nspname=ANY(ARRAY[
-            'identity','core','ledger','serve','scorecard','register','memory','evidence','evaluator'
+            'identity','core','ledger','serve','scorecard','register','memory','evidence','evaluator',
+            'erasure_reconcile'
           ]) AND namespace.nspowner=role.oid)) AS owns_database_or_schema,
       EXISTS (
         SELECT 1 FROM pg_catalog.pg_class AS relation
         JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid=relation.relnamespace
         WHERE namespace.nspname=ANY(ARRAY[
-          'identity','core','ledger','serve','scorecard','register','memory','evidence','evaluator'
+          'identity','core','ledger','serve','scorecard','register','memory','evidence','evaluator',
+          'erasure_reconcile'
         ]) AND relation.relkind IN ('r','p')
           AND has_table_privilege(current_user,relation.oid,
             'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
       ) AS any_table_privilege,
       (SELECT count(*)::text FROM pg_catalog.pg_proc AS procedure
         JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid=procedure.pronamespace
-        WHERE namespace.nspname='core'
+        WHERE namespace.nspname IN ('core','erasure_reconcile')
           AND has_function_privilege(current_user,procedure.oid,'EXECUTE')) AS exact_function_count,
       EXISTS (
         SELECT 1
@@ -363,9 +397,16 @@ async function readContentProvisionRoleWitness(pool: Pool): Promise<ContentProvi
         WHERE has_function_privilege(
           forbidden_role.role_name,capability.signature,'EXECUTE'
         )
-      ) AS forbidden_function_privilege
+      ) AS forbidden_function_privilege,
+      EXISTS (
+        SELECT 1 FROM unnest($1::text[]) AS forbidden_role(role_name)
+        JOIN reconcile ON reconcile.signature=ANY($3::text[])
+        WHERE has_function_privilege(forbidden_role.role_name,reconcile.oid,'EXECUTE')
+      ) AS forbidden_reconcile_privilege,
+      (SELECT count(*)::text FROM reconcile WHERE reconcile.signature=ANY($3::text[])
+        AND has_function_privilege(current_user,reconcile.oid,'EXECUTE')) AS reconcile_function_count
     FROM pg_catalog.pg_roles AS role WHERE role.rolname=current_user
-  `,[CONTENT_PROVISION_FORBIDDEN_ROLES,CONTENT_PROVISION_SIGNATURES]);
+  `,[CONTENT_PROVISION_FORBIDDEN_ROLES,CONTENT_PROVISION_SIGNATURES,CONTENT_PROVISION_RECONCILE_SIGNATURES]);
   const row = result.rows[0];
   if (row === undefined) throw new TypeError("CONTENT_PROVISION_DATABASE_ROLE_ATTESTATION_FAILED");
   return Object.freeze({
@@ -382,7 +423,9 @@ async function readContentProvisionRoleWitness(pool: Pool): Promise<ContentProvi
     ownsDatabaseOrSchema: row.owns_database_or_schema,
     anyTablePrivilege: row.any_table_privilege,
     exactFunctionCount: Number(row.exact_function_count),
-    forbiddenFunctionPrivilege: row.forbidden_function_privilege
+    forbiddenFunctionPrivilege: row.forbidden_function_privilege,
+    forbiddenReconcilePrivilege: row.forbidden_reconcile_privilege,
+    reconcileFunctionCount: Number(row.reconcile_function_count)
   });
 }
 
@@ -391,13 +434,28 @@ export async function assertContentProvisionDatabaseRole(
   provisionPool: Pool
 ): Promise<void> {
   const [runtimePrincipal,provision] = await Promise.all([
-    runtimePool.query<{ principal: string; provision_capabilities: boolean[] }>(`
+    runtimePool.query<{
+      principal: string;
+      provision_capabilities: boolean[];
+      reconcile_schema_usage: boolean;
+      reconcile_function_executable: boolean;
+    }>(`
       SELECT current_user AS principal,
         ARRAY(
           SELECT has_function_privilege(current_user,capability.signature,'EXECUTE')
           FROM unnest($1::text[]) AS capability(signature)
-        ) AS provision_capabilities
-    `,[CONTENT_PROVISION_SIGNATURES]),
+        ) AS provision_capabilities,
+        COALESCE(has_schema_privilege(current_user,to_regnamespace('erasure_reconcile'),'USAGE'),false)
+          AS reconcile_schema_usage,
+        EXISTS (
+          SELECT 1 FROM pg_catalog.pg_proc AS procedure
+          JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid=procedure.pronamespace
+          WHERE namespace.nspname='erasure_reconcile'
+            AND namespace.nspname||'.'||procedure.proname||'('
+              ||replace(pg_catalog.oidvectortypes(procedure.proargtypes),', ',',')||')'=ANY($2::text[])
+            AND has_function_privilege(current_user,procedure.oid,'EXECUTE')
+        ) AS reconcile_function_executable
+    `,[CONTENT_PROVISION_SIGNATURES,CONTENT_PROVISION_RECONCILE_SIGNATURES]),
     readContentProvisionRoleWitness(provisionPool)
   ]);
   const exactFunctions = await Promise.all(CONTENT_PROVISION_SIGNATURES.map(async (signature) =>
@@ -411,13 +469,16 @@ export async function assertContentProvisionDatabaseRole(
     || runtimePrincipal.rows[0].provision_capabilities.length
       !== CONTENT_PROVISION_SIGNATURES.length
     || runtimePrincipal.rows[0].provision_capabilities.some((allowed) => allowed)
+    || runtimePrincipal.rows[0].reconcile_schema_usage
+    || runtimePrincipal.rows[0].reconcile_function_executable
     || provision.sessionPrincipal !== provision.principal
     || provision.superuser || provision.createRole || provision.createDatabase
     || provision.replication || provision.bypassRls
     || !provision.contentMember || provision.crossedRole || provision.dangerousBuiltinMember
     || provision.ownsDatabaseOrSchema || provision.anyTablePrivilege
-    || provision.forbiddenFunctionPrivilege
-    || provision.exactFunctionCount !== CONTENT_PROVISION_SIGNATURES.length
+    || provision.forbiddenFunctionPrivilege || provision.forbiddenReconcilePrivilege
+    || provision.reconcileFunctionCount !== CONTENT_PROVISION_RECONCILE_SIGNATURES.length
+    || provision.exactFunctionCount !== CONTENT_PROVISION_ATTESTED_FUNCTION_COUNT
     || exactFunctions.some((allowed) => !allowed)) {
     throw new TypeError("CONTENT_PROVISION_DATABASE_ROLE_MUST_BE_ISOLATED");
   }
@@ -462,6 +523,8 @@ export async function acquireRunContentLease(
   const runIds = Object.freeze([...new Set(requestedRunIds)].sort());
   if (runIds.length === 0) throw new TypeError("CONTENT_LEASE_RUN_REQUIRED");
   for (;;) {
+    // Where pool.connect() below checks out, read in this same context (the router's comparison, NV-31).
+    const source = accountContextSource(pool);
     const client = await abortablePrivateWork(() => pool.connect(), signal, late => late.release(true));
     const acquired: string[] = [];
     let released = false;
@@ -469,7 +532,11 @@ export async function acquireRunContentLease(
     let previousLockTimeout: string | undefined;
     const abort = () => {
       invalidated ??= new Error("PRIVATE_STREAM_CLOSED");
-      if (!released) { released = true; void cancelAndDestroyPrivateClient(pool, client).catch(() => {}); }
+      if (!released) {
+        released = true;
+        liveRunContentLeases.delete(client);
+        void cancelAndDestroyPrivateClient(pool, client).catch(() => {});
+      }
     };
     signal?.addEventListener("abort", abort, { once: true });
     if (signal?.aborted) abort();
@@ -477,6 +544,7 @@ export async function acquireRunContentLease(
       signal?.removeEventListener("abort", abort);
       if (released) return;
       released = true;
+      liveRunContentLeases.delete(client);
       let failure: unknown = invalidated;
       for (const runId of [...acquired].reverse()) {
         try {
@@ -523,7 +591,7 @@ export async function acquireRunContentLease(
         await abortablePrivateWork(() => new Promise<void>((resolve) => setTimeout(resolve,10)), signal);
         continue;
       }
-      return Object.freeze({
+      const lease: RunContentLease = Object.freeze({
         runIds,
         client,
         invalidate: (error: Error) => {
@@ -550,6 +618,9 @@ export async function acquireRunContentLease(
         },
         release: unlock
       });
+      runContentLeaseSources.set(lease, source);
+      liveRunContentLeases.set(client, lease);
+      return lease;
     } catch (error) {
       await unlock().catch(() => undefined);
       throw error;
@@ -598,6 +669,43 @@ export async function withRunContentLease<T>(
   }
 }
 
+/**
+ * Security fixes run 3 (K10, NV-31): a lease body's queries run on the lease's own client. On a routed pool, a
+ * `pool.query` made inside a live run content lease scope or a live publication lease scope runs on that lease's
+ * client while its source is the lease's (below), instead of asking for a second connection while the first is held
+ * (hold-and-wait, budget audit 2026-10-10 items 2-4). A lease is live from just before it is returned until its release begins, and
+ * only the lease the calling context holds counts, never a later lease on the same client. `pool.connect()` is never
+ * routed (a transaction keeps its own client). A bare lease (prepareLeasedContentEncryptionForRuns outside a scope)
+ * routes only its own key loads; its holder's later `pool.query` calls are outside every scope and go to the pool. A
+ * routed statement skips the pool's latched-failure refusal and busy line, since it runs on a client already held.
+ * Opt-in per pool: the API's runtime and publication-cleanup pools (apps/api/src/main.ts); the runner's is not
+ * routed. Never route a pool whose statements try-lock the lease namespaces, such as the erasure pool: 0123's core
+ * erasure prepare try-locks a run's lease key, and a session never conflicts with its own advisory locks, so on a
+ * lease's session that try-lock would succeed where it must answer CONTENDED.
+ * Row-level security (merge of security fixes run 3 with origin/dev): a lease's client runs as the login, and under the
+ * account context, of the checkout that gave it (createPool's account-context routing). A body statement goes to it
+ * only while that statement's own source (accountContextSource) is the lease's: a `crossAccount(...)` frame entered in
+ * the body of a lease a request took goes to the pool's target as the routing says, and a statement on this pool whose
+ * route is the target rides a lease held on that target (the public read's shared lease, X10). A statement whose
+ * source is not the lease's runs where the routing sends it; on the API that is the other login's pool (a request's
+ * lease and its frames' target), so the lease's own pool is never asked for a second connection by it.
+ */
+export function routeLeaseBodyQueries(pool: Pool): void {
+  if (routedLeasePools.has(pool)) throw new TypeError("LEASE_BODY_QUERIES_ALREADY_ROUTED");
+  routedLeasePools.add(pool);
+  const mutablePool = pool as unknown as { query: UntypedMethod };
+  const query = mutablePool.query.bind(pool);
+  mutablePool.query = (...args: unknown[]): unknown => {
+    const source = accountContextSource(pool);
+    const scope = contentLeaseScope.getStore();
+    const client = scope !== undefined && liveRunContentLeases.get(scope.lease.client) === scope.lease
+      && sameAccountContextSource(runContentLeaseSources.get(scope.lease), source)
+      ? scope.lease.client : publicationLeaseClientFor(source);
+    return client === undefined ? query(...args) : (client as unknown as { query: UntypedMethod }).query(...args);
+  };
+}
+
+import { publicationLeaseClientFor } from "./publication-lease.js";
 export {
   acquirePublicationContentLease,
   withPublicationContentLease,
@@ -643,7 +751,10 @@ export async function prepareLeasedContentEncryptionForRuns(
           "Encrypted content cannot be read without the external key store"
         );
       }
-      preparedByRun.set(runId, await abortablePrivateWork(() => cipher.prepareRun(runId), signal, late => late.close()));
+      // NV-31: a bare lease's key load runs in that lease's scope, so a routed pool runs the resolver on its client.
+      preparedByRun.set(runId, await abortablePrivateWork(() => borrowed
+        ? cipher.prepareRun(runId)
+        : contentLeaseScope.run(Object.freeze({ pool, lease }), () => cipher.prepareRun(runId)), signal, late => late.close()));
     }
     await lease.assertLive();
     let closed = false;
@@ -1208,7 +1319,15 @@ export async function migrate(pool: Pool, options: MigrateOptions = {}): Promise
   try {
     // Side-by-side spec 2026-10-21 §5 ("Each step runs on its own"): one migrator at a time, held for the session (not
     // one transaction) because the prologue and every forward step now commit on their own; released in `finally`.
-    await client.query("SELECT pg_advisory_lock(hashtextextended('debateai:schema-migrations', 0))");
+    // Security fixes run 3 (NV-38): the lock is tried every 50 ms, never waited for inside a statement. A waiting
+    // statement keeps its snapshot, and an outside-transaction step's concurrent index build on the holder's session
+    // waits for every older snapshot, so the two would deadlock (40P01). Between tries this session holds no snapshot,
+    // and a try never waits. No deadline, as before.
+    for (;;) {
+      const lock = await client.query<{ acquired: boolean }>("SELECT pg_try_advisory_lock(hashtextextended('debateai:schema-migrations', 0)) AS acquired");
+      if (lock.rows[0]?.acquired === true) break;
+      await new Promise<void>((resolve) => { setTimeout(resolve, 50); });
+    }
     // The prologue: the ledger tables, the lineage and its receipts, the base recipe, 0108, 0110 and the replay of
     // every applied chain step, in one transaction with the 2 s lock wait (migration-transaction.ts). It returns the
     // applied prefix of the chain and the steps a newer release added (accepted in it, or refused).

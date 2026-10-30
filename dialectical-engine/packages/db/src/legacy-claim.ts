@@ -53,4 +53,29 @@ export class PostgresLegacyRunClaimRepository {
     }
     return Object.freeze({ status:row.claim_status,claimedCount:row.claimed_count });
   }
+
+  /** NV-01: charges one claim attempt to the account's budget (0131's core.legacy_claim_admit), before any claim work. */
+  async admit(
+    userId: string,
+    policy: Readonly<{ maxAttempts: number; windowMs: number; lockMs: number }>
+  ): Promise<Readonly<{ admitted: boolean; retryAfterMs: number }>> {
+    const result = await this.pool.query<{ admitted: unknown; retry_after_ms: unknown }>(
+      "SELECT admitted,retry_after_ms FROM core.legacy_claim_admit($1,$2,$3,$4)",
+      [userId,policy.windowMs,policy.maxAttempts,policy.lockMs]
+    );
+    const row = result.rows[0];
+    // pg answers bigint as a string.
+    const retryAfterMs = typeof row?.retry_after_ms === "string" || typeof row?.retry_after_ms === "number"
+      ? Number(row.retry_after_ms) : Number.NaN;
+    if (result.rows.length !== 1 || typeof row?.admitted !== "boolean"
+      || !Number.isSafeInteger(retryAfterMs) || retryAfterMs < 0) {
+      throw new TypeError("LEGACY_RUN_CLAIM_ADMIT_INVALID");
+    }
+    return Object.freeze({ admitted:row.admitted,retryAfterMs });
+  }
+
+  /** NV-01: after a CLAIMED outcome, drops the account's count unless a lock is active (0131's core.legacy_claim_clear). */
+  async clearAttempts(userId: string): Promise<void> {
+    await this.pool.query("SELECT core.legacy_claim_clear($1)",[userId]);
+  }
 }

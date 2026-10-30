@@ -85,6 +85,7 @@ import {
   type RunProjection,
   type Session,
   CRISIS_SUPPORT_OFFERED,
+  crisisCheckOverlong,
   detectCrisis,
   warmCrisisCheck,
   SENSITIVE_DATA_CONSENT_REQUIRED,
@@ -279,7 +280,7 @@ import type { AdmissionRunMembers } from "./admission-settings.js";
 import { debateShapeForPanel, normaliseAskForDebateShape, roomDepthParams } from "./debate-shape-ask.js";
 import { engineForAsk } from "./engine-ask.js";
 import { lengthAnswerWordsFor, lengthGuidanceForAsk } from "./length-guidance-ask.js";
-import type { MfaApplication } from "./mfa.js";
+import type { MfaApplication, MfaVerificationLimiter } from "./mfa.js";
 import type { AuthSourceContext } from "@debateai/db";
 import type { AuthenticatedSession, SessionApplication, LoginResult } from "./sessions.js";
 import type { StaffCapability } from "@debateai/kernel";
@@ -301,7 +302,7 @@ import {
   readOwnerRun, readOwnerRunAnswer, readOwnerAnswer, readOwnerInspection, unlessRemovedByCheck,
   readOwnerLedgerDigest, readOwnerStory, readOwnerDisclosure, readOwnerNode
 } from "./owner-read.js";
-import type { LegacyRunClaimApplication } from "./legacy-claim.js";
+import { LEGACY_RUN_CLAIM_ACCOUNT_POLICY, LEGACY_RUN_CLAIM_SOURCE_POLICY, type LegacyRunClaimApplication } from "./legacy-claim.js";
 import type { LegalAcceptanceApplication } from "./legal.js";
 import type { CountryGate } from "./country-gate.js";
 import type { GeoLookup } from "@debateai/geo";
@@ -315,6 +316,7 @@ import {
 } from "./email-change.js";
 import type { RecoveryApplication } from "./recovery.js";
 import { clientIpNetworkScope, normalizeClientIp, TRUSTED_UI_PROXY_NETWORKS } from "./client-ip.js";
+import { gateForwardedHeaders, UI_API_PROOF_VERDICT_HEADER, type UiApiProofVerdict } from "./ui-api-proof.js";
 import {
   installSupportRoutes,
   type SupportAdmission,
@@ -332,6 +334,7 @@ import {
   RUN_EVENT_HEARTBEAT_FRAME, snapshotRunEventItems, tailRunEvents,
   type RunEventMark, type RunEventTailClock, type RunEventTailTiming
 } from "./run-event-tail.js";
+import { RUN_EVENT_STREAM_REFUSAL, RunEventStreamSlots } from "./run-event-streams.js";
 
 type RouteAuthPolicy = "public" | "user" | "operator" | "staff";
 type RouteOriginPolicy = "trusted";
@@ -772,6 +775,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "PROVIDER_USAGE_CAP",
   "PROVIDER_USAGE_INVALID",
   "PROVIDER_USAGE_UNREPORTED",
+  "PUBLICATION_LEASE_CONTENDED",
   "PUBLICATION_LEASE_SCOPE_EXPANSION_FORBIDDEN",
   "QUERY_SET_REF_REQUIRED",
   "RAW_ARTIFACT_RUN_REQUIRED",
@@ -1399,6 +1403,8 @@ export const authorizationPolicyInventory = Object.freeze([
   // same exact-Origin rule as login, so a browser on another site cannot drive them.
   { route: "POST /v1/auth/register", auth: "public", origin: "trusted", resource: "identity", action: "register" },
   { route: "POST /v1/auth/verify-email", auth: "public", origin: "trusted", resource: "identity", action: "verify-email" },
+  // NV-14 Revision 3: the same rule for the route that carries the token holder's password (mounted after S04).
+  { route: "POST /v1/auth/verify-email/password", auth: "public", origin: "trusted", resource: "identity", action: "verify-email" },
   { route: "POST /v1/auth/resend-verification", auth: "public", origin: "trusted", resource: "identity", action: "resend-verification" },
   { route:"POST /v1/auth/recovery/prove",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
   { route:"POST /v1/auth/recovery/enrollment/options",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
@@ -1744,6 +1750,7 @@ const EMAIL_CHANGE_STATUS: Readonly<Record<EmailChangeErrorCode, number>> = Obje
   EMAIL_UNCHANGED: 422,
   STEP_UP_REQUIRED: 403,
   RESEND_COOLDOWN: 429,
+  SEND_LIMIT: 429,
   NO_PENDING_CHANGE: 404,
   LINK_INVALID: 404,
   LINK_EXPIRED: 410,
@@ -1776,6 +1783,8 @@ export interface ApiOptions {
    * bot target; the proof is checked after the per-source admission, before any mail work.
    */
   readonly turnstileRecoveryRequired?: boolean;
+  /** NV-03: the UI's proof (ui-api-proof.ts); absent or null, no forwarded client address is honoured. */
+  readonly uiApiProof?: Buffer | null;
   readonly recovery?: RecoveryApplication;
   readonly passwordReset?: PasswordResetApplication;
   readonly backupEmail?: BackupEmailApplication;
@@ -1828,6 +1837,11 @@ export interface ApiOptions {
   readonly accountErasure?: AccountErasureApplication;
   readonly dataExport?: DataExportApplication;
   readonly legacyRunClaim?: LegacyRunClaimApplication;
+  /**
+   * NV-01: the claim route's per-source ceiling (one IPv4 address or IPv6 /64, LEGACY_RUN_CLAIM_SOURCE_POLICY).
+   * Optional for test compositions (absent: no source charge, like `admission`), always supplied by main.
+   */
+  readonly legacyRunClaimSourceLimiter?: MfaVerificationLimiter;
   /** Paid plans L4: re-acceptance of the Terms and the Privacy Policy; the routes answer 503 without it. */
   readonly legal?: LegalAcceptanceApplication;
   /** Turn 14 — change email; the routes answer a closed 503 when it is absent. */
@@ -2406,8 +2420,20 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
   });
   /**
+   * NV-03: a loopback peer names the client only with the UI's proof. This must stay the FIRST request hook: it runs
+   * before every other hook, handler and request.ip read, removes the proof header, and unless the proof matched
+   * deletes the forwarded headers and cf-ipcountry from the raw headers Fastify computes request.ip from. The verdict
+   * is kept per request for GET /readyz.
+   */
+  const uiApiProofVerdicts = new WeakMap<object, UiApiProofVerdict>();
+  api.addHook("onRequest", (request, _reply, done) => {
+    uiApiProofVerdicts.set(request.raw, gateForwardedHeaders(request.raw.headers, options.uiApiProof ?? null));
+    done();
+  });
+  /**
    * Row-level security S01 (PLAN S4.2, DECISIONS D28, D29): every request runs in a request scope of its own, opened
-   * here, by the first hook registered, so each statement it makes on a T1 pool runs on that pool's own login and
+   * here, by the first hook registered after NV-03's header gate above (which makes no statement and reads no account),
+   * so each statement it makes on a T1 pool runs on that pool's own login and
    * carries the account context of its session once the session preHandler below has authenticated it — and never
    * another request's. A statement made outside every request goes to the pool's system login. preValidation re-enters
    * the request's scope after the body is parsed (defensive: Fastify 5.12.5 keeps it without, spike 2).
@@ -2494,6 +2520,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     });
   };
   const admissionRefusalAuditedUntil = new Map<string, number>();
+  const runEventStreams = new RunEventStreamSlots();
+  /** NV-20: one refusal line per route, reason and Retry-After window; never one per request, never an id or address. */
+  const runEventRefusalAuditedUntil = new Map<string, number>();
   const ADMISSION_ALLOWED: AdmissionDecision = Object.freeze({ allowed: true as const });
   /**
    * B10: refuses when the sealed admission budget for `key` is spent. The
@@ -2961,7 +2990,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
 
   const socialCookie = (name:string,value:string,expiresAt:string,sameSite:'Lax'|'None'='Lax') => `${name}=${value}; Path=/; Max-Age=${Math.max(0,Math.min(300,Math.floor((new Date(expiresAt).getTime()-Date.now())/1000)))}; HttpOnly; Secure; SameSite=${sameSite}`;
   const clearedSocialCookie = (name:string,sameSite:'Lax'|'None'='Lax') => `${name}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=${sameSite}`;
-  api.get('/v1/auth/providers',routePolicy('GET /v1/auth/providers'),async(request,reply)=>{if(!admitOrRefuse(reply,'publicReads','GET /v1/auth/providers',sourceFor(request).ip))return reply;return reply.send(await options.socialAuth?.authProviders() ?? {providers:[]});});
+  api.get('/v1/auth/providers',routePolicy('GET /v1/auth/providers'),async(request,reply)=>{if(!admitOrRefuse(reply,'publicReads','GET /v1/auth/providers',clientIpNetworkScope(sourceFor(request).ip)))return reply;return reply.send(await options.socialAuth?.authProviders() ?? {providers:[]});});
   api.post<{Params:{provider:string}}>('/v1/auth/social/:provider/begin',credentialRoutePolicy('POST /v1/auth/social/{provider}/begin'),async(request,reply)=>{
     const provider=SocialProviderSchema.safeParse(request.params.provider);if(!provider.success)throw new SocialAuthError('SOCIAL_PROOF_INVALID');if(!options.socialAuth)throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');
     const result=await options.socialAuth.begin(provider.data,request.body??{},sourceFor(request));
@@ -3031,9 +3060,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   }
   if(options.consumerSecurity!==undefined){
     const security=options.consumerSecurity;
-    api.get('/v1/account/auth-methods',routePolicy('GET /v1/account/auth-methods'),async(request,reply)=>{if(!admitOrRefuse(reply,'publicReads','GET /v1/account/auth-methods',sourceFor(request).ip))return reply;return reply.send(await security.authMethods(request.authenticatedSession!));});
+    api.get('/v1/account/auth-methods',routePolicy('GET /v1/account/auth-methods'),async(request,reply)=>{if(!admitOrRefuse(reply,'publicReads','GET /v1/account/auth-methods',clientIpNetworkScope(sourceFor(request).ip)))return reply;return reply.send(await security.authMethods(request.authenticatedSession!));});
     api.post('/v1/account/auth-methods/remove',credentialRoutePolicy('POST /v1/account/auth-methods/remove'),async(request,reply)=>{await security.removeAuthMethod(request.body,request.authenticatedSession!,sourceFor(request));return reply.status(204).send();});
-    api.get('/v1/account/mfa-recovery',routePolicy('GET /v1/account/mfa-recovery'),async(request,reply)=>{if(!admitOrRefuse(reply,'publicReads','GET /v1/account/mfa-recovery',sourceFor(request).ip))return reply;return reply.send(await security.pendingMfaRecovery(request.authenticatedSession!));});
+    api.get('/v1/account/mfa-recovery',routePolicy('GET /v1/account/mfa-recovery'),async(request,reply)=>{if(!admitOrRefuse(reply,'publicReads','GET /v1/account/mfa-recovery',clientIpNetworkScope(sourceFor(request).ip)))return reply;return reply.send(await security.pendingMfaRecovery(request.authenticatedSession!));});
     api.post('/v1/account/mfa-recovery/cancel',credentialRoutePolicy('POST /v1/account/mfa-recovery/cancel'),async(request,reply)=>reply.send(await security.cancelPendingMfaRecovery(request.body,request.authenticatedSession!,sourceFor(request))));
     api.post('/v1/account/recovery-codes/regenerate',credentialRoutePolicy('POST /v1/account/recovery-codes/regenerate'),async(request,reply)=>reply.send(await security.regenerateRecoveryCodes(request.body,request.authenticatedSession!,sourceFor(request))));
     api.post('/v1/auth/passkeys/step-up/options',credentialRoutePolicy('POST /v1/auth/passkeys/step-up/options'),async(request,reply)=>reply.send(await security.beginPasskeyStepUp(request.body,request.authenticatedSession!,sourceFor(request))));
@@ -3351,9 +3380,41 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         return reply.status(503).send({ error:"LEGACY_RUN_CLAIM_UNAVAILABLE" });
       }
       const input=parseRequest(LegacyRunClaimRequestSchema,request.body);
+      const source=sourceFor(request);
+      // NV-01: the per-source ceiling first (in process), then the durable per-account budget the application charges
+      // before any hashing or SQL claim work; both answer the admitOrRefuse 429 and never let the token reach the claim.
+      if (options.legacyRunClaimSourceLimiter!==undefined) {
+        const decision=options.legacyRunClaimSourceLimiter.decideSource(source.ip,options.admissionClock?.() ?? new Date());
+        if (!decision.allowed) {
+          if (decision.auditRefusal) {
+            console.error(JSON.stringify(Object.freeze({
+              event:"api.admission.refused",route:"POST /v1/account/legacy-runs/claim",
+              reason:"LEGACY_CLAIM_SOURCE",windowMs:LEGACY_RUN_CLAIM_SOURCE_POLICY.windowMs
+            })));
+          }
+          // The shared constant's lock, so a part-spent lock is overstated (advisory; an early retry meets the same refusal).
+          return reply.status(429)
+            .header("retry-after",String(Math.ceil(LEGACY_RUN_CLAIM_SOURCE_POLICY.temporaryLockMs/1_000)))
+            .send({ error:"ADMISSION_RATE_LIMITED",message:"ADMISSION_RATE_LIMITED" });
+        }
+      }
       const outcome=await options.legacyRunClaim.claim({
-        authenticated,legacyToken:input.legacy_token,source:sourceFor(request)
+        authenticated,legacyToken:input.legacy_token,source
       });
+      if (outcome.status==="RATE_LIMITED") {
+        const now=(options.admissionClock?.() ?? new Date()).getTime();
+        const auditKey="POST /v1/account/legacy-runs/claim:LEGACY_CLAIM_ACCOUNT";
+        if ((admissionRefusalAuditedUntil.get(auditKey) ?? 0)<=now) {
+          admissionRefusalAuditedUntil.set(auditKey,now+LEGACY_RUN_CLAIM_ACCOUNT_POLICY.lockMs);
+          console.error(JSON.stringify(Object.freeze({
+            event:"api.admission.refused",route:"POST /v1/account/legacy-runs/claim",
+            reason:"LEGACY_CLAIM_ACCOUNT",windowMs:LEGACY_RUN_CLAIM_ACCOUNT_POLICY.windowMs
+          })));
+        }
+        return reply.status(429)
+          .header("retry-after",String(Math.max(1,Math.ceil(outcome.retryAfterMs/1_000))))
+          .send({ error:"ADMISSION_RATE_LIMITED",message:"ADMISSION_RATE_LIMITED" });
+      }
       if (outcome.status==="SESSION_INVALID") {
         return reply.status(401).send({ error:"SESSION_REQUIRED" });
       }
@@ -3589,7 +3650,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     "/v1/public/debates",
     routePolicy("GET /v1/public/debates"),
     async (request, reply) => {
-      if (!admitOrRefuse(reply, "publicReads", "GET /v1/public/debates", sourceFor(request).ip)) return reply;
+      // NV-19 (DL5-F3): every public read is charged to the caller's network; an IPv6 address is its /64.
+      if (!admitOrRefuse(reply, "publicReads", "GET /v1/public/debates", clientIpNetworkScope(sourceFor(request).ip))) return reply;
       const limit = Number(request.query.limit);
       const offset = Number(request.query.offset);
       if (!Number.isInteger(limit) || limit < 1 || limit > 100
@@ -3609,7 +3671,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     "/v1/public/debates/:id",
     routePolicy("GET /v1/public/debates/{id}"),
     async (request, reply) => {
-      if (!admitOrRefuse(reply, "publicReads", "GET /v1/public/debates/{id}", sourceFor(request).ip)) return reply;
+      if (!admitOrRefuse(reply, "publicReads", "GET /v1/public/debates/{id}", clientIpNetworkScope(sourceFor(request).ip))) return reply;
       const publicationRef = ResourceIdSchema.safeParse(request.params.id);
       if (!publicationRef.success || options.publications === undefined) {
         return reply.status(404).send({ error: "DEBATE_NOT_FOUND" });
@@ -3677,6 +3739,26 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       if (meetsMinimumAge(dateOfBirth)) return reply.send({ outcome: "allowed" });
       reply.header("set-cookie", ageRefusalCookie());
       return reply.send({ outcome: "refused" });
+    });
+  }
+  // NV-14 Revision 3: verification with the password the token holder chooses (the new verify page's only call).
+  // Mounted after the registration region (S04), which keeps POST /v1/auth/verify-email as it was at d5c02f8bd: the
+  // password-less route the release before's page calls, so it stays the N-1 fallback.
+  if (registrationMounted) {
+    api.post("/v1/auth/verify-email/password", credentialRoutePolicy("POST /v1/auth/verify-email/password"), async (request, reply) => {
+      const body = typeof request.body === "object" && request.body !== null
+        ? request.body as Record<string, unknown>
+        : {};
+      // Required here, and bounded as register bounds it, before any service work.
+      const password = body.password;
+      if (typeof password !== "string" || !passwordWithinRequestBound(body)) {
+        return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      }
+      const response = await options.registration!.verifyEmail({
+        token: typeof body.token === "string" ? body.token : "",
+        password
+      }, sourceFor(request));
+      return reply.send(response);
     });
   }
   // Paid plans L4: re-acceptance. Mounted after the registration region (S04), whatever the list order.
@@ -3800,11 +3882,14 @@ export function buildApi(options: ApiOptions): FastifyInstance {
    * Side-by-side spec §6 (plan C5): the process probes. Neither needs a session, reads the database or charges an
    * admission budget: /readyz answers from the release watcher's last read (never a query of its own), so the website's
    * /readyz and Caddy's health check can poll it every second. `cache-control: no-store` comes from the onSend hook.
+   * The verdict header tells the website whether its proof matched (NV-03); the body stays what root's tools read.
    */
   api.get("/livez", routePolicy("GET /livez"), async (_request, reply) => reply.send({ live: true }));
-  api.get("/readyz", routePolicy("GET /readyz"), async (_request, reply) => {
+  api.get("/readyz", routePolicy("GET /readyz"), async (request, reply) => {
     const readiness = options.readiness?.readiness()
       ?? Object.freeze({ ready: true, releaseKey: options.releaseKey ?? null, reasons: Object.freeze([]) });
+    const verdict = uiApiProofVerdicts.get(request.raw);
+    if (verdict === "accepted" || verdict === "refused") reply.header(UI_API_PROOF_VERDICT_HEADER, verdict);
     return reply.status(readiness.ready ? 200 : 503)
       .send({ ready: readiness.ready, releaseKey: readiness.releaseKey, reasons: [...readiness.reasons] });
   });
@@ -3860,7 +3945,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // below anyway, and checking 256 KB of text would hold the event loop for seconds. Trimmed
     // first, exactly as AskRequestSchema keeps it, so the limit measured here is the limit
     // below: padding a crisis question past 8 KB with spaces must not skip the check.
-    if (Buffer.byteLength(questionLine, "utf8") <= ASK_QUESTION_MAX_BYTES && detectCrisis(questionLine).crisis) {
+    // NV-28: the lists run over at most crisisCheckMaxChars() of the question as spelled for the check. No ordinary
+    // question within the 8 KB bound reaches it; one that does (compatibility forms such as ﷺ, which normalise to many
+    // letters) is never checked in part: it gets help numbers, never a debate, so a crisis phrase past the cap still
+    // meets help.
+    if (Buffer.byteLength(questionLine, "utf8") <= ASK_QUESTION_MAX_BYTES
+      && (crisisCheckOverlong(questionLine) || detectCrisis(questionLine).crisis)) {
       return reply.status(422).send({
         error: CRISIS_SUPPORT_OFFERED, message: CRISIS_SUPPORT_OFFERED,
         country: edgeCountry(request.headers)
@@ -4149,84 +4239,111 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   });
 
   api.get<{ Params: { id: string } }>("/v1/runs/:id/events", routePolicy("GET /v1/runs/{id}/events"), async (request, reply) => {
-    if (!admitOrRefuse(reply, "publicReads", "GET /v1/runs/{id}/events", sourceFor(request).ip)) return reply;
-    const parsedRunId = ResourceIdSchema.safeParse(request.params.id);
-    const ownership = ownershipFor(request);
-    // Side-by-side C9: the stream follows the newest run; a stream still open on an old id reads a null mark
-    // (eventMark) and ends with the clean close the page treats as "reconnect", and the reconnect lands here.
-    const runId = parsedRunId.success ? await resolvedRunId(options, parsedRunId.data) : null;
-    if (runId === null || await unlessRemovedByCheck(options, runId,
-      () => options.application.readRun(runId, request.session, ownership)) === null) {
-      return reply.status(404).send({ error: "RUN_NOT_FOUND" });
-    }
-    const access = options.synthesisAnswerAccess ?? OPEN_SYNTHESIS_ANSWER_ACCESS;
-    if (await access.stateOf({ runId }) !== "SHOW") {
-      return reply.status(404).send({ error: "RUN_NOT_FOUND" });
-    }
-    reply.raw.writeHead(200, {
-      ...SECURITY_HEADERS,
-      "content-type": "text/event-stream",
-      "cache-control": "no-store",
-      // writeHead bypasses onSend: the stream names its release here (side-by-side spec §6, plan C5).
-      ...(options.releaseKey === undefined ? {} : { "x-debateai-release": options.releaseKey }),
-      ...(request.cookieRefresh === undefined
-        ? {} : { "set-cookie": [...refreshedCookies(request.cookieRefresh)] }),
-      connection: "keep-alive"
-    });
-    // Live run events (2026-10-11): one admission (above) buys one long-lived stream that
-    // replays the stored events, then follows the run until its terminal event — or until this
-    // process drains (side-by-side spec §6, plan C6): a clean close, and the page reconnects and
-    // replays. A replay-only stream (no change mark) ends on its own.
-    const application = options.application;
-    const readiness = options.readiness;
-    const snapshot = async function* (signal: AbortSignal) {
-      for await (const event of options.application.events(runId, request.session, ownership, signal)) {
-        if (await access.stateOf({ runId }) !== "SHOW") return;
-        yield event;
+    // Security fixes run 3 (NV-20): a slot of this session's and this account's live-stream cap is taken before any
+    // admission charge, query or stream effect, and the finally below frees it on every exit (run-event-streams.ts).
+    const streamOwner = request.authenticatedSession;
+    if (streamOwner === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    const streamSlot = runEventStreams.open({ sessionId: streamOwner.session.session_id, ownerRef: streamOwner.ownerRef });
+    if (typeof streamSlot === "string") {
+      const now = (options.admissionClock?.() ?? new Date()).getTime();
+      const auditKey = `GET /v1/runs/{id}/events:${streamSlot}`;
+      if ((runEventRefusalAuditedUntil.get(auditKey) ?? 0) <= now) {
+        runEventRefusalAuditedUntil.set(auditKey, now + RUN_EVENT_STREAM_REFUSAL.retryAfterSeconds * 1_000);
+        console.error(JSON.stringify(Object.freeze({
+          event: "api.run_events.refused", route: "GET /v1/runs/{id}/events", reason: streamSlot,
+          windowMs: RUN_EVENT_STREAM_REFUSAL.retryAfterSeconds * 1_000
+        })));
       }
-    };
-    await streamAuthorizedEvents({
-      events: signal => application.eventMark === undefined
-        ? snapshotRunEventItems(snapshot(signal))
-        : tailRunEvents({
-          snapshot,
-          mark: async markSignal => {
-            // The owner may enter the synthesis hold while this SSE response is
-            // open. Stop the stream before a heartbeat or a later event reveals
-            // any private progress from the held run.
-            if (await access.stateOf({ runId }) !== "SHOW") return null;
-            return application.eventMark === undefined
-              ? null : application.eventMark(runId, request.session, ownership, markSignal);
-          },
-          signal,
-          ...(readiness === undefined ? {} : { draining: () => readiness.draining() }),
-          ...(options.runEventTail === undefined ? {} : { timing: options.runEventTail }),
-          ...(options.runEventTail?.clock === undefined ? {} : { clock: options.runEventTail.clock })
-        }),
-      check: async signal => {
-        if (request.authenticatedSession === undefined || options.sessions?.assertCurrent === undefined) throw new Error("SESSION_REQUIRED");
-        await options.sessions.assertCurrent(request.authenticatedSession, signal);
-      },
-      write: item => {
-        if (item.kind === "heartbeat") {
-          reply.raw.write(RUN_EVENT_HEARTBEAT_FRAME);
-          return;
+      return reply.status(429).header("retry-after", String(RUN_EVENT_STREAM_REFUSAL.retryAfterSeconds))
+        .send({ error: "RUN_EVENT_STREAMS_LIMITED", message: "RUN_EVENT_STREAMS_LIMITED" });
+    }
+    try {
+      // NV-20: a client that left while the preHandler authenticated it costs no admission charge and no read.
+      if (reply.raw.destroyed) return;
+      if (!admitOrRefuse(reply, "publicReads", "GET /v1/runs/{id}/events", clientIpNetworkScope(sourceFor(request).ip))) return reply;
+      const parsedRunId = ResourceIdSchema.safeParse(request.params.id);
+      const ownership = ownershipFor(request);
+      // Side-by-side C9: the stream follows the newest run; a stream still open on an old id reads a null mark
+      // (eventMark) and ends with the clean close the page treats as "reconnect", and the reconnect lands here.
+      const runId = parsedRunId.success ? await resolvedRunId(options, parsedRunId.data) : null;
+      if (runId === null || await unlessRemovedByCheck(options, runId,
+        () => options.application.readRun(runId, request.session, ownership)) === null) {
+        return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      }
+      const access = options.synthesisAnswerAccess ?? OPEN_SYNTHESIS_ANSWER_ACCESS;
+      if (await access.stateOf({ runId }) !== "SHOW") {
+        return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      }
+      // NV-20: a client that left while the run was resolved or read has already emitted its only 'close'; the
+      // stream's peer listener (attached synchronously below, before any await) would never hear it.
+      if (reply.raw.destroyed) return;
+      reply.raw.writeHead(200, {
+        ...SECURITY_HEADERS,
+        "content-type": "text/event-stream",
+        "cache-control": "no-store",
+        // writeHead bypasses onSend: the stream names its release here (side-by-side spec §6, plan C5).
+        ...(options.releaseKey === undefined ? {} : { "x-debateai-release": options.releaseKey }),
+        ...(request.cookieRefresh === undefined
+          ? {} : { "set-cookie": [...refreshedCookies(request.cookieRefresh)] }),
+        connection: "keep-alive"
+      });
+      // Live run events (2026-10-11): one admission (above) buys one long-lived stream that
+      // replays the stored events, then follows the run until its terminal event — or until this
+      // process drains (side-by-side spec §6, plan C6): a clean close, and the page reconnects and
+      // replays. A replay-only stream (no change mark) ends on its own.
+      const application = options.application;
+      const readiness = options.readiness;
+      const snapshot = async function* (signal: AbortSignal) {
+        for await (const event of options.application.events(runId, request.session, ownership, signal)) {
+          if (await access.stateOf({ runId }) !== "SHOW") return;
+          yield event;
         }
-        // Side-by-side spec §6 (plan C14): an event this release cannot read (a newer release's kind or shape) is
-        // skipped with one journal line; the stream goes on. Throwing here ended the stream, the page reconnected,
-        // replayed the same event and ended again, forever. No new event type is ever sent.
-        const parsed = RunEventSchema.safeParse(item.event);
-        if (!parsed.success) {
-          console.error(JSON.stringify(Object.freeze({
-            event: "api.run_event.unreadable", runId, event_type: unreadableEventType(item.event)
-          })));
-          return;
-        }
-        const event = parsed.data;
-        reply.raw.write(`id: ${event.event_id}\nevent: ${event.event_type}\ndata: ${JSON.stringify(event)}\n\n`);
-      },
-      close: () => { if (!reply.raw.destroyed) reply.raw.end(); }, peer: reply.raw
-    });
+      };
+      await streamAuthorizedEvents({
+        events: signal => application.eventMark === undefined
+          ? snapshotRunEventItems(snapshot(signal))
+          : tailRunEvents({
+            snapshot,
+            mark: async markSignal => {
+              // The owner may enter the synthesis hold while this SSE response is
+              // open. Stop the stream before a heartbeat or a later event reveals
+              // any private progress from the held run.
+              if (await access.stateOf({ runId }) !== "SHOW") return null;
+              return application.eventMark === undefined
+                ? null : application.eventMark(runId, request.session, ownership, markSignal);
+            },
+            signal,
+            ...(readiness === undefined ? {} : { draining: () => readiness.draining() }),
+            ...(options.runEventTail === undefined ? {} : { timing: options.runEventTail }),
+            ...(options.runEventTail?.clock === undefined ? {} : { clock: options.runEventTail.clock })
+          }),
+        check: async signal => {
+          if (request.authenticatedSession === undefined || options.sessions?.assertCurrent === undefined) throw new Error("SESSION_REQUIRED");
+          await options.sessions.assertCurrent(request.authenticatedSession, signal);
+        },
+        write: item => {
+          if (item.kind === "heartbeat") {
+            reply.raw.write(RUN_EVENT_HEARTBEAT_FRAME);
+            return;
+          }
+          // Side-by-side spec §6 (plan C14): an event this release cannot read (a newer release's kind or shape) is
+          // skipped with one journal line; the stream goes on. Throwing here ended the stream, the page reconnected,
+          // replayed the same event and ended again, forever. No new event type is ever sent.
+          const parsed = RunEventSchema.safeParse(item.event);
+          if (!parsed.success) {
+            console.error(JSON.stringify(Object.freeze({
+              event: "api.run_event.unreadable", runId, event_type: unreadableEventType(item.event)
+            })));
+            return;
+          }
+          const event = parsed.data;
+          reply.raw.write(`id: ${event.event_id}\nevent: ${event.event_type}\ndata: ${JSON.stringify(event)}\n\n`);
+        },
+        close: () => { if (!reply.raw.destroyed) reply.raw.end(); }, peer: reply.raw
+      });
+    } finally {
+      streamSlot.release();
+    }
   });
   api.get<{ Params: { id: string } }>("/v1/runs/:id", routePolicy("GET /v1/runs/{id}"), async (request, reply) => {
     const parsedRunId = ResourceIdSchema.safeParse(request.params.id);
@@ -4300,6 +4417,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         });
         return reply.status(404).send({ error: "RUN_NOT_FOUND" });
       }
+      // NV-46: every content check is counted per owner before any judge call; a failed preflight is not counted.
+      if (!admitOrRefuse(reply, "publishChecks", "POST /v1/runs/{id}/publish", authenticated.ownerRef)) return reply;
       // FIX-HS2-p1 sd-B1 (ruling R-P): each private-content phase holds the run's lease (one pooled client) only
       // for its own reads and writes; `publish` awaits the content check — up to D on an external judge — under
       // none, and re-reads the answer under a fresh lease before it commits.
@@ -5480,7 +5599,8 @@ export async function evaluationOrRefusal(
 /** What the room's locked decision produced inside the lease. */
 /**
  * What the room's decision came to for one ask. A WAIT's `cause` (final fix wave S8b) is the hold that ALONE decided the
- * wait (decideAdmission's `cause`: SWITCHING or SITE_BUSY), else null; the journal line names it instead of the scope.
+ * wait (decideAdmission's `cause`: SWITCHING, SITE_BUSY or PERSON_BUSY), else null; the journal line names it instead
+ * of the scope.
  */
 type RoomOutcome =
   | Readonly<{ kind: "START"; runId: string; workItemId: string }>
@@ -6168,7 +6288,8 @@ export class PostgresAskApplication implements AskApplication {
     };
     if (outcome.kind === "WAIT") {
       // Final fix wave S8b: a wait the hold alone decided (a switch, or the version not passed: SWITCHING; the site's cap:
-      // SITE_BUSY) names that cause, not the day's scope it never measured; any other wait names its scope, as before.
+      // SITE_BUSY; the person's share of its places: PERSON_BUSY) names that cause, not the day's scope it never
+      // measured; any other wait names its scope, as before.
       console.info(JSON.stringify(Object.freeze(outcome.cause === null
         ? { event: "api.ask.waiting", runId: outcome.runId, scope: outcome.scope }
         : { event: "api.ask.waiting", runId: outcome.runId, cause: outcome.cause })));

@@ -157,6 +157,7 @@
   "billing.subscription.withdrawNothingDue": "Atlikta. Jūsų planas baigėsi. Jau panaudota dalis padengia visą kainą, todėl jums nieko nepriklauso grąžinti.",
   "billing.subscription.withdrawOwnerReview": "Jūsų planas baigėsi. Vienam iš jūsų mokėjimų jau buvo atliktas grąžinimas, todėl patikrinsime, kas dar priklauso, ir per 14 dienų parašysime jums el. laišką.",
   "billing.subscription.withdrawWindowClosed": "14 dienų sutarties atsisakymo terminas baigėsi arba jis netaikomas ten, kur gyvenate. Atšaukti vis tiek galite bet kada.",
+  "billing.subscription.withdrawDebateRunning": "Jūsų pradėti debatai dar gali naudoti kreditą, todėl dar negalime pasakyti, kiek panaudojote. Bandykite dar kartą vėliau. Sutarties atsisakyti dar turite daugiau nei dieną.",
   "billing.subscription.stillConfirming": "Tai dar tvirtiname su mokėjimų paslaugų teikėju. Po kelių minučių vėl peržiūrėkite šį puslapį.",
   "billing.subscription.actionFailed": "Nepavyko. Bandykite dar kartą.",
   "billing.subscription.invoices": "Sąskaitos faktūros",

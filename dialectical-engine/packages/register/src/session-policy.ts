@@ -149,7 +149,13 @@ const admissionPolicyValueSchema = z.object({
   billing_cancel_link: admissionScopeValueSchema("source").optional(),
   // Paid plans P4-G (go-live row 31): the room read, per owner. No code-owned row carries it: the owner seals
   // its value in the hosted operator's file, in the same version as the budget band (ruling C7).
-  ask_room_reads: admissionScopeValueSchema("owner").optional()
+  ask_room_reads: admissionScopeValueSchema("owner").optional(),
+  // Security audit run 3, NV-46: publish content checks, per owner. No sealed row carries it; the parser applies
+  // DEFAULT_PUBLISH_CHECKS when absent, so the parsed scope is never null.
+  publish_checks: admissionScopeValueSchema("owner").optional(),
+  // Security audit run 3, NV-47: paid question-language fast checks, per owner. No sealed row carries it; the parser
+  // applies DEFAULT_LANGUAGE_CHECKS when absent, so the parsed scope is never null.
+  language_checks: admissionScopeValueSchema("owner").optional()
 }).strict();
 
 export type AdmissionPolicyValue = z.infer<typeof admissionPolicyValueSchema>;
@@ -182,6 +188,10 @@ export type AdmissionPolicy = Readonly<{
   billingCancelLink: AdmissionScopePolicy<"source"> | null;
   /** P4-G (go-live row 31): GET /v1/asks/room, per owner; required with the budget band (ruling C7). */
   askRoomReads: AdmissionScopePolicy<"owner"> | null;
+  /** NV-46: POST /v1/runs/{id}/publish content checks, per owner; never null (the parser's default when the version carries none). */
+  publishChecks: AdmissionScopePolicy<"owner">;
+  /** NV-47: paid question-language fast checks, per owner; never null (the parser's default when the version carries none). */
+  languageChecks: AdmissionScopePolicy<"owner">;
   sourceRef: string;
 }>;
 
@@ -189,7 +199,8 @@ export type AdmissionPolicy = Readonly<{
  * B10 admission budgets. The mechanism is ruled by the plan; the numbers are
  * proposals until V rules on V-1, after which a new versioned row carries the
  * ratified values. `capacity` bounds the distinct keys a process tracks per
- * scope; beyond it new keys are refused, never admitted unbounded.
+ * scope; beyond it an owner-keyed scope refuses new keys and a source-keyed
+ * scope gives up its least-evidenced key (NV-19); a table never grows unbounded.
  */
 export const ADMISSION_POLICY_REGISTER_ROW = Object.freeze({
   rowKey: ADMISSION_POLICY_ROW_KEY,
@@ -286,12 +297,38 @@ export const ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
   })
 });
 
+/**
+ * Security audit run 3, NV-46: one owner's publish content checks (each a pass of paid judge calls) per API process
+ * per fixed window, starting at the owner's first counted attempt. Applied when the version carries no
+ * `publish_checks`, which is every sealed version today, so neither row above is edited. The capacity matches NV-47's
+ * `languageChecks` (8,192 x 24); fail-closed, never evicting. The value is the owner's to rule (V-1).
+ */
+const DEFAULT_PUBLISH_CHECKS = Object.freeze({
+  key: "owner" as const, limit: 10, window_ms: 24 * 60 * 60_000, capacity: 196_608
+});
+
+/**
+ * Security audit run 3, NV-47: one owner's paid question-language fast checks per API process per fixed 24 h window,
+ * asked by the decider right before each check. On the 13 always-check sites (en and ro among them) that is one per
+ * signed-in ask. Applied when the version carries no `language_checks`, which is every sealed version today, so neither
+ * row above is edited. The limit, 120, is the MAX plan's day at the WORST-CASE debate cost (its 30 USD day over the
+ * 250,000-micro per-run ceiling): it is the fewest debates that day pays for, not the most, so a heavier asker loses
+ * the CR-2 check (the fallback lock, never a refusal) after the 120th ask. The capacity is about the `asks` scope's
+ * reach over a day (8,192 x 24), so this fixed 24 h table does not bind long before `asks` does; fail-closed, never
+ * evicting (eviction would reset a heavy owner's count). The value is the owner's to rule (V-1).
+ */
+const DEFAULT_LANGUAGE_CHECKS = Object.freeze({
+  key: "owner" as const, limit: 120, window_ms: 24 * 60 * 60_000, capacity: 196_608
+});
+
 export function admissionPolicyFromValue(value: unknown, sourceRef: string): AdmissionPolicy {
   const parsed = admissionPolicyValueSchema.safeParse(value);
   if (!parsed.success || sourceRef.trim() === "") {
     throw new TypedDomainError("ADMISSION_POLICY_INVALID", "The sealed admission policy is absent or malformed");
   }
   const policy = parsed.data;
+  const publishChecks = policy.publish_checks ?? DEFAULT_PUBLISH_CHECKS;
+  const languageChecks = policy.language_checks ?? DEFAULT_LANGUAGE_CHECKS;
   return Object.freeze({
     asks: Object.freeze({
       key: policy.asks.key,
@@ -364,6 +401,18 @@ export function admissionPolicyFromValue(value: unknown, sourceRef: string): Adm
       limit: policy.ask_room_reads.limit,
       windowMs: policy.ask_room_reads.window_ms,
       capacity: policy.ask_room_reads.capacity
+    }),
+    publishChecks: Object.freeze({
+      key: publishChecks.key,
+      limit: publishChecks.limit,
+      windowMs: publishChecks.window_ms,
+      capacity: publishChecks.capacity
+    }),
+    languageChecks: Object.freeze({
+      key: languageChecks.key,
+      limit: languageChecks.limit,
+      windowMs: languageChecks.window_ms,
+      capacity: languageChecks.capacity
     }),
     sourceRef
   });

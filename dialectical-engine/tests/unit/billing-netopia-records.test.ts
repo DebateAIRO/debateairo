@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { openRecord } from "@debateai/crypto";
 import { createSecretToken } from "@debateai/payments-netopia";
 import {
-  openCardToken, openQuarantined, sealCardToken, sealNoticeAllowed, sealNoticeRaw, sealQuarantined
+  noticeQuarantineIdOf, openCardToken, openQuarantined, sealCardToken, sealNoticeAllowed, sealNoticeRaw, sealQuarantined
 } from "../../apps/api/src/billing/records.js";
 
 const KEY = Buffer.alloc(32, 5);
@@ -56,5 +56,24 @@ describe("N9 the sealed NETOPIA records", () => {
     expect(() => openQuarantined(KEY, { quarantineId, rawCiphertext: sealed.headerCiphertext!, headerCiphertext: null })).toThrow("RECORD_DECRYPT_FAILED");
     expect(() => openQuarantined(KEY, { quarantineId: randomUUID(), rawCiphertext: sealed.rawCiphertext, headerCiphertext: null }))
       .toThrow("RECORD_DECRYPT_FAILED");
+  });
+
+  it("NV-44: names a quarantined message by its bytes and header under the records key, as a version-8 UUID", () => {
+    const raw = Buffer.from("{\"order\":{\"orderID\":\"" + "c".repeat(32) + "\"}}", "utf8");
+    const header = ["eyJhbGciOiJSUzUxMiJ9", "eyJpc3MiOiJ4In0", "c2ln"].join(".");
+    const id = noticeQuarantineIdOf(KEY, raw, header);
+    expect(noticeQuarantineIdOf(KEY, Buffer.from(raw), header)).toBe(id);
+    expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u);
+    const changed = Buffer.from(raw);
+    changed.writeUInt8(changed.readUInt8(changed.length - 3) ^ 1, changed.length - 3);
+    expect(noticeQuarantineIdOf(KEY, changed, header)).not.toBe(id);
+    expect(noticeQuarantineIdOf(KEY, raw, undefined)).not.toBe(noticeQuarantineIdOf(KEY, raw, ""));
+    expect(noticeQuarantineIdOf(KEY, raw, `${header}x`)).not.toBe(id);
+    // Keyed: another records key names the same bytes differently, so the clear id confirms no guess.
+    expect(noticeQuarantineIdOf(Buffer.alloc(32, 9), raw, header)).not.toBe(id);
+    expect(() => noticeQuarantineIdOf(Buffer.alloc(31, 5), raw, header)).toThrow("RECORD_KEY_INVALID");
+    const sealed = sealQuarantined(KEY, id, raw, header);
+    const opened = openQuarantined(KEY, { quarantineId: id, rawCiphertext: sealed.rawCiphertext, headerCiphertext: sealed.headerCiphertext });
+    expect([opened.rawBody.equals(raw), opened.header]).toEqual([true, header]);
   });
 });

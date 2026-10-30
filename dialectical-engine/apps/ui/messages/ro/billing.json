@@ -157,6 +157,7 @@
   "billing.subscription.withdrawNothingDue": "Gata. Abonamentul dvs. s-a încheiat. Partea pe care ați folosit-o deja acoperă întregul preț, așa că nu vi se cuvine nicio sumă înapoi.",
   "billing.subscription.withdrawOwnerReview": "Abonamentul dvs. s-a încheiat. Pentru una dintre plățile dvs. s-a făcut deja o rambursare, așa că verificăm ce vi se mai cuvine și vă scriem pe e-mail în cel mult 14 zile.",
   "billing.subscription.withdrawWindowClosed": "Perioada de retragere de 14 zile s-a încheiat sau nu se aplică acolo unde locuiți. Puteți anula în continuare oricând.",
+  "billing.subscription.withdrawDebateRunning": "Este posibil ca o dezbatere pe care ați pornit-o să folosească încă credit, așa că nu putem ști încă cât ați folosit. Vă rugăm să încercați din nou mai târziu. Mai aveți mai mult de o zi pentru a vă retrage.",
   "billing.subscription.stillConfirming": "Încă așteptăm confirmarea de la procesatorul de plăți. Reveniți pe această pagină peste câteva minute.",
   "billing.subscription.actionFailed": "Nu a mers. Vă rugăm să încercați din nou.",
   "billing.subscription.invoices": "Facturi",

@@ -1,5 +1,5 @@
 import type { Pool, PoolClient } from 'pg';
-import type { AuditContextHasher, CryptoEnvelope } from '@debateai/crypto';
+import type { Argon2AuditPriority, AuditContextHasher, CryptoEnvelope } from '@debateai/crypto';
 import type { AuthSourceContext } from './identity.js';
 import { MAIL_LOCALE_SETTING } from './mail-locale.js';
 export type ConsumerLegalPair = Readonly<{
@@ -107,10 +107,11 @@ export type TotpEnrollmentLookup = Readonly<{ enrollmentTokenHash:string;socialE
 /** Execute-only authority. Cleanup commits first; audit reduction holds no connection and precedes its owning transaction/locks. */
 export class PostgresConsumerAuthRepository {
     constructor(private readonly pool: Pool, private readonly auditContext: AuditContextHasher) { }
-    private async audited<T>(source: AuthSourceContext, operation: (client: PoolClient, prepared: Readonly<Record<string, string>>) => Promise<T>): Promise<T> {
+    private async audited<T>(source: AuthSourceContext, operation: (client: PoolClient, prepared: Readonly<Record<string, string>>) => Promise<T>, priority: Argon2AuditPriority = 'ordinary'): Promise<T> {
         const normalize = (value: unknown, max: number) => (typeof value === 'string' && value.trim() !== '' ? value.trim() : 'unknown').slice(0, max);
-        const ip = await this.auditContext.hashSourceIp(normalize(source.ip, 64));
-        const ua = await this.auditContext.hashUserAgent(normalize(source.userAgent, 256));
+        // K09/NV-42: only passkey completeLogin passes 'login' (reserved audit capacity).
+        const ip = await this.auditContext.hashSourceIp(normalize(source.ip, 64), priority);
+        const ua = await this.auditContext.hashUserAgent(normalize(source.userAgent, 256), priority);
         if (!/^[0-9a-f]{64}$/.test(ip) || !/^[0-9a-f]{64}$/.test(ua))
             throw new TypeError('AUDIT_CONTEXT_DIGEST_INVALID');
         const prepared = { ipArgon2id: 'argon2id-audit:v1:' + ip, userAgentArgon2id: 'argon2id-audit:v1:' + ua };
@@ -157,7 +158,8 @@ export class PostgresConsumerAuthRepository {
     async beginEnrollment<T>(input: ConsumerEnrollmentSeed, currentLegal: readonly ConsumerLegalPair[], source: AuthSourceContext, validateOptions: (candidate: ConsumerEnrollmentOptions) => Promise<T>): Promise<T> {
         // A separate transaction prevents cleanup challenge-row locks from being
         // retained while preflight waits for an account held by a completion.
-        await this.pool.query('SELECT identity.prune_consumer_passkey_challenges($1)', [input.challengeCapacity]);
+        // NV-41 (0131): the cleanup also gives up the heaviest anonymous source's oldest rows when the store is full.
+        await this.pool.query('SELECT identity.prune_consumer_passkey_challenges_evicting($1)', [input.challengeCapacity]);
         return this.audited(source, async (client, prepared) => {
             const preflight = await client.query<{
                 value: ConsumerEnrollmentOptions;
@@ -173,7 +175,7 @@ export class PostgresConsumerAuthRepository {
     }>): Promise<Readonly<{
         expiresAt: string;
     }>> {
-        await this.pool.query('SELECT identity.prune_consumer_passkey_challenges($1)', [input.challengeCapacity]);
+        await this.pool.query('SELECT identity.prune_consumer_passkey_challenges_evicting($1)', [input.challengeCapacity]);
         const result = await this.pool.query('SELECT identity.begin_consumer_passkey_login($1) AS value', [input]);
         return result.rows[0].value;
     }
@@ -200,6 +202,6 @@ export class PostgresConsumerAuthRepository {
     async completeLogin(input: ConsumerLoginCompletion, source: AuthSourceContext): Promise<ConsumerSessionCommit> {
         return this.audited(source, async (client, prepared) => { const result = await client.query<{
             value: ConsumerSessionCommit;
-        }>('SELECT identity.complete_consumer_passkey_login($1,$2) AS value', [input, prepared]); return result.rows[0]!.value; });
+        }>('SELECT identity.complete_consumer_passkey_login($1,$2) AS value', [input, prepared]); return result.rows[0]!.value; }, 'login');
     }
 }

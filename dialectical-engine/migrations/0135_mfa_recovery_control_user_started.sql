@@ -1,0 +1,20 @@
+-- 0135 · The MFA-recovery control table's user index (security audit run 3, NV-15 and NV-16): every read of
+-- identity.mfa_recovery_control by user_id, NV-15's count of an account's unpaired link-password failures and its
+-- latest pairing, and NV-16's per-destination start count, then reads only that account's rows instead of the whole
+-- retained table (rows go only with erasure and the FK cascade).
+--
+-- n1 (side-by-side spec §5, the database rule):
+-- n1: expand
+-- n1: keeps-verifier
+-- n1: outside-transaction
+--   expand               additive only: one new index on a table 0106 created. CONCURRENTLY takes SHARE UPDATE
+--                        EXCLUSIVE only, so the release before keeps reading and writing the table during the build.
+--                        Its second column bounds both counts' email_expires_at test.
+--   keeps-verifier       no billing relation or billing function, so the effective-capability verifier in force
+--                        (0130's, migrations/lineage/README.md step 3) stays in force and the manifest names it.
+--   outside-transaction  a concurrent build cannot run inside a transaction block, so this is its own step and its
+--                        whole body is the one statement below. migrate() builds it on its session first (2 s lock
+--                        wait, five tries, an INVALID leftover dropped concurrently before the build), then records
+--                        the step in a step transaction that refuses unless the index is valid and on this table
+--                        (packages/db/src/migration-forward-chain.ts runOutsideTransactionStep).
+CREATE INDEX CONCURRENTLY IF NOT EXISTS mfa_recovery_control_user_started ON identity.mfa_recovery_control(user_id,email_expires_at);

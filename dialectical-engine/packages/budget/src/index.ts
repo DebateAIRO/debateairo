@@ -47,6 +47,7 @@ export {
   decideRunCostEnvelope,
   isCostEnvelopePhase,
   projectedCallCeilingMicros,
+  projectedCallUsage,
   providerUsageUnreported,
   readReportedUsage,
   readUsageCounters,
@@ -121,6 +122,8 @@ export {
 
 /** Budget spec 2026-09-28 §2.5 (B2): the estimate a hold and a room are decided with. */
 export {
+  BUDGET_WALL_STOP_KINDS,
+  BUDGET_WALL_STOP_REASONS,
   PostgresRecentRunUsageSource,
   RecentRunsCostEstimator,
   estimateFromSampleCosts,

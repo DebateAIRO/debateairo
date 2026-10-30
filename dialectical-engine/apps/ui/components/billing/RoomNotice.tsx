@@ -29,7 +29,9 @@ const TOP_PLAN = PlanIdSchema.options[PlanIdSchema.options.length - 1];
  */
 function timed(key: string, topPlanKey: string, room: AskRoom): RoomSentence | null {
   if (room.resets_at === null) return null;
-  const top = room.plan_id === TOP_PLAN;
+  // NV-43: billing off names no plan (a person's share of the site's day is full), so there is nothing to upgrade to:
+  // the top-plan sentence, no clause, no link.
+  const top = room.plan_id === TOP_PLAN || room.plan_id === null;
   return Object.freeze({ key: top ? topPlanKey : key, at: room.resets_at, upgrade: !top, waitingRunRef: null });
 }
 

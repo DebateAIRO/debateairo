@@ -176,6 +176,74 @@ export class PostgresEmailChangeRepository {
     return Object.freeze({ status: row?.result_status === "COOLDOWN" ? "COOLDOWN" : "NONE" });
   }
 
+  // NV-12 (0131): the new release's request and resend go through the bounded entry points, which share one
+  // per-account budget of confirmation mails (LIMIT when it is full) and never move a change past issued_at + the
+  // link TTL. `request` and `resend` above stay for the release before's 0079 path.
+  async requestBounded(input: Parameters<PostgresEmailChangeRepository["request"]>[0]
+    & Readonly<{ maximumSends: number; windowMs: number }>): Promise<EmailChangeRequestOutcome | Readonly<{ status: "LIMIT" }>> {
+    assertCredentialHash(input.grantTokenHash);
+    assertCredentialHash(input.confirmTokenHash);
+    assertCredentialHash(input.cancelTokenHash);
+    assertBlindIndex(input.newEmailBlindIndex);
+    const emailChangeId = randomUUID();
+    const prepared = await this.prepareAuditContext(input.source);
+    const row = await this.transaction(async (client) => (await client.query<{
+      result_status: "PENDING" | "DENIED" | "UNCHANGED" | "LIMIT";
+      result_expires_at: Date | null;
+      result_current_email_ciphertext: CryptoEnvelope | null;
+      result_address_available: boolean | null;
+    }>(`
+      SELECT * FROM identity.request_email_change_bounded(
+        $1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10::jsonb,$11,$12
+      )
+    `, [
+      input.userId, input.sessionId, input.grantTokenHash, emailChangeId,
+      Buffer.from(input.newEmailBlindIndex), JSON.stringify(input.newEmailCiphertext),
+      input.confirmTokenHash, input.cancelTokenHash, input.expiresAt, JSON.stringify(prepared),
+      input.maximumSends, input.windowMs
+    ])).rows[0]);
+    if (row?.result_status === "LIMIT") return Object.freeze({ status: "LIMIT" });
+    if (row?.result_status === "PENDING" && row.result_expires_at !== null
+      && row.result_current_email_ciphertext !== null && row.result_address_available !== null) {
+      return Object.freeze({
+        status: "PENDING",
+        emailChangeId,
+        expiresAt: row.result_expires_at,
+        currentEmailCiphertext: row.result_current_email_ciphertext,
+        addressAvailable: row.result_address_available
+      });
+    }
+    return Object.freeze({ status: row?.result_status === "UNCHANGED" ? "UNCHANGED" : "DENIED" });
+  }
+
+  async resendBounded(input: Parameters<PostgresEmailChangeRepository["resend"]>[0]
+    & Readonly<{ maximumSends: number; windowMs: number; linkTtlMs: number }>): Promise<EmailChangeResendOutcome | Readonly<{ status: "LIMIT" }>> {
+    assertCredentialHash(input.confirmTokenHash);
+    const prepared = await this.prepareAuditContext(input.source);
+    const row = await this.transaction(async (client) => (await client.query<{
+      result_status: "RESENT" | "COOLDOWN" | "NONE" | "LIMIT";
+      result_new_email_ciphertext: CryptoEnvelope | null;
+      result_expires_at: Date | null;
+      result_address_available: boolean | null;
+    }>(`
+      SELECT * FROM identity.resend_email_change_bounded($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9)
+    `, [
+      input.userId, input.sessionId, input.confirmTokenHash, input.expiresAt,
+      input.cooldownMs, JSON.stringify(prepared), input.maximumSends, input.windowMs, input.linkTtlMs
+    ])).rows[0]);
+    if (row?.result_status === "LIMIT") return Object.freeze({ status: "LIMIT" });
+    if (row?.result_status === "RESENT" && row.result_new_email_ciphertext !== null
+      && row.result_expires_at !== null && row.result_address_available !== null) {
+      return Object.freeze({
+        status: "RESENT",
+        newEmailCiphertext: row.result_new_email_ciphertext,
+        expiresAt: row.result_expires_at,
+        addressAvailable: row.result_address_available
+      });
+    }
+    return Object.freeze({ status: row?.result_status === "COOLDOWN" ? "COOLDOWN" : "NONE" });
+  }
+
   async cancelOwn(input: Readonly<{
     userId: string;
     sessionId: string;

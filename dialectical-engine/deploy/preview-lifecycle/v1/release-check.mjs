@@ -171,6 +171,8 @@ function withDefaults(layout, deps) {
     }),
     statfs: deps.statfs ?? (path => statfs(path)),
     readMeminfo: deps.readMeminfo ?? (() => readFile('/proc/meminfo', 'utf8')),
+    // NV-55: the live floor below which only a holder of CAP_NET_BIND_SERVICE may bind (the public server's slots).
+    readUnprivilegedPortStart: deps.readUnprivilegedPortStart ?? (() => readFile('/proc/sys/net/ipv4/ip_unprivileged_port_start', 'utf8')),
     pathExists: deps.pathExists ?? pathExists,
     // The settings line (S15): the switch's own plan for a pinned new release, else the pointer from the current release.
     planSettings: deps.planSettings ?? (input => planSettingsForSwitch({ ...input, layout, deps: { run } })),
@@ -445,7 +447,8 @@ export async function releaseCheck({ label, olderManifest, newerManifest, gateRo
       if (await io.pathExists(REBOOT_REQUIRED_PATH)) pending.push('reboot required');
       return pending.length ? miss(pending.join(', ')) : pass('none');
     },
-    // The slot the current release does not use: nothing listens on its two ports and no unit of `label` runs.
+    // The slot the current release does not use: nothing listens on its two ports and no unit of `label` runs, and,
+    // where the slots are below 1024 (the public server, NV-55), that they are still reserved.
     SLOT_FREE: async () => {
       const { releases, label: older } = await currentLabel();
       const spare = releases[older].slot === 'A' ? 'B' : 'A';
@@ -453,6 +456,16 @@ export async function releaseCheck({ label, olderManifest, newerManifest, gateRo
       const pinned = own(releases, label);
       if (pinned && pinned.slot !== spare) busy.push(`${label} pinned in slot ${pinned.slot}`);
       const slots = slotsOf(layout);
+      const slotPorts = Object.values(slots).flatMap(slot => [Number(slot.uiPort), Number(slot.apiPort)]);
+      if (slotPorts.some(port => port < 1024)) {
+        // A later sysctl file, a `sysctl -w` or /etc/sysctl.conf under `sysctl --system` could lower it after boot.
+        let value = null;
+        try {
+          const text = String(await io.readUnprivilegedPortStart()).trim();
+          if (/^[0-9]{1,6}$/u.test(text)) value = Number(text);
+        } catch { value = null; }
+        if (!(value !== null && value > Math.max(...slotPorts))) busy.push(`slot ports not reserved (ip_unprivileged_port_start ${value ?? 'unreadable'})`);
+      }
       for (const port of [slots[spare].uiPort, slots[spare].apiPort]) if (!await io.portRefuses(Number(port))) busy.push(`port ${port} answers`);
       for (const service of ['api', 'ui', 'runner']) {
         const unit = unitNameFor(layout, service, label);

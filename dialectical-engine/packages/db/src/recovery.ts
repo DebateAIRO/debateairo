@@ -117,4 +117,41 @@ export class PostgresRecoveryStartRepository {
       key.fill(0);
     }
   }
+
+  /**
+   * NV-18 (0131): closes recovery bindings left open past one hour, in up to `rounds` rounds of at most `limit`, and
+   * stops at the first short round. Each round is its own short transaction, so no transaction holds more than `limit`
+   * subject locks, and its lock wait is bounded (`SET LOCAL` ends with the round; the pooled connection goes back with
+   * its default). Returns the number closed.
+   */
+  async expireStaleBindings(limit:number,rounds:number):Promise<number>{
+    if(!(Number.isInteger(limit)&&limit>=1&&limit<=1000&&Number.isInteger(rounds)&&rounds>=1&&rounds<=10)){
+      throw new TypeError("RECOVERY_BINDING_BATCH_INVALID");
+    }
+    let total=0;
+    for(let round=0;round<rounds;round++){
+      const client=await this.pool.connect();
+      let expired:number;
+      try{
+        await client.query("BEGIN");
+        await client.query("SET LOCAL lock_timeout = '10s'");
+        const value=(await client.query<{expired:unknown}>(
+          "SELECT identity.expire_stale_account_recovery_bindings($1) AS expired",[limit]
+        )).rows[0]?.expired;
+        if(typeof value!=="number"||!Number.isInteger(value)||value<0||value>limit){
+          throw new TypeError("RECOVERY_BINDING_EXPIRY_OUTCOME_INVALID");
+        }
+        expired=value;
+        await client.query("COMMIT");
+      }catch(error){
+        await client.query("ROLLBACK");
+        throw error;
+      }finally{
+        client.release();
+      }
+      total+=expired;
+      if(expired<limit)break;
+    }
+    return total;
+  }
 }

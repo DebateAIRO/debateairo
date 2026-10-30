@@ -36,7 +36,7 @@ guard that keeps the code and the numbers in step is
 | Pool (name in `pg_stat_activity`) | Before | Now | Wait limit | Why this size (from the code audit) |
 |---|---|---|---|---|
 | `api:runtime`: almost every read and write | 10 | 20 | 5 s | A content lease holds one connection while its body takes a second, so 8 overlapping reads need 17; billing timers and other loops use up to about 7 more at once |
-| `api:authorization`: sign-in, sessions, account pages | 10 | 12 | 5 s | Every signed-in request, plus a check every 250 ms for each open debate page, plus recovery mail that holds one connection for up to 5 s while it sends |
+| `api:authorization`: sign-in, sessions, account pages | 10 | 12 | 5 s | Every signed-in request, plus a check every 250 ms for each open debate page, plus recovery mail that holds one connection for up to 5 s while it sends; at most 4 open debate pages per session and 8 per account hold a live stream (NV-20) |
 | `api:publication-cleanup` (only when publishing is on) | 10 | 4 | 5 s | The 30 s cleanup timer runs two cleanups at once, each using 2 connections |
 | `api:content-provision` | 10 | 2 | 5 s | Only the single-flight erasure cycle uses it at run time |
 | `api:ask-admission-server` | 10 | 4 | 10 s | One per ask in flight; asks are meant to wait their turn, so the limit is longer |
@@ -44,7 +44,7 @@ guard that keeps the code and the numbers in step is
 | `api:room-decision` | 4 | 4 | 10 s | Unchanged; one decision holds the site's day lock and the others queue here by design |
 | `api:erasure` | 10 | 4 | 5 s | The erasure timer holds 2; deletes need the rest |
 | `api:evaluator-dev-menu` | 10 | 2 | 5 s | Development only: the server refuses to start it anywhere else |
-| `api:support` | 10 | 6 | 5 s | Opening a support case holds one connection and reads messages on a second |
+| `api:support` | 10 | 6 | 5 s | No support flow holds two connections since synthesis-flag S05 (2026-10-25, migration 0129): the support chat keeps no conversation, so case opens and their transcript read are gone. An incident answer reads in one statement, the erasure timer's support shred and its readback take one connection, one at a time (security fixes run 3, C-1), and the boot checks use it once |
 | `api:support-relay-lease` | 18 | removed | — | Removed by synthesis-flag S05 (V-111, V-114, 2026-10-25): the relay queue and its daily call count now live in the API's memory, so the pool is no longer opened. The totals below are after this removal |
 | `support:control` | 2 | 2 | 0.2 s | Unchanged; the support settings reader |
 | `api:data-export` (only when the export store is set; mission data-export S01) | — | 1 | 15 s | One export build at a time on one connection: its lease renewal (every 15 s) waits for the snapshot read to free it, so a read of up to about 30 s keeps its lease |
@@ -218,26 +218,36 @@ a freeze), but each still deserves its own fix:
    `declareHatchetWalkingSkeletonTask` (`apps/runner/src/index.ts`) set `executionTimeout` only for the preview, and the
    SDK registers a task without one with `'60s'` (`@hatchet-dev/typescript-sdk` 1.28.1, `resolveExecutionTimeout`).
    Every deployment now gets 60 minutes (`RUNNER_EXECUTION_LIMIT`), beside this change's 30-minute queue wait.
-2. **Public debate pages:** each reader takes a blocking, exclusive lock per publication on one connection, then reads on
-   a second (`apps/api/src/publications.ts` `readPublicDebate`, `packages/db/src/publication-lease.ts`). Many readers of
-   one popular debate queue on the lock, each holding a connection. Fix: a shared lock for readers, and reads on the
-   lease's own connection.
+2. **Fixed (security fixes run 3, NV-21).** **Public debate pages:** each reader takes a blocking, exclusive lock per
+   publication on one connection, then reads on a second (`apps/api/src/publications.ts` `readPublicDebate`,
+   `packages/db/src/publication-lease.ts`). Many readers of one popular debate queue on the lock, each holding a
+   connection. Fix: a shared lock for readers, and reads on the lease's own connection. Readers now share the lease and
+   read on its connection, and exclusive holders (key cleanup, erasure) wait at most 2 s (`LEASE_LOCK_WAITS`).
 3. **Answer and home-page reads fan out**: three queries per node of the debate tree, all at once
    (`packages/serve/src/index.ts` `readNodesForRun`; the home list multiplies that by up to 50 answers). One big page can
-   occupy the whole main pool for a moment. Fix: a small concurrency limit or one set-based query.
+   occupy the whole main pool for a moment. Fix: a small concurrency limit or one set-based query. On the API (security
+   fixes run 3, NV-31) the node fan-out is serialized on the lease's connection, so one page holds one connection; the
+   set-based query remains a possible speed-up.
 4. **The run-key lookup inside every content lease takes a second connection** (the owner resolver in
    `apps/api/src/main.ts`, `FileRunContentKeyStore`). Fix: resolve on the lease's connection, or cache it.
+   **Fixed on the API (security fixes run 3, NV-31)**: the resolver's query runs on the lease's connection, for borrowed
+   and bare leases (`routeLeaseBodyQueries`, `packages/db/src/index.ts`); the runner is unchanged.
 5. **Recovery mail holds a sign-in connection and the account's row locks while it sends** (up to 5 s;
    `packages/db/src/consumer-security-mail.ts`), with up to 32 sends at once. A slow mail server can starve sign-ins.
    Fix: cap those sends below the pool size, or send after the commit.
-6. **Deleting a debate that is still running** waits, holding an erasure connection, for the runner's AI call to finish
-   (`packages/db/src/account-erasure.ts` `withErasureContentLeases`, a blocking lock with no time limit). Fix: a lock
-   timeout or try-lock on the delete request.
+6. **Fixed (security fixes run 3, NV-30).** **Deleting a debate that is still running** waits, holding an erasure
+   connection, for the runner's AI call to finish (`packages/db/src/account-erasure.ts` `withErasureContentLeases`, a
+   blocking lock with no time limit). Fix: a lock timeout or try-lock on the delete request. A delete request checks its
+   grant first, then tries the run's lease once in the same statement (`erasure_reconcile.prepare_private_run_erasure`).
+   A request whose run is in use answers 'pending' without spending its grant, and a fake grant takes no lock. The
+   account-erasure timer waits at most 2 s for each run's lease, then retries in the next cycle.
 7. **Billing leases** hold one connection idle across NETOPIA calls (up to 30 s) and take a second for the write
    (`apps/api/src/billing/renewal.ts`, `refunds.ts`). `upgrade.ts` already does it right with `withTransactionOn`.
    Billing is off today.
-8. **Opening a support case** reads the messages on a second connection while holding the first
-   (`packages/db/src/support.ts` `createCaseOnce`); **the publication cleanup timer** has no overlap guard
+8. **Gone (synthesis-flag S05, 2026-10-25).** **Opening a support case** read the messages on a second connection while
+   holding the first (`packages/db/src/support.ts` `createCaseOnce`). Security fixes run 3 (NV-32) moved that read onto
+   the case transaction's connection; S05 then retired support cases and the stored transcript (migration 0129), so
+   neither the case open nor the read exists any more. **The publication cleanup timer** has no overlap guard
    (`apps/api/src/main.ts`).
 9. **A pool that sees one broken idle connection refuses everything until the process restarts**, by design
    (`tests/integration/pol03-pool-resilience.test.ts`). systemd restarts the API only when it crashes, not when a pool

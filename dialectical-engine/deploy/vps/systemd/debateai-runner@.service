@@ -38,6 +38,10 @@ WorkingDirectory=/opt/debateai/releases/%i/dialectical-engine
 # worker identity); the later file wins. No "-": a release without its own file does not start.
 EnvironmentFile=/etc/debateai/runner.env
 EnvironmentFile=/etc/debateai/releases/%i/runner.env
+# NV-52: the base file is root's (README §3), and these dynamic-loader, libc and Node start-up variables reach no
+# process of this unit, root's `+` hooks included. ld.so and libc act on them for /usr/bin/env itself, before `env -i`
+# runs.
+UnsetEnvironment=LD_PRELOAD LD_LIBRARY_PATH LD_AUDIT LD_DEBUG_OUTPUT LD_PROFILE LD_PROFILE_OUTPUT LD_TRACE_LOADED_OBJECTS GLIBC_TUNABLES GCONV_PATH LOCPATH NODE_OPTIONS NODE_PATH
 Environment=NODE_ENV=production
 Environment=NODE_EXTRA_CA_CERTS=/etc/debateai/hatchet-tls/ca.crt
 # ProtectHome=true empties /home and /root, so the maker CLIs get a private HOME under the state

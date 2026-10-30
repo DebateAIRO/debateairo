@@ -167,6 +167,22 @@ describe("work items are fenced by release (side-by-side §3)", () => {
     await expect(fenceA().listLapsedClaimed(0)).rejects.toBeInstanceOf(TypeError);
   });
 
+  // NV-25 (security audit run 3): the stale-READY re-send's listing, each item with its run's settings version.
+  it("listReady lists this release's READY items only, oldest first, with their versions", async () => {
+    const aFirst = await runWithJob(KEY_A), aLapsed = await runWithJob(KEY_A), aSecond = await runWithJob(KEY_A);
+    const aLive = await runWithJob(KEY_A);
+    await runWithJob(KEY_B);
+    await runWithJob();
+    await runlessJob();
+    await claim(aLapsed, "worker:old", false);
+    await claim(aLive, "worker:a", true);
+    expect(await fenceA().listReady(10)).toEqual([
+      { runId: aFirst.runId, workItemId: aFirst.workItemId, registerVersion: 1 },
+      { runId: aSecond.runId, workItemId: aSecond.workItemId, registerVersion: 1 }
+    ]);
+    await expect(fenceA().listReady(0)).rejects.toBeInstanceOf(TypeError);
+  });
+
   it("recordTerminalFailure writes only this release's items, never under another worker's live claim (D2)", async () => {
     const failure = (job: { runId: string; workItemId: string }, reason: string) =>
       fenceA().recordTerminalFailure({ ...job, reason });

@@ -1,0 +1,20 @@
+-- 0133 · The backup-email outbox's pending-only due index (security audit run 3, NV-38), in the shape 0103:434
+-- gives identity.password_recovery_notice: every claim on identity.backup_email_notice, the release before's and this
+-- release's alike, then reads only pending rows, however much finished history the table keeps.
+--
+-- n1 (side-by-side spec §5, the database rule):
+-- n1: expand
+-- n1: keeps-verifier
+-- n1: outside-transaction
+--   expand               additive only: one new index on a table 0105 created. CONCURRENTLY takes SHARE UPDATE
+--                        EXCLUSIVE only, so the release before keeps reading and writing the table during the build,
+--                        and its own claims use the index too (their predicates carry sent_at IS NULL AND dead_at IS
+--                        NULL).
+--   keeps-verifier       no billing relation or billing function, so the effective-capability verifier in force
+--                        (0130's, migrations/lineage/README.md step 3) stays in force and the manifest names it.
+--   outside-transaction  a concurrent build cannot run inside a transaction block, so this is its own step and its
+--                        whole body is the one statement below. migrate() builds it on its session first (2 s lock
+--                        wait, five tries, an INVALID leftover dropped concurrently before the build), then records
+--                        the step in a step transaction that refuses unless the index is valid and on this table
+--                        (packages/db/src/migration-forward-chain.ts runOutsideTransactionStep).
+CREATE INDEX CONCURRENTLY IF NOT EXISTS backup_email_notice_due ON identity.backup_email_notice (available_at,created_at,notice_id) WHERE sent_at IS NULL AND dead_at IS NULL;

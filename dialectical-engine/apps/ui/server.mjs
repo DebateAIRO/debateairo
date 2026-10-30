@@ -8,9 +8,17 @@ import {
   installGracefulClose,
   noteUnusableApiBase,
   parseWebsiteReleaseKey,
+  READINESS_API_TIMEOUT_MS,
   releaseHeaderFor
 } from "./release-edge.mjs";
-import { hardenIncomingProxyHeaders, parseTrustedProxies, readEdgeSecret } from "./trusted-client-ip.mjs";
+import {
+  assertUiApiProofPolicy,
+  hardenIncomingProxyHeaders,
+  installUiApiProof,
+  parseTrustedProxies,
+  readEdgeSecret,
+  readUiApiProof
+} from "./trusted-client-ip.mjs";
 
 function refuse(code) {
   const error = new TypeError(code);
@@ -25,6 +33,9 @@ const development = process.argv.includes("--dev");
 // DIALECTICAL_UI_EDGE_SECRET_PATH (C2b) adds a shared secret those peers must
 // present. With neither set every client is its socket address. Both are
 // parsed before Next starts so a wrong value refuses to boot.
+// DIALECTICAL_UI_API_PROOF_PATH (NV-03) is the UI-to-API proof, sent to the API
+// with every forwarded address: read and checked here too, then installed once
+// for the route code, never put in the environment.
 const hostname = process.env.DIALECTICAL_UI_HOST?.trim() || "127.0.0.1";
 const portText = process.env.PORT?.trim() || "3000";
 const port = Number(portText);
@@ -33,6 +44,9 @@ if (!Number.isInteger(port) || port < 1 || port > 65_535) {
 }
 const trustedProxies = parseTrustedProxies(process.env.DIALECTICAL_UI_TRUSTED_PROXIES);
 const edgeSecret = readEdgeSecret(process.env.DIALECTICAL_UI_EDGE_SECRET_PATH);
+const uiApiProof = readUiApiProof(process.env.DIALECTICAL_UI_API_PROOF_PATH);
+assertUiApiProofPolicy({ development, trustedProxies, edgeSecret, uiApiProof });
+installUiApiProof(uiApiProof);
 // NETOPIA spec 2026-10-05 §2.17.1: the card form's origin setting is removed; a start that still finds it names it
 // once, never its value, and goes on.
 for (const key of ["XMONEY_SDK_ORIGIN"]) {
@@ -58,6 +72,9 @@ const readiness = createReadinessResponder({
   apiBase,
   releaseKey,
   fetch: globalThis.fetch,
+  uiApiProof,
+  // NV-27: below Caddy's 3 s probe timeout, so a slow API answer is this website's 503, never a probe timeout.
+  timeoutMs: READINESS_API_TIMEOUT_MS,
   draining: () => draining
 });
 
@@ -75,7 +92,8 @@ const server = createServer((request, response) => {
   // when the pair is healthy, which /readyz checks), so a headerless API shows as missing (C12 review).
   const ownRelease = releaseHeaderFor(releaseKey, request.url);
   if (ownRelease !== null) response.setHeader("x-debateai-release", ownRelease);
-  // Spec §6: the health check Caddy polls (with or without the edge secret) is answered here, never by Next.
+  // Spec §6: the health check Caddy polls (with or without the edge secret) is answered here, never by Next, and
+  // the website's /readyz proves the UI-to-API proof with its API (NV-03).
   if (readiness(request, response)) return;
   void handle(request, response).catch((error) => {
     console.error("[UI_REQUEST_FAILED]", error);

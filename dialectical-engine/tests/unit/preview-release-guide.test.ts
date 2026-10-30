@@ -72,7 +72,7 @@ const code = (line: string) => !line.trimStart().startsWith('#');
 /** The steps, in the order the guide runs them. */
 const STEPS = Object.freeze([
   'TA0', 'TA1', 'TA8', 'TA_UNITS', 'TA_CADDY', 'TA_ENV', 'TA_OP', 'TB0', 'TB1', 'TB2', 'TB3', 'TB4', 'TB5', 'TB6', 'TB7', 'TB8', 'TB9', 'RBA_T', 'RBB_T',
-  'SB1', 'SB1B', 'SB3', 'SB4', 'SB5', 'SB5B', 'SB7', 'SB8', 'SB9', 'SB10', 'SB11', 'SB12', 'SB13', 'SB13B', 'SB14', 'SB14B', 'SB15',
+  'SB1', 'SB1B', 'SB3', 'SB4', 'SB5', 'SB5B', 'SB5C', 'SB7', 'SB8', 'SB9', 'SB10', 'SB11', 'SB12', 'SB13', 'SB13B', 'SB14', 'SB14B', 'SB15',
   'WB1', 'WB2', 'WB3', 'WB4', 'DR1', 'DR2', 'DR3', 'DR4', 'DR5', 'DR6', 'RBD_A', 'RBD_B', 'MT1', 'MT2', 'PM1', 'PM2'
 ]);
 /** The scripts that make the names file (they cannot read it yet). */
@@ -485,6 +485,41 @@ describe('the preview release guide: transition T, side by side, the way back, t
     // An empty value is refused by the settings reader: no marks means no line. The drained path edits after DR1.
     expect(sectionOf(guide, sideBySide.split('\n').find(line => line.startsWith('### SB5b. '))!)).toMatch(/leave the\s+line out/);
     expect(drained).toContain('To change the payment marks on this path, run SB5b right after DR1.');
+  });
+
+  it('SB5c adds the proof lines only to a release that knows them, before its launch plans, with matching copies', () => {
+    const sb5c = scriptOf('SB5C').lines;
+    expect(sideBySide.indexOf('\n### SB5c. ')).toBeGreaterThan(sideBySide.indexOf('\n### SB5b. '));
+    expect(sideBySide.indexOf('\n### SB5c. ')).toBeLessThan(sideBySide.indexOf('\n### SB6. '));
+    const at = (needle: string) => { const found = sb5c.findIndex(line => line.includes(needle) && line.includes('SB5C_NOT_DONE')); expect(found, needle).toBeGreaterThan(-1); return found; };
+    // Each release starts its website from its own UI folder and its API from its own API folder: both must know the key.
+    const uiKnows = at('grep -q "\'DIALECTICAL_UI_API_PROOF_PATH\'" "$CUI/dialectical-engine/deploy/preview-auth-dev/v1/environment.mjs"');
+    expect(read('deploy/preview-auth-dev/v1/environment.mjs')).toContain("'DIALECTICAL_UI_API_PROOF_PATH'");
+    const apiKnows = at('grep -q \'UI_API_PROOF_PATH: z\\.\' "$CAPI/dialectical-engine/packages/register/src/runtime-environment.ts"');
+    expect(read('packages/register/src/runtime-environment.ts')).toContain('UI_API_PROOF_PATH: z.');
+    const apiPlan = at('[ ! -e "$ART/api-launch.json" ]');
+    const uiPlan = at('[ ! -e "$ART/ui-launch.json" ]');
+    const users = at('[ -n "$AU" ] && [ "$AU" != root ] && [ -n "$AGRP" ] && [ -n "$UU" ] && [ "$UU" != root ] && [ "$AU" != "$UU" ]');
+    const copies = at('cmp -s "$PRF/ui.secret" "$PRF/api/proof.secret"');
+    const edit = sb5c.findIndex(line => line.startsWith('cp -p '));
+    const moved = sb5c.map((line, index) => line.startsWith('mv "$F.new" "$F"') ? index : -1).filter(index => index >= 0);
+    const same = sb5c.findIndex(line => line.startsWith('lc release-env.mjs same --labels "$OLABEL,$LABEL" --slots "$OSLOT,$SLOT" ||'));
+    for (const guard of [uiKnows, apiKnows, apiPlan, uiPlan, users, copies]) expect(guard).toBeLessThan(edit);
+    expect(moved.length).toBeGreaterThan(0);
+    for (const index of moved) { expect(edit).toBeLessThan(index); expect(index).toBeLessThan(same); }
+    // Only the new release's own files: never the live ones an older release reads.
+    for (const line of sb5c.filter(code)) expect(line, line).not.toMatch(/\$E\/(api|ui)\.env\b/);
+    // The users come from the instances (TB5 moved the fixed units aside); AU and AGRP are the names file's.
+    expect(sb5c).toContain('UU=$(systemctl show -p User --value "debateai-preview-ui@$OLABEL")');
+    expect(sb5c.filter(code).some(line => /(^|[\s;])(AU|AGRP)=/.test(line))).toBe(false);
+    for (const line of sb5c.filter(code)) expect(line, line).not.toMatch(/debateai-preview-(api|ui)(?!@)/);
+    // The proof folder has its own name; the names file's PD (the DeepInfra authority) is left alone.
+    expect(sb5c.some(line => line.startsWith('PRF='))).toBe(true);
+    expect(sb5c.filter(code).some(line => /(^|[\s;])PD=/.test(line))).toBe(false);
+    const redirect = sb5c.find(line => line.includes('> "$PRF/ui.secret.new"'));
+    expect(redirect).toBeDefined();
+    expect(redirect).toMatch(/\bset -C\b/);
+    expect(drained).toContain('run SB5c right after DR1');
   });
 
   it('no script stops a runner instance outside the drained and before-switch blocks', () => {
@@ -1094,5 +1129,98 @@ describe('settings activation: the guide (side-by-side spec §13)', async () => 
     // S16 (ruling R28, built in this wave): the storyteller as its own story checker is refused, seats left out included.
     expect(prose).toContain('answer-seats-storyteller-is-story-checker');
     expect(prose).toContain('counting a seat left out as the seat it follows');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// NV-07: the restore fence. H11 sits before the transition section (so the step order above is unchanged); every restore
+// in the guide (rbB, rbB-T, rbD-B) and the lifecycle guide's nightly-dump restore revoke the restored sessions and mark
+// the fence before any API starts, and H11 step 4 is the owner's way to release the public hold.
+describe('NV-07: the restore fence in the guides', () => {
+  const H11 = '### H11. The restore fence (from the release that carries NV-07)';
+  const REVOKE = 'psqlq "UPDATE identity.session SET revoked_at = GREATEST(clock_timestamp(), created_at) WHERE revoked_at IS NULL"';
+  const FENCE_QUESTION = 'FH=$(psqlq "SELECT to_regclass(\'identity.restore_fence\')';
+
+  it('keeps H10 the NETOPIA alarm and puts H11 after it, before the hosted-base recipe', () => {
+    const lines = guide.split('\n');
+    expect(lines.filter(line => line.startsWith('### H10. '))).toEqual(['### H10. The alarm on NETOPIA\'s notify address']);
+    expect(lines.filter(line => line.startsWith('### H11. The restore fence'))).toEqual([H11]);
+    const at = guide.indexOf(`\n${H11}\n`);
+    expect(at).toBeGreaterThan(guide.indexOf('\n### H10. '));
+    expect(at).toBeLessThan(guide.indexOf('\n## A normal release on a hosted base'));
+    expect(at).toBeLessThan(guide.indexOf(`\n${TRANSITION}\n`));
+  });
+
+  it('H11: the folder and drop-in, the SB5b-shaped setting, the INITIALISED check, and the read, reconcile and release', () => {
+    const h11 = sectionOf(guide, H11);
+    // H11's blocks sit inside its numbered steps (three spaces in), as H9's do.
+    const blocks = blocksOf(h11.split('\n').map(line => line.replace(/^ {3}/, '')).join('\n'));
+    expect(blocks[0]!.lines[0]).toBe(NAMES_LINE);
+    for (const needle of ['install -d -m 0700 -o "$AU" -g "$AGRP" "$FD"', '/etc/systemd/system/debateai-preview-api@.service.d/zzzzzzzzzz-fence-restore.conf']) {
+      expect(blocks[0]!.lines.join('\n'), needle).toContain(needle);
+    }
+    const step2 = blocks.filter(block => block.lines.at(-1) === 'echo H11_DONE');
+    expect(step2).toHaveLength(1);
+    const script = step2[0]!.lines;
+    expect(script[0]).toBe('set -euo pipefail');
+    expect(script[1]).toBe(NAMES_LINE);
+    for (const needle of ['A=$E/api-$LABEL.env', '$ART/api-launch.json', "printf 'RESTORE_FENCE_PATH=%s\\n'", 'uniq -d', 'release-env.mjs same']) {
+      expect(script.join('\n'), needle).toContain(needle);
+    }
+    expect(script.find(line => line.includes('H11_NOT_DONE'))).toContain('(SB5 or DR1 first)');
+    for (const line of script.filter(code)) if (line.includes('_NOT_DONE')) expect(line, line).toMatch(/exit 1/);
+    expect(h11).toContain('after DR1, before DR5');
+    expect(h11).toContain('SELECT public_hold_since, last_revoked_at, last_revoked_counts FROM identity.restore_fence');
+    expect(h11.split('\n').find(line => line.includes('restore_fence_release_public_hold_v1('))).toContain('# must print t');
+    for (const words of ['fresh yes', 'next 60 s settle', 'rbD-B always sets the hold', 'SB7', '"outcome":"INITIALISED"']) expect(h11, words).toContain(words);
+  });
+
+  it('rbB-T and rbD-B revoke the restored sessions after the ledger check and before any API starts, then mark the fence', () => {
+    for (const step of ['RBB_T', 'RBD_B']) {
+      const lines = scriptOf(step).lines;
+      const ledger = lines.findIndex(line => line.includes('public.debateai_schema_migration') && line.includes('= "$LEDGER0" ]') && line.includes(`${step}_NOT_DONE: the restored database`));
+      const revoke = lines.findIndex(line => line.startsWith(REVOKE));
+      const start = lines.findIndex(line => /^systemctl start "?debateai-preview-api/.test(line));
+      expect(ledger, step).toBeGreaterThan(-1);
+      expect(revoke, step).toBe(ledger + 1);
+      expect(lines[revoke + 1]!.startsWith(`FENCE=/var/lib/debateai-v3-preview/api/restore-fence/fence; ${FENCE_QUESTION}`), step).toBe(true);
+      expect(lines[revoke + 2], step).toContain('install -m 0600');
+      expect(start, step).toBeGreaterThan(revoke + 2);
+    }
+    // rbB (the drained recipe of the old layout, before the transition) carries the same lines.
+    const rbb = guide.slice(guide.indexOf('**rbB: from B3 on'), guide.indexOf('echo RBB_DONE'));
+    const lines = rbb.split('\n');
+    const revoke = lines.findIndex(line => line.startsWith(REVOKE));
+    expect(revoke).toBeGreaterThan(lines.findIndex(line => line.includes('RBB_NOT_DONE: the restored database is not ledger')));
+    expect(revoke).toBeLessThan(lines.findIndex(line => line.startsWith('systemctl start debateai-preview-api')));
+    for (const line of lines.slice(revoke, revoke + 3)) {
+      for (const match of line.matchAll(/([A-Z][A-Z0-9_]*)_NOT_DONE/g)) expect(match[1], line).toBe('RBB');
+      expect(line, line).toMatch(/exit 1/);
+    }
+  });
+
+  it('the prose of every restore and of SB5 and DR1 points to H11', () => {
+    const paragraph = (start: string, end: string) => guide.slice(guide.indexOf(start), guide.indexOf(end, guide.indexOf(start)));
+    expect(paragraph('**rbB: from B3 on', '```sh')).toContain('H11 step 4');
+    expect(paragraph('**rbB-T: from TB3 on, at any later point.**', '```sh')).toContain('H11 step 4');
+    expect(paragraph('**rbD-B: from DR4 on.**', '```sh')).toContain('H11 step 4');
+    expect(sectionOf(guide, '### SB5. The three env files, and the database-ahead file')).toContain('H11 step 2');
+    expect(sectionOf(guide, '#### DR1. The three env files')).toContain('H11 step 2');
+  });
+
+  it("the lifecycle guide's nightly-dump restore runs the same lines with its own archive, stamp and psqlq", () => {
+    const lifecycle = read('deploy/preview-lifecycle/v1/README.md');
+    const section = sectionOf(lifecycle, '## Restore a nightly dump');
+    expect(section).toContain('H11 step 4');
+    expect(section).toContain('rbD-B');
+    const block = blocksOf(section).find(candidate => candidate.lines.some(line => line.includes('RESTORE_DONE')));
+    expect(block).toBeDefined();
+    const text = block!.lines.join('\n');
+    for (const needle of ['S=/root/preview-archive/restore-$TS',
+      'psqlq() { runuser -u postgres -- /usr/lib/postgresql/18/bin/psql -h /run/debateai-v3-preview/postgresql -p 5434 -d debateai -XAt -c "$1"; }',
+      REVOKE, FENCE_QUESTION, 'RESTORE_DONE']) expect(text, needle).toContain(needle);
+    for (const line of block!.lines.filter(line => line.includes('RESTORE_NOT_DONE'))) expect(line, line).toMatch(/exit 1/);
+    // psqlq is the names file's definition byte for byte.
+    expect(guide).toContain(text.split('\n').find(line => line.trimStart().startsWith('psqlq() {'))!.trimStart());
   });
 });

@@ -157,6 +157,7 @@
   "billing.subscription.withdrawNothingDue": "Lest. Il-pjan tiegħek intemm. Il-parti li diġà użajt tkopri l-prezz kollu, għalhekk xejn mhu dovut lura lilek.",
   "billing.subscription.withdrawOwnerReview": "Il-pjan tiegħek intemm. Diġà sar rimborż fuq wieħed mill-ħlasijiet tiegħek, għalhekk se niċċekkjaw x’għadu dovut u nibagħtulek email fi żmien 14-il jum.",
   "billing.subscription.withdrawWindowClosed": "Il-perjodu ta’ rtirar ta’ 14-il jum intemm, jew ma japplikax fejn tgħix. Xorta tista’ tikkanċella fi kwalunkwe ħin.",
+  "billing.subscription.withdrawDebateRunning": "Dibattitu li bdejt jista’ jkun għadu qed juża l-kreditu, għalhekk għadna ma nistgħux ngħidu kemm użajt. Jekk jogħġbok erġa’ pprova aktar tard. Għad għandek aktar minn ġurnata biex tirtira.",
   "billing.subscription.stillConfirming": "Għadna qed nikkonfermaw dan mal-fornitur tal-ħlas. Erġa’ ċċekkja din il-paġna fi ftit minuti.",
   "billing.subscription.actionFailed": "Ma ħadimx. Erġa’ pprova.",
   "billing.subscription.invoices": "Fatturi",

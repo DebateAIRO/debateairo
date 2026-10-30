@@ -14,6 +14,9 @@
 # in the later key snapshot; a key erased between the two corresponds to a row that was already
 # erased. The reverse order can produce a row whose key no longer exists.
 #
+# The restore fence (RESTORE_FENCE_PATH, README §9 "After any restore") is deliberately NOT captured: a restore must
+# never roll it back, because the API compares it with the restored database's own copy. Do not add it here.
+#
 # The six raw 32-byte secrets are NOT in that envelope. They go to a SECOND age recipient whose
 # private key never touches this host (offline escrow held by V). The audit source-IP salt is a
 # key, not metadata: bundling it with the dump would let whoever holds one backup re-identify

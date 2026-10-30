@@ -11,7 +11,9 @@ import type { BillingAudit } from "./audit.js";
 import { emailJob } from "./email-job.js";
 import type { NoticeSpool, SpoolEntry } from "./notice-spool.js";
 import { enqueueOnce } from "./outbox.js";
-import { openQuarantined, sealCardToken, sealNoticeAllowed, sealNoticeRaw, sealQuarantined } from "./records.js";
+import {
+  noticeQuarantineIdOf, openQuarantined, sealCardToken, sealNoticeAllowed, sealNoticeRaw, sealQuarantined
+} from "./records.js";
 
 /** §2.7.2's answer: 200 (verified), 503 (not verified, or not stored: NETOPIA sends again), 429 (over budget). */
 export type NoticeAnswer = Readonly<{ status: 200 | 429 | 503; body: string }>;
@@ -32,11 +34,28 @@ export interface NetopiaNoticeIntakePort {
 /** ON: billing is on. PROVIDER_ONLY (ruling C-9): hosted, billing off, NETOPIA's settings complete. */
 export type NetopiaIntakeMode = "ON" | "PROVIDER_ONLY";
 
+/** NV-44: the quarantine's caps (NOTICE_QUARANTINE_LIMITS). */
+export type NoticeQuarantineLimits = Readonly<{ orderRows: number; ownerDayRows: number; dayRows: number; dayBytes: number }>;
+
+/**
+ * NV-44: NETOPIA sends a message and 5 copies 5 minutes apart (deploy/vps/README.md §14.5), so 64 rows hold about ten
+ * such payment attempts for one order; one owner adds at most 64 rows a day; the day caps bound every row except an
+ * order's first and any message carrying a saved card.
+ */
+export const NOTICE_QUARANTINE_LIMITS: NoticeQuarantineLimits = Object.freeze({
+  orderRows: 64, ownerDayRows: 64, dayRows: 2_000, dayBytes: 32 * 1024 * 1024
+});
+
+/** NV-44: why a message that failed verification was not kept (`billing.notice.quarantine_refused`'s cause). */
+export type NoticeQuarantineRefusal = "UNKNOWN_ORDER" | "ORDER_FULL" | "OWNER_DAY_FULL" | "DAY_FULL" | "BUSY";
+
+type NoticeQuarantineLoad = Awaited<ReturnType<BillingRepository["noticeQuarantineLoad"]>>;
+
 export type NetopiaNoticeIntakeDeps = Readonly<{
   repository: Pick<BillingRepository,
     | "withTransaction" | "insertPaymentNotice" | "insertPaymentNoticeRaw" | "insertPaymentNoticeOutcome"
-    | "insertNoticeQuarantine" | "quarantineSince" | "insertCardToken" | "toolOrder" | "charge" | "customerByOwner"
-    | "enqueue">;
+    | "insertNoticeQuarantine" | "noticeQuarantineLoad" | "tryLockNoticeQuarantineOrder" | "quarantineSince"
+    | "insertCardToken" | "toolOrder" | "charge" | "customerByOwner" | "enqueue">;
   jobs: Pick<BillingJobQueries, "bringForward" | "outboxJobExists">;
   /** Our POS signature and the trusted NETOPIA keys, read at this start (N8's `noticeTrust`). */
   trust: NoticeTrust;
@@ -57,6 +76,8 @@ export type NetopiaNoticeIntakeDeps = Readonly<{
    * from BILLING_NOTICE_SPOOL_PATH). Absent: such a message is answered 503 and nothing is kept, as before.
    */
   spool?: NoticeSpool;
+  /** NV-44: the quarantine's caps, for tests only; absent (main.ts, runtime.ts): NOTICE_QUARANTINE_LIMITS. */
+  quarantineLimits?: NoticeQuarantineLimits;
 }>;
 
 const CHARGE_ORDER = /^[0-9a-f]{32}$/u;
@@ -100,6 +121,8 @@ type CardSource = Readonly<{
 export class NetopiaNoticeIntake implements NetopiaNoticeIntakePort {
   /** B3a: the replay under way, so the start's replay and a tick's never read the same files at once. */
   private replaying: Promise<number> | undefined;
+  /** NV-44: the quarantine re-check under way, so two became-current transitions never read it at once. */
+  private rechecking: Promise<number> | undefined;
 
   constructor(private readonly deps: NetopiaNoticeIntakeDeps) {}
 
@@ -203,9 +226,19 @@ export class NetopiaNoticeIntake implements NetopiaNoticeIntakePort {
    * §2.7.4 step 2: the quarantine of the last 14 days, verified with the keys read at this start. Read in keyset pages
    * (ruling PR-30), so a flood of stored rejections never sits in memory at once; storing a message adds no
    * quarantine row, so the pages do not move under the loop. A row whose body is already stored writes no outcome:
-   * NETOPIA sent nothing, so it is not a DUPLICATE, and it does not count as verified.
+   * NETOPIA sent nothing, so it is not a DUPLICATE, and it does not count as verified. Single-flight (NV-44), as the
+   * spool's replay is: a call while a pass runs gets that pass's result.
    */
   async recheckQuarantine(now: Date): Promise<number> {
+    if (this.rechecking !== undefined) return this.rechecking;
+    const run = this.recheckOnce(now).finally(() => {
+      this.rechecking = undefined;
+    });
+    this.rechecking = run;
+    return run;
+  }
+
+  private async recheckOnce(now: Date): Promise<number> {
     const since = new Date(now.getTime() - QUARANTINE_DAYS * DAY_MS);
     const { repository } = this.deps;
     let quarantined = 0;
@@ -265,18 +298,51 @@ export class NetopiaNoticeIntake implements NetopiaNoticeIntakePort {
     return netopiaNoticeAnswer(reason);
   }
 
-  /** Seals the message into the quarantine; with billing on, O4 (once an hour) when it names an open charge of ours. */
+  /**
+   * Seals the message into the quarantine when it could be NETOPIA's and the caps allow (NV-44): its order is ours,
+   * the same bytes are not kept yet (the id is their keyed MAC), and its order, its owner and the UTC day are under
+   * NOTICE_QUARANTINE_LIMITS. The caps are read and refused with no lock; only a message that would be kept takes its
+   * order's try-lock (held: BUSY, never a wait), reads again and is kept. Every refusal but a duplicate writes one
+   * line. With billing on, O4 (once an hour) when it names an open charge of ours, whether it was kept or not.
+   */
   private async quarantine(input: NoticeArrival, reason: NoticeRejectionReason): Promise<boolean> {
-    const orderId = parseNetopiaNotice(input.rawBody, input.now).orderId;
-    const quarantineId = randomUUID();
-    const sealed = sealQuarantined(this.deps.recordsKey, quarantineId, input.rawBody, input.header);
-    return this.deps.repository.withTransaction(async (client) => {
-      await this.deps.repository.insertNoticeQuarantine(client, {
-        quarantineId, receivedAt: input.now, reason, orderId, rawCiphertext: sealed.rawCiphertext,
-        headerCiphertext: sealed.headerCiphertext, keyId: sealed.keyId
-      });
-      if (this.deps.mode !== "ON") return false;
+    const parsed = parseNetopiaNotice(input.rawBody, input.now);
+    const { orderId } = parsed;
+    const carriesCard = parsed.savedCard !== null;
+    const { repository, recordsKey } = this.deps;
+    const dayStart = new Date(Math.floor(input.now.getTime() / DAY_MS) * DAY_MS);
+    const window = {
+      orderSince: new Date(input.now.getTime() - QUARANTINE_DAYS * DAY_MS),
+      dayStart, dayEnd: new Date(dayStart.getTime() + DAY_MS)
+    };
+    return repository.withTransaction(async (client) => {
       const target = await this.targetOf(client, orderId);
+      if (target.kind === "UNKNOWN" || orderId === null) {
+        this.deps.audit("billing.notice.quarantine_refused", { cause: "UNKNOWN_ORDER" });
+        return false;
+      }
+      // Named and sealed only for an order of ours: a message naming none costs no MAC and no seal.
+      const quarantineId = noticeQuarantineIdOf(recordsKey, input.rawBody, input.header);
+      const sealed = sealQuarantined(recordsKey, quarantineId, input.rawBody, input.header);
+      const bytes = sealed.rawCiphertext.length + (sealed.headerCiphertext?.length ?? 0);
+      const ownerRef = target.kind === "CHARGE" ? target.ownerRef : null;
+      const refusal = async () => {
+        const load = await repository.noticeQuarantineLoad(client, { quarantineId, orderId, ...window, ownerRef });
+        return this.refusalOf(load, bytes, ownerRef !== null, carriesCard);
+      };
+      let outcome = await refusal();
+      if (outcome === null) {
+        outcome = await repository.tryLockNoticeQuarantineOrder(client, orderId) ? await refusal() : "BUSY";
+      }
+      if (outcome === null) {
+        await repository.insertNoticeQuarantine(client, {
+          quarantineId, receivedAt: input.now, reason, orderId, rawCiphertext: sealed.rawCiphertext,
+          headerCiphertext: sealed.headerCiphertext, keyId: sealed.keyId
+        });
+      } else if (outcome !== "DUPLICATE") {
+        this.deps.audit("billing.notice.quarantine_refused", { cause: outcome });
+      }
+      if (this.deps.mode !== "ON") return false;
       if (target.kind !== "CHARGE" || !target.ours || !target.open) return false;
       return enqueueOnce({ repository: this.deps.repository, jobs: this.deps.jobs }, client, emailJob({
         template: "O4", recipient: { kind: "OWNER" }, dedupeRef: input.now.toISOString().slice(0, 13),
@@ -284,6 +350,25 @@ export class NetopiaNoticeIntake implements NetopiaNoticeIntakePort {
         notBefore: input.now
       }));
     });
+  }
+
+  /**
+   * NV-44: why a message would not be kept, from what the quarantine holds (`load`) and its own sealed size; null: keep
+   * it. The order and owner caps bind every row; the day caps spare an order's first kept message and any message
+   * carrying a saved card, because NETOPIA sends the card once, in the first message about a payment, and one order may
+   * carry several payments.
+   */
+  private refusalOf(
+    load: NoticeQuarantineLoad, bytes: number, owned: boolean, carriesCard: boolean
+  ): NoticeQuarantineRefusal | "DUPLICATE" | null {
+    const limits = this.deps.quarantineLimits ?? NOTICE_QUARANTINE_LIMITS;
+    if (load.duplicate) return "DUPLICATE";
+    if (load.orderRows >= limits.orderRows) return "ORDER_FULL";
+    if (owned && load.ownerDayRows >= limits.ownerDayRows) return "OWNER_DAY_FULL";
+    if (load.orderRows > 0 && !carriesCard && (load.dayRows >= limits.dayRows || load.dayBytes + bytes > limits.dayBytes)) {
+      return "DAY_FULL";
+    }
+    return null;
   }
 
   /**

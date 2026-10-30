@@ -8,7 +8,7 @@ import {
   type DebateMapView,
   type RunProjection
 } from "@debateai/contract";
-import { normalizeClientIp, TRUSTED_CLIENT_IP_HEADER } from "../trusted-client-ip.mjs";
+import { installedUiApiProof, normalizeClientIp, TRUSTED_CLIENT_IP_HEADER, UI_API_PROOF_HEADER } from "../trusted-client-ip.mjs";
 import type { DebateDetail, DebateSummary } from "./types.js";
 import { debateDetailFromAnswer, debateSummariesFromIndex } from "./v3/adapter.js";
 import { readAnswerFloor } from "./v3/floorAnswer.js";
@@ -52,6 +52,8 @@ export function readSessionCookie(
  * into one bucket shared by everyone. server.mjs strips every inbound forwarded header
  * and re-stamps the visitor's address; the same rule as the /api proxy applies here: the
  * stamp is vouched for only behind server.mjs (L3-F6), and only as one exact address.
+ * NV-03: the API honours that address only with the UI-to-API proof, so
+ * createServerContractClient sends the proof server.mjs installed beside it.
  */
 export function readTrustedClientIp(
   store: Readonly<{ get(name: string): string | null }>
@@ -71,7 +73,14 @@ export function createServerContractClient(
     throw new Error("DIALECTICAL_API_BASE_REQUIRED");
   }
   const session = sessionCookieValue(sessionCookie);
-  return createContractClient(baseUrl, fetchImplementation, {
+  // NV-03: the proof travels with the forwarded address, added here so the shared contract client never handles it.
+  const proof = clientIp === undefined ? null : installedUiApiProof();
+  const upstreamFetch: typeof fetch = proof === null ? fetchImplementation : (input, init) => {
+    const headers = new Headers(init?.headers);
+    headers.set(UI_API_PROOF_HEADER, proof);
+    return fetchImplementation(input, { ...init, headers });
+  };
+  return createContractClient(baseUrl, upstreamFetch, {
     mode: "cookie",
     ...(session === null ? {} : {
       cookieHeader: `${USER_TOKEN_COOKIE}=${session}`

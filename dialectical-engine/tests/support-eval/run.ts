@@ -366,6 +366,8 @@ const DETERMINISTIC_STRUCTURAL_RELAY: SupportModelPort = Object.freeze({
 });
 
 const EVAL_IDENTITY = testHttpIdentity("support-eval-public-guide");
+/** NV-03: the UI-to-API proof the evaluated API holds. */
+const EVAL_UI_API_PROOF = "e".repeat(43);
 
 export async function createInProcessSupportEvalExecutor(input: Readonly<{
   mode?: SupportEvalMode;
@@ -440,9 +442,11 @@ export async function createInProcessSupportEvalExecutor(input: Readonly<{
         snapshot: corpusSnapshots.get
       })
     });
+    // NV-03: the API honours the per-case x-forwarded-for only from the proven UI this harness stands in for.
     server = buildApi({
       application: evalAskApplication(),sessions: testSessionApplication([EVAL_IDENTITY]),
-      allowedOrigin: TEST_APP_ORIGIN,networkPseudonym: sourcePseudonym,support
+      allowedOrigin: TEST_APP_ORIGIN,networkPseudonym: sourcePseudonym,support,
+      uiApiProof: Buffer.from(EVAL_UI_API_PROOF)
     });
     let address = 0;
     const activeServer = server;
@@ -463,7 +467,8 @@ export async function createInProcessSupportEvalExecutor(input: Readonly<{
             method: "POST",url: "/v1/support/messages",remoteAddress: ip,
             headers: {
               origin: TEST_APP_ORIGIN,...identityHeaders,
-              "x-forwarded-for": ip
+              "x-forwarded-for": ip,
+              "x-debateai-ui-proof": EVAL_UI_API_PROOF
             },
             payload: { text: message.content,language: testCase.expectedLanguage }
           });

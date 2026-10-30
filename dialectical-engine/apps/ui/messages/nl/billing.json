@@ -157,6 +157,7 @@
   "billing.subscription.withdrawNothingDue": "Klaar. Uw abonnement is beëindigd. Het deel dat u al hebt gebruikt, dekt de volledige prijs, dus u hebt niets terug te krijgen.",
   "billing.subscription.withdrawOwnerReview": "Uw abonnement is beëindigd. Op een van uw betalingen is al een terugbetaling gedaan, dus we controleren wat er nog verschuldigd is en e-mailen u binnen 14 dagen.",
   "billing.subscription.withdrawWindowClosed": "De herroepingstermijn van 14 dagen is verstreken, of die geldt niet waar u woont. U kunt nog steeds op elk moment opzeggen.",
+  "billing.subscription.withdrawDebateRunning": "Een debat dat u bent begonnen, gebruikt mogelijk nog tegoed, dus we kunnen nog niet zien hoeveel u hebt gebruikt. Probeer het later opnieuw. U hebt nog meer dan een dag om te herroepen.",
   "billing.subscription.stillConfirming": "We bevestigen dit nog bij de betaalprovider. Bekijk deze pagina over een paar minuten opnieuw.",
   "billing.subscription.actionFailed": "Dat is niet gelukt. Probeer het opnieuw.",
   "billing.subscription.invoices": "Facturen",

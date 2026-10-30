@@ -299,7 +299,7 @@ describe("side-by-side C7 the billing runtime's loops run only while the release
       audit: () => undefined,
       clock: () => new Date(),
       reportPending: () => undefined,
-      ownerSpend: { readOwnerSpentMicros: async () => 0 },
+      ownerSpend: { readWithdrawalSpend: async () => ({ spentMicros: 0, liveRuns: 0 }) },
       blindIndexKey: new Uint8Array(32),
       identities: { ownerRefByEmailBlindIndex: async () => null },
       taxAuthorities: taxAuthoritiesFromValue(

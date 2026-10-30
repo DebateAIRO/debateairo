@@ -88,6 +88,7 @@ async function publishWith(answer: Answer, readAnswerFloor: FloorReader) {
       return true;
     },
     abandonKeyProvision: async () => true,
+    readOwnedVisibility: async () => ({ state: "PRIVATE", publicRef: null }),
     readPublic: async () => null
   } as unknown as PostgresPublicationRepository;
   const application = new PostgresPublicationApplication(repository, cipher, () => new Date("2026-09-27T12:00:00.000Z"));

@@ -33,6 +33,7 @@ import {
   loadKek,
   totpCodeAtStep,
   verifyChain,
+  verifyPassword,
   type Argon2Executor,
   type ChainedAuditEvent,
   type UserDekStore
@@ -2055,7 +2056,7 @@ setTimeout(() => undefined, 500);
           phone: "+40722123456", recoveryEmail: `s3d-hang-${index}-recovery@example.test`,
           adultAffirmed: true
         }, {
-          ip: `2001:db8:3d::${index + 1}`,
+          ip: `2001:db8:a041:${(index + 1).toString(16)}::1`,
           userAgent: "vitest-s3d-hanging-transport",
           requestId: `request:s3d:hang:${index}`
         });
@@ -2080,7 +2081,7 @@ setTimeout(() => undefined, 500);
       flow.service.resendVerification({
         email: `s3d-hang-topup-${index}@example.test`
       }, {
-        ip: `2001:db8:3d:7::${index + 1}`,
+        ip: `2001:db8:a066:${(index + 1).toString(16)}::1`,
         userAgent: "vitest-s3d-hanging-transport-topup",
         requestId: `request:s3d:hang:topup:${index}`
       }).catch(() => undefined));
@@ -2335,7 +2336,7 @@ setTimeout(() => undefined, 500);
         phone: "+40722123456", recoveryEmail: `s3d-retained-saturation-${index}-recovery@example.test`,
         adultAffirmed: true
       }, {
-        ip: `2001:db8:3d:4e::${index + 1}`,
+        ip: `2001:db8:a321:${(index + 1).toString(16)}::1`,
         userAgent: "vitest-s3d-retained-saturation",
         requestId: `request:s3d:retained:saturation:${index}`
       }).catch(() => undefined)
@@ -2356,7 +2357,7 @@ setTimeout(() => undefined, 500);
       flow.service.resendVerification({
         email: `s3d-retained-topup-${index}@example.test`
       }, {
-        ip: `2001:db8:3d:4f::${index + 1}`,
+        ip: `2001:db8:a342:${(index + 1).toString(16)}::1`,
         userAgent: "vitest-s3d-retained-saturation-topup",
         requestId: `request:s3d:retained:saturation:topup:${index}`
       }).catch(() => undefined)
@@ -2410,7 +2411,7 @@ setTimeout(() => undefined, 500);
             phone: "+40722123456", recoveryEmail: `s3d-retained-refusal-${index}-recovery@example.test`,
             adultAffirmed: true
           }, {
-            ip: `2001:db8:3d:4f::${(index % 512) + 1}`,
+            ip: `2001:db8:a396:${((index % 512) + 1).toString(16)}::1`,
             userAgent: "vitest-s3d-retained-refusal",
             requestId: `request:s3d:retained:refusal:${index}`
           });
@@ -2635,7 +2636,7 @@ setTimeout(() => undefined, 500);
       adultAffirmed: true
     });
     const requestSource = (label: string, index: number) => ({
-      ip: `2001:db8:3d:${(label.length + index).toString(16)}::${index + 1}`,
+      ip: `2001:db8:${(0xa600 + label.length + index).toString(16)}:${(index + 1).toString(16)}::1`,
       userAgent: `vitest-s3d-r3-${label}`,
       requestId: `request:s3d:r3:${label}:${index}`
     });
@@ -3049,7 +3050,7 @@ setTimeout(() => undefined, 500);
       adultAffirmed: true
     });
     const requestSource = (route: "register" | "resend", arm: string, index: number) => ({
-      ip: `2001:db8:${route === "register" ? "3e" : "3f"}:${arm.length}::${index + 1}`,
+      ip: `2001:db8:${((route === "register" ? 0xb000 : 0xb100) + arm.length).toString(16)}:${(index + 1).toString(16)}::1`,
       userAgent: `vitest-s3d-boundary-${route}-${arm}`,
       requestId: `request:s3d:boundary:${route}:${arm}:${index}`
     });
@@ -3073,7 +3074,7 @@ setTimeout(() => undefined, 500);
       await Promise.all(resendSeeds.slice(offset, offset + 24).map((email, batchIndex) => {
         const index = offset + batchIndex;
         return flow.service.register(registerInput(email), {
-        ip: `2001:db8:3d:5eed::${index + 1}`,
+        ip: `2001:db8:a059:${(index + 1).toString(16)}::1`,
         userAgent: "vitest-s3d-boundary-seed",
         requestId: `request:s3d:boundary:seed:${index}`
         });
@@ -3098,7 +3099,7 @@ setTimeout(() => undefined, 500);
       const prefix = `s3d-boundary-r${round}-${route}`;
       const fillers = Array.from({ length: basePolicy.channel.maxConcurrentVerificationDispatches },
         (_, index) => flow.service.register(registerInput(`${prefix}-filler-${index}@example.test`), {
-          ip: `2001:db8:${round.toString(16)}:f::${index + 1}`,
+          ip: `2001:db8:${(0xb200 + round).toString(16)}:${(index + 1).toString(16)}::1`,
           userAgent: "vitest-s3d-boundary-filler",
           requestId: `request:s3d:boundary:r${round}:filler:${index}`
         }));
@@ -3521,7 +3522,7 @@ setTimeout(() => undefined, 500);
       adultAffirmed: true
     });
     const source = (arm: string, index: number) => ({
-      ip: `2001:db8:4d:${arm.length.toString(16)}::${index + 1}`,
+      ip: `2001:db8:${(0xb300 + arm.length).toString(16)}:${(index + 1).toString(16)}::1`,
       userAgent: `vitest-s3d-successor-${arm}`,
       requestId: `request:s3d:successor:${arm}:${index}`
     });
@@ -3819,7 +3820,7 @@ setTimeout(() => undefined, 500);
             phone: "+40722123456", recoveryEmail: `s3d-b4-${size}-${index}-recovery@example.test`,
             adultAffirmed: true
           }, {
-            ip: `2001:db8:3d:b4:${size.toString(16)}::${index + 1}`,
+            ip: `2001:db8:${(0xb400 + size).toString(16)}:${(index + 1).toString(16)}::1`,
             userAgent: "vitest-s3d-b4-healthy-mta",
             requestId: `request:s3d:b4:${size}:${index}`
           });
@@ -4025,7 +4026,7 @@ setTimeout(() => undefined, 500);
         phone: "+40722123456", recoveryEmail: `s3d-deadline-filler-${index}-recovery@example.test`,
         adultAffirmed: true
       }, {
-        ip: `2001:db8:3d:dead::${index + 1}`,
+        ip: `2001:db8:a011:${(index + 1).toString(16)}::1`,
         userAgent: "vitest-s3d-deadline-filler",
         requestId: `request:s3d:deadline:filler:${index}`
       }));
@@ -4078,7 +4079,7 @@ setTimeout(() => undefined, 500);
         phone: "+40722123456", recoveryEmail: `s3d-deadline-${arm}-${sample}-recovery@example.test`,
         adultAffirmed: true
       }, {
-        ip: `2001:db8:3d:deae::${index + 1}`,
+        ip: `2001:db8:a064:${(index + 1).toString(16)}::1`,
         userAgent: `vitest-s3d-deadline-${arm}`,
         requestId: `request:s3d:deadline:${arm}:${sample}`
       }).then(() => Object.freeze({
@@ -4399,7 +4400,7 @@ setTimeout(() => undefined, 500);
       await flow.advance(60_000);
       try {
         await flow.service.resendVerification({ email }, {
-          ip: `2001:db8:3d:5::${((minute - 1) % 20) + 1}`,
+          ip: `2001:db8:a385:${(((minute - 1) % 20) + 1).toString(16)}::1`,
           userAgent: "vitest-s3d-rolling-ceiling",
           requestId: `request:s3d:rolling:${minute}`
         });
@@ -8622,5 +8623,147 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
     await expect(flow.repository.activateMfaEnrollment({enrollmentTokenHash:hashToken("verification",enrollmentToken),recoveryCodeId:randomUUID(),occurredAt:new Date(),source})).rejects.toThrow("MFA_ENROLLMENT_STATE_INVALID");
     expect(await snapshot()).toEqual({...before,denials:before.denials+1});
     const chain=await readAuditChain();expect(chain.rootCount).toBe(1);expect(chain.chain).toHaveLength(chain.totalRows);
+  });
+});
+
+/**
+ * NV-14: an unverified registrant may seed a pending account under someone else's address with a password of their
+ * choosing. The mailed verification is the first point at which control of the address is proven, so the new release
+ * writes the token holder's password there, in the one consume transaction, after the registration policy.
+ */
+describe("NV-14 verification sets the token holder's password", () => {
+  const nv14Source = Object.freeze({ ...source, ip: "192.0.2.141", requestId: "request:nv14" });
+  const storedHash = async (userId: string) => (await database.pool.query<{ password_hash: string | null }>(
+    'SELECT password_hash FROM identity."user" WHERE user_id=$1', [userId])).rows[0]!.password_hash;
+  const accountState = async (userId: string) => (await database.pool.query<{ state: string }>(
+    'SELECT state FROM identity."user" WHERE user_id=$1', [userId])).rows[0]!.state;
+  /** Enrols TOTP with the step before now, so a login may use the current step (drift 1) without waiting. */
+  async function enrolTotp(flow: ReturnType<typeof buildService>, token: string, hash: string) {
+    const { mfa, sessions } = await currentMfa(flow, hash, () => new Date());
+    const setup = await mfa.beginTotp({ enrollmentToken: token }, nv14Source);
+    const secret = decodeBase32(setup.secret), step = Math.floor(Date.now() / 30_000);
+    const enrolled = await mfa.verifyTotp({ enrollmentToken: token, code: totpCodeAtStep(secret, step - 1) }, nv14Source);
+    return { sessions, secret, step, enrolled };
+  }
+
+  it("refuses a password outside the policy before consuming, so the token still verifies", async () => {
+    const policy = withPolicy({ password: { ...basePolicy.password, maximumLength: 64 } });
+    const flow = buildService({ legalAcceptance: true, initialNow: new Date(), policy });
+    const registered = await registerAccount(flow.service, `policy-${randomUUID()}`);
+    const token = (flow.mail as MemoryMailSender).messages[0]!.token;
+    await expect(flow.service.verifyEmail({ token, password: "seven77" }, nv14Source))
+      .rejects.toMatchObject({ code: "AUTH_INPUT_INVALID" });
+    await expect(flow.service.verifyEmail({ token, password: "p".repeat(65) }, nv14Source))
+      .rejects.toMatchObject({ code: "AUTH_INPUT_INVALID" });
+    expect(await accountState(registered.user.user_id)).toBe("pending_verification");
+    await expect(flow.service.verifyEmail({ token, password: "Long enough pass 1" }, nv14Source))
+      .resolves.toEqual({ status: "mfa_required" });
+    expect(await accountState(registered.user.user_id)).toBe("pending_mfa");
+    const hash = await storedHash(registered.user.user_id);
+    expect(await verifyPassword(sharedArgon2Pool(), hash!, "Long enough pass 1")).toBe(true);
+  }, 120_000);
+
+  it("replaces a registrant's password with the inbox owner's, so the registrant's no longer signs in", async () => {
+    const flow = buildService({ legalAcceptance: true, initialNow: new Date() });
+    const mail = flow.mail as MemoryMailSender;
+    const email = `victim-${randomUUID()}@example.test`;
+    const registered = await registerAccount(flow.service, "nv14-registrant", { email, password: "Registrant pass 1" });
+    expect(mail.messages).toHaveLength(1);
+    // The inbox owner's own sign-up for the address is a silent duplicate: the same answer, and no mail.
+    const duplicate = await registerAccount(flow.service, "nv14-owner", { email, password: "Inbox owner pass 1" });
+    expect(duplicate.response).toEqual(REGISTRATION_PUBLIC_RESPONSE);
+    expect(mail.messages).toHaveLength(1);
+    await flow.advance(basePolicy.verification.resendCooldownMs + 1);
+    await expect(flow.service.resendVerification({ email }, nv14Source)).resolves.toEqual(RESEND_PUBLIC_RESPONSE);
+    await flow.service.drainMailDispatches();
+    expect(mail.messages).toHaveLength(2);
+    const token = mail.messages[1]!.token;
+    await expect(flow.service.verifyEmail({ token, password: "Inbox owner pass 1" }, nv14Source))
+      .resolves.toEqual({ status: "mfa_required" });
+    const hash = await storedHash(registered.user.user_id);
+    expect(hash).not.toBe(registered.user.password_hash);
+    expect(await verifyPassword(sharedArgon2Pool(), hash!, "Inbox owner pass 1")).toBe(true);
+    expect(await verifyPassword(sharedArgon2Pool(), hash!, "Registrant pass 1")).toBe(false);
+    const { sessions, secret, enrolled } = await enrolTotp(flow, token, hash!);
+    secret.fill(0);
+    expect(enrolled).toMatchObject({ status: "authenticated" });
+    expect(await accountState(registered.user.user_id)).toBe("active");
+    await expect(sessions.beginLogin({ email, password: "Registrant pass 1" }, nv14Source))
+      .rejects.toMatchObject({ code: "AUTH_CREDENTIALS_INVALID" });
+    await expect(sessions.beginLogin({ email, password: "Inbox owner pass 1" }, nv14Source))
+      .resolves.toMatchObject({ status: "mfa_required" });
+  }, 120_000);
+
+  // NV-14 Revision 3: the end-to-end witness that the route the verify page posts to reaches the password-setting
+  // consume. A request without a password, or with one the policy refuses, consumes nothing.
+  it("sets the inbox owner's password through POST /v1/auth/verify-email/password and refuses a request without one", async () => {
+    const flow = buildService({ legalAcceptance: true, initialNow: new Date() });
+    const email = `victim-http-${randomUUID()}@example.test`;
+    const registered = await registerAccount(flow.service, "nv14-http-registrant", { email, password: "Registrant pass 1" });
+    const token = (flow.mail as MemoryMailSender).messages[0]!.token;
+    const api = buildApi({ allowedOrigin: enrollmentOrigin, application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
+    const headers = { origin: enrollmentOrigin, "user-agent": "nv14-r3-http" };
+    const verify = (payload: Record<string, unknown>) => api.inject({
+      method: "POST", url: "/v1/auth/verify-email/password", headers, payload
+    });
+    try {
+      const missing = await verify({ token });
+      expect(missing.statusCode).toBe(400);
+      expect(missing.json()).toEqual({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      const refused = await verify({ token, password: "seven77" });
+      expect(refused.statusCode).toBe(400);
+      expect(refused.json()).toMatchObject({ error: "AUTH_INPUT_INVALID" });
+      expect(await accountState(registered.user.user_id)).toBe("pending_verification");
+      const verified = await verify({ token, password: "Inbox owner pass 1" });
+      expect(verified.statusCode).toBe(200);
+      expect(verified.json()).toEqual({ status: "mfa_required" });
+      expect(await accountState(registered.user.user_id)).toBe("pending_mfa");
+      const hash = await storedHash(registered.user.user_id);
+      expect(await verifyPassword(sharedArgon2Pool(), hash!, "Inbox owner pass 1")).toBe(true);
+      expect(await verifyPassword(sharedArgon2Pool(), hash!, "Registrant pass 1")).toBe(false);
+    } finally {
+      await api.close();
+    }
+  }, 120_000);
+
+  // Guard (green before NV-14 too, where the password is ignored): a registrant who verifies with the password they
+  // chose keeps a working password + TOTP sign-in.
+  it("guard: a legitimate registrant who re-types their password signs in with it and TOTP", async () => {
+    const flow = buildService({ legalAcceptance: true, initialNow: new Date() });
+    const password = "correct horse battery staple";
+    const registered = await registerAccount(flow.service, `nv14-legit-${randomUUID()}`, { password });
+    const token = (flow.mail as MemoryMailSender).messages[0]!.token;
+    await expect(flow.service.verifyEmail({ token, password }, nv14Source)).resolves.toEqual({ status: "mfa_required" });
+    const hash = await storedHash(registered.user.user_id);
+    expect(await verifyPassword(sharedArgon2Pool(), hash!, password)).toBe(true);
+    const { sessions, secret, step } = await enrolTotp(flow, token, hash!);
+    const challenge = await sessions.beginLogin({ email: registered.email, password }, nv14Source);
+    const logged = await sessions.completeLogin({ challengeToken: challenge.challengeToken, code: totpCodeAtStep(secret, step) }, nv14Source);
+    secret.fill(0);
+    expect(logged.status).toBe("authenticated");
+  }, 120_000);
+
+  it("installs the password-setting consume STRICT, SECURITY DEFINER, installer-owned and for debateai_runtime only", async () => {
+    const rows = (await database.pool.query(`
+      SELECT p.proisstrict AS strict,p.prosecdef AS definer,p.proconfig AS config,p.provolatile AS volatility,
+        p.proowner=o.proowner AS same_owner,
+        (SELECT relowner FROM pg_class WHERE oid='identity.social_identity'::regclass)=p.proowner AS owns_links,
+        has_function_privilege('debateai_runtime',p.oid,'EXECUTE') AS runtime,
+        has_function_privilege('debateai_erasure_runtime',p.oid,'EXECUTE') AS erasure,
+        EXISTS(SELECT 1 FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a WHERE a.grantee=0) AS public,
+        p.prosrc AS body,o.prosrc AS installed
+      FROM pg_proc p,pg_proc o
+      WHERE p.oid=to_regprocedure('identity.consume_verification_set_password(text,timestamptz,jsonb,text)')
+        AND o.oid='identity.consume_verification_with_audit(text,timestamptz,jsonb)'::regprocedure`)).rows;
+    expect(rows).toHaveLength(1);
+    const { body, installed, ...shape } = rows[0] as Record<string, unknown> & { body: string; installed: string };
+    expect(shape).toEqual({
+      strict: true, definer: true, config: ["search_path=pg_catalog"], volatility: "v",
+      same_owner: true, owns_links: true, runtime: true, erasure: false, public: false
+    });
+    // Otherwise exactly the installed consume (0096's body with 0100's rewrite): only the lines marked NV-14 differ.
+    const unmarked = body.split("\n").filter((line) => !line.includes("-- NV-14")).join("\n");
+    expect(unmarked.trim()).toBe(installed.trim());
+    expect(body.split("\n").filter((line) => line.includes("-- NV-14")).length).toBeGreaterThan(0);
   });
 });

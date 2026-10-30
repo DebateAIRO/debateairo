@@ -289,7 +289,18 @@ describe('the real readiness seam', () => {
     expect(announce).toBeGreaterThan(0);
     expect(announce).toBeLessThan(resend); expect(resend).toBeLessThan(retire); expect(retire).toBeLessThan(ended);
     expect(source.slice(ended)).toContain('lapsedResend.stop();\nretirement.stop();');
-    expect(source).toContain('stopWorker: async () => {\n    lapsedResend.stop();\n    await worker.stop();\n');
+    expect(source).toContain('stopWorker: async () => {\n    lapsedResend.stop();\n    staleReadyResend?.stop();\n    await worker.stop();\n');
+    // NV-25: the stale-READY re-send starts off the private preview only, beside the lapsed one, and stops with it.
+    expect(source).toContain('const staleReadyResend = previewGate === undefined\n  ? startStaleReadyResend({');
+    const stale = source.slice(source.indexOf('startStaleReadyResend({'), retire);
+    expect(source.indexOf('startStaleReadyResend({')).toBeGreaterThan(resend);
+    for (const wiring of [
+      'admit: staleReadyDayAdmission({ cache: runnerSettings, hosted: environment.DEPLOYMENT_MODE === "hosted" }),',
+      'capacity: () => RUNNER_CAPACITY.concurrentRuns - executions.count(),',
+      'running: (workItemId) => executions.isWorkingOn(workItemId),',
+      'paused: () => retirementSignal.claimsStopped(),'
+    ]) expect(stale).toContain(wiring);
+    expect(source.slice(source.indexOf('await started;'))).toContain('retirement.stop();\nstaleReadyResend?.stop();');
   });
 
   // R4 (final review): a retired runner's process ends by itself (the public server has no launcher to exit it). The
@@ -297,7 +308,7 @@ describe('the real readiness seam', () => {
   // which Hatchet resolves before its running tasks finish (and a planned stop leaves the exit to Hatchet itself).
   it('runner main ends both pools once the retired worker has stopped, and never at its tail', async () => {
     const source = await readFile(resolve('apps/runner/src/main.ts'), 'utf8');
-    expect(source).toContain('stopWorker: async () => {\n    lapsedResend.stop();\n    await worker.stop();\n    await Promise.allSettled([pool.end(), keepAlivePool.end()]);\n  },');
+    expect(source).toContain('stopWorker: async () => {\n    lapsedResend.stop();\n    staleReadyResend?.stop();\n    await worker.stop();\n    await Promise.allSettled([pool.end(), keepAlivePool.end()]);\n  },');
     expect(source.match(/\.end\(\)/g)).toHaveLength(2);
     expect(source.slice(source.indexOf('await started;'))).not.toContain('.end()');
   });

@@ -23,9 +23,11 @@
  *
  * S7.1-R44 (D37): the classification of the 66 members of `probes/REQ-FIX-RLS-2/unkeyed-reads.tsv`, and of the one
  * member origin/dev added before the merge (1667370dd, the runner's boot preload), and the two synthesis-flag's settlement
- * check claim added (packages/serve/src/synthesis-check.ts, X26, merge onto 76b76f4ba), covers them EXACT, each member once,
- * and the rule `probes/REQ-FIX-RLS-2/unkeyed-reads.py` (ported below, verbatim in its regular expressions) re-run on this
- * head tree finds no member that is not one of the 69 (matched by file and SQL text).
+ * check claim added (packages/serve/src/synthesis-check.ts, X26, merge onto 76b76f4ba), and, since the merge with the
+ * security fixes of audit run 3, the runner's stale-READY listing (NV-25, X1) and the estimator's rewritten sample (NV-49,
+ * X20, in place of the probe's estimate.ts member), covers them EXACT, each member once, and the rule
+ * `probes/REQ-FIX-RLS-2/unkeyed-reads.py` (ported below, verbatim in its regular expressions) re-run on this head tree finds
+ * no member that is not one of the 70 (matched by file and SQL text).
  */
 import { randomBytes, randomUUID } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
@@ -358,7 +360,9 @@ describe("row-level security S01 C7: every cross-account reader still sees both 
         await repository.claimNext({ workerId: randomUUID(), claimSeconds: 60 }),
         await repository.claimNext({ workerId: randomUUID(), claimSeconds: 60 }),
         await repository.listDispatchable(100),
-        await repository.listLapsedClaimed(100)
+        await repository.listLapsedClaimed(100),
+        // Security fixes run 3 (NV-25): the stale-READY re-send's listing, every account's READY items, on this login.
+        await repository.listReady(100)
       ]);
       expect(sightings("X1", login, seen, withMarks([runs.a], [runs.b]))).toEqual([]);
     } finally { await finishWork(items); }
@@ -898,7 +902,7 @@ describe("row-level security S01 C7: every cross-account reader still sees both 
       .toEqual({ before: 2, after: [], answered: [login], legal: before.reduce((sum, row) => sum + row.n, 0) + 2 });
   });
 
-  it("S7.1-R44 the classification constant (D37's three lists, 69 members: the probe's 66, dev's 1667370dd and synthesis-flag's two claim reads) covers probes/REQ-FIX-RLS-2/unkeyed-reads.tsv EXACT, each member once", async () => {
+  it("S7.1-R44 the classification constant (D37's three lists, 70 members: the probe's 66, dev's 1667370dd, synthesis-flag's two claim reads and audit run 3's NV-25 listing; NV-49 rewrote the probe's estimate.ts member) covers probes/REQ-FIX-RLS-2/unkeyed-reads.tsv EXACT, each member once", async () => {
     const classified = Object.entries(R44_CLASSIFICATION).flatMap(([kind, members]) => members.map(([member]) => ({ kind, member })));
     const counts = new Map<string, number>();
     for (const { member } of classified) counts.set(member, (counts.get(member) ?? 0) + 1);
@@ -908,12 +912,12 @@ describe("row-level security S01 C7: every cross-account reader still sees both 
       twice: [...counts].filter(([, n]) => n > 1).map(([member]) => member),
       missing: base.filter((member) => !counts.has(member)),
       extra: [...counts.keys()].filter((member) => !base.includes(member))
-    }).toEqual({ lists: { reader: 59, perAccount: 5, neverT1: 5 }, twice: [], missing: [], extra: [] });
-    // R36/R44 at head: the rule re-run on this tree; every member must be one of the 69 (same file, same SQL text).
+    }).toEqual({ lists: { reader: 60, perAccount: 5, neverT1: 5 }, twice: [], missing: [], extra: [] });
+    // R36/R44 at head: the rule re-run on this tree; every member must be one of the 70 (same file, same SQL text).
     const head = await unkeyedReads(PRODUCT_ROOT);
     const known = new Set(R44_BASE_MEMBERS.map(([member, sql]) => `${member.split(":")[0]}\t${sql}`));
     const unclassified = head.filter(({ file, sql }) => !known.has(`${file}\t${sql}`)).map(({ file, line, sql }) => `${file}:${line}\t${sql}`);
-    expect({ head: head.length, unclassified }).toEqual({ head: 69, unclassified: [] });
+    expect({ head: head.length, unclassified }).toEqual({ head: 70, unclassified: [] });
   });
 });
 
@@ -969,7 +973,11 @@ const R44_BASE_MEMBERS: readonly (readonly [string, string])[] = Object.freeze([
   ["packages/battery/src/index.ts:406", "SELECT DISTINCT run.register_version::integer AS register_version FROM core.work_item AS item JOIN core.run AS run ON run.run_id = item.run_"],
   ["packages/battery/src/index.ts:413", "SELECT work.work_item_id, work.run_id FROM core.work_item AS work JOIN ledger.model_spend_hold AS hold ON hold.run_id = work.run_id WHERE wo"],
   ["packages/battery/src/index.ts:471", "WITH candidate AS ( SELECT work_item_id FROM core.work_item AS item WHERE (state = 'READY' OR (state = 'CLAIMED' AND claim_deadline <= clock"],
-  ["packages/budget/src/estimate.ts:233", "WITH sample AS ( SELECT run.run_id, max(spend.recorded_at) AS last_charged_at FROM core.run AS run JOIN ledger.model_spend AS spend ON spend"],
+  // Security fixes run 3 (merged 2026-10-29; not at base): NV-25's stale-READY listing (WorkItemRepository.listReady, the
+  // runner's own login, as listLapsedClaimed) and NV-49's estimator sample, which replaced the probe's estimate.ts:233
+  // member (`WITH sample AS …`) with its candidate/ranked/sample CTEs, still inside readRecentRunUsage's X20 frame.
+  ["packages/battery/src/index.ts:449", "SELECT item.work_item_id, item.run_id, run.register_version::integer AS register_version FROM core.work_item AS item JOIN core.run AS run ON"],
+  ["packages/budget/src/estimate.ts:309", "WITH candidate AS ( SELECT run.run_id, run.asker_id, max(spend.recorded_at) AS last_charged_at FROM core.run AS run JOIN ledger.model_spend "],
   ["packages/budget/src/model-spend.ts:1032", "SELECT coalesce(sum(charge_micros),0)::text AS total FROM ledger.model_spend WHERE charged_on = $1::date"],
   ["packages/budget/src/model-spend.ts:1071", "SELECT coalesce(sum(greatest(0, hold.held_micros - coalesce(spent.total, 0))), 0)::text AS total FROM ( SELECT DISTINCT work.run_id FROM cor"],
   ["packages/budget/src/model-spend.ts:1198", "SELECT ( coalesce((SELECT sum(charge_micros) FROM ledger.model_spend WHERE charged_on = $1::date), 0) + coalesce((SELECT sum(reserved_micros"],
@@ -1069,9 +1077,9 @@ const R44_CLASSIFICATION: Readonly<Record<"reader" | "perAccount" | "neverT1", r
     ["apps/api/src/preview-budget-estimate.ts:1226", "X21"], ["apps/api/src/preview-budget-estimate.ts:1281", "X21"],
     ["apps/api/src/release-state.ts:374", "X19"],
     ["packages/battery/src/index.ts:340", "X1"], ["packages/battery/src/index.ts:378", "X1"], ["packages/battery/src/index.ts:406", "X1"],
-    ["packages/battery/src/index.ts:471", "X1"],
+    ["packages/battery/src/index.ts:471", "X1"], ["packages/battery/src/index.ts:449", "X1"],
     ["packages/battery/src/index.ts:413", "X13"],
-    ["packages/budget/src/estimate.ts:233", "X20"],
+    ["packages/budget/src/estimate.ts:309", "X20"],
     ["packages/budget/src/model-spend.ts:1032", "X23"], ["packages/budget/src/model-spend.ts:1071", "X23"], ["packages/budget/src/model-spend.ts:1198", "X23"],
     ...[138, 162, 206, 234, 260, 304, 395, 405].map((line) => [`packages/db/src/billing-jobs.ts:${line}`, "X11"] as const),
     ...[301, 650, 698, 714, 722, 744, 772, 875, 986, 1017, 1130, 1202, 1236, 1275, 1330, 1355, 1380, 1414, 1454, 1509, 1531, 1619]

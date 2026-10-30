@@ -1,0 +1,17 @@
+{
+  "version": "security-fixes-run3-forward0131-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0130_row_level_security.sql",
+    "manifestSha256": "fc7743f56b0ebcee33d1a3a21fb31983922c0f4099f2e7c18e19b2887764ecbc",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0131_security_fixes_run3.sql",
+    "sha256": "1997722f72e551a2fd4086e8840fa84d32af8fb42cf4b34959f020bf4947b38f"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  }
+}

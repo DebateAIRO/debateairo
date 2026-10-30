@@ -370,7 +370,7 @@ describe("P3-01 production database-principal manifest", () => {
           effectiveMemberships: [],
           ownsDatabases: ["debateai"],
           ownsSchemas: [
-            "audit_crypto_internal", "billing", "core", "evidence", "identity", "ledger", "legal",
+            "audit_crypto_internal", "billing", "core", "erasure_reconcile", "evidence", "identity", "ledger", "legal",
             "memory", "obs", "observation", "register", "rls", "scorecard", "serve", "support"
           ]
         });
@@ -530,7 +530,7 @@ describe("P3-01 production database-principal manifest", () => {
         { component: "apps/api", environmentKey: "DATA_EXPORT_DATABASE_URL", purpose: "DATA_EXPORT_WORKER", binding: "WIRED_WHEN_ENABLED", condition: "DATA_EXPORT_STORE_PATH set" },
         { component: "apps/api", environmentKey: "ERASURE_DATABASE_URL", purpose: "ACCOUNT_AND_PRIVATE_RUN_ERASURE", binding: "WIRED" },
         { component: "apps/api", environmentKey: "AUTHORIZATION_DATABASE_URL", purpose: "STEP_UP_SESSION_ROTATION", binding: "WIRED" },
-        { component: "apps/api", environmentKey: "PUBLICATION_CLEANUP_DATABASE_URL", purpose: "PUBLICATION_KEY_CLEANUP", binding: "WIRED_WHEN_ENABLED", condition: "PUBLICATION_ENABLED=true" },
+        { component: "apps/api", environmentKey: "PUBLICATION_CLEANUP_DATABASE_URL", purpose: "PUBLICATION_KEY_CLEANUP", binding: "WIRED_WHEN_ENABLED", condition: "PUBLICATION_ENABLED=true, or CORPUS_KEK_PATH, PUBLICATION_KEY_STORE_PATH and PUBLICATION_CLEANUP_DATABASE_URL all set" },
         { component: "apps/api", environmentKey: "SUPPORT_DATABASE_URL", purpose: "SUPPORT_DATA_PLANE", binding: "WIRED" },
         // V-3. `pnpm exec tsx apps/runner/src/rotate-kek-cli.ts` re-wraps
         // support.session_key and support.case_key under a new master key. It is

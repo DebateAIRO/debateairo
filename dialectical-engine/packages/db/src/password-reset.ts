@@ -34,6 +34,9 @@ type Source = Readonly<{
 // The SQL source is exactly the two hashed members (password_reset_audit, 0104:67, compares it with jsonb_build_object);
 // a leaked mailLocale member is refused by the recovery start, so mailLocale stays in TypeScript.
 const sourceJson = (source: Source) => JSON.stringify({ ipArgon2id: source.ipArgon2id, userAgentArgon2id: source.userAgentArgon2id });
+// NV-39: the digest the source window is keyed by (the caller's /64 for IPv6); a source prepared without a scope is
+// admitted by its address digest.
+const admissionDigests = new WeakMap<object, string>();
 // R-08: an absent or unknown request value is `en` before the setting is written (the API resolves it once in sourceFor).
 const requestMailLocale = (value: string | undefined): string => {
   try {
@@ -43,7 +46,7 @@ const requestMailLocale = (value: string | undefined): string => {
     return "en";
   }
 };
-type Capability = "password_reset_prepare" | "password_reset_start" | "password_reset_exchange" | "password_reset_read" | "password_reset_complete" | "password_reset_cancel" | "password_reset_cancel_session" | "password_reset_admit" | "password_reset_failure" | "expire_password_reset" | "password_reset_claim_notice" | "password_reset_finish_notice";
+type Capability = "password_reset_prepare" | "password_reset_start" | "password_reset_exchange" | "password_reset_read" | "password_reset_complete" | "password_reset_cancel" | "password_reset_cancel_session" | "password_reset_admit" | "password_reset_failure" | "expire_password_reset" | "password_reset_claim_pending_notice" | "password_reset_finish_notice" | "password_reset_start_guarded" | "password_reset_proof_reserve" | "password_reset_proof_refused" | "password_reset_complete_guarded" | "password_reset_admit_evicting";
 /** Execute-only reset store: HTTP never supplies subject IDs or table selectors. */
 export class PostgresPasswordResetRepository {
   constructor(private readonly pool: Pool, private readonly audit: AuditContextHasher, private readonly registerVersion: number) {
@@ -56,12 +59,17 @@ export class PostgresPasswordResetRepository {
     const result = client ? await client.query<{ result: T }>(text, [...args]) : await this.pool.query<{ result: T }>(text, [...args]);
     return result.rows[0]!.result;
   }
-  async prepareSource(source: AuthSourceContext): Promise<Source> {
+  /** NV-39: `admissionScope` (the service's rate-limit scope) is hashed too when it differs from the address. */
+  async prepareSource(source: AuthSourceContext, admissionScope?: string): Promise<Source> {
     const norm = (value: unknown, max: number) => (typeof value === "string" && value.trim() ? value.trim() : "unknown").slice(0, max);
-    const [ip, ua] = await Promise.all([this.audit.hashSourceIp(norm(source.ip, 64)), this.audit.hashUserAgent(norm(source.userAgent, 256))]);
-    if (!/^[0-9a-f]{64}$/.test(ip) || !/^[0-9a-f]{64}$/.test(ua))
+    const ipInput = norm(source.ip, 64), scopeInput = admissionScope === undefined ? undefined : norm(admissionScope, 64);
+    const [ip, ua, scope] = await Promise.all([this.audit.hashSourceIp(ipInput), this.audit.hashUserAgent(norm(source.userAgent, 256)), scopeInput !== undefined && scopeInput !== ipInput ? this.audit.hashSourceIp(scopeInput) : undefined]);
+    if (!/^[0-9a-f]{64}$/.test(ip) || !/^[0-9a-f]{64}$/.test(ua) || (scope !== undefined && !/^[0-9a-f]{64}$/.test(scope)))
       throw new TypeError("PASSWORD_RESET_SOURCE_INVALID");
-    return { ipArgon2id: `argon2id-audit:v1:${ip}`, userAgentArgon2id: `argon2id-audit:v1:${ua}`, mailLocale: requestMailLocale(source.mailLocale) };
+    const prepared = { ipArgon2id: `argon2id-audit:v1:${ip}`, userAgentArgon2id: `argon2id-audit:v1:${ua}`, mailLocale: requestMailLocale(source.mailLocale) };
+    if (scope !== undefined)
+      admissionDigests.set(prepared, `argon2id-audit:v1:${scope}`);
+    return prepared;
   }
   async assertRole(): Promise<void> {
     const row = (await this.pool.query<{
@@ -87,13 +95,22 @@ export class PostgresPasswordResetRepository {
     }>[];
     source: Source;
   }>) {
-    return withMailLocale(this.pool, input.source.mailLocale, client => this.call<boolean>("password_reset_start", [input.index, input.candidateId, input.channels, JSON.stringify(input.refs), input.linkHash, input.cancelHash, JSON.stringify(input.notices), sourceJson(input.source), this.registerVersion], client));
+    // NV-17: 0131's guarded start refuses while the account's proof lock is live, then delegates to 0108's sealed start.
+    return withMailLocale(this.pool, input.source.mailLocale, client => this.call<boolean>("password_reset_start_guarded", [input.index, input.candidateId, input.channels, JSON.stringify(input.refs), input.linkHash, input.cancelHash, JSON.stringify(input.notices), sourceJson(input.source), this.registerVersion], client));
   }
   exchange(link: string, session: string, csrf: string, source: Source) {
     return this.call<"PASSWORD_REQUIRED" | "INVALID">("password_reset_exchange", [link, session, csrf, sourceJson(source)]);
   }
   read(session: string) {
     return this.call<PasswordResetRecord | null>("password_reset_read", [session]);
+  }
+  /** NV-17: charges the account's proof counter before the code is matched (0131); READY carries what complete needs. */
+  reserveProof(session: string, source: Source, lockMs: number) {
+    return withMailLocale(this.pool, source.mailLocale, client => this.call<Readonly<{ status: "INVALID" | "REFUSED" }> | Readonly<{ status: "READY"; userId: string; factorId: string; factorSecret: CryptoEnvelope; lastAcceptedStep: number | null; nowMs: number }>>("password_reset_proof_reserve", [session, sourceJson(source), lockMs], client));
+  }
+  /** NV-17: settles a mismatched code: the proof DENY audit, and the REFUSED close at the cap or under the lock. */
+  proofRefused(session: string, source: Source) {
+    return withMailLocale(this.pool, source.mailLocale, client => this.call<void>("password_reset_proof_refused", [session, sourceJson(source)], client));
   }
   complete(input: Readonly<{
     sessionHash: string;
@@ -104,10 +121,10 @@ export class PostgresPasswordResetRepository {
     step: number;
     source: Source;
   }>) {
-    return withMailLocale(this.pool, input.source.mailLocale, client => this.call<"COMPLETED" | "INVALID">("password_reset_complete", [input.sessionHash, input.passwordHash, input.factorId, JSON.stringify(input.factorSecret), input.lastAcceptedStep, input.step, sourceJson(input.source)], client));
+    return withMailLocale(this.pool, input.source.mailLocale, client => this.call<"COMPLETED" | "INVALID">("password_reset_complete_guarded", [input.sessionHash, input.passwordHash, input.factorId, JSON.stringify(input.factorSecret), input.lastAcceptedStep, input.step, sourceJson(input.source)], client));
   }
   // C09 (R-21): cancel, cancelSession and failure write CANCELLED or REFUSED through password_reset_close (0104:83, notice at 0104:92);
-  // failure is the REFUSED route, reached by repeated wrong codes in complete. Each runs in its own withMailLocale transaction.
+  // failure is the release before's REFUSED route (this release's complete settles through proofRefused). Each runs in its own withMailLocale transaction.
   cancel(hash: string, source: Source) {
     return withMailLocale(this.pool, source.mailLocale, client => this.call<"CANCELLED" | "INVALID">("password_reset_cancel", [hash, sourceJson(source)], client));
   }
@@ -115,7 +132,8 @@ export class PostgresPasswordResetRepository {
     return withMailLocale(this.pool, source.mailLocale, client => this.call<"CANCELLED" | "INVALID">("password_reset_cancel_session", [hash, sourceJson(source)], client));
   }
   admit(source: Source) {
-    return this.call<boolean>("password_reset_admit", [sourceJson(source), this.registerVersion]);
+    // NV-39: the 0131 admit, keyed by the admission digest, gives up a bounded batch of rows when the window is full.
+    return this.call<boolean>("password_reset_admit_evicting", [JSON.stringify({ ipArgon2id: admissionDigests.get(source) ?? source.ipArgon2id, userAgentArgon2id: source.userAgentArgon2id }), this.registerVersion]);
   }
   failure(hash: string, source: Source) {
     return withMailLocale(this.pool, source.mailLocale, client => this.call<void>("password_reset_failure", [hash, sourceJson(source)], client));
@@ -124,7 +142,8 @@ export class PostgresPasswordResetRepository {
     return this.call<number>("expire_password_reset", [batch]);
   }
   async claimNotice(leaseMs: number): Promise<PasswordResetNotice | null> {
-    const row = await this.call<(Omit<PasswordResetNotice, "mailLocale"> & Readonly<{ mail_locale: string }>) | null>("password_reset_claim_notice", [leaseMs]);
+    // NV-40: 0131's claim dead-letters every stale unleased PROOF first, so null means nothing deliverable is due.
+    const row = await this.call<(Omit<PasswordResetNotice, "mailLocale"> & Readonly<{ mail_locale: string }>) | null>("password_reset_claim_pending_notice", [leaseMs]);
     if (row === null)
       return null;
     // The stored value is checked here too: an unreadable row fails closed instead of sending in a default language.

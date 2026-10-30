@@ -9,11 +9,15 @@ import { canonicalResend, canonicalSignup, passedTurnstile } from "../support/tu
  * are all called by the site's own pages with fetch POST (verify-email too: the
  * mailed link opens a page, and that page posts the token), so a browser always
  * sends Origin; anything but the site's exact origin is refused before work.
+ * NV-14 Revision 3 adds a fifth, verify-email/password (the route the verify
+ * page now posts to), which carries the same rule from its first mount.
  */
 const ORIGIN = "https://app.example.test";
 const routes = [
   ["/v1/auth/register", canonicalSignup, 202],
   ["/v1/auth/verify-email", { token: "a".repeat(43) }, 200],
+  // NV-14 Revision 3: the route the verify page posts the token and password to
+  ["/v1/auth/verify-email/password", { token: "a".repeat(43), password: "Inbox owner pass 1" }, 200],
   ["/v1/auth/resend-verification", canonicalResend, 202],
   ["/v1/auth/recovery/start", { email: "alice@example.test" }, 202]
 ] as const;

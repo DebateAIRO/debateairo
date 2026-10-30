@@ -1340,6 +1340,118 @@ so a release does not touch them and needs no step for them. Setup, the test sit
 meaning of each email: `deploy/notify-alarm/README.md`. Each knock writes one harmless
 `billing.notice.unverified` line with `NOTICE_HEADER_MISSING` in the API's journal.
 
+### H11. The restore fence (from the release that carries NV-07)
+
+This is the preview copy of `deploy/vps/README.md` §9's restore fence ("After any restore — before any API
+starts"). A restore puts back the sessions and every other bearer of the copy's time, so a sign-out, a password
+change or another revocation since then would be undone. The API keeps a token in two places: one row in the
+database (`identity.restore_fence`, in every dump and copy) and one file,
+`/var/lib/debateai-v3-preview/api/restore-fence/fence`, which nothing copies. When they disagree at a start, the API
+revokes every long-lived bearer and holds the public library before it answers anything.
+
+The folder `/var/lib/debateai-v3-preview/api/restore-fence` belongs to the API's user and is `0700`. It is outside
+the nightly backup (`backup.mjs` copies only the database), outside the online backup (it copies only the key stores
+its env keys name, `backup.mjs` `KEY_STORE_KEYS`, and `RESTORE_FENCE_PATH` is never one of them) and outside the cold
+copy (only the PostgreSQL data and config folders). A hosted release carrying NV-07 refuses to start without the
+setting (`RESTORE_FENCE_PATH_REQUIRED`) or without the folder (`RESTORE_FENCE_DIRECTORY_MISSING`). An older release
+refuses the setting, because the launcher admits only the keys its own shape knows (`environment.mjs`
+`narrowEnvironment`), and the launcher of a release that carries it admits only that one path. So the line goes only
+into the file of a release that carries NV-07, and every later release inherits it through SB5's derive, which copies
+the file byte for byte except the derived keys (`release-env.mjs` `deriveEnvironmentText`).
+
+1. **The folder and the API's write permission.** This runs in the release's root shell, any time before SB12 (side
+   by side) or DR6 (drained); `daemon-reload` changes nothing in a running instance. It sources the release's names
+   file first, for `AU`, `AGRP`, `CAPI` and `OLABEL`:
+
+   ```sh
+   . /root/preview-archive/rNN-names.sh
+   FD=/var/lib/debateai-v3-preview/api/restore-fence
+   ( set -euo pipefail
+     [ -n "${AU:-}" ] && [ "$AU" != root ] && [ -n "${AGRP:-}" ] && [ -n "${CAPI:-}" ] || exit 1
+     grep -q RESTORE_FENCE_PATH "$CAPI/dialectical-engine/packages/register/src/runtime-environment.ts"   # stops here when this release does not carry NV-07
+     [ -d /etc/systemd/system/debateai-preview-api@.service.d ]   # the template layout (since T)
+     install -d -m 0700 -o "$AU" -g "$AGRP" "$FD"
+     install -o root -g root -m 0644 "$CAPI/dialectical-engine/deploy/preview-auth-dev/v1/debateai-preview-api-restore-fence.conf" /etc/systemd/system/debateai-preview-api@.service.d/zzzzzzzzzz-fence-restore.conf
+     systemctl daemon-reload
+     echo "fence folder and write permission in place" )
+   stat -c '%a %U %G %n' "$FD"
+   systemctl show -p ReadWritePaths "debateai-preview-api@$OLABEL"
+   ```
+
+   `stat` prints `700 <API user> <API group>`, and `systemctl show` lists
+   `-/var/lib/debateai-v3-preview/api/restore-fence`. Do not create the file: an empty file is the restore marker.
+
+2. **The setting, in the new release's own api file.** Only for the first release that carries NV-07, once the
+   release's env files exist and before its launch plans are made (the launch plans start the API from this file):
+   side by side: after SB5, before SB10; drained: after DR1, before DR5 (DR1 derives the same
+   `$E/api-$LABEL.env`, and DR5 writes `$ART/api-launch.json`). Missing it there would make the new API refuse with
+   `RESTORE_FENCE_PATH_REQUIRED` at DR6, inside the downtime. It is in SB5b's shape:
+
+   ```sh
+   set -euo pipefail
+   . /root/preview-archive/rNN-names.sh
+   # H11 step 2: RESTORE_FENCE_PATH in the new release's own api file (the first release that carries NV-07; never an older release's file).
+   FENCE=/var/lib/debateai-v3-preview/api/restore-fence/fence
+   A=$E/api-$LABEL.env
+   [ -f "$A" ] && [ "$(stat -c '%a %U' "$A")" = "640 root" ] || { echo "H11_NOT_DONE: $A is not root's 0640 file (SB5 or DR1 first)"; exit 1; }
+   [ ! -e "$ART/api-launch.json" ] || { echo "H11_NOT_DONE: $ART/api-launch.json exists: SB10 or DR5 made the launch plans already (nothing changed): ask"; exit 1; }
+   grep -q RESTORE_FENCE_PATH "$CAPI/dialectical-engine/packages/register/src/runtime-environment.ts" || { echo "H11_NOT_DONE: this release's API does not know RESTORE_FENCE_PATH (its launcher would refuse the line; nothing changed)"; exit 1; }
+   [ "$(stat -c '%a %U %G' "${FENCE%/*}")" = "700 $AU $AGRP" ] || { echo "H11_NOT_DONE: ${FENCE%/*} is not the API's 0700 folder (step 1 first; nothing changed)"; exit 1; }
+   [ "$(grep -c '^RESTORE_FENCE_PATH=' "$A" || true)" = 0 ] || { echo "H11_NOT_DONE: $A names RESTORE_FENCE_PATH already (derived from a release that carries it: this step is not needed; nothing changed)"; exit 1; }
+   [ ! -e "$S/api-$LABEL.env.before-fence" ] || { echo "H11_NOT_DONE: $S/api-$LABEL.env.before-fence exists: step 2 ran for this release before (look first)"; exit 1; }
+   cp -p "$A" "$S/api-$LABEL.env.before-fence"
+   ( umask 077; cat "$A" > "$A.new"; printf 'RESTORE_FENCE_PATH=%s\n' "$FENCE" >> "$A.new" )
+   chown --reference="$A" "$A.new"
+   chmod --reference="$A" "$A.new"
+   mv "$A.new" "$A"
+   [ "$(grep -c '^RESTORE_FENCE_PATH=' "$A")" = 1 ] && grep -qxF "RESTORE_FENCE_PATH=$FENCE" "$A" || { echo "H11_NOT_DONE: the line is not in $A exactly once (the file before is $S/api-$LABEL.env.before-fence): ask"; exit 1; }
+   [ -z "$(grep -oE '^[A-Z_][A-Z0-9_]*=' "$A" | sort | uniq -d)" ] || { echo "H11_NOT_DONE: $A names a key twice (the file before is $S/api-$LABEL.env.before-fence): ask"; exit 1; }
+   diff <(awk '!/^RESTORE_FENCE_PATH=/' "$S/api-$LABEL.env.before-fence") <(awk '!/^RESTORE_FENCE_PATH=/' "$A") >/dev/null && [ "$(stat -c '%a %U:%G' "$A")" = "$(stat -c '%a %U:%G' "$S/api-$LABEL.env.before-fence")" ] || { echo "H11_NOT_DONE: another line, the mode or the owner of $A changed (the file before is $S/api-$LABEL.env.before-fence): ask"; exit 1; }
+   lc release-env.mjs same --labels "$OLABEL,$LABEL" --slots "$OSLOT,$SLOT" || { echo "H11_NOT_DONE: a SAME check is BAD (above; the file before is $S/api-$LABEL.env.before-fence)"; exit 1; }
+   echo "api-$LABEL.env: RESTORE_FENCE_PATH=$FENCE"
+   echo H11_DONE
+   ```
+
+   At the first NV-07 release, `lc` is still the old release's installed tools, which do not have
+   `SAME_API_RESTORE_FENCE_PATH` yet. They pass it, and the script itself proves the line is there exactly once.
+
+3. **After SB12 (or DR6) starts the new API**, run
+   `journalctl -u "debateai-preview-api@$LABEL" -o cat --no-pager | grep -c '"event":"api.restore_fence","outcome":"INITIALISED"'`.
+   It prints `1` for the first release that carries NV-07; later releases print `0` (an advance writes no line). A
+   `"outcome":"RESTORE_REVOKED"` line at any start means the fence saw a restore or a lost file: go to step 4.
+
+4. **After a restore.** The restore sources are rbB, rbB-T and rbD-B (their scripts revoke the restored sessions and
+   mark the fence themselves), a nightly dump restored into the live database (the lifecycle guide's own block,
+   `deploy/preview-lifecycle/v1/README.md` "Restore a nightly dump"), and SB7's online backup, a last resort with no
+   in-repo restore procedure: whoever restores it by hand runs the lifecycle guide's block before any API starts, then
+   this step.
+
+   **rbD-B always sets the hold.** It marks the fence even when no API ran since DR3's copy, for example right after a
+   DR4 failure. Everyone is signed out and the library is held with nothing to reconcile. That is expected and fails
+   closed: the owner checks that nothing happened after the copy's time and releases the hold below.
+
+   The read, in a root shell with the names file (or H1's `psqlq`):
+
+   ```sh
+   psqlq "SELECT to_regclass('identity.restore_fence') IS NOT NULL"   # f: the restored database predates NV-07, there is no hold; stop here
+   psqlq "SELECT public_hold_since, last_revoked_at, last_revoked_counts FROM identity.restore_fence"
+   ```
+
+   An empty `public_hold_since` means there is no hold. With a hold, the owner reconciles before the release: re-apply
+   what happened on the site after the copy's time, from records outside the restored database (unpublishes,
+   erasures, staff disables, role rotations), then tell people to repeat any credential change made since (password,
+   TOTP, recovery codes, a removed passkey or social link, a removed backup address). Then the owner gives a fresh yes
+   in the live chat ("Yes, open the public library again after the restore of STAMP", with the copy's stamp), and the
+   release runs:
+
+   ```sh
+   psqlq "SELECT identity.restore_fence_release_public_hold_v1('restore of STAMP reconciled')"   # must print t
+   ```
+
+   `f` means there was no hold to release. Only the **current** release picks the release up, at its
+   next 60 s settle; a staged release picks it up when it becomes current. The read above then shows
+   `public_hold_since` empty, and the library lists debates again.
+
 ## A normal release on a hosted base (since R19, 21 October 2026)
 
 **Since the transition release T, this is the drained recipe of the old layout.** It ran on one fixed unit per
@@ -2127,8 +2239,13 @@ the cold copy. rbB does the following, in order:
 4. it re-pins the old release's three plans, which rebuilds the lock;
 5. it writes the drop-ins, then starts the API, the website and the runner.
 
+Right after the restored database answers, it revokes the restored sessions and marks the restore fence (H11) before
+any API starts.
+
 **Everything written to the database after B2 is lost with it**: the new version, the new tables, and anything
-people did on the site since then.
+people did on the site since then. Sign-outs, password changes and other revocations since then would come back with
+it, so the script revokes every restored session first. When the release it starts carries NV-07, the public library
+stays empty until the owner releases the hold: H11 step 4.
 
 ```sh
 set -euo pipefail
@@ -2155,6 +2272,9 @@ tar -C "$PGP" -xzf "$S/pg18-v3-preview-cold.tgz" || { echo "RBB_NOT_DONE: the re
 systemctl start debateai-preview-postgresql || { echo "RBB_NOT_DONE: PostgreSQL did not start on the restored folder"; exit 1; }
 for i in $(seq 1 30); do /usr/lib/postgresql/18/bin/pg_isready -q -h "$SOCK" -p 5434 && break; sleep 2; done
 [ "$(psqlq "SELECT count(*)||'|'||max(name) FROM public.debateai_schema_migration")" = "$LEDGER0" ] && [ "$(psqlq "SELECT register_version FROM register.register_version ORDER BY register_version DESC LIMIT 1")" = "$REG0" ] || { echo "RBB_NOT_DONE: the restored database is not ledger $LEDGER0, register $REG0"; exit 1; }
+psqlq "UPDATE identity.session SET revoked_at = GREATEST(clock_timestamp(), created_at) WHERE revoked_at IS NULL" >/dev/null && psqlq "UPDATE staff.privilege_session SET revoked_at = GREATEST(clock_timestamp(), created_at) WHERE revoked_at IS NULL" >/dev/null || { echo "RBB_NOT_DONE: the restored sessions were not revoked; the database is up, the app services are stopped"; exit 1; }
+FENCE=/var/lib/debateai-v3-preview/api/restore-fence/fence; FH=$(psqlq "SELECT to_regclass('identity.restore_fence') IS NOT NULL") || { echo "RBB_NOT_DONE: the restored database did not answer the fence question; the sessions are revoked, the app services are stopped"; exit 1; }
+if [ -d "${FENCE%/*}" ]; then case "$FH" in t) install -m 0600 -o "$(stat -c %U "${FENCE%/*}")" -g "$(stat -c %G "${FENCE%/*}")" /dev/null "$FENCE" || { echo "RBB_NOT_DONE: the restore fence was not marked; the app services are stopped"; exit 1; } ;; f) if [ -e "$FENCE" ]; then mv "$FENCE" "$S/restore-fence.before-$TS" || { echo "RBB_NOT_DONE: the restore fence did not move aside; the app services are stopped"; exit 1; }; fi ;; *) echo "RBB_NOT_DONE: the fence answer was '$FH'; the sessions are revoked, the app services are stopped"; exit 1 ;; esac; fi
 systemctl start debateai-preview-hatchet || { echo "RBB_NOT_DONE: Hatchet did not start"; exit 1; }
 CID=; for i in $(seq 1 30); do CID=$(docker ps -q --no-trunc --filter label=com.docker.compose.project=debateai-v3-preview --filter label=com.docker.compose.service=hatchet-lite || true); [ -n "$CID" ] && break; sleep 2; done
 IP=$(docker inspect "$CID" --format '{{(index .NetworkSettings.Networks "debateai-v3-preview-internal").IPAddress}}' || true)
@@ -3141,7 +3261,7 @@ lc() { /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchai
 tl() { /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node "$TL/$1" "${@:2}"; }
 cslots() { /usr/bin/env -i PATH=/usr/local/bin:/usr/bin:/bin TZ=UTC /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node "$CAPI/dialectical-engine/deploy/preview-release/v1/caddy-slots.mjs" "$@"; }
 cad() { systemd-run --quiet --pipe --wait --collect -p EnvironmentFile=/etc/debateai-v3-preview/public/caddy.env /usr/bin/caddy "$@"; }
-readyz() { printf 'X-Debateai-Edge-Secret: %s\n' "$(cat "$EDGE")" | curl -s -m 5 -H @- -w '\n%{http_code}' "http://127.0.0.1:$1/readyz" || true; }
+readyz() { curl -s -m 5 -w '\n%{http_code}' "http://127.0.0.1:$1/readyz" || true; }
 edgekey() { { curl -s -m 15 -o /dev/null -D - http://127.0.0.1:3090/readyz || true; } | tr -d '\r' | awk 'NR == 1 { s = $2 } tolower($1) == "x-debateai-release:" { k = $2 } END { print (s == "" ? "000" : s) " " (k == "" ? "none" : k) }'; }
 gs() { /usr/bin/python3 -I "$1/preview_budget_authority.py" status --private "$2"; }
 EOF
@@ -3306,15 +3426,16 @@ PR=$(jq -r '[.apps.http.servers[].routes[] | select(.match[0].host[0]=="v3-previ
 echo "upstreams: $UP; listener rewrite: $RW; health check: $HC; listener: $LI; public /readyz: $PR"
 [ "$UP" = "127.0.0.1:3100 127.0.0.1:3200" ] || { echo "TA_CADDY_NOT_DONE: the proxies' upstreams are not the two slots' websites"; exit 1; }
 [ "$RW" = "/readyz?" ] || { echo "TA_CADDY_NOT_DONE: the listener's rewrite is not /readyz? (the bare ? clears the query): ask"; exit 1; }
-[ "$HC" = "/readyz passes 1 fails 1 secret true" ] || { echo "TA_CADDY_NOT_DONE: the health check is not /readyz, 1 pass, 1 fail, with the edge secret header: ask"; exit 1; }
+[ "$HC" = "/readyz passes 1 fails 2 secret false" ] || { echo "TA_CADDY_NOT_DONE: the health check is not /readyz, 1 pass, 2 fails, with no edge secret header: ask"; exit 1; }
 [ "$LI" = "127.0.0.1:3090" ] || { echo "TA_CADDY_NOT_DONE: the readiness listener is not 127.0.0.1:3090 only: ask"; exit 1; }
 [ "$PR" = "static_response 404" ] || { echo "TA_CADDY_NOT_DONE: the public route does not refuse /readyz with exactly one 404 of its own: ask"; exit 1; }
 echo TA_CADDY_DONE
 ```
 
 The adapted configuration holds the basic-auth hash: the script keeps it in a variable and prints only handler names,
-addresses and the health-check fields. Whether Caddy fills in `{file.…}` inside `health_headers` can only be seen with
-Caddy running: TB7 checks it, and puts the old file back if not.
+addresses and the health-check fields. The health check carries no secret (NV-55: the website answers its readiness
+to any peer), so there is nothing for `{file.…}` to fill in there. The main proxy's `header_up` still reads the file,
+and whether Caddy fills it in can only be seen with Caddy running: TB7 checks it, and puts the old file back if not.
 
 ### TA-env. T's three env files
 
@@ -3710,7 +3831,7 @@ c=000; for i in $(seq 1 40); do c=$(curl -s -o /dev/null -w '%{http_code}' "http
 [ "$c" = 200 ] || { echo "TB6_NOT_DONE: T's website does not answer /login with 200; the runner is left stopped (way back: rbB-T)"; exit 1; }
 echo "DOWNTIME END $(date -u) ($(( $(date +%s) - $(tail -n 1 "$S/downtime-start-epoch") )) s)"
 systemctl start debateai-preview-backup.timer && [ "$(systemctl is-active debateai-preview-backup.timer || true)" = active ] || { echo "TB6_NOT_DONE: the backup timer did not start (the API and the website are up)"; exit 1; }
-RZ=$(readyz "$UIP"); echo "T's website /readyz (Host 127.0.0.1:$UIP, as Caddy's health check sends it): ${RZ##*$'\n'} $(jq -c '{releaseKey, reasons}' <<<"${RZ%$'\n'*}" 2>/dev/null || echo '(no JSON)')"
+RZ=$(readyz "$UIP"); echo "T's website /readyz (Host 127.0.0.1:$UIP, as Caddy's health check asks it, with no secret): ${RZ##*$'\n'} $(jq -c '{releaseKey, reasons}' <<<"${RZ%$'\n'*}" 2>/dev/null || echo '(no JSON)')"
 [ "${RZ##*$'\n'}" = 200 ] && [ "$(jq -r .releaseKey <<<"${RZ%$'\n'*}" 2>/dev/null)" = "$KEY" ] || { echo "TB6_NOT_DONE: T's website /readyz is not 200 for $KEY (the site is up on slot A; do not run TB7): ask"; exit 1; }
 echo TB6_DONE
 ```
@@ -3748,7 +3869,7 @@ cmp -s "$S/Caddyfile.two-slot" "$C" || back "the two-slot file is not the live f
 [ "$(systemctl is-active caddy || true)" = active ] || back "caddy is not active on the two-slot file"
 EK="000 none"; for i in $(seq 1 30); do EK=$(edgekey); [ "$EK" = "200 $KEY" ] && break; sleep 1; done
 echo "edge 127.0.0.1:3090/readyz: $EK"
-[ "$EK" = "200 $KEY" ] || back "the edge did not answer 200 with x-debateai-release $KEY within 30 s (no slot healthy: is the edge secret filled in inside health_headers?)"
+[ "$EK" = "200 $KEY" ] || back "the edge did not answer 200 with x-debateai-release $KEY within 30 s (no slot healthy)"
 PC=$(curl -s -o /dev/null -m 15 -w '%{http_code}' https://v3-preview.dezbatere.ro/ || true); echo "public / without the password: $PC"
 [ "$PC" = 401 ] || back "the public site does not answer 401 without the password (got $PC)"
 RP=$(curl -s -o /dev/null -m 15 -w '%{http_code}' https://v3-preview.dezbatere.ro/readyz || true); echo "public /readyz without the password: $RP"
@@ -3904,11 +4025,14 @@ order:
 4. R19's operator folder comes back (T's moves to `$S/operator-lifecycle-v1.T`) and the v1 lock comes back (lock v2
    moves to `$S/release-lock.v2-T.json`);
 5. the cold copy's data **and** config folders come back (the current ones are moved aside as
-   `….after-<stamp>`, never deleted), so `max_connections` is 200 again;
+   `….after-<stamp>`, never deleted), so `max_connections` is 200 again; it revokes the restored sessions and marks
+   the restore fence (H11) before any API starts;
 6. R19's API, website, backup timer and runner start.
 
 **Everything written to the database after TB2 is lost with it**: T's version, the release table, and anything people
-did on the site since. Nothing is deleted. If rbB-T stops half way, read the line it printed: everything before it is
+did on the site since. Sign-outs, password changes and other revocations since then would come back with it, so the
+script revokes every restored session first. When the release it starts carries NV-07, the public library stays empty
+until the owner releases the hold: H11 step 4. Nothing is deleted. If rbB-T stops half way, read the line it printed: everything before it is
 done, nothing after it is; finish with the owner.
 
 ```sh
@@ -3977,6 +4101,9 @@ tar -C /etc/debateai-v3-preview -xzf "$S/pg18-v3-preview-config.tgz" || { echo "
 systemctl start debateai-preview-postgresql || { echo "RBB_T_NOT_DONE: PostgreSQL did not start on the restored folders"; exit 1; }
 for i in $(seq 1 30); do /usr/lib/postgresql/18/bin/pg_isready -q -h "$SOCK" -p 5434 && break; sleep 2; done
 [ "$(psqlq "SELECT count(*)||'|'||max(name) FROM public.debateai_schema_migration")" = "$LEDGER0" ] && [ "$(psqlq "SELECT register_version FROM register.register_version ORDER BY register_version DESC LIMIT 1")" = "$REG0" ] && [ "$(psqlq "SHOW max_connections")" = 200 ] || { echo "RBB_T_NOT_DONE: the restored database is not ledger $LEDGER0, register $REG0, 200 connections"; exit 1; }
+psqlq "UPDATE identity.session SET revoked_at = GREATEST(clock_timestamp(), created_at) WHERE revoked_at IS NULL" >/dev/null && psqlq "UPDATE staff.privilege_session SET revoked_at = GREATEST(clock_timestamp(), created_at) WHERE revoked_at IS NULL" >/dev/null || { echo "RBB_T_NOT_DONE: the restored sessions were not revoked; the database is up, the app services are stopped"; exit 1; }
+FENCE=/var/lib/debateai-v3-preview/api/restore-fence/fence; FH=$(psqlq "SELECT to_regclass('identity.restore_fence') IS NOT NULL") || { echo "RBB_T_NOT_DONE: the restored database did not answer the fence question; the sessions are revoked, the app services are stopped"; exit 1; }
+if [ -d "${FENCE%/*}" ]; then case "$FH" in t) install -m 0600 -o "$(stat -c %U "${FENCE%/*}")" -g "$(stat -c %G "${FENCE%/*}")" /dev/null "$FENCE" || { echo "RBB_T_NOT_DONE: the restore fence was not marked; the app services are stopped"; exit 1; } ;; f) if [ -e "$FENCE" ]; then mv "$FENCE" "$S/restore-fence.before-$TS" || { echo "RBB_T_NOT_DONE: the restore fence did not move aside; the app services are stopped"; exit 1; }; fi ;; *) echo "RBB_T_NOT_DONE: the fence answer was '$FH'; the sessions are revoked, the app services are stopped"; exit 1 ;; esac; fi
 systemctl start debateai-preview-hatchet || { echo "RBB_T_NOT_DONE: Hatchet did not start"; exit 1; }
 CID=; for i in $(seq 1 30); do CID=$(docker ps -q --no-trunc --filter label=com.docker.compose.project=debateai-v3-preview --filter label=com.docker.compose.service=hatchet-lite || true); [ -n "$CID" ] && break; sleep 2; done
 IP=$(docker inspect "$CID" --format '{{(index .NetworkSettings.Networks "debateai-v3-preview-internal").IPAddress}}' || true)
@@ -4046,6 +4173,7 @@ release's prestart verifies with `--database-ahead` and its proof names the file
 | SB4 | the release check (read-only) | up | nothing to undo |
 | SB5 | the three env files; the database-ahead file | up | nothing to undo (unused files) |
 | SB5b | only when the payment marks list changes: the list in the new release's ui file | up | nothing to undo (an unused file; the one before is in `$S`) |
+| SB5c | only the first upload with NV-03 (or after going back to a release without it): the UI-to-API proof in the new release's api and ui files | up | nothing to undo (unused files; the ones before are in `$S`) |
 | SB6 | the owner's fresh yes | up | – |
 | MT1, PM2, MT2 | only the first upload that lists the marks: Caddy's rule (see "Payment marks: the files and Caddy's rule") | up (one Caddy restart, about a second) | PM2 puts the old Caddyfile back itself |
 | SB7 | the online backup | up | nothing to undo |
@@ -4143,7 +4271,7 @@ pre() { /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolcha
 lc() { /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node "$L/$1" "${@:2}"; }
 cslots() { /usr/bin/env -i PATH=/usr/local/bin:/usr/bin:/bin TZ=UTC /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node "$CAPI/dialectical-engine/deploy/preview-release/v1/caddy-slots.mjs" "$@"; }
 cad() { systemd-run --quiet --pipe --wait --collect -p EnvironmentFile=/etc/debateai-v3-preview/public/caddy.env /usr/bin/caddy "$@"; }
-readyz() { printf 'X-Debateai-Edge-Secret: %s\n' "$(cat "$EDGE")" | curl -s -m 5 -H @- -w '\n%{http_code}' "http://127.0.0.1:$1/readyz" || true; }
+readyz() { curl -s -m 5 -w '\n%{http_code}' "http://127.0.0.1:$1/readyz" || true; }
 edgekey() { { curl -s -m 15 -o /dev/null -D - http://127.0.0.1:3090/readyz || true; } | tr -d '\r' | awk 'NR == 1 { s = $2 } tolower($1) == "x-debateai-release:" { k = $2 } END { print (s == "" ? "000" : s) " " (k == "" ? "none" : k) }'; }
 gs() { /usr/bin/python3 -I "$1/preview_budget_authority.py" status --private "$2"; }
 activev() { local o=${OKEY%%-*}; if [ -f "$L/settings-version.mjs" ] && [ -f "$OCAPI/dialectical-engine/tools/settings-version/cli.ts" ]; then lc settings-version.mjs status | sed -n 's/^DEBATEAI_SETTINGS_STATUS //p' | jq -er .effectiveActive; else printf '%s\n' "${o#r}"; fi; }
@@ -4296,7 +4424,8 @@ echo SB4_DONE
 `release-env.mjs derive` copies each of the old release's files into `<service>-$LABEL.env`, changing only the values
 one release owns (version and key, the new slot's ports, the runner's worker id and name, the API's mail helper). The
 SAME checks then hold the two releases to the same gates, scope, mode, workflow and team, and to different keys,
-worker ids and ports (`--slots` in the order of `--labels`).
+worker ids and ports (`--slots` in the order of `--labels`). The first release that carries NV-07 also needs H11 step 2
+after this step and before SB10.
 
 ```sh
 set -euo pipefail
@@ -4368,6 +4497,79 @@ diff <(awk '!/^PAYMENT_MARKS_AVAILABLE=/' "$S/ui-$LABEL.env.before-marks") <(awk
 lc release-env.mjs same --labels "$OLABEL,$LABEL" --slots "$OSLOT,$SLOT" || { echo "SB5B_NOT_DONE: a SAME check is BAD (above; the file before is $S/ui-$LABEL.env.before-marks)"; exit 1; }
 echo "ui-$LABEL.env: PAYMENT_MARKS_AVAILABLE=$MARKS"
 echo SB5B_DONE
+```
+
+### SB5c. The UI-to-API proof, in the new release's api and ui files
+
+The API trusts a forwarded client address, and the edge country, only from a loopback peer that carries the
+UI-to-API proof (NV-03): the same bytes in two files, the API's copy read through `UI_API_PROOF_PATH` and the
+website's through `DIALECTICAL_UI_API_PROOF_PATH`. After this code, the hosted preview API refuses to start without
+its line, the website (which trusts Caddy) refuses to start without its own, and a pair with one line only, or with
+copies that differ, is never ready (`UI_API_PROOF_REFUSED`), so the switch refuses it.
+
+Each release reads its own `api-<label>.env` and `ui-<label>.env`, derived from the old release's files in SB5, so
+once a release's files hold the lines every later release carries them: SB5c runs in the first upload whose code has
+NV-03, and again in the first upload after going back to a release whose files lack the lines. A release before NV-03
+refuses both names (its starters let through only the settings they list), so the lines never go into `api.env`,
+`ui.env` or an older release's file: a refused file would stop that release at its next start, its way back
+included. SB5c runs after SB5 and before SB10, whose launch plans start the release from these files; it stops once
+either launch plan exists.
+
+The two copies live in their own folder, `/etc/debateai-v3-preview/ui-api-proof/` (`$PRF`; the names file's `PD` is
+the DeepInfra authority folder): `ui.secret`, `0400` to the website's user, and `api/proof.secret`, `0600` to the
+API's user in a `0700` folder of its own. The script makes them only when neither exists, under temporary names. If
+it stops while making them (`openssl` failed), the temporary `$PRF/ui.secret.new` or `$PRF/api/proof.secret.new` is
+left behind and noclobber refuses the next run: remove both by hand before running SB5c again. The website's user
+comes from the old release's instance, because TB5 moved the fixed units aside; `$AU` and `$AGRP` are the names
+file's (SB1).
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# SB5c: the UI-to-API proof (NV-03): its two copies, then one line in each of the new release's own api and ui files (never a release before NV-03).
+PRF=/etc/debateai-v3-preview/ui-api-proof
+A=$E/api-$LABEL.env
+U=$E/ui-$LABEL.env
+UU=$(systemctl show -p User --value "debateai-preview-ui@$OLABEL")
+[ -n "$AU" ] && [ "$AU" != root ] && [ -n "$AGRP" ] && [ -n "$UU" ] && [ "$UU" != root ] && [ "$AU" != "$UU" ] || { echo "SB5C_NOT_DONE: the API's or the website's user is empty, root, or the same user (nothing changed): ask"; exit 1; }
+UGRP=$(id -gn "$UU")
+[ -f "$A" ] && [ "$(stat -c '%a %U' "$A")" = "640 root" ] && [ -f "$U" ] && [ "$(stat -c '%a %U' "$U")" = "640 root" ] || { echo "SB5C_NOT_DONE: $A or $U is not root's 0640 file (SB5 first)"; exit 1; }
+[ ! -e "$ART/api-launch.json" ] && [ ! -e "$ART/ui-launch.json" ] || { echo "SB5C_NOT_DONE: a launch plan exists in $ART: SB10 made the launch plans already (nothing changed): ask"; exit 1; }
+grep -q "'DIALECTICAL_UI_API_PROOF_PATH'" "$CUI/dialectical-engine/deploy/preview-auth-dev/v1/environment.mjs" || { echo "SB5C_NOT_DONE: this release's website does not know DIALECTICAL_UI_API_PROOF_PATH (a release before NV-03 would refuse to start; nothing changed)"; exit 1; }
+grep -q 'UI_API_PROOF_PATH: z\.' "$CAPI/dialectical-engine/packages/register/src/runtime-environment.ts" || { echo "SB5C_NOT_DONE: this release's API does not know UI_API_PROOF_PATH (a release before NV-03 would refuse to start; nothing changed)"; exit 1; }
+[ ! -e "$S/api-$LABEL.env.before-proof" ] && [ ! -e "$S/ui-$LABEL.env.before-proof" ] || { echo "SB5C_NOT_DONE: a .before-proof file exists in $S: SB5c ran for this release before (look first)"; exit 1; }
+! systemctl show -p InaccessiblePaths -p TemporaryFileSystem "debateai-preview-api@$OLABEL" "debateai-preview-ui@$OLABEL" | tr ' =' '\n\n' | sed 's/^-//; s/:.*$//' | grep -qxE '/|/etc|/etc/debateai-v3-preview|/etc/debateai-v3-preview/ui-api-proof(/.*)?' || { echo "SB5C_NOT_DONE: a unit of this layout hides $PRF (nothing changed): ask"; exit 1; }
+if [ ! -e "$PRF/ui.secret" ] && [ ! -e "$PRF/api/proof.secret" ]; then
+install -d -m 0755 -o root -g root "$PRF"
+install -d -m 0700 -o "$AU" -g "$AGRP" "$PRF/api"
+( set -C; umask 0277 && openssl rand -base64 32 | tr '+/' '-_' | tr -d '=' > "$PRF/ui.secret.new" )
+chown "$UU:$UGRP" "$PRF/ui.secret.new"
+install -m 0600 -o "$AU" -g "$AGRP" "$PRF/ui.secret.new" "$PRF/api/proof.secret.new"
+mv "$PRF/api/proof.secret.new" "$PRF/api/proof.secret"
+mv "$PRF/ui.secret.new" "$PRF/ui.secret"
+fi
+[ "$(stat -c '%a %U' "$PRF/ui.secret")" = "400 $UU" ] && [ "$(stat -c '%a %U' "$PRF/api/proof.secret")" = "600 $AU" ] && [ "$(stat -c '%a %U' "$PRF/api")" = "700 $AU" ] || { echo "SB5C_NOT_DONE: a proof copy is missing, or it or its folder has the wrong mode or owner: ask"; exit 1; }
+cmp -s "$PRF/ui.secret" "$PRF/api/proof.secret" || { echo "SB5C_NOT_DONE: the two proof copies differ or one is missing: ask"; exit 1; }
+[ "$(wc -c < "$PRF/ui.secret")" -ge 43 ] || { echo "SB5C_NOT_DONE: the proof is too short (openssl failed?): ask"; exit 1; }
+cp -p "$A" "$S/api-$LABEL.env.before-proof"
+cp -p "$U" "$S/ui-$LABEL.env.before-proof"
+F=$A
+( umask 077; awk '!/^UI_API_PROOF_PATH=/' "$F" > "$F.new"; printf 'UI_API_PROOF_PATH=%s\n' "$PRF/api/proof.secret" >> "$F.new" )
+chown --reference="$F" "$F.new"
+chmod --reference="$F" "$F.new"
+mv "$F.new" "$F"
+F=$U
+( umask 077; awk '!/^DIALECTICAL_UI_API_PROOF_PATH=/' "$F" > "$F.new"; printf 'DIALECTICAL_UI_API_PROOF_PATH=%s\n' "$PRF/ui.secret" >> "$F.new" )
+chown --reference="$F" "$F.new"
+chmod --reference="$F" "$F.new"
+mv "$F.new" "$F"
+[ "$(grep -c '^UI_API_PROOF_PATH=' "$A")" = 1 ] && grep -qxF "UI_API_PROOF_PATH=$PRF/api/proof.secret" "$A" || { echo "SB5C_NOT_DONE: the line is not in $A exactly once (the file before is $S/api-$LABEL.env.before-proof): ask"; exit 1; }
+[ "$(grep -c '^DIALECTICAL_UI_API_PROOF_PATH=' "$U")" = 1 ] && grep -qxF "DIALECTICAL_UI_API_PROOF_PATH=$PRF/ui.secret" "$U" || { echo "SB5C_NOT_DONE: the line is not in $U exactly once (the file before is $S/ui-$LABEL.env.before-proof): ask"; exit 1; }
+diff <(awk '!/^UI_API_PROOF_PATH=/' "$S/api-$LABEL.env.before-proof") <(awk '!/^UI_API_PROOF_PATH=/' "$A") >/dev/null && [ "$(stat -c '%a %U:%G' "$A")" = "$(stat -c '%a %U:%G' "$S/api-$LABEL.env.before-proof")" ] || { echo "SB5C_NOT_DONE: another line, the mode or the owner of $A changed (the file before is $S/api-$LABEL.env.before-proof): ask"; exit 1; }
+diff <(awk '!/^DIALECTICAL_UI_API_PROOF_PATH=/' "$S/ui-$LABEL.env.before-proof") <(awk '!/^DIALECTICAL_UI_API_PROOF_PATH=/' "$U") >/dev/null && [ "$(stat -c '%a %U:%G' "$U")" = "$(stat -c '%a %U:%G' "$S/ui-$LABEL.env.before-proof")" ] || { echo "SB5C_NOT_DONE: another line, the mode or the owner of $U changed (the file before is $S/ui-$LABEL.env.before-proof): ask"; exit 1; }
+lc release-env.mjs same --labels "$OLABEL,$LABEL" --slots "$OSLOT,$SLOT" || { echo "SB5C_NOT_DONE: a SAME check is BAD (above; the files before are in $S)"; exit 1; }
+echo "api-$LABEL.env and ui-$LABEL.env: the UI-to-API proof lines"
+echo SB5C_DONE
 ```
 
 ### SB6. The owner's fresh yes
@@ -4599,7 +4801,7 @@ echo SB11_DONE
 
 ### SB12. The new API and website, in the spare slot
 
-Both start and stay not-ready: the new website's own `/readyz` (asked directly, with the edge secret) answers 503 with
+Both start and stay not-ready: the new website's own `/readyz` (asked directly) answers 503 with
 the new key and only `NOT_CURRENT`, and the site keeps answering from the old release.
 
 ```sh
@@ -4626,8 +4828,8 @@ echo SB12_DONE
 `release-switch.mjs switch` checks everything first (the new release STAGED with its three units up, its runner's start
 line on its key with nothing re-sent, its website waiting, the edge on the old key, both gates active, no maintenance
 flag). Then one database write makes the new release current (take traffic from the database clock + 8 s: the old API's
-5 s stale read bound, one 2 s health interval and 1 s more), the edge must show the new key three times in a row, one more
-health interval passes, and only then the old website and API stop. While the edge does not show the new key yet, the new
+5 s stale read bound, the 2 s take-out time (two failed checks 1 s apart) and 1 s more), the edge must show the new key
+three times in a row, one more take-out time passes, and only then the old website and API stop. While the edge does not show the new key yet, the new
 website's own `/readyz` is read too: a reason that waiting cannot clear (anything but `BOOTING`, `NOT_CURRENT` or
 `BEFORE_TAKE_TRAFFIC_FROM`) switches back at once, `SWITCH_REVERTED` with reason `WEBSITE_NOT_READY` and the website's
 reasons, instead of after the whole 30 seconds.
@@ -4979,7 +5181,8 @@ pgrep -f '[r]elease-switch.mjs' || mv /etc/debateai-v3-preview/lifecycle/release
 could not run beside the new database (spec §5's escape hatch). Then the upload goes the old way once more, on the
 template layout: a quiet moment, the old release stopped with nothing open, a cold copy, the migrations, and a switch
 with the old pair already stopped. SB1 to SB4 stand as they are (the names, the staging, the practice, the plan); SB5's
-database-ahead file is not made. To change the payment marks on this path, run SB5b right after DR1. The first time
+database-ahead file is not made. To change the payment marks on this path, run SB5b right after DR1. To add the
+UI-to-API proof on this path, run SB5c right after DR1. The first time
 the marks are listed, MT1, PM2 and MT2 ("Payment marks: the files and Caddy's rule") go after DR1 and SB5b, before DR2.
 
 **The owner's yes, fresh in the live chat right before DR2.** It names the downtime, the cold copy, the migrations by
@@ -5013,6 +5216,8 @@ done
 lc release-env.mjs same --labels "$OLABEL,$LABEL" --slots "$OSLOT,$SLOT" || { echo "DR1_NOT_DONE: a SAME check is BAD (above)"; exit 1; }
 echo DR1_DONE
 ```
+
+The first release that carries NV-07 also needs H11 step 2 after this step and before DR5.
 
 #### DR2. The downtime starts: nothing open, the old release stopped
 
@@ -5234,7 +5439,11 @@ folders come back (the current ones moved aside, never deleted), the lock goes b
 release's entry leaves it; the old one's is byte for byte the same), the new release's instance drop-ins move into
 `$S/systemd-new/`, the old release's retire timers are turned off (the switch armed them; mark-retired may not have
 run) and the boot target's drop-in goes back to SB1's copy (the switch pointed it at the new pair; the current one moves
-into `$S`), and the old release starts again. Everything written to the database after DR3 is lost with it.
+into `$S`), and the old release starts again. Right after the restored database answers, it revokes the restored
+sessions and marks the restore fence (H11) before any API starts. Everything written to the database after DR3 is lost
+with it. Sign-outs, password changes and other revocations since then would come back with it, so the script revokes
+every restored session first. When the release it starts carries NV-07, the public library stays empty until the owner
+releases the hold: H11 step 4.
 
 ```sh
 set -euo pipefail
@@ -5276,6 +5485,9 @@ tar -C /etc/debateai-v3-preview -xzf "$S/pg18-v3-preview-config.tgz" || { echo "
 systemctl start debateai-preview-postgresql || { echo "RBD_B_NOT_DONE: PostgreSQL did not start on the restored folders"; exit 1; }
 for i in $(seq 1 30); do /usr/lib/postgresql/18/bin/pg_isready -q -h "$SOCK" -p 5434 && break; sleep 2; done
 [ "$(psqlq "SELECT count(*)||'|'||max(name) FROM public.debateai_schema_migration")" = "$LEDGER0" ] && [ "$(psqlq "SELECT register_version FROM register.register_version ORDER BY register_version DESC LIMIT 1")" = "$REG0" ] || { echo "RBD_B_NOT_DONE: the restored database is not ledger $LEDGER0, register $REG0"; exit 1; }
+psqlq "UPDATE identity.session SET revoked_at = GREATEST(clock_timestamp(), created_at) WHERE revoked_at IS NULL" >/dev/null && psqlq "UPDATE staff.privilege_session SET revoked_at = GREATEST(clock_timestamp(), created_at) WHERE revoked_at IS NULL" >/dev/null || { echo "RBD_B_NOT_DONE: the restored sessions were not revoked; the database is up, the app services are stopped"; exit 1; }
+FENCE=/var/lib/debateai-v3-preview/api/restore-fence/fence; FH=$(psqlq "SELECT to_regclass('identity.restore_fence') IS NOT NULL") || { echo "RBD_B_NOT_DONE: the restored database did not answer the fence question; the sessions are revoked, the app services are stopped"; exit 1; }
+if [ -d "${FENCE%/*}" ]; then case "$FH" in t) install -m 0600 -o "$(stat -c %U "${FENCE%/*}")" -g "$(stat -c %G "${FENCE%/*}")" /dev/null "$FENCE" || { echo "RBD_B_NOT_DONE: the restore fence was not marked; the app services are stopped"; exit 1; } ;; f) if [ -e "$FENCE" ]; then mv "$FENCE" "$S/restore-fence.before-$TS" || { echo "RBD_B_NOT_DONE: the restore fence did not move aside; the app services are stopped"; exit 1; }; fi ;; *) echo "RBD_B_NOT_DONE: the fence answer was '$FH'; the sessions are revoked, the app services are stopped"; exit 1 ;; esac; fi
 systemctl start debateai-preview-hatchet || { echo "RBD_B_NOT_DONE: Hatchet did not start"; exit 1; }
 CID=; for i in $(seq 1 30); do CID=$(docker ps -q --no-trunc --filter label=com.docker.compose.project=debateai-v3-preview --filter label=com.docker.compose.service=hatchet-lite || true); [ -n "$CID" ] && break; sleep 2; done
 [ -n "$CID" ] && { [ -z "$CID0" ] || [ "$CID" = "$CID0" ]; } || { echo "RBD_B_NOT_DONE: the Hatchet container is missing or changed; the gateway is NOT started: stop and ask"; exit 1; }

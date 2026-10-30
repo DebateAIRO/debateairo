@@ -4,7 +4,8 @@ import { isIP } from "node:net";
  * The API is loopback-bound and the executable Next server is its only proxy
  * hop. Do not widen this to `true`, a hop count, or a private-network range:
  * those make a deployment change silently redefine which caller headers are
- * authoritative.
+ * authoritative. A loopback peer is trusted only together with the UI's proof
+ * (ui-api-proof.ts, NV-03).
  */
 export const TRUSTED_UI_PROXY_NETWORKS = Object.freeze([
   "127.0.0.1/32",

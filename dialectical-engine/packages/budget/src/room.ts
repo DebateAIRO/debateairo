@@ -15,8 +15,9 @@ import type { SpendScope } from "./person-allowance.js";
  *    FITS otherwise. Only FULL makes a question wait (A5).
  *  - The ADMISSION over every scope: wait when a scope is FULL, when the line
  *    holds a run waiting for the site (a new question never jumps the line), or
- *    when the site holds every question back (`AdmissionHold`); a person who
- *    already has their waiting questions is refused instead; START otherwise.
+ *    when the site, or the person's share of its places, holds the question
+ *    back (`AdmissionHold`); a person who already has their waiting questions
+ *    is refused instead; START otherwise.
  *  - The WALL for a running debate: real spend plus the next call's projection
  *    against the finish edge. Holds are not counted here.
  */
@@ -40,8 +41,11 @@ export type ScopeRoom = Readonly<{ scope: SpendScope; room: Room; resetsAt: Date
  * say. SITE_BUSY: the site already runs as many debates as its runners take (`SITE_CONCURRENT_DEBATES`, across
  * releases). SWITCHING: this release is not the current one, so a release switch is under way. Either waits for the
  * waker's next tick; both live only in the database (`core.run_wait_reason.waits_for`), never on the wire.
+ * NV-48 (security audit run 3): PERSON_BUSY, the asker already has their share of the site's places live
+ * (`OWNER_CONCURRENT_DEBATES`); it holds back only that person's question and is recorded as the person's own wait
+ * (PERSON, never site-like), never on the wire.
  */
-export type AdmissionHold = "SITE_BUSY" | "SWITCHING";
+export type AdmissionHold = "SITE_BUSY" | "SWITCHING" | "PERSON_BUSY";
 /**
  * A WAIT's `cause` names the hold only when it is the ONE reason to wait: no scope is FULL and the line holds nobody
  * back. A wait the rooms or the line decide is recorded as before, whatever the hold.
@@ -206,7 +210,7 @@ export function decideAdmission(input: Readonly<{
   }
   const nextTickAt = validDate(input.nextTickAt, "BUDGET_ADMISSION_TICK_INVALID");
   const hold = input.hold ?? null;
-  if (hold !== null && hold !== "SITE_BUSY" && hold !== "SWITCHING") throw new TypeError("BUDGET_ADMISSION_HOLD_INVALID");
+  if (hold !== null && hold !== "SITE_BUSY" && hold !== "SWITCHING" && hold !== "PERSON_BUSY") throw new TypeError("BUDGET_ADMISSION_HOLD_INVALID");
   const anyFull = rooms.some((entry) => entry.room === "FULL");
   const mustWait = input.siteLineBlocking || anyFull || hold !== null;
   if (mustWait) {

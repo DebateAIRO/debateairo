@@ -13,11 +13,13 @@ const now = new Date("2026-10-04T09:00:00.000Z");
 const session = Object.freeze({ userId: "user:t14-timings", sessionId: "session:t14-timings" });
 const source = Object.freeze({ ip: "203.0.113.7", userAgent: "t14-timings", requestId: "request:t14-timings" });
 
-function service(timings: Partial<Pick<Dependencies, "tokenTtlMs" | "resendCooldownMs">> = {}) {
-  const resends: { expiresAt: Date; cooldownMs: number }[] = [];
+function service(timings: Partial<Pick<Dependencies, "tokenTtlMs" | "resendCooldownMs" | "sendLimit">> = {}) {
+  type Resend = { expiresAt: Date; cooldownMs: number; maximumSends: number; windowMs: number; linkTtlMs: number };
+  const resends: Resend[] = [];
   const repository = {
-    async resend(input: Readonly<{ expiresAt: Date; cooldownMs: number }>) {
-      resends.push({ expiresAt: input.expiresAt, cooldownMs: input.cooldownMs });
+    async resendBounded(input: Readonly<Resend>) {
+      const { expiresAt, cooldownMs, maximumSends, windowMs, linkTtlMs } = input;
+      resends.push({ expiresAt, cooldownMs, maximumSends, windowMs, linkTtlMs });
       return Object.freeze({ status: "COOLDOWN" as const });
     }
   };
@@ -34,17 +36,34 @@ function service(timings: Partial<Pick<Dependencies, "tokenTtlMs" | "resendCoold
 }
 
 describe("Turn 14 change-email timings", () => {
-  it("gives a 24-hour link and a 60-second resend cooldown when the caller passes neither", async () => {
+  it("gives a 24-hour link, a 60-second resend cooldown and three mails an hour when the caller passes none", async () => {
     const { built, resends } = service();
     await expect(built.resend(session, source)).rejects.toMatchObject({ code: "RESEND_COOLDOWN" });
-    expect(resends).toEqual([{ expiresAt: new Date(now.getTime() + 24 * 3_600_000), cooldownMs: 60_000 }]);
+    expect(resends).toEqual([{
+      expiresAt: new Date(now.getTime() + 24 * 3_600_000), cooldownMs: 60_000,
+      maximumSends: 3, windowMs: 3_600_000, linkTtlMs: 24 * 3_600_000
+    }]);
   });
 
   it("uses a caller's own timings, and still refuses either one out of range", async () => {
     const { built, resends } = service({ tokenTtlMs: 3_600_000, resendCooldownMs: 1_000 });
     await expect(built.resend(session, source)).rejects.toMatchObject({ code: "RESEND_COOLDOWN" });
-    expect(resends).toEqual([{ expiresAt: new Date(now.getTime() + 3_600_000), cooldownMs: 1_000 }]);
+    expect(resends).toEqual([{
+      expiresAt: new Date(now.getTime() + 3_600_000), cooldownMs: 1_000,
+      maximumSends: 3, windowMs: 3_600_000, linkTtlMs: 3_600_000
+    }]);
     expect(() => service({ resendCooldownMs: 999 })).toThrow("EMAIL_CHANGE_POLICY_INVALID");
     expect(() => service({ tokenTtlMs: 25 * 3_600_000 + 1 })).toThrow("EMAIL_CHANGE_POLICY_INVALID");
+  });
+
+  it("passes a caller's send limit to the database, and refuses one out of the bounds 0131 checks (NV-12)", async () => {
+    const { built, resends } = service({ sendLimit: { maximumSends: 1, windowMs: 60_000 } });
+    await expect(built.resend(session, source)).rejects.toMatchObject({ code: "RESEND_COOLDOWN" });
+    expect(resends).toMatchObject([{ maximumSends: 1, windowMs: 60_000 }]);
+    expect(() => service({ sendLimit: { maximumSends: 0, windowMs: 3_600_000 } })).toThrow("EMAIL_CHANGE_POLICY_INVALID");
+    expect(() => service({ sendLimit: { maximumSends: 4, windowMs: 3_600_000 } })).toThrow("EMAIL_CHANGE_POLICY_INVALID");
+    expect(() => service({ sendLimit: { maximumSends: 3, windowMs: 59_999 } })).toThrow("EMAIL_CHANGE_POLICY_INVALID");
+    expect(() => service({ sendLimit: { maximumSends: 3, windowMs: 86_400_001 } })).toThrow("EMAIL_CHANGE_POLICY_INVALID");
+    expect(() => service({ sendLimit: { maximumSends: 2.5, windowMs: 3_600_000 } })).toThrow("EMAIL_CHANGE_POLICY_INVALID");
   });
 });

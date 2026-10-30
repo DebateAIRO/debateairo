@@ -1,6 +1,6 @@
 import { withMailLocale } from '../../packages/db/src/mail-locale.js';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, onTestFinished } from 'vitest';
 import { createPool, migrate, PostgresConsumerAuthRepository, PostgresSessionRepository, runInRequestScope, setRequestCredential, type Pool } from '@debateai/db';
 import { hashToken, Argon2WorkerPool, encrypt, generateTotpSecret, hashPassword, totpCodeAtStep, decodeBase32, createEmailBlindIndex, type AuditContextHasher } from '@debateai/crypto';
 import { AUTH_POLICY_REGISTER_ROWS, authPolicyFromRegisterRows, MFA_POLICY_REGISTER_ROW, mfaPolicyFromValue, SESSION_POLICY_REGISTER_ROW, SESSION_POLICY_DEPLOYMENT_REGISTER_ROW, sessionPolicyFromValue } from '@debateai/register';
@@ -116,6 +116,9 @@ describe('restricted consumer passkey authority', () => {
         const functions = (await database.pool.query("SELECT p.proname,p.prosecdef,p.proconfig,p.proowner=(SELECT proowner FROM pg_proc WHERE oid='identity.read_email_settings(uuid,uuid)'::regprocedure) AS owner FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='identity' AND p.proname=ANY($1::text[])", [["prune_consumer_passkey_challenges", "lock_consumer_challenges_internal", "reserve_consumer_challenge_internal", "assert_consumer_options_capacity_internal", "consumer_options_context_internal", "prepare_consumer_passkey_enrollment", "append_consumer_passkey_audit_internal", "consumer_initial_evidence_internal", "begin_consumer_passkey_enrollment", "begin_consumer_passkey_login", "read_consumer_passkey_challenge", "read_consumer_passkey_credential", "insert_consumer_session_internal", "complete_consumer_passkey_enrollment", "complete_consumer_passkey_login"]])).rows;
         expect(functions.length).toBe(15);
         expect(functions.every(x => x.owner && x.prosecdef && x.proconfig.includes('search_path=pg_catalog'))).toBe(true);
+        // NV-41: the evicting cleanup is a definer owned by the cleanup it supersedes, pg_temp last, for the authorization runtime only.
+        expect((await database.pool.query("SELECT p.prosecdef,p.proconfig,p.proowner=(SELECT proowner FROM pg_proc WHERE oid='identity.prune_consumer_passkey_challenges(integer)'::regprocedure) AS owner,has_function_privilege('consumer_test_runtime',p.oid,'EXECUTE') AS allowed,has_function_privilege('debateai_runtime',p.oid,'EXECUTE') AS app_allowed,has_function_privilege('public',p.oid,'EXECUTE') AS public_allowed FROM pg_proc p WHERE p.oid='identity.prune_consumer_passkey_challenges_evicting(integer)'::regprocedure")).rows[0])
+            .toEqual({ prosecdef: true, proconfig: ['search_path=pg_catalog, pg_temp'], owner: true, allowed: true, app_allowed: false, public_allowed: false });
     });
     it('requires discoverability and UV without attachment restrictions and safely resumes the bound email enrollment', async () => {
         const a = await account(), one = await service.beginPasskeyEnrollment({ enrollment_token: a.bearer }, source), two = await service.beginPasskeyEnrollment({ enrollment_token: a.bearer }, source);
@@ -545,8 +548,9 @@ describe('retained ceremony bounds and transaction order', () => {
         await database.pool.query(`INSERT INTO identity.consumer_passkey_challenge(handle_hash,challenge_hash,retention_hash,purpose,binding_hash,rp_id,origin,expires_at)
           SELECT 'sha256:'||md5('handle'||n)||md5('handle2'||n),'sha256:'||repeat('a',64),'sha256:'||md5('source'||n)||md5('source2'||n),'LOGIN','sha256:'||repeat('b',64),$2,$3,now()+interval '5 minutes' FROM generate_series(1,$1::integer) n`, [capacity, rpId, origin]);
         const local = { ...source, ip: '203.0.113.210' }, fresh = new ConsumerWebAuthnService(repo, (await freshSessions()).consumerProducer(), { publicAppUrl: origin });
-        await expect(fresh.beginPasskeyLogin({}, local)).rejects.toMatchObject({ code: 'MFA_RATE_LIMITED' });
-        expect((await database.pool.query('SELECT count(*)::int AS n FROM identity.consumer_passkey_challenge')).rows[0].n).toBe(capacity);
+        // NV-41: a full store gives up anonymous pending rows down to the low-water mark instead of refusing the begin.
+        await fresh.beginPasskeyLogin({}, local);
+        expect((await database.pool.query('SELECT count(*)::int AS n FROM identity.consumer_passkey_challenge')).rows[0].n).toBe(capacity - Math.max(1, Math.floor(capacity / 64)) + 1);
         await database.pool.query("UPDATE identity.consumer_passkey_challenge SET created_at=now()-interval '10 minutes',expires_at=now()-interval '5 minutes'");
         await fresh.beginPasskeyLogin({}, local);
         expect((await database.pool.query('SELECT count(*)::int AS n FROM identity.consumer_passkey_challenge')).rows[0].n).toBe(1);
@@ -847,4 +851,51 @@ it('enforces the policy8192 addition capacity across fresh processes, admits own
     await expect(totpService(repo,(await freshSessions()).consumerProducer()).beginTotp({stepUpGrant:extraGrant.grant},sourceForExtra,extraGrant.session)).resolves.toMatchObject({status:'verification_required'});
     expect((await database.pool.query('SELECT count(*)::int AS n FROM identity.mfa_factor WHERE mfa_factor_id=ANY($1::uuid[])',[ids.slice(0,5)])).rows[0].n).toBe(0);
   } finally {await database.pool.query('DELETE FROM identity.consumer_totp_enrollment WHERE user_id=ANY($1::uuid[])',[ids]);await database.pool.query('DELETE FROM identity.mfa_factor WHERE user_id=ANY($1::uuid[])',[ids]);await database.pool.query('DELETE FROM identity."user" WHERE user_id=ANY($1::uuid[])',[ids]);}
+});
+
+// NV-41: the shared full store. 8,190 anonymous LOGIN rows for 1,638 five-row sources, created over the last two minutes,
+// plus two single-row sources created three minutes ago, older than every flood row (expires_at stays within 0098's
+// five-minute CHECK). Callers build their fixtures first, so today's code fails at the asserted begin and not earlier.
+const passkeyCapacity = mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value).verificationLimits.capacity;
+const passkeyLowWater = passkeyCapacity - Math.max(1, Math.floor(passkeyCapacity / 64));
+const floodHandles = (count: number) => `SELECT 'sha256:'||md5('nv41-flood'||n)||md5('nv41-flood2'||n) FROM generate_series(0,${count - 1}) n`;
+async function fillPasskeyStore() {
+    // A refused case would otherwise leave the store full for the next case's fixture.
+    onTestFinished(async () => { await database.pool.query('DELETE FROM identity.consumer_passkey_challenge'); });
+    await database.pool.query('DELETE FROM identity.consumer_passkey_challenge');
+    await database.pool.query(`INSERT INTO identity.consumer_passkey_challenge(handle_hash,challenge_hash,retention_hash,purpose,binding_hash,rp_id,origin,created_at,expires_at)
+      SELECT 'sha256:'||md5('nv41-flood'||n)||md5('nv41-flood2'||n),'sha256:'||repeat('a',64),'sha256:'||md5('nv41-source'||(n/5))||md5('nv41-source2'||(n/5)),'LOGIN','sha256:'||repeat('b',64),$2,$3,
+        now()-interval '2 minutes'+n*interval '1 millisecond',now()-interval '2 minutes'+n*interval '1 millisecond'+interval '4 minutes' FROM generate_series(0,$1::integer-3) n`, [passkeyCapacity, rpId, origin]);
+    await database.pool.query(`INSERT INTO identity.consumer_passkey_challenge(handle_hash,challenge_hash,retention_hash,purpose,binding_hash,rp_id,origin,created_at,expires_at)
+      SELECT 'sha256:'||md5('nv41-single'||n)||md5('nv41-single2'||n),'sha256:'||repeat('a',64),'sha256:'||md5('nv41-lone'||n)||md5('nv41-lone2'||n),'LOGIN','sha256:'||repeat('b',64),$1,$2,
+        now()-interval '3 minutes',now()-interval '3 minutes'+interval '4 minutes' FROM generate_series(1,2) n`, [rpId, origin]);
+    expect((await database.pool.query('SELECT count(*)::int AS n FROM identity.consumer_passkey_challenge')).rows[0].n).toBe(passkeyCapacity);
+}
+const passkeyRows = async (where = 'true', values: unknown[] = []) => (await database.pool.query(`SELECT count(*)::int AS n FROM identity.consumer_passkey_challenge WHERE ${where}`, values)).rows[0].n as number;
+
+it("NV-41: a full store gives up the heaviest anonymous source's oldest rows instead of refusing a visitor", async () => {
+    await fillPasskeyStore();
+    await expect(new ConsumerWebAuthnService(repo, (await freshSessions()).consumerProducer(), { publicAppUrl: origin }).beginPasskeyLogin({}, { ...source, ip: '203.0.113.211' })).resolves.toMatchObject({ challenge_handle: expect.any(String) });
+    const evicted = passkeyCapacity - passkeyLowWater;
+    expect(await passkeyRows()).toBe(passkeyLowWater + 1);
+    expect(await passkeyRows(`handle_hash IN (SELECT 'sha256:'||md5('nv41-single'||n)||md5('nv41-single2'||n) FROM generate_series(1,2) n)`)).toBe(2);
+    expect(await passkeyRows(`handle_hash IN (${floodHandles(passkeyCapacity - 2)})`)).toBe(passkeyCapacity - 2 - evicted);
+    expect(await passkeyRows(`handle_hash IN (${floodHandles(evicted)})`)).toBe(0);
+});
+it('NV-41: a full store still admits a passkey enrollment begin', async () => {
+    const a = await account();
+    await fillPasskeyStore();
+    await expect(service.beginPasskeyEnrollment({ enrollment_token: a.bearer }, source)).resolves.toMatchObject({ challenge_handle: expect.any(String) });
+    expect(await passkeyRows()).toBe(passkeyLowWater + 1);
+    expect(await passkeyRows("user_id=$1 AND purpose='INITIAL_ENROLLMENT'", [a.userId])).toBe(1);
+});
+it('NV-41: a full store still admits a password-continuation passkey begin', async () => {
+    const a = await enrolled(), g = await addGrant(a), continuation = token();
+    const identity = { userId: a.userId, ownerRef: a.ownerRef, auditToken: a.auditToken, passwordHash: fixturePassword, factorId: g.factorId, secretCiphertext: env, lastAcceptedStep: 2 };
+    expect(await new PostgresSessionRepository(runtime, audit).createLoginChallenge({ identity, challengeId: randomUUID(), challengeTokenHash: hashToken('login-challenge', continuation), bindingHash: sessions.consumerProducer().bindingHash(source), occurredAt: new Date(), expiresAt: new Date(Date.now() + 300000), source })).toBe(true);
+    await fillPasskeyStore();
+    const fresh = new ConsumerWebAuthnService(repo, (await freshSessions()).consumerProducer(), { publicAppUrl: origin });
+    await expect(fresh.beginPasskeyLogin({ continuation_token: continuation }, source)).resolves.toMatchObject({ challenge_handle: expect.any(String) });
+    expect(await passkeyRows()).toBe(passkeyLowWater + 1);
+    expect(await passkeyRows("user_id=$1 AND purpose='LOGIN'", [a.userId])).toBe(1);
 });

@@ -15,7 +15,8 @@ import {
   type AuditContextHasher,
   type ChainedAuditEvent,
   type CryptoEnvelope,
-  type ReadableUserDekStore
+  type ReadableUserDekStore,
+  type RunContentKeyStore
 } from "../../packages/crypto/src/index.js";
 import {
   assertPublicationCleanupDatabaseRole,
@@ -26,16 +27,30 @@ import {
   PostgresAccountErasureRepository,
   PostgresSessionRepository,
   PostgresPublicationRepository,
+  PostgresSupportShredRepository,
   RunRepository,
   migrate,
+  prepareLeasedContentEncryptionForRun,
+  routeLeaseBodyQueries,
+  withRunContentLease,
+  crossAccount,
   requestScopeActive,
+  runInRequestScope,
   type LoginIdentityRecord
 } from "@debateai/db";
+import {
+  acquirePublicationContentLease,
+  isDatabasePoolBusy,
+  LEASE_LOCK_WAITS,
+  withPublicationContentLease
+} from "../../packages/db/src/index.js";
 import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
-import { apiTestPools, inAccountRequest, provisionRlsLogins, type RlsLogins } from "../support/rls-logins.js";
+import { apiTestPools, createSystemTwin, inAccountRequest, provisionRlsLogins, type RlsLogins } from "../support/rls-logins.js";
 import { PostgresPublicationApplication } from "../../apps/api/src/publications.js";
+import { MadeByNewerReleaseError } from "../../apps/api/src/made-by-newer-release.js";
+import { MemoryRepository } from "@debateai/memory";
 import { buildApi, type AskApplication } from "@debateai/api";
 import { createPublicEvaluatorConsumerWorker } from "../../apps/evaluator-worker/src/index.js";
 import {
@@ -314,7 +329,11 @@ async function encryptedSnapshot(
   runId: string,
   marker: string,
   // Engine redesign R2 (B12): the snapshot's terminal, label and floor; absent: today's SERVED / SUPPORTED, no floor.
-  shape: Readonly<{ terminal?: string; verdict?: string | null; floor?: Readonly<Record<string, unknown>> }> = {}
+  // NV-31 (g): `extra` adds top-level members this release does not know, so the public parse fails after decryption.
+  shape: Readonly<{
+    terminal?: string; verdict?: string | null; floor?: Readonly<Record<string, unknown>>;
+    extra?: Readonly<Record<string, unknown>>;
+  }> = {}
 ): Promise<CryptoEnvelope> {
   const provision = await database.pool.query<{
     user_id: string;
@@ -354,7 +373,8 @@ async function encryptedSnapshot(
         badges: [], residual_objections: [], reversal_point: "new evidence",
         as_of: "2026-08-24T00:00:00.000Z"
       },
-      ...(shape.floor === undefined ? {} : { floor: shape.floor })
+      ...(shape.floor === undefined ? {} : { floor: shape.floor }),
+      ...(shape.extra ?? {})
     });
   } finally {
     prepared.close();
@@ -434,7 +454,7 @@ describe("S8 publication on real PostgreSQL", () => {
         erasureId,preview.runIds,preview.legacyRunIds,preview.publishedRunIds
       )).toBe("PREPARED");
       expect(await new AccountErasureCoordinator(
-        erasureRepository,users,runKeys,publicationCipher
+        erasureRepository,users,runKeys,publicationCipher,new PostgresSupportShredRepository(database.pool)
       ).execute(erasureId,source)).toBe("CLEANED");
       expect(await runKeys.exists(runId)).toBe(false);
       expect(await publicationCipher.exists(publicationRef)).toBe(true);
@@ -1329,7 +1349,7 @@ describe("S8 publication on real PostgreSQL", () => {
       erasureId,preview.runIds,preview.legacyRunIds,preview.publishedRunIds
     )).toBe("PREPARED");
     expect(await new AccountErasureCoordinator(
-      erasureRepository,users,runKeys,publicationCipher
+      erasureRepository,users,runKeys,publicationCipher,new PostgresSupportShredRepository(database.pool)
     ).execute(erasureId,{
       ip: identity.userId,userAgent: identity.ownerRef,requestId: identity.sessionId
     })).toBe("CLEANED");
@@ -2575,7 +2595,7 @@ describe("DPD-S01 delete public debates at account erasure", () => {
     }
   }
   async function clean(erasureId:string,coordinator=new AccountErasureCoordinator(
-    erasureRepository,users,runKeys,publicationCipher
+    erasureRepository,users,runKeys,publicationCipher,new PostgresSupportShredRepository(database.pool)
   )) {
     for (let round=0;round<4;round++) {
       const outcome=await coordinator.execute(erasureId,source);
@@ -2701,7 +2721,7 @@ describe("DPD-S01 delete public debates at account erasure", () => {
     });
     await due(fixture.identity.userId);
     const coordinator=new AccountErasureCoordinator(
-      erasureRepository,users,runKeys,publicationCipher
+      erasureRepository,users,runKeys,publicationCipher,new PostgresSupportShredRepository(database.pool)
     );
     expect(await coordinator.execute(scheduled!.erasureId,source)).toBe("CONTENDED");
     expect(await erasureRepository.current({
@@ -2751,7 +2771,9 @@ describe("DPD-S01 delete public debates at account erasure", () => {
       exists:(candidate:string)=>publicationCipher.exists(candidate),
       keyReadable:(candidate:string)=>publicationCipher.keyReadable(candidate)
     };
-    const coordinator=new AccountErasureCoordinator(erasureRepository,users,runKeys,cipher);
+    const coordinator=new AccountErasureCoordinator(
+      erasureRepository,users,runKeys,cipher,new PostgresSupportShredRepository(database.pool)
+    );
     await expect(coordinator.execute(scheduled!.erasureId,source)).rejects.toThrow("DPD_FORCED_DESTROY_FAILURE");
     expect(finalize).toHaveBeenCalledTimes(0);
     expect((await database.pool.query('SELECT 1 FROM identity."user" WHERE user_id=$1',[fixture.identity.userId])).rowCount).toBe(1);
@@ -2797,7 +2819,7 @@ describe("DPD-S01 delete public debates at account erasure", () => {
     const coordinator=new AccountErasureCoordinator(erasureRepository,users,runKeys,{
       destroy:(ref:string)=>publicationCipher.destroy(ref),
       exists:(ref:string)=>publicationCipher.exists(ref),keyReadable
-    });
+    },new PostgresSupportShredRepository(database.pool));
     expect(await clean(scheduled.erasure_id,coordinator)).toBe("CLEANED");
     expect(await Promise.all(refs.map(publicRead))).toEqual(before);
     for (const ref of refs) expect(keyReadable).toHaveBeenCalledWith(ref);
@@ -3025,6 +3047,536 @@ describe("DPD-S01 delete public debates at account erasure", () => {
     await expectForgedVersion3Refused({
       erasureId:request!.erasureId,runId:second.runId,ref:first.ref,
       prepared:true,preparedRefs:[first.ref],latestPublished:{ runId:second.runId,ref:first.ref }
+    });
+  });
+});
+
+describe("NV-21 public reads share the publication lease and read on its connection", () => {
+  // Security fixes run 3, K10: a public reader holds one pooled connection at a time and never queues inside PostgreSQL
+  // behind another reader; only key destruction takes the lease exclusively, and no lease wait is unbounded.
+  const LEASE_NAMESPACE = "debateai:publication-content-lease:v1:";
+
+  async function publishedRef(label: string): Promise<string> {
+    const identity = await createIdentity(label);
+    const runId = await createRun(identity, label);
+    const publicationRef = randomUUID();
+    // The snapshot's published_at (encryptedSnapshot's) must equal the publication's own time, or the public read refuses it.
+    const occurredAt = new Date("2026-08-24T00:00:00.000Z");
+    const grantToken = await grant(identity, runId, "PUBLISH", "q", occurredAt);
+    expect(await repository.publish({
+      runId, userId: identity.userId, ownerRef: identity.ownerRef, sessionId: identity.sessionId,
+      grantTokenHash: hashToken("step-up-grant", grantToken), occurredAt, source, publicationRef,
+      expectedPseudonym: identity.pseudonym,
+      contentCiphertext: await encryptedSnapshot(publicationRef, runId, label)
+    })).toBe(true);
+    return publicationRef;
+  }
+
+  async function withSmallPool<T>(
+    sizing: Readonly<{ max: number; connectionTimeoutMillis: number }>,
+    use: (small: Pool, app: PostgresPublicationApplication) => Promise<T>
+  ): Promise<T> {
+    const small = createPool(database.connectionString, { ...sizing, name: "test:runtime" });
+    try {
+      return await use(small, new PostgresPublicationApplication(
+        new PostgresPublicationRepository(small, fakeAuditHasher), publicationCipher
+      ));
+    } finally {
+      await small.end();
+    }
+  }
+
+  async function exclusiveLeaseLocks(publicationRef: string): Promise<readonly Readonly<{ granted: boolean }>[]> {
+    // An advisory lock on one bigint key shows as classid (its high 32 bits), objid (its low 32 bits) and objsubid 1.
+    return (await database.pool.query<{ granted: boolean }>(`
+      SELECT held.granted
+      FROM pg_catalog.pg_locks AS held,
+        LATERAL (SELECT hashtextextended($1,0) AS key) AS lease
+      WHERE held.locktype='advisory' AND held.objsubid=1 AND held.mode='ExclusiveLock'
+        AND held.classid::bigint=((lease.key >> 32) & 4294967295)
+        AND held.objid::bigint=(lease.key & 4294967295)
+    `, [`${LEASE_NAMESPACE}${publicationRef}`])).rows;
+  }
+
+  it("(a) answers an unknown ref on a pool of one without asking for a second connection", async () => {
+    await withSmallPool({ max: 1, connectionTimeoutMillis: 500 }, async (_small, app) => {
+      const started = performance.now();
+      const out: unknown = await app.readPublicDebate(randomUUID()).catch((error: unknown) => error);
+      const elapsed = performance.now() - started;
+      // Before NV-21 the lease held the only connection while readPublic asked the pool for another: busy after 500 ms.
+      expect(isDatabasePoolBusy(out)).toBe(false);
+      expect(out).toBeNull();
+      expect(elapsed).toBeLessThan(300);
+    });
+  });
+
+  it("(b) keeps a full pool serving while as many public reads as connections run at once", async () => {
+    await withSmallPool({ max: 4, connectionTimeoutMillis: 1_000 }, async (small, app) => {
+      const reads = Array.from({ length: 4 }, () =>
+        app.readPublicDebate(randomUUID()).catch((error: unknown) => error));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      const started = performance.now();
+      const probe: unknown = await small.query("SELECT 1 AS one")
+        .then(() => performance.now() - started, (error: unknown) => error);
+      expect(await Promise.all(reads)).toEqual([null, null, null, null]);
+      expect(probe).toBeTypeOf("number");
+      expect(probe as number).toBeLessThan(300);
+    });
+  });
+
+  it("(c) lets three readers of one published ref read it at once on a pool of two", async () => {
+    const publicationRef = await publishedRef("nv21-c");
+    await withSmallPool({ max: 2, connectionTimeoutMillis: 1_000 }, async (_small, app) => {
+      const reads = await Promise.all(Array.from({ length: 3 }, () =>
+        app.readPublicDebate(publicationRef).catch((error: unknown) => error)));
+      for (const read of reads) expect(read).toMatchObject({ public_ref: publicationRef });
+    });
+  });
+
+  it("(d) waits out a short exclusive holder, then reads the debate (behaviour check, green before NV-21 too)", async () => {
+    const publicationRef = await publishedRef("nv21-d");
+    await withSmallPool({ max: 2, connectionTimeoutMillis: 1_000 }, async (_small, app) => {
+      const exclusive = await acquirePublicationContentLease(database.pool, [publicationRef]);
+      const releasing = new Promise<void>((resolve) => setTimeout(resolve, 200)).then(() => exclusive.release());
+      try {
+        // The pg_locks query (f) relies on finds this key's granted exclusive lock.
+        expect(await exclusiveLeaseLocks(publicationRef)).toEqual([{ granted: true }]);
+        const started = performance.now();
+        await expect(app.readPublicDebate(publicationRef)).resolves.toMatchObject({ public_ref: publicationRef });
+        expect(performance.now() - started).toBeGreaterThanOrEqual(150);
+      } finally {
+        await releasing;
+      }
+    });
+  });
+
+  it("(e) reads as not found, with one content-free line, while an exclusive holder outlasts the shared wait", async () => {
+    const holdMs = LEASE_LOCK_WAITS.sharedMs + 500;
+    const publicationRef = await publishedRef("nv21-e");
+    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      await withSmallPool({ max: 2, connectionTimeoutMillis: 1_000 }, async (_small, app) => {
+        const exclusive = await acquirePublicationContentLease(database.pool, [publicationRef]);
+        const releasing = new Promise<void>((resolve) => setTimeout(resolve, holdMs)).then(() => exclusive.release());
+        try {
+          const started = performance.now();
+          const out: unknown = await app.readPublicDebate(publicationRef).catch((error: unknown) => error);
+          const elapsed = performance.now() - started;
+          expect(out).toBeNull();
+          expect(elapsed).toBeGreaterThanOrEqual(LEASE_LOCK_WAITS.sharedMs - 100);
+          expect(elapsed).toBeLessThan(holdMs);
+        } finally {
+          await releasing;
+        }
+      });
+      expect(errors.mock.calls.map((call) => call[0])).toContain(
+        JSON.stringify({ event: "api.publication.lease_contended", id: publicationRef })
+      );
+    } finally {
+      errors.mockRestore();
+    }
+  }, 30_000);
+
+  it("(f) bounds an exclusive wait behind a shared holder and leaves no exclusive lock behind", async () => {
+    const publicationRef = randomUUID();
+    const shared = await acquirePublicationContentLease(database.pool, [publicationRef], "shared");
+    const started = performance.now();
+    const pending = acquirePublicationContentLease(database.pool, [publicationRef]);
+    let outcome: Readonly<{ state: "acquired" | "rejected" | "pending"; error?: unknown; elapsed: number }>;
+    let exclusiveLocks: readonly Readonly<{ granted: boolean }>[];
+    try {
+      // Before NV-21 the exclusive request waited for ever; the race bounds the red run.
+      outcome = await Promise.race([
+        pending.then(
+          () => ({ state: "acquired" as const, elapsed: performance.now() - started }),
+          (error: unknown) => ({ state: "rejected" as const, error, elapsed: performance.now() - started })
+        ),
+        new Promise<Readonly<{ state: "pending"; elapsed: number }>>((resolve) =>
+          setTimeout(() => resolve({ state: "pending", elapsed: performance.now() - started }), 6_000))
+      ]);
+      exclusiveLocks = await exclusiveLeaseLocks(publicationRef);
+    } finally {
+      await shared.release();
+      // A pending or late-granted exclusive lease is released, so neither its lock nor its connection outlives this case.
+      await pending.then((lease) => lease.release(), () => undefined);
+    }
+    expect(outcome).toMatchObject({ state: "rejected", error: { code: "PUBLICATION_LEASE_CONTENDED" } });
+    expect(outcome.elapsed).toBeGreaterThanOrEqual(1_900);
+    expect(outcome.elapsed).toBeLessThan(3_500);
+    expect(exclusiveLocks).toEqual([]);
+  }, 30_000);
+
+  it("(g) refuses an exclusive request nested inside a shared scope", async () => {
+    const publicationRef = randomUUID();
+    await expect(withPublicationContentLease(database.pool, [publicationRef], () =>
+      withPublicationContentLease(database.pool, [publicationRef], async () => 1), "shared"))
+      .rejects.toMatchObject({ code: "PUBLICATION_LEASE_SCOPE_EXPANSION_FORBIDDEN" });
+    // A shared request inside a shared scope borrows it.
+    await expect(withPublicationContentLease(database.pool, [publicationRef], () =>
+      withPublicationContentLease(database.pool, [publicationRef], async () => 1, "shared"), "shared"))
+      .resolves.toBe(1);
+  });
+});
+
+describe("NV-31 lease-body queries run on the lease's own connection (routed pools)", () => {
+  // Security fixes run 3, K10 (NV-31): on a routed pool a lease body's pool.query runs on the lease's own client, so a
+  // leased read holds one connection and lease holders can never all wait for one another. Each unrouted twin is
+  // today's behaviour (and the runner's): the nested query asks the pool for a second connection.
+  type Sizing = Readonly<{ max: number; connectionTimeoutMillis: number }>;
+  const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+  const own = (identity: Identity) => ({ ownerRef: identity.ownerRef, legacyAskerId: null });
+
+  /** A pool whose key store queries that pool on every load: the production resolver's shape (apps/api/src/main.ts). */
+  function nv31Pool(sizing: Sizing, routed: boolean, gate?: () => Promise<void>): Pool {
+    const pool = createPool(database.connectionString, { ...sizing, name: "test:runtime" });
+    const store: RunContentKeyStore = {
+      store: (runId, identity, contentKey) => runKeys.store(runId, identity, contentKey),
+      load: async (runId) => {
+        await gate?.();
+        await pool.query("SELECT 1 AS one");
+        return runKeys.load(runId);
+      },
+      exists: (runId) => runKeys.exists(runId),
+      ownerRef: (runId) => runKeys.ownerRef(runId),
+      listByOwner: (ownerRef) => runKeys.listByOwner(ownerRef),
+      destroy: (runId) => runKeys.destroy(runId)
+    };
+    try {
+      if (routed) routeLeaseBodyQueries(pool);
+      configureContentEncryption(pool, new ContentCipher(store));
+    } catch (error) {
+      void pool.end();
+      throw error;
+    }
+    return pool;
+  }
+
+  async function withNv31Pool<T>(
+    sizing: Sizing, routed: boolean, use: (pool: Pool) => Promise<T>, gate?: () => Promise<void>
+  ): Promise<T> {
+    const pool = nv31Pool(sizing, routed, gate);
+    try {
+      return await use(pool);
+    } finally {
+      await pool.end();
+    }
+  }
+
+  /** Holds every key load until `count` loads have entered, or until `ms` after the first one did. */
+  function loadGate(count: number, ms: number): () => Promise<void> {
+    let entered = 0;
+    let open: () => void = () => undefined;
+    const opened = new Promise<void>((resolve) => { open = resolve; });
+    return async () => {
+      entered += 1;
+      if (entered === 1) setTimeout(open, ms);
+      if (entered >= count) open();
+      await opened;
+    };
+  }
+
+  async function pid(executor: Pool | PoolClient): Promise<number> {
+    return (await (executor as Pool).query<{ pid: number }>("SELECT pg_backend_pid() AS pid")).rows[0]!.pid;
+  }
+
+  it("(a) reads an encrypted run on a pool of one: the key load's query runs on the lease's connection", async () => {
+    const identity = await createIdentity("nv31-a");
+    const run = await createRun(identity, "nv31-a");
+    const sizing = { max: 1, connectionTimeoutMillis: 500 };
+    // Unrouted: the lease holds the only connection while the key load asks the pool for another.
+    await withNv31Pool(sizing, false, async (plain) => {
+      const started = performance.now();
+      const out: unknown = await new RunRepository(plain).readLoadingProjection(run, own(identity))
+        .catch((error: unknown) => error);
+      expect(isDatabasePoolBusy(out)).toBe(true);
+      expect(performance.now() - started).toBeGreaterThanOrEqual(450);
+    });
+    await withNv31Pool(sizing, true, async (routed) => {
+      await expect(new RunRepository(routed).readLoadingProjection(run, own(identity)))
+        .resolves.toMatchObject({ runRef: run, questionLine: "S8 private question nv31-a" });
+    });
+  });
+
+  it("(b) revalidates a memory disclosure lease and runs its body on the lease's connection", async () => {
+    const identity = await createIdentity("nv31-b");
+    const run = await createRun(identity, "nv31-b");
+    const sizing = { max: 1, connectionTimeoutMillis: 500 };
+    const disclose = (pool: Pool) => new MemoryRepository(pool).withDisclosureContentLease([run], async () =>
+      (await pool.query<{ one: number }>("SELECT 1 AS one")).rows[0]!.one);
+    // Unrouted: the in-lease revalidation (leaseRunIdsForDisclosure) asks the pool for a second connection.
+    await withNv31Pool(sizing, false, async (plain) => {
+      expect(isDatabasePoolBusy(await disclose(plain).catch((error: unknown) => error))).toBe(true);
+    });
+    await withNv31Pool(sizing, true, async (routed) => {
+      await expect(disclose(routed)).resolves.toBe(1);
+    });
+  });
+
+  it("(c) serves eight encrypted reads on a pool of four with no busy refusal and a connection left for others", async () => {
+    const identity = await createIdentity("nv31-c");
+    const run = await createRun(identity, "nv31-c");
+    const sizing = { max: 4, connectionTimeoutMillis: 1_000 };
+    const eightReads = (pool: Pool): Promise<unknown>[] => Array.from({ length: 8 }, () =>
+      new RunRepository(pool).readLoadingProjection(run, own(identity)).catch((error: unknown) => error));
+    // Unrouted: the gate holds the key loads together, so four lease holders each wait for a fifth connection at once.
+    await withNv31Pool(sizing, false, async (plain) => {
+      const reads = await Promise.all(eightReads(plain));
+      expect(reads.filter((read) => isDatabasePoolBusy(read)).length).toBeGreaterThanOrEqual(1);
+    }, loadGate(4, 300));
+    await withNv31Pool(sizing, true, async (routed) => {
+      const reads = eightReads(routed);
+      await sleep(50);
+      const started = performance.now();
+      const probe: unknown = await routed.query("SELECT 1 AS one")
+        .then(() => performance.now() - started, (error: unknown) => error);
+      for (const read of await Promise.all(reads)) {
+        expect(isDatabasePoolBusy(read)).toBe(false);
+        expect(read).toMatchObject({ runRef: run, questionLine: "S8 private question nv31-c" });
+      }
+      expect(probe).toBeTypeOf("number");
+      expect(probe as number).toBeLessThan(1_000);
+    }, loadGate(4, 300));
+  });
+
+  it("(d) runs a lease body's pool query on the lease's own backend, for both lease kinds (behaviour check)", async () => {
+    const identity = await createIdentity("nv31-d");
+    const run = await createRun(identity, "nv31-d");
+    await withNv31Pool({ max: 2, connectionTimeoutMillis: 1_000 }, true, async (routed) => {
+      const [viaPool, viaLease] = await withRunContentLease(routed, [run], async (lease) =>
+        [await pid(routed), await pid(lease.client)]);
+      expect(viaPool).toBe(viaLease);
+      for (const mode of ["shared", "exclusive"] as const) {
+        const [poolPid, leasePid] = await withPublicationContentLease(routed, [randomUUID()], async (lease) =>
+          [await pid(routed), await pid(lease.client)], mode);
+        expect(poolPid, mode).toBe(leasePid);
+      }
+      // Outside every lease a routed query runs on a pool connection, as before.
+      await expect(routed.query("SELECT 1 AS one")).resolves.toMatchObject({ rows: [{ one: 1 }] });
+    });
+  });
+
+  it("(e) refuses to route one pool twice (behaviour check)", async () => {
+    await withNv31Pool({ max: 1, connectionTimeoutMillis: 500 }, true, async (routed) => {
+      expect(() => routeLeaseBodyQueries(routed)).toThrow("LEASE_BODY_QUERIES_ALREADY_ROUTED");
+    });
+  });
+
+  it("(f) runs a bare lease's key load on that lease's connection", async () => {
+    const identity = await createIdentity("nv31-f");
+    const run = await createRun(identity, "nv31-f");
+    const sizing = { max: 1, connectionTimeoutMillis: 500 };
+    // Unrouted (and routed without a scope for the bare lease): the key load asks the pool for a second connection.
+    await withNv31Pool(sizing, false, async (plain) => {
+      expect(isDatabasePoolBusy(await prepareLeasedContentEncryptionForRun(plain, run)
+        .catch((error: unknown) => error))).toBe(true);
+    });
+    await withNv31Pool(sizing, true, async (routed) => {
+      const leased = await prepareLeasedContentEncryptionForRun(routed, run);
+      try {
+        expect(leased.prepared).not.toBeNull();
+      } finally {
+        await leased.close();
+      }
+    });
+  });
+
+  it("(g) reads an unparsable public snapshot's run release key on the publication lease's connection", async () => {
+    const OWN = ["r19", "a".repeat(12)].join("-");
+    const NEWER = ["r20", "b".repeat(12)].join("-");
+    const identity = await createIdentity("nv31-g");
+    const runId = await createRun(identity, "nv31-g");
+    const publicationRef = randomUUID();
+    // As NV-21's publishedRef: the snapshot's published_at equals the publication's own time.
+    const occurredAt = new Date("2026-08-24T00:00:00.000Z");
+    const grantToken = await grant(identity, runId, "PUBLISH", "g", occurredAt);
+    expect(await repository.publish({
+      runId, userId: identity.userId, ownerRef: identity.ownerRef, sessionId: identity.sessionId,
+      grantTokenHash: hashToken("step-up-grant", grantToken), occurredAt, source, publicationRef,
+      expectedPseudonym: identity.pseudonym,
+      contentCiphertext: await encryptedSnapshot(publicationRef, runId, "nv31-g",
+        { extra: { future_member: { kind: "next" } } })
+    })).toBe(true);
+    const sizing = { max: 1, connectionTimeoutMillis: 500 };
+    // Each application's run-key reader queries its own pool, as PostgresAskApplication.readRunReleaseKey does.
+    const application = (pool: Pool) => new PostgresPublicationApplication(
+      new PostgresPublicationRepository(pool, fakeAuditHasher), publicationCipher,
+      undefined, undefined, undefined, undefined,
+      {
+        ownReleaseKey: OWN,
+        readRunReleaseKey: async (id) => {
+          await pool.query("SELECT release_key FROM core.run WHERE run_id = $1::uuid", [id]);
+          return NEWER;
+        }
+      }
+    );
+    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      // Unrouted: the key read waits for a second connection, its busy failure is swallowed, and the page is not found.
+      await withNv31Pool(sizing, false, async (plain) => {
+        const started = performance.now();
+        await expect(application(plain).readPublicDebate(publicationRef)).resolves.toBeNull();
+        expect(performance.now() - started).toBeGreaterThanOrEqual(450);
+      });
+      expect(errors.mock.calls.map((call) => call[0])).toContain(
+        JSON.stringify({ event: "api.publication.snapshot_unreadable", id: publicationRef, releaseKey: null }));
+      errors.mockClear();
+      await withNv31Pool(sizing, true, async (routed) => {
+        await expect(application(routed).readPublicDebate(publicationRef)).rejects.toBeInstanceOf(MadeByNewerReleaseError);
+      });
+      expect(errors.mock.calls.map((call) => call[0])).toContain(JSON.stringify({
+        event: "api.debate.made_by_newer_release", route: "GET /v1/public/debates/{id}", id: publicationRef, releaseKey: NEWER
+      }));
+    } finally {
+      errors.mockRestore();
+    }
+  });
+
+  it("(h) never lets a stale run-lease context join a later lease's session on the same client", async () => {
+    const identity = await createIdentity("nv31-h");
+    const run = await createRun(identity, "nv31-h");
+    await withNv31Pool({ max: 2, connectionTimeoutMillis: 1_000 }, true, async (routed) => {
+      let first = 0;
+      let stale: Promise<number> = Promise.resolve(0);
+      await withRunContentLease(routed, [run], async (lease) => {
+        first = await pid(lease.client);
+        // A timer carries this lease's async context past its release.
+        stale = sleep(100).then(() => pid(routed));
+      });
+      const second = await withRunContentLease(routed, [run], async (lease) => {
+        await sleep(250);
+        return pid(lease.client);
+      });
+      // pg-pool hands the idle client to the second lease, so the check below is not vacuous.
+      expect(second).toBe(first);
+      expect(await stale).not.toBe(second);
+    });
+  });
+
+  it("(i) never lets a stale publication-lease context join a later lease's session on the same client", async () => {
+    const publicationRef = randomUUID();
+    await withNv31Pool({ max: 2, connectionTimeoutMillis: 1_000 }, true, async (routed) => {
+      let first = 0;
+      let stale: Promise<number> = Promise.resolve(0);
+      await withPublicationContentLease(routed, [publicationRef], async (lease) => {
+        first = await pid(lease.client);
+        stale = sleep(100).then(() => pid(routed));
+      }, "shared");
+      const second = await withPublicationContentLease(routed, [publicationRef], async (lease) => {
+        await sleep(250);
+        return pid(lease.client);
+      }, "shared");
+      expect(second).toBe(first);
+      expect(await stale).not.toBe(second);
+    });
+  });
+
+  /**
+   * Row-level security with NV-31: a routed pool on a T1-shaped login (debateai_runtime) whose cross-account target is
+   * that login's system twin (debateai_runtime and debateai_rls_all_accounts), as main.ts wires the API's runtime pool
+   * to systemPool. Neither is the superuser, so a request scope opened here is one the product could open.
+   */
+  async function withTargetedPool<T>(
+    label: string, sizing: Sizing, use: (pools: Readonly<{ routed: Pool; t1: string; system: string }>) => Promise<T>
+  ): Promise<T> {
+    const t1 = `${label}_t1`;
+    const system = `${label}_system`;
+    const password = randomBytes(24).toString("hex");
+    await database.pool.query(`CREATE ROLE ${t1} LOGIN PASSWORD '${password}' IN ROLE debateai_runtime`);
+    const url = new URL(database.connectionString);
+    url.username = t1;
+    url.password = password;
+    const target = createPool(await createSystemTwin(database, system, ["debateai_runtime"]), { ...sizing, name: "test:system" });
+    const routed = createPool(url.toString(), { ...sizing, name: "test:runtime", crossAccount: target });
+    try {
+      routeLeaseBodyQueries(routed);
+      return await use({ routed, t1, system });
+    } finally {
+      await routed.end();
+      await target.end();
+    }
+  }
+
+  async function who(executor: Pool | PoolClient): Promise<Readonly<{ login: string; pid: number }>> {
+    return (await (executor as Pool).query<{ login: string; pid: number }>(
+      "SELECT current_user::text AS login, pg_backend_pid() AS pid")).rows[0]!;
+  }
+
+  it("(j) sends a crossAccount statement in the body of a lease a request took to the frame's target, and the body's own statements to the lease", async () => {
+    const identity = await createIdentity("nv31-j");
+    const run = await createRun(identity, "nv31-j");
+    // One connection each: a body statement that asked either pool for a second connection would fail busy.
+    await withTargetedPool("nv31_j", { max: 1, connectionTimeoutMillis: 1_000 }, async ({ routed, t1, system }) => {
+      const probe = async (client: PoolClient) => ({
+        lease: await who(client),
+        body: await who(routed),
+        frame: await crossAccount("X18h", () => who(routed))
+      });
+      // In the owner's request the lease is a connection of the request's own login, under the owner's context: its
+      // body statements stay on it, and a crossAccount frame's statement runs as the target's login (X18h: the key
+      // store's owner lookup in a key load).
+      const token = sessionTokensBySession.get(identity.sessionId)!;
+      const leases = [
+        await inAccountRequest(token, () => withRunContentLease(routed, [run], (lease) => probe(lease.client))),
+        ...await inAccountRequest(token, async () => [
+          await withPublicationContentLease(routed, [randomUUID()], (lease) => probe(lease.client), "shared"),
+          await withPublicationContentLease(routed, [randomUUID()], (lease) => probe(lease.client), "exclusive")
+        ])
+      ];
+      for (const seen of leases) {
+        expect(seen.lease.login).toBe(t1);
+        expect(seen.body).toEqual(seen.lease);
+        expect(seen.frame.login).toBe(system);
+      }
+      // Outside a request the lease is a connection of the target, and both kinds of statement run on it.
+      const background = await withRunContentLease(routed, [run], (lease) => probe(lease.client));
+      expect(background.lease.login).toBe(system);
+      expect(background.body).toEqual(background.lease);
+      expect(background.frame).toEqual(background.lease);
+    });
+  });
+
+  it("(k) reads an unparsable public snapshot's run release key as the target's login, on the shared lease the target holds, inside an anonymous request", async () => {
+    const OWN = ["r19", "a".repeat(12)].join("-");
+    const NEWER = ["r20", "b".repeat(12)].join("-");
+    const identity = await createIdentity("nv31-k");
+    const runId = await createRun(identity, "nv31-k");
+    const publicationRef = randomUUID();
+    const occurredAt = new Date("2026-08-24T00:00:00.000Z");
+    const grantToken = await grant(identity, runId, "PUBLISH", "k", occurredAt);
+    expect(await repository.publish({
+      runId, userId: identity.userId, ownerRef: identity.ownerRef, sessionId: identity.sessionId,
+      grantTokenHash: hashToken("step-up-grant", grantToken), occurredAt, source, publicationRef,
+      expectedPseudonym: identity.pseudonym,
+      contentCiphertext: await encryptedSnapshot(publicationRef, runId, "nv31-k",
+        { extra: { future_member: { kind: "next" } } })
+    })).toBe(true);
+    // The target has one connection, which the shared lease holds (X10: taken on the cross-account target).
+    await withTargetedPool("nv31_k", { max: 1, connectionTimeoutMillis: 500 }, async ({ routed, system }) => {
+      const read: Readonly<{ login: string; visible: boolean }>[] = [];
+      const application = new PostgresPublicationApplication(
+        new PostgresPublicationRepository(routed, fakeAuditHasher), publicationCipher,
+        undefined, undefined, undefined, undefined,
+        {
+          ownReleaseKey: OWN,
+          // As PostgresAskApplication.readRunReleaseKey: core.run on the runtime pool, which RLS limits to the
+          // reader's own rows on the T1 login (an anonymous reader's: none).
+          readRunReleaseKey: async (id) => {
+            const row = (await routed.query<{ login: string; visible: boolean }>(
+              "SELECT current_user::text AS login, EXISTS (SELECT 1 FROM core.run WHERE run_id = $1::uuid) AS visible", [id]
+            )).rows[0]!;
+            read.push(row);
+            return row.visible ? NEWER : null;
+          }
+        }
+      );
+      const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      try {
+        await expect(runInRequestScope(() => application.readPublicDebate(publicationRef)))
+          .rejects.toBeInstanceOf(MadeByNewerReleaseError);
+      } finally {
+        errors.mockRestore();
+      }
+      expect(read).toEqual([{ login: system, visible: true }]);
     });
   });
 });

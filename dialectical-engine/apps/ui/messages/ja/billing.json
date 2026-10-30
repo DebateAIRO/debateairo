@@ -157,6 +157,7 @@
   "billing.subscription.withdrawNothingDue": "完了しました。プランは終了しました。すでに利用した分が料金全額に相当するため、返金額はありません。",
   "billing.subscription.withdrawOwnerReview": "プランは終了しました。お支払いのうち 1 件はすでに返金済みのため、未払い分を確認し、14 日以内にメールでご連絡します。",
   "billing.subscription.withdrawWindowClosed": "14 日間の撤回期間が終了したか、お住まいの地域では適用されません。解約はいつでも可能です。",
+  "billing.subscription.withdrawDebateRunning": "開始したディベートがまだクレジットを使用している可能性があるため、利用した量をまだ確定できません。しばらくしてからもう一度お試しください。撤回できる期間はまだ 1 日以上あります。",
   "billing.subscription.stillConfirming": "決済事業者にまだ確認しています。数分後にもう一度このページをご確認ください。",
   "billing.subscription.actionFailed": "うまくいきませんでした。もう一度お試しください。",
   "billing.subscription.invoices": "請求書",

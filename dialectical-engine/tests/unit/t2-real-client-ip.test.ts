@@ -10,7 +10,7 @@ import {
   type RegistrationApplication
 } from "../../apps/api/src/registration.js";
 import * as restoredUiRoute from "../../apps/ui/app/api/[...path]/route.js";
-import { hardenIncomingProxyHeaders as hardenRestoredUiHeaders } from "../../apps/ui/trusted-client-ip.mjs";
+import { hardenIncomingProxyHeaders as hardenRestoredUiHeaders, installUiApiProof } from "../../apps/ui/trusted-client-ip.mjs";
 
 type ProxyRoute = Readonly<{
   POST(request: Request, context: {
@@ -44,9 +44,13 @@ function inertApplication(): ApiOptions["application"] {
   return {} as ApiOptions["application"];
 }
 
+/** NV-03: the UI-to-API proof the API is built with; a forwarded address counts only beside it. */
+const PROOF = "t".repeat(43);
+
 async function observedAuthSource(input: Readonly<{
   remoteAddress: string;
   xForwardedFor?: string;
+  proof?: boolean;
 }>): Promise<string> {
   const observed: string[] = [];
   const registration: RegistrationApplication = {
@@ -63,7 +67,7 @@ async function observedAuthSource(input: Readonly<{
       return RESEND_PUBLIC_RESPONSE;
     }
   };
-  const api = buildApi({ allowedOrigin: TEST_APP_ORIGIN, application: inertApplication(), turnstile: passedTurnstile, registration });
+  const api = buildApi({ allowedOrigin: TEST_APP_ORIGIN, application: inertApplication(), turnstile: passedTurnstile, registration, uiApiProof: Buffer.from(PROOF) });
   try {
     const response = await api.inject({
       method: "POST",
@@ -71,7 +75,8 @@ async function observedAuthSource(input: Readonly<{
       remoteAddress: input.remoteAddress,
       headers: {
         origin: TEST_APP_ORIGIN,
-        ...(input.xForwardedFor === undefined ? {} : { "x-forwarded-for": input.xForwardedFor })
+        ...(input.xForwardedFor === undefined ? {} : { "x-forwarded-for": input.xForwardedFor }),
+        ...(input.proof === true ? { "x-debateai-ui-proof": PROOF } : {})
       },
       payload: {
         ...canonicalSignup,
@@ -96,14 +101,23 @@ describe("T2 API trusted-hop client address", () => {
   it("trusts one loopback UI hop without using trustProxy:true", async () => {
     await expect(observedAuthSource({
       remoteAddress: "127.0.0.1",
-      xForwardedFor: "203.0.113.9"
+      xForwardedFor: "203.0.113.9",
+      proof: true
     })).resolves.toBe("203.0.113.9");
+  });
+
+  it("does not trust a loopback hop that lacks the UI's proof (NV-03)", async () => {
+    await expect(observedAuthSource({
+      remoteAddress: "127.0.0.1",
+      xForwardedFor: "203.0.113.9"
+    })).resolves.toBe("127.0.0.1");
   });
 
   it("stops at the first untrusted address in a multi-hop spoof", async () => {
     await expect(observedAuthSource({
       remoteAddress: "127.0.0.1",
-      xForwardedFor: "198.51.100.250, 203.0.113.9"
+      xForwardedFor: "198.51.100.250, 203.0.113.9",
+      proof: true
     })).resolves.toBe("203.0.113.9");
   });
 
@@ -123,11 +137,13 @@ describe("T2 API trusted-hop client address", () => {
   it("normalizes IPv4-mapped and expanded IPv6 addresses before limiter/audit use", async () => {
     await expect(observedAuthSource({
       remoteAddress: "127.0.0.1",
-      xForwardedFor: "::ffff:203.0.113.9"
+      xForwardedFor: "::ffff:203.0.113.9",
+      proof: true
     })).resolves.toBe("203.0.113.9");
     await expect(observedAuthSource({
       remoteAddress: "::1",
-      xForwardedFor: "2001:0db8:0000:0000:0000:0000:0000:0009"
+      xForwardedFor: "2001:0db8:0000:0000:0000:0000:0000:0009",
+      proof: true
     })).resolves.toBe("2001:db8::9");
   });
 });
@@ -137,6 +153,8 @@ async function forwardedHeaders(
   trustedClientIp: string,
   extraHeaders: Readonly<Record<string, string>> = {}
 ): Promise<Headers> {
+  // NV-03: installed, none (the edge stamp is set here, so a never-installed proof would log its line).
+  installUiApiProof(null);
   let captured: Headers | undefined;
   globalThis.fetch = (async (_url: unknown, init: RequestInit = {}) => {
     captured = new Headers(init.headers);

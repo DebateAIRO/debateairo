@@ -1,10 +1,10 @@
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { tsImport } from 'tsx/esm/api';
 import { prepareLaunch } from './launch-plan.mjs';
 import { readEnvironmentFile,narrowEnvironment,installNarrowEnvironment } from './environment.mjs';
 import { afterRunnerReady,linuxProcessIdentity } from './runtime-receipt.mjs';
 import { refuse } from './custody.mjs';
+import { loadTsxApi } from './tsx-api.mjs';
 /** The in-process readiness event apps/runner/src/runner-ready.ts announces (RUNNER_READY_PROCESS_EVENT). */
 export const RUNNER_READY_PROCESS_EVENT='debateai:runner-ready';
 /** The in-process event apps/runner/src/runner-retirement.ts emits when the runner retired itself (RUNNER_RETIRED_PROCESS_EVENT). */
@@ -34,6 +34,7 @@ export function assertRunnerReleaseKey(configured,plan,source) {
 /** Prepare-only (the default, `--plan <file>`): validates plan, custody, environment and release key; starts nothing. */
 export async function prepareRunner(argv) {
  const {plan,source}=await prepareLaunch(argv,'runner',import.meta.url);
+ const {tsImport}=await loadTsxApi();
  const runtime=await tsImport(join(plan.sourceRoot,'dialectical-engine/packages/register/src/runtime-environment.ts'),import.meta.url);
  const configured=await readEnvironmentFile(plan.environment.path,plan.environment);
  narrowEnvironment('runner',configured,runtime,plan.publication,plan);
@@ -51,6 +52,7 @@ export async function prepareRunner(argv) {
  */
 export async function launchRunner(argv) {
  const {plan,source}=await prepareLaunch(argv,'runner',import.meta.url);
+ const {tsImport}=await loadTsxApi();
  const engine=join(plan.sourceRoot,'dialectical-engine');
  const runtime=await tsImport(join(engine,'packages/register/src/runtime-environment.ts'),import.meta.url);
  const configured=await readEnvironmentFile(plan.environment.path,plan.environment);

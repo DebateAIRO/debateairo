@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ContractHttpError, type AnswerDisclosure, type AnswerStory, type RunProjection } from "@debateai/contract";
+import { ContractHttpError, type AnswerDisclosure, type AnswerStory, type RunProjection, type Session } from "@debateai/contract";
 import {
   handleReportHeadRequest,
   handleReportRequest,
@@ -40,6 +40,15 @@ const RECORD: AnswerDisclosure = {
   cut_short: { arguing: "MONEY", answer_writing: null }
 };
 
+/** The owner GET /v1/session names: the render gate's key (NV-26). */
+const OWNER_SESSION: Session = {
+  asker_id: "owner:00000000-0000-4000-8000-0000000000a1",
+  session_id: "00000000-0000-4000-8000-000000000001",
+  caller_scope: "ASKER",
+  ownership_provenance: "server_session",
+  provisional_identity_model: false
+};
+
 function reader(overrides: Partial<ReportReader> = {}): ReportReader {
   return {
     readAnswer: async () => STORY_FIXTURE_ANSWER,
@@ -47,6 +56,7 @@ function reader(overrides: Partial<ReportReader> = {}): ReportReader {
     readRun: async () => RUN,
     readAnswerStory: async () => storyFixture("READY"),
     readAnswerDisclosure: async () => RECORD,
+    readSession: async () => OWNER_SESSION,
     ...overrides
   };
 }
@@ -122,14 +132,17 @@ describe("the PDF route reads the answer's record (GET)", () => {
 describe("HEAD never reads the record: it makes no PDF", () => {
   it("answers without the read", async () => {
     const readAnswerDisclosure = vi.fn(async () => RECORD);
+    // Nor the owner: only a render needs the gate's key (NV-26).
+    const readSession = vi.fn(async () => OWNER_SESSION);
     const response = await handleReportHeadRequest({
       id: STORY_FIXTURE_DEBATE_ID,
       sessionCookie: SESSION,
       interfaceLocale: "en",
-      client: () => reader({ readAnswerDisclosure }),
+      client: () => reader({ readAnswerDisclosure, readSession }),
       now: NOW
     });
     expect(response.status).toBe(200);
     expect(readAnswerDisclosure).not.toHaveBeenCalled();
+    expect(readSession).not.toHaveBeenCalled();
   });
 });
