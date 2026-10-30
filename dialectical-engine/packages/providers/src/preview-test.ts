@@ -22,6 +22,10 @@ import {
   previewThinkingStepOf, type PreviewThinkingLevels
 } from "./preview-thinking.js";
 import type { PreviewGateSettings } from "./preview-line-up.js";
+import {
+  PERPLEXITY_SEARCH_REQUEST_MAX_BYTES, PERPLEXITY_SEARCH_REQUEST_NANO_USD, PERPLEXITY_SEARCH_URL, perplexitySearchBodyAccepted,
+  type PERPLEXITY_SEARCH_VENDOR
+} from "./perplexity-search.js";
 
 export const PREVIEW_GLM_MODEL = "zai-org/GLM-5.3-Flash" as const;
 export const PREVIEW_GLM_PROVIDER_REF = "preview:fixture-a" as const;
@@ -72,12 +76,27 @@ export interface PreviewProviderTestConfig {
   readonly budget_socket: string;
   readonly scope_id: string;
   readonly anthropic_budget_socket?: string;
+  /**
+   * Perplexity plan 2026-10-30, task W2-1: the web search gate's socket (README-perplexity.md: perplexity-budget-v1.sock).
+   * Search is a gate, never a model provider: no roster names it, and absent, no debate searches the web.
+   */
+  readonly perplexity_budget_socket?: string;
   /** Spec 2026-10-12 §4.2: the owner's thinking-level table, keyed by reviewed model id; absent = every row's default. */
   readonly thinking_levels?: PreviewThinkingLevels;
 }
 /** Each non-DeepInfra provider's optional socket key (a later provider adds its own key here). */
 export const PREVIEW_PROVIDER_SOCKET_KEYS: Readonly<Record<Exclude<PreviewProviderName, "deepinfra">, "anthropic_budget_socket">> =
   Object.freeze({ anthropic: "anthropic_budget_socket" });
+/**
+ * Perplexity plan W2-1: every spending gate the app can call: the model providers' gates and the web search gate. The
+ * search gate is not a model provider (PreviewProviderName stays the providers with model rows).
+ */
+export type PreviewGateName = PreviewProviderName | typeof PERPLEXITY_SEARCH_VENDOR;
+/** The web search gate's optional socket key. */
+export const PREVIEW_SEARCH_SOCKET_KEY = "perplexity_budget_socket" as const;
+/** Each non-DeepInfra gate's optional socket key: the providers' keys, then the search gate's. */
+export const PREVIEW_GATE_SOCKET_KEYS: Readonly<Record<Exclude<PreviewGateName, "deepinfra">, "anthropic_budget_socket" | "perplexity_budget_socket">> =
+  Object.freeze({ ...PREVIEW_PROVIDER_SOCKET_KEYS, perplexity: PREVIEW_SEARCH_SOCKET_KEY });
 const PREVIEW_SOCKET_PATTERN = /^\/run\/debateai-v3-preview\/[a-z0-9-]+\.sock$/u;
 /**
  * The gate socket a provider's calls go through under this config, or undefined when it has none. Addition D16: only the
@@ -86,6 +105,10 @@ const PREVIEW_SOCKET_PATTERN = /^\/run\/debateai-v3-preview\/[a-z0-9-]+\.sock$/u
 export function previewProviderSocket(config: PreviewGateSettings, provider: PreviewProviderName): string | undefined {
   return provider === "deepinfra" ? config.budget_socket : config[PREVIEW_PROVIDER_SOCKET_KEYS[provider]];
 }
+/** Perplexity plan W2-1: any gate's socket under this config (a provider's, or the web search gate's), or undefined. */
+export function previewGateSocket(config: PreviewGateSettings, gate: PreviewGateName): string | undefined {
+  return gate === "deepinfra" ? config.budget_socket : config[PREVIEW_GATE_SOCKET_KEYS[gate]];
+}
 /** What the target check needs; the legacy five-key literal (v1 publish kit) still fits it. */
 export type PreviewTargetRosters = Readonly<Partial<PreviewProviderTestConfig> & { free_model_ids: readonly string[] }>;
 function refused(): never { throw new TypeError("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID"); }
@@ -93,7 +116,7 @@ const LEGACY_CONFIG_KEYS = ["budget_socket", "deployment", "free_model_ids", "re
 const CONFIG_KEYS = [...LEGACY_CONFIG_KEYS, "premium_model_ids"].sort();
 /** Addition D14 (owner 2026-10-22): the sockets-only form, the five keys less the roster (plus optional provider sockets). */
 const SOCKETS_ONLY_CONFIG_KEYS = LEGACY_CONFIG_KEYS.filter(key => key !== "free_model_ids");
-const OPTIONAL_SOCKET_KEYS: readonly string[] = Object.values(PREVIEW_PROVIDER_SOCKET_KEYS);
+const OPTIONAL_SOCKET_KEYS: readonly string[] = Object.values(PREVIEW_GATE_SOCKET_KEYS);
 function reviewedRoster(value: unknown): readonly string[] {
   if (!Array.isArray(value) || value.length < 1 || value.length > PREVIEW_MODEL_ROWS.length
     || value.some(id => previewModelRow(id) === undefined) || new Set(value).size !== value.length) return refused();
@@ -842,8 +865,8 @@ export interface PreviewBudgetExecution {
 export interface PreviewBudgetPort {
   execute(input: PreviewBudgetExecution, signal?: AbortSignal): Promise<Readonly<{ status: number; body: string }>>;
 }
-/** Each provider's gate port; a single port (the pre-PR-B form) is the DeepInfra gate's. */
-export type PreviewBudgetPorts = Readonly<Partial<Record<PreviewProviderName, PreviewBudgetPort>>>;
+/** Each gate's port (Perplexity plan W2-1: the web search gate's too); a single port (the pre-PR-B form) is the DeepInfra gate's. */
+export type PreviewBudgetPorts = Readonly<Partial<Record<PreviewGateName, PreviewBudgetPort>>>;
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -958,6 +981,10 @@ function carriesKeyHeader(headers: RequestInit["headers"]): boolean {
  * (exact keys, the row's effort and JSON switches and its reviewed sampling, at most 256 KiB for a standard call and 1 MiB
  * for a final writer (LG-B), with 1 <= max_tokens <= that tier's bound), never a key header, and reserves at that row's price (an Anthropic body carrying the one cache
  * mark: its input at the step's 5-minute cache-write price, 2026-10-12).
+ *
+ * Perplexity plan 2026-10-30, task W2-1: the exact search URL (PERPLEXITY_SEARCH_URL) goes to the web search gate's
+ * port only, with a body that gate accepts (perplexitySearchBodyAccepted: exactly its reviewed members and bounds, at
+ * most 16 KiB), never a key header, and a hold of exactly one search ($0.001, the gate's request_usd).
  */
 export function createPreviewGuardedFetch(ports: PreviewBudgetPort | PreviewBudgetPorts): typeof fetch {
   const byProvider: PreviewBudgetPorts = typeof (ports as PreviewBudgetPort).execute === "function"
@@ -965,6 +992,7 @@ export function createPreviewGuardedFetch(ports: PreviewBudgetPort | PreviewBudg
   return async (input, init) => {
     if (init?.signal?.aborted) throw new DOMException("Private preview call canceled", "TimeoutError");
     const url = String(input);
+    if (url === PERPLEXITY_SEARCH_URL) return previewGuardedSearch(byProvider, init);
     const provider: PreviewProviderName | undefined = url === `${PREVIEW_DEEPINFRA_BASE_URL}/chat/completions` ? "deepinfra"
       : url === PREVIEW_ANTHROPIC_MESSAGES_URL ? "anthropic" : undefined;
     if (provider === undefined || init?.method !== "POST" || typeof init.body !== "string"
@@ -994,6 +1022,21 @@ export function createPreviewGuardedFetch(ports: PreviewBudgetPort | PreviewBudg
       ...(tier === "FINAL_WRITER" ? { callTier: "FINAL_WRITER" as const } : {}) }, init!.signal ?? undefined);
     return new Response(result.body, { status: result.status, headers: { "content-type": "application/json" } });
   };
+}
+/** Perplexity plan W2-1: one web search through its own gate (see createPreviewGuardedFetch). */
+async function previewGuardedSearch(ports: PreviewBudgetPorts, init: RequestInit | undefined): Promise<Response> {
+  if (init?.method !== "POST" || typeof init.body !== "string"
+    || Buffer.byteLength(init.body, "utf8") > PERPLEXITY_SEARCH_REQUEST_MAX_BYTES || carriesKeyHeader(init.headers)) refused();
+  const body = init!.body as string;
+  let decoded: unknown; try { decoded = JSON.parse(body); } catch { return refused(); }
+  if (!perplexitySearchBodyAccepted(decoded)) refused();
+  const port = ports.perplexity;
+  // No search gate configured: nothing is reserved or sent.
+  if (port === undefined) throw new TypedDomainError("PROVIDER_CALL_FAILED", "Private preview gate for this provider is not configured");
+  const result = await port.execute({ operationId: randomUUID(), requestBody: body,
+    requestSha256: createHash("sha256").update(body).digest("hex"),
+    reservedUsd: previewNanoUsdText(PERPLEXITY_SEARCH_REQUEST_NANO_USD) }, init!.signal ?? undefined);
+  return new Response(result.body, { status: result.status, headers: { "content-type": "application/json" } });
 }
 /**
  * Step 1 (owner, 2026-10-08): the v2 gate refuses with 409 and {"error": CODE}. The team's day
@@ -1167,13 +1210,14 @@ export function createPreviewBudgetRpcPort(
 }
 /**
  * PR B: one RPC port per gate this config names (DeepInfra on `budget_socket`, Anthropic on
- * `anthropic_budget_socket` when set). The guarded fetch routes each call to its own provider's port.
+ * `anthropic_budget_socket` when set; Perplexity plan W2-1: the web search gate on `perplexity_budget_socket` when set).
+ * The guarded fetch routes each call to its own gate's port.
  */
 export function createPreviewBudgetRpcPorts(config: PreviewGateSettings): PreviewBudgetPorts {
-  const ports: Partial<Record<PreviewProviderName, PreviewBudgetPort>> = {};
-  for (const provider of ["deepinfra", ...Object.keys(PREVIEW_PROVIDER_SOCKET_KEYS)] as PreviewProviderName[]) {
-    const socket = previewProviderSocket(config, provider);
-    if (socket !== undefined) ports[provider] = createPreviewBudgetRpcPort(config, socket);
+  const ports: Partial<Record<PreviewGateName, PreviewBudgetPort>> = {};
+  for (const gate of ["deepinfra", ...Object.keys(PREVIEW_GATE_SOCKET_KEYS)] as PreviewGateName[]) {
+    const socket = previewGateSocket(config, gate);
+    if (socket !== undefined) ports[gate] = createPreviewBudgetRpcPort(config, socket);
   }
   return Object.freeze(ports);
 }
