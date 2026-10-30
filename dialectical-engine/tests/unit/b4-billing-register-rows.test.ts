@@ -33,7 +33,7 @@ const policyRow = () => structuredClone(BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.v
 const plansOf = (value: unknown) => billingPlansFromValue(value, "b4 test");
 const policyOf = (value: unknown) => billingPolicyFromValue(value, "b4 test");
 
-describe("billingPlans v3 carries exactly the owner's plans", () => {
+describe("billingPlans v4 carries exactly the owner's plans", () => {
   const plans = plansOf(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value);
 
   it("names the row and the four plans in price order", () => {
@@ -49,10 +49,13 @@ describe("billingPlans v3 carries exactly the owner's plans", () => {
     ["PLUS", "premium", 20_000_000, 20_000_000, 100_000_000, 5_000_000, 2_000, 5_000],
     ["PRO", "premium", 50_000_000, 50_000_000, 250_000_000, 20_000_000, 2_000, 5_000],
     ["MAX", "premium", 200_000_000, 200_000_000, 1_000_000_000, 150_000_000, 2_000, 5_000]
-  ] as const)("%s: tier %s, price USD %d EUR %d RON %d, credit %d, day %s, week %s, finish 11000", (id, tier, usd, eur, ron, credit, day, week) => {
+  ] as const)("%s: tier %s, price USD %d EUR %d RON %d, credit %d, day %s, week %s, edge 100% + 20 cents, reserve 20 cents", (id, tier, usd, eur, ron, credit, day, week) => {
     const plan = planById(plans, id);
+    // v4 (owner 2026-10-30, Q1-Q3): every limit may be passed by a FIXED 20 cents, Free included, never a share; one
+    // reserve of 20 cents (enough for one closing) is kept back from the day, the week and the month.
     expect(plan).toMatchObject({
-      planId: id, tier, monthlyCreditMicros: credit, dayBasisPoints: day, weekBasisPoints: week, finishBasisPoints: 11_000
+      planId: id, tier, monthlyCreditMicros: credit, dayBasisPoints: day, weekBasisPoints: week, finishBasisPoints: 10_000,
+      finishOverflowMicros: 200_000, reserveMicros: 200_000
     });
     expect([planNetPrice(plan, "USD"), planNetPrice(plan, "EUR"), planNetPrice(plan, "RON")]).toEqual([usd, eur, ron]);
   });
@@ -60,7 +63,8 @@ describe("billingPlans v3 carries exactly the owner's plans", () => {
   it("gives Free, and only Free, fixed gauges: depth 1 (owner 2026-10-29), the depth V4 sends for every Free ask", async () => {
     expect(planById(plans, "FREE").fixedGauges).toEqual({ riskTier: "standard", compositionBudgetTier: "low", depth: 1 });
     for (const id of ["PLUS", "PRO", "MAX"] as const) expect(planById(plans, id).fixedGauges).toBeNull();
-    expect(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.sourceRef).toContain("billingPlans v3");
+    expect(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.sourceRef).toContain("billingPlans v4");
+    expect(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.sourceRef).toContain("owner's Free month 2026-10-29: Free questions at depth 1");
     // The UI's Free reset (choosePlanTier) is the source the risk and composition gauges were copied from (spec §2.3.4).
     const page = await readFile(new URL("../../apps/ui/app/new/NewDebatePageClient.tsx", import.meta.url), "utf8");
     const reset = page.slice(page.indexOf("function choosePlanTier("), page.indexOf("const askAsOf"));
@@ -108,6 +112,19 @@ describe("billingPlans v3 carries exactly the owner's plans", () => {
     ["a missing plan", (row: ReturnType<typeof plansRow>) => { row.plans.pop(); }],
     ["a finish edge under 100%", (row: ReturnType<typeof plansRow>) => { row.plans[1]!.finish_bp = 9_999; }],
     ["a finish edge over 200%", (row: ReturnType<typeof plansRow>) => { row.plans[1]!.finish_bp = 20_001; }],
+    ["a fixed overflow on top of a share edge", (row: ReturnType<typeof plansRow>) => { row.plans[1]!.finish_bp = 11_000; }],
+    ["a negative overflow", (row: ReturnType<typeof plansRow>) => { row.plans[1]!.finish_overflow_micros = -1; }],
+    ["an overflow that is not whole micro-units", (row: ReturnType<typeof plansRow>) => { row.plans[1]!.finish_overflow_micros = 0.5; }],
+    ["an overflow larger than the monthly credit", (row: ReturnType<typeof plansRow>) => { row.plans[0]!.finish_overflow_micros = 200_001; }],
+    ["a reserve of nothing", (row: ReturnType<typeof plansRow>) => { row.plans[2]!.reserve_micros = 0; }],
+    ["a reserve larger than the monthly credit", (row: ReturnType<typeof plansRow>) => { row.plans[0]!.reserve_micros = 200_001; }],
+    ["an overflow without a reserve", (row: ReturnType<typeof plansRow>) => { delete row.plans[1]!.reserve_micros; }],
+    ["a reserve without an overflow", (row: ReturnType<typeof plansRow>) => { delete row.plans[1]!.finish_overflow_micros; }],
+    ["v4 members on some plans only", (row: ReturnType<typeof plansRow>) => {
+      delete row.plans[3]!.finish_overflow_micros;
+      delete row.plans[3]!.reserve_micros;
+      row.plans[3]!.finish_bp = 11_000;
+    }],
     ["Free with a price", (row: ReturnType<typeof plansRow>) => { row.plans[0]!.net_prices.RON = 10_000; }],
     // 4 micros x 2000 bp / 10000 rounds down to a 0-micro day cap, and a 0-micro
     // limit breaks every admission and wall check on that plan. (A week cap can
@@ -130,6 +147,28 @@ describe("billingPlans v3 carries exactly the owner's plans", () => {
       value_json: BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value, source_ref: BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.sourceRef
     }] }) } as never;
     await expect(readBillingPlans(sealedPool, 7)).resolves.toMatchObject({ sourceRef: BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.sourceRef });
+  });
+
+  it("still reads a sealed v3 row (no v4 members): the 110% share edge, no fixed overflow and no reserve", () => {
+    const v3 = plansRow();
+    for (const plan of v3.plans) {
+      delete plan.finish_overflow_micros;
+      delete plan.reserve_micros;
+      plan.finish_bp = 11_000;
+    }
+    const sealed = plansOf(v3);
+    for (const id of PLAN_IDS) {
+      expect(planById(sealed, id), id).toMatchObject({ finishBasisPoints: 11_000, finishOverflowMicros: null, reserveMicros: null });
+    }
+  });
+
+  it("accepts an overflow of 0 and one as large as the month's credit; a reserve of the whole credit", () => {
+    const edges = plansRow();
+    edges.plans[1]!.finish_overflow_micros = 0;
+    edges.plans[0]!.finish_overflow_micros = 200_000;
+    edges.plans[0]!.reserve_micros = 200_000;
+    expect(planById(plansOf(edges), "PLUS").finishOverflowMicros).toBe(0);
+    expect(planById(plansOf(edges), "FREE")).toMatchObject({ finishOverflowMicros: 200_000, reserveMicros: 200_000 });
   });
 });
 

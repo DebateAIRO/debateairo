@@ -247,6 +247,41 @@ describe("B9a · each of the run owner's windows, walled at its own finish edge 
   });
 });
 
+// billingPlans v4 (owner 2026-10-30, Q1 and Q3): each window's edge is its limit plus a FIXED 20 cents, carried on the
+// window as `finishOverflowMicros` beside a 100% share edge. Every overflow is spend inside the month too, so the month's
+// own edge (its limit plus 20 cents) holds all of them together.
+describe("B9a · a window with a fixed overflow (billingPlans v4: 20 cents past every limit)", () => {
+  const overflowWindow = (scope: PersonWindow["scope"], periodStart: Date, limitMicros: number): PersonWindow => Object.freeze({
+    ...window(scope, periodStart, limitMicros), finishBasisPoints: 10_000, finishOverflowMicros: 200_000
+  });
+  const WINDOWS = [
+    overflowWindow("PERSON_DAY", DAY_START, 1_000_000),     // edge 1 200 000
+    overflowWindow("PERSON_WEEK", WEEK_START, 2_500_000),   // edge 2 700 000
+    overflowWindow("PERSON_MONTH", MONTH_START, 5_000_000)  // edge 5 200 000
+  ];
+  const guardFor = (spent: ReadonlyMap<number, number>) => {
+    const persons = owner("owner-1", WINDOWS, spent);
+    return new CostEnvelopeGuard({
+      store: store({ daySpent: 0 }).spend, policy: POLICY, clock: () => NOW,
+      sharedWall: { finishBasisPoints: 11_500, persons: persons.persons, owners: persons.owners }
+    });
+  };
+
+  it.each([
+    ["PERSON_DAY", DAY_START, 1_200_000],
+    ["PERSON_WEEK", WEEK_START, 2_700_000],
+    ["PERSON_MONTH", MONTH_START, 5_200_000]
+  ] as const)("%s: admits exactly 20 cents past the limit and refuses one micro-unit more", async (_scope, start, edge) => {
+    expect(await decide(guardFor(new Map([[start.getTime(), edge - PROJECTED]])), "BODY")).toBe("ADMITTED");
+    expect(await decide(guardFor(new Map([[start.getTime(), edge - PROJECTED + 1]])), "BODY")).toBe("PERSON_ALLOWANCE_REACHED");
+  });
+
+  it("holds a day's overflow to the month's: a day still under its edge stops once the month's 20 cents are used", async () => {
+    const spent = new Map([[DAY_START.getTime(), 100_000], [MONTH_START.getTime(), 5_200_000 - PROJECTED + 1]]);
+    expect(await decide(guardFor(spent), "BODY")).toBe("PERSON_ALLOWANCE_REACHED");
+  });
+});
+
 describe("B9a · the refusals", () => {
   it("keep the day's code for the site and give a person's window its own, with no figure in either", () => {
     expect(sharedWallReached("SITE_DAY").code).toBe("DAILY_COST_ENVELOPE_REACHED");

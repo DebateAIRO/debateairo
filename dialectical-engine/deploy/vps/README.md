@@ -2366,7 +2366,7 @@ With billing on (hosted, and a published `billingPolicy` saying `enabled: true`)
 All are in UTC, and each person sees them in their own time zone.
 
 - **The limits** come from the `billingPlans` row: the plan's monthly credit, and for paid plans a day and a week share of it. Free has its month only.
-- **A running debate may finish up to 110%** of any person window (`finish_bp` `11000`). The extra is on the site; it is not taken from the next month.
+- **A running debate may finish past a person window's limit.** On a version that sealed billingPlans v3 that is up to 110% of any person window (`finish_bp` `11000`). Since billingPlans v4 (owner 2026-10-30) it is a fixed 20 cents past every day, week and month limit on every plan, Free included (`finish_bp` `10000`, `finish_overflow_micros` `200000`). Every overflow is spend inside the month too, so the month's own 20 cents hold them all; once the month is full, every new question waits for the new month. The extra is on the site; it is not taken from the next month.
 - **The server decides the ask:**
   - the plan's tier;
   - for Free, the sealed fixed gauges;

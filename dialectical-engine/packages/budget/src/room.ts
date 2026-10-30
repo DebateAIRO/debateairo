@@ -18,7 +18,8 @@ import type { SpendScope } from "./person-allowance.js";
  *    when the site holds every question back (`AdmissionHold`); a person who
  *    already has their waiting questions is refused instead; START otherwise.
  *  - The WALL for a running debate: real spend plus the next call's projection
- *    against the finish edge. Holds are not counted here.
+ *    against the finish edge: the limit's share edge plus, on a billingPlans v4
+ *    window, its fixed overflow in micro-units. Holds are not counted here.
  */
 export type Room = "FITS" | "CLOSE" | "FULL";
 /**
@@ -136,6 +137,8 @@ export function decideSharedWall(input: Readonly<{
   projectedMicros: number;
   limitMicros: number;
   finishBasisPoints: number;
+  /** billingPlans v4: a fixed amount past the share edge (20 cents); absent is none. */
+  finishOverflowMicros?: number;
 }>): Wall {
   const spent = wholeMicros(input?.spentMicros, "BUDGET_WALL_SPENT_INVALID");
   const projected = wholeMicros(input?.projectedMicros, "BUDGET_WALL_PROJECTION_INVALID");
@@ -144,7 +147,9 @@ export function decideSharedWall(input: Readonly<{
   const finish = basisPointsWithin(
     input?.finishBasisPoints, WHOLE_BASIS_POINTS, 2n * WHOLE_BASIS_POINTS, "BUDGET_WALL_FINISH_INVALID"
   );
-  return spent + projected <= edgeOf(limit, finish) ? "WITHIN" : "WOULD_CROSS";
+  const overflow = input.finishOverflowMicros === undefined
+    ? 0n : wholeMicros(input.finishOverflowMicros, "BUDGET_WALL_OVERFLOW_INVALID");
+  return spent + projected <= edgeOf(limit, finish) + overflow ? "WITHIN" : "WOULD_CROSS";
 }
 
 /**

@@ -102,6 +102,34 @@ describe("B1 decideSharedWall — the running wall, real spend only", () => {
     expect(wall(0, 10_000)).toBe("WITHIN");
     expect(wall(0, 20_000)).toBe("WITHIN");
   });
+
+  // billingPlans v4 (owner 2026-10-30, Q1 and Q3): every person limit may be passed by a FIXED 20 cents, not a share.
+  it("adds a fixed overflow in micro-units past the limit's edge (billingPlans v4: 20 cents past every limit)", () => {
+    const overflow = (spentMicros: number, finishOverflowMicros: number, finishBasisPoints = 10_000) =>
+      decideSharedWall({ spentMicros, projectedMicros: 0, limitMicros: LIMIT, finishBasisPoints, finishOverflowMicros });
+    expect(overflow(300_000, 200_000)).toBe("WITHIN");
+    expect(overflow(300_001, 200_000)).toBe("WOULD_CROSS");
+    expect(decideSharedWall({ spentMicros: 299_000, projectedMicros: 1_000, limitMicros: LIMIT, finishBasisPoints: 10_000,
+      finishOverflowMicros: 200_000 })).toBe("WITHIN");
+    expect(decideSharedWall({ spentMicros: 299_000, projectedMicros: 1_001, limitMicros: LIMIT, finishBasisPoints: 10_000,
+      finishOverflowMicros: 200_000 })).toBe("WOULD_CROSS");
+    // The overflow is added to the rounded-down share edge: floor(3 x 11 000 / 10 000) + 2 = 5.
+    expect(decideSharedWall({ spentMicros: 5, projectedMicros: 0, limitMicros: 3, finishBasisPoints: 11_000, finishOverflowMicros: 2 }))
+      .toBe("WITHIN");
+    expect(decideSharedWall({ spentMicros: 6, projectedMicros: 0, limitMicros: 3, finishBasisPoints: 11_000, finishOverflowMicros: 2 }))
+      .toBe("WOULD_CROSS");
+    // Absent or 0 is the share edge alone, as before.
+    expect(overflow(100_000, 0)).toBe("WITHIN");
+    expect(overflow(100_001, 0)).toBe("WOULD_CROSS");
+    expect(wall(100_001, 10_000)).toBe("WOULD_CROSS");
+  });
+
+  it("refuses an overflow that is not a whole, non-negative number of micro-units", () => {
+    for (const finishOverflowMicros of [-1, 0.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1, "200000"]) {
+      expect(() => decideSharedWall({ spentMicros: 0, projectedMicros: 0, limitMicros: LIMIT, finishBasisPoints: 10_000,
+        finishOverflowMicros: finishOverflowMicros as number }), String(finishOverflowMicros)).toThrow("BUDGET_WALL_OVERFLOW_INVALID");
+    }
+  });
 });
 
 describe("B1 decideAdmission — START, WAIT, REFUSE_ALREADY_WAITING", () => {

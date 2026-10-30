@@ -4,7 +4,8 @@
  *
  * The budget spec's slot returned ONE period or null. Billing gives each person
  * up to three windows (a day, a week and a month; Free only the month), each with
- * its own limit, reset, finish edge (the plan row's 11000) and close edge (the
+ * its own limit, reset, finish edge (the plan row's share, and since billingPlans
+ * v4 its fixed overflow) and close edge (the
  * costEnvelopePolicy band's). An EMPTY list means no personal limit: billing off,
  * local mode, or a legacy asker with no owner_ref.
  */
@@ -21,6 +22,11 @@ export type PersonWindow = Readonly<{
   /** Exact internal grant pin; absent on historical customer windows. */
   funding?: import("@debateai/kernel").FundingBasis;
   finishBasisPoints: number;
+  /**
+   * billingPlans v4 (owner 2026-10-30, Q1-Q3): a fixed amount a running debate may take this window past its
+   * share edge, in USD micro-units (20 cents). Absent on a v3 plan's window, and on an internal grant: the share alone.
+   */
+  finishOverflowMicros?: number;
   closeBasisPoints: number;
 }>;
 

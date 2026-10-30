@@ -177,7 +177,7 @@ describe("the owner's leaner Free (R22 item 11): four Free debates a month fit i
     expect(debate.expectedCalls).toBe(37);
   });
 
-  it("about 4.8 cents a debate; the owner's month (2 questions + 2 digs) about 19.2 cents: under Free's 20, and under the 22-cent finish edge", () => {
+  it("about 4.8 cents a debate; the owner's month (2 questions + 2 digs) about 19.2 cents: under Free's 20, and under the 40-cent finish edge", () => {
     // GLM 1,200, DeepSeek 1,520, Qwen 911, Haiku 1,000 micro-dollars a call at the calibrated start: 1,157.75 on average.
     expect(mean(LEAN_FREE_MODEL_IDS, callMicros)).toBeCloseTo(1157.75, 2);
     // 37 x 1,157.75 + the final step (Haiku writes and DeepSeek checks, the answer and the story): 4.79 cents.
@@ -186,7 +186,10 @@ describe("the owner's leaner Free (R22 item 11): four Free debates a month fit i
     const month = DEBATES_PER_MONTH * debate.expectedMicros;
     expect(month).toBe(191_508);
     expect(month).toBeLessThan(FREE_MONTH_MICROS);
-    const finishEdge = FREE_MONTH_MICROS * BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value.plans.find((plan) => plan.plan_id === "FREE")!.finish_bp / 10_000;
+    // billingPlans v4 (owner 2026-10-30, Q1): Free's month may be passed by a fixed 20 cents, so its edge is 40 cents.
+    const free = BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value.plans.find((plan) => plan.plan_id === "FREE")!;
+    const finishEdge = FREE_MONTH_MICROS * free.finish_bp / 10_000 + free.finish_overflow_micros;
+    expect(finishEdge).toBe(400_000);
     expect(month).toBeLessThan(finishEdge);
     // The realistic worst case (64 KiB in, 8,192 out on every call) is still far above: the calibrated start is the plan.
     expect(debate.worstMicros).toBe(299_069);

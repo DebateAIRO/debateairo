@@ -78,6 +78,13 @@ export function computeWindows(
  * The person's windows under `plan`, in the order DAY, WEEK, MONTH. Free has
  * only MONTH.
  *
+ * Each window carries the plan's finish edge: `finishBasisPoints`, and on a
+ * billingPlans v4 plan `finishOverflowMicros` too (owner 2026-10-30, Q1-Q3: a
+ * fixed 20 cents past every limit, with the share at 100%). A v3 plan's windows
+ * carry no overflow member, exactly as before. Every overflow is spend inside the
+ * month as well, so the month's own edge (its limit plus the overflow) holds them
+ * all together; once the month is full every new question waits for its reset.
+ *
  * A6: after an upgrade the current period's MONTH limit is
  * `monthCreditOverrideMicros`, the prorated credit stored on the entitlement
  * event. The day and week caps are the plan's own caps, on its full credit, but
@@ -101,12 +108,14 @@ export function personWindowsFor(
   }
   const windows = computeWindows(anchor, now);
   const monthLimit = monthCreditOverrideMicros ?? plan.monthlyCreditMicros;
+  const overflow = plan.finishOverflowMicros ?? null;
   const person = (scope: PersonWindow["scope"], limitMicros: number, window: TimeWindow): PersonWindow => Object.freeze({
     scope,
     limitMicros,
     periodStart: window.start,
     resetsAt: window.end,
     finishBasisPoints: plan.finishBasisPoints,
+    ...(overflow === null ? {} : { finishOverflowMicros: overflow }),
     closeBasisPoints
   });
   const result: PersonWindow[] = [];

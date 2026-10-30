@@ -85,6 +85,7 @@ function plan(planId: "FREE" | "PLUS" | "PRO" | "MAX", monthlyCreditMicros: numb
   return Object.freeze({
     planId, tier: free ? "free" as const : "premium" as const, netPrices: Object.freeze({ USD: 0, EUR: 0, RON: 0 }), monthlyCreditMicros,
     dayBasisPoints: free ? null : 2000, weekBasisPoints: free ? null : 5000, finishBasisPoints: 11000,
+    finishOverflowMicros: null, reserveMicros: null,
     // R-11: Free's fixed risk tier is "standard" (what /new sends today).
     fixedGauges: free ? Object.freeze({ riskTier: "standard" as const, compositionBudgetTier: "low" as const, depth: 2 }) : null
   });

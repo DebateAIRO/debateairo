@@ -80,7 +80,8 @@ const MONTH_START = new Date("2026-10-15T00:00:00.000Z");
 /** A Free person's one window (billing-core `personWindowsFor`: Free has only the month), with `spentMicros` already spent. */
 function freePerson(spentMicros: number): Readonly<{ persons: PersonAllowanceSource; owners: RunOwnerSpendReader }> {
   const month: PersonWindow = Object.freeze({ scope: "PERSON_MONTH", limitMicros: FREE.monthly_credit_micros, periodStart: MONTH_START,
-    resetsAt: new Date("2026-11-15T00:00:00.000Z"), finishBasisPoints: FREE.finish_bp, closeBasisPoints: SITE.admission_close_basis_points });
+    resetsAt: new Date("2026-11-15T00:00:00.000Z"), finishBasisPoints: FREE.finish_bp, finishOverflowMicros: FREE.finish_overflow_micros,
+    closeBasisPoints: SITE.admission_close_basis_points });
   return Object.freeze({
     persons: { read: async () => Object.freeze([month]) },
     owners: { readRunChargeOwnerRef: async () => "owner-free", readOwnerSpentMicros: async () => spentMicros }
@@ -122,9 +123,10 @@ describe("Free plan: root 0's kept room against the limits a Free debate actuall
     }
   });
 
-  it("the room is never measured against the Free person's month: with 15 of 20 cents spent the map call is still admitted", async () => {
-    const spent = 150_000;
-    const wallEdge = FREE.monthly_credit_micros * FREE.finish_bp / 10_000;
+  it("the room is never measured against the Free person's month: with 25 cents spent (past Free's 20, inside its 40-cent edge) the map call is still admitted", async () => {
+    const spent = 250_000;
+    // billingPlans v4 (owner 2026-10-30, Q1): Free's month edge is its 20 cents plus a fixed 20-cent overflow.
+    const wallEdge = FREE.monthly_credit_micros * FREE.finish_bp / 10_000 + FREE.finish_overflow_micros;
     // The room alone would cross the person's finish edge, so a room counted there would refuse the call.
     expect(spent + freeRoom(dearest)).toBeGreaterThan(wallEdge);
     expect(spent + projectedCallCeilingMicros(price(dearest), LIST_PROJECTION)).toBeLessThanOrEqual(wallEdge);

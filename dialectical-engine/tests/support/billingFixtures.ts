@@ -28,7 +28,8 @@ import { FakeTaxEngine, fakeTaxMicros } from "./fake-tax-engine.js";
 export const PROFILE_ADDRESS_ONLY: BillingRecipientReader = Object.freeze({ currentAddress: async () => null });
 
 /**
- * The engine's plans in the v2 shape (spec 2026-10-05 §2.16.2). Suites about something else keep their dollar amounts:
+ * The engine's plans in the v2 shape (spec 2026-10-05 §2.16.2), with a sealed v3 row's 110% finish edge and no v4
+ * overflow or reserve (billingPlans v4 is pinned on the engine's own row). Suites about something else keep their dollar amounts:
  * every country pays in USD here. Part C's suites use `testRegionalPlans`, the engine's own rule (spec 2026-10-05
  * §2.16.1).
  */
@@ -39,13 +40,13 @@ export const testBillingPlans: BillingPlans = Object.freeze({
   plans: Object.freeze([
     // R-11: Free's fixed risk tier is "standard", what apps/ui/app/new/defaults.tsx sends today.
     { planId: "FREE", tier: "free", netPrices: { USD: 0, EUR: 0, RON: 0 }, monthlyCreditMicros: 200_000, dayBasisPoints: null,
-      weekBasisPoints: null, finishBasisPoints: 11_000, fixedGauges: { riskTier: "standard", compositionBudgetTier: "low", depth: 1 } },
+      weekBasisPoints: null, finishBasisPoints: 11_000, finishOverflowMicros: null, reserveMicros: null, fixedGauges: { riskTier: "standard", compositionBudgetTier: "low", depth: 1 } },
     { planId: "PLUS", tier: "premium", netPrices: { USD: 20_000_000, EUR: 20_000_000, RON: 100_000_000 },
-      monthlyCreditMicros: 5_000_000, dayBasisPoints: 2_000, weekBasisPoints: 5_000, finishBasisPoints: 11_000, fixedGauges: null },
+      monthlyCreditMicros: 5_000_000, dayBasisPoints: 2_000, weekBasisPoints: 5_000, finishBasisPoints: 11_000, finishOverflowMicros: null, reserveMicros: null, fixedGauges: null },
     { planId: "PRO", tier: "premium", netPrices: { USD: 50_000_000, EUR: 50_000_000, RON: 250_000_000 },
-      monthlyCreditMicros: 20_000_000, dayBasisPoints: 2_000, weekBasisPoints: 5_000, finishBasisPoints: 11_000, fixedGauges: null },
+      monthlyCreditMicros: 20_000_000, dayBasisPoints: 2_000, weekBasisPoints: 5_000, finishBasisPoints: 11_000, finishOverflowMicros: null, reserveMicros: null, fixedGauges: null },
     { planId: "MAX", tier: "premium", netPrices: { USD: 200_000_000, EUR: 200_000_000, RON: 1_000_000_000 },
-      monthlyCreditMicros: 150_000_000, dayBasisPoints: 2_000, weekBasisPoints: 5_000, finishBasisPoints: 11_000, fixedGauges: null }
+      monthlyCreditMicros: 150_000_000, dayBasisPoints: 2_000, weekBasisPoints: 5_000, finishBasisPoints: 11_000, finishOverflowMicros: null, reserveMicros: null, fixedGauges: null }
   ])
 }) as BillingPlans;
 

@@ -295,7 +295,10 @@ export interface SharedWallInput {
    * is never read, and the person half still applies.
    */
   readonly finishBasisPoints: number | null;
-  /** The run owner's windows, each carrying its own finish edge (11 000); `NO_PERSON_ALLOWANCE` supplies none. */
+  /**
+   * The run owner's windows, each carrying its own finish edge (v3: 11 000; billingPlans v4: 10 000 plus a fixed
+   * 20-cent overflow); `NO_PERSON_ALLOWANCE` supplies none.
+   */
   readonly persons: PersonAllowanceSource;
   readonly owners: RunOwnerSpendReader;
 }
@@ -897,7 +900,8 @@ export class CostEnvelopeGuard {
    *    `finishBasisPoints: null` there is no site-day wall and the day is not
    *    read.
    *  · each of the run owner's windows: the owner's RUN + STORY spend inside the
-   *    window plus this call, against that window's own finish edge (110%),
+   *    window plus this call, against that window's own finish edge (v3: 110%;
+   *    billingPlans v4: the limit plus its fixed 20-cent overflow),
    *    with or without the band (ruling R-19: the person wall applies iff the
    *    run has a charge scope).
    *
@@ -934,7 +938,8 @@ export class CostEnvelopeGuard {
           + inFlight.person,
         projectedMicros,
         limitMicros: window.limitMicros,
-        finishBasisPoints: window.finishBasisPoints
+        finishBasisPoints: window.finishBasisPoints,
+        ...(window.finishOverflowMicros === undefined ? {} : { finishOverflowMicros: window.finishOverflowMicros })
       }) === "WOULD_CROSS") {
         throw sharedWallReached(window.scope);
       }
