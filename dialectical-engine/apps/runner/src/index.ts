@@ -263,6 +263,7 @@ import {
 } from "./run-seats.js";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
 import { CONTENT_REFUSED_HALT_REASON, buildStoryRunSnapshot, storyAlsoRaisedFrom, storyAnswersNoteFrom, storyBackupCandidatesFrom, storyBackupMakersFrom, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
+import { runDigPathRewrite, type PathRewriteRunnerSettings } from "./path-rewrite.js";
 import {
   shapeCloseCallExtraSeats, shapeCloseCallFires, shapeCloseCallFold, shapeDistinctMakerOptions, shapeRankScrutiny, shapeSelectChains,
   type ScrutinyCandidate
@@ -2704,6 +2705,13 @@ export interface WalkingSkeletonSettings {
     writeAfterSettle(input: StoryWriteInput): Promise<void>;
     reportSnapshotFailure(failure: StorySnapshotFailure): void;
   };
+  /**
+   * Dig-model revision task W3-5: the path rewrite (path-rewrite.ts). Set, a settled run that is a dig (an ask with a
+   * parent) keeps its points and its answer text and writes NO story: the path it was dug from is rewritten in the
+   * story's place, from the same snapshot (owner Q-D13). Absent (fixtures, local mode's acceptance root), or for a first
+   * debate: the story, as today.
+   */
+  readonly pathRewrite?: PathRewriteRunnerSettings;
   /**
    * ENGINE MONEY RULE (spec 2026-09-26 §14.4.2), TASK M3: each provider
    * target's price (`buildProviderPriceMap`), so a MONEY refusal of an
@@ -11998,9 +12006,14 @@ export class WalkingSkeletonRunner {
     if (storyWriter !== undefined && settled !== null) {
       try {
         if (settled.kind === "SNAPSHOT") {
-          // Side-by-side spec §13 (S3, ruling R36): every write carries this debate's own version's story policy (null
-          // included: the version sealed no story rows); undefined only without per-version settings (the writer's own).
-          await storyWriter.writeAfterSettle(settings.storyPolicy === undefined ? settled.input : Object.freeze({ ...settled.input, policy: settings.storyPolicy }));
+          // Dig-model revision W3-5 (owner Q-D13): a dig keeps its points and its answer text, both stored above, and
+          // writes NO story: the path it was dug from is rewritten in the story's place (path-rewrite.ts, which never
+          // rejects). A first debate, or a runner without the rewrite's settings, gets its story as today.
+          if (!(await runDigPathRewrite(settings.pathRewrite, settled.input))) {
+            // Side-by-side spec §13 (S3, ruling R36): every write carries this debate's own version's story policy (null
+            // included: the version sealed no story rows); undefined only without per-version settings (the writer's own).
+            await storyWriter.writeAfterSettle(settings.storyPolicy === undefined ? settled.input : Object.freeze({ ...settled.input, policy: settings.storyPolicy }));
+          }
         } else {
           storyWriter.reportSnapshotFailure(settled);
         }

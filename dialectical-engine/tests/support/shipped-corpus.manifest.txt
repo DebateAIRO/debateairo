@@ -398,6 +398,8 @@ apps/runner/src/owner-command.ts
 apps/runner/src/owner-recovery-cli.ts
 apps/runner/src/owner-recovery-custody.ts
 apps/runner/src/owner-recovery-material.ts
+apps/runner/src/path-rewrite-material.ts
+apps/runner/src/path-rewrite.ts
 apps/runner/src/production-database-principals-cli.ts
 apps/runner/src/production-database-principals.ts
 apps/runner/src/production-database-url.ts
@@ -1285,6 +1287,7 @@ packages/story/src/length.ts
 packages/story/src/loop.ts
 packages/story/src/material.ts
 packages/story/src/pack.ts
+packages/story/src/path-rewrite.ts
 packages/story/src/public.ts
 packages/story/src/repository.ts
 packages/story/src/status.ts

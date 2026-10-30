@@ -166,3 +166,4 @@ export {
 } from "./writer.js";
 export * from "./status.js";
 export * from "./public.js";
+export * from "./path-rewrite.js";

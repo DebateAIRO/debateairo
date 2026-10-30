@@ -2,7 +2,8 @@
 // parses the row; the code side folds engine 2's sealed contracts into one fingerprint text and its sha256. R1d seals no
 // contract (deviation 2), so the hash is the sha256 of the header alone. A phase that appends a contract (R2a: verdict.investigate.v1;
 // R2b: verdict.judge.v1; R3: the map's eight engine-2 contracts, then judge.assigned-root.unknown.v2 and .resolved.v2;
-// W1-5: the web wording's 20; W1-5b: web.plan.v2, web.pick.v2, web.read-top.v2, web.suggest.v1)
+// W1-5: the web wording's 20; W1-5b: web.plan.v2, web.pick.v2, web.read-top.v2, web.suggest.v1; W3-5: path-rewrite.writer.v1,
+// path-rewrite.checker.v1)
 // moves ENGINE_SEALED_IDS and ENGINE_CONTRACT_HASH_SEALED and says why in its commit (INTERFACE §2.5); R1D_ENGINE_CONTRACT_HASH
 // stays the empty list's seal.
 import { createHash } from "node:crypto";
@@ -40,7 +41,9 @@ const ENGINE_SEALED_IDS: readonly string[] = ["verdict.investigate.v1", "verdict
   "serve.synthesizer.length.sources.v1", "serve.synthesizer.length.reader.sources.v1",
   // W1-5b (owner approvals of 2026-10-30): the second web wording as new ids; web.plan.v1, web.pick.v1 and
   // web.read-top.v1 stay sealed above, unused (tests/unit/web-prompts.test.ts).
-  "web.plan.v2", "web.pick.v2", "web.read-top.v2", "web.suggest.v1"];
+  "web.plan.v2", "web.pick.v2", "web.read-top.v2", "web.suggest.v1",
+  // W3-5 (dig-model revision 2026-10-30; drafts 5.1 and 5.2, approved as written): the path rewrite's writer and checker.
+  "path-rewrite.writer.v1", "path-rewrite.checker.v1"];
 /**
  * R1d's seal: sha256 of the header text alone, no trailing newline. Printed once with
  * `printf '%s' debateai.engine-contracts.v1 | shasum -a 256` and pasted here; the test also recomputes it.
@@ -52,8 +55,9 @@ const R1D_ENGINE_CONTRACT_HASH = "b98a45d5933d82205d5c6514082d4151bfb8f3f45b3677
  */
 // R3 (2026-10-17): + the map's eight engine-2 contracts and judge.assigned-root.*.v2 (option-1 drafts, approve before switch-on)
 // (ba2f15d5d89b2f7b4c3168e2f7908f5d3130aa55fc4929ad0825b15028500a4d, history). W1-5 (2026-10-30): + the web wording's 20
-// (a5a988393472a0e5a86d01c2a194e4aacb247c4d4407b6d8ad88fe06a818af5c, history). W1-5b (2026-10-30): + the second web wording's 4.
-const ENGINE_CONTRACT_HASH_SEALED = "64ec9ef0258010b8b63f9a5e270a2c734b7311650c47281eda1fe2fc7b61057a";
+// (a5a988393472a0e5a86d01c2a194e4aacb247c4d4407b6d8ad88fe06a818af5c, history). W1-5b (2026-10-30): + the second web wording's 4
+// (64ec9ef0258010b8b63f9a5e270a2c734b7311650c47281eda1fe2fc7b61057a, history). W3-5 (2026-10-31): + the path rewrite's 2.
+const ENGINE_CONTRACT_HASH_SEALED = "e87152961c68939de279dec08e8c50423e758936db4bc8e7d785a61455151123";
 const SELECT = "SELECT value_json FROM register.register_row WHERE register_version=$1 AND row_key=$2";
 const runtime = { nodeVersion: "v26.8.2", pnpmVersion: "11.20.0", sourceRevision: "a".repeat(40), sourceTree: "b".repeat(40),
   operatorSha256: "c".repeat(64), observedAt: "2026-10-16T12:00:00.000Z" };

@@ -15,7 +15,9 @@ import {
 } from "@debateai/runner";
 import { BLIND_JUDGE_GRADE_CONTRACT_HASH, DOMAIN_TAGGER_CONTRACT_HASH } from "../../packages/evaluator/src/index.js";
 import { CONSUMER_AGGREGATE_PROMPT_CONTRACT } from "../../packages/evaluator/src/consumer.js";
-import { buildStorytellerContract, buildStoryCheckerContract, loadStoryPack, resolveStoryPackDir, storyContractHash } from "@debateai/story";
+import {
+  PATH_REWRITE_SEALED_CONTRACTS, buildStorytellerContract, buildStoryCheckerContract, loadStoryPack, resolveStoryPackDir, storyContractHash
+} from "@debateai/story";
 import {
   STORYTELLER_V1_CONTRACT_ID,
   STORYTELLER_V1_ANSWER_FORM,
@@ -42,6 +44,15 @@ describe("S01 seals the content rule", () => {
     expect(JSON.parse(packet.messages[1]!.content.split("\n").slice(1, -1).join("\n"))).toMatchObject({
       format: "debateai.framed-material.v1", frame: "debateai.prompt-frame.v2"
     });
+  });
+  // W3-5 (dig-model revision): the path rewrite's writer and checker carry the same rule bytes in their seal input, between
+  // the frame version and their own contract (engineContractHash folds exactly this text).
+  it("R7-b holds for the path rewrite's two contracts", () => {
+    for (const contract of PATH_REWRITE_SEALED_CONTRACTS) {
+      expect(promptContractFingerprintText(contract)).toBe([
+        "debateai.prompt-frame.v2", RULE, contract.contractId, contract.instruction, contract.answerForm
+      ].join("\n"));
+    }
   });
   // Property: the seal input includes every policy byte in the specified order.
   it("R7-b seals the rule bytes between frame version and contract", () => {
