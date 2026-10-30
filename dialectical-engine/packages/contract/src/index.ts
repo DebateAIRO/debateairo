@@ -26,9 +26,13 @@ import { VerdictStateSchema } from "./verdict-state.js"; export * from "./verdic
 import { DebateMapViewSchema } from "./map-view.js"; export * from "./map-view.js";
 import {
   ReadingLevelStateSchema, ReadingLevelSaveRequestSchema, LastVisitSchema, LastVisitRecordRequestSchema, LastVisitRecordedSchema,
-  DigLinkRecordSchema, DigLinksSchema, DigLinkRecordRequestSchema, DigLinkRecordedSchema
+  DigLinkRecordSchema, DigLinksSchema, DigLinkRecordRequestSchema, DigLinkRecordedSchema, DigLinkModeSchema
 } from "./account-memory.js";
 export * from "./account-memory.js";
+import { AnswerWebSchema, AskParentSchema, DebateInvestigationSchema, DigSharePercentSchema, DigSuggestionSchema, InvestigationCloseRequestSchema,
+  ResearchedAddRequestSchema, ResearchedAddedSchema, RoomReserveSchema, WebOtherPageSchema, WebPathSchema, WebSourceSchema,
+  WEB_CONTRACT_LIMITS } from "./web.js";
+export * from "./web.js";
 export * from "./crisis.js";
 export * from "./question-check.js";
 export * from "./harm-helpline.js";
@@ -285,7 +289,9 @@ export const AskRequestSchema = z.object({
   // Side-by-side spec §13 (Task S12): the settings version the /new page's room read answered from (its
   // `settings_version`). Present and no longer the active one, an ask whose choices the active version does not offer is
   // refused 409 ASK_SETTINGS_CHANGED ("please choose again"); absent (an older page), the ask is normalised as before.
-  settings_version: SettingsVersionSchema.optional()
+  settings_version: SettingsVersionSchema.optional(),
+  // Plan 2026-10-30 W1-6: a dig names the debate it digs (AskParentSchema, ./web.ts); absent, the ask is a new question.
+  parent: AskParentSchema.optional()
 }).strict();
 export type AskRequest = z.infer<typeof AskRequestSchema>;
 
@@ -434,8 +440,18 @@ export const AskRoomQuerySchema = z.object({
   // Debate shape (spec 2026-10-12 §3.2): the /new page reads the room for the settings it will send.
   depth_mode: DepthModeSchema.optional(),
   scrutiny: ScrutinySchema.optional(),
-  answer_length: AnswerLengthSchema.optional()
-}).strict();
+  answer_length: AnswerLengthSchema.optional(),
+  // Plan 2026-10-30 W1-6 (Q14): a room read for a dig names its parent, its mode and how many picks it combines, so the
+  // answer can say the dig's share of today. The mode and the picks only beside a parent.
+  dig_parent: z.uuid().optional(),
+  dig_mode: DigLinkModeSchema.optional(),
+  dig_picks: z.string().regex(/^[0-9]{1,2}$/u).transform(Number)
+    .pipe(z.number().int().min(1).max(WEB_CONTRACT_LIMITS.digPicksMax)).optional()
+}).strict().superRefine((query, context) => {
+  if (query.dig_parent === undefined && (query.dig_mode !== undefined || query.dig_picks !== undefined)) {
+    context.addIssue({ code: "custom", message: "dig_mode and dig_picks go only beside dig_parent" });
+  }
+});
 
 /**
  * Length guidance (spec 2026-10-15 §3.8; controller ruling Q9): the answer writer's three targets for the person's plan,
@@ -464,6 +480,13 @@ const PreviewRostersSchema = z.object({
   premium: z.array(z.string().min(1)).min(1)
 }).strict();
 
+/** W1-6 (Q2): "blocked until {reset}" is a FULL person window whose reset `resets_at` names. */
+function roomReserveIssues(answer: Readonly<{ room: string; scope: string | null; reserve?: string | undefined }>, context: z.RefinementCtx): void {
+  if (answer.reserve === "BLOCKED" && (answer.room !== "FULL" || !PERSON_SCOPES.has(answer.scope ?? ""))) {
+    context.addIssue({ code: "custom", message: "BLOCKED names a full person window and its reset" });
+  }
+}
+
 const CustomerAskRoomResponseSchema = z.object({
   room: z.enum(["FITS", "CLOSE", "FULL", "ALREADY_WAITING"]),
   scope: z.enum(["SITE_DAY", "PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]).nullable(),
@@ -486,8 +509,13 @@ const CustomerAskRoomResponseSchema = z.object({
   // API answers the pages from the activation pointer. The page sends it back with the ask (`AskRequest.settings_version`).
   settings_version: SettingsVersionSchema.optional(),
   // Addition D24 (Task SA7 part A): on the preview, that version's line-up (PreviewRostersSchema); absent elsewhere.
-  preview_rosters: PreviewRostersSchema.optional()
+  preview_rosters: PreviewRostersSchema.optional(),
+  // Plan 2026-10-30 W1-6 (Q2): the reserve's word, KEPT or BLOCKED (RoomReserveSchema, ./web.ts); absent before R22.
+  reserve: RoomReserveSchema.optional(),
+  // W1-6 (Q14): a dig's share of today, only on a read asked for a dig (the owner-approved exception to I6).
+  dig_share_percent: DigSharePercentSchema.optional()
 }).strict().superRefine((answer, context) => {
+  roomReserveIssues(answer, context);
   if (answer.waits_for !== undefined
     && (!(answer.room === "FULL" || answer.room === "ALREADY_WAITING") || !PERSON_SCOPES.has(answer.scope ?? ""))) {
     context.addIssue({ code: "custom", message: "waits_for names a person scope of a question that would wait" });
@@ -510,8 +538,12 @@ const InternalAskRoomResponseSchema = z.object({
   // Side-by-side spec §13 (Task S12): as the customer answer's `settings_version`.
   settings_version:SettingsVersionSchema.optional(),
   // Addition D24 (Task SA7 part A): as the customer answer's `preview_rosters`.
-  preview_rosters:PreviewRostersSchema.optional()
+  preview_rosters:PreviewRostersSchema.optional(),
+  // Plan 2026-10-30 W1-6: as the customer answer's `reserve` and `dig_share_percent`.
+  reserve:RoomReserveSchema.optional(),
+  dig_share_percent:DigSharePercentSchema.optional()
 }).strict().superRefine((answer,context)=>{
+  roomReserveIssues(answer,context);
   if ((answer.room==="FITS") !== (answer.scope===null) || (answer.room==="FITS" && answer.resets_at!==null)
     || ((answer.room==="ALREADY_WAITING") !== (answer.waiting_run_ref!==null))
     || ((answer.room==="FULL" || answer.room==="ALREADY_WAITING") && answer.resets_at===null)
@@ -1347,7 +1379,11 @@ export const NodeSchema = z.object({
   condition_marks: z.array(ConditionMarkSchema),
   abstention: AbstentionSchema.nullable(),
   staleness_state: StalenessStateSchema,
-  relevant_as_of: z.iso.datetime()
+  relevant_as_of: z.iso.datetime(),
+  // Plan 2026-10-30 W1-6: the checked extracts the point rests on, as people see them (WebSourceSchema, ./web.ts), and
+  // the server's flag that its locator is one of them. Both optional: a point without the flag is never "Sure" (Q17).
+  sources: z.array(WebSourceSchema).max(WEB_CONTRACT_LIMITS.sourcesPerPointMax).optional(),
+  looked_up_checked: z.boolean().optional()
 }).strict();
 export type Node = z.infer<typeof NodeSchema>;
 
@@ -1636,8 +1672,18 @@ export const AnswerSchema = z.object({
   // A21: optional, so every stored and fixture answer without it still parses.
   model_assignment: AnswerModelAssignmentSchema.optional(),
   // R2: engine 2 only (INTERFACE §9.8); optional, so every engine-1 and older answer parses unchanged.
-  judges_comparison: JudgesComparisonSchema.optional()
+  judges_comparison: JudgesComparisonSchema.optional(),
+  // Plan 2026-10-30 W1-6: each path's web search, other pages and dig suggestions (AnswerWebSchema, ./web.ts); optional,
+  // so every answer served before R22 parses unchanged.
+  web: AnswerWebSchema.optional()
 }).strict().superRefine((answer, context) => {
+  // W1-6: the server's checked flag stands only on a looked-up point whose locator is one of its own sources.
+  for (const node of answer.nodes) {
+    if (node.looked_up_checked === true && (node.way_of_knowing !== "LOOKED_UP"
+      || !(node.sources ?? []).some((source) => source.extract_id === node.locator))) {
+      context.addIssue({ code: "custom", message: "looked_up_checked needs a looked-up point whose locator is one of its sources" });
+    }
+  }
   if ((answer.confidence_band === null) !== (answer.band_ceiling === null)) {
     context.addIssue({ code: "custom", message: "confidence_band and band_ceiling must be present together" });
   }
@@ -1865,6 +1911,9 @@ export const contractInventory = Object.freeze({
     AnswerStorySchema, AnswerDisclosureSchema, DebateMapViewSchema, BillingPlansResponseSchema,
     ReadingLevelStateSchema, ReadingLevelSaveRequestSchema, LastVisitSchema, LastVisitRecordRequestSchema, LastVisitRecordedSchema,
     DigLinkRecordSchema, DigLinksSchema, DigLinkRecordRequestSchema, DigLinkRecordedSchema,
+    // Plan 2026-10-30 W1-6: the web, dig-suggestion and investigation shapes (./web.ts); no route yet.
+    WebSourceSchema, WebOtherPageSchema, WebPathSchema, AnswerWebSchema, DigSuggestionSchema, AskParentSchema,
+    DebateInvestigationSchema, ResearchedAddRequestSchema, ResearchedAddedSchema, InvestigationCloseRequestSchema,
     BillingQuoteRequestSchema, BillingQuoteResponseSchema, BillingCheckoutRequestSchema, BillingCheckoutResponseSchema,
     BillingCheckoutPendingErrorSchema, BillingChargeStatusResponseSchema,
     BillingSubscriptionResponseSchema, BillingDowngradeRequestSchema, BillingInvoicesResponseSchema,

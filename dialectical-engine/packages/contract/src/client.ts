@@ -3,7 +3,7 @@ import {
   ReadingLevelStateSchema, ReadingLevelSaveRequestSchema, LastVisitSchema, LastVisitRecordRequestSchema, LastVisitRecordedSchema,
   DigLinksSchema, DigLinkRecordRequestSchema, DigLinkRecordedSchema,
   type AccountReadingLevel, type ReadingLevelState, type LastVisit, type LastVisitRecorded, type VisitItems,
-  type DigLinks, type DigLinkRecordRequest, type DigLinkRecorded
+  type DigLinks, type DigLinkRecordRequest, type DigLinkRecorded, type DigLinkMode
 } from "./account-memory.js";
 import type { VerdictState } from "./verdict-state.js";
 import { PublicationReviewAskRequestSchema, PublicationReviewAskResponseSchema, PublicationReviewStateSchema,
@@ -486,6 +486,10 @@ export interface ContractClient {
     depth_mode?: DepthMode;
     scrutiny?: Scrutiny;
     answer_length?: AnswerLength;
+    /** Plan 2026-10-30 W1-6 (Q14): a dig's room read, so the answer says the dig's share of today; only when given. */
+    dig_parent?: string;
+    dig_mode?: DigLinkMode;
+    dig_picks?: number;
   }>): Promise<AskRoomResponse>;
   /** Paid-plans spec §1.2 (U1): the person's windows as whole percentages; 404 when billing is off. */
   getBillingUsage(): Promise<BillingUsageResponse>;
@@ -867,13 +871,19 @@ export function createContractClient(
       depth_mode?: DepthMode;
       scrutiny?: Scrutiny;
       answer_length?: AnswerLength;
+      dig_parent?: string;
+      dig_mode?: DigLinkMode;
+      dig_picks?: number;
     }>) => request(`/v1/asks/room?${new URLSearchParams({
       plan_tier: input.plan_tier,
       composition_budget_tier: input.composition_budget_tier,
       depth: String(input.depth),
       ...(input.depth_mode === undefined ? {} : { depth_mode: input.depth_mode }),
       ...(input.scrutiny === undefined ? {} : { scrutiny: input.scrutiny }),
-      ...(input.answer_length === undefined ? {} : { answer_length: input.answer_length })
+      ...(input.answer_length === undefined ? {} : { answer_length: input.answer_length }),
+      ...(input.dig_parent === undefined ? {} : { dig_parent: input.dig_parent }),
+      ...(input.dig_mode === undefined ? {} : { dig_mode: input.dig_mode }),
+      ...(input.dig_picks === undefined ? {} : { dig_picks: String(input.dig_picks) })
     }).toString()}`, AskRoomResponseSchema),
     getBillingUsage: () => request("/v1/billing/usage", BillingUsageResponseSchema),
     getBillingPlans: () => request("/v1/billing/plans", BillingPlansResponseSchema),
