@@ -139,7 +139,8 @@ if (answer !== undefined) {
     const missing = [
       ...["HELD_UP", "PARTLY_HELD", "FELL", "SET_ASIDE"].filter((fate) => !fates.has(fate)),
       // "ANSWERED" is in the word list but lib/v4/trust.ts gives it to no point today; a FELL path's position reads "FELL".
-      ...["LOOKED_UP_AND_AGREED", "ARGUED_AND_AGREED", "AGREED_BUT_DATED", "DISPUTED", "COULD_NOT_CHECK", "FELL", null].filter((basis) => !bases.has(basis)),
+      // W2-6: "Sure" rests on a checked page (WEB_CHECKED_AND_AGREED); a remembered citation is LOOKED_UP_AND_AGREED.
+      ...["WEB_CHECKED_AND_AGREED", "LOOKED_UP_AND_AGREED", "ARGUED_AND_AGREED", "AGREED_BUT_DATED", "DISPUTED", "COULD_NOT_CHECK", "FELL", null].filter((basis) => !bases.has(basis)),
       ...(map.objections.length === 2 ? [] : ["two objections"]),
       ...(map.wouldChange === null ? ["reversal point"] : [])
     ];
