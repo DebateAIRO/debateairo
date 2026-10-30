@@ -1,0 +1,203 @@
+/*
+ * The new dig model and the money rule in the mock's seeded debates (plan 2026-10-30-dig-model-revision.md, task W2-7; owner
+ * answers of 30-31 Oct). The shapes are the contract's (packages/contract/src/web.ts); every text here is MADE UP.
+ *
+ * The dig trail, three levels down from the first debate (1111, level 0):
+ *   - 8888 (level 1) dug 1111's path n-renew from an AI suggestion chosen as it was: READY rewrite, no verdict.
+ *   - d100 (level 1) dug 1111's path n-mix with the person's own view and their edit of a suggestion: READY rewrite with
+ *     the verdict "helped this path and the main question".
+ *   - d200 (level 2) dug 8888's path n-renew with the person's own view: READY rewrite with "did not help this path"; so
+ *     1111's n-renew (the path 8888 dug) is marked "a dig further down changed part of this".
+ *   - d300 (level 3) dug d200's path n-nuclear from an AI suggestion: its rewrite is still WRITING.
+ * Every dig keeps its points and its answer text (owner Q-D13); only its story is dropped (the mock's stories stay, so
+ * today's pages still draw the digs).
+ *
+ * The money rule: a paused debate (the month wall; Continue once the month resets) and a usage read that says running work
+ * borrowed from tomorrow's allowance (switch usage=BORROWED).
+ */
+import type { AnswerDig, AnswerPathRewrites, DugPick, PathRewrite, UsageBorrow } from "../../packages/contract/src/web.js";
+
+/** A finished rewrite (the checker passed it): it carries the path's new text. */
+type ReadyRewrite = Extract<PathRewrite, { state: "READY" }>;
+
+export const DIG_RUNS = Object.freeze({
+  root: "11111111-1111-4111-8111-111111111111",
+  levelOne: "88888888-8888-4888-8888-888888888888",
+  ownView: "d1000000-0000-4000-8000-000000000001",
+  levelTwo: "d2000000-0000-4000-8000-000000000002",
+  levelThree: "d3000000-0000-4000-8000-000000000003"
+});
+/** A debate whose planned AI calls and searches paused at the month wall. */
+export const RUN_PAUSED = "e1000000-0000-4000-8000-000000000001";
+
+/** When each seeded dig finished (its run settled); the mock's runs settle at these moments. */
+export const DIG_FINISHED_AT = Object.freeze({
+  levelOne: "2026-10-29T08:12:00.000Z",
+  ownView: "2026-10-29T10:20:00.000Z",
+  levelTwo: "2026-10-30T09:15:00.000Z",
+  levelThree: "2026-10-30T15:40:00.000Z"
+});
+
+/** The dig's own paths (every mock answer is the same debate, so every dig has these four), with the rewrite's lines. */
+const STORAGE_DIG_PATHS = [
+  { position_ref: "n-mix", line: "Batteries for the hours, plus a firm back-up for windless weeks, cover the grid at a cost most countries can carry.", fate: "HELD_UP" },
+  { position_ref: "n-renew", line: "Batteries and power lines alone can already cover several windless days.", fate: "FELL" },
+  { position_ref: "n-nuclear", line: "Only firm plants such as nuclear can carry a windless week.", fate: "PARTLY_HELD" },
+  { position_ref: "n-smr", line: "Storage lasting whole weeks will be cheap within a few years.", fate: "SET_ASIDE" }
+] as const;
+
+const PICK_STORAGE: DugPick = {
+  kind: "CONTRADICTING", place: "p:n-renew-storage", by: "AI_SUGGESTION",
+  text: "Can batteries and power lines really cover several windless days at an acceptable cost?"
+};
+const PICK_OWN_BACKUP: DugPick = {
+  kind: "OWN_VIEW", place: "path:n-mix", by: "PERSON_OWN_VIEW",
+  text: "Keeping some old gas plants as a back-up for winter might be cheaper than building new nuclear."
+};
+const PICK_EDITED_LAND: DugPick = {
+  kind: "UNDOCUMENTED", place: "p:n-mix-land", by: "PERSON_EDITED",
+  text: "Nuclear needs less land than wind or solar: does that matter in a small, crowded country like mine?"
+};
+const PICK_OWN_HYDRO: DugPick = {
+  kind: "OWN_VIEW", place: "path:n-renew", by: "PERSON_OWN_VIEW",
+  text: "Pumped hydro in the mountains could carry a windless week."
+};
+const PICK_BUILD_TIMES: DugPick = {
+  kind: "HELPS_MAIN_QUESTION", place: "path:n-nuclear", by: "AI_SUGGESTION",
+  text: "Were reactors built faster outside Europe and North America, and could that be repeated here?"
+};
+
+const REWRITE_LEVEL_ONE: ReadyRewrite = {
+  rewrite_id: "rw-8888-n-renew", dig_run_id: DIG_RUNS.levelOne, dig_level: 1, dig_finished_at: DIG_FINISHED_AT.levelOne,
+  state: "READY", rewritten_at: "2026-10-29T08:14:30.000Z", changed: true,
+  text: {
+    line: "Only renewables and storage: partly held. It is the cheapest and fastest way to add clean power, but batteries cover hours, not the several windless days a winter can bring.",
+    summary: "Cheapest and fastest to build; storage that lasts several days is not yet affordable.",
+    fate: "PARTLY_HELD"
+  },
+  what_changed: [
+    "The dig found that today's batteries cover hours, not several windless days, so the claim this path rested on did not hold.",
+    "It left open whether storage lasting whole weeks will become cheap."
+  ],
+  fate_before: "PARTLY_HELD", view: null, dig_paths: [...STORAGE_DIG_PATHS]
+};
+
+const REWRITE_OWN_VIEW: ReadyRewrite = {
+  rewrite_id: "rw-d100-n-mix", dig_run_id: DIG_RUNS.ownView, dig_level: 1, dig_finished_at: DIG_FINISHED_AT.ownView,
+  state: "READY", rewritten_at: "2026-10-29T10:23:00.000Z", changed: true,
+  text: {
+    line: "Mostly renewables, plus some firm power: held up. Keeping some existing plants as a winter back-up can be cheaper than building new nuclear, so new nuclear is one choice among several.",
+    summary: "Wind and sun first; firm power for winter from existing plants or some new nuclear.",
+    fate: "HELD_UP"
+  },
+  what_changed: [
+    "The dig found that keeping some existing plants as a back-up costs less than building new firm power, so new nuclear is no longer the only firm choice here.",
+    "Land use mattered only for the smallest, most crowded countries."
+  ],
+  fate_before: "HELD_UP",
+  view: {
+    outcome: "HELPED", scope: "MAIN_QUESTION",
+    reason: "The back-up you named turned out to be the cheaper way to cover winter, which changes how much new nuclear the answer needs.",
+    own_words: [PICK_OWN_BACKUP.text, PICK_EDITED_LAND.text]
+  },
+  dig_paths: [
+    { position_ref: "n-mix", line: "Keep some existing plants as a winter back-up while wind and sun grow.", fate: "HELD_UP" },
+    { position_ref: "n-renew", line: "Build only renewables and storage, and close every old plant.", fate: "PARTLY_HELD" },
+    { position_ref: "n-nuclear", line: "Build new nuclear as the winter back-up.", fate: "FELL" },
+    { position_ref: "n-smr", line: "Small reactors on old coal sites.", fate: "SET_ASIDE" }
+  ]
+};
+
+const REWRITE_LEVEL_TWO: ReadyRewrite = {
+  rewrite_id: "rw-d200-n-renew", dig_run_id: DIG_RUNS.levelTwo, dig_level: 2, dig_finished_at: DIG_FINISHED_AT.levelTwo,
+  state: "READY", rewritten_at: "2026-10-30T09:18:00.000Z", changed: true,
+  text: {
+    line: "Batteries and power lines alone can already cover several windless days: did not hold. Pumped hydro helps where there are mountains, but only a few countries have enough of it.",
+    summary: "Batteries cover hours; pumped hydro covers days only in a few countries.",
+    fate: "FELL"
+  },
+  what_changed: ["The dig found that pumped hydro can carry a few windless days, but only in countries with large mountain reservoirs."],
+  fate_before: "FELL",
+  view: {
+    outcome: "DID_NOT_HELP", scope: "PATH",
+    reason: "Pumped hydro covers a windless week only where large reservoirs already exist, which most countries in the question lack.",
+    own_words: [PICK_OWN_HYDRO.text]
+  },
+  dig_paths: [
+    { position_ref: "n-mix", line: "Pumped hydro plus batteries, where the mountains allow it.", fate: "PARTLY_HELD" },
+    { position_ref: "n-renew", line: "Pumped hydro can carry a windless week anywhere.", fate: "FELL" },
+    { position_ref: "n-nuclear", line: "Firm plants are still needed where there are no mountains.", fate: "HELD_UP" },
+    { position_ref: "n-smr", line: "New reservoirs can be built in time.", fate: "SET_ASIDE" }
+  ]
+};
+
+const REWRITE_LEVEL_THREE: PathRewrite = {
+  rewrite_id: "rw-d300-n-nuclear", dig_run_id: DIG_RUNS.levelThree, dig_level: 3, dig_finished_at: DIG_FINISHED_AT.levelThree,
+  state: "WRITING"
+};
+
+/** `Answer.path_rewrites` per seeded run (absent: no dig has touched that debate's paths). */
+export const PATH_REWRITES: Readonly<Record<string, AnswerPathRewrites>> = Object.freeze({
+  // The first debate: two paths rewritten since its report (version 1, closed 28 Oct); n-renew also changed further down.
+  [DIG_RUNS.root]: {
+    paths: [
+      { position_ref: "n-mix", current: REWRITE_OWN_VIEW.text, history: [REWRITE_OWN_VIEW] },
+      { position_ref: "n-renew", current: REWRITE_LEVEL_ONE.text, history: [REWRITE_LEVEL_ONE], changed_below: true }
+    ],
+    changed_since: { count: 2, since_report_version: 1 }
+  },
+  [DIG_RUNS.levelOne]: {
+    paths: [{ position_ref: "n-renew", current: REWRITE_LEVEL_TWO.text, history: [REWRITE_LEVEL_TWO] }],
+    changed_since: { count: 1, since_report_version: null }
+  },
+  [DIG_RUNS.levelTwo]: {
+    paths: [{ position_ref: "n-nuclear", current: null, history: [REWRITE_LEVEL_THREE] }],
+    changed_since: { count: 0, since_report_version: null }
+  }
+});
+
+/** `Answer.dig` per seeded dig: what it dug and its rewrite of the parent path. */
+export const DIG_ANSWERS: Readonly<Record<string, AnswerDig>> = Object.freeze({
+  [DIG_RUNS.levelOne]: {
+    parent_run_id: DIG_RUNS.root, position_ref: "n-renew", places: ["p:n-renew-storage"], level: 1, picks: [PICK_STORAGE], rewrite: REWRITE_LEVEL_ONE
+  },
+  [DIG_RUNS.ownView]: {
+    parent_run_id: DIG_RUNS.root, position_ref: "n-mix", places: ["path:n-mix", "p:n-mix-land"], level: 1,
+    picks: [PICK_OWN_BACKUP, PICK_EDITED_LAND], rewrite: REWRITE_OWN_VIEW
+  },
+  [DIG_RUNS.levelTwo]: {
+    parent_run_id: DIG_RUNS.levelOne, position_ref: "n-renew", places: ["path:n-renew"], level: 2, picks: [PICK_OWN_HYDRO], rewrite: REWRITE_LEVEL_TWO
+  },
+  [DIG_RUNS.levelThree]: {
+    parent_run_id: DIG_RUNS.levelTwo, position_ref: "n-nuclear", places: ["path:n-nuclear"], level: 3, picks: [PICK_BUILD_TIMES], rewrite: REWRITE_LEVEL_THREE
+  }
+});
+
+/** The seeded digs beyond 8888 (which server.ts already seeds): their question line and when they ran. */
+export const SEEDED_NEW_DIGS = Object.freeze([
+  {
+    runRef: DIG_RUNS.ownView, answerId: "aaaad100-0000-4000-8000-000000000001", seq: 9, mode: "quick" as const,
+    question: "Would keeping some old plants as a winter back-up be cheaper than new nuclear, and does land use matter in a small country?",
+    askedAt: "2026-10-29T10:05:00.000Z", settledAt: DIG_FINISHED_AT.ownView
+  },
+  {
+    runRef: DIG_RUNS.levelTwo, answerId: "aaaad200-0000-4000-8000-000000000002", seq: 10, mode: "quick" as const,
+    question: "Could pumped hydro in the mountains carry a windless week?",
+    askedAt: "2026-10-30T09:00:00.000Z", settledAt: DIG_FINISHED_AT.levelTwo
+  },
+  {
+    runRef: DIG_RUNS.levelThree, answerId: "aaaad300-0000-4000-8000-000000000003", seq: 11, mode: "thorough" as const,
+    question: "Were reactors built faster outside Europe and North America, and could that be repeated here?",
+    askedAt: "2026-10-30T15:10:00.000Z", settledAt: DIG_FINISHED_AT.levelThree
+  }
+]);
+
+/** The month pause of RUN_PAUSED: until the next month starts; `canContinue` once the mock plays the new month. */
+export function monthPause(nextMonthStartsAt: string, canContinue: boolean): { until: string; can_continue: boolean } {
+  return { until: nextMonthStartsAt, can_continue: canContinue };
+}
+
+/** The usage read's borrow notice (switch usage=BORROWED): finishing the running debate used 4% of tomorrow's allowance. */
+export function borrowNotice(runRef: string, tomorrowStartsAt: string): UsageBorrow {
+  return { scope: "PERSON_DAY", run_ref: runRef, percent: 4, next_window_starts_at: tomorrowStartsAt };
+}

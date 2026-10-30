@@ -7,6 +7,10 @@
  * Every JSON body it sends is checked against the website's own contract schemas (packages/contract) — all seeded
  * bodies once at startup (a bad shape stops the start), and every body again just before it is sent.
  *
+ * Plan 2026-10-30-dig-model-revision.md, task W2-7: it also plays the new dig model (rewritten paths, the verdict on the
+ * person's point of view, a dig trail three levels down; rewrite-seed.ts) and the money rule (a debate paused at the month
+ * wall with Continue, a usage read that borrowed from tomorrow, a room where new starts wait for the reset).
+ *
  * stdout: one JSON line at start ({"mock":"ready",...}) and one JSON line per posted ask ({"mock":"ask",...}).
  * stderr: one line per request ("[mock] GET /v1/session 200"); MOCK_QUIET=1 hides them.
  */
@@ -17,9 +21,12 @@ import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createSeed, SEED_NODE_IDS, type StoryStatus } from "./seed.js";
 import {
-  answerDraftProblems, contractOrDraft, DraftAskParentSchema, DraftInvestigationSchema, DraftNodeWebSchema, DraftRoomPartSchema,
-  DraftRoomQueryPartSchema, splitAsk, splitRoomQuery, stripAnswer, stripNode, stripRoom, type DraftAskParent
+  answerDraftProblems, contractOrDraft, DraftAskParentSchema, DraftInvestigationSchema, DraftMonthPauseSchema, DraftNodeWebSchema,
+  DraftRoomPartSchema, DraftRoomQueryPartSchema, DraftRunContinuedSchema, DraftRunContinueRefusedSchema, DraftRunContinueRequestSchema,
+  DraftUsageBorrowsSchema, splitAsk, splitRoomQuery, stripAnswer, stripNode, stripRoom,
+  stripRun, stripUsage, type DraftAskParent
 } from "./web-draft.js";
+import { borrowNotice, DIG_ANSWERS, DIG_RUNS, monthPause, PATH_REWRITES, RUN_PAUSED, SEEDED_NEW_DIGS } from "./rewrite-seed.js";
 import type { WebCase } from "./web-seed.js";
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -67,14 +74,23 @@ const seed = createSeed(F);
 // Settings (environment, and live via GET /__mock/set)
 // ---------------------------------------------------------------------------------------------------------------
 
-/** BLOCKED is a mock switch: a FULL day with the DRAFT reserve word BLOCKED ("blocked until {reset}"); today's contract reads FULL. */
-const ROOM_MODES = ["FITS", "CLOSE", "FULL", "ALREADY_WAITING", "BLOCKED"] as const;
+/**
+ * BLOCKED is a mock switch: a FULL day with the DRAFT reserve word BLOCKED ("blocked until {reset}"); today's contract reads FULL.
+ * WAIT_RESET (W2-7, money rule): a FULL day whose new starts wait for the reset (`new_starts`); running work goes on.
+ */
+const ROOM_MODES = ["FITS", "CLOSE", "FULL", "ALREADY_WAITING", "BLOCKED", "WAIT_RESET"] as const;
 type RoomMode = (typeof ROOM_MODES)[number];
 const ASK_MODES = ["AUTO", "ACCEPT", "WAITING", "ALREADY_WAITING", "LANGUAGE_CHOICE"] as const;
 type AskMode = (typeof ASK_MODES)[number];
 /** The person's plan: Plus (paid, the web step runs) or Free (never searches). */
 const PLAN_MODES = ["PLUS", "FREE"] as const;
 type PlanMode = (typeof PLAN_MODES)[number];
+/** W2-7 (money rule): the usage read as today (NORMAL), or after running work borrowed from tomorrow (BORROWED). */
+const USAGE_MODES = ["NORMAL", "BORROWED"] as const;
+type UsageMode = (typeof USAGE_MODES)[number];
+/** W2-7 (money rule): the paused debate waits for the month reset (UNTIL_RESET), or the new month has started (CAN_CONTINUE). */
+const PAUSE_MODES = ["UNTIL_RESET", "CAN_CONTINUE"] as const;
+type PauseMode = (typeof PAUSE_MODES)[number];
 
 function choice<T extends string>(name: string, raw: string | undefined, allowed: readonly T[], fallback: T): T {
   if (raw === undefined || raw.trim() === "") return fallback;
@@ -105,6 +121,8 @@ const QUIET = process.env.MOCK_QUIET === "1";
 let roomMode: RoomMode = choice("MOCK_ROOM", process.env.MOCK_ROOM, ROOM_MODES, "FITS");
 let askMode: AskMode = choice("MOCK_ASK", process.env.MOCK_ASK, ASK_MODES, "AUTO");
 let planMode: PlanMode = choice("MOCK_PLAN", process.env.MOCK_PLAN, PLAN_MODES, "PLUS");
+let usageMode: UsageMode = choice("MOCK_USAGE", process.env.MOCK_USAGE, USAGE_MODES, "NORMAL");
+let pauseMode: PauseMode = choice("MOCK_PAUSE", process.env.MOCK_PAUSE, PAUSE_MODES, "UNTIL_RESET");
 
 // ---------------------------------------------------------------------------------------------------------------
 // The seeded world
@@ -153,6 +171,8 @@ type MockRun = {
   storyReadyAt?: number;
   /** The draft web case its answer carries (web-seed.ts). */
   web?: WebCase;
+  /** W2-7 (money rule): its planned calls and searches paused at the month wall, until Continue (POST /v1/runs/{id}/continue). */
+  monthPaused?: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   answer?: any;
 };
@@ -179,14 +199,19 @@ function settledRun(input: Readonly<{
     answerId: input.answerId,
     storyReadyAt: input.storyReadyAt,
     web: input.web,
-    answer: seed.answer({
-      answerId: input.answerId,
-      runRef: input.runRef,
-      question: input.question,
-      askedAt: iso(input.askedAt),
-      servedAt: iso(input.settleAt),
-      web: input.web
-    })
+    answer: {
+      ...seed.answer({
+        answerId: input.answerId,
+        runRef: input.runRef,
+        question: input.question,
+        askedAt: iso(input.askedAt),
+        servedAt: iso(input.settleAt),
+        web: input.web
+      }),
+      // W2-7: the seeded digs' rewrites of their parents' paths, and a dig's own part (rewrite-seed.ts).
+      ...(PATH_REWRITES[input.runRef] === undefined ? {} : { path_rewrites: PATH_REWRITES[input.runRef] }),
+      ...(DIG_ANSWERS[input.runRef] === undefined ? {} : { dig: DIG_ANSWERS[input.runRef] })
+    }
   });
 }
 
@@ -223,6 +248,15 @@ settledRun({
   question: "Does this hold up, and when? Batteries and long-distance power lines can already cover multi-day lulls in wind and sun at an acceptable cost.",
   askedAt: Date.parse("2026-10-29T08:00:00.000Z"), settleAt: Date.parse("2026-10-29T08:12:00.000Z"), storyReadyAt: 0
 });
+// W2-7 (dig model): a dig with the person's own view (level 1), a dig of the dig (level 2) and a dig of that (level 3),
+// whose rewrite is still writing; and a debate paused at the month wall (money rule).
+for (const dig of SEEDED_NEW_DIGS) {
+  settledRun({
+    runRef: dig.runRef, answerId: dig.answerId, seq: dig.seq, web: "PAID", question: dig.question,
+    askedAt: Date.parse(dig.askedAt), settleAt: Date.parse(dig.settledAt), storyReadyAt: 0
+  });
+}
+addRun({ runRef: RUN_PAUSED, seq: 12, monthPaused: true, question: "Should my region build a hydrogen pipeline or more power lines?" });
 
 type RunState = "QUEUED" | "WAITING" | "CLAIMED" | "RUNNING" | "HOLDING" | "SETTLED" | "FAILED";
 
@@ -324,6 +358,12 @@ openInvestigation(RUN_FREE, [{ report_version: 1, closed_at: "2026-10-26T10:00:0
 openInvestigation(RUN_SEARCH_FAILED);
 openInvestigation(RUN_RUNNING);
 openInvestigation(RUN_WAITING);
+openInvestigation(RUN_PAUSED);
+// W2-7: the dig trail. Each dig joins the first debate's investigation (a dig of a dig too).
+for (const dig of SEEDED_NEW_DIGS) {
+  const answer = DIG_ANSWERS[dig.runRef]!;
+  linkDig(answer.parent_run_id, { child_run_id: dig.runRef, places: answer.places, mode: dig.mode }, Date.parse(dig.askedAt));
+}
 
 // ---------------------------------------------------------------------------------------------------------------
 // Response bodies
@@ -339,8 +379,15 @@ function runProjection(run: MockRun, now = Date.now()) {
     hold_until: null,
     argument_language: ENGLISH,
     waits_until: state === "WAITING" ? waitsUntil(now) : null,
-    waits_for: null
+    waits_for: null,
+    // W2-7 (money rule, draft): paused at the month wall until the next month; Continue once it has started.
+    ...(run.monthPaused === true && state === "RUNNING" ? { month_pause: monthPause(nextUtcMonth(now), pauseMode === "CAN_CONTINUE") } : {})
   };
+}
+
+function nextUtcMonth(now = Date.now()): string {
+  const date = new Date(now);
+  return iso(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1));
 }
 
 function storyRead(run: MockRun, now = Date.now()) {
@@ -385,6 +432,8 @@ function answerIndex(limit: number, offset: number, now = Date.now()) {
 
 /** A dig's share of today (draft, Q14), in steps of 5: what the mock says a quick look and a thorough dig take. */
 const DIG_SHARE_PERCENT = Object.freeze({ quick: 20, thorough: 35 });
+/** W2-7 (money rule, draft): what the mock says a new question takes of today. */
+const START_SHARE_PERCENT = 15;
 
 function roomRead(
   mode: RoomMode, now = Date.now(), plan_id: PlanMode = planMode, reserveKept = anyInvestigationOpen(),
@@ -392,7 +441,8 @@ function roomRead(
 ) {
   // Draft words: the person's one reserve is KEPT while an investigation is open; BLOCKED is a FULL day until its reset.
   const reserve = mode === "BLOCKED" ? { reserve: "BLOCKED" as const } : reserveKept ? { reserve: "KEPT" as const } : {};
-  const share = digMode === null ? {} : { dig_share_percent: DIG_SHARE_PERCENT[digMode] };
+  // W2-7 (money rule): a read for a new question carries its estimate too, as a share of today.
+  const share = digMode === null ? { start_share_percent: START_SHARE_PERCENT } : { dig_share_percent: DIG_SHARE_PERCENT[digMode] };
   const plan = {
     plan_id,
     // shape_settings is left out on purpose: the contract allows only `true` or absent, and absent means "off".
@@ -409,21 +459,28 @@ function roomRead(
     FULL: () => ({ room: "FULL", scope: "PERSON_DAY", resets_at: nextUtcMidnight(now), waiting_run_ref: null, ...plan }),
     ALREADY_WAITING: () => ({ room: "ALREADY_WAITING", scope: "PERSON_DAY", resets_at: waitsUntil(now), waiting_run_ref: RUN_WAITING, ...plan }),
     // Draft: a closing found no credits left, so everything waits for the day's limit to reset.
-    BLOCKED: () => ({ room: "FULL", scope: "PERSON_DAY", resets_at: nextUtcMidnight(now), waiting_run_ref: null, ...plan })
+    BLOCKED: () => ({ room: "FULL", scope: "PERSON_DAY", resets_at: nextUtcMidnight(now), waiting_run_ref: null, ...plan }),
+    // W2-7 (money rule, draft): the day is used up (perhaps by running work that borrowed); new starts wait for its reset.
+    WAIT_RESET: () => ({
+      room: "FULL", scope: "PERSON_DAY", resets_at: nextUtcMidnight(now), waiting_run_ref: null, ...plan, new_starts: "BLOCKED_UNTIL_RESET"
+    })
   };
   return rooms[mode]();
 }
 
-function billingUsage(now = Date.now(), plan_id: PlanMode = planMode) {
+function billingUsage(now = Date.now(), plan_id: PlanMode = planMode, usage: UsageMode = usageMode) {
   const date = new Date(now);
   const daysToMonday = ((8 - date.getUTCDay()) % 7) || 7;
+  // W2-7 (money rule, draft): BORROWED is the day after the running debate went past it: 104% used, 4% of tomorrow's taken.
+  const borrowed = usage === "BORROWED";
   return {
     plan_id,
     windows: [
-      { scope: "PERSON_DAY", percent: 14, resets_at: nextUtcMidnight(now) },
-      { scope: "PERSON_WEEK", percent: 31, resets_at: iso(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + daysToMonday)) },
-      { scope: "PERSON_MONTH", percent: 9, resets_at: iso(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1)) }
-    ]
+      { scope: "PERSON_DAY", percent: borrowed ? 104 : 14, resets_at: nextUtcMidnight(now) },
+      { scope: "PERSON_WEEK", percent: borrowed ? 47 : 31, resets_at: iso(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + daysToMonday)) },
+      { scope: "PERSON_MONTH", percent: borrowed ? 16 : 9, resets_at: nextUtcMonth(now) }
+    ],
+    ...(borrowed ? { borrowed: [borrowNotice(RUN_RUNNING, nextUtcMidnight(now))] } : {})
   };
 }
 
@@ -509,6 +566,16 @@ const draftServed = (schema: any, full: unknown, strip: (body: any) => any) => c
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const checkAnswerDraft = (answer: any): string[] => answerDraftProblems(answer);
 
+/** W2-7: the draft parts of a run read (its month pause) and of the usage read (its borrow notices), when there. */
+const draftPart = (key: string, schema: { safeParse: (body: unknown) => { success: boolean; error?: { issues: unknown } } }) => ({
+  safeParse: (body: unknown) => {
+    const value = (body as Record<string, unknown>)[key];
+    return value === undefined ? { success: true } : schema.safeParse(value);
+  }
+});
+const runDraftSchema = draftPart("month_pause", DraftMonthPauseSchema);
+const usageDraftSchema = draftPart("borrowed", DraftUsageBorrowsSchema);
+
 function investigationBody(investigation: Investigation) {
   return {
     investigation_id: investigation.investigation_id,
@@ -556,12 +623,15 @@ function startupCheck(): number {
         }
       }
     }
-    check(`GET /v1/billing/usage (${plan})`, C.BillingUsageResponseSchema, billingUsage(Date.now(), plan));
+    for (const usage of USAGE_MODES) {
+      checkDraft(`GET /v1/billing/usage (${plan}, ${usage})`, C.BillingUsageResponseSchema, billingUsage(Date.now(), plan, usage), stripUsage,
+        usageDraftSchema);
+    }
   }
   check("GET /v1/billing/plans", C.BillingPlansResponseSchema, BILLING_PLANS);
   check("GET /v1/answers", C.AnswerIndexSchema, answerIndex(50, 0));
   for (const run of runs.values()) {
-    check(`GET /v1/runs/${run.runRef}`, C.RunProjectionSchema, runProjection(run));
+    checkDraft(`GET /v1/runs/${run.runRef}`, C.RunProjectionSchema, runProjection(run), stripRun, runDraftSchema);
     check(`GET /v1/runs/${run.runRef}/visibility`, C.PublicationTransitionSchema, { state: "PRIVATE", public_ref: null });
     check(`GET /v1/runs/${run.runRef}/last-visit`, C.LastVisitSchema, { seen_at: null, items: null });
     check(`GET /v1/runs/${run.runRef}/dig-links`, C.DigLinksSchema, digLinksOf(run.runRef));
@@ -738,7 +808,7 @@ function streamEvents(req: IncomingMessage, res: ServerResponse, run: MockRun): 
 
 function effectiveAskMode(): Exclude<AskMode, "AUTO"> {
   if (askMode !== "AUTO") return askMode;
-  if (roomMode === "FULL" || roomMode === "BLOCKED") return "WAITING";
+  if (roomMode === "FULL" || roomMode === "BLOCKED" || roomMode === "WAIT_RESET") return "WAITING";
   if (roomMode === "ALREADY_WAITING") return "ALREADY_WAITING";
   return "ACCEPT";
 }
@@ -833,13 +903,17 @@ function mockState() {
     room: roomMode,
     ask: askMode,
     plan: planMode,
+    usage: usageMode,
+    pause: pauseMode,
     ask_effective: effectiveAskMode(),
     now: iso(now),
     reading_level: readingLevel,
     reserve: roomMode === "BLOCKED" ? "BLOCKED" : anyInvestigationOpen() ? "KEPT" : null,
     draft_fields_sent: {
       answer: draftServed(C.AnswerSchema, runs.get(RUN_SETTLED)!.answer, stripAnswer),
-      room: draftServed(C.AskRoomResponseSchema, roomRead(roomMode, now), stripRoom)
+      room: draftServed(C.AskRoomResponseSchema, roomRead(roomMode, now), stripRoom),
+      run: draftServed(C.RunProjectionSchema, runProjection(runs.get(RUN_PAUSED)!, now), stripRun),
+      usage: draftServed(C.BillingUsageResponseSchema, billingUsage(now, planMode, "BORROWED"), stripUsage)
     },
     investigations: [...investigations.values()].map(investigationBody),
     dig_links: digLinks.map((record) => ({ ...record })),
@@ -851,7 +925,8 @@ function mockState() {
       story: run.answerId === undefined || stateOf(run, now) !== "SETTLED" ? null : storyStatusOf(run, now),
       settles_at: run.settleAt === undefined ? null : iso(run.settleAt),
       story_ready_at: run.storyReadyAt === undefined ? null : iso(run.storyReadyAt),
-      web: run.web ?? null
+      web: run.web ?? null,
+      month_paused: run.monthPaused === true
     }))
   };
 }
@@ -894,13 +969,21 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
         const room = url.searchParams.get("room");
         const ask = url.searchParams.get("ask");
         const plan = url.searchParams.get("plan");
+        const usage = url.searchParams.get("usage");
+        const pause = url.searchParams.get("pause");
         if (room !== null) roomMode = choice("room", room, ROOM_MODES, roomMode);
         if (ask !== null) askMode = choice("ask", ask, ASK_MODES, askMode);
         if (plan !== null) planMode = choice("plan", plan, PLAN_MODES, planMode);
+        if (usage !== null) usageMode = choice("usage", usage, USAGE_MODES, usageMode);
+        if (pause !== null) {
+          pauseMode = choice("pause", pause, PAUSE_MODES, pauseMode);
+          // Setting the pause again pauses the seeded debate again (after a Continue), so a click-test can be repeated.
+          runs.get(RUN_PAUSED)!.monthPaused = true;
+        }
       } catch (failure) {
         // The detail goes to the mock's log, never into the reply (CodeQL js/stack-trace-exposure, PR #224).
         process.stderr.write(`[mock] setting refused: ${failure instanceof Error ? failure.message : String(failure)}\n`);
-        return sendJson(req, res, 400, { error: "MOCK_SETTING_INVALID", message: "Unknown value for room, ask or plan; see the mock's log." });
+        return sendJson(req, res, 400, { error: "MOCK_SETTING_INVALID", message: "Unknown value for room, ask, plan, usage or pause; see the mock's log." });
       }
       return sendJson(req, res, 200, mockState());
     }
@@ -910,7 +993,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (parts[1] === "sign-out" && isGet) {
       return sendJson(req, res, 200, { signed_in: false }, undefined, { "set-cookie": clearedSessionCookies() });
     }
-    return notFound(req, res, "MOCK_CONTROL_NOT_FOUND", "Known: /__mock/state, /__mock/set?room=&ask=&plan=, /__mock/draft/v1/..., /__mock/sign-in, /__mock/sign-out");
+    return notFound(req, res, "MOCK_CONTROL_NOT_FOUND", "Known: /__mock/state, /__mock/set?room=&ask=&plan=&usage=&pause=, /__mock/draft/v1/..., /__mock/sign-in, /__mock/sign-out");
   }
 
   // ---- the website edge's readiness probe (server.mjs /readyz forwards to <API>/readyz) ----
@@ -964,7 +1047,10 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (path === "/v1/asks" && method === "POST") return postAsk(req, res);
 
   // ---- billing ----
-  if (path === "/v1/billing/usage" && isGet) return sendJson(req, res, 200, billingUsage(), C.BillingUsageResponseSchema);
+  if (path === "/v1/billing/usage" && isGet) {
+    // W2-7 (draft): the borrow notices ride the usage read once the contract knows them.
+    return sendDraftable(billingUsage(), C.BillingUsageResponseSchema, stripUsage, issuesOf(usageDraftSchema));
+  }
   if (path === "/v1/billing/plans" && isGet) return sendJson(req, res, 200, BILLING_PLANS, C.BillingPlansResponseSchema);
 
   // ---- answers ----
@@ -1010,6 +1096,16 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       lastVisits.set(run.runRef, { seen_at: seenAt, items: { ...parsed.data.items } });
       return sendJson(req, res, 200, { seen_at: seenAt }, C.LastVisitRecordedSchema);
     }
+    if (parts[3] === "continue") {
+      // Draft route (W2-7, money rule): Continue on a debate paused at the month wall, once the new month has started.
+      if (run.monthPaused !== true || stateOf(run) !== "RUNNING") return sendJson(req, res, 409, { error: "RUN_NOT_PAUSED", message: "RUN_NOT_PAUSED" });
+      if (!DraftRunContinueRequestSchema.safeParse(body ?? {}).success) return sendJson(req, res, 400, { error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      if (pauseMode !== "CAN_CONTINUE") {
+        return sendJson(req, res, 409, { error: "RUN_PAUSED_UNTIL_RESET", message: "RUN_PAUSED_UNTIL_RESET", until: nextUtcMonth() }, DraftRunContinueRefusedSchema);
+      }
+      run.monthPaused = false;
+      return sendJson(req, res, 200, { state: "CONTINUING" }, DraftRunContinuedSchema);
+    }
     if (parts[3] === "dig-links") {
       const parsed = C.DigLinkRecordRequestSchema.safeParse(body);
       if (!parsed.success || parsed.data.child_run_id === run.runRef) return sendJson(req, res, 400, { error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
@@ -1038,7 +1134,8 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const run = runs.get(parts[2]!);
     if (run === undefined) return notFound(req, res, "RUN_NOT_FOUND", "No run with this id.");
     const sub = parts.slice(3).join("/");
-    if (sub === "") return sendJson(req, res, 200, runProjection(run), C.RunProjectionSchema);
+    // W2-7 (draft): a debate paused at the month wall says so once the contract knows `month_pause`.
+    if (sub === "") return sendDraftable(runProjection(run), C.RunProjectionSchema, stripRun, issuesOf(runDraftSchema));
     if (sub === "answer") {
       if (stateOf(run) !== "SETTLED" || run.answer === undefined) return notFound(req, res, "ANSWER_NOT_FOUND", "This run has no answer yet.");
       return sendDraftable(run.answer, C.AnswerSchema, stripAnswer, checkAnswerDraft);
@@ -1089,7 +1186,9 @@ server.listen(PORT, HOST, () => {
     draft_fields_sent: draftServed(C.AnswerSchema, runs.get(RUN_SETTLED)!.answer, stripAnswer),
     seed_runs: {
       settled: RUN_SETTLED, running: RUN_RUNNING, waiting: RUN_WAITING, failed: RUN_FAILED, story_writing: RUN_STORY_WRITING,
-      free: RUN_FREE, search_failed: RUN_SEARCH_FAILED, dig: RUN_DIG
+      free: RUN_FREE, search_failed: RUN_SEARCH_FAILED, dig: RUN_DIG,
+      // W2-7: the dig trail (own view at level 1, then levels 2 and 3) and the debate paused at the month wall.
+      dig_own_view: DIG_RUNS.ownView, dig_level_two: DIG_RUNS.levelTwo, dig_level_three: DIG_RUNS.levelThree, paused: RUN_PAUSED
     }
   })}\n`);
 });
