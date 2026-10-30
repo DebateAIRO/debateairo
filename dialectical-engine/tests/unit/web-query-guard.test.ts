@@ -168,6 +168,21 @@ describe("long runs stay fast (CodeQL js/polynomial-redos, PR #224)", () => {
     expect(finding?.end).toBe(text.length);
   });
 
+  it("reads a domain of 100,000 '-' and many '@'-dash runs in linear time, and still finds a real email", () => {
+    const started = performance.now();
+    expect(findPersonalData(`x@${"-".repeat(100_000)}`)).toEqual([]);
+    expect(findPersonalData(`a@${"-".repeat(1_000)} `.repeat(200))).toEqual([]);
+    expect(findPersonalData(`${"-".repeat(50_000)} ion@exemplu-mare.ro`).map((finding) => finding.kind)).toEqual(["EMAIL"]);
+    expect(performance.now() - started).toBeLessThan(2_000);
+  });
+
+  it("finds an email whose parts use letters beyond the basic range, and leaves out a trailing dot", () => {
+    const text = "scrie lui 𝒜na.ştefan@şcoală.ro. mulţumesc";
+    const [finding] = findPersonalData(text);
+    expect(finding?.kind).toBe("EMAIL");
+    expect(text.slice(finding!.start, finding!.end)).toBe("𝒜na.ştefan@şcoală.ro");
+  });
+
   it("reads 100,000 apostrophes as no first-person word, in linear time", () => {
     const started = performance.now();
     expect(firstPersonWords("'".repeat(100_000))).toEqual([]);

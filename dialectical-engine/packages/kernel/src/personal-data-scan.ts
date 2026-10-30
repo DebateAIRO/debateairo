@@ -22,9 +22,47 @@ export const PERSONAL_DATA_KINDS: readonly PersonalDataKind[] = Object.freeze([
 ]);
 
 /** One character of an email's local part (before `@`). */
-const EMAIL_LOCAL_CHAR = /[\p{L}\p{N}._%+-]/u;
-/** An email's domain, read from just after its `@` (sticky, so it is tried at that one place only). */
-const EMAIL_DOMAIN = /[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)+/uy;
+const EMAIL_LOCAL_CHAR = /^[\p{L}\p{N}._%+-]$/u;
+/** One character of a domain label (letters, digits, `-`). */
+const EMAIL_LABEL_CHAR = /^[\p{L}\p{N}-]$/u;
+/** The character (a whole code point) that ends just before `index`, or "" at the start. */
+function charBefore(text: string, index: number): string {
+  if (index <= 0) return "";
+  const low = text.charCodeAt(index - 1);
+  if (index >= 2 && low >= 0xdc00 && low <= 0xdfff) {
+    const high = text.charCodeAt(index - 2);
+    if (high >= 0xd800 && high <= 0xdbff) return text.slice(index - 2, index);
+  }
+  return text[index - 1]!;
+}
+/** The character (a whole code point) that starts at `index`, or "" at the end. */
+function charAt(text: string, index: number): string {
+  const point = text.codePointAt(index);
+  return point === undefined ? "" : String.fromCodePoint(point);
+}
+/** Where a run of domain-label characters starting at `index` ends (`index` itself when there is none). */
+function labelEnd(text: string, index: number): number {
+  let at = index;
+  for (let char = charAt(text, at); char !== "" && EMAIL_LABEL_CHAR.test(char); char = charAt(text, at)) at += char.length;
+  return at;
+}
+/**
+ * The end of a dotted domain starting at `index` (labels joined by single dots, at least two labels), or -1. Read by
+ * index, with no pattern, so a long run of `-` or of labels costs one pass (CodeQL js/polynomial-redos, PR #224); a
+ * trailing dot is not part of the domain, as with the pattern it replaces.
+ */
+function domainEnd(text: string, index: number): number {
+  let end = labelEnd(text, index);
+  if (end === index) return -1;
+  let labels = 1;
+  while (text[end] === ".") {
+    const next = labelEnd(text, end + 1);
+    if (next === end + 1) break;
+    end = next;
+    labels += 1;
+  }
+  return labels >= 2 ? end : -1;
+}
 /** The longest local part RFC 5321 allows; a longer run is still found, as its last 64 characters. */
 const EMAIL_LOCAL_MAX = 64;
 /**
@@ -37,13 +75,13 @@ function emailSpans(text: string): readonly Readonly<{ start: number; end: numbe
   let lastEnd = 0;
   for (let at = text.indexOf("@"); at >= 0; at = text.indexOf("@", at + 1)) {
     let start = at;
-    while (start > lastEnd && at - start < EMAIL_LOCAL_MAX && EMAIL_LOCAL_CHAR.test(text[start - 1]!)) start -= 1;
+    for (let char = charBefore(text, start); start > lastEnd && at - start < EMAIL_LOCAL_MAX && char !== ""
+      && EMAIL_LOCAL_CHAR.test(char); char = charBefore(text, start)) start -= char.length;
     if (start === at) continue;
-    EMAIL_DOMAIN.lastIndex = at + 1;
-    const domain = EMAIL_DOMAIN.exec(text);
-    if (domain === null) continue;
-    spans.push({ start, end: at + 1 + domain[0].length });
-    lastEnd = at + 1 + domain[0].length;
+    const end = domainEnd(text, at + 1);
+    if (end < 0) continue;
+    spans.push({ start, end });
+    lastEnd = end;
     at = lastEnd - 1;
   }
   return spans;

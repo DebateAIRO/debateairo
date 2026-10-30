@@ -484,7 +484,8 @@ describe("through the guarded fetch: the exact search URL, to the search gate's 
     await expect(send(PERPLEXITY_SEARCH_URL, { body: JSON.stringify({ ...JSON.parse(body), model: "sonar" }) })).rejects.toThrow();
     await expect(send(PERPLEXITY_SEARCH_URL, { method: "GET" })).rejects.toThrow();
     await expect(send(PERPLEXITY_SEARCH_URL, { headers: { authorization: "Bearer pplx-x" } })).rejects.toThrow();
-    await expect(send(PERPLEXITY_SEARCH_URL, { body: body.replace("{", `{${" ".repeat(PERPLEXITY_SEARCH_REQUEST_MAX_BYTES)}`) }))
+    // The same JSON with padding after its opening brace: over the byte cap, still valid JSON.
+    await expect(send(PERPLEXITY_SEARCH_URL, { body: `{${" ".repeat(PERPLEXITY_SEARCH_REQUEST_MAX_BYTES)}${body.slice(1)}` }))
       .rejects.toThrow();
     expect(executions).toHaveLength(0);
     await expect(send(PERPLEXITY_SEARCH_URL)).resolves.toBeInstanceOf(Response);
