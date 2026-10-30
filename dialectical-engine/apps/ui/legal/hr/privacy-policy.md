@@ -50,7 +50,7 @@ Prikupljamo samo ono što je potrebno za rad računa, ono što nam odlučite dat
 
 Pri registraciji provjeravamo državu IP adrese i dob. Datum rođenja služi samo za provjeru i ne pohranjuje se. Provjera IP adrese obavlja se lokalno, bez slanja adrese trećoj strani. Prije svake nove rasprave lokalno provjeravamo i državu IP adrese; raspravu odbijamo ako je država uvijek blokirana. Razgovor s pomoći provjerava se na isti način: na prvoj stranici svake kartice preglednika koja bi prikazala Pomoć i pri svakom zahtjevu za podršku lokalno utvrđujemo državu vaše IP adrese i provjeravamo popis izlaznih Tor adresa. Ako ne pružamo uslugu u vašoj državi, ako ste iza izlazne Tor adrese ili ako se država ne može utvrditi, razgovor s pomoći ne prikazuje se, a zahtjevi za podršku odbijaju se. Stranica prima samo tri odgovora da ili ne, nude li se ondje registracija, plaćanje i razgovor s pomoći, a nikada državu; u kartici zadržava samo odgovor o razgovoru s pomoći, dok karticu ne zatvorite (odjeljak 13.). Ništa od te provjere ne čuvamo i ona ne upisuje nikakav revizijski zapis.
 
-**Ne** prikupljamo analitičke ni telemetrijske podatke o načinu na koji upotrebljavate proizvod i u tu svrhu ne postavljamo kolačiće. Ako se to promijeni, najprije će se promijeniti ova Pravila i Pravila o kolačićima te ćemo vas pitati.
+**Ne** prikupljamo analitičke ni telemetrijske podatke o načinu na koji upotrebljavate proizvod i u tu svrhu ne postavljamo kolačiće; čuvamo samo ono što je stranicama potrebno da bi vam radile, a navedeno je u ovoj tablici (primjerice kada ste posljednji put otvorili kartu neke rasprave). Ako se to promijeni, najprije će se promijeniti ova Pravila i Pravila o kolačićima te ćemo vas pitati.
 
 ## 3. Osjetljive informacije
 

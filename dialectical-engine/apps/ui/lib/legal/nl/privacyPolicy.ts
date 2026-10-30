@@ -63,7 +63,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         ]
       },
       { kind: "p", text: "Bij registratie controleren wij het IP-land en uw leeftijd. De geboortedatum wordt alleen voor de controle verzonden en niet opgeslagen. De IP-controle gebeurt lokaal, zonder het adres aan derden te verstrekken. Vóór elk nieuw debat controleren wij ook lokaal het IP-land; het debat wordt geweigerd als het land altijd geblokkeerd is. De hulpchat wordt op dezelfde manier gecontroleerd: op de eerste pagina van elk browsertabblad dat Hulp zou tonen, en bij elk ondersteuningsverzoek, zoeken wij het land van uw IP-adres op en controleren wij de Tor-lijst. Waar wij de dienst niet aanbieden, achter een Tor-uitgang, of waar het land niet kan worden vastgesteld, wordt de hulpchat niet getoond en worden ondersteuningsverzoeken geweigerd. De pagina ontvangt slechts drie antwoorden van ja of nee, namelijk of registratie, betaling en de hulpchat daar worden aangeboden, en nooit het land; zij bewaart alleen het antwoord over de hulpchat, in het tabblad, totdat u het sluit (hoofdstuk 13). Wij bewaren niets van deze opzoeking en er wordt geen auditvermelding voor geschreven." },
-      { kind: "p", text: "Wij verzamelen geen analyse- of telemetriegegevens over hoe u het product gebruikt en plaatsen daarvoor geen cookies. Als dat verandert, worden eerst dit beleid en het Cookiebeleid gewijzigd en wordt uw toestemming gevraagd." }
+      { kind: "p", text: "Wij verzamelen geen analyse- of telemetriegegevens over hoe u het product gebruikt en plaatsen daarvoor geen cookies; wij bewaren alleen wat de pagina's nodig hebben om voor u te werken, zoals vermeld in deze tabel (bijvoorbeeld wanneer u de kaart van een debat het laatst hebt geopend). Als dat verandert, worden eerst dit beleid en het Cookiebeleid gewijzigd en wordt uw toestemming gevraagd." }
     ]
   },
   {
@@ -349,7 +349,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.8",
-  sha256: "bf5b5b38e2dc7144cd7c21c919c2f5078e8b0664aa6dd8c2d802c6ec3be1120f",
+  sha256: "d2f01f6effe29d01098b2bd5c26a6a3be0e4ce0868ec2ab9097d8ce12b45abb9",
   eyebrow: "PRIVACYBELEID · v3.8 · VAN KRACHT OP 12 OKTOBER 2026",
   title: "Wat wij opslaan en waarom",
   lede: "Uw rechten en onze verplichtingen krachtens de GDPR (EU) 2016/679, in begrijpelijke taal. Veertien hoofdstukken en Bijlage B — scrol tot het einde.",

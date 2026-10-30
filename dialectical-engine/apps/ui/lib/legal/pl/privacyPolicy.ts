@@ -63,7 +63,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         ]
       },
       { kind: "p", text: "Podczas rejestracji sprawdzamy kraj adresu IP lokalnie za pomocą DB-IP Lite i listy adresów wyjściowych Tor; nie wysyłamy adresu do zewnętrznego dostawcy. Odmawiamy rejestracji z krajów, w których usługa jest niedostępna, z Tor i z adresów o nieznanym kraju. Przed rozpoczęciem każdej nowej debaty sprawdzamy też lokalnie kraj adresu IP i możemy odmówić, jeśli znajduje się on na liście krajów zawsze blokowanych. Czat pomocy jest sprawdzany w ten sam sposób: na pierwszej stronie każdej karty przeglądarki, która pokazałaby Pomoc, oraz przy każdym żądaniu do wsparcia ustalamy kraj Twojego adresu IP i sprawdzamy listę adresów wyjściowych Tor. Tam, gdzie nie świadczymy usługi, za wyjściem Tor lub gdy nie można ustalić kraju, czat pomocy nie jest pokazywany, a żądania do wsparcia są odrzucane. Strona otrzymuje tylko trzy odpowiedzi typu tak lub nie, czyli czy rejestracja, płatność i czat pomocy są tam oferowane, a nigdy kraj; zachowuje wyłącznie odpowiedź dotyczącą czatu pomocy, w karcie, dopóki jej nie zamkniesz (sekcja 13). Niczego z tego sprawdzenia nie przechowujemy i nie zapisuje ono wpisu w dzienniku audytu. Podajesz datę urodzenia wyłącznie do sprawdzenia wieku: nie zapisujemy jej. Zapis wieku przy pomyślnej rejestracji oznacza „pozytywny”; w przypadku istniejących kont może też oznaczać „negatywny”. Wybierasz kraj zamieszkania, a w USA również stan, abyśmy mogli stosować właściwe przepisy konsumenckie, dotyczące prywatności i podatków." },
-      { kind: "p", text: "Nie gromadzimy danych analitycznych ani telemetrycznych dotyczących sposobu korzystania przez Ciebie z produktu i nie ustawiamy w tym celu plików cookie. Jeżeli to się zmieni, najpierw zmienimy niniejszą politykę i Politykę plików cookie oraz poprosimy Cię o dokonanie wyboru." }
+      { kind: "p", text: "Nie gromadzimy danych analitycznych ani telemetrycznych dotyczących sposobu korzystania przez Ciebie z produktu i nie ustawiamy w tym celu plików cookie; przechowujemy tylko to, czego strony potrzebują, aby działać dla Ciebie, i wymieniamy to w tej tabeli (na przykład datę ostatniego otwarcia mapy debaty). Jeżeli to się zmieni, najpierw zmienimy niniejszą politykę i Politykę plików cookie oraz poprosimy Cię o dokonanie wyboru." }
     ]
   },
   {
@@ -349,7 +349,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.8",
-  sha256: "cdda772e4b7d9098f97b8fcf44c789a8efc6e27f6d98b8b6748c6217c9a1f717",
+  sha256: "e7d4c8f37a70409f3e4ceca6d5c3da05632e81eb6abd945a630a5221fea2064f",
   eyebrow: "POLITYKA PRYWATNOŚCI · v3.8 · OBOWIĄZUJE OD 12 PAŹDZIERNIKA 2026",
   title: "Co przechowujemy i dlaczego",
   lede: "Twoje prawa i nasze obowiązki wynikające z RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679), wyjaśnione prostym językiem. Czternaście sekcji i załącznik B — przewiń do końca.",

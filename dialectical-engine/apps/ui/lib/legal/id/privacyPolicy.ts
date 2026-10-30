@@ -63,7 +63,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         ]
       },
       { kind: "p", text: "Saat mendaftar, kami memeriksa negara alamat IP dan usia Anda. Tanggal lahir dikirim untuk pemeriksaan saja dan tidak disimpan. Pemeriksaan IP dilakukan secara lokal tanpa mengirimkan alamat itu ke pihak ketiga. Sebelum setiap debat baru, kami juga memeriksa negara IP secara lokal; debat ditolak jika negaranya selalu diblokir. Obrolan bantuan diperiksa dengan cara yang sama: pada halaman pertama setiap tab browser yang akan menampilkan Bantuan, dan pada setiap permintaan dukungan, kami mencari negara alamat IP Anda secara lokal dan memeriksa daftar keluar Tor. Jika kami tidak melayani negara itu, jika alamat berasal dari titik keluar Tor, atau jika negaranya tidak dapat ditentukan, obrolan bantuan tidak ditampilkan dan permintaan dukungan ditolak. Halaman hanya menerima tiga jawaban ya atau tidak, yaitu apakah pendaftaran, pembayaran, dan obrolan bantuan ditawarkan di sana, dan tidak pernah negaranya; halaman hanya menyimpan jawaban obrolan bantuan, di tab, sampai Anda menutupnya (bagian 13). Kami tidak menyimpan apa pun dari pencarian ini, dan pencarian ini tidak menulis entri audit." },
-      { kind: "p", text: "Kami tidak mengumpulkan analitik atau telemetri tentang cara Anda menggunakan produk, dan kami tidak memasang kuki untuk tujuan tersebut. Jika hal itu berubah, kebijakan ini dan Kebijakan Kuki akan berubah terlebih dahulu, dan Anda akan dimintai persetujuan." }
+      { kind: "p", text: "Kami tidak mengumpulkan analitik atau telemetri tentang cara Anda menggunakan produk, dan kami tidak memasang kuki untuk tujuan tersebut; kami hanya menyimpan apa yang diperlukan halaman agar berfungsi untuk Anda, yang tercantum dalam tabel ini (misalnya kapan terakhir kali Anda membuka peta sebuah debat). Jika hal itu berubah, kebijakan ini dan Kebijakan Kuki akan berubah terlebih dahulu, dan Anda akan dimintai persetujuan." }
     ]
   },
   {
@@ -349,7 +349,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.8",
-  sha256: "5711a5b769b07d61d0aa6fe71966b7a7e4aafda359783dafae6a9c4b8a3fb44b",
+  sha256: "bc11e2067145f1757798bcb2b85ceb66ee5d6352d7e061e47c3efb638a4fd0a5",
   eyebrow: "KEBIJAKAN PRIVASI · v3.8 · BERLAKU 12 OKTOBER 2026",
   title: "Apa yang kami simpan, dan alasannya",
   lede: "Hak Anda dan kewajiban kami berdasarkan GDPR (EU) 2016/679, dalam bahasa yang mudah dipahami. Empat belas bagian dan Lampiran B — gulir hingga akhir.",

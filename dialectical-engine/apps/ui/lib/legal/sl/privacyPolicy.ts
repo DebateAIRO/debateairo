@@ -63,7 +63,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         ]
       },
       { kind: "p", text: "Ob registraciji lokalno preverimo državo naslova IP s podatki DB-IP Lite in seznamom izhodnih vozlišč Tor; naslova ne pošljemo tretji osebi. Registracijo zavrnemo iz držav, kjer storitev ni na voljo, z izhodnih vozlišč Tor in z naslovov, katerih države ne poznamo. Pred vsako novo razpravo prav tako lokalno preverimo državo naslova IP in lahko razpravo zavrnemo, če je država na seznamu vedno blokiranih. Klepet za pomoč se preverja enako: na prvi strani vsakega zavihka brskalnika, ki bi prikazal Pomoč, in ob vsaki zahtevi za podporo poiščemo državo vašega naslova IP in preverimo seznam izhodnih vozlišč Tor. Kjer storitev ni na voljo, za izhodnim vozliščem Tor ali kadar države ni mogoče določiti, se klepet za pomoč ne prikaže in zahteve za podporo se zavrnejo. Stran prejme samo tri odgovore da ali ne, ali so tam ponujeni registracija, plačilo in klepet za pomoč, in nikoli države; hrani samo odgovor o klepetu za pomoč, v zavihku, dokler ga ne zaprete (razdelek 13). Ničesar od tega iskanja ne hranimo in ne zapiše nobenega vnosa v revizijsko sled. Rojstni datum vnesete samo zaradi preverjanja starosti; ne shranimo ga. Ob uspešni registraciji shranimo rezultat »uspešen«; pri obstoječih računih je lahko rezultat tudi »zavrnjen«. Navedete še državo prebivališča in v ZDA zvezno državo, da uporabimo ustrezna pravila varstva potrošnikov, zasebnosti in davkov." },
-      { kind: "p", text: "Ne zbiramo analitičnih ali telemetričnih podatkov o vaši uporabi izdelka in v ta namen ne nameščamo piškotkov. Če se to spremeni, bomo najprej spremenili ta pravilnik in Pravilnik o piškotkih ter vas prosili za odločitev." }
+      { kind: "p", text: "Ne zbiramo analitičnih ali telemetričnih podatkov o vaši uporabi izdelka in v ta namen ne nameščamo piškotkov; hranimo le tisto, kar strani potrebujejo, da vam delujejo, in to je navedeno v tej tabeli (na primer, kdaj ste nazadnje odprli zemljevid neke razprave). Če se to spremeni, bomo najprej spremenili ta pravilnik in Pravilnik o piškotkih ter vas prosili za odločitev." }
     ]
   },
   {
@@ -349,7 +349,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.8",
-  sha256: "ba057de2ec4ad7dcdc92b03fb14ace53a84ed37c62aef4a8d917c6601f173fbf",
+  sha256: "b7b3ac071a0c60ead2df8dabe405af4c49e6fda73e315345314b4aa36b23c637",
   eyebrow: "PRAVILNIK O ZASEBNOSTI · v3.8 · VELJA OD 12. OKTOBRA 2026",
   title: "Kaj hranimo in zakaj",
   lede: "Vaše pravice in naše obveznosti po GDPR (EU) 2016/679 v razumljivem jeziku. Štirinajst razdelkov in Priloga B — pomaknite se do konca.",

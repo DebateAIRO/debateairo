@@ -63,7 +63,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         ]
       },
       { kind: "p", text: "No registo, determinamos localmente o país do seu endereço IP com o DB-IP Lite e verificamos separadamente a lista de saídas Tor, sem enviar o endereço a terceiros. Recusamos registos de países onde o serviço não está disponível, de endereços de saída Tor e de endereços cujo país é desconhecido. Antes de cada novo debate, também verificamos localmente o país do IP e podemos recusá-lo se o país constar da lista de bloqueio permanente. O chat de ajuda é verificado da mesma forma: na primeira página de cada separador do navegador que mostraria Ajuda, e em cada pedido de apoio, determinamos o país do seu endereço IP e verificamos a lista de saídas Tor. Onde não prestamos o serviço, atrás de uma saída Tor ou quando o país não pode ser determinado, o chat de ajuda não é mostrado e os pedidos de apoio são recusados. A página recebe apenas três respostas de sim ou não, a indicar se o registo, o pagamento e o chat de ajuda são oferecidos aí, e nunca o país; guarda apenas a resposta do chat de ajuda, no separador, até o fechar (secção 13). Não conservamos nada desta consulta e ela não escreve nenhuma entrada no registo de auditoria. Indica a data de nascimento apenas para verificar a idade; não a guardamos. Os registos criados após uma inscrição aceite têm resultado «aprovado»; a verificação de contas já existentes pode ter resultado «aprovado» ou «recusado». Escolhe também o país onde reside e, nos EUA, o estado, para aplicarmos as regras de consumo, privacidade e fiscais pertinentes." },
-      { kind: "p", text: "Não recolhemos dados analíticos nem telemetria sobre a forma como utiliza o produto e não instalamos cookies para esse fim. Se isso mudar, esta política e a Política de Cookies serão alteradas primeiro, e ser-lhe-á pedido o seu consentimento." }
+      { kind: "p", text: "Não recolhemos dados analíticos nem telemetria sobre a forma como utiliza o produto e não instalamos cookies para esse fim; guardamos apenas aquilo de que as páginas precisam para funcionar para si, indicado nesta tabela (por exemplo, quando abriu pela última vez o mapa de um debate). Se isso mudar, esta política e a Política de Cookies serão alteradas primeiro, e ser-lhe-á pedido o seu consentimento." }
     ]
   },
   {
@@ -349,7 +349,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.8",
-  sha256: "6db6260d30c0e3937b18731a448119c96a587ac65c65a5631a32dcef7d14f5cc",
+  sha256: "97550dbff5287fe0b10c53d52a8feb1a0d6564923eecdc83fc8515f800b63f92",
   eyebrow: "POLÍTICA DE PRIVACIDADE · v3.8 · EM VIGOR DESDE 12 DE OUTUBRO DE 2026",
   title: "O que armazenamos e porquê",
   lede: "Os seus direitos e as nossas obrigações ao abrigo do GDPR (EU) 2016/679, em linguagem clara. Catorze secções e o Anexo B — desloque-se até ao fim.",

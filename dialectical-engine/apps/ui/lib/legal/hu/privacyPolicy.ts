@@ -63,7 +63,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         ]
       },
       { kind: "p", text: "Regisztrációnál ellenőrizzük az IP-cím országát és az életkort. A születési dátumot kizárólag ellenőrzésre küldi el; nem tároljuk. Az IP-ellenőrzés helyben történik, harmadik félhez nem kerül a cím. Minden új vita előtt is helyben ellenőrizzük az IP-cím országát; a mindig tiltott országokból induló vitát elutasítjuk. A súgócsevegést ugyanígy ellenőrizzük: minden olyan böngészőlap első oldalán, amely Súgót jelenítene meg, és minden támogatási kérésnél helyben megkeressük az Ön IP-címének országát, és ellenőrizzük a Tor-kilépőcímek listáját. Ha olyan országból érkezik, ahol nem nyújtjuk a szolgáltatást, Tor-kilépőpont mögül, vagy ha az ország nem határozható meg, a súgócsevegés nem jelenik meg, a támogatási kéréseket pedig elutasítjuk. Az oldal csak három igen-nem választ kap arról, hogy ott kínálunk-e regisztrációt, fizetést és súgócsevegést, az országot soha; a böngészőlapban csak a súgócsevegésre adott választ tartja meg, amíg Ön be nem zárja a lapot (13. szakasz). Ebből a keresésből semmit nem őrzünk meg, és nem ír auditbejegyzést." },
-      { kind: "p", text: "Nem gyűjtünk analitikai vagy telemetriai adatokat arról, hogyan használja a terméket, és ilyen célból sütiket sem helyezünk el. Ha ez megváltozik, előbb ezt a szabályzatot és a Sütiszabályzatot módosítjuk, és az Ön döntését kérjük." }
+      { kind: "p", text: "Nem gyűjtünk analitikai vagy telemetriai adatokat arról, hogyan használja a terméket, és ilyen célból sütiket sem helyezünk el; csak azt őrizzük meg, amire az oldalaknak szükségük van ahhoz, hogy az Ön számára működjenek, és ezt ez a táblázat sorolja fel (például azt, hogy mikor nyitotta meg utoljára egy vita térképét). Ha ez megváltozik, előbb ezt a szabályzatot és a Sütiszabályzatot módosítjuk, és az Ön döntését kérjük." }
     ]
   },
   {
@@ -349,7 +349,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.8",
-  sha256: "50af83c72a7278d97d8bb286837e4b93a7adc647bbaee683ee7806bb2d6cee6a",
+  sha256: "f216713d845a574bcd78cfb36364dc26840dce01fb28f6d41aff0f56a5f3518f",
   eyebrow: "ADATVÉDELMI SZABÁLYZAT · v3.8 · HATÁLYOS 2026. OKTÓBER 12.",
   title: "Mit tárolunk és miért",
   lede: "Az Ön jogai és a GDPR (EU) 2016/679 szerinti kötelezettségeink közérthetően. Tizennégy szakasz és a B. melléklet — görgessen a végéig.",

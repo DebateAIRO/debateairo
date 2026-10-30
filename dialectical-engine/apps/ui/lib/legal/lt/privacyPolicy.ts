@@ -63,7 +63,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         ]
       },
       { kind: "p", text: "Registruojantis tikriname IP adreso šalį ir amžių. Gimimo data perduodama tik patikrai ir nesaugoma. IP patikra atliekama vietoje, nesiunčiant adreso trečiajai šaliai. Prieš kiekvienus naujus debatus taip pat vietoje tikriname IP adreso šalį; debatus atmetame, jei šalis visada blokuojama. Pagalbos pokalbis tikrinamas taip pat: pirmajame kiekvieno naršyklės skirtuko, kuriame būtų rodoma Pagalba, puslapyje ir kiekvienos pagalbos užklausos metu vietoje nustatome jūsų IP adreso šalį ir tikriname Tor išėjimo mazgų sąrašą. Jei esate šalyje, kurioje neteikiame paslaugos, naudojate Tor išėjimo mazgą arba šalies nustatyti negalima, pagalbos pokalbis nerodomas, o pagalbos užklausos atmetamos. Puslapis gauna tik tris atsakymus taip arba ne, ar ten siūloma registracija, mokėjimas ir pagalbos pokalbis, ir niekada šalies; skirtuke jis išsaugo tik pagalbos pokalbio atsakymą, kol skirtuką uždarysite (13 skyrius). Iš šios paieškos nieko nesaugome, ir ji nerašo jokio audito įrašo." },
-      { kind: "p", text: "Nerenkame analitikos ar telemetrijos duomenų apie tai, kaip naudojatės produktu, ir šiuo tikslu nenustatome slapukų. Jei tai pasikeis, pirmiausia bus pakeista ši politika ir Slapukų politika, o jūsų bus paprašyta pasirinkti." }
+      { kind: "p", text: "Nerenkame analitikos ar telemetrijos duomenų apie tai, kaip naudojatės produktu, ir šiuo tikslu nenustatome slapukų; saugome tik tai, ko puslapiams reikia, kad jie jums veiktų, ir tai išvardyta šioje lentelėje (pavyzdžiui, kada paskutinį kartą atidarėte kurių nors debatų žemėlapį). Jei tai pasikeis, pirmiausia bus pakeista ši politika ir Slapukų politika, o jūsų bus paprašyta pasirinkti." }
     ]
   },
   {
@@ -349,7 +349,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.8",
-  sha256: "4a2a920c0008aae47c65919a818d8818b24e818d5c2bcbfc700698895161094e",
+  sha256: "28cc07f1390ebec9dee00e20ec97afabfb542fe5d8addab351026750e78f23be",
   eyebrow: "PRIVATUMO POLITIKA · v3.8 · ĮSIGALIOJA 2026 M. SPALIO 12 D.",
   title: "Ką saugome ir kodėl",
   lede: "Jūsų teisės ir mūsų pareigos pagal GDPR (EU) 2016/679, paaiškintos paprastai. Keturiolika skyrių ir B priedas — slinkite iki pabaigos.",

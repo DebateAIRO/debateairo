@@ -63,7 +63,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         ]
       },
       { kind: "p", text: "Pri registrácii zisťujeme krajinu IP adresy lokálne pomocou DB-IP Lite a osobitne kontrolujeme zoznam výstupných uzlov Tor; adresu neposielame tretej strane. Odmietneme registráciu z krajín, v ktorých službu neponúkame, z výstupných uzlov Tor a z adries s neznámou krajinou. Pred každou novou debatou tiež lokálne kontrolujeme krajinu IP adresy a môžeme ju odmietnuť, ak je krajina na zozname trvalo blokovaných. Chat pomoci sa kontroluje rovnako: na prvej stránke každej karty prehliadača, na ktorej by sa zobrazila Pomoc, a pri každej žiadosti o podporu zisťujeme krajinu vašej IP adresy a kontrolujeme zoznam výstupných uzlov Tor. Kde službu neponúkame, za výstupným uzlom Tor alebo keď sa krajina nedá zistiť, chat pomoci sa nezobrazí a žiadosti o podporu sa odmietnu. Stránka dostane iba tri odpovede áno alebo nie, a to či sa tam ponúka registrácia, platba a chat pomoci, a nikdy krajinu; uchováva iba odpoveď o chate pomoci, na karte, kým ju nezatvoríte (časť 13). Z tohto zisťovania nič neuchovávame a ani samotné zisťovanie nezapisuje do auditného záznamu žiadnu položku. Dátum narodenia zadáte iba na overenie veku; neukladáme ho. Pri úspešnej registrácii sa uloží výsledok „úspešný“; pri existujúcich účtoch môže byť aj „zamietnutý“. Vyberiete tiež krajinu pobytu a v USA štát, aby sme uplatnili príslušné pravidlá ochrany spotrebiteľa, ochrany osobných údajov a daňové pravidlá." },
-      { kind: "p", text: "Nezhromažďujeme analytické ani telemetrické údaje o používaní produktu a na tento účel nenastavujeme súbory cookie. Ak sa to zmení, najskôr zmeníme tieto zásady a Zásady používania súborov cookie a požiadame vás o rozhodnutie." }
+      { kind: "p", text: "Nezhromažďujeme analytické ani telemetrické údaje o používaní produktu a na tento účel nenastavujeme súbory cookie; uchovávame len to, čo stránky potrebujú, aby vám fungovali, a je to uvedené v tejto tabuľke (napríklad kedy ste naposledy otvorili mapu niektorej debaty). Ak sa to zmení, najskôr zmeníme tieto zásady a Zásady používania súborov cookie a požiadame vás o rozhodnutie." }
     ]
   },
   {
@@ -349,7 +349,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.8",
-  sha256: "7b64857ad8acb64656db84fe6226e695991e630cf279e5036724ef2d8fa5107b",
+  sha256: "076a1635ba33eb2f7a1d5af535048cc8f3cd724e24e3410f194c72e5c393e768",
   eyebrow: "ZÁSADY OCHRANY OSOBNÝCH ÚDAJOV · v3.8 · ÚČINNÉ OD 12. OKTÓBRA 2026",
   title: "Čo uchovávame a prečo",
   lede: "Vaše práva a naše povinnosti podľa GDPR (EU) 2016/679 zrozumiteľne. Štrnásť častí a príloha B — prejdite až na koniec.",

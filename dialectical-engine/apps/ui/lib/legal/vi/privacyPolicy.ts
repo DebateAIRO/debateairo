@@ -63,7 +63,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         ]
       },
       { kind: "p", text: "Khi đăng ký, chúng tôi kiểm tra quốc gia của địa chỉ IP ngay trên hệ thống bằng DB-IP Lite và danh sách địa chỉ thoát Tor, không gửi địa chỉ cho bên thứ ba. Chúng tôi từ chối đăng ký từ quốc gia chưa cung cấp dịch vụ, từ địa chỉ thoát Tor và từ địa chỉ không xác định được quốc gia. Trước mỗi cuộc tranh luận mới, chúng tôi cũng kiểm tra quốc gia của IP ngay trên hệ thống và có thể từ chối nếu quốc gia thuộc danh sách luôn bị chặn. Cuộc trò chuyện trợ giúp được kiểm tra theo cách tương tự: trên trang đầu tiên của mỗi thẻ trình duyệt sẽ hiển thị Trợ giúp, và ở mỗi yêu cầu gửi đến trò chuyện hỗ trợ, chúng tôi tra cứu quốc gia của địa chỉ IP của bạn và kiểm tra danh sách địa chỉ thoát Tor. Ở nơi chúng tôi không cung cấp dịch vụ, sau một địa chỉ thoát Tor, hoặc khi không xác định được quốc gia, cuộc trò chuyện trợ giúp không được hiển thị và các yêu cầu gửi đến trò chuyện hỗ trợ bị từ chối. Trang chỉ nhận ba câu trả lời có hoặc không, cho biết đăng ký, thanh toán và cuộc trò chuyện trợ giúp có được cung cấp ở đó hay không, và không bao giờ nhận quốc gia; trang chỉ giữ câu trả lời về cuộc trò chuyện trợ giúp, trong thẻ, cho đến khi bạn đóng thẻ (mục 13). Chúng tôi không lưu giữ gì từ lần tra cứu này và nó không ghi bản ghi nào vào nhật ký kiểm toán. Bạn nhập ngày sinh chỉ để kiểm tra độ tuổi; chúng tôi không lưu ngày sinh. Đăng ký thành công chỉ lưu kết quả “đạt”; với tài khoản đã tồn tại, kết quả có thể là “đạt” hoặc “không đạt”. Bạn cũng chọn quốc gia cư trú và, nếu ở Hoa Kỳ, tiểu bang để chúng tôi áp dụng quy định về người tiêu dùng, quyền riêng tư và thuế phù hợp." },
-      { kind: "p", text: "Chúng tôi không thu thập dữ liệu phân tích hoặc dữ liệu đo từ xa về cách bạn sử dụng sản phẩm và không đặt cookie cho mục đích đó. Nếu điều này thay đổi, chính sách này và Chính sách Cookie sẽ được thay đổi trước, đồng thời bạn sẽ được hỏi ý kiến." }
+      { kind: "p", text: "Chúng tôi không thu thập dữ liệu phân tích hoặc dữ liệu đo từ xa về cách bạn sử dụng sản phẩm và không đặt cookie cho mục đích đó; chúng tôi chỉ lưu giữ những gì các trang cần để hoạt động cho bạn, được liệt kê trong bảng này (chẳng hạn như lần cuối bạn mở bản đồ của một cuộc tranh luận). Nếu điều này thay đổi, chính sách này và Chính sách Cookie sẽ được thay đổi trước, đồng thời bạn sẽ được hỏi ý kiến." }
     ]
   },
   {
@@ -349,7 +349,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.8",
-  sha256: "ab314406cb03a8943aaa6666deca4827d3dc84823cb0652f00ee2680ceebef2b",
+  sha256: "5bb90f7865af4d91d3ca3c79719361f87ff59bd95dd250d4b849e5ed94b854b2",
   eyebrow: "CHÍNH SÁCH QUYỀN RIÊNG TƯ · v3.8 · CÓ HIỆU LỰC 12 THÁNG 10 NĂM 2026",
   title: "Dữ liệu chúng tôi lưu trữ và lý do",
   lede: "Các quyền của bạn và nghĩa vụ của chúng tôi theo GDPR (EU) 2016/679, được trình bày bằng ngôn ngữ dễ hiểu. Mười bốn mục và Phụ lục B — cuộn đến cuối.",

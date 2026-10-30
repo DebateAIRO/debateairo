@@ -63,7 +63,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         ]
       },
       { kind: "p", text: "La înregistrare, stabilim local țara adresei IP cu DB-IP Lite și verificăm separat lista adreselor de ieșire Tor, fără a trimite adresa unui terț. Refuzăm înregistrarea din țările în care serviciul nu este disponibil, de la adresele de ieșire Tor și de la adresele a căror țară nu este cunoscută. La începutul fiecărei dezbateri noi, verificăm tot local țara adresei IP și putem refuza dezbaterea dacă țara se află pe lista celor blocate întotdeauna. Chatul de ajutor este verificat în același mod: pe prima pagină a fiecărei file de browser care ar afișa Ajutor, precum și la fiecare solicitare de asistență, căutăm țara adresei dumneavoastră IP și verificăm lista adreselor de ieșire Tor. Acolo unde nu deservim, în spatele unei ieșiri Tor sau când țara nu poate fi stabilită, chatul de ajutor nu este afișat, iar solicitările de asistență sunt refuzate. Pagina primește doar trei răspunsuri de tip da sau nu, anume dacă înregistrarea, plata și chatul de ajutor sunt oferite acolo, și niciodată țara; păstrează numai răspunsul privind chatul de ajutor, în filă, până când o închideți (secțiunea 13). Nu păstrăm nimic din această căutare și ea nu scrie nicio înregistrare în jurnalul de audit. Introduceți data nașterii numai pentru verificarea vârstei; nu o stocăm. Pentru înregistrările reușite, rezultatul păstrat este „admis”; pentru conturile deja existente, poate fi „admis” sau „respins”. Declarați și țara în care locuiți, precum și statul dacă locuiți în SUA, pentru a aplica normele privind consumatorii, confidențialitatea și taxele." },
-      { kind: "p", text: "Nu colectăm date analitice sau de telemetrie despre modul în care utilizați produsul și nu setăm module cookie în acest scop. Dacă acest lucru se schimbă, prezenta politică și Politica privind modulele cookie vor fi modificate mai întâi, iar dumneavoastră veți fi întrebat." }
+      { kind: "p", text: "Nu colectăm date analitice sau de telemetrie despre modul în care utilizați produsul și nu setăm module cookie în acest scop; păstrăm doar ceea ce le este necesar paginilor pentru a funcționa pentru dumneavoastră, după cum arată acest tabel (de exemplu, când ați deschis ultima dată harta unei dezbateri). Dacă acest lucru se schimbă, prezenta politică și Politica privind modulele cookie vor fi modificate mai întâi, iar dumneavoastră veți fi întrebat." }
     ]
   },
   {
@@ -349,7 +349,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.8",
-  sha256: "161658cc80f0919b13471b2b900bb9a778e4109008134e038200a7960d5cd8a3",
+  sha256: "915e2c514aef25440efc62e922ce0de0cab8e7debdd45ec783233995c2badbaa",
   eyebrow: "POLITICA DE CONFIDENȚIALITATE · v3.8 · ÎN VIGOARE DE LA 12 OCTOMBRIE 2026",
   title: "Ce stocăm și de ce",
   lede: "Drepturile dumneavoastră și obligațiile noastre în temeiul GDPR (EU) 2016/679, într-un limbaj clar. Paisprezece secțiuni și Anexa B — derulați până la final.",

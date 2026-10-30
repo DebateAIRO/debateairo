@@ -63,7 +63,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         ]
       },
       { kind: "p", text: "Kayıt sırasında IP adresinizin ülkesini DB-IP Lite ile yerel olarak belirler, Tor çıkış adresleri listesini ayrıca kontrol ederiz; adresi üçüncü tarafa göndermeyiz. Hizmet sunmadığımız ülkelerden, Tor çıkış adreslerinden ve ülkesi bilinmeyen adreslerden kaydı reddederiz. Her yeni tartışma başlamadan önce IP adresinin ülkesini yine yerel olarak kontrol eder ve ülke her zaman engellenenler listesindeyse tartışmayı reddedebiliriz. Yardım sohbeti de aynı şekilde kontrol edilir: Yardım gösterecek her tarayıcı sekmesinin ilk sayfasında ve destek sohbetine yapılan her istekte IP adresinizin ülkesini arar ve Tor çıkış adresleri listesini kontrol ederiz. Hizmet sunmadığımız yerlerde, bir Tor çıkışının arkasında veya ülke belirlenemediğinde yardım sohbeti gösterilmez ve destek sohbetine yapılan istekler reddedilir. Sayfa yalnızca kayıt, ödeme ve yardım sohbetinin orada sunulup sunulmadığına ilişkin üç evet-hayır yanıtı alır, ülkeyi asla almaz; yalnızca yardım sohbetinin yanıtını, siz kapatana kadar sekmede tutar (bölüm 13). Bu aramadan hiçbir şey saklamayız ve arama denetim kaydına giriş yazmaz. Doğum tarihinizi yalnızca yaş kontrolü için girersiniz; saklamayız. Başarılı kayıtta saklanan sonuç “geçti”dir; mevcut hesapların kontrolünde sonuç “geçti” veya “reddedildi” olabilir. Tüketici, gizlilik ve vergi kurallarını uygulamak için ikamet ülkenizi, ABD’deyseniz eyaletinizi de seçersiniz." },
-      { kind: "p", text: "Ürünü nasıl kullandığınıza ilişkin analitik veya telemetri toplamayız ve bu amaçla hiçbir çerez yerleştirmeyiz. Bu değişecek olursa önce bu politika ve Çerez Politikası değişir ve size sorulur." }
+      { kind: "p", text: "Ürünü nasıl kullandığınıza ilişkin analitik veya telemetri toplamayız ve bu amaçla hiçbir çerez yerleştirmeyiz; yalnızca sayfaların size hizmet edebilmesi için gerekenleri saklarız ve bunlar bu tabloda listelenmiştir (örneğin bir tartışmanın haritasını en son ne zaman açtığınız). Bu değişecek olursa önce bu politika ve Çerez Politikası değişir ve size sorulur." }
     ]
   },
   {
@@ -349,7 +349,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.8",
-  sha256: "75a3063be3aa5a8102a38965ecddc0005a3a13e7ea2ef36f11230731368c033a",
+  sha256: "4bdf98078c7ca7da521c256ec3fbcaa4e2a45a0aa74706dac5e30bbce23afca1",
   eyebrow: "GİZLİLİK POLİTİKASI · v3.8 · YÜRÜRLÜK TARİHİ 12 EKİM 2026",
   title: "Neleri neden saklıyoruz?",
   lede: "GDPR (EU) 2016/679 kapsamındaki haklarınız ve yükümlülüklerimiz sade bir dille açıklanmıştır. On dört bölüm ve Ek B — sonuna kadar kaydırın.",

@@ -50,7 +50,7 @@ Mēs vācam tikai to, kas nepieciešams konta darbībai, ko jūs izvēlaties mum
 
 Reģistrējoties pārbaudām IP adreses valsti un vecumu. Dzimšanas datumu nosūta tikai pārbaudei, un tas netiek glabāts. IP pārbaude notiek lokāli, nenosūtot adresi trešajai personai. Pirms katrām jaunām debatēm lokāli pārbaudām arī IP adreses valsti; debates atsakām, ja valsts vienmēr ir bloķēta. Palīdzības tērzēšanu pārbauda tādā pašā veidā: katras pārlūkprogrammas cilnes pirmajā lapā, kurā tiktu rādīta Palīdzība, un katra atbalsta pieprasījuma laikā mēs lokāli noskaidrojam jūsu IP adreses valsti un pārbaudām Tor izejas mezglu sarakstu. Ja esat valstī, kur mēs nesniedzam pakalpojumu, aiz Tor izejas mezgla vai ja valsti nevar noteikt, palīdzības tērzēšana netiek rādīta un atbalsta pieprasījumi tiek atteikti. Lapa saņem tikai trīs atbildes „jā” vai „nē”: vai tur tiek piedāvāta reģistrācija, maksājums un palīdzības tērzēšana, un nekad valsti; cilnē tā saglabā tikai palīdzības tērzēšanas atbildi, līdz cilni aizverat (13. sadaļa). No šīs noskaidrošanas mēs neko neglabājam, un tā neraksta nevienu audita ierakstu.
 
-Mēs **nevācam** analītikas vai telemetrijas datus par to, kā izmantojat produktu, un šādam nolūkam neiestatām sīkdatnes. Ja tas mainīsies, vispirms tiks mainītas šī politika un Sīkdatņu politika un jums tiks lūgta piekrišana.
+Mēs **nevācam** analītikas vai telemetrijas datus par to, kā izmantojat produktu, un šādam nolūkam neiestatām sīkdatnes; mēs glabājam tikai to, kas lapām nepieciešams, lai tās jums darbotos, un tas ir uzskaitīts šajā tabulā (piemēram, kad pēdējo reizi atvērāt kādu debašu karti). Ja tas mainīsies, vispirms tiks mainītas šī politika un Sīkdatņu politika un jums tiks lūgta piekrišana.
 
 ## 3. Sensitīva informācija
 

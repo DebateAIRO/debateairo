@@ -63,7 +63,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         ]
       },
       { kind: "p", text: "Waqt ir-reġistrazzjoni nivverifikaw il-pajjiż tal-IP u l-età. Id-data tat-twelid tintbagħat għall-verifika biss u ma tinħażinx. Il-verifika tal-IP issir lokalment mingħajr ma jintbagħat l-indirizz lil terzi. Qabel kull dibattitu ġdid nivverifikaw ukoll lokalment il-pajjiż tal-IP; id-dibattitu jiġi rrifjutat jekk il-pajjiż ikun dejjem imblukkat. Iċ-chat tal-għajnuna jiġi vverifikat bl-istess mod: fl-ewwel paġna ta’ kull tab tal-browser li tkun se turi Għajnuna, u f’kull talba ta’ appoġġ, infittxu lokalment il-pajjiż tal-indirizz IP tiegħek u nivverifikaw il-lista tal-indirizzi tal-ħruġ ta’ Tor. Fejn ma nipprovdux is-servizz, wara ħruġ ta’ Tor, jew meta l-pajjiż ma jistax jiġi ddeterminat, iċ-chat tal-għajnuna ma jintwerax u t-talbiet ta’ appoġġ jiġu rrifjutati. Il-paġna tirċievi biss tliet tweġibiet iva jew le, jekk ir-reġistrazzjoni, il-ħlas u ċ-chat tal-għajnuna humiex offruti hemmhekk, u qatt il-pajjiż; iżżomm biss it-tweġiba taċ-chat tal-għajnuna, fit-tab, sakemm tagħlaqha (taqsima 13). Ma nżommu xejn minn din it-tfittxija, u ma tikteb ebda entrata tal-awditjar." },
-      { kind: "p", text: "Ma niġbrux analitika jew telemetrija dwar kif tuża l-prodott, u ma nużaw ebda cookies għal dan il-għan. Jekk dan jinbidel, l-ewwel jinbidlu din il-politika u l-Politika dwar il-Cookies, u tintalab tagħżel." }
+      { kind: "p", text: "Ma niġbrux analitika jew telemetrija dwar kif tuża l-prodott, u ma nużaw ebda cookies għal dan il-għan; inżommu biss dak li l-paġni għandhom bżonn biex jaħdmu għalik, kif imniżżel f’din it-tabella (pereżempju, meta l-aħħar fetaħt il-mappa ta’ dibattitu). Jekk dan jinbidel, l-ewwel jinbidlu din il-politika u l-Politika dwar il-Cookies, u tintalab tagħżel." }
     ]
   },
   {
@@ -349,7 +349,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.8",
-  sha256: "bf2871472ff7878a79659ed7ef3b3c6c4b1aad5b8cd71a6c14a465ff4297439e",
+  sha256: "77d26aeea1e23cab73cb26c79640e3f71ac84c3f645331b351d271966654f84e",
   eyebrow: "POLITIKA DWAR IL-PRIVATEZZA · v3.8 · EFFETTIVA 12 TA’ OTTUBRU 2026",
   title: "X’naħżnu, u għaliex",
   lede: "Id-drittijiet tiegħek u l-obbligi tagħna skont il-GDPR (EU) 2016/679, b’lingwaġġ ċar. Erbatax-il taqsima u l-Anness B — niżżel sal-aħħar.",
