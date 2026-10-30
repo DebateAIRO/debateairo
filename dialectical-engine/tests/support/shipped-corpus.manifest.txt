@@ -928,6 +928,8 @@ packages/budget/src/model-spend.ts
 packages/budget/src/person-allowance.ts
 packages/budget/src/room.ts
 packages/budget/src/spend-lock.ts
+packages/budget/src/web-charge.ts
+packages/budget/src/web-estimate.ts
 packages/contract/src/account-memory.ts
 packages/contract/src/auth-shared.ts
 packages/contract/src/billing-address.ts
@@ -1247,6 +1249,7 @@ packages/register/src/story-policy.ts
 packages/register/src/support-config.ts
 packages/register/src/support-no-source-check-policy.ts
 packages/register/src/tax-authorities.ts
+packages/register/src/web-sites.ts
 packages/scorecard/scripts/write-schema.ts
 packages/scorecard/src/estimate.ts
 packages/scorecard/src/first-call-plan-models.ts

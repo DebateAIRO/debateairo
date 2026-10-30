@@ -12,9 +12,12 @@ import {
   engineSettingsOfReceipt,
   lengthGuidanceOfReceipt,
   lengthGuidanceReceiptSchema,
+  webReceiptSchema,
+  webSitesOfReceipt,
   type DebateShapeCeilingInput,
   type EngineSettings,
-  type LengthGuidance
+  type LengthGuidance,
+  type WebSites
 } from "@debateai/register";
 import type { Pool } from "pg";
 import { allocateSequence, withWriteTransaction } from "@debateai/db";
@@ -56,7 +59,9 @@ export {
   storyCostEnvelopeReached,
   type CostEnvelopePhase,
   type DailyCostEnvelopeDecision,
+  type ProviderCachePrices,
   type ProviderTargetPrice,
+  type ProviderVendorPrices,
   type ReportedUsage,
   type RunCostEnvelopeDecision,
   type UsageCounterRead
@@ -92,8 +97,27 @@ export {
   type RunProviderSeamInput,
   type RunOwnerSpendReader,
   type SharedWallApplication,
-  type SharedWallInput
+  type SharedWallInput,
+  type WebSearchCostSeam
 } from "./model-spend.js";
+
+/** Web search (plan 2026-10-30, W2-2): one search's price and ledger name, and the web part's estimate. */
+export {
+  WEB_SEARCH_MODEL,
+  WEB_SEARCH_PROVIDER_REF,
+  WEB_SEARCH_PROVIDER_REF_PREFIX,
+  WEB_SEARCH_REQUEST_MICROS,
+  isWebSearchProviderRef,
+  webSearchChargeMicros,
+  type WebSearchOutcome
+} from "./web-charge.js";
+export {
+  WEB_CALL_ALLOWANCES,
+  estimateWebPartMicros,
+  webCallTokens,
+  type WebPartEstimate,
+  type WebRolePrices
+} from "./web-estimate.js";
 
 /**
  * Budget spec 2026-09-28 §2.3 with the paid-plans spec §2.4.1 (B1): the room for
@@ -229,7 +253,12 @@ const costEnvelopeBasisSchema = z.object({
    * Engine redesign (INTERFACE §3.2): the run's engine-2 values and extra sites; present exactly when the engine row was
    * in force at admission. Absent: engine 1. Not tied to `formula_version` (unlike `shape`).
    */
-  engine: engineReceiptSchema.optional()
+  engine: engineReceiptSchema.optional(),
+  /**
+   * Web search (plan 2026-10-30, W2-2): the run's web part (searches, reader calls, pick calls, readers 2-3 calls);
+   * present exactly when the run was admitted with web search on. Absent: no web part, today's receipt.
+   */
+  web: webReceiptSchema.optional()
 }).strict().superRefine((basis, ctx) => {
   /**
    * S09B: the serve leg is disclosed TWICE — once as the billed site count
@@ -404,6 +433,8 @@ export interface CostEnvelopeBasis {
    * `engineOfRun(basis)` (`@debateai/register`), never from `wire.engine`.
    */
   readonly engine?: EngineSettings;
+  /** Web search (W2-2): the web part the run was admitted with; absent on every run admitted without web search. */
+  readonly web?: WebSites;
   readonly wire: Readonly<Record<string, unknown>>;
 }
 
@@ -455,6 +486,7 @@ export function parseCostEnvelopeBasis(value: unknown): CostEnvelopeBasis {
     ...(parsed.data.shape === undefined ? {} : { shape: debateShapeOfReceipt(parsed.data.shape) }),
     ...(parsed.data.length === undefined ? {} : { length: lengthGuidanceOfReceipt(parsed.data.length) }),
     ...(parsed.data.engine === undefined ? {} : { engine: engineSettingsOfReceipt(parsed.data.engine) }),
+    ...(parsed.data.web === undefined ? {} : { web: webSitesOfReceipt(parsed.data.web) }),
     wire: Object.freeze(parsed.data)
   });
 }

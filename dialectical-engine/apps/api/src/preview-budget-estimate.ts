@@ -53,6 +53,7 @@ import {
   previewStorytellerOutputCap,
   previewStorytellerTokenCeiling,
   previewTierOutputBound,
+  previewVendorPrices,
   type PreviewCallTier,
   type PreviewGateRemaining,
   type PreviewGateSettings,
@@ -62,8 +63,10 @@ import {
 } from "@debateai/providers";
 import {
   lengthGuidanceAllowanceTokens, readStoryPolicyFromRegister, readStructuralCeilingPolicyInputs,
-  readSynthesisRoleControls, type DebateShapeCeilingInput, type EngineSettings
+  readSynthesisRoleControls, webReceiptSchema, webSitesOfReceipt, type DebateShapeCeilingInput, type EngineSettings,
+  type WebSites
 } from "@debateai/register";
+import { WEB_CALL_ALLOWANCES, WEB_SEARCH_REQUEST_MICROS, webCallTokens, type ProviderTargetPrice, type WebRolePrices } from "@debateai/budget";
 import type { Pool, PoolClient } from "pg";
 import { admittedEngineOf, admittedLengthOf, admittedShapeOf, expectedCallsByRoleFromBasis, mapLengthAllowanceTokens } from "./ask-model-picker.js";
 
@@ -938,7 +941,8 @@ export function estimatePreviewGateNeeds(input: PreviewEstimateSettings & Readon
   }
   const pricer = input.pricer
     ?? previewEstimatePricer({ measured: [], callOutputTokens: previewOutputTokensForBasis(input.callOutputTokens, input.basis) });
-  return gateNeeds(byGate, previewCallShares({ ...input, dearestFor: dearestByPricer(pricer, reviewedRow) }), reviewedRow, pricer);
+  return withPreviewWebNeeds(gateNeeds(byGate, previewCallShares({ ...input, dearestFor: dearestByPricer(pricer, reviewedRow) }), reviewedRow, pricer),
+    input.basis, input.panel.map((member) => reviewedRow(member.model_id)));
 }
 
 /**
@@ -963,7 +967,145 @@ export function estimateUnfinishedRunHolds(run: PreviewUnfinishedRun, settings: 
   const calls = previewCallShares({ ...settings, askProbeModelIds: [], basis: run.basis, panel: run.panel,
     roleModelOfRef: (ref) => previewModelRowForRef(ref)?.model ?? dearestRow.model, storyOnly: run.phase === "STORY", debateCallCount,
     dearestFor: dearestByPricer(pricer, rowOf), ...(rotated ? { rotated: true } : {}) });
-  return gateNeeds(byGate, calls, rowOf, pricer);
+  const needs = gateNeeds(byGate, calls, rowOf, pricer);
+  // W2-2: a debate still writing its story has done its web part.
+  return run.phase === "STORY" ? needs : withPreviewWebNeeds(needs, run.basis, run.panel.map((member) => rowOf(member.model_id)));
+}
+
+/**
+ * Web search (plan 2026-10-30, W2-2): the preview's web roles. Reader 1 and the pick are Claude Haiku (Anthropic gate);
+ * readers 2 and 3 are two other companies (DeepSeek and GLM, Qwen as the other choice), priced at the dearest of the
+ * three; the planner is an open owner choice (Q11: Haiku, DeepSeek or Qwen), priced at the dearest of them on EACH of
+ * their gates (one of the two is over-counted, never under).
+ */
+export const PREVIEW_WEB_ROLE_MODELS = Object.freeze({
+  readerOne: "claude-haiku-5-5",
+  pick: "claude-haiku-5-5",
+  topReaders: Object.freeze(["deepseek-ai/DeepSeek-V4.1-Flash", "zai-org/GLM-5.3-Flash", "Qwen/Qwen3.8-Flash"]),
+  planner: Object.freeze(["claude-haiku-5-5", "deepseek-ai/DeepSeek-V4.1-Flash", "Qwen/Qwen3.8-Flash"])
+});
+
+/** W2-2: the web part a receipt carries (its `web` member), or null for a run admitted without web search. */
+export function previewWebSitesOf(basis: Readonly<Record<string, unknown>>): WebSites | null {
+  if (basis.web === undefined) return null;
+  const parsed = webReceiptSchema.safeParse(basis.web);
+  if (!parsed.success) throw new TypeError("PREVIEW_WEB_RECEIPT_INVALID");
+  return webSitesOfReceipt(parsed.data);
+}
+
+const previewRowOrThrow = (model: string): PreviewModelRow => {
+  const row = previewModelRow(model);
+  if (row === undefined) throw new TypeError("PREVIEW_MODEL_UNREVIEWED");
+  return row;
+};
+const dearestRow = (models: readonly string[], tokens: Readonly<{ inputTokens: number; outputTokens: number }>): PreviewModelRow =>
+  models.map(previewRowOrThrow).reduce((best, row) =>
+    previewCallNanoUsd(row, BigInt(tokens.inputTokens), tokens.outputTokens) > previewCallNanoUsd(best, BigInt(tokens.inputTokens), tokens.outputTokens) ? row : best);
+
+/**
+ * One web call on a row, in nano-USD: its input at the row's price, its instruction part at the row's 5-minute
+ * cache-write price when the row caches (the dearest way the gate settles it), its output at the full max_tokens.
+ */
+function previewWebCallNanoUsd(row: PreviewModelRow, tokens: Readonly<{ inputTokens: number; outputTokens: number }>, cached: boolean): bigint {
+  const plain = previewCallNanoUsd(row, BigInt(tokens.inputTokens), tokens.outputTokens);
+  const write = row.cacheWriteInputNanoUsdPerToken;
+  if (!cached || write === undefined) return plain;
+  const instruction = BigInt(Math.min(WEB_CALL_ALLOWANCES.instructionTokens, tokens.inputTokens));
+  return plain + instruction * (write - row.inputNanoUsdPerToken);
+}
+
+/**
+ * W2-2: the web part's calls and money on each gate, at the caps (`webCallTokens`), with the estimate's 15%. The
+ * searches are NOT here: they go through the Perplexity gate, and a search it refuses costs nothing while the debate
+ * goes on without it (`previewWebSearchNeed` gives their figure for that gate). The pack's reading inside the arguing
+ * is priced on every gate the panel uses, at that gate's dearest panel row (over-counted, never under).
+ */
+export function previewWebGateShares(sites: WebSites, panelRows: readonly PreviewModelRow[]):
+  ReadonlyMap<PreviewGateKey, Readonly<{ calls: number; nanoUsd: bigint }>> {
+  const tokens = webCallTokens(sites);
+  const shares = new Map<PreviewGateKey, { calls: number; nanoUsd: bigint }>();
+  const add = (row: PreviewModelRow, calls: number, nanoUsdEach: bigint, countsAsCalls = true): void => {
+    const gate = previewGateKeyOf(row.model) ?? "deepinfra";
+    const entry = shares.get(gate) ?? { calls: 0, nanoUsd: 0n };
+    shares.set(gate, { calls: entry.calls + (countsAsCalls ? calls : 0), nanoUsd: entry.nanoUsd + BigInt(calls) * nanoUsdEach });
+  };
+  const readerOne = previewRowOrThrow(PREVIEW_WEB_ROLE_MODELS.readerOne);
+  add(readerOne, tokens.readerOne.calls, previewWebCallNanoUsd(readerOne, tokens.readerOne, true));
+  const pick = previewRowOrThrow(PREVIEW_WEB_ROLE_MODELS.pick);
+  add(pick, tokens.pick.calls, previewWebCallNanoUsd(pick, tokens.pick, true));
+  const top = dearestRow(PREVIEW_WEB_ROLE_MODELS.topReaders, tokens.topReaders);
+  add(top, tokens.topReaders.calls, previewWebCallNanoUsd(top, tokens.topReaders, true));
+  const plannerGates = new Map<PreviewGateKey, PreviewModelRow>();
+  for (const model of PREVIEW_WEB_ROLE_MODELS.planner) {
+    const row = previewRowOrThrow(model);
+    const gate = previewGateKeyOf(row.model) ?? "deepinfra";
+    const held = plannerGates.get(gate);
+    if (held === undefined || previewWebCallNanoUsd(row, tokens.planner, true) > previewWebCallNanoUsd(held, tokens.planner, true)) plannerGates.set(gate, row);
+  }
+  for (const row of plannerGates.values()) add(row, tokens.planner.calls, previewWebCallNanoUsd(row, tokens.planner, true));
+  const packGates = new Map<PreviewGateKey, PreviewModelRow>();
+  for (const row of panelRows) {
+    const gate = previewGateKeyOf(row.model) ?? "deepinfra";
+    const held = packGates.get(gate);
+    if (held === undefined || row.inputNanoUsdPerToken > held.inputNanoUsdPerToken) packGates.set(gate, row);
+  }
+  // The pack is read inside calls the debate already counts: money only, no extra calls.
+  for (const row of packGates.values()) add(row, tokens.pack.calls, BigInt(tokens.pack.inputTokens) * row.inputNanoUsdPerToken, false);
+  return new Map([...shares].map(([gate, share]) => [gate, Object.freeze({
+    calls: Number(withMargin(BigInt(share.calls))), nanoUsd: withMargin(share.nanoUsd) })]));
+}
+
+/** W2-2: what the Perplexity gate must allow for this web part: every search the cap allows, at its price. */
+export function previewWebSearchNeed(sites: WebSites): Readonly<{ searches: number; nanoUsd: bigint }> {
+  return Object.freeze({ searches: sites.searches, nanoUsd: BigInt(sites.searches) * BigInt(WEB_SEARCH_REQUEST_MICROS) * 1000n });
+}
+
+/**
+ * W2-2: the gate needs with the web part added (a run without a `web` member: unchanged). A gate the debate did not
+ * otherwise use gets its own need; the web models are NOT added to any gate's required models, because a web call a
+ * gate cannot serve fails the web step only, never the debate.
+ */
+function withPreviewWebNeeds(needs: readonly PreviewGateNeed[], basis: Readonly<Record<string, unknown>>,
+  panelRows: readonly PreviewModelRow[]): readonly PreviewGateNeed[] {
+  const sites = previewWebSitesOf(basis);
+  if (sites === null) return needs;
+  const shares = previewWebGateShares(sites, panelRows);
+  const merged = needs.map((need) => {
+    const share = shares.get(need.gate);
+    return share === undefined ? need : Object.freeze({ ...need, expectedCalls: need.expectedCalls + share.calls,
+      callsWithMargin: need.callsWithMargin + share.calls, callsNanoUsd: need.callsNanoUsd + share.nanoUsd });
+  });
+  for (const [gate, share] of shares) {
+    if (needs.some((need) => need.gate === gate)) continue;
+    merged.push(Object.freeze({ gate, modelIds: Object.freeze([]), expectedCalls: share.calls, callsWithMargin: share.calls,
+      callsNanoUsd: share.nanoUsd }));
+  }
+  return Object.freeze(merged);
+}
+
+/**
+ * W2-2: the hosted room's web role prices (`RecentRunsCostEstimator`'s `webPrices`) from the site's priced targets:
+ * each role at the dearest of its preview models the site prices; the pack at the dearest priced target. Null when the
+ * site prices no Claude Haiku (reader 1 cannot run, so there is no web part to price: a web class answers the maximum).
+ */
+export function previewWebRolePrices(prices: ReadonlyMap<string, ProviderTargetPrice>): WebRolePrices | null {
+  const priced = (model: string): ProviderTargetPrice | null => {
+    for (const [ref, price] of prices) if (previewModelRowForRef(ref)?.model === model) return price;
+    return null;
+  };
+  const dearest = (list: readonly (ProviderTargetPrice | null)[]): ProviderTargetPrice | null => list.reduce<ProviderTargetPrice | null>(
+    (best, price) => price === null ? best : best === null ? price : Object.freeze({
+      inputMicrosPerMillionTokens: Math.max(best.inputMicrosPerMillionTokens, price.inputMicrosPerMillionTokens),
+      outputMicrosPerMillionTokens: Math.max(best.outputMicrosPerMillionTokens, price.outputMicrosPerMillionTokens) }), null);
+  const haiku = priced(PREVIEW_WEB_ROLE_MODELS.readerOne);
+  const top = dearest(PREVIEW_WEB_ROLE_MODELS.topReaders.map(priced));
+  const planner = dearest(PREVIEW_WEB_ROLE_MODELS.planner.map(priced));
+  const pack = dearest([...prices.values()]);
+  if (haiku === null || top === null || planner === null || pack === null) return null;
+  // Reader 1 and the pick carry their cached instruction part at Haiku's 5-minute cache-write price (F4's real prices).
+  const vendorPrices = previewVendorPrices(previewRowOrThrow(PREVIEW_WEB_ROLE_MODELS.readerOne));
+  const cachedHaiku = vendorPrices === undefined ? haiku : Object.freeze({ ...haiku, vendorPrices });
+  return Object.freeze({ readerOne: cachedHaiku, pick: cachedHaiku, topReaders: top, planner, pack });
 }
 
 /**

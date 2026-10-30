@@ -67,7 +67,7 @@ import {
 import { journalSettingsCode } from "./admission-alarm.js";
 import { composeAskModelPicker, type AskModelPickerBoot, type AskModelPickerSettings, type CallTokenCeilings } from "./ask-model-picker.js";
 import { assertEngineHasLengthPolicy } from "./engine-ask.js";
-import { previewVersionTermsOf, readPreviewBudgetGateSettings, type PreviewBudgetGateSettings, type PreviewVersionTerms } from "./preview-budget-estimate.js";
+import { previewVersionTermsOf, previewWebRolePrices, readPreviewBudgetGateSettings, type PreviewBudgetGateSettings, type PreviewVersionTerms } from "./preview-budget-estimate.js";
 import { composeQuestionLanguage, type QuestionLanguagePaidRoute } from "./question-language/boot.js";
 import type { QuestionLanguageChoiceNeeded, QuestionLanguageLock, QuestionLanguagePort } from "./question-language/decider.js";
 import type { QuestionLanguageReferenceKey } from "./question-language/reference.js";
@@ -353,7 +353,9 @@ export async function loadAdmissionSettings(pool: Pool, version: number, site: A
         prices: site.prices,
         maximumMicros: mostOneRunMaySpendMicros(guardPolicy),
         // Fresh-site estimate: the site's starting figures (a SITE row, read once from the site version).
-        start: site.costEstimateStart
+        start: site.costEstimateStart,
+        // Web search (W2-2): a web class short of samples starts at its depth's figure plus its web part at the caps.
+        webPrices: previewWebRolePrices(site.prices)
       })
     });
   });
