@@ -31,7 +31,9 @@ import {
 export * from "./account-memory.js";
 import { AnswerWebSchema, AskParentSchema, DebateInvestigationSchema, DigSharePercentSchema, DigSuggestionSchema, InvestigationCloseRequestSchema,
   ResearchedAddRequestSchema, ResearchedAddedSchema, RoomReserveSchema, WebOtherPageSchema, WebPathSchema, WebSourceSchema,
-  WEB_CONTRACT_LIMITS } from "./web.js";
+  WEB_CONTRACT_LIMITS, AnswerDigSchema, AnswerPathRewritesSchema, DigTooDeepSchema, MonthPauseSchema, PathRewriteSchema,
+  PathRewritesSchema, PointOfViewVerdictSchema, RoomNewStartsSchema, RunContinueRefusedSchema, RunContinueRequestSchema,
+  RunContinuedSchema, UsageBorrowSchema, UsageBorrowsSchema } from "./web.js";
 export * from "./web.js";
 export * from "./crisis.js";
 export * from "./question-check.js";
@@ -487,6 +489,20 @@ function roomReserveIssues(answer: Readonly<{ room: string; scope: string | null
   }
 }
 
+/**
+ * W2-7 (the money rule, owner 31 Oct): new starts wait for the reset of a FULL person window; a read carries a new
+ * question's estimate or a dig's, never both.
+ */
+function roomMoneyIssues(answer: Readonly<{ room: string; scope: string | null; new_starts?: string | undefined;
+  start_share_percent?: number | undefined; dig_share_percent?: number | undefined }>, context: z.RefinementCtx): void {
+  if (answer.new_starts !== undefined && (answer.room !== "FULL" || !PERSON_SCOPES.has(answer.scope ?? ""))) {
+    context.addIssue({ code: "custom", message: "new starts wait only for the reset of a full person window" });
+  }
+  if (answer.start_share_percent !== undefined && answer.dig_share_percent !== undefined) {
+    context.addIssue({ code: "custom", message: "a room read estimates a new question or a dig, not both" });
+  }
+}
+
 const CustomerAskRoomResponseSchema = z.object({
   room: z.enum(["FITS", "CLOSE", "FULL", "ALREADY_WAITING"]),
   scope: z.enum(["SITE_DAY", "PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]).nullable(),
@@ -513,9 +529,14 @@ const CustomerAskRoomResponseSchema = z.object({
   // Plan 2026-10-30 W1-6 (Q2): the reserve's word, KEPT or BLOCKED (RoomReserveSchema, ./web.ts); absent before R22.
   reserve: RoomReserveSchema.optional(),
   // W1-6 (Q14): a dig's share of today, only on a read asked for a dig (the owner-approved exception to I6).
-  dig_share_percent: DigSharePercentSchema.optional()
+  dig_share_percent: DigSharePercentSchema.optional(),
+  // W2-7 (money rule): a new question's estimate, as a share of today in the same steps; absent on a read for a dig.
+  start_share_percent: DigSharePercentSchema.optional(),
+  // W2-7 (money rule): new questions and digs wait for `resets_at` (RoomNewStartsSchema, ./web.ts); running work goes on.
+  new_starts: RoomNewStartsSchema.optional()
 }).strict().superRefine((answer, context) => {
   roomReserveIssues(answer, context);
+  roomMoneyIssues(answer, context);
   if (answer.waits_for !== undefined
     && (!(answer.room === "FULL" || answer.room === "ALREADY_WAITING") || !PERSON_SCOPES.has(answer.scope ?? ""))) {
     context.addIssue({ code: "custom", message: "waits_for names a person scope of a question that would wait" });
@@ -541,9 +562,13 @@ const InternalAskRoomResponseSchema = z.object({
   preview_rosters:PreviewRostersSchema.optional(),
   // Plan 2026-10-30 W1-6: as the customer answer's `reserve` and `dig_share_percent`.
   reserve:RoomReserveSchema.optional(),
-  dig_share_percent:DigSharePercentSchema.optional()
+  dig_share_percent:DigSharePercentSchema.optional(),
+  // W2-7: as the customer answer's `start_share_percent` and `new_starts`.
+  start_share_percent:DigSharePercentSchema.optional(),
+  new_starts:RoomNewStartsSchema.optional()
 }).strict().superRefine((answer,context)=>{
   roomReserveIssues(answer,context);
+  roomMoneyIssues(answer,context);
   if ((answer.room==="FITS") !== (answer.scope===null) || (answer.room==="FITS" && answer.resets_at!==null)
     || ((answer.room==="ALREADY_WAITING") !== (answer.waiting_run_ref!==null))
     || ((answer.room==="FULL" || answer.room==="ALREADY_WAITING") && answer.resets_at===null)
@@ -560,7 +585,9 @@ const CustomerBillingUsageResponseSchema = z.object({
     scope: z.enum(["PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]),
     percent: z.number().int().min(0).max(110),
     resets_at: z.iso.datetime()
-  }).strict()).max(3)
+  }).strict()).max(3),
+  // W2-7 (money rule): what running work borrowed from the next day or week to finish (UsageBorrowSchema, ./web.ts).
+  borrowed: UsageBorrowsSchema.optional()
 }).strict();
 const InternalBillingUsageResponseSchema = z.object({
  plan_id:z.null(),funding:InternalFundingUsageSchema,windows:z.array(z.object({scope:z.enum(["PERSON_DAY","PERSON_WEEK","PERSON_GRANT"]),percent:z.number().int().min(0).max(100),resets_at:z.iso.datetime()}).strict()).min(1).max(3)
@@ -869,8 +896,13 @@ export const RunProjectionSchema = z.object({
   waits_until: z.iso.datetime().nullable().optional(),
   // Final review Part 1b, Important 1: a WAITING run that waits only for its
   // person's own running debates (`waits_until` is then the next tick).
-  waits_for: WaitsForSchema.nullable().optional()
+  waits_for: WaitsForSchema.nullable().optional(),
+  // W2-7 (money rule): the month wall paused this debate's planned calls and searches (MonthPauseSchema, ./web.ts).
+  month_pause: MonthPauseSchema.optional()
 }).strict().superRefine((run, context) => {
+  if (run.month_pause !== undefined && !(run.state === "CLAIMED" || run.state === "RUNNING" || run.state === "HOLDING")) {
+    context.addIssue({ code: "custom", message: "only a debate already running pauses at the month wall" });
+  }
   if (run.waits_for !== undefined && run.waits_for !== null && run.state !== "WAITING") {
     context.addIssue({ code: "custom", message: "only a WAITING run waits for anything" });
   }
@@ -1675,7 +1707,11 @@ export const AnswerSchema = z.object({
   judges_comparison: JudgesComparisonSchema.optional(),
   // Plan 2026-10-30 W1-6: each path's web search, other pages and dig suggestions (AnswerWebSchema, ./web.ts); optional,
   // so every answer served before R22 parses unchanged.
-  web: AnswerWebSchema.optional()
+  web: AnswerWebSchema.optional(),
+  // W2-7 (dig model): each path's rewrites by digs and the "changed since" count (AnswerPathRewritesSchema, ./web.ts),
+  // and, on a dig's own answer, what it dug and its rewrite (AnswerDigSchema). Optional: older answers parse unchanged.
+  path_rewrites: AnswerPathRewritesSchema.optional(),
+  dig: AnswerDigSchema.optional()
 }).strict().superRefine((answer, context) => {
   // W1-6: the server's checked flag stands only on a looked-up point whose locator is one of its own sources.
   for (const node of answer.nodes) {
@@ -1914,6 +1950,9 @@ export const contractInventory = Object.freeze({
     // Plan 2026-10-30 W1-6: the web, dig-suggestion and investigation shapes (./web.ts); no route yet.
     WebSourceSchema, WebOtherPageSchema, WebPathSchema, AnswerWebSchema, DigSuggestionSchema, AskParentSchema,
     DebateInvestigationSchema, ResearchedAddRequestSchema, ResearchedAddedSchema, InvestigationCloseRequestSchema,
+    // W2-7: the dig model's rewrite and nesting shapes and the money rule's words (./web.ts); no route yet.
+    PathRewriteSchema, PathRewritesSchema, AnswerPathRewritesSchema, AnswerDigSchema, PointOfViewVerdictSchema, DigTooDeepSchema,
+    MonthPauseSchema, UsageBorrowSchema, RunContinueRequestSchema, RunContinuedSchema, RunContinueRefusedSchema,
     BillingQuoteRequestSchema, BillingQuoteResponseSchema, BillingCheckoutRequestSchema, BillingCheckoutResponseSchema,
     BillingCheckoutPendingErrorSchema, BillingChargeStatusResponseSchema,
     BillingSubscriptionResponseSchema, BillingDowngradeRequestSchema, BillingInvoicesResponseSchema,

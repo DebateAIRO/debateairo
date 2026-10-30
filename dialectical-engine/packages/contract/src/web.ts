@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { ACCOUNT_MEMORY_LIMITS, DigLinkModeSchema, DigLinkPlaceSchema, DigLinkRecordSchema } from "./account-memory.js";
 import { CatalogLocaleCodeSchema } from "./locale.js";
+import { STORY_RUNAWAY_LIMITS, StoryFateSchema } from "./story.js";
 
 /**
  * WEB SEARCH, DIG SUGGESTIONS AND INVESTIGATIONS (plan 2026-10-30 W1-6; owner answers of 30 Oct, OWNER-ANSWERS-2026-10-29
@@ -18,6 +19,9 @@ import { CatalogLocaleCodeSchema } from "./locale.js";
  *  - dig suggestions come in four kinds, are combined and edited by the person, who may add their own view at any place
  *    (at most 3 combined on Free, Q19);
  *  - earlier report versions are kept when an investigation is reopened (Q5).
+ *
+ * The new dig model and the money rule (plan 2026-10-30-dig-model-revision.md, task W2-7; owner answers of 30-31 Oct,
+ * OWNER-ANSWERS-2026-10-29.md "Dig model revision" and "How web money is spent") are at the end of this file.
  *
  * It imports only zod and the zod-only modules beside it (never ./index.js), for the module-cycle reason map-view.ts gives.
  */
@@ -293,3 +297,294 @@ export type DebateInvestigation = z.infer<typeof DebateInvestigationSchema>;
 
 /** POST body of "Write my report": nothing but the request; the route names the investigation. */
 export const InvestigationCloseRequestSchema = z.object({}).strict();
+
+// ---------------------------------------------------------------------------------------------------------------------
+// The new dig model (plan 2026-10-30-dig-model-revision.md, task W2-7; owner answers of 30 Oct, "Dig model revision").
+// A dig runs a short follow-up debate and then ONE writer call rewrites the parent path (checked by a second AI): its new
+// text, "What the dig changed", what became of it, the lines and fates of the dig's own paths, and, when the dig carries
+// the person's own words, the verdict "Your point of view". The dig keeps its points and its answer text; only its story
+// is dropped (Q-D13). The main answer is not rewritten by a dig: the map counts the paths changed since it was written.
+// Digs nest: the first debate is level 0, a dig of it level 1, and so on to DIG_LEVEL_MAX. Picks stay on one path (Q-D1).
+// There is no person-written search words box: what is sent to the web search stays the planner's decision.
+// ---------------------------------------------------------------------------------------------------------------------
+
+/**
+ * The deepest dig level (owner Q-D12: fixed in code; moving it is a release). Level 0 is the first debate. This is how many
+ * digs sit above a debate, never how far one debate's argument tree grows (a separate bound, declared once in index.ts).
+ * The database check of migration 0134 uses the same literal, pinned equal to this constant by an architecture test.
+ * Declared in a frozen table, as WEB_CONTRACT_LIMITS' counts are, and named once below (FREE_DIG_PICKS_MAX's pattern).
+ */
+const DIG_LEVELS = Object.freeze({ max: 10 });
+export const DIG_LEVEL_MAX: number = DIG_LEVELS.max;
+export const DigLevelSchema = z.number().int().min(0).max(DIG_LEVEL_MAX);
+/** A dig's own level: 1 to DIG_LEVEL_MAX (level 0 is the first debate, which is no dig). */
+const DugLevelSchema = z.number().int().min(1).max(DIG_LEVEL_MAX);
+
+/** Whether a debate at `level` may be dug further: every level below DIG_LEVEL_MAX may; the deepest offers no "Dig here too". */
+export function canDigFromLevel(level: number): boolean {
+  if (!DigLevelSchema.safeParse(level).success) throw new RangeError("DIG_LEVEL_INVALID");
+  return level < DIG_LEVEL_MAX;
+}
+
+/** The 409 body of an ask that would go past DIG_LEVEL_MAX (two quick clicks): nothing was started and nothing charged. */
+export const DIG_TOO_DEEP = "DIG_TOO_DEEP" as const;
+export const DigTooDeepSchema = z.object({
+  error: z.literal(DIG_TOO_DEEP),
+  message: z.literal(DIG_TOO_DEEP),
+  level_max: z.literal(DIG_LEVEL_MAX)
+}).strict();
+export type DigTooDeep = z.infer<typeof DigTooDeepSchema>;
+
+/** Runaway guards for the rewrite's texts (about 5-10 times what the writer is asked for), as STORY_RUNAWAY_LIMITS are. */
+export const DIG_MODEL_LIMITS = Object.freeze({
+  lineMaxChars: STORY_RUNAWAY_LIMITS.positionLineMaxChars,
+  summaryMaxChars: 4000,
+  /** Draft 5.1 (approved): "What the dig changed" is one to three plain sentences. */
+  whatChangedSentencesMax: 3,
+  sentenceMaxChars: 1000,
+  reasonMaxChars: WEB_CONTRACT_LIMITS.reasonMaxChars,
+  /** A path's rewrites: at most one per dig of the investigation. */
+  rewritesPerPathMax: WEB_CONTRACT_LIMITS.investigationDigsMax
+});
+
+const LineSchema = z.string().trim().min(1).max(DIG_MODEL_LIMITS.lineMaxChars);
+const SentenceSchema = z.string().trim().min(1).max(DIG_MODEL_LIMITS.sentenceMaxChars);
+
+/** A path's text as people see it: its line, a short summary, and what became of it (the story's four fates). */
+export const PathTextSchema = z.object({
+  line: LineSchema,
+  summary: z.string().trim().min(1).max(DIG_MODEL_LIMITS.summaryMaxChars),
+  fate: StoryFateSchema
+}).strict();
+export type PathText = z.infer<typeof PathTextSchema>;
+
+/** One of the dig's own paths, as the rewrite call wrote it (owner Q-D2): its line and what became of it. */
+export const DigPathLineSchema = z.object({
+  position_ref: PositionRefSchema,
+  line: LineSchema,
+  fate: StoryFateSchema
+}).strict();
+export type DigPathLine = z.infer<typeof DigPathLineSchema>;
+
+/**
+ * "Your point of view" (draft 5.3, approved): whether the person's own words helped this path (or also the main question),
+ * did not help, or could not be settled by the dig, with the AI's one-sentence reason. `own_words` are the person's own
+ * texts the dig carried (their own view, their edit of a suggestion), quoted above the line. The page picks the line from
+ * the outcome and scope; an AI never writes the line itself.
+ */
+export const POINT_OF_VIEW_OUTCOMES = ["HELPED", "DID_NOT_HELP", "NOT_SETTLED"] as const;
+export const POINT_OF_VIEW_SCOPES = ["PATH", "MAIN_QUESTION"] as const;
+export const PointOfViewVerdictSchema = z.object({
+  outcome: z.enum(POINT_OF_VIEW_OUTCOMES),
+  scope: z.enum(POINT_OF_VIEW_SCOPES),
+  reason: z.string().trim().min(1).max(DIG_MODEL_LIMITS.reasonMaxChars),
+  own_words: z.array(z.string().trim().min(1).max(WEB_CONTRACT_LIMITS.pickTextMaxChars)).min(1).max(WEB_CONTRACT_LIMITS.digPicksMax)
+}).strict();
+export type PointOfViewVerdict = z.infer<typeof PointOfViewVerdictSchema>;
+
+/**
+ * A rewrite's states: WRITING (the dig is done, the path is being rewritten), READY or READY_WITH_RESERVATION (the checker
+ * passed it, or the last round left a reservation), FAILED (the path keeps its text; the report reads the dig directly).
+ */
+export const PATH_REWRITE_STATES = ["WRITING", "READY", "READY_WITH_RESERVATION", "FAILED"] as const;
+export type PathRewriteState = (typeof PATH_REWRITE_STATES)[number];
+
+/** Every rewrite names the dig that made it, its level, and when the dig finished (rewrites follow that order). */
+const RewriteBase = {
+  rewrite_id: WebRefSchema,
+  dig_run_id: z.uuid(),
+  dig_level: DugLevelSchema,
+  dig_finished_at: z.iso.datetime()
+};
+
+/** A finished rewrite: the new text, what the dig changed, the fate it had before, the verdict (or none), the dig's paths. */
+function finishedRewrite<S extends "READY" | "READY_WITH_RESERVATION">(state: S) {
+  return z.object({
+    ...RewriteBase,
+    state: z.literal(state),
+    rewritten_at: z.iso.datetime(),
+    /** False: "The dig didn't change this path." (its "what the dig changed" is still shown). Worked out by code. */
+    changed: z.boolean(),
+    text: PathTextSchema,
+    what_changed: z.array(SentenceSchema).min(1).max(DIG_MODEL_LIMITS.whatChangedSentencesMax),
+    fate_before: StoryFateSchema,
+    view: PointOfViewVerdictSchema.nullable(),
+    dig_paths: z.array(DigPathLineSchema).max(WEB_CONTRACT_LIMITS.pathsMax)
+  }).strict();
+}
+
+/** One rewrite of a path by one dig. Only a finished rewrite carries text; a writing or failed one leaves the path's. */
+export const PathRewriteSchema = z.discriminatedUnion("state", [
+  z.object({ ...RewriteBase, state: z.literal("WRITING") }).strict(),
+  finishedRewrite("READY"),
+  finishedRewrite("READY_WITH_RESERVATION"),
+  z.object({ ...RewriteBase, state: z.literal("FAILED"), failed_at: z.iso.datetime() }).strict()
+]).superRefine((rewrite, context) => {
+  const settledAt = rewrite.state === "WRITING" ? null : rewrite.state === "FAILED" ? rewrite.failed_at : rewrite.rewritten_at;
+  if (settledAt !== null && Date.parse(settledAt) < Date.parse(rewrite.dig_finished_at)) {
+    context.addIssue({ code: "custom", message: "a rewrite settles after its dig finished" });
+  }
+  if (rewrite.state !== "READY" && rewrite.state !== "READY_WITH_RESERVATION") return;
+  if (!rewrite.changed && rewrite.fate_before !== rewrite.text.fate) {
+    context.addIssue({ code: "custom", message: "a rewrite that changed nothing keeps the path's fate" });
+  }
+  if (new Set(rewrite.dig_paths.map((path) => path.position_ref)).size !== rewrite.dig_paths.length) {
+    context.addIssue({ code: "custom", message: "each of the dig's paths is listed once" });
+  }
+});
+export type PathRewrite = z.infer<typeof PathRewriteSchema>;
+
+const isFinished = (rewrite: PathRewrite): rewrite is Extract<PathRewrite, { state: "READY" | "READY_WITH_RESERVATION" }> =>
+  rewrite.state === "READY" || rewrite.state === "READY_WITH_RESERVATION";
+
+/**
+ * One path of an answer and its rewrites, newest last (in the order their digs finished; each based on the one before).
+ * `current` is the newest finished rewrite's text, or null while no dig has rewritten the path (the story's line stands).
+ * `changed_below` (only ever true): a deeper dig changed a path inside this path's dig (owner Q-D5: marked, not rewritten).
+ */
+export const PathRewritesSchema = z.object({
+  position_ref: PositionRefSchema,
+  current: PathTextSchema.nullable(),
+  history: z.array(PathRewriteSchema).max(DIG_MODEL_LIMITS.rewritesPerPathMax),
+  changed_below: z.literal(true).optional()
+}).strict().superRefine((path, context) => {
+  if (path.history.length === 0 && path.changed_below !== true) {
+    context.addIssue({ code: "custom", message: "a path is listed when a dig rewrote it or changed something below it" });
+  }
+  if (path.history.some((rewrite, at) => at > 0 && Date.parse(rewrite.dig_finished_at) < Date.parse(path.history[at - 1]!.dig_finished_at))) {
+    context.addIssue({ code: "custom", message: "rewrites go in the order their digs finished" });
+  }
+  if (new Set(path.history.map((rewrite) => rewrite.rewrite_id)).size !== path.history.length
+    || new Set(path.history.map((rewrite) => rewrite.dig_run_id)).size !== path.history.length) {
+    context.addIssue({ code: "custom", message: "each rewrite and each dig appears once in a path's history" });
+  }
+  const finished = path.history.filter(isFinished);
+  if (finished.some((rewrite, at) => at > 0 && rewrite.fate_before !== finished[at - 1]!.text.fate)) {
+    context.addIssue({ code: "custom", message: "each rewrite is based on the one before it" });
+  }
+  const newest = finished.at(-1);
+  const current = path.current;
+  const matches = newest === undefined ? current === null
+    : current !== null && current.line === newest.text.line && current.summary === newest.text.summary && current.fate === newest.text.fate;
+  if (!matches) context.addIssue({ code: "custom", message: "the current text is the newest finished rewrite's, or null when none" });
+});
+export type PathRewrites = z.infer<typeof PathRewritesSchema>;
+
+/**
+ * "Paths changed since the answer was written" (owner Q-D11): how many paths have a finished rewrite newer than the first
+ * answer (`since_report_version` null) or than the latest report (its version).
+ */
+export const PathsChangedSinceSchema = z.object({
+  count: z.number().int().min(0).max(WEB_CONTRACT_LIMITS.pathsMax),
+  since_report_version: z.number().int().positive().nullable()
+}).strict();
+export type PathsChangedSince = z.infer<typeof PathsChangedSinceSchema>;
+
+/** `Answer.path_rewrites`: each rewritten (or changed-below) path once, and the "changed since" count. */
+export const AnswerPathRewritesSchema = z.object({
+  paths: z.array(PathRewritesSchema).max(WEB_CONTRACT_LIMITS.pathsMax),
+  changed_since: PathsChangedSinceSchema
+}).strict().superRefine((rewrites, context) => {
+  if (new Set(rewrites.paths.map((path) => path.position_ref)).size !== rewrites.paths.length) {
+    context.addIssue({ code: "custom", message: "each path is listed once" });
+  }
+  if (rewrites.changed_since.count > rewrites.paths.filter((path) => path.history.some(isFinished)).length) {
+    context.addIssue({ code: "custom", message: "only a path with a finished rewrite counts as changed" });
+  }
+});
+export type AnswerPathRewrites = z.infer<typeof AnswerPathRewritesSchema>;
+
+/**
+ * Who wrote a pick the dig carried: an AI suggestion chosen as it was, the person's edit of one, or the person's own view.
+ * The verdict shows when the dig carries the person's own words (owner Q-D4): their own view or their edited suggestion.
+ */
+export const DIG_PICK_AUTHORS = ["AI_SUGGESTION", "PERSON_EDITED", "PERSON_OWN_VIEW"] as const;
+export const DugPickSchema = z.object({
+  kind: z.enum([...DIG_SUGGESTION_KINDS, "OWN_VIEW"]),
+  place: DigLinkPlaceSchema,
+  text: z.string().trim().min(1).max(WEB_CONTRACT_LIMITS.pickTextMaxChars),
+  by: z.enum(DIG_PICK_AUTHORS)
+}).strict().superRefine((pick, context) => {
+  if ((pick.kind === "OWN_VIEW") !== (pick.by === "PERSON_OWN_VIEW")) {
+    context.addIssue({ code: "custom", message: "the person's own view, and only it, is a pick of kind OWN_VIEW" });
+  }
+});
+export type DugPick = z.infer<typeof DugPickSchema>;
+
+/**
+ * `Answer.dig`, on a dig's own answer: what it dug (its parent, the path it rewrites, the places, its level, its picks)
+ * and its rewrite of that path (whose `dig_paths` are the dig's own paths with their lines and fates). A dig of an open
+ * question hanging under the main question rewrites no path (`position_ref` and `rewrite` null).
+ */
+export const AnswerDigSchema = z.object({
+  parent_run_id: z.uuid(),
+  position_ref: PositionRefSchema.nullable(),
+  places: z.array(DigLinkPlaceSchema).max(ACCOUNT_MEMORY_LIMITS.digPlacesMax),
+  level: DugLevelSchema,
+  picks: z.array(DugPickSchema).max(WEB_CONTRACT_LIMITS.digPicksMax),
+  rewrite: PathRewriteSchema.nullable()
+}).strict().superRefine((dig, context) => {
+  const rewrite = dig.rewrite;
+  if (rewrite === null) return;
+  if (dig.position_ref === null) context.addIssue({ code: "custom", message: "only a dig of a path rewrites it" });
+  if (rewrite.dig_level !== dig.level) context.addIssue({ code: "custom", message: "a dig's rewrite is of the dig's own level" });
+  if (!isFinished(rewrite)) return;
+  const ownWords = dig.picks.filter((pick) => pick.by !== "AI_SUGGESTION").map((pick) => pick.text);
+  const view = rewrite.view;
+  if ((view !== null) !== (ownWords.length > 0)
+    || (view !== null && JSON.stringify(view.own_words) !== JSON.stringify(ownWords))) {
+    context.addIssue({ code: "custom", message: "the verdict is there exactly when a pick carries the person's own words, quoting them in order" });
+  }
+});
+export type AnswerDig = z.infer<typeof AnswerDigSchema>;
+
+// ---------------------------------------------------------------------------------------------------------------------
+// The money rule (owner, 31 Oct, "How web money is spent"): no worst-case hold before a start; the estimate is shown as a
+// share of today; running work is never stopped by the day or week, and what it uses past them is borrowed from the next
+// day or week (the page says so); new starts wait for the day or week reset; the month is the wall: the running debate's
+// planned calls and searches pause, and the person presses Continue once the month resets (true resume, nothing paid twice).
+// ---------------------------------------------------------------------------------------------------------------------
+
+/** Room read: new questions and digs wait for `resets_at` (a full person day, week or month); running work goes on. */
+export const RoomNewStartsSchema = z.enum(["BLOCKED_UNTIL_RESET"]);
+export type RoomNewStarts = z.infer<typeof RoomNewStartsSchema>;
+
+/**
+ * Usage read: running work went past a day or week window, so part of the NEXT window's allowance was used to finish it.
+ * `percent` is that part, a whole share of the next window; `next_window_starts_at` is when that lower window starts. The
+ * month is never borrowed from.
+ */
+export const UsageBorrowSchema = z.object({
+  scope: z.enum(["PERSON_DAY", "PERSON_WEEK"]),
+  run_ref: z.string().min(1),
+  percent: z.number().int().min(1).max(100),
+  next_window_starts_at: z.iso.datetime()
+}).strict();
+export type UsageBorrow = z.infer<typeof UsageBorrowSchema>;
+
+/** The usage read's borrow notices: each (window, run) once. */
+export const UsageBorrowsSchema = z.array(UsageBorrowSchema).max(20)
+  .refine((borrows) => new Set(borrows.map((borrow) => `${borrow.scope} ${borrow.run_ref}`)).size === borrows.length,
+    { message: "each window and run is named once" });
+
+/**
+ * Run read: the running debate reached the month wall, so its remaining planned AI calls and searches are paused until
+ * the month resets (`until`). `can_continue` turns true once it has: the page then offers Continue.
+ */
+export const MonthPauseSchema = z.object({
+  until: z.iso.datetime(),
+  can_continue: z.boolean()
+}).strict();
+export type MonthPause = z.infer<typeof MonthPauseSchema>;
+
+/** POST body of Continue on a month-paused debate; the route names the run. Finished work is never paid again. */
+export const RunContinueRequestSchema = z.object({}).strict();
+export const RunContinuedSchema = z.object({ state: z.literal("CONTINUING") }).strict();
+export type RunContinued = z.infer<typeof RunContinuedSchema>;
+/** Continue pressed before the month reset: refused, nothing changed. */
+export const RUN_PAUSED_UNTIL_RESET = "RUN_PAUSED_UNTIL_RESET" as const;
+export const RunContinueRefusedSchema = z.object({
+  error: z.literal(RUN_PAUSED_UNTIL_RESET),
+  message: z.literal(RUN_PAUSED_UNTIL_RESET),
+  until: z.iso.datetime()
+}).strict();
