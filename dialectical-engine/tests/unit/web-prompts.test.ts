@@ -30,7 +30,7 @@ import {
   WEB_PLANNER_LOCAL_SENTENCE, WEB_PLANNER_V2_ANSWER_FORM, WEB_PLANNER_V2_INSTRUCTION, WEB_PLANNER_V2_MATERIAL_FIELDS,
   WEB_PLANNER_V2_PROMPT_CONTRACT, WEB_READ_TOP_V2_INSTRUCTION, WEB_READ_TOP_V2_PROMPT_CONTRACT, WEB_REPLY_COUNTRY_INVALID,
   WEB_STEP_PROMPT_CONTRACTS_IN_USE, WEB_SUGGEST_ANSWER_FORM, WEB_SUGGEST_INSTRUCTION, WEB_SUGGEST_MATERIAL_FIELDS,
-  WEB_SUGGEST_PROMPT_CONTRACT, WEB_TOP_COUNT_BY_DEPTH, WEB_TOP_COUNTS, WEB_WORDING_V2_SEALED_CONTRACTS,
+  WEB_SUGGEST_PROMPT_CONTRACT, WEB_TOP_COUNT_BY_MODE, WEB_TOP_COUNTS, WEB_WORDING_V2_SEALED_CONTRACTS,
   webPickV2MaterialFields, webPickV2ReplyIssues, webPlannerCountry, webPlannerV2MaterialFields, webPlannerV2ReplyIssues,
   webPlannerV2ReplySchema, webReadTopV2MaterialFields, webSuggestionsKept, webSuggestMaterialFields, webSuggestReplySchema
 } from "@debateai/judgement";
@@ -416,9 +416,9 @@ describe("the second wording: new contract ids, v1 sealed and left unused", () =
   });
 
   it("the page count comes from code: 3 on Quick look, 5 on Thorough", () => {
-    expect(WEB_TOP_COUNT_BY_DEPTH).toEqual({ quick: 3, thorough: 5 });
+    expect(WEB_TOP_COUNT_BY_MODE).toEqual({ quick: 3, thorough: 5 });
     expect(WEB_TOP_COUNTS).toEqual([3, 5]);
-    expect(Object.isFrozen(WEB_TOP_COUNT_BY_DEPTH) && Object.isFrozen(WEB_TOP_COUNTS)).toBe(true);
+    expect(Object.isFrozen(WEB_TOP_COUNT_BY_MODE) && Object.isFrozen(WEB_TOP_COUNTS)).toBe(true);
   });
 
   it("pins the v2 answer forms byte for byte (readers 2-3 keep v1's form, which names no number)", () => {
