@@ -202,6 +202,10 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // Reclaim resume (spec 2026-10-14): the replay book reads the run's recorded prompts and replies through
       // prepareLeasedContentEncryptionForRun, which borrows the lease the runner already holds when it is read.
       "apps/runner/src/run-replay.ts",
+      // Web search (plan 2026-10-30 W3-1): the web step seals and opens one debate's 0132 rows (search words, pages,
+      // readings, extracts) under that run's own content lease (prepareLeasedContentEncryptionForRun), closed when the
+      // step ends; page texts are opened only to fill the vendor's copy of a reader's prompt (W3-0).
+      "apps/runner/src/web-step.ts",
       "packages/db/src/index.ts",
       "packages/evaluator/src/index.ts",
       "packages/evidence/src/index.ts",
@@ -270,6 +274,10 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // it (the run's lane-wrapped, leased gateway), naming the run. It opens no lease and reads no content of its own;
       // the searches and pages it plans are stored through packages/db/src/web-evidence.ts by the web step.
       "apps/runner/src/web-planner.ts",
+      // Web search W3-1: the web step sends readers 1, 2 and 3 through the member gateways the runner hands it (the run's
+      // lane-wrapped, leased gateways), naming the run; each call's record holds page references only and its
+      // vendorPacketOf fills the page texts into the vendor's copy (W3-0). The step's own lease is the one listed above.
+      "apps/runner/src/web-step.ts",
       "packages/evaluator/src/index.ts",
       // Engine redesign R2b (B1): the comparing judges' call is sent through the gateway the runner hands it (the judge
       // seat's own lane-wrapped member gateway, never the arguing judge's, inside the leased runner, naming the run). It
