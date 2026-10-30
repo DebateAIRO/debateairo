@@ -38,6 +38,7 @@ import { randomUUID } from "node:crypto";
 import { DataExportApplication } from "./data-export/service.js";
 import { FileDataExportStore } from "./data-export/store.js";
 import { collectSnapshot } from "./data-export/snapshot.js";
+import { runContentOpener } from "./data-export/run-content.js";
 import { loadArchiveCatalog } from "./data-export/archive-catalog.js";
 import { OwnerViewAdapter } from "./data-export/owner-view-adapter.js";
 import { TemplatedDataExportMail } from "./data-export/mail.js";
@@ -1637,7 +1638,9 @@ if (environment.DATA_EXPORT_STORE_PATH !== undefined) {
             plain = supportKeys.openContent(context as Parameters<typeof supportKeys.openContent>[0], key, ciphertext);
             return plain.toString("utf8");
           } finally { plain?.fill(0); key.fill(0); }
-        }
+        },
+        // 0132's web values, under each debate's run key on the pool that carries the content cipher.
+        openRunContent: runContentOpener(pool)
       },
       now: () => new Date()
     })

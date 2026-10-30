@@ -171,7 +171,8 @@ describe("side-by-side C9: an old run id follows its re-admission chain", () => 
       decrypt: {
         openUserField: async (_user, field) => `PLAIN:${field}`,
         openRecord: () => "PLAIN:record",
-        openSupport: async () => "PLAIN:support"
+        openSupport: async () => "PLAIN:support",
+        openRunContent: async () => []
       },
       now: () => new Date("2026-10-22T00:00:00.000Z")
     });

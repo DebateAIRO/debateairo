@@ -425,5 +425,8 @@
   "threat_reports": [],
   "page_reading_level": null,
   "debate_visits": [],
-  "dig_links": []
+  "dig_links": [],
+  "web_evidence": [],
+  "investigations": [],
+  "reserve_events": []
 }

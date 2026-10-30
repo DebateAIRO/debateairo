@@ -1,4 +1,4 @@
-import type { ExportSnapshot, DebateEntry, RoleRotation, Row, SupportCaseEntry, SupportSessionEntry, SynthesisCheckEntry, PublicationReviewEntry } from "./types.js";
+import type { ExportSnapshot, DebateEntry, RoleRotation, Row, SupportCaseEntry, SupportSessionEntry, SynthesisCheckEntry, PublicationReviewEntry, WebSourceEntry } from "./types.js";
 import type { RecordAad } from "../../../../packages/crypto/src/records.js";
 import { TypedDomainError } from "@debateai/kernel";
 
@@ -16,6 +16,9 @@ export const RAW_SECTIONS = [
   "support_case_messages", "support_ratings", "support_key_states", "audit_events", "threat_reports",
   // V4 account memory (migration 0131, identity.read_data_export_page_memory).
   "page_reading_level", "debate_visits", "dig_links",
+  // The Perplexity plan's stores: each debate's web evidence (0132, identity.read_data_export_web_evidence) and the
+  // investigations with the reserve events (0133, identity.read_data_export_investigations).
+  "web_evidence", "investigations", "reserve_events",
 ] as const;
 export type RawSection = typeof RAW_SECTIONS[number];
 export type RawExportRows = Readonly<Record<RawSection, unknown>>;
@@ -44,10 +47,16 @@ export interface OwnerViewPort {
 export type UserDekField = "user.email_ciphertext" | "user.recovery_email_ciphertext" | "user.phone_ciphertext";
 export type SupportKeyHandle = Readonly<{ kind: "session" | "case"; ref: string }>;
 export type SupportContentContext = Readonly<Record<string, unknown>>;
+/** 0132's carriers the archive opens. A page's text (identity.web_page_text) and a path's pack are never among them. */
+export type WebExportCarrier = "identity.web_search" | "identity.web_page" | "identity.web_reading" | "identity.web_extract";
+export type RunContentItem = Readonly<{ carrier: WebExportCarrier; primaryKey: string; envelope: unknown }>;
 export interface ExportDecryptors {
   openUserField(userId: string, field: UserDekField, envelope: unknown): Promise<string>;
   openRecord(aad: RecordAad, ciphertext: Buffer): string;
   openSupport(keyRef: SupportKeyHandle, wrapped: Buffer, context: SupportContentContext, ciphertext: Buffer): Promise<string>;
+  /** One debate's sealed web values, opened under its run key in one content lease, in order; null when the debate's
+   * private content was erased meanwhile (./run-content.ts). */
+  openRunContent(runId: string, items: readonly RunContentItem[]): Promise<readonly unknown[] | null>;
 }
 
 export class DataExportBuildError extends Error {
@@ -107,6 +116,23 @@ export const KEEP_COLUMNS = {
   page_reading_level: ["reading_level", "updated_at"],
   debate_visits: ["run_id", "seen_at", "items"],
   dig_links: ["parent_run_id", "child_run_id", "places", "mode", "created_at"],
+  // 0132's read_web_evidence lists, per debate. Left out (README W2): a search's charge_micros (a cost record, C5), a
+  // page's keyed text_digest and text_chars, and the packs; `content` is each row's envelope, opened under the run's key.
+  web_evidence: {
+    searches: ["search_id", "path_ref", "side", "language_kind", "language", "country", "look_back", "outcome", "result_count", "searched_at", "content"],
+    pages: ["page_id", "search_id", "rank", "read_depth", "text_state", "found_at", "content"],
+    readings: ["reading_id", "page_id", "reader", "maker", "outcome", "grade", "read_at", "content"],
+    extracts: ["extract_id", "page_id", "path_ref", "label", "found_by", "created_at", "content"],
+    picks: ["path_ref", "rank", "page_id"],
+    researched: ["page_id", "path_ref", "chosen_at", "outcome", "settled_at"],
+  },
+  // 0133's investigation_json, and its reserve events.
+  investigations: {
+    investigation: ["investigation_id", "root_run_id", "state", "opened_at", "last_activity_at", "closed_at", "report_version", "members", "closings"],
+    members: ["run_id", "parent_run_id", "places", "mode", "joined_at"],
+    closings: ["report_version", "closed_at", "reopened_at", "report_ref", "report_written_at"],
+  },
+  reserve_events: ["event_no", "kind", "amount_micros", "investigation_id", "report_version", "blocked_window", "blocked_until", "recorded_at"],
 } as const;
 
 type RawRow = Record<string, unknown>;
@@ -155,7 +181,7 @@ function object(value: unknown): RawRow {
 // leaving user-authored text intact and retaining PostgreSQL's microseconds.
 function timestampField(name: string): boolean {
   return name === "at" || name === "as_of" || name === "period_start" || name === "period_end"
-    || name === "paid_through" || name === "hold_until" || name === "waits_until"
+    || name === "paid_through" || name === "hold_until" || name === "waits_until" || name === "blocked_until"
     || /(?:_at|_as_of|At|AsOf)$/.test(name);
 }
 
@@ -288,6 +314,76 @@ async function collectDebates(raw: RawExportRows, ownerView: OwnerViewPort, owne
   return entries;
 }
 
+/**
+ * 0132 (Perplexity plan): each debate's web sources, under the archive's names. The sealed values are opened under the
+ * debate's run key in one call per debate, as the owner reads it: a deleted debate, one a check removed or one whose key
+ * is gone is UNRECOVERABLE (its rows stay, their sealed values null), as collectDebates exports it. The page texts and the
+ * packs are never opened (README W1, W2).
+ */
+async function collectWebSources(raw: RawExportRows, ownerView: OwnerViewPort, decrypt: ExportDecryptors): Promise<WebSourceEntry[]> {
+  const tombstoned = new Set(rows(raw.erasure_tombstones).map((item) => string(item.run_id)));
+  const keep = KEEP_COLUMNS.web_evidence;
+  const entries: WebSourceEntry[] = [];
+  for (const item of rows(raw.web_evidence)) {
+    const reference = string(item.run_id);
+    const web = row(item.web);
+    const searches = rows(web.searches), pages = rows(web.pages), readings = rows(web.readings), extracts = rows(web.extracts);
+    const picks = rows(web.picks).map((source) => project(source, keep.picks));
+    const researched = rows(web.researched).map((source) => project(source, keep.researched));
+    const sealed: RunContentItem[] = [];
+    const slot = (carrier: WebExportCarrier, source: RawRow, id: string): number =>
+      source.content == null ? -1 : sealed.push({ carrier, primaryKey: string(source[id]), envelope: source.content }) - 1;
+    const searchSlots = searches.map((source) => slot("identity.web_search", source, "search_id"));
+    const pageSlots = pages.map((source) => slot("identity.web_page", source, "page_id"));
+    const readingSlots = readings.map((source) => slot("identity.web_reading", source, "reading_id"));
+    const extractSlots = extracts.map((source) => slot("identity.web_extract", source, "extract_id"));
+    const readable = !tombstoned.has(reference) && !await ownerView.runRemovedByCheck(reference) && await ownerView.runKeyPresent(reference);
+    const opened = !readable ? null : sealed.length === 0 ? [] : await decrypt.openRunContent(reference, sealed);
+    if (opened !== null && opened.length !== sealed.length) throw new DataExportBuildError("DATA_EXPORT_DECRYPT_FAILED");
+    const value = (index: number): unknown => opened === null || index < 0 ? null : opened[index];
+    const strip = (source: RawRow, columns: readonly string[], name: string, index: number): Row => {
+      const { content: _sealed, ...rest } = project(source, columns);
+      return { ...rest, [name]: value(index) };
+    };
+    const pathOf = new Map(searches.map((source) => [string(source.search_id), source.path_ref]));
+    const topRank = new Map(picks.map((pick) => [string(pick.page_id), pick.rank]));
+    entries.push({
+      debate_reference: reference, content_status: opened === null ? "UNRECOVERABLE" : "READABLE",
+      searches: searches.map((source, index) => strip(source, keep.searches, "words", searchSlots[index]!) as WebSourceEntry["searches"][number]),
+      pages: pages.map((source, index) => {
+        const { page_id, search_id, rank, read_depth, text_state, found_at, about } = strip(source, keep.pages, "about", pageSlots[index]!);
+        return { page_id, search_id, path_ref: pathOf.get(string(search_id)) ?? null, rank, top_rank: topRank.get(string(page_id)) ?? null,
+          read_depth, text_state, found_at, about };
+      }),
+      readings: readings.map((source, index) => strip(source, keep.readings, "line", readingSlots[index]!) as WebSourceEntry["readings"][number]),
+      quotes: extracts.map((source, index) => strip(source, keep.extracts, "quote", extractSlots[index]!) as WebSourceEntry["quotes"][number]),
+      added_to_researched: researched,
+    });
+  }
+  return entries;
+}
+
+/** 0133: the account's investigations, a debate named by its reference as in debates.json (never a run_id key). */
+function collectInvestigations(raw: RawExportRows): Row[] {
+  const keep = KEEP_COLUMNS.investigations;
+  return rows(raw.investigations).map((source) => {
+    const { root_run_id, members, closings, ...investigation } = project(source, keep.investigation);
+    const { investigation_id, state, opened_at, last_activity_at, closed_at, report_version } = investigation;
+    return {
+      investigation_id, root_debate_reference: string(root_run_id), state, opened_at, last_activity_at, closed_at, report_version,
+      members: rows(members).map((member) => {
+        const { run_id, parent_run_id, places, mode, joined_at } = project(member, keep.members);
+        return { debate_reference: string(run_id), dug_from_reference: parent_run_id === null ? null : string(parent_run_id), places, mode, joined_at };
+      }),
+      report_versions: rows(closings).map((closing) => {
+        const { report_ref, ...rest } = project(closing, keep.closings);
+        return { report_version: rest.report_version, closed_at: rest.closed_at, reopened_at: rest.reopened_at,
+          report_reference: report_ref, report_written_at: rest.report_written_at };
+      }),
+    };
+  });
+}
+
 async function collectSupport(raw: RawExportRows, decrypt: ExportDecryptors): Promise<ExportSnapshot["support"]> {
   const keyStates = new Map(rows(raw.support_key_states).map((item) => [`${string(item.kind)}:${string(item.ref)}`, item]));
   const messages = rows(raw.support_messages);
@@ -415,7 +511,7 @@ export async function collectSnapshot(input: {
     const legalAcceptances: Row[] = [];
     for (const source of rows(raw.legal_acceptances)) legalAcceptances.push(plain(project(source, KEEP_COLUMNS.legal_acceptances), "evidence_ciphertext", "evidence",
       openedRecord(decrypt, source, "evidence_ciphertext", { table: "legal.acceptance", column: "evidence_ciphertext", rowId: string(source.acceptance_id) })));
-    const simple = <K extends Exclude<RawSection, "billing">>(section: K): Row[] => rows(raw[section]).map((source) => project(source, KEEP_COLUMNS[section]));
+    const simple = <K extends Exclude<RawSection, "billing" | "web_evidence" | "investigations">>(section: K): Row[] => rows(raw[section]).map((source) => project(source, KEEP_COLUMNS[section]));
     return utcTimestampStrings({
       exportId: claim.exportId, userId: claim.userId, locale: claim.locale,
       requestedAt: claim.requestedAt, generatedAt: input.now(), recipient: email ?? "",
@@ -431,6 +527,10 @@ export async function collectSnapshot(input: {
         dig_links: simple("dig_links").map(({ parent_run_id, child_run_id, places, mode, created_at }) => ({
           debate_reference: string(child_run_id), dug_from_reference: string(parent_run_id), places, mode, created_at
         })),
+        // The Perplexity plan's investigations (0133): each with its members (the root, then each dig and the debate it
+        // was dug from) and its report versions; and the person's reserve, as its event list.
+        investigations: collectInvestigations(raw),
+        reserve_events: simple("reserve_events"),
       },
       security: {
         mfa_factors: simple("mfa_factors"), passkeys: simple("passkey_credentials"),
@@ -439,7 +539,8 @@ export async function collectSnapshot(input: {
         email_changes: emailChanges, recovery_email_changes: recoveryEmailChanges, recovery_requests: simple("recovery_requests"),
       },
       consents: { legal_acceptances: legalAcceptances, sensitive_data_consents: simple("sensitive_data_consents") },
-      debates: { debates: await collectDebates(raw, input.ownerView, claim.ownerRef) },
+      debates: { debates: await collectDebates(raw, input.ownerView, claim.ownerRef),
+        web_sources: await collectWebSources(raw, input.ownerView, decrypt) },
       billing: await collectBilling(raw.billing, decrypt),
       support: await collectSupport(raw, decrypt),
       activity: { events: rows(raw.audit_events).map((source) => ({ type: string(source.event_type), at: string(source.occurred_at) })) },

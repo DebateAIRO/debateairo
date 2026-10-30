@@ -34,7 +34,7 @@ async function collect(raw: Record<string, unknown>) {
     claim: { exportId: "export", userId: "user", ownerRef: "owner", sessionId: "session",
       locale: "en", requestedAt: new Date("2026-10-29T10:00:00.000Z"), attempt: 1 }, workerId: "worker",
     source: { readRaw: async () => raw as never }, ownerView: {} as never,
-    decrypt: { openUserField: async () => "ada@example.test", openRecord: () => "", openSupport: async () => "" },
+    decrypt: { openUserField: async () => "ada@example.test", openRecord: () => "", openSupport: async () => "", openRunContent: async () => [] },
     now: () => new Date("2026-10-29T11:00:00.000Z")
   });
 }
@@ -98,6 +98,8 @@ describe("V4 account memory in the data export", () => {
 
   it("names the new account records in the README", () => {
     expect(renderReadme()).toContain(
-      "account.json — account, channels, region, age checks, erasure requests, kept questions, reading level, debate visits and dig links.");
+      // 0132/0133 (the Perplexity plan) append the investigations and the reserve events to the same line.
+      "account.json — account, channels, region, age checks, erasure requests, kept questions, reading level, debate visits, dig links, "
+        + "investigations and reserve events.");
   });
 });
