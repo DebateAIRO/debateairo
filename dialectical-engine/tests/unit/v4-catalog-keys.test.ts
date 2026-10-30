@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { OPEN_QUESTION_KINDS, READING_LEVELS, DIG_MODES, TRUST_BASES, TRUST_WORDS } from "../../apps/ui/lib/v4/types.js";
+import { basisKey, OPEN_QUESTION_KINDS, READING_LEVELS, DIG_MODES, TRUST_BASES, TRUST_WORDS } from "../../apps/ui/lib/v4/types.js";
 
 /*
  * V4 initial (2026-10-28): the v4 namespace has no English backstop in t() (only chrome/home/newDebate/support/time
@@ -84,7 +84,8 @@ describe("V4 catalogue keys", () => {
   it("every key built from a shared word list exists for every word", () => {
     const built = [
       ...TRUST_WORDS.flatMap((word) => [`v4.trust.${word}`, `v4.trustCount.${word}`]),
-      ...TRUST_BASES.map((basis) => `v4.basis.${basis}`),
+      // W2-6: the new "Sure" basis reads the approved "v4.web.sureBasis"; every other basis its "v4.basis.<BASIS>".
+      ...TRUST_BASES.map(basisKey),
       ...["HELD_UP", "PARTLY_HELD", "FELL", "SET_ASIDE"].map((fate) => `v4.fate.${fate}`),
       ...READING_LEVELS.map((level) => `v4.readingLevel.${level}`),
       ...DIG_MODES.map((mode) => `v4.digMode.${mode}`)

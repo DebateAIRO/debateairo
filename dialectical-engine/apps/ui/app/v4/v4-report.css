@@ -119,6 +119,7 @@
 .v4RepPoint[data-trust="DIDNT_HOLD"] .v4RepPointMark { background: none; box-shadow: inset 0 0 0 1.5px var(--v4-fell); }
 .v4RepPointBody { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .v4RepPointWord { font-size: var(--t-meta); font-weight: 600; color: var(--text-2); }
+.v4RepSmallHead { margin: 8px 0 0; font-size: var(--t-meta); font-weight: 700; color: var(--text-2); }
 
 /* "Your digs". */
 .v4RepDigs { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 12px; }
@@ -194,4 +195,7 @@
   .v4RepSection, .v4RepAnswer { break-inside: auto; }
   .v4RepDoc a { text-decoration: none; color: var(--qr-ink); }
   .v4RepDigLink { display: none; }
+  /* W2-6: a printed source keeps its address, since a printed link cannot be followed. */
+  .v4RepDoc .v4SourceLink::after { content: " " attr(href); font-weight: 400; }
+  .v4RepDoc .v4Source { background: none; border-color: var(--qr-ink); break-inside: avoid; }
 }

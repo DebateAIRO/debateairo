@@ -14,7 +14,7 @@ It moved here from a scratch folder on 30 Oct 2026 (Perplexity plan, task W1-7) 
 |---|---|
 | `server.ts` | The mock server (plain Node, no extra packages). |
 | `seed.ts` | The seeded English debate (nuclear vs renewables), built from the website's own story sample (`apps/ui/lib/v3/storyFixture.ts`). |
-| `web-draft.ts` | The **draft** shapes of the web search, dig suggestions and investigations, and how they are held back while the contract does not know them. See "Draft fields" below. |
+| `web-draft.ts` | The shapes of the web search, dig suggestions and investigations, imported from the contract (W1-6), and how they would be held back from a contract that does not know them. See "Draft fields" below. |
 | `web-seed.ts` | The made-up web pages of the seeded debates (all on `.example` sites; no real article is quoted). |
 | `check.ts` | Self-check. It reads every endpoint through the website's own code: the `/api` proxy, the typed client, and the V4 map builder. |
 
@@ -94,7 +94,7 @@ Once the new "Sure" rule is built (task W2-6), n-mix-cost will read *sure for th
 
 ## Draft fields (web search, dig suggestions, investigations)
 
-The real shapes are task W1-6's (`packages/contract/src/web.ts`), built at the same time as this mock. Until they merge, the mock carries copies of them in `web-draft.ts`, taken from that lane's commit `76e935bbd` (same field names, words and rules; every seeded body was checked against that commit's schemas on 30 Oct):
+The shapes are task W1-6's (`packages/contract/src/web.ts`). W1-6 merged (`76e935bbd`), and since task W2-6 `web-draft.ts` imports them from the contract instead of carrying copies (the "Draft…" names stayed, so nothing else changed). The fields are still called "draft" below because the real API does not serve them yet (W3-3):
 
 | Where | Draft field | What it holds |
 |---|---|---|
@@ -107,10 +107,10 @@ The real shapes are task W1-6's (`packages/contract/src/web.ts`), built at the s
 
 How they are sent:
 
-- **To the website** (the normal `/v1/...` addresses): a draft field is sent only when the contract's own schema already accepts it. Today it does not, so the mock holds the draft fields back and the website gets today's shape: no sources and no `web`, the BLOCKED room is a plain `FULL`, no `reserve`, no `dig_share_percent`. `/__mock/state` says which are sent (`draft_fields_sent`).
+- **To the website** (the normal `/v1/...` addresses): a draft field is sent only when the contract's own schema accepts it. Since W1-6 merged it does, so the website gets the sources, `web`, `reserve` and `dig_share_percent`. Started against an older contract (`MOCK_ENGINE_DIR`), the mock holds them back and the website gets the older shape: no sources and no `web`, the BLOCKED room a plain `FULL`. `/__mock/state` says which are sent (`draft_fields_sent`).
 - **In full**: put `/__mock/draft` before any `/v1/...` address, for example `http://127.0.0.1:4011/__mock/draft/v1/answers/aaaa1111-1111-4111-8111-111111111111`. These replies are checked against the draft schemas only.
 
-**After W1-6 merges:** the contract accepts these bodies, so the website starts receiving them with no change here. Then replace the copies in `web-draft.ts` with imports from `packages/contract` (fixing any name W1-6's review changed), and run `tests/unit/v4-mock-api.test.ts` and `check.ts`.
+**Since W1-6 merged:** the contract accepts these bodies and the website receives them; `web-draft.ts` imports the contract's schemas (W2-6). Check with `tests/unit/v4-mock-api.test.ts` and `check.ts`.
 
 The seeded web cases (`web-seed.ts`):
 
@@ -133,7 +133,7 @@ Set these when starting the mock, or change them live by opening `http://127.0.0
 | Setting | Values | Effect |
 |---|---|---|
 | `MOCK_PLAN` / `plan=` | `PLUS` (default), `FREE` | The person's plan, as the room read and the usage read say it. |
-| `MOCK_ROOM` / `room=` | `FITS` (default), `CLOSE`, `FULL`, `ALREADY_WAITING`, `BLOCKED` | What the "is there room today" read (`GET /v1/asks/room`) says. `BLOCKED` is a FULL day with the draft reserve word `BLOCKED` ("blocked until {reset}"); the website sees a plain `FULL` until the contract knows the word. |
+| `MOCK_ROOM` / `room=` | `FITS` (default), `CLOSE`, `FULL`, `ALREADY_WAITING`, `BLOCKED` | What the "is there room today" read (`GET /v1/asks/room`) says. `BLOCKED` is a FULL day with the reserve word `BLOCKED` ("blocked until {reset}"); against a contract older than W1-6 the website sees a plain `FULL`. |
 | `MOCK_ASK` / `ask=` | `AUTO` (default), `ACCEPT`, `WAITING`, `ALREADY_WAITING`, `LANGUAGE_CHOICE` | What a new ask gets. `AUTO` follows the room: FULL or BLOCKED makes asks wait in line, ALREADY_WAITING refuses with 422, anything else accepts. |
 | `MOCK_PORT` | default `4011` | Port (always on 127.0.0.1). |
 | `MOCK_RUN_SECONDS` | default `25` | How long a new debate "runs". |

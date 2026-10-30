@@ -8,6 +8,7 @@ import { openQuestionsOf } from "@/lib/v4/mapModel";
 import { levelHref } from "@/lib/v4/storage";
 import { countTrust } from "@/lib/v4/trust";
 import {
+  basisKey,
   DIG_MODES,
   TRUST_WORDS,
   type DigMode,
@@ -37,6 +38,7 @@ import {
   type ResolvedSelection,
   type Title
 } from "./V4MapTree";
+import { V4OtherPages, V4SearchNote, V4SourceList, V4WebNoteLine } from "./V4Sources";
 import { V4TrustBar } from "./V4TrustBar";
 
 /*
@@ -44,6 +46,9 @@ import { V4TrustBar } from "./V4TrustBar";
  * the question, the answer here so far, the bar, the points in the four trust words, then where to dig and the dig
  * button. Points no second AI checked are only counted (decision 6). The reading level decides how much each point
  * says. Nothing here fetches or stores anything.
+ * Perplexity plan W2-6 (2026-10-30): each point shows its sources at every reading level (V4Sources.tsx); the question
+ * shows the debate's web note (Free, a failed search, switched off) and a path its own search note, above the points;
+ * a path then lists the other pages its search found, each with "Add to researched" (wired in W4-4).
  */
 
 type PanelProps = Readonly<{
@@ -67,6 +72,8 @@ type PanelProps = Readonly<{
   onDig: (target: DigTarget) => void;
   digBusy: boolean;
   roomNotice?: ReactNode;
+  /** W2-6: "Add to researched" on one of a path's other pages; W4-4 wires it (until then the button cannot be used). */
+  onAddResearched?: (pathId: string, pageRef: string) => void;
   headingRef: RefObject<HTMLHeadingElement | null>;
   catalog: MessageCatalog;
   locale: string;
@@ -79,7 +86,7 @@ function basisLine(point: V4Point, catalog: MessageCatalog, locale: string): str
       ? t(catalog, "v4.basis.AGREED_BUT_DATED.noDate")
       : t(catalog, "v4.basis.AGREED_BUT_DATED", { date: formatDate(locale, point.asOf, { dateStyle: "medium" }) });
   }
-  return t(catalog, `v4.basis.${point.basis}`);
+  return t(catalog, basisKey(point.basis));
 }
 
 function PointItem(props: Readonly<{ point: V4Point; word: TrustWord; level: ReadingLevel; catalog: MessageCatalog; locale: string }>) {
@@ -102,6 +109,7 @@ function PointItem(props: Readonly<{ point: V4Point; word: TrustWord; level: Rea
             </div>
           )
           : null}
+        <V4SourceList sources={point.sources} catalog={catalog} locale={props.locale} />
         {level === "expert" && word === "DIDNT_HOLD" && point.answeredBy !== null
           ? (
             <p className="v4PanelBasis">
@@ -379,6 +387,7 @@ function RootBody(props: Readonly<{ panel: PanelProps }>) {
             )
             : <p className="v4Muted">{t(catalog, writing ? "v4.panel.storyWriting" : "v4.panel.storyMissing")}</p>}
       </Section>
+      <V4WebNoteLine note={map.webNote} catalog={catalog} />
       <TrustSection counts={map.counts} points={map.points} unchecked={map.unchecked} panel={panel} />
       {panel.readingLevel === "expert" && map.why.length > 0
         ? (
@@ -410,6 +419,7 @@ function PathBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolve
   const line = path.line.replace(/\s+/g, " ").trim();
   // The heading shows the short title; the full line is repeated here only when the title had to be cut.
   const cut = line.length > 0 && shortText(line) !== line;
+  const addResearched = panel.onAddResearched;
   return (
     <>
       <Section title={t(panel.catalog, "v4.panel.answerHere")}>
@@ -419,7 +429,24 @@ function PathBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolve
         {cut ? <p className="v4PanelText" data-ai-generated="true">{line}</p> : null}
         {!cut && path.fate === null ? <p className="v4Muted">{t(panel.catalog, "v4.panel.pathNoMore")}</p> : null}
       </Section>
+      {path.web !== undefined
+        ? <V4SearchNote search={path.web.search} catalog={panel.catalog} />
+        : <V4WebNoteLine note={panel.map.webNote} catalog={panel.catalog} />}
       <TrustSection counts={path.counts} points={path.points} unchecked={path.unchecked} panel={panel} />
+      {path.web !== undefined && path.web.otherPages.length > 0
+        ? (
+          <Section title={t(panel.catalog, "v4.web.otherPages")}>
+            <V4OtherPages
+              pages={path.web.otherPages}
+              catalog={panel.catalog}
+              locale={panel.locale}
+              actions
+              heading={false}
+              {...(addResearched === undefined ? {} : { onAddResearched: (pageRef: string) => addResearched(path.id, pageRef) })}
+            />
+          </Section>
+        )
+        : null}
       <WhereToDig
         open={undugOpen(path.open, panel.digs)}
         digs={digsUnder(panel.map, panel.digs, path.id)}

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Answer, AnswerStory, DigLinks } from "@debateai/contract";
 import { AuthGate } from "@/components/AuthGate";
 import { V4Header } from "@/components/v4/V4Header";
+import { V4OtherPages, V4SearchNote, V4SourceList, V4WebNoteLine } from "@/components/v4/V4Sources";
 import { V4TrustBar } from "@/components/v4/V4TrustBar";
 import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { STORY_POLLING, unreadableStory } from "@/lib/v3/useAnswerStory";
@@ -14,13 +15,17 @@ import { loadDigView, loadStory, loadV4, storyReadFailed } from "@/lib/v4/load";
 import { buildV4Map } from "@/lib/v4/mapModel";
 import { mergeDigLinks, readDigRecords } from "@/lib/v4/accountMemory";
 import { levelHref, useReadingLevel } from "@/lib/v4/storage";
-import { TRUST_WORDS, type DigLink, type DigView, type ReadingLevel, type V4Map, type V4Path } from "@/lib/v4/types";
+import { basisKey, TRUST_WORDS, type DigLink, type DigView, type ReadingLevel, type V4Map, type V4Path } from "@/lib/v4/types";
 
 /*
  * V4 initial (2026-10-28), D5: the report. A document made from the same served answer as the map — nothing is
  * invented; parts the engine has no data for yet ("Gives up:", the per-round rewrite) are left out (row D 3, 4).
  * Fix wave 1, Decision A: nothing is kept in the browser — the level comes from the address (or, N7, the account), and
  * the digs from the account (N11: its dig records, then its question list by text).
+ * Perplexity plan W2-6 (2026-10-30): the report shows the web part as the map does — the debate's web note (Free, a
+ * failed search, switched off) above the paths, each path's own search note, and at the expert level each point's
+ * sources and each path's other pages (listed only: the report has no buttons). The old line "This first version does
+ * not search the web for sources yet." gives way to these notes.
  */
 
 type Props = Readonly<{
@@ -361,8 +366,11 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
         {map.paths.length > 0 ? (
           <section className="v4RepSection" aria-labelledby="v4-report-paths">
             <h2 id="v4-report-paths" className="v4RepH2">{t(catalog, "v4.report.pathsHeading")}</h2>
+            <V4WebNoteLine note={map.webNote} catalog={catalog} className="v4RepNote" />
             <ol className="v4RepPaths">
-              {map.paths.map((path) => <ReportPath key={path.id} path={path} level={level} catalog={catalog} locale={locale} />)}
+              {map.paths.map((path) => (
+                <ReportPath key={path.id} path={path} level={level} catalog={catalog} locale={locale} debateNote={map.webNote !== null && map.webNote !== undefined} />
+              ))}
             </ol>
           </section>
         ) : null}
@@ -395,13 +403,13 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
         <section className="v4RepSection" aria-labelledby="v4-report-checked">
           <h2 id="v4-report-checked" className="v4RepH2">{t(catalog, "v4.report.checkedHeading")}</h2>
           <p className="v4RepProse">{t(catalog, "v4.report.checkedSecondAi")}</p>
-          <p className="v4RepProse">{t(catalog, "v4.report.checkedNoWeb")}</p>
           <p className="v4RepProse">{t(catalog, "v4.report.checkedWordsIntro")}</p>
           <ul className="v4RepWords">
             {TRUST_WORDS.map((word) => (
               <li key={word} className="v4RepWord">
                 <b>{t(catalog, `v4.trust.${word}`)}</b>
-                <span>{t(catalog, `v4.report.word.${word}`)}</span>
+                {/* W2-6: "Sure" now means a page this debate looked up, in the owner-approved words of its basis. */}
+                <span>{t(catalog, word === "SURE" ? basisKey("WEB_CHECKED_AND_AGREED") : `v4.report.word.${word}`)}</span>
               </li>
             ))}
           </ul>
@@ -411,7 +419,14 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
   );
 }
 
-function ReportPath({ path, level, catalog, locale }: Readonly<{ path: V4Path; level: ReadingLevel; catalog: MessageCatalog; locale: string }>) {
+function ReportPath({ path, level, catalog, locale, debateNote }: Readonly<{
+  path: V4Path;
+  level: ReadingLevel;
+  catalog: MessageCatalog;
+  locale: string;
+  /** W2-6: the debate's own web note is shown above the paths, so the paths do not repeat it. */
+  debateNote: boolean;
+}>) {
   const checked = path.points.filter((point) => point.trust !== null);
   return (
     <li className="v4RepPath">
@@ -420,15 +435,17 @@ function ReportPath({ path, level, catalog, locale }: Readonly<{ path: V4Path; l
       <div className="v4RepBar">
         <V4TrustBar counts={path.counts} unchecked={path.unchecked} catalog={catalog} size="small" showCounts />
       </div>
+      {path.web !== undefined && !debateNote ? <V4SearchNote search={path.web.search} catalog={catalog} className="v4RepNote" /> : null}
       {level === "expert" && checked.length > 0 ? (
         <ul className="v4RepPoints">
           {checked.map((point) => (
             <li key={point.id} className="v4RepPoint" data-trust={point.trust ?? undefined}>
               <span className="v4RepPointMark" aria-hidden="true" />
-              <span className="v4RepPointBody">
+              <div className="v4RepPointBody">
                 <span className="v4RepPointWord">{t(catalog, `v4.trust.${point.trust}`)}</span>
                 <span data-ai-generated="true">{point.text}</span>
-              </span>
+                <V4SourceList sources={point.sources} catalog={catalog} locale={locale} />
+              </div>
             </li>
           ))}
         </ul>
@@ -436,6 +453,9 @@ function ReportPath({ path, level, catalog, locale }: Readonly<{ path: V4Path; l
       {level === "expert" && path.unchecked > 0 ? (
         <p className="v4RepNote">{tPlural(catalog, "v4.report.pathUnchecked", path.unchecked, locale)}</p>
       ) : null}
+      {level === "expert" && path.web !== undefined
+        ? <V4OtherPages pages={path.web.otherPages} catalog={catalog} locale={locale} actions={false} headingClassName="v4RepSmallHead" />
+        : null}
     </li>
   );
 }

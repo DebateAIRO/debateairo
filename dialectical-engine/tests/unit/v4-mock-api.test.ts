@@ -2,10 +2,14 @@ import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import * as fixture from "../../apps/ui/lib/v3/storyFixture.js";
-import { AnswerSchema, AskRoomResponseSchema, AskRequestSchema, AskRoomQuerySchema, NodeSchema } from "../../packages/contract/src/index.js";
+import {
+  AnswerSchema, AnswerWebSchema, AskParentSchema, AskRoomResponseSchema, AskRequestSchema, AskRoomQuerySchema, cutQuoteAtWordEdge,
+  DebateInvestigationSchema, DigSuggestionSchema, NodeSchema, WebOtherPageSchema, WebPathSchema, WebSourceSchema
+} from "../../packages/contract/src/index.js";
 import { createSeed, SEED_NODE_IDS } from "../../tools/v4-mock-api/seed.js";
 import {
-  answerDraftProblems, contractOrDraft, cutQuote, DraftAskParentSchema, DraftInvestigationSchema, DraftRoomPartSchema,
+  answerDraftProblems, contractOrDraft, cutQuote, DraftAnswerWebSchema, DraftAskParentSchema, DraftDigSuggestionSchema,
+  DraftInvestigationSchema, DraftOtherPageSchema, DraftRoomPartSchema, DraftSourceSchema, DraftWebPathSchema,
   DraftRoomQueryPartSchema, READ_DEPTHS, RESEARCHED_STATES, splitAsk, splitRoomQuery, stripAnswer, stripRoom, SUGGESTION_KINDS,
   SUGGESTION_SIDES
 } from "../../tools/v4-mock-api/web-draft.js";
@@ -36,6 +40,23 @@ const allSources = (web: WebCase): Loose[] => answerOf(web).nodes.flatMap((node:
 const suggestionsOf = (web: WebCase): Loose[] => pathsOf(web).flatMap((path) => path.suggestions);
 
 describe("V4 mock API: the draft web fields", () => {
+  it("serves the contract's own shapes, not copies (plan W2-6: W1-6 merged)", () => {
+    expect(DraftSourceSchema).toBe(WebSourceSchema);
+    expect(DraftOtherPageSchema).toBe(WebOtherPageSchema);
+    expect(DraftDigSuggestionSchema).toBe(DigSuggestionSchema);
+    expect(DraftWebPathSchema).toBe(WebPathSchema);
+    expect(DraftAnswerWebSchema).toBe(AnswerWebSchema);
+    expect(DraftAskParentSchema).toBe(AskParentSchema);
+    expect(DraftInvestigationSchema).toBe(DebateInvestigationSchema);
+    expect(cutQuote("word ".repeat(40))).toBe(cutQuoteAtWordEdge("word ".repeat(40)));
+    // The contract knows the web fields now, so the website gets every seeded case whole.
+    for (const web of WEB_CASES) {
+      const answer = answerOf(web);
+      expect(contractOrDraft(AnswerSchema, answer, stripAnswer), web).toEqual({ body: answer, draft: true });
+    }
+  });
+
+
   it("cuts a quote to at most 120 characters at a word edge", () => {
     expect(cutQuote("A short quote.")).toBe("A short quote.");
     const long = "word ".repeat(40).trim();
