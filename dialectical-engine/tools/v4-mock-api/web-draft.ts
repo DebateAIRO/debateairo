@@ -17,10 +17,17 @@
  * planner's reason; dig suggestions per path (contradicting, undocumented, needs more web, helps the main question for or
  * against); one reserve, kept while an investigation is open; "blocked until {reset}" when a closing found no credits
  * left; a dig's share of today as a percentage (Q14).
+ *
+ * Plan 2026-10-30-dig-model-revision.md, task W2-7: the new dig model's shapes (a path's rewrites by digs, the verdict on
+ * the person's point of view, "paths changed since the answer was written", a dig's own answer with its level 1-10) and the
+ * money rule's words (a new question's share of today, new starts waiting for the reset, the usage read's borrow notices,
+ * a run's month pause) come from the contract too; the strip functions below hold them back from an older contract.
  */
 import { z } from "zod";
 import { DigLinkModeSchema } from "../../packages/contract/src/account-memory.js";
 import {
+  AnswerDigSchema,
+  AnswerPathRewritesSchema,
   AnswerWebSchema,
   AskParentSchema,
   cutQuoteAtWordEdge,
@@ -29,7 +36,13 @@ import {
   DigSharePercentSchema,
   DigSuggestionSchema,
   DigSuggestionSideSchema,
+  MonthPauseSchema,
+  RoomNewStartsSchema,
   RoomReserveSchema,
+  RunContinuedSchema,
+  RunContinueRefusedSchema,
+  RunContinueRequestSchema,
+  UsageBorrowsSchema,
   WEB_CONTRACT_LIMITS,
   WEB_READ_DEPTHS,
   WEB_RESEARCHED_STATES,
@@ -94,6 +107,16 @@ export type DraftAskParent = AskParent;
 export const DraftInvestigationSchema = DebateInvestigationSchema;
 export type DraftInvestigation = DebateInvestigation;
 
+/** W2-7: `Answer.path_rewrites`, `Answer.dig`, a run's `month_pause` and the usage read's `borrowed` (the contract's). */
+export const DraftPathRewritesSchema = AnswerPathRewritesSchema;
+export const DraftAnswerDigSchema = AnswerDigSchema;
+export const DraftMonthPauseSchema = MonthPauseSchema;
+export const DraftUsageBorrowsSchema = UsageBorrowsSchema;
+/** W2-7: Continue on a month-paused debate (no route in the contract yet; the mock serves POST /v1/runs/{id}/continue). */
+export const DraftRunContinueRequestSchema = RunContinueRequestSchema;
+export const DraftRunContinuedSchema = RunContinuedSchema;
+export const DraftRunContinueRefusedSchema = RunContinueRefusedSchema;
+
 /**
  * The room read's web part, with the contract's words (RoomReserveSchema, DigSharePercentSchema) and its rule (BLOCKED
  * names a full person window and its reset); the rest of the room read is the contract's AskRoomResponseSchema.
@@ -103,10 +126,19 @@ export const DraftRoomPartSchema = z.looseObject({
   room: z.enum(["FITS", "CLOSE", "FULL", "ALREADY_WAITING"]),
   scope: z.string().nullable(),
   reserve: RoomReserveSchema.optional(),
-  dig_share_percent: DigSharePercentSchema.optional()
+  dig_share_percent: DigSharePercentSchema.optional(),
+  // W2-7 (money rule): a new question's share of today, and new starts waiting for the reset.
+  start_share_percent: DigSharePercentSchema.optional(),
+  new_starts: RoomNewStartsSchema.optional()
 }).superRefine((room, context) => {
   if (room.reserve === "BLOCKED" && (room.room !== "FULL" || !PERSON_SCOPES.has(room.scope ?? ""))) {
     context.addIssue({ code: "custom", message: "BLOCKED names a full person window and its reset" });
+  }
+  if (room.new_starts !== undefined && (room.room !== "FULL" || !PERSON_SCOPES.has(room.scope ?? ""))) {
+    context.addIssue({ code: "custom", message: "new starts wait only for the reset of a full person window" });
+  }
+  if (room.start_share_percent !== undefined && room.dig_share_percent !== undefined) {
+    context.addIssue({ code: "custom", message: "a room read estimates a new question or a dig, not both" });
   }
 });
 
@@ -136,14 +168,29 @@ export function stripNode<T extends Json>(node: T): T {
 }
 
 export function stripAnswer<T extends Json>(answer: T): T {
-  const { web: _web, ...rest } = answer;
+  const { web: _web, path_rewrites: _rewrites, dig: _dig, ...rest } = answer;
   const nodes = Array.isArray(rest.nodes) ? (rest.nodes as Json[]).map(stripNode) : rest.nodes;
   return { ...rest, nodes } as unknown as T;
 }
 
-/** Without `reserve` and `dig_share_percent`, a BLOCKED room is today's FULL (a question waits for that reset). */
+/**
+ * Without `reserve` and `dig_share_percent` (W1-6) and `start_share_percent` and `new_starts` (W2-7), a BLOCKED or
+ * "new starts wait" room is today's FULL (a question waits for that reset).
+ */
 export function stripRoom<T extends Json>(room: T): T {
-  const { reserve: _reserve, dig_share_percent: _share, ...rest } = room;
+  const { reserve: _reserve, dig_share_percent: _share, start_share_percent: _start, new_starts: _starts, ...rest } = room;
+  return rest as unknown as T;
+}
+
+/** W2-7: without its month pause, a paused debate reads as today's RUNNING. */
+export function stripRun<T extends Json>(run: T): T {
+  const { month_pause: _pause, ...rest } = run;
+  return rest as unknown as T;
+}
+
+/** W2-7: without its borrow notices, the usage read is today's (the day may still read above 100%). */
+export function stripUsage<T extends Json>(usage: T): T {
+  const { borrowed: _borrowed, ...rest } = usage;
   return rest as unknown as T;
 }
 
@@ -167,6 +214,15 @@ export function answerDraftProblems(answer: Json): string[] {
   const problems: string[] = [];
   const web = DraftAnswerWebSchema.safeParse(answer.web);
   if (!web.success) problems.push(`web: ${JSON.stringify(web.error.issues)}`);
+  // W2-7: the rewrites and a dig's own part are optional; when there, they pass the contract's schemas.
+  if (answer.path_rewrites !== undefined) {
+    const rewrites = DraftPathRewritesSchema.safeParse(answer.path_rewrites);
+    if (!rewrites.success) problems.push(`path_rewrites: ${JSON.stringify(rewrites.error.issues)}`);
+  }
+  if (answer.dig !== undefined) {
+    const dig = DraftAnswerDigSchema.safeParse(answer.dig);
+    if (!dig.success) problems.push(`dig: ${JSON.stringify(dig.error.issues)}`);
+  }
   for (const node of answer.nodes as Json[]) {
     const result = DraftNodeWebSchema.safeParse({ sources: node.sources, looked_up_checked: node.looked_up_checked });
     if (!result.success) problems.push(`node ${String(node.node_id)}: ${JSON.stringify(result.error.issues)}`);

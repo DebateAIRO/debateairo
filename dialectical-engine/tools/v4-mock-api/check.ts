@@ -11,6 +11,10 @@
  *
  * Perplexity plan W1-7 (2026-10-30): it also reads the DRAFT web fields (web-draft.ts) at /__mock/draft/v1/..., the
  * account memory of migration 0131, the investigations, a Free person, and the "blocked until reset" room.
+ *
+ * Plan 2026-10-30-dig-model-revision.md, task W2-7: it also reads the dig model's rewritten paths, the verdict on the
+ * person's point of view and the dig trail three levels down, and the money rule's words: a new question's share of today,
+ * new starts waiting for the reset, the borrow notice and the debate paused at the month wall with Continue.
  */
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -80,7 +84,12 @@ const RUNS = {
   storyWriting: "55555555-5555-4555-8555-555555555555",
   free: "66666666-6666-4666-8666-666666666666",
   searchFailed: "77777777-7777-4777-8777-777777777777",
-  dig: "88888888-8888-4888-8888-888888888888"
+  dig: "88888888-8888-4888-8888-888888888888",
+  // W2-7: the dig trail (own view at level 1, then levels 2 and 3) and the debate paused at the month wall.
+  digOwnView: "d1000000-0000-4000-8000-000000000001",
+  digLevelTwo: "d2000000-0000-4000-8000-000000000002",
+  digLevelThree: "d3000000-0000-4000-8000-000000000003",
+  paused: "e1000000-0000-4000-8000-000000000001"
 };
 const MOCK = process.env.DIALECTICAL_API_BASE!;
 /** A mock control or a draft read, straight from the mock (not part of the real API). */
@@ -329,6 +338,78 @@ await step("Write my report closes the investigation (draft)", async () => {
   const closed: Loose = await response.json();
   must(response.ok && closed.state === "CLOSED" && closed.closings.length === 1, `HTTP ${response.status}, ${closed.state}`);
   return `CLOSED, report version ${closed.closings.at(-1).report_version}`;
+}, (value: string) => value);
+
+// ---- W2-7: the new dig model (rewritten paths, the verdict, nesting) and the money rule ----
+
+await step("rewritten paths of the first debate, through the website's client", async () => {
+  const served: Loose = await client.readRunAnswer(RUNS.settled);
+  must(state.draft_fields_sent.answer === ("path_rewrites" in served), "path_rewrites sent exactly when the contract knows them");
+  const rewrites: Loose = (await draftAnswer(RUNS.settled)).path_rewrites;
+  const byPath = Object.fromEntries(rewrites.paths.map((path: Loose) => [path.position_ref, path]));
+  must(byPath["n-mix"].current.line === byPath["n-mix"].history.at(-1).text.line, "the current text is the newest rewrite's");
+  must(byPath["n-mix"].history.at(-1).view.outcome === "HELPED" && byPath["n-mix"].history.at(-1).view.scope === "MAIN_QUESTION", "a verdict");
+  must(byPath["n-renew"].changed_below === true && byPath["n-renew"].history.at(-1).view === null, "changed further down; an AI pick has no verdict");
+  must(rewrites.changed_since.count === 2 && rewrites.changed_since.since_report_version === 1, "2 paths changed since report version 1");
+  return `${rewrites.paths.length} paths rewritten, ${rewrites.changed_since.count} changed since report version ${rewrites.changed_since.since_report_version}`;
+}, (value: string) => value);
+await step("the dig trail three levels down (draft)", async () => {
+  const trail: string[] = [];
+  for (const [id, level, parent] of [[RUNS.dig, 1, RUNS.settled], [RUNS.digLevelTwo, 2, RUNS.dig], [RUNS.digLevelThree, 3, RUNS.digLevelTwo]] as const) {
+    const dig: Loose = (await draftAnswer(id)).dig;
+    must(dig.level === level && dig.parent_run_id === parent, `level ${level} under its parent`);
+    trail.push(`level ${dig.level} ${dig.rewrite.state}${dig.rewrite.view ? ` (${dig.rewrite.view.outcome})` : ""}`);
+  }
+  const own: Loose = (await draftAnswer(RUNS.digOwnView)).dig;
+  must(own.picks.some((pick: Loose) => pick.by === "PERSON_OWN_VIEW") && own.rewrite.view !== null, "the own-view dig carries its verdict");
+  const links: Loose = await client.readDigLinks(RUNS.digLevelTwo);
+  must(links.parent?.parent_run_id === RUNS.dig && links.children.some((link: Loose) => link.child_run_id === RUNS.digLevelThree), "the dig links nest");
+  const investigation: Loose = await mock(`/v1/runs/${RUNS.digLevelThree}/investigation`);
+  must(investigation.root_run_id === RUNS.settled, "a dig of a dig is in the first debate's investigation");
+  return trail.join(" › ");
+}, (value: string) => value);
+await step("a new question's estimate, as a share of today", async () => {
+  const room: Loose = await client.getAskRoom({ plan_tier: "premium", composition_budget_tier: "medium", depth: 2, answer_length: "standard" });
+  must((room.start_share_percent === 15) === state.draft_fields_sent.room, `start share ${room.start_share_percent}`);
+  return `${room.start_share_percent ?? "(held back)"}%`;
+}, (value: string) => value);
+await step("new starts wait for the day's reset (room=WAIT_RESET)", async () => {
+  await mock("/__mock/set?room=WAIT_RESET");
+  try {
+    const draft: Loose = await mock("/__mock/draft/v1/asks/room?plan_tier=premium&composition_budget_tier=medium&depth=2&answer_length=standard");
+    must(draft.room === "FULL" && draft.new_starts === "BLOCKED_UNTIL_RESET" && draft.resets_at !== null, "FULL, new starts blocked until the reset");
+    return `new starts wait until ${draft.resets_at}`;
+  } finally {
+    await mock("/__mock/set?room=FITS");
+  }
+}, (value: string) => value);
+await step("running work borrowed from tomorrow (usage=BORROWED)", async () => {
+  await mock("/__mock/set?usage=BORROWED");
+  try {
+    const usage: Loose = await client.getBillingUsage();
+    must(usage.windows[0].percent > 100, "the day reads over 100%");
+    must((usage.borrowed?.[0]?.percent === 4) === state.draft_fields_sent.usage, "the borrow notice sent exactly when the contract knows it");
+    return `day ${usage.windows[0].percent}%, borrowed ${usage.borrowed?.[0]?.percent ?? "(held back)"}% of tomorrow`;
+  } finally {
+    await mock("/__mock/set?usage=NORMAL");
+  }
+}, (value: string) => value);
+await step("a debate paused at the month wall, then Continue", async () => {
+  await mock("/__mock/set?pause=UNTIL_RESET");
+  const continueRun = () => fetch(`${MOCK}/v1/runs/${RUNS.paused}/continue`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+  const before: Loose = await client.readRun(RUNS.paused);
+  must(before.state === "RUNNING" && (before.month_pause?.can_continue === false) === state.draft_fields_sent.run, "paused until the reset");
+  const early = await continueRun();
+  must(early.status === 409 && (await early.json()).error === "RUN_PAUSED_UNTIL_RESET", "Continue before the reset is refused");
+  await mock("/__mock/set?pause=CAN_CONTINUE");
+  const ready: Loose = await mock(`/__mock/draft/v1/runs/${RUNS.paused}`);
+  must(ready.month_pause.can_continue === true, "Continue offered once the month reset");
+  const resumed = await continueRun();
+  must(resumed.status === 200 && (await resumed.json()).state === "CONTINUING", "Continue resumes it");
+  const after: Loose = await mock(`/__mock/draft/v1/runs/${RUNS.paused}`);
+  must(after.month_pause === undefined, "no pause after Continue");
+  await mock("/__mock/set?pause=UNTIL_RESET");
+  return `paused until ${before.month_pause?.until ?? ready.month_pause.until}; Continue refused early, then resumed`;
 }, (value: string) => value);
 
 // The sign-in helper's cookies must survive the proxy's cookie rules.

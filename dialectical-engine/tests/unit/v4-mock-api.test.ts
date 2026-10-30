@@ -3,16 +3,20 @@ import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import * as fixture from "../../apps/ui/lib/v3/storyFixture.js";
 import {
-  AnswerSchema, AnswerWebSchema, AskParentSchema, AskRoomResponseSchema, AskRequestSchema, AskRoomQuerySchema, cutQuoteAtWordEdge,
-  DebateInvestigationSchema, DigSuggestionSchema, NodeSchema, WebOtherPageSchema, WebPathSchema, WebSourceSchema
+  AnswerDigSchema, AnswerPathRewritesSchema, AnswerSchema, AnswerWebSchema, AskParentSchema, AskRoomResponseSchema, AskRequestSchema,
+  AskRoomQuerySchema, BillingUsageResponseSchema, cutQuoteAtWordEdge, DebateInvestigationSchema, DIG_LEVEL_MAX, DigSuggestionSchema,
+  MonthPauseSchema, NodeSchema, RunProjectionSchema, UsageBorrowSchema, WebOtherPageSchema, WebPathSchema, WebSourceSchema
 } from "../../packages/contract/src/index.js";
 import { createSeed, SEED_NODE_IDS } from "../../tools/v4-mock-api/seed.js";
 import {
   answerDraftProblems, contractOrDraft, cutQuote, DraftAnswerWebSchema, DraftAskParentSchema, DraftDigSuggestionSchema,
   DraftInvestigationSchema, DraftOtherPageSchema, DraftRoomPartSchema, DraftSourceSchema, DraftWebPathSchema,
-  DraftRoomQueryPartSchema, READ_DEPTHS, RESEARCHED_STATES, splitAsk, splitRoomQuery, stripAnswer, stripRoom, SUGGESTION_KINDS,
-  SUGGESTION_SIDES
+  DraftRoomQueryPartSchema, READ_DEPTHS, RESEARCHED_STATES, splitAsk, splitRoomQuery, stripAnswer, stripRoom, stripRun, stripUsage,
+  SUGGESTION_KINDS, SUGGESTION_SIDES, DraftPathRewritesSchema, DraftAnswerDigSchema, DraftMonthPauseSchema, DraftUsageBorrowsSchema
 } from "../../tools/v4-mock-api/web-draft.js";
+import {
+  borrowNotice, DIG_ANSWERS, DIG_FINISHED_AT, DIG_RUNS, monthPause, PATH_REWRITES, SEEDED_NEW_DIGS
+} from "../../tools/v4-mock-api/rewrite-seed.js";
 import { WEB_CASES, type WebCase } from "../../tools/v4-mock-api/web-seed.js";
 
 /*
@@ -213,6 +217,95 @@ describe("V4 mock API: the draft web fields", () => {
       "v4.web.noSearch", "v4.web.switchedOff", "v4.web.previewOnly", "v4.web.fewerReaders", "v4.web.otherPages", "v4.web.addResearched",
       "v4.web.failed", "v4.web.free", "v4.web.sureBasis", "v4.room.blockedUntil", "v4.dig.quotaShare", "v4.dig.quotaDayUsed",
       "v4.suggest.ownView", "v4.suggest.edit"
+    ];
+    expect(words.filter((key) => !(key in catalog))).toEqual([]);
+  });
+});
+
+/*
+ * Plan 2026-10-30-dig-model-revision.md, task W2-7: the mock's seeded dig model (rewritten paths, the verdict on the
+ * person's point of view, a dig trail three levels down) and the money rule (a paused debate, a borrow notice, new starts
+ * waiting for the reset). The shapes are the contract's; these checks hold the seed to the owner's rules.
+ */
+describe("V4 mock API: the new dig model and the money rule", () => {
+  it("serves the contract's own shapes for the rewrites, a dig's part, the pause and the borrow notices", () => {
+    expect(DraftPathRewritesSchema).toBe(AnswerPathRewritesSchema);
+    expect(DraftAnswerDigSchema).toBe(AnswerDigSchema);
+    expect(DraftMonthPauseSchema).toBe(MonthPauseSchema);
+    expect(DraftUsageBorrowsSchema.element).toBe(UsageBorrowSchema);
+  });
+
+  it("every seeded rewrite and dig passes the contract, and an answer carrying them passes AnswerSchema", () => {
+    for (const [run, rewrites] of Object.entries(PATH_REWRITES)) {
+      expect(AnswerPathRewritesSchema.safeParse(rewrites).success, run).toBe(true);
+      const answer = { ...answerOf("PAID"), path_rewrites: rewrites, ...(DIG_ANSWERS[run] === undefined ? {} : { dig: DIG_ANSWERS[run] }) };
+      expect(AnswerSchema.safeParse(answer).success, run).toBe(true);
+      expect(answerDraftProblems(answer), run).toEqual([]);
+      // Held back from an older contract: no rewrites and no dig part.
+      expect(Object.keys(stripAnswer(answer)).filter((key) => key === "path_rewrites" || key === "dig"), run).toEqual([]);
+    }
+    for (const [run, dig] of Object.entries(DIG_ANSWERS)) expect(AnswerDigSchema.safeParse(dig).success, run).toBe(true);
+  });
+
+  it("a rewritten path shows its new text, what the dig changed and, beside the person's own words, the verdict", () => {
+    const root = PATH_REWRITES[DIG_RUNS.root]!;
+    const mix = root.paths.find((path) => path.position_ref === "n-mix")!;
+    const newest: Loose = mix.history.at(-1);
+    expect(mix.current).toEqual(newest.text);
+    expect(newest.what_changed.length).toBeGreaterThan(0);
+    expect(newest.view).toMatchObject({ outcome: "HELPED", scope: "MAIN_QUESTION" });
+    expect(newest.view.own_words).toEqual(DIG_ANSWERS[DIG_RUNS.ownView]!.picks.filter((pick) => pick.by !== "AI_SUGGESTION").map((pick) => pick.text));
+    // A dig made of an AI suggestion chosen as it was carries no verdict.
+    const renew = root.paths.find((path) => path.position_ref === "n-renew")!;
+    expect((renew.history.at(-1) as Loose).view).toBeNull();
+    expect(renew.changed_below).toBe(true);
+    expect(root.changed_since).toEqual({ count: 2, since_report_version: 1 });
+  });
+
+  it("the dig trail goes three levels down, each dig under its parent, the deepest one still rewriting", () => {
+    const chain = [DIG_RUNS.levelOne, DIG_RUNS.levelTwo, DIG_RUNS.levelThree].map((run) => DIG_ANSWERS[run]!);
+    expect(chain.map((dig) => dig.level)).toEqual([1, 2, 3]);
+    expect(chain.map((dig) => dig.parent_run_id)).toEqual([DIG_RUNS.root, DIG_RUNS.levelOne, DIG_RUNS.levelTwo]);
+    expect(chain.map((dig) => dig.rewrite?.state)).toEqual(["READY", "READY", "WRITING"]);
+    expect(chain.every((dig) => dig.level < DIG_LEVEL_MAX)).toBe(true);
+    // Each rewrite stands in its parent's path history, finished when its dig's run settled.
+    for (const [run, dig] of Object.entries(DIG_ANSWERS)) {
+      const parent = PATH_REWRITES[dig.parent_run_id]!.paths.find((path) => path.position_ref === dig.position_ref)!;
+      expect(parent.history.map((rewrite) => rewrite.rewrite_id), run).toContain(dig.rewrite!.rewrite_id);
+      const seeded = SEEDED_NEW_DIGS.find((candidate) => candidate.runRef === run);
+      expect(dig.rewrite!.dig_finished_at, run).toBe(seeded?.settledAt ?? DIG_FINISHED_AT.levelOne);
+    }
+  });
+
+  it("a paused debate, the borrow notice and a room whose new starts wait fall back to today's reads", () => {
+    const run = { run_ref: DIG_RUNS.root, question_line: "Should I move?", state: "RUNNING", terminal_reason: null, hold_until: null };
+    const paused = { ...run, month_pause: monthPause("2026-11-01T00:00:00.000Z", false) };
+    expect(RunProjectionSchema.safeParse(paused).success).toBe(true);
+    expect(stripRun(paused)).toEqual(run);
+    const usage = {
+      plan_id: "PLUS", windows: [{ scope: "PERSON_DAY", percent: 104, resets_at: "2026-11-01T00:00:00.000Z" }],
+      borrowed: [borrowNotice(DIG_RUNS.root, "2026-11-01T00:00:00.000Z")]
+    };
+    expect(BillingUsageResponseSchema.safeParse(usage).success).toBe(true);
+    expect(BillingUsageResponseSchema.safeParse(stripUsage(usage)).success).toBe(true);
+    expect(Object.keys(stripUsage(usage))).toEqual(["plan_id", "windows"]);
+    const wait = {
+      room: "FULL", scope: "PERSON_DAY", resets_at: "2026-11-01T00:00:00.000Z", waiting_run_ref: null, plan_id: "PLUS",
+      new_starts: "BLOCKED_UNTIL_RESET", start_share_percent: 15
+    };
+    expect(DraftRoomPartSchema.safeParse(wait).success).toBe(true);
+    expect(AskRoomResponseSchema.safeParse(wait).success).toBe(true);
+    expect(DraftRoomPartSchema.safeParse({ ...wait, room: "FITS", scope: null, resets_at: null }).success).toBe(false);
+    expect(AskRoomResponseSchema.safeParse(stripRoom(wait)).success).toBe(true);
+    expect(Object.keys(stripRoom(wait))).not.toContain("new_starts");
+  });
+
+  it("every dig-model and money-rule word the mock plays has its English line in the V4 catalogue", () => {
+    const words = [
+      "v4.view.heading", "v4.view.HELPED.MAIN_QUESTION", "v4.view.DID_NOT_HELP.PATH", "v4.view.asYours", "v4.view.why",
+      "v4.rewrite.whatChanged", "v4.rewrite.changedSince.other", "v4.rewrite.changedSinceReport", "v4.rewrite.changedBelow",
+      "v4.rewrite.state.WRITING", "v4.nest.level", "v4.nest.digHereToo", "v4.room.startShare", "v4.money.startsWait.PERSON_DAY",
+      "v4.money.borrowed.PERSON_DAY", "v4.money.paused", "v4.money.pausedReady", "v4.money.continue", "v4.debate.state.PAUSED_MONTH"
     ];
     expect(words.filter((key) => !(key in catalog))).toEqual([]);
   });

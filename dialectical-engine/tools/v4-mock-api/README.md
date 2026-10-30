@@ -8,6 +8,8 @@ Every reply it sends is checked against the website's own contract rules (`packa
 
 It moved here from a scratch folder on 30 Oct 2026 (Perplexity plan, task W1-7) and gained: a Free person, the account memory of migration 0131, the web search's draft fields (sources, other pages, a failed search, a path with no search planned), dig suggestions, investigations with the reserve kept, and a "blocked until reset" room.
 
+On 31 Oct 2026 (dig model revision, task W2-7) it gained the owner's new dig model and money rule: paths rewritten by digs (with "What the dig changed" and the verdict on the person's point of view), a dig trail three levels down, a debate paused at the month wall with Continue, a usage read where running work borrowed from tomorrow, a room where new starts wait for the reset, and a new question's share of today. See "The new dig model and the money rule" below.
+
 ## Files
 
 | File | What it is |
@@ -16,6 +18,7 @@ It moved here from a scratch folder on 30 Oct 2026 (Perplexity plan, task W1-7) 
 | `seed.ts` | The seeded English debate (nuclear vs renewables), built from the website's own story sample (`apps/ui/lib/v3/storyFixture.ts`). |
 | `web-draft.ts` | The shapes of the web search, dig suggestions and investigations, imported from the contract (W1-6), and how they would be held back from a contract that does not know them. See "Draft fields" below. |
 | `web-seed.ts` | The made-up web pages of the seeded debates (all on `.example` sites; no real article is quoted). |
+| `rewrite-seed.ts` | The new dig model's seeded rewrites, digs and dig trail, and the money rule's paused debate and borrow notice (task W2-7). |
 | `check.ts` | Self-check. It reads every endpoint through the website's own code: the `/api` proxy, the typed client, and the V4 map builder. |
 
 The unit test `tests/unit/v4-mock-api.test.ts` checks the seed and the draft shapes without starting anything.
@@ -73,7 +76,11 @@ All the answers carry the same English debate: *"Should countries build new nucl
 | `55555555-5555-4555-8555-555555555555` | **Finished**, but its story says "still writing" for the first 40 seconds after the mock starts. Answer id `aaaa5555-…`. | paid, searched | open |
 | `66666666-6666-4666-8666-666666666666` | **Finished**, asked on the **Free** plan. Answer id `aaaa6666-…`. | Free: not on this plan | closed (report version 1) |
 | `77777777-7777-4777-8777-777777777777` | **Finished**, but its **web search failed**. Answer id `aaaa7777-…`. | failed | open |
-| `88888888-8888-4888-8888-888888888888` | **Finished dig** of 1111, from the still-argued point `p:n-renew-storage`, quick look. Answer id `aaaa8888-…`. | paid, searched | member of 1111's |
+| `88888888-8888-4888-8888-888888888888` | **Finished dig** of 1111, from the still-argued point `p:n-renew-storage`, quick look. Answer id `aaaa8888-…`. **Level 1**; it rewrote 1111's path n-renew (an AI suggestion, so no verdict). | paid, searched | member of 1111's |
+| `d1000000-0000-4000-8000-000000000001` | **Finished dig** of 1111's path n-mix with the person's **own view** and their **edit** of a suggestion. Level 1. Answer id `aaaad100-…`. Its rewrite carries the verdict "helped this path and the main question". | paid, searched | member of 1111's |
+| `d2000000-0000-4000-8000-000000000002` | **Finished dig of the dig** 8888 (its path n-renew), with the person's own view. **Level 2**. Answer id `aaaad200-…`. Verdict "did not help this path"; 1111's n-renew is marked "a dig further down changed part of this". | paid, searched | member of 1111's |
+| `d3000000-0000-4000-8000-000000000003` | **Finished dig** of d200's path n-nuclear, thorough. **Level 3**. Answer id `aaaad300-…`. Its rewrite is **still writing**. | paid, searched | member of 1111's |
+| `e1000000-0000-4000-8000-000000000001` | **Paused at the month wall** (running; its planned calls and searches wait). Continue is refused until the switch `pause=CAN_CONTINUE`. | – | open |
 
 Example pages: `http://127.0.0.1:3011/v4/debate/11111111-1111-4111-8111-111111111111` (the map) and `…/report` (the report). An answer id also opens these pages.
 
@@ -118,6 +125,21 @@ The seeded web cases (`web-seed.ts`):
 - **Failed** (7777, and any new ask with `#webfail` in the question): every path `FAILED`, no sources, no other pages.
 - **Free** (6666, and new asks with `plan_tier: "free"`): every path `NOT_ON_PLAN`, no sources; its suggestions never ask for a web search.
 
+## The new dig model and the money rule (task W2-7)
+
+The shapes are the contract's (`packages/contract/src/web.ts`, merged in W2-7), so the website receives them; against an older contract (`MOCK_ENGINE_DIR`) they are held back like the other draft fields.
+
+| Where | Field | What it holds |
+|---|---|---|
+| each answer | `path_rewrites` | per rewritten path: `current` (the newest finished rewrite's line, summary and fate), `history` (newest last: each dig's rewrite with its state `WRITING` / `READY` / `READY_WITH_RESERVATION` / `FAILED`, "What the dig changed", the fate before, the verdict `view` or null, the dig's own paths with their lines and fates), `changed_below`; and `changed_since` (how many paths changed since the answer, or since report version n) |
+| a dig's answer | `dig` | its parent, the path it rewrote, its places, its **level** (1-10), its picks with who wrote each (`AI_SUGGESTION`, `PERSON_EDITED`, `PERSON_OWN_VIEW`), and its rewrite |
+| `GET /v1/asks/room` | `start_share_percent`, `new_starts` | a new question's share of today (15% in the mock); `BLOCKED_UNTIL_RESET` when the day is used up (switch `room=WAIT_RESET`) |
+| `GET /v1/billing/usage` | `borrowed` | with `usage=BORROWED`: the day reads 104% and running work used 4% of tomorrow's allowance |
+| `GET /v1/runs/:id` | `month_pause` | on run `e100…`: `until` (the next month) and `can_continue` |
+| `POST /v1/runs/:id/continue` | (draft route) | 409 `RUN_PAUSED_UNTIL_RESET` before the month reset, 200 `{"state":"CONTINUING"}` after it (switch `pause=CAN_CONTINUE`); setting `pause=` again pauses the run again |
+
+Every dig keeps its points and its answer text (owner Q-D13); the mock's digs still have a story, so today's pages draw them as before.
+
 ## A new debate from the page (POST /v1/asks)
 
 - Each ask the page sends is printed on the mock's standard output as one JSON line, `{"mock":"ask", "valid":…, "outcome":…, "run_ref":…, "body":{…}}`, so you can check exactly what was sent. To see only those lines, start the mock with `| grep '"mock":"ask"'` at the end of the command. The per-request lines go to the error output, so they are not caught by that filter.
@@ -133,8 +155,10 @@ Set these when starting the mock, or change them live by opening `http://127.0.0
 | Setting | Values | Effect |
 |---|---|---|
 | `MOCK_PLAN` / `plan=` | `PLUS` (default), `FREE` | The person's plan, as the room read and the usage read say it. |
-| `MOCK_ROOM` / `room=` | `FITS` (default), `CLOSE`, `FULL`, `ALREADY_WAITING`, `BLOCKED` | What the "is there room today" read (`GET /v1/asks/room`) says. `BLOCKED` is a FULL day with the reserve word `BLOCKED` ("blocked until {reset}"); against a contract older than W1-6 the website sees a plain `FULL`. |
-| `MOCK_ASK` / `ask=` | `AUTO` (default), `ACCEPT`, `WAITING`, `ALREADY_WAITING`, `LANGUAGE_CHOICE` | What a new ask gets. `AUTO` follows the room: FULL or BLOCKED makes asks wait in line, ALREADY_WAITING refuses with 422, anything else accepts. |
+| `MOCK_ROOM` / `room=` | `FITS` (default), `CLOSE`, `FULL`, `ALREADY_WAITING`, `BLOCKED`, `WAIT_RESET` | What the "is there room today" read (`GET /v1/asks/room`) says. `BLOCKED` is a FULL day with the reserve word `BLOCKED` ("blocked until {reset}"); against a contract older than W1-6 the website sees a plain `FULL`. `WAIT_RESET` is a FULL day whose new starts wait for the reset (`new_starts`, W2-7). |
+| `MOCK_USAGE` / `usage=` | `NORMAL` (default), `BORROWED` | The usage read: as today, or after running work borrowed from tomorrow (W2-7). |
+| `MOCK_PAUSE` / `pause=` | `UNTIL_RESET` (default), `CAN_CONTINUE` | Whether the paused debate `e100…` may continue yet (W2-7). Setting it pauses that debate again. |
+| `MOCK_ASK` / `ask=` | `AUTO` (default), `ACCEPT`, `WAITING`, `ALREADY_WAITING`, `LANGUAGE_CHOICE` | What a new ask gets. `AUTO` follows the room: FULL, BLOCKED or WAIT_RESET makes asks wait in line, ALREADY_WAITING refuses with 422, anything else accepts. |
 | `MOCK_PORT` | default `4011` | Port (always on 127.0.0.1). |
 | `MOCK_RUN_SECONDS` | default `25` | How long a new debate "runs". |
 | `MOCK_STORY_WRITING_SECONDS` | default `40` | How long run 5555's story says "still writing". |
@@ -155,7 +179,7 @@ A wrong value stops the start with a clear message, for example `MOCK_ROOM_INVAL
 | `GET`/`POST /v1/account/reading-level` | The reading level (0131), null until saved. |
 | `GET /v1/asks/room?…` | The plan (`PLUS` or `FREE`), settings version 20, answer length offered, word targets 300/700/1500. The debate-shape switch is left out (the contract allows only "on" or absent). The query is checked like the real API checks it. Draft: `reserve`, `dig_share_percent`. |
 | `POST /v1/asks` | See above. |
-| `GET /v1/billing/usage` | Day 14%, week 31%, month 9%. |
+| `GET /v1/billing/usage` | Day 14%, week 31%, month 9%; with `usage=BORROWED`, day 104% with a borrow notice. |
 | `GET /v1/billing/plans` | The register's default plans (Free, Plus $20, Pro $50, Max $200). |
 | `GET /v1/answers?limit=&offset=` | Finished debates, plus the open runs (running, waiting, failed). |
 | `GET /v1/answers/:id[?version=1]` | The answer (version 1 only). Draft: sources and path research. |
@@ -167,6 +191,7 @@ A wrong value stops the start with a clear message, for example `MOCK_ROOM_INVAL
 | `GET`/`POST /v1/runs/:id/last-visit` | The last visit (0131): both null before a first visit. |
 | `GET`/`POST /v1/runs/:id/dig-links` | The dig links (0131): the parent this debate was dug from, and the digs made from it. A child already dug from another debate gets 409 `DIG_LINK_CONFLICT`. |
 | `GET /v1/runs/:id/investigation`, `POST …/investigation/close` | Draft routes, see "Draft fields". |
+| `POST /v1/runs/:id/continue` | Draft route (W2-7): Continue on the month-paused debate. |
 | `GET /v1/runs/:id/events` | A live event stream. For a finished or failed run it replays three events and closes. For an open run it stays open with a keep-alive every 15 s, and a new debate's stream sends "finished" after 25 s. |
 | `GET /v1/geo/availability`, `/v1/public/ai-providers`, `/v1/public/debates`, `/v1/deployment` | Simple valid replies. |
 | `POST /v1/auth/logout` | 204. The mock still says "signed in" afterwards. |
@@ -188,7 +213,7 @@ Anything else gets a 404 `NOT_MOCKED` reply. The mock also prints a line like `[
 
 ## Self-check
 
-With the mock running, this reads every endpoint through the website's own proxy code and typed client, draws the seeded debates with the V4 map builder, and reads the draft fields. It does not start the website. It posts three asks (so three extra debates appear in the mock), saves the reading level, records a last visit and a dig link, closes run 7777's investigation, and switches the plan and the room and back.
+With the mock running, this reads every endpoint through the website's own proxy code and typed client, draws the seeded debates with the V4 map builder, and reads the draft fields. It does not start the website. It posts three asks (so three extra debates appear in the mock), saves the reading level, records a last visit and a dig link, closes run 7777's investigation, switches the plan, the room and the usage and back, and continues the paused debate (then pauses it again). Since W2-7 it also reads the rewritten paths, the verdict and the dig trail.
 
 ```sh
 cd dialectical-engine/apps/ui && ../../node_modules/.bin/tsx ../../tools/v4-mock-api/check.ts
