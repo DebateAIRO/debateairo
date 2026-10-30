@@ -2,6 +2,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { basisKey, OPEN_QUESTION_KINDS, READING_LEVELS, DIG_MODES, TRUST_BASES, TRUST_WORDS } from "../../apps/ui/lib/v4/types.js";
+import { DIG_LEVEL_MAX, POINT_OF_VIEW_OUTCOMES, POINT_OF_VIEW_SCOPES } from "../../packages/contract/src/web.js";
 
 /*
  * V4 initial (2026-10-28): the v4 namespace has no English backstop in t() (only chrome/home/newDebate/support/time
@@ -20,6 +21,21 @@ const APPROVED_LINES: Readonly<Record<string, string>> = Object.freeze({
   "v4.dig.quotaShare": "This dig uses about {percent}% of today. After it you can still finish your report.",
   "v4.dig.quotaDayUsed": "You've used what today allows for digging. Write your report now, or keep digging after {time}.",
   "v4.rail.writeReport": "Write my report"
+});
+
+/**
+ * Dig model revision (W2-7): the verdict lines on the person's point of view, draft 5.3 of
+ * docs/superpowers/plans/2026-10-30-dig-model-revision.md, approved as written by the owner (30 Oct). Code picks the line
+ * from the outcome and scope; a NOT_SETTLED verdict has one line whatever its scope.
+ */
+const APPROVED_VIEW_LINES: Readonly<Record<string, string>> = Object.freeze({
+  "v4.view.HELPED.PATH": "Your point of view helped this path.",
+  "v4.view.HELPED.MAIN_QUESTION": "Your point of view helped this path and the main question.",
+  "v4.view.DID_NOT_HELP.PATH": "Your point of view did not help this path.",
+  "v4.view.DID_NOT_HELP.MAIN_QUESTION": "Your point of view did not help this path or the main question.",
+  "v4.view.NOT_SETTLED": "The dig could not settle whether your point of view helps.",
+  "v4.view.asYours": "The AIs weighed your point of view as yours. They did not take it as a finding.",
+  "v4.view.why": "Why: {reason}"
 });
 
 /** Owner Q20: labels drafted for the owner's click-test, not yet approved. */
@@ -42,7 +58,56 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.suggest.kind.HELPS_MAIN_QUESTION.FOR",
   "v4.suggest.kind.HELPS_MAIN_QUESTION.AGAINST",
   "v4.suggest.ownView",
-  "v4.suggest.edit"
+  "v4.suggest.edit",
+  // Dig model revision (W2-7): the page labels of section 5.5 (no search-words box: the owner corrected that on 30 Oct).
+  "v4.view.heading",
+  "v4.rewrite.changedSince.one",
+  "v4.rewrite.changedSince.other",
+  "v4.rewrite.changedSinceReport",
+  "v4.rewrite.whatChanged",
+  "v4.rewrite.rewrittenOnce",
+  "v4.rewrite.rewrittenMany",
+  "v4.rewrite.showEarlier",
+  "v4.rewrite.hideEarlier",
+  "v4.rewrite.before",
+  "v4.rewrite.seeDigPoints",
+  "v4.rewrite.openDigMap",
+  "v4.rewrite.state.WRITING",
+  "v4.rewrite.state.NO_CHANGE",
+  "v4.rewrite.state.FAILED",
+  "v4.rewrite.changedBelow",
+  "v4.rewrite.digCard.CHANGED",
+  "v4.rewrite.digCard.NO_CHANGE",
+  "v4.rewrite.digCard.RUNNING",
+  "v4.rewrite.digCard.WAITING",
+  "v4.rewrite.digCard.FAILED",
+  "v4.nest.digHereToo",
+  "v4.nest.trailRoot",
+  "v4.nest.level",
+  "v4.nest.deepest",
+  "v4.nest.tooDeep",
+  "v4.digPage.lookedInto",
+  "v4.digPage.rewrote",
+  "v4.digPage.backToPath",
+  "v4.digPage.rewriting",
+  "v4.changes.digChanged",
+  "v4.changes.digNoChange",
+  "v4.report.pathsChangedHeading",
+  // The money rule (owner, 31 Oct): the estimate before a new question, the borrow notice, new starts after the reset,
+  // the month pause and Continue.
+  "v4.room.startShare",
+  "v4.money.borrowed.PERSON_DAY",
+  "v4.money.borrowed.PERSON_WEEK",
+  "v4.money.startsWait.PERSON_DAY",
+  "v4.money.startsWait.PERSON_WEEK",
+  "v4.money.startsWait.PERSON_MONTH",
+  "v4.debate.state.PAUSED_MONTH",
+  "v4.money.paused",
+  "v4.money.pausedReady",
+  "v4.money.continue",
+  "v4.money.continueNote",
+  "v4.money.continuing",
+  "v4.money.continueTooEarly"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {
@@ -115,7 +180,22 @@ describe("V4 catalogue keys", () => {
     // Owner Q20 (2026-10-30): these labels are drafted in plain English and approved by the owner at the click-test, in
     // place on the map (checkpoints C1 and C2). Until then they are DRAFTS: change their words here and in v4.json together.
     expect(DRAFTED_UNTIL_CLICK_TEST.filter((key) => !(key in catalog))).toEqual([]);
-    expect(DRAFTED_UNTIL_CLICK_TEST.filter((key) => key in APPROVED_LINES)).toEqual([]);
+    expect(DRAFTED_UNTIL_CLICK_TEST.filter((key) => key in APPROVED_LINES || key in APPROVED_VIEW_LINES)).toEqual([]);
+    expect(new Set(DRAFTED_UNTIL_CLICK_TEST).size).toBe(DRAFTED_UNTIL_CLICK_TEST.length);
+  });
+
+  it("the approved point-of-view lines (draft 5.3) are in the catalogue word for word, one per outcome and scope", () => {
+    expect(Object.fromEntries(Object.keys(APPROVED_VIEW_LINES).map((key) => [key, catalog[key]]))).toEqual(APPROVED_VIEW_LINES);
+    const built = POINT_OF_VIEW_OUTCOMES.flatMap((outcome) => outcome === "NOT_SETTLED"
+      ? [`v4.view.${outcome}`]
+      : POINT_OF_VIEW_SCOPES.map((scope) => `v4.view.${outcome}.${scope}`));
+    expect(built.filter((key) => !(key in APPROVED_VIEW_LINES))).toEqual([]);
+  });
+
+  it("no search-words label is drafted (the owner's correction of 30 Oct), and the level labels name DIG_LEVEL_MAX", () => {
+    expect(Object.entries(catalog).filter(([key, value]) => /search ?words/iu.test(`${key} ${value}`))).toEqual([]);
+    const levelLabels = ["v4.nest.level", "v4.nest.deepest", "v4.nest.tooDeep"];
+    for (const key of levelLabels) expect(catalog[key], key).toContain(String(DIG_LEVEL_MAX));
   });
 
   it("placeholders are well formed", () => {
