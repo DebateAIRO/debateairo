@@ -775,6 +775,15 @@ export function auditProductionFixtureImports(where:string,source:string):readon
  return [];
 }
 
+/**
+ * Perplexity plan 2026-10-30, task W1-7: the V4 mock API (tools/v4-mock-api) is a local stand-in for the API that the
+ * website is click-tested against on a developer's computer. It is never deployed and holds no engine policy: its
+ * switches (port, room, plan) come from the environment of the person who starts it, and its self-check hands the
+ * website's proxy the mock's address the way the website itself is started (DIALECTICAL_API_BASE). By name, these two
+ * files only; every other rule still applies to them, and the law is unchanged everywhere else.
+ */
+const LOCAL_MOCK_ENVIRONMENT_READERS: ReadonlySet<string> = new Set(["tools/v4-mock-api/server.ts", "tools/v4-mock-api/check.ts"]);
+
 export async function auditSourceRules(): Promise<{ readonly blocking: readonly string[] }> {
   const blocking: string[] = [];
   const engineFiles = withoutUiSurface([
@@ -787,7 +796,8 @@ export async function auditSourceRules(): Promise<{ readonly blocking: readonly 
     const source = await readFile(path, "utf8");
     const where = relative(root, path);
     gatewayDeclarations += source.match(/interface\s+ProviderGateway\b/g)?.length ?? 0;
-    if (source.includes(["process", "env"].join(".")) && where !== "packages/register/src/runtime-environment.ts") {
+    if (source.includes(["process", "env"].join(".")) && where !== "packages/register/src/runtime-environment.ts"
+      && !LOCAL_MOCK_ENVIRONMENT_READERS.has(where)) {
       blocking.push(`${where} reads the process environment outside the register loader`);
     }
     if ((where.startsWith("packages/propagation/") || where.startsWith("packages/battery/decision/")) && /from\s+["'](?:node:|pg|drizzle|@debateai\/db)/.test(source)) {

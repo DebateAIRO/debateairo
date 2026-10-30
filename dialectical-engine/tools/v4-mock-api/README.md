@@ -1,0 +1,198 @@
+# V4 mock API
+
+This is a small stand-in for the real DebateAIRO V3 API. It lets you click through the website (`apps/ui`) on your computer without the real API, the database or any AI.
+
+It plays one person who is signed in (on the Plus plan, or on Free with a switch), has already agreed to everything (age check, sensitive-data notice, terms), and owns eight seeded debates. You can also start new debates: each one "runs" for 25 seconds and then shows a finished answer.
+
+Every reply it sends is checked against the website's own contract rules (`packages/contract`). All seeded replies are checked once when it starts, and it refuses to start if one is wrong. Every reply is checked again just before it is sent.
+
+It moved here from a scratch folder on 30 Oct 2026 (Perplexity plan, task W1-7) and gained: a Free person, the account memory of migration 0131, the web search's draft fields (sources, other pages, a failed search, a path with no search planned), dig suggestions, investigations with the reserve kept, and a "blocked until reset" room.
+
+## Files
+
+| File | What it is |
+|---|---|
+| `server.ts` | The mock server (plain Node, no extra packages). |
+| `seed.ts` | The seeded English debate (nuclear vs renewables), built from the website's own story sample (`apps/ui/lib/v3/storyFixture.ts`). |
+| `web-draft.ts` | The **draft** shapes of the web search, dig suggestions and investigations, and how they are held back while the contract does not know them. See "Draft fields" below. |
+| `web-seed.ts` | The made-up web pages of the seeded debates (all on `.example` sites; no real article is quoted). |
+| `check.ts` | Self-check. It reads every endpoint through the website's own code: the `/api` proxy, the typed client, and the V4 map builder. |
+
+The unit test `tests/unit/v4-mock-api.test.ts` checks the seed and the draft shapes without starting anything.
+
+## 1. Start the mock
+
+Run it from the repository's `dialectical-engine` folder:
+
+```sh
+cd dialectical-engine && node_modules/.bin/tsx tools/v4-mock-api/server.ts
+```
+
+When it is ready it prints one line that starts with `{"mock":"ready"`. It listens on `http://127.0.0.1:4011`. Stop it with Ctrl+C.
+
+## 2. Start the website against it
+
+Use a second terminal, while the mock is running:
+
+```sh
+cd dialectical-engine/apps/ui && DIALECTICAL_API_BASE=http://127.0.0.1:4011 PORT=3011 NEXT_DIST_DIR=.next-v4mock node server.mjs --dev
+```
+
+Then open `http://127.0.0.1:3011/v4`.
+
+Settings the development mode needs:
+
+- Only `DIALECTICAL_API_BASE` is required. Both the `/api` proxy and the server-rendered pages read it.
+- In `--dev`, nothing else is required. `RELEASE_KEY` may be left out (it is required only outside `--dev`). `DIALECTICAL_UI_HOST` defaults to `127.0.0.1`. `NEXT_PUBLIC_API_BASE` defaults to `/api`.
+- Optional, not needed here: `NEXT_PUBLIC_VERDICT_FIRST_UI=true` (a banner on the classic debate page), `NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON` (preview site only), `TURNSTILE_SITE_KEY` (the anti-robot box on sign-up and sign-in, which the mock never needs).
+
+Cautions, after the website has run in development mode:
+
+- It changes `apps/ui/next-env.d.ts` and `apps/ui/tsconfig.json`. Put both back before committing: `git checkout -- apps/ui/next-env.d.ts apps/ui/tsconfig.json`.
+- `.next-v4mock` is the website's build cache. Git does NOT ignore it (only `.next/` is ignored), so never commit it. Move it to the Trash when you finish testing.
+- The development website is heavy. Do not run it next to other big jobs (tests, builds) on a 16 GB Mac.
+
+### Signing in, for the server-drawn pages (optional)
+
+The V4 pages (`/v4`, `/v4/debate/<id>`, `/v4/debate/<id>/report`) check the session from the browser, and the mock always says "signed in". So they work right away.
+
+Some classic pages decide on the server, by looking for the session cookie: the home page `/` and the classic debate page `/debate/<id>`. To give the browser that cookie, open this address once: `http://127.0.0.1:3011/api/__mock/sign-in`. To remove it, open `http://127.0.0.1:3011/api/__mock/sign-out`.
+
+This works in Chrome and Firefox, which allow secure cookies on `127.0.0.1`. Safari may refuse the cookie.
+
+## Seeded debates
+
+All the answers carry the same English debate: *"Should countries build new nuclear power, or put the money into renewables and storage?"* Only the question line, and the web case (see "Draft fields"), change between them.
+
+| Run id | What you see | Web case | Investigation |
+|---|---|---|---|
+| `11111111-1111-4111-8111-111111111111` | **Finished**, the nuclear question, story ready. Answer id `aaaa1111-…`. | paid, searched | **open** (reopened by its dig 8888; report version 1 kept as an earlier version) |
+| `22222222-2222-4222-8222-222222222222` | **Running forever** ("Is a four-day work week good for productivity and for workers?"). | – | open |
+| `33333333-3333-4333-8333-333333333333` | **Waiting in line**. It is expected to start 20 minutes after the mock started. | – | open |
+| `44444444-4444-4444-8444-444444444444` | **Failed** with `RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM` (the website's "the AI models it needs were unavailable" sentence). | – | none |
+| `55555555-5555-4555-8555-555555555555` | **Finished**, but its story says "still writing" for the first 40 seconds after the mock starts. Answer id `aaaa5555-…`. | paid, searched | open |
+| `66666666-6666-4666-8666-666666666666` | **Finished**, asked on the **Free** plan. Answer id `aaaa6666-…`. | Free: not on this plan | closed (report version 1) |
+| `77777777-7777-4777-8777-777777777777` | **Finished**, but its **web search failed**. Answer id `aaaa7777-…`. | failed | open |
+| `88888888-8888-4888-8888-888888888888` | **Finished dig** of 1111, from the still-argued point `p:n-renew-storage`, quick look. Answer id `aaaa8888-…`. | paid, searched | member of 1111's |
+
+Example pages: `http://127.0.0.1:3011/v4/debate/11111111-1111-4111-8111-111111111111` (the map) and `…/report` (the report). An answer id also opens these pages.
+
+### What the seeded debate shows on the V4 map
+
+This is the output of `check.ts`, drawn by the website's own map builder (`apps/ui/lib/v4/mapModel.ts`):
+
+| Path (story position) | Fate | Points, with the trust word each one gets |
+|---|---|---|
+| `n-mix`: mostly renewables, plus some nuclear | HELD_UP | n-mix *sure for this case* (argued and agreed) · n-mix-firm *sure for this case* · n-mix-cost **sure** (looked up and agreed) · n-mix-land *not checked yet* (no review) |
+| `n-renew`: renewables and storage only | PARTLY_HELD | n-renew *sure for this case* · n-renew-cost **sure** · n-renew-battery *sure for this case, but dated* (STALE, as of 2023-12-31) · n-renew-storage *still argued* (disputed) · n-renew-winter *sure for this case* |
+| `n-nuclear`: nuclear first | FELL | n-nuclear **didn't hold** (its path fell) · n-nuclear-build **sure** · n-nuclear-clean **sure** |
+| `n-smr`: wait for small modular reactors | SET_ASIDE | n-smr *not checked yet* · n-smr-cost *still argued* (the second AI could not check it) |
+
+Open questions on the map: the two remaining objections, plus "what would change the answer". The last one carries the star.
+
+Once the new "Sure" rule is built (task W2-6), n-mix-cost will read *sure for the case named*: its citation is remembered, not one of this debate's pages (`looked_up_checked: false`).
+
+## Draft fields (web search, dig suggestions, investigations)
+
+The real shapes are task W1-6's (`packages/contract`), written at the same time as this mock. Until they merge, the mock uses its own **draft** shapes, all in `web-draft.ts`:
+
+| Where | Draft field | What it holds |
+|---|---|---|
+| each point of an answer | `sources`, `looked_up_checked` | the checked extracts (id such as `S2-1`, a quote of at most 120 characters cut at a word edge, reader 1's one line, title, site, link, date, read depth `WHOLE` / `PREVIEW_ONLY` / `ABSTRACT_ONLY`, `fewer_readers`); whether the point rests on an extract of this debate |
+| each answer | `path_research` | per path: the web status (`SEARCHED`, `NO_SEARCH_PLANNED` with the planner's reason, `FAILED`, `NOT_ON_PLAN`), other pages (title, site, link, one line, never a grade), "added to researched" choices (`READING`, `ADDS`, `ADDS_NOTHING`, `FAILED`), and dig suggestions (`CONTRADICTING`, `UNDOCUMENTED`, `NEEDS_MORE_WEB`, `HELPS_FOR`, `HELPS_AGAINST`, each with its text and the places it rests on) |
+| `GET /v1/asks/room` | `reserve_kept`, room `BLOCKED` | the person's one reserve is held (an investigation is open); "blocked until {reset}" |
+| `GET /v1/billing/usage` | `dig_share` | a dig's share of today, in whole percent, for a quick look and a thorough dig |
+| `POST /v1/asks` | `parent` | a dig names its parent run, the places it was dug from, and its mode |
+| `GET /v1/runs/:id/investigation` | (new route) | the investigation the run belongs to: state `OPEN`/`CLOSED`, its digs, its report versions |
+| `POST /v1/runs/:id/investigation/close` | (new route) | "Write my report": closes it and adds a report version |
+
+How they are sent:
+
+- **To the website** (the normal `/v1/...` addresses): a draft field is sent only when the contract's own schema already accepts it. Today it does not, so the mock holds the draft fields back and the website gets today's shape: no sources or path research, `BLOCKED` reads as `FULL`, no `reserve_kept`, no `dig_share`. `/__mock/state` says which are sent (`draft_fields_sent`).
+- **In full**: put `/__mock/draft` before any `/v1/...` address, for example `http://127.0.0.1:4011/__mock/draft/v1/answers/aaaa1111-1111-4111-8111-111111111111`. These replies are checked against the draft schemas only.
+
+**After W1-6 merges:** rename the fields in `web-draft.ts` to the contract's names (or use the contract's schemas there), run `tests/unit/v4-mock-api.test.ts` and `check.ts`, and the website starts receiving them.
+
+The seeded web cases (`web-seed.ts`):
+
+- **Paid, searched** (1111, 5555, 8888, and new paid asks): paths n-mix, n-renew and n-nuclear were searched; **n-smr had no search planned** ("Whether these reactors will be cheap is a forecast; no published report can settle it yet."). Five sources sit under n-renew-cost, n-renew-battery (preview only, fewer readers), n-nuclear-build (two pages) and n-nuclear-clean (abstract only). Six other pages; researched choices with every outcome; dig suggestions of every kind.
+- **Failed** (7777, and any new ask with `#webfail` in the question): every path `FAILED`, no sources, no other pages.
+- **Free** (6666, and new asks with `plan_tier: "free"`): every path `NOT_ON_PLAN`, no sources; its suggestions never ask for a web search.
+
+## A new debate from the page (POST /v1/asks)
+
+- Each ask the page sends is printed on the mock's standard output as one JSON line, `{"mock":"ask", "valid":…, "outcome":…, "run_ref":…, "body":{…}}`, so you can check exactly what was sent. To see only those lines, start the mock with `| grep '"mock":"ask"'` at the end of the command. The per-request lines go to the error output, so they are not caught by that filter.
+- An ask that breaks the contract's ask rules (or whose draft `parent` breaks the draft rules) gets a 400 reply, and its line says `"valid":false` with the reasons. A `parent` naming an unknown run gets 404.
+- A valid ask gets a new run id. The run reads "running" for 25 seconds, then "finished". Its answer is the nuclear debate with your question line. Its story says "still writing" for 10 more seconds, then ready.
+- A new question opens its own investigation. A dig, whether it names its `parent` in the ask (the draft way) or the page records the link after start (`POST /v1/runs/<parent>/dig-links`, today's way), joins its parent's investigation and reopens it if it was closed.
+- Put `#mix` anywhere in the question to get the "your question mixes languages" offer (409 QUESTION_LANGUAGE_CHOICE_NEEDED). Answering the offer goes through.
+
+## Switches
+
+Set these when starting the mock, or change them live by opening `http://127.0.0.1:4011/__mock/set?room=FULL&ask=WAITING&plan=FREE` (the same address also works through the website as `/api/__mock/set?...`). `/__mock/state` shows the current switches, every run with its state and timings, the investigations, the dig links and the reading level.
+
+| Setting | Values | Effect |
+|---|---|---|
+| `MOCK_PLAN` / `plan=` | `PLUS` (default), `FREE` | The person's plan, as the room read and the usage read say it. |
+| `MOCK_ROOM` / `room=` | `FITS` (default), `CLOSE`, `FULL`, `ALREADY_WAITING`, `BLOCKED` | What the "is there room today" read (`GET /v1/asks/room`) says. `BLOCKED` is a draft word ("blocked until {reset}"); the website reads it as `FULL` until the contract knows it. |
+| `MOCK_ASK` / `ask=` | `AUTO` (default), `ACCEPT`, `WAITING`, `ALREADY_WAITING`, `LANGUAGE_CHOICE` | What a new ask gets. `AUTO` follows the room: FULL or BLOCKED makes asks wait in line, ALREADY_WAITING refuses with 422, anything else accepts. |
+| `MOCK_PORT` | default `4011` | Port (always on 127.0.0.1). |
+| `MOCK_RUN_SECONDS` | default `25` | How long a new debate "runs". |
+| `MOCK_STORY_WRITING_SECONDS` | default `40` | How long run 5555's story says "still writing". |
+| `MOCK_POSTED_STORY_SECONDS` | default `10` | How long a new debate's story says "still writing" after it finishes. |
+| `MOCK_QUIET=1` | | Hides the per-request lines. |
+| `MOCK_ENGINE_DIR` | path | Where `dialectical-engine` is. Not needed when the mock runs from this folder. |
+
+A wrong value stops the start with a clear message, for example `MOCK_ROOM_INVALID: bogus (allowed: FITS, CLOSE, FULL, ALREADY_WAITING, BLOCKED)`.
+
+## Endpoints it serves
+
+| Endpoint | Reply |
+|---|---|
+| `GET /v1/session` | Signed in. |
+| `GET /v1/auth/age-confirmation` | `confirmed` (the age check is not asked). |
+| `GET`/`POST /v1/account/sensitive-data-consent` | `given` (no consent pop-up). |
+| `GET /v1/account/legal-status`, `POST /v1/account/legal-accept` | Nothing to accept / 204. |
+| `GET`/`POST /v1/account/reading-level` | The reading level (0131), null until saved. |
+| `GET /v1/asks/room?…` | The plan (`PLUS` or `FREE`), settings version 20, answer length offered, word targets 300/700/1500. The debate-shape switch is left out (the contract allows only "on" or absent). The query is checked like the real API checks it. Draft: `reserve_kept`, `BLOCKED`. |
+| `POST /v1/asks` | See above. |
+| `GET /v1/billing/usage` | Day 14%, week 31%, month 9%. Draft: `dig_share` 20% (quick look) and 35% (thorough). |
+| `GET /v1/billing/plans` | The register's default plans (Free, Plus $20, Pro $50, Max $200). |
+| `GET /v1/answers?limit=&offset=` | Finished debates, plus the open runs (running, waiting, failed). |
+| `GET /v1/answers/:id[?version=1]` | The answer (version 1 only). Draft: sources and path research. |
+| `GET /v1/answers/:id/story` | WRITING or READY, as described above. |
+| `GET /v1/answers/:id/map` | 404, as for a debate made without the debate-shape setting. The website treats this as "no map view". |
+| `GET /v1/answers/:id/disclosure` | A normal record (the planned AIs wrote and checked it, nothing was cut short). |
+| `GET /v1/answers/:id/inspection`, `/ledger-digest`, `/nodes/:nodeId` | Simple valid replies (the classic debate page reads them). |
+| `GET /v1/runs/:id`, `/answer`, `/visibility` | The run. Its answer appears once it is finished (404 before). It is private. |
+| `GET`/`POST /v1/runs/:id/last-visit` | The last visit (0131): both null before a first visit. |
+| `GET`/`POST /v1/runs/:id/dig-links` | The dig links (0131): the parent this debate was dug from, and the digs made from it. A child already dug from another debate gets 409 `DIG_LINK_CONFLICT`. |
+| `GET /v1/runs/:id/investigation`, `POST …/investigation/close` | Draft routes, see "Draft fields". |
+| `GET /v1/runs/:id/events` | A live event stream. For a finished or failed run it replays three events and closes. For an open run it stays open with a keep-alive every 15 s, and a new debate's stream sends "finished" after 25 s. |
+| `GET /v1/geo/availability`, `/v1/public/ai-providers`, `/v1/public/debates`, `/v1/deployment` | Simple valid replies. |
+| `POST /v1/auth/logout` | 204. The mock still says "signed in" afterwards. |
+| `GET /readyz` | Ready (for the website's own `/readyz` check). |
+
+An unknown run id gets 404 on every run route, as the real API answers a debate that is not yours.
+
+Anything else gets a 404 `NOT_MOCKED` reply. The mock also prints a line like `[mock] GET /v1/billing/subscription 404 <- NOT MOCKED`, so you can see at once what the website asked for that is missing.
+
+## Not mocked (the website may call these)
+
+- **Billing pages**: subscription, invoices, charge status, card details and card change, checkout, quote, upgrade, downgrade, cancel, withdraw (`/settings`, `/pricing` buying, `/checkout`, `/settings/card`, `/cancel`, `/withdraw`).
+- **Account and security settings**: sessions list, sign-in methods, social links, email change, recovery email, phone, data export, account erasure (`/settings`, `/settings/security`, `/export`).
+- **Signing in and up for real**: login, register, password reset, MFA, social sign-in, age check (`/login`, `/sign-up`, `/recover`, …). The mock just says "signed in"; use `/api/__mock/sign-in` for the cookie.
+- **Publishing**: publish and unpublish, the public debate page `/public/debate/<id>`, deleting a private debate.
+- **The classic page's extra actions**: investigations (`POST /v1/answers/:id/investigations/:gap`) and unlinking memory.
+- **"Add to researched"** (task W4-4): the seeded choices show every outcome, but there is no route to add one yet.
+- **The support assistant** (`/v1/support/*`), the evaluator dev menu (`/v1/dev/evaluator`, shown only when `NEXT_PUBLIC_EVALUATOR_DEV_MENU_ENABLED` is on), and the staff pages (`/v1/admin/*`).
+
+## Self-check
+
+With the mock running, this reads every endpoint through the website's own proxy code and typed client, draws the seeded debates with the V4 map builder, and reads the draft fields. It does not start the website. It posts three asks (so three extra debates appear in the mock), saves the reading level, records a last visit and a dig link, closes run 7777's investigation, and switches the plan and the room and back.
+
+```sh
+cd dialectical-engine/apps/ui && ../../node_modules/.bin/tsx ../../tools/v4-mock-api/check.ts
+```
+
+`MOCK_URL` points it at another address (default `http://127.0.0.1:4011`). The last line is `ALL CHECKS PASSED`, or the number of checks that failed.
