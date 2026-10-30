@@ -440,6 +440,42 @@ export function storyFixture(status: AnswerStory["status"]): AnswerStory {
 }
 
 /**
+ * Charts (design 2026-10-28): the charts the chart call could plan for this story. A bar of the two figures the
+ * points cite (the pay rise and the rent gap, each copied from its claim) after the long story's paragraph on the
+ * immediate move, and a bar of the two leading positions' strengths after "Our answer in short".
+ */
+export const STORY_FIXTURE_CHARTS: NonNullable<AnswerStory["charts"]> = Object.freeze([
+  {
+    after: "long.2.1",
+    kind: "bar",
+    title: "Cât de puternice au rămas cele două variante principale",
+    x: null,
+    y: { label: "Tăria după cântărire", source: "strength", log: false },
+    items: [
+      { label: "Mutare treptată, cu lucru hibrid", node_ref: "n-hybrid", x: null, y: null },
+      { label: "Mutare imediată", node_ref: "n-yes", x: null, y: null }
+    ]
+  },
+  {
+    after: "long.3.2",
+    kind: "bar",
+    title: "Cât câștigați și cât plătiți în plus în Cluj",
+    x: null,
+    y: { label: "Diferența față de București (%)", source: "figure", log: false },
+    items: [
+      { label: "Salariul, după impozite", node_ref: "n-yes-pay", x: null, y: { value: 35, text: "35%" } },
+      { label: "Chiria pentru trei camere", node_ref: "n-yes-rent", x: null, y: { value: 30, text: "30%" } }
+    ]
+  }
+]) as NonNullable<AnswerStory["charts"]>;
+
+/** The sample story with its charts, as a story written after the charts shipped is served. */
+export function storyFixtureWithCharts(status: AnswerStory["status"]): AnswerStory {
+  const story = storyFixture(status);
+  return story.story === null ? story : { ...story, charts: structuredClone([...STORY_FIXTURE_CHARTS]) };
+}
+
+/**
  * Engine money rule, Task M6 (spec §14.4.4): the same debate as a FLOOR answer.
  * No answer could be written, so the sealed answer is components-only, with no
  * label and no prose; the engine kept the label and the position it rests on.

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Fil-qosor
-eyebrow: TERMINI TAS-SERVIZZ · v2.8 · EFFETTIVI 12 TA’ OTTUBRU 2026
+eyebrow: TERMINI TAS-SERVIZZ · v2.9 · EFFETTIVI 12 TA’ OTTUBRU 2026
 title: Dak li taqbel miegħu
 lede: Il-kuntratt bejnek u DMS Merchandise Shop S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.
-endMarker: TMIEM IT-TERMINI · v2.8
+endMarker: TMIEM IT-TERMINI · v2.9
 bodyLabel: Test tat-Termini tas-Servizz
 annexTitle: Anness A — Termini reġjonali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LIĠI APPLIKABBLI
 -->
 
-**Version 2.8 · Effective 12 ta’ Ottubru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
+**Version 2.9 · Effective 12 ta’ Ottubru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
 
 **In short.** Irid ikollok 18-il sena jew aktar. Dialectical Engine tibni argumenti b’mudelli tal-IA u dak kollu li tiġġenera jista’ jkun żbaljat — mhuwiex parir. Id-dibattiti tiegħek huma privati sakemm ma tippubblikahomx; jekk tippubblikahom, kulħadd jista’ jaqrahom. It-test li tissottometti jintbagħat lill-fornituri tal-IA elenkati fir-Reġistru tal-Fornituri tagħna, u ma jintużax għat-taħriġ tal-mudelli. Irrapporta kontenut illegali fuq support@dezbatere.ro kemm jekk għandek kont kif ukoll jekk le. Tapplika l-liġi Rumena, iżda l-protezzjonijiet lokali tiegħek bħala konsumatur jibqgħu japplikaw għalik.
 
@@ -138,6 +138,8 @@ Jekk m’intix ċert jekk xi ħaġa hijiex permessa, staqsina qabel tippubblikah
 
 **Riżultati.** Bejnek u bejnietna, tista’ tuża r-riżultat tad-dibattiti tiegħek stess għal kwalunkwe skop legali, u aħna ma nippretendux sjieda tat-test iġġenerat. Kun af li riżultat iġġenerat jista’ ma jkunx protett mid-drittijiet tal-awtur f’ħafna ġuriżdizzjonijiet; li riżultat simili jista’ jiġi ġġenerat għal utenti oħra; li r-riżultati jistgħu jirriproduċu jew jixbhu materjal ta’ parti terza; u li xi materjal mis-sorsi miksub minn fornitur tal-IA jista’ jkollu restrizzjonijiet fuq l-użu mill-ġdid. Int responsabbli biex tivverifika qabel tiddependi fuq ir-riżultati jew terġa’ tippubblikahom.
 
+**Graffs u statistika li niġġeneraw.** Il-graffs f’rapport ta’ dibattitu, u l-istatistika li niġbru għalihom — l-għażla, l-arranġament, id-disinn u t-tpinġija tagħhom — huma magħmula minn Dialectical Engine u jappartjenu lil DMS Merchandise Shop S.R.L.; kull graff huwa mmarkat “Copyrighted by DMS Merchandise Shop SRL”. Dan ma jestendix għaċ-ċifri li juri graff, li ġejjin mid-dibattitu tiegħek, jew għat-test tad-dibattitu tiegħek. Aħna nagħtuk liċenzja b’xejn, dinjija, mhux esklużiva u perpetwa biex tuża, tikkopja u taqsam dawk il-graffs għal kwalunkwe skop legali, sakemm iżżomm magħhom l-avviż u t-tikketta li huma ġġenerati mill-IA. Fejn il-liġi ma tirrikonoxxix drittijiet f’materjal iġġenerat mill-IA, dan il-paragrafu ma jagħtina xejn aktar minn dak li tippermetti l-liġi.
+
 ## 9. Pubblikazzjoni ta’ dibattitu
 
 Id-dibattiti huma **privati b’mod awtomatiku**. Xejn minn dak li toħloq ma jkun viżibbli għal ħaddieħor sakemm ma tippubblikahx.
@@ -240,6 +242,8 @@ Jekk tgħix band’oħra, l-Anness A jiddikjara d-dritt ta’ rtirar jew il-perj
 Ngħidulek minn qabel, fuq mezz durabbli, x’inhu jinbidel u meta. Jekk il-bidla jkollha effett negattiv aktar minn minuri fuq l-aċċess tiegħek għas-servizz jew l-użu tiegħu, tista’ tittermina mingħajr ħlas fi żmien **30 jum** minn meta tiġi avżat, jew minn meta tidħol fis-seħħ il-bidla, skont liema jiġi l-aħħar, u nagħtuk lura kwalunkwe ammont imħallas bil-quddiem għall-perjodu mhux użat.
 
 **F’dawn it-Termini.** Nistgħu nibdlu dawn it-Termini għall-istess tipi ta’ raġunijiet. Għal bidliet li ma jnaqqsux id-drittijiet tiegħek, nippubblikaw il-verżjoni l-ġdida b’sommarju ta’ dak li nbidel u nibagħtulek messaġġ elettroniku mill-inqas **30 jum** qabel ma tidħol fis-seħħ; jekk tkompli tuża Dialectical Engine wara dik id-data, dan ifisser li taċċettaha, u tista’ tagħlaq il-kont tiegħek qabel dak iż-żmien. Għal bidliet li jnaqqsu d-drittijiet tiegħek — inkluż żidiet fil-prezz fuq pjan eżistenti, limiti aktar baxxi, funzjonalitajiet imneħħija, użi ġodda tal-kontenut tiegħek, jew bidliet fir-responsabbiltà, fil-liġi applikabbli jew fis-soluzzjoni tat-tilwim — nitolbuk taċċetta l-verżjoni l-ġdida b’mod espliċitu meta terġa’ tidħol fil-kont, u l-bidla tapplika biss għall-futur. Qatt ma nagħmlu bidla retroattiva, u qatt ma nużaw din it-taqsima biex nibdlu l-qalba ta’ dak li ħallast għalih f’nofs it-terminu mingħajr ma noffrulek mod kif toħroġ. Il-verżjonijiet preċedenti jibqgħu disponibbli fuq dezbatere.ro/terms/versions.
+
+Il-Verżjoni 2.9 issostitwiet il-verżjoni 2.8: it-taqsima 8 tikseb il-paragrafu “Graffs u statistika li niġġeneraw”, li jgħid lil min jappartjenu l-graffs f’rapport ta’ dibattitu u jagħtik liċenzja biex tużahom.
 
 Il-Verżjoni 2.8 issostitwiet il-verżjoni 2.7: il-verifika tal-mistoqsijiet tirrifjuta wkoll mistoqsija li tistaqsi kif jitwettaq reat jew kif wieħed jaħrab mill-piena tiegħu, jew jekk xi ħadd għandux iwettaq reat, bħax-xiri jew il-bejgħ illegali ta’ drogi jew armi, is-serq jew l-evażjoni tat-taxxa, u ma żżommhiex; mistoqsija dwar jekk liġi għandhiex tinbidel xorta tibda dibattitu (taqsima 7). Tistabbilixxi wkoll linja waħda għad-drogi u tħalli mistoqsija dwar jekk il-liġi dwar is-suwiċidju, l-ewtanasja jew il-mewt assistita għandhiex tinbidel tibda dibattitu (taqsima 7), u l-verifika tal-mistoqsijiet ma għadhiex iżżomm l-ebda mistoqsija għat-tim tagħna (it-taqsimiet 7 u 10); l-iskrin li jirrifjuta mistoqsija huwa d-dikjarazzjoni tar-raġunijiet tagħna għal kull mistoqsija li, skont it-taqsima 7, ma tibdiex dibattitu (taqsima 10).
 

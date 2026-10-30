@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: W skrócie
-eyebrow: WARUNKI ŚWIADCZENIA USŁUG · v2.8 · OBOWIĄZUJĄ OD 12 PAŹDZIERNIKA 2026
+eyebrow: WARUNKI ŚWIADCZENIA USŁUG · v2.9 · OBOWIĄZUJĄ OD 12 PAŹDZIERNIKA 2026
 title: Na co wyrażasz zgodę
 lede: Umowa między Tobą a DMS Merchandise Shop S.R.L., napisana prostym językiem. Dziewiętnaście sekcji i załącznik A — przewiń do końca.
-endMarker: KONIEC WARUNKÓW · v2.8
+endMarker: KONIEC WARUNKÓW · v2.9
 bodyLabel: Treść Warunków świadczenia usług
 annexTitle: Załącznik A — Warunki regionalne
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PRAWO WŁAŚCIWE
 -->
 
-**Version 2.8 · Effective 12 października 2026 · Poprzednie wersje są dostępne pod adresem dezbatere.ro/terms/versions · Język: polski.**
+**Version 2.9 · Effective 12 października 2026 · Poprzednie wersje są dostępne pod adresem dezbatere.ro/terms/versions · Język: polski.**
 
 **In short.** Musisz mieć ukończone 18 lat. Dialectical Engine tworzy argumenty przy użyciu modeli sztucznej inteligencji, a wszystko, co generuje, może być błędne — nie jest to porada. Twoje debaty są prywatne, chyba że je opublikujesz; po publikacji każdy może je przeczytać. Przesyłany przez Ciebie tekst jest przekazywany dostawcom AI wymienionym w naszym Rejestrze Dostawców i nie jest wykorzystywany do trenowania modeli. Nielegalne treści zgłaszaj pod adresem support@dezbatere.ro, niezależnie od tego, czy masz konto. Zastosowanie ma prawo rumuńskie, jednak zachowujesz ochronę konsumencką wynikającą z prawa miejscowego.
 
@@ -138,6 +138,8 @@ Jeżeli nie masz pewności, czy dana treść jest dozwolona, skontaktuj się z n
 
 **Wyniki.** W stosunkach między Tobą a nami możesz wykorzystywać wyniki własnych debat w dowolnym zgodnym z prawem celu, a my nie rościmy sobie praw własności do wygenerowanego tekstu. Pamiętaj, że w wielu jurysdykcjach wygenerowane wyniki mogą nie podlegać ochronie prawa autorskiego; że podobne wyniki mogą zostać wygenerowane dla innych użytkowników; że wyniki mogą powielać lub przypominać materiały podmiotów trzecich; oraz że niektóre materiały źródłowe pobierane przez dostawcę AI mogą podlegać ograniczeniom dotyczącym ponownego wykorzystywania. Masz obowiązek zweryfikować wyniki przed oparciem się na nich lub ich ponownym opublikowaniem.
 
+**Wykresy i statystyki, które generujemy.** Wykresy w raporcie z debaty oraz statystyki, które dla nich zestawiamy — ich dobór, układ, projekt graficzny i rysunek — są tworzone przez Dialectical Engine i należą do DMS Merchandise Shop S.R.L.; każdy wykres jest opatrzony informacją „Copyrighted by DMS Merchandise Shop SRL”. Nie dotyczy to liczb prezentowanych na wykresie, które pochodzą z Twojej debaty, ani tekstu Twojej debaty. Udzielamy Ci nieodpłatnej, ogólnoświatowej, niewyłącznej i bezterminowej licencji na wykorzystywanie, kopiowanie i udostępnianie tych wykresów w dowolnym zgodnym z prawem celu, pod warunkiem że zachowasz przy nich tę informację oraz oznaczenie o wygenerowaniu przez AI. Jeżeli prawo nie uznaje praw do materiałów wygenerowanych przez AI, niniejszy akapit nie przyznaje nam więcej, niż pozwala prawo.
+
 ## 9. Publikowanie debaty
 
 Debaty są **domyślnie prywatne**. Żadna utworzona przez Ciebie treść nie jest widoczna dla innych osób, dopóki jej nie opublikujesz.
@@ -240,6 +242,8 @@ Jeżeli mieszkasz w innym miejscu, załącznik A określa prawo odstąpienia lub
 Z wyprzedzeniem informujemy Cię na trwałym nośniku, co i kiedy ulegnie zmianie. Jeżeli zmiana ma więcej niż nieznaczny negatywny wpływ na Twój dostęp do usługi lub korzystanie z niej, możesz bezpłatnie rozwiązać umowę w terminie **30 dni** od otrzymania informacji lub wejścia zmiany w życie — w zależności od tego, która z tych dat jest późniejsza — a my zwrócimy wszelkie kwoty zapłacone z góry za niewykorzystany okres.
 
 **Zmiany niniejszych Warunków.** Możemy zmieniać niniejsze Warunki z tych samych rodzajów powodów. W przypadku zmian, które nie ograniczają Twoich praw, publikujemy nową wersję wraz z podsumowaniem zmian i wysyłamy Ci wiadomość e-mail co najmniej **30 dni** przed jej wejściem w życie; dalsze korzystanie z Dialectical Engine po tej dacie oznacza akceptację zmiany, a przed tą datą możesz zamknąć konto. W przypadku zmian ograniczających Twoje prawa — w tym podwyżek cen w istniejącym planie, obniżenia limitów, usunięcia funkcji, nowych sposobów wykorzystywania Twoich treści albo zmian odpowiedzialności, prawa właściwego lub rozstrzygania sporów — prosimy Cię o wyraźne zaakceptowanie nowej wersji przy kolejnym logowaniu, a zmiana obowiązuje wyłącznie na przyszłość. Nigdy nie wprowadzamy zmian z mocą wsteczną ani nie wykorzystujemy niniejszej sekcji do zmiany w trakcie okresu podstawowego zakresu opłaconej przez Ciebie usługi bez zapewnienia możliwości rezygnacji. Poprzednie wersje pozostają dostępne pod adresem dezbatere.ro/terms/versions.
+
+Wersja 2.9 zastąpiła wersję 2.8: w sekcji 8 dodano akapit „Wykresy i statystyki, które generujemy”, który określa, do kogo należą wykresy w raporcie z debaty, i udziela Ci licencji na ich wykorzystywanie.
 
 Wersja 2.8 zastąpiła wersję 2.7: kontrola pytań odrzuca również pytanie o to, jak popełnić przestępstwo lub uniknąć za nie kary, albo czy ktoś powinien je popełnić, na przykład nielegalnie kupić lub sprzedać narkotyki lub broń, ukraść coś lub uchylać się od podatków, i go nie przechowuje; pytanie o to, czy należy zmienić jakieś prawo, nadal rozpoczyna debatę (sekcja 7). Wprowadza też jedną zasadę dotyczącą narkotyków i pozwala, by pytanie o to, czy należy zmienić prawo dotyczące samobójstwa, eutanazji lub wspomaganego umierania, rozpoczynało debatę (sekcja 7), a kontrola pytań nie przechowuje już żadnego pytania dla naszego zespołu (sekcje 7 i 10); ekran, który odrzuca pytanie, jest naszym uzasadnieniem w przypadku każdego pytania, które zgodnie z sekcją 7 nie rozpoczyna debaty (sekcja 10).
 

@@ -1120,6 +1120,29 @@ export function toCheckerPromptMaterial(material: StoryMaterial, candidate: Stor
 }
 
 /**
+ * Charts (design 2026-10-28): the chart call's fenced fields: the same material, then the report's text it may put a
+ * chart under (the reasons and the long version, with the short references the model reads).
+ */
+export function toChartsPromptMaterial(
+  material: StoryMaterial,
+  story: StoryBody,
+  /** Data blocks (2026-10-30): each claim's figures as code read them (blocks.ts `storyFiguresField`). */
+  figures: readonly Readonly<{ id: string; figures: readonly string[] }>[] = []
+): readonly FramedMaterialField[] {
+  const fields = [
+    ...storyCoreFields(material),
+    { name: "report_text", content: JSON.stringify({ why: story.why, long: story.long }) },
+    { name: "figures", content: JSON.stringify(figures) }
+  ];
+  return Object.freeze(fields.map((field) => Object.freeze(field)));
+}
+
+/** Charts (design 2026-10-28): every position's and point's claim, by the short reference the models read. */
+export function storyMaterialClaims(material: Pick<StoryMaterial, "positions" | "points">): ReadonlyMap<string, string> {
+  return new Map([...material.positions, ...material.points].map((entry) => [entry.id, entry.claim] as const));
+}
+
+/**
  * Story v4 round 2 (R1d, spec §7.2 item 8): the accepted round-1 draft as the storyteller's own answer, in the v4 form's
  * order (short, why, reviewer_note, long last) and without `shape_id`, which the v4 form never asks for (code sets it).
  * Its references are the material's short ones, as the model wrote them.

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ringkasnya
-eyebrow: KETENTUAN LAYANAN · v2.8 · BERLAKU 12 OKTOBER 2026
+eyebrow: KETENTUAN LAYANAN · v2.9 · BERLAKU 12 OKTOBER 2026
 title: Hal yang Anda setujui
 lede: Kontrak antara Anda dan DMS Merchandise Shop S.R.L., dalam bahasa yang mudah dipahami. Sembilan belas bagian dan Lampiran A — gulir hingga akhir.
-endMarker: AKHIR KETENTUAN · v2.8
+endMarker: AKHIR KETENTUAN · v2.9
 bodyLabel: Teks Ketentuan Layanan
 annexTitle: Lampiran A — Ketentuan regional
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 HUKUM YANG BERLAKU
 -->
 
-**Version 2.8 · Effective 12 Oktober 2026 · Versi sebelumnya di dezbatere.ro/terms/versions · Bahasa: Indonesia.**
+**Version 2.9 · Effective 12 Oktober 2026 · Versi sebelumnya di dezbatere.ro/terms/versions · Bahasa: Indonesia.**
 
 **In short.** Anda harus berusia 18 tahun atau lebih. Dialectical Engine menyusun argumen dengan model AI dan segala sesuatu yang dihasilkannya mungkin salah — ini bukan nasihat. Debat Anda bersifat privat kecuali Anda memublikasikannya; jika Anda memublikasikannya, siapa pun dapat membacanya. Teks yang Anda kirim diteruskan kepada penyedia AI yang tercantum dalam Daftar Penyedia kami, dan tidak digunakan untuk melatih model. Laporkan konten ilegal ke support@dezbatere.ro, baik Anda memiliki akun maupun tidak. Hukum Rumania berlaku, tetapi perlindungan konsumen setempat Anda tetap berlaku bagi Anda.
 
@@ -138,6 +138,8 @@ Jika Anda tidak yakin apakah sesuatu diperbolehkan, tanyakan kepada kami sebelum
 
 **Keluaran.** Dalam hubungan antara Anda dan kami, Anda dapat menggunakan keluaran debat Anda sendiri untuk tujuan apa pun yang sah, dan kami tidak mengeklaim kepemilikan atas teks yang dihasilkan. Harap diketahui bahwa keluaran yang dihasilkan mungkin tidak dapat dilindungi hak cipta di banyak yurisdiksi; keluaran serupa mungkin dihasilkan untuk pengguna lain; keluaran mungkin memperbanyak atau menyerupai materi pihak ketiga; dan beberapa materi sumber yang diambil oleh penyedia AI mungkin memiliki pembatasan penggunaan kembali. Anda bertanggung jawab untuk melakukan pemeriksaan sebelum mengandalkan atau memublikasikan ulang keluaran.
 
+**Grafik dan statistik yang kami hasilkan.** Grafik dalam laporan debat, serta statistik yang kami susun untuknya — pemilihan, penataan, desain, dan penggambarannya — dibuat oleh Dialectical Engine dan merupakan milik DMS Merchandise Shop S.R.L.; setiap grafik diberi tanda "Copyrighted by DMS Merchandise Shop SRL". Hal ini tidak mencakup angka yang ditampilkan grafik, yang berasal dari debat Anda, maupun teks debat Anda. Kami memberi Anda lisensi gratis, berlaku di seluruh dunia, non-eksklusif, dan abadi untuk menggunakan, menyalin, dan membagikan grafik tersebut untuk tujuan apa pun yang sah, asalkan Anda tetap menyertakan pemberitahuan tersebut dan label bahwa grafik dihasilkan AI bersama grafik tersebut. Jika hukum tidak mengakui hak atas materi yang dihasilkan AI, paragraf ini tidak memberi kami lebih dari yang diizinkan hukum.
+
 ## 9. Memublikasikan debat
 
 Debat bersifat **privat secara bawaan**. Tidak ada hal yang Anda buat yang terlihat oleh orang lain kecuali Anda memublikasikannya.
@@ -240,6 +242,8 @@ Jika Anda tinggal di tempat lain, Lampiran A menyatakan hak penarikan diri atau 
 Kami memberi tahu Anda terlebih dahulu, pada media tahan lama, mengenai hal yang berubah dan waktu perubahan. Jika perubahan tersebut menimbulkan dampak negatif yang lebih dari kecil terhadap akses ke atau penggunaan layanan oleh Anda, Anda dapat mengakhiri layanan tanpa biaya dalam waktu **30 hari** sejak menerima pemberitahuan, atau sejak perubahan berlaku, mana yang lebih akhir, dan kami mengembalikan setiap jumlah yang telah dibayar di muka untuk periode yang tidak digunakan.
 
 **Pada Ketentuan ini.** Kami dapat mengubah Ketentuan ini untuk jenis alasan yang sama. Untuk perubahan yang tidak mengurangi hak Anda, kami memublikasikan versi baru beserta ringkasan perubahan dan mengirim email kepada Anda sekurang-kurangnya **30 hari** sebelum perubahan berlaku; jika Anda terus menggunakan Dialectical Engine setelah tanggal tersebut, berarti Anda menerimanya, dan Anda dapat menutup akun sebelumnya. Untuk perubahan yang mengurangi hak Anda — termasuk kenaikan harga pada paket yang sudah ada, batas yang lebih rendah, fitur yang dihapus, penggunaan baru atas konten Anda, atau perubahan pada tanggung jawab, hukum yang berlaku, maupun penyelesaian sengketa — kami meminta Anda menerima versi baru secara tegas saat masuk berikutnya, dan perubahan hanya berlaku untuk waktu mendatang. Kami tidak pernah memberlakukan perubahan secara surut, dan tidak pernah menggunakan bagian ini untuk mengubah inti dari hal yang telah Anda bayar di tengah masa berlaku tanpa menawarkan jalan keluar. Versi sebelumnya tetap tersedia di dezbatere.ro/terms/versions.
+
+Versi 2.9 menggantikan versi 2.8: bagian 8 mendapat paragraf baru “Grafik dan statistik yang kami hasilkan”, yang menyatakan siapa pemilik grafik dalam laporan debat dan memberi Anda lisensi untuk menggunakannya.
 
 Versi 2.8 menggantikan versi 2.7: pemeriksaan pertanyaan juga menolak pertanyaan yang menanyakan cara melakukan kejahatan atau lolos dari hukumannya, atau apakah seseorang sebaiknya melakukan kejahatan, seperti membeli atau menjual narkoba atau senjata secara ilegal, mencuri, atau menghindari pajak, dan tidak menyimpannya; pertanyaan tentang apakah suatu undang-undang sebaiknya diubah tetap memulai debat (bagian 7). Versi ini juga menetapkan satu aturan untuk pertanyaan tentang narkoba dan memungkinkan pertanyaan tentang apakah undang-undang mengenai bunuh diri, eutanasia, atau kematian dengan bantuan sebaiknya diubah untuk memulai debat (bagian 7), dan pemeriksaan pertanyaan tidak lagi menyimpan pertanyaan apa pun untuk dibaca tim kami (bagian 7 dan 10); layar yang menolak suatu pertanyaan adalah pernyataan alasan kami untuk setiap pertanyaan yang menurut bagian 7 tidak memulai debat (bagian 10).
 

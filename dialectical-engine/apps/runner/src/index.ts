@@ -13107,13 +13107,17 @@ export function declareHatchetWalkingSkeletonTask(input: {
  * or `STORY:CHECKER:{round}`, the round 1 to 8 (the `storyLoopMaxRounds` schema
  * cap, packages/register/src/story-policy.ts), and each carries its own role:
  * the storyteller is a SYNTHESIZER call and the checker an EVALUATOR call.
+ * Charts (design 2026-10-28): the story's chart call is `STORY:CHARTS:1`, one
+ * call after an accepted story, with the storyteller's role (SYNTHESIZER).
  * Anything else under the prefix is not a story call at all.
  */
 const STORY_CALL_SITE_PREFIX = "STORY:";
 const STORY_CALL_SITE = /^STORY:(STORYTELLER|CHECKER):[1-8]$/u;
+const STORY_CHARTS_CALL_SITE = "STORY:CHARTS:1";
 
 /** The role a well-formed story call site must carry, or null for any other key. */
 function storyCallSiteRole(callSiteKey: string): ProviderCallRequest["role"] | null {
+  if (callSiteKey === STORY_CHARTS_CALL_SITE) return "SYNTHESIZER";
   const site = STORY_CALL_SITE.exec(callSiteKey);
   if (site === null) return null;
   return site[1] === "STORYTELLER" ? "SYNTHESIZER" : "EVALUATOR";

@@ -707,6 +707,6 @@ describe("the owner's sample report script (look first, then wire)", () => {
     expect(result.status).toBe(2);
     expect(result.stderr).toContain("Usage:");
     expect(result.stderr).toContain("<absolute path to the output .pdf>");
-    expect(result.stderr).toContain("|floor|lower-cost]");
+    expect(result.stderr).toContain("|floor|lower-cost|charts|scatter|tables]");
   }, 125_000);
 });

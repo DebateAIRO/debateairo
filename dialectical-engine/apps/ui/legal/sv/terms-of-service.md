@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kort sagt
-eyebrow: ANVÄNDARVILLKOR · v2.8 · GÄLLER FRÅN 12 OKTOBER 2026
+eyebrow: ANVÄNDARVILLKOR · v2.9 · GÄLLER FRÅN 12 OKTOBER 2026
 title: Vad du godkänner
 lede: Avtalet mellan dig och DMS Merchandise Shop S.R.L., på ett lättbegripligt språk. Nitton avsnitt och bilaga A — rulla till slutet.
-endMarker: SLUT PÅ VILLKOREN · v2.8
+endMarker: SLUT PÅ VILLKOREN · v2.9
 bodyLabel: Användarvillkorens text
 annexTitle: Bilaga A — Regionala villkor
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TILLÄMPLIG LAG
 -->
 
-**Version 2.8 · Effective 12 oktober 2026 · Tidigare versioner finns på dezbatere.ro/terms/versions · Språk: svenska.**
+**Version 2.9 · Effective 12 oktober 2026 · Tidigare versioner finns på dezbatere.ro/terms/versions · Språk: svenska.**
 
 **In short.** Du måste ha fyllt 18 år. Dialectical Engine bygger argument med AI-modeller, och allt som tjänsten genererar kan vara felaktigt — det är inte rådgivning. Dina debatter är privata om du inte publicerar dem; om du publicerar kan vem som helst läsa dem. Text som du skickar in överförs till de AI-leverantörer som anges i vårt register över AI-leverantörer och används inte för att träna modeller. Rapportera olagligt innehåll till support@dezbatere.ro, oavsett om du har ett konto eller inte. Rumänsk lag är tillämplig, men du behåller ditt lokala konsumentskydd.
 
@@ -138,6 +138,8 @@ Om du är osäker på om något är tillåtet ska du fråga oss innan du publice
 
 **Resultat.** I förhållandet mellan dig och oss får du använda resultatet från dina egna debatter för varje lagligt ändamål, och vi gör inte anspråk på äganderätt till genererad text. Observera att genererade resultat i många jurisdiktioner kanske inte kan skyddas av upphovsrätt; att liknande resultat kan genereras för andra användare; att resultat kan återge eller likna material från tredje part; och att visst källmaterial som en AI-leverantör hämtar kan omfattas av begränsningar avseende återanvändning. Du ansvarar för att kontrollera detta innan du förlitar dig på eller återpublicerar resultat.
 
+**Diagram och statistik som vi genererar.** Diagrammen i en debattrapport och den statistik som vi sammanställer för dem — deras urval, uppställning, utformning och ritning — skapas av Dialectical Engine och tillhör DMS Merchandise Shop S.R.L.; varje diagram är försett med angivelsen ”Copyrighted by DMS Merchandise Shop SRL”. Detta omfattar inte de siffror som ett diagram visar, som kommer från din debatt, och inte heller texten i din debatt. Vi ger dig en kostnadsfri, världsomspännande, icke-exklusiv och evig licens att använda, kopiera och dela diagrammen för varje lagligt ändamål, förutsatt att du behåller angivelsen och märkningen om AI-generering tillsammans med dem. Om lagen inte erkänner rättigheter till AI-genererat material ger detta stycke oss inte mer än vad lagen tillåter.
+
 ## 9. Publicering av en debatt
 
 Debatter är **privata som standard**. Ingenting som du skapar är synligt för någon annan om du inte publicerar det.
@@ -240,6 +242,8 @@ Om du bor någon annanstans anger bilaga A den ånger- eller betänketid som gä
 Vi underrättar dig i förväg, på ett varaktigt medium, om vad som ändras och när. Om ändringen har mer än en mindre negativ inverkan på din åtkomst till eller användning av tjänsten får du säga upp avtalet utan kostnad inom **30 dagar** från det att du underrättades eller från det att ändringen trädde i kraft, beroende på vilket som inträffar senare, och vi återbetalar eventuellt förskottsbetalt belopp för den oanvända perioden.
 
 **Dessa villkor.** Vi får ändra dessa villkor av samma slags skäl. Vid ändringar som inte minskar dina rättigheter publicerar vi den nya versionen tillsammans med en sammanfattning av ändringarna och skickar e-post till dig minst **30 dagar** innan ändringen träder i kraft; om du fortsätter att använda Dialectical Engine efter det datumet innebär det att du godkänner ändringen, och du får avsluta ditt konto före dess. Vid ändringar som minskar dina rättigheter — däribland prishöjningar för ett befintligt abonnemang, lägre gränser, borttagna funktioner, ny användning av ditt innehåll eller ändringar av ansvar, tillämplig lag eller tvistlösning — ber vi dig uttryckligen godkänna den nya versionen nästa gång du loggar in, och ändringen gäller endast framåt i tiden. Vi gör aldrig en ändring retroaktiv och använder aldrig detta avsnitt för att ändra kärnan i det som du har betalat för under en pågående avtalsperiod utan att erbjuda dig en utväg. Tidigare versioner finns kvar på dezbatere.ro/terms/versions.
+
+Version 2.9 ersatte version 2.8: avsnitt 8 får stycket ”Diagram och statistik som vi genererar”, som anger vem som äger diagrammen i en debattrapport och ger dig en licens att använda dem.
 
 Version 2.8 ersatte version 2.7: frågekontrollen avvisar också en fråga om hur man begår ett brott eller kommer undan med det, eller om någon borde begå ett, till exempel att köpa eller sälja droger eller vapen olagligt, stjäla eller undandra skatt, och sparar den inte; en fråga om huruvida en lag borde ändras startar fortfarande en debatt (avsnitt 7). Den fastställer också en enda linje för droger och låter en fråga om huruvida lagstiftningen om självmord, dödshjälp eller assisterat döende borde ändras starta en debatt (avsnitt 7), och frågekontrollen behåller inte längre någon fråga för vårt team (avsnitt 7 och 10); skärmen som avvisar en fråga är vår motivering för varje fråga som enligt avsnitt 7 inte startar en debatt (avsnitt 10).
 

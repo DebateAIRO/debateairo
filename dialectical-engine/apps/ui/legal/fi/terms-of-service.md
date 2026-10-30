@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lyhyesti
-eyebrow: KÄYTTÖEHDOT · v2.8 · VOIMASSA 12. LOKAKUUTA 2026 ALKAEN
+eyebrow: KÄYTTÖEHDOT · v2.9 · VOIMASSA 12. LOKAKUUTA 2026 ALKAEN
 title: Mihin sitoudut
 lede: Sinun ja DMS Merchandise Shop S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.
-endMarker: KÄYTTÖEHTOJEN LOPPU · v2.8
+endMarker: KÄYTTÖEHTOJEN LOPPU · v2.9
 bodyLabel: Käyttöehtojen teksti
 annexTitle: Liite A — Alueelliset ehdot
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 SOVELLETTAVA LAKI
 -->
 
-**Version 2.8 · Effective 12. lokakuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
+**Version 2.9 · Effective 12. lokakuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
 
 **In short.** Sinun on oltava vähintään 18-vuotias. Dialectical Engine muodostaa argumentteja tekoälymalleilla, ja kaikki sen tuottama voi olla virheellistä — se ei ole neuvontaa. Väittelysi ovat yksityisiä, ellet julkaise niitä; jos julkaiset ne, kuka tahansa voi lukea niitä. Lähettämäsi teksti toimitetaan palveluntarjoajarekisterissämme luetelluille tekoälypalveluntarjoajille, eikä sitä käytetä mallien kouluttamiseen. Ilmoita lainvastaisesta sisällöstä osoitteeseen support@dezbatere.ro riippumatta siitä, onko sinulla tiliä. Sopimukseen sovelletaan Romanian lakia, mutta paikallinen kuluttajansuojasi säilyy.
 
@@ -138,6 +138,8 @@ Jos et ole varma, onko jokin sallittua, kysy meiltä ennen sen julkaisemista.
 
 **Tuotokset.** Sinun ja meidän välisessä suhteessa saat käyttää omien väittelyidesi tuotoksia mihin tahansa lailliseen tarkoitukseen, emmekä vaadi tuotetun tekstin omistusoikeutta. Huomaa, ettei tuotettu sisältö välttämättä saa tekijänoikeussuojaa monilla lainkäyttöalueilla; muille käyttäjille voidaan tuottaa samankaltaista sisältöä; tuotokset voivat toisintaa kolmannen osapuolen aineistoa tai muistuttaa sitä; ja joihinkin tekoälypalveluntarjoajan hakemiin lähdeaineistoihin voi kohdistua uudelleenkäyttörajoituksia. Vastaat tarkistamisesta ennen tuotoksiin luottamista tai niiden julkaisemista uudelleen.
 
+**Tuottamamme kaaviot ja tilastot.** Väittelyraportin kaaviot ja niitä varten kokoamamme tilastot — niiden valinta, järjestys, ulkoasu ja piirtäminen — ovat Dialectical Engine -palvelun tekemiä ja kuuluvat yhtiölle DMS Merchandise Shop S.R.L.; jokaisessa kaaviossa on merkintä ”Copyrighted by DMS Merchandise Shop SRL”. Tämä ei koske kaavion esittämiä lukuja, jotka ovat peräisin väittelystäsi, eikä väittelysi tekstiä. Myönnämme sinulle maksuttoman, maailmanlaajuisen, ei-yksinomaisen ja pysyvän käyttöluvan käyttää, kopioida ja jakaa näitä kaavioita mihin tahansa lailliseen tarkoitukseen edellyttäen, että säilytät niiden yhteydessä tämän merkinnän sekä tekoälyn tuottamaa sisältöä koskevan merkinnän. Jos laki ei tunnusta oikeuksia tekoälyn tuottamaan aineistoon, tämä kappale ei anna meille enempää kuin laki sallii.
+
 ## 9. Väittelyn julkaiseminen
 
 Väittelyt ovat **oletusarvoisesti yksityisiä**. Mikään luomasi ei näy muille, ellet julkaise sitä.
@@ -240,6 +242,8 @@ Jos asut muualla, liitteessä A ilmoitetaan alueellasi mahdollisesti sovellettav
 Ilmoitamme sinulle etukäteen pysyvällä välineellä, mikä muuttuu ja milloin. Jos muutoksella on vähäistä suurempi kielteinen vaikutus mahdollisuuteesi käyttää palvelua tai palvelun käyttöösi, voit päättää sopimuksen maksutta **30 päivän** kuluessa ilmoituksesta tai muutoksen voimaantulosta sen mukaan, kumpi ajankohta on myöhäisempi, ja palautamme käyttämättömään aikaan kohdistuvat ennakkomaksut.
 
 **Näiden käyttöehtojen muutokset.** Voimme muuttaa näitä käyttöehtoja samanlaisista syistä. Jos muutos ei vähennä oikeuksiasi, julkaisemme uuden version ja yhteenvedon muutoksista sekä lähetämme sinulle sähköpostia vähintään **30 päivää ennen** sen voimaantuloa; Dialectical Engine -palvelun käytön jatkaminen kyseisen ajankohdan jälkeen merkitsee hyväksyntääsi, ja voit sulkea tilisi ennen sitä. Jos muutos vähentää oikeuksiasi — mukaan lukien olemassa olevan tilauksen hinnankorotukset, alhaisemmat rajat, poistetut ominaisuudet, sisältösi uudet käyttötavat tai vastuuta, sovellettavaa lakia tai riidanratkaisua koskevat muutokset — pyydämme sinua hyväksymään uuden version nimenomaisesti seuraavan kirjautumisesi yhteydessä, ja muutosta sovelletaan vain jatkossa. Emme koskaan muuta ehtoja taannehtivasti emmekä käytä tätä kohtaa muuttaaksemme kesken sopimuskauden maksamasi palvelun ydintä tarjoamatta sinulle mahdollisuutta irtautua. Aiemmat versiot säilyvät saatavilla osoitteessa dezbatere.ro/terms/versions.
+
+Versio 2.9 korvasi version 2.8: kohtaan 8 lisätään kappale ”Tuottamamme kaaviot ja tilastot”, jossa kerrotaan, kenelle väittelyraportin kaaviot kuuluvat, ja myönnetään sinulle käyttölupa niiden käyttämiseen.
 
 Versio 2.8 korvasi version 2.7: kysymystarkistus hylkää myös kysymyksen siitä, miten rikos tehdään tai miten siitä selvitään rangaistuksetta, tai pitäisikö jonkun tehdä rikos, esimerkiksi ostaa tai myydä huumeita tai aseita laittomasti, varastaa tai kiertää veroja, eikä säilytä sitä; kysymys siitä, pitäisikö jotakin lakia muuttaa, käynnistää edelleen väittelyn (kohta 7). Se määrittää myös huumeille yhden linjan ja sallii kysymyksen siitä, pitäisikö itsemurhaa, eutanasiaa tai avustettua kuolemaa koskevaa lainsäädäntöä muuttaa, käynnistää väittelyn (kohta 7), eikä kysymystarkistus enää säilytä yhtään kysymystä tiimimme luettavaksi (kohdat 7 ja 10); kysymyksen hylkäävä näkymä on perustelumme jokaiselle kysymykselle, joka ei kohdan 7 mukaan käynnistä väittelyä (kohta 10).
 

@@ -2,11 +2,14 @@ import { Fragment, type JSX } from "react";
 import { Document, Link, Page, StyleSheet, Text, View, type Styles } from "@react-pdf/renderer";
 import type { Answer, AnswerDisclosure, AnswerStory } from "@debateai/contract";
 import { formatNumber } from "../i18n/translate.js";
+import { ReportChartBlock } from "./ReportChart.js";
+import { ReportRankingBlock, ReportTableBlock, type TableCell, type TableWords } from "./ReportTable.js";
 import { REPORT_FONT_FAMILIES } from "./reportFonts.js";
 import type { ReportCatalogs } from "./reportLanguage.js";
 import { reportLineBreaker } from "./reportLineBreaks.js";
 import { reportLayout, reportPrintedText, type ReportLayout } from "./reportLayout.js";
-import { buildReportModel, reportPageWords, type ReportModel, type ReportParagraph } from "./reportModel.js";
+import { buildReportModel, pointAnchor, reportPageWords, type ReportModel, type ReportParagraph } from "./reportModel.js";
+import type { ReportRanking, ReportTableCell } from "./reportTables.js";
 
 /**
  * The downloadable report (spec 2026-09-26 §10, amended by §14). It renders
@@ -158,13 +161,16 @@ interface Look {
   /** The footer's words, and the page numbers opposite them on the side a line ends. */
   readonly footerText: Style;
   readonly footerPages: Style;
+  /** Charts (design 2026-10-28): the logo file in each chart's corner, or null for the wordmark. */
+  readonly logo: string | null;
 }
 
-function lookOf(model: ReportModel, layout: ReportLayout): Look {
+function lookOf(model: ReportModel, layout: ReportLayout, logo: string | null): Look {
   const rtl = layout.direction === "rtl";
   const pagesLeft = layout.pageNumberSide === "left";
   return {
     model,
+    logo,
     page: rtl ? { fontFamily: [...layout.faces.body], textAlign: layout.textAlign } : { fontFamily: [...layout.faces.body] },
     heading: { fontFamily: [...layout.faces.heading], fontWeight: layout.faces.headingWeight },
     tracked: layout.trackedCapitals ? {} : { letterSpacing: 0 },
@@ -326,6 +332,65 @@ function CoverAndShort({ look }: { look: Look }): JSX.Element {
   );
 }
 
+/** A table cell's words, then its [Pn] link to the point it is copied from, as a paragraph's citation is printed. */
+function CellText({ look, style, cell }: { look: Look; style: TextStyle; cell: ReportTableCell }): JSX.Element {
+  return (
+    <Text
+      style={withDirection(style, look)}
+      hyphenationPenalty={NEVER_BREAK_BETWEEN_RUNS}
+      hyphenationCallback={reportLineBreaker(cell.cite === null ? cell.text : `${cell.text}${citationText(cell.cite)}`)}
+    >
+      <Text style={look.text}>{cell.text}</Text>
+      {cell.cite === null ? null : (
+        <Link src={`#${pointAnchor(cell.cite)}`} style={[styles.cite, look.text]}>{citationText(cell.cite)}</Link>
+      )}
+    </Text>
+  );
+}
+
+function tableWords(look: Look): TableWords {
+  return function TableText({ style, text }) {
+    return <Words look={look} style={style} text={text} />;
+  };
+}
+
+function tableCell(look: Look): TableCell {
+  return function TableCellText({ style, cell }) {
+    return <CellText look={look} style={style} cell={cell} />;
+  };
+}
+
+/**
+ * Charts (design 2026-10-28) and tables (data blocks, 2026-10-30): the table, then the chart, that follow the paragraph
+ * `after` names, or nothing.
+ */
+function BlocksAfter({ look, after }: { look: Look; after: string }): JSX.Element | null {
+  const table = look.model.tables.find((item) => item.after === after);
+  const chart = look.model.charts.find((item) => item.after === after);
+  if (table === undefined && chart === undefined) return null;
+  return (
+    <>
+      {table === undefined ? null : <ReportTableBlock table={table} row={look.row} Words={tableWords(look)} Cell={tableCell(look)} />}
+      {chart === undefined ? null : (
+        <ReportChartBlock
+          chart={chart}
+          locale={look.model.language}
+          logo={look.logo}
+          row={look.row}
+          Words={({ style, text }) => <Words look={look} style={style} text={text} />}
+        />
+      )}
+    </>
+  );
+}
+
+/** The ranking of the answers (data blocks, 2026-10-30), where its placement puts it, or nothing. */
+function RankingIn({ look, placement }: { look: Look; placement: ReportRanking["placement"] }): JSX.Element | null {
+  const { ranking } = look.model;
+  if (ranking === null || ranking.placement !== placement) return null;
+  return <ReportRankingBlock ranking={ranking} row={look.row} Words={tableWords(look)} Cell={tableCell(look)} />;
+}
+
 function LongStory({ look }: { look: Look }): JSX.Element {
   const { model } = look;
   return (
@@ -338,7 +403,10 @@ function LongStory({ look }: { look: Look }): JSX.Element {
             <Words look={look} style={styles.sectionTitle} text={section.title} />
           </KeepWithNext>
           {section.paragraphs.map((item, itemIndex) => (
-            <StoryText look={look} key={itemIndex} paragraph={item} variant="paragraph" />
+            <Fragment key={itemIndex}>
+              <StoryText look={look} paragraph={item} variant="paragraph" />
+              <BlocksAfter look={look} after={`long.${String(index + 1)}.${String(itemIndex + 1)}`} />
+            </Fragment>
           ))}
         </Fragment>
       ))}
@@ -369,15 +437,19 @@ function Why({ look }: { look: Look }): JSX.Element {
     <>
       <Heading look={look} title={why.title} first />
       {why.reasons.map((reason, index) => (
-        <View key={index} style={[styles.reasonRow, look.row]}>
-          <Words look={look} style={styles.reasonNumber} text={reasonNumber(model, index)} />
-          <View style={styles.reasonText}>
-            <StoryText look={look} paragraph={reason} variant="paragraph" />
+        <Fragment key={index}>
+          <View style={[styles.reasonRow, look.row]}>
+            <Words look={look} style={styles.reasonNumber} text={reasonNumber(model, index)} />
+            <View style={styles.reasonText}>
+              <StoryText look={look} paragraph={reason} variant="paragraph" />
+            </View>
           </View>
-        </View>
+          <BlocksAfter look={look} after={`why.${String(index + 1)}`} />
+        </Fragment>
       ))}
       <Subheading look={look} text={why.changeLead} />
       <StoryText look={look} paragraph={why.change} variant="paragraph" />
+      <RankingIn look={look} placement="why" />
     </>
   );
 }
@@ -388,6 +460,7 @@ function Appendix({ look }: { look: Look }): JSX.Element {
     <>
       <Heading look={look} title={model.appendix.title} first />
       <Words look={look} style={styles.intro} text={model.appendix.intro} />
+      <RankingIn look={look} placement="appendix" />
       {model.appendix.entries.map((entry) => (
         <Fragment key={entry.anchor}>
           <KeepWithNext ahead={52} style={styles.entryHeadBox} id={entry.anchor}>
@@ -430,8 +503,12 @@ function About({ look }: { look: Look }): JSX.Element {
   );
 }
 
-export function ReportDocumentView({ model }: { model: ReportModel }): JSX.Element {
-  const look = lookOf(model, reportLayout(model.language, reportPrintedText(model)));
+export function ReportDocumentView({ model, logo = null }: {
+  model: ReportModel;
+  /** Charts (design 2026-10-28): the logo file for each chart's corner (`resolveReportLogo`), or null for the wordmark. */
+  logo?: string | null;
+}): JSX.Element {
+  const look = lookOf(model, reportLayout(model.language, reportPrintedText(model)), logo);
   const page = [styles.page, look.page];
   return (
     <Document

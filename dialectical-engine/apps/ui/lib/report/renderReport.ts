@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { Font, renderToBuffer } from "@react-pdf/renderer";
 import type { Answer, AnswerDisclosure, AnswerStory } from "@debateai/contract";
 import { ReportDocumentView } from "./ReportDocument.js";
@@ -27,6 +27,18 @@ export function resolveReportFontDirectory(cwd: string = process.cwd()): string 
     if (existsSync(join(candidate, FONT_DIRECTORY_MARKER))) return candidate;
   }
   throw new Error("REPORT_FONTS_UNRESOLVED: the report fonts are not under assets/fonts or apps/ui/assets/fonts");
+}
+
+/**
+ * Charts (design 2026-10-28): the company logo for each chart's corner, beside the fonts' directory
+ * (apps/ui/assets/brand/report-logo.png). Dropping the file in is all a logo needs; until then, null, and every chart
+ * shows the wordmark.
+ */
+export const REPORT_LOGO_FILE = "brand/report-logo.png";
+
+export function resolveReportLogo(fontDirectory: string): string | null {
+  const logo = join(dirname(fontDirectory), REPORT_LOGO_FILE);
+  return existsSync(logo) ? logo : null;
 }
 
 /**
@@ -109,9 +121,10 @@ export async function renderReportPdf(input: Readonly<{
   fontDirectory?: string;
 }>): Promise<Buffer> {
   if (!reportSupportedForLocale(input.catalogs.locale)) throw new RangeError(`REPORT_LOCALE_UNSUPPORTED: ${input.catalogs.locale}`);
-  registerReportFonts(input.fontDirectory ?? resolveReportFontDirectory());
+  const fontDirectory = input.fontDirectory ?? resolveReportFontDirectory();
+  registerReportFonts(fontDirectory);
   const model = buildReportModel(input.answer, input.story, input.generatedAt, input.catalogs, input.disclosure ?? null);
   const { faces } = reportLayout(model.language, reportPrintedText(model));
   await prepareReportFonts([...new Set([...faces.body, ...faces.heading])]);
-  return renderToBuffer(ReportDocumentView({ model }));
+  return renderToBuffer(ReportDocumentView({ model, logo: model.charts.length === 0 ? null : resolveReportLogo(fontDirectory) }));
 }

@@ -109,6 +109,46 @@ export {
 } from "./repository.js";
 export { readStoryEnrichment } from "./enrichment.js";
 export {
+  STORY_CHARTS_ANSWER_FORM,
+  STORY_CHARTS_CALL_SITE_KEY,
+  STORY_CHARTS_CONTRACT_ID,
+  STORY_CHARTS_INSTRUCTION,
+  buildStoryChartsContract,
+  classifyStoryChartsContent,
+  figureReadings,
+  parseStoryCharts,
+  readStoryCharts,
+  restoreChartRefs,
+  storyChartParagraph,
+  type StoryChartDropCode,
+  type StoryChartsContext,
+  type StoryChartsReading
+} from "./charts.js";
+export {
+  claimFigures,
+  parseStoryBlocks,
+  readStoryBlocks,
+  restoreTableRefs,
+  storyArgumentSides,
+  storyBlockCallNeeded,
+  storyBlockNeeds,
+  storyFiguresField,
+  storyRanking,
+  type StoryArgumentSides,
+  type StoryBlockNeeds,
+  type StoryBlocksContext,
+  type StoryBlocksReading,
+  type StoryTableDropCode
+} from "./blocks.js";
+export {
+  STORY_BLOCK_MENU,
+  STORY_QUESTION_FORMS,
+  storyFormIsProseOnly,
+  storyQuestionFormOf,
+  type StoryBlockKind,
+  type StoryQuestionForm
+} from "./forms.js";
+export {
   StoryWriter,
   storyV4ShapeId,
   withoutStoryNodeIds,

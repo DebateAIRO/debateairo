@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kurz gesagt
-eyebrow: NUTZUNGSBEDINGUNGEN · v2.8 · GÜLTIG AB 12. OKTOBER 2026
+eyebrow: NUTZUNGSBEDINGUNGEN · v2.9 · GÜLTIG AB 12. OKTOBER 2026
 title: Womit Sie sich einverstanden erklären
 lede: Der Vertrag zwischen Ihnen und DMS Merchandise Shop S.R.L. in verständlicher Sprache. Neunzehn Abschnitte und Anhang A – scrollen Sie bis zum Ende.
-endMarker: ENDE DER NUTZUNGSBEDINGUNGEN · v2.8
+endMarker: ENDE DER NUTZUNGSBEDINGUNGEN · v2.9
 bodyLabel: Text der Nutzungsbedingungen
 annexTitle: Anhang A – Regionale Bestimmungen
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ANWENDBARES RECHT
 -->
 
-**Version 2.8 · Effective 12. Oktober 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
+**Version 2.9 · Effective 12. Oktober 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
 
 **In short.** Sie müssen mindestens 18 Jahre alt sein. Dialectical Engine erstellt Argumente mithilfe von KI-Modellen, und alles, was es erzeugt, kann falsch sein – es handelt sich nicht um Beratung. Ihre Debatten sind privat, sofern Sie sie nicht veröffentlichen; wenn Sie sie veröffentlichen, kann jede Person sie lesen. Von Ihnen übermittelter Text wird an die in unserem Verzeichnis aufgeführten KI-Anbieter gesendet und nicht zum Trainieren von Modellen verwendet. Melden Sie rechtswidrige Inhalte unter support@dezbatere.ro, unabhängig davon, ob Sie ein Konto haben. Es gilt rumänisches Recht, Ihre örtlichen Verbraucherschutzrechte bleiben Ihnen jedoch erhalten.
 
@@ -138,6 +138,8 @@ Wenn Sie nicht sicher sind, ob etwas erlaubt ist, fragen Sie uns, bevor Sie es v
 
 **Ergebnisse.** Im Verhältnis zwischen Ihnen und uns dürfen Sie das Ergebnis Ihrer eigenen Debatten für jeden rechtmäßigen Zweck verwenden, und wir beanspruchen kein Eigentum an erzeugtem Text. Beachten Sie, dass erzeugte Ergebnisse in vielen Rechtsordnungen möglicherweise nicht urheberrechtlich geschützt werden können, dass ähnliche Ergebnisse für andere Personen erzeugt werden können, dass Ergebnisse Material Dritter wiedergeben oder diesem ähneln können und dass für bestimmtes Ausgangsmaterial, das ein KI-Anbieter abruft, Beschränkungen für die Weiterverwendung gelten können. Sie sind dafür verantwortlich, dies zu prüfen, bevor Sie sich auf Ergebnisse verlassen oder sie erneut veröffentlichen.
 
+**Von uns erzeugte Diagramme und Statistiken.** Die Diagramme in einem Debattenbericht und die Statistiken, die wir für sie zusammenstellen – deren Auswahl, Anordnung, Gestaltung und zeichnerische Ausführung –, werden von Dialectical Engine erstellt und gehören der DMS Merchandise Shop S.R.L.; jedes Diagramm trägt den Vermerk „Copyrighted by DMS Merchandise Shop SRL“. Dies erstreckt sich weder auf die Zahlen, die ein Diagramm zeigt und die aus Ihrer Debatte stammen, noch auf den Text Ihrer Debatte. Wir räumen Ihnen eine unentgeltliche, weltweite, nicht ausschließliche und unbefristete Lizenz ein, diese Diagramme für jeden rechtmäßigen Zweck zu nutzen, zu vervielfältigen und weiterzugeben, sofern Sie den Vermerk und die Kennzeichnung als KI-generiert bei ihnen belassen. Soweit das Recht keine Rechte an KI-generiertem Material anerkennt, verschafft uns dieser Absatz nicht mehr, als das Recht zulässt.
+
 ## 9. Veröffentlichung einer Debatte
 
 Debatten sind **standardmäßig privat**. Nichts, was Sie erstellen, ist für andere sichtbar, sofern Sie es nicht veröffentlichen.
@@ -240,6 +242,8 @@ Wenn Sie anderswo leben, nennt Anhang A das in Ihrer Region gegebenenfalls gelte
 Wir teilen Ihnen im Voraus auf einem dauerhaften Datenträger mit, was sich wann ändert. Hat die Änderung mehr als geringfügige nachteilige Auswirkungen auf Ihren Zugang zum Dienst oder dessen Nutzung, können Sie innerhalb von **30 Tagen** nach der Mitteilung oder nach Inkrafttreten der Änderung, je nachdem, welcher Zeitpunkt später liegt, kostenlos kündigen; wir erstatten alle für den ungenutzten Zeitraum vorausgezahlten Beträge.
 
 **Änderungen dieser Nutzungsbedingungen.** Wir können diese Nutzungsbedingungen aus denselben Arten von Gründen ändern. Bei Änderungen, die Ihre Rechte nicht einschränken, veröffentlichen wir die neue Fassung mit einer Zusammenfassung der Änderungen und senden Ihnen mindestens **30 Tage vor ihrem Inkrafttreten** eine E-Mail; wenn Sie Dialectical Engine nach diesem Datum weiterhin nutzen, stimmen Sie der Änderung zu, und Sie können Ihr Konto vorher schließen. Bei Änderungen, die Ihre Rechte einschränken – darunter Preiserhöhungen für einen bestehenden Tarif, niedrigere Limits, entfernte Funktionen, neue Nutzungen Ihrer Inhalte oder Änderungen der Haftung, des anwendbaren Rechts oder der Streitbeilegung – bitten wir Sie, der neuen Fassung bei Ihrer nächsten Anmeldung ausdrücklich zuzustimmen; die Änderung gilt nur für die Zukunft. Wir nehmen Änderungen niemals rückwirkend vor und verwenden diesen Abschnitt niemals dazu, den Kern Ihrer bereits bezahlten Leistung während der Laufzeit zu ändern, ohne Ihnen eine Beendigungsmöglichkeit einzuräumen. Frühere Fassungen bleiben unter dezbatere.ro/terms/versions verfügbar.
+
+Version 2.9 ersetzte Version 2.8: Abschnitt 8 erhält den Absatz „Von uns erzeugte Diagramme und Statistiken“, der festlegt, wem die Diagramme in einem Debattenbericht gehören, und Ihnen eine Lizenz zu ihrer Nutzung einräumt.
 
 Version 2.8 ersetzte Version 2.7: Die Fragenprüfung lehnt auch eine Frage ab, wie man eine Straftat begeht oder ungestraft davonkommt, oder ob jemand eine begehen sollte, etwa Drogen oder Waffen illegal kaufen oder verkaufen, stehlen oder Steuern hinterziehen, und bewahrt sie nicht auf; eine Frage, ob ein Gesetz geändert werden sollte, lässt weiterhin eine Debatte beginnen (Abschnitt 7). Sie legt außerdem eine einheitliche Linie für Drogen fest und lässt aus einer Frage, ob die Gesetzeslage zu Suizid, Euthanasie oder Sterbehilfe geändert werden sollte, eine Debatte beginnen (Abschnitt 7), und die Fragenprüfung bewahrt keine Frage mehr für unser Team auf (Abschnitte 7 und 10); der Bildschirm, der eine Frage ablehnt, ist unsere Begründung für jede Frage, mit der nach Abschnitt 7 keine Debatte beginnt (Abschnitt 10).
 

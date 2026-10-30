@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Tóm tắt
-eyebrow: ĐIỀU KHOẢN DỊCH VỤ · v2.8 · CÓ HIỆU LỰC 12 THÁNG 10 NĂM 2026
+eyebrow: ĐIỀU KHOẢN DỊCH VỤ · v2.9 · CÓ HIỆU LỰC 12 THÁNG 10 NĂM 2026
 title: Những điều bạn đồng ý
 lede: Hợp đồng giữa bạn và DMS Merchandise Shop S.R.L., được trình bày bằng ngôn ngữ dễ hiểu. Mười chín mục và Phụ lục A — cuộn đến cuối.
-endMarker: HẾT ĐIỀU KHOẢN · v2.8
+endMarker: HẾT ĐIỀU KHOẢN · v2.9
 bodyLabel: Nội dung Điều khoản dịch vụ
 annexTitle: Phụ lục A — Điều khoản theo khu vực
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LUẬT ĐIỀU CHỈNH
 -->
 
-**Version 2.8 · Effective 12 tháng 10 năm 2026 · Các phiên bản trước tại dezbatere.ro/terms/versions · Ngôn ngữ: tiếng Việt.**
+**Version 2.9 · Effective 12 tháng 10 năm 2026 · Các phiên bản trước tại dezbatere.ro/terms/versions · Ngôn ngữ: tiếng Việt.**
 
 **In short.** Bạn phải từ 18 tuổi trở lên. Dialectical Engine xây dựng các lập luận bằng mô hình AI và mọi nội dung do dịch vụ tạo ra đều có thể sai — đó không phải là lời tư vấn. Các cuộc tranh luận của bạn là riêng tư trừ khi bạn công khai chúng; nếu bạn công khai, bất kỳ ai cũng có thể đọc. Văn bản bạn gửi được chuyển đến các nhà cung cấp AI nêu trong Sổ đăng ký nhà cung cấp của chúng tôi và không được dùng để huấn luyện mô hình. Hãy báo cáo nội dung bất hợp pháp tại support@dezbatere.ro dù bạn có tài khoản hay không. Luật Romania điều chỉnh, nhưng các biện pháp bảo vệ người tiêu dùng tại nơi bạn sinh sống vẫn được bảo đảm.
 
@@ -138,6 +138,8 @@ Nếu không chắc một nội dung có được phép hay không, hãy hỏi c
 
 **Kết quả.** Trong quan hệ giữa bạn và chúng tôi, bạn có thể sử dụng kết quả từ các cuộc tranh luận của chính mình cho bất kỳ mục đích hợp pháp nào, và chúng tôi không tuyên bố quyền sở hữu đối với văn bản được tạo ra. Hãy lưu ý rằng kết quả được tạo ra có thể không được bảo hộ quyền tác giả tại nhiều hệ thống pháp luật; kết quả tương tự có thể được tạo ra cho người dùng khác; kết quả có thể sao chép hoặc giống tài liệu của bên thứ ba; và một số tài liệu nguồn do nhà cung cấp AI truy xuất có thể chịu hạn chế về việc tái sử dụng. Bạn chịu trách nhiệm kiểm tra trước khi dựa vào hoặc công bố lại kết quả.
 
+**Biểu đồ và số liệu thống kê do chúng tôi tạo ra.** Các biểu đồ trong một báo cáo tranh luận và các số liệu thống kê chúng tôi tổng hợp cho các biểu đồ đó — bao gồm việc lựa chọn, sắp xếp, thiết kế và vẽ chúng — do Dialectical Engine tạo ra và thuộc về DMS Merchandise Shop S.R.L.; mỗi biểu đồ đều mang dòng thông báo "Copyrighted by DMS Merchandise Shop SRL". Điều này không áp dụng cho các con số mà biểu đồ thể hiện, vốn đến từ cuộc tranh luận của bạn, hoặc cho văn bản cuộc tranh luận của bạn. Chúng tôi cấp cho bạn giấy phép miễn phí, trên toàn thế giới, không độc quyền và vĩnh viễn để sử dụng, sao chép và chia sẻ các biểu đồ đó cho bất kỳ mục đích hợp pháp nào, với điều kiện bạn giữ nguyên dòng thông báo và nhãn do AI tạo đi kèm biểu đồ. Trường hợp pháp luật không công nhận quyền đối với tài liệu do AI tạo ra, đoạn này không trao cho chúng tôi nhiều hơn mức pháp luật cho phép.
+
 ## 9. Công khai một cuộc tranh luận
 
 Các cuộc tranh luận **mặc định là riêng tư**. Không nội dung nào bạn tạo ra hiển thị cho người khác trừ khi bạn công khai nội dung đó.
@@ -240,6 +242,8 @@ Nếu sống tại nơi khác, Phụ lục A quy định quyền rút lui hoặc
 Chúng tôi thông báo trước cho bạn trên một phương tiện bền vững về nội dung và thời điểm thay đổi. Nếu thay đổi có tác động tiêu cực lớn hơn mức không đáng kể đối với khả năng truy cập hoặc sử dụng dịch vụ của bạn, bạn có thể chấm dứt miễn phí trong vòng **30 ngày** kể từ khi được thông báo hoặc kể từ khi thay đổi có hiệu lực, tùy thời điểm nào muộn hơn, và chúng tôi hoàn trả mọi khoản đã trả trước cho thời gian chưa sử dụng.
 
 **Đối với các Điều khoản này.** Chúng tôi có thể thay đổi các Điều khoản này vì các loại lý do tương tự. Đối với thay đổi không làm giảm quyền của bạn, chúng tôi đăng phiên bản mới kèm bản tóm tắt nội dung thay đổi và gửi email cho bạn ít nhất **30 ngày** trước khi phiên bản có hiệu lực; tiếp tục sử dụng Dialectical Engine sau ngày đó có nghĩa là bạn chấp nhận phiên bản mới, và bạn có thể đóng tài khoản trước ngày đó. Đối với thay đổi làm giảm quyền của bạn — bao gồm tăng giá đối với gói hiện có, hạ thấp giới hạn, loại bỏ tính năng, cách sử dụng mới đối với nội dung của bạn, hoặc thay đổi về trách nhiệm, luật điều chỉnh hay giải quyết tranh chấp — chúng tôi yêu cầu bạn chấp nhận rõ ràng phiên bản mới vào lần đăng nhập tiếp theo, và thay đổi chỉ áp dụng về sau. Chúng tôi không bao giờ áp dụng thay đổi hồi tố và không bao giờ dùng mục này để thay đổi nội dung cốt lõi mà bạn đã thanh toán giữa kỳ mà không cho bạn một lối thoát. Các phiên bản trước vẫn được cung cấp tại dezbatere.ro/terms/versions.
+
+Phiên bản 2.9 thay thế phiên bản 2.8: mục 8 được bổ sung đoạn “Biểu đồ và số liệu thống kê do chúng tôi tạo ra”, quy định ai sở hữu các biểu đồ trong một báo cáo tranh luận và cấp cho bạn giấy phép sử dụng các biểu đồ đó.
 
 Phiên bản 2.8 thay thế phiên bản 2.7: bước kiểm tra câu hỏi cũng từ chối một câu hỏi về cách phạm tội hoặc thoát khỏi hình phạt, hoặc về việc liệu ai đó có nên phạm tội hay không, chẳng hạn như mua hoặc bán trái phép ma túy hay vũ khí, trộm cắp hoặc trốn thuế, và không lưu giữ câu hỏi đó; một câu hỏi về việc liệu một luật có nên thay đổi hay không vẫn bắt đầu một cuộc tranh luận (mục 7). Phiên bản này cũng đặt ra một nguyên tắc duy nhất cho các câu hỏi về ma túy và cho phép một câu hỏi về việc liệu luật về tự tử, an tử hoặc chết có hỗ trợ có nên thay đổi hay không bắt đầu một cuộc tranh luận (mục 7), và bước kiểm tra câu hỏi không còn lưu giữ bất kỳ câu hỏi nào để nhóm của chúng tôi đọc (mục 7 và 10); màn hình từ chối một câu hỏi là bản nêu lý do của chúng tôi cho mọi câu hỏi mà theo mục 7 không bắt đầu một cuộc tranh luận (mục 10).
 

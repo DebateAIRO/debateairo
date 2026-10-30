@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Stručne
-eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v2.8 · ÚČINNÉ OD 12. OKTÓBRA 2026
+eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v2.9 · ÚČINNÉ OD 12. OKTÓBRA 2026
 title: S čím súhlasíte
 lede: Zmluva medzi vami a DMS Merchandise Shop S.R.L. zrozumiteľným jazykom. Devätnásť častí a príloha A — prejdite až na koniec.
-endMarker: KONIEC PODMIENOK · v2.8
+endMarker: KONIEC PODMIENOK · v2.9
 bodyLabel: Text Podmienok poskytovania služby
 annexTitle: Príloha A — Regionálne podmienky
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ROZHODNÉ PRÁVO
 -->
 
-**Version 2.8 · Effective 12. októbra 2026 · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
+**Version 2.9 · Effective 12. októbra 2026 · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
 
 **In short.** Musíte mať aspoň 18 rokov. Dialectical Engine vytvára argumenty pomocou modelov umelej inteligencie a všetko, čo vygeneruje, môže byť nesprávne — nejde o poradenstvo. Vaše debaty sú súkromné, pokiaľ ich nezverejníte; ak ich zverejníte, môže ich čítať ktokoľvek. Text, ktorý zadáte, sa odosiela poskytovateľom umelej inteligencie uvedeným v našom Registri poskytovateľov a nepoužíva sa na trénovanie modelov. Nezákonný obsah nahláste na support@dezbatere.ro bez ohľadu na to, či máte účet. Rozhodným právom je rumunské právo, vaše miestne práva na ochranu spotrebiteľa vám však zostávajú zachované.
 
@@ -138,6 +138,8 @@ Ak si nie ste istí, či je niečo dovolené, opýtajte sa nás pred zverejnení
 
 **Výstupy.** Vo vzťahu medzi vami a nami môžete výstup svojich vlastných debát použiť na akýkoľvek zákonný účel a my si k vygenerovanému textu neuplatňujeme vlastnícke právo. Majte na pamäti, že v mnohých právnych poriadkoch nemusí byť vygenerovaný výstup chránený autorským právom; že podobný výstup môže byť vygenerovaný aj pre iných používateľov; že výstupy môžu rozmnožovať materiál tretích strán alebo sa mu podobať; a že na niektoré zdrojové materiály získané poskytovateľom umelej inteligencie sa môžu vzťahovať obmedzenia opätovného použitia. Pred použitím výstupov ako podkladu alebo ich opätovným zverejnením zodpovedáte za ich overenie.
 
+**Grafy a štatistiky, ktoré generujeme.** Grafy v správe o debate a štatistiky, ktoré pre ne zostavujeme — ich výber, usporiadanie, dizajn a vykreslenie — sú vytvorené službou Dialectical Engine a patria spoločnosti DMS Merchandise Shop S.R.L.; každý graf nesie upozornenie „Copyrighted by DMS Merchandise Shop SRL“. Nevzťahuje sa to na údaje, ktoré graf zobrazuje a ktoré pochádzajú z vašej debaty, ani na text vašej debaty. Udeľujeme vám bezodplatnú, celosvetovú, nevýhradnú a časovo neobmedzenú licenciu tieto grafy používať, kopírovať a zdieľať na akýkoľvek zákonný účel, ak pri nich ponecháte toto upozornenie a označenie, že ich vytvorila umelá inteligencia. Ak právo neuznáva práva k materiálom vytvoreným umelou inteligenciou, tento odsek nám nedáva viac, než pripúšťa zákon.
+
 ## 9. Zverejnenie debaty
 
 Debaty sú **v predvolenom nastavení súkromné**. Nič z toho, čo vytvoríte, nie je viditeľné nikomu inému, pokiaľ to nezverejníte.
@@ -240,6 +242,8 @@ Ak žijete inde, príloha A uvádza právo na odstúpenie alebo lehotu na rozmys
 O tom, čo a kedy sa mení, vás vopred informujeme na trvanlivom médiu. Ak má zmena viac než nepodstatný nepriaznivý vplyv na váš prístup k službe alebo jej používanie, môžete zmluvu bezplatne ukončiť do **30 dní** odo dňa, keď ste boli informovaní, alebo odo dňa nadobudnutia účinnosti zmeny, podľa toho, ktorý deň nastane neskôr, a vrátime vám prípadnú predplatenú sumu za nevyužité obdobie.
 
 **Zmeny týchto Podmienok.** Tieto Podmienky môžeme meniť z rovnakých druhov dôvodov. Pri zmenách, ktoré neobmedzujú vaše práva, zverejníme novú verziu so zhrnutím zmien a najmenej **30 dní** pred nadobudnutím účinnosti vám zašleme e-mail; pokračovaním v používaní Dialectical Engine po tomto dátume zmenu prijímate a pred týmto dátumom môžete svoj účet odstrániť. Pri zmenách, ktoré obmedzujú vaše práva — vrátane zvýšenia ceny existujúceho programu, zníženia limitov, odstránenia funkcií, nového spôsobu použitia vášho obsahu alebo zmien zodpovednosti, rozhodného práva či riešenia sporov — vás pri nasledujúcom prihlásení požiadame, aby ste novú verziu výslovne prijali, a zmena platí iba do budúcnosti. Žiadnu zmenu nikdy neuplatníme spätne a túto časť nikdy nepoužijeme na zmenu podstaty toho, za čo ste počas obdobia zaplatili, bez toho, aby sme vám ponúkli možnosť zmluvu ukončiť. Predchádzajúce verzie zostávajú dostupné na adrese dezbatere.ro/terms/versions.
+
+Verzia 2.9 nahradila verziu 2.8: do časti 8 pribudol odsek „Grafy a štatistiky, ktoré generujeme“, ktorý určuje, komu patria grafy v správe o debate, a udeľuje vám licenciu na ich používanie.
 
 Verzia 2.8 nahradila verziu 2.7: kontrola otázky zamieta aj otázku, ako spáchať trestný čin alebo ako za neho uniknúť trestu, alebo či by ho niekto mal spáchať, napríklad nelegálne kúpiť či predať drogy alebo zbrane, kradnúť alebo krátiť dane, a takú otázku neuchováva; otázka, či by sa mal zmeniť zákon, debatu naďalej začne (časť 7). Okrem toho stanovuje jednotné pravidlo pre drogy a umožňuje, aby otázka, či by sa mal zmeniť zákon o samovražde, eutanázii alebo asistovanom umieraní, začala debatu (časť 7), a kontrola otázky už neuchováva žiadnu otázku na prečítanie naším tímom (časti 7 a 10); obrazovka, ktorá zamietne otázku, je naším odôvodnením pre každú otázku, z ktorej podľa časti 7 debata nezačne (časť 10).
 
