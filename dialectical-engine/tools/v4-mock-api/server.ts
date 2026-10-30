@@ -17,8 +17,8 @@ import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createSeed, SEED_NODE_IDS, type StoryStatus } from "./seed.js";
 import {
-  answerDraftParts, contractOrDraft, DraftAnswerWebSchema, DraftAskParentSchema, DraftInvestigationSchema, DraftNodeWebSchema,
-  DraftRoomPartSchema, DraftUsagePartSchema, splitAsk, stripAnswer, stripNode, stripRoom, stripUsage, type DraftAskParent
+  answerDraftProblems, contractOrDraft, DraftAskParentSchema, DraftInvestigationSchema, DraftNodeWebSchema, DraftRoomPartSchema,
+  DraftRoomQueryPartSchema, splitAsk, splitRoomQuery, stripAnswer, stripNode, stripRoom, type DraftAskParent
 } from "./web-draft.js";
 import type { WebCase } from "./web-seed.js";
 
@@ -67,7 +67,7 @@ const seed = createSeed(F);
 // Settings (environment, and live via GET /__mock/set)
 // ---------------------------------------------------------------------------------------------------------------
 
-/** BLOCKED is a DRAFT word ("blocked until {reset}"); today's contract reads it as FULL (web-draft.ts stripRoom). */
+/** BLOCKED is a mock switch: a FULL day with the DRAFT reserve word BLOCKED ("blocked until {reset}"); today's contract reads FULL. */
 const ROOM_MODES = ["FITS", "CLOSE", "FULL", "ALREADY_WAITING", "BLOCKED"] as const;
 type RoomMode = (typeof ROOM_MODES)[number];
 const ASK_MODES = ["AUTO", "ACCEPT", "WAITING", "ALREADY_WAITING", "LANGUAGE_CHOICE"] as const;
@@ -267,15 +267,15 @@ type Investigation = {
   investigation_id: string;
   root_run_id: string;
   state: "OPEN" | "CLOSED";
-  members: Array<{ run_id: string; parent_run_id: string; places: string[]; mode: "quick" | "thorough" }>;
-  closings: Array<{ version: number; closed_at: string }>;
+  digs: DigLink[];
+  closings: Array<{ report_version: number; closed_at: string; report: "WRITING" | "READY" | "FAILED"; answer_id: string | null }>;
 };
 const investigations = new Map<string, Investigation>();
 /** Run id → the root run of its investigation. */
 const investigationOfRun = new Map<string, string>();
 
 function openInvestigation(rootRunId: string, closings: Investigation["closings"] = [], state: Investigation["state"] = "OPEN"): Investigation {
-  const investigation: Investigation = { investigation_id: randomUUID(), root_run_id: rootRunId, state, members: [], closings };
+  const investigation: Investigation = { investigation_id: randomUUID(), root_run_id: rootRunId, state, digs: [], closings };
   investigations.set(rootRunId, investigation);
   investigationOfRun.set(rootRunId, rootRunId);
   return investigation;
@@ -303,12 +303,13 @@ function linkDig(parentRunId: string, link: Readonly<{ child_run_id: string; pla
   if (!runs.has(parentRunId) || !runs.has(link.child_run_id)) return "NOT_OWNED";
   const earlier = digLinks.find((record) => record.child_run_id === link.child_run_id);
   if (earlier !== undefined) return earlier.parent_run_id === parentRunId ? "RECORDED" : "CONFLICT";
-  digLinks.push({ parent_run_id: parentRunId, child_run_id: link.child_run_id, places: [...link.places], mode: link.mode, created_at: iso(now) });
+  const record: DigLink = { parent_run_id: parentRunId, child_run_id: link.child_run_id, places: [...link.places], mode: link.mode, created_at: iso(now) };
+  digLinks.push(record);
   const investigation = investigationOf(parentRunId) ?? openInvestigation(parentRunId);
   const placeholder = investigations.get(link.child_run_id);
   // A dig asked as a new question first had an investigation of its own; it joins its parent's.
-  if (placeholder !== undefined && placeholder.members.length === 0 && placeholder.closings.length === 0) investigations.delete(link.child_run_id);
-  investigation.members.push({ run_id: link.child_run_id, parent_run_id: parentRunId, places: [...link.places], mode: link.mode });
+  if (placeholder !== undefined && placeholder.digs.length === 0 && placeholder.closings.length === 0) investigations.delete(link.child_run_id);
+  investigation.digs.push(record);
   investigation.state = "OPEN";
   investigationOfRun.set(link.child_run_id, investigation.root_run_id);
   return "RECORDED";
@@ -316,10 +317,10 @@ function linkDig(parentRunId: string, link: Readonly<{ child_run_id: string; pla
 
 // Seeded: run 1111 was closed once (report version 1) and reopened by its dig 8888; 5555 and 7777 are open; the Free
 // debate 6666 was closed. Run 4444 (failed) has none; 2222 and 3333 (running, waiting) are open.
-openInvestigation(RUN_SETTLED, [{ version: 1, closed_at: "2026-10-28T09:00:00.000Z" }], "CLOSED");
+openInvestigation(RUN_SETTLED, [{ report_version: 1, closed_at: "2026-10-28T09:00:00.000Z", report: "READY", answer_id: ANSWER_SETTLED }], "CLOSED");
 linkDig(RUN_SETTLED, { child_run_id: RUN_DIG, places: ["p:n-renew-storage"], mode: "quick" }, Date.parse("2026-10-29T08:00:00.000Z"));
 openInvestigation(RUN_STORY_WRITING);
-openInvestigation(RUN_FREE, [{ version: 1, closed_at: "2026-10-26T10:00:00.000Z" }], "CLOSED");
+openInvestigation(RUN_FREE, [{ report_version: 1, closed_at: "2026-10-26T10:00:00.000Z", report: "READY", answer_id: ANSWER_FREE }], "CLOSED");
 openInvestigation(RUN_SEARCH_FAILED);
 openInvestigation(RUN_RUNNING);
 openInvestigation(RUN_WAITING);
@@ -382,16 +383,24 @@ function answerIndex(limit: number, offset: number, now = Date.now()) {
   };
 }
 
-function roomRead(mode: RoomMode, now = Date.now(), plan_id: PlanMode = planMode, reserveKept = anyInvestigationOpen()) {
-  // Draft word: the person's one reserve is kept while an investigation is open (never on a blocked room).
-  const reserve = reserveKept && mode !== "BLOCKED" ? { reserve_kept: true as const } : {};
+/** A dig's share of today (draft, Q14), in steps of 5: what the mock says a quick look and a thorough dig take. */
+const DIG_SHARE_PERCENT = Object.freeze({ quick: 20, thorough: 35 });
+
+function roomRead(
+  mode: RoomMode, now = Date.now(), plan_id: PlanMode = planMode, reserveKept = anyInvestigationOpen(),
+  digMode: "quick" | "thorough" | null = null
+) {
+  // Draft words: the person's one reserve is KEPT while an investigation is open; BLOCKED is a FULL day until its reset.
+  const reserve = mode === "BLOCKED" ? { reserve: "BLOCKED" as const } : reserveKept ? { reserve: "KEPT" as const } : {};
+  const share = digMode === null ? {} : { dig_share_percent: DIG_SHARE_PERCENT[digMode] };
   const plan = {
     plan_id,
     // shape_settings is left out on purpose: the contract allows only `true` or absent, and absent means "off".
     answer_words: { short: 300, standard: 700, detailed: 1500 },
     length_settings: true,
     settings_version: 20,
-    ...reserve
+    ...reserve,
+    ...share
   };
   // One builder per room word (a table: the source law wants a default and an exhaustive fall-through in any switch).
   const rooms: Readonly<Record<RoomMode, () => Record<string, unknown>>> = {
@@ -400,7 +409,7 @@ function roomRead(mode: RoomMode, now = Date.now(), plan_id: PlanMode = planMode
     FULL: () => ({ room: "FULL", scope: "PERSON_DAY", resets_at: nextUtcMidnight(now), waiting_run_ref: null, ...plan }),
     ALREADY_WAITING: () => ({ room: "ALREADY_WAITING", scope: "PERSON_DAY", resets_at: waitsUntil(now), waiting_run_ref: RUN_WAITING, ...plan }),
     // Draft: a closing found no credits left, so everything waits for the day's limit to reset.
-    BLOCKED: () => ({ room: "BLOCKED", scope: "PERSON_DAY", resets_at: nextUtcMidnight(now), waiting_run_ref: null, ...plan })
+    BLOCKED: () => ({ room: "FULL", scope: "PERSON_DAY", resets_at: nextUtcMidnight(now), waiting_run_ref: null, ...plan })
   };
   return rooms[mode]();
 }
@@ -410,8 +419,6 @@ function billingUsage(now = Date.now(), plan_id: PlanMode = planMode) {
   const daysToMonday = ((8 - date.getUTCDay()) % 7) || 7;
   return {
     plan_id,
-    // Draft (owner Q14): a dig's share of today, rounded, as a percentage, per dig mode.
-    dig_share: { quick: 20, thorough: 35 },
     windows: [
       { scope: "PERSON_DAY", percent: 14, resets_at: nextUtcMidnight(now) },
       { scope: "PERSON_WEEK", percent: 31, resets_at: iso(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + daysToMonday)) },
@@ -500,24 +507,14 @@ function runEvent(runRef: string, seq: number, type: string, payload: Record<str
 const draftServed = (schema: any, full: unknown, strip: (body: any) => any) => contractOrDraft(schema, full, strip).draft;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function checkAnswerDraft(answer: any): string[] {
-  const parts = answerDraftParts(answer);
-  const problems: string[] = [];
-  const web = DraftAnswerWebSchema.safeParse(parts.web);
-  if (!web.success) problems.push(`path_research: ${JSON.stringify(web.error.issues)}`);
-  for (const node of parts.nodes) {
-    const result = DraftNodeWebSchema.safeParse(node.web);
-    if (!result.success) problems.push(`node ${node.id}: ${JSON.stringify(result.error.issues)}`);
-  }
-  return problems;
-}
+const checkAnswerDraft = (answer: any): string[] => answerDraftProblems(answer);
 
 function investigationBody(investigation: Investigation) {
   return {
     investigation_id: investigation.investigation_id,
     root_run_id: investigation.root_run_id,
     state: investigation.state,
-    members: investigation.members.map((member) => ({ ...member, places: [...member.places] })),
+    digs: investigation.digs.map((record) => ({ ...record, places: [...record.places] })),
     closings: investigation.closings.map((closing) => ({ ...closing }))
   };
 }
@@ -553,10 +550,13 @@ function startupCheck(): number {
   for (const plan of PLAN_MODES) {
     for (const mode of ROOM_MODES) {
       for (const reserve of [true, false]) {
-        checkDraft(`GET /v1/asks/room (${plan}, ${mode}, reserve ${reserve})`, C.AskRoomResponseSchema, roomRead(mode, Date.now(), plan, reserve), stripRoom, DraftRoomPartSchema);
+        for (const dig of [null, "quick", "thorough"] as const) {
+          checkDraft(`GET /v1/asks/room (${plan}, ${mode}, reserve ${reserve}, dig ${dig})`, C.AskRoomResponseSchema,
+            roomRead(mode, Date.now(), plan, reserve, dig), stripRoom, DraftRoomPartSchema);
+        }
       }
     }
-    checkDraft(`GET /v1/billing/usage (${plan})`, C.BillingUsageResponseSchema, billingUsage(Date.now(), plan), stripUsage, DraftUsagePartSchema);
+    check(`GET /v1/billing/usage (${plan})`, C.BillingUsageResponseSchema, billingUsage(Date.now(), plan));
   }
   check("GET /v1/billing/plans", C.BillingPlansResponseSchema, BILLING_PLANS);
   check("GET /v1/answers", C.AnswerIndexSchema, answerIndex(50, 0));
@@ -834,11 +834,10 @@ function mockState() {
     ask_effective: effectiveAskMode(),
     now: iso(now),
     reading_level: readingLevel,
-    reserve_kept: anyInvestigationOpen() && roomMode !== "BLOCKED",
+    reserve: roomMode === "BLOCKED" ? "BLOCKED" : anyInvestigationOpen() ? "KEPT" : null,
     draft_fields_sent: {
       answer: draftServed(C.AnswerSchema, runs.get(RUN_SETTLED)!.answer, stripAnswer),
-      room: draftServed(C.AskRoomResponseSchema, roomRead(roomMode, now), stripRoom),
-      usage: draftServed(C.BillingUsageResponseSchema, billingUsage(now), stripUsage)
+      room: draftServed(C.AskRoomResponseSchema, roomRead(roomMode, now), stripRoom)
     },
     investigations: [...investigations.values()].map(investigationBody),
     dig_links: digLinks.map((record) => ({ ...record })),
@@ -943,16 +942,25 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
 
   // ---- asking ----
   if (path === "/v1/asks/room" && isGet) {
-    const query = C.AskRoomQuerySchema.safeParse(Object.fromEntries(url.searchParams));
-    if (!query.success) {
-      return sendJson(req, res, 400, { error: "MALFORMED_REQUEST", message: "The room query does not pass AskRoomQuerySchema.", issues: query.error.issues });
+    // A read for a dig names its parent, mode and picks (DRAFT query part); today's query rules read the rest.
+    const all = Object.fromEntries(url.searchParams);
+    const whole = C.AskRoomQuerySchema.safeParse(all);
+    const split = whole.success ? { query: all, dig: Object.fromEntries(Object.entries(all).filter(([key]) => key.startsWith("dig_"))) } : splitRoomQuery(all);
+    const query = whole.success ? whole : C.AskRoomQuerySchema.safeParse(split.query);
+    const dig = DraftRoomQueryPartSchema.safeParse(split.dig);
+    if (!query.success || !dig.success) {
+      return sendJson(req, res, 400, {
+        error: "MALFORMED_REQUEST", message: "The room query does not pass AskRoomQuerySchema (or its draft dig part).",
+        issues: query.success ? dig.error?.issues : query.error.issues
+      });
     }
-    return sendDraftable(roomRead(roomMode), C.AskRoomResponseSchema, stripRoom, issuesOf(DraftRoomPartSchema));
+    const digMode = dig.data.dig_parent === undefined ? null : dig.data.dig_mode ?? "quick";
+    return sendDraftable(roomRead(roomMode, Date.now(), planMode, anyInvestigationOpen(), digMode), C.AskRoomResponseSchema, stripRoom, issuesOf(DraftRoomPartSchema));
   }
   if (path === "/v1/asks" && method === "POST") return postAsk(req, res);
 
   // ---- billing ----
-  if (path === "/v1/billing/usage" && isGet) return sendDraftable(billingUsage(), C.BillingUsageResponseSchema, stripUsage, issuesOf(DraftUsagePartSchema));
+  if (path === "/v1/billing/usage" && isGet) return sendJson(req, res, 200, billingUsage(), C.BillingUsageResponseSchema);
   if (path === "/v1/billing/plans" && isGet) return sendJson(req, res, 200, BILLING_PLANS, C.BillingPlansResponseSchema);
 
   // ---- answers ----
@@ -1013,7 +1021,10 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (investigation === undefined) return sendJson(req, res, 404, { error: "INVESTIGATION_NOT_FOUND" });
     if (investigation.state === "OPEN") {
       investigation.state = "CLOSED";
-      investigation.closings.push({ version: investigation.closings.length + 1, closed_at: iso(Date.now()) });
+      const root = runs.get(investigation.root_run_id);
+      investigation.closings.push({
+        report_version: investigation.closings.length + 1, closed_at: iso(Date.now()), report: "READY", answer_id: root?.answerId ?? null
+      });
     }
     return sendJson(req, res, 200, investigationBody(investigation), DraftInvestigationSchema);
   }

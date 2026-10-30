@@ -19,8 +19,9 @@
  * holds no machine path.
  *
  * Perplexity plan W1-7 (2026-10-30): an answer may also carry the DRAFT web fields of one case (web-seed.ts): sources
- * and the "checked looked up" flag on each point, and each path's research (web status, other pages, researched
- * choices, dig suggestions). server.ts sends them only when the contract already accepts them (web-draft.ts).
+ * and the "checked looked up" flag on each point (a checked point's locator becomes its extract id), and `web.paths`
+ * (each path's search, other pages with "added to researched", dig suggestions). server.ts sends them only when the
+ * contract already accepts them (web-draft.ts).
  */
 import { webCase, type WebCase } from "./web-seed.js";
 
@@ -433,7 +434,7 @@ export function createSeed(fixture: any) {
       ...served,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       nodes: served.nodes.map((node: any) => ({ ...node, ...web.nodes[node.node_id] })),
-      path_research: web.pathResearch
+      web: { paths: web.paths }
     };
   }
 

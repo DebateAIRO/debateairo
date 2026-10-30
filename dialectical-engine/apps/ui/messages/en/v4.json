@@ -297,6 +297,8 @@
   "v4.dig.quotaShare": "This dig uses about {percent}% of today. After it you can still finish your report.",
   "v4.dig.quotaDayUsed": "You've used what today allows for digging. Write your report now, or keep digging after {time}.",
   "v4.web.noSearch": "We didn't look this part up on the web: {reason}",
+  "v4.web.noSearch.noReason": "We didn't look this part up on the web.",
+  "v4.web.switchedOff": "Web search was switched off when this debate ran.",
   "v4.web.previewOnly": "Preview only: we could read just the start of this page.",
   "v4.web.fewerReaders": "Fewer AIs read this page than planned.",
   "v4.web.otherPages": "Other pages found",
@@ -309,8 +311,8 @@
   "v4.suggest.kind.CONTRADICTING": "Where the AIs disagree",
   "v4.suggest.kind.UNDOCUMENTED": "Not backed by a source yet",
   "v4.suggest.kind.NEEDS_MORE_WEB": "Worth looking up further",
-  "v4.suggest.kind.HELPS_FOR": "Could show this part is right",
-  "v4.suggest.kind.HELPS_AGAINST": "Could show this part is wrong",
+  "v4.suggest.kind.HELPS_MAIN_QUESTION.FOR": "Could show this part is right",
+  "v4.suggest.kind.HELPS_MAIN_QUESTION.AGAINST": "Could show this part is wrong",
   "v4.suggest.ownView": "Add your own view",
   "v4.suggest.edit": "Edit this path"
 }

@@ -94,28 +94,27 @@ Once the new "Sure" rule is built (task W2-6), n-mix-cost will read *sure for th
 
 ## Draft fields (web search, dig suggestions, investigations)
 
-The real shapes are task W1-6's (`packages/contract`), written at the same time as this mock. Until they merge, the mock uses its own **draft** shapes, all in `web-draft.ts`:
+The real shapes are task W1-6's (`packages/contract/src/web.ts`), built at the same time as this mock. Until they merge, the mock carries copies of them in `web-draft.ts`, taken from that lane's commit `76e935bbd` (same field names, words and rules; every seeded body was checked against that commit's schemas on 30 Oct):
 
 | Where | Draft field | What it holds |
 |---|---|---|
-| each point of an answer | `sources`, `looked_up_checked` | the checked extracts (id such as `S2-1`, a quote of at most 120 characters cut at a word edge, reader 1's one line, title, site, link, date, read depth `WHOLE` / `PREVIEW_ONLY` / `ABSTRACT_ONLY`, `fewer_readers`); whether the point rests on an extract of this debate |
-| each answer | `path_research` | per path: the web status (`SEARCHED`, `NO_SEARCH_PLANNED` with the planner's reason, `FAILED`, `NOT_ON_PLAN`), other pages (title, site, link, one line, never a grade), "added to researched" choices (`READING`, `ADDS`, `ADDS_NOTHING`, `FAILED`), and dig suggestions (`CONTRADICTING`, `UNDOCUMENTED`, `NEEDS_MORE_WEB`, `HELPS_FOR`, `HELPS_AGAINST`, each with its text and the places it rests on) |
-| `GET /v1/asks/room` | `reserve_kept`, room `BLOCKED` | the person's one reserve is held (an investigation is open); "blocked until {reset}" |
-| `GET /v1/billing/usage` | `dig_share` | a dig's share of today, in whole percent, for a quick look and a thorough dig |
-| `POST /v1/asks` | `parent` | a dig names its parent run, the places it was dug from, and its mode |
-| `GET /v1/runs/:id/investigation` | (new route) | the investigation the run belongs to: state `OPEN`/`CLOSED`, its digs, its report versions |
+| each point of an answer | `sources`, `looked_up_checked` | the checked extracts (id such as `S2-1`, a quote of at most 120 characters cut at a word edge, title, site, link, read depth `WHOLE` / `PREVIEW_ONLY` / `ABSTRACT_ONLY`, reader 1's one line with its language, the page's date, `fewer_readers`); whether the point rests on an extract of this debate (its locator is then that extract's id) |
+| each answer | `web.paths` | per path: `search` (`SEARCHED`, `NO_SEARCH_PLANNED` with the planner's reason, `FAILED`, `NOT_ON_PLAN`, `SWITCHED_OFF`), other pages (title, site, link, read depth, one line, never a grade; `researched` once added: `READING`, `ADDS` with its quotes, `ADDS_NOTHING`, `FAILED`), and `suggestions` (`CONTRADICTING`, `UNDOCUMENTED`, `NEEDS_MORE_WEB`, `HELPS_MAIN_QUESTION` with a side `FOR` or `AGAINST`; each with its text and the places it rests on) |
+| `GET /v1/asks/room` | `reserve`, `dig_share_percent` | `KEPT`: the person's one reserve is held (an investigation is open); `BLOCKED`: a FULL day until its reset. A read asked for a dig (`dig_parent`, `dig_mode`, `dig_picks` in the query) also says the dig's share of today, in steps of 5% (20% for a quick look, 35% for a thorough dig) |
+| `POST /v1/asks` | `parent` | a dig names its parent run, the places it was dug from, its mode, and its picks (suggestions as sent, edited or not, and the person's own view) |
+| `GET /v1/runs/:id/investigation` | (new route; W1-6 names no route yet) | the investigation the run belongs to: state `OPEN`/`CLOSED`, its digs (the 0131 link records), and every closing with its report version |
 | `POST /v1/runs/:id/investigation/close` | (new route) | "Write my report": closes it and adds a report version |
 
 How they are sent:
 
-- **To the website** (the normal `/v1/...` addresses): a draft field is sent only when the contract's own schema already accepts it. Today it does not, so the mock holds the draft fields back and the website gets today's shape: no sources or path research, `BLOCKED` reads as `FULL`, no `reserve_kept`, no `dig_share`. `/__mock/state` says which are sent (`draft_fields_sent`).
+- **To the website** (the normal `/v1/...` addresses): a draft field is sent only when the contract's own schema already accepts it. Today it does not, so the mock holds the draft fields back and the website gets today's shape: no sources and no `web`, the BLOCKED room is a plain `FULL`, no `reserve`, no `dig_share_percent`. `/__mock/state` says which are sent (`draft_fields_sent`).
 - **In full**: put `/__mock/draft` before any `/v1/...` address, for example `http://127.0.0.1:4011/__mock/draft/v1/answers/aaaa1111-1111-4111-8111-111111111111`. These replies are checked against the draft schemas only.
 
-**After W1-6 merges:** rename the fields in `web-draft.ts` to the contract's names (or use the contract's schemas there), run `tests/unit/v4-mock-api.test.ts` and `check.ts`, and the website starts receiving them.
+**After W1-6 merges:** the contract accepts these bodies, so the website starts receiving them with no change here. Then replace the copies in `web-draft.ts` with imports from `packages/contract` (fixing any name W1-6's review changed), and run `tests/unit/v4-mock-api.test.ts` and `check.ts`.
 
 The seeded web cases (`web-seed.ts`):
 
-- **Paid, searched** (1111, 5555, 8888, and new paid asks): paths n-mix, n-renew and n-nuclear were searched; **n-smr had no search planned** ("Whether these reactors will be cheap is a forecast; no published report can settle it yet."). Five sources sit under n-renew-cost, n-renew-battery (preview only, fewer readers), n-nuclear-build (two pages) and n-nuclear-clean (abstract only). Six other pages; researched choices with every outcome; dig suggestions of every kind.
+- **Paid, searched** (1111, 5555, 8888, and new paid asks): paths n-mix, n-renew and n-nuclear were searched; **n-smr had no search planned** ("Whether these reactors will be cheap is a forecast; no published report can settle it yet."). Five sources sit under n-renew-cost, n-renew-battery (preview only, fewer readers), n-nuclear-build (two pages) and n-nuclear-clean (abstract only). Six other pages, four of them added to researched, one per outcome; dig suggestions of every kind and both sides.
 - **Failed** (7777, and any new ask with `#webfail` in the question): every path `FAILED`, no sources, no other pages.
 - **Free** (6666, and new asks with `plan_tier: "free"`): every path `NOT_ON_PLAN`, no sources; its suggestions never ask for a web search.
 
@@ -134,7 +133,7 @@ Set these when starting the mock, or change them live by opening `http://127.0.0
 | Setting | Values | Effect |
 |---|---|---|
 | `MOCK_PLAN` / `plan=` | `PLUS` (default), `FREE` | The person's plan, as the room read and the usage read say it. |
-| `MOCK_ROOM` / `room=` | `FITS` (default), `CLOSE`, `FULL`, `ALREADY_WAITING`, `BLOCKED` | What the "is there room today" read (`GET /v1/asks/room`) says. `BLOCKED` is a draft word ("blocked until {reset}"); the website reads it as `FULL` until the contract knows it. |
+| `MOCK_ROOM` / `room=` | `FITS` (default), `CLOSE`, `FULL`, `ALREADY_WAITING`, `BLOCKED` | What the "is there room today" read (`GET /v1/asks/room`) says. `BLOCKED` is a FULL day with the draft reserve word `BLOCKED` ("blocked until {reset}"); the website sees a plain `FULL` until the contract knows the word. |
 | `MOCK_ASK` / `ask=` | `AUTO` (default), `ACCEPT`, `WAITING`, `ALREADY_WAITING`, `LANGUAGE_CHOICE` | What a new ask gets. `AUTO` follows the room: FULL or BLOCKED makes asks wait in line, ALREADY_WAITING refuses with 422, anything else accepts. |
 | `MOCK_PORT` | default `4011` | Port (always on 127.0.0.1). |
 | `MOCK_RUN_SECONDS` | default `25` | How long a new debate "runs". |
@@ -154,9 +153,9 @@ A wrong value stops the start with a clear message, for example `MOCK_ROOM_INVAL
 | `GET`/`POST /v1/account/sensitive-data-consent` | `given` (no consent pop-up). |
 | `GET /v1/account/legal-status`, `POST /v1/account/legal-accept` | Nothing to accept / 204. |
 | `GET`/`POST /v1/account/reading-level` | The reading level (0131), null until saved. |
-| `GET /v1/asks/room?…` | The plan (`PLUS` or `FREE`), settings version 20, answer length offered, word targets 300/700/1500. The debate-shape switch is left out (the contract allows only "on" or absent). The query is checked like the real API checks it. Draft: `reserve_kept`, `BLOCKED`. |
+| `GET /v1/asks/room?…` | The plan (`PLUS` or `FREE`), settings version 20, answer length offered, word targets 300/700/1500. The debate-shape switch is left out (the contract allows only "on" or absent). The query is checked like the real API checks it. Draft: `reserve`, `dig_share_percent`. |
 | `POST /v1/asks` | See above. |
-| `GET /v1/billing/usage` | Day 14%, week 31%, month 9%. Draft: `dig_share` 20% (quick look) and 35% (thorough). |
+| `GET /v1/billing/usage` | Day 14%, week 31%, month 9%. |
 | `GET /v1/billing/plans` | The register's default plans (Free, Plus $20, Pro $50, Max $200). |
 | `GET /v1/answers?limit=&offset=` | Finished debates, plus the open runs (running, waiting, failed). |
 | `GET /v1/answers/:id[?version=1]` | The answer (version 1 only). Draft: sources and path research. |

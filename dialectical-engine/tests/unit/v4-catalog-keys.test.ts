@@ -25,6 +25,8 @@ const APPROVED_LINES: Readonly<Record<string, string>> = Object.freeze({
 /** Owner Q20: labels drafted for the owner's click-test, not yet approved. */
 const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.web.noSearch",
+  "v4.web.noSearch.noReason",
+  "v4.web.switchedOff",
   "v4.web.previewOnly",
   "v4.web.fewerReaders",
   "v4.web.otherPages",
@@ -37,8 +39,8 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.suggest.kind.CONTRADICTING",
   "v4.suggest.kind.UNDOCUMENTED",
   "v4.suggest.kind.NEEDS_MORE_WEB",
-  "v4.suggest.kind.HELPS_FOR",
-  "v4.suggest.kind.HELPS_AGAINST",
+  "v4.suggest.kind.HELPS_MAIN_QUESTION.FOR",
+  "v4.suggest.kind.HELPS_MAIN_QUESTION.AGAINST",
   "v4.suggest.ownView",
   "v4.suggest.edit"
 ]);

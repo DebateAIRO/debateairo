@@ -192,37 +192,38 @@ const draftAnswer = async (runId: string): Promise<Loose> => {
   return mock(`/__mock/draft/v1/answers/${served.answer_id}`);
 };
 const state: Loose = await step("mock state", () => mock("/__mock/state"),
-  (value: Loose) => `draft fields sent to the website: answer ${value.draft_fields_sent.answer}, room ${value.draft_fields_sent.room}, usage ${value.draft_fields_sent.usage}`);
+  (value: Loose) => `draft fields sent to the website: answer ${value.draft_fields_sent.answer}, room ${value.draft_fields_sent.room}`);
 await step("contract read holds back what the contract does not know yet", async () => {
   const served: Loose = await client.readRunAnswer(RUNS.settled);
-  must(("path_research" in served) === state.draft_fields_sent.answer, "path_research sent although the contract does not know it");
+  must(("web" in served) === state.draft_fields_sent.answer, "web sent although the contract does not know it");
   return served.nodes.some((node: Loose) => "sources" in node) ? "sources sent" : "sources held back";
 }, (value: string) => value);
 
 await step("paid debate: sources, other pages, no search planned, every outcome (draft)", async () => {
   const answer = await draftAnswer(RUNS.settled);
-  const paths: Loose[] = answer.path_research;
-  must(paths.map((path) => path.web.status).join(" ") === "SEARCHED SEARCHED SEARCHED NO_SEARCH_PLANNED", "path statuses");
+  const paths: Loose[] = answer.web.paths;
+  must(paths.map((path) => path.search.status).join(" ") === "SEARCHED SEARCHED SEARCHED NO_SEARCH_PLANNED", "path statuses");
   const sources: Loose[] = answer.nodes.flatMap((node: Loose) => node.sources);
   must(sources.length > 0 && sources.every((source) => source.quote.length <= 120), "quotes of at most 120 characters");
   must(new Set(sources.map((source) => source.read_depth)).size === 3, "whole, preview only and abstract only");
-  must(sources.some((source) => source.fewer_readers), "a page with fewer readers");
+  must(sources.some((source) => source.fewer_readers === true), "a page with fewer readers");
   const remembered = answer.nodes.find((node: Loose) => node.node_id === "n-mix-cost");
   must(remembered.way_of_knowing === "LOOKED_UP" && remembered.looked_up_checked === false, "a remembered citation is not checked");
-  const kinds = new Set(paths.flatMap((path) => path.dig_suggestions.map((suggestion: Loose) => suggestion.kind)));
-  const outcomes = new Set(paths.flatMap((path) => path.researched.map((choice: Loose) => choice.outcome)));
-  must(kinds.size === 5 && outcomes.size === 4, "every suggestion kind and researched outcome");
-  return `${sources.length} sources, ${paths.flatMap((path) => path.other_pages).length} other pages, no search on ${paths[3].position_ref}: "${paths[3].web.reason}"`;
+  const suggestions: Loose[] = paths.flatMap((path) => path.suggestions);
+  const kinds = new Set(suggestions.map((suggestion) => `${suggestion.kind}${suggestion.side === null ? "" : `.${suggestion.side}`}`));
+  const states = new Set(paths.flatMap((path) => path.other_pages.filter((page: Loose) => page.researched !== undefined).map((page: Loose) => page.researched.state)));
+  must(kinds.size === 5 && states.size === 4, "every suggestion kind and side, and every researched outcome");
+  return `${sources.length} sources, ${paths.flatMap((path) => path.other_pages).length} other pages, no search on ${paths[3].position_ref}: "${paths[3].search.reason}"`;
 }, (value: string) => value);
 await step("debate whose search failed (draft)", async () => {
   const answer = await draftAnswer(RUNS.searchFailed);
-  must(answer.path_research.every((path: Loose) => path.web.status === "FAILED"), "every path FAILED");
+  must(answer.web.paths.every((path: Loose) => path.search.status === "FAILED"), "every path FAILED");
   must(answer.nodes.every((node: Loose) => node.sources.length === 0), "no sources");
   return "every path FAILED, no sources";
 }, (value: string) => value);
 await step("Free debate (draft)", async () => {
   const answer = await draftAnswer(RUNS.free);
-  must(answer.path_research.every((path: Loose) => path.web.status === "NOT_ON_PLAN"), "every path NOT_ON_PLAN");
+  must(answer.web.paths.every((path: Loose) => path.search.status === "NOT_ON_PLAN"), "every path NOT_ON_PLAN");
   must(answer.nodes.every((node: Loose) => node.sources.length === 0 && node.looked_up_checked === false), "no sources, nothing checked");
   return "every path NOT_ON_PLAN, no sources";
 }, (value: string) => value);
@@ -274,20 +275,25 @@ await step("investigation of the first debate, reserve kept (draft)", async () =
   const investigation: Loose = await mock(`/v1/runs/${RUNS.settled}/investigation`);
   const room: Loose = await mock("/__mock/draft/v1/asks/room?plan_tier=premium&composition_budget_tier=medium&depth=2&answer_length=standard");
   must(investigation.state === "OPEN" && investigation.closings.length >= 1, "open again, with an earlier report");
-  must(investigation.members.some((member: Loose) => member.run_id === RUNS.dig), "the dig is a member");
-  must(room.reserve_kept === true, "the room says the reserve is kept");
-  return `OPEN, ${investigation.members.length} dig(s), ${investigation.closings.length} earlier report(s), room reserve kept`;
+  must(investigation.digs.some((link: Loose) => link.child_run_id === RUNS.dig), "the dig is in it");
+  must(room.reserve === "KEPT", "the room says the reserve is kept");
+  return `OPEN, ${investigation.digs.length} dig(s), ${investigation.closings.length} earlier report(s), room reserve ${room.reserve}`;
 }, (value: string) => value);
-await step("a dig's share of today (draft)", () => mock("/__mock/draft/v1/billing/usage"),
-  (usage: Loose) => `quick ${usage.dig_share.quick}%, thorough ${usage.dig_share.thorough}%`);
+await step("a dig's share of today (draft room read for a dig)", async () => {
+  const quick: Loose = await mock(`/__mock/draft/v1/asks/room?plan_tier=premium&composition_budget_tier=medium&depth=1&answer_length=short&dig_parent=${RUNS.settled}&dig_mode=quick&dig_picks=1`);
+  const thorough: Loose = await mock(`/__mock/draft/v1/asks/room?plan_tier=premium&composition_budget_tier=medium&depth=2&answer_length=standard&dig_parent=${RUNS.settled}&dig_mode=thorough&dig_picks=2`);
+  const served: Loose = await client.getAskRoom({ plan_tier: "premium", composition_budget_tier: "medium", depth: 1, answer_length: "short" });
+  must(served.dig_share_percent === undefined, "a read for a new question carries no share");
+  return `quick ${quick.dig_share_percent}%, thorough ${thorough.dig_share_percent}%`;
+}, (value: string) => value);
 await step("blocked until reset (draft), read as FULL by today's contract", async () => {
   await mock("/__mock/set?room=BLOCKED");
   try {
     const draft: Loose = await mock("/__mock/draft/v1/asks/room?plan_tier=premium&composition_budget_tier=medium&depth=2&answer_length=standard");
     const served: Loose = await client.getAskRoom({ plan_tier: "premium", composition_budget_tier: "medium", depth: 2, answer_length: "standard" });
-    must(draft.room === "BLOCKED" && draft.resets_at !== null && draft.reserve_kept === undefined, "draft room BLOCKED, no reserve");
-    must(served.room === (state.draft_fields_sent.room ? "BLOCKED" : "FULL"), `served room ${served.room}`);
-    return `draft BLOCKED until ${draft.resets_at}; website reads ${served.room}`;
+    must(draft.room === "FULL" && draft.reserve === "BLOCKED" && draft.resets_at !== null, "draft room FULL, reserve BLOCKED");
+    must(served.room === "FULL" && (served.reserve === "BLOCKED") === state.draft_fields_sent.room, `served room ${served.room} ${served.reserve}`);
+    return `draft BLOCKED until ${draft.resets_at}; website reads ${served.room}${served.reserve === undefined ? "" : ` ${served.reserve}`}`;
   } finally {
     await mock("/__mock/set?room=FITS");
   }
@@ -296,7 +302,13 @@ await step("blocked until reset (draft), read as FULL by today's contract", asyn
 await step("a dig sent with its parent (draft) joins the investigation", async () => {
   const sent: Loose = await client.submitAsk({
     ...ask, question_line: "Does this hold up, and when? Storage that lasts several days is cheap enough.",
-    parent: { parent_run_id: RUNS.settled, places: ["p:n-renew-storage", "path:n-renew"], mode: "thorough" }
+    parent: {
+      parent_run_id: RUNS.settled, places: ["p:n-renew-storage", "path:n-renew"], mode: "thorough",
+      picks: [
+        { kind: "CONTRADICTING", suggestion_id: "renew-contradicting", place: "p:n-renew-storage", text: "Can batteries cover several windless days?" },
+        { kind: "OWN_VIEW", suggestion_id: null, place: "path:n-renew", text: "What would pumped hydro add?" }
+      ]
+    }
   });
   const links: Loose = await client.readDigLinks(RUNS.settled);
   const investigation: Loose = await mock(`/v1/runs/${sent.run_ref}/investigation`);
@@ -315,7 +327,7 @@ await step("Write my report closes the investigation (draft)", async () => {
   const response = await fetch(`${MOCK}/v1/runs/${RUNS.searchFailed}/investigation/close`, { method: "POST" });
   const closed: Loose = await response.json();
   must(response.ok && closed.state === "CLOSED" && closed.closings.length === 1, `HTTP ${response.status}, ${closed.state}`);
-  return `CLOSED, report version ${closed.closings.at(-1).version}`;
+  return `CLOSED, report version ${closed.closings.at(-1).report_version}`;
 }, (value: string) => value);
 
 // The sign-in helper's cookies must survive the proxy's cookie rules.
