@@ -12,6 +12,39 @@ const ui = resolve(import.meta.dirname, "../../apps/ui");
 const catalog = JSON.parse(readFileSync(join(ui, "messages/en/v4.json"), "utf8")) as Record<string, string>;
 const v4Dirs = ["app/v4", "components/v4", "lib/v4"];
 
+/** The approved page lines of the web search and the digs (PERPLEXITY-DESIGN.md §7.1; owner Q14: a percentage). */
+const APPROVED_LINES: Readonly<Record<string, string>> = Object.freeze({
+  "v4.web.sureBasis": "A second AI agreed, and the point rests on a page we looked up.",
+  "v4.web.failed": "We couldn't look things up on the web this time. The points below come from the AIs' own knowledge.",
+  "v4.web.free": "Not checked on the web; paid plans look things up.",
+  "v4.dig.quotaShare": "This dig uses about {percent}% of today. After it you can still finish your report.",
+  "v4.dig.quotaDayUsed": "You've used what today allows for digging. Write your report now, or keep digging after {time}.",
+  "v4.rail.writeReport": "Write my report"
+});
+
+/** Owner Q20: labels drafted for the owner's click-test, not yet approved. */
+const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
+  "v4.web.noSearch",
+  "v4.web.noSearch.noReason",
+  "v4.web.switchedOff",
+  "v4.web.previewOnly",
+  "v4.web.fewerReaders",
+  "v4.web.otherPages",
+  "v4.web.addResearched",
+  "v4.web.researched.READING",
+  "v4.web.researched.ADDS",
+  "v4.web.researched.ADDS_NOTHING",
+  "v4.web.researched.FAILED",
+  "v4.room.blockedUntil",
+  "v4.suggest.kind.CONTRADICTING",
+  "v4.suggest.kind.UNDOCUMENTED",
+  "v4.suggest.kind.NEEDS_MORE_WEB",
+  "v4.suggest.kind.HELPS_MAIN_QUESTION.FOR",
+  "v4.suggest.kind.HELPS_MAIN_QUESTION.AGAINST",
+  "v4.suggest.ownView",
+  "v4.suggest.edit"
+]);
+
 function sources(): Array<{ path: string; text: string }> {
   const out: Array<{ path: string; text: string }> = [];
   const walk = (dir: string) => {
@@ -69,6 +102,19 @@ describe("V4 catalogue keys", () => {
         expect(absent, `${path}: ${stem}<kind>`).toEqual([]);
       }
     }
+  });
+
+  it("the owner-approved web and dig lines are in the catalogue word for word", () => {
+    // Perplexity plan W1-7 (2026-10-30): PERPLEXITY-DESIGN.md §7.1 "User-facing words", all approved by the owner; the dig
+    // line shows a PERCENTAGE of today (owner Q14). "Write my report" is the rail's existing key.
+    expect(Object.fromEntries(Object.keys(APPROVED_LINES).map((key) => [key, catalog[key]]))).toEqual(APPROVED_LINES);
+  });
+
+  it("the drafted labels (owner Q20) are all there until the owner approves them at the click-test", () => {
+    // Owner Q20 (2026-10-30): these labels are drafted in plain English and approved by the owner at the click-test, in
+    // place on the map (checkpoints C1 and C2). Until then they are DRAFTS: change their words here and in v4.json together.
+    expect(DRAFTED_UNTIL_CLICK_TEST.filter((key) => !(key in catalog))).toEqual([]);
+    expect(DRAFTED_UNTIL_CLICK_TEST.filter((key) => key in APPROVED_LINES)).toEqual([]);
   });
 
   it("placeholders are well formed", () => {
