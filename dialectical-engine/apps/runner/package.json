@@ -18,6 +18,7 @@
     "@debateai/providers": "workspace:*",
     "@debateai/graph": "workspace:*",
     "@debateai/judgement": "workspace:*",
+    "@debateai/evidence": "workspace:*",
     "@debateai/map": "workspace:*",
     "@debateai/battery": "workspace:*",
     "@debateai/billing-core": "workspace:*",
