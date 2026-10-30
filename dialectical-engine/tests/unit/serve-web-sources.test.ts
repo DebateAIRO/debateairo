@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import type { Pool } from "pg";
 import { AnswerSchema, WEB_CONTRACT_LIMITS, type Node } from "@debateai/contract";
 import {
-  serveWebEvidence, withWebSources, type WebPlanPathRecord, type WebServeEvidence
+  serveWebEvidence, webPathRefOfPosition, webPathRootsOf, webPathsAtRoots, webPlanReasonOf, withWebSources,
+  type WebPlanPathRecord, type WebServeEvidence
 } from "../../packages/serve/src/web-sources.js";
 import { ServeRepository } from "../../packages/serve/src/index.js";
 import { buildPublicDebateBody } from "../../apps/api/src/publications.js";
@@ -183,9 +184,14 @@ describe("W3-3 · an old answer is served exactly as before", () => {
     const none = await new ServeRepository(answerReadPool(null, reads)).readAnswerProjection("answer-1", OWNERSHIP);
     const empty = await new ServeRepository(answerReadPool({ searches: [], pages: [], readings: [], extracts: [], picks: [],
       packs: [], researched: [] }, reads)).readAnswerProjection("answer-1", OWNERSHIP);
-    expect(reads.filter((sql) => sql.includes("identity.read_web_evidence"))).toHaveLength(3);
-    expect(JSON.stringify(none)).toBe(JSON.stringify(before));
-    expect(JSON.stringify(empty)).toBe(JSON.stringify(before));
+    // W3-6: no plan stored (0134's read answers [] before the planner ran, null when the debate is not live) adds nothing.
+    const noPlan = await new ServeRepository(answerReadPool(null, reads, [])).readAnswerProjection("answer-1", OWNERSHIP);
+    const notLive = await new ServeRepository(answerReadPool(null, reads, null)).readAnswerProjection("answer-1", OWNERSHIP);
+    expect(reads.filter((sql) => sql.includes("identity.read_web_evidence"))).toHaveLength(5);
+    expect(reads.filter((sql) => sql.includes("identity.read_web_plan"))).toHaveLength(5);
+    // Nothing kept: no map root is looked up and no key is opened for the web part.
+    expect(reads.filter((sql) => sql.includes("core.map_position"))).toEqual([]);
+    for (const read of [none, empty, noPlan, notLive]) expect(JSON.stringify(read)).toBe(JSON.stringify(before));
     expect(before).not.toHaveProperty("web");
     for (const node of before!.nodes) {
       expect(node).not.toHaveProperty("sources");
@@ -343,6 +349,84 @@ describe("W3-3 · the public debate carries the same sources (publication check,
   });
 });
 
+describe("W3-6 · every plan status reaches the served answer, each path named by its root in force", () => {
+  const ROOT_A = "6f1c2a3b-0000-4000-8000-00000000000a";
+  const ROOT_B = "6f1c2a3b-0000-4000-8000-00000000000b";
+  const ROOT_C = "6f1c2a3b-0000-4000-8000-00000000000c";
+  const ROOT_D = "6f1c2a3b-0000-4000-8000-00000000000d";
+  const ROOT_E = "6f1c2a3b-0000-4000-8000-00000000000e";
+  /** The store keys paths by the map's answer id: a1 searched, then one path for each other decision. */
+  const stored = () => evidence({
+    searches: evidence().searches.map((search) => ({ ...search, pathRef: "a1" })),
+    extracts: evidence().extracts.map((extract) => ({ ...extract, pathRef: "a1" })),
+    picks: [{ pathRef: "a1", rank: 1, pageId: "p1" }]
+  });
+  const PLAN: WebPlanPathRecord[] = [
+    { pathId: "a1", status: "PLANNED", reason: null },
+    { pathId: "a2", status: "NO_SEARCH_PLANNED", reason: "Only values are weighed here." },
+    { pathId: "a3", status: "NOT_ON_PLAN", reason: null },
+    { pathId: "a4", status: "SWITCHED_OFF", reason: null }
+  ];
+  const roots = webPathRootsOf([
+    { answerId: "a1", rootNodeId: ROOT_A, stale: false }, { answerId: "a2", rootNodeId: ROOT_B, stale: false },
+    { answerId: "a3", rootNodeId: ROOT_C, stale: false }, { answerId: "a4", rootNodeId: ROOT_D, stale: false }]);
+
+  it("SEARCHED, NO_SEARCH_PLANNED with its reason, NOT_ON_PLAN and SWITCHED_OFF, each at its answer's root", () => {
+    const served = webPathsAtRoots(serveWebEvidence({ evidence: stored(), plan: PLAN }), roots)!;
+    expect(served.web.paths.map((path) => [path.position_ref, path.search])).toEqual([
+      [ROOT_A, { status: "SEARCHED" }],
+      [ROOT_B, { status: "NO_SEARCH_PLANNED", reason: "Only values are weighed here." }],
+      [ROOT_C, { status: "NOT_ON_PLAN" }],
+      [ROOT_D, { status: "SWITCHED_OFF" }]
+    ]);
+    expect(served.web.paths[0]!.other_pages.map((page) => page.page_ref)).toEqual(["p2", "p3"]);
+    // FAILED too: a planned path no search answered, and a failed planner.
+    const failed = webPathsAtRoots(serveWebEvidence({ evidence: null, plan: [{ pathId: "a1", status: "PLANNED", reason: null },
+      { pathId: "a2", status: "FAILED", reason: null }] }), roots)!;
+    expect(failed.web.paths.map((path) => [path.position_ref, path.search.status])).toEqual([[ROOT_A, "FAILED"], [ROOT_B, "FAILED"]]);
+    parses([], served.web);
+    parses([], failed.web);
+  });
+
+  it("names a path by the root in force, never the answer id: after a re-point, the new root; a stale root is no root", () => {
+    const repointed = webPathRootsOf([{ answerId: "a1", rootNodeId: ROOT_E.toUpperCase(), stale: false },
+      { answerId: "a2", rootNodeId: ROOT_B, stale: true }]);
+    const served = webPathsAtRoots(serveWebEvidence({ evidence: stored(), plan: PLAN }), repointed)!;
+    expect(served.web.paths.map((path) => path.position_ref)).toEqual([ROOT_E]);
+    expect(JSON.stringify(served.web)).not.toMatch(/"a[1-4]"/u);
+  });
+
+  it("leaves out a path whose answer has no root yet; the points' sources are untouched", () => {
+    const whole = serveWebEvidence({ evidence: stored(), plan: PLAN })!;
+    const unrooted = webPathsAtRoots(whole, new Map([["a2", ROOT_B]]))!;
+    expect(unrooted.web.paths.map((path) => [path.position_ref, path.search.status])).toEqual([[ROOT_B, "NO_SEARCH_PLANNED"]]);
+    expect(unrooted.sources).toBe(whole.sources);
+    const nodes = [point("a", "LOOKED_UP", "S1-1", "agree")];
+    expect(withWebSources(nodes, unrooted)).toEqual(withWebSources(nodes, whole));
+    expect(webPathsAtRoots(whole, new Map())!.web.paths).toEqual([]);
+    expect(webPathsAtRoots(null, roots)).toBeNull();
+  });
+
+  it("opens the stored reason's shape only: `{ reason }`, else none", () => {
+    expect(webPlanReasonOf({ reason: "Values." })).toBe("Values.");
+    for (const value of [null, "Values.", { reason: 3 }, { reason: "  " }, ["Values."]]) expect(webPlanReasonOf(value)).toBeNull();
+  });
+});
+
+describe("W3-6 · \"Add to researched\" goes back from a root to the stored path (W4-4)", () => {
+  it("gives the answer id whose root in force a served position_ref names, or null", () => {
+    const roots = webPathRootsOf([{ answerId: "a1", rootNodeId: "6f1c2a3b-0000-4000-8000-00000000000a", stale: false },
+      { answerId: "a2", rootNodeId: "6f1c2a3b-0000-4000-8000-00000000000b", stale: true }]);
+    const served = webPathsAtRoots(serveWebEvidence({ evidence: null, plan: [{ pathId: "a1", status: "SWITCHED_OFF", reason: null }] }), roots)!;
+    expect(webPathRefOfPosition(served.web.paths[0]!.position_ref, roots)).toBe("a1");
+    expect(webPathRefOfPosition(" 6F1C2A3B-0000-4000-8000-00000000000A ", roots)).toBe("a1");
+    // A set-aside root, an answer id and an unknown node name no path.
+    for (const position of ["6f1c2a3b-0000-4000-8000-00000000000b", "a1", "6f1c2a3b-0000-4000-8000-0000000000ff"]) {
+      expect(webPathRefOfPosition(position, roots)).toBeNull();
+    }
+  });
+});
+
 /* ----------------------------------------------------------------- a stand-in pool for one answer read */
 
 const OWNERSHIP = { ownerRef: "00000000-0000-4000-8000-0000000000c1", legacyAskerId: null } as const;
@@ -351,8 +435,9 @@ const OWNERSHIP = { ownerRef: "00000000-0000-4000-8000-0000000000c1", legacyAske
  * One answer read (as tests/unit/r2-comparing-judges.test.ts stands it in): two looked-up points, one with an S-locator.
  * `web` is what identity.read_web_evidence answers: undefined = a database that knows no such read (every unknown read
  * finds nothing, as before W3-3), null = the run is not a live private debate, or an empty store. Every read is kept.
+ * `plan` is what 0134's identity.read_web_plan answers, likewise (W3-6).
  */
-function answerReadPool(web: unknown, reads: string[]): Pool {
+function answerReadPool(web: unknown, reads: string[], plan?: unknown): Pool {
   const at = new Date("2026-10-21T00:00:00.000Z");
   const nodeRow = (nodeId: string, locator: string | null) => ({
     node_id: nodeId, claim_text: `The point ${nodeId}.`, node_content_ciphertext: null, way_of_knowing: "LOOKED_UP",
@@ -382,6 +467,7 @@ function answerReadPool(web: unknown, reads: string[]): Pool {
     if (sql.includes("AS root_sites")) return { rows: [answerRow] };
     if (sql.includes("AS defeater_refs")) return { rows: [nodeRow("node-a", "S1-1"), nodeRow("node-b", null)] };
     if (sql.includes("identity.read_web_evidence")) return { rows: web === undefined ? [] : [{ web }] };
+    if (sql.includes("identity.read_web_plan")) return { rows: plan === undefined ? [] : [{ plan }] };
     if (sql.includes("pg_try_advisory_lock_shared")) return { rows: [{ acquired: true }] };
     if (sql.includes("pg_advisory_unlock_shared")) return { rows: [{ unlocked: true }] };
     if (sql.includes("run_private_content_is_live")) return { rows: (params[0] as string[]).map((runId) => ({ run_id: runId, live: true })) };

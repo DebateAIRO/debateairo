@@ -185,6 +185,16 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     expect(ADMISSION).toContain("readers.readPreviewBudgetGateSettings(pool, version, previewConfig,");
   });
 
+  it("W3-6: both hand the runner the same web settings, and neither holds a stand-in for the web plan's store", () => {
+    // The step keeps the planner's decision in 0134's store itself (web-step.ts runRunnerWebStep), on the runner's pool.
+    const call = (source: string) => withoutComments(source).match(/webSearch: runnerWebSearchSettings\(\{[^}]*\}\)/gu)
+      ?.map((text) => text.replace(/\s+/gu, " "));
+    expect(call(RUNNER_MAIN)).toEqual(["webSearch: runnerWebSearchSettings({ pool, previewGate, fetch: previewFetch, "
+      + "guardOf: runnerSite.money === null ? null : runCostEnvelopeGuard })"]);
+    expect(call(PRACTICE_RUNNER)).toEqual(call(RUNNER_MAIN));
+    for (const source of [RUNNER_MAIN, PRACTICE_RUNNER]) expect(source).not.toContain("recordPlanPathStatuses");
+  });
+
   it("parallel AI calls: both build the call scheduler, the busy coordinator, the call subjects, the attempt counter and the keep-alive renewals", () => {
     // Spec 2026-10-12-parallel-calls-design.md §3.2-§3.6: the practice measures the runner the preview runs.
     for (const source of [RUNNER_MAIN, PRACTICE_RUNNER]) {
