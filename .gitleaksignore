@@ -124,3 +124,8 @@ fd422018e71b56b9826d8d6ce9f6a0fb4840b249:dialectical-engine/tests/unit/preview_b
 # 2026-10-29 — the same false alarm echoed: this file's first comment for the entry above quoted that storage-key line
 # word for word (commit cdef99219, line 121), and gitleaks matched the quote. The comment no longer quotes it.
 cdef992197a9b6c4d904e9e9269c50cc2a59a915:.gitleaksignore:generic-api-key:121
+# 2026-10-30 — Perplexity gate test (PR #224, commit c1ea4d571): generic-api-key matched a made-up DeepInfra-shaped
+# test value (the word synthetic, a key label and the digits zero to nine) used to check that the DeepInfra gate accepts
+# its own key shape and refuses a Perplexity one. Not a key; the test now builds the value from pieces. Owner's ruling of
+# 2026-10-30, as for U5.
+c1ea4d571f6feab2576eea18b0a1546573371a4c:dialectical-engine/tests/unit/preview_budget_authority_perplexity_test.py:generic-api-key:513
