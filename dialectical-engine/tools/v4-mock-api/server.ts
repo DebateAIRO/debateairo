@@ -748,8 +748,10 @@ async function postAsk(req: IncomingMessage, res: ServerResponse): Promise<void>
   try {
     body = await readJsonBody(req);
   } catch (failure) {
-    const code = failure instanceof Error ? failure.message : "INVALID_JSON";
-    sendJson(req, res, code === "PAYLOAD_TOO_LARGE" ? 413 : 400, { error: code === "PAYLOAD_TOO_LARGE" ? code : "MALFORMED_REQUEST", message: code });
+    // A fixed code, never the error's own text (CodeQL js/stack-trace-exposure, PR #224).
+    const tooLarge = failure instanceof Error && failure.message === "PAYLOAD_TOO_LARGE";
+    const code = tooLarge ? "PAYLOAD_TOO_LARGE" : "MALFORMED_REQUEST";
+    sendJson(req, res, tooLarge ? 413 : 400, { error: code, message: code });
     return;
   }
   // A dig may name its parent (DRAFT field `parent`, web-draft.ts). Today's ask rules read the rest; once the contract
@@ -896,7 +898,9 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
         if (ask !== null) askMode = choice("ask", ask, ASK_MODES, askMode);
         if (plan !== null) planMode = choice("plan", plan, PLAN_MODES, planMode);
       } catch (failure) {
-        return sendJson(req, res, 400, { error: "MOCK_SETTING_INVALID", message: failure instanceof Error ? failure.message : String(failure) });
+        // The detail goes to the mock's log, never into the reply (CodeQL js/stack-trace-exposure, PR #224).
+        process.stderr.write(`[mock] setting refused: ${failure instanceof Error ? failure.message : String(failure)}\n`);
+        return sendJson(req, res, 400, { error: "MOCK_SETTING_INVALID", message: "Unknown value for room, ask or plan; see the mock's log." });
       }
       return sendJson(req, res, 200, mockState());
     }

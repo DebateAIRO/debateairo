@@ -150,3 +150,28 @@ describe("cleaning: dates and instruction words are removed by code", () => {
     expect(guardSearch("asistentă 0722 2026 123 456").outcome).toBe("HOLD");
   });
 });
+
+describe("long runs stay fast (CodeQL js/polynomial-redos, PR #224)", () => {
+  it("scans 100,000 '%' with no @ in linear time, and still finds an email after them", () => {
+    const run = "%".repeat(100_000);
+    const started = performance.now();
+    expect(findPersonalData(run)).toEqual([]);
+    const found = findPersonalData(`${run} write to ana.pop@example.ro please`);
+    expect(found.map((finding) => finding.kind)).toEqual(["EMAIL"]);
+    expect(performance.now() - started).toBeLessThan(2_000);
+  });
+
+  it("finds the email right after a long local-looking run, as its last 64 characters", () => {
+    const text = `${"a".repeat(500)}@example.com`;
+    const [finding] = findPersonalData(text);
+    expect(finding?.kind).toBe("EMAIL");
+    expect(finding?.end).toBe(text.length);
+  });
+
+  it("reads 100,000 apostrophes as no first-person word, in linear time", () => {
+    const started = performance.now();
+    expect(firstPersonWords("'".repeat(100_000))).toEqual([]);
+    expect(firstPersonWords(`${"'".repeat(50_000)}my${"'".repeat(50_000)} salary`)).toEqual(["my"]);
+    expect(performance.now() - started).toBeLessThan(2_000);
+  });
+});

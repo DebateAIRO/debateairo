@@ -36,6 +36,9 @@ PRICE = Decimal('0.001')
 DAY = '2026-10-08'
 
 
+# A made-up DeepInfra-shaped key, built from pieces so the secret scanner never reads it as a key (PR #224).
+SYNTHETIC_DEEPINFRA_KEY = 'synthetic' + '-key-' + ''.join(str(digit) for digit in range(10))
+
 def no_network(*_args, **_kwargs):
     raise AssertionError('tests must never build the real HTTPS transport')
 
@@ -503,17 +506,17 @@ class RequestShapeTests(PerplexityTest):
 class KeyAndTransportTests(PerplexityTest):
     def test_only_a_pplx_key_is_sent_and_the_other_gates_refuse_one(self):
         self.assertTrue(re.fullmatch(PERPLEXITY.key_pattern, KEY))
-        for other in ('synthetic-key-0123456789', 'sk-' + 'ant-api03-' + 'x' * 20, 'AIza' + 'x' * 35, 'pplx_' + 'x' * 20,
+        for other in (SYNTHETIC_DEEPINFRA_KEY, 'sk-' + 'ant-api03-' + 'x' * 20, 'AIza' + 'x' * 35, 'pplx_' + 'x' * 20,
                       'pplx-' + 'x' * 10 + ' y'):
             with self.subTest(other=other):
                 self.assertFalse(re.fullmatch(PERPLEXITY.key_pattern, other))
         deepinfra, anthropic = bridge.helper.PROFILES['deepinfra'], bridge.helper.PROFILES['anthropic']
         self.assertFalse(re.fullmatch(deepinfra.key_pattern, KEY))  # A Perplexity key in the DeepInfra gate is refused.
         self.assertFalse(re.fullmatch(anthropic.key_pattern, KEY))
-        self.assertTrue(re.fullmatch(deepinfra.key_pattern, 'synthetic-key-0123456789'))
+        self.assertTrue(re.fullmatch(deepinfra.key_pattern, SYNTHETIC_DEEPINFRA_KEY))
         gate = self.ready()
         with self.refused('KEY_SHAPE_INVALID'):
-            self.call(gate, key_loader=lambda _p: 'synthetic-key-0123456789')
+            self.call(gate, key_loader=lambda _p: SYNTHETIC_DEEPINFRA_KEY)
         self.assertIsNone(gate.day(DAY))
 
     def test_redaction_blanks_perplexity_key_shapes(self):

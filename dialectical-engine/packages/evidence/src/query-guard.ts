@@ -130,12 +130,21 @@ export function cleanSearchText(raw: string): Readonly<{ text: string; removed: 
   });
 }
 
+/** `text` without its leading and trailing apostrophes, by index: no pattern, so a run of `'` costs one pass (CodeQL). */
+function trimApostrophes(text: string): string {
+  let start = 0;
+  let end = text.length;
+  while (start < end && text[start] === "'") start += 1;
+  while (end > start && text[end - 1] === "'") end -= 1;
+  return text.slice(start, end);
+}
+
 /** The first-person words in a search, in order ("I'm", "my", "meu"); empty when there are none. */
 export function firstPersonWords(raw: string): readonly string[] {
   const found: string[] = [];
   let previous = "";
   for (const match of normalised(raw).matchAll(/[\p{L}']+/gu)) {
-    const word = match[0].replace(/^'+|'+$/gu, "");
+    const word = trimApostrophes(match[0]);
     const lower = word.toLocaleLowerCase("en");
     const roman = word === "I" && ROMAN_NUMERAL_NOUNS.has(previous);
     // A word in capitals is a code, not a pronoun: US and EU, Portland ME, MY (Malaysia).

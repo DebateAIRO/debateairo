@@ -21,7 +21,33 @@ export const PERSONAL_DATA_KINDS: readonly PersonalDataKind[] = Object.freeze([
   "EMAIL", "PHONE", "IBAN", "CARD", "NATIONAL_ID", "ID_NUMBER", "URL_QUERY"
 ]);
 
-const EMAIL = /[\p{L}\p{N}._%+-]+@[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)+/gu;
+/** One character of an email's local part (before `@`). */
+const EMAIL_LOCAL_CHAR = /[\p{L}\p{N}._%+-]/u;
+/** An email's domain, read from just after its `@` (sticky, so it is tried at that one place only). */
+const EMAIL_DOMAIN = /[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)+/uy;
+/** The longest local part RFC 5321 allows; a longer run is still found, as its last 64 characters. */
+const EMAIL_LOCAL_MAX = 64;
+/**
+ * The email addresses in `text`, leftmost first and never overlapping: a local part, `@`, a dotted domain. Found from
+ * each `@` outwards rather than by one pattern over the whole text, so a long run of `%` or `.` with no `@` costs one
+ * pass, not one pass per character (CodeQL js/polynomial-redos, PR #224).
+ */
+function emailSpans(text: string): readonly Readonly<{ start: number; end: number }>[] {
+  const spans: { start: number; end: number }[] = [];
+  let lastEnd = 0;
+  for (let at = text.indexOf("@"); at >= 0; at = text.indexOf("@", at + 1)) {
+    let start = at;
+    while (start > lastEnd && at - start < EMAIL_LOCAL_MAX && EMAIL_LOCAL_CHAR.test(text[start - 1]!)) start -= 1;
+    if (start === at) continue;
+    EMAIL_DOMAIN.lastIndex = at + 1;
+    const domain = EMAIL_DOMAIN.exec(text);
+    if (domain === null) continue;
+    spans.push({ start, end: at + 1 + domain[0].length });
+    lastEnd = at + 1 + domain[0].length;
+    at = lastEnd - 1;
+  }
+  return spans;
+}
 /** A web address token: a scheme, a leading `www.`, or a dotted host followed by a path. */
 const URL_TOKEN = /\S+/gu;
 const URL_START = /^(?:[a-z][a-z0-9+.-]*:\/\/|www\.)|^[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)+\//iu;
@@ -117,7 +143,7 @@ export function findPersonalData(text: string): readonly PersonalDataFinding[] {
     const query = value.indexOf("?");
     if (query >= 0 && query < value.length - 1) found("URL_QUERY", token.index, token.index + value.length);
   }
-  for (const email of masked.matchAll(EMAIL)) found("EMAIL", email.index, email.index + email[0].length);
+  for (const email of emailSpans(masked)) found("EMAIL", email.start, email.end);
   for (const paper of masked.matchAll(PAPER_NUMBERS)) mask(paper.index, paper.index + paper[0].length);
 
   for (const start of [...masked.matchAll(IBAN_START)].map((match) => match.index)) {
