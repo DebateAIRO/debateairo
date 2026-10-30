@@ -631,6 +631,8 @@ describe("serve.answer_story — the encrypted, insert-once story row", () => {
       { tgname: "aaa_enforce_content_attestation_v2", function_name: "core.enforce_content_attestation_v2_answer_story", enabled: "O" },
       { tgname: "enforce_content_ciphertext", function_name: "core.enforce_content_ciphertext_answer_story", enabled: "O" },
       { tgname: "enforce_erasure_barrier", function_name: "core.enforce_erasure_barrier_answer_story", enabled: "O" },
+      // 0130 (row-level security, #226): a story row may name only its own run's artifacts.
+      { tgname: "guard_own_references", function_name: "core.guard_own_references", enabled: "O" },
       { tgname: "reject_mutation", function_name: "core.reject_mutation", enabled: "O" },
       { tgname: "reject_truncate", function_name: "core.reject_truncate", enabled: "O" }
     ]);
