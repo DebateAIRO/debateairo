@@ -31,11 +31,14 @@ describe("the ask's question-language fields (question-language spec 2026-10-13)
       "decision_scope", "as_of", "steering_presets", "plan_tier", "model_strength", "steering_annotations",
       "site_language", "question_language_choice",
       // Side-by-side spec §13 (Task S12): the room read's settings version, a later optional key of its own.
-      "settings_version"
+      "settings_version",
+      // Plan 2026-10-30 W1-6: a dig's parent, a later optional key of its own.
+      "parent"
     ]);
     expect(AskRequestSchema.shape.site_language.safeParse(undefined).success).toBe(true);
     expect(AskRequestSchema.shape.question_language_choice.safeParse(undefined).success).toBe(true);
     expect(AskRequestSchema.shape.settings_version.safeParse(undefined).success).toBe(true);
+    expect(AskRequestSchema.shape.parent.safeParse(undefined).success).toBe(true);
     // Still strict: an unknown key is refused exactly as before.
     expect(AskRequestSchema.safeParse({ ...ASK, question_language: "ro" }).success).toBe(false);
   });
