@@ -15,7 +15,7 @@ import {
   SUGGESTION_KINDS, SUGGESTION_SIDES, DraftPathRewritesSchema, DraftAnswerDigSchema, DraftMonthPauseSchema, DraftUsageBorrowsSchema
 } from "../../tools/v4-mock-api/web-draft.js";
 import {
-  borrowNotice, DIG_ANSWERS, DIG_FINISHED_AT, DIG_RUNS, monthPause, PATH_REWRITES, SEEDED_NEW_DIGS
+  borrowNotice, DEEPEST_DIG, DIG_ANSWERS, DIG_FINISHED_AT, DIG_RUNS, monthPause, PATH_REWRITES, SEEDED_NEW_DIGS
 } from "../../tools/v4-mock-api/rewrite-seed.js";
 import { WEB_CASES, type WebCase } from "../../tools/v4-mock-api/web-seed.js";
 
@@ -275,6 +275,14 @@ describe("V4 mock API: the new dig model and the money rule", () => {
       const seeded = SEEDED_NEW_DIGS.find((candidate) => candidate.runRef === run);
       expect(dig.rewrite!.dig_finished_at, run).toBe(seeded?.settledAt ?? DIG_FINISHED_AT.levelOne);
     }
+  });
+
+  it("W3-4: a dig at the deepest level, for the click-test of the deepest-level line", () => {
+    expect(AnswerDigSchema.safeParse(DEEPEST_DIG.dig).success).toBe(true);
+    expect(DEEPEST_DIG.dig.level).toBe(DIG_LEVEL_MAX);
+    expect(DEEPEST_DIG.dig.parent_run_id).toBe(DIG_RUNS.levelThree);
+    expect(Object.keys(DIG_ANSWERS)).not.toContain(DEEPEST_DIG.runRef);
+    expect(Date.parse(DEEPEST_DIG.settledAt)).toBeGreaterThan(Date.parse(DEEPEST_DIG.askedAt));
   });
 
   it("a paused debate, the borrow notice and a room whose new starts wait fall back to today's reads", () => {

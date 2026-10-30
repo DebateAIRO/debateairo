@@ -26,7 +26,7 @@ import {
   DraftUsageBorrowsSchema, splitAsk, splitRoomQuery, stripAnswer, stripNode, stripRoom,
   stripRun, stripUsage, type DraftAskParent
 } from "./web-draft.js";
-import { borrowNotice, DIG_ANSWERS, DIG_RUNS, monthPause, PATH_REWRITES, RUN_PAUSED, SEEDED_NEW_DIGS } from "./rewrite-seed.js";
+import { borrowNotice, DEEPEST_DIG, DIG_ANSWERS, DIG_RUNS, monthPause, PATH_REWRITES, RUN_PAUSED, SEEDED_NEW_DIGS } from "./rewrite-seed.js";
 import type { WebCase } from "./web-seed.js";
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -190,7 +190,11 @@ function addRun(run: MockRun): MockRun {
 function settledRun(input: Readonly<{
   runRef: string; answerId: string; question: string; seq: number; askedAt: number; settleAt: number; storyReadyAt: number;
   web: WebCase;
+  /** W3-4: a dig's own part (its parent, places, level, picks); else the seeded one, if any. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  dig?: any;
 }>): MockRun {
+  const dig = input.dig ?? DIG_ANSWERS[input.runRef];
   return addRun({
     runRef: input.runRef,
     question: input.question,
@@ -210,7 +214,7 @@ function settledRun(input: Readonly<{
       }),
       // W2-7: the seeded digs' rewrites of their parents' paths, and a dig's own part (rewrite-seed.ts).
       ...(PATH_REWRITES[input.runRef] === undefined ? {} : { path_rewrites: PATH_REWRITES[input.runRef] }),
-      ...(DIG_ANSWERS[input.runRef] === undefined ? {} : { dig: DIG_ANSWERS[input.runRef] })
+      ...(dig === undefined ? {} : { dig })
     }
   });
 }
@@ -257,6 +261,11 @@ for (const dig of SEEDED_NEW_DIGS) {
   });
 }
 addRun({ runRef: RUN_PAUSED, seq: 12, monthPaused: true, question: "Should my region build a hydrogen pipeline or more power lines?" });
+// W3-4: a dig at the deepest level (10), whose map offers no dig anywhere (rewrite-seed.ts DEEPEST_DIG).
+settledRun({
+  runRef: DEEPEST_DIG.runRef, answerId: DEEPEST_DIG.answerId, seq: DEEPEST_DIG.seq, web: "PAID", question: DEEPEST_DIG.question,
+  askedAt: Date.parse(DEEPEST_DIG.askedAt), settleAt: Date.parse(DEEPEST_DIG.settledAt), storyReadyAt: 0, dig: DEEPEST_DIG.dig
+});
 
 type RunState = "QUEUED" | "WAITING" | "CLAIMED" | "RUNNING" | "HOLDING" | "SETTLED" | "FAILED";
 
@@ -363,6 +372,42 @@ openInvestigation(RUN_PAUSED);
 for (const dig of SEEDED_NEW_DIGS) {
   const answer = DIG_ANSWERS[dig.runRef]!;
   linkDig(answer.parent_run_id, { child_run_id: dig.runRef, places: answer.places, mode: dig.mode }, Date.parse(dig.askedAt));
+}
+linkDig(DEEPEST_DIG.dig.parent_run_id, { child_run_id: DEEPEST_DIG.runRef, places: DEEPEST_DIG.dig.places, mode: DEEPEST_DIG.mode },
+  Date.parse(DEEPEST_DIG.askedAt));
+
+/** W3-4: a debate's dig level, as its answer says it (0: a first debate, or a run with no answer yet). */
+function digLevelOfRun(runRef: string): number {
+  const level = runs.get(runRef)?.answer?.dig?.level;
+  return typeof level === "number" ? level : 0;
+}
+
+/**
+ * W3-4: a new dig's own part (AnswerDigSchema), from the ask's parent: the path its places name first (or none), its
+ * level, and each pick with who wrote it — the person's own view, or a suggestion as written or edited (compared with the
+ * text the parent's answer suggested).
+ */
+function digPartOf(parent: DraftAskParent, level: number) {
+  const parentAnswer = runs.get(parent.parent_run_id)?.answer;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const suggested = new Map<string, string>((parentAnswer?.web?.paths ?? []).flatMap((path: any) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    path.suggestions.map((item: any) => [item.suggestion_id, item.text] as [string, string])));
+  const pathPlace = parent.places.find((place) => place.startsWith("path:"));
+  return {
+    parent_run_id: parent.parent_run_id,
+    position_ref: pathPlace === undefined ? null : pathPlace.slice("path:".length).replace(/#\d+$/u, ""),
+    places: [...parent.places],
+    level,
+    picks: (parent.picks ?? []).map((pick) => ({
+      kind: pick.kind,
+      place: pick.place,
+      text: pick.text,
+      by: pick.kind === "OWN_VIEW" ? "PERSON_OWN_VIEW"
+        : suggested.get(pick.suggestion_id ?? "") === pick.text ? "AI_SUGGESTION" : "PERSON_EDITED"
+    })),
+    rewrite: null
+  };
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -852,6 +897,15 @@ async function postAsk(req: IncomingMessage, res: ServerResponse): Promise<void>
     sendJson(req, res, 404, { error: "RUN_NOT_FOUND", message: "RUN_NOT_FOUND" });
     return;
   }
+  // W3-4 (dig model revision §2): a dig is its parent's level + 1; past DIG_LEVEL_MAX it is refused before anything starts.
+  const levelMax: number = typeof C.DIG_LEVEL_MAX === "number" ? C.DIG_LEVEL_MAX : 10;
+  const digLevel = parent === null ? 0 : digLevelOfRun(parent.parent_run_id) + 1;
+  if (digLevel > levelMax) {
+    log("DIG_TOO_DEEP", null);
+    sendJson(req, res, 409, { error: "DIG_TOO_DEEP", message: "DIG_TOO_DEEP", level_max: levelMax },
+      ...(C.DigTooDeepSchema === undefined ? [] : [C.DigTooDeepSchema]));
+    return;
+  }
   const ask = parsed.data;
   const question: string = ask.question_line.trim();
   const wantsLanguageChoice = mode === "LANGUAGE_CHOICE" || /#mix/iu.test(question);
@@ -886,7 +940,9 @@ async function postAsk(req: IncomingMessage, res: ServerResponse): Promise<void>
   const web: WebCase = ask.plan_tier === "free" ? "FREE" : /#webfail/iu.test(question) ? "FAILED" : "PAID";
   const run = settledRun({
     runRef, answerId: randomUUID(), question, seq, askedAt: now, settleAt,
-    storyReadyAt: settleAt + POSTED_STORY_SECONDS * 1000, web
+    storyReadyAt: settleAt + POSTED_STORY_SECONDS * 1000, web,
+    // W3-4: a dig's answer says its level and its picks, so its own map knows how deep it is.
+    ...(parent === null ? {} : { dig: digPartOf(parent, digLevel) })
   });
   join(runRef);
   log(parent === null ? "QUEUED" : "QUEUED_DIG", runRef);
@@ -1188,7 +1244,7 @@ server.listen(PORT, HOST, () => {
       settled: RUN_SETTLED, running: RUN_RUNNING, waiting: RUN_WAITING, failed: RUN_FAILED, story_writing: RUN_STORY_WRITING,
       free: RUN_FREE, search_failed: RUN_SEARCH_FAILED, dig: RUN_DIG,
       // W2-7: the dig trail (own view at level 1, then levels 2 and 3) and the debate paused at the month wall.
-      dig_own_view: DIG_RUNS.ownView, dig_level_two: DIG_RUNS.levelTwo, dig_level_three: DIG_RUNS.levelThree, paused: RUN_PAUSED
+      dig_own_view: DIG_RUNS.ownView, dig_level_two: DIG_RUNS.levelTwo, dig_level_three: DIG_RUNS.levelThree, dig_deepest: DEEPEST_DIG.runRef, paused: RUN_PAUSED
     }
   })}\n`);
 });

@@ -89,7 +89,9 @@ const RUNS = {
   digOwnView: "d1000000-0000-4000-8000-000000000001",
   digLevelTwo: "d2000000-0000-4000-8000-000000000002",
   digLevelThree: "d3000000-0000-4000-8000-000000000003",
-  paused: "e1000000-0000-4000-8000-000000000001"
+  paused: "e1000000-0000-4000-8000-000000000001",
+  // W3-4: a dig at the deepest level (10).
+  deepest: "d1000000-0000-4000-8000-000000000010"
 };
 const MOCK = process.env.DIALECTICAL_API_BASE!;
 /** A mock control or a draft read, straight from the mock (not part of the real API). */
@@ -367,6 +369,17 @@ await step("the dig trail three levels down (draft)", async () => {
   const investigation: Loose = await mock(`/v1/runs/${RUNS.digLevelThree}/investigation`);
   must(investigation.root_run_id === RUNS.settled, "a dig of a dig is in the first debate's investigation");
   return trail.join(" › ");
+}, (value: string) => value);
+await step("the deepest level, and a dig past it refused before it starts (W3-4)", async () => {
+  const deepest: Loose = (await draftAnswer(RUNS.deepest)).dig;
+  must(deepest.level === 10 && deepest.parent_run_id === RUNS.digLevelThree, "the deepest dig says level 10");
+  const refused = await fetch(`${MOCK}/v1/asks`, {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ...ask, question_line: "Look into this: one level more", parent: { parent_run_id: RUNS.deepest, places: ["path:n-mix"], mode: "quick" } })
+  });
+  const body: Loose = await refused.json();
+  must(refused.status === 409 && body.error === "DIG_TOO_DEEP" && body.level_max === 10, "a dig at level 11 is refused 409 DIG_TOO_DEEP");
+  return `level ${deepest.level}; one more: ${refused.status} ${body.error}`;
 }, (value: string) => value);
 await step("a new question's estimate, as a share of today", async () => {
   const room: Loose = await client.getAskRoom({ plan_tier: "premium", composition_budget_tier: "medium", depth: 2, answer_length: "standard" });

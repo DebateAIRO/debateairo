@@ -12,6 +12,10 @@
  * Every dig keeps its points and its answer text (owner Q-D13); only its story is dropped (the mock's stories stay, so
  * today's pages still draw the digs).
  *
+ * The deepest level (task W3-4): a dig at level 10 (DIG_LEVEL_MAX), hung under d300 for the click-test of the "deepest
+ * level" line. The six digs between levels 3 and 10 are NOT seeded: only its own answer says level 10, so its map offers
+ * no dig anywhere. A dig the page sends from any other debate gets its parent's level + 1, and past 10 a 409 DIG_TOO_DEEP.
+ *
  * The money rule: a paused debate (the month wall; Continue once the month resets) and a usage read that says running work
  * borrowed from tomorrow's allowance (switch usage=BORROWED).
  */
@@ -201,3 +205,21 @@ export function monthPause(nextMonthStartsAt: string, canContinue: boolean): { u
 export function borrowNotice(runRef: string, tomorrowStartsAt: string): UsageBorrow {
   return { scope: "PERSON_DAY", run_ref: runRef, percent: 4, next_window_starts_at: tomorrowStartsAt };
 }
+
+/**
+ * Task W3-4: a dig at the deepest level (10), for the click-test of the "deepest level" line. Its parent is d300 (level 3);
+ * the levels in between are not seeded, so only this answer's own `dig` says 10. It rewrote nothing yet (its rewrite is
+ * null): what the page shows of it is that nothing more can be dug from its map.
+ */
+export const DEEPEST_DIG = Object.freeze({
+  runRef: "d1000000-0000-4000-8000-000000000010",
+  answerId: "aaaad110-0000-4000-8000-000000000010",
+  seq: 13,
+  mode: "quick" as const,
+  question: "Could reactors in my country be built in seven years, if the first ones were?",
+  askedAt: "2026-10-30T16:00:00.000Z",
+  settledAt: "2026-10-30T16:20:00.000Z",
+  dig: {
+    parent_run_id: DIG_RUNS.levelThree, position_ref: "n-nuclear", places: ["path:n-nuclear"], level: 10, picks: [], rewrite: null
+  } satisfies AnswerDig
+});
