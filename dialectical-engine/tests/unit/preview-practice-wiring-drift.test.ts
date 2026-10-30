@@ -297,7 +297,10 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       // whenever hosted (a version without a story ceiling refuses inside its guard, STORY_ENVELOPE_MISSING).
       "const runSettingsVersions = createRunSettingsVersions();",
       "const runCostEnvelopeGuard = runCostEnvelopeGuardOf(runnerSettings, runSettingsVersions);",
+      // Owner answer F4 (2026-10-30, task W2-2): both seams charge at the vendor's real prices on the preview.
+      "const price = previewTargetChargePrice(previewGate !== undefined, target, providerTargetPrice(target));",
       "if (runnerSite.money !== null && price === null) { throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`); }",
+
       "...(runnerSite.money === null || price === null ? {} : { buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => runCostEnvelopeGuard(runId).providerSeam({ runId, price, requireReportedUsage: true, phase, sharedWall }), buildStoryCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).storySeam({ runId, price, requireReportedUsage: true }) })",
       "settingsForVersion: (version) => runnerSettings.settingsFor(version),",
       "hosted: environment.DEPLOYMENT_MODE === \"hosted\",",

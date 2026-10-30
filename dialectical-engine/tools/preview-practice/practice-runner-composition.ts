@@ -65,6 +65,7 @@ import {
   previewTargetGatewayControls,
   providerTargetGatewayControls,
   providerTargetPrice,
+  previewTargetChargePrice,
   resolveProviderTargetCredentials,
   withPreviewProviderCallPolicy,
   withStructureRepair,
@@ -236,7 +237,8 @@ export async function composePracticeRunner(input: Readonly<{
     throw new TypeError("PRACTICE_TARGET_DECLARES_A_CREDENTIAL");
   });
   function targetGateway(target: (typeof providerTargets)[number]): ProviderGateway {
-    const price = providerTargetPrice(target);
+    // Owner answer F4 (2026-10-30), as main.ts: a reviewed Anthropic row's calls at the vendor's real prices.
+    const price = previewTargetChargePrice(previewGate !== undefined, target, providerTargetPrice(target));
     if (runnerSite.money !== null && price === null) {
       throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`);
     }

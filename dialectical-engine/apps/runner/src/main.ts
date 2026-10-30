@@ -24,7 +24,7 @@ import {
 // ONE line on purpose: `tests/architecture/dev-runner-provider-set.test.ts` pins this
 // import line so `probeTarget` — the persisting probe — cannot enter this module under
 // any local name (codex r2 B1). A multi-line import hides the specifiers from that pin.
-import { createPreviewGuardedFetch, createPreviewBudgetRpcPorts, createPreviewBusyCoordinator, previewRunResilience, withPreviewProviderCallPolicy, previewProbeControls, previewSealedRoleFallbackCovered, previewTargetGatewayControls, PREVIEW_GLM_DEADLINE_MS, observeClaimTimeTarget, providerTargetGatewayControls, providerTargetPrice, resolveProviderTargetCredentials, previewStructureRepairRoute, previewStructureRepairCeiling, withStructureRepair, previewFinalWriterTierUnreadLine, type PreviewFinalWriterTierUnread, type ProviderGateway } from "@debateai/providers";
+import { createPreviewGuardedFetch, createPreviewBudgetRpcPorts, createPreviewBusyCoordinator, previewRunResilience, withPreviewProviderCallPolicy, previewProbeControls, previewSealedRoleFallbackCovered, previewTargetGatewayControls, PREVIEW_GLM_DEADLINE_MS, observeClaimTimeTarget, providerTargetGatewayControls, providerTargetPrice, previewTargetChargePrice, resolveProviderTargetCredentials, previewStructureRepairRoute, previewStructureRepairCeiling, withStructureRepair, previewFinalWriterTierUnreadLine, type PreviewFinalWriterTierUnread, type ProviderGateway } from "@debateai/providers";
 import {
   STORY_SHAPES_DIR_ENV_KEY,
   StoryWriter,
@@ -230,7 +230,9 @@ const previewBusy = createPreviewBusyCoordinator();
  * anyway, because a control that depends on another control having run is one edit away from being none.
  */
 function targetGateway(target: (typeof providerTargets)[number]): ProviderGateway {
-  const price = providerTargetPrice(target);
+  // Owner answer F4 (2026-10-30): on the preview, a reviewed Anthropic row's calls are charged at the vendor's real
+  // prices (cache writes and reads, the 100,000-token step), the same steps its gate settles at.
+  const price = previewTargetChargePrice(previewGate !== undefined, target, providerTargetPrice(target));
   if (runnerSite.money !== null && price === null) {
     throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`);
   }
