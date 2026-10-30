@@ -107,7 +107,31 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.money.continue",
   "v4.money.continueNote",
   "v4.money.continuing",
-  "v4.money.continueTooEarly"
+  "v4.money.continueTooEarly",
+  // Perplexity plan W3-4 (31 Oct): choosing what to dig on the map — the two lines a dig's question asks a suggestion and
+  // the person's own view with, the panel's "Choose what to dig" (the one-path rule, Free's cap, edits, own view), and
+  // Continue's failure line. No search-words label (the owner's correction of 31 Oct).
+  "v4.digText.suggestion",
+  "v4.digText.ownView",
+  "v4.suggest.heading",
+  "v4.suggest.onePath",
+  "v4.suggest.otherPath",
+  "v4.suggest.freeCap",
+  "v4.suggest.full",
+  "v4.suggest.empty",
+  "v4.suggest.tooLong",
+  "v4.suggest.pick",
+  "v4.suggest.none",
+  "v4.suggest.more",
+  "v4.suggest.editLabel",
+  "v4.suggest.editDone",
+  "v4.suggest.edited",
+  "v4.suggest.cancel",
+  "v4.suggest.ownViewLabel",
+  "v4.suggest.ownViewAdd",
+  "v4.suggest.ownViewTag",
+  "v4.suggest.remove",
+  "v4.money.continueFailed"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {
@@ -190,6 +214,16 @@ describe("V4 catalogue keys", () => {
       ? [`v4.view.${outcome}`]
       : POINT_OF_VIEW_SCOPES.map((scope) => `v4.view.${outcome}.${scope}`));
     expect(built.filter((key) => !(key in APPROVED_VIEW_LINES))).toEqual([]);
+  });
+
+  it("W3-4: the map's dig lines are the drafts and approved lines the page reads, and say the plan's caps", () => {
+    // Free's cap is read from the contract (FREE_DIG_PICKS_MAX) into the line, never written into it.
+    expect(catalog["v4.suggest.freeCap"]).toContain("{count}");
+    // A dig's question asks the person's own view as theirs, never as a finding (approved line v4.view.asYours).
+    expect(catalog["v4.digText.ownView"]).toMatch(/not taken as a finding/u);
+    for (const key of ["v4.digText.suggestion", "v4.digText.ownView"]) expect(catalog[key], key).toContain("{text}");
+    // Users see shares of their quota, never prices: no money sign or amount in any V4 line.
+    expect(Object.entries(catalog).filter(([, value]) => /[$€£¢]|\b(?:USD|EUR|RON|lei|cents?|dollars?)\b/iu.test(value))).toEqual([]);
   });
 
   it("no search-words label is drafted (the owner's correction of 30 Oct), and the level labels name DIG_LEVEL_MAX", () => {

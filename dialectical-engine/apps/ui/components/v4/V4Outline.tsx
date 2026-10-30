@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { t } from "@/lib/i18n/translate";
 import { ownWords } from "@/lib/v4/askText";
 import type { DigView, V4OpenQuestion, V4Selection } from "@/lib/v4/types";
@@ -10,6 +11,7 @@ import {
   NewDot,
   openCount,
   openNote,
+  pathExtras,
   pathTitle,
   PickBox,
   resolveSelection,
@@ -41,6 +43,7 @@ function OpenRow(props: Readonly<{ question: V4OpenQuestion; pieces: MapPiecesPr
         onTogglePick={pieces.onTogglePick}
         catalog={pieces.catalog}
         className="v4OutPick"
+        {...(pieces.choice === undefined ? {} : { choice: pieces.choice })}
       />
       <button
         type="button"
@@ -95,8 +98,11 @@ function Children(props: Readonly<{
   pieces: MapPiecesProps;
   selectedId: V4Selection;
   groupKey: string;
+  /** W3-4: the path's suggestions and "Dig here too" (null: none). */
+  extra?: ReactNode;
 }>) {
-  if (props.open.length === 0 && props.digs.length === 0) return null;
+  const extra = props.extra ?? null;
+  if (props.open.length === 0 && props.digs.length === 0 && extra === null) return null;
   return (
     <ul className="v4OutGroup v4OutLeaves">
       {props.open.map((question) => (
@@ -105,6 +111,7 @@ function Children(props: Readonly<{
       {props.digs.map((dig) => (
         <DigRow key={dig.link.childRunId} dig={dig} pieces={props.pieces} selectedId={props.selectedId} />
       ))}
+      {extra}
     </ul>
   );
 }
@@ -166,6 +173,7 @@ export function V4Outline(props: MapPiecesProps) {
                         digs={digsUnder(map, digs, path.id)}
                         pieces={props}
                         selectedId={selectedId}
+                        extra={pathExtras(path, props, "outline")}
                       />
                     </li>
                   );

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
+import type { MoneyLine } from "@/lib/v4/money";
 import { levelHref } from "@/lib/v4/storage";
 import type { ReadingLevel } from "@/lib/v4/types";
 
@@ -38,10 +39,16 @@ export function V4Rail(props: Readonly<{
   digs: V4DigCounts;
   /** "strip": the 768–1099 px top strip; "column": the desktop rail and the phone map sheet. */
   variant: "column" | "strip";
+  /**
+   * W3-4 (the money rule, owner 31 Oct): the usage area's notices — running work went past today's or this week's
+   * allowance and used part of the next one to finish (lib/v4/money.ts borrowLines). Shares only, never a price.
+   */
+  usageNotes?: readonly MoneyLine[];
   catalog: MessageCatalog;
   locale: string;
 }>) {
   const { runId, level, showReadStep, openLeft, digs, variant, catalog, locale } = props;
+  const usageNotes = props.usageNotes ?? [];
   const mapStep = showReadStep ? 3 : 2;
   const reportHref = levelHref(`/v4/debate/${encodeURIComponent(runId)}/report`, level);
   const anyDig = digs.running + digs.done + digs.failed > 0;
@@ -100,6 +107,12 @@ export function V4Rail(props: Readonly<{
         <span>{t(catalog, "v4.rail.openLeft")}</span>
         <strong className="v4DebRailOpenCount">{openLeft}</strong>
       </div>
+
+      {usageNotes.length > 0 ? (
+        <div className="v4DebRailBlock v4DebRailUsage" role="status">
+          {usageNotes.map((note) => <p key={note.key} className="v4DebRailUsageNote">{t(catalog, note.key, note.values)}</p>)}
+        </div>
+      ) : null}
 
       {goodTime ? (
         <div className="v4DebRailGoodTime" role="note">
