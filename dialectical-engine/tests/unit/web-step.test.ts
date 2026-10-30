@@ -51,7 +51,8 @@ describe("W3-1 the web step: when nothing is called", () => {
     expect({ bodies: bodiesOf(ais), searches: search.queries.length, prepared: store.prepared() }).toEqual({ bodies: 0, searches: 0, prepared: 0 });
   });
 
-  it("the planner plans none: its reasons recorded before anything else, no search, nothing stored", async () => {
+  // W3-6: the run's key is opened (once) so each reason is kept sealed under it; still no search and no 0132 row.
+  it("the planner plans none: its reasons recorded, sealed under the run's key, no search, nothing stored", async () => {
     const ais = team({ haiku: { planner: planReply([noWeb("a1", "It turns on what the town values."), noWeb("a2", "Values only.")]) } });
     const search = perplexity();
     const store = memoryStore();
@@ -62,7 +63,8 @@ describe("W3-1 the web step: when nothing is called", () => {
     expect(input.planStatuses).toEqual([[
       { pathId: "a1", status: "NO_SEARCH_PLANNED", reason: "It turns on what the town values.", searchesToSend: 0 },
       { pathId: "a2", status: "NO_SEARCH_PLANNED", reason: "Values only.", searchesToSend: 0 }]]);
-    expect({ planner: ais.haiku.bodies.length, searches: search.queries.length, prepared: store.prepared() }).toEqual({ planner: 1, searches: 0, prepared: 0 });
+    expect({ planner: ais.haiku.bodies.length, searches: search.queries.length, prepared: store.prepared() }).toEqual({ planner: 1, searches: 0, prepared: 1 });
+    expect(store.writes).toEqual([]);
   });
 
   it("every planner fails: the debate goes on without the web, each path FAILED with the planner's code", async () => {

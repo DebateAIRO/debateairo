@@ -64,7 +64,7 @@ import { readEngineRunnerSettings, type EngineRunnerSettings } from "./engine-bo
 import { readDevelopmentRunnerPolicy, type DevelopmentRunnerPolicy } from "./dev-runner-policy.js";
 import { selectPathPages } from "@debateai/evidence";
 import { searchCallSubject } from "./call-lane-gateway.js";
-import type { RecordPlanPathStatuses, WebStepRunnerSettings } from "./web-step.js";
+import type { WebStepRunnerSettings } from "./web-step.js";
 
 /**
  * Side-by-side spec §13 (settings changes without an upload), runner points 1, 2 and 7: the runner's ONE per-version
@@ -841,7 +841,8 @@ export function runPreviewThinkingLevelsOf(
  *   mode charges nothing, as for every call.
  * - The run's plan: billing pinned it at admission (`billing.run_charge_scope`, 0084, which the runner's role reads).
  *   No row (local mode) or no plan (a team grant) is no plan: no search.
- * - The planner's per-path decision goes to `recordPlanPathStatuses` (0134's store, wired at the merge with W2-8).
+ * - The planner's per-path decision is kept by the step itself in 0134's store (web-step.ts `postgresWebPlanStatusRecorder`,
+ *   W3-6), on the runner's pool and under the step's own lease: nothing to set here.
  * A search waits in the debate's lane under the search row's limits (`searchCallSubject`).
  */
 export function runnerWebSearchSettings(input: Readonly<{
@@ -850,8 +851,6 @@ export function runnerWebSearchSettings(input: Readonly<{
   fetch: typeof fetch;
   /** The run's own version's money guard (`runCostEnvelopeGuardOf`), or null in local mode. */
   guardOf: ((runId: string) => CostEnvelopeGuard) | null;
-  /** 0134's writer of the planner's per-path decision (W2-8); absent until the merge: one content-free line instead. */
-  recordPlanPathStatuses?: RecordPlanPathStatuses;
 }>): WebStepRunnerSettings {
   const gated = input.previewGate !== undefined && previewGateSocket(input.previewGate, "perplexity") !== undefined;
   const search = gated
@@ -867,9 +866,6 @@ export function runnerWebSearchSettings(input: Readonly<{
       const row = (await input.pool.query<{ plan_id: PlanId | null }>(
         "SELECT plan_id FROM billing.run_charge_scope WHERE run_id = $1::uuid", [runId])).rows[0];
       return row?.plan_id ?? null;
-    },
-    recordPlanPathStatuses: input.recordPlanPathStatuses ?? (async (runId) => {
-      console.warn(JSON.stringify({ kind: "DEBATEAI_WEB_STEP", event: "WEB_PLAN_STATUS_STORE_PENDING", runId }));
-    })
+    }
   });
 }

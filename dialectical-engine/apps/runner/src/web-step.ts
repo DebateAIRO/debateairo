@@ -13,7 +13,8 @@
  *   debate's call lane holds them to its limits (3 at a time per AI). Never path by path.
  * - Free never searches, and the web setting can be off: then NO call is made, nothing is charged, and each path's
  *   decision (NOT_ON_PLAN, SWITCHED_OFF) is recorded. The planner's per-path decision (`webPlanPathStatuses`) is written
- *   once, before any search, through `recordPlanPathStatuses` (the store is 0134's, wired at the merge).
+ *   once, before any search, through `recordPlanPathStatuses` (0134's identity.web_plan_path, W3-6). A planned map opens
+ *   the run's key first, so each NO_SEARCH_PLANNED reason (model text) is sealed under it, never kept in the clear.
  * - Store first: a search's row is written as soon as it answers, and a path's pages (with their texts, sealed under the
  *   run's key) before any reader call of that path. A run claimed again finds its stored searches and pages, never
  *   searches again, reads the same pages in the same order and so sends byte-identical prompts, which the replay book
@@ -33,8 +34,8 @@
 import { createHash } from "node:crypto";
 import type { Pool } from "pg";
 import {
-  PostgresWebEvidenceRepository, WEB_EVIDENCE_CARRIERS, decryptLeasedContentForRun, encryptAttestedLeasedContentForRun,
-  prepareLeasedContentEncryptionForRun, type CryptoEnvelope, type WebEvidenceRead, type WebSealed
+  PostgresWebEvidenceRepository, WEB_EVIDENCE_CARRIERS, WEB_PLAN_CARRIER, decryptLeasedContentForRun, encryptAttestedLeasedContentForRun,
+  prepareLeasedContentEncryptionForRun, type CryptoEnvelope, type WebEvidenceRead, type WebPlanPathRecord, type WebSealed
 } from "@debateai/db";
 import { findVerbatim, selectPathPages, siteOf, type FrozenWebSearch } from "@debateai/evidence";
 import {
@@ -76,7 +77,7 @@ export type WebStepPath = Readonly<{
 /** 0132's writers and readers the step uses (`PostgresWebEvidenceRepository`). */
 export type WebStepStore = Pick<PostgresWebEvidenceRepository,
   "recordSearch" | "recordPage" | "recordReading" | "recordExtract" | "recordPicks" | "recordPack" | "read" | "readPageTexts">;
-type WebCarrier = typeof WEB_EVIDENCE_CARRIERS[keyof typeof WEB_EVIDENCE_CARRIERS];
+type WebCarrier = typeof WEB_EVIDENCE_CARRIERS[keyof typeof WEB_EVIDENCE_CARRIERS] | typeof WEB_PLAN_CARRIER;
 /** The run's key, as the step uses it: seal a value for a carrier and primary key, open one, and the digest secret. */
 export type WebStepCipher = Readonly<{
   seal: (carrier: WebCarrier, primaryKey: string, value: unknown) => WebSealed;
@@ -88,8 +89,11 @@ export type WebStepPorts = Readonly<{ store: WebStepStore; cipher: WebStepCipher
 /**
  * The planner's per-path decision, stored so the page can say "no search planned, because …" (serve W3-3). Written once,
  * before any search; a run claimed again writes the same decision again, which the store answers as already there.
+ * `cipher` is the run's key under the step's own lease (`prepare`), or null when none was opened (Free, the setting off,
+ * a failed planner: no reason to seal) or it could not be (then a NO_SEARCH_PLANNED reason cannot be kept).
  */
-export type RecordPlanPathStatuses = (runId: string, statuses: readonly WebPlanPathStatus[]) => Promise<void>;
+export type RecordPlanPathStatuses = (runId: string, statuses: readonly WebPlanPathStatus[],
+  cipher: Pick<WebStepCipher, "seal"> | null) => Promise<void>;
 
 export type WebStepInput = Readonly<{
   runId: string;
@@ -239,27 +243,28 @@ export async function runWebStep(input: WebStepInput): Promise<WebStepResult> {
     ...(input.stopsHere === undefined ? {} : { stopsHere: input.stopsHere })
   });
   const statuses = webPlanPathStatuses(plan, pathRefs);
-  // The decision, once, before any search. A failure to keep it is logged: the debate goes on, the web too.
-  try {
-    await input.recordPlanPathStatuses(input.runId, statuses);
-  } catch (error) {
-    if (input.abandon?.(error) === true) throw error;
-    log("WEB_PLAN_STATUS_NOT_RECORDED", { runId: input.runId, code: codeOf(error) });
-  }
+  // The decision, once, before any search. A failure to keep it (NOT_LIVE included, WEB_EVIDENCE_NOT_LIVE) is logged:
+  // the debate goes on, the web too.
+  const keepDecision = async (cipher: WebStepCipher | null): Promise<void> => {
+    try {
+      await input.recordPlanPathStatuses(input.runId, statuses, cipher);
+    } catch (error) {
+      if (input.abandon?.(error) === true) throw error;
+      log("WEB_PLAN_STATUS_NOT_RECORDED", { runId: input.runId, code: codeOf(error) });
+    }
+  };
   const bare = (pathRef: string, status: WebStepPathStatus, code: string | null): WebStepPathOutcome => Object.freeze({
     pathRef, status, code, searchesSent: 0, pageIds: Object.freeze([]), top: Object.freeze([]), packId: null, extractLabels: Object.freeze([])
   });
   if (plan.kind !== "PLANNED") {
+    // Free, the setting off, or no planner answered: no reason to seal, so no key is opened.
+    await keepDecision(null);
     log("WEB_STEP_NO_SEARCH", { runId: input.runId, plan: plan.kind, ...(plan.kind === "FAILED" ? { code: plan.code } : {}) });
     return Object.freeze({ plan: plan.kind, paths: Object.freeze(statuses.map((entry) =>
       bare(entry.pathId, entry.status === "PLANNED" ? "FAILED" : entry.status, plan.kind === "FAILED" ? plan.code : null))) });
   }
-  const toSearch = statuses.filter((entry) => entry.status === "PLANNED");
-  if (toSearch.length === 0) {
-    return Object.freeze({ plan: plan.kind, paths: Object.freeze(statuses.map((entry) => bare(entry.pathId, "NO_SEARCH_PLANNED", null))) });
-  }
 
-  // Only now is anything opened: the store, and the run's key under its lease.
+  // Only now is anything opened: the store, and the run's key under its lease (a reason to seal, or searches to send).
   let ports: WebStepPorts;
   let stored: WebEvidenceRead | null;
   try {
@@ -267,10 +272,16 @@ export async function runWebStep(input: WebStepInput): Promise<WebStepResult> {
   } catch (error) {
     if (input.abandon?.(error) === true) throw error;
     log("WEB_STEP_UNAVAILABLE", { runId: input.runId, code: codeOf(error) });
+    // Without the key no reason can be sealed: a map with one keeps no decision (WEB_PLAN_REASON_UNSEALED, logged).
+    await keepDecision(null);
     return Object.freeze({ plan: plan.kind, paths: Object.freeze(statuses.map((entry) =>
       entry.status === "PLANNED" ? bare(entry.pathId, "FAILED", codeOf(error)) : bare(entry.pathId, "NO_SEARCH_PLANNED", null))) });
   }
   try {
+    await keepDecision(ports.cipher);
+    if (!statuses.some((entry) => entry.status === "PLANNED")) {
+      return Object.freeze({ plan: plan.kind, paths: Object.freeze(statuses.map((entry) => bare(entry.pathId, "NO_SEARCH_PLANNED", null))) });
+    }
     try {
       stored = await ports.store.read(input.runId);
     } catch (error) {
@@ -561,8 +572,37 @@ export type WebStepRunnerSettings = Readonly<{
   searchSubject: CallSubject;
   searchSeamOf: ((runId: string) => WebSearchCostSeam) | null;
   readRunPlan: (runId: string) => Promise<PlanId | null>;
-  recordPlanPathStatuses: RecordPlanPathStatuses;
 }>;
+
+/**
+ * 0134's rows for the planner's decision: each NO_SEARCH_PLANNED reason sealed under the run's key (carrier
+ * WEB_PLAN_CARRIER, the path_ref as its key, `{ reason }` as serve W3-6 opens it); every other status keeps none. A
+ * reason with no key to seal it is refused before anything is written (WEB_PLAN_REASON_UNSEALED): never in the clear.
+ */
+export function webPlanPathRecords(statuses: readonly WebPlanPathStatus[], cipher: Pick<WebStepCipher, "seal"> | null):
+  readonly WebPlanPathRecord[] {
+  return Object.freeze(statuses.map((entry): WebPlanPathRecord => {
+    if (entry.status !== "NO_SEARCH_PLANNED") {
+      return Object.freeze({ pathRef: entry.pathId, status: entry.status, searchesToSend: entry.searchesToSend, reason: null });
+    }
+    if (cipher === null) throw new TypedDomainError("WEB_PLAN_REASON_UNSEALED", "A path's reason is kept only under the run's key");
+    return Object.freeze({ pathRef: entry.pathId, status: entry.status, searchesToSend: 0,
+      reason: cipher.seal(WEB_PLAN_CARRIER, entry.pathId, { reason: entry.reason ?? "" }) });
+  }));
+}
+
+/**
+ * The real store of the planner's decision (0134, `recordPlanStatuses` on the runner's pool). ALREADY is success: a run
+ * claimed again writes the same decision again and the first stays. NOT_LIVE (the debate is gone) is the step's own
+ * WEB_EVIDENCE_NOT_LIVE, which the step logs; its paths go on.
+ */
+export function postgresWebPlanStatusRecorder(pool: Pick<Pool, "query">): RecordPlanPathStatuses {
+  return async (runId, statuses, cipher) => {
+    if (statuses.length === 0) return;
+    const answer = await new PostgresWebEvidenceRepository(pool).recordPlanStatuses(runId, webPlanPathRecords(statuses, cipher));
+    if (answer === "NOT_LIVE") throw new TypedDomainError("WEB_EVIDENCE_NOT_LIVE", "The web store refused the plan");
+  };
+}
 
 /** The store and the run's key, under its own content lease (closed when the step ends). */
 export async function postgresWebStepPorts(pool: Pool, runId: string): Promise<WebStepPorts> {
@@ -582,7 +622,8 @@ export async function postgresWebStepPorts(pool: Pool, runId: string): Promise<W
 
 /**
  * The one call the runner makes (index.ts, after the map's answer check): the run's plan read, the searches through the
- * debate's lane, the store opened on the runner's pool. Absent settings: nothing runs and nothing is recorded.
+ * debate's lane, the store opened on the runner's pool, and the planner's decision kept in 0134's store on the same
+ * pool, its reasons sealed under the step's one lease. Absent settings: nothing runs and nothing is recorded.
  */
 export async function runRunnerWebStep(input: Omit<WebStepInput, "planId" | "webSwitchedOn" | "search" | "searchSeam"
   | "recordPlanPathStatuses" | "prepare"> & Readonly<{
@@ -609,7 +650,7 @@ export async function runRunnerWebStep(input: Omit<WebStepInput, "planId" | "web
     webSwitchedOn: settings.switchedOn && settings.search !== null,
     search: lane === null ? port : laneSearchPort({ lane: lane.lane, scheduler: lane.scheduler, subject: settings.searchSubject, port }),
     searchSeam: settings.searchSeamOf === null ? null : () => settings.searchSeamOf!(rest.runId),
-    recordPlanPathStatuses: settings.recordPlanPathStatuses,
+    recordPlanPathStatuses: postgresWebPlanStatusRecorder(pool),
     prepare: () => postgresWebStepPorts(pool, rest.runId)
   });
 }

@@ -47,6 +47,18 @@ describe("the runner reads the engine from the receipt only", () => {
     }
   });
 
+  it("W3-6: the planner's decision goes to 0134's store, from the step itself, on the runner's pool, under the step's lease", () => {
+    const step = read("apps/runner/src/web-step.ts");
+    expect(step.split("recordPlanPathStatuses: postgresWebPlanStatusRecorder(pool),")).toHaveLength(2);
+    expect(step.split("prepare: () => postgresWebStepPorts(pool, rest.runId)")).toHaveLength(2);
+    // No second lease: the recorder seals with the cipher the step's own `prepare` opened, and opens none itself.
+    expect(step.split("await keepDecision(ports.cipher);")).toHaveLength(2);
+    expect(step.split("prepareLeasedContentEncryptionForRun(")).toHaveLength(2);
+    const settings = read("apps/runner/src/run-settings.ts");
+    expect(settings).not.toContain("WEB_PLAN_STATUS_STORE_PENDING");
+    expect(settings).not.toContain("recordPlanPathStatuses");
+  });
+
   it("the runner's settings carry the boot settings beside the debate shape's", () => {
     const shapeAt = RUNNER.indexOf("readonly debateShape?: DebateShapeRunnerSettings | null;");
     expect(shapeAt).toBeGreaterThan(0);
