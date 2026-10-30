@@ -547,16 +547,20 @@ describe("the pick v2 and readers 2-3 v2: the page count from code", () => {
     expect(() => webPickV2ReplyIssues(webPickReplySchema.parse({ top: [] }), sent, 4 as 3)).toThrowError(code("WEB_TOP_COUNT_INVALID"));
   });
 
-  it("readers 2-3 read exactly top_count pages, 3 or 5, with v1's table and reply checks", () => {
+  it("readers 2-3 read what there is: 1 page up to top_count (3 or 5), with v1's table and reply checks (owner, 30 Oct)", () => {
     for (const topCount of [3, 5] as const) {
-      const fields = webReadTopV2MaterialFields({ question: "Q?", answer: "Yes", topCount, pages: pages.slice(0, topCount) });
-      expect(fields.map((f) => f.name)).toEqual([...WEB_READ_TOP_MATERIAL_FIELDS]);
-      expect(JSON.parse(fields[2]!.content)).toHaveLength(topCount);
+      for (let count = 1; count <= topCount; count += 1) {
+        const fields = webReadTopV2MaterialFields({ question: "Q?", answer: "Yes", topCount, pages: pages.slice(0, count) });
+        expect(fields.map((f) => f.name)).toEqual([...WEB_READ_TOP_MATERIAL_FIELDS]);
+        expect(JSON.parse(fields[2]!.content)).toHaveLength(count);
+      }
     }
     expect(webReadTopV2MaterialFields({ question: "Q?", answer: "Yes", topCount: 3, pages: pages.slice(0, 3) }))
       .toEqual(webReadTopMaterialFields({ question: "Q?", answer: "Yes", pages: pages.slice(0, 3) }));
-    expect(() => webReadTopV2MaterialFields({ question: "Q", answer: "A", topCount: 5, pages: pages.slice(0, 3) })).toThrowError(code("WEB_READ_TOP_PAGE_COUNT"));
-    expect(() => webReadTopV2MaterialFields({ question: "Q", answer: "A", topCount: 3, pages: pages.slice(0, 5) })).toThrowError(code("WEB_READ_TOP_PAGE_COUNT"));
+    expect(() => webReadTopV2MaterialFields({ question: "Q", answer: "A", topCount: 5, pages: [] })).toThrowError(code("WEB_READ_TOP_PAGE_COUNT"));
+    expect(() => webReadTopV2MaterialFields({ question: "Q", answer: "A", topCount: 3, pages: [] })).toThrowError(code("WEB_READ_TOP_PAGE_COUNT"));
+    expect(() => webReadTopV2MaterialFields({ question: "Q", answer: "A", topCount: 3, pages: pages.slice(0, 4) })).toThrowError(code("WEB_READ_TOP_PAGE_COUNT"));
+    expect(() => webReadTopV2MaterialFields({ question: "Q", answer: "A", topCount: 5, pages })).toThrowError(code("WEB_READ_TOP_PAGE_COUNT"));
     expect(() => webReadTopV2MaterialFields({ question: "Q", answer: "A", topCount: 4 as 3, pages: pages.slice(0, 4) })).toThrowError(code("WEB_TOP_COUNT_INVALID"));
     const five = webReadTopReplySchema.parse({ pages: pages.slice(0, 5).map((p) => ({ page_id: p.pageId, grade: 1, extracts: [] })), worth_looking_into: [] });
     expect(webReadTopReplyIssues(five, pages.slice(0, 5).map((p) => p.pageId))).toEqual([]);

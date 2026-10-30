@@ -1,8 +1,9 @@
 // Web search (plan 2026-10-30 task W2-5; owner answers of 2026-10-29/30, "Perplexity design round" to the end): readers 2
 // and 3. Two AIs of two other companies (makers count, so DeepSeek and GLM are two even though DeepInfra hosts both;
-// Qwen the other choice; never reader 1's company) read a path's top pages whole: 3 on Quick look, 5 on Thorough. Code
-// checks their extracts word for word, merges the same extract found by several readers, records the grade spread and
-// keeps their "still worth looking into" lines. A reader that fails leaves the page read by fewer AIs. Thinking low.
+// Qwen the other choice; never reader 1's company) read a path's top pages whole: up to 3 on Quick look, up to 5 on
+// Thorough, as many as there are (owner, 30 Oct: "read what there is"). Code checks their extracts word for word, merges
+// the same extract found by several readers, records the grade spread and keeps their "still worth looking into" lines.
+// A reader that fails leaves the page read by fewer AIs. Thinking low.
 //
 // Every AI here is a scripted stand-in, and the pages are made up. The verbatim checker is W2-4's; this file hands the
 // step a stand-in of the assumed shape `(pageText, extract) => boolean` (spaces evened out, then found).
@@ -111,7 +112,7 @@ describe("W2-5 company rotation: two other makers, never reader 1's", () => {
   });
 });
 
-describe("W2-5 the calls: the sealed v2 wording, 3 or 5 pages, no page text in the call record, thinking low", () => {
+describe("W2-5 the calls: the sealed v2 wording, up to 3 or 5 pages, no page text in the call record, thinking low", () => {
   it("Quick look: one call per reader, keys WEB:read-top:<path>:<2|3>, web.read-top.v2, exactly the 3 top pages", async () => {
     const answer = replyOf([{ id: "p1", grade: 3, extracts: [] }, { id: "p2", grade: 0, extracts: [] }, { id: "p3", grade: 2, extracts: [] }]);
     const { result, seen } = run({ pathIndex: 1, replies: { "WEB:read-top:1:2": answer, "WEB:read-top:1:3": answer } });
@@ -271,22 +272,41 @@ describe("W2-5 a reader that fails leaves fewer readers, disclosed", () => {
     expect(ran.pages.every((entry) => entry.fewerReaders)).toBe(true);
   });
 
-  it("fewer top pages than the count: the largest sealed count that fits is read, the rest by reader 1 alone", async () => {
-    const three = replyOf(["p1", "p2", "p3"].map((id) => ({ id, grade: 2, extracts: [] })));
-    const { result, seen } = run({ mode: "thorough", pages: [P1, P2, P3, P4],
-      replies: { "WEB:read-top:0:2": three, "WEB:read-top:0:3": three } });
-    const ran = await result;
-    expect(ran.topCount).toBe(3);
-    expect(seen).toHaveLength(2);
-    expect(ran.pages.map((entry) => entry.fewerReaders)).toEqual([false, false, false, true]);
-    expect(ran.pages[3]).toEqual({ pageId: P4.pageId, grades: { 1: 1, 2: null, 3: null }, readBy: [1], fewerReaders: true, spread: null });
+  it("fewer top pages than the count: readers 2 and 3 read what there is, 1 to 5 pages (owner, 30 Oct); none: not asked", async () => {
+    const ids = (call: WebTopReaderCallInput) =>
+      (JSON.parse(call.material.find((entry) => entry.name === "pages")!.content) as Array<{ page_id: string }>).map((entry) => entry.page_id);
+    const four = replyOf(["p1", "p2", "p3", "p4"].map((id) => ({ id, grade: 2, extracts: [] })));
+    const thorough = run({ mode: "thorough", pages: [P1, P2, P3, P4], replies: { "WEB:read-top:0:2": four, "WEB:read-top:0:3": four } });
+    const ranFour = await thorough.result;
+    expect(ranFour.topCount).toBe(4);
+    expect(thorough.seen.map(ids)).toEqual([["p1", "p2", "p3", "p4"], ["p1", "p2", "p3", "p4"]]);
+    expect(ranFour.pages.map((entry) => entry.fewerReaders)).toEqual([false, false, false, false]);
 
-    const short = run({ pages: [P1, P2], replies: {} });
-    const none = await short.result;
-    expect(short.seen).toHaveLength(0);
+    for (const [mode, pages] of [["quick", [P1, P2]], ["quick", [P1]], ["thorough", [P1, P2, P3]], ["thorough", [P1]]] as const) {
+      const answer = replyOf(pages.map((_, index) => ({ id: `p${String(index + 1)}`, grade: 1, extracts: [] })));
+      const fewer = run({ mode, pages, replies: { "WEB:read-top:0:2": answer, "WEB:read-top:0:3": answer } });
+      const ran = await fewer.result;
+      expect([mode, ran.topCount]).toEqual([mode, pages.length]);
+      expect(fewer.seen.map(ids)).toEqual([pages.map((_, index) => `p${String(index + 1)}`), pages.map((_, index) => `p${String(index + 1)}`)]);
+      expect(ran.readers.map((entry) => entry.outcome)).toEqual(["READ", "READ"]);
+      expect(ran.pages.every((entry) => !entry.fewerReaders && entry.readBy.join() === "1,2,3")).toBe(true);
+    }
+
+    // More pages than the mode's count (never from W2-4): the top ones are read, the rest by reader 1 alone.
+    const three = replyOf(["p1", "p2", "p3"].map((id) => ({ id, grade: 2, extracts: [] })));
+    const over = run({ pages: [P1, P2, P3, P4], replies: { "WEB:read-top:0:2": three, "WEB:read-top:0:3": three } });
+    const ranOver = await over.result;
+    expect(ranOver.topCount).toBe(WEB_TOP_COUNT_BY_MODE.quick);
+    expect(over.seen.map(ids)).toEqual([["p1", "p2", "p3"], ["p1", "p2", "p3"]]);
+    expect(ranOver.pages[3]).toEqual({ pageId: P4.pageId, grades: { 1: 1, 2: null, 3: null }, readBy: [1], fewerReaders: true, spread: null });
+
+    // No helpful page at all: readers 2 and 3 are not asked.
+    const empty = run({ mode: "thorough", pages: [], replies: {} });
+    const none = await empty.result;
+    expect(empty.seen).toHaveLength(0);
     expect(none.topCount).toBe(0);
-    expect(none.readers.map((entry) => [entry.outcome, entry.failure])).toEqual([["NOT_ASKED", "TOO_FEW_PAGES"], ["NOT_ASKED", "TOO_FEW_PAGES"]]);
-    expect(none.pages.every((entry) => entry.fewerReaders && entry.readBy.join() === "1")).toBe(true);
+    expect(none.readers.map((entry) => [entry.outcome, entry.failure])).toEqual([["NOT_ASKED", "NO_TOP_PAGES"], ["NOT_ASKED", "NO_TOP_PAGES"]]);
+    expect(none.pages).toEqual([]);
   });
 });
 

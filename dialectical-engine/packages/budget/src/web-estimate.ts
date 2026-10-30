@@ -50,7 +50,10 @@ export type WebRolePrices = Readonly<{
   pick: ProviderTargetPrice;
   /** Readers 2 and 3 (two other companies: DeepSeek, GLM, Qwen as the other choice): the dearest of them. */
   topReaders: ProviderTargetPrice;
-  /** The planner (open owner choice Q11: Haiku, DeepSeek or Qwen): the dearest of them. */
+  /**
+   * The planner (owner, 30 Oct: Claude Haiku first, Qwen the backup, then GLM, DeepSeek): the dearest of them. The
+   * preview prices Haiku, DeepSeek and Qwen; GLM costs less than DeepSeek on both counts, so it is covered.
+   */
   planner: ProviderTargetPrice;
   /** The arguing calls that read the packs: the dearest debater's price. */
   pack: ProviderTargetPrice;

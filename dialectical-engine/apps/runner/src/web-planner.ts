@@ -79,14 +79,12 @@ export const WEB_PLAN_SEARCH_CAP_BY_MODE = Object.freeze({ quick: 20, thorough: 
 export const WEB_PLANNER_PATHS_MAX = 8 as const;
 
 /**
- * Which AI plans (plan Q11 was left open; the owner's answers name the readers only). The cheapest suitable model of
- * the reviewed rows first: the planner reads a few thousand tokens and writes a short list, so the output price
- * decides — Qwen3.8-Flash ($0.113 / $0.382 per million), then Claude Haiku 5.5 ($0.10 / $0.50), GLM-5.3-Flash
- * ($0.15 / $0.50), DeepSeek-V4.1-Flash ($0.20 / $0.60). About 0.1¢ a debate. A backup is the next one of another
- * company.
+ * Which AI plans (owner, 30 Oct, "Search planner AI": "Haiku first", Qwen as the backup): Claude Haiku 5.5
+ * ($0.10 / $0.50 per million), then Qwen3.8-Flash ($0.113 / $0.382), GLM-5.3-Flash ($0.15 / $0.50),
+ * DeepSeek-V4.1-Flash ($0.20 / $0.60). About 0.1¢ a debate. A backup is the next one of another company.
  */
 export const WEB_PLANNER_MODEL_ORDER = Object.freeze([
-  "Qwen/Qwen3.8-Flash", "claude-haiku-5-5", "zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash"
+  "claude-haiku-5-5", "Qwen/Qwen3.8-Flash", "zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash"
 ] as const);
 
 /** The planner's call-site keys: the first planner, then its backup (the thinking table reads both as `web_planner`). */
