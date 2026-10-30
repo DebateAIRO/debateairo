@@ -9,6 +9,7 @@ export type * from "./provider-funding.js";
 export * from "./region.js";
 export * from "./italy-approval.js";
 export * from "./mail-address.js";
+export * from "./personal-data-scan.js";
 export * from "./payment-regions.js";
 export * from "./engine.js";
 export * from "./engine-material.js";

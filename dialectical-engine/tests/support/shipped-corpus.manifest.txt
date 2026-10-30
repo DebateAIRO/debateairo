@@ -1073,7 +1073,11 @@ packages/evaluator/src/dispatch-binding.ts
 packages/evaluator/src/harvest-constants.ts
 packages/evaluator/src/index.ts
 packages/evaluator/src/public-aggregate-provider.ts
+packages/evidence/src/host-filter.ts
 packages/evidence/src/index.ts
+packages/evidence/src/query-guard.ts
+packages/evidence/src/web-query-set.ts
+packages/evidence/src/window.ts
 packages/geo/src/decide.ts
 packages/geo/src/index.ts
 packages/geo/src/ip.ts
@@ -1099,6 +1103,7 @@ packages/kernel/src/length-guidance.ts
 packages/kernel/src/mail-address.ts
 packages/kernel/src/manualPhone.ts
 packages/kernel/src/payment-regions.ts
+packages/kernel/src/personal-data-scan.ts
 packages/kernel/src/provider-funding.ts
 packages/kernel/src/question-language.ts
 packages/kernel/src/reading-level.ts
