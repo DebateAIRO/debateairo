@@ -1,4 +1,4 @@
-export type DevelopmentAuthStackProfileName = "default" | "support-preview";
+export type DevelopmentAuthStackProfileName = "default" | "support-preview" | "rls";
 
 export type DevelopmentAuthStackProfile = Readonly<{
   name: DevelopmentAuthStackProfileName;
@@ -51,6 +51,26 @@ export const SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE: DevelopmentAuthStac
     composeProjectName: "debateai-v3-support-preview"
   });
 
+/**
+ * Row-level security S01 (DECISIONS D43): V's TEST stack, selected by DEBATEAI_DEV_AUTH_STACK_PROFILE=rls. Its own
+ * compose project (and so its own Postgres volume) and every port outside the two profiles above and the listener
+ * baseline measured at intake, so V's default stack is never started, migrated or stopped by it.
+ */
+export const RLS_DEVELOPMENT_AUTH_STACK_PROFILE: DevelopmentAuthStackProfile = Object.freeze({
+  name: "rls",
+  publicOrigin: "https://localhost:5200",
+  publicPort: 5200,
+  uiPort: 5201,
+  apiPort: 11790,
+  providerPorts: Object.freeze([11791, 11795, 11792, 11796, 11793, 11797, 11798] as const),
+  supportModelPort: 11794,
+  billingFakePorts: Object.freeze([11799, 11800, 11801] as const),
+  postgresPort: 56532,
+  hatchetGrpcPort: 7677,
+  hatchetApiPort: 11888,
+  composeProjectName: "debateai-v3-rls"
+});
+
 export function loadDevelopmentAuthStackProfile(
   source: Readonly<Record<string, string | undefined>>
 ): DevelopmentAuthStackProfile {
@@ -59,5 +79,6 @@ export function loadDevelopmentAuthStackProfile(
     return DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE;
   }
   if (value === "support-preview") return SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE;
+  if (value === "rls") return RLS_DEVELOPMENT_AUTH_STACK_PROFILE;
   throw new TypeError("DEV_AUTH_STACK_PROFILE_INVALID");
 }

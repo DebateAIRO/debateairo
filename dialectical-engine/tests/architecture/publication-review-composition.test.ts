@@ -49,6 +49,10 @@ describe("publication review production composition", () => {
     }> }>(variable(source, "publicationReviewStaff"), {
       createPublicationReviewStaffService: (input: unknown) => input,
       publicationReviewRepository: {},
+      // Row-level security X28: staff reads run on the cross-account target (rls-cross-account-sites pins the wiring).
+      PublicationReviewRepository: EmptyReader,
+      crossAccountPool: (target: unknown) => target,
+      crossAccount: (_reader: string, use: () => Promise<unknown>) => use(),
       application: {
         withContentLease: async (_runId: string, use: () => Promise<unknown>) => use(),
         readAnswer: async () => ({ answer_version: 2, synthesis: "same" })

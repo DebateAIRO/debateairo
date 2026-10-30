@@ -237,6 +237,17 @@ function validateExactEnvironment(
       "debateai_dev_authorization",
       postgresPort
     );
+    // Row-level security S01 (PLAN S2.4): the API's two system logins, each on its own development principal.
+    assertLocalDatabaseUrl(
+      values.API_SYSTEM_DATABASE_URL!,
+      "debateai_dev_api_system",
+      postgresPort
+    );
+    assertLocalDatabaseUrl(
+      values.API_AUTHORIZATION_SYSTEM_DATABASE_URL!,
+      "debateai_dev_authorization_system",
+      postgresPort
+    );
     assertLocalDatabaseUrl(
       values.PUBLICATION_CLEANUP_DATABASE_URL!,
       "debateai_dev_publication_cleanup",

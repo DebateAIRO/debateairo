@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { DEVELOPMENT_DATABASE_PRINCIPALS } from "../../apps/runner/src/dev-database-principals.js";
+import { DEVELOPMENT_DATABASE_PRINCIPALS, type DevelopmentDatabasePrincipal } from "../../apps/runner/src/dev-database-principals.js";
 
 const source = (relativePath: string): Promise<string> =>
   readFile(new URL(`../../${relativePath}`, import.meta.url), "utf8");
@@ -45,8 +45,11 @@ describe("DEV-01 local-auth topology specification", () => {
     const documented = topology.principals.filter(({ id }) => id.startsWith("debateai_dev_")
       && id !== "debateai_dev_migrator" && id !== "debateai_dev_hatchet");
     expect(documented.map(({ id, memberships, purpose }) => ({ id, memberships, environmentKey: purpose[0] })))
-      .toEqual(DEVELOPMENT_DATABASE_PRINCIPALS.map(({ roleName, capabilityRole, environmentKey }) => ({
-        id: roleName, memberships: [capabilityRole], environmentKey
+      // Row-level security S01 (PLAN S2.3, DECISIONS D46): a principal's cross-account marker follows its capability role.
+      .toEqual(DEVELOPMENT_DATABASE_PRINCIPALS.map(({ roleName, capabilityRole, crossAccountRole, environmentKey }: DevelopmentDatabasePrincipal) => ({
+        id: roleName,
+        memberships: [capabilityRole, ...(crossAccountRole === undefined ? [] : [crossAccountRole])],
+        environmentKey
       })));
   });
 
@@ -159,7 +162,7 @@ describe("DEV-01 local-auth topology specification", () => {
       {
         id: "debateai_dev_liveness", login: true,
         attributes: ["INHERIT", "NOSUPERUSER", "NOCREATEDB", "NOCREATEROLE", "NOREPLICATION", "NOBYPASSRLS"],
-        memberships: ["debateai_runtime"],
+        memberships: ["debateai_runtime", "debateai_rls_all_accounts"],
         forbiddenMemberships: ["debateai_billing_runtime", "debateai_content_provision", "debateai_erasure_runtime", "debateai_authorization_runtime", "debateai_publication_cleanup", "debateai_replay", "debateai_settlement_watch", "pg_*"], owns: [],
         purpose: ["LIVENESS_DATABASE_URL"], serviceCredential: true
       },
@@ -198,6 +201,28 @@ describe("DEV-01 local-auth topology specification", () => {
         memberships: ["debateai_data_export_worker"],
         forbiddenMemberships: ["debateai_runtime", "debateai_authorization_runtime", "debateai_erasure_runtime", "debateai_support", "pg_*"],
         owns: [], purpose: ["DATA_EXPORT_DATABASE_URL"], serviceCredential: true
+      },
+      // Row-level security S01 (PLAN S2.3, DECISIONS D29, D46): the API's two system logins and the runner's own login.
+      {
+        id: "debateai_dev_api_system", login: true,
+        attributes: ["INHERIT", "NOSUPERUSER", "NOCREATEDB", "NOCREATEROLE", "NOREPLICATION", "NOBYPASSRLS"],
+        memberships: ["debateai_billing_runtime", "debateai_rls_all_accounts"],
+        forbiddenMemberships: ["debateai_content_provision", "debateai_erasure_runtime", "pg_*"], owns: [],
+        purpose: ["API_SYSTEM_DATABASE_URL", "ROOM_DECISION_POOL"], serviceCredential: true
+      },
+      {
+        id: "debateai_dev_authorization_system", login: true,
+        attributes: ["INHERIT", "NOSUPERUSER", "NOCREATEDB", "NOCREATEROLE", "NOREPLICATION", "NOBYPASSRLS"],
+        memberships: ["debateai_authorization_runtime", "debateai_rls_all_accounts"],
+        forbiddenMemberships: ["debateai_content_provision", "debateai_erasure_runtime", "debateai_publication_cleanup", "debateai_replay", "debateai_settlement_watch", "pg_*"], owns: [],
+        purpose: ["API_AUTHORIZATION_SYSTEM_DATABASE_URL"], serviceCredential: true
+      },
+      {
+        id: "debateai_dev_runner", login: true,
+        attributes: ["INHERIT", "NOSUPERUSER", "NOCREATEDB", "NOCREATEROLE", "NOREPLICATION", "NOBYPASSRLS"],
+        memberships: ["debateai_runtime", "debateai_rls_all_accounts"],
+        forbiddenMemberships: ["debateai_billing_runtime", "debateai_content_provision", "debateai_erasure_runtime", "debateai_authorization_runtime", "debateai_publication_cleanup", "debateai_replay", "debateai_settlement_watch", "pg_*"], owns: [],
+        purpose: ["RUNNER_DATABASE_URL"], serviceCredential: true
       },
       {
         id: "debateai_dev_hatchet", login: true,

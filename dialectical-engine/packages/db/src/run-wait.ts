@@ -1,4 +1,5 @@
 import type { Pool, PoolClient } from "pg";
+import { crossAccount } from "./account-context.js";
 
 /**
  * Budget spec 2026-09-28 §2.7 (migration 0083) — THE WAITING LINE.
@@ -228,16 +229,18 @@ export class RunWaitRepository {
    * measures it again. A run whose own person is still full holds nobody back.
    */
   async siteLineBlocking(now: Date): Promise<boolean> {
-    const result = await this.pool.query<{ blocking: boolean }>(
-      `SELECT EXISTS (
-         SELECT 1 FROM core.run_waiting_v AS line
-         WHERE (line.waits_for IS DISTINCT FROM 'PERSON' OR ${PERSON_BLOCK_MAY_HAVE_LIFTED})
-           AND NOT EXISTS (SELECT 1 FROM billing.run_charge_scope AS funding WHERE funding.run_id=line.run_id AND funding.funding_kind='INTERNAL'
-             AND billing.read_internal_run_state(line.run_id)='HELD')
-       ) AS blocking`,
-      [now]
-    );
-    return result.rows[0]?.blocking === true;
+    return crossAccount("X22", async () => {
+      const result = await this.pool.query<{ blocking: boolean }>(
+        `SELECT EXISTS (
+           SELECT 1 FROM core.run_waiting_v AS line
+           WHERE (line.waits_for IS DISTINCT FROM 'PERSON' OR ${PERSON_BLOCK_MAY_HAVE_LIFTED})
+             AND NOT EXISTS (SELECT 1 FROM billing.run_charge_scope AS funding WHERE funding.run_id=line.run_id AND funding.funding_kind='INTERNAL'
+               AND billing.read_internal_run_state(line.run_id)='HELD')
+         ) AS blocking`,
+        [now]
+      );
+      return result.rows[0]?.blocking === true;
+    });
   }
 
   /**

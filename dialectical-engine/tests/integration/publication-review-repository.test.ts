@@ -3,27 +3,31 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { configureContentEncryption, contentCipherFor, createPool, decryptContentForRun, migrate, type Pool } from "@debateai/db";
 import { PublicationReviewRepository, PublicationReviewRefusal, ServeRepository, SynthesisCheckRepository } from "@debateai/serve";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { provisionRlsLogins, type RlsLogins } from "../support/rls-logins.js";
 import { persistTerminalRun } from "../support/settledRun.js";
 import { createEncryptedStoryRun, provisionStoryEncryptedOwner, releaseStoryEncryptedOwner, type StoryEncryptedOwner } from "../support/storyEncryptedOwner.js";
 
 const policyVersion = "synthesis.content-check.v1@0123456789abcdef";
 const hash = (value: string) => `sha256:${createHash("sha256").update(value).digest("hex")}`;
 let database: TestDatabase, runtime: Pool, owner: StoryEncryptedOwner;
+let logins: RlsLogins | undefined;
 let reviews: PublicationReviewRepository, checks: SynthesisCheckRepository;
 
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
   owner = await provisionStoryEncryptedOwner(database.pool);
-  const url = new URL(database.connectionString);
-  url.searchParams.set("options", "-c role=debateai_runtime");
-  runtime = createPool(url.toString());
+  // Row-level security S01: bare debateai_runtime carries no account context, so it now sees no account's rows. These
+  // statements run where the API runs every statement outside a request: its system login (tests/support/rls-logins.ts).
+  logins = await provisionRlsLogins(database);
+  runtime = createPool(logins.url("API_SYSTEM_DATABASE_URL"));
   configureContentEncryption(runtime, contentCipherFor(database.pool)!);
   reviews = new PublicationReviewRepository(runtime);
   checks = new SynthesisCheckRepository(runtime);
 }, 180_000);
 afterAll(async () => {
   await runtime?.end();
+  await logins?.end();
   await database?.stop();
   if (owner) await releaseStoryEncryptedOwner(owner);
 });

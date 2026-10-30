@@ -7599,7 +7599,9 @@ a:focus-visible {
    the heavier weight and a shadow the inactive tab does not have. */
 .libTab[aria-current="page"] {
   border-color: var(--ink);
-  background: var(--ink);
+  /* background-color, not the background shorthand: the same in browsers (.libTab already sets the rest), and the
+     test DOM (jsdom 30.1) drops a shorthand that holds var(). */
+  background-color: var(--ink);
   color: var(--bg);
   font-weight: 700;
   box-shadow: var(--shadow-tab);

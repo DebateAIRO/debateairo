@@ -3,6 +3,7 @@ import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { parseProviderDiscoveryTargets } from "@debateai/providers";
 import { loadDevelopmentApiProcessEnvironment } from "./dev-api-process.js";
+import { readDevelopmentRunnerDatabaseUrl } from "./dev-api-environment.js";
 import {
   DEVELOPMENT_ORGAN_COST_BOUNDS,
   DEVELOPMENT_RUN_DEATH_POLICY
@@ -40,6 +41,8 @@ export type DevelopmentRunnerChild = Readonly<{
 
 export type DevelopmentRunnerProcessOperations = Readonly<{
   loadApiEnvironment(repositoryRoot: string): Promise<Readonly<Record<string, string>>>;
+  /** Row-level security S01 (SPEC X1): the runner's own login, the custody credential file's RUNNER_DATABASE_URL. */
+  loadRunnerDatabaseUrl(repositoryRoot: string): Promise<string>;
   startRunner(environment: Readonly<Record<string, string>>): DevelopmentRunnerChild;
 }>;
 
@@ -59,6 +62,7 @@ export class DevelopmentRunnerProcessError extends Error {
 function createRunnerEnvironment(
   commandEnvironment: Readonly<Record<string, string>>,
   apiEnvironment: Readonly<Record<string, string>>,
+  runnerDatabaseUrl: string,
   profile: DevelopmentAuthStackProfile
 ): Readonly<Record<string, string>> {
   const providerPanel = parseDevelopmentProviderPanelTargets(
@@ -78,13 +82,15 @@ function createRunnerEnvironment(
     || releaseKey === undefined
     || apiEnvironment.REGISTER_DEPLOYMENT_RECEIPT_SHA256 === undefined
     || apiEnvironment.REGISTER_DEPLOYMENT_RECEIPT_FILE === undefined
-    || apiEnvironment.PROVIDER_DISCOVERY_TARGETS_JSON !== providerPanel.targetsJson) {
+    || apiEnvironment.PROVIDER_DISCOVERY_TARGETS_JSON !== providerPanel.targetsJson
+    // Row-level security S01 (SPEC X1): the runner reads across accounts on its own login, never on the API's.
+    || runnerDatabaseUrl === apiEnvironment.DATABASE_URL) {
     throw new DevelopmentRunnerProcessError("DEV_RUNNER_PROCESS_ENVIRONMENT_INVALID");
   }
   return Object.freeze({
     ...commandEnvironment,
     KEK_PATH: apiEnvironment.KEK_PATH!,
-    DATABASE_URL: apiEnvironment.DATABASE_URL!,
+    DATABASE_URL: runnerDatabaseUrl,
     RUNNER_WORKER_ID: "development:walking-skeleton",
     DEBATEAI_DEPLOYMENT_MODE: "local",
     REGISTER_VERSION: registerVersion,
@@ -149,11 +155,14 @@ export async function startDevelopmentRunnerProcess(input: Readonly<{
 }>): Promise<DevelopmentRunnerProcess> {
   const profile = input.profile ?? DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE;
   const apiEnvironment = await input.operations.loadApiEnvironment(input.repositoryRoot);
+  const runnerDatabaseUrl = await input.operations.loadRunnerDatabaseUrl(input.repositoryRoot);
   // An environment the runner cannot be given names itself (DEV_RUNNER_PROCESS_ENVIRONMENT_INVALID); any other failure
   // while building it or spawning stays DEV_RUNNER_PROCESS_START_FAILED, its cause kept off the printed line.
   let runnerEnvironment: Readonly<Record<string, string>>;
   try {
-    runnerEnvironment = createRunnerEnvironment(input.commandEnvironment, apiEnvironment, profile);
+    runnerEnvironment = createRunnerEnvironment(
+      input.commandEnvironment, apiEnvironment, runnerDatabaseUrl, profile
+    );
   } catch (error) {
     if (error instanceof DevelopmentRunnerProcessError) throw error;
     throw new DevelopmentRunnerProcessError("DEV_RUNNER_PROCESS_START_FAILED", error);
@@ -210,6 +219,7 @@ export function createDevelopmentRunnerProcessOperations(
   const cwd = resolve(repositoryRoot);
   return Object.freeze({
     loadApiEnvironment: (root) => loadDevelopmentApiProcessEnvironment(root, profile),
+    loadRunnerDatabaseUrl: (root) => readDevelopmentRunnerDatabaseUrl(root, profile),
     startRunner(environment) {
       const child = spawn(
         process.execPath,

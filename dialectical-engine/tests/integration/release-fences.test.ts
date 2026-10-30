@@ -7,17 +7,21 @@ import { LEGACY_RELEASE_KEY } from "@debateai/kernel";
 import { acceptanceFailureRecorder, ACCEPTANCE_WORKER_ID } from "../../acceptance/main.js";
 import { ACCEPTANCE_RELEASE_KEY } from "../../acceptance/seed-register.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
+import { createSystemTwin } from "../support/rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { listRunnerSettingsPreload } from "../../apps/runner/src/run-settings.js";
 
 /**
  * Side-by-side spec §3 ("the database refuses to give a runner another release's debate"), over embedded Postgres,
- * connected as a principal with exactly the live runner principal's one membership (debateai_runtime), so every read
- * and write below is one a runner may really make. The superuser pool only arranges rows (claims, lapsed deadlines).
+ * connected as the live runner's own login: debateai_runtime and, since row-level security S01, the marker role
+ * debateai_rls_all_accounts (a system twin, as deploy/postgres/hardening.sql and the dev runner login grant it), so
+ * every read and write below is one a runner may really make. The bare debateai_runtime login, with no account
+ * context, sees none of these items (the last case). The superuser pool only arranges rows (claims, lapsed deadlines).
  * CI skips this directory; run it before merging.
  */
 let database: TestDatabase;
 let runtime: Pool;
+let bareRuntime: Pool;
 
 const KEY_A = ["r1", "aaaaaaaaaaaa"].join("-");
 const KEY_B = ["r2", "bbbbbbbbbbbb"].join("-");
@@ -25,15 +29,17 @@ const KEY_B = ["r2", "bbbbbbbbbbbb"].join("-");
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
-  await database.pool.query("CREATE ROLE fence_runner_runtime LOGIN PASSWORD 'fence-runner-private-fixture-only' IN ROLE debateai_runtime");
+  runtime = createPool(await createSystemTwin(database, "fence_runner_runtime", ["debateai_runtime"]));
+  await database.pool.query("CREATE ROLE fence_bare_runtime LOGIN PASSWORD 'fence-bare-private-fixture-only' IN ROLE debateai_runtime");
   const url = new URL(database.connectionString);
-  url.username = "fence_runner_runtime";
-  url.password = "fence-runner-private-fixture-only";
-  runtime = createPool(url.toString());
+  url.username = "fence_bare_runtime";
+  url.password = "fence-bare-private-fixture-only";
+  bareRuntime = createPool(url.toString());
 }, 600_000);
 
 afterAll(async () => {
   await runtime?.end();
+  await bareRuntime?.end();
   await database?.stop();
 });
 
@@ -331,6 +337,21 @@ describe("work items are fenced by release (side-by-side §3)", () => {
     expect(await new WorkItemRepository(runtime, { releaseKey: KEY_B, workerId: "worker:b" })
       .setAsideWorkItem({ ...bClaimed, reason: "BACKSTOP", readyOnly: false })).toBe(true);
     expect(await jobRow(bClaimed.workItemId)).toEqual({ state: "FAILED", terminal_reason: "RUN_SET_ASIDE:BACKSTOP", claimed_by: null });
+  });
+
+  it("the bare runtime login, with no account context, reads and writes none of its own release's items (row-level security, 0126)", async () => {
+    const a = await runWithJob(KEY_A), runless = await runlessJob();
+    const bare = new WorkItemRepository(bareRuntime, { releaseKey: KEY_A, workerId: "worker:a" });
+    expect(await bare.listDispatchable(10)).toEqual([]);
+    expect(await bare.releaseKeyOf(a.workItemId)).toBeNull();
+    expect(await bare.claimById({ workItemId: a.workItemId, workerId: "worker:a", claimSeconds })).toBeNull();
+    expect(await bare.claimNext({ workerId: "worker:a", claimSeconds })).toBeNull();
+    expect(await bare.recordTerminalFailure({ ...a, reason: "TEST_LAYER:BARE" })).toBe(false);
+    expect(await bare.setAsideOpenWork({ reason: "BACKSTOP", limit: 10 })).toEqual([]);
+    for (const job of [a, runless]) expect(await jobRow(job.workItemId)).toEqual({ state: "READY", terminal_reason: null, claimed_by: null });
+    // Not vacuous: the runner's own login claims the same item.
+    expect(await fenceA().claimById({ workItemId: a.workItemId, workerId: "worker:a", claimSeconds }))
+      .toMatchObject({ workItemId: a.workItemId, claimedBy: "worker:a" });
   });
 });
 

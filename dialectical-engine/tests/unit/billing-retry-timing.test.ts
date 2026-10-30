@@ -90,6 +90,8 @@ describe("P2-I7 a saved-card charge's outcome rows are dated when the call retur
   const CARD_TOKEN_ID = ["5b7e1c2a", "4d3f", "4a6b", "9c8d", "0e1f2a3b4c5d"].join("-");
   const QUOTE_ID = "6c8f2d3b-5e4a-4b7c-8d9e-1f2a3b4c5d6e";
   const CUSTOMER_ID = "7d9a3e4c-6f5b-4c8d-9e0f-2a3b4c5d6e7f";
+  // The owner's INITIAL charge, which saved the card (usableSavedCard answers only a card the owner's own charge saved).
+  const INITIAL_CHARGE_ID = "d".repeat(32);
 
   /** The sealed records `preparedCharge` opens: the saved card, the checkout's location and the payer's profile. */
   function storedRecords() {
@@ -119,8 +121,9 @@ describe("P2-I7 a saved-card charge's outcome rows are dated when the call retur
         enqueue: async (_client: unknown, job: { kind: string; notBefore: Date }) => { enqueued.push(job); },
         cardTokenById: async () => ({
           tokenId: CARD_TOKEN_ID, paymentProvider: "netopia", paymentEnvironment: "sandbox", revokedAt: null, expMonth: 12,
-          expYear: 2029, tokenCiphertext: card.ciphertext, keyId: card.keyId
+          expYear: 2029, tokenCiphertext: card.ciphertext, keyId: card.keyId, sourceChargeId: INITIAL_CHARGE_ID
         }),
+        charge: async (chargeId: string) => (chargeId === INITIAL_CHARGE_ID ? { chargeId, ownerRef: "o-timing", events: [] } : unused()),
         chargesForSubscription: async () => [{ kind: "INITIAL", quoteId: QUOTE_ID }],
         quote: async () => ({
           quoteId: QUOTE_ID, planId: "PLUS", locationCiphertext: location.ciphertext, keyId: location.keyId, currency: "USD"

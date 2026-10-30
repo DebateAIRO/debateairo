@@ -29,6 +29,7 @@ import {
   type StoryPolicy
 } from "@debateai/register";
 import type { Pool, PoolClient } from "pg";
+import { crossAccount } from "@debateai/db";
 import {
   COST_ENVELOPE_CHARGE_UNREPRESENTABLE,
   chargeMicrosForUsage,
@@ -1052,11 +1053,13 @@ export class PostgresModelSpendStore implements ModelSpendStore {
   }
 
   async readDaySpentMicros(day: string): Promise<number> {
-    const result = await this.pool.query<{ total: string }>(
-      "SELECT coalesce(sum(charge_micros),0)::text AS total FROM ledger.model_spend WHERE charged_on = $1::date",
-      [day]
-    );
-    return this.#total(result.rows[0]?.total);
+    return crossAccount("X23", async () => {
+      const result = await this.pool.query<{ total: string }>(
+        "SELECT coalesce(sum(charge_micros),0)::text AS total FROM ledger.model_spend WHERE charged_on = $1::date",
+        [day]
+      );
+      return this.#total(result.rows[0]?.total);
+    });
   }
 
   /**
@@ -1215,52 +1218,54 @@ export class PostgresModelSpendStore implements ModelSpendStore {
     expiresAt: Date;
     decide: (committedMicros: number) => boolean;
   }>): Promise<Readonly<{ admitted: boolean; committedMicros: number }>> {
-    const client = await this.pool.connect();
-    try {
-      await client.query("BEGIN");
-      /**
-       * A stable 64-bit key for this UTC day: two API processes admitting on the
-       * same day take the same lock, and different days never contend.
-       *
-       * The SINGLE-key `bigint` form, over `hashtextextended(<text>, 0)` — the
-       * shape `migrations/0040_account_erasure.sql` uses a dozen times.
-       * PostgreSQL's two-key overload is `(integer, integer)` and `hashtext`
-       * returns integer, so a two-key call built from bigints resolves to NO
-       * function and raises 42883 on every ask. `tests/architecture/
-       * v28-advisory-lock-shape.test.ts` pins this text, because the engine is
-       * down here and nothing can execute it.
-       */
-      await client.query(
-        "SELECT pg_advisory_xact_lock("
-        + "pg_catalog.hashtextextended('debateai.cost_envelope.day:' || $1, 0))",
-        [input.day]
-      );
-      const committed = await client.query<{ total: string }>(
-        `SELECT (
-           coalesce((SELECT sum(charge_micros) FROM ledger.model_spend WHERE charged_on = $1::date), 0)
-           + coalesce((SELECT sum(reserved_micros) FROM ledger.model_spend_reservation
-                        WHERE reserved_on = $1::date AND expires_at > $2), 0)
-         )::text AS total`,
-        [input.day, input.now]
-      );
-      const committedMicros = this.#total(committed.rows[0]?.total);
-      const admitted = input.decide(committedMicros);
-      if (admitted) {
+    return crossAccount("X23", async () => {
+      const client = await this.pool.connect();
+      try {
+        await client.query("BEGIN");
+        /**
+         * A stable 64-bit key for this UTC day: two API processes admitting on the
+         * same day take the same lock, and different days never contend.
+         *
+         * The SINGLE-key `bigint` form, over `hashtextextended(<text>, 0)` — the
+         * shape `migrations/0040_account_erasure.sql` uses a dozen times.
+         * PostgreSQL's two-key overload is `(integer, integer)` and `hashtext`
+         * returns integer, so a two-key call built from bigints resolves to NO
+         * function and raises 42883 on every ask. `tests/architecture/
+         * v28-advisory-lock-shape.test.ts` pins this text, because the engine is
+         * down here and nothing can execute it.
+         */
         await client.query(
-          `INSERT INTO ledger.model_spend_reservation
-             (reservation_id, reserved_on, reserved_micros, opened_at, expires_at)
-           VALUES (gen_random_uuid(), $1::date, $2, $3, $4)`,
-          [input.day, input.reservedMicros, input.now, input.expiresAt]
+          "SELECT pg_advisory_xact_lock("
+          + "pg_catalog.hashtextextended('debateai.cost_envelope.day:' || $1, 0))",
+          [input.day]
         );
+        const committed = await client.query<{ total: string }>(
+          `SELECT (
+             coalesce((SELECT sum(charge_micros) FROM ledger.model_spend WHERE charged_on = $1::date), 0)
+             + coalesce((SELECT sum(reserved_micros) FROM ledger.model_spend_reservation
+                          WHERE reserved_on = $1::date AND expires_at > $2), 0)
+           )::text AS total`,
+          [input.day, input.now]
+        );
+        const committedMicros = this.#total(committed.rows[0]?.total);
+        const admitted = input.decide(committedMicros);
+        if (admitted) {
+          await client.query(
+            `INSERT INTO ledger.model_spend_reservation
+               (reservation_id, reserved_on, reserved_micros, opened_at, expires_at)
+             VALUES (gen_random_uuid(), $1::date, $2, $3, $4)`,
+            [input.day, input.reservedMicros, input.now, input.expiresAt]
+          );
+        }
+        await client.query("COMMIT");
+        return Object.freeze({ admitted, committedMicros });
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
       }
-      await client.query("COMMIT");
-      return Object.freeze({ admitted, committedMicros });
-    } catch (error) {
-      await client.query("ROLLBACK").catch(() => undefined);
-      throw error;
-    } finally {
-      client.release();
-    }
+    });
   }
 
   /**

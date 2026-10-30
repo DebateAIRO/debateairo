@@ -772,7 +772,8 @@ describe("P1b — the outbox and the cancel tokens", () => {
       await billing.insertCancelToken(c, { tokenSha256: expired, subscriptionId, issuedAt: new Date(Date.now() - 90_000_000), expiresAt: new Date(Date.now() - 3_600_000) });
     });
     const results = await Promise.all([1, 2, 3].map(() => billing.withTransaction((c) => billing.useCancelToken(c, token, new Date()))));
-    expect(results.filter((result) => result !== null)).toEqual([{ subscriptionId }]);
+    // No ownerRef was issued here, so the stored owner is null (V-18's cancelByToken refuses such a link).
+    expect(results.filter((result) => result !== null)).toEqual([{ subscriptionId, ownerRef: null }]);
     expect(await billing.withTransaction((c) => billing.useCancelToken(c, expired, new Date()))).toBeNull();
   });
 });

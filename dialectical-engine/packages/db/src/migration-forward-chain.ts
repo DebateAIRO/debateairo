@@ -21,6 +21,7 @@ import { loadForward0126 } from './migration-forward0126.js';
 import { loadForward0127 } from './migration-forward0127.js';
 import { loadForward0128 } from './migration-forward0128.js';
 import { loadForward0129 } from './migration-forward0129.js';
+import { loadForward0130 } from './migration-forward0130.js';
 
 /**
  * The forward steps after dev's sealed lineage, its 0108 and its 0110 (PR-54, PR-58, migrations/lineage/README.md): an
@@ -32,9 +33,14 @@ import { loadForward0129 } from './migration-forward0129.js';
  * (replayForwardChain), then each pending step commits on its own (applyForwardStep inside its own transaction), so a
  * step's locks never outlive it and a step that fails leaves every earlier step applied. Each step after 0122 also
  * records its n1 header in public.debateai_schema_migration_step_n1, so an older release can accept a database at most
- * one release ahead (migration-ahead.ts, side-by-side §5 "database ahead").
+ * one release ahead (migration-ahead.ts, side-by-side §5 "database ahead"). A step that deliberately changes a field an
+ * earlier step's postcondition digests declares it (amendsPostconditionsOf, row-level-security 0124, D38): the chain
+ * records the amended step's digest re-measured right after it in public.debateai_schema_migration_step_amendment, and
+ * every later migrate() compares that step against its latest amendment instead of its receipt.
  */
 export type ForwardStepAnchor=Readonly<{baseRecipeSha256:string;previousName:string;previousManifestSha256:string;previousVerifierSha256:string}>;
+/** One recorded amendment of an earlier step's postcondition: which step, which relations, which field, its new value, the policies added. */
+export type PostconditionAmendment=Readonly<{step:string;relations:readonly string[];field:'relrowsecurity';value:true;policies:readonly string[]}>;
 export type ForwardStepPlan=Readonly<{
  name:string; version:string; manifestSha256:string; sourceSha256:string; sql:string;
  previousName:string; previousManifestSha256:string; previousVerifierSha256:string;
@@ -46,6 +52,11 @@ export type ForwardStepPlan=Readonly<{
   * is applied — not only while it is the last one — so appending a step never retires an earlier step's promises.
   */
  replayVerifierSql?:string;
+ /**
+  * The earlier steps whose postcondition this step changes by design (row-level-security 0124: the row-security flag of
+  * eighteen tables of six steps, D38 and F-C1-1); each is recorded with that step's digest re-measured after this step, and compared from then on.
+  */
+ amendsPostconditionsOf?:readonly PostconditionAmendment[];
 }>;
 type StepLoader=(anchor:ForwardStepAnchor)=>Promise<ForwardStepPlan>;
 /**
@@ -65,9 +76,9 @@ export type ChainStep=ForwardStepPlan&Readonly<{n1:N1Declaration}>;
  * 2026-10-21 side-by-side uploads), then the settings activation (0124, side-by-side spec §13: settings changes without
  * an upload), then the Italy-specific approval (0125, mission italy-clause-approval), then mission synthesis-flag's
  * synthesis check (0126, S01), publication review (0127, S02), threat reports (0128, S04) and support answer scope
- * (0129, S05). A new step appends its loader here (README).
+ * (0129, S05), then row-level security (0130, mission row-level-security S01). A new step appends its loader here (README).
  */
-const STEPS:readonly StepLoader[]=Object.freeze([loadForward111,loadForwardAuthDbBatch,loadForward0113,loadForward0114,loadForward115,loadForward0116,loadForward0117,loadForward0118,loadForward0119,loadForward0120,loadForward0121,loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129]);
+const STEPS:readonly StepLoader[]=Object.freeze([loadForward111,loadForwardAuthDbBatch,loadForward0113,loadForward0114,loadForward115,loadForward0116,loadForward0117,loadForward0118,loadForward0119,loadForward0120,loadForward0121,loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130]);
 
 /** A forward step's file name; the receipt and declaration tables CHECK the same shape. */
 export const FORWARD_STEP_NAME=/^\d{4}_[a-z0-9_]+\.sql$/;
@@ -161,6 +172,16 @@ const assertReceiptAcl=(client:PoolClient,owner:Readonly<{oid:string}>):Promise<
 /** The declaration table: its primary key and its two CHECKs (the step-name shape and the 64-hex head). */
 const assertDeclarationAcl=(client:PoolClient,owner:Readonly<{oid:string}>):Promise<void>=>
  assertPrivateTable(client,owner,'public.debateai_schema_migration_step_n1',DECLARATION_SHAPE,3,'DECLARATION_ACL_DRIFT');
+/**
+ * Row-level security 0124 (D38): one row per earlier step whose postcondition a later step changed by design — the
+ * amended step, the step that amended it, the declaration, and the amended step's digest re-measured right after the
+ * amending step. Private to the installer like the declaration table: its primary key and its three CHECKs.
+ */
+const AMENDMENT_SHAPE:readonly Column[]=[{name:'source_name',type:'text',required:true},{name:'amended_by',type:'text',required:true},
+ {name:'amendment',type:'jsonb',required:true},{name:'postcondition_evidence_digest',type:'text',required:true},
+ {name:'recorded_at',type:'timestamp with time zone',required:true}];
+const assertAmendmentAcl=(client:PoolClient,owner:Readonly<{oid:string}>):Promise<void>=>
+ assertPrivateTable(client,owner,'public.debateai_schema_migration_step_amendment',AMENDMENT_SHAPE,4,'AMENDMENT_ACL');
 
 /**
  * Read-only, for the "database ahead" check (migration-ahead.ts, side-by-side §5), which also runs outside migrate():
@@ -188,12 +209,23 @@ function preconditionDigest(plan:MigrationPlan,step:ChainStep,owner:unknown):str
 type Receipt=Readonly<Record<(typeof RECEIPT_COLUMNS)[number],string>>;
 const readReceipts=async(client:PoolClient):Promise<readonly Receipt[]>=>
  (await client.query<Receipt>('SELECT * FROM public.debateai_schema_migration_step ORDER BY source_name')).rows;
+type Amendment=Readonly<{source_name:string;amended_by:string;postcondition_evidence_digest:string}>;
+const readAmendments=async(client:PoolClient):Promise<readonly Amendment[]>=>
+ (await client.query<Amendment>('SELECT source_name,amended_by,postcondition_evidence_digest FROM public.debateai_schema_migration_step_amendment')).rows;
 /**
  * Every applied step's postcondition digest is compared, not only the last one's: appending a step must not retire the
  * check of an earlier step's objects (a later step never changes an earlier step's objects without its own design).
+ * That design is a recorded amendment (D38): an amended step is compared against its amendment with the greatest
+ * amended_by, every other step against its receipt; an amendment made by a step that is not applied is refused.
  */
-async function assertPostconditions(client:PoolClient,applied:readonly ChainStep[],receipts:readonly Receipt[]):Promise<void>{
- for(const [index,step] of applied.entries())if(receipts[index]?.postcondition_evidence_digest!==await step.postconditionEvidence(client))return fail(`POSTCONDITION_DRIFT ${step.name}`);
+async function assertPostconditions(client:PoolClient,applied:readonly ChainStep[],receipts:readonly Receipt[],amendments:readonly Amendment[]):Promise<void>{
+ const names=new Set(applied.map(({name})=>name));
+ for(const row of amendments)if(!names.has(row.amended_by))return fail(`AMENDMENT_BINDING_DRIFT ${row.amended_by}`);
+ for(const [index,step] of applied.entries()){
+  const latest=amendments.filter(({source_name})=>source_name===step.name).reduce<Amendment|undefined>((found,row)=>found===undefined||row.amended_by>found.amended_by?row:found,undefined);
+  const expected=latest===undefined?receipts[index]?.postcondition_evidence_digest:latest.postcondition_evidence_digest;
+  if(expected!==await step.postconditionEvidence(client))return fail(`POSTCONDITION_DRIFT ${step.name}`);
+ }
 }
 
 /**
@@ -243,6 +275,19 @@ export async function replayForwardChain(client:PoolClient,plan:MigrationPlan,ap
   await client.query('REVOKE ALL ON public.debateai_schema_migration_step_n1 FROM PUBLIC');
  }
  await assertDeclarationAcl(client,owner);
+ // Row-level security 0124 (D38): the amendment table, created on first use (no step before 0124 amends anything).
+ if((await client.query<{present:boolean}>("SELECT to_regclass('public.debateai_schema_migration_step_amendment') IS NOT NULL present")).rows[0]?.present!==true){
+  await client.query(`CREATE TABLE public.debateai_schema_migration_step_amendment(
+   source_name text NOT NULL CONSTRAINT fwdamend_source_check CHECK(source_name ~ '^[0-9]{4}_[a-z0-9_]+[.]sql$'),
+   amended_by text NOT NULL CONSTRAINT fwdamend_amended_by_check CHECK(amended_by ~ '^[0-9]{4}_[a-z0-9_]+[.]sql$'),
+   amendment jsonb NOT NULL,
+   postcondition_evidence_digest text NOT NULL CONSTRAINT fwdamend_post_sha_check CHECK(postcondition_evidence_digest ~ '^[0-9a-f]{64}$'),
+   recorded_at timestamptz NOT NULL,
+   PRIMARY KEY(source_name,amended_by)
+  )`);
+  await client.query('REVOKE ALL ON public.debateai_schema_migration_step_amendment FROM PUBLIC');
+ }
+ await assertAmendmentAcl(client,owner);
  const ahead=new Set(extra);
  const receipts=(await readReceipts(client)).filter(receipt=>!ahead.has(receipt.source_name));
  if(receipts.length!==done.length)return fail('RECEIPT_BINDING_DRIFT');
@@ -254,7 +299,7 @@ export async function replayForwardChain(client:PoolClient,plan:MigrationPlan,ap
  }
  // Every applied step's own checks run on every replay, whichever step is last.
  for(const step of done)if(step.replayVerifierSql!==undefined)await client.query(step.replayVerifierSql);
- await assertPostconditions(client,done,receipts);
+ await assertPostconditions(client,done,receipts,await readAmendments(client));
  return done;
 }
 
@@ -280,6 +325,13 @@ export async function applyForwardStep(client:PoolClient,plan:MigrationPlan,step
  if(step.n1.outsideTransaction)await assertConcurrentIndexValid(client,step);
  else await client.query(step.sql);
  await client.query(step.verifierSql);
+ // D38: each earlier step this one amends by design is recorded with its digest re-measured now, after this step's SQL.
+ for(const amendment of step.amendsPostconditionsOf??[]){
+  const amended=done.find(({name})=>name===amendment.step);
+  if(amended===undefined)return fail('AMENDMENT_ORDER');
+  await client.query('INSERT INTO public.debateai_schema_migration_step_amendment(source_name,amended_by,amendment,postcondition_evidence_digest,recorded_at) VALUES($1,$2,$3::jsonb,$4,statement_timestamp())',
+   [amended.name,step.name,JSON.stringify(amendment),await amended.postconditionEvidence(client)]);
+ }
  const post=await step.postconditionEvidence(client);
  await client.query('INSERT INTO public.debateai_schema_migration(name,applied_at) VALUES($1,statement_timestamp())',[step.name]);
  await client.query(`INSERT INTO public.debateai_schema_migration_step(source_name,base_recipe_sha256,previous_manifest_sha256,forward_manifest_sha256,source_sha256,verifier_sha256,precondition_evidence_digest,postcondition_evidence_digest,executed_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,statement_timestamp())`,
@@ -295,9 +347,10 @@ export async function applyForwardStep(client:PoolClient,plan:MigrationPlan,step
  for(const entry of applied)if(entry.replayVerifierSql!==undefined)await client.query(entry.replayVerifierSql);
  const receipts=await readReceipts(client);
  if(receipts.length!==applied.length||receipts.some((receipt,index)=>receipt.source_name!==applied[index]?.name))return fail(`RECEIPT_BINDING_DRIFT ${step.name}`);
- await assertPostconditions(client,applied,receipts);
+ await assertPostconditions(client,applied,receipts,await readAmendments(client));
  await assertReceiptAcl(client,owner);
  await assertDeclarationAcl(client,owner);
+ await assertAmendmentAcl(client,owner);
 }
 
 const PLAIN_NAME=/^[a-z_][a-z0-9_]*$/;
