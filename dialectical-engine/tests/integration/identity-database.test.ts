@@ -64,7 +64,10 @@ describe("S2 identity schema on real PostgreSQL", () => {
       "debate_last_visit", "dig_link",
       "email_change_request",
       // 0133 investigations: a debate and its digs, their closings and the one reserve.
-      "investigation", "investigation_closing", "investigation_member", "investigation_reserve_event",
+      "investigation", "investigation_closing",
+      // 0134 the dig model: each dig's level.
+      "investigation_dig_level",
+      "investigation_member", "investigation_reserve_event",
       "login_challenge", "mfa_factor",
       "mfa_recovery_control", "mfa_recovery_legacy_cohort", "mfa_recovery_notice", "mfa_recovery_notice_binding",
       "mfa_recovery_source_window", "mfa_recovery_staged_code",
@@ -72,12 +75,20 @@ describe("S2 identity schema on real PostgreSQL", () => {
       "password_recovery_control", "password_recovery_feed", "password_recovery_notice",
       "password_recovery_retry_lock", "password_recovery_source_window", "password_recovery_staged_code",
       "password_reset_control", "password_reset_notice", "password_reset_notice_binding", "password_reset_source_window",
+      // 0134 the dig model: a path's rewrites and the turns that order them.
+      "path_rewrite", "path_rewrite_turn",
       "private_erasure_audit_binding",
-      "publication_event_binding", "recovery_code", "recovery_email_request", "registration_region", "run_execution_binding", "runtime_audit_attempt",
+      "publication_event_binding", "recovery_code", "recovery_email_request", "registration_region", "run_execution_binding",
+      // 0134 the month pause of a running debate.
+      "run_pause_event",
+      "runtime_audit_attempt",
       "sensitive_data_consent", "session", "social_enrollment", "social_flow", "social_identity", "staff_webauthn_metadata", "step_up_grant", "synthesis_check_erasure_binding", "user",
       "verification_delivery_reservation", "verification_token_credential",
       // 0132 web evidence store: a debate's searches, pages, transient page texts, readings, extracts, packs, picks, choices.
-      "web_extract", "web_pack", "web_page", "web_page_text", "web_pick", "web_reading", "web_researched", "web_search"
+      "web_extract", "web_pack", "web_page", "web_page_text", "web_pick",
+      // 0134 the web plan: the planner's decision for each path.
+      "web_plan_path",
+      "web_reading", "web_researched", "web_search"
     ]);
 
     const columns = await database.pool.query<{ table_name: string; column_name: string; data_type: string }>(`

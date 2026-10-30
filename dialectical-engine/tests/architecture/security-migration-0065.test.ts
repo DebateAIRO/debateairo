@@ -658,7 +658,8 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
       "0130_row_level_security.sql",
       "0131_v4_account_memory.sql",
       "0132_web_evidence.sql",
-      "0133_investigations.sql"
+      "0133_investigations.sql",
+      "0134_dig_model_and_month_pause.sql"
     ]);
     expect(plan.forwardChain[1]!.name).toBe(AUTH_DB_BATCH_MIGRATION);
   });

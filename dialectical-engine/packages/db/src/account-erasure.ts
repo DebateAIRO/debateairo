@@ -10,6 +10,7 @@ import {
 } from "@debateai/crypto";
 import type { AuthSourceContext } from "./identity.js";
 import {
+  FORGET_ERASED_DEBATE_DIG_MODEL,
   FORGET_ERASED_DEBATE_INVESTIGATION,
   FORGET_ERASED_DEBATE_PAGE_MEMORY,
   FORGET_ERASED_DEBATE_WEB_EVIDENCE,
@@ -51,7 +52,9 @@ const ERASURE_FUNCTION_SIGNATURES = Object.freeze([
   FORGET_ERASED_DEBATE_PAGE_MEMORY,
   // 0132 §12 and 0133 §9: its web evidence and its investigation rows too.
   FORGET_ERASED_DEBATE_WEB_EVIDENCE,
-  FORGET_ERASED_DEBATE_INVESTIGATION
+  FORGET_ERASED_DEBATE_INVESTIGATION,
+  // 0134 §9: its month pauses and path rewrites.
+  FORGET_ERASED_DEBATE_DIG_MODEL
 ] as const);
 const ERASURE_FORBIDDEN_ROLES = Object.freeze([
   "public","debateai_runtime","debateai_authorization_runtime",

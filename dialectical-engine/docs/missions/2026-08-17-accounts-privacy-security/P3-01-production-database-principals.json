@@ -2803,6 +2803,41 @@
       "grants": [
         "EXECUTE ON FUNCTION identity.read_data_export_investigations(uuid,uuid)"
       ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0134_dig_model_and_month_pause.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.join_investigation_nested(uuid,uuid,uuid,text[],text)",
+        "EXECUTE ON FUNCTION identity.read_dig_level(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.read_investigation_dig_levels(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.read_path_rewrites(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.resume_paused_run(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.read_run_pause(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.read_paused_runs(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0134_dig_model_and_month_pause.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_dig_level_of_run(uuid)",
+        "EXECUTE ON FUNCTION identity.take_path_rewrite_turn(uuid,uuid,text)",
+        "EXECUTE ON FUNCTION identity.read_path_rewrite_turn(uuid)",
+        "EXECUTE ON FUNCTION identity.record_path_rewrite(uuid,uuid,integer,uuid,text,text,text,text,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_path_rewrites_of_run(uuid)",
+        "EXECUTE ON FUNCTION identity.record_web_plan_path(uuid,text,text,smallint,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_web_plan(uuid)",
+        "EXECUTE ON FUNCTION identity.record_run_pause(uuid,text,timestamptz,integer,integer,bigint)",
+        "EXECUTE ON FUNCTION identity.read_run_pause_of_run(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0134_dig_model_and_month_pause.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_dig_model(uuid,uuid)"
+      ]
     }
   ],
   "deploymentObligations": [

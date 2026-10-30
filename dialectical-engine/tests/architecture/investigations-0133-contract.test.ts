@@ -16,7 +16,7 @@ import {
  * 0133 (Perplexity plan 2026-10-30, task W1-3; owner answers Q2, Q4, Q5): investigations (a debate and its digs as one
  * budget unit), their members (the server-side dig parent), their closings by report version (kept on reopening) and
  * the person's one reserve, all account-owned (ON DELETE CASCADE), with the page texts' wipe on closing and after 30
- * days without activity. The last step of the chain, `expand`, keeping 0130's verifier. No database here: the
+ * days without activity. Followed by the dig model's 0134; `expand`, keeping 0130's verifier. No database here: the
  * behaviour is tests/integration/investigations-database.test.ts.
  */
 const NAME = "0133_investigations.sql";
@@ -55,8 +55,8 @@ const body = (sql: string, name: string): string => {
 };
 
 describe("0133: the investigations step", () => {
-  it("C-T is the last step of the chain's STEPS, after 0132, with its own loader", async () => {
-    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0131,loadForward0132,loadForward0133]);");
+  it("C-T follows 0132 in the chain's STEPS (the dig model's 0134 comes after it), with its own loader", async () => {
+    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0131,loadForward0132,loadForward0133,loadForward0134]);");
     const loader = read("packages/db/src/migration-forward0133.ts");
     expect(loader).toContain(`const NAME = "${NAME}";`);
     expect(loader).toContain('const VERSION = "investigations-forward0133-v1";');
@@ -65,8 +65,9 @@ describe("0133: the investigations step", () => {
     for (const table of TABLES) expect(loader).toContain(`"${table}"`);
     for (const signature of [...PRIVATE, ...API, ...RUNTIME, FORGET, EXPORT_READER]) expect(loader).toContain(`"${signature}"`);
     const plan = await loadMigrationPlan();
-    expect(plan.forwardChain.slice(-2).map((step) => step.name)).toEqual(["0132_web_evidence.sql", NAME]);
-    expect(plan.forwardChain.at(-1)?.replayVerifierSql).toBeUndefined();
+    const names = plan.forwardChain.map((step) => step.name);
+    expect(names.slice(names.indexOf(NAME) - 1, names.indexOf(NAME) + 1)).toEqual(["0132_web_evidence.sql", NAME]);
+    expect(plan.forwardChain.find((step) => step.name === NAME)?.replayVerifierSql).toBeUndefined();
   });
 
   it("C-M is bound to 0132's manifest and to the verifier in force (0130's)", () => {

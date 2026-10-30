@@ -65,7 +65,7 @@ describe("reply measures migration 0120 — architecture contract", () => {
 
   it("follows the reclaim resume in the chain, with its own loader", async () => {
     const chain = await read("packages/db/src/migration-forward-chain.ts");
-    expect(chain).toContain("loadForward0119,loadForward0120,loadForward0121,loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130,loadForward0131,loadForward0132,loadForward0133]");
+    expect(chain).toContain("loadForward0119,loadForward0120,loadForward0121,loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130,loadForward0131,loadForward0132,loadForward0133,loadForward0134]");
     const loader = await read("packages/db/src/migration-forward0120.ts");
     expect(loader).toContain("const PREVIOUS='0119_reclaim_resume.sql';");
     expect(loader).toContain("const NAME='0120_reply_measures.sql';");

@@ -21,6 +21,7 @@ import type { Pool, PoolClient } from "pg";
  */
 type Executor = Pick<Pool, "query"> | PoolClient;
 
+export type JoinOutcome = "JOINED" | "ALREADY" | "NOT_OWNED" | "CLOSED" | "CONFLICT" | "TOO_DEEP";
 export type ReserveState = "NONE" | "HELD" | "USED" | "RELEASED" | "BLOCKED";
 export type ReserveRead = Readonly<{
   state: ReserveState;
@@ -57,14 +58,19 @@ export class PostgresInvestigationRepository {
       .rows[0]?.id ?? null;
   }
 
-  /** The server-side dig parent: the dig joins its parent's investigation and its dig link is written with it. */
+  /**
+   * The server-side dig parent: the dig joins its parent's investigation and its dig link is written with it. Since 0134
+   * through identity.join_investigation_nested (0133's join plus the dig level): TOO_DEEP when the parent is at level 10
+   * (nothing written); `digLevel` is the dig's level on JOINED and ALREADY. 0133's identity.join_investigation is no
+   * longer called.
+   */
   async join(input: Readonly<{ ownerRef: string; parentRunId: string; childRunId: string; places: readonly string[];
     mode: "quick" | "thorough" }>): Promise<Readonly<{
-      outcome: "JOINED" | "ALREADY" | "NOT_OWNED" | "CLOSED" | "CONFLICT"; investigationId: string | null }>> {
-    const row = (await this.pool.query<{ outcome: "JOINED" | "ALREADY" | "NOT_OWNED" | "CLOSED" | "CONFLICT"; investigation_id: string | null }>(
-      "SELECT outcome,investigation_id FROM identity.join_investigation($1,$2,$3,$4::text[],$5)",
+      outcome: JoinOutcome; investigationId: string | null; digLevel: number | null }>> {
+    const row = (await this.pool.query<{ outcome: JoinOutcome; investigation_id: string | null; dig_level: number | null }>(
+      "SELECT outcome,investigation_id,dig_level FROM identity.join_investigation_nested($1,$2,$3,$4::text[],$5)",
       [input.ownerRef, input.parentRunId, input.childRunId, [...input.places], input.mode])).rows[0]!;
-    return Object.freeze({ outcome: row.outcome, investigationId: row.investigation_id });
+    return Object.freeze({ outcome: row.outcome, investigationId: row.investigation_id, digLevel: row.dig_level });
   }
 
   async touch(ownerRef: string, runId: string): Promise<Date | null> {
