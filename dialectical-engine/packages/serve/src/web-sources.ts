@@ -3,6 +3,7 @@ import {
   type AnswerWeb, type Node, type WebExplanation, type WebOtherPage, type WebPath, type WebReadDepth, type WebResearched,
   type WebSearchStatus, type WebSource
 } from "@debateai/contract";
+import { exhaustive } from "@debateai/kernel";
 
 /**
  * SERVE: SOURCES AND WEB STATUS TO THE ANSWER (plan 2026-10-30 task W3-3; owner answers of 2026-10-29/30, "Perplexity
@@ -210,16 +211,18 @@ export function serveWebEvidence(input: Readonly<{
     const answered = searches.some((search) => search.pathRef === pathRef && (search.outcome === "FOUND" || search.outcome === "EMPTY"));
     if (answered) return { status: "SEARCHED" };
     const decided = plan.find((record) => record.pathId === pathRef);
-    switch (decided?.status) {
+    const status = decided?.status;
+    switch (status) {
       case "NO_SEARCH_PLANNED": {
-        const reason = text(decided.reason);
+        const reason = text(decided?.reason ?? null);
         return { status: "NO_SEARCH_PLANNED",
           reason: reason === null || reason === NO_REASON_GIVEN ? null : cutQuoteAtWordEdge(reason, WEB_CONTRACT_LIMITS.reasonMaxChars) };
       }
       case "NOT_ON_PLAN": return { status: "NOT_ON_PLAN" };
       case "SWITCHED_OFF": return { status: "SWITCHED_OFF" };
       // Planned with no search answered, the planner failed, or searches with no plan: the path went on without the web.
-      default: return { status: "FAILED" };
+      case "PLANNED": case "FAILED": case undefined: return { status: "FAILED" };
+      default: return exhaustive(status);
     }
   };
 
