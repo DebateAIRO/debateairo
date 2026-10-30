@@ -275,6 +275,7 @@ import {
   buildScrutinyLegs, buildShapePlan, shapeLegCanRun, shapePositionCount, shapePositionsForTodaysOpening, shapePositionsFromMap,
   type ShapeLeg, type ShapePlan, type ShapePositionPlan
 } from "./shape-plan.js";
+import { runRunnerWebStep, type WebStepRunnerSettings } from "./web-step.js";
 import {
   shapeDistinctMakers, shapeHandOverRoot, shapeMakerBar, shapeRootMakerBar, shapeSeatOrder, shapeSpareForRefusedRoot,
   shapeSpareThatAnswered, shapeWriterSeat
@@ -2830,6 +2831,12 @@ export interface WalkingSkeletonSettings {
    * (ENGINE_RUNNER_UNCONFIGURED otherwise); a run without the member never reads it. Absent: engine 1, today's runner.
    */
   readonly engine?: EngineRunnerSettings | null;
+  /**
+   * Perplexity plan 2026-10-30, task W3-1: the web step's settings (run-settings.ts `runnerWebSearchSettings`), a process
+   * member. Set, every shaped run whose map argues its own answers runs the web step after the map's answer check (Free
+   * and the off switch make no call). Absent (fixtures, local mode's acceptance root): no web step, nothing recorded.
+   */
+  readonly webSearch?: WebStepRunnerSettings;
   /**
    * Side-by-side spec §13 (S5 adds them, S6 reads them): the debate's own version's story policy (null: the version
    * sealed no story rows) and its call-lane limits (`perDebate`, `perModelPerDebate`, from its callConcurrencyPolicy
@@ -7690,6 +7697,30 @@ export class WalkingSkeletonRunner {
      * debate can always pay its first position. A keep-alive refusal abandons the run, as today. Never on today's run
      * (`shapeRun === null`): no map, no call, no storage.
      */
+    /**
+     * T12-R0 / T12-R2 / T12-R3: root 0's room (see below), worked out when asked: by the map's calls and, after the map, by
+     * the web step (Perplexity plan W3-1), which keeps the same room.
+     */
+    const rootZeroRoomMicros = (): number => {
+      // T12-R0 / T12-R2 / T12-R3: root 0's room, at the dearest member of root 0's OWN seat (and the seat it is handed
+      // to when its member sits out); hosted prices only. It covers root 0's first attempt + one retry, the larger of a
+      // length retry and a format repair (`rootZeroRoomAttempts`, `rootZeroKeepRoomMicros`), plus, on a routed run, the
+      // structure-repair call (the sum: refused-repair salvage B is root 0's own second POST after it).
+      const providerPrices = settings.providerPrices ?? EMPTY_PROVIDER_PRICES;
+      const rootZeroPrices = rootZeroRoomRefs({ seats: rootSeats, membersOf, canHandOver: sitOut !== null, sitsOut: seatSitsOut })
+        .flatMap((providerRef) => { const price = providerPrices.get(providerRef); return price === undefined ? [] : [price]; });
+      // LG-A (Task 14 carry): on a routed run root 0 may also send the structure-repair call, at the repair target's price.
+      const repairCeiling = settings.structureRepairCeiling ?? null;
+      const repairPrice = repairCeiling === null ? undefined : providerPrices.get(repairCeiling.providerRef);
+      return rootZeroKeepRoomMicros({ prices: rootZeroPrices, ...rootZeroRoomAttempts({
+        questionLine: run.questionLine, argumentLanguageName: run.argumentLanguageName, questionLanguage: shapeLanguage,
+        tokenCeiling: guidedCallBound(settings.judgeBound, "opening", lengthGuidance).tokenCeiling,
+        lengthed: lengthGuidance !== null,
+        // Ruling "PF-C5 root-0 bound" (a): with the row, root 0's map material is bounded by the runaway limits (L19).
+        materialChars: rootEngineMaterialChars ?? rootMaterialChars }),
+        structureRepair: repairCeiling === null || repairPrice === undefined ? null : { price: repairPrice,
+          attempt: { requestBytes: repairCeiling.requestBytes, completionTokenCeiling: repairCeiling.completionTokenCeiling } } });
+    };
     let debateShapeMap: MapResult | null = null;
     let shapeMapResult: MapResult | null = null;
     let mapSpendStop: EnvelopeStopKind | null = null;
@@ -7697,24 +7728,8 @@ export class WalkingSkeletonRunner {
       const runMap = async (): Promise<Readonly<{ result: MapResult; spendStop: EnvelopeStopKind | null }>> => {
         /** PF-B40: map seats outside the claim-eligible list, wrapped once each. */
         const mapOnlyMembers = new Map<string, ConfiguredSeatMaker>();
-        // T12-R0 / T12-R2 / T12-R3: root 0's room, at the dearest member of root 0's OWN seat (and the seat it is handed
-        // to when its member sits out); hosted prices only. It covers root 0's first attempt + one retry, the larger of a
-        // length retry and a format repair (`rootZeroRoomAttempts`, `rootZeroKeepRoomMicros`), plus, on a routed run, the
-        // structure-repair call (the sum: refused-repair salvage B is root 0's own second POST after it).
-        const providerPrices = settings.providerPrices ?? EMPTY_PROVIDER_PRICES;
-        const rootZeroPrices = rootZeroRoomRefs({ seats: rootSeats, membersOf, canHandOver: sitOut !== null, sitsOut: seatSitsOut })
-          .flatMap((providerRef) => { const price = providerPrices.get(providerRef); return price === undefined ? [] : [price]; });
-        // LG-A (Task 14 carry): on a routed run root 0 may also send the structure-repair call, at the repair target's price.
-        const repairCeiling = settings.structureRepairCeiling ?? null;
-        const repairPrice = repairCeiling === null ? undefined : providerPrices.get(repairCeiling.providerRef);
-        const keepRoomMicros = rootZeroKeepRoomMicros({ prices: rootZeroPrices, ...rootZeroRoomAttempts({
-          questionLine: run.questionLine, argumentLanguageName: run.argumentLanguageName, questionLanguage: shapeLanguage,
-          tokenCeiling: guidedCallBound(settings.judgeBound, "opening", lengthGuidance).tokenCeiling,
-          lengthed: lengthGuidance !== null,
-          // Ruling "PF-C5 root-0 bound" (a): with the row, root 0's map material is bounded by the runaway limits (L19).
-          materialChars: rootEngineMaterialChars ?? rootMaterialChars }),
-          structureRepair: repairCeiling === null || repairPrice === undefined ? null : { price: repairPrice,
-            attempt: { requestBytes: repairCeiling.requestBytes, completionTokenCeiling: repairCeiling.completionTokenCeiling } } });
+        // T12-R0 / T12-R2 / T12-R3: root 0's room (`rootZeroRoomMicros`, above).
+        const keepRoomMicros = rootZeroRoomMicros();
         const mapCaller = createRunnerMapCaller({
           runId: run.runId, subjectItemId: claimed.workItemId, mapContractHash: shapeRun.mapContractHash,
           judgeBound: settings.judgeBound,
@@ -7846,6 +7861,31 @@ export class WalkingSkeletonRunner {
         answers: shapeAnswerCount, pointsPerAnswer: shapeRun.shape.pointsPerAnswer, ring: engine.engine === 2, engineMap });
     /** Ruling C-TWO: the map's own answers are argued (two or more); the story and the debate page share this rule. */
     const shapeMapArgued = shapeMapPositions !== null && mapAnswersArgued(shapeMapPositions.length);
+    /**
+     * Perplexity plan W3-1 — THE WEB STEP, after the map's answer check and before root 0 (web-step.ts), on an engine-2
+     * run whose map argues its own answers (the web contracts are under the engine seal): every argued path at once,
+     * through this debate's lane, keeping root 0's room. Free and the off switch make no call. It never stops the debate;
+     * only a keep-alive stop passes through. Its packs are stored for the arguing calls (W4-1).
+     */
+    if (settings.webSearch !== undefined && settings.engine != null && engine.engine === 2 && shapeMapArgued
+      && shapeMapPositions !== null && debateShapeMap !== null && debateShapeMap.choice !== null) {
+      const claimOf = new Map(debateShapeMap.keyPoints.map((keyPoint) => [keyPoint.keyPointId, keyPoint] as const));
+      const pointsOf = (ids: readonly string[]) => ids.flatMap((id) => { const keyPoint = claimOf.get(id);
+        return keyPoint === undefined ? [] : [{ text: keyPoint.claim, restsOn: keyPoint.restsOn ?? "assumption" as const }]; });
+      await runRunnerWebStep({
+        pool: this.pool, settings: settings.webSearch,
+        lane: callScheduler === undefined || callLane === undefined ? null : { lane: callLane, scheduler: callScheduler },
+        runId: run.runId, subjectItemId: claimed.workItemId, mode: "quick", question: run.questionLine,
+        questionLanguage: shapeLanguage, placeCountry: null, asOf: new Date(),
+        siteLanguage: shapeLanguage === null ? { code: "en", name: "English" } : { code: shapeLanguage.code, name: shapeLanguage.name },
+        paths: debateShapeMap.choice.answers.slice(0, shapeMapPositions.length).map((answer) => ({ pathRef: answer.answerId,
+          answer: answer.statement, forPoints: pointsOf(answer.forKeyPointIds), againstPoints: pointsOf(answer.againstKeyPointIds) })),
+        members: [...configuredByProviderRef.values()].map((maker) => ({ provider: sitOutMaker(maker).provider,
+          providerRef: maker.providerRef, maker: maker.maker, model: callSubjects?.subjectOf(maker.providerRef).model ?? maker.providerRef })),
+        contractHash: settings.engine.engineContractHash, bound: settings.judgeBound,
+        keepRoomMicros: rootZeroRoomMicros(), abandon: keepAliveStop, stopsHere: (error) => expansionPhaseStop(error) !== null
+      });
+    }
     const shapePositions: readonly ShapePositionPlan[] | null = shapeRun === null ? null
       : shapeMapArgued ? shapeMapPositions
         : shapePositionsForTodaysOpening({ answers: shapeAnswerCount, pointsPerAnswer: shapeRun.shape.pointsPerAnswer, ring: engine.engine === 2 });

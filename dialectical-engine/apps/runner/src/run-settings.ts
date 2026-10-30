@@ -20,6 +20,7 @@ import {
   type CostEnvelopePolicy,
   type DeploymentMode,
   type ModelScorecardReadResult,
+  type PlanId,
   type StoryPolicy
 } from "@debateai/register";
 import {
@@ -41,7 +42,9 @@ import {
   assertPreviewRostersServed,
   assertPreviewTargetSet,
   assertPricedProviderTargets,
+  createPerplexitySearchPort,
   parseProviderDiscoveryTargets,
+  previewGateSocket,
   previewPlanTierRosters,
   previewRunnerPolicy,
   resolvePreviewLineUp,
@@ -59,6 +62,9 @@ import { runnerSettingsOfVersion } from "./run-debate-members.js";
 import { readDebateShapeRunnerSettings, type DebateShapeRunnerSettings } from "./debate-shape-boot.js";
 import { readEngineRunnerSettings, type EngineRunnerSettings } from "./engine-boot.js";
 import { readDevelopmentRunnerPolicy, type DevelopmentRunnerPolicy } from "./dev-runner-policy.js";
+import { selectPathPages } from "@debateai/evidence";
+import { searchCallSubject } from "./call-lane-gateway.js";
+import type { RecordPlanPathStatuses, WebStepRunnerSettings } from "./web-step.js";
 
 /**
  * Side-by-side spec §13 (settings changes without an upload), runner points 1, 2 and 7: the runner's ONE per-version
@@ -821,4 +827,49 @@ export function runPreviewThinkingLevelsOf(
     }
     return settings.previewConfig?.thinking_levels;
   };
+}
+
+/**
+ * Perplexity plan 2026-10-30, task W3-1 — THE RUNNER'S WEB SETTINGS (web-step.ts `runRunnerWebStep`).
+ *
+ * - The search port: the preview's guarded fetch routes the search URL to the search gate's own socket and carries no
+ *   key, so web search runs only where the configuration names that socket. Elsewhere (hosted production, local) there is
+ *   no port yet, and every debate's paths are SWITCHED_OFF: no call, nothing charged.
+ * - The web setting (owner Q16, "a settings switch"): until the register's `webSearchPolicy` row exists (plan §4.2), the
+ *   switch is whether this server has a search gate, as above; the row replaces it without touching the step.
+ * - The money: each search is charged through its run's own version's guard (`searchSeam`, W2-2), hosted only; local
+ *   mode charges nothing, as for every call.
+ * - The run's plan: billing pinned it at admission (`billing.run_charge_scope`, 0084, which the runner's role reads).
+ *   No row (local mode) or no plan (a team grant) is no plan: no search.
+ * - The planner's per-path decision goes to `recordPlanPathStatuses` (0134's store, wired at the merge with W2-8).
+ * A search waits in the debate's lane under the search row's limits (`searchCallSubject`).
+ */
+export function runnerWebSearchSettings(input: Readonly<{
+  pool: Pick<Pool, "query">;
+  previewGate: PreviewGateSettings | undefined;
+  fetch: typeof fetch;
+  /** The run's own version's money guard (`runCostEnvelopeGuardOf`), or null in local mode. */
+  guardOf: ((runId: string) => CostEnvelopeGuard) | null;
+  /** 0134's writer of the planner's per-path decision (W2-8); absent until the merge: one content-free line instead. */
+  recordPlanPathStatuses?: RecordPlanPathStatuses;
+}>): WebStepRunnerSettings {
+  const gated = input.previewGate !== undefined && previewGateSocket(input.previewGate, "perplexity") !== undefined;
+  const search = gated
+    ? createPerplexitySearchPort({ fetch: input.fetch, selectPages: (pages) => selectPathPages(pages, new Set<string>()) })
+    : null;
+  const guardOf = input.guardOf;
+  return Object.freeze({
+    switchedOn: search !== null,
+    search,
+    searchSubject: searchCallSubject(input.previewGate),
+    searchSeamOf: guardOf === null ? null : (runId: string) => guardOf(runId).searchSeam({ runId }),
+    readRunPlan: async (runId: string): Promise<PlanId | null> => {
+      const row = (await input.pool.query<{ plan_id: PlanId | null }>(
+        "SELECT plan_id FROM billing.run_charge_scope WHERE run_id = $1::uuid", [runId])).rows[0];
+      return row?.plan_id ?? null;
+    },
+    recordPlanPathStatuses: input.recordPlanPathStatuses ?? (async (runId) => {
+      console.warn(JSON.stringify({ kind: "DEBATEAI_WEB_STEP", event: "WEB_PLAN_STATUS_STORE_PENDING", runId }));
+    })
+  });
 }
