@@ -54,6 +54,13 @@ import type { FundingBasis, ProviderCallAdmission } from "@debateai/kernel";
 import type { SpendScope } from "./person-allowance.js";
 import type { PersonAllowanceSource } from "./person-allowance.js";
 import { decideSharedWall } from "./room.js";
+import {
+  WEB_SEARCH_PROVIDER_REF,
+  WEB_SEARCH_REQUEST_MICROS,
+  isWebSearchProviderRef,
+  webSearchChargeMicros,
+  type WebSearchOutcome
+} from "./web-charge.js";
 
 /**
  * Where a charge came from. `RUN` is a debate; `SUPPORT` is the help chat;
@@ -250,6 +257,18 @@ export interface ProviderCostSeam {
    * no-op without a counter.
    */
   releaseInFlight?(): void;
+}
+
+/**
+ * Web search (W2-2): the money seam of one debate's searches (`CostEnvelopeGuard.searchSeam`). The web step asks
+ * `assertSearchAllowed` before each search is sent (a refusal: the search is not sent, nothing is charged), then
+ * `recordSearch` once it has ended, with the admission it was given.
+ */
+export interface WebSearchCostSeam {
+  assertSearchAllowed(options?: Readonly<{ keepRoomMicros?: number }>): Promise<ProviderCallAdmission | undefined>;
+  recordSearch(observed: Readonly<{ outcome: WebSearchOutcome; admission?: ProviderCallAdmission }>): Promise<void>;
+  /** Releases the search still counted in flight (idempotent), for a search that never reached `recordSearch`. */
+  releaseInFlight(): void;
 }
 
 /**
@@ -727,46 +746,9 @@ export class CostEnvelopeGuard {
       assertCallAllowed: async (projection) => {
         releaseInFlight();
         const projectedMicros = projectedCallCeilingMicros(input.price, projection);
-        // Counted FIRST, synchronously, then the others are read before the
-        // ledger is: of two calls racing for the last room, the later reader
-        // sees the earlier one, still in flight here or already charged.
-        let othersOfRun = 0;
-        let othersOfRunner = 0;
-        if (inFlight !== null) {
-          const own = BigInt(projectedMicros);
-          releaseCurrent = inFlight.begin(input.runId, own);
-          othersOfRun = Number(inFlight.projectedMicros(input.runId) - own);
-          othersOfRunner = Number(inFlight.projectedMicrosAll() - own);
-        }
         try {
-          const keepRoomMicros = projection.keepRoomMicros ?? 0;
-          if (!Number.isSafeInteger(keepRoomMicros) || keepRoomMicros < 0) throw new TypeError("COST_ENVELOPE_KEEP_ROOM_INVALID");
-          const spentMicros = await envelope.readSpentMicros(input.runId) + othersOfRun;
-          const decision = decideRunCostEnvelope({ spentMicros, projectedMicros, ceilingMicros: envelope.ceilingMicros });
-          if (decision.kind === "WOULD_CROSS") throw envelope.refusal(decision);
-          // T12-R0 / T12-R1: a call that fits but would leave less than the room it names (root 0's worst-case call,
-          // named only by the map's calls) is refused with its OWN code: the run's money is not spent, so only the map
-          // stops, never the arguing.
-          if (keepRoomMicros > 0) {
-            const withRoom = decideRunCostEnvelope({ spentMicros, projectedMicros: projectedMicros + keepRoomMicros,
-              ceilingMicros: envelope.ceilingMicros });
-            if (withRoom.kind === "WOULD_CROSS") throw runCostEnvelopeRoomKept(withRoom, keepRoomMicros);
-          }
-          // B9: then the shared wall, for a walled BODY call on a guard that has one.
-          if (walled && this.#sharedWall !== null) {
-            await this.#assertSharedWall(this.#sharedWall, input.runId, projectedMicros, {
-              siteDay: othersOfRunner,
-              person: othersOfRun
-            });
-          }
-          await this.#fundingAdmission?.assertProviderFundingAdmission(input.runId, this.#clock());
-          const callId = randomUUID();
-          if (this.#store.reserveInternalCall === undefined) return;
-          const internal = await this.#store.reserveInternalCall({ callId, runId: input.runId, projectedMicros, spendSource, spendPhase: phase });
-          if (typeof internal !== "boolean") throw new TypedDomainError("INTERNAL_FUNDING_UNAVAILABLE","Provider funding admission returned no decision");
-          const admission: ProviderCallAdmission = Object.freeze({kind:internal ? "INTERNAL" : "ORDINARY",callId});
-          admissions.add(admission);
-          return admission;
+          return await this.#admit({ runId: input.runId, projectedMicros, keepRoomMicros: projection.keepRoomMicros ?? 0,
+            envelope, walled, spendSource, phase, inFlight, admissions, hold: (release) => { releaseCurrent = release; } });
         } catch (error) {
           // Refused, or the admission failed: nothing will be sent for it.
           releaseInFlight();
@@ -839,6 +821,131 @@ export class CostEnvelopeGuard {
         if (!input.requireReportedUsage) return;
         if (readReportedUsage(observed.usage) === null) {
           throw providerUsageUnreported(observed.providerRef);
+        }
+      },
+      releaseInFlight
+    };
+  }
+
+  /**
+   * THE ONE ADMISSION of a metered call and of a search (W2-2): counted in flight FIRST, synchronously (`hold` gets the
+   * release), then the others are read before the ledger is: of two calls racing for the last room, the later reader
+   * sees the earlier one, still in flight here or already charged. Then the run's own ceiling, the room a call names
+   * (T12-R0/R1), the shared wall for a walled BODY call (B9), the funding admission and the internal reservation.
+   */
+  async #admit(args: Readonly<{
+    runId: string;
+    projectedMicros: number;
+    keepRoomMicros: number;
+    envelope: MeteredEnvelope;
+    walled: boolean;
+    spendSource: MeteredSpendSource;
+    phase: CostEnvelopePhase | null;
+    inFlight: InFlightSpend | null;
+    admissions: WeakSet<ProviderCallAdmission>;
+    hold: (release: () => void) => void;
+  }>): Promise<ProviderCallAdmission | undefined> {
+    const { runId, projectedMicros, keepRoomMicros, envelope, inFlight } = args;
+    let othersOfRun = 0;
+    let othersOfRunner = 0;
+    if (inFlight !== null) {
+      const own = BigInt(projectedMicros);
+      args.hold(inFlight.begin(runId, own));
+      othersOfRun = Number(inFlight.projectedMicros(runId) - own);
+      othersOfRunner = Number(inFlight.projectedMicrosAll() - own);
+    }
+    if (!Number.isSafeInteger(keepRoomMicros) || keepRoomMicros < 0) throw new TypeError("COST_ENVELOPE_KEEP_ROOM_INVALID");
+    const spentMicros = await envelope.readSpentMicros(runId) + othersOfRun;
+    const decision = decideRunCostEnvelope({ spentMicros, projectedMicros, ceilingMicros: envelope.ceilingMicros });
+    if (decision.kind === "WOULD_CROSS") throw envelope.refusal(decision);
+    // T12-R0 / T12-R1: a call that fits but would leave less than the room it names (root 0's worst-case call,
+    // named only by the map's calls) is refused with its OWN code: the run's money is not spent, so only the map
+    // stops, never the arguing.
+    if (keepRoomMicros > 0) {
+      const withRoom = decideRunCostEnvelope({ spentMicros, projectedMicros: projectedMicros + keepRoomMicros,
+        ceilingMicros: envelope.ceilingMicros });
+      if (withRoom.kind === "WOULD_CROSS") throw runCostEnvelopeRoomKept(withRoom, keepRoomMicros);
+    }
+    // B9: then the shared wall, for a walled BODY call on a guard that has one.
+    if (args.walled && this.#sharedWall !== null) {
+      await this.#assertSharedWall(this.#sharedWall, runId, projectedMicros, {
+        siteDay: othersOfRunner,
+        person: othersOfRun
+      });
+    }
+    await this.#fundingAdmission?.assertProviderFundingAdmission(runId, this.#clock());
+    const callId = randomUUID();
+    if (this.#store.reserveInternalCall === undefined) return undefined;
+    const internal = await this.#store.reserveInternalCall({ callId, runId, projectedMicros, spendSource: args.spendSource, spendPhase: args.phase });
+    if (typeof internal !== "boolean") throw new TypedDomainError("INTERNAL_FUNDING_UNAVAILABLE","Provider funding admission returned no decision");
+    const admission: ProviderCallAdmission = Object.freeze({kind:internal ? "INTERNAL" : "ORDINARY",callId});
+    args.admissions.add(admission);
+    return admission;
+  }
+
+  /**
+   * Web search (plan 2026-10-30, W2-2) — ONE DEBATE'S SEARCH SEAM. A search is money only (a flat price per request,
+   * no tokens), so it is admitted like a call made while the debate is argued (BODY): against the run's body ceiling,
+   * the room a call names (`keepRoomMicros`: the web step keeps root 0's worst-case call, as every map call does), the
+   * shared wall (the site's day and the run owner's windows, at their finish edges) and the calls in flight, all at the
+   * search's price. `recordSearch` then writes ONE RUN row of the run, phase BODY, 0 tokens, the price as its charge,
+   * for a search that SUCCEEDED, and nothing for one that FAILED, so every window reader counts it unchanged.
+   * A refused search is never sent: the web step goes on without it (the debate never stops for a search).
+   */
+  searchSeam(input: Readonly<{ runId: string; providerRef?: string; requestMicros?: number }>): WebSearchCostSeam {
+    if (typeof input?.runId !== "string" || input.runId.trim() === "") throw new TypeError("COST_ENVELOPE_RUN_REQUIRED");
+    const providerRef = input.providerRef ?? WEB_SEARCH_PROVIDER_REF;
+    if (!isWebSearchProviderRef(providerRef)) throw new TypeError("WEB_SEARCH_PROVIDER_REF_INVALID");
+    const requestMicros = input.requestMicros ?? WEB_SEARCH_REQUEST_MICROS;
+    webSearchChargeMicros("SUCCEEDED", requestMicros);
+    const envelope = this.#envelopeFor("RUN", "BODY");
+    const admissions = new WeakSet<ProviderCallAdmission>();
+    const inFlight = this.#inFlight;
+    let releaseCurrent: (() => void) | null = null;
+    const releaseInFlight = (): void => {
+      const release = releaseCurrent;
+      releaseCurrent = null;
+      release?.();
+    };
+    return {
+      assertSearchAllowed: async (options = {}) => {
+        releaseInFlight();
+        try {
+          return await this.#admit({ runId: input.runId, projectedMicros: requestMicros, keepRoomMicros: options.keepRoomMicros ?? 0,
+            envelope, walled: true, spendSource: "RUN", phase: "BODY", inFlight, admissions,
+            hold: (release) => { releaseCurrent = release; } });
+        } catch (error) {
+          releaseInFlight();
+          throw error;
+        }
+      },
+      recordSearch: async (observed) => {
+        try {
+          const chargeMicros = webSearchChargeMicros(observed.outcome, requestMicros);
+          if (chargeMicros === 0) return;
+          const admission = observed.admission;
+          if (this.#store.reserveInternalCall !== undefined && (admission === undefined || !admissions.has(admission)))
+            throw new TypedDomainError("INTERNAL_PROVIDER_FRAME_INVALID","Settlement requires this seam's immutable admitted frame");
+          const entry: ModelSpendEntry = Object.freeze({
+            spendId: admission?.kind === "INTERNAL" ? admission.callId : randomUUID(),
+            spendSource: "RUN" as const,
+            runId: input.runId,
+            providerRef,
+            chargedOn: costEnvelopeDay(this.#clock()),
+            chargeMicros,
+            inputTokens: 0,
+            outputTokens: 0,
+            spendPhase: "BODY" as const,
+            attemptId: null
+          });
+          if (admission?.kind === "INTERNAL") {
+            try { await this.#store.settleInternalCall!(admission.callId, entry); }
+            catch {
+              throw new TypedDomainError("INTERNAL_PROVIDER_SETTLEMENT_UNCERTAIN","The admitted internal provider settlement needs reconciliation");
+            }
+          } else await this.#store.recordSpend(entry);
+        } finally {
+          releaseInFlight();
         }
       },
       releaseInFlight
