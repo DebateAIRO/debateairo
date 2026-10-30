@@ -504,6 +504,7 @@ export function isRunLevelSpendStop(error: unknown): boolean {
 export * from "./debate-roles.js";
 export * from "./length-guidance.js";
 export * from "./reading-level.js";
+export * from "./web-sentences.js";
 export * from "./support-credentials.js";
 export * from "./support-text-views.js";
 

@@ -18,6 +18,7 @@ import {
   ENGINE_QUESTION_KINDS,
   LENGTH_SENTENCE_WRITING,
   TypedDomainError,
+  WEB_EXTRACT_WEIGH_SENTENCE,
   argumentLanguageDirective,
   lengthGuidanceField,
   questionLanguageSentence,
@@ -80,6 +81,19 @@ export const COMPARING_JUDGE_ANSWER_FORM = [
 export const COMPARING_JUDGE_PROMPT_CONTRACT: PromptContract = Object.freeze({
   contractId: COMPARING_JUDGE_CONTRACT_ID,
   instruction: `${COMPARING_JUDGE_INSTRUCTION} ${LENGTH_SENTENCE_WRITING}`,
+  answerForm: COMPARING_JUDGE_ANSWER_FORM
+});
+
+/**
+ * Web search (plan 2026-10-30 task W1-5; design §7.1 item 7, approved 2026-10-30): the comparing judges when the debate
+ * read web sources. A looked-up point then carries the extract it rests on (inside the `answers` field), and the judges are
+ * told the item-7 sentence, after the owner's text and before the length sentence. A NEW contract (never an edit of
+ * verdict.judge.v1), sealed by engineContractHash only; a debate without sources sends verdict.judge.v1 to the byte.
+ */
+export const COMPARING_JUDGE_SOURCES_CONTRACT_ID = "verdict.judge.sources.v1" as const;
+export const COMPARING_JUDGE_SOURCES_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: COMPARING_JUDGE_SOURCES_CONTRACT_ID,
+  instruction: `${COMPARING_JUDGE_INSTRUCTION} ${WEB_EXTRACT_WEIGH_SENTENCE} ${LENGTH_SENTENCE_WRITING}`,
   answerForm: COMPARING_JUDGE_ANSWER_FORM
 });
 

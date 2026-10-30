@@ -36,6 +36,7 @@ import {
   buildStorytellerContract,
   storyCheckerLengthField,
   storyContractForReader,
+  storyContractForSources,
   storyContractHash,
   storyContractInArgumentLanguage,
   storyLengthField
@@ -202,6 +203,11 @@ export type StoryWriteInput = StoryRunSnapshot & {
    * sentence each, `storyContractForReader`). Absent on every other run: today's story bytes.
    */
   readonly readingLevel?: ReadingLevel;
+  /**
+   * Web search (W1-5, design §7.1 item 7): set by the runner only when the story's material carries web extracts; then
+   * the storyteller is told item 7's two sentences (`storyContractForSources`). Absent on every other run: today's bytes.
+   */
+  readonly webSources?: true;
   /**
    * R2 (spec §7.2 item 2, INTERFACE §9.9): the comparing judges' question kinds; their majority picks the v4 story's
    * one shape (`storyV4ShapeId`). Set by the runner under engine 2 only; absent: the pack's default shape.
@@ -677,7 +683,8 @@ export class StoryWriter {
     // V4 reading level (owner N6): the reader sentence after the pack's text, before the language line; none without a level.
     const readingLevel = input.readingLevel ?? null;
     const storytellerContract = storyContractInArgumentLanguage(
-      storyContractForReader(buildStorytellerContract(pack, mapFields, v4), readingLevel, "STORYTELLER"), languageName, lock);
+      storyContractForSources(storyContractForReader(buildStorytellerContract(pack, mapFields, v4), readingLevel, "STORYTELLER"),
+        input.webSources === true, "STORYTELLER"), languageName, lock);
     const checkerContract = storyContractInArgumentLanguage(
       storyContractForReader(buildStoryCheckerContract(pack, mapFields, v4), readingLevel, "CHECKER"), languageName, lock);
     const storytellerHash = storyContractHash(storytellerContract);

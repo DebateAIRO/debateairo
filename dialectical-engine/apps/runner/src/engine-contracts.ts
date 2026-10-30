@@ -1,7 +1,11 @@
 import { createHash } from "node:crypto";
-import { COMPARING_JUDGE_PROMPT_CONTRACT, POINT_INVESTIGATION_PROMPT_CONTRACT, judgeAssignedRootV2PromptContract } from "@debateai/judgement";
+import {
+  COMPARING_JUDGE_PROMPT_CONTRACT, COMPARING_JUDGE_SOURCES_PROMPT_CONTRACT, POINT_INVESTIGATION_PROMPT_CONTRACT, WEB_STEP_PROMPT_CONTRACTS,
+  judgeAssignedRootV2PromptContract, judgeSourcesSealedContracts
+} from "@debateai/judgement";
 import { MAP_ENGINE_CONTRACT_NAMES, mapEnginePromptContracts } from "@debateai/map";
 import { promptContractFingerprintText, type PromptContract } from "@debateai/providers";
+import { SYNTHESIZER_LENGTH_READER_SOURCES_PROMPT_CONTRACT, SYNTHESIZER_LENGTH_SOURCES_PROMPT_CONTRACT } from "@debateai/serve";
 
 /**
  * Engine redesign (spec 2026-10-15 §9; INTERFACE §2.2): the one seal over engine 2's sealed prompt contracts. The runner
@@ -15,8 +19,8 @@ export const ENGINE_CONTRACT_FINGERPRINT_HEADER = "debateai.engine-contracts.v1"
  * Every engine-2 sealed contract, append-only in phase order, never reordered (INTERFACE §2.2, §2.5). R1d: none, so the
  * fingerprint text is the header alone (deviation 2: the story v4 contracts are test-pinned, not sealed). R2a appends
  * verdict.investigate.v1 and R2b verdict.judge.v1 (R2 plan deviation 1); R3 the map v2 contracts and the assigned-root
- * v2 pair; R4 the writer's and checker's engine pair. A phase that appends moves ENGINE_SEALED_IDS and
- * ENGINE_CONTRACT_HASH_SEALED in tests/unit/engine-contract-hash.test.ts.
+ * v2 pair; R4 the writer's and checker's engine pair; W1-5 (web search, 2026-10-30) the web wording. A phase that
+ * appends moves ENGINE_SEALED_IDS and ENGINE_CONTRACT_HASH_SEALED in tests/unit/engine-contract-hash.test.ts.
  */
 export function engineSealedContracts(): readonly PromptContract[] {
   // Append-only, in phase order: R2a seals the investigation (spec §4.2b), R2b the comparing judges (spec §4.8); R3 and
@@ -28,7 +32,15 @@ export function engineSealedContracts(): readonly PromptContract[] {
     // then the fixed-words position writer, unknown then resolved.
     ...MAP_ENGINE_CONTRACT_NAMES.map((name) => mapEnginePromptContracts()[name]),
     judgeAssignedRootV2PromptContract("unknown"),
-    judgeAssignedRootV2PromptContract("resolved")
+    judgeAssignedRootV2PromptContract("resolved"),
+    // Web search (plan 2026-10-30 task W1-5; design §7.1 items 1-7, approved 2026-10-30): the web step's four (planner,
+    // reader 1, the top-3 pick, readers 2 and 3); the arguing legs' and the review's sources variants (items 5, 6); the
+    // comparing judges' (item 7); the answer writer's two (item 7). None is in the judge or composer seal.
+    ...WEB_STEP_PROMPT_CONTRACTS,
+    ...judgeSourcesSealedContracts(),
+    COMPARING_JUDGE_SOURCES_PROMPT_CONTRACT,
+    SYNTHESIZER_LENGTH_SOURCES_PROMPT_CONTRACT,
+    SYNTHESIZER_LENGTH_READER_SOURCES_PROMPT_CONTRACT
   ]);
 }
 

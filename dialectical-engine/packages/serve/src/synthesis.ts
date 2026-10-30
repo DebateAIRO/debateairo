@@ -1,5 +1,5 @@
 import type { WayOfKnowing } from "@debateai/kernel";
-import { READER_SENTENCE_WRITING, TypedDomainError, isRunLevelSpendStop } from "@debateai/kernel";
+import { READER_SENTENCE_WRITING, TypedDomainError, WEB_WRITER_SENTENCES, isRunLevelSpendStop } from "@debateai/kernel";
 import { promptContractFingerprintText, type PromptContract } from "@debateai/providers";
 
 /**
@@ -1978,6 +1978,25 @@ export const SYNTHESIZER_READER_PROMPT_CONTRACT: PromptContract = Object.freeze(
 export const SYNTHESIZER_LENGTH_READER_PROMPT_CONTRACT: PromptContract = Object.freeze({
   contractId: SYNTHESIZER_LENGTH_READER_CONTRACT_ID,
   instruction: `${SYNTHESIZER_INSTRUCTIONS} ${SYNTHESIZER_LENGTH_SENTENCE} ${READER_SENTENCE_WRITING}`,
+  answerForm: SYNTHESIZER_ANSWER_FORM
+});
+/**
+ * Web search (plan 2026-10-30 task W1-5; design §7.1 item 7, approved 2026-10-30): the writer of an engine-2 debate that
+ * read web sources. A looked-up point then carries the extract it rests on, and the writer is told item 7's two
+ * sentences (WEB_WRITER_SENTENCES), last. Two VARIANTS, of length.v3 and of length.reader.v1 (engine 2 always tells the
+ * length). Sealed by the ENGINE seal only (apps/runner/src/engine-contracts.ts), never by SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT,
+ * so `composerContractHash` does not move; a debate without sources sends length.v3 or length.reader.v1 to the byte.
+ */
+export const SYNTHESIZER_LENGTH_SOURCES_CONTRACT_ID = "serve.synthesizer.length.sources.v1" as const;
+export const SYNTHESIZER_LENGTH_READER_SOURCES_CONTRACT_ID = "serve.synthesizer.length.reader.sources.v1" as const;
+export const SYNTHESIZER_LENGTH_SOURCES_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: SYNTHESIZER_LENGTH_SOURCES_CONTRACT_ID,
+  instruction: `${SYNTHESIZER_INSTRUCTIONS} ${SYNTHESIZER_LENGTH_SENTENCE} ${WEB_WRITER_SENTENCES}`,
+  answerForm: SYNTHESIZER_ANSWER_FORM
+});
+export const SYNTHESIZER_LENGTH_READER_SOURCES_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: SYNTHESIZER_LENGTH_READER_SOURCES_CONTRACT_ID,
+  instruction: `${SYNTHESIZER_INSTRUCTIONS} ${SYNTHESIZER_LENGTH_SENTENCE} ${READER_SENTENCE_WRITING} ${WEB_WRITER_SENTENCES}`,
   answerForm: SYNTHESIZER_ANSWER_FORM
 });
 /**
