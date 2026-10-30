@@ -260,3 +260,26 @@
 .v4PanelModes .v4Chip { min-height: 44px; }
 .v4PanelDigBtn { width: 100%; }
 .v4Panel .v4MapPulse { margin-right: 6px; vertical-align: middle; }
+
+/* Perplexity plan W2-6: sources under a point, a path's search note and its other pages (V4Sources.tsx). Phone first:
+   nothing here has a fixed width, long titles and addresses wrap, and buttons keep the 44px touch height. */
+.v4WebNote { margin: 0; font-size: var(--t-ui); color: var(--text-2); border-left: 3px solid var(--line-strong); padding: 2px 0 2px 10px; }
+.v4Sources { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.v4Source {
+  display: flex; flex-direction: column; gap: 4px; min-width: 0; overflow-wrap: anywhere;
+  padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2);
+}
+.v4SourceWhy { margin: 0; font-size: var(--t-ui); font-weight: 600; color: var(--text); }
+.v4SourceQuote { margin: 0; padding: 0 0 0 10px; border-left: 2px solid var(--line-strong); font-size: var(--t-ui); color: var(--text); }
+.v4SourceQuote p { margin: 0; }
+.v4SourceQuote p::before { content: open-quote; }
+.v4SourceQuote p::after { content: close-quote; }
+.v4SourceMeta { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; font-size: var(--t-meta); color: var(--text-2); min-width: 0; }
+.v4SourceLink { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.v4SourceSite, .v4SourceDate { color: var(--text-2); }
+.v4SourceFlag { margin: 0; font-size: var(--t-meta); color: var(--text-2); }
+.v4OtherPages { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.v4OtherPage { background: var(--surface); }
+.v4OtherPageAdd { align-self: flex-start; min-height: 44px; }
+.v4OtherPageAdd:disabled { opacity: 0.6; cursor: not-allowed; }
+.v4OtherPageOutcome { display: flex; flex-direction: column; gap: 6px; }

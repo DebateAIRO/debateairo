@@ -43,7 +43,7 @@ describe("levelHref", () => {
 
 describe("no browser storage (Decision A, S01-R17)", () => {
   it("lib/v4 never writes browser storage or cookies", () => {
-    for (const file of ["storage.ts", "useReadingLevel.ts", "digIndex.ts", "askText.ts", "askConfig.ts", "useV4Ask.tsx"]) {
+    for (const file of ["storage.ts", "useReadingLevel.ts", "digIndex.ts", "askText.ts", "askConfig.ts", "useV4Ask.tsx", "trust.ts", "web.ts"]) {
       const source = readFileSync(resolve(here, "../../apps/ui/lib/v4", file), "utf8");
       expect(source, file).not.toMatch(/\.setItem\(|localStorage|sessionStorage|document\.cookie/);
     }

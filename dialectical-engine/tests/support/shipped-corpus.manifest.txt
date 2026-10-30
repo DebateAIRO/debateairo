@@ -652,6 +652,7 @@ apps/ui/components/v4/V4Outline.tsx
 apps/ui/components/v4/V4Panel.tsx
 apps/ui/components/v4/V4Rail.tsx
 apps/ui/components/v4/V4ReportClient.tsx
+apps/ui/components/v4/V4Sources.tsx
 apps/ui/components/v4/V4TrustBar.tsx
 apps/ui/content-security-policy.d.mts
 apps/ui/content-security-policy.mjs
@@ -878,6 +879,7 @@ apps/ui/lib/v4/trust.ts
 apps/ui/lib/v4/types.ts
 apps/ui/lib/v4/useReadingLevel.ts
 apps/ui/lib/v4/useV4Ask.tsx
+apps/ui/lib/v4/web.ts
 apps/ui/middleware.ts
 apps/ui/next-env.d.ts
 apps/ui/next.config.mjs

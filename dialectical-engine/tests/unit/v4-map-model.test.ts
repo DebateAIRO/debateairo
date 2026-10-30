@@ -70,8 +70,10 @@ describe("trust words (first-version mapping)", () => {
       node("unchecked", null)
     ]));
     const word = (id: string) => [points.get(id)?.trust, points.get(id)?.basis];
-    expect(word("looked")).toEqual(["SURE", "LOOKED_UP_AND_AGREED"]);
-    expect(word("ran")).toEqual(["SURE", "LOOKED_UP_AND_AGREED"]);
+    // Perplexity plan W2-6 (owner Q17): with no checked looked-up flag (every answer before R22) a named source or a
+    // worked sum is at most "Sure, for the case named"; "Sure" itself is tested in v4-trust-web.test.ts.
+    expect(word("looked")).toEqual(["SURE_FOR_CASE", "LOOKED_UP_AND_AGREED"]);
+    expect(word("ran")).toEqual(["SURE_FOR_CASE", "LOOKED_UP_AND_AGREED"]);
     expect(word("reasoned")).toEqual(["SURE_FOR_CASE", "ARGUED_AND_AGREED"]);
     expect(word("dated")).toEqual(["SURE_FOR_CASE", "AGREED_BUT_DATED"]);
     expect(points.get("dated")?.asOf).toBe("2025-01-02T00:00:00.000Z");
@@ -117,7 +119,7 @@ describe("trust words (first-version mapping)", () => {
     expect(points.get("kid")?.trust).toBe("STILL_ARGUED");
     expect(points.get("other")?.trust).toBeNull();
     // Without a story, or with one that is not ready, nothing fell.
-    expect(pointsOf(answer).get("pos")?.trust).toBe("SURE");
+    expect(pointsOf(answer).get("pos")?.trust).toBe("SURE_FOR_CASE");
     expect(fellPositionsOf(storyFixture("WRITING")).size).toBe(0);
     expect(fellPositionsOf({ ...story, status: "UNAVAILABLE" }).size).toBe(0);
     expect(fellPositionsOf(null).size).toBe(0);
@@ -125,7 +127,7 @@ describe("trust words (first-version mapping)", () => {
 
   it("never carries a score", () => {
     for (const point of pointsOf(STORY_FIXTURE_ANSWER).values()) {
-      expect(Object.keys(point).sort()).toEqual(["answeredBy", "asOf", "basis", "id", "reasons", "text", "trust"]);
+      expect(Object.keys(point).sort()).toEqual(["answeredBy", "asOf", "basis", "id", "reasons", "sources", "text", "trust"]);
     }
     expect(JSON.stringify(buildV4Map({ runId: "r", answer: STORY_FIXTURE_ANSWER, story: storyFixture("READY") })))
       .not.toMatch(/base_score|final_strength|strength/u);
@@ -139,11 +141,11 @@ describe("trust words (first-version mapping)", () => {
       node("d", null)
     ])).values()];
     const { counts, unchecked } = countTrust(points);
-    expect(counts).toEqual({ SURE: 1, SURE_FOR_CASE: 0, STILL_ARGUED: 1, DIDNT_HOLD: 0 });
+    expect(counts).toEqual({ SURE: 0, SURE_FOR_CASE: 1, STILL_ARGUED: 1, DIDNT_HOLD: 0 });
     expect(unchecked).toBe(2);
     expect(emptyCounts()).toEqual({ SURE: 0, SURE_FOR_CASE: 0, STILL_ARGUED: 0, DIDNT_HOLD: 0 });
     expect(addCounts(counts, { SURE: 2, SURE_FOR_CASE: 1, STILL_ARGUED: 0, DIDNT_HOLD: 3 }))
-      .toEqual({ SURE: 3, SURE_FOR_CASE: 1, STILL_ARGUED: 1, DIDNT_HOLD: 3 });
+      .toEqual({ SURE: 2, SURE_FOR_CASE: 2, STILL_ARGUED: 1, DIDNT_HOLD: 3 });
   });
 });
 
@@ -165,7 +167,8 @@ describe("buildV4Map", () => {
     expect(map.paths[2]?.open).toEqual([]);
     expect(map.points.find((point) => point.id === "n-not-now")).toMatchObject({ trust: "DIDNT_HOLD", basis: "FELL" });
     expect(map.points.map((point) => point.id)).toEqual(STORY_FIXTURE_ANSWER.nodes.map((n) => n.node_id));
-    expect(map.counts).toEqual({ SURE: 2, SURE_FOR_CASE: 3, STILL_ARGUED: 1, DIDNT_HOLD: 1 });
+    // W2-6: the fixture's two looked-up points carry no checked flag (an answer from before R22): no longer "Sure".
+    expect(map.counts).toEqual({ SURE: 0, SURE_FOR_CASE: 5, STILL_ARGUED: 1, DIDNT_HOLD: 1 });
     expect(map.unchecked).toBe(1);
     const body = storyFixture("READY").story!;
     // DATA-7: with a ready story, "what would change it" is the story's checked change paragraph.

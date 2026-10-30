@@ -158,7 +158,8 @@ describe("loadDigView", () => {
     const view = await loadDigView(link, fakeClient({ run: run("SETTLED"), runAnswer: ANSWER, story }));
     expect(view).toEqual({
       link, state: "DONE", headline: story.story!.short.headline,
-      counts: { SURE: 2, SURE_FOR_CASE: 3, STILL_ARGUED: 1, DIDNT_HOLD: 1 }
+      // Perplexity plan W2-6: the fixture's looked-up points carry no checked flag, so none is "Sure" (owner Q17).
+      counts: { SURE: 0, SURE_FOR_CASE: 5, STILL_ARGUED: 1, DIDNT_HOLD: 1 }
     });
   });
 

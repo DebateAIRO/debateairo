@@ -1,8 +1,9 @@
-import type { StoryFate } from "@debateai/contract";
+import type { StoryFate, WebOtherPage, WebSearchStatus, WebSource } from "@debateai/contract";
 
 /*
- * V4 initial (2026-10-28): the shapes every V4 page shares. V4 is built over today's V3 answer, story and run reads;
- * nothing here needs a new API field. Owner decisions referenced: R/42 §7 (row D, decided 2026-10-27).
+ * V4 initial (2026-10-28): the shapes every V4 page shares. V4 is built over today's V3 answer, story and run reads.
+ * Owner decisions referenced: R/42 §7 (row D, decided 2026-10-27). Perplexity plan W2-6 (2026-10-30): the answer's
+ * optional web fields (sources, each path's search and other pages) ride along; an answer without them reads as before.
  */
 
 /** Row D decision 2: the four trust words, in the order the bar and the panel show them. */
@@ -11,11 +12,20 @@ export type TrustWord = (typeof TRUST_WORDS)[number];
 export type TrustCounts = Readonly<Record<TrustWord, number>>;
 
 /**
- * Why a point carries its word. V3 has no sources, so the words are worked out from the second AI's review, how the
- * point is known, how fresh it is and whether its story path fell (lib/v4/trust.ts). Each basis has its own
- * plain line in the v4 catalogue ("v4.basis.<BASIS>").
+ * Why a point carries its word, worked out from the second AI's review, how the point is known, the server's checked
+ * looked-up flag, how fresh it is and whether its story path fell (lib/v4/trust.ts). Each basis has its own plain line
+ * in the v4 catalogue (`basisKey`).
  */
 export const TRUST_BASES = [
+  /**
+   * W2-6 (owner, 30 Oct): "Sure" — the point rests on an extract of a page this debate looked up (the server's
+   * `looked_up_checked`), a second AI agreed and it is fresh. Its line is the approved "v4.web.sureBasis".
+   */
+  "WEB_CHECKED_AND_AGREED",
+  /**
+   * The point names where it comes from or how it was worked out (LOOKED_UP or RAN) and a second AI agreed, but no page
+   * of this debate backs it (a remembered citation, or any debate from before R22): at most "Sure, for the case named".
+   */
   "LOOKED_UP_AND_AGREED",
   "ARGUED_AND_AGREED",
   "AGREED_BUT_DATED",
@@ -27,6 +37,11 @@ export const TRUST_BASES = [
   "FELL"
 ] as const;
 export type TrustBasis = (typeof TRUST_BASES)[number];
+
+/** The catalogue key of a basis's plain line. */
+export function basisKey(basis: TrustBasis): string {
+  return basis === "WEB_CHECKED_AND_AGREED" ? "v4.web.sureBasis" : `v4.basis.${basis}`;
+}
 
 /** One point the debate made (a V3 node), in words only: no scores ever reach a V4 page. */
 export type V4Point = Readonly<{
@@ -41,6 +56,11 @@ export type V4Point = Readonly<{
   answeredBy: string | null;
   /** AGREED_BUT_DATED: the date the point was true as of (ISO). */
   asOf: string | null;
+  /**
+   * W2-6: the checked extracts the point rests on, quotes cut to 120 characters (page text, with reader 1's line in the
+   * site's language). Absent or empty: none (Free, an old debate, a point resting on reasoning).
+   */
+  sources?: readonly WebSource[];
 }>;
 
 /** Row D decision 9: everything on the map is "a question". These are the open ones a person can dig into. */
@@ -70,7 +90,19 @@ export type V4Path = Readonly<{
   counts: TrustCounts;
   unchecked: number;
   open: readonly V4OpenQuestion[];
+  /** W2-6: this path's web search and the other pages it found; absent when the answer says nothing about it. */
+  web?: V4PathWeb;
 }>;
+
+/** W2-6: one path's web part as the pages show it (never a grade: the contract carries none). */
+export type V4PathWeb = Readonly<{ search: WebSearchStatus; otherPages: readonly WebOtherPage[] }>;
+
+/**
+ * W2-6: one note for the whole debate when its paths share it: FREE (Free never searches: "Not checked on the web; paid
+ * plans look things up."), FAILED (the search failed: the debate went on without the web) or SWITCHED_OFF.
+ */
+export const WEB_NOTES = ["FREE", "FAILED", "SWITCHED_OFF"] as const;
+export type V4WebNote = (typeof WEB_NOTES)[number];
 
 export type V4Section = Readonly<{ title: string; paragraphs: readonly string[] }>;
 
@@ -108,6 +140,8 @@ export type V4Map = Readonly<{
   fallbackText: string | null;
   /** RULES-1: the story is READY_WITH_RESERVATION with a body (parts of the summary could not be double-checked). */
   reservation: boolean;
+  /** W2-6: the debate's web note (above); null or absent when there is none (it searched, or an answer from before R22). */
+  webNote?: V4WebNote | null;
 }>;
 
 /** Row D / sieve 2026-10-26: the reading level is chosen once; ids follow the D1 prototype's three choices. */

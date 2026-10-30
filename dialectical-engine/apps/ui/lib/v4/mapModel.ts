@@ -1,6 +1,7 @@
 import type { Answer, AnswerStory } from "@debateai/contract";
 import { countTrust, pointsOf } from "./trust.js";
-import type { V4Map, V4OpenQuestion, V4Path, V4Point } from "./types.js";
+import type { V4Map, V4OpenQuestion, V4Path, V4PathWeb, V4Point } from "./types.js";
+import { pathWebOf, webNoteOf } from "./web.js";
 
 /*
  * V4 initial (2026-10-28): one served answer (+ its story, when written) as the map row D draws (R/42 §7). Paths are
@@ -90,12 +91,13 @@ function stillArgued(points: readonly V4Point[], pathId: string | null): V4OpenQ
     .map((point) => ({ id: `p:${point.id}`, kind: "STILL_ARGUED" as const, text: point.text, star: false, pathId }));
 }
 
-function pathOf(id: string, fate: V4Path["fate"], line: string, points: readonly V4Point[]): V4Path {
+function pathOf(id: string, fate: V4Path["fate"], line: string, points: readonly V4Point[], web?: V4PathWeb): V4Path {
   const { counts, unchecked } = countTrust(points);
-  return { id, fate, line, points, counts, unchecked, open: stillArgued(points, id) };
+  return { id, fate, line, points, counts, unchecked, open: stillArgued(points, id), ...(web === undefined ? {} : { web }) };
 }
 
-function storyPaths(body: StoryBody | null, byId: ReadonlyMap<string, V4Point>): V4Path[] {
+/** W2-6: each story path gets its web part by the position that argued it (a repeated position: every copy the same). */
+function storyPaths(answer: Answer, body: StoryBody | null, byId: ReadonlyMap<string, V4Point>): V4Path[] {
   if (body === null) return [];
   const seen = new Map<string, number>();
   return body.short.paths.map((storyPath) => {
@@ -110,7 +112,7 @@ function storyPaths(body: StoryBody | null, byId: ReadonlyMap<string, V4Point>):
       taken.add(ref);
       points.push(point);
     }
-    return pathOf(id, storyPath.fate, storyPath.line, points);
+    return pathOf(id, storyPath.fate, storyPath.line, points, pathWebOf(answer, storyPath.position_ref));
   });
 }
 
@@ -194,7 +196,7 @@ export function buildV4Map(input: Readonly<{
   const body = readyBody(story);
   const byId = pointsOf(answer, story);
   const allPoints = [...byId.values()];
-  let paths = storyPaths(body, byId);
+  let paths = storyPaths(answer, body, byId);
   if (paths.length === 0) {
     const first = answer.composed_text.find((segment) => segment.text.trim().length > 0);
     paths = [pathOf("all", null, first === undefined ? answer.question_line : first.text, allPoints)];
@@ -245,7 +247,8 @@ export function buildV4Map(input: Readonly<{
     objections: answer.residual_objections.map((objection) => objection.trim()).filter((objection) => objection.length > 0),
     storyState: storyStateOf(story, body, input.storyGaveUp === true),
     fallbackText: body === null ? composedText(answer) : null,
-    reservation: body !== null && story?.status === "READY_WITH_RESERVATION"
+    reservation: body !== null && story?.status === "READY_WITH_RESERVATION",
+    webNote: webNoteOf(answer)
   };
 }
 

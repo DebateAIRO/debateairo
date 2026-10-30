@@ -27,8 +27,9 @@ describe("snapshotItems", () => {
       ["open:o:0", "open"],
       ["open:p:n-hybrid-school", "open"],
       ["point:n-yes", "SURE_FOR_CASE"],
-      ["point:n-yes-pay", "SURE"],
-      ["point:n-yes-rent", "SURE"],
+      // Perplexity plan W2-6 (owner Q17): the fixture's looked-up points have no checked flag, so they are no longer "Sure".
+      ["point:n-yes-pay", "SURE_FOR_CASE"],
+      ["point:n-yes-rent", "SURE_FOR_CASE"],
       ["point:n-not-now", "DIDNT_HOLD"],
       ["point:n-not-now-once", "SURE_FOR_CASE"],
       ["point:n-hybrid", "SURE_FOR_CASE"],
