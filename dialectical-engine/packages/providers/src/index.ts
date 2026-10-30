@@ -3157,6 +3157,8 @@ export {
   structureReplayReaders
 } from "./structure-repair.js";
 export * from "./preview-test.js";
+// Perplexity plan 2026-10-30, task W2-1: the web search adapter (a search provider kind, never a model).
+export * from "./perplexity-search.js";
 // Side-by-side spec §13, addition D12-D20 (owner 2026-10-22): the preview line-up as a settings value, the env's gate part.
 export * from "./preview-line-up.js";
 // Side-by-side spec §13, addition D24 (owner 2026-10-22: providers only, not the models, listed automatically): the

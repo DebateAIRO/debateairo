@@ -11,7 +11,7 @@
 import { TypedDomainError } from "@debateai/kernel";
 import { previewModelRow, previewModelRowForRef, previewRostersHonourMakerRule, PREVIEW_MODEL_ROWS } from "./preview-models.js";
 import {
-  PREVIEW_PROVIDER_SOCKET_KEYS, PREVIEW_STRUCTURE_REPAIR_MODEL, readPreviewEnvironmentSource, validatePreviewProviderTestConfig,
+  PREVIEW_GATE_SOCKET_KEYS, PREVIEW_STRUCTURE_REPAIR_MODEL, readPreviewEnvironmentSource, validatePreviewProviderTestConfig,
   type PreviewProviderTestConfig
 } from "./preview-test.js";
 import { parsePreviewThinkingLevels, type PreviewThinkingLevels } from "./preview-thinking.js";
@@ -27,7 +27,7 @@ export type PreviewLineUp = Readonly<{
 }>;
 /** Addition D13-D14: the part of the preview configuration that stays in the env (no rosters, no table). */
 export type PreviewGateSettings = Pick<PreviewProviderTestConfig,
-  "deployment" | "requested_thinking_level" | "budget_socket" | "scope_id" | "anthropic_budget_socket">;
+  "deployment" | "requested_thinking_level" | "budget_socket" | "scope_id" | "anthropic_budget_socket" | "perplexity_budget_socket">;
 /**
  * Addition D14: the env, parsed. `envLineUp` is the line-up the two old forms carry (the fallback for a settings version
  * without the row); null for the sockets-only form.
@@ -71,10 +71,11 @@ export function parsePreviewLineUp(value: unknown): PreviewLineUp {
 /**
  * Addition D14 (owner 2026-10-22): the env's three accepted forms, read through the same key check as
  * parsePreviewProviderTestConfig (readPreviewEnvironmentSource), so the two parsers cannot drift:
- * - the legacy five keys (free = premium = [GLM]) and the six keys (two rosters, optional Anthropic socket): their
- *   rosters and optional table become `envLineUp`, the fallback for settings versions without the line-up row;
+ * - the legacy five keys (free = premium = [GLM]) and the six keys (two rosters, optional Anthropic and web search
+ *   sockets): their rosters and optional table become `envLineUp`, the fallback for settings versions without the
+ *   line-up row;
  * - the sockets-only form (`budget_socket`, `deployment`, `requested_thinking_level`, `scope_id`, optional
- *   `anthropic_budget_socket`; no rosters, no table): `envLineUp: null`.
+ *   `anthropic_budget_socket` and `perplexity_budget_socket`; no rosters, no table): `envLineUp: null`.
  * Undefined when the variable is unset; PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID otherwise (a table without rosters
  * included), or the thinking parser's own error for a bad table. Whether an env line-up may stand beside a site version
  * carrying the row (D15) is the boot's decision, not this parser's.
@@ -94,7 +95,7 @@ export function parsePreviewEnvironmentConfig(source: string | undefined): Previ
  * (PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID, today's rule), as is any line-up today's parser would refuse.
  */
 export function composePreviewProviderTestConfig(gate: PreviewGateSettings, lineUp: PreviewLineUp): PreviewProviderTestConfig {
-  const sockets = Object.fromEntries(Object.values(PREVIEW_PROVIDER_SOCKET_KEYS).flatMap(key =>
+  const sockets = Object.fromEntries(Object.values(PREVIEW_GATE_SOCKET_KEYS).flatMap(key =>
     typeof gate[key] === "string" ? [[key, gate[key]]] : []));
   const composed = validatePreviewProviderTestConfig({ deployment: gate.deployment, requested_thinking_level: gate.requested_thinking_level,
     budget_socket: gate.budget_socket, scope_id: gate.scope_id, ...sockets,

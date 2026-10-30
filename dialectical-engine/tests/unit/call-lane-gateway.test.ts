@@ -9,8 +9,12 @@ import { describe, expect, it } from "vitest";
 import { TypedDomainError } from "@debateai/kernel";
 import {
   createPreviewBusyCoordinator,
+  PERPLEXITY_SEARCH_MODEL,
   PreviewGateUnsent,
   PreviewUnbilledRefusal,
+  type PerplexitySearchOutcome,
+  type PerplexitySearchPort,
+  type PerplexitySearchRequest,
   type PreviewGateRemaining,
   type PreviewProviderTestConfig,
   type ProviderCallRequest,
@@ -20,8 +24,11 @@ import {
 import {
   applyPreviewGateCapacities,
   laneGateway,
+  laneSearchPort,
   previewCallSubjects,
   previewGateNames,
+  previewSearchGateRemainingReader,
+  searchCallSubject,
   targetCallSubjects
 } from "../../apps/runner/src/call-lane-gateway.js";
 import {
@@ -309,6 +316,22 @@ describe("call subjects", () => {
     const subjects = previewCallSubjects(PREVIEW);
     expect(new Set(["preview:deepseek-v4-1-flash", "preview:claude-haiku-5-5"].map((ref) => subjects.subjectOf(ref).gate)))
       .toEqual(new Set(previewGateNames(PREVIEW)));
+    // Perplexity plan W2-1: the search gate is no model provider's gate; its own reader gives its slots at boot.
+    const withSearch = { ...PREVIEW, perplexity_budget_socket: "/run/debateai-v3-preview/perplexity-budget-v1.sock" };
+    expect(previewGateNames(withSearch)).toEqual(["deepinfra", "anthropic"]);
+    expect(previewSearchGateRemainingReader(withSearch)?.gate).toBe("perplexity");
+    expect(previewSearchGateRemainingReader(PREVIEW)).toBeUndefined();
+  });
+
+  it("web search is its own subject: the search row, the vendor perplexity, its gate only when the socket is named", () => {
+    expect(searchCallSubject({ ...PREVIEW, perplexity_budget_socket: "/run/debateai-v3-preview/perplexity-budget-v1.sock" }))
+      .toEqual({ model: PERPLEXITY_SEARCH_MODEL, vendor: "perplexity", gate: "perplexity" });
+    expect(searchCallSubject(PREVIEW)).toEqual({ model: PERPLEXITY_SEARCH_MODEL, vendor: "perplexity", gate: null });
+    // Off the preview (hosted): no gate, the vendor's own runner-wide limit.
+    expect(searchCallSubject(undefined)).toEqual({ model: PERPLEXITY_SEARCH_MODEL, vendor: "perplexity", gate: null });
+    // It is never a debater's subject: no reviewed ref resolves to it.
+    const subjects = previewCallSubjects(PREVIEW);
+    expect(subjects.subjectOf("preview:perplexity-search-fast")).toEqual({ model: "preview:perplexity-search-fast", vendor: "default", gate: null });
   });
 
   it("off the preview: the target's model, the vendor from its host, no gate", () => {
@@ -317,8 +340,10 @@ describe("call subjects", () => {
       { providerRef: "b", model: "haiku", baseUrl: "https://api.anthropic.com/v1" },
       { providerRef: "c", model: "local", baseUrl: "http://127.0.0.1:8080/v1" },
       { providerRef: "d", model: "lookalike", baseUrl: "https://notdeepinfra.com.example/v1" },
-      { providerRef: "e", model: "broken", baseUrl: "not a url" }
+      { providerRef: "e", model: "broken", baseUrl: "not a url" },
+      { providerRef: "f", model: "search", baseUrl: "https://api.perplexity.ai" }
     ]);
+    expect(subjects.subjectOf("f")).toEqual({ model: "search", vendor: "perplexity", gate: null });
     expect(subjects.subjectOf("a")).toEqual({ model: "glm", vendor: "deepinfra", gate: null });
     expect(subjects.subjectOf("b")).toEqual({ model: "haiku", vendor: "anthropic", gate: null });
     expect(subjects.subjectOf("c")).toEqual({ model: "local", vendor: "default", gate: null });
@@ -507,6 +532,65 @@ describe("laneGateway: beforeSlot waits outside every slot (R31)", () => {
     await expect(gateway.call(request("JUDGE"))).rejects.toBe(refusal);
     expect(calls).toBe(0);
     expect(lane.tickets).toEqual([]);
+  });
+});
+
+const SEARCH_REQUEST: PerplexitySearchRequest = Object.freeze({
+  query: "nurse net salary Germany", mode: "START", afterDate: null, language: "en", country: null
+});
+const SEARCH_SUBJECT = Object.freeze({ model: PERPLEXITY_SEARCH_MODEL, vendor: "perplexity", gate: "perplexity" });
+const searchFailed = (failure: string): PerplexitySearchOutcome =>
+  ({ outcome: "FAILED", failure, chargeMicros: 0, resultCount: 0 }) as PerplexitySearchOutcome;
+const searchEmpty: PerplexitySearchOutcome = Object.freeze({
+  outcome: "EMPTY", chargeMicros: 1000, resultCount: 0, pages: [], reused: [], dropped: []
+});
+
+describe("laneSearchPort: a web search waits for its slots in the debate's lane (Perplexity plan W2-1)", () => {
+  it("asks for the search subject's slots as an OTHER call, and hands back the outcome unchanged", async () => {
+    const lane = recordingLane();
+    const seen: Array<[PerplexitySearchRequest, AbortSignal | undefined]> = [];
+    const inner: PerplexitySearchPort = { search: async (request, signal) => { seen.push([request, signal]); return searchEmpty; } };
+    const signal = new AbortController().signal;
+    const outcome = await laneSearchPort({ lane, scheduler: recordingScheduler(), subject: SEARCH_SUBJECT, port: inner })
+      .search(SEARCH_REQUEST, signal);
+    expect(outcome).toBe(searchEmpty);
+    expect(seen).toEqual([[SEARCH_REQUEST, signal]]);
+    expect(lane.tickets).toEqual([{ ...SEARCH_SUBJECT, priority: "OTHER" }]);
+  });
+
+  it("an answered search heals its gate; a search the gate could not send makes it unhealthy; others mark nothing", async () => {
+    const scheduler = recordingScheduler();
+    const outcomes = [searchEmpty, searchFailed("GATE_UNSENT"), searchFailed("BUSY"), searchFailed("TIMEOUT")];
+    const inner: PerplexitySearchPort = { search: async () => outcomes.shift()! };
+    const port = laneSearchPort({ lane: recordingLane(), scheduler, subject: SEARCH_SUBJECT, port: inner });
+    for (let index = 0; index < 4; index += 1) await port.search(SEARCH_REQUEST);
+    expect(scheduler.marks).toEqual(["healthy:perplexity", "unhealthy:perplexity"]);
+    const noGate = recordingScheduler();
+    await laneSearchPort({ lane: recordingLane(), scheduler: noGate, subject: { ...SEARCH_SUBJECT, gate: null },
+      port: { search: async () => searchEmpty } }).search(SEARCH_REQUEST);
+    expect(noGate.marks).toEqual([]);
+  });
+
+  it("a search still waiting when the lane closes is FAILED STOPPED, never sent and never thrown", async () => {
+    const scheduler = createCallScheduler({ policy: SERIAL });
+    const lane = scheduler.openLane("debate-1");
+    const first = deferred<PerplexitySearchOutcome>();
+    let sent = 0;
+    const port = laneSearchPort({ lane, scheduler, subject: { ...SEARCH_SUBJECT, gate: null },
+      port: { search: () => { sent += 1; return first.promise; } } });
+    const a = port.search(SEARCH_REQUEST);
+    const b = port.search(SEARCH_REQUEST);
+    lane.close();
+    await expect(b).resolves.toEqual(searchFailed("STOPPED"));
+    first.resolve(searchEmpty);
+    await expect(a).resolves.toBe(searchEmpty);
+    expect(sent).toBe(1);
+  });
+
+  it("an inner port that throws anyway is FAILED UNEXPECTED, so the debate goes on", async () => {
+    const port = laneSearchPort({ lane: recordingLane(), scheduler: recordingScheduler(), subject: SEARCH_SUBJECT,
+      port: { search: async () => { throw new Error("bug"); } } });
+    await expect(port.search(SEARCH_REQUEST)).resolves.toEqual(searchFailed("UNEXPECTED"));
   });
 });
 

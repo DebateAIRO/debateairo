@@ -1185,6 +1185,7 @@ packages/providers/src/content-rule.ts
 packages/providers/src/index.ts
 packages/providers/src/model-json.ts
 packages/providers/src/patch-follow-up.ts
+packages/providers/src/perplexity-search.ts
 packages/providers/src/preview-busy.ts
 packages/providers/src/preview-line-up.ts
 packages/providers/src/preview-models.ts
