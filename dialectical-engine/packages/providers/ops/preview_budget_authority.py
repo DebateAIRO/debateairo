@@ -22,6 +22,11 @@ largest enabled final-writer worst case (F = 0 without the member: max_concurren
 largest standard worst case, as before LG-B). The profile
 API (the helper's DeepInfraProfile docstring lists it) is all the core calls, so a new provider
 is one reviewed profile class.
+Per-request prices, beside the token rule (plan 2026-10-30, task W1-1): a row that carries request_usd (Perplexity's
+search) reserves, and is checked against its profile's per-call cap, at exactly that amount whatever the request's size
+(reservation_for); its token prices and its profile's reservation and ceiling prices are all 0 (row_prices_ok), and
+its profile's account() charges exactly that amount for a reply it fully understands. Everything else (the pot, the
+call count, the slots, cool-offs, bookings, halts, /remaining) is the same for both kinds of row.
 
 init creates fresh v3 state from a hash-bound GO; activate opens it on the reviewed Linux host
 for open_days; serve is Root-operated Unix IPC and, with probe, the only reader of Root's
@@ -156,10 +161,10 @@ an upload an older release's debate may still ask for a row or a price the new G
 reads either as that model sitting out, never as money). Every other refusal, among them every
 failure after a reservation, is the opaque PREVIEW_TEST_AUTHORITY_STOPPED.
 
-Team total (owner, 2026-10-10; raised by owner answer M1, 2026-10-15): one GO's daily_budget_usd is at most
-MAX_GO_BUDGET_USD ($12.00, the DeepInfra pot), and activate (root, in a shell, so outside every unit's sandbox) also adds
-the daily_budget_usd of the other provider gates' GO files (GATE_PATHS) and refuses when the sum is over
-TEAM_TOTAL_BUDGET_USD ($16.00: DeepInfra $12.00 + Anthropic $4.00).
+Team total (owner, 2026-10-10; raised by owner answer M1, 2026-10-15, and by owner answer Q12, 2026-10-30): one GO's
+daily_budget_usd is at most MAX_GO_BUDGET_USD ($12.00, the DeepInfra pot), and activate (root, in a shell, so outside
+every unit's sandbox) also adds the daily_budget_usd of the other provider gates' GO files (GATE_PATHS) and refuses when
+the sum is over TEAM_TOTAL_BUDGET_USD ($17.00: DeepInfra $12.00 + Anthropic $4.00 + Perplexity $1.00).
 
 Probe fence: a probe refuses (PROBE_FENCE_REQUIRED) unless it runs inside the fenced transient
 unit the README gives (check_probe_fence), so a bare run never reads the key without the network
@@ -294,10 +299,11 @@ ENTRY_STATES = ('pending', 'settled', 'uncertain', 'released_unbilled', BOOKED_M
 # sent (socket timeouts, resets, TLS errors, a closed or cut reply). Only these are booked at the
 # reservation; anything else after the reservation stays uncertain and halts.
 BOOKABLE_TRANSPORT_FAILURES = (OSError, http.client.HTTPException)
-# Owner ruling 2026-10-10, raised by owner answer M1 (2026-10-15): one GO may ask for at most $12.00 a day (the
-# DeepInfra pot), and the daily team total over every provider gate's pot is $16.00 (DeepInfra $12.00 + Anthropic $4.00).
+# Owner ruling 2026-10-10, raised by owner answer M1 (2026-10-15) and owner answer Q12 (2026-10-30): one GO may ask for at
+# most $12.00 a day (the DeepInfra pot), and the daily team total over every provider gate's pot is $17.00 (DeepInfra
+# $12.00 + Anthropic $4.00 + Perplexity $1.00; it was $16.00 before the Perplexity gate).
 MAX_GO_BUDGET_USD = Decimal('12.00')
-TEAM_TOTAL_BUDGET_USD = Decimal('16.00')  # Checked only by activate's sum over every gate's GO.
+TEAM_TOTAL_BUDGET_USD = Decimal('17.00')  # Checked only by activate's sum over every gate's GO.
 TEAM_GO_BYTES = 64 * 1024
 # Every provider gate on the preview host, by GO provider: (private folder, GO file). Reviewed:
 # activate sums the other gates' GOs from here, and the probe fence checks every other gate's
@@ -307,6 +313,9 @@ GATE_PATHS = {
                   '/etc/debateai-v3-preview/provider-deepinfra-go-v3.json'),
     'anthropic': ('/var/lib/debateai-v3-preview/provider-anthropic-authority-v1',
                   '/etc/debateai-v3-preview/provider-anthropic-go-v1.json'),
+    # Plan 2026-10-30, task W1-1: web search (deploy/preview-gate/v3/README-perplexity.md).
+    'perplexity': ('/var/lib/debateai-v3-preview/provider-perplexity-authority-v1',
+                   '/etc/debateai-v3-preview/provider-perplexity-go-v1.json'),
     'google': ('/var/lib/debateai-v3-preview/provider-google-authority-v1',
                '/etc/debateai-v3-preview/provider-google-go-v1.json'),
 }
@@ -435,9 +444,17 @@ def _int_in(value, low, high):
     return type(value) is int and low <= value <= high
 
 
+def request_priced(row):
+    """Whether a row is priced per request (its request_usd), not per token (plan 2026-10-30, task W1-1)."""
+    return getattr(row, 'request_usd', None) is not None
+
+
 def reservation_for(request_bytes, row, prices):
     """One call's hold: (request bytes + 2048) x input price + output bound x output price, per
-    million tokens, at the given (input, output) prices. The app computes the same figure in nano-USD."""
+    million tokens, at the given (input, output) prices. The app computes the same figure in nano-USD.
+    A per-request row (request_priced) holds exactly its request_usd, whatever the size and prices."""
+    if request_priced(row):
+        return row.request_usd
     input_price, output_price = prices
     return (Decimal(request_bytes + RESERVATION_OVERHEAD_BYTES) * input_price
             + Decimal(row.output_bound) * output_price) / Decimal(1000000)
@@ -511,6 +528,20 @@ def prices_ok(prices):
     return isinstance(prices, tuple) and len(prices) == 2 and all(_price_ok(price) for price in prices)
 
 
+def row_prices_ok(row, prices):
+    """Token prices a row may reserve at. A token row: prices_ok. A per-request row (plan 2026-10-30, task W1-1): its own
+    token prices and these prices are exactly Decimal 0, and its request_usd is a finite Decimal above 0 and at most
+    MAX_PROFILE_CALL_CAP_USD (the profile's own per-call cap is checked by row_reviewed)."""
+    if not request_priced(row):
+        return prices_ok(prices)
+    zero = (Decimal(0), Decimal(0))
+    price = row.request_usd
+    return (isinstance(prices, tuple) and len(prices) == 2 and all(type(value) is Decimal for value in prices)
+            and prices == zero and (row.input_usd_per_m, row.output_usd_per_m) == zero
+            and all(type(value) is Decimal for value in (row.input_usd_per_m, row.output_usd_per_m))
+            and type(price) is Decimal and price.is_finite() and Decimal(0) < price <= MAX_PROFILE_CALL_CAP_USD)
+
+
 def sampling_reviewed(profile, sampling):
     """None, or a non-empty tuple of (name, number) pairs: each name one of the profile's
     sampling_keys, named once, each number a finite int or float (never a bool)."""
@@ -543,7 +574,7 @@ def row_reviewed(profile, model, row):
     full-size request that reserves no more than the profile's per-call cap."""
     return bool(isinstance(model, str) and MODEL_ID_PATTERN.fullmatch(model) and '..' not in model
                 and getattr(row, 'model', None) == model and isinstance(row.maker, str) and 1 <= len(row.maker) <= 64
-                and prices_ok(profile.ceiling_prices(row)) and helper.path_valid(profile.path_for(row))
+                and row_prices_ok(row, profile.ceiling_prices(row)) and helper.path_valid(profile.path_for(row))
                 and _int_in(row.output_bound, 1, MAX_OUTPUT_BOUND)
                 and efforts_reviewed(profile, getattr(row, 'efforts', None))
                 and type(row.json_object) is bool and sampling_reviewed(profile, getattr(row, 'sampling', None))
@@ -1108,7 +1139,7 @@ def validate_request(input, go, probe=False, moment=None):
     prices = (profile.reservation_prices(row, moment, len(raw), cache_write=True) if cache_write_of(profile, body)
               else profile.reservation_prices(row, moment, len(raw)))
     ceiling = profile.ceiling_prices(row)
-    if not prices_ok(prices) or prices[0] > ceiling[0] or prices[1] > ceiling[1] \
+    if not row_prices_ok(row, prices) or prices[0] > ceiling[0] or prices[1] > ceiling[1] \
             or not helper.path_valid(profile.path_for(row)):
         raise SafetyError('REQUEST_INVALID')  # Cannot happen for a reviewed profile; checked anyway.
     reserved = reservation_for(len(raw), checked, prices)
@@ -1200,6 +1231,8 @@ def reserve_call(private, go, go_sha, input, reserved, row, host, peer_uid, now,
                                        'provider': go['provider'], 'model': row.model, 'maker': row.maker,
                                        'reserve_input_usd_per_m': str(prices[0]), 'reserve_output_usd_per_m': str(prices[1]),
                                        'output_bound': row.output_bound,
+                                       # Plan 2026-10-30 (W1-1): a per-request row records its price.
+                                       **({'reserve_request_usd': str(row.request_usd)} if request_priced(row) else {}),
                                        # LG-B (controller ruling 5): logged per tier; a standard entry is unchanged.
                                        **({'call_tier': 'FINAL_WRITER'} if request_tier(input) == 'FINAL_WRITER' else {}),
                                        'requested_effort': requested_effort, 'peer_uid': peer_uid,
@@ -1786,9 +1819,14 @@ def probe_summary(observed, profile):
     max_tokens = min(1024, row.output_bound)
     billed = accounting.get('billed_output_tokens')
     completion = billed if billed is not None else accounting.get('completion_tokens')
+    # A per-request row (a search, W1-1) sends its probe body's settings, never a token limit or a thinking level.
+    sent = ({name: value for name, value in profile.probe_body(row).items() if name != 'query'} if request_priced(row)
+            else {'max_tokens': max_tokens, 'effort': effort_word(row.efforts[0]),  # The row's default (probe_body).
+                  **({'sampling': dict(row.sampling)} if getattr(row, 'sampling', None) else {})})
     return {'status': 'probed', 'provider': profile.name, 'model': row.model, 'maker': row.maker,
-            'sent': {'max_tokens': max_tokens, 'effort': effort_word(row.efforts[0]),  # The row's default (probe_body).
-                     **({'sampling': dict(row.sampling)} if getattr(row, 'sampling', None) else {})},
+            'sent': sent,
+            # W1-1: how many results a search returned (None when its reply could not be read).
+            **({'results': accounting.get('results')} if request_priced(row) else {}),
             # A model that bills past max_tokens would overrun its reservation in real use: do not enable it.
             'completion_within_max_tokens': completion <= max_tokens if type(completion) is int else None,
             'http_status': observed['changes'].get('http_status'),

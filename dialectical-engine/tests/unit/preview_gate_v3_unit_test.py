@@ -195,10 +195,12 @@ class UnitFileTests(unittest.TestCase):
         self.assertEqual([pair for pair in directives(UNIT) if pair[0] not in changed],
                          [pair for pair in directives(V2_UNIT) if pair[0] not in changed])
         hidden, v2_hidden = ' '.join(values(UNIT, 'InaccessiblePaths')).split(), ' '.join(values(V2_UNIT, 'InaccessiblePaths')).split()
-        # v2's state, and (PR B) the other provider gates' state and GOs.
+        # v2's state, and (PR B) the other provider gates' state and GOs, Perplexity's since plan task W1-1 (2026-10-30).
         self.assertEqual(set(hidden) - set(v2_hidden), {'-' + V2_PRIVATE, '-/etc/debateai-v3-preview/provider-team-go-v2.json',
                                                         '-/var/lib/debateai-v3-preview/provider-anthropic-authority-v1',
                                                         '-/etc/debateai-v3-preview/provider-anthropic-go-v1.json',
+                                                        '-/var/lib/debateai-v3-preview/provider-perplexity-authority-v1',
+                                                        '-/etc/debateai-v3-preview/provider-perplexity-go-v1.json',
                                                         '-/var/lib/debateai-v3-preview/provider-google-authority-v1',
                                                         '-/etc/debateai-v3-preview/provider-google-go-v1.json'})
         self.assertLessEqual(set(v2_hidden), set(hidden))

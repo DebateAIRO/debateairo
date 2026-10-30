@@ -30,7 +30,8 @@ spec.loader.exec_module(preview_key)
 Refusal = preview_key.Refusal
 KEYS = {'deepinfra': ('synthetic' + '-deepinfra-' + '0123456789').encode(),
         'anthropic': ('sk-' + 'ant-' + 'api03-' + 'synthetic_test-' + '0123456789').encode(),
-        'google': ('AI' + 'za' + 'Synthetic_test-' + 'x' * 20).encode()}
+        'google': ('AI' + 'za' + 'Synthetic_test-' + 'x' * 20).encode(),
+        'perplexity': ('pp' + 'lx-' + 'SyntheticTest' + '0123456789abcdef').encode()}
 
 
 class KeyCommandTest(unittest.TestCase):
@@ -68,7 +69,7 @@ class InstallTests(KeyCommandTest):
     def test_each_provider_installs_its_key_as_one_root_only_file(self):
         previous = os.umask(0)  # Even a lax umask gives exactly 600.
         self.addCleanup(os.umask, previous)
-        for provider in ('deepinfra', 'anthropic', 'google'):
+        for provider in ('deepinfra', 'anthropic', 'google', 'perplexity'):
             with self.subTest(provider):
                 result = self.install(provider)
                 path = self.key_file(provider)
@@ -81,7 +82,7 @@ class InstallTests(KeyCommandTest):
                 self.assertEqual(self.listing(provider), ['api-key.txt'])  # No temporary file left.
                 self.assertNotIn(KEYS[provider].decode(), json.dumps(result))
                 self.assertNotIn(hashlib.sha256(KEYS[provider]).hexdigest(), json.dumps(result))
-        self.assertEqual(self.reads, ['deepinfra', 'anthropic', 'google'])
+        self.assertEqual(self.reads, ['deepinfra', 'anthropic', 'google', 'perplexity'])
 
     def test_an_existing_key_is_kept_without_replace_and_replaced_with_it(self):
         self.install('anthropic')
@@ -117,6 +118,17 @@ class InstallTests(KeyCommandTest):
         with self.refused('KEY_USED_BY_OTHER_PROVIDER'):
             self.install('deepinfra')
         self.assertEqual(self.listing('deepinfra'), [])
+
+    def test_the_perplexity_shape_is_its_own_and_no_other_prompt_takes_it(self):
+        # Plan task W1-1 (2026-10-30): the same rule as the gates' key_pattern; a pplx- key at the DeepInfra prompt is refused.
+        for provider in ('deepinfra', 'anthropic', 'google'):
+            with self.subTest(provider=provider), self.refused('KEY_SHAPE_INVALID'):
+                self.install(provider, key=KEYS['perplexity'])
+        for wrong in (KEYS['deepinfra'], ('pp' + 'lx_' + 'x' * 20).encode(), ('pp' + 'lx-' + 'short').encode(),
+                      ('pp' + 'lx-' + 'x' * 20 + ' y').encode()):
+            with self.subTest(wrong=wrong), self.refused('KEY_SHAPE_INVALID'):
+                self.install('perplexity', key=wrong)
+        self.assertEqual(self.listing('perplexity'), [])
 
     def test_the_temporary_file_is_removed_when_writing_fails(self):
         real_fsync, calls = os.fsync, []
@@ -244,7 +256,8 @@ class RefusalTests(KeyCommandTest):
         self.assertIn("tty_path='/dev/tty'", text)
         self.assertIn('RLIMIT_CORE, (0, 0)', text)
         self.assertIn('os.umask(0o077)', text)
-        self.assertEqual(set(preview_key.FOLDERS), {'deepinfra', 'anthropic', 'google'})
+        self.assertEqual(set(preview_key.FOLDERS), {'deepinfra', 'anthropic', 'google', 'perplexity'})
+        self.assertEqual(preview_key.FOLDERS['perplexity'], '/var/lib/debateai-v3-preview/provider-perplexity-authority-v1')
         self.assertEqual(preview_key.FOLDERS['anthropic'], '/var/lib/debateai-v3-preview/provider-anthropic-authority-v1')
 
 

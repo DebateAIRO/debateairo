@@ -960,6 +960,13 @@ The journal must show one `"event": "start"` line and the folder two sockets, `s
 `ubuntu`. A refusal prints one plain word (for example `GATE_RELAY_GATE_MISSING:anthropic`) and the unit
 ends.
 
+**Web search (plan 2026-10-30, task W1-1).** Once the Perplexity gate is installed (deploy/preview-gate/v3/
+README-perplexity.md), a practice run that searches the web needs its socket too: add
+`--perplexity-gate /run/debateai-v3-preview/perplexity-budget-v1.sock` at the end of the relay command above. The folder
+then holds three sockets (`perplexity.sock` beside the other two), the S-5 forward adds
+`-L "$D/perplexity.sock:/run/debateai-practice/perplexity.sock"`, and the relay refuses to start
+(`GATE_RELAY_GATE_MISSING:perplexity`) while that gate is not running. Without the option nothing changes.
+
 ### S-5, Mac: forward the two sockets
 
 A short private folder (macOS limits a socket path to 104 bytes), the settings copied down, then the forward. Leave

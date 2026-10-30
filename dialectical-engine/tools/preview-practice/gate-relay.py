@@ -2,9 +2,12 @@
 """gate-relay.py - a byte-for-byte relay in front of the DebateAI v3 preview spending gates.
 
 What it is
-  The preview server has two spending gates. Each gate is a unix-socket service that holds
+  The preview server has two spending gates for the AIs, and (plan 2026-10-30, task W1-1) a
+  third one for web search. Each gate is a unix-socket service that holds
   a vendor API key and answers only peers whose unix uid is 994 or 992. This relay listens
-  on two unix sockets in one directory (deepinfra.sock and anthropic.sock). Every connection
+  on two unix sockets in one directory (deepinfra.sock and anthropic.sock), and on a third,
+  perplexity.sock, only when it is started with --perplexity-gate (the search gate is then
+  required, like the other two). Every connection
   it accepts is forwarded, byte for byte, to the matching gate socket, so the gate sees the
   relay's uid (992) as the peer. An operator's ssh -L forward can then reach the relay even
   though the ssh user cannot reach the gates directly.
@@ -38,6 +41,8 @@ import time
 
 DEFAULT_DEEPINFRA_GATE = "/run/debateai-v3-preview/deepinfra-budget-v3.sock"
 DEFAULT_ANTHROPIC_GATE = "/run/debateai-v3-preview/anthropic-budget-v1.sock"
+# The web search gate's socket (README-perplexity.md): relayed only when --perplexity-gate names it.
+DEFAULT_PERPLEXITY_GATE = "/run/debateai-v3-preview/perplexity-budget-v1.sock"
 DEFAULT_MODE = 0o660
 DEFAULT_MAX_CONNECTIONS = 4
 DEFAULT_LIFETIME_SECONDS = 28800.0
@@ -47,7 +52,8 @@ DEFAULT_DRAIN_SECONDS = 1500.0
 DEFAULT_IDLE_TIMEOUT_SECONDS = 1500.0
 
 NAMES = ("deepinfra", "anthropic")
-SOCKET_FILE_NAMES = {"deepinfra": "deepinfra.sock", "anthropic": "anthropic.sock"}
+OPTIONAL_NAMES = ("perplexity",)
+SOCKET_FILE_NAMES = {"deepinfra": "deepinfra.sock", "anthropic": "anthropic.sock", "perplexity": "perplexity.sock"}
 
 CHUNK_BYTES = 65536
 LISTEN_BACKLOG = 16
@@ -81,6 +87,7 @@ class RelayConfig:
         deepinfra_gate=DEFAULT_DEEPINFRA_GATE,
         anthropic_gate=DEFAULT_ANTHROPIC_GATE,
         group=None,
+        perplexity_gate=None,
         mode=DEFAULT_MODE,
         max_connections=DEFAULT_MAX_CONNECTIONS,
         lifetime_seconds=DEFAULT_LIFETIME_SECONDS,
@@ -89,6 +96,8 @@ class RelayConfig:
     ):
         self.listen_dir = listen_dir
         self.gate_paths = {"deepinfra": deepinfra_gate, "anthropic": anthropic_gate}
+        if perplexity_gate is not None:
+            self.gate_paths["perplexity"] = perplexity_gate
         self.group = group
         self.mode = mode
         self.max_connections = max_connections
@@ -104,8 +113,13 @@ def check_not_root():
         raise RelayRefusal("GATE_RELAY_REFUSES_ROOT")
 
 
+def relay_names(gate_paths):
+    """The gates this relay carries: the two AI gates always, the search gate when it was named."""
+    return NAMES + tuple(name for name in OPTIONAL_NAMES if name in gate_paths)
+
+
 def check_gates(gate_paths):
-    for name in NAMES:
+    for name in relay_names(gate_paths):
         try:
             mode = os.stat(gate_paths[name]).st_mode
         except OSError:
@@ -324,11 +338,12 @@ class RelayServer:
         check_gates(cfg.gate_paths)
         gid = resolve_group(cfg.group)
         check_listen_dir(cfg.listen_dir)
-        paths = {name: os.path.join(cfg.listen_dir, SOCKET_FILE_NAMES[name]) for name in NAMES}
-        # Check both paths before removing anything, so a refusal leaves the directory alone.
-        states = {name: probe_socket_path(paths[name]) for name in NAMES}
+        names = relay_names(cfg.gate_paths)
+        paths = {name: os.path.join(cfg.listen_dir, SOCKET_FILE_NAMES[name]) for name in names}
+        # Check every path before removing anything, so a refusal leaves the directory alone.
+        states = {name: probe_socket_path(paths[name]) for name in names}
         try:
-            for name in NAMES:
+            for name in names:
                 if states[name] == "stale":
                     _unlink_if_present(paths[name])
                 self._bind(name, paths[name], cfg.mode, gid)
@@ -342,13 +357,13 @@ class RelayServer:
         self._log(
             "start",
             pid=os.getpid(),
-            listen=list(NAMES),
+            listen=list(names),
             max_connections=cfg.max_connections,
             lifetime_seconds=cfg.lifetime_seconds,
             drain_seconds=cfg.drain_seconds,
             idle_timeout_seconds=cfg.idle_timeout_seconds,
         )
-        for name in NAMES:
+        for name in names:
             thread = threading.Thread(
                 target=self._accept_loop,
                 args=(name, self._listeners[name]),
@@ -582,6 +597,9 @@ def build_parser():
                         help="path of the DeepInfra gate socket")
     parser.add_argument("--anthropic-gate", default=DEFAULT_ANTHROPIC_GATE,
                         help="path of the Anthropic gate socket")
+    parser.add_argument("--perplexity-gate", default=None,
+                        help="path of the Perplexity web search gate socket (usually " + DEFAULT_PERPLEXITY_GATE
+                        + "); relayed as perplexity.sock only when given")
     parser.add_argument("--group", default=None,
                         help="group name or numeric gid to give the two relay sockets")
     parser.add_argument("--mode", type=_parse_mode, default=DEFAULT_MODE,
@@ -603,6 +621,7 @@ def main(argv=None):
         listen_dir=args.listen_dir,
         deepinfra_gate=args.deepinfra_gate,
         anthropic_gate=args.anthropic_gate,
+        perplexity_gate=args.perplexity_gate,
         group=args.group,
         mode=args.mode,
         max_connections=args.max_connections,

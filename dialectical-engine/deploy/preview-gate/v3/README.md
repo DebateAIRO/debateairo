@@ -95,27 +95,30 @@ What is new in v3:
 - A price change is a reviewed code change (the gate, the app and their shared test file),
   never an edit of the GO.
 
-### Money: DeepInfra's share of the team total ($16 since LG-B)
+### Money: DeepInfra's share of the team total ($16 since LG-B, $17 with web search)
 
 The owner's team limit was $12 a day (owner ruling, 2026-10-10); since length guidance LG-B it is $16 a day (owner
-answer M1, 2026-10-15). It is split into one pot per provider, each with its own gate. For now there are two: DeepInfra
-and Anthropic. Google is parked. The split (owner answer M1, 2026-10-15; until then DeepInfra $10.00 and Anthropic
-$2.00):
+answer M1, 2026-10-15), and with the web search gate $17 a day (owner answer Q12, 2026-10-30: Perplexity $1.00). It is
+split into one pot per provider, each with its own gate: DeepInfra, Anthropic and Perplexity (web search). Google is
+parked. The split (owner answer M1, 2026-10-15; until then DeepInfra $10.00 and Anthropic $2.00; Perplexity from
+2026-10-30):
 
 | Gate | Pot per day | Calls per day | Calls at once | Status |
 |---|---|---|---|---|
 | DeepInfra (this gate) | $12.00 | 2,000 | 10 | this README |
 | Anthropic (Claude Haiku) | $4.00 | 600 | 2 | its own gate: README-anthropic.md |
+| Perplexity (web search, $0.001 a search) | $1.00 | 1,000 searches | 10 | its own gate: README-perplexity.md |
 | Google | none | - | - | parked; the split is set again if it comes back |
-| **Total** | **$16.00** | **2,600** | | |
+| **Total** | **$17.00** | **3,600** | | |
 
-Until the Anthropic gate is open, the preview spends at most $12.00 a day.
+Until the Anthropic gate is open, the preview spends at most $12.00 a day; until the Perplexity gate is open, at most
+$16.00.
 
-The gate itself keeps the $16 total:
+The gate itself keeps the $17 total (gate code of the web search release; the code before it kept $16):
 - One GO may never ask for more than $12.00 a day.
-- `activate` adds this GO's pot to the pots in the other gates' GO files (Anthropic's and
+- `activate` adds this GO's pot to the pots in the other gates' GO files (Anthropic's, Perplexity's and
   Google's, at their fixed places in `/etc/debateai-v3-preview/`) and refuses when the sum is
-  above $16.00 (`TEAM_TOTAL_BUDGET_EXCEEDED`). A gate that is not installed (no GO file) counts as
+  above $17.00 (`TEAM_TOTAL_BUDGET_EXCEEDED`). A gate that is not installed (no GO file) counts as
   $0. A GO file that is there but cannot be read, is not root's, can be written by others, or is
   not a proper GO refuses (`TEAM_TOTAL_UNVERIFIABLE`): the gate never guesses the total.
 - `activate` can see the other GO files because root runs it in a shell. The running gates
@@ -566,7 +569,7 @@ or spent).
 
 ```sh
 P=/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3; GO=/etc/debateai-v3-preview/provider-deepinfra-go-v3.json; A=/opt/debateai-v3-preview/operator/deepinfra-budget-v3/preview_budget_authority.py
-systemd-run --quiet --wait --pipe --collect --unit=debateai-preview-probe-deepinfra -p IPAddressDeny=any -p IPAddressAllow=127.0.0.53/32 $(sed -n 's#^IPAddressAllow=#-p IPAddressAllow=#p' /etc/systemd/system/debateai-preview-provider-budget.service.d/50-deepinfra-addresses.conf) -p ProtectSystem=strict -p ReadWritePaths=$P -p ProtectHome=yes -p PrivateTmp=yes -p PrivateDevices=yes -p NoNewPrivileges=yes -p CapabilityBoundingSet= -p LimitCORE=0 -p UMask=0077 -p 'RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6' -p 'InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-team-authority-v2 -/etc/debateai-v3-preview/provider-team-go-v2.json -/var/lib/debateai-v3-preview/provider-test-authority -/var/lib/debateai-v3-preview/provider-anthropic-authority-v1 -/etc/debateai-v3-preview/provider-anthropic-go-v1.json -/var/lib/debateai-v3-preview/provider-google-authority-v1 -/etc/debateai-v3-preview/provider-google-go-v1.json -/etc/debateai-v3-preview/api.env -/etc/debateai-v3-preview/api -/etc/debateai-v3-preview/runner -/root' /usr/bin/python3 -I $A probe --private $P --go $GO --model deepseek-ai/DeepSeek-V4.1-Flash
+systemd-run --quiet --wait --pipe --collect --unit=debateai-preview-probe-deepinfra -p IPAddressDeny=any -p IPAddressAllow=127.0.0.53/32 $(sed -n 's#^IPAddressAllow=#-p IPAddressAllow=#p' /etc/systemd/system/debateai-preview-provider-budget.service.d/50-deepinfra-addresses.conf) -p ProtectSystem=strict -p ReadWritePaths=$P -p ProtectHome=yes -p PrivateTmp=yes -p PrivateDevices=yes -p NoNewPrivileges=yes -p CapabilityBoundingSet= -p LimitCORE=0 -p UMask=0077 -p 'RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6' -p 'InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-team-authority-v2 -/etc/debateai-v3-preview/provider-team-go-v2.json -/var/lib/debateai-v3-preview/provider-test-authority -/var/lib/debateai-v3-preview/provider-anthropic-authority-v1 -/etc/debateai-v3-preview/provider-anthropic-go-v1.json -/var/lib/debateai-v3-preview/provider-perplexity-authority-v1 -/etc/debateai-v3-preview/provider-perplexity-go-v1.json -/var/lib/debateai-v3-preview/provider-google-authority-v1 -/etc/debateai-v3-preview/provider-google-go-v1.json -/etc/debateai-v3-preview/api.env -/etc/debateai-v3-preview/api -/etc/debateai-v3-preview/runner -/root' /usr/bin/python3 -I $A probe --private $P --go $GO --model deepseek-ai/DeepSeek-V4.1-Flash
 ```
 
 For MiMo, use `--model XiaomiMiMo/MiMo-V2.6-Pro` instead; for Qwen, `--model Qwen/Qwen3.8-Flash`.
@@ -737,6 +740,15 @@ restart them, and check with `systemctl show -p InaccessiblePaths <unit>` that e
 README-anthropic.md, step 3a. The near-term setup is DeepInfra and Anthropic only (Google later);
 the daily split (owner's ruling, 2026-10-10 evening) is DeepInfra $10.00 and Anthropic $2.00, $12.00 together.
 Since length guidance LG-B (owner answer M1, 2026-10-15): DeepInfra $12.00 and Anthropic $4.00, $16.00 together.
+
+## Before the Perplexity gate: re-install this gate's units first
+
+The Perplexity web search gate (README-perplexity.md, install step 3a) adds a third key to this server. The same rule
+as for Anthropic: this release's two DeepInfra units hide the Perplexity key folder and GO
+(`/var/lib/debateai-v3-preview/provider-perplexity-authority-v1`, `/etc/debateai-v3-preview/provider-perplexity-go-v1.json`);
+the units installed before it do not. So they are installed from this release, reloaded, restarted and checked live
+BEFORE the Perplexity key goes in (the commands: README-perplexity.md, step 3a). With it the daily split is DeepInfra
+$12.00, Anthropic $4.00 and Perplexity $1.00, $17.00 together (owner answer Q12, 2026-10-30).
 
 ## Redeploy (2026-10-12): calls on their way together count once
 
