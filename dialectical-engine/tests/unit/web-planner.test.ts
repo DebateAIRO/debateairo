@@ -89,7 +89,7 @@ function input(overrides: Partial<WebPlannerInput> & Readonly<{ gateway: Provide
   return {
     planId: "PLUS", webSwitchedOn: true, mode: "quick", runId: "run-1", subjectItemId: "work-1",
     question: "Should a nurse from Romania move to Germany?", questionLanguage: ROMANIAN, placeCountry: "RO", asOf: AS_OF,
-    paths: PATHS, seats: [seat("qwen", gateway), seat("haiku", gateway)], contractHash: "seal-engine", bound: BOUND,
+    paths: PATHS, seats: [seat("haiku", gateway), seat("qwen", gateway)], contractHash: "seal-engine", bound: BOUND,
     ...rest
   };
 }
@@ -146,7 +146,7 @@ describe("W2-3 the web planner: the call and the plan", () => {
     expect(sent).toHaveLength(1);
     const [call] = sent;
     expect(call!.callSiteKey).toBe("WEB:plan");
-    expect(call!.providerRef).toBe("ref-qwen");
+    expect(call!.providerRef).toBe("ref-haiku");
     expect(call!.request).toMatchObject({ runId: "run-1", subjectItemId: "work-1", role: "JUDGE", lane: "served", contractHash: "seal-engine", bound: BOUND });
     expect(call!.request.thinkingLevel).toBeUndefined();
     const framed = webPlannerFramedPrompt({ question: input({ gateway }).question, placeCountry: "RO", questionLanguage: ROMANIAN, paths: PATHS });
@@ -297,10 +297,10 @@ describe("W2-3 the web planner: slips follow the owner's recovery order", () => 
     }, sent);
     const result = await planned(planWebSearches(input({ gateway })));
     expect(sent.map((s) => [s.callSiteKey, s.providerRef, s.repair])).toEqual([
-      ["WEB:plan", "ref-qwen", false], ["WEB:plan", "ref-qwen", true], [WEB_PLAN_BACKUP_CALL_SITE_KEY, "ref-haiku", false]
+      ["WEB:plan", "ref-haiku", false], ["WEB:plan", "ref-haiku", true], [WEB_PLAN_BACKUP_CALL_SITE_KEY, "ref-qwen", false]
     ]);
-    expect(result.attempts).toEqual([{ callSiteKey: "WEB:plan", maker: "maker-qwen", code: "WEB_PLANNER_REPLY_REFUSED" }]);
-    expect(result).toMatchObject({ callSiteKey: WEB_PLAN_BACKUP_CALL_SITE_KEY, maker: "maker-haiku", model: "model-haiku" });
+    expect(result.attempts).toEqual([{ callSiteKey: "WEB:plan", maker: "maker-haiku", code: "WEB_PLANNER_REPLY_REFUSED" }]);
+    expect(result).toMatchObject({ callSiteKey: WEB_PLAN_BACKUP_CALL_SITE_KEY, maker: "maker-qwen", model: "model-qwen" });
   });
 
   it("every planner failing is not a crash: the debate goes on without the web (FAILED), nothing searched", async () => {
@@ -309,8 +309,8 @@ describe("W2-3 the web planner: slips follow the owner's recovery order", () => 
     const gateway = scriptedGateway({ "WEB:plan": [down], [WEB_PLAN_BACKUP_CALL_SITE_KEY]: [new Error("socket closed")] }, sent);
     const outcome = await planWebSearches(input({ gateway }));
     expect(outcome).toEqual({ kind: "FAILED", code: "WEB_PLANNER_CALL_FAILED", attempts: [
-      { callSiteKey: "WEB:plan", maker: "maker-qwen", code: "PREVIEW_GATE_UNAVAILABLE" },
-      { callSiteKey: WEB_PLAN_BACKUP_CALL_SITE_KEY, maker: "maker-haiku", code: "WEB_PLANNER_CALL_FAILED" }
+      { callSiteKey: "WEB:plan", maker: "maker-haiku", code: "PREVIEW_GATE_UNAVAILABLE" },
+      { callSiteKey: WEB_PLAN_BACKUP_CALL_SITE_KEY, maker: "maker-qwen", code: "WEB_PLANNER_CALL_FAILED" }
     ] });
     expect(webPlanPathStatuses(outcome, ["root-0", "root-1"]).map((path) => path.status)).toEqual(["FAILED", "FAILED"]);
     const none0 = await planWebSearches(input({ gateway, seats: [] }));
@@ -322,7 +322,7 @@ describe("W2-3 the web planner: slips follow the owner's recovery order", () => 
     const sent: Sent[] = [];
     const gateway = scriptedGateway({ "WEB:plan": [stop, stop] }, sent);
     const outcome = await planWebSearches(input({ gateway, stopsHere: (error) => error === stop }));
-    expect(outcome).toEqual({ kind: "FAILED", code: "RUN_SPEND_STOPPED", attempts: [{ callSiteKey: "WEB:plan", maker: "maker-qwen", code: "RUN_SPEND_STOPPED" }] });
+    expect(outcome).toEqual({ kind: "FAILED", code: "RUN_SPEND_STOPPED", attempts: [{ callSiteKey: "WEB:plan", maker: "maker-haiku", code: "RUN_SPEND_STOPPED" }] });
     expect(sent).toHaveLength(1);
     await expect(planWebSearches(input({ gateway, abandon: (error) => error === stop }))).rejects.toBe(stop);
   });
@@ -361,13 +361,16 @@ describe("W2-3 the web planner: replay, the cap and who plans", () => {
     expect([four.searchesToSend, four.localPairsOverCap]).toEqual([16, []]);
   });
 
-  it("who plans: the cheapest suitable model first, then the next of another company", () => {
-    expect(WEB_PLANNER_MODEL_ORDER).toEqual(["Qwen/Qwen3.8-Flash", "claude-haiku-5-5", "zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash"]);
+  it("who plans: Claude Haiku first (owner, 30 Oct), then the next of another company: Qwen, GLM, DeepSeek", () => {
+    expect(WEB_PLANNER_MODEL_ORDER).toEqual(["claude-haiku-5-5", "Qwen/Qwen3.8-Flash", "zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash"]);
     const member = (model: string, maker: string) => ({ model, maker, providerRef: `ref-${model}` });
     const panel = [member("deepseek-ai/DeepSeek-V4.1-Flash", "DeepSeek"), member("zai-org/GLM-5.3-Flash", "Z.AI"),
       member("Qwen/Qwen3.8-Flash", "Alibaba"), member("claude-haiku-5-5", "Anthropic")];
-    expect(webPlannerSeats(panel).map((m) => m.model)).toEqual(["Qwen/Qwen3.8-Flash", "claude-haiku-5-5"]);
+    expect(webPlannerSeats(panel).map((m) => m.model)).toEqual(["claude-haiku-5-5", "Qwen/Qwen3.8-Flash"]);
+    expect(webPlannerSeats(panel.slice(0, 3)).map((m) => m.model)).toEqual(["Qwen/Qwen3.8-Flash", "zai-org/GLM-5.3-Flash"]);
     expect(webPlannerSeats(panel.slice(0, 2)).map((m) => m.model)).toEqual(["zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash"]);
+    expect(webPlannerSeats([panel[0]!, panel[3]!]).map((m) => m.model)).toEqual(["claude-haiku-5-5", "deepseek-ai/DeepSeek-V4.1-Flash"]);
+    expect(webPlannerSeats([member("claude-haiku-5-5", "Anthropic")]).map((m) => m.model)).toEqual(["claude-haiku-5-5"]);
     expect(webPlannerSeats([member("Qwen/Qwen3.8-Flash", "Alibaba")]).map((m) => m.model)).toEqual(["Qwen/Qwen3.8-Flash"]);
     expect(webPlannerSeats([member("XiaomiMiMo/MiMo-V2.6-Pro", "Xiaomi")])).toEqual([]);
   });
