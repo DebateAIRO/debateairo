@@ -231,6 +231,7 @@ describe("personWindowsFor: the plan's limits over those windows", () => {
     for (const plan of v3Row.plans) {
       delete plan.finish_overflow_micros;
       delete plan.reserve_micros;
+      delete plan.reserve_held;
       plan.finish_bp = 11_000;
     }
     const v3 = billingPlansFromValue(v3Row, "b4 sealed v3");

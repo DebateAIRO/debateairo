@@ -49,15 +49,26 @@ describe("billingPlans v4 carries exactly the owner's plans", () => {
     ["PLUS", "premium", 20_000_000, 20_000_000, 100_000_000, 5_000_000, 2_000, 5_000],
     ["PRO", "premium", 50_000_000, 50_000_000, 250_000_000, 20_000_000, 2_000, 5_000],
     ["MAX", "premium", 200_000_000, 200_000_000, 1_000_000_000, 150_000_000, 2_000, 5_000]
-  ] as const)("%s: tier %s, price USD %d EUR %d RON %d, credit %d, day %s, week %s, edge 100% + 20 cents, reserve 20 cents", (id, tier, usd, eur, ron, credit, day, week) => {
+  ] as const)("%s: tier %s, price USD %d EUR %d RON %d, credit %d, day %s, week %s, edge 100% + 20 cents", (id, tier, usd, eur, ron, credit, day, week) => {
     const plan = planById(plans, id);
-    // v4 (owner 2026-10-30, Q1-Q3): every limit may be passed by a FIXED 20 cents, Free included, never a share; one
-    // reserve of 20 cents (enough for one closing) is kept back from the day, the week and the month.
+    // v4 (owner 2026-10-30, Q1 and Q3): every limit may be passed by a FIXED 20 cents, Free included, never a share.
     expect(plan).toMatchObject({
       planId: id, tier, monthlyCreditMicros: credit, dayBasisPoints: day, weekBasisPoints: week, finishBasisPoints: 10_000,
-      finishOverflowMicros: 200_000, reserveMicros: 200_000
+      finishOverflowMicros: 200_000
     });
     expect([planNetPrice(plan, "USD"), planNetPrice(plan, "EUR"), planNetPrice(plan, "RON")]).toEqual([usd, eur, ron]);
+  });
+
+  // v4 (owner 2026-10-30, Q2 and the Free ruling): "it could go for 5 cents for free plans, on top of the 20. For paid,
+  // it stays 20 cents". Paid plans keep 20 cents back inside their day, week and month; Free's 5 cents sit beyond its
+  // 20-cent credit, so a Free closing never takes from the month.
+  it.each([
+    ["FREE", 50_000, "ON_TOP_OF_CREDIT"],
+    ["PLUS", 200_000, "INSIDE_LIMITS"],
+    ["PRO", 200_000, "INSIDE_LIMITS"],
+    ["MAX", 200_000, "INSIDE_LIMITS"]
+  ] as const)("%s: the closing reserve is %d micro-units, held %s", (id, reserve, held) => {
+    expect(planById(plans, id)).toMatchObject({ reserveMicros: reserve, reserveHeld: held });
   });
 
   it("gives Free, and only Free, fixed gauges: depth 1 (owner 2026-10-29), the depth V4 sends for every Free ask", async () => {
@@ -120,9 +131,14 @@ describe("billingPlans v4 carries exactly the owner's plans", () => {
     ["a reserve larger than the monthly credit", (row: ReturnType<typeof plansRow>) => { row.plans[0]!.reserve_micros = 200_001; }],
     ["an overflow without a reserve", (row: ReturnType<typeof plansRow>) => { delete row.plans[1]!.reserve_micros; }],
     ["a reserve without an overflow", (row: ReturnType<typeof plansRow>) => { delete row.plans[1]!.finish_overflow_micros; }],
+    ["a reserve without saying where it is held", (row: ReturnType<typeof plansRow>) => { delete row.plans[0]!.reserve_held; }],
+    ["a place to hold it without a reserve", (row: ReturnType<typeof plansRow>) => { delete row.plans[2]!.reserve_micros; }],
+    ["an unknown place to hold the reserve", (row: ReturnType<typeof plansRow>) => { row.plans[1]!.reserve_held = "SOMEWHERE"; }],
+    ["a paid plan's reserve on top of its credit", (row: ReturnType<typeof plansRow>) => { row.plans[1]!.reserve_held = "ON_TOP_OF_CREDIT"; }],
     ["v4 members on some plans only", (row: ReturnType<typeof plansRow>) => {
       delete row.plans[3]!.finish_overflow_micros;
       delete row.plans[3]!.reserve_micros;
+      delete row.plans[3]!.reserve_held;
       row.plans[3]!.finish_bp = 11_000;
     }],
     ["Free with a price", (row: ReturnType<typeof plansRow>) => { row.plans[0]!.net_prices.RON = 10_000; }],
@@ -154,21 +170,26 @@ describe("billingPlans v4 carries exactly the owner's plans", () => {
     for (const plan of v3.plans) {
       delete plan.finish_overflow_micros;
       delete plan.reserve_micros;
+      delete plan.reserve_held;
       plan.finish_bp = 11_000;
     }
     const sealed = plansOf(v3);
     for (const id of PLAN_IDS) {
-      expect(planById(sealed, id), id).toMatchObject({ finishBasisPoints: 11_000, finishOverflowMicros: null, reserveMicros: null });
+      expect(planById(sealed, id), id).toMatchObject({
+        finishBasisPoints: 11_000, finishOverflowMicros: null, reserveMicros: null, reserveHeld: null
+      });
     }
   });
 
-  it("accepts an overflow of 0 and one as large as the month's credit; a reserve of the whole credit", () => {
+  it("accepts an overflow of 0 and one as large as the month's credit; a reserve of the whole credit; Free's held inside", () => {
     const edges = plansRow();
     edges.plans[1]!.finish_overflow_micros = 0;
     edges.plans[0]!.finish_overflow_micros = 200_000;
     edges.plans[0]!.reserve_micros = 200_000;
+    edges.plans[0]!.reserve_held = "INSIDE_LIMITS";
     expect(planById(plansOf(edges), "PLUS").finishOverflowMicros).toBe(0);
-    expect(planById(plansOf(edges), "FREE")).toMatchObject({ finishOverflowMicros: 200_000, reserveMicros: 200_000 });
+    expect(planById(plansOf(edges), "FREE"))
+      .toMatchObject({ finishOverflowMicros: 200_000, reserveMicros: 200_000, reserveHeld: "INSIDE_LIMITS" });
   });
 });
 

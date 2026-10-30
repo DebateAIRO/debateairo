@@ -26,10 +26,15 @@ import { RISK_TIERS, TypedDomainError, type RiskTier } from "@debateai/kernel";
  *    `finish_bp` at 100%: a window's edge is its limit plus the overflow. Every
  *    overflow is spend inside the month too, so the month's own edge holds them
  *    all, and once the month is full everything waits for the new month.
- *    `reserve_micros` is the one reserve kept back for a closing (20 cents),
- *    read by the investigation admission. Both are optional, so a sealed v3
- *    row still parses (no overflow, no reserve); a row carries both on every
- *    plan or on none.
+ *    `reserve_micros` is the one reserve kept for a closing, read by the
+ *    investigation admission, and `reserve_held` says where it is kept (owner
+ *    2026-10-30: "it could go for 5 cents for free plans, on top of the 20. For
+ *    paid, it stays 20 cents"): INSIDE_LIMITS, held back from the day, week and
+ *    month (paid plans, 20 cents), or ON_TOP_OF_CREDIT, kept beyond the monthly
+ *    credit so a closing never takes from it (Free, 5 cents). A paid plan's
+ *    reserve is always inside its limits. The three are optional, so a sealed
+ *    v3 row still parses (no overflow, no reserve); a row carries all three on
+ *    every plan or on none.
  *  - Free's `fixed_gauges`: the risk and composition gauges are the values
  *    `/new` sends for Free (NewDebatePageClient.tsx `choosePlanTier`); the depth
  *    is the owner's Free month of 29 October 2026 ("question with depth 1"),
@@ -40,6 +45,10 @@ export const BILLING_PLANS_ROW_KEY = "billingPlans" as const;
 
 export const PLAN_IDS = Object.freeze(["FREE", "PLUS", "PRO", "MAX"] as const);
 export type PlanId = typeof PLAN_IDS[number];
+
+/** v4: where a plan's closing reserve is kept, inside its limits or on top of its monthly credit. */
+export const RESERVE_HELD = Object.freeze(["INSIDE_LIMITS", "ON_TOP_OF_CREDIT"] as const);
+export type ReserveHeld = typeof RESERVE_HELD[number];
 
 export type FreeFixedGauges = Readonly<{ riskTier: RiskTier; compositionBudgetTier: "low"; depth: number }>;
 
@@ -54,8 +63,10 @@ export type BillingPlan = Readonly<{
   finishBasisPoints: number;
   /** v4: the fixed amount a running debate may take each window past its limit (micro-units); null on a v3 row. */
   finishOverflowMicros: number | null;
-  /** v4: the one reserve kept back for a closing (micro-units); null on a v3 row. */
+  /** v4: the one reserve kept for a closing (micro-units); null on a v3 row. */
   reserveMicros: number | null;
+  /** v4: where that reserve is kept (paid: INSIDE_LIMITS; Free: ON_TOP_OF_CREDIT); null on a v3 row. */
+  reserveHeld: ReserveHeld | null;
   fixedGauges: FreeFixedGauges | null;
 }>;
 
@@ -107,6 +118,7 @@ const planSchema = z.object({
   finish_bp: finishBasisPoints,
   finish_overflow_micros: micros.optional(),
   reserve_micros: positiveMicros.optional(),
+  reserve_held: z.enum(RESERVE_HELD).optional(),
   fixed_gauges: fixedGaugesSchema.nullable()
 }).strict();
 
@@ -123,9 +135,10 @@ const billingPlansValueSchema = z.object({
   const v4 = value.plans[0]?.finish_overflow_micros !== undefined;
   value.plans.forEach((plan, index) => {
     if (plan.plan_id !== PLAN_IDS[index]) refuse(index, "plans are listed FREE, PLUS, PRO, MAX");
-    // v4's two members come together, on every plan or on none (a sealed v3 row has neither).
-    if ((plan.finish_overflow_micros !== undefined) !== v4 || (plan.reserve_micros !== undefined) !== v4) {
-      refuse(index, "the fixed overflow and the reserve are on every plan or on none");
+    // v4's three members come together, on every plan or on none (a sealed v3 row has none of them).
+    if ((plan.finish_overflow_micros !== undefined) !== v4 || (plan.reserve_micros !== undefined) !== v4
+      || (plan.reserve_held !== undefined) !== v4) {
+      refuse(index, "the fixed overflow, the reserve and where it is held are on every plan or on none");
     }
     if (plan.finish_overflow_micros !== undefined) {
       // The edge is the limit plus the overflow, never a share on top of it.
@@ -134,6 +147,10 @@ const billingPlansValueSchema = z.object({
     }
     if (plan.reserve_micros !== undefined && plan.reserve_micros > plan.monthly_credit_micros) {
       refuse(index, "a reserve is at most the monthly credit");
+    }
+    // Owner 2026-10-30: "For paid, it stays 20 cents", held back inside the paid plan's limits.
+    if (plan.plan_id !== "FREE" && plan.reserve_held === "ON_TOP_OF_CREDIT") {
+      refuse(index, "a paid plan's reserve is held inside its limits");
     }
     for (const currency of PRICE_CURRENCIES) {
       const price = plan.net_prices[currency];
@@ -194,7 +211,8 @@ export const BILLING_PLANS_MEMBERS: readonly string[] = Object.freeze(Object.key
  * month, 29 October 2026) lowers Free's fixed depth from 2 to 1; v4 (owner's
  * answers of 30 October 2026, Q1-Q3) replaces the 110% finish edge with a fixed
  * 20 cents past every limit on every plan, Free included, and adds the one
- * 20-cent reserve for a closing. The EUR and RON prices are placeholders until
+ * closing reserve: 20 cents inside a paid plan's limits, 5 cents on top of
+ * Free's 20-cent credit. The EUR and RON prices are placeholders until
  * the owner publishes a price list (go-live row 73). The first paid test debates
  * may revise them. That revision is a NEW register version of this row, never an
  * edit.
@@ -205,8 +223,8 @@ export const BILLING_PLANS_DEPLOYMENT_REGISTER_ROW = Object.freeze({
     + " week 50%, USD 20/50/200; owner's choice 2026-10-10: RON for RO, EUR for 31 European countries, USD"
     + " elsewhere; EUR and RON prices are placeholders until the owner's price list, go-live row 73; owner's Free month"
     + " 2026-10-29: Free questions at depth 1; owner's answers 2026-10-30 Q1-Q3: a fixed 20-cent overflow past every"
-    + " day, week and month limit on every plan, Free included, in place of the 110% finish edge, and one 20-cent"
-    + " reserve for a closing)",
+    + " day, week and month limit on every plan, Free included, in place of the 110% finish edge, and one reserve for"
+    + " a closing: 20 cents inside a paid plan's limits, 5 cents on top of Free's 20-cent credit)",
   value: Object.freeze({
     kind: "BILLING_PLANS" as const,
     credit_currency: "USD" as const,
@@ -222,25 +240,29 @@ export const BILLING_PLANS_DEPLOYMENT_REGISTER_ROW = Object.freeze({
       Object.freeze({
         plan_id: "FREE" as const, tier: "free" as const, net_prices: Object.freeze({ USD: 0, EUR: 0, RON: 0 }),
         monthly_credit_micros: 200_000,
-        day_bp: null, week_bp: null, finish_bp: 10_000, finish_overflow_micros: 200_000, reserve_micros: 200_000,
+        day_bp: null, week_bp: null, finish_bp: 10_000, finish_overflow_micros: 200_000,
+        reserve_micros: 50_000, reserve_held: "ON_TOP_OF_CREDIT" as const,
         fixed_gauges: Object.freeze({ risk_tier: "standard" as const, composition_budget_tier: "low" as const, depth: 1 })
       }),
       Object.freeze({
         plan_id: "PLUS" as const, tier: "premium" as const, net_prices: Object.freeze({ USD: 20_000_000, EUR: 20_000_000, RON: 100_000_000 }),
         monthly_credit_micros: 5_000_000,
-        day_bp: 2_000, week_bp: 5_000, finish_bp: 10_000, finish_overflow_micros: 200_000, reserve_micros: 200_000,
+        day_bp: 2_000, week_bp: 5_000, finish_bp: 10_000, finish_overflow_micros: 200_000,
+        reserve_micros: 200_000, reserve_held: "INSIDE_LIMITS" as const,
         fixed_gauges: null
       }),
       Object.freeze({
         plan_id: "PRO" as const, tier: "premium" as const, net_prices: Object.freeze({ USD: 50_000_000, EUR: 50_000_000, RON: 250_000_000 }),
         monthly_credit_micros: 20_000_000,
-        day_bp: 2_000, week_bp: 5_000, finish_bp: 10_000, finish_overflow_micros: 200_000, reserve_micros: 200_000,
+        day_bp: 2_000, week_bp: 5_000, finish_bp: 10_000, finish_overflow_micros: 200_000,
+        reserve_micros: 200_000, reserve_held: "INSIDE_LIMITS" as const,
         fixed_gauges: null
       }),
       Object.freeze({
         plan_id: "MAX" as const, tier: "premium" as const, net_prices: Object.freeze({ USD: 200_000_000, EUR: 200_000_000, RON: 1_000_000_000 }),
         monthly_credit_micros: 150_000_000,
-        day_bp: 2_000, week_bp: 5_000, finish_bp: 10_000, finish_overflow_micros: 200_000, reserve_micros: 200_000,
+        day_bp: 2_000, week_bp: 5_000, finish_bp: 10_000, finish_overflow_micros: 200_000,
+        reserve_micros: 200_000, reserve_held: "INSIDE_LIMITS" as const,
         fixed_gauges: null
       })
     ])
@@ -268,6 +290,7 @@ export function billingPlansFromValue(value: unknown, sourceRef: string): Billin
       finishBasisPoints: plan.finish_bp,
       finishOverflowMicros: plan.finish_overflow_micros ?? null,
       reserveMicros: plan.reserve_micros ?? null,
+      reserveHeld: plan.reserve_held ?? null,
       fixedGauges: plan.fixed_gauges === null ? null : Object.freeze({
         riskTier: plan.fixed_gauges.risk_tier,
         compositionBudgetTier: plan.fixed_gauges.composition_budget_tier,
