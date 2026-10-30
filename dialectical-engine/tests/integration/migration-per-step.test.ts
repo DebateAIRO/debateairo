@@ -31,8 +31,11 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 const SIDE_BY_SIDE = "0123_side_by_side_releases.sql";
 /** Row-level security (mission row-level-security, SPEC-v4 R26): a chain step after 0123, the one before the last. */
 const RLS = "0130_row_level_security.sql";
-/** The V4 account memory (owner rulings N7 and N11): the chain's last step since the merge of origin/dev 64ef40c21. */
+/** The V4 account memory (owner rulings N7 and N11): the chain's third step from the end since the Perplexity plan's two. */
 const V4 = "0131_v4_account_memory.sql";
+/** The Perplexity plan's web evidence store and investigations (task W1-3): the chain's last two steps. */
+const WEB = "0132_web_evidence.sql";
+const INVESTIGATIONS = "0133_investigations.sql";
 const EXPAND: N1Declaration = Object.freeze({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false, concurrentIndex: null });
 /** A later step with constant digests, as forward-chain-replay-verifiers.test.ts builds its probes, plus its n1 header. */
 function probe(previous: ChainStep, name: string, sql: string, n1: N1Declaration = EXPAND): ChainStep {
@@ -65,15 +68,17 @@ describe("Review Focus 1: a step that fails (or a kill) between steps", () => {
 
   it("a failing step leaves every earlier step committed", async () => {
     const real = (await loadMigrationPlan()).forwardChain.map((step) => step.name);
-    expect(real).toHaveLength(21);
-    expect(real.at(-2)).toBe(RLS);
-    expect(real.at(-1)).toBe(V4);
+    expect(real).toHaveLength(23);
+    expect(real.at(-4)).toBe(RLS);
+    expect(real.at(-3)).toBe(V4);
+    expect(real.at(-2)).toBe(WEB);
+    expect(real.at(-1)).toBe(INVESTIGATIONS);
     chain.shape = extendedBy((last) => probe(last, "0199_probe_fail.sql", "SELECT 1/0"));
     await expect(migrate(db.pool)).rejects.toMatchObject({ code: "22012" });
     chain.shape = undefined;
-    // All twenty-one real steps were applied by that same run and stay committed; the probe left nothing.
+    // All twenty-three real steps were applied by that same run and stay committed; the probe left nothing.
     expect(await receipts()).toEqual(real);
-    expect((await db.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration_step")).rows[0].n).toBe(21);
+    expect((await db.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration_step")).rows[0].n).toBe(23);
     expect(await ledger()).toEqual(expect.arrayContaining(real));
     expect(await ledger()).not.toContain("0199_probe_fail.sql");
     // The next run continues where the last one stopped: everything replays, nothing is left to apply.
@@ -86,14 +91,15 @@ describe("Review Focus 2: a page read holding a lock on core.run while 0123's AL
   beforeAll(async () => {
     db = await startTestDatabase();
     // The database a release before 0123 leaves: the chain up to 0123 (then the settings activation 0124, the
-    // Italy-specific approval 0125, synthesis-flag's 0126 to 0129, row-level security's 0130 and the V4 account memory
-    // 0131, which migrate() applies after 0123 and which take no lock on core.run: 0125 alters legal.acceptance only,
-    // 0131 creates identity tables).
+    // Italy-specific approval 0125, synthesis-flag's 0126 to 0129, row-level security's 0130, the V4 account memory
+    // 0131 and the Perplexity plan's 0132 and 0133, which migrate() applies after 0123 and which take no lock on core.run:
+    // 0125 alters legal.acceptance only, 0131 to 0133 create identity tables).
     chain.shape = (steps) => steps.slice(0, (steps as readonly ChainStep[]).findIndex((step) => step.name === SIDE_BY_SIDE));
     try { await migrate(db.pool); } finally { chain.shape = undefined; }
     expect(await ledger()).not.toContain(SIDE_BY_SIDE);
     expect(await ledger()).not.toContain(RLS);
     expect(await ledger()).not.toContain(V4);
+    expect(await ledger()).not.toContain(INVESTIGATIONS);
   }, 300_000);
   afterAll(async () => { await db?.stop(); });
 

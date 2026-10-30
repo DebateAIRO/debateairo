@@ -2415,7 +2415,16 @@ export const CONTENT_CARRIERS = Object.freeze([
   "serve.synthesis_check_result",
   // Publication review (migration 0127): decision reason and the transient reviewer copy.
   "serve.publication_review_decision",
-  "serve.publication_review_copy"
+  "serve.publication_review_copy",
+  // Web evidence store (migration 0132): the search words; a page's address, site, title and date; its whole text (the
+  // transient carrier, wiped on closing or 30 days after the investigation's last activity); a reading's line and leads;
+  // a checked extract's quote; a path's pack.
+  "identity.web_search",
+  "identity.web_page",
+  "identity.web_page_text",
+  "identity.web_reading",
+  "identity.web_extract",
+  "identity.web_pack"
 ] as const);
 
 export type ContentCarrier = typeof CONTENT_CARRIERS[number];

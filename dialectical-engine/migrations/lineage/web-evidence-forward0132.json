@@ -1,0 +1,17 @@
+{
+  "version": "web-evidence-forward0132-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0131_v4_account_memory.sql",
+    "manifestSha256": "5a3ee6cdde1b60bc647526f4f6ed2820980d172c4ab43e08a5fd05e166f7afed",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0132_web_evidence.sql",
+    "sha256": "568c336ca55db3eae60afbe8893883cf309b7b41f90b16f94e1a61fc91b38619"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  }
+}

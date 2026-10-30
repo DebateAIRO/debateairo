@@ -44,8 +44,8 @@ const HELPER = "identity.page_memory_run_owned(uuid,uuid)";
 const FORGET = "identity.forget_erased_debate_page_memory(uuid)";
 
 describe("0131: the V4 account memory step", () => {
-  it("C-T is the last step of the chain's STEPS, after 0130, with its own loader", async () => {
-    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0129,loadForward0130,loadForward0131]");
+  it("C-T follows 0130 in the chain's STEPS (the Perplexity plan's 0132 and 0133 come after it), with its own loader", async () => {
+    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0129,loadForward0130,loadForward0131,");
     const loader = read("packages/db/src/migration-forward0131.ts");
     expect(loader).toContain(`const NAME = "${NAME}";`);
     expect(loader).toContain('const VERSION = "v4-account-memory-forward0131-v1";');
@@ -54,8 +54,9 @@ describe("0131: the V4 account memory step", () => {
     for (const table of TABLES) expect(loader).toContain(`"${table}"`);
     for (const signature of [...API_FUNCTIONS, FORGET, EXPORT_READER, HELPER]) expect(loader).toContain(`"${signature}"`);
     const plan = await loadMigrationPlan();
-    expect(plan.forwardChain.slice(-2).map((step) => step.name)).toEqual(["0130_row_level_security.sql", NAME]);
-    expect(plan.forwardChain.at(-1)?.replayVerifierSql).toBeUndefined();
+    const names = plan.forwardChain.map((step) => step.name);
+    expect(names.slice(names.indexOf(NAME) - 1, names.indexOf(NAME) + 1)).toEqual(["0130_row_level_security.sql", NAME]);
+    expect(plan.forwardChain.find((step) => step.name === NAME)?.replayVerifierSql).toBeUndefined();
   });
 
   it("C-M has 0129's manifest shape, bound to 0130's manifest and to the verifier in force (0130's)", () => {
@@ -186,7 +187,8 @@ describe("0131: the V4 account memory step", () => {
     expect([begin, finalize, committed, forgetCall, commit].every((at, index, all) => at > 0 && (index === 0 || at > all[index - 1]!))).toBe(true);
     const erasure = read("packages/db/src/account-erasure.ts");
     expect(erasure).toContain("finalizeWithPageMemory<PrivateRunErasureOutcome>(this.pool, input.erasureId,\n      `SELECT core.finalize_private_run_erasure($1,$2,$3,$4,$5) AS outcome`");
-    expect(erasure).toMatch(/const ERASURE_FUNCTION_SIGNATURES = Object\.freeze\(\[[\s\S]*?FORGET_ERASED_DEBATE_PAGE_MEMORY\n\] as const\);/u);
+    // 0132 and 0133 append their own deletions after it (the web evidence, the investigation rows).
+    expect(erasure).toMatch(/const ERASURE_FUNCTION_SIGNATURES = Object\.freeze\(\[[\s\S]*?FORGET_ERASED_DEBATE_PAGE_MEMORY,\n[\s\S]*?\] as const\);/u);
     expect(read("packages/db/src/synthesis-check-erasure.ts"))
       .toContain('finalizeWithPageMemory<SynthesisCheckErasureOutcome>(this.pool, input.erasureId,\n      "SELECT core.finalize_synthesis_check_erasure($1,$2,$3,$4,$5) AS outcome"');
     expect(read(SQL_PATH)).toMatch(/^-- n1: expand$/mu);
@@ -195,7 +197,7 @@ describe("0131: the V4 account memory step", () => {
   it("C-R is documented as the twenty-first step, after row-level security's section", () => {
     const readme = read("migrations/lineage/README.md");
     expect(readme.replace(/\s+/gu, " ")).toContain(
-      "the support answer scope (0129, below) the nineteenth, row-level security (0130, below) the twentieth and the V4 account memory (0131, below) the twenty-first.");
+      "the support answer scope (0129, below) the nineteenth, row-level security (0130, below) the twentieth, the V4 account memory (0131, below) the twenty-first,");
     const heading = "## The V4 account memory (0131)";
     const at = readme.indexOf(heading);
     expect(readme.indexOf("## Row-level security (0130)")).toBeGreaterThan(0);
