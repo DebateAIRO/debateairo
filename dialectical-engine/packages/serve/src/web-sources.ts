@@ -14,7 +14,9 @@ import { exhaustive } from "@debateai/kernel";
  *    in the language the site was shown in (Q8), and `fewer_readers` when a planned reader did not read the page;
  *  - on a looked-up point, the server's `looked_up_checked` flag: true only when its locator is an extract of THIS
  *    debate and the reviewer agreed with the point ("Sure" needs it, Q17);
- *  - on the answer, `web.paths[]`: each path's search status and its other pages (dig suggestions are W4-3's).
+ *  - on the answer, `web.paths[]`: each path's search status and its other pages (dig suggestions are W4-3's), each
+ *    path named by its opening position, the root node id in force (W3-6, `webPathsAtRoots`), as the story paths and the
+ *    map view name it; the store keys it by the map's answer id.
  *
  * Rules this file keeps:
  *  - never a grade or a score: the input below has no grade, no spread and no maker, so none can reach the answer;
@@ -34,6 +36,8 @@ export type WebStoredPageAbout = Readonly<{ url: string; site: string; title: st
 export type WebStoredReadingLine = Readonly<{ line: string; language: string; leads?: readonly string[] }>;
 /** identity.web_extract's sealed value: the checked extract, word for word as the page writes it. */
 export type WebStoredExtractQuote = Readonly<{ quote: string }>;
+/** identity.web_plan_path's sealed value (0134, NO_SEARCH_PLANNED only): the planner's reason, model text. */
+export type WebStoredPlanReason = Readonly<{ reason: string }>;
 
 /* ----------------------------------------------------------------- the input */
 
@@ -237,6 +241,48 @@ export function serveWebEvidence(input: Readonly<{
     if (parsed.success) paths.push(parsed.data);
   }
   return { web: { paths }, sources };
+}
+
+/** The planner's reason as stored (0134's sealed `{ reason }`, opened), or null when it is not one. */
+export function webPlanReasonOf(value: unknown): string | null {
+  return isRecord(value) ? text(value.reason) : null;
+}
+
+/* ----------------------------------------------------------------- path names (W3-6) */
+
+/**
+ * Each answer id of the map with a live root in force, to that root's node id (core.map_position with its re-points,
+ * migration 0119; packages/db `readMapRootsInForce`). An answer whose root is not argued yet, or whose root in force was
+ * set aside ('stale') and not yet re-pointed, has none: no node of the answer names it.
+ */
+export type WebPathRoots = ReadonlyMap<string, string>;
+
+export function webPathRootsOf(roots: readonly Readonly<{ answerId: string; rootNodeId: string; stale: boolean }>[]): WebPathRoots {
+  return new Map(roots.filter((root) => !root.stale).map((root) => [root.answerId, root.rootNodeId.toLowerCase()] as const));
+}
+
+/**
+ * The answer's web paths named as the contract names them (`WebPathSchema.position_ref`): by the root node id in force,
+ * not the answer id the store keys them by. A path whose answer has no root is left out; the points' sources hang on
+ * nodes and are untouched. With no web part, none.
+ */
+export function webPathsAtRoots(served: ServedWeb | null, roots: WebPathRoots): ServedWeb | null {
+  if (served === null) return null;
+  const paths = served.web.paths.flatMap((path) => {
+    const root = roots.get(path.position_ref);
+    return root === undefined ? [] : [{ ...path, position_ref: root }];
+  });
+  return { web: { paths }, sources: served.sources };
+}
+
+/**
+ * "Add to researched" (W4-4, `ResearchedAddRequestSchema.position_ref`): the stored path_ref (the map's answer id) of the
+ * path a served position names (its root node id in force), or null when no answer of the run has that root now.
+ */
+export function webPathRefOfPosition(positionRef: string, roots: WebPathRoots): string | null {
+  const wanted = positionRef.trim().toLowerCase();
+  for (const [answerId, root] of roots) if (root === wanted) return answerId;
+  return null;
 }
 
 /* ----------------------------------------------------------------- the points */

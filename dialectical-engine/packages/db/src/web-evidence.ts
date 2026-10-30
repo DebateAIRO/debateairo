@@ -1,5 +1,8 @@
 import type { Pool, PoolClient } from "pg";
 import type { CryptoEnvelope } from "@debateai/crypto";
+// W3-6: each map answer's root in force, which names a web path on the page (re-exported here: the package index's
+// bytes are pinned by the migration audit, NATIVE_MIGRATE_MODULE_SHA256).
+export { MAP_ROOT_IN_FORCE_SQL, readMapRootsInForce, type MapRootInForce } from "./map-roots.js";
 
 /**
  * The web evidence store (migration 0132; Perplexity plan 2026-10-30, task W1-3): what one debate's web step keeps, per

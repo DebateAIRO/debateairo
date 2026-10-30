@@ -1024,6 +1024,7 @@ packages/db/src/investigations.ts
 packages/db/src/legacy-claim.ts
 packages/db/src/legal-acceptance.ts
 packages/db/src/mail-locale.ts
+packages/db/src/map-roots.ts
 packages/db/src/migration-ahead.ts
 packages/db/src/migration-forward-auth-db-batch.ts
 packages/db/src/migration-forward-chain.ts

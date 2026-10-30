@@ -17,8 +17,10 @@ import {
   normalizeRunOwnership,
   prepareLeasedContentEncryptionForRun,
   PostgresWebEvidenceRepository,
+  readMapRootsInForce,
   RunRepository,
   WEB_EVIDENCE_CARRIERS,
+  WEB_PLAN_CARRIER,
   withRunContentLease,
   type CryptoEnvelope,
   withWriteTransaction,
@@ -30,7 +32,9 @@ import { judgesComparisonOf, judgesRecountApplies, servedPositionOf } from "./ju
 import type { EngineVerdictTrigger } from "./engine-verdict.js";
 import { SynthesisCheckRepository, synthesisTextOf, verdictOfRecord } from "./synthesis-check.js";
 import { PublicationReviewRepository, reviewStateOf } from "./publication-review.js";
-import { serveWebEvidence, withWebSources, type ServedWeb } from "./web-sources.js";
+import {
+  serveWebEvidence, webPathRootsOf, webPathsAtRoots, webPlanReasonOf, withWebSources, type ServedWeb
+} from "./web-sources.js";
 export { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
 export {
   judgesComparisonOf, judgesRecountApplies, recountJudgesVotes, rootIndexOfCallSite, servedPositionOf, type ComparisonVote,
@@ -3652,18 +3656,21 @@ export class ServeRepository {
    * inside the caller's content lease and shaped by ./web-sources.ts; null when it kept no search (every answer before
    * R22, Free, the setting off), so such an answer reads exactly as before. Only what is served is opened: each page's
    * address, title and date, reader 1's line and each checked extract; never a search's words, a page's text or a grade.
-   * The planner's per-path decision is not stored yet (0132 keeps searches only, W3-1's to add), so the paths are those
-   * the searches name.
+   * W3-6: the planner's per-path decision (0134's identity.read_web_plan) comes too, each NO_SEARCH_PLANNED reason opened
+   * under the same lease, so NO_SEARCH_PLANNED, NOT_ON_PLAN and SWITCHED_OFF reach the page; and each path is named by
+   * its root node id in force (core.map_position, 0119's re-points), a path whose answer has no root yet left out.
    */
   async #readServedWeb(runId: string): Promise<ServedWeb | null> {
-    const stored = await new PostgresWebEvidenceRepository(this.pool).read(runId);
-    if (stored === null || stored.searches.length === 0) return null;
+    const repository = new PostgresWebEvidenceRepository(this.pool);
+    const [stored, plan] = await Promise.all([repository.read(runId), repository.readPlanStatuses(runId)]);
+    if ((stored === null || stored.searches.length === 0) && (plan === null || plan.length === 0)) return null;
+    const roots = webPathRootsOf(await readMapRootsInForce(this.pool, runId));
     const cipher = await prepareLeasedContentEncryptionForRun(this.pool, runId);
     try {
-      const open = (carrier: (typeof WEB_EVIDENCE_CARRIERS)[keyof typeof WEB_EVIDENCE_CARRIERS], id: string,
+      const open = (carrier: (typeof WEB_EVIDENCE_CARRIERS)[keyof typeof WEB_EVIDENCE_CARRIERS] | typeof WEB_PLAN_CARRIER, id: string,
         envelope: CryptoEnvelope | null): unknown => decryptLeasedContentForRun<unknown>(cipher, carrier, id, envelope, null);
-      const served = serveWebEvidence({
-        evidence: {
+      const served = webPathsAtRoots(serveWebEvidence({
+        evidence: stored === null ? null : {
           searches: stored.searches.map((search) => ({ searchId: search.search_id, pathRef: search.path_ref, outcome: search.outcome })),
           pages: stored.pages.map((page) => ({ pageId: page.page_id, searchId: page.search_id, rank: page.rank,
             readDepth: page.read_depth, about: open(WEB_EVIDENCE_CARRIERS.page, page.page_id, page.content) })),
@@ -3675,8 +3682,9 @@ export class ServeRepository {
           picks: stored.picks.map((pick) => ({ pathRef: pick.path_ref, rank: pick.rank, pageId: pick.page_id })),
           researched: stored.researched.map((chosen) => ({ pageId: chosen.page_id, pathRef: chosen.path_ref, outcome: chosen.outcome }))
         },
-        plan: null
-      });
+        plan: (plan ?? []).map((decided) => ({ pathId: decided.pathRef, status: decided.status,
+          reason: decided.status === "NO_SEARCH_PLANNED" ? webPlanReasonOf(open(WEB_PLAN_CARRIER, decided.pathRef, decided.reason)) : null }))
+      }), roots);
       await cipher.assertLive();
       return served;
     } finally {
