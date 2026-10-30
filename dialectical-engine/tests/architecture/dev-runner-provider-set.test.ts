@@ -351,7 +351,10 @@ describe("production runner provider topology", () => {
     const INTENTIONALLY_ABSENT: Readonly<Record<string, string>> = {
       // c5e0b2862 (debate shape, map stage).
       mapChoices: "A storage seam only: absent, the runner stores and reads a shaped run's map with "
-        + "new MapChoiceRepository(pool) on its own pool, which is the production store; nothing composes it today."
+        + "new MapChoiceRepository(pool) on its own pool, which is the production store; nothing composes it today.",
+      // Dig-model revision W3-5: the path rewrite.
+      pathRewrite: "Composed once the runner can read a dig's picks (the W3-2 lane hands them to the run) and the gateway "
+        + "carries the PATH_REWRITE call sites and money seam (W3-2); absent, every settled run writes its story as today."
     };
 
     const unaccounted = optionalMembers

@@ -6,6 +6,7 @@ import {
 import { MAP_ENGINE_CONTRACT_NAMES, mapEnginePromptContracts } from "@debateai/map";
 import { promptContractFingerprintText, type PromptContract } from "@debateai/providers";
 import { SYNTHESIZER_LENGTH_READER_SOURCES_PROMPT_CONTRACT, SYNTHESIZER_LENGTH_SOURCES_PROMPT_CONTRACT } from "@debateai/serve";
+import { PATH_REWRITE_SEALED_CONTRACTS } from "@debateai/story";
 
 /**
  * Engine redesign (spec 2026-10-15 §9; INTERFACE §2.2): the one seal over engine 2's sealed prompt contracts. The runner
@@ -20,7 +21,8 @@ export const ENGINE_CONTRACT_FINGERPRINT_HEADER = "debateai.engine-contracts.v1"
  * fingerprint text is the header alone (deviation 2: the story v4 contracts are test-pinned, not sealed). R2a appends
  * verdict.investigate.v1 and R2b verdict.judge.v1 (R2 plan deviation 1); R3 the map v2 contracts and the assigned-root
  * v2 pair; R4 the writer's and checker's engine pair; W1-5 (web search, 2026-10-30) the web wording; W1-5b its second
- * wording as new ids (the v1s it supersedes stay sealed, unused). A phase that
+ * wording as new ids (the v1s it supersedes stay sealed, unused); W3-5 (dig-model revision) the path rewrite's writer and
+ * checker. A phase that
  * appends moves ENGINE_SEALED_IDS and ENGINE_CONTRACT_HASH_SEALED in tests/unit/engine-contract-hash.test.ts.
  */
 export function engineSealedContracts(): readonly PromptContract[] {
@@ -45,7 +47,10 @@ export function engineSealedContracts(): readonly PromptContract[] {
     // W1-5b (owner approvals of 2026-10-30): the planner v2 (the local pair), the pick v2 and readers 2 and 3 v2 (3 or 5
     // pages, from code), and the dig-suggestion call (W0-1 drafts §2.1). web.plan.v1, web.pick.v1 and web.read-top.v1
     // above are never removed or edited: sealed, unused.
-    ...WEB_WORDING_V2_SEALED_CONTRACTS
+    ...WEB_WORDING_V2_SEALED_CONTRACTS,
+    // W3-5 (dig-model revision 2026-10-30; drafts 5.1 and 5.2, approved as written): the path rewrite's writer, then its
+    // checker (packages/story/src/path-rewrite.ts).
+    ...PATH_REWRITE_SEALED_CONTRACTS
   ]);
 }
 

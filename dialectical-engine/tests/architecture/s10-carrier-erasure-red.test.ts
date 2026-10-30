@@ -257,6 +257,10 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // runner hands it (lane, sit-out book, keep-alive, the run-required leased gateway), naming the run. It opens
       // no lease and reads no content of its own; the map's storage goes through packages/map/src/repository.ts above.
       "apps/runner/src/map-stage.ts",
+      // Dig-model revision W3-5: the path rewrite sends each writer and checker call through the member gateway the
+      // settled run's snapshot hands it (the run-required, leased gateway, or the replay book over it), inside the step
+      // lease the runner's post-settle hook gives, naming the dig's run. Its text is sealed through the composition's seal.
+      "apps/runner/src/path-rewrite.ts",
       // L4-F9 repair: the keep-alive hands each runner call, unchanged, to the
       // gateway it wraps (the run-required, leased gateway), or refuses it before
       // anything is sent. It opens no lease and reads no content of its own.

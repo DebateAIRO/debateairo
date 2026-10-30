@@ -303,3 +303,26 @@ export async function readStoryPolicyFromRegister(
     sourceRef: row.source_ref
   })), registerVersion);
 }
+
+/**
+ * THE PATH REWRITE (dig-model revision 2026-10-30, task W3-5; owner answers Q-D10, Q-D13, Q-D14): a dig writes no story;
+ * one writer call (Claude Haiku 5.5) and one checker call (GLM; Luna later) rewrite the path it was dug from. Code-owned,
+ * never a register row: the rewrite is part of the dig and its contracts are sealed by engineContractHash, so these
+ * numbers move with a release, as the web step's do.
+ *  - thinking: both steps think at the low level (the owner's rule for the final steps of a dig, as the web steps). The
+ *    step names are the names the preview's thinking table reads for the two call sites (`PATH_REWRITE:WRITER:{round}`,
+ *    `PATH_REWRITE:CHECKER:{round}`, packages/story/src/path-rewrite.ts).
+ *  - rounds: at most 2 on a paid plan, 1 on Free (Q-D14), and the backup writer's loop the same again after them.
+ *  - the writer's output cap is 8,192 tokens; the checker answers in one short object.
+ */
+export const PATH_REWRITE_THINKING = Object.freeze({
+  writer: Object.freeze({ step: "path_rewrite_writer", level: "low" } as const),
+  checker: Object.freeze({ step: "path_rewrite_checker", level: "low" } as const)
+});
+
+export const PATH_REWRITE_POLICY = Object.freeze({
+  maxRounds: 2,
+  freeMaxRounds: 1,
+  writerBound: Object.freeze({ maxAttempts: 3, tokenCeiling: 8192, deadlineMs: 240_000 }),
+  checkerBound: Object.freeze({ maxAttempts: 3, tokenCeiling: 2048, deadlineMs: 180_000 })
+} as const);

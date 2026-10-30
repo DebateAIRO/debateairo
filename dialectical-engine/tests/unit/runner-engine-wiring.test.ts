@@ -85,6 +85,20 @@ describe("the runner reads the engine from the receipt only", () => {
     }
   });
 
+  // W3-5 (dig-model revision): the path rewrite is a process member beside the story, and runs only in the after-settle
+  // branch, after the run's lease, in the story's place for a dig; an engine-2 contract pair sealed with the rest.
+  it("the path rewrite: settings beside the story's, one call in the after-settle branch, its contracts under the engine seal", () => {
+    const storyAt = RUNNER.indexOf("  readonly story?: {");
+    expect(storyAt).toBeGreaterThan(0);
+    expect(RUNNER.indexOf("  readonly pathRewrite?: PathRewriteRunnerSettings;")).toBeGreaterThan(storyAt);
+    const leaseClosed = RUNNER.indexOf('"The runner failed inside its private-content disclosure lease"');
+    const call = RUNNER.indexOf("if (!(await runDigPathRewrite(settings.pathRewrite, settled.input))) {");
+    expect(call).toBeGreaterThan(leaseClosed);
+    expect(RUNNER.indexOf("await storyWriter.writeAfterSettle(", call)).toBeGreaterThan(call);
+    const contracts = read("apps/runner/src/engine-contracts.ts");
+    expect(contracts.indexOf("...PATH_REWRITE_SEALED_CONTRACTS")).toBeGreaterThan(contracts.indexOf("...WEB_WORDING_V2_SEALED_CONTRACTS"));
+  });
+
   // Ruling R3-T14.1: R3 adds ENGINE_MAP_CHECK_UNBUDGETED in its alphabetical place beside R1d's refusal, so the pin reads
   // the declared list (both codes, in both alphabets) and its order, not one adjacency.
   it("the per-run refusals are declared diagnostic codes in both alphabets, each alphabet in sorted order", () => {
