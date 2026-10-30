@@ -15,9 +15,11 @@ const BASE = { deployment: "v3-preview", requested_thinking_level: "high",
   budget_socket: "/run/debateai-v3-preview/provider-budget.sock", scope_id: "preview-fixture" };
 
 describe("the thinking-level table", () => {
-  it("names the ten steps", () => {
+  // Web search (W1-5, 2026-10-30): the web step's four after today's ten (tests/unit/web-prompts.test.ts maps their call sites).
+  it("names the fourteen steps", () => {
     expect(PREVIEW_THINKING_STEPS).toEqual(["opening", "pros_cons", "cross_exchange", "judge_panel", "reviewer",
-      "answer_writer", "answer_checker", "story_writer", "story_checker", "slip_fix"]);
+      "answer_writer", "answer_checker", "story_writer", "story_checker", "slip_fix",
+      "web_planner", "web_reader", "web_pick", "web_reader_top"]);
   });
   it("parses a valid table", () => {
     expect(parsePreviewThinkingLevels({ [QWEN]: { level: "low", steps: { story_writer: "medium" } }, [HAIKU]: { level: "medium" } }))

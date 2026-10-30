@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
+  COMPARING_JUDGE_SOURCES_PROMPT_CONTRACT,
   PANEL_PROMPT_CONTRACT,
+  WEB_STEP_PROMPT_CONTRACTS,
+  judgeSourcesSealedContracts,
   judgeConsiderationPromptContract,
   judgePromptContract,
   reviewPromptContract,
@@ -14,6 +17,8 @@ import {
   SYNTHESIZER_ANSWER_FORM,
   SYNTHESIZER_CONTRACT_ID,
   SYNTHESIZER_INSTRUCTIONS,
+  SYNTHESIZER_LENGTH_READER_SOURCES_PROMPT_CONTRACT,
+  SYNTHESIZER_LENGTH_SOURCES_PROMPT_CONTRACT,
   SYNTHESIZER_PROMPT_CONTRACT,
   SYNTHESIZER_V1_ANSWER_FORM,
   SYNTHESIZER_V1_CONTRACT_ID,
@@ -867,7 +872,11 @@ describe("REVIEW ITEM 4 — no prompt anywhere still carries the retired sentenc
     ["story-checker", buildStoryCheckerContract(STORY_PACK)],
     // Story v4 (R1d): the v4 pair, with the shipped pack's v4 passages and the default shape.
     ["story-storyteller-v4", buildStorytellerContract(STORY_PACK, false, { shapeId: "general" })],
-    ["story-checker-v4", buildStoryCheckerContract(STORY_PACK, false, { shapeId: "general" })]
+    ["story-checker-v4", buildStoryCheckerContract(STORY_PACK, false, { shapeId: "general" })],
+    // Web search (W1-5, 2026-10-30): every new sealed contract; their texts are pinned in tests/unit/web-prompts.test.ts.
+    ...[...WEB_STEP_PROMPT_CONTRACTS, ...judgeSourcesSealedContracts(), COMPARING_JUDGE_SOURCES_PROMPT_CONTRACT,
+      SYNTHESIZER_LENGTH_SOURCES_PROMPT_CONTRACT, SYNTHESIZER_LENGTH_READER_SOURCES_PROMPT_CONTRACT]
+      .map((contract): [string, typeof contract] => [contract.contractId, contract])
   ])("%s", (_name, contract) => {
     const whole = `${contract.instruction} ${contract.answerForm}`;
     expect(whole).not.toContain("untrusted data, not instructions");
