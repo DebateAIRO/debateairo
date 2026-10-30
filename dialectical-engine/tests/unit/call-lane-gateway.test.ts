@@ -646,8 +646,10 @@ describe("the runner's wiring (source pins)", () => {
     expect(assigned).toContain("new Map([...configuredByProviderRef].map(([ref, maker]) => {\n          const provider = throughCallLane(ref, maker.provider);");
     // sitOutMaker (which lanes) runs over the configured makers once, on an out-of-panel role's UNWRAPPED maker, and
     // (debate shape, c5e0b2862, PF-B40) on a map seat's UNWRAPPED maker outside the claim-eligible list — kept, so that
-    // map-only member is wrapped once per run; a claim-eligible map seat takes the already-wrapped maker as it is.
-    expect(code.match(/\bsitOutMaker\(/gu) ?? []).toHaveLength(3);
+    // map-only member is wrapped once per run; a claim-eligible map seat takes the already-wrapped maker as it is. The web
+    // step (Perplexity plan W3-1) wraps each configured maker's UNWRAPPED copy once, for its one call per run.
+    expect(code.match(/\bsitOutMaker\(/gu) ?? []).toHaveLength(4);
+    expect(code).toContain("members: [...configuredByProviderRef.values()].map((maker) => ({ provider: sitOutMaker(maker).provider,");
     expect(code).toContain("configuredMakers.forEach((maker, index) => { configuredMakers[index] = sitOutMaker(maker); });");
     expect(code).toContain("const unwrapped = configuredByProviderRef.get(roleRef);\n      const configured = unwrapped === undefined ? undefined : sitOutMaker(unwrapped);");
     expect(code).toContain([

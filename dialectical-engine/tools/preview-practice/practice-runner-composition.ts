@@ -91,7 +91,8 @@ import { applyPreviewGateCapacities, previewCallSubjects, previewGateNames, stru
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
 import {
   createRunnerSettingsCache, createRunSettingsVersions, loadRunnerVersionSettings, preloadRunnerSettings, readRunnerSiteContext,
-  runCostEnvelopeGuardOf, runnerSettingsOfVersion, runnerSettingsSummary, runPreviewThinkingLevelsOf, type RunnerVersionReaders
+  runCostEnvelopeGuardOf, runnerSettingsOfVersion, runnerSettingsSummary, runnerWebSearchSettings, runPreviewThinkingLevelsOf,
+  type RunnerVersionReaders
 } from "../../apps/runner/src/run-settings.js";
 import { createRunnerRetirementSignal } from "../../apps/runner/src/runner-retirement.js";
 import { PracticeCallStats } from "./practice-parallel.js";
@@ -374,6 +375,10 @@ export async function composePracticeRunner(input: Readonly<{
     // model, vendor and gate, and the claim renewals on their own pool.
     callScheduler: runnerCallScheduler,
     callSubjects: previewCallSubjects(previewGate),
+    // Perplexity plan W3-1, as main.ts: the web step where the practice's gate names the search socket; a debate whose
+    // run names no paid plan (billing.run_charge_scope) is NOT_ON_PLAN and makes no web call.
+    webSearch: runnerWebSearchSettings({ pool, previewGate, fetch: previewFetch,
+      guardOf: runnerSite.money === null ? null : runCostEnvelopeGuard }),
     // Ruling R31, as main.ts: a call to a busy model waits on the busy coordinator BEFORE it takes any slot.
     callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model),
     renewals: new WorkItemRepository(input.keepAlivePool, { releaseKey: environment.RELEASE_KEY, workerId: environment.RUNNER_WORKER_ID }),

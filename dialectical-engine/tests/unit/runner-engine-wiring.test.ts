@@ -37,6 +37,16 @@ describe("the runner reads the engine from the receipt only", () => {
     expect(RUNNER).not.toContain("readEngineRunnerSettings");
   });
 
+  it("W3-1: the web step runs from one call site, only on an engine-2 run, under the engine seal the boot settings carry", () => {
+    expect(RUNNER.split("await runRunnerWebStep(")).toHaveLength(2);
+    expect(RUNNER).toContain("if (settings.webSearch !== undefined && settings.engine != null && engine.engine === 2 && shapeMapArgued");
+    expect(RUNNER).toContain("contractHash: settings.engine.engineContractHash, bound: settings.judgeBound,");
+    const step = read("apps/runner/src/web-step.ts");
+    for (const name of ["readEngineVersionPolicy", "ENGINE_VERSION_POLICY_ROW_KEY", "readEngineRunnerSettings"]) {
+      expect(step).not.toContain(name);
+    }
+  });
+
   it("the runner's settings carry the boot settings beside the debate shape's", () => {
     const shapeAt = RUNNER.indexOf("readonly debateShape?: DebateShapeRunnerSettings | null;");
     expect(shapeAt).toBeGreaterThan(0);
