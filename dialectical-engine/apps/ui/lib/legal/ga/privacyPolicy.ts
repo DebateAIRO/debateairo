@@ -63,7 +63,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         ]
       },
       { kind: "p", text: "Tráth clárúcháin seiceálaimid tír do sheolta IP go háitiúil agus diúltaímid do chlárú ó thíortha nach bhfreastalaímid orthu, ó sheoltaí imeachta Tor agus ó sheoltaí nach eol a dtír. Ní sheolaimid an seoladh IP chuig tríú páirtí don tseiceáil seo. Úsáidimid do dháta breithe chun d’aois a sheiceáil gan é a stóráil; dearbhaíonn tú freisin do thír chónaithe agus, más sna Stáit Aontaithe atá tú, do stát. Ag tús gach díospóireachta nua seiceálaimid tír an tseolta IP go háitiúil freisin agus féadfaimid í a dhiúltú má tá an tír toirmiscthe go buan; is le clárú amháin a bhaineann diúltú mar gheall ar Tor nó tír anaithnid. Seiceáiltear an comhrá cabhrach ar an mbealach céanna: ar an gcéad leathanach de gach cluaisín brabhsálaí a thaispeánfadh Cabhair, agus ar gach iarratas tacaíochta, aimsímid tír an tseolta IP agus seiceálaimid liosta na seoltaí imeachta Tor. Sna háiteanna nach bhfreastalaímid orthu, taobh thiar de sheoladh imeachta Tor, nó nuair nach féidir an tír a chinneadh, ní thaispeántar an comhrá cabhrach agus diúltaítear d’iarratais tacaíochta. Ní fhaigheann an leathanach ach trí fhreagra tá-nó-níl (an dtairgtear clárú, íocaíocht agus an comhrá cabhrach ann) agus ní fhaigheann sé an tír riamh; ní choinníonn sé ach freagra an chomhrá cabhrach, sa chluaisín, go dtí go ndúnann tú é (rannán 13). Ní choinnímid aon ní den chuardach seo, agus ní scríobhann sé aon taifead iniúchóireachta." },
-      { kind: "p", text: "Ní bhailímid anailísíocht ná teiliméadracht faoin gcaoi a n-úsáideann tú an táirge, agus ní shocraímid aon fhianán chun na críche sin. Má athraíonn sé sin, athróidh an beartas seo agus an Beartas Fianán ar dtús, agus iarrfar ort rogha a dhéanamh." }
+      { kind: "p", text: "Ní bhailímid anailísíocht ná teiliméadracht faoin gcaoi a n-úsáideann tú an táirge, agus ní shocraímid aon fhianán chun na críche sin; ní choinnímid ach a bhfuil de dhíth ar na leathanaigh chun oibriú duit, atá liostaithe sa tábla seo (mar shampla, cathain a d'oscail tú léarscáil díospóireachta go deireanach). Má athraíonn sé sin, athróidh an beartas seo agus an Beartas Fianán ar dtús, agus iarrfar ort rogha a dhéanamh." }
     ]
   },
   {
@@ -349,7 +349,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.8",
-  sha256: "d8537641b65be79c5963c03edf718726bcbbccbcac743c8efeb2b1ddedd673a9",
+  sha256: "302ef54089eba43a559c76bad36ac30568c15cb3835971f49f642afde0d82c1d",
   eyebrow: "BEARTAS PRÍOBHÁIDEACHAIS · v3.8 · I bhFEIDHM 12 DEIREADH FÓMHAIR 2026",
   title: "An méid a stórálaimid, agus an fáth",
   lede: "Do chearta agus ár n-oibleagáidí faoin GDPR (EU) 2016/679, i bhfriotal soiléir. Ceithre rannán déag agus Iarscríbhinn B — scrollaigh go dtí an deireadh.",

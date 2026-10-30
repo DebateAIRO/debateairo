@@ -63,7 +63,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         ]
       },
       { kind: "p", text: "At sign-up, we refuse access from countries we do not serve, Tor exit addresses and IP addresses whose country we cannot determine. When you start a new debate, we check the IP country again and may refuse the request from a blocked country. The help chat is checked the same way: on the first page of each browser tab that would show Help, and on every support request, we look up your IP address's country and check the Tor exit list. Where we do not serve, behind a Tor exit, or where the country cannot be determined, the help chat is not shown and support requests are refused. The page receives only three yes-or-no answers, whether sign-up, payment and the help chat are offered there, and never the country; it keeps only the help chat's answer, in the tab, until you close it (section 13). We keep nothing of this lookup, and it writes no audit entry. These checks run locally; we do not send your IP address to DB-IP or another third party for them. We aggregate refusal audit entries by route, code, country and time window. You enter your date of birth so we can check your age, but we do not keep the date. A successful registration stores a passed age-check result; for an existing account, the check may record passed or refused. You also choose your country of residence and, if it is the United States, your state." },
-      { kind: "p", text: "We do not collect analytics or telemetry about how you use the product, and we set no cookies for that purpose. If that changes, this policy and the Cookie Policy change first, and you will be asked." }
+      { kind: "p", text: "We do not collect analytics or telemetry about how you use the product, and we set no cookies for that purpose; we keep only what the pages need to work for you, listed in this table (such as when you last opened a debate's map). If that changes, this policy and the Cookie Policy change first, and you will be asked." }
     ]
   },
   {
@@ -349,7 +349,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.8",
-  sha256: "a290320b6c036e7035a29808ebbf6f81efc114c7a4a2eedc72122d37c67f2a43",
+  sha256: "e78c9d0eb71839d562868d3ae6312b53cf18c8b8407d8aadff1cc07f2a13000b",
   eyebrow: "PRIVACY POLICY · v3.8 · EFFECTIVE 12 OCTOBER 2026",
   title: "What we store, and why",
   lede: "Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Fourteen sections and Annex B — scroll to the end.",

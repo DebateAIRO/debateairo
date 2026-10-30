@@ -276,7 +276,8 @@ import {
   type ShapeLeg, type ShapePlan, type ShapePositionPlan
 } from "./shape-plan.js";
 import {
-  shapeDistinctMakers, shapeHandOverRoot, shapeMakerBar, shapeRootMakerBar, shapeSeatOrder, shapeWriterSeat
+  shapeDistinctMakers, shapeHandOverRoot, shapeMakerBar, shapeRootMakerBar, shapeSeatOrder, shapeSpareForRefusedRoot,
+  shapeSpareThatAnswered, shapeWriterSeat
 } from "./shape-seats.js";
 import { keepAliveProviderGateway, runKeepAliveScope, startRunKeepAlive, type RunnerTaskControl } from "./run-keep-alive.js";
 import type { RunnerRetirementSignal, TaskExecutionCounter } from "./runner-retirement.js";
@@ -8051,13 +8052,106 @@ export class WalkingSkeletonRunner {
       });
       return primaryAttempt;
     };
-    let primaryAttempt = await openFirstPosition(rootSeats[0]!, rootLegOf(0));
+    /**
+     * Pre-flight PF-B45: per plan position, the maker that REALLY wrote it (the runner-up, or a cheaper maker a refused
+     * call moved to), recorded before its statement is told — the shape's writer rule reads it, never the planned maker.
+     * Declared before root 0, whose refused answer reads it (R22, `handRefusedRootToSpare`).
+     */
+    const answeredMakers: (string | undefined)[] = [];
+    const rootCallSiteKey = (rootIndex: number): string =>
+      rootIndex === 1 ? "JUDGE:root:secondary" : `JUDGE:root:${String(rootIndex)}`;
+    /**
+     * R22 (owner ruling 2026-10-30, "Yes, use the spare debater") — A POSITION WHOSE ANSWER WAS REFUSED AFTER EVERY
+     * REPAIR GOES TO A SPARE DEBATER. 379ad0c99 hands it to the seat's backup; a seat with no usable backup (every seat
+     * on the test site, whose legacy book has none) let the refusal fail the debate. A shaped run now hands the position
+     * over the way a position whose maker sits out is handed over before its first call (`shapeHandOverRoot`'s SWAP): to
+     * a seat no position uses, of a maker that is none of the refused seat's, up, not sitting out, never refused a
+     * position and arguing no other one (`shapeSpareForRefusedRoot`). From then on the spare is the position's author for
+     * every later step (`rootSeats`, `positionAnswerers`, `answeredMakers`, the node's maker), so its cross-replies, the
+     * judges' own-maker rule and the neutral seating all see its maker. It is asked at the position's own site, for the
+     * same leg, so every spending gate binds its call as it binds any other (the run's money and attempt ceilings, root
+     * 0's first-call phase, the step's allowance, which the preview counts per maker), and its ledger rows sit beside the
+     * refused ones under its own route. The switch is told on the progress stream (cause CONTENT_REFUSED), and the answer
+     * discloses the stand-in with BACKUP-MODEL-USED (`spareAnswers`). No spare (today's opening: every seat argues a
+     * position; a shape that argues every seat), and today's rule stands: the refusal fails the debate.
+     */
+    const refusedRootSeats = new Set<RunSeat>();
+    /** The roots a spare took over: on this pass after a refusal, or on a resumed pass after an earlier one's. */
+    const spareRoots = new Set<number>();
+    /** How many of those roots a spare answered on this pass; each is a stand-in the answer discloses. */
+    let spareAnswers = 0;
+    const rootSiteKey = (rootIndex: number): string => rootIndex === 0 ? FIRST_POSITION_CALL_SITE_KEY : rootCallSiteKey(rootIndex);
+    /** Hands root `rootIndex` to a spare after its refused answer; false when the failure must travel as today. */
+    const handRefusedRootToSpare = async (rootIndex: number, error: unknown): Promise<boolean> => {
+      if (shapePlan === null || !(error instanceof JudgeContentRefusedError)) return false;
+      const refused = rootSeats[rootIndex]!;
+      refusedRootSeats.add(refused);
+      const siteKey = rootSiteKey(rootIndex);
+      const otherRootMakers = answeredMakers.slice(0, rootCount).filter((_maker, index) => index !== rootIndex);
+      const spare = shapeSpareForRefusedRoot({
+        makers: rootSeats.map((seat) => seat.main.maker), rootCount, rootIndex, sitsOut: rootSitsOut,
+        refusedMakers: membersOf(refused).map((member) => member.maker),
+        takes: (index) => {
+          const seat = rootSeats[index]!;
+          return !refusedRootSeats.has(seat) && !seatSitsOut(seat) && seatCaller.plan(seat, siteKey) !== null
+            && !otherRootMakers.includes(seat.main.maker);
+        }
+      });
+      if (spare === null) return false;
+      const to = rootSeats[spare]!;
+      [rootSeats[rootIndex], rootSeats[spare]] = [to, refused];
+      spareRoots.add(rootIndex);
+      await announceSwitch(backupSwitchEventValue({
+        role: "POSITION", seatIndex: refused.pinnedSeatIndex,
+        fromProviderRef: refused.main.providerRef, fromCandidateId: refused.main.candidate?.candidateId ?? null,
+        toProviderRef: to.main.providerRef, toCandidateId: to.main.candidate?.candidateId ?? null,
+        cause: "CONTENT_REFUSED", callSiteKey: siteKey
+      }));
+      return true;
+    };
+    /**
+     * R22 — A RESUMED PASS KEEPS THE SPARE. Before root `rootIndex`'s first call: a spare whose member answered the root's
+     * site on an earlier pass, when no member of the root's own seat did (`shapeSpareThatAnswered`, from the replay
+     * book), takes the root again at once. So the refused member is never asked again, and the spare's answer is
+     * replayed from the record rather than bought twice; its switch was told on that pass.
+     */
+    const resumeSpareHandOver = (rootIndex: number): void => {
+      if (shapePlan === null || spareRoots.has(rootIndex)) return;
+      const siteKey = rootSiteKey(rootIndex);
+      const spare = shapeSpareThatAnswered({
+        seatRefs: rootSeats.map((seat) => membersOf(seat).map((member) => member.providerRef)), rootCount, rootIndex,
+        answeredBy: replayBook.answeredBy((key) => seatBaseCallSiteKey(key) === siteKey), sitsOut: rootSitsOut
+      });
+      if (spare === null) return;
+      refusedRootSeats.add(rootSeats[rootIndex]!);
+      [rootSeats[rootIndex], rootSeats[spare]] = [rootSeats[spare]!, rootSeats[rootIndex]!];
+      spareRoots.add(rootIndex);
+    };
+    /**
+     * R22: root 0's refused answer goes to a spare, asked at once for the same leg (`handRefusedRootToSpare`); a spare
+     * refused in turn goes on to the next one. None left, the refusal travels as today.
+     */
+    const openRootZeroBySpare = async (refusal: unknown): ReturnType<typeof openFirstPosition> => {
+      let refused = refusal;
+      for (;;) {
+        if (!(await handRefusedRootToSpare(0, refused))) throw refused;
+        try {
+          return await openFirstPosition(rootSeats[0]!, rootLegOf(0));
+        } catch (next) {
+          // The spare's own call refused for money spent nothing on it: the debate ends on the refusal, as today.
+          if (next instanceof TypedDomainError && next.code === "RUN_CEILING_BELOW_FIRST_CALL") throw refusal;
+          refused = next;
+        }
+      }
+    };
+    resumeSpareHandOver(0);
+    let primaryAttempt = await openFirstPosition(rootSeats[0]!, rootLegOf(0)).catch(openRootZeroBySpare);
     // Fix (d): root 0 cannot be dropped — nothing would exist to answer from — so when its member sat out, the next
     // member that does not sit out opens instead (the two seats trade roots, above).
     for (let next = 1; primaryAttempt.kind === "HALTED" && rootSitsOut(0) && next < rootSeats.length; next += 1) {
       if (rootSitsOut(next)) continue;
       [rootSeats[0], rootSeats[next]] = [rootSeats[next]!, rootSeats[0]!];
-      primaryAttempt = await openFirstPosition(rootSeats[0]!, rootLegOf(0));
+      primaryAttempt = await openFirstPosition(rootSeats[0]!, rootLegOf(0)).catch(openRootZeroBySpare);
     }
     if (primaryAttempt.kind === "HALTED") {
       throw new TypedDomainError(
@@ -8065,6 +8159,7 @@ export class WalkingSkeletonRunner {
         "The primary maker position failed after the full cooldown and final-retry courtesy"
       );
     }
+    if (spareRoots.has(0)) spareAnswers += 1;
     const judged = primaryAttempt.value.value;
     // A15: the member that ANSWERED root 0 — its lineage, its panel's author
     // (controller carry 8), and the writer of its cross-exchanges.
@@ -8073,11 +8168,6 @@ export class WalkingSkeletonRunner {
     // B9: the node's author is the model that actually wrote it — the member
     // that answered root 0, or the cheaper maker its refused first call moved to.
     const rootAuthor = actualAuthor(FIRST_POSITION_CALL_SITE_KEY, primaryMaker);
-    /**
-     * Pre-flight PF-B45: per plan position, the maker that REALLY wrote it (the runner-up, or a cheaper maker a refused
-     * call moved to), recorded before its statement is told — the shape's writer rule reads it, never the planned maker.
-     */
-    const answeredMakers: (string | undefined)[] = [];
     answeredMakers[0] = rootAuthor.maker;
     const reduced = reduceAssessment({
       claimType: judged.normalizedClaim.claimType,
@@ -8215,6 +8305,11 @@ export class WalkingSkeletonRunner {
        * its seat (main and backup) and on a call moved to a cheaper maker. Absent on today's legs.
        */
       readonly makerBar?: (member: Readonly<{ maker: string }>) => boolean;
+      /**
+       * R22 (owner ruling 2026-10-30): the leg's JUDGEMENT_SCHEDULED receipt was already written, for the call whose
+       * refused answer this one takes over (a spare debater's), so this call writes none of its own. Absent: today's.
+       */
+      readonly receiptWritten?: true;
       readonly role: string;
       readonly parentNodeId: string | null;
       readonly childKind: "support" | "defeater" | null;
@@ -8267,7 +8362,7 @@ export class WalkingSkeletonRunner {
       | { readonly kind: "AUTHORED"; readonly value: AuthoredPosition }
       | { readonly kind: "HALTED"; readonly record: HaltedExpansionRecord }
     > => {
-      const scheduled = this.#ledger.append({
+      const scheduled: Promise<unknown> = input.receiptWritten === true ? Promise.resolve() : this.#ledger.append({
         runId: run.runId,
         attemptId: runnerAttemptId,
         actionKind: "JUDGEMENT_SCHEDULED",
@@ -8876,8 +8971,6 @@ export class WalkingSkeletonRunner {
     const ROOT_SAVE: Omit<SaveInput, "authorIndex"> = Object.freeze({
       parentNodeId: null, childKind: null, siblingOrdinal: 0, explorationDecision: "continue", edges: Object.freeze([])
     });
-    const rootCallSiteKey = (rootIndex: number): string =>
-      rootIndex === 1 ? "JUDGE:root:secondary" : `JUDGE:root:${String(rootIndex)}`;
     /** Root 0's panel result: its selection rule is recorded on the propagation receipt (below). */
     const rootZeroPanel: { selection: Awaited<ReturnType<typeof runNodePanel>> | null } = { selection: null };
     /**
@@ -8931,6 +9024,8 @@ export class WalkingSkeletonRunner {
       // Spec §2.3 (O6): right before the author call. Fix (d): too few members left ends the arguing, and a root
       // whose member sits out is dropped without a call.
       if (arguingStopped()) return;
+      // R22: a resumed pass keeps the spare an earlier pass handed this position to, before any call.
+      resumeSpareHandOver(rootIndex);
       if (dropSatOutRoot(rootIndex, true)) return;
       const input: AuthorPositionInput = {
         authorIndex: rootIndex,
@@ -8946,11 +9041,34 @@ export class WalkingSkeletonRunner {
       };
       let authoredRoot: Awaited<ReturnType<typeof authorAndPanel>>;
       try {
-        // Spec §2.1: the root's statement is told as soon as its author call returned — its replies start from it.
-        authoredRoot = await authorAndPanel(input, (statement, maker) => {
-          answeredMakers[rootIndex] = maker;
-          statements[rootIndex]!.resolve(statement);
-        });
+        try {
+          // Spec §2.1: the root's statement is told as soon as its author call returned — its replies start from it.
+          authoredRoot = await authorAndPanel(input, (statement, maker) => {
+            answeredMakers[rootIndex] = maker;
+            statements[rootIndex]!.resolve(statement);
+          });
+        } catch (refusal) {
+          // R22 (owner ruling 2026-10-30): a position refused after every repair goes to a spare debater, asked at once
+          // for the same leg at the same site (`handRefusedRootToSpare`); a spare refused in turn goes on to the next.
+          // None left, the refusal travels to the catch below as today.
+          const told = (statement: string, maker: string): void => {
+            answeredMakers[rootIndex] = maker;
+            statements[rootIndex]!.resolve(statement);
+          };
+          let refused: unknown = refusal;
+          for (;;) {
+            if (!(await handRefusedRootToSpare(rootIndex, refused))) throw refused;
+            try {
+              authoredRoot = await authorAndPanel({ ...input, seat: rootSeats[rootIndex]!,
+                makerBar: shapeRootMakerBar(rootSeats[rootIndex]!.main.maker,
+                  () => answeredMakers.slice(0, rootCount).filter((_maker, index) => index !== rootIndex)),
+                receiptWritten: true }, told);
+              break;
+            } catch (next) {
+              refused = next;
+            }
+          }
+        }
       } catch (error) {
         const stop = expansionPhaseStop(error);
         if (stop === null) throw error;
@@ -8971,6 +9089,7 @@ export class WalkingSkeletonRunner {
             : `Maker position ${String(rootIndex)} failed after the full cooldown and final-retry courtesy`
         );
       }
+      if (spareRoots.has(rootIndex)) spareAnswers += 1;
       const authoredValue = authoredRoot.value;
       const saved = await nodeRecorder.commit(rootIndex, async () => {
         if (bodyFailed) return null;
@@ -11549,7 +11668,9 @@ export class WalkingSkeletonRunner {
      */
     const backupRecords = backupModelUsedRecords({
       answers: seatCaller.backupAnswers(),
-      fallbackRoles: fellBackRoles.filter((role) => seatCaller.answered(role).length > 0)
+      fallbackRoles: fellBackRoles.filter((role) => seatCaller.answered(role).length > 0),
+      // R22 (owner ruling 2026-10-30): every position a spare debater wrote after its seat's answer was refused.
+      spareAnswers
     }, servedRoot.nodeId);
     if (backupRecords.length > 0) {
       conditionMarkRecords = Object.freeze([...conditionMarkRecords, ...backupRecords]);

@@ -63,7 +63,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         ]
       },
       { kind: "p", text: "Vid registrering kontrollerar vi IP-adressens land lokalt med DB-IP Lite och listan över Tor-utgångar, utan att skicka adressen till tredje part. Vi nekar registrering från länder där tjänsten inte erbjuds, från Tor-utgångar och från adresser vars land inte kan fastställas. Inför varje ny debatt kontrollerar vi också IP-adressens land lokalt och kan neka debatten om landet finns på listan över länder som alltid blockeras. Hjälpchatten kontrolleras på samma sätt: på första sidan i varje webbläsarflik som skulle visa Hjälp, och vid varje supportförfrågan, slår vi upp landet för din IP-adress och kontrollerar listan över Tor-utgångar. Där vi inte erbjuder tjänsten, bakom en Tor-utgång eller när landet inte kan fastställas visas inte hjälpchatten och supportförfrågningar nekas. Sidan får bara tre ja- eller nej-svar, om registrering, betalning och hjälpchatten erbjuds där, och aldrig landet; den behåller bara hjälpchattens svar, i fliken, tills du stänger den (avsnitt 13). Vi behåller ingenting av denna uppslagning, och den skriver ingen post i granskningsloggen. Du anger födelsedatum enbart för ålderskontrollen; det lagras inte. En lyckad registrering sparar resultatet ”godkänt”; för befintliga konton kan resultatet vara ”godkänt” eller ”underkänt”. Du anger också bosättningsland och, i USA, delstat så att vi kan tillämpa rätt regler för konsumentskydd, integritet och skatt." },
-      { kind: "p", text: "Vi samlar inte in analysdata eller telemetri om hur du använder produkten, och vi placerar inga cookies för detta ändamål. Om det ändras kommer denna policy och cookiepolicyn att ändras först, och du kommer att tillfrågas." }
+      { kind: "p", text: "Vi samlar inte in analysdata eller telemetri om hur du använder produkten, och vi placerar inga cookies för detta ändamål; vi sparar bara det som sidorna behöver för att fungera för dig, och det står i den här tabellen (till exempel när du senast öppnade en debatts karta). Om det ändras kommer denna policy och cookiepolicyn att ändras först, och du kommer att tillfrågas." }
     ]
   },
   {
@@ -349,7 +349,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.8",
-  sha256: "23d8c9ae1d50327ebbe298e53f082d663ffb763366e4fed2dbf0003d0701f202",
+  sha256: "b7d98403b308d570f7a40cf0b8ee83d296a862fd4304cd8e09def31163406734",
   eyebrow: "INTEGRITETSPOLICY · v3.8 · GÄLLER FRÅN 12 OKTOBER 2026",
   title: "Vad vi lagrar och varför",
   lede: "Dina rättigheter och våra skyldigheter enligt GDPR (EU) 2016/679, på ett lättbegripligt språk. Fjorton avsnitt och bilaga B — rulla till slutet.",

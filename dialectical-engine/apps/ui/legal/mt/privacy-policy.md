@@ -50,7 +50,7 @@ Niġbru biss dak li jeħtieġ kont biex jaħdem, dak li tagħżel li tagħtina, 
 
 Waqt ir-reġistrazzjoni nivverifikaw il-pajjiż tal-IP u l-età. Id-data tat-twelid tintbagħat għall-verifika biss u ma tinħażinx. Il-verifika tal-IP issir lokalment mingħajr ma jintbagħat l-indirizz lil terzi. Qabel kull dibattitu ġdid nivverifikaw ukoll lokalment il-pajjiż tal-IP; id-dibattitu jiġi rrifjutat jekk il-pajjiż ikun dejjem imblukkat. Iċ-chat tal-għajnuna jiġi vverifikat bl-istess mod: fl-ewwel paġna ta’ kull tab tal-browser li tkun se turi Għajnuna, u f’kull talba ta’ appoġġ, infittxu lokalment il-pajjiż tal-indirizz IP tiegħek u nivverifikaw il-lista tal-indirizzi tal-ħruġ ta’ Tor. Fejn ma nipprovdux is-servizz, wara ħruġ ta’ Tor, jew meta l-pajjiż ma jistax jiġi ddeterminat, iċ-chat tal-għajnuna ma jintwerax u t-talbiet ta’ appoġġ jiġu rrifjutati. Il-paġna tirċievi biss tliet tweġibiet iva jew le, jekk ir-reġistrazzjoni, il-ħlas u ċ-chat tal-għajnuna humiex offruti hemmhekk, u qatt il-pajjiż; iżżomm biss it-tweġiba taċ-chat tal-għajnuna, fit-tab, sakemm tagħlaqha (taqsima 13). Ma nżommu xejn minn din it-tfittxija, u ma tikteb ebda entrata tal-awditjar.
 
-**Ma niġbrux** analitika jew telemetrija dwar kif tuża l-prodott, u ma nużaw ebda cookies għal dan il-għan. Jekk dan jinbidel, l-ewwel jinbidlu din il-politika u l-Politika dwar il-Cookies, u tintalab tagħżel.
+**Ma niġbrux** analitika jew telemetrija dwar kif tuża l-prodott, u ma nużaw ebda cookies għal dan il-għan; inżommu biss dak li l-paġni għandhom bżonn biex jaħdmu għalik, kif imniżżel f’din it-tabella (pereżempju, meta l-aħħar fetaħt il-mappa ta’ dibattitu). Jekk dan jinbidel, l-ewwel jinbidlu din il-politika u l-Politika dwar il-Cookies, u tintalab tagħżel.
 
 ## 3. Informazzjoni sensittiva
 

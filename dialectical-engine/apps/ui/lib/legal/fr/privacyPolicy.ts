@@ -63,7 +63,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         ]
       },
       { kind: "p", text: "Lors de l’inscription, nous vérifions localement le pays de votre adresse IP et refusons les inscriptions depuis les pays où le service n’est pas proposé, les adresses de sortie Tor et les adresses dont le pays est inconnu. Nous ne transmettons pas l’adresse IP à un tiers pour ce contrôle. Nous utilisons votre date de naissance pour vérifier votre âge sans la conserver; vous indiquez également votre pays de résidence et, le cas échéant, votre État américain. Au début de chaque nouveau débat, nous vérifions aussi localement le pays de l’adresse IP et pouvons refuser le débat si le pays est bloqué en permanence ; les refus liés à Tor ou à un pays inconnu concernent l’inscription. Le chat d’aide est vérifié de la même manière : sur la première page de chaque onglet du navigateur qui afficherait Aide, et à chaque demande d’assistance, nous déterminons le pays de votre adresse IP et consultons la liste d’adresses de sortie Tor. Là où nous ne proposons pas le service, derrière une sortie Tor ou lorsque le pays ne peut pas être déterminé, le chat d’aide n’est pas affiché et les demandes d’assistance sont refusées. La page reçoit seulement trois réponses par oui ou par non, indiquant si l’inscription, le paiement et le chat d’aide y sont proposés, et jamais le pays ; elle ne garde que la réponse concernant le chat d’aide, dans l’onglet, jusqu’à la fermeture de l’onglet (section 13). Nous ne conservons rien de cette consultation et elle n’écrit aucune entrée d’audit." },
-      { kind: "p", text: "Nous ne collectons aucune donnée d'analyse ou de télémétrie sur votre utilisation du produit et nous ne déposons aucun cookie à cette fin. Si cela change, la présente politique et la Politique relative aux cookies seront d'abord modifiées, et votre accord sera demandé." }
+      { kind: "p", text: "Nous ne collectons aucune donnée d'analyse ou de télémétrie sur votre utilisation du produit et nous ne déposons aucun cookie à cette fin ; nous ne conservons que ce dont les pages ont besoin pour fonctionner pour vous, indiqué dans ce tableau (par exemple la date à laquelle vous avez ouvert pour la dernière fois la carte d'un débat). Si cela change, la présente politique et la Politique relative aux cookies seront d'abord modifiées, et votre accord sera demandé." }
     ]
   },
   {
@@ -349,7 +349,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.8",
-  sha256: "9e0f94ff419ddd3c8188b6eeecd78d7616148e36663f75b5ae6313d29993883a",
+  sha256: "04684ae5bd104f821356717034b07a417e5bd3e9845cb72c0020069f1ee444fb",
   eyebrow: "POLITIQUE DE CONFIDENTIALITÉ · v3.8 · EN VIGUEUR LE 12 OCTOBRE 2026",
   title: "Ce que nous conservons, et pourquoi",
   lede: "Vos droits et nos obligations au titre du GDPR (EU) 2016/679, en termes clairs. Quatorze sections et l'annexe B — faites défiler jusqu'à la fin.",

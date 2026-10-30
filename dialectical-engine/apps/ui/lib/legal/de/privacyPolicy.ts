@@ -63,7 +63,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         ]
       },
       { kind: "p", text: "Bei der Registrierung prüfen wir das Land Ihrer IP-Adresse lokal und lehnen Registrierungen aus nicht versorgten Ländern, von Tor-Ausgangsadressen und von Adressen mit unbekanntem Land ab. Für diese Prüfung übermitteln wir die IP-Adresse nicht an Dritte. Ihr Geburtsdatum verwenden wir zur Altersprüfung, ohne es zu speichern; Sie geben auch Ihr Wohnsitzland und gegebenenfalls Ihren US-Bundesstaat an. Beim Start jeder neuen Debatte prüfen wir das IP-Land ebenfalls lokal und können die Debatte ablehnen, wenn das Land dauerhaft gesperrt ist; Ablehnungen wegen Tor oder eines unbekannten Landes betreffen die Registrierung. Der Hilfe-Chat wird auf dieselbe Weise geprüft: Auf der ersten Seite jedes Browser-Tabs, auf der Hilfe angezeigt würde, und bei jeder Supportanfrage ermitteln wir das Land Ihrer IP-Adresse und prüfen die Liste der Tor-Ausgangsadressen. Wo wir den Dienst nicht anbieten, hinter einer Tor-Ausgangsadresse oder wenn sich das Land nicht bestimmen lässt, wird der Hilfe-Chat nicht angezeigt, und Supportanfragen werden abgelehnt. Die Seite erhält nur drei Ja-oder-Nein-Antworten, nämlich ob Registrierung, Zahlung und der Hilfe-Chat dort angeboten werden, und niemals das Land; sie behält nur die Antwort zum Hilfe-Chat, im Tab, bis Sie ihn schließen (Abschnitt 13). Von dieser Abfrage speichern wir nichts, und sie schreibt keinen Eintrag ins Prüfprotokoll." },
-      { kind: "p", text: "Wir erheben keine Analyse- oder Telemetriedaten darüber, wie Sie das Produkt nutzen, und setzen zu diesem Zweck keine Cookies. Sollte sich dies ändern, werden zuerst diese Datenschutzerklärung und die Cookie-Richtlinie geändert und Sie werden um Ihre Entscheidung gebeten." }
+      { kind: "p", text: "Wir erheben keine Analyse- oder Telemetriedaten darüber, wie Sie das Produkt nutzen, und setzen zu diesem Zweck keine Cookies; wir speichern nur, was die Seiten brauchen, damit sie für Sie funktionieren, und führen es in dieser Tabelle auf (etwa wann Sie die Karte einer Debatte zuletzt geöffnet haben). Sollte sich dies ändern, werden zuerst diese Datenschutzerklärung und die Cookie-Richtlinie geändert und Sie werden um Ihre Entscheidung gebeten." }
     ]
   },
   {
@@ -349,7 +349,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.8",
-  sha256: "fed27f8a12ebdf3c46dd5882fc1beb487d71fc87aa355fbbb1bc2da03a647888",
+  sha256: "ed170d8797f761dd9f32737d83377ba5e4f350f7b81597302005df60750ca774",
   eyebrow: "DATENSCHUTZERKLÄRUNG · v3.8 · GÜLTIG AB 12. OKTOBER 2026",
   title: "Was wir speichern und warum",
   lede: "DSGVO – GDPR (EU) 2016/679: Ihre Rechte und unsere Pflichten, verständlich formuliert. Vierzehn Abschnitte und Anhang B – scrollen Sie bis zum Ende.",

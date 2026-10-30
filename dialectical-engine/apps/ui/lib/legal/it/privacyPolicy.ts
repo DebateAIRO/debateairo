@@ -63,7 +63,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         ]
       },
       { kind: "p", text: "Alla registrazione verifichiamo il Paese dell’IP e l’età. La data di nascita viene inviata soltanto per la verifica e non viene conservata. La verifica dell’IP avviene localmente, senza inviare l’indirizzo a terzi. Prima di ogni nuovo dibattito verifichiamo localmente anche il Paese dell’IP; il dibattito viene rifiutato se il Paese è sempre bloccato. La chat di assistenza viene verificata allo stesso modo: nella prima pagina di ogni scheda del browser che mostrerebbe Aiuto, e a ogni richiesta di supporto, cerchiamo localmente il Paese del tuo indirizzo IP e controlliamo l’elenco delle uscite Tor. Nei Paesi in cui non prestiamo il servizio, dietro un’uscita Tor o quando il Paese non può essere determinato, la chat di assistenza non viene mostrata e le richieste di supporto vengono rifiutate. La pagina riceve solo tre risposte sì o no, cioè se la registrazione, il pagamento e la chat di assistenza sono offerti lì, e mai il Paese; conserva soltanto la risposta della chat di assistenza, nella scheda, finché non la chiudi (sezione 13). Non conserviamo nulla di questa ricerca e questa verifica non scrive alcuna voce di audit." },
-      { kind: "p", text: "Non raccogliamo dati analitici o di telemetria sul modo in cui utilizzi il prodotto e non impostiamo cookie a tale scopo. Se ciò dovesse cambiare, modificheremo prima la presente informativa e l'Informativa sui cookie e ti verrà chiesto il consenso." }
+      { kind: "p", text: "Non raccogliamo dati analitici o di telemetria sul modo in cui utilizzi il prodotto e non impostiamo cookie a tale scopo; conserviamo solo ciò che serve alle pagine per funzionare per te, come indicato in questa tabella (ad esempio quando hai aperto per l'ultima volta la mappa di un dibattito). Se ciò dovesse cambiare, modificheremo prima la presente informativa e l'Informativa sui cookie e ti verrà chiesto il consenso." }
     ]
   },
   {
@@ -349,7 +349,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.8",
-  sha256: "d778c12bc94d46e9b5031f89636f3947aacf6fd1ed22b5c1e8495034d674e3f9",
+  sha256: "9f6edafe76bde87ac8fdc8267dccae4b007b1343ca669fb4e9d7e121bd44caec",
   eyebrow: "INFORMATIVA SULLA PRIVACY · v3.8 · IN VIGORE DAL 12 OTTOBRE 2026",
   title: "Cosa conserviamo e perché",
   lede: "I tuoi diritti e i nostri obblighi ai sensi del GDPR (EU) 2016/679, in un linguaggio chiaro. Quattordici sezioni e Allegato B — scorri fino alla fine.",

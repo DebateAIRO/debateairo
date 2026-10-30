@@ -63,7 +63,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         ]
       },
       { kind: "p", text: "Rekisteröityessä tarkistamme IP-osoitteesi maan paikallisesti ja hylkäämme rekisteröinnit maista, joissa palvelua ei tarjota, Tor-poistumisosoitteista sekä osoitteista, joiden maata ei tunneta. Emme lähetä IP-osoitetta kolmannelle osapuolelle tätä tarkistusta varten. Käytämme syntymäaikaasi iän tarkistamiseen tallentamatta sitä; ilmoitat myös asuinmaasi ja tarvittaessa Yhdysvaltain osavaltiosi. Jokaisen uuden väittelyn alkaessa tarkistamme myös IP-osoitteen maan paikallisesti ja voimme estää väittelyn, jos maa on pysyvästi estetty; Tor-osoitteiden ja tuntemattomien maiden torjunta koskee rekisteröitymistä. Ohjekeskustelu tarkistetaan samalla tavalla: jokaisen selaimen välilehden ensimmäisellä sivulla, jolla Ohje näytettäisiin, ja jokaisen tukipyynnön yhteydessä selvitämme IP-osoitteesi maan ja tarkistamme Tor-poistumisosoitteiden luettelon. Siellä, missä emme tarjoa palvelua, Tor-poistumisosoitteen takana tai kun maata ei voida selvittää, ohjekeskustelua ei näytetä ja tukipyynnöt hylätään. Sivu saa vain kolme kyllä- tai ei-vastausta siitä, tarjotaanko siellä rekisteröitymistä, maksamista ja ohjekeskustelua, eikä koskaan maata; se pitää vain ohjekeskustelun vastauksen välilehdessä, kunnes suljet sen (osio 13). Emme säilytä tästä hausta mitään, eikä se kirjoita auditointimerkintää." },
-      { kind: "p", text: "Emme kerää analytiikkaa tai telemetriatietoja siitä, miten käytät tuotetta, emmekä aseta evästeitä tähän tarkoitukseen. Jos tämä muuttuu, tämä käytäntö ja Evästekäytäntö muutetaan ensin ja sinulta pyydetään lupa." }
+      { kind: "p", text: "Emme kerää analytiikkaa tai telemetriatietoja siitä, miten käytät tuotetta, emmekä aseta evästeitä tähän tarkoitukseen; säilytämme vain sen, mitä sivut tarvitsevat toimiakseen sinulle, ja se on lueteltu tässä taulukossa (esimerkiksi se, milloin avasit jonkin väittelyn kartan viimeksi). Jos tämä muuttuu, tämä käytäntö ja Evästekäytäntö muutetaan ensin ja sinulta pyydetään lupa." }
     ]
   },
   {
@@ -349,7 +349,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.8",
-  sha256: "ea861f070b3ee45a0363d70c5ee6a57181ab274d4e8267032b3998bb09f42d03",
+  sha256: "893d40e7790595aa5e67a7f6836b3d69d746565b9aede5a586018a6bdf4f9fe0",
   eyebrow: "TIETOSUOJAKÄYTÄNTÖ · v3.8 · VOIMASSA 12. LOKAKUUTA 2026 ALKAEN",
   title: "Mitä säilytämme ja miksi",
   lede: "Oikeutesi ja velvollisuutemme GDPR (EU) 2016/679 -asetuksen nojalla selkeällä kielellä. Neljätoista osiota ja liite B — vieritä loppuun asti.",

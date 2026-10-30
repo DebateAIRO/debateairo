@@ -63,7 +63,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         ]
       },
       { kind: "p", text: "Registreerumisel kontrollime IP-aadressi riiki kohapeal ning keeldume registreerimisest riikidest, kus teenus pole saadaval, Tori väljumisaadressidelt ja teadmata riigiga aadressidelt. Selleks kontrolliks me IP-aadressi kolmandale osapoolele ei saada. Sünnikuupäeva kasutame vanuse kontrollimiseks seda talletamata; märgite ka oma elukohariigi ja vajaduse korral USA osariigi. Iga uue väitluse alustamisel kontrollime ka IP-aadressi riiki kohapeal ja võime väitluse tagasi lükata, kui riik on püsivalt blokeeritud; Tori või teadmata riigi tõttu keeldumine puudutab registreerumist. Abivestlust kontrollitakse samamoodi: iga brauseri vahekaardi esimesel lehel, millel kuvataks Abi, ja iga kasutajatoe päringu korral määrame teie IP-aadressi riigi ning kontrollime Tori väljumisaadresside nimekirja. Kus me teenust ei paku, Tori väljumisaadressi taga või kui riiki ei saa määrata, abivestlust ei kuvata ja kasutajatoe päringud lükatakse tagasi. Leht saab ainult kolm jah-või-ei vastust, kas seal pakutakse registreerumist, makset ja abivestlust, ning mitte kunagi riiki; vahekaardis säilitab see ainult abivestluse vastuse, kuni selle sulgete (jaotis 13). Sellest otsingust me midagi ei säilita ja see ei kirjuta auditikirjet." },
-      { kind: "p", text: "Me ei kogu analüüsi- ega telemeetriaandmeid selle kohta, kuidas te toodet kasutate, ega paigalda selleks küpsiseid. Kui see muutub, muudetakse esmalt käesolevat poliitikat ja Küpsisepoliitikat ning teilt küsitakse nõusolekut." }
+      { kind: "p", text: "Me ei kogu analüüsi- ega telemeetriaandmeid selle kohta, kuidas te toodet kasutate, ega paigalda selleks küpsiseid; säilitame ainult seda, mida lehed vajavad, et teie jaoks toimida, ja see on loetletud selles tabelis (näiteks see, millal te mõne väitluse kaardi viimati avasite). Kui see muutub, muudetakse esmalt käesolevat poliitikat ja Küpsisepoliitikat ning teilt küsitakse nõusolekut." }
     ]
   },
   {
@@ -349,7 +349,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.8",
-  sha256: "56baacd84888530ec421b5b72ad268fd355e682071961ecb3c94b6de8eba4e05",
+  sha256: "07f949cb4a5a9e7e15261460fd5f5095a6e0dd0e94fb7af1cee51d7938f012c9",
   eyebrow: "PRIVAATSUSPOLIITIKA · v3.8 · KEHTIB ALATES 12. OKTOOBRIST 2026",
   title: "Mida ja miks me talletame",
   lede: "Teie õigused ja meie kohustused GDPR (EU) 2016/679 alusel lihtsas keeles. Neliteist jaotist ja lisa B — kerige lõpuni.",

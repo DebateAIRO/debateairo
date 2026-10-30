@@ -63,7 +63,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         ]
       },
       { kind: "p", text: "Al registrarse, comprobamos localmente el país de su dirección IP y rechazamos registros de países donde no prestamos servicio, direcciones de salida de Tor y direcciones de país desconocido. No enviamos la IP a terceros para esta comprobación. Usamos su fecha de nacimiento para verificar la edad sin conservarla; también indica su país de residencia y, si vive en Estados Unidos, su estado. Al iniciar cada nuevo debate también comprobamos localmente el país de la IP y podemos rechazarlo si está bloqueado permanentemente; los rechazos por Tor o país desconocido se aplican al registro. El chat de ayuda se comprueba del mismo modo: en la primera página de cada pestaña del navegador que mostraría Ayuda, y en cada solicitud de soporte, determinamos el país de su dirección IP y comprobamos la lista de direcciones de salida de Tor. Donde no prestamos servicio, detrás de una dirección de salida de Tor o cuando no se puede determinar el país, el chat de ayuda no se muestra y las solicitudes de soporte se rechazan. La página recibe solo tres respuestas de sí o no, si allí se ofrecen el registro, el pago y el chat de ayuda, y nunca el país; solo conserva la respuesta sobre el chat de ayuda, en la pestaña, hasta que la cierre (sección 13). No conservamos nada de esta consulta y no escribe ningún registro de auditoría." },
-      { kind: "p", text: "No recopilamos datos analíticos ni telemetría sobre cómo utiliza el producto, ni instalamos cookies con ese fin. Si esto cambia, modificaremos antes esta política y la Política de cookies, y se le solicitará su elección." }
+      { kind: "p", text: "No recopilamos datos analíticos ni telemetría sobre cómo utiliza el producto, ni instalamos cookies con ese fin; solo conservamos lo que las páginas necesitan para funcionar para usted, que figura en esta tabla (por ejemplo, cuándo abrió por última vez el mapa de un debate). Si esto cambia, modificaremos antes esta política y la Política de cookies, y se le solicitará su elección." }
     ]
   },
   {
@@ -349,7 +349,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.8",
-  sha256: "d544f31ec366344e808e14bdc8374946ab63c80a4d846d68245e98e70cb8b9df",
+  sha256: "10b4f85f2430b5003932b8f40c53deba9c198b17636c953308a86d9651c0254a",
   eyebrow: "POLÍTICA DE PRIVACIDAD · v3.8 · EN VIGOR DESDE 12 DE OCTUBRE DE 2026",
   title: "Qué almacenamos y por qué",
   lede: "Sus derechos y nuestras obligaciones conforme al RGPD – GDPR (EU) 2016/679, en lenguaje claro. Catorce secciones y el anexo B — desplácese hasta el final.",

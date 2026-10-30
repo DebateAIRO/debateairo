@@ -63,7 +63,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         ]
       },
       { kind: "p", text: "Ved tilmelding kontrollerer vi lokalt landet ud fra din IP-adresse. Vi afviser adresser fra lande, hvor tjenesten ikke tilbydes, Tor-udgangsadresser og adresser med ukendt land. Vi sender ikke IP-adressen til en tredjepart til denne kontrol. Vi bruger din fødselsdato til alderskontrol uden at gemme den, og du oplyser dit bopælsland samt din delstat, hvis du bor i USA. Ved starten af hver ny debat kontrollerer vi også IP-landet lokalt og kan afvise debatten, hvis landet altid er blokeret; afvisning på grund af Tor eller ukendt land gælder tilmelding. Hjælpechatten kontrolleres på samme måde: på den første side i hver browserfane, der ville vise Hjælp, og ved hver supportanmodning slår vi landet for din IP-adresse op og kontrollerer listen over Tor-udgangsadresser. Hvor vi ikke tilbyder tjenesten, bag en Tor-udgangsadresse eller hvor landet ikke kan bestemmes, vises hjælpechatten ikke, og supportanmodninger afvises. Siden modtager kun tre ja- eller nej-svar, om tilmelding, betaling og hjælpechatten tilbydes der, og aldrig landet; den beholder kun svaret om hjælpechatten, i fanen, indtil du lukker den (afsnit 13). Vi gemmer intet af dette opslag, og det skriver ingen revisionsregistrering." },
-      { kind: "p", text: "Vi indsamler ikke analyse- eller telemetridata om, hvordan du bruger produktet, og vi sætter ingen cookies til dette formål. Hvis det ændrer sig, ændres denne politik og Cookiepolitikken først, og du bliver spurgt." }
+      { kind: "p", text: "Vi indsamler ikke analyse- eller telemetridata om, hvordan du bruger produktet, og vi sætter ingen cookies til dette formål; vi gemmer kun det, som siderne har brug for for at fungere for dig, og det står i denne tabel (for eksempel hvornår du sidst åbnede en debats kort). Hvis det ændrer sig, ændres denne politik og Cookiepolitikken først, og du bliver spurgt." }
     ]
   },
   {
@@ -349,7 +349,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.8",
-  sha256: "52f21f2363f0be537fc48fdbad0f87d3a112e5ff8fc3f80e7b5267f1e9676d05",
+  sha256: "b2b22ebc3a30b73b4b13ef97800b90f5d78a1999280e408d14f1e853f16a47ea",
   eyebrow: "PRIVATLIVSPOLITIK · v3.8 · GÆLDENDE FRA 12. OKTOBER 2026",
   title: "Hvad vi opbevarer, og hvorfor",
   lede: "Dine rettigheder og vores forpligtelser i henhold til GDPR (EU) 2016/679 forklaret i et klart sprog. Fjorten afsnit og bilag B — rul helt ned.",

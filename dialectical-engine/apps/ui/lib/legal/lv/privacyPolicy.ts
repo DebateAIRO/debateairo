@@ -63,7 +63,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         ]
       },
       { kind: "p", text: "Reģistrējoties pārbaudām IP adreses valsti un vecumu. Dzimšanas datumu nosūta tikai pārbaudei, un tas netiek glabāts. IP pārbaude notiek lokāli, nenosūtot adresi trešajai personai. Pirms katrām jaunām debatēm lokāli pārbaudām arī IP adreses valsti; debates atsakām, ja valsts vienmēr ir bloķēta. Palīdzības tērzēšanu pārbauda tādā pašā veidā: katras pārlūkprogrammas cilnes pirmajā lapā, kurā tiktu rādīta Palīdzība, un katra atbalsta pieprasījuma laikā mēs lokāli noskaidrojam jūsu IP adreses valsti un pārbaudām Tor izejas mezglu sarakstu. Ja esat valstī, kur mēs nesniedzam pakalpojumu, aiz Tor izejas mezgla vai ja valsti nevar noteikt, palīdzības tērzēšana netiek rādīta un atbalsta pieprasījumi tiek atteikti. Lapa saņem tikai trīs atbildes „jā” vai „nē”: vai tur tiek piedāvāta reģistrācija, maksājums un palīdzības tērzēšana, un nekad valsti; cilnē tā saglabā tikai palīdzības tērzēšanas atbildi, līdz cilni aizverat (13. sadaļa). No šīs noskaidrošanas mēs neko neglabājam, un tā neraksta nevienu audita ierakstu." },
-      { kind: "p", text: "Mēs nevācam analītikas vai telemetrijas datus par to, kā izmantojat produktu, un šādam nolūkam neiestatām sīkdatnes. Ja tas mainīsies, vispirms tiks mainītas šī politika un Sīkdatņu politika un jums tiks lūgta piekrišana." }
+      { kind: "p", text: "Mēs nevācam analītikas vai telemetrijas datus par to, kā izmantojat produktu, un šādam nolūkam neiestatām sīkdatnes; mēs glabājam tikai to, kas lapām nepieciešams, lai tās jums darbotos, un tas ir uzskaitīts šajā tabulā (piemēram, kad pēdējo reizi atvērāt kādu debašu karti). Ja tas mainīsies, vispirms tiks mainītas šī politika un Sīkdatņu politika un jums tiks lūgta piekrišana." }
     ]
   },
   {
@@ -349,7 +349,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.8",
-  sha256: "8119f6aa6b746e79e9ece5fbd801dc05997e7b7c9edcf337efea82526bf50265",
+  sha256: "5debd4f87830db1cafa83541849ca7f95709ba49bef68e04a866125041e44a79",
   eyebrow: "PRIVĀTUMA POLITIKA · v3.8 · SPĒKĀ NO 2026. GADA 12. OKTOBRA",
   title: "Ko mēs glabājam un kāpēc",
   lede: "Jūsu tiesības un mūsu pienākumi saskaņā ar GDPR (EU) 2016/679, izklāstīti vienkāršā valodā. Četrpadsmit sadaļas un B pielikums — ritiniet līdz beigām.",

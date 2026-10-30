@@ -50,7 +50,7 @@ Renkame tik tai, ko reikia paskyrai veikti, ką nusprendžiate mums pateikti ir 
 
 Registruojantis tikriname IP adreso šalį ir amžių. Gimimo data perduodama tik patikrai ir nesaugoma. IP patikra atliekama vietoje, nesiunčiant adreso trečiajai šaliai. Prieš kiekvienus naujus debatus taip pat vietoje tikriname IP adreso šalį; debatus atmetame, jei šalis visada blokuojama. Pagalbos pokalbis tikrinamas taip pat: pirmajame kiekvieno naršyklės skirtuko, kuriame būtų rodoma Pagalba, puslapyje ir kiekvienos pagalbos užklausos metu vietoje nustatome jūsų IP adreso šalį ir tikriname Tor išėjimo mazgų sąrašą. Jei esate šalyje, kurioje neteikiame paslaugos, naudojate Tor išėjimo mazgą arba šalies nustatyti negalima, pagalbos pokalbis nerodomas, o pagalbos užklausos atmetamos. Puslapis gauna tik tris atsakymus taip arba ne, ar ten siūloma registracija, mokėjimas ir pagalbos pokalbis, ir niekada šalies; skirtuke jis išsaugo tik pagalbos pokalbio atsakymą, kol skirtuką uždarysite (13 skyrius). Iš šios paieškos nieko nesaugome, ir ji nerašo jokio audito įrašo.
 
-**Nerenkame** analitikos ar telemetrijos duomenų apie tai, kaip naudojatės produktu, ir šiuo tikslu nenustatome slapukų. Jei tai pasikeis, pirmiausia bus pakeista ši politika ir Slapukų politika, o jūsų bus paprašyta pasirinkti.
+**Nerenkame** analitikos ar telemetrijos duomenų apie tai, kaip naudojatės produktu, ir šiuo tikslu nenustatome slapukų; saugome tik tai, ko puslapiams reikia, kad jie jums veiktų, ir tai išvardyta šioje lentelėje (pavyzdžiui, kada paskutinį kartą atidarėte kurių nors debatų žemėlapį). Jei tai pasikeis, pirmiausia bus pakeista ši politika ir Slapukų politika, o jūsų bus paprašyta pasirinkti.
 
 ## 3. Neskelbtina informacija
 

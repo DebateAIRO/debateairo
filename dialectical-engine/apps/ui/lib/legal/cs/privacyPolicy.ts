@@ -63,7 +63,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         ]
       },
       { kind: "p", text: "Při registraci místně ověřujeme zemi podle IP adresy a odmítáme registrace ze zemí, kde službu neposkytujeme, z výstupních adres sítě Tor a z adres, jejichž zemi nelze určit. IP adresu k této kontrole neposíláme třetí straně. Datum narození použijeme k ověření věku, ale neuložíme je; uvádíte také zemi svého bydliště a případný stát USA. Při zahájení každé nové debaty zemi podle IP adresy také místně ověřujeme a debatu můžeme odmítnout, je-li země trvale blokována; odmítnutí kvůli Tor nebo neznámé zemi se týká registrace. Chat nápovědy se kontroluje stejně: na první stránce každé karty prohlížeče, která by zobrazila Nápovědu, a při každém požadavku na podporu zjišťujeme zemi vaší IP adresy a kontrolujeme seznam výstupních adres sítě Tor. Tam, kde službu neposkytujeme, za výstupní adresou sítě Tor nebo když nelze zemi určit, se chat nápovědy nezobrazí a požadavky na podporu se odmítnou. Stránka dostává pouze tři odpovědi ano, nebo ne: zda se tam nabízí registrace, platba a chat nápovědy; zemi nikdy nedostává a uchovává jen odpověď o chatu nápovědy, na kartě, dokud ji nezavřete (oddíl 13). Nic z tohoto zjišťování neuchováváme a nezapisuje se žádný auditní záznam." },
-      { kind: "p", text: "Neshromažďujeme analytické ani telemetrické údaje o vašem používání produktu a za tímto účelem nenastavujeme žádné soubory cookie. Pokud se to změní, nejprve změníme tyto zásady a Zásady používání souborů cookie a požádáme vás o vyjádření." }
+      { kind: "p", text: "Neshromažďujeme analytické ani telemetrické údaje o vašem používání produktu a za tímto účelem nenastavujeme žádné soubory cookie; uchováváme jen to, co stránky potřebují, aby vám fungovaly, a to je uvedeno v této tabulce (například kdy jste naposledy otevřeli mapu některé debaty). Pokud se to změní, nejprve změníme tyto zásady a Zásady používání souborů cookie a požádáme vás o vyjádření." }
     ]
   },
   {
@@ -349,7 +349,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.8",
-  sha256: "736722129e653e026dabd49c238bc5e15ac7919976f037261ec65a53bdfbf47c",
+  sha256: "3455405a53579b8cfcd494ccdc0140793c677b2695976f138b24b1795359e2a0",
   eyebrow: "ZÁSADY OCHRANY OSOBNÍCH ÚDAJŮ · v3.8 · ÚČINNÉ OD 12. ŘÍJNA 2026",
   title: "Co uchováváme a proč",
   lede: "Vaše práva a naše povinnosti podle GDPR (EU) 2016/679 srozumitelným jazykem. Čtrnáct oddílů a příloha B — přejděte až na konec.",

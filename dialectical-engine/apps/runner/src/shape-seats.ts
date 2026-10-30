@@ -27,6 +27,38 @@ export function shapeHandOverRoot(input: Readonly<{ makers: readonly string[]; r
   return Object.freeze({ kind: "NONE" });
 }
 
+/**
+ * R22 (owner ruling 2026-10-30, "Yes, use the spare debater") — THE SPARE DEBATER A POSITION IS HANDED TO WHEN ITS
+ * ANSWER WAS REFUSED AFTER EVERY REPAIR: the SWAP `shapeHandOverRoot` makes for a position whose maker sits out, among
+ * the seats no position uses that may take it (`takes`: up, not sitting out, never refused a position, arguing no other
+ * position) and whose maker is none of the refused seat's (`refusedMakers`). Never a SHARE: a seat that already argues
+ * a position is no spare. Null when no spare is left (today's opening has none: every seat argues), so the refusal
+ * fails the debate as today.
+ */
+export function shapeSpareForRefusedRoot(input: Readonly<{ makers: readonly string[]; rootCount: number; rootIndex: number;
+  sitsOut: (index: number) => boolean; refusedMakers: readonly string[]; takes: (index: number) => boolean }>): number | null {
+  const handOver = shapeHandOverRoot({ makers: input.makers, rootCount: input.rootCount, rootIndex: input.rootIndex,
+    sitsOut: (index) => index < input.rootCount ? input.sitsOut(index)
+      : !input.takes(index) || input.refusedMakers.includes(input.makers[index]!) });
+  return handOver.kind === "SWAP" ? handOver.withIndex : null;
+}
+
+/**
+ * R22 (owner ruling 2026-10-30) — A RESUMED RUN KEEPS ITS SPARE: the seat no position uses whose member answered root
+ * `rootIndex`'s site on an earlier pass (`answeredBy`, the replay book's routes), when no member of the root's own seat
+ * did; null otherwise. The root is handed to it before any call, so the refused member is never asked again and the
+ * spare's answer is replayed from the record, not bought twice.
+ */
+export function shapeSpareThatAnswered(input: Readonly<{ seatRefs: readonly (readonly string[])[]; rootCount: number;
+  rootIndex: number; answeredBy: readonly string[]; sitsOut: (index: number) => boolean }>): number | null {
+  const answered = (index: number): boolean => input.seatRefs[index]!.some((ref) => input.answeredBy.includes(ref));
+  if (input.seatRefs[input.rootIndex] === undefined || answered(input.rootIndex)) return null;
+  for (let index = input.rootCount; index < input.seatRefs.length; index += 1) {
+    if (answered(index) && !input.sitsOut(index)) return index;
+  }
+  return null;
+}
+
 export function shapeWriterSeat(input: Readonly<{ seatMakers: readonly string[]; avoidMakers: readonly string[];
   preferMaker: string | null; offset: number; sitsOut: (index: number) => boolean }>): number | null {
   const count = input.seatMakers.length;
