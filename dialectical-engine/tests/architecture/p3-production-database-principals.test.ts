@@ -880,6 +880,62 @@ describe("P3-01 production database-principal manifest", () => {
   "roleName": "debateai_data_export_worker",
   "source": "migrations/0131_v4_account_memory.sql",
   "grants": ["EXECUTE ON FUNCTION identity.read_data_export_page_memory(uuid,uuid)"]
+},
+// The Perplexity plan's stores (0132, 0133; task W1-3): the runner's web-evidence functions for the shared runtime role
+// (the runner; the API's roles inherit them), the person's choice and the investigation functions for the API's own role,
+// the runtime role's reserve reader, report writer and 30-day sweep, and one export reader each. No table grant.
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0132_web_evidence.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.record_web_search(uuid,uuid,text,text,text,text,text,text,text,bigint,smallint,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.record_web_page(uuid,uuid,uuid,smallint,text,jsonb,bytea,integer,bytea,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.record_web_reading(uuid,uuid,uuid,smallint,text,text,smallint,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.record_web_extract(uuid,uuid,uuid,text,smallint[],jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.record_web_picks(uuid,text,uuid[])",
+    "EXECUTE ON FUNCTION identity.record_web_pack(uuid,uuid,text,text[],jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_web_evidence(uuid)",
+    "EXECUTE ON FUNCTION identity.read_web_page_texts(uuid,uuid[])",
+    "EXECUTE ON FUNCTION identity.settle_web_researched(uuid,uuid,text)"
+  ]
+},
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0132_web_evidence.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.record_web_researched(uuid,uuid,uuid)"]
+},
+{
+  "roleName": "debateai_data_export_worker",
+  "source": "migrations/0132_web_evidence.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.read_data_export_web_evidence(uuid,uuid)"]
+},
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0133_investigations.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.open_investigation(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.join_investigation(uuid,uuid,uuid,text[],text)",
+    "EXECUTE ON FUNCTION identity.touch_investigation(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.close_investigation(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.reopen_investigation(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.read_investigation(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.record_reserve_event(uuid,text,bigint,uuid,integer,text,timestamptz)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0133_investigations.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_reserve(uuid)",
+    "EXECUTE ON FUNCTION identity.read_investigation_of_run(uuid)",
+    "EXECUTE ON FUNCTION identity.record_investigation_report(uuid,integer,uuid)",
+    "EXECUTE ON FUNCTION identity.wipe_inactive_web_page_text(integer)"
+  ]
+},
+{
+  "roleName": "debateai_data_export_worker",
+  "source": "migrations/0133_investigations.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.read_data_export_investigations(uuid,uuid)"]
 }
 ]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))
@@ -1226,6 +1282,40 @@ it("discloses exactly 0131's grants to the API's own role and the export worker 
   // Six API functions for the API's role, the export reader for the worker; nothing for the shared runtime, no table grant.
   expect(declared).toHaveLength(7);
   expect(declared.some(grant => / TO debateai_runtime;$/u.test(grant))).toBe(false);
+  expect(declared.some(grant => !/^GRANT EXECUTE ON FUNCTION /u.test(grant))).toBe(false);
+});
+
+it("discloses exactly 0132's grants to the runtime role, the API's own role and the export worker (Perplexity plan W1-3)", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const sql = await readFile("migrations/0132_web_evidence.sql", "utf8");
+  const disclosed = "debateai_runtime|debateai_staff_security_owner|debateai_billing_runtime|debateai_data_export_worker";
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)].map(([statement]) => statement)
+    .filter(statement => new RegExp(`\\bTO\\b.*\\b(?:${disclosed})\\b`, "u").test(statement)
+      && !new RegExp(` TO (?:${disclosed});$`, "u").test(statement))).toEqual([]);
+  const actual = [...sql.matchAll(new RegExp(`^GRANT [^\\n]+ TO (?:${disclosed});$`, "gm"))]
+    .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0132_web_evidence.sql")
+    .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
+  expect(actual).toEqual(declared);
+  // Function grants only: no role holds a table right on these tables.
+  expect(declared).toHaveLength(11);
+  expect(declared.some(grant => !/^GRANT EXECUTE ON FUNCTION /u.test(grant))).toBe(false);
+});
+
+it("discloses exactly 0133's grants to the runtime role, the API's own role and the export worker (Perplexity plan W1-3)", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const sql = await readFile("migrations/0133_investigations.sql", "utf8");
+  const disclosed = "debateai_runtime|debateai_staff_security_owner|debateai_billing_runtime|debateai_data_export_worker";
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)].map(([statement]) => statement)
+    .filter(statement => new RegExp(`\\bTO\\b.*\\b(?:${disclosed})\\b`, "u").test(statement)
+      && !new RegExp(` TO (?:${disclosed});$`, "u").test(statement))).toEqual([]);
+  const actual = [...sql.matchAll(new RegExp(`^GRANT [^\\n]+ TO (?:${disclosed});$`, "gm"))]
+    .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0133_investigations.sql")
+    .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
+  expect(actual).toEqual(declared);
+  // Function grants only: no role holds a table right on these tables.
+  expect(declared).toHaveLength(12);
   expect(declared.some(grant => !/^GRANT EXECUTE ON FUNCTION /u.test(grant))).toBe(false);
 });
 

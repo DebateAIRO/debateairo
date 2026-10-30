@@ -122,6 +122,10 @@ const WORKER_FUNCTIONS = [
   "identity.read_data_export_threat_reports(uuid,uuid)",
   // V4 account memory (migration 0131): the reading level, debate visits and dig links.
   "identity.read_data_export_page_memory(uuid,uuid)",
+  // The Perplexity plan's stores (0132, 0133): a debate's web evidence, the investigations and the reserve events. Their
+  // archive sections are not wired yet (apps/api/src/data-export); the boot check already pins that the worker reaches them.
+  "identity.read_data_export_web_evidence(uuid,uuid)",
+  "identity.read_data_export_investigations(uuid,uuid)",
   "identity.complete_data_export(uuid,uuid,text,text,bigint,timestamp with time zone)",
   "identity.fail_data_export(uuid,uuid,text)",
   "identity.sweep_data_exports()",
@@ -148,7 +152,7 @@ export async function assertDataExportDatabaseRoles(requestPool: Pool, workerPoo
     const [request, worker] = await Promise.all([roleWitness(requestPool), roleWitness(workerPool)]);
     if (request === undefined || worker === undefined || request.principal === worker.principal
       || !request.authorization_member || request.worker_member || request.request_count !== 4 || request.worker_count !== 0
-      || !worker.worker_member || worker.authorization_member || worker.request_count !== 0 || worker.worker_count !== 10
+      || !worker.worker_member || worker.authorization_member || worker.request_count !== 0 || worker.worker_count !== 12
       || request.privileged || worker.privileged) {
       throw new TypeError("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
     }

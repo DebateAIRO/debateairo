@@ -38,6 +38,9 @@ import {
   registerAccountContextPool
 } from "./account-context.js";
 export { PostgresDataExportRepository, PostgresDataExportSource } from "./data-export.js";
+// The Perplexity plan's stores (migrations 0132 and 0133, task W1-3): a debate's web evidence and the investigations.
+export * from "./web-evidence.js";
+export * from "./investigations.js";
 export * from "./pool-budget.js";
 export * from "./release-state.js";
 export { recordRunSupersession, resolveRunRef } from "./run-supersession.js";

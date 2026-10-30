@@ -2744,6 +2744,65 @@
       "grants": [
         "EXECUTE ON FUNCTION identity.read_data_export_page_memory(uuid,uuid)"
       ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0132_web_evidence.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.record_web_search(uuid,uuid,text,text,text,text,text,text,text,bigint,smallint,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.record_web_page(uuid,uuid,uuid,smallint,text,jsonb,bytea,integer,bytea,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.record_web_reading(uuid,uuid,uuid,smallint,text,text,smallint,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.record_web_extract(uuid,uuid,uuid,text,smallint[],jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.record_web_picks(uuid,text,uuid[])",
+        "EXECUTE ON FUNCTION identity.record_web_pack(uuid,uuid,text,text[],jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_web_evidence(uuid)",
+        "EXECUTE ON FUNCTION identity.read_web_page_texts(uuid,uuid[])",
+        "EXECUTE ON FUNCTION identity.settle_web_researched(uuid,uuid,text)"
+      ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0132_web_evidence.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.record_web_researched(uuid,uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0132_web_evidence.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_web_evidence(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0133_investigations.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.open_investigation(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.join_investigation(uuid,uuid,uuid,text[],text)",
+        "EXECUTE ON FUNCTION identity.touch_investigation(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.close_investigation(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.reopen_investigation(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.read_investigation(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.record_reserve_event(uuid,text,bigint,uuid,integer,text,timestamptz)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0133_investigations.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_reserve(uuid)",
+        "EXECUTE ON FUNCTION identity.read_investigation_of_run(uuid)",
+        "EXECUTE ON FUNCTION identity.record_investigation_report(uuid,integer,uuid)",
+        "EXECUTE ON FUNCTION identity.wipe_inactive_web_page_text(integer)"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0133_investigations.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_investigations(uuid,uuid)"
+      ]
     }
   ],
   "deploymentObligations": [

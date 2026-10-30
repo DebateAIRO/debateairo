@@ -9,7 +9,12 @@ import {
   type RunContentKeyStore
 } from "@debateai/crypto";
 import type { AuthSourceContext } from "./identity.js";
-import { FORGET_ERASED_DEBATE_PAGE_MEMORY, finalizeWithPageMemory } from "./erasure-page-memory.js";
+import {
+  FORGET_ERASED_DEBATE_INVESTIGATION,
+  FORGET_ERASED_DEBATE_PAGE_MEMORY,
+  FORGET_ERASED_DEBATE_WEB_EVIDENCE,
+  finalizeWithPageMemory
+} from "./erasure-page-memory.js";
 import { MAIL_LOCALE_SETTING, withMailLocale } from "./mail-locale.js";
 import { withPublicationContentLease } from "./publication-lease.js";
 
@@ -43,7 +48,10 @@ const ERASURE_FUNCTION_SIGNATURES = Object.freeze([
   "core.pending_synthesis_check_erasure_cleanup(integer)",
   "core.finalize_synthesis_check_erasure(uuid,timestamptz,timestamptz,integer,integer)",
   // 0131 §4b (R22 item 16): a deleted debate's page memory goes in its finalize transaction.
-  FORGET_ERASED_DEBATE_PAGE_MEMORY
+  FORGET_ERASED_DEBATE_PAGE_MEMORY,
+  // 0132 §12 and 0133 §9: its web evidence and its investigation rows too.
+  FORGET_ERASED_DEBATE_WEB_EVIDENCE,
+  FORGET_ERASED_DEBATE_INVESTIGATION
 ] as const);
 const ERASURE_FORBIDDEN_ROLES = Object.freeze([
   "public","debateai_runtime","debateai_authorization_runtime",
