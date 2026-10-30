@@ -38,7 +38,7 @@ describe("R2 SPLIT in the data export (Q1 option 1)", () => {
     const [first, second] = snapshotA.debates.debates;
     const split = { ...first!, run_answer: { ...(first!.run_answer as Record<string, unknown>), verdict_state: "SPLIT" } };
     const contested = { ...second!, run_answer: { ...(second!.run_answer as Record<string, unknown>), verdict_state: "CONTESTED" } };
-    const html = renderYourDataHtml({ ...snapshotA, debates: { debates: [split, contested] } }, loadArchiveCatalog("en"));
+    const html = renderYourDataHtml({ ...snapshotA, debates: { debates: [split, contested], web_sources: [] } }, loadArchiveCatalog("en"));
     expect(html).toMatch(/<span class="pill split">Contested<\/span>/u);
     expect(html).toMatch(/<span class="pill contested">Close call<\/span>/u);
   });
@@ -58,7 +58,7 @@ describe("R2 SPLIT in the data export (Q1 option 1)", () => {
     const [first] = snapshotA.debates.debates;
     for (const state of ["constructor", "toString", "__proto__", "MAYBE"]) {
       const odd = { ...first!, run_answer: { ...(first!.run_answer as Record<string, unknown>), verdict_state: state } };
-      const html = renderYourDataHtml({ ...snapshotA, debates: { debates: [odd] } }, loadArchiveCatalog("en"));
+      const html = renderYourDataHtml({ ...snapshotA, debates: { debates: [odd], web_sources: [] } }, loadArchiveCatalog("en"));
       expect(html, state).not.toContain('class="pill');
     }
   });

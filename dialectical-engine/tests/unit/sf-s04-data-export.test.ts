@@ -25,7 +25,7 @@ async function collect(raw: Record<string, unknown>) {
     claim: { exportId: "export", userId: "user", ownerRef: "owner", sessionId: "session",
       locale: "en", requestedAt: new Date("2026-10-20T10:00:00.000Z"), attempt: 1 }, workerId: "worker",
     source: { readRaw: async () => raw as never }, ownerView: {} as never,
-    decrypt: { openUserField: async () => "ada@example.test", openRecord: () => "", openSupport: async () => "" },
+    decrypt: { openUserField: async () => "ada@example.test", openRecord: () => "", openSupport: async () => "", openRunContent: async () => [] },
     now: () => new Date("2026-10-20T11:00:00.000Z")
   });
 }

@@ -5,17 +5,18 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { inflateRawSync } from "node:zlib";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { CONTENT_CIPHERTEXT_SENTINEL, configureContentEncryption, createPool, migrate, PostgresConsumerSecurityRepository, PostgresDataExportRepository, PostgresDataExportSource, PostgresSessionRepository, PostgresSocialIdentityRepository, RunRepository, runInRequestScope, ServeDisclosureRepository, type Pool } from "@debateai/db";
+import { CONTENT_CIPHERTEXT_SENTINEL, configureContentEncryption, createPool, migrate, PostgresConsumerSecurityRepository, PostgresDataExportRepository, PostgresDataExportSource, PostgresInvestigationRepository, PostgresSessionRepository, PostgresSocialIdentityRepository, PostgresWebEvidenceRepository, PostgresWebResearchedRepository, RunRepository, runInRequestScope, ServeDisclosureRepository, type Pool, type WebSealed } from "@debateai/db";
 import { StoryRepository } from "@debateai/story";
 import { WorkItemRepository } from "@debateai/battery";
 import { Argon2WorkerPool, ContentCipher, decrypt, encrypt, FileRunContentKeyStore, FileUserDekStore,
-  generateDek, generateTotpSecret, hashPassword, hashToken, loadKek, openRecord, sealRecord, totpCodeAtStep } from "@debateai/crypto";
+  generateDek, generateTotpSecret, hashPassword, hashToken, loadKek, openRecord, sealRecord, totpCodeAtStep, type ContentCarrier } from "@debateai/crypto";
 import { AUTH_POLICY_REGISTER_ROWS, authPolicyFromRegisterRows, MFA_POLICY_REGISTER_ROW, mfaPolicyFromValue,
   SESSION_POLICY_REGISTER_ROW, sessionPolicyFromValue } from "@debateai/register";
 import { renderMail } from "@debateai/mail-templates";
 import { DataExportApplication } from "../../apps/api/src/data-export/service.js";
 import { FileDataExportStore } from "../../apps/api/src/data-export/store.js";
-import { collectSnapshot } from "../../apps/api/src/data-export/snapshot.js";
+import { collectSnapshot, type ExportDecryptors, type OwnerViewPort } from "../../apps/api/src/data-export/snapshot.js";
+import { runContentOpener } from "../../apps/api/src/data-export/run-content.js";
 import { loadArchiveCatalog } from "../../apps/api/src/data-export/archive-catalog.js";
 import { TemplatedDataExportMail } from "../../apps/api/src/data-export/mail.js";
 import type { TemplatedMail } from "../../apps/api/src/mail-channel.js";
@@ -119,7 +120,8 @@ describe("data export over a real database and encrypted file store", () => {
   }
 
   function application(directory: string, email: string, workerId = randomUUID(), recoveryEmail?: string, recordsKey?: Buffer,
-    userKey?: Buffer, actualOwnerView?: OwnerViewAdapter) {
+    userKey?: Buffer, actualOwnerView?: OwnerViewPort,
+    runContent: ExportDecryptors["openRunContent"] = async () => { throw Error("RUN_CONTENT_NOT_EXPECTED"); }) {
     const repo = new PostgresDataExportRepository(runtime, workerRuntime, {
       hashSourceIp: async () => "a".repeat(64), hashUserAgent: async () => "b".repeat(64)
     } as never);
@@ -138,7 +140,7 @@ describe("data export over a real database and encrypted file store", () => {
           : decrypt(userKey, envelope as Parameters<typeof decrypt>[1],
             ["identity", field, userId, "run:none", userId, `user-dek:${userId}`, "1"]).toString("utf8"),
           openRecord: (aad, ciphertext) => recordsKey === undefined ? "{}" : openRecord(recordsKey, aad, ciphertext).toString("utf8"),
-          openSupport: async () => "fixture-support" }, now: () => new Date() }); }
+          openSupport: async () => "fixture-support", openRunContent: runContent }, now: () => new Date() }); }
         catch (error) { if (actualOwnerView) { let current: unknown = error; for (let i = 0; i < 5 && current instanceof Error; i++) { lines.push(`E3:${current.stack ?? current}`); current = current.cause; } } throw error; }
       },
       archiveCatalog: loadArchiveCatalog, mail, publicAppUrl: "https://example.test", workerId,
@@ -929,5 +931,104 @@ describe("data export over a real database and encrypted file store", () => {
       }
       expect((await db.pool.query("SELECT count(*)::int n FROM identity.social_flow AS flow WHERE row_to_json(flow)::text LIKE $1", [`%${token}%`])).rows[0].n).toBe(0);
     } finally { for (const spy of spies) spy.mockRestore(); }
+  });
+
+  it("E15 (0132, 0133) carries a debate's web sources opened under its key, never a page text or pack, and the investigations and reserve", async () => {
+    // The approved privacy rows: search words, links, sites, titles, dates and short quotes are kept with the debate; page
+    // text only up to 30 days after the last activity, so the archive names its state (STORED) and never carries it.
+    const a = await account(), secretDir = join(root, randomUUID()), contentPool = poolFacade(pools.runtime);
+    const seedPool = createPool(db.connectionString);
+    try {
+      const users = new FileUserDekStore(secretDir, loadKek(generateDek()));
+      await users.store(a.userId, generateDek());
+      const keys = new FileRunContentKeyStore(secretDir, users, async ownerRef => {
+        if (ownerRef !== a.ownerRef) throw Error("WRONG_OWNER");
+        return a.userId;
+      });
+      const cipher = new ContentCipher(keys);
+      configureContentEncryption(contentPool, cipher);
+      configureContentEncryption(seedPool, cipher);
+      const start = (tag: string) => new RunRepository(seedPool).startRun({
+        questionLine: `e15-${tag}-question`, askContract: { audience: "data-export-test" },
+        principal: { kind: "server", userId: a.userId, ownerRef: a.ownerRef },
+        sessionId: a.sessionId, callerScope: "ASKER", asOf: new Date(),
+        askerRiskTier: "casual", effectiveRiskTier: "casual", tierSource: "ASKER",
+        tierProvenanceRef: "data-export-test", compositionBudgetTier: "low",
+        depthParams: { depth: 1 }, discoveredPanel: fixtureDiscoveredPanel(1),
+        strangerSampleRate: 1, envelopeBasis: { source: "data-export-test" },
+        registerVersion: 1, batteryVersion: "data-export-test", batteryRows: []
+      });
+      const runId = await start("root"), dig = await start("dig"), closedRoot = await start("closed");
+      const prepared = await cipher.prepareRun(runId);
+      const seal = (carrier: ContentCarrier, id: string, value: unknown): WebSealed => {
+        const envelope = prepared.encrypt(carrier, id, value);
+        return { envelope, attestation: prepared.attestEnvelope(carrier, id, "content_ciphertext", envelope) };
+      };
+      const web = new PostgresWebEvidenceRepository(seedPool);
+      const search = randomUUID(), top = randomUUID(), other = randomUUID(), reading = randomUUID(), extract = randomUUID();
+      expect(await web.recordSearch({ runId, searchId: search, pathRef: "pos-1", side: "for", languageKind: "english", language: "en",
+        country: null, lookBack: "12m", outcome: "FOUND", chargeMicros: 1000, resultCount: 2,
+        words: seal("identity.web_search", search, { words: "e15-search-words" }) })).toBe("RECORDED");
+      for (const [page, rank] of [[top, 1], [other, 2]] as const) {
+        expect(await web.recordPage({ runId, pageId: page, searchId: search, rank, readDepth: "whole",
+          about: seal("identity.web_page", page, { url: `https://example.test/e15-${rank}`, site: "example.test", title: `e15-title-${rank}` }),
+          text: { chars: 20, digest: Buffer.alloc(32, rank), sealed: seal("identity.web_page_text", page, { text: `e15-page-text-${rank}` }) } }))
+          .toBe("RECORDED");
+      }
+      expect(await web.recordReading({ runId, readingId: reading, pageId: top, reader: 1, maker: "anthropic", outcome: "READ", grade: 3,
+        line: seal("identity.web_reading", reading, { line: "e15-reader-line" }) })).toBe("RECORDED");
+      expect(await web.recordExtract({ runId, extractId: extract, pageId: top, label: "S1-1", foundBy: [1],
+        quote: seal("identity.web_extract", extract, { quote: "e15-short-quote" }) })).toBe("RECORDED");
+      expect(await web.recordPicks(runId, "pos-1", [top])).toBe("RECORDED");
+      const pack = randomUUID();
+      expect(await web.recordPack({ runId, packId: pack, pathRef: "pos-1", extractLabels: ["S1-1"],
+        pack: seal("identity.web_pack", pack, { text: "e15-pack-text" }) })).toBe("RECORDED");
+      prepared.close();
+      expect(await new PostgresWebResearchedRepository(seedPool).record(a.ownerRef, runId, other)).toBe("RECORDED");
+      const investigations = new PostgresInvestigationRepository(seedPool);
+      const joined = await investigations.join({ ownerRef: a.ownerRef, parentRunId: runId, childRunId: dig, places: ["pos-1"], mode: "quick" });
+      expect(joined.outcome).toBe("JOINED");
+      const closed = (await investigations.open(a.ownerRef, closedRoot))!;
+      expect(await investigations.recordReserveEvent(a.ownerRef, { kind: "HELD", amountMicros: 200_000 })).toBe("RECORDED");
+      expect(await investigations.close(a.ownerRef, closed)).toMatchObject({ outcome: "CLOSED", reportVersion: 1 });
+      expect(await investigations.recordReserveEvent(a.ownerRef, { kind: "USED", investigationId: closed, reportVersion: 1 })).toBe("RECORDED");
+      const ownerView: OwnerViewPort = {
+        runKeyPresent: runId => keys.exists(runId), runRemovedByCheck: async () => false, resolveRunRef: async runId => runId,
+        readRun: async () => ({ state: "SETTLED", question_line: "e15 question" }), readRunAnswer: async () => null,
+        readAnswer: async () => null, readInspection: async () => null, readLedgerDigest: async () => null, readStory: async () => null,
+        readDisclosure: async () => null, readNode: async () => null, readSynthesisChecks: async () => [], readPublicationReviews: async () => []
+      };
+      const fixture = application(join(root, randomUUID()), a.email, randomUUID(), undefined, undefined, undefined, ownerView,
+        runContentOpener(contentPool));
+      await accepted(a, fixture.app);
+      await fixture.app.runOnce();
+      const row = (await db.pool.query("SELECT * FROM identity.data_export WHERE user_id=$1 ORDER BY requested_at DESC LIMIT 1", [a.userId])).rows[0];
+      expect(row.status, lines.join("\n")).toBe("SENT");
+      const archive = entries(await fixture.store.read(row.export_id, a.userId));
+      const sources = JSON.parse(archive["debates.json"]!).web_sources;
+      expect(sources).toHaveLength(1);
+      expect(sources[0]).toMatchObject({ debate_reference: runId, content_status: "READABLE",
+        searches: [{ search_id: search, path_ref: "pos-1", outcome: "FOUND", words: { words: "e15-search-words" } }],
+        pages: [
+          { page_id: top, path_ref: "pos-1", rank: 1, top_rank: 1, read_depth: "whole", text_state: "STORED",
+            about: { url: "https://example.test/e15-1", site: "example.test", title: "e15-title-1" } },
+          { page_id: other, path_ref: "pos-1", rank: 2, top_rank: null, text_state: "STORED", about: { title: "e15-title-2" } }],
+        readings: [{ reading_id: reading, page_id: top, reader: 1, maker: "anthropic", grade: 3, line: { line: "e15-reader-line" } }],
+        quotes: [{ extract_id: extract, page_id: top, label: "S1-1", found_by: [1], quote: { quote: "e15-short-quote" } }],
+        added_to_researched: [{ page_id: other, path_ref: "pos-1", outcome: null, settled_at: null }] });
+      const all = JSON.stringify(archive);
+      for (const absent of ["e15-page-text", "e15-pack-text", "charge_micros", "text_digest"]) expect(all, absent).not.toContain(absent);
+      const account = JSON.parse(archive["account.json"]!);
+      expect(account.investigations).toMatchObject([
+        { investigation_id: joined.investigationId, root_debate_reference: runId, state: "open", report_version: 0,
+          members: [{ debate_reference: runId, dug_from_reference: null, mode: null },
+            { debate_reference: dig, dug_from_reference: runId, places: ["pos-1"], mode: "quick" }], report_versions: [] },
+        { investigation_id: closed, root_debate_reference: closedRoot, state: "closed", report_version: 1,
+          members: [{ debate_reference: closedRoot, dug_from_reference: null }],
+          report_versions: [{ report_version: 1, reopened_at: null, report_reference: null }] }]);
+      expect(account.reserve_events).toMatchObject([
+        { event_no: 1, kind: "HELD", amount_micros: 200_000, investigation_id: null },
+        { event_no: 2, kind: "USED", amount_micros: 200_000, investigation_id: closed, report_version: 1 }]);
+    } finally { await seedPool.end(); }
   });
 });

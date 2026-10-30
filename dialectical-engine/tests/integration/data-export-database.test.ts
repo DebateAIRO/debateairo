@@ -1,7 +1,7 @@
 import { withMailLocale } from '../../packages/db/src/mail-locale.js';
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { migrate, RunRepository } from "@debateai/db";
+import { migrate, PostgresInvestigationRepository, PostgresWebEvidenceRepository, RunRepository, type WebSealed } from "@debateai/db";
 import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 import { Pool, type PoolClient } from "pg";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
@@ -455,6 +455,66 @@ describe("data export database authority", () => {
       expect(Object.fromEntries(items.map(item => [item.kind, [item.clauses, item.leg]]))).toEqual({
         TERMS: [null, null], ITALY_SPECIFIC_APPROVAL: [[11, 12, 14, 15, 18], "BOTH"]
       });
+    } finally {
+      await db.pool.query("UPDATE identity.data_export SET status='CANCELLED',closed_at=clock_timestamp(),lease_owner=NULL,lease_until=NULL WHERE export_id=$1", [exportId]);
+    }
+  });
+
+  it("X-WEB the worker adapter reads each debate's web evidence (never a page text) and the investigations with the reserve events", async () => {
+    const a = await account(), exportId = randomUUID(), worker = randomUUID();
+    const owner = (await db.pool.query(`SELECT owner_ref FROM identity."user" WHERE user_id=$1`, [a.user])).rows[0].owner_ref as string;
+    const secret = Buffer.alloc(32, 5), runId = randomUUID(), seq = 9_300_000 + Math.floor(Math.random() * 1000);
+    // A private debate with content encryption and its attestation secret, seeded as 0132's own suite seeds one.
+    const seed = await db.pool.connect();
+    try {
+      await seed.query("BEGIN");
+      await seed.query("SET LOCAL session_replication_role = 'replica'");
+      await seed.query(`INSERT INTO core.run
+        (run_id,question_line,asker_id,session_id,caller_scope,as_of,asker_risk_tier,risk_tier,
+         tier_source,tier_provenance_ref,composition_budget_tier,depth_params,agent_count,discovered_panel,
+         stranger_sample_rate,envelope_basis,register_version,battery_version,ask_contract,created_at_seq,
+         question_blind_index_version,content_encryption_version)
+        VALUES ($1,'Fixture question',$2,$3,'ASKER',now(),'standard','standard','ASKER','fixture','low',
+         '{}'::jsonb,2,'[{},{}]'::jsonb,0,'{}'::jsonb,1,'fixture','{}'::jsonb,$4,1,1)`, [runId, `owner:${owner}`, randomUUID(), seq]);
+      await seed.query("INSERT INTO core.run_ownership_event(run_id,owner_ref,at_seq) VALUES ($1,$2,$3)", [runId, owner, seq]);
+      await seed.query("INSERT INTO core.run_content_attestation_secret(run_id,secret,created_at) VALUES ($1,$2,now())", [runId, secret]);
+      await seed.query("COMMIT");
+    } catch (error) { await seed.query("ROLLBACK"); throw error; } finally { seed.release(); }
+    const sealed = async (carrier: string, ref: string, ct: string): Promise<WebSealed> => {
+      const envelope = { v: 1, keyId: "fixture-key", nonce: "AAAAAAAAAAAAAAAA", tag: "AAAAAAAAAAAAAAAAAAAAAA==", ct };
+      const attestation = (await db.pool.query(`SELECT audit_crypto_internal.hmac(
+          core.content_envelope_attestation_bytes($1,$2,$3,'content_ciphertext',$4::jsonb),$5::bytea,'sha256') AS value`,
+        [runId, carrier, ref, JSON.stringify(envelope), secret])).rows[0].value as Buffer;
+      return { envelope: envelope as never, attestation };
+    };
+    const web = new PostgresWebEvidenceRepository(db.pool);
+    const search = randomUUID(), page = randomUUID(), extract = randomUUID();
+    expect(await web.recordSearch({ runId, searchId: search, pathRef: "pos-1", side: "for", languageKind: "english", language: "en",
+      country: null, lookBack: "12m", outcome: "FOUND", chargeMicros: 1000, resultCount: 1,
+      words: await sealed("identity.web_search", search, "d29yZHM=") })).toBe("RECORDED");
+    expect(await web.recordPage({ runId, pageId: page, searchId: search, rank: 1, readDepth: "whole",
+      about: await sealed("identity.web_page", page, "YWJvdXQ="),
+      text: { chars: 9, digest: Buffer.alloc(32, 1), sealed: await sealed("identity.web_page_text", page, "eC13ZWItcGFnZS10ZXh0") } })).toBe("RECORDED");
+    expect(await web.recordExtract({ runId, extractId: extract, pageId: page, label: "S1-1", foundBy: [1],
+      quote: await sealed("identity.web_extract", extract, "cXVvdGU=") })).toBe("RECORDED");
+    const investigations = new PostgresInvestigationRepository(db.pool);
+    const investigationId = (await investigations.open(owner, runId))!;
+    expect(await investigations.recordReserveEvent(owner, { kind: "HELD", amountMicros: 200_000 })).toBe("RECORDED");
+    await db.pool.query(`INSERT INTO identity.data_export(export_id,user_id,session_id,locale,status,requested_at,attempts,lease_owner,lease_until)
+      VALUES($1,$2,$3,'en','PREPARING',clock_timestamp(),1,$4,clock_timestamp()+interval '45 seconds')`, [exportId, a.user, a.session, worker]);
+    try {
+      const raw = await new PostgresDataExportSource(workerPool).readRaw(exportId, worker) as Record<string, any>;
+      expect(raw.web_evidence.map((entry: { run_id: string }) => entry.run_id)).toEqual([runId]);
+      const step = raw.web_evidence[0].web;
+      expect(Object.keys(step).sort()).toEqual(["extracts", "packs", "pages", "picks", "readings", "researched", "searches"]);
+      expect(step.pages.map((item: { page_id: string; text_state: string; content: { ct: string } }) => [item.page_id, item.text_state, item.content.ct]))
+        .toEqual([[page, "STORED", "YWJvdXQ="]]);
+      expect(step.extracts.map((item: { label: string; content: { ct: string } }) => [item.label, item.content.ct])).toEqual([["S1-1", "cXVvdGU="]]);
+      // The page text stays in identity.web_page_text: 0132's export reader never returns it.
+      expect(JSON.stringify(raw)).not.toContain("eC13ZWItcGFnZS10ZXh0");
+      expect(raw.investigations.map((item: { investigation_id: string; root_run_id: string }) => [item.investigation_id, item.root_run_id]))
+        .toEqual([[investigationId, runId]]);
+      expect(raw.reserve_events.map((item: { kind: string; amount_micros: number }) => [item.kind, item.amount_micros])).toEqual([["HELD", 200_000]]);
     } finally {
       await db.pool.query("UPDATE identity.data_export SET status='CANCELLED',closed_at=clock_timestamp(),lease_owner=NULL,lease_until=NULL WHERE export_id=$1", [exportId]);
     }

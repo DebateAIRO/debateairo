@@ -122,8 +122,8 @@ const WORKER_FUNCTIONS = [
   "identity.read_data_export_threat_reports(uuid,uuid)",
   // V4 account memory (migration 0131): the reading level, debate visits and dig links.
   "identity.read_data_export_page_memory(uuid,uuid)",
-  // The Perplexity plan's stores (0132, 0133): a debate's web evidence, the investigations and the reserve events. Their
-  // archive sections are not wired yet (apps/api/src/data-export); the boot check already pins that the worker reaches them.
+  // The Perplexity plan's stores (0132, 0133): a debate's web evidence, the investigations and the reserve events
+  // (debates.json web_sources; account.json investigations and reserve_events).
   "identity.read_data_export_web_evidence(uuid,uuid)",
   "identity.read_data_export_investigations(uuid,uuid)",
   "identity.complete_data_export(uuid,uuid,text,text,bigint,timestamp with time zone)",
@@ -165,18 +165,25 @@ export class PostgresDataExportSource implements DataExportSourcePort {
   constructor(private readonly pool: Pool) {}
 
   async readRaw(exportId: string, workerId: string): Promise<RawExportRows> {
-    const row = (await this.pool.query<{ snapshot: RawExportRows; threat_reports: unknown; page_memory: Record<string, unknown> | null }>(
+    const row = (await this.pool.query<{ snapshot: RawExportRows; threat_reports: unknown; page_memory: Record<string, unknown> | null;
+      web_evidence: unknown; investigations: Record<string, unknown> | null }>(
       "SELECT identity.read_data_export_snapshot_v2($1,$2) snapshot, identity.read_data_export_threat_reports($1,$2) threat_reports, "
-        + "identity.read_data_export_page_memory($1,$2) page_memory",
+        + "identity.read_data_export_page_memory($1,$2) page_memory, identity.read_data_export_web_evidence($1,$2) web_evidence, "
+        + "identity.read_data_export_investigations($1,$2) investigations",
       [exportId, workerId])).rows[0]!;
     // 0131's reader answers {page_reading_level, debate_visits, dig_links}; a missing member stays missing, so the
     // snapshot's exact-section check refuses the export rather than leaving the records out.
+    // 0132's reader answers [{run_id, web}] per debate; 0133's {investigations, reserve_events}, read the same way.
     const memory = row.page_memory ?? {};
+    const investigations = row.investigations ?? {};
     return {
       ...row.snapshot, threat_reports: row.threat_reports,
       ...("page_reading_level" in memory ? { page_reading_level: memory.page_reading_level } : {}),
       ...("debate_visits" in memory ? { debate_visits: memory.debate_visits } : {}),
-      ...("dig_links" in memory ? { dig_links: memory.dig_links } : {})
+      ...("dig_links" in memory ? { dig_links: memory.dig_links } : {}),
+      web_evidence: row.web_evidence,
+      ...("investigations" in investigations ? { investigations: investigations.investigations } : {}),
+      ...("reserve_events" in investigations ? { reserve_events: investigations.reserve_events } : {})
     } as RawExportRows;
   }
 }

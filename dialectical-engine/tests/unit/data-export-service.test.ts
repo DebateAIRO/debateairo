@@ -27,10 +27,10 @@ function snapshotA(claim: ExportClaim, now: Date): ExportSnapshot {
   return {
     exportId: claim.exportId, userId: claim.userId, locale: claim.locale,
     requestedAt: claim.requestedAt, generatedAt: now, recipient: "recipient@example.test",
-    account: { account: { pseudonym: "snapshot-a", email: "recipient@example.test", created_at: START.toISOString() }, channels: [], registration_region: null, age_checks: [], erasure_requests: [], kept_questions: [], reading_level: null, debate_visits: [], dig_links: [] },
+    account: { account: { pseudonym: "snapshot-a", email: "recipient@example.test", created_at: START.toISOString() }, channels: [], registration_region: null, age_checks: [], erasure_requests: [], kept_questions: [], reading_level: null, debate_visits: [], dig_links: [], investigations: [], reserve_events: [] },
     security: { mfa_factors: [], passkeys: [], recovery_codes: null, sessions: [], social_identities: [], email_changes: [], recovery_email_changes: [], recovery_requests: [] },
     consents: { legal_acceptances: [], sensitive_data_consents: [] },
-    debates: { debates: [] },
+    debates: { debates: [], web_sources: [] },
     billing: { customers: [], customer_xmoney: [], customer_profile_events: [], quotes: [], subscription_events: [], entitlement_events: [], run_charge_scopes: [], charges: [], internal_grants: [], withdrawal_owner_settlements: [], charge_events: [], quote_uses: [], invoice_intents: [], invoices: [], location_evidence: [] },
     support: { sessions: [], cases: [] }, activity: { events: [] }
   };

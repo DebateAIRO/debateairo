@@ -190,6 +190,9 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       .map(([path]) => path)
       .sort();
     expect(primitiveFiles).toEqual([
+      // The data export (0132): one debate's web values are opened under its key inside one content lease
+      // (prepareLeasedContentEncryptionForRun), and a debate erased meanwhile is exported UNRECOVERABLE.
+      "apps/api/src/data-export/run-content.ts",
       // V-6 (0069): the live event stream decrypts an encrypted run's
       // investigation-gap rows, and the value overlay seals the weight owner.
       // Both prepare the run's cipher through prepareLeasedContentEncryptionForRun,

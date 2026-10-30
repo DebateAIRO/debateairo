@@ -46,13 +46,13 @@ describe("data export readable page", () => {
     expect(page()).toContain("The content of this debate can no longer be read: its key was destroyed.");
   });
   it("H-6 explains an archive with no debates", () => {
-    expect(renderYourDataHtml({ ...snapshotA, debates: { debates: [] } }, loadArchiveCatalog("en"))).toContain("You have no debates.");
+    expect(renderYourDataHtml({ ...snapshotA, debates: { debates: [], web_sources: [] } }, loadArchiveCatalog("en"))).toContain("You have no debates.");
   });
   it("H-7 never renders a UUID", () => {
     expect(page()).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
   });
   it("H-8 has one dark mode rule, escapes user text, and follows S5 structure", () => {
-    const altered = { ...snapshotA, debates: { debates: [{ ...snapshotA.debates.debates[0]!, question: `<b>&"'` }] } };
+    const altered = { ...snapshotA, debates: { debates: [{ ...snapshotA.debates.debates[0]!, question: `<b>&"'` }], web_sources: [] } };
     const html = renderYourDataHtml(altered, loadArchiveCatalog("en"));
     expect(html.match(/@media \(prefers-color-scheme: dark\)/g)).toHaveLength(1);
     expect(html).toContain("&lt;b&gt;&amp;&quot;&#39;");
