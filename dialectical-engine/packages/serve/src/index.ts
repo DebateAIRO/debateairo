@@ -16,7 +16,9 @@ import {
   encryptAttestedLeasedContentForRun,
   normalizeRunOwnership,
   prepareLeasedContentEncryptionForRun,
+  PostgresWebEvidenceRepository,
   RunRepository,
+  WEB_EVIDENCE_CARRIERS,
   withRunContentLease,
   type CryptoEnvelope,
   withWriteTransaction,
@@ -28,6 +30,7 @@ import { judgesComparisonOf, judgesRecountApplies, servedPositionOf } from "./ju
 import type { EngineVerdictTrigger } from "./engine-verdict.js";
 import { SynthesisCheckRepository, synthesisTextOf, verdictOfRecord } from "./synthesis-check.js";
 import { PublicationReviewRepository, reviewStateOf } from "./publication-review.js";
+import { serveWebEvidence, withWebSources, type ServedWeb } from "./web-sources.js";
 export { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
 export {
   judgesComparisonOf, judgesRecountApplies, recountJudgesVotes, rootIndexOfCallSite, servedPositionOf, type ComparisonVote,
@@ -68,6 +71,8 @@ export * from "./synthesis.js";
 export * from "./engine-verdict.js";
 export * from "./synthesis-check.js";
 export * from "./publication-review.js";
+// Plan 2026-10-30 W3-3: the web step's stored rows as the answer's sources and web status.
+export * from "./web-sources.js";
 
 /**
  * T6 r4 / codex r2 B1 — the value `ledger.node_review.outcome` can hold.
@@ -2972,9 +2977,10 @@ export class ServeRepository {
       subjectRef: row.answer_id,
       relevantAsOf: row.relevant_as_of
     });
-    const [nodes, edges] = await Promise.all([
+    const [nodes, edges, servedWeb] = await Promise.all([
       this.readNodesForRun(row.run_id, row.answer_id, row.answer_version),
-      this.readEdgesForRun(row.run_id)
+      this.readEdgesForRun(row.run_id),
+      this.#readServedWeb(row.run_id)
     ]);
     const numbers = await this.pool.query<{
       value: number;
@@ -3170,7 +3176,8 @@ export class ServeRepository {
       number_slots: numberSlots,
       abstention: abstention.rows[0] ?? null,
       shadow_suppressions: shadowSuppressions.rows,
-      nodes,
+      // Plan 2026-10-30 W3-3: each point's checked sources and looked-up flag; the very same points without web rows.
+      nodes: withWebSources(nodes, servedWeb),
       edges,
       badges: staleness.badge === null || row.badges.includes(staleness.badge)
         ? row.badges
@@ -3231,7 +3238,9 @@ export class ServeRepository {
       staleness_state: staleness.state,
       relevant_as_of: staleness.relevantAsOf,
       ...(modelAssignment === undefined ? {} : { model_assignment: modelAssignment }),
-      ...(judgesComparison === undefined ? {} : { judges_comparison: judgesComparison })
+      ...(judgesComparison === undefined ? {} : { judges_comparison: judgesComparison }),
+      // Plan 2026-10-30 W3-3: each path's web search and other pages; absent when the debate kept no web rows.
+      ...(servedWeb === null ? {} : { web: servedWeb.web })
     };
     });
   }
@@ -3630,8 +3639,49 @@ export class ServeRepository {
     );
     const runId = owner.rows[0]?.run_id;
     if (runId === undefined) return null;
-    return (await this.readNodesForRun(runId, answerId, owner.rows[0]!.answer_version))
-      .find((node) => node.node_id === nodeId) ?? null;
+    const answerVersion = owner.rows[0]!.answer_version;
+    // Plan 2026-10-30 W3-3: the point with its sources and flag, read under one lease (the node read borrows it).
+    return withRunContentLease(this.pool, [runId], async () => {
+      const nodes = await this.readNodesForRun(runId, answerId, answerVersion);
+      return withWebSources(nodes, await this.#readServedWeb(runId)).find((node) => node.node_id === nodeId) ?? null;
+    });
+  }
+
+  /**
+   * Plan 2026-10-30 W3-3: what the run's web step kept (0132's identity.read_web_evidence), opened under the run's key
+   * inside the caller's content lease and shaped by ./web-sources.ts; null when it kept no search (every answer before
+   * R22, Free, the setting off), so such an answer reads exactly as before. Only what is served is opened: each page's
+   * address, title and date, reader 1's line and each checked extract; never a search's words, a page's text or a grade.
+   * The planner's per-path decision is not stored yet (0132 keeps searches only, W3-1's to add), so the paths are those
+   * the searches name.
+   */
+  async #readServedWeb(runId: string): Promise<ServedWeb | null> {
+    const stored = await new PostgresWebEvidenceRepository(this.pool).read(runId);
+    if (stored === null || stored.searches.length === 0) return null;
+    const cipher = await prepareLeasedContentEncryptionForRun(this.pool, runId);
+    try {
+      const open = (carrier: (typeof WEB_EVIDENCE_CARRIERS)[keyof typeof WEB_EVIDENCE_CARRIERS], id: string,
+        envelope: CryptoEnvelope | null): unknown => decryptLeasedContentForRun<unknown>(cipher, carrier, id, envelope, null);
+      const served = serveWebEvidence({
+        evidence: {
+          searches: stored.searches.map((search) => ({ searchId: search.search_id, pathRef: search.path_ref, outcome: search.outcome })),
+          pages: stored.pages.map((page) => ({ pageId: page.page_id, searchId: page.search_id, rank: page.rank,
+            readDepth: page.read_depth, about: open(WEB_EVIDENCE_CARRIERS.page, page.page_id, page.content) })),
+          readings: stored.readings.map((reading) => ({ pageId: reading.page_id, reader: reading.reader, outcome: reading.outcome,
+            line: reading.reader === 1 && reading.outcome === "READ"
+              ? open(WEB_EVIDENCE_CARRIERS.reading, reading.reading_id, reading.content) : null })),
+          extracts: stored.extracts.map((extract) => ({ pageId: extract.page_id, pathRef: extract.path_ref, label: extract.label,
+            quote: open(WEB_EVIDENCE_CARRIERS.extract, extract.extract_id, extract.content) })),
+          picks: stored.picks.map((pick) => ({ pathRef: pick.path_ref, rank: pick.rank, pageId: pick.page_id })),
+          researched: stored.researched.map((chosen) => ({ pageId: chosen.page_id, pathRef: chosen.path_ref, outcome: chosen.outcome }))
+        },
+        plan: null
+      });
+      await cipher.assertLive();
+      return served;
+    } finally {
+      await cipher.close();
+    }
   }
 
   /** Reclaim resume (migration 0119): nodes a later copy set aside ('stale'), and their edges, are not the answer's. */

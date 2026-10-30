@@ -1270,6 +1270,7 @@ packages/serve/src/model-assignment.ts
 packages/serve/src/publication-review.ts
 packages/serve/src/synthesis-check.ts
 packages/serve/src/synthesis.ts
+packages/serve/src/web-sources.ts
 packages/settlement/src/index.ts
 packages/story/src/backup.ts
 packages/story/src/blocks.ts
