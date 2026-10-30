@@ -450,8 +450,12 @@ def whole_count(value):
 # of (name, number) pairs: the request must carry exactly those members with exactly those values.
 # final_writer_output_bound (length guidance LG-B, L26, 2026-10-15) is the model's own maximum output: a final-writer
 # request (callTier FINAL_WRITER) may ask up to it and reserves at it. None: the row has no final-writer tier.
+# request_usd (plan 2026-10-30, task W1-1) is a per-request price in USD, beside the token rule, for a vendor that charges
+# per request and reports no usage (Perplexity's search). A row with it reserves, and is charged, exactly that amount
+# whatever the request's size; its token prices are 0 and its profile's reservation and ceiling prices are (0, 0). None
+# (every token row): the token rule.
 ModelRow = namedtuple('ModelRow', 'model maker input_usd_per_m output_usd_per_m output_bound efforts json_object sampling '
-                      'final_writer_output_bound', defaults=(None, None))
+                      'final_writer_output_bound request_usd', defaults=(None, None, None))
 
 
 PATH_PATTERN = re.compile(r'/[A-Za-z0-9._~:/-]{0,511}')
@@ -517,6 +521,9 @@ class DeepInfraProfile:
                                          active. A profile without it accounts every such reply as before (halt)
       probe_body(row) -> dict            the probe's tiny request (max_tokens <= 1024), with the row's sampling
       reply_text(response) -> str|None   answer or error text, for the probe's short excerpt
+    A profile whose rows carry request_usd (PerplexityProfile, plan 2026-10-30 task W1-1) prices per request instead:
+    its reservation_prices and ceiling_prices are (0, 0), and its account() charges exactly the row's request_usd for a
+    reply it fully understands.
     """
     name = 'deepinfra'
     host = 'api.deepinfra.com'
@@ -538,8 +545,9 @@ class DeepInfraProfile:
     final_writer_max_request_bytes = 1024 * 1024
     final_writer_per_call_cap_usd = Decimal('0.75')
     redaction_patterns = ()  # DeepInfra keys have no fixed shape; the key itself and Bearer are always blanked.
-    # No fixed shape either, but never another provider's key (Anthropic sk-ant-, Google AIza).
-    key_pattern = r'(?!sk-ant-|AIza)[!-~]{16,512}'
+    # No fixed shape either, but never another provider's key (Anthropic sk-ant-, Google AIza, Perplexity pplx-: plan
+    # 2026-10-30 task W1-1).
+    key_pattern = r'(?!sk-ant-|AIza|pplx-)[!-~]{16,512}'
     # Reviewed sampling (2026-10-12): the members a row may set, in the order the app's body carries them.
     sampling_keys = ('temperature', 'top_p', 'top_k')
     # Spec 2026-10-12 section 4.1: the words a row's menu may hold. None is no reasoning_effort member at all (the
@@ -1251,9 +1259,236 @@ class AnthropicProfile:
         return error.get('message') if isinstance(error, dict) and isinstance(error.get('message'), str) else None
 
 
+# Perplexity's Search API (plan 2026-10-30, task W1-1; docs.perplexity.ai/api-reference/search-post, read 2026-10-30).
+# The reply members it documents, at the top level and in each result. Anything else halts: a new member may be a new
+# way to bill, as Anthropic's usage.speed was on 2026-10-16.
+SEARCH_REPLY_KEYS = frozenset({'id', 'results', 'server_time'})
+SEARCH_REPLY_REQUIRED = frozenset({'id', 'results'})
+SEARCH_RESULT_KEYS = frozenset({'title', 'url', 'snippet', 'date', 'last_updated'})
+SEARCH_RESULT_REQUIRED = frozenset({'title', 'url', 'snippet'})
+SEARCH_RESULT_DATES = ('date', 'last_updated')
+# Perplexity's date filter form, MM/DD/YYYY; ISO 3166-1 alpha-2 (upper case) and ISO 639-1 (lower case) codes.
+SEARCH_DATE = re.compile(r'(0[1-9]|1[0-2])/(0[1-9]|[12][0-9]|3[01])/([0-9]{4})')
+SEARCH_COUNTRY = re.compile(r'[A-Z]{2}')
+SEARCH_LANGUAGE = re.compile(r'[a-z]{2}')
+
+
+def search_date_valid(value):
+    """A real calendar day written as Perplexity's MM/DD/YYYY, from the year 1900 on."""
+    match = SEARCH_DATE.fullmatch(value) if isinstance(value, str) else None
+    if match is None or int(match.group(3)) < 1900:
+        return False
+    try:
+        datetime(int(match.group(3)), int(match.group(1)), int(match.group(2)))
+    except ValueError:
+        return False
+    return True
+
+
+def search_outline(response):
+    """What an unreadable search reply looked like, for the operator: its top-level member names with each value's kind,
+    and the member names (with kinds) found in its result objects. Never a text, a number, a link or an id; a name
+    outside lowercase snake_case shows as (other); at most 40 items a list."""
+    if not isinstance(response, dict):
+        return {'reply_kind': outline_kind(response)}
+    outline = {'reply': outline_capped(sorted('%s:%s' % (outline_name(key), outline_kind(value))
+                                              for key, value in response.items()))}
+    results = response.get('results')
+    if isinstance(results, list):
+        names = {'%s:%s' % (outline_name(key), outline_kind(value))
+                 for item in results if isinstance(item, dict) for key, value in item.items()}
+        outline['result'] = outline_capped(sorted(names))
+    return outline
+
+
+class PerplexityProfile:
+    """api.perplexity.ai, Search API (POST /search), Bearer key. One reviewed row, fast search (plan 2026-10-30, task
+    W1-1; owner answers of 2026-10-30). A search is not a model: the request names none, and the gate maps every request
+    to its one row (SEARCH_MODEL), whose id is what the records, /remaining and the GO's enabled_models name. The profile
+    API is DeepInfraProfile's.
+
+    Price (owner, 2026-10-30): $0.001 per request in fast mode, the page text included (Perplexity's pricing page, read
+    2026-10-22; sieve test R/34). Perplexity reports no usage and no cost, so the row carries request_usd: every search
+    reserves exactly $0.001 whatever its size, and a reply this profile fully understands is charged exactly that. The
+    per-call cap is one search. reservation_prices and ceiling_prices are (0, 0): no token is ever priced.
+
+    Request (body_valid): exactly query (one text of 1 to 500 characters, not only whitespace; a list of texts is refused,
+    since Perplexity merges a multi-query request's results into one list), max_results (1 to 10), max_tokens_per_page
+    (1 to 32,768), max_tokens (1 to 327,680, the row's output_bound) and search_type "fast"; optionally
+    search_after_date_filter (MM/DD/YYYY, a real day), country (ISO 3166-1 alpha-2, upper case) and
+    search_language_filter (exactly one ISO 639-1 code, lower case). Nothing else: no model, no stream, no domain or
+    recency filter, no other search type. Every whole number is a JSON integer (never true, 5.0 or "5").
+
+    Reply (account): only the documented members: id (text), results (a list of at most 10 objects) and an optional
+    server_time (text or null); each result title, url and snippet (texts) and optionally date and last_updated (text or
+    null). Anything else, at either level, makes the charge uncertain and the gate halts, with the check that failed and
+    an outline of names and kinds (search_outline) in the ledger entry. No reply is booked unread (no bookable_unreported).
+
+    Refusals (docs.perplexity.ai rate-limit and search pages, read 2026-10-30): a 429 that is exactly an error object
+    (request_rate_limit_exceeded, token_rate_limit_exceeded or overloaded) is unbilled and busy: the search cools off as a
+    model does. A 400 that is exactly an error object, and a 422 that is exactly a detail list (a validation error), are
+    unbilled and not busy (the unsent streak). None of them may carry id, results, a billing key or a token count anywhere.
+    A server error (500 to 599) without id, results, a billing key or a tokens_* count is booked at its reservation
+    ($0.001). A 401, 402, 403, any other 4xx and any other reply halt.
+    """
+    name = 'perplexity'
+    host = 'api.perplexity.ai'
+    path = '/search'
+    SEARCH_MODEL = 'perplexity-search-fast'
+    SEARCH_TYPE = 'fast'
+    per_call_cap_usd = Decimal('0.001')
+    max_request_bytes = 16 * 1024
+    redaction_patterns = (r'pplx-[A-Za-z0-9_-]+',)
+    # Perplexity's API keys start with pplx- (its console and API key guide); read_key bounds the length (16 to 512).
+    key_pattern = r'pplx-[A-Za-z0-9_-]+'
+    effort_words = (None,)  # A search has no thinking level: the request never carries one.
+    REQUIRED_FIELDS = ('query', 'max_results', 'max_tokens_per_page', 'max_tokens', 'search_type')
+    OPTIONAL_FIELDS = ('search_after_date_filter', 'country', 'search_language_filter')
+    QUERY_CHARS = (1, 500)
+    MAX_RESULTS = (1, 10)
+    MAX_TOKENS_PER_PAGE = (1, 32768)
+    MAX_TOKENS = (1, 327680)  # Ten whole pages at the per-page bound.
+    LANGUAGE_ITEMS = 1
+    # output_bound is the max_tokens ceiling (page text, never priced); the token prices are 0 (request_usd prices it).
+    rows = {SEARCH_MODEL: ModelRow(SEARCH_MODEL, 'Perplexity', Decimal(0), Decimal(0), MAX_TOKENS[1], (None,), False,
+                                   request_usd=Decimal('0.001'))}
+    # The well-formed refusals that bill nothing, by status: the one member the reply holds. Only 429 is busy.
+    UNBILLED_STATUSES = {400: 'error', 422: 'detail', 429: 'error'}
+    BUSY_STATUSES = frozenset({429})
+    PROBE_QUERY = 'European Parliament'
+
+    def path_for(self, row):
+        return self.path
+
+    def auth_headers(self, key):
+        return {'Authorization': 'Bearer ' + key}
+
+    def reservation_prices(self, row, moment, request_bytes=None):
+        """No token is priced: the row's request_usd is the whole hold."""
+        return Decimal(0), Decimal(0)
+
+    def ceiling_prices(self, row):
+        return Decimal(0), Decimal(0)
+
+    def requested_model(self, body):
+        """The request names no model: every search is this profile's one row."""
+        return self.SEARCH_MODEL if isinstance(body, dict) else None
+
+    def body_valid(self, body, row):
+        """Exactly the reviewed members, each within its bounds (see the class docstring)."""
+        if not isinstance(body, dict) or row.model != self.SEARCH_MODEL:
+            return False
+        required, optional = set(self.REQUIRED_FIELDS), set(self.OPTIONAL_FIELDS)
+        if not required <= set(body) <= required | optional:
+            return False
+        query = body['query']
+        if not (isinstance(query, str) and self.QUERY_CHARS[0] <= len(query) <= self.QUERY_CHARS[1]
+                and query.strip(JS_WHITESPACE)):
+            return False
+        for member, (low, high) in (('max_results', self.MAX_RESULTS), ('max_tokens_per_page', self.MAX_TOKENS_PER_PAGE),
+                                    ('max_tokens', (self.MAX_TOKENS[0], row.output_bound))):
+            if not (type(body[member]) is int and low <= body[member] <= high):
+                return False
+        if body['search_type'] != self.SEARCH_TYPE:
+            return False
+        if 'search_after_date_filter' in body and not search_date_valid(body['search_after_date_filter']):
+            return False
+        if 'country' in body and not (isinstance(body['country'], str) and SEARCH_COUNTRY.fullmatch(body['country'])):
+            return False
+        if 'search_language_filter' in body:
+            languages = body['search_language_filter']
+            if not (isinstance(languages, list) and len(languages) == self.LANGUAGE_ITEMS
+                    and all(isinstance(code, str) and SEARCH_LANGUAGE.fullmatch(code) for code in languages)):
+                return False
+        return True
+
+    def body_effort(self, body):
+        return None
+
+    def request_bytes(self, body):
+        return canonical(body)
+
+    def search_check(self, response):
+        """(None, number of results) for a reply this profile fully understands, else (the check it failed, None)."""
+        if not isinstance(response, dict):
+            return 'reply_invalid', None
+        if not set(response) <= SEARCH_REPLY_KEYS:
+            return 'reply_unknown_field', None
+        if not SEARCH_REPLY_REQUIRED <= set(response):
+            return 'reply_missing_field', None
+        if not isinstance(response['id'], str) or not (response.get('server_time') is None
+                                                       or isinstance(response['server_time'], str)):
+            return 'reply_invalid', None
+        results = response['results']
+        if not isinstance(results, list) or len(results) > self.MAX_RESULTS[1]:
+            return 'results_invalid', None
+        for item in results:
+            if not isinstance(item, dict):
+                return 'result_invalid', None
+            if not set(item) <= SEARCH_RESULT_KEYS:
+                return 'result_unknown_field', None
+            if not (SEARCH_RESULT_REQUIRED <= set(item) and all(isinstance(item[key], str) for key in SEARCH_RESULT_REQUIRED)
+                    and all(item.get(key) is None or isinstance(item[key], str) for key in SEARCH_RESULT_DATES)):
+                return 'result_invalid', None
+        return None, len(results)
+
+    def account(self, response, row, moment):
+        """Exactly the row's request_usd for a reply search_check understands; otherwise unknown (the gate halts)."""
+        reason, count = self.search_check(response)
+        base = {'input_usd_per_m': '0', 'output_usd_per_m': '0', 'prompt_tokens': None, 'completion_tokens': None,
+                'total_tokens': None, 'cached_tokens': None, 'reasoning_tokens': None, 'provider_estimated_cost_usd': None}
+        if reason is not None:
+            return {**base, 'usage_valid': False, 'configured_price_cost_usd': None, 'guard_charge_usd': None,
+                    'cost_basis': 'unknown; full reservation retained', 'invalid_reason': reason,
+                    'reply_shape': search_outline(response), 'results': None}
+        price = str(row.request_usd)
+        return {**base, 'usage_valid': True, 'configured_price_cost_usd': price, 'guard_charge_usd': price,
+                'cost_basis': 'Perplexity per-request list price (fast search); no usage or cost reported',
+                'request_usd': price, 'results': count}
+
+    def reply_model(self, response):
+        """A search answer names no model: one that carries results is this profile's one row."""
+        return self.SEARCH_MODEL if isinstance(response, dict) and 'results' in response else None
+
+    def unbilled_refusal(self, status, response):
+        """True only for Perplexity's own well-formed refusals that bill nothing (see the class docstring), judged on
+        the RAW reply."""
+        member = self.UNBILLED_STATUSES.get(status) if type(status) is int else None
+        if member is None or not isinstance(response, dict) or set(response) != {member}:
+            return False
+        shaped = isinstance(response[member], dict) if member == 'error' else isinstance(response[member], list)
+        return (shaped and not names_any_key(response, BILLED_KEYS + ('id', 'results'))
+                and not names_any_key_prefixed(response, 'tokens_') and not names_any_key_suffixed(response, '_tokens'))
+
+    def busy_refusal(self, status, response):
+        """Of the unbilled refusals, only 429 (a rate limit or overload) says Perplexity is busy."""
+        return status in self.BUSY_STATUSES
+
+    def bookable_server_error(self, status, response):
+        """A server error (500 to 599) that carries no id, no results, no billing key and no tokens_* count anywhere:
+        booked at its reservation (one search), as a connection that failed after the send is."""
+        return (type(status) is int and 500 <= status <= 599 and isinstance(response, dict)
+                and not names_any_key(response, BILLED_KEYS + ('id', 'results'))
+                and not names_any_key_prefixed(response, 'tokens_'))
+
+    def probe_body(self, row):
+        """One tiny search: one result, short page text."""
+        return {'query': self.PROBE_QUERY, 'max_results': 1, 'max_tokens_per_page': 256, 'max_tokens': 256,
+                'search_type': self.SEARCH_TYPE}
+
+    def reply_text(self, response):
+        """The first result's title, or an error's message (for the probe's short excerpt only)."""
+        results = response.get('results')
+        if isinstance(results, list) and results and isinstance(results[0], dict) and isinstance(results[0].get('title'), str):
+            return results[0]['title']
+        error = response.get('error')
+        if isinstance(error, dict):
+            return error.get('message') if isinstance(error.get('message'), str) else None
+        return error if isinstance(error, str) else None
+
 # The providers this gate can serve. Google is a reserved name: a GO naming it is refused until
 # its reviewed profile is added here.
-PROFILES = {profile.name: profile for profile in (DeepInfraProfile(), AnthropicProfile())}
+PROFILES = {profile.name: profile for profile in (DeepInfraProfile(), AnthropicProfile(), PerplexityProfile())}
 
 
 class HttpsTransport:

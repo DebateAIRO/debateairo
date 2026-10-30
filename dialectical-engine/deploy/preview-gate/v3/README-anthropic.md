@@ -26,6 +26,9 @@ they hide the Anthropic key folder (install step 3a, which comes BEFORE the Anth
   ruling of 2026-10-10 (evening, calls late) until then, DeepInfra $10.00 and Anthropic $2.00. The first install's GO
   (install step 5) says `"2.00"`; the LG-B section below writes `"4.00"`. One GO may ask at most $12.00, and each
   gate's `activate` refuses if the GO files add up to more than $16.00.
+- **Web search (plan 2026-10-30):** a third gate, Perplexity (README-perplexity.md), with a $1.00 pot; the team total
+  rises to $17.00 (owner answer Q12, 2026-10-30). This gate's two units are re-installed from that release first, so
+  they hide the Perplexity key folder and GO (README-perplexity.md, step 3a).
 - **Ready for Google later, already now:** every gate's unit hides a Google key folder and GO,
   the key command knows `install google` (key shape `AIza...`), and the DeepInfra gate refuses a
   key that starts with `AIza`. None of this needs a Google account today.
@@ -406,12 +409,12 @@ Probe when nobody is using the preview. The command runs the probe inside its ow
 one the DeepInfra probe uses (the DeepInfra README, "The probe is a real paid call"): its own unit
 name (`debateai-preview-probe-anthropic`), the service's network allow-list (only the resolver and
 Anthropic's range), no root powers, and every other gate's folder and GO hidden (DeepInfra's,
-Google's and the retired v1 and v2 gates'). Copy it whole: the probe checks its fence and refuses
+Google's, Perplexity's since the web search release, and the retired v1 and v2 gates'). Copy it whole: the probe checks its fence and refuses
 without it (`PROBE_FENCE_REQUIRED`, with `missing` naming what is absent; nothing is read or spent).
 
 ```sh
 P=/var/lib/debateai-v3-preview/provider-anthropic-authority-v1; GO=/etc/debateai-v3-preview/provider-anthropic-go-v1.json; A=/opt/debateai-v3-preview/operator/anthropic-budget-v1/preview_budget_authority.py
-systemd-run --quiet --wait --pipe --collect --unit=debateai-preview-probe-anthropic -p IPAddressDeny=any -p 'IPAddressAllow=127.0.0.53/32 160.79.104.0/23' -p 'RestrictAddressFamilies=AF_UNIX AF_INET' -p ProtectSystem=strict -p ReadWritePaths=$P -p ProtectHome=yes -p PrivateTmp=yes -p PrivateDevices=yes -p NoNewPrivileges=yes -p CapabilityBoundingSet= -p LimitCORE=0 -p UMask=0077 -p 'InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3 -/etc/debateai-v3-preview/provider-deepinfra-go-v3.json -/var/lib/debateai-v3-preview/provider-google-authority-v1 -/etc/debateai-v3-preview/provider-google-go-v1.json -/var/lib/debateai-v3-preview/provider-team-authority-v2 -/etc/debateai-v3-preview/provider-team-go-v2.json -/var/lib/debateai-v3-preview/provider-test-authority -/etc/debateai-v3-preview/api.env -/etc/debateai-v3-preview/api -/etc/debateai-v3-preview/runner -/root' /usr/bin/python3 -I $A probe --private $P --go $GO --model claude-haiku-5-5
+systemd-run --quiet --wait --pipe --collect --unit=debateai-preview-probe-anthropic -p IPAddressDeny=any -p 'IPAddressAllow=127.0.0.53/32 160.79.104.0/23' -p 'RestrictAddressFamilies=AF_UNIX AF_INET' -p ProtectSystem=strict -p ReadWritePaths=$P -p ProtectHome=yes -p PrivateTmp=yes -p PrivateDevices=yes -p NoNewPrivileges=yes -p CapabilityBoundingSet= -p LimitCORE=0 -p UMask=0077 -p 'InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3 -/etc/debateai-v3-preview/provider-deepinfra-go-v3.json -/var/lib/debateai-v3-preview/provider-perplexity-authority-v1 -/etc/debateai-v3-preview/provider-perplexity-go-v1.json -/var/lib/debateai-v3-preview/provider-google-authority-v1 -/etc/debateai-v3-preview/provider-google-go-v1.json -/var/lib/debateai-v3-preview/provider-team-authority-v2 -/etc/debateai-v3-preview/provider-team-go-v2.json -/var/lib/debateai-v3-preview/provider-test-authority -/etc/debateai-v3-preview/api.env -/etc/debateai-v3-preview/api -/etc/debateai-v3-preview/runner -/root' /usr/bin/python3 -I $A probe --private $P --go $GO --model claude-haiku-5-5
 ```
 
 It sends "Reply exactly: OK" with an answer limit of 1,024 tokens and the thinking setting

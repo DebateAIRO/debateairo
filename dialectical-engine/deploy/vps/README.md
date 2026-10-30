@@ -2264,6 +2264,29 @@ Restart `debateai-api@$label` and, with `unfinished` at 0, `debateai-runner@$lab
 answer the health probe is reported ABSENT and simply does not join a panel; it does not stop the
 service.
 
+### Web search (Perplexity) on a hosted server
+
+The owner asked for the Perplexity setup to be ready on every hosted server, not only on the test site (owner answer
+Q21, 2026-10-30; plan `2026-10-30-perplexity-and-dig-map`, task W1-1). Web search is one vendor beside the AI vendors,
+but it is not a model and never a debate target: it never joins a panel and has no thinking level.
+
+- **What it is.** Perplexity's Search API: `POST https://api.perplexity.ai/search`, fast search only
+  (`search_type` `"fast"`), at **$0.001 per search**, the page text included. Perplexity reports no usage and no cost,
+  so the app counts that fixed price for every search it makes. The request and answer rules, the bounds and the price
+  are the reviewed ones in `tests/unit/fixtures/preview-search-rows.json`, the same file the test site's spending gate
+  (`deploy/preview-gate/v3/README-perplexity.md`) and the app's search adapter both follow.
+- **This host has no spending gate**, so there is no Perplexity pot here: the app's own cost limits (the cost
+  envelopes below and each person's windows) bound what searches spend, as they bound the AI calls. Set the vendor's own
+  monthly spend limit in the Perplexity console as an outside fuse.
+- **Vetting.** Perplexity is already named in the published privacy notice and terms (step 1 still applies: record the
+  date you read its API data-use and retention terms).
+- **The key.** Step 2 above, with the short name `perplexity`: both credential files (the runner's and the API's) hold
+  the `authorization` header value, that is the scheme word `Bearer`, a space and the key (it starts with `pplx-`).
+  Rotating it means replacing both files, as for every vendor.
+- **Switching it on and off.** Web search is turned on or off by the app's settings switch (owner answer Q16), never by
+  editing a file here. The member that names the search target in `runner.env` and `api.env` arrives with the app's
+  search adapter (plan task W2-1); until a release carries it, this host makes no search.
+
 ### The cost envelopes (V-28) — and the temporary values for the first paid run
 
 Every limit here is in money, enforced in code, in the hosted deployment only. Local mode spends no money and has none of them.

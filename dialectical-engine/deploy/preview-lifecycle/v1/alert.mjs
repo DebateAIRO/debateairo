@@ -15,16 +15,17 @@
 // "gate-halted-<reason>" (the gate stopped taking paid calls) and "gate-addresses-mismatch"
 // (DeepInfra's addresses no longer match the gate's allow-list), and the Google gate's twins
 // "google-halted-<reason>" and "google-addresses-mismatch", and the Anthropic gate's
-// "anthropic-halted-<reason>" and "anthropic-addresses-mismatch". Each carries the one command
+// "anthropic-halted-<reason>" and "anthropic-addresses-mismatch", and (plan 2026-10-30, task W1-1) the Perplexity
+// web search gate's "perplexity-halted-<reason>" and "perplexity-addresses-mismatch". Each carries the one command
 // that fixes it. Fixed wording, no amounts; at most one per notice name per 30 minutes.
 // Daily unbilled alert (2026-10-12 ruling: alert, never halt): "gate-unbilled-<count>_<YYYY>_<MM>_<DD>"
-// (DeepInfra) and "anthropic-unbilled-<count>_<YYYY>_<MM>_<DD>", queued by the halt watcher at most
+// (DeepInfra), "anthropic-unbilled-<count>_<YYYY>_<MM>_<DD>" and "perplexity-unbilled-<count>_<YYYY>_<MM>_<DD>", queued by the halt watcher at most
 // once per gate per Bucharest day when status's today_unbilled_releases reaches its
 // --unbilled-alert-at threshold. The email names the gate, the count and the day, says nothing was
 // halted, asks the owner to check that vendor's billing page, and gives the gate's read-only
 // `status` command. Google (parked) has none.
 // Booked-at-maximum alert (owner ruling 2026-10-12, "Book max cost, keep going"):
-// "gate-booked-<count>_<YYYY>_<MM>_<DD>" (DeepInfra) and "anthropic-booked-<count>_<YYYY>_<MM>_<DD>", queued
+// "gate-booked-<count>_<YYYY>_<MM>_<DD>" (DeepInfra), "anthropic-booked-<count>_<YYYY>_<MM>_<DD>" and "perplexity-booked-...", queued
 // by the halt watcher whenever status's today_booked_max rises: a call was sent, then the vendor connection
 // failed or timed out, or the vendor answered a server error or an answer without a bill count (owner ruling
 // 2026-10-15; owner answer M3), and the gate booked the call's full reservation as its charge and kept working. The
@@ -122,7 +123,8 @@ const NOTICES = Object.freeze({
 });
 /** `<kind>-<code>` -> { kind, code, unit } for the notice kinds; anything else null (an unbilled or booked kind needs a valid count and day). */
 export function parseNotice(text) {
-  const match = typeof text === 'string' ? (NOTICE.exec(text) ?? ANTHROPIC_NOTICE.exec(text) ?? RELEASE_NOTICE.exec(text)) : null;
+  const match = typeof text === 'string'
+    ? (NOTICE.exec(text) ?? ANTHROPIC_NOTICE.exec(text) ?? PERPLEXITY_NOTICE.exec(text) ?? RELEASE_NOTICE.exec(text)) : null;
   if (match && (match[1].endsWith('-unbilled') || match[1].endsWith('-booked')) && unbilledCode(match[2]) === null) return null;
   // A release notice's code must read back as a release label, so the runner unit it names is a real instance name.
   if (match && match[1].startsWith('release-') && !RELEASE_LABEL.test(releaseOf(match[2]))) return null;
@@ -150,6 +152,31 @@ const ANTHROPIC_NOTICES = Object.freeze({
     lead: 'The hourly address check of the Anthropic spending gate failed. Usually api.anthropic.com now answers with an address outside the published range the gate may reach (160.79.104.0/23), so Claude calls fail as not sent until this is fixed; the journal lines below say which case it is (ANTHROPIC_ADDRESSES_OUTSIDE_RANGE, or DNS trouble). This email blanks addresses. The range is written in the reviewed code, so there is no update command: run the check below to see the current answer, compare it with Anthropic\'s published list (platform.claude.com/docs/en/api/ip-addresses), and if the range really changed, the new range is a reviewed code change (README-anthropic.md, "Addresses").',
     command: `/usr/bin/python3 -I ${ANTHROPIC_FOLDER}/anthropic_addresses.py check`,
     lookAt: ANTHROPIC_ADDRESS_UNIT, journal: ANTHROPIC_ADDRESS_UNIT
+  })
+});
+
+// The Perplexity web search gate (deploy/preview-gate/v3/README-perplexity.md; plan 2026-10-30, task W1-1): its own
+// notices, kept apart like the Anthropic ones. Its addresses are pinned in a drop-in like DeepInfra's, so its address
+// notice carries the update command.
+const PERPLEXITY_NOTICE = /^(perplexity-halted|perplexity-addresses|perplexity-unbilled|perplexity-booked)-([a-z0-9_]{1,64})$/;
+const PERPLEXITY_FOLDER = '/opt/debateai-v3-preview/operator/perplexity-budget-v1';
+const PERPLEXITY_PRIVATE = '/var/lib/debateai-v3-preview/provider-perplexity-authority-v1';
+const PERPLEXITY_UNIT = 'debateai-preview-perplexity-budget.service';
+const PERPLEXITY_ADDRESS_UNIT = 'debateai-preview-perplexity-addresses.service';
+const PERPLEXITY_NOTICES = Object.freeze({
+  'perplexity-halted': code => ({
+    subject: `Preview: Perplexity web search gate stopped: ${code}`,
+    lead: `The preview's Perplexity spending gate stopped taking paid web searches. Reason code: ${code}. Debates go on without web search (and say so on the page) until it is re-opened; the AI models are not affected. Check the reason first (deploy/preview-gate/v3/README-perplexity.md, "Re-open after a halt"; status shows today's spend and every halt). Then re-open it with the one command below.`,
+    command: `/usr/bin/python3 -I ${PERPLEXITY_FOLDER}/preview_budget_authority.py activate --private ${PERPLEXITY_PRIVATE} --go /etc/debateai-v3-preview/provider-perplexity-go-v1.json`,
+    lookAt: PERPLEXITY_UNIT, journal: null
+  }),
+  'perplexity-unbilled': unbilledNotice('Perplexity', PERPLEXITY_FOLDER, PERPLEXITY_PRIVATE, PERPLEXITY_UNIT),
+  'perplexity-booked': bookedNotice('Perplexity', PERPLEXITY_FOLDER, PERPLEXITY_PRIVATE, PERPLEXITY_UNIT),
+  'perplexity-addresses': code => ({
+    subject: `Preview: Perplexity gate address list needs an update (${code})`,
+    lead: 'The hourly address check of the Perplexity spending gate failed. Usually the addresses of api.perplexity.ai no longer match the gate\'s allow-list, and web searches fail as not sent until it is updated (debates go on without web search); the journal lines below say which case it is (PERPLEXITY_ADDRESSES_CHANGED, or another error such as an unreadable list). This email blanks addresses; to see the new ones, run the journalctl line under "What to look at" and check that they are Perplexity\'s. Then run the one command below. It adds today\'s DNS answer to the list and restarts the gate.',
+    command: `/usr/bin/python3 -I ${PERPLEXITY_FOLDER}/perplexity_addresses.py update --dropin /etc/systemd/system/debateai-preview-perplexity-budget.service.d/50-perplexity-addresses.conf && systemctl restart debateai-preview-perplexity-budget`,
+    lookAt: PERPLEXITY_ADDRESS_UNIT, journal: PERPLEXITY_ADDRESS_UNIT
   })
 });
 
@@ -445,7 +472,7 @@ export async function runAlert({ unit, layout = LAYOUT, deps = {}, test = false,
   try {
     if (typeof unit !== 'string' || !UNIT.test(unit)) refuse('UNIT_REFUSED');
     if (notice !== null && (parseNotice(`${notice.kind}-${notice.code}`)?.unit !== unit)) refuse('NOTICE_REFUSED');
-    const failure = notice !== null ? { kind: 'notice', send: true, restarts: null, notice: (NOTICES[notice.kind] ?? ANTHROPIC_NOTICES[notice.kind] ?? RELEASE_NOTICES[notice.kind])(notice.code) }
+    const failure = notice !== null ? { kind: 'notice', send: true, restarts: null, notice: (NOTICES[notice.kind] ?? ANTHROPIC_NOTICES[notice.kind] ?? PERPLEXITY_NOTICES[notice.kind] ?? RELEASE_NOTICES[notice.kind])(notice.code) }
       : test ? { kind: 'test', send: true, restarts: null }
       : classifyFailure(await Promise.resolve().then(() => (deps.readUnitState ?? (name => readUnitState(name, { layout })))(unit)).catch(() => null));
     if (!failure.send) return done({ event: 'PREVIEW_LIFECYCLE_ALERT_SKIPPED', unit, state: failure.kind, restarts: failure.restarts });

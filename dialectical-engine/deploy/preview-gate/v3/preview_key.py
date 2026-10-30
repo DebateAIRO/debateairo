@@ -5,7 +5,7 @@ Run by the owner, as root, at a real terminal:
 
   /usr/bin/python3 -I preview_key.py install <provider> [--replace]
 
-<provider> is one of deepinfra, anthropic, google; each has one fixed private folder (FOLDERS).
+<provider> is one of deepinfra, anthropic, google, perplexity; each has one fixed private folder (FOLDERS).
 The key is typed or pasted at a hidden prompt: it is read from /dev/tty with echo off, never
 from the command line, the environment or a pipe. It is never printed, nor its hash; what is
 printed at the end is only the new file's mode, owner, link count and size, and how many stale
@@ -44,16 +44,20 @@ FOLDERS = {
     'deepinfra': '/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3',
     'anthropic': '/var/lib/debateai-v3-preview/provider-anthropic-authority-v1',
     'google': '/var/lib/debateai-v3-preview/provider-google-authority-v1',
+    # Plan 2026-10-30, task W1-1: the web search gate (README-perplexity.md).
+    'perplexity': '/var/lib/debateai-v3-preview/provider-perplexity-authority-v1',
 }
 # The key shapes, the same as the gate profiles' key_pattern. DeepInfra's keys have no fixed shape:
 # the gate's own read_key rule (16 to 512 printable ASCII characters, no spaces), but never another
-# provider's key (Anthropic sk-ant-, Google AIza) pasted at the wrong prompt.
+# provider's key (Anthropic sk-ant-, Google AIza, Perplexity pplx-) pasted at the wrong prompt.
 SHAPES = {
-    'deepinfra': re.compile(r'(?!sk-ant-|AIza)[!-~]{16,512}'),
+    'deepinfra': re.compile(r'(?!sk-ant-|AIza|pplx-)[!-~]{16,512}'),
     # Only Anthropic's ordinary API form (sk-ant-api + two digits + '-'); an Admin form or any other
     # Anthropic credential is refused, as the gate's AnthropicProfile.key_pattern does.
     'anthropic': re.compile(r'(?=.{16,512}\Z)sk-ant-api[0-9]{2}-[A-Za-z0-9_-]+', re.ASCII),
     'google': re.compile(r'AIza[0-9A-Za-z_-]{35}', re.ASCII),
+    # Perplexity's API keys start with pplx- (the gate's PerplexityProfile.key_pattern, with read_key's length bounds).
+    'perplexity': re.compile(r'(?=.{16,512}\Z)pplx-[A-Za-z0-9_-]+', re.ASCII),
 }
 MAX_LINE_BYTES = 1024
 PROMPT = 'Paste the %s key and press Enter (nothing will show while you paste): '

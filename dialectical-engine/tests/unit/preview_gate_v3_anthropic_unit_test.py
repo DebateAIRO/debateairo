@@ -175,6 +175,9 @@ class GateUnitTests(unittest.TestCase):
         gates = {
             'deepinfra': (DEEPINFRA_PRIVATE, '/etc/debateai-v3-preview/provider-deepinfra-go-v3.json'),
             'anthropic': (PRIVATE, GO),
+            # Plan task W1-1 (2026-10-30): the Perplexity gate.
+            'perplexity': ('/var/lib/debateai-v3-preview/provider-perplexity-authority-v1',
+                           '/etc/debateai-v3-preview/provider-perplexity-go-v1.json'),
             'google': (GOOGLE_PRIVATE, '/etc/debateai-v3-preview/provider-google-go-v1.json'),
             'team-v2': ('/var/lib/debateai-v3-preview/provider-team-authority-v2', '/etc/debateai-v3-preview/provider-team-go-v2.json'),
         }

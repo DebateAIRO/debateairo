@@ -67,6 +67,8 @@ InaccessiblePaths=-/etc/debateai-v3-preview/auth-dev-v1 -/var/lib/debateai-v3-pr
 InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-team-authority-v2 -/etc/debateai-v3-preview/provider-team-go-v2.json
 InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3 -/etc/debateai-v3-preview/provider-deepinfra-go-v3.json
 InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-google-authority-v1 -/etc/debateai-v3-preview/provider-google-go-v1.json
+# The Perplexity (web search) gate's state and GO (plan 2026-10-30, task W1-1): hidden here too.
+InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-perplexity-authority-v1 -/etc/debateai-v3-preview/provider-perplexity-go-v1.json
 # IPv4 only: no AF_INET6 socket can even be opened, so a connect to an IPv6 answer fails at once
 # and the transport moves on to the IPv4 one.
 RestrictAddressFamilies=AF_UNIX AF_INET

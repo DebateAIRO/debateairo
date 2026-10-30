@@ -627,6 +627,39 @@ describe('spending-gate notices', () => {
     expect(update).toContain('  /usr/bin/python3 -I /opt/debateai-v3-preview/operator/anthropic-budget-v1/anthropic_addresses.py check');
   });
 
+  it('the Perplexity web search gate has its own four notices, each naming its own unit and command (plan task W1-1)', async () => {
+    const halted = 'debateai-preview-notice@perplexity-halted-uncertain_charge.service';
+    expect(alert.parseAlertArgs(['--notice', 'perplexity-halted-uncertain_charge'])).toEqual({ unit: halted, test: false, notice: { kind: 'perplexity-halted', code: 'uncertain_charge', unit: halted } });
+    expect(alert.parseAlertArgs(['--notice', 'perplexity-addresses-mismatch'])).toMatchObject({ notice: { kind: 'perplexity-addresses', code: 'mismatch' } });
+    expect(alert.parseAlertArgs(['--notice', 'perplexity-unbilled-3_2026_10_30'])).toMatchObject({ notice: { kind: 'perplexity-unbilled', code: '3_2026_10_30' } });
+    expect(alert.parseAlertArgs(['--notice', 'perplexity-booked-1_2026_10_30'])).toMatchObject({ notice: { kind: 'perplexity-booked', code: '1_2026_10_30' } });
+    for (const name of ['perplexity-halted-Bad', 'perplexity-unbilled-x_2026_10_30', 'perplexity-booked-1_2026_02_31', 'perplexity-other-x']) {
+      expect(alert.parseAlertArgs(['--notice', name]), name).toBeNull();
+    }
+    const layout = server();
+    const h = harness(layout, { ...notMe, readJournal: async () => { throw new Error('a halt notice reads no journal'); } });
+    await alert.runAlert({ ...alert.parseAlertArgs(['--notice', 'perplexity-halted-uncertain_charge']), layout, deps: h.deps });
+    const mail = h.sent[0]!;
+    expect(mail).toContain('Subject: Preview: Perplexity web search gate stopped: uncertain_charge');
+    expect(mail).toContain('  /usr/bin/python3 -I /opt/debateai-v3-preview/operator/perplexity-budget-v1/preview_budget_authority.py activate --private /var/lib/debateai-v3-preview/provider-perplexity-authority-v1 --go /etc/debateai-v3-preview/provider-perplexity-go-v1.json');
+    expect(mail).toContain('systemctl status debateai-preview-perplexity-budget.service');
+    expect(mail).not.toMatch(/\$|usd|deepinfra|anthropic/i);
+    const asked: string[] = [];
+    const second = server();
+    const g = harness(second, { ...notMe, readJournal: async (name: string) => { asked.push(name); return ['{"status": "refused", "error": "PERPLEXITY_ADDRESSES_CHANGED", "new": ["203.0.113.9"]}']; } });
+    await alert.runAlert({ ...alert.parseAlertArgs(['--notice', 'perplexity-addresses-mismatch']), layout: second, deps: g.deps });
+    expect(asked).toEqual(['debateai-preview-perplexity-addresses.service']);
+    const update = g.sent[0]!;
+    expect(update).toContain('Subject: Preview: Perplexity gate address list needs an update (mismatch)');
+    expect(update).not.toContain('203.0.113.9');
+    expect(update).toContain('  /usr/bin/python3 -I /opt/debateai-v3-preview/operator/perplexity-budget-v1/perplexity_addresses.py update --dropin /etc/systemd/system/debateai-preview-perplexity-budget.service.d/50-perplexity-addresses.conf && systemctl restart debateai-preview-perplexity-budget');
+    const third = server();
+    const b = harness(third, { ...notMe, readJournal: async () => { throw new Error('a booked notice reads no journal'); } });
+    await alert.runAlert({ ...alert.parseAlertArgs(['--notice', 'perplexity-booked-1_2026_10_30']), layout: third, deps: b.deps });
+    expect(b.sent[0]!).toContain('Subject: Preview: Perplexity gate: 1 call booked at its maximum today (2026-10-30)');
+    expect(b.sent[0]!).toContain('  /usr/bin/python3 -I /opt/debateai-v3-preview/operator/perplexity-budget-v1/preview_budget_authority.py status --private /var/lib/debateai-v3-preview/provider-perplexity-authority-v1');
+  });
+
   // 2026-10-12 ruling: a high daily count of unbilled refusals ALERTS (once a day per gate), never halts.
   describe('daily unbilled-refusal alert', () => {
     const deepinfra = 'debateai-preview-notice@gate-unbilled-100_2026_10_12.service';

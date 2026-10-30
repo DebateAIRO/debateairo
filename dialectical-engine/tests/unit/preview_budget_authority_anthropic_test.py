@@ -353,20 +353,22 @@ class FinalWriterTierTests(AnthropicTest):
 
 class GoAndActivateTests(AnthropicTest):
     def test_the_owners_pots_add_up_to_the_team_total_and_one_cent_more_refuses(self):
-        # Owner answer M1 (2026-10-15): Anthropic $4.00 (this GO) + DeepInfra $12.00 = the $16.00 team total. Each GO
+        # Owner answer M1 (2026-10-15): Anthropic $4.00 (this GO) + DeepInfra $12.00 = $16.00; owner answer Q12
+        # (2026-10-30): + Perplexity $1.00 = the $17.00 team total. Each GO
         # alone may ask up to the $12.00 per-GO ceiling, so a $4.01 Anthropic GO is itself valid: what refuses it is
         # the team-total check at activate.
         def deepinfra_go(gate, budget):
-            path = gate.root / 'team-go-deepinfra.json'
-            path.write_text(json.dumps({'schema': 'preview-provider-budget-go-v3', 'provider': 'deepinfra',
-                                        'daily_budget_usd': budget}))
-            os.chmod(path, 0o600)
-        self.assertEqual((bridge.TEAM_TOTAL_BUDGET_USD, bridge.MAX_GO_BUDGET_USD), (Decimal('16.00'), Decimal('12.00')))
+            for provider, amount in (('deepinfra', budget), ('perplexity', '1.00')):
+                path = gate.root / ('team-go-' + provider + '.json')
+                path.write_text(json.dumps({'schema': 'preview-provider-budget-go-v3', 'provider': provider,
+                                            'daily_budget_usd': amount}))
+                os.chmod(path, 0o600)
+        self.assertEqual((bridge.TEAM_TOTAL_BUDGET_USD, bridge.MAX_GO_BUDGET_USD), (Decimal('17.00'), Decimal('12.00')))
         gate = self.gate(daily_budget_usd='4.00')
         self.assertEqual(bridge.read_go(gate.go_path)['daily_budget_usd'], '4.00')
         gate.init()
         deepinfra_go(gate, '12.00')
-        self.assertEqual(gate.activate()['state'], 'active')  # 4.00 + 12.00 = 16.00 exactly.
+        self.assertEqual(gate.activate()['state'], 'active')  # 4.00 + 12.00 + 1.00 = 17.00 exactly.
         for mine, theirs in (('4.01', '12.00'), ('4.02', '11.99')):
             with self.subTest(anthropic=mine, deepinfra=theirs):
                 gate = self.gate(daily_budget_usd=mine)
@@ -1329,6 +1331,7 @@ class RequestShapeTests(AnthropicTest):
         self.assertTrue(re.fullmatch(ANTHROPIC.key_pattern, KEY))
         self.assertFalse(re.fullmatch(deepinfra.key_pattern, KEY))  # An Anthropic key in the DeepInfra gate is refused.
         self.assertFalse(re.fullmatch(deepinfra.key_pattern, 'AIza' + 'x' * 35))
+        self.assertFalse(re.fullmatch(deepinfra.key_pattern, 'pp' + 'lx-' + 'x' * 40))  # Nor a Perplexity key (W1-1).
         self.assertTrue(re.fullmatch(deepinfra.key_pattern, 'synthetic-key-0123456789'))
 
 
