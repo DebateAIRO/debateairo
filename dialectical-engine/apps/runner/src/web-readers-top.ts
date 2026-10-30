@@ -5,8 +5,10 @@
  *
  * Plain words: after reader 1 has read every page of a path and the pick has chosen its top pages, two more AIs read
  * those top pages whole, each from another company. Makers count as companies, even when one vendor hosts them (owner,
- * Q11): DeepSeek and GLM, with Qwen as the other choice, never reader 1's company. They read the top 3 on Quick look and
- * the top 5 on Thorough (code passes the count; the sealed wording web.read-top.v2 names none). Then code, never an AI:
+ * Q11): DeepSeek and GLM, with Qwen as the other choice, never reader 1's company. They read the top pages there are,
+ * up to 3 on Quick look and up to 5 on Thorough, at least 1 (owner, 30 Oct, "read what there is"; code passes the
+ * pages, the sealed wording web.read-top.v2 names no number); with no top page they are not asked. Then code, never
+ * an AI:
  * - keeps an extract only when the verbatim checker finds it on the stored page text (W2-4's checker, handed in);
  * - merges the same extract found by several readers (reader 1's checked extracts included) into one, with who found it;
  * - records each page's grades by reader and their spread;
@@ -22,8 +24,8 @@
  */
 import { webPageTextRef } from "@debateai/db";
 import {
-  WEB_READ_TOP_V2_PROMPT_CONTRACT, WEB_REPLY_IDS_INCOMPLETE, WEB_TOP_COUNTS, WEB_TOP_COUNT_BY_MODE, webReadTopCallSiteKey,
-  webReadTopReplySchema, webReadTopV2MaterialFields, type WebMode, type WebReadTopReply, type WebTopCount
+  WEB_READ_TOP_V2_PROMPT_CONTRACT, WEB_REPLY_IDS_INCOMPLETE, WEB_TOP_COUNT_BY_MODE, webReadTopCallSiteKey,
+  webReadTopReplySchema, webReadTopV2MaterialFields, type WebMode, type WebReadTopReply
 } from "@debateai/judgement";
 import { TypedDomainError } from "@debateai/kernel";
 import {
@@ -86,7 +88,7 @@ export type WebTopReaderCallOutcome =
 export type WebTopReaderCall = (input: WebTopReaderCallInput) => Promise<WebTopReaderCallOutcome>;
 
 /** Why a reader is missing: no other company on the line-up, too few top pages, the call failed, or a same-company answer. */
-export type WebTopReaderFailure = "NO_SEAT" | "TOO_FEW_PAGES" | "UNAVAILABLE" | "SAME_MAKER" | "UNREADABLE";
+export type WebTopReaderFailure = "NO_SEAT" | "NO_TOP_PAGES" | "UNAVAILABLE" | "SAME_MAKER" | "UNREADABLE";
 export type WebTopReaderOutcome = Readonly<{
   reader: WebTopReader;
   /** The maker that answered when kept, else the planned seat's; null when no seat was planned. */
@@ -114,8 +116,8 @@ export type WebTopLead = Readonly<{ text: string; from: readonly WebTopReader[] 
 
 export type WebTopReadersResult = Readonly<{
   pathIndex: number;
-  /** How many pages readers 2 and 3 were sent: 3 or 5, or 0 when the path has too few. */
-  topCount: WebTopCount | 0;
+  /** How many pages readers 2 and 3 were sent: 1 up to the mode's count (3 or 5), or 0 when the path has no top page. */
+  topCount: number;
   readers: readonly WebTopReaderOutcome[];
   readings: readonly WebTopReading[];
   pages: readonly WebTopPageSpread[];
@@ -214,12 +216,9 @@ type ReaderRead = Readonly<{
   leads: readonly string[];
 }>;
 
-/** How many pages readers 2 and 3 are sent: the mode's count, else the largest sealed count the path has, else none. */
-function sentCount(mode: WebMode, available: number): WebTopCount | 0 {
-  const wanted = WEB_TOP_COUNT_BY_MODE[mode];
-  if (available >= wanted) return wanted;
-  const fits = WEB_TOP_COUNTS.filter((count) => count <= available);
-  return fits.length === 0 ? 0 : fits[fits.length - 1]!;
+/** How many pages readers 2 and 3 are sent: what there is, up to the mode's count; 0 when the path has no top page. */
+function sentCount(mode: WebMode, available: number): number {
+  return Math.min(WEB_TOP_COUNT_BY_MODE[mode], available);
 }
 
 /**
@@ -254,7 +253,7 @@ export async function runWebTopReaders(input: Readonly<{
   if (topCount !== 0 && seats.length > 0) {
     const pageTexts = new Map(sent.map((page) => [webPageTextRef(page.pageId, page.textDigest), page.text]));
     const material = webReadTopV2MaterialFields({
-      question: input.question, answer: input.answer, topCount,
+      question: input.question, answer: input.answer, topCount: WEB_TOP_COUNT_BY_MODE[input.mode],
       pages: sent.map((page, index) => ({ pageId: promptIds[index]!, title: page.title, site: page.site, date: page.date,
         text: webPageTextRef(page.pageId, page.textDigest) }))
     });
@@ -297,7 +296,7 @@ export async function runWebTopReaders(input: Readonly<{
     if (outcomes.has(reader)) continue;
     const planned = seats.find((entry) => entry.reader === reader)?.seat ?? null;
     outcomes.set(reader, Object.freeze({ reader, maker: planned?.maker ?? null, providerRef: planned?.providerRef ?? null,
-      outcome: "NOT_ASKED", failure: topCount === 0 ? "TOO_FEW_PAGES" : "NO_SEAT" }));
+      outcome: "NOT_ASKED", failure: topCount === 0 ? "NO_TOP_PAGES" : "NO_SEAT" }));
   }
 
   const readerOneOf = new Map(input.readerOne.map((entry) => [entry.pageId, entry]));
