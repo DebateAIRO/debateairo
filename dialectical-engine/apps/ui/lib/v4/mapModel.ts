@@ -1,4 +1,5 @@
-import type { Answer, AnswerStory } from "@debateai/contract";
+import { canDigFromLevel, DigLevelSchema, type Answer, type AnswerStory, type DigSuggestion } from "@debateai/contract";
+import { pathSuggestionsOf } from "./suggestions.js";
 import { countTrust, pointsOf } from "./trust.js";
 import type { V4Map, V4OpenQuestion, V4Path, V4PathWeb, V4Point } from "./types.js";
 import { pathWebOf, webNoteOf } from "./web.js";
@@ -91,14 +92,28 @@ function stillArgued(points: readonly V4Point[], pathId: string | null): V4OpenQ
     .map((point) => ({ id: `p:${point.id}`, kind: "STILL_ARGUED" as const, text: point.text, star: false, pathId }));
 }
 
-function pathOf(id: string, fate: V4Path["fate"], line: string, points: readonly V4Point[], web?: V4PathWeb): V4Path {
+function pathOf(id: string, fate: V4Path["fate"], line: string, points: readonly V4Point[], web?: V4PathWeb,
+  suggestions: readonly DigSuggestion[] = []): V4Path {
   const { counts, unchecked } = countTrust(points);
-  return { id, fate, line, points, counts, unchecked, open: stillArgued(points, id), ...(web === undefined ? {} : { web }) };
+  return {
+    id, fate, line, points, counts, unchecked, open: stillArgued(points, id),
+    ...(web === undefined ? {} : { web }),
+    ...(suggestions.length === 0 ? {} : { suggestions })
+  };
+}
+
+/** W3-4: this debate's dig level from its answer (`Answer.dig.level`); null when the answer does not say. */
+function digLevelOf(answer: Answer): number | null {
+  const level = answer.dig?.level;
+  return level !== undefined && DigLevelSchema.safeParse(level).success ? level : null;
 }
 
 /** W2-6: each story path gets its web part by the position that argued it (a repeated position: every copy the same). */
 function storyPaths(answer: Answer, body: StoryBody | null, byId: ReadonlyMap<string, V4Point>): V4Path[] {
   if (body === null) return [];
+  // W3-4: the deepest level's paths cannot be dug, so they offer no suggestions.
+  const level = digLevelOf(answer);
+  const diggable = level === null || canDigFromLevel(level);
   const seen = new Map<string, number>();
   return body.short.paths.map((storyPath) => {
     const times = (seen.get(storyPath.position_ref) ?? 0) + 1;
@@ -112,7 +127,8 @@ function storyPaths(answer: Answer, body: StoryBody | null, byId: ReadonlyMap<st
       taken.add(ref);
       points.push(point);
     }
-    return pathOf(id, storyPath.fate, storyPath.line, points, pathWebOf(answer, storyPath.position_ref));
+    return pathOf(id, storyPath.fate, storyPath.line, points, pathWebOf(answer, storyPath.position_ref),
+      diggable ? pathSuggestionsOf(answer, storyPath.position_ref) : []);
   });
 }
 
@@ -248,7 +264,8 @@ export function buildV4Map(input: Readonly<{
     storyState: storyStateOf(story, body, input.storyGaveUp === true),
     fallbackText: body === null ? composedText(answer) : null,
     reservation: body !== null && story?.status === "READY_WITH_RESERVATION",
-    webNote: webNoteOf(answer)
+    webNote: webNoteOf(answer),
+    digLevel: digLevelOf(answer)
   };
 }
 

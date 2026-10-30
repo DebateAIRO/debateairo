@@ -1,7 +1,7 @@
 import { askQuestionMaxBytes } from "@debateai/contract";
 import { catalogLocale, isLocale } from "../i18n/locales.js";
 import { t, type MessageCatalog } from "../i18n/translate.js";
-import type { DigTarget, GoalHorizon, GoalPlace, GoalPurpose, OpenQuestionKind, V4Goal } from "./types.js";
+import type { DigTarget, GoalHorizon, GoalPlace, GoalPurpose, OpenQuestionKind, V4DigPick, V4Goal } from "./types.js";
 
 /*
  * V4 initial (spec 2026-10-28, B2): what is SENT as question_line. The person's D2 choices travel as plain sentences in
@@ -154,16 +154,38 @@ export function composeQuestion(question: string, goal: V4Goal, catalog: Message
   return sentences.length === 0 ? asked : `${asked}\n\n${sentences.join("\n")}`;
 }
 
-/** The plain texts a dig starts from: the path's line, or each open question's text (the toast and the dig link). */
+/** W3-4: how a pick is asked: an open question by its kind, a suggestion as written or edited, the person's own view. */
+function pickItem(pick: V4DigPick): DigItem {
+  if (pick.kind === "OPEN") return { key: DIG_KIND_KEYS[pick.question.kind], text: oneLine(pick.question.text) };
+  return { key: pick.kind === "SUGGESTION" ? "v4.digText.suggestion" : "v4.digText.ownView", text: oneLine(pick.text) };
+}
+
+function pickText(pick: V4DigPick): string {
+  return pick.kind === "OPEN" ? pick.question.text : pick.text;
+}
+
+/**
+ * The plain texts a dig starts from: the path's line, each open question's text, or each pick's text as sent (the toast
+ * and the dig link).
+ */
 export function digTargetQuestions(target: DigTarget): readonly string[] {
-  return target.kind === "path" ? [target.path.line] : target.questions.map((question) => question.text);
+  if (target.kind === "path") return [target.path.line];
+  if (target.kind === "open") return target.questions.map((question) => question.text);
+  return target.picks.map(pickText);
 }
 
 type DigItem = Readonly<{ key: string; text: string }>;
 
+/**
+ * The items a dig's question asks. W3-4: a dig of picks on a path names the path's current line first (the dig model
+ * revision, section 2: the question keeps the parent path's line), then each pick; picks of the main question's own open
+ * questions name no path.
+ */
 function digItems(target: DigTarget): readonly DigItem[] {
   if (target.kind === "path") return [{ key: "v4.digText.path", text: oneLine(target.path.line) }];
-  return target.questions.map((question) => ({ key: DIG_KIND_KEYS[question.kind], text: oneLine(question.text) }));
+  if (target.kind === "open") return target.questions.map((question) => ({ key: DIG_KIND_KEYS[question.kind], text: oneLine(question.text) }));
+  const line = target.path === null ? "" : oneLine(target.path.line);
+  return [...(line.length === 0 ? [] : [{ key: "v4.digText.path", text: line }]), ...target.picks.map(pickItem)];
 }
 
 const ELLIPSIS = "…";
@@ -356,12 +378,14 @@ function templatePattern(template: string, capture: string): RegExp {
 }
 
 /** What kind of line a dig item was written as (English only; null off English or when no template matches). */
-export type DigItemKind = OpenQuestionKind | "PATH";
+export type DigItemKind = OpenQuestionKind | "PATH" | "SUGGESTION" | "OWN_VIEW";
 
 /** The item text inside one dig line: the kind/path template's {text}/{line}, or the line itself when none matches. */
 function itemText(line: string, catalog: MessageCatalog): Readonly<{ text: string; kind: DigItemKind | null }> {
   const templates: ReadonlyArray<readonly [string, string, DigItemKind]> = [
     [t(catalog, "v4.digText.path"), "line", "PATH"],
+    [t(catalog, "v4.digText.suggestion"), "text", "SUGGESTION"],
+    [t(catalog, "v4.digText.ownView"), "text", "OWN_VIEW"],
     ...(Object.entries(DIG_KIND_KEYS) as Array<[OpenQuestionKind, string]>)
       .map(([kind, key]) => [t(catalog, key), "text", kind] as const)
   ];

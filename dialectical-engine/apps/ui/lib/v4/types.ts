@@ -1,4 +1,4 @@
-import type { StoryFate, WebOtherPage, WebSearchStatus, WebSource } from "@debateai/contract";
+import type { DigSuggestion, StoryFate, WebOtherPage, WebSearchStatus, WebSource } from "@debateai/contract";
 
 /*
  * V4 initial (2026-10-28): the shapes every V4 page shares. V4 is built over today's V3 answer, story and run reads.
@@ -92,6 +92,11 @@ export type V4Path = Readonly<{
   open: readonly V4OpenQuestion[];
   /** W2-6: this path's web search and the other pages it found; absent when the answer says nothing about it. */
   web?: V4PathWeb;
+  /**
+   * W3-4: the path's dig suggestions (AI text, in the answer's order; lib/v4/suggestions.ts). Absent or empty: none (an
+   * answer from before R22, a level-10 dig, whose paths cannot be dug).
+   */
+  suggestions?: readonly DigSuggestion[];
 }>;
 
 /** W2-6: one path's web part as the pages show it (never a grade: the contract carries none). */
@@ -142,6 +147,11 @@ export type V4Map = Readonly<{
   reservation: boolean;
   /** W2-6: the debate's web note (above); null or absent when there is none (it searched, or an answer from before R22). */
   webNote?: V4WebNote | null;
+  /**
+   * W3-4: this debate's dig level from its answer (`Answer.dig.level`, 1 to DIG_LEVEL_MAX); null or absent when the
+   * answer does not say (a first debate, or a dig from before R22). Never the debate's own argument bound.
+   */
+  digLevel?: number | null;
 }>;
 
 /** Row D / sieve 2026-10-26: the reading level is chosen once; ids follow the D1 prototype's three choices. */
@@ -230,10 +240,25 @@ export type DigView = Readonly<{
 /** What the panel shows: the question itself, one path, one open question or one dig. */
 export type V4Selection = "root" | `path:${string}` | `open:${string}` | `dig:${string}`;
 
-/** What a dig button digs into: one path, or one or more open questions (the tray). */
+/**
+ * W3-4: one thing a dig is made of, chosen on the map: an open question, one of a path's dig suggestions (its text as the
+ * person left it: as written, or edited), or the person's own view at a path. `group` is the path it belongs to (null:
+ * the main question itself); owner Q-D1, a dig combines picks of one group only (lib/v4/suggestions.ts).
+ */
+export type V4DigPick =
+  | Readonly<{ kind: "OPEN"; key: string; group: string | null; question: V4OpenQuestion }>
+  | Readonly<{ kind: "SUGGESTION"; key: string; group: string; suggestion: DigSuggestion; text: string }>
+  | Readonly<{ kind: "OWN_VIEW"; key: string; group: string; text: string }>;
+
+/** W3-4: what the person has chosen to dig so far: picks of one group, in the order they were chosen. */
+export type V4DigDraft = Readonly<{ group: string | null; picks: readonly V4DigPick[] }>;
+
+/** What a dig button digs into: one path, one or more open questions (the tray), or the person's picks (W3-4). */
 export type DigTarget =
   | Readonly<{ kind: "path"; path: V4Path }>
-  | Readonly<{ kind: "open"; questions: readonly V4OpenQuestion[] }>;
+  | Readonly<{ kind: "open"; questions: readonly V4OpenQuestion[] }>
+  /** `path`: the path the picks belong to (null: the main question), whose line the dig's question names first. */
+  | Readonly<{ kind: "picks"; path: V4Path | null; picks: readonly V4DigPick[] }>;
 
 /** A dig waiting out its 10-second Undo (row D decision 1). Nothing is sent before `sendsAt`. */
 export type PendingDig = Readonly<{ target: DigTarget; mode: DigMode; sendsAt: number }>;

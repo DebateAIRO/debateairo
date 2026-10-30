@@ -650,6 +650,7 @@ apps/ui/components/support/supportConversation.test.mjs
 apps/ui/components/v4/V4AskClient.tsx
 apps/ui/components/v4/V4ChangesBar.tsx
 apps/ui/components/v4/V4DebateClient.tsx
+apps/ui/components/v4/V4DigSuggest.tsx
 apps/ui/components/v4/V4DigToast.tsx
 apps/ui/components/v4/V4Header.tsx
 apps/ui/components/v4/V4MapTree.tsx
@@ -879,7 +880,9 @@ apps/ui/lib/v4/changes.ts
 apps/ui/lib/v4/digIndex.ts
 apps/ui/lib/v4/load.ts
 apps/ui/lib/v4/mapModel.ts
+apps/ui/lib/v4/money.ts
 apps/ui/lib/v4/storage.ts
+apps/ui/lib/v4/suggestions.ts
 apps/ui/lib/v4/trust.ts
 apps/ui/lib/v4/types.ts
 apps/ui/lib/v4/useReadingLevel.ts
