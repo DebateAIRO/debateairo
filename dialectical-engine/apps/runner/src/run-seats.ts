@@ -996,7 +996,8 @@ export const BACKUP_MODEL_USED_WORDING = Object.freeze({
   /**
    * A planned model was replaced: a main answered by its runner-up (during a
    * call, at claim or on a resumed pass), or a role whose planned models were
-   * all unavailable, answered by the debaters. Final review m1: "could not be
+   * all unavailable, answered by the debaters; or (R22) a position a spare
+   * debater wrote after its seat's answer was refused. Final review m1: "could not be
    * used", never "unavailable" — a main whose key reached its bound with only
    * OK answers on resumed passes is handed over too, and it was never down.
    */
@@ -1026,6 +1027,11 @@ export function backupModelUsedRecords(
     readonly answers: readonly BackupAnswer[];
     /** Roles whose pinned seats were all absent at claim and whose calls the debaters answered (carry 8d). */
     readonly fallbackRoles: readonly string[];
+    /**
+     * R22 (owner ruling 2026-10-30, "Yes, use the spare debater"): how many positions a spare debater answered because
+     * their seat's answer was refused after every repair (the runner's `spareAnswers`). Each is a stand-in. Absent: none.
+     */
+    readonly spareAnswers?: number;
   },
   servedRootNodeId: string
 ): readonly ConditionMarkRecord[] {
@@ -1041,7 +1047,8 @@ export function backupModelUsedRecords(
       callSiteKey: null,
       terminalTransportOutcome: null
     });
-  const standIn = input.fallbackRoles.length > 0 || input.answers.some((answer) => answer.answeredSlot === "RUNNER_UP");
+  const standIn = input.fallbackRoles.length > 0 || (input.spareAnswers ?? 0) > 0
+    || input.answers.some((answer) => answer.answeredSlot === "RUNNER_UP");
   const usual = input.answers.some((answer) => answer.answeredSlot === "MAIN");
   return Object.freeze([
     ...(standIn ? [record(BACKUP_MODEL_USED_WORDING.STAND_IN)] : []),
