@@ -1,4 +1,4 @@
-// tests/architecture/v4-account-memory-0130-contract.test.ts
+// tests/architecture/v4-account-memory-0131-contract.test.ts
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
@@ -13,19 +13,20 @@ import {
 } from "../../tools/orphan-audit/src/index.js";
 
 /**
- * 0130 (owner rulings N7 and N11, 2026-10-29; test-site release R22): the V4 pages remember the reading level, the
+ * 0131 (owner rulings N7 and N11, 2026-10-29; test-site release R22): the V4 pages remember the reading level, the
  * last visit of each debate and each dig's link in the person's ACCOUNT. Three identity tables keyed by the account's
  * owner_ref (ON DELETE CASCADE, so account erasure removes them), six API functions for the API's own role, one export
- * reader for the export worker. An `expand` step that keeps 0111's effective verifier in force. No database here: the
- * behaviour is tests/integration/v4-account-memory-database.test.ts.
+ * reader for the export worker. An `expand` step that keeps 0130's effective verifier in force (written as 0130,
+ * renumbered to 0131 at the merge of origin/dev 64ef40c21, whose row-level security took 0130 first). No database
+ * here: the behaviour is tests/integration/v4-account-memory-database.test.ts.
  */
-const NAME = "0130_v4_account_memory.sql";
+const NAME = "0131_v4_account_memory.sql";
 const SQL_PATH = `migrations/${NAME}`;
-const MANIFEST_PATH = "migrations/lineage/v4-account-memory-forward0130.json";
-const VERIFIER_111 = "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a";
+const MANIFEST_PATH = "migrations/lineage/v4-account-memory-forward0131.json";
+const VERIFIER_130 = "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57";
 const read = (path: string): string => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
 const sha256 = (text: string): string => createHash("sha256").update(text).digest("hex");
-/** The SQL without its `--` comments (no literal or body of 0130 contains `--`). */
+/** The SQL without its `--` comments (no literal or body of 0131 contains `--`). */
 const code = (sql: string): string => sql.split("\n").map((line) => line.replace(/--.*$/u, "")).join("\n");
 
 const TABLES = ["identity.page_reading_level", "identity.debate_last_visit", "identity.dig_link"] as const;
@@ -42,37 +43,37 @@ const HELPER = "identity.page_memory_run_owned(uuid,uuid)";
 /** R22 item 16: deleting one private debate also deletes its page memory, called by the erasure role alone. */
 const FORGET = "identity.forget_erased_debate_page_memory(uuid)";
 
-describe("0130: the V4 account memory step", () => {
-  it("C-T is the last step of the chain's STEPS, after 0129, with its own loader", async () => {
-    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0128,loadForward0129,loadForward0130]");
-    const loader = read("packages/db/src/migration-forward0130.ts");
+describe("0131: the V4 account memory step", () => {
+  it("C-T is the last step of the chain's STEPS, after 0130, with its own loader", async () => {
+    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0129,loadForward0130,loadForward0131]");
+    const loader = read("packages/db/src/migration-forward0131.ts");
     expect(loader).toContain(`const NAME = "${NAME}";`);
-    expect(loader).toContain('const VERSION = "v4-account-memory-forward0130-v1";');
-    expect(loader).toContain('const PREVIOUS = "0129_support_answer_scope.sql";');
-    expect(loader).toContain("MIGRATION_FORWARD0130_");
+    expect(loader).toContain('const VERSION = "v4-account-memory-forward0131-v1";');
+    expect(loader).toContain('const PREVIOUS = "0130_row_level_security.sql";');
+    expect(loader).toContain("MIGRATION_FORWARD0131_");
     for (const table of TABLES) expect(loader).toContain(`"${table}"`);
     for (const signature of [...API_FUNCTIONS, FORGET, EXPORT_READER, HELPER]) expect(loader).toContain(`"${signature}"`);
     const plan = await loadMigrationPlan();
-    expect(plan.forwardChain.slice(-2).map((step) => step.name)).toEqual(["0129_support_answer_scope.sql", NAME]);
+    expect(plan.forwardChain.slice(-2).map((step) => step.name)).toEqual(["0130_row_level_security.sql", NAME]);
     expect(plan.forwardChain.at(-1)?.replayVerifierSql).toBeUndefined();
   });
 
-  it("C-M has 0129's manifest shape, bound to 0129's manifest and to the verifier in force (0111's)", () => {
+  it("C-M has 0129's manifest shape, bound to 0130's manifest and to the verifier in force (0130's)", () => {
     const manifest = JSON.parse(read(MANIFEST_PATH)) as Record<string, unknown>;
-    const previous = JSON.parse(read("migrations/lineage/support-answer-scope-forward0129.json")) as { baseRecipeSha256: string };
+    const previous = JSON.parse(read("migrations/lineage/row-level-security-forward0130.json")) as { baseRecipeSha256: string };
     expect(Object.keys(manifest)).toEqual(["version", "baseRecipeSha256", "previous", "migration", "verifier"]);
     expect(manifest).toEqual({
-      version: "v4-account-memory-forward0130-v1",
+      version: "v4-account-memory-forward0131-v1",
       baseRecipeSha256: previous.baseRecipeSha256,
       previous: {
-        name: "0129_support_answer_scope.sql",
-        manifestSha256: sha256(read("migrations/lineage/support-answer-scope-forward0129.json")),
-        verifierSha256: VERIFIER_111
+        name: "0130_row_level_security.sql",
+        manifestSha256: sha256(read("migrations/lineage/row-level-security-forward0130.json")),
+        verifierSha256: VERIFIER_130
       },
       migration: { name: NAME, sha256: sha256(read(SQL_PATH)) },
-      verifier: { path: "lineage/verify-effective-capabilities-111.sql", sha256: VERIFIER_111 }
+      verifier: { path: "lineage/verify-effective-capabilities-130.sql", sha256: VERIFIER_130 }
     });
-    expect(sha256(read("migrations/lineage/verify-effective-capabilities-111.sql"))).toBe(VERIFIER_111);
+    expect(sha256(read("migrations/lineage/verify-effective-capabilities-130.sql"))).toBe(VERIFIER_130);
   });
 
   it("C-H declares `-- n1: expand` and `-- n1: keeps-verifier` in its header", () => {
@@ -92,7 +93,7 @@ describe("0130: the V4 account memory step", () => {
       for (const defined of definedFunctionNames(source)) earlierFunctions.add(defined);
       for (const defined of definedRelationNames(source)) earlierRelations.add(defined);
     }
-    // Nothing 0130 creates existed before it.
+    // Nothing 0131 creates existed before it.
     for (const table of TABLES) expect(earlierRelations.has(table), table).toBe(false);
     for (const signature of [...API_FUNCTIONS, FORGET, EXPORT_READER, HELPER]) {
       expect(earlierFunctions.has(signature.slice(0, signature.indexOf("("))), signature).toBe(false);
@@ -191,17 +192,18 @@ describe("0130: the V4 account memory step", () => {
     expect(read(SQL_PATH)).toMatch(/^-- n1: expand$/mu);
   });
 
-  it("C-R is documented as the twentieth step, after the support answer scope's section", () => {
+  it("C-R is documented as the twenty-first step, after row-level security's section", () => {
     const readme = read("migrations/lineage/README.md");
     expect(readme.replace(/\s+/gu, " ")).toContain(
-      "the threat reports (0128, below) the eighteenth, the support answer scope (0129, below) the nineteenth and the V4 account memory (0130, below) the twentieth.");
-    const heading = "## The V4 account memory (0130)";
+      "the support answer scope (0129, below) the nineteenth, row-level security (0130, below) the twentieth and the V4 account memory (0131, below) the twenty-first.");
+    const heading = "## The V4 account memory (0131)";
     const at = readme.indexOf(heading);
-    expect(at).toBeGreaterThan(readme.indexOf("## The support answer scope (0129)"));
+    expect(readme.indexOf("## Row-level security (0130)")).toBeGreaterThan(0);
+    expect(at).toBeGreaterThan(readme.indexOf("## Row-level security (0130)"));
     expect(readme.indexOf("## Replay: every applied step keeps its own checks")).toBeGreaterThan(at);
     const section = readme.slice(at, readme.indexOf("\n## ", at + heading.length));
-    for (const needle of ["twentieth", "0129", NAME, "v4-account-memory-forward0130.json", "verify-effective-capabilities-111.sql",
-      "packages/db/src/migration-forward0130.ts", "`loadForward0130`", "`STEPS`", "MIGRATION_FORWARD0130_",
+    for (const needle of ["twenty-first", "0130", NAME, "v4-account-memory-forward0131.json", "verify-effective-capabilities-130.sql",
+      "packages/db/src/migration-forward0131.ts", "`loadForward0131`", "`STEPS`", "MIGRATION_FORWARD0131_",
       ...TABLES, EXPORT_READER, "debateai_billing_runtime", "ON DELETE CASCADE", "-- n1: expand", "-- n1: keeps-verifier",
       "replayVerifierSql", "renumber"]) {
       expect(section.replace(/\s+/gu, " "), needle).toContain(needle);

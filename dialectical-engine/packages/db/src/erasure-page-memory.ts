@@ -1,11 +1,11 @@
 import type { Pool } from "pg";
 
-/** 0130 §4b: the erasure role's one page-memory function. */
+/** 0131 §4b: the erasure role's one page-memory function. */
 export const FORGET_ERASED_DEBATE_PAGE_MEMORY = "identity.forget_erased_debate_page_memory(uuid)" as const;
 
 /**
  * R22 item 16 (owner, 2026-10-29: "Yes, delete them too"): deleting one private debate also deletes its V4 page memory
- * (0130: its last-visit row and every dig link where it is the parent or the child) in the SAME transaction as the
+ * (0131: its last-visit row and every dig link where it is the parent or the child) in the SAME transaction as the
  * rest of that deletion, the one that writes the run's erasure tombstone. `finalizeSql` is that finalize statement
  * (0040/0123's core.finalize_private_run_erasure or 0126's core.finalize_synthesis_check_erasure), one row with an
  * `outcome` column. The run is read from 0040's manifest first (finalize deletes the intent it names); only a COMMITTED

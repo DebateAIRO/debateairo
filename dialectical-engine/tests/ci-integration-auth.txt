@@ -76,7 +76,7 @@ tests/integration/auth-dev-lineage.test.ts
 tests/integration/auth-dev-migration.test.ts
 tests/integration/preview-auth-preservation.test.ts
 tests/integration/preview-auth-dev-fallback.test.ts
-# The V4 account memory (0130): account-owned rows, removed with the account, read by the export behind its lease.
+# The V4 account memory (0131): account-owned rows, removed with the account, read by the export behind its lease.
 tests/integration/v4-account-memory-database.test.ts
 
 # NOT listed: preview-auth-dev-startup.test.ts — red on dev at d1ac3641b (2 of 17: PREVIEW_STAGE_PROCESS_EXITED; it

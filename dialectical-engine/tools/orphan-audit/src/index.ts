@@ -601,9 +601,21 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // re-export gained ItalyApprovalAcceptanceRow (migration 0125's row type, one type-only line). migrate() is byte-identical.
 // synthesis-flag integration with origin/dev b1005606c (2026-10-28): the merged module of the synthesis-flag and
 // Italy-approval lines above, pinned once. migrate() is origin/dev's.
+// Row-level security S01, C3 (2026-10-24, 47e673787; PLAN §0.3, DECISIONS D55, D58, D72): the module after it re-exported
+// ./account-context.js, createPool gained the crossAccount option and the request-scope routing (the credential sent at
+// checkout, release rule v3), wrapClientQueries looked a client's query up per call, and readRoleRotationCounts ran
+// inside crossAccount("X24"). migrate() is byte-identical (its 13,111-byte slice, sha256 d1495dbe4bbf…, at ca61cbe00 and
+// b6a70bc0c). Re-pinned by BUILD-S01-C10 (Ruling R-15), not by the module's writer; REV(S01) reviews the module.
+// Row-level security S01 merged into dev (2026-10-28): the module carries both changes above. migrate() is byte-identical
+// (its 13,114-byte slice, sha256 d1495dbe4bbf…, at ca61cbe00, origin/dev b1005606c and the slice head 235bd65df).
+// Row-level security S01 merged onto origin/dev 76b76f4ba (2026-10-28): the module carries the synthesis-flag lines and
+// row security's lines above. migrate() is byte-identical (its 13,114-byte slice, sha256 d1495dbe4bbf…, at ca61cbe00,
+// b1005606c, 76b76f4ba and 20808ee31).
 // R22 engine follow-ups (2026-10-29, owner ruling "Backup AI takes the seat"): the reviewed module after
 // RunBackupSwitchLifecycleValue's cause admitted CONTENT_REFUSED (a type and its comment only). migrate() is byte-identical.
-const NATIVE_MIGRATE_MODULE_SHA256 = "b174a292b92ce44e153d8037ecb0e79b0982715ff36b327a564396e7d6581750";
+// Merge of origin/dev 64ef40c21 (row-level security, #226) into the V4 branch (2026-10-30): the module carries both the
+// row-security lines and the R22 CONTENT_REFUSED cause above. migrate() is byte-identical.
+const NATIVE_MIGRATE_MODULE_SHA256 = "3cb52db675600669edad9b56c3fe94f0a668e907cf59644e37a1208d50eef6a6";
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
 // ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK and the rethrow after it, then the one retried
 // SQLSTATE). A6 review (2026-10-22): its doc gained one sentence (a step holds its locks until COMMIT; 2 s bounds each

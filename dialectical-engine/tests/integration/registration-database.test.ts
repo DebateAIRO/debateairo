@@ -65,6 +65,7 @@ import {
   type VerificationMail
 } from "../../apps/api/src/mail-channel.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { createSystemTwin } from "../support/rls-logins.js";
 
 let database: TestDatabase;
 let secretRoot: string;
@@ -1377,6 +1378,11 @@ setTimeout(() => undefined, 500);
       ) VALUES ($1,$2,'totp',$3::jsonb,'pending',clock_timestamp())
     `, [factorId,registered.user.user_id,JSON.stringify(secretCiphertext)]);
 
+    // Row-level security (0126; X18d-X18f; D29): these readers run before any session exists, so the API runs them on
+    // its system login, which holds debateai_runtime's grants plus the cross-account marker and nothing else (the
+    // system twin). The bare runtime role with no account context reads none of the stages.
+    const systemRole = "registration_mfa_runtime_system";
+    await createSystemTwin(database, systemRole, ["debateai_runtime"]);
     const client = await database.pool.connect();
     const runtimeRepository = new PostgresIdentityRepository(
       { query: client.query.bind(client) } as never,
@@ -1385,6 +1391,12 @@ setTimeout(() => undefined, 500);
     try {
       await client.query("BEGIN");
       await client.query("SET LOCAL ROLE debateai_runtime");
+      await expect(runtimeRepository.readMfaEnrollmentIdentity(tokenHash)).resolves.toBeNull();
+      await expect(runtimeRepository.readTotpEnrollment(tokenHash)).resolves.toBeNull();
+      await client.query("ROLLBACK");
+
+      await client.query("BEGIN");
+      await client.query(`SET LOCAL ROLE ${systemRole}`);
       await expect(runtimeRepository.readMfaEnrollmentIdentity(tokenHash)).resolves.toEqual({
         userId: registered.user.user_id,
         pseudonym: registered.user.pseudonym
@@ -1408,6 +1420,11 @@ setTimeout(() => undefined, 500);
 
       await client.query("BEGIN");
       await client.query("SET LOCAL ROLE debateai_runtime");
+      await expect(runtimeRepository.readRecoveryCodeForConfirmation(tokenHash, 1)).resolves.toBeNull();
+      await client.query("ROLLBACK");
+
+      await client.query("BEGIN");
+      await client.query(`SET LOCAL ROLE ${systemRole}`);
       await expect(runtimeRepository.readRecoveryCodeForConfirmation(tokenHash, 1)).resolves.toEqual({
         userId: registered.user.user_id,
         recoveryCodeId,

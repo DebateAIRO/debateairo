@@ -4,6 +4,7 @@ import { PostgresModelSpendStore, costEnvelopeDay } from "@debateai/budget";
 import { createPool, migrate, EntitlementRepository, PostgresInternalAllowanceRepository, RunRepository, recordSpendWaiver, type Pool } from "@debateai/db";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { internalFundingFixture } from "../support/internalFundingFixture.js";
+import { createSystemTwin } from "../support/rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
@@ -14,26 +15,28 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * for a funded person). The site's day still counts the real spend: readDaySpentMicros is unchanged. The runner's login
  * (debateai_runtime only) and the API's (debateai_runtime and debateai_billing_runtime) both write it. CI skips this
  * directory; run it alone.
+ *
+ * Row-level security (0126, D29): both logins are system logins, so each test login is the system twin of its roles
+ * (the runner's login: debateai_runtime and the cross-account marker; the API's statements outside a request run on
+ * api-system: the billing role and the marker). The same roles with no account context and no marker (`bare`) read
+ * none of the person's spend and may not write a waiver.
  */
-let database: TestDatabase, runner: Pool, api: Pool, fixture: ReturnType<typeof internalFundingFixture>;
-
-function login(name: string): Pool {
-  const url = new URL(database.connectionString);
-  url.username = name;
-  url.password = ["private", "fixture", name].join("-");
-  return createPool(url.toString());
-}
+let database: TestDatabase, runner: Pool, api: Pool, bare: Pool, fixture: ReturnType<typeof internalFundingFixture>;
 
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
-  await database.pool.query(`CREATE ROLE waiver_runner LOGIN PASSWORD '${["private", "fixture", "waiver_runner"].join("-")}' IN ROLE debateai_runtime`);
-  await database.pool.query(`CREATE ROLE waiver_api LOGIN PASSWORD '${["private", "fixture", "waiver_api"].join("-")}' IN ROLE debateai_runtime,debateai_billing_runtime`);
-  runner = login("waiver_runner");
-  api = login("waiver_api");
+  runner = createPool(await createSystemTwin(database, "waiver_runner", ["debateai_runtime"]));
+  api = createPool(await createSystemTwin(database, "waiver_api", ["debateai_runtime", "debateai_billing_runtime"]));
+  const secret = ["private", "fixture", "waiver_bare"].join("-");
+  await database.pool.query(`CREATE ROLE waiver_bare LOGIN PASSWORD '${secret}' IN ROLE debateai_runtime,debateai_billing_runtime`);
+  const url = new URL(database.connectionString);
+  url.username = "waiver_bare";
+  url.password = secret;
+  bare = createPool(url.toString());
   fixture = internalFundingFixture(database.pool, api);
 }, 240_000);
-afterAll(async () => { await runner?.end(); await api?.end(); await database?.stop(); });
+afterAll(async () => { await runner?.end(); await api?.end(); await bare?.end(); await database?.stop(); });
 
 /** An active subscription person (the free plan, no entitlement event), as b6a-room-decisions seeds one. */
 async function subscriptionPerson(): Promise<string> {
@@ -181,5 +184,15 @@ describe("side-by-side §9, C10: a set-aside debate uses none of the person's qu
     }
     expect((await database.pool.query("SELECT reason FROM ledger.model_spend_waiver WHERE run_id=$1", [first])).rows)
       .toEqual([{ reason: "BACKSTOP" }]);
+  });
+
+  it("row-level security (0126): the same roles with no account context read none of the window and write no waiver", async () => {
+    // The control on the runner's login: the person's window holds the second run's 200 (the first is waived).
+    expect(await new PostgresModelSpendStore(runner).readOwnerSpentMicros(ownerRef, from, to)).toBe(200);
+    expect(await new PostgresModelSpendStore(bare).readOwnerSpentMicros(ownerRef, from, to)).toBe(0);
+    const runId = await subscriptionRun(ownerRef, new Date());
+    expect(await refusalCode(recordSpendWaiver(bare, runId, "BACKSTOP"))).toBe("42501");
+    expect((await database.pool.query("SELECT count(*)::int AS n FROM ledger.model_spend_waiver WHERE run_id=$1", [runId])).rows[0].n)
+      .toBe(0);
   });
 });

@@ -42,7 +42,7 @@ const ERASURE_FUNCTION_SIGNATURES = Object.freeze([
   "core.prepare_synthesis_check_erasures(integer)",
   "core.pending_synthesis_check_erasure_cleanup(integer)",
   "core.finalize_synthesis_check_erasure(uuid,timestamptz,timestamptz,integer,integer)",
-  // 0130 §4b (R22 item 16): a deleted debate's page memory goes in its finalize transaction.
+  // 0131 §4b (R22 item 16): a deleted debate's page memory goes in its finalize transaction.
   FORGET_ERASED_DEBATE_PAGE_MEMORY
 ] as const);
 const ERASURE_FORBIDDEN_ROLES = Object.freeze([
@@ -998,7 +998,7 @@ export class PostgresPrivateRunErasureRepository {
     // only pre-account-erasure forensic mapping.
     void input.source;
     void this.auditContext;
-    // R22 item 16: the run's page memory (0130) goes in this same transaction (erasure-page-memory.ts).
+    // R22 item 16: the run's page memory (0131) goes in this same transaction (erasure-page-memory.ts).
     const outcome = await finalizeWithPageMemory<PrivateRunErasureOutcome>(this.pool, input.erasureId,
       `SELECT core.finalize_private_run_erasure($1,$2,$3,$4,$5) AS outcome`,
       [input.erasureId,input.keyCleanupCompletedAt,input.occurredAt,

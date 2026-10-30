@@ -20,6 +20,7 @@ import { PostgresAccountErasureApplication } from "../../apps/api/src/account-er
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { TEST_APP_ORIGIN, testSessionApplication, testSessionHeaders, type TestHttpIdentity } from "../support/httpSession.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { apiTestPools, provisionRlsLogins, type ApiTestPools } from "../support/rls-logins.js";
 
 /**
  * Side-by-side uploads spec 2026-10-21 §4 (plan A addendum A-x3) — DELETING A DEBATE ERASES EVERY RUN OF IT. A debate that
@@ -38,6 +39,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 type Person = Readonly<{ userId: string; ownerRef: string; sessionId: string; identity: TestHttpIdentity }>;
 
 let database: TestDatabase;
+let pools: ApiTestPools | undefined;
 let secretRoot: string;
 let keys: FileRunContentKeyStore;
 let erasurePool: PgPool;
@@ -99,18 +101,26 @@ beforeAll(async () => {
   other = await person("other", users);
   resolver.set(owner.ownerRef, owner.userId).set(other.ownerRef, other.userId);
   configureContentEncryption(database.pool, new ContentCipher(keys));
-  // The erasure application's own login acts as debateai_erasure_runtime (EXECUTE on its exact function list only).
-  erasurePool = new PgPool({ connectionString: database.connectionString, max: 2, options: "-c role=debateai_erasure_runtime" });
-  const acting = (await erasurePool.query<{ role: string }>("SELECT current_user AS role")).rows[0]!.role;
-  if (acting !== "debateai_erasure_runtime") throw new Error(`erasure pool acts as ${acting}`);
+  // R21 (PLAN S5.3): the API's pools are the mode's (the product's logins in API-login mode); seeding stays on the
+  // harness superuser.
+  pools = await apiTestPools(database, import.meta.url);
+  // The erasure application's own login acts as debateai_erasure_runtime (EXECUTE on its exact function list only): the
+  // product's erasure login in API-login mode, else, as at base, a harness connection acting as that role.
+  erasurePool = pools.erasure !== database.pool ? pools.erasure
+    : new PgPool({ connectionString: database.connectionString, max: 2, options: "-c role=debateai_erasure_runtime" });
+  const acting = (await erasurePool.query<{ role: string; erasure: boolean; superuser: boolean }>(
+    `SELECT current_user AS role, pg_has_role(current_user, 'debateai_erasure_runtime', 'USAGE') AS erasure,
+            (SELECT rolsuper FROM pg_roles WHERE rolname = current_user) AS superuser`)).rows[0]!;
+  if (!acting.erasure || acting.superuser) throw new Error(`erasure pool acts as ${acting.role}`);
   // A second reader with the cipher, so a read after the erasure never reuses a key loaded before it.
   readerPool = new PgPool({ connectionString: database.connectionString, max: 2 });
   configureContentEncryption(readerPool, new ContentCipher(keys));
 }, 600_000);
 
 afterAll(async () => {
-  await erasurePool?.end();
+  if (erasurePool !== undefined && erasurePool !== pools?.erasure) await erasurePool.end();
   await readerPool?.end();
+  if (database !== undefined && pools !== undefined && pools.runtime !== database.pool) await (await provisionRlsLogins(database)).end();
   await database?.stop();
   if (secretRoot !== undefined) await rm(secretRoot, { recursive: true, force: true });
 });
@@ -227,7 +237,11 @@ function askApplication(): AskApplication {
       fleet: { state: "UNAVAILABLE", reason: "NO_TYPED_FLEET_SOURCE" }
     }),
     events: async function* () { /* no events */ },
-    resolveRunRef: (runId: string) => resolveRunRef(database.pool, runId)
+    // The application's run-ref read, on its runtime pool as main.ts gives PostgresAskApplication `pool` (R21).
+    resolveRunRef: (runId: string) => {
+      if (pools === undefined) throw new Error("ERASE_SUPERSEDED_POOLS_UNBUILT");
+      return resolveRunRef(pools.runtime, runId);
+    }
   };
 }
 
@@ -369,7 +383,7 @@ describe("side-by-side A-x3: deleting a re-admitted debate erases every run of i
     const dug = await waitingRun("Which dig was started from it?", ownerPrincipal(), owner.sessionId);
     const kept = await waitingRun("Is another debate's memory kept?", ownerPrincipal(), owner.sessionId);
     const keptDig = await waitingRun("Is another dig link kept?", ownerPrincipal(), owner.sessionId);
-    // What the V4 pages store (0130), written here by the test's superuser through the same functions the API calls.
+    // What the V4 pages store (0131), written here by the test's superuser through the same functions the API calls.
     const visit = (run: string) => database.pool.query("SELECT identity.record_debate_last_visit($1,$2,$3::jsonb)",
       [owner.ownerRef, run, JSON.stringify({ "point:n-1": "SURE" })]);
     const dig = async (parent: string, child: string) => expect((await database.pool.query<{ outcome: string }>(

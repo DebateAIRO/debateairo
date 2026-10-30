@@ -1,4 +1,4 @@
--- 0130 · V4 account memory (owner rulings N7 and N11, 2026-10-29; test-site release R22).
+-- 0131 · V4 account memory (owner rulings N7 and N11, 2026-10-29; test-site release R22).
 -- .superpowers/sdd/v4-account-memory/DESIGN.md §1.
 --
 -- The V4 pages remember three things in the person's ACCOUNT, never in the browser (a browser key would need a cookie-page
@@ -33,10 +33,18 @@
 --                   (§4b's EXECUTE for debateai_erasure_runtime) is the erasure boot check's concern: a release's check
 --                   counts that role's functions exactly (assertAccountErasureDatabaseRole), so a release before this
 --                   one would refuse to restart its erasure worker beside it, as it already would beside 0126's three.
---                   R22, the first release to carry 0130, goes the drained way for 0126-0129, so none does.
+--                   R22, the first release to carry 0131, goes the drained way for 0126-0130, so none does.
+--   row security    0130 (row-level security) leaves these three tables outside its scope rule: no request role can
+--                   SELECT them (every role's rights are revoked below; only the definers, owned by the migrator as
+--                   0115's export owner, read and write them), so their row security stays off as on every
+--                   out-of-scope table, and nothing here touches row security, which keeps the step expand-only.
 -- n1: keeps-verifier
---   keeps-verifier  no billing relation or billing function, so lineage/verify-effective-capabilities-111.sql (0111's,
+--   keeps-verifier  no billing relation or billing function, so lineage/verify-effective-capabilities-130.sql (0130's,
 --                   migrations/lineage/README.md step 3) stays in force and the manifest names it.
+--
+-- Written as 0130; renumbered to 0131 at the merge of origin/dev 64ef40c21 (2026-10-30), whose row-level security took
+-- 0130 first (migrations/lineage/README.md, C1's recipe). The body is unchanged but for its own number in §7's
+-- refusals.
 --
 -- Replay-safe in the repository's form (tools/orphan-audit auditMigrationReplaySafety): CREATE TABLE / INDEX IF NOT
 -- EXISTS with their constraints inline, CREATE OR REPLACE FUNCTION of names no earlier migration defines, and
@@ -390,12 +398,12 @@ BEGIN
       OR (SELECT c.relowner FROM pg_catalog.pg_class AS c WHERE c.oid = pg_catalog.to_regclass(v_name)) IS DISTINCT FROM v_owner
       OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger AS t WHERE t.tgrelid = pg_catalog.to_regclass(v_name)
         AND t.tgname = 'reject_truncate' AND NOT t.tgisinternal) THEN
-      RAISE EXCEPTION 'V4_ACCOUNT_MEMORY_0130_CONTRACT tables %', v_name;
+      RAISE EXCEPTION 'V4_ACCOUNT_MEMORY_0131_CONTRACT tables %', v_name;
     END IF;
     FOREACH v_role IN ARRAY ARRAY['debateai_runtime', 'debateai_billing_runtime', 'debateai_authorization_runtime',
       'debateai_erasure_runtime', 'debateai_replay', 'debateai_data_export_worker'] LOOP
       IF pg_catalog.has_table_privilege(v_role, v_name, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') THEN
-        RAISE EXCEPTION 'V4_ACCOUNT_MEMORY_0130_CONTRACT table privilege % %', v_role, v_name;
+        RAISE EXCEPTION 'V4_ACCOUNT_MEMORY_0131_CONTRACT table privilege % %', v_role, v_name;
       END IF;
     END LOOP;
   END LOOP;
@@ -407,7 +415,7 @@ BEGIN
   ] LOOP
     IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_proc AS p WHERE p.oid = pg_catalog.to_regprocedure(v_name)
         AND p.prosecdef AND p.proowner = v_owner AND p.proconfig = '{search_path=pg_catalog}'::text[]) THEN
-      RAISE EXCEPTION 'V4_ACCOUNT_MEMORY_0130_CONTRACT definers %', v_name;
+      RAISE EXCEPTION 'V4_ACCOUNT_MEMORY_0131_CONTRACT definers %', v_name;
     END IF;
     -- Exactly one of the six roles may call each: the export worker the reader, the erasure role §4b, the API's role the rest.
     FOREACH v_role IN ARRAY ARRAY['debateai_runtime', 'debateai_billing_runtime', 'debateai_authorization_runtime',
@@ -416,7 +424,7 @@ BEGIN
           WHEN 'identity.read_data_export_page_memory(uuid,uuid)' THEN 'debateai_data_export_worker'
           WHEN 'identity.forget_erased_debate_page_memory(uuid)' THEN 'debateai_erasure_runtime'
           ELSE 'debateai_billing_runtime' END) THEN
-        RAISE EXCEPTION 'V4_ACCOUNT_MEMORY_0130_CONTRACT privileges % %', v_role, v_name;
+        RAISE EXCEPTION 'V4_ACCOUNT_MEMORY_0131_CONTRACT privileges % %', v_role, v_name;
       END IF;
     END LOOP;
   END LOOP;
@@ -425,7 +433,7 @@ BEGIN
     OR pg_catalog.has_function_privilege('debateai_billing_runtime', 'identity.page_memory_run_owned(uuid,uuid)', 'EXECUTE')
     OR pg_catalog.has_function_privilege('debateai_runtime', 'identity.page_memory_run_owned(uuid,uuid)', 'EXECUTE')
     OR pg_catalog.has_function_privilege('debateai_erasure_runtime', 'identity.page_memory_run_owned(uuid,uuid)', 'EXECUTE') THEN
-    RAISE EXCEPTION 'V4_ACCOUNT_MEMORY_0130_CONTRACT helper';
+    RAISE EXCEPTION 'V4_ACCOUNT_MEMORY_0131_CONTRACT helper';
   END IF;
 END
 $page_memory_contract$;

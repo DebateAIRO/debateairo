@@ -42,8 +42,11 @@ const OPERATOR_COMMANDS = 10; // billing, support and owner commands, run by han
 // 2 × (79 + 34) = 226 at most. With Hatchet, the migrator and the operator's commands that was 289 of the 317 the server
 // allows (320 less the superuser's 3), so 28 stayed free. The release watcher's own pool (final fix wave P1: 1 per API,
 // so a burst of page reads on the runtime pool can never make /readyz DATABASE_UNREACHABLE) makes it 2 × (80 + 34) = 228
-// and 291, so 26 stay free. max_connections stays 320.
-const SPARE = 26;
+// and 291, so 26 stay free. Row-level security S01 (DECISIONS D50): the API's two system pools (api-system 6,
+// api-authorization-system 2; every statement outside a request runs on them) and the support relay lease pool's removal
+// (synthesis-flag S05, 18) make one API 70 and two releases 2 × (70 + 34) = 208, 271 in all, so 46 stay free.
+// max_connections stays 320.
+const SPARE = 46;
 // Two releases live at once during the side-by-side transition (spec §9): the old one keeps its drained debates while
 // the new one takes new work, and each release has its own API and its own runner.
 const LIVE_RELEASES = 2;
@@ -137,7 +140,10 @@ describe("no pool is smaller than what one of its flows holds at once", () => {
       // One export build at a time (single-flight timer) on one connection (V-43): its lease renewal queues behind its snapshot read.
       dataExport: 1,
       // The release watcher's reads chain (one at a time, never overlapping; apps/api/src/release-state.ts).
-      releaseWatch: 1
+      releaseWatch: 1,
+      // Row-level security S01 (DECISIONS D50): no flow audit exists for the two system pools yet, so the floor is the size.
+      system: 6,
+      authorizationSystem: 2
     };
     for (const [key, floor] of Object.entries(floors)) {
       expect(API_DATABASE_POOLS[key as keyof typeof API_DATABASE_POOLS].max, key).toBeGreaterThanOrEqual(floor);
@@ -201,10 +207,22 @@ describe("the whole server stays under Postgres's limit", () => {
   it("fits two live releases, Hatchet, the migrator and the operator with room to spare", () => {
     const api = sum(API_DATABASE_POOLS, ["evaluatorDevMenu"]) + SUPPORT_CONTROL_PLANE_POOL.max;
     const runner = sum(RUNNER_DATABASE_POOLS);
-    expect(api).toBeLessThanOrEqual(80);
+    expect(api).toBeLessThanOrEqual(70);
     expect(runner).toBe(34);
     const ceiling = LIVE_RELEASES * (api + runner) + HATCHET_ROLE_LIMIT + MIGRATOR_ROLE_LIMIT + OPERATOR_COMMANDS;
     expect(ceiling + SPARE).toBeLessThanOrEqual(POSTGRES_MAX_CONNECTIONS - SUPERUSER_RESERVED);
+  });
+
+  it("S2.6-a one API holds at most 70 connections and two releases 271 of 317", () => {
+    const api = sum(API_DATABASE_POOLS, ["evaluatorDevMenu"]) + SUPPORT_CONTROL_PLANE_POOL.max;
+    expect(api).toBe(70);
+    expect(API_DATABASE_POOLS.system).toEqual({ name: "api:system", max: 6, connectionTimeoutMillis: 5_000 });
+    expect(API_DATABASE_POOLS.authorizationSystem)
+      .toEqual({ name: "api:authorization-system", max: 2, connectionTimeoutMillis: 5_000 });
+    const ceiling = LIVE_RELEASES * (api + sum(RUNNER_DATABASE_POOLS))
+      + HATCHET_ROLE_LIMIT + MIGRATOR_ROLE_LIMIT + OPERATOR_COMMANDS;
+    expect(ceiling).toBe(271);
+    expect(ceiling + SPARE).toBe(POSTGRES_MAX_CONNECTIONS - SUPERUSER_RESERVED);
   });
 
   it("the server config allows the budget", async () => {

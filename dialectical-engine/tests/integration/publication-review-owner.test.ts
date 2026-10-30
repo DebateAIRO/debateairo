@@ -14,6 +14,7 @@ import { createSynthesisPublishGate, type SynthesisPublishGate } from "../../app
 import type { Answer } from "@debateai/contract";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { provisionRlsLogins, type RlsLogins } from "../support/rls-logins.js";
 import { persistTerminalRun } from "../support/settledRun.js";
 import {
   createEncryptedStoryRun, provisionStoryEncryptedOwner, releaseStoryEncryptedOwner,
@@ -23,6 +24,7 @@ import {
 const POLICY_VERSION = "synthesis.content-check.v1@0123456789abcdef";
 const grantToken = () => randomBytes(32).toString("base64url");
 let database: TestDatabase;
+let logins: RlsLogins | undefined;
 let runtime: Pool;
 let owner: StoryEncryptedOwner;
 let reviews: PublicationReviewRepository;
@@ -34,9 +36,10 @@ beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
   owner = await provisionStoryEncryptedOwner(database.pool);
-  const url = new URL(database.connectionString);
-  url.searchParams.set("options", "-c role=debateai_runtime");
-  runtime = createPool(url.toString());
+  // Row-level security S01: bare debateai_runtime carries no account context, so it now sees no account's rows. These
+  // statements run where the API runs every statement outside a request: its system login (tests/support/rls-logins.ts).
+  logins = await provisionRlsLogins(database);
+  runtime = createPool(logins.url("API_SYSTEM_DATABASE_URL"));
   configureContentEncryption(runtime, contentCipherFor(database.pool)!);
   reviews = new PublicationReviewRepository(runtime);
   checks = new SynthesisCheckRepository(runtime);
@@ -50,6 +53,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await runtime?.end();
+  await logins?.end();
   await database?.stop();
   if (owner) await releaseStoryEncryptedOwner(owner);
 });

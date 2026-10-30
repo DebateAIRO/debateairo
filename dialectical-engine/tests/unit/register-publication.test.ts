@@ -360,6 +360,9 @@ describe("bigint-safe versions and separate publication hash domains", () => {
       DATABASE_URL: "postgresql://runtime:test@127.0.0.1:5432/debateai",
       SUPPORT_DATABASE_URL: "postgresql://support:test@127.0.0.1:5432/debateai",
       AUTHORIZATION_DATABASE_URL: "postgresql://authorization:test@127.0.0.1:5432/debateai",
+      // Row-level security S01 (PLAN S2.5): the API's two system logins.
+      API_SYSTEM_DATABASE_URL: "postgresql://api_system:test@127.0.0.1:5432/debateai",
+      API_AUTHORIZATION_SYSTEM_DATABASE_URL: "postgresql://authorization_system:test@127.0.0.1:5432/debateai",
       API_HOST: "127.0.0.1",
       API_PORT: "3000",
       STRANGER_SAMPLE_RATE: "0.1",

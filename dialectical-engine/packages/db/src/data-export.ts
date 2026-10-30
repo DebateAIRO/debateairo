@@ -120,7 +120,7 @@ const WORKER_FUNCTIONS = [
   "identity.renew_data_export_lease(uuid,uuid,integer)",
   "identity.read_data_export_snapshot_v2(uuid,uuid)",
   "identity.read_data_export_threat_reports(uuid,uuid)",
-  // V4 account memory (migration 0130): the reading level, debate visits and dig links.
+  // V4 account memory (migration 0131): the reading level, debate visits and dig links.
   "identity.read_data_export_page_memory(uuid,uuid)",
   "identity.complete_data_export(uuid,uuid,text,text,bigint,timestamp with time zone)",
   "identity.fail_data_export(uuid,uuid,text)",
@@ -165,7 +165,7 @@ export class PostgresDataExportSource implements DataExportSourcePort {
       "SELECT identity.read_data_export_snapshot_v2($1,$2) snapshot, identity.read_data_export_threat_reports($1,$2) threat_reports, "
         + "identity.read_data_export_page_memory($1,$2) page_memory",
       [exportId, workerId])).rows[0]!;
-    // 0130's reader answers {page_reading_level, debate_visits, dig_links}; a missing member stays missing, so the
+    // 0131's reader answers {page_reading_level, debate_visits, dig_links}; a missing member stays missing, so the
     // snapshot's exact-section check refuses the export rather than leaving the records out.
     const memory = row.page_memory ?? {};
     return {

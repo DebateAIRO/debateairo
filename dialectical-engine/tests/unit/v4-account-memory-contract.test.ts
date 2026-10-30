@@ -8,15 +8,15 @@ import { createContractClient } from "../../packages/contract/src/client.js";
 import { READING_LEVELS, DIG_MODES } from "../../apps/ui/lib/v4/types.js";
 
 /**
- * V4 account memory (owner rulings N7 and N11): the contract's shapes, its limits held equal to 0130's own, and the six
+ * V4 account memory (owner rulings N7 and N11): the contract's shapes, its limits held equal to 0131's own, and the six
  * client methods' requests.
  */
-const sql = readFileSync(new URL("../../migrations/0130_v4_account_memory.sql", import.meta.url), "utf8");
+const sql = readFileSync(new URL("../../migrations/0131_v4_account_memory.sql", import.meta.url), "utf8");
 const RUN = "11111111-1111-4111-8111-111111111111";
 const CHILD = "22222222-2222-4222-8222-222222222222";
 
 describe("V4 account memory contract", () => {
-  it("holds its limits and word lists equal to 0130's and to the V4 pages'", () => {
+  it("holds its limits and word lists equal to 0131's and to the V4 pages'", () => {
     expect(sql).toContain(`(SELECT count(*) FROM jsonb_each(p_items)) > ${ACCOUNT_MEMORY_LIMITS.visitItemsMax}`);
     expect(sql).toContain(`octet_length(p_items::text) > ${ACCOUNT_MEMORY_LIMITS.visitBodyMaxBytes}`);
     expect(sql).toContain(`octet_length(items::text) <= ${ACCOUNT_MEMORY_LIMITS.visitBodyMaxBytes}`);

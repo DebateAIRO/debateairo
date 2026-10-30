@@ -60,7 +60,7 @@ export class PostgresSynthesisCheckErasureRepository {
     destroyedKeyCount: 0 | 1;
     alreadyAbsentKeyCount: 0 | 1;
   }>): Promise<SynthesisCheckErasureOutcome> {
-    // R22 item 16: a removed debate's page memory (0130) goes in this same transaction (erasure-page-memory.ts).
+    // R22 item 16: a removed debate's page memory (0131) goes in this same transaction (erasure-page-memory.ts).
     const outcome = await finalizeWithPageMemory<SynthesisCheckErasureOutcome>(this.pool, input.erasureId,
       "SELECT core.finalize_synthesis_check_erasure($1,$2,$3,$4,$5) AS outcome",
       [input.erasureId,input.keyCleanupCompletedAt,input.occurredAt,

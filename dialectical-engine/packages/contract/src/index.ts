@@ -1752,7 +1752,7 @@ export const contractInventory = Object.freeze({
     "POST /v1/account/export",
     "POST /v1/account/export/download",
     "POST /v1/account/removal-notice/take",
-    // V4 account memory (owner rulings N7 and N11, migration 0130): the reading level kept in the account.
+    // V4 account memory (owner rulings N7 and N11, migration 0131): the reading level kept in the account.
     "GET /v1/account/reading-level",
     "POST /v1/account/reading-level",
     "GET /v1/account/legal-status",

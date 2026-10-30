@@ -15,6 +15,7 @@ import { debateSummariesFromIndex } from "../../apps/ui/lib/v3/adapter.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
 import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { provisionRlsLogins, type RlsLogins } from "../support/rls-logins.js";
 import { persistTerminalRun } from "../support/settledRun.js";
 import {
   createEncryptedStoryRun, provisionStoryEncryptedOwner, releaseStoryEncryptedOwner,
@@ -22,9 +23,11 @@ import {
 } from "../support/storyEncryptedOwner.js";
 
 let database: TestDatabase;
+let logins: RlsLogins | undefined;
 let runtime: Pool;
 /** The answer list as the API's login reads it: debateai_billing_runtime, which 0123 (side-by-side releases) grants
- * core.run_supersession, a table the list reads since that merge. Everything else here stays on debateai_runtime. */
+ * core.run_supersession, a table the list reads since that merge. Since row security (S01) both pools are the API's
+ * system login, which holds that role and sees every account. */
 let apiPool: Pool;
 let owner: StoryEncryptedOwner;
 
@@ -55,19 +58,19 @@ beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
   owner = await provisionStoryEncryptedOwner(database.pool);
-  const url = new URL(database.connectionString);
-  url.searchParams.set("options", "-c role=debateai_runtime");
-  runtime = createPool(url.toString());
+  // Row-level security S01: bare debateai_runtime carries no account context, so it now sees no account's rows. These
+  // statements run where the API runs every statement outside a request: its system login (tests/support/rls-logins.ts).
+  logins = await provisionRlsLogins(database);
+  runtime = createPool(logins.url("API_SYSTEM_DATABASE_URL"));
   configureContentEncryption(runtime, contentCipherFor(database.pool)!);
-  const apiUrl = new URL(database.connectionString);
-  apiUrl.searchParams.set("options", "-c role=debateai_billing_runtime");
-  apiPool = createPool(apiUrl.toString());
+  apiPool = createPool(logins.url("API_SYSTEM_DATABASE_URL"));
   configureContentEncryption(apiPool, contentCipherFor(database.pool)!);
 }, 180_000);
 
 afterAll(async () => {
   await runtime?.end();
   await apiPool?.end();
+  await logins?.end();
   await database?.stop();
   if (owner !== undefined) await releaseStoryEncryptedOwner(owner);
 });

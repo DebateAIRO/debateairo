@@ -7,11 +7,11 @@ import type {
 } from "@debateai/contract";
 
 /**
- * V4 account memory (owner rulings N7 and N11, 2026-10-29; migration 0130): the reading level, the last visit of each
+ * V4 account memory (owner rulings N7 and N11, 2026-10-29; migration 0131): the reading level, the last visit of each
  * debate and each dig's link, kept in the person's account instead of the browser. This module is the port the routes
- * use and its one PostgreSQL adapter, over 0130's functions on the API's runtime pool (EXECUTE for
+ * use and its one PostgreSQL adapter, over 0131's functions on the API's runtime pool (EXECUTE for
  * debateai_billing_runtime only). Ownership is decided in the database: every function checks that each run it touches
- * is the caller's (0130's identity.page_memory_run_owned) and answers "not owned" otherwise, which the routes turn into
+ * is the caller's (0131's identity.page_memory_run_owned) and answers "not owned" otherwise, which the routes turn into
  * the closed 404 every run-owner route answers. Nothing here stores or returns question or answer text.
  */
 
@@ -30,7 +30,7 @@ export interface AccountMemoryStore {
   recordDigLink(ownerRef: string, parentRunId: string, link: DigLinkRecordRequest): Promise<DigLinkOutcome>;
 }
 
-/** 0130 refused what it was asked to store (SQLSTATE 22023): the route answers 400 MALFORMED_REQUEST. */
+/** 0131 refused what it was asked to store (SQLSTATE 22023): the route answers 400 MALFORMED_REQUEST. */
 export class AccountMemoryInputError extends Error {
   constructor(readonly code: string) {
     super(code);
@@ -71,7 +71,7 @@ function linkOf(raw: RawLink): DigLinks["children"][number] {
   };
 }
 
-/** 22023 is 0130's own refusal of a value (it validates before any read); everything else is the caller's to see. */
+/** 22023 is 0131's own refusal of a value (it validates before any read); everything else is the caller's to see. */
 async function refusing<T>(run: () => Promise<T>): Promise<T> {
   try {
     return await run();

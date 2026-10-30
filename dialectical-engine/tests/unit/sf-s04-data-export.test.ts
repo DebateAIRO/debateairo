@@ -12,7 +12,7 @@ function rawRows() {
     adult_affirmed_at: "2026-01-01T00:00:00.000Z" };
   raw.registration_region = null;
   raw.recovery_codes = null;
-  // 0130's reading level is one row or null, like the region.
+  // 0131's reading level is one row or null, like the region.
   raw.page_reading_level = null;
   raw.billing = Object.fromEntries(Object.keys(KEEP_COLUMNS.billing).map(key => [key, []]));
   raw.threat_reports = [{ question: "Should I hurt my neighbour?", kept_at: "2026-10-20T09:00:00.000Z",
@@ -56,7 +56,7 @@ describe("S04 data export", () => {
       request_count: name === "request" ? 4 : 0, worker_count: workerCount, privileged: false });
     const pool = (name: string, workerCount: number) => ({ query: async (_sql: string, params: unknown[]) => {
       seen.push(params); return { rows: [principal(name, workerCount)] }; } });
-    // 0130 (the V4 account memory) adds a tenth worker function, its page-memory reader.
+    // 0131 (the V4 account memory) adds a tenth worker function, its page-memory reader.
     await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 10) as never)).resolves.toBeUndefined();
     expect(seen[1]?.[1]).toContain("identity.read_data_export_threat_reports(uuid,uuid)");
     await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 9) as never)).rejects.toThrow("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");

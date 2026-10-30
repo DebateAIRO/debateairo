@@ -13,6 +13,7 @@ import { withMailLocale } from "../../packages/db/src/mail-locale.js";
 import { b64, digest, fixture, key } from "../support/staffWebAuthnFixtures.js";
 import type { StaffHttpApplication } from "../../apps/api/src/staff/routes.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { provisionRlsLogins, type RlsLogins } from "../support/rls-logins.js";
 import { persistTerminalRun } from "../support/settledRun.js";
 import { createEncryptedStoryRun, provisionStoryEncryptedOwner, releaseStoryEncryptedOwner, type StoryEncryptedOwner } from "../support/storyEncryptedOwner.js";
 import { staffHttpAskApplication } from "../support/staffHttpApplication.js";
@@ -22,6 +23,7 @@ const hash = (value: string) => `sha256:${createHash("sha256").update(value).dig
 const token = () => randomBytes(32).toString("base64url");
 const policyVersion = "synthesis.content-check.v1@0123456789abcdef";
 let database: TestDatabase, owner: StoryEncryptedOwner;
+let logins: RlsLogins | undefined;
 let runtime: Pool;
 let reviews: PublicationReviewRepository, checks: SynthesisCheckRepository;
 type Actor = { identity: TestHttpIdentity; staffId: string; staffToken: string; staffCsrf: string; capabilities: string[] };
@@ -31,9 +33,10 @@ beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
   owner = await provisionStoryEncryptedOwner(database.pool);
-  const url = new URL(database.connectionString);
-  url.searchParams.set("options", "-c role=debateai_runtime");
-  runtime = createPool(url.toString());
+  // Row-level security S01: bare debateai_runtime carries no account context, so it now sees no account's rows. These
+  // statements run where the API runs every statement outside a request: its system login (tests/support/rls-logins.ts).
+  logins = await provisionRlsLogins(database);
+  runtime = createPool(logins.url("API_SYSTEM_DATABASE_URL"));
   configureContentEncryption(runtime, contentCipherFor(database.pool)!);
   reviews = new PublicationReviewRepository(runtime);
   checks = new SynthesisCheckRepository(runtime);
@@ -41,6 +44,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await runtime?.end();
+  await logins?.end();
   await database?.stop();
   if (owner) await releaseStoryEncryptedOwner(owner);
 });
@@ -243,7 +247,7 @@ it("keeps the oldest 100 pending reviews and reports whether more are waiting", 
 
 describe("staff publication review HTTP over the migrated database", () => {
   it("each route refuses a staff member without PUBLICATION_REVIEW and queue answers an authorized reviewer", async () => {
-    expect((await runtime.query<{current_user:string}>("SELECT current_user")).rows[0]?.current_user).toBe("debateai_runtime");
+    expect((await runtime.query<{current_user:string}>("SELECT current_user")).rows[0]?.current_user).toBe("debateai_dev_api_system"); // row-level security X28: the API's system login
     const no=await actor(["TEAM_READ"]),yes=await actor([
       "TEAM_READ","TEAM_INVITE","TEAM_GRANT","TEAM_DISABLE","AUDIT_READ","EMERGENCY_DISABLE","PUBLICATION_REVIEW"
     ],false,true),d=await debate(),api=composition([no,yes]);

@@ -1,17 +1,17 @@
 import { z } from "zod";
 
 /**
- * V4 account memory (owner rulings N7 and N11, 2026-10-29; migration 0130): what the V4 pages keep in the person's
+ * V4 account memory (owner rulings N7 and N11, 2026-10-29; migration 0131): what the V4 pages keep in the person's
  * account instead of the browser — the reading level, the last visit of each debate ("since your last visit") and the
  * link of each dig to the debate it was dug from. Ids, the level, state words, places and times only: no question or
- * answer text ever rides these shapes. The limits are 0130's own (identity.record_debate_last_visit,
+ * answer text ever rides these shapes. The limits are 0131's own (identity.record_debate_last_visit,
  * identity.record_dig_link, identity.read_dig_links); a unit test holds them equal. It imports only zod (never
  * ./index.js), for the same module-cycle reason map-view.ts does.
  */
 export const ACCOUNT_MEMORY_LIMITS = Object.freeze({
   /** Entries in one visit snapshot. */
   visitItemsMax: 512,
-  /** A snapshot's stored size in bytes (0130's cap, visitItemsStoredBytes) and the visit write's body limit. */
+  /** A snapshot's stored size in bytes (0131's cap, visitItemsStoredBytes) and the visit write's body limit. */
   visitBodyMaxBytes: 65_536,
   /** Places one dig names on its parent's map. */
   digPlacesMax: 16,
@@ -40,7 +40,7 @@ export const VISIT_WORD_PATTERN = /^[A-Za-z_]{1,32}$/u;
 export const DIG_PLACE_PATTERN = new RegExp(`^${ID_CHARACTERS}{1,160}$`, "u");
 
 /**
- * The size 0130 stores a snapshot at (PostgreSQL's jsonb text, `{"k": "v", "k2": "v2"}`): two braces, each entry's key and
+ * The size 0131 stores a snapshot at (PostgreSQL's jsonb text, `{"k": "v", "k2": "v2"}`): two braces, each entry's key and
  * word with their quotes and ": ", and ", " between entries. Exact for keys and words that match the patterns above.
  */
 export function visitItemsStoredBytes(items: Readonly<Record<string, string>>): number {

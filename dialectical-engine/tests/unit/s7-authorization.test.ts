@@ -348,7 +348,7 @@ describe("S7 deny-by-default authorization", () => {
     // data-export S01's 3 routes.
     // Debate shape P2c adds GET /v1/answers/{id}/map. Side-by-side C5 adds GET /livez and GET /readyz. Side-by-side §13
     // addition D24 adds GET /v1/public/ai-providers.
-    // The synthesis check adds the once-only removal notice route. The V4 account memory (0130) adds six: the reading level
+    // The synthesis check adds the once-only removal notice route. The V4 account memory (0131) adds six: the reading level
     // (read, save), a debate's last visit (read, record) and its dig links (read, record).
     expect(contractInventory.routes).toHaveLength(180);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);

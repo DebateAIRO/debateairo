@@ -19,10 +19,12 @@ import { requireTurnstileProof, TurnstileGateError, type TurnstileVerifier } fro
 import { AccountProfileError, type AccountProfileService } from "./account-profile.js";
 import { RecoveryEmailError, type RecoveryEmailService } from "./recovery-email.js";
 import type { ProfileSession } from "@debateai/db";
+import { runInRequestScope, setRequestCredential } from "@debateai/db";
 import { normalizeManualPhone } from "./phone-profile.js";
 import { answerForOutcome, type AskQuestionCheck } from "./question-check/ask-gate.js";
 import { resolveSourceMailLocale } from "./mail-locale.js";
 import { exhaustive, type FundingBasis } from "@debateai/kernel";
+import { AsyncResource } from "node:async_hooks";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -993,6 +995,10 @@ const KNOWN_FAILURE_CONSTANTS: readonly string[] = Object.freeze([
   "ACCOUNT_NOT_ACTIVE",
   "ACCOUNT_RECOVERY_BINDING_IMMUTABLE",
   "ADDON_GRADING_LINEAGE_UNRESOLVED",
+  "API_AUTHORIZATION_SYSTEM_DATABASE_URL_MUST_BE_SEPARATE",
+  "API_AUTHORIZATION_SYSTEM_DATABASE_URL_REQUIRED",
+  "API_SYSTEM_DATABASE_URL_MUST_BE_SEPARATE",
+  "API_SYSTEM_DATABASE_URL_REQUIRED",
   "ARGON2_POOL_CAPACITY_INVALID",
   "ARGON2_POOL_WORKER_COUNT_INVALID",
   "ASK_ADMISSION_DATABASE_POOLS_MUST_BE_SEPARATE",
@@ -1446,7 +1452,7 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/account/export", auth: "user", resource: "identity", action: "request-data-export" },
   { route: "POST /v1/account/export/download", auth: "user", resource: "identity", action: "download-data-export" },
   { route: "POST /v1/account/removal-notice/take", auth: "user", resource: "identity", action: "take-removal-notice" },
-  // V4 account memory (N7, migration 0130): the account's reading level. A write carries the CSRF pair like any user route.
+  // V4 account memory (N7, migration 0131): the account's reading level. A write carries the CSRF pair like any user route.
   { route: "GET /v1/account/reading-level", auth: "user", resource: "identity", action: "read-reading-level" },
   { route: "POST /v1/account/reading-level", auth: "user", resource: "identity", action: "save-reading-level" },
   { route: "GET /v1/account/legal-status", auth: "user", resource: "identity", action: "read-legal-status" },
@@ -1504,7 +1510,7 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/runs/{id}/unpublish", auth: "user", resource: "run-owner", action: "unpublish" },
   { route: "POST /v1/runs/{id}/publication-review", auth: "user", resource: "run-owner", action: "request-review" },
   { route: "GET /v1/runs/{id}/publication-review", auth: "user", resource: "run-owner", action: "read-review" },
-  // V4 account memory (N7, N11, migration 0130): a debate's last visit and its dig links, owner-scoped in the database.
+  // V4 account memory (N7, N11, migration 0131): a debate's last visit and its dig links, owner-scoped in the database.
   { route: "GET /v1/runs/{id}/last-visit", auth: "user", resource: "run-owner", action: "read-last-visit" },
   { route: "POST /v1/runs/{id}/last-visit", auth: "user", resource: "run-owner", action: "record-last-visit" },
   { route: "GET /v1/runs/{id}/dig-links", auth: "user", resource: "run-owner", action: "read-dig-links" },
@@ -1838,7 +1844,7 @@ export interface ApiOptions {
    */
   readonly mapViews?: AnswerMapViewApplication;
   /**
-   * V4 account memory (owner rulings N7 and N11, migration 0130): the reading level, each debate's last visit and each
+   * V4 account memory (owner rulings N7 and N11, migration 0131): the reading level, each debate's last visit and each
    * dig's link, kept in the account. Its six routes are always mounted; without it they answer 503
    * ACCOUNT_MEMORY_UNAVAILABLE, and the V4 pages fall back to what they do without memory.
    */
@@ -2232,6 +2238,9 @@ function exactCsrfPair(header: unknown, cookie: string | null): string | null {
 }
 
 function sessionCookie(value: string, maxAgeSeconds: number): string {
+  // Row-level security S01 (PLAN S4.2, DECISIONS D28): the one place a request issues a session token, so every
+  // statement the request makes from here on carries that session's account context.
+  setRequestCredential(value);
   return `${SESSION_COOKIE_NAME}=${value}; Path=/; Max-Age=${maxAgeSeconds}; HttpOnly; Secure; SameSite=Lax`;
 }
 
@@ -2420,6 +2429,28 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       void reply.status(fault.statusCode).send({ error: fault.code, message: fault.code });
     }
   });
+  /**
+   * Row-level security S01 (PLAN S4.2, DECISIONS D28, D29): every request runs in a request scope of its own, opened
+   * here, by the first hook registered, so each statement it makes on a T1 pool runs on that pool's own login and
+   * carries the account context of its session once the session preHandler below has authenticated it — and never
+   * another request's. A statement made outside every request goes to the pool's system login. preValidation re-enters
+   * the request's scope after the body is parsed (defensive: Fastify 5.12.5 keeps it without, spike 2).
+   */
+  const requestScopes = new WeakMap<object, AsyncResource>();
+  api.addHook("onRequest", (request, _reply, done) => {
+    runInRequestScope(() => {
+      requestScopes.set(request, new AsyncResource("debateai-request-scope"));
+      done();
+    });
+  });
+  api.addHook("preValidation", (request, _reply, done) => {
+    const scope = requestScopes.get(request);
+    if (scope === undefined) {
+      done();
+      return;
+    }
+    scope.runInAsyncScope(done);
+  });
   api.addHook("onRoute", (route) => {
     for (const method of Array.isArray(route.method) ? route.method : [route.method]) {
       const key = canonicalRoute(method, route.url);
@@ -2568,6 +2599,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         if (sessionToken === null || options.sessions === undefined) return;
         const authenticated = await options.sessions.authenticate(sessionToken, sourceFor(request));
         if (authenticated === null) return;
+        setRequestCredential(sessionToken);
         request.authenticatedSession = authenticated;
         request.session = authenticated.session;
         const csrfCookieToken = exactCookie(rawCookie, CSRF_COOKIE_NAME);
@@ -2605,6 +2637,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         );
       }
       if (authenticated === null) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+      setRequestCredential(sessionToken!);
       request.authenticatedSession = authenticated;
       request.session = authenticated.session;
       const csrfCookieToken = exactCookie(rawCookie, CSRF_COOKIE_NAME);
@@ -3330,7 +3363,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       notice: ownerRef === null ? false : await access.takeRemovalNotice(ownerRef)
     }));
   });
-  // V4 account memory (owner rulings N7 and N11, migration 0130). The account is the signed-in one (the cookie session:
+  // V4 account memory (owner rulings N7 and N11, migration 0131). The account is the signed-in one (the cookie session:
   // `auth: "user"` admits nothing else), so a write can only ever touch the caller's own rows; the run routes below are
   // owner-scoped in the database too. No admission scope, as every account self route: storage is one row per account
   // (the level) or per owned debate (a visit, a dig), so it cannot grow past what the account owns.
@@ -4470,8 +4503,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       return reply.status(response.status).send(response.body);
     }
   );
-  // V4 account memory (owner rulings N7 and N11, migration 0130): "not this account's debate" is the closed 404 every
-  // run-owner route answers, decided by 0130's functions (the run's latest ownership event names the caller's account).
+  // V4 account memory (owner rulings N7 and N11, migration 0131): "not this account's debate" is the closed 404 every
+  // run-owner route answers, decided by 0131's functions (the run's latest ownership event names the caller's account).
   // The id is the one the page holds, never resolved to a re-admitted run, so a write and its later read meet.
   const memoryRunOf = (request: Readonly<{ params: { id: string }; session: Session; authenticatedSession?: AuthenticatedSession }>) => {
     const runId = ResourceIdSchema.safeParse(request.params.id);

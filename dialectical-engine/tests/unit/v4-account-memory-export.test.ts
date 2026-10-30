@@ -7,7 +7,7 @@ import { readZip } from "../support/zip-reader.js";
 import { assertDataExportDatabaseRoles, PostgresDataExportSource } from "../../packages/db/src/data-export.js";
 
 /**
- * V4 account memory (owner rulings N7 and N11, migration 0130): the person's data export carries the reading level, the
+ * V4 account memory (owner rulings N7 and N11, migration 0131): the person's data export carries the reading level, the
  * debate visits and the dig links in account.json, under the archive's own names (a debate is a "reference", as in
  * debates.json; never a raw run_id key), with only the columns listed here.
  */
@@ -72,7 +72,7 @@ describe("V4 account memory in the data export", () => {
     await expect(collect(raw)).rejects.toMatchObject({ code: "DATA_EXPORT_SOURCE_FAILED" });
   });
 
-  it("reads the three sections through 0130's reader, beside the snapshot and the kept questions", async () => {
+  it("reads the three sections through 0131's reader, beside the snapshot and the kept questions", async () => {
     const seen: string[] = [];
     const pool = { query: async (sql: string) => {
       seen.push(sql);

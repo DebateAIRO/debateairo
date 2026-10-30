@@ -4,7 +4,7 @@ import { createPool, migrate, type Pool } from "@debateai/db";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
- * 0130 on real PostgreSQL (owner rulings N7 and N11, 2026-10-29): the V4 account memory. The API's own role
+ * 0131 on real PostgreSQL (owner rulings N7 and N11, 2026-10-29): the V4 account memory. The API's own role
  * (debateai_billing_runtime) saves and reads the reading level, the last visit of a debate it owns and the dig links
  * between its own debates; every write is validated before any read; the shared runtime role reaches none of it; the
  * tables are never read directly; the export worker reads the account's rows behind the export lease; deleting the
@@ -36,7 +36,7 @@ async function account(state = "active"): Promise<Account> {
   const ownerRef = (await database.pool.query<{ owner_ref: string }>('SELECT owner_ref FROM identity."user" WHERE user_id=$1', [userId])).rows[0]!.owner_ref;
   return { userId, ownerRef };
 }
-/** A run whose latest ownership event names `owner`. Only the event is seeded: 0130 reads nothing else of the run. */
+/** A run whose latest ownership event names `owner`. Only the event is seeded: 0131 reads nothing else of the run. */
 async function ownedRun(owner: Account): Promise<string> {
   const runId = randomUUID();
   const seed = await database.pool.connect();
@@ -79,7 +79,7 @@ afterAll(async () => {
   await database?.stop();
 });
 
-describe("0130 the reading level", () => {
+describe("0131 the reading level", () => {
   it("D1 the API's role saves and reads the account's level; the last choice wins", async () => {
     const person = await account();
     expect(await readLevel(api, person.ownerRef)).toBeNull();
@@ -100,7 +100,7 @@ describe("0130 the reading level", () => {
   });
 });
 
-describe("0130 the last visit of a debate", () => {
+describe("0131 the last visit of a debate", () => {
   it("D3 reads nothing before a first visit, then the saved snapshot; a later save replaces it", async () => {
     const person = await account();
     const run = await ownedRun(person);
@@ -151,7 +151,7 @@ describe("0130 the last visit of a debate", () => {
   });
 });
 
-describe("0130 the dig links", () => {
+describe("0131 the dig links", () => {
   it("D6 records a dig between two of the account's debates once, and reads it from both ends", async () => {
     const person = await account();
     const parent = await ownedRun(person);
@@ -206,7 +206,7 @@ describe("0130 the dig links", () => {
   });
 });
 
-describe("0130 who may reach it", () => {
+describe("0131 who may reach it", () => {
   it("D9 the shared runtime role calls none of the functions, and no API role reads a table directly", async () => {
     const person = await account();
     const run = await ownedRun(person);
@@ -285,8 +285,8 @@ describe("0130 who may reach it", () => {
  * the run is no longer the account's for any page-memory read or write. The whole route is
  * tests/integration/side-by-side-erase-superseded.test.ts.
  */
-describe("0130 deleting one debate (R22 item 16)", () => {
-  /** The erasure tombstone core.finalize_private_run_erasure writes, seeded alone (0130 reads nothing else of it). */
+describe("0131 deleting one debate (R22 item 16)", () => {
+  /** The erasure tombstone core.finalize_private_run_erasure writes, seeded alone (0131 reads nothing else of it). */
   const tombstone = (client: { query: Pool["query"] }, run: string) => client.query(`INSERT INTO serve.private_run_erasure_tombstone
     (run_id,completed_at,destroyed_key_count,already_absent_key_count) VALUES ($1,clock_timestamp(),1,0)`, [run]);
   async function seedTombstone(run: string): Promise<void> {
@@ -357,7 +357,7 @@ describe("0130 deleting one debate (R22 item 16)", () => {
     expect(await links([gone])).toEqual([]);
   });
 
-  it("D15 only the erasure role calls it, and the erasure role calls nothing else of 0130", async () => {
+  it("D15 only the erasure role calls it, and the erasure role calls nothing else of 0131", async () => {
     const person = await account();
     const run = await ownedRun(person);
     for (const pool of [api, shared, worker]) {

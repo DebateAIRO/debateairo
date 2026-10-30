@@ -37,6 +37,9 @@ export function validApiEnvironmentFixture(): Record<string, string> {
     DATABASE_URL: "postgresql://api:pass@127.0.0.1:5432/debateai",
     SUPPORT_DATABASE_URL: "postgresql://support:pass@127.0.0.1:5432/debateai",
     AUTHORIZATION_DATABASE_URL: "postgresql://authorization:pass@127.0.0.1:5432/debateai",
+    // Row-level security S01 (PLAN S2.5): the API's two system logins, each its own URL.
+    API_SYSTEM_DATABASE_URL: "postgresql://api_system:pass@127.0.0.1:5432/debateai",
+    API_AUTHORIZATION_SYSTEM_DATABASE_URL: "postgresql://authorization_system:pass@127.0.0.1:5432/debateai",
     ERASURE_DATABASE_URL: "postgresql://erasure:pass@127.0.0.1:5432/debateai",
     CONTENT_PROVISION_DATABASE_URL: "postgresql://content:pass@127.0.0.1:5432/debateai",
     ACCOUNT_ERASURE_GRACE_MS: "604800000",

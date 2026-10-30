@@ -5,7 +5,7 @@ import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
 
 /**
  * Privacy Policy 3.8, R22 item 15 (owner-approved 2026-10-29): the V4 debate pages keep three things in the account
- * (migration 0130: identity.page_reading_level, identity.debate_last_visit, identity.dig_link), so the policy says so.
+ * (migration 0131: identity.page_reading_level, identity.debate_last_visit, identity.dig_link), so the policy says so.
  * Section 2 gains the row "Page settings and visits" after "Debate content"; section 4's first row lists it among its
  * data; section 7 gains its retention row after "Provider return records and retrieval references": kept while the
  * account exists, deleted with the account, and (R22 item 16) a debate's last visit and its links are also deleted with

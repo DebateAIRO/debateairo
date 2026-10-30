@@ -6,6 +6,7 @@ import { WorkItemRepository } from "@debateai/battery";
 import { RunRepository, RunWaitRepository, recordRunSupersession, resolveRunRef, type StartRunInput } from "@debateai/db";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { startContentRunFixture, type ContentRunFixture } from "../support/contentRunFixture.js";
+import { createSystemTwin } from "../support/rls-logins.js";
 
 /**
  * Re-admission records (side-by-side uploads spec 2026-10-21 §4, §9, §13; migration 0123 §4-§5). A waiting debate
@@ -23,7 +24,18 @@ import { startContentRunFixture, type ContentRunFixture } from "../support/conte
 let fixture: ContentRunFixture;
 const waits = (): RunWaitRepository => new RunWaitRepository(fixture.database.pool);
 
-beforeAll(async () => { fixture = await startContentRunFixture("run-supersession"); }, 240_000);
+/**
+ * Row-level security (0126, D29): the room records supersessions on the api-system login (roomDecisionPool: the billing
+ * role and the cross-account marker), and the runner reads runs on its own login (debateai_runtime and the marker).
+ */
+const API_SYSTEM_TWIN = "supersession_api_system_twin";
+const RUNNER_TWIN = "supersession_runner_twin";
+
+beforeAll(async () => {
+  fixture = await startContentRunFixture("run-supersession");
+  await createSystemTwin(fixture.database, API_SYSTEM_TWIN, ["debateai_billing_runtime"]);
+  await createSystemTwin(fixture.database, RUNNER_TWIN, ["debateai_runtime"]);
+}, 240_000);
 afterAll(async () => { await fixture?.stop(); });
 
 async function inTransaction<T>(use: (client: PoolClient) => Promise<T>): Promise<T> {
@@ -666,10 +678,11 @@ describe("0123 §4: the readmitted run's key provision (A-x1) and the runtime's 
       readmit_provision: true, readmit_runtime: false, readmit_public: false, lock_provision: false, lock_public: false,
       unstarted: true, runner_unstarted: false, provision_unstarted: false, unstarted_public: false
     });
-    // And it works as the API's role: record an edge, resolve it, read the line, the stamp and the release state.
+    // And it works as the API's role, on the login the room uses (API_SYSTEM_TWIN): record an edge, resolve it, read
+    // the line, the stamp and the release state.
     const w = await waitingRun();
     const n = await waitingRun();
-    await asRole("debateai_billing_runtime", async (client) => {
+    await asRole(API_SYSTEM_TWIN, async (client) => {
       await client.query("BEGIN");
       await recordRunSupersession(client, { oldRunId: w, newRunId: n });
       await client.query("COMMIT");
@@ -678,9 +691,18 @@ describe("0123 §4: the readmitted run's key provision (A-x1) and the runtime's 
       expect((await client.query("SELECT release_key FROM core.run WHERE run_id=$1", [n])).rows).toEqual([{ release_key: "legacy" }]);
       expect((await client.query("SELECT count(*)::int AS n FROM core.read_current_release()")).rows).toEqual([{ n: 0 }]);
     });
-    // The runner's role reads the stamp and its release state, and can neither record nor resolve.
+    // The bare billing role with no account context may not record an edge (row-level security, 0126).
+    const bareOld = await waitingRun();
+    const bareNew = await waitingRun();
+    await asRole("debateai_billing_runtime", async (client) => {
+      await client.query("BEGIN");
+      expect(codeOf(await refusal(recordRunSupersession(client, { oldRunId: bareOld, newRunId: bareNew })))).toBe("42501");
+      await client.query("ROLLBACK");
+    });
+    // The runner's role, on the runner's login (RUNNER_TWIN), reads the stamp and its release state, and can neither
+    // record nor resolve.
     const m = await waitingRun();
-    await asRole("debateai_runtime", async (client) => {
+    await asRole(RUNNER_TWIN, async (client) => {
       expect((await client.query("SELECT release_key FROM core.run WHERE run_id=$1", [n])).rows).toEqual([{ release_key: "legacy" }]);
       expect((await client.query(`SELECT count(*)::int AS n FROM core.read_release_state('${["r17", "0123456789ab"].join("-")}')`)).rows).toEqual([{ n: 0 }]);
       expect(codeOf(await refusal(resolveRunRef(client, w)))).toBe("42501");
@@ -688,6 +710,10 @@ describe("0123 §4: the readmitted run's key provision (A-x1) and the runtime's 
       await client.query("BEGIN");
       expect(codeOf(await refusal(recordRunSupersession(client, { oldRunId: n, newRunId: m })))).toBe("42501");
       await client.query("ROLLBACK");
+    });
+    // The bare runtime role with no account context reads no run (row-level security, 0126).
+    await asRole("debateai_runtime", async (client) => {
+      expect((await client.query("SELECT release_key FROM core.run WHERE run_id=$1", [n])).rows).toEqual([]);
     });
     expect(await resolveRunRef(fixture.database.pool, n)).toBe(n);
   });

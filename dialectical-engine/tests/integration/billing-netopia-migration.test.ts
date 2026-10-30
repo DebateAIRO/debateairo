@@ -6,6 +6,7 @@ import { migrate } from "@debateai/db";
 import { loadMigrationPlan } from "../../packages/db/src/migration-lineage.js";
 import { seedDevLineage108, seedDevLineage110 } from "../support/devLineage108.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { createSystemTwin } from "../support/rls-logins.js";
 
 /**
  * Spec 2026-10-05 §2.5 and review finding SR-16: 0111 applies on a database that already holds xMoney-era rows (the
@@ -47,11 +48,18 @@ const SYNTHESIS_CHECK_MIGRATION = "0126_synthesis_check.sql";
 const PUBLICATION_REVIEW_MIGRATION = "0127_publication_review.sql";
 const THREAT_REPORT_MIGRATION = "0128_threat_reports.sql";
 const SUPPORT_ANSWER_SCOPE_MIGRATION = "0129_support_answer_scope.sql";
-/** The V4 account memory (owner rulings N7 and N11), chained after synthesis-flag's 0129. */
-const V4_ACCOUNT_MEMORY_MIGRATION = "0130_v4_account_memory.sql";
-const CHAIN = [NETOPIA_MIGRATION, AUTH_DB_BATCH, PART_C_MIGRATION, ROLE_ROTATION_MIGRATION, EXPORT_MIGRATION, MAIL_LOCALE_MIGRATION, MAP_MIGRATION, LANGUAGE_CHECK_MIGRATION, RECLAIM_MIGRATION, REPLY_MEASURES_MIGRATION, ENGINE_VERDICT_MIGRATION, ENGINE_MAP_CHECK_MIGRATION, SIDE_BY_SIDE_MIGRATION, SETTINGS_ACTIVATION_MIGRATION, ITALY_APPROVAL_MIGRATION, SYNTHESIS_CHECK_MIGRATION, PUBLICATION_REVIEW_MIGRATION, THREAT_REPORT_MIGRATION, SUPPORT_ANSWER_SCOPE_MIGRATION, V4_ACCOUNT_MEMORY_MIGRATION] as const;
+/** Row-level security (mission row-level-security, SPEC-v4 R26), chained after the support answer scope's. */
+const RLS_MIGRATION = "0130_row_level_security.sql";
+/** The V4 account memory (owner rulings N7 and N11), chained after row-level security; migrate() applies it last. */
+const V4_ACCOUNT_MEMORY_MIGRATION = "0131_v4_account_memory.sql";
+const CHAIN = [NETOPIA_MIGRATION, AUTH_DB_BATCH, PART_C_MIGRATION, ROLE_ROTATION_MIGRATION, EXPORT_MIGRATION, MAIL_LOCALE_MIGRATION, MAP_MIGRATION, LANGUAGE_CHECK_MIGRATION, RECLAIM_MIGRATION, REPLY_MEASURES_MIGRATION, ENGINE_VERDICT_MIGRATION, ENGINE_MAP_CHECK_MIGRATION, SIDE_BY_SIDE_MIGRATION, SETTINGS_ACTIVATION_MIGRATION, ITALY_APPROVAL_MIGRATION, SYNTHESIS_CHECK_MIGRATION, PUBLICATION_REVIEW_MIGRATION, THREAT_REPORT_MIGRATION, SUPPORT_ANSWER_SCOPE_MIGRATION, RLS_MIGRATION, V4_ACCOUNT_MEMORY_MIGRATION] as const;
 const DEV_110 = "0110_account_erasure_public_debates.sql";
 const SUPERSEDING_VERIFIER = "lineage/verify-effective-capabilities-111.sql";
+/**
+ * The effective-capability verifier in force at the chain head: 0130 supersedes 0111's with its own, whose only changed
+ * clause is the row-security flag of NETOPIA's tables (SPEC-v4 R28, R34; billing.tool_order keeps none).
+ */
+const IN_FORCE_VERIFIER = "lineage/verify-effective-capabilities-130.sql";
 const SEALED_VERIFIER = "lineage/verify-effective-capabilities.sql";
 // A made-up key id, built from pieces so the whole value never appears as one secret-shaped literal.
 const KEY_ID = ["01234567", "89abcdef"].join("");
@@ -70,6 +78,8 @@ const NEW_TABLES = [
 const refused = { code: "23514", message: "REFUND_EXCEEDS_CHARGE" } as const;
 
 let database: TestDatabase;
+/** The api-system shape the billing runtime runs on since row-level security (D41): its billing role and the cross-account marker. */
+const BILLING_SYSTEM_TWIN = "netopia_billing_system_twin";
 const legacy = {
   ownerRef: randomUUID(), subscriptionId: randomUUID(), chargeId: chargeIdOf(), jobId: randomUUID()
 } as const;
@@ -121,6 +131,7 @@ beforeAll(async () => {
   await seedXMoneyEraRows();
   ledgersBefore = await migrationLedgers();
   await migrate(database.pool);
+  await createSystemTwin(database, BILLING_SYSTEM_TWIN, ["debateai_billing_runtime"]);
 }, 600_000);
 afterAll(async () => { await database?.stop(); });
 
@@ -307,9 +318,13 @@ describe("N6 — 0111 over an xMoney-era database (spec §2.5, §2.5.4)", () => 
     await expect(insert("PAUSED", {})).rejects.toMatchObject({ constraint: "subscription_event_kind_known" });
   });
   it("queues PAYMENT_REFUND jobs and records the card-saving agreement on the upgrade and card pages", async () => {
-    await asRole("debateai_billing_runtime", (client) => client.query(`INSERT INTO billing.outbox (job_id, kind, ref, payload,
+    const refundJob = (client: PoolClient) => client.query(`INSERT INTO billing.outbox (job_id, kind, ref, payload,
       created_at, not_before) VALUES ($1, 'PAYMENT_REFUND', $2, '{}'::jsonb, clock_timestamp(), clock_timestamp())`,
-    [randomUUID(), `refund:${chargeIdOf()}`]));
+    [randomUUID(), `refund:${chargeIdOf()}`]);
+    // Row-level security (0130, D32, D41): the billing runtime queues on the api-system login; the bare billing role
+    // with no account context is refused (billing.outbox holds no account key, so its per-account policy admits none).
+    await asRole(BILLING_SYSTEM_TWIN, refundJob);
+    await expect(asRole("debateai_billing_runtime", refundJob)).rejects.toMatchObject({ code: "42501" });
     await expect(query(`INSERT INTO billing.outbox (job_id, kind, ref, payload, created_at, not_before)
       VALUES ($1, 'CANCEL_ORDER', 'x', '{}'::jsonb, clock_timestamp(), clock_timestamp())`, [randomUUID()]))
       .rejects.toMatchObject({ constraint: "outbox_kind_known" });
@@ -524,7 +539,7 @@ describe("F10 — 0111 is the forward step after dev's 0110, with its receipt an
     expect(after.ledger.filter((row) => !(CHAIN as readonly string[]).includes(row.name))).toEqual(before.ledger);
     expect(after.forward108).toEqual(before.forward108);
     expect(after.forward110).toEqual(before.forward110);
-    expect(after.steps).toHaveLength(20);
+    expect(after.steps).toHaveLength(21);
     expect(after.steps[0]).toMatchObject({
       source_name: NETOPIA_MIGRATION, base_recipe_sha256: plan.recipeSha256,
       previous_manifest_sha256: plan.forward110.manifestSha256, forward_manifest_sha256: step!.manifestSha256,
@@ -556,7 +571,10 @@ describe("F10 — 0111 is the forward step after dev's 0110, with its receipt an
   });
 
   it("holds under the superseding verifier, which the sealed one cannot (NETOPIA's tables are outside its closed list)", async () => {
-    expect(await inTransaction(await verifier(SUPERSEDING_VERIFIER))).toBe("accepted");
+    expect(await inTransaction(await verifier(IN_FORCE_VERIFIER))).toBe("accepted");
+    // 0130 turns row security on for eight of NETOPIA's tables, which 0111's own verifier refuses; 0130's verifier, in
+    // force after it, differs from 0111's in that one clause (SPEC-v4 R28, R34).
+    expect(await inTransaction(await verifier(SUPERSEDING_VERIFIER))).toBe("BILLING_NETOPIA_111_TABLE_PRIVILEGE card_token");
     expect(await inTransaction(await verifier(SEALED_VERIFIER))).toBe("AUTH_DEV_107_RELATION_INVENTORY");
   });
 
@@ -575,7 +593,8 @@ describe("F10 — 0111 is the forward step after dev's 0110, with its receipt an
   });
 
   it("the superseding verifier refuses a NETOPIA table or purge granted to a wrong role, and an unexpected billing function", async () => {
-    const sql = await verifier(SUPERSEDING_VERIFIER);
+    // The verifier in force at the head (0130's): every check 0111's makes, row security aside (SPEC-v4 R34).
+    const sql = await verifier(IN_FORCE_VERIFIER);
     const drift = (change: string) => inTransaction(`${change};\n${sql}`);
     expect(await drift("GRANT SELECT ON billing.card_token TO debateai_authorization_runtime")).toBe("BILLING_NETOPIA_111_TABLE_PRIVILEGE card_token");
     expect(await drift("GRANT SELECT (order_id) ON billing.tool_order TO debateai_replay")).toBe("BILLING_NETOPIA_111_TABLE_PRIVILEGE tool_order");
@@ -614,8 +633,27 @@ describe("F10 — 0111 is the forward step after dev's 0110, with its receipt an
       }
     }
     // Every applied step's postcondition digest is compared, not only the last one's: 0111's stays checked with the
-    // steps after it.
+    // steps after it. Since row-level security (0130, D38), a step 0130 amends by design is compared against its
+    // amendment row instead (packages/db/src/migration-forward-chain.ts assertPostconditions): zeroing that row's
+    // digest is refused the same way. Which steps are amended is what the chain declares, and the database recorded.
+    const declaredAmended = (await loadMigrationPlan()).forwardChain.flatMap((step) => (step.amendsPostconditionsOf ?? []).map(({ step: amended }) => amended));
+    const amendmentRows = (await query("SELECT source_name, amended_by, postcondition_evidence_digest FROM public.debateai_schema_migration_step_amendment ORDER BY source_name, amended_by")).rows;
+    expect(declaredAmended.length).toBeGreaterThan(0);
+    expect([...new Set(amendmentRows.map((row) => row.source_name as string))]).toEqual([...declaredAmended].sort());
+    for (const name of declaredAmended) {
+      const rows = amendmentRows.filter((row) => row.source_name === name);
+      await query("UPDATE public.debateai_schema_migration_step_amendment SET postcondition_evidence_digest = repeat('0', 64) WHERE source_name = $1", [name]);
+      try {
+        await expect(migrate(database.pool), name).rejects.toThrow(`MIGRATION_FORWARD_CHAIN_POSTCONDITION_DRIFT ${name}`);
+      } finally {
+        for (const row of rows) {
+          await query("UPDATE public.debateai_schema_migration_step_amendment SET postcondition_evidence_digest = $1 WHERE source_name = $2 AND amended_by = $3",
+            [row.postcondition_evidence_digest, name, row.amended_by]);
+        }
+      }
+    }
     for (const [index, name] of CHAIN.entries()) {
+      if (declaredAmended.includes(name)) continue;
       await query("UPDATE public.debateai_schema_migration_step SET postcondition_evidence_digest = repeat('0', 64) WHERE source_name = $1", [name]);
       try {
         await expect(migrate(database.pool), name).rejects.toThrow(`MIGRATION_FORWARD_CHAIN_POSTCONDITION_DRIFT ${name}`);
@@ -700,11 +738,11 @@ describe("F10 — 0111 is the forward step after dev's 0110, with its receipt an
         { name: SETTINGS_ACTIVATION_MIGRATION, n: 1 }, { name: ITALY_APPROVAL_MIGRATION, n: 1 },
         { name: SYNTHESIS_CHECK_MIGRATION, n: 1 },
         { name: PUBLICATION_REVIEW_MIGRATION, n: 1 }, { name: THREAT_REPORT_MIGRATION, n: 1 }, { name: SUPPORT_ANSWER_SCOPE_MIGRATION, n: 1 },
-        { name: V4_ACCOUNT_MEMORY_MIGRATION, n: 1 }]);
+        { name: RLS_MIGRATION, n: 1 }, { name: V4_ACCOUNT_MEMORY_MIGRATION, n: 1 }]);
       const receipt110 = (await older.pool.query("SELECT source_name, chain_manifest_sha256 FROM public.debateai_schema_migration_forward110")).rows;
       expect(receipt110).toEqual([{ source_name: DEV_110, chain_manifest_sha256: plan.forward108.manifestSha256 }]);
       const receipts = await receiptOf(older.pool);
-      expect(receipts).toHaveLength(20);
+      expect(receipts).toHaveLength(21);
       expect(receipts[0]).toMatchObject({ source_name: NETOPIA_MIGRATION, previous_manifest_sha256: plan.forward110.manifestSha256 });
       expect(receipts[1]).toMatchObject({ source_name: AUTH_DB_BATCH, previous_manifest_sha256: plan.forwardChain[0]!.manifestSha256 });
       expect(receipts[2]).toMatchObject({ source_name: PART_C_MIGRATION, previous_manifest_sha256: plan.forwardChain[1]!.manifestSha256 });
@@ -724,7 +762,8 @@ describe("F10 — 0111 is the forward step after dev's 0110, with its receipt an
       expect(receipts[16]).toMatchObject({ source_name: PUBLICATION_REVIEW_MIGRATION, previous_manifest_sha256: plan.forwardChain[15]!.manifestSha256 });
       expect(receipts[17]).toMatchObject({ source_name: THREAT_REPORT_MIGRATION, previous_manifest_sha256: plan.forwardChain[16]!.manifestSha256 });
       expect(receipts[18]).toMatchObject({ source_name: SUPPORT_ANSWER_SCOPE_MIGRATION, previous_manifest_sha256: plan.forwardChain[17]!.manifestSha256 });
-      expect(receipts[19]).toMatchObject({ source_name: V4_ACCOUNT_MEMORY_MIGRATION, previous_manifest_sha256: plan.forwardChain[18]!.manifestSha256 });
+      expect(receipts[19]).toMatchObject({ source_name: RLS_MIGRATION, previous_manifest_sha256: plan.forwardChain[18]!.manifestSha256 });
+      expect(receipts[20]).toMatchObject({ source_name: V4_ACCOUNT_MEMORY_MIGRATION, previous_manifest_sha256: plan.forwardChain[19]!.manifestSha256 });
       const before = (await older.pool.query("SELECT name, applied_at FROM public.debateai_schema_migration ORDER BY name")).rows;
       await migrate(older.pool);
       expect((await older.pool.query("SELECT name, applied_at FROM public.debateai_schema_migration ORDER BY name")).rows).toEqual(before);

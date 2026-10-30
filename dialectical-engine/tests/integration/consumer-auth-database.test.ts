@@ -1,7 +1,7 @@
 import { withMailLocale } from '../../packages/db/src/mail-locale.js';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createPool, migrate, PostgresConsumerAuthRepository, PostgresSessionRepository, type Pool } from '@debateai/db';
+import { createPool, migrate, PostgresConsumerAuthRepository, PostgresSessionRepository, runInRequestScope, setRequestCredential, type Pool } from '@debateai/db';
 import { hashToken, Argon2WorkerPool, encrypt, generateTotpSecret, hashPassword, totpCodeAtStep, decodeBase32, createEmailBlindIndex, type AuditContextHasher } from '@debateai/crypto';
 import { AUTH_POLICY_REGISTER_ROWS, authPolicyFromRegisterRows, MFA_POLICY_REGISTER_ROW, mfaPolicyFromValue, SESSION_POLICY_REGISTER_ROW, SESSION_POLICY_DEPLOYMENT_REGISTER_ROW, sessionPolicyFromValue } from '@debateai/register';
 import { currentDocument } from '@debateai/legal-manifest';
@@ -10,7 +10,13 @@ import { MfaEnrollmentService } from '../../apps/api/src/mfa.js';
 import { SessionService, type AuthenticatedSession } from '../../apps/api/src/sessions.js';
 import { startTestDatabase, type TestDatabase } from '../support/testDatabase.js';
 import { consumerFixture, origin, rpId, b64 } from '../support/consumerWebAuthnFixtures.js';
+import { createSystemTwin } from '../support/rls-logins.js';
 let database: TestDatabase, runtime: Pool, repo: PostgresConsumerAuthRepository, sessions: SessionService, service: ConsumerWebAuthnService;
+// Row-level security (0126, D28, D29): the authorization pool as main.ts wires it. Inside a request it runs on its own
+// login with the session credential the database verifies; outside one, on its system twin (the same capability role
+// and the cross-account marker).
+let systemRuntime: Pool, scopedRuntime: Pool;
+const inRequest = <T>(sessionToken: string, work: () => Promise<T>): Promise<T> => runInRequestScope(() => { setRequestCredential(sessionToken); return work(); });
 const source = { ip: '192.0.2.7', userAgent: 'consumer-test', requestId: 'task7' }, audit = { hashSourceIp: async () => 'ab'.repeat(32), hashUserAgent: async () => 'cd'.repeat(32) } as unknown as AuditContextHasher;
 const token = () => b64(randomBytes(32));
 const hash = (value: string) => 'sha256:' + createHash('sha256').update(value).digest('hex');
@@ -28,6 +34,8 @@ beforeAll(async () => {
     url.username = 'consumer_test_runtime';
     url.password = 'consumer-test-only';
     runtime = createPool(url.toString());
+    systemRuntime = createPool(await createSystemTwin(database, 'consumer_test_runtime_system', ['debateai_authorization_runtime']));
+    scopedRuntime = createPool(url.toString(), { crossAccount: systemRuntime });
     repo = new PostgresConsumerAuthRepository(runtime, audit);
     sessions = await freshSessions();
     service = new ConsumerWebAuthnService(repo, sessions.consumerProducer(), { publicAppUrl: origin });
@@ -37,7 +45,7 @@ async function freshSessions() {
         dekStore: {} as never, argon2: {} as never, authPolicy: authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS), mfaPolicy: mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value),
         sessionPolicy: sessionPolicyFromValue(SESSION_POLICY_REGISTER_ROW.value, SESSION_POLICY_REGISTER_ROW.sourceRef), blindIndexKey: Buffer.alloc(32, 5), dummyPasswordHash: fixturePassword });
 }
-afterAll(async () => { await runtime?.end(); await database?.stop(); });
+afterAll(async () => { await scopedRuntime?.end(); await systemRuntime?.end(); await runtime?.end(); await database?.stop(); });
 async function account(badLegal = false, missingAdult = false) {
     // Independent synthetic clients keep correctness cases independent of the real shared source gate.
     source.ip = `198.51.${Math.floor(++sourceSequence / 256)}.${sourceSequence % 256}`;
@@ -262,13 +270,16 @@ describe('restricted consumer passkey authority', () => {
             const passwordHash = await hashPassword(argon2, password, authPolicy.password.argon2id);
             await database.pool.query('UPDATE identity."user" SET password_hash=$2 WHERE user_id=$1', [a.userId, passwordHash]);
             await withMailLocale(database.pool, 'en', (c) => c.query("INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at) VALUES($1,$2,'totp',$3,'active',now(),now())", [factorId, a.userId, encrypt(dek, secret, ['identity', 'mfa_factor.secret_ciphertext', factorId, 'run:none', a.userId, `user-dek:${a.userId}`, '1'])]));
-            const realSessions = await SessionService.create({ repository: new PostgresSessionRepository(runtime, audit), riskSignals: { recordForSession: async () => 'recorded' } as never, onRiskSignalFailure: () => undefined,
+            const realSessions = await SessionService.create({ repository: new PostgresSessionRepository(scopedRuntime, audit), riskSignals: { recordForSession: async () => 'recorded' } as never, onRiskSignalFailure: () => undefined,
                 dekStore: { load: async () => Buffer.from(dek) } as never, argon2, authPolicy, mfaPolicy: mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value), sessionPolicy: sessionPolicyFromValue(SESSION_POLICY_REGISTER_ROW.value, SESSION_POLICY_REGISTER_ROW.sourceRef), blindIndexKey: Buffer.alloc(32, 5), dummyPasswordHash: passwordHash });
-            const authenticated = (await realSessions.authenticate(a.result.sessionToken, source))!;
-            const rotation = await realSessions.stepUp({ session: authenticated, password, code: totpCodeAtStep(secret, Math.floor(Date.now() / 30000)), authorization: { action: 'ADD_PASSKEY' } }, source);
+            // The bare login with no account context reads no account's password (row-level security, 0126); the
+            // step-up runs as the API runs it, inside the request that presents the session.
+            expect((await runtime.query('SELECT password_hash FROM identity."user" WHERE user_id=$1', [a.userId])).rows).toEqual([]);
+            const authenticated = (await inRequest(a.result.sessionToken, () => realSessions.authenticate(a.result.sessionToken, source)))!;
+            const rotation = await inRequest(a.result.sessionToken, () => realSessions.stepUp({ session: authenticated, password, code: totpCodeAtStep(secret, Math.floor(Date.now() / 30000)), authorization: { action: 'ADD_PASSKEY' } }, source));
             expect(rotation.grantToken).toBeTruthy();
-            expect(await realSessions.authenticate(a.result.sessionToken, source)).toBeNull();
-            const current = (await realSessions.authenticate(rotation.sessionToken, source))!, o = await service.beginPasskeyEnrollment({ step_up_grant: rotation.grantToken }, source, current), f = consumerFixture();
+            expect(await inRequest(a.result.sessionToken, () => realSessions.authenticate(a.result.sessionToken, source))).toBeNull();
+            const current = (await inRequest(rotation.sessionToken, () => realSessions.authenticate(rotation.sessionToken, source)))!, o = await service.beginPasskeyEnrollment({ step_up_grant: rotation.grantToken }, source, current), f = consumerFixture();
             expect(await service.completePasskeyEnrollment({ challenge_handle: o.challenge_handle, credential: f.registration(o.options.challenge) }, source, current)).toEqual({ status: 'enrolled' });
         }
         finally {
@@ -803,10 +814,13 @@ it('produces ADD_TOTP from genuinely verified password/TOTP step-up and keeps th
   try {
     const authPolicy=authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS),password='Task8 real additional TOTP proof!',passwordHash=await hashPassword(argon2,password,authPolicy.password.argon2id);
     await database.pool.query('UPDATE identity."user" SET password_hash=$2 WHERE user_id=$1',[a.userId,passwordHash]);
-    const actual=await SessionService.create({repository:new PostgresSessionRepository(runtime,audit),riskSignals:{recordForSession:async()=> 'recorded'} as never,onRiskSignalFailure:()=>{},dekStore:{load:async()=>Buffer.from(totpDek)} as never,argon2,authPolicy,mfaPolicy:mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value),sessionPolicy:sessionPolicyFromValue(SESSION_POLICY_DEPLOYMENT_REGISTER_ROW.value,SESSION_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef),blindIndexKey:Buffer.alloc(32,5),dummyPasswordHash:passwordHash});
-    const current=(await actual.authenticate(signed.sessionToken,source))!;
-    const rotated=await actual.stepUp({session:current,password,code:totpCodeAtStep(decodeBase32(b.secret),Math.floor(Date.now()/30000)+1),authorization:{action:'ADD_TOTP'}},source);
-    const fresh=(await actual.authenticate(rotated.sessionToken,source))!;expect(fresh).not.toBeNull();
+    const actual=await SessionService.create({repository:new PostgresSessionRepository(scopedRuntime,audit),riskSignals:{recordForSession:async()=> 'recorded'} as never,onRiskSignalFailure:()=>{},dekStore:{load:async()=>Buffer.from(totpDek)} as never,argon2,authPolicy,mfaPolicy:mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value),sessionPolicy:sessionPolicyFromValue(SESSION_POLICY_DEPLOYMENT_REGISTER_ROW.value,SESSION_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef),blindIndexKey:Buffer.alloc(32,5),dummyPasswordHash:passwordHash});
+    // The bare login with no account context reads no account's password (row-level security, 0126); the step-up runs
+    // as the API runs it, inside the request that presents the session.
+    expect((await runtime.query('SELECT password_hash FROM identity."user" WHERE user_id=$1',[a.userId])).rows).toEqual([]);
+    const current=(await inRequest(signed.sessionToken,()=>actual.authenticate(signed.sessionToken,source)))!;
+    const rotated=await inRequest(signed.sessionToken,()=>actual.stepUp({session:current,password,code:totpCodeAtStep(decodeBase32(b.secret),Math.floor(Date.now()/30000)+1),authorization:{action:'ADD_TOTP'}},source));
+    const fresh=(await inRequest(rotated.sessionToken,()=>actual.authenticate(rotated.sessionToken,source)))!;expect(fresh).not.toBeNull();
     const added=await mfa.beginTotp({stepUpGrant:rotated.grantToken!},source,fresh);
     await expect(mfa.verifyTotp({enrollmentToken:added.enrollment_token,code:totpCode(added.secret)},source,fresh)).resolves.toEqual({status:'enrolled'});
     expect((await state(a)).sessions).toBe(1);expect((await database.pool.query("SELECT count(*)::int AS n FROM identity.mfa_factor WHERE user_id=$1 AND state='active'",[a.userId])).rows[0].n).toBe(2);

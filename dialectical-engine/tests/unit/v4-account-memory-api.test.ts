@@ -7,9 +7,9 @@ import {
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
 
 /**
- * V4 account memory (owner rulings N7 and N11, migration 0130): the six routes. Each is a signed-in (cookie) route; a
+ * V4 account memory (owner rulings N7 and N11, migration 0131): the six routes. Each is a signed-in (cookie) route; a
  * write needs the exact Origin and the CSRF pair; a run that is not the caller's is the closed 404 RUN_NOT_FOUND (the
- * store, i.e. 0130's functions, decides it); a malformed body is 400 before the store is asked; without a store each
+ * store, i.e. 0131's functions, decides it); a malformed body is 400 before the store is asked; without a store each
  * route answers 503 ACCOUNT_MEMORY_UNAVAILABLE. The PostgreSQL behaviour is tests/integration/v4-account-memory-database.test.ts.
  */
 const OWNER = testHttpIdentity("account-memory-owner");
@@ -232,7 +232,7 @@ describe("accountMemoryStoreFrom: the PostgreSQL adapter", () => {
     };
   }
 
-  it("calls 0130's functions with the owner first, and reads their rows", async () => {
+  it("calls 0131's functions with the owner first, and reads their rows", async () => {
     const seen: Array<[string, unknown[]]> = [];
     expect(await accountMemoryStoreFrom(recordingQuery([{ reading_level: "background" }], seen)).readReadingLevel(OWNER_REF)).toBe("background");
     expect(await accountMemoryStoreFrom(recordingQuery([{ reading_level: null }])).readReadingLevel(OWNER_REF)).toBeNull();
@@ -258,7 +258,7 @@ describe("accountMemoryStoreFrom: the PostgreSQL adapter", () => {
     expect(await accountMemoryStoreFrom(recordingQuery([{ links: null }])).readDigLinks(OWNER_REF, FOREIGN)).toBeNull();
   });
 
-  it("maps 0130's 22023 refusals to AccountMemoryInputError and refuses an outcome it does not know", async () => {
+  it("maps 0131's 22023 refusals to AccountMemoryInputError and refuses an outcome it does not know", async () => {
     const refused = Object.assign(new Error("DIG_LINK_INVALID"), { code: "22023" });
     await expect(accountMemoryStoreFrom(recordingQuery(refused)).recordDigLink(OWNER_REF, RUN, { child_run_id: CHILD, places: [], mode: "quick" }))
       .rejects.toBeInstanceOf(AccountMemoryInputError);

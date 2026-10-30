@@ -60,7 +60,7 @@ describe("S2 identity schema on real PostgreSQL", () => {
       "consumer_recovery_enrollment", "consumer_recovery_gate", "consumer_recovery_reservation", "consumer_recovery_token",
       "consumer_security_challenge", "consumer_security_notice", "consumer_totp_enrollment",
       "data_export",
-      // 0130 V4 account memory: the reading level, debate visits and dig links.
+      // 0131 V4 account memory: the reading level, debate visits and dig links.
       "debate_last_visit", "dig_link",
       "email_change_request", "login_challenge", "mfa_factor",
       "mfa_recovery_control", "mfa_recovery_legacy_cohort", "mfa_recovery_notice", "mfa_recovery_notice_binding",

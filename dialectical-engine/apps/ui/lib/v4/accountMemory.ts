@@ -13,7 +13,7 @@ import { findOpenQuestion, findPath } from "./mapModel.js";
 import { READING_LEVELS, type DigLink, type ReadingLevel, type SeenSnapshot, type V4Map } from "./types.js";
 
 /*
- * V4 account memory (owner rulings N7 and N11, 2026-10-29; migration 0130): what the V4 pages keep in the person's
+ * V4 account memory (owner rulings N7 and N11, 2026-10-29; migration 0131): what the V4 pages keep in the person's
  * ACCOUNT, never in the browser — the reading level, the last visit of each debate ("since your last visit") and the link
  * of each dig to the debate it came from. Reads throw, so a page can tell "nothing saved yet" from "could not read" and
  * fall back to what it did before this memory existed; writes are best-effort and never throw (a page never waits on
@@ -48,7 +48,7 @@ export async function saveAccountLevel(level: ReadingLevel, client: LevelClient 
 }
 
 /**
- * The part of a map snapshot the account can keep: entries whose id and word fit 0130's shape. The same filter is used
+ * The part of a map snapshot the account can keep: entries whose id and word fit 0131's shape. The same filter is used
  * on the snapshot compared with the kept one, so an item that can never be kept is never reported as new.
  */
 export function storableItems(items: Readonly<Record<string, string>>): Readonly<Record<string, string>> {
