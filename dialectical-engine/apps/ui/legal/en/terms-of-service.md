@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In short
-eyebrow: TERMS OF SERVICE · v2.8 · EFFECTIVE 12 OCTOBER 2026
+eyebrow: TERMS OF SERVICE · v2.9 · EFFECTIVE 12 OCTOBER 2026
 title: What you agree to
 lede: The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.
-endMarker: END OF TERMS · v2.8
+endMarker: END OF TERMS · v2.9
 bodyLabel: Terms of Service text
 annexTitle: Annex A — Regional terms
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 GOVERNING LAW
 -->
 
-**Version 2.8 · Effective 12 October 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
+**Version 2.9 · Effective 12 October 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
 
 **In short.** You must be 18 or over. Dialectical Engine builds arguments with AI models and everything it generates may be wrong — it is not advice. Your debates are private unless you publish them; if you publish, anyone can read them. Text you submit is sent to AI providers listed in our Provider Register, and is not used to train models. Report illegal content at support@dezbatere.ro whether or not you have an account. Romanian law governs, but your local consumer protections stay with you.
 
@@ -138,6 +138,8 @@ If you are unsure whether something is allowed, ask us before you post it.
 
 **Outputs.** As between you and us, you may use the output of your own debates for any lawful purpose, and we do not claim ownership of generated text. Be aware that generated output may not be protectable by copyright in many jurisdictions; that similar output may be generated for other users; that outputs may reproduce or resemble third-party material; and that some source material an AI provider retrieves may carry restrictions on reuse. You are responsible for checking before you rely on or republish outputs.
 
+**Charts and statistics we generate.** The charts in a debate report, and the statistics we compile for them — their selection, arrangement, design and drawing — are made by Dialectical Engine and belong to DMS Merchandise Shop S.R.L.; each chart is marked "Copyrighted by DMS Merchandise Shop SRL". This does not extend to the figures a chart shows, which come from your debate, or to the text of your debate. We grant you a free, worldwide, non-exclusive and perpetual licence to use, copy and share those charts for any lawful purpose, provided you keep the notice and the AI-generated label with them. Where the law does not recognise rights in AI-generated material, this paragraph gives us no more than the law allows.
+
 ## 9. Publishing a debate
 
 Debates are **private by default**. Nothing you create is visible to anyone else unless you publish it.
@@ -240,6 +242,8 @@ If you live elsewhere, Annex A states the withdrawal or cooling-off right that a
 We tell you in advance, on a durable medium, what is changing and when. If the change has more than a minor negative effect on your access to or use of the service, you may terminate free of charge within **30 days** of being told, or of the change taking effect, whichever is later, and we refund any prepaid amount for the unused period.
 
 **To these Terms.** We may change these Terms for the same kinds of reasons. For changes that do not reduce your rights, we post the new version with a summary of what changed and email you at least **30 days** before it takes effect; continuing to use Dialectical Engine after that date means you accept it, and you may close your account before then. For changes that reduce your rights — including price increases on an existing plan, lower limits, removed features, new uses of your content, or changes to liability, governing law or dispute resolution — we ask you to accept the new version expressly at your next sign-in, and the change applies only going forward. We never make a change retroactive, and we never use this section to change the core of what you have paid for mid-term without offering you a way out. Prior versions stay available at dezbatere.ro/terms/versions.
+
+Version 2.9 replaced version 2.8: section 8 gains the paragraph "Charts and statistics we generate", which says who owns the charts in a debate report and gives you a licence to use them.
 
 Version 2.8 replaced version 2.7: the question check also refuses a question that asks how to commit a crime or get away with one, or whether someone should commit one, such as buying or selling drugs or weapons illegally, stealing or evading tax, and does not keep it; a question about whether a law should change still starts a debate (section 7). It also sets one line for drugs and lets a question about whether the law on suicide, euthanasia or assisted dying should change start a debate (section 7), and the question check no longer keeps any question for our team (sections 7 and 10); the screen that refuses a question is our statement of reasons for every question section 7 does not start (section 10).
 

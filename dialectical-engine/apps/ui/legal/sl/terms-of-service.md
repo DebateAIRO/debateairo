@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Na kratko
-eyebrow: POGOJI UPORABE · v2.8 · VELJAVNI OD 12. OKTOBRA 2026
+eyebrow: POGOJI UPORABE · v2.9 · VELJAVNI OD 12. OKTOBRA 2026
 title: S čim soglašate
 lede: Pogodba med vami in družbo DMS Merchandise Shop S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.
-endMarker: KONEC POGOJEV · v2.8
+endMarker: KONEC POGOJEV · v2.9
 bodyLabel: Besedilo Pogojev uporabe
 annexTitle: Priloga A — Regionalni pogoji
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PRAVO, KI SE UPORABLJA
 -->
 
-**Version 2.8 · Effective 12. oktobra 2026 · Prejšnje različice so na dezbatere.ro/terms/versions · Jezik: slovenščina.**
+**Version 2.9 · Effective 12. oktobra 2026 · Prejšnje različice so na dezbatere.ro/terms/versions · Jezik: slovenščina.**
 
 **In short.** Stari morate biti najmanj 18 let. Dialectical Engine z modeli umetne inteligence oblikuje argumente in vse, kar ustvari, je lahko napačno — to ni nasvet. Vaše razprave so zasebne, razen če jih objavite; če jih objavite, jih lahko prebere vsakdo. Besedilo, ki ga pošljete, se posreduje ponudnikom umetne inteligence, navedenim v našem Registru ponudnikov, in se ne uporablja za učenje modelov. Nezakonito vsebino prijavite na support@dezbatere.ro, ne glede na to, ali imate račun. Uporablja se romunsko pravo, vendar ohranite varstvo potrošnikov po svojem lokalnem pravu.
 
@@ -138,6 +138,8 @@ Ta pravila veljajo za vsebino, ki jo pošljete in objavite, ter za način uporab
 
 **Rezultati.** V razmerju med vami in nami lahko rezultate svojih razprav uporabljate za kateri koli zakonit namen, mi pa ne uveljavljamo lastništva ustvarjenega besedila. Upoštevajte, da ustvarjenega rezultata v številnih pravnih redih morda ni mogoče avtorskopravno zaščititi; da se lahko podoben rezultat ustvari za druge uporabnike; da lahko rezultati reproducirajo gradivo tretjih oseb ali so mu podobni; ter da za nekatera izvorna gradiva, ki jih pridobi ponudnik umetne inteligence, lahko veljajo omejitve ponovne uporabe. Preden se zanesete na rezultate ali jih ponovno objavite, ste odgovorni za preverjanje.
 
+**Grafikoni in statistični podatki, ki jih ustvarimo.** Grafikoni v poročilu o razpravi in statistični podatki, ki jih zanje pripravimo — njihov izbor, razporeditev, oblikovanje in izris — so delo storitve Dialectical Engine in pripadajo družbi DMS Merchandise Shop S.R.L.; vsak grafikon je označen z obvestilom »Copyrighted by DMS Merchandise Shop SRL«. To ne velja za številke, ki jih prikazuje grafikon in izhajajo iz vaše razprave, niti za besedilo vaše razprave. Podeljujemo vam brezplačno, svetovno, neizključno in časovno neomejeno licenco za uporabo, kopiranje in deljenje teh grafikonov za kateri koli zakonit namen, pod pogojem, da ob njih ohranite obvestilo in oznako, da jih je ustvarila umetna inteligenca. Kadar zakon ne priznava pravic na gradivu, ki ga ustvari umetna inteligenca, nam ta odstavek ne daje več, kot dovoljuje zakon.
+
 ## 9. Objava razprave
 
 Razprave so **privzeto zasebne**. Nič, kar ustvarite, ni vidno drugim, razen če to objavite.
@@ -240,6 +242,8 @@ Dialectical Engine ponuja brezplačen paket. Na voljo bo plačljivi paket **Prem
 Na trajnem nosilcu vas vnaprej obvestimo, kaj se spreminja in kdaj. Če ima sprememba več kot zgolj manjši negativen vpliv na vaš dostop do storitve ali njeno uporabo, lahko brezplačno odpoveste pogodbo v **30 dneh** od obvestila ali začetka učinkovanja spremembe, kar je pozneje, mi pa vam vrnemo vse vnaprej plačane zneske za neizkoriščeno obdobje.
 
 **Spremembe teh Pogojev.** Te Pogoje lahko spremenimo iz enakih vrst razlogov. Pri spremembah, ki ne zmanjšujejo vaših pravic, objavimo novo različico s povzetkom sprememb in vam najmanj **30 dni** pred začetkom veljavnosti pošljemo e-poštno sporočilo; nadaljnja uporaba Dialectical Engine po tem datumu pomeni, da spremembo sprejemate, pred tem pa lahko zaprete račun. Pri spremembah, ki zmanjšujejo vaše pravice — vključno z zvišanjem cen obstoječega paketa, nižjimi omejitvami, odstranjenimi funkcijami, novimi načini uporabe vaše vsebine ali spremembami odgovornosti, prava, ki se uporablja, oziroma reševanja sporov — vas ob naslednji prijavi prosimo, da novo različico izrecno sprejmete, sprememba pa velja samo za naprej. Sprememb nikoli ne uveljavljamo za nazaj in tega razdelka nikoli ne uporabimo za spremembo bistva tega, kar ste plačali, med trajanjem pogodbe, ne da bi vam ponudili možnost odstopa. Prejšnje različice ostanejo dostopne na dezbatere.ro/terms/versions.
+
+Različica 2.9 je nadomestila različico 2.8: razdelek 8 dobi odstavek »Grafikoni in statistični podatki, ki jih ustvarimo«, ki določa, komu pripadajo grafikoni v poročilu o razpravi, in vam podeljuje licenco za njihovo uporabo.
 
 Različica 2.8 je nadomestila različico 2.7: naše preverjanje vprašanja zavrne tudi vprašanje, kako storiti kaznivo dejanje ali se izogniti kazni zanj, in vprašanje, ali bi ga kdo moral storiti, na primer nezakonito kupiti ali prodati droge ali orožje, krasti ali utajiti davek, in ga ne hrani; vprašanje, ali bi bilo treba spremeniti kakšen zakon, še vedno začne razpravo (razdelek 7). Določa tudi enotno pravilo za droge in omogoča, da vprašanje, ali bi bilo treba spremeniti zakon o samomoru, evtanaziji ali pomoči pri umiranju, začne razpravo (razdelek 7), preverjanje vprašanja pa nobenega vprašanja več ne hrani, da bi ga prebrala naša ekipa (razdelka 7 in 10); zaslon, ki zavrne vprašanje, je naša obrazložitev za vsako vprašanje, iz katerega se po razdelku 7 razprava ne začne (razdelek 10).
 

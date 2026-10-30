@@ -582,14 +582,16 @@ describe("the PDF's text styles (apps/ui/lib/report/ReportDocument.tsx)", () => 
   it("never lets a text break between runs (where textkit would print a stray hyphen)", () => {
     // textkit 7.0.1 treats every run boundary (a word, then a [Pn] marker or an underlined P5; a change of
     // script, as Japanese changes between Han and kana) as a hyphenation point; at its own infinity, 10000,
-    // a penalty is never a line break. The report has four kinds of text and each sets it: Words (every
-    // plain text), StoryText, an appendix entry's head, and the page numbers.
+    // a penalty is never a line break. The report has five kinds of text and each sets it: Words (every
+    // plain text), StoryText, a table cell with its [Pn] link (data blocks, 2026-10-30), an appendix entry's head,
+    // and the page numbers.
     expect(source).toMatch(/^const NEVER_BREAK_BETWEEN_RUNS = 10000;$/mu);
-    expect(source.match(/hyphenationPenalty=/gu)).toHaveLength(4);
-    expect(source.match(/hyphenationPenalty=\{NEVER_BREAK_BETWEEN_RUNS\}/gu)).toHaveLength(4);
-    // Seven Text elements: those four, and the three nested in StoryText and in the entry head. A new one comes here first.
-    expect(source.match(/<Text\b/gu)).toHaveLength(7);
-    expect(source.match(/hyphenationCallback=\{reportLineBreaker\(/gu)).toHaveLength(3);
+    expect(source.match(/hyphenationPenalty=/gu)).toHaveLength(5);
+    expect(source.match(/hyphenationPenalty=\{NEVER_BREAK_BETWEEN_RUNS\}/gu)).toHaveLength(5);
+    // Nine Text elements: those five, and the four nested in StoryText, the table cell and the entry head. A new one
+    // comes here first.
+    expect(source.match(/<Text\b/gu)).toHaveLength(9);
+    expect(source.match(/hyphenationCallback=\{reportLineBreaker\(/gu)).toHaveLength(4);
   });
 
   it("lets a position row and the reviewer-note box wrap across pages; the reservation line stays whole (LG-A, L10)", () => {

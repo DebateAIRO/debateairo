@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Īsumā
-eyebrow: PAKALPOJUMA NOTEIKUMI · v2.8 · SPĒKĀ NO 2026. GADA 12. OKTOBRA
+eyebrow: PAKALPOJUMA NOTEIKUMI · v2.9 · SPĒKĀ NO 2026. GADA 12. OKTOBRA
 title: Kam jūs piekrītat
 lede: Līgums starp jums un DMS Merchandise Shop S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.
-endMarker: NOTEIKUMU BEIGAS · v2.8
+endMarker: NOTEIKUMU BEIGAS · v2.9
 bodyLabel: Pakalpojuma noteikumu teksts
 annexTitle: A pielikums — Reģionālie noteikumi
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PIEMĒROJAMIE TIESĪBU AKTI
 -->
 
-**Version 2.8 · Effective 2026. gada 12. oktobris · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
+**Version 2.9 · Effective 2026. gada 12. oktobris · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
 
 **In short.** Jums jābūt vismaz 18 gadus vecam. Dialectical Engine veido argumentus ar MI modeļiem, un viss, ko tas ģenerē, var būt nepareizs — tā nav konsultācija. Jūsu debates ir privātas, ja vien tās nepublicējat; ja tās publicējat, ikviens tās var lasīt. Jūsu iesniegtais teksts tiek nosūtīts mūsu Pakalpojumu sniedzēju reģistrā norādītajiem MI pakalpojumu sniedzējiem un netiek izmantots modeļu apmācīšanai. Par nelikumīgu saturu ziņojiet uz support@dezbatere.ro neatkarīgi no tā, vai jums ir konts. Piemēro Rumānijas tiesību aktus, taču jums joprojām ir vietējā patērētāju aizsardzība.
 
@@ -138,6 +138,8 @@ Ja neesat pārliecināts, vai kaut kas ir atļauts, pirms publicēšanas jautāj
 
 **Rezultāti.** Attiecībās starp jums un mums jūs drīkstat savu debašu rezultātu izmantot jebkuram likumīgam nolūkam, un mēs nepretendējam uz īpašumtiesībām uz ģenerēto tekstu. Ņemiet vērā, ka daudzās jurisdikcijās ģenerēto rezultātu autortiesības var neaizsargāt; ka līdzīgs rezultāts var tikt ģenerēts citiem lietotājiem; ka rezultāti var reproducēt trešo personu materiālus vai tiem līdzināties; un ka uz atsevišķiem avotu materiāliem, ko izgūst MI pakalpojumu sniedzējs, var attiekties atkārtotas izmantošanas ierobežojumi. Pirms paļaujaties uz rezultātiem vai tos pārpublicējat, jums tie jāpārbauda.
 
+**Mūsu ģenerētās diagrammas un statistika.** Debašu pārskatā iekļautās diagrammas un statistika, ko mēs tām apkopojam, — to atlase, izkārtojums, dizains un zīmējums — ir Dialectical Engine veidotas un pieder DMS Merchandise Shop S.R.L.; katra diagramma ir marķēta ar norādi „Copyrighted by DMS Merchandise Shop SRL”. Tas neattiecas uz skaitļiem, ko diagramma attēlo un kas iegūti no jūsu debatēm, kā arī uz jūsu debašu tekstu. Mēs piešķiram jums bezmaksas, visā pasaulē spēkā esošu, neekskluzīvu un beztermiņa licenci izmantot, kopēt un kopīgot šīs diagrammas jebkuram likumīgam nolūkam ar nosacījumu, ka kopā ar tām saglabājat šo norādi un marķējumu, ka tās ģenerējis MI. Ja tiesību akti neatzīst tiesības uz MI ģenerētu materiālu, šī rindkopa mums nepiešķir vairāk, nekā pieļauj tiesību akti.
+
 ## 9. Debašu publicēšana
 
 Debates **pēc noklusējuma ir privātas**. Nekas no jūsu izveidotā nav redzams citām personām, ja vien to nepublicējat.
@@ -240,6 +242,8 @@ Ja dzīvojat citviet, A pielikumā norādītas jūsu reģionā piemērojamās at
 Mēs pastāvīgā informācijas nesējā iepriekš paziņojam, kas un kad mainīsies. Ja izmaiņas vairāk nekā nebūtiski nelabvēlīgi ietekmē jūsu piekļuvi pakalpojumam vai tā lietošanu, varat bez maksas izbeigt līgumu **30 dienu laikā** pēc paziņojuma saņemšanas vai izmaiņu stāšanās spēkā atkarībā no tā, kurš datums ir vēlāks, un mēs atmaksājam iepriekš samaksāto summu par neizmantoto periodu.
 
 **Šo Noteikumu izmaiņas.** Mēs varam mainīt šos Noteikumus tādu pašu iemeslu dēļ. Attiecībā uz izmaiņām, kas nesamazina jūsu tiesības, mēs publicējam jauno versiju kopā ar izmaiņu kopsavilkumu un vismaz **30 dienu iepriekš** nosūtām jums e-pasta ziņojumu par tās stāšanos spēkā; turpinot lietot Dialectical Engine pēc šī datuma, jūs izmaiņām piekrītat, un pirms tam varat slēgt kontu. Attiecībā uz izmaiņām, kas samazina jūsu tiesības, — tostarp esoša plāna cenas paaugstinājumu, zemākiem ierobežojumiem, noņemtām funkcijām, jauniem jūsu satura lietošanas veidiem vai izmaiņām atbildībā, piemērojamajos tiesību aktos vai strīdu izšķiršanā — mēs lūdzam nākamajā pierakstīšanās reizē skaidri piekrist jaunajai versijai, un izmaiņas attiecas tikai uz turpmāko laiku. Mēs nekad neveicam izmaiņas ar atpakaļejošu spēku un nekad neizmantojam šo sadaļu, lai termiņa vidū mainītu jums apmaksātā pakalpojuma būtību, nepiedāvājot iespēju izstāties. Iepriekšējās versijas ir pieejamas vietnē dezbatere.ro/terms/versions.
+
+Versija 2.9 aizstāja versiju 2.8: 8. sadaļa tiek papildināta ar rindkopu „Mūsu ģenerētās diagrammas un statistika”, kas nosaka, kam pieder debašu pārskata diagrammas, un piešķir jums licenci tās izmantot.
 
 Versija 2.8 aizstāja versiju 2.7: jautājumu pārbaude noraida arī jautājumu par to, kā izdarīt noziegumu vai izvairīties no soda par to, vai par to, vai kādam vajadzētu izdarīt noziegumu, piemēram, nelikumīgi pirkt vai pārdot narkotikas vai ieročus, zagt vai izvairīties no nodokļu nomaksas, un to nesaglabā; jautājums par to, vai kāds likums būtu jāmaina, joprojām ļauj debatēm sākties (7. sadaļa). Tā arī nosaka vienotu noteikumu attiecībā uz narkotikām un ļauj debatēm sākties no jautājuma par to, vai būtu jāmaina likums, kas attiecas uz pašnāvību, eitanāziju vai asistēto miršanu (7. sadaļa), un jautājumu pārbaude vairs neglabā nevienu jautājumu mūsu komandai (7. un 10. sadaļa); ekrāns, kas noraida jautājumu, ir mūsu pamatojums attiecībā uz katru jautājumu, kas saskaņā ar 7. sadaļu neļauj debatēm sākties (10. sadaļa).
 

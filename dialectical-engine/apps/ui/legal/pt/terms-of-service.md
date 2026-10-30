@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Em resumo
-eyebrow: TERMOS DE SERVIÇO · v2.8 · EM VIGOR DESDE 12 DE OUTUBRO DE 2026
+eyebrow: TERMOS DE SERVIÇO · v2.9 · EM VIGOR DESDE 12 DE OUTUBRO DE 2026
 title: Aquilo com que concorda
 lede: O contrato entre si e a DMS Merchandise Shop S.R.L., em linguagem clara. Dezanove secções e o Anexo A — desloque-se até ao fim.
-endMarker: FIM DOS TERMOS · v2.8
+endMarker: FIM DOS TERMOS · v2.9
 bodyLabel: Texto dos Termos de Serviço
 annexTitle: Anexo A — Termos regionais
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEI APLICÁVEL
 -->
 
-**Version 2.8 · Effective 12 de outubro de 2026 · Versões anteriores em dezbatere.ro/terms/versions · Idioma: português.**
+**Version 2.9 · Effective 12 de outubro de 2026 · Versões anteriores em dezbatere.ro/terms/versions · Idioma: português.**
 
 **In short.** Tem de ter pelo menos 18 anos. A Dialectical Engine constrói argumentos com modelos de IA e tudo o que gera pode estar errado — não constitui aconselhamento. Os seus debates são privados, a menos que os publique; se os publicar, qualquer pessoa poderá lê-los. O texto que envia é transmitido aos fornecedores de IA indicados no nosso Registo de Fornecedores e não é utilizado para treinar modelos. Denuncie conteúdos ilegais através de support@dezbatere.ro, tenha ou não uma conta. É aplicável a lei romena, mas as proteções locais de que beneficia enquanto consumidor mantêm-se.
 
@@ -138,6 +138,8 @@ Se tiver dúvidas sobre se algo é permitido, pergunte-nos antes de o publicar.
 
 **Resultados.** Na relação entre o utilizador e nós, pode utilizar os resultados dos seus próprios debates para qualquer finalidade lícita e não reivindicamos a titularidade do texto gerado. Tenha em conta que os resultados gerados podem não ser protegidos por direitos de autor em muitas jurisdições; que podem ser gerados resultados semelhantes para outros utilizadores; que os resultados podem reproduzir ou assemelhar-se a materiais de terceiros; e que alguns materiais de origem obtidos por um fornecedor de IA podem estar sujeitos a restrições de reutilização. É responsável por efetuar verificações antes de se basear nos resultados ou de os voltar a publicar.
 
+**Gráficos e estatísticas que geramos.** Os gráficos de um relatório de debate, bem como as estatísticas que compilamos para os mesmos — a respetiva seleção, disposição, conceção e desenho —, são criados pela Dialectical Engine e pertencem à DMS Merchandise Shop S.R.L.; cada gráfico ostenta a menção «Copyrighted by DMS Merchandise Shop SRL». Tal não abrange os valores apresentados num gráfico, que provêm do seu debate, nem o texto do seu debate. Concedemos-lhe uma licença gratuita, mundial, não exclusiva e perpétua para utilizar, copiar e partilhar esses gráficos para qualquer finalidade lícita, desde que mantenha junto deles a menção e a identificação de conteúdo gerado por IA. Quando a lei não reconheça direitos sobre materiais gerados por IA, o presente parágrafo não nos confere mais do que a lei permite.
+
 ## 9. Publicação de um debate
 
 Os debates são **privados por predefinição**. Nada do que criar será visível para qualquer outra pessoa, a menos que o publique.
@@ -240,6 +242,8 @@ Se residir noutro local, o Anexo A indica o direito de retratação ou o períod
 Informá-lo-emos previamente, num suporte duradouro, sobre o que será alterado e quando. Se a alteração tiver um efeito negativo mais do que ligeiro no seu acesso ao serviço ou na sua utilização, poderá resolver o contrato sem encargos no prazo de **30 dias** após ser informado, ou após a produção de efeitos da alteração, consoante a data que for posterior, e reembolsaremos qualquer montante pré-pago relativo ao período não utilizado.
 
 **A estes Termos.** Podemos alterar estes Termos pelos mesmos tipos de motivos. No caso de alterações que não reduzam os seus direitos, publicamos a nova versão com um resumo das alterações e enviamos-lhe uma mensagem de correio eletrónico pelo menos **30 dias** antes de produzir efeitos; a utilização continuada da Dialectical Engine depois dessa data significa que a aceita; pode encerrar a sua conta antes dessa data. No caso de alterações que reduzam os seus direitos — incluindo aumentos de preço de um plano existente, redução de limites, remoção de funcionalidades, novas utilizações do seu conteúdo ou alterações relativas à responsabilidade, à lei aplicável ou à resolução de litígios — pedimos-lhe que aceite expressamente a nova versão quando voltar a iniciar sessão, e a alteração só se aplica daí em diante. Nunca aplicamos uma alteração retroativamente e nunca utilizamos esta secção para alterar, durante o respetivo prazo, o essencial daquilo por que pagou sem lhe oferecer uma forma de sair. As versões anteriores permanecem disponíveis em dezbatere.ro/terms/versions.
+
+A versão 2.9 substituiu a versão 2.8: a secção 8 passa a incluir o parágrafo «Gráficos e estatísticas que geramos», que indica a quem pertencem os gráficos de um relatório de debate e lhe concede uma licença para os utilizar.
 
 A versão 2.8 substituiu a versão 2.7: a verificação de perguntas também recusa uma pergunta sobre como cometer um crime ou escapar impune, ou sobre se alguém deveria cometer um, como comprar ou vender ilegalmente drogas ou armas, roubar ou fugir aos impostos, e não a guarda; uma pergunta sobre se uma lei deveria mudar continua a fazer começar um debate (secção 7). Fixa também um único critério para as drogas e permite que uma pergunta sobre se a lei relativa ao suicídio, à eutanásia ou à morte assistida deveria mudar faça começar um debate (secção 7), e a verificação de perguntas já não conserva nenhuma pergunta para a nossa equipa (secções 7 e 10); o ecrã que recusa uma pergunta é a nossa exposição dos motivos para cada pergunta com que, segundo a secção 7, não começa um debate (secção 10).
 

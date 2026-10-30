@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kısaca
-eyebrow: HİZMET KOŞULLARI · v2.8 · YÜRÜRLÜK TARİHİ 12 EKİM 2026
+eyebrow: HİZMET KOŞULLARI · v2.9 · YÜRÜRLÜK TARİHİ 12 EKİM 2026
 title: Kabul ettiğiniz hükümler
 lede: Sizinle DMS Merchandise Shop S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.
-endMarker: KOŞULLARIN SONU · v2.8
+endMarker: KOŞULLARIN SONU · v2.9
 bodyLabel: Hizmet Koşulları metni
 annexTitle: Ek A — Bölgesel koşullar
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 UYGULANACAK HUKUK
 -->
 
-**Version 2.8 · Effective 12 Ekim 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
+**Version 2.9 · Effective 12 Ekim 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
 
 **In short.** En az 18 yaşında olmalısınız. Dialectical Engine, yapay zekâ modelleriyle argümanlar oluşturur ve ürettiği her şey yanlış olabilir — bunlar tavsiye değildir. Tartışmalarınız, siz yayımlamadıkça özeldir; yayımlarsanız herkes okuyabilir. Gönderdiğiniz metin, Sağlayıcı Sicilimizde belirtilen yapay zekâ sağlayıcılarına iletilir ve modelleri eğitmek için kullanılmaz. Hesabınız olsun veya olmasın, hukuka aykırı içerikleri support@dezbatere.ro adresine bildirin. Romanya hukuku uygulanır; ancak yerel tüketici korumalarınız saklıdır.
 
@@ -138,6 +138,8 @@ Bir şeye izin verilip verilmediğinden emin değilseniz, göndermeden önce biz
 
 **Çıktılar.** Sizinle aramızdaki ilişki bakımından, kendi tartışmalarınızın çıktısını hukuka uygun her amaçla kullanabilirsiniz ve üretilen metin üzerinde mülkiyet iddiasında bulunmayız. Üretilen çıktının birçok yargı çevresinde telif hakkıyla korunamayabileceğini; benzer çıktının başka kullanıcılar için de üretilebileceğini; çıktıların üçüncü taraf materyallerini çoğaltabileceğini veya bunlara benzeyebileceğini ve bir yapay zekâ sağlayıcısının eriştiği bazı kaynak materyallerin yeniden kullanım kısıtlamalarına tabi olabileceğini göz önünde bulundurun. Çıktılara dayanmadan veya onları yeniden yayımlamadan önce kontrol etmek sizin sorumluluğunuzdadır.
 
+**Ürettiğimiz grafikler ve istatistikler.** Bir tartışma raporundaki grafikler ve bunlar için derlediğimiz istatistikler — bunların seçimi, düzenlenmesi, tasarımı ve çizimi — Dialectical Engine tarafından oluşturulur ve DMS Merchandise Shop S.R.L. şirketine aittir; her grafik "Copyrighted by DMS Merchandise Shop SRL" ibaresini taşır. Bu durum, bir grafiğin gösterdiği ve tartışmanızdan gelen rakamları ya da tartışmanızın metnini kapsamaz. Size, söz konusu grafikleri hukuka uygun her amaçla kullanmanız, kopyalamanız ve paylaşmanız için ücretsiz, dünya çapında, münhasır olmayan ve süresiz bir lisans veririz; bunun koşulu, ibareyi ve yapay zekâ tarafından üretildiği etiketini grafiklerle birlikte muhafaza etmenizdir. Hukukun yapay zekâ tarafından üretilen materyal üzerinde hak tanımadığı durumlarda, bu paragraf bize hukukun izin verdiğinden fazlasını sağlamaz.
+
 ## 9. Bir tartışmanın yayımlanması
 
 Tartışmalar **varsayılan olarak özeldir**. Oluşturduğunuz hiçbir şey, siz yayımlamadıkça başka hiç kimse tarafından görülemez.
@@ -240,6 +242,8 @@ Başka bir yerde yaşıyorsanız bölgenizde geçerli olan cayma veya vazgeçme 
 Neyin ne zaman değişeceğini kalıcı veri saklayıcısıyla önceden bildiririz. Değişiklik, hizmete erişiminiz veya hizmeti kullanımınız üzerinde önemsizden daha fazla olumsuz etkiye sahipse, bildirimin size iletilmesinden veya değişikliğin yürürlüğe girmesinden hangisi daha geç ise o tarihten itibaren **30 gün içinde** ücretsiz olarak sözleşmeyi sona erdirebilirsiniz; kullanılmayan dönem için önceden ödenmiş tutarları iade ederiz.
 
 **Bu Koşullarda.** Bu Koşulları aynı tür nedenlerle değiştirebiliriz. Haklarınızı azaltmayan değişiklikler için yeni sürümü, değişikliklerin özetiyle yayımlar ve yürürlüğe girmesinden en az **30 gün önce** size e-posta göndeririz; o tarihten sonra Dialectical Engine'i kullanmaya devam etmeniz değişikliği kabul ettiğiniz anlamına gelir ve hesabınızı o tarihten önce kapatabilirsiniz. Mevcut bir plandaki fiyat artışları, daha düşük sınırlar, kaldırılan özellikler, içeriğinizin yeni kullanım biçimleri veya sorumluluk, uygulanacak hukuk ya da uyuşmazlık çözümüne ilişkin değişiklikler dahil, haklarınızı azaltan değişiklikler için bir sonraki oturum açışınızda yeni sürümü açıkça kabul etmenizi isteriz ve değişiklik yalnızca ileriye dönük uygulanır. Hiçbir değişikliği geriye yürütmeyiz ve size bir çıkış yolu sunmadan, sürenin ortasında ücretini ödediğiniz hususun özünü değiştirmek için bu bölümü kullanmayız. Önceki sürümler dezbatere.ro/terms/versions adresinde erişilebilir kalır.
+
+Sürüm 2.9, sürüm 2.8'in yerine geçmiştir: 8. bölüme “Ürettiğimiz grafikler ve istatistikler” paragrafı eklenmiştir; bu paragraf bir tartışma raporundaki grafiklerin kime ait olduğunu belirtir ve size bunları kullanmanız için bir lisans verir.
 
 Sürüm 2.8, sürüm 2.7'in yerine geçmiştir: soru kontrolümüz artık bir suçun nasıl işleneceğini ya da cezasından nasıl kaçılacağını veya birinin suç işleyip işlememesi gerektiğini soran bir soruyu da (örneğin yasa dışı olarak uyuşturucu ya da silah alıp satmak, hırsızlık yapmak veya vergi kaçırmak) reddeder ve bu soruyu saklamaz; bir yasanın değişip değişmemesi gerektiğine dair bir soru ise tartışma başlatmaya devam eder (7. bölüm). Ayrıca uyuşturucuya ilişkin sorular için tek bir kural belirler ve intihar, ötanazi veya yardımlı ölüme ilişkin yasanın değişip değişmemesi gerektiğine dair bir sorunun tartışma başlatmasına izin verir (7. bölüm) ve soru kontrolü artık hiçbir soruyu ekibimizin okuması için saklamaz (7. ve 10. bölümler); bir soruyu reddeden ekran, 7. bölüm uyarınca tartışma başlatmayan her soru için gerekçe bildirimimizdir (10. bölüm).
 

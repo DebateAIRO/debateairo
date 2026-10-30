@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Trumpai
-eyebrow: PASLAUGŲ TEIKIMO SĄLYGOS · v2.8 · ĮSIGALIOJA 2026 M. SPALIO 12 D.
+eyebrow: PASLAUGŲ TEIKIMO SĄLYGOS · v2.9 · ĮSIGALIOJA 2026 M. SPALIO 12 D.
 title: Su kuo sutinkate
 lede: Jūsų ir DMS Merchandise Shop S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.
-endMarker: SĄLYGŲ PABAIGA · v2.8
+endMarker: SĄLYGŲ PABAIGA · v2.9
 bodyLabel: Paslaugų teikimo sąlygų tekstas
 annexTitle: A priedas — Regioninės sąlygos
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TAIKYTINA TEISĖ
 -->
 
-**Version 2.8 · Effective 2026 m. spalio 12 d. · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
+**Version 2.9 · Effective 2026 m. spalio 12 d. · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
 
 **In short.** Turite būti ne jaunesni kaip 18 metų. Dialectical Engine kuria argumentus naudodama DI modelius, todėl viskas, ką ji sugeneruoja, gali būti klaidinga — tai nėra konsultacija. Jūsų debatai yra privatūs, nebent juos paskelbiate; paskelbtus debatus gali skaityti bet kas. Jūsų pateiktas tekstas siunčiamas mūsų Paslaugų teikėjų registre nurodytiems DI paslaugų teikėjams ir nenaudojamas modeliams mokyti. Apie neteisėtą turinį praneškite adresu support@dezbatere.ro, nesvarbu, ar turite paskyrą. Taikoma Rumunijos teisė, tačiau jums ir toliau taikoma vietos vartotojų apsauga.
 
@@ -138,6 +138,8 @@ Jei abejojate, ar kas nors leidžiama, prieš paskelbdami paklauskite mūsų.
 
 **Rezultatai.** Jūsų ir mūsų santykiuose savo debatų rezultatus galite naudoti bet kokiu teisėtu tikslu, o mes nepretenduojame į sugeneruoto teksto nuosavybę. Atminkite, kad daugelyje jurisdikcijų sugeneruoti rezultatai gali būti nesaugomi autorių teisėmis; kad panašūs rezultatai gali būti sugeneruoti kitiems naudotojams; kad rezultatuose gali būti atgaminta trečiųjų šalių medžiaga ar jie gali būti į ją panašūs; ir kad kai kuriai šaltinių medžiagai, kurią gauna DI paslaugų teikėjas, gali būti taikomi pakartotinio naudojimo apribojimai. Prieš remdamiesi rezultatais ar juos pakartotinai skelbdami, privalote juos patikrinti.
 
+**Mūsų generuojamos diagramos ir statistika.** Debatų ataskaitoje pateikiamos diagramos ir joms mūsų sudaroma statistika — jų atranka, išdėstymas, dizainas ir braižymas — yra sukurtos Dialectical Engine ir priklauso DMS Merchandise Shop S.R.L.; kiekviena diagrama pažymėta užrašu „Copyrighted by DMS Merchandise Shop SRL“. Tai netaikoma diagramoje rodomiems skaičiams, kurie gaunami iš jūsų debatų, ir jūsų debatų tekstui. Suteikiame jums nemokamą, visame pasaulyje galiojančią, neišimtinę ir neterminuotą licenciją bet kokiu teisėtu tikslu naudoti, kopijuoti šias diagramas ir jomis dalytis, su sąlyga, kad kartu su jomis išsaugosite šį užrašą ir žymą, kad jas sugeneravo DI. Kai teisės aktai nepripažįsta teisių į DI sugeneruotą medžiagą, ši pastraipa mums nesuteikia daugiau, nei leidžia teisės aktai.
+
 ## 9. Debatų paskelbimas
 
 Pagal numatytuosius nustatymus debatai yra **privatūs**. Niekas, ką sukuriate, nėra matoma kitiems, nebent tai paskelbiate.
@@ -240,6 +242,8 @@ Jei gyvenate kitur, A priede nurodyta jūsų regione taikoma teisė atsisakyti s
 Patvariojoje laikmenoje iš anksto pranešame, kas ir kada keisis. Jei pakeitimas turi didesnį nei nedidelį neigiamą poveikį jūsų prieigai prie paslaugos ar naudojimuisi ja, galite nemokamai nutraukti sutartį per **30 dienų** nuo pranešimo gavimo arba pakeitimo įsigaliojimo dienos, atsižvelgiant į tai, kuri data vėlesnė, o mes grąžinsime visas iš anksto už nepanaudotą laikotarpį sumokėtas sumas.
 
 **Šių Sąlygų pakeitimai.** Šias Sąlygas galime keisti dėl tokių pačių priežasčių. Jei pakeitimai nesumažina jūsų teisių, paskelbiame naują versiją su pakeitimų santrauka ir išsiunčiame jums el. laišką bent prieš **30 dienų** iki jos įsigaliojimo; jei po tos dienos toliau naudositės Dialectical Engine, tai reikš, kad su pakeitimais sutinkate, o iki tol galite uždaryti paskyrą. Jei pakeitimais sumažinamos jūsų teisės — įskaitant esamo plano kainos padidinimą, mažesnes ribas, pašalintas funkcijas, naujus jūsų turinio naudojimo būdus arba atsakomybės, taikytinos teisės ar ginčų sprendimo pakeitimus — kitą kartą prisijungus prašome aiškiai sutikti su nauja versija, o pakeitimas taikomas tik ateityje. Niekada netaikome pakeitimo atgaline data ir niekada nesinaudojame šiuo skyriumi tam, kad sutarties laikotarpio viduryje pakeistume esminius dalykus, už kuriuos sumokėjote, nepasiūlydami galimybės atsisakyti sutarties. Ankstesnes versijas galima rasti adresu dezbatere.ro/terms/versions.
+
+2.9 versija pakeitė 2.8 versiją: 8 skyrius papildomas pastraipa „Mūsų generuojamos diagramos ir statistika“, kurioje nurodoma, kam priklauso debatų ataskaitos diagramos, ir suteikiama jums licencija jas naudoti.
 
 2.8 versija pakeitė 2.7 versiją: mūsų klausimų patikra taip pat atmeta klausimą, kaip padaryti nusikaltimą ar išvengti už jį bausmės, arba ar kas nors turėtų jį padaryti, pavyzdžiui, neteisėtai pirkti ar parduoti narkotikus ar ginklus, vogti ar vengti mokėti mokesčius, ir jo nesaugo; klausimas, ar reikėtų pakeisti kokį nors įstatymą, ir toliau pradeda debatus (7 skyrius). Ji taip pat nustato vieną taisyklę narkotikams ir leidžia klausimui, ar reikėtų pakeisti su savižudybe, eutanazija ar padėjimu mirti susijusį įstatymą, pradėti debatus (7 skyrius), o klausimų patikra nebesaugo jokio klausimo mūsų komandai (7 ir 10 skyriai); klausimą atmetantis ekranas yra mūsų motyvų pareiškimas dėl kiekvieno klausimo, dėl kurio pagal 7 skyrių debatai neprasideda (10 skyrius).
 

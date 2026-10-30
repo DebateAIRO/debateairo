@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Pe scurt
-eyebrow: TERMENII SERVICIULUI · v2.8 · ÎN VIGOARE DE LA 12 OCTOMBRIE 2026
+eyebrow: TERMENII SERVICIULUI · v2.9 · ÎN VIGOARE DE LA 12 OCTOMBRIE 2026
 title: Ce acceptați
 lede: Contractul dintre dumneavoastră și DMS Merchandise Shop S.R.L., într-un limbaj clar. Nouăsprezece secțiuni și Anexa A — derulați până la final.
-endMarker: SFÂRȘITUL TERMENILOR · v2.8
+endMarker: SFÂRȘITUL TERMENILOR · v2.9
 bodyLabel: Textul Termenilor serviciului
 annexTitle: Anexa A — Termeni regionali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEGEA APLICABILĂ
 -->
 
-**Version 2.8 · Effective 12 octombrie 2026 · Versiunile anterioare la dezbatere.ro/terms/versions · Limba: română.**
+**Version 2.9 · Effective 12 octombrie 2026 · Versiunile anterioare la dezbatere.ro/terms/versions · Limba: română.**
 
 **In short.** Trebuie să aveți cel puțin 18 ani. Dialectical Engine construiește argumente cu modele de inteligență artificială, iar tot ceea ce generează poate fi greșit — nu constituie consultanță. Dezbaterile dumneavoastră sunt private dacă nu le publicați; dacă le publicați, oricine le poate citi. Textul pe care îl transmiteți este trimis furnizorilor de IA enumerați în Registrul furnizorilor de IA și nu este folosit pentru antrenarea modelelor. Raportați conținutul ilegal la support@dezbatere.ro, indiferent dacă aveți sau nu un cont. Se aplică legea română, însă protecția locală a consumatorilor de care beneficiați se menține.
 
@@ -138,6 +138,8 @@ Dacă nu sunteți sigur dacă un anumit conținut este permis, întrebați-ne î
 
 **Rezultate.** În raporturile dintre dumneavoastră și noi, puteți utiliza rezultatul propriilor dezbateri în orice scop legal, iar noi nu revendicăm drepturi de proprietate asupra textului generat. Rețineți că, în numeroase jurisdicții, conținutul generat poate să nu fie protejabil prin drepturi de autor; că pot fi generate rezultate similare pentru alți utilizatori; că rezultatele pot reproduce sau semăna cu materiale ale terților; și că anumite materiale-sursă recuperate de un furnizor de IA pot fi supuse unor restricții de reutilizare. Aveți responsabilitatea de a verifica înainte de a vă baza pe rezultate sau de a le republica.
 
+**Graficele și statisticile pe care le generăm.** Graficele dintr-un raport de dezbatere și statisticile pe care le compilăm pentru ele — selecția, aranjarea, designul și desenarea lor — sunt realizate de Dialectical Engine și aparțin DMS Merchandise Shop S.R.L.; fiecare grafic poartă mențiunea „Copyrighted by DMS Merchandise Shop SRL”. Acest lucru nu se extinde asupra cifrelor pe care le arată un grafic, care provin din dezbaterea dumneavoastră, și nici asupra textului dezbaterii. Vă acordăm o licență gratuită, mondială, neexclusivă și perpetuă de a folosi, copia și distribui aceste grafice în orice scop legal, cu condiția să păstrați mențiunea și eticheta „generat de AI” alături de ele. Acolo unde legea nu recunoaște drepturi asupra materialelor generate de AI, acest paragraf nu ne conferă mai mult decât permite legea.
+
 ## 9. Publicarea unei dezbateri
 
 Dezbaterile sunt **private în mod implicit**. Nimic din ceea ce creați nu este vizibil altor persoane dacă nu îl publicați.
@@ -240,6 +242,8 @@ Dacă locuiți în altă parte, Anexa A precizează dreptul de retragere sau per
 Vă informăm în avans, pe un suport durabil, ce se modifică și când. Dacă modificarea are un efect negativ mai mult decât minor asupra accesului la serviciu sau a utilizării acestuia, puteți înceta contractul fără costuri în termen de **30 de zile** de la informare sau de la data la care modificarea produce efecte, luându-se în considerare data mai recentă, iar noi rambursăm orice sumă plătită în avans pentru perioada neutilizată.
 
 **Cu privire la acești Termeni.** Putem modifica acești Termeni pentru aceleași tipuri de motive. Pentru modificările care nu vă reduc drepturile, publicăm noua versiune însoțită de un rezumat al modificărilor și vă trimitem un e-mail cu cel puțin **30 de zile** înainte ca aceasta să producă efecte; continuarea utilizării Dialectical Engine după data respectivă înseamnă că o acceptați și vă puteți închide contul înainte de acea dată. Pentru modificările care vă reduc drepturile — inclusiv majorarea prețurilor unui plan existent, reducerea limitelor, eliminarea unor funcții, noi utilizări ale conținutului dumneavoastră sau modificări privind răspunderea, legea aplicabilă ori soluționarea litigiilor — vă solicităm să acceptați în mod expres noua versiune la următoarea autentificare, iar modificarea se aplică numai pentru viitor. Nu aplicăm niciodată retroactiv o modificare și nu folosim niciodată această secțiune pentru a modifica, pe parcursul termenului, esența serviciului pentru care ați plătit fără să vă oferim o posibilitate de încetare. Versiunile anterioare rămân disponibile la dezbatere.ro/terms/versions.
+
+Versiunea 2.9 a înlocuit versiunea 2.8: secțiunea 8 primește paragraful „Graficele și statisticile pe care le generăm”, care arată cui aparțin graficele dintr-un raport de dezbatere și vă acordă o licență de a le folosi.
 
 Versiunea 2.8 a înlocuit versiunea 2.7: verificarea întrebărilor refuză și o întrebare despre cum se comite o infracțiune sau cum se scapă nepedepsit ori despre dacă cineva ar trebui să comită una, de exemplu cumpărarea sau vânzarea ilegală de droguri ori arme, furtul sau evaziunea fiscală, și nu o păstrează; o întrebare despre dacă o lege ar trebui schimbată duce în continuare la o dezbatere (secțiunea 7). De asemenea, stabilește un singur criteriu pentru droguri și permite ca o întrebare despre dacă legea privind sinuciderea, eutanasia sau moartea asistată ar trebui schimbată să ducă la o dezbatere (secțiunea 7), iar verificarea întrebărilor nu mai păstrează nicio întrebare pentru echipa noastră (secțiunile 7 și 10); ecranul care refuză o întrebare este expunerea noastră a motivelor pentru fiecare întrebare pentru care, potrivit secțiunii 7, nu începe o dezbatere (secțiunea 10).
 

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Go hachomair
-eyebrow: TÉARMAÍ SEIRBHÍSE · v2.8 · I bhFEIDHM 12 DEIREADH FÓMHAIR 2026
+eyebrow: TÉARMAÍ SEIRBHÍSE · v2.9 · I bhFEIDHM 12 DEIREADH FÓMHAIR 2026
 title: An méid lena n-aontaíonn tú
 lede: An conradh idir tú agus DMS Merchandise Shop S.R.L., i bhfriotal soiléir. Naoi rannán déag agus Iarscríbhinn A — scrollaigh go dtí an deireadh.
-endMarker: DEIREADH NA dTÉARMAÍ · v2.8
+endMarker: DEIREADH NA dTÉARMAÍ · v2.9
 bodyLabel: Téacs na dTéarmaí Seirbhíse
 annexTitle: Iarscríbhinn A — Téarmaí réigiúnacha
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 AN DLÍ RIALAITHE
 -->
 
-**Version 2.8 · Effective 12 Deireadh Fómhair 2026 · Leaganacha roimhe seo ag dezbatere.ro/terms/versions · Teanga: Gaeilge.**
+**Version 2.9 · Effective 12 Deireadh Fómhair 2026 · Leaganacha roimhe seo ag dezbatere.ro/terms/versions · Teanga: Gaeilge.**
 
 **In short.** Ní mór duit a bheith 18 mbliana d'aois nó os a chionn. Tógann Dialectical Engine argóintí le samhlacha IS agus d'fhéadfadh gach rud a ghineann sé a bheith mícheart — ní comhairle é. Bíonn do dhíospóireachtaí príobháideach mura bhfoilsíonn tú iad; má fhoilsíonn tú iad, is féidir le duine ar bith iad a léamh. Seoltar téacs a chuireann tú isteach chuig soláthraithe IS atá liostaithe inár gClár Soláthraithe, agus ní úsáidtear é chun samhlacha a oiliúint. Tuairiscigh ábhar neamhdhleathach ag support@dezbatere.ro cibé acu atá cuntas agat nó nach bhfuil. Is é dlí na Rómáine an dlí rialaithe, ach coimeádann tú do chosaintí áitiúla tomhaltóra.
 
@@ -138,6 +138,8 @@ Mura bhfuil tú cinnte an gceadaítear rud éigin, cuir ceist orainn sula gcuire
 
 **Aschuir.** Sa chaidreamh idir tú féin agus sinne, féadfaidh tú aschur do dhíospóireachtaí féin a úsáid chun aon chríche dleathaí, agus ní éilímid úinéireacht ar théacs ginte. Tabhair faoi deara go bhféadfadh sé nach mbeadh aschur ginte incháilithe do chosaint cóipchirt i mórán dlínsí; go bhféadfaí aschur cosúil leis a ghiniúint d'úsáideoirí eile; go bhféadfadh aschuir ábhar tríú páirtí a atáirgeadh nó a bheith cosúil leis; agus go bhféadfadh srianta ar athúsáid a bheith ag gabháil le roinnt bunábhair a aisghabhann soláthraí IS. Tá tú freagrach as seiceáil sula mbraitheann tú ar aschuir nó sula n-athfhoilsíonn tú iad.
 
+**Cairteacha agus staitisticí a ghinimid.** Is é Dialectical Engine a chruthaíonn na cairteacha i dtuarascáil díospóireachta agus na staitisticí a thiomsaímid dóibh — a roghnú, a socrú, a ndearadh agus a líníocht — agus is le DMS Merchandise Shop S.R.L. iad; tá an fógra "Copyrighted by DMS Merchandise Shop SRL" ar gach cairt. Ní bhaineann sé seo leis na figiúirí a thaispeánann cairt, a thagann ó do dhíospóireacht, ná le téacs do dhíospóireachta. Deonaímid ceadúnas saor in aisce, domhanda, neamheisiach agus suthain duit chun na cairteacha sin a úsáid, a chóipeáil agus a chomhroinnt chun aon chríche dleathaí, ar choinníoll go gcoinníonn tú an fógra agus an lipéad gur ghin IS iad in éineacht leo. Sa chás nach n-aithníonn an dlí cearta in ábhar a ghin IS, ní thugann an mhír seo níos mó dúinn ná mar a cheadaíonn an dlí.
+
 ## 9. Díospóireacht a fhoilsiú
 
 Bíonn díospóireachtaí **príobháideach mar réamhshocrú**. Ní bhíonn aon ní a chruthaíonn tú infheicthe d'aon duine eile mura bhfoilsíonn tú é.
@@ -240,6 +242,8 @@ Má tá cónaí ort in áit eile, sonraítear in Iarscríbhinn A cibé ceart tar
 Insímid duit roimh ré, ar mheán marthanach, cad atá ag athrú agus cathain. Má bhíonn éifeacht dhiúltach níos mó ná mionéifeacht ag an athrú ar do rochtain ar an tseirbhís nó ar d'úsáid aisti, féadfaidh tú foirceannadh saor in aisce laistigh de **30 lá** tar éis duit a bheith curtha ar an eolas, nó tar éis don athrú teacht i bhfeidhm, cibé acu is déanaí, agus aisíocaimid aon mhéid réamhíoctha don tréimhse nár úsáideadh.
 
 **Ar na Téarmaí seo.** Féadfaimid na Téarmaí seo a athrú ar na cineálacha céanna cúiseanna. I gcás athruithe nach laghdaíonn do chearta, foilsímid an leagan nua le hachoimre ar an méid a d'athraigh agus seolaimid ríomhphost chugat **30 lá ar a laghad** sula dtagann sé i bhfeidhm; má leanann tú d'úsáid Dialectical Engine tar éis an dáta sin, ciallaíonn sé go nglacann tú leis, agus féadfaidh tú do chuntas a dhúnadh roimhe sin. I gcás athruithe a laghdaíonn do chearta — lena n-áirítear méaduithe praghais ar phlean atá ann cheana, teorainneacha níos ísle, gnéithe a baineadh, úsáidí nua as d'ábhar, nó athruithe ar dhliteanas, ar an dlí rialaithe nó ar réiteach díospóidí — iarraimid ort glacadh go sainráite leis an leagan nua ag do chéad síniú isteach eile, agus ní bhíonn feidhm ag an athrú ach feasta. Ní dhéanaimid athrú aisghníomhach riamh, agus ní úsáidimid an rannán seo riamh chun croílár an mhéid ar íoc tú as a athrú i lár téarma gan bealach amach a thairiscint duit. Fanann leaganacha roimhe seo ar fáil ag dezbatere.ro/terms/versions.
+
+Tháinig leagan 2.9 in ionad leagan 2.8: cuirtear an mhír «Cairteacha agus staitisticí a ghinimid» le rannán 8, a deir cé leis na cairteacha i dtuarascáil díospóireachta agus a thugann ceadúnas duit iad a úsáid.
 
 Tháinig leagan 2.8 in ionad leagan 2.7: diúltaíonn ár seiceáil ceiste freisin do cheist a fhiafraíonn conas coir a dhéanamh nó éalú ó phionós ina leith, nó cé acu ar cheart do dhuine coir a dhéanamh, mar shampla drugaí nó airm a cheannach nó a dhíol go mídhleathach, goid nó imghabháil cánach, agus ní choinnímid í; tosaíonn ceist faoi cé acu ar cheart dlí a athrú díospóireacht i gcónaí (rannán 7). Socraíonn sé freisin aon chritéar amháin do dhrugaí agus ligeann sé do cheist faoi cé acu ar cheart an dlí maidir le féinmharú, eotanáis nó bás cuidithe a athrú díospóireacht a thosú (rannán 7), agus ní choinníonn ár seiceáil ceiste aon cheist dár bhfoireann a thuilleadh (rannáin 7 agus 10); is é an scáileán a dhiúltaíonn do cheist ár ráiteas ar chúiseanna i gcás gach ceiste nach dtosaíonn díospóireacht faoi rannán 7 (rannán 10).
 

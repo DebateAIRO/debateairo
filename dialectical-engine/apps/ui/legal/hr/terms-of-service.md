@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ukratko
-eyebrow: UVJETI KORIŠTENJA · v2.8 · NA SNAZI OD 12. LISTOPADA 2026.
+eyebrow: UVJETI KORIŠTENJA · v2.9 · NA SNAZI OD 12. LISTOPADA 2026.
 title: Na što pristajete
 lede: Ugovor između vas i društva DMS Merchandise Shop S.R.L., jednostavnim jezikom. Devetnaest odjeljaka i Prilog A — pomaknite se do kraja.
-endMarker: KRAJ UVJETA · v2.8
+endMarker: KRAJ UVJETA · v2.9
 bodyLabel: Tekst Uvjeta korištenja
 annexTitle: Prilog A — Regionalni uvjeti
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 MJERODAVNO PRAVO
 -->
 
-**Version 2.8 · Effective 12. listopada 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
+**Version 2.9 · Effective 12. listopada 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
 
 **In short.** Morate imati najmanje 18 godina. Dialectical Engine izrađuje argumente pomoću modela umjetne inteligencije i sve što generira može biti pogrešno — to nije savjet. Vaše su rasprave privatne osim ako ih objavite; ako ih objavite, svatko ih može pročitati. Tekst koji pošaljete prosljeđuje se pružateljima usluga umjetne inteligencije navedenima u našem Registru pružatelja i ne upotrebljava se za treniranje modela. Nezakonit sadržaj prijavite na support@dezbatere.ro, bez obzira na to imate li račun. Primjenjuje se rumunjsko pravo, ali zadržavate zaštitu potrošača prema svojem lokalnom pravu.
 
@@ -138,6 +138,8 @@ Ako niste sigurni je li nešto dopušteno, obratite nam se prije objavljivanja.
 
 **Izlazni sadržaj.** U odnosu između vas i nas, izlazni sadržaj vlastitih rasprava možete upotrebljavati u bilo koju zakonitu svrhu, a mi ne polažemo pravo vlasništva na generirani tekst. Imajte na umu da generirani izlazni sadržaj u mnogim pravnim sustavima možda nije zaštićen autorskim pravom; da se sličan izlazni sadržaj može generirati za druge korisnike; da izlazni sadržaj može reproducirati materijale trećih strana ili im nalikovati; te da neki izvorni materijali koje pružatelj usluga umjetne inteligencije dohvati mogu podlijegati ograničenjima ponovne uporabe. Odgovorni ste za provjeru prije nego što se oslonite na izlazni sadržaj ili ga ponovno objavite.
 
+**Grafikoni i statistike koje izrađujemo.** Grafikone u izvješću o raspravi i statistike koje za njih sastavljamo — njihov odabir, raspored, dizajn i crtanje — izrađuje Dialectical Engine, a pripadaju društvu DMS Merchandise Shop S.R.L.; svaki grafikon nosi napomenu „Copyrighted by DMS Merchandise Shop SRL”. To se ne odnosi na brojčane podatke koje grafikon prikazuje, a koji potječu iz vaše rasprave, ni na tekst vaše rasprave. Dajemo vam besplatnu, svjetsku, neisključivu i trajnu licenciju za upotrebu, umnožavanje i dijeljenje tih grafikona u bilo koju zakonitu svrhu, pod uvjetom da uz njih zadržite tu napomenu i oznaku da su generirani umjetnom inteligencijom. Ako zakon ne priznaje prava na materijalu generiranom umjetnom inteligencijom, ovaj nam stavak ne daje više nego što zakon dopušta.
+
 ## 9. Objavljivanje rasprave
 
 Rasprave su **prema zadanim postavkama privatne**. Ništa što izradite nije vidljivo drugima osim ako to objavite.
@@ -240,6 +242,8 @@ Ako živite drugdje, Prilog A navodi pravo na odustanak ili razdoblje za odustan
 Na trajnom mediju unaprijed vas obavještavamo što se mijenja i kada. Ako promjena ima više nego neznatan negativan učinak na vaš pristup usluzi ili njezinu uporabu, možete bez naknade raskinuti ugovor u roku od **30 dana** od obavijesti ili od stupanja promjene na snagu, ovisno o tome što je kasnije, a mi ćemo vratiti svaki unaprijed plaćeni iznos za neiskorišteno razdoblje.
 
 **Promjene ovih Uvjeta.** Ove Uvjete možemo mijenjati zbog istih vrsta razloga. Za promjene koje ne umanjuju vaša prava objavljujemo novu verziju sa sažetkom promjena i šaljemo vam e-poruku najmanje **30 dana** prije njezina stupanja na snagu; nastavak uporabe Dialectical Engine-a nakon tog datuma znači da je prihvaćate, a prije toga možete zatvoriti račun. Za promjene koje umanjuju vaša prava — uključujući povećanja cijena postojećeg plana, niža ograničenja, uklonjene značajke, nove načine uporabe vašeg sadržaja ili promjene odgovornosti, mjerodavnog prava ili rješavanja sporova — tražimo da izričito prihvatite novu verziju pri sljedećoj prijavi, a promjena se primjenjuje samo ubuduće. Promjenu nikada ne primjenjujemo retroaktivno i ovaj odjeljak nikada ne upotrebljavamo za izmjenu bitnog sadržaja onoga što ste platili usred razdoblja bez omogućavanja izlaska iz ugovora. Prethodne verzije ostaju dostupne na dezbatere.ro/terms/versions.
+
+Verzija 2.9 zamijenila je verziju 2.8: odjeljku 8. dodan je odlomak „Grafikoni i statistike koje izrađujemo”, koji određuje kome pripadaju grafikoni u izvješću o raspravi i daje vam licenciju za njihovu upotrebu.
 
 Verzija 2.8 zamijenila je verziju 2.7: provjera pitanja odbija i pitanje kako počiniti kazneno djelo ili izbjeći kaznu za njega, ili treba li ga netko počiniti, na primjer nezakonito kupovati ili prodavati drogu ili oružje, krasti ili utajiti porez, i ne čuva ga; pitanje treba li promijeniti neki zakon i dalje pokreće raspravu (odjeljak 7.). Također uvodi jednu granicu za droge i dopušta da pitanje treba li promijeniti zakon o samoubojstvu, eutanaziji ili potpomognutom umiranju pokrene raspravu (odjeljak 7.), a provjera pitanja više ne čuva nijedno pitanje za naš tim (odjeljci 7. i 10.); zaslon koji odbija pitanje jest naše obrazloženje za svako pitanje koje prema odjeljku 7. ne pokreće raspravu (odjeljak 10.).
 

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In breve
-eyebrow: CONDIZIONI DI SERVIZIO · v2.8 · IN VIGORE DAL 12 OTTOBRE 2026
+eyebrow: CONDIZIONI DI SERVIZIO · v2.9 · IN VIGORE DAL 12 OTTOBRE 2026
 title: Ciò che accetti
 lede: Il contratto tra te e DMS Merchandise Shop S.R.L., in un linguaggio chiaro. Diciannove sezioni e Allegato A — scorri fino alla fine.
-endMarker: FINE DELLE CONDIZIONI · v2.8
+endMarker: FINE DELLE CONDIZIONI · v2.9
 bodyLabel: Testo delle Condizioni di servizio
 annexTitle: Allegato A — Condizioni regionali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEGGE APPLICABILE
 -->
 
-**Version 2.8 · Effective 12 ottobre 2026 · Versioni precedenti su dezbatere.ro/terms/versions · Lingua: italiano.**
+**Version 2.9 · Effective 12 ottobre 2026 · Versioni precedenti su dezbatere.ro/terms/versions · Lingua: italiano.**
 
 **In short.** Devi avere almeno 18 anni. Dialectical Engine costruisce argomentazioni con modelli di IA e tutto ciò che genera può essere errato — non costituisce consulenza. I tuoi dibattiti sono privati, salvo che tu non li pubblichi; se li pubblichi, chiunque può leggerli. Il testo che invii viene trasmesso ai fornitori di IA elencati nel nostro Registro dei fornitori e non viene utilizzato per addestrare i modelli. Segnala i contenuti illegali a support@dezbatere.ro, indipendentemente dal fatto che tu abbia un account. Si applica la legge rumena, ma le tutele locali dei consumatori restano impregiudicate.
 
@@ -138,6 +138,8 @@ Se non sei sicuro che qualcosa sia consentito, chiedicelo prima di pubblicarlo.
 
 **Risultati.** Nei rapporti tra te e noi, puoi utilizzare il risultato dei tuoi dibattiti per qualsiasi scopo lecito e non rivendichiamo la titolarità del testo generato. Tieni presente che, in molti ordinamenti, i risultati generati potrebbero non essere tutelabili dal diritto d'autore; che risultati simili potrebbero essere generati per altri utenti; che i risultati potrebbero riprodurre materiali di terzi o assomigliarvi; e che alcuni materiali sorgente reperiti da un fornitore di IA potrebbero essere soggetti a restrizioni al riutilizzo. Sei responsabile delle verifiche necessarie prima di fare affidamento sui risultati o ripubblicarli.
 
+**Grafici e statistiche che generiamo.** I grafici contenuti nel report di un dibattito e le statistiche che elaboriamo per essi — la loro selezione, disposizione, progettazione e realizzazione grafica — sono creati da Dialectical Engine e appartengono a DMS Merchandise Shop S.R.L.; ogni grafico reca la dicitura "Copyrighted by DMS Merchandise Shop SRL". Ciò non si estende ai dati numerici mostrati da un grafico, che provengono dal tuo dibattito, né al testo del tuo dibattito. Ti concediamo una licenza gratuita, mondiale, non esclusiva e perpetua per utilizzare, copiare e condividere tali grafici per qualsiasi scopo lecito, a condizione che tu vi mantenga la dicitura e l'indicazione che sono generati dall'IA. Laddove la legge non riconosca diritti sui materiali generati dall'IA, il presente paragrafo non ci attribuisce più di quanto la legge consenta.
+
 ## 9. Pubblicazione di un dibattito
 
 I dibattiti sono **privati per impostazione predefinita**. Nulla di ciò che crei è visibile ad altri, salvo che tu non lo pubblichi.
@@ -240,6 +242,8 @@ Se vivi altrove, l'Allegato A indica il diritto di recesso o il periodo di ripen
 Ti comunichiamo anticipatamente, su un supporto durevole, cosa cambia e quando. Se la modifica produce un effetto negativo più che minimo sul tuo accesso al servizio o sul suo utilizzo, puoi recedere gratuitamente entro **30 giorni** dalla comunicazione o dall'entrata in vigore della modifica, se successiva, e rimborsiamo qualsiasi importo prepagato per il periodo non utilizzato.
 
 **Alle presenti Condizioni.** Possiamo modificare le presenti Condizioni per le medesime categorie di motivi. In caso di modifiche che non riducono i tuoi diritti, pubblichiamo la nuova versione con una sintesi delle modifiche e ti inviamo un'email almeno **30 giorni** prima della sua entrata in vigore; continuando a utilizzare Dialectical Engine dopo tale data accetti la modifica e puoi chiudere il tuo account prima di allora. In caso di modifiche che riducono i tuoi diritti — compresi aumenti di prezzo di un piano esistente, limiti inferiori, funzionalità eliminate, nuovi utilizzi dei tuoi contenuti o modifiche alla responsabilità, alla legge applicabile o alla risoluzione delle controversie — ti chiediamo di accettare espressamente la nuova versione al tuo accesso successivo e la modifica si applica soltanto per il futuro. Non apportiamo mai una modifica retroattiva e non utilizziamo mai la presente sezione per modificare, durante il relativo periodo, il nucleo di ciò per cui hai pagato senza offrirti una via d'uscita. Le versioni precedenti restano disponibili all'indirizzo dezbatere.ro/terms/versions.
+
+La versione 2.9 ha sostituito la versione 2.8: la sezione 8 acquisisce il paragrafo «Grafici e statistiche che generiamo», che stabilisce a chi appartengono i grafici contenuti nel report di un dibattito e ti concede una licenza per utilizzarli.
 
 La versione 2.8 ha sostituito la versione 2.7: la verifica delle domande rifiuta anche una domanda su come commettere un reato o farla franca, o su se qualcuno dovrebbe commetterne uno, come comprare o vendere illegalmente droghe o armi, rubare o evadere le tasse, e non la conserva; una domanda su se una legge dovrebbe cambiare fa ancora iniziare un dibattito (sezione 7). Fissa inoltre un unico criterio per le droghe e consente che una domanda su se la legge relativa al suicidio, all'eutanasia o alla morte assistita dovrebbe cambiare faccia iniziare un dibattito (sezione 7), e la verifica delle domande non conserva più alcuna domanda per il nostro team (sezioni 7 e 10); la schermata che rifiuta una domanda è la nostra motivazione per ogni domanda con cui, secondo la sezione 7, non inizia un dibattito (sezione 10).
 

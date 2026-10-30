@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: En bref
-eyebrow: CONDITIONS D’UTILISATION · v2.8 · PRISE D’EFFET 12 OCTOBRE 2026
+eyebrow: CONDITIONS D’UTILISATION · v2.9 · PRISE D’EFFET 12 OCTOBRE 2026
 title: Ce que vous acceptez
 lede: Le contrat entre vous et DMS Merchandise Shop S.R.L., en termes clairs. Dix-neuf sections et l’annexe A — faites défiler jusqu’à la fin.
-endMarker: FIN DES CONDITIONS · v2.8
+endMarker: FIN DES CONDITIONS · v2.9
 bodyLabel: Texte des Conditions d’utilisation
 annexTitle: Annexe A — Conditions régionales
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 DROIT APPLICABLE
 -->
 
-**Version 2.8 · Effective 12 octobre 2026 · Versions précédentes sur dezbatere.ro/terms/versions · Langue : français.**
+**Version 2.9 · Effective 12 octobre 2026 · Versions précédentes sur dezbatere.ro/terms/versions · Langue : français.**
 
 **In short.** Vous devez avoir au moins 18 ans. Dialectical Engine construit des arguments à l’aide de modèles d’IA et tout ce qu’il génère peut être erroné — il ne s’agit pas d’un conseil. Vos débats sont privés, sauf si vous les publiez ; si vous les publiez, tout le monde peut les lire. Le texte que vous soumettez est transmis aux fournisseurs d’IA inscrits dans notre Registre des fournisseurs et n’est pas utilisé pour entraîner des modèles. Signalez tout contenu illicite à support@dezbatere.ro, que vous ayez ou non un compte. Le droit roumain s’applique, mais les protections locales dont vous bénéficiez en tant que consommateur demeurent acquises.
 
@@ -138,6 +138,8 @@ Si vous ne savez pas si une utilisation est autorisée, interrogez-nous avant de
 
 **Résultats.** Dans nos rapports avec vous, vous pouvez utiliser le résultat de vos propres débats à toute fin licite et nous ne revendiquons aucun droit de propriété sur le texte généré. Sachez qu’un résultat généré peut ne pas être susceptible de protection par le droit d’auteur dans de nombreux pays ; qu’un résultat similaire peut être généré pour d’autres utilisateurs ; que les résultats peuvent reproduire ou ressembler à des éléments appartenant à des tiers ; et que certains éléments sources récupérés par un fournisseur d’IA peuvent être soumis à des restrictions de réutilisation. Il vous incombe de procéder aux vérifications nécessaires avant de vous fier aux résultats ou de les republier.
 
+**Graphiques et statistiques que nous générons.** Les graphiques figurant dans un rapport de débat, ainsi que les statistiques que nous compilons pour ceux-ci — leur sélection, leur agencement, leur conception et leur tracé —, sont réalisés par Dialectical Engine et appartiennent à DMS Merchandise Shop S.R.L. ; chaque graphique porte la mention « Copyrighted by DMS Merchandise Shop SRL ». Cela ne s’étend ni aux chiffres que présente un graphique, qui proviennent de votre débat, ni au texte de votre débat. Nous vous accordons une licence gratuite, mondiale, non exclusive et perpétuelle pour utiliser, copier et partager ces graphiques à toute fin licite, à condition que vous conserviez avec eux cette mention et la mention « généré par l’IA ». Lorsque la loi ne reconnaît pas de droits sur les contenus générés par l’IA, le présent paragraphe ne nous confère pas davantage que ce que la loi permet.
+
 ## 9. Publication d’un débat
 
 Les débats sont **privés par défaut**. Rien de ce que vous créez n’est visible par autrui, sauf si vous le publiez.
@@ -240,6 +242,8 @@ Si vous résidez ailleurs, l’annexe A précise le droit de rétractation ou le
 Nous vous informons à l’avance, sur un support durable, de la modification et de sa date. Si celle-ci a une incidence négative plus que mineure sur votre accès au service ou son utilisation, vous pouvez résilier sans frais dans un délai de **30 jours** à compter du jour où vous en avez été informé ou de son entrée en vigueur, la date la plus tardive étant retenue, et nous remboursons tout montant payé d’avance pour la période non utilisée.
 
 **Modifications des présentes Conditions.** Nous pouvons modifier les présentes Conditions pour les mêmes types de motifs. Pour les modifications qui ne réduisent pas vos droits, nous publions la nouvelle version avec un résumé des changements et vous envoyons un e-mail au moins **30 jours** avant son entrée en vigueur ; la poursuite de l’utilisation de Dialectical Engine après cette date vaut acceptation et vous pouvez clôturer votre compte avant celle-ci. Pour les modifications qui réduisent vos droits — notamment les hausses de prix d’une formule existante, les diminutions de limites, la suppression de fonctionnalités, les nouvelles utilisations de votre contenu ou les modifications relatives à la responsabilité, au droit applicable ou au règlement des litiges —, nous vous demandons d’accepter expressément la nouvelle version lors de votre prochaine connexion et la modification ne s’applique que pour l’avenir. Nous n’appliquons jamais une modification rétroactivement et n’utilisons jamais la présente section pour modifier, pendant sa durée, l’essence de ce pour quoi vous avez payé sans vous offrir une possibilité de résiliation. Les versions antérieures restent disponibles à l’adresse dezbatere.ro/terms/versions.
+
+La version 2.9 a remplacé la version 2.8 : la section 8 s’enrichit du paragraphe « Graphiques et statistiques que nous générons », qui indique à qui appartiennent les graphiques d’un rapport de débat et vous accorde une licence pour les utiliser.
 
 La version 2.8 a remplacé la version 2.7 : la vérification des questions refuse aussi une question qui demande comment commettre une infraction ou échapper aux poursuites, ou si quelqu’un devrait en commettre une, par exemple acheter ou vendre illégalement des drogues ou des armes, voler ou frauder le fisc, et ne la conserve pas ; une question sur le point de savoir si une loi devrait changer fait toujours commencer un débat (section 7). Cette version fixe aussi un critère unique pour les drogues et permet qu’une question sur le point de savoir si la loi relative au suicide, à l’euthanasie ou à l’aide à mourir devrait changer fasse commencer un débat (section 7), et la vérification des questions ne conserve plus aucune question pour notre équipe (sections 7 et 10) ; l’écran qui refuse une question est notre exposé des motifs pour toute question qui, selon la section 7, ne fait pas commencer de débat (section 10).
 

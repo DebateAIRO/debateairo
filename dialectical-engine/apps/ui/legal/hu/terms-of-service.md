@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Röviden
-eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v2.8 · HATÁLYOS 2026. OKTÓBER 12.
+eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v2.9 · HATÁLYOS 2026. OKTÓBER 12.
 title: Amit Ön elfogad
 lede: Az Ön és a DMS Merchandise Shop S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.
-endMarker: A FELTÉTELEK VÉGE · v2.8
+endMarker: A FELTÉTELEK VÉGE · v2.9
 bodyLabel: A Szolgáltatási feltételek szövege
 annexTitle: A. melléklet — Regionális feltételek
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 IRÁNYADÓ JOG
 -->
 
-**Version 2.8 · Effective 2026. október 12. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
+**Version 2.9 · Effective 2026. október 12. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
 
 **In short.** Önnek legalább 18 évesnek kell lennie. A Dialectical Engine mesterségesintelligencia-modellekkel épít fel érveket, és minden általa létrehozott tartalom téves lehet — nem minősül tanácsadásnak. Vitái mindaddig bizalmasak, amíg közzé nem teszi őket; közzététel esetén bárki elolvashatja azokat. Az Ön által beküldött szöveget továbbítjuk a Szolgáltatói nyilvántartásunkban felsorolt MI-szolgáltatóknak, és azt nem használjuk modellek betanítására. Jogellenes tartalmat a support@dezbatere.ro címen jelenthet be, függetlenül attól, hogy rendelkezik-e fiókkal. A román jog az irányadó, de az Ön helyi fogyasztóvédelmi jogai változatlanul megilletik.
 
@@ -138,6 +138,8 @@ Ha nem biztos abban, hogy valami megengedett-e, közzététele előtt kérdezzen
 
 **Kimenetek.** Az Ön és közöttünk fennálló jogviszonyban saját vitáinak kimenetét bármely jogszerű célra felhasználhatja, mi pedig nem tartunk igényt a létrehozott szöveg tulajdonjogára. Vegye figyelembe, hogy a létrehozott kimenet számos joghatóságban nem részesülhet szerzői jogi védelemben; más felhasználók számára hasonló kimenet jöhet létre; a kimenetek harmadik felek anyagait többszörözhetik vagy azokhoz hasonlíthatnak; továbbá az MI-szolgáltató által lekért egyes forrásanyagokra újrafelhasználási korlátozások vonatkozhatnak. Ön felel azért, hogy a kimenetekre való támaszkodás vagy azok újbóli közzététele előtt ellenőrzést végezzen.
 
+**Az általunk létrehozott diagramok és statisztikák.** A vitajelentésben szereplő diagramokat és az azokhoz általunk összeállított statisztikákat — azok kiválasztását, elrendezését, kialakítását és megrajzolását — a Dialectical Engine készíti, és azok a DMS Merchandise Shop S.R.L. tulajdonát képezik; minden diagramon szerepel a „Copyrighted by DMS Merchandise Shop SRL” megjelölés. Ez nem terjed ki a diagramon megjelenített számadatokra, amelyek az Ön vitájából származnak, sem az Ön vitájának szövegére. Ingyenes, az egész világra kiterjedő, nem kizárólagos és időben korlátlan engedélyt adunk Önnek arra, hogy e diagramokat bármely jogszerű célra felhasználja, másolja és megossza, feltéve, hogy megtartja rajtuk a megjelölést és az MI által létrehozott tartalomra utaló címkét. Ha a jog nem ismer el jogokat az MI által létrehozott anyagokon, e bekezdés alapján bennünket nem illet meg több, mint amit a jog lehetővé tesz.
+
 ## 9. Vita közzététele
 
 A viták **alapértelmezés szerint bizalmasak**. Az Ön által létrehozott tartalmat senki más nem láthatja, amíg Ön közzé nem teszi.
@@ -240,6 +242,8 @@ Ha Ön máshol él, az A. melléklet határozza meg a régiójában esetlegesen 
 Tartós adathordozón előzetesen közöljük Önnel, mi és mikor változik. Ha a módosítás az Ön szolgáltatáshoz való hozzáférésére vagy annak használatára kisebbnél nagyobb hátrányos hatást gyakorol, Ön az értesítéstől vagy a módosítás hatálybalépésétől számított **30 napon** belül — a kettő közül a későbbi időpontig — díjmentesen megszüntetheti a szerződést, mi pedig visszatérítjük a fel nem használt időszakra előre kifizetett összeget.
 
 **E Feltételek módosítása.** E Feltételeket ugyanezen típusú okokból módosíthatjuk. Az Ön jogait nem csökkentő módosítások esetén legalább **30 nappal** a hatálybalépés előtt közzétesszük az új változatot a módosítások összefoglalásával, és e-mailben értesítjük Önt; ha ezt az időpontot követően tovább használja a Dialectical Engine szolgáltatást, azzal elfogadja a módosítást, fiókját pedig ezt megelőzően megszüntetheti. Az Ön jogait csökkentő módosítások — ideértve egy meglévő csomag árának emelését, az alacsonyabb korlátokat, funkciók eltávolítását, tartalmának új felhasználási módjait, illetve a felelősség, az irányadó jog vagy a vitarendezés módosítását — esetén következő bejelentkezésekor kifejezett elfogadását kérjük, és a módosítás csak a jövőre nézve alkalmazandó. Módosítást soha nem alkalmazunk visszamenőleg, és e szakaszt soha nem használjuk arra, hogy a már kifizetett szolgáltatás lényegét a futamidő alatt megváltoztassuk anélkül, hogy kilépési lehetőséget biztosítanánk. A korábbi változatok továbbra is elérhetők itt: dezbatere.ro/terms/versions.
+
+A 2.9-es verzió a 2.8-as verzió helyébe lépett: a 8. szakasz kiegészül „Az általunk létrehozott diagramok és statisztikák” című bekezdéssel, amely meghatározza, kinek a tulajdonát képezik a vitajelentésben szereplő diagramok, és engedélyt ad Önnek azok felhasználására.
 
 A 2.8-os verzió a 2.7-ös verzió helyébe lépett: a kérdésellenőrzés azt a kérdést is elutasítja, amely arra kérdez rá, hogyan lehet bűncselekményt elkövetni vagy megúszni a büntetést, vagy hogy valakinek el kellene-e követnie egyet, például kábítószert vagy fegyvert illegálisan venni vagy eladni, lopni vagy adót csalni, és nem őrzi meg; abból a kérdésből, hogy meg kellene-e változtatni egy törvényt, továbbra is elindul a vita (7. szakasz). Emellett egységes szabályt állapít meg a drogokra, és lehetővé teszi, hogy abból a kérdésből, hogy meg kellene-e változtatni az öngyilkosságra, az eutanáziára vagy a segített halálra vonatkozó törvényt, elinduljon a vita (7. szakasz), a kérdésellenőrzés pedig már egyetlen kérdést sem őriz meg csapatunk számára (7. és 10. szakasz); a kérdést elutasító képernyő a mi indokolásunk minden olyan kérdés esetében, amelyből a 7. szakasz szerint nem indul el vita (10. szakasz).
 

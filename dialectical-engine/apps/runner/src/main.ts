@@ -324,7 +324,9 @@ const storyWriter = new StoryWriter({
     ].find((candidate) => candidate.providerRef === roleRef);
     return member === undefined ? null : { provider: member.provider, providerRef: member.providerRef };
   },
-  log: storyLog
+  log: storyLog,
+  // Charts in the verdict PDF (design 2026-10-28): one chart call after every accepted story.
+  charts: true
 });
 /**
  * The claim-time probe of one target (both claim probes below). Spec 2026-10-11 busy model §2: on the
