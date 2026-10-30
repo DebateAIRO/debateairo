@@ -87,7 +87,11 @@ function redactNodeForPublic(node: Node): PublicNode {
           ledger_unknown_ref: "REDACTED_OWNER_ONLY"
         },
     staleness_state: node.staleness_state,
-    relevant_as_of: node.relevant_as_of
+    relevant_as_of: node.relevant_as_of,
+    // Plan 2026-10-30 W3-3: a point's web sources and the server's checked flag, as the owner's answer serves them (the
+    // publication check judges every source text, 432c6bdec); absent on a point without them, so older snapshots match.
+    ...(node.sources === undefined ? {} : { sources: node.sources.map((source) => ({ ...source })) }),
+    ...(node.looked_up_checked === undefined ? {} : { looked_up_checked: node.looked_up_checked })
   };
 }
 
