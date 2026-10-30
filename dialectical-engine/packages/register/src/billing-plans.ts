@@ -224,7 +224,7 @@ export const BILLING_PLANS_DEPLOYMENT_REGISTER_ROW = Object.freeze({
     + " elsewhere; EUR and RON prices are placeholders until the owner's price list, go-live row 73; owner's Free month"
     + " 2026-10-29: Free questions at depth 1; owner's answers 2026-10-30 Q1-Q3: a fixed 20-cent overflow past every"
     + " day, week and month limit on every plan, Free included, in place of the 110% finish edge, and one reserve for"
-    + " a closing: 20 cents inside a paid plan's limits, 5 cents on top of Free's 20-cent credit)",
+    + " a closing: 20 cents inside a paid plan's limits, five cents on top of Free's 20-cent credit)",
   value: Object.freeze({
     kind: "BILLING_PLANS" as const,
     credit_currency: "USD" as const,
