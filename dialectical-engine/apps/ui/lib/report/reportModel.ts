@@ -6,6 +6,7 @@ import { countStoryPositions, morePathsWords, storyFateWords, storyLabelWords, t
 import { orderedPoints, type NumberedPoint } from "./pointNumbers.js";
 import { buildReportCharts, type ReportChart } from "./reportCharts.js";
 import type { ReportCatalogs } from "./reportLanguage.js";
+import { buildReportTables, type ReportRanking, type ReportTable } from "./reportTables.js";
 
 /**
  * Every string the PDF prints (spec 2026-09-26 §10, amended by §14), built by a
@@ -112,6 +113,13 @@ export interface ReportModel {
    * long story. Empty for a story without charts.
    */
   readonly charts: readonly ReportChart[];
+  /**
+   * Tables (data blocks, 2026-10-30): each comparison table and pros and cons list printed right after the paragraph its
+   * `after` names, before that paragraph's chart if it has one; and the ranking of the answers, at the end of "Why this
+   * answer" or at the head of the list of points. Empty, and null, for a story without them.
+   */
+  readonly tables: readonly ReportTable[];
+  readonly ranking: ReportRanking | null;
   /**
    * "About this report": the rows, then the plain sentences (Task M6, spec
    * §14.4.5) that say what the answer's record holds: the answer is the
@@ -607,6 +615,9 @@ export function buildReportModel(
   const charts = buildReportCharts({
     story, answer, numbers, locale, catalog: publicCatalog, listWords: (items) => listWords(locale, items)
   });
+  const { tables, ranking } = buildReportTables({
+    story, answer, numbers, locale, catalog: publicCatalog, listWords: (items) => listWords(locale, items)
+  });
   return {
     language: locale,
     documentTitle: t(publicCatalog, "public.report.documentTitle", { question: answer.question_line }),
@@ -663,6 +674,8 @@ export function buildReportModel(
       })
     },
     charts,
+    tables,
+    ranking,
     about: {
       title: t(publicCatalog, "public.report.title.about"),
       rows: [
@@ -674,7 +687,12 @@ export function buildReportModel(
         { label: t(publicCatalog, "public.report.about.checkedBy"), value: lineageWords(story.checker) ?? notRecorded }
       ],
       // Charts (design 2026-10-28): how they were made, said once, only when the report has some.
-      notes: [...aboutNotes(disclosure, publicCatalog), ...(charts.length === 0 ? [] : [t(publicCatalog, "public.report.about.charts")])]
+      notes: [
+        ...aboutNotes(disclosure, publicCatalog),
+        ...(charts.length === 0 ? [] : [t(publicCatalog, "public.report.about.charts")]),
+        // Tables (data blocks, 2026-10-30): the same, only when the report has some (the ranking among them).
+        ...(tables.length === 0 && ranking === null ? [] : [t(publicCatalog, "public.report.about.tables")])
+      ]
     }
   };
 }

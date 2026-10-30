@@ -1123,8 +1123,17 @@ export function toCheckerPromptMaterial(material: StoryMaterial, candidate: Stor
  * Charts (design 2026-10-28): the chart call's fenced fields: the same material, then the report's text it may put a
  * chart under (the reasons and the long version, with the short references the model reads).
  */
-export function toChartsPromptMaterial(material: StoryMaterial, story: StoryBody): readonly FramedMaterialField[] {
-  const fields = [...storyCoreFields(material), { name: "report_text", content: JSON.stringify({ why: story.why, long: story.long }) }];
+export function toChartsPromptMaterial(
+  material: StoryMaterial,
+  story: StoryBody,
+  /** Data blocks (2026-10-30): each claim's figures as code read them (blocks.ts `storyFiguresField`). */
+  figures: readonly Readonly<{ id: string; figures: readonly string[] }>[] = []
+): readonly FramedMaterialField[] {
+  const fields = [
+    ...storyCoreFields(material),
+    { name: "report_text", content: JSON.stringify({ why: story.why, long: story.long }) },
+    { name: "figures", content: JSON.stringify(figures) }
+  ];
   return Object.freeze(fields.map((field) => Object.freeze(field)));
 }
 

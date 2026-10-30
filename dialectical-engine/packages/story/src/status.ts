@@ -115,6 +115,8 @@ export function buildAnswerStory(input: {
     point_numbers: stored === null || stored.pointNumbers === null ? null : { ...stored.pointNumbers },
     story: stored === null ? null : stored.body,
     // Charts (design 2026-10-28): owner-only like the long story, and only when the story has some.
-    ...(stored === null || stored.charts === undefined || stored.charts.length === 0 ? {} : { charts: [...stored.charts] })
+    ...(stored === null || stored.charts === undefined || stored.charts.length === 0 ? {} : { charts: [...stored.charts] }),
+    // Tables (data blocks, 2026-10-30): the same, beside the charts.
+    ...(stored === null || stored.tables === undefined || stored.tables.length === 0 ? {} : { tables: [...stored.tables] })
   };
 }

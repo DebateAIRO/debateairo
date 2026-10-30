@@ -6,10 +6,12 @@ import {
   StoryChartsSchema,
   StoryLanguageTagSchema,
   StoryOutcomeSchema,
+  StoryTablesSchema,
   StoryVerdictBasisSchema,
   type MakerLineage,
   type StoryBody,
   type StoryChart,
+  type StoryTable,
   type StoryVerdictBasis
 } from "@debateai/contract";
 import {
@@ -75,6 +77,8 @@ export interface StoryRecordInput {
    * migration, as `backup`); absent on a story with none and on every row written before them.
    */
   readonly charts?: readonly StoryChart[];
+  /** Tables (data blocks, 2026-10-30): sealed with the content exactly as the charts, with real node ids. */
+  readonly tables?: readonly StoryTable[];
 }
 
 export interface StoredStory extends StoryRecordInput {
@@ -104,7 +108,9 @@ const StoredStoryContentSchema = z.object({
   // R1d: optional, so every row sealed before it (no member) still parses; a story without a backup writes none.
   backup: StoredStoryBackupSchema.optional(),
   // Charts (design 2026-10-28): optional for the same reason; a story without charts writes none.
-  charts: StoryChartsSchema.optional()
+  charts: StoryChartsSchema.optional(),
+  // Tables (data blocks, 2026-10-30): optional for the same reason; a story without tables writes none.
+  tables: StoryTablesSchema.optional()
 }).strict();
 
 type StoredStoryContent = z.infer<typeof StoredStoryContentSchema>;
@@ -209,7 +215,8 @@ export class StoryRepository {
       languageTag: record.languageTag,
       // R1d: only when set, so a story without a backup seals exactly today's content.
       ...(record.backup === undefined ? {} : { backup: record.backup }),
-      ...(record.charts === undefined || record.charts.length === 0 ? {} : { charts: record.charts })
+      ...(record.charts === undefined || record.charts.length === 0 ? {} : { charts: record.charts }),
+      ...(record.tables === undefined || record.tables.length === 0 ? {} : { tables: record.tables })
     });
     if (!parsed.success) {
       const fields = [...new Set(parsed.error.issues.map((issue) => String(issue.path[0] ?? "content")))];
@@ -363,6 +370,7 @@ export class StoryRepository {
           storytellerRepairs: row.storyteller_repairs,
           ...(content.data.backup === undefined ? {} : { backup: Object.freeze({ ...content.data.backup }) }),
           ...(content.data.charts === undefined ? {} : { charts: Object.freeze([...content.data.charts]) }),
+          ...(content.data.tables === undefined ? {} : { tables: Object.freeze([...content.data.tables]) }),
           createdAt: row.created_at
         };
         return Object.freeze(stored);

@@ -13,6 +13,7 @@ import {
   storyFixtureWithCharts
 } from "../lib/v3/storyFixture";
 import { STORY_SCRIPT_SAMPLE_LOCALES, storyScriptSample, type StoryScriptSampleLocale } from "../lib/v3/storyScriptSamples";
+import { STORY_TABLES_SAMPLE_ANSWER, STORY_TABLES_SAMPLE_LANGUAGE, storyTablesSample } from "../lib/v3/storyTablesSample";
 
 /**
  * The owner's sample report (spec 2026-09-26 §10, "look first, then wire"):
@@ -28,13 +29,15 @@ import { STORY_SCRIPT_SAMPLE_LOCALES, storyScriptSample, type StoryScriptSampleL
  * model wrote the answer, the debate stopped exploring early, and the answer
  * was written from its most important points). Only About says so.
  * Charts (design 2026-10-28): "charts" prints the Romanian sample with its two bar charts; "scatter" prints an English
- * sample whose points cite a price and a score for five AI models, charted cost against score.
+ * sample whose points cite a price and a score for five AI models, charted cost against score. Tables (data blocks,
+ * 2026-10-30): "tables" prints an English sample that picks among three phones, with a comparison table, a pros and cons
+ * list, the ranking of the answers and a bar chart.
  *
- * Usage: pnpm --filter dialectical-engine-v2ui run story:sample-pdf <absolute path to the output .pdf> [language|floor|lower-cost|charts|scatter]
+ * Usage: pnpm --filter dialectical-engine-v2ui run story:sample-pdf <absolute path to the output .pdf> [language|floor|lower-cost|charts|scatter|tables]
  * (pnpm runs the script from apps/ui, so a relative path is resolved from there,
  * and so are the vendored fonts).
  */
-const VARIANTS: readonly string[] = Object.freeze(["floor", "lower-cost", "charts", "scatter"]);
+const VARIANTS: readonly string[] = Object.freeze(["floor", "lower-cost", "charts", "scatter", "tables"]);
 const [outputPath, choice] = process.argv.slice(2);
 const samples: readonly string[] = STORY_SCRIPT_SAMPLE_LOCALES;
 if (outputPath === undefined || outputPath.trim().length === 0 || (choice !== undefined && !samples.includes(choice) && !VARIANTS.includes(choice))) {
@@ -58,6 +61,8 @@ const sample = choice === "floor"
     ? { answer: STORY_FIXTURE_ANSWER, story: storyFixtureWithCharts("READY"), disclosure: storyFixtureDisclosure("served") }
   : choice === "scatter"
     ? { answer: STORY_CHARTS_SAMPLE_ANSWER, story: storyChartsSample(), disclosure: null }
+  : choice === "tables"
+    ? { answer: STORY_TABLES_SAMPLE_ANSWER, story: storyTablesSample(), disclosure: null }
   : choice === "lower-cost"
     ? { answer: STORY_FIXTURE_ANSWER, story: storyFixture("READY_WITH_RESERVATION"), disclosure: storyFixtureDisclosure("lower-cost") }
     : language === undefined
@@ -67,7 +72,8 @@ const pdf = await renderReportPdf({
   ...sample,
   generatedAt: new Date(),
   catalogs: await loadReportCatalogs({
-    questionTag: language ?? (choice === "scatter" ? STORY_CHARTS_SAMPLE_LANGUAGE.tag : STORY_FIXTURE_LANGUAGE.tag),
+    questionTag: language ?? (choice === "scatter" ? STORY_CHARTS_SAMPLE_LANGUAGE.tag
+      : choice === "tables" ? STORY_TABLES_SAMPLE_LANGUAGE.tag : STORY_FIXTURE_LANGUAGE.tag),
     interfaceLocale: "en",
     load
   })

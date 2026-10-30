@@ -125,6 +125,30 @@ export {
   type StoryChartsReading
 } from "./charts.js";
 export {
+  claimFigures,
+  parseStoryBlocks,
+  readStoryBlocks,
+  restoreTableRefs,
+  storyArgumentSides,
+  storyBlockCallNeeded,
+  storyBlockNeeds,
+  storyFiguresField,
+  storyRanking,
+  type StoryArgumentSides,
+  type StoryBlockNeeds,
+  type StoryBlocksContext,
+  type StoryBlocksReading,
+  type StoryTableDropCode
+} from "./blocks.js";
+export {
+  STORY_BLOCK_MENU,
+  STORY_QUESTION_FORMS,
+  storyFormIsProseOnly,
+  storyQuestionFormOf,
+  type StoryBlockKind,
+  type StoryQuestionForm
+} from "./forms.js";
+export {
   StoryWriter,
   storyV4ShapeId,
   withoutStoryNodeIds,

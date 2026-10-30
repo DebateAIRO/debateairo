@@ -67,6 +67,56 @@ when two measures cover the same items, a scatter; one measure across several it
 | Samples | `story:sample-pdf <path> charts` (Romanian, two bar charts), `… scatter` (English, cost against score) |
 | Terms clause | drafted, not applied: `docs/legal/2026-10-28-terms-chart-ownership-draft.md` (a v2.7 release across 35 drafts) |
 
+## Data blocks: tables, and which debates get blocks (2026-10-30)
+
+The first real debate (three phones compared on security) got no chart: the chart call ran and the model, told that
+"most reports need no chart", returned an empty list. The owner asked for charts on the debates that need them, tables
+beside them, and none on the debates that do not.
+
+**Owner decisions (2026-10-30)**
+
+- Q1. Seventeen kinds of question. Nine compare things: pick among named options, yes/no decision, is it true, how much,
+  best way, money trade-off, why/cause, prediction, trend. Eight are answered in words and get no block: values,
+  personal, taste, interpretation, definition, hypothetical, a private person, a single fact. Crisis stays with the
+  question check.
+- Q2. First release: the comparison table, the ranking table, and pros and cons, beside the existing bar and scatter.
+- Q3. A table cell or entry is copied word for word from the claim it cites. One that fails the check is emptied
+  ("not stated in the debate"); a table is left out only when too little is left of it.
+- Q4. Health and legal questions get tables and charts like any other; the cover's "not professional advice" line
+  stands for them.
+- Q5. Three answers or more always get the ranking of the answers, in the list of points for a kind answered in words.
+- Q6. A debate with nothing worth showing gets no block call at all.
+- Q7. Nothing is stored or logged about why a story got no block.
+- Q9. The block call names the kind of question (an enum in its reply).
+- Q10. No copyright line under tables, for now (Terms 2.9 names charts only); to be settled later.
+- Q11. PDF only, as the charts.
+
+**How it works**
+
+1. **The need test** (code, `storyBlockNeeds`): figures (three claims or more state numbers), compare (two options at
+   least, argued with two points or more), pros and cons (a position argued for and against, or two positions argued),
+   ranking (three positions or more). The block call (`story.charts.v2`, still `STORY:CHARTS:1`) runs only when one of
+   the first three holds.
+2. **The block call** gets the same material plus a `figures` field (each claim's figures as code read them) and
+   returns the kind of question, charts and tables. Code keeps only the blocks the kind's menu allows
+   (`packages/story/src/forms.ts`); an unknown kind keeps every kind, and the checks alone decide.
+3. **The ranking** is code's (`storyRanking`): each position by place, with whether it won and whether it finished
+   within the tie margin. The PDF reads each claim and strength from the answer.
+4. **Storage and serving**: an optional `tables` member beside `charts`, sealed and owner-only the same way.
+5. **The PDF**: a table prints after its paragraph, before that paragraph's chart; the ranking prints at the end of
+   "Why this answer" or at the head of the list of points. Cells link to their points. About gains one sentence when
+   the report has tables. Eleven new strings in 35 locales.
+
+| Piece | Where |
+|---|---|
+| Table schemas and limits | `packages/contract/src/story.ts` (`StoryTableSchema`, `STORY_TABLE_LIMITS`, `AnswerStory.tables`) |
+| Kinds of question and menus | `packages/story/src/forms.ts` |
+| Need test, figures, table checks, ranking, ref restore | `packages/story/src/blocks.ts` |
+| Contract v2 (kind, tables) | `packages/story/src/charts.ts` |
+| The call and the ranking | `packages/story/src/writer.ts` (`#blocksFor`) |
+| Report model + drawing | `apps/ui/lib/report/reportTables.ts`, `ReportTable.tsx`, `ReportDocument.tsx` |
+| Sample | `story:sample-pdf <path> tables` (three phones) |
+
 ## Known limits
 
 - The chart call has no length-guidance step and no thinking-level row of its own: on the private preview it is a

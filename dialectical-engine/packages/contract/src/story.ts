@@ -213,6 +213,90 @@ export type StoryChart = z.infer<typeof StoryChartSchema>;
 export const StoryChartsSchema = z.array(StoryChartSchema).max(STORY_CHART_LIMITS.maxCharts);
 
 /**
+ * Tables in the verdict PDF (data blocks, 2026-10-30): beside the charts, a comparison table, a pros and cons list and
+ * the ranking of the answers. The limits every table obeys, in one place.
+ *  - maxTables: the most tables one story carries (the ranking among them).
+ *  - columns / rows: a comparison table is asked for on two to five things, for two to eight options. A column that
+ *    loses its cells to the checks is taken out, so a stored table keeps one column at least (minKeptColumns).
+ *  - maxOptions / maxEntries: a pros and cons list covers one to four positions, at most four entries a side.
+ *  - minRankingRows / maxRankingRows: a ranking needs three answers at least; a debate argues eight at most.
+ *  - columnMaxChars / cellMaxChars: a column's name; a cell or entry, copied from its point's claim.
+ */
+export const STORY_TABLE_LIMITS = Object.freeze({
+  maxTables: 4,
+  minColumns: 2,
+  minKeptColumns: 1,
+  maxColumns: 5,
+  minRows: 2,
+  maxRows: 8,
+  maxOptions: 4,
+  maxEntries: 4,
+  minRankingRows: 3,
+  maxRankingRows: 8,
+  columnMaxChars: 40,
+  cellMaxChars: 160
+});
+
+/** A cell or a list entry: words copied from one point's claim, and that point. */
+export const StoryTableCellSchema = z.object({
+  text: z.string().trim().min(1).max(STORY_TABLE_LIMITS.cellMaxChars),
+  node_ref: z.string().min(1)
+}).strict();
+export type StoryTableCell = z.infer<typeof StoryTableCellSchema>;
+
+/**
+ * Options in rows, the things compared in columns. A null cell is something the debate did not state: the PDF prints
+ * "not stated in the debate" there. Every row has one cell per column.
+ */
+export const StoryCompareTableSchema = z.object({
+  kind: z.literal("compare"),
+  after: StoryChartAnchorSchema,
+  title: z.string().trim().min(1).max(STORY_CHART_LIMITS.titleMaxChars),
+  columns: z.array(z.string().trim().min(1).max(STORY_TABLE_LIMITS.columnMaxChars))
+    .min(STORY_TABLE_LIMITS.minKeptColumns).max(STORY_TABLE_LIMITS.maxColumns),
+  rows: z.array(z.object({
+    label: z.string().trim().min(1).max(STORY_CHART_LIMITS.labelMaxChars),
+    cells: z.array(StoryTableCellSchema.nullable()).min(STORY_TABLE_LIMITS.minKeptColumns).max(STORY_TABLE_LIMITS.maxColumns)
+  }).strict()).min(STORY_TABLE_LIMITS.minRows).max(STORY_TABLE_LIMITS.maxRows)
+}).strict();
+export type StoryCompareTable = z.infer<typeof StoryCompareTableSchema>;
+
+/** For each position it covers: the points that argue for it and the points that argue against it. */
+export const StoryProsConsTableSchema = z.object({
+  kind: z.literal("pros_cons"),
+  after: StoryChartAnchorSchema,
+  title: z.string().trim().min(1).max(STORY_CHART_LIMITS.titleMaxChars),
+  options: z.array(z.object({
+    label: z.string().trim().min(1).max(STORY_CHART_LIMITS.labelMaxChars),
+    position_ref: z.string().min(1),
+    pros: z.array(StoryTableCellSchema).max(STORY_TABLE_LIMITS.maxEntries),
+    cons: z.array(StoryTableCellSchema).max(STORY_TABLE_LIMITS.maxEntries)
+  }).strict()).min(1).max(STORY_TABLE_LIMITS.maxOptions)
+}).strict();
+export type StoryProsConsTable = z.infer<typeof StoryProsConsTableSchema>;
+
+/**
+ * How the answers placed, built by code from the engine's own record, never by a model: each position in its place, and
+ * whether it won or finished within the tie margin of the winner. The PDF reads each strength from the answer.
+ * `placement`: in "Why this answer", or in the list of points for a question that gets no tables in the story.
+ */
+export const StoryRankingTableSchema = z.object({
+  kind: z.literal("ranking"),
+  placement: z.enum(["why", "appendix"]),
+  rows: z.array(z.object({
+    node_ref: z.string().min(1),
+    won: z.boolean(),
+    close: z.boolean()
+  }).strict()).min(STORY_TABLE_LIMITS.minRankingRows).max(STORY_TABLE_LIMITS.maxRankingRows)
+}).strict();
+export type StoryRankingTable = z.infer<typeof StoryRankingTableSchema>;
+
+export const StoryTableSchema = z.discriminatedUnion("kind", [StoryCompareTableSchema, StoryProsConsTableSchema, StoryRankingTableSchema]);
+export type StoryTable = z.infer<typeof StoryTableSchema>;
+
+export const StoryTablesSchema = z.array(StoryTableSchema).max(STORY_TABLE_LIMITS.maxTables);
+
+/**
  * GET /v1/answers/{id}/story (spec 2026-09-26 §10). `status` is WRITING while
  * the runner may still be writing, the stored outcome once a row exists, and
  * UNAVAILABLE otherwise (a FAILED row, no verdict, an unreadable row, or the
@@ -245,7 +329,9 @@ export const AnswerStorySchema = z.object({
    * The story's charts (design 2026-10-28), owner-only like the long story. Optional, so a server older than the charts
    * still parses; absent or empty when the story has none.
    */
-  charts: StoryChartsSchema.optional()
+  charts: StoryChartsSchema.optional(),
+  /** The story's tables (data blocks, 2026-10-30), owner-only and optional exactly as the charts. */
+  tables: StoryTablesSchema.optional()
 }).strict();
 export type AnswerStory = z.infer<typeof AnswerStorySchema>;
 

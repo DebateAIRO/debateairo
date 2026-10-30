@@ -209,6 +209,8 @@ describe("the gateway's story scope accepts the chart call on its own key and ro
 const PACK = loadStoryPack(resolveStoryPackDir({ env: {}, moduleUrl: import.meta.url }));
 const ROOT = "11111111-1111-4111-8111-111111111111";
 const ATTACK = "22222222-2222-4222-8222-222222222222";
+// Data blocks (2026-10-30): a third figure and a point for the position, so the debate passes the need test.
+const SUPPORT = "77777777-7777-4777-8777-777777777777";
 
 const POLICY: StoryPolicy = Object.freeze({
   storytellerRoleRef: "provider:storyteller",
@@ -248,10 +250,20 @@ const SNAPSHOT: StoryWriteInput = Object.freeze<StoryWriteInput>({
       nodeId: ATTACK, claim: "Payroll costs rise by 8% a year.", isPosition: false, wayOfKnowing: "LOOKED_UP",
       baseScore: 0.4, finalStrength: 0.4, excludedReason: null, authorModel: "maker-a",
       panelDispersion: null, criticSummary: "One source only."
+    },
+    {
+      nodeId: SUPPORT, claim: "Sick days fell by 4.5 a year in the trial.", isPosition: false, wayOfKnowing: "LOOKED_UP",
+      baseScore: 0.35, finalStrength: 0.35, excludedReason: null, authorModel: "maker-a",
+      panelDispersion: null, criticSummary: "A small trial."
     }
   ],
-  arrows: [{ sourceNodeId: ATTACK, targetNodeId: ROOT, polarity: "attack" }],
-  sensitivity: [{ removedNodeId: ROOT, leverage: 0.61 }, { removedNodeId: ATTACK, leverage: 0.09 }],
+  arrows: [
+    { sourceNodeId: ATTACK, targetNodeId: ROOT, polarity: "attack" },
+    { sourceNodeId: SUPPORT, targetNodeId: ROOT, polarity: "support" }
+  ],
+  sensitivity: [
+    { removedNodeId: ROOT, leverage: 0.61 }, { removedNodeId: ATTACK, leverage: 0.09 }, { removedNodeId: SUPPORT, leverage: 0.05 }
+  ],
   setAside: [],
   judgeArtifactRefs: new Map([[ROOT, "66666666-6666-4666-8666-666666666666"]])
 });
@@ -382,6 +394,21 @@ describe("StoryWriter — the chart call (charts on)", () => {
     expect(inserted[0]?.outcome).toBe("READY");
     expect(inserted[0]).not.toHaveProperty("charts");
     expect(details).toContainEqual(expect.objectContaining({ event: "STORY_CHARTS_FAILED", code: "Error" }));
+  });
+
+  it("a debate with nothing worth showing gets no block call at all (data blocks, owner decision Q6)", async () => {
+    const { provider, calls } = answering(CHART_PLAN);
+    const { writer, inserted } = harness(provider, true);
+    await writer.writeAfterSettle({
+      ...SNAPSHOT,
+      nodes: SNAPSHOT.nodes.slice(0, 2),
+      arrows: SNAPSHOT.arrows.slice(0, 1),
+      sensitivity: SNAPSHOT.sensitivity.slice(0, 2)
+    });
+    expect(calls.map((call) => call.callSiteKey)).toEqual(["STORY:STORYTELLER:1", "STORY:CHECKER:1"]);
+    expect(inserted[0]?.outcome).toBe("READY");
+    expect(inserted[0]).not.toHaveProperty("charts");
+    expect(inserted[0]).not.toHaveProperty("tables");
   });
 
   it("an empty plan stores no charts member", async () => {

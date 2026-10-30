@@ -1,9 +1,11 @@
 import { z } from "zod";
-import { STORY_CHART_LIMITS, StoryChartSchema, type StoryBody, type StoryChart, type StoryChartFigure, type StoryParagraph } from "@debateai/contract";
+import { STORY_CHART_LIMITS, STORY_TABLE_LIMITS, StoryChartSchema, type StoryBody, type StoryChart, type StoryChartFigure,
+  type StoryParagraph } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
 import { decodeModelJson, decodedRepairsOf, parsedWithRepairs, type ContentClassification, type ModelReplyFacts,
   type PromptContract } from "@debateai/providers";
 import { STORY_QUOTE_SENTENCE } from "./contracts.js";
+import { STORY_BLOCK_MENU, STORY_QUESTION_FORMS, STORY_QUESTION_FORM_MEANINGS } from "./forms.js";
 
 /**
  * CHARTS IN THE VERDICT PDF (design 2026-10-28). After the story is accepted, ONE more call asks the model that wrote it
@@ -16,21 +18,32 @@ import { STORY_QUOTE_SENTENCE } from "./contracts.js";
  * writes one, and the PDF reads it from the answer, the same number the report's list of points prints.
  */
 
-export const STORY_CHARTS_CONTRACT_ID = "story.charts.v1" as const;
+/** v2 (data blocks, 2026-10-30): the reply also names the kind of question and may plan tables. */
+export const STORY_CHARTS_CONTRACT_ID = "story.charts.v2" as const;
 
 /** The chart call's one call site: on the story lane, with the storyteller's role (the gateway checks the pair). */
 export const STORY_CHARTS_CALL_SITE_KEY = "STORY:CHARTS:1" as const;
 
 /**
- * OWNER WORDING (design 2026-10-28). The instruction half: what a chart is for, and when there should be none.
+ * OWNER WORDING (design 2026-10-28, data blocks 2026-10-30). The instruction half: name the kind of question, then show
+ * the comparisons the debate makes in the block that suits each, from what the debate states and nothing else. Code ran
+ * this call only because the debate holds figures, options or arguments for and against worth showing.
  */
-export const STORY_CHARTS_INSTRUCTION = `You add charts to a finished report about a debate. The report_text field holds the report's text: the reasons in why.reasons and the long version in long.sections, each paragraph with the ids of the points it rests on. The positions and points fields hold the debate's positions and points, each with its claim.
-Add a chart only where it lets the reader see a comparison that a paragraph makes, using numbers the debate itself states. Two measures that cover the same things, such as the price and the test score of several products, make a scatter chart; one measure across several things makes a bar chart. A measure is either the figures the claims state (source "figure") or how strong each point or position turned out in the debate (source "strength"). Most reports need no chart or only one: a chart that repeats a single number, compares things that do not belong together, or decorates a paragraph is worse than none. When no chart would help, return an empty list.
-Never invent, estimate, convert, round or add up a number: every figure is copied from the claim of the point it belongs to.`;
+export const STORY_CHARTS_INSTRUCTION = `You add charts and tables to a finished report about a debate. The report_text field holds the report's text: the reasons in why.reasons and the long version in long.sections, each paragraph with the ids of the points it rests on. The positions and points fields hold the debate's positions and points, each with its claim. The figures field lists, for each point or position whose claim states numbers, those numbers as the claim writes them.
+First name the kind of question the debate answers. A question about right and wrong, a relationship or feeling, taste, the meaning of a work, what a word covers, what would have happened, a private person, or a single fact is answered in words: its report gets no chart and no table.
+For every other kind, show the comparisons the debate makes in the block that suits them. Options compared on two or more things (such as price, years of updates and encryption) make a comparison table, one row per option and one column per thing compared. Points that argue for and against a position make a pros and cons list. One measure across three or more things makes a bar chart; two measures that cover the same three or more things, such as the price and the test score of several products, make a scatter chart. A measure is either the figures the claims state (source "figure") or how strong each point or position turned out in the debate (source "strength").
+Use only what the debate states. Never invent, estimate, convert, round or add up a number, and never put words in a claim: every figure, cell and list entry is copied character for character from the claim of the point it cites. When the claims do not say something a table asks, leave that cell null. A block that repeats a single number, compares things that do not belong together, or decorates a paragraph is worse than none.`;
+
+const STORY_QUESTION_FORM_LINES = STORY_QUESTION_FORMS.map((form) => {
+  const menu = STORY_BLOCK_MENU[form];
+  const blocks = menu.length === 0 ? "no block" : menu.map((kind) => `"${kind}"`).join(", ");
+  return `  "${form}": ${STORY_QUESTION_FORM_MEANINGS[form]} (${blocks})`;
+}).join("\n");
 
 /** OWNER WORDING (design 2026-10-28). The answer form: code's, mirrored by `StoryChartsReplySchema` and `readStoryCharts`. */
 export const STORY_CHARTS_ANSWER_FORM = `Return only one JSON object with exactly the following schema and no additional keys, with no text before or after it and no code fence. Every string is plain text: no Markdown, no HTML, no links, no control characters, and no bidirectional embedding, override or isolate characters (U+202A to U+202E and U+2066 to U+2069).
 {
+  "question_form": the kind of question, one of the ids below,
   "charts": [{
     "after": "why.N" for the N-th entry of why.reasons, or "long.S.P" for paragraph P of section S of long.sections, counting from 1,
     "kind": "bar" | "scatter",
@@ -39,13 +52,30 @@ export const STORY_CHARTS_ANSWER_FORM = `Return only one JSON object with exactl
     "y": { "label": non-empty string of at most ${String(STORY_CHART_LIMITS.labelMaxChars)} characters, "source": "figure" | "strength", "log": boolean },
     "items": [{ "label": non-empty string of at most ${String(STORY_CHART_LIMITS.labelMaxChars)} characters, "node_ref": id, "x": null | { "value": number, "text": string }, "y": null | { "value": number, "text": string } }, ...],
     "frontier": null | { "x": "lower" | "higher", "y": "lower" | "higher" }
+  }, ...],
+  "tables": [{
+    "after": as a chart's,
+    "kind": "compare",
+    "title": as a chart's,
+    "columns": [non-empty string of at most ${String(STORY_TABLE_LIMITS.columnMaxChars)} characters, ...],
+    "rows": [{ "label": non-empty string of at most ${String(STORY_CHART_LIMITS.labelMaxChars)} characters, "cells": [null | { "text": string, "node_ref": id }, ...] }, ...]
+  } | {
+    "after": as a chart's,
+    "kind": "pros_cons",
+    "title": as a chart's,
+    "options": [{ "label": non-empty string of at most ${String(STORY_CHART_LIMITS.labelMaxChars)} characters, "position_ref": id, "pros": [{ "text": string, "node_ref": id }, ...], "cons": [{ "text": string, "node_ref": id }, ...] }, ...]
   }, ...]
 }
-charts has 0 to ${String(STORY_CHART_LIMITS.maxCharts)} entries, and at most one chart goes after any one paragraph. A bar chart has "x": null and ${String(STORY_CHART_LIMITS.minItems)} to ${String(STORY_CHART_LIMITS.maxItems)} items, and plots y for each item. A scatter chart has both axes, two different measures, and ${String(STORY_CHART_LIMITS.minScatterItems)} to ${String(STORY_CHART_LIMITS.maxItems)} items.
+The kinds of question, each with the blocks its report may carry:
+${STORY_QUESTION_FORM_LINES}
+Only the blocks a kind lists are kept; for a kind with no block, charts and tables are empty lists.
+charts has 0 to ${String(STORY_CHART_LIMITS.maxCharts)} entries and tables 0 to ${String(STORY_TABLE_LIMITS.maxTables - 1)}, and at most one chart or table goes after any one paragraph. A bar chart has "x": null and ${String(STORY_CHART_LIMITS.minItems)} to ${String(STORY_CHART_LIMITS.maxItems)} items, and plots y for each item. A scatter chart has both axes, two different measures, and ${String(STORY_CHART_LIMITS.minScatterItems)} to ${String(STORY_CHART_LIMITS.maxItems)} items.
 Each node_ref is copied exactly from an id in the points field or the positions field, and the paragraph the chart goes after lists that id in its node_refs. Several items may share one node_ref when one claim states figures for several things.
 On an axis whose source is "figure", each item's value for that axis is an object: "text" is copied character for character from the claim of that item's node_ref (the number with its unit or sign exactly as the claim writes it, such as $0.15 or 52 %), and "value" is that same number as a JSON number, in the unit the axis label names. On an axis whose source is "strength", and on the x of a bar chart, each item's value is null: code fills in the strengths.
 "log" is true only when the axis's values are all above zero and span more than a hundredfold.
 "frontier" is null on a bar chart. On a scatter chart, when a reader would want the best of both measures (a lower price and a higher score, say), it says which end of each axis is better, "lower" or "higher", and the report draws a line through the items nothing else beats on both; otherwise it is null.
+A comparison table has ${String(STORY_TABLE_LIMITS.minColumns)} to ${String(STORY_TABLE_LIMITS.maxColumns)} columns and ${String(STORY_TABLE_LIMITS.minRows)} to ${String(STORY_TABLE_LIMITS.maxRows)} rows, and each row has exactly one cell per column. A cell's "text" is copied character for character from the claim of its node_ref, at most ${String(STORY_TABLE_LIMITS.cellMaxChars)} characters, and says that row's option on that column's thing; a cell no claim states is null.
+A pros and cons list covers 1 to ${String(STORY_TABLE_LIMITS.maxOptions)} positions, each named by its position_ref, with at most ${String(STORY_TABLE_LIMITS.maxEntries)} pros and ${String(STORY_TABLE_LIMITS.maxEntries)} cons. A pro's node_ref is a point that supports that position and a con's a point that attacks it, and each entry's "text" is copied character for character from that point's claim, at most ${String(STORY_TABLE_LIMITS.cellMaxChars)} characters.
 Titles and labels are in the question's language, say what is measured and in which unit, and contain no score or threshold from the material and no engine words such as judge, evaluator, checker, margin, band or rung.
 ${STORY_QUOTE_SENTENCE}`;
 
@@ -58,10 +88,16 @@ export function buildStoryChartsContract(): PromptContract {
 }
 
 /**
- * The reply's outer shape. Each chart is read on its own (`readStoryCharts`), so one bad chart costs that chart and
- * never the others; only a reply that is not `{ "charts": [...] }` at all is refused, and repaired by the gateway.
+ * The reply's outer shape. Each chart and table is read on its own (`readStoryCharts`, `readStoryBlocks`), so one bad
+ * block costs that block and never the others; only a reply that is not `{ "charts": [...] }` with at most a kind of
+ * question and a list of tables beside it is refused, and repaired by the gateway. An unknown kind is not a refusal:
+ * it reads as no kind (`storyQuestionFormOf`).
  */
-const StoryChartsReplySchema = z.object({ charts: z.array(z.unknown()).max(STORY_CHART_LIMITS.maxCharts * 4) }).strict();
+export const StoryBlocksReplySchema = z.object({
+  question_form: z.string().optional(),
+  charts: z.array(z.unknown()).max(STORY_CHART_LIMITS.maxCharts * 4),
+  tables: z.array(z.unknown()).max(STORY_TABLE_LIMITS.maxTables * 4).optional()
+}).strict();
 
 /** What a chart plan is checked against: the story as the model read it (short refs) and each reference's claim. */
 export interface StoryChartsContext {
@@ -98,7 +134,7 @@ export interface StoryChartsReading {
 }
 
 /** Control characters other than line feed and tab, and the bidirectional overrides the story refuses too. */
-const FORBIDDEN_CHARACTERS = /[\u0000-\u0008\u000B-\u001F\u007F‪-‮⁦-⁩]/u;
+export const FORBIDDEN_CHARACTERS =/[\u0000-\u0008\u000B-\u001F\u007F‪-‮⁦-⁩]/u;
 
 /** The paragraph a chart's anchor names, or null when the story has no such paragraph. */
 export function storyChartParagraph(body: Pick<StoryBody, "why" | "long">, after: string): StoryParagraph | null {
@@ -108,7 +144,7 @@ export function storyChartParagraph(body: Pick<StoryBody, "why" | "long">, after
 }
 
 /** Spaces of every width as one plain space, in canonical composition, so "52 %" with a no-break space matches "52 %". */
-function normalised(text: string): string {
+export function normalised(text: string): string {
   return text.normalize("NFC").replace(/[\s    ]+/gu, " ").trim();
 }
 
@@ -166,7 +202,7 @@ function escaped(text: string): string {
 }
 
 /** A material score as a whole token (no digit on either side, and no percent sign after), as the story's own check reads it. */
-function scorePattern(scoreTexts: ReadonlySet<string>): RegExp | null {
+export function scorePattern(scoreTexts: ReadonlySet<string>): RegExp | null {
   if (scoreTexts.size === 0) return null;
   return new RegExp(`(?<![0-9])(?:${[...scoreTexts].map(escaped).join("|")})(?![0-9%])`, "u");
 }
@@ -210,7 +246,7 @@ function checkedChart(chart: StoryChart, context: StoryChartsContext, scores: Re
  * each one left out. Never throws for anything the model wrote.
  */
 export function readStoryCharts(value: unknown, context: StoryChartsContext): StoryChartsReading {
-  const reply = StoryChartsReplySchema.safeParse(value);
+  const reply = StoryBlocksReplySchema.safeParse(value);
   if (!reply.success) return { charts: [], dropped: ["CHART_SCHEMA"] };
   const scores = scorePattern(context.scoreTexts);
   const charts: StoryChart[] = [];
@@ -241,7 +277,7 @@ export function readStoryCharts(value: unknown, context: StoryChartsContext): St
 export function classifyStoryChartsContent(content: string, reply?: ModelReplyFacts): ContentClassification {
   const decoded = decodeModelJson(content, reply);
   if (!decoded.ok) return { parseStatus: "PARSE_FAILED", parseError: decoded.error };
-  const read = StoryChartsReplySchema.safeParse(decoded.value);
+  const read = StoryBlocksReplySchema.safeParse(decoded.value);
   return read.success
     ? parsedWithRepairs(decodedRepairsOf(decoded))
     : { parseStatus: "SCHEMA_FAILED", parseError: read.error.message };

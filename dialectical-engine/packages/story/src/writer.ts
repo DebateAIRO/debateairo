@@ -1,5 +1,5 @@
 import { STORY_COST_ENVELOPE_REACHED } from "@debateai/budget";
-import { StoryLanguageTagSchema, type MakerLineage, type StoryBody, type StoryChart } from "@debateai/contract";
+import { StoryLanguageTagSchema, type MakerLineage, type StoryBody, type StoryChart, type StoryTable } from "@debateai/contract";
 import type { Pool } from "@debateai/db";
 import { TypedDomainError, questionLanguageFromRun, replyLanguageCheckFor, withQuestionLanguageField, type EngineQuestionKind,
   type QuestionLanguage } from "@debateai/kernel";
@@ -30,10 +30,18 @@ import {
   type StoryBackupRecord
 } from "./backup.js";
 import {
+  parseStoryBlocks,
+  restoreTableRefs,
+  storyArgumentSides,
+  storyBlockCallNeeded,
+  storyBlockNeeds,
+  storyFiguresField,
+  storyRanking
+} from "./blocks.js";
+import {
   STORY_CHARTS_CALL_SITE_KEY,
   buildStoryChartsContract,
   classifyStoryChartsContent,
-  parseStoryCharts,
   restoreChartRefs
 } from "./charts.js";
 import {
@@ -45,6 +53,7 @@ import {
   storyLengthField
 } from "./contracts.js";
 import { readStoryEnrichment } from "./enrichment.js";
+import { storyFormIsProseOnly, type StoryQuestionForm } from "./forms.js";
 import { storyActualWords, storyGuidedBound, storyGuidedWords } from "./length.js";
 import { runStoryLoop, storyCallSiteKey, storyLoopLastRound, type StoryLoopDependencies, type StoryLoopOutcome } from "./loop.js";
 import {
@@ -443,6 +452,14 @@ function fallbackRecord(input: StoryWriteInput, pack: StoryPack | null): StoryRe
   return Object.freeze({ ...failedRecord(input, "STORY_UNEXPECTED_ERROR", pack), verdictBasis: null, languageTag: null });
 }
 
+/** A story's charts and tables, with real node ids, as they are stored. */
+interface StoryBlocks {
+  readonly charts: readonly StoryChart[];
+  readonly tables: readonly StoryTable[];
+}
+
+const NO_BLOCKS: StoryBlocks = Object.freeze({ charts: Object.freeze([]), tables: Object.freeze([]) });
+
 function recordFromOutcome(
   input: StoryWriteInput,
   pack: StoryPack,
@@ -450,8 +467,9 @@ function recordFromOutcome(
   refMap: ReadonlyMap<string, string>,
   storytellerRepairs: number,
   backup: StoryBackupRecord | null,
-  charts: readonly StoryChart[] = []
+  blocks: StoryBlocks = NO_BLOCKS
 ): StoryRecordInput {
+  const { charts, tables } = blocks;
   // The lineage is the SERVED round's: under the earlier-draft fallback that is
   // the earlier round, whose writer wrote and whose checker judged the story
   // the reader sees. A FAILED loop serves nothing, so it names the last round's.
@@ -501,8 +519,9 @@ function recordFromOutcome(
     shapeId: body.shape_id,
     body,
     reservation: outcome.reservation,
-    // Charts (design 2026-10-28): only a story that has some carries the member.
-    ...(charts.length === 0 ? {} : { charts })
+    // Charts (design 2026-10-28) and tables (data blocks, 2026-10-30): only a story that has some carries the member.
+    ...(charts.length === 0 ? {} : { charts }),
+    ...(tables.length === 0 ? {} : { tables })
   };
   return Object.freeze(written);
 }
@@ -903,9 +922,10 @@ export class StoryWriter {
         }
       }
     }
-    // Charts (design 2026-10-28): one more call, after an accepted story, to the maker that wrote the served draft. The
-    // story is stored as it is whatever becomes of it.
-    const charts = served.outcome === "FAILED" || this.#deps.charts !== true ? [] : await this.#chartsFor(input, {
+    // Charts (design 2026-10-28) and tables (data blocks, 2026-10-30): one more call, after an accepted story, to the maker
+    // that wrote the served draft, when the debate holds something worth showing. The story is stored as it is whatever
+    // becomes of it.
+    const blocks = served.outcome === "FAILED" || this.#deps.charts !== true ? NO_BLOCKS : await this.#blocksFor(input, {
       material: built.material,
       scoreTexts: built.index.scoreTexts,
       refMap: built.refMap,
@@ -916,15 +936,16 @@ export class StoryWriter {
       lock,
       call: (planned, request) => callStoryRole(planned, request, null)
     });
-    return recordFromOutcome(input, pack, served, built.refMap, repairedRounds.size, backup, charts);
+    return recordFromOutcome(input, pack, served, built.refMap, repairedRounds.size, backup, blocks);
   }
 
   /**
-   * Charts (design 2026-10-28): the chart call and its checks (packages/story/src/charts.ts). Never throws: a refused
-   * call, money, a reply that is not a chart plan, or a plan with no chart that passes, all mean no charts, logged by
-   * code and counts only.
+   * Charts and tables (design 2026-10-28, data blocks 2026-10-30): the block call and its checks (charts.ts, blocks.ts),
+   * made only when the debate holds figures, options or arguments for and against (`storyBlockNeeds`); then the ranking
+   * of the answers, which code builds whatever became of the call. Never throws: a refused call, money, a reply that is
+   * not a plan, or a plan with nothing that passes, all mean no planned blocks, logged by code and counts only.
    */
-  async #chartsFor(input: StoryWriteInput, args: Readonly<{
+  async #blocksFor(input: StoryWriteInput, args: Readonly<{
     material: StoryMaterial;
     scoreTexts: ReadonlySet<string>;
     refMap: ReadonlyMap<string, string>;
@@ -934,39 +955,60 @@ export class StoryWriter {
     languageName: string | null;
     lock: QuestionLanguage | null;
     call: (planned: StoryRoleMaker, request: ProviderCallRequest) => Promise<Readonly<{ result: ProviderCallResult }>>;
-  }>): Promise<readonly StoryChart[]> {
-    try {
-      const contract = storyContractInArgumentLanguage(buildStoryChartsContract(), args.languageName, args.lock);
-      const reading = rememberingAcceptedReply((content, reply) => classifyStoryChartsContent(content, reply));
-      const request = storyCallRequest({
-        story: input,
-        site: "CHARTS",
-        round: 1,
-        providerRef: args.teller.providerRef,
-        bound: args.bound,
-        contract,
-        contractHash: storyContractHash(contract),
-        material: withQuestionLanguageField(toChartsPromptMaterial(args.material, args.body), args.lock),
-        classifyContent: reading.classifyContent
-      });
-      const { result } = await args.call(args.teller, request);
-      const accepted = reading.acceptedAs(result.content);
-      const read = parseStoryCharts(result.content, {
-        body: args.body,
-        claims: storyMaterialClaims(args.material),
-        scoreTexts: args.scoreTexts
-      }, accepted.reply);
-      const charts = restoreChartRefs(read.charts, args.refMap);
-      this.#log("STORY_CHARTS_WRITTEN", () => ({
-        answerId: input.answerId, answerVersion: input.answerVersion, charts: charts.length, dropped: [...read.dropped]
-      }));
-      return charts;
-    } catch (error) {
-      this.#log("STORY_CHARTS_FAILED", () => ({
-        answerId: input.answerId, answerVersion: input.answerVersion, code: codeOf(error)
-      }));
-      return [];
+  }>): Promise<StoryBlocks> {
+    const needs = storyBlockNeeds(args.material);
+    let planned: Readonly<{ form: StoryQuestionForm | null; charts: readonly StoryChart[]; tables: readonly StoryTable[] }> =
+      { form: null, charts: [], tables: [] };
+    if (storyBlockCallNeeded(needs)) {
+      try {
+        const contract = storyContractInArgumentLanguage(buildStoryChartsContract(), args.languageName, args.lock);
+        const reading = rememberingAcceptedReply((content, reply) => classifyStoryChartsContent(content, reply));
+        const request = storyCallRequest({
+          story: input,
+          site: "CHARTS",
+          round: 1,
+          providerRef: args.teller.providerRef,
+          bound: args.bound,
+          contract,
+          contractHash: storyContractHash(contract),
+          material: withQuestionLanguageField(
+            toChartsPromptMaterial(args.material, args.body, storyFiguresField(args.material)), args.lock
+          ),
+          classifyContent: reading.classifyContent
+        });
+        const { result } = await args.call(args.teller, request);
+        const accepted = reading.acceptedAs(result.content);
+        const read = parseStoryBlocks(result.content, {
+          body: args.body,
+          claims: storyMaterialClaims(args.material),
+          scoreTexts: args.scoreTexts,
+          sides: storyArgumentSides(args.material)
+        }, accepted.reply);
+        planned = { form: read.form, charts: restoreChartRefs(read.charts, args.refMap), tables: restoreTableRefs(read.tables, args.refMap) };
+        this.#log("STORY_CHARTS_WRITTEN", () => ({
+          answerId: input.answerId, answerVersion: input.answerVersion,
+          charts: planned.charts.length, tables: planned.tables.length, dropped: [...read.dropped]
+        }));
+      } catch (error) {
+        this.#log("STORY_CHARTS_FAILED", () => ({
+          answerId: input.answerId, answerVersion: input.answerVersion, code: codeOf(error)
+        }));
+      }
     }
+    // Owner decision Q5: three answers or more always get their ranking, in the list of points for a question answered
+    // in words, in "Why this answer" otherwise (an unknown kind included).
+    const ranking = needs.ranking ? storyRanking(args.material, storyFormIsProseOnly(planned.form) ? "appendix" : "why") : null;
+    let tables = planned.tables;
+    if (ranking !== null) {
+      try {
+        tables = [...restoreTableRefs([ranking], args.refMap), ...planned.tables];
+      } catch (error) {
+        this.#log("STORY_CHARTS_FAILED", () => ({
+          answerId: input.answerId, answerVersion: input.answerVersion, code: codeOf(error)
+        }));
+      }
+    }
+    return Object.freeze({ charts: planned.charts, tables: Object.freeze([...tables]) });
   }
 
   /** Why a story failed, or why an earlier draft is the one served: codes only (today's two logs, one loop at a time). */
