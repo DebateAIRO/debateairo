@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import type { QuestionLanguageChoice } from "@debateai/contract";
+import { ContractHttpError, DIG_TOO_DEEP, type AskParent, type QuestionLanguageChoice } from "@debateai/contract";
 import { COOKIE_SESSION_MARKER, contractClient, createDebate } from "@/lib/api";
 import { readAskRoom, useAskRoom, waitingRoomOf, type AskRoom } from "@/lib/billing/room";
 import {
@@ -16,7 +16,7 @@ import { isCrisisSupportRefusal, useCrisisSupport } from "@/components/CrisisSup
 import { useQuestionLanguageChoice } from "@/components/QuestionLanguageChoice";
 import { catalogLocale, isLocale, type LocaleCode } from "@/lib/i18n/locales";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
-import { v4AskConfig, v4RoomQuery, type V4AskSettings } from "./askConfig";
+import { effectiveDigMode, v4AskConfig, v4RoomQuery, type V4AskSettings } from "./askConfig";
 import type { DigMode, ReadingLevel } from "./types";
 
 /*
@@ -48,11 +48,25 @@ type InternalFunding = Readonly<{ kind: "INTERNAL"; expires_at: string }>;
 
 const STOPPED: V4AskOutcome = Object.freeze({ kind: "STOPPED" });
 
+/**
+ * W3-4: the dig the map page is about to send, so its room read says the dig's share of today (`dig_share_percent`):
+ * the debate it digs and how many picks it combines (0: a dig of a whole path or one open question).
+ */
+export type V4DigRoom = Readonly<{ parentRunId: string; picks: number }>;
+
+/** W3-4: the API's 409 for a dig that would go past the deepest level (two quick clicks): nothing started, nothing used. */
+function isDigTooDeep(failure: unknown): boolean {
+  return failure instanceof ContractHttpError && failure.status === 409 && failure.serverCode === DIG_TOO_DEEP;
+}
+
 export function useV4Ask(input: Readonly<{
   catalog: MessageCatalog; homeCatalog: MessageCatalog; newDebateCatalog: MessageCatalog;
   locale: string; crisisCountryHint: string | null; mode: DigMode; readingLevel: ReadingLevel;
+  /** W3-4: on the map page, the dig its room read is for; absent (the ask page), the read is for a new question. */
+  dig?: V4DigRoom | null;
 }>): Readonly<{
-  submit(questionLine: string, mode: DigMode, origin?: V4AskOrigin): Promise<V4AskOutcome>;
+  /** W3-4: a dig sends its `parent` (the debate it digs, its places, mode and picks); a new question sends none. */
+  submit(questionLine: string, mode: DigMode, origin?: V4AskOrigin, parent?: AskParent | null): Promise<V4AskOutcome>;
   /** ASK-3: whether this text reads as a person in crisis (the page enables Start for it even when it is short). */
   flagsCrisis(text: string): boolean;
   room: AskRoom | null;
@@ -61,6 +75,8 @@ export function useV4Ask(input: Readonly<{
   dialogs: React.ReactNode;
 }> {
   const { catalog, homeCatalog, newDebateCatalog, locale, crisisCountryHint, mode, readingLevel } = input;
+  const digParent = input.dig?.parentRunId ?? null;
+  const digPicks = input.dig?.picks ?? 0;
   const [submitting, setSubmitting] = React.useState(false);
   const submitFlight = React.useRef(false);
   const consent = useSensitiveDataConsent({ catalog: homeCatalog, locale });
@@ -102,7 +118,14 @@ export function useV4Ask(input: Readonly<{
     ...(settingsVersion.current === undefined ? {} : { settingsVersion: settingsVersion.current })
   }), []);
   // Contract deviation 9: the room for the ask this page would send now (the page's mode and level).
-  const roomQuery = v4RoomQuery(mode, readingLevel, settingsFor(planTier, shapeSettings, lengthSettings));
+  const baseQuery = v4RoomQuery(mode, readingLevel, settingsFor(planTier, shapeSettings, lengthSettings));
+  // W3-4 (owner Q14): a dig's read names its parent, mode and picks, so the answer says the dig's share of today.
+  const roomQuery = digParent === null ? baseQuery : {
+    ...baseQuery,
+    dig_parent: digParent,
+    dig_mode: effectiveDigMode(mode, planTier),
+    ...(digPicks > 0 ? { dig_picks: digPicks } : {})
+  };
   const [room, setRoom] = useAskRoom(contractClient, roomQuery);
 
   /** Ruling R51: a read from another version is authoritative — its switches apply as they are (they may turn off). */
@@ -136,7 +159,8 @@ export function useV4Ask(input: Readonly<{
       pageLocale, consent, crisis, languageChoice };
   });
 
-  const submit = React.useCallback(async (questionLine: string, askMode: DigMode, origin: V4AskOrigin = "ask"): Promise<V4AskOutcome> => {
+  const submit = React.useCallback(async (questionLine: string, askMode: DigMode, origin: V4AskOrigin = "ask",
+    parent: AskParent | null = null): Promise<V4AskOutcome> => {
     if (submitFlight.current) return STOPPED;
     const now = live.current;
     const question = questionLine.trim();
@@ -176,10 +200,14 @@ export function useV4Ask(input: Readonly<{
         // is answered with the person's own wording, a stale reference is checked once more without a choice.
         const sendsLanguage = askSettings.shapeSettings;
         try {
+          // W3-4: a dig's parent rides with every pass of the same press (today's calls when there is none).
+          const sentParent = parent ?? undefined;
           debate = !sendsLanguage
-            ? await createDebate(next.line, config, COOKIE_SESSION_MARKER)
+            ? sentParent === undefined
+              ? await createDebate(next.line, config, COOKIE_SESSION_MARKER)
+              : await createDebate(next.line, config, COOKIE_SESSION_MARKER, undefined, undefined, sentParent)
             : await createDebate(next.line, config, COOKIE_SESSION_MARKER, undefined,
-              next.choice === undefined ? { siteLanguage } : { siteLanguage, choice: next.choice });
+              next.choice === undefined ? { siteLanguage } : { siteLanguage, choice: next.choice }, sentParent);
         } catch (refusal) {
           // Today's one retry after the consent screen; it is not one of the four asks.
           if (isSensitiveDataConsentRefusal(refusal) && !consentRetried) {
@@ -235,6 +263,8 @@ export function useV4Ask(input: Readonly<{
       }
       return { kind: "STARTED", runId: debate.id };
     } catch (exc) {
+      // W3-4: two quick clicks past the deepest level; the API started nothing and used nothing (label 5.5).
+      if (isDigTooDeep(exc)) return refused(t(now.catalog, "v4.nest.tooDeep"));
       if (isCrisisSupportRefusal(exc)) {
         // ASK-4: the API's crisis gate refused a dig: no help pop-up for AI-written text, a plain sentence instead.
         if (dig) return refused(t(now.catalog, "v4.digError.cannotFollow"));

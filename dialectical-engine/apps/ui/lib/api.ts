@@ -1,10 +1,12 @@
 import {
+  AskParentSchema,
   ContractHttpError,
   createContractClient,
   DepthParamsSchema,
   PLAN_TIERS,
   type Answer,
   type ArgumentLanguage,
+  type AskParent,
   type AskRequest,
   type ContractClient,
   type DepthParams,
@@ -495,7 +497,9 @@ export async function createDebate(
    * Question language (spec 2026-10-13): the page's language, and the person's answer to an offer
    * when there is one. Absent, the ask is today's ask, sent by today's call.
    */
-  language?: Readonly<{ siteLanguage: SiteLanguage; choice?: QuestionLanguageChoice }>
+  language?: Readonly<{ siteLanguage: SiteLanguage; choice?: QuestionLanguageChoice }>,
+  /** Plan 2026-10-30 W3-4: a dig names the debate it digs, its places, mode and picks (AskParentSchema). */
+  parent?: AskParent
 ): Promise<{ id: string }> {
   const riskTier = requiredString(config, "risk_tier");
   if (!RISK_TIERS.has(riskTier)) throw new Error("ASK_FIELD_REQUIRED: risk_tier must be casual, standard, or high-stakes.");
@@ -534,7 +538,8 @@ export async function createDebate(
     ...(modelStrength === undefined ? {} : { model_strength: modelStrength }),
     ...(language === undefined ? {} : { site_language: language.siteLanguage }),
     ...(language?.choice === undefined ? {} : { question_language_choice: language.choice }),
-    ...(settingsVersion === undefined ? {} : { settings_version: settingsVersion })
+    ...(settingsVersion === undefined ? {} : { settings_version: settingsVersion }),
+    ...(parent === undefined ? {} : { parent: AskParentSchema.parse(parent) })
   };
   requireToken(token);
   if (language === undefined) {                                   // today's call, unchanged

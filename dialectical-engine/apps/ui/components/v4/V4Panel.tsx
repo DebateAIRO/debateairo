@@ -4,7 +4,9 @@ import Link from "next/link";
 import type { ReactNode, RefObject } from "react";
 import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { addedLines, ownWords, startsWithLabel } from "@/lib/v4/askText";
-import { openQuestionsOf } from "@/lib/v4/mapModel";
+import { findOpenQuestion, openQuestionsOf } from "@/lib/v4/mapModel";
+import type { MoneyLine } from "@/lib/v4/money";
+import { draftTarget } from "@/lib/v4/suggestions";
 import { levelHref } from "@/lib/v4/storage";
 import { countTrust } from "@/lib/v4/trust";
 import {
@@ -38,6 +40,7 @@ import {
   type ResolvedSelection,
   type Title
 } from "./V4MapTree";
+import { V4DigCompose, V4MoneyLines, type V4DigChoice } from "./V4DigSuggest";
 import { V4OtherPages, V4SearchNote, V4SourceList, V4WebNoteLine } from "./V4Sources";
 import { V4TrustBar } from "./V4TrustBar";
 
@@ -74,6 +77,10 @@ type PanelProps = Readonly<{
   roomNotice?: ReactNode;
   /** W2-6: "Add to researched" on one of a path's other pages; W4-4 wires it (until then the button cannot be used). */
   onAddResearched?: (pathId: string, pageRef: string) => void;
+  /** W3-4: choosing what to dig (suggestions, edits, own view, the one-path rule, "Dig here too", the deepest level). */
+  choice?: V4DigChoice;
+  /** W3-4: the money lines before a dig (its share of today; new starts waiting for the reset). Never a price. */
+  money?: readonly MoneyLine[];
   headingRef: RefObject<HTMLHeadingElement | null>;
   catalog: MessageCatalog;
   locale: string;
@@ -251,6 +258,7 @@ function WhereToDig(props: Readonly<{
                     onTogglePick={panel.onTogglePick}
                     catalog={panel.catalog}
                     className="v4PanelPick"
+                    {...(panel.choice === undefined ? {} : { choice: panel.choice })}
                   />
                   <button
                     type="button"
@@ -287,9 +295,23 @@ function WhereToDig(props: Readonly<{
   );
 }
 
-/** Quick look / Thorough, then "Dig deeper here" (row D decisions 1 and 5). */
-function DigBlock(props: Readonly<{ target: DigTarget; panel: PanelProps }>) {
+/** W3-4: at the deepest level the dig button is replaced by this line (label 5.5). */
+function DeepestLine(props: Readonly<{ catalog: MessageCatalog }>) {
+  return <p className="v4PanelHint v4PanelDeepest" role="note">{t(props.catalog, "v4.nest.deepest")}</p>;
+}
+
+/**
+ * Quick look / Thorough, then "Dig deeper here" (row D decisions 1 and 5). W3-4: "Dig here too" where a dig already
+ * exists (and on every path of a dig's own map); the person's picks name how many they are; the money lines before the
+ * dig; at the deepest level the "deepest level" line instead of all of it.
+ */
+function DigBlock(props: Readonly<{ target: DigTarget; panel: PanelProps; again?: boolean }>) {
   const { panel } = props;
+  if (panel.choice !== undefined && !panel.choice.canDig) return <DeepestLine catalog={panel.catalog} />;
+  // Several picks: "Dig into {count} together" (today's tray words); one, or a whole path: as before, or "Dig here too".
+  const label = props.target.kind === "picks" && props.target.picks.length >= 2
+    ? tPlural(panel.catalog, "v4.dig.trayDig", props.target.picks.length, panel.locale)
+    : t(panel.catalog, props.again === true ? "v4.nest.digHereToo" : "v4.panel.dig");
   return (
     <section className="v4PanelDig">
       {panel.showDigModes === false ? null : (
@@ -316,9 +338,10 @@ function DigBlock(props: Readonly<{ target: DigTarget; panel: PanelProps }>) {
         disabled={panel.digBusy}
         onClick={() => panel.onDig(props.target)}
       >
-        {t(panel.catalog, "v4.panel.dig")}
+        {label}
       </button>
       {panel.digBusy ? <p className="v4PanelHint v4Muted">{t(panel.catalog, "v4.panel.digBusy")}</p> : null}
+      <V4MoneyLines lines={panel.money ?? []} catalog={panel.catalog} />
       {panel.roomNotice ?? null}
     </section>
   );
@@ -453,9 +476,19 @@ function PathBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolve
         emptyKey="v4.panel.noOpenPath"
         panel={panel}
       />
-      <DigBlock target={{ kind: "path", path }} panel={panel} />
+      {panel.choice !== undefined ? <V4DigCompose path={path} choice={panel.choice} catalog={panel.catalog} locale={panel.locale} /> : null}
+      <DigBlock target={pathTarget(path, panel)} panel={panel} again={panel.choice?.digHereToo(path.id) === true} />
     </>
   );
+}
+
+/** W3-4: a path's dig button digs the person's picks on this path when there are some, else the whole path (as before). */
+function pathTarget(path: V4Map["paths"][number], panel: PanelProps): DigTarget {
+  const draft = panel.choice?.draft;
+  if (draft !== undefined && draft.group === path.id && draft.picks.length > 0) {
+    return draftTarget(draft, panel.map.paths) ?? { kind: "path", path };
+  }
+  return { kind: "path", path };
 }
 
 function OpenBody(props: Readonly<{ panel: PanelProps; resolved: Extract<ResolvedSelection, { kind: "open" }> }>) {
@@ -484,16 +517,45 @@ function OpenBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolve
           </>
         )
         : (
-          <button
-            type="button"
-            className="v4Btn"
-            onClick={(event) => panel.onSelect(`dig:${dig.link.childRunId}`, viaKeyboard(event))}
-          >
-            {t(panel.catalog, "v4.panel.seeDig")}
-          </button>
+          <>
+            <button
+              type="button"
+              className="v4Btn"
+              onClick={(event) => panel.onSelect(`dig:${dig.link.childRunId}`, viaKeyboard(event))}
+            >
+              {t(panel.catalog, "v4.panel.seeDig")}
+            </button>
+            {/* W3-4: an open question that already has a dig offers "Dig here too" (the deepest level: its line). */}
+            {panel.choice !== undefined ? <DigBlock target={{ kind: "open", questions: [question] }} panel={panel} again /> : null}
+          </>
         )}
     </>
   );
+}
+
+/**
+ * W3-4: "Dig here too" under a dig: a dig of a path opens that path, where the person chooses what to dig again; a dig of
+ * open questions digs the ones still on the map. Nothing at the deepest level but its line; nothing for a dig that failed.
+ */
+function DigAgain(props: Readonly<{ panel: PanelProps; resolved: Extract<ResolvedSelection, { kind: "dig" }> }>) {
+  const { panel } = props;
+  const { dig, home } = props.resolved;
+  if (panel.choice === undefined || dig.state === "FAILED") return null;
+  if (!panel.choice.canDig) return <DeepestLine catalog={panel.catalog} />;
+  const pathPlace = dig.link.openQuestionIds.find((id) => id.startsWith("path:"));
+  if (pathPlace !== undefined && home.path !== null) {
+    const pathId = home.path.id;
+    return (
+      <button type="button" className="v4Btn" onClick={(event) => panel.onSelect(`path:${pathId}`, viaKeyboard(event))}>
+        {t(panel.catalog, "v4.nest.digHereToo")}
+      </button>
+    );
+  }
+  const questions = dig.link.openQuestionIds.flatMap((id) => {
+    const question = findOpenQuestion(panel.map, id);
+    return question === null ? [] : [question];
+  });
+  return questions.length === 0 ? null : <DigBlock target={{ kind: "open", questions }} panel={panel} again />;
 }
 
 function DigBody(props: Readonly<{ panel: PanelProps; resolved: Extract<ResolvedSelection, { kind: "dig" }> }>) {
@@ -546,6 +608,7 @@ function DigBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolved
           </Link>
         )
         : null}
+      <DigAgain panel={panel} resolved={props.resolved} />
     </>
   );
 }

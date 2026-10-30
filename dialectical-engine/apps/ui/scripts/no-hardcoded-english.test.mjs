@@ -80,6 +80,18 @@ test("the English scanner sees user-visible attributes and TypeScript label tabl
   );
 });
 
+test("the V4 map's dig choice and money lines (W3-4) are scanned, never allowlisted, and carry no hard-coded English", () => {
+  const files = [
+    "components/v4/V4DigSuggest.tsx", "components/v4/V4DebateClient.tsx", "components/v4/V4MapTree.tsx",
+    "components/v4/V4Outline.tsx", "components/v4/V4Panel.tsx", "components/v4/V4Rail.tsx", "components/v4/V4AskClient.tsx",
+    "lib/v4/suggestions.ts", "lib/v4/money.ts"
+  ];
+  for (const path of files) {
+    assert.equal(allowed(path), false, path);
+    assert.deepEqual(visibleEnglishFromSource(path, readFileSync(resolve(root, path), "utf8")), [], path);
+  }
+});
+
 test("migrated JSX contains no hard-coded user-visible English", () => {
   const failures = [];
   const visit = (directory) => {

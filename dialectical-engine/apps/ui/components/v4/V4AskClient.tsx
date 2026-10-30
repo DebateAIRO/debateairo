@@ -6,11 +6,13 @@ import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 
 import { askQuestionMaxBytes } from "@debateai/contract";
 import { AuthGate } from "@/components/AuthGate";
 import { RoomNotice } from "@/components/billing/RoomNotice";
+import { V4MoneyLines } from "@/components/v4/V4DigSuggest";
 import { V4Header } from "@/components/v4/V4Header";
 import { contractClient } from "@/lib/api";
 import { catalogLocale, isLocale } from "@/lib/i18n/locales";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { composeQuestion, FREE_GOAL_CHOICES_MAX, goalChoiceCount, goalWithinPlan, ownWords } from "@/lib/v4/askText";
+import { startShareLine, startsWaitLine, type MoneyLine } from "@/lib/v4/money";
 import { levelHref, useReadingLevel } from "@/lib/v4/storage";
 import {
   DIG_MODES,
@@ -195,6 +197,16 @@ function V4AskForm({
   const quickLine = accepted !== null && accepted.basis === plain ? accepted.text : plain;
   const tooLong = byteLength(sentLine) > askQuestionMaxBytes();
   const busy = ask.submitting || pressed !== null;
+  // W3-4 (the money rule, owner 31 Oct): before a new question, its share of today; when new starts wait for the day,
+  // week or month reset, that line with the time takes the place of today's room notice. Shares only, never a price.
+  const startsWait = startsWaitLine(ask.room, locale);
+  const startLines: readonly MoneyLine[] = [startShareLine(ask.room), startsWait].filter((line): line is MoneyLine => line !== null);
+  const roomLines = (
+    <>
+      <V4MoneyLines lines={startLines} catalog={catalog} />
+      {startsWait === null ? <RoomNotice room={ask.room} catalog={{ ...newDebateCatalog, ...billingCatalog }} locale={locale} /> : null}
+    </>
+  );
   const shortHint = trimmed.length > 0 && !longEnough && !crisisText;
 
   // Changing step moves focus to the new step's heading or the question, and back to the top.
@@ -341,7 +353,7 @@ function V4AskForm({
               {pressed === "quick" ? t(catalog, "v4.ask.starting") : t(catalog, "v4.ask.justAnswer")}
             </button>
           </div>
-          <RoomNotice room={ask.room} catalog={{ ...newDebateCatalog, ...billingCatalog }} locale={locale} />
+          {roomLines}
           {refusalAlert}
 
           {recent.length === 0 ? null : (
@@ -567,7 +579,7 @@ function V4AskForm({
                 {pressed === "start" ? t(catalog, "v4.ask.starting") : t(catalog, "v4.read.start")}
               </button>
             </div>
-            <RoomNotice room={ask.room} catalog={{ ...newDebateCatalog, ...billingCatalog }} locale={locale} />
+            {roomLines}
             {refusalAlert}
           </div>
         </div>

@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, type MouseEvent } from "react";
+import { useState, type MouseEvent, type ReactNode } from "react";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { ownWords } from "@/lib/v4/askText";
 import { findOpenQuestion, uniqueOpenQuestions } from "@/lib/v4/mapModel";
 import type { DigView, V4Map, V4OpenQuestion, V4Path, V4Selection } from "@/lib/v4/types";
+import type { PickRefusal } from "@/lib/v4/suggestions";
+import { DigHereTooLeaf, refusalLine, SuggestionLeaves, type V4DigChoice } from "./V4DigSuggest";
 import { V4TrustBar } from "./V4TrustBar";
 
 /*
@@ -123,7 +125,24 @@ export type MapPiecesProps = Readonly<{
   onSelect: (selection: V4Selection, viaKeyboard: boolean) => void;
   onTogglePick: (openQuestionId: string) => void;
   catalog: MessageCatalog;
+  /**
+   * W3-4: choosing what to dig (V4DigSuggest.tsx): each path's suggestions, the one-path rule on every pick box, and
+   * "Dig here too". Absent: the pieces draw as before W3-4.
+   */
+  choice?: V4DigChoice;
 }>;
+
+/**
+ * W3-4: whether an open question's pick box is closed: nothing can be dug from this map (the deepest level), or picks of
+ * another path are waiting (owner Q-D1), or the plan's cap is reached. A picked box always stays open, to unpick it.
+ */
+export function pickClosed(question: V4OpenQuestion, picked: boolean, choice: V4DigChoice | undefined):
+  Readonly<{ reason: PickRefusal | null }> | null {
+  if (choice === undefined || picked) return null;
+  if (!choice.canDig) return { reason: null };
+  const reason = choice.refusalFor(question.pathId);
+  return reason === null ? null : { reason };
+}
 
 /** At most two open questions per card on the map; the selected and the picked ones are always shown. */
 const SHOWN_OPEN = 2;
@@ -143,15 +162,25 @@ export function PickBox(props: Readonly<{
   onTogglePick: (openQuestionId: string) => void;
   catalog: MessageCatalog;
   className?: string;
+  /** W3-4: the dig choice, so a box that cannot join the picks is closed and says why. */
+  choice?: V4DigChoice;
 }>) {
+  const closed = pickClosed(props.question, props.picked, props.choice);
+  const reason = closed === null || closed.reason === null || props.choice === undefined
+    ? null
+    : refusalLine(closed.reason, props.choice.planTier, props.catalog);
   return (
     <label className={props.className ?? "v4MapPick"}>
       <input
         type="checkbox"
         checked={props.picked}
+        disabled={closed !== null}
         onChange={() => props.onTogglePick(props.question.id)}
       />
-      <span className="v4SrOnly">{t(props.catalog, "v4.map.pick", { question: shortText(props.question.text) })}</span>
+      <span className="v4SrOnly">
+        {t(props.catalog, "v4.map.pick", { question: shortText(props.question.text) })}
+        {reason === null ? null : ` ${reason}`}
+      </span>
     </label>
   );
 }
@@ -223,7 +252,13 @@ function OpenCard(props: Readonly<{
           {pieces.changed.has(id) ? <NewDot catalog={pieces.catalog} /> : null}
         </span>
       </button>
-      <PickBox question={question} picked={picked} onTogglePick={pieces.onTogglePick} catalog={pieces.catalog} />
+      <PickBox
+        question={question}
+        picked={picked}
+        onTogglePick={pieces.onTogglePick}
+        catalog={pieces.catalog}
+        {...(pieces.choice === undefined ? {} : { choice: pieces.choice })}
+      />
     </div>
   );
 }
@@ -265,13 +300,16 @@ function Leaves(props: Readonly<{
   selectedId: V4Selection;
   expanded: boolean;
   onExpand: () => void;
+  /** W3-4: the path's suggestions and "Dig here too", after its digs (null: none). */
+  extra?: ReactNode;
 }>) {
   const { open, digs, pieces, selectedId } = props;
   const keep = (question: V4OpenQuestion, index: number) =>
     props.expanded || index < SHOWN_OPEN || pieces.picked.has(question.id) || selectedId === `open:${question.id}`;
   const shown = open.filter(keep);
   const hidden = open.length - shown.length;
-  if (shown.length === 0 && digs.length === 0) return null;
+  const extra = props.extra ?? null;
+  if (shown.length === 0 && digs.length === 0 && extra === null) return null;
   return (
     <ul className="v4MapLeaves">
       {shown.map((question) => (
@@ -293,7 +331,27 @@ function Leaves(props: Readonly<{
           <DigCard dig={dig} pieces={pieces} selectedId={selectedId} />
         </li>
       ))}
+      {extra}
     </ul>
+  );
+}
+
+/**
+ * W3-4: what a path adds under its open questions and digs: its suggestions (with their pick boxes) and "Dig here too"
+ * (a path that already has a dig, or any path of a dig's own map). Null when there is nothing to add.
+ */
+export function pathExtras(path: V4Path, pieces: MapPiecesProps, variant: "tree" | "outline"): ReactNode {
+  const choice = pieces.choice;
+  if (choice === undefined || !choice.canDig) return null;
+  const onOpenPath = (): void => pieces.onSelect(`path:${path.id}`, false);
+  const suggestions = (path.suggestions ?? []).length > 0;
+  const again = choice.digHereToo(path.id);
+  if (!suggestions && !again) return null;
+  return (
+    <>
+      <SuggestionLeaves path={path} choice={choice} onOpenPath={onOpenPath} variant={variant} catalog={pieces.catalog} />
+      {again ? <DigHereTooLeaf onOpenPath={onOpenPath} variant={variant} catalog={pieces.catalog} /> : null}
+    </>
   );
 }
 
@@ -370,6 +428,7 @@ export function V4MapTree(props: MapPiecesProps) {
                           selectedId={selectedId}
                           expanded={expanded.has(path.id)}
                           onExpand={() => expand(path.id)}
+                          extra={pathExtras(path, props, "tree")}
                         />
                       </li>
                     );

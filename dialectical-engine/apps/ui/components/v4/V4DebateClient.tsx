@@ -2,18 +2,19 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
-import type { AnswerStory, DigLinks, RunProjection } from "@debateai/contract";
+import { canDigFromLevel, type AnswerStory, type DigLinks, type DigSuggestion, type RunProjection, type UsageBorrow } from "@debateai/contract";
 import { AuthGate } from "@/components/AuthGate";
 import { RoomNotice } from "@/components/billing/RoomNotice";
 import { V4ChangesBar } from "@/components/v4/V4ChangesBar";
+import { V4MoneyLines, type V4DigChoice } from "@/components/v4/V4DigSuggest";
 import { V4DigToast, type V4DigNotice } from "@/components/v4/V4DigToast";
 import { V4Header } from "@/components/v4/V4Header";
-import { digFor, openCount, resolveSelection, selectionIdOf, V4MapTree } from "@/components/v4/V4MapTree";
+import { digFor, digsUnder, openCount, pathTitle, resolveSelection, selectionIdOf, TitleText, V4MapTree } from "@/components/v4/V4MapTree";
 import { V4Outline } from "@/components/v4/V4Outline";
 import { V4Panel } from "@/components/v4/V4Panel";
 import { V4Rail, type V4DigCounts } from "@/components/v4/V4Rail";
 import { isNotFound } from "@/lib/api";
-import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
+import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { runFailureMessage } from "@/lib/v3/runFailure";
 import { digQuestion, digTargetQuestions, ownWords, parseDigQuestion } from "@/lib/v4/askText";
 import { mergeDigLinks, readDigRecords, readLastVisit, recordDig, recordLastVisit, storableItems } from "@/lib/v4/accountMemory";
@@ -22,6 +23,32 @@ import { effectiveDigMode } from "@/lib/v4/askConfig";
 import { digLinksFor, digParentOf, mergeIndex, readQuestionIndex, type IndexEntry } from "@/lib/v4/digIndex";
 import { loadDigView, loadStory, loadV4, storyReadFailed, type V4Load } from "@/lib/v4/load";
 import { buildV4Map, uniqueOpenQuestions } from "@/lib/v4/mapModel";
+import {
+  borrowLines,
+  continueRun,
+  digShareLine,
+  monthPauseOf,
+  readBorrowed,
+  startsWaitLine,
+  type ContinueOutcome,
+  type MoneyLine
+} from "@/lib/v4/money";
+import {
+  addPick,
+  askParentOf,
+  draftTarget,
+  editPick,
+  EMPTY_DRAFT,
+  openPick,
+  ownViewPick,
+  pickedOpenIds,
+  pickRefusal,
+  picksMax,
+  placesOf,
+  removePick,
+  suggestionPick,
+  togglePick as toggleDraftPick
+} from "@/lib/v4/suggestions";
 import { levelHref, useReadingLevel } from "@/lib/v4/storage";
 import type {
   DigLink,
@@ -32,8 +59,8 @@ import type {
   ReadingLevel,
   SeenSnapshot,
   V4Change,
+  V4DigDraft,
   V4Map,
-  V4OpenQuestion,
   V4Selection
 } from "@/lib/v4/types";
 import { useV4Ask, type V4AskOutcome } from "@/lib/v4/useV4Ask";
@@ -182,23 +209,25 @@ function linkKeyOf(links: readonly DigLink[]): string {
   return links.map((link) => link.childRunId).join("|");
 }
 
-/** A dig of a whole path is linked by the path ("path:<id>"), as the map pieces place it (V4MapTree digHome). */
-function linkedIdsOf(target: DigTarget): readonly string[] {
-  return target.kind === "path" ? [`path:${target.path.id}`] : target.questions.map((question) => question.id);
-}
+/** What the phone's pinned dig button digs into, and whether it reads "Dig here too" (a dig is already there). */
+type PhoneTarget = Readonly<{ target: DigTarget; again: boolean }>;
 
 /**
- * What the phone's pinned "Dig deeper here" digs into: a path or one open question (never the root or a dig).
- * RULES-5: an open question that already has a dig offers none.
+ * What the phone's pinned "Dig deeper here" digs into: a path (the person's picks on it, when there are some) or one
+ * open question (never the root or a dig). W3-4: an open question that already has a dig, and a path that has one (or
+ * any path of a dig's own map), offer "Dig here too"; at the deepest level nothing is offered.
  */
-function targetOf(map: V4Map, digs: readonly DigView[], selection: V4Selection): DigTarget | null {
+function targetOf(map: V4Map, digs: readonly DigView[], selection: V4Selection, choice: V4DigChoice): PhoneTarget | null {
+  if (!choice.canDig) return null;
   if (selection.startsWith("path:")) {
     const path = map.paths.find((candidate) => `path:${candidate.id}` === selection);
-    return path === undefined ? null : { kind: "path", path };
+    if (path === undefined) return null;
+    const mine = choice.draft.group === path.id ? draftTarget(choice.draft, map.paths) : null;
+    return { target: mine ?? { kind: "path", path }, again: choice.digHereToo(path.id) };
   }
   if (selection.startsWith("open:")) {
     const question = uniqueOpenQuestions(map).find((candidate) => `open:${candidate.id}` === selection);
-    return question === undefined || digFor(question, digs) !== null ? null : { kind: "open", questions: [question] };
+    return question === undefined ? null : { target: { kind: "open", questions: [question] }, again: digFor(question, digs) !== null };
   }
   return null;
 }
@@ -252,7 +281,6 @@ function V4Debate({
   const [chosenLevel, chooseLevel] = useReadingLevel(initialLevel);
   const readingLevel: ReadingLevel = chosenLevel ?? DEFAULT_LEVEL;
   const [digMode, setDigMode] = useState<DigMode>("quick");
-  const ask = useV4Ask({ catalog, homeCatalog, newDebateCatalog, locale, crisisCountryHint, mode: digMode, readingLevel });
 
   const mounted = useRef(true);
   useEffect(() => {
@@ -544,6 +572,41 @@ function V4Debate({
   /** N11: the record of the dig this debate is (null when it is not one, or when the records could not be read). */
   const recordParent = digRecords?.parent ?? null;
 
+  // ── The dig level (W3-4): how many digs sit above this debate, never how far one debate's argument tree grows ────
+  // The answer says it (`Answer.dig.level`); a dig whose answer does not say is still a dig (its question or its record
+  // names a parent), so it offers "Dig here too" on every path, and the API refuses one past the deepest level.
+  const mapLevel = map?.digLevel ?? null;
+  const isDigMap = mapLevel !== null ? mapLevel > 0 : isDigPage || recordParent !== null;
+  const canDig = mapLevel === null || canDigFromLevel(mapLevel);
+
+  // ── What the person chose to dig (W3-4): picks of one path, kept in memory only ─────────────────────────────────
+  const [draft, setDraft] = useState<V4DigDraft>(EMPTY_DRAFT);
+  const draftRef = useRef(draft);
+  const commitDraft = useCallback((next: V4DigDraft): void => {
+    draftRef.current = next;
+    setDraft(next);
+  }, []);
+  const ownViewSerial = useRef(0);
+  // W3-4 (owner Q14): the room read is for the dig the page would send now, so it says the dig's share of today.
+  const ask = useV4Ask({
+    catalog, homeCatalog, newDebateCatalog, locale, crisisCountryHint, mode: digMode, readingLevel,
+    dig: servedRunId === null || !canDig ? null : { parentRunId: servedRunId, picks: draft.picks.length }
+  });
+  const planTier = ask.planTier;
+
+  // ── The money rule (owner, 31 Oct): what running work borrowed from tomorrow or next week, read once ────────────
+  const [borrowed, setBorrowed] = useState<readonly UsageBorrow[]>([]);
+  useEffect(() => {
+    if (!hasLoad) return;
+    let active = true;
+    void readBorrowed().then((next) => {
+      if (active) setBorrowed(next);
+    });
+    return () => {
+      active = false;
+    };
+  }, [hasLoad]);
+
   // ── Digs: the ones started in this visit (memory) merged with the recorded ones and the ones found by text ──────
   const [visitLinks, setVisitLinks] = useState<readonly DigLink[]>(() => [...startedThisVisit.values()].map((entry) => entry.link));
   const links = useMemo<readonly DigLink[]>(() => {
@@ -687,22 +750,42 @@ function V4Debate({
     if (panelColRef.current !== null) panelColRef.current.scrollTop = 0;
   }, [shownSelection]);
 
-  // ── Picks for the tray (row D decision 1: a tray only when several are picked) ────────────────────────────────
-  const [picked, setPicked] = useState<ReadonlySet<string>>(() => new Set());
+  // ── Picks for the tray (row D decision 1; W3-4: any pick shows the tray, which digs them together) ─────────────
+  // Owner Q-D1: picks stay on one path; a pick box of another path is closed while picks wait (lib/v4/suggestions.ts
+  // refuses it too). FIT-1: a point still argued under two paths is one pick, sent once.
+  const picked = useMemo<ReadonlySet<string>>(() => pickedOpenIds(draft), [draft]);
   const togglePick = useCallback((openQuestionId: string): void => {
-    setPicked((previous) => {
-      const next = new Set(previous);
-      if (next.has(openQuestionId)) next.delete(openQuestionId);
-      else next.add(openQuestionId);
-      return next;
-    });
-  }, []);
-  // FIT-1: a point still argued under two paths is one pick, sent once.
-  const pickedQuestions = useMemo<readonly V4OpenQuestion[]>(
-    () => (map === null ? [] : uniqueOpenQuestions(map).filter((question) => picked.has(question.id))),
-    [map, picked]
-  );
-  const hasTray = pickedQuestions.length >= 2;
+    if (map === null || !canDig) return;
+    const question = uniqueOpenQuestions(map).find((candidate) => candidate.id === openQuestionId);
+    if (question === undefined) return;
+    commitDraft(toggleDraftPick(draftRef.current, openPick(question), planTier).draft);
+  }, [map, canDig, planTier, commitDraft]);
+  const choice = useMemo<V4DigChoice | undefined>(() => {
+    if (map === null) return undefined;
+    const keep = (change: Readonly<{ draft: V4DigDraft; refused: ReturnType<typeof pickRefusal> }>) => {
+      if (change.refused === null) commitDraft(change.draft);
+      return change.refused;
+    };
+    return {
+      draft,
+      planTier,
+      canDig,
+      digHereToo: (pathId: string) => canDig && (isDigMap || digsUnder(map, digs, pathId).length > 0),
+      refusalFor: (group: string | null) => pickRefusal(draft, group, planTier),
+      onToggleSuggestion: (pathId: string, suggestion: DigSuggestion) => {
+        if (canDig) keep(toggleDraftPick(draftRef.current, suggestionPick(pathId, suggestion), planTier));
+      },
+      onEditPick: (key: string, text: string) => keep(editPick(draftRef.current, key, text)),
+      onAddOwnView: (pathId: string, text: string) => {
+        ownViewSerial.current += 1;
+        return keep(addPick(draftRef.current, ownViewPick(pathId, text, ownViewSerial.current), planTier));
+      },
+      onRemovePick: (key: string) => commitDraft(removePick(draftRef.current, key)),
+      onClear: () => commitDraft(EMPTY_DRAFT)
+    };
+  }, [map, draft, planTier, canDig, isDigMap, digs, commitDraft]);
+  const trayTarget = map === null || !canDig ? null : draftTarget(draft, map.paths);
+  const hasTray = trayTarget !== null;
 
   // ── The dig flow ────────────────────────────────────────────────────────────────────────────────────────────────
   const [pending, setPending] = useState<PendingDig | null>(null);
@@ -710,13 +793,14 @@ function V4Debate({
   const [notice, setNotice] = useState<V4DigNotice | null>(null);
   const digBusy = pending !== null || sending || ask.submitting;
   // Owner N13: Free has no Quick look / Thorough choice; its digs are quick looks.
-  const sentDigMode = effectiveDigMode(digMode, ask.planTier);
+  const sentDigMode = effectiveDigMode(digMode, planTier);
 
   const startDig = useCallback((target: DigTarget): void => {
-    if (digBusy || map === null) return;
+    // W3-4: nothing is dug from the deepest level (the page offers no button there; this holds it).
+    if (digBusy || map === null || !canDig) return;
     setNotice(null);
     setPending({ target, mode: sentDigMode, sendsAt: Date.now() + UNDO_MS });
-  }, [digBusy, map, sentDigMode]);
+  }, [digBusy, map, canDig, sentDigMode]);
 
   const undoDig = useCallback((): void => setPending(null), []);
 
@@ -725,8 +809,10 @@ function V4Debate({
     setSending(true);
     let outcome: V4AskOutcome;
     try {
-      // ASK-4: a dig carries AI-written text, so it is sent as a dig (no client crisis pop-up on AI words).
-      outcome = await ask.submit(digQuestion(dig.target, parentQuestionLine, catalog, locale), dig.mode, "dig");
+      // ASK-4: a dig carries AI-written text, so it is sent as a dig (no client crisis pop-up on AI words). W3-4: with its
+      // parent (the debate it digs, the places, the mode and the picks as sent).
+      outcome = await ask.submit(digQuestion(dig.target, parentQuestionLine, catalog, locale), dig.mode, "dig",
+        askParentOf(parentRunId, dig.target, dig.mode));
     } catch {
       outcome = { kind: "REFUSED", message: t(catalog, "v4.dig.failed") };
     }
@@ -734,7 +820,7 @@ function V4Debate({
       const link: DigLink = {
         parentRunId,
         childRunId: outcome.runId,
-        openQuestionIds: linkedIdsOf(dig.target),
+        openQuestionIds: placesOf(dig.target),
         questions: digTargetQuestions(dig.target),
         mode: dig.mode,
         startedAt: new Date().toISOString()
@@ -746,9 +832,12 @@ function V4Debate({
       if (!mounted.current) return;
       // Shown at once (as working); the dig loop reads its real state straight away.
       setVisitLinks((previous) => [...previous.filter((known) => known.childRunId !== link.childRunId), link]);
-      if (dig.target.kind === "open") {
-        const sent = new Set(link.openQuestionIds);
-        setPicked((previous) => new Set([...previous].filter((idOf) => !sent.has(idOf))));
+      // The picks it was made of are taken off the tray (picks made during the send stay).
+      const sentKeys = new Set(dig.target.kind === "picks"
+        ? dig.target.picks.map((pick) => pick.key)
+        : dig.target.kind === "open" ? dig.target.questions.map((question) => `open:${question.id}`) : []);
+      if (sentKeys.size > 0) {
+        commitDraft([...sentKeys].reduce((left, key) => removePick(left, key), draftRef.current));
       }
       const selection: V4Selection = `dig:${link.childRunId}`;
       setSelected(selection);
@@ -968,7 +1057,8 @@ function V4Debate({
       classicHref={classicHref}
     >
       {served !== null ? (
-        <Link className="v4Btn v4BtnPrimary v4DebReportLink" href={reportHref}>{t(catalog, "v4.debate.report")}</Link>
+        // W3-4: "Write my report" is always there once the answer is served (the owner's money rule keeps it possible).
+        <Link className="v4Btn v4BtnPrimary v4DebReportLink" href={reportHref}>{t(catalog, "v4.rail.writeReport")}</Link>
       ) : null}
     </V4Header>
   );
@@ -994,6 +1084,7 @@ function V4Debate({
           ) : (
             <ProgressScreen
               run={load.run}
+              runId={runId}
               startedAt={startedAt}
               now={now}
               reconnecting={loadProblem === "UNREACHABLE"}
@@ -1014,10 +1105,14 @@ function V4Debate({
   };
   const openLeft = openCount(map, digs);
   const room = ask.room;
-  const roomNotice = room !== null && (room.room === "CLOSE" || room.room === "FULL" || room.room === "ALREADY_WAITING")
+  // The money rule: new starts waiting for the reset get their own line (with the time) in place of today's notice.
+  const startsWait = startsWaitLine(room, locale);
+  const money: readonly MoneyLine[] = [digShareLine(room), startsWait].filter((line): line is MoneyLine => line !== null);
+  const roomNotice = startsWait === null && room !== null
+    && (room.room === "CLOSE" || room.room === "FULL" || room.room === "ALREADY_WAITING")
     ? <RoomNotice room={room} catalog={{ ...newDebateCatalog, ...billingCatalog }} locale={locale} />
     : null;
-  const phoneTarget = layout === "phone" ? targetOf(map, digs, shownSelection) : null;
+  const phoneTarget = layout === "phone" && choice !== undefined ? targetOf(map, digs, shownSelection, choice) : null;
   const showChanges = tourStops.length > 0;
 
   const rail = (variant: "column" | "strip") => (
@@ -1028,6 +1123,7 @@ function V4Debate({
       openLeft={openLeft}
       digs={dugCounts}
       variant={variant}
+      usageNotes={borrowLines(borrowed)}
       catalog={catalog}
       locale={locale}
     />
@@ -1040,26 +1136,38 @@ function V4Debate({
     picked,
     onSelect: select,
     onTogglePick: togglePick,
-    catalog
+    catalog,
+    ...(choice === undefined ? {} : { choice })
   } as const;
 
-  const tray = hasTray ? (
+  // W3-4: the tray names the path its picks are on (owner Q-D1: one path per dig), the money lines, and Free's cap.
+  const tray = hasTray && trayTarget !== null && trayTarget.kind === "picks" ? (
     <section className="v4DebTray" aria-label={t(catalog, "v4.dig.trayLabel")}>
       <p className="v4DebTrayText">
-        <strong>{tPlural(catalog, "v4.dig.trayPicked", pickedQuestions.length, locale)}</strong>
+        <strong>{tPlural(catalog, "v4.dig.trayPicked", trayTarget.picks.length, locale)}</strong>
+        {trayTarget.path !== null ? (
+          <>{" · "}<TitleText title={pathTitle(trayTarget.path, catalog, 40)} catalog={catalog} /></>
+        ) : null}
         {" · "}
         {t(catalog, `v4.digMode.${sentDigMode}`)}
       </p>
+      <p className="v4DebTrayHint v4Muted">
+        {t(catalog, "v4.suggest.onePath")}
+        {planTier === "free" ? <>{" "}{t(catalog, "v4.suggest.freeCap", { count: picksMax("free") })}</> : null}
+      </p>
+      <V4MoneyLines lines={money} catalog={catalog} />
       <div className="v4DebTrayActions">
         <button
           type="button"
           className="v4Btn v4BtnPrimary"
           disabled={digBusy}
-          onClick={() => startDig({ kind: "open", questions: pickedQuestions })}
+          onClick={() => startDig(trayTarget)}
         >
-          {tPlural(catalog, "v4.dig.trayDig", pickedQuestions.length, locale)}
+          {trayTarget.picks.length >= 2
+            ? tPlural(catalog, "v4.dig.trayDig", trayTarget.picks.length, locale)
+            : t(catalog, "v4.panel.dig")}
         </button>
-        <button type="button" className="v4Link v4DebTrayClear" onClick={() => setPicked(new Set())}>
+        <button type="button" className="v4Link v4DebTrayClear" onClick={() => commitDraft(EMPTY_DRAFT)}>
           {t(catalog, "v4.dig.trayClear")}
         </button>
       </div>
@@ -1117,6 +1225,8 @@ function V4Debate({
           {map.storyState === "WRITING" ? (
             <p className="v4DebNote v4Muted" role="status">{t(catalog, "v4.debate.storyWriting")}</p>
           ) : null}
+          {/* W3-4: the deepest level offers no dig anywhere on its map; this line says so once, at the top. */}
+          {canDig ? null : <p className="v4DebNote v4DebDeepest" role="note">{t(catalog, "v4.nest.deepest")}</p>}
 
           <div className="v4DebGrid">
             {layout === "desktop" ? <div className="v4DebRailCol">{rail("column")}</div> : null}
@@ -1137,10 +1247,12 @@ function V4Debate({
                 onSelect={select}
                 digMode={digMode}
                 onDigMode={setDigMode}
-                showDigModes={ask.planTier !== "free"}
+                showDigModes={planTier !== "free"}
                 onDig={startDig}
                 digBusy={digBusy}
                 roomNotice={roomNotice}
+                money={money}
+                {...(choice === undefined ? {} : { choice })}
                 headingRef={headingRef}
                 catalog={catalog}
                 locale={locale}
@@ -1233,6 +1345,9 @@ function FailedScreen({ run, classicHref, askHref, catalog, homeCatalog }: Reado
 
 /** RULES-4: QUEUED and CLAIMED say "Starting"; only a run that really waits for a spot says so. */
 function stateLine(run: RunProjection, catalog: MessageCatalog, locale: string): string {
+  // W3-4 (the money rule): at the month wall the debate's planned calls and searches pause until the month resets.
+  const pause = monthPauseOf(run);
+  if (pause !== null) return t(catalog, "v4.debate.state.PAUSED_MONTH", { date: formatDate(locale, pause.until, { dateStyle: "medium" }) });
   switch (run.state) {
     case "WAITING": {
       const time = clockTime(run.waits_until, locale);
@@ -1253,8 +1368,43 @@ function stateLine(run: RunProjection, catalog: MessageCatalog, locale: string):
   }
 }
 
-function ProgressScreen({ run, startedAt, now, reconnecting, classicHref, catalog, locale }: Readonly<{
+/**
+ * W3-4 (the money rule, owner 31 Oct): a debate paused at the month wall. Continue resumes it once the month has reset
+ * (true resume: what is done is not paid for again); pressed too early, nothing changes and the page says from when.
+ */
+function MonthPaused({ run, runId, catalog, locale }: Readonly<{
+  run: RunProjection; runId: string; catalog: MessageCatalog; locale: string;
+}>) {
+  const pause = monthPauseOf(run);
+  const [pressing, setPressing] = useState(false);
+  const [outcome, setOutcome] = useState<ContinueOutcome | null>(null);
+  if (pause === null) return null;
+  const date = (iso: string): string => formatDate(locale, iso, { dateStyle: "medium" });
+  const press = async (): Promise<void> => {
+    setPressing(true);
+    const next = await continueRun(runId);
+    setOutcome(next);
+    setPressing(false);
+  };
+  const continuing = pressing || outcome?.kind === "CONTINUING";
+  return (
+    <div className="v4DebPaused">
+      <p>{pause.can_continue ? t(catalog, "v4.money.pausedReady") : t(catalog, "v4.money.paused", { date: date(pause.until) })}</p>
+      <button type="button" className="v4Btn v4BtnPrimary" disabled={continuing} onClick={() => void press()}>
+        {continuing ? t(catalog, "v4.money.continuing") : t(catalog, "v4.money.continue")}
+      </button>
+      <p className="v4Muted">{t(catalog, "v4.money.continueNote")}</p>
+      {outcome?.kind === "TOO_EARLY" ? (
+        <p role="status">{t(catalog, "v4.money.continueTooEarly", { date: date(outcome.until) })}</p>
+      ) : null}
+      {outcome?.kind === "FAILED" ? <p role="status">{t(catalog, "v4.money.continueFailed")}</p> : null}
+    </div>
+  );
+}
+
+function ProgressScreen({ run, runId, startedAt, now, reconnecting, classicHref, catalog, locale }: Readonly<{
   run: RunProjection;
+  runId: string;
   startedAt: string | null;
   now: number | null;
   reconnecting: boolean;
@@ -1278,7 +1428,9 @@ function ProgressScreen({ run, startedAt, now, reconnecting, classicHref, catalo
           {minutes < 1 ? t(catalog, "v4.debate.elapsedJustNow") : tPlural(catalog, "v4.debate.elapsed", minutes, locale)}
         </p>
       )}
-      <p className="v4Muted">{t(catalog, "v4.debate.usually")}</p>
+      {monthPauseOf(run) === null
+        ? <p className="v4Muted">{t(catalog, "v4.debate.usually")}</p>
+        : <MonthPaused run={run} runId={runId} catalog={catalog} locale={locale} />}
       {reconnecting ? <p className="v4Muted">{t(catalog, "v4.debate.reconnecting")}</p> : null}
       <Link className="v4Link" href={classicHref}>{t(catalog, "v4.common.classicView")}</Link>
     </section>
@@ -1290,7 +1442,7 @@ function ProgressScreen({ run, startedAt, now, reconnecting, classicHref, catalo
 function PhoneBar({ mapButtonRef, onMap, target, onDig, digBusy, catalog }: Readonly<{
   mapButtonRef: RefObject<HTMLButtonElement | null>;
   onMap: () => void;
-  target: DigTarget | null;
+  target: PhoneTarget | null;
   onDig: (target: DigTarget) => void;
   digBusy: boolean;
   catalog: MessageCatalog;
@@ -1301,8 +1453,8 @@ function PhoneBar({ mapButtonRef, onMap, target, onDig, digBusy, catalog }: Read
         {t(catalog, "v4.debate.mapButton")}
       </button>
       {target !== null ? (
-        <button type="button" className="v4Btn v4BtnPrimary v4DebPhoneDig" disabled={digBusy} onClick={() => onDig(target)}>
-          {t(catalog, "v4.debate.digHere")}
+        <button type="button" className="v4Btn v4BtnPrimary v4DebPhoneDig" disabled={digBusy} onClick={() => onDig(target.target)}>
+          {t(catalog, target.again ? "v4.nest.digHereToo" : "v4.debate.digHere")}
         </button>
       ) : null}
     </div>

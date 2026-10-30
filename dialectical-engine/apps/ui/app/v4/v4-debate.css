@@ -180,3 +180,14 @@
 @media (min-width: 768px) {
   .v4DebToastLifted { bottom: calc(96px + var(--safe-b)); }
 }
+
+/* Perplexity plan W3-4: the tray's one-path line and money lines, the deepest-level note, the month pause with Continue,
+   and the rail's borrow notice. No fixed widths; text wraps at 375px. */
+.v4DebTrayHint { margin: 0; font-size: var(--t-meta); }
+.v4DebTray .v4MoneyLine { font-size: var(--t-meta); }
+.v4DebDeepest { color: var(--text); }
+.v4DebPaused { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.v4DebPaused p { margin: 0; }
+.v4DebPaused .v4Btn { min-height: 44px; }
+.v4DebRailUsage { border-left: 3px solid var(--gold); padding-left: 10px; }
+.v4DebRailUsageNote { margin: 0; font-size: var(--t-ui); overflow-wrap: anywhere; }
