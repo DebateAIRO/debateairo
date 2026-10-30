@@ -430,6 +430,7 @@ apps/runner/src/support-shred-cli.ts
 apps/runner/src/support-status-cli-credentials.ts
 apps/runner/src/support-status-cli.ts
 apps/runner/src/support-switch-cli.ts
+apps/runner/src/web-page-text-gateway.ts
 apps/runner/src/web-planner.ts
 apps/runner/src/web-reader-all.ts
 apps/runner/src/web-readers-top.ts
@@ -1204,6 +1205,7 @@ packages/providers/src/provider-companies.ts
 packages/providers/src/provider-probe.ts
 packages/providers/src/reply-fixer.ts
 packages/providers/src/reply-words.ts
+packages/providers/src/sent-form.ts
 packages/providers/src/structure-repair.ts
 packages/providers/src/unbilled-refusal.ts
 packages/published-arithmetic/src/index.ts
