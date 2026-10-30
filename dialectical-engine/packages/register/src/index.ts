@@ -1172,7 +1172,8 @@ export {
   type BillingPlan,
   type BillingPlans,
   type FreeFixedGauges,
-  type PlanId
+  type PlanId,
+  type ReserveHeld
 } from "./billing-plans.js";
 export {
   BILLING_POLICY_DEPLOYMENT_REGISTER_ROW,

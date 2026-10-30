@@ -1,6 +1,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { allowanceVsPlus, computeWindows, personWindowsFor } from "@debateai/billing-core";
+import { decideSharedWall } from "@debateai/budget";
 import {
   BILLING_PLANS_DEPLOYMENT_REGISTER_ROW,
   billingPlansFromValue,
@@ -187,7 +188,8 @@ describe("personWindowsFor: the plan's limits over those windows", () => {
       ["PERSON_DAY", 1_000_000], ["PERSON_WEEK", 2_500_000], ["PERSON_MONTH", 5_000_000]
     ]);
     const computed = computeWindows(anchor, now);
-    expect(windows[0]).toMatchObject({ periodStart: computed.day.start, resetsAt: computed.day.end, finishBasisPoints: 11_000, closeBasisPoints: 9_500 });
+    expect(windows[0]).toMatchObject({ periodStart: computed.day.start, resetsAt: computed.day.end, finishBasisPoints: 10_000,
+      finishOverflowMicros: 200_000, closeBasisPoints: 9_500 });
     expect(windows[1]).toMatchObject({ periodStart: computed.week.start, resetsAt: computed.week.end });
     expect(windows[2]).toMatchObject({ periodStart: computed.month.start, resetsAt: computed.month.end });
   });
@@ -195,6 +197,53 @@ describe("personWindowsFor: the plan's limits over those windows", () => {
   it("gives Free only its month", () => {
     expect(personWindowsFor(planById(plans, "FREE"), anchor, now, 9_500).map((window) => [window.scope, window.limitMicros]))
       .toEqual([["PERSON_MONTH", 200_000]]);
+  });
+
+  // billingPlans v4 (owner 2026-10-30, Q1 and Q3): "Every limit [...] until of course the monthly limit which is once the
+  // 20 cents, and then waits until the new month starts." Each window may be passed by 20 cents; every overflow is spend
+  // inside the month, so the month's own edge (its limit plus 20 cents, once) holds them all; then the month is FULL.
+  it.each([
+    ["FREE", [["PERSON_MONTH", 400_000]]],
+    ["PLUS", [["PERSON_DAY", 1_200_000], ["PERSON_WEEK", 2_700_000], ["PERSON_MONTH", 5_200_000]]],
+    ["PRO", [["PERSON_DAY", 4_200_000], ["PERSON_WEEK", 10_200_000], ["PERSON_MONTH", 20_200_000]]],
+    ["MAX", [["PERSON_DAY", 30_200_000], ["PERSON_WEEK", 75_200_000], ["PERSON_MONTH", 150_200_000]]]
+  ] as const)("v4 %s: each window's running wall stands exactly 20 cents past its limit", (id, edges) => {
+    const windows = personWindowsFor(planById(plans, id), anchor, now, 9_500);
+    expect(windows.map((window) => window.scope)).toEqual(edges.map(([scope]) => scope));
+    windows.forEach((window, index) => {
+      const edge = edges[index]![1];
+      expect(window.finishOverflowMicros, `${id} ${window.scope}`).toBe(200_000);
+      const at = (spentMicros: number) => decideSharedWall({ spentMicros, projectedMicros: 0, limitMicros: window.limitMicros,
+        finishBasisPoints: window.finishBasisPoints, finishOverflowMicros: window.finishOverflowMicros ?? Number.NaN });
+      expect(at(edge), `${id} ${window.scope}`).toBe("WITHIN");
+      expect(at(edge + 1), `${id} ${window.scope}`).toBe("WOULD_CROSS");
+    });
+  });
+
+  it("v4 after an upgrade: the prorated month and the day and week under it each keep exactly 20 cents (A6)", () => {
+    const windows = personWindowsFor(planById(plans, "PRO"), anchor, now, 9_500, 3_000_000);
+    expect(windows.map((window) => [window.limitMicros, window.finishBasisPoints, window.finishOverflowMicros]))
+      .toEqual([[3_000_000, 10_000, 200_000], [3_000_000, 10_000, 200_000], [3_000_000, 10_000, 200_000]]);
+  });
+
+  it("a sealed v3 plan keeps its 110% share edge and carries no overflow member", () => {
+    const v3Row = structuredClone(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value) as unknown as { plans: Array<Record<string, unknown>> };
+    for (const plan of v3Row.plans) {
+      delete plan.finish_overflow_micros;
+      delete plan.reserve_micros;
+      delete plan.reserve_held;
+      plan.finish_bp = 11_000;
+    }
+    const v3 = billingPlansFromValue(v3Row, "b4 sealed v3");
+    for (const window of personWindowsFor(planById(v3, "PLUS"), anchor, now, 9_500)) {
+      expect(window.finishBasisPoints).toBe(11_000);
+      expect(Object.hasOwn(window, "finishOverflowMicros"), window.scope).toBe(false);
+    }
+    const day = personWindowsFor(planById(v3, "PLUS"), anchor, now, 9_500)[0]!;
+    expect(decideSharedWall({ spentMicros: 1_100_000, projectedMicros: 0, limitMicros: day.limitMicros,
+      finishBasisPoints: day.finishBasisPoints })).toBe("WITHIN");
+    expect(decideSharedWall({ spentMicros: 1_100_001, projectedMicros: 0, limitMicros: day.limitMicros,
+      finishBasisPoints: day.finishBasisPoints })).toBe("WOULD_CROSS");
   });
 
   it("uses a prorated month credit after an upgrade, and never lets a day or week cap exceed it (A6)", () => {

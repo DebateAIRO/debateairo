@@ -163,14 +163,16 @@ describe("B9a · the person's wall over the real ledger", () => {
       plans: billingPlansFromValue(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value, BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.sourceRef),
       closeBasisPoints: 9_500
     });
-    // Free has one window, the month, with the plan's finish edge.
+    // Free has one window, the month, with the plan's finish edge (billingPlans v4: its limit plus a fixed 20 cents).
     const windows = await persons.read(ownerRef, new Date());
     expect(windows.map((entry) => entry.scope)).toEqual(["PERSON_MONTH"]);
     const month = windows[0]!;
-    const edge = Math.floor((month.limitMicros * month.finishBasisPoints) / 10_000);
+    const edge = Math.floor((month.limitMicros * month.finishBasisPoints) / 10_000) + (month.finishOverflowMicros ?? 0);
+    expect(edge).toBe(400_000);
+    // The run's own ceiling stands above the 40-cent edge, so the person's month is the wall this asks.
     const guard = new CostEnvelopeGuard({
       store,
-      policy: { perRunCeilingMicros: 250_000, dailyCeilingMicros: 1_000_000_000 },
+      policy: { perRunCeilingMicros: 1_000_000, dailyCeilingMicros: 1_000_000_000 },
       sharedWall: { finishBasisPoints: 11_500, persons, owners: store }
     });
 

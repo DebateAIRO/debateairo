@@ -34,10 +34,12 @@ describe("BillingPersonAllowanceSource (spec §2.4.1)", () => {
     const { current, allowance } = source("PLUS");
     const windows = await allowance.read(OWNER, now);
     expect(current).toHaveBeenCalledWith(OWNER, now);
-    expect(windows.map((window) => [window.scope, window.limitMicros, window.closeBasisPoints, window.finishBasisPoints])).toEqual([
-      ["PERSON_DAY", 1_000_000, 9_500, 11_000],
-      ["PERSON_WEEK", 2_500_000, 9_500, 11_000],
-      ["PERSON_MONTH", 5_000_000, 9_500, 11_000]
+    // billingPlans v4 (owner 2026-10-30, Q1 and Q3): each window's edge is its limit plus a fixed 20 cents.
+    expect(windows.map((window) => [window.scope, window.limitMicros, window.closeBasisPoints, window.finishBasisPoints,
+      window.finishOverflowMicros])).toEqual([
+      ["PERSON_DAY", 1_000_000, 9_500, 10_000, 200_000],
+      ["PERSON_WEEK", 2_500_000, 9_500, 10_000, 200_000],
+      ["PERSON_MONTH", 5_000_000, 9_500, 10_000, 200_000]
     ]);
     expect(windows[2]!.resetsAt).toEqual(computeWindows(anchor, now).month.end);
   });
