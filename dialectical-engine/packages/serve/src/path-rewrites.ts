@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
 import {
-  AnswerDigSchema, AnswerPathRewritesSchema, PathRewriteSchema, PathRewritesSchema, StoryBodySchema, WEB_CONTRACT_LIMITS,
-  trustOfPoint, type AnswerDig, type AnswerPathRewrites, type PathRewrite, type PathRewrites, type RewritePointTrust,
-  type TrustRulePoint
+  AnswerDigSchema, AnswerMainAnswerSchema, AnswerPathRewritesSchema, MainAnswerVersionSchema, PathRewriteSchema, PathRewritesSchema, StoryBodySchema,
+  WEB_CONTRACT_LIMITS, trustOfPoint, type AnswerDig, type AnswerMainAnswer, type AnswerPathRewrites, type MainAnswerVersion, type PathRewrite,
+  type PathRewrites, type RewritePointTrust, type TrustRulePoint
 } from "@debateai/contract";
-import type { DigPickAuthor, DigPickKind, PathRewriteEntry } from "@debateai/db";
+import type { DigPickAuthor, DigPickKind, MainAnswerUpdateRead, PathLineEntry, PathRewriteEntry } from "@debateai/db";
 
 /**
  * SERVE: THE PATH REWRITES TO THE ANSWER (dig-model revision 2026-10-30, task W4-5; owner answers Q-D2 to Q-D13). Plain
@@ -38,6 +38,11 @@ import type { DigPickAuthor, DigPickKind, PathRewriteEntry } from "@debateai/db"
  *  - a stored value that does not make a valid shape is left out (that path, that dig), never failing the answer, as
  *    A21's projection does.
  * Pure: the repository reads and opens the rows; this file only shapes them.
+ *
+ * R22 decisions 2 and 3: a path's history is its whole line (0138): a dig's own rewrites and the rows a change climbed up from below, in the
+ * order their turns were taken (`turnsOnTheLine`), each of those marked CHILD_PATH, its "really changed" the stored one, and no verdict
+ * (the person's own words are answered on the path they dug). And the debate's `main_answer`: the versions a changed first-debate path made,
+ * oldest first, the newest the one that stands (`serveMainAnswer`). Never who paid, never a score.
  */
 
 /* ----------------------------------------------------------------- what the rewrite seals (W3-5 writes it) */
@@ -60,6 +65,8 @@ export type RewriteTurn = Readonly<{
   opened: unknown;
   /** The person's own words among the dig's picks, in their order (their own view, their edit of a suggestion); null: unread. */
   ownWords: readonly string[] | null;
+  /** R22 decision 2: a row a change climbed up from below: code's stored "really changed" (null while writing or FAILED). */
+  climbed?: Readonly<{ changed: boolean | null }>;
 }>;
 
 /** A dig's picks as 0135 keeps them, each text opened under the dig's key. */
@@ -309,7 +316,8 @@ function rewriteOf(turn: RewriteTurn, level: number | null, base: BaseText | und
   const digFinishedAt = isoOf(entry.taken_at);
   const rewriteId = entry.rewrite_id ?? pathRewriteIdOfDig(entry.run_id);
   if (level === null || digFinishedAt === null) return null;
-  const common = { rewrite_id: rewriteId, dig_run_id: entry.run_id, dig_level: level, dig_finished_at: digFinishedAt };
+  const common = { rewrite_id: rewriteId, dig_run_id: entry.run_id, dig_level: level, dig_finished_at: digFinishedAt,
+    ...(turn.climbed === undefined ? {} : { cause: "CHILD_PATH" as const }) };
   let shaped: unknown;
   if (entry.state === "WRITING") {
     shaped = { ...common, state: "WRITING" };
@@ -319,8 +327,8 @@ function rewriteOf(turn: RewriteTurn, level: number | null, base: BaseText | und
     const stored = storedText(turn.opened);
     // The fate is code's (Q-D3): 0134's clear column; a sealed text that names another one is not served.
     if (stored === null || entry.fate_after === null || entry.fate_before === null || stored.text.fate !== entry.fate_after) return null;
-    const changed = entry.fate_after !== entry.fate_before || base === undefined || !sameWords(base.line, stored.text.line)
-      || (base.summary !== null && !sameWords(base.summary, stored.text.summary));
+    const changed = turn.climbed?.changed ?? (entry.fate_after !== entry.fate_before || base === undefined || !sameWords(base.line, stored.text.line)
+      || (base.summary !== null && !sameWords(base.summary, stored.text.summary)));
     const ownWords = turn.ownWords ?? [];
     const view = entry.verdict_outcome !== null && entry.verdict_scope !== null && stored.view_reason !== null && ownWords.length > 0
       ? { outcome: entry.verdict_outcome, scope: entry.verdict_scope, reason: stored.view_reason, own_words: [...ownWords] } : null;
@@ -362,6 +370,66 @@ export function pathHistoryOf(input: Readonly<{
     }
     return { turn, rewrite };
   });
+}
+
+/* ----------------------------------------------------------------- the path's whole line (R22 decision 2) */
+
+/**
+ * A debate's rewrites and climbed rows as one list of turns, each path's in its line's order (`path_seq` the place in that line), each based
+ * on the finished turn before it, so `pathHistoryOf` serves them as one history. `line` null: 0134's turns as they are (no line to read).
+ * A public dig's row the check has not allowed is not listed. Pure over what the two readers gave.
+ */
+export function turnsOnTheLine(entries: readonly PathRewriteEntry[], line: readonly PathLineEntry[] | null, parentRunId: string):
+  readonly Readonly<{ entry: PathRewriteEntry; climbed: boolean; changed: boolean | null }>[] {
+  if (line === null) return entries.map((entry) => ({ entry, climbed: false, changed: null }));
+  const own = new Map(entries.map((entry) => [lower(entry.run_id), entry] as const));
+  const merged: Array<Readonly<{ entry: PathRewriteEntry; climbed: boolean; changed: boolean | null }>> = [];
+  const seq = new Map<string, number>();
+  const newest = new Map<string, string>();
+  for (const turn of line) {
+    if (turn.held || turn.hidden) continue;
+    const pathSeq = (seq.get(turn.position_ref) ?? 0) + 1;
+    const base = newest.get(turn.position_ref) ?? null;
+    const dug = turn.source === "PATH_REWRITE" ? own.get(lower(turn.run_id)) : undefined;
+    if (turn.source === "PATH_REWRITE" && dug === undefined) continue;
+    seq.set(turn.position_ref, pathSeq);
+    const entry: PathRewriteEntry = dug !== undefined ? { ...dug, path_seq: pathSeq, based_on_rewrite_id: base } : {
+      run_id: turn.run_id, parent_run_id: parentRunId, position_ref: turn.position_ref, path_seq: pathSeq, taken_at: turn.taken_at, state: turn.state,
+      rewrite_id: turn.entry_id, parent_answer_version: null, based_on_rewrite_id: base, failure_code: turn.failure_code, fate_before: turn.fate_before,
+      fate_after: turn.fate_after, verdict_outcome: null, verdict_scope: null, writer_lineage: null, checker_lineage: null, rounds: null, artifact_refs: null,
+      recorded_at: turn.recorded_at, content: turn.content
+    };
+    if (isFinishedState(entry.state) && entry.rewrite_id !== null) newest.set(turn.position_ref, entry.rewrite_id);
+    merged.push({ entry, climbed: dug === undefined, changed: dug === undefined ? turn.changed : null });
+  }
+  return merged;
+}
+
+/* ----------------------------------------------------------------- the main answer (R22 decision 3) */
+
+/** The trigger a version's sealed text names, and what it says. */
+export type MainAnswerRow = Readonly<{ row: MainAnswerUpdateRead; opened: unknown }>;
+
+function mainAnswerVersionOf({ row, opened }: MainAnswerRow): MainAnswerVersion | null {
+  if (!isFinishedState(row.outcome) || !isRecord(opened) || !Array.isArray(opened.segments)) return null;
+  const parsed = MainAnswerVersionSchema.safeParse({
+    version: row.answer_seq, updated_at: isoOf(row.recorded_at), trigger: opened.trigger, position_ref: opened.position_ref,
+    segments: opened.segments.map((text: unknown) => ({ text })),
+    ...(row.outcome === "READY_WITH_RESERVATION" ? { with_reservation: true } : {})
+  });
+  return parsed.success ? parsed.data : null;
+}
+
+/**
+ * `Answer.main_answer`: every version the tree's changes wrote, oldest first, the newest the answer that stands; a FAILED one changes nothing
+ * and is not listed. `writing`: a path of this debate is being rewritten, so a new version may follow. Null while there is nothing to say.
+ */
+export function serveMainAnswer(rows: readonly MainAnswerRow[], writing: boolean): AnswerMainAnswer | null {
+  const history = rows.flatMap((entry) => { const version = mainAnswerVersionOf(entry); return version === null ? [] : [version]; })
+    .slice(-WEB_CONTRACT_LIMITS.mainAnswerVersionsMax);
+  if (history.length === 0 && !writing) return null;
+  const parsed = AnswerMainAnswerSchema.safeParse({ current: history.at(-1) ?? null, history, ...(writing ? { writing: true } : {}) });
+  return parsed.success ? parsed.data : null;
 }
 
 /* ----------------------------------------------------------------- the answer's rewrites */
