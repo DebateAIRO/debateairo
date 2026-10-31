@@ -139,7 +139,7 @@ describe("0137: public debates anyone can dig", () => {
     expect(sql).toContain("content_ciphertext->>'keyId' = 'publication-snapshot:' || publication_ref::text || ':v1'");
     expect(sql).toMatch(/owner_ref uuid REFERENCES identity\."user"\(owner_ref\) ON DELETE SET NULL,\n\s*publication_ref/u);
     // The new sources name their run; every source the release before writes stays in the list.
-    const sources = (text: string): string[] | undefined => text.match(/spend_source IN \(([^)]*)\)\) NOT VALID/u)?.[1]?.match(/'[^']+'/gu);
+    const sources = (text: string) => text.match(/spend_source IN \(([^)]*)\)\) NOT VALID/u)?.[1]?.match(/'[^']+'/gu);
     expect(sources(sql)).toEqual([...(sources(code(read("migrations/0136_investigation_reports.sql"))) ?? []),
       "'PATH_CLIMB'", "'ANSWER_UPDATE'", "'CONTRIBUTION_CHECK'", "'PUBLIC_REPORT'"]);
     expect(sql).toContain("ADD CONSTRAINT model_spend_r22_sources_name_their_run");

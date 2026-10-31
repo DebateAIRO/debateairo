@@ -26,7 +26,7 @@ const read = (path: string): string => readFileSync(new URL(path, ROOT), "utf8")
 const sha256 = (text: string): string => createHash("sha256").update(text).digest("hex");
 const code = (sql: string): string => sql.split("\n").map((line) => line.replace(/--.*$/u, "")).join("\n");
 
-const TABLES = [] as const;
+const TABLES: readonly string[] = [];
 const FUNCTIONS = [
   "billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean)",
   "billing.read_internal_grant_commitments(uuid,uuid,uuid,uuid)",
@@ -111,7 +111,7 @@ describe("0140: a funded person's window counts every spend kind", () => {
   it("C-K redefines exactly what it says, with no real figure, and the limit stays a server setting", () => {
     const sql = code(read(SQL_PATH));
     const kinds = "'RUN','STORY','PATH_REWRITE','INVESTIGATION_REPORT','PATH_CLIMB','ANSWER_UPDATE','CONTRIBUTION_CHECK'";
-    expect(sql.split(kinds).length).toBe(6); // the admission list, the two readers, the commitments, the team's
+    expect(sql.split(kinds).length).toBe(5); // the admission list, the spend reader, the commitments, the team's
     expect(sql).toContain("IF p_source='PUBLIC_REPORT' THEN RETURN false;END IF;");
     const team = read("packages/register/src/team-limit.ts");
     expect(team).toContain('export const TEAM_LIMIT_SETTING = "TEAM_LIMIT_MONTH_MICROS" as const;');

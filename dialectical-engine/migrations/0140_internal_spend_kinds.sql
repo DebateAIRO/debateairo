@@ -36,8 +36,10 @@ BEGIN
   END LOOP;
 END
 $internal_admission_sources$;
+ALTER TABLE billing.internal_provider_admission DROP CONSTRAINT IF EXISTS internal_provider_admission_source_check;
 ALTER TABLE billing.internal_provider_admission ADD CONSTRAINT internal_provider_admission_source_check
   CHECK (spend_source IN ('RUN','STORY','PATH_REWRITE','INVESTIGATION_REPORT','PATH_CLIMB','ANSWER_UPDATE','CONTRIBUTION_CHECK'));
+ALTER TABLE billing.internal_provider_admission DROP CONSTRAINT IF EXISTS internal_provider_admission_phase_check;
 ALTER TABLE billing.internal_provider_admission ADD CONSTRAINT internal_provider_admission_phase_check
   CHECK ((spend_source = 'RUN' AND spend_phase IS NOT NULL AND spend_phase IN ('BODY','SERVE')) OR (spend_source <> 'RUN' AND spend_phase IS NULL));
 

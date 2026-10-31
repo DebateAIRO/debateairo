@@ -8,7 +8,7 @@
   },
   "migration": {
     "name": "0139_passage_retention.sql",
-    "sha256": "85e17cfbf4e62bb5011244fcbe687d20bb8e69b6f57fcdb209d97a5b2f65374d"
+    "sha256": "9d59019030ec7622f190da2a9695ab4383220a9f877495a54c2c5b8461c1c428"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-130.sql",

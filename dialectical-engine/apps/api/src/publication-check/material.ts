@@ -4,6 +4,8 @@ export const CHECKED_TEXT_PATHS: readonly { path: string; kind: PublicationPartK
   { path: "question", kind: "QUESTION" },
   ...["confidence_band", "summary_segments[].text", "badges[]", "residual_objections[]", "reversal_point"]
     .map(path => ({ path: `answer.${path}`, kind: "SUMMARY" as const })),
+  // Decision 13 of 31 Oct: the main answer a contribution updated, judged with the summary.
+  { path: "main_answer_update.segments[].text", kind: "SUMMARY" },
   ...["claim", "base_score.kind", "base_score.source", "base_score.producer", "base_score.replay_handle",
     "final_strength.kind", "final_strength.source", "final_strength.producer", "final_strength.replay_handle",
     "locator", "abstention.question_class", "abstention.register_row_key", "abstention.unlock_condition"]
@@ -16,11 +18,9 @@ export const CHECKED_TEXT_PATHS: readonly { path: string; kind: PublicationPartK
   // its title, site and link, and reader 1's line about it), judged with the arguments they back; the date is excluded.
   ...["quote", "title", "site", "link", "explanation.text"]
     .map(path => ({ path: `answer.nodes[].sources[].${path}`, kind: "ARGUMENTS" as const })),
-  { path: "answer.nodes[].review.reasons[]", kind: "REVIEWS" },
-  // Decision 13 of 31 Oct: what a contribution put on the public page: its path's text is judged with the arguments, the updated main answer
-  // with the summary. The contributor's pseudonym and the date stay out, as the author's are.
+  // Decision 13: a contribution's path text, judged with the arguments. Its contributor's pseudonym and date stay out, as the author's do.
   ...["line", "summary", "what_changed[]"].map(path => ({ path: `contributions[].${path}`, kind: "ARGUMENTS" as const })),
-  { path: "main_answer_update.segments[].text", kind: "SUMMARY" },
+  { path: "answer.nodes[].review.reasons[]", kind: "REVIEWS" },
   ...["headline", "summary", "confidence", "paths[].line", "change.text", "reviewer_note.text"]
     .map(path => ({ path: `story_short.${path}`, kind: "STORY" as const }))
 ];

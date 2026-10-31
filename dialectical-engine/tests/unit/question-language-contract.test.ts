@@ -33,7 +33,11 @@ describe("the ask's question-language fields (question-language spec 2026-10-13)
       // Side-by-side spec §13 (Task S12): the room read's settings version, a later optional key of its own.
       "settings_version",
       // Plan 2026-10-30 W1-6: a dig's parent, a later optional key of its own.
-      "parent"
+      "parent",
+      // The owner's changes of 31 Oct: a dig on a public debate, the purpose lines and the Free notice, later optional keys.
+      "public_parent",
+      "purpose_lines",
+      "free_public_notice"
     ]);
     expect(AskRequestSchema.shape.site_language.safeParse(undefined).success).toBe(true);
     expect(AskRequestSchema.shape.question_language_choice.safeParse(undefined).success).toBe(true);

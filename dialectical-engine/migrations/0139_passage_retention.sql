@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS identity.web_passage_wipe (
   run_id uuid NOT NULL,
   wipe_no integer NOT NULL CONSTRAINT web_passage_wipe_no_check CHECK (wipe_no BETWEEN 1 AND 100000),
   owner_ref uuid NOT NULL REFERENCES identity."user"(owner_ref) ON DELETE CASCADE,
-  reason text NOT NULL CONSTRAINT web_passage_wipe_reason_check CHECK (reason IN ('NOTHING_RUNS','REPORT_WRITTEN')),
+  wipe_reason text NOT NULL CONSTRAINT web_passage_wipe_reason_check CHECK (wipe_reason IN ('NOTHING_RUNS','REPORT_WRITTEN')),
   page_texts integer NOT NULL CONSTRAINT web_passage_wipe_texts_check CHECK (page_texts >= 0),
   extracts integer NOT NULL CONSTRAINT web_passage_wipe_extracts_check CHECK (extracts >= 0),
   packs integer NOT NULL CONSTRAINT web_passage_wipe_packs_check CHECK (packs >= 0),
@@ -301,7 +301,7 @@ BEGIN
   PERFORM pg_catalog.set_config('debateai.passage_retention_forget', 'off', true);
   PERFORM pg_catalog.set_config('debateai.web_evidence_forget', 'off', true);
   IF v_packs + v_extracts + v_replies + v_texts > 0 THEN
-    INSERT INTO identity.web_passage_wipe (run_id, wipe_no, owner_ref, reason, page_texts, extracts, packs, replies)
+    INSERT INTO identity.web_passage_wipe (run_id, wipe_no, owner_ref, wipe_reason, page_texts, extracts, packs, replies)
     VALUES (p_run_id, COALESCE((SELECT max(earlier.wipe_no) FROM identity.web_passage_wipe AS earlier WHERE earlier.run_id = p_run_id), 0) + 1,
       v_owner, p_reason, v_texts, v_extracts, v_packs, v_replies);
   END IF;
@@ -423,7 +423,7 @@ BEGIN
         'page_id', quote.page_id, 'path_ref', quote.path_ref, 'label', quote.label, 'created_at', quote.created_at,
         'content', quote.content_ciphertext) ORDER BY quote.created_at, quote.extract_id)
       FROM identity.web_shown_quote AS quote WHERE quote.owner_ref = v_owner_ref), '[]'::jsonb),
-    'web_passage_wipes', COALESCE((SELECT jsonb_agg(jsonb_build_object('run_id', wipe.run_id, 'wipe_no', wipe.wipe_no, 'reason', wipe.reason,
+    'web_passage_wipes', COALESCE((SELECT jsonb_agg(jsonb_build_object('run_id', wipe.run_id, 'wipe_no', wipe.wipe_no, 'reason', wipe.wipe_reason,
         'page_texts', wipe.page_texts, 'extracts', wipe.extracts, 'packs', wipe.packs, 'replies', wipe.replies, 'wiped_at', wipe.wiped_at)
         ORDER BY wipe.wiped_at, wipe.run_id, wipe.wipe_no)
       FROM identity.web_passage_wipe AS wipe WHERE wipe.owner_ref = v_owner_ref), '[]'::jsonb));
