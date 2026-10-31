@@ -5306,7 +5306,8 @@ setTimeout(() => undefined, 500);
         + `n4_claimed=false sealed_decision_version=1 sealed_n_star=2 sealed_retained=true`
       );
     }
-  }, 300_000);
+    // Run time only, not a timing bound: the seed drain and every odd wave's mid-wave drain now wait out the equal work.
+  }, 450_000);
 
   it("S3b F3 removes caller-selected account audit tokens and DB-mints the live binding", async () => {
     const flow = buildService();
