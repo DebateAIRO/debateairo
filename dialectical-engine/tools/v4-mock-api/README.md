@@ -80,6 +80,8 @@ All the answers carry the same English debate: *"Should countries build new nucl
 | `d1000000-0000-4000-8000-000000000001` | **Finished dig** of 1111's path n-mix with the person's **own view** and their **edit** of a suggestion. Level 1. Answer id `aaaad100-…`. Its rewrite carries the verdict "helped this path and the main question". | paid, searched | member of 1111's |
 | `d2000000-0000-4000-8000-000000000002` | **Finished dig of the dig** 8888 (its path n-renew), with the person's own view. **Level 2**. Answer id `aaaad200-…`. Verdict "did not help this path"; 1111's n-renew is marked "a dig further down changed part of this". | paid, searched | member of 1111's |
 | `d3000000-0000-4000-8000-000000000003` | **Finished dig** of d200's path n-nuclear, thorough. **Level 3**. Answer id `aaaad300-…`. Its rewrite is **still writing**. | paid, searched | member of 1111's |
+| `d4000000-0000-4000-8000-000000000004` | **Finished dig** of 1111's path n-nuclear (task W4-6). Level 1. Answer id `aaaad400-…`. Its rewrite **failed**: the path keeps its text, and the page says the dig's points and sources are below. | paid, searched | member of 1111's |
+| `d5000000-0000-4000-8000-000000000005` | **Finished dig** of 1111's path n-smr (task W4-6). Level 1. Answer id `aaaad500-…`. Its rewrite is ready but **changed nothing** ("The dig didn't change this path."). | paid, searched | member of 1111's |
 | `d1000000-0000-4000-8000-000000000010` | **Finished dig at the deepest level (10)**, hung under d300 (task W3-4). Answer id `aaaad110-…`. The six digs between levels 3 and 10 are not seeded: only its own answer says level 10, so its map offers no dig anywhere and shows the "deepest level" line. | paid, searched | member of 1111's |
 | `e1000000-0000-4000-8000-000000000001` | **Paused at the month wall** (running; its planned calls and searches wait). Continue is refused until the switch `pause=CAN_CONTINUE`. | – | open |
 
@@ -139,7 +141,9 @@ The shapes are the contract's (`packages/contract/src/web.ts`, merged in W2-7), 
 | `GET /v1/runs/:id` | `month_pause` | on run `e100…`: `until` (the next month) and `can_continue` |
 | `POST /v1/runs/:id/continue` | (draft route) | 409 `RUN_PAUSED_UNTIL_RESET` before the month reset, 200 `{"state":"CONTINUING"}` after it (switch `pause=CAN_CONTINUE`); setting `pause=` again pauses the run again |
 
-Every dig keeps its points and its answer text (owner Q-D13); the mock's digs still have a story, so today's pages draw them as before.
+Every dig keeps its points and its answer text (owner Q-D13). The mock's digs still have a story, but since task W4-6 the website never reads a dig's story: a dig's map is drawn from its rewrite's own paths (each with its line and fate), or from the positions it argued while its rewrite is still being written.
+
+Since task W4-6 the first debate's map shows all four rewrite states: n-mix and n-renew **rewritten**, n-nuclear **failed** (dig d400), n-smr **no change** (dig d500); and **rewriting** one level down, on d200's n-nuclear (dig d300). "Paths changed since your report (version 1): 2." stays: a failed rewrite and one that changed nothing are not counted.
 
 ## A new debate from the page (POST /v1/asks)
 

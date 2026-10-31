@@ -15,6 +15,8 @@
  * Plan 2026-10-30-dig-model-revision.md, task W2-7: it also reads the dig model's rewritten paths, the verdict on the
  * person's point of view and the dig trail three levels down, and the money rule's words: a new question's share of today,
  * new starts waiting for the reset, the borrow notice and the debate paused at the month wall with Continue.
+ * Task W4-6: it draws the first debate's map with its four rewrite states, and a dig's map from its rewrite's own paths
+ * with no story, through the website's own map builder.
  */
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -89,6 +91,9 @@ const RUNS = {
   digOwnView: "d1000000-0000-4000-8000-000000000001",
   digLevelTwo: "d2000000-0000-4000-8000-000000000002",
   digLevelThree: "d3000000-0000-4000-8000-000000000003",
+  // W4-6: a dig whose rewrite failed, and one whose rewrite changed nothing.
+  digFailed: "d4000000-0000-4000-8000-000000000004",
+  digNoChange: "d5000000-0000-4000-8000-000000000005",
   paused: "e1000000-0000-4000-8000-000000000001",
   // W3-4: a dig at the deepest level (10).
   deepest: "d1000000-0000-4000-8000-000000000010"
@@ -380,6 +385,28 @@ await step("the deepest level, and a dig past it refused before it starts (W3-4)
   const body: Loose = await refused.json();
   must(refused.status === 409 && body.error === "DIG_TOO_DEEP" && body.level_max === 10, "a dig at level 11 is refused 409 DIG_TOO_DEEP");
   return `level ${deepest.level}; one more: ${refused.status} ${body.error}`;
+}, (value: string) => value);
+// ---- W4-6: the map of rewritten paths and of a dig, drawn by the website's own map builder ----
+await step("the four rewrite states on the first debate's map, through the website's map builder (W4-6)", async () => {
+  const served = await client.readRunAnswer(RUNS.settled);
+  const map = mapModel.buildV4Map({ runId: RUNS.settled, answer: served, story: await client.readAnswerStory(served.answer_id) });
+  const states = Object.fromEntries(map.paths.map((path: Loose) => [path.id, mapModel.rewriteStateOf(path.rewrites?.history.at(-1))]));
+  must(states["n-mix"] === "REWRITTEN" && states["n-renew"] === "REWRITTEN", "two paths rewritten");
+  must(states["n-nuclear"] === "FAILED" && states["n-smr"] === "NO_CHANGE", "one failed, one not changed");
+  for (const [id, state] of [[RUNS.digFailed, "FAILED"], [RUNS.digNoChange, "READY"]] as const) {
+    const own: Loose = (await client.readRunAnswer(id)).dig;
+    must(own?.rewrite?.state === state && own.parent_run_id === RUNS.settled, `the dig ${id} says its rewrite is ${state}`);
+  }
+  const level2 = mapModel.buildV4Map({ runId: RUNS.digLevelTwo, answer: await client.readRunAnswer(RUNS.digLevelTwo), story: null });
+  must(level2.paths.some((path: Loose) => mapModel.rewriteStateOf(path.rewrites?.history.at(-1)) === "REWRITING"), "a path still being rewritten one level down");
+  return Object.entries(states).map(([id, state]) => `${id} ${state}`).join(", ") + "; d200's n-nuclear REWRITING";
+}, (value: string) => value);
+await step("a dig's map is drawn from its rewrite's own paths, with no story (W4-6, Q-D13)", async () => {
+  const dug = await client.readRunAnswer(RUNS.dig);
+  const map = mapModel.buildV4Map({ runId: RUNS.dig, answer: dug, story: await client.readAnswerStory(dug.answer_id) });
+  must(map.storyState === "NONE" && map.headline === null && map.fallbackText !== null, "no story; its answer text stays");
+  must(map.paths.map((path: Loose) => path.fate).join(" ") === "HELD_UP FELL PARTLY_HELD SET_ASIDE", "the rewrite's own fates");
+  return `${map.paths.length} paths, level ${map.dig?.level}, story ${map.storyState}`;
 }, (value: string) => value);
 await step("a new question's estimate, as a share of today", async () => {
   const room: Loose = await client.getAskRoom({ plan_tier: "premium", composition_budget_tier: "medium", depth: 2, answer_length: "standard" });

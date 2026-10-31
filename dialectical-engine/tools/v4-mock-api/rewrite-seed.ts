@@ -9,8 +9,11 @@
  *   - d200 (level 2) dug 8888's path n-renew with the person's own view: READY rewrite with "did not help this path"; so
  *     1111's n-renew (the path 8888 dug) is marked "a dig further down changed part of this".
  *   - d300 (level 3) dug d200's path n-nuclear from an AI suggestion: its rewrite is still WRITING.
- * Every dig keeps its points and its answer text (owner Q-D13); only its story is dropped (the mock's stories stay, so
- * today's pages still draw the digs).
+ *   - d400 (level 1, task W4-6) dug 1111's path n-nuclear: its rewrite FAILED (the path keeps its text).
+ *   - d500 (level 1, task W4-6) dug 1111's path n-smr: its rewrite is READY but changed nothing ("no change").
+ * So the first debate's map shows all four states of draft 5.5: rewritten, rewriting (on d200), failed and no change.
+ * Every dig keeps its points and its answer text (owner Q-D13); only its story is dropped. The mock's stories stay, but
+ * since task W4-6 the website never reads a dig's story: a dig's map is drawn from its rewrite's own paths.
  *
  * The deepest level (task W3-4): a dig at level 10 (DIG_LEVEL_MAX), hung under d300 for the click-test of the "deepest
  * level" line. The six digs between levels 3 and 10 are NOT seeded: only its own answer says level 10, so its map offers
@@ -29,7 +32,10 @@ export const DIG_RUNS = Object.freeze({
   levelOne: "88888888-8888-4888-8888-888888888888",
   ownView: "d1000000-0000-4000-8000-000000000001",
   levelTwo: "d2000000-0000-4000-8000-000000000002",
-  levelThree: "d3000000-0000-4000-8000-000000000003"
+  levelThree: "d3000000-0000-4000-8000-000000000003",
+  /** Task W4-6: a dig whose rewrite failed, and one whose rewrite changed nothing. */
+  failed: "d4000000-0000-4000-8000-000000000004",
+  noChange: "d5000000-0000-4000-8000-000000000005"
 });
 /** A debate whose planned AI calls and searches paused at the month wall. */
 export const RUN_PAUSED = "e1000000-0000-4000-8000-000000000001";
@@ -39,7 +45,9 @@ export const DIG_FINISHED_AT = Object.freeze({
   levelOne: "2026-10-29T08:12:00.000Z",
   ownView: "2026-10-29T10:20:00.000Z",
   levelTwo: "2026-10-30T09:15:00.000Z",
-  levelThree: "2026-10-30T15:40:00.000Z"
+  levelThree: "2026-10-30T15:40:00.000Z",
+  failed: "2026-10-30T12:00:00.000Z",
+  noChange: "2026-10-30T12:30:00.000Z"
 });
 
 /** The dig's own paths (every mock answer is the same debate, so every dig has these four), with the rewrite's lines. */
@@ -135,6 +143,40 @@ const REWRITE_LEVEL_TWO: ReadyRewrite = {
   ]
 };
 
+const PICK_BUILD_RECORD: DugPick = {
+  kind: "CONTRADICTING", place: "p:n-nuclear-build", by: "AI_SUGGESTION",
+  text: "Did any reactor in Europe or North America finish on time and on budget since 2005?"
+};
+const PICK_SMR_COST: DugPick = {
+  kind: "NEEDS_MORE_WEB", place: "path:n-smr", by: "AI_SUGGESTION",
+  text: "Is there any published cost for a small modular reactor that is already running?"
+};
+
+/** Task W4-6: the dig ran, but its rewrite failed twice: the path keeps its text; the report reads the dig directly. */
+const REWRITE_FAILED: PathRewrite = {
+  rewrite_id: "rw-d400-n-nuclear", dig_run_id: DIG_RUNS.failed, dig_level: 1, dig_finished_at: DIG_FINISHED_AT.failed,
+  state: "FAILED", failed_at: "2026-10-30T12:04:00.000Z"
+};
+
+/** Task W4-6: the dig found nothing that changes the path; its "what the dig changed" sentence is still shown. */
+const REWRITE_NO_CHANGE: ReadyRewrite = {
+  rewrite_id: "rw-d500-n-smr", dig_run_id: DIG_RUNS.noChange, dig_level: 1, dig_finished_at: DIG_FINISHED_AT.noChange,
+  state: "READY", rewritten_at: "2026-10-30T12:33:00.000Z", changed: false,
+  text: {
+    line: "Wait for small modular reactors: set aside. None is running commercially in Europe or North America yet, so their cost could not be weighed.",
+    summary: "Too early to weigh: no small reactor is running commercially here yet.",
+    fate: "SET_ASIDE"
+  },
+  what_changed: ["The dig found no published cost for a small reactor already running, so the path stays as it was."],
+  fate_before: "SET_ASIDE", view: null,
+  dig_paths: [
+    { position_ref: "n-mix", line: "Build what works today, and keep a place for small reactors later.", fate: "HELD_UP" },
+    { position_ref: "n-renew", line: "Small reactors will not be needed at all.", fate: "PARTLY_HELD" },
+    { position_ref: "n-nuclear", line: "Build large reactors now and small ones later.", fate: "FELL" },
+    { position_ref: "n-smr", line: "Small reactors will be cheap within a decade.", fate: "SET_ASIDE" }
+  ]
+};
+
 const REWRITE_LEVEL_THREE: PathRewrite = {
   rewrite_id: "rw-d300-n-nuclear", dig_run_id: DIG_RUNS.levelThree, dig_level: 3, dig_finished_at: DIG_FINISHED_AT.levelThree,
   state: "WRITING"
@@ -146,7 +188,10 @@ export const PATH_REWRITES: Readonly<Record<string, AnswerPathRewrites>> = Objec
   [DIG_RUNS.root]: {
     paths: [
       { position_ref: "n-mix", current: REWRITE_OWN_VIEW.text, history: [REWRITE_OWN_VIEW] },
-      { position_ref: "n-renew", current: REWRITE_LEVEL_ONE.text, history: [REWRITE_LEVEL_ONE], changed_below: true }
+      { position_ref: "n-renew", current: REWRITE_LEVEL_ONE.text, history: [REWRITE_LEVEL_ONE], changed_below: true },
+      // Task W4-6: a failed rewrite (no text: the path keeps its own) and one that changed nothing; neither is counted.
+      { position_ref: "n-nuclear", current: null, history: [REWRITE_FAILED] },
+      { position_ref: "n-smr", current: REWRITE_NO_CHANGE.text, history: [REWRITE_NO_CHANGE] }
     ],
     changed_since: { count: 2, since_report_version: 1 }
   },
@@ -174,6 +219,12 @@ export const DIG_ANSWERS: Readonly<Record<string, AnswerDig>> = Object.freeze({
   },
   [DIG_RUNS.levelThree]: {
     parent_run_id: DIG_RUNS.levelTwo, position_ref: "n-nuclear", places: ["path:n-nuclear"], level: 3, picks: [PICK_BUILD_TIMES], rewrite: REWRITE_LEVEL_THREE
+  },
+  [DIG_RUNS.failed]: {
+    parent_run_id: DIG_RUNS.root, position_ref: "n-nuclear", places: ["p:n-nuclear-build"], level: 1, picks: [PICK_BUILD_RECORD], rewrite: REWRITE_FAILED
+  },
+  [DIG_RUNS.noChange]: {
+    parent_run_id: DIG_RUNS.root, position_ref: "n-smr", places: ["path:n-smr"], level: 1, picks: [PICK_SMR_COST], rewrite: REWRITE_NO_CHANGE
   }
 });
 
@@ -193,6 +244,16 @@ export const SEEDED_NEW_DIGS = Object.freeze([
     runRef: DIG_RUNS.levelThree, answerId: "aaaad300-0000-4000-8000-000000000003", seq: 11, mode: "thorough" as const,
     question: "Were reactors built faster outside Europe and North America, and could that be repeated here?",
     askedAt: "2026-10-30T15:10:00.000Z", settledAt: DIG_FINISHED_AT.levelThree
+  },
+  {
+    runRef: DIG_RUNS.failed, answerId: "aaaad400-0000-4000-8000-000000000004", seq: 14, mode: "quick" as const,
+    question: "Did any reactor in Europe or North America finish on time and on budget since 2005?",
+    askedAt: "2026-10-30T11:40:00.000Z", settledAt: DIG_FINISHED_AT.failed
+  },
+  {
+    runRef: DIG_RUNS.noChange, answerId: "aaaad500-0000-4000-8000-000000000005", seq: 15, mode: "quick" as const,
+    question: "Is there any published cost for a small modular reactor that is already running?",
+    askedAt: "2026-10-30T12:10:00.000Z", settledAt: DIG_FINISHED_AT.noChange
   }
 ]);
 
