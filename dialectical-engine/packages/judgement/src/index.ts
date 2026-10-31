@@ -60,7 +60,8 @@ import {
   judgeConsiderationSourcesPromptContract,
   judgeSourcesMaterialFields,
   judgeSourcesPromptContract,
-  reviewSourcesPromptContract
+  reviewSourcesPromptContract,
+  PANEL_SOURCES_PROMPT_CONTRACT
 } from "./web-prompts.js";
 import type { Pool, PoolClient } from "pg";
 import {
@@ -476,7 +477,13 @@ export interface InvestigatedPoint {
  * separate (S4-1). It carries no edges: measurement is the reviewer's seat,
  * and the panel never sees an edge.
  */
-export type PanelAssessmentInput = JudgeSubjectInput;
+export type PanelAssessmentInput = JudgeSubjectInput & Readonly<{
+  /**
+   * Decision 10 (R22): the extract the graded point names, as one JSON text, on a lengthed panel call only. Present: the
+   * sources variant (`judge.panel.length.sources.v1`) with `cited_extract` right after the statement.
+   */
+  citedExtract?: string;
+}>;
 
 export interface PanelAssessment {
   readonly judgementRef: string;
@@ -1136,9 +1143,13 @@ export class Judge {
    * records WHICH way the member fell over instead of collapsing the panel.
    */
   async assess(input: PanelAssessmentInput): Promise<PanelAssessment> {
+    const panelCited = input.citedExtract;
+    if (panelCited !== undefined && input.length === undefined) {
+      throw new TypedDomainError("JUDGE_SOURCES_UNLENGTHED", "A panel call that reads an extract is always told its length");
+    }
     const framed = buildFramedPrompt({
       contract: promptContractInArgumentLanguage(
-        input.length === undefined ? PANEL_PROMPT_CONTRACT : PANEL_LENGTH_PROMPT_CONTRACT,
+        input.length === undefined ? PANEL_PROMPT_CONTRACT : panelCited === undefined ? PANEL_LENGTH_PROMPT_CONTRACT : PANEL_SOURCES_PROMPT_CONTRACT,
         input.argumentLanguageName,
         input.questionLanguage
       ),
@@ -1146,6 +1157,7 @@ export class Judge {
       material: withQuestionLanguageField([
         { name: "question_line", content: input.questionLine },
         { name: "statement", content: input.statement },
+        ...(panelCited === undefined ? [] : [{ name: "cited_extract", content: panelCited }]),
         // Length guidance (spec 2026-10-15 §3.2): the variant's target, right before the lock.
         ...(input.length === undefined
           ? []

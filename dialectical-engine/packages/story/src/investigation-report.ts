@@ -437,6 +437,8 @@ export type ReportCallMaterial = Readonly<{
   storyWriterOf: (answer: ReportAnswerDraft) => readonly FramedMaterialField[];
   storyCheckerOf: (answer: ReportAnswerDraft, candidate: ReportStoryDraft) => readonly FramedMaterialField[];
   index: ReportIndex;
+  /** F5: how many leading fields every step's material shares, byte for byte (the dossier's): they go first on the Anthropic wire. */
+  sharedFieldCount?: number;
 }>;
 
 export type ReportRunCall = Readonly<{
@@ -499,7 +501,7 @@ type StepCall<D> = Readonly<{
 }>;
 
 /** What one checked step needs of a call: everything but the plan's story bound and the story's own material. */
-type StepRun = Omit<ReportRunCall, "free" | "material" | "storyLanguageCheck"> & Readonly<{ material: Pick<ReportCallMaterial, "index"> }>;
+type StepRun = Omit<ReportRunCall, "free" | "material" | "storyLanguageCheck"> & Readonly<{ material: Pick<ReportCallMaterial, "index" | "sharedFieldCount"> }>;
 
 function reportRequest(call: StepRun, input: Readonly<{
   site: ReportSite; round: number; providerRef: string; contract: PromptContract; material: readonly FramedMaterialField[];
@@ -507,8 +509,18 @@ function reportRequest(call: StepRun, input: Readonly<{
   classifyContent: (content: string, reply?: ModelReplyFacts) => ContentClassification;
   revision: Readonly<{ ownDraft: string; problems: string }> | null;
 }>): ProviderCallRequest {
-  const framed = buildFramedPrompt({ contract: input.contract, material: input.material,
-    ...(call.randomBytes === undefined ? {} : { randomBytes: call.randomBytes }) });
+  // F5's one fence is never a reason to fail: a reply that repeated it (an AI reads it in its prompt) would be material here,
+  // which the door refuses, so this one call takes a fresh fence and pays the plain price.
+  const framed = (() => {
+    try {
+      return buildFramedPrompt({ contract: input.contract, material: input.material,
+        ...(call.randomBytes === undefined ? {} : { randomBytes: call.randomBytes }) });
+    } catch (error) {
+      if (call.randomBytes === undefined || !(error instanceof TypedDomainError)
+        || (error.code !== "PROMPT_FENCE_UNAVAILABLE" && error.code !== "PROMPT_CANARY_UNAVAILABLE")) throw error;
+      return buildFramedPrompt({ contract: input.contract, material: input.material });
+    }
+  })();
   const packet = input.revision === null ? framed.packet
     : buildFramedRevisionPrompt(framed.packet, input.revision.ownDraft, input.revision.problems);
   const revision = input.revision;
@@ -523,6 +535,7 @@ function reportRequest(call: StepRun, input: Readonly<{
     contractHash: call.contractHash,
     providerRef: input.providerRef,
     packet: call.guard(packet),
+    ...(call.material.sharedFieldCount === undefined ? {} : { sharedFirstFieldCount: call.material.sharedFieldCount }),
     classifyContent: input.classifyContent,
     buildRepairPacket: (rejected: RejectedProviderContent): PromptPacket => call.guard(revision === null
       ? buildFramedRepairPrompt(framed, schemaFailureLocator(rejected))
@@ -601,7 +614,7 @@ async function writeStep<D>(call: StepRun, step: StepCall<D>): Promise<ReportSte
 
 /** What the overall answer needs: a report call without the story's parts. */
 export type OverallAnswerCall = Omit<ReportRunCall, "free" | "material" | "storyLanguageCheck"> & Readonly<{
-  material: Pick<ReportCallMaterial, "answerWriter" | "answerCheckerOf" | "index">;
+  material: Pick<ReportCallMaterial, "answerWriter" | "answerCheckerOf" | "index" | "sharedFieldCount">;
 }>;
 
 /**

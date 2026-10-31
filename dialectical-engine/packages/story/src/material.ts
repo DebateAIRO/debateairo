@@ -188,7 +188,7 @@ export interface StoryMaterialExtract {
 function storyExtractOf(node: StorySnapshotNode): Readonly<{ extract?: StoryMaterialExtract }> {
   const cited = node.citedExtract;
   return cited === undefined ? {} : { extract: Object.freeze({ id: cited.id, quote: cited.quote, title: cited.title, site: cited.site,
-    date: cited.date }) };
+    date: cited.date, ...(cited.note === undefined ? {} : { note: cited.note }) }) };
 }
 
 export interface StoryMaterialPoint {

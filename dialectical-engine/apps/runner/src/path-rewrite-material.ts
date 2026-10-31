@@ -2,7 +2,7 @@ import type { StoryFate } from "@debateai/contract";
 import { TypedDomainError, withQuestionLanguageField, withReaderField, type QuestionLanguage, type ReadingLevel } from "@debateai/kernel";
 import { buildFramedPrompt, type FramedMaterialField, type PromptPacket } from "@debateai/providers";
 import {
-  PATH_REWRITE_WRITER_PROMPT_CONTRACT, withoutStoryNodeIds, type PathRewriteCallMaterial, type PathRewriteDraft,
+  PATH_REWRITE_WRITER_V2_PROMPT_CONTRACT, withoutStoryNodeIds, type PathRewriteCallMaterial, type PathRewriteDraft,
   type PathRewritePickMark, type StoryNodeEnrichment, type StoryWriteInput
 } from "@debateai/story";
 
@@ -81,8 +81,15 @@ export type PathRewritePoint = Readonly<{
   disputed: boolean;
 }>;
 
-/** A checked extract a point cites, word for word as the page writes it. */
-export type PathRewriteExtract = Readonly<{ pointId: string; label: string; site: string; title: string | null; quote: string }>;
+/**
+ * What a point cites, as the rewrite reads it. Decision 6: on the dig's own paths, the rewrite right after it, the checked
+ * extract word for word; on the parent path, an older debate's, only its 120-character shown quote.
+ */
+export type PathRewriteExtract = Readonly<{
+  pointId: string; label: string; site: string; title: string | null; quote: string;
+  /** Decision 8: reader 1's note on the page; absent when it wrote none. */
+  note?: string;
+}>;
 
 export type PathRewriteParentPath = Readonly<{
   positionRef: string;
@@ -186,7 +193,8 @@ function sourcesJson(extracts: readonly PathRewriteExtract[], kept: readonly Pat
     point: refs.pointRef.get(extract.pointId)!,
     site: extract.site,
     ...(extract.title === null ? {} : { title: extract.title }),
-    quote: extract.quote
+    quote: extract.quote,
+    ...(extract.note === undefined ? {} : { note: extract.note })
   }));
 }
 
@@ -237,7 +245,7 @@ export function buildPathRewriteMaterial(input: PathRewriteMaterialInput): PathR
   for (const [at, step] of PATH_REWRITE_LADDER.entries()) {
     const { fields, keptRefs } = fieldsAt(input, refs, step);
     const writer = closing(input, fields);
-    bodyBytes = pathRewriteBodyBytes(buildFramedPrompt({ contract: PATH_REWRITE_WRITER_PROMPT_CONTRACT, material: writer }).packet);
+    bodyBytes = pathRewriteBodyBytes(buildFramedPrompt({ contract: PATH_REWRITE_WRITER_V2_PROMPT_CONTRACT, material: writer }).packet);
     if (!pathRewriteBodyFits(bodyBytes + PATH_REWRITE_ROUND_TWO_ROOM_BYTES)) continue;
     const index = Object.freeze({ pointRefs: keptRefs, digPathRefs: Object.freeze([...refs.digRef.values()]), personWords });
     const checkerOf = (candidate: PathRewriteDraft): readonly FramedMaterialField[] =>

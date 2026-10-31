@@ -33,7 +33,7 @@
 import { webPageTextRef } from "@debateai/db";
 import { checkVerbatimExtracts, type VerbatimFound } from "@debateai/evidence";
 import {
-  WEB_PICK_V2_PROMPT_CONTRACT, WEB_PROMPT_LIMITS, WEB_READ_ALL_PROMPT_CONTRACT, webPickCallSiteKey, webPickV2MaterialFields,
+  WEB_PICK_V2_PROMPT_CONTRACT, WEB_PROMPT_LIMITS, WEB_READ_ALL_V2_PROMPT_CONTRACT, webPickCallSiteKey, webPickV2MaterialFields,
   webReadAllCallSiteKey, webReadAllMaterialFields, type WebPage, type WebTopCount
 } from "@debateai/judgement";
 import { TypedDomainError } from "@debateai/kernel";
@@ -80,6 +80,8 @@ export type ReaderOneCall = (request: ReaderOneCallRequest) => Promise<ReaderOne
 export type ReaderOneGrade = 0 | 1 | 2 | 3;
 export type ReaderOnePageRead = Readonly<{
   pageId: string; outcome: "READ"; grade: ReaderOneGrade; adds: string;
+  /** Decision 8: its note on the page, up to three sentences in its own words; null when it wrote none. */
+  note: string | null;
   /** The passages found word for word, as the PAGE writes them, each once. */
   extracts: readonly VerbatimFound[];
   /** How many copied passages the page does not hold word for word. */
@@ -92,7 +94,7 @@ export type ReaderOnePageNotRead = Readonly<{
 }>;
 export type ReaderOnePageResult = ReaderOnePageRead | ReaderOnePageNotRead;
 /** A page reader 1 read earlier in the investigation (W4-2): what it gave, reused as it is. */
-export type ReaderOneKnownReading = Readonly<{ grade: ReaderOneGrade; adds: string; extracts: readonly string[]; maker: string }>;
+export type ReaderOneKnownReading = Readonly<{ grade: ReaderOneGrade; adds: string; note: string | null; extracts: readonly string[]; maker: string }>;
 /** The call-site key and raw artifact a reused reading names: no call was made for it. */
 export const REUSED_READING = "REUSED" as const;
 /**
@@ -159,7 +161,7 @@ function buildBatch(input: Readonly<{ question: string; answer: string; siteLang
   const withRefs = webReadAllMaterialFields({ ...common, pages: items.map((item) => asPage(item, item.ref)) });
   const vendorPages = asInBlock(pagesField(withTexts));
   const recordedPages = asInBlock(pagesField(withRefs));
-  const vendor = buildFramedPrompt({ contract: WEB_READ_ALL_PROMPT_CONTRACT, material: withTexts }).packet;
+  const vendor = buildFramedPrompt({ contract: WEB_READ_ALL_V2_PROMPT_CONTRACT, material: withTexts }).packet;
   const packet = swapped(vendor, vendorPages, recordedPages);
   return Object.freeze({
     items: Object.freeze([...items]),
@@ -200,7 +202,7 @@ function planBatches(input: Readonly<{ question: string; answer: string; siteLan
 
 /* ----------------------------------------------------------------- the replies */
 
-type ReadEntry = Readonly<{ grade: ReaderOneGrade; adds: string; extracts: readonly string[] }>;
+type ReadEntry = Readonly<{ grade: ReaderOneGrade; adds: string; note: string | null; extracts: readonly string[] }>;
 
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -214,13 +216,15 @@ function readEntries(value: unknown, promptIds: readonly string[]): ReadonlyMap<
   const sent = new Set(promptIds);
   for (const entry of value.pages as readonly unknown[]) {
     if (!isRecord(entry) || typeof entry.page_id !== "string" || !sent.has(entry.page_id) || entries.has(entry.page_id)) continue;
-    const { grade, adds, extracts } = entry;
+    const { grade, adds, note, extracts } = entry;
     if (typeof grade !== "number" || !Number.isInteger(grade) || grade < 0 || grade > WEB_PROMPT_LIMITS.gradeMax) continue;
     if (typeof adds !== "string" || oneLine(adds) === "") continue;
     if (extracts !== undefined && !Array.isArray(extracts)) continue;
     entries.set(entry.page_id, Object.freeze({
       grade: grade as ReaderOneGrade,
       adds: oneLine(adds),
+      // A page with no note keeps its reading: the note is what people read, never a reason to send the page again.
+      note: typeof note === "string" && oneLine(note) !== "" ? oneLine(note) : null,
       extracts: Object.freeze(((extracts ?? []) as readonly unknown[])
         .filter((extract): extract is string => typeof extract === "string" && extract.trim() !== ""))
     }));
@@ -307,7 +311,7 @@ export async function readAllPages(input: Readonly<{
     const known = input.known?.get(item.page.pageId);
     if (known === undefined) continue;
     const checked = checkVerbatimExtracts(item.page.text, known.extracts);
-    results.set(item.page.pageId, Object.freeze({ pageId: item.page.pageId, outcome: "READ", grade: known.grade, adds: known.adds,
+    results.set(item.page.pageId, Object.freeze({ pageId: item.page.pageId, outcome: "READ", grade: known.grade, adds: known.adds, note: known.note,
       extracts: checked.kept, extractsDropped: checked.dropped.length, maker: known.maker, rawArtifactRef: REUSED_READING,
       callSiteKey: REUSED_READING }));
   }
@@ -324,7 +328,7 @@ export async function readAllPages(input: Readonly<{
     const keyed = plan.batches.map((batch) => ({ batch, callSiteKey: webReadAllCallSiteKey(input.answerIndex, nextIndex++) }));
     const answers = await Promise.all(keyed.map(({ batch, callSiteKey }) => {
       const promptIds = batch.items.map((item) => item.promptId);
-      return ask(input.call, { callSiteKey, contractId: WEB_READ_ALL_PROMPT_CONTRACT.contractId, packet: batch.packet,
+      return ask(input.call, { callSiteKey, contractId: WEB_READ_ALL_V2_PROMPT_CONTRACT.contractId, packet: batch.packet,
         vendorPacketOf: batch.vendorPacketOf, inputTokens: batch.inputTokens },
       (content, reply) => classifyReadAllReply(content, promptIds, reply));
     }));
@@ -346,7 +350,7 @@ export async function readAllPages(input: Readonly<{
         }
         const checked = checkVerbatimExtracts(item.page.text, entry.extracts);
         results.set(item.page.pageId, Object.freeze({
-          pageId: item.page.pageId, outcome: "READ", grade: entry.grade, adds: entry.adds,
+          pageId: item.page.pageId, outcome: "READ", grade: entry.grade, adds: entry.adds, note: entry.note,
           extracts: checked.kept, extractsDropped: checked.dropped.length,
           maker: answer.maker, rawArtifactRef: answer.rawArtifactRef, callSiteKey
         }));

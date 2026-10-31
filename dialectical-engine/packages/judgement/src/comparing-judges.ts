@@ -188,7 +188,8 @@ export function comparingJudgeOrder(answerCount: number, seat: number): readonly
  * the quote word for word, and the page's title, site and date. Never the page's text, a grade or a reader.
  */
 function extractForJudge(extract: EngineCitedExtract) {
-  return Object.freeze({ id: extract.id, quote: extract.quote, title: extract.title, site: extract.site, date: extract.date });
+  return Object.freeze({ id: extract.id, quote: extract.quote, title: extract.title, site: extract.site, date: extract.date,
+    ...(extract.note === undefined ? {} : { note: extract.note }) });
 }
 
 /** W4-1: whether the material a judge is shown carries any cited extract (then the judges' sources variant is sent). */

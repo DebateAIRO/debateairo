@@ -51,8 +51,8 @@ describe("W3-5 a dig rewrites the path it was dug from", () => {
     expect(vendors.glm.requests.map((request) => [request.callSiteKey, request.role, request.lane])).toEqual([["PATH_REWRITE:CHECKER:1", "EVALUATOR", "story"]]);
     for (const request of [...vendors.haiku.requests, ...vendors.glm.requests]) expect(request.contractHash).toBe(engineContractHash());
     expect(vendors.haiku.requests[0]!.bound.tokenCeiling).toBe(8192);
-    expect(readPromptFrame(vendors.haiku.requests[0]!.packet).contractId).toBe("path-rewrite.writer.v1");
-    expect(readPromptFrame(vendors.glm.requests[0]!.packet).contractId).toBe("path-rewrite.checker.v1");
+    expect(readPromptFrame(vendors.haiku.requests[0]!.packet).contractId).toBe("path-rewrite.writer.v2");
+    expect(readPromptFrame(vendors.glm.requests[0]!.packet).contractId).toBe("path-rewrite.checker.v2");
     // The checker reads the rewrite code kept, after the material.
     const checked = fieldsOf(vendors.glm.requests[0]!.packet);
     expect(JSON.parse(checked.get("rewrite")!)).toMatchObject({ fate: "PARTLY_HELD" });

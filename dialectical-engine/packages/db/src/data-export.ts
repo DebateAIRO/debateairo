@@ -176,15 +176,30 @@ export async function assertDataExportDatabaseRoles(requestPool: Pool, workerPoo
   }
 }
 
+/**
+ * R22 decision 7: the short quote outlives the passage, so an export after the wipe still holds it. Each quote whose extract
+ * is gone joins its debate's extracts, naming the carrier it is sealed under.
+ */
+function withShownQuotes(webEvidence: unknown, shownQuotes: unknown): unknown {
+  if (!Array.isArray(webEvidence) || !Array.isArray(shownQuotes)) return webEvidence;
+  return webEvidence.map((item: { run_id?: unknown; web?: { extracts?: Array<{ extract_id?: unknown }> } }) => {
+    const here = item.web?.extracts ?? [];
+    const gone = shownQuotes.filter((quote: { run_id?: unknown; extract_id?: unknown }) => quote.run_id === item.run_id
+      && !here.some((extract) => extract.extract_id === quote.extract_id));
+    return gone.length === 0 ? item : { ...item, web: { ...item.web, extracts: [...here,
+      ...gone.map((quote: object) => ({ ...quote, found_by: [], sealed_as: "identity.web_shown_quote" }))] } };
+  });
+}
+
 export class PostgresDataExportSource implements DataExportSourcePort {
   constructor(private readonly pool: Pool) {}
 
   async readRaw(exportId: string, workerId: string): Promise<RawExportRows> {
     const row = (await this.pool.query<{ snapshot: RawExportRows; threat_reports: unknown; page_memory: Record<string, unknown> | null;
-      web_evidence: unknown; investigations: Record<string, unknown> | null }>(
+      web_evidence: unknown; investigations: Record<string, unknown> | null; passage_retention: Readonly<{ web_shown_quotes?: unknown }> | null }>(
       "SELECT identity.read_data_export_snapshot_v2($1,$2) snapshot, identity.read_data_export_threat_reports($1,$2) threat_reports, "
         + "identity.read_data_export_page_memory($1,$2) page_memory, identity.read_data_export_web_evidence($1,$2) web_evidence, "
-        + "identity.read_data_export_investigations($1,$2) investigations",
+        + "identity.read_data_export_investigations($1,$2) investigations, identity.read_data_export_passage_retention($1,$2) passage_retention",
       [exportId, workerId])).rows[0]!;
     // 0131's reader answers {page_reading_level, debate_visits, dig_links}; a missing member stays missing, so the
     // snapshot's exact-section check refuses the export rather than leaving the records out.
@@ -196,7 +211,7 @@ export class PostgresDataExportSource implements DataExportSourcePort {
       ...("page_reading_level" in memory ? { page_reading_level: memory.page_reading_level } : {}),
       ...("debate_visits" in memory ? { debate_visits: memory.debate_visits } : {}),
       ...("dig_links" in memory ? { dig_links: memory.dig_links } : {}),
-      web_evidence: row.web_evidence,
+      web_evidence: withShownQuotes(row.web_evidence, row.passage_retention?.web_shown_quotes),
       ...("investigations" in investigations ? { investigations: investigations.investigations } : {}),
       ...("reserve_events" in investigations ? { reserve_events: investigations.reserve_events } : {})
     } as RawExportRows;

@@ -68,7 +68,7 @@ function investigation(pages: ReadonlyMap<string, WebReusedPage>): WebReuseSourc
 const readBefore = (overrides: Partial<WebReusedPage> = {}): WebReusedPage => ({
   sourceRunId: OTHER_RUN, sourcePageId: "55555555-5555-4555-8555-555555555555",
   text: "The earlier stored page says rent takes two thirds of the pay gap.\nIt was read in the first debate.",
-  grade: 3, line: "It weighs rent against pay.", lineLanguage: "en", readerOneMaker: "anthropic",
+  grade: 3, line: "It weighs rent against pay.", note: null, lineLanguage: "en", readerOneMaker: "anthropic",
   topReadings: [{ reader: 2, maker: "deepseek", outcome: "READ", grade: 3 }, { reader: 3, maker: "z.ai", outcome: "READ", grade: 2 }],
   extracts: [{ quote: "The earlier stored page says rent takes two thirds of the pay gap.", foundBy: [1, 2] }],
   ...overrides

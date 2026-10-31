@@ -87,7 +87,7 @@ const sent = (body: string): PromptPacket => ({ messages: (JSON.parse(body) as {
 export function fieldsOf(packet: PromptPacket): ReadonlyMap<string, string> {
   return new Map(readPromptFrame({ messages: packet.messages.slice(0, 2) }).fields.map((entry) => [entry.name, entry.content] as const));
 }
-export const isChecker = (packet: PromptPacket): boolean => packet.messages[0]!.content.includes("path-rewrite.checker.v1");
+export const isChecker = (packet: PromptPacket): boolean => packet.messages[0]!.content.includes("path-rewrite.checker.v");
 
 /** A writer reply that fits the material it was sent: every dig path once, P1 to rest on, a verdict when the picks need one. */
 export function fittingRewrite(packet: PromptPacket, change: Readonly<Record<string, unknown>> = {}): string {

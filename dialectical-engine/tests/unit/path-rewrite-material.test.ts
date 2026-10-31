@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 import { buildFramedPrompt, type PromptPacket } from "@debateai/providers";
 import { canonicalPromptFingerprint } from "@debateai/scorecard";
-import { PATH_REWRITE_WRITER_PROMPT_CONTRACT } from "@debateai/story";
+import { PATH_REWRITE_WRITER_V2_PROMPT_CONTRACT } from "@debateai/story";
 import {
   PATH_REWRITE_BODY_MAX_BYTES, PATH_REWRITE_BODY_OTHER_MEMBERS_BYTES, PATH_REWRITE_INPUT_OVER_LIMIT, buildPathRewriteMaterial,
   pathRewriteBodyBytes, pathRewriteBodyFits, pathRewriteDigPathsOf, pathRewriteGuard, type PathRewriteDigPath,
@@ -30,7 +30,7 @@ describe("W3-5 the rewrite's material", () => {
     const one = built(buildPathRewriteMaterial(input()));
     const two = built(buildPathRewriteMaterial(input()));
     expect(JSON.stringify(two.material.writer)).toBe(JSON.stringify(one.material.writer));
-    const packet = (fields: typeof one.material.writer) => buildFramedPrompt({ contract: PATH_REWRITE_WRITER_PROMPT_CONTRACT, material: fields }).packet;
+    const packet = (fields: typeof one.material.writer) => buildFramedPrompt({ contract: PATH_REWRITE_WRITER_V2_PROMPT_CONTRACT, material: fields }).packet;
     expect(canonicalPromptFingerprint(packet(two.material.writer).messages)).toBe(canonicalPromptFingerprint(packet(one.material.writer).messages));
     expect([...fieldsOf(one).keys()]).toEqual(["question", "place", "purpose", "path", "picks", "dig_paths", "reader"]);
     expect(one.ladderStep).toBe(1);

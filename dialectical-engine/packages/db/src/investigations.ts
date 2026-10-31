@@ -82,10 +82,11 @@ export class PostgresInvestigationRepository {
   }
 
   /** "Write my report": closes, numbers the next report version and wipes the investigation's page texts. */
+  /** R22 decision 7: 0139's closing, without 0133's wipe of every text ("other pages" keep their 30 days); `wipedTexts` is always 0. */
   async close(ownerRef: string, investigationId: string): Promise<Readonly<{
     outcome: "CLOSED" | "ALREADY_CLOSED" | "NOT_OWNED"; reportVersion: number | null; wipedTexts: number }>> {
     const row = (await this.pool.query<{ outcome: "CLOSED" | "ALREADY_CLOSED" | "NOT_OWNED"; report_version: number | null; wiped_texts: number }>(
-      "SELECT outcome,report_version,wiped_texts FROM identity.close_investigation($1,$2)", [ownerRef, investigationId])).rows[0]!;
+      "SELECT outcome,report_version,wiped_texts FROM identity.close_investigation_keeping_texts($1,$2)", [ownerRef, investigationId])).rows[0]!;
     return Object.freeze({ outcome: row.outcome, reportVersion: row.report_version, wipedTexts: row.wiped_texts });
   }
 

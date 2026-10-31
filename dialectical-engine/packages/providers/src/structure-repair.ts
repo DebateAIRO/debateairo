@@ -41,6 +41,7 @@ import {
 } from "./prompt-frame.js";
 import { CONTENT_FOLLOW_UP_SENTENCES, contentFollowUpSentence } from "./content-follow-up.js";
 import { planPatchFollowUp, type PatchFollowUpPlan } from "./patch-follow-up.js";
+import { packetWithPageTexts, packetWithPassageRefs } from "./sent-form.js";
 import {
   PROVIDER_COST_ENVELOPE_REFUSAL_CODES, ProviderContentUnacceptedError, ProviderStructureUnrepairedError,
   type ContentClassification, type PromptPacket, type ProviderCallRequest, type ProviderCallResult, type ProviderGateway,
@@ -1027,6 +1028,9 @@ async function repairStructure(gateway: ProviderGateway, request: ProviderCallRe
   };
   const classify = request.classifyContent!;
   const broken = unrepaired.rejected.rawText;
+  // R22: a reply that copies passages stays out of the repair's records too: its prompt names it, the vendor gets it.
+  const record = request.replyRecord;
+  const brokenText = record === undefined ? null : new Map([[record.refOf(unrepaired.lastRawArtifactRef), broken]]);
   let packet: PromptPacket;
   let answerForm: string;
   try {
@@ -1038,6 +1042,7 @@ async function repairStructure(gateway: ProviderGateway, request: ProviderCallRe
       { name: "machine_rejection_code", content: locator.code },
       { name: "machine_rejection_path", content: locator.path }
     ] }).packet;
+    if (brokenText !== null) packet = packetWithPassageRefs(packet, brokenText);
   } catch {
     throw unaccepted();
   }
@@ -1057,6 +1062,7 @@ async function repairStructure(gateway: ProviderGateway, request: ProviderCallRe
       providerRef: route.providerRef,
       packet,
       ...(request.keepRoomMicros === undefined ? {} : { keepRoomMicros: request.keepRoomMicros }),
+      ...(brokenText === null ? {} : { replyRecord: record!, vendorPacketOf: (recorded: PromptPacket) => packetWithPageTexts(recorded, brokenText) }),
       classifyContent: (content, reply): ContentClassification => {
         const classified = classify(content, reply);
         if (classified.parseStatus !== "PARSED") return classified;

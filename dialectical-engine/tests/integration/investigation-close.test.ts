@@ -156,9 +156,9 @@ describe("W5-1 Write my report on real PostgreSQL", () => {
     await pageText(person, root);
     await pageText(person, dig);
 
-    // "Write my report": closed, version 1 numbered, every member's page text wiped in the same transaction.
-    expect(await investigations.close(person.ownerRef, id)).toEqual({ outcome: "CLOSED", reportVersion: 1, wipedTexts: 2 });
-    expect([await pageTexts(root), await pageTexts(dig)]).toEqual([0, 0]);
+    // "Write my report": closed, version 1 numbered; the texts stay until the report is written (R22 decision 7).
+    expect(await investigations.close(person.ownerRef, id)).toEqual({ outcome: "CLOSED", reportVersion: 1, wipedTexts: 0 });
+    expect([await pageTexts(root), await pageTexts(dig)]).toEqual([1, 1]);
 
     const contents = new Map<string, unknown>();
     const vendors = team();

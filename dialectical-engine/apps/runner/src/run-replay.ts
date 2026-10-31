@@ -3,8 +3,11 @@
 // earlier copy got answered is REPLAYED from the record — the same raw artifact and ledger entry, no vendor contact, no
 // new ledger row, no money — instead of being bought a second time. Owner ruling 2026-10-14 (the true resume).
 import {
+  PostgresPassageRetentionRepository,
+  WEB_REPLY_TEXT_CARRIER,
   decryptLeasedContentForRun,
   prepareLeasedContentEncryptionForRun,
+  webReplyTextIdOf,
   type CryptoEnvelope,
   type Pool
 } from "@debateai/db";
@@ -18,6 +21,7 @@ import {
   type ProviderWireKind
 } from "@debateai/providers";
 import { canonicalPromptFingerprint } from "@debateai/scorecard";
+import { passageRecordedPacket } from "./passage-record.js";
 
 /** One recorded reply: the vendor's own bytes (`raw_artifact.raw_text`) and who gave it. */
 export interface RecordedArtifact {
@@ -216,7 +220,8 @@ export function replayingGateway(
       const replay = book.take({
         callSiteKey: request.callSiteKey,
         providerRef: request.providerRef,
-        fingerprint: canonicalPromptFingerprint(request.packet.messages)
+        // R22: the record holds a passage by its name, so the request is compared in that form.
+        fingerprint: canonicalPromptFingerprint(passageRecordedPacket(request.runId, request.packet).messages)
       });
       if (replay === null) return inner.call(request);
       const { accepted, answered, repairAttempts } = replay;
@@ -271,13 +276,30 @@ export async function readReplayBook(pool: Pool, runId: string, workItemId: stri
   if (rows.rows.length === 0 && nodes.rows.length === 0) return EMPTY_REPLAY_BOOK;
   const leased = await prepareLeasedContentEncryptionForRun(pool, runId);
   try {
-    const attempts = rows.rows.map((row): RecordedAttempt => {
+    // R22 (0139): a reader's reply is recorded by name; its bytes come back from their own store while the debate runs. A name
+    // with no stored text reads as no reply: the call cannot be replayed, the path an unreadable reply already takes.
+    const opened = rows.rows.map((row) => row.raw_artifact_ref === null || row.provider === null ? null
+      : decryptLeasedContentForRun<Readonly<{ rawText?: unknown }>>(
+        leased, "ledger.raw_artifact", row.raw_artifact_ref, row.artifact_ciphertext, { rawText: row.raw_text }));
+    const named = [...new Set(opened.flatMap((reply) => { const id = typeof reply?.rawText === "string" ? webReplyTextIdOf(reply.rawText) : null;
+      return id === null ? [] : [id]; }))];
+    const storedReplies = new Map<string, string>();
+    if (named.length > 0) {
+      for (const stored of (await new PostgresPassageRetentionRepository(pool).readReplyTexts(runId, named)) ?? []) {
+        const text = decryptLeasedContentForRun<unknown>(leased, WEB_REPLY_TEXT_CARRIER, stored.artifact_id, stored.content, null);
+        if (typeof text === "string") storedReplies.set(stored.artifact_id, text);
+      }
+    }
+    const replyOf = (reply: Readonly<{ rawText?: unknown }> | null): string | null => {
+      if (typeof reply?.rawText !== "string") return null;
+      const id = webReplyTextIdOf(reply.rawText);
+      return id === null ? reply.rawText : storedReplies.get(id) ?? null;
+    };
+    const attempts = rows.rows.map((row, index): RecordedAttempt => {
       const prompt = row.attempt_id === null || (row.prompt_text === null && row.prompt_ciphertext === null) ? null
         : decryptLeasedContentForRun<Readonly<{ promptFingerprint?: unknown }>>(
           leased, "ledger.call_prompt", row.attempt_id, row.prompt_ciphertext, { promptFingerprint: row.prompt_fingerprint });
-      const reply = row.raw_artifact_ref === null || row.provider === null ? null
-        : decryptLeasedContentForRun<Readonly<{ rawText?: unknown }>>(
-          leased, "ledger.raw_artifact", row.raw_artifact_ref, row.artifact_ciphertext, { rawText: row.raw_text });
+      const replyText = replyOf(opened[index] ?? null);
       return Object.freeze({
         callSiteKey: row.call_site_key,
         actorRef: row.actor_ref,
@@ -286,8 +308,8 @@ export async function readReplayBook(pool: Pool, runId: string, workItemId: stri
         rawArtifactRef: row.raw_artifact_ref,
         thinkingLevel: row.thinking_level,
         promptFingerprint: typeof prompt?.promptFingerprint === "string" ? prompt.promptFingerprint : null,
-        artifact: reply === null || typeof reply.rawText !== "string" ? null : Object.freeze({
-          rawText: reply.rawText, provider: row.provider!, modelId: row.model_id!, maker: row.maker!,
+        artifact: replyText === null ? null : Object.freeze({
+          rawText: replyText, provider: row.provider!, modelId: row.model_id!, maker: row.maker!,
           modelVersion: row.model_version, thinkingTokens: row.thinking_tokens,
           attempt: row.reply_attempt === null || !/^[0-9]{1,3}$/u.test(row.reply_attempt) ? null : Number(row.reply_attempt)
         })

@@ -90,8 +90,8 @@ describe("F4 · the prices are the vendor's, the gate's and the parity file's, a
     // A DeepInfra row bills every prompt token alike: no vendor prices, today's charge.
     expect(previewVendorPrices(previewModelRow("zai-org/GLM-5.3-Flash")!)).toBeUndefined();
     expect(previewTargetChargePrice(true, { baseUrl: "https://api.deepinfra.com/v1/openai", model: "zai-org/GLM-5.3-Flash" }, PLAIN)).toBe(PLAIN);
-    // Off the preview the declared price is kept as it is.
-    expect(previewTargetChargePrice(false, { baseUrl: "https://api.anthropic.com/v1", model: "claude-haiku-5-5" }, PLAIN)).toBe(PLAIN);
+    // The vendor's bill does not depend on the preview's gate (tests/unit/f4-cache-charge-end-to-end.test.ts).
+    expect(previewTargetChargePrice(false, { baseUrl: "https://api.anthropic.com/v1", model: "claude-haiku-5-5" }, PLAIN)).toEqual(REAL);
   });
 
   it("every cache mark the app sends is the 5-minute kind (no ttl), as the gate requires", () => {

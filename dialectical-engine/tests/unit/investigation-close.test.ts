@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 import { InvestigationReportStorySchema } from "@debateai/contract";
 import type { PathRewriteEntry } from "@debateai/db";
-import { previewThinkingStepOf, readPromptFrame } from "@debateai/providers";
+import { ANTHROPIC_DOSSIER_FIRST_SYSTEM, anthropicMessagesRequestBody, previewThinkingStepOf, readPromptFrame } from "@debateai/providers";
 import { INVESTIGATION_REPORT_POLICY } from "@debateai/register";
 import { INVESTIGATION_REPORT_SEAM_CEILING_MICROS } from "@debateai/budget";
 import { engineContractHash, ENGINE_SEALED_CONTRACT_IDS } from "../../apps/runner/src/engine-contracts.js";
@@ -75,7 +75,7 @@ describe("W5-1 Write my report: the closing", () => {
   });
 
   it("the five report contracts are sealed by the engine hash, appended last", () => {
-    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-8)).toEqual(["report.answer.v1", "report.answer.later.v1", "report.answer-check.v1",
+    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-12, -4)).toEqual(["report.answer.v1", "report.answer.later.v1", "report.answer-check.v1",
       "report.story.v1", "report.story-check.v1", "report.answer.v2", "report.answer.later.v2", "report.answer-check.v2"]);
   });
 
@@ -95,6 +95,23 @@ describe("W5-1 Write my report: the closing", () => {
     expect(new Set(frames.map((frame) => frame.canary)).size).toBe(1);
     // Another closing (another seed) has another fence.
     expect(closingRandomBytes(Buffer.alloc(32, 1))(16).equals(closingRandomBytes(Buffer.alloc(32, 2))(16))).toBe(false);
+  });
+
+  it("F5: on the Anthropic wire the answer's and the story's calls open with the same marked dossier, whatever the instruction", async () => {
+    const store = memoryReports();
+    const vendors = team();
+    await closeInvestigation(settingsOver({ store, vendors }), closingOf());
+    const firstBlocks = vendors.haiku.requests.map((request) => {
+      expect(request.sharedFirstFieldCount).toBeGreaterThan(0);
+      const body = JSON.parse(anthropicMessagesRequestBody({ model: "claude-haiku-5-5", maxTokens: 10, thinkingLevel: "low", messages: request.packet.messages,
+        sharedFirstFieldCount: request.sharedFirstFieldCount! })) as { system: string; messages: Array<{ content: Array<{ text: string; cache_control?: unknown }> }> };
+      expect(body.system).toBe(ANTHROPIC_DOSSIER_FIRST_SYSTEM);
+      expect(body.messages[0]!.content.length).toBeLessThanOrEqual(4);
+      return body.messages[0]!.content[0]!;
+    });
+    expect(vendors.haiku.requests.map((request) => contractOf(request.packet))).toEqual(["report.answer.v2", "report.story.v1"]);
+    expect(firstBlocks[0]).toEqual(firstBlocks[1]);
+    expect(firstBlocks[0]!.cache_control).toEqual({ type: "ephemeral" });
   });
 
   it("every Haiku call reads under 100K tokens, also on a level-10 investigation fitted by the ladder", async () => {

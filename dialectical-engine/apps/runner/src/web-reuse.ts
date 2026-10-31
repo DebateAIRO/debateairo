@@ -5,7 +5,7 @@
  *
  * Plain words: a dig belongs to an investigation (0133) with its first debate and the other digs. When the dig's search
  * finds a page one of them already read, the page is not read again: what its readers gave there (reader 1's grade, line
- * and copied passages, and readers 2 and 3's readings and checked extracts when it was one of their top pages) is carried
+ * and copied passages, and readers 2 and 3's readings and the shown quotes when it was one of their top pages; R22 decision 6: never another debate's passages) is carried
  * into the dig. Its text comes from the investigation's store while it is kept there; once a report closed the
  * investigation (or 30 days passed) it was wiped, and the text the dig's own search just brought back is used instead:
  * that search is the fetch again, its one charge (0.1¢) all it costs, no reader paid.
@@ -22,8 +22,8 @@
  */
 import type { Pool } from "pg";
 import {
-  PostgresInvestigationRunnerRepository, PostgresWebEvidenceRepository, WEB_EVIDENCE_CARRIERS, decryptLeasedContentForRun,
-  prepareLeasedContentEncryptionForRun, type CryptoEnvelope
+  PostgresInvestigationRunnerRepository, PostgresPassageRetentionRepository, PostgresWebEvidenceRepository, WEB_EVIDENCE_CARRIERS,
+  WEB_SHOWN_QUOTE_CARRIER, decryptLeasedContentForRun, prepareLeasedContentEncryptionForRun, type CryptoEnvelope
 } from "@debateai/db";
 import { addressKey } from "@debateai/evidence";
 
@@ -44,11 +44,13 @@ export type WebReusedPage = Readonly<{
   /** Reader 1's reading: grade, its one line (in the site's language then) and the maker that read it. */
   grade: WebReusedGrade;
   line: string;
+  /** Decision 8: reader 1's note on the page; null when it wrote none. */
+  note: string | null;
   lineLanguage: string;
   readerOneMaker: string;
   /** Readers 2 and 3's readings, when the page was one of their top pages there; empty otherwise (they read it now). */
   topReadings: readonly WebReusedTopReading[];
-  /** The page's checked extracts there (reader 1's among them), in label order. */
+  /** The page's shown quotes there, without their cut mark (reader 1's among them), in label order: never its passages. */
   extracts: readonly WebReusedExtract[];
 }>;
 
@@ -77,6 +79,7 @@ export function reusedReadingContent(page: WebReusedPage): Readonly<Record<strin
   return Object.freeze({
     line: page.line,
     language: page.lineLanguage,
+    ...(page.note === null ? {} : { note: page.note }),
     reused: Object.freeze({
       run_id: page.sourceRunId, page_id: page.sourcePageId, wiped: page.text === null,
       top_readings: page.topReadings.map((reading) => ({ reader: reading.reader, maker: reading.maker, outcome: reading.outcome,
@@ -106,12 +109,14 @@ export function reusedOfReadingContent(value: unknown, grade: number | null, mak
     return [Object.freeze({ quote: entry.quote, foundBy: Object.freeze([...entry.found_by as WebReaderNumber[]]) })];
   });
   return Object.freeze({ sourceRunId: reused.run_id, sourcePageId: reused.page_id, text: reused.wiped === true ? null : keptText, grade, line: value.line,
-    lineLanguage: value.language, readerOneMaker: maker, topReadings: Object.freeze(topReadings), extracts: Object.freeze(extracts) });
+    note: typeof value.note === "string" ? value.note : null, lineLanguage: value.language, readerOneMaker: maker, topReadings: Object.freeze(topReadings), extracts: Object.freeze(extracts) });
 }
 
 /* ----------------------------------------------------------------- the investigation in PostgreSQL */
 
 const textOf = (value: unknown, key: string): string | null => isRecord(value) && typeof value[key] === "string" ? value[key] : null;
+/** A shown quote as words of the page: its cut mark taken off, so the verbatim check finds what it was cut from. */
+const CUT_AT_END = /\u2026$/u;
 
 /**
  * The investigation's read pages on the runner's pool (debateai_runtime): 0133's members (`read_investigation_of_run`),
@@ -128,14 +133,16 @@ export function postgresWebReuseSource(pool: Pool, runId: string): WebReuseSourc
       if (investigation === null) return found;
       const others = investigation.members.map((member) => member.run_id).filter((member) => member.toLowerCase() !== runId.toLowerCase());
       const store = new PostgresWebEvidenceRepository(pool);
+      const retention = new PostgresPassageRetentionRepository(pool);
       for (const memberRunId of others) {
         if (found.size === wanted.size) break;
         const evidence = await store.read(memberRunId);
         if (evidence === null || evidence.pages.length === 0) continue;
+        const shownQuotes = (await retention.readShownQuotes(memberRunId)) ?? [];
         const leased = await prepareLeasedContentEncryptionForRun(pool, memberRunId);
         try {
           if (leased.prepared === null) continue;
-          const open = (carrier: (typeof WEB_EVIDENCE_CARRIERS)[keyof typeof WEB_EVIDENCE_CARRIERS], id: string,
+          const open = (carrier: (typeof WEB_EVIDENCE_CARRIERS)[keyof typeof WEB_EVIDENCE_CARRIERS] | typeof WEB_SHOWN_QUOTE_CARRIER, id: string,
             envelope: CryptoEnvelope | null): unknown => decryptLeasedContentForRun<unknown>(leased, carrier, id, envelope, null);
           for (const page of evidence.pages) {
             const one = evidence.readings.find((reading) => reading.page_id === page.page_id && reading.reader === 1
@@ -148,10 +155,10 @@ export function postgresWebReuseSource(pool: Pool, runId: string): WebReuseSourc
             const line = textOf(reading, "line");
             const language = textOf(reading, "language");
             if (line === null || language === null) continue;
-            const extracts = evidence.extracts.filter((extract) => extract.page_id === page.page_id).flatMap((extract): WebReusedExtract[] => {
-              const quote = textOf(open(WEB_EVIDENCE_CARRIERS.extract, extract.extract_id, extract.content), "quote");
-              const foundBy = extract.found_by.filter(isReader);
-              return quote === null || foundBy.length === 0 ? [] : [Object.freeze({ quote, foundBy: Object.freeze(foundBy) })];
+            const extracts = shownQuotes.filter((shown) => shown.page_id === page.page_id).flatMap((shown): WebReusedExtract[] => {
+              const quote = textOf(open(WEB_SHOWN_QUOTE_CARRIER, shown.extract_id, shown.content), "quote");
+              const foundBy = shown.found_by.filter(isReader);
+              return quote === null || foundBy.length === 0 ? [] : [Object.freeze({ quote: quote.replace(CUT_AT_END, ""), foundBy: Object.freeze(foundBy) })];
             });
             const topReadings = evidence.readings.filter((entry) => entry.page_id === page.page_id && (entry.reader === 2 || entry.reader === 3))
               .map((entry): WebReusedTopReading => Object.freeze({ reader: entry.reader as 2 | 3, maker: entry.maker,
@@ -163,7 +170,7 @@ export function postgresWebReuseSource(pool: Pool, runId: string): WebReuseSourc
               text = typeof opened === "string" ? opened : null;
             }
             found.set(key, Object.freeze({ sourceRunId: memberRunId, sourcePageId: page.page_id, text, grade: one.grade, line,
-              lineLanguage: language, readerOneMaker: one.maker, topReadings: Object.freeze(topReadings), extracts: Object.freeze(extracts) }));
+              note: textOf(reading, "note"), lineLanguage: language, readerOneMaker: one.maker, topReadings: Object.freeze(topReadings), extracts: Object.freeze(extracts) }));
           }
           await leased.assertLive();
         } finally {

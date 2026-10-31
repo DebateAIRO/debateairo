@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { webPageTextRef } from "@debateai/db";
 import {
-  WEB_PICK_V2_CONTRACT_ID, WEB_READ_ALL_CONTRACT_ID, WEB_READ_ALL_INSTRUCTION, WEB_TOP_COUNT_BY_MODE, type WebTopCount
+  WEB_PICK_V2_CONTRACT_ID, WEB_READ_ALL_V2_CONTRACT_ID, WEB_READ_ALL_V2_INSTRUCTION, WEB_TOP_COUNT_BY_MODE, type WebTopCount
 } from "@debateai/judgement";
 import { assertFramedPrompt, estimateWindowTokens, type PromptPacket } from "@debateai/providers";
 import { canonicalPromptFingerprint } from "@debateai/scorecard";
@@ -60,7 +60,7 @@ function stand(script: Script) {
 
 /** A reader that grades every page it was sent `grade(page_id)` and copies its opening sentence. */
 const readEverything = (grade: (id: string) => number = () => 2): Script => (request, vendor) => {
-  if (request.contractId !== WEB_READ_ALL_CONTRACT_ID) return pick(request);
+  if (request.contractId !== WEB_READ_ALL_V2_CONTRACT_ID) return pick(request);
   return JSON.stringify({ pages: pagesIn(vendor).map((sent) => ({
     page_id: sent.page_id, grade: grade(sent.page_id), adds: `What ${sent.title} adds.`,
     extracts: [sent.text.slice(0, sent.text.indexOf(".") + 1)]
@@ -86,7 +86,7 @@ describe("reader 1 reads every page whole, in batches the code checks before sen
     const pages = [1, 2, 3, 4, 5].map((n) => page(n, 60_000));
     const { result, seen } = read(pages, readEverything());
     const done = await result;
-    const reads = seen.filter((entry) => entry.request.contractId === WEB_READ_ALL_CONTRACT_ID);
+    const reads = seen.filter((entry) => entry.request.contractId === WEB_READ_ALL_V2_CONTRACT_ID);
     expect(reads.map((entry) => entry.request.callSiteKey)).toEqual(["WEB:read1:2:0", "WEB:read1:2:1", "WEB:read1:2:2"]);
     for (const { request, vendor } of reads) {
       expect(request.inputTokens).toBe(estimateWindowTokens(vendor.messages));
@@ -132,7 +132,7 @@ describe("reader 1 reads every page whole, in batches the code checks before sen
     const small = page(3);
     const { result, seen } = read([big, huge, small], readEverything());
     const done = await result;
-    const reads = seen.filter((entry) => entry.request.contractId === WEB_READ_ALL_CONTRACT_ID);
+    const reads = seen.filter((entry) => entry.request.contractId === WEB_READ_ALL_V2_CONTRACT_ID);
     expect(reads.map((entry) => pagesIn(entry.vendor).map((sent) => sent.title))).toEqual([["Ferry note 1"], ["Ferry note 3"]]);
     expect(reads[0]!.request.inputTokens).toBeGreaterThan(WEB_READER_ONE_LIMITS.batchTokensMax);
     expect(reads[0]!.request.inputTokens).toBeLessThan(WEB_READER_ONE_LIMITS.callInputTokensBelow);
@@ -155,7 +155,7 @@ describe("reader 1 reads every page whole, in batches the code checks before sen
     const pages = [1, 2, 3].map((n) => page(n, 20_000));
     const { result, seen } = read(pages, readEverything(), { requestBytesMax: 50_000 });
     await result;
-    const reads = seen.filter((entry) => entry.request.contractId === WEB_READ_ALL_CONTRACT_ID);
+    const reads = seen.filter((entry) => entry.request.contractId === WEB_READ_ALL_V2_CONTRACT_ID);
     expect(reads).toHaveLength(2);
     for (const { vendor } of reads) expect(Buffer.byteLength(JSON.stringify(vendor.messages))).toBeLessThanOrEqual(50_000);
   });
@@ -196,7 +196,7 @@ describe("what reader 1 gives back, and what the code keeps", () => {
     });
     const done = await result;
     const { request, vendor } = seen[0]!;
-    expect(vendor.messages[0]!.content.startsWith(WEB_READ_ALL_INSTRUCTION)).toBe(true);
+    expect(vendor.messages[0]!.content.startsWith(WEB_READ_ALL_V2_INSTRUCTION)).toBe(true);
     expect(vendor.messages[0]!.content).not.toContain("IMPORTANT SYSTEM NOTICE");
     const { fence } = assertFramedPrompt(vendor);
     const user = vendor.messages[1]!.content;
@@ -305,7 +305,7 @@ describe("the top pick, and the other pages", () => {
   );
 
   it("a pick naming an unknown page or one twice is completed by grade, in code", async () => {
-    const { result } = read(eight, (request, vendor) => request.contractId === WEB_READ_ALL_CONTRACT_ID
+    const { result } = read(eight, (request, vendor) => request.contractId === WEB_READ_ALL_V2_CONTRACT_ID
       ? readEverything((id) => grades[id]!)(request, vendor)
       : JSON.stringify({ top: ["p7", "p99", "p7"] }));
     const done = await result;
@@ -315,7 +315,7 @@ describe("the top pick, and the other pages", () => {
   });
 
   it("an unavailable pick falls back to the grades, best first, ties in search order", async () => {
-    const { result } = read(eight, (request, vendor) => request.contractId === WEB_READ_ALL_CONTRACT_ID
+    const { result } = read(eight, (request, vendor) => request.contractId === WEB_READ_ALL_V2_CONTRACT_ID
       ? readEverything((id) => grades[id]!)(request, vendor) : "UNAVAILABLE");
     const done = await result;
     expect(done.top).toEqual([eight[1]!.pageId, eight[4]!.pageId, eight[3]!.pageId]);

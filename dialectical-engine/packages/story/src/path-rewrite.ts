@@ -150,6 +150,24 @@ export const PATH_REWRITE_SEALED_CONTRACTS: readonly PromptContract[] = Object.f
   PATH_REWRITE_WRITER_PROMPT_CONTRACT, PATH_REWRITE_CHECKER_PROMPT_CONTRACT
 ]);
 
+/* ----------------------------------------------------------------- version 2 (plan 2026-10-31 decision 11, owner Q5) */
+
+/** v1 with "search words" taken out (the person writes no search words): every other word stays. OWNER-EDITABLE: a new id. */
+export const PATH_REWRITE_WRITER_V2_INSTRUCTION = PATH_REWRITE_WRITER_INSTRUCTION.replace(
+  "their own view, their own wording, or their own search words.", "their own view or their own wording.");
+export const PATH_REWRITE_CHECKER_V2_INSTRUCTION = PATH_REWRITE_CHECKER_INSTRUCTION.replace(
+  "if the person's own view, wording or search words are in the dig", "if the person's own view or wording are in the dig");
+export const PATH_REWRITE_WRITER_V2_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: "path-rewrite.writer.v2", instruction: PATH_REWRITE_WRITER_V2_INSTRUCTION, answerForm: PATH_REWRITE_WRITER_ANSWER_FORM
+});
+export const PATH_REWRITE_CHECKER_V2_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: "path-rewrite.checker.v2", instruction: PATH_REWRITE_CHECKER_V2_INSTRUCTION, answerForm: PATH_REWRITE_CHECKER_ANSWER_FORM
+});
+/** What a rewrite sends from R22 on; v1 stays sealed, unused. */
+export const PATH_REWRITE_V2_SEALED_CONTRACTS: readonly PromptContract[] = Object.freeze([
+  PATH_REWRITE_WRITER_V2_PROMPT_CONTRACT, PATH_REWRITE_CHECKER_V2_PROMPT_CONTRACT
+]);
+
 /* ----------------------------------------------------------------- the call sites */
 
 export type PathRewriteSite = "WRITER" | "CHECKER";
@@ -450,7 +468,7 @@ export async function writePathRewrite(call: PathRewriteRunCall): Promise<PathRe
         // A revision goes to the maker that wrote the draft it revises.
         const author = revision === null ? teller : (draftWriter.get(round - 1) ?? teller);
         const request = rewriteRequest(call, { site: "WRITER", round, providerRef: author.providerRef,
-          contract: PATH_REWRITE_WRITER_PROMPT_CONTRACT, material: call.material.writer, classifyContent: reading.classifyContent, revision });
+          contract: PATH_REWRITE_WRITER_V2_PROMPT_CONTRACT, material: call.material.writer, classifyContent: reading.classifyContent, revision });
         const result = await call.send(author, request);
         draftWriter.set(round, author);
         const accepted = reading.acceptedAs(result.content);
@@ -469,7 +487,7 @@ export async function writePathRewrite(call: PathRewriteRunCall): Promise<PathRe
     const reading = rememberingAcceptedReply((content, reply) =>
       classifyPathRewriteCheckerContent(content, reply, call.checkerLanguageCheck));
     const request = rewriteRequest(call, { site: "CHECKER", round, providerRef: call.checker.providerRef,
-      contract: PATH_REWRITE_CHECKER_PROMPT_CONTRACT, material: call.material.checkerOf(candidate),
+      contract: PATH_REWRITE_CHECKER_V2_PROMPT_CONTRACT, material: call.material.checkerOf(candidate),
       classifyContent: reading.classifyContent, revision: null });
     const result = await call.send(call.checker, request);
     const accepted = reading.acceptedAs(result.content);

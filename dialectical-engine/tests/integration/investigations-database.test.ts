@@ -180,11 +180,12 @@ describe("0133 an investigation and its digs", () => {
     await pagesWithText(root);
     await pagesWithText(dig, 3);
     await pagesWithText(outside);
-    expect(await investigations.close(person.ownerRef, investigationId!)).toEqual({ outcome: "CLOSED", reportVersion: 1, wipedTexts: 5 });
-    expect([await texts(root), await texts(dig), await texts(outside)]).toEqual([0, 0, 2]);
+    expect(await investigations.close(person.ownerRef, investigationId!)).toEqual({ outcome: "CLOSED", reportVersion: 1, wipedTexts: 0 });
+    // R22 decision 7: the closing keeps the texts ("other pages" keep their 30 days); 0139's wipe takes the rest once the report is written.
+    expect([await texts(root), await texts(dig), await texts(outside)]).toEqual([2, 3, 2]);
     // Links and checked quotes stay: the pages are there, their texts read WIPED.
     const web = (await new PostgresWebEvidenceRepository(runner).read(root))!;
-    expect(web.pages.map((page) => page.text_state)).toEqual(["WIPED", "WIPED"]);
+    expect(web.pages.map((page) => page.text_state)).toEqual(["STORED", "STORED"]);
     expect(await investigations.close(person.ownerRef, investigationId!)).toEqual({ outcome: "ALREADY_CLOSED", reportVersion: 1, wipedTexts: 0 });
     // A closed investigation takes no new dig until it is reopened.
     const late = await run(person);

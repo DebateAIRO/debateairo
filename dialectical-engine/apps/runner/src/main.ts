@@ -15,6 +15,7 @@ import { composeInvestigationClose } from "./investigation-close-sources.js";
 import { startInvestigationCloseSweep } from "./investigation-close.js";
 import { startPathRewriteSweep } from "./path-rewrite-sweep.js";
 import { startTreeSweep } from "./path-climb.js";
+import { startPassageSweep, wipeInvestigationPassages } from "./passage-sweep.js";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
 import { releaseTaskName, TypedDomainError } from "@debateai/kernel";
 import {
@@ -364,6 +365,9 @@ const closingPrices = buildProviderPriceMap(providerTargets, environment.DEPLOYM
 const investigationClose = composeInvestigationClose({ pool, targets: providerTargets,
   members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
   priceOf: (providerRef) => closingPrices.get(providerRef) ?? null,
+  // R22 decision 7: a written report takes its investigation's page texts and passages with it. A FAILED one may be written
+  // again; the sweep takes them once nothing runs either way.
+  onReportSettled: (settled) => settled.outcome === "FAILED" ? undefined : wipeInvestigationPassages(pool, settled.rootRunId),
   log: storyLog });
 /**
  * The claim-time probe of one target (both claim probes below). Spec 2026-10-11 busy model §2: on the
@@ -599,6 +603,8 @@ const treeSweep = pathRewrite === undefined || retireRequestStanding ? null
   : startTreeSweep({ ...pathRewrite.treeSweep, paused: () => retirementSignal.claimsStopped() });
 const investigationCloseSweep = investigationClose === undefined || retireRequestStanding ? null
   : startInvestigationCloseSweep({ ...investigationClose, paused: () => retirementSignal.claimsStopped() });
+// R22 decision 7: whole page texts and passages go when nothing runs on a debate; other pages 30 days after last activity.
+const passageSweep = retireRequestStanding ? null : startPassageSweep(pool, { paused: () => retirementSignal.claimsStopped() });
 announceRunnerReady({
   kind: "DEBATEAI_RUNNER_READY",
   worker: environment.HATCHET_WORKER_NAME,
@@ -649,6 +655,7 @@ const retirement = startRunnerRetirement({
     pathRewriteSweep?.stop();
     treeSweep?.stop();
     investigationCloseSweep?.stop();
+    passageSweep?.stop();
     await worker.stop();
     await Promise.allSettled([pool.end(), keepAlivePool.end()]);
   },
@@ -662,4 +669,5 @@ lapsedResend.stop();
 pathRewriteSweep?.stop();
 treeSweep?.stop();
 investigationCloseSweep?.stop();
+passageSweep?.stop();
 retirement.stop();

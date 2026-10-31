@@ -30,6 +30,8 @@ import {
   readMapRootsInForce,
   RunRepository,
   WEB_EVIDENCE_CARRIERS,
+  WEB_SHOWN_QUOTE_CARRIER,
+  PostgresPassageRetentionRepository,
   WEB_PLAN_CARRIER,
   withRunContentLease,
   type CryptoEnvelope,
@@ -3868,12 +3870,13 @@ export class ServeRepository {
    */
   async #readServedWeb(runId: string): Promise<ServedWeb | null> {
     const repository = new PostgresWebEvidenceRepository(this.pool);
-    const [stored, plan] = await Promise.all([repository.read(runId), repository.readPlanStatuses(runId)]);
+    const [stored, plan, shownQuotes] = await Promise.all([repository.read(runId), repository.readPlanStatuses(runId),
+      new PostgresPassageRetentionRepository(this.pool).readShownQuotes(runId)]);
     if ((stored === null || stored.searches.length === 0) && (plan === null || plan.length === 0)) return null;
     const roots = webPathRootsOf(await readMapRootsInForce(this.pool, runId));
     const cipher = await prepareLeasedContentEncryptionForRun(this.pool, runId);
     try {
-      const open = (carrier: (typeof WEB_EVIDENCE_CARRIERS)[keyof typeof WEB_EVIDENCE_CARRIERS] | typeof WEB_PLAN_CARRIER, id: string,
+      const open = (carrier: (typeof WEB_EVIDENCE_CARRIERS)[keyof typeof WEB_EVIDENCE_CARRIERS] | typeof WEB_PLAN_CARRIER | typeof WEB_SHOWN_QUOTE_CARRIER, id: string,
         envelope: CryptoEnvelope | null): unknown => decryptLeasedContentForRun<unknown>(cipher, carrier, id, envelope, null);
       const served = webPathsAtRoots(serveWebEvidence({
         evidence: stored === null ? null : {
@@ -3883,8 +3886,12 @@ export class ServeRepository {
           readings: stored.readings.map((reading) => ({ pageId: reading.page_id, reader: reading.reader, outcome: reading.outcome,
             line: reading.reader === 1 && reading.outcome === "READ"
               ? open(WEB_EVIDENCE_CARRIERS.reading, reading.reading_id, reading.content) : null })),
-          extracts: stored.extracts.map((extract) => ({ pageId: extract.page_id, pathRef: extract.path_ref, label: extract.label,
-            quote: open(WEB_EVIDENCE_CARRIERS.extract, extract.extract_id, extract.content) })),
+          // Decision 7: the shown quotes outlive the passages; an extract with none yet (a runner stopped between the two) is cut on serving.
+          extracts: [...(shownQuotes ?? []).map((quote) => ({ pageId: quote.page_id, pathRef: quote.path_ref, label: quote.label,
+            quote: open(WEB_SHOWN_QUOTE_CARRIER, quote.extract_id, quote.content) })),
+          ...stored.extracts.filter((extract) => !(shownQuotes ?? []).some((quote) => quote.extract_id === extract.extract_id))
+            .map((extract) => ({ pageId: extract.page_id, pathRef: extract.path_ref, label: extract.label,
+              quote: open(WEB_EVIDENCE_CARRIERS.extract, extract.extract_id, extract.content) }))],
           picks: stored.picks.map((pick) => ({ pathRef: pick.path_ref, rank: pick.rank, pageId: pick.page_id })),
           researched: stored.researched.map((chosen) => ({ pageId: chosen.page_id, pathRef: chosen.path_ref, outcome: chosen.outcome }))
         },

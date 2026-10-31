@@ -18,6 +18,7 @@ import {
 import type { DossierDig, DossierPath, DossierRewrite, DossierSource, DossierText } from "./investigation-dossier.js";
 import { pathRewriteBodyBytes, type PathRewriteDigPath } from "./path-rewrite-material.js";
 import { PATH_REWRITE_CHECKER_MODEL, PATH_REWRITE_WRITER_MODEL } from "./path-rewrite-composition.js";
+import { backfillShownQuotes } from "./passage-sweep.js";
 import { pointsOf, storedDigPathsOf } from "./path-rewrite-sources.js";
 import { readReplayBook } from "./run-replay.js";
 
@@ -39,9 +40,9 @@ import { readReplayBook } from "./run-replay.js";
  *  - the earlier report's answer (0136, opened under the root's key), from version 2 on (F8 A).
  *
  * DECISION 6, AI TEXT ONLY: nothing here opens a passage. Quotes come from 0139's shown quotes, cut to 120 characters when
- * they were written, never from identity.web_extract or a pack; 0135's stored paths carry their extracts' whole words for the
- * rewrite right after the debate, and those are dropped on the spot, unread. A debate with no shown quote yet (an old one RETENTION
- * has not reached) lists no sources rather than touching a passage.
+ * they were written, never from identity.web_extract or a pack; 0135's stored paths keep no words of their extracts (version 2). An extract
+ * a stopped runner left without its shown quote gets it first (passage-sweep.ts `backfillShownQuotes`, the one reader of the
+ * passage here, which only cuts it to the quote), so no reader of the report loses a source to a crash.
  * tests/architecture/report-reads-ai-text-only.test.ts holds this file to it.
  */
 
@@ -91,6 +92,8 @@ async function sourcesOfPoints(pool: Pool, runId: string, pointIds: readonly str
     return [...new Set(row?.locator?.match(LOCATOR_EXTRACT_IDS) ?? [])].map((label) => ({ pointId: callerId.get(id.toLowerCase()) ?? id, label }));
   });
   if (named.length === 0) return [];
+  // A runner stopped between an extract and its shown quote leaves no quote: written now, so the report still lists the source.
+  await backfillShownQuotes(pool, runId);
   const quotes = await new PostgresPassageRetentionRepository(pool).readShownQuotes(runId);
   if (quotes === null || quotes.length === 0) return [];
   const evidence = await new PostgresWebEvidenceRepository(pool).read(runId);

@@ -52,10 +52,11 @@
 import { createHash } from "node:crypto";
 import type { Pool } from "pg";
 import {
-  PostgresDigPicksRunnerRepository, PostgresInvestigationRunnerRepository, PostgresWebEvidenceRepository, RunRepository,
-  WEB_EVIDENCE_CARRIERS, WEB_PLAN_CARRIER, decryptLeasedContentForRun, encryptAttestedLeasedContentForRun,
+  PostgresDigPicksRunnerRepository, PostgresInvestigationRunnerRepository, PostgresPassageRetentionRepository, PostgresWebEvidenceRepository, RunRepository,
+  WEB_EVIDENCE_CARRIERS, WEB_PLAN_CARRIER, WEB_REPLY_TEXT_CARRIER, WEB_SHOWN_QUOTE_CARRIER, decryptLeasedContentForRun, webReplyTextRef, encryptAttestedLeasedContentForRun,
   prepareLeasedContentEncryptionForRun, type CryptoEnvelope, type WebEvidenceRead, type WebPlanPathRecord, type WebSealed
 } from "@debateai/db";
+import { cutQuoteAtWordEdge } from "@debateai/contract";
 import { addressKey, findVerbatim, selectPathPages, siteOf } from "@debateai/evidence";
 import {
   WEB_TOP_COUNT_BY_MODE, type WebMode, type WebPlannerPoint
@@ -64,7 +65,7 @@ import { TypedDomainError, questionLanguageOf, type QuestionLanguage } from "@de
 import {
   buildFramedPrompt, packetWithPageTexts, type CallBound, type FramedMaterialField, type PerplexityPage,
   type PerplexitySearchMode, type PerplexitySearchPort, type PerplexitySearchRequest, type PromptContract, type PromptPacket,
-  type ProviderGateway
+  type ProviderGateway, type ProviderReplyRecord
 } from "@debateai/providers";
 import type { WebSearchCostSeam } from "@debateai/budget";
 import type { PlanId } from "@debateai/register";
@@ -106,7 +107,8 @@ export type WebStepPath = Readonly<{
 /** 0132's writers and readers the step uses (`PostgresWebEvidenceRepository`). */
 export type WebStepStore = Pick<PostgresWebEvidenceRepository,
   "recordSearch" | "recordPage" | "recordReading" | "recordExtract" | "recordPicks" | "recordPack" | "read" | "readPageTexts">;
-type WebCarrier = typeof WEB_EVIDENCE_CARRIERS[keyof typeof WEB_EVIDENCE_CARRIERS] | typeof WEB_PLAN_CARRIER;
+type WebCarrier = typeof WEB_EVIDENCE_CARRIERS[keyof typeof WEB_EVIDENCE_CARRIERS] | typeof WEB_PLAN_CARRIER
+  | typeof WEB_SHOWN_QUOTE_CARRIER | typeof WEB_REPLY_TEXT_CARRIER;
 /** The run's key, as the step uses it: seal a value for a carrier and primary key, open one, and the digest secret. */
 export type WebStepCipher = Readonly<{
   seal: (carrier: WebCarrier, primaryKey: string, value: unknown) => WebSealed;
@@ -114,7 +116,11 @@ export type WebStepCipher = Readonly<{
   lease: WebPageTextDigestKey;
 }>;
 /** What the step stores into, opened only once the planner planned a search (Free and the off switch touch nothing). */
-export type WebStepPorts = Readonly<{ store: WebStepStore; cipher: WebStepCipher; close: () => Promise<void> }>;
+export type WebStepPorts = Readonly<{
+  store: WebStepStore; cipher: WebStepCipher; close: () => Promise<void>;
+  /** 0139's writers: the shown quote kept for good, a reader's reply kept apart from the call record. Absent: scripted fixtures only. */
+  retention?: Pick<PostgresPassageRetentionRepository, "recordShownQuote" | "recordReplyText">;
+}>;
 /**
  * The planner's per-path decision, stored so the page can say "no search planned, because …" (serve W3-3). Written once,
  * before any search; a run claimed again writes the same decision again, which the store answers as already there.
@@ -667,6 +673,15 @@ async function runGroup(context: GroupContext): Promise<GroupOutcome> {
     }, lease: cipher.lease })
     : null;
   const call = callShape(input, context.keepRoom);
+  // R22 (0139): a reader's reply copies passages, so its bytes go to their own store and the call record keeps only their name.
+  const retention = ports.retention;
+  const replyRecord: Readonly<{ replyRecord?: ProviderReplyRecord }> = retention === undefined ? {} : { replyRecord: Object.freeze({
+    store: async (artifactId: string, rawText: string) => {
+      await retention.recordReplyText(runId, artifactId, cipher.seal(WEB_REPLY_TEXT_CARRIER, artifactId, rawText));
+      return webReplyTextRef(artifactId);
+    },
+    refOf: webReplyTextRef
+  }) };
 
   // Reader 1 and its pick (a reused page is not read again: its reading joins the pick as it was given).
   const readerOne = context.readerOne;
@@ -674,7 +689,7 @@ async function runGroup(context: GroupContext): Promise<GroupOutcome> {
     try {
       const result = await readerOne.provider.call({ ...call, callSiteKey: request.callSiteKey, providerRef: readerOne.providerRef,
         packet: request.packet, vendorPacketOf: fromStore ?? request.vendorPacketOf,
-        sentInputTokensBelow: WEB_READER_ONE_LIMITS.callInputTokensBelow, classifyContent: request.classifyContent });
+        sentInputTokensBelow: WEB_READER_ONE_LIMITS.callInputTokensBelow, classifyContent: request.classifyContent, ...replyRecord });
       return { kind: "ANSWERED", content: result.content, maker: result.maker, rawArtifactRef: result.rawArtifactRef };
     } catch (error) {
       if (stops(error)) throw error;
@@ -687,7 +702,7 @@ async function runGroup(context: GroupContext): Promise<GroupOutcome> {
   const read = await readAllPages({ answerIndex: index, question: input.question, answer: group.answer,
     siteLanguage: input.siteLanguage.name, topCount: WEB_TOP_COUNT_BY_MODE[input.mode], pages: pages.map(asReaderPage), call: readerOneCall,
     ...(known.size === 0 ? {} : { known: new Map([...known].map(([pageId, page]) => [pageId, Object.freeze({ grade: page.grade,
-      adds: page.line, extracts: reusedReaderOneExtracts(page), maker: page.readerOneMaker })])) }) });
+      adds: page.line, note: page.note, extracts: reusedReaderOneExtracts(page), maker: page.readerOneMaker })])) }) });
   const pageOf = new Map(pages.map((page) => [page.pageId, page]));
 
   // Readers 2 and 3 on the top pages they have not read in the investigation; a reused top page they read is carried.
@@ -699,7 +714,7 @@ async function runGroup(context: GroupContext): Promise<GroupOutcome> {
       const packet = webTopRecordedPacket(request.contract, request.material, request.pageTexts);
       const result = await member.provider.call({ ...call, callSiteKey: request.callSiteKey, providerRef: member.providerRef, packet,
         vendorPacketOf: fromStore ?? ((recorded) => packetWithPageTexts(recorded, request.pageTexts)),
-        classifyContent: request.classifyContent });
+        classifyContent: request.classifyContent, ...replyRecord });
       return { kind: "ANSWERED", content: result.content, maker: result.maker };
     } catch (error) {
       if (stops(error)) throw error;
@@ -726,7 +741,8 @@ async function runGroup(context: GroupContext): Promise<GroupOutcome> {
     ...read.pages.filter((page) => !known.has(page.pageId)).map((page) => ({ pageId: page.pageId, reader: 1 as const,
       maker: webMakerSlug(page.outcome === "READ" ? page.maker : readerOne.maker), outcome: page.outcome === "READ" ? "READ" as const : "FAILED" as const,
       grade: page.outcome === "READ" ? page.grade : null,
-      line: page.outcome === "READ" ? { line: page.adds, language: input.siteLanguage.code } as object : null })),
+      line: page.outcome === "READ" ? { line: page.adds, language: input.siteLanguage.code,
+        ...(page.note === null ? {} : { note: page.note }) } as object : null })),
     ...top.readings.map((reading) => ({ pageId: reading.pageId, reader: reading.reader, maker: webMakerSlug(reading.maker),
       outcome: reading.outcome, grade: reading.grade,
       line: reading.outcome === "READ" ? { leads: top.leads.filter((lead) => lead.from.includes(reading.reader)).map((lead) => lead.text) } as object : null })),
@@ -758,6 +774,11 @@ async function runGroup(context: GroupContext): Promise<GroupOutcome> {
     const extractId = webStepRowId(runId, "extract", extract.label);
     written(await store.recordExtract({ runId, extractId, pageId: extract.pageId, label: extract.label, foundBy: extract.foundBy,
       quote: cipher.seal(WEB_EVIDENCE_CARRIERS.extract, extractId, { quote: extract.quote }) }));
+    // R22 (0139): the 120-character quote people and every later AI read, kept apart: it outlives the passage.
+    if (retention !== undefined) {
+      written(await retention.recordShownQuote(runId, extractId,
+        cipher.seal(WEB_SHOWN_QUOTE_CARRIER, extractId, { quote: cutQuoteAtWordEdge(extract.quote) })));
+    }
   }
   if (read.top.length > 0) written(await store.recordPicks(runId, group.pathRef, read.top));
 
@@ -768,7 +789,9 @@ async function runGroup(context: GroupContext): Promise<GroupOutcome> {
     pack: cipher.seal(WEB_EVIDENCE_CARRIERS.pack, packId, {
       path_ref: group.pathRef,
       pages: read.top.map((pageId, rank) => { const page = pageOf.get(pageId)!; return { page_id: pageId, rank: rank + 1,
-        title: page.title, site: page.site, url: page.url, date: page.date, read_depth: page.readDepth }; }),
+        title: page.title, site: page.site, url: page.url, date: page.date, read_depth: page.readDepth,
+        // Decision 8: reader 1's note, for every AI that reads this pack or an extract of it.
+        note: readOf.get(pageId)?.note ?? null }; }),
       extracts: extracts.map((extract) => ({ label: extract.label, page_id: extract.pageId, quote: extract.quote, found_by: extract.foundBy })),
       leads: top.leads.map((lead) => lead.text)
     }) }));
@@ -840,7 +863,8 @@ export async function postgresWebStepPorts(pool: Pool, runId: string): Promise<W
     open: (carrier, primaryKey, envelope) => decryptLeasedContentForRun<unknown>(leased, carrier, primaryKey, envelope, null),
     lease: Object.freeze({ databaseAttestationSecret: () => prepared.databaseAttestationSecret() })
   });
-  return Object.freeze({ store: new PostgresWebEvidenceRepository(pool), cipher, close: () => leased.close() });
+  return Object.freeze({ store: new PostgresWebEvidenceRepository(pool), cipher, close: () => leased.close(),
+    retention: new PostgresPassageRetentionRepository(pool) });
 }
 
 /**

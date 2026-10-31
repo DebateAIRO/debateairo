@@ -40,7 +40,11 @@ export type EngineMaterialInvestigation = Readonly<{
  * whose locator is one of this debate's extract ids; absent everywhere else and on every debate with no packs, so the
  * material built without one is today's, byte for byte. Code copies it from the stored pack; an AI never writes it.
  */
-export type EngineCitedExtract = Readonly<{ id: string; quote: string; title: string | null; site: string; date: string | null }>;
+export type EngineCitedExtract = Readonly<{
+  id: string; quote: string; title: string | null; site: string; date: string | null;
+  /** Decision 8: reader 1's note on the page; absent when it wrote none. */
+  note?: string;
+}>;
 
 export type EngineMaterialPoint = Readonly<{
   /** The node id (the writer's node_refs; the story maps it to Pn). */
