@@ -23,7 +23,7 @@ export * from "./dig-picks.js";
  *   path's new line and summary, "What the dig changed", the verdict's reason, the dig's own paths' lines and fates) is
  *   sealed under the DIG's run key with carrier `PATH_REWRITE_CARRIER` and the rewrite id as its key. Its charges are
  *   spend source PATH_REWRITE on the dig's run; the person's window readers (packages/budget readOwnerSpentMicros,
- *   0123's billing.read_internal_grant_spent) count RUN and STORY only until they learn it.
+ *   0140's billing.read_internal_grant_spent) count it.
  * - The web plan (W3-1 writes, packages/serve reads): `PostgresWebEvidenceRepository.recordPlanStatuses` (one row per
  *   run and path, written once) and `readPlanStatuses` (web-evidence.ts), over identity.web_plan_path.
  * - The month wall (W1-4/W3-2/W3-1): `recordPause` when the runner stops a debate's planned work at the month limit, with

@@ -51,8 +51,7 @@ const CREDENTIAL_ROUTES = Object.freeze([
   ["POST", "/v1/account/erasure/cancel"],
   ["POST", "/v1/account/legacy-runs/claim"],
   ["DELETE", `/v1/debates/${RUN_ID}`],
-  ["POST", `/v1/runs/${RUN_ID}/publish`],
-  ["POST", `/v1/runs/${RUN_ID}/unpublish`]
+  ["POST", `/v1/runs/${RUN_ID}/publish`]
 ] as const);
 
 function fixtureApplication(): AskApplication {

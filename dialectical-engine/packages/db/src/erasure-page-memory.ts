@@ -11,6 +11,10 @@ export const FORGET_ERASED_DEBATE_DIG_MODEL = "identity.forget_erased_debate_dig
 /** 0135 §6: the erasure role's deletion of one debate's dig picks and its path rewrite's material (the same signature as
  *  dig-picks.ts's, kept here as the others are: dig-picks.ts imports the package index, which imports the erasure code). */
 export const FORGET_ERASED_DEBATE_DIG_PICKS = "identity.forget_erased_debate_dig_picks(uuid)" as const;
+/** 0137, 0138, 0139 (the owner's changes of 31 Oct): one debate's public contribution and Free ask, its tree updates, its quotes and saved replies. */
+export const FORGET_ERASED_DEBATE_PUBLIC = "identity.forget_erased_debate_public(uuid)" as const;
+export const FORGET_ERASED_DEBATE_TREE_UPDATES = "identity.forget_erased_debate_tree_updates(uuid)" as const;
+export const FORGET_ERASED_DEBATE_PASSAGES = "identity.forget_erased_debate_passages(uuid)" as const;
 
 /**
  * R22 item 16 (owner, 2026-10-29: "Yes, delete them too"): deleting one private debate also deletes its V4 page memory
@@ -24,7 +28,9 @@ export const FORGET_ERASED_DEBATE_DIG_PICKS = "identity.forget_erased_debate_dig
  * erased dig leaves it) and its web evidence (0132: searches, pages, page texts, readings, extracts, picks, packs and
  * researched choices), and its dig model rows (0134: its month pauses, its own path rewrite and turn as a dig, so the
  * path it was dug from falls back to its previous text, and every rewrite and turn of its own paths) and its dig picks
- * (0135: as a dig, its picks and its rewrite's material; the digs dug from it keep theirs).
+ * (0135: as a dig, its picks and its rewrite's material; the digs dug from it keep theirs), its public contribution and Free ask
+ * (0137: a contribution on the page stays with no name), its tree updates (0138: what it caused or sits on, its answer versions and
+ * purpose lines) and its quotes and saved replies (0139).
  */
 export async function finalizeWithPageMemory<Outcome extends string>(
   pool: Pool,
@@ -47,6 +53,9 @@ export async function finalizeWithPageMemory<Outcome extends string>(
         await client.query("SELECT identity.forget_erased_debate_web_evidence($1)", [runId]);
         await client.query("SELECT identity.forget_erased_debate_dig_model($1)", [runId]);
         await client.query("SELECT identity.forget_erased_debate_dig_picks($1)", [runId]);
+        await client.query("SELECT identity.forget_erased_debate_public($1)", [runId]);
+        await client.query("SELECT identity.forget_erased_debate_tree_updates($1)", [runId]);
+        await client.query("SELECT identity.forget_erased_debate_passages($1)", [runId]);
       }
       await client.query("COMMIT");
       return outcome;

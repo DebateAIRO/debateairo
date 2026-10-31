@@ -79,7 +79,6 @@ import {
   RecoveryEmailSettingsSchema, RecoveryEmailRequestSchema, RecoveryEmailRemoveRequestSchema,
   StepUpAuthorizationRequestSchema,
   AuthenticationResponseSchema, PasskeyEnrollmentResponseSchema, BeginTotpEnrollmentRequestSchema, CompleteTotpEnrollmentRequestSchema, TotpEnrollmentOptionsResponseSchema, TotpEnrollmentResponseSchema, LoginContinuationResponseSchema,
-  UnpublishDebateRequestSchema,
   type Answer,
   type AnswerIndex,
   type ArgumentLanguage,
@@ -1535,7 +1534,6 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "GET /v1/runs/{id}/events", auth: "user", resource: "run-owner", action: "read-events" },
   { route: "GET /v1/runs/{id}/answer", auth: "user", resource: "run-owner", action: "read-run-answer" },
   { route: "POST /v1/runs/{id}/publish", auth: "user", resource: "run-owner", action: "publish" },
-  { route: "POST /v1/runs/{id}/unpublish", auth: "user", resource: "run-owner", action: "unpublish" },
   { route: "POST /v1/runs/{id}/publication-review", auth: "user", resource: "run-owner", action: "request-review" },
   { route: "GET /v1/runs/{id}/publication-review", auth: "user", resource: "run-owner", action: "read-review" },
   // V4 account memory (N7, N11, migration 0131): a debate's last visit and its dig links, owner-scoped in the database.
@@ -4571,49 +4569,6 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         });
       }
       return reply.status(201).send(PublicationTransitionSchema.parse(published));
-    }
-  );
-  api.post<{ Params: { id: string } }>(
-    "/v1/runs/:id/unpublish",
-    credentialRoutePolicy("POST /v1/runs/{id}/unpublish"),
-    async (request, reply) => {
-      const parsedRunId = ResourceIdSchema.safeParse(request.params.id);
-      const runId = parsedRunId.success ? await resolvedRunId(options, parsedRunId.data) : null;
-      const authenticated = request.authenticatedSession;
-      if (runId === null || authenticated === undefined) {
-        return reply.status(404).send({ error: "RUN_NOT_FOUND" });
-      }
-      const input = parseRequest(UnpublishDebateRequestSchema, request.body);
-      if (options.publications === undefined) {
-        return reply.status(503).send({ error: "PUBLICATION_UNAVAILABLE" });
-      }
-      if (!await options.publications.preflightGrant({
-        runId,
-        authenticated,
-        grantToken: input.step_up_grant,
-        action: "UNPUBLISH"
-      })) {
-        await options.publications.auditPreflightDenial({
-          authenticated,
-          requestId: request.id
-        });
-        return reply.status(404).send({ error: "RUN_NOT_FOUND" });
-      }
-      const owned = await options.application.readRun(
-        runId,
-        request.session,
-        ownershipFor(request)
-      );
-      if (owned === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
-      const unpublished = await options.publications.unpublish({
-        runId,
-        authenticated,
-        grantToken: input.step_up_grant,
-        source: sourceFor(request)
-      });
-      return unpublished === null
-        ? reply.status(404).send({ error: "RUN_NOT_FOUND" })
-        : reply.send(PublicationTransitionSchema.parse(unpublished));
     }
   );
   const publicationReviewOwner = options.publicationReviews === undefined ? null : createPublicationReviewOwnerRoutes({

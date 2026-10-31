@@ -28,8 +28,11 @@ import { STORY_RUNAWAY_LIMITS, StoryFateSchema } from "./story.js";
 export const WEB_CONTRACT_LIMITS = Object.freeze({
   /** Owner rule: every quote shown to people is at most 120 characters. */
   quoteMaxChars: 120,
-  /** Runaway guards (about 5-10 times what the AIs are asked for), as STORY_RUNAWAY_LIMITS are. */
-  explanationMaxChars: 600,
+  /**
+   * Runaway guards (about 5-10 times what the AIs are asked for), as STORY_RUNAWAY_LIMITS are. The explanation is reader 1's page note:
+   * up to three sentences since decision 8 of 31 Oct ("what it is, what it found, and what it leaves out").
+   */
+  explanationMaxChars: 2500,
   reasonMaxChars: 1000,
   titleMaxChars: 500,
   siteMaxChars: 253,
@@ -46,7 +49,13 @@ export const WEB_CONTRACT_LIMITS = Object.freeze({
   /** Owner answer Q19: on Free, a dig combines at most 3 picks (the same cap as Free's 3 choices). */
   freeDigPicksMax: 3,
   investigationDigsMax: ACCOUNT_MEMORY_LIMITS.digChildrenMax,
-  reportVersionsMax: 100
+  reportVersionsMax: 100,
+  /** A debate's place, time and purpose lines (decision 5): each one line, the person's own words or a catalogue sentence. */
+  purposeLineMaxChars: 500,
+  /** The main answer's automatic versions served with it, newest last (decision 3). */
+  mainAnswerVersionsMax: 200,
+  /** A public debate's listed contributions (decision 13). */
+  publicContributionsMax: 500
 });
 
 /** Owner answer Q19: Free's cap on the picks one dig combines (WEB_CONTRACT_LIMITS.freeDigPicksMax). */
@@ -89,7 +98,7 @@ export const WEB_READ_DEPTHS = ["WHOLE", "PREVIEW_ONLY", "ABSTRACT_ONLY"] as con
 export const WebReadDepthSchema = z.enum(WEB_READ_DEPTHS);
 export type WebReadDepth = z.infer<typeof WebReadDepthSchema>;
 
-/** Reader 1's one line about a page (what it is about and why it matters), in the site's language at the time (Q8). */
+/** Reader 1's note on a page (what it is, what it found and what it leaves out), in the site's language at the time (Q8). */
 export const WebExplanationSchema = z.object({
   text: z.string().trim().min(1).max(WEB_CONTRACT_LIMITS.explanationMaxChars),
   language: CatalogLocaleCodeSchema
@@ -482,7 +491,14 @@ const RewriteBase = {
   rewrite_id: WebRefSchema,
   dig_run_id: z.uuid(),
   dig_level: DugLevelSchema,
-  dig_finished_at: z.iso.datetime()
+  dig_finished_at: z.iso.datetime(),
+  /**
+   * Decision 2 of 31 Oct: DIG, a dig of this path; CHILD_PATH, a path below really changed, so this one was rewritten too (paid by the
+   * person who dug). Absent: a rewrite from before the tree climbed, always a dig's. The contributor names a public debate's digger
+   * (`contributor` null: "a contributor", the name went).
+   */
+  cause: z.enum(["DIG", "CHILD_PATH"]).optional(),
+  contributor: z.string().trim().min(1).nullable().optional()
 };
 
 /** A finished rewrite: the new text, what the dig changed, the fate it had before, the verdict (or none), the dig's paths. */
@@ -695,3 +711,104 @@ export const RunContinueRefusedSchema = z.object({
   until: z.iso.datetime()
 }).strict();
 export type RunContinueRefused = z.infer<typeof RunContinueRefusedSchema>;
+
+// ---------------------------------------------------------------------------------------------------------------------
+// The owner's changes of 31 Oct 2026 (plan 2026-10-31-r22-owner-changes.md): the shapes the lanes fill. Every member that rides an ask,
+// an answer or a public snapshot is OPTIONAL there, so everything made before reads exactly as before.
+// ---------------------------------------------------------------------------------------------------------------------
+
+const PurposeLineSchema = z.string().trim().min(1).max(WEB_CONTRACT_LIMITS.purposeLineMaxChars);
+
+/**
+ * Decision 5: a debate's place, time and purpose lines, each one line, at least one. On the ask they are structured, whatever the page's
+ * language (the sentences appended to `question_line` go only with an English page, ASK-1). Stored encrypted, written at the ask, passed to
+ * every rewrite, answer update and report. An old debate has none.
+ */
+export const PurposeLinesSchema = z.object({
+  place: PurposeLineSchema.optional(),
+  time: PurposeLineSchema.optional(),
+  purpose: PurposeLineSchema.optional()
+}).strict().refine((lines) => lines.place !== undefined || lines.time !== undefined || lines.purpose !== undefined,
+  { message: "at least one line" });
+export type PurposeLines = z.infer<typeof PurposeLinesSchema>;
+
+/** Decision 3: what made the main answer change: a first-debate path a dig rewrote, or one a deeper dig's change climbed to. */
+export const MAIN_ANSWER_TRIGGERS = ["PATH_REWRITE", "CHILD_PATH"] as const;
+const MainAnswerSegmentSchema = z.object({ text: z.string().trim().min(1).max(12_000) }).strict();
+
+/** One automatic version of the main answer. Never a score, a price or who paid. */
+export const MainAnswerVersionSchema = z.object({
+  version: z.number().int().positive(),
+  updated_at: z.iso.datetime(),
+  trigger: z.enum(MAIN_ANSWER_TRIGGERS),
+  /** The path whose change made it. */
+  position_ref: PositionRefSchema,
+  segments: z.array(MainAnswerSegmentSchema).min(1).max(2),
+  /** The check left a reservation, as on a rewrite. */
+  with_reservation: z.literal(true).optional()
+}).strict();
+export type MainAnswerVersion = z.infer<typeof MainAnswerVersionSchema>;
+
+/**
+ * `Answer.main_answer`: the main answer as it stands now and its history, newest last. `current` is the newest version, or null while no
+ * path has changed it (the first answer stands). `writing` (only ever true): a change is being written into it.
+ */
+export const AnswerMainAnswerSchema = z.object({
+  current: MainAnswerVersionSchema.nullable(),
+  history: z.array(MainAnswerVersionSchema).max(WEB_CONTRACT_LIMITS.mainAnswerVersionsMax),
+  writing: z.literal(true).optional()
+}).strict().superRefine((answer, context) => {
+  const versions = answer.history.map((entry) => entry.version);
+  if (versions.some((version, at) => at > 0 && version <= versions[at - 1]!)) {
+    context.addIssue({ code: "custom", message: "the history goes oldest first" });
+  }
+  if ((answer.current?.version ?? null) !== (versions.at(-1) ?? null)) {
+    context.addIssue({ code: "custom", message: "the current version is the newest of the history, or null when none" });
+  }
+});
+export type AnswerMainAnswer = z.infer<typeof AnswerMainAnswerSchema>;
+
+/**
+ * Decision 13: a dig on a public debate, named by the page it was started from: `public_ref` is all a stranger knows of the debate (never
+ * its run id), `dig_ref` the contribution they dig under (a public update's id; absent: the first debate).
+ */
+export const PublicDigParentSchema = z.object({
+  public_ref: z.uuid(),
+  dig_ref: z.uuid().optional(),
+  places: z.array(DigLinkPlaceSchema).max(ACCOUNT_MEMORY_LIMITS.digPlacesMax),
+  mode: DigLinkModeSchema,
+  picks: z.array(DigPickSchema).min(1).max(WEB_CONTRACT_LIMITS.digPicksMax).optional()
+}).strict();
+export type PublicDigParent = z.infer<typeof PublicDigParentSchema>;
+
+/**
+ * `Answer.contribution`, on a dig made on a public debate, for the digger: CHECKING (the AI check on it is running), ON_THE_PAGE (it changed
+ * the public page) or KEPT_PRIVATE (the check refused it or could not run: the dig stays theirs, and the page is unchanged).
+ */
+export const AnswerContributionSchema = z.object({
+  public_ref: z.uuid(),
+  state: z.enum(["CHECKING", "ON_THE_PAGE", "KEPT_PRIVATE"])
+}).strict();
+export type AnswerContribution = z.infer<typeof AnswerContributionSchema>;
+
+/**
+ * A contribution as the public page shows it, on its path, with the date. `contributor` is a pseudonym, or null once the name went (the page
+ * says "a contributor"). Every string the public sees is in the HS-S02 lists (apps/api/src/publication-check/material.ts).
+ */
+export const PublicContributionSchema = z.object({
+  position_ref: PositionRefSchema,
+  contributor: z.string().trim().min(1).nullable(),
+  contributed_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
+  line: z.string().trim().min(1).max(STORY_RUNAWAY_LIMITS.positionLineMaxChars),
+  summary: z.string().trim().min(1).max(DIG_MODEL_LIMITS.summaryMaxChars),
+  fate: StoryFateSchema,
+  what_changed: z.array(z.string().trim().min(1).max(WEB_CONTRACT_LIMITS.reasonMaxChars)).max(DIG_MODEL_LIMITS.whatChangedSentencesMax)
+}).strict();
+export type PublicContribution = z.infer<typeof PublicContributionSchema>;
+
+/** The public page's main answer once a contribution changed it (the first snapshot stays sealed as it was). */
+export const PublicMainAnswerSchema = z.object({
+  updated_at: z.iso.datetime(),
+  segments: z.array(MainAnswerSegmentSchema).min(1).max(2)
+}).strict();
+export type PublicMainAnswer = z.infer<typeof PublicMainAnswerSchema>;

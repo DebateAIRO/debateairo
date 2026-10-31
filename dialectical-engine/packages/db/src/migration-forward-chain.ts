@@ -28,6 +28,10 @@ import { loadForward0133 } from './migration-forward0133.js';
 import { loadForward0134 } from './migration-forward0134.js';
 import { loadForward0135 } from './migration-forward0135.js';
 import { loadForward0136 } from './migration-forward0136.js';
+import { loadForward0137 } from './migration-forward0137.js';
+import { loadForward0138 } from './migration-forward0138.js';
+import { loadForward0139 } from './migration-forward0139.js';
+import { loadForward0140 } from './migration-forward0140.js';
 
 /**
  * The forward steps after dev's sealed lineage, its 0108 and its 0110 (PR-54, PR-58, migrations/lineage/README.md): an
@@ -85,10 +89,11 @@ export type ChainStep=ForwardStepPlan&Readonly<{n1:N1Declaration}>;
  * (0129, S05), then row-level security (0130, mission row-level-security S01), then the V4 account memory (0131, owner
  * rulings N7 and N11), then the web evidence store (0132) and investigations (0133) of the Perplexity plan (2026-10-30,
  * task W1-3), then the new dig model and the month pause (0134, dig-model revision task W2-8), then a dig's picks and its
- * path rewrite's material (0135, task W3-7), then the final report over an investigation (0136, task W5-1). A new step
+ * path rewrite's material (0135, task W3-7), then the final report over an investigation (0136, task W5-1), then the owner's changes of
+ * 31 Oct: public debates (0137), tree updates (0138), passage retention (0139) and the drained spend kinds (0140). A new step
  * appends its loader here (README).
  */
-const STEPS:readonly StepLoader[]=Object.freeze([loadForward111,loadForwardAuthDbBatch,loadForward0113,loadForward0114,loadForward115,loadForward0116,loadForward0117,loadForward0118,loadForward0119,loadForward0120,loadForward0121,loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130,loadForward0131,loadForward0132,loadForward0133,loadForward0134,loadForward0135,loadForward0136]);
+const STEPS:readonly StepLoader[]=Object.freeze([loadForward111,loadForwardAuthDbBatch,loadForward0113,loadForward0114,loadForward115,loadForward0116,loadForward0117,loadForward0118,loadForward0119,loadForward0120,loadForward0121,loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130,loadForward0131,loadForward0132,loadForward0133,loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140]);
 
 /** A forward step's file name; the receipt and declaration tables CHECK the same shape. */
 export const FORWARD_STEP_NAME=/^\d{4}_[a-z0-9_]+\.sql$/;

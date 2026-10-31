@@ -446,7 +446,6 @@ export interface ContractClient {
   readPublicDebate(publicationRef: string): Promise<PublicDebate>;
   readRunVisibility(runId: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
   publishRun(runId: string, stepUpGrant: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
-  unpublishRun(runId: string, stepUpGrant: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
   requestPublicationReview(runId: string, stepUpGrant: string): Promise<{ state: "UNDER_REVIEW" }>;
   readPublicationReview(runId: string): Promise<PublicationReviewState>;
   scheduleAccountErasure(stepUpGrant:string,deletePublicDebates?:boolean):Promise<{
@@ -788,14 +787,6 @@ export function createContractClient(
       { method: "POST", body: JSON.stringify({
           step_up_grant: stepUpGrant,
           warning_acknowledged: true
-        }) }
-    ),
-    unpublishRun: (runId: string, stepUpGrant: string) => request(
-      `/v1/runs/${encodeURIComponent(runId)}/unpublish`,
-      PublicationTransitionSchema,
-      { method: "POST", body: JSON.stringify({
-          step_up_grant: stepUpGrant,
-          copies_may_persist_acknowledged: true
         }) }
     ),
     requestPublicationReview: (runId: string, stepUpGrant: string) => request(

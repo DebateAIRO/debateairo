@@ -12,6 +12,9 @@ import type { AuthSourceContext } from "./identity.js";
 import {
   FORGET_ERASED_DEBATE_DIG_MODEL,
   FORGET_ERASED_DEBATE_DIG_PICKS,
+  FORGET_ERASED_DEBATE_PUBLIC,
+  FORGET_ERASED_DEBATE_TREE_UPDATES,
+  FORGET_ERASED_DEBATE_PASSAGES,
   FORGET_ERASED_DEBATE_INVESTIGATION,
   FORGET_ERASED_DEBATE_PAGE_MEMORY,
   FORGET_ERASED_DEBATE_WEB_EVIDENCE,
@@ -57,7 +60,11 @@ const ERASURE_FUNCTION_SIGNATURES = Object.freeze([
   // 0134 §9: its month pauses and path rewrites.
   FORGET_ERASED_DEBATE_DIG_MODEL,
   // 0135 §6: its dig picks and its path rewrite's material.
-  FORGET_ERASED_DEBATE_DIG_PICKS
+  FORGET_ERASED_DEBATE_DIG_PICKS,
+  // The owner's changes of 31 Oct (0137 to 0139).
+  FORGET_ERASED_DEBATE_PUBLIC,
+  FORGET_ERASED_DEBATE_TREE_UPDATES,
+  FORGET_ERASED_DEBATE_PASSAGES
 ] as const);
 const ERASURE_FORBIDDEN_ROLES = Object.freeze([
   "public","debateai_runtime","debateai_authorization_runtime",

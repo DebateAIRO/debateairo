@@ -90,7 +90,20 @@ export type ModelSpendSource =
    * checks, written after the person closed the investigation. It names the investigation's ROOT run, counts in the
    * person's windows like RUN and STORY, and is never walled: it is paid from the reserve the money rule always keeps.
    */
-  | "INVESTIGATION_REPORT";
+  | "INVESTIGATION_REPORT"
+  /**
+   * The owner's changes of 31 Oct (0137): a rewrite of a path above the first (the tree climbs while a level really changed), the main
+   * answer's automatic version and the AI check on a contribution each name the DIG that caused them, count in the person's windows
+   * like PATH_REWRITE, and are never walled: the person who dug pays. No seam charges them yet: the Tree and Public lanes add theirs.
+   */
+  | "PATH_CLIMB"
+  | "ANSWER_UPDATE"
+  | "CONTRIBUTION_CHECK"
+  /**
+   * A report on a public debate written by someone other than its owner (0137): it names the ROOT's run, whose scope is its owner's, so
+   * it is never counted through that scope; its payer is identity.public_report_charge's, whose reader their window adds.
+   */
+  | "PUBLIC_REPORT";
 
 /**
  * W5-1: the report seam's safety net per closing, the largest plan's reserve (20 cents; packages/register
@@ -1383,8 +1396,7 @@ export class PostgresModelSpendStore implements ModelSpendStore {
    * subscription spend in [$2, $3): the RUN, STORY and PATH_REWRITE charges of the runs `billing.run_charge_scope` pins to
    * owner $1 on a subscription, admitted before $3, a premium run removed by its synthesis check excepted, no waiver
    * (side-by-side C10). `readOwnerSpentMicros` and the money rule's two batch readers below share it. 0123's
-   * `billing.read_internal_grant_spent` (the internal branch) still counts RUN and STORY only: it learns PATH_REWRITE
-   * only through a later drained database step.
+   * `billing.read_internal_grant_spent` (the internal branch) counts the same kinds since the drained step 0140.
    */
   static readonly #ownerSpendFrom = `FROM billing.run_charge_scope AS scope
        JOIN ledger.model_spend AS spend ON spend.run_id = scope.run_id
@@ -1398,7 +1410,7 @@ export class PostgresModelSpendStore implements ModelSpendStore {
              ) THEN serve.run_removed_by_synthesis_check(run.run_id) ELSE false END
          )
          AND scope.admitted_at < $3
-         AND spend.spend_source IN ('RUN','STORY','PATH_REWRITE','INVESTIGATION_REPORT')
+         AND spend.spend_source IN ('RUN','STORY','PATH_REWRITE','INVESTIGATION_REPORT','PATH_CLIMB','ANSWER_UPDATE','CONTRIBUTION_CHECK')
          AND spend.recorded_at >= $2 AND spend.recorded_at < $3
          AND NOT EXISTS (SELECT 1 FROM ledger.model_spend_waiver AS waiver WHERE waiver.run_id = spend.run_id)`;
 

@@ -187,7 +187,11 @@ describe('the general preview guard on each complete 0108 lineage (PR-59)',()=>{
     '0133_investigations.sql',
     '0134_dig_model_and_month_pause.sql',
     '0135_dig_picks.sql',
-    '0136_investigation_reports.sql'
+    '0136_investigation_reports.sql',
+    '0137_public_debates.sql',
+    '0138_tree_updates.sql',
+    '0139_passage_retention.sql',
+    '0140_internal_spend_kinds.sql'
    ]);
    const ledger=async(client:{query:pg.Pool['query']}=db.pool)=>(await client.query('SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name')).rows;
    const resolutionTable=async()=>(await db.pool.query("SELECT to_regclass('public.debateai_schema_migration_resolution') IS NOT NULL present")).rows[0].present as boolean;

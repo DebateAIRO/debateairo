@@ -135,7 +135,7 @@ export interface SessionApplication {
     code: string;
     authorization?:
       | Readonly<{
-        action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
+        action: "PUBLISH" | "DELETE_PRIVATE_DEBATE";
         targetRunId: string;
       }>
       | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "WITHDRAW_SUBSCRIPTION" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" | "ADD_TOTP" | "REGENERATE_RECOVERY_CODES" | "EXPORT_DATA" }>
@@ -690,7 +690,7 @@ export class SessionService implements SessionApplication {
     code: string;
     authorization?:
       | Readonly<{
-        action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
+        action: "PUBLISH" | "DELETE_PRIVATE_DEBATE";
         targetRunId: string;
       }>
       | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "WITHDRAW_SUBSCRIPTION" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" | "ADD_TOTP" | "REGENERATE_RECOVERY_CODES" | "EXPORT_DATA" }>

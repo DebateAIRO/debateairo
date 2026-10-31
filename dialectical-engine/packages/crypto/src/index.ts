@@ -2436,7 +2436,15 @@ export const CONTENT_CARRIERS = Object.freeze([
   "identity.path_rewrite_input",
   // The final report over an investigation (migration 0136): the report's text, sealed under the investigation's ROOT
   // run key and bound to the report id (erasing the root erases its investigation, its closings and their reports).
-  "identity.investigation_report"
+  "identity.investigation_report",
+  // The owner's changes of 31 Oct: a climb's or a public dig's path rewrite (0138), sealed under the DIG that caused it; the main
+  // answer's automatic versions under the ROOT's key; a debate's place, time and purpose lines under its own key.
+  "identity.path_update",
+  "identity.main_answer_update",
+  "identity.run_purpose_lines",
+  // 0139: the quote people see, kept apart from the passage, and a reader's saved reply in its transient store, under the run's key.
+  "identity.web_shown_quote",
+  "identity.web_reply_text"
 ] as const);
 
 export type ContentCarrier = typeof CONTENT_CARRIERS[number];

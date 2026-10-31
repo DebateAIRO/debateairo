@@ -63,7 +63,7 @@ describe("S10 rendered erasure boundaries",()=>{
             step_up_grant:{ token:"g".repeat(43),action:"DELETE_PRIVATE_DEBATE" as const,
               target_run_id:RUN_ID,expires_at:new Date(Date.now()+300000).toISOString() }
           })),
-          publishRun:vi.fn(),unpublishRun:vi.fn(),
+          publishRun:vi.fn(),
           deletePrivateDebate:vi.fn(async ()=>({ status:outcome }))
         };
         function Page(){
@@ -100,7 +100,7 @@ describe("S10 rendered erasure boundaries",()=>{
           step_up_grant:{ token:"g".repeat(43),action:"DELETE_PRIVATE_DEBATE" as const,
             target_run_id:RUN_ID,expires_at:new Date(Date.now()+300000).toISOString() }
         })),
-        publishRun:vi.fn(),unpublishRun:vi.fn(),
+        publishRun:vi.fn(),
         deletePrivateDebate:vi.fn(async ()=>{ throw new Error("DENIED"); })
       };
       function Page(){

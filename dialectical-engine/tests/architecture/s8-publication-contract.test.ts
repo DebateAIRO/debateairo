@@ -117,7 +117,7 @@ describe("Accounts S8 publication architecture", () => {
     expect(databaseSessions).toContain("grantTokenHash");
     expect(api).toContain("PublishDebateRequestSchema");
     expect(api).toContain("step_up_grant");
-    expect(api.match(/auditPreflightDenial\(/g)).toHaveLength(3);
+    expect(api.match(/auditPreflightDenial\(/g)).toHaveLength(2);
     expect(contract).toContain("warning_acknowledged");
     expect(contract).toContain("z.literal(true)");
   });
@@ -161,7 +161,7 @@ describe("Accounts S8 publication architecture", () => {
     // and the also-raised claims, never a maker, a count, a mark or a map id.
     expect(schema).toContain("map_view: DebateMapViewSchema.optional()");
     expect([...schema.matchAll(/^  ([a-z_]+):/gmu)].map((match) => match[1]))
-      .toEqual(["public_ref", "author_pseudonym", "question", "published_at", "answer", "story_short", "language", "floor", "map_view"]);
+      .toEqual(["public_ref", "author_pseudonym", "question", "published_at", "answer", "story_short", "language", "floor", "map_view", "contributions", "main_answer_update"]);
     const floorStart = disclosure.indexOf("export const AnswerFloorSchema");
     const floorEnd = disclosure.indexOf("export type AnswerFloor =");
     expect(floorStart).toBeGreaterThan(-1);
@@ -240,18 +240,13 @@ describe("Accounts S8 publication architecture", () => {
       expect(control).toContain("<SecurityConfirmation");
     expect(control).toContain("authorization={{action,target_run_id:runId}}");
       expect(control).toContain("publishRun(runId, grant.token)");
-      expect(control).toContain("unpublishRun(runId, grant.token)");
+      expect(control).not.toContain("unpublishRun");
       expect(control).toContain('type="checkbox"');
       expect(control).toContain('t(catalog, "public.publication.publishWarning")');
       expect(englishPublicCatalog["public.publication.publishWarning"]).toBe(
         "Publishing makes this debate readable by anyone and may allow search engines to index it. " +
         "It leaves your private deletion envelope, and public copies may persist even if you later " +
         "unpublish or delete your account."
-      );
-      expect(control).toContain('t(catalog, "public.publication.unpublishWarning")');
-      expect(englishPublicCatalog["public.publication.unpublishWarning"]).toBe(
-        "Unpublishing stops future anonymous reads from Dialectical Engine, but copies already downloaded, " +
-        "quoted, cached, or indexed may persist."
       );
     }
     // The home surface fetches the published list and states the indexing

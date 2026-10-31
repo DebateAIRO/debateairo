@@ -2886,6 +2886,128 @@
       "grants": [
         "EXECUTE ON FUNCTION identity.read_data_export_investigation_reports(uuid,uuid)"
       ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0137_public_debates.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.join_public_investigation(uuid,uuid,uuid,text[],text,text)",
+        "EXECUTE ON FUNCTION identity.record_public_dig_picks(uuid,uuid,jsonb)",
+        "EXECUTE ON FUNCTION identity.read_own_public_contributions(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.record_free_public_ask(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0137_public_debates.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_public_contribution_of_run(uuid)",
+        "EXECUTE ON FUNCTION identity.settle_public_contribution(uuid,text,uuid)",
+        "EXECUTE ON FUNCTION identity.record_public_debate_update(uuid,uuid,text,text,uuid,jsonb)",
+        "EXECUTE ON FUNCTION identity.read_public_debate_updates(uuid)",
+        "EXECUTE ON FUNCTION identity.public_author_name_gone(uuid)",
+        "EXECUTE ON FUNCTION identity.read_free_debates_to_publish(integer)",
+        "EXECUTE ON FUNCTION core.prepare_free_publication(uuid,uuid)",
+        "EXECUTE ON FUNCTION core.publish_free_debate(uuid,uuid,text,jsonb,timestamptz)",
+        "EXECUTE ON FUNCTION identity.refuse_free_publication(uuid)",
+        "EXECUTE ON FUNCTION identity.record_public_report_charge(uuid,uuid,uuid,integer,bigint)",
+        "EXECUTE ON FUNCTION identity.read_public_report_spent(uuid,timestamptz,timestamptz)"
+      ]
+    },
+    {
+      "roleName": "debateai_erasure_runtime",
+      "source": "migrations/0137_public_debates.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.forget_erased_debate_public(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0137_public_debates.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_public_debates(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0138_tree_updates.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.take_path_update_turn(uuid,uuid,uuid,text,text,smallint,text,uuid)",
+        "EXECUTE ON FUNCTION identity.read_path_update_turn(uuid)",
+        "EXECUTE ON FUNCTION identity.record_path_update(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.record_path_rewrite_in_line(text,uuid,uuid,uuid,integer,uuid,text,text,text,text,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_path_line_of_run(uuid)",
+        "EXECUTE ON FUNCTION identity.read_path_climb_next(uuid)",
+        "EXECUTE ON FUNCTION identity.record_main_answer_update(uuid,uuid,uuid,text,uuid,uuid,uuid,text,text,jsonb,jsonb,smallint,jsonb,bigint,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_main_answer_updates_of_run(uuid)",
+        "EXECUTE ON FUNCTION identity.read_run_purpose_lines_of_run(uuid)",
+        "EXECUTE ON FUNCTION identity.reopen_public_investigation(uuid,integer)"
+      ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0138_tree_updates.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.record_run_purpose_lines(uuid,uuid,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_path_line(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.read_main_answer_updates(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.read_run_purpose_lines(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.close_public_investigation(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_erasure_runtime",
+      "source": "migrations/0138_tree_updates.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.forget_erased_debate_tree_updates(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0138_tree_updates.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_tree_updates(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0139_passage_retention.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.record_web_shown_quote(uuid,uuid,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_web_shown_quotes(uuid)",
+        "EXECUTE ON FUNCTION identity.record_web_reply_text(uuid,uuid,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_web_reply_texts(uuid,uuid[])",
+        "EXECUTE ON FUNCTION identity.wipe_debate_passages(uuid,text)",
+        "EXECUTE ON FUNCTION identity.read_debates_holding_passages(integer)"
+      ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0139_passage_retention.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.close_investigation_keeping_texts(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_erasure_runtime",
+      "source": "migrations/0139_passage_retention.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.forget_erased_debate_passages(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0139_passage_retention.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_passage_retention(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0140_internal_spend_kinds.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION staff.read_team_internal_spent(timestamptz,timestamptz)"
+      ]
     }
   ],
   "deploymentObligations": [

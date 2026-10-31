@@ -211,7 +211,7 @@ export default async function HomePage({
             <div className="libList recentList">
               <SynthesisHoldRefresher active={debates.some((debate) => debate.synthesis_check === "CHECKING")} />
               <DebatesBuffer debates={debates} catalog={catalog} timeCatalog={timeCatalog} locale={locale}
-                checkingLabel={t(publicCatalog, "public.publication.checkingDebate")} composeCatalog={composeCatalog} publicCatalog={publicCatalog} />
+                checkingLabel={t(publicCatalog, "public.publication.checkingDebate")} composeCatalog={composeCatalog} />
             </div>
           ) : (
             <p className="tabEmptyHint">{t(catalog, "home.signInHint")}</p>
