@@ -1,0 +1,366 @@
+/* V4 initial (2026-10-28): map pieces (B4b): the trust bar, the map tree (D3), the phone outline (D7) and the panel
+   (D3 right side, D8 point marks). Site tokens and the V4 tokens from v4-base.css only. */
+
+/* ---------- the four-shade bar (row D decision 2) ---------- */
+.v4Bar { display: flex; flex-direction: column; gap: 6px; min-width: 0; width: 100%; }
+.v4BarTrack { display: flex; gap: 2px; width: 100%; height: 6px; }
+.v4BarLarge .v4BarTrack { height: 10px; }
+.v4BarEmpty { border: 1px dashed var(--line-strong); border-radius: 2px; }
+.v4BarSeg { flex-basis: 0; min-width: 6px; border-radius: 1px; }
+.v4BarSure { background: var(--v4-sure); }
+.v4BarCase { background: var(--v4-case); }
+.v4BarArgued { background: repeating-linear-gradient(45deg, var(--v4-argued) 0 3px, var(--v4-argued-soft) 3px 5px); }
+.v4BarFell { background: transparent; box-shadow: inset 0 0 0 1.5px var(--v4-fell); }
+.v4BarCounts { font-size: var(--t-ui); color: var(--text-2); }
+
+/* ---------- shared marks ---------- */
+.v4MapNote { display: inline-flex; align-items: center; gap: 6px; font-size: var(--t-meta); color: var(--text-2); }
+.v4MapStar { color: var(--gold); font-size: 15px; line-height: 1; }
+.v4MapNew { display: inline-flex; align-items: center; gap: 5px; font-size: var(--t-meta); font-weight: 700; color: var(--con-text); }
+.v4MapNewDot { width: 8px; height: 8px; border-radius: var(--r-dot); background: var(--accent); flex: none; }
+.v4MapPulse {
+  display: inline-block; flex: none; width: 9px; height: 9px; border-radius: var(--r-dot); background: var(--accent);
+  animation: v4MapPulse 1.6s ease-in-out infinite;
+}
+@keyframes v4MapPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.7); } }
+@media (prefers-reduced-motion: reduce) { .v4MapPulse { animation: none; } }
+.v4MapFate {
+  display: inline-block; align-self: flex-start; font-size: var(--t-micro); font-weight: 700; letter-spacing: .02em;
+  border-radius: var(--r-pill); padding: 1px 8px; border: 1px solid var(--line-strong); color: var(--text-2);
+  background: var(--surface-2);
+}
+.v4MapFateHELD_UP { color: var(--ok-text); background: var(--ok-bg); border-color: var(--ok-border); }
+.v4MapFatePARTLY_HELD { color: var(--gold-text); background: var(--gold-bg); border-color: var(--gold-border); }
+.v4MapFateFELL { color: var(--con-text); background: var(--con-bg); border-color: var(--con-border); }
+.v4MapRootChip {
+  display: inline-block; align-self: flex-start; font-size: var(--t-meta); font-weight: 700; color: var(--ink);
+  background: var(--gold-bg); border-radius: var(--r-pill); padding: 1px 9px;
+}
+.v4MapEmpty { margin: 0; padding: 12px 0; }
+
+/* ---------- the map tree (D3) ---------- */
+.v4Map { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+/* Wide maps scroll inside their own box, never the page (F §4.2: sideways scroll at about 1,024 px). */
+.v4MapScroll { overflow-x: auto; overflow-y: visible; padding: 4px 4px 10px; -webkit-overflow-scrolling: touch; }
+.v4MapCanvas { min-width: max-content; display: flex; flex-direction: column; gap: 10px; }
+.v4MapHeads {
+  display: grid; grid-template-columns: 196px 228px 236px; column-gap: 32px;
+  font-family: var(--font-mono); font-size: var(--t-micro); letter-spacing: var(--ls-eyebrow); text-transform: uppercase;
+  color: var(--text-3);
+}
+.v4MapBody { display: flex; align-items: flex-start; }
+.v4MapRootCol { width: 196px; flex: none; display: flex; flex-direction: column; position: relative; }
+/* The stub from the question card to the trunk of the paths. */
+.v4MapRootCol::after {
+  content: ""; position: absolute; top: 40px; right: -32px; width: 32px; border-top: 2px solid var(--line-strong);
+}
+.v4MapRootCol:has(+ .v4MapEmpty)::after { display: none; }
+
+.v4MapRoot, .v4MapPath, .v4MapOpenMain, .v4MapDig {
+  display: flex; flex-direction: column; align-items: stretch; gap: 6px; width: 100%; min-height: 44px;
+  text-align: left; cursor: pointer; font: inherit; font-size: var(--t-ui); line-height: 1.35;
+}
+.v4MapRoot {
+  background: var(--ink); color: var(--surface); border: 0; border-radius: var(--r-card); padding: 12px 14px;
+  min-height: 80px;
+}
+.v4MapRoot .v4BarSure { background: var(--surface); }
+/* UI-12: on the dark card the softer-ink and outline segments need 3:1 against --ink in both modes; a surface/ink mix
+   stays apart from Sure (surface) and the --con-border outline keeps Didn't hold in the accent family. */
+.v4MapRoot .v4BarCase { background: color-mix(in srgb, var(--surface) 60%, var(--ink)); }
+.v4MapRoot .v4BarFell { box-shadow: inset 0 0 0 1.5px var(--con-border); }
+.v4MapRoot .v4BarEmpty { border-color: var(--text-3); }
+.v4MapRoot .v4MapNew { color: var(--gold-bg); }
+.v4MapRootTitle {
+  font-size: 16px; line-height: 1.3;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden;
+}
+.v4MapPath {
+  background: var(--surface); color: var(--text); border: 1.5px solid var(--line-strong); border-radius: 12px;
+  padding: 9px 12px; min-height: 80px;
+}
+.v4MapPath:hover, .v4MapOpenMain:hover, .v4MapDig:hover { background: var(--surface-2); }
+.v4MapPathTitle, .v4MapOpenTitle, .v4MapDigTitle {
+  font-weight: 700; color: var(--text);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden;
+}
+.v4MapPathTitle { font-size: 14px; }
+.v4MapSelected.v4MapRoot, .v4MapSelected.v4MapPath, .v4MapSelected.v4MapDig, .v4MapSelected.v4MapOpen {
+  outline: 2.5px solid var(--accent); outline-offset: 3px; box-shadow: 0 0 0 6px var(--focus-halo);
+}
+
+/* Trunk and branches: CSS borders, one vertical line per column and a stub into every card. */
+.v4MapBranches, .v4MapLeaves { list-style: none; margin: 0; padding: 0; }
+.v4MapBranches { margin-left: 32px; display: flex; flex-direction: column; gap: 14px; }
+.v4MapBranch { position: relative; display: flex; align-items: flex-start; gap: 32px; padding-left: 0; }
+.v4MapBranch > .v4MapPath { width: 228px; flex: none; }
+.v4MapBranch::before, .v4MapLeaf::before {
+  content: ""; position: absolute; left: -16px; top: -7px; bottom: -7px; border-left: 2px solid var(--line-strong);
+}
+.v4MapBranch:first-child::before { top: 40px; }
+.v4MapBranch:last-child::before { bottom: auto; height: 47px; }
+.v4MapBranch:first-child:last-child::before { display: none; }
+.v4MapBranch::after {
+  content: ""; position: absolute; left: -16px; top: 40px; width: 16px; border-top: 2px solid var(--line-strong);
+}
+.v4MapBranches > .v4MapBranch:first-child::after { left: -32px; width: 32px; }
+.v4MapBranches > .v4MapBranch:first-child:last-child::after { left: -32px; width: 32px; }
+
+.v4MapLeaves { position: relative; width: 236px; flex: none; display: flex; flex-direction: column; gap: 10px; }
+.v4MapBranch > .v4MapLeaves::before {
+  content: ""; position: absolute; left: -32px; top: 30px; width: 16px; border-top: 2px dashed var(--line-strong);
+}
+.v4MapLeaf { position: relative; }
+.v4MapLeaf::before { border-left-style: dashed; left: -16px; }
+.v4MapLeaf:first-child::before { top: 30px; }
+.v4MapLeaf:last-child::before { bottom: auto; height: 37px; }
+.v4MapLeaf:first-child:last-child::before { display: none; }
+.v4MapLeaf::after {
+  content: ""; position: absolute; left: -16px; top: 30px; width: 16px; border-top: 2px dashed var(--line-strong);
+}
+/* The question's own open questions hang under its card in a short column. */
+.v4MapRootLeaves { padding: 14px 0 0 22px; position: relative; }
+.v4MapRootLeaves:empty { display: none; }
+.v4MapRootLeaves::before {
+  content: ""; position: absolute; left: 10px; top: 0; height: 44px; border-left: 2px dashed var(--line-strong);
+}
+.v4MapRootLeaves .v4MapLeaves { width: 174px; }
+.v4MapRootLeaves .v4MapLeaf::before, .v4MapRootLeaves .v4MapLeaf::after { left: -12px; }
+.v4MapRootLeaves .v4MapLeaf::after { width: 12px; }
+
+.v4MapOpen {
+  display: flex; align-items: stretch; background: var(--gold-bg); border: 1.5px dashed var(--gold-border);
+  border-radius: 12px;
+}
+.v4MapPicked { border-style: solid; border-color: var(--gold); }
+.v4MapOpenMain {
+  flex-direction: row; align-items: flex-start; gap: 8px; background: transparent; border: 0; border-radius: 12px;
+  padding: 8px 4px 8px 12px; color: var(--text); min-width: 0; flex: 1;
+}
+.v4MapOpenBody { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.v4MapPick, .v4OutPick, .v4PanelPick {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px;
+  cursor: pointer;
+}
+.v4MapPick input, .v4OutPick input, .v4PanelPick input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.v4MapMore {
+  font: inherit; font-size: var(--t-meta); font-weight: 600; color: var(--text-2); background: var(--surface);
+  border: 1px dashed var(--line-strong); border-radius: var(--r-pill); padding: 0 14px; min-height: 44px; cursor: pointer;
+}
+.v4MapDig {
+  background: var(--surface); color: var(--text); border: 1.5px solid var(--accent); border-radius: 12px; padding: 8px 12px;
+}
+.v4MapDigFAILED { border-color: var(--line-strong); border-style: dashed; }
+.v4MapDigHeadline {
+  font-size: var(--t-meta); color: var(--text-2);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden;
+}
+
+.v4MapLegend {
+  list-style: none; margin: 0; padding: 0 4px; display: flex; flex-wrap: wrap; gap: 6px 16px;
+  font-size: var(--t-meta); color: var(--text-2);
+}
+.v4MapLegend li { display: inline-flex; align-items: center; gap: 6px; }
+.v4MapKey { display: inline-block; width: 18px; height: 8px; border-radius: 1px; }
+.v4MapKeyOpen { background: var(--gold-bg); border: 1.5px dashed var(--gold-border); height: 12px; border-radius: 3px; }
+
+/* ---------- the phone outline (D7) ---------- */
+.v4Out { min-width: 0; }
+.v4OutTree, .v4OutGroup { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.v4OutGroup { margin: 6px 0 0 12px; padding-left: 10px; border-left: 2px solid var(--line-strong); }
+.v4OutLeaves { border-left-style: dashed; }
+.v4OutRow { display: flex; flex-direction: column; gap: 0; min-width: 0; }
+.v4OutRoot, .v4OutPath, .v4OutMain {
+  display: flex; flex-direction: column; align-items: stretch; gap: 6px; width: 100%; min-height: 44px; text-align: left;
+  cursor: pointer; font: inherit; font-size: var(--t-ui); line-height: 1.35; border-radius: 12px; min-width: 0;
+}
+.v4OutRoot { background: var(--ink); color: var(--surface); border: 0; padding: 12px 14px; }
+.v4OutRoot .v4MapNew { color: var(--gold-bg); }
+.v4OutRootTitle { font-size: 15.5px; overflow-wrap: anywhere; }
+.v4OutPath { background: var(--surface); color: var(--text); border: 1.5px solid var(--line-strong); padding: 10px 12px; }
+.v4OutTitle { font-weight: 700; overflow-wrap: anywhere; }
+.v4OutMeta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.v4OutHere { font-size: var(--t-meta); font-weight: 600; color: var(--con-text); }
+.v4OutOpen { flex-direction: row; align-items: stretch; background: var(--gold-bg); border: 1.5px dashed var(--gold-border); border-radius: 12px; }
+.v4OutOpen .v4OutMain { background: transparent; border: 0; padding: 8px 12px 8px 0; color: var(--text); flex: 1; }
+.v4OutDig .v4OutMain { background: var(--surface); color: var(--text); border: 1.5px solid var(--accent); padding: 8px 12px; }
+.v4OutSelected.v4OutRoot, .v4OutSelected.v4OutPath { outline: 2.5px solid var(--accent); outline-offset: 2px; }
+.v4OutSelected.v4OutOpen, .v4OutSelected.v4OutDig .v4OutMain { border-color: var(--accent); border-style: solid; }
+
+/* ---------- the panel (D3 right side) ---------- */
+.v4Panel { display: flex; flex-direction: column; gap: 16px; min-width: 0; overflow-wrap: anywhere; }
+.v4PanelCrumbs ol { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; font-size: var(--t-ui); }
+.v4PanelCrumbs li { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.v4PanelCrumbs li + li::before { content: "›"; color: var(--text-3); }
+.v4PanelCrumbs .v4Link { font-weight: 600; min-height: 44px; text-decoration: none; }
+.v4PanelCrumbs [aria-current] { color: var(--text-2); }
+.v4PanelH2 { margin: 0; font-size: 19px; line-height: 1.3; font-weight: 700; }
+.v4Panel-root .v4PanelH2 { font-family: var(--font-display); font-weight: var(--fw-display); font-size: 21px; }
+.v4PanelH2:focus { outline: none; }
+.v4PanelH2:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.v4PanelSection { display: flex; flex-direction: column; gap: 8px; }
+.v4PanelH3 {
+  margin: 0; font-family: var(--font-mono); font-size: var(--t-micro); letter-spacing: .14em; text-transform: uppercase;
+  color: var(--con-text); font-weight: 500;
+}
+.v4PanelText { margin: 0; }
+.v4PanelHeadline { margin: 0 0 6px; font-size: 18px; line-height: 1.35; }
+.v4PanelFallback { display: flex; flex-direction: column; gap: 8px; }
+/* "What we asked the AIs": the full question as sent, with the lines added from the person's choices. */
+.v4PanelSent, .v4PanelFirstAnswer { border: 1px solid var(--line-2); border-radius: var(--r-card); background: var(--surface); }
+.v4PanelSent > summary, .v4PanelFirstAnswer > summary {
+  cursor: pointer; font-size: var(--t-ui); font-weight: 600; color: var(--text-2); padding: 10px 14px; min-height: 44px;
+  display: flex; align-items: center;
+}
+.v4PanelSent > summary::-webkit-details-marker, .v4PanelFirstAnswer > summary::-webkit-details-marker { display: none; }
+.v4PanelSent > summary::before, .v4PanelFirstAnswer > summary::before { content: "▸"; margin-right: 8px; color: var(--text-3); }
+.v4PanelSent[open] > summary::before, .v4PanelFirstAnswer[open] > summary::before { content: "▾"; }
+/* R22 W5-1 (owner Q-D11): under the report's answer, the first debate's answer, one click away. */
+.v4PanelFirstAnswerBody { display: flex; flex-direction: column; gap: 8px; padding: 0 14px 12px; }
+.v4PanelSentText { margin: 0; padding: 0 14px 12px; white-space: pre-wrap; font-size: var(--t-ui); color: var(--text); }
+.v4PanelHint { margin: 0; font-size: var(--t-ui); }
+.v4PanelBar { display: flex; }
+.v4PanelGroups { display: flex; flex-direction: column; gap: 8px; }
+.v4PanelGroup { border: 1px solid var(--line-2); border-radius: var(--r-card); background: var(--surface); }
+.v4PanelGroup > summary {
+  list-style-position: inside; cursor: pointer; font-weight: 700; padding: 10px 14px; min-height: 44px;
+  display: flex; align-items: center;
+}
+.v4PanelGroup > summary::-webkit-details-marker { display: none; }
+.v4PanelGroup > summary::before { content: "▸"; margin-right: 8px; color: var(--text-3); }
+.v4PanelGroup[open] > summary::before { content: "▾"; }
+.v4PanelPoints { list-style: none; margin: 0; padding: 0 14px 12px; display: flex; flex-direction: column; gap: 10px; }
+.v4PanelPoint { display: flex; gap: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.v4PanelMark { flex: none; width: 5px; border-radius: 2px; align-self: stretch; }
+.v4PanelPointSURE .v4PanelMark { background: var(--v4-sure); }
+.v4PanelPointSURE_FOR_CASE .v4PanelMark { background: var(--v4-case); }
+.v4PanelPointSTILL_ARGUED .v4PanelMark { background: repeating-linear-gradient(45deg, var(--v4-argued) 0 3px, var(--v4-argued-soft) 3px 5px); }
+.v4PanelPointDIDNT_HOLD .v4PanelMark { background: transparent; box-shadow: inset 0 0 0 1.5px var(--v4-fell); }
+.v4PanelPointDIDNT_HOLD .v4PanelPointText { text-decoration: line-through; text-decoration-color: var(--text-3); color: var(--text-2); }
+.v4PanelPointBody { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.v4PanelPointText { margin: 0; }
+.v4PanelBasis { margin: 0; font-size: var(--t-ui); color: var(--text-2); }
+.v4PanelReasons ul, .v4PanelWhy { margin: 4px 0 0; padding-left: 18px; font-size: var(--t-ui); color: var(--text-2); }
+.v4PanelWhy { color: var(--text); font-size: var(--t-body); display: flex; flex-direction: column; gap: 4px; }
+.v4PanelSmallHead { margin: 6px 0 0; font-size: var(--t-meta); font-weight: 700; color: var(--text-2); }
+.v4PanelUnchecked { margin: 0; font-size: var(--t-ui); }
+.v4PanelRows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.v4PanelOpenRow { display: flex; align-items: stretch; background: var(--gold-bg); border: 1.5px dashed var(--gold-border); border-radius: 12px; }
+.v4PanelRowBtn {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px; flex: 1; min-width: 0; min-height: 44px;
+  text-align: left; background: var(--surface); border: 1px solid var(--line-2); border-radius: 12px; padding: 8px 12px;
+  cursor: pointer; font: inherit; font-size: var(--t-ui); color: var(--text); width: 100%;
+}
+.v4PanelOpenRow .v4PanelRowBtn { background: transparent; border: 0; padding-left: 0; }
+.v4PanelRowBtn:hover { background: var(--surface-2); }
+.v4PanelRowTitle { font-weight: 700; }
+.v4PanelModeTag { display: inline-block; font-size: var(--t-meta); color: var(--text-2); border: 1px solid var(--line-strong); border-radius: var(--r-pill); padding: 0 8px; }
+.v4PanelDig {
+  display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px solid var(--line-2);
+}
+.v4PanelModes { display: flex; flex-wrap: wrap; gap: 8px; }
+.v4PanelModes .v4Chip { min-height: 44px; }
+.v4PanelDigBtn { width: 100%; }
+.v4Panel .v4MapPulse { margin-right: 6px; vertical-align: middle; }
+
+/* Perplexity plan W2-6: sources under a point, a path's search note and its other pages (V4Sources.tsx). Phone first:
+   nothing here has a fixed width, long titles and addresses wrap, and buttons keep the 44px touch height. */
+.v4WebNote { margin: 0; font-size: var(--t-ui); color: var(--text-2); border-left: 3px solid var(--line-strong); padding: 2px 0 2px 10px; }
+.v4Sources { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.v4Source {
+  display: flex; flex-direction: column; gap: 4px; min-width: 0; overflow-wrap: anywhere;
+  padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2);
+}
+.v4SourceWhy { margin: 0; font-size: var(--t-ui); font-weight: 600; color: var(--text); }
+.v4SourceQuote { margin: 0; padding: 0 0 0 10px; border-left: 2px solid var(--line-strong); font-size: var(--t-ui); color: var(--text); }
+.v4SourceQuote p { margin: 0; }
+.v4SourceQuote p::before { content: open-quote; }
+.v4SourceQuote p::after { content: close-quote; }
+.v4SourceMeta { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; font-size: var(--t-meta); color: var(--text-2); min-width: 0; }
+.v4SourceLink { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.v4SourceSite, .v4SourceDate { color: var(--text-2); }
+.v4SourceFlag { margin: 0; font-size: var(--t-meta); color: var(--text-2); }
+.v4OtherPages { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.v4OtherPage { background: var(--surface); }
+.v4OtherPageAdd { align-self: flex-start; min-height: 44px; }
+.v4OtherPageAdd:disabled { opacity: 0.6; cursor: not-allowed; }
+.v4OtherPageOutcome { display: flex; flex-direction: column; gap: 6px; }
+
+/* Perplexity plan W3-4: choosing what to dig (V4DigSuggest.tsx). A path's suggestions on the tree and the outline, the
+   panel's "Choose what to dig", edits and the person's own view. Phone first: nothing has a fixed width, text wraps, and
+   every control keeps the 44px touch height. */
+.v4Sug {
+  display: flex; align-items: stretch; background: var(--surface); border: 1.5px dashed var(--line-strong);
+  border-radius: 12px; min-width: 0;
+}
+.v4SugPicked { border-style: solid; border-color: var(--gold); }
+.v4SugMain {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px; flex: 1; min-width: 0; min-height: 44px;
+  text-align: left; background: transparent; border: 0; border-radius: 12px; padding: 8px 4px 8px 12px; cursor: pointer;
+  font: inherit; font-size: var(--t-ui); color: var(--text); overflow-wrap: anywhere;
+}
+.v4SugKind { font-size: var(--t-meta); font-weight: 700; color: var(--text-2); }
+.v4SugText { min-width: 0; }
+.v4SugAgain { width: 100%; }
+.v4Sugs { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.v4SugGroup { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.v4SugList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.v4SugRow {
+  display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 4px 10px 8px 0; overflow-wrap: anywhere;
+  border: 1.5px dashed var(--line-strong); border-radius: 12px; background: var(--surface);
+}
+.v4SugRow.v4SugPicked { border-style: solid; border-color: var(--gold); }
+.v4SugRowHead { display: flex; align-items: flex-start; gap: 0; min-width: 0; }
+.v4SugRowText { margin: 0; padding-top: 12px; font-size: var(--t-ui); min-width: 0; flex: 1; }
+.v4SugRowPlain { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; padding-left: 12px; }
+.v4SugRowPlain .v4SugRowText { padding-top: 8px; }
+.v4SugRowPlain .v4Link { min-height: 44px; }
+.v4SugTag {
+  display: inline-block; font-size: var(--t-meta); color: var(--text-2); border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill); padding: 0 8px;
+}
+.v4SugEdit { align-self: flex-start; min-height: 44px; margin-left: 44px; }
+.v4SugEditor { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding-left: 12px; }
+.v4SugLabel { font-size: var(--t-ui); font-weight: 700; }
+.v4SugInput {
+  width: 100%; box-sizing: border-box; font: inherit; font-size: var(--t-body); color: var(--text); background: var(--surface);
+  border: 1px solid var(--line-strong); border-radius: 10px; padding: 8px 10px; resize: vertical; min-height: 5em;
+}
+.v4SugEditorActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.v4SugEditorActions .v4Btn, .v4SugEditorActions .v4Link, .v4SugOwnOpen { min-height: 44px; }
+.v4SugOwnOpen { align-self: flex-start; }
+.v4SugProblem { margin: 0; font-size: var(--t-ui); color: var(--text); font-weight: 600; }
+.v4SugElsewhere {
+  display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-left: 3px solid var(--gold);
+  background: var(--gold-bg); border-radius: 0 10px 10px 0;
+}
+.v4SugElsewhere .v4Btn { align-self: flex-start; min-height: 44px; }
+.v4MoneyLine { margin: 0; color: var(--text); }
+.v4PanelDeepest { margin: 0; padding: 10px 12px; border-left: 3px solid var(--line-strong); color: var(--text); }
+.v4MapPick input:disabled, .v4OutPick input:disabled, .v4PanelPick input:disabled { cursor: not-allowed; opacity: 0.45; }
+
+/* Dig model revision W4-6: what a dig did to a path (V4PathRewrite.tsx). The card carries one line; the panel the rest.
+   Phone first: nothing has a fixed width, text wraps, and every control keeps the 44px touch height. */
+.v4RewriteNote { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: var(--t-meta); color: var(--text-2); }
+.v4RewriteNoteREWRITTEN .v4RewriteNoteLine { color: var(--text); font-weight: 600; }
+.v4RewriteNoteBelow { font-style: italic; }
+.v4Rewrite {
+  display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 10px 12px; overflow-wrap: anywhere;
+  border-left: 3px solid var(--line-strong); border-radius: 0 10px 10px 0; background: var(--surface);
+}
+.v4RewriteREWRITTEN { border-left-color: var(--accent); }
+.v4RewriteFAILED { border-left-color: var(--gold); }
+.v4RewriteState { margin: 0; font-weight: 600; color: var(--text); }
+.v4RewriteWhen { margin: 0; font-size: var(--t-ui); }
+.v4RewriteSentences, .v4RewriteOwnWords, .v4RewriteEarlierList, .v4DigPagePicks {
+  margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 4px; min-width: 0;
+}
+.v4RewriteOwnWords { list-style: none; padding-left: 0; }
+.v4RewriteOwnWords q { display: block; padding-left: 10px; border-left: 2px solid var(--line-strong); }
+.v4RewriteVerdict { margin: 0; font-weight: 700; color: var(--text); }
+.v4RewriteView, .v4RewriteChanged, .v4RewriteEarlier, .v4RewriteDig, .v4DigPage, .v4DigPageLooked {
+  display: flex; flex-direction: column; gap: 6px; min-width: 0;
+}
+.v4RewriteToggle, .v4RewriteDigMap, .v4DigPageBack { align-self: flex-start; min-height: 44px; }
+.v4RewritePointWord { font-size: var(--t-meta); font-weight: 700; color: var(--text-2); }
+.v4RewriteBelow { margin: 0; font-style: italic; color: var(--text-2); }

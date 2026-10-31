@@ -215,7 +215,7 @@
   "debateChrome.condition.missingNumber": "再現失敗後に数値を削除",
   "debateChrome.condition.owedCheckUnexecuted": "完了時に必要な確認を未実行",
   "debateChrome.condition.synthesisObjectionStanding": "この記述に対する評価者の異論が未解決",
-  "debateChrome.condition.digestCompressed": "合成予算内に収めるためノードの要約を短縮",
+  "debateChrome.condition.digestCompressed": "ディベートの規模が非常に大きかったため、回答はその短縮版をもとに作成されました。",
   "debateChrome.condition.digestCannotExist": "合成予算内で要約を作成できず",
   "debateChrome.condition.protectedCoreGuardRetired": "予算上限により実行を停止し、言い換え確認による制限を解除",
   "debateChrome.condition.hiddenUnjudgeable": "非表示：審査不能 — 読むには非表示項目を表示してください",

@@ -38,6 +38,11 @@ import {
   registerAccountContextPool
 } from "./account-context.js";
 export { PostgresDataExportRepository, PostgresDataExportSource } from "./data-export.js";
+// The Perplexity plan's stores (migrations 0132 and 0133, task W1-3): a debate's web evidence and the investigations.
+export * from "./web-evidence.js";
+export * from "./investigations.js";
+// The new dig model and the month pause (migration 0134, dig-model revision task W2-8).
+export * from "./dig-model.js";
 export * from "./pool-budget.js";
 export * from "./release-state.js";
 export { recordRunSupersession, resolveRunRef } from "./run-supersession.js";
@@ -2114,12 +2119,14 @@ export interface RunBackupSwitchLifecycleValue {
   readonly from_provider_ref: string;
   readonly to_provider_ref: string;
   /**
-   * TRANSPORT_FAILURE / USAGE_CAP: during a call (R4). ABSENT_AT_CLAIM: the main
+   * TRANSPORT_FAILURE / USAGE_CAP: during a call (R4). CONTENT_REFUSED: during a
+   * root position's call, its answer refused after every repair (R22, owner ruling
+   * 2026-10-29). ABSENT_AT_CLAIM: the main
    * was not claim-eligible, so its runner-up sits in the seat. SPENT_ON_EARLIER_PASS:
    * a resumed pass found the planned member's key at this site already at its
    * allowance (A16c, carry 8c) — the ledger rows under `call_site_key` say why.
    */
-  readonly cause: "TRANSPORT_FAILURE" | "USAGE_CAP" | "ABSENT_AT_CLAIM" | "SPENT_ON_EARLIER_PASS";
+  readonly cause: "TRANSPORT_FAILURE" | "USAGE_CAP" | "CONTENT_REFUSED" | "ABSENT_AT_CLAIM" | "SPENT_ON_EARLIER_PASS";
   /** The planned member's key at the site; null for a switch made at claim. */
   readonly call_site_key: string | null;
 }

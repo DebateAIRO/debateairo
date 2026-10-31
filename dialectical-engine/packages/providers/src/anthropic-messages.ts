@@ -290,7 +290,9 @@ function isCounter(value: unknown): value is number {
  * `total_tokens`, the members `@debateai/budget` charges from):
  *  · input = `input_tokens` + `cache_creation_input_tokens` + `cache_read_input_tokens`
  *    (the two cache members count as zero when absent or null);
- *  · output = `output_tokens`, which already includes the thinking tokens.
+ *  · output = `output_tokens`, which already includes the thinking tokens;
+ *  · F4: the cache parts the vendor named (`cache_creation_input_tokens`, its 1-hour part from `cache_creation`, and
+ *    `cache_read_input_tokens`), so the charge prices each at its own rate.
  * A counter that is missing or malformed is passed on as -1 (or as the bad
  * value itself), so the shared strict parse names it PROVIDER_USAGE_INVALID and
  * the charge falls back to this attempt's projected maximum — never to zero.
@@ -308,10 +310,25 @@ export function anthropicUsageAsEngineUsage(usage: unknown): unknown {
     ? input + cacheParts.reduce<number>((sum, part) => sum + (isCounter(part) ? part : 0), 0)
     : -1;
   const completion = isCounter(output) ? output : -1;
+  // Owner answer F4 (2026-10-30): the person's quota counts cache writes and reads at the price the vendor bills, so
+  // the parts the vendor named travel on to the charge (packages/budget/src/cost-envelope.ts cacheParts). Only when the
+  // prompt count was read, and only the non-zero members the vendor sent (a zero part prices nothing); the strict usage
+  // parse strips them (C-I1), so the raw
+  // artifact's usage keeps the engine's three counters.
+  const write = usage.cache_creation_input_tokens;
+  const read = usage.cache_read_input_tokens;
+  const split = usage.cache_creation;
+  const hour = isRecord(split) && isCounter(split.ephemeral_1h_input_tokens) && isCounter(split.ephemeral_5m_input_tokens)
+    && isCounter(write) && split.ephemeral_1h_input_tokens + split.ephemeral_5m_input_tokens === write
+    ? split.ephemeral_1h_input_tokens : undefined;
   return {
     prompt_tokens: prompt,
     completion_tokens: completion,
-    ...(prompt >= 0 && completion >= 0 ? { total_tokens: prompt + completion } : {})
+    ...(prompt >= 0 && completion >= 0 ? { total_tokens: prompt + completion } : {}),
+    ...(prompt >= 0 && isCounter(write) && write > 0 ? { cache_creation_input_tokens: write } : {}),
+    // The 1-hour part whenever the vendor split a write (0 included): without it the charge prices every write as 1-hour.
+    ...(prompt >= 0 && isCounter(write) && write > 0 && hour !== undefined ? { cache_creation_1h_input_tokens: hour } : {}),
+    ...(prompt >= 0 && isCounter(read) && read > 0 ? { cache_read_input_tokens: read } : {})
   };
 }
 

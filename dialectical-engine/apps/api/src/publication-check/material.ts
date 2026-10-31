@@ -12,6 +12,10 @@ export const CHECKED_TEXT_PATHS: readonly { path: string; kind: PublicationPartK
   // public page shows, judged with the arguments (kept beside them, so one call per kind holds).
   { path: "map_view.positions[].answer", kind: "ARGUMENTS" },
   { path: "map_view.also_raised[]", kind: "ARGUMENTS" },
+  // Plan 2026-10-30 W1-6: a point's web sources are text the public page shows beside the point (a page's own words,
+  // its title, site and link, and reader 1's line about it), judged with the arguments they back; the date is excluded.
+  ...["quote", "title", "site", "link", "explanation.text"]
+    .map(path => ({ path: `answer.nodes[].sources[].${path}`, kind: "ARGUMENTS" as const })),
   { path: "answer.nodes[].review.reasons[]", kind: "REVIEWS" },
   ...["headline", "summary", "confidence", "paths[].line", "change.text", "reviewer_note.text"]
     .map(path => ({ path: `story_short.${path}`, kind: "STORY" as const }))
@@ -19,7 +23,8 @@ export const CHECKED_TEXT_PATHS: readonly { path: string; kind: PublicationPartK
 
 export function isExcludedTextPath(path: string, schemaType: string): boolean {
   if (schemaType === "enum" || schemaType === "literal") return true;
-  if (["public_ref", "published_at", "author_pseudonym", "language", "answer.as_of"].includes(path)) return true;
+  if (["public_ref", "published_at", "author_pseudonym", "language", "answer.as_of",
+    "answer.nodes[].sources[].published_on"].includes(path)) return true;
   if (path === "floor" || path.startsWith("floor.") || path === "answer.edges" || path.startsWith("answer.edges[]")) return true;
   const segments = path.split(".").map(segment => segment.replace(/\[\]$/, ""));
   return segments.some(segment => segment === "maker_lineage" || segment === "reviewer_lineage"

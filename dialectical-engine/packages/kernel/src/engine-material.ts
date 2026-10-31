@@ -34,6 +34,14 @@ export type EngineMaterialInvestigation = Readonly<{
   reason: string;
 }>;
 
+/**
+ * Web search (plan 2026-10-30 task W4-1; design §3.5): the checked extract a looked-up point rests on: its id in this
+ * debate's packs (`S<path>-<n>`), the quote word for word, and the page it is from. Present only on a point (or a case)
+ * whose locator is one of this debate's extract ids; absent everywhere else and on every debate with no packs, so the
+ * material built without one is today's, byte for byte. Code copies it from the stored pack; an AI never writes it.
+ */
+export type EngineCitedExtract = Readonly<{ id: string; quote: string; title: string | null; site: string; date: string | null }>;
+
 export type EngineMaterialPoint = Readonly<{
   /** The node id (the writer's node_refs; the story maps it to Pn). */
   pointRef: string;
@@ -50,6 +58,8 @@ export type EngineMaterialPoint = Readonly<{
   /** "Cannot assess", not resolved by an investigation. */
   notYetChecked: boolean;
   investigation: EngineMaterialInvestigation | null;
+  /** W4-1: the extract the point cites; absent when it cites none of this debate's. */
+  citedExtract?: EngineCitedExtract;
 }>;
 
 export type EngineMaterialAnswer = Readonly<{
@@ -64,6 +74,8 @@ export type EngineMaterialAnswer = Readonly<{
   /** Strongest first by honest final strength. */
   objections: readonly EngineMaterialPoint[];
   assumptions: readonly string[];
+  /** W4-1: the extract the position's case cites; absent when it cites none of this debate's. */
+  citedExtract?: EngineCitedExtract;
 }>;
 
 export type EngineDisputedPoint = Readonly<{
@@ -102,12 +114,16 @@ export type EngineMaterialSourcePoint = Readonly<{
   reviewerReasons: readonly string[];
   honestFinalStrength: number;
   investigation: EngineMaterialInvestigation | null;
+  /** W4-1: the extract the point cites (code's copy from the debate's packs); absent when it cites none. */
+  citedExtract?: EngineCitedExtract;
 }>;
 
 export type EngineMaterialSource = Readonly<{
   question: string;
   answers: readonly Readonly<{
     letter: EngineAnswerLetter; rootNodeId: string; words: string; caseText: string | null; assumptions: readonly string[];
+    /** W4-1: the extract the position's case cites; absent when it cites none. */
+    citedExtract?: EngineCitedExtract;
   }>[];
   points: readonly EngineMaterialSourcePoint[];
 }>;
@@ -196,6 +212,12 @@ function investigationOf(investigation: EngineMaterialInvestigation | null): Eng
   });
 }
 
+/** W4-1: a cited extract, rebuilt member by member (a widened object never passes its extra members on). */
+function citedExtractOf(extract: EngineCitedExtract | undefined): Readonly<{ citedExtract?: EngineCitedExtract }> {
+  return extract === undefined ? {} : { citedExtract: Object.freeze({ id: extract.id, quote: extract.quote, title: extract.title,
+    site: extract.site, date: extract.date }) };
+}
+
 function materialPoint(point: EngineMaterialSourcePoint): EngineMaterialPoint {
   return Object.freeze({
     pointRef: point.nodeId,
@@ -206,7 +228,8 @@ function materialPoint(point: EngineMaterialSourcePoint): EngineMaterialPoint {
     restsOn: point.restsOn,
     disputed: point.status === "DISPUTE",
     notYetChecked: point.status === "CANNOT_ASSESS",
-    investigation: investigationOf(point.investigation)
+    investigation: investigationOf(point.investigation),
+    ...citedExtractOf(point.citedExtract)
   });
 }
 
@@ -242,7 +265,8 @@ export function engineMaterialOf(source: EngineMaterialSource): EngineDebateMate
         caseText: answer.caseText,
         supports: Object.freeze(mine.filter((point) => sideOf.get(point.nodeId) === "FOR").map(materialPoint)),
         objections: Object.freeze(mine.filter((point) => sideOf.get(point.nodeId) === "AGAINST").map(materialPoint)),
-        assumptions: Object.freeze([...answer.assumptions])
+        assumptions: Object.freeze([...answer.assumptions]),
+        ...citedExtractOf(answer.citedExtract)
       });
     })),
     disputed: Object.freeze(answers.flatMap((answer) => [...ofAnswer(answer.letter)]

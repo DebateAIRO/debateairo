@@ -23,6 +23,9 @@ import type { StoryCheckerVerdict } from "./validate.js";
  * so the storyteller revises what it wrote; misleading on the last round is READY_WITH_RESERVATION. `firstRound` lets
  * a second loop (the backup storyteller) number its rounds after the first loop's; the last round is at most 8, the
  * story call-site keys' range.
+ *
+ * W3-5 (dig-model revision): the loop is generic in the draft it carries (`B`, the story's body by default), so the path
+ * rewrite (./path-rewrite.ts) reuses these rounds, this fallback and these failure codes for its own draft.
  */
 
 export const STORY_LOOP_FAILURE_CODES = Object.freeze({
@@ -65,7 +68,10 @@ export interface StoryCallRecord {
   readonly lineage: MakerLineage;
 }
 
-export interface StoryLoopDependencies {
+/** What the loop reads of a checker's verdict (the story's carries its criteria too; the path rewrite's does not). */
+export type StoryLoopVerdict = Pick<StoryCheckerVerdict, "satisfied" | "objection" | "misleading">;
+
+export interface StoryLoopDependencies<B = StoryBody> {
   /**
    * `priorDraft` (story v4): the draft the checker found misleading, which this round revises as the model's own turn
    * (`buildStoryRevisionPrompt`). Always null under v3, and in a loop's first round.
@@ -73,9 +79,9 @@ export interface StoryLoopDependencies {
   writeStory(input: {
     readonly round: number;
     readonly priorObjection: string | null;
-    readonly priorDraft: StoryBody | null;
-  }): Promise<StoryCallRecord & { readonly body: StoryBody }>;
-  checkStory(input: { readonly round: number; readonly candidate: StoryBody }): Promise<StoryCallRecord & { readonly verdict: StoryCheckerVerdict }>;
+    readonly priorDraft: B | null;
+  }): Promise<StoryCallRecord & { readonly body: B }>;
+  checkStory(input: { readonly round: number; readonly candidate: B }): Promise<StoryCallRecord & { readonly verdict: StoryLoopVerdict }>;
 }
 
 export interface StoryRoundRecord {
@@ -95,10 +101,10 @@ export interface StoryLaterFailure {
   readonly cause: string;
 }
 
-export type StoryLoopOutcome =
+export type StoryLoopOutcome<B = StoryBody> =
   | {
     readonly outcome: "READY" | "READY_WITH_RESERVATION";
-    readonly body: StoryBody;
+    readonly body: B;
     readonly reservation: string | null;
     /**
      * The round whose draft is served, and whose writer and checker made it.
@@ -131,13 +137,13 @@ function isStoryCallRecord(value: unknown): value is StoryCallRecord {
     && typeof record.lineage === "object" && record.lineage !== null;
 }
 
-function isWrittenStory(value: unknown): value is StoryCallRecord & { readonly body: StoryBody } {
+function isWrittenStory<B>(value: unknown): value is StoryCallRecord & { readonly body: B } {
   if (!isStoryCallRecord(value)) return false;
   const body = (value as { readonly body?: unknown }).body;
   return typeof body === "object" && body !== null;
 }
 
-function isCheckedStory(value: unknown): value is StoryCallRecord & { readonly verdict: StoryCheckerVerdict } {
+function isCheckedStory(value: unknown): value is StoryCallRecord & { readonly verdict: StoryLoopVerdict } {
   if (!isStoryCallRecord(value)) return false;
   const verdict = (value as { readonly verdict?: unknown }).verdict;
   if (typeof verdict !== "object" || verdict === null) return false;
@@ -178,10 +184,10 @@ function storyFailureCode(error: unknown, stage: "WRITE" | "CHECK"): string {
   return STORY_LOOP_FAILURE_CODES.unexpected;
 }
 
-export async function runStoryLoop(
+export async function runStoryLoop<B = StoryBody>(
   input: { readonly maxRounds: number; readonly v4?: true; readonly firstRound?: number },
-  deps: StoryLoopDependencies
-): Promise<StoryLoopOutcome> {
+  deps: StoryLoopDependencies<B>
+): Promise<StoryLoopOutcome<B>> {
   if (!Number.isInteger(input.maxRounds) || input.maxRounds < 1) {
     throw new TypedDomainError("STORY_LOOP_ROUNDS_INVALID", `The story loop needs at least one round, not ${String(input.maxRounds)}`);
   }
@@ -196,10 +202,10 @@ export async function runStoryLoop(
   const v4 = input.v4 === true;
   const rounds: StoryRoundRecord[] = [];
   let priorObjection: string | null = null;
-  let priorDraft: StoryBody | null = null;
-  type ObjectedDraft = { readonly round: number; readonly body: StoryBody; readonly objection: string };
+  let priorDraft: B | null = null;
+  type ObjectedDraft = { readonly round: number; readonly body: B; readonly objection: string };
   let lastUnsatisfied: ObjectedDraft | null = null;
-  const reserved = (draft: ObjectedDraft, laterFailure: StoryLaterFailure | null): StoryLoopOutcome =>
+  const reserved = (draft: ObjectedDraft, laterFailure: StoryLaterFailure | null): StoryLoopOutcome<B> =>
     Object.freeze({
       outcome: "READY_WITH_RESERVATION" as const,
       body: draft.body,
@@ -209,12 +215,12 @@ export async function runStoryLoop(
       rounds: Object.freeze([...rounds])
     });
   /** A failure keeps the latest checked-but-objected draft when one exists (spec §6); otherwise it is FAILED. */
-  const stopped = (failureCode: string, cause: string): StoryLoopOutcome => {
+  const stopped = (failureCode: string, cause: string): StoryLoopOutcome<B> => {
     const earlierDraft = lastUnsatisfied;
     if (earlierDraft !== null) return reserved(earlierDraft, Object.freeze({ failureCode, cause }));
     return Object.freeze({ outcome: "FAILED" as const, failureCode, cause, rounds: Object.freeze([...rounds]) });
   };
-  const ready = (round: number, body: StoryBody): StoryLoopOutcome => Object.freeze({
+  const ready = (round: number, body: B): StoryLoopOutcome<B> => Object.freeze({
     outcome: "READY" as const,
     body,
     reservation: null,
@@ -227,10 +233,10 @@ export async function runStoryLoop(
     // Every read of a dependency's result stays inside its guarded region, so a
     // malformed result becomes a named failure instead of a thrown TypeError.
     let writer: StoryCallRecord;
-    let body: StoryBody;
+    let body: B;
     try {
       const written: unknown = await deps.writeStory({ round, priorObjection, priorDraft });
-      if (!isWrittenStory(written)) throw dependencyResultInvalid("writeStory");
+      if (!isWrittenStory<B>(written)) throw dependencyResultInvalid("writeStory");
       writer = storyCallRecord(written);
       body = written.body;
     } catch (error) {

@@ -2415,7 +2415,28 @@ export const CONTENT_CARRIERS = Object.freeze([
   "serve.synthesis_check_result",
   // Publication review (migration 0127): decision reason and the transient reviewer copy.
   "serve.publication_review_decision",
-  "serve.publication_review_copy"
+  "serve.publication_review_copy",
+  // Web evidence store (migration 0132): the search words; a page's address, site, title and date; its whole text (the
+  // transient carrier, wiped on closing or 30 days after the investigation's last activity); a reading's line and leads;
+  // a checked extract's quote; a path's pack.
+  "identity.web_search",
+  "identity.web_page",
+  "identity.web_page_text",
+  "identity.web_reading",
+  "identity.web_extract",
+  "identity.web_pack",
+  // The path rewrite (migration 0134): a path's new line and summary, "What the dig changed", the verdict's reason and the
+  // dig's own paths' lines and fates, sealed under the DIG's run key (erasing the dig erases its rewrite).
+  "identity.path_rewrite",
+  // The web plan (migration 0134): the search planner's reason for a path with no search.
+  "identity.web_plan_path",
+  // A dig's picks (migration 0135): each pick's text, the person's own words or the AI suggestion as they sent it, sealed
+  // under the DIG's run key; and the dig's own paths as its settled run gave them to its path rewrite.
+  "identity.dig_pick",
+  "identity.path_rewrite_input",
+  // The final report over an investigation (migration 0136): the report's text, sealed under the investigation's ROOT
+  // run key and bound to the report id (erasing the root erases its investigation, its closings and their reports).
+  "identity.investigation_report"
 ] as const);
 
 export type ContentCarrier = typeof CONTENT_CARRIERS[number];

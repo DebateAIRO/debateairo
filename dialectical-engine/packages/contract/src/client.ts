@@ -1,4 +1,17 @@
 import { ContractHttpError, type ContractErrorCode, type ContractWaitingRefusal } from "./http-error.js";
+import { RunContinueRefusedSchema, RunContinueRequestSchema, RunContinuedSchema, type RunContinued, type RunContinueRefused } from "./web.js";
+import { InvestigationCloseRequestSchema } from "./web.js";
+import {
+  InvestigationReopenRequestSchema, InvestigationReopenedSchema, InvestigationReportAcceptedSchema, InvestigationReportsSchema,
+  InvestigationReportWritingSchema, type InvestigationReopened, type InvestigationReportAccepted, type InvestigationReports,
+  type InvestigationReportWriting
+} from "./investigation-report.js";
+import {
+  ReadingLevelStateSchema, ReadingLevelSaveRequestSchema, LastVisitSchema, LastVisitRecordRequestSchema, LastVisitRecordedSchema,
+  DigLinksSchema, DigLinkRecordRequestSchema, DigLinkRecordedSchema,
+  type AccountReadingLevel, type ReadingLevelState, type LastVisit, type LastVisitRecorded, type VisitItems,
+  type DigLinks, type DigLinkRecordRequest, type DigLinkRecorded, type DigLinkMode
+} from "./account-memory.js";
 import type { VerdictState } from "./verdict-state.js";
 import { PublicationReviewAskRequestSchema, PublicationReviewAskResponseSchema, PublicationReviewStateSchema,
   type PublicationReviewState } from "./publication-review.js";
@@ -355,6 +368,10 @@ function exactPublicMessageSchema<const Message extends string>(message: Message
 
 const RecoveryStartPublicResponseSchema = exactPublicMessageSchema(RECOVERY_START_PUBLIC_MESSAGE);
 
+/** R22 W5-1: "Write my report" refused because a finished report version stands (the page offers "Keep digging"). */
+export const INVESTIGATION_CLOSED = "INVESTIGATION_CLOSED" as const;
+export type InvestigationClosedRefusal = Readonly<{ error: typeof INVESTIGATION_CLOSED; message: typeof INVESTIGATION_CLOSED }>;
+
 export interface ContractClient {
   /** Age gate: answers `refused` (and sets the lockout cookie) for anyone under the minimum age. */
   checkAge(dateOfBirth: string): Promise<AgeCheckResult>;
@@ -480,6 +497,10 @@ export interface ContractClient {
     depth_mode?: DepthMode;
     scrutiny?: Scrutiny;
     answer_length?: AnswerLength;
+    /** Plan 2026-10-30 W1-6 (Q14): a dig's room read, so the answer says the dig's share of today; only when given. */
+    dig_parent?: string;
+    dig_mode?: DigLinkMode;
+    dig_picks?: number;
   }>): Promise<AskRoomResponse>;
   /** Paid-plans spec §1.2 (U1): the person's windows as whole percentages; 404 when billing is off. */
   getBillingUsage(): Promise<BillingUsageResponse>;
@@ -520,6 +541,29 @@ export interface ContractClient {
   readAnswer(answerId: string, version?: number): Promise<Answer>;
   readRunAnswer(runId: string): Promise<Answer>;
   takeRemovalNotice(): Promise<RemovalNoticeTake>;
+  /** V4 account memory (N7): the reading level kept in the account (null until first chosen). */
+  readReadingLevel(): Promise<ReadingLevelState>;
+  saveReadingLevel(level: AccountReadingLevel): Promise<ReadingLevelState>;
+  /** V4 account memory (N7): what this debate's map showed when the person last looked (both null before a first visit). */
+  readLastVisit(runId: string): Promise<LastVisit>;
+  recordLastVisit(runId: string, items: VisitItems): Promise<LastVisitRecorded>;
+  /** V4 account memory (N11): the dig this debate came from, and the digs made from it. */
+  readDigLinks(runId: string): Promise<DigLinks>;
+  recordDigLink(parentRunId: string, link: DigLinkRecordRequest): Promise<DigLinkRecorded>;
+  /**
+   * R22 W3-8 (the money rule): Continue on a debate paused at the month wall. Pressed before the month reset it is
+   * refused and nothing changes: the 409 RUN_PAUSED_UNTIL_RESET body is answered as data, with its `until`.
+   */
+  continueRun(runId: string): Promise<RunContinued | RunContinueRefused>;
+  /** R22 W5-1: the investigation the debate is in and its report versions, oldest first. */
+  readInvestigation(runId: string): Promise<InvestigationReports>;
+  /**
+   * R22 W5-1: "Write my report" (202, the version being written). Once a finished version stands the 409
+   * INVESTIGATION_CLOSED is answered as data: the page then offers "Keep digging".
+   */
+  writeReport(runId: string): Promise<InvestigationReportAccepted | InvestigationClosedRefusal>;
+  /** R22 W5-1: "Keep digging". While a version is being written the 409 INVESTIGATION_REPORT_WRITING is answered as data. */
+  reopenInvestigation(runId: string): Promise<InvestigationReopened | InvestigationReportWriting>;
   readRun(runId: string): Promise<RunProjection>;
   readInspection(answerId: string, version?: number): Promise<Inspection>;
   readLedgerDigest(answerId: string): Promise<ExecutionLedgerDigest>;
@@ -852,13 +896,19 @@ export function createContractClient(
       depth_mode?: DepthMode;
       scrutiny?: Scrutiny;
       answer_length?: AnswerLength;
+      dig_parent?: string;
+      dig_mode?: DigLinkMode;
+      dig_picks?: number;
     }>) => request(`/v1/asks/room?${new URLSearchParams({
       plan_tier: input.plan_tier,
       composition_budget_tier: input.composition_budget_tier,
       depth: String(input.depth),
       ...(input.depth_mode === undefined ? {} : { depth_mode: input.depth_mode }),
       ...(input.scrutiny === undefined ? {} : { scrutiny: input.scrutiny }),
-      ...(input.answer_length === undefined ? {} : { answer_length: input.answer_length })
+      ...(input.answer_length === undefined ? {} : { answer_length: input.answer_length }),
+      ...(input.dig_parent === undefined ? {} : { dig_parent: input.dig_parent }),
+      ...(input.dig_mode === undefined ? {} : { dig_mode: input.dig_mode }),
+      ...(input.dig_picks === undefined ? {} : { dig_picks: String(input.dig_picks) })
     }).toString()}`, AskRoomResponseSchema),
     getBillingUsage: () => request("/v1/billing/usage", BillingUsageResponseSchema),
     getBillingPlans: () => request("/v1/billing/plans", BillingPlansResponseSchema),
@@ -935,6 +985,41 @@ export function createContractClient(
     readAnswer: (answerId: string, version?: number) => request(`/v1/answers/${encodeURIComponent(answerId)}${versionQuery(version)}`, AnswerSchema),
     readRunAnswer: (runId: string) => request(`/v1/runs/${encodeURIComponent(runId)}/answer`, AnswerSchema),
     takeRemovalNotice: () => request("/v1/account/removal-notice/take", RemovalNoticeTakeSchema, { method: "POST" }),
+    readReadingLevel: () => request("/v1/account/reading-level", ReadingLevelStateSchema),
+    saveReadingLevel: (level: AccountReadingLevel) => request("/v1/account/reading-level", ReadingLevelStateSchema,
+      { method: "POST", body: JSON.stringify(ReadingLevelSaveRequestSchema.parse({ reading_level: level })) }),
+    readLastVisit: (runId: string) => request(`/v1/runs/${encodeURIComponent(runId)}/last-visit`, LastVisitSchema),
+    recordLastVisit: (runId: string, items: VisitItems) => request(`/v1/runs/${encodeURIComponent(runId)}/last-visit`, LastVisitRecordedSchema,
+      { method: "POST", body: JSON.stringify(LastVisitRecordRequestSchema.parse({ items })) }),
+    readDigLinks: (runId: string) => request(`/v1/runs/${encodeURIComponent(runId)}/dig-links`, DigLinksSchema),
+    recordDigLink: (parentRunId: string, link: DigLinkRecordRequest) => request(`/v1/runs/${encodeURIComponent(parentRunId)}/dig-links`, DigLinkRecordedSchema,
+      { method: "POST", body: JSON.stringify(DigLinkRecordRequestSchema.parse(link)) }),
+    continueRun: (runId: string) => requestJson<RunContinued | RunContinueRefused>(
+      root.href, fetchImplementation, `/v1/runs/${encodeURIComponent(runId)}/continue`, RunContinuedSchema,
+      { method: "POST", body: JSON.stringify(RunContinueRequestSchema.parse({})) }, auth, undefined,
+      (status, body) => {
+        if (status !== 409) return null;
+        const refused = RunContinueRefusedSchema.safeParse(body);
+        return refused.success ? refused.data : null;
+      }
+    ),
+    readInvestigation: (runId: string) => request(`/v1/runs/${encodeURIComponent(runId)}/investigation`, InvestigationReportsSchema),
+    writeReport: (runId: string) => requestJson<InvestigationReportAccepted | InvestigationClosedRefusal>(
+      root.href, fetchImplementation, `/v1/runs/${encodeURIComponent(runId)}/report`, InvestigationReportAcceptedSchema,
+      { method: "POST", body: JSON.stringify(InvestigationCloseRequestSchema.parse({})) }, auth, 202,
+      (status, body) => status === 409 && typeof body === "object" && body !== null
+        && (body as { error?: unknown }).error === INVESTIGATION_CLOSED
+        ? Object.freeze({ error: INVESTIGATION_CLOSED, message: INVESTIGATION_CLOSED }) : null
+    ),
+    reopenInvestigation: (runId: string) => requestJson<InvestigationReopened | InvestigationReportWriting>(
+      root.href, fetchImplementation, `/v1/runs/${encodeURIComponent(runId)}/reopen`, InvestigationReopenedSchema,
+      { method: "POST", body: JSON.stringify(InvestigationReopenRequestSchema.parse({})) }, auth, undefined,
+      (status, body) => {
+        if (status !== 409) return null;
+        const writing = InvestigationReportWritingSchema.safeParse(body);
+        return writing.success ? writing.data : null;
+      }
+    ),
     readRun: (runId: string) => request(`/v1/runs/${encodeURIComponent(runId)}`, RunProjectionSchema),
     readInspection: (answerId: string, version?: number) => request(`/v1/answers/${encodeURIComponent(answerId)}/inspection${versionQuery(version)}`, InspectionSchema),
     readLedgerDigest: (answerId: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/ledger-digest`, ExecutionLedgerDigestSchema),

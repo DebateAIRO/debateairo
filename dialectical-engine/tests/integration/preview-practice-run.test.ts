@@ -858,8 +858,10 @@ describe("preview practice: debate mode", () => {
       }
     }
     // Every refused call went first, then the patch follow-up. LG-A (L33, controller ruling 8; Tasks 11 and 13): the practice
-    // wires the structure-repair route (Haiku is a target), so each MiMo call is routed and sends at most 2 POSTs: no full re-ask.
-    expect(new Set(report.failures.map((failure) => failure.replyForm))).toEqual(new Set(["ORIGINAL", "PATCH"]));
+    // wires the structure-repair route (Haiku is a target), so each MiMo call is routed and sent at most 2 POSTs. R22 (owner
+    // ruling 2026-10-29, "Allow 3 sends"): a panel seat is a judge call, so after its refused patch it sends the one full
+    // re-ask too, refused again here.
+    expect(new Set(report.failures.map((failure) => failure.replyForm))).toEqual(new Set(["ORIGINAL", "PATCH", "FULL"]));
   }, 600_000);
 
   it("refuses to start (HARNESS_ERROR, exit 40) without the acknowledgement, and sends nothing", async () => {
@@ -1290,6 +1292,8 @@ describe("engine 2's story (R1d)", () => {
     storyJsonBreaks?: { model: string; replies: number; parseFailed: number }[];
     writerPins?: { answerWriter: PinOutcome | null; storyteller: PinOutcome | null };
     investigations?: { cannotAssessReviews: number; run: number; capped: number; skipped: number; unavailable: number };
+    /** W5-2: the web table (an engine-2 debate with a debate-shape map only); absent when the web step left no row. */
+    web?: { search: string; paths: { plan: string | null; searches: number }[]; totals: { searches: number; searchFeeMicros: number } };
     /** R2 B11: the comparing judges' block (engine 2 only). */
     judgeVotes?: { model: string; maker: string; letter: string | null; counted: boolean | null }[];
     labels?: { label: string; trigger: string; engine1LadderLabel: string | null } | null;
@@ -1321,6 +1325,14 @@ describe("engine 2's story (R1d)", () => {
     expect(report.investigations).toBeDefined();
     if (engine === 1) expect(report.investigations).toMatchObject({ run: 0, capped: 0, skipped: 0, unavailable: 0 });
     expect(markdown).toContain("| cannot-assess reviews | asked |");
+    // W5-2: billing is kept off in the practice, so its run has no paid plan: a web step that ran planned no search for
+    // any path, sent none and paid none, and its table says so.
+    if (report.web !== undefined) {
+      expect(report.web.search).toBe("PERPLEXITY");
+      expect(report.web.paths.every((path) => path.plan === "NOT_ON_PLAN" && path.searches === 0)).toBe(true);
+      expect(report.web.totals).toMatchObject({ searches: 0, searchFeeMicros: 0 });
+      expect(markdown).toContain("Web search per path (W5-2;");
+    }
   };
   const framedOf = (request: GateRecord) => readFramedMaterial(wirePacket(stubChatBody(request.provider, request.body)));
   const answered = (requests: readonly GateRecord[], kind: "STORYTELLER" | "STORY_CHECKER") =>

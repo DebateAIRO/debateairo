@@ -216,7 +216,7 @@
   "debateChrome.condition.missingNumber": "Luku poistettiin toistovirheen jälkeen",
   "debateChrome.condition.owedCheckUnexecuted": "Vaadittua tarkistusta ei suoritettu ennen valmistumista",
   "debateChrome.condition.synthesisObjectionStanding": "Arvioijan vastalause tähän lausumaan on edelleen voimassa",
-  "debateChrome.condition.digestCompressed": "Solmujen yhteenvetoja lyhennettiin koontibudjettiin sopiviksi",
+  "debateChrome.condition.digestCompressed": "Väittely oli hyvin laaja, joten vastaus kirjoitettiin sen lyhennetyn version pohjalta.",
   "debateChrome.condition.digestCannotExist": "Koostetta ei voitu muodostaa koontibudjetin rajoissa",
   "debateChrome.condition.protectedCoreGuardRetired": "Suoritus pysähtyi budjettiin; uudelleenmuotoilun tarkistus ei enää estänyt sitä",
   "debateChrome.condition.hiddenUnjudgeable": "Piilotettu: ei voitu arvioida — lue näyttämällä piilotetut",

@@ -60,16 +60,43 @@ describe("S2 identity schema on real PostgreSQL", () => {
       "consumer_recovery_enrollment", "consumer_recovery_gate", "consumer_recovery_reservation", "consumer_recovery_token",
       "consumer_security_challenge", "consumer_security_notice", "consumer_totp_enrollment",
       "data_export",
-      "email_change_request", "login_challenge", "mfa_factor",
+      // 0131 V4 account memory: the reading level, debate visits and dig links.
+      "debate_last_visit", "dig_link",
+      // 0135 a dig's picks: the set and each pick.
+      "dig_pick", "dig_pick_set",
+      "email_change_request",
+      // 0133 investigations: a debate and its digs, their closings and the one reserve.
+      "investigation", "investigation_closing",
+      // 0134 the dig model: each dig's level.
+      "investigation_dig_level",
+      "investigation_member",
+      // 0136 the investigation's final report: one per closing.
+      "investigation_report",
+      "investigation_reserve_event",
+      "login_challenge", "mfa_factor",
       "mfa_recovery_control", "mfa_recovery_legacy_cohort", "mfa_recovery_notice", "mfa_recovery_notice_binding",
       "mfa_recovery_source_window", "mfa_recovery_staged_code",
+      "page_reading_level",
       "password_recovery_control", "password_recovery_feed", "password_recovery_notice",
       "password_recovery_retry_lock", "password_recovery_source_window", "password_recovery_staged_code",
       "password_reset_control", "password_reset_notice", "password_reset_notice_binding", "password_reset_source_window",
+      // 0134 the dig model: a path's rewrites and the turns that order them.
+      "path_rewrite",
+      // 0135 the path rewrite's material: the dig's own paths, stored before its turn.
+      "path_rewrite_input",
+      "path_rewrite_turn",
       "private_erasure_audit_binding",
-      "publication_event_binding", "recovery_code", "recovery_email_request", "registration_region", "run_execution_binding", "runtime_audit_attempt",
+      "publication_event_binding", "recovery_code", "recovery_email_request", "registration_region", "run_execution_binding",
+      // 0134 the month pause of a running debate.
+      "run_pause_event",
+      "runtime_audit_attempt",
       "sensitive_data_consent", "session", "social_enrollment", "social_flow", "social_identity", "staff_webauthn_metadata", "step_up_grant", "synthesis_check_erasure_binding", "user",
-      "verification_delivery_reservation", "verification_token_credential"
+      "verification_delivery_reservation", "verification_token_credential",
+      // 0132 web evidence store: a debate's searches, pages, transient page texts, readings, extracts, packs, picks, choices.
+      "web_extract", "web_pack", "web_page", "web_page_text", "web_pick",
+      // 0134 the web plan: the planner's decision for each path.
+      "web_plan_path",
+      "web_reading", "web_researched", "web_search"
     ]);
 
     const columns = await database.pool.query<{ table_name: string; column_name: string; data_type: string }>(`

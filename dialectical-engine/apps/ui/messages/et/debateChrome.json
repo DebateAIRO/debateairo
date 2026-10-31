@@ -216,7 +216,7 @@
   "debateChrome.condition.missingNumber": "Arv eemaldati pärast taasesituse nurjumist",
   "debateChrome.condition.owedCheckUnexecuted": "Nõutud kontroll jäi lõpetamisel tegemata",
   "debateChrome.condition.synthesisObjectionStanding": "Hindaja vastuväide sellele väitele on endiselt jõus",
-  "debateChrome.condition.digestCompressed": "Sõlmede kokkuvõtteid lühendati koostamiseelarvesse mahtumiseks",
+  "debateChrome.condition.digestCompressed": "Väitlus oli väga mahukas, seega kirjutati vastus selle lühendatud versiooni põhjal.",
   "debateChrome.condition.digestCannotExist": "Koostamiseelarve piires ei saanud kokkuvõtet luua",
   "debateChrome.condition.protectedCoreGuardRetired": "Käitus peatus eelarve tõttu; ümbersõnastuse kontroll ei piiranud seda enam",
   "debateChrome.condition.hiddenUnjudgeable": "Peidetud: ei saanud hinnata — lugemiseks kuvage peidetud sisu",

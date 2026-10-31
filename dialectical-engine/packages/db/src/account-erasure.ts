@@ -9,6 +9,14 @@ import {
   type RunContentKeyStore
 } from "@debateai/crypto";
 import type { AuthSourceContext } from "./identity.js";
+import {
+  FORGET_ERASED_DEBATE_DIG_MODEL,
+  FORGET_ERASED_DEBATE_DIG_PICKS,
+  FORGET_ERASED_DEBATE_INVESTIGATION,
+  FORGET_ERASED_DEBATE_PAGE_MEMORY,
+  FORGET_ERASED_DEBATE_WEB_EVIDENCE,
+  finalizeWithPageMemory
+} from "./erasure-page-memory.js";
 import { MAIL_LOCALE_SETTING, withMailLocale } from "./mail-locale.js";
 import { withPublicationContentLease } from "./publication-lease.js";
 
@@ -40,7 +48,16 @@ const ERASURE_FUNCTION_SIGNATURES = Object.freeze([
   "core.finalize_private_run_erasure(uuid,timestamptz,timestamptz,integer,integer)",
   "core.prepare_synthesis_check_erasures(integer)",
   "core.pending_synthesis_check_erasure_cleanup(integer)",
-  "core.finalize_synthesis_check_erasure(uuid,timestamptz,timestamptz,integer,integer)"
+  "core.finalize_synthesis_check_erasure(uuid,timestamptz,timestamptz,integer,integer)",
+  // 0131 §4b (R22 item 16): a deleted debate's page memory goes in its finalize transaction.
+  FORGET_ERASED_DEBATE_PAGE_MEMORY,
+  // 0132 §12 and 0133 §9: its web evidence and its investigation rows too.
+  FORGET_ERASED_DEBATE_WEB_EVIDENCE,
+  FORGET_ERASED_DEBATE_INVESTIGATION,
+  // 0134 §9: its month pauses and path rewrites.
+  FORGET_ERASED_DEBATE_DIG_MODEL,
+  // 0135 §6: its dig picks and its path rewrite's material.
+  FORGET_ERASED_DEBATE_DIG_PICKS
 ] as const);
 const ERASURE_FORBIDDEN_ROLES = Object.freeze([
   "public","debateai_runtime","debateai_authorization_runtime",
@@ -995,12 +1012,13 @@ export class PostgresPrivateRunErasureRepository {
     // only pre-account-erasure forensic mapping.
     void input.source;
     void this.auditContext;
-    const result = await this.pool.query<{ outcome: PrivateRunErasureOutcome }>(
+    // R22 item 16: the run's page memory (0131) goes in this same transaction (erasure-page-memory.ts).
+    const outcome = await finalizeWithPageMemory<PrivateRunErasureOutcome>(this.pool, input.erasureId,
       `SELECT core.finalize_private_run_erasure($1,$2,$3,$4,$5) AS outcome`,
       [input.erasureId,input.keyCleanupCompletedAt,input.occurredAt,
         input.destroyedKeyCount,input.alreadyAbsentKeyCount]
     );
-    return result.rows[0]?.outcome ?? "NOT_FOUND";
+    return outcome ?? "NOT_FOUND";
   }
 }
 

@@ -338,6 +338,79 @@ export const PREVIEW_MODEL_ROWS_BY_PROVIDER: Readonly<Record<PreviewProviderName
       upperStep: { aboveChargedInputTokens: 100_000, inputUsdPerM: "0.50", outputUsdPerM: "2.50", cacheWriteInputUsdPerM: "0.625" } })
   ])
 });
+/**
+ * Owner answer F4 (2026-10-30): the price steps Anthropic bills a Claude Haiku 5.5 call at, as the person's quota now
+ * counts them: plain input, the 5-minute and 1-hour cache writes, the cache read, and the output, up to 100,000 prompt
+ * tokens and above (the prompt counts every input token, cache reads and writes included). Verified 2026-10-30 against
+ * platform.claude.com/docs/en/about-claude/pricing (model table: "Claude Haiku 5.5 (for prompts up to 100,000 tokens)
+ * $0.10, $0.125, $0.20, $0.01, $0.50"; "(for prompts over 100,000 tokens) $0.50, $0.625, $1, $0.05, $2.50"; the
+ * multipliers 1.25x, 2x, 0.1x; "A request's prompt length counts all of its input tokens, including cache reads and
+ * cache writes") and .../build-with-claude/prompt-caching ("By default, the cache has a 5-minute lifetime. The cache is
+ * refreshed for no additional cost each time the cached content is used"; measured from the start of the request).
+ * The gate settles at the same steps (preview_budget_helper.py AnthropicProfile.settlement_steps), and the parity file
+ * tests/unit/fixtures/preview-model-rows-anthropic.json (`settlement_steps`) holds them; a test keeps the three equal.
+ */
+export const PREVIEW_ANTHROPIC_SETTLEMENT_STEPS = Object.freeze([
+  Object.freeze({ promptTokensUpTo: 100_000 as number | null, inputUsdPerM: "0.10", cacheWrite5mUsdPerM: "0.125",
+    cacheWrite1hUsdPerM: "0.20", cacheReadUsdPerM: "0.01", outputUsdPerM: "0.50" }),
+  Object.freeze({ promptTokensUpTo: null as number | null, inputUsdPerM: "0.50", cacheWrite5mUsdPerM: "0.625",
+    cacheWrite1hUsdPerM: "1.00", cacheReadUsdPerM: "0.05", outputUsdPerM: "2.50" })
+]);
+
+/** USD per million with two or three decimals, in micro-units per million tokens (0.125 -> 125,000). */
+function microsPerMillion(usdPerM: string): number {
+  const match = /^(\d+)\.(\d{2,3})$/u.exec(usdPerM);
+  if (match === null) throw new TypeError("PREVIEW_MODEL_ROW_PRICE_INVALID");
+  return (Number(match[1]) * 1000 + Number(match[2]!.padEnd(3, "0"))) * 1000;
+}
+
+/**
+ * F4: the real prices the quota charges a reviewed row's calls at (the shape of `@debateai/budget`'s
+ * `ProviderTargetPrice.vendorPrices`, structurally: this file imports nothing), or undefined for a row whose vendor
+ * bills every prompt token alike (DeepInfra: its cached tokens are charged at the full input price, never less).
+ */
+export function previewVendorPrices(row: PreviewModelRow): Readonly<{
+  lower: Readonly<{ cacheWriteMicrosPerMillionTokens: number; cacheWriteOneHourMicrosPerMillionTokens: number; cacheReadMicrosPerMillionTokens: number }>;
+  upper: Readonly<{ abovePromptTokens: number; inputMicrosPerMillionTokens: number; outputMicrosPerMillionTokens: number;
+    cacheWriteMicrosPerMillionTokens: number; cacheWriteOneHourMicrosPerMillionTokens: number; cacheReadMicrosPerMillionTokens: number }>;
+}> | undefined {
+  if (row.provider !== "anthropic") return undefined;
+  const [lower, upper] = PREVIEW_ANTHROPIC_SETTLEMENT_STEPS;
+  // The row's own prices are the lower step's: a drift here is a reviewed change that must move both.
+  if (lower!.inputUsdPerM !== row.inputUsdPerM || lower!.outputUsdPerM !== row.outputUsdPerM
+    || lower!.cacheWrite5mUsdPerM !== row.cacheWriteInputUsdPerM || row.upperStep === undefined
+    || lower!.promptTokensUpTo !== row.upperStep.aboveChargedInputTokens || upper!.inputUsdPerM !== row.upperStep.inputUsdPerM
+    || upper!.outputUsdPerM !== row.upperStep.outputUsdPerM || upper!.cacheWrite5mUsdPerM !== row.upperStep.cacheWriteInputUsdPerM) {
+    throw new TypeError("PREVIEW_SETTLEMENT_STEPS_DRIFT");
+  }
+  const cache = (step: typeof lower) => ({
+    cacheWriteMicrosPerMillionTokens: microsPerMillion(step!.cacheWrite5mUsdPerM),
+    cacheWriteOneHourMicrosPerMillionTokens: microsPerMillion(step!.cacheWrite1hUsdPerM),
+    cacheReadMicrosPerMillionTokens: microsPerMillion(step!.cacheReadUsdPerM)
+  });
+  return Object.freeze({
+    lower: Object.freeze(cache(lower)),
+    upper: Object.freeze({ abovePromptTokens: lower!.promptTokensUpTo!, inputMicrosPerMillionTokens: microsPerMillion(upper!.inputUsdPerM),
+      outputMicrosPerMillionTokens: microsPerMillion(upper!.outputUsdPerM), ...cache(upper) })
+  });
+}
+
+/**
+ * F4: the price a target's calls are CHARGED at — its declared price, plus, on the preview, the vendor's real prices of
+ * its reviewed row (`previewVendorPrices`) when that vendor bills the cache and the prompt's size (Anthropic). The
+ * runner and the practice runner both build their money seams' price with it, so the two cannot drift.
+ */
+export function previewTargetChargePrice<P extends Readonly<{ inputMicrosPerMillionTokens: number; outputMicrosPerMillionTokens: number }>>(
+  previewOn: boolean,
+  target: Readonly<{ baseUrl: string; model: string }>,
+  price: P | null
+): (P & Readonly<{ vendorPrices?: NonNullable<ReturnType<typeof previewVendorPrices>> }>) | null {
+  if (price === null || !previewOn) return price;
+  const reviewed = previewModelRowForEndpoint(target.baseUrl, target.model);
+  const vendorPrices = reviewed === undefined ? undefined : previewVendorPrices(reviewed);
+  return vendorPrices === undefined ? price : Object.freeze({ ...price, vendorPrices });
+}
+
 /** Every reviewed row, providers in the order above. */
 export const PREVIEW_MODEL_ROWS: readonly PreviewModelRow[] = Object.freeze(
   (Object.keys(PREVIEW_MODEL_ROWS_BY_PROVIDER) as PreviewProviderName[]).flatMap((provider) => PREVIEW_MODEL_ROWS_BY_PROVIDER[provider])

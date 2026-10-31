@@ -190,15 +190,41 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       .map(([path]) => path)
       .sort();
     expect(primitiveFiles).toEqual([
+      // The data export (0132): one debate's web values are opened under its key inside one content lease
+      // (prepareLeasedContentEncryptionForRun), and a debate erased meanwhile is exported UNRECOVERABLE.
+      "apps/api/src/data-export/run-content.ts",
       // V-6 (0069): the live event stream decrypts an encrypted run's
       // investigation-gap rows, and the value overlay seals the weight owner.
       // Both prepare the run's cipher through prepareLeasedContentEncryptionForRun,
       // which establishes or borrows the session content lease (checked below).
       "apps/api/src/index.ts",
+      // The final report over an investigation (0136, R22 W5-1): each written version is opened under the investigation's
+      // ROOT run key inside withRunContentLease (prepareLeasedContentEncryptionForRuns); a root erased meanwhile reads null.
+      "apps/api/src/investigation-report.ts",
       "apps/evaluator-worker/src/index.ts",
+      // The path rewrite switched on (dig-model revision W3-7): the composition seals each rewrite's text under the dig's
+      // run key inside withRunContentLease; the sources open the parent's story, its nodes, the base rewrite and the
+      // extracts each under its own run's key, inside withRunContentLease or through prepareLeasedContentEncryptionForRun.
+      // W5-1: the closing's sources open the root's story, its nodes, each dig's rewrite, the extracts with reader 1's line
+      // and the earlier report, each under its own run's key, inside withRunContentLease; each version is sealed under the
+      // ROOT run key inside withRunContentLease.
+      "apps/runner/src/investigation-close-sources.ts",
+      "apps/runner/src/path-rewrite-composition.ts",
+      "apps/runner/src/path-rewrite-sources.ts",
       // Reclaim resume (spec 2026-10-14): the replay book reads the run's recorded prompts and replies through
       // prepareLeasedContentEncryptionForRun, which borrows the lease the runner already holds when it is read.
       "apps/runner/src/run-replay.ts",
+      // Web search W4-2: a dig reuses the pages its investigation already read; each other member's 0132 rows (page
+      // address, reader 1's line, extracts, a kept text) are opened under that member's own key, one short lease each
+      // (prepareLeasedContentEncryptionForRun), after the dig's searches and before any reader call.
+      "apps/runner/src/web-reuse.ts",
+      // Web search (plan 2026-10-30 W3-1): the web step seals and opens one debate's 0132 rows (search words, pages,
+      // readings, extracts) under that run's own content lease (prepareLeasedContentEncryptionForRun), closed when the
+      // step ends; page texts are opened only to fill the vendor's copy of a reader's prompt (W3-0).
+      "apps/runner/src/web-step.ts",
+      // A dig's picks (0135, dig-model revision W3-7): the picks and the path rewrite's material are sealed inside
+      // withRunContentLease and opened through prepareLeasedContentEncryptionForRun, both under the dig's own run key.
+      "packages/db/src/dig-picks.ts",
       "packages/db/src/index.ts",
       "packages/evaluator/src/index.ts",
       "packages/evidence/src/index.ts",
@@ -246,10 +272,18 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // It opens no lease and reads no content.
       "apps/runner/src/call-lane-gateway.ts",
       "apps/runner/src/index.ts",
+      // W5-1: the closing sends each answer, story and check call through the configured member's gateway (or the replay
+      // book over it), naming the investigation's root run. It reads no content itself; its sources and its seal open and
+      // seal under the runs' keys inside withRunContentLease (investigation-close-sources.ts above).
+      "apps/runner/src/investigation-close.ts",
       // Debate shape (0117, c5e0b2862): the map stage's caller sends each map call through the member gateway the
       // runner hands it (lane, sit-out book, keep-alive, the run-required leased gateway), naming the run. It opens
       // no lease and reads no content of its own; the map's storage goes through packages/map/src/repository.ts above.
       "apps/runner/src/map-stage.ts",
+      // Dig-model revision W3-5: the path rewrite sends each writer and checker call through the member gateway the
+      // settled run's snapshot hands it (the run-required, leased gateway, or the replay book over it), inside the step
+      // lease the runner's post-settle hook gives, naming the dig's run. Its text is sealed through the composition's seal.
+      "apps/runner/src/path-rewrite.ts",
       // L4-F9 repair: the keep-alive hands each runner call, unchanged, to the
       // gateway it wraps (the run-required, leased gateway), or refuses it before
       // anything is sent. It opens no lease and reads no content of its own.
@@ -263,6 +297,14 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // wraps, and counts it until it settles (the backstop never retires under a call in flight). It opens no lease
       // and reads no content of its own.
       "apps/runner/src/runner-retirement.ts",
+      // Web search W2-3: the planner sends its one call (and a backup's) through the member gateway the web step hands
+      // it (the run's lane-wrapped, leased gateway), naming the run. It opens no lease and reads no content of its own;
+      // the searches and pages it plans are stored through packages/db/src/web-evidence.ts by the web step.
+      "apps/runner/src/web-planner.ts",
+      // Web search W3-1: the web step sends readers 1, 2 and 3 through the member gateways the runner hands it (the run's
+      // lane-wrapped, leased gateways), naming the run; each call's record holds page references only and its
+      // vendorPacketOf fills the page texts into the vendor's copy (W3-0). The step's own lease is the one listed above.
+      "apps/runner/src/web-step.ts",
       "packages/evaluator/src/index.ts",
       // Engine redesign R2b (B1): the comparing judges' call is sent through the gateway the runner hands it (the judge
       // seat's own lane-wrapped member gateway, never the arguing judge's, inside the leased runner, naming the run). It

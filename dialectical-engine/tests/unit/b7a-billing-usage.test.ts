@@ -236,3 +236,28 @@ describe("B7a the API root supplies the room read and the usage read", () => {
     );
   });
 });
+
+// Plan 2026-10-30 dig-model revision W3-2 (the owner's money rule, 31 Oct): running work that went past a day or week
+// borrowed from the next one, and the read names each run doing so ("we used {percent}% of tomorrow's allowance").
+describe("W3-2 the borrow notice on the usage read", () => {
+  it("maps each borrowing run to the wire, and the contract accepts the read", async () => {
+    const response = await usageRoute({
+      read: async () => Object.freeze({
+        planId: "PLUS" as const,
+        windows: [{ scope: "PERSON_DAY" as const, percent: 105, resetsAt: new Date("2026-10-09T00:00:00.000Z") }],
+        borrowed: [{ scope: "PERSON_DAY" as const, runRef: "run-b", percent: 5, nextWindowStartsAt: new Date("2026-10-09T00:00:00.000Z") }]
+      })
+    });
+    expect(response.statusCode).toBe(200);
+    expect(BillingUsageResponseSchema.parse(response.json())).toMatchObject({
+      borrowed: [{ scope: "PERSON_DAY", run_ref: "run-b", percent: 5, next_window_starts_at: "2026-10-09T00:00:00.000Z" }]
+    });
+  });
+
+  it("writes no member when nothing is borrowed", async () => {
+    const response = await usageRoute({
+      read: async () => Object.freeze({ planId: "PLUS" as const, windows: [], borrowed: [] })
+    });
+    expect(response.json()).not.toHaveProperty("borrowed");
+  });
+});

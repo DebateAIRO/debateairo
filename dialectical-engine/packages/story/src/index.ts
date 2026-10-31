@@ -28,6 +28,8 @@ export {
   buildStoryCheckerContract,
   buildStorytellerContract,
   storyCheckerLengthField,
+  storyContractForReader,
+  storyContractForSources,
   storyContractHash,
   storyContractInArgumentLanguage,
   storyLengthField
@@ -70,6 +72,7 @@ export {
   type StoryAnswersNoteKind,
   type StoryMaterial,
   type StoryMaterialAlsoRaised,
+  type StoryMaterialExtract,
   type StoryMaterialOmitted,
   type StoryMaterialPoint,
   type StoryMaterialPosition,
@@ -164,3 +167,6 @@ export {
 } from "./writer.js";
 export * from "./status.js";
 export * from "./public.js";
+export * from "./path-rewrite.js";
+// W5-1: the final report over an investigation.
+export * from "./investigation-report.js";

@@ -1,7 +1,13 @@
 import { createHash } from "node:crypto";
-import { COMPARING_JUDGE_PROMPT_CONTRACT, POINT_INVESTIGATION_PROMPT_CONTRACT, judgeAssignedRootV2PromptContract } from "@debateai/judgement";
+import {
+  COMPARING_JUDGE_PROMPT_CONTRACT, COMPARING_JUDGE_SOURCES_PROMPT_CONTRACT, POINT_INVESTIGATION_PROMPT_CONTRACT, WEB_STEP_PROMPT_CONTRACTS,
+  WEB_DIG_SEALED_CONTRACTS, WEB_WORDING_V2_SEALED_CONTRACTS, judgeAssignedRootV2PromptContract, judgeSourcesSealedContracts
+} from "@debateai/judgement";
 import { MAP_ENGINE_CONTRACT_NAMES, mapEnginePromptContracts } from "@debateai/map";
 import { promptContractFingerprintText, type PromptContract } from "@debateai/providers";
+import { SYNTHESIZER_LENGTH_READER_SOURCES_PROMPT_CONTRACT, SYNTHESIZER_LENGTH_SOURCES_PROMPT_CONTRACT } from "@debateai/serve";
+import { INVESTIGATION_REPORT_SEALED_CONTRACTS, PATH_REWRITE_SEALED_CONTRACTS } from "@debateai/story";
+import { EVALUATOR_SOURCES_SEALED_CONTRACTS } from "./answer-checker-sources.js";
 
 /**
  * Engine redesign (spec 2026-10-15 §9; INTERFACE §2.2): the one seal over engine 2's sealed prompt contracts. The runner
@@ -15,8 +21,11 @@ export const ENGINE_CONTRACT_FINGERPRINT_HEADER = "debateai.engine-contracts.v1"
  * Every engine-2 sealed contract, append-only in phase order, never reordered (INTERFACE §2.2, §2.5). R1d: none, so the
  * fingerprint text is the header alone (deviation 2: the story v4 contracts are test-pinned, not sealed). R2a appends
  * verdict.investigate.v1 and R2b verdict.judge.v1 (R2 plan deviation 1); R3 the map v2 contracts and the assigned-root
- * v2 pair; R4 the writer's and checker's engine pair. A phase that appends moves ENGINE_SEALED_IDS and
- * ENGINE_CONTRACT_HASH_SEALED in tests/unit/engine-contract-hash.test.ts.
+ * v2 pair; R4 the writer's and checker's engine pair; W1-5 (web search, 2026-10-30) the web wording; W1-5b its second
+ * wording as new ids (the v1s it supersedes stay sealed, unused); W3-5 (dig-model revision) the path rewrite's writer and
+ * checker; W4-2 the dig's planner (one search per pick); W4-7 the answer checker's two sources variants; W5-1 the
+ * final report's five. A phase that
+ * appends moves ENGINE_SEALED_IDS and ENGINE_CONTRACT_HASH_SEALED in tests/unit/engine-contract-hash.test.ts.
  */
 export function engineSealedContracts(): readonly PromptContract[] {
   // Append-only, in phase order: R2a seals the investigation (spec §4.2b), R2b the comparing judges (spec §4.8); R3 and
@@ -28,7 +37,33 @@ export function engineSealedContracts(): readonly PromptContract[] {
     // then the fixed-words position writer, unknown then resolved.
     ...MAP_ENGINE_CONTRACT_NAMES.map((name) => mapEnginePromptContracts()[name]),
     judgeAssignedRootV2PromptContract("unknown"),
-    judgeAssignedRootV2PromptContract("resolved")
+    judgeAssignedRootV2PromptContract("resolved"),
+    // Web search (plan 2026-10-30 task W1-5; design §7.1 items 1-7, approved 2026-10-30): the web step's four (planner,
+    // reader 1, the top-3 pick, readers 2 and 3); the arguing legs' and the review's sources variants (items 5, 6); the
+    // comparing judges' (item 7); the answer writer's two (item 7). None is in the judge or composer seal.
+    ...WEB_STEP_PROMPT_CONTRACTS,
+    ...judgeSourcesSealedContracts(),
+    COMPARING_JUDGE_SOURCES_PROMPT_CONTRACT,
+    SYNTHESIZER_LENGTH_SOURCES_PROMPT_CONTRACT,
+    SYNTHESIZER_LENGTH_READER_SOURCES_PROMPT_CONTRACT,
+    // W1-5b (owner approvals of 2026-10-30): the planner v2 (the local pair), the pick v2 and readers 2 and 3 v2 (3 or 5
+    // pages, from code), and the dig-suggestion call (W0-1 drafts §2.1). web.plan.v1, web.pick.v1 and web.read-top.v1
+    // above are never removed or edited: sealed, unused.
+    ...WEB_WORDING_V2_SEALED_CONTRACTS,
+    // W3-5 (dig-model revision 2026-10-30; drafts 5.1 and 5.2, approved as written): the path rewrite's writer, then its
+    // checker (packages/story/src/path-rewrite.ts).
+    ...PATH_REWRITE_SEALED_CONTRACTS,
+    // W4-2 (plan 2026-10-30; owner Q9, the 31 Oct correction): the dig's planner, one search per pick (a draft wording,
+    // OWNER WORDING before switch-on; a reworded one is a new id appended after it).
+    ...WEB_DIG_SEALED_CONTRACTS,
+    // W4-7 (plan 2026-10-30; design §7.1 item 7): the answer checker's length and length-reader variants that read the
+    // cited extracts the writer read, the instruction and form unchanged (answer-checker-sources.ts). Neither is in the
+    // conformance or composer seal.
+    ...EVALUATOR_SOURCES_SEALED_CONTRACTS,
+    // W5-1 (the final report over an investigation; W0-1 §2.6 and draft 5.6 approved, R4's two instructions shown at the
+    // first checkpoint (F11), the story's two OWNER WORDING drafts): the answer, the later version's answer, the answer
+    // check, the story and the story check (packages/story/src/investigation-report.ts).
+    ...INVESTIGATION_REPORT_SEALED_CONTRACTS
   ]);
 }
 

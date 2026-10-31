@@ -217,7 +217,7 @@
   "debateChrome.condition.missingNumber": "Cifra eliminada tras un fallo de reproducción",
   "debateChrome.condition.owedCheckUnexecuted": "La comprobación pendiente no se ejecutó al finalizar",
   "debateChrome.condition.synthesisObjectionStanding": "Una objeción de un evaluador sigue vigente para esta declaración",
-  "debateChrome.condition.digestCompressed": "Los resúmenes de los nodos se acortaron para ajustarse al presupuesto de composición",
+  "debateChrome.condition.digestCompressed": "El debate era muy amplio, así que la respuesta se redactó a partir de una versión abreviada del debate.",
   "debateChrome.condition.digestCannotExist": "No se pudo crear ningún resumen dentro del presupuesto de composición",
   "debateChrome.condition.protectedCoreGuardRetired": "La ejecución se detuvo por el presupuesto; la comprobación de reformulación dejó de condicionarla",
   "debateChrome.condition.hiddenUnjudgeable": "Oculta: no se pudo evaluar — muestre los elementos ocultos para leerla",

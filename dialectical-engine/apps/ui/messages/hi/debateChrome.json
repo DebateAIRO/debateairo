@@ -216,7 +216,7 @@
   "debateChrome.condition.missingNumber": "पुनर्चालन विफल होने के बाद संख्या हटा दी गई",
   "debateChrome.condition.owedCheckUnexecuted": "समापन तक अपेक्षित जाँच नहीं की गई",
   "debateChrome.condition.synthesisObjectionStanding": "इस कथन पर मूल्यांकनकर्ता की आपत्ति अभी बनी हुई है",
-  "debateChrome.condition.digestCompressed": "रचना-बजट में समाने के लिए नोड सारांश छोटे किए गए",
+  "debateChrome.condition.digestCompressed": "वाद-विवाद बहुत बड़ा था, इसलिए उत्तर उसके एक संक्षिप्त रूप के आधार पर लिखा गया।",
   "debateChrome.condition.digestCannotExist": "रचना-बजट में कोई सार-संकलन नहीं बन सका",
   "debateChrome.condition.protectedCoreGuardRetired": "बजट पर संचालन रुका; पुनर्कथन जाँच अब इसे नियंत्रित नहीं करती",
   "debateChrome.condition.hiddenUnjudgeable": "छिपा हुआ: निर्णय नहीं किया जा सका — पढ़ने के लिए छिपी सामग्री दिखाएँ",

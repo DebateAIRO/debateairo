@@ -422,5 +422,11 @@
       "occurred_at": "2026-10-02T00:00:00.000Z"
     }
   ],
-  "threat_reports": []
+  "threat_reports": [],
+  "page_reading_level": null,
+  "debate_visits": [],
+  "dig_links": [],
+  "web_evidence": [],
+  "investigations": [],
+  "reserve_events": []
 }

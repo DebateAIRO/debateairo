@@ -9,6 +9,7 @@ export type * from "./provider-funding.js";
 export * from "./region.js";
 export * from "./italy-approval.js";
 export * from "./mail-address.js";
+export * from "./personal-data-scan.js";
 export * from "./payment-regions.js";
 export * from "./engine.js";
 export * from "./engine-material.js";
@@ -503,6 +504,8 @@ export function isRunLevelSpendStop(error: unknown): boolean {
 
 export * from "./debate-roles.js";
 export * from "./length-guidance.js";
+export * from "./reading-level.js";
+export * from "./web-sentences.js";
 export * from "./support-credentials.js";
 export * from "./support-text-views.js";
 

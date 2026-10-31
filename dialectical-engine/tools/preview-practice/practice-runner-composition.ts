@@ -37,7 +37,7 @@
  *    the integration test only; the real practice waits for real.
  */
 import type { Pool } from "pg";
-import { RunRepository } from "@debateai/db";
+import { PostgresDigModelRunnerRepository, RunRepository } from "@debateai/db";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
 import { TypedDomainError } from "@debateai/kernel";
 import {
@@ -65,6 +65,7 @@ import {
   previewTargetGatewayControls,
   providerTargetGatewayControls,
   providerTargetPrice,
+  previewTargetChargePrice,
   resolveProviderTargetCredentials,
   withPreviewProviderCallPolicy,
   withStructureRepair,
@@ -88,9 +89,13 @@ import { assertRunnerPrimaryProviderConfiguration, createRunnerProviderTopology 
 import { createCallScheduler, type CallSubject } from "../../apps/runner/src/call-scheduler.js";
 import { applyPreviewGateCapacities, previewCallSubjects, previewGateNames, structureRepairThroughLane } from "../../apps/runner/src/call-lane-gateway.js";
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
+import { MonthPause, monthPaused } from "../../apps/runner/src/month-pause.js";
+import { composePathRewrite } from "../../apps/runner/src/path-rewrite-composition.js";
+import { composeInvestigationClose } from "../../apps/runner/src/investigation-close-sources.js";
 import {
   createRunnerSettingsCache, createRunSettingsVersions, loadRunnerVersionSettings, preloadRunnerSettings, readRunnerSiteContext,
-  runCostEnvelopeGuardOf, runnerSettingsOfVersion, runnerSettingsSummary, runPreviewThinkingLevelsOf, type RunnerVersionReaders
+  runCostEnvelopeGuardOf, runnerSettingsOfVersion, runnerSettingsSummary, runnerWebSearchSettings, runPreviewThinkingLevelsOf,
+  type RunnerVersionReaders
 } from "../../apps/runner/src/run-settings.js";
 import { createRunnerRetirementSignal } from "../../apps/runner/src/runner-retirement.js";
 import { PracticeCallStats } from "./practice-parallel.js";
@@ -183,6 +188,8 @@ export async function composePracticeRunner(input: Readonly<{
   }
   // As main.ts (side-by-side spec §13, S14): both in-flight counters, the gateway's (attempts) and the money guard's.
   const gatewayInFlight = createRunInFlight();
+  // W3-2, as main.ts: at the month wall a debate's planned calls pause until the person continues.
+  const monthPause = new MonthPause({ store: new PostgresDigModelRunnerRepository(pool) });
   const moneyInFlight = createRunInFlight();
   /**
    * As main.ts: the site reads, by the SAME function (`readRunnerSiteContext`, apps/runner/src/run-settings.ts): the
@@ -236,7 +243,8 @@ export async function composePracticeRunner(input: Readonly<{
     throw new TypeError("PRACTICE_TARGET_DECLARES_A_CREDENTIAL");
   });
   function targetGateway(target: (typeof providerTargets)[number]): ProviderGateway {
-    const price = providerTargetPrice(target);
+    // Owner answer F4 (2026-10-30), as main.ts: a reviewed Anthropic row's calls at the vendor's real prices.
+    const price = previewTargetChargePrice(previewGate !== undefined, target, providerTargetPrice(target));
     if (runnerSite.money !== null && price === null) {
       throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`);
     }
@@ -251,8 +259,12 @@ export async function composePracticeRunner(input: Readonly<{
       // Hosted only, as main.ts: each call charged to the run's envelope (and the story's calls to the story's own).
       // Side-by-side spec §13 (S6), as main.ts: each call charged to its own run's version's guard.
       ...(runnerSite.money === null || price === null ? {} : {
-        buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => runCostEnvelopeGuard(runId).providerSeam({ runId, price, requireReportedUsage: true, phase, sharedWall }),
-        buildStoryCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).storySeam({ runId, price, requireReportedUsage: true })
+        // W3-2, as main.ts: the month pause on a walled call, and a dig's path rewrite on its own seam.
+        buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => monthPaused(runCostEnvelopeGuard(runId).providerSeam({ runId, price, requireReportedUsage: true, phase, sharedWall }), { runId, phase, sharedWall, pause: monthPause, plannedMicros: () => runCostEnvelopeGuard(runId).bodyMicrosLeft(runId) }),
+        buildStoryCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).storySeam({ runId, price, requireReportedUsage: true }),
+        buildPathRewriteCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).pathRewriteSeam({ runId, price, requireReportedUsage: true }),
+        // W5-1: "Write my report"'s calls spend the report seam, never walled (main.ts's line).
+        buildInvestigationReportCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).investigationReportSeam({ runId, price, requireReportedUsage: true })
       })
     });
     // Spec §3.4, as main.ts: the gate is marked unhealthy on its FIRST unsent refusal, before the resend wait.
@@ -303,6 +315,20 @@ export async function composePracticeRunner(input: Readonly<{
     // Charts in the verdict PDF (design 2026-10-28), as main.ts: the practice debate makes the same chart call.
     charts: true
   });
+  /**
+   * Dig-model revision W3-7: THE PATH REWRITE, switched on. A settled dig writes no story; the path it was dug from is
+   * rewritten in the story's place (apps/runner/src/path-rewrite-composition.ts, the same call as the preview practice's),
+   * its calls charged on the never-walled PATH_REWRITE seam above. Undefined when no Haiku or no GLM target is configured.
+   */
+  const pathRewrite = composePathRewrite({ pool, targets: providerTargets,
+    members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
+    log: storyLog });
+  // W5-1: the closing, composed as main.ts composes it (the practice writes a report only when its script presses it).
+  const closingPrices = buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE);
+  const investigationClose = composeInvestigationClose({ pool, targets: providerTargets,
+    members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
+    priceOf: (providerRef) => closingPrices.get(providerRef) ?? null,
+    log: storyLog });
   function observeClaimTarget(target: (typeof providerTargets)[number]) {
     return observeClaimTimeTarget({
       preview: true,
@@ -348,6 +374,9 @@ export async function composePracticeRunner(input: Readonly<{
       };
     },
     story: storyWriter,
+    // Dig-model revision W3-7: a dig's path rewrite in its story's place (above).
+    ...(pathRewrite === undefined ? {} : { pathRewrite: pathRewrite.settings }),
+    ...(investigationClose === undefined ? {} : { investigationClose }),
     providerPrices: buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE),
     // LG-A (Task 14 carry), as main.ts: root 0's room adds the structure-repair call to its first attempt and retry (the sum).
     structureRepairCeiling: previewStructureRepairCeiling(structureRepairRoute),
@@ -372,6 +401,11 @@ export async function composePracticeRunner(input: Readonly<{
     // model, vendor and gate, and the claim renewals on their own pool.
     callScheduler: runnerCallScheduler,
     callSubjects: previewCallSubjects(previewGate),
+    // Perplexity plan W3-1, as main.ts: the web step where the practice's gate names the search socket; a debate whose
+    // run names no paid plan (billing.run_charge_scope) is NOT_ON_PLAN and makes no web call; searches pause at the month
+    // wall through the same month pause (W4-2).
+    webSearch: runnerWebSearchSettings({ pool, previewGate, fetch: previewFetch,
+      guardOf: runnerSite.money === null ? null : runCostEnvelopeGuard, pause: monthPause }),
     // Ruling R31, as main.ts: a call to a busy model waits on the busy coordinator BEFORE it takes any slot.
     callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model),
     renewals: new WorkItemRepository(input.keepAlivePool, { releaseKey: environment.RELEASE_KEY, workerId: environment.RUNNER_WORKER_ID }),

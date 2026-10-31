@@ -18,6 +18,18 @@ function afterLease(source: string): string {
     "          await storyWriter.writeAfterSettle(");
 }
 
+/**
+ * W3-5 (dig-model revision 2026-10-30): the one addition after the lease is the dig's path rewrite in the story's place
+ * (apps/runner/src/path-rewrite.ts). It is folded back here, exactly as written, so everything else after the lease is
+ * still compared with the base byte for byte.
+ */
+function withoutPathRewrite(source: string): string {
+  const added = /          \/\/ Dig-model revision W3-5 \(owner Q-D13\)[^\n]*\n          \/\/[^\n]*\n          \/\/[^\n]*\n          if \(!\(await runDigPathRewrite\(settings\.pathRewrite, settled\.input\)\)\) \{\n((?:            [^\n]*\n){3})          \}\n/u;
+  const match = added.exec(source);
+  if (match === null) return source;
+  return source.replace(match[0], match[1]!.split("\n").map((line) => line.slice(2)).join("\n"));
+}
+
 describe("synthesis check request runner wiring", () => {
   it("the runner passes synthesisCheckRequest: true at exactly its two persist calls and adds nothing after the content lease", async () => {
     const source = await readFile(runnerPath, "utf8");
@@ -31,7 +43,8 @@ describe("synthesis check request runner wiring", () => {
     const base = execFileSync("git", ["show", `d78d58b4f:${basePath}`], {
       cwd: process.cwd(), encoding: "utf8"
     });
-    expect(afterLease(source)).toBe(afterLease(base));
+    expect(withoutPathRewrite(source)).not.toBe(source);
+    expect(afterLease(withoutPathRewrite(source))).toBe(afterLease(base));
   });
 
   it("persists the check request and wins settlement before awaiting the optional story", async () => {

@@ -12,6 +12,8 @@ function rawRows() {
     adult_affirmed_at: "2026-01-01T00:00:00.000Z" };
   raw.registration_region = null;
   raw.recovery_codes = null;
+  // 0131's reading level is one row or null, like the region.
+  raw.page_reading_level = null;
   raw.billing = Object.fromEntries(Object.keys(KEEP_COLUMNS.billing).map(key => [key, []]));
   raw.threat_reports = [{ question: "Should I hurt my neighbour?", kept_at: "2026-10-20T09:00:00.000Z",
     decision: "REPORTED", decided_by_staff_id: "staff-secret" }];
@@ -23,7 +25,7 @@ async function collect(raw: Record<string, unknown>) {
     claim: { exportId: "export", userId: "user", ownerRef: "owner", sessionId: "session",
       locale: "en", requestedAt: new Date("2026-10-20T10:00:00.000Z"), attempt: 1 }, workerId: "worker",
     source: { readRaw: async () => raw as never }, ownerView: {} as never,
-    decrypt: { openUserField: async () => "ada@example.test", openRecord: () => "", openSupport: async () => "" },
+    decrypt: { openUserField: async () => "ada@example.test", openRecord: () => "", openSupport: async () => "", openRunContent: async () => [] },
     now: () => new Date("2026-10-20T11:00:00.000Z")
   });
 }
@@ -54,9 +56,17 @@ describe("S04 data export", () => {
       request_count: name === "request" ? 4 : 0, worker_count: workerCount, privileged: false });
     const pool = (name: string, workerCount: number) => ({ query: async (_sql: string, params: unknown[]) => {
       seen.push(params); return { rows: [principal(name, workerCount)] }; } });
-    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 9) as never)).resolves.toBeUndefined();
+    // 0131 (the V4 account memory) adds a tenth worker function, its page-memory reader; 0132 and 0133 (the web evidence
+    // store and the investigations) an eleventh and a twelfth; 0134 (the dig model) a thirteenth; 0135 (the dig picks) a
+    // fourteenth; 0136 (the investigation reports) a fifteenth.
+    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 15) as never)).resolves.toBeUndefined();
     expect(seen[1]?.[1]).toContain("identity.read_data_export_threat_reports(uuid,uuid)");
-    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 8) as never)).rejects.toThrow("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
-    await expect(assertDataExportDatabaseRoles(pool("request", 1) as never, pool("worker", 9) as never)).rejects.toThrow("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
+    expect(seen[1]?.[1]).toContain("identity.read_data_export_web_evidence(uuid,uuid)");
+    expect(seen[1]?.[1]).toContain("identity.read_data_export_investigations(uuid,uuid)");
+    expect(seen[1]?.[1]).toContain("identity.read_data_export_dig_model(uuid,uuid)");
+    expect(seen[1]?.[1]).toContain("identity.read_data_export_dig_picks(uuid,uuid)");
+    expect(seen[1]?.[1]).toContain("identity.read_data_export_investigation_reports(uuid,uuid)");
+    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 14) as never)).rejects.toThrow("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
+    await expect(assertDataExportDatabaseRoles(pool("request", 1) as never, pool("worker", 15) as never)).rejects.toThrow("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
   });
 });

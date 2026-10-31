@@ -554,10 +554,16 @@ describe("V-MINIMUM-PAYLOAD — the synthesis prompt surface withholds the machi
     // keeps guarding the moved text (tests-that-are-not-testing control 1). Length guidance (LG-C Task 13): the checker's
     // fourth argument is the run's `checkerLength` (the writer's words and its own, with the receipt's `length`, else null).
     expect(occurrences(runner, "buildSynthesisRolePrompt(request, run.argumentLanguageName")).toBe(SYNTHESIS_CALL_SITES);
-    expect(occurrences(runner, "buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, checkerLength, shapeLanguage)")).toBe(1);
+    // V4 reading level (owner N6, 2026-10-29): both pass the run's level as the sixth (null on every V3 ask: today's
+    // packet), and the reader field joins after the length fields, inside the language wrapper (`withReaderField`).
     expect(occurrences(runner,
-      "buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, synthesisLength,\n          shapeLanguage)")).toBe(1);
-    expect(occurrences(runner, "toSynthesisPromptMaterial(request)")).toBe(1);
+      "buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, checkerLength, shapeLanguage,\n          readingLevel)")).toBe(1);
+    expect(occurrences(runner,
+      "buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, synthesisLength,\n          shapeLanguage, readingLevel)")).toBe(1);
+    expect(occurrences(runner, "material: withQuestionLanguageField(withReaderField(")).toBe(1);
+    // W4-7: the one projection is told whether the checker reads the cited extracts (its sources variant), nothing else.
+    expect(occurrences(runner, "toSynthesisPromptMaterial(request, { checkerReadsExtracts: checkerSourced })")).toBe(1);
+    expect(occurrences(runner, "toSynthesisPromptMaterial(")).toBe(1);
     // Debate shape (040ddb9fd): the answer-length variant adds ONE field after that one projection, nothing else.
     // Question language (P2L Task 13, PF-L40): a shaped run's lock adds ONE code-owned field after those, last; the
     // wrapper returns the same array without a lock, so today's material is that one projection still.

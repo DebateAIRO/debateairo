@@ -18,7 +18,8 @@ import type { SpendScope } from "./person-allowance.js";
  *    when the site holds every question back (`AdmissionHold`); a person who
  *    already has their waiting questions is refused instead; START otherwise.
  *  - The WALL for a running debate: real spend plus the next call's projection
- *    against the finish edge. Holds are not counted here.
+ *    against the finish edge: the limit's share edge plus, on a billingPlans v4
+ *    window, its fixed overflow in micro-units. Holds are not counted here.
  */
 export type Room = "FITS" | "CLOSE" | "FULL";
 /**
@@ -136,6 +137,8 @@ export function decideSharedWall(input: Readonly<{
   projectedMicros: number;
   limitMicros: number;
   finishBasisPoints: number;
+  /** billingPlans v4: a fixed amount past the share edge (20 cents); absent is none. */
+  finishOverflowMicros?: number;
 }>): Wall {
   const spent = wholeMicros(input?.spentMicros, "BUDGET_WALL_SPENT_INVALID");
   const projected = wholeMicros(input?.projectedMicros, "BUDGET_WALL_PROJECTION_INVALID");
@@ -144,7 +147,9 @@ export function decideSharedWall(input: Readonly<{
   const finish = basisPointsWithin(
     input?.finishBasisPoints, WHOLE_BASIS_POINTS, 2n * WHOLE_BASIS_POINTS, "BUDGET_WALL_FINISH_INVALID"
   );
-  return spent + projected <= edgeOf(limit, finish) ? "WITHIN" : "WOULD_CROSS";
+  const overflow = input.finishOverflowMicros === undefined
+    ? 0n : wholeMicros(input.finishOverflowMicros, "BUDGET_WALL_OVERFLOW_INVALID");
+  return spent + projected <= edgeOf(limit, finish) + overflow ? "WITHIN" : "WOULD_CROSS";
 }
 
 /**
@@ -232,4 +237,127 @@ export function decideAdmission(input: Readonly<{
     }
   }
   return Object.freeze({ kind: "START" as const, worst: worst?.room ?? "FITS", worstScope: worst?.scope ?? null });
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// THE MONEY RULE (owner, 31 Oct 2026, "How web money is spent"; plan 2026-10-30 dig-model revision, its closing section).
+// It applies to a billingPlans v4 person's windows (they carry `borrows` or `keepsReserveMicros`); a v3 window and an
+// internal grant's keep the rules above unchanged.
+//  1. No worst-case hold before a start: a question or dig starts when the day, week and month have room (its estimate
+//     is shown as a share of today, not held).
+//  2. Running work is never stopped by the day or week: what it uses past them is BORROWED from the next day or week,
+//     which starts lower by that much. New starts wait for the reset.
+//  3. The month is the wall: no new start, and a running debate's remaining planned calls and searches pause. Only the
+//     calls already in flight may finish, within the month's tolerance (the old fixed 20-cent overflow).
+//  4. The final-answer reserve is always kept: a paid plan's 20 cents inside its month.
+// ---------------------------------------------------------------------------------------------------------------------
+
+/**
+ * Open owner question (held 31 Oct, to be ruled on in the morning): does what running work borrowed at the end of a
+ * month carry into the NEW month's first day and week? This is the ONE switch for it. NO (the default): the new month
+ * starts clean, because the month is the wall and an overspend at its end is the in-flight tolerance. YES: the borrow
+ * chain runs on from the last day and week of the month before.
+ */
+export const BORROW_CARRIES_ACROSS_MONTH: boolean = false;
+
+/** The blocks the day and week windows tile a month with, from its anchor (billing-core `computeWindows`). */
+export const BORROW_WINDOW_SPANS_MS: Readonly<Record<"PERSON_DAY" | "PERSON_WEEK", number>> = Object.freeze({
+  PERSON_DAY: 86_400_000,
+  PERSON_WEEK: 7 * 86_400_000
+});
+
+/** One day or week window of the borrow chain: its limit and what was spent in it (the ledger, by recorded time). */
+export type BorrowWindow = Readonly<{ limitMicros: number; usedMicros: number }>;
+
+/**
+ * Borrowing is DERIVED, never stored (the ledger is append-only, and a stored copy could drift from it). For the windows
+ * w1 … wn of one kind, oldest first, ending with the current one:
+ *   borrowed(w1) = `carryInMicros` (0 unless the cross-month switch carries the month before's last over);
+ *   borrowed(wk+1) = max(0, used(wk) + borrowed(wk) − limit(wk)).
+ * `borrowedMicros[k]` is how much lower window k started; `overMicros` is what the LAST window is borrowing from the next
+ * (its used plus borrowed past its limit): when it is more than 0, the page says some of tomorrow's (or next week's)
+ * allowance was used to finish the running task.
+ */
+export function deriveBorrows(windows: ReadonlyArray<BorrowWindow>, carryInMicros = 0): Readonly<{
+  borrowedMicros: readonly number[];
+  overMicros: number;
+}> {
+  if (!Array.isArray(windows)) throw new TypeError("BUDGET_BORROW_WINDOWS_INVALID");
+  let borrowed = wholeMicros(carryInMicros, "BUDGET_BORROW_CARRY_INVALID");
+  const result: number[] = [];
+  let over = 0n;
+  for (const window of windows) {
+    const limit = wholeMicros(window?.limitMicros, "BUDGET_BORROW_WINDOWS_INVALID");
+    const used = wholeMicros(window?.usedMicros, "BUDGET_BORROW_WINDOWS_INVALID");
+    result.push(Number(borrowed));
+    over = used + borrowed > limit ? used + borrowed - limit : 0n;
+    borrowed = over;
+  }
+  return Object.freeze({ borrowedMicros: Object.freeze(result), overMicros: Number(over) });
+}
+
+/**
+ * The day or week blocks of the month [`monthStart`, `monthEnd`), oldest first: 24-hour or 7-day blocks counted from
+ * the month's start, the last one cut at the month's end (billing-core `computeWindows`' tiling, exactly).
+ */
+export function tiledWindows(monthStart: Date, monthEnd: Date, scope: "PERSON_DAY" | "PERSON_WEEK"): ReadonlyArray<Readonly<{
+  start: Date; end: Date }>> {
+  const start = validDate(monthStart, "BUDGET_BORROW_MONTH_INVALID").getTime();
+  const end = validDate(monthEnd, "BUDGET_BORROW_MONTH_INVALID").getTime();
+  const span = BORROW_WINDOW_SPANS_MS[scope];
+  if (span === undefined || end <= start) throw new TypeError("BUDGET_BORROW_MONTH_INVALID");
+  const blocks: Array<Readonly<{ start: Date; end: Date }>> = [];
+  for (let at = start; at < end; at += span) {
+    blocks.push(Object.freeze({ start: new Date(at), end: new Date(Math.min(at + span, end)) }));
+  }
+  return Object.freeze(blocks);
+}
+
+/**
+ * The limit a NEW start is measured against: the window's limit less the final-answer reserve kept inside it (a paid
+ * plan's month), never below one micro-unit (`decideRoom` refuses a zero limit). New starts compare used + borrowed
+ * with it; only FULL makes them wait, for the window's reset.
+ */
+export function startLimitMicros(window: Readonly<{ limitMicros: number; keepsReserveMicros?: number }>): number {
+  const limit = wholeMicros(window?.limitMicros, "BUDGET_ROOM_LIMIT_INVALID");
+  const reserve = window.keepsReserveMicros === undefined ? 0n : wholeMicros(window.keepsReserveMicros, "BUDGET_ROOM_RESERVE_INVALID");
+  return Number(limit - reserve > 1n ? limit - reserve : 1n);
+}
+
+/**
+ * THE MONTH WALL for one call while a debate is argued (money rule point 3). The wall's edge is the month's limit less
+ * the reserve kept inside it. A call is WITHIN when the month (real spend plus the run's other calls in flight, both in
+ * `spentMicros`) is still below that edge, AND its own projected maximum stays within the edge plus the tolerance for
+ * calls in flight (billingPlans v4's `finish_overflow_micros`, 20 cents). Otherwise it WOULD_CROSS: the runner pauses
+ * the debate's remaining planned work instead of sending it.
+ */
+export function decideMonthWall(input: Readonly<{
+  spentMicros: number;
+  projectedMicros: number;
+  limitMicros: number;
+  keepsReserveMicros?: number;
+  toleranceMicros: number;
+}>): Wall {
+  const spent = wholeMicros(input?.spentMicros, "BUDGET_WALL_SPENT_INVALID");
+  const projected = wholeMicros(input?.projectedMicros, "BUDGET_WALL_PROJECTION_INVALID");
+  const limit = wholeMicros(input?.limitMicros, "BUDGET_WALL_LIMIT_INVALID");
+  if (limit < 1n) throw new TypeError("BUDGET_WALL_LIMIT_INVALID");
+  const reserve = input.keepsReserveMicros === undefined ? 0n : wholeMicros(input.keepsReserveMicros, "BUDGET_WALL_RESERVE_INVALID");
+  const tolerance = wholeMicros(input.toleranceMicros, "BUDGET_WALL_OVERFLOW_INVALID");
+  const edge = limit > reserve ? limit - reserve : 0n;
+  if (spent >= edge) return "WOULD_CROSS";
+  return spent + projected <= edge + tolerance ? "WITHIN" : "WOULD_CROSS";
+}
+
+/**
+ * The borrow notice's share: what the current window is borrowing, as a whole percentage of the next window's limit,
+ * rounded UP (a borrow of anything shows at least 1%) and at most 100. 0 when nothing is borrowed.
+ */
+export function borrowPercent(overMicros: number, nextLimitMicros: number): number {
+  const over = wholeMicros(overMicros, "BUDGET_BORROW_OVER_INVALID");
+  const limit = wholeMicros(nextLimitMicros, "BUDGET_ROOM_LIMIT_INVALID");
+  if (limit < 1n) throw new TypeError("BUDGET_ROOM_LIMIT_INVALID");
+  if (over === 0n) return 0;
+  const percent = (over * 100n + limit - 1n) / limit;
+  return Number(percent > 100n ? 100n : percent < 1n ? 1n : percent);
 }

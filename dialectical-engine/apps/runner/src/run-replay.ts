@@ -133,6 +133,12 @@ export interface ReplayBook {
   siteNodeId(nodeId: string): string;
   /** The recorded answer to this request, consumed, or null. */
   take(request: Readonly<{ callSiteKey: string; providerRef: string; fingerprint: string }>): Replay | null;
+  /**
+   * R22 (owner ruling 2026-10-30, "Yes, use the spare debater"): the routes whose recorded answer at a site `matches`
+   * accepts is still to be replayed, in record order, each once. The runner reads it for a position an earlier copy
+   * handed to a spare debater, so the copy hands it over again before any call (`shapeSpareThatAnswered`).
+   */
+  answeredBy(matches: (callSiteKey: string) => boolean): readonly string[];
   /** Nothing is replayed any more and the recorded content is dropped (the run's content lease is over). */
   close(): void;
 }
@@ -173,6 +179,9 @@ export function createReplayBook(input: Readonly<{
         return replay;
       }
       return null;
+    },
+    answeredBy(matches) {
+      return Object.freeze([...new Set(pending.filter((call) => matches(call.callSiteKey)).map((call) => call.actorRef))]);
     },
     close() {
       pending.splice(0, pending.length);

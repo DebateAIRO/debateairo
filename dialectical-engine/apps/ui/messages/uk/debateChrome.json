@@ -216,7 +216,7 @@
   "debateChrome.condition.missingNumber": "Число видалено після помилки повторного відтворення",
   "debateChrome.condition.owedCheckUnexecuted": "Обов’язкову перевірку не виконано до завершення",
   "debateChrome.condition.synthesisObjectionStanding": "Заперечення оцінювача щодо цього твердження досі чинне",
-  "debateChrome.condition.digestCompressed": "Підсумки вузлів скорочено відповідно до бюджету компонування",
+  "debateChrome.condition.digestCompressed": "Дебати були дуже великими, тому відповідь написано на основі їхньої скороченої версії.",
   "debateChrome.condition.digestCannotExist": "У межах бюджету компонування не вдалося створити зведення",
   "debateChrome.condition.protectedCoreGuardRetired": "Запуск зупинено через бюджет; перевірка переформулювання більше не блокувала його",
   "debateChrome.condition.hiddenUnjudgeable": "Приховано: оцінити не вдалося — увімкніть показ прихованого, щоб прочитати",

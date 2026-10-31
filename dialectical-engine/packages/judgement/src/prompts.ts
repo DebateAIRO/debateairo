@@ -226,6 +226,27 @@ export function judgeConsiderationPromptContract(
   });
 }
 
+/**
+ * Web search (plan 2026-10-30 task W1-5; design §7.1 item 5): the closed tables of the arguing legs' SOURCES variants
+ * (./web-prompts.ts). Each is the leg's lengthed table with `sources` (the path's checked extracts, with their ids) right
+ * before `length`. New tables beside today's; no existing table changes.
+ */
+const withSourcesBeforeLength = (table: readonly string[]): readonly string[] =>
+  Object.freeze([...table.slice(0, -1), "sources", "length"]);
+export const JUDGE_ASSIGNED_ROOT_V2_SOURCES_MATERIAL_FIELDS: readonly string[] =
+  withSourcesBeforeLength(JUDGE_ASSIGNED_ROOT_V2_MATERIAL_FIELDS);
+export const JUDGE_LEG_SOURCES_MATERIAL_FIELDS: Readonly<Record<"support" | "attack" | "cross-root", readonly string[]>> =
+  Object.freeze({
+    support: withSourcesBeforeLength(JUDGE_LEG_LENGTH_MATERIAL_FIELDS.support),
+    attack: withSourcesBeforeLength(JUDGE_LEG_LENGTH_MATERIAL_FIELDS.attack),
+    "cross-root": withSourcesBeforeLength(JUDGE_LEG_LENGTH_MATERIAL_FIELDS["cross-root"])
+  });
+export const JUDGE_LEG_CONSIDERATION_SOURCES_MATERIAL_FIELDS: Readonly<Record<JudgeConsiderationLegKind, readonly string[]>> =
+  Object.freeze({
+    support: withSourcesBeforeLength(JUDGE_LEG_CONSIDERATION_LENGTH_MATERIAL_FIELDS.support),
+    attack: withSourcesBeforeLength(JUDGE_LEG_CONSIDERATION_LENGTH_MATERIAL_FIELDS.attack)
+  });
+
 /* ------------------------------------------------------- the review contract */
 
 export const REVIEW_INSTRUCTIONS =
@@ -239,6 +260,16 @@ export const REVIEW_INSTRUCTIONS =
 export function reviewAnswerForm(edgeCount: number): string {
   return `Return only one JSON object with exactly this schema and no additional keys:\n{\n  "outcome": "agree" | "dispute" | "cannot-assess",\n  "reasons": [non-empty string, ...],\n  "edge_bearings": [number in [0,1] or null, ...]\n}\nedge_bearings has exactly ${String(edgeCount)} entries.`;
 }
+
+/**
+ * The lengthed review's fields, in the order `Judge.review` sends them (written down here for the first time; the call
+ * itself is unchanged). Web search (W1-5, design §7.1 item 6): the sources variant adds `cited_extract`, the extract the
+ * reviewed point names, right after the statement.
+ */
+export const REVIEW_MATERIAL_FIELDS: readonly string[] =
+  Object.freeze(["question_line", "statement", "edges_sourced_by_this_node", "length"]);
+export const REVIEW_SOURCES_MATERIAL_FIELDS: readonly string[] =
+  Object.freeze(["question_line", "statement", "cited_extract", "edges_sourced_by_this_node", "length"]);
 
 export function reviewPromptContract(edgeCount: number, lengthed = false): PromptContract {
   return Object.freeze({

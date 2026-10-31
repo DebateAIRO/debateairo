@@ -30,6 +30,7 @@ import {
 import type { DebateShapeCeilingInput } from "./debate-shape-policy.js";
 import { lengthGuidanceReceipt, type LengthGuidance } from "./length-guidance-policy.js";
 import { engineReceipt, type EngineSettings } from "./engine-version-policy.js";
+import { webReceipt, type WebSites } from "./web-sites.js";
 
 export const CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY = "claimTypeCompositionMap" as const;
 export {
@@ -225,6 +226,12 @@ export interface StructuralCeilingInput {
    * Needs `length`: engine 2 is always lengthed. Absent: no `engine` member and today's ceiling, byte for byte.
    */
   readonly engine?: EngineSettings;
+  /**
+   * Web search (plan 2026-10-30, W2-2): the web part's counts (`webSitesOf` at admission), passed only for a paid
+   * debate whose web search is on. Its model calls are billed into the ceiling like a panel member's; its searches are
+   * money only (`envelope_basis.web.searches`). Absent: no `web` member and today's ceiling, byte for byte.
+   */
+  readonly web?: WebSites;
 }
 
 /**
@@ -233,7 +240,7 @@ export interface StructuralCeilingInput {
  * pass, so an omitted term reached the arithmetic as `undefined` and minted a
  * `NaN` ceiling in silence. A missing term is now as loud as an invalid one.
  */
-const STRUCTURAL_CEILING_MEMBERS: readonly Exclude<keyof StructuralCeilingInput, "backupSequencesProvisioned" | "shape" | "length" | "engine">[] = Object.freeze([
+const STRUCTURAL_CEILING_MEMBERS: readonly Exclude<keyof StructuralCeilingInput, "backupSequencesProvisioned" | "shape" | "length" | "engine" | "web">[] = Object.freeze([
   "panelSize", "depth", "judgeMaxAttempts", "organMaxAttempts", "maxRecompose",
   "maxCooldownHoldsPerRun", "finalRetryAttempts", "branchingFactor",
   "compositionSegmentCap", "fixedOrgansPerComposition",
@@ -464,6 +471,9 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
   }
   const engineMember = input.engine === undefined ? null : engineReceipt(input.engine, panelMemberAttempts);
   const engineAddedAttempts = engineMember === null ? 0 : engineMember.sites.added_model_attempts;
+  // Web search (W2-2): the web part's model calls, each one call bounded like a panel member (backup included).
+  const webMember = input.web === undefined ? null : webReceipt(input.web, panelMemberAttempts);
+  const webAddedAttempts = webMember === null ? 0 : webMember.sites.added_model_attempts;
   // Debate shape (spec 2026-10-12 §3.6): the map's sites are author sites at the cooldown allowance; every node has its
   // graders, its close-call extras (counted on EVERY node, so the ceiling never under-counts) and its reviews; the P
   // cross-replies are the cross-exchange author sites (no runner-up), as today's M(M-1).
@@ -501,7 +511,8 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
     + crossExchangeAuthorSites * crossExchangeSiteAttempts
     + panelSites * panelMemberAttempts
     + serveSites * serveSiteAttempts
-    + engineAddedAttempts;
+    + engineAddedAttempts
+    + webAddedAttempts;
   return Object.freeze({
     kind: "COMPUTED_STRUCTURAL_CEILING",
     max_model_attempts: maxModelAttempts,
@@ -566,7 +577,10 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
     ...(input.length === undefined ? {} : { length: lengthGuidanceReceipt(input.length) }),
     // Engine redesign (INTERFACE §3.2): the engine's frozen values and sites, LAST (after `length`) and only with the
     // engine row, so a receipt minted without them keeps its bytes. `formula_version` never changes for it.
-    ...(engineMember === null ? {} : { engine: engineMember })
+    ...(engineMember === null ? {} : { engine: engineMember }),
+    // Web search (W2-2): the web part's frozen counts, LAST (after `engine`) and only for a debate with web, so a
+    // receipt minted without it keeps its bytes. `formula_version` never changes for it.
+    ...(webMember === null ? {} : { web: webMember })
   });
 }
 
@@ -1172,7 +1186,8 @@ export {
   type BillingPlan,
   type BillingPlans,
   type FreeFixedGauges,
-  type PlanId
+  type PlanId,
+  type ReserveHeld
 } from "./billing-plans.js";
 export {
   BILLING_POLICY_DEPLOYMENT_REGISTER_ROW,
@@ -1234,7 +1249,12 @@ export {
   readStoryPolicyFromRegister,
   type StoryPolicy,
   type StoryRegisterRow,
-  type StoryRegisterRowsInput
+  type StoryRegisterRowsInput,
+  // W3-5 (dig-model revision): the path rewrite's code-owned numbers and its thinking steps.
+  PATH_REWRITE_POLICY,
+  PATH_REWRITE_THINKING,
+  // W5-1: the final report's code-owned numbers.
+  INVESTIGATION_REPORT_POLICY
 } from "./story-policy.js";
 // A19: the optional model scorecard (absent -> the plan rosters choose the models).
 export {
@@ -1343,6 +1363,25 @@ export {
   type EngineSites,
   type EngineVersionPolicy
 } from "./engine-version-policy.js";
+export {
+  WEB_HAIKU_PROMPT_TOKEN_LINE,
+  WEB_READER_BATCH_TOKENS,
+  WEB_SEARCH_PAGE_TOKEN_CAP,
+  WEB_SEARCH_REQUEST_TOKEN_CAP,
+  WEB_SITES_LIMITS,
+  WEB_SITES_START,
+  webModelCalls,
+  webReaderOneCalls,
+  webReceipt,
+  webReceiptSchema,
+  webSitesOf,
+  webSitesOfReceipt,
+  type WebDepth,
+  type WebKind,
+  type WebReceipt,
+  type WebSiteInput,
+  type WebSites
+} from "./web-sites.js";
 export {
   QUESTION_LANGUAGE_CHECK_DEFAULT_INSTRUCTION,
   QUESTION_LANGUAGE_POLICY_ROW_KEY,

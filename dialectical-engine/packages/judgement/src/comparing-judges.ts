@@ -18,12 +18,14 @@ import {
   ENGINE_QUESTION_KINDS,
   LENGTH_SENTENCE_WRITING,
   TypedDomainError,
+  WEB_EXTRACT_WEIGH_SENTENCE,
   argumentLanguageDirective,
   lengthGuidanceField,
   questionLanguageSentence,
   replyLanguageCheckFor,
   withQuestionLanguageField,
   type EngineAnswerLetter,
+  type EngineCitedExtract,
   type EngineDebateMaterial,
   type EngineMaterialPoint,
   type EngineQuestionKind,
@@ -80,6 +82,19 @@ export const COMPARING_JUDGE_ANSWER_FORM = [
 export const COMPARING_JUDGE_PROMPT_CONTRACT: PromptContract = Object.freeze({
   contractId: COMPARING_JUDGE_CONTRACT_ID,
   instruction: `${COMPARING_JUDGE_INSTRUCTION} ${LENGTH_SENTENCE_WRITING}`,
+  answerForm: COMPARING_JUDGE_ANSWER_FORM
+});
+
+/**
+ * Web search (plan 2026-10-30 task W1-5; design §7.1 item 7, approved 2026-10-30): the comparing judges when the debate
+ * read web sources. A looked-up point then carries the extract it rests on (inside the `answers` field), and the judges are
+ * told the item-7 sentence, after the owner's text and before the length sentence. A NEW contract (never an edit of
+ * verdict.judge.v1), sealed by engineContractHash only; a debate without sources sends verdict.judge.v1 to the byte.
+ */
+export const COMPARING_JUDGE_SOURCES_CONTRACT_ID = "verdict.judge.sources.v1" as const;
+export const COMPARING_JUDGE_SOURCES_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: COMPARING_JUDGE_SOURCES_CONTRACT_ID,
+  instruction: `${COMPARING_JUDGE_INSTRUCTION} ${WEB_EXTRACT_WEIGH_SENTENCE} ${LENGTH_SENTENCE_WRITING}`,
   answerForm: COMPARING_JUDGE_ANSWER_FORM
 });
 
@@ -168,6 +183,20 @@ export function comparingJudgeOrder(answerCount: number, seat: number): readonly
 // OWNER WORDING — approve before switch-on (the material's keys below and in `comparingJudgeMaterialFields` are new
 // words the AI reads: answers, letter, answer, case, supporting_points, objections, assumptions, disputed,
 // not_yet_checked, rests_on, from_rival_reply, investigation, reviewer_reasons, disputed_points).
+/**
+ * Web search (W4-1; design §7.1 item 7): the extract a looked-up point (or a case) rests on, as a judge reads it: its id,
+ * the quote word for word, and the page's title, site and date. Never the page's text, a grade or a reader.
+ */
+function extractForJudge(extract: EngineCitedExtract) {
+  return Object.freeze({ id: extract.id, quote: extract.quote, title: extract.title, site: extract.site, date: extract.date });
+}
+
+/** W4-1: whether the material a judge is shown carries any cited extract (then the judges' sources variant is sent). */
+export function comparingJudgeMaterialCitesExtracts(material: EngineDebateMaterial): boolean {
+  return material.answers.some((answer) => answer.citedExtract !== undefined
+    || [...answer.supports, ...answer.objections].some((point) => point.citedExtract !== undefined));
+}
+
 /** One point as a judge reads it: its words and its labels; never its node id, its maker or a number. */
 function pointForJudge(point: EngineMaterialPoint) {
   return Object.freeze({
@@ -183,7 +212,9 @@ function pointForJudge(point: EngineMaterialPoint) {
       found: point.investigation.found,
       basis: point.investigation.basis,
       reason: point.investigation.reason
-    })
+    }),
+    // W4-1: last, and only on a point that cites one of this debate's extracts; every other point keeps today's bytes.
+    ...(point.citedExtract === undefined ? {} : { extract: extractForJudge(point.citedExtract) })
   });
 }
 
@@ -215,7 +246,9 @@ export function comparingJudgeMaterialFields(input: Readonly<{
       case: answer.caseText,
       supporting_points: answer.supports.map(pointForJudge),
       objections: answer.objections.map(pointForJudge),
-      assumptions: [...answer.assumptions]
+      assumptions: [...answer.assumptions],
+      // W4-1: the extract the position's case cites, last; absent, today's bytes.
+      ...(answer.citedExtract === undefined ? {} : { case_extract: extractForJudge(answer.citedExtract) })
     })];
   });
   const disputed = input.material.disputed.map((entry) => Object.freeze({
@@ -233,15 +266,31 @@ export function comparingJudgeMaterialFields(input: Readonly<{
 
 export type ComparingJudgeSeat = Readonly<{ seat: number; maker: string; providerRef: string; argued: boolean }>;
 
+/** One run judge seat as the pick reads it: the member planned for it, and (optional) its other member. */
+export type ComparingJudgeCandidateSeat = Readonly<{
+  maker: string;
+  providerRef: string;
+  /**
+   * Owner ruling 2026-10-29 (MORNING-2026-10-17 item 6, "prefer neutral judges"): the seat's other member, which judges
+   * in place of the planned member only when the planned member's maker argued an answer and this member's maker argued
+   * none. It never stands in as a fallback.
+   */
+  alternate?: Readonly<{ maker: string; providerRef: string }>;
+}>;
+
 /**
- * WHO JUDGES (spec §4.3; INTERFACE §9.3): the seats in rotation from `rotationOffset`; makers that argued none of the
- * answers first, then makers that argued one; never two seats of one maker; at most `count` and at most
+ * WHO JUDGES (spec §4.3; INTERFACE §9.3; owner ruling 2026-10-29, "prefer neutral judges"): the seats in rotation from
+ * `rotationOffset`. First, every seat that a maker that argued none of the answers can fill: its planned member when that
+ * member's maker argued none, else its other member when that one's maker argued none. Only then, for the seats still
+ * open, today's fallback: the remaining seats' planned members, makers that argued one, in the same rotation. Each run
+ * seat fills at most one judge seat; never two seats of one maker; at most `count` and at most
  * `COMPARING_JUDGE_LIMITS.maxSeats`. A maker that argued EVERY answer (the only arguing maker, a one-maker debate) is
  * never seated: its vote could never be counted (spec §4.7, "one maker": no judge can run). Seats are numbered 1..k in
- * the order picked; seat k is called `VERDICT:judge:<k>` and sees the answers in `comparingJudgeOrder(n, k)`.
+ * the order picked; seat k is called `VERDICT:judge:<k>` and sees the answers in `comparingJudgeOrder(n, k)`. Without
+ * any `alternate` the pick is exactly the one before the ruling.
  */
 export function pickComparingJudges(input: Readonly<{
-  seats: readonly Readonly<{ maker: string; providerRef: string }>[];
+  seats: readonly ComparingJudgeCandidateSeat[];
   arguingMakers: ReadonlySet<string>;
   count: number;
   rotationOffset: number;
@@ -255,22 +304,29 @@ export function pickComparingJudges(input: Readonly<{
   const start = input.rotationOffset % input.seats.length;
   const rotated = [...input.seats.slice(start), ...input.seats.slice(0, start)];
   const loneArguer = input.arguingMakers.size === 1 ? [...input.arguingMakers][0] : undefined;
-  const sittable = rotated.filter((seat) => seat.maker !== loneArguer);
-  const ordered = [
-    ...sittable.filter((seat) => !input.arguingMakers.has(seat.maker)),
-    ...sittable.filter((seat) => input.arguingMakers.has(seat.maker))
-  ];
   const limit = Math.min(input.count, COMPARING_JUDGE_LIMITS.maxSeats);
   const seatedMakers = new Set<string>();
+  const filled = new Set<number>();
   const picked: ComparingJudgeSeat[] = [];
-  for (const seat of ordered) {
-    if (picked.length >= limit) break;
-    if (seatedMakers.has(seat.maker)) continue;
-    seatedMakers.add(seat.maker);
+  const seatFrom = (index: number, member: Readonly<{ maker: string; providerRef: string }>): void => {
+    filled.add(index);
+    seatedMakers.add(member.maker);
     picked.push(Object.freeze({
-      seat: picked.length + 1, maker: seat.maker, providerRef: seat.providerRef, argued: input.arguingMakers.has(seat.maker)
+      seat: picked.length + 1, maker: member.maker, providerRef: member.providerRef, argued: input.arguingMakers.has(member.maker)
     }));
-  }
+  };
+  // Neutral judges first: the planned member, else the other member, of a maker that argued none of the answers.
+  rotated.forEach((seat, index) => {
+    if (picked.length >= limit) return;
+    const neutral = [seat, seat.alternate].find((member) => member !== undefined
+      && !input.arguingMakers.has(member.maker) && !seatedMakers.has(member.maker));
+    if (neutral !== undefined) seatFrom(index, neutral);
+  });
+  // Today's fallback for the seats still open: the remaining seats' planned members, in the same rotation.
+  rotated.forEach((seat, index) => {
+    if (picked.length >= limit || filled.has(index) || seat.maker === loneArguer || seatedMakers.has(seat.maker)) return;
+    seatFrom(index, seat);
+  });
   return Object.freeze(picked);
 }
 
@@ -335,8 +391,10 @@ function inRunLanguage(
  * came. The runner counts any failure as a missing vote.
  */
 export async function askComparingJudge(provider: ProviderGateway, input: ComparingJudgeCallInput): Promise<ComparingJudgeAnswer> {
+  // W4-1: material that carries a cited extract is judged under the sources variant (item 7); without one, v1 to the byte.
+  const contract = comparingJudgeMaterialCitesExtracts(input.material) ? COMPARING_JUDGE_SOURCES_PROMPT_CONTRACT : COMPARING_JUDGE_PROMPT_CONTRACT;
   const framed = buildFramedPrompt({
-    contract: inRunLanguage(COMPARING_JUDGE_PROMPT_CONTRACT, input.argumentLanguageName, input.questionLanguage),
+    contract: inRunLanguage(contract, input.argumentLanguageName, input.questionLanguage),
     material: comparingJudgeMaterialFields({
       material: input.material, seat: input.seat, length: input.length, questionLanguage: input.questionLanguage ?? null,
       // pre-flight PF-R2b1.9: D3's practice order rides through unchanged (exactOptionalPropertyTypes).

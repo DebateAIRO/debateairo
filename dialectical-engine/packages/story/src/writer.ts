@@ -1,8 +1,10 @@
 import { STORY_COST_ENVELOPE_REACHED } from "@debateai/budget";
 import { StoryLanguageTagSchema, type MakerLineage, type StoryBody, type StoryChart, type StoryTable } from "@debateai/contract";
 import type { Pool } from "@debateai/db";
-import { TypedDomainError, questionLanguageFromRun, replyLanguageCheckFor, withQuestionLanguageField, type EngineQuestionKind,
-  type QuestionLanguage } from "@debateai/kernel";
+import {
+  TypedDomainError, questionLanguageFromRun, replyLanguageCheckFor, withQuestionLanguageField, withReaderField, type EngineQuestionKind,
+  type QuestionLanguage, type ReadingLevel
+} from "@debateai/kernel";
 import {
   buildFramedPrompt,
   buildFramedRepairPrompt,
@@ -48,6 +50,8 @@ import {
   buildStoryCheckerContract,
   buildStorytellerContract,
   storyCheckerLengthField,
+  storyContractForReader,
+  storyContractForSources,
   storyContractHash,
   storyContractInArgumentLanguage,
   storyLengthField
@@ -218,6 +222,17 @@ export type StoryWriteInput = StoryRunSnapshot & {
    * field, replies checked against it). Absent on every other run: today's story bytes.
    */
   readonly languageLocked?: true;
+  /**
+   * V4 reading level (owner ruling N6, 2026-10-29): set by the runner only when the run was asked with a level; then the
+   * storyteller and the checker are told the reader (a `reader` material field before `question_language`, and one
+   * sentence each, `storyContractForReader`). Absent on every other run: today's story bytes.
+   */
+  readonly readingLevel?: ReadingLevel;
+  /**
+   * Web search (W1-5, design §7.1 item 7): set by the runner only when the story's material carries web extracts; then
+   * the storyteller is told item 7's two sentences (`storyContractForSources`). Absent on every other run: today's bytes.
+   */
+  readonly webSources?: true;
   /**
    * R2 (spec §7.2 item 2, INTERFACE §9.9): the comparing judges' question kinds; their majority picks the v4 story's
    * one shape (`storyV4ShapeId`). Set by the runner under engine 2 only; absent: the pack's default shape.
@@ -707,8 +722,13 @@ export class StoryWriter {
     // other story gets the instructions it got before the debate shape, byte for byte.
     const mapFields = storyMaterialHasMapFields(built.material);
     // R1d: v4 contracts under engine 2 with the table; `null` builds today's v3 contracts byte for byte.
-    const storytellerContract = storyContractInArgumentLanguage(buildStorytellerContract(pack, mapFields, v4), languageName, lock);
-    const checkerContract = storyContractInArgumentLanguage(buildStoryCheckerContract(pack, mapFields, v4), languageName, lock);
+    // V4 reading level (owner N6): the reader sentence after the pack's text, before the language line; none without a level.
+    const readingLevel = input.readingLevel ?? null;
+    const storytellerContract = storyContractInArgumentLanguage(
+      storyContractForSources(storyContractForReader(buildStorytellerContract(pack, mapFields, v4), readingLevel, "STORYTELLER"),
+        input.webSources === true, "STORYTELLER"), languageName, lock);
+    const checkerContract = storyContractInArgumentLanguage(
+      storyContractForReader(buildStoryCheckerContract(pack, mapFields, v4), readingLevel, "CHECKER"), languageName, lock);
     const storytellerHash = storyContractHash(storytellerContract);
     const checkerHash = storyContractHash(checkerContract);
     // Length guidance under v4 only (LG-D Task 4, spec 2026-10-15 §3.4): a `length` field before the language field, the
@@ -798,8 +818,8 @@ export class StoryWriter {
             bound: storytellerBound,
             contract: storytellerContract,
             contractHash: storytellerHash,
-            material: withQuestionLanguageField(withLengthField(
-              toStoryPromptMaterial(built.material, revision === null ? priorObjection : null), storytellerLength), lock),
+            material: withQuestionLanguageField(withReaderField(withLengthField(
+              toStoryPromptMaterial(built.material, revision === null ? priorObjection : null), storytellerLength), readingLevel), lock),
             classifyContent: reading.classifyContent,
             ...(revision === null ? {} : { revision }),
             ...storytellerWords
@@ -847,7 +867,8 @@ export class StoryWriter {
         bound: checkerBound,
         contract: checkerContract,
         contractHash: checkerHash,
-        material: withQuestionLanguageField(withLengthField(toCheckerPromptMaterial(built.material, candidate), checkerLength), lock),
+        material: withQuestionLanguageField(withReaderField(withLengthField(toCheckerPromptMaterial(built.material, candidate),
+          checkerLength), readingLevel), lock),
         classifyContent: reading.classifyContent,
         ...checkerWords
       });

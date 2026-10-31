@@ -15,9 +15,12 @@ const BASE = { deployment: "v3-preview", requested_thinking_level: "high",
   budget_socket: "/run/debateai-v3-preview/provider-budget.sock", scope_id: "preview-fixture" };
 
 describe("the thinking-level table", () => {
-  it("names the ten steps", () => {
+  // Web search (W1-5, 2026-10-30): the web step's four after today's ten (tests/unit/web-prompts.test.ts maps their call sites).
+  // Dig-model revision W3-7: the path rewrite's two after them (packages/register PATH_REWRITE_THINKING).
+  it("names the sixteen steps", () => {
     expect(PREVIEW_THINKING_STEPS).toEqual(["opening", "pros_cons", "cross_exchange", "judge_panel", "reviewer",
-      "answer_writer", "answer_checker", "story_writer", "story_checker", "slip_fix"]);
+      "answer_writer", "answer_checker", "story_writer", "story_checker", "slip_fix",
+      "web_planner", "web_reader", "web_pick", "web_reader_top", "path_rewrite_writer", "path_rewrite_checker"]);
   });
   it("parses a valid table", () => {
     expect(parsePreviewThinkingLevels({ [QWEN]: { level: "low", steps: { story_writer: "medium" } }, [HAIKU]: { level: "medium" } }))
@@ -83,5 +86,33 @@ describe("the level lookup", () => {
   it("'default' travels as DEFAULT_ONLY", () => {
     expect(previewThinkingLevelOnRequest("default")).toBe(THINKING_LEVEL_DEFAULT_ONLY);
     expect(previewThinkingLevelOnRequest("none")).toBe("none");
+  });
+});
+
+describe("the path rewrite's steps (dig-model revision W3-7)", () => {
+  it("maps the story lane's PATH_REWRITE sites to the two steps, as packages/story names them", async () => {
+    const story = await import("@debateai/story");
+    for (const round of [1, 2, 3, 4]) {
+      expect(previewThinkingStepOf({ callSiteKey: `PATH_REWRITE:WRITER:${String(round)}`, lane: "story" })).toBe("path_rewrite_writer");
+      expect(previewThinkingStepOf({ callSiteKey: `PATH_REWRITE:CHECKER:${String(round)}`, lane: "story" })).toBe("path_rewrite_checker");
+      expect(story.pathRewriteThinkingOf(`PATH_REWRITE:WRITER:${String(round)}`)?.step).toBe("path_rewrite_writer");
+      expect(story.pathRewriteThinkingOf(`PATH_REWRITE:CHECKER:${String(round)}`)?.step).toBe("path_rewrite_checker");
+    }
+    expect(previewThinkingStepOf({ callSiteKey: "PATH_REWRITE:WRITER:5", lane: "story" })).toBeNull();
+    expect(previewThinkingStepOf({ callSiteKey: "PATH_REWRITE:WRITER:1", lane: "served" })).toBeNull();
+  });
+
+  it("thinks low by the code's rule unless the owner's table sets the step; an AI without low keeps its own", async () => {
+    const story = await import("@debateai/story");
+    expect(story.pathRewriteThinkingOf("PATH_REWRITE:WRITER:1")?.level).toBe("low");
+    const haiku = previewModelRow(HAIKU)!;
+    const glm = previewModelRow(GLM)!;
+    expect(previewThinkingLevelFor(undefined, haiku, "path_rewrite_writer")).toBe("low");
+    expect(previewThinkingLevelFor({ [HAIKU]: { level: "high" } }, haiku, "path_rewrite_writer")).toBe("low");
+    expect(previewThinkingLevelFor({ [HAIKU]: { steps: { path_rewrite_writer: "medium" } } }, haiku, "path_rewrite_writer")).toBe("medium");
+    expect(previewThinkingLevelFor(undefined, glm, "path_rewrite_checker"))
+      .toBe((glm.efforts as readonly string[]).includes("low") ? "low" : glm.defaultEffort);
+    // Every other step is as before.
+    expect(previewThinkingLevelFor({ [HAIKU]: { level: "high" } }, haiku, "story_writer")).toBe("high");
   });
 });

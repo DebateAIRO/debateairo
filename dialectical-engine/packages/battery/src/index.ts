@@ -317,6 +317,16 @@ function assertWorkLimit(limit: number, what: string): void {
   }
 }
 
+/**
+ * The money rule (owner, 31 Oct 2026; R22 W3-8) — A DEBATE PAUSED AT THE MONTH WALL STAYS PAUSED. Its newest pause event
+ * (0134's identity.run_pause_event, read through `identity.read_run_pause_of_run`, granted to the runner's role) is
+ * PAUSED until the person presses Continue in the new month. Until then no claim takes its work item and no dispatch
+ * list names it, whatever restarts in between; a work item without a run, or of a run that is no live private debate
+ * (the read answers null), is never paused.
+ */
+const NOT_MONTH_PAUSED = (runColumn: string): string =>
+  `(${runColumn} IS NULL OR identity.read_run_pause_of_run(${runColumn})->>'state' IS DISTINCT FROM 'PAUSED')`;
+
 export class WorkItemRepository {
   readonly #fence: Readonly<{ releaseKey: string; workerId: string | null }>;
 
@@ -340,7 +350,8 @@ export class WorkItemRepository {
       `SELECT item.work_item_id, item.run_id
        FROM core.work_item AS item
        JOIN core.run AS run ON run.run_id = item.run_id AND run.release_key = $2
-       WHERE item.state = 'READY' OR (item.state = 'CLAIMED' AND item.claim_deadline <= clock_timestamp())
+       WHERE (item.state = 'READY' OR (item.state = 'CLAIMED' AND item.claim_deadline <= clock_timestamp()))
+         AND ${NOT_MONTH_PAUSED("item.run_id")}
        ORDER BY item.created_at_seq, item.work_item_id
        LIMIT $1`,
       [limit, this.#fence.releaseKey]
@@ -425,6 +436,7 @@ export class WorkItemRepository {
        FROM core.work_item AS item
        JOIN core.run AS run ON run.run_id = item.run_id AND run.release_key = $2
        WHERE item.state = 'CLAIMED' AND item.claim_deadline <= clock_timestamp()
+         AND ${NOT_MONTH_PAUSED("item.run_id")}
        ORDER BY item.created_at_seq, item.work_item_id
        LIMIT $1`,
       [limit, this.#fence.releaseKey]
@@ -519,6 +531,7 @@ export class WorkItemRepository {
           WHERE (state = 'READY' OR (state = 'CLAIMED' AND claim_deadline <= clock_timestamp()))
             AND (item.run_id IS NULL
               OR EXISTS (SELECT 1 FROM core.run AS run WHERE run.run_id = item.run_id AND run.release_key = $3))
+            AND ${NOT_MONTH_PAUSED("item.run_id")}
           ORDER BY created_at_seq
           FOR UPDATE SKIP LOCKED
           LIMIT 1
@@ -546,7 +559,10 @@ export class WorkItemRepository {
     });
   }
 
-  /** Spec §3: as `claimNext`, for the one item Hatchet handed over; another release's item is never claimed (null). */
+  /**
+   * Spec §3: as `claimNext`, for the one item Hatchet handed over; another release's item is never claimed (null), nor
+   * (W3-8) an item whose debate is paused at the month wall.
+   */
   async claimById(input: {
     readonly workItemId: string;
     readonly workerId: string;
@@ -571,6 +587,7 @@ export class WorkItemRepository {
             AND (state = 'READY' OR (state = 'CLAIMED' AND claim_deadline <= clock_timestamp()))
             AND (item.run_id IS NULL
               OR EXISTS (SELECT 1 FROM core.run AS run WHERE run.run_id = item.run_id AND run.release_key = $4))
+            AND ${NOT_MONTH_PAUSED("item.run_id")}
           FOR UPDATE SKIP LOCKED
         )
         UPDATE core.work_item AS item
@@ -632,6 +649,50 @@ export class WorkItemRepository {
       if (row?.claim_deadline != null) return { kind: "RENEWED", claimDeadline: row.claim_deadline };
       return row?.state === "DONE" || row?.state === "FAILED" ? { kind: "FINISHED" } : { kind: "LOST" };
     });
+  }
+
+  /**
+   * The money rule (R22 W3-8) — A PLANNED STOP'S RELEASE. A copy that stopped at the month wall gives its claim up at
+   * once (the deadline becomes now), so the item is claimable the moment the person continues; it stays CLAIMED, never
+   * FAILED, and while its debate is paused no claim or list takes it (`NOT_MONTH_PAUSED`). Fenced as a renewal is: on
+   * this worker and the deadline this copy last saw (±1 ms), so a claim another copy holds is never touched. True when
+   * this call released it.
+   */
+  async releaseClaim(input: {
+    readonly workItemId: string;
+    readonly workerId: string;
+    readonly heldUntil: Date;
+  }): Promise<boolean> {
+    return withWriteTransaction(this.pool, async (client) => {
+      const result = await client.query(
+        `UPDATE core.work_item
+         SET claim_deadline = clock_timestamp()
+         WHERE work_item_id = $1 AND state = 'CLAIMED' AND claimed_by = $2
+           AND claim_deadline BETWEEN $3::timestamptz - interval '1 millisecond'
+                                  AND $3::timestamptz + interval '1 millisecond'`,
+        [input.workItemId, input.workerId, input.heldUntil]
+      );
+      return result.rowCount === 1;
+    });
+  }
+
+  /**
+   * R22 W3-8: the run's work item a runner could claim now — READY, or CLAIMED with its claim lapsed (a copy stopped at
+   * the month wall released it); null when there is none (a runner holds it, it ended, or no item). The API's wake
+   * sends only this one, and only once Continue recorded the resume, so the pause is not read here (the API's role is
+   * not granted 0134's runner read; the claim itself still refuses a paused debate).
+   */
+  async claimableWorkItemOfRun(runId: string): Promise<string | null> {
+    const result = await this.pool.query<{ work_item_id: string }>(
+      `SELECT item.work_item_id
+       FROM core.work_item AS item
+       WHERE item.run_id = $1
+         AND (item.state = 'READY' OR (item.state = 'CLAIMED' AND item.claim_deadline <= clock_timestamp()))
+       ORDER BY item.created_at_seq, item.work_item_id
+       LIMIT 1`,
+      [runId]
+    );
+    return result.rows[0]?.work_item_id ?? null;
   }
 
   /**

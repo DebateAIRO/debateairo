@@ -9,10 +9,10 @@ import { readZip } from "../support/zip-reader.js";
 const names = ["README.txt", "manifest.json", "your-data.html", "account.json", "security.json", "consents.json",
   "debates.json", "billing.json", "support.json", "activity.json"];
 const sections: Record<string, string[]> = {
-  "account.json": ["account", "channels", "registration_region", "age_checks", "erasure_requests", "kept_questions"],
+  "account.json": ["account", "channels", "registration_region", "age_checks", "erasure_requests", "kept_questions", "reading_level", "debate_visits", "dig_links", "investigations", "reserve_events"],
   "security.json": ["mfa_factors", "passkeys", "recovery_codes", "sessions", "social_identities", "email_changes", "recovery_email_changes", "recovery_requests"],
   "consents.json": ["legal_acceptances", "sensitive_data_consents"],
-  "debates.json": ["debates"],
+  "debates.json": ["debates", "web_sources"],
   "billing.json": ["customers", "customer_xmoney", "customer_profile_events", "quotes", "subscription_events", "entitlement_events", "run_charge_scopes", "charges", "internal_grants", "withdrawal_owner_settlements", "charge_events", "quote_uses", "invoice_intents", "invoices", "location_evidence"],
   "support.json": ["sessions", "cases"],
   "activity.json": ["events"]
@@ -105,7 +105,8 @@ describe("data export archive", () => {
   it("A-9 README names every entry and every exclusion", () => {
     const readme = archive()[0]!.bytes.toString("utf8");
     for (const name of names) expect(readme).toContain(name);
-    expect(README_EXCLUSION_LINES).toHaveLength(11);
+    // 0132/0133 (the Perplexity plan) add W1 (page texts) and W2 (charges, digests, packs).
+    expect(README_EXCLUSION_LINES).toHaveLength(13);
     for (const line of README_EXCLUSION_LINES) expect(readme).toContain(line);
     expect(readme).toContain("Your date of birth is never stored.");
     expect(readme).toContain("Cookie choices are stored only in your browser, never on our servers.");

@@ -1,6 +1,15 @@
 import { validatePreviewProviderTestConfig, previewLineUpOfConfig, previewPlanTierRosters, previewTeamAdmits, PREVIEW_TEAM_ONLY, PREVIEW_TEAM_RUNS_SQL, type PreviewProviderTestConfig } from "@debateai/providers";
 import { registerPasswordResetRoutes, passwordResetPolicyInventory } from "./password-reset-routes.js";
 import { registerEmailMfaRoutes, emailMfaPolicyInventory } from "./email-mfa-routes.js";
+import { AccountMemoryInputError, type AccountMemoryStore } from "./account-memory.js";
+import {
+  admitDig, digPathIndexOf, joinAtStart, recordDigPicksAtStart, type DigAdmissionPorts, type DigJoinPort, type DigPathIndex,
+  type DigPicksPort, type DigSuggestionTextReader
+} from "./dig-admission.js";
+import { continuePausedRun, monthPauseOf, type ContinuedRunWake, type MonthPausePort, type MonthRoomReader } from "./month-pause.js";
+import {
+  readInvestigationReports, reopenInvestigation, writeInvestigationReport, type InvestigationReportPorts
+} from "./investigation-report.js";
 import type { PasswordResetApplication } from "./password-reset.js";
 import { settingsVersionPassed, type ReleaseLifecycleState, type ReleaseState, type ReleaseWatcher } from "./release-state.js";
 import { activeVersionAlarm, journalSettingsCode, type ActiveVersionAlarm } from "./admission-alarm.js";
@@ -110,7 +119,35 @@ import {
   QuestionLanguageChoiceNeededSchema,
   PUBLICATION_APPROVAL_REQUIRED,
   DEBATE_REMOVED_BY_CHECK,
-  RemovalNoticeTakeSchema
+  RemovalNoticeTakeSchema,
+  ReadingLevelStateSchema,
+  ReadingLevelSaveRequestSchema,
+  LastVisitSchema,
+  LastVisitRecordRequestSchema,
+  LastVisitRecordedSchema,
+  DigLinksSchema,
+  DigLinkRecordRequestSchema,
+  DigLinkRecordedSchema,
+  ACCOUNT_MEMORY_LIMITS,
+  DIG_LEVEL_MAX,
+  DIG_TOO_DEEP,
+  DigTooDeepSchema,
+  DIG_PICKS_ONE_PATH,
+  DigPicksOnePathSchema,
+  DIG_FREE_PICKS_MAX,
+  DigFreePicksMaxSchema,
+  FREE_DIG_PICKS_MAX,
+  RunContinueRequestSchema,
+  RunContinuedSchema,
+  InvestigationCloseRequestSchema,
+  InvestigationReopenRequestSchema,
+  InvestigationReopenedSchema,
+  InvestigationReportAcceptedSchema,
+  InvestigationReportWritingSchema,
+  INVESTIGATION_REPORT_WRITING,
+  RunContinueRefusedSchema,
+  RUN_PAUSED_UNTIL_RESET,
+  type AskParent
 } from "@debateai/contract";
 import type { Pool, PoolClient, QueryResultRow, QueryResult } from "pg";
 import { assertPreviewBudgetAdmits, PreviewGateUnavailableRefusal, type PreviewAdmissionLock, type PreviewBudgetGateSettings } from "./preview-budget-estimate.js";
@@ -810,6 +847,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RUN_HOLD_RECORDER_UNRESOLVED",
   "RUN_LEGACY_ASKER_INVALID",
   "RUN_MAKER_COUNT_INVALID",
+  "RUN_MONTH_PAUSED",
   "RUN_NOT_FOUND",
   "RUN_OWNER_INVALID",
   "RUN_OWNER_RAW_ID_FORBIDDEN",
@@ -1442,6 +1480,9 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/account/export", auth: "user", resource: "identity", action: "request-data-export" },
   { route: "POST /v1/account/export/download", auth: "user", resource: "identity", action: "download-data-export" },
   { route: "POST /v1/account/removal-notice/take", auth: "user", resource: "identity", action: "take-removal-notice" },
+  // V4 account memory (N7, migration 0131): the account's reading level. A write carries the CSRF pair like any user route.
+  { route: "GET /v1/account/reading-level", auth: "user", resource: "identity", action: "read-reading-level" },
+  { route: "POST /v1/account/reading-level", auth: "user", resource: "identity", action: "save-reading-level" },
   { route: "GET /v1/account/legal-status", auth: "user", resource: "identity", action: "read-legal-status" },
   { route: "POST /v1/account/legal-accept", auth: "user", resource: "identity", action: "accept-legal" },
   { route: "POST /v1/account/legacy-runs/claim", auth: "user", resource: "identity", action: "claim-legacy-runs" },
@@ -1497,6 +1538,17 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/runs/{id}/unpublish", auth: "user", resource: "run-owner", action: "unpublish" },
   { route: "POST /v1/runs/{id}/publication-review", auth: "user", resource: "run-owner", action: "request-review" },
   { route: "GET /v1/runs/{id}/publication-review", auth: "user", resource: "run-owner", action: "read-review" },
+  // V4 account memory (N7, N11, migration 0131): a debate's last visit and its dig links, owner-scoped in the database.
+  { route: "GET /v1/runs/{id}/last-visit", auth: "user", resource: "run-owner", action: "read-last-visit" },
+  { route: "POST /v1/runs/{id}/last-visit", auth: "user", resource: "run-owner", action: "record-last-visit" },
+  { route: "GET /v1/runs/{id}/dig-links", auth: "user", resource: "run-owner", action: "read-dig-links" },
+  { route: "POST /v1/runs/{id}/dig-links", auth: "user", resource: "run-owner", action: "record-dig-link" },
+  // R22 W3-8 (the money rule): Continue on a month-paused debate, owner-scoped in the database (0134's resume_paused_run).
+  { route: "POST /v1/runs/{id}/continue", auth: "user", resource: "run-owner", action: "continue-run" },
+  // R22 W5-1: the final report over an investigation (0133's closings, 0136's report versions), owner-scoped in the database.
+  { route: "GET /v1/runs/{id}/investigation", auth: "user", resource: "run-owner", action: "read-investigation" },
+  { route: "POST /v1/runs/{id}/report", auth: "user", resource: "run-owner", action: "write-report" },
+  { route: "POST /v1/runs/{id}/reopen", auth: "user", resource: "run-owner", action: "reopen-investigation" },
   { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" },
   { route: "GET /v1/billing/plans", auth: "public", resource: "billing", action: "read-plans" },
   { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" },
@@ -1825,6 +1877,34 @@ export interface ApiOptions {
    * view. Optional like `disclosures`; without it the route answers its closed 404.
    */
   readonly mapViews?: AnswerMapViewApplication;
+  /**
+   * V4 account memory (owner rulings N7 and N11, migration 0131): the reading level, each debate's last visit and each
+   * dig's link, kept in the account. Its six routes are always mounted; without it they answer 503
+   * ACCOUNT_MEMORY_UNAVAILABLE, and the V4 pages fall back to what they do without memory.
+   */
+  readonly accountMemory?: AccountMemoryStore;
+  /**
+   * Plan 2026-10-30 dig-model revision W3-2 (0134): each debate's dig level and its month pause, on the API's own pool
+   * (`PostgresDigModelRepository`). Absent: an ask's `parent` is not read (as before W3-2: the page's after-start dig
+   * link is the only one) and no run read carries `month_pause`.
+   */
+  readonly digModel?: Pick<DigAdmissionPorts, "readDigLevel"> & MonthPausePort;
+  /** W3-2 (0133, 0134): at start, a dig joins its parent's investigation (`PostgresInvestigationRepository.join`). */
+  readonly investigations?: DigJoinPort;
+  /** W3-7 (0135): once a dig joined, what it was made of is kept for its path rewrite (`PostgresDigPicksRepository`). */
+  readonly digPicks?: DigPicksPort;
+  /** W3-7: a parent's stored dig suggestion, to tell an AI suggestion from the person's edit (W4-3's store; absent: none). */
+  readonly digSuggestionText?: DigSuggestionTextReader;
+  /** W3-2: whether a person's month has room again after a month pause (the ask room's `monthHasRoom`). */
+  readonly monthRoom?: MonthRoomReader;
+  /** R22 W3-8: after Continue, the paused debate's work item is handed to its runner again (./month-pause.ts). */
+  readonly continuedRunWake?: ContinuedRunWake;
+  /**
+   * R22 W5-1: the final report over an investigation (./investigation-report.ts): 0136's reports read, 0133's open, close
+   * and reopen, the ownership check and the opener of what the runner sealed under the ROOT's run key. Absent: the three
+   * routes answer the closed 404, as Continue does without `digModel`.
+   */
+  readonly investigationReports?: InvestigationReportPorts;
   readonly accountErasure?: AccountErasureApplication;
   readonly dataExport?: DataExportApplication;
   readonly legacyRunClaim?: LegacyRunClaimApplication;
@@ -3339,6 +3419,78 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       notice: ownerRef === null ? false : await access.takeRemovalNotice(ownerRef)
     }));
   });
+  // V4 account memory (owner rulings N7 and N11, migration 0131). The account is the signed-in one (the cookie session:
+  // `auth: "user"` admits nothing else), so a write can only ever touch the caller's own rows; the run routes below are
+  // owner-scoped in the database too. No admission scope, as every account self route: storage is one row per account
+  // (the level) or per owned debate (a visit, a dig), so it cannot grow past what the account owns.
+  // Plan 2026-10-30 dig-model revision W3-2 (owner Q-D1): where the parent map's places hang, read from the parent's
+  // story the way the map reads it; null when the parent has no story yet (every point then hangs under the question).
+  const digPathIndexFor = async (request: Readonly<{ session: Session; authenticatedSession?: AuthenticatedSession }>,
+    parentRunId: string): Promise<DigPathIndex | null> => {
+    if (options.stories === undefined) return null;
+    const ownership = ownershipFor(request);
+    const answer = await readOwnerRunAnswer(options, parentRunId, request.session, ownership);
+    if (answer === null) return null;
+    const story = await options.stories.readStory({ answerId: answer.answer_id, answerVersion: answer.answer_version, ownership });
+    const paths = story?.body?.short.paths;
+    return paths === undefined ? null : digPathIndexOf(paths);
+  };
+  // W3-2: a dig's admission (./dig-admission.ts) before anything is charged; the path its places share when the ask may go
+  // on (W3-7: its picks are kept on it), else the refusal sent. Another
+  // account's parent is the closed 404; a parent at the deepest level 409 DIG_TOO_DEEP; picks the page never sends
+  // (more than Free combines, or from more than one path) a 400 with its own code (W3-8: DIG_FREE_PICKS_MAX, DIG_PICKS_ONE_PATH).
+  const digRefusal = async (request: Readonly<{ session: Session; authenticatedSession?: AuthenticatedSession }>,
+    reply: FastifyReply, parent: AskParent, settings: Pick<AskRequest, "plan_tier" | "composition_budget_tier" | "depth_params">
+  ): Promise<Readonly<{ refused: FastifyReply }> | Readonly<{ positionRef: string | null }>> => {
+    const digModel = options.digModel;
+    if (digModel === undefined) return { positionRef: null };
+    const ownerRef = request.authenticatedSession?.ownerRef;
+    if (ownerRef === undefined) return { refused: reply.status(404).send({ error: "RUN_NOT_FOUND" }) };
+    const decided = await decideRoomSettingsAndPlan(settings, ownerRef, options.askBilling);
+    const admission = await admitDig({ ownerRef, parent, free: decided.settings.plan_tier === "free" }, {
+      readDigLevel: (owner, runId) => digModel.readDigLevel(owner, runId),
+      readPathIndex: (_owner, runId) => digPathIndexFor(request, runId)
+    });
+    switch (admission.kind) {
+      case "ADMIT": return { positionRef: admission.positionRef };
+      case "NOT_FOUND": return { refused: reply.status(404).send({ error: "RUN_NOT_FOUND" }) };
+      case "TOO_DEEP":
+        return { refused: reply.status(409).send(DigTooDeepSchema.parse({ error: DIG_TOO_DEEP, message: DIG_TOO_DEEP, level_max: DIG_LEVEL_MAX })) };
+      // W3-8: each of the two refusals the page never sends has its own code, so the page can say which one it was.
+      case "MALFORMED": return { refused: admission.reason === "FREE_PICKS_OVER"
+        ? reply.status(400).send(DigFreePicksMaxSchema.parse({ error: DIG_FREE_PICKS_MAX, message: DIG_FREE_PICKS_MAX, picks_max: FREE_DIG_PICKS_MAX }))
+        : reply.status(400).send(DigPicksOnePathSchema.parse({ error: DIG_PICKS_ONE_PATH, message: DIG_PICKS_ONE_PATH })) };
+      default: return exhaustive(admission);
+    }
+  };
+  const accountMemoryOrRefuse = (reply: FastifyReply): AccountMemoryStore | null => {
+    if (options.accountMemory !== undefined) return options.accountMemory;
+    void reply.status(503).send({ error: "ACCOUNT_MEMORY_UNAVAILABLE", message: "ACCOUNT_MEMORY_UNAVAILABLE" });
+    return null;
+  };
+  const accountMemoryMalformed = (reply: FastifyReply) =>
+    reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+  api.get("/v1/account/reading-level", routePolicy("GET /v1/account/reading-level"), async (request, reply) => {
+    const ownerRef = ownershipFor(request).ownerRef;
+    if (ownerRef === null) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    const memory = accountMemoryOrRefuse(reply);
+    if (memory === null) return reply;
+    return reply.send(ReadingLevelStateSchema.parse({ reading_level: await memory.readReadingLevel(ownerRef) }));
+  });
+  api.post("/v1/account/reading-level", credentialRoutePolicy("POST /v1/account/reading-level"), async (request, reply) => {
+    const ownerRef = ownershipFor(request).ownerRef;
+    if (ownerRef === null) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    const body = ReadingLevelSaveRequestSchema.safeParse(request.body);
+    if (!body.success) return accountMemoryMalformed(reply);
+    const memory = accountMemoryOrRefuse(reply);
+    if (memory === null) return reply;
+    try {
+      return reply.send(ReadingLevelStateSchema.parse({ reading_level: await memory.saveReadingLevel(ownerRef, body.data.reading_level) }));
+    } catch (error) {
+      if (error instanceof AccountMemoryInputError) return accountMemoryMalformed(reply);
+      throw error;
+    }
+  });
   api.post(
     "/v1/account/legacy-runs/claim",
     credentialRoutePolicy("POST /v1/account/legacy-runs/claim"),
@@ -3893,6 +4045,17 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (Buffer.byteLength(ask.question_line, "utf8") > ASK_QUESTION_MAX_BYTES) {
       return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     }
+    // Plan 2026-10-30 dig-model revision W3-2: a dig's own checks come before the question check (a paid site call) and
+    // before the room, so a refused dig is charged nothing. Without the dig model the parent is not read (as before).
+    const digParent = options.digModel === undefined ? undefined : ask.parent;
+    let digPositionRef: string | null = null;
+    if (digParent !== undefined) {
+      const admitted = await digRefusal(request, reply, digParent, {
+        plan_tier: ask.plan_tier, composition_budget_tier: ask.composition_budget_tier, depth_params: ask.depth_params
+      });
+      if ("refused" in admitted) return admitted.refused;
+      digPositionRef = admitted.positionRef;
+    }
     if (options.questionCheck === undefined) {
       return reply.status(503).send({ error: "QUESTION_CHECK_UNAVAILABLE", message: "QUESTION_CHECK_UNAVAILABLE" });
     }
@@ -3907,6 +4070,17 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         : Object.freeze({ kind: "server" as const, userId: request.authenticatedSession.userId,
           ownerRef: request.authenticatedSession.ownerRef })
     ));
+    // W3-2: at start (started or waiting in line) the server writes the dig's link and joins it to its parent's
+    // investigation; a join that does not take leaves the run as it is (the page's own link call is the fallback).
+    const digOwner = request.authenticatedSession?.ownerRef;
+    if (digParent !== undefined && digOwner !== undefined && options.investigations !== undefined) {
+      const joined = await joinAtStart({ ownerRef: digOwner, parent: digParent, childRunId: accepted.run_ref }, options.investigations);
+      // W3-7: a dig that joined keeps what it was made of (0135), for the rewrite of the path its picks are on.
+      if ((joined === "JOINED" || joined === "ALREADY") && options.digPicks !== undefined) {
+        await recordDigPicksAtStart({ ownerRef: digOwner, parent: digParent, childRunId: accepted.run_ref, positionRef: digPositionRef },
+          options.digPicks, options.digSuggestionText);
+      }
+    }
     return reply.status(202).send(accepted);
   });
 
@@ -3920,6 +4094,19 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const query = AskRoomQuerySchema.safeParse(request.query);
     if (!query.success) return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     const access = ownershipFor(request);
+    // Plan 2026-10-30 dig-model revision W3-2: a read for a dig names its parent; the parent is checked as the ask will
+    // check it (the person's, below the deepest level), and the answer gives the dig's share of today.
+    const digParent = query.data.dig_parent;
+    if (digParent !== undefined && options.digModel !== undefined) {
+      const level = access.ownerRef === null ? null : await options.digModel.readDigLevel(access.ownerRef, digParent);
+      if (level === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      if (level >= DIG_LEVEL_MAX) {
+        return reply.status(409).send(DigTooDeepSchema.parse({ error: DIG_TOO_DEEP, message: DIG_TOO_DEEP, level_max: DIG_LEVEL_MAX }));
+      }
+    }
+    const digMember = digParent === undefined ? {} : {
+      dig: Object.freeze({ parentRunId: digParent, mode: query.data.dig_mode ?? "quick" as const, picks: query.data.dig_picks ?? null })
+    };
     // Side-by-side spec §13 (S10): the active version's rows, read once for this request; the room estimates with it.
     const view = await admissionView();
     const versionMember = view.registerVersion === undefined ? {} : { registerVersion: view.registerVersion };
@@ -3932,6 +4119,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       : await options.askRoom.readRoom({
           access,
           ...versionMember,
+          ...digMember,
           settingsClass: await (async () => {
             // B8 (R-28): with billing on, the room is read for the ask the server would run. Debate shape (spec
             // 2026-10-12 §3.2): with the query's shape settings, normalised under the plan key submit would use.
@@ -3956,6 +4144,11 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       plan_id: answer.planId,
       ...(answer.funding === undefined ? {} : {funding:{kind:"INTERNAL",expires_at:answer.funding.expiresAt.toISOString()}}),
       ...(answer.waitsFor === undefined ? {} : { waits_for: answer.waitsFor }),
+      // W3-2 (the money rule): the reserve kept, the estimate as a share of today, and new starts waiting for a reset.
+      ...(answer.reserve === undefined ? {} : { reserve: answer.reserve }),
+      ...(answer.startSharePercent === undefined ? {} : { start_share_percent: answer.startSharePercent }),
+      ...(answer.digSharePercent === undefined ? {} : { dig_share_percent: answer.digSharePercent }),
+      ...(answer.newStarts === undefined ? {} : { new_starts: answer.newStarts }),
       // Debate shape P2c (Contract deviation 7): the same row the normalisation above reads. After P2b, main.ts hands
       // the API only an in-force row (`debateShapeInForce`); without one the member is never written, so the body is
       // today's byte for byte, and the page offers none of the three settings it would drop.
@@ -4239,7 +4432,16 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       options.releaseKey,
       { route: "GET /v1/runs/{id}", id: runId }
     );
-    return run === null ? reply.status(404).send({ error: "RUN_NOT_FOUND" }) : reply.send(run);
+    if (run === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    // W3-2 (the money rule): a debate paused at the month wall says until when, and whether Continue is offered.
+    const ownerRef = request.authenticatedSession?.ownerRef;
+    if (options.digModel === undefined || ownerRef === undefined
+      || !(run.state === "CLAIMED" || run.state === "RUNNING" || run.state === "HOLDING")) return reply.send(run);
+    const pause = await options.digModel.readPause(ownerRef, runId);
+    if (pause?.state !== "PAUSED") return reply.send(run);
+    const now = new Date();
+    const monthPause = monthPauseOf(pause, now, await options.monthRoom?.monthHasRoom(ownerRef, now) ?? false);
+    return reply.send(monthPause === null ? run : RunProjectionSchema.parse({ ...run, month_pause: monthPause }));
   });
   api.get<{ Params: { id: string } }>(
     "/v1/runs/:id/visibility",
@@ -4447,6 +4649,133 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       return reply.status(response.status).send(response.body);
     }
   );
+  // V4 account memory (owner rulings N7 and N11, migration 0131): "not this account's debate" is the closed 404 every
+  // run-owner route answers, decided by 0131's functions (the run's latest ownership event names the caller's account).
+  // The id is the one the page holds, never resolved to a re-admitted run, so a write and its later read meet.
+  const memoryRunOf = (request: Readonly<{ params: { id: string }; session: Session; authenticatedSession?: AuthenticatedSession }>) => {
+    const runId = ResourceIdSchema.safeParse(request.params.id);
+    const ownerRef = ownershipFor(request).ownerRef;
+    return runId.success && ownerRef !== null ? { runId: runId.data, ownerRef } : null;
+  };
+  api.get<{ Params: { id: string } }>("/v1/runs/:id/last-visit", routePolicy("GET /v1/runs/{id}/last-visit"), async (request, reply) => {
+    const target = memoryRunOf(request);
+    if (target === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    const memory = accountMemoryOrRefuse(reply);
+    if (memory === null) return reply;
+    const visit = await memory.readLastVisit(target.ownerRef, target.runId);
+    return visit === null ? reply.status(404).send({ error: "RUN_NOT_FOUND" }) : reply.send(LastVisitSchema.parse(visit));
+  });
+  api.post<{ Params: { id: string } }>(
+    "/v1/runs/:id/last-visit",
+    { ...routePolicy("POST /v1/runs/{id}/last-visit"), bodyLimit: ACCOUNT_MEMORY_LIMITS.visitBodyMaxBytes },
+    async (request, reply) => {
+      const target = memoryRunOf(request);
+      if (target === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      const body = LastVisitRecordRequestSchema.safeParse(request.body);
+      if (!body.success) return accountMemoryMalformed(reply);
+      const memory = accountMemoryOrRefuse(reply);
+      if (memory === null) return reply;
+      let seenAt: Date | null;
+      try {
+        seenAt = await memory.recordLastVisit(target.ownerRef, target.runId, body.data.items);
+      } catch (error) {
+        if (error instanceof AccountMemoryInputError) return accountMemoryMalformed(reply);
+        throw error;
+      }
+      return seenAt === null
+        ? reply.status(404).send({ error: "RUN_NOT_FOUND" })
+        : reply.send(LastVisitRecordedSchema.parse({ seen_at: seenAt.toISOString() }));
+    }
+  );
+  api.get<{ Params: { id: string } }>("/v1/runs/:id/dig-links", routePolicy("GET /v1/runs/{id}/dig-links"), async (request, reply) => {
+    const target = memoryRunOf(request);
+    if (target === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    const memory = accountMemoryOrRefuse(reply);
+    if (memory === null) return reply;
+    const links = await memory.readDigLinks(target.ownerRef, target.runId);
+    return links === null ? reply.status(404).send({ error: "RUN_NOT_FOUND" }) : reply.send(DigLinksSchema.parse(links));
+  });
+  api.post<{ Params: { id: string } }>("/v1/runs/:id/dig-links", credentialRoutePolicy("POST /v1/runs/{id}/dig-links"), async (request, reply) => {
+    const target = memoryRunOf(request);
+    if (target === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    const body = DigLinkRecordRequestSchema.safeParse(request.body);
+    if (!body.success || body.data.child_run_id === target.runId) return accountMemoryMalformed(reply);
+    const memory = accountMemoryOrRefuse(reply);
+    if (memory === null) return reply;
+    let outcome: Awaited<ReturnType<AccountMemoryStore["recordDigLink"]>>;
+    try {
+      outcome = await memory.recordDigLink(target.ownerRef, target.runId, body.data);
+    } catch (error) {
+      if (error instanceof AccountMemoryInputError) return accountMemoryMalformed(reply);
+      throw error;
+    }
+    switch (outcome) {
+      case "RECORDED": return reply.send(DigLinkRecordedSchema.parse({ recorded: true }));
+      // Either debate is not the caller's: one closed answer, whichever it was.
+      case "NOT_OWNED": return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      case "CONFLICT": return reply.status(409).send({ error: "DIG_LINK_CONFLICT", message: "DIG_LINK_CONFLICT" });
+      default: return exhaustive(outcome);
+    }
+  });
+  // R22 W3-8 (the money rule): Continue on a debate paused at the month wall (./month-pause.ts): another account's debate
+  // is the closed 404, a press before the reset 409 RUN_PAUSED_UNTIL_RESET (nothing changed), a second press CONTINUING.
+  api.post<{ Params: { id: string } }>("/v1/runs/:id/continue", credentialRoutePolicy("POST /v1/runs/{id}/continue"), async (request, reply) => {
+    const target = memoryRunOf(request);
+    if (target === null || options.digModel === undefined) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    if (!RunContinueRequestSchema.safeParse(request.body ?? {}).success) {
+      return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    }
+    const room = options.monthRoom ?? Object.freeze({ monthHasRoom: async () => false });
+    const outcome = await continuePausedRun({ ...target, now: new Date() }, options.digModel, room, options.continuedRunWake);
+    switch (outcome.kind) {
+      case "CONTINUING": return reply.send(RunContinuedSchema.parse({ state: "CONTINUING" }));
+      case "NOT_FOUND": return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      case "NOT_PAUSED": return reply.status(409).send({ error: "RUN_NOT_PAUSED", message: "RUN_NOT_PAUSED" });
+      case "UNTIL_RESET": return reply.status(409).send(RunContinueRefusedSchema.parse({
+        error: RUN_PAUSED_UNTIL_RESET, message: RUN_PAUSED_UNTIL_RESET, until: outcome.until }));
+      default: return exhaustive(outcome);
+    }
+  });
+  // R22 W5-1: the final report over an investigation (./investigation-report.ts). Another account's debate is the closed
+  // 404 on all three; "Write my report" answers 202 with the version being written (a second press the same version), 409
+  // INVESTIGATION_CLOSED once a finished version stands (the page offers "Keep digging"); a reopen while a version is being
+  // written is 409 INVESTIGATION_REPORT_WRITING, nothing changed.
+  api.get<{ Params: { id: string } }>("/v1/runs/:id/investigation", routePolicy("GET /v1/runs/{id}/investigation"), async (request, reply) => {
+    const target = memoryRunOf(request);
+    if (target === null || options.investigationReports === undefined) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    const read = await readInvestigationReports(target, options.investigationReports);
+    return read === null ? reply.status(404).send({ error: "RUN_NOT_FOUND" }) : reply.send(read);
+  });
+  api.post<{ Params: { id: string } }>("/v1/runs/:id/report", credentialRoutePolicy("POST /v1/runs/{id}/report"), async (request, reply) => {
+    const target = memoryRunOf(request);
+    if (target === null || options.investigationReports === undefined) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    if (!InvestigationCloseRequestSchema.safeParse(request.body ?? {}).success) {
+      return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    }
+    const outcome = await writeInvestigationReport(target, options.investigationReports);
+    switch (outcome.kind) {
+      case "WRITING": return reply.status(202).send(InvestigationReportAcceptedSchema.parse({
+        state: "WRITING", report_version: outcome.reportVersion, waiting_for_digs: outcome.waitingForDigs }));
+      case "CLOSED": return reply.status(409).send({ error: "INVESTIGATION_CLOSED", message: "INVESTIGATION_CLOSED" });
+      case "NOT_FOUND": return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      default: return exhaustive(outcome);
+    }
+  });
+  api.post<{ Params: { id: string } }>("/v1/runs/:id/reopen", credentialRoutePolicy("POST /v1/runs/{id}/reopen"), async (request, reply) => {
+    const target = memoryRunOf(request);
+    if (target === null || options.investigationReports === undefined) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    if (!InvestigationReopenRequestSchema.safeParse(request.body ?? {}).success) {
+      return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    }
+    const outcome = await reopenInvestigation(target, options.investigationReports);
+    switch (outcome.kind) {
+      case "OPEN": return reply.send(InvestigationReopenedSchema.parse({ state: "OPEN" }));
+      case "WRITING": return reply.status(409).send(InvestigationReportWritingSchema.parse({
+        error: INVESTIGATION_REPORT_WRITING, message: INVESTIGATION_REPORT_WRITING, report_version: outcome.reportVersion }));
+      case "NOT_FOUND": return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      default: return exhaustive(outcome);
+    }
+  });
   api.post<{ Params: { id: string } }>("/v1/answers/:id/memory-link/unlink", routePolicy("POST /v1/answers/{id}/memory-link/unlink"), async (request, reply) => {
     const answerId = ResourceIdSchema.safeParse(request.params.id);
     if (!answerId.success) return reply.status(404).send({ error: "MEMORY_LINK_NOT_FOUND" });

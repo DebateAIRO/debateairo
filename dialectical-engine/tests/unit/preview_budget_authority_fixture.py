@@ -166,7 +166,7 @@ class Gate:
         # folder, where none exists unless a test writes one, never under the host's /etc.
         options = {'host': HOST, 'platform': 'linux', 'now': self.clock, 'owner_uid': os.getuid(),
                    'gate_go_paths': {name: str(self.root / ('team-go-' + name + '.json'))
-                                     for name in ('deepinfra', 'anthropic', 'google')}}
+                                     for name in ('deepinfra', 'anthropic', 'perplexity', 'google')}}
         options.update(kwargs)
         return self.bridge.activate(self.private, self.go_path, **options)
 

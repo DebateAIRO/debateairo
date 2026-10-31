@@ -54,6 +54,8 @@ export interface BillingUsageReader {
       percent: number;
       resetsAt: Date;
     }>>;
+    /** The money rule (W3-2): the runs borrowing from the next day or week to finish; absent when none is. */
+    borrowed?: ReadonlyArray<Readonly<{ scope: "PERSON_DAY" | "PERSON_WEEK"; runRef: string; percent: number; nextWindowStartsAt: Date }>>;
   }>>;
 }
 
@@ -192,7 +194,10 @@ export function installBillingRoutes(api: FastifyInstance, deps: BillingRouteDep
       ...(usage.funding === undefined ? {} : {funding:{kind:"INTERNAL",expires_at:usage.funding.expiresAt.toISOString()}}),
       windows: usage.windows.map((window) => ({
         scope: window.scope, percent: window.percent, resets_at: window.resetsAt.toISOString()
-      }))
+      })),
+      ...(usage.borrowed === undefined || usage.borrowed.length === 0 ? {} : { borrowed: usage.borrowed.map((borrow) => ({
+        scope: borrow.scope, run_ref: borrow.runRef, percent: borrow.percent, next_window_starts_at: borrow.nextWindowStartsAt.toISOString()
+      })) })
     }));
   });
 

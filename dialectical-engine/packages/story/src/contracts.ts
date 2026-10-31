@@ -1,12 +1,16 @@
 import { createHash } from "node:crypto";
 import {
   LENGTH_FIELD,
+  READER_SENTENCE_STORY_CHECKER,
+  READER_SENTENCE_WRITING,
   STORY_WORD_TARGET_FIELDS,
+  WEB_WRITER_SENTENCES,
   argumentLanguageDirective,
   lengthGuidanceText,
   questionLanguageSentence,
   type CharactersPerWord,
   type QuestionLanguage,
+  type ReadingLevel,
   type StoryWordTargetField
 } from "@debateai/kernel";
 import { promptContractFingerprintText, type PromptContract } from "@debateai/providers";
@@ -255,6 +259,41 @@ export function storyCheckerLengthField(targets: Readonly<Record<StoryWordTarget
     content: [...storyTargetLines(targets, languageCode, charactersPerWord),
       `objection: ${lengthGuidanceText(objectionWords, languageCode, charactersPerWord)}`].join("\n")
   });
+}
+
+/**
+ * V4 reading level (owner ruling N6, 2026-10-29): with the run's level, the storyteller's instruction gains the writers'
+ * reader sentence (READER_SENTENCE_WRITING) and the checker's the story checker's (READER_SENTENCE_STORY_CHECKER), after a
+ * blank line, as the language line is added; the level itself rides as the material field `reader`. Call it BEFORE
+ * `storyContractInArgumentLanguage`, so the language line stays last. Code's sentences, never the pack's: they enter the
+ * per-call `storyContractHash`, as the language line does. No level (null): the same contract, today's bytes.
+ * OWNER WORDING — pending approval.
+ */
+export function storyContractForReader(
+  contract: PromptContract,
+  readingLevel: ReadingLevel | null,
+  role: "STORYTELLER" | "CHECKER"
+): PromptContract {
+  if (readingLevel === null) return contract;
+  const sentence = role === "STORYTELLER" ? READER_SENTENCE_WRITING : READER_SENTENCE_STORY_CHECKER;
+  return Object.freeze({ ...contract, instruction: `${contract.instruction}\n\n${sentence}` });
+}
+
+/**
+ * Web search (plan 2026-10-30 task W1-5; design §7.1 item 7, approved 2026-10-30): when the debate read web sources, a
+ * looked-up point in the story's material carries the extract it rests on, and the storyteller's instruction gains item
+ * 7's two sentences (WEB_WRITER_SENTENCES) after a blank line, as the reader sentence is added. The checker is told
+ * nothing new. Call it after `storyContractForReader` and BEFORE `storyContractInArgumentLanguage`, so the language line
+ * stays last. Code's sentences, never the pack's: they enter the per-call `storyContractHash`, as the reader sentence
+ * does. No sources: the same contract, today's bytes.
+ */
+export function storyContractForSources(
+  contract: PromptContract,
+  sourced: boolean,
+  role: "STORYTELLER" | "CHECKER"
+): PromptContract {
+  if (!sourced || role !== "STORYTELLER") return contract;
+  return Object.freeze({ ...contract, instruction: `${contract.instruction}\n\n${WEB_WRITER_SENTENCES}` });
 }
 
 /**

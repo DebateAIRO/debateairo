@@ -76,6 +76,17 @@ tests/integration/auth-dev-lineage.test.ts
 tests/integration/auth-dev-migration.test.ts
 tests/integration/preview-auth-preservation.test.ts
 tests/integration/preview-auth-dev-fallback.test.ts
+# The V4 account memory (0131): account-owned rows, removed with the account, read by the export behind its lease.
+tests/integration/v4-account-memory-database.test.ts
+# The Perplexity plan's stores (0132, 0133): a debate's encrypted web evidence and the investigations with the one reserve.
+tests/integration/web-evidence-database.test.ts
+tests/integration/investigations-database.test.ts
+# The dig model and the month pause (0134): dig levels, the encrypted path rewrites in order, the month pause, deletions.
+tests/integration/dig-model-database.test.ts
+# A dig's picks and its path rewrite's material (0135): the picks written once, the material, the sweep's list, deletions.
+tests/integration/path-rewrite-database.test.ts
+# The investigation's final report (0136): the report written once per closing, the waiting digs, the readers, deletions.
+tests/integration/investigation-report-database.test.ts
 
 # NOT listed: preview-auth-dev-startup.test.ts — red on dev at d1ac3641b (2 of 17: PREVIEW_STAGE_PROCESS_EXITED; it
 # starts the real API/UI stage processes, so it is a deployment rehearsal, not a self-contained suite).

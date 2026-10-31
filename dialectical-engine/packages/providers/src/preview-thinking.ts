@@ -9,9 +9,14 @@
 import { THINKING_LEVEL_DEFAULT_ONLY, debateRoleFromCallSiteKey, exhaustive, lengthCallStepOf } from "@debateai/kernel";
 import { previewModelRow, type PreviewEffort, type PreviewModelRow } from "./preview-models.js";
 
-/** Spec 2026-10-12 §4.3: the step names a table may override (slip_fix = a repair POST inside a call). */
+/**
+ * Spec 2026-10-12 §4.3: the step names a table may override (slip_fix = a repair POST inside a call). Web search (plan
+ * 2026-10-30 task W1-5): the web step's four, after today's ten — the planner, reader 1 reading every page, the top-3
+ * pick, and readers 2 and 3 on the top pages (the plan sets them low in the line-up's thinking table).
+ */
 export const PREVIEW_THINKING_STEPS = Object.freeze(["opening", "pros_cons", "cross_exchange", "judge_panel", "reviewer",
-  "answer_writer", "answer_checker", "story_writer", "story_checker", "slip_fix"] as const);
+  "answer_writer", "answer_checker", "story_writer", "story_checker", "slip_fix",
+  "web_planner", "web_reader", "web_pick", "web_reader_top", "path_rewrite_writer", "path_rewrite_checker"] as const);
 /** Spec 2026-10-12 §4.3: one step name (see PREVIEW_THINKING_STEPS). */
 export type PreviewThinkingStep = typeof PREVIEW_THINKING_STEPS[number];
 /** Spec 2026-10-12 §4.2: one AI's entry in the table: its usual level and optional per-step levels. */
@@ -79,9 +84,26 @@ export function previewThinkingStepOf(request: Readonly<{ callSiteKey: string; l
   if (lengthCallStepOf(request.callSiteKey) === "structure_repair") return "slip_fix";
   if (request.lane === "story" && /^STORY:STORYTELLER:[1-8]$/u.test(request.callSiteKey)) return "story_writer";
   if (request.lane === "story" && /^STORY:CHECKER:[1-8]$/u.test(request.callSiteKey)) return "story_checker";
+  // Dig-model revision W3-7: a dig's path rewrite, on the story lane (packages/story PATH_REWRITE_CALL_SITE; its step names
+  // are packages/register PATH_REWRITE_THINKING's).
+  const rewriteSite = /^PATH_REWRITE:(WRITER|CHECKER):[1-4]$/u.exec(request.callSiteKey);
+  if (request.lane === "story" && rewriteSite !== null) return rewriteSite[1] === "WRITER" ? "path_rewrite_writer" : "path_rewrite_checker";
+  // W5-1: the final report over an investigation (packages/story INVESTIGATION_REPORT_CALL_SITE) runs at the owner's four
+  // final steps: its answer at answer_writer / answer_checker, its story at story_writer / story_checker.
+  const reportSite = /^INVESTIGATION_REPORT:(ANSWER|ANSWER_CHECK|STORY|STORY_CHECK):[1-4]$/u.exec(request.callSiteKey);
+  if (request.lane === "story" && reportSite !== null) {
+    return reportSite[1] === "ANSWER" ? "answer_writer" : reportSite[1] === "ANSWER_CHECK" ? "answer_checker"
+      : reportSite[1] === "STORY" ? "story_writer" : "story_checker";
+  }
   // Debate shape (merge of dev into Phase 2, 2026-10-13): the map's calls (MAP:angles, MAP:list:N, MAP:merge, MAP:gap:N,
   // MAP:choose; packages/map) build the debate's opening, so they run at the owner's `opening` level, the closest step.
   if (/^MAP:/u.test(request.callSiteKey)) return "opening";
+  // Web search (W1-5): the web step's call sites (@debateai/judgement's web-prompts.ts builds them), a seat suffix allowed.
+  const webSite = /^WEB:(plan|read1:\d+:\d+|pick:\d+|read-top:\d+:[23])(?::seat:(?:main|runnerUp))?$/u.exec(request.callSiteKey);
+  if (webSite !== null) {
+    const site = webSite[1]!;
+    return site === "plan" ? "web_planner" : site.startsWith("read1:") ? "web_reader" : site.startsWith("pick:") ? "web_pick" : "web_reader_top";
+  }
   const role = debateRoleFromCallSiteKey(request.callSiteKey);
   if (role === null) return null;
   switch (role) {
@@ -102,7 +124,20 @@ export function previewThinkingStepOf(request: Readonly<{ callSiteKey: string; l
  */
 export function previewThinkingLevelFor(levels: PreviewThinkingLevels | undefined, row: PreviewModelRow, step: PreviewThinkingStep | null): PreviewEffort {
   const choice = levels?.[row.model];
-  return (step === null ? undefined : choice?.steps?.[step]) ?? choice?.level ?? row.defaultEffort;
+  return (step === null ? undefined : choice?.steps?.[step]) ?? codeStepLevel(row, step) ?? choice?.level ?? row.defaultEffort;
+}
+
+/**
+ * Dig-model revision W3-7: the steps whose level the code sets (packages/register PATH_REWRITE_THINKING: the final steps of
+ * a dig think low, the owner's rule). The owner's step override still wins; an AI without the level on its menu keeps its
+ * usual one.
+ */
+export const PREVIEW_CODE_STEP_LEVELS: Readonly<Partial<Record<PreviewThinkingStep, PreviewEffort>>> = Object.freeze({
+  path_rewrite_writer: "low", path_rewrite_checker: "low"
+});
+function codeStepLevel(row: PreviewModelRow, step: PreviewThinkingStep | null): PreviewEffort | undefined {
+  const level = step === null ? undefined : PREVIEW_CODE_STEP_LEVELS[step];
+  return level !== undefined && (row.efforts as readonly string[]).includes(level) ? level : undefined;
 }
 
 /**

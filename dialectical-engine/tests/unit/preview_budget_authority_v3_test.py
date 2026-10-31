@@ -1308,7 +1308,8 @@ class ProfileTests(GateTest):
 
     def test_reserved_provider_names_have_no_profile_yet(self):
         # Anthropic's profile arrived with PR B (its own tests: preview_budget_authority_anthropic_test.py).
-        self.assertEqual(set(bridge.helper.PROFILES), {'deepinfra', 'anthropic'})
+        # Perplexity's arrived with plan task W1-1 (2026-10-30; preview_budget_authority_perplexity_test.py).
+        self.assertEqual(set(bridge.helper.PROFILES), {'deepinfra', 'anthropic', 'perplexity'})
         self.assertNotIn('google', bridge.helper.PROFILES)
 
 
@@ -2257,8 +2258,9 @@ class ReasoningTokenTests(GateTest):
 
 class TeamTotalTests(GateTest):
     """Round 2 review, figures from the owner's ruling of 2026-10-10 as raised by owner answer M1 (2026-10-15): one GO
-    is at most $12.00 a day (MAX_GO_BUDGET_USD), and activate adds the other gates' GOs to stay within the $16.00 team
-    total (DeepInfra $12.00 + Anthropic $4.00) (a fixed, reviewed list; tests reach it only through activate's seam)."""
+    is at most $12.00 a day (MAX_GO_BUDGET_USD), and activate adds the other gates' GOs to stay within the team total,
+    $16.00 (DeepInfra $12.00 + Anthropic $4.00) and, since the owner's answer of 2026-10-30 (Q12), $17.00 (+ Perplexity
+    $1.00) (a fixed, reviewed list; tests reach it only through activate's seam)."""
 
     def other_go(self, gate, provider, budget='1.50', **fields):
         path = gate.root / ('team-go-' + provider + '.json')
@@ -2267,8 +2269,8 @@ class TeamTotalTests(GateTest):
         os.chmod(path, 0o600)
         return path
 
-    def test_one_go_is_capped_at_twelve_dollars_and_the_team_total_is_sixteen(self):
-        self.assertEqual((bridge.MAX_GO_BUDGET_USD, bridge.TEAM_TOTAL_BUDGET_USD), (Decimal('12.00'), Decimal('16.00')))
+    def test_one_go_is_capped_at_twelve_dollars_and_the_team_total_is_seventeen(self):
+        self.assertEqual((bridge.MAX_GO_BUDGET_USD, bridge.TEAM_TOTAL_BUDGET_USD), (Decimal('12.00'), Decimal('17.00')))
         gate = self.gate()
         self.assertEqual(bridge.read_go(gate.write_go(name='ok.json', daily_budget_usd='12.00'))['daily_budget_usd'], '12.00')
         for budget in ('12.01', '16.00', '50.00'):
@@ -2286,7 +2288,8 @@ class TeamTotalTests(GateTest):
                                            os.getuid()), Decimal('16.00'))
 
     def test_a_sum_over_the_team_total_refuses(self):
-        for others in ({'anthropic': '4.01'}, {'anthropic': '3.50', 'google': '0.51'}, {'google': '12.00'}):
+        for others in ({'anthropic': '4.01', 'perplexity': '1.00'}, {'anthropic': '3.50', 'google': '1.51'},
+                       {'google': '12.00'}, {'anthropic': '4.00', 'perplexity': '1.01'}):
             with self.subTest(others=others):
                 gate = self.gate(daily_budget_usd='12.00')
                 gate.init()
@@ -2296,18 +2299,21 @@ class TeamTotalTests(GateTest):
                     gate.activate()
                 self.assertEqual(gate.control()['state'], 'initialized')
 
-    def test_the_owners_pots_twelve_plus_four_reach_the_total_and_one_cent_more_refuses(self):
-        # Owner answer M1 (2026-10-15): DeepInfra $12.00 (2,000 calls, 10 at once, all four models), Anthropic $4.00.
+    def test_the_owners_pots_twelve_plus_four_plus_one_reach_the_total_and_one_cent_more_refuses(self):
+        # Owner answer M1 (2026-10-15): DeepInfra $12.00 (2,000 calls, 10 at once, all four models), Anthropic $4.00;
+        # owner answer Q12 (2026-10-30): Perplexity $1.00, the team total $17.00.
         proposed = {'daily_budget_usd': '12.00', 'max_paid_posts_per_day': 2000, 'max_concurrent_calls': 10,
                     'enabled_models': ALL}
         gate = self.gate(**proposed)
         gate.init()
         self.other_go(gate, 'anthropic', '4.00')
-        self.assertEqual(gate.activate()['state'], 'active')  # 12.00 + 4.00 = 16.00 exactly.
+        self.other_go(gate, 'perplexity', '1.00')
+        self.assertEqual(gate.activate()['state'], 'active')  # 12.00 + 4.00 + 1.00 = 17.00 exactly.
         gate = self.gate(**proposed)
         gate.init()
         self.other_go(gate, 'anthropic', '4.01')
-        with self.refused('TEAM_TOTAL_BUDGET_EXCEEDED'):  # 12.00 + 4.01 = 16.01.
+        self.other_go(gate, 'perplexity', '1.00')
+        with self.refused('TEAM_TOTAL_BUDGET_EXCEEDED'):  # 12.00 + 4.01 + 1.00 = 17.01.
             gate.activate()
         self.assertEqual(gate.control()['state'], 'initialized')
         # A DeepInfra GO of 12.01 never gets as far as the sum: one GO is at most $12.00.
@@ -2383,6 +2389,7 @@ class TeamTotalTests(GateTest):
         self.assertEqual({name: go for name, (_private, go) in bridge.GATE_PATHS.items()}, {
             'deepinfra': '/etc/debateai-v3-preview/provider-deepinfra-go-v3.json',
             'anthropic': '/etc/debateai-v3-preview/provider-anthropic-go-v1.json',
+            'perplexity': '/etc/debateai-v3-preview/provider-perplexity-go-v1.json',
             'google': '/etc/debateai-v3-preview/provider-google-go-v1.json'})
         text = SOURCE.read_text()
         self.assertIn('result = activate(args.private, args.go)\n', text)  # main() passes no seam.

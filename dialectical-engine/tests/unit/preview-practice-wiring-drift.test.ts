@@ -185,6 +185,31 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     expect(ADMISSION).toContain("readers.readPreviewBudgetGateSettings(pool, version, previewConfig,");
   });
 
+  it("W3-6: both hand the runner the same web settings, and neither holds a stand-in for the web plan's store", () => {
+    // The step keeps the planner's decision in 0134's store itself (web-step.ts runRunnerWebStep), on the runner's pool.
+    const call = (source: string) => withoutComments(source).match(/webSearch: runnerWebSearchSettings\(\{[^}]*\}\)/gu)
+      ?.map((text) => text.replace(/\s+/gu, " "));
+    // W4-2: both hand in the process's month pause, so searches pause at the month wall as the AI calls do.
+    expect(call(RUNNER_MAIN)).toEqual(["webSearch: runnerWebSearchSettings({ pool, previewGate, fetch: previewFetch, "
+      + "guardOf: runnerSite.money === null ? null : runCostEnvelopeGuard, pause: monthPause })"]);
+    expect(call(PRACTICE_RUNNER)).toEqual(call(RUNNER_MAIN));
+    for (const source of [RUNNER_MAIN, PRACTICE_RUNNER]) expect(source).not.toContain("recordPlanPathStatuses");
+  });
+
+  it("W3-7: both compose the path rewrite with the one function, the same members, and hand it to the runner the same way", () => {
+    const composed = (source: string) => flat(source).match(/const pathRewrite = composePathRewrite\(\{.*?\}\);/gu);
+    expect(composed(RUNNER_MAIN)).toEqual(["const pathRewrite = composePathRewrite({ pool, targets: providerTargets, members: "
+      + "[providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), "
+      + "...providerTopology.additionalMakers], log: storyLog });"]);
+    expect(composed(PRACTICE_RUNNER)).toEqual(composed(RUNNER_MAIN));
+    for (const source of [RUNNER_MAIN, PRACTICE_RUNNER]) {
+      expect(flat(source)).toContain("...(pathRewrite === undefined ? {} : { pathRewrite: pathRewrite.settings }),");
+    }
+    // The sweep is a process's: main.ts starts it after its worker; the practice runs one debate and starts none.
+    expect(flat(RUNNER_MAIN)).toContain("startPathRewriteSweep({ ...pathRewrite.sweep, paused: () => retirementSignal.claimsStopped() })");
+    expect(PRACTICE_RUNNER).not.toContain("startPathRewriteSweep");
+  });
+
   it("parallel AI calls: both build the call scheduler, the busy coordinator, the call subjects, the attempt counter and the keep-alive renewals", () => {
     // Spec 2026-10-12-parallel-calls-design.md §3.2-§3.6: the practice measures the runner the preview runs.
     for (const source of [RUNNER_MAIN, PRACTICE_RUNNER]) {
@@ -297,8 +322,14 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       // whenever hosted (a version without a story ceiling refuses inside its guard, STORY_ENVELOPE_MISSING).
       "const runSettingsVersions = createRunSettingsVersions();",
       "const runCostEnvelopeGuard = runCostEnvelopeGuardOf(runnerSettings, runSettingsVersions);",
+      // Owner answer F4 (2026-10-30, task W2-2): both seams charge at the vendor's real prices on the preview.
+      "const price = previewTargetChargePrice(previewGate !== undefined, target, providerTargetPrice(target));",
       "if (runnerSite.money !== null && price === null) { throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`); }",
-      "...(runnerSite.money === null || price === null ? {} : { buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => runCostEnvelopeGuard(runId).providerSeam({ runId, price, requireReportedUsage: true, phase, sharedWall }), buildStoryCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).storySeam({ runId, price, requireReportedUsage: true }) })",
+
+      // Plan 2026-10-30 dig-model revision W3-2 (the owner's money rule): the month pause on a walled call, and a dig's
+      // path rewrite on its own never-walled seam, in both compositions alike.
+      "const monthPause = new MonthPause({ store: new PostgresDigModelRunnerRepository(pool) });",
+      "...(runnerSite.money === null || price === null ? {} : { buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => monthPaused(runCostEnvelopeGuard(runId).providerSeam({ runId, price, requireReportedUsage: true, phase, sharedWall }), { runId, phase, sharedWall, pause: monthPause, plannedMicros: () => runCostEnvelopeGuard(runId).bodyMicrosLeft(runId) }), buildStoryCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).storySeam({ runId, price, requireReportedUsage: true }), buildPathRewriteCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).pathRewriteSeam({ runId, price, requireReportedUsage: true }), buildInvestigationReportCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).investigationReportSeam({ runId, price, requireReportedUsage: true }) })",
       "settingsForVersion: (version) => runnerSettings.settingsFor(version),",
       "hosted: environment.DEPLOYMENT_MODE === \"hosted\",",
       "providerPrices: buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE),",

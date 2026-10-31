@@ -18,6 +18,8 @@ import {
   storyContractInArgumentLanguage
 } from "@debateai/story";
 import { STORYTELLER_V2_ANSWER_FORM } from "../../packages/story/src/contracts.js";
+import * as story from "../../packages/story/src/path-rewrite.js";
+import * as report from "../../packages/story/src/investigation-report.js";
 
 /**
  * Verdict story, Task 2 — the two code-owned contracts (spec §5.2). The byte
@@ -210,3 +212,69 @@ describe("verdict story — the verdict basis the story explains", () => {
 it("preserves the installed concise storyteller answer form fingerprint",()=>{expect(createHash("sha256").update(STORYTELLER_V2_ANSWER_FORM).digest("hex")).toBe("0e7ec7acc8a69057e6f23d1623cea3516925da8b72f310a06b33b859fa2d68e5");});
 // Story format robustness (2026-10-12): v3 is v2 plus the quote sentence; v2 above stays as history.
 it("pins the current storyteller v3 answer form fingerprint",()=>{expect(createHash("sha256").update(STORYTELLER_ANSWER_FORM).digest("hex")).toBe("443f79f8470f9a4597a0371b3849b9612a0df33047946d8a30d6aa74348840b4");});
+
+// W3-5 (dig-model revision 2026-10-30): the path rewrite's two contracts, code's answer forms beside the owner's approved
+// instructions (drafts 5.1 and 5.2; their text is pinned in prompt-text-pins.test.ts).
+// W5-1: the final report's five contracts, code's answer forms beside the instructions (pinned in prompt-text-pins.test.ts).
+describe("final report — the answer, story and check contracts", () => {
+  it("frames for the door, and each answer form names every member its parser enforces", () => {
+    for (const contract of report.INVESTIGATION_REPORT_SEALED_CONTRACTS) {
+      const framed = buildFramedPrompt({ contract, material: [{ name: "question", content: "Should the city fund the tram?" }] });
+      expect(assertFramedPrompt(framed.packet).contractId).toBe(contract.contractId);
+    }
+    for (const member of ["segments", "text", "rests_on", "revision_problems"]) expect(report.REPORT_ANSWER_FORM, member).toContain(member);
+    for (const member of ["short_answer", "what_would_change", "how_it_went", "card", "paragraph", "still_open", "revision_problems"]) {
+      expect(report.REPORT_STORY_FORM, member).toContain(member);
+    }
+    for (const member of ["satisfied", "problem", "part", "misleading"]) expect(report.REPORT_STORY_CHECK_FORM, member).toContain(member);
+    expect(report.REPORT_ANSWER_CHECK_FORM).not.toContain("misleading");
+    expect(Object.keys(report.ReportStoryReplySchema.shape).sort()).toEqual(["how_it_went", "short_answer", "still_open", "what_would_change"]);
+  });
+
+  it("names its four call sites on the story lane with their roles, rounds 1 to 4", () => {
+    expect(report.investigationReportCallSiteKey("ANSWER", 1)).toBe("INVESTIGATION_REPORT:ANSWER:1");
+    expect(report.investigationReportCallSiteRole("INVESTIGATION_REPORT:STORY_CHECK:4")).toBe("EVALUATOR");
+    expect(report.investigationReportCallSiteRole("INVESTIGATION_REPORT:STORY:5")).toBeNull();
+    expect(() => report.investigationReportCallSiteKey("STORY", 5)).toThrow();
+  });
+});
+
+describe("path rewrite — the writer and checker contracts", () => {
+  it("puts the owner's wording in the instruction slot and code's form in the answer slot, and frames for the door", () => {
+    expect(story.PATH_REWRITE_WRITER_PROMPT_CONTRACT).toEqual({ contractId: "path-rewrite.writer.v1",
+      instruction: story.PATH_REWRITE_WRITER_INSTRUCTION, answerForm: story.PATH_REWRITE_WRITER_ANSWER_FORM });
+    expect(story.PATH_REWRITE_CHECKER_PROMPT_CONTRACT).toEqual({ contractId: "path-rewrite.checker.v1",
+      instruction: story.PATH_REWRITE_CHECKER_INSTRUCTION, answerForm: story.PATH_REWRITE_CHECKER_ANSWER_FORM });
+    for (const contract of story.PATH_REWRITE_SEALED_CONTRACTS) {
+      const framed = buildFramedPrompt({ contract, material: [{ name: "question", content: "Should the city fund the tram?" }] });
+      expect(assertFramedPrompt(framed.packet).contractId).toBe(contract.contractId);
+    }
+  });
+
+  it("each answer form names every member its parser enforces", () => {
+    for (const member of ["line", "summary", "what_changed", "text", "rests_on", "fate", "view", "outcome", "scope", "reason",
+      "dig_paths", "position_ref", "HELD_UP", "PARTLY_HELD", "FELL", "SET_ASIDE", "HELPED", "DID_NOT_HELP", "NOT_SETTLED",
+      "PATH", "MAIN_QUESTION", "PERSON_EDITED", "PERSON_OWN_VIEW", "revision_problems"]) {
+      expect(story.PATH_REWRITE_WRITER_ANSWER_FORM, member).toContain(member);
+    }
+    expect(Object.keys(story.PathRewriteReplySchema.shape).sort()).toEqual(["dig_paths", "fate", "line", "summary", "view", "what_changed"]);
+    for (const member of ["satisfied", "problem", "part", ...story.PATH_REWRITE_PARTS]) {
+      expect(story.PATH_REWRITE_CHECKER_ANSWER_FORM, member).toContain(member);
+    }
+    // No trust word anywhere in the form: the path's word is code's (Q-D3).
+    expect(story.PATH_REWRITE_WRITER_ANSWER_FORM).not.toMatch(/trust|SURE/u);
+  });
+
+  it("the call sites: the writer is a synthesizer call, the checker an evaluator call, rounds 1 to 4 only", () => {
+    expect(story.pathRewriteCallSiteKey("WRITER", 1)).toBe("PATH_REWRITE:WRITER:1");
+    expect(story.pathRewriteCallSiteRole("PATH_REWRITE:WRITER:4")).toBe("SYNTHESIZER");
+    expect(story.pathRewriteCallSiteRole("PATH_REWRITE:CHECKER:3")).toBe("EVALUATOR");
+    expect(story.pathRewriteCallSiteRole("PATH_REWRITE:CHECKER:5")).toBeNull();
+    expect(story.pathRewriteCallSiteRole("STORY:STORYTELLER:1")).toBeNull();
+    expect(() => story.pathRewriteCallSiteKey("CHECKER", 5)).toThrow(expect.objectContaining({ code: "PATH_REWRITE_ROUND_INVALID" }));
+    // Both steps think low, under their own step names.
+    expect(story.pathRewriteThinkingOf("PATH_REWRITE:WRITER:2")).toEqual({ step: "path_rewrite_writer", level: "low" });
+    expect(story.pathRewriteThinkingOf("PATH_REWRITE:CHECKER:1")).toEqual({ step: "path_rewrite_checker", level: "low" });
+    expect(story.pathRewriteThinkingOf("STORY:CHECKER:1")).toBeNull();
+  });
+});

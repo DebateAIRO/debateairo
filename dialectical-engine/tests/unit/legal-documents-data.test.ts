@@ -373,14 +373,16 @@ describe("legal documents — generated data", () => {
       expect(texts(section(PRIVACY_POLICY, "00"))[0]!.startsWith("We collect what an account needs")).toBe(true);
     });
 
-    // V, 2026-10-28: the "Refused questions we keep" row went with the keeping, leaving thirteen.
-    it("turns the collection table into thirteen rows joined with em dashes", () => {
+    // V, 2026-10-28: the "Refused questions we keep" row went with the keeping, leaving thirteen; R22 item 15
+    // (2026-10-29) adds "Page settings and visits" after "Debate content": fourteen.
+    it("turns the collection table into fourteen rows joined with em dashes", () => {
       const collect = section(PRIVACY_POLICY, "02");
       expect(collect.blocks.map((block) => block.kind)).toEqual(["p", "list", "p", "p"]);
       const table = collect.blocks[1]!;
       if (table.kind !== "list") throw new Error("unreachable");
-      expect(table.items).toHaveLength(13);
+      expect(table.items).toHaveLength(14);
       expect(table.items.some((item) => /refused questions/i.test(item))).toBe(false);
+      expect(table.items[8]!.startsWith("Page settings and visits — The reading level you choose on the debate pages;")).toBe(true);
       expect(table.items[0]!.startsWith("Account — Email address and recovery email address")).toBe(true);
       expect(table.items[0]!.endsWith("— You, at registration")).toBe(true);
     });

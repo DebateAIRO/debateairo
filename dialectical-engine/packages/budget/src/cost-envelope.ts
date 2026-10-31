@@ -136,12 +136,51 @@ export const PROJECTED_INPUT_BYTES_PER_TOKEN = 2 as const;
 export interface ProviderTargetPrice {
   readonly inputMicrosPerMillionTokens: number;
   readonly outputMicrosPerMillionTokens: number;
+  /**
+   * Owner answer F4 (2026-10-30): "count them at the real price". A vendor whose bill depends on the prompt cache and
+   * on the prompt's size (Anthropic: Claude Haiku 5.5) carries its real prices here, and a charge is then the vendor's
+   * own bill: plain input, 5-minute and 1-hour cache writes and cache reads each at their own price, at the step the
+   * whole prompt reaches. Absent: every prompt token at `inputMicrosPerMillionTokens`, as before (DeepInfra).
+   */
+  readonly vendorPrices?: ProviderVendorPrices;
+}
+
+/** The cache prices of one prompt-size step, in micro-units per million tokens. */
+export interface ProviderCachePrices {
+  /** A 5-minute cache write: 1.25x the step's input price on Anthropic. */
+  readonly cacheWriteMicrosPerMillionTokens: number;
+  /** A 1-hour cache write: 2x the step's input price. */
+  readonly cacheWriteOneHourMicrosPerMillionTokens: number;
+  /** A cache read (a hit, which also refreshes the entry): 0.1x the step's input price. */
+  readonly cacheReadMicrosPerMillionTokens: number;
+}
+
+/**
+ * A vendor's real prices: the target's own input and output prices with `lower`'s cache prices up to
+ * `upper.abovePromptTokens` prompt tokens, and every price at `upper` above that. The prompt counts ALL its input
+ * tokens, cache reads and writes included (Anthropic's pricing page, "Long context pricing").
+ */
+export interface ProviderVendorPrices {
+  readonly lower: ProviderCachePrices;
+  readonly upper?: ProviderCachePrices & Readonly<{
+    abovePromptTokens: number;
+    inputMicrosPerMillionTokens: number;
+    outputMicrosPerMillionTokens: number;
+  }>;
 }
 
 /** Vendor-reported token counts, already separated into the two priced sides. */
 export interface ReportedUsage {
   readonly promptTokens: number;
   readonly completionTokens: number;
+  /**
+   * F4: the parts of `promptTokens` the vendor wrote to or read from its prompt cache, when it said so. Only a price
+   * with `vendorPrices` reads them. `cacheWriteOneHourTokens` is the 1-hour part of the writes; when a write is
+   * reported without that split, every write is charged at the 1-hour price, so a charge never undercounts.
+   */
+  readonly cacheWriteTokens?: number;
+  readonly cacheWriteOneHourTokens?: number;
+  readonly cacheReadTokens?: number;
 }
 
 const TOKENS_PER_MILLION = 1_000_000n;
@@ -183,6 +222,30 @@ function ceilDivToMicros(count: number, pricePerMillion: number): number {
 function assertPrice(price: ProviderTargetPrice): void {
   assertCountedInteger(price?.inputMicrosPerMillionTokens, "COST_ENVELOPE_PRICE_INVALID");
   assertCountedInteger(price?.outputMicrosPerMillionTokens, "COST_ENVELOPE_PRICE_INVALID");
+  const vendor = price.vendorPrices;
+  if (vendor === undefined) return;
+  for (const step of [vendor.lower, ...(vendor.upper === undefined ? [] : [vendor.upper])]) {
+    assertCountedInteger(step?.cacheWriteMicrosPerMillionTokens, "COST_ENVELOPE_PRICE_INVALID");
+    assertCountedInteger(step?.cacheWriteOneHourMicrosPerMillionTokens, "COST_ENVELOPE_PRICE_INVALID");
+    assertCountedInteger(step?.cacheReadMicrosPerMillionTokens, "COST_ENVELOPE_PRICE_INVALID");
+  }
+  if (vendor.upper !== undefined) {
+    assertCountedInteger(vendor.upper.abovePromptTokens, "COST_ENVELOPE_PRICE_INVALID");
+    assertCountedInteger(vendor.upper.inputMicrosPerMillionTokens, "COST_ENVELOPE_PRICE_INVALID");
+    assertCountedInteger(vendor.upper.outputMicrosPerMillionTokens, "COST_ENVELOPE_PRICE_INVALID");
+  }
+}
+
+/**
+ * F4: the step a prompt of `promptTokens` is billed at — the upper one when the prompt is above its line (every input
+ * token counted, cached or not), else the target's own prices with the lower step's cache prices.
+ */
+function vendorStepFor(price: ProviderTargetPrice, vendor: ProviderVendorPrices, promptTokens: number):
+  ProviderCachePrices & Readonly<{ inputMicrosPerMillionTokens: number; outputMicrosPerMillionTokens: number }> {
+  return vendor.upper !== undefined && promptTokens > vendor.upper.abovePromptTokens
+    ? vendor.upper
+    : { ...vendor.lower, inputMicrosPerMillionTokens: price.inputMicrosPerMillionTokens,
+        outputMicrosPerMillionTokens: price.outputMicrosPerMillionTokens };
 }
 
 /**
@@ -199,8 +262,23 @@ export function chargeMicrosForUsage(
   const completionTokens = assertCountedInteger(
     usage?.completionTokens, "COST_ENVELOPE_USAGE_INVALID"
   );
-  return ceilDivToMicros(promptTokens, price.inputMicrosPerMillionTokens)
-    + ceilDivToMicros(completionTokens, price.outputMicrosPerMillionTokens);
+  const vendor = price.vendorPrices;
+  if (vendor === undefined) {
+    return ceilDivToMicros(promptTokens, price.inputMicrosPerMillionTokens)
+      + ceilDivToMicros(completionTokens, price.outputMicrosPerMillionTokens);
+  }
+  // F4: the vendor's own bill. Each kind of input token at its own price, at the step the whole prompt reaches.
+  const write = usage.cacheWriteTokens === undefined ? 0 : assertCountedInteger(usage.cacheWriteTokens, "COST_ENVELOPE_USAGE_INVALID");
+  const read = usage.cacheReadTokens === undefined ? 0 : assertCountedInteger(usage.cacheReadTokens, "COST_ENVELOPE_USAGE_INVALID");
+  const hour = usage.cacheWriteOneHourTokens === undefined ? write
+    : assertCountedInteger(usage.cacheWriteOneHourTokens, "COST_ENVELOPE_USAGE_INVALID");
+  if (write + read > promptTokens || hour > write) throw new TypeError("COST_ENVELOPE_USAGE_INVALID");
+  const step = vendorStepFor(price, vendor, promptTokens);
+  return ceilDivToMicros(promptTokens - write - read, step.inputMicrosPerMillionTokens)
+    + ceilDivToMicros(write - hour, step.cacheWriteMicrosPerMillionTokens)
+    + ceilDivToMicros(hour, step.cacheWriteOneHourMicrosPerMillionTokens)
+    + ceilDivToMicros(read, step.cacheReadMicrosPerMillionTokens)
+    + ceilDivToMicros(completionTokens, step.outputMicrosPerMillionTokens);
 }
 
 /**
@@ -221,6 +299,9 @@ export function projectedCallCeilingMicros(
     bound?.completionTokenCeiling, "COST_ENVELOPE_PROJECTION_INVALID"
   );
   const projectedPromptTokens = Math.ceil(requestBytes / PROJECTED_INPUT_BYTES_PER_TOKEN);
+  // F4: `vendorPrices` changes the CHARGE only. The projection keeps the target's plain prices: its two bytes per token
+  // already over-count a real prompt (Haiku reads 2.3-3.2 bytes a token) by more than a 5-minute write's 1.25x, and
+  // the upper step would wrongly price a 236 KiB story request (about 81,000 real tokens) at five times its bill.
   return ceilDivToMicros(projectedPromptTokens, price.inputMicrosPerMillionTokens)
     + ceilDivToMicros(completionTokenCeiling, price.outputMicrosPerMillionTokens);
 }
@@ -425,12 +506,38 @@ export function chargeableUsage(
     // An absent side is zero only while the rest of the block can be trusted.
     return read === "MALFORMED" || !readable ? projected : 0;
   };
+  const promptTokens = side(parts.promptTokens, Math.ceil(requestBytes / PROJECTED_INPUT_BYTES_PER_TOKEN));
   return Object.freeze({
-    promptTokens: side(
-      parts.promptTokens, Math.ceil(requestBytes / PROJECTED_INPUT_BYTES_PER_TOKEN)
-    ),
-    completionTokens: side(parts.completionTokens, completionTokenCeiling)
+    promptTokens,
+    completionTokens: side(parts.completionTokens, completionTokenCeiling),
+    // F4: the cache parts only when the vendor's own prompt count was read (a fallback has none to split).
+    ...(typeof parts.promptTokens === "number" ? cacheParts(usage, promptTokens) : {})
   });
+}
+
+/**
+ * F4: the cache parts of a READ prompt count, from the members the Anthropic reply carries in the engine's shape
+ * (`cache_creation_input_tokens`, its 1-hour part `cache_creation_1h_input_tokens`, `cache_read_input_tokens`;
+ * anthropic-messages.ts anthropicUsageAsEngineUsage). None named: nothing (every prompt token at the plain input
+ * price). Named but unreadable, or more than the prompt holds: every prompt token as a 1-hour write, the dearest input
+ * price there is, so an unreadable split never makes a call cheaper than the vendor billed.
+ */
+function cacheParts(usage: unknown, promptTokens: number): Pick<ReportedUsage, "cacheWriteTokens" | "cacheWriteOneHourTokens" | "cacheReadTokens"> {
+  const row = usage as Readonly<Record<string, unknown>>;
+  const names = ["cache_creation_input_tokens", "cache_creation_1h_input_tokens", "cache_read_input_tokens"] as const;
+  if (names.every((name) => row[name] === undefined)) return {};
+  const readable = (value: unknown): value is number | undefined => value === undefined
+    || (typeof value === "number" && Number.isSafeInteger(value) && value >= 0 && value <= MAX_REPORTED_USAGE_COUNTER);
+  const [write, hour, read] = names.map((name) => row[name]);
+  if (readable(write) && readable(hour) && readable(read)
+    && (write ?? 0) + (read ?? 0) <= promptTokens && (hour ?? 0) <= (write ?? 0)) {
+    return {
+      ...(write === undefined ? {} : { cacheWriteTokens: write }),
+      ...(hour === undefined ? {} : { cacheWriteOneHourTokens: hour }),
+      ...(read === undefined ? {} : { cacheReadTokens: read })
+    };
+  }
+  return { cacheWriteTokens: promptTokens, cacheWriteOneHourTokens: promptTokens };
 }
 
 /** T12-R1: the room-only refusal (`RUN_COST_ENVELOPE_ROOM_KEPT`), with the decision that included the room. */
@@ -515,6 +622,23 @@ export function sharedWallReached(scope: SpendScope): TypedDomainError {
         PERSON_ALLOWANCE_REACHED,
         `A call while arguing would take the run owner's ${scope} allowance past its finish edge`
       );
+}
+
+/**
+ * The money rule (owner, 31 Oct 2026): the refusal of a call at the MONTH wall of a billingPlans v4 window. Its code is
+ * still PERSON_ALLOWANCE_REACHED and its message the month's own, so wherever nothing pauses the debate it stops the
+ * arguing exactly as before (and the answer is still written). The runner's month-pause seam
+ * (apps/runner/src/month-pause.ts) recognises it, records the pause and holds the debate's remaining planned calls until
+ * the person presses Continue; `resumableAt` is the month's reset. Figure-free, as every wall refusal.
+ */
+export class MonthWallReachedError extends TypedDomainError {
+  constructor(readonly resumableAt: Date) {
+    super(PERSON_ALLOWANCE_REACHED, "A call while arguing would take the run owner's PERSON_MONTH allowance past its finish edge");
+  }
+}
+
+export function isMonthWallReached(error: unknown): error is MonthWallReachedError {
+  return error instanceof MonthWallReachedError;
 }
 
 /** The refusal a hosted answer gets when its vendor reported no usage figures. */

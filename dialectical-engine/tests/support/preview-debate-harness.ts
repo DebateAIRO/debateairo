@@ -33,6 +33,7 @@ import {
   previewRunnerPolicy,
   previewRunResilience,
   previewSealedRoleFallbackCovered,
+  previewTargetChargePrice,
   previewTargetGatewayControls,
   previewTargetJsonRow,
   providerTargetGatewayControls,
@@ -432,7 +433,8 @@ export function previewDebateHarness(input: Readonly<{
     gates.remainingReads.splice(bootReads);
     const busy = createPreviewBusyCoordinator();
     const versionSeams = (target: ProviderDiscoveryTarget) => {
-      const price = providerTargetPrice(target);
+      // F4 (W2-2), as the runner: a reviewed Anthropic row's calls at the vendor's real prices.
+      const price = previewTargetChargePrice(true, target, providerTargetPrice(target));
       return runGuard === null || price === null ? {} : {
         buildCostEnvelopeSeam: (runId: string, phase: Parameters<NonNullable<Parameters<typeof createPostgresProviderGateway>[1]["buildCostEnvelopeSeam"]>>[1],
           sharedWall: Parameters<NonNullable<Parameters<typeof createPostgresProviderGateway>[1]["buildCostEnvelopeSeam"]>>[2]) =>

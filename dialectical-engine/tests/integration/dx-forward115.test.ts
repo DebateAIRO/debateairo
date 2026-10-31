@@ -39,6 +39,17 @@ const THREAT_REPORT = "0128_threat_reports.sql";
 const SUPPORT_ANSWER_SCOPE = "0129_support_answer_scope.sql";
 /** Row-level security, chained after the support answer scope (mission row-level-security, SPEC-v4 R26). */
 const RLS = "0130_row_level_security.sql";
+/** The V4 account memory (owner rulings N7 and N11), chained after row-level security. */
+const V4_ACCOUNT_MEMORY = "0131_v4_account_memory.sql";
+/** The Perplexity plan's web evidence store and investigations (task W1-3), chained after the V4 account memory. */
+const WEB_EVIDENCE = "0132_web_evidence.sql";
+const INVESTIGATIONS = "0133_investigations.sql";
+/** The dig model and the month pause (dig-model revision task W2-8), chained after the investigations. */
+const DIG_MODEL = "0134_dig_model_and_month_pause.sql";
+/** A dig's picks and its path rewrite's material (dig-model revision task W3-7), chained after the dig model. */
+const DIG_PICKS = "0135_dig_picks.sql";
+/** The investigation's final report (R22 task W5-1), chained after the dig picks. */
+const INVESTIGATION_REPORTS = "0136_investigation_reports.sql";
 const ROTATE = "identity.rotate_session_after_step_up(uuid,uuid,text,uuid,bigint,uuid,text,text,text,jsonb,timestamp with time zone,uuid,text,text,uuid,timestamp with time zone)";
 const rows = async (db: TestDatabase, table: string) => (await db.pool.query(`SELECT * FROM ${table} ORDER BY 1`)).rows;
 const ledger = (db: TestDatabase) => rows(db, "public.debateai_schema_migration");
@@ -50,13 +61,13 @@ describe("data export forward115", () => {
   beforeAll(async () => { db = await startTestDatabase(); await migrate(db.pool); }, 180_000);
   afterAll(async () => { await db?.stop(); });
 
-  it("G1 applies 0110, NETOPIA 0111, the auth batch 0112, Part C 0113, role rotation 0114, export 0115, the mail locale 0116, the map 0117, the language check 0118 and the reclaim resume 0119 and the reply measures 0120, the engine verdict 0121, the engine's map answer step 0122, the side-by-side releases 0123, the settings activation 0124, the Italy-specific approval 0125, the synthesis check 0126, the publication review 0127, the threat reports 0128 and the support answer scope 0129 with linked receipts", async () => {
+  it("G1 applies 0110, NETOPIA 0111, the auth batch 0112, Part C 0113, role rotation 0114, export 0115, the mail locale 0116, the map 0117, the language check 0118 and the reclaim resume 0119 and the reply measures 0120, the engine verdict 0121, the engine's map answer step 0122, the side-by-side releases 0123, the settings activation 0124, the Italy-specific approval 0125, the synthesis check 0126, the publication review 0127, the threat reports 0128 and the support answer scope 0129 and the V4 account memory 0130 with linked receipts", async () => {
     const plan = await loadMigrationPlan();
-    expect(plan.forwardChain.map(step => step.name)).toEqual([NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAIL_LOCALE, MAP, LANGUAGE_CHECK, RECLAIM, REPLY_MEASURES, ENGINE_VERDICT, ENGINE_MAP_CHECK, SIDE_BY_SIDE, SETTINGS_ACTIVATION, ITALY_APPROVAL, SYNTHESIS_CHECK, PUBLICATION_REVIEW, THREAT_REPORT, SUPPORT_ANSWER_SCOPE, RLS]);
+    expect(plan.forwardChain.map(step => step.name)).toEqual([NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAIL_LOCALE, MAP, LANGUAGE_CHECK, RECLAIM, REPLY_MEASURES, ENGINE_VERDICT, ENGINE_MAP_CHECK, SIDE_BY_SIDE, SETTINGS_ACTIVATION, ITALY_APPROVAL, SYNTHESIS_CHECK, PUBLICATION_REVIEW, THREAT_REPORT, SUPPORT_ANSWER_SCOPE, RLS, V4_ACCOUNT_MEMORY, WEB_EVIDENCE, INVESTIGATIONS, DIG_MODEL, DIG_PICKS, INVESTIGATION_REPORTS]);
     const names = (await ledger(db)).map(row => row.name).filter(name => /^01[123]/u.test(name));
-    expect(names).toEqual(["0110_account_erasure_public_debates.sql", NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAIL_LOCALE, MAP, LANGUAGE_CHECK, RECLAIM, REPLY_MEASURES, ENGINE_VERDICT, ENGINE_MAP_CHECK, SIDE_BY_SIDE, SETTINGS_ACTIVATION, ITALY_APPROVAL, SYNTHESIS_CHECK, PUBLICATION_REVIEW, THREAT_REPORT, SUPPORT_ANSWER_SCOPE, RLS]);
+    expect(names).toEqual(["0110_account_erasure_public_debates.sql", NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAIL_LOCALE, MAP, LANGUAGE_CHECK, RECLAIM, REPLY_MEASURES, ENGINE_VERDICT, ENGINE_MAP_CHECK, SIDE_BY_SIDE, SETTINGS_ACTIVATION, ITALY_APPROVAL, SYNTHESIS_CHECK, PUBLICATION_REVIEW, THREAT_REPORT, SUPPORT_ANSWER_SCOPE, RLS, V4_ACCOUNT_MEMORY, WEB_EVIDENCE, INVESTIGATIONS, DIG_MODEL, DIG_PICKS, INVESTIGATION_REPORTS]);
     const steps = await receipts(db);
-    expect(steps.map(step => step.source_name)).toEqual([NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAIL_LOCALE, MAP, LANGUAGE_CHECK, RECLAIM, REPLY_MEASURES, ENGINE_VERDICT, ENGINE_MAP_CHECK, SIDE_BY_SIDE, SETTINGS_ACTIVATION, ITALY_APPROVAL, SYNTHESIS_CHECK, PUBLICATION_REVIEW, THREAT_REPORT, SUPPORT_ANSWER_SCOPE, RLS]);
+    expect(steps.map(step => step.source_name)).toEqual([NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAIL_LOCALE, MAP, LANGUAGE_CHECK, RECLAIM, REPLY_MEASURES, ENGINE_VERDICT, ENGINE_MAP_CHECK, SIDE_BY_SIDE, SETTINGS_ACTIVATION, ITALY_APPROVAL, SYNTHESIS_CHECK, PUBLICATION_REVIEW, THREAT_REPORT, SUPPORT_ANSWER_SCOPE, RLS, V4_ACCOUNT_MEMORY, WEB_EVIDENCE, INVESTIGATIONS, DIG_MODEL, DIG_PICKS, INVESTIGATION_REPORTS]);
     expect(steps[4].previous_manifest_sha256).toBe(steps[3].forward_manifest_sha256);
     expect(steps[4].verifier_sha256).toBe(steps[3].verifier_sha256);
     expect(steps[5].previous_manifest_sha256).toBe(steps[4].forward_manifest_sha256);

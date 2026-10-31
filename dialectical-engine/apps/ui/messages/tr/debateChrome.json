@@ -216,7 +216,7 @@
   "debateChrome.condition.missingNumber": "Sayı, yeniden oynatma hatasından sonra kaldırıldı",
   "debateChrome.condition.owedCheckUnexecuted": "Yapılması gereken denetim tamamlanma sırasında yürütülmedi",
   "debateChrome.condition.synthesisObjectionStanding": "Bu ifadeye yönelik bir değerlendirici itirazı hâlâ geçerli",
-  "debateChrome.condition.digestCompressed": "Düğüm özetleri oluşturma bütçesine sığması için kısaltıldı",
+  "debateChrome.condition.digestCompressed": "Tartışma çok büyüktü; bu nedenle yanıt, tartışmanın kısaltılmış bir sürümüne dayanarak yazıldı.",
   "debateChrome.condition.digestCannotExist": "Oluşturma bütçesi içinde özet hazırlanamadı",
   "debateChrome.condition.protectedCoreGuardRetired": "Yürütme bütçe nedeniyle durdu; yeniden ifade denetimi artık engel oluşturmadı",
   "debateChrome.condition.hiddenUnjudgeable": "Gizli: değerlendirilemedi — okumak için gizli öğeleri gösterin",

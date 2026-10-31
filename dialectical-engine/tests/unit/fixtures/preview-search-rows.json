@@ -1,0 +1,42 @@
+{
+  "schema": "preview-search-rows-v1",
+  "about": "The reviewed Perplexity search row of the preview spending gate (plan 2026-10-30, task W1-1; owner answers of 2026-10-30: fast mode, $0.001 per search, a $1.00 daily pot, the team total raised to $17.00). The gate (packages/providers/ops/preview_budget_helper.py, PerplexityProfile) and the app's search adapter (task W2-1) must both equal this file; a price or bound change is a reviewed change to both sides and to this file. Perplexity charges per request, never per token, and reports no usage: a search reserves and is charged exactly request_usd, whatever its size, and a reply naming any field outside reply_fields halts the gate. The request carries no model member; the gate maps every request to its one row, whose model id is the name the gate's records and its /remaining answer use. Every member a request may carry is listed under request_fields; any other member is refused before anything is reserved. query is one text (a list of texts is refused: Perplexity bills a multi-query request once but merges its results). search_language_filter is a list of exactly one ISO 639-1 code; country is one ISO 3166-1 alpha-2 code; search_after_date_filter is Perplexity's MM/DD/YYYY form.",
+  "provider": "perplexity",
+  "host": "api.perplexity.ai",
+  "path": "/search",
+  "key_prefix": "pplx-",
+  "per_call_cap_usd": "0.001",
+  "max_request_bytes": 16384,
+  "rows": [
+    {
+      "model": "perplexity-search-fast",
+      "maker": "Perplexity",
+      "request_usd": "0.001",
+      "request_nano_usd": 1000000,
+      "search_type": "fast",
+      "worst_case_reservation_usd": "0.001"
+    }
+  ],
+  "request_fields": {
+    "required": ["query", "max_results", "max_tokens_per_page", "max_tokens", "search_type"],
+    "optional": ["search_after_date_filter", "country", "search_language_filter"]
+  },
+  "bounds": {
+    "query_chars": [1, 500],
+    "max_results": [1, 10],
+    "max_tokens_per_page": [1, 32768],
+    "max_tokens": [1, 327680],
+    "search_language_filter_items": 1
+  },
+  "reply_fields": {
+    "top_level": ["id", "results", "server_time"],
+    "required_top_level": ["id", "results"],
+    "result": ["title", "url", "snippet", "date", "last_updated"],
+    "required_result": ["title", "url", "snippet"],
+    "max_results": 10
+  },
+  "unbilled_refusals": {
+    "busy": [429],
+    "not_busy": [400, 422]
+  }
+}

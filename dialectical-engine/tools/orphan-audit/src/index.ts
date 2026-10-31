@@ -611,7 +611,14 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // Row-level security S01 merged onto origin/dev 76b76f4ba (2026-10-28): the module carries the synthesis-flag lines and
 // row security's lines above. migrate() is byte-identical (its 13,114-byte slice, sha256 d1495dbe4bbf…, at ca61cbe00,
 // b1005606c, 76b76f4ba and 20808ee31).
-const NATIVE_MIGRATE_MODULE_SHA256 = "6a957bde3c9b8e1664ccd5a6bb233fdf06991411bd60112848b8d21de4bb4a87";
+// R22 engine follow-ups (2026-10-29, owner ruling "Backup AI takes the seat"): the reviewed module after
+// RunBackupSwitchLifecycleValue's cause admitted CONTENT_REFUSED (a type and its comment only). migrate() is byte-identical.
+// Merge of origin/dev 64ef40c21 (row-level security, #226) into the V4 branch (2026-10-30): the module carries both the
+// row-security lines and the R22 CONTENT_REFUSED cause above. migrate() is byte-identical.
+// Perplexity plan W1-3 (2026-10-30): two export lines for the web evidence and investigation repositories (0132, 0133).
+// Dig-model revision W2-8 (2026-10-31): one comment and one export line for the dig model repositories (0134).
+// migrate() is byte-identical.
+const NATIVE_MIGRATE_MODULE_SHA256 = "cbd585d27e2079c47271b02f226946b2a4a57c1c89d1342a9e815f4e3db0ffc9";
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
 // ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK and the rethrow after it, then the one retried
 // SQLSTATE). A6 review (2026-10-22): its doc gained one sentence (a step holds its locks until COMMIT; 2 s bounds each
@@ -758,10 +765,12 @@ export function auditNumericSourceLiteralExports(name: string, source: string): 
 /** The deployed preview-test module is a finite production budget/config boundary.
  * Only its reviewed direct runtime imports are exceptional; mixed fixture imports still block.
  * Side-by-side addition D14-D16 (owner 2026-10-22): preview-line-up.ts, the env's gate part and the line-up composed back
- * into that module's config shape, is one more reviewed direct caller (it reuses the one env key check there). */
+ * into that module's config shape, is one more reviewed direct caller (it reuses the one env key check there).
+ * Perplexity plan 2026-10-30, task W2-1: perplexity-search.ts, the web search adapter, is one more: it reads that module's
+ * gate refusal classes to name why a search failed (halted, busy, unsent, not served), never a fixture. */
 export function auditProductionFixtureImports(where:string,source:string):readonly string[]{
  const runtimeCaller=where==="packages/providers/src/index.ts"||where==="packages/providers/src/provider-probe.ts"
-  ||where==="packages/providers/src/preview-line-up.ts";
+  ||where==="packages/providers/src/preview-line-up.ts"||where==="packages/providers/src/perplexity-search.ts";
  for(const match of source.matchAll(/from\s+["']([^"']+)["']/g)){
   const specifier=match[1]!;
   if(!/(?:tests?|fixtures?)/.test(specifier))continue;
@@ -770,6 +779,15 @@ export function auditProductionFixtureImports(where:string,source:string):readon
  }
  return [];
 }
+
+/**
+ * Perplexity plan 2026-10-30, task W1-7: the V4 mock API (tools/v4-mock-api) is a local stand-in for the API that the
+ * website is click-tested against on a developer's computer. It is never deployed and holds no engine policy: its
+ * switches (port, room, plan) come from the environment of the person who starts it, and its self-check hands the
+ * website's proxy the mock's address the way the website itself is started (DIALECTICAL_API_BASE). By name, these two
+ * files only; every other rule still applies to them, and the law is unchanged everywhere else.
+ */
+const LOCAL_MOCK_ENVIRONMENT_READERS: ReadonlySet<string> = new Set(["tools/v4-mock-api/server.ts", "tools/v4-mock-api/check.ts"]);
 
 export async function auditSourceRules(): Promise<{ readonly blocking: readonly string[] }> {
   const blocking: string[] = [];
@@ -783,7 +801,8 @@ export async function auditSourceRules(): Promise<{ readonly blocking: readonly 
     const source = await readFile(path, "utf8");
     const where = relative(root, path);
     gatewayDeclarations += source.match(/interface\s+ProviderGateway\b/g)?.length ?? 0;
-    if (source.includes(["process", "env"].join(".")) && where !== "packages/register/src/runtime-environment.ts") {
+    if (source.includes(["process", "env"].join(".")) && where !== "packages/register/src/runtime-environment.ts"
+      && !LOCAL_MOCK_ENVIRONMENT_READERS.has(where)) {
       blocking.push(`${where} reads the process environment outside the register loader`);
     }
     if ((where.startsWith("packages/propagation/") || where.startsWith("packages/battery/decision/")) && /from\s+["'](?:node:|pg|drizzle|@debateai\/db)/.test(source)) {

@@ -216,7 +216,7 @@
   "debateChrome.condition.missingNumber": "Broj je uklonjen nakon neuspjeha ponovne reprodukcije",
   "debateChrome.condition.owedCheckUnexecuted": "Obvezna provjera nije izvršena pri dovršetku",
   "debateChrome.condition.synthesisObjectionStanding": "Prigovor ocjenjivača na ovu izjavu i dalje stoji",
-  "debateChrome.condition.digestCompressed": "Sažeci čvorova skraćeni su radi uklapanja u proračun sastavljanja",
+  "debateChrome.condition.digestCompressed": "Rasprava je bila vrlo opsežna, pa je odgovor napisan na temelju njezine skraćene verzije.",
   "debateChrome.condition.digestCannotExist": "Sažetak nije bilo moguće izraditi unutar proračuna sastavljanja",
   "debateChrome.condition.protectedCoreGuardRetired": "Izvođenje je zaustavljeno zbog proračuna; provjera preoblikovanja više ga nije uvjetovala",
   "debateChrome.condition.hiddenUnjudgeable": "Skriveno: nije se moglo ocijeniti — prikažite skriveno da biste ga pročitali",

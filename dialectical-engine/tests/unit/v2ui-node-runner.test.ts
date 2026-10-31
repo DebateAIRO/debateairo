@@ -24,12 +24,15 @@ describe("HYG-01 v2-ui Node test gate", () => {
       cwd: v2UiDirectory,
       encoding: "utf8",
       env: { ...process.env, NO_COLOR: "1" },
-      timeout: 120_000
+      // A hang guard, not a speed check: the 43 files run one at a time, each in its own tsx process (about 40 s on a
+      // free Mac). On CI they share the runner with the whole root gate, and PR #224 (about 150 more gate files) took
+      // them past 120 s twice. The suite must still exit 0.
+      timeout: 300_000
     });
 
     expect(
       { status: result.status, signal: result.signal, stderr: result.stderr, stdout: result.stdout },
       "The v2-ui Node suites are part of the enforced root Vitest gate; phantom .mjs coverage is forbidden"
     ).toMatchObject({ status: 0, signal: null });
-  }, 125_000);
+  }, 305_000);
 });

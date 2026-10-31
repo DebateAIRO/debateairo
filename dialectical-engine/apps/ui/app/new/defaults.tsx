@@ -18,6 +18,8 @@ export const PROVISIONAL_COMPOSITION_BUDGET_DEFAULT = "low" as const;
 export type DepthMode = NonNullable<DepthParams["depthMode"]>;
 export type Scrutiny = NonNullable<DepthParams["scrutiny"]>;
 export type AnswerLength = NonNullable<DepthParams["answerLength"]>;
+/** V4 reading level (owner N6): the same three levels the contract's depth_params carries. */
+export type ReadingLevel = NonNullable<DepthParams["readingLevel"]>;
 export const DEPTH_MODES: readonly DepthMode[] = ["adaptive", "fixed"];
 export const SCRUTINY_LEVELS: readonly Scrutiny[] = ["standard", "deep", "exhaustive"];
 export const ANSWER_LENGTHS: readonly AnswerLength[] = ["short", "standard", "detailed"];
@@ -100,6 +102,8 @@ export type NewDebateAskDefaults = {
   readonly depthMode?: DepthMode;
   readonly scrutiny?: Scrutiny;
   readonly answerLength?: AnswerLength;
+  /** V4 reading level (owner N6, 2026-10-29): sent by the V4 ask page only; absent sends nothing (every /new ask). */
+  readonly readingLevel?: ReadingLevel;
   /**
    * Side-by-side spec §13 (Task S12): the settings version the room read named (`settings_version`); absent sends
    * nothing, so the API normalises the ask as before.
@@ -136,6 +140,7 @@ export function buildNewDebateAskConfig(
     ...(defaults.depthMode === undefined ? {} : { depth_mode: defaults.depthMode }),
     ...(defaults.scrutiny === undefined ? {} : { scrutiny: defaults.scrutiny }),
     ...(defaults.answerLength === undefined ? {} : { answer_length: defaults.answerLength }),
+    ...(defaults.readingLevel === undefined ? {} : { reading_level: defaults.readingLevel }),
     ...(defaults.settingsVersion === undefined ? {} : { settings_version: defaults.settingsVersion })
   };
 }

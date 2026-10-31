@@ -1,12 +1,18 @@
 import { AsyncLocalStorage, AsyncResource } from "node:async_hooks";
 import {
+  PERPLEXITY_SEARCH_MODEL,
+  PERPLEXITY_SEARCH_VENDOR,
   PREVIEW_PROVIDER_SOCKET_KEYS,
   createPreviewRemainingRpcPort,
   previewCallTierOf,
+  previewGateSocket,
   previewModelRowForRef,
   previewProviderSocket,
   providerCallGateUnsent,
   structureRepairOriginalKey,
+  type PerplexitySearchOutcome,
+  type PerplexitySearchPort,
+  type PreviewGateName,
   type PreviewGateRemaining,
   type PreviewGateSettings,
   type PreviewProviderName,
@@ -67,6 +73,8 @@ function vendorOfBaseUrl(baseUrl: string): string {
   }
   if (hostIs(hostname, "deepinfra.com")) return "deepinfra";
   if (hostIs(hostname, "anthropic.com")) return "anthropic";
+  // Perplexity plan W2-1: the web search vendor (never a declared target today; its own runner-wide limit if one is).
+  if (hostIs(hostname, "perplexity.ai")) return PERPLEXITY_SEARCH_VENDOR;
   return "default";
 }
 
@@ -198,13 +206,16 @@ export function structureRepairThroughLane(route: StructureRepairRoute | null, s
   } satisfies ProviderGateway) });
 }
 
-/** The preview gates this configuration names, each with a socket: the gate names `previewCallSubjects` reports. */
+/**
+ * The model providers' preview gates this configuration names, each with a socket: the gate names `previewCallSubjects`
+ * reports. The web search gate is not one of them (Perplexity plan W2-1): `previewSearchGateRemainingReader`.
+ */
 export function previewGateNames(config: PreviewGateSettings): readonly PreviewProviderName[] {
   return Object.freeze((["deepinfra", ...Object.keys(PREVIEW_PROVIDER_SOCKET_KEYS)] as PreviewProviderName[])
     .filter((gate) => previewProviderSocket(config, gate) !== undefined));
 }
 
-/** Each preview gate's read-only `/remaining`, over the configuration's own sockets (main.ts). */
+/** Each model provider's preview gate's read-only `/remaining`, over the configuration's own sockets (main.ts). */
 export function previewGateRemainingReaders(config: PreviewGateSettings): readonly Readonly<{
   gate: PreviewProviderName;
   remaining: () => Promise<PreviewGateRemaining>;
@@ -248,4 +259,68 @@ export async function applyPreviewGateCapacities(input: Readonly<{
     if (finalWriterSlots !== undefined) input.scheduler.setGateFinalWriterCapacity(gate, finalWriterSlots);
     input.scheduler.setGateCapacity(gate, slots);
   }));
+}
+
+/**
+ * Perplexity plan 2026-10-30, task W2-1 — A WEB SEARCH'S SUBJECT. Search is no model and no maker's call: its subject
+ * is the search row (`perplexity-search-fast`, so the debate's and the runner's per-model limits cap searches at once),
+ * the vendor `perplexity`, and on the preview its own gate when the configuration names its socket (else no gate: the
+ * guarded fetch then sends nothing and the search fails NOT_CONFIGURED). Off the preview there is no gate.
+ */
+export function searchCallSubject(config: PreviewGateSettings | undefined): CallSubject {
+  const gate = config !== undefined && previewGateSocket(config, PERPLEXITY_SEARCH_VENDOR) !== undefined ? PERPLEXITY_SEARCH_VENDOR : null;
+  return Object.freeze({ model: PERPLEXITY_SEARCH_MODEL, vendor: PERPLEXITY_SEARCH_VENDOR, gate });
+}
+
+/**
+ * Perplexity plan W2-1: the web search gate's read-only `/remaining` when the configuration names its socket, in the
+ * form `applyPreviewGateCapacities` takes, so its slots (`max_concurrent_calls`) are read at boot like every gate's and
+ * searches wait in the scheduler instead of being refused. Undefined when no search gate is configured.
+ */
+export function previewSearchGateRemainingReader(config: PreviewGateSettings): Readonly<{
+  gate: PreviewGateName;
+  remaining: () => Promise<PreviewGateRemaining>;
+}> | undefined {
+  const socket = previewGateSocket(config, PERPLEXITY_SEARCH_VENDOR);
+  if (socket === undefined) return undefined;
+  const port = createPreviewRemainingRpcPort({ budget_socket: socket, scope_id: config.scope_id });
+  return Object.freeze({ gate: PERPLEXITY_SEARCH_VENDOR, remaining: () => port.remaining() });
+}
+
+const searchFailed = (failure: "STOPPED" | "UNEXPECTED"): PerplexitySearchOutcome =>
+  Object.freeze({ outcome: "FAILED", failure, chargeMicros: 0, resultCount: 0 });
+
+/**
+ * Perplexity plan W2-1 — ONE DEBATE'S WEB SEARCHES, THROUGH ITS LANE. Each search waits for its slots in the debate's
+ * lane as an OTHER call (never ahead of the arguing calls), under the search row's limits and its gate's slots, runs in
+ * the caller's async context, and keeps the gate's health as `laneGateway` does: an answered search (FOUND, EMPTY)
+ * marks the gate healthy, one the gate proved unsent (GATE_UNSENT) marks it unhealthy, before the slot frees. It never
+ * throws: a search still waiting when the lane stops is FAILED STOPPED (never sent), and an inner port that throws
+ * anyway is FAILED UNEXPECTED, so a search can never end the debate (owner 2026-10-30: the debate goes on without web).
+ */
+export function laneSearchPort(input: Readonly<{
+  lane: DebateCallLane;
+  scheduler: Pick<CallScheduler, "markGateHealthy" | "markGateUnhealthy">;
+  subject: CallSubject;
+  port: PerplexitySearchPort;
+}>): PerplexitySearchPort {
+  const { lane, scheduler, subject, port } = input;
+  const gate = subject.gate;
+  return Object.freeze({
+    async search(request, signal) {
+      const send = AsyncResource.bind(async (): Promise<PerplexitySearchOutcome> => {
+        let outcome: PerplexitySearchOutcome;
+        try { outcome = await port.search(request, signal); } catch { outcome = searchFailed("UNEXPECTED"); }
+        if (gate !== null && (outcome.outcome === "FOUND" || outcome.outcome === "EMPTY")) scheduler.markGateHealthy(gate);
+        if (gate !== null && outcome.outcome === "FAILED" && outcome.failure === "GATE_UNSENT") scheduler.markGateUnhealthy(gate);
+        return outcome;
+      });
+      try {
+        return await lane.run({ ...subject, priority: "OTHER" }, send);
+      } catch {
+        // The lane stopped or held the search back before it started: nothing was sent.
+        return searchFailed("STOPPED");
+      }
+    }
+  } satisfies PerplexitySearchPort);
 }

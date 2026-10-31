@@ -216,7 +216,7 @@
   "debateChrome.condition.missingNumber": "Číslo bolo po zlyhaní prehratia odstránené",
   "debateChrome.condition.owedCheckUnexecuted": "Povinná kontrola sa do dokončenia nevykonala",
   "debateChrome.condition.synthesisObjectionStanding": "Voči tomuto tvrdeniu naďalej platí námietka hodnotiteľa",
-  "debateChrome.condition.digestCompressed": "Súhrny uzlov boli skrátené, aby sa zmestili do rozpočtu na zostavenie",
+  "debateChrome.condition.digestCompressed": "Debata bola veľmi rozsiahla, preto bola odpoveď napísaná z jej skrátenej verzie.",
   "debateChrome.condition.digestCannotExist": "V rámci rozpočtu na zostavenie nebolo možné vytvoriť súhrn",
   "debateChrome.condition.protectedCoreGuardRetired": "Beh sa zastavil pre rozpočtové obmedzenie; kontrola preformulovania ho už neblokovala",
   "debateChrome.condition.hiddenUnjudgeable": "Skryté: nedalo sa posúdiť — obsah zobrazíte povolením skrytých položiek",

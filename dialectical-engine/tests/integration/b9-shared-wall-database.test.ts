@@ -163,18 +163,24 @@ describe("B9a · the person's wall over the real ledger", () => {
       plans: billingPlansFromValue(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value, BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.sourceRef),
       closeBasisPoints: 9_500
     });
-    // Free has one window, the month, with the plan's finish edge.
+    // Free has one window, the month. billingPlans v4 first put its edge at its limit plus a fixed 20 cents; the owner's
+    // money rule (31 Oct) changed that meaning, and this row with it: the month is a wall at its 20 cents (Free keeps no
+    // reserve inside, its 5 cents sit on top), and the 20 cents are only the tolerance for a call in flight there.
     const windows = await persons.read(ownerRef, new Date());
     expect(windows.map((entry) => entry.scope)).toEqual(["PERSON_MONTH"]);
     const month = windows[0]!;
-    const edge = Math.floor((month.limitMicros * month.finishBasisPoints) / 10_000);
+    expect([month.keepsReserveMicros, month.finishOverflowMicros]).toEqual([0, 200_000]);
+    const wall = month.limitMicros - (month.keepsReserveMicros ?? 0);
+    expect(wall).toBe(200_000);
+    // The run's own ceiling stands above the 20-cent wall, so the person's month is the wall this asks.
     const guard = new CostEnvelopeGuard({
       store,
-      policy: { perRunCeilingMicros: 250_000, dailyCeilingMicros: 1_000_000_000 },
+      policy: { perRunCeilingMicros: 1_000_000, dailyCeilingMicros: 1_000_000_000 },
       sharedWall: { finishBasisPoints: 11_500, persons, owners: store }
     });
 
-    await charge(store, runId, "RUN", edge - PROJECTED);
+    // One micro-unit below the wall the call is admitted (its worst case inside the tolerance); at the wall, refused.
+    await charge(store, runId, "RUN", wall - 1);
     expect(await decide(guard, runId)).toBe("ADMITTED");
     await charge(store, runId, "RUN", 1);
     expect(await decide(guard, runId)).toBe("PERSON_ALLOWANCE_REACHED");

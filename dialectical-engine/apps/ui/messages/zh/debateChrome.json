@@ -215,7 +215,7 @@
   "debateChrome.condition.missingNumber": "重放失败后移除了数值",
   "debateChrome.condition.owedCheckUnexecuted": "运行结束时未执行应完成的检查",
   "debateChrome.condition.synthesisObjectionStanding": "评估者对此陈述的异议仍然成立",
-  "debateChrome.condition.digestCompressed": "为适应合成预算，节点摘要已缩短",
+  "debateChrome.condition.digestCompressed": "辩论规模很大，因此答案是根据辩论的缩减版本撰写的。",
   "debateChrome.condition.digestCannotExist": "无法在合成预算内生成摘要",
   "debateChrome.condition.protectedCoreGuardRetired": "运行因预算而停止；复述检查不再构成门槛",
   "debateChrome.condition.hiddenUnjudgeable": "已隐藏：无法评审 — 显示隐藏内容后即可阅读",

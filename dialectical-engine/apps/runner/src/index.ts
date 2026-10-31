@@ -28,6 +28,7 @@ import {
 import { GraphRepository, recordEdgeMeasurementsOnClient } from "@debateai/graph";
 import {
   Judge,
+  JudgeContentRefusedError,
   JudgementRepository,
   insertPreparedNodeReview,
   translateNodeReviewFailure,
@@ -168,6 +169,11 @@ import {
   SYNTHESIZER_PROMPT_CONTRACT,
   SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT,
   SYNTHESIZER_LENGTH_PROMPT_CONTRACT,
+  SYNTHESIZER_LENGTH_READER_PROMPT_CONTRACT,
+  SYNTHESIZER_LENGTH_READER_SOURCES_PROMPT_CONTRACT,
+  SYNTHESIZER_LENGTH_SOURCES_PROMPT_CONTRACT,
+  SYNTHESIZER_READER_PROMPT_CONTRACT,
+  digestCitesExtracts,
   EVALUATOR_INSTRUCTIONS,
   EVALUATOR_V1_INSTRUCTIONS,
   type BandCeilingRegisterRow,
@@ -192,7 +198,7 @@ import {
   type VerdictLabelDerivation,
   verdictDerivationOfJudges
 } from "@debateai/serve";
-import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN, debateShapeSettingsOf } from "@debateai/contract";
+import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN, debateShapeSettingsOf, readingLevelOf } from "@debateai/contract";
 import {
   MapChoiceRepository, mapAnswersArgued, mapCheckFailedMergedAnswerIds, mapCheckFailedStatements, mapLimitsFor, type MapResult
 } from "@debateai/map";
@@ -208,6 +214,9 @@ import {
   lengthGuidanceText,
   lengthGuidanceField,
   LENGTH_SENTENCE_ANSWER_CHECKER,
+  READER_SENTENCE_ANSWER_CHECKER,
+  withReaderField,
+  type ReadingLevel,
   type CharactersPerWord,
   type LengthCallStep,
   type LengthGuide,
@@ -256,7 +265,9 @@ import {
   type SeatSlot
 } from "./run-seats.js";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
-import { buildStoryRunSnapshot, storyAlsoRaisedFrom, storyAnswersNoteFrom, storyBackupCandidatesFrom, storyBackupMakersFrom, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
+import { CONTENT_REFUSED_HALT_REASON, buildStoryRunSnapshot, storyAlsoRaisedFrom, storyAnswersNoteFrom, storyBackupCandidatesFrom, storyBackupMakersFrom, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
+import { runDigPathRewrite, type PathRewriteRunnerSettings } from "./path-rewrite.js";
+import { pokeInvestigationClosing, type InvestigationCloseSettings } from "./investigation-close.js";
 import {
   shapeCloseCallExtraSeats, shapeCloseCallFires, shapeCloseCallFold, shapeDistinctMakerOptions, shapeRankScrutiny, shapeSelectChains,
   type ScrutinyCandidate
@@ -269,13 +280,23 @@ import {
   buildScrutinyLegs, buildShapePlan, shapeLegCanRun, shapePositionCount, shapePositionsForTodaysOpening, shapePositionsFromMap,
   type ShapeLeg, type ShapePlan, type ShapePositionPlan
 } from "./shape-plan.js";
+import { runRunnerWebStep, type WebStepRunnerSettings } from "./web-step.js";
 import {
-  shapeDistinctMakers, shapeHandOverRoot, shapeMakerBar, shapeRootMakerBar, shapeSeatOrder, shapeWriterSeat
+  WEB_ROOT_SOURCES_MAX_BYTES, engineSourceWithCitedExtracts, legWithWebSources, readDebateWebPacks, webCitedExtractsOf, webReviewInput,
+  type DebateWebPacks
+} from "./web-packs.js";
+import { EVALUATOR_LENGTH_READER_SOURCES_PROMPT_CONTRACT, EVALUATOR_LENGTH_SOURCES_PROMPT_CONTRACT } from "./answer-checker-sources.js";
+import {
+  shapeDistinctMakers, shapeHandOverRoot, shapeMakerBar, shapeRootMakerBar, shapeSeatOrder, shapeSpareForRefusedRoot,
+  shapeSpareThatAnswered, shapeWriterSeat
 } from "./shape-seats.js";
 import { keepAliveProviderGateway, runKeepAliveScope, startRunKeepAlive, type RunnerTaskControl } from "./run-keep-alive.js";
 import type { RunnerRetirementSignal, TaskExecutionCounter } from "./runner-retirement.js";
 import { EMPTY_REPLAY_BOOK, readReplayBook, replayingGateway, type ReplayBook } from "./run-replay.js";
+import { isMonthPausedStop, RUN_MONTH_PAUSED } from "./month-pause.js";
 import type { RunInFlight } from "./run-in-flight.js";
+import { PATH_REWRITE_CALL_SITE_PREFIX, isPathRewriteCallSite, pathRewriteCallSiteRole } from "./path-rewrite-scope.js";
+import { INVESTIGATION_REPORT_CALL_SITE_PREFIX, investigationReportCallSiteRole } from "@debateai/story";
 // Side-by-side spec §13 (S6): the per-version settings types (type-only: run-settings.ts imports this module) and the one
 // debate-member mapping, from its own module so this one never loads the loader.
 import type { RunnerSettingsResolution, RunSettingsVersions } from "./run-settings.js";
@@ -535,6 +556,8 @@ const REVIEW_RETHROWN_CODES: readonly string[] = Object.freeze([
   "RUNNER_CLAIM_LOST",
   "RUNNER_TIME_LIMIT_REACHED",
   "RUNNER_RETIRING",
+  // W3-8 (the money rule): the month wall's planned stop ends this copy as a lost claim does.
+  RUN_MONTH_PAUSED,
   CALL_LANE_STOPPED,
   CALL_LANE_HELD_BACK
 ]);
@@ -546,11 +569,13 @@ function callHeldBack(error: unknown): boolean {
 
 /**
  * L4-F9: the keep-alive's refusal — the debate must make no further model call (its claim taken, or its time up; and,
- * side-by-side spec §4, its release retiring).
+ * side-by-side spec §4, its release retiring). R22 W3-8 (the money rule): and the month wall's planned stop
+ * (RUN_MONTH_PAUSED, ./month-pause.ts): this copy ends the same way, nothing more is saved, and `execute` releases the
+ * claim instead of failing the debate, which stays paused in the database until the person continues.
  */
 function keepAliveStop(error: unknown): boolean {
   return error instanceof TypedDomainError && (error.code === "RUNNER_CLAIM_LOST" || error.code === "RUNNER_TIME_LIMIT_REACHED"
-    || error.code === "RUNNER_RETIRING");
+    || error.code === "RUNNER_RETIRING" || error.code === RUN_MONTH_PAUSED);
 }
 
 export function reviewFailureOutcome(error: unknown): ReviewFailureOutcome {
@@ -838,10 +863,39 @@ export const EVALUATOR_LENGTH_PROMPT_CONTRACT: PromptContract = Object.freeze({
   instruction: `${EVALUATOR_INSTRUCTIONS} ${LENGTH_SENTENCE_ANSWER_CHECKER}`,
   answerForm: EVALUATOR_CONTRACT_TEXT
 });
-/** What `conformanceContractHash` seals from length guidance on: v2, then its length variant (as the writer's seal). */
-export const EVALUATOR_CONTRACTS_FINGERPRINT_TEXT: string = [
+/**
+ * V4 reading level (owner ruling N6, 2026-10-29): the checker told the level the writer wrote for, so it never objects to
+ * plain wording or to precise terms that suit that reader. Two VARIANTS — v2's instruction, then (with its own target)
+ * the length sentence, then the kernel's one reader sentence (READER_SENTENCE_ANSWER_CHECKER); v2's answer form, so the
+ * verdict schema is unchanged. The level arrives as the material field `reader`. A debate asked without a level never
+ * sends them: v2 or length.v1, byte for byte. OWNER WORDING — pending approval.
+ */
+export const EVALUATOR_READER_CONTRACT_ID = "serve.evaluator.reader.v1" as const;
+export const EVALUATOR_LENGTH_READER_CONTRACT_ID = "serve.evaluator.length.reader.v1" as const;
+export const EVALUATOR_READER_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: EVALUATOR_READER_CONTRACT_ID,
+  instruction: `${EVALUATOR_INSTRUCTIONS} ${READER_SENTENCE_ANSWER_CHECKER}`,
+  answerForm: EVALUATOR_CONTRACT_TEXT
+});
+export const EVALUATOR_LENGTH_READER_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: EVALUATOR_LENGTH_READER_CONTRACT_ID,
+  instruction: `${EVALUATOR_INSTRUCTIONS} ${LENGTH_SENTENCE_ANSWER_CHECKER} ${READER_SENTENCE_ANSWER_CHECKER}`,
+  answerForm: EVALUATOR_CONTRACT_TEXT
+});
+/** Shipped history: what `conformanceContractHash` sealed from length guidance until the reading level — v2, then length.v1 (108f1b29...). */
+export const EVALUATOR_LENGTH_CONTRACTS_FINGERPRINT_TEXT: string = [
   promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT),
   promptContractFingerprintText(EVALUATOR_LENGTH_PROMPT_CONTRACT)
+].join("\n---\n");
+/**
+ * What `conformanceContractHash` seals from the reading level (2026-10-29) on: every checker contract the runner sends —
+ * v2, length.v1, reader.v1, then length.reader.v1 (as the writer's seal).
+ */
+export const EVALUATOR_CONTRACTS_FINGERPRINT_TEXT: string = [
+  promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT),
+  promptContractFingerprintText(EVALUATOR_LENGTH_PROMPT_CONTRACT),
+  promptContractFingerprintText(EVALUATOR_READER_PROMPT_CONTRACT),
+  promptContractFingerprintText(EVALUATOR_LENGTH_READER_PROMPT_CONTRACT)
 ].join("\n---\n");
 
 /**
@@ -964,35 +1018,63 @@ export const evaluatorVerdictSchema = z.object({
  * Question language (spec 2026-10-13 L6): with a shaped run's lock, the named
  * sentence replaces the directive and the `question_language` field rides LAST
  * (after `answer_length`); without one (null), the packet is today's, byte for byte.
+ * V4 reading level (owner N6, 2026-10-29): with the run's level, the writer and the checker take their reader variant
+ * and the `reader` field rides after the length fields, before `question_language`; without one (null, every V3 ask),
+ * the packet is today's, byte for byte.
  */
 export function buildSynthesisRolePrompt(
   request: SynthesizerRequest | EvaluatorRequest,
   argumentLanguageName: string,
   randomBytes?: (size: number) => Buffer,
   length: RoleLength | null = null,
-  questionLanguage: QuestionLanguage | null = null
+  questionLanguage: QuestionLanguage | null = null,
+  readingLevel: ReadingLevel | null = null
 ): FramedPrompt {
   // Length guidance (spec 2026-10-15 §3.2): the writer with a target takes its length variant; the checker takes its own
   // only with its own target (`ownWords`, a run admitted with the length row). Every other call: today's packet.
   const writerLengthed = request.role === "SYNTHESIZER" && length !== null;
   const checkerLengthed = request.role === "EVALUATOR" && length !== null && length.ownWords !== null;
+  const told = readingLevel !== null;
+  // Web search (W4-1; design §7.1 item 7): a lengthed writer whose digest carries a cited extract takes its sources variant
+  // (the extract rides on its node). Without one (no packs, nothing cited), today's contract, byte for byte.
+  const sourced = writerLengthed && digestCitesExtracts(request.digest);
+  // W4-7: the checker reads the very extracts the writer read (the same digest), under its own sources variant: the
+  // checker's instruction unchanged, so it never objects to a source it was not shown. None cited: today's packet.
+  const checkerSourced = checkerLengthed && digestCitesExtracts(request.digest);
+  if (request.role === "SYNTHESIZER" && !writerLengthed && digestCitesExtracts(request.digest)) {
+    // Engine 2, the only engine that reads packs, always tells the length: an unlengthed writer with extracts is a defect.
+    throw new TypedDomainError("SYNTHESIZER_SOURCES_UNLENGTHED", "A writer that reads extracts is always told its length");
+  }
+  if (request.role === "EVALUATOR" && !checkerLengthed && digestCitesExtracts(request.digest)) {
+    // The same for its checker: engine 2 always tells it its own length; one sent the extracts blind would be a defect.
+    throw new TypedDomainError("EVALUATOR_SOURCES_UNLENGTHED", "A checker that reads extracts is always told its length");
+  }
   // V-MINIMUM-PAYLOAD: the one projection, applied once; a length variant only appends its own fields after it.
-  const material = toSynthesisPromptMaterial(request);
+  const material = toSynthesisPromptMaterial(request, { checkerReadsExtracts: checkerSourced });
   return buildFramedPrompt({
     contract: promptContractInArgumentLanguage(
       request.role === "SYNTHESIZER"
-        ? (writerLengthed ? SYNTHESIZER_LENGTH_PROMPT_CONTRACT : SYNTHESIZER_PROMPT_CONTRACT)
-        : (checkerLengthed ? EVALUATOR_LENGTH_PROMPT_CONTRACT : EVALUATOR_PROMPT_CONTRACT),
+        ? (sourced
+          ? (told ? SYNTHESIZER_LENGTH_READER_SOURCES_PROMPT_CONTRACT : SYNTHESIZER_LENGTH_SOURCES_PROMPT_CONTRACT)
+          : writerLengthed
+          ? (told ? SYNTHESIZER_LENGTH_READER_PROMPT_CONTRACT : SYNTHESIZER_LENGTH_PROMPT_CONTRACT)
+          : (told ? SYNTHESIZER_READER_PROMPT_CONTRACT : SYNTHESIZER_PROMPT_CONTRACT))
+        : (checkerSourced
+          ? (told ? EVALUATOR_LENGTH_READER_SOURCES_PROMPT_CONTRACT : EVALUATOR_LENGTH_SOURCES_PROMPT_CONTRACT)
+          : checkerLengthed
+          ? (told ? EVALUATOR_LENGTH_READER_PROMPT_CONTRACT : EVALUATOR_LENGTH_PROMPT_CONTRACT)
+          : (told ? EVALUATOR_READER_PROMPT_CONTRACT : EVALUATOR_PROMPT_CONTRACT)),
       argumentLanguageName,
       questionLanguage
     ),
-    // The language field wraps the ONE projection (and the length fields after it): it rides LAST; with no lock
-    // `withQuestionLanguageField` returns the same array, today's bytes.
-    material: withQuestionLanguageField(
+    // The language field wraps the ONE projection (and the length and reader fields after it): it rides LAST; with no
+    // lock `withQuestionLanguageField` returns the same array, and with no level `withReaderField` does: today's bytes.
+    material: withQuestionLanguageField(withReaderField(
       writerLengthed ? [...material, answerLengthField(length)]
         : checkerLengthed ? [...material, answerLengthField(length),
           lengthGuidanceField(length.ownWords!, length.languageCode, length.charactersPerWord)]
           : material,
+      readingLevel),
       questionLanguage),
     ...(randomBytes === undefined ? {} : { randomBytes })
   });
@@ -1426,6 +1508,38 @@ export interface HaltedExpansionRecord {
   readonly plannedLegCount: number;
   readonly terminalTransportOutcome: "TIMED_OUT" | "FAILED";
   readonly lastLedgerEntryRef: string;
+  /**
+   * R22 (owner ruling 2026-10-29): present when the leg was given up because its author's reply was refused after the
+   * gateway's repairs (`JudgeContentRefusedError`), not because its transport died; the outcome is then the refused
+   * attempt's FAILED row. Absent on every transport halt, whose record is today's to the byte.
+   */
+  readonly haltedBy?: "CONTENT_REFUSED";
+}
+
+/**
+ * The answer's class-N record for one halted leg: the branch under `parentNodeId` was never authored. A transport halt
+ * keeps today's reason; a leg given up for its refused content (R22) never claims a transport failure, and carries the
+ * coded reason the story is never handed (`CONTENT_REFUSED_HALT_REASON`) until the owner approves its words.
+ */
+export function haltedExpansionConditionRecord(record: HaltedExpansionRecord): ConditionMarkRecord {
+  return Object.freeze({
+    mark: "UNAUTHORED-BRANCH-HALTED",
+    scope: "node",
+    subjectRef: record.parentNodeId!,
+    reason: record.haltedBy === "CONTENT_REFUSED"
+      ? CONTENT_REFUSED_HALT_REASON
+      : "Expansion halted after transport exhaustion; no node was authored to hide or reveal",
+    liftPath: "Retry the halted authoring call in a new run",
+    servedRootRule: null,
+    affectedNodeIds: Object.freeze([record.parentNodeId!]),
+    callSiteKey: record.callSiteKey,
+    plannedLegCount: record.plannedLegCount,
+    terminalTransportOutcome: record.terminalTransportOutcome,
+    hiddenStrength: null,
+    hiddenScoreThreshold: null,
+    hiddenScoreThresholdSourceRef: null,
+    excludedFromServedNumber: null
+  });
 }
 
 export function remainingProviderAttempts(maxAttempts: number, consumed: number): number {
@@ -1470,19 +1584,37 @@ export async function withCooldownRetry<T>(input: {
    * today's path.
    */
   readonly haltsAtOnce?: (error: ProviderCallFailedError) => boolean;
+  /**
+   * R22 (owner ruling 2026-10-29, slip-recovery step 4): a leg whose author's reply was refused after the gateway's
+   * whole repair chain (`JudgeContentRefusedError`: code salvage, the patch follow-up, the full re-ask its allowance
+   * leaves) HALTS like a dead transport, so one author's format slip never fails the debate. No hold and no final
+   * retry: asking again is what that chain already did. The runner sets it for a reply or a cross-exchange only (a leg
+   * with a parent); absent (a root, a review, every direct caller), a refusal travels unchanged, as today.
+   */
+  readonly haltsOnContentRefusal?: boolean;
 }): Promise<
   | { readonly kind: "AUTHORED"; readonly value: T }
   | { readonly kind: "HALTED"; readonly record: HaltedExpansionRecord }
 > {
   const spent = async (fromErrors: number): Promise<number> =>
     input.siteAttemptsSpent === undefined ? fromErrors : await input.siteAttemptsSpent();
-  const halted = async (error: ProviderCallFailedError, attemptsSpent: number) => {
-    const record = Object.freeze({
+  /** The refusal this site may be given up on, or null when the failure must travel (R22). */
+  const contentRefusal = (error: unknown): JudgeContentRefusedError | null =>
+    input.haltsOnContentRefusal === true && error instanceof JudgeContentRefusedError ? error : null;
+  /** A refused reply ends as its refused attempt's FAILED row, which the gateway's refusal names (R22). */
+  const refusedAs = (error: JudgeContentRefusedError) => Object.freeze({
+    lastOutcome: "FAILED" as const, lastLedgerEntryRef: error.refusal.lastLedgerEntryRef, haltedBy: "CONTENT_REFUSED" as const
+  });
+  const halted = async (error: Readonly<{
+    lastOutcome: "TIMED_OUT" | "FAILED"; lastLedgerEntryRef: string; haltedBy?: "CONTENT_REFUSED";
+  }>, attemptsSpent: number) => {
+    const record: HaltedExpansionRecord = Object.freeze({
       callSiteKey: input.callSiteKey,
       parentNodeId: input.parentNodeId,
       plannedLegCount: input.plannedLegCount,
       terminalTransportOutcome: error.lastOutcome,
-      lastLedgerEntryRef: error.lastLedgerEntryRef
+      lastLedgerEntryRef: error.lastLedgerEntryRef,
+      ...(error.haltedBy === undefined ? {} : { haltedBy: error.haltedBy })
     });
     await input.hold.record({
       kind: "ledger.could_not_do",
@@ -1507,6 +1639,8 @@ export async function withCooldownRetry<T>(input: {
         value: await input.attempt(input.baseMaxAttempts + input.policy.finalRetryAttempts)
       };
     } catch (retryError) {
+      const refused = contentRefusal(retryError);
+      if (refused !== null) return halted(refusedAs(refused), error.attempts + refused.refusal.attempts);
       if (!(retryError instanceof ProviderCallFailedError)) throw retryError;
       return halted(retryError, error.attempts + retryError.attempts);
     }
@@ -1514,6 +1648,8 @@ export async function withCooldownRetry<T>(input: {
   try {
     return { kind: "AUTHORED", value: await input.attempt(input.baseMaxAttempts) };
   } catch (error) {
+    const refused = contentRefusal(error);
+    if (refused !== null) return halted(refusedAs(refused), refused.refusal.attempts);
     if (!(error instanceof ProviderCallFailedError)) throw error;
     if (input.haltsAtOnce?.(error) === true) return halted(error, error.attempts);
     if (input.finalRetryPermitted !== undefined && !(await input.finalRetryPermitted())) {
@@ -2605,6 +2741,15 @@ export interface WalkingSkeletonSettings {
     reportSnapshotFailure(failure: StorySnapshotFailure): void;
   };
   /**
+   * Dig-model revision task W3-5: the path rewrite (path-rewrite.ts). Set, a settled run that is a dig (an ask with a
+   * parent) keeps its points and its answer text and writes NO story: the path it was dug from is rewritten in the
+   * story's place, from the same snapshot (owner Q-D13). Absent (fixtures, local mode's acceptance root), or for a first
+   * debate: the story, as today.
+   */
+  readonly pathRewrite?: PathRewriteRunnerSettings;
+  /** W5-1: "Write my report"'s closing, poked when a member of a closing investigation settles (the story stage). */
+  readonly investigationClose?: InvestigationCloseSettings;
+  /**
    * ENGINE MONEY RULE (spec 2026-09-26 §14.4.2), TASK M3: each provider
    * target's price (`buildProviderPriceMap`), so a MONEY refusal of an
    * answer-writing call tries the cheaper claim-eligible makers first. Never
@@ -2730,6 +2875,12 @@ export interface WalkingSkeletonSettings {
    * (ENGINE_RUNNER_UNCONFIGURED otherwise); a run without the member never reads it. Absent: engine 1, today's runner.
    */
   readonly engine?: EngineRunnerSettings | null;
+  /**
+   * Perplexity plan 2026-10-30, task W3-1: the web step's settings (run-settings.ts `runnerWebSearchSettings`), a process
+   * member. Set, every shaped run whose map argues its own answers runs the web step after the map's answer check (Free
+   * and the off switch make no call). Absent (fixtures, local mode's acceptance root): no web step, nothing recorded.
+   */
+  readonly webSearch?: WebStepRunnerSettings;
   /**
    * Side-by-side spec §13 (S5 adds them, S6 reads them): the debate's own version's story policy (null: the version
    * sealed no story rows) and its call-lane limits (`perDebate`, `perModelPerDebate`, from its callConcurrencyPolicy
@@ -5727,6 +5878,8 @@ export class WalkingSkeletonRunner {
        * member that ACTUALLY retries. Absent, `seatMember` is taken.
        */
       readonly retrySeatMember?: () => SeatMember | null;
+      /** R22: a reply's or a cross-exchange's refused content halts the leg (`withCooldownRetry`), never the debate. */
+      readonly haltsOnContentRefusal?: boolean;
     }): Promise<
       | { readonly kind: "AUTHORED"; readonly value: T }
       | { readonly kind: "HALTED"; readonly record: HaltedExpansionRecord }
@@ -5805,6 +5958,7 @@ export class WalkingSkeletonRunner {
         policy,
         hold: laterParent === null ? hold : laterParentHold(hold, laterParent),
         attempt: input.attempt,
+        ...(input.haltsOnContentRefusal === true ? { haltsOnContentRefusal: true } : {}),
         ...(siteAttemptsSpent === undefined ? {} : { siteAttemptsSpent }),
         // Run resilience (spec 2026-10-12, ruling R-a): on the preview a busy member, an unavailable gate or a member
         // that already sits out halts the site at once — no ten-minute hold for a model that will not be asked again.
@@ -6506,6 +6660,12 @@ export class WalkingSkeletonRunner {
     const shapeLanguage: QuestionLanguage | null = runQuestionLanguageLock(shapeShape, run);
     const shapeLanguageInput = shapeLanguage === null ? {} : { questionLanguage: shapeLanguage };
     /**
+     * V4 reading level (owner N6, 2026-10-29): the person's level, stored with the run's depth_params by the API, or null
+     * (every V3 ask, every older run). Only the final writers read it: the answer writer and checker, the storyteller and
+     * the story checker. Null: every one of their packets is today's, byte for byte.
+     */
+    const readingLevel: ReadingLevel | null = readingLevelOf(run.depthParams);
+    /**
      * A15 (R5) and controller ruling A14 (carry 1): debaters come from distinct
      * makers. On an assigned run a POSITION member may answer only when no OTHER
      * POSITION seat holds its maker — read off the CLAIMED book, never off who
@@ -6727,6 +6887,16 @@ export class WalkingSkeletonRunner {
     // ledger rule (`seatCallPlan`'s `prefer`), no longer a filter, so its seat
     // keeps its backup; the ledger read still seeds `positionAnswerers`.
     const positionRule = (seat: RunSeat) => (member: SeatIdentity): boolean => positionMakerIsFree(seat, member);
+    /**
+     * R22 (owner ruling 2026-10-29, "Backup AI takes the seat") — WHO MAY WRITE A ROOT POSITION WHOSE ANSWER WAS REFUSED
+     * AFTER EVERY REPAIR: the seat's other member (its backup, which the root's own fairness rule already allows), when it
+     * is of another maker and does not sit out the rest of the run (the preview's sit-out book). The member that answers
+     * is the root's author for every later step (`positionAnswerers`, the node's maker), and the answer discloses it with
+     * BACKUP-MODEL-USED. A seat with no such member (every legacy book: no runner-up) keeps today's rule: the refusal
+     * fails the debate.
+     */
+    const positionBackup = (backup: SeatMember, refused: SeatMember): boolean =>
+      backup.maker !== refused.maker && sitOut?.sitsOut(backup.providerRef) !== true;
     /** Final review M-1: a shaped root's maker bar narrows its POSITION rule (main and backup); none is today's rule. */
     const positionSeatRule = (seat: RunSeat, bar?: (member: Readonly<{ maker: string }>) => boolean) => bar === undefined
       ? positionRule(seat) : (member: SeatIdentity): boolean => positionRule(seat)(member) && bar(member);
@@ -7571,6 +7741,34 @@ export class WalkingSkeletonRunner {
      * debate can always pay its first position. A keep-alive refusal abandons the run, as today. Never on today's run
      * (`shapeRun === null`): no map, no call, no storage.
      */
+    /**
+     * T12-R0 / T12-R2 / T12-R3: root 0's room (see below), worked out when asked: by the map's calls and, after the map, by
+     * the web step (Perplexity plan W3-1), which keeps the same room. W4-1: the web step keeps it `withPack`: room for a
+     * case writer that reads its path's pack (engine 2's fixed-words leg under its sources variant, the pack at its cut),
+     * so a debate whose web step ran can still pay its first position; the map (before any pack exists) keeps today's.
+     */
+    const rootZeroRoomMicros = (withPack = false): number => {
+      // T12-R0 / T12-R2 / T12-R3: root 0's room, at the dearest member of root 0's OWN seat (and the seat it is handed
+      // to when its member sits out); hosted prices only. It covers root 0's first attempt + one retry, the larger of a
+      // length retry and a format repair (`rootZeroRoomAttempts`, `rootZeroKeepRoomMicros`), plus, on a routed run, the
+      // structure-repair call (the sum: refused-repair salvage B is root 0's own second POST after it).
+      const providerPrices = settings.providerPrices ?? EMPTY_PROVIDER_PRICES;
+      const rootZeroPrices = rootZeroRoomRefs({ seats: rootSeats, membersOf, canHandOver: sitOut !== null, sitsOut: seatSitsOut })
+        .flatMap((providerRef) => { const price = providerPrices.get(providerRef); return price === undefined ? [] : [price]; });
+      // LG-A (Task 14 carry): on a routed run root 0 may also send the structure-repair call, at the repair target's price.
+      const repairCeiling = settings.structureRepairCeiling ?? null;
+      const repairPrice = repairCeiling === null ? undefined : providerPrices.get(repairCeiling.providerRef);
+      return rootZeroKeepRoomMicros({ prices: rootZeroPrices, ...rootZeroRoomAttempts({
+        questionLine: run.questionLine, argumentLanguageName: run.argumentLanguageName, questionLanguage: shapeLanguage,
+        tokenCeiling: guidedCallBound(settings.judgeBound, "opening", lengthGuidance).tokenCeiling,
+        lengthed: lengthGuidance !== null,
+        // Ruling "PF-C5 root-0 bound" (a): with the row, root 0's map material is bounded by the runaway limits (L19).
+        // W4-1: kept by the web step, engine 2's case writer with its path's pack at the cut.
+        ...(withPack && rootEngineMaterialChars !== null ? { sourcesChars: WEB_ROOT_SOURCES_MAX_BYTES } : {}),
+        materialChars: rootEngineMaterialChars ?? rootMaterialChars }),
+        structureRepair: repairCeiling === null || repairPrice === undefined ? null : { price: repairPrice,
+          attempt: { requestBytes: repairCeiling.requestBytes, completionTokenCeiling: repairCeiling.completionTokenCeiling } } });
+    };
     let debateShapeMap: MapResult | null = null;
     let shapeMapResult: MapResult | null = null;
     let mapSpendStop: EnvelopeStopKind | null = null;
@@ -7578,24 +7776,8 @@ export class WalkingSkeletonRunner {
       const runMap = async (): Promise<Readonly<{ result: MapResult; spendStop: EnvelopeStopKind | null }>> => {
         /** PF-B40: map seats outside the claim-eligible list, wrapped once each. */
         const mapOnlyMembers = new Map<string, ConfiguredSeatMaker>();
-        // T12-R0 / T12-R2 / T12-R3: root 0's room, at the dearest member of root 0's OWN seat (and the seat it is handed
-        // to when its member sits out); hosted prices only. It covers root 0's first attempt + one retry, the larger of a
-        // length retry and a format repair (`rootZeroRoomAttempts`, `rootZeroKeepRoomMicros`), plus, on a routed run, the
-        // structure-repair call (the sum: refused-repair salvage B is root 0's own second POST after it).
-        const providerPrices = settings.providerPrices ?? EMPTY_PROVIDER_PRICES;
-        const rootZeroPrices = rootZeroRoomRefs({ seats: rootSeats, membersOf, canHandOver: sitOut !== null, sitsOut: seatSitsOut })
-          .flatMap((providerRef) => { const price = providerPrices.get(providerRef); return price === undefined ? [] : [price]; });
-        // LG-A (Task 14 carry): on a routed run root 0 may also send the structure-repair call, at the repair target's price.
-        const repairCeiling = settings.structureRepairCeiling ?? null;
-        const repairPrice = repairCeiling === null ? undefined : providerPrices.get(repairCeiling.providerRef);
-        const keepRoomMicros = rootZeroKeepRoomMicros({ prices: rootZeroPrices, ...rootZeroRoomAttempts({
-          questionLine: run.questionLine, argumentLanguageName: run.argumentLanguageName, questionLanguage: shapeLanguage,
-          tokenCeiling: guidedCallBound(settings.judgeBound, "opening", lengthGuidance).tokenCeiling,
-          lengthed: lengthGuidance !== null,
-          // Ruling "PF-C5 root-0 bound" (a): with the row, root 0's map material is bounded by the runaway limits (L19).
-          materialChars: rootEngineMaterialChars ?? rootMaterialChars }),
-          structureRepair: repairCeiling === null || repairPrice === undefined ? null : { price: repairPrice,
-            attempt: { requestBytes: repairCeiling.requestBytes, completionTokenCeiling: repairCeiling.completionTokenCeiling } } });
+        // T12-R0 / T12-R2 / T12-R3: root 0's room (`rootZeroRoomMicros`, above).
+        const keepRoomMicros = rootZeroRoomMicros();
         const mapCaller = createRunnerMapCaller({
           runId: run.runId, subjectItemId: claimed.workItemId, mapContractHash: shapeRun.mapContractHash,
           judgeBound: settings.judgeBound,
@@ -7727,6 +7909,49 @@ export class WalkingSkeletonRunner {
         answers: shapeAnswerCount, pointsPerAnswer: shapeRun.shape.pointsPerAnswer, ring: engine.engine === 2, engineMap });
     /** Ruling C-TWO: the map's own answers are argued (two or more); the story and the debate page share this rule. */
     const shapeMapArgued = shapeMapPositions !== null && mapAnswersArgued(shapeMapPositions.length);
+    /**
+     * Perplexity plan W3-1 — THE WEB STEP, after the map's answer check and before root 0 (web-step.ts), on an engine-2
+     * run whose map argues its own answers (the web contracts are under the engine seal): every argued path at once,
+     * through this debate's lane, keeping root 0's room. Free and the off switch make no call. It never stops the debate;
+     * only a keep-alive stop passes through. Its packs are stored for the arguing calls (W4-1).
+     */
+    /**
+     * Perplexity plan W4-1 — THE DEBATE'S PACKS, read back from the web store once the web step has settled (web-packs.ts):
+     * the arguing legs read them, and the locator check, the reviewer, the judges, the writer and the storyteller read the
+     * one extract a point cites. Null (Free, the web off, no pack kept, an old run): every call is today's, byte for byte.
+     * Root i argues path `shapeMapPositions[i].answerId`, the ref the web step keyed its pack by.
+     */
+    let webPacks: DebateWebPacks | null = null;
+    const webPathOfRoot = (rootIndex: number | null): string | null => webPacks === null || rootIndex === null ? null
+      : shapeMapPositions?.[rootIndex]?.answerId ?? null;
+    /** The locator check's list, on a debate with packs (`Judge.judge`'s `debateExtractIds`); nothing otherwise. */
+    const webLocatorInput = (): Readonly<{ debateExtractIds?: ReadonlySet<string> }> =>
+      webPacks === null ? {} : { debateExtractIds: webPacks.extractIds };
+    if (settings.webSearch !== undefined && settings.engine != null && engine.engine === 2 && shapeMapArgued
+      && shapeMapPositions !== null && debateShapeMap !== null && debateShapeMap.choice !== null) {
+      const claimOf = new Map(debateShapeMap.keyPoints.map((keyPoint) => [keyPoint.keyPointId, keyPoint] as const));
+      const pointsOf = (ids: readonly string[]) => ids.flatMap((id) => { const keyPoint = claimOf.get(id);
+        return keyPoint === undefined ? [] : [{ text: keyPoint.claim, restsOn: keyPoint.restsOn ?? "assumption" as const }]; });
+      const webStep = await runRunnerWebStep({
+        pool: this.pool, settings: settings.webSearch,
+        lane: callScheduler === undefined || callLane === undefined ? null : { lane: callLane, scheduler: callScheduler },
+        runId: run.runId, subjectItemId: claimed.workItemId, mode: "quick", question: run.questionLine,
+        questionLanguage: shapeLanguage, placeCountry: null, asOf: new Date(),
+        siteLanguage: shapeLanguage === null ? { code: "en", name: "English" } : { code: shapeLanguage.code, name: shapeLanguage.name },
+        paths: debateShapeMap.choice.answers.slice(0, shapeMapPositions.length).map((answer) => ({ pathRef: answer.answerId,
+          answer: answer.statement, forPoints: pointsOf(answer.forKeyPointIds), againstPoints: pointsOf(answer.againstKeyPointIds) })),
+        members: [...configuredByProviderRef.values()].map((maker) => ({ provider: sitOutMaker(maker).provider,
+          providerRef: maker.providerRef, maker: maker.maker, model: callSubjects?.subjectOf(maker.providerRef).model ?? maker.providerRef })),
+        contractHash: settings.engine.engineContractHash, bound: settings.judgeBound,
+        keepRoomMicros: rootZeroRoomMicros(true), abandon: keepAliveStop, stopsHere: (error) => expansionPhaseStop(error) !== null
+      });
+      // W4-1: only a step that kept a pack opens the store again; a re-claimed run reads the same packs, so its prompts
+      // are the same bytes. No web search happens inside the debate: the legs read what was stored here. W4-7: with the
+      // step's outcomes, so every path of a dig reads the one pack kept under its first path.
+      if (webStep.paths.some((path) => path.packId !== null)) {
+        webPacks = await readDebateWebPacks({ pool: this.pool, runId: run.runId, paths: webStep.paths, abandon: keepAliveStop });
+      }
+    }
     const shapePositions: readonly ShapePositionPlan[] | null = shapeRun === null ? null
       : shapeMapArgued ? shapeMapPositions
         : shapePositionsForTodaysOpening({ answers: shapeAnswerCount, pointsPerAnswer: shapeRun.shape.pointsPerAnswer, ring: engine.engine === 2 });
@@ -7888,8 +8113,10 @@ export class WalkingSkeletonRunner {
         const material = shapeEngineRootMaterial({ assignedAnswer: position.statement, mapPoints: position.mapPoints,
           pointsRaised: JSON.stringify((position.pointsRaised ?? []).map((point) => ({ text: point.text, rests_on: point.restsOn }))),
           assumptions: JSON.stringify(position.assumptions ?? []) }, rootEngineMaterialChars!);
-        return { kind: "assigned-root", assignedAnswer: material.assignedAnswer, mapPoints: material.mapPoints,
+        const engineLeg: JudgeLeg = { kind: "assigned-root", assignedAnswer: material.assignedAnswer, mapPoints: material.mapPoints,
           engine: { pointsRaised: material.pointsRaised, assumptions: material.assumptions } };
+        // W4-1: the case writer reads its path's pack (the sources variant); a path with none, the v2 leg to the byte.
+        return legWithWebSources(engineLeg, webPacks, { own: webPathOfRoot(rootIndex) });
       }
       const material = shapeRootMaterial({ assignedAnswer: position.statement, mapPoints: position.mapPoints }, rootMaterialChars);
       return { kind: "assigned-root", assignedAnswer: material.assignedAnswer, mapPoints: material.mapPoints };
@@ -7907,6 +8134,7 @@ export class WalkingSkeletonRunner {
           seat: primarySeat,
           callSiteKey: "JUDGE",
           ...primaryPlan.options,
+          contentRefusalBackup: positionBackup,
           call: (member, callSiteKey) => member.judge.judge({
             runId: run.runId,
             subjectItemId: claimed.workItemId,
@@ -7918,6 +8146,7 @@ export class WalkingSkeletonRunner {
             ...shapeLanguageInput,
             ...lengthGuideOf(judgeLegLengthStep(leg)),
             leg,
+            ...webLocatorInput(),
             providerRef: member.providerRef,
             contractHash: settings.judgeContractHash,
             bound: { ...guidedCallBound(settings.judgeBound, judgeLegLengthStep(leg), lengthGuidance), maxAttempts }
@@ -7932,13 +8161,106 @@ export class WalkingSkeletonRunner {
       });
       return primaryAttempt;
     };
-    let primaryAttempt = await openFirstPosition(rootSeats[0]!, rootLegOf(0));
+    /**
+     * Pre-flight PF-B45: per plan position, the maker that REALLY wrote it (the runner-up, or a cheaper maker a refused
+     * call moved to), recorded before its statement is told — the shape's writer rule reads it, never the planned maker.
+     * Declared before root 0, whose refused answer reads it (R22, `handRefusedRootToSpare`).
+     */
+    const answeredMakers: (string | undefined)[] = [];
+    const rootCallSiteKey = (rootIndex: number): string =>
+      rootIndex === 1 ? "JUDGE:root:secondary" : `JUDGE:root:${String(rootIndex)}`;
+    /**
+     * R22 (owner ruling 2026-10-30, "Yes, use the spare debater") — A POSITION WHOSE ANSWER WAS REFUSED AFTER EVERY
+     * REPAIR GOES TO A SPARE DEBATER. 379ad0c99 hands it to the seat's backup; a seat with no usable backup (every seat
+     * on the test site, whose legacy book has none) let the refusal fail the debate. A shaped run now hands the position
+     * over the way a position whose maker sits out is handed over before its first call (`shapeHandOverRoot`'s SWAP): to
+     * a seat no position uses, of a maker that is none of the refused seat's, up, not sitting out, never refused a
+     * position and arguing no other one (`shapeSpareForRefusedRoot`). From then on the spare is the position's author for
+     * every later step (`rootSeats`, `positionAnswerers`, `answeredMakers`, the node's maker), so its cross-replies, the
+     * judges' own-maker rule and the neutral seating all see its maker. It is asked at the position's own site, for the
+     * same leg, so every spending gate binds its call as it binds any other (the run's money and attempt ceilings, root
+     * 0's first-call phase, the step's allowance, which the preview counts per maker), and its ledger rows sit beside the
+     * refused ones under its own route. The switch is told on the progress stream (cause CONTENT_REFUSED), and the answer
+     * discloses the stand-in with BACKUP-MODEL-USED (`spareAnswers`). No spare (today's opening: every seat argues a
+     * position; a shape that argues every seat), and today's rule stands: the refusal fails the debate.
+     */
+    const refusedRootSeats = new Set<RunSeat>();
+    /** The roots a spare took over: on this pass after a refusal, or on a resumed pass after an earlier one's. */
+    const spareRoots = new Set<number>();
+    /** How many of those roots a spare answered on this pass; each is a stand-in the answer discloses. */
+    let spareAnswers = 0;
+    const rootSiteKey = (rootIndex: number): string => rootIndex === 0 ? FIRST_POSITION_CALL_SITE_KEY : rootCallSiteKey(rootIndex);
+    /** Hands root `rootIndex` to a spare after its refused answer; false when the failure must travel as today. */
+    const handRefusedRootToSpare = async (rootIndex: number, error: unknown): Promise<boolean> => {
+      if (shapePlan === null || !(error instanceof JudgeContentRefusedError)) return false;
+      const refused = rootSeats[rootIndex]!;
+      refusedRootSeats.add(refused);
+      const siteKey = rootSiteKey(rootIndex);
+      const otherRootMakers = answeredMakers.slice(0, rootCount).filter((_maker, index) => index !== rootIndex);
+      const spare = shapeSpareForRefusedRoot({
+        makers: rootSeats.map((seat) => seat.main.maker), rootCount, rootIndex, sitsOut: rootSitsOut,
+        refusedMakers: membersOf(refused).map((member) => member.maker),
+        takes: (index) => {
+          const seat = rootSeats[index]!;
+          return !refusedRootSeats.has(seat) && !seatSitsOut(seat) && seatCaller.plan(seat, siteKey) !== null
+            && !otherRootMakers.includes(seat.main.maker);
+        }
+      });
+      if (spare === null) return false;
+      const to = rootSeats[spare]!;
+      [rootSeats[rootIndex], rootSeats[spare]] = [to, refused];
+      spareRoots.add(rootIndex);
+      await announceSwitch(backupSwitchEventValue({
+        role: "POSITION", seatIndex: refused.pinnedSeatIndex,
+        fromProviderRef: refused.main.providerRef, fromCandidateId: refused.main.candidate?.candidateId ?? null,
+        toProviderRef: to.main.providerRef, toCandidateId: to.main.candidate?.candidateId ?? null,
+        cause: "CONTENT_REFUSED", callSiteKey: siteKey
+      }));
+      return true;
+    };
+    /**
+     * R22 — A RESUMED PASS KEEPS THE SPARE. Before root `rootIndex`'s first call: a spare whose member answered the root's
+     * site on an earlier pass, when no member of the root's own seat did (`shapeSpareThatAnswered`, from the replay
+     * book), takes the root again at once. So the refused member is never asked again, and the spare's answer is
+     * replayed from the record rather than bought twice; its switch was told on that pass.
+     */
+    const resumeSpareHandOver = (rootIndex: number): void => {
+      if (shapePlan === null || spareRoots.has(rootIndex)) return;
+      const siteKey = rootSiteKey(rootIndex);
+      const spare = shapeSpareThatAnswered({
+        seatRefs: rootSeats.map((seat) => membersOf(seat).map((member) => member.providerRef)), rootCount, rootIndex,
+        answeredBy: replayBook.answeredBy((key) => seatBaseCallSiteKey(key) === siteKey), sitsOut: rootSitsOut
+      });
+      if (spare === null) return;
+      refusedRootSeats.add(rootSeats[rootIndex]!);
+      [rootSeats[rootIndex], rootSeats[spare]] = [rootSeats[spare]!, rootSeats[rootIndex]!];
+      spareRoots.add(rootIndex);
+    };
+    /**
+     * R22: root 0's refused answer goes to a spare, asked at once for the same leg (`handRefusedRootToSpare`); a spare
+     * refused in turn goes on to the next one. None left, the refusal travels as today.
+     */
+    const openRootZeroBySpare = async (refusal: unknown): ReturnType<typeof openFirstPosition> => {
+      let refused = refusal;
+      for (;;) {
+        if (!(await handRefusedRootToSpare(0, refused))) throw refused;
+        try {
+          return await openFirstPosition(rootSeats[0]!, rootLegOf(0));
+        } catch (next) {
+          // The spare's own call refused for money spent nothing on it: the debate ends on the refusal, as today.
+          if (next instanceof TypedDomainError && next.code === "RUN_CEILING_BELOW_FIRST_CALL") throw refusal;
+          refused = next;
+        }
+      }
+    };
+    resumeSpareHandOver(0);
+    let primaryAttempt = await openFirstPosition(rootSeats[0]!, rootLegOf(0)).catch(openRootZeroBySpare);
     // Fix (d): root 0 cannot be dropped — nothing would exist to answer from — so when its member sat out, the next
     // member that does not sit out opens instead (the two seats trade roots, above).
     for (let next = 1; primaryAttempt.kind === "HALTED" && rootSitsOut(0) && next < rootSeats.length; next += 1) {
       if (rootSitsOut(next)) continue;
       [rootSeats[0], rootSeats[next]] = [rootSeats[next]!, rootSeats[0]!];
-      primaryAttempt = await openFirstPosition(rootSeats[0]!, rootLegOf(0));
+      primaryAttempt = await openFirstPosition(rootSeats[0]!, rootLegOf(0)).catch(openRootZeroBySpare);
     }
     if (primaryAttempt.kind === "HALTED") {
       throw new TypedDomainError(
@@ -7946,6 +8268,7 @@ export class WalkingSkeletonRunner {
         "The primary maker position failed after the full cooldown and final-retry courtesy"
       );
     }
+    if (spareRoots.has(0)) spareAnswers += 1;
     const judged = primaryAttempt.value.value;
     // A15: the member that ANSWERED root 0 — its lineage, its panel's author
     // (controller carry 8), and the writer of its cross-exchanges.
@@ -7954,11 +8277,6 @@ export class WalkingSkeletonRunner {
     // B9: the node's author is the model that actually wrote it — the member
     // that answered root 0, or the cheaper maker its refused first call moved to.
     const rootAuthor = actualAuthor(FIRST_POSITION_CALL_SITE_KEY, primaryMaker);
-    /**
-     * Pre-flight PF-B45: per plan position, the maker that REALLY wrote it (the runner-up, or a cheaper maker a refused
-     * call moved to), recorded before its statement is told — the shape's writer rule reads it, never the planned maker.
-     */
-    const answeredMakers: (string | undefined)[] = [];
     answeredMakers[0] = rootAuthor.maker;
     const reduced = reduceAssessment({
       claimType: judged.normalizedClaim.claimType,
@@ -8096,6 +8414,11 @@ export class WalkingSkeletonRunner {
        * its seat (main and backup) and on a call moved to a cheaper maker. Absent on today's legs.
        */
       readonly makerBar?: (member: Readonly<{ maker: string }>) => boolean;
+      /**
+       * R22 (owner ruling 2026-10-30): the leg's JUDGEMENT_SCHEDULED receipt was already written, for the call whose
+       * refused answer this one takes over (a spare debater's), so this call writes none of its own. Absent: today's.
+       */
+      readonly receiptWritten?: true;
       readonly role: string;
       readonly parentNodeId: string | null;
       readonly childKind: "support" | "defeater" | null;
@@ -8148,7 +8471,7 @@ export class WalkingSkeletonRunner {
       | { readonly kind: "AUTHORED"; readonly value: AuthoredPosition }
       | { readonly kind: "HALTED"; readonly record: HaltedExpansionRecord }
     > => {
-      const scheduled = this.#ledger.append({
+      const scheduled: Promise<unknown> = input.receiptWritten === true ? Promise.resolve() : this.#ledger.append({
         runId: run.runId,
         attemptId: runnerAttemptId,
         actionKind: "JUDGEMENT_SCHEDULED",
@@ -8176,12 +8499,15 @@ export class WalkingSkeletonRunner {
         parentNodeId: input.parentNodeId,
         plannedLegCount: input.plannedLegCount,
         failureScope: input.parentNodeId === null ? "MAKER_POSITION" : "EXPANSION",
+        haltsOnContentRefusal: input.parentNodeId !== null,
         seatMember: childPlan.seatMember,
         retrySeatMember: childPlan.retryMember,
         attempt: (maxAttempts) => seatCaller.callSeat({
           seat: input.seat,
           callSiteKey: input.callSiteKey,
           ...childPlan.options,
+          // R22: a root's refused answer goes to its seat's backup; a reply's or a cross-exchange's halts its leg.
+          ...(input.parentNodeId === null && input.seat.role === "POSITION" ? { contentRefusalBackup: positionBackup } : {}),
           call: (member, callSiteKey) => member.judge.judge({
             runId: run.runId,
             subjectItemId: claimed.workItemId,
@@ -8191,6 +8517,8 @@ export class WalkingSkeletonRunner {
             ...shapeLanguageInput,
             ...lengthGuideOf(judgeLegLengthStep(input.leg)),
             leg: input.leg,
+            // W4-1: on a debate with packs, "looked up" stays only for one of its extract ids.
+            ...webLocatorInput(),
             providerRef: member.providerRef,
             contractHash: settings.judgeContractHash,
             bound: { ...guidedCallBound(settings.judgeBound, judgeLegLengthStep(input.leg), lengthGuidance), maxAttempts }
@@ -8478,6 +8806,8 @@ export class WalkingSkeletonRunner {
               ...shapeLanguageInput,
               ...lengthGuideOf("reviewer"),
               statement: authoredNode.statement,
+              // W4-1 (item 6): a looked-up point is reviewed with the extract it names; it does not support it: a dispute.
+              ...webReviewInput(webPacks, authoredNode, lengthGuidance !== null),
               authorMaker: authoredNode.maker,
               providerRef: member.providerRef,
               contractHash: settings.judgeContractHash,
@@ -8754,8 +9084,6 @@ export class WalkingSkeletonRunner {
     const ROOT_SAVE: Omit<SaveInput, "authorIndex"> = Object.freeze({
       parentNodeId: null, childKind: null, siblingOrdinal: 0, explorationDecision: "continue", edges: Object.freeze([])
     });
-    const rootCallSiteKey = (rootIndex: number): string =>
-      rootIndex === 1 ? "JUDGE:root:secondary" : `JUDGE:root:${String(rootIndex)}`;
     /** Root 0's panel result: its selection rule is recorded on the propagation receipt (below). */
     const rootZeroPanel: { selection: Awaited<ReturnType<typeof runNodePanel>> | null } = { selection: null };
     /**
@@ -8809,6 +9137,8 @@ export class WalkingSkeletonRunner {
       // Spec §2.3 (O6): right before the author call. Fix (d): too few members left ends the arguing, and a root
       // whose member sits out is dropped without a call.
       if (arguingStopped()) return;
+      // R22: a resumed pass keeps the spare an earlier pass handed this position to, before any call.
+      resumeSpareHandOver(rootIndex);
       if (dropSatOutRoot(rootIndex, true)) return;
       const input: AuthorPositionInput = {
         authorIndex: rootIndex,
@@ -8824,11 +9154,34 @@ export class WalkingSkeletonRunner {
       };
       let authoredRoot: Awaited<ReturnType<typeof authorAndPanel>>;
       try {
-        // Spec §2.1: the root's statement is told as soon as its author call returned — its replies start from it.
-        authoredRoot = await authorAndPanel(input, (statement, maker) => {
-          answeredMakers[rootIndex] = maker;
-          statements[rootIndex]!.resolve(statement);
-        });
+        try {
+          // Spec §2.1: the root's statement is told as soon as its author call returned — its replies start from it.
+          authoredRoot = await authorAndPanel(input, (statement, maker) => {
+            answeredMakers[rootIndex] = maker;
+            statements[rootIndex]!.resolve(statement);
+          });
+        } catch (refusal) {
+          // R22 (owner ruling 2026-10-30): a position refused after every repair goes to a spare debater, asked at once
+          // for the same leg at the same site (`handRefusedRootToSpare`); a spare refused in turn goes on to the next.
+          // None left, the refusal travels to the catch below as today.
+          const told = (statement: string, maker: string): void => {
+            answeredMakers[rootIndex] = maker;
+            statements[rootIndex]!.resolve(statement);
+          };
+          let refused: unknown = refusal;
+          for (;;) {
+            if (!(await handRefusedRootToSpare(rootIndex, refused))) throw refused;
+            try {
+              authoredRoot = await authorAndPanel({ ...input, seat: rootSeats[rootIndex]!,
+                makerBar: shapeRootMakerBar(rootSeats[rootIndex]!.main.maker,
+                  () => answeredMakers.slice(0, rootCount).filter((_maker, index) => index !== rootIndex)),
+                receiptWritten: true }, told);
+              break;
+            } catch (next) {
+              refused = next;
+            }
+          }
+        }
       } catch (error) {
         const stop = expansionPhaseStop(error);
         if (stop === null) throw error;
@@ -8849,6 +9202,7 @@ export class WalkingSkeletonRunner {
             : `Maker position ${String(rootIndex)} failed after the full cooldown and final-retry courtesy`
         );
       }
+      if (spareRoots.has(rootIndex)) spareAnswers += 1;
       const authoredValue = authoredRoot.value;
       const saved = await nodeRecorder.commit(rootIndex, async () => {
         if (bodyFailed) return null;
@@ -9177,10 +9531,12 @@ export class WalkingSkeletonRunner {
           authorIndex: shapeLeg === null ? leg.authorIndex : seat.seatIndex,
           seat,
           // DL4-F4: the parent's statement is material, in its own fenced field; a shape point's chosen point too.
-          leg: shapeLeg?.consideration != null
+          // W4-1: a defender or critic reads the pack of the path its chain is under; none, today's leg to the byte.
+          leg: legWithWebSources(shapeLeg?.consideration != null
             ? { kind: leg.polarity === "support" ? "support" as const : "attack" as const, positionUnderDebate: parentStatement,
               consideration: shapeLeg.consideration }
             : { kind: leg.polarity === "support" ? "support" as const : "attack" as const, positionUnderDebate: parentStatement },
+          webPacks, { own: webPathOfRoot(leg.rootIndex) }),
           callSiteKey: shapeLeg?.callSiteKey ?? `JUDGE:${role}:root${leg.rootIndex}:r${leg.round}:p${leg.parentIndex}`,
           ...(makerBar === undefined ? {} : { makerBar }),
           role,
@@ -9272,7 +9628,9 @@ export class WalkingSkeletonRunner {
             diversityShare: 0,
             pinned: null
           }),
-          leg: { kind: "cross-root" as const, ownPosition, otherMakersPosition },
+          // W4-1: a reply to a rival reads its own path's pack, then the rival's.
+          leg: legWithWebSources({ kind: "cross-root" as const, ownPosition, otherMakersPosition }, webPacks,
+            { own: webPathOfRoot(shapeLeg.rootIndex), rival: webPathOfRoot(target) }),
           ...(crossBar === undefined ? {} : { makerBar: crossBar }),
           callSiteKey: shapeLeg.callSiteKey,
           role: "cross-root response",
@@ -9649,6 +10007,11 @@ export class WalkingSkeletonRunner {
     const authoredNodeList = [...authoredNodes.entries()]
       .sort(([left], [right]) => left - right)
       .map(([, authored]) => authored);
+    /**
+     * W4-1: the extract each looked-up node cites, by node id (after the locator check, only this debate's): the comparing
+     * judges, the answer writer and the storyteller read it with the point (item 7). Empty without packs: today's bytes.
+     */
+    const webCited = webCitedExtractsOf(webPacks, authoredNodeList);
     const authoredMakerPositions = Array.from({ length: rootCount }, (_, index) => authoredNodes.get(index))
       .filter((candidate): candidate is AuthoredDebateNode => candidate !== undefined);
     // Reclaim resume: a node of this run that THIS copy did not save (a copy that lost the run, still writing) is set
@@ -9950,7 +10313,8 @@ export class WalkingSkeletonRunner {
       // pre-flight consistency; Ruling PF-R43.1): the servable source keeps its name, so R4's final writers' bundle reads
       // the very source the judges read (returned below as `materialSource`).
       const servableSource = comparingJudgesSourceOf({
-        source,
+        // W4-1 (item 7): a case or point that cites one of this debate's extracts carries it; none, the same source.
+        source: engineSourceWithCitedExtracts(source, webCited),
         servableRootIds: servable,
         honestFinalStrength: strengthOf,
         propagatableNodeIds: new Set(strengthDecision.standing.snapshot.nodes
@@ -9974,9 +10338,17 @@ export class WalkingSkeletonRunner {
       const planKey = comparingJudgeCallSiteKey(1);
       const judgeSeats = seatBook.judge.filter((seat) => !seatSitsOut(seat)).flatMap((seat) => {
         const member = seatCaller.plan(seat, planKey);
-        return member === null ? [] : [Object.freeze({ seat, member })];
+        if (member === null) return [];
+        // Owner ruling 2026-10-29 ("prefer neutral judges"): the seat's other member, up and not sitting out, which judges
+        // in the planned member's place only when its maker argued no answer and the planned member's did
+        // (`pickComparingJudges`). Same seat, so its thinking level, gateway, lane and money checks are the seat's own.
+        const other = seatCaller.plan(seat, planKey, { eligible: (candidate) => candidate.pinnedAs !== member.pinnedAs });
+        const alternate = other === null || other.maker === member.maker || (sitOut !== null && sitOut.sitsOut(other.providerRef))
+          ? null : other;
+        return [Object.freeze({ seat, member, alternate })];
       });
-      const runSeatOf = new Map(judgeSeats.map(({ seat, member }) => [member.providerRef, seat] as const));
+      const runSeatOf = new Map(judgeSeats.flatMap(({ seat, member, alternate }) => [[member.providerRef, seat] as const,
+        ...(alternate === null ? [] : [[alternate.providerRef, seat] as const])]));
       const modelIdOf = (member: Readonly<{ providerRef: string; candidate: SeatCandidate | null }>): string =>
         member.candidate?.modelId ?? panelModelIds.get(member.providerRef) ?? member.providerRef;
       const verdictVotes = new VerdictVoteRepository(this.pool);
@@ -9994,8 +10366,11 @@ export class WalkingSkeletonRunner {
         material,
         arguedByMaker: new Map(authoredMakerPositions.map((root) => [root.nodeId, root.maker] as const)),
         honestFinalStrength: new Map([...strengthOf].filter(([nodeId]) => servable.has(nodeId))),
-        candidates: judgeSeats.map(({ member }) => Object.freeze({
-          maker: member.maker, providerRef: member.providerRef, modelId: modelIdOf(member)
+        candidates: judgeSeats.map(({ member, alternate }) => Object.freeze({
+          maker: member.maker, providerRef: member.providerRef, modelId: modelIdOf(member),
+          ...(alternate === null ? {} : { alternate: Object.freeze({
+            maker: alternate.maker, providerRef: alternate.providerRef, modelId: modelIdOf(alternate)
+          }) })
         })),
         rotationOffset: seatRotationOffset({ runId: run.runId, role: "JUDGE", callSiteKey: planKey }),
         moneyStopped: runBodyBudgetStop !== null,
@@ -10511,22 +10886,7 @@ export class WalkingSkeletonRunner {
         hiddenScoreThresholdSourceRef: threshold!.sourceRef,
         excludedFromServedNumber: false
       })),
-      ...haltedExpansionRecords.map((record): ConditionMarkRecord => Object.freeze({
-        mark: "UNAUTHORED-BRANCH-HALTED",
-        scope: "node",
-        subjectRef: record.parentNodeId!,
-        reason: "Expansion halted after transport exhaustion; no node was authored to hide or reveal",
-        liftPath: "Retry the halted authoring call in a new run",
-        servedRootRule: null,
-        affectedNodeIds: Object.freeze([record.parentNodeId!]),
-        callSiteKey: record.callSiteKey,
-        plannedLegCount: record.plannedLegCount,
-        terminalTransportOutcome: record.terminalTransportOutcome,
-        hiddenStrength: null,
-        hiddenScoreThreshold: null,
-        hiddenScoreThresholdSourceRef: null,
-        excludedFromServedNumber: null
-      })),
+      ...haltedExpansionRecords.map(haltedExpansionConditionRecord),
       // S2-3 / J5: one typed record per downgraded node, projected onto that
       // node through `affectedNodeIds` so the disclosure is visible where the
       // override happened — not only on the answer.
@@ -10633,7 +10993,9 @@ export class WalkingSkeletonRunner {
      * looks like an internal id — every such token in the person's question
      * and in each node's full statement (not the digest's clipped summaries).
      */
-    const personTexts = Object.freeze([run.questionLine, ...authoredNodeList.map((node) => node.statement)]);
+    // W4-1: a cited extract is material the writer may quote and name (item 7), so its words count as the person's here.
+    const personTexts = Object.freeze([run.questionLine, ...authoredNodeList.map((node) => node.statement),
+      ...[...webCited.values()].flatMap((extract) => [extract.quote, extract.site, ...(extract.title === null ? [] : [extract.title])])]);
     const personIdTokens = idShapedTokensIn(personTexts);
     const digestNodes: readonly DigestSourceNode[] = Object.freeze(authoredNodeList.map((node) => Object.freeze({
       nodeId: node.nodeId,
@@ -10653,7 +11015,9 @@ export class WalkingSkeletonRunner {
       // propagated number at the end of the debate.
       isSurvivingObjection: strengthByNodeId.has(node.nodeId)
         && materialised.arrows.some((arrow) => arrow.sourceNodeId === node.nodeId && arrow.polarity === "attack"),
-      leverage: digestLeverage.get(node.nodeId) ?? null
+      leverage: digestLeverage.get(node.nodeId) ?? null,
+      // W4-1 (item 7): the writer reads a looked-up node with the extract it rests on; none, today's digest.
+      ...(webCited.has(node.nodeId) ? { citedExtract: webCited.get(node.nodeId)! } : {})
     })));
     const serveStartedAt = new Date();
     /**
@@ -10934,7 +11298,7 @@ export class WalkingSkeletonRunner {
         // step 8; Task 5 binding note): a shaped run's writer is asked for about the row's answer length — every writer
         // call, first try and retries (each is a request through here); the checker's packet is never lengthed.
         const framed = buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, synthesisLength,
-          shapeLanguage);
+          shapeLanguage, readingLevel);
         const packet = framed.packet;
         /**
          * The draft as the engine reads it. Final review I-1: it is read INSIDE
@@ -11116,7 +11480,8 @@ export class WalkingSkeletonRunner {
         const checkerOptions = synthesisSeatOptions("EVALUATOR", checkerSeat, checkerSiteKey);
         const planned: ServeRoleMaker = seatCaller.plan(checkerSeat, checkerSiteKey, checkerOptions) ?? checkerSeat.main;
         checkerPlannedByRound.set(request.round, planned.providerRef);
-        const framed = buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, checkerLength, shapeLanguage);
+        const framed = buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, checkerLength, shapeLanguage,
+          readingLevel);
         const packet = framed.packet;
         /**
          * The verdict as the engine reads it, its coherence included (the loop
@@ -11430,7 +11795,9 @@ export class WalkingSkeletonRunner {
      */
     const backupRecords = backupModelUsedRecords({
       answers: seatCaller.backupAnswers(),
-      fallbackRoles: fellBackRoles.filter((role) => seatCaller.answered(role).length > 0)
+      fallbackRoles: fellBackRoles.filter((role) => seatCaller.answered(role).length > 0),
+      // R22 (owner ruling 2026-10-30): every position a spare debater wrote after its seat's answer was refused.
+      spareAnswers
     }, servedRoot.nodeId);
     if (backupRecords.length > 0) {
       conditionMarkRecords = Object.freeze([...conditionMarkRecords, ...backupRecords]);
@@ -11608,6 +11975,8 @@ export class WalkingSkeletonRunner {
               argumentLanguage: { tag: run.argumentLanguageTag, name: run.argumentLanguageName },
               // P2L Task 17: the story writes in the lock only when the run's shape receipt locked it.
               languageLocked: shapeLanguage !== null,
+              // V4 reading level (owner N6): the story is written for the person's level; null, today's story.
+              readingLevel,
               ...(lengthGuidance === null ? {} : { lengthGuidance }),
               // Engine redesign R1d (spec 2026-10-15 §7; INTERFACE §5.1): the receipt's engine, never the row, so an
               // engine-2 debate's story is told v4 (with the length table above); engine 1: null, today's story. The
@@ -11651,6 +12020,8 @@ export class WalkingSkeletonRunner {
               // own statement (the node the label's servedNodeId names).
               servedSegments: floor === null ? finalSegments : [{ text: servedRootJudgement.statement }],
               authored: authoredNodeList,
+              // W4-1 (item 7): the storyteller reads a looked-up point with the extract it rests on; none, today's story.
+              ...(webCited.size === 0 ? {} : { citedExtracts: webCited }),
               positionNodeIds: makerPositionNodeIds,
               ...(engineMap ? enginePositionWordsOf(engineMapFactsNow()) : {}),
               // Debate shape P2c (spec 2026-10-12 §3.3 step 8): the map's unchosen points, for the story's "also
@@ -11756,9 +12127,17 @@ export class WalkingSkeletonRunner {
     if (storyWriter !== undefined && settled !== null) {
       try {
         if (settled.kind === "SNAPSHOT") {
-          // Side-by-side spec §13 (S3, ruling R36): every write carries this debate's own version's story policy (null
-          // included: the version sealed no story rows); undefined only without per-version settings (the writer's own).
-          await storyWriter.writeAfterSettle(settings.storyPolicy === undefined ? settled.input : Object.freeze({ ...settled.input, policy: settings.storyPolicy }));
+          // Dig-model revision W3-5 (owner Q-D13): a dig keeps its points and its answer text, both stored above, and
+          // writes NO story: the path it was dug from is rewritten in the story's place (path-rewrite.ts, which never
+          // rejects). A first debate, or a runner without the rewrite's settings, gets its story as today.
+          if (!(await runDigPathRewrite(settings.pathRewrite, settled.input))) {
+            // Side-by-side spec §13 (S3, ruling R36): every write carries this debate's own version's story policy (null
+            // included: the version sealed no story rows); undefined only without per-version settings (the writer's own).
+            await storyWriter.writeAfterSettle(settings.storyPolicy === undefined ? settled.input : Object.freeze({ ...settled.input, policy: settings.storyPolicy }));
+          }
+          // W5-1 (owner F7 A): a closing waits for its running digs and their rewrites; this member is now settled, so a
+          // closing of its investigation may start at once rather than at the next sweep. Never rejects.
+          await pokeInvestigationClosing(settings.investigationClose, settled.input.runId);
         } else {
           storyWriter.reportSnapshotFailure(settled);
         }
@@ -11768,6 +12147,22 @@ export class WalkingSkeletonRunner {
     }
     return executed;
     });
+    } catch (error) {
+      if (!isMonthPausedStop(error)) throw error;
+      /**
+       * R22 W3-8 (the money rule) — THE MONTH WALL'S PLANNED STOP. The pause is recorded (./month-pause.ts), the arguing
+       * ended as at a lost claim, nothing more was saved and no answer written. The keep-alive stops renewing, the claim
+       * is given up now, fenced on the deadline this copy last set, and the task ends without a failure: no FAILED row,
+       * no Hatchet retry. While the debate is paused no runner claims or re-sends it (packages/battery
+       * `NOT_MONTH_PAUSED`); after Continue the next copy replays every call already answered and goes on. A release
+       * that finds another copy's claim changes nothing.
+       */
+      keepAlive.stop();
+      const released = await this.#work.releaseClaim({
+        workItemId: claimed.workItemId, workerId: claimInput.workerId, heldUntil: keepAlive.heldUntil()
+      });
+      console.warn(JSON.stringify({ kind: "DEBATEAI_RUNNER_CLAIM", event: "MONTH_PAUSED", workItemId: claimed.workItemId, released }));
+      return { kind: "MONTH_PAUSED" };
     } finally {
       callLane?.close();
       keepAlive.stop();
@@ -11803,7 +12198,12 @@ export function settingsJournalCode(code: string): string {
 export type RunnerExecutionResult =
   | { readonly kind: "NO_WORK" }
   | { readonly kind: "COMPLETED"; readonly answerId: string }
-  | { readonly kind: "TERMINAL_FAILED"; readonly artifactRef: string | null };
+  | { readonly kind: "TERMINAL_FAILED"; readonly artifactRef: string | null }
+  /**
+   * R22 W3-8 (the money rule): the debate reached the month wall. Its pause is recorded, its claim released, nothing is
+   * FAILED and no answer written: it stays paused in the database until the person continues (./month-pause.ts).
+   */
+  | { readonly kind: "MONTH_PAUSED" };
 
 export interface RunnerFailureRecorder {
   recordTerminalFailure(input: {
@@ -12286,6 +12686,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RUN_HOLD_RECORDER_UNRESOLVED",
   "RUN_LEGACY_ASKER_INVALID",
   "RUN_MAKER_COUNT_INVALID",
+  "RUN_MONTH_PAUSED",
   "RUN_NOT_FOUND",
   "RUN_OWNER_INVALID",
   "RUN_OWNER_RAW_ID_FORBIDDEN",
@@ -12936,6 +13337,8 @@ export const RUNNER_EXECUTION_LIMIT = "3600s" as const;
  */
 const LEAVES_WORK_ITEM_ALONE: ReadonlySet<string> = new Set([
   "RUNNER_CLAIM_LOST",
+  // R22 W3-8: a month pause `execute` did not get to answer itself (MONTH_PAUSED) is never FAILED either.
+  RUN_MONTH_PAUSED,
   "RUNNER_RELEASE_MISMATCH",
   "RUNNER_RETIRING",
   "SETTINGS_VERSION_UNSUPPORTED"
@@ -13115,9 +13518,14 @@ const STORY_CALL_SITE_PREFIX = "STORY:";
 const STORY_CALL_SITE = /^STORY:(STORYTELLER|CHECKER):[1-8]$/u;
 const STORY_CHARTS_CALL_SITE = "STORY:CHARTS:1";
 
-/** The role a well-formed story call site must carry, or null for any other key. */
+/** The role a well-formed story call site must carry, or null for any other key. W3-2: a dig's path rewrite's too. */
 function storyCallSiteRole(callSiteKey: string): ProviderCallRequest["role"] | null {
   if (callSiteKey === STORY_CHARTS_CALL_SITE) return "SYNTHESIZER";
+  const rewrite = pathRewriteCallSiteRole(callSiteKey);
+  if (rewrite !== null) return rewrite;
+  // W5-1: the final report's four sites (packages/story INVESTIGATION_REPORT_CALL_SITE), each with its one role.
+  const report = investigationReportCallSiteRole(callSiteKey);
+  if (report !== null) return report;
   const site = STORY_CALL_SITE.exec(callSiteKey);
   if (site === null) return null;
   return site[1] === "STORYTELLER" ? "SYNTHESIZER" : "EVALUATOR";
@@ -13132,7 +13540,9 @@ function storyCallSiteRole(callSiteKey: string): ProviderCallRequest["role"] | n
 export function storyCallScopeAgrees(request: Pick<ProviderCallRequest, "lane" | "callSiteKey" | "role">): boolean {
   const key = structureRepairOriginalKey(request.callSiteKey);
   const storyScope = request.lane === "story";
-  return !((storyScope || key.startsWith(STORY_CALL_SITE_PREFIX)) && (!storyScope || storyCallSiteRole(key) !== request.role));
+  const storyKey = key.startsWith(STORY_CALL_SITE_PREFIX) || key.startsWith(PATH_REWRITE_CALL_SITE_PREFIX)
+    || key.startsWith(INVESTIGATION_REPORT_CALL_SITE_PREFIX);
+  return !((storyScope || storyKey) && (!storyScope || storyCallSiteRole(key) !== request.role));
 }
 
 /**
@@ -13230,6 +13640,10 @@ export function createPostgresProviderGateway(
        * refused, so a story can never spend unbounded where the debate cannot.
        */
       readonly buildStoryCostEnvelopeSeam?: (runId: string) => InFlightReleasingSeam;
+      /** W3-2: a dig's path rewrite (story lane, `PATH_REWRITE:` sites) spends its own never-walled seam. */
+      readonly buildPathRewriteCostEnvelopeSeam?: (runId: string) => InFlightReleasingSeam;
+      /** W5-1: the final report (story lane, `INVESTIGATION_REPORT:` sites, the root run) spends its own never-walled seam. */
+      readonly buildInvestigationReportCostEnvelopeSeam?: (runId: string) => InFlightReleasingSeam;
       /**
        * Parallel AI calls (spec 2026-10-12 §3.5): this process's calls in
        * flight, for the run-wide attempt ceiling. A call bounded by that ceiling
@@ -13242,7 +13656,8 @@ export function createPostgresProviderGateway(
     }
 ): ProviderGateway {
   const { buildCostEnvelopeSeam, ...gatewayOptions } = options;
-  const { buildStoryCostEnvelopeSeam, inFlight, ...httpOptions } = gatewayOptions;
+  const { buildStoryCostEnvelopeSeam, buildPathRewriteCostEnvelopeSeam, buildInvestigationReportCostEnvelopeSeam, inFlight,
+    ...httpOptions } = gatewayOptions;
   const ledger = new LedgerRepository(pool);
   const budget = new BudgetRepository(pool);
   const http = new OpenAICompatibleProviderGateway({
@@ -13288,7 +13703,13 @@ export function createPostgresProviderGateway(
       // Final fix wave S1: a defence for a composition that meters debate calls but gives no story seam. main.ts and the
       // practice always give both, so in production a version without a story ceiling is refused by its guard's story
       // seam instead (the same STORY_ENVELOPE_MISSING, built below before the provider-failure capture).
-      if (storyScope && buildStoryCostEnvelopeSeam === undefined && buildCostEnvelopeSeam !== undefined) {
+      const pathRewrite = storyScope && isPathRewriteCallSite(structureRepairOriginalKey(request.callSiteKey));
+      // W5-1: the final report's sites spend the report seam (never walled), on the investigation's root run.
+      const reportCall = storyScope && investigationReportCallSiteRole(structureRepairOriginalKey(request.callSiteKey)) !== null;
+      const storyLaneSeam = reportCall ? buildInvestigationReportCostEnvelopeSeam
+        : pathRewrite ? buildPathRewriteCostEnvelopeSeam : buildStoryCostEnvelopeSeam;
+      if (storyScope && storyLaneSeam === undefined
+        && buildCostEnvelopeSeam !== undefined) {
         throw new TypedDomainError(
           "STORY_ENVELOPE_MISSING",
           "A metered deployment makes no story call without the story's own money bound"
@@ -13387,7 +13808,7 @@ export function createPostgresProviderGateway(
        * it ends the call before anything is sent, with its own code, uncaptured.
        */
       costEnvelope = storyScope
-        ? buildStoryCostEnvelopeSeam?.(leasedRunId)
+        ? storyLaneSeam?.(leasedRunId)
         : buildCostEnvelopeSeam?.(leasedRunId, costEnvelopePhase, providerCallSharedWall(request));
       try {
         return await http.call({

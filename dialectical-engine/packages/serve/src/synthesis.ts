@@ -1,5 +1,5 @@
-import type { WayOfKnowing } from "@debateai/kernel";
-import { TypedDomainError, isRunLevelSpendStop } from "@debateai/kernel";
+import type { EngineCitedExtract, WayOfKnowing } from "@debateai/kernel";
+import { READER_SENTENCE_WRITING, TypedDomainError, WEB_WRITER_SENTENCES, isRunLevelSpendStop } from "@debateai/kernel";
 import { promptContractFingerprintText, type PromptContract } from "@debateai/providers";
 
 /**
@@ -73,6 +73,12 @@ export interface DigestSourceNode {
    * position, a direct child, or on a kept point's chain).
    */
   readonly leverage?: number | null;
+  /**
+   * Web search (plan 2026-10-30 task W4-1; design §7.1 item 7): the checked extract a looked-up node rests on, when its
+   * locator is one of this debate's extract ids. The writer reads it as the entry's `extract`; absent on every other node
+   * and every debate with no packs, so the digest is today's, byte for byte.
+   */
+  readonly citedExtract?: EngineCitedExtract;
 }
 
 export interface DigestPolarityRelation {
@@ -96,6 +102,20 @@ export interface DigestNodeEntry {
   readonly wayOfKnowing: WayOfKnowing;
   readonly marks: readonly string[];
   readonly polarityRelations: readonly DigestPolarityRelation[];
+  /** W4-1: the extract the node cites (id, quote, page), last; absent when it cites none of this debate's. */
+  readonly extract?: EngineCitedExtract;
+}
+
+/** W4-1: a node's cited extract as its digest entry carries it, member by member; nothing when it cites none. */
+function digestExtractOf(node: DigestSourceNode): Readonly<{ extract?: EngineCitedExtract }> {
+  const cited = node.citedExtract;
+  return cited === undefined ? {} : { extract: Object.freeze({ id: cited.id, quote: cited.quote, title: cited.title, site: cited.site,
+    date: cited.date }) };
+}
+
+/** W4-1: whether a digest carries any cited extract (then the writer is sent its sources variant). */
+export function digestCitesExtracts(digest: SynthesisDigest): boolean {
+  return digest.nodes.some((node) => node.extract !== undefined);
 }
 
 /**
@@ -225,7 +245,8 @@ function compressAt(
       finalStrength: node.finalStrength,
       wayOfKnowing: node.wayOfKnowing,
       marks: Object.freeze([...node.marks]),
-      polarityRelations: Object.freeze(node.polarityRelations.map((relation) => Object.freeze({ ...relation })))
+      polarityRelations: Object.freeze(node.polarityRelations.map((relation) => Object.freeze({ ...relation }))),
+      ...digestExtractOf(node)
     });
   });
   const shape = {
@@ -308,6 +329,8 @@ function selectEmphasis(
  * the first step's cap (`(K, 60)` for the K that fit), so a tight budget gets
  * longer summaries before it could ever afford more points. `decisiveCount`
  * null is every ranked point; `summaryCap` null is the statement verbatim.
+ * Above 120 points the walk climbs in steps of 40 up to 480 (owner ruling
+ * 2026-10-29), so a large debate keeps as many points as fit.
  *
  * Both rungs keep the compressed mark the summary levels ride on; no new mark
  * exists, so the sealed chain's `.marks` pass-through is unchanged. The disclosure
@@ -327,6 +350,18 @@ export const DIGEST_LADDER = Object.freeze({
     Object.freeze({ decisiveCount: 80, summaryCap: 240 }),
     Object.freeze({ decisiveCount: 80, summaryCap: 480 }),
     Object.freeze({ decisiveCount: 120, summaryCap: 480 }),
+    // Owner ruling 2026-10-29 (MORNING-2026-10-17 item 9, "finer steps in between"): above 120 points, a rung every 40
+    // up to 480, so the writer gets the largest that fits rather than 120 or every point. The whole-statement ladder
+    // (LG-E, R4's branch) takes its decisive counts from this schedule.
+    Object.freeze({ decisiveCount: 160, summaryCap: 480 }),
+    Object.freeze({ decisiveCount: 200, summaryCap: 480 }),
+    Object.freeze({ decisiveCount: 240, summaryCap: 480 }),
+    Object.freeze({ decisiveCount: 280, summaryCap: 480 }),
+    Object.freeze({ decisiveCount: 320, summaryCap: 480 }),
+    Object.freeze({ decisiveCount: 360, summaryCap: 480 }),
+    Object.freeze({ decisiveCount: 400, summaryCap: 480 }),
+    Object.freeze({ decisiveCount: 440, summaryCap: 480 }),
+    Object.freeze({ decisiveCount: 480, summaryCap: 480 }),
     Object.freeze({ decisiveCount: null, summaryCap: null })
   ]) as readonly Readonly<{ decisiveCount: number | null; summaryCap: number | null }>[]
 });
@@ -576,7 +611,8 @@ function compactAt(input: {
       // A relation onto a node this digest does not carry has nothing to name.
       polarityRelations: Object.freeze(node.polarityRelations
         .filter((relation) => refOf.has(relation.targetNodeId))
-        .map((relation) => Object.freeze({ polarity: relation.polarity, targetNodeId: ref(relation.targetNodeId) })))
+        .map((relation) => Object.freeze({ polarity: relation.polarity, targetNodeId: ref(relation.targetNodeId) }))),
+      ...digestExtractOf(node)
     });
   });
   const emphasis: DigestEmphasis = Object.freeze({
@@ -1249,7 +1285,8 @@ export function buildEvaluatorRequest(input: {
  * the answer text may print none of them anyway (`synthesisWordingIndex`).
  */
 export function toSynthesisPromptMaterial(
-  request: SynthesizerRequest | EvaluatorRequest
+  request: SynthesizerRequest | EvaluatorRequest,
+  options: Readonly<{ checkerReadsExtracts?: boolean }> = {}
 ): readonly { readonly name: string; readonly content: string }[] {
   const codeLabel = {
     verdictLabel: request.codeLabel.verdictLabel,
@@ -1261,8 +1298,12 @@ export function toSynthesisPromptMaterial(
     servedStrength: digestStrength(request.codeLabel.servedStrength),
     margin: request.codeLabel.margin === null ? null : digestStrength(request.codeLabel.margin)
   };
+  // W4-1: the writer reads each looked-up node's cited extract (its sources variant says so, item 7). W4-7: the checker
+  // reads the same extracts only under its own sources variant (`checkerReadsExtracts`, the runner's choice); otherwise
+  // its digest carries none and its packet stays today's, byte for byte.
+  const shown = request.role === "EVALUATOR" && options.checkerReadsExtracts !== true ? withoutExtracts(request.digest) : request.digest;
   const fields = [
-    { name: "digest", content: JSON.stringify(shownDigest(request.digest)) },
+    { name: "digest", content: JSON.stringify(shownDigest(shown)) },
     { name: "code_label", content: JSON.stringify(codeLabel) }
   ];
   if (request.role === "EVALUATOR") {
@@ -1280,6 +1321,11 @@ export function toSynthesisPromptMaterial(
  * digits of each strength, and never grows: a rounded number prints no longer
  * than the number it rounds.
  */
+function withoutExtracts(digest: SynthesisDigest): SynthesisDigest {
+  if (!digestCitesExtracts(digest)) return digest;
+  return Object.freeze({ ...digest, nodes: Object.freeze(digest.nodes.map(({ extract: _extract, ...node }) => Object.freeze(node))) });
+}
+
 function shownDigest(digest: SynthesisDigest): SynthesisDigest {
   return Object.freeze({
     ...digest,
@@ -1916,21 +1962,73 @@ export const SYNTHESIZER_PROMPT_CONTRACT: PromptContract = Object.freeze({
  * then one sentence; the target arrives as the material field `answer_length` ("about N words"). A run without a
  * shape never sends it, so its writer prompt is the current contract's to the byte. Sealed with it by
  * `composerContractHash` (SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT). length.v1 was v3's variant (shipped history,
- * byte for byte); length.v2 is v4's: the same instruction and sentence, v4's form.
+ * byte for byte); length.v2 was v4's: the same instruction and sentence, v4's form (shipped history, byte for byte).
+ * length.v3 (owner 17 Oct #5, ruled 2026-10-29) is what the runner sends: length.v2 with ONE new sentence that names
+ * "the length" instead of "the number of words", because for Chinese, Japanese and Thai the `answer_length` field names
+ * characters ("about N characters", `lengthGuidanceText`), and the old sentence then contradicted its own field. One
+ * sentence for every language, as the kernel's length sentences already are. OWNER WORDING — pending approval.
  */
 export const SYNTHESIZER_LENGTH_V1_CONTRACT_ID = "serve.synthesizer.length.v1" as const;
-export const SYNTHESIZER_LENGTH_CONTRACT_ID = "serve.synthesizer.length.v2" as const;
-export const SYNTHESIZER_LENGTH_SENTENCE = "Write the answer in about the number of words named in answer_length; "
+export const SYNTHESIZER_LENGTH_V2_CONTRACT_ID = "serve.synthesizer.length.v2" as const;
+export const SYNTHESIZER_LENGTH_CONTRACT_ID = "serve.synthesizer.length.v3" as const;
+/** Shipped history: the sentence of length.v1 and length.v2, byte for byte (it names words). */
+export const SYNTHESIZER_LENGTH_V1_SENTENCE = "Write the answer in about the number of words named in answer_length; "
+  + "it is a target, never a reason to leave out a point the answer needs.";
+/** length.v3's sentence: length.v2's with "the length" for "the number of words"; every other byte the same. */
+export const SYNTHESIZER_LENGTH_SENTENCE = "Write the answer in about the length named in answer_length; "
   + "it is a target, never a reason to leave out a point the answer needs.";
 /** Shipped history, as sent: v3's length variant (v3's instruction, the length sentence, v3's form). */
 export const SYNTHESIZER_LENGTH_V1_PROMPT_CONTRACT: PromptContract = Object.freeze({
   contractId: SYNTHESIZER_LENGTH_V1_CONTRACT_ID,
-  instruction: `${SYNTHESIZER_INSTRUCTIONS} ${SYNTHESIZER_LENGTH_SENTENCE}`,
+  instruction: `${SYNTHESIZER_INSTRUCTIONS} ${SYNTHESIZER_LENGTH_V1_SENTENCE}`,
   answerForm: SYNTHESIZER_V3_ANSWER_FORM
+});
+/** Shipped history, as sent: v4's first length variant (v4's instruction, the words sentence, v4's form). */
+export const SYNTHESIZER_LENGTH_V2_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: SYNTHESIZER_LENGTH_V2_CONTRACT_ID,
+  instruction: `${SYNTHESIZER_INSTRUCTIONS} ${SYNTHESIZER_LENGTH_V1_SENTENCE}`,
+  answerForm: SYNTHESIZER_ANSWER_FORM
 });
 export const SYNTHESIZER_LENGTH_PROMPT_CONTRACT: PromptContract = Object.freeze({
   contractId: SYNTHESIZER_LENGTH_CONTRACT_ID,
   instruction: `${SYNTHESIZER_INSTRUCTIONS} ${SYNTHESIZER_LENGTH_SENTENCE}`,
+  answerForm: SYNTHESIZER_ANSWER_FORM
+});
+/**
+ * V4 reading level (owner ruling N6, 2026-10-29): the writer told the person's level. Two VARIANTS of the current
+ * contract — without and with the length sentence — each with the kernel's one reader sentence last
+ * (READER_SENTENCE_WRITING); the level itself arrives as the material field `reader`. A debate asked without a level
+ * never sends them, so its writer prompt is v4's or length.v3's to the byte. OWNER WORDING — pending approval.
+ */
+export const SYNTHESIZER_READER_CONTRACT_ID = "serve.synthesizer.reader.v1" as const;
+export const SYNTHESIZER_LENGTH_READER_CONTRACT_ID = "serve.synthesizer.length.reader.v1" as const;
+export const SYNTHESIZER_READER_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: SYNTHESIZER_READER_CONTRACT_ID,
+  instruction: `${SYNTHESIZER_INSTRUCTIONS} ${READER_SENTENCE_WRITING}`,
+  answerForm: SYNTHESIZER_ANSWER_FORM
+});
+export const SYNTHESIZER_LENGTH_READER_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: SYNTHESIZER_LENGTH_READER_CONTRACT_ID,
+  instruction: `${SYNTHESIZER_INSTRUCTIONS} ${SYNTHESIZER_LENGTH_SENTENCE} ${READER_SENTENCE_WRITING}`,
+  answerForm: SYNTHESIZER_ANSWER_FORM
+});
+/**
+ * Web search (plan 2026-10-30 task W1-5; design §7.1 item 7, approved 2026-10-30): the writer of an engine-2 debate that
+ * read web sources. A looked-up point then carries the extract it rests on, and the writer is told item 7's two
+ * sentences (WEB_WRITER_SENTENCES), last. Two VARIANTS, of length.v3 and of length.reader.v1 (engine 2 always tells the
+ * length). Sealed by the ENGINE seal only (apps/runner/src/engine-contracts.ts), never by SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT,
+ * so `composerContractHash` does not move; a debate without sources sends length.v3 or length.reader.v1 to the byte.
+ */
+export const SYNTHESIZER_LENGTH_SOURCES_CONTRACT_ID = "serve.synthesizer.length.sources.v1" as const;
+export const SYNTHESIZER_LENGTH_READER_SOURCES_CONTRACT_ID = "serve.synthesizer.length.reader.sources.v1" as const;
+export const SYNTHESIZER_LENGTH_SOURCES_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: SYNTHESIZER_LENGTH_SOURCES_CONTRACT_ID,
+  instruction: `${SYNTHESIZER_INSTRUCTIONS} ${SYNTHESIZER_LENGTH_SENTENCE} ${WEB_WRITER_SENTENCES}`,
+  answerForm: SYNTHESIZER_ANSWER_FORM
+});
+export const SYNTHESIZER_LENGTH_READER_SOURCES_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: SYNTHESIZER_LENGTH_READER_SOURCES_CONTRACT_ID,
+  instruction: `${SYNTHESIZER_INSTRUCTIONS} ${SYNTHESIZER_LENGTH_SENTENCE} ${READER_SENTENCE_WRITING} ${WEB_WRITER_SENTENCES}`,
   answerForm: SYNTHESIZER_ANSWER_FORM
 });
 /**
@@ -1941,10 +2039,20 @@ export const SYNTHESIZER_V3_CONTRACTS_FINGERPRINT_TEXT: string = [
   promptContractFingerprintText(SYNTHESIZER_V3_PROMPT_CONTRACT),
   promptContractFingerprintText(SYNTHESIZER_LENGTH_V1_PROMPT_CONTRACT)
 ].join("\n---\n");
-/** What `composerContractHash` seals from v4 (2026-10-15) on: v4, then its length variant length.v2. */
+/** Shipped history: what `composerContractHash` sealed from v4 (2026-10-15) until the reading level — v4, then length.v2 (879d2c5d...). */
+export const SYNTHESIZER_V4_CONTRACTS_FINGERPRINT_TEXT: string = [
+  promptContractFingerprintText(SYNTHESIZER_PROMPT_CONTRACT),
+  promptContractFingerprintText(SYNTHESIZER_LENGTH_V2_PROMPT_CONTRACT)
+].join("\n---\n");
+/**
+ * What `composerContractHash` seals from the reading level (2026-10-29) on: every writer contract the runner sends — v4,
+ * length.v3, reader.v1, then length.reader.v1.
+ */
 export const SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT: string = [
   promptContractFingerprintText(SYNTHESIZER_PROMPT_CONTRACT),
-  promptContractFingerprintText(SYNTHESIZER_LENGTH_PROMPT_CONTRACT)
+  promptContractFingerprintText(SYNTHESIZER_LENGTH_PROMPT_CONTRACT),
+  promptContractFingerprintText(SYNTHESIZER_READER_PROMPT_CONTRACT),
+  promptContractFingerprintText(SYNTHESIZER_LENGTH_READER_PROMPT_CONTRACT)
 ].join("\n---\n");
 /** The material field that carries the answer length the writer aims at ("about N words"; a target, never a cut). */
 export function synthesizerAnswerLengthField(words: number): Readonly<{ name: "answer_length"; content: string }> {

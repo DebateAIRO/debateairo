@@ -10,13 +10,13 @@ base verifier).
 
 Every migration after 0110 is a forward step in an ordered chain anchored on 0110; 0111 (NETOPIA, PR-54, PR-58) is the
 first, the auth DB batch (0112, below) the second, Part C's prices (0113, below) the third, role rotation (0114,
-below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth, the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, the synthesis check (0126, below) the sixteenth, the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth, the support answer scope (0129, below) the nineteenth and row-level security (0130, below) the twentieth. A step is added with new files only; NNNN is its number, the step before's number plus one:
+below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth, the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, the synthesis check (0126, below) the sixteenth, the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth, the support answer scope (0129, below) the nineteenth, row-level security (0130, below) the twentieth, the V4 account memory (0131, below) the twenty-first, the web evidence store (0132, below) the twenty-second, the investigations (0133, below) the twenty-third, the dig model with the month pause (0134, below) the twenty-fourth, the dig picks (0135, below) the twenty-fifth and the investigation reports (0136, below) the twenty-sixth. A step is added with new files only; NNNN is its number, the step before's number plus one:
 
 1. `migrations/NNNN_<name>.sql`: the SQL, forward-only and replayable.
 2. A manifest in `lineage/`, shaped like `billing-netopia-forward111.json`: its version, the recipe's SHA-256,
-   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0130: 0130,
-   `row-level-security-forward0130.json`, and `verify-effective-capabilities-130.sql`, which supersedes 0111's, which
-   0112 to 0129 keep),
+   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0136: 0136,
+   `investigation-reports-forward0136.json`, and `verify-effective-capabilities-130.sql`, which supersedes 0111's, which
+   0112 to 0129 keep; 0131 to 0136 keep 0130's),
    and its own migration and verifier. (0111's own `previous` is 0110: `auth-dev-preview-20261006-forward110.json`
    and the sealed `verify-effective-capabilities.sql`.)
 3. A new verifier `lineage/verify-effective-capabilities-NNNN.sql` only when the step adds billing relations or
@@ -443,6 +443,162 @@ so it was renumbered again, to 0130, at its merge onto that dev (2026-10-28). Th
 `serve.synthesis_check_*` tables 0126 grants `debateai_runtime` SELECT on to the in-scope set (113 to 118 relations; each
 keyed on its run, K4) and V-18's guard on `serve.synthesis_check_attempt.request_id`.
 
+## The V4 account memory (0131)
+
+The twenty-first step, after row-level security (0130), is `0131_v4_account_memory.sql` with
+`v4-account-memory-forward0131.json` and `packages/db/src/migration-forward0131.ts` (`loadForward0131`, appended
+last to `STEPS`, `MIGRATION_FORWARD0131_` refusals). Owner rulings N7 and N11 (2026-10-29, test-site release R22):
+the V4 pages keep the reading level, each debate's last visit and each dig's link in the account, never in the
+browser. It creates `identity.page_reading_level`, `identity.debate_last_visit` and `identity.dig_link`, each keyed
+by the account's `owner_ref` with `ON DELETE CASCADE` (account erasure deletes the `identity."user"` row, so the
+rows go with it), and nine functions: six for the API's own role `debateai_billing_runtime` (never the shared
+runtime role), a private ownership helper, `identity.forget_erased_debate_page_memory(uuid)` for
+`debateai_erasure_runtime` (R22 item 16: deleting one private debate also deletes its visit row and every dig link
+where it is the parent or the child, in the transaction that writes the run's erasure tombstone, called by
+`packages/db/src/erasure-page-memory.ts` from both finalize paths), and the export reader
+`identity.read_data_export_page_memory(uuid,uuid)` for `debateai_data_export_worker` behind 0128's lease gate.
+Tables and functions take 0115's export owner, as 0125's export reader does. Its postcondition records its own three
+tables and nine functions. It declares `-- n1: expand` (new objects only; the erasure role's one new grant changes
+the count the erasure boot check expects, which R22's drained upload makes moot) and `-- n1: keeps-verifier`: `verify-effective-capabilities-130.sql` (0130's) stays the
+verifier in force and there is no `replayVerifierSql`. Row-level security (0130) leaves the three tables outside its
+scope rule: no request role (`debateai_billing_runtime`, `debateai_authorization_runtime`) can SELECT them (every
+role's table rights are revoked; only the definers, owned by the migrator as 0115's export owner, read and write them),
+so row security stays off on them, as on every out-of-scope table, and the step stays expand-only. Written as 0130, it
+was renumbered to 0131 at the merge of `origin/dev` 64ef40c21 (2026-10-30), whose row-level security took 0130 first
+(C1's recipe: every file and constant that carries the number, `previous` now 0130's manifest and its verifier, the
+manifest digests recomputed, the chain lists re-pinned). If an earlier pending step takes 0131 first, renumber this
+step again by the same recipe before merge.
+
+## The web evidence store (0132) and investigations (0133)
+
+The twenty-second and twenty-third steps, after the V4 account memory (0131), carry the Perplexity plan's storage
+(`docs/superpowers/plans/2026-10-30-perplexity-and-dig-map.md`, task W1-3; the owner's answers of 2026-10-29/30 override
+it): `0132_web_evidence.sql` with `web-evidence-forward0132.json` and `packages/db/src/migration-forward0132.ts`
+(`loadForward0132`, `MIGRATION_FORWARD0132_` refusals), then `0133_investigations.sql` with
+`investigations-forward0133.json` and `packages/db/src/migration-forward0133.ts` (`loadForward0133`,
+`MIGRATION_FORWARD0133_` refusals), appended in that order to `STEPS`. Each declares `-- n1: expand` (new tables and
+functions only; the erasure role's one new function each changes the count its boot check expects, which R22's drained
+upload makes moot, as 0131's did) and `-- n1: keeps-verifier`: no billing relation or function (the reserve lives in the
+identity schema), so `verify-effective-capabilities-130.sql` stays in force and neither has a `replayVerifierSql`.
+
+0132 keeps one debate's web step: `identity.web_search`, `identity.web_page`, the transient `identity.web_page_text`,
+`identity.web_reading`, `identity.web_extract`, `identity.web_pick`, `identity.web_pack` and
+`identity.web_researched`. Six of them are run content carriers (`CONTENT_CARRIERS` in `packages/crypto`): the search
+words, a page's address, site, title and date, its whole text, a reading's line, an extract's quote and a pack are
+encrypted under the run's key and attested by the runner; one trigger refuses a run without content encryption, an
+erased run and a wrong attestation, so no web text is ever plaintext. The page text lives only in its own table: a
+reader prompt kept in `ledger.call_prompt` names a page by its id and keyed digest (`webPageTextRef`,
+`packages/db/src/web-evidence.ts`), never its text. 0133 keeps `identity.investigation`,
+`identity.investigation_member` (the server-side dig parent; joining writes 0131's `identity.dig_link` too),
+`identity.investigation_closing` (one row per report version, kept when the investigation reopens) and
+`identity.investigation_reserve_event` (the person's one reserve as an event list: HELD, USED, RELEASED, BLOCKED until
+the limit that ran out resets). Closing an investigation wipes its page texts in the same transaction, and the
+scheduler's sweep wipes them 30 days after the investigation's last activity even while it is open.
+
+Every row of both names its account's `owner_ref` with `ON DELETE CASCADE`, so account erasure removes them; deleting one
+private debate calls `identity.forget_erased_debate_investigation(uuid)` and
+`identity.forget_erased_debate_web_evidence(uuid)` for `debateai_erasure_runtime` in the finalize transaction, beside
+0131's (`packages/db/src/erasure-page-memory.ts`). The export worker reads both through 0128's lease gate. Tables and
+definers take 0115's export owner, as 0131's do; no role holds a table right, so row-level security (0130) leaves them
+outside its scope rule and the steps stay expand-only. If an earlier pending step takes 0132 or 0133 first, renumber
+these steps by the same recipe before merge (C1's: every file and constant that carries the number, `previous`, the
+manifest digests, the chain lists).
+
+## The dig model and the month pause (0134)
+
+The twenty-fourth step, after the investigations (0133), carries the new dig model's storage and the money rule's
+month pause (`docs/superpowers/plans/2026-10-30-dig-model-revision.md`, task W2-8 and "The money rule (owner, 31 Oct
+2026)"): `0134_dig_model_and_month_pause.sql` with `dig-model-forward0134.json` and
+`packages/db/src/migration-forward0134.ts` (`loadForward0134`, `MIGRATION_FORWARD0134_` refusals), appended last to
+`STEPS`. It declares `-- n1: expand` (new tables and functions; `ledger.model_spend`'s shared source list re-added NOT
+VALID with `PATH_REWRITE`, and that source's own run rule NOT VALID; the erasure role's one new function changes the
+count its boot check expects, which R22's drained upload makes moot) and `-- n1: keeps-verifier`: no billing relation
+or function, so `verify-effective-capabilities-130.sql` stays in force and it has no `replayVerifierSql`.
+
+It keeps `identity.investigation_dig_level` (each dig's level, 1..10; the first debate is 0 and has no row; the members
+0133 already held are filled in by walking their parents), `identity.path_rewrite_turn` (a settled dig's place in the
+line of rewrites of the path it was dug from), `identity.path_rewrite` (one rewrite per dig, insert-once: outcome,
+fates, the verdict's codes and lineage in clear; the path's new text, "What the dig changed", the verdict's reason and the
+dig's own paths only in an envelope under the dig's run key, a `CONTENT_CARRIERS` entry) and
+`identity.web_plan_path` (the search planner's decision for each path of a run, written once: PLANNED,
+NO_SEARCH_PLANNED with its reason sealed under the run's key and checked by 0132's content trigger, NOT_ON_PLAN,
+SWITCHED_OFF or FAILED, and the searches it sends) and `identity.run_pause_event` (PAUSED at the month wall with its reset and the planned work left, RESUMED on the person's
+Continue). 0133's member table and join function are NOT altered or revoked: 0133's postcondition digests that table's
+columns and the join's grants, so the level is a table of its own and `identity.join_investigation_nested` supersedes
+the join (TOO_DEEP at level 11, under 0133's two locks); no source calls 0133's join any more. Day and week borrowing
+keeps no record: it is derived from the spend windows (`packages/db/src/dig-model.ts`).
+
+Every row names its account's `owner_ref` with `ON DELETE CASCADE`; deleting one private debate calls
+`identity.forget_erased_debate_dig_model(uuid)` in the finalize transaction after 0133's (an erased dig takes its own
+rewrite and turn; an erased debate the rewrites of its paths; a dig's level goes with its 0133 member row). The export
+worker reads `identity.read_data_export_dig_model(uuid,uuid)` through 0128's lease gate. Tables and definers take
+0115's export owner; no role holds a table right, so row-level security (0130) leaves them outside its scope rule. If
+an earlier pending step takes 0134 first, renumber this step by the same recipe before merge (C1's: every file and
+constant that carries the number, `previous`, the manifest digests, the chain lists).
+
+## The dig picks (0135)
+
+The twenty-fifth step, after the dig model (0134), carries what the path rewrite needs to run for real
+(`docs/superpowers/plans/2026-10-30-dig-model-revision.md`, task W3-7: the path rewrite switched on):
+`0135_dig_picks.sql` with `dig-picks-forward0135.json` and `packages/db/src/migration-forward0135.ts` (`loadForward0135`,
+`MIGRATION_FORWARD0135_` refusals), appended last to `STEPS`. It declares `-- n1: expand` (three new tables and seven new
+functions; no earlier function, table or trigger changes, 0132's content check is called by two new triggers and 0134's
+turn and rewrite tables are only read; the erasure role's one new function changes the count its boot check expects,
+which R22's drained upload makes moot) and `-- n1: keeps-verifier`: no billing relation or function, so
+`verify-effective-capabilities-130.sql` stays in force and it has no `replayVerifierSql`.
+
+It keeps `identity.dig_pick_set` (one per dig, insert-once: its parent, the path of the parent's map its picks are on,
+null when they hang under the main question, and how many picks it holds), `identity.dig_pick` (each pick in the
+person's order: its kind, the suggestion it chose, its place and who wrote it in clear; its text only in an envelope under
+the dig's run key, a `CONTENT_CARRIERS` entry checked by 0132's content trigger) and `identity.path_rewrite_input` (the
+dig's own paths as its settled run gave them to its rewrite, written once before the rewrite takes its turn, sealed the
+same way, so a runner that stops mid-rewrite can build the same material again). The asks route writes the picks
+(`identity.record_dig_picks`, the API's own role); the runner reads them, stores the material and lists the settled digs
+whose rewrite has no row (`identity.read_unwritten_path_rewrites`, the sweep).
+
+Every row names its account's `owner_ref` with `ON DELETE CASCADE`; deleting one private debate calls
+`identity.forget_erased_debate_dig_picks(uuid)` in the finalize transaction after 0134's (an erased dig takes its own
+picks and material; the digs dug from an erased debate keep theirs). The export worker reads
+`identity.read_data_export_dig_picks(uuid,uuid)` through 0128's lease gate. Tables and definers take 0115's export owner;
+no role holds a table right, so row-level security (0130) leaves them outside its scope rule. If an earlier pending step
+takes 0135 first, renumber this step by the same recipe before merge (C1's: every file and constant that carries the
+number, `previous`, the manifest digests, the chain lists).
+
+## The investigation reports (0136)
+
+The twenty-sixth step, after the dig picks (0135), carries the final report the runner writes over an investigation
+(R22, plan task W5-1: the report the runner writes for a closing; owner answer F7 A: the report waits for the digs still
+running and for their path rewrites): `0136_investigation_reports.sql` with `investigation-reports-forward0136.json` and
+`packages/db/src/migration-forward0136.ts` (`loadForward0136`, `MIGRATION_FORWARD0136_` refusals), appended last to
+`STEPS`. It declares `-- n1: expand` (one new table and eleven new functions; no earlier function, table or trigger
+changes, 0133's `identity.record_investigation_report` is called by the new writer, not redefined, and 0133's to 0135's
+tables are only read; `ledger.model_spend`'s shared source list is re-added `NOT VALID` in 0134's pattern with one more
+source, `INVESTIGATION_REPORT`, whose run rule `model_spend_investigation_report_names_its_run` restricts only the new
+source) and `-- n1: keeps-verifier`: no billing relation or function, so `verify-effective-capabilities-130.sql` stays
+in force and it has no `replayVerifierSql`.
+
+It keeps `identity.investigation_report` (one row per closing whose report the runner wrote, insert-once: the 0133
+closing it answers, by investigation and report version, the id that closing records as its report, the
+investigation's root debate, the outcome and the story's, the newest path rewrite the version covered, the dossier's
+fingerprint, the ladder step and how many items were left out, the writer's and checker's lineage, rounds, artifact
+refs and what it cost; its text only in an envelope under the ROOT's run key, a `CONTENT_CARRIERS` entry checked on
+insert by this step's trigger in 0134's shape, 0132's checks called, not redefined). The runner lists the closings
+still waiting for their report (`identity.read_unreported_closings`), reads the members a report still waits for,
+writes the report (`identity.record_investigation_report_version`, which also records it on 0133's closing in the same
+transaction), reads a debate's reports and when the newest closing without a report was made (the money seam sums that
+closing's charges from then on); the API reads the person's reports (`identity.read_investigation_reports`, its own
+role).
+
+Every row names its account's `owner_ref` and its closing with `ON DELETE CASCADE`: an erased root takes its
+investigation and closings with it (0133's `identity.forget_erased_debate_investigation`, in the finalize transaction
+of the run's erasure), and so its reports; an erased dig leaves them, as they are sealed under the root's key and stay
+with the root. So this step adds no deletion function and the erasure role's count is unchanged. The export worker
+reads `identity.read_data_export_investigation_reports(uuid,uuid)` through 0128's lease gate. The table and ten of the
+eleven definers take 0115's export owner (the content trigger keeps the migrator, as 0134's does); no role holds a
+table right, so row-level security (0130) leaves it outside its scope rule. If an earlier pending step takes 0136
+first, renumber this step by the same recipe before merge (C1's: every file and constant that carries the number,
+`previous`, the manifest digests, the chain lists).
+
 ## Replay: every applied step keeps its own checks
 
 On a later `migrate()` EVERY applied step is checked by its receipt and by its postcondition digest (not only the
@@ -454,7 +610,7 @@ changes something an earlier step's verifier pins must change that verifier thro
 cannot silently pass. The effective-capability verifier of the last applied step (after 0129: 0111's, which the batch,
 Part C's step, role rotation, the data export, the mail locale, the debate shape map, the language check's site cost,
 the reclaim resume, the reply measures, the engine verdict, the engine's map answer step, the side-by-side releases,
-the settings activation, the Italy-specific approval, the synthesis check, the publication review, the threat reports and the support answer scope keep; after 0130: `verify-effective-capabilities-130.sql`) still
+the settings activation, the Italy-specific approval, the synthesis check, the publication review, the threat reports and the support answer scope keep; after 0130: `verify-effective-capabilities-130.sql`, which the V4 account memory (0131), the web evidence store (0132), the investigations (0133), the dig model (0134), the dig picks (0135) and the investigation reports (0136) keep) still
 runs at the end of every `migrate()`. A step that changes by design a field an earlier step's postcondition digests
 declares it (`amendsPostconditionsOf`, 0130 below): the earlier step is then compared against its latest recorded
 amendment instead of its receipt.

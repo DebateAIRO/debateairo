@@ -680,7 +680,7 @@ describe("budget spec §2.14 — one hosted debate under a tiny daily limit wait
         resetsAt: "2031-10-11T00:00:00.000Z"
       },
       whileWaiting: async ({ runId, accepted }) => {
-        expect(accepted.applied).toEqual({ plan_tier: "free", risk_tier: "standard", composition_budget_tier: "low", depth: 2 });
+        expect(accepted.applied).toEqual({ plan_tier: "free", risk_tier: "standard", composition_budget_tier: "low", depth: 1 });
         // Task11: queue entry pins the ordinary kind/event; wake retains current-plan rules.
         expect(await chargeScopeOf(runId)).toEqual([{owner_ref:owner.ownerRef,plan_id:"FREE"}]);
       },

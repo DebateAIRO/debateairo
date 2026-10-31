@@ -78,6 +78,17 @@ export function computeWindows(
  * The person's windows under `plan`, in the order DAY, WEEK, MONTH. Free has
  * only MONTH.
  *
+ * Each window carries the plan's finish edge, `finishBasisPoints`. A v3 plan's
+ * windows carry nothing more, exactly as before. On a billingPlans v4 plan the
+ * owner's money rule of 31 October 2026 replaces the "fixed 20 cents past every
+ * limit" of 30 October (Q1-Q3):
+ *  - the DAY and the WEEK carry `borrows`: running work is never stopped by
+ *    them, and what it uses past them is borrowed from the next one;
+ *  - the MONTH is the wall: its `finishOverflowMicros` (20 cents) is only the
+ *    tolerance for calls already in flight there, and `keepsReserveMicros` is the
+ *    final-answer reserve kept inside it (a paid plan's `reserve_micros`, held
+ *    INSIDE_LIMITS; 0 on Free, whose reserve sits ON_TOP_OF_CREDIT).
+ *
  * A6: after an upgrade the current period's MONTH limit is
  * `monthCreditOverrideMicros`, the prorated credit stored on the entitlement
  * event. The day and week caps are the plan's own caps, on its full credit, but
@@ -101,12 +112,21 @@ export function personWindowsFor(
   }
   const windows = computeWindows(anchor, now);
   const monthLimit = monthCreditOverrideMicros ?? plan.monthlyCreditMicros;
+  const overflow = plan.finishOverflowMicros ?? null;
+  const reserveInside = plan.reserveHeld === "INSIDE_LIMITS" ? plan.reserveMicros ?? 0 : 0;
+  const moneyRule = (scope: PersonWindow["scope"]): Partial<PersonWindow> => {
+    if (overflow === null) return {};
+    return scope === "PERSON_MONTH"
+      ? { finishOverflowMicros: overflow, keepsReserveMicros: reserveInside }
+      : { borrows: true as const };
+  };
   const person = (scope: PersonWindow["scope"], limitMicros: number, window: TimeWindow): PersonWindow => Object.freeze({
     scope,
     limitMicros,
     periodStart: window.start,
     resetsAt: window.end,
     finishBasisPoints: plan.finishBasisPoints,
+    ...moneyRule(scope),
     closeBasisPoints
   });
   const result: PersonWindow[] = [];

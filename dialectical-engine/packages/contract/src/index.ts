@@ -17,13 +17,27 @@ import { SessionSchema, LegalDocumentPairSchema } from "./auth-shared.js";
 export * from "./auth-shared.js";
 import { ConsumerAuthenticationCredentialSchema, consumerAuthContractSchemas } from "./consumer-auth.js";
 export * from "./consumer-auth.js";
-import { ABSTENTION_KINDS, CONDITION_MARKS, DEBATE_ROLES, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES, MODEL_STRENGTHS, SERVED_ROOT_RULE_HISTORY, TIER_SOURCES } from "@debateai/kernel";
+import { ABSTENTION_KINDS, CONDITION_MARKS, DEBATE_ROLES, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES, MODEL_STRENGTHS, READING_LEVELS, SERVED_ROOT_RULE_HISTORY, TIER_SOURCES } from "@debateai/kernel";
 import { PlanTierSchema } from "./plan-tiers.js"; export * from "./plan-tiers.js";
 import { MakerLineageSchema, PublicMakerLineageSchema } from "./lineage.js"; export * from "./lineage.js";
 import { AnswerStorySchema, PublicStoryShortSchema, StoryLanguageTagSchema } from "./story.js"; export * from "./story.js";
 import { AnswerDisclosureSchema, AnswerFloorSchema } from "./disclosure.js"; export * from "./disclosure.js";
 import { VerdictStateSchema } from "./verdict-state.js"; export * from "./verdict-state.js";
 import { DebateMapViewSchema } from "./map-view.js"; export * from "./map-view.js";
+import {
+  ReadingLevelStateSchema, ReadingLevelSaveRequestSchema, LastVisitSchema, LastVisitRecordRequestSchema, LastVisitRecordedSchema,
+  DigLinkRecordSchema, DigLinksSchema, DigLinkRecordRequestSchema, DigLinkRecordedSchema, DigLinkModeSchema
+} from "./account-memory.js";
+export * from "./account-memory.js";
+import { AnswerWebSchema, AskParentSchema, DebateInvestigationSchema, DigSharePercentSchema, DigSuggestionSchema, InvestigationCloseRequestSchema,
+  ResearchedAddRequestSchema, ResearchedAddedSchema, RoomReserveSchema, WebOtherPageSchema, WebPathSchema, WebSourceSchema,
+  WEB_CONTRACT_LIMITS, AnswerDigSchema, AnswerPathRewritesSchema, DigTooDeepSchema, DigPicksOnePathSchema, DigFreePicksMaxSchema, MonthPauseSchema, PathRewriteSchema,
+  PathRewritesSchema, PointOfViewVerdictSchema, RoomNewStartsSchema, RunContinueRefusedSchema, RunContinueRequestSchema,
+  RunContinuedSchema, UsageBorrowSchema, UsageBorrowsSchema } from "./web.js";
+export * from "./web.js";
+import { InvestigationReopenRequestSchema, InvestigationReopenedSchema, InvestigationReportAcceptedSchema, InvestigationReportsSchema,
+  InvestigationReportWritingSchema } from "./investigation-report.js";
+export * from "./investigation-report.js";
 export * from "./crisis.js";
 export * from "./question-check.js";
 export * from "./harm-helpline.js";
@@ -193,12 +207,23 @@ export type Scrutiny = z.infer<typeof ScrutinySchema>;
 export const AnswerLengthSchema = z.enum(["short", "standard", "detailed"]);
 export type AnswerLength = z.infer<typeof AnswerLengthSchema>;
 
-/** Closed at the contract door: the depth, plus the three optional shape settings (spec 2026-10-12 §3.2). */
+/**
+ * V4 reading level (owner ruling N6, 2026-10-29): the reader the answer writer and the storyteller write for. Missing
+ * (every V3 /new ask, every older run) reads as none: today's prompts, byte for byte.
+ */
+export const ReadingLevelSchema = z.enum(READING_LEVELS);
+export type ReadingLevel = z.infer<typeof ReadingLevelSchema>;
+
+/**
+ * Closed at the contract door: the depth, plus the three optional shape settings (spec 2026-10-12 §3.2), plus the V4
+ * reading level (N6), which rides here the way `answerLength` does and is stored with the run's depth_params.
+ */
 export const DepthParamsSchema = z.object({
   depth: ExpansionDepthSchema,
   depthMode: DepthModeSchema.optional(),
   scrutiny: ScrutinySchema.optional(),
-  answerLength: AnswerLengthSchema.optional()
+  answerLength: AnswerLengthSchema.optional(),
+  readingLevel: ReadingLevelSchema.optional()
 }).strict();
 export type DepthParams = z.infer<typeof DepthParamsSchema>;
 
@@ -222,6 +247,17 @@ export function debateShapeSettingsOf(depthParams: Readonly<Record<string, unkno
     scrutiny: shapeSettingOf(depthParams, "scrutiny", ScrutinySchema, "standard"),
     answerLength: shapeSettingOf(depthParams, "answerLength", AnswerLengthSchema, "standard")
   });
+}
+
+/**
+ * V4 reading level (N6): an asked or stored depth_params' level, or null when it has none (every V3 ask, every run stored
+ * before the level). A present value outside the three levels is refused, as a shape setting is.
+ */
+export function readingLevelOf(depthParams: Readonly<Record<string, unknown>>): ReadingLevel | null {
+  if (!Object.hasOwn(depthParams, "readingLevel") || depthParams.readingLevel === undefined) return null;
+  const parsed = ReadingLevelSchema.safeParse(depthParams.readingLevel);
+  if (!parsed.success) throw new TypeError("DEPTH_PARAMS_SHAPE_INVALID:readingLevel");
+  return parsed.data;
 }
 
 /** The 35 site locales (apps/ui/messages/<locale>): the language the person's page is in (question-language spec 2026-10-13, L1). */
@@ -258,7 +294,9 @@ export const AskRequestSchema = z.object({
   // Side-by-side spec §13 (Task S12): the settings version the /new page's room read answered from (its
   // `settings_version`). Present and no longer the active one, an ask whose choices the active version does not offer is
   // refused 409 ASK_SETTINGS_CHANGED ("please choose again"); absent (an older page), the ask is normalised as before.
-  settings_version: SettingsVersionSchema.optional()
+  settings_version: SettingsVersionSchema.optional(),
+  // Plan 2026-10-30 W1-6: a dig names the debate it digs (AskParentSchema, ./web.ts); absent, the ask is a new question.
+  parent: AskParentSchema.optional()
 }).strict();
 export type AskRequest = z.infer<typeof AskRequestSchema>;
 
@@ -407,8 +445,18 @@ export const AskRoomQuerySchema = z.object({
   // Debate shape (spec 2026-10-12 §3.2): the /new page reads the room for the settings it will send.
   depth_mode: DepthModeSchema.optional(),
   scrutiny: ScrutinySchema.optional(),
-  answer_length: AnswerLengthSchema.optional()
-}).strict();
+  answer_length: AnswerLengthSchema.optional(),
+  // Plan 2026-10-30 W1-6 (Q14): a room read for a dig names its parent, its mode and how many picks it combines, so the
+  // answer can say the dig's share of today. The mode and the picks only beside a parent.
+  dig_parent: z.uuid().optional(),
+  dig_mode: DigLinkModeSchema.optional(),
+  dig_picks: z.string().regex(/^[0-9]{1,2}$/u).transform(Number)
+    .pipe(z.number().int().min(1).max(WEB_CONTRACT_LIMITS.digPicksMax)).optional()
+}).strict().superRefine((query, context) => {
+  if (query.dig_parent === undefined && (query.dig_mode !== undefined || query.dig_picks !== undefined)) {
+    context.addIssue({ code: "custom", message: "dig_mode and dig_picks go only beside dig_parent" });
+  }
+});
 
 /**
  * Length guidance (spec 2026-10-15 §3.8; controller ruling Q9): the answer writer's three targets for the person's plan,
@@ -437,6 +485,27 @@ const PreviewRostersSchema = z.object({
   premium: z.array(z.string().min(1)).min(1)
 }).strict();
 
+/** W1-6 (Q2): "blocked until {reset}" is a FULL person window whose reset `resets_at` names. */
+function roomReserveIssues(answer: Readonly<{ room: string; scope: string | null; reserve?: string | undefined }>, context: z.RefinementCtx): void {
+  if (answer.reserve === "BLOCKED" && (answer.room !== "FULL" || !PERSON_SCOPES.has(answer.scope ?? ""))) {
+    context.addIssue({ code: "custom", message: "BLOCKED names a full person window and its reset" });
+  }
+}
+
+/**
+ * W2-7 (the money rule, owner 31 Oct): new starts wait for the reset of a FULL person window; a read carries a new
+ * question's estimate or a dig's, never both.
+ */
+function roomMoneyIssues(answer: Readonly<{ room: string; scope: string | null; new_starts?: string | undefined;
+  start_share_percent?: number | undefined; dig_share_percent?: number | undefined }>, context: z.RefinementCtx): void {
+  if (answer.new_starts !== undefined && (answer.room !== "FULL" || !PERSON_SCOPES.has(answer.scope ?? ""))) {
+    context.addIssue({ code: "custom", message: "new starts wait only for the reset of a full person window" });
+  }
+  if (answer.start_share_percent !== undefined && answer.dig_share_percent !== undefined) {
+    context.addIssue({ code: "custom", message: "a room read estimates a new question or a dig, not both" });
+  }
+}
+
 const CustomerAskRoomResponseSchema = z.object({
   room: z.enum(["FITS", "CLOSE", "FULL", "ALREADY_WAITING"]),
   scope: z.enum(["SITE_DAY", "PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]).nullable(),
@@ -459,8 +528,18 @@ const CustomerAskRoomResponseSchema = z.object({
   // API answers the pages from the activation pointer. The page sends it back with the ask (`AskRequest.settings_version`).
   settings_version: SettingsVersionSchema.optional(),
   // Addition D24 (Task SA7 part A): on the preview, that version's line-up (PreviewRostersSchema); absent elsewhere.
-  preview_rosters: PreviewRostersSchema.optional()
+  preview_rosters: PreviewRostersSchema.optional(),
+  // Plan 2026-10-30 W1-6 (Q2): the reserve's word, KEPT or BLOCKED (RoomReserveSchema, ./web.ts); absent before R22.
+  reserve: RoomReserveSchema.optional(),
+  // W1-6 (Q14): a dig's share of today, only on a read asked for a dig (the owner-approved exception to I6).
+  dig_share_percent: DigSharePercentSchema.optional(),
+  // W2-7 (money rule): a new question's estimate, as a share of today in the same steps; absent on a read for a dig.
+  start_share_percent: DigSharePercentSchema.optional(),
+  // W2-7 (money rule): new questions and digs wait for `resets_at` (RoomNewStartsSchema, ./web.ts); running work goes on.
+  new_starts: RoomNewStartsSchema.optional()
 }).strict().superRefine((answer, context) => {
+  roomReserveIssues(answer, context);
+  roomMoneyIssues(answer, context);
   if (answer.waits_for !== undefined
     && (!(answer.room === "FULL" || answer.room === "ALREADY_WAITING") || !PERSON_SCOPES.has(answer.scope ?? ""))) {
     context.addIssue({ code: "custom", message: "waits_for names a person scope of a question that would wait" });
@@ -483,8 +562,16 @@ const InternalAskRoomResponseSchema = z.object({
   // Side-by-side spec §13 (Task S12): as the customer answer's `settings_version`.
   settings_version:SettingsVersionSchema.optional(),
   // Addition D24 (Task SA7 part A): as the customer answer's `preview_rosters`.
-  preview_rosters:PreviewRostersSchema.optional()
+  preview_rosters:PreviewRostersSchema.optional(),
+  // Plan 2026-10-30 W1-6: as the customer answer's `reserve` and `dig_share_percent`.
+  reserve:RoomReserveSchema.optional(),
+  dig_share_percent:DigSharePercentSchema.optional(),
+  // W2-7: as the customer answer's `start_share_percent` and `new_starts`.
+  start_share_percent:DigSharePercentSchema.optional(),
+  new_starts:RoomNewStartsSchema.optional()
 }).strict().superRefine((answer,context)=>{
+  roomReserveIssues(answer,context);
+  roomMoneyIssues(answer,context);
   if ((answer.room==="FITS") !== (answer.scope===null) || (answer.room==="FITS" && answer.resets_at!==null)
     || ((answer.room==="ALREADY_WAITING") !== (answer.waiting_run_ref!==null))
     || ((answer.room==="FULL" || answer.room==="ALREADY_WAITING") && answer.resets_at===null)
@@ -501,7 +588,9 @@ const CustomerBillingUsageResponseSchema = z.object({
     scope: z.enum(["PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]),
     percent: z.number().int().min(0).max(110),
     resets_at: z.iso.datetime()
-  }).strict()).max(3)
+  }).strict()).max(3),
+  // W2-7 (money rule): what running work borrowed from the next day or week to finish (UsageBorrowSchema, ./web.ts).
+  borrowed: UsageBorrowsSchema.optional()
 }).strict();
 const InternalBillingUsageResponseSchema = z.object({
  plan_id:z.null(),funding:InternalFundingUsageSchema,windows:z.array(z.object({scope:z.enum(["PERSON_DAY","PERSON_WEEK","PERSON_GRANT"]),percent:z.number().int().min(0).max(100),resets_at:z.iso.datetime()}).strict()).min(1).max(3)
@@ -810,8 +899,13 @@ export const RunProjectionSchema = z.object({
   waits_until: z.iso.datetime().nullable().optional(),
   // Final review Part 1b, Important 1: a WAITING run that waits only for its
   // person's own running debates (`waits_until` is then the next tick).
-  waits_for: WaitsForSchema.nullable().optional()
+  waits_for: WaitsForSchema.nullable().optional(),
+  // W2-7 (money rule): the month wall paused this debate's planned calls and searches (MonthPauseSchema, ./web.ts).
+  month_pause: MonthPauseSchema.optional()
 }).strict().superRefine((run, context) => {
+  if (run.month_pause !== undefined && !(run.state === "CLAIMED" || run.state === "RUNNING" || run.state === "HOLDING")) {
+    context.addIssue({ code: "custom", message: "only a debate already running pauses at the month wall" });
+  }
   if (run.waits_for !== undefined && run.waits_for !== null && run.state !== "WAITING") {
     context.addIssue({ code: "custom", message: "only a WAITING run waits for anything" });
   }
@@ -1320,7 +1414,11 @@ export const NodeSchema = z.object({
   condition_marks: z.array(ConditionMarkSchema),
   abstention: AbstentionSchema.nullable(),
   staleness_state: StalenessStateSchema,
-  relevant_as_of: z.iso.datetime()
+  relevant_as_of: z.iso.datetime(),
+  // Plan 2026-10-30 W1-6: the checked extracts the point rests on, as people see them (WebSourceSchema, ./web.ts), and
+  // the server's flag that its locator is one of them. Both optional: a point without the flag is never "Sure" (Q17).
+  sources: z.array(WebSourceSchema).max(WEB_CONTRACT_LIMITS.sourcesPerPointMax).optional(),
+  looked_up_checked: z.boolean().optional()
 }).strict();
 export type Node = z.infer<typeof NodeSchema>;
 
@@ -1609,8 +1707,22 @@ export const AnswerSchema = z.object({
   // A21: optional, so every stored and fixture answer without it still parses.
   model_assignment: AnswerModelAssignmentSchema.optional(),
   // R2: engine 2 only (INTERFACE §9.8); optional, so every engine-1 and older answer parses unchanged.
-  judges_comparison: JudgesComparisonSchema.optional()
+  judges_comparison: JudgesComparisonSchema.optional(),
+  // Plan 2026-10-30 W1-6: each path's web search, other pages and dig suggestions (AnswerWebSchema, ./web.ts); optional,
+  // so every answer served before R22 parses unchanged.
+  web: AnswerWebSchema.optional(),
+  // W2-7 (dig model): each path's rewrites by digs and the "changed since" count (AnswerPathRewritesSchema, ./web.ts),
+  // and, on a dig's own answer, what it dug and its rewrite (AnswerDigSchema). Optional: older answers parse unchanged.
+  path_rewrites: AnswerPathRewritesSchema.optional(),
+  dig: AnswerDigSchema.optional()
 }).strict().superRefine((answer, context) => {
+  // W1-6: the server's checked flag stands only on a looked-up point whose locator is one of its own sources.
+  for (const node of answer.nodes) {
+    if (node.looked_up_checked === true && (node.way_of_knowing !== "LOOKED_UP"
+      || !(node.sources ?? []).some((source) => source.extract_id === node.locator))) {
+      context.addIssue({ code: "custom", message: "looked_up_checked needs a looked-up point whose locator is one of its sources" });
+    }
+  }
   if ((answer.confidence_band === null) !== (answer.band_ceiling === null)) {
     context.addIssue({ code: "custom", message: "confidence_band and band_ceiling must be present together" });
   }
@@ -1725,6 +1837,9 @@ export const contractInventory = Object.freeze({
     "POST /v1/account/export",
     "POST /v1/account/export/download",
     "POST /v1/account/removal-notice/take",
+    // V4 account memory (owner rulings N7 and N11, migration 0131): the reading level kept in the account.
+    "GET /v1/account/reading-level",
+    "POST /v1/account/reading-level",
     "GET /v1/account/legal-status",
     "POST /v1/account/legal-accept",
     "POST /v1/account/legacy-runs/claim",
@@ -1776,6 +1891,17 @@ export const contractInventory = Object.freeze({
     "POST /v1/runs/{id}/unpublish",
     "POST /v1/runs/{id}/publication-review",
     "GET /v1/runs/{id}/publication-review",
+    // V4 account memory (N7, N11): the last visit of a debate and the dig links around it.
+    "GET /v1/runs/{id}/last-visit",
+    "POST /v1/runs/{id}/last-visit",
+    "GET /v1/runs/{id}/dig-links",
+    "POST /v1/runs/{id}/dig-links",
+    // R22 W3-8 (the money rule): Continue on a debate paused at the month wall, once the month has reset.
+    "POST /v1/runs/{id}/continue",
+    // R22 W5-1: the final report over an investigation: its versions, "Write my report" and "Keep digging".
+    "GET /v1/runs/{id}/investigation",
+    "POST /v1/runs/{id}/report",
+    "POST /v1/runs/{id}/reopen",
     "GET /v1/billing/usage",
     "GET /v1/billing/plans",
     "POST /v1/billing/quote",
@@ -1828,6 +1954,19 @@ export const contractInventory = Object.freeze({
     ShadowSuppressionSchema, AbstentionSchema, InvestigationGapSchema, InvestigationRequestSchema,
     InvestigationAcceptedSchema, ExecutionLedgerDigestSchema, ValueHingeProjectionSchema, ConditionMarkSchema, EdgeSchema,
     AnswerStorySchema, AnswerDisclosureSchema, DebateMapViewSchema, BillingPlansResponseSchema,
+    ReadingLevelStateSchema, ReadingLevelSaveRequestSchema, LastVisitSchema, LastVisitRecordRequestSchema, LastVisitRecordedSchema,
+    DigLinkRecordSchema, DigLinksSchema, DigLinkRecordRequestSchema, DigLinkRecordedSchema,
+    // Plan 2026-10-30 W1-6: the web, dig-suggestion and investigation shapes (./web.ts); no route yet.
+    WebSourceSchema, WebOtherPageSchema, WebPathSchema, AnswerWebSchema, DigSuggestionSchema, AskParentSchema,
+    DebateInvestigationSchema, ResearchedAddRequestSchema, ResearchedAddedSchema, InvestigationCloseRequestSchema,
+    // W2-7: the dig model's rewrite and nesting shapes and the money rule's words (./web.ts); no route yet.
+    PathRewriteSchema, PathRewritesSchema, AnswerPathRewritesSchema, AnswerDigSchema, PointOfViewVerdictSchema, DigTooDeepSchema,
+    // W3-8: the two dig refusals with their own codes (./web.ts).
+    DigPicksOnePathSchema, DigFreePicksMaxSchema,
+    MonthPauseSchema, UsageBorrowSchema, RunContinueRequestSchema, RunContinuedSchema, RunContinueRefusedSchema,
+    // W5-1: the final report over an investigation (./investigation-report.ts).
+    InvestigationReportsSchema, InvestigationReportAcceptedSchema, InvestigationReopenRequestSchema, InvestigationReopenedSchema,
+    InvestigationReportWritingSchema,
     BillingQuoteRequestSchema, BillingQuoteResponseSchema, BillingCheckoutRequestSchema, BillingCheckoutResponseSchema,
     BillingCheckoutPendingErrorSchema, BillingChargeStatusResponseSchema,
     BillingSubscriptionResponseSchema, BillingDowngradeRequestSchema, BillingInvoicesResponseSchema,

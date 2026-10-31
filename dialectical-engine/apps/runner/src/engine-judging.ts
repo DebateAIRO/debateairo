@@ -27,7 +27,12 @@ import {
   type EngineQuestionKind,
   type EngineVerdictMaterial
 } from "@debateai/kernel";
-import { pickComparingJudges, type ComparingJudgeReply, type ComparingJudgeSeat } from "@debateai/judgement";
+import {
+  pickComparingJudges,
+  type ComparingJudgeCandidateSeat,
+  type ComparingJudgeReply,
+  type ComparingJudgeSeat
+} from "@debateai/judgement";
 import { deriveJudgesVerdict, type ConditionMarkRecord, type JudgesVerdict } from "@debateai/serve";
 import type { EngineSettings } from "@debateai/register";
 import { CALL_LANE_STOPPED } from "./call-scheduler.js";
@@ -76,8 +81,17 @@ export type ComparingJudgesStepInput = Readonly<{
   arguedByMaker: ReadonlyMap<string, string>;
   /** rootNodeId -> this pass's honest final strength (the tie-break). */
   honestFinalStrength: ReadonlyMap<string, number>;
-  /** The judge seats a member could take, each as its first planned member. */
-  candidates: readonly Readonly<{ maker: string; providerRef: string; modelId: string }>[];
+  /**
+   * The judge seats a member could take, each as its first planned member, and (owner ruling 2026-10-29, "prefer neutral
+   * judges") the seat's other member, which judges in its place only when its maker argued no answer and the planned
+   * member's maker argued one (`pickComparingJudges`).
+   */
+  candidates: readonly Readonly<{
+    maker: string;
+    providerRef: string;
+    modelId: string;
+    alternate?: Readonly<{ maker: string; providerRef: string; modelId: string }>;
+  }>[];
   rotationOffset: number;
   /** The arguing ended on a spend stop: no judge is asked (spec §4.7). */
   moneyStopped: boolean;
@@ -127,7 +141,8 @@ export type ComparingJudgesStepResult = Readonly<{
  * judge, a lane stop would be reused by a resumed copy and never asked.
  */
 const ENDS_THIS_COPY: ReadonlySet<string> = new Set([
-  "RUNNER_CLAIM_LOST", "RUNNER_TIME_LIMIT_REACHED", "RUNNER_RETIRING", CALL_LANE_STOPPED
+  // R22 W3-8: the month wall's planned stop (./month-pause.ts) ends this copy too.
+  "RUNNER_CLAIM_LOST", "RUNNER_TIME_LIMIT_REACHED", "RUNNER_RETIRING", "RUN_MONTH_PAUSED", CALL_LANE_STOPPED
 ]);
 export function endsThisCopy(error: unknown): boolean {
   const code = (error as Readonly<{ code?: unknown }> | null)?.code;
@@ -274,8 +289,10 @@ export async function runComparingJudges(input: ComparingJudgesStepInput): Promi
   })));
   const arguingMakers = new Set(answers.flatMap((answer) => answer.arguedByMaker === null ? [] : [answer.arguedByMaker]));
   const mayAsk = !input.moneyStopped && answers.length >= 2;
-  const candidateSeats = Object.freeze(input.candidates.map(({ maker, providerRef }) => Object.freeze({ maker, providerRef })));
-  const pickOf = (seats: typeof candidateSeats, count: number): readonly ComparingJudgeSeat[] =>
+  const candidateSeats: readonly ComparingJudgeCandidateSeat[] = Object.freeze(input.candidates.map(({ maker, providerRef, alternate }) =>
+    Object.freeze({ maker, providerRef,
+      ...(alternate === undefined ? {} : { alternate: Object.freeze({ maker: alternate.maker, providerRef: alternate.providerRef }) }) })));
+  const pickOf = (seats: readonly ComparingJudgeCandidateSeat[], count: number): readonly ComparingJudgeSeat[] =>
     pickComparingJudges({ seats, arguingMakers, count, rotationOffset: input.rotationOffset });
   const seatOfRow = (row: RecordedComparingJudgeVote): ComparingJudgeSeat => Object.freeze({
     seat: row.judgeSeat, maker: row.maker, providerRef: row.providerRef, argued: arguingMakers.has(row.maker)
@@ -293,8 +310,15 @@ export async function runComparingJudges(input: ComparingJudgesStepInput): Promi
   const freshSeats = firstPick.filter((seat) => !recordedBySeat.has(seat.seat));
   const clashing = freshSeats.filter((seat) => heldMakers.has(seat.maker));
   const seatedMakers = new Set([...heldMakers, ...freshSeats.filter((seat) => !heldMakers.has(seat.maker)).map((seat) => seat.maker)]);
-  const spares = clashing.length === 0 ? []
-    : pickOf(Object.freeze(candidateSeats.filter((seat) => !seatedMakers.has(seat.maker))), clashing.length);
+  const spares = clashing.length === 0 ? [] : pickOf(Object.freeze(candidateSeats.flatMap((seat) => {
+    // Owner ruling 2026-10-29: a seated maker's member never sits again, and the other member still stands in only as a
+    // maker that argued no answer (it never becomes a fallback).
+    const alternate = seat.alternate !== undefined && !seatedMakers.has(seat.alternate.maker) ? seat.alternate : undefined;
+    if (!seatedMakers.has(seat.maker)) {
+      return [Object.freeze({ maker: seat.maker, providerRef: seat.providerRef, ...(alternate === undefined ? {} : { alternate }) })];
+    }
+    return alternate !== undefined && !arguingMakers.has(alternate.maker) ? [alternate] : [];
+  })), clashing.length);
   const picked: readonly ComparingJudgeSeat[] = [
     ...firstPick.filter((seat) => !clashing.includes(seat)),
     ...clashing.flatMap((seat, index) => {
@@ -373,7 +397,8 @@ export async function runComparingJudges(input: ComparingJudgesStepInput): Promi
   // Each new vote recorded once, in seat order, after the count (so `counted` and its reason are known).
   // The letter's root in THIS copy's servable answers, never a root read from a recorded row (ruling PF-R2b4.6).
   const rootOf = new Map(answers.map((answer) => [answer.letter, answer.rootNodeId] as const));
-  const modelOf = new Map(input.candidates.map((candidate) => [candidate.providerRef, candidate.modelId] as const));
+  const modelOf = new Map(input.candidates.flatMap((candidate) => [[candidate.providerRef, candidate.modelId] as const,
+    ...(candidate.alternate === undefined ? [] : [[candidate.alternate.providerRef, candidate.alternate.modelId] as const])]));
   /** The seats this copy asked (a call was made); every other seat's vote is a stored row. */
   const asked = outcomes.filter((outcome) => outcome.recorded === null).length;
   for (const outcome of outcomes) {

@@ -29,8 +29,19 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * directory; run it alone.
  */
 const SIDE_BY_SIDE = "0123_side_by_side_releases.sql";
-/** Row-level security (mission row-level-security, SPEC-v4 R26): the chain's step after 0123, its last. */
+/** Row-level security (mission row-level-security, SPEC-v4 R26): a chain step after 0123, the one before the last. */
 const RLS = "0130_row_level_security.sql";
+/** The V4 account memory (owner rulings N7 and N11): the chain's sixth step from the end since the Perplexity plan's two, 0134, 0135 and 0136. */
+const V4 = "0131_v4_account_memory.sql";
+/** The Perplexity plan's web evidence store and investigations (task W1-3): the two steps before the last three. */
+const WEB = "0132_web_evidence.sql";
+const INVESTIGATIONS = "0133_investigations.sql";
+/** The dig model and the month pause (dig-model revision task W2-8): the third step from the end. */
+const DIG_MODEL = "0134_dig_model_and_month_pause.sql";
+/** A dig's picks and its path rewrite's material (dig-model revision task W3-7): the step before the last. */
+const DIG_PICKS = "0135_dig_picks.sql";
+/** The investigation's final report (R22 task W5-1): the chain's last step. */
+const INVESTIGATION_REPORTS = "0136_investigation_reports.sql";
 const EXPAND: N1Declaration = Object.freeze({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false, concurrentIndex: null });
 /** A later step with constant digests, as forward-chain-replay-verifiers.test.ts builds its probes, plus its n1 header. */
 function probe(previous: ChainStep, name: string, sql: string, n1: N1Declaration = EXPAND): ChainStep {
@@ -63,14 +74,20 @@ describe("Review Focus 1: a step that fails (or a kill) between steps", () => {
 
   it("a failing step leaves every earlier step committed", async () => {
     const real = (await loadMigrationPlan()).forwardChain.map((step) => step.name);
-    expect(real).toHaveLength(20);
-    expect(real.at(-1)).toBe(RLS);
+    expect(real).toHaveLength(26);
+    expect(real.at(-7)).toBe(RLS);
+    expect(real.at(-6)).toBe(V4);
+    expect(real.at(-5)).toBe(WEB);
+    expect(real.at(-4)).toBe(INVESTIGATIONS);
+    expect(real.at(-3)).toBe(DIG_MODEL);
+    expect(real.at(-2)).toBe(DIG_PICKS);
+    expect(real.at(-1)).toBe(INVESTIGATION_REPORTS);
     chain.shape = extendedBy((last) => probe(last, "0199_probe_fail.sql", "SELECT 1/0"));
     await expect(migrate(db.pool)).rejects.toMatchObject({ code: "22012" });
     chain.shape = undefined;
-    // All twenty real steps were applied by that same run and stay committed; the probe left nothing.
+    // All twenty-six real steps were applied by that same run and stay committed; the probe left nothing.
     expect(await receipts()).toEqual(real);
-    expect((await db.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration_step")).rows[0].n).toBe(20);
+    expect((await db.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration_step")).rows[0].n).toBe(26);
     expect(await ledger()).toEqual(expect.arrayContaining(real));
     expect(await ledger()).not.toContain("0199_probe_fail.sql");
     // The next run continues where the last one stopped: everything replays, nothing is left to apply.
@@ -83,12 +100,19 @@ describe("Review Focus 2: a page read holding a lock on core.run while 0123's AL
   beforeAll(async () => {
     db = await startTestDatabase();
     // The database a release before 0123 leaves: the chain up to 0123 (then the settings activation 0124, the
-    // Italy-specific approval 0125, synthesis-flag's 0126 to 0129 and row-level security's 0130, which migrate() applies
-    // after 0123 and which take no lock on core.run: 0125 alters legal.acceptance only).
+    // Italy-specific approval 0125, synthesis-flag's 0126 to 0129, row-level security's 0130, the V4 account memory
+    // 0131, the Perplexity plan's 0132 and 0133, the dig model's 0134, the dig picks' 0135 and the investigation reports'
+    // 0136, which migrate() applies after 0123 and which take no lock on core.run: 0125 alters legal.acceptance only, 0131
+    // to 0136 create identity tables, 0134 and 0136 also re-add CHECKs on ledger.model_spend, NOT VALID).
     chain.shape = (steps) => steps.slice(0, (steps as readonly ChainStep[]).findIndex((step) => step.name === SIDE_BY_SIDE));
     try { await migrate(db.pool); } finally { chain.shape = undefined; }
     expect(await ledger()).not.toContain(SIDE_BY_SIDE);
     expect(await ledger()).not.toContain(RLS);
+    expect(await ledger()).not.toContain(V4);
+    expect(await ledger()).not.toContain(INVESTIGATIONS);
+    expect(await ledger()).not.toContain(DIG_MODEL);
+    expect(await ledger()).not.toContain(DIG_PICKS);
+    expect(await ledger()).not.toContain(INVESTIGATION_REPORTS);
   }, 300_000);
   afterAll(async () => { await db?.stop(); });
 

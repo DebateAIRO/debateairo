@@ -216,7 +216,7 @@
   "debateChrome.condition.missingNumber": "أُزيل الرقم بعد فشل إعادة التشغيل",
   "debateChrome.condition.owedCheckUnexecuted": "لم يُنفّذ الفحص المستحق عند الإكمال",
   "debateChrome.condition.synthesisObjectionStanding": "لا يزال اعتراض أحد المقيّمين قائمًا على هذه العبارة",
-  "debateChrome.condition.digestCompressed": "اختُصرت ملخصات العقد لتلائم ميزانية التركيب",
+  "debateChrome.condition.digestCompressed": "كانت المناظرة كبيرة جدًا، لذا كُتبت الإجابة استنادًا إلى نسخة مختصرة منها.",
   "debateChrome.condition.digestCannotExist": "تعذّر إنشاء ملخص ضمن ميزانية التركيب",
   "debateChrome.condition.protectedCoreGuardRetired": "توقف التشغيل بسبب الميزانية؛ ولم يعد فحص إعادة الصياغة شرطًا لاستمراره",
   "debateChrome.condition.hiddenUnjudgeable": "مخفي: تعذّر تحكيمه — اعرض العناصر المخفية لقراءته",

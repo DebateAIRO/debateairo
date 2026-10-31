@@ -14,20 +14,41 @@ import {
   decryptLeasedContentForRun,
   encryptAttestedContentForRun,
   encryptAttestedLeasedContentForRun,
+  isRunContentLeaseHeld,
   normalizeRunOwnership,
+  PATH_REWRITE_CARRIER,
   prepareLeasedContentEncryptionForRun,
+  prepareLeasedContentEncryptionForRuns,
+  PostgresDigModelRunnerRepository,
+  PostgresDigPicksRunnerRepository,
+  PostgresInvestigationReportRunnerRepository, PostgresInvestigationRunnerRepository,
+  PostgresWebEvidenceRepository,
+  readMapRootsInForce,
   RunRepository,
+  WEB_EVIDENCE_CARRIERS,
+  WEB_PLAN_CARRIER,
   withRunContentLease,
   type CryptoEnvelope,
+  type DigPicksRead,
+  type PathRewriteEntry,
+  type PathRewritesRead,
   withWriteTransaction,
   type RunOwnershipInput
 } from "@debateai/db";
-import { AnswerIndexSchema, ConditionMarkSchema, ExecutionLedgerDigestSchema, type Answer, type AnswerIndex, type ConditionMark, type Edge, type ExecutionLedgerDigest, type Inspection, type InvestigationAccepted, type Node, type VerdictState } from "@debateai/contract";
+import { AnswerIndexSchema, ConditionMarkSchema, ExecutionLedgerDigestSchema, type Answer, type AnswerIndex, type ConditionMark, type Edge, type ExecutionLedgerDigest, type Inspection, type InvestigationAccepted, type Node, type VerdictState, webRanOnFree } from "@debateai/contract";
 import { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
 import { judgesComparisonOf, judgesRecountApplies, servedPositionOf } from "./judges-comparison.js";
 import type { EngineVerdictTrigger } from "./engine-verdict.js";
 import { SynthesisCheckRepository, synthesisTextOf, verdictOfRecord } from "./synthesis-check.js";
 import { PublicationReviewRepository, reviewStateOf } from "./publication-review.js";
+import {
+  serveWebEvidence, webPathRootsOf, webPathsAtRoots, webPlanReasonOf, withWebSources, type ServedWeb
+} from "./web-sources.js";
+import {
+  changedBelowPathsOf, digLevelsOf, digsBelowOf, latestWrittenReportOf, ownWordsOf, pathHistoryOf, restsOnOf, serveDig,
+  servePathRewrites, storyPathLinesOf, storyPathPointsOf, type DebatePoints, type PathTrustSources, type RewriteTurn,
+  type StoryPathPoints
+} from "./path-rewrites.js";
 export { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
 export {
   judgesComparisonOf, judgesRecountApplies, recountJudgesVotes, rootIndexOfCallSite, servedPositionOf, type ComparisonVote,
@@ -68,6 +89,10 @@ export * from "./synthesis.js";
 export * from "./engine-verdict.js";
 export * from "./synthesis-check.js";
 export * from "./publication-review.js";
+// Plan 2026-10-30 W3-3: the web step's stored rows as the answer's sources and web status.
+export * from "./web-sources.js";
+// Dig-model revision W4-5: each path's rewrites by digs, and a dig's own `dig`, as the answer serves them.
+export * from "./path-rewrites.js";
 
 /**
  * T6 r4 / codex r2 B1 — the value `ledger.node_review.outcome` can hold.
@@ -2939,6 +2964,10 @@ export class ServeRepository {
     // A21: which models did each job — undefined when the run pinned no assignment,
     // or pinned one that does not parse (omitted whole and reported, never a failed answer).
     const modelAssignment = projectModelAssignment(row.role_assignment_row, row.run_id);
+    // Dig-model revision W4-5: the rewrites are the owner's alone (the row above is the ownership check) and are read
+    // before this answer's own lease, since each is sealed under its dig's key. A read inside a caller's lease (the
+    // publication's, the review catch-up's: neither shows them) and a legacy asker's read carry none.
+    const digModel = access.ownerRef === null || isRunContentLeaseHeld() ? {} : await this.#readPathRewrites(row.run_id);
     return this.#memory.withDisclosureContentLease([row.run_id],async () => {
     const [runContent, factContent, composedContent, answerContent, conformanceContent] = await Promise.all([
       decryptContentForRun<{ questionLine: string }>(
@@ -2972,9 +3001,10 @@ export class ServeRepository {
       subjectRef: row.answer_id,
       relevantAsOf: row.relevant_as_of
     });
-    const [nodes, edges] = await Promise.all([
+    const [nodes, edges, servedWeb] = await Promise.all([
       this.readNodesForRun(row.run_id, row.answer_id, row.answer_version),
-      this.readEdgesForRun(row.run_id)
+      this.readEdgesForRun(row.run_id),
+      this.#readServedWeb(row.run_id)
     ]);
     const numbers = await this.pool.query<{
       value: number;
@@ -3170,7 +3200,8 @@ export class ServeRepository {
       number_slots: numberSlots,
       abstention: abstention.rows[0] ?? null,
       shadow_suppressions: shadowSuppressions.rows,
-      nodes,
+      // Plan 2026-10-30 W3-3: each point's checked sources and looked-up flag; the very same points without web rows.
+      nodes: withWebSources(nodes, servedWeb),
       edges,
       badges: staleness.badge === null || row.badges.includes(staleness.badge)
         ? row.badges
@@ -3231,7 +3262,11 @@ export class ServeRepository {
       staleness_state: staleness.state,
       relevant_as_of: staleness.relevantAsOf,
       ...(modelAssignment === undefined ? {} : { model_assignment: modelAssignment }),
-      ...(judgesComparison === undefined ? {} : { judges_comparison: judgesComparison })
+      ...(judgesComparison === undefined ? {} : { judges_comparison: judgesComparison }),
+      // Plan 2026-10-30 W3-3: each path's web search and other pages; absent when the debate kept no web rows.
+      ...(servedWeb === null ? {} : { web: servedWeb.web }),
+      // Dig-model revision W4-5: each rewritten path and, on a dig, what it dug; absent when no dig touched the debate.
+      ...digModel
     };
     });
   }
@@ -3630,8 +3665,189 @@ export class ServeRepository {
     );
     const runId = owner.rows[0]?.run_id;
     if (runId === undefined) return null;
-    return (await this.readNodesForRun(runId, answerId, owner.rows[0]!.answer_version))
-      .find((node) => node.node_id === nodeId) ?? null;
+    const answerVersion = owner.rows[0]!.answer_version;
+    // Plan 2026-10-30 W3-3: the point with its sources and flag, read under one lease (the node read borrows it).
+    return withRunContentLease(this.pool, [runId], async () => {
+      const nodes = await this.readNodesForRun(runId, answerId, answerVersion);
+      return withWebSources(nodes, await this.#readServedWeb(runId)).find((node) => node.node_id === nodeId) ?? null;
+    });
+  }
+
+  /**
+   * Dig-model revision W4-5: the debate's path rewrites and, on a dig, what it dug (0134's turns and rewrites, 0135's
+   * picks, 0133's investigation), shaped by ./path-rewrites.ts. Through the runtime role's readers, which the API's role
+   * reaches by membership (so the runner's and the tests' runtime pools keep reading answers), and only after the answer
+   * row's ownership check. Each rewrite's text and each dig's picks are opened under that dig's key and the story lines
+   * under their debate's, inside one lease over every debate concerned. A debate no dig touched, which is no dig either,
+   * costs two reads and serves exactly as before; one erased while it is read is served without its rewrites.
+   * W4-8 (Q-D3): for a finished rewrite, the points of the path's debate and of each dig whose rewrite rests on its own
+   * points are read too, each debate's points with ITS served web (so a checked extract only ever counts for the debate
+   * that holds it), and the rewritten path's trust words are worked out from them by ./path-rewrites.ts.
+   */
+  async #readPathRewrites(runId: string): Promise<Pick<Answer, "path_rewrites" | "dig">> {
+    const store = new PostgresDigModelRunnerRepository(this.pool);
+    const pickStore = new PostgresDigPicksRunnerRepository(this.pool);
+    const read: PathRewritesRead | null = await store.readPathRewrites(runId);
+    if (read === null) return {};
+    let ownPicks: DigPicksRead | null | undefined;
+    if (read.paths.length === 0 && read.own === null) {
+      ownPicks = await pickStore.read(runId);
+      if (ownPicks === null) return {};
+    }
+    const investigation = await new PostgresInvestigationRunnerRepository(this.pool).ofRun(runId);
+    const members = investigation?.members ?? [];
+    // W5-1: each written version's newest covered rewrite (0136), the "changed since" count's cut-off.
+    const coveredByVersion = new Map<number, string | null>(investigation === null ? [] : ((await new PostgresInvestigationReportRunnerRepository(this.pool)
+      .readOfRun(runId).catch(() => null))?.reports ?? []).map((entry) => [entry.report_version, entry.covered_rewrite_recorded_at] as const));
+    const levels = digLevelsOf(members);
+    const levelOf = (digRunId: string): number | null => levels.get(digRunId.toLowerCase()) ?? null;
+    const own = read.own;
+    const parentTurns = own === null ? [] : ((await store.readPathRewrites(own.parent_run_id))?.paths ?? [])
+      .filter((entry) => entry.position_ref === own.position_ref);
+    // Q-D5: a path is marked when a dig below the dig of that path finished a rewrite of its own.
+    const below = digsBelowOf(members, read.paths.map((entry) => entry.run_id));
+    const finished = new Set<string>();
+    for (const digRunId of new Set([...below.values()].flat())) {
+      const state = (await store.readPathRewrites(digRunId))?.own?.state;
+      if (state === "READY" || state === "READY_WITH_RESERVATION") finished.add(digRunId);
+    }
+    const scope = [...new Set([runId, ...read.paths.map((entry) => entry.run_id), ...(own === null ? [] : [own.parent_run_id]),
+      ...parentTurns.map((entry) => entry.run_id)].map((id) => id.toLowerCase()))];
+    try {
+      return await withRunContentLease(this.pool, scope, async () => {
+        const ciphers = await prepareLeasedContentEncryptionForRuns(this.pool, scope);
+        try {
+          const cipherOf = (id: string) => ciphers.get(id.toLowerCase())!;
+          const picksOf = async (digRunId: string): Promise<DigPicksRead | null> => {
+            if (ownPicks !== undefined && digRunId.toLowerCase() === runId.toLowerCase()) return ownPicks;
+            // A pick set that does not open is no words of the person's: the verdict is then not shown (Q-D4).
+            return pickStore.read(digRunId).catch((error: unknown) => { if (error instanceof TypeError) return null; throw error; });
+          };
+          const turnOf = async (entry: PathRewriteEntry): Promise<RewriteTurn> => {
+            if ((entry.state !== "READY" && entry.state !== "READY_WITH_RESERVATION") || entry.rewrite_id === null) {
+              return { entry, opened: null, ownWords: null };
+            }
+            const opened = decryptLeasedContentForRun<unknown>(cipherOf(entry.run_id), PATH_REWRITE_CARRIER, entry.rewrite_id,
+              (entry.content ?? null) as CryptoEnvelope | null, null);
+            const picks = entry.verdict_outcome === null ? null : await picksOf(entry.run_id);
+            return { entry, opened, ownWords: picks === null ? null : ownWordsOf(picks.picks) };
+          };
+          const storyBodyOf = async (debateRunId: string): Promise<unknown> => {
+            const story = (await this.pool.query<{ story_id: string; content: unknown; content_ciphertext: CryptoEnvelope | null }>(
+              `SELECT story.story_id::text AS story_id, story.content, story.content_ciphertext
+                 FROM serve.answer_story AS story
+                WHERE story.run_id = $1
+                ORDER BY story.answer_version DESC, story.created_at DESC
+                LIMIT 1`, [debateRunId])).rows[0];
+            if (story === undefined) return undefined;
+            const opened = decryptLeasedContentForRun<unknown>(cipherOf(debateRunId), "serve.answer_story", story.story_id,
+              story.content_ciphertext, story.content);
+            return typeof opened === "object" && opened !== null ? (opened as { readonly body?: unknown }).body : undefined;
+          };
+          const storyLinesOf = async (debateRunId: string): Promise<ReadonlyMap<string, string>> =>
+            storyPathLinesOf(await storyBodyOf(debateRunId));
+          // W4-8: each debate's points as the trust rule reads them, with its own served web, read once per debate.
+          const pointsRead = new Map<string, DebatePoints>();
+          const readPoints = async (debateRunId: string): Promise<void> => {
+            const key = debateRunId.toLowerCase();
+            if (pointsRead.has(key)) return;
+            // The lease's scope names each debate in lower case.
+            const served = await this.#readServedWeb(key);
+            const nodes = withWebSources(await this.readNodesForRun(key), served);
+            pointsRead.set(key, { points: new Map(nodes.map((node) => [node.node_id.toLowerCase(), node] as const)),
+              free: webRanOnFree(served?.web) });
+          };
+          /** W4-8: what the trust words of `debateRunId`'s paths are counted from, when `pathTurns` has a finished rewrite. */
+          const trustSourcesOf = async (debateRunId: string, pathTurns: readonly RewriteTurn[]):
+            Promise<((positionRef: string) => PathTrustSources) | undefined> => {
+            const done = pathTurns.filter((candidate) => candidate.opened !== null);
+            if (done.length === 0) return undefined;
+            const own: ReadonlyMap<string, StoryPathPoints> = storyPathPointsOf(await storyBodyOf(debateRunId));
+            await readPoints(debateRunId);
+            for (const candidate of done) if (restsOnOf(candidate.opened).length > 0) await readPoints(candidate.entry.run_id);
+            const pointsOf = (id: string): DebatePoints | null => pointsRead.get(id.toLowerCase()) ?? null;
+            return (positionRef) => ({ own: own.get(positionRef) ?? null, parent: pointsOf(debateRunId), digOf: pointsOf });
+          };
+
+          const turns: RewriteTurn[] = [];
+          for (const entry of read.paths) turns.push(await turnOf(entry));
+          const trustOf = await trustSourcesOf(runId, turns);
+          const pathRewrites = turns.length === 0 ? null : servePathRewrites({
+            turns, levelOf, storyLines: await storyLinesOf(runId), changedBelow: changedBelowPathsOf(read.paths, below, finished),
+            report: latestWrittenReportOf(investigation?.closings ?? [], coveredByVersion), ...(trustOf === undefined ? {} : { trustOf })
+          });
+
+          const kept = await picksOf(runId);
+          let dig: Answer["dig"] | null = null;
+          if (kept !== null) {
+            let rewrite: NonNullable<Answer["dig"]>["rewrite"] = null;
+            if (own !== null) {
+              const parentHistory: RewriteTurn[] = [];
+              for (const entry of parentTurns) parentHistory.push(await turnOf(entry));
+              const parentTrust = await trustSourcesOf(own.parent_run_id, parentHistory);
+              // The dig's rewrite as its parent's path serves it: written on the same earlier text, so `changed` agrees,
+              // and its trust words are the same (W4-8).
+              rewrite = pathHistoryOf({ turns: parentHistory, levelOf,
+                storyLine: (await storyLinesOf(own.parent_run_id)).get(own.position_ref) ?? null,
+                ...(parentTrust === undefined ? {} : { trust: parentTrust(own.position_ref) }) })
+                .find((step) => step.turn.entry.run_id.toLowerCase() === runId.toLowerCase())?.rewrite ?? null;
+            }
+            const member = members.find((candidate) => candidate.run_id.toLowerCase() === runId.toLowerCase());
+            dig = serveDig({ parentRunId: kept.parentRunId, positionRef: kept.positionRef, places: member?.places ?? [],
+              level: levelOf(runId), picks: kept.picks, rewrite });
+          }
+          await cipherOf(runId).assertLive();
+          return { ...(pathRewrites === null ? {} : { path_rewrites: pathRewrites }), ...(dig === null ? {} : { dig }) };
+        } finally {
+          // One close closes every debate's prepared key (the lease is the outer one, released by it).
+          await ciphers.get(scope[0]!)?.close();
+        }
+      });
+    } catch (error) {
+      if (error instanceof TypedDomainError && error.code === "PRIVATE_CONTENT_ERASED") return {};
+      throw error;
+    }
+  }
+
+  /**
+   * Plan 2026-10-30 W3-3: what the run's web step kept (0132's identity.read_web_evidence), opened under the run's key
+   * inside the caller's content lease and shaped by ./web-sources.ts; null when it kept no search (every answer before
+   * R22, Free, the setting off), so such an answer reads exactly as before. Only what is served is opened: each page's
+   * address, title and date, reader 1's line and each checked extract; never a search's words, a page's text or a grade.
+   * W3-6: the planner's per-path decision (0134's identity.read_web_plan) comes too, each NO_SEARCH_PLANNED reason opened
+   * under the same lease, so NO_SEARCH_PLANNED, NOT_ON_PLAN and SWITCHED_OFF reach the page; and each path is named by
+   * its root node id in force (core.map_position, 0119's re-points), a path whose answer has no root yet left out.
+   */
+  async #readServedWeb(runId: string): Promise<ServedWeb | null> {
+    const repository = new PostgresWebEvidenceRepository(this.pool);
+    const [stored, plan] = await Promise.all([repository.read(runId), repository.readPlanStatuses(runId)]);
+    if ((stored === null || stored.searches.length === 0) && (plan === null || plan.length === 0)) return null;
+    const roots = webPathRootsOf(await readMapRootsInForce(this.pool, runId));
+    const cipher = await prepareLeasedContentEncryptionForRun(this.pool, runId);
+    try {
+      const open = (carrier: (typeof WEB_EVIDENCE_CARRIERS)[keyof typeof WEB_EVIDENCE_CARRIERS] | typeof WEB_PLAN_CARRIER, id: string,
+        envelope: CryptoEnvelope | null): unknown => decryptLeasedContentForRun<unknown>(cipher, carrier, id, envelope, null);
+      const served = webPathsAtRoots(serveWebEvidence({
+        evidence: stored === null ? null : {
+          searches: stored.searches.map((search) => ({ searchId: search.search_id, pathRef: search.path_ref, outcome: search.outcome })),
+          pages: stored.pages.map((page) => ({ pageId: page.page_id, searchId: page.search_id, rank: page.rank,
+            readDepth: page.read_depth, about: open(WEB_EVIDENCE_CARRIERS.page, page.page_id, page.content) })),
+          readings: stored.readings.map((reading) => ({ pageId: reading.page_id, reader: reading.reader, outcome: reading.outcome,
+            line: reading.reader === 1 && reading.outcome === "READ"
+              ? open(WEB_EVIDENCE_CARRIERS.reading, reading.reading_id, reading.content) : null })),
+          extracts: stored.extracts.map((extract) => ({ pageId: extract.page_id, pathRef: extract.path_ref, label: extract.label,
+            quote: open(WEB_EVIDENCE_CARRIERS.extract, extract.extract_id, extract.content) })),
+          picks: stored.picks.map((pick) => ({ pathRef: pick.path_ref, rank: pick.rank, pageId: pick.page_id })),
+          researched: stored.researched.map((chosen) => ({ pageId: chosen.page_id, pathRef: chosen.path_ref, outcome: chosen.outcome }))
+        },
+        plan: (plan ?? []).map((decided) => ({ pathId: decided.pathRef, status: decided.status,
+          reason: decided.status === "NO_SEARCH_PLANNED" ? webPlanReasonOf(open(WEB_PLAN_CARRIER, decided.pathRef, decided.reason)) : null }))
+      }), roots);
+      await cipher.assertLive();
+      return served;
+    } finally {
+      await cipher.close();
+    }
   }
 
   /** Reclaim resume (migration 0119): nodes a later copy set aside ('stale'), and their edges, are not the answer's. */
