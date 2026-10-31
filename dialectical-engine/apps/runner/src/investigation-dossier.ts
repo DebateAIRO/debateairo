@@ -78,7 +78,7 @@ export const INVESTIGATION_REPORT_WHOLE_LEVELS = 3 as const;
 export const INVESTIGATION_REPORT_POINT_CAPS = Object.freeze([6, 3, 1, 0]);
 /**
  * The words the answer is asked for (the writer's length target; decision 27): about 300 for a debate of up to 8 paths (a first
- * debate alone), 50 more for every 8 paths beyond them, at most 600 (reached at 56 paths) however big the debate.
+ * debate alone), 50 more for every 8 paths beyond them, at most 600 (reached at 49 paths) however big the debate.
  */
 export const INVESTIGATION_REPORT_ANSWER_WORDS = Object.freeze({ base: 300, step: 50, pathsPerStep: 8, most: 600 });
 export function investigationReportAnswerLength(paths: number): string {

@@ -15,7 +15,7 @@ import {
  * call, and one over the line goes down the same ladder. Every attempt is checked again as it leaves (the gateway's `sentInputTokensBelow`).
  * A small call has no extra step. A failed count stops nothing: the byte guard's answer stands, and the counter logs it.
  *
- * It only ever trims. A count under the line never lets a call past the byte guard (see the report to the owner: bytes / 2 is far above the
+ * It only ever trims. A count under the line never lets a call past the byte guard (bytes / 2 is far above the
  * real count for Latin text, so a real count could carry much more).
  *
  * THE FENCE COUNTED is fixed by code, not the call's own random one, so a closing run again counts the same bytes and lands on the same step.
