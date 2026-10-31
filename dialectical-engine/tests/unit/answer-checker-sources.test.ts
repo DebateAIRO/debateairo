@@ -111,8 +111,10 @@ describe("a debate with no packs sends today's checker packet, byte for byte", (
 describe("the seals", () => {
   it("the engine seal appends the two after W4-2's dig planner; the composer and conformance seals do not move", () => {
     const sealed = engineSealedContracts();
-    expect(sealed.slice(-2)).toEqual([...EVALUATOR_SOURCES_SEALED_CONTRACTS]);
-    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-3)).toEqual(["web.plan-dig.v1", "serve.evaluator.length.sources.v1",
+    // Right after W4-2's dig planner; W5-1's final-report five follow them (appended later, same seal).
+    const after = ENGINE_SEALED_CONTRACT_IDS.indexOf("web.plan-dig.v1") + 1;
+    expect(sealed.slice(after, after + 2)).toEqual([...EVALUATOR_SOURCES_SEALED_CONTRACTS]);
+    expect(ENGINE_SEALED_CONTRACT_IDS.slice(after - 1, after + 2)).toEqual(["web.plan-dig.v1", "serve.evaluator.length.sources.v1",
       "serve.evaluator.length.reader.sources.v1"]);
     expect(sha256(SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT)).toBe(COMPOSER_SEAL);
     expect(sha256(EVALUATOR_CONTRACTS_FINGERPRINT_TEXT)).toBe(CONFORMANCE_SEAL);
