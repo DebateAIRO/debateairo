@@ -1292,6 +1292,8 @@ describe("engine 2's story (R1d)", () => {
     storyJsonBreaks?: { model: string; replies: number; parseFailed: number }[];
     writerPins?: { answerWriter: PinOutcome | null; storyteller: PinOutcome | null };
     investigations?: { cannotAssessReviews: number; run: number; capped: number; skipped: number; unavailable: number };
+    /** W5-2: the web table (an engine-2 debate with a debate-shape map only); absent when the web step left no row. */
+    web?: { search: string; paths: { plan: string | null; searches: number }[]; totals: { searches: number; searchFeeMicros: number } };
     /** R2 B11: the comparing judges' block (engine 2 only). */
     judgeVotes?: { model: string; maker: string; letter: string | null; counted: boolean | null }[];
     labels?: { label: string; trigger: string; engine1LadderLabel: string | null } | null;
@@ -1323,6 +1325,14 @@ describe("engine 2's story (R1d)", () => {
     expect(report.investigations).toBeDefined();
     if (engine === 1) expect(report.investigations).toMatchObject({ run: 0, capped: 0, skipped: 0, unavailable: 0 });
     expect(markdown).toContain("| cannot-assess reviews | asked |");
+    // W5-2: billing is kept off in the practice, so its run has no paid plan: a web step that ran planned no search for
+    // any path, sent none and paid none, and its table says so.
+    if (report.web !== undefined) {
+      expect(report.web.search).toBe("PERPLEXITY");
+      expect(report.web.paths.every((path) => path.plan === "NOT_ON_PLAN" && path.searches === 0)).toBe(true);
+      expect(report.web.totals).toMatchObject({ searches: 0, searchFeeMicros: 0 });
+      expect(markdown).toContain("Web search per path (W5-2;");
+    }
   };
   const framedOf = (request: GateRecord) => readFramedMaterial(wirePacket(stubChatBody(request.provider, request.body)));
   const answered = (requests: readonly GateRecord[], kind: "STORYTELLER" | "STORY_CHECKER") =>
