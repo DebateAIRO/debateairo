@@ -1285,6 +1285,7 @@ packages/serve/src/engine-verdict.ts
 packages/serve/src/index.ts
 packages/serve/src/judges-comparison.ts
 packages/serve/src/model-assignment.ts
+packages/serve/src/path-rewrites.ts
 packages/serve/src/publication-review.ts
 packages/serve/src/synthesis-check.ts
 packages/serve/src/synthesis.ts
