@@ -245,7 +245,11 @@ export function memoryStore(options: Readonly<{ refusePagesOf?: (searchId: strin
       pages: [...pages.values()].map((row) => ({ page_id: row.pageId as string, search_id: row.searchId as string, rank: row.rank as number,
         read_depth: row.readDepth as string, text_chars: null, text_digest: null, found_at: "now",
         content: (row.about as WebSealed).envelope, text_state: texts.has(row.pageId as string) ? "STORED" as const : "WIPED" as const })),
-      readings: [], extracts: [], picks: [], packs: [], researched: []
+      // W4-2: the readings too, as 0132 reads them back (a dig's reused page carries its reading from the first write).
+      readings: [...readings.values()].map((row) => ({ reading_id: row.readingId as string, page_id: row.pageId as string,
+        reader: row.reader as number, maker: row.maker as string, outcome: row.outcome as string, grade: row.grade as number | null,
+        read_at: "now", content: (row.line as WebSealed | null)?.envelope ?? null })),
+      extracts: [], picks: [], packs: [], researched: []
     }),
     readPageTexts: async (_runId, pageIds) => pageIds.flatMap((pageId) => {
       const row = texts.get(pageId);

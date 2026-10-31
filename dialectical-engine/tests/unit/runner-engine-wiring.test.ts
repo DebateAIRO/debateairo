@@ -49,8 +49,10 @@ describe("the runner reads the engine from the receipt only", () => {
 
   it("W3-6: the planner's decision goes to 0134's store, from the step itself, on the runner's pool, under the step's lease", () => {
     const step = read("apps/runner/src/web-step.ts");
-    expect(step.split("recordPlanPathStatuses: postgresWebPlanStatusRecorder(pool),")).toHaveLength(2);
-    expect(step.split("prepare: () => postgresWebStepPorts(pool, rest.runId)")).toHaveLength(2);
+    // The runner's call keeps them by default; only a fixture hands in its own (`stepPorts`, W4-2's test seam).
+    expect(step.split("recordPlanPathStatuses: stepPorts?.recordPlanPathStatuses ?? postgresWebPlanStatusRecorder(pool),")).toHaveLength(2);
+    expect(step.split("prepare: stepPorts?.prepare ?? (() => postgresWebStepPorts(pool, rest.runId))")).toHaveLength(2);
+    expect(RUNNER).not.toContain("stepPorts");
     // No second lease: the recorder seals with the cipher the step's own `prepare` opened, and opens none itself.
     expect(step.split("await keepDecision(ports.cipher);")).toHaveLength(2);
     expect(step.split("prepareLeasedContentEncryptionForRun(")).toHaveLength(2);

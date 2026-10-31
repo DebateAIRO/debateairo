@@ -91,6 +91,10 @@ export type ReaderOnePageNotRead = Readonly<{
   pageId: string; outcome: "NOT_READ"; reason: "TOO_LARGE" | "CALL_UNAVAILABLE" | "LEFT_OUT_OF_REPLY";
 }>;
 export type ReaderOnePageResult = ReaderOnePageRead | ReaderOnePageNotRead;
+/** A page reader 1 read earlier in the investigation (W4-2): what it gave, reused as it is. */
+export type ReaderOneKnownReading = Readonly<{ grade: ReaderOneGrade; adds: string; extracts: readonly string[]; maker: string }>;
+/** The call-site key and raw artifact a reused reading names: no call was made for it. */
+export const REUSED_READING = "REUSED" as const;
 /**
  * How the top was chosen: PICK (the pick call, as it answered); PICK_COMPLETED_BY_GRADE (its usable ids, the rest by
  * grade); GRADE_ORDER (the pick call was unavailable); NO_PICK_NEEDED (top_count or fewer pages help: all of them).
@@ -278,6 +282,12 @@ export async function readAllPages(input: Readonly<{
   topCount: WebTopCount;
   pages: readonly ReaderOnePage[];
   call: ReaderOneCall;
+  /**
+   * W4-2 (a dig): pages reader 1 already read in this investigation, by page id: their grade, line, copied passages and
+   * the reader's maker, reused and never sent again. They still join the pick, by their grade and line. Code checks the
+   * passages again on the page text given here (a page fetched again after its text was wiped may have changed).
+   */
+  known?: ReadonlyMap<string, ReaderOneKnownReading>;
   /** The call's body cap, less headroom; the STANDARD tier's by default. */
   requestBytesMax?: number;
 }>): Promise<ReaderOnePathResult> {
@@ -286,13 +296,22 @@ export async function readAllPages(input: Readonly<{
     throw new TypedDomainError("WEB_READER_PAGES_INVALID", "Each page is given once, by its id");
   }
   // Short prompt ids, by search order: the same on a follow-up and on a resumed run, so replies map back and replay.
-  const items: readonly Sendable[] = input.pages.map((page, index) => Object.freeze({
+  const allItems: readonly Sendable[] = input.pages.map((page, index) => Object.freeze({
     page, promptId: `p${String(index + 1)}`, ref: webPageTextRef(page.pageId, page.textDigest)
   }));
   const shape = { question: input.question, answer: input.answer, siteLanguage: input.siteLanguage,
     requestBytesMax: input.requestBytesMax ?? WEB_READER_ONE_LIMITS.requestBytesMax };
   const results = new Map<string, ReaderOnePageResult>();
   const calls: ReaderOneCallRecord[] = [];
+  for (const item of allItems) {
+    const known = input.known?.get(item.page.pageId);
+    if (known === undefined) continue;
+    const checked = checkVerbatimExtracts(item.page.text, known.extracts);
+    results.set(item.page.pageId, Object.freeze({ pageId: item.page.pageId, outcome: "READ", grade: known.grade, adds: known.adds,
+      extracts: checked.kept, extractsDropped: checked.dropped.length, maker: known.maker, rawArtifactRef: REUSED_READING,
+      callSiteKey: REUSED_READING }));
+  }
+  const items = allItems.filter((item) => !results.has(item.page.pageId));
 
   let plan = planBatches(shape, items);
   let nextIndex = 0;
@@ -347,8 +366,8 @@ export async function readAllPages(input: Readonly<{
     top = byGrade(helpful).map((page) => page.pageId);
     topChosenBy = "NO_PICK_NEEDED";
   } else {
-    const promptIdOf = new Map(items.map((item) => [item.page.pageId, item.promptId]));
-    const pageIdOf = new Map(items.map((item) => [item.promptId, item.page.pageId]));
+    const promptIdOf = new Map(allItems.map((item) => [item.page.pageId, item.promptId]));
+    const pageIdOf = new Map(allItems.map((item) => [item.promptId, item.page.pageId]));
     const shown = helpful.map((page) => promptIdOf.get(page.pageId)!);
     const titled = new Map(input.pages.map((page) => [page.pageId, page]));
     const material = webPickV2MaterialFields({ question: input.question, answer: input.answer, topCount: input.topCount,

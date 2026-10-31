@@ -392,9 +392,10 @@ export async function composePracticeRunner(input: Readonly<{
     callScheduler: runnerCallScheduler,
     callSubjects: previewCallSubjects(previewGate),
     // Perplexity plan W3-1, as main.ts: the web step where the practice's gate names the search socket; a debate whose
-    // run names no paid plan (billing.run_charge_scope) is NOT_ON_PLAN and makes no web call.
+    // run names no paid plan (billing.run_charge_scope) is NOT_ON_PLAN and makes no web call; searches pause at the month
+    // wall through the same month pause (W4-2).
     webSearch: runnerWebSearchSettings({ pool, previewGate, fetch: previewFetch,
-      guardOf: runnerSite.money === null ? null : runCostEnvelopeGuard }),
+      guardOf: runnerSite.money === null ? null : runCostEnvelopeGuard, pause: monthPause }),
     // Ruling R31, as main.ts: a call to a busy model waits on the busy coordinator BEFORE it takes any slot.
     callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model),
     renewals: new WorkItemRepository(input.keepAlivePool, { releaseKey: environment.RELEASE_KEY, workerId: environment.RUNNER_WORKER_ID }),
