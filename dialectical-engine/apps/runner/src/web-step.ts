@@ -151,6 +151,8 @@ export type WebStepInput = Readonly<{
   members: readonly WebStepMember[];
   /** `engineContractHash()`, the seal that covers the web contracts. */
   contractHash: string;
+  /** Decision 12: names a step's members to the run's replay book before they are asked (run-replay.ts). */
+  openReplayStep?: (members: readonly Readonly<{ callSiteKey: string; providerRef: string }>[], contractHash: string) => void;
   bound: CallBound;
   /** Root 0's room, which no web call and no search may cut into. */
   keepRoomMicros?: number;
@@ -777,7 +779,8 @@ async function runGroup(context: GroupContext): Promise<GroupOutcome> {
     readerOneMaker: readerOne.maker,
     candidates: context.topMembers.map((member) => Object.freeze({ maker: member.maker, providerRef: member.providerRef })),
     verbatim: (pageText, extract) => findVerbatim(pageText, extract) !== null,
-    call: topCall
+    call: topCall,
+    ...(input.openReplayStep === undefined ? {} : { openReplayStep: (members) => input.openReplayStep!(members, input.contractHash) })
   });
 
   // The readings: reader 1 for every page it read now (its one line, in the site's language; a reused page's was kept

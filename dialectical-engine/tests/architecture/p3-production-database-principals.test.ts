@@ -1182,6 +1182,23 @@ describe("P3-01 production database-principal manifest", () => {
     "EXECUTE ON FUNCTION staff.complete_team_limit_notice(uuid,uuid,boolean)",
     "EXECUTE ON FUNCTION staff.team_limit_notice_user(uuid,uuid)"
   ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0143_run_handover.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.run_release_now(uuid)",
+    "EXECUTE ON FUNCTION identity.run_settings_version_now(uuid)",
+    "EXECUTE ON FUNCTION identity.run_work_is_parked(uuid,text,timestamptz)",
+    "EXECUTE ON FUNCTION identity.wipe_inactive_web_page_text_of_idle_debates(integer)"
+  ]
+},
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0143_run_handover.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.continue_paused_run_in_release(uuid,uuid,text,bigint)"
+  ]
 }
 ]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))

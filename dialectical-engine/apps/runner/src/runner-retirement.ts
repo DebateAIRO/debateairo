@@ -131,7 +131,8 @@ export function createRunnerRetirementSignal(): RunnerRetirementSignal {
 
 /**
  * Part 2, spec §4 "Retirement (drained)": a release retires when, "in one database transaction", its state is
- * DRAINING, its front pair has stopped and no READY or CLAIMED work item of its runs is left, and, "in the process: no
+ * DRAINING, its front pair has stopped and no READY or CLAIMED work item of its runs is left (decision 12: a paused debate's
+ * does not count: it waits for its person, not for this release, and continues in the release then current), and, "in the process: no
  * debate task is still executing" (the task counter above, the verdict story included) and no model call of this
  * process is in flight (R1's call counter: integration M6, a keep-alive stop can end a task under its call). Then the
  * runner stops claiming, says so on stdout (`DEBATEAI_RUNNER_RETIRED {"releaseKey":…}`) and as the in-process event
@@ -230,7 +231,8 @@ export function postgresRunnerRetirementStore(
           `SELECT count(*)::int AS open_work
              FROM core.work_item w
              JOIN core.run r ON r.run_id = w.run_id
-            WHERE r.release_key = $1 AND w.state IN ('READY','CLAIMED')`,
+            WHERE identity.run_release_now(r.run_id) = $1 AND w.state IN ('READY','CLAIMED')
+              AND NOT identity.run_work_is_parked(w.run_id, w.state, w.claim_deadline)`,
           [releaseKey]
         );
         await client.query("COMMIT");

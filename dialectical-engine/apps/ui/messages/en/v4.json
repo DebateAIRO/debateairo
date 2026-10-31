@@ -135,6 +135,7 @@
   "v4.debate.usually": "This usually takes a few minutes. You can close this page and come back later.",
   "v4.debate.reconnecting": "We lost touch for a moment. Trying again…",
   "v4.debate.failedTitle": "This question didn't finish",
+  "v4.debate.foundTitle": "What the AIs found before it stopped",
   "v4.debate.askNew": "Ask a new question",
   "v4.debate.notFoundTitle": "We couldn't find this question",
   "v4.debate.notFoundBody": "The link may be wrong, or the question may belong to another account.",

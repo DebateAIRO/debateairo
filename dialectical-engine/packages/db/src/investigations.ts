@@ -129,9 +129,12 @@ export class PostgresInvestigationRunnerRepository {
       "SELECT identity.record_investigation_report($1,$2,$3) AS outcome", [investigationId, reportVersion, reportRef])).rows[0]!.outcome;
   }
 
-  /** The scheduler's sweep: at most `limit` texts whose investigation was idle more than 30 days. */
+  /**
+   * The scheduler's sweep: at most `limit` texts whose investigation was idle more than 30 days, never of a debate that still
+   * has open work or an investigation with a debate that has (0143: a paused debate needs them when it continues).
+   */
   async wipeInactivePageText(limit = 500): Promise<number> {
-    return (await this.pool.query<{ wiped: number }>("SELECT identity.wipe_inactive_web_page_text($1) AS wiped", [limit])).rows[0]!.wiped;
+    return (await this.pool.query<{ wiped: number }>("SELECT identity.wipe_inactive_web_page_text_of_idle_debates($1) AS wiped", [limit])).rows[0]!.wiped;
   }
 
   readReserve(ownerRef: string): Promise<ReserveRead> {

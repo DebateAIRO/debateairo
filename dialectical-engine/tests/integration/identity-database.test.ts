@@ -97,6 +97,8 @@ describe("S2 identity schema on real PostgreSQL", () => {
       // 0137 public debates: the public debates' contributions, updates and report charges.
       "public_contribution", "public_debate_update", "public_report_charge", "public_report_writer",
       "publication_event_binding", "recovery_code", "recovery_email_request", "registration_region", "run_execution_binding",
+      // 0143 the hand-over of a paused debate: which release and settings version it moved from and to.
+      "run_handover",
       // 0134 the month pause of a running debate.
       "run_pause_event",
       // 0138 tree updates: a run's purpose lines.

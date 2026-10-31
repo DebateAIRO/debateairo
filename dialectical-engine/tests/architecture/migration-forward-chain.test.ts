@@ -93,7 +93,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0139_passage_retention.sql",
       "0140_internal_spend_kinds.sql",
       "0141_path_suggestions.sql",
-      "0142_team_limit.sql"
+      "0142_team_limit.sql",
+      "0143_run_handover.sql"
     ]);
     const [step] = plan.forwardChain;
     // 0110 runs the sealed effective-capability verifier after its SQL (applyForward110) and its own manifest names it
@@ -166,7 +167,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0139_passage_retention.sql",
       "0140_internal_spend_kinds.sql",
       "0141_path_suggestions.sql",
-      "0142_team_limit.sql"
+      "0142_team_limit.sql",
+      "0143_run_handover.sql"
     ]);
     // The verifier in force after 0112 is the one 0112's manifest names (it adds no billing object): 0111's.
     const batchManifest = JSON.parse((await bytesOf("lineage/auth-db-batch-forward.json")).toString("utf8"));
@@ -233,7 +235,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0139_passage_retention.sql",
       "0140_internal_spend_kinds.sql",
       "0141_path_suggestions.sql",
-      "0142_team_limit.sql"
+      "0142_team_limit.sql",
+      "0143_run_handover.sql"
     ]);
     expect(partC!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/role-rotation-forward0114.json")).toString("utf8"));
@@ -296,7 +299,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0139_passage_retention.sql",
       "0140_internal_spend_kinds.sql",
       "0141_path_suggestions.sql",
-      "0142_team_limit.sql"
+      "0142_team_limit.sql",
+      "0143_run_handover.sql"
     ]);
     expect(mailLocale!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/debate-shape-map-forward0117.json")).toString("utf8"));
@@ -359,7 +363,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0139_passage_retention.sql",
       "0140_internal_spend_kinds.sql",
       "0141_path_suggestions.sql",
-      "0142_team_limit.sql"
+      "0142_team_limit.sql",
+      "0143_run_handover.sql"
     ]);
     expect(mapStep!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/language-check-spend-forward0118.json")).toString("utf8"));
@@ -422,7 +427,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0139_passage_retention.sql",
       "0140_internal_spend_kinds.sql",
       "0141_path_suggestions.sql",
-      "0142_team_limit.sql"
+      "0142_team_limit.sql",
+      "0143_run_handover.sql"
     ]);
     expect(languageStep!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/reclaim-resume-forward0119.json")).toString("utf8"));
@@ -699,8 +705,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
 
   it("chains the synthesis check 0126 after 0125: the recipe, 0125's manifest and the effective verifier 0125 keeps (0111's)", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-17);
-    const prior = plan.forwardChain.at(-18);
+    const step = plan.forwardChain.at(-18);
+    const prior = plan.forwardChain.at(-19);
     expect(step?.name).toBe("0126_synthesis_check.sql");
     expect(prior?.name).toBe("0125_italy_specific_approval.sql");
     const manifest = JSON.parse((await bytesOf("lineage/synthesis-check-forward0126.json")).toString("utf8"));
@@ -733,20 +739,20 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "synthesis_check_removal_notice", "synthesis_check_erasure_binding", "SYNTHESIS_CHECK",
       "debateai_erasure_runtime", "renumber", "`STEPS`"
     ]) expect(own, needle).toContain(needle);
-    expect(readme.replace(/\s+/gu, " ")).toContain("the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, the synthesis check (0126, below) the sixteenth, the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth, the support answer scope (0129, below) the nineteenth, row-level security (0130, below) the twentieth, the V4 account memory (0131, below) the twenty-first, the web evidence store (0132, below) the twenty-second, the investigations (0133, below) the twenty-third, the dig model with the month pause (0134, below) the twenty-fourth, the dig picks (0135, below) the twenty-fifth, the investigation reports (0136, below) the twenty-sixth, the public debates (0137, below) the twenty-seventh, the tree updates (0138, below) the twenty-eighth, the passage retention (0139, below) the twenty-ninth, the funded spend kinds (0140, below) the thirtieth, the path suggestions (0141, below) the thirty-first and the team's one limit (0142, below) the thirty-second");
+    expect(readme.replace(/\s+/gu, " ")).toContain("the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, the synthesis check (0126, below) the sixteenth, the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth, the support answer scope (0129, below) the nineteenth, row-level security (0130, below) the twentieth, the V4 account memory (0131, below) the twenty-first, the web evidence store (0132, below) the twenty-second, the investigations (0133, below) the twenty-third, the dig model with the month pause (0134, below) the twenty-fourth, the dig picks (0135, below) the twenty-fifth, the investigation reports (0136, below) the twenty-sixth, the public debates (0137, below) the twenty-seventh, the tree updates (0138, below) the twenty-eighth, the passage retention (0139, below) the twenty-ninth, the funded spend kinds (0140, below) the thirtieth, the path suggestions (0141, below) the thirty-first, the team's one limit (0142, below) the thirty-second and the hand-over (0143, below) the thirty-third");
   });
 
   it("0127 is followed by 0128 and its previous is 0126", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-16);
+    const step = plan.forwardChain.at(-17);
     expect(step?.name).toBe("0127_publication_review.sql");
     expect(step?.previousName).toBe("0126_synthesis_check.sql");
   });
 
   it("0127's manifest binds 0126's manifest and effective verifier SHA-256", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-16);
-    const prior = plan.forwardChain.at(-17);
+    const step = plan.forwardChain.at(-17);
+    const prior = plan.forwardChain.at(-18);
     expect(step?.name).toBe("0127_publication_review.sql");
     const manifest = JSON.parse((await bytesOf("lineage/publication-review-forward0127.json")).toString("utf8"));
     expect(manifest.previous).toEqual({
@@ -969,8 +975,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
   }, 120_000);
   it("chains the threat reports 0128 after 0127 with 0127's manifest and effective verifier", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-15);
-    const previous = plan.forwardChain.at(-16);
+    const step = plan.forwardChain.at(-16);
+    const previous = plan.forwardChain.at(-17);
     const manifest = JSON.parse((await bytesOf("lineage/threat-reports-forward0128.json")).toString("utf8"));
     expect(step?.name).toBe("0128_threat_reports.sql");
     expect(previous?.name).toBe("0127_publication_review.sql");
@@ -994,8 +1000,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
 
   it("chains support deletion 0129 after 0128 and records its source digest", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-14);
-    const previous = plan.forwardChain.at(-15);
+    const step = plan.forwardChain.at(-15);
+    const previous = plan.forwardChain.at(-16);
     const manifest = JSON.parse((await bytesOf("lineage/support-answer-scope-forward0129.json")).toString("utf8"));
     expect(step?.name).toBe("0129_support_answer_scope.sql");
     expect(previous?.name).toBe("0128_threat_reports.sql");
@@ -1008,8 +1014,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
 
   it("chains the V4 account memory 0131 after row-level security 0130 with 0130's manifest and effective verifier", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-12);
-    const previous = plan.forwardChain.at(-13);
+    const step = plan.forwardChain.at(-13);
+    const previous = plan.forwardChain.at(-14);
     const manifest = JSON.parse((await bytesOf("lineage/v4-account-memory-forward0131.json")).toString("utf8"));
     expect(step?.name).toBe("0131_v4_account_memory.sql");
     expect(previous?.name).toBe("0130_row_level_security.sql");
@@ -1022,14 +1028,13 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
 
   it("chains the web evidence store 0132 after 0131, the investigations 0133, the dig model 0134, the dig picks 0135, the investigation reports 0136, the public debates 0137, the tree updates 0138, the passage retention 0139, the funded spend kinds 0140, the path suggestions 0141 and the team's one limit 0142 last, each keeping 0130's effective verifier", async () => {
     const plan = await loadMigrationPlan();
-    const [account, web, investigations, digModel, digPicks, reports, publicDebates, treeUpdates, passages, spendKinds, suggestions, team] = [
-      plan.forwardChain.at(-12), plan.forwardChain.at(-11), plan.forwardChain.at(-10), plan.forwardChain.at(-9), plan.forwardChain.at(-8), plan.forwardChain.at(-7),
-      plan.forwardChain.at(-6), plan.forwardChain.at(-5), plan.forwardChain.at(-4), plan.forwardChain.at(-3), plan.forwardChain.at(-2), plan.forwardChain.at(-1)];
+    const [account, web, investigations, digModel, digPicks, reports, publicDebates, treeUpdates, passages, spendKinds, suggestions, team, handover] = [
+      plan.forwardChain.at(-13), plan.forwardChain.at(-12), plan.forwardChain.at(-11), plan.forwardChain.at(-10), plan.forwardChain.at(-9), plan.forwardChain.at(-8), plan.forwardChain.at(-7), plan.forwardChain.at(-6), plan.forwardChain.at(-5), plan.forwardChain.at(-4), plan.forwardChain.at(-3), plan.forwardChain.at(-2), plan.forwardChain.at(-1)];
     expect([account?.name, web?.name, investigations?.name, digModel?.name, digPicks?.name, reports?.name, publicDebates?.name,
-      treeUpdates?.name, passages?.name, spendKinds?.name, suggestions?.name, team?.name])
+      treeUpdates?.name, passages?.name, spendKinds?.name, suggestions?.name, team?.name, handover?.name])
       .toEqual(["0131_v4_account_memory.sql", "0132_web_evidence.sql", "0133_investigations.sql", "0134_dig_model_and_month_pause.sql",
         "0135_dig_picks.sql", "0136_investigation_reports.sql", "0137_public_debates.sql", "0138_tree_updates.sql",
-        "0139_passage_retention.sql", "0140_internal_spend_kinds.sql", "0141_path_suggestions.sql", "0142_team_limit.sql"]);
+        "0139_passage_retention.sql", "0140_internal_spend_kinds.sql", "0141_path_suggestions.sql", "0142_team_limit.sql", "0143_run_handover.sql"]);
     for (const [step, previous, manifestPath, previousManifestPath] of [
       [web, account, "lineage/web-evidence-forward0132.json", "lineage/v4-account-memory-forward0131.json"],
       [investigations, web, "lineage/investigations-forward0133.json", "lineage/web-evidence-forward0132.json"],
@@ -1041,7 +1046,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       [passages, treeUpdates, "lineage/passage-retention-forward0139.json", "lineage/tree-updates-forward0138.json"],
       [spendKinds, passages, "lineage/internal-spend-kinds-forward0140.json", "lineage/passage-retention-forward0139.json"],
       [suggestions, spendKinds, "lineage/path-suggestions-forward0141.json", "lineage/internal-spend-kinds-forward0140.json"],
-      [team, suggestions, "lineage/team-limit-forward0142.json", "lineage/path-suggestions-forward0141.json"]
+      [team, suggestions, "lineage/team-limit-forward0142.json", "lineage/path-suggestions-forward0141.json"],
+      [handover, team, "lineage/run-handover-forward0143.json", "lineage/team-limit-forward0142.json"]
     ] as const) {
       const manifest = JSON.parse((await bytesOf(manifestPath)).toString("utf8"));
       expect(manifest.previous).toEqual({ name: previous?.name, manifestSha256: sha256(await bytesOf(previousManifestPath)),

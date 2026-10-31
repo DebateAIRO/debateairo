@@ -236,6 +236,8 @@ export async function runWebTopReaders(input: Readonly<{
   candidates: readonly WebTopReaderSeat[];
   verbatim: WebVerbatimCheck;
   call: WebTopReaderCall;
+  /** Decision 12 (run-replay.ts): readers 2 and 3 of one path are one step, so they never read under two releases' wording. */
+  openReplayStep?: (members: readonly Readonly<{ callSiteKey: string; providerRef: string }>[]) => void;
 }>): Promise<WebTopReadersResult> {
   if (new Set(input.pages.map((page) => page.pageId)).size !== input.pages.length) {
     throw new TypedDomainError("WEB_TOP_READERS_PAGES_INVALID", "Each top page is given once");
@@ -257,6 +259,8 @@ export async function runWebTopReaders(input: Readonly<{
       pages: sent.map((page, index) => ({ pageId: promptIds[index]!, title: page.title, site: page.site, date: page.date,
         text: webPageTextRef(page.pageId, page.textDigest) }))
     });
+    input.openReplayStep?.(seats.map(({ reader, seat }) => Object.freeze({
+      callSiteKey: webReadTopCallSiteKey(input.pathIndex, reader), providerRef: seat.providerRef })));
     const answered = await Promise.all(seats.map(({ reader, seat }) => input.call({
       reader, seat, callSiteKey: webReadTopCallSiteKey(input.pathIndex, reader), contract: WEB_READ_TOP_V2_PROMPT_CONTRACT,
       material, pageTexts, classifyContent: (content, reply) => classifyWebReadTopReply(content, reply, promptIds)

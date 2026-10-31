@@ -43,7 +43,9 @@ import {
   withPreviewProviderCallPolicy,
   withStructureRepair,
   type PreviewProviderTestConfig,
-  type ProviderDiscoveryTarget
+  type ProviderCallRequest,
+  type ProviderDiscoveryTarget,
+  type ProviderGateway
 } from "@debateai/providers";
 import {
   CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY,
@@ -213,6 +215,14 @@ export type AdmittedRun = Awaited<ReturnType<ReturnType<typeof previewDebateHarn
  * The harness over the caller's migrated database pool (read when called, so a `beforeAll` may start it) and the
  * caller's list of stub closers (closed by the caller's `afterEach`).
  */
+/** Decision 12: what another release's sealed wording sent: other bytes, under another contract hash. */
+export const OLDER_RELEASE_HASH = "older-release-sealed-contracts";
+export const olderReleaseWording = (request: ProviderCallRequest): ProviderCallRequest => {
+  const messages = request.packet.messages.map((message, index) => index === 0
+    ? { ...message, content: `Older wording of this instruction.\n${message.content}` } : message);
+  return { ...request, contractHash: OLDER_RELEASE_HASH, packet: Object.assign({}, request.packet, { messages }) };
+};
+
 export function previewDebateHarness(input: Readonly<{
   pool: () => Pool;
   stubClosers: (() => Promise<void>)[];
@@ -354,6 +364,11 @@ export function previewDebateHarness(input: Readonly<{
       noDigest?: boolean;
       /** Side-by-side spec §3 (B6): the release this runner runs as, as main.ts passes RELEASE_KEY; absent, `legacy`. */
       releaseKey?: string;
+      /**
+       * Decision 12 (the hand-over): each call as another release's sealed wording would have sent it, recorded so.
+       * Absent: the wording of this code.
+       */
+      reword?: (request: ProviderCallRequest) => ProviderCallRequest;
       /** Side-by-side spec §4 (B8): the retirement signal, as main.ts passes it; absent, the runner never retires. */
       retirement?: Pick<RunnerRetirementSignal, "claimsStopped" | "callsStopped">;
       /**
@@ -442,7 +457,9 @@ export function previewDebateHarness(input: Readonly<{
         buildStoryCostEnvelopeSeam: (runId: string) => runGuard(runId).storySeam({ runId, price, requireReportedUsage: true })
       };
     };
-    const targetGateway = (target: ProviderDiscoveryTarget) => withPreviewProviderCallPolicy(
+    const reworded = (gateway: ProviderGateway): ProviderGateway => options.reword === undefined ? gateway
+      : Object.freeze({ call: (request: ProviderCallRequest) => gateway.call(options.reword!(request)) });
+    const targetGateway = (target: ProviderDiscoveryTarget) => reworded(withPreviewProviderCallPolicy(
       createPostgresProviderGateway(pool(), {
         fetchImplementation: gates.guardedFetch, endpoint: target.baseUrl, model: target.model, maker: target.maker,
         ...providerTargetGatewayControls(target), ...previewTargetGatewayControls(PREVIEW, target), inFlight: gatewayInFlight,
@@ -459,7 +476,7 @@ export function previewDebateHarness(input: Readonly<{
           thinkingLevelsOf: runPreviewThinkingLevelsOf(perVersion.cache, perVersion.versions, perVersion.site.siteVersion)
         })
       }
-    );
+    ));
     // LG-A (final review I-1): main.ts's order when the route is asked for; otherwise each target's gateway as before.
     const targetGateways = options.structureRepair === true
       ? new Map(TARGETS.map((target) => [target.providerRef, targetGateway(target)] as const)) : null;

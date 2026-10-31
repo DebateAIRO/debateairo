@@ -115,6 +115,24 @@ export class PostgresDigModelRepository {
       "SELECT identity.resume_paused_run($1,$2) AS outcome", [ownerRef, runId])).rows[0]!.outcome;
   }
 
+  /**
+   * Plan 2026-10-31 decision 12: Continue when the debate's release is not this one. The hand-over and the resume commit
+   * together (0143); `toRegisterVersion` is one this release has passed. The room code has already found room.
+   */
+  async resumeInRelease(ownerRef: string, runId: string, toReleaseKey: string, toRegisterVersion: number)
+    : Promise<"RECORDED" | "NOT_PAUSED" | "NOT_OWNED" | "NOT_CURRENT" | "VERSION_NOT_PASSED"> {
+    return (await this.pool.query<{ outcome: "RECORDED" | "NOT_PAUSED" | "NOT_OWNED" | "NOT_CURRENT" | "VERSION_NOT_PASSED" }>(
+      "SELECT identity.continue_paused_run_in_release($1,$2,$3,$4) AS outcome", [ownerRef, runId, toReleaseKey, toRegisterVersion])).rows[0]!.outcome;
+  }
+
+  /** The release and settings version that own the debate now (0143), for the API's hand-over decision. */
+  async readRunReleaseNow(runId: string): Promise<Readonly<{ releaseKey: string; registerVersion: number }> | null> {
+    const row = (await this.pool.query<{ release_key: string | null; register_version: number | null }>(
+      "SELECT identity.run_release_now($1) AS release_key, identity.run_settings_version_now($1)::integer AS register_version", [runId])).rows[0];
+    return row?.release_key === null || row?.release_key === undefined || row.register_version === null ? null
+      : Object.freeze({ releaseKey: row.release_key, registerVersion: row.register_version });
+  }
+
   async readPause(ownerRef: string, runId: string): Promise<RunPauseRead | null> {
     return (await this.pool.query<{ pause: RunPauseRead | null }>("SELECT identity.read_run_pause($1,$2) AS pause",
       [ownerRef, runId])).rows[0]?.pause ?? null;

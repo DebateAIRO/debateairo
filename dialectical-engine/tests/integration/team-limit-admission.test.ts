@@ -1,11 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AskRoom } from "../../apps/api/src/ask-room.js";
+import { continuePausedRun } from "../../apps/api/src/month-pause.js";
 import { readWebRunPlan } from "../../apps/runner/src/run-settings.js";
 import { canonicalTeamLimitActionBinding } from "../../apps/api/src/staff/team-limit.js";
 import { CostEnvelopeGuard, PostgresModelSpendStore } from "@debateai/budget";
+import { WorkItemRepository } from "@debateai/battery";
 import * as billing from "@debateai/billing-core";
-import { createPool, EntitlementRepository, migrate, PostgresInternalAllowanceRepository, RunWaitRepository, type Pool } from "@debateai/db";
+import { createPool, EntitlementRepository, migrate, PostgresDigModelRepository, PostgresDigModelRunnerRepository, PostgresInternalAllowanceRepository, RunWaitRepository, type Pool } from "@debateai/db";
 import { BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, TEAM_FEATURE_PLAN_ID } from "@debateai/register";
 import { authorizeStaffAlertFixture } from "../support/staffAlertReadiness.js";
 import { internalFundingFixture } from "../support/internalFundingFixture.js";
@@ -97,6 +99,26 @@ describe("a new team question or dig", () => {
 });
 
 describe("a running team debate", () => {
+  it("a paused funded debate: its Continue never asks the team's month, and the pause gives no money back", async () => {
+    const p = await funded(), runId = await pinnedRun(p);
+    const committed = async () => Number((await database.pool.query("SELECT staff.read_team_internal_committed() AS v")).rows[0].v);
+    const start = await committed();
+    await new PostgresModelSpendStore(runtime).openHold(database.pool, { runId, heldMicros: 5000 });
+    await new WorkItemRepository(database.pool).enqueue({ runId, batteryRowId: "Q1", commandKey: `team-paused:${runId}`, nodeSet: [] });
+    const before = await committed();
+    expect(before).toBe(start + 5000);
+    const until = new Date(Date.now() + 60_000);
+    expect(await new PostgresDigModelRunnerRepository(database.pool).recordPause({ runId, reason: "MONTH_WALL", resumableAt: until, plannedCalls: 1, plannedSearches: 0, plannedMicros: 1 })).toBe("RECORDED");
+    // The site's limit stops counting it; the team's month still does: the money is promised to the debate until it ends.
+    expect(await committed()).toBe(before);
+    // The team's month full, the person's windows are the grant's: no month to wait for.
+    await setLimit(p.actor, 0);
+    expect(await room().readRoom({ access: p.access, settingsClass } as never)).toMatchObject({ room: "FULL", scope: "TEAM_MONTH" });
+    expect(await room().monthHasRoom(p.actor.ownerRef)).toBe(true);
+    const outcome = await continuePausedRun({ ownerRef: p.actor.ownerRef, runId, now: new Date(until.getTime() + 1) }, new PostgresDigModelRepository(database.pool), room());
+    expect(outcome).toEqual({ kind: "CONTINUING" });
+  });
+
   it("is never stopped by the team's month, even past it: its calls are held to its grant alone", async () => {
     const p = await funded(), runId = await pinnedRun(p);
     await setLimit(p.actor, 0);

@@ -7,7 +7,7 @@ import {
   admitDig, digPathIndexOf, joinAtStart, recordDigPicksAtStart, type DigAdmissionPorts, type DigJoinPort, type DigPathIndex,
   type DigPicksPort, type DigSuggestionTextReader
 } from "./dig-admission.js";
-import { continuePausedRun, monthPauseOf, type ContinuedRunWake, type MonthPausePort, type MonthRoomReader } from "./month-pause.js";
+import { continuePausedRun, monthPauseOf, type ContinuedRunWake, type MonthPausePort, type MonthRoomReader, type RunHandoverPort } from "./month-pause.js";
 import {
   readInvestigationReports, reopenInvestigation, writeInvestigationReport, type InvestigationReportPorts
 } from "./investigation-report.js";
@@ -79,6 +79,7 @@ import {
   PublishDebateRequestSchema,
   RunEventSchema,
   RunProjectionSchema,
+  type RunFoundPage,
   SessionSchema,
   AccountPhoneProfileSchema, PhoneProfileRevealRequestSchema, PhoneProfileRevealSchema, PhoneProfileUpdateRequestSchema,
   RecoveryEmailSettingsSchema, RecoveryEmailRequestSchema, RecoveryEmailRemoveRequestSchema,
@@ -1736,6 +1737,8 @@ export interface AskApplication {
   submit(ask: AskRequest, session: Session, principal: AskPrincipal): Promise<AskAccepted>;
   readAnswer(answerId: string, session: Session, version: number | undefined, ownership: RunOwnershipAccess): Promise<Answer | null>;
   readRunAnswer(runId: string, session: Session, ownership: RunOwnershipAccess): Promise<Answer | null>;
+  /** Decision 12: what the AIs found on a debate set aside; asked only after that debate's owner-gated read. */
+  readRunFound?(runId: string): Promise<readonly RunFoundPage[]>;
   readRun(runId: string, session: Session, ownership: RunOwnershipAccess): Promise<RunProjection | null>;
   readAnswerIndex(session: Session, limit: number, offset: number, ownership: RunOwnershipAccess): Promise<AnswerIndex>;
   readSynthesisChecks?(answerId: string, session: Session, ownership: RunOwnershipAccess): Promise<readonly {
@@ -1908,6 +1911,8 @@ export interface ApiOptions {
   readonly monthRoom?: MonthRoomReader;
   /** R22 W3-8: after Continue, the paused debate's work item is handed to its runner again (./month-pause.ts). */
   readonly continuedRunWake?: ContinuedRunWake;
+  /** Decision 12 (./month-pause.ts): where Continue hands a debate of another release; absent: Continue resumes it where it is. */
+  readonly runHandover?: RunHandoverPort;
   /**
    * R22 W5-1: the final report over an investigation (./investigation-report.ts): 0136's reports read, 0133's open, close
    * and reopen, the ownership check and the opener of what the runner sealed under the ROOT's run key. Absent: the three
@@ -4475,6 +4480,11 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       { route: "GET /v1/runs/{id}", id: runId }
     );
     if (run === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    // Decision 12: a debate an update set aside keeps what the AIs found readable on its page.
+    if (run.state === "FAILED" && run.terminal_reason?.includes("RUN_SET_ASIDE:") === true && options.application.readRunFound !== undefined) {
+      const found = await options.application.readRunFound(runId);
+      if (found.length > 0) return reply.send(RunProjectionSchema.parse({ ...run, found }));
+    }
     // W3-2 (the money rule): a debate paused at the month wall says until when, and whether Continue is offered.
     const ownerRef = request.authenticatedSession?.ownerRef;
     if (options.digModel === undefined || ownerRef === undefined
@@ -4725,11 +4735,14 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     }
     const room = options.monthRoom ?? Object.freeze({ monthHasRoom: async () => false });
-    const outcome = await continuePausedRun({ ...target, now: new Date() }, options.digModel, room, options.continuedRunWake);
+    const outcome = await continuePausedRun({ ...target, now: new Date() }, options.digModel, room, options.continuedRunWake,
+      undefined, options.runHandover);
     switch (outcome.kind) {
       case "CONTINUING": return reply.send(RunContinuedSchema.parse({ state: "CONTINUING" }));
       case "NOT_FOUND": return reply.status(404).send({ error: "RUN_NOT_FOUND" });
       case "NOT_PAUSED": return reply.status(409).send({ error: "RUN_NOT_PAUSED", message: "RUN_NOT_PAUSED" });
+      // Decision 12: an upload is switching over this moment; nothing changed, the person's next press goes through.
+      case "TRY_AGAIN": return reply.status(503).send({ error: "RUN_CONTINUE_TRY_AGAIN", message: "RUN_CONTINUE_TRY_AGAIN" });
       case "UNTIL_RESET": return reply.status(409).send(RunContinueRefusedSchema.parse({
         error: RUN_PAUSED_UNTIL_RESET, message: RUN_PAUSED_UNTIL_RESET, until: outcome.until }));
       default: return exhaustive(outcome);
@@ -4866,10 +4879,10 @@ export class PostgresRunReleaseLookup implements RunReleaseLookup {
       release_key: string; state: string | null; front_pair_stopped: boolean | null; retire_requested: boolean | null;
       still_draining: boolean | null; any_current: boolean;
     }>(
-      `SELECT run.release_key, state.state, state.front_pair_stopped, state.retire_requested, state.still_draining,
+      `SELECT identity.run_release_now(run.run_id) AS release_key, state.state, state.front_pair_stopped, state.retire_requested, state.still_draining,
               EXISTS (SELECT 1 FROM core.read_current_release()) AS any_current
        FROM core.run AS run
-       LEFT JOIN LATERAL core.read_release_state(run.release_key) AS state ON true
+       LEFT JOIN LATERAL core.read_release_state(identity.run_release_now(run.run_id)) AS state ON true
        WHERE run.run_id = $1`,
       [runId]
     );
@@ -6983,6 +6996,10 @@ export class PostgresAskApplication implements AskApplication {
     return this.#serve.readAnswerProjection(answerId, ownership, version);
   }
 
+  readRunFound(runId: string): Promise<readonly RunFoundPage[]> {
+    return this.#serve.readRunFound(runId);
+  }
+
   readRunAnswer(runId: string, _session: Session, ownership: RunOwnershipAccess): Promise<Answer | null> {
     return this.#serve.readRunAnswerProjection(runId, ownership);
   }
@@ -7063,7 +7080,7 @@ export class PostgresAskApplication implements AskApplication {
    */
   async readRunReleaseKey(runId: string): Promise<string | null> {
     const result = await this.pool.query<{ release_key: string }>(
-      "SELECT release_key FROM core.run WHERE run_id = $1::uuid", [runId]
+      "SELECT identity.run_release_now(run_id) AS release_key FROM core.run WHERE run_id = $1::uuid", [runId]
     );
     return result.rows[0]?.release_key ?? null;
   }
@@ -7071,7 +7088,7 @@ export class PostgresAskApplication implements AskApplication {
   /** Side-by-side C14: the release of the run that answered (`serve.answer.run_id`), every version alike. */
   async readAnswerReleaseKey(answerId: string): Promise<string | null> {
     const result = await this.pool.query<{ release_key: string }>(
-      `SELECT run.release_key FROM serve.answer AS answer JOIN core.run AS run ON run.run_id = answer.run_id
+      `SELECT identity.run_release_now(run.run_id) AS release_key FROM serve.answer AS answer JOIN core.run AS run ON run.run_id = answer.run_id
         WHERE answer.answer_id = $1::uuid LIMIT 1`, [answerId]
     );
     return result.rows[0]?.release_key ?? null;

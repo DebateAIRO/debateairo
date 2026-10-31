@@ -43,7 +43,7 @@ import {
   withWriteTransaction,
   type RunOwnershipInput
 } from "@debateai/db";
-import { AnswerIndexSchema, ConditionMarkSchema, ExecutionLedgerDigestSchema, PurposeLinesSchema, isDigPickPathRef, type Answer, type AnswerIndex, type ConditionMark, type DigSuggestion, type Edge, type ExecutionLedgerDigest, type Inspection, type InvestigationAccepted, type Node, type VerdictState, webRanOnFree } from "@debateai/contract";
+import { AnswerIndexSchema, ConditionMarkSchema, ExecutionLedgerDigestSchema, PurposeLinesSchema, RunFoundPageSchema, isDigPickPathRef, type RunFoundPage, type Answer, type AnswerIndex, type ConditionMark, type DigSuggestion, type Edge, type ExecutionLedgerDigest, type Inspection, type InvestigationAccepted, type Node, type VerdictState, webRanOnFree } from "@debateai/contract";
 import { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
 import { judgesComparisonOf, judgesRecountApplies, servedPositionOf } from "./judges-comparison.js";
 import type { EngineVerdictTrigger } from "./engine-verdict.js";
@@ -2908,7 +2908,7 @@ export class ServeRepository {
       // Ruling R2b-B6.1: each root's author call site (its plan place, so its letter), read only for a run with vote rows.
       root_sites: Array<{ node_id: string; call_site_key: string }>;
     }>(
-      `SELECT answer.answer_id, answer.answer_version, answer.run_id, run.release_key,
+      `SELECT answer.answer_id, answer.answer_version, answer.run_id, identity.run_release_now(answer.run_id) AS release_key,
               (SELECT receipt.served_root_selection ->> 'rule'
                  FROM ledger.propagation_run AS receipt
                 WHERE receipt.run_id = answer.run_id AND receipt.served_root_selection IS NOT NULL
@@ -3886,6 +3886,44 @@ export class ServeRepository {
       });
     } catch (error) {
       if (error instanceof TypedDomainError && error.code === "PRIVATE_CONTENT_ERASED") return new Map();
+      throw error;
+    }
+  }
+
+  /**
+   * Plan 2026-10-31 decision 12: what the AIs found before a debate was set aside by an update (no answer will ever carry it):
+   * each page's address and title, reader 1's note and the shown quotes, all of which outlive the passages (decision 7). The
+   * caller has already checked the debate is the person's. Empty when the debate kept no page or its content was erased.
+   */
+  async readRunFound(runId: string): Promise<readonly RunFoundPage[]> {
+    const repository = new PostgresWebEvidenceRepository(this.pool);
+    const [stored, shownQuotes] = await Promise.all([repository.read(runId), new PostgresPassageRetentionRepository(this.pool).readShownQuotes(runId)]);
+    if (stored === null || stored.pages.length === 0) return Object.freeze([]);
+    try {
+      return await withRunContentLease(this.pool, [runId], async () => {
+        const cipher = await prepareLeasedContentEncryptionForRun(this.pool, runId);
+        try {
+          const found: RunFoundPage[] = [];
+          for (const page of [...stored.pages].sort((a, b) => a.rank - b.rank).slice(0, 64)) {
+            const about = decryptLeasedContentForRun<unknown>(cipher, WEB_EVIDENCE_CARRIERS.page, page.page_id, page.content, null) as Readonly<{ url?: unknown; site?: unknown; title?: unknown }> | null;
+            const reading = stored.readings.find((row) => row.page_id === page.page_id && row.reader === 1 && row.outcome === "READ");
+            const line = reading === undefined ? null
+              : decryptLeasedContentForRun<unknown>(cipher, WEB_EVIDENCE_CARRIERS.reading, reading.reading_id, reading.content, null) as Readonly<{ note?: unknown; line?: unknown }> | null;
+            const quotes = (shownQuotes ?? []).filter((quote) => quote.page_id === page.page_id).slice(0, 32)
+              .map((quote) => (decryptLeasedContentForRun<unknown>(cipher, WEB_SHOWN_QUOTE_CARRIER, quote.extract_id, quote.content, null) as Readonly<{ quote?: unknown }> | null)?.quote);
+            const parsed = RunFoundPageSchema.safeParse({ url: about?.url, site: about?.site, title: typeof about?.title === "string" && about.title.trim() !== "" ? about.title : about?.site,
+              note: typeof line?.note === "string" && line.note.trim() !== "" ? line.note : typeof line?.line === "string" && line.line.trim() !== "" ? line.line : null,
+              quotes: quotes.filter((quote): quote is string => typeof quote === "string" && quote.trim() !== "") });
+            if (parsed.success) found.push(parsed.data);
+          }
+          await cipher.assertLive();
+          return Object.freeze(found);
+        } finally {
+          await cipher.close();
+        }
+      });
+    } catch (error) {
+      if (error instanceof TypedDomainError && error.code === "PRIVATE_CONTENT_ERASED") return Object.freeze([]);
       throw error;
     }
   }

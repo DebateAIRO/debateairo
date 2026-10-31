@@ -10,6 +10,36 @@ import { runDigPathRewrite } from "../../apps/runner/src/path-rewrite.js";
 import { createReplayBook, recordedCalls } from "../../apps/runner/src/run-replay.js";
 import { DIG_A, dig, digSnapshot, memoryStore, membersOf, recorded, settingsOver, team, until } from "../support/path-rewrite-world.js";
 
+describe("decision 12: a dig's rewrite owed across an upload", () => {
+  it("the writer's answer under the older wording stands, free; only the checker it never reached is sent, under the new wording", async () => {
+    const store = memoryStore();
+    const settings = settingsOver({ store, digs: new Map([[DIG_A, dig()]]) });
+    const first = team();
+    let writerAnswered = false;
+    const marking = (gateway: ProviderGateway): ProviderGateway => ({ call: async (request) => {
+      const result = await gateway.call(request);
+      if (request.callSiteKey.startsWith("PATH_REWRITE:WRITER:")) writerAnswered = true;
+      return result;
+    } });
+    void runDigPathRewrite(settings, digSnapshot(DIG_A, membersOf(first, marking), {
+      stepLease: <T>(use: () => Promise<T>) => (writerAnswered ? new Promise<T>(() => undefined) : use())
+    }));
+    await until(() => writerAnswered);
+    for (let at = 0; at < 20; at += 1) await new Promise<void>((resolve) => setImmediate(resolve));
+
+    // The record as the older release wrote it: other bytes, under its own hash.
+    const attempts = recorded(first.all).map((attempt) => ({ ...attempt, contractHash: "older-release", promptFingerprint: "older-words" }));
+    const book = createReplayBook({ calls: recordedCalls(attempts), earlierNodes: [] });
+    const again = team();
+    expect(await runDigPathRewrite({ ...settings, replayBookOf: async () => book }, digSnapshot(DIG_A, membersOf(again)))).toBe(true);
+    expect(again.haiku.bodies).toHaveLength(0);
+    expect(again.glm.bodies).toHaveLength(1);
+    expect(book.stood).toBe(1);
+    expect(store.rewrites[0]).toMatchObject({ digRunId: DIG_A, outcome: "READY" });
+    expect(store.rewrites[0]!.artifactRefs[0]).toBe(first.haiku.artifacts[0]!.artifactId);
+  });
+});
+
 describe("W3-5 a rewrite killed after the writer, run again", () => {
   it("pays nothing twice: the writer is replayed from the record, the checker is sent once, one row is stored", async () => {
     const store = memoryStore();

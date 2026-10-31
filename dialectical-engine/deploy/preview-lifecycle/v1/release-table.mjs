@@ -210,14 +210,24 @@ export async function readReleaseEvents({ releaseKey, layout = LAYOUT, run = run
   }));
 }
 
-/** READY or CLAIMED work items of one release (through core.run.release_key), or of every release when `releaseKey` is null. */
+/**
+ * READY or CLAIMED work items of one release (the release that owns the run now, 0143), or of every release when `releaseKey` is
+ * null. Never a paused debate's: it waits for its person, not for a release, and continues in the release then current. Before
+ * 0143 is applied (the upload that brings it reads this first) no debate can be paused or handed over: core.run's stamp is the
+ * answer, so the read works on the database either side of that step.
+ */
 export async function countOpenWork({ releaseKey, layout = LAYOUT, run = runBounded }) {
+  if (releaseKey !== null) requireKey(releaseKey);
+  const [probe] = await query({ sql: "SELECT to_regprocedure('identity.run_work_is_parked(uuid,text,timestamptz)') IS NOT NULL;\n", layout, run });
+  const handover = probe?.[0] === 't';
+  const open = " WHERE item.state IN ('READY', 'CLAIMED')";
+  const notParked = handover ? '\n   AND NOT identity.run_work_is_parked(item.run_id, item.state, item.claim_deadline)' : '';
   if (releaseKey === null) {
-    return count(await query({ sql: "SELECT count(*) FROM core.work_item AS item\n WHERE item.state IN ('READY', 'CLAIMED');\n", layout, run }));
+    return count(await query({ sql: `SELECT count(*) FROM core.work_item AS item\n${open}${notParked};\n`, layout, run }));
   }
-  requireKey(releaseKey);
+  const owner = handover ? 'identity.run_release_now(run.run_id)' : 'run.release_key';
   return count(await query({
-    sql: "SELECT count(*) FROM core.work_item AS item\n  JOIN core.run AS run ON run.run_id = item.run_id\n WHERE item.state IN ('READY', 'CLAIMED')\n   AND run.release_key = :'release_key';\n",
+    sql: `SELECT count(*) FROM core.work_item AS item\n  JOIN core.run AS run ON run.run_id = item.run_id\n${open}${notParked}\n   AND ${owner} = :'release_key';\n`,
     variables: [['release_key', releaseKey]], layout, run
   }));
 }
