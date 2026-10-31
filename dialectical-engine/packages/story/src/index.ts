@@ -72,6 +72,7 @@ export {
   type StoryAnswersNoteKind,
   type StoryMaterial,
   type StoryMaterialAlsoRaised,
+  type StoryMaterialExtract,
   type StoryMaterialOmitted,
   type StoryMaterialPoint,
   type StoryMaterialPosition,

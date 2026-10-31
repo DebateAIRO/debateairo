@@ -1,4 +1,4 @@
-import type { WayOfKnowing } from "@debateai/kernel";
+import type { EngineCitedExtract, WayOfKnowing } from "@debateai/kernel";
 import { READER_SENTENCE_WRITING, TypedDomainError, WEB_WRITER_SENTENCES, isRunLevelSpendStop } from "@debateai/kernel";
 import { promptContractFingerprintText, type PromptContract } from "@debateai/providers";
 
@@ -73,6 +73,12 @@ export interface DigestSourceNode {
    * position, a direct child, or on a kept point's chain).
    */
   readonly leverage?: number | null;
+  /**
+   * Web search (plan 2026-10-30 task W4-1; design §7.1 item 7): the checked extract a looked-up node rests on, when its
+   * locator is one of this debate's extract ids. The writer reads it as the entry's `extract`; absent on every other node
+   * and every debate with no packs, so the digest is today's, byte for byte.
+   */
+  readonly citedExtract?: EngineCitedExtract;
 }
 
 export interface DigestPolarityRelation {
@@ -96,6 +102,20 @@ export interface DigestNodeEntry {
   readonly wayOfKnowing: WayOfKnowing;
   readonly marks: readonly string[];
   readonly polarityRelations: readonly DigestPolarityRelation[];
+  /** W4-1: the extract the node cites (id, quote, page), last; absent when it cites none of this debate's. */
+  readonly extract?: EngineCitedExtract;
+}
+
+/** W4-1: a node's cited extract as its digest entry carries it, member by member; nothing when it cites none. */
+function digestExtractOf(node: DigestSourceNode): Readonly<{ extract?: EngineCitedExtract }> {
+  const cited = node.citedExtract;
+  return cited === undefined ? {} : { extract: Object.freeze({ id: cited.id, quote: cited.quote, title: cited.title, site: cited.site,
+    date: cited.date }) };
+}
+
+/** W4-1: whether a digest carries any cited extract (then the writer is sent its sources variant). */
+export function digestCitesExtracts(digest: SynthesisDigest): boolean {
+  return digest.nodes.some((node) => node.extract !== undefined);
 }
 
 /**
@@ -225,7 +245,8 @@ function compressAt(
       finalStrength: node.finalStrength,
       wayOfKnowing: node.wayOfKnowing,
       marks: Object.freeze([...node.marks]),
-      polarityRelations: Object.freeze(node.polarityRelations.map((relation) => Object.freeze({ ...relation })))
+      polarityRelations: Object.freeze(node.polarityRelations.map((relation) => Object.freeze({ ...relation }))),
+      ...digestExtractOf(node)
     });
   });
   const shape = {
@@ -590,7 +611,8 @@ function compactAt(input: {
       // A relation onto a node this digest does not carry has nothing to name.
       polarityRelations: Object.freeze(node.polarityRelations
         .filter((relation) => refOf.has(relation.targetNodeId))
-        .map((relation) => Object.freeze({ polarity: relation.polarity, targetNodeId: ref(relation.targetNodeId) })))
+        .map((relation) => Object.freeze({ polarity: relation.polarity, targetNodeId: ref(relation.targetNodeId) }))),
+      ...digestExtractOf(node)
     });
   });
   const emphasis: DigestEmphasis = Object.freeze({
@@ -1275,8 +1297,10 @@ export function toSynthesisPromptMaterial(
     servedStrength: digestStrength(request.codeLabel.servedStrength),
     margin: request.codeLabel.margin === null ? null : digestStrength(request.codeLabel.margin)
   };
+  // W4-1: the writer reads each looked-up node's cited extract (its sources variant says so, item 7); the checker is told
+  // nothing new, so its digest never carries one and its packet stays today's, byte for byte.
   const fields = [
-    { name: "digest", content: JSON.stringify(shownDigest(request.digest)) },
+    { name: "digest", content: JSON.stringify(shownDigest(request.role === "EVALUATOR" ? withoutExtracts(request.digest) : request.digest)) },
     { name: "code_label", content: JSON.stringify(codeLabel) }
   ];
   if (request.role === "EVALUATOR") {
@@ -1294,6 +1318,11 @@ export function toSynthesisPromptMaterial(
  * digits of each strength, and never grows: a rounded number prints no longer
  * than the number it rounds.
  */
+function withoutExtracts(digest: SynthesisDigest): SynthesisDigest {
+  if (!digestCitesExtracts(digest)) return digest;
+  return Object.freeze({ ...digest, nodes: Object.freeze(digest.nodes.map(({ extract: _extract, ...node }) => Object.freeze(node))) });
+}
+
 function shownDigest(digest: SynthesisDigest): SynthesisDigest {
   return Object.freeze({
     ...digest,

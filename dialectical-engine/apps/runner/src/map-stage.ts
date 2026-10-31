@@ -334,7 +334,7 @@ type RootZeroRequestInput = Readonly<{
    * Root 0's map material limits (`rootZeroMapMaterialCharsFor`); absent = today's `rootZeroMapMaterialChars`. With
    * `pointsRaised` and `assumptions` (engine 2, `rootZeroEngineMaterialCharsFor`), the fixed-words leg is framed too.
    */
-  materialChars?: Readonly<{ answer: number; points: number; pointsRaised?: number; assumptions?: number }>;
+  materialChars?: Readonly<{ answer: number; points: number; pointsRaised?: number; assumptions?: number; sources?: number }>;
 }>;
 
 /**
@@ -372,15 +372,20 @@ export type RootZeroAttempt = Readonly<{ requestBytes: number; completionTokenCe
  * the first bound, under both. Each is sized the conservative way the first attempt is (`rootPositionRequestBytesBound`),
  * and each frames the run's lock when it has one (PF-L38: `rootZeroRoomLock`) and, on a run with a length receipt
  * (`lengthed`), the lengthed variant at its bound target (spec 2026-10-15 §3.2). With `pointsRaised` and `assumptions`
- * (engine 2, `rootZeroEngineMaterialCharsFor`), the fixed-words leg is framed too.
+ * (engine 2, `rootZeroEngineMaterialCharsFor`), the fixed-words leg is framed too. Web search W4-1: with `sourcesChars` as
+ * well, that leg is also framed reading a pack of that many characters (its sources variant), as the web step keeps it.
  */
 export function rootZeroRoomAttempts(input: Readonly<{ questionLine: string; argumentLanguageName: string; tokenCeiling: number;
   questionLanguage?: QuestionLanguage | null; lengthed?: boolean;
-  materialChars?: Readonly<{ answer: number; points: number; pointsRaised?: number; assumptions?: number }> }>):
+  materialChars?: Readonly<{ answer: number; points: number; pointsRaised?: number; assumptions?: number }>;
+  sourcesChars?: number }>):
   Readonly<{ first: RootZeroAttempt; retries: readonly RootZeroAttempt[] }> {
+  // W4-1: a pack is read only by engine 2's fixed-words leg, so `sourcesChars` rides only with its material limits.
+  const materialChars = input.materialChars === undefined || input.sourcesChars === undefined || input.materialChars.pointsRaised === undefined
+    ? input.materialChars : { ...input.materialChars, sources: input.sourcesChars };
   const question = { questionLine: input.questionLine, argumentLanguageName: input.argumentLanguageName,
     questionLanguage: input.questionLanguage ?? null, ...(input.lengthed === true ? { lengthed: true } : {}),
-    ...(input.materialChars === undefined ? {} : { materialChars: input.materialChars }) };
+    ...(materialChars === undefined ? {} : { materialChars }) };
   const firstBound = lengthRetryTokenCeiling(input.tokenCeiling, 0);
   const lengthRetryBound = lengthRetryTokenCeiling(input.tokenCeiling, 1);
   return Object.freeze({

@@ -25,6 +25,7 @@ import {
   replyLanguageCheckFor,
   withQuestionLanguageField,
   type EngineAnswerLetter,
+  type EngineCitedExtract,
   type EngineDebateMaterial,
   type EngineMaterialPoint,
   type EngineQuestionKind,
@@ -182,6 +183,20 @@ export function comparingJudgeOrder(answerCount: number, seat: number): readonly
 // OWNER WORDING — approve before switch-on (the material's keys below and in `comparingJudgeMaterialFields` are new
 // words the AI reads: answers, letter, answer, case, supporting_points, objections, assumptions, disputed,
 // not_yet_checked, rests_on, from_rival_reply, investigation, reviewer_reasons, disputed_points).
+/**
+ * Web search (W4-1; design §7.1 item 7): the extract a looked-up point (or a case) rests on, as a judge reads it: its id,
+ * the quote word for word, and the page's title, site and date. Never the page's text, a grade or a reader.
+ */
+function extractForJudge(extract: EngineCitedExtract) {
+  return Object.freeze({ id: extract.id, quote: extract.quote, title: extract.title, site: extract.site, date: extract.date });
+}
+
+/** W4-1: whether the material a judge is shown carries any cited extract (then the judges' sources variant is sent). */
+export function comparingJudgeMaterialCitesExtracts(material: EngineDebateMaterial): boolean {
+  return material.answers.some((answer) => answer.citedExtract !== undefined
+    || [...answer.supports, ...answer.objections].some((point) => point.citedExtract !== undefined));
+}
+
 /** One point as a judge reads it: its words and its labels; never its node id, its maker or a number. */
 function pointForJudge(point: EngineMaterialPoint) {
   return Object.freeze({
@@ -197,7 +212,9 @@ function pointForJudge(point: EngineMaterialPoint) {
       found: point.investigation.found,
       basis: point.investigation.basis,
       reason: point.investigation.reason
-    })
+    }),
+    // W4-1: last, and only on a point that cites one of this debate's extracts; every other point keeps today's bytes.
+    ...(point.citedExtract === undefined ? {} : { extract: extractForJudge(point.citedExtract) })
   });
 }
 
@@ -229,7 +246,9 @@ export function comparingJudgeMaterialFields(input: Readonly<{
       case: answer.caseText,
       supporting_points: answer.supports.map(pointForJudge),
       objections: answer.objections.map(pointForJudge),
-      assumptions: [...answer.assumptions]
+      assumptions: [...answer.assumptions],
+      // W4-1: the extract the position's case cites, last; absent, today's bytes.
+      ...(answer.citedExtract === undefined ? {} : { case_extract: extractForJudge(answer.citedExtract) })
     })];
   });
   const disputed = input.material.disputed.map((entry) => Object.freeze({
@@ -372,8 +391,10 @@ function inRunLanguage(
  * came. The runner counts any failure as a missing vote.
  */
 export async function askComparingJudge(provider: ProviderGateway, input: ComparingJudgeCallInput): Promise<ComparingJudgeAnswer> {
+  // W4-1: material that carries a cited extract is judged under the sources variant (item 7); without one, v1 to the byte.
+  const contract = comparingJudgeMaterialCitesExtracts(input.material) ? COMPARING_JUDGE_SOURCES_PROMPT_CONTRACT : COMPARING_JUDGE_PROMPT_CONTRACT;
   const framed = buildFramedPrompt({
-    contract: inRunLanguage(COMPARING_JUDGE_PROMPT_CONTRACT, input.argumentLanguageName, input.questionLanguage),
+    contract: inRunLanguage(contract, input.argumentLanguageName, input.questionLanguage),
     material: comparingJudgeMaterialFields({
       material: input.material, seat: input.seat, length: input.length, questionLanguage: input.questionLanguage ?? null,
       // pre-flight PF-R2b1.9: D3's practice order rides through unchanged (exactOptionalPropertyTypes).

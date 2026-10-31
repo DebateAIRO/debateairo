@@ -1,5 +1,6 @@
 import {
-  DEBATE_SHAPE_MARKS, type CompositionBudgetTier, type DebateShapeMark, type EngineQuestionKind, type ReadingLevel, type WayOfKnowing
+  DEBATE_SHAPE_MARKS, type CompositionBudgetTier, type DebateShapeMark, type EngineCitedExtract, type EngineQuestionKind, type ReadingLevel,
+  type WayOfKnowing
 } from "@debateai/kernel";
 import type { VerdictState } from "@debateai/contract";
 import { MAP_ENGINE_INTERNAL_FIELD_NAMES, mapAlsoRaisedOf, type MapResult } from "@debateai/map";
@@ -85,6 +86,11 @@ export interface StorySnapshotSource {
   readonly languageLocked?: boolean;
   /** V4 reading level (owner N6, 2026-10-29): the run's level, or null / absent — today's story. */
   readonly readingLevel?: ReadingLevel | null;
+  /**
+   * Web search (W4-1; design §7.1 item 7): the extract each looked-up node cites, by node id (only this debate's). Any:
+   * each node carries its extract and the storyteller is told item 7 (`webSources`). Absent or empty: today's story.
+   */
+  readonly citedExtracts?: ReadonlyMap<string, EngineCitedExtract>;
   readonly compositionBudgetTier: CompositionBudgetTier;
   readonly verdict: {
     /** The contract's closed list (B4 Minor 2, R2b final wave P2), so a fifth state cannot be missed here. */
@@ -402,7 +408,8 @@ export function buildStoryRunSnapshot(source: StorySnapshotSource): StoryWriteIn
       excludedReason: excludedReasonOf(node.nodeId),
       authorModel: node.maker,
       panelDispersion: node.panelDispersion,
-      criticSummary: withoutNodeIds(node.reversalPoint)
+      criticSummary: withoutNodeIds(node.reversalPoint),
+      ...(source.citedExtracts?.has(node.nodeId) === true ? { citedExtract: source.citedExtracts.get(node.nodeId)! } : {})
     }))),
     arrows: Object.freeze(inArrowOrder(source.arrows, source.arrowOrder).map((arrow) => Object.freeze({
       sourceNodeId: arrow.sourceNodeId,
@@ -429,6 +436,8 @@ export function buildStoryRunSnapshot(source: StorySnapshotSource): StoryWriteIn
     ...(source.lengthGuidance === undefined ? {} : { lengthGuidance: source.lengthGuidance }),
     ...(source.languageLocked === true ? { languageLocked: true as const } : {}),
     ...(source.readingLevel === undefined || source.readingLevel === null ? {} : { readingLevel: source.readingLevel }),
+    // W4-1: told only when a node of the material carries an extract (`storyContractForSources`).
+    ...(source.authored.some((node) => source.citedExtracts?.has(node.nodeId) === true) ? { webSources: true as const } : {}),
     // R1d: the receipt's engine and the backup storytellers, only when the runner handed them over (an engine-2 debate).
     ...(source.engine === undefined || source.engine === null ? {} : { engine: source.engine }),
     ...(source.backupCandidates === undefined ? {} : { backupCandidates: Object.freeze([...source.backupCandidates]) }),

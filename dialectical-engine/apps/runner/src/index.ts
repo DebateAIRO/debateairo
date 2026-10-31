@@ -170,7 +170,10 @@ import {
   SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT,
   SYNTHESIZER_LENGTH_PROMPT_CONTRACT,
   SYNTHESIZER_LENGTH_READER_PROMPT_CONTRACT,
+  SYNTHESIZER_LENGTH_READER_SOURCES_PROMPT_CONTRACT,
+  SYNTHESIZER_LENGTH_SOURCES_PROMPT_CONTRACT,
   SYNTHESIZER_READER_PROMPT_CONTRACT,
+  digestCitesExtracts,
   EVALUATOR_INSTRUCTIONS,
   EVALUATOR_V1_INSTRUCTIONS,
   type BandCeilingRegisterRow,
@@ -277,6 +280,10 @@ import {
   type ShapeLeg, type ShapePlan, type ShapePositionPlan
 } from "./shape-plan.js";
 import { runRunnerWebStep, type WebStepRunnerSettings } from "./web-step.js";
+import {
+  WEB_ROOT_SOURCES_MAX_BYTES, engineSourceWithCitedExtracts, legWithWebSources, readDebateWebPacks, webCitedExtractsOf, webReviewInput,
+  type DebateWebPacks
+} from "./web-packs.js";
 import {
   shapeDistinctMakers, shapeHandOverRoot, shapeMakerBar, shapeRootMakerBar, shapeSeatOrder, shapeSpareForRefusedRoot,
   shapeSpareThatAnswered, shapeWriterSeat
@@ -1025,12 +1032,21 @@ export function buildSynthesisRolePrompt(
   const writerLengthed = request.role === "SYNTHESIZER" && length !== null;
   const checkerLengthed = request.role === "EVALUATOR" && length !== null && length.ownWords !== null;
   const told = readingLevel !== null;
+  // Web search (W4-1; design §7.1 item 7): a lengthed writer whose digest carries a cited extract takes its sources variant
+  // (the extract rides on its node). Without one (no packs, nothing cited), today's contract, byte for byte.
+  const sourced = writerLengthed && digestCitesExtracts(request.digest);
+  if (request.role === "SYNTHESIZER" && !writerLengthed && digestCitesExtracts(request.digest)) {
+    // Engine 2, the only engine that reads packs, always tells the length: an unlengthed writer with extracts is a defect.
+    throw new TypedDomainError("SYNTHESIZER_SOURCES_UNLENGTHED", "A writer that reads extracts is always told its length");
+  }
   // V-MINIMUM-PAYLOAD: the one projection, applied once; a length variant only appends its own fields after it.
   const material = toSynthesisPromptMaterial(request);
   return buildFramedPrompt({
     contract: promptContractInArgumentLanguage(
       request.role === "SYNTHESIZER"
-        ? (writerLengthed
+        ? (sourced
+          ? (told ? SYNTHESIZER_LENGTH_READER_SOURCES_PROMPT_CONTRACT : SYNTHESIZER_LENGTH_SOURCES_PROMPT_CONTRACT)
+          : writerLengthed
           ? (told ? SYNTHESIZER_LENGTH_READER_PROMPT_CONTRACT : SYNTHESIZER_LENGTH_PROMPT_CONTRACT)
           : (told ? SYNTHESIZER_READER_PROMPT_CONTRACT : SYNTHESIZER_PROMPT_CONTRACT))
         : (checkerLengthed
@@ -7713,9 +7729,11 @@ export class WalkingSkeletonRunner {
      */
     /**
      * T12-R0 / T12-R2 / T12-R3: root 0's room (see below), worked out when asked: by the map's calls and, after the map, by
-     * the web step (Perplexity plan W3-1), which keeps the same room.
+     * the web step (Perplexity plan W3-1), which keeps the same room. W4-1: the web step keeps it `withPack`: room for a
+     * case writer that reads its path's pack (engine 2's fixed-words leg under its sources variant, the pack at its cut),
+     * so a debate whose web step ran can still pay its first position; the map (before any pack exists) keeps today's.
      */
-    const rootZeroRoomMicros = (): number => {
+    const rootZeroRoomMicros = (withPack = false): number => {
       // T12-R0 / T12-R2 / T12-R3: root 0's room, at the dearest member of root 0's OWN seat (and the seat it is handed
       // to when its member sits out); hosted prices only. It covers root 0's first attempt + one retry, the larger of a
       // length retry and a format repair (`rootZeroRoomAttempts`, `rootZeroKeepRoomMicros`), plus, on a routed run, the
@@ -7731,6 +7749,8 @@ export class WalkingSkeletonRunner {
         tokenCeiling: guidedCallBound(settings.judgeBound, "opening", lengthGuidance).tokenCeiling,
         lengthed: lengthGuidance !== null,
         // Ruling "PF-C5 root-0 bound" (a): with the row, root 0's map material is bounded by the runaway limits (L19).
+        // W4-1: kept by the web step, engine 2's case writer with its path's pack at the cut.
+        ...(withPack && rootEngineMaterialChars !== null ? { sourcesChars: WEB_ROOT_SOURCES_MAX_BYTES } : {}),
         materialChars: rootEngineMaterialChars ?? rootMaterialChars }),
         structureRepair: repairCeiling === null || repairPrice === undefined ? null : { price: repairPrice,
           attempt: { requestBytes: repairCeiling.requestBytes, completionTokenCeiling: repairCeiling.completionTokenCeiling } } });
@@ -7881,12 +7901,24 @@ export class WalkingSkeletonRunner {
      * through this debate's lane, keeping root 0's room. Free and the off switch make no call. It never stops the debate;
      * only a keep-alive stop passes through. Its packs are stored for the arguing calls (W4-1).
      */
+    /**
+     * Perplexity plan W4-1 — THE DEBATE'S PACKS, read back from the web store once the web step has settled (web-packs.ts):
+     * the arguing legs read them, and the locator check, the reviewer, the judges, the writer and the storyteller read the
+     * one extract a point cites. Null (Free, the web off, no pack kept, an old run): every call is today's, byte for byte.
+     * Root i argues path `shapeMapPositions[i].answerId`, the ref the web step keyed its pack by.
+     */
+    let webPacks: DebateWebPacks | null = null;
+    const webPathOfRoot = (rootIndex: number | null): string | null => webPacks === null || rootIndex === null ? null
+      : shapeMapPositions?.[rootIndex]?.answerId ?? null;
+    /** The locator check's list, on a debate with packs (`Judge.judge`'s `debateExtractIds`); nothing otherwise. */
+    const webLocatorInput = (): Readonly<{ debateExtractIds?: ReadonlySet<string> }> =>
+      webPacks === null ? {} : { debateExtractIds: webPacks.extractIds };
     if (settings.webSearch !== undefined && settings.engine != null && engine.engine === 2 && shapeMapArgued
       && shapeMapPositions !== null && debateShapeMap !== null && debateShapeMap.choice !== null) {
       const claimOf = new Map(debateShapeMap.keyPoints.map((keyPoint) => [keyPoint.keyPointId, keyPoint] as const));
       const pointsOf = (ids: readonly string[]) => ids.flatMap((id) => { const keyPoint = claimOf.get(id);
         return keyPoint === undefined ? [] : [{ text: keyPoint.claim, restsOn: keyPoint.restsOn ?? "assumption" as const }]; });
-      await runRunnerWebStep({
+      const webStep = await runRunnerWebStep({
         pool: this.pool, settings: settings.webSearch,
         lane: callScheduler === undefined || callLane === undefined ? null : { lane: callLane, scheduler: callScheduler },
         runId: run.runId, subjectItemId: claimed.workItemId, mode: "quick", question: run.questionLine,
@@ -7897,8 +7929,13 @@ export class WalkingSkeletonRunner {
         members: [...configuredByProviderRef.values()].map((maker) => ({ provider: sitOutMaker(maker).provider,
           providerRef: maker.providerRef, maker: maker.maker, model: callSubjects?.subjectOf(maker.providerRef).model ?? maker.providerRef })),
         contractHash: settings.engine.engineContractHash, bound: settings.judgeBound,
-        keepRoomMicros: rootZeroRoomMicros(), abandon: keepAliveStop, stopsHere: (error) => expansionPhaseStop(error) !== null
+        keepRoomMicros: rootZeroRoomMicros(true), abandon: keepAliveStop, stopsHere: (error) => expansionPhaseStop(error) !== null
       });
+      // W4-1: only a step that kept a pack opens the store again; a re-claimed run reads the same packs, so its prompts
+      // are the same bytes. No web search happens inside the debate: the legs read what was stored here.
+      if (webStep.paths.some((path) => path.packId !== null)) {
+        webPacks = await readDebateWebPacks({ pool: this.pool, runId: run.runId, abandon: keepAliveStop });
+      }
     }
     const shapePositions: readonly ShapePositionPlan[] | null = shapeRun === null ? null
       : shapeMapArgued ? shapeMapPositions
@@ -8061,8 +8098,10 @@ export class WalkingSkeletonRunner {
         const material = shapeEngineRootMaterial({ assignedAnswer: position.statement, mapPoints: position.mapPoints,
           pointsRaised: JSON.stringify((position.pointsRaised ?? []).map((point) => ({ text: point.text, rests_on: point.restsOn }))),
           assumptions: JSON.stringify(position.assumptions ?? []) }, rootEngineMaterialChars!);
-        return { kind: "assigned-root", assignedAnswer: material.assignedAnswer, mapPoints: material.mapPoints,
+        const engineLeg: JudgeLeg = { kind: "assigned-root", assignedAnswer: material.assignedAnswer, mapPoints: material.mapPoints,
           engine: { pointsRaised: material.pointsRaised, assumptions: material.assumptions } };
+        // W4-1: the case writer reads its path's pack (the sources variant); a path with none, the v2 leg to the byte.
+        return legWithWebSources(engineLeg, webPacks, { own: webPathOfRoot(rootIndex) });
       }
       const material = shapeRootMaterial({ assignedAnswer: position.statement, mapPoints: position.mapPoints }, rootMaterialChars);
       return { kind: "assigned-root", assignedAnswer: material.assignedAnswer, mapPoints: material.mapPoints };
@@ -8092,6 +8131,7 @@ export class WalkingSkeletonRunner {
             ...shapeLanguageInput,
             ...lengthGuideOf(judgeLegLengthStep(leg)),
             leg,
+            ...webLocatorInput(),
             providerRef: member.providerRef,
             contractHash: settings.judgeContractHash,
             bound: { ...guidedCallBound(settings.judgeBound, judgeLegLengthStep(leg), lengthGuidance), maxAttempts }
@@ -8462,6 +8502,8 @@ export class WalkingSkeletonRunner {
             ...shapeLanguageInput,
             ...lengthGuideOf(judgeLegLengthStep(input.leg)),
             leg: input.leg,
+            // W4-1: on a debate with packs, "looked up" stays only for one of its extract ids.
+            ...webLocatorInput(),
             providerRef: member.providerRef,
             contractHash: settings.judgeContractHash,
             bound: { ...guidedCallBound(settings.judgeBound, judgeLegLengthStep(input.leg), lengthGuidance), maxAttempts }
@@ -8749,6 +8791,8 @@ export class WalkingSkeletonRunner {
               ...shapeLanguageInput,
               ...lengthGuideOf("reviewer"),
               statement: authoredNode.statement,
+              // W4-1 (item 6): a looked-up point is reviewed with the extract it names; it does not support it: a dispute.
+              ...webReviewInput(webPacks, authoredNode, lengthGuidance !== null),
               authorMaker: authoredNode.maker,
               providerRef: member.providerRef,
               contractHash: settings.judgeContractHash,
@@ -9472,10 +9516,12 @@ export class WalkingSkeletonRunner {
           authorIndex: shapeLeg === null ? leg.authorIndex : seat.seatIndex,
           seat,
           // DL4-F4: the parent's statement is material, in its own fenced field; a shape point's chosen point too.
-          leg: shapeLeg?.consideration != null
+          // W4-1: a defender or critic reads the pack of the path its chain is under; none, today's leg to the byte.
+          leg: legWithWebSources(shapeLeg?.consideration != null
             ? { kind: leg.polarity === "support" ? "support" as const : "attack" as const, positionUnderDebate: parentStatement,
               consideration: shapeLeg.consideration }
             : { kind: leg.polarity === "support" ? "support" as const : "attack" as const, positionUnderDebate: parentStatement },
+          webPacks, { own: webPathOfRoot(leg.rootIndex) }),
           callSiteKey: shapeLeg?.callSiteKey ?? `JUDGE:${role}:root${leg.rootIndex}:r${leg.round}:p${leg.parentIndex}`,
           ...(makerBar === undefined ? {} : { makerBar }),
           role,
@@ -9567,7 +9613,9 @@ export class WalkingSkeletonRunner {
             diversityShare: 0,
             pinned: null
           }),
-          leg: { kind: "cross-root" as const, ownPosition, otherMakersPosition },
+          // W4-1: a reply to a rival reads its own path's pack, then the rival's.
+          leg: legWithWebSources({ kind: "cross-root" as const, ownPosition, otherMakersPosition }, webPacks,
+            { own: webPathOfRoot(shapeLeg.rootIndex), rival: webPathOfRoot(target) }),
           ...(crossBar === undefined ? {} : { makerBar: crossBar }),
           callSiteKey: shapeLeg.callSiteKey,
           role: "cross-root response",
@@ -9944,6 +9992,11 @@ export class WalkingSkeletonRunner {
     const authoredNodeList = [...authoredNodes.entries()]
       .sort(([left], [right]) => left - right)
       .map(([, authored]) => authored);
+    /**
+     * W4-1: the extract each looked-up node cites, by node id (after the locator check, only this debate's): the comparing
+     * judges, the answer writer and the storyteller read it with the point (item 7). Empty without packs: today's bytes.
+     */
+    const webCited = webCitedExtractsOf(webPacks, authoredNodeList);
     const authoredMakerPositions = Array.from({ length: rootCount }, (_, index) => authoredNodes.get(index))
       .filter((candidate): candidate is AuthoredDebateNode => candidate !== undefined);
     // Reclaim resume: a node of this run that THIS copy did not save (a copy that lost the run, still writing) is set
@@ -10245,7 +10298,8 @@ export class WalkingSkeletonRunner {
       // pre-flight consistency; Ruling PF-R43.1): the servable source keeps its name, so R4's final writers' bundle reads
       // the very source the judges read (returned below as `materialSource`).
       const servableSource = comparingJudgesSourceOf({
-        source,
+        // W4-1 (item 7): a case or point that cites one of this debate's extracts carries it; none, the same source.
+        source: engineSourceWithCitedExtracts(source, webCited),
         servableRootIds: servable,
         honestFinalStrength: strengthOf,
         propagatableNodeIds: new Set(strengthDecision.standing.snapshot.nodes
@@ -10924,7 +10978,9 @@ export class WalkingSkeletonRunner {
      * looks like an internal id — every such token in the person's question
      * and in each node's full statement (not the digest's clipped summaries).
      */
-    const personTexts = Object.freeze([run.questionLine, ...authoredNodeList.map((node) => node.statement)]);
+    // W4-1: a cited extract is material the writer may quote and name (item 7), so its words count as the person's here.
+    const personTexts = Object.freeze([run.questionLine, ...authoredNodeList.map((node) => node.statement),
+      ...[...webCited.values()].flatMap((extract) => [extract.quote, extract.site, ...(extract.title === null ? [] : [extract.title])])]);
     const personIdTokens = idShapedTokensIn(personTexts);
     const digestNodes: readonly DigestSourceNode[] = Object.freeze(authoredNodeList.map((node) => Object.freeze({
       nodeId: node.nodeId,
@@ -10944,7 +11000,9 @@ export class WalkingSkeletonRunner {
       // propagated number at the end of the debate.
       isSurvivingObjection: strengthByNodeId.has(node.nodeId)
         && materialised.arrows.some((arrow) => arrow.sourceNodeId === node.nodeId && arrow.polarity === "attack"),
-      leverage: digestLeverage.get(node.nodeId) ?? null
+      leverage: digestLeverage.get(node.nodeId) ?? null,
+      // W4-1 (item 7): the writer reads a looked-up node with the extract it rests on; none, today's digest.
+      ...(webCited.has(node.nodeId) ? { citedExtract: webCited.get(node.nodeId)! } : {})
     })));
     const serveStartedAt = new Date();
     /**
@@ -11947,6 +12005,8 @@ export class WalkingSkeletonRunner {
               // own statement (the node the label's servedNodeId names).
               servedSegments: floor === null ? finalSegments : [{ text: servedRootJudgement.statement }],
               authored: authoredNodeList,
+              // W4-1 (item 7): the storyteller reads a looked-up point with the extract it rests on; none, today's story.
+              ...(webCited.size === 0 ? {} : { citedExtracts: webCited }),
               positionNodeIds: makerPositionNodeIds,
               ...(engineMap ? enginePositionWordsOf(engineMapFactsNow()) : {}),
               // Debate shape P2c (spec 2026-10-12 §3.3 step 8): the map's unchosen points, for the story's "also
