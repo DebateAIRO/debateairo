@@ -26,10 +26,10 @@
  */
 import { z } from "zod";
 import type { Pool } from "pg";
-import { WEB_EVIDENCE_CARRIERS } from "@debateai/db";
+import { WEB_EVIDENCE_CARRIERS, webExtractTextRef } from "@debateai/db";
 import { TypedDomainError, type EngineCitedExtract, type EngineMaterialSource } from "@debateai/kernel";
 import type { JudgeLeg } from "@debateai/judgement";
-import { postgresWebStepPorts, type WebStepPorts } from "./web-step.js";
+import { postgresWebStepPorts, webStepRowId, type WebStepPorts } from "./web-step.js";
 
 /* ----------------------------------------------------------------- the size */
 
@@ -53,13 +53,16 @@ const storedPackSchema = z.object({
   path_ref: text,
   pages: z.array(z.object({
     page_id: text, rank: z.number().int().min(1), title: z.string().nullable(), site: text, date: z.string().nullable(),
-    read_depth: z.enum(["whole", "preview", "abstract"])
+    read_depth: z.enum(["whole", "preview", "abstract"]),
+    /** Decision 8: reader 1's note; absent on a page it wrote none for. */
+    note: z.string().nullable().optional()
   })),
   extracts: z.array(z.object({ label: z.string().regex(/^S[1-9][0-9]*-[1-9][0-9]*$/u), page_id: text, quote: text }))
 });
 
 export type WebPackPage = Readonly<{
   pageId: string; rank: number; title: string | null; site: string; date: string | null; readDepth: "whole" | "preview" | "abstract";
+  note?: string;
 }>;
 export type WebPackExtract = Readonly<{ label: string; pageId: string; quote: string }>;
 /** One path's pack: its top pages, best first, and its checked extracts in the pack's own order. */
@@ -74,7 +77,7 @@ export function webPackOf(value: unknown): WebPack | null {
   return Object.freeze({
     pathRef: parsed.data.path_ref,
     pages: Object.freeze(pages.map((page) => Object.freeze({ pageId: page.page_id, rank: page.rank, title: page.title, site: page.site,
-      date: page.date, readDepth: page.read_depth }))),
+      date: page.date, readDepth: page.read_depth, ...(typeof page.note === "string" && page.note !== "" ? { note: page.note } : {}) }))),
     // An extract of a page the pack does not list has no page to name: left out.
     extracts: Object.freeze(parsed.data.extracts.filter((extract) => known.has(extract.page_id))
       .map((extract) => Object.freeze({ label: extract.label, pageId: extract.page_id, quote: extract.quote })))
@@ -85,7 +88,7 @@ export function webPackOf(value: unknown): WebPack | null {
 
 /** How a pack reads in a leg's `sources` field (code's keys): pages by their rank, extracts by their id. */
 type ShownPack = Readonly<{
-  pages: readonly Readonly<{ page: number; title: string | null; site: string; date: string | null; read: string }>[];
+  pages: readonly Readonly<{ page: number; title: string | null; site: string; date: string | null; read: string; note?: string }>[];
   extracts: readonly Readonly<{ id: string; page: number; quote: string }>[];
 }>;
 
@@ -101,7 +104,8 @@ export function webPackShown(pack: WebPack): ShownPack {
   const shownPages: ShownPack["pages"][number][] = [];
   const rankOf = new Map<string, number>();
   for (const page of pack.pages) {
-    const entry = Object.freeze({ page: page.rank, title: page.title, site: page.site, date: page.date, read: page.readDepth });
+    const entry = Object.freeze({ page: page.rank, title: page.title, site: page.site, date: page.date, read: page.readDepth,
+      ...(page.note === undefined ? {} : { note: page.note }) });
     if (bytesOf({ pages: [...shownPages, entry], extracts: [] }) > WEB_PACK_LIMITS.bytes) continue;
     shownPages.push(entry);
     rankOf.set(page.pageId, page.rank);
@@ -130,6 +134,8 @@ export type DebateWebPacks = Readonly<{
   packOf: (pathRef: string) => WebPack | undefined;
   /** The extract a locator names, exactly, as the reviewer, judges and writers read it; undefined for any other locator. */
   citedExtract: (locator: string | null) => EngineCitedExtract | undefined;
+  /** R22: each extract's name and text, for the recorded form of every prompt that carries it (passage-record.ts). */
+  passages: ReadonlyMap<string, string>;
 }>;
 
 /**
@@ -142,7 +148,7 @@ export type WebPackShare = Readonly<{ pathRef: string; keptUnder: string }>;
  * The debate's packs, or null when it kept none (then nothing in the debate changes). `shared` names the paths that read
  * a pack kept under another path (a dig's); none on a first debate, where each path reads only its own.
  */
-export function debateWebPacks(packs: readonly WebPack[], shared: readonly WebPackShare[] = []): DebateWebPacks | null {
+export function debateWebPacks(packs: readonly WebPack[], shared: readonly WebPackShare[] = [], runId?: string): DebateWebPacks | null {
   const kept = packs.filter((pack) => pack.extracts.length > 0 || pack.pages.length > 0);
   if (kept.length === 0) return null;
   const byPath = new Map(kept.map((pack) => [pack.pathRef, pack] as const));
@@ -152,17 +158,21 @@ export function debateWebPacks(packs: readonly WebPack[], shared: readonly WebPa
     if (pack !== undefined && !byPath.has(share.pathRef)) byPath.set(share.pathRef, pack);
   }
   const extracts = new Map<string, EngineCitedExtract>();
+  const passages = new Map<string, string>();
   for (const pack of kept) {
     const pageOf = new Map(pack.pages.map((page) => [page.pageId, page] as const));
     for (const extract of pack.extracts) {
       const page = pageOf.get(extract.pageId)!;
-      extracts.set(extract.label, Object.freeze({ id: extract.label, quote: extract.quote, title: page.title, site: page.site, date: page.date }));
+      extracts.set(extract.label, Object.freeze({ id: extract.label, quote: extract.quote, title: page.title, site: page.site, date: page.date,
+        ...(page.note === undefined ? {} : { note: page.note }) }));
+      if (runId !== undefined) passages.set(webExtractTextRef(webStepRowId(runId, "extract", extract.label)), extract.quote);
     }
   }
   return Object.freeze({
     extractIds: new Set(extracts.keys()),
     packOf: (pathRef) => byPath.get(pathRef),
-    citedExtract: (locator) => locator === null ? undefined : extracts.get(locator)
+    citedExtract: (locator) => locator === null ? undefined : extracts.get(locator),
+    passages
   });
 }
 
@@ -173,10 +183,16 @@ export function debateWebPacks(packs: readonly WebPack[], shared: readonly WebPa
 export function webSourcesText(packs: DebateWebPacks | null,
   entries: readonly Readonly<{ pathRef: string | null; for: WebPackFor }>[]): string | undefined {
   if (packs === null) return undefined;
-  const shown = entries.flatMap((entry) => {
+  // R22: one pack read for two fields (a dig's cross-reply: every path shares it) is shown once, naming both.
+  const shownPacks: Array<{ pack: WebPack; fors: WebPackFor[] }> = [];
+  for (const entry of entries) {
     const pack = entry.pathRef === null ? undefined : packs.packOf(entry.pathRef);
-    return pack === undefined ? [] : [Object.freeze({ for: entry.for, ...webPackShown(pack) })];
-  });
+    if (pack === undefined) continue;
+    const same = shownPacks.find((shown) => shown.pack === pack);
+    if (same === undefined) shownPacks.push({ pack, fors: [entry.for] });
+    else same.fors.push(entry.for);
+  }
+  const shown = shownPacks.map(({ pack, fors }) => Object.freeze({ for: fors.join(", "), ...webPackShown(pack) }));
   return shown.length === 0 ? undefined : JSON.stringify(shown);
 }
 
@@ -223,8 +239,12 @@ export function webReviewInput(packs: DebateWebPacks | null, node: WebCitingNode
   if (packs === null || !lengthed) return {};
   const extract = webCitedExtractsOf(packs, [node]).get(node.nodeId);
   return extract === undefined ? {}
-    : { citedExtract: JSON.stringify({ id: extract.id, quote: extract.quote, title: extract.title, site: extract.site, date: extract.date }) };
+    : { citedExtract: JSON.stringify({ id: extract.id, quote: extract.quote, title: extract.title, site: extract.site, date: extract.date,
+      ...(extract.note === undefined ? {} : { note: extract.note }) }) };
 }
+
+/** Decision 10: the panel's `cited_extract`, the same one the review reads; nothing when the graded point cites none. */
+export const webPanelInput = webReviewInput;
 
 /** The comparing judges' source with each cited extract on its case or point; the same source when none cites one. */
 export function engineSourceWithCitedExtracts(source: EngineMaterialSource, cited: ReadonlyMap<string, EngineCitedExtract>):
@@ -290,7 +310,7 @@ export async function readDebateWebPacks(input: Readonly<{
       return home === undefined || home === path.pathRef ? [] : [Object.freeze({ pathRef: path.pathRef, keptUnder: home })];
     });
     // The store's order is its own; the debate reads packs by path, so the order never reaches a prompt.
-    return debateWebPacks(packs, shared);
+    return debateWebPacks(packs, shared, input.runId);
   } catch (error) {
     if (input.abandon?.(error) === true) throw error;
     log("WEB_PACKS_UNREAD", { runId: input.runId, code: error instanceof TypedDomainError ? error.code : "UNTYPED" });

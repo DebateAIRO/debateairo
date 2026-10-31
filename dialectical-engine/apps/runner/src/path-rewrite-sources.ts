@@ -1,7 +1,7 @@
 import { readingLevelOf, StoryBodySchema, StoryFateSchema, type StoryFate } from "@debateai/contract";
 import {
-  PATH_REWRITE_CARRIER, PostgresDigModelRunnerRepository, PostgresDigPicksRunnerRepository, PostgresWebEvidenceRepository,
-  RunRepository, WEB_EVIDENCE_CARRIERS, decryptContentForRun, decryptLeasedContentForRun, prepareLeasedContentEncryptionForRun,
+  PATH_REWRITE_CARRIER, PostgresDigModelRunnerRepository, PostgresDigPicksRunnerRepository, PostgresPassageRetentionRepository, PostgresWebEvidenceRepository,
+  RunRepository, WEB_EVIDENCE_CARRIERS, WEB_SHOWN_QUOTE_CARRIER, decryptContentForRun, decryptLeasedContentForRun, prepareLeasedContentEncryptionForRun,
   withRunContentLease, type CryptoEnvelope, type Pool
 } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
@@ -25,13 +25,14 @@ import type { PathRewriteDig, PathRewriteSources, PathRewriteStoredInput } from 
  *    one; its points are the story path's points (each node's own words), each pointing at the point it argues when that
  *    point is on the path too (core.edge), disputed when the second AI disputed it (ledger.node_review), no trust word;
  *    and only the checked extracts their locators name (0132, W3-3's rule).
- *  - `digExtractsOf`: the same extract rule on the dig's own points.
- *  - `recordInput` / `storedInputOf`: 0135's identity.path_rewrite_input, the dig's own paths as `{ v: 1, dig_paths }`.
+ *  - `digExtractsOf`: the same extract rule on the dig's own points, whose passages it may read (decision 6).
+ *  - `recordInput` / `storedInputOf`: 0135's identity.path_rewrite_input, the dig's own paths as `{ v: 2, dig_paths }`.
  *  - `parentCodesOf`: clear codes only, for a FAILED row (the base rewrite's version and fate, else the story's).
  */
 
 const LOCATOR_EXTRACT_IDS = /(?<![A-Za-z0-9])S[0-9]{1,4}-[0-9]{1,4}(?![0-9])/gu;
-const INPUT_VERSION = 1;
+/** R22 (decision 7): version 2 keeps no quote: a passage stored here would outlive the wipe. It is read back by its label. */
+const INPUT_VERSION = 2;
 const DIG_CHAIN_MAX = 12;
 
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
@@ -64,8 +65,13 @@ async function storyPathOf(pool: Pool, runId: string, pathId: string): Promise<S
   return null;
 }
 
-/** The checked extracts each point's locator names, in the locator's order, each once. */
-async function extractsOfPoints(pool: Pool, runId: string, pointIds: readonly string[]): Promise<ReadonlyMap<string, readonly PathRewriteExtract[]>> {
+/**
+ * What each point's locator names, in the locator's order, each once, with reader 1's note on its page. Decision 6:
+ * "PASSAGE" is the dig's own rewrite right after it: the checked extract while it is stored (0139 holds it until that
+ * rewrite is written), else its shown quote. "SHOWN" is every older debate's: only the shown quote, whether or not its
+ * passages are still stored, so what a later prompt reads never depends on when the sweep ran.
+ */
+async function extractsOfPoints(pool: Pool, runId: string, pointIds: readonly string[], read: "PASSAGE" | "SHOWN"): Promise<ReadonlyMap<string, readonly PathRewriteExtract[]>> {
   const result = new Map<string, PathRewriteExtract[]>();
   if (pointIds.length === 0) return result;
   const located = (await pool.query<{ node_id: string; locator: string | null }>(
@@ -73,20 +79,27 @@ async function extractsOfPoints(pool: Pool, runId: string, pointIds: readonly st
   const named = located.flatMap((row) => [...new Set(row.locator?.match(LOCATOR_EXTRACT_IDS) ?? [])].map((label) => ({ pointId: row.node_id, label })));
   if (named.length === 0) return result;
   const evidence = await new PostgresWebEvidenceRepository(pool).read(runId);
-  if (evidence === null || evidence.extracts.length === 0) return result;
+  const shownQuotes = (await new PostgresPassageRetentionRepository(pool).readShownQuotes(runId)) ?? [];
+  if (evidence === null || shownQuotes.length === 0) return result;
   const callerId = new Map(pointIds.map((id) => [id.toLowerCase(), id] as const));
   const cipher = await prepareLeasedContentEncryptionForRun(pool, runId);
   try {
     for (const { pointId, label } of named) {
-      const extract = evidence.extracts.find((candidate) => candidate.label === label);
-      const page = extract === undefined ? undefined : evidence.pages.find((candidate) => candidate.page_id === extract.page_id);
-      if (extract === undefined || page === undefined) continue;
-      const quote = decryptLeasedContentForRun<unknown>(cipher, WEB_EVIDENCE_CARRIERS.extract, extract.extract_id, extract.content, null);
+      const shown = shownQuotes.find((candidate) => candidate.label === label);
+      const page = shown === undefined ? undefined : evidence.pages.find((candidate) => candidate.page_id === shown.page_id);
+      if (shown === undefined || page === undefined) continue;
+      const extract = read === "PASSAGE" ? evidence.extracts.find((candidate) => candidate.label === label) : undefined;
+      const quote = extract === undefined
+        ? decryptLeasedContentForRun<unknown>(cipher, WEB_SHOWN_QUOTE_CARRIER, shown.extract_id, shown.content, null)
+        : decryptLeasedContentForRun<unknown>(cipher, WEB_EVIDENCE_CARRIERS.extract, extract.extract_id, extract.content, null);
       const about = decryptLeasedContentForRun<unknown>(cipher, WEB_EVIDENCE_CARRIERS.page, page.page_id, page.content, null);
       if (!isRecord(quote) || typeof quote.quote !== "string" || !isRecord(about) || typeof about.site !== "string") continue;
+      const reading = evidence.readings.find((candidate) => candidate.page_id === page.page_id && candidate.reader === 1 && candidate.outcome === "READ" && candidate.content !== null);
+      const opened = reading === undefined ? null : decryptLeasedContentForRun<unknown>(cipher, WEB_EVIDENCE_CARRIERS.reading, reading.reading_id, reading.content, null);
       const id = callerId.get(pointId.toLowerCase()) ?? pointId;
       result.set(id, [...(result.get(id) ?? []), Object.freeze({ pointId: id, label, site: about.site,
-        title: typeof about.title === "string" ? about.title : null, quote: quote.quote })]);
+        title: typeof about.title === "string" ? about.title : null, quote: quote.quote,
+        ...(isRecord(opened) && typeof opened.note === "string" && opened.note !== "" ? { note: opened.note } : {}) })]);
     }
     await cipher.assertLive();
   } finally {
@@ -140,20 +153,30 @@ function storedPoint(value: unknown): PathRewritePoint {
     || !(value.trust === null || typeof value.trust === "string") || typeof value.disputed !== "boolean") return unread("point");
   return Object.freeze({ id: value.id, text: value.text, onId: value.onId, side: value.side, trust: value.trust, disputed: value.disputed });
 }
-function storedExtract(value: unknown): PathRewriteExtract {
-  if (!isRecord(value) || typeof value.pointId !== "string" || typeof value.label !== "string" || typeof value.site !== "string"
-    || !(value.title === null || typeof value.title === "string") || typeof value.quote !== "string") return unread("extract");
-  return Object.freeze({ pointId: value.pointId, label: value.label, site: value.site, title: value.title, quote: value.quote });
+function storedExtractPoint(value: unknown): string {
+  if (!isRecord(value) || typeof value.pointId !== "string" || typeof value.label !== "string") return unread("extract");
+  return value.pointId;
 }
-/** 0135's stored dig paths, checked member by member (the same objects `pathRewriteDigPathsOf` built). */
-export function storedDigPathsOf(value: unknown): readonly PathRewriteDigPath[] {
+/**
+ * 0135's stored dig paths, checked member by member (the same objects `pathRewriteDigPathsOf` built), with each path's
+ * extracts read again by `extractsOf` (stored as labels only): the same bytes while the dig's passages are held.
+ */
+export function storedDigPathsOf(value: unknown, extractsOf: ReadonlyMap<string, readonly PathRewriteExtract[]> = new Map()): readonly PathRewriteDigPath[] {
   if (!isRecord(value) || value.v !== INPUT_VERSION || !Array.isArray(value.dig_paths)) return unread("input");
   return Object.freeze(value.dig_paths.map((path: unknown) => {
     if (!isRecord(path) || typeof path.positionRef !== "string" || typeof path.statement !== "string"
       || !Array.isArray(path.points) || !Array.isArray(path.extracts)) return unread("dig path");
-    return Object.freeze({ positionRef: path.positionRef, statement: path.statement,
-      points: Object.freeze(path.points.map(storedPoint)), extracts: Object.freeze(path.extracts.map(storedExtract)) });
+    const cited = new Set(path.extracts.map(storedExtractPoint));
+    const points = Object.freeze(path.points.map(storedPoint));
+    return Object.freeze({ positionRef: path.positionRef, statement: path.statement, points,
+      extracts: Object.freeze(points.flatMap((point) => cited.has(point.id) ? extractsOf.get(point.id) ?? [] : [])) });
   }));
+}
+
+/** What 0135's row keeps of the dig's paths: each extract by its point and label, never its words (decision 7). */
+export function digPathsForStore(digPaths: readonly PathRewriteDigPath[]): Readonly<{ v: number; dig_paths: readonly unknown[] }> {
+  return Object.freeze({ v: INPUT_VERSION, dig_paths: digPaths.map((path) =>
+    Object.freeze({ ...path, extracts: path.extracts.map(({ pointId, label }) => Object.freeze({ pointId, label })) })) });
 }
 
 export function postgresPathRewriteSources(pool: Pool): PathRewriteSources {
@@ -205,16 +228,20 @@ export function postgresPathRewriteSources(pool: Pool): PathRewriteSources {
       }
       const pointIds = story.nodeRefs.filter((id) => id.toLowerCase() !== story.positionNodeId.toLowerCase());
       const points = await pointsOf(pool, parentRunId, pointIds);
-      const extracts = await extractsOfPoints(pool, parentRunId, points.map((point) => point.id));
+      // Decision 6: the parent is an older debate: AI text and the shown quote, never a passage.
+      const extracts = await extractsOfPoints(pool, parentRunId, points.map((point) => point.id), "SHOWN");
       return Object.freeze({ positionRef, answerVersion: text.answerVersion, line: text.line, summary: text.summary, fate: text.fate,
         points, extracts: Object.freeze(points.flatMap((point) => extracts.get(point.id) ?? [])) });
     },
     readEnrichment: (input) => readStoryEnrichment(pool, input),
-    digExtractsOf: (runId, pointIds) => extractsOfPoints(pool, runId, pointIds),
-    recordInput: (runId, workItemId, digPaths) => picks.recordInput(runId, workItemId, { v: INPUT_VERSION, dig_paths: digPaths }),
+    digExtractsOf: (runId, pointIds) => extractsOfPoints(pool, runId, pointIds, "PASSAGE"),
+    recordInput: (runId, workItemId, digPaths) => picks.recordInput(runId, workItemId, digPathsForStore(digPaths)),
     storedInputOf: async (runId: string): Promise<PathRewriteStoredInput | null> => {
       const input = (await picks.read(runId))?.input ?? null;
-      return input === null ? null : Object.freeze({ workItemId: input.workItemId, digPaths: storedDigPathsOf(input.value) });
+      if (input === null) return null;
+      const stored = storedDigPathsOf(input.value);
+      const extracts = await extractsOfPoints(pool, runId, stored.flatMap((path) => path.points.map((point) => point.id)), "PASSAGE");
+      return Object.freeze({ workItemId: input.workItemId, digPaths: storedDigPathsOf(input.value, extracts) });
     },
     parentCodesOf: async ({ parentRunId, positionRef, baseRewriteId }) => {
       if (baseRewriteId !== null) {

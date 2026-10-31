@@ -282,7 +282,7 @@ import {
 } from "./shape-plan.js";
 import { runRunnerWebStep, type WebStepRunnerSettings } from "./web-step.js";
 import {
-  WEB_ROOT_SOURCES_MAX_BYTES, engineSourceWithCitedExtracts, legWithWebSources, readDebateWebPacks, webCitedExtractsOf, webReviewInput,
+  WEB_ROOT_SOURCES_MAX_BYTES, engineSourceWithCitedExtracts, legWithWebSources, readDebateWebPacks, webCitedExtractsOf, webPanelInput, webReviewInput,
   type DebateWebPacks
 } from "./web-packs.js";
 import { EVALUATOR_LENGTH_READER_SOURCES_PROMPT_CONTRACT, EVALUATOR_LENGTH_SOURCES_PROMPT_CONTRACT } from "./answer-checker-sources.js";
@@ -293,6 +293,7 @@ import {
 import { keepAliveProviderGateway, runKeepAliveScope, startRunKeepAlive, type RunnerTaskControl } from "./run-keep-alive.js";
 import type { RunnerRetirementSignal, TaskExecutionCounter } from "./runner-retirement.js";
 import { EMPTY_REPLAY_BOOK, readReplayBook, replayingGateway, type ReplayBook } from "./run-replay.js";
+import { holdRunPassages, passageRecordedRequest, releaseRunPassages } from "./passage-record.js";
 import { isMonthPausedStop, RUN_MONTH_PAUSED } from "./month-pause.js";
 import type { RunInFlight } from "./run-in-flight.js";
 import { PATH_REWRITE_CALL_SITE_PREFIX, isPathRewriteCallSite, pathRewriteCallSiteRole } from "./path-rewrite-scope.js";
@@ -6980,6 +6981,8 @@ export class WalkingSkeletonRunner {
       readonly authorTau: number;
       readonly claimType: ClaimType;
       readonly statement: string;
+      /** Decision 10: the graded point's way of knowing and locator, so the panel reads the extract it cites. */
+      readonly cites?: Readonly<{ wayOfKnowing: string; locator: string | null }>;
       readonly callSiteKey: string;
       readonly questionLine: string;
       /**
@@ -7160,6 +7163,7 @@ export class WalkingSkeletonRunner {
               ...shapeLanguageInput,
               ...lengthGuideOf("judge_panel"),
               statement: input.statement,
+              ...(input.cites === undefined ? {} : webPanelInput(webPacks, { nodeId: input.callSiteKey, ...input.cites }, lengthGuidance !== null)),
               authorMaker: input.authorMaker,
               providerRef: member.providerRef,
               contractHash: judgeContractHash,
@@ -7950,6 +7954,8 @@ export class WalkingSkeletonRunner {
       // step's outcomes, so every path of a dig reads the one pack kept under its first path.
       if (webStep.paths.some((path) => path.packId !== null)) {
         webPacks = await readDebateWebPacks({ pool: this.pool, runId: run.runId, paths: webStep.paths, abandon: keepAliveStop });
+        // R22: from here on every prompt of this run records a passage by its name (passage-record.ts).
+        if (webPacks !== null) holdRunPassages(run.runId, webPacks.passages);
       }
     }
     const shapePositions: readonly ShapePositionPlan[] | null = shapeRun === null ? null
@@ -8560,6 +8566,7 @@ export class WalkingSkeletonRunner {
         authorTau: childReduced.tau,
         claimType: childJudged.normalizedClaim.claimType,
         statement: childJudged.statement,
+        cites: { wayOfKnowing: childJudged.wayOfKnowing, locator: childJudged.locator },
         callSiteKey: `PANEL:${input.callSiteKey}`,
         // The PANEL assesses a node against THE DEBATE'S QUESTION. It used to
         // receive the leg's concatenated instruction string, so a parent's
@@ -9107,6 +9114,7 @@ export class WalkingSkeletonRunner {
         authorTau: reduced.tau,
         claimType: judged.normalizedClaim.claimType,
         statement: judged.statement,
+        cites: { wayOfKnowing: judged.wayOfKnowing, locator: judged.locator },
         callSiteKey: "PANEL:root",
         questionLine: run.questionLine,
         onSpendStop: "AUTHOR_ONLY"
@@ -12166,6 +12174,7 @@ export class WalkingSkeletonRunner {
     } finally {
       callLane?.close();
       keepAlive.stop();
+      releaseRunPassages(claimedRunId);
     }
   }
 }
@@ -13677,7 +13686,9 @@ export function createPostgresProviderGateway(
     })
   });
   return {
-    async call(request: ProviderCallRequest): Promise<ProviderCallResult> {
+    async call(incoming: ProviderCallRequest): Promise<ProviderCallResult> {
+      // R22: whatever built this prompt, a passage goes on record only by its name (passage-record.ts).
+      const request = passageRecordedRequest(incoming);
       if (request.runId === null) {
         throw new TypedDomainError(
           "PROVIDER_RUN_REQUIRED",

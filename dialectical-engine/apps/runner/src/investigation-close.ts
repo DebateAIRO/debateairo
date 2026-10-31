@@ -22,9 +22,9 @@ import { replayingGateway, type ReplayBook } from "./run-replay.js";
 /**
  * "WRITE MY REPORT" — THE CLOSING (plan 2026-10-30 task W5-1; design W0-1 with the owner's answers F1-F14, the dig-model
  * revision's §4, the money rule of 31 Oct). The person's press (apps/api, POST /v1/runs/{id}/report) closes the
- * investigation in one transaction (0133): its next report version is numbered and every member's page texts are wiped
- * (links, sites, titles, dates and the shown quotes with reader 1's line stay, owner F9). The runner then writes the
- * version here, found by its sweep (0136's identity.read_unreported_closings, at boot and every minute) or poked at once
+ * investigation in one transaction (0139's closing, which keeps the texts): its next report version is numbered. Once the
+ * version is written the members' page texts and passages go (R22 decision 7, `wipePassages`; "other pages" keep their 30
+ * days; links, sites, titles, dates, the shown quotes and the notes stay). The runner then writes the version here, found by its sweep (0136's identity.read_unreported_closings, at boot and every minute) or poked at once
  * when a member of a closing investigation finishes (index.ts, the story stage):
  *  1. it WAITS while any dig is still running or still rewriting its path (owner F7 A; 0136's waiting rule: a dig paused
  *     at the month wall waits for a reset and goes to the next version). The page says so. A closing that has waited past
@@ -99,6 +99,8 @@ export type InvestigationCloseSettings = Readonly<{
   replayBookOf?: (rootRunId: string, subjectItemId: string) => Promise<ReplayBook>;
   /** How long a closing waits for running digs before it goes on with what is settled (default 6 hours). */
   giveUpWaitingMs?: number;
+  /** Decision 7: after a report is written, the investigation's page texts and passages go (passage-sweep.ts). Never rejects. */
+  wipePassages?: (rootRunId: string) => Promise<void>;
   /** The closing's one random source (F5); absent: 32 fresh random bytes per closing. Tests pass a fixed one. */
   closingSeed?: () => Buffer;
   contractHash?: string;
@@ -182,6 +184,7 @@ export async function closeInvestigation(settings: InvestigationCloseSettings, c
     log("INVESTIGATION_REPORT_STORED", { investigationId: closing.investigationId, reportVersion: closing.reportVersion,
       outcome: record.outcome, storyOutcome: record.storyOutcome, failureCode: record.failureCode, ladderStep: record.ladderStep,
       spentMicros: record.spentMicros, stored });
+    if (record.outcome !== "FAILED") await settings.wipePassages?.(closing.rootRunId);
     return stored;
   } catch (error) {
     log("INVESTIGATION_REPORT_NOT_RECORDED", { investigationId: closing.investigationId, reportVersion: closing.reportVersion, code: codeOf(error) });

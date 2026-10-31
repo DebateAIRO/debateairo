@@ -48,7 +48,7 @@ export type UserDekField = "user.email_ciphertext" | "user.recovery_email_cipher
 export type SupportKeyHandle = Readonly<{ kind: "session" | "case"; ref: string }>;
 export type SupportContentContext = Readonly<Record<string, unknown>>;
 /** 0132's carriers the archive opens. A page's text (identity.web_page_text) and a path's pack are never among them. */
-export type WebExportCarrier = "identity.web_search" | "identity.web_page" | "identity.web_reading" | "identity.web_extract";
+export type WebExportCarrier = "identity.web_search" | "identity.web_page" | "identity.web_reading" | "identity.web_extract" | "identity.web_shown_quote";
 export type RunContentItem = Readonly<{ carrier: WebExportCarrier; primaryKey: string; envelope: unknown }>;
 export interface ExportDecryptors {
   openUserField(userId: string, field: UserDekField, envelope: unknown): Promise<string>;
@@ -336,7 +336,7 @@ async function collectWebSources(raw: RawExportRows, ownerView: OwnerViewPort, d
     const searchSlots = searches.map((source) => slot("identity.web_search", source, "search_id"));
     const pageSlots = pages.map((source) => slot("identity.web_page", source, "page_id"));
     const readingSlots = readings.map((source) => slot("identity.web_reading", source, "reading_id"));
-    const extractSlots = extracts.map((source) => slot("identity.web_extract", source, "extract_id"));
+    const extractSlots = extracts.map((source) => slot(source.sealed_as === "identity.web_shown_quote" ? "identity.web_shown_quote" : "identity.web_extract", source, "extract_id"));
     const readable = !tombstoned.has(reference) && !await ownerView.runRemovedByCheck(reference) && await ownerView.runKeyPresent(reference);
     const opened = !readable ? null : sealed.length === 0 ? [] : await decrypt.openRunContent(reference, sealed);
     if (opened !== null && opened.length !== sealed.length) throw new DataExportBuildError("DATA_EXPORT_DECRYPT_FAILED");

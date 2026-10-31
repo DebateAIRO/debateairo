@@ -1,12 +1,12 @@
 import { createHash } from "node:crypto";
 import {
   COMPARING_JUDGE_PROMPT_CONTRACT, COMPARING_JUDGE_SOURCES_PROMPT_CONTRACT, POINT_INVESTIGATION_PROMPT_CONTRACT, WEB_STEP_PROMPT_CONTRACTS,
-  WEB_DIG_SEALED_CONTRACTS, WEB_WORDING_V2_SEALED_CONTRACTS, judgeAssignedRootV2PromptContract, judgeSourcesSealedContracts
+  WEB_DIG_SEALED_CONTRACTS, WEB_R22_SEALED_CONTRACTS, WEB_WORDING_V2_SEALED_CONTRACTS, judgeAssignedRootV2PromptContract, judgeSourcesSealedContracts
 } from "@debateai/judgement";
 import { MAP_ENGINE_CONTRACT_NAMES, mapEnginePromptContracts } from "@debateai/map";
 import { promptContractFingerprintText, type PromptContract } from "@debateai/providers";
 import { SYNTHESIZER_LENGTH_READER_SOURCES_PROMPT_CONTRACT, SYNTHESIZER_LENGTH_SOURCES_PROMPT_CONTRACT } from "@debateai/serve";
-import { INVESTIGATION_REPORT_SEALED_CONTRACTS, PATH_REWRITE_SEALED_CONTRACTS } from "@debateai/story";
+import { INVESTIGATION_REPORT_SEALED_CONTRACTS, PATH_REWRITE_SEALED_CONTRACTS, PATH_REWRITE_V2_SEALED_CONTRACTS } from "@debateai/story";
 import { EVALUATOR_SOURCES_SEALED_CONTRACTS } from "./answer-checker-sources.js";
 
 /**
@@ -63,7 +63,12 @@ export function engineSealedContracts(): readonly PromptContract[] {
     // W5-1 (the final report over an investigation; W0-1 §2.6 and draft 5.6 approved, R4's two instructions shown at the
     // first checkpoint (F11), the story's two OWNER WORDING drafts): the answer, the later version's answer, the answer
     // check, the story and the story check (packages/story/src/investigation-report.ts).
-    ...INVESTIGATION_REPORT_SEALED_CONTRACTS
+    ...INVESTIGATION_REPORT_SEALED_CONTRACTS,
+    // R22 retention lane (plan 2026-10-31 decisions 8, 10, 11): reader 1 v2 (its page note), the panel's sources variant
+    // (the graders' line), then the rewrite's writer and checker v2 ("search words" out). The ones they replace stay
+    // sealed, unused. None is in the judge, composer or conformance seal.
+    ...WEB_R22_SEALED_CONTRACTS,
+    ...PATH_REWRITE_V2_SEALED_CONTRACTS
   ]);
 }
 

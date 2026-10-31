@@ -459,7 +459,9 @@ export function buildInvestigationDossier(input: DossierInput): DossierBuilt {
       storyWriterOf: (answer: ReportAnswerDraft) => closingFields(input, [...dossier, field("answer", answerJson(answer))]),
       storyCheckerOf: (answer: ReportAnswerDraft, candidate: ReportStoryDraft) => closingFields(input, [...dossier,
         field("answer", answerJson(answer)), field("story", JSON.stringify(candidate))]),
-      index: Object.freeze({ refs: built.refs, cardRefs: built.cardRefs })
+      index: Object.freeze({ refs: built.refs, cardRefs: built.cardRefs }),
+      // F5: the dossier's fields lead every step's material; they go first on the Anthropic wire.
+      sharedFieldCount: dossier.length
     });
     const cardRuns = new Map<string, string>();
     for (const dig of cards) cardRuns.set(refs.cardRef.get(lower(dig.runId))!, dig.runId);

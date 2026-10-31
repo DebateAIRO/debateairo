@@ -29,6 +29,11 @@ export const PROVIDER_SENT_FORM_INVALID = "PROVIDER_SENT_FORM_INVALID" as const;
 /** A sent form at or over the call's input line (`ProviderCallRequest.sentInputTokensBelow`). */
 export const PROVIDER_SENT_INPUT_OVER_LIMIT = "PROVIDER_SENT_INPUT_OVER_LIMIT" as const;
 
+/** The deepest a material text stands: a JSON text in a field's JSON in a list's JSON in the block's own. */
+const PASSAGE_ESCAPE_LEVELS = 4;
+/** The name of a whole saved reply (`webReplyTextRef`, packages/db passage-retention.ts): the one reference an answer turn may be. */
+const WHOLE_REPLY_REF = /^web-reply-text:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
+
 /** One escape level more: how a JSON text's characters stand inside another JSON text. */
 const escapedOnce = (text: string): string => JSON.stringify(text).slice(1, -1);
 function escapedTimes(text: string, times: number): string {
@@ -78,12 +83,49 @@ export function packetWithPageTexts(packet: PromptPacket, texts: ReadonlyMap<str
       let content = message.content;
       for (const ref of held) {
         if (!content.includes(ref)) continue;
+        // R22: the AI's own earlier answer as a follow-up hands it back: its whole turn names the reply, and nothing else.
+        if (message.role === "assistant" && content === ref && WHOLE_REPLY_REF.test(ref)) {
+          content = texts.get(ref)!;
+          break;
+        }
         if (message.role !== "user") throw unplaced();
         content = withText(content, ref, texts.get(ref)!);
       }
       return content === message.content ? message : Object.freeze({ role: message.role, content });
     }))
   });
+}
+
+/**
+ * R22 (plan 2026-10-31 decisions 6, 7): the other way round. The packet with every whole-text occurrence of each text put
+ * back to its reference, in the user turns, at whatever escape level it stands: what `ledger.call_prompt` may keep of a
+ * prompt built over real passages (the frame is built over the texts, so the fence is checked against them). The sent form
+ * is `packetWithPageTexts(recorded, texts)`, and it must give back `packet` byte for byte, or nothing is sent
+ * (PROVIDER_SENT_FORM_INVALID: the refusal names no content). A text that stands only inside a longer one stays: it is the
+ * longer text's writer's own words. A packet holding none comes back as it is, the same object.
+ */
+export function packetWithPassageRefs(packet: PromptPacket, texts: ReadonlyMap<string, string>): PromptPacket {
+  let changed = false;
+  const messages = packet.messages.map((message) => {
+    if (message.role !== "user") return message;
+    let content = message.content;
+    for (const [ref, text] of texts) {
+      for (let level = PASSAGE_ESCAPE_LEVELS - 1; level >= 0; level -= 1) {
+        const whole = escapedTimes(JSON.stringify(text), level);
+        if (content.includes(whole)) content = content.split(whole).join(escapedTimes(JSON.stringify(ref), level));
+      }
+    }
+    if (content === message.content) return message;
+    changed = true;
+    return Object.freeze({ role: message.role, content });
+  });
+  if (!changed) return packet;
+  const recorded: PromptPacket = Object.freeze({ messages: Object.freeze(messages) });
+  const again = packetWithPageTexts(recorded, texts);
+  if (again.messages.some((message, index) => message.content !== packet.messages[index]!.content)) {
+    throw new TypedDomainError(PROVIDER_SENT_FORM_INVALID, "A recorded form must give back the packet it names");
+  }
+  return recorded;
 }
 
 /**
@@ -100,7 +142,8 @@ export function assertSentForm(recorded: PromptPacket, sent: PromptPacket): void
   for (const [index, message] of recorded.messages.entries()) {
     const other = sent.messages[index];
     if (other === undefined || other.role !== message.role || typeof other.content !== "string"
-      || (message.role !== "user" && other.content !== message.content)) throw invalid();
+      || (message.role !== "user" && other.content !== message.content
+        && !(message.role === "assistant" && WHOLE_REPLY_REF.test(message.content)))) throw invalid();
   }
   const before = assertFramedPrompt(recorded);
   const after = assertFramedPrompt(sent);

@@ -365,6 +365,8 @@ export type ReportCallMaterial = Readonly<{
   storyWriterOf: (answer: ReportAnswerDraft) => readonly FramedMaterialField[];
   storyCheckerOf: (answer: ReportAnswerDraft, candidate: ReportStoryDraft) => readonly FramedMaterialField[];
   index: ReportIndex;
+  /** F5: how many leading fields every step's material shares, byte for byte (the dossier's): they go first on the Anthropic wire. */
+  sharedFieldCount?: number;
 }>;
 
 export type ReportRunCall = Readonly<{
@@ -430,8 +432,18 @@ function reportRequest(call: ReportRunCall, input: Readonly<{
   classifyContent: (content: string, reply?: ModelReplyFacts) => ContentClassification;
   revision: Readonly<{ ownDraft: string; problems: string }> | null;
 }>): ProviderCallRequest {
-  const framed = buildFramedPrompt({ contract: input.contract, material: input.material,
-    ...(call.randomBytes === undefined ? {} : { randomBytes: call.randomBytes }) });
+  // F5's one fence is never a reason to fail: a reply that repeated it (an AI reads it in its prompt) would be material here,
+  // which the door refuses, so this one call takes a fresh fence and pays the plain price.
+  const framed = (() => {
+    try {
+      return buildFramedPrompt({ contract: input.contract, material: input.material,
+        ...(call.randomBytes === undefined ? {} : { randomBytes: call.randomBytes }) });
+    } catch (error) {
+      if (call.randomBytes === undefined || !(error instanceof TypedDomainError)
+        || (error.code !== "PROMPT_FENCE_UNAVAILABLE" && error.code !== "PROMPT_CANARY_UNAVAILABLE")) throw error;
+      return buildFramedPrompt({ contract: input.contract, material: input.material });
+    }
+  })();
   const packet = input.revision === null ? framed.packet
     : buildFramedRevisionPrompt(framed.packet, input.revision.ownDraft, input.revision.problems);
   const revision = input.revision;
@@ -446,6 +458,7 @@ function reportRequest(call: ReportRunCall, input: Readonly<{
     contractHash: call.contractHash,
     providerRef: input.providerRef,
     packet: call.guard(packet),
+    ...(call.material.sharedFieldCount === undefined ? {} : { sharedFirstFieldCount: call.material.sharedFieldCount }),
     classifyContent: input.classifyContent,
     buildRepairPacket: (rejected: RejectedProviderContent): PromptPacket => call.guard(revision === null
       ? buildFramedRepairPrompt(framed, schemaFailureLocator(rejected))

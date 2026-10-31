@@ -69,7 +69,7 @@ describe("a dig: every path reads the one shared pack", () => {
     const cross = JSON.parse(sourcesField(legWithWebSources({ kind: "cross-root", ownPosition: "No.", otherMakersPosition: "Yes." },
       shared, { own: "b2", rival: "b1" }))!) as readonly Readonly<{ for: string; extracts: readonly Readonly<{ id: string }>[] }>[];
     expect(cross.map((entry) => [entry.for, entry.extracts.map((extract) => extract.id)]))
-      .toEqual([["own_position", ["S1-1", "S1-2"]], ["other_makers_position", ["S1-1", "S1-2"]]]);
+      .toEqual([["own_position, other_makers_position", ["S1-1", "S1-2"]]]);
     // The locator check and the cited extracts are the pack's own: nothing new is made up for b2.
     expect([...shared.extractIds]).toEqual(["S1-1", "S1-2"]);
     expect(shared.citedExtract("S1-1")?.quote).toBe("Winter crossings fall by a third.");

@@ -11,8 +11,8 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  configureContentEncryption, contentCipherFor, createPool, PostgresDigPicksRepository, PostgresInvestigationRepository,
-  WEB_EVIDENCE_CARRIERS, migrate, type Pool
+  configureContentEncryption, contentCipherFor, createPool, PostgresDigPicksRepository, PostgresInvestigationRepository, PostgresPassageRetentionRepository,
+  WEB_EVIDENCE_CARRIERS, WEB_REPLY_TEXT_CARRIER, migrate, webReplyTextIdOf, type Pool
 } from "@debateai/db";
 import { WEB_DIG_PLANNER_CONTRACT_ID, framedJudgePromptForTest, type JudgeLeg } from "@debateai/judgement";
 import { LENGTH_GUIDANCE_START, type LengthGuide } from "@debateai/kernel";
@@ -171,6 +171,20 @@ function legsOf(packs: DebateWebPacks | null): Record<string, string> {
 const sourcesIn = (frame: string): string | undefined =>
   (JSON.parse(frame) as { fields: { name: string; content: string }[] }).fields.find((field) => field.name === "sources")?.content;
 
+/** R22: a reader's reply is on record by name; the book reads it back from its own store, as readReplayBook does. */
+async function withStoredReplies(runId: string, attempts: ReturnType<typeof recorded>): Promise<ReturnType<typeof recorded>> {
+  const named = attempts.flatMap((attempt) => { const id = attempt.artifact === null ? null : webReplyTextIdOf(attempt.artifact.rawText); return id === null ? [] : [id]; });
+  const stored = (await new PostgresPassageRetentionRepository(runner).readReplyTexts(runId, named)) ?? [];
+  const ports = await postgresWebStepPorts(runner, runId);
+  try {
+    const texts = new Map(stored.map((reply) => [reply.artifact_id, ports.cipher.open(WEB_REPLY_TEXT_CARRIER, reply.artifact_id, reply.content) as string]));
+    return attempts.map((attempt) => { const id = attempt.artifact === null ? null : webReplyTextIdOf(attempt.artifact.rawText);
+      return id === null ? attempt : { ...attempt, artifact: { ...attempt.artifact!, rawText: texts.get(id)! } }; });
+  } finally {
+    await ports.close();
+  }
+}
+
 describe("W4-7 a dig's web step and its reuse, on real PostgreSQL", () => {
   it("one pack under the first path, read by every dig path; a read page reused; claimed again, the same prompts", async () => {
     const parent = await firstDebate();
@@ -201,7 +215,7 @@ describe("W4-7 a dig's web step and its reuse, on real PostgreSQL", () => {
     const secondSearch = digPerplexity();
     const money = searchMoney();
     const result = await runnerStep({ runId: dig, question: DIG_QUESTION, paths: DIG_PATHS, settings: settingsOf(secondSearch.port, money),
-      members: membersOf(second.all, replaying(createReplayBook({ calls: recordedCalls(recorded(first.all)), earlierNodes: [] }), secondAsked)) });
+      members: membersOf(second.all, replaying(createReplayBook({ calls: recordedCalls(await withStoredReplies(dig, recorded(first.all))), earlierNodes: [] }), secondAsked)) });
     expect(secondSearch.queries).toEqual([]);
     expect(money.charged).toEqual([]);
     expect(second.haiku.bodies).toHaveLength(0);
@@ -247,7 +261,7 @@ describe("W4-7 a dig's web step and its reuse, on real PostgreSQL", () => {
     }
     expect((JSON.parse(sourcesIn(legs["b2:case"]!)!) as { extracts: { id: string }[] }[])[0]!.extracts.map((extract) => extract.id))
       .toEqual(result.paths[0]!.extractLabels);
-    expect(JSON.parse(sourcesIn(legs["b2:cross"]!)!).map((entry: { for: string }) => entry.for)).toEqual(["own_position", "other_makers_position"]);
+    expect(JSON.parse(sourcesIn(legs["b2:cross"]!)!).map((entry: { for: string }) => entry.for)).toEqual(["own_position, other_makers_position"]);
     expect((await readDebateWebPacks({ pool: runner, runId: dig }))!.packOf("b2")).toBeUndefined();
 
     // Claimed once more after it finished: nothing is sent, searched or charged, and the legs read the same bytes.
@@ -256,7 +270,7 @@ describe("W4-7 a dig's web step and its reuse, on real PostgreSQL", () => {
     const thirdSearch = digPerplexity();
     const thirdMoney = searchMoney();
     const again = await runnerStep({ runId: dig, question: DIG_QUESTION, paths: DIG_PATHS, settings: settingsOf(thirdSearch.port, thirdMoney),
-      members: membersOf(third.all, replaying(createReplayBook({ calls: recordedCalls(recorded([...first.all, ...second.all])), earlierNodes: [] }),
+      members: membersOf(third.all, replaying(createReplayBook({ calls: recordedCalls(await withStoredReplies(dig, recorded([...first.all, ...second.all]))), earlierNodes: [] }),
         thirdAsked)) });
     expect({ sent: sentBodies(third), searched: thirdSearch.queries.length, charged: thirdMoney.charged.length }).toEqual({ sent: 0, searched: 0, charged: 0 });
     expect(thirdAsked.length).toBeGreaterThan(0);

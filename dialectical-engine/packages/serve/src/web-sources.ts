@@ -20,8 +20,8 @@ import { exhaustive } from "@debateai/kernel";
  *
  * Rules this file keeps:
  *  - never a grade or a score: the input below has no grade, no spread and no maker, so none can reach the answer;
- *  - quotes come from the stored extracts, never from a page's text or an AI call record, so a debate whose page texts
- *    were wiped serves the same quotes and lines (F9: only the shown quotes and reader 1's line stay);
+ *  - quotes come from the shown quotes (0139, kept for good), never from a page's text or an AI call record, so a debate
+ *    whose page texts and passages were wiped serves the same quotes and notes (decision 7);
  *  - an answer whose debate kept no web rows serves exactly as before: no `web`, no `sources`, no flag;
  *  - a stored value that does not make a valid shape is left out (that source, that page or that path), never failing
  *    the answer, as A21's projection does.
@@ -85,7 +85,8 @@ function pageAbout(value: unknown): WebStoredPageAbout | null {
 
 function readingLine(value: unknown): WebExplanation | null {
   if (!isRecord(value)) return null;
-  const line = text(value.line);
+  // Decision 8: under the source stands reader 1's note; a reading with none (an older one) shows its one line.
+  const line = text(value.note) ?? text(value.line);
   if (line === null) return null;
   const parsed = WebExplanationSchema.safeParse({
     text: cutQuoteAtWordEdge(line, WEB_CONTRACT_LIMITS.explanationMaxChars), language: value.language

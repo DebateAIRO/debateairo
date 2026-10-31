@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { DIG_LEVEL_MAX, type MakerLineage, type StoryFate } from "@debateai/contract";
-import type { PathRewriteRecord, PostgresDigModelRunnerRepository, RewriteTurnRead, WebSealed } from "@debateai/db";
+import { webExtractTextRef, type PathRewriteRecord, type PostgresDigModelRunnerRepository, type RewriteTurnRead, type WebSealed } from "@debateai/db";
 import { TypedDomainError, replyLanguageCheckFor } from "@debateai/kernel";
 import type { ProviderCallRequest, ProviderCallResult } from "@debateai/providers";
 import { PATH_REWRITE_POLICY } from "@debateai/register";
@@ -13,7 +13,9 @@ import {
   buildPathRewriteMaterial, pathRewriteDigPathsOf, pathRewriteGuard, type PathRewriteDigPath, type PathRewriteExtract,
   type PathRewriteParentPath, type PathRewritePick, type PathRewriteQuestion
 } from "./path-rewrite-material.js";
+import { holdRunPassages, releaseRunPassages } from "./passage-record.js";
 import { replayingGateway, type ReplayBook } from "./run-replay.js";
+import { webStepRowId } from "./web-step.js";
 
 /**
  * THE PATH REWRITE (dig-model revision 2026-10-30, task W3-5; owner answers Q-D1 to Q-D14). When a dig's run settles (an
@@ -228,6 +230,12 @@ export async function runDigPathRewrite(settings: PathRewriteRunnerSettings | un
   return true;
 }
 
+/** R22: this rewrite's prompts record each of the dig's cited passages by name (passage-record.ts). */
+function holdDigPassages(digRunId: string, digPaths: readonly PathRewriteDigPath[]): void {
+  holdRunPassages(digRunId, new Map(digPaths.flatMap((path) => path.extracts.map((extract) =>
+    [webExtractTextRef(webStepRowId(digRunId, "extract", extract.label)), extract.quote] as const))));
+}
+
 async function digPathsOf(settings: PathRewriteRunnerSettings, input: StoryWriteInput, lease: StepLease): Promise<readonly PathRewriteDigPath[]> {
   const digRunId = input.runId;
   const enrichment = await lease(() => settings.sources.readEnrichment({ runId: digRunId,
@@ -318,6 +326,15 @@ async function parentCodesFor(settings: PathRewriteRunnerSettings, job: PathRewr
  * the store itself cannot be read or written; the turn is then the sweep's.
  */
 export async function rewriteThePath(settings: PathRewriteRunnerSettings, job: PathRewriteJob, log: Log): Promise<void> {
+  if (job.digPaths !== null) holdDigPassages(job.digRunId, job.digPaths);
+  try {
+    await rewriteOnItsTurn(settings, job, log);
+  } finally {
+    releaseRunPassages(job.digRunId);
+  }
+}
+
+async function rewriteOnItsTurn(settings: PathRewriteRunnerSettings, job: PathRewriteJob, log: Log): Promise<void> {
   const digRunId = job.digRunId;
   const taken = await settings.turns.takeRewriteTurn(digRunId, job.parentRunId, job.positionRef);
   if (taken.outcome !== "TAKEN" && taken.outcome !== "ALREADY") {

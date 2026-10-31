@@ -110,7 +110,7 @@ export interface DigestNodeEntry {
 function digestExtractOf(node: DigestSourceNode): Readonly<{ extract?: EngineCitedExtract }> {
   const cited = node.citedExtract;
   return cited === undefined ? {} : { extract: Object.freeze({ id: cited.id, quote: cited.quote, title: cited.title, site: cited.site,
-    date: cited.date }) };
+    date: cited.date, ...(cited.note === undefined ? {} : { note: cited.note }) }) };
 }
 
 /** W4-1: whether a digest carries any cited extract (then the writer is sent its sources variant). */
