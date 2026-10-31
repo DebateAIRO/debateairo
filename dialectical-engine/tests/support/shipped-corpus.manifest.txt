@@ -347,6 +347,7 @@ apps/observation-agent/src/store/status.ts
 apps/replay/src/cli.ts
 apps/replay/src/database-url.ts
 apps/replay/src/index.ts
+apps/runner/src/answer-checker-sources.ts
 apps/runner/src/call-lane-gateway.ts
 apps/runner/src/call-scheduler.ts
 apps/runner/src/debate-shape-boot.ts

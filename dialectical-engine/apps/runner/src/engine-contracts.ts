@@ -7,6 +7,7 @@ import { MAP_ENGINE_CONTRACT_NAMES, mapEnginePromptContracts } from "@debateai/m
 import { promptContractFingerprintText, type PromptContract } from "@debateai/providers";
 import { SYNTHESIZER_LENGTH_READER_SOURCES_PROMPT_CONTRACT, SYNTHESIZER_LENGTH_SOURCES_PROMPT_CONTRACT } from "@debateai/serve";
 import { PATH_REWRITE_SEALED_CONTRACTS } from "@debateai/story";
+import { EVALUATOR_SOURCES_SEALED_CONTRACTS } from "./answer-checker-sources.js";
 
 /**
  * Engine redesign (spec 2026-10-15 §9; INTERFACE §2.2): the one seal over engine 2's sealed prompt contracts. The runner
@@ -22,7 +23,7 @@ export const ENGINE_CONTRACT_FINGERPRINT_HEADER = "debateai.engine-contracts.v1"
  * verdict.investigate.v1 and R2b verdict.judge.v1 (R2 plan deviation 1); R3 the map v2 contracts and the assigned-root
  * v2 pair; R4 the writer's and checker's engine pair; W1-5 (web search, 2026-10-30) the web wording; W1-5b its second
  * wording as new ids (the v1s it supersedes stay sealed, unused); W3-5 (dig-model revision) the path rewrite's writer and
- * checker; W4-2 the dig's planner (one search per pick). A phase that
+ * checker; W4-2 the dig's planner (one search per pick); W4-7 the answer checker's two sources variants. A phase that
  * appends moves ENGINE_SEALED_IDS and ENGINE_CONTRACT_HASH_SEALED in tests/unit/engine-contract-hash.test.ts.
  */
 export function engineSealedContracts(): readonly PromptContract[] {
@@ -53,7 +54,11 @@ export function engineSealedContracts(): readonly PromptContract[] {
     ...PATH_REWRITE_SEALED_CONTRACTS,
     // W4-2 (plan 2026-10-30; owner Q9, the 31 Oct correction): the dig's planner, one search per pick (a draft wording,
     // OWNER WORDING before switch-on; a reworded one is a new id appended after it).
-    ...WEB_DIG_SEALED_CONTRACTS
+    ...WEB_DIG_SEALED_CONTRACTS,
+    // W4-7 (plan 2026-10-30; design §7.1 item 7): the answer checker's length and length-reader variants that read the
+    // cited extracts the writer read, the instruction and form unchanged (answer-checker-sources.ts). Neither is in the
+    // conformance or composer seal.
+    ...EVALUATOR_SOURCES_SEALED_CONTRACTS
   ]);
 }
 

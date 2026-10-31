@@ -284,6 +284,7 @@ import {
   WEB_ROOT_SOURCES_MAX_BYTES, engineSourceWithCitedExtracts, legWithWebSources, readDebateWebPacks, webCitedExtractsOf, webReviewInput,
   type DebateWebPacks
 } from "./web-packs.js";
+import { EVALUATOR_LENGTH_READER_SOURCES_PROMPT_CONTRACT, EVALUATOR_LENGTH_SOURCES_PROMPT_CONTRACT } from "./answer-checker-sources.js";
 import {
   shapeDistinctMakers, shapeHandOverRoot, shapeMakerBar, shapeRootMakerBar, shapeSeatOrder, shapeSpareForRefusedRoot,
   shapeSpareThatAnswered, shapeWriterSeat
@@ -1035,12 +1036,19 @@ export function buildSynthesisRolePrompt(
   // Web search (W4-1; design §7.1 item 7): a lengthed writer whose digest carries a cited extract takes its sources variant
   // (the extract rides on its node). Without one (no packs, nothing cited), today's contract, byte for byte.
   const sourced = writerLengthed && digestCitesExtracts(request.digest);
+  // W4-7: the checker reads the very extracts the writer read (the same digest), under its own sources variant: the
+  // checker's instruction unchanged, so it never objects to a source it was not shown. None cited: today's packet.
+  const checkerSourced = checkerLengthed && digestCitesExtracts(request.digest);
   if (request.role === "SYNTHESIZER" && !writerLengthed && digestCitesExtracts(request.digest)) {
     // Engine 2, the only engine that reads packs, always tells the length: an unlengthed writer with extracts is a defect.
     throw new TypedDomainError("SYNTHESIZER_SOURCES_UNLENGTHED", "A writer that reads extracts is always told its length");
   }
+  if (request.role === "EVALUATOR" && !checkerLengthed && digestCitesExtracts(request.digest)) {
+    // The same for its checker: engine 2 always tells it its own length; one sent the extracts blind would be a defect.
+    throw new TypedDomainError("EVALUATOR_SOURCES_UNLENGTHED", "A checker that reads extracts is always told its length");
+  }
   // V-MINIMUM-PAYLOAD: the one projection, applied once; a length variant only appends its own fields after it.
-  const material = toSynthesisPromptMaterial(request);
+  const material = toSynthesisPromptMaterial(request, { checkerReadsExtracts: checkerSourced });
   return buildFramedPrompt({
     contract: promptContractInArgumentLanguage(
       request.role === "SYNTHESIZER"
@@ -1049,7 +1057,9 @@ export function buildSynthesisRolePrompt(
           : writerLengthed
           ? (told ? SYNTHESIZER_LENGTH_READER_PROMPT_CONTRACT : SYNTHESIZER_LENGTH_PROMPT_CONTRACT)
           : (told ? SYNTHESIZER_READER_PROMPT_CONTRACT : SYNTHESIZER_PROMPT_CONTRACT))
-        : (checkerLengthed
+        : (checkerSourced
+          ? (told ? EVALUATOR_LENGTH_READER_SOURCES_PROMPT_CONTRACT : EVALUATOR_LENGTH_SOURCES_PROMPT_CONTRACT)
+          : checkerLengthed
           ? (told ? EVALUATOR_LENGTH_READER_PROMPT_CONTRACT : EVALUATOR_LENGTH_PROMPT_CONTRACT)
           : (told ? EVALUATOR_READER_PROMPT_CONTRACT : EVALUATOR_PROMPT_CONTRACT)),
       argumentLanguageName,
@@ -7932,9 +7942,10 @@ export class WalkingSkeletonRunner {
         keepRoomMicros: rootZeroRoomMicros(true), abandon: keepAliveStop, stopsHere: (error) => expansionPhaseStop(error) !== null
       });
       // W4-1: only a step that kept a pack opens the store again; a re-claimed run reads the same packs, so its prompts
-      // are the same bytes. No web search happens inside the debate: the legs read what was stored here.
+      // are the same bytes. No web search happens inside the debate: the legs read what was stored here. W4-7: with the
+      // step's outcomes, so every path of a dig reads the one pack kept under its first path.
       if (webStep.paths.some((path) => path.packId !== null)) {
-        webPacks = await readDebateWebPacks({ pool: this.pool, runId: run.runId, abandon: keepAliveStop });
+        webPacks = await readDebateWebPacks({ pool: this.pool, runId: run.runId, paths: webStep.paths, abandon: keepAliveStop });
       }
     }
     const shapePositions: readonly ShapePositionPlan[] | null = shapeRun === null ? null
