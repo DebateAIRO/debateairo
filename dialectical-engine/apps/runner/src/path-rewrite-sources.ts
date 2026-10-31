@@ -167,6 +167,34 @@ export function postgresPathRewriteSources(pool: Pool): PathRewriteSources {
     return entry;
   };
 
+  /**
+   * R22 decision 1: one path of a dig, for the dig dug from it. Its points and sources are what the dig's settled run gave its own
+   * rewrite (0135's stored paths); its line and fate are what that rewrite wrote for it (`dig_paths`). A dig whose own rewrite failed or
+   * is still writing has no such line: its answer on that path stands, and its fate is not known. Null: no such path, or nothing stored.
+   */
+  const digPathOf = async (parentRunId: string, positionRef: string): Promise<Readonly<{ answerVersion: number; line: string; fate: StoryFate;
+    points: readonly PathRewritePoint[]; extracts: readonly PathRewriteExtract[] }> | null> => {
+    const stored = (await picks.read(parentRunId))?.input?.value;
+    if (stored === undefined || stored === null) return null;
+    const path = storedDigPathsOf(stored).find((candidate) => candidate.positionRef.toLowerCase() === positionRef.toLowerCase());
+    if (path === undefined) return null;
+    const version = (await pool.query<{ answer_version: number }>(
+      "SELECT answer_version FROM serve.answer WHERE run_id = $1 ORDER BY answer_version DESC LIMIT 1", [parentRunId])).rows[0];
+    const answerVersion = version === undefined ? 1 : Number(version.answer_version);
+    const own = (await digModel.readPathRewrites(parentRunId))?.own ?? null;
+    let written: Readonly<{ line: string; fate: StoryFate }> | null = null;
+    if (own !== null && (own.state === "READY" || own.state === "READY_WITH_RESERVATION") && own.rewrite_id !== null) {
+      const opened = await withRunContentLease(pool, [parentRunId], () => decryptContentForRun<unknown>(pool, parentRunId,
+        PATH_REWRITE_CARRIER, own.rewrite_id!, (own.content ?? null) as CryptoEnvelope | null, null));
+      const line = isRecord(opened) && Array.isArray(opened.dig_paths) ? opened.dig_paths.find((candidate: unknown) => isRecord(candidate)
+        && typeof candidate.position_ref === "string" && candidate.position_ref.toLowerCase() === positionRef.toLowerCase()) as unknown : undefined;
+      const fate = isRecord(line) ? StoryFateSchema.safeParse(line.fate) : null;
+      if (isRecord(line) && typeof line.line === "string" && fate?.success === true) written = Object.freeze({ line: line.line, fate: fate.data });
+    }
+    return Object.freeze({ answerVersion, line: written?.line ?? path.statement, fate: written?.fate ?? "SET_ASIDE",
+      points: path.points, extracts: path.extracts });
+  };
+
   return Object.freeze({
     digOf: async (runId: string): Promise<PathRewriteDig | null> => {
       const own = await picks.read(runId);
@@ -191,9 +219,12 @@ export function postgresPathRewriteSources(pool: Pool): PathRewriteSources {
     },
     parentPathOf: async ({ parentRunId, positionRef, baseRewriteId }): Promise<PathRewriteParentPath> => {
       const story = await storyPathOf(pool, parentRunId, positionRef);
-      if (story === null) return unread("parent story path");
-      let text: Readonly<{ answerVersion: number; line: string; summary: string | null; fate: StoryFate }> =
-        { answerVersion: story.answerVersion, line: story.line, summary: null, fate: story.fate };
+      // R22 decision 1: a dig has no story, so a path of a dig (a dig of level 2 or deeper is dug from one) is read from that dig.
+      const digPath = story === null ? await digPathOf(parentRunId, positionRef) : null;
+      if (story === null && digPath === null) return unread("parent path");
+      let text: Readonly<{ answerVersion: number; line: string; summary: string | null; fate: StoryFate }> = story !== null
+        ? { answerVersion: story.answerVersion, line: story.line, summary: null, fate: story.fate }
+        : { answerVersion: digPath!.answerVersion, line: digPath!.line, summary: null, fate: digPath!.fate };
       if (baseRewriteId !== null) {
         const entry = await rewriteText(parentRunId, baseRewriteId);
         const opened = await withRunContentLease(pool, [entry.run_id], () => decryptContentForRun<unknown>(pool, entry.run_id,
@@ -203,7 +234,11 @@ export function postgresPathRewriteSources(pool: Pool): PathRewriteSources {
         if (written === null || typeof written.line !== "string" || typeof written.summary !== "string" || !fate.success) return unread("base text");
         text = { answerVersion: entry.parent_answer_version!, line: written.line, summary: written.summary, fate: fate.data };
       }
-      const pointIds = story.nodeRefs.filter((id) => id.toLowerCase() !== story.positionNodeId.toLowerCase());
+      if (digPath !== null) {
+        return Object.freeze({ positionRef, answerVersion: text.answerVersion, line: text.line, summary: text.summary, fate: text.fate,
+          points: digPath.points, extracts: digPath.extracts });
+      }
+      const pointIds = story!.nodeRefs.filter((id) => id.toLowerCase() !== story!.positionNodeId.toLowerCase());
       const points = await pointsOf(pool, parentRunId, pointIds);
       const extracts = await extractsOfPoints(pool, parentRunId, points.map((point) => point.id));
       return Object.freeze({ positionRef, answerVersion: text.answerVersion, line: text.line, summary: text.summary, fate: text.fate,
