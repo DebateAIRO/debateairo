@@ -31,7 +31,7 @@ import {
   WEB_PLANNER_V2_PROMPT_CONTRACT, WEB_READ_TOP_V2_INSTRUCTION, WEB_READ_TOP_V2_PROMPT_CONTRACT, WEB_REPLY_COUNTRY_INVALID,
   WEB_STEP_PROMPT_CONTRACTS_IN_USE, WEB_SUGGEST_ANSWER_FORM, WEB_SUGGEST_INSTRUCTION, WEB_SUGGEST_MATERIAL_FIELDS,
   WEB_SUGGEST_PROMPT_CONTRACT, WEB_TOP_COUNT_BY_MODE, WEB_TOP_COUNTS, WEB_WORDING_V2_SEALED_CONTRACTS,
-  WEB_DIG_PLANNER_ANSWER_FORM, WEB_DIG_PLANNER_CONTRACT_ID, WEB_DIG_PLANNER_INSTRUCTION, WEB_DIG_PLANNER_MATERIAL_FIELDS,
+  WEB_DIG_METHOD_SEALED_CONTRACTS, WEB_DIG_PLANNER_ANSWER_FORM, WEB_DIG_PLANNER_CONTRACT_ID, WEB_DIG_PLANNER_INSTRUCTION, WEB_DIG_PLANNER_MATERIAL_FIELDS,
   WEB_DIG_PLANNER_PROMPT_CONTRACT, WEB_DIG_SEALED_CONTRACTS, webDigPlannerMaterialFields, webDigPlannerReplyIssues,
   webDigPlannerReplySchema,
   webPickV2MaterialFields, webPickV2ReplyIssues, webPlannerCountry, webPlannerV2MaterialFields, webPlannerV2ReplyIssues,
@@ -353,7 +353,9 @@ describe("the seals", () => {
       // W4-7: the answer checker's two sources variants, after the dig's planner.
       ...EVALUATOR_SOURCES_SEALED_CONTRACTS,
       // W5-1: the final report's five, after the dig's planner.
-      ...INVESTIGATION_REPORT_SEALED_CONTRACTS
+      ...INVESTIGATION_REPORT_SEALED_CONTRACTS,
+      // R22 decision 9 and W4-3: the dig method's two drafts.
+      ...WEB_DIG_METHOD_SEALED_CONTRACTS
     ];
     const sealed = engineSealedContracts();
     expect(sealed.slice(-appended.length)).toEqual(appended);
@@ -372,7 +374,9 @@ describe("the seals", () => {
       "path-rewrite.writer.v1", "path-rewrite.checker.v1", "web.plan-dig.v1",
       "serve.evaluator.length.sources.v1", "serve.evaluator.length.reader.sources.v1",
       // W5-1: the final report's five, after them.
-      "report.answer.v1", "report.answer.later.v1", "report.answer-check.v1", "report.story.v1", "report.story-check.v1"
+      "report.answer.v1", "report.answer.later.v1", "report.answer-check.v1", "report.story.v1", "report.story-check.v1",
+      // R22 decision 9 and W4-3: the dig method's two drafts, last.
+      "web.plan-dig.v2", "web.suggest-dig.v1"
     ]);
     expect(new Set(ENGINE_SEALED_CONTRACT_IDS).size).toBe(ENGINE_SEALED_CONTRACT_IDS.length);
     // The review is sealed with its edge count at zero, as the judge seal seals the review.

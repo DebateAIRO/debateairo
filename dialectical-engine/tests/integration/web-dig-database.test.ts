@@ -11,10 +11,10 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  configureContentEncryption, contentCipherFor, createPool, PostgresDigPicksRepository, PostgresInvestigationRepository,
+  configureContentEncryption, contentCipherFor, createPool, PostgresDigPicksRepository, PostgresDigPicksRunnerRepository, PostgresInvestigationRepository,
   WEB_EVIDENCE_CARRIERS, migrate, type Pool
 } from "@debateai/db";
-import { WEB_DIG_PLANNER_CONTRACT_ID, framedJudgePromptForTest, type JudgeLeg } from "@debateai/judgement";
+import { WEB_DIG_PLANNER_V2_CONTRACT_ID, framedJudgePromptForTest, type JudgeLeg } from "@debateai/judgement";
 import { LENGTH_GUIDANCE_START, type LengthGuide } from "@debateai/kernel";
 import {
   PERPLEXITY_SEARCH_CHARGE_MICROS, createPerplexitySearchPort, readPromptFrame, type PromptPacket, type ProviderCallRequest,
@@ -65,7 +65,8 @@ const DIG_QUESTION = "Would winter ridership fill a second ferry pier?";
 const PICKS = Object.freeze(["Does winter ridership fall?", "I think tourists keep the ferries full all year."]);
 const Q1 = "winter ferry ridership harbour statistics";
 const Q2 = "tourist ferry passengers all year survey";
-const DIG_PLAN = JSON.stringify({ searches: [{ pick_id: "k1", pace: "normal", query: Q1 }, { pick_id: "k2", pace: "normal", query: Q2 }] });
+const DIG_PLAN = (packet: PromptPacket): string => JSON.stringify({ country: null, needs_search: true, reason: null, pace: "normal",
+  searches: [{ side: "for", local: false, query: readPromptFrame(packet).fields.find((entry) => entry.name === "chosen")?.content === PICKS[1] ? Q2 : Q1 }] });
 /** The dig's own paths (its map's answers): the pack is kept under b1, and b2 reads it too. */
 const DIG_PATHS: readonly WebStepPath[] = Object.freeze([
   Object.freeze({ pathRef: "b1", answer: "Yes: winter crossings stay steady.", forPoints: [], againstPoints: [] }),
@@ -186,8 +187,9 @@ describe("W4-7 a dig's web step and its reuse, on real PostgreSQL", () => {
     const firstSearch = digPerplexity();
     await expect(runnerStep({ runId: dig, question: DIG_QUESTION, paths: DIG_PATHS, members: membersOf(first.all, killed),
       settings: settingsOf(firstSearch.port), abandon: (error) => error instanceof Killed })).rejects.toBeInstanceOf(Killed);
-    expect(contractOf(first.haiku.bodies[0]!)).toBe(WEB_DIG_PLANNER_CONTRACT_ID);
-    expect(JSON.parse(fieldOf(first.haiku.bodies[0]!, "picks"))).toEqual([{ pick_id: "k1", text: PICKS[0] }, { pick_id: "k2", text: PICKS[1] }]);
+    expect(contractOf(first.haiku.bodies[0]!)).toBe(WEB_DIG_PLANNER_V2_CONTRACT_ID);
+    expect(first.haiku.bodies.filter((body) => contractOf(body) === WEB_DIG_PLANNER_V2_CONTRACT_ID).map((body) => fieldOf(body, "chosen")).sort())
+      .toEqual([...PICKS].sort());
     expect([...firstSearch.queries].sort()).toEqual([Q1, Q2].sort());
 
     // The copy that claims it again: every call the first made is answered by the replay book, so its prompts are the
@@ -263,6 +265,41 @@ describe("W4-7 a dig's web step and its reuse, on real PostgreSQL", () => {
     expect(again.paths).toEqual(result.paths);
     expect(legsOf(await readDebateWebPacks({ pool: runner, runId: dig, paths: again.paths }))).toEqual(legs);
     expect((await pathsKept(dig)).packs).toEqual(["b1"]);
+  });
+
+  it("R22 decision 9: a dig below level 1 plans from its parent dig's own AI text and the first debate's notes, never a passage", async () => {
+    const PASSAGE = "A whole passage copied from the page, which no later step may read.";
+    const parent = await firstDebate();
+    const { dig } = await digOf(parent);
+    const position = randomUUID();
+    expect(await new PostgresDigPicksRunnerRepository(runner).recordInput(dig, randomUUID(), { v: 1, dig_paths: [{ positionRef: position,
+      statement: "Winter crossings stay steady.", points: [{ id: randomUUID(), text: "Winter riders held up last year.", onId: null, side: "for", trust: null, disputed: true }],
+      extracts: [{ pointId: position, label: "S1-1", site: "example.org", title: null, quote: PASSAGE }] }] })).toBe("RECORDED");
+    // The dig below it joins after its parent stored its paths.
+    const below = await createEncryptedStoryRun(database.pool, owner, DIG_QUESTION);
+    const joined = await new PostgresInvestigationRepository(api).join({ ownerRef: owner.ownerRef, parentRunId: dig, childRunId: below,
+      places: [`path:${position}`], mode: "quick" });
+    expect(joined).toMatchObject({ outcome: "JOINED", digLevel: 2 });
+    expect(await new PostgresDigPicksRepository(api).record({ ownerRef: owner.ownerRef, runId: below, parentRunId: dig, positionRef: position,
+      picks: [{ kind: "OWN_VIEW", suggestionId: null, place: `path:${position}`, author: "PERSON_OWN_VIEW", text: PICKS[1]! }] })).toBe("RECORDED");
+
+    const ais = team({ haiku: { planner: JSON.stringify({ country: null, needs_search: false, reason: "Nothing new.", pace: null, searches: [] }) } });
+    const result = await runnerStep({ runId: below, question: DIG_QUESTION, paths: DIG_PATHS, members: membersOf(ais.all), settings: settingsOf(digPerplexity().port) });
+    expect(result.paths.map((path) => path.status)).toEqual(["NO_SEARCH_PLANNED", "NO_SEARCH_PLANNED"]);
+    const known = fieldOf(ais.haiku.bodies[0]!, "already_investigated");
+    expect(known).toContain("Winter crossings stay steady.");
+    expect(known).toContain("Winter riders held up last year.");
+    expect(known).toContain("It counts ferry riders.");
+    expect(known).toContain(QUERIES.a1for);
+    expect(known).not.toContain(PASSAGE);
+    // The page text and its extracts of the first debate are not there either.
+    expect(known).not.toContain("thousand riders");
+    // The same digest on a re-claim, also once a later dig has joined and settled.
+    const late = await createEncryptedStoryRun(database.pool, owner, DIG_QUESTION);
+    await new PostgresInvestigationRepository(api).join({ ownerRef: owner.ownerRef, parentRunId: dig, childRunId: late, places: [`path:${position}`], mode: "quick" });
+    const again = team({ haiku: { planner: JSON.stringify({ country: null, needs_search: false, reason: "Nothing new.", pace: null, searches: [] }) } });
+    await runnerStep({ runId: below, question: DIG_QUESTION, paths: DIG_PATHS, members: membersOf(again.all), settings: settingsOf(digPerplexity().port) });
+    expect(fieldOf(again.haiku.bodies[0]!, "already_investigated")).toBe(known);
   });
 
   it("once the investigation's texts are wiped, a dig's own search fetches the page again for its 0.1 cent: no reader paid", async () => {

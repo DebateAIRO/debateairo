@@ -5,6 +5,7 @@
 // or a pick that stay data, code's checks of the reply (refs, verdict, trust word), and two digs of one path in order.
 import { describe, expect, it } from "vitest";
 import { readPromptFrame, type PromptPacket } from "@debateai/providers";
+import type { DigSuggestionsJob } from "../../apps/runner/src/dig-suggestions-step.js";
 import { engineContractHash } from "../../apps/runner/src/engine-contracts.js";
 import { pathRewriteIdOf, runDigPathRewrite } from "../../apps/runner/src/path-rewrite.js";
 import {
@@ -59,6 +60,24 @@ describe("W3-5 a dig rewrites the path it was dug from", () => {
     // W4-3's hook: once the row is stored, for the dig's own paths.
     expect(hooked).toEqual([{ digRunId: DIG_A, parentRunId: dig().parentRunId, positionRef: dig().positionRef, level: 1,
       outcome: "READY", digPathRefs: [DIG_NODES.no, DIG_NODES.yes] }]);
+  });
+
+  it("W4-3: the AI's suggestions are sealed with the rewrite, told what it changed; a failure to write them costs the rewrite nothing", async () => {
+    const offered = [{ position_ref: "pos", suggestions: [{ suggestion_id: "s-1", kind: "HELPS_MAIN_QUESTION" as const, side: "FOR" as const, text: "t", places: ["path:pos"] }] }];
+    const store = memoryStore();
+    const jobs: DigSuggestionsJob[] = [];
+    await runDigPathRewrite(settingsOver({ store, digs: new Map([[DIG_A, dig()]]), extra: { suggest: async (job) => { jobs.push(job); return offered; } } }),
+      digSnapshot(DIG_A, membersOf(team())));
+    expect(jobs[0]).toMatchObject({ digRunId: DIG_A, free: false, whatChanged: ["The dig weakened the year-round case: winter ridership falls."] });
+    const row = store.rewrites[0]!;
+    expect(row.outcome).toBe("READY");
+    expect(store.contents.get(row.rewriteId)).toMatchObject({ dig_suggestions: offered });
+
+    const failing = memoryStore();
+    await runDigPathRewrite(settingsOver({ store: failing, digs: new Map([[DIG_A, dig()]]), extra: { suggest: async () => { throw new Error("down"); } } }),
+      digSnapshot(DIG_A, membersOf(team())));
+    expect(failing.rewrites[0]!.outcome).toBe("READY");
+    expect(failing.contents.get(failing.rewrites[0]!.rewriteId)).not.toHaveProperty("dig_suggestions");
   });
 
   it("at level 10 the rewrite runs and no suggestions are asked for", async () => {

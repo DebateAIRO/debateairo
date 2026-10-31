@@ -3,6 +3,7 @@ import { registerPasswordResetRoutes, passwordResetPolicyInventory } from "./pas
 import { registerEmailMfaRoutes, emailMfaPolicyInventory } from "./email-mfa-routes.js";
 import { AccountMemoryInputError, type AccountMemoryStore } from "./account-memory.js";
 import {
+  digSuggestionTextFromAnswer,
   admitDig, digPathIndexOf, joinAtStart, recordDigPicksAtStart, type DigAdmissionPorts, type DigJoinPort, type DigPathIndex,
   type DigPicksPort, type DigSuggestionTextReader
 } from "./dig-admission.js";
@@ -4076,7 +4077,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       // W3-7: a dig that joined keeps what it was made of (0135), for the rewrite of the path its picks are on.
       if ((joined === "JOINED" || joined === "ALREADY") && options.digPicks !== undefined) {
         await recordDigPicksAtStart({ ownerRef: digOwner, parent: digParent, childRunId: accepted.run_ref, positionRef: digPositionRef },
-          options.digPicks, options.digSuggestionText);
+          options.digPicks, options.digSuggestionText ?? digSuggestionTextFromAnswer((parentRunId) =>
+            options.application.readRunAnswer(parentRunId, request.session, ownershipFor(request))));
       }
     }
     return reply.status(202).send(accepted);

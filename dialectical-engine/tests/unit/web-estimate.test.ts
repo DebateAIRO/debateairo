@@ -20,6 +20,7 @@ import {
   webModelCalls,
   webReaderOneCalls,
   webReceipt,
+  webSitesOfReceipt,
   webSitesOf
 } from "@debateai/register";
 import {
@@ -70,11 +71,15 @@ describe("W2-2 · the web part's counts at the owner's caps", () => {
       readerOneCallsPerPack: 14, topCount: 5 });
   });
 
-  it("a dig: one search per chosen suggestion, 5 results each, one shared pack", () => {
-    expect(webSitesOf({ kind: "DIG", depth: "QUICK", digSearches: 3 })).toMatchObject({ packs: 1, searches: 3, resultsPerSearch: 5,
-      pageTokensPerPack: 300_000, readerOneCalls: 6, pickCalls: 1, topReaderCalls: 2, plannerCalls: 1 });
+  it("a dig (R22 decision 9): up to 4 searches per chosen path, each chosen path's own planner, 5 results each, one shared pack", () => {
+    expect(webSitesOf({ kind: "DIG", depth: "QUICK", digPicks: 3 })).toMatchObject({ packs: 1, searches: 12, resultsPerSearch: 5,
+      pageTokensPerPack: 1_200_000, readerOneCalls: 21, pickCalls: 1, topReaderCalls: 2, plannerCalls: 3 });
+    // Under the debate's cap: Quick look 20, Thorough 40; a planner per chosen path whatever the cap keeps.
+    expect(webSitesOf({ kind: "DIG", depth: "QUICK", digPicks: 16 })).toMatchObject({ searches: 20, plannerCalls: 16 });
+    expect(webSitesOf({ kind: "DIG", depth: "THOROUGH", digPicks: 16 })).toMatchObject({ searches: 40, plannerCalls: 16, topCount: 5 });
     const refused = expect.objectContaining({ code: "WEB_SITES_INVALID" });
-    expect(() => webSitesOf({ kind: "DIG", depth: "QUICK", digSearches: 0 })).toThrow(refused);
+    expect(() => webSitesOf({ kind: "DIG", depth: "QUICK", digPicks: 0 })).toThrow(refused);
+    expect(() => webSitesOf({ kind: "DIG", depth: "QUICK", digPicks: 17 })).toThrow(refused);
     expect(() => webSitesOf({ kind: "START", depth: "QUICK", paths: 11 })).toThrow(refused);
     expect(() => webSitesOf({ kind: "START", depth: "DEEP" as never, paths: 2 })).toThrow(refused);
   });
@@ -196,6 +201,31 @@ describe("W2-2 · the receipt carries the web part (envelope_basis.web)", () => 
       { ...member, page_token_cap: 10_000 }, { ...member, extra: 1 }]) {
       expect(() => parseCostEnvelopeBasis({ ...basis, web: tampered })).toThrow(expect.objectContaining({ code: "RUN_COST_ENVELOPE_UNRESOLVED" }));
     }
+  });
+});
+
+describe("R22 decision 9 · a dig's web part fits up to 4 searches per chosen path", () => {
+  const digSites = (digPicks: number) => webSitesOf({ kind: "DIG", depth: "QUICK", digPicks });
+  it("the part counts every search, every chosen path's planner and the suggestions, and grows with the picks", () => {
+    const one = estimateWebPartMicros(digSites(1), ROLES);
+    const three = estimateWebPartMicros(digSites(3), ROLES);
+    expect(one.searches).toBe(4);
+    expect(one.searchMicros).toBe(4 * 1_000);
+    expect(three.searchMicros).toBe(12 * 1_000);
+    expect(three.plannerMicros).toBe(3 * one.plannerMicros);
+    expect(one.suggestMicros).toBeGreaterThan(0);
+    expect(three.totalMicros).toBeGreaterThan(one.totalMicros);
+    // A first debate's part is untouched: no suggestion part, the same total as pinned above.
+    expect(estimateWebPartMicros(webSitesOf({ kind: "START", depth: "QUICK", paths: 5 }), ROLES).suggestMicros).toBe(0);
+  });
+  it("a dig's receipt carries its planners and reads back to the same counts", () => {
+    const sites = digSites(3);
+    expect(webSitesOfReceipt(webReceipt(sites, 2))).toEqual(sites);
+    expect(webReceipt(sites, 2).sites.planner).toBe(3);
+  });
+  it("every Haiku call of the part stays under the price line, at the most searches a dig may send", () => {
+    const tokens = webCallTokens(webSitesOf({ kind: "DIG", depth: "THOROUGH", digPicks: 16 }));
+    for (const call of [tokens.readerOne, tokens.pick, tokens.planner]) expect(call.inputTokens).toBeLessThan(WEB_HAIKU_PROMPT_TOKEN_LINE);
   });
 });
 

@@ -15,10 +15,12 @@ import { TypedDomainError } from "@debateai/kernel";
  *  - 4 searches per web path on a Quick look (2 English, for and against; 2 in the question's language and country,
  *    for and against, when the planner says local information helps), so up to 20 at 5 paths; Thorough doubles the cap
  *    (8 per path) ("Search cap vs 4 per path", "Thorough", Q10);
- *  - 10 results per search at a debate's start, 5 for a dig, one search per chosen dig suggestion (plan W2-1, Q9);
+ *  - 10 results per search at a debate's start, 5 for a dig (plan W2-1, Q9);
+ *  - a dig (R22 decision 9, replacing "one search per chosen suggestion"): each chosen path has its own planner call and up to
+ *    4 searches, within the debate's cap (Quick look 20, Thorough 40), and its one pack shared by the dig's paths;
  *  - reader 1 reads every page whole, in batches of at most 80,000 tokens, every Haiku call under 100,000 (plan W2-4);
  *  - the top 3 pages per path (Thorough: 5) are read whole by readers 2 and 3 ("Thorough's top 5 vs the approved 3");
- *  - one planner call per debate or dig (plan W2-3, W4-2).
+ *  - one planner call per debate (plan W2-3), one per chosen path of a dig (decision 9).
  * The page sizes are the search request's own caps (`max_tokens_per_page`, `max_tokens`, task W2-1), so a search can
  * never bring back more text than is counted here: WEB_SEARCH_PAGE_TOKEN_CAP and WEB_SEARCH_REQUEST_TOKEN_CAP must be
  * exactly what the adapter sends (W2-1 reads them from here). The thinking of every web step is set low (owner rule);
@@ -45,14 +47,17 @@ export const WEB_SITES_START = Object.freeze({
   topCount: Object.freeze({ QUICK: 3, THOROUGH: 5 }),
   /** Readers 2 and 3: two AIs from two other companies. */
   topReaders: 2,
-  /** One planner call per debate (or per dig). */
+  /** One planner call per debate; a dig has one per chosen path (`digSearchesPerPick` beside it). */
   plannerCalls: 1,
+  /** A dig's chosen path: up to 4 searches (R22 decision 9), under the debate's cap below. */
+  digSearchesPerPick: 4,
+  digSearchCap: Object.freeze({ QUICK: 20, THOROUGH: 40 }),
   /** One pick call per pack (per path at the start, per dig). */
   pickCallsPerPack: 1
 });
 
-/** The largest debate the receipt accepts (five paths today; ten gives room) and the most searches a dig may ask. */
-export const WEB_SITES_LIMITS = Object.freeze({ webPathsMax: 10, digSearchesMax: 10 });
+/** The largest debate the receipt accepts (five paths today; ten gives room) and the most paths one dig may choose (the contract's). */
+export const WEB_SITES_LIMITS = Object.freeze({ webPathsMax: 10, digPicksMax: 16 });
 
 export type WebDepth = "QUICK" | "THOROUGH";
 export type WebKind = "START" | "DIG";
@@ -63,8 +68,8 @@ export type WebSiteInput = Readonly<{
   depth: WebDepth;
   /** START: the paths the debate weighs, every one of which may search (the planner may plan fewer, never more). */
   paths?: number;
-  /** DIG: one search per chosen dig suggestion (owner Q9). */
-  digSearches?: number;
+  /** DIG: the paths the person chose (R22 decision 9): each has its own planner and up to 4 searches. */
+  digPicks?: number;
 }>;
 
 /** The web part's counts, camelCase (the estimate and the runner read these). */
@@ -119,20 +124,22 @@ export function webSitesOf(input: WebSiteInput): WebSites {
   let packs: number;
   let searchesPerPack: number;
   let resultsPerSearch: number;
+  let plannerCalls: number = start.plannerCalls;
   if (input.kind === "START") {
-    if (!whole(input.paths, 1, WEB_SITES_LIMITS.webPathsMax) || input.digSearches !== undefined) {
-      return invalid("A debate's web part needs its paths (1 to 10) and no dig searches");
+    if (!whole(input.paths, 1, WEB_SITES_LIMITS.webPathsMax) || input.digPicks !== undefined) {
+      return invalid("A debate's web part needs its paths (1 to 10) and no dig picks");
     }
     packs = input.paths;
     searchesPerPack = start.searchesPerPath[input.depth];
     resultsPerSearch = start.resultsPerSearch.START;
   } else if (input.kind === "DIG") {
-    if (!whole(input.digSearches, 1, WEB_SITES_LIMITS.digSearchesMax) || input.paths !== undefined) {
-      return invalid("A dig's web part needs its searches (1 to 10, one per chosen suggestion) and no paths");
+    if (!whole(input.digPicks, 1, WEB_SITES_LIMITS.digPicksMax) || input.paths !== undefined) {
+      return invalid("A dig's web part needs its chosen paths (1 to 16) and no debate paths");
     }
     packs = 1;
-    searchesPerPack = input.digSearches;
+    searchesPerPack = Math.min(input.digPicks * start.digSearchesPerPick, start.digSearchCap[input.depth]);
     resultsPerSearch = start.resultsPerSearch.DIG;
+    plannerCalls = input.digPicks;
   } else {
     return invalid("The web part is a debate's START or a DIG");
   }
@@ -152,7 +159,7 @@ export function webSitesOf(input: WebSiteInput): WebSites {
     pageTokensPerPack,
     readerOneCallsPerPack,
     topCount: start.topCount[input.depth],
-    plannerCalls: start.plannerCalls,
+    plannerCalls,
     readerOneCalls: packs * readerOneCallsPerPack,
     pickCalls: packs * start.pickCallsPerPack,
     topReaderCalls: packs * start.topReaders
@@ -184,7 +191,7 @@ export const webReceiptSchema = z.object({
   reader_batch_tokens: count(1, WEB_HAIKU_PROMPT_TOKEN_LINE),
   top_count: count(1, 10),
   sites: z.object({
-    planner: count(0, 1),
+    planner: count(0, WEB_SITES_LIMITS.digPicksMax),
     reader_one: count(1, 10_000),
     pick: count(1, 64),
     top_readers: count(1, 64),
@@ -195,7 +202,7 @@ export const webReceiptSchema = z.object({
   try {
     expected = webSitesOf(receipt.kind === "START"
       ? { kind: "START", depth: receipt.depth, paths: receipt.packs }
-      : { kind: "DIG", depth: receipt.depth, digSearches: receipt.searches });
+      : { kind: "DIG", depth: receipt.depth, digPicks: receipt.sites.planner });
   } catch (error) {
     ctx.addIssue({ code: "custom", path: ["packs"], message: `the web part cannot be counted (${error instanceof Error ? error.message : String(error)})` });
   }
@@ -254,5 +261,5 @@ export function webReceipt(sites: WebSites, perSiteAttempts: number): WebReceipt
 export function webSitesOfReceipt(receipt: WebReceipt): WebSites {
   return receipt.kind === "START"
     ? webSitesOf({ kind: "START", depth: receipt.depth, paths: receipt.packs })
-    : webSitesOf({ kind: "DIG", depth: receipt.depth, digSearches: receipt.searches });
+    : webSitesOf({ kind: "DIG", depth: receipt.depth, digPicks: receipt.sites.planner });
 }

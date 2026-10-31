@@ -392,13 +392,14 @@ export function isMoneyRuleWindow(window: PersonWindow): boolean {
  * (its only window) — on a dig's read as `digSharePercent`, else as `startSharePercent`; and the reserve, always kept.
  * Nothing on a read whose windows are not billingPlans v4's.
  */
-function moneyRuleMembers(question: RoomQuestion, evaluation: RoomEvaluation): Pick<AskRoomAnswer,
+function moneyRuleMembers(question: RoomQuestion, evaluation: RoomEvaluation, digWebPartMicros: number = 0): Pick<AskRoomAnswer,
   "startSharePercent" | "digSharePercent" | "reserve"> {
   if (!evaluation.moneyRule) return {};
   const today = evaluation.personUses.find((use) => use.scope === "PERSON_DAY")
     ?? evaluation.personUses.find((use) => use.scope === "PERSON_MONTH");
   if (today === undefined) return { reserve: "KEPT" };
-  const share = digSharePercent(evaluation.estimateMicros, today.limitMicros);
+  // A dig's share counts its web part (R22 decision 9): up to 4 searches per chosen path, so more picks read as more of today.
+  const share = digSharePercent(evaluation.estimateMicros + digWebPartMicros, today.limitMicros);
   return question.dig === undefined
     ? { startSharePercent: share, reserve: "KEPT" }
     : { digSharePercent: share, reserve: "KEPT" };
@@ -770,7 +771,7 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
     const planId = grant !== null || this.#options.entitlements === null || ownerRef === null ? null
       : (await this.#options.entitlements.current(ownerRef, now)).planId;
     const funding = grant === null ? {} : {funding: Object.freeze({kind:"INTERNAL" as const, expiresAt:grant.expiresAt})};
-    const money = grant === null ? moneyRuleMembers(question, evaluation) : {};
+    const money = grant === null ? moneyRuleMembers(question, evaluation, await this.#digWebPartMicros(question)) : {};
     const admission = evaluation.admission;
     switch (admission.kind) {
       case "REFUSE_ALREADY_WAITING":
@@ -1058,6 +1059,16 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
     if (gate === undefined) return null;
     if (!(await gate.ownReleaseIsCurrent(tx, question.registerVersion))) return "SWITCHING";
     return await this.#siteIsBusy(tx, gate) ? "SITE_BUSY" : null;
+  }
+
+  /**
+   * R22 decision 9: a dig's web part for the share shown before it, 0 for a question, for Free (which never searches) and with
+   * no web prices. Only the line reads it: the room is still measured by `estimateMicros`, so it holds and walls nothing more.
+   */
+  async #digWebPartMicros(question: RoomQuestion): Promise<number> {
+    if (question.dig === undefined || question.settingsClass.planTier === "free") return 0;
+    const estimator = await this.#estimatorFor(question.registerVersion);
+    return estimator.digWebPartMicros?.({ depth: question.dig.mode === "thorough" ? "THOROUGH" : "QUICK", digPicks: Math.max(question.dig.picks ?? 1, 1) }) ?? 0;
   }
 
   /** The site's live debates at its cap, counted under `SITE_CONCURRENT_DEBATES_LOCK` on the decision's own transaction. */

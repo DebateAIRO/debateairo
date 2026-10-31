@@ -168,8 +168,32 @@ export interface DigPicksPort {
     picks: readonly Readonly<{ kind: DigPick["kind"]; suggestionId: string | null; place: string; author: DigPickAuthor; text: string }>[] }>):
     Promise<"RECORDED" | "ALREADY" | "NOT_OWNED" | "NOT_A_DIG" | "NOT_SEALED">;
 }
-/** The stored text of a dig suggestion of the parent (W4-3's store), or null when none is stored under that id. */
+/** The text of a dig suggestion the parent offers (W4-3), or null when it offers none under that id. */
 export type DigSuggestionTextReader = (ownerRef: string, parentRunId: string, suggestionId: string) => Promise<string | null>;
+
+/** A suggestion's text as the parent's answer serves it, whichever path offers it; null when none has that id. */
+export function digSuggestionTextOf(answer: Readonly<{ web?: Readonly<{ paths: readonly Readonly<{ suggestions: readonly Readonly<{
+  suggestion_id: string; text: string }>[] }>[] }> | undefined }> | null, suggestionId: string): string | null {
+  for (const path of answer?.web?.paths ?? []) {
+    const found = path.suggestions.find((suggestion) => suggestion.suggestion_id === suggestionId);
+    if (found !== undefined) return found.text;
+  }
+  return null;
+}
+
+/**
+ * W4-3: the reader the asks route hands `recordDigPicksAtStart`: what was offered is what the parent's answer serves, the one
+ * place every kind of suggestion is worked out or opened (the same read the map page made). Read once per dig, however many
+ * picks it has. An answer that cannot be read compares with nothing, so every pick reads as the person's: never passed off as
+ * an AI's, and the dig's picks are still kept.
+ */
+export function digSuggestionTextFromAnswer(readAnswer: (parentRunId: string) => Promise<Parameters<typeof digSuggestionTextOf>[0]>): DigSuggestionTextReader {
+  const read = new Map<string, Promise<Parameters<typeof digSuggestionTextOf>[0]>>();
+  return async (_ownerRef, parentRunId, suggestionId) => {
+    if (!read.has(parentRunId)) read.set(parentRunId, readAnswer(parentRunId).catch(() => null));
+    return digSuggestionTextOf(await read.get(parentRunId)!, suggestionId);
+  };
+}
 
 /**
  * W3-7: once the dig joined its parent's investigation (JOINED or ALREADY), what it was made of is kept once (0135), each

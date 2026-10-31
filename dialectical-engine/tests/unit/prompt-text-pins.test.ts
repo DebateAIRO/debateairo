@@ -4,6 +4,7 @@ import {
   COMPARING_JUDGE_SOURCES_PROMPT_CONTRACT,
   PANEL_PROMPT_CONTRACT,
   WEB_STEP_PROMPT_CONTRACTS,
+  WEB_DIG_METHOD_SEALED_CONTRACTS,
   WEB_DIG_SEALED_CONTRACTS,
   WEB_WORDING_V2_SEALED_CONTRACTS,
   judgeSourcesSealedContracts,
@@ -899,7 +900,9 @@ describe("REVIEW ITEM 4 — no prompt anywhere still carries the retired sentenc
       // W4-7: the answer checker's two sources variants; pinned in tests/unit/answer-checker-sources.test.ts.
       ...EVALUATOR_SOURCES_SEALED_CONTRACTS,
       // W5-1: the final report's five; their texts are pinned below.
-      ...INVESTIGATION_REPORT_SEALED_CONTRACTS]
+      ...INVESTIGATION_REPORT_SEALED_CONTRACTS,
+      // R22 decision 9 and W4-3: the dig method's two drafts; pinned in tests/unit/web-dig-method.test.ts.
+      ...WEB_DIG_METHOD_SEALED_CONTRACTS]
       .map((contract): [string, typeof contract] => [contract.contractId, contract])
   ])("%s", (_name, contract) => {
     const whole = `${contract.instruction} ${contract.answerForm}`;

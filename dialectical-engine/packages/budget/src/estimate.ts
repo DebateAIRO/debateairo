@@ -57,6 +57,8 @@ export type RunShapeClass = Readonly<{ plan: DebateShapePlanKey; depthMode: Dept
 
 export interface CostEstimator {
   estimateMicros(settings: RunSettingsClass): Promise<number>;
+  /** R22 decision 9: a dig's web part at its most, for the share shown before it; absent or null: not known. */
+  digWebPartMicros?(web: Readonly<{ depth: "QUICK" | "THOROUGH"; digPicks: number }>): number | null;
 }
 
 export type RecentRunCharge = Readonly<{ providerRef: string; inputTokens: number; outputTokens: number }>;
@@ -234,6 +236,16 @@ export class RecentRunsCostEstimator implements CostEstimator {
       || this.#start.minSamples > this.#sampleSize)) {
       throw new TypeError("COST_ESTIMATE_OPTIONS_INVALID");
     }
+  }
+
+  /**
+   * R22 decision 9: a dig's web part at the most it can do (up to 4 searches per chosen path, each chosen path's planner,
+   * the readers, its suggestions), for the share of today shown before it. Null with no web prices. It holds nothing and walls
+   * nothing (the owner's money rule, 31 Oct: no worst-case hold before a start): only the line reads it.
+   */
+  digWebPartMicros(web: Readonly<{ depth: "QUICK" | "THOROUGH"; digPicks: number }>): number | null {
+    if (this.#webPrices === null) return null;
+    return estimateWebPartMicros(webSitesOf({ kind: "DIG", depth: web.depth, digPicks: web.digPicks }), this.#webPrices).totalMicros;
   }
 
   async estimateMicros(settings: RunSettingsClass): Promise<number> {

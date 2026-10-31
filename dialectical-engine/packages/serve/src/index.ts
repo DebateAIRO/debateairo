@@ -41,10 +41,12 @@ import { judgesComparisonOf, judgesRecountApplies, servedPositionOf } from "./ju
 import type { EngineVerdictTrigger } from "./engine-verdict.js";
 import { SynthesisCheckRepository, synthesisTextOf, verdictOfRecord } from "./synthesis-check.js";
 import { PublicationReviewRepository, reviewStateOf } from "./publication-review.js";
+import { digLeadSuggestions, digLeadsOfPack, webWithDigSuggestions } from "./dig-suggestions.js";
 import {
   serveWebEvidence, webPathRootsOf, webPathsAtRoots, webPlanReasonOf, withWebSources, type ServedWeb
 } from "./web-sources.js";
 import {
+  digSuggestionsOf,
   changedBelowPathsOf, digLevelsOf, digsBelowOf, latestWrittenReportOf, ownWordsOf, pathHistoryOf, restsOnOf, serveDig,
   servePathRewrites, storyPathLinesOf, storyPathPointsOf, type DebatePoints, type PathTrustSources, type RewriteTurn,
   type StoryPathPoints
@@ -91,6 +93,7 @@ export * from "./synthesis-check.js";
 export * from "./publication-review.js";
 // Plan 2026-10-30 W3-3: the web step's stored rows as the answer's sources and web status.
 export * from "./web-sources.js";
+export * from "./dig-suggestions.js";
 // Dig-model revision W4-5: each path's rewrites by digs, and a dig's own `dig`, as the answer serves them.
 export * from "./path-rewrites.js";
 
@@ -3264,7 +3267,8 @@ export class ServeRepository {
       ...(modelAssignment === undefined ? {} : { model_assignment: modelAssignment }),
       ...(judgesComparison === undefined ? {} : { judges_comparison: judgesComparison }),
       // Plan 2026-10-30 W3-3: each path's web search and other pages; absent when the debate kept no web rows.
-      ...(servedWeb === null ? {} : { web: servedWeb.web }),
+      // W4-3: the kinds code finds on each path joined the AI's (`#readServedWeb`); none at level 10, which cannot be dug.
+      ...(servedWeb === null ? {} : { web: webWithDigSuggestions(servedWeb.web, nodes, edges, digModel.dig?.level ?? null) }),
       // Dig-model revision W4-5: each rewritten path and, on a dig, what it dug; absent when no dig touched the debate.
       ...digModel
     };
@@ -3843,8 +3847,19 @@ export class ServeRepository {
         plan: (plan ?? []).map((decided) => ({ pathId: decided.pathRef, status: decided.status,
           reason: decided.status === "NO_SEARCH_PLANNED" ? webPlanReasonOf(open(WEB_PLAN_CARRIER, decided.pathRef, decided.reason)) : null }))
       }), roots);
+      // W4-3: the AI's suggestions on this debate's paths, when it is a dig with a checked rewrite (sealed with it, under its
+      // key), and the readers' "still worth looking into" lines from each pack (code's kind; a wiped pack has none).
+      const own = (await new PostgresDigModelRunnerRepository(this.pool).readPathRewrites(runId))?.own ?? null;
+      const rewriteOpened = own === null || own.rewrite_id === null || own.content === null || own.content === undefined ? null
+        : decryptLeasedContentForRun<unknown>(cipher, PATH_REWRITE_CARRIER, own.rewrite_id, own.content as CryptoEnvelope, null);
+      const leadsOf = new Map((stored?.packs ?? []).flatMap((pack): (readonly [string, readonly string[]])[] => {
+        const root = roots.get(pack.path_ref);
+        return root === undefined || pack.content === null ? [] : [[root, digLeadsOfPack(open(WEB_EVIDENCE_CARRIERS.pack, pack.pack_id, pack.content))]];
+      }));
       await cipher.assertLive();
-      return served;
+      return served === null ? null : { ...served, web: { paths: served.web.paths.map((path) => ({ ...path,
+        suggestions: [...digSuggestionsOf(rewriteOpened, path.position_ref),
+          ...digLeadSuggestions(runId, path.position_ref, leadsOf.get(path.position_ref) ?? [])] })) } };
     } finally {
       await cipher.close();
     }

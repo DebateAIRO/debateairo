@@ -30,6 +30,10 @@ import { WEB_SEARCH_REQUEST_MICROS } from "./web-charge.js";
  *  - pickInputTokensPerPage: a page's title, site, grade and one line as the pick reads them.
  *  - plannerInputTokensPerPack: a path, its points for and against and what they rest on (design §2: about 6,000).
  *  - packReadTokensPerPack: a path's pack read across its arguing calls (design §4.2: about 40,000 tokens).
+ *  - digPlannerInputTokens: one chosen path's planner on a dig: what is chosen and what the whole debate already investigated
+ *    (apps/runner investigation-digest.ts cuts it at 32,000 bytes, 2 bytes a token).
+ *  - digSuggest*: the suggestions on a dig's own paths (W4-3): one small call per path, at the most paths a map has,
+ *    reading the same digest and that path's points, on a paid plan only.
  */
 export const WEB_CALL_ALLOWANCES = Object.freeze({
   instructionTokens: 4_000,
@@ -39,7 +43,11 @@ export const WEB_CALL_ALLOWANCES = Object.freeze({
   topReaderOutputTokens: 16_384,
   plannerInputTokensPerPack: 6_000,
   plannerOutputTokens: 8_192,
-  packReadTokensPerPack: 40_000
+  packReadTokensPerPack: 40_000,
+  digPlannerInputTokens: 18_000,
+  digSuggestPaths: 5,
+  digSuggestInputTokens: 22_000,
+  digSuggestOutputTokens: 1_024
 });
 
 /** Each web role's price: the dearest of the models that may take it. */
@@ -68,6 +76,8 @@ export type WebPartEstimate = Readonly<{
   topReaderMicros: number;
   plannerMicros: number;
   packMicros: number;
+  /** A dig's own-path suggestions (W4-3), at their most; 0 for a first debate. */
+  suggestMicros: number;
   totalMicros: number;
 }>;
 
@@ -92,7 +102,9 @@ export function webCallTokens(sites: WebSites): Readonly<{
     pick: Object.freeze({ calls: sites.pickCalls, inputTokens: pickInput, outputTokens: a.pickOutputTokens }),
     topReaders: Object.freeze({ calls: sites.topReaderCalls, inputTokens: sites.topCount * sites.pageTokenCap + a.instructionTokens,
       outputTokens: a.topReaderOutputTokens }),
-    planner: Object.freeze({ calls: sites.plannerCalls, inputTokens: sites.packs * a.plannerInputTokensPerPack + a.instructionTokens,
+    // A debate's one planner reads every path; a dig's planners read one chosen path each and the investigation's digest.
+    planner: Object.freeze({ calls: sites.plannerCalls,
+      inputTokens: (sites.kind === "DIG" ? a.digPlannerInputTokens : sites.packs * a.plannerInputTokensPerPack) + a.instructionTokens,
       outputTokens: a.plannerOutputTokens }),
     // The pack's reading inside the arguing: input only (the arguing calls' own output is already in the debate's
     // estimate), one figure per pack.
@@ -122,7 +134,10 @@ export function estimateWebPartMicros(sites: WebSites, prices: WebRolePrices, se
   const topReaderMicros = part(prices.topReaders, tokens.topReaders, true);
   const plannerMicros = part(prices.planner, tokens.planner, true);
   const packMicros = part(prices.pack, tokens.pack, false);
-  const totalMicros = searchTotal + readerOneMicros + pickMicros + topReaderMicros + plannerMicros + packMicros;
+  const a = WEB_CALL_ALLOWANCES;
+  const suggestMicros = sites.kind !== "DIG" ? 0 : a.digSuggestPaths
+    * callMicros(prices.readerOne, a.digSuggestInputTokens + a.instructionTokens, a.digSuggestOutputTokens, true);
+  const totalMicros = searchTotal + readerOneMicros + pickMicros + topReaderMicros + plannerMicros + packMicros + suggestMicros;
   if (!Number.isSafeInteger(totalMicros)) throw new TypeError("WEB_ESTIMATE_UNREPRESENTABLE");
   return Object.freeze({
     searches: sites.searches,
@@ -133,6 +148,7 @@ export function estimateWebPartMicros(sites: WebSites, prices: WebRolePrices, se
     topReaderMicros,
     plannerMicros,
     packMicros,
+    suggestMicros,
     totalMicros
   });
 }

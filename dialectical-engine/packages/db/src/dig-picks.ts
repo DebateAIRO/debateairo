@@ -34,7 +34,7 @@ export type DigPicksRead = Readonly<{
   positionRef: string | null;
   picks: readonly DigPickRead[];
   /** The rewrite's material once the runner stored it: the work item its calls name and the dig's own paths, opened. */
-  input: Readonly<{ workItemId: string; value: unknown }> | null;
+  input: Readonly<{ workItemId: string; recordedAt: string; value: unknown }> | null;
 }>;
 export type UnwrittenPathRewrite = Readonly<{
   runId: string; parentRunId: string; positionRef: string;
@@ -92,7 +92,7 @@ export class PostgresDigPicksRunnerRepository {
         return Object.freeze({ pickNo: pick.pick_no, kind: pick.kind, suggestionId: pick.suggestion_id, place: pick.place,
           author: pick.author, text });
       });
-      const input = row.input === null ? null : Object.freeze({ workItemId: row.input.work_item_id,
+      const input = row.input === null ? null : Object.freeze({ workItemId: row.input.work_item_id, recordedAt: row.input.recorded_at,
         value: decryptLeasedContentForRun<unknown>(leased, PATH_REWRITE_INPUT_CARRIER, row.run_id.toLowerCase(), row.input.content, null) });
       await leased.assertLive();
       return Object.freeze({ runId: row.run_id, parentRunId: row.parent_run_id, positionRef: row.position_ref,

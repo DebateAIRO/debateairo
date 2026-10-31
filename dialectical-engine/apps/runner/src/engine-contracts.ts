@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import {
   COMPARING_JUDGE_PROMPT_CONTRACT, COMPARING_JUDGE_SOURCES_PROMPT_CONTRACT, POINT_INVESTIGATION_PROMPT_CONTRACT, WEB_STEP_PROMPT_CONTRACTS,
-  WEB_DIG_SEALED_CONTRACTS, WEB_WORDING_V2_SEALED_CONTRACTS, judgeAssignedRootV2PromptContract, judgeSourcesSealedContracts
+  WEB_DIG_METHOD_SEALED_CONTRACTS, WEB_DIG_SEALED_CONTRACTS, WEB_WORDING_V2_SEALED_CONTRACTS, judgeAssignedRootV2PromptContract, judgeSourcesSealedContracts
 } from "@debateai/judgement";
 import { MAP_ENGINE_CONTRACT_NAMES, mapEnginePromptContracts } from "@debateai/map";
 import { promptContractFingerprintText, type PromptContract } from "@debateai/providers";
@@ -63,7 +63,10 @@ export function engineSealedContracts(): readonly PromptContract[] {
     // W5-1 (the final report over an investigation; W0-1 §2.6 and draft 5.6 approved, R4's two instructions shown at the
     // first checkpoint (F11), the story's two OWNER WORDING drafts): the answer, the later version's answer, the answer
     // check, the story and the story check (packages/story/src/investigation-report.ts).
-    ...INVESTIGATION_REPORT_SEALED_CONTRACTS
+    ...INVESTIGATION_REPORT_SEALED_CONTRACTS,
+    // R22 decision 9 and W4-3 (both DRAFT wordings, OWNER WORDING before switch-on): a dig's planner per chosen path
+    // (web.plan-dig.v1 above stays sealed, withdrawn and called by nothing), and the suggestions on a dig's own paths.
+    ...WEB_DIG_METHOD_SEALED_CONTRACTS
   ]);
 }
 
