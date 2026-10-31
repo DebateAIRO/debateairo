@@ -7,7 +7,7 @@ import {
   type StoryParagraph,
   type StoryVerdictBasis
 } from "@debateai/contract";
-import { TypedDomainError } from "@debateai/kernel";
+import { TypedDomainError, type EngineCitedExtract } from "@debateai/kernel";
 import {
   buildFramedPrompt,
   buildFramedRevisionPrompt,
@@ -50,6 +50,12 @@ export interface StorySnapshotNode {
   readonly authorModel: string | null;
   readonly panelDispersion: number | null;
   readonly criticSummary: string | null;
+  /**
+   * Web search (plan 2026-10-30 task W4-1; design §7.1 item 7): the checked extract a looked-up node rests on, when its
+   * locator is one of this debate's extract ids. The material carries it as the entry's `extract`; absent on every other
+   * node and every debate with no packs, so the material is today's, byte for byte.
+   */
+  readonly citedExtract?: EngineCitedExtract;
 }
 
 /** An arrow onto an EDGE has `targetNodeId: null`; the story material drops it. */
@@ -160,11 +166,29 @@ export interface StoryMaterialPosition {
    * only on a dispute) ride on this entry instead of a point entry. Absent in v3, whose `points` list the position too.
    */
   readonly known_by?: "LOOKED_UP" | "RAN" | "REASONING";
+  /** W4-1: the extract the position's case rests on (v4 only, beside `known_by`); absent when it cites none. */
+  readonly extract?: StoryMaterialExtract;
   readonly best_case?: string;
   readonly objection?: string;
   readonly objection_to?: string;
   readonly review?: "agree" | "dispute" | "cannot-assess";
   readonly review_reasons?: readonly string[];
+}
+
+/** W4-1: a cited extract as the storyteller reads it: its id, the quote word for word, and the page's title, site and date. */
+export interface StoryMaterialExtract {
+  readonly id: string;
+  readonly quote: string;
+  readonly title: string | null;
+  readonly site: string;
+  readonly date: string | null;
+}
+
+/** W4-1: a node's extract entry, member by member; nothing when it cites none (today's bytes). */
+function storyExtractOf(node: StorySnapshotNode): Readonly<{ extract?: StoryMaterialExtract }> {
+  const cited = node.citedExtract;
+  return cited === undefined ? {} : { extract: Object.freeze({ id: cited.id, quote: cited.quote, title: cited.title, site: cited.site,
+    date: cited.date }) };
 }
 
 export interface StoryMaterialPoint {
@@ -174,6 +198,8 @@ export interface StoryMaterialPoint {
   readonly attacks?: readonly string[];
   readonly claim: string;
   readonly known_by: "LOOKED_UP" | "RAN" | "REASONING";
+  /** W4-1: the extract a looked-up point rests on, right after `known_by`; absent when it cites none of this debate's. */
+  readonly extract?: StoryMaterialExtract;
   readonly base?: number;
   readonly final?: number;
   readonly set_aside?: string;
@@ -276,14 +302,20 @@ type StoryKeyList<T> = { readonly [K in keyof Required<T>]: true };
 const STORY_POINT_KEYS: StoryKeyList<StoryMaterialPoint> = {
   id: true, position: true, supports: true, attacks: true, claim: true, known_by: true, base: true, final: true,
   set_aside: true, best_case: true, objection: true, objection_to: true, review: true, review_reasons: true, author: true,
-  judge_spread: true, leverage: true
+  judge_spread: true, leverage: true,
+  // W4-1: a looked-up point's cited extract (web debates only).
+  extract: true
 };
 const STORY_POSITION_KEYS: StoryKeyList<StoryMaterialPosition> = {
   id: true, place: true, claim: true, author: true, final: true, won: true, within_tie_margin: true,
   // Story v4 (R1d): the position's own judge texts. Each is a point key already, so STORY_MATERIAL_KEYS and
   // STORY_ENGINE_TOKENS keep their exact values (pinned in tests/unit/story-material.test.ts).
-  known_by: true, best_case: true, objection: true, objection_to: true, review: true, review_reasons: true
+  known_by: true, best_case: true, objection: true, objection_to: true, review: true, review_reasons: true,
+  // W4-1: a point key already.
+  extract: true
 };
+/** W4-1: the cited extract's own keys (none with an underscore, so STORY_ENGINE_TOKENS does not move). */
+const STORY_EXTRACT_KEYS: StoryKeyList<StoryMaterialExtract> = { id: true, quote: true, title: true, site: true, date: true };
 const STORY_VERDICT_KEYS: StoryKeyList<StoryMaterialVerdict> = {
   label: true, rule_in_words: true, rung: true, trigger: true, winner_id: true, winner_final: true, runner_up_id: true,
   runner_up_final: true, margin: true, disagreement: true, thresholds: true, confidence_band: true, marks: true,
@@ -305,7 +337,7 @@ const STORY_MATERIAL_FIELD_NAMES = Object.freeze([
 export const STORY_MATERIAL_KEYS: readonly string[] = Object.freeze([...new Set([
   ...Object.keys(STORY_POINT_KEYS), ...Object.keys(STORY_POSITION_KEYS), ...Object.keys(STORY_VERDICT_KEYS),
   ...Object.keys(STORY_THRESHOLD_KEYS), ...Object.keys(STORY_OMITTED_KEYS), ...Object.keys(STORY_SET_ASIDE_KEYS),
-  ...Object.keys(STORY_ALSO_RAISED_KEYS), ...STORY_MATERIAL_FIELD_NAMES
+  ...Object.keys(STORY_ALSO_RAISED_KEYS), ...STORY_MATERIAL_FIELD_NAMES, ...Object.keys(STORY_EXTRACT_KEYS)
 ])]);
 
 /**
@@ -931,7 +963,7 @@ export function buildStoryMaterial(input: {
       id: ref(node.nodeId),
       place: index + 1,
       claim: storyClip(node.claim, step.claimChars),
-      ...(v4 ? { known_by: node.wayOfKnowing } : {}),
+      ...(v4 ? { known_by: node.wayOfKnowing, ...storyExtractOf(node) } : {}),
       ...(node.authorModel === null ? {} : { author: node.authorModel }),
       ...(node.finalStrength === null ? {} : { final: storyNumber(node.finalStrength) }),
       won: node.nodeId === basis.winner_node_id,
@@ -959,6 +991,7 @@ export function buildStoryMaterial(input: {
           ...(attacks.length === 0 ? {} : { attacks: Object.freeze(attacks) }),
           claim: storyClip(node.claim, step.claimChars),
           known_by: node.wayOfKnowing,
+          ...storyExtractOf(node),
           ...(node.baseScore === null ? {} : { base: storyNumber(node.baseScore) }),
           ...(node.finalStrength === null ? {} : { final: storyNumber(node.finalStrength) }),
           ...(node.excludedReason === null ? {} : { set_aside: node.excludedReason }),

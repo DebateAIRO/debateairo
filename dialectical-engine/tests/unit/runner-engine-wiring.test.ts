@@ -59,6 +59,26 @@ describe("the runner reads the engine from the receipt only", () => {
     expect(settings).not.toContain("recordPlanPathStatuses");
   });
 
+  it("W4-1: the packs are read once, after the web step kept one, and reach the legs and readers from that one read", () => {
+    expect(RUNNER.split("const webStep = await runRunnerWebStep(")).toHaveLength(2);
+    expect(RUNNER.split("webPacks = await readDebateWebPacks({ pool: this.pool, runId: run.runId, abandon: keepAliveStop });")).toHaveLength(2);
+    expect(RUNNER.indexOf("if (webStep.paths.some((path) => path.packId !== null)) {"))
+      .toBeLessThan(RUNNER.indexOf("webPacks = await readDebateWebPacks("));
+    // The case writer, the defenders and critics, and the cross-replies (own path, then the rival's).
+    expect(RUNNER.split("legWithWebSources(")).toHaveLength(4);
+    expect(RUNNER).toContain("{ own: webPathOfRoot(shapeLeg.rootIndex), rival: webPathOfRoot(target) }");
+    // The locator check rides every authoring call; the reviewer, judges, writer and storyteller read the cited extract.
+    expect(RUNNER.split("...webLocatorInput(),")).toHaveLength(3);
+    expect(RUNNER).toContain("...webReviewInput(webPacks, authoredNode, lengthGuidance !== null),");
+    expect(RUNNER).toContain("const webCited = webCitedExtractsOf(webPacks, authoredNodeList);");
+    expect(RUNNER).toContain("source: engineSourceWithCitedExtracts(source, webCited),");
+    expect(RUNNER).toContain("...(webCited.size === 0 ? {} : { citedExtracts: webCited }),");
+    // No web search inside the debate: index.ts never names the search port or the store's writers.
+    for (const name of ["PerplexitySearchPort", "recordPack(", "recordExtract(", ".search("]) expect(RUNNER).not.toContain(name);
+    const packs = read("apps/runner/src/web-packs.ts");
+    for (const name of ["search(", "recordPack(", "provider.call(", "gateway.call("]) expect(packs).not.toContain(name);
+  });
+
   it("the runner's settings carry the boot settings beside the debate shape's", () => {
     const shapeAt = RUNNER.indexOf("readonly debateShape?: DebateShapeRunnerSettings | null;");
     expect(shapeAt).toBeGreaterThan(0);

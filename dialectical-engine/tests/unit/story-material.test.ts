@@ -1332,11 +1332,15 @@ describe("story v4 — the material's key lists keep their exact values", () => 
     // this case PASSES before the change (Step 2) and must pass after it.
     expect(STORY_MATERIAL_KEYS).toEqual([
       "id", "position", "supports", "attacks", "claim", "known_by", "base", "final", "set_aside", "best_case", "objection",
-      "objection_to", "review", "review_reasons", "author", "judge_spread", "leverage", "place", "won", "within_tie_margin",
+      "objection_to", "review", "review_reasons", "author", "judge_spread", "leverage",
+      // W4-1 (web search, 2026-10-31): a looked-up point's cited extract.
+      "extract", "place", "won", "within_tie_margin",
       "label", "rule_in_words", "rung", "trigger", "winner_id", "winner_final", "runner_up_id", "runner_up_final", "margin",
       "disagreement", "thresholds", "confidence_band", "marks", "positions_argued", "tie_margin", "low_cut", "high_cut",
       "position_ref", "reason", "question", "verdict", "served_statement", "positions", "points", "hinges", "omitted",
-      "also_raised", "answers_note", "prior_objection"
+      "also_raised", "answers_note", "prior_objection",
+      // W4-1: the cited extract's own keys (none with an underscore: STORY_ENGINE_TOKENS below does not move).
+      "quote", "title", "site", "date"
     ]);
     expect(STORY_ENGINE_TOKENS).toEqual([
       "SUPPORTED", "CONTESTED", "UNSUPPORTED", "SPLIT", "HELD_UP", "PARTLY_HELD", "FELL", "SET_ASIDE", "LOOKED_UP", "RAN", "REASONING",
@@ -1344,6 +1348,28 @@ describe("story v4 — the material's key lists keep their exact values", () => 
       "rule_in_words", "winner_id", "winner_final", "runner_up_id", "runner_up_final", "confidence_band", "positions_argued",
       "tie_margin", "low_cut", "high_cut", "position_ref", "served_statement", "also_raised", "answers_note", "prior_objection"
     ]);
+  });
+});
+
+describe("web search (W4-1): a looked-up point carries the extract it rests on, only when it cites one", () => {
+  const EXTRACT = { id: "S1-2", quote: "Ridership grew 4% a year.", title: "Tram report", site: "city.example", date: "2025-11-02" };
+  it("v3 and v4: the point (or the v4 position) carries `extract` right after known_by; every other entry, today's bytes", () => {
+    const cited = snapshot({ nodes: snapshot().nodes.map((entry) => entry.nodeId === "position:a" ? { ...entry, citedExtract: EXTRACT } : entry) });
+    for (const v4 of [undefined, V4] as const) {
+      const options = { enrichment: V4_ENRICHMENT, budgetBytes: LOW_BUDGET, shapeIds: SHAPES, ...(v4 === undefined ? {} : { v4 }) };
+      const before = built(buildStoryMaterial({ snapshot: snapshot(), ...options }));
+      const after = built(buildStoryMaterial({ snapshot: cited, ...options }));
+      const list = v4 === undefined ? after.material.points : after.material.positions;
+      const entry = (list as unknown as readonly Readonly<Record<string, unknown>>[]).find((item) => item.extract !== undefined)!;
+      expect(entry.extract).toEqual(EXTRACT);
+      expect(Object.keys(entry).indexOf("extract")).toBe(Object.keys(entry).indexOf("known_by") + 1);
+      const withoutExtract = (fields: readonly FramedMaterialField[]) => fields.map((item) => ({ ...item,
+        content: item.content.replace(`,"extract":${JSON.stringify(EXTRACT)}`, "") }));
+      expect(withoutExtract(toStoryPromptMaterial(after.material, null))).toEqual(toStoryPromptMaterial(before.material, null));
+    }
+    // No extract anywhere: the very same material.
+    expect(buildStoryMaterial({ snapshot: snapshot(), enrichment: ENRICHMENT, budgetBytes: LOW_BUDGET, shapeIds: SHAPES }))
+      .toEqual(buildStoryMaterial({ snapshot: snapshot(), enrichment: ENRICHMENT, budgetBytes: LOW_BUDGET, shapeIds: SHAPES }));
   });
 });
 
