@@ -2,6 +2,7 @@
 // by the owner as written on 2026-10-30. Each approved sentence is pinned here as an exact string, typed from the design
 // (never derived from the code), so any edit fails here first. The engine-1 judge seal and the answer writer's composer
 // seal do not move: every new contract is sealed by engineContractHash only.
+import { ASK_CLARIFY_PROMPT_CONTRACT } from "@debateai/judgement";
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
@@ -359,7 +360,9 @@ describe("the seals", () => {
       // R22 report lane (decision 4): the overall writer and checker, after them.
       ...REPORT_OVERALL_SEALED_CONTRACTS,
       // R22: reader 1 v2, the panel's sources variant, the rewrite's v2 pair.
-      ...WEB_R22_SEALED_CONTRACTS, ...PATH_REWRITE_V2_SEALED_CONTRACTS
+      ...WEB_R22_SEALED_CONTRACTS, ...PATH_REWRITE_V2_SEALED_CONTRACTS,
+      // R22 clarify lane (decision 29): dynamic step 2's small call.
+      ASK_CLARIFY_PROMPT_CONTRACT
     ];
     const sealed = engineSealedContracts();
     expect(sealed.slice(-appended.length)).toEqual(appended);
@@ -384,7 +387,7 @@ describe("the seals", () => {
       "web.plan-dig.v2", "web.suggest-dig.v1", "web.plan-dig.v3",
       // R22 report lane (decision 4).
       "report.answer.v2", "report.answer.later.v2", "report.answer-check.v2",
-      "web.read-all.v2", "judge.panel.length.sources.v1", "path-rewrite.writer.v2", "path-rewrite.checker.v2"
+      "web.read-all.v2", "judge.panel.length.sources.v1", "path-rewrite.writer.v2", "path-rewrite.checker.v2", "ask.clarify.v1"
     ]);
     expect(new Set(ENGINE_SEALED_CONTRACT_IDS).size).toBe(ENGINE_SEALED_CONTRACT_IDS.length);
     // The review is sealed with its edge count at zero, as the judge seal seals the review.

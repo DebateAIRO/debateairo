@@ -2,6 +2,7 @@
 // W3-5 (dig-model revision 2026-10-30): the path rewrite's material is built by code, the same bytes every time; the 100K
 // guard (W0-1 §1.4) passes a body of 195,904 bytes and refuses 195,905; the ladder keeps whole statements, never cutting
 // inside a text, and a material that fits on no step is TOO_LARGE. Made-up debates.
+import { purposeLinesMaterial } from "@debateai/contract";
 import { describe, expect, it } from "vitest";
 import { buildFramedPrompt, type PromptPacket } from "@debateai/providers";
 import { canonicalPromptFingerprint } from "@debateai/scorecard";
@@ -116,3 +117,24 @@ describe("W3-5 the rewrite's material", () => {
     expect(paths[1]!.points.map((point) => [point.id, point.side])).toEqual([[DIG_NODES.buses, "against"]]);
   });
 });
+
+describe("decision 29: the person's step-2 answers reach the rewrite's AI", () => {
+  const LINE = "Should the town build a second pier?\n\nWhich town? Harbour Town.\nPlease also look at: fishing jobs.";
+  const LINES = { answers: [{ question: "Which town?", answer: "Harbour Town" }], angles: ["fishing jobs"] };
+  const packetText = (question: ReturnType<typeof input>["question"]) =>
+    [...fieldsOf(built(buildPathRewriteMaterial(input({ question })))).entries()].map(([name, content]) => `${name}=${content}`);
+  it("in the question's own field, on every language, and not a second time", () => {
+    const fields = packetText({ ...dig().question, line: LINE, ...purposeLinesMaterial(LINE, LINES) });
+    expect(fields).toContain(`question=${LINE}`);
+    expect(fields.some((field) => field.startsWith("purpose="))).toBe(false);
+  });
+  it("in the purpose field, when the question's words no longer say them", () => {
+    const fields = packetText({ ...dig().question, line: "Should the town build a second pier?", ...purposeLinesMaterial("Should the town build a second pier?", LINES) });
+    expect(fields).toContain("purpose=Which town? Harbour Town.\nfishing jobs");
+  });
+  it("an old debate's first-shape lines stay in their own fields", () => {
+    const fields = packetText({ ...dig().question, ...purposeLinesMaterial("Q?", { place: "In Harbour Town", time: "Next year", purpose: "To vote" }) });
+    expect(fields).toEqual(expect.arrayContaining(["place=In Harbour Town", "time=Next year", "purpose=To vote"]));
+  });
+});
+

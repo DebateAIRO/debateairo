@@ -133,5 +133,13 @@
   "newDebate.plan.current.FREE": "Váš program: Bezplatný",
   "newDebate.plan.current.PLUS": "Váš program: Plus",
   "newDebate.plan.current.PRO": "Váš program: Pro",
-  "newDebate.plan.current.MAX": "Váš program: Max"
+  "newDebate.plan.current.MAX": "Váš program: Max",
+  "newDebate.askText.purposeQuestion": "Na čo potrebujete odpoveď?",
+  "newDebate.askText.purposeDecide": "Na rozhodnutie",
+  "newDebate.askText.purposeUnderstand": "Na pochopenie témy",
+  "newDebate.askText.purposeWrite": "Na písanie o tejto téme",
+  "newDebate.askText.otherAnswer": "Iná odpoveď…",
+  "newDebate.askText.otherLabel": "Vaša vlastná odpoveď",
+  "newDebate.askText.matters": "Ak odpovede vedú rôznymi smermi, pre mňa je najdôležitejšie: {matters}",
+  "newDebate.askText.angles": "Prosím, pozrite sa aj na: {list}."
 }

@@ -3,40 +3,42 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { askQuestionMaxBytes } from "@debateai/contract";
+import { askQuestionMaxBytes, type ClarifyQuestion } from "@debateai/contract";
 import { AuthGate } from "@/components/AuthGate";
 import { RoomNotice } from "@/components/billing/RoomNotice";
 import { V4MoneyLines } from "@/components/v4/V4DigSuggest";
 import { V4Header } from "@/components/v4/V4Header";
 import { contractClient } from "@/lib/api";
-import { catalogLocale, isLocale } from "@/lib/i18n/locales";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
-import { composeQuestion, FREE_GOAL_CHOICES_MAX, goalChoiceCount, goalWithinPlan, ownWords, purposeLinesOfGoal } from "@/lib/v4/askText";
+import {
+  answersStillAsked, clarifyingQuestions, composeQuestion, FREE_GOAL_CHOICES_MAX, goalChoiceCount, goalWithinPlan, ownWords, purposeLinesOfGoal
+} from "@/lib/v4/askText";
 import { startShareLine, startsWaitLine, type MoneyLine } from "@/lib/v4/money";
 import { levelHref, useReadingLevel } from "@/lib/v4/storage";
 import {
   DIG_MODES,
   EMPTY_GOAL,
-  GOAL_HORIZONS,
-  GOAL_PLACES,
-  GOAL_PURPOSES,
   READING_LEVELS,
   type DigMode,
   type ReadingLevel,
-  type V4Goal
+  type V4Goal,
+  type V4GoalAnswer
 } from "@/lib/v4/types";
+import { useAskClarify } from "@/lib/v4/useAskClarify";
 import { useV4Ask } from "@/lib/v4/useV4Ask";
 
 /*
  * V4 initial (spec "/v4 — D1 Ask + D2 How we read your question", row D decisions 5 and 10). D1: the question and,
- * once, the reading level. D2: the optional choices, then EXACTLY the text the AIs will get (composeQuestion), so
- * nothing is hidden. The ask itself is V3's, through useV4Ask (consent, crisis help, room, question language).
+ * once, the reading level. D2 (decision 29, dynamic): a small AI's clarifying questions, all optional, then EXACTLY the
+ * text the AIs will get (composeQuestion), so nothing is hidden. The ask itself is V3's, through useV4Ask (consent, crisis help, room, question language).
  * Fix wave 1, Decision A: nothing is kept in this browser. The level lives in the address (`?level=`), and the recent
  * questions come from the account only. N7 (2026-10-29): the chosen level is kept in the account too (useReadingLevel).
  */
 
 /** The API's own floor for a question is a few words; Start waits for it (spec: "under 7 characters"). */
 const QUESTION_MIN = 7;
+/** The longest answer a person types under "Other". */
+const OTHER_MAX = 120;
 /** D2 "Add your own angle": at most five (V4Goal.angles). */
 const ANGLES_MAX = 5;
 /** Recent questions: this many from the account, at most. */
@@ -85,6 +87,66 @@ function useRecentQuestions(): readonly Recent[] {
     return () => { active = false; };
   }, []);
   return recent;
+}
+
+/** Decision 29: one clarifying question, in the look the fixed buttons had: its label, its answers as chips, then "Other" with a line to type on. */
+function ClarifyBlock({ question, given, full, onChange, inputId, otherLabel, otherInputLabel }: Readonly<{
+  question: ClarifyQuestion;
+  given: V4GoalAnswer | undefined;
+  /** Free's cap is reached: only a question already answered can still change. */
+  full: boolean;
+  onChange(next: V4GoalAnswer | null): void;
+  inputId: string;
+  otherLabel: string;
+  otherInputLabel: string;
+}>) {
+  const labelId = `${inputId}-label`;
+  return (
+    <div className="v4AskBlock" role="group" aria-labelledby={labelId}>
+      <span id={labelId} className="v4AskLabel" dir="auto" data-ai-generated="true">{question.text}</span>
+      <div className="v4AskChips">
+        {question.answers.map((answer) => {
+          const pressed = given !== undefined && !given.other && given.answer === answer;
+          return (
+            <button
+              key={answer}
+              type="button"
+              className="v4Chip"
+              dir="auto"
+              aria-pressed={pressed}
+              disabled={full && given === undefined}
+              onClick={() => onChange(pressed ? null : { question: question.text, answer, other: false })}
+            >
+              {answer}
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          className="v4Chip"
+          aria-pressed={given?.other === true}
+          disabled={full && given === undefined}
+          onClick={() => onChange(given?.other === true ? null : { question: question.text, answer: "", other: true })}
+        >
+          {otherLabel}
+        </button>
+      </div>
+      {given?.other === true ? (
+        <div className="v4AskInline">
+          <label className="v4AskLabelSmall" htmlFor={inputId}>{otherInputLabel}</label>
+          <input
+            id={inputId}
+            className="v4AskInput"
+            type="text"
+            dir="auto"
+            value={given.answer}
+            maxLength={OTHER_MAX}
+            onChange={(event) => onChange({ question: question.text, answer: event.target.value, other: true })}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export function V4AskClient({
@@ -179,9 +241,6 @@ function V4AskForm({
     readingLevel: level
   });
 
-  // ASK-1: "what matters" and the angles are added as English sentences, so they are offered only on English pages for now. Decision 5 of
-  // 31 Oct: the place, the time and the purpose go as their own field, so they are offered on every page.
-  const choicesOffered = isLocale(locale) && catalogLocale(locale) === "en";
   // Owner 2026-10-29 (Free plan shape): a Free ask carries at most FREE_GOAL_CHOICES_MAX choices; paid plans have no cap.
   // Once Free's cap is reached, only the choices already set can still be changed. What is sent never carries more.
   const choicesFull = ask.planTier === "free" && goalChoiceCount(goal) >= FREE_GOAL_CHOICES_MAX;
@@ -191,9 +250,22 @@ function V4AskForm({
   // ASK-3: a crisis message may be very short; it must still reach the crisis help (V3 enables Start for it).
   const crisisText = ask.flagsCrisis(trimmed);
   const canGoOn = longEnough || crisisText;
-  const composed = useMemo(() => composeQuestion(trimmed, sentGoal, catalog, locale), [trimmed, sentGoal, catalog, locale]);
+  // Decision 29: the question goes to the small AI only once the person has agreed to the sensitive-data notice, and never in crisis words.
+  const [consented, setConsented] = useState(false);
+  const clarify = useAskClarify({ active: step === "read" && longEnough, question: trimmed, mayCall: consented && !crisisText });
+  const questions = useMemo(() => (clarify.reply === null ? [] : clarifyingQuestions(clarify.reply, newDebateCatalog)), [clarify.reply, newDebateCatalog]);
+  // A changed question: answers that no longer apply are dropped, the moment its new questions arrive.
+  useEffect(() => {
+    if (clarify.reply === null) return;
+    setGoal((current) => {
+      const answers = answersStillAsked(current.answers, questions);
+      return answers === current.answers ? current : { ...current, answers };
+    });
+  }, [clarify.reply, questions]);
+  // The lead-ins are read from `newDebate`, the namespace every language has (v4 is English in all 35 tonight).
+  const composed = useMemo(() => composeQuestion(trimmed, sentGoal, newDebateCatalog), [trimmed, sentGoal, newDebateCatalog]);
   // "Just answer it" sends the question alone, tidied the same way (so its title is the person's whole words).
-  const plain = useMemo(() => composeQuestion(trimmed, EMPTY_GOAL, catalog, locale), [trimmed, catalog, locale]);
+  const plain = useMemo(() => composeQuestion(trimmed, EMPTY_GOAL, newDebateCatalog), [trimmed, newDebateCatalog]);
   const sentLine = accepted !== null && accepted.basis === composed ? accepted.text : composed;
   const quickLine = accepted !== null && accepted.basis === plain ? accepted.text : plain;
   const tooLong = byteLength(sentLine) > askQuestionMaxBytes();
@@ -237,7 +309,7 @@ function V4AskForm({
     setPressed(which);
     try {
       // "Just answer it" sends the question alone; Start sends the choices too.
-      const outcome = await ask.submit(questionLine, askMode, "ask", null, which === "start" ? purposeLinesOfGoal(sentGoal, catalog) : undefined);
+      const outcome = await ask.submit(questionLine, askMode, "ask", null, which === "start" ? purposeLinesOfGoal(sentGoal) : undefined);
       switch (outcome.kind) {
         case "STARTED":
           router.push(levelHref(`/v4/debate/${encodeURIComponent(outcome.runId)}`, savedLevel ?? draftLevel));
@@ -258,7 +330,7 @@ function V4AskForm({
     setPressed(null);
   }
 
-  function goOn() {
+  async function goOn() {
     if (!canGoOn) return;
     // ASK-3: a crisis message goes straight to the ask, which offers help (and sends nothing) instead of D2.
     if (crisisText && !longEnough) {
@@ -267,7 +339,18 @@ function V4AskForm({
     }
     keepLevel();
     setRefusal(null);
+    // Decision 29: the small AI reads the question before Start, so the one-time consent comes first. Refused, or the read failed: D2 opens all the
+    // same, with the generic options; Start asks again.
+    setConsented(await ask.ensureConsent().catch(() => false));
     setStep("read");
+  }
+
+  /** Sets or clears one question's answer, keeping them in the order the questions are shown (so the sentences read in that order). */
+  function answerQuestion(question: ClarifyQuestion, next: V4GoalAnswer | null) {
+    const others = goal.answers.filter((given) => given.question !== question.text);
+    const answers = next === null ? others : [...others, next];
+    const place = (given: V4GoalAnswer): number => questions.findIndex((shown) => shown.text === given.question);
+    setGoal({ ...goal, answers: [...answers].sort((a, b) => place(a) - place(b)) });
   }
 
   function addAngle() {
@@ -342,7 +425,7 @@ function V4AskForm({
           ) : null}
 
           <div className="v4AskActions">
-            <button type="button" className="v4Btn v4BtnPrimary" onClick={goOn} disabled={!canGoOn || busy}>
+            <button type="button" className="v4Btn v4BtnPrimary" onClick={() => void goOn()} disabled={!canGoOn || busy}>
               {t(catalog, "v4.ask.continue")}
             </button>
             <button
@@ -414,75 +497,20 @@ function V4AskForm({
                   <p className="v4AskHint v4Muted">{t(catalog, "v4.read.freeChoices", { count: FREE_GOAL_CHOICES_MAX })}</p>
                 ) : null}
 
-                <div className="v4AskBlock" role="group" aria-labelledby={`${ids}-place`}>
-                  <span id={`${ids}-place`} className="v4AskLabel">{t(catalog, "v4.read.place.label")}</span>
-                  <div className="v4AskChips">
-                    {GOAL_PLACES.map((place) => (
-                      <button
-                        key={place}
-                        type="button"
-                        className="v4Chip"
-                        aria-pressed={goal.place === place}
-                        disabled={choicesFull && goal.place === null}
-                        onClick={() => setGoal({ ...goal, place: goal.place === place ? null : place })}
-                      >
-                        {t(catalog, `v4.read.place.${place}`)}
-                      </button>
-                    ))}
-                  </div>
-                  {goal.place === "OTHER" ? (
-                    <div className="v4AskInline">
-                      <label className="v4AskLabelSmall" htmlFor={`${ids}-other`}>{t(catalog, "v4.read.place.otherLabel")}</label>
-                      <input
-                        id={`${ids}-other`}
-                        className="v4AskInput"
-                        type="text"
-                        value={goal.placeOther}
-                        maxLength={120}
-                        onChange={(event) => setGoal({ ...goal, placeOther: event.target.value })}
-                      />
-                    </div>
-                  ) : null}
-                </div>
+                {clarify.waiting ? <p className="v4AskHint v4Muted" role="status">{t(catalog, "v4.read.clarifyWaiting")}</p> : null}
+                {questions.map((shown, at) => (
+                  <ClarifyBlock
+                    key={shown.text}
+                    question={shown}
+                    given={goal.answers.find((given) => given.question === shown.text)}
+                    full={choicesFull}
+                    onChange={(next) => answerQuestion(shown, next)}
+                    inputId={`${ids}-other-${at}`}
+                    otherLabel={t(newDebateCatalog, "newDebate.askText.otherAnswer")}
+                    otherInputLabel={t(newDebateCatalog, "newDebate.askText.otherLabel")}
+                  />
+                ))}
 
-                <div className="v4AskBlock" role="group" aria-labelledby={`${ids}-time`}>
-                  <span id={`${ids}-time`} className="v4AskLabel">{t(catalog, "v4.read.horizon.label")}</span>
-                  <div className="v4AskChips">
-                    {GOAL_HORIZONS.map((horizon) => (
-                      <button
-                        key={horizon}
-                        type="button"
-                        className="v4Chip"
-                        aria-pressed={goal.horizon === horizon}
-                        disabled={choicesFull && goal.horizon === null}
-                        onClick={() => setGoal({ ...goal, horizon: goal.horizon === horizon ? null : horizon })}
-                      >
-                        {t(catalog, `v4.read.horizon.${horizon}`)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="v4AskBlock" role="group" aria-labelledby={`${ids}-for`}>
-                  <span id={`${ids}-for`} className="v4AskLabel">{t(catalog, "v4.read.purpose.label")}</span>
-                  <div className="v4AskChips">
-                    {GOAL_PURPOSES.map((purpose) => (
-                      <button
-                        key={purpose}
-                        type="button"
-                        className="v4Chip"
-                        aria-pressed={goal.purpose === purpose}
-                        disabled={choicesFull && goal.purpose === null}
-                        onClick={() => setGoal({ ...goal, purpose: goal.purpose === purpose ? null : purpose })}
-                      >
-                        {t(catalog, `v4.read.purpose.${purpose}`)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {choicesOffered ? (
-                <>
                 <div className="v4AskBlock">
                   <label className="v4AskLabel" htmlFor={`${ids}-matters`}>{t(catalog, "v4.read.matters.label")}</label>
                   <input
@@ -541,17 +569,13 @@ function V4AskForm({
                     <p className="v4AskHint v4Muted">{t(catalog, "v4.read.angles.full")}</p>
                   ) : null}
                 </div>
-                </>
-                ) : (
-                  <p className="v4AskHint v4Muted">{t(catalog, "v4.read.englishOnlyNote")}</p>
-                )}
             </>
 
             <div className="v4AskBlock">
               <span className="v4AskLabel" id={`${ids}-sent`}>{t(catalog, "v4.read.sentLabel")}</span>
               <p className="v4AskSent" aria-labelledby={`${ids}-sent`}>{sentLine}</p>
               {tooLong ? <p className="v4AskRefusal" role="alert">{t(catalog, "v4.read.tooLong")}</p> : null}
-              {choicesOffered ? <p className="v4AskHint v4Muted">{t(catalog, "v4.read.honestNote")}</p> : null}
+              <p className="v4AskHint v4Muted">{t(catalog, "v4.read.honestNote")}</p>
             </div>
           </section>
 

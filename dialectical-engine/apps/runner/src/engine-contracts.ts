@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import {
-  COMPARING_JUDGE_PROMPT_CONTRACT, COMPARING_JUDGE_SOURCES_PROMPT_CONTRACT, POINT_INVESTIGATION_PROMPT_CONTRACT, WEB_STEP_PROMPT_CONTRACTS,
+  ASK_CLARIFY_SEALED_CONTRACTS, COMPARING_JUDGE_PROMPT_CONTRACT, COMPARING_JUDGE_SOURCES_PROMPT_CONTRACT, POINT_INVESTIGATION_PROMPT_CONTRACT, WEB_STEP_PROMPT_CONTRACTS,
   WEB_DIG_METHOD_SEALED_CONTRACTS, WEB_DIG_SEALED_CONTRACTS, WEB_R22_SEALED_CONTRACTS, WEB_WORDING_V2_SEALED_CONTRACTS, judgeAssignedRootV2PromptContract,
   judgeSourcesSealedContracts
 } from "@debateai/judgement";
@@ -75,7 +75,10 @@ export function engineSealedContracts(): readonly PromptContract[] {
     // (the graders' line), then the rewrite's writer and checker v2 ("search words" out). The ones they replace stay
     // sealed, unused. None is in the judge, composer or conformance seal.
     ...WEB_R22_SEALED_CONTRACTS,
-    ...PATH_REWRITE_V2_SEALED_CONTRACTS
+    ...PATH_REWRITE_V2_SEALED_CONTRACTS,
+    // R22 clarify lane (plan 2026-10-31 decision 29, the instruction approved word for word; the answer form a draft): dynamic step 2's small
+    // call, which the API makes before a debate exists. It is sealed with the engine's so no release changes it unseen.
+    ...ASK_CLARIFY_SEALED_CONTRACTS
   ]);
 }
 

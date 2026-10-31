@@ -3,6 +3,7 @@
 // paths with the story's line beside them, a FAILED rewrite bringing its dig's own material, the person's views beside
 // their verdicts, the shown quotes cut to 120 characters, the earlier report from version 2 on, the 100K guard and the
 // ladder: a level-10 tree still fits, whole statements only, and every shortening counted.
+import { purposeLinesMaterial } from "@debateai/contract";
 import { describe, expect, it } from "vitest";
 import { buildFramedPrompt } from "@debateai/providers";
 import { REPORT_STORY_PROMPT_CONTRACT } from "@debateai/story";
@@ -284,3 +285,15 @@ describe("W5-1 the final report's dossier", () => {
     expect([PATH_YES, PATH_NO]).toHaveLength(2);
   });
 });
+
+describe("decision 29: the person's step-2 answers reach the report's and the answer update's AI", () => {
+  const LINE = "Should the town build a second pier?\n\nWhich town? Harbour Town.";
+  const LINES = { answers: [{ question: "Which town?", answer: "Harbour Town" }], matters: "the cost" };
+  it("what the question says goes in its field; what it does not, in the purpose field", () => {
+    const base = investigationInput();
+    const fields = dossierFieldsOf(built(investigationInput({ question: { ...base.question, line: LINE, ...purposeLinesMaterial(LINE, LINES) } })));
+    expect(fields.find((entry) => entry.name === "question")?.content).toBe(LINE);
+    expect(fields.find((entry) => entry.name === "purpose")?.content).toBe("the cost");
+  });
+});
+

@@ -133,5 +133,13 @@
   "newDebate.plan.current.FREE": "Uw abonnement: Gratis",
   "newDebate.plan.current.PLUS": "Uw abonnement: Plus",
   "newDebate.plan.current.PRO": "Uw abonnement: Pro",
-  "newDebate.plan.current.MAX": "Uw abonnement: Max"
+  "newDebate.plan.current.MAX": "Uw abonnement: Max",
+  "newDebate.askText.purposeQuestion": "Waarvoor heeft u het antwoord nodig?",
+  "newDebate.askText.purposeDecide": "Om een beslissing te nemen",
+  "newDebate.askText.purposeUnderstand": "Om het te begrijpen",
+  "newDebate.askText.purposeWrite": "Om erover te schrijven",
+  "newDebate.askText.otherAnswer": "Een ander antwoord…",
+  "newDebate.askText.otherLabel": "Uw eigen antwoord",
+  "newDebate.askText.matters": "Als de antwoorden in verschillende richtingen wijzen, vind ik het belangrijkst: {matters}",
+  "newDebate.askText.angles": "Kijkt u ook alstublieft naar deze invalshoeken: {list}."
 }

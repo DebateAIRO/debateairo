@@ -133,5 +133,13 @@
   "newDebate.plan.current.FREE": "Din plan: Gratis",
   "newDebate.plan.current.PLUS": "Din plan: Plus",
   "newDebate.plan.current.PRO": "Din plan: Pro",
-  "newDebate.plan.current.MAX": "Din plan: Max"
+  "newDebate.plan.current.MAX": "Din plan: Max",
+  "newDebate.askText.purposeQuestion": "Hvad skal svaret bruges til?",
+  "newDebate.askText.purposeDecide": "For at træffe en beslutning",
+  "newDebate.askText.purposeUnderstand": "For at forstå det",
+  "newDebate.askText.purposeWrite": "For at skrive om det",
+  "newDebate.askText.otherAnswer": "Et andet svar…",
+  "newDebate.askText.otherLabel": "Mit eget svar",
+  "newDebate.askText.matters": "Hvis svarene peger i forskellige retninger, er det vigtigst for mig: {matters}",
+  "newDebate.askText.angles": "Kig gerne også på: {list}."
 }

@@ -58,4 +58,20 @@ describe("the ask stores the lines", () => {
     expect(questionWithPurposeLines(line, { place: LINES.place! })).toBe(line);
     expect(questionWithPurposeLines(line, undefined)).toBe(line);
   });
+  it("decision 29: the answers in the question reach the debate and the check as one text, and the structured copy is stored beside it, nothing checked twice", async () => {
+    const { api, checked, stored, submitted } = apiOver(async () => "RECORDED");
+    const answered: PurposeLines = { answers: [{ question: "Which town?", answer: "Harbour Town" }], matters: "the cost", angles: ["fishing jobs"] };
+    const line = `${ask.question_line}\n\nWhich town? Harbour Town.\nWhat matters most to me: the cost\nPlease also look at: fishing jobs.`;
+    expect((await api.inject({ method: "POST", url: "/v1/asks", headers, payload: { ...ask, question_line: line, purpose_lines: answered } })).statusCode).toBe(202);
+    expect(submitted[0]!.question_line).toBe(line);
+    expect(checked).toEqual([line]);
+    expect(stored).toEqual([[expect.any(String), RUN_ID, answered]]);
+    await api.close();
+  });
+  it("decision 29: a line sent beside the question and not in it is still judged by the check", async () => {
+    const { api, checked } = apiOver(async () => "RECORDED");
+    await api.inject({ method: "POST", url: "/v1/asks", headers, payload: { ...ask, purpose_lines: { angles: ["a line the question does not say"] } } });
+    expect(checked).toEqual([`${ask.question_line}\n\na line the question does not say`]);
+    await api.close();
+  });
 });

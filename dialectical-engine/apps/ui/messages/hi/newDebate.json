@@ -133,5 +133,13 @@
   "newDebate.plan.current.FREE": "आपकी योजना: निःशुल्क",
   "newDebate.plan.current.PLUS": "आपकी योजना: Plus",
   "newDebate.plan.current.PRO": "आपकी योजना: Pro",
-  "newDebate.plan.current.MAX": "आपकी योजना: Max"
+  "newDebate.plan.current.MAX": "आपकी योजना: Max",
+  "newDebate.askText.purposeQuestion": "यह जवाब आपको किस काम के लिए चाहिए?",
+  "newDebate.askText.purposeDecide": "फ़ैसला लेने के लिए",
+  "newDebate.askText.purposeUnderstand": "इसे समझने के लिए",
+  "newDebate.askText.purposeWrite": "इसके बारे में लिखने के लिए",
+  "newDebate.askText.otherAnswer": "कोई और जवाब…",
+  "newDebate.askText.otherLabel": "आपका अपना जवाब",
+  "newDebate.askText.matters": "अगर जवाब अलग-अलग दिशाओं में जाएँ, तो मेरे लिए सबसे अहम बात है: {matters}",
+  "newDebate.askText.angles": "कृपया इन पहलुओं को भी देखें: {list}।"
 }

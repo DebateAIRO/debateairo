@@ -1,33 +1,24 @@
-import { WEB_CONTRACT_LIMITS, askQuestionMaxBytes, type PurposeLines } from "@debateai/contract";
+import {
+  WEB_CONTRACT_LIMITS, askQuestionMaxBytes, purposeAnswerSentence, type AskClarifyResponse, type ClarifyQuestion, type PurposeAnswer, type PurposeLines
+} from "@debateai/contract";
 import { catalogLocale, isLocale } from "../i18n/locales.js";
 import { t, type MessageCatalog } from "../i18n/translate.js";
-import type { DigTarget, GoalHorizon, GoalPlace, GoalPurpose, OpenQuestionKind, V4DigPick, V4Goal } from "./types.js";
+import type { DigTarget, OpenQuestionKind, V4DigPick, V4Goal, V4GoalAnswer } from "./types.js";
 
 /*
- * V4 initial (spec 2026-10-28, B2): what is SENT as question_line. The person's D2 choices travel as plain sentences in
- * the page's language, appended to their question, so nothing is hidden: the ask page shows this exact text before
- * Start. A dig is a follow-up question written the same way. Every sentence is a catalogue key; none is built here.
+ * V4 initial (spec 2026-10-28, B2): what is SENT as question_line. The person's D2 choices travel as plain sentences,
+ * appended to their question, so nothing is hidden: the ask page shows this exact text before Start. Decision 29: on every
+ * language; the clarifying questions and answers are already in the question's language, the lead-ins are catalogue keys.
+ * A dig is a follow-up question written the same way.
  */
 
 /** The parts a person may add (D2), at most this many angles (spec: "max 5"). */
-const ANGLES_MAX = 5;
+const ANGLES_MAX = WEB_CONTRACT_LIMITS.anglesMax;
 
-const PLACE_KEYS: Readonly<Record<Exclude<GoalPlace, "OTHER">, string>> = Object.freeze({
-  ANYWHERE: "v4.askText.place.ANYWHERE",
-  ROMANIA: "v4.askText.place.ROMANIA",
-  EU: "v4.askText.place.EU"
-});
-const HORIZON_KEYS: Readonly<Record<GoalHorizon, string>> = Object.freeze({
-  NOW: "v4.askText.horizon.NOW",
-  FIVE_YEARS: "v4.askText.horizon.FIVE_YEARS",
-  TWENTY_FIVE_YEARS: "v4.askText.horizon.TWENTY_FIVE_YEARS",
-  LONG_RUN: "v4.askText.horizon.LONG_RUN"
-});
-const PURPOSE_KEYS: Readonly<Record<GoalPurpose, string>> = Object.freeze({
-  DECIDE: "v4.askText.purpose.DECIDE",
-  UNDERSTAND: "v4.askText.purpose.UNDERSTAND",
-  WRITE: "v4.askText.purpose.WRITE"
-});
+/** First-shape sentences, only so an old debate's added lines are still recognised when a dig carries them (offEnglishCarried). */
+const PLACE_KEYS: readonly string[] = ["v4.askText.place.ANYWHERE", "v4.askText.place.ROMANIA", "v4.askText.place.EU"];
+const HORIZON_KEYS: readonly string[] = ["v4.askText.horizon.NOW", "v4.askText.horizon.FIVE_YEARS", "v4.askText.horizon.TWENTY_FIVE_YEARS", "v4.askText.horizon.LONG_RUN"];
+const PURPOSE_KEYS: readonly string[] = ["v4.askText.purpose.DECIDE", "v4.askText.purpose.UNDERSTAND", "v4.askText.purpose.WRITE"];
 const DIG_KIND_KEYS: Readonly<Record<OpenQuestionKind, string>> = Object.freeze({
   STILL_ARGUED: "v4.digText.kind.STILL_ARGUED",
   OBJECTION: "v4.digText.kind.OBJECTION",
@@ -58,72 +49,80 @@ export function cleanAngles(angles: readonly string[]): readonly string[] {
 export const FREE_GOAL_CHOICES_MAX = 3;
 
 /**
- * How many D2 choices a goal carries: the place (a pressed "Another place" counts), the time, the purpose, what matters
- * (when not blank) and each angle as sent (`cleanAngles`).
+ * How many D2 choices a goal carries: each question answered (a pressed "Other" counts), what matters (when not blank) and each angle as sent
+ * (`cleanAngles`).
  */
 export function goalChoiceCount(goal: V4Goal): number {
-  return (goal.place === null ? 0 : 1) + (goal.horizon === null ? 0 : 1) + (goal.purpose === null ? 0 : 1)
-    + (oneLine(goal.matters).length === 0 ? 0 : 1) + cleanAngles(goal.angles).length;
+  return goal.answers.length + (oneLine(goal.matters).length === 0 ? 0 : 1) + cleanAngles(goal.angles).length;
 }
 
 /**
- * The goal a plan may send. A paid plan: the goal itself. Free: at most FREE_GOAL_CHOICES_MAX choices, the first ones in
- * the order they are sent (place, time, purpose, what matters, angles); the rest are dropped from the end. A goal
- * already within the cap is returned as it is.
+ * The goal a plan may send. A paid plan: the goal itself. Free: at most FREE_GOAL_CHOICES_MAX choices, the first ones in the order they are sent
+ * (the answers, what matters, angles); the rest are dropped from the end. A goal already within the cap is returned as it is.
  */
 export function goalWithinPlan(goal: V4Goal, planTier: "free" | "premium"): V4Goal {
   if (planTier !== "free" || goalChoiceCount(goal) <= FREE_GOAL_CHOICES_MAX) return goal;
-  let left = FREE_GOAL_CHOICES_MAX;
-  const keep = (set: boolean): boolean => {
-    if (!set || left === 0) return false;
-    left -= 1;
-    return true;
-  };
-  const place = keep(goal.place !== null) ? goal.place : null;
-  const horizon = keep(goal.horizon !== null) ? goal.horizon : null;
-  const purpose = keep(goal.purpose !== null) ? goal.purpose : null;
-  const matters = keep(oneLine(goal.matters).length > 0) ? goal.matters : "";
-  const angles = cleanAngles(goal.angles).slice(0, left);
-  return Object.freeze({ place, placeOther: place === "OTHER" ? goal.placeOther : "", horizon, purpose, matters, angles: Object.freeze(angles) });
+  const answers = goal.answers.slice(0, FREE_GOAL_CHOICES_MAX);
+  let left = FREE_GOAL_CHOICES_MAX - answers.length;
+  const keepsMatters = oneLine(goal.matters).length > 0 && left > 0;
+  if (keepsMatters) left -= 1;
+  return Object.freeze({ answers: Object.freeze(answers), matters: keepsMatters ? goal.matters : "", angles: Object.freeze(cleanAngles(goal.angles).slice(0, left)) });
 }
 
-/** The sentences the D2 choices add, in the spec's order: place, time, purpose, what matters, angles. */
+/** The answers as sent: one line each; a pressed "Other" with nothing typed says nothing. */
+function sentAnswers(goal: V4Goal): readonly PurposeAnswer[] {
+  const line = (text: string): string => oneLine(text).slice(0, WEB_CONTRACT_LIMITS.purposeLineMaxChars);
+  return goal.answers.flatMap((given) => (oneLine(given.answer).length === 0 ? [] : [{ question: line(given.question), answer: line(given.answer) }]));
+}
+
+/**
+ * The sentences the D2 choices add, in the spec's order: the answers ("Where? Bucharest."), what matters, angles. The answers are already in the
+ * question's language; the two lead-ins are catalogue keys of `newDebate`, in all 35 languages, read from the page's language.
+ */
 function goalSentences(goal: V4Goal, catalog: MessageCatalog): readonly string[] {
-  const sentences: string[] = [];
-  if (goal.place === "OTHER") {
-    const place = oneLine(goal.placeOther);
-    if (place.length > 0) sentences.push(t(catalog, "v4.askText.place.OTHER", { place }));
-  } else if (goal.place !== null) {
-    sentences.push(t(catalog, PLACE_KEYS[goal.place]));
-  }
-  if (goal.horizon !== null) sentences.push(t(catalog, HORIZON_KEYS[goal.horizon]));
-  if (goal.purpose !== null) sentences.push(t(catalog, PURPOSE_KEYS[goal.purpose]));
+  const sentences: string[] = sentAnswers(goal).map(purposeAnswerSentence);
   const matters = oneLine(goal.matters);
-  if (matters.length > 0) sentences.push(t(catalog, "v4.askText.matters", { matters }));
+  if (matters.length > 0) sentences.push(t(catalog, "newDebate.askText.matters", { matters }));
   const angles = cleanAngles(goal.angles);
   // ASK-6: the template ends the sentence itself, so one closing mark the person typed is not doubled ("waste..").
-  if (angles.length > 0) sentences.push(t(catalog, "v4.askText.angles", { list: angles.join("; ").replace(/[.!?。]$/u, "") }));
+  if (angles.length > 0) sentences.push(t(catalog, "newDebate.askText.angles", { list: angles.join("; ").replace(/[.!?。]$/u, "") }));
   return sentences;
 }
 
 /**
- * Decision 5 of 31 Oct: a goal's place, time and purpose as the ask's structured `purpose_lines`, whatever the page's language: the debate
- * stores them encrypted and every rewrite, answer update and report reads them. Undefined when none is set (a line is at most the contract's
- * length). What matters and the angles stay in the question.
+ * Decisions 5 and 29: a goal as the ask's structured `purpose_lines`, whatever the page's language: the debate stores them encrypted and every
+ * rewrite, answer update and report reads them. Undefined when none is set.
  */
-export function purposeLinesOfGoal(goal: V4Goal, catalog: MessageCatalog): PurposeLines | undefined {
-  const typedPlace = goal.place === "OTHER" ? oneLine(goal.placeOther) : "";
-  const place = goal.place === "OTHER" ? (typedPlace.length > 0 ? t(catalog, "v4.askText.place.OTHER", { place: typedPlace }) : null)
-    : goal.place === null ? null : t(catalog, PLACE_KEYS[goal.place]);
-  const time = goal.horizon === null ? null : t(catalog, HORIZON_KEYS[goal.horizon]);
-  const purpose = goal.purpose === null ? null : t(catalog, PURPOSE_KEYS[goal.purpose]);
-  if (place === null && time === null && purpose === null) return undefined;
-  const line = (text: string): string => text.slice(0, WEB_CONTRACT_LIMITS.purposeLineMaxChars);
-  return Object.freeze({ ...(place === null ? {} : { place: line(place) }), ...(time === null ? {} : { time: line(time) }),
-    ...(purpose === null ? {} : { purpose: line(purpose) }) });
+export function purposeLinesOfGoal(goal: V4Goal): PurposeLines | undefined {
+  const answers = sentAnswers(goal);
+  const matters = oneLine(goal.matters).slice(0, WEB_CONTRACT_LIMITS.purposeLineMaxChars);
+  const angles = [...cleanAngles(goal.angles)].map((angle) => angle.slice(0, WEB_CONTRACT_LIMITS.purposeLineMaxChars));
+  if (answers.length === 0 && matters.length === 0 && angles.length === 0) return undefined;
+  return { ...(answers.length === 0 ? {} : { answers: [...answers] }), ...(matters.length === 0 ? {} : { matters }), ...(angles.length === 0 ? {} : { angles }) };
 }
 
-/** ASK-1: the English sentences go only with an English page (all 35 locales load the English v4 file tonight). */
+/** Decision 29: the generic purpose question, shown when no AI read the question. In the page's language, from `newDebate`, in all 35 languages. */
+export function genericPurposeQuestion(catalog: MessageCatalog): ClarifyQuestion {
+  return { text: t(catalog, "newDebate.askText.purposeQuestion"), answers: [
+    t(catalog, "newDebate.askText.purposeDecide"), t(catalog, "newDebate.askText.purposeUnderstand"), t(catalog, "newDebate.askText.purposeWrite")
+  ] };
+}
+
+/** The questions a reply puts on the page, in order: the AI's, the one about what the answer is for last; or the generic one. */
+export function clarifyingQuestions(reply: AskClarifyResponse, catalog: MessageCatalog): readonly ClarifyQuestion[] {
+  return reply.source === "AI" ? Object.freeze([...reply.questions, reply.purpose]) : Object.freeze([genericPurposeQuestion(catalog)]);
+}
+
+/** A changed question: an answer stays only while its question is still asked and, unless the person typed it, still offered. */
+export function answersStillAsked(answers: readonly V4GoalAnswer[], questions: readonly ClarifyQuestion[]): readonly V4GoalAnswer[] {
+  const kept = answers.filter((given) => {
+    const asked = questions.find((question) => question.text === given.question);
+    return asked !== undefined && (given.other || asked.answers.includes(given.answer));
+  });
+  return kept.length === answers.length ? answers : Object.freeze(kept);
+}
+
+/** ASK-1, a dig's framing only: its English sentences go only with an English page (all 35 locales load the English v4 file tonight). */
 function writesEnglish(locale: string): boolean {
   return isLocale(locale) && catalogLocale(locale) === "en";
 }
@@ -160,13 +159,11 @@ export function addedLines(questionLine: string): readonly string[] {
 
 /**
  * The question as sent: the person's words, then (only when a part is set) a blank line and one sentence per part,
- * one per line. No part set: the trimmed question exactly. Off an English page (ASK-1) only the person's words are sent:
- * the sentences exist in English only, and would bring up the language pop-up and mix languages for the AIs. A blank
- * line inside the person's own words is closed up to one line break, so ownWords() always gets all of them back.
+ * one per line. No part set: the trimmed question exactly. A blank line inside the person's own words is closed up to
+ * one line break, so ownWords() always gets all of them back. `catalog`: the page language's `newDebate`.
  */
-export function composeQuestion(question: string, goal: V4Goal, catalog: MessageCatalog, locale: string): string {
+export function composeQuestion(question: string, goal: V4Goal, catalog: MessageCatalog): string {
   const asked = question.trim().replace(/\n\s*\n/g, "\n");
-  if (!writesEnglish(locale)) return asked;
   const sentences = goalSentences(goal, catalog);
   return sentences.length === 0 ? asked : `${asked}\n\n${sentences.join("\n")}`;
 }
@@ -286,12 +283,12 @@ function contextQuestion(line: string, catalog: MessageCatalog): string | null {
   return englishContext(line, catalog) ?? quotedLine(line);
 }
 
-/** The D2 sentence templates (English only tonight): a carried line matching one is an English catalogue sentence. */
+/** The first-shape D2 sentence templates, English only: a carried line matching one is an English catalogue sentence. */
 const GOAL_SENTENCE_KEYS: readonly string[] = [
-  ...Object.values(PLACE_KEYS),
+  ...PLACE_KEYS,
   "v4.askText.place.OTHER",
-  ...Object.values(HORIZON_KEYS),
-  ...Object.values(PURPOSE_KEYS),
+  ...HORIZON_KEYS,
+  ...PURPOSE_KEYS,
   "v4.askText.matters",
   "v4.askText.angles"
 ];

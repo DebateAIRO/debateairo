@@ -29,7 +29,7 @@ describe("the ask's new members", () => {
     expect(PurposeLinesSchema.safeParse({ time: "Now" }).success).toBe(true);
     expect(PurposeLinesSchema.safeParse({}).success).toBe(false);
     expect(PurposeLinesSchema.safeParse({ place: "x".repeat(WEB_CONTRACT_LIMITS.purposeLineMaxChars + 1) }).success).toBe(false);
-    expect(PurposeLinesSchema.safeParse({ place: "x", matters: "y" }).success).toBe(false);
+    expect(PurposeLinesSchema.safeParse({ place: "x", extra: "y" }).success).toBe(false);
   });
 
   it("a stranger's dig names the page, never a run", () => {

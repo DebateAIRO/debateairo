@@ -75,9 +75,9 @@ describe("W5-1 Write my report: the closing", () => {
   });
 
   it("the five report contracts are sealed by the engine hash, appended last", () => {
-    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-15, -10)).toEqual(["report.answer.v1", "report.answer.later.v1", "report.answer-check.v1",
+    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-16, -11)).toEqual(["report.answer.v1", "report.answer.later.v1", "report.answer-check.v1",
       "report.story.v1", "report.story-check.v1"]);
-    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-7, -4)).toEqual(["report.answer.v2", "report.answer.later.v2", "report.answer-check.v2"]);
+    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-8, -5)).toEqual(["report.answer.v2", "report.answer.later.v2", "report.answer-check.v2"]);
   });
 
   it("F5: one fence and canary for the whole closing, so a step's second round opens with its first round's bytes", async () => {

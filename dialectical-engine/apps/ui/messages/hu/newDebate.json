@@ -133,5 +133,13 @@
   "newDebate.plan.current.FREE": "Az Ön előfizetése: Ingyenes",
   "newDebate.plan.current.PLUS": "Az Ön előfizetése: Plus",
   "newDebate.plan.current.PRO": "Az Ön előfizetése: Pro",
-  "newDebate.plan.current.MAX": "Az Ön előfizetése: Max"
+  "newDebate.plan.current.MAX": "Az Ön előfizetése: Max",
+  "newDebate.askText.purposeQuestion": "Mire szeretné a választ?",
+  "newDebate.askText.purposeDecide": "Döntés meghozatalához",
+  "newDebate.askText.purposeUnderstand": "Megértéséhez",
+  "newDebate.askText.purposeWrite": "Erről szóló íráshoz",
+  "newDebate.askText.otherAnswer": "Más válasz…",
+  "newDebate.askText.otherLabel": "Saját válasz",
+  "newDebate.askText.matters": "Ha a válaszok különböző irányba mutatnak, nekem a legfontosabb: {matters}",
+  "newDebate.askText.angles": "Kérem, nézze meg ezeket a szempontokat is: {list}."
 }

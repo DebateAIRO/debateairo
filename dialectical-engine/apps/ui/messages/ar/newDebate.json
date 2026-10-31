@@ -133,5 +133,13 @@
   "newDebate.plan.current.FREE": "خطتك: المجانية",
   "newDebate.plan.current.PLUS": "خطتك: Plus",
   "newDebate.plan.current.PRO": "خطتك: Pro",
-  "newDebate.plan.current.MAX": "خطتك: Max"
+  "newDebate.plan.current.MAX": "خطتك: Max",
+  "newDebate.askText.purposeQuestion": "ما الغرض من الإجابة؟",
+  "newDebate.askText.purposeDecide": "لاتخاذ قرار",
+  "newDebate.askText.purposeUnderstand": "لفهمه",
+  "newDebate.askText.purposeWrite": "للكتابة عنه",
+  "newDebate.askText.otherAnswer": "إجابة أخرى…",
+  "newDebate.askText.otherLabel": "إجابتي الخاصة",
+  "newDebate.askText.matters": "إذا تعارضت الإجابات، فما يهمني أكثر هو: {matters}",
+  "newDebate.askText.angles": "من فضلك ألقِ نظرة أيضاً على: {list}."
 }

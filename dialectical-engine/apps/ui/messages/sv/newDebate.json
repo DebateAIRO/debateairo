@@ -133,5 +133,13 @@
   "newDebate.plan.current.FREE": "Ditt abonnemang: Kostnadsfritt",
   "newDebate.plan.current.PLUS": "Ditt abonnemang: Plus",
   "newDebate.plan.current.PRO": "Ditt abonnemang: Pro",
-  "newDebate.plan.current.MAX": "Ditt abonnemang: Max"
+  "newDebate.plan.current.MAX": "Ditt abonnemang: Max",
+  "newDebate.askText.purposeQuestion": "Vad vill du ha svaret till?",
+  "newDebate.askText.purposeDecide": "För att fatta ett beslut",
+  "newDebate.askText.purposeUnderstand": "För att förstå det",
+  "newDebate.askText.purposeWrite": "För att skriva om det",
+  "newDebate.askText.otherAnswer": "Annat svar…",
+  "newDebate.askText.otherLabel": "Ditt eget svar",
+  "newDebate.askText.matters": "Om svaren pekar åt olika håll är det viktigast för mig: {matters}",
+  "newDebate.askText.angles": "Titta gärna också på: {list}."
 }

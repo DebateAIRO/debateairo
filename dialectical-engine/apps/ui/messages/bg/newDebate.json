@@ -133,5 +133,13 @@
   "newDebate.plan.current.FREE": "Вашият план: Безплатен",
   "newDebate.plan.current.PLUS": "Вашият план: Plus",
   "newDebate.plan.current.PRO": "Вашият план: Pro",
-  "newDebate.plan.current.MAX": "Вашият план: Max"
+  "newDebate.plan.current.MAX": "Вашият план: Max",
+  "newDebate.askText.purposeQuestion": "За какво ви трябва отговорът?",
+  "newDebate.askText.purposeDecide": "За да взема решение",
+  "newDebate.askText.purposeUnderstand": "За да го разбера",
+  "newDebate.askText.purposeWrite": "За да пиша по темата",
+  "newDebate.askText.otherAnswer": "Друг отговор…",
+  "newDebate.askText.otherLabel": "Моят собствен отговор",
+  "newDebate.askText.matters": "Ако отговорите сочат в различни посоки, най-важното за мен е: {matters}",
+  "newDebate.askText.angles": "Моля, разгледайте също: {list}."
 }

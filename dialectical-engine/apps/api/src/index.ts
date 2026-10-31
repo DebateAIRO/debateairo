@@ -32,6 +32,7 @@ import { runInRequestScope, setRequestCredential } from "@debateai/db";
 import { normalizeManualPhone } from "./phone-profile.js";
 import { answerForOutcome, type AskQuestionCheck } from "./question-check/ask-gate.js";
 import { questionWithPurposeLines, recordPurposeLinesAtAsk, type PurposeLinesPort } from "./purpose-lines.js";
+import type { AskClarifyPort } from "./ask-clarify.js";
 import { resolveSourceMailLocale } from "./mail-locale.js";
 import { exhaustive, type FundingBasis } from "@debateai/kernel";
 import { AsyncResource } from "node:async_hooks";
@@ -58,6 +59,8 @@ import {
   AskAlreadyWaitingSchema,
   AskRequestSchema,
   askQuestionMaxBytes,
+  AskClarifyRequestSchema,
+  AskClarifyResponseSchema,
   DeploymentSchema,
   EventTypeSchema,
   InvestigationAcceptedSchema,
@@ -1514,6 +1517,7 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "GET /v1/support/status", auth: "public", session: "optional", resource: "support-status", action: "read" },
   { route: "POST /v1/asks", auth: "user", resource: "run-owner", action: "create" },
   { route: "GET /v1/asks/room", auth: "user", resource: "run-owner", action: "read-room" },
+  { route: "POST /v1/asks/clarify", auth: "user", resource: "run-owner", action: "read-clarifying-questions" },
   { route: "GET /v1/session", auth: "user", resource: "session-self", action: "read" },
   { route: "GET /v1/deployment", auth: "operator", resource: "deployment", action: "read" },
   // Side-by-side spec §6 (plan C5): the process probes. Public and session-free (the website's /readyz and Caddy poll
@@ -1896,6 +1900,8 @@ export interface ApiOptions {
   readonly digPicks?: DigPicksPort;
   /** Decision 5 of 31 Oct (0138): a debate's place, time and purpose lines, sealed under its run key at the ask. */
   readonly purposeLines?: PurposeLinesPort;
+  /** Decision 29: dynamic step 2's small call. Absent: every page gets the generic purpose options. */
+  readonly askClarify?: AskClarifyPort;
   /** W3-7: a parent's stored dig suggestion, to tell an AI suggestion from the person's edit (W4-3's store; absent: none). */
   readonly digSuggestionText?: DigSuggestionTextReader;
   /** W3-2: whether a person's month has room again after a month pause (the ask room's `monthHasRoom`). */
@@ -4092,6 +4098,29 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       await recordPurposeLinesAtAsk({ ownerRef: digOwner, runId: accepted.run_ref, lines: ask.purpose_lines }, options.purposeLines);
     }
     return reply.status(202).send(accepted);
+  });
+
+  /**
+   * Decision 29: the clarifying questions for step 2, before a debate exists. A signed-in person only. The question reaches the AI only when the
+   * ask itself could send it there: not a question in crisis (their words go to no model, as on POST /v1/asks), never before the sensitive-data
+   * consent, never off the preview's team, never from a blocked country. In each of those cases, as on any failure, the answer is GENERIC and the
+   * page carries on: this route never stands between a person and Start.
+   */
+  api.post("/v1/asks/clarify", routePolicy("POST /v1/asks/clarify"), async (request, reply) => {
+    const asker = request.authenticatedSession;
+    if (asker === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    const body = AskClarifyRequestSchema.safeParse(request.body);
+    if (!body.success || Buffer.byteLength(body.data.question_line, "utf8") > ASK_QUESTION_MAX_BYTES) {
+      return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    }
+    const question = body.data.question_line;
+    const mayAsk = options.askClarify !== undefined && !detectCrisis(question).crisis
+      && previewTeamAdmits(previewConfig, options.previewTeamUserIds, asker.userId)
+      && (options.countryGate?.ask(sourceFor(request)) ?? null) === null
+      && options.sessions?.readSensitiveDataConsent !== undefined
+      && await options.sessions.readSensitiveDataConsent(asker) === "given";
+    const answer = mayAsk ? await options.askClarify!.read(asker.ownerRef, question) : { source: "GENERIC" as const };
+    return reply.send(AskClarifyResponseSchema.parse(answer));
   });
 
   api.get<{ Querystring: Record<string, unknown> }>("/v1/asks/room", routePolicy("GET /v1/asks/room"), async (request, reply) => {

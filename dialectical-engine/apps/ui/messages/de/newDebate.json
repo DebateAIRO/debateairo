@@ -133,5 +133,13 @@
   "newDebate.plan.current.FREE": "Ihr Tarif: Kostenlos",
   "newDebate.plan.current.PLUS": "Ihr Tarif: Plus",
   "newDebate.plan.current.PRO": "Ihr Tarif: Pro",
-  "newDebate.plan.current.MAX": "Ihr Tarif: Max"
+  "newDebate.plan.current.MAX": "Ihr Tarif: Max",
+  "newDebate.askText.purposeQuestion": "Wofür brauchen Sie die Antwort?",
+  "newDebate.askText.purposeDecide": "Um eine Entscheidung zu treffen",
+  "newDebate.askText.purposeUnderstand": "Um es zu verstehen",
+  "newDebate.askText.purposeWrite": "Um darüber zu schreiben",
+  "newDebate.askText.otherAnswer": "Andere Antwort…",
+  "newDebate.askText.otherLabel": "Meine eigene Antwort",
+  "newDebate.askText.matters": "Wenn die Antworten in verschiedene Richtungen gehen, ist mir am wichtigsten: {matters}",
+  "newDebate.askText.angles": "Bitte schauen Sie sich außerdem noch an: {list}."
 }

@@ -224,34 +224,23 @@ export type DigLink = Readonly<{
   startedAt: string | null;
 }>;
 
-/** D2 "How we read your question": the optional parts a person may set. Every part is optional and starts unset. */
-export const GOAL_PLACES = ["ANYWHERE", "ROMANIA", "EU", "OTHER"] as const;
-export type GoalPlace = (typeof GOAL_PLACES)[number];
-export const GOAL_HORIZONS = ["NOW", "FIVE_YEARS", "TWENTY_FIVE_YEARS", "LONG_RUN"] as const;
-export type GoalHorizon = (typeof GOAL_HORIZONS)[number];
-export const GOAL_PURPOSES = ["DECIDE", "UNDERSTAND", "WRITE"] as const;
-export type GoalPurpose = (typeof GOAL_PURPOSES)[number];
+/**
+ * Decision 29: one clarifying question the person answered, as the AI (or, when no AI read the question, the page's generic purpose question)
+ * asked it. `other`: the person pressed "Other", so `answer` is what they typed, blank until they do.
+ */
+export type V4GoalAnswer = Readonly<{ question: string; answer: string; other: boolean }>;
 
+/** D2 "How we read your question": the optional parts a person may set. Every part is optional and starts unset. */
 export type V4Goal = Readonly<{
-  place: GoalPlace | null;
-  /** The place typed when place is OTHER. */
-  placeOther: string;
-  horizon: GoalHorizon | null;
-  purpose: GoalPurpose | null;
+  /** The clarifying questions answered, in the order they are shown. */
+  answers: readonly V4GoalAnswer[];
   /** What matters most when the answers pull apart, in the person's words. */
   matters: string;
-  /** The person's own angles ("Add your own angle"), at most five. */
+  /** The person's own angles ("Add your own angle"), at most five: things to investigate, in their words. */
   angles: readonly string[];
 }>;
 
-export const EMPTY_GOAL: V4Goal = Object.freeze({
-  place: null,
-  placeOther: "",
-  horizon: null,
-  purpose: null,
-  matters: "",
-  angles: Object.freeze([])
-});
+export const EMPTY_GOAL: V4Goal = Object.freeze({ answers: Object.freeze([]), matters: "", angles: Object.freeze([]) });
 
 /**
  * What the page saw earlier, per item id: the item's word (a trust word, a fate or a dig state). In memory for this visit;

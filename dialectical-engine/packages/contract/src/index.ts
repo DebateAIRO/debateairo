@@ -29,7 +29,7 @@ import {
   DigLinkRecordSchema, DigLinksSchema, DigLinkRecordRequestSchema, DigLinkRecordedSchema, DigLinkModeSchema
 } from "./account-memory.js";
 export * from "./account-memory.js";
-import { AnswerContributionSchema, AnswerMainAnswerSchema, MainAnswerVersionSchema, PublicContributionSchema, PublicDigParentSchema, PublicMainAnswerSchema, PurposeLinesSchema, AnswerWebSchema, AskParentSchema, DebateInvestigationSchema, DigSharePercentSchema, DigSuggestionSchema, InvestigationCloseRequestSchema,
+import { AnswerContributionSchema, AnswerMainAnswerSchema, MainAnswerVersionSchema, PublicContributionSchema, PublicDigParentSchema, PublicMainAnswerSchema, PurposeLinesSchema, AskClarifyRequestSchema, AskClarifyResponseSchema, AnswerWebSchema, AskParentSchema, DebateInvestigationSchema, DigSharePercentSchema, DigSuggestionSchema, InvestigationCloseRequestSchema,
   ResearchedAddRequestSchema, ResearchedAddedSchema, RoomReserveSchema, WebOtherPageSchema, WebPathSchema, WebSourceSchema,
   WEB_CONTRACT_LIMITS, AnswerDigSchema, AnswerPathRewritesSchema, DigTooDeepSchema, DigPicksOnePathSchema, DigFreePicksMaxSchema, MonthPauseSchema, PathRewriteSchema,
   PathRewritesSchema, PointOfViewVerdictSchema, RoomNewStartsSchema, RunContinueRefusedSchema, RunContinueRequestSchema,
@@ -1876,6 +1876,8 @@ export const contractInventory = Object.freeze({
     "GET /v1/support/status",
     "POST /v1/asks",
     "GET /v1/asks/room",
+    // Decision 29: dynamic step 2.
+    "POST /v1/asks/clarify",
     "GET /v1/session",
     "GET /v1/deployment",
     // Side-by-side spec §6 (plan C5): the API's liveness and readiness probes.
@@ -1979,6 +1981,8 @@ export const contractInventory = Object.freeze({
     // The owner's changes of 31 Oct (./web.ts): the shapes the Tree and Public lanes fill; no route yet.
     PurposeLinesSchema, MainAnswerVersionSchema, AnswerMainAnswerSchema, PublicDigParentSchema, AnswerContributionSchema,
     PublicContributionSchema, PublicMainAnswerSchema,
+    // Decision 29: dynamic step 2.
+    AskClarifyRequestSchema, AskClarifyResponseSchema,
     BillingQuoteRequestSchema, BillingQuoteResponseSchema, BillingCheckoutRequestSchema, BillingCheckoutResponseSchema,
     BillingCheckoutPendingErrorSchema, BillingChargeStatusResponseSchema,
     BillingSubscriptionResponseSchema, BillingDowngradeRequestSchema, BillingInvoicesResponseSchema,

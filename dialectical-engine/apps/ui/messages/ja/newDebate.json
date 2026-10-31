@@ -133,5 +133,13 @@
   "newDebate.plan.current.FREE": "ご利用のプラン：無料",
   "newDebate.plan.current.PLUS": "ご利用のプラン：Plus",
   "newDebate.plan.current.PRO": "ご利用のプラン：Pro",
-  "newDebate.plan.current.MAX": "ご利用のプラン：Max"
+  "newDebate.plan.current.MAX": "ご利用のプラン：Max",
+  "newDebate.askText.purposeQuestion": "回答は何のために必要ですか？",
+  "newDebate.askText.purposeDecide": "決断するため",
+  "newDebate.askText.purposeUnderstand": "理解するため",
+  "newDebate.askText.purposeWrite": "それについて書くため",
+  "newDebate.askText.otherAnswer": "別の回答…",
+  "newDebate.askText.otherLabel": "自分の回答",
+  "newDebate.askText.matters": "回答同士が食い違うとき、私にとって一番大事なのは：{matters}",
+  "newDebate.askText.angles": "次の観点も見てください：{list}。"
 }
