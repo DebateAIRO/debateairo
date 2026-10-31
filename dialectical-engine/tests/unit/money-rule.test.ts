@@ -433,7 +433,7 @@ describe("PATH_REWRITE is never walled", () => {
     await store.readOwnerSpentInRangesMicros(OWNER, [{ from: at("2026-10-01T00:00:00.000Z"), to: at("2026-10-02T00:00:00.000Z") }]);
     await store.readOwnerChargesMicros(OWNER, at("2026-10-01T00:00:00.000Z"), at("2026-10-02T00:00:00.000Z"));
     expect(texts).toHaveLength(3);
-    for (const text of texts) expect(text).toContain("spend.spend_source IN ('RUN','STORY','PATH_REWRITE','INVESTIGATION_REPORT')");
+    for (const text of texts) expect(text).toContain("spend.spend_source IN ('RUN','STORY','PATH_REWRITE','INVESTIGATION_REPORT','PATH_CLIMB','ANSWER_UPDATE','CONTRIBUTION_CHECK')");
   });
 });
 

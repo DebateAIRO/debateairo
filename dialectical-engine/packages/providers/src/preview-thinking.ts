@@ -86,7 +86,8 @@ export function previewThinkingStepOf(request: Readonly<{ callSiteKey: string; l
   if (request.lane === "story" && /^STORY:CHECKER:[1-8]$/u.test(request.callSiteKey)) return "story_checker";
   // Dig-model revision W3-7: a dig's path rewrite, on the story lane (packages/story PATH_REWRITE_CALL_SITE; its step names
   // are packages/register PATH_REWRITE_THINKING's).
-  const rewriteSite = /^PATH_REWRITE:(WRITER|CHECKER):[1-4]$/u.exec(request.callSiteKey);
+  // R22 decision 2: the climb is the same writer and checker at the same steps.
+  const rewriteSite = /^(?:PATH_REWRITE|PATH_CLIMB):(WRITER|CHECKER):[1-4]$/u.exec(request.callSiteKey);
   if (request.lane === "story" && rewriteSite !== null) return rewriteSite[1] === "WRITER" ? "path_rewrite_writer" : "path_rewrite_checker";
   // W5-1: the final report over an investigation (packages/story INVESTIGATION_REPORT_CALL_SITE) runs at the owner's four
   // final steps: its answer at answer_writer / answer_checker, its story at story_writer / story_checker.
@@ -95,6 +96,9 @@ export function previewThinkingStepOf(request: Readonly<{ callSiteKey: string; l
     return reportSite[1] === "ANSWER" ? "answer_writer" : reportSite[1] === "ANSWER_CHECK" ? "answer_checker"
       : reportSite[1] === "STORY" ? "story_writer" : "story_checker";
   }
+  // R22 decision 3: the automatic main-answer update is the report's answer step, at the same two steps.
+  const updateSite = /^ANSWER_UPDATE:(ANSWER|ANSWER_CHECK):[1-4]$/u.exec(request.callSiteKey);
+  if (request.lane === "story" && updateSite !== null) return updateSite[1] === "ANSWER" ? "answer_writer" : "answer_checker";
   // Debate shape (merge of dev into Phase 2, 2026-10-13): the map's calls (MAP:angles, MAP:list:N, MAP:merge, MAP:gap:N,
   // MAP:choose; packages/map) build the debate's opening, so they run at the owner's `opening` level, the closest step.
   if (/^MAP:/u.test(request.callSiteKey)) return "opening";

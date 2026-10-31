@@ -205,8 +205,10 @@ describe("W3-7 the path rewrite on the database", () => {
     const pass = await sweepPathRewrites({ ...fresh.sweep, now: later });
     expect(pass.rewritten).toBeGreaterThanOrEqual(1);
     expect((await rowOf(dig)).map((row) => row.outcome)).toEqual(["READY"]);
-    expect(again.sent.haiku).toHaveLength(0);
-    expect(again.sent.glm).toHaveLength(1);
+    // Once stored, the changed path updates the main answer on the report's prompts (R22, tests/integration/r22-tree-database.test.ts).
+    const rewriteCalls = (packets: readonly PromptPacket[]) => packets.filter((packet) => packet.messages[0]!.content.includes("path-rewrite."));
+    expect(rewriteCalls(again.sent.haiku)).toHaveLength(0);
+    expect(rewriteCalls(again.sent.glm)).toHaveLength(1);
     expect(first.sent.haiku).toHaveLength(1);
     expect(await writerEntries(dig)).toBe(1);
   });

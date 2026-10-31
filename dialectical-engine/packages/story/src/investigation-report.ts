@@ -231,6 +231,19 @@ export const INVESTIGATION_REPORT_THINKING_STEPS = Object.freeze({
   ANSWER: "answer_writer", ANSWER_CHECK: "answer_checker", STORY: "story_writer", STORY_CHECK: "story_checker"
 } as const);
 
+/**
+ * R22 decisions 3 and 4: the automatic main-answer update runs the report's own answer step and its check, on the report's own prompts
+ * (never a copy); its sites are its own only so the gateway charges them as ANSWER_UPDATE on the triggering dig's run, never walled.
+ */
+export const ANSWER_UPDATE_CALL_SITE = /^ANSWER_UPDATE:(ANSWER|ANSWER_CHECK):([1-4])$/u;
+export const ANSWER_UPDATE_CALL_SITE_PREFIX = "ANSWER_UPDATE:" as const;
+
+/** The role an answer-update call site carries, or null for any other key. */
+export function answerUpdateCallSiteRole(callSiteKey: string): "SYNTHESIZER" | "EVALUATOR" | null {
+  const site = ANSWER_UPDATE_CALL_SITE.exec(callSiteKey);
+  return site === null ? null : REPORT_SITE_ROLES[site[1] as ReportSite];
+}
+
 export function investigationReportCallSiteKey(site: ReportSite, round: number): string {
   if (!Number.isInteger(round) || round < 1 || round > INVESTIGATION_REPORT_LAST_ROUND) {
     throw new TypedDomainError("INVESTIGATION_REPORT_ROUND_INVALID", "A report round is 1 to 4");
@@ -374,6 +387,8 @@ export type ReportRunCall = Readonly<{
   contractHash: string;
   /** 2 on a paid plan, 1 on Free's slim report (F1). */
   maxRounds: number;
+  /** Which sites the calls name; absent: the final report's. */
+  siteFamily?: "INVESTIGATION_REPORT" | "ANSWER_UPDATE";
   free: boolean;
   /** Version 2 and later: the writer reads the earlier report's answer (F8 A). */
   later: boolean;
@@ -438,7 +453,9 @@ function reportRequest(call: ReportRunCall, input: Readonly<{
   return Object.freeze({
     runId: call.runId,
     subjectItemId: call.subjectItemId,
-    callSiteKey: investigationReportCallSiteKey(input.site, input.round),
+    callSiteKey: call.siteFamily === "ANSWER_UPDATE"
+      ? investigationReportCallSiteKey(input.site, input.round).replace(INVESTIGATION_REPORT_CALL_SITE_PREFIX, ANSWER_UPDATE_CALL_SITE_PREFIX)
+      : investigationReportCallSiteKey(input.site, input.round),
     role: REPORT_SITE_ROLES[input.site],
     lane: "story" as const,
     preferredResponseFormat: "json_object" as const,
@@ -528,17 +545,7 @@ async function writeStep<D>(call: ReportRunCall, step: StepCall<D>): Promise<Rep
  * FAILED, as the story loop does.
  */
 export async function writeInvestigationReport(call: ReportRunCall): Promise<ReportWritten> {
-  const lastRound = Math.min(storyLoopLastRound(), INVESTIGATION_REPORT_LAST_ROUND);
-  if (!Number.isInteger(call.maxRounds) || call.maxRounds < 1 || 2 * call.maxRounds > lastRound) {
-    throw new TypedDomainError("INVESTIGATION_REPORT_ROUNDS_INVALID", "A report step runs 1 or 2 rounds, and the backup's after them");
-  }
-  const answer = await writeStep<ReportAnswerDraft>(call, {
-    writerSite: "ANSWER", checkerSite: "ANSWER_CHECK",
-    writerContract: call.later ? REPORT_ANSWER_LATER_PROMPT_CONTRACT : REPORT_ANSWER_PROMPT_CONTRACT,
-    checkerContract: REPORT_ANSWER_CHECK_PROMPT_CONTRACT, rules: ANSWER_RULES,
-    writerMaterial: call.material.answerWriter, checkerMaterialOf: call.material.answerCheckerOf,
-    writerBound: INVESTIGATION_REPORT_POLICY.answerBound, writerLanguageCheck: call.answerLanguageCheck
-  });
+  const answer = await writeAnswerStep(call);
   if (answer.outcome.outcome === "FAILED") return Object.freeze({ answer, story: null });
   const served = answer.outcome.body;
   const story = await writeStep<ReportStoryDraft>(call, {
@@ -549,6 +556,28 @@ export async function writeInvestigationReport(call: ReportRunCall): Promise<Rep
     writerLanguageCheck: call.storyLanguageCheck
   });
   return Object.freeze({ answer, story });
+}
+
+function writeAnswerStep(call: ReportRunCall): Promise<ReportStepWritten<ReportAnswerDraft>> {
+  const lastRound = Math.min(storyLoopLastRound(), INVESTIGATION_REPORT_LAST_ROUND);
+  if (!Number.isInteger(call.maxRounds) || call.maxRounds < 1 || 2 * call.maxRounds > lastRound) {
+    throw new TypedDomainError("INVESTIGATION_REPORT_ROUNDS_INVALID", "A report step runs 1 or 2 rounds, and the backup's after them");
+  }
+  return writeStep<ReportAnswerDraft>(call, {
+    writerSite: "ANSWER", checkerSite: "ANSWER_CHECK",
+    writerContract: call.later ? REPORT_ANSWER_LATER_PROMPT_CONTRACT : REPORT_ANSWER_PROMPT_CONTRACT,
+    checkerContract: REPORT_ANSWER_CHECK_PROMPT_CONTRACT, rules: ANSWER_RULES,
+    writerMaterial: call.material.answerWriter, checkerMaterialOf: call.material.answerCheckerOf,
+    writerBound: INVESTIGATION_REPORT_POLICY.answerBound, writerLanguageCheck: call.answerLanguageCheck
+  });
+}
+
+/**
+ * R22 decision 3: the automatic update of the main answer: the report's answer step and its check, and no story. `call.runId` is the
+ * run that pays (the dig that triggered it); the sites are ANSWER_UPDATE's whatever `siteFamily` says. Never throws for a provider.
+ */
+export function writeMainAnswerUpdate(call: Omit<ReportRunCall, "siteFamily">): Promise<ReportStepWritten<ReportAnswerDraft>> {
+  return writeAnswerStep(Object.freeze({ ...call, siteFamily: "ANSWER_UPDATE" as const }));
 }
 
 /** A loop failure code under the report's own prefix (STORY_WRITE_REJECTED → INVESTIGATION_REPORT_WRITE_REJECTED). */

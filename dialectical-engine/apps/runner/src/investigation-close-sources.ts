@@ -1,7 +1,8 @@
 import { readingLevelOf, StoryBodySchema, StoryFateSchema, type StoryFate } from "@debateai/contract";
 import {
-  INVESTIGATION_REPORT_CARRIER, PATH_REWRITE_CARRIER, PostgresDigModelRunnerRepository, PostgresDigPicksRunnerRepository,
-  PostgresInvestigationReportRunnerRepository, PostgresInvestigationRunnerRepository, PostgresWebEvidenceRepository, RunRepository,
+  INVESTIGATION_REPORT_CARRIER, PATH_REWRITE_CARRIER, PATH_UPDATE_CARRIER, PostgresDigModelRunnerRepository, PostgresDigPicksRunnerRepository,
+  PostgresInvestigationReportRunnerRepository, PostgresInvestigationRunnerRepository, PostgresTreeUpdateRunnerRepository,
+  PostgresWebEvidenceRepository, RunRepository,
   WEB_EVIDENCE_CARRIERS, decryptContentForRun, decryptLeasedContentForRun, encryptAttestedContentForRun,
   prepareLeasedContentEncryptionForRun, withRunContentLease, type CryptoEnvelope, type InvestigationReportsRead, type PathRewriteEntry,
   type Pool, type UnreportedClosing, type WebSealed
@@ -129,6 +130,25 @@ function storedRewriteOf(value: unknown): StoredRewrite | null {
   });
 }
 
+/**
+ * R22 decision 2: the paths of a debate whose newest text is a climb's row (a change from below), by the map's id. A dig card holds the
+ * rewrites its own dig wrote; these it cannot. The row is sealed under the dig that started the climb.
+ */
+async function climbedTextsOf(pool: Pool, runId: string): Promise<ReadonlyMap<string, DossierText>> {
+  const line = (await new PostgresTreeUpdateRunnerRepository(pool).readLine(runId)) ?? [];
+  const texts = new Map<string, DossierText>();
+  for (const positionRef of new Set(line.map((entry) => entry.position_ref))) {
+    const newest = line.filter((entry) => entry.position_ref === positionRef && (entry.state === "READY" || entry.state === "READY_WITH_RESERVATION")
+      && !entry.held && !entry.hidden && entry.entry_id !== null).at(-1);
+    if (newest === undefined || newest.source !== "PATH_UPDATE" || newest.content === null) continue;
+    const opened = await withRunContentLease(pool, [newest.run_id], () => decryptContentForRun<unknown>(pool, newest.run_id, PATH_UPDATE_CARRIER,
+      newest.entry_id!, newest.content, null)).catch(() => null);
+    const text = storedRewriteOf({ what_changed: [], dig_paths: [], ...(isRecord(opened) ? opened : {}) })?.text;
+    if (text !== undefined) texts.set(positionRef, text);
+  }
+  return texts;
+}
+
 export function postgresInvestigationCloseSources(pool: Pool): InvestigationCloseSources {
   const runs = new RunRepository(pool);
   const picks = new PostgresDigPicksRunnerRepository(pool);
@@ -168,10 +188,12 @@ export function postgresInvestigationCloseSources(pool: Pool): InvestigationClos
         return path === undefined ? null : Object.freeze({ line: path.line, fate: path.fate });
       };
       const paths: DossierPath[] = [];
+      const climbedOnFirst = await climbedTextsOf(pool, root);
       for (const path of story?.paths ?? []) {
         const pointIds = path.nodeRefs.filter((id) => id.toLowerCase() !== path.positionNodeId.toLowerCase());
         const points = await pointsOf(pool, root, pointIds);
-        paths.push(Object.freeze({ ref: path.ref, storyLine: path.line, storyFate: path.fate, points,
+        const climbedText = climbedOnFirst.get(path.ref);
+        paths.push(Object.freeze({ ref: path.ref, storyLine: path.line, storyFate: path.fate, ...(climbedText === undefined ? {} : { climbedText }), points,
           sources: await sourcesOfPoints(pool, root, points.map((point) => point.id)) }));
       }
       const digs: DossierDig[] = [];
@@ -192,6 +214,7 @@ export function postgresInvestigationCloseSources(pool: Pool): InvestigationClos
           const before = await beforeOf(turn, turnsOfParent.get(parentRunId.toLowerCase())!, storyLine);
           const opened = turn.state === "FAILED" ? null : await openRewrite(turn).catch(() => null);
           const finished = opened !== null && turn.fate_after !== null;
+          const climbedOnDig = await climbedTextsOf(pool, member.run_id);
           rewrite = Object.freeze({
             rewriteId: turn.rewrite_id, recordedAt: new Date(Date.parse(turn.recorded_at)).toISOString(),
             state: finished ? turn.state : "FAILED",
@@ -200,7 +223,10 @@ export function postgresInvestigationCloseSources(pool: Pool): InvestigationClos
             whatChanged: finished ? opened.whatChanged : [],
             view: finished && turn.verdict_outcome !== null && turn.verdict_scope !== null && opened.viewReason !== null
               ? Object.freeze({ outcome: turn.verdict_outcome, scope: turn.verdict_scope, reason: opened.viewReason }) : null,
-            digPaths: finished ? opened.digPaths : []
+            digPaths: !finished ? [] : Object.freeze(opened.digPaths.map((path) => {
+              const climbed = climbedOnDig.get(path.positionRef);
+              return climbed === undefined ? path : Object.freeze({ ...path, line: climbed.line, fate: climbed.fate });
+            }))
           });
         }
         let ownMaterial: DossierDig["ownMaterial"] = null;
@@ -301,6 +327,13 @@ export function composeInvestigationClose(input: Readonly<{
     }),
     reserveMicros: INVESTIGATION_REPORT_POLICY.reserveMicros,
     replayBookOf: (rootRunId: string, subject: string) => readReplayBook(pool, rootRunId, subject),
+    climbsOpen: async (rootRunId: string) => {
+      const tree = new PostgresTreeUpdateRunnerRepository(pool);
+      const members = (await new PostgresInvestigationRunnerRepository(pool).ofRun(rootRunId))?.members ?? [];
+      let open = 0;
+      for (const member of members) open += ((await tree.readLine(member.run_id)) ?? []).filter((entry) => entry.source === "PATH_UPDATE" && entry.state === "WRITING").length;
+      return open;
+    },
     log: input.log
   });
 }

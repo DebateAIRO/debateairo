@@ -1,7 +1,7 @@
-import { readingLevelOf, StoryBodySchema, StoryFateSchema, type StoryFate } from "@debateai/contract";
+import { PurposeLinesSchema, readingLevelOf, StoryBodySchema, StoryFateSchema, type PurposeLines, type StoryFate } from "@debateai/contract";
 import {
-  PATH_REWRITE_CARRIER, PostgresDigModelRunnerRepository, PostgresDigPicksRunnerRepository, PostgresWebEvidenceRepository,
-  RunRepository, WEB_EVIDENCE_CARRIERS, decryptContentForRun, decryptLeasedContentForRun, prepareLeasedContentEncryptionForRun,
+  PATH_REWRITE_CARRIER, PATH_UPDATE_CARRIER, PostgresDigModelRunnerRepository, PostgresDigPicksRunnerRepository,
+  PostgresTreeUpdateRunnerRepository, PostgresWebEvidenceRepository, RUN_PURPOSE_LINES_CARRIER, RunRepository, WEB_EVIDENCE_CARRIERS, decryptContentForRun, decryptLeasedContentForRun, prepareLeasedContentEncryptionForRun,
   withRunContentLease, type CryptoEnvelope, type Pool
 } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
@@ -18,8 +18,8 @@ import type { PathRewriteDig, PathRewriteSources, PathRewriteStoredInput } from 
  *  - `digOf`: 0135's picks (null for a run that keeps none, or whose picks hang under the main question: it gets its
  *    story), 0134's level, the dig's own ask (Free, the reading level) and the main question: the investigation's first
  *    debate's question, found by walking the picks' parents up (a debate with no pick set is the first). The main
- *    question's place, time and purpose lines: none are stored by the asks route, so none; the locked question
- *    language: not read here (null: the reply's language is checked against the question line).
+ *    question's place, time and purpose lines (R22 decision 5): 0138's, written at its ask; an old debate has none; the locked
+ *    question language: not read here (null: the reply's language is checked against the question line).
  *  - `parentPathOf`: the path on the parent's latest story (its line and fate; the map's path ids, "<ref>#2" for a
  *    position argued twice), its text replaced by the base rewrite's (0134, opened under that dig's key) when there is
  *    one; its points are the story path's points (each node's own words), each pointing at the point it argues when that
@@ -156,15 +156,36 @@ export function storedDigPathsOf(value: unknown): readonly PathRewriteDigPath[] 
   }));
 }
 
+/** R22 decision 5: a debate's place, time and purpose lines, opened under its own key; null when it has none (an old debate). */
+export async function purposeLinesOf(pool: Pool, runId: string): Promise<PurposeLines | null> {
+  const sealed = await new PostgresTreeUpdateRunnerRepository(pool).readPurposeLines(runId);
+  if (sealed === null) return null;
+  const opened = await withRunContentLease(pool, [runId], () => decryptContentForRun<unknown>(pool, runId, RUN_PURPOSE_LINES_CARRIER, runId, sealed, null));
+  const parsed = PurposeLinesSchema.safeParse(opened);
+  return parsed.success ? parsed.data : null;
+}
+
 export function postgresPathRewriteSources(pool: Pool): PathRewriteSources {
   const picks = new PostgresDigPicksRunnerRepository(pool);
   const digModel = new PostgresDigModelRunnerRepository(pool);
   const runs = new RunRepository(pool);
+  const tree = new PostgresTreeUpdateRunnerRepository(pool);
 
   const rewriteText = async (parentRunId: string, baseRewriteId: string) => {
     const entry = (await digModel.readPathRewrites(parentRunId))?.paths.find((candidate) => candidate.rewrite_id === baseRewriteId);
     if (entry === undefined || entry.parent_answer_version === null || entry.fate_after === null) return unread("base rewrite");
     return entry;
+  };
+
+  const updateTextOf = async (parentRunId: string, updateId: string) => {
+    const entry = (await tree.readLine(parentRunId))?.find((candidate) => candidate.source === "PATH_UPDATE" && candidate.entry_id?.toLowerCase() === updateId.toLowerCase());
+    if (entry === undefined || entry.content === null) return unread("base update");
+    const opened = await withRunContentLease(pool, [entry.run_id], () => decryptContentForRun<unknown>(pool, entry.run_id,
+      PATH_UPDATE_CARRIER, updateId, entry.content, null));
+    const written = isRecord(opened) && isRecord(opened.text) ? opened.text : null;
+    const fate = StoryFateSchema.safeParse(written?.fate);
+    if (written === null || typeof written.line !== "string" || typeof written.summary !== "string" || !fate.success) return unread("base update text");
+    return Object.freeze({ line: written.line, summary: written.summary, fate: fate.data });
   };
 
   /**
@@ -210,14 +231,16 @@ export function postgresPathRewriteSources(pool: Pool): PathRewriteSources {
       const ask = await runs.readStoredAsk(runId);
       const main = await runs.readStoredAsk(root);
       if (ask === null || main === null) return unread("ask");
+      // Decision 5: the place, time and purpose lines are the first debate's, written at its ask; an old debate has none.
+      const lines = await purposeLinesOf(pool, root);
       return Object.freeze({
         parentRunId: own.parentRunId, positionRef: own.positionRef, level, free: ask.planTier === "free",
-        question: Object.freeze({ line: main.questionLine, place: null, time: null, purpose: null,
+        question: Object.freeze({ line: main.questionLine, place: lines?.place ?? null, time: lines?.time ?? null, purpose: lines?.purpose ?? null,
           readingLevel: readingLevelOf(ask.depthParams), language: null }),
         picks: Object.freeze(own.picks.map((pick) => Object.freeze({ text: pick.text, by: pick.author })))
       });
     },
-    parentPathOf: async ({ parentRunId, positionRef, baseRewriteId }): Promise<PathRewriteParentPath> => {
+    parentPathOf: async ({ parentRunId, positionRef, baseRewriteId, baseUpdateId }): Promise<PathRewriteParentPath> => {
       const story = await storyPathOf(pool, parentRunId, positionRef);
       // R22 decision 1: a dig has no story, so a path of a dig (a dig of level 2 or deeper is dug from one) is read from that dig.
       const digPath = story === null ? await digPathOf(parentRunId, positionRef) : null;
@@ -233,6 +256,10 @@ export function postgresPathRewriteSources(pool: Pool): PathRewriteSources {
         const fate = StoryFateSchema.safeParse(written?.fate);
         if (written === null || typeof written.line !== "string" || typeof written.summary !== "string" || !fate.success) return unread("base text");
         text = { answerVersion: entry.parent_answer_version!, line: written.line, summary: written.summary, fate: fate.data };
+      } else if (baseUpdateId !== null && baseUpdateId !== undefined) {
+        // R22 decision 2: the path's newest text is a climb's row, sealed under the dig that started the climb.
+        const written = await updateTextOf(parentRunId, baseUpdateId);
+        text = { answerVersion: text.answerVersion, line: written.line, summary: written.summary, fate: written.fate };
       }
       if (digPath !== null) {
         return Object.freeze({ positionRef, answerVersion: text.answerVersion, line: text.line, summary: text.summary, fate: text.fate,

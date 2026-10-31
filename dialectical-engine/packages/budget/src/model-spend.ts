@@ -111,6 +111,8 @@ export type ModelSpendSource =
  * its own plan's reserve (5 cents on Free) before it is sent.
  */
 export const INVESTIGATION_REPORT_SEAM_CEILING_MICROS = 200_000 as const;
+/** R22 decision 2: a climb rewrites at most one path per level above, so its safety net is that many rewrites' ceilings. */
+export const PATH_CLIMB_SEAM_LEVELS = 10 as const;
 
 /**
  * Question language, P2L Task 19 (migration 0118): the ONE writer of a LANGUAGE_CHECK row, a SECURITY DEFINER
@@ -242,6 +244,10 @@ export interface ModelSpendStore {
    * that closing began, 0136's identity.read_closing_since_of_root). Optional: without it there is no report seam.
    */
   readRunInvestigationReportSpentMicros?(runId: string): Promise<number>;
+  /** R22 decision 2: everything this dig's climb has been charged (spend source PATH_CLIMB only). Optional: without it, no climb seam. */
+  readRunPathClimbSpentMicros?(runId: string): Promise<number>;
+  /** R22 decision 3: every main-answer update this dig has paid for (spend source ANSWER_UPDATE only). Optional: without it, no seam. */
+  readRunAnswerUpdateSpentMicros?(runId: string): Promise<number>;
   /** Everything the WHOLE application has been charged on that UTC day. */
   readDaySpentMicros(day: string): Promise<number>;
   /**
@@ -581,7 +587,7 @@ export function assertRunCeilingCoversOneCall(input: Readonly<{
 }
 
 /** The spend sources a gateway money seam charges (the support chat keeps its own accounting). */
-type MeteredSpendSource = Extract<ModelSpendSource, "RUN" | "STORY" | "PATH_REWRITE" | "INVESTIGATION_REPORT">;
+type MeteredSpendSource = Extract<ModelSpendSource, "RUN" | "STORY" | "PATH_REWRITE" | "INVESTIGATION_REPORT" | "PATH_CLIMB" | "ANSWER_UPDATE">;
 
 /** What a metered seam spends against: see `CostEnvelopeGuard.#envelopeFor`. */
 interface MeteredEnvelope {
@@ -766,6 +772,24 @@ export class CostEnvelopeGuard {
    */
   investigationReportSeam(input: ProviderSeamInput): ProviderCostSeam {
     return this.#meteredSeam(input, "INVESTIGATION_REPORT", null, false);
+  }
+
+  /**
+   * R22 decision 2: THE CLIMB'S money seam. A rewrite that really changed a path rewrites the path above, up to the first debate; those
+   * calls name the run of the dig that started the climb, whoever that person is, and are NEVER walled (the money rule: a dig that started
+   * always gets its rewrites). Its safety net is one rewrite's ceiling per level, summed over PATH_CLIMB charges only, and it refuses
+   * with the story's own code, so that level ends FAILED.
+   */
+  pathClimbSeam(input: ProviderSeamInput): ProviderCostSeam {
+    return this.#meteredSeam(input, "PATH_CLIMB", null, false);
+  }
+
+  /**
+   * R22 decision 3: THE MAIN-ANSWER UPDATE'S money seam. When a first-debate path changes, the answer is rewritten and checked on the run
+   * of the dig that triggered it, NEVER walled, held to the report's safety net summed over ANSWER_UPDATE charges only.
+   */
+  answerUpdateSeam(input: ProviderSeamInput): ProviderCostSeam {
+    return this.#meteredSeam(input, "ANSWER_UPDATE", null, false);
   }
 
   /**
@@ -1100,6 +1124,37 @@ export class CostEnvelopeGuard {
           refusal: storyCostEnvelopeReached
         });
       }
+      case "PATH_CLIMB": {
+        const ceilingMicros = this.#storyCeilingMicros;
+        const read = this.#store.readRunPathClimbSpentMicros;
+        if (ceilingMicros === null || read === undefined) {
+          throw new TypedDomainError(
+            "STORY_ENVELOPE_MISSING",
+            "A metered climb seam needs the sealed storyCostEnvelopePolicy row and the climb's spent total"
+          );
+        }
+        return Object.freeze({
+          spendSource: "PATH_CLIMB",
+          ceilingMicros: ceilingMicros * PATH_CLIMB_SEAM_LEVELS,
+          readSpentMicros: (runId: string) => read.call(this.#store, runId),
+          refusal: storyCostEnvelopeReached
+        });
+      }
+      case "ANSWER_UPDATE": {
+        const read = this.#store.readRunAnswerUpdateSpentMicros;
+        if (read === undefined) {
+          throw new TypedDomainError(
+            "STORY_ENVELOPE_MISSING",
+            "A metered answer-update seam needs the update's spent total"
+          );
+        }
+        return Object.freeze({
+          spendSource: "ANSWER_UPDATE",
+          ceilingMicros: INVESTIGATION_REPORT_SEAM_CEILING_MICROS,
+          readSpentMicros: (runId: string) => read.call(this.#store, runId),
+          refusal: storyCostEnvelopeReached
+        });
+      }
       default:
         return exhaustive(spendSource);
     }
@@ -1294,6 +1349,24 @@ export class PostgresModelSpendStore implements ModelSpendStore {
     const result = await this.pool.query<{ total: string }>(
       `SELECT coalesce(sum(charge_micros),0)::text AS total FROM ledger.model_spend
        WHERE run_id = $1 AND spend_source = 'PATH_REWRITE'`,
+      [runId]
+    );
+    return this.#total(result.rows[0]?.total);
+  }
+
+  async readRunPathClimbSpentMicros(runId: string): Promise<number> {
+    const result = await this.pool.query<{ total: string }>(
+      `SELECT coalesce(sum(charge_micros),0)::text AS total FROM ledger.model_spend
+       WHERE run_id = $1 AND spend_source = 'PATH_CLIMB'`,
+      [runId]
+    );
+    return this.#total(result.rows[0]?.total);
+  }
+
+  async readRunAnswerUpdateSpentMicros(runId: string): Promise<number> {
+    const result = await this.pool.query<{ total: string }>(
+      `SELECT coalesce(sum(charge_micros),0)::text AS total FROM ledger.model_spend
+       WHERE run_id = $1 AND spend_source = 'ANSWER_UPDATE'`,
       [runId]
     );
     return this.#total(result.rows[0]?.total);

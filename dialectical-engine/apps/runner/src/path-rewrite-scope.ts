@@ -1,4 +1,8 @@
-import { pathRewriteCallSiteRole as storyPathRewriteCallSiteRole } from "@debateai/story";
+import {
+  ANSWER_UPDATE_CALL_SITE_PREFIX as STORY_ANSWER_UPDATE_CALL_SITE_PREFIX, PATH_CLIMB_CALL_SITE_PREFIX as STORY_PATH_CLIMB_CALL_SITE_PREFIX,
+  answerUpdateCallSiteRole as storyAnswerUpdateCallSiteRole, pathClimbCallSiteRole as storyPathClimbCallSiteRole,
+  pathRewriteCallSiteRole as storyPathRewriteCallSiteRole
+} from "@debateai/story";
 
 /**
  * Plan 2026-10-30 dig-model revision W3-2 (for W3-5) — A DIG'S PATH REWRITE ON THE STORY LANE. The rewrite's calls run
@@ -14,6 +18,13 @@ export const PATH_REWRITE_CALL_SITE_PREFIX = "PATH_REWRITE:";
 export function pathRewriteCallSiteRole(callSiteKey: string): "SYNTHESIZER" | "EVALUATOR" | null {
   return storyPathRewriteCallSiteRole(callSiteKey);
 }
+
+/** R22 decision 2: the climb's sites, the same roles, charged on their own never-walled PATH_CLIMB seam. */
+export const PATH_CLIMB_CALL_SITE_PREFIX = STORY_PATH_CLIMB_CALL_SITE_PREFIX;
+export const pathClimbCallSiteRole = storyPathClimbCallSiteRole;
+/** R22 decision 3: the main-answer update's sites, charged on their own never-walled ANSWER_UPDATE seam. */
+export const ANSWER_UPDATE_CALL_SITE_PREFIX = STORY_ANSWER_UPDATE_CALL_SITE_PREFIX;
+export const answerUpdateCallSiteRole = storyAnswerUpdateCallSiteRole;
 
 export function isPathRewriteCallSite(callSiteKey: string): boolean {
   return pathRewriteCallSiteRole(callSiteKey) !== null;

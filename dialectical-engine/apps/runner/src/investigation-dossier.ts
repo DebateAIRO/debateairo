@@ -102,6 +102,8 @@ export type DossierPath = Readonly<{
   ref: string;
   storyLine: string;
   storyFate: StoryFate;
+  /** R22 decision 2: the path's text when its newest change climbed to it from a path below (no dig card holds that text). */
+  climbedText?: DossierText;
   points: readonly PathRewritePoint[];
   sources: readonly DossierSource[];
 }>;
@@ -309,7 +311,7 @@ function fieldsAt(input: DossierInput, cards: readonly DossierDig[], refs: Refs,
     const kept = keptPoints(path.points, step.pointCap);
     pointsLeftOut += path.points.length - kept.length;
     for (const point of kept) known.add(refs.pointRef.get(lower(point.id))!);
-    const current = latest.get(path.ref) ?? { line: path.storyLine, summary: null, fate: path.storyFate };
+    const current = path.climbedText ?? latest.get(path.ref) ?? { line: path.storyLine, summary: null, fate: path.storyFate };
     return {
       ref, ...textJson(current),
       ...(current.line === path.storyLine ? {} : { story_line: path.storyLine }),
