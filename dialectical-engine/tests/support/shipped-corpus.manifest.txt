@@ -156,6 +156,7 @@ apps/api/src/publication-check/verdict.ts
 apps/api/src/publication-review/owner.ts
 apps/api/src/publication-review/staff.ts
 apps/api/src/publications.ts
+apps/api/src/purpose-lines.ts
 apps/api/src/question-check/ask-gate.ts
 apps/api/src/question-check/check.ts
 apps/api/src/question-check/compose.ts
@@ -381,6 +382,7 @@ apps/runner/src/dev-support-config.ts
 apps/runner/src/dev-support-model.ts
 apps/runner/src/dev-ui-process-cli.ts
 apps/runner/src/dev-ui-process.ts
+apps/runner/src/dig-suggestions-step.ts
 apps/runner/src/engine-boot.ts
 apps/runner/src/engine-contracts.ts
 apps/runner/src/engine-investigations.ts
@@ -396,6 +398,7 @@ apps/runner/src/hosted-register-publish.ts
 apps/runner/src/index.ts
 apps/runner/src/investigation-close-sources.ts
 apps/runner/src/investigation-close.ts
+apps/runner/src/investigation-digest.ts
 apps/runner/src/investigation-dossier.ts
 apps/runner/src/main.ts
 apps/runner/src/map-stage.ts
@@ -408,6 +411,10 @@ apps/runner/src/owner-command.ts
 apps/runner/src/owner-recovery-cli.ts
 apps/runner/src/owner-recovery-custody.ts
 apps/runner/src/owner-recovery-material.ts
+apps/runner/src/passage-record.ts
+apps/runner/src/passage-sweep.ts
+apps/runner/src/path-climb-sources.ts
+apps/runner/src/path-climb.ts
 apps/runner/src/path-rewrite-composition.ts
 apps/runner/src/path-rewrite-material.ts
 apps/runner/src/path-rewrite-scope.ts
@@ -446,6 +453,7 @@ apps/runner/src/support-shred-cli.ts
 apps/runner/src/support-status-cli-credentials.ts
 apps/runner/src/support-status-cli.ts
 apps/runner/src/support-switch-cli.ts
+apps/runner/src/token-line.ts
 apps/runner/src/web-packs.ts
 apps/runner/src/web-page-text-gateway.ts
 apps/runner/src/web-planner.ts
@@ -674,6 +682,7 @@ apps/ui/components/v4/V4DigSuggest.tsx
 apps/ui/components/v4/V4DigToast.tsx
 apps/ui/components/v4/V4Header.tsx
 apps/ui/components/v4/V4LevelTrail.tsx
+apps/ui/components/v4/V4MainAnswer.tsx
 apps/ui/components/v4/V4MapTree.tsx
 apps/ui/components/v4/V4Outline.tsx
 apps/ui/components/v4/V4Panel.tsx
@@ -1239,6 +1248,7 @@ packages/payments-netopia/src/status.ts
 packages/payments-netopia/src/time.ts
 packages/propagation/src/index.ts
 packages/providers/src/anthropic-messages.ts
+packages/providers/src/anthropic-token-count.ts
 packages/providers/src/content-follow-up.ts
 packages/providers/src/content-rule.ts
 packages/providers/src/index.ts
@@ -1316,6 +1326,7 @@ packages/scorecard/src/picker.ts
 packages/scorecard/src/plan-caps.ts
 packages/scorecard/src/role-rotation.ts
 packages/scorecard/src/schema.ts
+packages/serve/src/dig-suggestions.ts
 packages/serve/src/engine-verdict.ts
 packages/serve/src/index.ts
 packages/serve/src/judges-comparison.ts
