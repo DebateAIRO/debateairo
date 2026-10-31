@@ -134,12 +134,8 @@
   "newDebate.plan.current.PLUS": "Vaš paket: Plus",
   "newDebate.plan.current.PRO": "Vaš paket: Pro",
   "newDebate.plan.current.MAX": "Vaš paket: Max",
-  "newDebate.askText.purposeQuestion": "Za kaj potrebujete odgovor?",
-  "newDebate.askText.purposeDecide": "Da se odločim",
-  "newDebate.askText.purposeUnderstand": "Da to razumem",
-  "newDebate.askText.purposeWrite": "Da o tem napišem",
   "newDebate.askText.otherAnswer": "Drug odgovor…",
-  "newDebate.askText.otherLabel": "Vaš lastni odgovor",
+  "newDebate.askText.otherLabel": "Vaše lastno dodatno pojasnilo",
   "newDebate.askText.matters": "Če odgovori kažejo v različne smeri, mi je najpomembnejše: {matters}",
   "newDebate.askText.angles": "Prosim, oglejte si tudi: {list}."
 }

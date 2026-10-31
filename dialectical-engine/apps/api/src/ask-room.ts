@@ -284,6 +284,11 @@ export type AskRoomAnswer = Readonly<{
 
 export interface AskRoomReader {
   readRoom(question: RoomQuestion): Promise<AskRoomAnswer>;
+  /**
+   * Decisions 29 and 31: whether the person's pool has anything left for step 2's small AI, and what funds them. Empty: a window spent to its
+   * limit (holds aside: a running debate does not empty it), measured as the room measures a start. Optional for a room that cannot say.
+   */
+  readPersonPool?(ownerRef: string, now: Date): Promise<Readonly<{ empty: boolean; funding: FundingBasis | null }>>;
 }
 
 /**
@@ -1222,6 +1227,23 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
       ? Object.freeze({ waitsFor: "PERSON" as const, personRecheckAt: fullOnSpendUntil ?? nextWholeMinute(now) })
       : Object.freeze({ waitsFor: "SITE" as const, personRecheckAt: null });
     return Object.freeze({ rooms: Object.freeze(rooms), personUses: Object.freeze(personUses), waitReason, moneyRule });
+  }
+
+  async readPersonPool(ownerRef: string, now: Date): Promise<Readonly<{ empty: boolean; funding: FundingBasis | null }>> {
+    const windows = await this.#options.personAllowance.read(ownerRef, now);
+    const moneyRule = windows.some(isMoneyRuleWindow);
+    const month = windows.find((window) => window.scope === "PERSON_MONTH") ?? null;
+    let empty = false;
+    for (const window of windows) {
+      const spent = await this.#options.spend.readOwnerSpentMicros(ownerRef, window.periodStart, window.resetsAt, window.funding, window.scope);
+      const borrowed = window.borrows === true && month !== null
+        ? (await readWindowBorrow({ ownerRef, window, month, currentSpentMicros: spent, spend: this.#options.spend,
+          allowance: this.#options.personAllowance })).borrowedMicros
+        : 0;
+      if (spent + borrowed >= (moneyRule ? startLimitMicros(window) : window.limitMicros)) empty = true;
+    }
+    const funding = windows[0]?.funding ?? null;
+    return Object.freeze({ empty, funding });
   }
 
   #waitingOf(access: RunOwnershipAccess): Promise<ReadonlyArray<WaitingRunRef>> {

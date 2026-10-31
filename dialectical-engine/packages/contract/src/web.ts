@@ -807,12 +807,14 @@ export const AskClarifyRequestSchema = z.object({ question_line: z.string().trim
 export type AskClarifyRequest = z.infer<typeof AskClarifyRequestSchema>;
 
 /**
- * The questions for step 2. `AI`: up to three questions and always the one about what the answer is for. `GENERIC`: no AI read the question
- * (it failed, it was too slow, the person's limit was reached, or this deployment has no paid AI), so the page shows its generic purpose options.
+ * The questions for step 2. `AI`: up to three questions and the one about what the answer is for (absent only when the AI would not write it, even
+ * asked twice). `NONE`: no AI read the question (it failed, it was too slow, the person's pool or limit is spent, or this deployment has no paid AI):
+ * the page shows no questions, only the person's own-words boxes, and they carry on.
  */
 export const AskClarifyResponseSchema = z.discriminatedUnion("source", [
-  z.object({ source: z.literal("AI"), questions: z.array(ClarifyQuestionSchema).max(WEB_CONTRACT_LIMITS.clarifyQuestionsMax), purpose: ClarifyQuestionSchema }).strict(),
-  z.object({ source: z.literal("GENERIC") }).strict()
+  z.object({ source: z.literal("AI"), questions: z.array(ClarifyQuestionSchema).max(WEB_CONTRACT_LIMITS.clarifyQuestionsMax), purpose: ClarifyQuestionSchema.optional() }).strict()
+    .refine((reply) => reply.questions.length > 0 || reply.purpose !== undefined, { message: "at least one question" }),
+  z.object({ source: z.literal("NONE") }).strict()
 ]);
 export type AskClarifyResponse = z.infer<typeof AskClarifyResponseSchema>;
 

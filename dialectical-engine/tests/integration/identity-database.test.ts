@@ -52,7 +52,10 @@ describe("S2 identity schema on real PostgreSQL", () => {
     expect(tables.rows.map((row) => row.table_name)).toEqual([
       "account_erasure_notification_outbox", "account_erasure_request",
       "account_recovery_binding", "account_recovery_request",
-      "account_recovery_state_event", "account_security_hold", "age_check", "audit_event", "authentication_risk_signal",
+      "account_recovery_state_event", "account_security_hold", "age_check",
+      // 0144 the small AI at step 2: one row naming the person, the cost and the time of each call.
+      "ask_clarify_charge",
+      "audit_event", "authentication_risk_signal",
       // 0105 backup-email verification, 0106 known-password MFA recovery, 0104 password-only reset.
       "backup_email_control", "backup_email_notice", "backup_email_notice_binding", "backup_email_proof_window", "backup_email_source_window",
       "channel_binding",

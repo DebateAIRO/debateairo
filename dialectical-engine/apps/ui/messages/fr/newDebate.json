@@ -134,12 +134,8 @@
   "newDebate.plan.current.PLUS": "Votre formule : Plus",
   "newDebate.plan.current.PRO": "Votre formule : Pro",
   "newDebate.plan.current.MAX": "Votre formule : Max",
-  "newDebate.askText.purposeQuestion": "Dans quel but voulez-vous la réponse ?",
-  "newDebate.askText.purposeDecide": "Pour prendre une décision",
-  "newDebate.askText.purposeUnderstand": "Pour le comprendre",
-  "newDebate.askText.purposeWrite": "Pour écrire à ce sujet",
   "newDebate.askText.otherAnswer": "Autre réponse…",
-  "newDebate.askText.otherLabel": "Ma propre réponse",
+  "newDebate.askText.otherLabel": "Votre propre précision supplémentaire",
   "newDebate.askText.matters": "Si les réponses vont dans des directions différentes, ce qui compte le plus pour moi : {matters}",
   "newDebate.askText.angles": "Pourriez-vous aussi jeter un œil à : {list}."
 }

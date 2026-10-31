@@ -134,12 +134,8 @@
   "newDebate.plan.current.PLUS": "Jūsu plāns: Plus",
   "newDebate.plan.current.PRO": "Jūsu plāns: Pro",
   "newDebate.plan.current.MAX": "Jūsu plāns: Max",
-  "newDebate.askText.purposeQuestion": "Kam jums vajadzīga atbilde?",
-  "newDebate.askText.purposeDecide": "Lai pieņemtu lēmumu",
-  "newDebate.askText.purposeUnderstand": "Lai to saprastu",
-  "newDebate.askText.purposeWrite": "Lai par to rakstītu",
   "newDebate.askText.otherAnswer": "Cita atbilde…",
-  "newDebate.askText.otherLabel": "Jūsu pašu atbilde",
+  "newDebate.askText.otherLabel": "Jūsu pašu papildu skaidrojums",
   "newDebate.askText.matters": "Ja atbildes ved dažādos virzienos, man vissvarīgākais ir: {matters}",
   "newDebate.askText.angles": "Lūdzu, apskatiet arī šos aspektus: {list}."
 }

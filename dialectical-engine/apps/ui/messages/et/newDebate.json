@@ -134,12 +134,8 @@
   "newDebate.plan.current.PLUS": "Teie pakett: Plus",
   "newDebate.plan.current.PRO": "Teie pakett: Pro",
   "newDebate.plan.current.MAX": "Teie pakett: Max",
-  "newDebate.askText.purposeQuestion": "Milleks te vastust vajate?",
-  "newDebate.askText.purposeDecide": "Otsuse tegemiseks",
-  "newDebate.askText.purposeUnderstand": "Selle mõistmiseks",
-  "newDebate.askText.purposeWrite": "Selle kohta kirjutamiseks",
   "newDebate.askText.otherAnswer": "Muu vastus…",
-  "newDebate.askText.otherLabel": "Minu enda vastus",
+  "newDebate.askText.otherLabel": "Teie enda täiendav selgitus",
   "newDebate.askText.matters": "Kui vastused lähevad eri suundades, on mulle kõige olulisem: {matters}",
   "newDebate.askText.angles": "Palun vaadake ka: {list}."
 }

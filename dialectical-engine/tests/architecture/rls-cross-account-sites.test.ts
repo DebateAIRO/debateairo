@@ -231,7 +231,7 @@ describe("row-level security S01 C4: the apps/api cross-account sites and the T1
     const found = descendants(source).filter((node): node is ts.CallExpression => ts.isCallExpression(node)).flatMap((call) => {
       const callee = call.expression;
       const name = ts.isIdentifier(callee) ? callee.text : ts.isPropertyAccessExpression(callee) ? callee.name.text : "";
-      return /^assert\w*DatabaseRole\w*$/u.test(name) || name === "assertRole" || name === "languageCheckSpendWriterPresent"
+      return /^assert\w*DatabaseRole\w*$/u.test(name) || name === "assertRole" || name === "languageCheckSpendWriterPresent" || name === "askClarifyChargeWriterPresent"
         ? [`${call.getText()} @ ${wrapperOf(call) ?? "UNWRAPPED"}`] : [];
     });
     expect(found).toEqual([
@@ -243,8 +243,8 @@ describe("row-level security S01 C4: the apps/api cross-account sites and the T1
       "assertContentProvisionDatabaseRole(pool,serverAskAdmissionPool) @ attestEveryRoute",
       "assertDataExportDatabaseRoles(authorizationPool, dataExportPool) @ attestEveryRoute",
       "languageCheckSpendWriterPresent(pool) @ onOwnConnections",
-      // Decision 29: dynamic step 2 takes the same route decision, above the support adapter, so it asks the same question of the same login.
-      "languageCheckSpendWriterPresent(pool) @ onOwnConnections",
+      // Decisions 29 and 31: dynamic step 2 asks after 0144's writer, of the same login.
+      "askClarifyChargeWriterPresent(pool) @ onOwnConnections",
       "passwordResetRepository.assertRole() @ attestEveryRoute",
       "backupEmailRepository.assertRole() @ attestEveryRoute",
       "mfaRecoveryRepository.assertRole() @ attestEveryRoute",

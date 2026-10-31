@@ -4101,10 +4101,11 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   });
 
   /**
-   * Decision 29: the clarifying questions for step 2, before a debate exists. A signed-in person only. The question reaches the AI only when the
+   * Decisions 29 and 31: the clarifying questions for step 2, before a debate exists. A signed-in person only. The question reaches the AI only when the
    * ask itself could send it there: not a question in crisis (their words go to no model, as on POST /v1/asks), never before the sensitive-data
-   * consent, never off the preview's team, never from a blocked country. In each of those cases, as on any failure, the answer is GENERIC and the
-   * page carries on: this route never stands between a person and Start.
+   * consent, never off the preview's team, never from a blocked country, and never on an empty pool, for the call counts in the person's quota. In each
+   * of those cases, as on any failure, the answer is NONE: the page shows no questions and the person carries on. This route never stands between a
+   * person and Start.
    */
   api.post("/v1/asks/clarify", routePolicy("POST /v1/asks/clarify"), async (request, reply) => {
     const asker = request.authenticatedSession;
@@ -4114,13 +4115,18 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     }
     const question = body.data.question_line;
+    const none = { source: "NONE" as const };
     const mayAsk = options.askClarify !== undefined && !detectCrisis(question).crisis
       && previewTeamAdmits(previewConfig, options.previewTeamUserIds, asker.userId)
       && (options.countryGate?.ask(sourceFor(request)) ?? null) === null
       && options.sessions?.readSensitiveDataConsent !== undefined
       && await options.sessions.readSensitiveDataConsent(asker) === "given";
-    const answer = mayAsk ? await options.askClarify!.read(asker.ownerRef, question) : { source: "GENERIC" as const };
-    return reply.send(AskClarifyResponseSchema.parse(answer));
+    if (!mayAsk) return reply.send(none);
+    // A pool that cannot be read is treated as empty: nothing is spent that cannot be counted, and the person carries on.
+    const pool = options.askRoom?.readPersonPool === undefined ? { empty: false, funding: null }
+      : await options.askRoom.readPersonPool(asker.ownerRef, new Date()).catch(() => ({ empty: true, funding: null }));
+    if (pool.empty) return reply.send(none);
+    return reply.send(AskClarifyResponseSchema.parse(await options.askClarify!.read(asker.ownerRef, question, pool.funding)));
   });
 
   api.get<{ Querystring: Record<string, unknown> }>("/v1/asks/room", routePolicy("GET /v1/asks/room"), async (request, reply) => {

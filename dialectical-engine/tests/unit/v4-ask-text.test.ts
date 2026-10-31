@@ -44,10 +44,6 @@ const CATALOG: Record<string, string> = Object.freeze({
   "v4.askText.purpose.WRITE": "I am writing about it.",
   "newDebate.askText.matters": "If the answers pull in different directions, what matters most to me: {matters}",
   "newDebate.askText.angles": "Please also look at: {list}.",
-  "newDebate.askText.purposeQuestion": "What do you want the answer for?",
-  "newDebate.askText.purposeDecide": "To make a decision",
-  "newDebate.askText.purposeUnderstand": "To understand it",
-  "newDebate.askText.purposeWrite": "To write about it",
   "v4.askText.matters": "If the answers pull in different directions, what matters most to me: {matters}",
   "v4.askText.angles": "Please also look at: {list}.",
   "v4.digText.path": "Look deeper into this part of the answer: {line}",
@@ -245,14 +241,16 @@ describe("the questions a reply puts on the page (decision 29)", () => {
   const ai = { source: "AI" as const, questions: [{ text: "Where?", answers: ["Here", "There"] }], purpose: { text: "What for?", answers: ["To vote", "To teach"] } };
 
   it("the AI's questions, the one about what the answer is for last", () => {
-    expect(clarifyingQuestions(ai, CATALOG).map((question) => question.text)).toEqual(["Where?", "What for?"]);
+    expect(clarifyingQuestions(ai).map((question) => question.text)).toEqual(["Where?", "What for?"]);
   });
-  it("no AI: the generic purpose question alone, with its three answers", () => {
-    expect(clarifyingQuestions({ source: "GENERIC" }, CATALOG)).toEqual([{ text: "What do you want the answer for?",
-      answers: ["To make a decision", "To understand it", "To write about it"] }]);
+  it("no purpose question after the re-ask: the AI's other questions stay", () => {
+    expect(clarifyingQuestions({ source: "AI", questions: ai.questions }).map((question) => question.text)).toEqual(["Where?"]);
+  });
+  it("no AI: no questions at all, in any language (decision 31)", () => {
+    expect(clarifyingQuestions({ source: "NONE" })).toEqual([]);
   });
   it("a changed question drops the answers that no longer apply, and keeps the rest, typed ones with their question", () => {
-    const asked = clarifyingQuestions(ai, CATALOG);
+    const asked = clarifyingQuestions(ai);
     const kept = { question: "Where?", answer: "Here", other: false };
     const typed = { question: "What for?", answer: "My own reason", other: true };
     const given = [kept, typed];

@@ -428,5 +428,6 @@
   "dig_links": [],
   "web_evidence": [],
   "investigations": [],
-  "reserve_events": []
+  "reserve_events": [],
+  "ask_clarify_calls": []
 }

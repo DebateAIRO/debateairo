@@ -18,7 +18,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/components/AuthGate", () => ({ AuthGate: ({ children }: { children: (token: string) => React.ReactNode }) => children("token") }));
 vi.mock("@/components/billing/RoomNotice", () => ({ RoomNotice: () => null }));
 vi.mock("@/components/v4/V4Header", () => ({ V4Header: () => null }));
-const clarify = vi.hoisted(() => ({ asked: [] as string[], answer: (_text: string, _signal?: AbortSignal): Promise<unknown> => Promise.resolve({ source: "GENERIC" }), consent: true }));
+const clarify = vi.hoisted(() => ({ asked: [] as string[], answer: (_text: string, _signal?: AbortSignal): Promise<unknown> => Promise.resolve({ source: "NONE" }), consent: true }));
 vi.mock("@/lib/api", () => ({ contractClient: { readAnswerIndex: async () => ({ items: [], open_runs: [] }),
   clarifyAsk: async (input: { question_line: string }, signal?: AbortSignal) => { clarify.asked.push(input.question_line); return clarify.answer(input.question_line, signal); } } }));
 vi.mock("@/lib/v4/useV4Ask", () => ({
@@ -174,40 +174,58 @@ describe("V4 step 2 on every language", () => {
 });
 
 describe("V4 step 2 never gets stuck", () => {
-  const generic = (locale = "en") => { const catalog = messages(locale, "newDebate"); return { question: catalog["newDebate.askText.purposeQuestion"]!, decide: catalog["newDebate.askText.purposeDecide"]! }; };
+  /** No question from the AI: the person's own-words boxes, the text sent, Start. No general choice in any language (decision 31). */
+  function ownWordsOnly(page: HTMLDivElement) {
+    expect(page.querySelectorAll('.v4AskBlock[role="group"]')).toHaveLength(0);
+    expect(page.querySelector('[id$="-matters"]')).not.toBeNull();
+    expect(page.querySelector('[id$="-angle"]')).not.toBeNull();
+    expect(page.textContent).not.toContain(CATALOG["v4.read.honestNote"]);
+    expect(buttonNamed(startName()).disabled).toBe(false);
+  }
 
-  it("a failed call: the generic purpose options, in the page's language", async () => {
+  it("a failed call: only the own-words boxes, and Start sends the question", async () => {
     clarify.answer = async () => { throw new Error("down"); };
     const page = await atStepTwo("premium", "ro");
-    const { question, decide } = generic("ro");
-    expect(page.textContent).toContain(question);
-    await press(decide);
-    expect(sentLines(page)).toEqual([`${question} ${decide}.`]);
+    ownWordsOnly(page);
+    await act(async () => buttonNamed(startName()).click());
+    expect(submitted.calls.at(-1)![0]).toBe(QUESTION);
   });
 
-  it("the server's generic answer: the same", async () => {
-    clarify.answer = async () => ({ source: "GENERIC" });
-    const page = await atStepTwo("premium");
-    expect(page.textContent).toContain(generic().question);
-    expect(page.querySelectorAll('.v4AskBlock[role="group"]')).toHaveLength(1);
+  it("the server has nothing to give (limit, empty pool, local mode, off the team, blocked country): the same", async () => {
+    clarify.answer = async () => ({ source: "NONE" });
+    ownWordsOnly(await atStepTwo("premium"));
   });
 
-  it("a call that never answers: Start works while it waits, and the generic options come at the page's limit", async () => {
+  it("a call that never answers: Start works while it waits, and at the page's limit the wait ends with no questions", async () => {
     vi.useFakeTimers();
     clarify.answer = () => new Promise(() => undefined);
     const page = await atStepTwo("premium");
-    expect(page.querySelector('[role="status"]')?.textContent).toBe(CATALOG["v4.read.clarifyWaiting"]);
+    expect(page.querySelector('[role="status"]')?.textContent).toBe("Analyzing your question…");
     expect(buttonNamed(startName()).disabled).toBe(false);
     await act(async () => { await vi.advanceTimersByTimeAsync(ASK_CLARIFY_PAGE_WAIT_MS); });
     expect(page.querySelector('[role="status"]')).toBeNull();
-    expect(page.textContent).toContain(generic().question);
+    ownWordsOnly(page);
   });
 
-  it("the consent refused: no call, the generic options, and D2 still opens", async () => {
+  it("the consent refused: no call, and step 2 still opens with the own-words boxes", async () => {
     clarify.consent = false;
     const page = await atStepTwo("premium");
     expect(clarify.asked).toEqual([]);
-    expect(page.textContent).toContain(generic().question);
+    ownWordsOnly(page);
+  });
+
+  it("no purpose question: the AI's other questions show", async () => {
+    clarify.answer = async () => ({ source: "AI", questions: AI.questions });
+    const page = await atStepTwo("premium");
+    expect(page.querySelectorAll('.v4AskBlock[role="group"]')).toHaveLength(2);
+  });
+
+  it("with questions, the note under the text sent says the owner's words, and Other's box its hint", async () => {
+    const page = await atStepTwo("premium");
+    expect(page.textContent).toContain("These would help us better understand your question");
+    const other = [...page.querySelectorAll("button")].find((button) => button.textContent?.trim() === "Other…")!;
+    await act(async () => other.click());
+    expect(page.querySelector(".v4AskInline label")?.textContent).toBe("Your own extra clarification");
   });
 });
 

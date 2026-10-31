@@ -134,12 +134,8 @@
   "newDebate.plan.current.PLUS": "O seu plano: Plus",
   "newDebate.plan.current.PRO": "O seu plano: Pro",
   "newDebate.plan.current.MAX": "O seu plano: Max",
-  "newDebate.askText.purposeQuestion": "Para que você quer a resposta?",
-  "newDebate.askText.purposeDecide": "Para tomar uma decisão",
-  "newDebate.askText.purposeUnderstand": "Para entender o assunto",
-  "newDebate.askText.purposeWrite": "Para escrever sobre o tema",
   "newDebate.askText.otherAnswer": "Outra resposta…",
-  "newDebate.askText.otherLabel": "Sua própria resposta",
+  "newDebate.askText.otherLabel": "Sua própria explicação adicional",
   "newDebate.askText.matters": "Se as respostas apontarem para lados diferentes, o que mais importa para mim é: {matters}",
   "newDebate.askText.angles": "Por favor, dê uma olhada também em: {list}."
 }

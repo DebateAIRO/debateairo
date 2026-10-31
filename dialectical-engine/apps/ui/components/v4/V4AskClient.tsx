@@ -253,7 +253,7 @@ function V4AskForm({
   // Decision 29: the question goes to the small AI only once the person has agreed to the sensitive-data notice, and never in crisis words.
   const [consented, setConsented] = useState(false);
   const clarify = useAskClarify({ active: step === "read" && longEnough, question: trimmed, mayCall: consented && !crisisText });
-  const questions = useMemo(() => (clarify.reply === null ? [] : clarifyingQuestions(clarify.reply, newDebateCatalog)), [clarify.reply, newDebateCatalog]);
+  const questions = useMemo(() => (clarify.reply === null ? [] : clarifyingQuestions(clarify.reply)), [clarify.reply]);
   // A changed question: answers that no longer apply are dropped, the moment its new questions arrive.
   useEffect(() => {
     if (clarify.reply === null) return;
@@ -340,7 +340,7 @@ function V4AskForm({
     keepLevel();
     setRefusal(null);
     // Decision 29: the small AI reads the question before Start, so the one-time consent comes first. Refused, or the read failed: D2 opens all the
-    // same, with the generic options; Start asks again.
+    // same, with no questions; Start asks again.
     setConsented(await ask.ensureConsent().catch(() => false));
     setStep("read");
   }
@@ -575,7 +575,7 @@ function V4AskForm({
               <span className="v4AskLabel" id={`${ids}-sent`}>{t(catalog, "v4.read.sentLabel")}</span>
               <p className="v4AskSent" aria-labelledby={`${ids}-sent`}>{sentLine}</p>
               {tooLong ? <p className="v4AskRefusal" role="alert">{t(catalog, "v4.read.tooLong")}</p> : null}
-              <p className="v4AskHint v4Muted">{t(catalog, "v4.read.honestNote")}</p>
+              {questions.length === 0 ? null : <p className="v4AskHint v4Muted">{t(catalog, "v4.read.honestNote")}</p>}
             </div>
           </section>
 
