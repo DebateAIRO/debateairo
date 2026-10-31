@@ -4,14 +4,12 @@ import { afterEach, expect, it, vi } from "vitest";
 import { ContractHttpError } from "@debateai/contract";
 import { readFileSync } from "node:fs";
 import { PublicationControl } from "../../apps/ui/components/PublicationControl.js";
-import { TakeDownControl } from "../../apps/ui/components/TakeDownControl.js";
 import { SecurityActionResume } from "../../apps/ui/components/auth/SecurityActionResume.js";
 import { mount, unmount, click } from "./task11-harness.js";
 import auth from "../../apps/ui/messages/en/auth.json";
 import settings from "../../apps/ui/messages/en/settings.json";
 import pub from "../../apps/ui/messages/en/public.json";
 import ro from "../../apps/ui/messages/ro/public.json";
-import home from "../../apps/ui/messages/en/home.json";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock("@/lib/i18n/I18nProvider", () => ({ useChromeI18n: () => ({ locale: "en" }) }));
@@ -57,7 +55,7 @@ function client(state: object = flagged) {
     readPublicationReview: vi.fn().mockResolvedValue(state),
     requestPublicationReview: vi.fn().mockResolvedValue({ state: "UNDER_REVIEW" }),
     publishRun: vi.fn().mockResolvedValue({ state: "PUBLISHED", public_ref: "ref" }),
-    unpublishRun: vi.fn(), deletePrivateDebate: vi.fn(), authMethods: vi.fn()
+    deletePrivateDebate: vi.fn(), authMethods: vi.fn()
   };
 }
 async function mounted(state: object = flagged, words: Record<string, string> = catalog) {
@@ -188,12 +186,9 @@ it("resumed PUBLISH asks on FLAGGED, publishes on CLEAR, waits for the read and 
   try { expect(host.textContent).toContain(pub["public.publication.statusUnavailable"]); expect(host.textContent).not.toContain("Complete proof"); }
   finally { await unmount(root, host); }
 });
-it("no element the panel or take-down control renders has an inline colour", async () => {
+it("no element the panel renders has an inline colour", async () => {
   const { host, root } = await mounted();
-  const takeDown = await mount(<TakeDownControl runRef={run} homeCatalog={home} publicCatalog={catalog} client={client() as never} />);
   try {
-    for (const container of [host, takeDown.host]) {
-      expect([...container.querySelectorAll<HTMLElement>("*")].some((element) => /(?:^|;)\s*(?:color|background|border-color)\s*:/.test(element.getAttribute("style") ?? ""))).toBe(false);
-    }
-  } finally { await unmount(root, host); await unmount(takeDown.root, takeDown.host); }
+    expect([...host.querySelectorAll<HTMLElement>("*")].some((element) => /(?:^|;)\s*(?:color|background|border-color)\s*:/.test(element.getAttribute("style") ?? ""))).toBe(false);
+  } finally { await unmount(root, host); }
 });

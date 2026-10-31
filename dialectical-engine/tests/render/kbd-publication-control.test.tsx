@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // Keyboard-only check (2026-10-22): every control on the debate's Visibility card swaps itself out — Publish… opens a
-// form in its place, the form's Cancel brings the button back, a finished publish turns Publish… into Unpublish…, the
+// form in its place, the form's Cancel brings the button back, a finished publish takes Publish… away (the debate stays public), the
 // security check's Cancel unmounts it — and focus fell to <body> each time. It now lands on what replaced the
 // control, on the control that opened the check, or on the card's heading.
 import { act } from "react";
@@ -16,7 +16,6 @@ const client = (overrides: Record<string, unknown> = {}) => ({
   // synthesis-flag S02: the control reads the debate's review state beside its visibility (an unflagged debate here).
   readPublicationReview: vi.fn(async () => ({ flagged: false, state: "NONE", categories: [], asks_used: 0, may_ask: false, refusal: null })),
   publishRun: vi.fn(async () => ({ state: "PUBLISHED" as const, public_ref: "22222222-2222-4222-8222-222222222222" })),
-  unpublishRun: vi.fn(async () => ({ state: "PRIVATE" as const, public_ref: null })),
   deletePrivateDebate: vi.fn(async () => ({ status: "CLEANED" as const })),
   authMethods: vi.fn(async () => methods),
   stepUp: vi.fn(async (_password: string, _code: string, authorization: Record<string, string>) => ({
@@ -76,7 +75,7 @@ describe("publishing", () => {
     expect(document.activeElement).toBe(button(pub["public.publication.publishPublicly"]));
   });
 
-  it("a finished publish lands on Unpublish…, the control that replaced the form", async () => {
+  it("a finished publish lands on the card's heading: nothing replaces the form, a public debate stays public", async () => {
     const api = client();
     await mount(api);
     await press(button(pub["public.publication.publishEllipsis"]));
@@ -86,7 +85,15 @@ describe("publishing", () => {
     expect(api.publishRun).toHaveBeenCalled();
     expect(document.body.textContent).toContain(pub["public.publication.publishedSuccess"]);
     expect(document.activeElement).not.toBe(document.body);
-    expect(document.activeElement).toBe(button(pub["public.publication.unpublishEllipsis"]));
+    expect(document.activeElement).toBe(document.querySelector("section h2"));
+    expect([...document.querySelectorAll("section button")]).toEqual([]);
+  });
+
+  it("a published debate says it is public and offers no way to take it back (owner decision 13)", async () => {
+    await mount(client({ readRunVisibility: vi.fn(async () => ({ state: "PUBLISHED" as const, public_ref: "22222222-2222-4222-8222-222222222222" })) }));
+    expect(document.body.textContent).toContain(pub["public.publication.publishedStatus"]);
+    expect(document.querySelector('a[href="/public/debate/22222222-2222-4222-8222-222222222222"]')).not.toBeNull();
+    expect([...document.querySelectorAll("section button")]).toEqual([]);
   });
 });
 

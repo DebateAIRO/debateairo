@@ -639,7 +639,6 @@ describe("hate-speech S02 publish path", () => {
       await inject("GET", `/v1/runs/${RUN_ID}`);
       await inject("GET", `/v1/runs/${RUN_ID}/answer`);
       await inject("GET", `/v1/runs/${RUN_ID}/visibility`);
-      await inject("POST", `/v1/runs/${RUN_ID}/unpublish`, { step_up_grant: GRANT_TOKEN });
       await inject("DELETE", `/v1/debates/${RUN_ID}`, {});
       await lifecycle.api.close();
       const refusedPreflight = routeApi({ publicationContentCheck: check, preflight: false });

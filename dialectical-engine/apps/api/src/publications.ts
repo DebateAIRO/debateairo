@@ -370,7 +370,7 @@ export interface PublicationApplication {
     runId: string;
     authenticated: AuthenticatedSession;
     grantToken: string;
-    action: "PUBLISH" | "UNPUBLISH";
+    action: "PUBLISH";
   }>): Promise<boolean>;
   auditPreflightDenial(input: Readonly<{
     authenticated: AuthenticatedSession;
@@ -394,12 +394,6 @@ export interface PublicationApplication {
     /** FIX-HS2-p1 sd-B1: the route's lease; the judge is awaited outside it. */
     contentLease?: PublicationContentLease;
   }>): Promise<PublicationPublishResult | null>;
-  unpublish(input: Readonly<{
-    runId: string;
-    authenticated: AuthenticatedSession;
-    grantToken: string;
-    source: AuthSourceContext;
-  }>): Promise<Readonly<{ state: "PRIVATE"; public_ref: null }> | null>;
   readPublicDebate(publicationRef: string): Promise<PublicDebate | null>;
   list(limit: number, offset: number): Promise<Readonly<{
     items: readonly Readonly<{
@@ -441,7 +435,7 @@ export class PostgresPublicationApplication implements PublicationApplication {
     runId: string;
     authenticated: AuthenticatedSession;
     grantToken: string;
-    action: "PUBLISH" | "UNPUBLISH";
+    action: "PUBLISH";
   }>): Promise<boolean> {
     return this.repository.preflightGrant({
       runId: input.runId,
@@ -632,42 +626,6 @@ export class PostgresPublicationApplication implements PublicationApplication {
       }
       throw error;
     }
-  }
-
-  async unpublish(input: Readonly<{
-    runId: string;
-    authenticated: AuthenticatedSession;
-    grantToken: string;
-    source: AuthSourceContext;
-  }>): Promise<Readonly<{ state: "PRIVATE"; public_ref: null }> | null> {
-    const grantTokenHash = hashToken("step-up-grant", input.grantToken);
-    if (!await this.preflightGrant({
-      runId: input.runId,
-      authenticated: input.authenticated,
-      grantToken: input.grantToken,
-      action: "UNPUBLISH"
-    })) {
-      await this.auditPreflightDenial({
-        authenticated: input.authenticated,
-        requestId: input.source.requestId
-      });
-      return null;
-    }
-    // Retry durable cleanup from a prior committed PRIVATE transition before
-    // handling the next request. Key I/O runs outside every DB transaction.
-    await this.reconcileKeyCleanup();
-    const publicationRef = await this.repository.unpublish({
-      runId: input.runId,
-      userId: input.authenticated.userId,
-      ownerRef: input.authenticated.ownerRef,
-      sessionId: input.authenticated.session.session_id,
-      grantTokenHash,
-      occurredAt: this.clock(),
-      source: input.source
-    });
-    if (publicationRef === null) return null;
-    await this.reconcileKeyCleanup();
-    return Object.freeze({ state: "PRIVATE" as const, public_ref: null });
   }
 
   async reconcileKeyCleanup(limit = 100): Promise<number> {

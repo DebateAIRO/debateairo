@@ -585,7 +585,6 @@ apps/ui/components/StoryPanel.tsx
 apps/ui/components/StoryShortBlocks.tsx
 apps/ui/components/SynthesisHoldRefresher.tsx
 apps/ui/components/SynthesisPanel.tsx
-apps/ui/components/TakeDownControl.tsx
 apps/ui/components/ThreatReportsLink.tsx
 apps/ui/components/ThreatReportsPanel.tsx
 apps/ui/components/Toast.tsx

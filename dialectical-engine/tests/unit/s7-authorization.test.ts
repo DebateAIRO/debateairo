@@ -135,7 +135,6 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "GET /v1/runs/{id}/events", auth: "user", resource: "run-owner", action: "read-events" },
   { route: "GET /v1/runs/{id}/answer", auth: "user", resource: "run-owner", action: "read-run-answer" },
   { route: "POST /v1/runs/{id}/publish", auth: "user", resource: "run-owner", action: "publish" },
-  { route: "POST /v1/runs/{id}/unpublish", auth: "user", resource: "run-owner", action: "unpublish" },
   { route: "POST /v1/runs/{id}/publication-review", auth: "user", resource: "run-owner", action: "request-review" },
   { route: "GET /v1/runs/{id}/publication-review", auth: "user", resource: "run-owner", action: "read-review" },
   { route: "GET /v1/runs/{id}/last-visit", auth: "user", resource: "run-owner", action: "read-last-visit" },
@@ -356,7 +355,8 @@ describe("S7 deny-by-default authorization", () => {
     // (read, save), a debate's last visit (read, record) and its dig links (read, record). R22 W3-8 adds Continue on a
     // month-paused debate (POST /v1/runs/{id}/continue). R22 W5-1 adds the final report's three: its versions
     // (GET /v1/runs/{id}/investigation), "Write my report" (POST /v1/runs/{id}/report) and "Keep digging" (POST /v1/runs/{id}/reopen).
-    expect(contractInventory.routes).toHaveLength(184);
+    // R22 owner decision 13 removed the Unpublish route (POST /v1/runs/{id}/unpublish): 183.
+    expect(contractInventory.routes).toHaveLength(183);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 

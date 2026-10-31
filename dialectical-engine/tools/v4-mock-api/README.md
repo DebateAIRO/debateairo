@@ -213,7 +213,7 @@ Anything else gets a 404 `NOT_MOCKED` reply. The mock also prints a line like `[
 - **Billing pages**: subscription, invoices, charge status, card details and card change, checkout, quote, upgrade, downgrade, cancel, withdraw (`/settings`, `/pricing` buying, `/checkout`, `/settings/card`, `/cancel`, `/withdraw`).
 - **Account and security settings**: sessions list, sign-in methods, social links, email change, recovery email, phone, data export, account erasure (`/settings`, `/settings/security`, `/export`).
 - **Signing in and up for real**: login, register, password reset, MFA, social sign-in, age check (`/login`, `/sign-up`, `/recover`, …). The mock just says "signed in"; use `/api/__mock/sign-in` for the cookie.
-- **Publishing**: publish and unpublish, the public debate page `/public/debate/<id>`, deleting a private debate.
+- **Publishing**: publish, the public debate page `/public/debate/<id>`, deleting a private debate.
 - **The classic page's extra actions**: investigations (`POST /v1/answers/:id/investigations/:gap`) and unlinking memory.
 - **"Add to researched"** (task W4-4): the seeded choices show every outcome, but there is no route to add one yet.
 - **The support assistant** (`/v1/support/*`), the evaluator dev menu (`/v1/dev/evaluator`, shown only when `NEXT_PUBLIC_EVALUATOR_DEV_MENU_ENABLED` is on), and the staff pages (`/v1/admin/*`).

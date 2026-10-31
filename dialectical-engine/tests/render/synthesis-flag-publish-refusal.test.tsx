@@ -28,7 +28,7 @@ function setup(publishRun: () => Promise<unknown>, onRemovedByCheck = vi.fn(),
   const client = { readRunVisibility, readPublicationReview: async () => ({
     flagged: false, state: "NONE", categories: [], asks_used: 0, may_ask: false, refusal: null
   }), publishRun,
-    unpublishRun: async () => ({ state: "PRIVATE", public_ref: null }), deletePrivateDebate: async () => ({ status: "CLEANED" }) };
+    deletePrivateDebate: async () => ({ status: "CLEANED" }) };
   return { node, root, client, onRemovedByCheck, cleanup: () => { act(() => root.unmount()); node.remove(); } };
 }
 

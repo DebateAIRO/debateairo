@@ -91,7 +91,7 @@ describe("S02 owner/public affordance drift pins", () => {
     expect(occurrences(ownerPage, "{...challengeProps}")).toBe(3);
     expect(occurrences(ownerPage, "const challengeProps = publicMode\n    ? {}\n    : { onChallengeNode:")).toBe(1);
     expect(occurrences(ownerPage, "{...(publicMode\n            ? {}\n            : { onChallenge:")).toBe(1);
-    // MUTATION — publication, unpublish and private-delete controls stay owner-only.
+    // MUTATION — publication and private-delete controls stay owner-only.
     expect(occurrences(ownerPage, "<PublicationControl")).toBe(1);
 
     // 20 before V's ruling of 2026-09-20; the public-only Overview control

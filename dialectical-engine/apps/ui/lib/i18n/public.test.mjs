@@ -15,7 +15,6 @@ const sourcePaths = [
   "components/PublicHonestyDrawer.tsx",
   "components/PublicationControl.tsx",
   "components/PublicationReviewPanel.tsx",
-  "components/TakeDownControl.tsx",
   "components/auth/SecurityActionResume.tsx",
   "lib/publicDebatePresentation.ts",
   "lib/v3/publicAnswerExport.ts",

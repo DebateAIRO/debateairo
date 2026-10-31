@@ -14,22 +14,6 @@ function styled<T extends HTMLElement>(tag: string, className: string, parent: H
 
 afterEach(() => document.body.replaceChildren());
 
-it("the Take down confirmation uses the canvas box, checkbox, button and failure-line geometry", () => {
-  const style = styled<HTMLStyleElement>("style", "");
-  style.textContent = styles;
-  const panel = styled<HTMLDivElement>("div", "tdPanel");
-  const label = styled<HTMLLabelElement>("label", "authCheck", panel);
-  const actions = styled<HTMLDivElement>("div", "tdActions", panel);
-  const submit = styled<HTMLButtonElement>("button", "setBtn setBtnPrimary", actions);
-  const status = styled<HTMLParagraphElement>("p", "tdStatus");
-  expect(getComputedStyle(panel).display).toBe("flex");
-  expect(getComputedStyle(panel).borderRadius).toBe("13px");
-  expect(getComputedStyle(panel).paddingTop).toBe("14px");
-  expect(getComputedStyle(label).display).toBe("flex");
-  expect(getComputedStyle(submit).borderRadius).toBe("999px");
-  expect(getComputedStyle(status).fontSize).toBe("11px");
-});
-
 it("the review queue and refusal reason use their own layout instead of the audit grid and browser textarea", () => {
   const style = styled<HTMLStyleElement>("style", "");
   style.textContent = styles;

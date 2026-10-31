@@ -1010,9 +1010,9 @@ export const SensitiveDataConsentRequestSchema = z.object({
 }).strict();
 export const SensitiveDataConsentStatusSchema = z.object({ status: z.enum(["required", "given"]) }).strict();
 export type SensitiveDataConsentStatus = z.infer<typeof SensitiveDataConsentStatusSchema>;
-export const VisibilityGrantActionSchema = z.enum(["PUBLISH", "UNPUBLISH"]);
+export const VisibilityGrantActionSchema = z.enum(["PUBLISH"]);
 export const RunTargetedGrantActionSchema = z.enum([
-  "PUBLISH", "UNPUBLISH", "DELETE_PRIVATE_DEBATE"
+  "PUBLISH", "DELETE_PRIVATE_DEBATE"
 ]);
 export const StepUpAuthorizationRequestSchema = z.discriminatedUnion("action", [
   z.object({
@@ -1131,11 +1131,6 @@ export const PublicationContentRefusalSchema = z.object({
 export const PublishDebateRequestSchema = z.object({
   step_up_grant: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
   warning_acknowledged: z.literal(true)
-}).strict();
-
-export const UnpublishDebateRequestSchema = z.object({
-  step_up_grant: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
-  copies_may_persist_acknowledged: z.literal(true)
 }).strict();
 
 const StepUpGrantTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
@@ -1903,7 +1898,6 @@ export const contractInventory = Object.freeze({
     "GET /v1/runs/{id}/events",
     "GET /v1/runs/{id}/answer",
     "POST /v1/runs/{id}/publish",
-    "POST /v1/runs/{id}/unpublish",
     "POST /v1/runs/{id}/publication-review",
     "GET /v1/runs/{id}/publication-review",
     // V4 account memory (N7, N11): the last visit of a debate and the dig links around it.
@@ -1953,7 +1947,7 @@ export const contractInventory = Object.freeze({
     RunTargetedGrantActionSchema,
     BeginSocialStepUpRequestSchema,SocialStepUpStatusRequestSchema,SocialStepUpStatusResponseSchema,CompleteSocialStepUpRequestSchema,StepUpAuthorizationRequestSchema, StepUpResponseSchema, BeginPasskeyStepUpRequestSchema, CompletePasskeyStepUpRequestSchema, AuthMethodsResponseSchema, RemoveAuthMethodRequestSchema, RegenerateRecoveryCodesRequestSchema, RecoveryCodesResponseSchema, MfaRecoveryPendingResponseSchema, MfaRecoveryPendingCancelRequestSchema, MfaRecoveryPendingCancelledSchema,
     DataExportRequestSchema, DataExportStatusSchema, DataExportDownloadRequestSchema,
-    PublishDebateRequestSchema, UnpublishDebateRequestSchema,
+    PublishDebateRequestSchema,
     AccountErasureScheduleRequestSchema,AccountErasureStatusSchema,
     AccountErasureCancelRequestSchema,AccountErasureCancelledSchema,PrivateDebateErasureRequestSchema,
     PrivateDebateErasureStatusSchema,LegacyRunClaimRequestSchema,LegacyRunClaimResultSchema,

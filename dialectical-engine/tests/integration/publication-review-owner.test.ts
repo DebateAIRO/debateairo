@@ -118,8 +118,7 @@ function apiFor(target: Debate, validGrant: boolean, token = grantToken(), optio
   const publications = {
     preflightGrant: async () => validGrant,
     auditPreflightDenial: async () => { denials++; return true; },
-    publish: async () => { publicationCalls++; return { state: "PUBLISHED", public_ref: randomUUID() }; },
-    unpublish: async () => ({ state: "PRIVATE", public_ref: null })
+    publish: async () => { publicationCalls++; return { state: "PUBLISHED", public_ref: randomUUID() }; }
   } as unknown as NonNullable<ApiOptions["publications"]>;
   const api = buildApi({
     application, publications, sessions: testSessionApplication([identity]), allowedOrigin: TEST_APP_ORIGIN,
@@ -152,10 +151,7 @@ function apiFor(target: Debate, validGrant: boolean, token = grantToken(), optio
   const publish = async () => await api.inject({ method: "POST", url: `/v1/runs/${target.runId}/publish`,
     headers: testSessionHeaders(identity, true), payload: { step_up_grant: token, warning_acknowledged: true }
   });
-  const unpublish = async () => await api.inject({ method: "POST", url: `/v1/runs/${target.runId}/unpublish`,
-    headers: testSessionHeaders(identity, true), payload: { step_up_grant: token, copies_may_persist_acknowledged: true }
-  });
-  return { api, post, get, publish, unpublish, token, denials: () => denials,
+  return { api, post, get, publish, token, denials: () => denials,
     publicationCalls: () => publicationCalls };
 }
 
@@ -357,13 +353,13 @@ describe("publication review owner routes over migrated database", () => {
     } finally { await fixture.api.close(); }
   });
 
-  it("after an unpublish, Publish of a covered version answers 201 without a new ask", async () => {
+  // The Unpublish route is gone (owner decision 13); a debate unpublished earlier stays private until it is published again.
+  it("publishing a covered version again answers 201 without a new ask", async () => {
     const target = await debate();
     await approve(target);
     const fixture = apiFor(target, true, grantToken(), { gate: gateFor(target) });
     try {
       expect((await fixture.publish()).statusCode).toBe(201);
-      expect((await fixture.unpublish()).statusCode).toBe(200);
       expect((await fixture.publish()).statusCode).toBe(201);
       expect(fixture.publicationCalls()).toBe(2);
       const rows = await database.pool.query<{ n: number }>(

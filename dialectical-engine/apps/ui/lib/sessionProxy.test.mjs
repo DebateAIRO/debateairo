@@ -232,7 +232,7 @@ test("S04 asks and S02 publish retain their own upstream ceilings; other routes 
     assert.equal(only(await call("POST", ["v1", "runs", RUN, "publish"])), PUBLISH_CEILING_MS);
     assert.equal(only(await call("POST", ["v1", "asks"])), ASK_CEILING_MS);
     for (const [method, path] of [
-      ["POST", ["v1", "runs", RUN, "unpublish"]],
+      ["POST", ["v1", "runs", RUN, "publication-review"]],
       ["POST", ["v1", "runs", RUN, "publish", "extra"]],
       // FIX-HS2-p2 (REV p2 survivor P6): a deeper path that also ends in /publish is not the publish route
       ["POST", ["v1", "runs", RUN, "answers", "publish"]],
