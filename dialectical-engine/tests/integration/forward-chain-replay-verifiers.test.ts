@@ -17,7 +17,7 @@ beforeAll(async () => {
   db = await startTestDatabase(); await migrate(db.pool);
   // Every probe test below builds on the real chain plus a first probe step that changes and checks nothing.
   plan = await loadMigrationPlan();
-  first = probe(plan.forwardChain.at(-2)!, "0199_replay_probe.sql");
+  first = probe(plan.forwardChain.at(-1)!, "0199_replay_probe.sql");
 }, 300_000);
 const NETOPIA = "0111_billing_netopia.sql";
 /** Part C's step, chained after the auth DB batch (spec 2026-10-05 §2.16.6); it keeps 0111's verifier in force too. */
@@ -89,10 +89,10 @@ it("keeps NETOPIA's 0111 verifier in force and replaying once the auth DB batch 
   // with 0129 the last of them, the verifier in force is 0111's, byte for byte. 0130's verifier supersedes it: every check 0111's makes,
   // its row-security clause aside (SPEC-v4 R34), and the V4 account memory's 0131, the web evidence store's 0132, the investigations' 0133, the dig model's 0134, the dig picks' 0135 and the investigation reports' 0136 keep 0130's, 0136 at the head.
   expect(batch!.verifierSha256).toBe(netopia!.verifierSha256);
-  expect(real.forwardChain.at(-13)!.verifierSha256).toBe(netopia!.verifierSha256);
-  for (const index of [-12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1]) {
+  expect(real.forwardChain.at(-14)!.verifierSha256).toBe(netopia!.verifierSha256);
+  for (const index of [-13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1]) {
     expect(real.forwardChain.at(index)!.verifierPath).toBe("lineage/verify-effective-capabilities-130.sql");
-    expect(real.forwardChain.at(index)!.verifierSha256).toBe(real.forwardChain.at(-12)!.verifierSha256);
+    expect(real.forwardChain.at(index)!.verifierSha256).toBe(real.forwardChain.at(-13)!.verifierSha256);
   }
   expect(real.forwardChain.at(-1)!.verifierSha256).not.toBe(netopia!.verifierSha256);
   expect(partC!.verifierSha256).toBe(netopia!.verifierSha256);
