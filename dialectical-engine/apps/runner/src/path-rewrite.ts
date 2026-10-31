@@ -113,6 +113,12 @@ export type PathRewriteContent = Readonly<{
   what_changed: readonly string[];
   view_reason: string | null;
   dig_paths: readonly Readonly<{ position_ref: string; line: string; fate: StoryFate }>[];
+  /**
+   * W4-8 (owner Q-D3): every point "What the dig changed" rests on, by its real id (the path's own and the dig's), each
+   * once in the order the sentences name them. The server counts the rewritten path's trust words over the path's own
+   * points and these. A rewrite sealed before W4-8 has none, and reads as resting on none.
+   */
+  rests_on: readonly string[];
 }>;
 
 /** What W4-3's hook is handed once the row is stored. */
@@ -451,7 +457,7 @@ async function composeRecord(settings: PathRewriteRunnerSettings, compose: Compo
     return failed(pathRewriteFailureCode(outcome.failureCode), written);
   }
   const served = written.rounds.find((round) => round.round === outcome.servedRound)!;
-  const content = contentOf(outcome.body, built.digPathRefs);
+  const content = contentOf(outcome.body, built.pointIds, built.digPathRefs);
   const sealed = await settings.seal(digRunId, rewriteId, content);
   return Object.freeze({
     rewriteId,
@@ -472,14 +478,22 @@ async function composeRecord(settings: PathRewriteRunnerSettings, compose: Compo
   });
 }
 
-/** The draft as it is stored: refs gone (the dig's paths named by their real refs), the reason apart from its codes. */
-function contentOf(draft: PathRewriteDraft, digPathRefs: ReadonlyMap<string, string>): PathRewriteContent {
+/**
+ * The draft as it is stored: refs gone (the dig's paths named by their real refs, the points the sentences rest on by
+ * their real ids), the reason apart from its codes. Code kept only sentences whose every ref the material gives.
+ */
+function contentOf(draft: PathRewriteDraft, pointIds: ReadonlyMap<string, string>, digPathRefs: ReadonlyMap<string, string>): PathRewriteContent {
+  const restsOn = [...new Set(draft.what_changed.flatMap((sentence) => sentence.rests_on.flatMap((name) => {
+    const id = pointIds.get(name);
+    return id === undefined ? [] : [id];
+  })))];
   return Object.freeze({
     text: Object.freeze({ line: draft.line, summary: draft.summary, fate: draft.fate }),
     what_changed: Object.freeze(draft.what_changed.map((sentence) => sentence.text)),
     view_reason: draft.view?.reason ?? null,
     dig_paths: Object.freeze(draft.dig_paths.map((path) => Object.freeze({
       position_ref: digPathRefs.get(path.position_ref) ?? path.position_ref, line: path.line, fate: path.fate
-    })))
+    }))),
+    rests_on: Object.freeze(restsOn)
   });
 }

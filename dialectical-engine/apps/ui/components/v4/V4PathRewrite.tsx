@@ -5,8 +5,9 @@ import { useState } from "react";
 import type { PathRewrite, PathsChangedSince, PointOfViewVerdict } from "@debateai/contract";
 import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { isFinishedRewrite, rewriteStateOf } from "@/lib/v4/mapModel";
+import { servedRewriteWords } from "@/lib/v4/trust";
 import { levelHref } from "@/lib/v4/storage";
-import type { DigView, ReadingLevel, RewriteState, V4Map, V4Path, V4Point } from "@/lib/v4/types";
+import type { DigView, ReadingLevel, RewriteState, TrustWord, V4Map, V4Path, V4Point } from "@/lib/v4/types";
 import { V4SourceList } from "./V4Sources";
 
 /*
@@ -143,11 +144,16 @@ function earlierTexts(path: V4Path): ReadonlyArray<Readonly<{ key: string; date:
   return out;
 }
 
-/** The dig's own points with their trust words and sources; points no second AI checked are only counted. */
-function DigPoints(props: Readonly<{ points: readonly V4Point[]; catalog: MessageCatalog; locale: string }>) {
+/**
+ * The dig's own points with their trust words and sources; points no second AI checked are only counted. W4-8: a point the
+ * rewrite rests on carries the word the server worked out for the path (`served`), the others their own.
+ */
+function DigPoints(props: Readonly<{ points: readonly V4Point[]; served: ReadonlyMap<string, TrustWord | null>; catalog: MessageCatalog;
+  locale: string }>) {
   const { catalog } = props;
-  const checked = props.points.filter((point) => point.trust !== null);
-  const unchecked = props.points.length - checked.length;
+  const points = props.points.map((point) => (props.served.has(point.id) ? { ...point, trust: props.served.get(point.id) ?? null } : point));
+  const checked = points.filter((point) => point.trust !== null);
+  const unchecked = points.length - checked.length;
   return (
     <div className="v4RewriteDigPoints">
       <ul className="v4PanelPoints">
@@ -232,7 +238,7 @@ export function V4PathRewrite(props: Readonly<{
           </button>
           {showPoints
             ? (digPoints !== null && digPoints.length > 0
-              ? <DigPoints points={digPoints} catalog={catalog} locale={locale} />
+              ? <DigPoints points={digPoints} served={servedRewriteWords(path.rewrites?.history)} catalog={catalog} locale={locale} />
               : <p className="v4PanelHint v4Muted">{t(catalog, "v4.rewrite.digPointsElsewhere")}</p>)
             : null}
           <Link className="v4Btn v4RewriteDigMap" href={levelHref(`/v4/debate/${encodeURIComponent(newest.dig_run_id)}`, props.linkLevel)}>

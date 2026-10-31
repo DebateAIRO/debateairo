@@ -403,6 +403,74 @@ export const PointOfViewVerdictSchema = z.object({
 export type PointOfViewVerdict = z.infer<typeof PointOfViewVerdictSchema>;
 
 /**
+ * W4-8 (owner Q-D3): the four trust words, the V4 page's codes (row D decision 2) in the order its bar shows them, and the
+ * ONE rule that gives a point its word. The page places every point with it (apps/ui/lib/v4/trust.ts) and the server works
+ * out a rewritten path's words with it (packages/serve/src/path-rewrites.ts), so the two never differ:
+ *   the position of a path whose fate is FELL    → DIDNT_HOLD / FELL
+ *   no second-AI review                          → no word yet (counted apart)
+ *   dispute                                      → STILL_ARGUED / DISPUTED
+ *   cannot-assess                                → STILL_ARGUED / COULD_NOT_CHECK
+ *   agree, not FRESH                             → SURE_FOR_CASE / AGREED_BUT_DATED
+ *   agree, REASONING                             → SURE_FOR_CASE / ARGUED_AND_AGREED
+ *   agree, LOOKED_UP, the server's checked flag  → SURE / WEB_CHECKED_AND_AGREED (never on Free)
+ *   agree, otherwise                             → SURE_FOR_CASE / LOOKED_UP_AND_AGREED
+ * The flag (`looked_up_checked`) is the server's: true only when the point's locator is a checked extract of the debate
+ * that holds the point. The rule reads no number of the engine.
+ */
+export const TRUST_WORDS = ["SURE", "SURE_FOR_CASE", "STILL_ARGUED", "DIDNT_HOLD"] as const;
+export type TrustWord = (typeof TRUST_WORDS)[number];
+export const TrustWordSchema = z.enum(TRUST_WORDS);
+/** Why the rule gave a point its word (each has its own plain line on the page). */
+export const TRUST_RULE_BASES = [
+  "WEB_CHECKED_AND_AGREED", "LOOKED_UP_AND_AGREED", "ARGUED_AND_AGREED", "AGREED_BUT_DATED", "DISPUTED", "COULD_NOT_CHECK", "FELL"
+] as const;
+export type TrustRuleBasis = (typeof TRUST_RULE_BASES)[number];
+/** A point as the rule reads it: the second AI's review, how fresh it is, how it is known and the server's checked flag. */
+export type TrustRulePoint = Readonly<{
+  review: Readonly<{ outcome: string }> | null;
+  staleness_state: string;
+  way_of_knowing: string;
+  looked_up_checked?: boolean | undefined;
+}>;
+export type TrustPlaced = Readonly<{ trust: TrustWord | null; basis: TrustRuleBasis | null }>;
+
+/** A point's trust word. `free`: its debate ran on Free (never "Sure"); `fell`: it is the position of a path that FELL. */
+export function trustOfPoint(point: TrustRulePoint, where: Readonly<{ free: boolean; fell: boolean }>): TrustPlaced {
+  if (where.fell) return { trust: "DIDNT_HOLD", basis: "FELL" };
+  const review = point.review;
+  if (review === null) return { trust: null, basis: null };
+  if (review.outcome === "dispute") return { trust: "STILL_ARGUED", basis: "DISPUTED" };
+  if (review.outcome === "cannot-assess") return { trust: "STILL_ARGUED", basis: "COULD_NOT_CHECK" };
+  if (point.staleness_state !== "FRESH") return { trust: "SURE_FOR_CASE", basis: "AGREED_BUT_DATED" };
+  if (point.way_of_knowing === "REASONING") return { trust: "SURE_FOR_CASE", basis: "ARGUED_AND_AGREED" };
+  if (point.way_of_knowing === "LOOKED_UP" && point.looked_up_checked === true && !where.free) {
+    return { trust: "SURE", basis: "WEB_CHECKED_AND_AGREED" };
+  }
+  return { trust: "SURE_FOR_CASE", basis: "LOOKED_UP_AND_AGREED" };
+}
+
+/** A debate ran on Free when its web part has a path NOT_ON_PLAN (Free never searches): its points are never "Sure". */
+export function webRanOnFree(web: Readonly<{ paths: readonly Readonly<{ search: Readonly<{ status: string }> }>[] }> | null | undefined): boolean {
+  return (web?.paths ?? []).some((path) => path.search.status === "NOT_ON_PLAN");
+}
+
+/** A point named by the rewrite (a node id, as the answer's points are named). */
+const RewritePointRefSchema = z.string().trim().min(1).max(160);
+/**
+ * W4-8: the points a rewrite rests on, at most: "What the dig changed" has at most three sentences, each resting on at most
+ * 40 points (the writer's answer form); and the points a rewritten path counts: its own (a story path names at most 40)
+ * plus those.
+ */
+const REWRITE_RESTS_ON_MAX = DIG_MODEL_LIMITS.whatChangedSentencesMax * 40;
+const REWRITE_TRUST_POINTS_MAX = REWRITE_RESTS_ON_MAX + 40;
+/** One point a rewritten path counts, with its trust word (null: no second AI checked it, counted apart). */
+export const RewritePointTrustSchema = z.object({
+  node_id: RewritePointRefSchema,
+  word: TrustWordSchema.nullable()
+}).strict();
+export type RewritePointTrust = z.infer<typeof RewritePointTrustSchema>;
+
+/**
  * A rewrite's states: WRITING (the dig is done, the path is being rewritten), READY or READY_WITH_RESERVATION (the checker
  * passed it, or the last round left a reservation), FAILED (the path keeps its text; the report reads the dig directly).
  */
@@ -429,7 +497,19 @@ function finishedRewrite<S extends "READY" | "READY_WITH_RESERVATION">(state: S)
     what_changed: z.array(SentenceSchema).min(1).max(DIG_MODEL_LIMITS.whatChangedSentencesMax),
     fate_before: StoryFateSchema,
     view: PointOfViewVerdictSchema.nullable(),
-    dig_paths: z.array(DigPathLineSchema).max(WEB_CONTRACT_LIMITS.pathsMax)
+    dig_paths: z.array(DigPathLineSchema).max(WEB_CONTRACT_LIMITS.pathsMax),
+    /**
+     * W4-8 (Q-D3): the points "What the dig changed" rests on, by node id: the path's own and the dig's. Absent on a
+     * rewrite served before W4-8; a rewrite stored before it rests on none.
+     */
+    rests_on: z.array(RewritePointRefSchema).max(REWRITE_RESTS_ON_MAX).optional(),
+    /**
+     * W4-8 (Q-D3): every point the rewritten path now counts, with its trust word, worked out by code (`trustOfPoint`):
+     * its own points first, each "Sure" only by a checked extract of the debate the path is on, then the dig's points the
+     * rewrite rests on, each "Sure" only by a checked extract of the dig. Words only, never a number. Absent: the page
+     * places the path's own points itself, as for a path no dig rewrote.
+     */
+    trust: z.array(RewritePointTrustSchema).max(REWRITE_TRUST_POINTS_MAX).optional()
   }).strict();
 }
 
@@ -450,6 +530,12 @@ export const PathRewriteSchema = z.discriminatedUnion("state", [
   }
   if (new Set(rewrite.dig_paths.map((path) => path.position_ref)).size !== rewrite.dig_paths.length) {
     context.addIssue({ code: "custom", message: "each of the dig's paths is listed once" });
+  }
+  if (rewrite.rests_on !== undefined && new Set(rewrite.rests_on).size !== rewrite.rests_on.length) {
+    context.addIssue({ code: "custom", message: "each point a rewrite rests on is named once" });
+  }
+  if (rewrite.trust !== undefined && new Set(rewrite.trust.map((point) => point.node_id)).size !== rewrite.trust.length) {
+    context.addIssue({ code: "custom", message: "each point a rewritten path counts is counted once" });
   }
 });
 export type PathRewrite = z.infer<typeof PathRewriteSchema>;

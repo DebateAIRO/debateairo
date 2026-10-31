@@ -41,7 +41,9 @@ describe("W3-5 a dig rewrites the path it was dug from", () => {
       view_reason: null,
       // The judges' order: the winner (No) first, then the runner-up (Yes).
       dig_paths: [{ position_ref: DIG_NODES.no, line: "Winter ridership falls.", fate: "HELD_UP" },
-        { position_ref: DIG_NODES.yes, line: "Winter crowds fill both piers.", fate: "FELL" }]
+        { position_ref: DIG_NODES.yes, line: "Winter crowds fill both piers.", fate: "FELL" }],
+      // W4-8 (Q-D3): the point the sentence rests on, by its real id (P1 is the parent path's first point).
+      rests_on: [PARENT_POINTS.queues]
     });
     // The calls: Haiku writes, GLM checks, on the story lane at the rewrite's own call sites, under the engine seal.
     expect(vendors.haiku.requests.map((request) => [request.callSiteKey, request.role, request.lane])).toEqual([["PATH_REWRITE:WRITER:1", "SYNTHESIZER", "story"]]);
@@ -172,6 +174,8 @@ describe("W3-5 a dig rewrites the path it was dug from", () => {
     await runDigPathRewrite(settingsOver({ store, digs: new Map([[DIG_A, dig()]]) }), digSnapshot(DIG_A, membersOf(vendors)));
     expect(vendors.haiku.bodies).toHaveLength(2);
     expect(store.contents.get(store.rewrites[0]!.rewriteId)!.what_changed).toEqual(["The dig weakened the year-round case."]);
+    // W4-8: the kept sentence's points by their real ids (P1 the parent path's, P4 the dig's), never the dropped one's.
+    expect(store.contents.get(store.rewrites[0]!.rewriteId)!.rests_on).toEqual([PARENT_POINTS.queues, DIG_NODES.bridge]);
     expect(JSON.parse(fieldsOf(vendors.glm.requests[0]!.packet).get("rewrite")!).what_changed).toEqual([
       { text: "The dig weakened the year-round case.", rests_on: ["P1", "P4"] }]);
   });

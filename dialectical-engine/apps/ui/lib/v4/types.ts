@@ -1,3 +1,4 @@
+import { TRUST_WORDS, type TrustWord } from "@debateai/contract";
 import type {
   AnswerDig,
   DigSuggestion,
@@ -15,9 +16,11 @@ import type {
  * optional web fields (sources, each path's search and other pages) ride along; an answer without them reads as before.
  */
 
-/** Row D decision 2: the four trust words, in the order the bar and the panel show them. */
-export const TRUST_WORDS = ["SURE", "SURE_FOR_CASE", "STILL_ARGUED", "DIDNT_HOLD"] as const;
-export type TrustWord = (typeof TRUST_WORDS)[number];
+/**
+ * Row D decision 2: the four trust words, in the order the bar and the panel show them. W4-8: the contract's codes, the
+ * ones the server serves a rewritten path's words in.
+ */
+export { TRUST_WORDS, type TrustWord };
 export type TrustCounts = Readonly<Record<TrustWord, number>>;
 
 /**

@@ -1,4 +1,4 @@
-import { cutQuoteAtWordEdge, WEB_CONTRACT_LIMITS, type Answer, type WebOtherPage, type WebSource } from "@debateai/contract";
+import { cutQuoteAtWordEdge, WEB_CONTRACT_LIMITS, webRanOnFree, type Answer, type WebOtherPage, type WebSource } from "@debateai/contract";
 import type { V4PathWeb, V4WebNote } from "./types.js";
 
 /*
@@ -34,7 +34,7 @@ export function sourcesOf(node: AnswerNode): readonly WebSource[] {
 
 /** Free never searches: a debate whose web part says "not on this plan" for any path ran on Free (owner: never "Sure"). */
 export function ranOnFree(answer: Answer): boolean {
-  return (answer.web?.paths ?? []).some((path) => path.search.status === "NOT_ON_PLAN");
+  return webRanOnFree(answer.web);
 }
 
 /** One path's web part, by the opening position that argued it (a story path's `position_ref`); absent when unknown. */

@@ -1,10 +1,12 @@
-import type { Answer, AnswerStory } from "@debateai/contract";
-import { TRUST_WORDS, type TrustBasis, type TrustCounts, type TrustWord, type V4Point } from "./types.js";
+import { trustOfPoint, type Answer, type AnswerStory, type PathRewrite } from "@debateai/contract";
+import { TRUST_WORDS, type TrustCounts, type TrustWord, type V4Point } from "./types.js";
 import { ranOnFree, sourcesOf } from "./web.js";
 
 /*
- * V4 initial (2026-10-28): the four trust words (row D decision 2), worked out from today's V3 answer. First-version
- * mapping, to be revalidated by the owner:
+ * V4 initial (2026-10-28): the four trust words (row D decision 2), worked out from today's V3 answer. W4-8 (owner Q-D3):
+ * the rule now lives in the contract (`trustOfPoint`, packages/contract/src/web.ts), the one the server also works out a
+ * rewritten path's words with, so the page and the server never differ. First-version mapping, to be revalidated by the
+ * owner:
  *   the position of a ready story path whose fate is FELL  → DIDNT_HOLD / FELL (fix wave 1, Decision B)
  *   no second-AI review                           → no word yet (decision 6: left out of the groups and the bar)
  *   dispute                                       → STILL_ARGUED / DISPUTED
@@ -21,23 +23,6 @@ import { ranOnFree, sourcesOf } from "./web.js";
  * was recorded", not "it won" (morning question). No other point is marked DIDNT_HOLD tonight.
  * Scores (base_score, final_strength) are never read here: no number from the engine reaches a V4 page.
  */
-
-type AnswerNode = Answer["nodes"][number];
-
-type Placed = Readonly<{ trust: TrustWord | null; basis: TrustBasis | null }>;
-
-function placeReviewed(node: AnswerNode, free: boolean): Placed {
-  const review = node.review;
-  if (review === null) return { trust: null, basis: null };
-  if (review.outcome === "dispute") return { trust: "STILL_ARGUED", basis: "DISPUTED" };
-  if (review.outcome === "cannot-assess") return { trust: "STILL_ARGUED", basis: "COULD_NOT_CHECK" };
-  if (node.staleness_state !== "FRESH") return { trust: "SURE_FOR_CASE", basis: "AGREED_BUT_DATED" };
-  if (node.way_of_knowing === "REASONING") return { trust: "SURE_FOR_CASE", basis: "ARGUED_AND_AGREED" };
-  if (node.way_of_knowing === "LOOKED_UP" && node.looked_up_checked === true && !free) {
-    return { trust: "SURE", basis: "WEB_CHECKED_AND_AGREED" };
-  }
-  return { trust: "SURE_FOR_CASE", basis: "LOOKED_UP_AND_AGREED" };
-}
 
 /** Decision B: the position nodes of a ready story's FELL paths (none without a ready story body). */
 export function fellPositionsOf(story: AnswerStory | null): ReadonlySet<string> {
@@ -62,7 +47,7 @@ export function pointsOf(answer: Answer, story: AnswerStory | null = null, fellP
   for (const node of answer.nodes) {
     if (points.has(node.node_id)) continue;
     const reasons = node.review === null ? [] : [...node.review.reasons];
-    const placed: Placed = fell.has(node.node_id) ? { trust: "DIDNT_HOLD", basis: "FELL" } : placeReviewed(node, free);
+    const placed = trustOfPoint(node, { free, fell: fell.has(node.node_id) });
     points.set(node.node_id, {
       id: node.node_id,
       text: node.claim,
@@ -82,7 +67,7 @@ export function emptyCounts(): TrustCounts {
 }
 
 /** Counts per trust word; points no second AI has checked are counted apart (decision 6). */
-export function countTrust(points: readonly V4Point[]): Readonly<{ counts: TrustCounts; unchecked: number }> {
+export function countTrust(points: readonly Pick<V4Point, "trust">[]): Readonly<{ counts: TrustCounts; unchecked: number }> {
   const counts: Record<TrustWord, number> = { ...emptyCounts() };
   let unchecked = 0;
   for (const point of points) {
@@ -90,6 +75,24 @@ export function countTrust(points: readonly V4Point[]): Readonly<{ counts: Trust
     else counts[point.trust] += 1;
   }
   return { counts, unchecked };
+}
+
+/**
+ * W4-8 (owner Q-D3): a rewritten path's counts, from the words the server worked out for it (its own points plus the dig's
+ * points its newest finished rewrite rests on); null when that rewrite carries none (served before W4-8, or its points
+ * were not read), and for a path no dig rewrote: the page then counts the path's own points, as before.
+ */
+export function servedRewriteCounts(history: readonly PathRewrite[] | undefined): Readonly<{ counts: TrustCounts; unchecked: number }> | null {
+  const newest = (history ?? []).filter((rewrite) => rewrite.state === "READY" || rewrite.state === "READY_WITH_RESERVATION").at(-1);
+  if (newest === undefined || !("trust" in newest) || newest.trust === undefined) return null;
+  return countTrust(newest.trust.map((point) => ({ trust: point.word })));
+}
+
+/** W4-8: the word the server gave each point of a path's newest finished rewrite, by node id (none when it gave none). */
+export function servedRewriteWords(history: readonly PathRewrite[] | undefined): ReadonlyMap<string, TrustWord | null> {
+  const newest = (history ?? []).filter((rewrite) => rewrite.state === "READY" || rewrite.state === "READY_WITH_RESERVATION").at(-1);
+  if (newest === undefined || !("trust" in newest) || newest.trust === undefined) return new Map();
+  return new Map(newest.trust.map((point) => [point.node_id, point.word] as const));
 }
 
 export function addCounts(a: TrustCounts, b: TrustCounts): TrustCounts {

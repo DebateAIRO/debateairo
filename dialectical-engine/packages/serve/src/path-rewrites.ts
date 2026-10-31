@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import {
   AnswerDigSchema, AnswerPathRewritesSchema, PathRewriteSchema, PathRewritesSchema, StoryBodySchema, WEB_CONTRACT_LIMITS,
-  type AnswerDig, type AnswerPathRewrites, type PathRewrite, type PathRewrites
+  trustOfPoint, type AnswerDig, type AnswerPathRewrites, type PathRewrite, type PathRewrites, type RewritePointTrust,
+  type TrustRulePoint
 } from "@debateai/contract";
 import type { DigPickAuthor, DigPickKind, PathRewriteEntry } from "@debateai/db";
 
@@ -21,8 +22,15 @@ import type { DigPickAuthor, DigPickKind, PathRewriteEntry } from "@debateai/db"
  * naming another fate is not served); `changed` compares the new text with the one the rewrite was written on (the newest
  * checked rewrite before it, else the debate's story line); the verdict "Your point of view" is shown only when a pick
  * carries the person's own words (Q-D4), its outcome and scope as 0134's codes (the page turns them into the approved
- * lines of draft 5.3), its own words quoted from the picks; no trust word is served: each point keeps its own review and
- * the server's checked flag (W3-3), so the page's words follow the same rules after a rewrite, "Sure" included.
+ * lines of draft 5.3), its own words quoted from the picks.
+ *
+ * W4-8 (owner Q-D3): the rewritten path's trust words are code's too. A finished rewrite serves the points "What the dig
+ * changed" rests on (`rests_on`, kept in its sealed text since W4-8; a text sealed before rests on none) and `trust`: every
+ * point the path now counts with its word, by the contract's one rule (`trustOfPoint`, the page's too): the path's own
+ * points (the story path's) first, each weighed with the checks of the debate the path is on, then the dig's points the
+ * rewrite rests on, each weighed with the dig's own checks, so "Sure" needs a checked looked-up extract of the very debate
+ * that holds the point. Only the path's own position takes the rewrite's FELL. Words only; when the path's points or a
+ * debate's points cannot be read, no `trust` is served and the page counts the path's own points as before.
  *
  * Rules this file keeps:
  *  - never a number of the engine: no lineage, round count, artifact, failure code or score reaches the answer;
@@ -40,6 +48,8 @@ export type StoredPathRewriteText = Readonly<{
   what_changed: readonly string[];
   view_reason: string | null;
   dig_paths: readonly Readonly<{ position_ref: string; line: string; fate: string }>[];
+  /** W4-8: the points the rewrite rests on, by id; a text sealed before W4-8 has none (read as none). */
+  rests_on: readonly string[];
 }>;
 
 /* ----------------------------------------------------------------- the input */
@@ -57,6 +67,22 @@ export type StoredDigPick = Readonly<{ kind: DigPickKind; place: string; author:
 
 /** The newest report written for the investigation (0133's closings): its version and when its report was stored. */
 export type WrittenReport = Readonly<{ version: number; writtenAt: string }>;
+
+/** W4-8: one debate's points as the trust rule reads them, by node id in lower case, and whether it ran on Free. */
+export type DebatePoints = Readonly<{ points: ReadonlyMap<string, TrustRulePoint>; free: boolean }>;
+
+/** W4-8: a story path's own points: its position (the node a FELL fate is about) and every node the story names on it. */
+export type StoryPathPoints = Readonly<{ positionRef: string; nodeRefs: readonly string[] }>;
+
+/**
+ * W4-8: what one path's trust words are counted from. `own`: the path's points (null: the path is no story path read here);
+ * `parent`: the points of the debate the path is on; `digOf`: a dig's own points (null: not read). Absent or null: no word.
+ */
+export type PathTrustSources = Readonly<{
+  own: StoryPathPoints | null;
+  parent: DebatePoints | null;
+  digOf: (digRunId: string) => DebatePoints | null;
+}>;
 
 /* ----------------------------------------------------------------- reading the stored values */
 
@@ -79,6 +105,8 @@ const sameWords = (left: string, right: string): boolean =>
 
 function storedText(value: unknown): StoredPathRewriteText | null {
   if (!isRecord(value) || !isRecord(value.text) || !Array.isArray(value.what_changed) || !Array.isArray(value.dig_paths)) return null;
+  const restsOn = storedRestsOn(value);
+  if (restsOn === null) return null;
   const { line, summary, fate } = value.text;
   if (typeof line !== "string" || typeof summary !== "string" || typeof fate !== "string") return null;
   if (!value.what_changed.every((sentence): sentence is string => typeof sentence === "string")) return null;
@@ -88,7 +116,19 @@ function storedText(value: unknown): StoredPathRewriteText | null {
     ? [{ position_ref: path.position_ref, line: path.line, fate: path.fate }] : [null]);
   if (digPaths.some((path) => path === null)) return null;
   return { text: { line, summary, fate }, what_changed: value.what_changed, view_reason: value.view_reason,
-    dig_paths: digPaths as StoredPathRewriteText["dig_paths"] };
+    dig_paths: digPaths as StoredPathRewriteText["dig_paths"], rests_on: restsOn };
+}
+
+/** W4-8: the ids a sealed text rests on: none when it was sealed before W4-8; null when the value is no list of ids. */
+function storedRestsOn(value: Readonly<Record<string, unknown>>): readonly string[] | null {
+  if (!("rests_on" in value) || value.rests_on === undefined) return [];
+  const restsOn = value.rests_on;
+  return Array.isArray(restsOn) && restsOn.every((id): id is string => typeof id === "string") ? restsOn : null;
+}
+
+/** W4-8: the points an opened rewrite text rests on (none when it makes no rewrite): which digs' points are to be read. */
+export function restsOnOf(opened: unknown): readonly string[] {
+  return storedText(opened)?.rests_on ?? [];
 }
 
 /**
@@ -122,6 +162,63 @@ export function storyPathLinesOf(body: unknown): ReadonlyMap<string, string> {
     lines.set(times === 1 ? path.position_ref : `${path.position_ref}#${String(times)}`, path.line);
   }
   return lines;
+}
+
+/**
+ * W4-8: each path of a story by the map's id (as `storyPathLinesOf` names them) to its own points: its position and the
+ * nodes the story names on it, in the story's order. None when the stored body is not a story's.
+ */
+export function storyPathPointsOf(body: unknown): ReadonlyMap<string, StoryPathPoints> {
+  const parsed = StoryBodySchema.nullable().safeParse(body);
+  const points = new Map<string, StoryPathPoints>();
+  if (!parsed.success || parsed.data === null) return points;
+  const seen = new Map<string, number>();
+  for (const path of parsed.data.short.paths) {
+    const times = (seen.get(path.position_ref) ?? 0) + 1;
+    seen.set(path.position_ref, times);
+    points.set(times === 1 ? path.position_ref : `${path.position_ref}#${String(times)}`,
+      { positionRef: path.position_ref, nodeRefs: [...path.node_refs] });
+  }
+  return points;
+}
+
+/* ----------------------------------------------------------------- a rewritten path's trust words (W4-8, Q-D3) */
+
+/**
+ * The points a rewritten path counts, each once with its word: the path's own points as the story names them (the
+ * debate's checks; the position takes the rewrite's FELL), then the dig's points the rewrite rests on (the dig's checks;
+ * a point the rewrite names that is none of the dig's is the path's own, already counted, or unknown, and is left out).
+ * Null when the path's points, the path's debate, or the dig's points it rests on cannot be read: no word is served then.
+ */
+export function rewriteTrustOf(input: Readonly<{
+  fate: string;
+  digRunId: string;
+  restsOn: readonly string[];
+  sources: PathTrustSources;
+}>): RewritePointTrust[] | null {
+  const { own, parent } = input.sources;
+  if (own === null || parent === null) return null;
+  const counted = new Set<string>();
+  const trust: RewritePointTrust[] = [];
+  const count = (nodeId: string, point: TrustRulePoint, free: boolean, fell: boolean) => {
+    counted.add(lower(nodeId));
+    trust.push({ node_id: nodeId, word: trustOfPoint(point, { free, fell }).trust });
+  };
+  for (const nodeId of own.nodeRefs) {
+    const point = parent.points.get(lower(nodeId));
+    if (point === undefined || counted.has(lower(nodeId))) continue;
+    count(nodeId, point, parent.free, input.fate === "FELL" && lower(nodeId) === lower(own.positionRef));
+  }
+  const digNamed = input.restsOn.filter((nodeId) => !counted.has(lower(nodeId)) && !parent.points.has(lower(nodeId)));
+  if (digNamed.length === 0) return trust;
+  const dig = input.sources.digOf(input.digRunId);
+  if (dig === null) return null;
+  for (const nodeId of digNamed) {
+    const point = dig.points.get(lower(nodeId));
+    if (point === undefined || counted.has(lower(nodeId))) continue;
+    count(nodeId, point, dig.free, false);
+  }
+  return trust;
 }
 
 /* ----------------------------------------------------------------- the investigation's tree */
@@ -197,8 +294,11 @@ export function latestWrittenReportOf(closings: readonly Readonly<{ report_versi
 
 type BaseText = Readonly<{ line: string; summary: string | null }>;
 
-/** One turn as the contract's rewrite, or null when its stored value makes none. `base` undefined: the earlier text is unknown. */
-function rewriteOf(turn: RewriteTurn, level: number | null, base: BaseText | undefined): PathRewrite | null {
+/**
+ * One turn as the contract's rewrite, or null when its stored value makes none. `base` undefined: the earlier text is
+ * unknown; `trustSources` undefined: no trust word is worked out (W4-8).
+ */
+function rewriteOf(turn: RewriteTurn, level: number | null, base: BaseText | undefined, trustSources?: PathTrustSources): PathRewrite | null {
   const entry = turn.entry;
   const digFinishedAt = isoOf(entry.taken_at);
   const rewriteId = entry.rewrite_id ?? pathRewriteIdOfDig(entry.run_id);
@@ -218,11 +318,15 @@ function rewriteOf(turn: RewriteTurn, level: number | null, base: BaseText | und
     const ownWords = turn.ownWords ?? [];
     const view = entry.verdict_outcome !== null && entry.verdict_scope !== null && stored.view_reason !== null && ownWords.length > 0
       ? { outcome: entry.verdict_outcome, scope: entry.verdict_scope, reason: stored.view_reason, own_words: [...ownWords] } : null;
+    const trust = trustSources === undefined ? null
+      : rewriteTrustOf({ fate: entry.fate_after, digRunId: entry.run_id, restsOn: stored.rests_on, sources: trustSources });
     shaped = {
       ...common, state: entry.state, rewritten_at: isoOf(entry.recorded_at), changed,
       text: { line: stored.text.line, summary: stored.text.summary, fate: entry.fate_after },
       what_changed: [...stored.what_changed], fate_before: entry.fate_before, view,
-      dig_paths: stored.dig_paths.map((path) => ({ position_ref: path.position_ref, line: path.line, fate: path.fate }))
+      dig_paths: stored.dig_paths.map((path) => ({ position_ref: path.position_ref, line: path.line, fate: path.fate })),
+      rests_on: [...new Set(stored.rests_on)],
+      ...(trust === null ? {} : { trust })
     };
   }
   const parsed = PathRewriteSchema.safeParse(shaped);
@@ -232,12 +336,13 @@ function rewriteOf(turn: RewriteTurn, level: number | null, base: BaseText | und
 /**
  * One path's rewrites in the order their digs finished (0134's turns, by path_seq), each its turn's (null where the
  * stored value makes no rewrite). `storyLine` is the debate's story line for the path: the text the first rewrite was
- * written on.
+ * written on. `trust` (W4-8): what each finished rewrite's trust words are counted from; absent, none are served.
  */
 export function pathHistoryOf(input: Readonly<{
   turns: readonly RewriteTurn[];
   levelOf: (digRunId: string) => number | null;
   storyLine: string | null;
+  trust?: PathTrustSources;
 }>): readonly Readonly<{ turn: RewriteTurn; rewrite: PathRewrite | null }>[] {
   const texts = new Map<string, BaseText>();
   return [...input.turns].sort((left, right) => left.entry.path_seq - right.entry.path_seq).map((turn) => {
@@ -245,7 +350,7 @@ export function pathHistoryOf(input: Readonly<{
     const base: BaseText | undefined = entry.based_on_rewrite_id === null
       ? (input.storyLine === null ? undefined : { line: input.storyLine, summary: null })
       : texts.get(lower(entry.based_on_rewrite_id));
-    const rewrite = rewriteOf(turn, input.levelOf(entry.run_id), base);
+    const rewrite = rewriteOf(turn, input.levelOf(entry.run_id), base, input.trust);
     if (rewrite !== null && isFinishedState(rewrite.state) && "text" in rewrite) {
       texts.set(lower(rewrite.rewrite_id), { line: rewrite.text.line, summary: rewrite.text.summary });
     }
@@ -260,7 +365,8 @@ export function pathHistoryOf(input: Readonly<{
  * `turns` are 0134's turns on the debate's paths in its order; `storyLines` the debate's story lines by path id;
  * `changedBelow` the paths a dig further down changed; `report` the investigation's newest written report.
  * "Paths changed since the answer was written": every path with a finished rewrite (a dig always follows the answer it
- * digs), or, once a report is written, every path with a finished rewrite stored after it.
+ * digs), or, once a report is written, every path with a finished rewrite stored after it. `trustOf` (W4-8): what a
+ * path's trust words are counted from, by its id; absent, none are served.
  */
 export function servePathRewrites(input: Readonly<{
   turns: readonly RewriteTurn[];
@@ -268,13 +374,15 @@ export function servePathRewrites(input: Readonly<{
   storyLines: ReadonlyMap<string, string>;
   changedBelow: ReadonlySet<string>;
   report: WrittenReport | null;
+  trustOf?: (positionRef: string) => PathTrustSources;
 }>): AnswerPathRewrites | null {
   const byPath = new Map<string, RewriteTurn[]>();
   for (const turn of input.turns) byPath.set(turn.entry.position_ref, [...(byPath.get(turn.entry.position_ref) ?? []), turn]);
   const paths: PathRewrites[] = [];
   for (const [positionRef, turns] of byPath) {
     if (paths.length >= WEB_CONTRACT_LIMITS.pathsMax) break;
-    const history = pathHistoryOf({ turns, levelOf: input.levelOf, storyLine: input.storyLines.get(positionRef) ?? null });
+    const history = pathHistoryOf({ turns, levelOf: input.levelOf, storyLine: input.storyLines.get(positionRef) ?? null,
+      ...(input.trustOf === undefined ? {} : { trust: input.trustOf(positionRef) }) });
     // One rewrite that makes no shape leaves the whole path out: its history would not follow on.
     if (history.some((step) => step.rewrite === null)) continue;
     const rewrites = history.map((step) => step.rewrite!);
