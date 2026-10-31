@@ -1,6 +1,5 @@
 import { localeDirection } from "../i18n/questionLocale.js";
 import { reportFaces, reportScript, type ReportFaces } from "./reportFonts.js";
-import type { ReportModel } from "./reportModel.js";
 
 /**
  * How a report is set in its language: its faces, its direction, the side its
@@ -51,7 +50,7 @@ export function reportLayout(locale: string, printed: string): ReportLayout {
 }
 
 /** Every string the report prints, joined: what its faces must cover. */
-export function reportPrintedText(model: ReportModel): string {
+export function reportPrintedText(model: object): string {
   const strings: string[] = [];
   const visit = (value: unknown): void => {
     if (typeof value === "string") strings.push(value);

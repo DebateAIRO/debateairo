@@ -7,7 +7,7 @@ import {
 import { TypedDomainError } from "@debateai/kernel";
 import { postgresInvestigationCloseSources } from "./investigation-close-sources.js";
 import type { MainAnswerContent, TreeUpdatePorts } from "./path-climb.js";
-import { postgresPathRewriteSources, purposeLinesOf, storedDigPathsOf } from "./path-rewrite-sources.js";
+import { postgresPathRewriteSources, storedDigPathsOf } from "./path-rewrite-sources.js";
 import { readReplayBook } from "./run-replay.js";
 
 /**
@@ -96,13 +96,7 @@ export function postgresTreeUpdatePorts(pool: Pool): TreeUpdatePorts {
       return isRecord(opened) && Array.isArray(opened.segments) && opened.segments.every((segment) => typeof segment === "string")
         ? opened.segments as readonly string[] : null;
     },
-    answerInputOf: async (rootRunId, earlier) => {
-      const read = await closing.inputOf(Object.freeze({ investigationId: rootRunId, reportVersion: 1, rootRunId, closedAt: new Date(0).toISOString() }), null);
-      if (read === null) return null;
-      const lines = await purposeLinesOf(pool, rootRunId);
-      return Object.freeze({ ...read, input: Object.freeze({ ...read.input, earlier,
-        question: Object.freeze({ ...read.input.question, place: lines?.place ?? null, time: lines?.time ?? null, purpose: lines?.purpose ?? null }) }) });
-    },
+    answerInputOf: closing.investigationInputOf,
     payerOf: async (digRunId: string) => {
       const asker = (await runs.readStoredAsk(digRunId))?.askerId;
       return asker?.startsWith("owner:") === true ? asker.slice("owner:".length) : null;

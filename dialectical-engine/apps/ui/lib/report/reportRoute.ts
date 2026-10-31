@@ -2,10 +2,12 @@ import { ContractHttpError, type Answer, type AnswerDisclosure, type AnswerStory
 import publicEnglish from "../../messages/en/public.json" with { type: "json" };
 import { DEFAULT_LOCALE, isLocale, LOCALE_COOKIE, type LocaleCode } from "../i18n/locales.js";
 import { questionLocale } from "../i18n/questionLocale.js";
+import { ownWords } from "../v4/askText.js";
 import { loadNamespace } from "../i18n/server.js";
 import { t, type MessageCatalog } from "../i18n/translate.js";
 import { USER_TOKEN_COOKIE, sessionCookieValue } from "../serverApi.js";
-import { renderReportPdf } from "./renderReport.js";
+import { renderInvestigationReportPdf, renderReportPdf } from "./renderReport.js";
+import type { FinishedInvestigationReport } from "./investigationReportModel.js";
 import { REPORT_RENDER_LIMITS, ReportRenderGate } from "./reportRenderGate.js";
 import {
   loadReportCatalogs,
@@ -174,7 +176,7 @@ export function reportContentDisposition(question: string, now: Date): string {
 }
 
 /** The same resolution as lib/serverApi.ts getDebateServer: an answer id first, then a run id. */
-async function readAnswerByIdOrRun(client: ReportReader, id: string): Promise<Answer> {
+async function readAnswerByIdOrRun(client: Pick<ReportReader, "readAnswer" | "readRunAnswer">, id: string): Promise<Answer> {
   try {
     return await client.readAnswer(id);
   } catch (failure) {
@@ -384,4 +386,102 @@ export async function handleReportHeadRequest(input: ReportRequestInput): Promis
   const prepared = await prepareReport(input, false);
   if (prepared.kind === "refused") return new Response(null, { status: prepared.status, headers: textHeaders() });
   return new Response(null, { status: 200, headers: pdfHeaders(prepared.answer.question_line, input.now) });
+}
+
+/* ------------------------------------------------------------------- the final report's PDF (plan 2026-10-31 decision 17) */
+
+export type InvestigationReportReader = Pick<ContractClient, "readAnswer" | "readRunAnswer" | "readRun" | "readInvestigation">;
+
+export type InvestigationReportRenderer = (input: Readonly<{
+  question: string;
+  version: FinishedInvestigationReport;
+  catalogs: ReportCatalogs;
+}>) => Promise<Buffer>;
+
+export type InvestigationReportRequestInput = Readonly<{
+  id: string;
+  sessionCookie: string | null;
+  interfaceLocale: LocaleCode;
+  client: () => InvestigationReportReader;
+  now: Date;
+  load?: ReportCatalogLoader;
+  render?: InvestigationReportRenderer;
+  supported?: (locale: string) => boolean;
+  gate?: ReportRenderGate;
+  signal?: AbortSignal;
+}>;
+
+interface ReadyInvestigationReport {
+  readonly kind: "ready";
+  readonly session: string;
+  readonly question: string;
+  readonly version: FinishedInvestigationReport;
+  readonly questionTag: string | null;
+  readonly locale: LocaleCode;
+}
+
+/**
+ * What GET and HEAD share, read with the owner's session: the debate's investigation and its current version (only a finished
+ * one has a PDF; earlier versions stay on the page), the first debate's own question and its language. A language the fonts
+ * cannot print yet is refused with the plain line, as the debate's own report (the page then offers its Print).
+ */
+async function prepareInvestigationReport(input: InvestigationReportRequestInput): Promise<Refusal | ReadyInvestigationReport> {
+  const session = input.sessionCookie;
+  if (session === null) return refuse(401, input.interfaceLocale, signInLine);
+  let question: string;
+  let questionTag: string | null;
+  let version: FinishedInvestigationReport | undefined;
+  try {
+    const client = input.client();
+    const answer = await readAnswerByIdOrRun(client, input.id);
+    const read = await client.readInvestigation(answer.run_ref);
+    const rootAnswer = read.root_run_id.toLowerCase() === answer.run_ref.toLowerCase() ? answer : await client.readRunAnswer(read.root_run_id);
+    question = ownWords(rootAnswer.question_line);
+    questionTag = (await client.readRun(read.root_run_id)).argument_language?.tag ?? null;
+    version = read.versions.find((entry): entry is FinishedInvestigationReport => entry.report_version === read.current
+      && (entry.state === "READY" || entry.state === "READY_WITH_RESERVATION"));
+  } catch (failure) {
+    return upstreamRefusal(failure, input.interfaceLocale);
+  }
+  const locale = questionLocale(questionTag, input.interfaceLocale);
+  if (version === undefined) return refuse(404, locale, notAvailableLine);
+  if (!(input.supported ?? reportSupportedForLocale)(locale)) return refuse(404, locale, unsupportedLine);
+  return { kind: "ready", session, question, version, questionTag, locale };
+}
+
+/** GET: made in memory in the question's language, through the same gate as the debate's own report; nothing is stored. */
+export async function handleInvestigationReportRequest(input: InvestigationReportRequestInput): Promise<Response> {
+  const load = input.load ?? loadNamespace;
+  const prepared = await prepareInvestigationReport(input);
+  if (prepared.kind === "refused") {
+    return textResponse(prepared.status, prepared.line(await refusalCatalog(load, prepared.locale)));
+  }
+  let catalogs: ReportCatalogs;
+  try {
+    catalogs = await loadReportCatalogs({ questionTag: prepared.questionTag, interfaceLocale: input.interfaceLocale, load });
+  } catch {
+    console.error("[INVESTIGATION_REPORT_CATALOGS_FAILED]");
+    return textResponse(500, tryAgainLine(await refusalCatalog(load, prepared.locale)));
+  }
+  const gate = input.gate ?? processRenderGate;
+  const admission = await gate.admit(prepared.session, input.signal);
+  if (admission.kind !== "admitted") return busyResponse(admission.kind === "busy" ? 429 : 503, gate, catalogs);
+  let pdf: Buffer;
+  try {
+    if (input.signal?.aborted === true) return busyResponse(503, gate, catalogs);
+    pdf = await (input.render ?? renderInvestigationReportPdf)({ question: prepared.question, version: prepared.version, catalogs });
+  } catch {
+    console.error("[INVESTIGATION_REPORT_RENDER_FAILED]");
+    return textResponse(500, tryAgainLine(catalogs.publicCatalog));
+  } finally {
+    admission.release();
+  }
+  return new Response(new Uint8Array(pdf.buffer as ArrayBuffer, pdf.byteOffset, pdf.byteLength), { status: 200, headers: pdfHeaders(prepared.question, input.now) });
+}
+
+/** HEAD: GET's status and headers, the PDF never made. */
+export async function handleInvestigationReportHeadRequest(input: InvestigationReportRequestInput): Promise<Response> {
+  const prepared = await prepareInvestigationReport(input);
+  if (prepared.kind === "refused") return new Response(null, { status: prepared.status, headers: textHeaders() });
+  return new Response(null, { status: 200, headers: pdfHeaders(prepared.question, input.now) });
 }

@@ -1,7 +1,7 @@
 import { createHash, randomBytes as cryptoRandomBytes } from "node:crypto";
 import {
-  InvestigationReportAnswerSchema, InvestigationReportStorySchema, type InvestigationReportAnswer, type InvestigationReportSource,
-  type InvestigationReportStory, type MakerLineage
+  InvestigationReportAnswerSchema, InvestigationReportPathSchema, InvestigationReportSourceSchema, InvestigationReportStorySchema, type InvestigationReportAnswer, type InvestigationReportPath,
+  type InvestigationReportSource, type InvestigationReportStory, type MakerLineage
 } from "@debateai/contract";
 import type {
   InvestigationReportOutcome, InvestigationReportRecord, InvestigationReportsRead, PostgresInvestigationReportRunnerRepository,
@@ -39,7 +39,8 @@ import { replayingGateway, type ReplayBook } from "./run-replay.js";
  *  4. it stores ONE row (0136's identity.record_investigation_report_version), its text sealed under the ROOT run's key,
  *     with the newest rewrite it covered (so the map's "paths changed since your report" counts only later rewrites), the
  *     dossier's fingerprint and ladder step, the rounds, lineages and cost. The same call marks the closing written
- *     (0133's report_ref). No answer after every round: a FAILED row (no text); the person may write it again.
+ *     (0133's report_ref). No answer after every round: a FAILED row (no text); the person may write it again;
+ *  5. `onReportSettled` runs: decision 7's wipe hooks here (RETENTION), never inside the closing.
  *
  * MONEY (the money rule, point 6): the reserve always kept, 20 cents inside a paid month and 5 on top of Free's 20, pays
  * the closing; it is never walled (no day, week or month stops it). Every call names the investigation's ROOT run on the
@@ -81,7 +82,26 @@ export type InvestigationReportContent = Readonly<{
   answer: InvestigationReportAnswer;
   story: InvestigationReportStory | null;
   sources: readonly InvestigationReportSource[];
+  /** The tree of paths as it stood (decision 17, the PDF): the version stays as written whatever is erased later. */
+  paths: readonly InvestigationReportPath[];
   shortened: boolean;
+}>;
+
+/**
+ * Who pays for a closing, and on which plan's rules (Free's slim report, its reserve). On a private debate it is the debate's
+ * owner (`ownerRef` null, `free` from the root's ask). Decision 13: on a public debate anyone with credit may write the report,
+ * so PUBLIC names the writer here (0138's identity.public_report_writer) through `payerOf`.
+ */
+export type InvestigationReportPayer = Readonly<{ ownerRef: string | null; free: boolean }>;
+
+/** A closing's report has settled: the place later steps hook on (decision 7's wipe, a public debate reopening). */
+export type InvestigationReportSettled = Readonly<{
+  investigationId: string;
+  reportVersion: number;
+  rootRunId: string;
+  reportId: string;
+  outcome: InvestigationReportOutcome | "FAILED";
+  payer: InvestigationReportPayer | null;
 }>;
 
 export type InvestigationCloseSettings = Readonly<{
@@ -101,6 +121,14 @@ export type InvestigationCloseSettings = Readonly<{
   climbsOpen?: (rootRunId: string) => Promise<number>;
   /** How long a closing waits for running digs before it goes on with what is settled (default 6 hours). */
   giveUpWaitingMs?: number;
+  /** Who pays and on which plan's rules; absent: the debate's owner, on the root's plan. */
+  payerOf?: (closing: UnreportedClosing, read: InvestigationCloseInput) => Promise<InvestigationReportPayer>;
+  /**
+   * Called once a closing's row stands (RECORDED, or ALREADY on a run again), whatever its outcome: a FAILED one too, so the
+   * hook decides. It is decision 7's place: RETENTION's wipe goes here, never inside the closing. A failure is logged and
+   * changes nothing about the report.
+   */
+  onReportSettled?: (settled: InvestigationReportSettled) => Promise<void> | void;
   /** The closing's one random source (F5); absent: 32 fresh random bytes per closing. Tests pass a fixed one. */
   closingSeed?: () => Buffer;
   contractHash?: string;
@@ -180,11 +208,20 @@ export async function closeInvestigation(settings: InvestigationCloseSettings, c
       return "WAITING";
     }
     if (pending.length > 0) log("INVESTIGATION_REPORT_WAIT_GIVEN_UP", { investigationId: closing.investigationId, waiting: pending.length });
-    const record = await composeRecord(settings, closing, log);
+    const composed = await composeRecord(settings, closing, log);
+    const { record, payer } = composed;
     const stored = await settings.reports.record(record);
     log("INVESTIGATION_REPORT_STORED", { investigationId: closing.investigationId, reportVersion: closing.reportVersion,
       outcome: record.outcome, storyOutcome: record.storyOutcome, failureCode: record.failureCode, ladderStep: record.ladderStep,
       spentMicros: record.spentMicros, stored });
+    if (stored === "RECORDED" || stored === "ALREADY") {
+      try {
+        await settings.onReportSettled?.(Object.freeze({ investigationId: closing.investigationId, reportVersion: closing.reportVersion,
+          rootRunId: closing.rootRunId, reportId: record.reportId, outcome: record.outcome, payer }));
+      } catch (error) {
+        log("INVESTIGATION_REPORT_SETTLE_HOOK_FAILED", { investigationId: closing.investigationId, reportVersion: closing.reportVersion, code: codeOf(error) });
+      }
+    }
     return stored;
   } catch (error) {
     log("INVESTIGATION_REPORT_NOT_RECORDED", { investigationId: closing.investigationId, reportVersion: closing.reportVersion, code: codeOf(error) });
@@ -224,7 +261,9 @@ async function spentOf(settings: InvestigationCloseSettings, rootRunId: string, 
   }
 }
 
-async function composeRecord(settings: InvestigationCloseSettings, closing: UnreportedClosing, log: Log): Promise<InvestigationReportRecord> {
+type Composed = Readonly<{ record: InvestigationReportRecord; payer: InvestigationReportPayer | null }>;
+
+async function composeRecord(settings: InvestigationCloseSettings, closing: UnreportedClosing, log: Log): Promise<Composed> {
   const reportId = investigationReportIdOf(closing.investigationId, closing.reportVersion);
   const root = closing.rootRunId;
   const nothing: Built = Object.freeze({ dossier: null, failureCode: null });
@@ -235,20 +274,22 @@ async function composeRecord(settings: InvestigationCloseSettings, closing: Unre
   } catch (error) {
     log("INVESTIGATION_REPORT_INPUT_UNREAD", { runId: root, code: codeOf(error) });
   }
-  if (read === null) return failedRecord(closing, reportId, "INVESTIGATION_REPORT_INPUT_UNREAD", nothing, 0, null);
+  if (read === null) return { record: failedRecord(closing, reportId, "INVESTIGATION_REPORT_INPUT_UNREAD", nothing, 0, null), payer: null };
+  const payer: InvestigationReportPayer = settings.payerOf === undefined ? Object.freeze({ ownerRef: null, free: read.free })
+    : await settings.payerOf(closing, read);
   const built = buildInvestigationDossier(read.input);
   if (built.kind === "TOO_LARGE") {
     log("INVESTIGATION_REPORT_DOSSIER_TOO_LARGE", { runId: root, bodyBytes: built.bodyBytes });
-    return failedRecord(closing, reportId, "INVESTIGATION_REPORT_DOSSIER_TOO_LARGE", nothing, 0, null);
+    return { record: failedRecord(closing, reportId, "INVESTIGATION_REPORT_DOSSIER_TOO_LARGE", nothing, 0, null), payer };
   }
   const dossier = built;
   const done: Built = Object.freeze({ dossier, failureCode: null });
   const writer = settings.roles.resolveProvider?.(settings.writerRoleRef) ?? null;
   const checker = settings.roles.resolveProvider?.(settings.checkerRoleRef) ?? null;
-  if (writer === null || checker === null) return failedRecord(closing, reportId, "INVESTIGATION_REPORT_ROLE_UNAVAILABLE", done, 0, null);
+  if (writer === null || checker === null) return { record: failedRecord(closing, reportId, "INVESTIGATION_REPORT_ROLE_UNAVAILABLE", done, 0, null), payer };
   const subject = investigationReportSubjectOf(reportId);
   const book = settings.replayBookOf === undefined ? null : await settings.replayBookOf(root, subject).catch(() => null);
-  const reserve = (settings.reserveMicros ?? INVESTIGATION_REPORT_POLICY.reserveMicros)[read.free ? "free" : "paid"];
+  const reserve = (settings.reserveMicros ?? INVESTIGATION_REPORT_POLICY.reserveMicros)[payer.free ? "free" : "paid"];
   const send = async (maker: StoryRoleMaker, request: ProviderCallRequest): Promise<ProviderCallResult> => {
     const spent = await spentOf(settings, root, log);
     const projected = settings.admission.projectedMicros(request);
@@ -263,8 +304,8 @@ async function composeRecord(settings: InvestigationCloseSettings, closing: Unre
   const seed = settings.closingSeed?.() ?? cryptoRandomBytes(32);
   const written = await writeInvestigationReport({
     runId: root, subjectItemId: subject, contractHash: settings.contractHash ?? engineContractHash(),
-    maxRounds: read.free ? INVESTIGATION_REPORT_POLICY.freeMaxRounds : INVESTIGATION_REPORT_POLICY.maxRounds,
-    free: read.free, later: read.input.earlier !== null,
+    maxRounds: payer.free ? INVESTIGATION_REPORT_POLICY.freeMaxRounds : INVESTIGATION_REPORT_POLICY.maxRounds,
+    free: payer.free, later: read.input.earlier !== null,
     writer, checker, backupCandidates: settings.roles.backupCandidates ?? [], backupMakers: settings.roles.backupMakers,
     material: dossier.material, send, guard: investigationReportGuard, randomBytes: closingRandomBytes(seed),
     answerLanguageCheck: replyLanguageCheckFor(read.questionLine, language, REPORT_ANSWER_PROSE),
@@ -276,7 +317,7 @@ async function composeRecord(settings: InvestigationCloseSettings, closing: Unre
   const answer = written.answer.outcome;
   if (answer.outcome === "FAILED") {
     log("INVESTIGATION_REPORT_ANSWER_FAILED", { runId: root, failureCode: answer.failureCode, cause: answer.cause });
-    return failedRecord(closing, reportId, investigationReportFailureCode(answer.failureCode), done, spentMicros, written.answer);
+    return { record: failedRecord(closing, reportId, investigationReportFailureCode(answer.failureCode), done, spentMicros, written.answer), payer };
   }
   const storyOutcome = written.story?.outcome ?? null;
   const story = storyOutcome === null || storyOutcome.outcome === "FAILED" ? null : storyOf(storyOutcome.body, dossier);
@@ -288,13 +329,22 @@ async function composeRecord(settings: InvestigationCloseSettings, closing: Unre
     v: 1 as const,
     answer: InvestigationReportAnswerSchema.parse({ segments: answer.body.segments.map((segment) => segment.text) }),
     story,
-    sources: dossier.sources,
+    sources: dossier.sources.flatMap((source) => {
+      // A page's address the contract cannot serve costs the address, not the source.
+      const parsed = InvestigationReportSourceSchema.safeParse(source);
+      const plain = parsed.success ? parsed : InvestigationReportSourceSchema.safeParse({ ...source, link: null });
+      return plain.success ? [plain.data] : [];
+    }),
+    paths: dossier.paths.flatMap((path) => {
+      const parsed = InvestigationReportPathSchema.safeParse(path);
+      return parsed.success ? [parsed.data] : [];
+    }),
     shortened: dossier.ladderStep > 1
   });
   const sealed = await settings.seal(root, reportId, content);
   const servedAnswer = written.answer.rounds.find((round) => round.round === answer.servedRound)!;
   const rounds = [...written.answer.rounds, ...(written.story?.rounds ?? [])];
-  return Object.freeze({
+  return { payer, record: Object.freeze({
     investigationId: closing.investigationId, reportVersion: closing.reportVersion, reportId,
     outcome: answer.outcome as InvestigationReportOutcome,
     storyOutcome: storyOutcome === null ? "FAILED" : storyOutcome.outcome,
@@ -307,7 +357,7 @@ async function composeRecord(settings: InvestigationCloseSettings, closing: Unre
     artifactRefs: Object.freeze(rounds.flatMap((round) => [round.writer.artifactRef, ...(round.checker === null ? [] : [round.checker.artifactRef])]).slice(0, 64)),
     spentMicros: Math.min(spentMicros, 100_000_000),
     content: sealed
-  });
+  }) };
 }
 
 /** The story as it is stored: card refs turned back into the digs' runs, a paragraph naming none left out. */

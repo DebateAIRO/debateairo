@@ -20,7 +20,7 @@ import {
   PATH_REWRITE_CHECKER_MODEL, PATH_REWRITE_WRITER_MODEL, composePathRewrite
 } from "../../apps/runner/src/path-rewrite-composition.js";
 import { postgresPurposeLines } from "../../apps/api/src/purpose-lines.js";
-import { sweepTreeUpdates } from "../../apps/runner/src/path-climb.js";
+import { advanceTree, pathUpdateIdOf, sweepTreeUpdates } from "../../apps/runner/src/path-climb.js";
 import { runDigPathRewrite } from "../../apps/runner/src/path-rewrite.js";
 import { sweepPathRewrites } from "../../apps/runner/src/path-rewrite-sweep.js";
 import { provisionRlsLogins, type RlsLogins } from "../support/rls-logins.js";
@@ -126,7 +126,7 @@ function vendors(behaviour: Behaviour = {}) {
       const packet = { messages: (JSON.parse(String(init?.body)) as { messages: PromptPacket["messages"] }).messages };
       sent[name].push(packet);
       if (behaviour.failWriterWhen?.(packet) === true) return new Response("{}", { status: 400 });
-      const content = contractOf(packet).endsWith("check.v1") || isChecker(packet) ? SATISFIED
+      const content = contractOf(packet).includes("check") || isChecker(packet) ? SATISFIED
         : contractOf(packet).startsWith("report.") ? JSON.stringify({ segments: [{ text: `The whole debate now points to version ${String(++texts)}.`, rests_on: [] }] })
           : behaviour.writeSame?.(packet) === true ? sameRewrite(packet) : freshRewrite(packet);
       return new Response(JSON.stringify({ id: `${name}-${String(sent[name].length)}`, model,
@@ -292,8 +292,8 @@ describe("decision 2: a rewrite that really changed a path rewrites the path abo
     const climbedLine = (JSON.parse(fieldsOf(team.sent.glm.filter(isChecker).at(-1)!).get("rewrite")!) as { line: string }).line;
     expect((JSON.parse(fieldsOf(answers[0]!).get("first_debate")!) as { paths: Array<{ line: string; story_line?: string }> }).paths[0]).toMatchObject({ line: climbedLine, story_line: PATH_LINE });
     expect((JSON.parse(fieldsOf(teams[0]!.sent.haiku.find((packet) => contractOf(packet).startsWith("report."))!).get("first_debate")!) as { paths: Array<{ line: string }> }).paths[0]!.line).toMatch(/^Partly: draft/u);
-    expect(answers.map(contractOf)).toEqual(["report.answer.later.v1"]);
-    expect(team.sent.glm.at(-1)!.messages[0]!.content).toContain("report.answer-check.v1");
+    expect(answers.map(contractOf)).toEqual(["report.answer.later.v2"]);
+    expect(team.sent.glm.at(-1)!.messages[0]!.content).toContain("report.answer-check.v2");
     expect(JSON.parse(fieldsOf(answers[0]!).get("earlier_report") ?? "null")).not.toBeNull();
   }, 180_000);
 
@@ -310,6 +310,19 @@ describe("decision 2: a rewrite that really changed a path rewrites the path abo
     const spent = (await database.pool.query<{ spent_micros: string }>("SELECT spent_micros::text FROM identity.main_answer_update WHERE run_id = $1 ORDER BY answer_seq DESC LIMIT 1", [root])).rows[0]!;
     expect(Number(spent.spent_micros)).toBeGreaterThan(0);
   }, 180_000);
+
+  it("one place after each climb's rewrite is recorded: it is told the path and how the level came out", async () => {
+    const { root, position } = await firstDebate();
+    const { digs: [one] } = await chain(root, position, 1);
+    const team = vendors();
+    const rewrite = composed(team.members);
+    const levels: unknown[] = [];
+    const settled = await settledDig(one!, nodesOf(one!).no, 2);
+    const { afterStored: _unused, ...withoutClimb } = rewrite.settings;
+    await runDigPathRewrite(withoutClimb, snapshotOf(settled.dig, settled.workItemId, team.members));
+    expect(await advanceTree({ ...rewrite.treeSweep.tree, afterLevel: (level) => { levels.push(level); } }, settled.dig)).toBe("ANSWER_UPDATED");
+    expect(levels).toEqual([{ digRunId: settled.dig, parentRunId: root, positionRef: position, updateId: pathUpdateIdOf(settled.dig, 1), outcome: "CHANGED" }]);
+  }, 120_000);
 
   it("stops as soon as a level comes out unchanged: nothing above is written and the answer stays", async () => {
     const { root, position } = await firstDebate();
@@ -461,7 +474,7 @@ describe("decision 5: the purpose lines reach every rewrite and answer update", 
         expect([fields.get("place"), fields.get("time"), fields.get("purpose")]).toEqual(["Harbour Town", "Before next spring", "A council vote"]);
       }
     }
-    expect(teams[1]!.sent.haiku.map(contractOf)).toEqual(["path-rewrite.writer.v1", "path-rewrite.writer.v1", "report.answer.later.v1"]);
+    expect(teams[1]!.sent.haiku.map(contractOf)).toEqual(["path-rewrite.writer.v1", "path-rewrite.writer.v1", "report.answer.later.v2"]);
 
     const old = await firstDebate();
     const { teams: [oldTeam] } = await chain(old.root, old.position, 1);

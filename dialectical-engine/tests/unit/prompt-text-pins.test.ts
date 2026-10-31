@@ -93,6 +93,11 @@ import {
   PATH_REWRITE_CHECKER_INSTRUCTION,
   PATH_REWRITE_SEALED_CONTRACTS,
   INVESTIGATION_REPORT_SEALED_CONTRACTS,
+  REPORT_ANSWER_FORM,
+  REPORT_ANSWER_CHECK_FORM,
+  REPORT_OVERALL_CHECKER_INSTRUCTION,
+  REPORT_OVERALL_SEALED_CONTRACTS,
+  REPORT_OVERALL_WRITER_INSTRUCTION,
   REPORT_CHECKER_FOLLOW_UP_CRITERION,
   REPORT_R4_CHECKER_INSTRUCTION,
   REPORT_R4_WRITER_INSTRUCTION,
@@ -899,7 +904,9 @@ describe("REVIEW ITEM 4 — no prompt anywhere still carries the retired sentenc
       // W4-7: the answer checker's two sources variants; pinned in tests/unit/answer-checker-sources.test.ts.
       ...EVALUATOR_SOURCES_SEALED_CONTRACTS,
       // W5-1: the final report's five; their texts are pinned below.
-      ...INVESTIGATION_REPORT_SEALED_CONTRACTS]
+      ...INVESTIGATION_REPORT_SEALED_CONTRACTS,
+      // R22 report lane (decision 4): the overall writer and checker; their texts are pinned below.
+      ...REPORT_OVERALL_SEALED_CONTRACTS]
       .map((contract): [string, typeof contract] => [contract.contractId, contract])
   ])("%s", (_name, contract) => {
     const whole = `${contract.instruction} ${contract.answerForm}`;
@@ -1035,5 +1042,39 @@ describe("W5-1 — the final report's contracts", () => {
     expect(REPORT_R4_CHECKER_INSTRUCTION.startsWith("Check the candidate answer against the material.")).toBe(true);
     expect({ writer: sha(REPORT_R4_WRITER_INSTRUCTION), checker: sha(REPORT_R4_CHECKER_INSTRUCTION),
       story: sha(REPORT_STORY_WRITER_INSTRUCTION), storyCheck: sha(REPORT_STORY_CHECKER_INSTRUCTION) }).toEqual(REPORT_TEXT_SHA256);
+  });
+});
+
+/**
+ * R22 report lane (plan 2026-10-31 decision 4, "Overall view, every point"): the writer and the checker the owner chose in place
+ * of R4, word for word, typed out here rather than read from the code, then the same approved lines as before. The first
+ * answer of a debate keeps approved v3 on purpose; the storyteller and the story checker stay as written (pinned above).
+ */
+describe("R22 decision 4 — the overall writer and checker", () => {
+  it("pins the writer word for word", () => {
+    expect(REPORT_OVERALL_WRITER_INSTRUCTION).toBe([
+      "Write the answer the person will read, from the material below. The material holds every path of the debate and every point argued on it. Use all of it: your answer is the overall view that comes from weighing every point, not the case for one path.",
+      "Start with what the whole debate points to for what the person wants to find out, in a few sentences. Then go through what matters: give each point room according to how much it bears on the person's question and its purpose, and how well it held up. A point that decides the question gets its reasons. A point that held only partly gets what it adds and what is doubtful about it. Points that fell or barely bear on the question may be grouped in a sentence that says what was considered and why it counts for little, but leave no path out.",
+      "Name what still stands against the overall view as the price of following it, never as refuted. Never present a disputed point as settled. Call an assumption an assumption. If the view could still change, say so once, naturally, where it fits. The answer must agree with the verdict in the material and must not sound more certain than its label allows. Add no facts.",
+      "Write natural sentences in the question's language, never a translation of these instructions. Write for the person who asked: never print a score or any other number taken from the material, never name the material, its parts or its point references, and never describe how the debate or its reviewers work. A figure that the question or an argument itself states may be repeated. Write about the number of words named in the length target; it is a target, never a reason to leave out a point the answer needs."
+    ].join("\n\n"));
+  });
+
+  it("pins the checker word for word", () => {
+    expect(REPORT_OVERALL_CHECKER_INSTRUCTION).toBe("Check the candidate answer against the material. It must follow the verdict in the material and be no more certain than its label allows. It must reflect every path, and give each point room according to how much it bears on the person's question and how well it held up: a point that decides the question must be there, and a weak point must not be given the weight of a strong one. It must present no disputed point as settled, add no fact that is not in the material, and carry what still stands as a cost of following the answer, never claiming to refute it. It must speak to the person: no score or other number taken from the material, no names of the material's parts or point references, and no description of how the debate was run. Return an objection only for a problem that would mislead the person or that breaks these rules.");
+  });
+
+  it("adds the approved lines as before, under new ids; the v1s stay sealed with their own words", () => {
+    const [answer, later, check] = REPORT_OVERALL_SEALED_CONTRACTS;
+    expect(REPORT_OVERALL_SEALED_CONTRACTS.map((contract) => contract.contractId)).toEqual(["report.answer.v2", "report.answer.later.v2", "report.answer-check.v2"]);
+    expect(answer!.instruction).toBe([REPORT_OVERALL_WRITER_INSTRUCTION, REPORT_WRITER_INVESTIGATION_LINES, REPORT_WRITER_REWRITTEN_PATHS_SENTENCE].join("\n\n"));
+    expect(later!.instruction).toBe([REPORT_OVERALL_WRITER_INSTRUCTION, REPORT_WRITER_INVESTIGATION_LINES, REPORT_WRITER_REWRITTEN_PATHS_SENTENCE,
+      REPORT_WRITER_LATER_VERSION_LINE].join("\n\n"));
+    expect(check!.instruction).toBe([REPORT_OVERALL_CHECKER_INSTRUCTION, REPORT_CHECKER_FOLLOW_UP_CRITERION].join("\n\n"));
+    expect(answer!.answerForm).toBe(REPORT_ANSWER_FORM);
+    expect(later!.answerForm).toBe(REPORT_ANSWER_FORM);
+    expect(check!.answerForm).toBe(REPORT_ANSWER_CHECK_FORM);
+    expect(INVESTIGATION_REPORT_SEALED_CONTRACTS[0]!.contractId).toBe("report.answer.v1");
+    expect(INVESTIGATION_REPORT_SEALED_CONTRACTS[0]!.instruction.startsWith(REPORT_R4_WRITER_INSTRUCTION)).toBe(true);
   });
 });

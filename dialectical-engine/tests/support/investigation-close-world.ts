@@ -36,7 +36,7 @@ export function firstPaths(pointsEach = 3): readonly DossierPath[] {
     points: Object.freeze(Array.from({ length: pointsEach }, (_, at) => point(`${prefix}${String(at).padStart(4, "0")}-0000-4000-8000-000000000000`,
       `Point ${String(at + 1)} of the path "${line}": ridership at rush hour fills the one pier today.`, at === 1))),
     sources: Object.freeze([Object.freeze({ pointId: `${prefix}0000-0000-4000-8000-000000000000`, site: "city.example.org",
-      title: "Ferry ridership 2025", quote: "Rush-hour ridership on the harbour line grew by a quarter between 2023 and 2025, while winter "
+      link: "https://city.example.org/ferry-ridership", title: "Ferry ridership 2025", quote: "Rush-hour ridership on the harbour line grew by a quarter between 2023 and 2025, while winter "
         + "ridership stayed flat and the morning boats still leave people on the quay.", line: "The city's own ridership counts." })])
   });
   return Object.freeze([make(PATH_YES, "Yes: a second pier would relieve rush hour.", "bbbb"), make(PATH_NO, "No: the money is better spent on buses.", "cccc")]);

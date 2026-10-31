@@ -44,7 +44,7 @@ import {
 } from "@debateai/serve";
 import { STORYTELLER_V4_CONTRACT_ID, storyContractForSources } from "@debateai/story";
 import { ENGINE_SEALED_CONTRACT_IDS, engineSealedContracts } from "../../apps/runner/src/engine-contracts.js";
-import { INVESTIGATION_REPORT_SEALED_CONTRACTS, PATH_REWRITE_SEALED_CONTRACTS } from "@debateai/story";
+import { INVESTIGATION_REPORT_SEALED_CONTRACTS, PATH_REWRITE_SEALED_CONTRACTS, REPORT_OVERALL_SEALED_CONTRACTS } from "@debateai/story";
 import { EVALUATOR_SOURCES_SEALED_CONTRACTS } from "../../apps/runner/src/answer-checker-sources.js";
 
 const sha256 = (text: string) => createHash("sha256").update(text).digest("hex");
@@ -353,7 +353,9 @@ describe("the seals", () => {
       // W4-7: the answer checker's two sources variants, after the dig's planner.
       ...EVALUATOR_SOURCES_SEALED_CONTRACTS,
       // W5-1: the final report's five, after the dig's planner.
-      ...INVESTIGATION_REPORT_SEALED_CONTRACTS
+      ...INVESTIGATION_REPORT_SEALED_CONTRACTS,
+      // R22 report lane (decision 4): the overall writer and checker, after them.
+      ...REPORT_OVERALL_SEALED_CONTRACTS
     ];
     const sealed = engineSealedContracts();
     expect(sealed.slice(-appended.length)).toEqual(appended);
@@ -372,7 +374,9 @@ describe("the seals", () => {
       "path-rewrite.writer.v1", "path-rewrite.checker.v1", "web.plan-dig.v1",
       "serve.evaluator.length.sources.v1", "serve.evaluator.length.reader.sources.v1",
       // W5-1: the final report's five, after them.
-      "report.answer.v1", "report.answer.later.v1", "report.answer-check.v1", "report.story.v1", "report.story-check.v1"
+      "report.answer.v1", "report.answer.later.v1", "report.answer-check.v1", "report.story.v1", "report.story-check.v1",
+      // R22 report lane (decision 4).
+      "report.answer.v2", "report.answer.later.v2", "report.answer-check.v2"
     ]);
     expect(new Set(ENGINE_SEALED_CONTRACT_IDS).size).toBe(ENGINE_SEALED_CONTRACT_IDS.length);
     // The review is sealed with its edge count at zero, as the judge seal seals the review.

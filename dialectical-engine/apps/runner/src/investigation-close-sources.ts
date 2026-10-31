@@ -1,11 +1,11 @@
-import { readingLevelOf, StoryBodySchema, StoryFateSchema, type StoryFate } from "@debateai/contract";
+import { PurposeLinesSchema, cutQuoteAtWordEdge, readingLevelOf, StoryBodySchema, StoryFateSchema, type StoryFate } from "@debateai/contract";
 import {
   INVESTIGATION_REPORT_CARRIER, PATH_REWRITE_CARRIER, PATH_UPDATE_CARRIER, PostgresDigModelRunnerRepository, PostgresDigPicksRunnerRepository,
-  PostgresInvestigationReportRunnerRepository, PostgresInvestigationRunnerRepository, PostgresTreeUpdateRunnerRepository,
-  PostgresWebEvidenceRepository, RunRepository,
-  WEB_EVIDENCE_CARRIERS, decryptContentForRun, decryptLeasedContentForRun, encryptAttestedContentForRun,
-  prepareLeasedContentEncryptionForRun, withRunContentLease, type CryptoEnvelope, type InvestigationReportsRead, type PathRewriteEntry,
-  type Pool, type UnreportedClosing, type WebSealed
+  PostgresInvestigationReportRunnerRepository, PostgresInvestigationRunnerRepository, PostgresPassageRetentionRepository,
+  PostgresTreeUpdateRunnerRepository, PostgresWebEvidenceRepository, RUN_PURPOSE_LINES_CARRIER, RunRepository, WEB_EVIDENCE_CARRIERS,
+  WEB_SHOWN_QUOTE_CARRIER, decryptContentForRun, decryptLeasedContentForRun, encryptAttestedContentForRun,
+  prepareLeasedContentEncryptionForRun, withRunContentLease, type CryptoEnvelope, type InvestigationReportsRead, type PathLineEntry,
+  type PathRewriteEntry, type Pool, type UnreportedClosing, type WebSealed
 } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import type { ProviderGateway, ProviderCallRequest } from "@debateai/providers";
@@ -13,7 +13,7 @@ import { INVESTIGATION_REPORT_POLICY } from "@debateai/register";
 import { projectedCallCeilingMicros, type ProviderTargetPrice } from "@debateai/budget";
 import {
   storedReportAnswerOf, type InvestigationCloseInput, type InvestigationCloseSettings, type InvestigationCloseSources,
-  type InvestigationReportContent
+  type InvestigationReportContent, type InvestigationReportPayer, type InvestigationReportSettled
 } from "./investigation-close.js";
 import type { DossierDig, DossierPath, DossierRewrite, DossierSource, DossierText } from "./investigation-dossier.js";
 import { pathRewriteBodyBytes, type PathRewriteDigPath } from "./path-rewrite-material.js";
@@ -28,12 +28,21 @@ import { readReplayBook } from "./run-replay.js";
  *  - the main question: the root's own ask (its line, its reading level; Free when its plan is);
  *  - the first debate: the root's latest story (its short answer, "what would change it", and each path in the map's
  *    order with the map's ids, "<ref>#2" for a position argued twice), each path's whole points (path-rewrite-sources'
- *    `pointsOf`: the node's own words, the point it argues, disputed when the second AI disputed it) and the checked
- *    extracts they cite, each as its quote and reader 1's line (owner F9: the longer extract is cut to the shown quote);
+ *    `pointsOf`: the node's own words, the point it argues, disputed when the second AI disputed it) and the sources they
+ *    cite, each as its shown quote and reader 1's page note;
  *  - each dig (0133's members): its picks and path (0135), its level (0134), its rewrite (0134, opened under the dig's
- *    key), the text the rewrite was written on (the base rewrite's, else the parent's story line), and, when its rewrite
- *    FAILED or is missing, its own paths and points as 0135 stored them for the rewrite (Q-D13);
+ *    key), the text the rewrite was written on (the base rewrite's, else the parent's story line), and its own paths with
+ *    every point on them, as 0135 stored them for the rewrite (a dig under the main question has none stored: its own story's);
+ *  - a path's newest text when a later update wrote it (0138's line: a climb, a public dig; a public dig its check did not
+ *    allow is left out whole);
+ *  - the debate's place, time and purpose lines (0138, decision 5; an old debate has none);
  *  - the earlier report's answer (0136, opened under the root's key), from version 2 on (F8 A).
+ *
+ * DECISION 6, AI TEXT ONLY: nothing here opens a passage. Quotes come from 0139's shown quotes, cut to 120 characters when
+ * they were written, never from identity.web_extract or a pack; 0135's stored paths carry their extracts' whole words for the
+ * rewrite right after the debate, and those are dropped on the spot, unread. A debate with no shown quote yet (an old one RETENTION
+ * has not reached) lists no sources rather than touching a passage.
+ * tests/architecture/report-reads-ai-text-only.test.ts holds this file to it.
  */
 
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
@@ -42,7 +51,7 @@ const unread = (what: string): never => { throw new TypedDomainError("INVESTIGAT
 const LOCATOR_EXTRACT_IDS = /(?<![A-Za-z0-9])S[0-9]{1,4}-[0-9]{1,4}(?![0-9])/gu;
 
 type StoryRead = Readonly<{
-  answer: Readonly<{ headline: string; summary: string; change: string }>;
+  answer: Readonly<{ headline: string; summary: string; change: string; confidence: string }>;
   paths: readonly Readonly<{ ref: string; positionNodeId: string; line: string; fate: StoryFate; nodeRefs: readonly string[] }>[];
 }>;
 
@@ -67,10 +76,10 @@ async function storyOf(pool: Pool, runId: string): Promise<StoryRead | null> {
       line: path.line, fate: path.fate, nodeRefs: Object.freeze([...path.node_refs]) });
   });
   return Object.freeze({ answer: Object.freeze({ headline: body.data.short.headline, summary: body.data.short.summary,
-    change: body.data.short.change.text }), paths: Object.freeze(paths) });
+    change: body.data.short.change.text, confidence: body.data.short.confidence }), paths: Object.freeze(paths) });
 }
 
-/** The checked extracts each point's locator names, each with reader 1's line about its page, in the locator's order. */
+/** The sources each point's locator names, each as its shown quote (0139) and reader 1's page note, in the locator's order. */
 async function sourcesOfPoints(pool: Pool, runId: string, pointIds: readonly string[]): Promise<readonly DossierSource[]> {
   if (pointIds.length === 0) return [];
   const located = (await pool.query<{ node_id: string; locator: string | null }>(
@@ -82,25 +91,28 @@ async function sourcesOfPoints(pool: Pool, runId: string, pointIds: readonly str
     return [...new Set(row?.locator?.match(LOCATOR_EXTRACT_IDS) ?? [])].map((label) => ({ pointId: callerId.get(id.toLowerCase()) ?? id, label }));
   });
   if (named.length === 0) return [];
+  const quotes = await new PostgresPassageRetentionRepository(pool).readShownQuotes(runId);
+  if (quotes === null || quotes.length === 0) return [];
   const evidence = await new PostgresWebEvidenceRepository(pool).read(runId);
-  if (evidence === null || evidence.extracts.length === 0) return [];
+  if (evidence === null) return [];
   return withRunContentLease(pool, [runId], async () => {
     const cipher = await prepareLeasedContentEncryptionForRun(pool, runId);
     try {
       const sources: DossierSource[] = [];
       for (const { pointId, label } of named) {
-        const extract = evidence.extracts.find((candidate) => candidate.label === label);
-        const page = extract === undefined ? undefined : evidence.pages.find((candidate) => candidate.page_id === extract.page_id);
-        if (extract === undefined || page === undefined) continue;
-        const quote = decryptLeasedContentForRun<unknown>(cipher, WEB_EVIDENCE_CARRIERS.extract, extract.extract_id, extract.content, null);
+        const shown = quotes.find((candidate) => candidate.label === label);
+        const page = shown === undefined ? undefined : evidence.pages.find((candidate) => candidate.page_id === shown.page_id);
+        if (shown === undefined || page === undefined) continue;
+        const quote = decryptLeasedContentForRun<unknown>(cipher, WEB_SHOWN_QUOTE_CARRIER, shown.extract_id, shown.content, null);
         const about = decryptLeasedContentForRun<unknown>(cipher, WEB_EVIDENCE_CARRIERS.page, page.page_id, page.content, null);
-        if (!isRecord(quote) || typeof quote.quote !== "string" || !isRecord(about) || typeof about.site !== "string") continue;
+        if (!isRecord(quote) || typeof quote.quote !== "string" || quote.quote.trim() === "" || !isRecord(about) || typeof about.site !== "string") continue;
         const reading = evidence.readings.find((candidate) => candidate.page_id === page.page_id && candidate.reader === 1
           && candidate.outcome === "READ" && candidate.content !== null);
         const opened = reading === undefined ? null
           : decryptLeasedContentForRun<unknown>(cipher, WEB_EVIDENCE_CARRIERS.reading, reading.reading_id, reading.content, null);
-        sources.push(Object.freeze({ pointId, site: about.site, title: typeof about.title === "string" ? about.title : null,
-          quote: quote.quote, line: isRecord(opened) && typeof opened.line === "string" && opened.line.trim() !== "" ? opened.line : null }));
+        sources.push(Object.freeze({ pointId, site: about.site, link: typeof about.url === "string" ? about.url : null,
+          title: typeof about.title === "string" ? about.title : null, quote: cutQuoteAtWordEdge(quote.quote),
+          line: isRecord(opened) && typeof opened.line === "string" && opened.line.trim() !== "" ? opened.line : null }));
       }
       await cipher.assertLive();
       return Object.freeze(sources);
@@ -108,6 +120,39 @@ async function sourcesOfPoints(pool: Pool, runId: string, pointIds: readonly str
       await cipher.close();
     }
   });
+}
+
+/** Each path's newest text on one debate when a later update wrote it (0138), and the digs its line says are not to be read. */
+async function lineOf(pool: Pool, runId: string): Promise<Readonly<{ newest: ReadonlyMap<string, DossierText>; hiddenDigs: ReadonlySet<string> }>> {
+  const line = (await new PostgresTreeUpdateRunnerRepository(pool).readLine(runId)) ?? [];
+  const hiddenDigs = new Set(line.filter((entry) => entry.hidden || entry.held).map((entry) => entry.run_id.toLowerCase()));
+  const lastOf = new Map<string, PathLineEntry>();
+  for (const entry of line) {
+    if (entry.hidden || entry.held || (entry.state !== "READY" && entry.state !== "READY_WITH_RESERVATION")) continue;
+    lastOf.set(entry.position_ref, entry);
+  }
+  const newest = new Map<string, DossierText>();
+  for (const [ref, entry] of lastOf) {
+    if (entry.source !== "PATH_UPDATE" || entry.entry_id === null || entry.content === null) continue;
+    const opened = await withRunContentLease(pool, [entry.run_id], () => decryptContentForRun<unknown>(pool, entry.run_id,
+      PATH_UPDATE_CARRIER, entry.entry_id!, entry.content, null)).catch(() => null);
+    const text = isRecord(opened) && isRecord(opened.text) ? opened.text : null;
+    const fate = StoryFateSchema.safeParse(entry.fate_after ?? text?.fate);
+    if (text !== null && typeof text.line === "string" && fate.success) {
+      newest.set(ref, Object.freeze({ line: text.line, summary: typeof text.summary === "string" ? text.summary : null, fate: fate.data }));
+    }
+  }
+  return Object.freeze({ newest, hiddenDigs });
+}
+
+/** The debate's place, time and purpose lines (decision 5), opened under its key; all null for an old debate. */
+async function purposeLinesOf(pool: Pool, runId: string): Promise<Readonly<{ place: string | null; time: string | null; purpose: string | null }>> {
+  const sealed = await new PostgresTreeUpdateRunnerRepository(pool).readPurposeLines(runId);
+  const none = Object.freeze({ place: null, time: null, purpose: null });
+  if (sealed === null) return none;
+  const opened = await withRunContentLease(pool, [runId], () => decryptContentForRun<unknown>(pool, runId, RUN_PURPOSE_LINES_CARRIER, runId.toLowerCase(), sealed, null));
+  const lines = PurposeLinesSchema.safeParse(opened);
+  return lines.success ? Object.freeze({ place: lines.data.place ?? null, time: lines.data.time ?? null, purpose: lines.data.purpose ?? null }) : none;
 }
 
 type StoredRewrite = Readonly<{ text: DossierText; whatChanged: readonly string[]; viewReason: string | null;
@@ -130,26 +175,11 @@ function storedRewriteOf(value: unknown): StoredRewrite | null {
   });
 }
 
-/**
- * R22 decision 2: the paths of a debate whose newest text is a climb's row (a change from below), by the map's id. A dig card holds the
- * rewrites its own dig wrote; these it cannot. The row is sealed under the dig that started the climb.
- */
-async function climbedTextsOf(pool: Pool, runId: string): Promise<ReadonlyMap<string, DossierText>> {
-  const line = (await new PostgresTreeUpdateRunnerRepository(pool).readLine(runId)) ?? [];
-  const texts = new Map<string, DossierText>();
-  for (const positionRef of new Set(line.map((entry) => entry.position_ref))) {
-    const newest = line.filter((entry) => entry.position_ref === positionRef && (entry.state === "READY" || entry.state === "READY_WITH_RESERVATION")
-      && !entry.held && !entry.hidden && entry.entry_id !== null).at(-1);
-    if (newest === undefined || newest.source !== "PATH_UPDATE" || newest.content === null) continue;
-    const opened = await withRunContentLease(pool, [newest.run_id], () => decryptContentForRun<unknown>(pool, newest.run_id, PATH_UPDATE_CARRIER,
-      newest.entry_id!, newest.content, null)).catch(() => null);
-    const text = storedRewriteOf({ what_changed: [], dig_paths: [], ...(isRecord(opened) ? opened : {}) })?.text;
-    if (text !== undefined) texts.set(positionRef, text);
-  }
-  return texts;
-}
+/** An investigation's material read by its root: what a closing reads, and what an automatic main-answer update reads too. */
+export type InvestigationInputReader = (rootRunId: string, earlier: Readonly<{ version: number; segments: readonly string[] }> | null)
+  => Promise<InvestigationCloseInput | null>;
 
-export function postgresInvestigationCloseSources(pool: Pool): InvestigationCloseSources {
+export function postgresInvestigationCloseSources(pool: Pool): InvestigationCloseSources & Readonly<{ investigationInputOf: InvestigationInputReader }> {
   const runs = new RunRepository(pool);
   const picks = new PostgresDigPicksRunnerRepository(pool);
   const digModel = new PostgresDigModelRunnerRepository(pool);
@@ -174,81 +204,123 @@ export function postgresInvestigationCloseSources(pool: Pool): InvestigationClos
     return Object.freeze({ line: story?.line ?? "", summary: null, fate: story?.fate ?? entry.fate_before ?? "SET_ASIDE" });
   };
 
+  const investigationInputOf: InvestigationInputReader = async (root, earlierAnswer) => {
+    const ask = await runs.readStoredAsk(root);
+    const investigation = await investigations.ofRun(root);
+    if (ask === null || investigation === null) return null;
+    const story = await storyOf(pool, root);
+    const stories = new Map<string, StoryRead | null>([[root.toLowerCase(), story]]);
+    const storyLine = async (runId: string, ref: string) => {
+      if (!stories.has(runId.toLowerCase())) stories.set(runId.toLowerCase(), await storyOf(pool, runId).catch(() => null));
+      const path = stories.get(runId.toLowerCase())?.paths.find((candidate) => candidate.ref === ref);
+      return path === undefined ? null : Object.freeze({ line: path.line, fate: path.fate });
+    };
+    const rootLine = await lineOf(pool, root);
+    const paths: DossierPath[] = [];
+    for (const path of story?.paths ?? []) {
+      const pointIds = path.nodeRefs.filter((id) => id.toLowerCase() !== path.positionNodeId.toLowerCase());
+      const points = await pointsOf(pool, root, pointIds);
+      paths.push(Object.freeze({ ref: path.ref, storyLine: path.line, storyFate: path.fate, points,
+        sources: await sourcesOfPoints(pool, root, points.map((point) => point.id)), current: rootLine.newest.get(path.ref) ?? null }));
+    }
+    const digs: DossierDig[] = [];
+    const turnsOfParent = new Map<string, readonly PathRewriteEntry[]>();
+    const members = [...investigation.members].filter((member) => member.parent_run_id !== null)
+      .sort((a, b) => (a.run_id < b.run_id ? -1 : a.run_id > b.run_id ? 1 : 0));
+    // A public dig its check did not allow is not part of the debate (decision 13), nor anything dug from it.
+    const lines = new Map<string, Awaited<ReturnType<typeof lineOf>>>();
+    for (const member of members) lines.set(member.run_id.toLowerCase(), await lineOf(pool, member.run_id));
+    const hidden = new Set([...rootLine.hiddenDigs, ...[...lines.values()].flatMap((line) => [...line.hiddenDigs])]);
+    for (let grew = hidden.size > 0; grew;) {
+      grew = false;
+      for (const member of members) {
+        if (!hidden.has(member.run_id.toLowerCase()) && hidden.has(member.parent_run_id!.toLowerCase())) {
+          hidden.add(member.run_id.toLowerCase());
+          grew = true;
+        }
+      }
+    }
+    for (const member of members) {
+      if (hidden.has(member.run_id.toLowerCase())) continue;
+      const own = await picks.read(member.run_id);
+      const level = await digModel.readDigLevel(member.run_id);
+      const read = await digModel.readPathRewrites(member.run_id);
+      const turn = read?.own ?? null;
+      const parentRunId = own?.parentRunId ?? member.parent_run_id!;
+      const newest = lines.get(member.run_id.toLowerCase())!.newest;
+      if (!turnsOfParent.has(parentRunId.toLowerCase())) {
+        turnsOfParent.set(parentRunId.toLowerCase(), (await digModel.readPathRewrites(parentRunId))?.paths ?? []);
+      }
+      let rewrite: DossierRewrite | null = null;
+      if (turn !== null && turn.state !== "WRITING" && turn.rewrite_id !== null && turn.recorded_at !== null) {
+        const before = await beforeOf(turn, turnsOfParent.get(parentRunId.toLowerCase())!, storyLine);
+        const opened = turn.state === "FAILED" ? null : await openRewrite(turn).catch(() => null);
+        const finished = opened !== null && turn.fate_after !== null;
+        rewrite = Object.freeze({
+          rewriteId: turn.rewrite_id, recordedAt: new Date(Date.parse(turn.recorded_at)).toISOString(),
+          state: finished ? turn.state : "FAILED",
+          before,
+          after: finished ? Object.freeze({ ...opened.text, fate: turn.fate_after! }) : null,
+          whatChanged: finished ? opened.whatChanged : [],
+          view: finished && turn.verdict_outcome !== null && turn.verdict_scope !== null && opened.viewReason !== null
+            ? Object.freeze({ outcome: turn.verdict_outcome, scope: turn.verdict_scope, reason: opened.viewReason }) : null,
+          // Each of the dig's own paths at its newest text, when a deeper dig's change climbed to it.
+          digPaths: finished ? Object.freeze(opened.digPaths.map((path) => {
+            const update = newest.get(path.positionRef);
+            return update === undefined ? path : Object.freeze({ positionRef: path.positionRef, line: update.line, fate: update.fate });
+          })) : []
+        });
+      }
+      const stored = own?.input?.value;
+      const storedPaths: readonly PathRewriteDigPath[] = stored === undefined || stored === null ? [] : (() => {
+        try { return storedDigPathsOf(stored); } catch { return []; }
+      })();
+      let digPaths: readonly PathRewriteDigPath[] = storedPaths;
+      if (digPaths.length === 0) {
+        // No paths stored (a dig under the main question, or one from before 0135): its own story's.
+        if (!stories.has(member.run_id.toLowerCase())) stories.set(member.run_id.toLowerCase(), await storyOf(pool, member.run_id).catch(() => null));
+        const ownStory = stories.get(member.run_id.toLowerCase()) ?? null;
+        const fromStory: PathRewriteDigPath[] = [];
+        for (const path of ownStory?.paths ?? []) {
+          const ids = path.nodeRefs.filter((id) => id.toLowerCase() !== path.positionNodeId.toLowerCase());
+          fromStory.push(Object.freeze({ positionRef: path.ref, statement: path.line, points: await pointsOf(pool, member.run_id, ids), extracts: Object.freeze([]) }));
+        }
+        digPaths = fromStory;
+      }
+      // Only what the AIs wrote: a stored path's extract words are dropped here, unread; its sources are the shown quotes.
+      const aiText = Object.freeze(digPaths.map((path) => Object.freeze({ positionRef: path.positionRef, statement: path.statement,
+        points: path.points, extracts: Object.freeze([]) })));
+      const pointIds = aiText.flatMap((path) => path.points.map((point) => point.id));
+      const ownMaterial: DossierDig["ownMaterial"] = aiText.length === 0 ? null : Object.freeze({
+        answer: Object.freeze([]),
+        paths: aiText,
+        sources: await sourcesOfPoints(pool, member.run_id, pointIds)
+      });
+      digs.push(Object.freeze({
+        runId: member.run_id, parentRunId, positionRef: own?.positionRef ?? null, level: Math.max(1, level),
+        finishedAt: new Date(Date.parse(turn?.taken_at ?? member.joined_at)).toISOString(),
+        picks: Object.freeze((own?.picks ?? []).map((pick) => Object.freeze({ text: pick.text, by: pick.author }))),
+        rewrite, ownMaterial
+      }));
+    }
+    const purpose = await purposeLinesOf(pool, root);
+    return Object.freeze({
+      free: ask.planTier === "free",
+      questionLine: ask.questionLine,
+      input: Object.freeze({
+        question: Object.freeze({ line: ask.questionLine, place: purpose.place, time: purpose.time, purpose: purpose.purpose,
+          readingLevel: readingLevelOf(ask.depthParams), language: null }),
+        first: Object.freeze({ runId: root, answer: story?.answer ?? null, paths: Object.freeze(paths) }),
+        digs: Object.freeze(digs),
+        earlier: earlierAnswer
+      })
+    });
+  };
+
   return Object.freeze({
+    investigationInputOf,
     inputOf: async (closing: UnreportedClosing, earlier: InvestigationReportsRead | null): Promise<InvestigationCloseInput | null> => {
       const root = closing.rootRunId;
-      const ask = await runs.readStoredAsk(root);
-      const investigation = await investigations.ofRun(root);
-      if (ask === null || investigation === null) return null;
-      const story = await storyOf(pool, root);
-      const stories = new Map<string, StoryRead | null>([[root.toLowerCase(), story]]);
-      const storyLine = async (runId: string, ref: string) => {
-        if (!stories.has(runId.toLowerCase())) stories.set(runId.toLowerCase(), await storyOf(pool, runId).catch(() => null));
-        const path = stories.get(runId.toLowerCase())?.paths.find((candidate) => candidate.ref === ref);
-        return path === undefined ? null : Object.freeze({ line: path.line, fate: path.fate });
-      };
-      const paths: DossierPath[] = [];
-      const climbedOnFirst = await climbedTextsOf(pool, root);
-      for (const path of story?.paths ?? []) {
-        const pointIds = path.nodeRefs.filter((id) => id.toLowerCase() !== path.positionNodeId.toLowerCase());
-        const points = await pointsOf(pool, root, pointIds);
-        const climbedText = climbedOnFirst.get(path.ref);
-        paths.push(Object.freeze({ ref: path.ref, storyLine: path.line, storyFate: path.fate, ...(climbedText === undefined ? {} : { climbedText }), points,
-          sources: await sourcesOfPoints(pool, root, points.map((point) => point.id)) }));
-      }
-      const digs: DossierDig[] = [];
-      const turnsOfParent = new Map<string, readonly PathRewriteEntry[]>();
-      const members = [...investigation.members].filter((member) => member.parent_run_id !== null)
-        .sort((a, b) => (a.run_id < b.run_id ? -1 : a.run_id > b.run_id ? 1 : 0));
-      for (const member of members) {
-        const own = await picks.read(member.run_id);
-        const level = await digModel.readDigLevel(member.run_id);
-        const read = await digModel.readPathRewrites(member.run_id);
-        const turn = read?.own ?? null;
-        const parentRunId = own?.parentRunId ?? member.parent_run_id!;
-        if (!turnsOfParent.has(parentRunId.toLowerCase())) {
-          turnsOfParent.set(parentRunId.toLowerCase(), (await digModel.readPathRewrites(parentRunId))?.paths ?? []);
-        }
-        let rewrite: DossierRewrite | null = null;
-        if (turn !== null && turn.state !== "WRITING" && turn.rewrite_id !== null && turn.recorded_at !== null) {
-          const before = await beforeOf(turn, turnsOfParent.get(parentRunId.toLowerCase())!, storyLine);
-          const opened = turn.state === "FAILED" ? null : await openRewrite(turn).catch(() => null);
-          const finished = opened !== null && turn.fate_after !== null;
-          const climbedOnDig = await climbedTextsOf(pool, member.run_id);
-          rewrite = Object.freeze({
-            rewriteId: turn.rewrite_id, recordedAt: new Date(Date.parse(turn.recorded_at)).toISOString(),
-            state: finished ? turn.state : "FAILED",
-            before,
-            after: finished ? Object.freeze({ ...opened.text, fate: turn.fate_after! }) : null,
-            whatChanged: finished ? opened.whatChanged : [],
-            view: finished && turn.verdict_outcome !== null && turn.verdict_scope !== null && opened.viewReason !== null
-              ? Object.freeze({ outcome: turn.verdict_outcome, scope: turn.verdict_scope, reason: opened.viewReason }) : null,
-            digPaths: !finished ? [] : Object.freeze(opened.digPaths.map((path) => {
-              const climbed = climbedOnDig.get(path.positionRef);
-              return climbed === undefined ? path : Object.freeze({ ...path, line: climbed.line, fate: climbed.fate });
-            }))
-          });
-        }
-        let ownMaterial: DossierDig["ownMaterial"] = null;
-        if (rewrite === null || rewrite.state === "FAILED") {
-          const stored = own?.input?.value;
-          const digPaths: readonly PathRewriteDigPath[] = stored === undefined || stored === null ? [] : (() => {
-            try { return storedDigPathsOf(stored); } catch { return []; }
-          })();
-          ownMaterial = Object.freeze({
-            answer: Object.freeze([]),
-            paths: digPaths,
-            sources: Object.freeze(digPaths.flatMap((path) => path.extracts.map((extract) => Object.freeze({ pointId: extract.pointId,
-              site: extract.site, title: extract.title, quote: extract.quote, line: null }))))
-          });
-        }
-        digs.push(Object.freeze({
-          runId: member.run_id, parentRunId, positionRef: own?.positionRef ?? null, level: Math.max(1, level),
-          finishedAt: new Date(Date.parse(turn?.taken_at ?? member.joined_at)).toISOString(),
-          picks: Object.freeze((own?.picks ?? []).map((pick) => Object.freeze({ text: pick.text, by: pick.author }))),
-          rewrite, ownMaterial
-        }));
-      }
       // F8 A: the newest finished version before this one, opened under the root's key.
       let earlierAnswer: Readonly<{ version: number; segments: readonly string[] }> | null = null;
       const prior = (earlier?.reports ?? []).filter((entry) => entry.report_version < closing.reportVersion
@@ -259,17 +331,7 @@ export function postgresInvestigationCloseSources(pool: Pool): InvestigationClos
         const segments = storedReportAnswerOf(opened);
         if (segments !== null) earlierAnswer = Object.freeze({ version: prior.report_version, segments });
       }
-      return Object.freeze({
-        free: ask.planTier === "free",
-        questionLine: ask.questionLine,
-        input: Object.freeze({
-          question: Object.freeze({ line: ask.questionLine, place: null, time: null, purpose: null,
-            readingLevel: readingLevelOf(ask.depthParams), language: null }),
-          first: Object.freeze({ runId: root, answer: story?.answer ?? null, paths: Object.freeze(paths) }),
-          digs: Object.freeze(digs),
-          earlier: earlierAnswer
-        })
-      });
+      return investigationInputOf(root, earlierAnswer);
     }
   });
 }
@@ -295,6 +357,10 @@ export function composeInvestigationClose(input: Readonly<{
   members: readonly Readonly<{ provider: ProviderGateway; providerRef: string; maker: string }>[];
   /** Each target's price (hosted); a target without one is counted at zero (local mode: free models). */
   priceOf: (providerRef: string) => ProviderTargetPrice | null;
+  /** Who pays when it is not the debate's owner (PUBLIC, decision 13). */
+  payerOf?: (closing: UnreportedClosing, read: InvestigationCloseInput) => Promise<InvestigationReportPayer>;
+  /** After a closing's row stands (RETENTION's wipe, decision 7; PUBLIC's reopening). */
+  onReportSettled?: (settled: InvestigationReportSettled) => Promise<void> | void;
   log: (event: string, detail: Record<string, unknown>) => void;
 }>): InvestigationCloseSettings | undefined {
   const writerRoleRef = input.targets.find((target) => target.model === PATH_REWRITE_WRITER_MODEL)?.providerRef;
@@ -327,6 +393,8 @@ export function composeInvestigationClose(input: Readonly<{
     }),
     reserveMicros: INVESTIGATION_REPORT_POLICY.reserveMicros,
     replayBookOf: (rootRunId: string, subject: string) => readReplayBook(pool, rootRunId, subject),
+    ...(input.payerOf === undefined ? {} : { payerOf: input.payerOf }),
+    ...(input.onReportSettled === undefined ? {} : { onReportSettled: input.onReportSettled }),
     climbsOpen: async (rootRunId: string) => {
       const tree = new PostgresTreeUpdateRunnerRepository(pool);
       const members = (await new PostgresInvestigationRunnerRepository(pool).ofRun(rootRunId))?.members ?? [];

@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes as cryptoRandomBytes } from "node:crypto";
 import type { StoryFate } from "@debateai/contract";
 import type {
   MainAnswerTriggerKind, MainAnswerUpdateRead, PathLineEntry, PathRewriteEntry, PathUpdateCauseKind, PathUpdateRecord, PathUpdateTurnRead,
@@ -8,11 +8,11 @@ import { TypedDomainError, replyLanguageCheckFor } from "@debateai/kernel";
 import type { ProviderCallRequest, ProviderCallResult } from "@debateai/providers";
 import { INVESTIGATION_REPORT_POLICY, PATH_REWRITE_POLICY } from "@debateai/register";
 import {
-  PATH_REWRITE_CHECKER_PROSE, PATH_REWRITE_PROSE, REPORT_ANSWER_PROSE, REPORT_CHECKER_PROSE, investigationReportFailureCode,
-  pathRewriteFailureCode, writeMainAnswerUpdate, writePathRewrite, type PathRewriteWritten, type StoryRoleMaker
+  PATH_REWRITE_CHECKER_PROSE, PATH_REWRITE_PROSE, REPORT_ANSWER_PROSE, REPORT_CHECKER_PROSE, answerUpdateCallSiteKey, investigationReportFailureCode,
+  pathRewriteFailureCode, writeOverallAnswer, writePathRewrite, type PathRewriteWritten, type StoryRoleMaker
 } from "@debateai/story";
 import { engineContractHash } from "./engine-contracts.js";
-import type { InvestigationCloseInput } from "./investigation-close.js";
+import { closingRandomBytes, type InvestigationCloseInput } from "./investigation-close.js";
 import { buildInvestigationDossier, investigationReportGuard } from "./investigation-dossier.js";
 import {
   buildPathRewriteMaterial, pathRewriteGuard, type PathRewriteDigPath, type PathRewriteParentPath, type PathRewritePick
@@ -32,7 +32,7 @@ import { replayingGateway, type ReplayBook } from "./run-replay.js";
  *     Each level takes a turn in its path's one line, waits for the front, writes on the line's newest text, and ends in a row (FAILED when
  *     every writer failed: the path keeps its text and the climb stops there). A level that comes out unchanged stops the climb.
  *  3. At the first debate a change means the main answer is next (`updateMainAnswer`): the report's own answer step and check, on the
- *     report's own prompts (packages/story `writeMainAnswerUpdate`), the whole tree as material, the version before it as the earlier
+ *     report's own prompts (packages/story `writeOverallAnswer`), the whole tree as material, the version before it as the earlier
  *     answer; one version per trigger, sealed under the ROOT's key (0138's `record_main_answer_update`). A FAILED version changes nothing.
  *
  * MONEY: every call names the run of the dig that started the climb, whoever dug it: `digRunId` is the only thing that says who pays
@@ -140,6 +140,11 @@ export type TreeUpdateSettings = Readonly<{
   /** Shared with the rewrite and both sweeps, so nothing runs a second copy beside a live one (paid twice). */
   inFlight?: PathRewriteInFlight;
   log?: (event: string, detail: Record<string, unknown>) => void;
+  /**
+   * THE ONE PLACE after a climb's rewrite is recorded, whatever it came out as: the path `positionRef` of `parentRunId` has a new row.
+   * Awaited before the climb goes on; must not reject (the DIG lane's "work out this path's suggestions again" is wired here at merge).
+   */
+  afterLevel?: (level: Readonly<{ digRunId: string; parentRunId: string; positionRef: string; updateId: string; outcome: "CHANGED" | "STOPPED" | "LEFT" }>) => Promise<void> | void;
 }>;
 
 /**
@@ -280,8 +285,11 @@ async function writeLevel(settings: TreeUpdateSettings, level: Level, log: Log):
     log("PATH_CLIMB_STORED", { runId: level.digRunId, step: level.step, outcome: record.outcome, changed: record.changed,
       failureCode: record.failureCode, stored });
     if (stored === "BASE_MOVED" || stored === "WAIT_TURN") continue;
-    if (stored === "RECORDED") return record.changed === true ? "CHANGED" : "STOPPED";
-    if (stored === "ALREADY") return levelOutcome(ports, level, updateId, log);
+    if (stored === "RECORDED" || stored === "ALREADY") {
+      const outcome = stored === "RECORDED" ? (record.changed === true ? "CHANGED" as const : "STOPPED" as const) : await levelOutcome(ports, level, updateId, log);
+      await settings.afterLevel?.(Object.freeze({ digRunId: level.digRunId, parentRunId: level.parentRunId, positionRef: level.positionRef, updateId, outcome }));
+      return outcome;
+    }
     return "STOPPED";
   }
   log("PATH_CLIMB_BASE_KEPT_MOVING", { runId: level.digRunId, step: level.step });
@@ -471,12 +479,12 @@ async function composeAnswer(settings: TreeUpdateSettings, update: AnswerUpdate,
       return update.lease(() => gateway.call(request));
     };
     const language = read.input.question.language;
-    const written = await writeMainAnswerUpdate({
-      runId, subjectItemId: subject, contractHash: settings.contractHash ?? engineContractHash(),
+    const written = await writeOverallAnswer({
+      runId, subjectItemId: subject, contractHash: settings.contractHash ?? engineContractHash(), callSiteOf: answerUpdateCallSiteKey,
       maxRounds: update.free ? INVESTIGATION_REPORT_POLICY.freeMaxRounds : INVESTIGATION_REPORT_POLICY.maxRounds,
-      free: update.free, later: read.input.earlier !== null,
+      later: read.input.earlier !== null,
       writer, checker, backupCandidates: settings.roles.backupCandidates ?? [], backupMakers: settings.roles.backupMakers,
-      material: dossier.material, send, guard: investigationReportGuard,
+      material: dossier.material, send, guard: investigationReportGuard, randomBytes: closingRandomBytes(cryptoRandomBytes(32)),
       answerLanguageCheck: replyLanguageCheckFor(read.questionLine, language, REPORT_ANSWER_PROSE),
       checkerLanguageCheck: replyLanguageCheckFor(read.questionLine, language, REPORT_CHECKER_PROSE),
       log: (event, detail) => log(event, { runId, ...detail })
