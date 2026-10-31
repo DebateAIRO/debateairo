@@ -338,7 +338,8 @@ export async function readPracticeWeb(pool: Pool, runId: string, search: Practic
 
 /* ----------------------------------------------------------------- report.md */
 
-const cell = (text: string): string => text.replace(/\|/gu, "\\|");
+/** A markdown table cell: backslashes first, so an escaped pipe can never be undone by the text's own backslash. */
+const cell = (text: string): string => text.replace(/\\/gu, "\\\\").replace(/\|/gu, "\\|");
 const microsAsNano = (micros: number): bigint => BigInt(micros) * 1_000n;
 
 /** report.md: the web table, one row per path, then one line for the planner and the rest. `dollars` is the report's `usd`. */

@@ -96,6 +96,15 @@ describe("W5-2 the web table", () => {
     expect(lines).toContain("- \"Sure, for the case named\" at most (agreed, but not on a checked extract of this debate): 2");
   });
 
+  // CodeQL js/incomplete-sanitization (PR #224): a backslash is escaped before a pipe, so the text's own backslash can
+  // never turn the escaped pipe back into a column break.
+  it("escapes a backslash before a pipe in a path's cell", () => {
+    const odd = "p\\|x";
+    const facts: PracticeWebFacts = Object.freeze({ ...FACTS, plan: [{ pathRef: odd, status: "NO_SEARCH_PLANNED" as const }] });
+    const row = practiceWebLines(practiceWebBlock(facts), usd).find((line) => line.startsWith("| p\\\\"));
+    expect(row?.startsWith("| p\\\\\\|x | NO_SEARCH_PLANNED |")).toBe(true);
+  });
+
   it("reads the call's answer index, its path from the pages its prompt names, and a reader's proposed extracts", async () => {
     expect(practiceWebCallIndex("WEB:read1:3:1")).toBe(3);
     expect(practiceWebCallIndex("WEB:pick:0")).toBe(0);
