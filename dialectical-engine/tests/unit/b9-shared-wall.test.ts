@@ -247,17 +247,21 @@ describe("B9a · each of the run owner's windows, walled at its own finish edge 
   });
 });
 
-// billingPlans v4 (owner 2026-10-30, Q1 and Q3): each window's edge is its limit plus a FIXED 20 cents, carried on the
-// window as `finishOverflowMicros` beside a 100% share edge. Every overflow is spend inside the month too, so the month's
-// own edge (its limit plus 20 cents) holds all of them together.
-describe("B9a · a window with a fixed overflow (billingPlans v4: 20 cents past every limit)", () => {
-  const overflowWindow = (scope: PersonWindow["scope"], periodStart: Date, limitMicros: number): PersonWindow => Object.freeze({
-    ...window(scope, periodStart, limitMicros), finishBasisPoints: 10_000, finishOverflowMicros: 200_000
+// billingPlans v4 (owner 2026-10-30, Q1 and Q3) gave each window a FIXED 20 cents past its limit. The owner's money rule
+// of 31 Oct changed that meaning, and these rows with it: running work is never stopped by the day or the week (they
+// `borrow`, and the wall does not ask them); the month is the wall, at its limit less the reserve kept inside it, and its
+// 20 cents (`finishOverflowMicros`) are only the tolerance for a call in flight there. At the wall the refusal is the
+// month's own (MonthWallReachedError, still PERSON_ALLOWANCE_REACHED), which the runner turns into a pause.
+describe("B9a · billingPlans v4 windows under the money rule (the day and week borrow, the month is the wall)", () => {
+  const borrowing = (scope: PersonWindow["scope"], periodStart: Date, limitMicros: number): PersonWindow => Object.freeze({
+    ...window(scope, periodStart, limitMicros), finishBasisPoints: 10_000, borrows: true as const
   });
   const WINDOWS = [
-    overflowWindow("PERSON_DAY", DAY_START, 1_000_000),     // edge 1 200 000
-    overflowWindow("PERSON_WEEK", WEEK_START, 2_500_000),   // edge 2 700 000
-    overflowWindow("PERSON_MONTH", MONTH_START, 5_000_000)  // edge 5 200 000
+    borrowing("PERSON_DAY", DAY_START, 1_000_000),
+    borrowing("PERSON_WEEK", WEEK_START, 2_500_000),
+    // wall 4 800 000 (the limit less the 20-cent reserve), tolerance 200 000
+    Object.freeze({ ...window("PERSON_MONTH", MONTH_START, 5_000_000), finishBasisPoints: 10_000, finishOverflowMicros: 200_000,
+      keepsReserveMicros: 200_000 })
   ];
   const guardFor = (spent: ReadonlyMap<number, number>) => {
     const persons = owner("owner-1", WINDOWS, spent);
@@ -267,17 +271,17 @@ describe("B9a · a window with a fixed overflow (billingPlans v4: 20 cents past 
     });
   };
 
-  it.each([
-    ["PERSON_DAY", DAY_START, 1_200_000],
-    ["PERSON_WEEK", WEEK_START, 2_700_000],
-    ["PERSON_MONTH", MONTH_START, 5_200_000]
-  ] as const)("%s: admits exactly 20 cents past the limit and refuses one micro-unit more", async (_scope, start, edge) => {
-    expect(await decide(guardFor(new Map([[start.getTime(), edge - PROJECTED]])), "BODY")).toBe("ADMITTED");
-    expect(await decide(guardFor(new Map([[start.getTime(), edge - PROJECTED + 1]])), "BODY")).toBe("PERSON_ALLOWANCE_REACHED");
+  it("never stops running work at the day or the week, however far past them", async () => {
+    expect(await decide(guardFor(new Map([[DAY_START.getTime(), 9_000_000], [WEEK_START.getTime(), 9_000_000]])), "BODY")).toBe("ADMITTED");
   });
 
-  it("holds a day's overflow to the month's: a day still under its edge stops once the month's 20 cents are used", async () => {
-    const spent = new Map([[DAY_START.getTime(), 100_000], [MONTH_START.getTime(), 5_200_000 - PROJECTED + 1]]);
+  it("PERSON_MONTH: admits a call one micro-unit below the wall (its worst case inside the tolerance) and refuses one at it", async () => {
+    expect(await decide(guardFor(new Map([[MONTH_START.getTime(), 4_800_000 - 1]])), "BODY")).toBe("ADMITTED");
+    expect(await decide(guardFor(new Map([[MONTH_START.getTime(), 4_800_000]])), "BODY")).toBe("PERSON_ALLOWANCE_REACHED");
+  });
+
+  it("a day still under its limit stops once the month reaches its wall", async () => {
+    const spent = new Map([[DAY_START.getTime(), 100_000], [MONTH_START.getTime(), 4_800_000]]);
     expect(await decide(guardFor(spent), "BODY")).toBe("PERSON_ALLOWANCE_REACHED");
   });
 });

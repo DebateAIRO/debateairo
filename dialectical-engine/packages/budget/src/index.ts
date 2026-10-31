@@ -42,6 +42,8 @@ export {
   RUN_COST_ENVELOPE_MONEY_REACHED,
   RUN_COST_ENVELOPE_ROOM_KEPT,
   STORY_COST_ENVELOPE_REACHED,
+  MonthWallReachedError,
+  isMonthWallReached,
   chargeMicrosForUsage,
   chargeableUsage,
   costEnvelopeDay,
@@ -135,6 +137,17 @@ export {
   type ScopeRoom,
   type WaitsFor,
   type Wall
+} from "./room.js";
+/** The money rule (owner, 31 Oct 2026): derived borrowing, the month wall, the reserve and the one cross-month switch. */
+export {
+  BORROW_CARRIES_ACROSS_MONTH,
+  BORROW_WINDOW_SPANS_MS,
+  borrowPercent,
+  decideMonthWall,
+  deriveBorrows,
+  startLimitMicros,
+  tiledWindows,
+  type BorrowWindow
 } from "./room.js";
 export {
   NO_PERSON_ALLOWANCE,

@@ -283,6 +283,7 @@ import { keepAliveProviderGateway, runKeepAliveScope, startRunKeepAlive, type Ru
 import type { RunnerRetirementSignal, TaskExecutionCounter } from "./runner-retirement.js";
 import { EMPTY_REPLAY_BOOK, readReplayBook, replayingGateway, type ReplayBook } from "./run-replay.js";
 import type { RunInFlight } from "./run-in-flight.js";
+import { PATH_REWRITE_CALL_SITE_PREFIX, isPathRewriteCallSite, pathRewriteCallSiteRole } from "./path-rewrite-scope.js";
 // Side-by-side spec §13 (S6): the per-version settings types (type-only: run-settings.ts imports this module) and the one
 // debate-member mapping, from its own module so this one never loads the loader.
 import type { RunnerSettingsResolution, RunSettingsVersions } from "./run-settings.js";
@@ -13357,9 +13358,11 @@ const STORY_CALL_SITE_PREFIX = "STORY:";
 const STORY_CALL_SITE = /^STORY:(STORYTELLER|CHECKER):[1-8]$/u;
 const STORY_CHARTS_CALL_SITE = "STORY:CHARTS:1";
 
-/** The role a well-formed story call site must carry, or null for any other key. */
+/** The role a well-formed story call site must carry, or null for any other key. W3-2: a dig's path rewrite's too. */
 function storyCallSiteRole(callSiteKey: string): ProviderCallRequest["role"] | null {
   if (callSiteKey === STORY_CHARTS_CALL_SITE) return "SYNTHESIZER";
+  const rewrite = pathRewriteCallSiteRole(callSiteKey);
+  if (rewrite !== null) return rewrite;
   const site = STORY_CALL_SITE.exec(callSiteKey);
   if (site === null) return null;
   return site[1] === "STORYTELLER" ? "SYNTHESIZER" : "EVALUATOR";
@@ -13374,7 +13377,8 @@ function storyCallSiteRole(callSiteKey: string): ProviderCallRequest["role"] | n
 export function storyCallScopeAgrees(request: Pick<ProviderCallRequest, "lane" | "callSiteKey" | "role">): boolean {
   const key = structureRepairOriginalKey(request.callSiteKey);
   const storyScope = request.lane === "story";
-  return !((storyScope || key.startsWith(STORY_CALL_SITE_PREFIX)) && (!storyScope || storyCallSiteRole(key) !== request.role));
+  const storyKey = key.startsWith(STORY_CALL_SITE_PREFIX) || key.startsWith(PATH_REWRITE_CALL_SITE_PREFIX);
+  return !((storyScope || storyKey) && (!storyScope || storyCallSiteRole(key) !== request.role));
 }
 
 /**
@@ -13472,6 +13476,8 @@ export function createPostgresProviderGateway(
        * refused, so a story can never spend unbounded where the debate cannot.
        */
       readonly buildStoryCostEnvelopeSeam?: (runId: string) => InFlightReleasingSeam;
+      /** W3-2: a dig's path rewrite (story lane, `PATH_REWRITE:` sites) spends its own never-walled seam. */
+      readonly buildPathRewriteCostEnvelopeSeam?: (runId: string) => InFlightReleasingSeam;
       /**
        * Parallel AI calls (spec 2026-10-12 §3.5): this process's calls in
        * flight, for the run-wide attempt ceiling. A call bounded by that ceiling
@@ -13484,7 +13490,7 @@ export function createPostgresProviderGateway(
     }
 ): ProviderGateway {
   const { buildCostEnvelopeSeam, ...gatewayOptions } = options;
-  const { buildStoryCostEnvelopeSeam, inFlight, ...httpOptions } = gatewayOptions;
+  const { buildStoryCostEnvelopeSeam, buildPathRewriteCostEnvelopeSeam, inFlight, ...httpOptions } = gatewayOptions;
   const ledger = new LedgerRepository(pool);
   const budget = new BudgetRepository(pool);
   const http = new OpenAICompatibleProviderGateway({
@@ -13530,7 +13536,9 @@ export function createPostgresProviderGateway(
       // Final fix wave S1: a defence for a composition that meters debate calls but gives no story seam. main.ts and the
       // practice always give both, so in production a version without a story ceiling is refused by its guard's story
       // seam instead (the same STORY_ENVELOPE_MISSING, built below before the provider-failure capture).
-      if (storyScope && buildStoryCostEnvelopeSeam === undefined && buildCostEnvelopeSeam !== undefined) {
+      const pathRewrite = storyScope && isPathRewriteCallSite(structureRepairOriginalKey(request.callSiteKey));
+      if (storyScope && (pathRewrite ? buildPathRewriteCostEnvelopeSeam : buildStoryCostEnvelopeSeam) === undefined
+        && buildCostEnvelopeSeam !== undefined) {
         throw new TypedDomainError(
           "STORY_ENVELOPE_MISSING",
           "A metered deployment makes no story call without the story's own money bound"
@@ -13629,7 +13637,7 @@ export function createPostgresProviderGateway(
        * it ends the call before anything is sent, with its own code, uncaptured.
        */
       costEnvelope = storyScope
-        ? buildStoryCostEnvelopeSeam?.(leasedRunId)
+        ? (pathRewrite ? buildPathRewriteCostEnvelopeSeam : buildStoryCostEnvelopeSeam)?.(leasedRunId)
         : buildCostEnvelopeSeam?.(leasedRunId, costEnvelopePhase, providerCallSharedWall(request));
       try {
         return await http.call({

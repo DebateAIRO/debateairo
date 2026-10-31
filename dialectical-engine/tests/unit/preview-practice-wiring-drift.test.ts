@@ -301,7 +301,10 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       "const price = previewTargetChargePrice(previewGate !== undefined, target, providerTargetPrice(target));",
       "if (runnerSite.money !== null && price === null) { throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`); }",
 
-      "...(runnerSite.money === null || price === null ? {} : { buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => runCostEnvelopeGuard(runId).providerSeam({ runId, price, requireReportedUsage: true, phase, sharedWall }), buildStoryCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).storySeam({ runId, price, requireReportedUsage: true }) })",
+      // Plan 2026-10-30 dig-model revision W3-2 (the owner's money rule): the month pause on a walled call, and a dig's
+      // path rewrite on its own never-walled seam, in both compositions alike.
+      "const monthPause = new MonthPause({ store: new PostgresDigModelRunnerRepository(pool) });",
+      "...(runnerSite.money === null || price === null ? {} : { buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => monthPaused(runCostEnvelopeGuard(runId).providerSeam({ runId, price, requireReportedUsage: true, phase, sharedWall }), { runId, phase, sharedWall, pause: monthPause }), buildStoryCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).storySeam({ runId, price, requireReportedUsage: true }), buildPathRewriteCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).pathRewriteSeam({ runId, price, requireReportedUsage: true }) })",
       "settingsForVersion: (version) => runnerSettings.settingsFor(version),",
       "hosted: environment.DEPLOYMENT_MODE === \"hosted\",",
       "providerPrices: buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE),",
