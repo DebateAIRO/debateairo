@@ -1,12 +1,24 @@
-import { canDigFromLevel, DigLevelSchema, type Answer, type AnswerStory, type DigSuggestion } from "@debateai/contract";
+import {
+  canDigFromLevel,
+  DigLevelSchema,
+  type Answer,
+  type AnswerStory,
+  type DigSuggestion,
+  type PathRewrite,
+  type StoryFate
+} from "@debateai/contract";
 import { pathSuggestionsOf } from "./suggestions.js";
 import { countTrust, pointsOf } from "./trust.js";
-import type { V4Map, V4OpenQuestion, V4Path, V4PathWeb, V4Point } from "./types.js";
+import type { RewriteState, V4Map, V4OpenQuestion, V4Path, V4PathRewrites, V4PathWeb, V4Point } from "./types.js";
 import { pathWebOf, webNoteOf } from "./web.js";
 
 /*
  * V4 initial (2026-10-28): one served answer (+ its story, when written) as the map row D draws (R/42 §7). Paths are
  * the story's paths; without a story there is one stand-in path holding every point, with no fate invented.
+ * Dig model revision W4-6 (owner Q-D13, 31 Oct): a dig keeps its points and its answer text and writes NO story, so a
+ * dig's own map never reads one: its paths are the ones its rewrite names (Q-D2: each with its line and fate), or, until
+ * the rewrite is written, the positions it argued (each line the position's own claim, no fate invented). Every path a
+ * dig rewrote shows its newest finished text (Answer.path_rewrites), and keeps what it said before.
  */
 
 type StoryBody = NonNullable<AnswerStory["story"]>;
@@ -108,27 +120,117 @@ function digLevelOf(answer: Answer): number | null {
   return level !== undefined && DigLevelSchema.safeParse(level).success ? level : null;
 }
 
-/** W2-6: each story path gets its web part by the position that argued it (a repeated position: every copy the same). */
-function storyPaths(answer: Answer, body: StoryBody | null, byId: ReadonlyMap<string, V4Point>): V4Path[] {
+/** One path before its points are placed: the position it stands for, its line and fate, and the nodes it holds. */
+type PathSpec = Readonly<{ id: string; positionRef: string; fate: StoryFate | null; line: string; nodeRefs: readonly string[] }>;
+
+/** The story's paths (a repeated position gets "#2", "#3" on its id). */
+function storySpecs(body: StoryBody | null): PathSpec[] {
   if (body === null) return [];
-  // W3-4: the deepest level's paths cannot be dug, so they offer no suggestions.
-  const level = digLevelOf(answer);
-  const diggable = level === null || canDigFromLevel(level);
   const seen = new Map<string, number>();
   return body.short.paths.map((storyPath) => {
     const times = (seen.get(storyPath.position_ref) ?? 0) + 1;
     seen.set(storyPath.position_ref, times);
     const id = times === 1 ? storyPath.position_ref : `${storyPath.position_ref}#${times}`;
+    return { id, positionRef: storyPath.position_ref, fate: storyPath.fate, line: storyPath.line, nodeRefs: storyPath.node_refs };
+  });
+}
+
+/**
+ * W4-6: the nodes under each position, through the answer's edges (a point attacking an edge sits with the point that edge
+ * starts from), the position first, then the answer's order. A node no edge leaves is a position: what the story would
+ * call a path.
+ */
+function positionTrees(answer: Answer): ReadonlyMap<string, readonly string[]> {
+  const edgeFrom = new Map(answer.edges.map((edge) => [edge.edge_id, edge.from_node_ref]));
+  const parentOf = new Map<string, string>();
+  for (const edge of answer.edges) {
+    const target = edge.target_kind === "NODE" ? edge.target_ref : edgeFrom.get(edge.target_ref);
+    if (target !== undefined && target !== edge.from_node_ref && !parentOf.has(edge.from_node_ref)) parentOf.set(edge.from_node_ref, target);
+  }
+  const rootOf = (id: string): string => {
+    let at = id;
+    // A loop in the edges ends the climb (each step is counted, so it cannot run on).
+    for (let steps = 0; steps <= answer.nodes.length; steps += 1) {
+      const up = parentOf.get(at);
+      if (up === undefined) return at;
+      at = up;
+    }
+    return at;
+  };
+  const trees = new Map<string, string[]>();
+  const ids = [...new Set(answer.nodes.map((node) => node.node_id))];
+  for (const id of ids) if (!parentOf.has(id)) trees.set(id, [id]);
+  for (const id of ids) {
+    if (!parentOf.has(id)) continue;
+    trees.get(rootOf(id))?.push(id);
+  }
+  return trees;
+}
+
+/**
+ * W4-6: a dig's own paths (owner Q-D2): the ones its finished rewrite names, each with its line and fate; until then the
+ * positions it argued, each with its own claim and no fate. A dig writes no story (Q-D13), so none is read.
+ */
+function digSpecs(answer: Answer): PathSpec[] {
+  const trees = positionTrees(answer);
+  const rewrite = answer.dig?.rewrite ?? null;
+  const named = rewrite !== null && isFinishedRewrite(rewrite) ? rewrite.dig_paths : [];
+  if (named.length > 0) {
+    return named.map((path) => ({
+      id: path.position_ref, positionRef: path.position_ref, fate: path.fate, line: path.line, nodeRefs: trees.get(path.position_ref) ?? []
+    }));
+  }
+  const claims = new Map(answer.nodes.map((node) => [node.node_id, node.claim]));
+  return [...trees.entries()].map(([id, nodeRefs]) => ({ id, positionRef: id, fate: null, line: claims.get(id) ?? "", nodeRefs }));
+}
+
+/** W4-6: a finished rewrite (the checker passed it, or its last round left a reservation): it carries the path's new text. */
+export function isFinishedRewrite(rewrite: PathRewrite): rewrite is Extract<PathRewrite, { state: "READY" | "READY_WITH_RESERVATION" }> {
+  return rewrite.state === "READY" || rewrite.state === "READY_WITH_RESERVATION";
+}
+
+/** W4-6: what became of a path's newest rewrite (draft 5.5's four states); null when no dig rewrote it (only marked below). */
+export function rewriteStateOf(rewrite: PathRewrite | null | undefined): RewriteState | null {
+  if (rewrite === null || rewrite === undefined) return null;
+  if (rewrite.state === "WRITING") return "REWRITING";
+  if (rewrite.state === "FAILED") return "FAILED";
+  return rewrite.changed ? "REWRITTEN" : "NO_CHANGE";
+}
+
+/** W4-6: each path's rewrites by position, and its text now (Answer.path_rewrites; an answer from before R22 has none). */
+function applyRewrites(answer: Answer, specs: readonly PathSpec[]): ReadonlyArray<PathSpec & { rewrites?: V4PathRewrites }> {
+  const byPosition = new Map((answer.path_rewrites?.paths ?? []).map((path) => [path.position_ref, path]));
+  return specs.map((spec) => {
+    const served = byPosition.get(spec.positionRef);
+    if (served === undefined) return spec;
+    const rewrites: V4PathRewrites = {
+      original: { line: spec.line, fate: spec.fate },
+      history: served.history,
+      changedBelow: served.changed_below === true
+    };
+    const current = served.current;
+    return current === null ? { ...spec, rewrites } : { ...spec, line: current.line, fate: current.fate, rewrites };
+  });
+}
+
+/** W2-6: each path gets its web part by the position that argued it (a repeated position: every copy the same). */
+function placePaths(answer: Answer, specs: ReadonlyArray<PathSpec & { rewrites?: V4PathRewrites }>,
+  byId: ReadonlyMap<string, V4Point>): V4Path[] {
+  // W3-4: the deepest level's paths cannot be dug, so they offer no suggestions.
+  const level = digLevelOf(answer);
+  const diggable = level === null || canDigFromLevel(level);
+  return specs.map((spec) => {
     const points: V4Point[] = [];
     const taken = new Set<string>();
-    for (const ref of storyPath.node_refs) {
+    for (const ref of spec.nodeRefs) {
       const point = byId.get(ref);
       if (point === undefined || taken.has(ref)) continue;
       taken.add(ref);
       points.push(point);
     }
-    return pathOf(id, storyPath.fate, storyPath.line, points, pathWebOf(answer, storyPath.position_ref),
-      diggable ? pathSuggestionsOf(answer, storyPath.position_ref) : []);
+    const path = pathOf(spec.id, spec.fate, spec.line, points, pathWebOf(answer, spec.positionRef),
+      diggable ? pathSuggestionsOf(answer, spec.positionRef) : []);
+    return { ...path, positionRef: spec.positionRef, ...(spec.rewrites === undefined ? {} : { rewrites: spec.rewrites }) };
   });
 }
 
@@ -208,11 +310,17 @@ export function buildV4Map(input: Readonly<{
   /** The page stopped waiting for the story (no more tries): a missing story then reads as unavailable. */
   storyGaveUp?: boolean;
 }>): V4Map {
-  const { answer, story } = input;
+  const { answer } = input;
+  // W4-6 (owner Q-D13): a dig writes no story, so its map never reads one, nor waits for one.
+  const isDig = answer.dig !== undefined;
+  const story = isDig ? null : input.story;
   const body = readyBody(story);
-  const byId = pointsOf(answer, story);
+  const specs = applyRewrites(answer, isDig ? digSpecs(answer) : storySpecs(body));
+  // Decision B on the map's own fates: the story's, a dig's own, and what a rewrite made of a path.
+  const fell = new Set(specs.filter((spec) => spec.fate === "FELL").map((spec) => spec.positionRef));
+  const byId = pointsOf(answer, story, fell);
   const allPoints = [...byId.values()];
-  let paths = storyPaths(answer, body, byId);
+  let paths = placePaths(answer, specs, byId);
   if (paths.length === 0) {
     const first = answer.composed_text.find((segment) => segment.text.trim().length > 0);
     paths = [pathOf("all", null, first === undefined ? answer.question_line : first.text, allPoints)];
@@ -261,12 +369,29 @@ export function buildV4Map(input: Readonly<{
     wouldChange: turn,
     wouldChangeAlt: turning.alt,
     objections: answer.residual_objections.map((objection) => objection.trim()).filter((objection) => objection.length > 0),
-    storyState: storyStateOf(story, body, input.storyGaveUp === true),
+    storyState: isDig ? "NONE" : storyStateOf(story, body, input.storyGaveUp === true),
     fallbackText: body === null ? composedText(answer) : null,
     reservation: body !== null && story?.status === "READY_WITH_RESERVATION",
     webNote: webNoteOf(answer),
-    digLevel: digLevelOf(answer)
+    digLevel: digLevelOf(answer),
+    changedSince: answer.path_rewrites?.changed_since ?? null,
+    dig: answer.dig ?? null
   };
+}
+
+/** W4-6: the path a dig rewrote on this map and that dig's rewrite of it (by the dig's run), or null when none here. */
+export function rewriteByDig(map: V4Map, digRunId: string): Readonly<{ path: V4Path; rewrite: PathRewrite }> | null {
+  for (const path of map.paths) {
+    const rewrite = path.rewrites?.history.find((candidate) => candidate.dig_run_id === digRunId);
+    if (rewrite !== undefined) return { path, rewrite };
+  }
+  return null;
+}
+
+/** W4-6: something on this map is still being rewritten: one of its paths, or (on a dig's own map) the path it came from. */
+export function rewriteWaiting(map: V4Map): boolean {
+  if (map.dig?.rewrite?.state === "WRITING") return true;
+  return map.paths.some((path) => path.rewrites?.history.at(-1)?.state === "WRITING");
 }
 
 /** Every open question on the map: the question's own, then each path's, with the star first. */

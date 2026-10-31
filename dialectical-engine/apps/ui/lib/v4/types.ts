@@ -1,4 +1,13 @@
-import type { DigSuggestion, StoryFate, WebOtherPage, WebSearchStatus, WebSource } from "@debateai/contract";
+import type {
+  AnswerDig,
+  DigSuggestion,
+  PathRewrite,
+  PathsChangedSince,
+  StoryFate,
+  WebOtherPage,
+  WebSearchStatus,
+  WebSource
+} from "@debateai/contract";
 
 /*
  * V4 initial (2026-10-28): the shapes every V4 page shares. V4 is built over today's V3 answer, story and run reads.
@@ -97,7 +106,30 @@ export type V4Path = Readonly<{
    * answer from before R22, a level-10 dig, whose paths cannot be dug).
    */
   suggestions?: readonly DigSuggestion[];
+  /**
+   * W4-6: the story position (or the dig's own path) this path stands for; `id` adds "#2" to a repeated one. Absent: the
+   * stand-in path, which stands for no position.
+   */
+  positionRef?: string;
+  /** W4-6: what digs did to this path (Answer.path_rewrites); absent when no dig rewrote it or changed anything below it. */
+  rewrites?: V4PathRewrites;
 }>;
+
+/**
+ * W4-6 (dig model revision, 5.5): one path's rewrites by digs as the map shows them. `line` and `fate` of the path are
+ * already the newest finished rewrite's; `original` keeps what the path said before any dig rewrote it, so each earlier
+ * text can be shown ("Show earlier text"). `history` is the contract's, newest last. `changedBelow`: a dig further down
+ * changed part of this path (owner Q-D5: marked only, never rewritten).
+ */
+export type V4PathRewrites = Readonly<{
+  original: Readonly<{ line: string; fate: StoryFate | null }>;
+  history: readonly PathRewrite[];
+  changedBelow: boolean;
+}>;
+
+/** W4-6: what became of a path's newest rewrite (the four states of draft 5.5). */
+export const REWRITE_STATES = ["REWRITING", "REWRITTEN", "NO_CHANGE", "FAILED"] as const;
+export type RewriteState = (typeof REWRITE_STATES)[number];
 
 /** W2-6: one path's web part as the pages show it (never a grade: the contract carries none). */
 export type V4PathWeb = Readonly<{ search: WebSearchStatus; otherPages: readonly WebOtherPage[] }>;
@@ -137,7 +169,8 @@ export type V4Map = Readonly<{
    */
   wouldChangeAlt: string | null;
   objections: readonly string[];
-  storyState: "READY" | "WRITING" | "UNAVAILABLE";
+  /** W4-6: NONE on a dig's own map: a dig keeps its points and its answer text and writes no story (owner Q-D13). */
+  storyState: "READY" | "WRITING" | "UNAVAILABLE" | "NONE";
   /**
    * DATA-2: the whole composed answer (V3's toStoryView fallback), set only when there is no ready story body, so the
    * page still has the answer to show while the story is missing or being written. AI text.
@@ -152,6 +185,13 @@ export type V4Map = Readonly<{
    * answer does not say (a first debate, or a dig from before R22). Never the debate's own argument bound.
    */
   digLevel?: number | null;
+  /**
+   * W4-6: "Paths changed since the answer was written" (or since report version n), as the answer says it; null or
+   * absent when the answer says nothing (no dig has rewritten any of its paths, or an answer from before R22).
+   */
+  changedSince?: PathsChangedSince | null;
+  /** W4-6: on a dig's own map, what it dug and its rewrite of the path it came from (`Answer.dig`); null otherwise. */
+  dig?: AnswerDig | null;
 }>;
 
 /** Row D / sieve 2026-10-26: the reading level is chosen once; ids follow the D1 prototype's three choices. */
@@ -235,6 +275,16 @@ export type DigView = Readonly<{
   headline: string | null;
   /** DONE: the follow-up's trust counts. */
   counts: TrustCounts | null;
+  /**
+   * W4-6: a dig of the new model (its answer says what it dug) rewrites the path it came from instead of writing a
+   * story: its rewrite (null: it rewrites no path, a dig of an open question under the main question). Absent: a dig from
+   * before R22, read by its story headline as before.
+   */
+  rewrite?: PathRewrite | null;
+  /** W4-6: DONE, a new-model dig: its own points, each with its trust word and sources ("See the dig's points and sources"). */
+  points?: readonly V4Point[];
+  /** W4-6 (the money rule): the dig's own run is paused at the month wall until this time (ISO); absent when it is not. */
+  pausedUntil?: string;
 }>;
 
 /** What the panel shows: the question itself, one path, one open question or one dig. */

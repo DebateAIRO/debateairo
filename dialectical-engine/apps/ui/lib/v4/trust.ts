@@ -52,10 +52,11 @@ export function fellPositionsOf(story: AnswerStory | null): ReadonlySet<string> 
 
 /**
  * Every point of the answer with its trust word, keyed by node id, in the answer's order (first copy of an id wins).
- * `story` (optional) adds Decision B: a FELL path's position does not hold, whatever its review said.
+ * `story` (optional) adds Decision B: a FELL path's position does not hold, whatever its review said. W4-6: `fell`, when
+ * given, names those positions instead (the map's own fates: a dig's paths, and a path a dig rewrote to fall or to stand).
  */
-export function pointsOf(answer: Answer, story: AnswerStory | null = null): ReadonlyMap<string, V4Point> {
-  const fell = fellPositionsOf(story);
+export function pointsOf(answer: Answer, story: AnswerStory | null = null, fellPositions?: ReadonlySet<string>): ReadonlyMap<string, V4Point> {
+  const fell = fellPositions ?? fellPositionsOf(story);
   const free = ranOnFree(answer);
   const points = new Map<string, V4Point>();
   for (const node of answer.nodes) {

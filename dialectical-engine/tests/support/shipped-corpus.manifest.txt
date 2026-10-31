@@ -665,9 +665,11 @@ apps/ui/components/v4/V4DebateClient.tsx
 apps/ui/components/v4/V4DigSuggest.tsx
 apps/ui/components/v4/V4DigToast.tsx
 apps/ui/components/v4/V4Header.tsx
+apps/ui/components/v4/V4LevelTrail.tsx
 apps/ui/components/v4/V4MapTree.tsx
 apps/ui/components/v4/V4Outline.tsx
 apps/ui/components/v4/V4Panel.tsx
+apps/ui/components/v4/V4PathRewrite.tsx
 apps/ui/components/v4/V4Rail.tsx
 apps/ui/components/v4/V4ReportClient.tsx
 apps/ui/components/v4/V4Sources.tsx

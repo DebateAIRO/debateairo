@@ -29,6 +29,7 @@ import {
   digNote,
   digsUnder,
   digTitle,
+  digWorking,
   openNote,
   pathTitle,
   PickBox,
@@ -41,6 +42,7 @@ import {
   type Title
 } from "./V4MapTree";
 import { V4DigCompose, V4MoneyLines, type V4DigChoice } from "./V4DigSuggest";
+import { V4DigPageIntro, V4PathRewrite, V4WhatChanged } from "./V4PathRewrite";
 import { V4OtherPages, V4SearchNote, V4SourceList, V4WebNoteLine } from "./V4Sources";
 import { V4TrustBar } from "./V4TrustBar";
 
@@ -52,6 +54,9 @@ import { V4TrustBar } from "./V4TrustBar";
  * Perplexity plan W2-6 (2026-10-30): each point shows its sources at every reading level (V4Sources.tsx); the question
  * shows the debate's web note (Free, a failed search, switched off) and a path its own search note, above the points;
  * a path then lists the other pages its search found, each with "Add to researched" (wired in W4-4).
+ * Dig model revision W4-6: a path a dig rewrote shows its rewrite under its new text (V4PathRewrite.tsx); a dig's own page
+ * says what it looked into and the path it rewrote in place of a short answer (a dig writes no story, owner Q-D13), then its
+ * answer text and its points as usual; a dig's panel says what became of its rewrite, or that it is paused at the month wall.
  */
 
 type PanelProps = Readonly<{
@@ -81,6 +86,8 @@ type PanelProps = Readonly<{
   choice?: V4DigChoice;
   /** W3-4: the money lines before a dig (its share of today; new starts waiting for the reset). Never a price. */
   money?: readonly MoneyLine[];
+  /** W4-6: on a dig's own map, the line of the path it dug, on the map above (null: not known yet, or no path). */
+  digPathLine?: string | null;
   headingRef: RefObject<HTMLHeadingElement | null>;
   catalog: MessageCatalog;
   locale: string;
@@ -217,6 +224,7 @@ function Section(props: Readonly<{ title: string; children: ReactNode; className
 
 function DigLinkRow(props: Readonly<{ dig: DigView; onSelect: PanelProps["onSelect"]; catalog: MessageCatalog }>) {
   const { dig } = props;
+  const working = digWorking(dig) && dig.pausedUntil === undefined;
   return (
     <li>
       <button
@@ -226,7 +234,7 @@ function DigLinkRow(props: Readonly<{ dig: DigView; onSelect: PanelProps["onSele
       >
         <TitleText className="v4PanelRowTitle" title={digTitle(dig, props.catalog)} catalog={props.catalog} />
         <span className="v4MapNote">
-          {dig.state === "WAITING" || dig.state === "RUNNING" ? <span className="v4MapPulse" aria-hidden="true" /> : null}
+          {working ? <span className="v4MapPulse" aria-hidden="true" /> : null}
           {digNote(dig, props.catalog)}
         </span>
       </button>
@@ -378,6 +386,8 @@ function RootBody(props: Readonly<{ panel: PanelProps }>) {
   // DATA-2: with no short answer yet, the whole composed answer is shown, so there is always an answer to read.
   const fallback = (map.fallbackText ?? "").split(/\n\s*\n/).map((paragraph) => paragraph.trim()).filter((paragraph) => paragraph.length > 0);
   const writing = map.storyState === "WRITING";
+  // W4-6 (Q-D13): a dig has no short answer by design: its answer text is the answer, with nothing said to be missing.
+  const noStory = map.storyState === "NONE";
   return (
     <>
       {addedLines(map.question).length > 0
@@ -388,6 +398,14 @@ function RootBody(props: Readonly<{ panel: PanelProps }>) {
           </details>
         )
         : null}
+      {map.dig !== null && map.dig !== undefined ? (
+        <V4DigPageIntro
+          map={map}
+          pathLine={panel.digPathLine ?? null}
+          linkLevel={panel.linkLevel === undefined ? panel.readingLevel : panel.linkLevel}
+          catalog={catalog}
+        />
+      ) : null}
       <Section title={t(catalog, "v4.panel.answerRoot")}>
         {headline.length > 0 || summary.length > 0
           ? (
@@ -405,10 +423,12 @@ function RootBody(props: Readonly<{ panel: PanelProps }>) {
                 <div className="v4PanelFallback" data-ai-generated="true">
                   {fallback.map((paragraph, index) => <p key={index} className="v4PanelText">{paragraph}</p>)}
                 </div>
-                <p className="v4PanelHint v4Muted">{t(catalog, writing ? "v4.panel.fallbackWriting" : "v4.panel.fallbackMissing")}</p>
+                {noStory ? null : (
+                  <p className="v4PanelHint v4Muted">{t(catalog, writing ? "v4.panel.fallbackWriting" : "v4.panel.fallbackMissing")}</p>
+                )}
               </>
             )
-            : <p className="v4Muted">{t(catalog, writing ? "v4.panel.storyWriting" : "v4.panel.storyMissing")}</p>}
+            : noStory ? null : <p className="v4Muted">{t(catalog, writing ? "v4.panel.storyWriting" : "v4.panel.storyMissing")}</p>}
       </Section>
       <V4WebNoteLine note={map.webNote} catalog={catalog} />
       <TrustSection counts={map.counts} points={map.points} unchecked={map.unchecked} panel={panel} />
@@ -452,6 +472,13 @@ function PathBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolve
         {cut ? <p className="v4PanelText" data-ai-generated="true">{line}</p> : null}
         {!cut && path.fate === null ? <p className="v4Muted">{t(panel.catalog, "v4.panel.pathNoMore")}</p> : null}
       </Section>
+      <V4PathRewrite
+        path={path}
+        digs={panel.digs}
+        linkLevel={panel.linkLevel === undefined ? panel.readingLevel : panel.linkLevel}
+        catalog={panel.catalog}
+        locale={panel.locale}
+      />
       {path.web !== undefined
         ? <V4SearchNote search={path.web.search} catalog={panel.catalog} />
         : <V4WebNoteLine note={panel.map.webNote} catalog={panel.catalog} />}
@@ -563,6 +590,12 @@ function DigBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolved
   const { dig } = props.resolved;
   const headline = dig.headline?.trim() ?? "";
   const more = dig.link.questions.slice(1).filter((question) => question.trim().length > 0);
+  // W4-6: a dig of the new model writes no story; it says what became of its rewrite of the path it came from.
+  const rewrite = dig.rewrite;
+  const finished = rewrite !== undefined && rewrite !== null && (rewrite.state === "READY" || rewrite.state === "READY_WITH_RESERVATION")
+    ? rewrite
+    : null;
+  const paused = dig.pausedUntil;
   return (
     <>
       {more.length > 0
@@ -576,18 +609,23 @@ function DigBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolved
         : null}
       <Section title={t(panel.catalog, "v4.panel.answerHere")}>
         <p className="v4PanelText">
-          {dig.state === "WAITING" || dig.state === "RUNNING" ? <span className="v4MapPulse" aria-hidden="true" /> : null}
-          {t(panel.catalog, `v4.panel.digState.${dig.state}`)}
+          {digWorking(dig) && paused === undefined ? <span className="v4MapPulse" aria-hidden="true" /> : null}
+          {paused !== undefined
+            ? t(panel.catalog, "v4.money.paused", { date: formatDate(panel.locale, paused, { dateStyle: "medium" }) })
+            : rewrite !== undefined && dig.state === "DONE"
+              ? digNote(dig, panel.catalog)
+              : t(panel.catalog, `v4.panel.digState.${dig.state}`)}
           {dig.link.mode !== null
             ? <> <span className="v4PanelModeTag">{t(panel.catalog, `v4.digMode.${dig.link.mode}`)}</span></>
             : null}
         </p>
-        {dig.state === "DONE"
+        {dig.state === "DONE" && rewrite === undefined
           ? (headline.length > 0
             ? <p className="v4PanelHeadline v4Serif" data-ai-generated="true">{headline}</p>
             : <p className="v4Muted">{t(panel.catalog, "v4.panel.digNoHeadline")}</p>)
           : null}
       </Section>
+      {dig.state === "DONE" && finished !== null ? <V4WhatChanged sentences={finished.what_changed} catalog={panel.catalog} /> : null}
       {dig.state === "DONE" && dig.counts !== null
         ? (
           <div className="v4PanelBar">

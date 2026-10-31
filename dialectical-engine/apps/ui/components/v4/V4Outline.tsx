@@ -8,6 +8,7 @@ import {
   digNote,
   digsUnder,
   digTitle,
+  digWorking,
   NewDot,
   openCount,
   openNote,
@@ -22,12 +23,14 @@ import {
   viaKeyboard,
   type MapPiecesProps
 } from "./V4MapTree";
+import { V4RewriteCardNote } from "./V4PathRewrite";
 import { V4TrustBar } from "./V4TrustBar";
 
 /*
  * V4 initial (2026-10-28): the phone map (D7) as an indented list: the question, then its own open questions, then
  * each path with its open questions and digs. Every open question has its pick box (the outline doubles as the tray).
- * Tapping a row calls onSelect; the page then shows that question in the panel.
+ * Tapping a row calls onSelect; the page then shows that question in the panel. W4-6: a rewritten path's row carries its
+ * new text and one line about its rewrite, as the tree's card does; the panel shows the rest.
  */
 
 function OpenRow(props: Readonly<{ question: V4OpenQuestion; pieces: MapPiecesProps; selectedId: V4Selection }>) {
@@ -70,7 +73,7 @@ function DigRow(props: Readonly<{ dig: DigView; pieces: MapPiecesProps; selected
   const { dig, pieces } = props;
   const id: V4Selection = `dig:${dig.link.childRunId}`;
   const selected = props.selectedId === id;
-  const working = dig.state === "WAITING" || dig.state === "RUNNING";
+  const working = digWorking(dig) && dig.pausedUntil === undefined;
   return (
     <li className={`v4OutRow v4OutDig${selected ? " v4OutSelected" : ""}`}>
       <button
@@ -166,6 +169,7 @@ export function V4Outline(props: MapPiecesProps) {
                           {props.changed.has(id) ? <NewDot catalog={catalog} /> : null}
                         </span>
                         <V4TrustBar counts={path.counts} unchecked={path.unchecked} catalog={catalog} />
+                        <V4RewriteCardNote path={path} catalog={catalog} locale={props.locale ?? "en"} />
                       </button>
                       <Children
                         groupKey={path.id}

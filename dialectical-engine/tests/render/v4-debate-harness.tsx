@@ -6,7 +6,8 @@ import { vi } from "vitest";
 import * as fixture from "../../apps/ui/lib/v3/storyFixture.js";
 import type { AskRoom } from "../../apps/ui/lib/billing/room.js";
 import type { ContinueOutcome } from "../../apps/ui/lib/v4/money.js";
-import type { DigLink, DigView } from "../../apps/ui/lib/v4/types.js";
+import type { DigTrail } from "../../apps/ui/lib/v4/load.js";
+import type { DigLink, DigView, SeenSnapshot } from "../../apps/ui/lib/v4/types.js";
 import type { V4AskOutcome } from "../../apps/ui/lib/v4/useV4Ask.js";
 import type { Answer, AnswerStory, AskParent, DigLinks, RunProjection, UsageBorrow } from "../../packages/contract/src/index.js";
 import { createSeed } from "../../tools/v4-mock-api/seed.js";
@@ -21,6 +22,8 @@ import { createSeed } from "../../tools/v4-mock-api/seed.js";
  * The test files register these stand-ins with vi.mock (vi.mock must sit in the test file itself):
  *   vi.mock("@/components/AuthGate", async () => (await import("./v4-debate-harness.js")).authGateMock);
  *   … see tests/render/v4-dig-suggestions.test.tsx.
+ * W4-6: the answer read again for rewrites (`loadAnswer`: `harness.fresh`, else the served one), the answers above a dig
+ * for its trail (`harness.ancestors`, by run id), each dig's read (`harness.digView`), and the account's last visit.
  */
 
 export const CATALOG = JSON.parse(readFileSync(resolve(import.meta.dirname, "../../apps/ui/messages/en/v4.json"), "utf8")) as Record<string, string>;
@@ -60,7 +63,16 @@ export const harness = {
   run: null as RunProjection | null,
   records: { parent: null, children: [] } as DigLinks,
   borrowed: [] as UsageBorrow[],
-  continueRun: vi.fn<(runId: string) => Promise<ContinueOutcome>>()
+  continueRun: vi.fn<(runId: string) => Promise<ContinueOutcome>>(),
+  /** W4-6: what reading the answer again returns (null: the served one). */
+  fresh: null as Answer | null,
+  /** W4-6: the answers above a dig, by run id (a missing one cannot be read). */
+  ancestors: {} as Record<string, Answer>,
+  /** W4-6: how each dig reads (null: done, with a headline and one sure point, as before). */
+  digView: null as ((link: DigLink) => DigView) | null,
+  lastVisit: null as SeenSnapshot | null,
+  loadStory: vi.fn(),
+  loadAnswer: vi.fn()
 };
 
 export function resetHarness(): void {
@@ -74,6 +86,12 @@ export function resetHarness(): void {
   harness.records = { parent: null, children: [] };
   harness.borrowed = [];
   harness.continueRun = vi.fn(async () => ({ kind: "CONTINUING" as const }));
+  harness.fresh = null;
+  harness.ancestors = {};
+  harness.digView = null;
+  harness.lastVisit = null;
+  harness.loadStory = vi.fn(async () => harness.story);
+  harness.loadAnswer = vi.fn(async (runId: string) => harness.fresh ?? harness.answer ?? seededAnswer(runId));
 }
 resetHarness();
 
@@ -104,8 +122,17 @@ export function loadMock(original: Record<string, unknown>) {
     loadV4: async (id: string) => harness.run !== null
       ? { kind: "RUN", runId: id, run: harness.run }
       : { kind: "SERVED", runId: id, answer: harness.answer ?? seededAnswer(id), story: harness.story },
-    loadStory: async () => harness.story,
-    loadDigView: async (link: DigLink): Promise<DigView> => ({
+    loadStory: (...args: unknown[]) => harness.loadStory(...args),
+    loadAnswer: (runId: string) => harness.loadAnswer(runId),
+    // The trail's own walk up the answers runs; only its reads are the harness's.
+    loadDigTrail: (dig: Answer["dig"]) => (original.loadDigTrail as (dig: unknown, client: unknown) => Promise<DigTrail>)(dig, {
+      readRunAnswer: async (runId: string) => {
+        const above = harness.ancestors[runId];
+        if (above === undefined) throw new Error("not readable");
+        return above;
+      }
+    }),
+    loadDigView: async (link: DigLink): Promise<DigView> => harness.digView?.(link) ?? ({
       link, state: "DONE", headline: "The dig's short answer.", counts: { SURE: 1, SURE_FOR_CASE: 0, STILL_ARGUED: 0, DIDNT_HOLD: 0 }
     })
   };
@@ -117,7 +144,7 @@ export function accountMemoryMock(original: Record<string, unknown>) {
   return {
     ...original,
     readDigRecords: async () => harness.records,
-    readLastVisit: async () => null,
+    readLastVisit: async () => harness.lastVisit,
     recordLastVisit: async () => true,
     recordDig: async () => true
   };
@@ -159,15 +186,15 @@ export async function advance(ms: number): Promise<void> {
   });
 }
 
-/** Mounts the map page of a fresh run id at `width`; returns the run id. */
-export async function mountMap(width: 375 | 1280 = 1280, runId: string = crypto.randomUUID()): Promise<string> {
+/** Mounts the map page of a fresh run id at `width`; returns the run id. W4-6: `initialPath` as `?path=` names it. */
+export async function mountMap(width: 375 | 1280 = 1280, runId: string = crypto.randomUUID(), initialPath: string | null = null): Promise<string> {
   stubWidth(width);
   const { V4DebateClient } = await import("../../apps/ui/components/v4/V4DebateClient.js");
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
   await act(async () => root?.render(
-    <V4DebateClient id={runId} initialLevel="background" catalog={CATALOG} homeCatalog={{}} newDebateCatalog={{}}
+    <V4DebateClient id={runId} initialPath={initialPath} initialLevel="background" catalog={CATALOG} homeCatalog={{}} newDebateCatalog={{}}
       billingCatalog={{}} locale="en" crisisCountryHint={null} />
   ));
   await settle();

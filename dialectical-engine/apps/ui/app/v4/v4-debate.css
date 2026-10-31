@@ -191,3 +191,18 @@
 .v4DebPaused .v4Btn { min-height: 44px; }
 .v4DebRailUsage { border-left: 3px solid var(--gold); padding-left: 10px; }
 .v4DebRailUsageNote { margin: 0; font-size: var(--t-ui); overflow-wrap: anywhere; }
+
+/* Dig model revision W4-6: the top of the map (paths changed since the answer), a dig's trail, and rewrites in the news. */
+.v4ChangedSince {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; min-width: 0;
+  border: 1px solid var(--line-strong); border-radius: var(--r-card); padding: 10px 14px; background: var(--surface);
+}
+.v4ChangedSinceText { margin: 0; flex: 1 1 240px; min-width: 0; }
+.v4ChangedSinceReport { min-height: 44px; text-decoration: none; }
+.v4Trail { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; min-width: 0; font-size: var(--t-ui); }
+.v4TrailParts { display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; margin: 0; padding: 0; list-style: none; min-width: 0; }
+.v4TrailParts li { display: inline-flex; align-items: center; min-width: 0; overflow-wrap: anywhere; }
+.v4TrailParts li + li::before { content: "›"; margin-right: 6px; color: var(--text-2); }
+.v4TrailParts .v4Link { min-height: 44px; display: inline-flex; align-items: center; }
+.v4TrailLevel { margin: 0; font-weight: 700; color: var(--text); }
+.v4DebChangesRewrites { flex: 1 1 100%; margin: 0; padding-left: 1.2em; min-width: 0; overflow-wrap: anywhere; }

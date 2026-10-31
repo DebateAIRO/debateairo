@@ -45,14 +45,18 @@ describe("no browser storage (Decision A, S01-R17)", () => {
   it("lib/v4 never writes browser storage or cookies", () => {
     for (const file of ["storage.ts", "useReadingLevel.ts", "digIndex.ts", "askText.ts", "askConfig.ts", "useV4Ask.tsx", "trust.ts", "web.ts",
       // Perplexity plan W3-4: choosing what to dig and the money lines keep nothing in the browser either.
-      "suggestions.ts", "money.ts"]) {
+      "suggestions.ts", "money.ts",
+      // Dig model revision W4-6: the rewrites, the dig trail and the news of a finished rewrite keep nothing in the browser.
+      "mapModel.ts", "changes.ts", "load.ts", "types.ts"]) {
       const source = readFileSync(resolve(here, "../../apps/ui/lib/v4", file), "utf8");
       expect(source, file).not.toMatch(/\.setItem\(|localStorage|sessionStorage|document\.cookie/);
     }
   });
 
-  it("the V4 map pieces that hold the dig choice never write browser storage or cookies (W3-4)", () => {
-    for (const file of ["V4DigSuggest.tsx", "V4DebateClient.tsx", "V4MapTree.tsx", "V4Outline.tsx", "V4Panel.tsx", "V4Rail.tsx", "V4AskClient.tsx"]) {
+  it("the V4 map pieces that hold the dig choice and the rewrites never write browser storage or cookies (W3-4, W4-6)", () => {
+    for (const file of ["V4DigSuggest.tsx", "V4DebateClient.tsx", "V4MapTree.tsx", "V4Outline.tsx", "V4Panel.tsx", "V4Rail.tsx", "V4AskClient.tsx",
+      // W4-6: a path's rewrites, the top of the map, a dig's trail and the news bar.
+      "V4PathRewrite.tsx", "V4LevelTrail.tsx", "V4ChangesBar.tsx", "V4Header.tsx"]) {
       const source = readFileSync(resolve(here, "../../apps/ui/components/v4", file), "utf8");
       expect(source, file).not.toMatch(/\.setItem\(|localStorage|sessionStorage|indexedDB|document\.cookie/);
     }

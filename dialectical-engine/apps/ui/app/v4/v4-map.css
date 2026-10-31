@@ -336,3 +336,29 @@
 .v4MoneyLine { margin: 0; color: var(--text); }
 .v4PanelDeepest { margin: 0; padding: 10px 12px; border-left: 3px solid var(--line-strong); color: var(--text); }
 .v4MapPick input:disabled, .v4OutPick input:disabled, .v4PanelPick input:disabled { cursor: not-allowed; opacity: 0.45; }
+
+/* Dig model revision W4-6: what a dig did to a path (V4PathRewrite.tsx). The card carries one line; the panel the rest.
+   Phone first: nothing has a fixed width, text wraps, and every control keeps the 44px touch height. */
+.v4RewriteNote { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: var(--t-meta); color: var(--text-2); }
+.v4RewriteNoteREWRITTEN .v4RewriteNoteLine { color: var(--text); font-weight: 600; }
+.v4RewriteNoteBelow { font-style: italic; }
+.v4Rewrite {
+  display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 10px 12px; overflow-wrap: anywhere;
+  border-left: 3px solid var(--line-strong); border-radius: 0 10px 10px 0; background: var(--surface);
+}
+.v4RewriteREWRITTEN { border-left-color: var(--accent); }
+.v4RewriteFAILED { border-left-color: var(--gold); }
+.v4RewriteState { margin: 0; font-weight: 600; color: var(--text); }
+.v4RewriteWhen { margin: 0; font-size: var(--t-ui); }
+.v4RewriteSentences, .v4RewriteOwnWords, .v4RewriteEarlierList, .v4DigPagePicks {
+  margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 4px; min-width: 0;
+}
+.v4RewriteOwnWords { list-style: none; padding-left: 0; }
+.v4RewriteOwnWords q { display: block; padding-left: 10px; border-left: 2px solid var(--line-strong); }
+.v4RewriteVerdict { margin: 0; font-weight: 700; color: var(--text); }
+.v4RewriteView, .v4RewriteChanged, .v4RewriteEarlier, .v4RewriteDig, .v4DigPage, .v4DigPageLooked {
+  display: flex; flex-direction: column; gap: 6px; min-width: 0;
+}
+.v4RewriteToggle, .v4RewriteDigMap, .v4DigPageBack { align-self: flex-start; min-height: 44px; }
+.v4RewritePointWord { font-size: var(--t-meta); font-weight: 700; color: var(--text-2); }
+.v4RewriteBelow { margin: 0; font-style: italic; color: var(--text-2); }
