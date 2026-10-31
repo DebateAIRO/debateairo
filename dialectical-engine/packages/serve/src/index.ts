@@ -19,7 +19,9 @@ import {
   PATH_REWRITE_CARRIER,
   prepareLeasedContentEncryptionForRun,
   prepareLeasedContentEncryptionForRuns,
+  PATH_SUGGESTIONS_CARRIER,
   PostgresDigModelRunnerRepository,
+  PostgresPathSuggestionsRepository,
   PostgresDigPicksRunnerRepository,
   PostgresInvestigationReportRunnerRepository, PostgresInvestigationRunnerRepository,
   PostgresWebEvidenceRepository,
@@ -35,13 +37,13 @@ import {
   withWriteTransaction,
   type RunOwnershipInput
 } from "@debateai/db";
-import { AnswerIndexSchema, ConditionMarkSchema, ExecutionLedgerDigestSchema, isDigPickPathRef, type Answer, type AnswerIndex, type ConditionMark, type Edge, type ExecutionLedgerDigest, type Inspection, type InvestigationAccepted, type Node, type VerdictState, webRanOnFree } from "@debateai/contract";
+import { AnswerIndexSchema, ConditionMarkSchema, ExecutionLedgerDigestSchema, isDigPickPathRef, type Answer, type AnswerIndex, type ConditionMark, type DigSuggestion, type Edge, type ExecutionLedgerDigest, type Inspection, type InvestigationAccepted, type Node, type VerdictState, webRanOnFree } from "@debateai/contract";
 import { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
 import { judgesComparisonOf, judgesRecountApplies, servedPositionOf } from "./judges-comparison.js";
 import type { EngineVerdictTrigger } from "./engine-verdict.js";
 import { SynthesisCheckRepository, synthesisTextOf, verdictOfRecord } from "./synthesis-check.js";
 import { PublicationReviewRepository, reviewStateOf } from "./publication-review.js";
-import { digLeadSuggestions, digLeadsOfPack, webWithDigSuggestions } from "./dig-suggestions.js";
+import { digLeadSuggestions, digLeadsOfPack, pathSuggestionsOfSet, webWithDigSuggestions } from "./dig-suggestions.js";
 import {
   digPicksAtMapPaths, serveWebEvidence, webPathRootsOf, webPathsAtRoots, webPlanReasonOf, withWebSources, type ServedWeb
 } from "./web-sources.js";
@@ -2971,6 +2973,8 @@ export class ServeRepository {
     // before this answer's own lease, since each is sealed under its dig's key. A read inside a caller's lease (the
     // publication's, the review catch-up's: neither shows them) and a legacy asker's read carry none.
     const digModel = access.ownerRef === null || isRunContentLeaseHeld() ? {} : await this.#readPathRewrites(row.run_id);
+    // W4-3 (0141): the AI's newest suggestions per path, read here for the same reason: each set is sealed under the run that paid for it.
+    const pathSuggestions = access.ownerRef === null || isRunContentLeaseHeld() ? new Map<string, readonly DigSuggestion[]>() : await this.#readPathSuggestions(row.run_id);
     return this.#memory.withDisclosureContentLease([row.run_id],async () => {
     const [runContent, factContent, composedContent, answerContent, conformanceContent] = await Promise.all([
       decryptContentForRun<{ questionLine: string }>(
@@ -3268,7 +3272,7 @@ export class ServeRepository {
       ...(judgesComparison === undefined ? {} : { judges_comparison: judgesComparison }),
       // Plan 2026-10-30 W3-3: each path's web search and other pages; absent when the debate kept no web rows.
       // W4-3: the kinds code finds on each path joined the AI's (`#readServedWeb`); none at level 10, which cannot be dug.
-      ...(servedWeb === null ? {} : { web: webWithDigSuggestions(servedWeb.web, nodes, edges, digModel.dig?.level ?? null) }),
+      ...(servedWeb === null ? {} : { web: webWithDigSuggestions(servedWeb.web, nodes, edges, digModel.dig?.level ?? null, pathSuggestions) }),
       // Dig-model revision W4-5: each rewritten path and, on a dig, what it dug; absent when no dig touched the debate.
       ...digModel
     };
@@ -3809,6 +3813,31 @@ export class ServeRepository {
       });
     } catch (error) {
       if (error instanceof TypedDomainError && error.code === "PRIVATE_CONTENT_ERASED") return {};
+      throw error;
+    }
+  }
+
+  /** W4-3 (0141): each path's newest set of the AI's suggestions, by its position in lower case, each opened under its own run's key. */
+  async #readPathSuggestions(runId: string): Promise<ReadonlyMap<string, readonly DigSuggestion[]>> {
+    const sets = new Map<string, readonly DigSuggestion[]>();
+    const rows = await new PostgresPathSuggestionsRepository(this.pool).readOfRun(runId);
+    if (rows === null || rows.length === 0) return sets;
+    const scope = [...new Set(rows.map((row) => row.run_id.toLowerCase()))];
+    try {
+      return await withRunContentLease(this.pool, scope, async () => {
+        const ciphers = await prepareLeasedContentEncryptionForRuns(this.pool, scope);
+        try {
+          for (const row of rows) {
+            sets.set(row.position_ref.toLowerCase(), pathSuggestionsOfSet(decryptLeasedContentForRun<unknown>(ciphers.get(row.run_id.toLowerCase())!,
+              PATH_SUGGESTIONS_CARRIER, row.set_id, row.content, null)));
+          }
+          return sets;
+        } finally {
+          await ciphers.get(scope[0]!)?.close();
+        }
+      });
+    } catch (error) {
+      if (error instanceof TypedDomainError && error.code === "PRIVATE_CONTENT_ERASED") return new Map();
       throw error;
     }
   }

@@ -208,6 +208,8 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // W5-1: the closing's sources open the root's story, its nodes, each dig's rewrite, the extracts with reader 1's line
       // and the earlier report, each under its own run's key, inside withRunContentLease; each version is sealed under the
       // ROOT run key inside withRunContentLease.
+      // W4-3 (0141): a set of suggestions sealed under the run that paid, inside withRunContentLease.
+      "apps/runner/src/dig-suggestions-step.ts",
       "apps/runner/src/investigation-close-sources.ts",
       // R22 decision 9: what the whole debate already investigated, for a dig's planners and its suggestions: each debate's story,
       // rewrite and web notes opened under its own run's key, inside withRunContentLease or through prepareLeasedContentEncryptionForRun.

@@ -9,7 +9,7 @@ import {
 } from "@debateai/judgement";
 import { createPerplexitySearchPort, previewThinkingStepOf, readPromptFrame, type PromptPacket, type ProviderCallRequest } from "@debateai/providers";
 import { addressKey, selectPathPages } from "../../packages/evidence/src/host-filter.js";
-import { digSuggestionIdOf, writeDigSuggestions, type DigSuggestionsJob } from "../../apps/runner/src/dig-suggestions-step.js";
+import { digSuggestionIdOf, refreshPathSuggestions, writeDigSuggestions, writeFirstDebateSuggestions, type DigSuggestionsJob, type PathSuggestionsStore } from "../../apps/runner/src/dig-suggestions-step.js";
 import { DIG_INVESTIGATED_MAX_BYTES, digDebateTextOf, investigatedText, type InvestigatedDebate } from "../../apps/runner/src/investigation-digest.js";
 import { isPathRewriteCallSite, pathRewriteCallSiteRole } from "../../apps/runner/src/path-rewrite-scope.js";
 import { ENGINE_SEALED_CONTRACT_IDS } from "../../apps/runner/src/engine-contracts.js";
@@ -406,6 +406,88 @@ describe("W4-3 the suggestions on a dig's own paths", () => {
     const { job, asked } = jobOf({ digPaths: [{ ...digPaths[0]!, points: [] }] });
     await writeDigSuggestions(job, async () => "[]", "seal");
     expect(asked).toEqual([]);
+  });
+});
+
+describe("W4-3 a first debate's paths, and a path a rewrite changed (0141)", () => {
+  const PATHS = [{ positionRef: "pos-1", statement: "Moving pays more.", extracts: [], points: [
+    { id: "n1", text: "Net pay is double.", onId: null, side: "for" as const, trust: null, disputed: true },
+    { id: "n2", text: "Rent eats it.", onId: null, side: "against" as const, trust: null, disputed: false }] },
+  { positionRef: "pos-2", statement: "Staying is safer.", extracts: [], points: [{ id: "n3", text: "Family is near.", onId: null, side: "for" as const, trust: null, disputed: false }] }];
+  const REPLY = JSON.stringify({ suggestions: [{ side: "against", question: "Do rents fall outside the city?", why: "It could keep the gain.", rests_on: ["f1"] },
+    { side: "for", question: "A point not on this path?", why: "No.", rests_on: ["z9"] }] });
+  function storeOf(existing: readonly string[] = []) {
+    const kept: { setId: string; runId: string; debateRunId: string; positionRef: string; content: { suggestions: readonly { suggestion_id: string; text: string }[] } }[] = [];
+    return { kept, store: { positionsOf: async () => new Set(existing), record: async (input: never) => { kept.push(input); return "RECORDED"; } } as unknown as PathSuggestionsStore };
+  }
+  function sending(reply: string = REPLY) {
+    const asked: ProviderCallRequest[] = [];
+    return { asked, send: (async (_maker: unknown, request: ProviderCallRequest) => {
+      asked.push(request);
+      if (request.classifyContent?.(reply, undefined).parseStatus !== "PARSED") throw new Error("REFUSED");
+      return { content: reply };
+    }) as never };
+  }
+  const WRITER = { provider: {} as never, providerRef: "ref-haiku" };
+  const firstJob = (send: never, free = false) => ({ runId: "11111111-1111-4111-8111-111111111111", workItemId: "w", free, question: "Should I move?", language: null, paths: PATHS,
+    wouldChangeIt: "Cheaper rent would change it.", writer: WRITER, send, log: () => undefined });
+
+  it("a first debate: the approved web.suggest.v1, one call per path, each set kept under the debate's key", async () => {
+    const { asked, send } = sending();
+    const { kept, store } = storeOf();
+    await writeFirstDebateSuggestions(firstJob(send), store, "seal");
+    expect(asked.map((request) => [readPromptFrame(request.packet).contractId, request.callSiteKey, request.lane]).sort()).toEqual([
+      ["web.suggest.v1", "PATH_REWRITE:SUGGEST:1", "story"], ["web.suggest.v1", "PATH_REWRITE:SUGGEST:2", "story"]]);
+    expect(readPromptFrame(asked[0]!.packet).fields.find((entry) => entry.name === "would_change_it")?.content).toBe("Cheaper rent would change it.");
+    const one = kept.find((entry) => entry.positionRef === "pos-1")!;
+    expect([one.runId, one.debateRunId]).toEqual([firstJob(send).runId, firstJob(send).runId]);
+    // A suggestion resting on a point this path doesn't have is dropped.
+    expect(one.content.suggestions.map((entry) => entry.text)).toEqual(["Do rents fall outside the city? It could keep the gain."]);
+  });
+
+  it("Free makes no call; a path that already has a set is left alone, so a re-run pays nothing", async () => {
+    const free = sending();
+    const freeStore = storeOf();
+    await writeFirstDebateSuggestions(firstJob(free.send, true), freeStore.store, "seal");
+    expect([free.asked, freeStore.kept]).toEqual([[], []]);
+    const again = sending();
+    const againStore = storeOf(["pos-1", "pos-2"]);
+    await writeFirstDebateSuggestions(firstJob(again.send), againStore.store, "seal");
+    expect([again.asked, againStore.kept]).toEqual([[], []]);
+  });
+
+  const refreshOf = (send: never, overrides: object = {}) => ({ digRunId: "22222222-2222-4222-8222-222222222222", workItemId: "w", free: false,
+    question: { line: "Should I move?", place: null, time: null, purpose: null, readingLevel: null as never, language: null }, debateRunId: "33333333-3333-4333-8333-333333333333",
+    positionRef: "pos-1", line: "Moving pays less than first said.", points: PATHS[0]!.points, whatChanged: ["Rent is higher."], step: 0, writer: WRITER, send, log: () => undefined, ...overrides });
+
+  it("Q-D8: after a rewrite, the path's set again from its new text, told what was investigated, under the paying dig's key, on the rewrite's seam", async () => {
+    const { asked, send } = sending(JSON.stringify({ suggestions: [{ side: "for", question: "Is rent capped?", why: "It could change this.", rests_on: ["a1"] }] }));
+    const { kept, store } = storeOf();
+    await refreshPathSuggestions(refreshOf(send), store, async () => INVESTIGATED, "seal");
+    const frame = readPromptFrame(asked[0]!.packet);
+    expect([frame.contractId, asked[0]!.callSiteKey, asked[0]!.role]).toEqual(["web.suggest-dig.v1", "PATH_REWRITE:SUGGEST:98", "SYNTHESIZER"]);
+    expect(frame.fields.find((entry) => entry.name === "answer")?.content).toBe("Moving pays less than first said.");
+    expect(frame.fields.find((entry) => entry.name === "already_investigated")?.content).toBe(INVESTIGATED);
+    expect(kept[0]).toMatchObject({ runId: refreshOf(send).digRunId, debateRunId: refreshOf(send).debateRunId, positionRef: "pos-1" });
+    expect(kept[0]!.content.suggestions[0]!.text).toBe("Is rent capped? It could change this.");
+  });
+
+  it("a refresh that offers none still replaces the old set; a failed one leaves it; Free makes no call; a climb's step is its own set", async () => {
+    const none = storeOf();
+    await refreshPathSuggestions(refreshOf(sending(JSON.stringify({ suggestions: [] })).send), none.store, async () => "[]", "seal");
+    expect(none.kept.map((entry) => entry.content.suggestions)).toEqual([[]]);
+    const failed = storeOf();
+    await refreshPathSuggestions(refreshOf((async () => { throw new Error("down"); }) as never), failed.store, async () => "[]", "seal");
+    expect(failed.kept).toEqual([]);
+    const free = sending();
+    const freeStore = storeOf();
+    await refreshPathSuggestions(refreshOf(free.send, { free: true }), freeStore.store, async () => "[]", "seal");
+    expect([free.asked, freeStore.kept]).toEqual([[], []]);
+    const climbing = sending(JSON.stringify({ suggestions: [] }));
+    const climb = storeOf();
+    await refreshPathSuggestions(refreshOf(climbing.send, { step: 2 }), climb.store, async () => "[]", "seal");
+    expect(climbing.asked[0]!.callSiteKey).toBe("PATH_REWRITE:SUGGEST:96");
+    expect(climb.kept[0]!.setId).not.toBe(none.kept[0]!.setId);
   });
 });
 

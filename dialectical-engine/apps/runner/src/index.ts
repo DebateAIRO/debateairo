@@ -266,7 +266,7 @@ import {
 } from "./run-seats.js";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
 import { CONTENT_REFUSED_HALT_REASON, buildStoryRunSnapshot, storyAlsoRaisedFrom, storyAnswersNoteFrom, storyBackupCandidatesFrom, storyBackupMakersFrom, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
-import { runDigPathRewrite, type PathRewriteRunnerSettings } from "./path-rewrite.js";
+import { runDigPathRewrite, runFirstDebateSuggestions, type PathRewriteRunnerSettings } from "./path-rewrite.js";
 import { pokeInvestigationClosing, type InvestigationCloseSettings } from "./investigation-close.js";
 import {
   shapeCloseCallExtraSeats, shapeCloseCallFires, shapeCloseCallFold, shapeDistinctMakerOptions, shapeRankScrutiny, shapeSelectChains,
@@ -12135,6 +12135,8 @@ export class WalkingSkeletonRunner {
             // included: the version sealed no story rows); undefined only without per-version settings (the writer's own).
             await storyWriter.writeAfterSettle(settings.storyPolicy === undefined ? settled.input : Object.freeze({ ...settled.input, policy: settings.storyPolicy }));
           }
+          // W4-3: what the AI offers to dig into on a debate that got its story, now that it is written. Never rejects.
+          await runFirstDebateSuggestions(settings.pathRewrite, settled.input);
           // W5-1 (owner F7 A): a closing waits for its running digs and their rewrites; this member is now settled, so a
           // closing of its investigation may start at once rather than at the next sweep. Never rejects.
           await pokeInvestigationClosing(settings.investigationClose, settled.input.runId);

@@ -11,9 +11,11 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  configureContentEncryption, contentCipherFor, createPool, PostgresDigPicksRepository, PostgresDigPicksRunnerRepository, PostgresInvestigationRepository,
+  configureContentEncryption, contentCipherFor, createPool, PostgresDigPicksRepository, PATH_SUGGESTIONS_CARRIER, PostgresDigPicksRunnerRepository, PostgresPathSuggestionsRepository, decryptContentForRun, withRunContentLease, PostgresInvestigationRepository,
   WEB_EVIDENCE_CARRIERS, migrate, type Pool
 } from "@debateai/db";
+import { pathSuggestionsOfSet } from "@debateai/serve";
+import { pathSuggestionsSetIdOf, postgresPathSuggestionsStore } from "../../apps/runner/src/dig-suggestions-step.js";
 import { WEB_DIG_PLANNER_V3_CONTRACT_ID, framedJudgePromptForTest, type JudgeLeg } from "@debateai/judgement";
 import { LENGTH_GUIDANCE_START, type LengthGuide } from "@debateai/kernel";
 import {
@@ -301,6 +303,23 @@ describe("W4-7 a dig's web step and its reuse, on real PostgreSQL", () => {
     const again = team({ haiku: { planner: JSON.stringify({ country: null, needs_search: false, reason: "Nothing new.", pace: null, searches: [] }) } });
     await runnerStep({ runId: below, question: DIG_QUESTION, paths: DIG_PATHS, members: membersOf(again.all), settings: settingsOf(digPerplexity().port) });
     expect(fieldOf(again.haiku.bodies[0]!, "already_investigated")).toBe(known);
+  });
+
+  it("W4-3 and Q-D8 (0141): a set kept under the dig that paid, on its parent's path, opens under that dig's key on the runner's store", async () => {
+    const parent = await firstDebate();
+    const { dig } = await digOf(parent);
+    const store = postgresPathSuggestionsStore(runner);
+    const position = randomUUID();
+    const set = pathSuggestionsSetIdOf(dig, parent, position, 0);
+    const content = { suggestions: [{ suggestion_id: "s-1", kind: "HELPS_MAIN_QUESTION", side: "FOR", text: "Is rent capped?", places: [`path:${position}`] }] };
+    const record = () => store.record({ setId: set, runId: dig, debateRunId: parent, positionRef: position, content: content as never });
+    expect(await record()).toBe("RECORDED");
+    expect(await record()).toBe("ALREADY");
+    expect([...await store.positionsOf(parent)]).toEqual([position]);
+    const [row] = (await new PostgresPathSuggestionsRepository(runner).readOfRun(parent))!;
+    expect(row!.run_id.toLowerCase()).toBe(dig.toLowerCase());
+    const opened = await withRunContentLease(runner, [dig], () => decryptContentForRun<unknown>(runner, dig, PATH_SUGGESTIONS_CARRIER, set, row!.content, null));
+    expect(pathSuggestionsOfSet(opened).map((entry) => entry.text)).toEqual(["Is rent capped?"]);
   });
 
   it("once the investigation's texts are wiped, a dig's own search fetches the page again for its 0.1 cent: no reader paid", async () => {

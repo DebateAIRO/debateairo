@@ -4,7 +4,8 @@ import {
 } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import type { ProviderGateway } from "@debateai/providers";
-import { writeDigSuggestionsOnPool } from "./dig-suggestions-step.js";
+import { postgresPathSuggestionsStore, refreshPathSuggestionsOnPool, writeDigSuggestionsOnPool } from "./dig-suggestions-step.js";
+import { firstDebateSuggestionFacts } from "./investigation-digest.js";
 import { createPathRewriteInFlight, type PathRewriteRunnerSettings } from "./path-rewrite.js";
 import { postgresPathRewriteSources } from "./path-rewrite-sources.js";
 import type { PathRewriteSweepSettings } from "./path-rewrite-sweep.js";
@@ -55,7 +56,10 @@ export function composePathRewrite(input: Readonly<{
     log: input.log,
     inFlight: createPathRewriteInFlight(),
     // W4-3: the AI's suggestions on the dig's own paths, told what the whole debate already investigated.
-    suggest: writeDigSuggestionsOnPool(pool)
+    suggest: writeDigSuggestionsOnPool(pool),
+    // Owner Q-D8, and a first debate's own (0141).
+    refreshSuggestions: refreshPathSuggestionsOnPool(pool),
+    firstDebateSuggestions: Object.freeze({ store: postgresPathSuggestionsStore(pool), read: firstDebateSuggestionFacts(pool) })
   });
   const members = Object.freeze([...input.members]);
   const picks = new PostgresDigPicksRunnerRepository(pool);
