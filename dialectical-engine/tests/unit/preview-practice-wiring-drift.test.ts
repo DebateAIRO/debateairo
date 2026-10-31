@@ -195,6 +195,20 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     for (const source of [RUNNER_MAIN, PRACTICE_RUNNER]) expect(source).not.toContain("recordPlanPathStatuses");
   });
 
+  it("W3-7: both compose the path rewrite with the one function, the same members, and hand it to the runner the same way", () => {
+    const composed = (source: string) => flat(source).match(/const pathRewrite = composePathRewrite\(\{.*?\}\);/gu);
+    expect(composed(RUNNER_MAIN)).toEqual(["const pathRewrite = composePathRewrite({ pool, targets: providerTargets, members: "
+      + "[providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), "
+      + "...providerTopology.additionalMakers], log: storyLog });"]);
+    expect(composed(PRACTICE_RUNNER)).toEqual(composed(RUNNER_MAIN));
+    for (const source of [RUNNER_MAIN, PRACTICE_RUNNER]) {
+      expect(flat(source)).toContain("...(pathRewrite === undefined ? {} : { pathRewrite: pathRewrite.settings }),");
+    }
+    // The sweep is a process's: main.ts starts it after its worker; the practice runs one debate and starts none.
+    expect(flat(RUNNER_MAIN)).toContain("startPathRewriteSweep({ ...pathRewrite.sweep, paused: () => retirementSignal.claimsStopped() })");
+    expect(PRACTICE_RUNNER).not.toContain("startPathRewriteSweep");
+  });
+
   it("parallel AI calls: both build the call scheduler, the busy coordinator, the call subjects, the attempt counter and the keep-alive renewals", () => {
     // Spec 2026-10-12-parallel-calls-design.md §3.2-§3.6: the practice measures the runner the preview runs.
     for (const source of [RUNNER_MAIN, PRACTICE_RUNNER]) {

@@ -401,8 +401,11 @@ apps/runner/src/owner-command.ts
 apps/runner/src/owner-recovery-cli.ts
 apps/runner/src/owner-recovery-custody.ts
 apps/runner/src/owner-recovery-material.ts
+apps/runner/src/path-rewrite-composition.ts
 apps/runner/src/path-rewrite-material.ts
 apps/runner/src/path-rewrite-scope.ts
+apps/runner/src/path-rewrite-sources.ts
+apps/runner/src/path-rewrite-sweep.ts
 apps/runner/src/path-rewrite.ts
 apps/runner/src/production-database-principals-cli.ts
 apps/runner/src/production-database-principals.ts

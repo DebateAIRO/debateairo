@@ -2,7 +2,10 @@ import { validatePreviewProviderTestConfig, previewLineUpOfConfig, previewPlanTi
 import { registerPasswordResetRoutes, passwordResetPolicyInventory } from "./password-reset-routes.js";
 import { registerEmailMfaRoutes, emailMfaPolicyInventory } from "./email-mfa-routes.js";
 import { AccountMemoryInputError, type AccountMemoryStore } from "./account-memory.js";
-import { admitDig, digPathIndexOf, joinAtStart, type DigAdmissionPorts, type DigJoinPort, type DigPathIndex } from "./dig-admission.js";
+import {
+  admitDig, digPathIndexOf, joinAtStart, recordDigPicksAtStart, type DigAdmissionPorts, type DigJoinPort, type DigPathIndex,
+  type DigPicksPort, type DigSuggestionTextReader
+} from "./dig-admission.js";
 import { monthPauseOf, type MonthPausePort, type MonthRoomReader } from "./month-pause.js";
 import type { PasswordResetApplication } from "./password-reset.js";
 import { settingsVersionPassed, type ReleaseLifecycleState, type ReleaseState, type ReleaseWatcher } from "./release-state.js";
@@ -1863,6 +1866,10 @@ export interface ApiOptions {
   readonly digModel?: Pick<DigAdmissionPorts, "readDigLevel"> & MonthPausePort;
   /** W3-2 (0133, 0134): at start, a dig joins its parent's investigation (`PostgresInvestigationRepository.join`). */
   readonly investigations?: DigJoinPort;
+  /** W3-7 (0135): once a dig joined, what it was made of is kept for its path rewrite (`PostgresDigPicksRepository`). */
+  readonly digPicks?: DigPicksPort;
+  /** W3-7: a parent's stored dig suggestion, to tell an AI suggestion from the person's edit (W4-3's store; absent: none). */
+  readonly digSuggestionText?: DigSuggestionTextReader;
   /** W3-2: whether a person's month has room again after a month pause (the ask room's `monthHasRoom`). */
   readonly monthRoom?: MonthRoomReader;
   readonly accountErasure?: AccountErasureApplication;
@@ -3395,27 +3402,28 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const paths = story?.body?.short.paths;
     return paths === undefined ? null : digPathIndexOf(paths);
   };
-  // W3-2: a dig's admission (./dig-admission.ts) before anything is charged; null when the ask may go on. Another
+  // W3-2: a dig's admission (./dig-admission.ts) before anything is charged; the path its places share when the ask may go
+  // on (W3-7: its picks are kept on it), else the refusal sent. Another
   // account's parent is the closed 404; a parent at the deepest level 409 DIG_TOO_DEEP; picks the page never sends
   // (more than Free combines, or from more than one path) the plain 400.
   const digRefusal = async (request: Readonly<{ session: Session; authenticatedSession?: AuthenticatedSession }>,
     reply: FastifyReply, parent: AskParent, settings: Pick<AskRequest, "plan_tier" | "composition_budget_tier" | "depth_params">
-  ): Promise<FastifyReply | null> => {
+  ): Promise<Readonly<{ refused: FastifyReply }> | Readonly<{ positionRef: string | null }>> => {
     const digModel = options.digModel;
-    if (digModel === undefined) return null;
+    if (digModel === undefined) return { positionRef: null };
     const ownerRef = request.authenticatedSession?.ownerRef;
-    if (ownerRef === undefined) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    if (ownerRef === undefined) return { refused: reply.status(404).send({ error: "RUN_NOT_FOUND" }) };
     const decided = await decideRoomSettingsAndPlan(settings, ownerRef, options.askBilling);
     const admission = await admitDig({ ownerRef, parent, free: decided.settings.plan_tier === "free" }, {
       readDigLevel: (owner, runId) => digModel.readDigLevel(owner, runId),
       readPathIndex: (_owner, runId) => digPathIndexFor(request, runId)
     });
     switch (admission.kind) {
-      case "ADMIT": return null;
-      case "NOT_FOUND": return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      case "ADMIT": return { positionRef: admission.positionRef };
+      case "NOT_FOUND": return { refused: reply.status(404).send({ error: "RUN_NOT_FOUND" }) };
       case "TOO_DEEP":
-        return reply.status(409).send(DigTooDeepSchema.parse({ error: DIG_TOO_DEEP, message: DIG_TOO_DEEP, level_max: DIG_LEVEL_MAX }));
-      case "MALFORMED": return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+        return { refused: reply.status(409).send(DigTooDeepSchema.parse({ error: DIG_TOO_DEEP, message: DIG_TOO_DEEP, level_max: DIG_LEVEL_MAX })) };
+      case "MALFORMED": return { refused: reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" }) };
       default: return exhaustive(admission);
     }
   };
@@ -4004,11 +4012,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // Plan 2026-10-30 dig-model revision W3-2: a dig's own checks come before the question check (a paid site call) and
     // before the room, so a refused dig is charged nothing. Without the dig model the parent is not read (as before).
     const digParent = options.digModel === undefined ? undefined : ask.parent;
+    let digPositionRef: string | null = null;
     if (digParent !== undefined) {
-      const refused = await digRefusal(request, reply, digParent, {
+      const admitted = await digRefusal(request, reply, digParent, {
         plan_tier: ask.plan_tier, composition_budget_tier: ask.composition_budget_tier, depth_params: ask.depth_params
       });
-      if (refused !== null) return refused;
+      if ("refused" in admitted) return admitted.refused;
+      digPositionRef = admitted.positionRef;
     }
     if (options.questionCheck === undefined) {
       return reply.status(503).send({ error: "QUESTION_CHECK_UNAVAILABLE", message: "QUESTION_CHECK_UNAVAILABLE" });
@@ -4028,7 +4038,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // investigation; a join that does not take leaves the run as it is (the page's own link call is the fallback).
     const digOwner = request.authenticatedSession?.ownerRef;
     if (digParent !== undefined && digOwner !== undefined && options.investigations !== undefined) {
-      await joinAtStart({ ownerRef: digOwner, parent: digParent, childRunId: accepted.run_ref }, options.investigations);
+      const joined = await joinAtStart({ ownerRef: digOwner, parent: digParent, childRunId: accepted.run_ref }, options.investigations);
+      // W3-7: a dig that joined keeps what it was made of (0135), for the rewrite of the path its picks are on.
+      if ((joined === "JOINED" || joined === "ALREADY") && options.digPicks !== undefined) {
+        await recordDigPicksAtStart({ ownerRef: digOwner, parent: digParent, childRunId: accepted.run_ref, positionRef: digPositionRef },
+          options.digPicks, options.digSuggestionText);
+      }
     }
     return reply.status(202).send(accepted);
   });

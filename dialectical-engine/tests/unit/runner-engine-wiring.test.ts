@@ -99,6 +99,25 @@ describe("the runner reads the engine from the receipt only", () => {
     expect(contracts.indexOf("...PATH_REWRITE_SEALED_CONTRACTS")).toBeGreaterThan(contracts.indexOf("...WEB_WORDING_V2_SEALED_CONTRACTS"));
   });
 
+  // W3-7: the rewrite is switched on in the shipped runner, and its calls are charged on the never-walled PATH_REWRITE seam.
+  it("main.ts composes the path rewrite, hands it to the runner, runs its sweep, and charges it on W3-2's pathRewriteSeam", () => {
+    const main = read("apps/runner/src/main.ts").replace(/\s+/gu, " ");
+    expect(main).toContain("const pathRewrite = composePathRewrite({ pool, targets: providerTargets,");
+    expect(main).toContain("...(pathRewrite === undefined ? {} : { pathRewrite: pathRewrite.settings }),");
+    expect(main).toContain("buildPathRewriteCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).pathRewriteSeam({ runId, price, requireReportedUsage: true })");
+    expect(main.indexOf("startPathRewriteSweep(")).toBeGreaterThan(main.indexOf("await worker.waitUntilReady("));
+    expect(main.match(/pathRewriteSweep\?\.stop\(\);/gu)).toHaveLength(2);
+    // The composition: Haiku writes and GLM checks, the store's sources, the dig's replay book, the sweep's list.
+    const composition = read("apps/runner/src/path-rewrite-composition.ts");
+    for (const piece of ['PATH_REWRITE_WRITER_MODEL = "claude-haiku-5-5"', 'PATH_REWRITE_CHECKER_MODEL = "zai-org/GLM-5.3-Flash"',
+      "postgresPathRewriteSources(pool)", "new PostgresDigModelRunnerRepository(pool)", "readReplayBook(pool, runId, workItemId)",
+      "picks.readUnwritten(before, limit)", "PATH_REWRITE_CARRIER", "createPathRewriteInFlight()"]) expect(composition).toContain(piece);
+    // One call-site pattern: the runner's scope reads packages/story's.
+    const scope = read("apps/runner/src/path-rewrite-scope.ts");
+    expect(scope).toContain('from "@debateai/story"');
+    expect(scope).not.toMatch(/\/\^PATH_REWRITE/u);
+  });
+
   // Ruling R3-T14.1: R3 adds ENGINE_MAP_CHECK_UNBUDGETED in its alphabetical place beside R1d's refusal, so the pin reads
   // the declared list (both codes, in both alphabets) and its order, not one adjacency.
   it("the per-run refusals are declared diagnostic codes in both alphabets, each alphabet in sorted order", () => {

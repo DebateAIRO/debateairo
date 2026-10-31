@@ -135,7 +135,9 @@ describe("admitDig and the one-path rule (pure)", () => {
     expect(await admitDig({ ownerRef: OWNER_REF, parent: parentOf(), free: false }, ports)).toEqual({ kind: "TOO_DEEP" });
     expect(readPathIndex).not.toHaveBeenCalled();
     expect(await admitDig({ ownerRef: OWNER_REF, parent: parentOf(), free: false },
-      { readDigLevel: async () => DIG_LEVEL_MAX - 1, readPathIndex })).toEqual({ kind: "ADMIT", parentLevel: DIG_LEVEL_MAX - 1 });
+      { readDigLevel: async () => DIG_LEVEL_MAX - 1, readPathIndex }))
+      // W3-7: the admission names the path the dig's places share (its picks are kept on it).
+      .toEqual({ kind: "ADMIT", parentLevel: DIG_LEVEL_MAX - 1, positionRef: "pos-a" });
   });
 });
 

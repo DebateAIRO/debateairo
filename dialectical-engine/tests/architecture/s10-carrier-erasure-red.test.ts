@@ -199,6 +199,11 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // which establishes or borrows the session content lease (checked below).
       "apps/api/src/index.ts",
       "apps/evaluator-worker/src/index.ts",
+      // The path rewrite switched on (dig-model revision W3-7): the composition seals each rewrite's text under the dig's
+      // run key inside withRunContentLease; the sources open the parent's story, its nodes, the base rewrite and the
+      // extracts each under its own run's key, inside withRunContentLease or through prepareLeasedContentEncryptionForRun.
+      "apps/runner/src/path-rewrite-composition.ts",
+      "apps/runner/src/path-rewrite-sources.ts",
       // Reclaim resume (spec 2026-10-14): the replay book reads the run's recorded prompts and replies through
       // prepareLeasedContentEncryptionForRun, which borrows the lease the runner already holds when it is read.
       "apps/runner/src/run-replay.ts",

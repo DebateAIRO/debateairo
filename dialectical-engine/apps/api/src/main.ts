@@ -27,7 +27,7 @@ import {readConsumerRecoveryPolicy} from "@debateai/register";
 import {SendmailConsumerAccountSender} from "./mail-channel.js";
 import { ConsumerSecurityService } from "./consumer-security.js";
 import { PostgresConsumerSecurityRepository } from "@debateai/db";
-import { PostgresDigModelRepository, PostgresInvestigationRepository } from "@debateai/db";
+import { PostgresDigModelRepository, PostgresDigPicksRepository, PostgresInvestigationRepository } from "@debateai/db";
 import { ConsumerWebAuthnService } from "./consumer-webauthn.js";
 import { PostgresConsumerAuthRepository } from "@debateai/db";
 import { UnixTurnstileVerifier } from "./turnstile.js";
@@ -1671,6 +1671,8 @@ const api = buildApi({
   // a pause is the ask room's (with billing on).
   digModel: new PostgresDigModelRepository(pool),
   investigations: new PostgresInvestigationRepository(pool),
+  // W3-7 (0135): a dig's picks, kept at start for its path rewrite, each text sealed under the dig's run key on this pool.
+  digPicks: new PostgresDigPicksRepository(pool),
   ...(askRoom === undefined ? {} : { monthRoom: askRoom }),
   ...(dataExport === undefined ? {} : { dataExport }),
   /**
