@@ -230,7 +230,10 @@ describe("the practice can practise register 12 before it is published (--regist
     expect(source).toContain("String(input.settings.runner.REGISTER_VERSION) !== liveVersion");
     expect(source).toContain("String(nextVersion) !== receipt.registerVersion");
     expect(source).toContain("REGISTER_VERSION: nextVersion");
-    expect(source).toContain("composePracticeRunner({ pool, environment: settings.runner,");
+    // R22 W5-2: the runner's settings pass through the search stand-in, which returns them unchanged without a stand-in
+    // and otherwise adds only the search socket (tests/unit/practice-search-stand-in.test.ts), so the live file still runs.
+    expect(source).toContain("practiceWithSearchStandIn(settings.runner, input.budgetPorts, input.searchStandIn)");
+    expect(source).toContain("composePracticeRunner({ pool, environment: standIn.environment,");
     const cli = readFileSync(new URL("../../tools/preview-practice/practice.ts", import.meta.url), "utf8");
     expect(cli).toContain("\"--register-next\"");
     expect(cli).toContain("await composePracticeNextRegisterVersion(register)");
