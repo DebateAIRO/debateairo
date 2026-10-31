@@ -149,7 +149,22 @@ describe("W5-1 the final report's dossier", () => {
     for (const card of cards) byLevel.set(card.level as number, Math.max(byLevel.get(card.level as number) ?? 0, form(card)));
     expect(byLevel.get(10) ?? 0).toBeLessThanOrEqual(byLevel.get(1) ?? 0);
     expect(dossierFieldsOf(dossier).some((entry) => entry.name === "left_out")).toBe(dossier.leftOut > 0);
-    expect(dossier.ladderStep).toBeGreaterThanOrEqual(4);
+    // So large that levels 1 to 3 alone do not fit: the list is gone, then the ladder runs on those levels. Nothing deeper is a card.
+    expect(cards.every((card) => (card.level as number) <= 3)).toBe(true);
+    expect(dossierFieldsOf(dossier).map((entry) => entry.name)).not.toContain("deeper_paths");
+    expect((field(dossier, "left_out") as { deeper_paths: number }).deeper_paths).toBe(42);
+    expect(dossier.ladderStep).toBeGreaterThanOrEqual(2);
+  });
+
+  it("decision 26: a list that does not fit leaves before any point at levels 1 to 3, the deepest level first", () => {
+    const dossier = built(investigationInput({ digs: deepChain(10, 6, 1000) }));
+    const cards = field(dossier, "follow_ups") as Array<Record<string, unknown>>;
+    expect(cards.every((card) => (card.level as number) <= 3 && "before" in (card.rewrite as object))).toBe(true);
+    const listed = field(dossier, "deeper_paths") as Array<{ level: number }>;
+    expect(dossier.ladderStep).toBe(2);
+    expect(listed.some((entry) => entry.level === 4)).toBe(true);
+    expect(listed.some((entry) => entry.level === 10)).toBe(false);
+    expect((field(dossier, "left_out") as { deeper_paths: number }).deeper_paths).toBe(42 - listed.length);
   });
 
   /* ------------------------------------------------- R22: "every path of the debate and every point argued on it" */
@@ -195,7 +210,7 @@ describe("W5-1 the final report's dossier", () => {
     const names = dossierFieldsOf(dossier).map((entry) => [entry.name, entry.content]);
     expect(names.slice(0, 4)).toEqual([["question", input.question.line], ["place", "In Harbour Town"], ["time", "Next year"], ["purpose", "To vote at the council"]]);
     expect(dossierFieldsOf(built()).map((entry) => entry.name)).not.toContain("purpose");
-    expect(dossier.paths[0]).toEqual({ line: "Newest line, from a climb.", summary: "Climbed.", fate: "FELL", level: 0 });
+    expect(dossier.paths[0]).toMatchObject({ line: "Newest line, from a climb.", summary: "Climbed.", fate: "FELL", level: 0 });
   });
 
   it("the checker reads the dossier and the candidate only: its approved wording has no length to read", () => {
@@ -209,6 +224,8 @@ describe("W5-1 the final report's dossier", () => {
     expect(paths.map((path) => [path.level, path.line])).toEqual([
       [0, "Partly: a second pier helps at rush hour, not in winter."],
       [1, "Winter ridership falls."],
+      // A dig with no path of its own keeps its row: what was dug.
+      [2, "Does the summer peak last?"],
       [0, "No: the money is better spent on buses."]
     ]);
   });

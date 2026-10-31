@@ -59,7 +59,9 @@ const ENGINE_SEALED_IDS: readonly string[] = ["verdict.investigate.v1", "verdict
   // R22 report lane (plan 2026-10-31 decision 4, approved): the overall writer, the later version's and the checker.
   "report.answer.v2", "report.answer.later.v2", "report.answer-check.v2",
   // R22 retention lane (decisions 8, 10, 11): reader 1's page note, the graders' cited passage, the rewrite without "search words".
-  "web.read-all.v2", "judge.panel.length.sources.v1", "path-rewrite.writer.v2", "path-rewrite.checker.v2"];
+  "web.read-all.v2", "judge.panel.length.sources.v1", "path-rewrite.writer.v2", "path-rewrite.checker.v2",
+  // R22 report 2 (decision 26): the writer who may ask once, the later version's, the checker of "every path in the material".
+  "report.answer.v3", "report.answer.later.v3", "report.answer-check.v3"];
 /**
  * R1d's seal: sha256 of the header text alone, no trailing newline. Printed once with
  * `printf '%s' debateai.engine-contracts.v1 | shasum -a 256` and pasted here; the test also recomputes it.
@@ -82,8 +84,10 @@ const R1D_ENGINE_CONTRACT_HASH = "b98a45d5933d82205d5c6514082d4151bfb8f3f45b3677
 // (25e7845643f503581c7da98aa7015209155a90647e1283fd8d59e38c93bd009a, history). R22 report lane (2026-10-31): + the overall writer,
 // the later version's and the checker. R22 retention lane: + web.read-all.v2, judge.panel.length.sources.v1 and the path rewrite's
 // v2 pair (848092c2fff40b49b15dcaefd4b26a7689b2ec5e8b8e56d2ef0ff41c748d6850 without web.plan-dig.v3, history). The lanes met before
-// anything shipped: this order is engineSealedContracts()'s own.
-const ENGINE_CONTRACT_HASH_SEALED = "60469207a7d5dfa9b690dbc2bffaa02b53f848f31b8db06c55e732f2e1a55e20";
+// anything shipped: this order is engineSealedContracts()'s own
+// (60469207a7d5dfa9b690dbc2bffaa02b53f848f31b8db06c55e732f2e1a55e20, history). R22 report 2 (decision 26): + the writer who may ask, its
+// later version and the checker of "every path in the material".
+const ENGINE_CONTRACT_HASH_SEALED = "9fbd6247ebe620501c02bd2bb4775185a7aeeb94b040769a671ee28a3297c9f0";
 const SELECT = "SELECT value_json FROM register.register_row WHERE register_version=$1 AND row_key=$2";
 const runtime = { nodeVersion: "v26.8.2", pnpmVersion: "11.20.0", sourceRevision: "a".repeat(40), sourceTree: "b".repeat(40),
   operatorSha256: "c".repeat(64), observedAt: "2026-10-16T12:00:00.000Z" };

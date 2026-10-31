@@ -218,7 +218,7 @@ it("pins the current storyteller v3 answer form fingerprint",()=>{expect(createH
 // W5-1: the final report's five contracts, code's answer forms beside the instructions (pinned in prompt-text-pins.test.ts).
 describe("final report — the answer, story and check contracts", () => {
   it("frames for the door, and each answer form names every member its parser enforces", () => {
-    for (const contract of [...report.INVESTIGATION_REPORT_SEALED_CONTRACTS, ...report.REPORT_OVERALL_SEALED_CONTRACTS]) {
+    for (const contract of [...report.INVESTIGATION_REPORT_SEALED_CONTRACTS, ...report.REPORT_OVERALL_SEALED_CONTRACTS, ...report.REPORT_DEEPER_SEALED_CONTRACTS]) {
       const framed = buildFramedPrompt({ contract, material: [{ name: "question", content: "Should the city fund the tram?" }] });
       expect(assertFramedPrompt(framed.packet).contractId).toBe(contract.contractId);
     }

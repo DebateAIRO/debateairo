@@ -7,7 +7,7 @@ import {
 import { MAP_ENGINE_CONTRACT_NAMES, mapEnginePromptContracts } from "@debateai/map";
 import { promptContractFingerprintText, type PromptContract } from "@debateai/providers";
 import { SYNTHESIZER_LENGTH_READER_SOURCES_PROMPT_CONTRACT, SYNTHESIZER_LENGTH_SOURCES_PROMPT_CONTRACT } from "@debateai/serve";
-import { INVESTIGATION_REPORT_SEALED_CONTRACTS, PATH_REWRITE_SEALED_CONTRACTS, PATH_REWRITE_V2_SEALED_CONTRACTS, REPORT_OVERALL_SEALED_CONTRACTS } from "@debateai/story";
+import { INVESTIGATION_REPORT_SEALED_CONTRACTS, PATH_REWRITE_SEALED_CONTRACTS, PATH_REWRITE_V2_SEALED_CONTRACTS, REPORT_DEEPER_SEALED_CONTRACTS, REPORT_OVERALL_SEALED_CONTRACTS } from "@debateai/story";
 import { EVALUATOR_SOURCES_SEALED_CONTRACTS } from "./answer-checker-sources.js";
 
 /**
@@ -75,7 +75,10 @@ export function engineSealedContracts(): readonly PromptContract[] {
     // (the graders' line), then the rewrite's writer and checker v2 ("search words" out). The ones they replace stay
     // sealed, unused. None is in the judge, composer or conformance seal.
     ...WEB_R22_SEALED_CONTRACTS,
-    ...PATH_REWRITE_V2_SEALED_CONTRACTS
+    ...PATH_REWRITE_V2_SEALED_CONTRACTS,
+    // R22 report 2 (plan 2026-10-31 decision 26): the writer who may ask once for deeper paths, the later version's, and the
+    // checker of "every path in the material". The v2 three stay sealed, unused.
+    ...REPORT_DEEPER_SEALED_CONTRACTS
   ]);
 }
 

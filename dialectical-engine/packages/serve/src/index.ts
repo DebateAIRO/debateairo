@@ -66,6 +66,8 @@ export {
 } from "./judges-comparison.js"; // pre-flight PF-R2b4.4; R2 B11: the practice report recounts through the same helper
 import { structureRepairAnsweredSql } from "@debateai/ledger";
 import { LivenessRepository } from "@debateai/liveness";
+/** The report's PDF works a point's trust word out on the runner, from the same staleness reading the answer serves (decision 27). */
+export { LivenessRepository } from "@debateai/liveness";
 import {
   MemoryRepository,
   canonicalizeQuestionText,

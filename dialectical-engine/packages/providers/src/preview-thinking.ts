@@ -93,14 +93,14 @@ export function previewThinkingStepOf(request: Readonly<{ callSiteKey: string; l
   if (request.lane === "story" && /^PATH_REWRITE:SUGGEST:[0-9]{1,2}$/u.test(request.callSiteKey)) return "path_rewrite_writer";
   // W5-1: the final report over an investigation (packages/story INVESTIGATION_REPORT_CALL_SITE) runs at the owner's four
   // final steps: its answer at answer_writer / answer_checker, its story at story_writer / story_checker.
-  const reportSite = /^INVESTIGATION_REPORT:(ANSWER|ANSWER_CHECK|STORY|STORY_CHECK):[1-4]$/u.exec(request.callSiteKey);
+  const reportSite = /^INVESTIGATION_REPORT:(ANSWER|ANSWER_ASKED|ANSWER_CHECK|STORY|STORY_CHECK):[1-4]$/u.exec(request.callSiteKey);
   if (request.lane === "story" && reportSite !== null) {
-    return reportSite[1] === "ANSWER" ? "answer_writer" : reportSite[1] === "ANSWER_CHECK" ? "answer_checker"
+    return reportSite[1] === "ANSWER" || reportSite[1] === "ANSWER_ASKED" ? "answer_writer" : reportSite[1] === "ANSWER_CHECK" ? "answer_checker"
       : reportSite[1] === "STORY" ? "story_writer" : "story_checker";
   }
   // R22 decision 3: the automatic main-answer update is the report's answer step, at the same two steps.
-  const updateSite = /^ANSWER_UPDATE:(ANSWER|ANSWER_CHECK):[1-4]$/u.exec(request.callSiteKey);
-  if (request.lane === "story" && updateSite !== null) return updateSite[1] === "ANSWER" ? "answer_writer" : "answer_checker";
+  const updateSite = /^ANSWER_UPDATE:(ANSWER|ANSWER_ASKED|ANSWER_CHECK):[1-4]$/u.exec(request.callSiteKey);
+  if (request.lane === "story" && updateSite !== null) return updateSite[1] === "ANSWER" || updateSite[1] === "ANSWER_ASKED" ? "answer_writer" : "answer_checker";
   // Debate shape (merge of dev into Phase 2, 2026-10-13): the map's calls (MAP:angles, MAP:list:N, MAP:merge, MAP:gap:N,
   // MAP:choose; packages/map) build the debate's opening, so they run at the owner's `opening` level, the closest step.
   if (/^MAP:/u.test(request.callSiteKey)) return "opening";

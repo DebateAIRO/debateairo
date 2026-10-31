@@ -1,4 +1,4 @@
-import { PurposeLinesSchema, cutQuoteAtWordEdge, readingLevelOf, StoryBodySchema, StoryFateSchema, type StoryFate } from "@debateai/contract";
+import { PurposeLinesSchema, cutQuoteAtWordEdge, readingLevelOf, StoryBodySchema, StoryFateSchema, trustOfPoint, type StoryFate, type TrustWord } from "@debateai/contract";
 import {
   INVESTIGATION_REPORT_CARRIER, PATH_REWRITE_CARRIER, PATH_UPDATE_CARRIER, PostgresDigModelRunnerRepository, PostgresDigPicksRunnerRepository,
   PostgresInvestigationReportRunnerRepository, PostgresInvestigationRunnerRepository, PostgresPassageRetentionRepository,
@@ -8,6 +8,7 @@ import {
   type PathRewriteEntry, type Pool, type UnreportedClosing, type WebSealed
 } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
+import { LivenessRepository } from "@debateai/serve";
 import type { ProviderGateway, ProviderCallRequest } from "@debateai/providers";
 import { INVESTIGATION_REPORT_POLICY } from "@debateai/register";
 import { projectedCallCeilingMicros, type ProviderTargetPrice } from "@debateai/budget";
@@ -125,6 +126,34 @@ async function sourcesOfPoints(pool: Pool, runId: string, pointIds: readonly str
   });
 }
 
+/**
+ * Decision 27: each point's trust word, by the contract's one rule (`trustOfPoint`), for the stored version's PDF. Unread points have
+ * no word; a failed read costs the words, never the report. Never in the writer's material: a word can change with time.
+ */
+async function trustWordsOf(pool: Pool, runId: string, free: boolean, pointIds: readonly string[]): Promise<ReadonlyMap<string, TrustWord>> {
+  const words = new Map<string, TrustWord>();
+  if (pointIds.length === 0) return words;
+  try {
+    const liveness = new LivenessRepository(pool);
+    const rows = (await pool.query<{ node_id: string; way_of_knowing: string; locator: string | null; relevant_as_of: Date; outcome: string | null }>(
+      `SELECT node.node_id::text AS node_id, node.way_of_knowing, node.locator, node.relevant_as_of, review.outcome
+         FROM core.node AS node
+         LEFT JOIN LATERAL (SELECT outcome FROM ledger.node_review WHERE node_id = node.node_id ORDER BY at_seq DESC LIMIT 1) AS review ON true
+        WHERE node.run_id = $1 AND node.node_id = ANY($2::uuid[])`, [runId, [...pointIds]])).rows;
+    const quotes = await new PostgresPassageRetentionRepository(pool).readShownQuotes(runId);
+    const labels = new Set((quotes ?? []).map((quote) => quote.label));
+    for (const row of rows) {
+      const staleness = await liveness.readSubjectStaleness({ runId, subjectKind: "NODE", subjectRef: row.node_id, relevantAsOf: row.relevant_as_of });
+      const placed = trustOfPoint({ review: row.outcome === null ? null : { outcome: row.outcome }, staleness_state: staleness.state, way_of_knowing: row.way_of_knowing,
+        looked_up_checked: row.way_of_knowing === "LOOKED_UP" && row.locator !== null && labels.has(row.locator) && row.outcome === "agree" }, { free, fell: false });
+      if (placed.trust !== null) words.set(row.node_id.toLowerCase(), placed.trust);
+    }
+  } catch {
+    return new Map();
+  }
+  return words;
+}
+
 /** Each path's newest text on one debate when a later update wrote it (0138), and the digs its line says are not to be read. */
 async function lineOf(pool: Pool, runId: string): Promise<Readonly<{ newest: ReadonlyMap<string, DossierText>; hiddenDigs: ReadonlySet<string> }>> {
   const line = (await new PostgresTreeUpdateRunnerRepository(pool).readLine(runId)) ?? [];
@@ -207,7 +236,7 @@ export function postgresInvestigationCloseSources(pool: Pool): InvestigationClos
     return Object.freeze({ line: story?.line ?? "", summary: null, fate: story?.fate ?? entry.fate_before ?? "SET_ASIDE" });
   };
 
-  const investigationInputOf: InvestigationInputReader = async (root, earlierAnswer) => {
+  const readInput = async (root: string, earlierAnswer: Parameters<InvestigationInputReader>[1], forReport: boolean): Promise<InvestigationCloseInput | null> => {
     const ask = await runs.readStoredAsk(root);
     const investigation = await investigations.ofRun(root);
     if (ask === null || investigation === null) return null;
@@ -307,6 +336,15 @@ export function postgresInvestigationCloseSources(pool: Pool): InvestigationClos
       }));
     }
     const purpose = await purposeLinesOf(pool, root);
+    const trustWords = new Map<string, TrustWord>();
+    if (forReport) {
+      const free = ask.planTier === "free";
+      for (const [id, word] of await trustWordsOf(pool, root, free, paths.flatMap((path) => path.points.map((point) => point.id)))) trustWords.set(id, word);
+      for (const dig of digs) {
+        const ids = dig.ownMaterial?.paths.flatMap((path) => path.points.map((point) => point.id)) ?? [];
+        for (const [id, word] of await trustWordsOf(pool, dig.runId, free, ids)) trustWords.set(id, word);
+      }
+    }
     return Object.freeze({
       free: ask.planTier === "free",
       questionLine: ask.questionLine,
@@ -315,13 +353,14 @@ export function postgresInvestigationCloseSources(pool: Pool): InvestigationClos
           readingLevel: readingLevelOf(ask.depthParams), language: null }),
         first: Object.freeze({ runId: root, answer: story?.answer ?? null, paths: Object.freeze(paths) }),
         digs: Object.freeze(digs),
-        earlier: earlierAnswer
+        earlier: earlierAnswer,
+        ...(trustWords.size === 0 ? {} : { trustWords })
       })
     });
   };
 
   return Object.freeze({
-    investigationInputOf,
+    investigationInputOf: (root, earlier) => readInput(root, earlier, false),
     inputOf: async (closing: UnreportedClosing, earlier: InvestigationReportsRead | null): Promise<InvestigationCloseInput | null> => {
       const root = closing.rootRunId;
       // F8 A: the newest finished version before this one, opened under the root's key.
@@ -334,7 +373,7 @@ export function postgresInvestigationCloseSources(pool: Pool): InvestigationClos
         const segments = storedReportAnswerOf(opened);
         if (segments !== null) earlierAnswer = Object.freeze({ version: prior.report_version, segments });
       }
-      return investigationInputOf(root, earlierAnswer);
+      return readInput(root, earlierAnswer, true);
     }
   });
 }

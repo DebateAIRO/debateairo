@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { StoryFateSchema } from "./story.js";
-import { WEB_CONTRACT_LIMITS } from "./web.js";
+import { TrustWordSchema, WEB_CONTRACT_LIMITS } from "./web.js";
 
 /**
  * THE FINAL REPORT OVER AN INVESTIGATION (plan 2026-10-30 task W5-1; design W0-1 with the owner's answers F1-F14, the
@@ -20,7 +20,10 @@ import { WEB_CONTRACT_LIMITS } from "./web.js";
  *  - a shortened dossier is disclosed with the approved line (owner F13), `shortened: true`;
  *  - from R22 on (decision 17, the PDF), each version also keeps the tree of paths as they stood when it was written, and
  *    each source its address, so a finished report stays as written whatever is erased later (decision 16). Both are
- *    optional: a version written before them has neither.
+ *    optional: a version written before them has neither;
+ *  - from R22's fuller PDF on (decision 27), each path also keeps its points with their trust words, and a dig's first path what
+ *    was dug, the person's own words beside their verdict, and what the dig changed, all of it what the AIs already wrote, so the PDF
+ *    reads at the time of the version. All optional. The API serves them only on the current version (the PDF prints only that one).
  *
  * It imports only zod and the zod-only modules beside it (never ./index.js), for the module-cycle reason web.ts gives.
  */
@@ -31,11 +34,15 @@ export const INVESTIGATION_REPORT_LIMITS = Object.freeze({
   segmentMaxChars: 12_000,
   partMaxChars: 8_000,
   stillOpenMax: 12,
-  sourcesMax: 200,
+  sourcesMax: 1_000,
   /** The paths of the whole tree: at most 8 for the first debate and for each dig. */
   pathsMax: 8 * (1 + WEB_CONTRACT_LIMITS.investigationDigsMax),
   /** A dig reaches at most level 10. */
   pathLevelMax: 10,
+  /** Runaway guards on what a path keeps for the PDF. */
+  pathPointsMax: 200,
+  pathChangedMax: 40,
+  digPicksMax: 40,
   versionsMax: WEB_CONTRACT_LIMITS.reportVersionsMax,
   digsMax: WEB_CONTRACT_LIMITS.investigationDigsMax
 });
@@ -85,7 +92,21 @@ export const InvestigationReportPathSchema = z.object({
   line: Part,
   summary: Part.nullable(),
   fate: StoryFateSchema.nullable(),
-  level: z.number().int().min(0).max(INVESTIGATION_REPORT_LIMITS.pathLevelMax)
+  level: z.number().int().min(0).max(INVESTIGATION_REPORT_LIMITS.pathLevelMax),
+  /** Every point argued on the path; `sources` are places in the version's `sources`. */
+  points: z.array(z.object({
+    text: Part,
+    trust: TrustWordSchema.nullable(),
+    side: z.enum(["for", "against"]).nullable(),
+    sources: z.array(z.number().int().min(0).max(INVESTIGATION_REPORT_LIMITS.sourcesMax)).max(40)
+  }).strict()).max(INVESTIGATION_REPORT_LIMITS.pathPointsMax).optional(),
+  /** On a dig's first path: what was dug, the person's own words and their verdict, what the dig changed. */
+  dig: z.object({
+    picks: z.array(Part).max(INVESTIGATION_REPORT_LIMITS.digPicksMax),
+    own_words: z.array(Part).max(INVESTIGATION_REPORT_LIMITS.digPicksMax),
+    view: z.object({ outcome: z.enum(["HELPED", "DID_NOT_HELP", "NOT_SETTLED"]), reason: Part }).strict().nullable(),
+    changed: z.array(Part).max(INVESTIGATION_REPORT_LIMITS.pathChangedMax)
+  }).strict().optional()
 }).strict();
 export type InvestigationReportPath = z.infer<typeof InvestigationReportPathSchema>;
 

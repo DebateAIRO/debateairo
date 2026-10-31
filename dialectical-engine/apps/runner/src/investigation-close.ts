@@ -1,6 +1,6 @@
 import { createHash, randomBytes as cryptoRandomBytes } from "node:crypto";
 import {
-  InvestigationReportAnswerSchema, InvestigationReportPathSchema, InvestigationReportSourceSchema, InvestigationReportStorySchema, type InvestigationReportAnswer, type InvestigationReportPath,
+  INVESTIGATION_REPORT_LIMITS, InvestigationReportAnswerSchema, InvestigationReportPathSchema, InvestigationReportSourceSchema, InvestigationReportStorySchema, type InvestigationReportAnswer, type InvestigationReportPath,
   type InvestigationReportSource, type InvestigationReportStory, type MakerLineage
 } from "@debateai/contract";
 import type {
@@ -86,6 +86,41 @@ export type InvestigationReportContent = Readonly<{
   paths: readonly InvestigationReportPath[];
   shortened: boolean;
 }>;
+
+/**
+ * The most a version's content may hold as JSON: 0136 refuses a sealed value over 1 MiB, and the seal writes base64. A tree beyond it
+ * keeps fewer details, each time from the deepest level up: a path's points, then what a dig changed, then the sources' notes, then
+ * the paths themselves. Such a version says it was shortened.
+ */
+export const INVESTIGATION_REPORT_CONTENT_MAX_BYTES = 700 * 1024;
+
+export function fittedReportContent(content: InvestigationReportContent, maxBytes: number = INVESTIGATION_REPORT_CONTENT_MAX_BYTES): InvestigationReportContent {
+  const fits = (candidate: InvestigationReportContent): boolean => Buffer.byteLength(JSON.stringify(candidate), "utf8") <= maxBytes;
+  if (fits(content)) return content;
+  let kept: InvestigationReportContent = Object.freeze({ ...content, shortened: true });
+  const atLevels = (change: (path: InvestigationReportPath, level: number) => InvestigationReportPath | null): InvestigationReportContent | null => {
+    for (let level = INVESTIGATION_REPORT_LIMITS.pathLevelMax; level >= 0; level -= 1) {
+      kept = Object.freeze({ ...kept, paths: Object.freeze(kept.paths.flatMap((path) => {
+        const changed = change(path, level);
+        return changed === null ? [] : [changed];
+      })) });
+      if (fits(kept)) return kept;
+    }
+    return null;
+  };
+  const without = (member: "points" | "dig") => (path: InvestigationReportPath, level: number): InvestigationReportPath => {
+    if (path.level !== level) return path;
+    const { [member]: _gone, ...rest } = path;
+    return rest;
+  };
+  const fitted = atLevels(without("points")) ?? atLevels(without("dig"));
+  if (fitted !== null) return fitted;
+  kept = Object.freeze({ ...kept, sources: Object.freeze(kept.sources.map((source) => Object.freeze({ ...source, line: null }))) });
+  if (fits(kept)) return kept;
+  const noPaths = atLevels((path, level) => (path.level === level ? null : path));
+  if (noPaths !== null) return noPaths;
+  return Object.freeze({ ...kept, sources: Object.freeze([]) });
+}
 
 /**
  * Who pays for a closing, and on which plan's rules (Free's slim report, its reserve). On a private debate it is the debate's
@@ -325,25 +360,36 @@ async function composeRecord(settings: InvestigationCloseSettings, closing: Unre
     // N14: a missing story is a defect to prevent; the backup ran already. The version keeps the answer alone.
     log("INVESTIGATION_REPORT_STORY_FAILED", { runId: root, failureCode: storyOutcome.failureCode, cause: storyOutcome.cause });
   }
-  const content: InvestigationReportContent = Object.freeze({
+  // A source the contract refuses leaves the list, so a point's numbers follow the places that remain.
+  const places = new Map<number, number>();
+  const sources = dossier.sources.flatMap((source, at) => {
+    // A page's address the contract cannot serve costs the address, not the source.
+    const parsed = InvestigationReportSourceSchema.safeParse(source);
+    const plain = parsed.success ? parsed : InvestigationReportSourceSchema.safeParse({ ...source, link: null });
+    if (!plain.success) return [];
+    places.set(at, places.size);
+    return [plain.data];
+  });
+  const content: InvestigationReportContent = fittedReportContent(Object.freeze({
     v: 1 as const,
     answer: InvestigationReportAnswerSchema.parse({ segments: answer.body.segments.map((segment) => segment.text) }),
     story,
-    sources: dossier.sources.flatMap((source) => {
-      // A page's address the contract cannot serve costs the address, not the source.
-      const parsed = InvestigationReportSourceSchema.safeParse(source);
-      const plain = parsed.success ? parsed : InvestigationReportSourceSchema.safeParse({ ...source, link: null });
-      return plain.success ? [plain.data] : [];
-    }),
+    sources,
     paths: dossier.paths.flatMap((path) => {
-      const parsed = InvestigationReportPathSchema.safeParse(path);
-      return parsed.success ? [parsed.data] : [];
+      const placed = path.points === undefined ? path : { ...path, points: path.points.map((point) => ({ ...point,
+        sources: point.sources.flatMap((at) => { const place = places.get(at); return place === undefined ? [] : [place]; }) })) };
+      const parsed = InvestigationReportPathSchema.safeParse(placed);
+      if (parsed.success) return [parsed.data];
+      // A detail the contract refuses (a runaway text) costs the details, not the path.
+      const bare = InvestigationReportPathSchema.safeParse({ line: path.line, summary: path.summary, fate: path.fate, level: path.level });
+      return bare.success ? [bare.data] : [];
     }),
     shortened: dossier.ladderStep > 1
-  });
+  }));
   const sealed = await settings.seal(root, reportId, content);
   const servedAnswer = written.answer.rounds.find((round) => round.round === answer.servedRound)!;
   const rounds = [...written.answer.rounds, ...(written.story?.rounds ?? [])];
+  const askRefs = written.answer.askArtifactRef === null ? [] : [written.answer.askArtifactRef];
   return { payer, record: Object.freeze({
     investigationId: closing.investigationId, reportVersion: closing.reportVersion, reportId,
     outcome: answer.outcome as InvestigationReportOutcome,
@@ -354,7 +400,7 @@ async function composeRecord(settings: InvestigationCloseSettings, closing: Unre
     answerRounds: written.answer.rounds.length, storyRounds: written.story?.rounds.length ?? 0,
     writerLineage: lineageRecord(servedAnswer.writer.lineage),
     checkerLineage: servedAnswer.checker === null ? null : lineageRecord(servedAnswer.checker.lineage),
-    artifactRefs: Object.freeze(rounds.flatMap((round) => [round.writer.artifactRef, ...(round.checker === null ? [] : [round.checker.artifactRef])]).slice(0, 64)),
+    artifactRefs: Object.freeze([...askRefs, ...rounds.flatMap((round) => [round.writer.artifactRef, ...(round.checker === null ? [] : [round.checker.artifactRef])])].slice(0, 64)),
     spentMicros: Math.min(spentMicros, 100_000_000),
     content: sealed
   }) };

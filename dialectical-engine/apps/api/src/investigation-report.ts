@@ -111,14 +111,19 @@ async function shapeReports(read: InvestigationReportsOwnerRead, ports: Investig
     return { ...base, state: report.outcome, written_at: iso(report.recorded_at), answer: content.answer, story: content.story,
       sources: content.sources, ...(content.paths === undefined ? {} : { paths: content.paths }), shortened: content.shortened };
   });
+  // Decision 27: a path's points and what a dig changed are for the PDF, which prints only the current version; earlier versions stay
+  // as written in the store and light here.
+  const current = versions.filter(finished).at(-1)?.report_version ?? null;
+  const served = versions.map((version) => version.report_version === current || !finished(version) || !("paths" in version) || version.paths === undefined ? version
+    : { ...version, paths: version.paths.map(({ line, summary, fate, level }) => ({ line, summary, fate, level })) });
   const digs = investigation.members.filter((member) => member.run_id.toLowerCase() !== rootRunId.toLowerCase()).length;
   return InvestigationReportsSchema.parse({
     investigation_id: investigation.investigation_id,
     root_run_id: rootRunId,
     state: investigation.state === "closed" ? "CLOSED" : "OPEN",
     digs: Math.min(digs, INVESTIGATION_REPORT_LIMITS.digsMax),
-    versions,
-    current: versions.filter(finished).at(-1)?.report_version ?? null
+    versions: served,
+    current
   });
 }
 
