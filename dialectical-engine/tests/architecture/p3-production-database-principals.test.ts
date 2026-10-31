@@ -1228,6 +1228,19 @@ describe("P3-01 production database-principal manifest", () => {
   "grants": [
     "EXECUTE ON FUNCTION identity.read_unsettled_web_researched(integer)"
   ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0146_team_allowances.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION staff.configure_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION staff.revoke_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION staff.read_member_allowance_command(jsonb,text,uuid,uuid)",
+    "EXECUTE ON FUNCTION staff.read_member_allowance_page(jsonb,text)",
+    "EXECUTE ON FUNCTION staff.claim_allowance_notices(integer)",
+    "EXECUTE ON FUNCTION staff.complete_allowance_notice(uuid,uuid,boolean)",
+    "EXECUTE ON FUNCTION staff.allowance_notice_user(uuid,uuid)"
+  ]
 }
 ]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))

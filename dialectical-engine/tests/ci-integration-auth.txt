@@ -100,6 +100,9 @@ tests/integration/team-limit-admission.test.ts
 tests/integration/ask-clarify-charge-database.test.ts
 # "Add to researched" (0145): the page read and charged once, its note and quote kept through the wipe, a stranger refused, 30 days later.
 tests/integration/web-researched-database.test.ts
+# The Owner's allowance for a member (0146): only the Owner, the proof bound to the member and the amounts, the ends, a member's debate charged and counted.
+tests/integration/team-allowance-database.test.ts
+tests/integration/team-allowance-http.test.ts
 
 # NOT listed: preview-auth-dev-startup.test.ts — red on dev at d1ac3641b (2 of 17: PREVIEW_STAGE_PROCESS_EXITED; it
 # starts the real API/UI stage processes, so it is a deployment rehearsal, not a self-contained suite).

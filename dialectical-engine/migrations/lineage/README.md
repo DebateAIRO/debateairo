@@ -14,9 +14,9 @@ below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116
 
 1. `migrations/NNNN_<name>.sql`: the SQL, forward-only and replayable.
 2. A manifest in `lineage/`, shaped like `billing-netopia-forward111.json`: its version, the recipe's SHA-256,
-   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0145: 0145,
-   `web-researched-unsettled-forward0145.json`, and `verify-effective-capabilities-130.sql`, which supersedes 0111's, which
-   0112 to 0129 keep; 0131 to 0145 keep 0130's),
+   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0146: 0146,
+   `team-allowances-forward0146.json`, and `verify-effective-capabilities-130.sql`, which supersedes 0111's, which
+   0112 to 0129 keep; 0131 to 0146 keep 0130's),
    and its own migration and verifier. (0111's own `previous` is 0110: `auth-dev-preview-20261006-forward110.json`
    and the sealed `verify-effective-capabilities.sql`.)
 3. A new verifier `lineage/verify-effective-capabilities-NNNN.sql` only when the step adds billing relations or
@@ -636,6 +636,10 @@ The thirty-fourth step (decisions 29 and 31): `0144_ask_clarify_charge.sql` with
 ## The pages waiting after "Add to researched" (0145)
 
 The thirty-fifth step (dig-model revision W4-4): `0145_web_researched_unsettled.sql` with `web-researched-unsettled-forward0145.json` and `packages/db/src/migration-forward0145.ts` (`loadForward0145`, `MIGRATION_FORWARD0145_` refusals), `-- n1: expand`, `-- n1: keeps-verifier`. `identity.read_unsettled_web_researched(integer)`, on `debateai_runtime`: the runner's list of the pages people added whose readers have not settled, oldest first, so a runner that stopped goes on from them. One function; no table.
+
+## The Owner's allowances for team members (0146)
+
+The thirty-sixth step (decision 32): `0146_team_allowances.sql` with `team-allowances-forward0146.json` and `packages/db/src/migration-forward0146.ts` (`loadForward0146`, `MIGRATION_FORWARD0146_` refusals), `-- n1: drained`, `-- n1: keeps-verifier`. It replaces `staff.configure_internal_allowance`, `staff.revoke_internal_allowance`, their binding and body functions and `billing.guard_internal_grant_commit` (same names and signatures, so 0130's verifier stays), and adds `staff.internal_grant_holder` and `staff.internal_grant_end`, append-only and private to the staff security owner, `staff.allowance_notice` with its three lease functions (0142's shape, its own table because 0142's postcondition pins that CHECK), the triggers on `staff.subject` and `staff.owner_designation` that end an allowance with the person or the Owner, and the two readers the Owner's page and ceremony use. The old self command and its proof bytes are unchanged.
 
 ## Replay: every applied step keeps its own checks
 

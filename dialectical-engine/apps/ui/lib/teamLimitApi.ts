@@ -32,20 +32,10 @@ export function formatDollars(locale: string, micros: number): string {
 
 export const isPracticeRef = (value: string): boolean => contract.TeamPracticeRequestSchema.shape.practice_ref.safeParse(value).success;
 
-/** The private team panel's client. Proof handles stay in the ceremony that made them: never a URL, never browser storage. */
-export function createTeamLimitClient({ fetchImplementation = fetch, apiBase = API_BASE, browser = createStaffWebAuthnBrowser() }: {
-  fetchImplementation?: typeof fetch;
-  apiBase?: string;
-  browser?: StaffBrowser;
-} = {}) {
-  const transport = createSameOriginFetch(apiBase, fetchImplementation);
-  const staff = createStaffApiClient({ fetchImplementation, apiBase, browser });
-  const origin = typeof window === "undefined" ? "http://localhost" : window.location.origin;
-  let generation = 0;
-  const cancel = () => { generation++; staff.cancel(); };
-
-  async function request<S extends z.ZodType>(path: string, schema: S, method = "GET", body?: unknown): Promise<Output<S>> {
-    const epoch = generation;
+/** One private admin page's requests: both CSRF headers on a change, the plain server code kept, and a page that moved on hears nothing. */
+export function privateAdminRequester(prefix: string, transport: ReturnType<typeof createSameOriginFetch>, origin: string, currentGeneration: () => number) {
+  return async function request<S extends z.ZodType>(path: string, schema: S, method = "GET", body?: unknown): Promise<Output<S>> {
+    const epoch = currentGeneration();
     const headers = new Headers();
     if (method !== "GET") {
       headers.set("content-type", "application/json");
@@ -56,14 +46,14 @@ export function createTeamLimitClient({ fetchImplementation = fetch, apiBase = A
     }
     let response: Response;
     try {
-      response = await transport(new URL(`/v1/admin/team-limit${path}`, origin), {
+      response = await transport(new URL(`${prefix}${path}`, origin), {
         method, headers, credentials: "same-origin", cache: "no-store",
         ...(body === undefined ? {} : { body: JSON.stringify(body) })
       });
     } catch {
       throw new contract.ContractHttpError("NETWORK_FAILURE", 0, "STAFF_NETWORK_FAILURE");
     }
-    if (generation !== epoch) throw new Error("STAFF_WEBAUTHN_CANCELLED");
+    if (currentGeneration() !== epoch) throw new Error("STAFF_WEBAUTHN_CANCELLED");
     if (!response.ok) {
       const value: unknown = await response.json().catch(() => null);
       const serverCode = value !== null && typeof value === "object" && "error" in value
@@ -76,13 +66,28 @@ export function createTeamLimitClient({ fetchImplementation = fetch, apiBase = A
     if (response.status !== 200) throw new contract.ContractHttpError("INVALID_RESPONSE", response.status, "STAFF_RESPONSE_INVALID");
     try {
       const value = schema.parse(await response.json()) as Output<S>;
-      if (generation !== epoch) throw new Error("STAFF_WEBAUTHN_CANCELLED");
+      if (currentGeneration() !== epoch) throw new Error("STAFF_WEBAUTHN_CANCELLED");
       return value;
     } catch (error) {
       if (error instanceof Error && error.message === "STAFF_WEBAUTHN_CANCELLED") throw error;
       throw new contract.ContractHttpError("INVALID_RESPONSE", response.status, "STAFF_RESPONSE_INVALID");
     }
-  }
+  };
+}
+
+/** The private team panel's client. Proof handles stay in the ceremony that made them: never a URL, never browser storage. */
+export function createTeamLimitClient({ fetchImplementation = fetch, apiBase = API_BASE, browser = createStaffWebAuthnBrowser() }: {
+  fetchImplementation?: typeof fetch;
+  apiBase?: string;
+  browser?: StaffBrowser;
+} = {}) {
+  const transport = createSameOriginFetch(apiBase, fetchImplementation);
+  const staff = createStaffApiClient({ fetchImplementation, apiBase, browser });
+  const origin = typeof window === "undefined" ? "http://localhost" : window.location.origin;
+  let generation = 0;
+  const cancel = () => { generation++; staff.cancel(); };
+
+  const request = privateAdminRequester("/v1/admin/team-limit", transport, origin, () => generation);
 
   async function changePartner(action: "TEAM_LIMIT_PARTNER_GRANT" | "TEAM_LIMIT_PARTNER_REVOKE", staffId: string, grantRevision: number) {
     const fields = { expected_revision: grantRevision, operation_id: crypto.randomUUID(), reason: PARTNER_REASON };
