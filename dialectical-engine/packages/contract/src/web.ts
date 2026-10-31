@@ -52,6 +52,14 @@ export const WEB_CONTRACT_LIMITS = Object.freeze({
   reportVersionsMax: 100,
   /** A debate's place, time and purpose lines (decision 5): each one line, the person's own words or a catalogue sentence. */
   purposeLineMaxChars: 500,
+  /** Decision 29: dynamic step 2. How many questions the AI may add beside the one about what the answer is for, and how long each part may be. */
+  clarifyQuestionsMax: 3,
+  clarifyQuestionMaxChars: 200,
+  clarifyAnswersMin: 2,
+  clarifyAnswersMax: 4,
+  clarifyAnswerMaxChars: 120,
+  /** The person's own angles on the ask page (step 2), each one line. */
+  anglesMax: 5,
   /** The main answer's automatic versions served with it, newest last (decision 3). */
   mainAnswerVersionsMax: 200,
   /** A public debate's listed contributions (decision 13). */
@@ -730,18 +738,83 @@ export type RunContinueRefused = z.infer<typeof RunContinueRefusedSchema>;
 
 const PurposeLineSchema = z.string().trim().min(1).max(WEB_CONTRACT_LIMITS.purposeLineMaxChars);
 
+/** Decision 29: one clarifying question the person answered, as asked and as answered. */
+export const PurposeAnswerSchema = z.object({ question: PurposeLineSchema, answer: PurposeLineSchema }).strict();
+export type PurposeAnswer = z.infer<typeof PurposeAnswerSchema>;
+
 /**
- * Decision 5: a debate's place, time and purpose lines, each one line, at least one. On the ask they are structured, whatever the page's
- * language (the sentences appended to `question_line` go only with an English page, ASK-1). Stored encrypted, written at the ask, passed to
- * every rewrite, answer update and report. An old debate has none.
+ * Decision 5 and decision 29: what the person said about their question at step 2. New debates carry `answers` (the AI's clarifying questions
+ * and the person's answers, the one about what the answer is for among them), `matters` and `angles` (the person's own words: an angle stays a
+ * thing to investigate). `place`, `time` and `purpose` are the first shape: nothing writes them any more, and what was stored that way stays
+ * readable. Stored encrypted, written at the ask, passed to every rewrite, answer update and report. An old debate has none.
  */
 export const PurposeLinesSchema = z.object({
   place: PurposeLineSchema.optional(),
   time: PurposeLineSchema.optional(),
-  purpose: PurposeLineSchema.optional()
-}).strict().refine((lines) => lines.place !== undefined || lines.time !== undefined || lines.purpose !== undefined,
-  { message: "at least one line" });
+  purpose: PurposeLineSchema.optional(),
+  answers: z.array(PurposeAnswerSchema).min(1).max(WEB_CONTRACT_LIMITS.clarifyQuestionsMax + 1).optional(),
+  matters: PurposeLineSchema.optional(),
+  angles: z.array(PurposeLineSchema).min(1).max(WEB_CONTRACT_LIMITS.anglesMax).optional()
+}).strict().refine((lines) => lines.place !== undefined || lines.time !== undefined || lines.purpose !== undefined
+  || lines.answers !== undefined || lines.matters !== undefined || lines.angles !== undefined,
+{ message: "at least one line" });
 export type PurposeLines = z.infer<typeof PurposeLinesSchema>;
+
+/** One answered question as the AIs and the person read it, added to the question: "Where? Bucharest." Its ending fits the script it is in. */
+export function purposeAnswerSentence(answer: PurposeAnswer): string {
+  const said = answer.answer.trim();
+  const closed = /[.!?…。！？؟।]$/u.test(said) ? said : `${said}${/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]$/u.test(said) ? "。" : "."}`;
+  return `${answer.question.trim()} ${closed}`;
+}
+
+/**
+ * The stored lines the question's own text does not already say, in the order they were added. New debates say every one of them in
+ * `question_line`, so this is empty for them unless the words were changed after step 2 (the language pop-up's rewrite); the question check
+ * and the later AIs read whatever is left here, so nothing the person said is lost and nothing is read twice.
+ */
+export function purposeLinesUnsaid(questionLine: string, lines: PurposeLines | null | undefined): readonly string[] {
+  if (lines === null || lines === undefined) return Object.freeze([]);
+  const all = [lines.place, lines.time, lines.purpose, ...(lines.answers ?? []).map(purposeAnswerSentence), lines.matters, ...(lines.angles ?? [])];
+  return Object.freeze(all.filter((line): line is string => line !== undefined && !questionLine.includes(line)));
+}
+
+/**
+ * The stored lines in the later AIs' three material fields (`place`, `time`, `purpose`; field names are code's vocabulary, outside every
+ * contract's seal, and no sealed instruction names them, so no new version is needed). First-shape lines stay in their own fields as they
+ * always were. Decision 29's lines the question does not already say go in `purpose`, one per line, after a first-shape purpose.
+ */
+export function purposeLinesMaterial(questionLine: string, lines: PurposeLines | null | undefined):
+Readonly<{ place: string | null; time: string | null; purpose: string | null }> {
+  if (lines === null || lines === undefined) return Object.freeze({ place: null, time: null, purpose: null });
+  const later = purposeLinesUnsaid(questionLine, { ...(lines.answers === undefined ? {} : { answers: lines.answers }),
+    ...(lines.matters === undefined ? {} : { matters: lines.matters }), ...(lines.angles === undefined ? {} : { angles: lines.angles }) });
+  const purpose = [...(lines.purpose === undefined ? [] : [lines.purpose]), ...later];
+  return Object.freeze({ place: lines.place ?? null, time: lines.time ?? null, purpose: purpose.length === 0 ? null : purpose.join("\n") });
+}
+
+const ClarifyTextSchema = z.string().trim().min(1).max(WEB_CONTRACT_LIMITS.clarifyQuestionMaxChars);
+const ClarifyAnswerSchema = z.string().trim().min(1).max(WEB_CONTRACT_LIMITS.clarifyAnswerMaxChars);
+
+/** Decision 29: one question to the person, with the answers to choose from. "Other" is the page's own, never the AI's. */
+export const ClarifyQuestionSchema = z.object({
+  text: ClarifyTextSchema,
+  answers: z.array(ClarifyAnswerSchema).min(WEB_CONTRACT_LIMITS.clarifyAnswersMin).max(WEB_CONTRACT_LIMITS.clarifyAnswersMax)
+}).strict();
+export type ClarifyQuestion = z.infer<typeof ClarifyQuestionSchema>;
+
+/** POST /v1/asks/clarify: the question as typed. Nothing else; the person is the session's. */
+export const AskClarifyRequestSchema = z.object({ question_line: z.string().trim().min(1) }).strict();
+export type AskClarifyRequest = z.infer<typeof AskClarifyRequestSchema>;
+
+/**
+ * The questions for step 2. `AI`: up to three questions and always the one about what the answer is for. `GENERIC`: no AI read the question
+ * (it failed, it was too slow, the person's limit was reached, or this deployment has no paid AI), so the page shows its generic purpose options.
+ */
+export const AskClarifyResponseSchema = z.discriminatedUnion("source", [
+  z.object({ source: z.literal("AI"), questions: z.array(ClarifyQuestionSchema).max(WEB_CONTRACT_LIMITS.clarifyQuestionsMax), purpose: ClarifyQuestionSchema }).strict(),
+  z.object({ source: z.literal("GENERIC") }).strict()
+]);
+export type AskClarifyResponse = z.infer<typeof AskClarifyResponseSchema>;
 
 /** Decision 3: what made the main answer change: a first-debate path a dig rewrote, or one a deeper dig's change climbed to. */
 export const MAIN_ANSWER_TRIGGERS = ["PATH_REWRITE", "CHILD_PATH"] as const;

@@ -10,6 +10,8 @@ It moved here from a scratch folder on 30 Oct 2026 (Perplexity plan, task W1-7) 
 
 On 31 Oct 2026 (dig model revision, task W2-7) it gained the owner's new dig model and money rule: paths rewritten by digs (with "What the dig changed" and the verdict on the person's point of view), a dig trail three levels down, a debate paused at the month wall with Continue, a usage read where running work borrowed from tomorrow, a room where new starts wait for the reset, and a new question's share of today. See "The new dig model and the money rule" below.
 
+On 31 Oct 2026 (R22 decision 29) it gained dynamic step 2: `POST /v1/asks/clarify` writes made-up clarifying questions. The end of the question picks the scene: `#generic` (the generic options), `#fail` (the call fails; the page shows the generic options), `#slow` (no answer past the page's 10-second limit), `#none` (only the question about what the answer is for). Any other question gets two questions and that one.
+
 ## Files
 
 | File | What it is |

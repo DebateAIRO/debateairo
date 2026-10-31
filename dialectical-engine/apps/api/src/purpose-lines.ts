@@ -1,10 +1,10 @@
-import type { PurposeLines } from "@debateai/contract";
+import { purposeLinesUnsaid, type PurposeLines } from "@debateai/contract";
 import {
   PostgresTreeUpdateRepository, RUN_PURPOSE_LINES_CARRIER, encryptAttestedContentForRun, withRunContentLease, type Pool
 } from "@debateai/db";
 
 /**
- * A DEBATE'S PLACE, TIME AND PURPOSE LINES (plan 2026-10-31-r22-owner-changes decision 5), at the ask: sealed under the new run's key
+ * A DEBATE'S STEP-2 LINES (plan 2026-10-31-r22-owner-changes decisions 5 and 29: the clarifying answers, what matters, the angles), at the ask: sealed under the new run's key
  * (0138's identity.run_purpose_lines, bound to the run's id), written once. Every rewrite, answer update and report reads them. A dig has none
  * of its own: it reads its first debate's. The ask stands whatever becomes of them: a debate without its lines still runs, as an old debate.
  */
@@ -36,8 +36,8 @@ export async function recordPurposeLinesAtAsk(input: Readonly<{ ownerRef: string
   return outcome;
 }
 
-/** The text the question check reads: the question, then each line it does not already say. The question alone when there are none. */
+/** The text the question check reads: the question, then each stored line it does not already say. The question alone when there are none. */
 export function questionWithPurposeLines(questionLine: string, lines: PurposeLines | undefined): string {
-  const added = [lines?.place, lines?.time, lines?.purpose].filter((line): line is string => line !== undefined && !questionLine.includes(line));
+  const added = purposeLinesUnsaid(questionLine, lines);
   return added.length === 0 ? questionLine : `${questionLine}\n\n${added.join("\n")}`;
 }

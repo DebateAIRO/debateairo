@@ -133,5 +133,13 @@
   "newDebate.plan.current.FREE": "Ваш тариф: Бесплатный",
   "newDebate.plan.current.PLUS": "Ваш тариф: Plus",
   "newDebate.plan.current.PRO": "Ваш тариф: Pro",
-  "newDebate.plan.current.MAX": "Ваш тариф: Max"
+  "newDebate.plan.current.MAX": "Ваш тариф: Max",
+  "newDebate.askText.purposeQuestion": "Для чего вам нужен ответ?",
+  "newDebate.askText.purposeDecide": "Чтобы принять решение",
+  "newDebate.askText.purposeUnderstand": "Чтобы понять",
+  "newDebate.askText.purposeWrite": "Чтобы написать об этом",
+  "newDebate.askText.otherAnswer": "Другой ответ…",
+  "newDebate.askText.otherLabel": "Ваш собственный ответ",
+  "newDebate.askText.matters": "Если ответы тянут в разные стороны, для меня важнее всего: {matters}",
+  "newDebate.askText.angles": "Пожалуйста, посмотрите также на: {list}."
 }

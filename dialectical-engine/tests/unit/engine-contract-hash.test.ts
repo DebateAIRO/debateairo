@@ -59,7 +59,9 @@ const ENGINE_SEALED_IDS: readonly string[] = ["verdict.investigate.v1", "verdict
   // R22 report lane (plan 2026-10-31 decision 4, approved): the overall writer, the later version's and the checker.
   "report.answer.v2", "report.answer.later.v2", "report.answer-check.v2",
   // R22 retention lane (decisions 8, 10, 11): reader 1's page note, the graders' cited passage, the rewrite without "search words".
-  "web.read-all.v2", "judge.panel.length.sources.v1", "path-rewrite.writer.v2", "path-rewrite.checker.v2"];
+  "web.read-all.v2", "judge.panel.length.sources.v1", "path-rewrite.writer.v2", "path-rewrite.checker.v2",
+  // R22 clarify lane (decision 29; the instruction approved word for word, the answer form a draft): dynamic step 2's small call.
+  "ask.clarify.v1"];
 /**
  * R1d's seal: sha256 of the header text alone, no trailing newline. Printed once with
  * `printf '%s' debateai.engine-contracts.v1 | shasum -a 256` and pasted here; the test also recomputes it.
@@ -83,7 +85,7 @@ const R1D_ENGINE_CONTRACT_HASH = "b98a45d5933d82205d5c6514082d4151bfb8f3f45b3677
 // the later version's and the checker. R22 retention lane: + web.read-all.v2, judge.panel.length.sources.v1 and the path rewrite's
 // v2 pair (848092c2fff40b49b15dcaefd4b26a7689b2ec5e8b8e56d2ef0ff41c748d6850 without web.plan-dig.v3, history). The lanes met before
 // anything shipped: this order is engineSealedContracts()'s own.
-const ENGINE_CONTRACT_HASH_SEALED = "60469207a7d5dfa9b690dbc2bffaa02b53f848f31b8db06c55e732f2e1a55e20";
+const ENGINE_CONTRACT_HASH_SEALED = "c6dd8f7ae23533564a92c0282e477480fbdea9c980b488f8fca2a58bd763ecdd";
 const SELECT = "SELECT value_json FROM register.register_row WHERE register_version=$1 AND row_key=$2";
 const runtime = { nodeVersion: "v26.8.2", pnpmVersion: "11.20.0", sourceRevision: "a".repeat(40), sourceTree: "b".repeat(40),
   operatorSha256: "c".repeat(64), observedAt: "2026-10-16T12:00:00.000Z" };

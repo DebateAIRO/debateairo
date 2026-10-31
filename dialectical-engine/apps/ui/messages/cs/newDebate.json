@@ -133,5 +133,13 @@
   "newDebate.plan.current.FREE": "Váš plán: Zdarma",
   "newDebate.plan.current.PLUS": "Váš plán: Plus",
   "newDebate.plan.current.PRO": "Váš plán: Pro",
-  "newDebate.plan.current.MAX": "Váš plán: Max"
+  "newDebate.plan.current.MAX": "Váš plán: Max",
+  "newDebate.askText.purposeQuestion": "K čemu odpověď potřebujete?",
+  "newDebate.askText.purposeDecide": "K rozhodnutí",
+  "newDebate.askText.purposeUnderstand": "K pochopení",
+  "newDebate.askText.purposeWrite": "K psaní o tomto tématu",
+  "newDebate.askText.otherAnswer": "Jiná odpověď…",
+  "newDebate.askText.otherLabel": "Moje vlastní odpověď",
+  "newDebate.askText.matters": "Pokud odpovědi vedou různými směry, nejvíc mi záleží na tom: {matters}",
+  "newDebate.askText.angles": "Prosím, podívejte se také na: {list}."
 }

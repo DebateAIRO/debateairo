@@ -243,6 +243,8 @@ describe("row-level security S01 C4: the apps/api cross-account sites and the T1
       "assertContentProvisionDatabaseRole(pool,serverAskAdmissionPool) @ attestEveryRoute",
       "assertDataExportDatabaseRoles(authorizationPool, dataExportPool) @ attestEveryRoute",
       "languageCheckSpendWriterPresent(pool) @ onOwnConnections",
+      // Decision 29: dynamic step 2 takes the same route decision, above the support adapter, so it asks the same question of the same login.
+      "languageCheckSpendWriterPresent(pool) @ onOwnConnections",
       "passwordResetRepository.assertRole() @ attestEveryRoute",
       "backupEmailRepository.assertRole() @ attestEveryRoute",
       "mfaRecoveryRepository.assertRole() @ attestEveryRoute",

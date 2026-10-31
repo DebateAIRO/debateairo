@@ -133,5 +133,13 @@
   "newDebate.plan.current.FREE": "Το πρόγραμμά σας: Δωρεάν",
   "newDebate.plan.current.PLUS": "Το πρόγραμμά σας: Plus",
   "newDebate.plan.current.PRO": "Το πρόγραμμά σας: Pro",
-  "newDebate.plan.current.MAX": "Το πρόγραμμά σας: Max"
+  "newDebate.plan.current.MAX": "Το πρόγραμμά σας: Max",
+  "newDebate.askText.purposeQuestion": "Για ποιον σκοπό χρειάζεστε την απάντηση;",
+  "newDebate.askText.purposeDecide": "Για να πάρω μια απόφαση",
+  "newDebate.askText.purposeUnderstand": "Για να το καταλάβω",
+  "newDebate.askText.purposeWrite": "Για να γράψω γι’ αυτό",
+  "newDebate.askText.otherAnswer": "Άλλη απάντηση…",
+  "newDebate.askText.otherLabel": "Η δική μου απάντηση",
+  "newDebate.askText.matters": "Αν οι απαντήσεις οδηγούν σε διαφορετικές κατευθύνσεις, για μένα το πιο σημαντικό είναι: {matters}",
+  "newDebate.askText.angles": "Παρακαλώ, δείτε επίσης: {list}."
 }

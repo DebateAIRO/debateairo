@@ -133,5 +133,13 @@
   "newDebate.plan.current.FREE": "Jūsų planas: Nemokamas",
   "newDebate.plan.current.PLUS": "Jūsų planas: Plus",
   "newDebate.plan.current.PRO": "Jūsų planas: Pro",
-  "newDebate.plan.current.MAX": "Jūsų planas: Max"
+  "newDebate.plan.current.MAX": "Jūsų planas: Max",
+  "newDebate.askText.purposeQuestion": "Kam jums reikalingas atsakymas?",
+  "newDebate.askText.purposeDecide": "Norint priimti sprendimą",
+  "newDebate.askText.purposeUnderstand": "Norint tai suprasti",
+  "newDebate.askText.purposeWrite": "Norint apie tai parašyti",
+  "newDebate.askText.otherAnswer": "Kitas atsakymas…",
+  "newDebate.askText.otherLabel": "Savo atsakymas",
+  "newDebate.askText.matters": "Jei atsakymai veda į skirtingas puses, man svarbiausia: {matters}",
+  "newDebate.askText.angles": "Prašau taip pat pažvelgti į šiuos aspektus: {list}."
 }

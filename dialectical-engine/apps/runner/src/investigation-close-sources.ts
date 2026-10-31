@@ -1,4 +1,4 @@
-import { PurposeLinesSchema, cutQuoteAtWordEdge, readingLevelOf, StoryBodySchema, StoryFateSchema, type StoryFate } from "@debateai/contract";
+import { PurposeLinesSchema, purposeLinesMaterial, cutQuoteAtWordEdge, readingLevelOf, StoryBodySchema, StoryFateSchema, type StoryFate } from "@debateai/contract";
 import {
   INVESTIGATION_REPORT_CARRIER, PATH_REWRITE_CARRIER, PATH_UPDATE_CARRIER, PostgresDigModelRunnerRepository, PostgresDigPicksRunnerRepository,
   PostgresInvestigationReportRunnerRepository, PostgresInvestigationRunnerRepository, PostgresPassageRetentionRepository,
@@ -148,14 +148,14 @@ async function lineOf(pool: Pool, runId: string): Promise<Readonly<{ newest: Rea
   return Object.freeze({ newest, hiddenDigs });
 }
 
-/** The debate's place, time and purpose lines (decision 5), opened under its key; all null for an old debate. */
-async function purposeLinesOf(pool: Pool, runId: string): Promise<Readonly<{ place: string | null; time: string | null; purpose: string | null }>> {
+/** The debate's step-2 lines (decisions 5 and 29), opened under its key, as the material's three fields; all null for an old debate. */
+async function purposeLinesOf(pool: Pool, runId: string, questionLine: string): Promise<Readonly<{ place: string | null; time: string | null; purpose: string | null }>> {
   const sealed = await new PostgresTreeUpdateRunnerRepository(pool).readPurposeLines(runId);
   const none = Object.freeze({ place: null, time: null, purpose: null });
   if (sealed === null) return none;
   const opened = await withRunContentLease(pool, [runId], () => decryptContentForRun<unknown>(pool, runId, RUN_PURPOSE_LINES_CARRIER, runId.toLowerCase(), sealed, null));
   const lines = PurposeLinesSchema.safeParse(opened);
-  return lines.success ? Object.freeze({ place: lines.data.place ?? null, time: lines.data.time ?? null, purpose: lines.data.purpose ?? null }) : none;
+  return lines.success ? purposeLinesMaterial(questionLine, lines.data) : none;
 }
 
 type StoredRewrite = Readonly<{ text: DossierText; whatChanged: readonly string[]; viewReason: string | null;
@@ -306,7 +306,7 @@ export function postgresInvestigationCloseSources(pool: Pool): InvestigationClos
         rewrite, ownMaterial
       }));
     }
-    const purpose = await purposeLinesOf(pool, root);
+    const purpose = await purposeLinesOf(pool, root, ask.questionLine);
     return Object.freeze({
       free: ask.planTier === "free",
       questionLine: ask.questionLine,

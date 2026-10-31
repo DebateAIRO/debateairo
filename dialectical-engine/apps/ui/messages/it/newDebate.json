@@ -133,5 +133,13 @@
   "newDebate.plan.current.FREE": "Il tuo piano: Gratuito",
   "newDebate.plan.current.PLUS": "Il tuo piano: Plus",
   "newDebate.plan.current.PRO": "Il tuo piano: Pro",
-  "newDebate.plan.current.MAX": "Il tuo piano: Max"
+  "newDebate.plan.current.MAX": "Il tuo piano: Max",
+  "newDebate.askText.purposeQuestion": "Per cosa le serve la risposta?",
+  "newDebate.askText.purposeDecide": "Per prendere una decisione",
+  "newDebate.askText.purposeUnderstand": "Per capirlo",
+  "newDebate.askText.purposeWrite": "Per scriverne",
+  "newDebate.askText.otherAnswer": "Un'altra risposta…",
+  "newDebate.askText.otherLabel": "La sua risposta personale",
+  "newDebate.askText.matters": "Se le risposte vanno in direzioni diverse, per me conta soprattutto: {matters}",
+  "newDebate.askText.angles": "La prego di esaminare anche questi aspetti: {list}."
 }

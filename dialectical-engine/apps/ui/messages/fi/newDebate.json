@@ -133,5 +133,13 @@
   "newDebate.plan.current.FREE": "Tilauksesi: Maksuton",
   "newDebate.plan.current.PLUS": "Tilauksesi: Plus",
   "newDebate.plan.current.PRO": "Tilauksesi: Pro",
-  "newDebate.plan.current.MAX": "Tilauksesi: Max"
+  "newDebate.plan.current.MAX": "Tilauksesi: Max",
+  "newDebate.askText.purposeQuestion": "Mihin tarvitsette vastauksen?",
+  "newDebate.askText.purposeDecide": "Päätöksen tekemiseen",
+  "newDebate.askText.purposeUnderstand": "Sen ymmärtämiseen",
+  "newDebate.askText.purposeWrite": "Siitä kirjoittamiseen",
+  "newDebate.askText.otherAnswer": "Toinen vastaus…",
+  "newDebate.askText.otherLabel": "Oma vastaukseni",
+  "newDebate.askText.matters": "Jos vastaukset vetävät eri suuntiin, minulle tärkeintä on: {matters}",
+  "newDebate.askText.angles": "Voisitteko katsoa myös: {list}."
 }

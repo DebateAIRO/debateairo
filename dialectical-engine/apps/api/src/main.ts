@@ -30,6 +30,7 @@ import { PostgresConsumerSecurityRepository } from "@debateai/db";
 import { PostgresDigModelRepository, PostgresDigPicksRepository, PostgresInvestigationReportRepository, PostgresInvestigationRepository } from "@debateai/db";
 import { investigationReportContentOpener } from "./investigation-report.js";
 import { postgresPurposeLines } from "./purpose-lines.js";
+import { ASK_CLARIFY_ROUTE_POLICY, ASK_CLARIFY_SPEND_REF, askClarifyTransport, createAskClarify } from "./ask-clarify.js";
 import { continuedRunWake } from "./month-pause.js";
 import { ConsumerWebAuthnService } from "./consumer-webauthn.js";
 import { PostgresConsumerAuthRepository } from "@debateai/db";
@@ -678,6 +679,30 @@ const admissionSite: AdmissionSiteContext = boot.runSync("admission-site", () =>
  * main.ts's own stage names; a refusal names its stage and refuses the boot with the loader's own typed code, as before.
  */
 const siteAdmission = await loadAdmissionSettings(pool, environment.REGISTER_VERSION, admissionSite, (name, run) => boot.run(name, async () => run()));
+/**
+ * Decision 29 (dynamic step 2): the small call before a debate exists takes the language check's one route decision (preview: the gate; hosted: the
+ * support target's key, recorded through 0118's writer under its own reference; local: none, so the generic purpose options). Above the support
+ * adapter, which clears the key this process keeps. A hosted site with no day ceiling makes no call: nothing here may stop a boot.
+ */
+const askClarifyDayCeiling = siteAdmission.costEnvelope?.guardPolicy.dailyCeilingMicros ?? null;
+const askClarify = await boot.run("ask-clarify", async () => createAskClarify({
+  transport: previewGate === undefined && askClarifyDayCeiling === null ? null : askClarifyTransport(await questionLanguageSiteRoute({
+    mode: environment.DEPLOYMENT_MODE,
+    policy: ASK_CLARIFY_ROUTE_POLICY,
+    dayCeilingMicros: askClarifyDayCeiling,
+    previewGate,
+    previewFetch,
+    readCredential: () => supportAnthropicMessagesKey(supportModelTarget, readSupportCredentialOnce),
+    spend: {
+      writerPresent: () => onOwnConnections(() => languageCheckSpendWriterPresent(pool)),
+      record: (entry) => recordLanguageCheckSpend(pool, { ...entry, providerRef: ASK_CLARIFY_SPEND_REF })
+    },
+    daySpentMicros: (day) => new PostgresModelSpendStore(pool).readDaySpentMicros(day),
+    report: (line) => console.error(JSON.stringify(line))
+  })),
+  clock: () => new Date(),
+  report: (line) => console.error(JSON.stringify(line))
+}));
 // Side-by-side spec §13 API point 2: every other version is loaded once, on first use, and kept (sealed versions never
 // change); the site version is served from the boot's load.
 const admissionCache = createAdmissionSettingsCache({
@@ -1689,6 +1714,7 @@ const api = buildApi({
   digPicks: new PostgresDigPicksRepository(pool),
   // Decision 5 of 31 Oct (0138): a debate's place, time and purpose lines, sealed under its run key on this pool.
   purposeLines: postgresPurposeLines(pool),
+  askClarify,
   ...(askRoom === undefined ? {} : { monthRoom: askRoom }),
   // R22 W3-8: after Continue, the paused debate's released work item goes back to its own release's runner through the
   // routed dispatcher (a failed send is only logged: the runner's lapsed re-send takes it within five minutes anyway).

@@ -1,5 +1,5 @@
 import { ContractHttpError, type ContractErrorCode, type ContractWaitingRefusal } from "./http-error.js";
-import { RunContinueRefusedSchema, RunContinueRequestSchema, RunContinuedSchema, type RunContinued, type RunContinueRefused } from "./web.js";
+import { AskClarifyResponseSchema, RunContinueRefusedSchema, RunContinueRequestSchema, RunContinuedSchema, type AskClarifyRequest, type AskClarifyResponse, type RunContinued, type RunContinueRefused } from "./web.js";
 import { InvestigationCloseRequestSchema } from "./web.js";
 import {
   InvestigationReopenRequestSchema, InvestigationReopenedSchema, InvestigationReportAcceptedSchema, InvestigationReportsSchema,
@@ -485,6 +485,8 @@ export interface ContractClient {
   submitAsk(input: AskRequest): Promise<AskAccepted>;
   /** Question language (spec 2026-10-13, D1): the same POST /v1/asks, with a valid real-mix offer (409) read as data. */
   submitAskOrLanguageChoice(input: AskRequest): Promise<AskSubmitOutcome>;
+  /** Decision 29: the clarifying questions for step 2. `signal` lets the page stop waiting. */
+  clarifyAsk(input: AskClarifyRequest, signal?: AbortSignal): Promise<AskClarifyResponse>;
   /**
    * Budget spec §2.7: the room this ask would find — a word, never a figure. Debate shape (M4): the three shape
    * fields go on the query only when given, so today's query is unchanged.
@@ -870,6 +872,8 @@ export function createContractClient(
     getGeoAvailability: () => request("/v1/geo/availability", GeoAvailabilityResponseSchema),
     readPublicAiProviders: () => request("/v1/public/ai-providers", PublicAiProvidersResponseSchema),
     submitAsk: (input: AskRequest) => request("/v1/asks", AskAcceptedSchema, { method: "POST", body: JSON.stringify(input) }),
+    clarifyAsk: (input: AskClarifyRequest, signal?: AbortSignal) => request("/v1/asks/clarify", AskClarifyResponseSchema,
+      { method: "POST", body: JSON.stringify(input), ...(signal === undefined ? {} : { signal }) }),
     submitAskOrLanguageChoice: (input: AskRequest) => requestJson<AskSubmitOutcome>(
       root.href, fetchImplementation, "/v1/asks",
       AskAcceptedSchema.transform((accepted): AskSubmitOutcome => Object.freeze({ kind: "ACCEPTED" as const, accepted })),

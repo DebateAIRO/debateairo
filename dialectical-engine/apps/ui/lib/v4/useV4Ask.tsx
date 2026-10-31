@@ -78,6 +78,8 @@ export function useV4Ask(input: Readonly<{
 }>): Readonly<{
   /** W3-4: a dig sends its `parent` (the debate it digs, its places, mode and picks); a new question sends none. */
   submit(questionLine: string, mode: DigMode, origin?: V4AskOrigin, parent?: AskParent | null, purposeLines?: PurposeLines): Promise<V4AskOutcome>;
+  /** Decision 29: the one-time sensitive-data consent, asked before the question goes to step 2's AI. The dialog is in `dialogs`. */
+  ensureConsent(): Promise<boolean>;
   /** ASK-3: whether this text reads as a person in crisis (the page enables Start for it even when it is short). */
   flagsCrisis(text: string): boolean;
   room: AskRoom | null;
@@ -333,5 +335,6 @@ export function useV4Ask(input: Readonly<{
     </>
   );
 
-  return { submit, flagsCrisis, room, planTier, submitting, dialogs };
+  const ensureConsent = React.useCallback(() => live.current.consent.ensureConsent(), []);
+  return { submit, ensureConsent, flagsCrisis, room, planTier, submitting, dialogs };
 }

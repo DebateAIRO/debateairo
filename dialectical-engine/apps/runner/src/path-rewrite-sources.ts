@@ -1,4 +1,4 @@
-import { PurposeLinesSchema, readingLevelOf, StoryBodySchema, StoryFateSchema, type PurposeLines, type StoryFate } from "@debateai/contract";
+import { PurposeLinesSchema, purposeLinesMaterial, readingLevelOf, StoryBodySchema, StoryFateSchema, type PurposeLines, type StoryFate } from "@debateai/contract";
 import {
   PATH_REWRITE_CARRIER, PATH_UPDATE_CARRIER, PostgresDigModelRunnerRepository, PostgresDigPicksRunnerRepository, PostgresPassageRetentionRepository,
   PostgresTreeUpdateRunnerRepository, PostgresWebEvidenceRepository, RUN_PURPOSE_LINES_CARRIER, RunRepository, WEB_EVIDENCE_CARRIERS, WEB_SHOWN_QUOTE_CARRIER,
@@ -174,7 +174,7 @@ export function storedDigPathsOf(value: unknown, extractsOf: ReadonlyMap<string,
   }));
 }
 
-/** R22 decision 5: a debate's place, time and purpose lines, opened under its own key; null when it has none (an old debate). */
+/** R22 decisions 5 and 29: a debate's step-2 lines, opened under its own key; null when it has none (an old debate). */
 export async function purposeLinesOf(pool: Pool, runId: string): Promise<PurposeLines | null> {
   const sealed = await new PostgresTreeUpdateRunnerRepository(pool).readPurposeLines(runId);
   if (sealed === null) return null;
@@ -255,11 +255,11 @@ export function postgresPathRewriteSources(pool: Pool): PathRewriteSources {
       const ask = await runs.readStoredAsk(runId);
       const main = await runs.readStoredAsk(root);
       if (ask === null || main === null) return unread("ask");
-      // Decision 5: the place, time and purpose lines are the first debate's, written at its ask; an old debate has none.
-      const lines = await purposeLinesOf(pool, root);
+      // Decision 5: the step-2 lines are the first debate's, written at its ask; an old debate has none. Decision 29: its question already says them.
+      const lines = purposeLinesMaterial(main.questionLine, await purposeLinesOf(pool, root));
       return Object.freeze({
         parentRunId: own.parentRunId, positionRef: own.positionRef, level, free: ask.planTier === "free",
-        question: Object.freeze({ line: main.questionLine, place: lines?.place ?? null, time: lines?.time ?? null, purpose: lines?.purpose ?? null,
+        question: Object.freeze({ line: main.questionLine, place: lines.place, time: lines.time, purpose: lines.purpose,
           readingLevel: readingLevelOf(ask.depthParams), language: null }),
         picks: Object.freeze(own.picks.map((pick) => Object.freeze({ text: pick.text, by: pick.author })))
       });
