@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  DIG_UPDATE_CALL_ALLOWANCES,
   RecentRunsCostEstimator,
   WEB_CALL_ALLOWANCES,
+  estimateDigUpdatesMicros,
   estimateWebPartMicros,
   parseCostEnvelopeBasis,
   settingsClassKey,
@@ -234,6 +236,32 @@ describe("R22 decision 9 · a dig's web part fits up to 4 searches per chosen pa
   it("every Haiku call of the part stays under the price line, at the most searches a dig may send", () => {
     const tokens = webCallTokens(webSitesOf({ kind: "DIG", depth: "THOROUGH", digPicks: 16 }));
     for (const call of [tokens.readerOne, tokens.pick, tokens.planner]) expect(call.inputTokens).toBeLessThan(WEB_HAIKU_PROMPT_TOKEN_LINE);
+  });
+});
+
+describe("the owner's ruling, 31 Oct: what follows a dig in its share", () => {
+  const a = DIG_UPDATE_CALL_ALLOWANCES;
+  it("counts its rewrite, a rewrite per level above and the answer's update, at every round the plan allows, on Free too", () => {
+    const paid = (level: number) => estimateDigUpdatesMicros({ level, free: false }, ROLES);
+    const free = (level: number) => estimateDigUpdatesMicros({ level, free: true }, ROLES);
+    // A level costs the same each time: the climb grows evenly with the dig's level, and level 1 has none but still its rewrite and answer update.
+    expect(paid(3) - paid(2)).toBe(paid(2) - paid(1));
+    expect(free(3) - free(2)).toBe(free(2) - free(1));
+    expect(free(1)).toBeGreaterThan(0);
+    // Free: one round and no suggestions, so less than paid but never nothing.
+    expect(free(1)).toBeLessThan(paid(1));
+    expect(free(2) - free(1)).toBeLessThan(paid(2) - paid(1));
+    // Never under one writer's and checker's call per rewrite and for the answer, at the allowances.
+    const prices = (input: number, output: number) => (input * ROLES.readerOne.inputMicrosPerMillionTokens + output * ROLES.readerOne.outputMicrosPerMillionTokens) / 1_000_000;
+    expect(free(1)).toBeGreaterThanOrEqual(prices(a.rewriteInputTokens, a.rewriteWriterOutputTokens) + prices(a.answerInputTokens, a.answerWriterOutputTokens));
+    expect(() => estimateDigUpdatesMicros({ level: 0, free: false }, ROLES)).toThrow("DIG_UPDATES_LEVEL_INVALID");
+  });
+
+  it("the hosted estimator prices it from its web prices; none without them", () => {
+    const estimator = (webPrices: WebRolePrices | null) => new RecentRunsCostEstimator({
+      source: { readRecentRunUsage: async () => [] }, prices: new Map(), maximumMicros: 3_660_000, webPrices });
+    expect(estimator(ROLES).digUpdatesPartMicros({ level: 2, free: true })).toBe(estimateDigUpdatesMicros({ level: 2, free: true }, ROLES));
+    expect(estimator(null).digUpdatesPartMicros({ level: 2, free: true })).toBeNull();
   });
 });
 

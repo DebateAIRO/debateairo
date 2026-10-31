@@ -115,7 +115,9 @@ export {
   type WebSearchOutcome
 } from "./web-charge.js";
 export {
+  DIG_UPDATE_CALL_ALLOWANCES,
   WEB_CALL_ALLOWANCES,
+  estimateDigUpdatesMicros,
   estimateWebPartMicros,
   webCallTokens,
   type WebPartEstimate,

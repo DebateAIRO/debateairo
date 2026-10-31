@@ -7,6 +7,7 @@ import {
 import {
   admitDig, digPathIndexOf, digPicksOnOnePath, joinAtStart, type DigJoinPort
 } from "../../apps/api/src/dig-admission.js";
+import type { AskRoomReader, RoomQuestion } from "../../apps/api/src/ask-room.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
 
 /**
@@ -36,7 +37,7 @@ const askOf = (parent: AskParent | undefined, planTier: "free" | "premium" = "pr
   ...(parent === undefined ? {} : { parent })
 });
 
-function apiWith(level: number | null) {
+function apiWith(level: number | null, askRoom?: AskRoomReader) {
   const submitted: AskRequest[] = [];
   const checked: string[] = [];
   const joins: Parameters<DigJoinPort["join"]>[0][] = [];
@@ -44,7 +45,7 @@ function apiWith(level: number | null) {
     submit: async (ask: AskRequest) => { submitted.push(ask); return { run_ref: CHILD, status: "QUEUED" as const }; }
   } as unknown as AskApplication;
   const api = buildApi({
-    application, sessions: testSessionApplication([IDENTITY]), allowedOrigin: TEST_APP_ORIGIN,
+    application, sessions: testSessionApplication([IDENTITY]), allowedOrigin: TEST_APP_ORIGIN, ...(askRoom === undefined ? {} : { askRoom }),
     questionCheck: { check: async (question: string) => { checked.push(question); return { outcome: "PASS" as const }; } },
     digModel: {
       readDigLevel: async (ownerRef: string, runId: string) => ownerRef === OWNER_REF && runId === PARENT ? level : null,
@@ -108,6 +109,17 @@ describe("the dig level at the asks route", () => {
     expect([DIG_PICKS_ONE_PATH, DIG_FREE_PICKS_MAX, FREE_DIG_PICKS_MAX]).toEqual(["DIG_PICKS_ONE_PATH", "DIG_FREE_PICKS_MAX", 3]);
     expect(DigPicksOnePathSchema.safeParse({ error: DIG_PICKS_ONE_PATH, message: DIG_PICKS_ONE_PATH, picks_max: 3 }).success).toBe(false);
     expect(DigFreePicksMaxSchema.safeParse({ error: DIG_FREE_PICKS_MAX, message: DIG_FREE_PICKS_MAX, picks_max: 4 }).success).toBe(false);
+  });
+
+  it("the room read for a dig names the dig's own level, one below its parent's, so its share can count the climb", async () => {
+    const asked: RoomQuestion[] = [];
+    const { api } = apiWith(2, { readRoom: async (question) => { asked.push(question);
+      return Object.freeze({ room: "FITS" as const, scope: null, resetsAt: null, waitingRunRef: null, planId: null }); } });
+    const response = await api.inject({ method: "GET", headers: testSessionHeaders(IDENTITY),
+      url: `/v1/asks/room?plan_tier=premium&composition_budget_tier=low&depth=1&dig_parent=${PARENT}&dig_mode=quick&dig_picks=1` });
+    expect(response.statusCode).toBe(200);
+    expect(asked[0]!.dig).toEqual({ parentRunId: PARENT, mode: "quick", picks: 1, level: 3 });
+    await api.close();
   });
 
   it("the room read for a dig is refused the same way at level 10", async () => {

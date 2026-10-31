@@ -4107,15 +4107,18 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // Plan 2026-10-30 dig-model revision W3-2: a read for a dig names its parent; the parent is checked as the ask will
     // check it (the person's, below the deepest level), and the answer gives the dig's share of today.
     const digParent = query.data.dig_parent;
+    let digLevel: number | undefined;
     if (digParent !== undefined && options.digModel !== undefined) {
       const level = access.ownerRef === null ? null : await options.digModel.readDigLevel(access.ownerRef, digParent);
       if (level === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
       if (level >= DIG_LEVEL_MAX) {
         return reply.status(409).send(DigTooDeepSchema.parse({ error: DIG_TOO_DEEP, message: DIG_TOO_DEEP, level_max: DIG_LEVEL_MAX }));
       }
+      digLevel = level + 1;
     }
     const digMember = digParent === undefined ? {} : {
-      dig: Object.freeze({ parentRunId: digParent, mode: query.data.dig_mode ?? "quick" as const, picks: query.data.dig_picks ?? null })
+      dig: Object.freeze({ parentRunId: digParent, mode: query.data.dig_mode ?? "quick" as const, picks: query.data.dig_picks ?? null,
+        ...(digLevel === undefined ? {} : { level: digLevel }) })
     };
     // Side-by-side spec §13 (S10): the active version's rows, read once for this request; the room estimates with it.
     const view = await admissionView();

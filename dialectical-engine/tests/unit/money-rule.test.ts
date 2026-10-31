@@ -65,7 +65,7 @@ function ledger(charges: readonly Charge[], batched = true) {
   return spend;
 }
 
-function roomWith(input: Readonly<{ plan: PlanId; charges: readonly Charge[]; now: Date; holds?: number; digWebPart?: (web: Readonly<{ depth: string; digPicks: number }>) => number | null; windows?: (now: Date) => ReadonlyArray<PersonWindow> }>) {
+function roomWith(input: Readonly<{ plan: PlanId; charges: readonly Charge[]; now: Date; holds?: number; digWebPart?: (web: Readonly<{ depth: string; digPicks: number }>) => number | null; digUpdates?: (dig: Readonly<{ level: number; free: boolean }>) => number | null; windows?: (now: Date) => ReadonlyArray<PersonWindow> }>) {
   const spend = { ...ledger(input.charges), readOwnerCountedHoldsMicros: async () => input.holds ?? 0 };
   const windows = input.windows ?? ((now: Date) => windowsOf(input.plan, now));
   return new AskRoom({
@@ -76,7 +76,8 @@ function roomWith(input: Readonly<{ plan: PlanId; charges: readonly Charge[]; no
       waitingForLegacyAsker: async () => [], readWaiting: async () => null, isWaiting: async () => false,
       enterWait: async () => undefined, recordReason: async () => undefined, markStarted: async () => undefined
     },
-    estimator: { estimateMicros: async () => 150_000, ...(input.digWebPart === undefined ? {} : { digWebPartMicros: input.digWebPart }) },
+    estimator: { estimateMicros: async () => 150_000, ...(input.digWebPart === undefined ? {} : { digWebPartMicros: input.digWebPart }),
+      ...(input.digUpdates === undefined ? {} : { digUpdatesPartMicros: input.digUpdates }) },
     personAllowance: { read: async (_owner, now) => windows(now) },
     entitlements: null,
     dailyCeilingMicros: 1_000_000_000,
@@ -164,6 +165,29 @@ describe("starts with no hold", () => {
     const room = roomWith({ plan: "FREE", charges: [], now: at("2026-10-03T12:00:00.000Z"), digWebPart: (web) => { asked.push(web); return 100_000; } });
     await room.readRoom({ ...QUESTION, settingsClass: { ...QUESTION.settingsClass, planTier: "free" }, dig: { parentRunId: OWNER, mode: "quick", picks: 3 } });
     expect(asked).toEqual([]);
+  });
+
+  it("the owner's ruling: a dig's share counts what follows it from its level, and holds nothing; Free's the same", async () => {
+    const asked: unknown[] = [];
+    const digUpdates = (dig: Readonly<{ level: number; free: boolean }>) => { asked.push(dig); return dig.level * 100_000; };
+    const room = roomWith({ plan: "PLUS", charges: [], now: at("2026-10-03T12:00:00.000Z"), digWebPart: () => 100_000, digUpdates });
+    const first = await room.readRoom({ ...QUESTION, dig: { parentRunId: OWNER, mode: "quick", picks: 1, level: 1 } });
+    const deep = await room.readRoom({ ...QUESTION, dig: { parentRunId: OWNER, mode: "quick", picks: 1, level: 4 } });
+    // 150 000 + 100 000 of web + 100 000 of updates of a 1 000 000 day: 35%; at level 4, 65%.
+    expect([first.digSharePercent, deep.digSharePercent]).toEqual([35, 65]);
+    expect(deep).toMatchObject({ room: "FITS", reserve: "KEPT" });
+    // A page that names no level reads as level 1; a question's own share never counts it.
+    expect((await room.readRoom({ ...QUESTION, dig: { parentRunId: OWNER, mode: "quick", picks: 1 } })).digSharePercent).toBe(35);
+    expect((await room.readRoom(QUESTION)).startSharePercent).toBe(15);
+    expect(asked).toEqual([{ level: 1, free: false }, { level: 4, free: false }, { level: 1, free: false }]);
+
+    const askedFree: unknown[] = [];
+    const free = roomWith({ plan: "FREE", charges: [], now: at("2026-10-03T12:00:00.000Z"), digWebPart: () => 100_000,
+      digUpdates: (dig) => { askedFree.push(dig); return 100_000; } });
+    const plain = roomWith({ plan: "FREE", charges: [], now: at("2026-10-03T12:00:00.000Z") });
+    const freeQuestion = { ...QUESTION, settingsClass: { ...QUESTION.settingsClass, planTier: "free" as const }, dig: { parentRunId: OWNER, mode: "quick" as const, picks: 1, level: 2 } };
+    expect((await free.readRoom(freeQuestion)).digSharePercent).toBeGreaterThan((await plain.readRoom(freeQuestion)).digSharePercent!);
+    expect(askedFree).toEqual([{ level: 2, free: true }]);
   });
 
   it("a dig's read gives the dig's share instead", async () => {

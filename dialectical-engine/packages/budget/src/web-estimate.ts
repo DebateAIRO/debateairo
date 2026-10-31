@@ -13,6 +13,8 @@
  * same arithmetic serves the hosted room and the preview's gate check.
  */
 import {
+  INVESTIGATION_REPORT_POLICY,
+  PATH_REWRITE_POLICY,
   WEB_HAIKU_PROMPT_TOKEN_LINE,
   type WebSites
 } from "@debateai/register";
@@ -152,4 +154,40 @@ export function estimateWebPartMicros(sites: WebSites, prices: WebRolePrices, se
     suggestMicros,
     totalMicros
   });
+}
+
+/**
+ * The owner's ruling (31 Oct): the share shown before a dig assumes the rewrites that follow it. The tokens of those calls: a rewrite reads a
+ * path and a debate's paths with their points, an answer update the tree, and each writes short texts (the answer at most 600 words).
+ * Allowances, not caps: a typical call with room to spare, so the line can read a bit high; every round the plan allows is counted, so it
+ * doesn't read low when a checker objects. `instructionTokens` come on top.
+ */
+export const DIG_UPDATE_CALL_ALLOWANCES = Object.freeze({
+  rewriteInputTokens: 8_000,
+  rewriteWriterOutputTokens: 2_048,
+  answerInputTokens: 20_000,
+  answerWriterOutputTokens: 2_048,
+  checkerOutputTokens: 512
+});
+
+/**
+ * What follows a dig, for its share only (nothing is held or walled on it): its own rewrite, a climb's rewrite of every path above it, as if each
+ * level really changed (`level - 1` of them: a dig at level 1 rewrites the first debate's own path), and the main answer's update. A paid dig
+ * also works out each climbed path's suggestions again (its own parent path's are in `digSuggestPaths`). Free counts the same but for its
+ * one round and no suggestions (owner: Free's answer updates work the same as paid). The writer is Claude Haiku, the checker another
+ * company's, so priced as reader 1 and readers 2 and 3.
+ */
+export function estimateDigUpdatesMicros(dig: Readonly<{ level: number; free: boolean }>, prices: Pick<WebRolePrices, "readerOne" | "topReaders">): number {
+  if (!Number.isSafeInteger(dig.level) || dig.level < 1) throw new TypeError("DIG_UPDATES_LEVEL_INVALID");
+  const a = DIG_UPDATE_CALL_ALLOWANCES;
+  const round = (inputTokens: number, writerOutputTokens: number): number => callMicros(prices.readerOne, inputTokens + WEB_CALL_ALLOWANCES.instructionTokens, writerOutputTokens, true)
+    + callMicros(prices.topReaders, inputTokens + writerOutputTokens + WEB_CALL_ALLOWANCES.instructionTokens, a.checkerOutputTokens, false);
+  const climbs = dig.level - 1;
+  const rewrites = (1 + climbs) * (dig.free ? PATH_REWRITE_POLICY.freeMaxRounds : PATH_REWRITE_POLICY.maxRounds) * round(a.rewriteInputTokens, a.rewriteWriterOutputTokens);
+  const answer = (dig.free ? INVESTIGATION_REPORT_POLICY.freeMaxRounds : INVESTIGATION_REPORT_POLICY.maxRounds) * round(a.answerInputTokens, a.answerWriterOutputTokens);
+  const suggestions = dig.free ? 0
+    : climbs * callMicros(prices.readerOne, WEB_CALL_ALLOWANCES.digSuggestInputTokens + WEB_CALL_ALLOWANCES.instructionTokens, WEB_CALL_ALLOWANCES.digSuggestOutputTokens, true);
+  const total = rewrites + answer + suggestions;
+  if (!Number.isSafeInteger(total)) throw new TypeError("WEB_ESTIMATE_UNREPRESENTABLE");
+  return total;
 }

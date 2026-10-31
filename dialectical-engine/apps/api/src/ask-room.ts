@@ -77,7 +77,7 @@ export type RoomQuestion = Readonly<{
    * below the deepest level, apps/api/src/dig-admission.ts). Its answer then carries the dig's share of today instead
    * of a new question's.
    */
-  dig?: Readonly<{ parentRunId: string; mode: DigLinkMode; picks: number | null }>;
+  dig?: Readonly<{ parentRunId: string; mode: DigLinkMode; picks: number | null; level?: number }>;
 }>;
 export type RoomDecision = Extract<Admission, { kind: "START" | "WAIT" }>;
 export type RoomDecisionContext = Readonly<{
@@ -398,7 +398,8 @@ function moneyRuleMembers(question: RoomQuestion, evaluation: RoomEvaluation, di
   const today = evaluation.personUses.find((use) => use.scope === "PERSON_DAY")
     ?? evaluation.personUses.find((use) => use.scope === "PERSON_MONTH");
   if (today === undefined) return { reserve: "KEPT" };
-  // A dig's share counts its web part (R22 decision 9): up to 4 searches per chosen path, so more picks read as more of today.
+  // A dig's share counts its web part (R22 decision 9: up to 4 searches per chosen path, so more picks read as more of today) and the
+  // automatic updates that follow it (the owner's ruling, 31 Oct), passed in together by the caller.
   const share = digSharePercent(evaluation.estimateMicros + digWebPartMicros, today.limitMicros);
   return question.dig === undefined
     ? { startSharePercent: share, reserve: "KEPT" }
@@ -771,7 +772,7 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
     const planId = grant !== null || this.#options.entitlements === null || ownerRef === null ? null
       : (await this.#options.entitlements.current(ownerRef, now)).planId;
     const funding = grant === null ? {} : {funding: Object.freeze({kind:"INTERNAL" as const, expiresAt:grant.expiresAt})};
-    const money = grant === null ? moneyRuleMembers(question, evaluation, await this.#digWebPartMicros(question)) : {};
+    const money = grant === null ? moneyRuleMembers(question, evaluation, await this.#digWebPartMicros(question) + await this.#digUpdatesPartMicros(question)) : {};
     const admission = evaluation.admission;
     switch (admission.kind) {
       case "REFUSE_ALREADY_WAITING":
@@ -1069,6 +1070,16 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
     if (question.dig === undefined || question.settingsClass.planTier === "free") return 0;
     const estimator = await this.#estimatorFor(question.registerVersion);
     return estimator.digWebPartMicros?.({ depth: question.dig.mode === "thorough" ? "THOROUGH" : "QUICK", digPicks: Math.max(question.dig.picks ?? 1, 1) }) ?? 0;
+  }
+
+  /**
+   * The owner's ruling (31 Oct): a dig's share assumes its rewrite, the climb from its level (`level - 1` paths above, a page that names no level
+   * reads as one) and the main answer's update, on Free as on paid. Only the line reads it; 0 for a question and with no web prices.
+   */
+  async #digUpdatesPartMicros(question: RoomQuestion): Promise<number> {
+    if (question.dig === undefined) return 0;
+    const estimator = await this.#estimatorFor(question.registerVersion);
+    return estimator.digUpdatesPartMicros?.({ level: question.dig.level ?? 1, free: question.settingsClass.planTier === "free" }) ?? 0;
   }
 
   /** The site's live debates at its cap, counted under `SITE_CONCURRENT_DEBATES_LOCK` on the decision's own transaction. */

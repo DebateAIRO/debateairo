@@ -4,7 +4,7 @@ import { AnswerLengthSchema, DepthModeSchema, ScrutinySchema, type AnswerLength,
 import { DEBATE_SHAPE_PLAN_KEYS, webSitesOf, type CostEstimateStartPolicy, type DebateShapePlanKey, type WebSiteInput } from "@debateai/register";
 import { chargeMicrosForUsage, type ProviderTargetPrice } from "./cost-envelope.js";
 import { WEB_SEARCH_REQUEST_MICROS, isWebSearchProviderRef } from "./web-charge.js";
-import { estimateWebPartMicros, type WebRolePrices } from "./web-estimate.js";
+import { estimateDigUpdatesMicros, estimateWebPartMicros, type WebRolePrices } from "./web-estimate.js";
 
 /**
  * Budget spec 2026-09-28 §2.5 — THE ESTIMATE, "recent debates at today's prices".
@@ -59,6 +59,8 @@ export interface CostEstimator {
   estimateMicros(settings: RunSettingsClass): Promise<number>;
   /** R22 decision 9: a dig's web part at its most, for the share shown before it; absent or null: not known. */
   digWebPartMicros?(web: Readonly<{ depth: "QUICK" | "THOROUGH"; digPicks: number }>): number | null;
+  /** The owner's ruling (31 Oct): what follows a dig at this level, for the same share; absent or null: not known. */
+  digUpdatesPartMicros?(dig: Readonly<{ level: number; free: boolean }>): number | null;
 }
 
 export type RecentRunCharge = Readonly<{ providerRef: string; inputTokens: number; outputTokens: number }>;
@@ -246,6 +248,11 @@ export class RecentRunsCostEstimator implements CostEstimator {
   digWebPartMicros(web: Readonly<{ depth: "QUICK" | "THOROUGH"; digPicks: number }>): number | null {
     if (this.#webPrices === null) return null;
     return estimateWebPartMicros(webSitesOf({ kind: "DIG", depth: web.depth, digPicks: web.digPicks }), this.#webPrices).totalMicros;
+  }
+
+  /** What follows a dig: its rewrite, the climb and the main answer's update. Null with no web prices. Like the web part, only the line reads it. */
+  digUpdatesPartMicros(dig: Readonly<{ level: number; free: boolean }>): number | null {
+    return this.#webPrices === null ? null : estimateDigUpdatesMicros(dig, this.#webPrices);
   }
 
   async estimateMicros(settings: RunSettingsClass): Promise<number> {
