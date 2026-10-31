@@ -1,0 +1,17 @@
+{
+  "version": "public-debates-forward0137-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0136_investigation_reports.sql",
+    "manifestSha256": "d76007be635665dc000125ed98fb8dc993a3ed2405d4c6219431b9a46dbdd3d8",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0137_public_debates.sql",
+    "sha256": "495c4e2777ef7e8374104bd4244880b165daa6cb71d666c09e8189ce9628c950"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  }
+}

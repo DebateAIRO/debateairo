@@ -29,7 +29,7 @@ import {
   DigLinkRecordSchema, DigLinksSchema, DigLinkRecordRequestSchema, DigLinkRecordedSchema, DigLinkModeSchema
 } from "./account-memory.js";
 export * from "./account-memory.js";
-import { AnswerWebSchema, AskParentSchema, DebateInvestigationSchema, DigSharePercentSchema, DigSuggestionSchema, InvestigationCloseRequestSchema,
+import { AnswerContributionSchema, AnswerMainAnswerSchema, MainAnswerVersionSchema, PublicContributionSchema, PublicDigParentSchema, PublicMainAnswerSchema, PurposeLinesSchema, AnswerWebSchema, AskParentSchema, DebateInvestigationSchema, DigSharePercentSchema, DigSuggestionSchema, InvestigationCloseRequestSchema,
   ResearchedAddRequestSchema, ResearchedAddedSchema, RoomReserveSchema, WebOtherPageSchema, WebPathSchema, WebSourceSchema,
   WEB_CONTRACT_LIMITS, AnswerDigSchema, AnswerPathRewritesSchema, DigTooDeepSchema, DigPicksOnePathSchema, DigFreePicksMaxSchema, MonthPauseSchema, PathRewriteSchema,
   PathRewritesSchema, PointOfViewVerdictSchema, RoomNewStartsSchema, RunContinueRefusedSchema, RunContinueRequestSchema,
@@ -296,7 +296,13 @@ export const AskRequestSchema = z.object({
   // refused 409 ASK_SETTINGS_CHANGED ("please choose again"); absent (an older page), the ask is normalised as before.
   settings_version: SettingsVersionSchema.optional(),
   // Plan 2026-10-30 W1-6: a dig names the debate it digs (AskParentSchema, ./web.ts); absent, the ask is a new question.
-  parent: AskParentSchema.optional()
+  parent: AskParentSchema.optional(),
+  // Decision 13 of 31 Oct: a dig on a public debate (PublicDigParentSchema, ./web.ts) instead of `parent`; absent, the ask is as before.
+  public_parent: PublicDigParentSchema.optional(),
+  // Decision 5: the debate's place, time and purpose lines, structured (PurposeLinesSchema, ./web.ts); absent, the debate keeps none.
+  purpose_lines: PurposeLinesSchema.optional(),
+  // Decision 13: this Free ask showed the notice that its question and debate are public. Only such a debate ever goes public.
+  free_public_notice: z.literal(true).optional()
 }).strict();
 export type AskRequest = z.infer<typeof AskRequestSchema>;
 
@@ -1555,7 +1561,11 @@ export const PublicDebateSchema = z.object({
   // Debate shape P2c (spec 2026-10-12 §3.3 step 8): the map view copied at publish time,
   // so the public page can list what was raised but not debated and title each position.
   // Optional: every snapshot published before it still parses.
-  map_view: DebateMapViewSchema.optional()
+  map_view: DebateMapViewSchema.optional(),
+  // Decision 13 of 31 Oct: what contributions changed since this snapshot (the snapshot itself never changes; these are read from
+  // 0137's sealed updates at each read). Optional: every snapshot published before them parses, and the API adds them, never the seal.
+  contributions: z.array(PublicContributionSchema).max(WEB_CONTRACT_LIMITS.publicContributionsMax).optional(),
+  main_answer_update: PublicMainAnswerSchema.optional()
 }).strict();
 export type PublicDebate = z.infer<typeof PublicDebateSchema>;
 
@@ -1714,7 +1724,12 @@ export const AnswerSchema = z.object({
   // W2-7 (dig model): each path's rewrites by digs and the "changed since" count (AnswerPathRewritesSchema, ./web.ts),
   // and, on a dig's own answer, what it dug and its rewrite (AnswerDigSchema). Optional: older answers parse unchanged.
   path_rewrites: AnswerPathRewritesSchema.optional(),
-  dig: AnswerDigSchema.optional()
+  dig: AnswerDigSchema.optional(),
+  // Decisions 3, 5 and 13 of 31 Oct (./web.ts): the main answer's automatic versions, the debate's purpose lines, and how the digger's
+  // contribution to a public debate stands. Optional: older answers parse unchanged.
+  main_answer: AnswerMainAnswerSchema.optional(),
+  purpose_lines: PurposeLinesSchema.optional(),
+  contribution: AnswerContributionSchema.optional()
 }).strict().superRefine((answer, context) => {
   // W1-6: the server's checked flag stands only on a looked-up point whose locator is one of its own sources.
   for (const node of answer.nodes) {
@@ -1967,6 +1982,9 @@ export const contractInventory = Object.freeze({
     // W5-1: the final report over an investigation (./investigation-report.ts).
     InvestigationReportsSchema, InvestigationReportAcceptedSchema, InvestigationReopenRequestSchema, InvestigationReopenedSchema,
     InvestigationReportWritingSchema,
+    // The owner's changes of 31 Oct (./web.ts): the shapes the Tree and Public lanes fill; no route yet.
+    PurposeLinesSchema, MainAnswerVersionSchema, AnswerMainAnswerSchema, PublicDigParentSchema, AnswerContributionSchema,
+    PublicContributionSchema, PublicMainAnswerSchema,
     BillingQuoteRequestSchema, BillingQuoteResponseSchema, BillingCheckoutRequestSchema, BillingCheckoutResponseSchema,
     BillingCheckoutPendingErrorSchema, BillingChargeStatusResponseSchema,
     BillingSubscriptionResponseSchema, BillingDowngradeRequestSchema, BillingInvoicesResponseSchema,

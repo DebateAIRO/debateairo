@@ -17,6 +17,10 @@ export const CHECKED_TEXT_PATHS: readonly { path: string; kind: PublicationPartK
   ...["quote", "title", "site", "link", "explanation.text"]
     .map(path => ({ path: `answer.nodes[].sources[].${path}`, kind: "ARGUMENTS" as const })),
   { path: "answer.nodes[].review.reasons[]", kind: "REVIEWS" },
+  // Decision 13 of 31 Oct: what a contribution put on the public page: its path's text is judged with the arguments, the updated main answer
+  // with the summary. The contributor's pseudonym and the date stay out, as the author's are.
+  ...["line", "summary", "what_changed[]"].map(path => ({ path: `contributions[].${path}`, kind: "ARGUMENTS" as const })),
+  { path: "main_answer_update.segments[].text", kind: "SUMMARY" },
   ...["headline", "summary", "confidence", "paths[].line", "change.text", "reviewer_note.text"]
     .map(path => ({ path: `story_short.${path}`, kind: "STORY" as const }))
 ];
@@ -24,7 +28,7 @@ export const CHECKED_TEXT_PATHS: readonly { path: string; kind: PublicationPartK
 export function isExcludedTextPath(path: string, schemaType: string): boolean {
   if (schemaType === "enum" || schemaType === "literal") return true;
   if (["public_ref", "published_at", "author_pseudonym", "language", "answer.as_of",
-    "answer.nodes[].sources[].published_on"].includes(path)) return true;
+    "answer.nodes[].sources[].published_on", "contributions[].contributor", "contributions[].contributed_on"].includes(path)) return true;
   if (path === "floor" || path.startsWith("floor.") || path === "answer.edges" || path.startsWith("answer.edges[]")) return true;
   const segments = path.split(".").map(segment => segment.replace(/\[\]$/, ""));
   return segments.some(segment => segment === "maker_lineage" || segment === "reviewer_lineage"
