@@ -14,7 +14,7 @@ import {
 } from "@debateai/db";
 import { createPostgresProviderGateway } from "@debateai/runner";
 import { StoryRepository } from "@debateai/story";
-import type { PromptPacket } from "@debateai/providers";
+import { readPromptFrame, type PromptPacket } from "@debateai/providers";
 import {
   PATH_REWRITE_CHECKER_MODEL, PATH_REWRITE_WRITER_MODEL, composePathRewrite
 } from "../../apps/runner/src/path-rewrite-composition.js";
