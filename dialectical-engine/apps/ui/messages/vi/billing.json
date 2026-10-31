@@ -11,6 +11,7 @@
   "billing.usage.grant": "Tổng khoản cấp",
   "billing.usage.expires": "Hết hạn {time}",
   "newDebate.room.internalGrantFull": "Khoản cấp nội bộ đã được dùng hết. Hết hạn {time}.",
+  "newDebate.room.internalTeamFull": "Hạn mức của nhóm trong tháng này đã hết. Các câu hỏi mới sẽ chờ cho đến khi một trong các chủ sở hữu nâng hạn mức hoặc tháng mới bắt đầu.",
   "newDebate.room.internalWindowFull": "Đã đạt giới hạn kỳ cấp kinh phí nội bộ. Kiểm tra lại {time}.",
   "newDebate.room.internalClose": "Kinh phí nội bộ của bạn đang gần giới hạn đã định.",
   "billing.plans.FREE.name": "Miễn phí",

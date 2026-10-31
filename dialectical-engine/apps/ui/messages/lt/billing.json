@@ -11,6 +11,7 @@
   "billing.usage.grant": "Visa dotacija",
   "billing.usage.expires": "Galioja iki {time}",
   "newDebate.room.internalGrantFull": "Vidinės dotacijos lėšos išnaudotos. Galioja iki {time}.",
+  "newDebate.room.internalTeamFull": "Komandos šio mėnesio limitas išnaudotas. Nauji klausimai lauks, kol vienas iš savininkų jį padidins arba prasidės naujas mėnuo.",
   "newDebate.room.internalWindowFull": "Pasiekta vidinio finansavimo laikotarpio riba. Patikrinkite dar kartą {time}.",
   "newDebate.room.internalClose": "Jūsų vidinis finansavimas artėja prie nustatytos ribos.",
   "billing.plans.FREE.name": "Nemokamas",

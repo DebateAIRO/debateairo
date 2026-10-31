@@ -53,6 +53,13 @@ The practice works for both kinds of preview: the local-mode preview of today an
 NETOPIA's sandbox (`deploy/preview-release/v1/README.md`, "Hosted preview with NETOPIA sandbox billing"). The
 practice reads which one it is from the exported settings; "Practising the hosted preview" below says what changes.
 
+## Practice money counts as team
+
+The practice's throwaway database is deleted at the end, so the live ledger never sees what it spent. A debate practice ends by printing
+one line, `team limit: add this practice on the team page: reference ..., charged $...`. One of the two accounts adds that on the private
+team page (a passkey asks; the same reference is refused twice), and from then on it counts against the team's month. The other modes
+(formats, openings, language and the rest) print their cost in their own reports: add those by hand with a fresh reference.
+
 ## Practising the hosted preview
 
 Once the preview runs in hosted mode (runbook H6 onwards), the exported settings say

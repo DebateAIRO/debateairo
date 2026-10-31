@@ -11,6 +11,7 @@
   "billing.usage.grant": "Σύνολο επιχορήγησης",
   "billing.usage.expires": "Λήγει {time}",
   "newDebate.room.internalGrantFull": "Το ποσό της εσωτερικής επιχορήγησης εξαντλήθηκε. Λήγει {time}.",
+  "newDebate.room.internalTeamFull": "Ο χώρος της ομάδας για αυτόν τον μήνα εξαντλήθηκε. Οι νέες ερωτήσεις περιμένουν μέχρι να τον αυξήσει ένας από τους ιδιοκτήτες ή να αρχίσει νέος μήνας.",
   "newDebate.room.internalWindowFull": "Το όριο της περιόδου εσωτερικής χρηματοδότησης συμπληρώθηκε. Ελέγξτε ξανά {time}.",
   "newDebate.room.internalClose": "Η εσωτερική χρηματοδότηση πλησιάζει το καθορισμένο όριό της.",
   "billing.plans.FREE.name": "Δωρεάν",

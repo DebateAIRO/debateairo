@@ -59,7 +59,7 @@ const ROLES = ["debateai_runtime", "debateai_billing_runtime", "debateai_authori
 describe("0136: the final report over an investigation", () => {
   it("C-T follows 0135 in the chain's STEPS (0137 to 0141 come after it), with its own loader", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
-    expect(chain).toContain("loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140,loadForward0141]);");
+    expect(chain).toContain("loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140,loadForward0141,loadForward0142]);");
     expect(chain).toContain("import { loadForward0136 } from './migration-forward0136.js';");
     const loader = read("packages/db/src/migration-forward0136.ts");
     expect(loader).toContain(`const NAME = "${NAME}";`);

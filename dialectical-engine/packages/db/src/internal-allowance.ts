@@ -4,6 +4,7 @@ import type { InternalAllowanceConfigure, InternalAllowancePolicy, InternalAllow
   InternalGrant, InternalRunFundingState, SecurityReceipt, StaffContext } from "@debateai/kernel";
 import { guardedAuthorityQuery } from "./staff-access.js";
 import type { StaffMutation } from "./staff-access.js";
+import { readTeamRoom, type TeamRoom } from "./team-limit.js";
 
 export type SelectedInternalAllowancePolicy = Readonly<{
   registerVersion: number;
@@ -106,6 +107,8 @@ export class PostgresInternalAllowanceRepository implements InternalAllowancePor
       || !Number.isSafeInteger(value.expectedRevision) || value.expectedRevision < 0 || !positive(value.policyRegisterVersion)) throw refusal();
     return Object.freeze({ ownerRef: value.ownerRef, expectedRevision: value.expectedRevision, policyRegisterVersion: value.policyRegisterVersion });
   }
+  /** Decision 24: does this estimate fit the team's month (0142). Nothing about the amount leaves the database. */
+  readTeamRoom(estimateMicros: number): Promise<TeamRoom> { return readTeamRoom(this.pool, estimateMicros); }
   async current(ownerRef: string, now: Date): Promise<InternalGrant | null> {
     const result = await this.pool.query<{ value: unknown }>("SELECT billing.read_internal_allowance($1::uuid,$2::timestamptz) AS value", [identifier(ownerRef), instant(now)]);
     return grantFrom(result.rows[0]?.value);

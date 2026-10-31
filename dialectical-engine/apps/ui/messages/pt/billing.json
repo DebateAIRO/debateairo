@@ -11,6 +11,7 @@
   "billing.usage.grant": "Total da dotação",
   "billing.usage.expires": "Expira {time}",
   "newDebate.room.internalGrantFull": "A dotação interna foi esgotada. Expira {time}.",
+  "newDebate.room.internalTeamFull": "A margem da equipa para este mês esgotou-se. As novas perguntas aguardam até que um dos proprietários a aumente ou comece um novo mês.",
   "newDebate.room.internalWindowFull": "O limite do período de financiamento interno foi atingido. Verifique novamente {time}.",
   "newDebate.room.internalClose": "O seu financiamento interno aproxima-se do limite definido.",
   "billing.plans.FREE.name": "Gratuito",

@@ -91,6 +91,11 @@ tests/integration/investigation-report-database.test.ts
 tests/integration/r22-foundation-database.test.ts
 # A path's suggestions (0141): insert-once, the newest per path, deletion both ways, export, no request role reads them.
 tests/integration/path-suggestions-database.test.ts
+# The team's one limit (0142, R22 decisions 14 and 24): the limit's log and holders, the practices, the notices, the functions the runtime calls.
+tests/integration/team-limit-database.test.ts
+tests/integration/team-limit-http.test.ts
+# The team's one limit (0142): the passkey-bound change, the notices and admission (R22 decisions 14 and 24).
+tests/integration/team-limit-admission.test.ts
 
 # NOT listed: preview-auth-dev-startup.test.ts — red on dev at d1ac3641b (2 of 17: PREVIEW_STAGE_PROCESS_EXITED; it
 # starts the real API/UI stage processes, so it is a deployment rehearsal, not a self-contained suite).

@@ -5,7 +5,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest, RouteOptions } from 'fastify';
 import type { z } from 'zod';
 import * as contract from '@debateai/contract';
-import type { ActionBinding, Reason, SecurityReceipt, StaffCapability } from '@debateai/kernel';
+import type { ActionBinding, Reason, SecurityReceipt, StaffCapability, TeamLimitAuthority } from '@debateai/kernel';
 import type { AuthSourceContext, StaffManagementRepository } from '@debateai/db';
 import type { AuthenticatedSession, SessionApplication } from '../sessions.js';
 import { exactStaffCookie, exactStaffCsrfPair, staffCookies, staffTokenHash, STAFF_COOKIE_NAME, STAFF_CSRF_COOKIE_NAME, STAFF_CSRF_HEADER, type StaffAccessApplication, type StaffAuthentication } from './access.js';
@@ -15,6 +15,7 @@ import { PublicationReviewRefusal } from '@debateai/serve';
 import type { PublicationReviewIntent, PublicationReviewStaffService } from '../publication-review/staff.js';
 import { registerThreatReportRoutes, ThreatReportHttpError, type ThreatReportStaffService } from './threat-reports.js';
 import { TypedDomainError } from '@debateai/kernel';
+import { canonicalTeamLimitActionBinding, isTeamLimitIntent, registerTeamLimitRoutes, TeamLimitHttpError, type TeamLimitIntent, type TeamLimitStaffService } from './team-limit.js';
 export const staffAuthorizationPolicyInventory = Object.freeze([
     { route: 'GET /v1/admin/enrollment', auth: 'user', resource: 'staff-self', action: 'enrollment' },
     { route: 'POST /v1/admin/prerequisites/step-up', auth: 'user', resource: 'staff-self', action: 'prerequisite' },
@@ -44,7 +45,13 @@ export const staffAuthorizationPolicyInventory = Object.freeze([
     { route: 'POST /v1/admin/publication-reviews/{reviewRef}/approve', auth: 'staff', staffCapability: 'PUBLICATION_REVIEW', resource: 'staff-publication-review', action: 'approve' },
     { route: 'POST /v1/admin/publication-reviews/{reviewRef}/refuse', auth: 'staff', staffCapability: 'PUBLICATION_REVIEW', resource: 'staff-publication-review', action: 'refuse' },
     { route: 'POST /v1/admin/internal-allowances', auth: 'staff', staffCapability: 'ALLOWANCE_WRITE', resource: 'staff-self', action: 'allowance-configure' },
-    { route: 'DELETE /v1/admin/internal-allowances/{grantId}', auth: 'staff', staffCapability: 'ALLOWANCE_WRITE', resource: 'staff-self', action: 'allowance-revoke' }
+    { route: 'DELETE /v1/admin/internal-allowances/{grantId}', auth: 'staff', staffCapability: 'ALLOWANCE_WRITE', resource: 'staff-self', action: 'allowance-revoke' },
+    // Decision 24: the team-limit authority is no capability, so each handler asks the database (0142's staff.authorize_action) itself.
+    { route: 'GET /v1/admin/team-limit', auth: 'staff', resource: 'staff-team', action: 'read' },
+    { route: 'POST /v1/admin/team-limit', auth: 'staff', resource: 'staff-team', action: 'set' },
+    { route: 'POST /v1/admin/team-limit/partner/{staffId}', auth: 'staff', resource: 'staff-team', action: 'partner-grant' },
+    { route: 'DELETE /v1/admin/team-limit/partner/{staffId}', auth: 'staff', resource: 'staff-team', action: 'partner-revoke' },
+    { route: 'POST /v1/admin/team-limit/practice', auth: 'staff', resource: 'staff-team', action: 'practice-record' }
 ] as const);
 /** Explicit v2 composition only. No ready flags, command prepare/commit, or private content readers. */
 export interface StaffHttpApplication {
@@ -57,6 +64,7 @@ export interface StaffHttpApplication {
     funding?: StaffInternalFundingApplication;
     publicationReviews?: PublicationReviewStaffService;
     threatReports?: ThreatReportStaffService;
+    teamLimit?: TeamLimitStaffService;
     /** Early lock check before any key ceremony (not the authority: the alert producer and the DB guard
      * still check every mutation). Production passes the runtime's readiness; absent, only those run. */
     readiness?: Readonly<{ readIndependentAlertReadiness(): Promise<'READY' | 'UNAVAILABLE'> }>;
@@ -95,7 +103,7 @@ const ordinary = (base: AuthenticatedSession) => ({ userId: base.userId, ordinar
 const reason = (wire: z.infer<typeof contract.ReasonSchema>): Reason => ({ code: wire.code, ...(wire.ticket_ref === undefined ? {} : { ticketRef: wire.ticket_ref }) });
 const receipt = (value: SecurityReceipt) => ({ operation_id: value.operationId, outcome: value.outcome, recorded_at: value.recordedAt.toISOString() });
 /** Fixed field order + sorted sets make the proof independent of browser object/key ordering. */
-export function canonicalStaffActionBinding(intent: Exclude<contract.StaffActionIntent, PublicationReviewIntent>, auth: StaffAuthentication): ActionBinding {
+export function canonicalStaffActionBinding(intent: Exclude<contract.StaffActionIntent, PublicationReviewIntent | TeamLimitIntent>, auth: StaffAuthentication): ActionBinding {
     if (intent.action === 'THREAT_REPORT_DECIDE') {
         const action = `THREAT_REPORT_${intent.decision}` as const;
         const body = { action, target_id: intent.target_report_ref, decision: intent.decision,
@@ -135,7 +143,9 @@ export function canonicalInternalAllowanceActionBinding(input: contract.Internal
     return { action: intent.action, targetId, expectedRevision: state.expectedRevision, operationId: intent.operation_id,
         bodySha256: createHash('sha256').update(parseCanonicalRegisterJson(Buffer.from(JSON.stringify(body)))).digest('hex') };
 }
-function capability(intent: contract.FundedStaffActionIntent): StaffCapability | null {
+function capability(intent: contract.FundedStaffActionIntent): StaffCapability | TeamLimitAuthority | null {
+    if (intent.action === 'TEAM_LIMIT_SET' || intent.action === 'TEAM_PRACTICE_RECORD') return 'TEAM_LIMIT_SET';
+    if (intent.action === 'TEAM_LIMIT_PARTNER_GRANT' || intent.action === 'TEAM_LIMIT_PARTNER_REVOKE') return 'TEAM_GRANT';
     if (intent.action === 'ALLOWANCE_CONFIGURE' || intent.action === 'ALLOWANCE_REVOKE') return 'ALLOWANCE_WRITE';
     if (intent.action === 'PUBLICATION_REVIEW_APPROVE' || intent.action === 'PUBLICATION_REVIEW_REFUSE') return 'PUBLICATION_REVIEW';
     if (intent.action === 'THREAT_REPORT_DECIDE') return 'THREAT_REPORT';
@@ -177,6 +187,12 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
         } else if (intent.action === 'PUBLICATION_REVIEW_APPROVE' || intent.action === 'PUBLICATION_REVIEW_REFUSE') {
             if (application!.publicationReviews === undefined) throw new StaffHttpRefusal(503, 'STAFF_UNAVAILABLE');
             binding = await application!.publicationReviews.decisionBinding(authentication, intent);
+        } else if (isTeamLimitIntent(intent)) {
+            if (application!.teamLimit === undefined) throw new StaffHttpRefusal(503, 'STAFF_UNAVAILABLE');
+            // The authority first: the state a ceremony is bound to goes to nobody else.
+            await application!.access.requireCapability(authentication, required!);
+            binding = canonicalTeamLimitActionBinding(intent, authentication.context.staffId,
+                intent.action === 'TEAM_LIMIT_SET' ? await application!.teamLimit.repository.readCommand(authentication.context, authentication.baseSession.tokenHash) : null);
         } else binding = canonicalStaffActionBinding(intent, authentication);
         await application!.access.assertCurrent(authentication);
         if (required !== null)
@@ -204,7 +220,7 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
                 catch (error) {
                     if (error instanceof StaffHttpRefusal)
                         return reply.code(error.status).send({ error: error.code });
-                    if (error instanceof ThreatReportHttpError)
+                    if (error instanceof ThreatReportHttpError || error instanceof TeamLimitHttpError)
                         return reply.code(error.status).send({ error: error.code });
                     if (error instanceof TypedDomainError && error.code.startsWith('THREAT_REPORT_')) {
                         const status = error.code === 'THREAT_REPORT_NOT_FOUND' ? 404
@@ -317,6 +333,7 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
         return project(contract.StaffAuditPageSchema, await application!.repository.readAuditPage({ context: authentication.context, ordinaryTokenHash: authentication.baseSession.tokenHash, limit: query.limit, ...(query.cursor === undefined ? {} : { cursor: query.cursor }) }));
     });
     registerThreatReportRoutes(route, application?.threatReports, application?.access, auth, actionAuthority);
+    registerTeamLimitRoutes(route, () => application!.teamLimit, () => application!.access, () => application!.intents, auth, actionAuthority);
     const reviewRef = (request: FastifyRequest): string => {
         const value = (request.params as { reviewRef?: unknown }).reviewRef;
         if (!contract.PublicationReviewQueueItemSchema.shape.review_ref.safeParse(value).success)

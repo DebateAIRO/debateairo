@@ -40,6 +40,8 @@ function fullSentence(room: AskRoom): RoomSentence | null {
   if (room.waits_for === "OWN_DEBATES") {
     return Object.freeze({ key: "newDebate.room.ownDebatesFull", at: null, upgrade: false, waitingRunRef: null });
   }
+  // Decisions 14 and 24: the team's month has no time to name. An owner can raise it at any moment, and the sentence says so itself.
+  if ("funding" in room && room.scope === "TEAM_MONTH") return Object.freeze({key:"newDebate.room.internalTeamFull",at:null,upgrade:false,waitingRunRef:null});
   if ("funding" in room) return Object.freeze({key:room.scope === "PERSON_GRANT" ? "newDebate.room.internalGrantFull" : "newDebate.room.internalWindowFull",at:room.scope === "PERSON_GRANT" ? room.funding.expires_at : room.resets_at,upgrade:false,waitingRunRef:null});
   const scope = room.scope;
   switch (scope) {

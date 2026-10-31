@@ -11,6 +11,7 @@
   "billing.usage.grant": "Kopējā dotācija",
   "billing.usage.expires": "Beidzas {time}",
   "newDebate.room.internalGrantFull": "Iekšējās dotācijas līdzekļi ir izlietoti. Tā beidzas {time}.",
+  "newDebate.room.internalTeamFull": "Komandas šī mēneša apjoms ir izlietots. Jauni jautājumi gaida, līdz kāds no īpašniekiem to palielina vai sākas jauns mēnesis.",
   "newDebate.room.internalWindowFull": "Sasniegts iekšējā finansējuma perioda limits. Pārbaudiet vēlreiz {time}.",
   "newDebate.room.internalClose": "Jūsu iekšējais finansējums tuvojas noteiktajam limitam.",
   "billing.plans.FREE.name": "Bezmaksas",

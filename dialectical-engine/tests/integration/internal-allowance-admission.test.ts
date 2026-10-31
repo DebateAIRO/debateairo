@@ -7,7 +7,7 @@ import { BILLING_PLANS_DEPLOYMENT_REGISTER_ROW,billingPlansFromValue } from "@de
 import { AskRoom } from "../../apps/api/src/ask-room.js";
 import { PersonUsageReader } from "../../apps/api/src/billing/usage.js";
 import { startTestDatabase,type TestDatabase } from "../support/testDatabase.js";
-import { internalFundingFixture } from "../support/internalFundingFixture.js";
+import { internalFundingFixture, plentyOfTeamRoom } from "../support/internalFundingFixture.js";
 import { createSystemTwin } from "../support/rls-logins.js";
 import { testReleaseKey } from "../support/releaseKey.js";
 /**
@@ -18,7 +18,7 @@ import { testReleaseKey } from "../support/releaseKey.js";
  */
 let database:TestDatabase,runtime:Pool,bare:Pool,fixture:ReturnType<typeof internalFundingFixture>;
 const plans=billingPlansFromValue(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value,"test:task11");
-beforeAll(async()=>{database=await startTestDatabase();await migrate(database.pool);runtime=createPool(await createSystemTwin(database,"task11_admission",["debateai_runtime","debateai_billing_runtime"]));await database.pool.query("CREATE ROLE task11_admission_bare LOGIN PASSWORD 'private-fixture-only' IN ROLE debateai_runtime,debateai_billing_runtime");const url=new URL(database.connectionString);url.username="task11_admission_bare";url.password="private-fixture-only";bare=createPool(url.toString());fixture=internalFundingFixture(database.pool,runtime);},120000);
+beforeAll(async()=>{database=await startTestDatabase();await migrate(database.pool);await plentyOfTeamRoom(database.pool);runtime=createPool(await createSystemTwin(database,"task11_admission",["debateai_runtime","debateai_billing_runtime"]));await database.pool.query("CREATE ROLE task11_admission_bare LOGIN PASSWORD 'private-fixture-only' IN ROLE debateai_runtime,debateai_billing_runtime");const url=new URL(database.connectionString);url.username="task11_admission_bare";url.password="private-fixture-only";bare=createPool(url.toString());fixture=internalFundingFixture(database.pool,runtime);},120000);
 afterEach(async()=>{await database.pool.query("INSERT INTO core.run_wait_start(run_id,started_at) SELECT run_id,clock_timestamp() FROM core.run_waiting_v");});
 afterAll(async()=>{await runtime?.end();await bare?.end();await database?.stop();});
 function source(){const C=(billing as unknown as {FundingAwarePersonAllowanceSource:new(input:unknown)=>any}).FundingAwarePersonAllowanceSource;return new C({allowances:new PostgresInternalAllowanceRepository(runtime),entitlements:new EntitlementRepository(runtime),plans,closeBasisPoints:9500});}

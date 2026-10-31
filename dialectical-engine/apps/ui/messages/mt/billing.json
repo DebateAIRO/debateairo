@@ -11,6 +11,7 @@
   "billing.usage.grant": "Għotja totali",
   "billing.usage.expires": "Jiskadi {time}",
   "newDebate.room.internalGrantFull": "L-allokazzjoni tal-għotja interna ntużat kollha. Tiskadi {time}.",
+  "newDebate.room.internalTeamFull": "L-ispazju tat-tim għal dan ix-xahar spiċċa. Id-domandi l-ġodda jistennew sakemm wieħed mis-sidien iżidu jew jibda xahar ġdid.",
   "newDebate.room.internalWindowFull": "Intlaħaq il-limitu tal-perjodu tal-finanzjament intern. Iċċekkja mill-ġdid {time}.",
   "newDebate.room.internalClose": "Il-finanzjament intern tiegħek qed joqrob lejn il-limitu stabbilit.",
   "billing.plans.FREE.name": "B’xejn",

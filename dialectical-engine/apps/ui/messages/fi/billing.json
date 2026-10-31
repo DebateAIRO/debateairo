@@ -11,6 +11,7 @@
   "billing.usage.grant": "Avustus yhteensä",
   "billing.usage.expires": "Vanhenee {time}",
   "newDebate.room.internalGrantFull": "Sisäinen avustus on käytetty loppuun. Se vanhenee {time}.",
+  "newDebate.room.internalTeamFull": "Tiimin tämän kuun tila on käytetty loppuun. Uudet kysymykset odottavat, kunnes joku omistajista kasvattaa sitä tai uusi kuukausi alkaa.",
   "newDebate.room.internalWindowFull": "Sisäisen rahoitusjakson raja on saavutettu. Tarkista uudelleen {time}.",
   "newDebate.room.internalClose": "Sisäinen rahoituksesi lähestyy määritettyä rajaansa.",
   "billing.plans.FREE.name": "Maksuton",

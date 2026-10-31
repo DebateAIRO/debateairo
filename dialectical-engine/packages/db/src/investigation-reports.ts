@@ -4,6 +4,7 @@ import type { Pool, PoolClient } from "pg";
 export * from "./public-debates.js";
 export * from "./tree-updates.js";
 export * from "./passage-retention.js";
+export * from "./team-limit.js";
 export * from "./team-spend.js";
 export * from "./path-suggestions.js";
 import type { InvestigationRead } from "./investigations.js";

@@ -11,6 +11,7 @@
   "billing.usage.grant": "סך המענק",
   "billing.usage.expires": "יפוג בתאריך {time}",
   "newDebate.room.internalGrantFull": "הקצבת המענק הפנימי נוצלה. היא תפוג בתאריך {time}.",
+  "newDebate.room.internalTeamFull": "המכסה של הצוות לחודש זה נוצלה במלואה. שאלות חדשות ימתינו עד שאחד הבעלים יגדיל אותה או עד שיתחיל חודש חדש.",
   "newDebate.room.internalWindowFull": "הגעת למגבלת תקופת המימון הפנימי. יש לבדוק שוב בתאריך {time}.",
   "newDebate.room.internalClose": "המימון הפנימי שלך מתקרב למגבלה שהוגדרה.",
   "billing.plans.FREE.name": "חינם",

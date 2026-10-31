@@ -11,6 +11,7 @@
   "billing.usage.grant": "Celkový grant",
   "billing.usage.expires": "Platnosť končí {time}",
   "newDebate.room.internalGrantFull": "Prostriedky interného grantu sú vyčerpané. Platnosť končí {time}.",
+  "newDebate.room.internalTeamFull": "Priestor tímu na tento mesiac sa minul. Nové otázky počkajú, kým ho niektorý z vlastníkov nezvýši alebo nezačne nový mesiac.",
   "newDebate.room.internalWindowFull": "Limit obdobia interného financovania bol dosiahnutý. Skontrolujte znova {time}.",
   "newDebate.room.internalClose": "Vaše interné financovanie sa blíži k stanovenému limitu.",
   "billing.plans.FREE.name": "Bezplatný",

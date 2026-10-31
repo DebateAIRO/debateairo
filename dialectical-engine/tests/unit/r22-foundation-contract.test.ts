@@ -7,13 +7,13 @@ import {
 import { webExtractTextRef, webReplyTextIdOf, webReplyTextRef } from "../../packages/db/src/passage-retention.js";
 import { extractCheckedText } from "../../apps/api/src/publication-check/material.js";
 import { packetWithPageTexts } from "../../packages/providers/src/sent-form.js";
-import { TEAM_FEATURE_PLAN_ID, TEAM_LIMIT_SETTING, teamLimitFromEnvironment, teamLimitWindow, teamRoomMicros } from "../../packages/register/src/team-limit.js";
+import { TEAM_FEATURE_PLAN_ID, teamLimitWindow } from "../../packages/register/src/team-limit.js";
 
 /**
  * Foundation F1 of R22 (plan 2026-10-31-r22-owner-changes): the shapes the lanes fill. Every member that rides an ask, an answer or a public
  * snapshot is optional, so what was made before reads as before; no score, price or who-paid reaches a public or an answer shape; every new
  * public string is in the HS-S02 lists; three page-note sentences fit; the passage references travel through W3-0's sent form; the team's
- * limit is only a setting. Numbers here are made up.
+ * limit is in the database, not a setting (0142). Numbers here are made up.
  */
 const VERSION = { version: 1, updated_at: "2026-10-31T10:00:00.000Z", trigger: "PATH_REWRITE", position_ref: "pos-1", segments: [{ text: "Made-up answer." }] };
 
@@ -111,18 +111,8 @@ describe("the page note and the passage references", () => {
 });
 
 describe("the team's limit", () => {
-  it("is a server setting with no default: absent is none, and a bad value stops the boot", () => {
-    expect(teamLimitFromEnvironment({})).toBeNull();
-    expect(teamLimitFromEnvironment({ [TEAM_LIMIT_SETTING]: "1234" })).toEqual({ monthMicros: 1234 });
-    for (const bad of ["", "0", "-1", "12.5", "ten", "99999999999999999"]) {
-      expect(() => teamLimitFromEnvironment({ [TEAM_LIMIT_SETTING]: bad }), bad).toThrow("The team limit setting");
-    }
-  });
-
-  it("counts over the calendar month and never goes below zero; a team debate has the top plan's features", () => {
+  it("counts over the calendar month; a team debate has the top plan's features", () => {
     expect(TEAM_FEATURE_PLAN_ID).toBe("MAX");
     expect(teamLimitWindow(new Date("2026-12-15T10:00:00Z"))).toEqual({ from: new Date("2026-12-01T00:00:00Z"), to: new Date("2027-01-01T00:00:00Z") });
-    expect(teamRoomMicros({ monthMicros: 100 }, 30)).toBe(70);
-    expect(teamRoomMicros({ monthMicros: 100 }, 130)).toBe(0);
   });
 });

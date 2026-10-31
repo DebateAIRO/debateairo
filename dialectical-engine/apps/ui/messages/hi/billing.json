@@ -11,6 +11,7 @@
   "billing.usage.grant": "कुल अनुदान",
   "billing.usage.expires": "समाप्ति {time}",
   "newDebate.room.internalGrantFull": "आंतरिक अनुदान की राशि समाप्त हो गई है। इसकी अवधि {time} को समाप्त होगी।",
+  "newDebate.room.internalTeamFull": "इस महीने के लिए टीम की गुंजाइश समाप्त हो गई है। नए प्रश्न तब तक प्रतीक्षा करेंगे जब तक कोई स्वामी इसे बढ़ा न दे या नया महीना शुरू न हो जाए।",
   "newDebate.room.internalWindowFull": "आंतरिक वित्तपोषण अवधि की सीमा पूरी हो गई है। {time} को फिर जाँचें।",
   "newDebate.room.internalClose": "आपका आंतरिक वित्तपोषण अपनी निर्धारित सीमा के करीब है।",
   "billing.plans.FREE.name": "निःशुल्क",

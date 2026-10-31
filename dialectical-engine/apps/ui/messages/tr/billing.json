@@ -11,6 +11,7 @@
   "billing.usage.grant": "Toplam hibe",
   "billing.usage.expires": "Bitiş: {time}",
   "newDebate.room.internalGrantFull": "İç hibe bütçesi tükenmiştir. Bitiş: {time}.",
+  "newDebate.room.internalTeamFull": "Ekibin bu ayki alanı doldu. Yeni sorular, sahiplerden biri bunu artırana veya yeni ay başlayana kadar bekler.",
   "newDebate.room.internalWindowFull": "İç finansman döneminin sınırına ulaşıldı. {time} tarihinde tekrar kontrol edin.",
   "newDebate.room.internalClose": "İç finansmanınız belirlenen sınırına yaklaşıyor.",
   "billing.plans.FREE.name": "Ücretsiz",

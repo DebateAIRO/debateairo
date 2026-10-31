@@ -11,6 +11,7 @@
   "billing.usage.grant": "Ukupna potpora",
   "billing.usage.expires": "Istječe {time}",
   "newDebate.room.internalGrantFull": "Interna potpora je potrošena. Istječe {time}.",
+  "newDebate.room.internalTeamFull": "Prostor tima za ovaj mjesec je potrošen. Nova pitanja čekaju dok ga jedan od vlasnika ne poveća ili dok ne počne novi mjesec.",
   "newDebate.room.internalWindowFull": "Dosegnuto je ograničenje razdoblja internog financiranja. Provjerite ponovno {time}.",
   "newDebate.room.internalClose": "Vaše interno financiranje približava se zadanoj granici.",
   "billing.plans.FREE.name": "Besplatno",

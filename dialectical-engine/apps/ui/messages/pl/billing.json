@@ -11,6 +11,7 @@
   "billing.usage.grant": "Całkowity grant",
   "billing.usage.expires": "Wygasa {time}",
   "newDebate.room.internalGrantFull": "Środki z grantu wewnętrznego zostały wykorzystane. Wygasa {time}.",
+  "newDebate.room.internalTeamFull": "Limit zespołu na ten miesiąc został wyczerpany. Nowe pytania czekają, aż jeden z właścicieli go zwiększy lub zacznie się nowy miesiąc.",
   "newDebate.room.internalWindowFull": "Osiągnięto limit okresu finansowania wewnętrznego. Sprawdź ponownie {time}.",
   "newDebate.room.internalClose": "Twoje finansowanie wewnętrzne zbliża się do ustalonego limitu.",
   "billing.plans.FREE.name": "Bezpłatny",

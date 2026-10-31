@@ -11,6 +11,7 @@
   "billing.usage.grant": "Общо за гранта",
   "billing.usage.expires": "Изтича {time}",
   "newDebate.room.internalGrantFull": "Средствата по вътрешния грант са изчерпани. Изтича {time}.",
+  "newDebate.room.internalTeamFull": "Мястото на екипа за този месец е изчерпано. Новите въпроси чакат, докато някой от собствениците го увеличи или започне нов месец.",
   "newDebate.room.internalWindowFull": "Лимитът за периода на вътрешното финансиране е достигнат. Проверете отново {time}.",
   "newDebate.room.internalClose": "Вътрешното финансиране наближава определения си лимит.",
   "billing.plans.FREE.name": "Безплатен",
