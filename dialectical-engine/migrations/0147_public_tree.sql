@@ -1187,8 +1187,6 @@ GRANT EXECUTE ON FUNCTION identity.record_public_page_skip(uuid,uuid,text,text) 
 GRANT EXECUTE ON FUNCTION identity.read_free_debate_owner(uuid) TO debateai_runtime;
 GRANT EXECUTE ON FUNCTION identity.forget_erased_debate_public_tree(uuid) TO debateai_erasure_runtime;
 GRANT EXECUTE ON FUNCTION identity.read_data_export_public_tree(uuid,uuid) TO debateai_data_export_worker;
--- 0137's reader of what a person paid for reports on public debates: the API's window readers add it too.
-GRANT EXECUTE ON FUNCTION identity.read_public_report_spent(uuid,timestamptz,timestamptz) TO debateai_billing_runtime;
 
 -- 14. THE CONTRACT THIS FILE CLAIMS, checked rather than assumed (0135's closing shape) ---------------------------------------------------
 DO $public_tree_contract$

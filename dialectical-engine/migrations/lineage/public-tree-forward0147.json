@@ -8,7 +8,7 @@
   },
   "migration": {
     "name": "0147_public_tree.sql",
-    "sha256": "80f3cdcae75e11a8defcb077ad35c5cff5a22474786f2c5b03ea44921a6e21be"
+    "sha256": "a437f057394cb5b463e6ed42c7569662ca1111b044e60fc38b1b5a846c83d78c"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-130.sql",
