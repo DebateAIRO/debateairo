@@ -94,3 +94,5 @@ tests/integration/path-suggestions-database.test.ts
 
 # NOT listed: preview-auth-dev-startup.test.ts — red on dev at d1ac3641b (2 of 17: PREVIEW_STAGE_PROCESS_EXITED; it
 # starts the real API/UI stage processes, so it is a deployment rehearsal, not a self-contained suite).
+# The hand-over (0143): a paused debate moves to the current release once, under the pause's own lock.
+tests/integration/run-handover-database.test.ts

@@ -890,6 +890,19 @@ export const ArgumentLanguageSchema = z.object({
 }).strict();
 export type ArgumentLanguage = z.infer<typeof ArgumentLanguageSchema>;
 
+/**
+ * Plan 2026-10-31 decision 12: a page the AIs read before a debate was set aside by an update, for the person to read on
+ * after it stopped: its address and title, reader 1's note and the short quotes shown from it (all kept after the passages go).
+ */
+export const RunFoundPageSchema = z.object({
+  url: z.url().max(2_048).refine((url) => /^https?:\/\//iu.test(url)),
+  site: z.string().trim().min(1).max(255),
+  title: z.string().trim().min(1).max(500),
+  note: z.string().trim().min(1).max(2_000).nullable(),
+  quotes: z.array(z.string().trim().min(1).max(500)).max(32)
+}).strict();
+export type RunFoundPage = z.infer<typeof RunFoundPageSchema>;
+
 export const RunProjectionSchema = z.object({
   run_ref: z.string().min(1),
   question_line: z.string().trim().min(1),
@@ -907,8 +920,13 @@ export const RunProjectionSchema = z.object({
   // person's own running debates (`waits_until` is then the next tick).
   waits_for: WaitsForSchema.nullable().optional(),
   // W2-7 (money rule): the month wall paused this debate's planned calls and searches (MonthPauseSchema, ./web.ts).
-  month_pause: MonthPauseSchema.optional()
+  month_pause: MonthPauseSchema.optional(),
+  // Decision 12: only on a debate that an update set aside: what the AIs found stays readable.
+  found: z.array(RunFoundPageSchema).max(64).optional()
 }).strict().superRefine((run, context) => {
+  if (run.found !== undefined && run.state !== "FAILED") {
+    context.addIssue({ code: "custom", message: "only a debate that stopped lists what was found so far" });
+  }
   if (run.month_pause !== undefined && !(run.state === "CLAIMED" || run.state === "RUNNING" || run.state === "HOLDING")) {
     context.addIssue({ code: "custom", message: "only a debate already running pauses at the month wall" });
   }

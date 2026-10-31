@@ -292,7 +292,7 @@ import {
 } from "./shape-seats.js";
 import { keepAliveProviderGateway, runKeepAliveScope, startRunKeepAlive, type RunnerTaskControl } from "./run-keep-alive.js";
 import type { RunnerRetirementSignal, TaskExecutionCounter } from "./runner-retirement.js";
-import { EMPTY_REPLAY_BOOK, readReplayBook, replayingGateway, type ReplayBook } from "./run-replay.js";
+import { EMPTY_REPLAY_BOOK, readReplayBook, replayingGateway, RUN_HANDOVER_IMPOSSIBLE, type ReplayBook } from "./run-replay.js";
 import { holdRunPassages, passageRecordedRequest, releaseRunPassages } from "./passage-record.js";
 import { isMonthPausedStop, RUN_MONTH_PAUSED } from "./month-pause.js";
 import type { RunInFlight } from "./run-in-flight.js";
@@ -562,6 +562,8 @@ const REVIEW_RETHROWN_CODES: readonly string[] = Object.freeze([
   "RUNNER_RETIRING",
   // W3-8 (the money rule): the month wall's planned stop ends this copy as a lost claim does.
   RUN_MONTH_PAUSED,
+  // Decision 12: a step that could only go on mixed two wordings ends this copy too; `execute` sets the debate aside.
+  RUN_HANDOVER_IMPOSSIBLE,
   CALL_LANE_STOPPED,
   CALL_LANE_HELD_BACK
 ]);
@@ -579,7 +581,7 @@ function callHeldBack(error: unknown): boolean {
  */
 function keepAliveStop(error: unknown): boolean {
   return error instanceof TypedDomainError && (error.code === "RUNNER_CLAIM_LOST" || error.code === "RUNNER_TIME_LIMIT_REACHED"
-    || error.code === "RUNNER_RETIRING" || error.code === RUN_MONTH_PAUSED);
+    || error.code === "RUNNER_RETIRING" || error.code === RUN_MONTH_PAUSED || error.code === RUN_HANDOVER_IMPOSSIBLE);
 }
 
 export function reviewFailureOutcome(error: unknown): ReviewFailureOutcome {
@@ -5830,8 +5832,8 @@ export class WalkingSkeletonRunner {
         "The frozen run could not be read through its required content lease"
       );
     }
-    // Side-by-side spec §13 (S6): never happens (`core.run` is insert-only), refused by name if it ever did: the run's
-    // stamp is the version this debate's settings came from.
+    // Side-by-side spec §13 (S6): never happens (`core.run` is insert-only and a hand-over reads the same on both sides),
+    // refused by name if it ever did: the run's stamp is the version this debate's settings came from.
     if (resolution !== null && run.registerVersion !== resolution.version) {
       throw new TypedDomainError(
         "RUN_SETTINGS_VERSION_DRIFT",
@@ -7206,6 +7208,10 @@ export class WalkingSkeletonRunner {
           ? null
           : { ownMaker: planned.maker, taken: new Set([input.authorMaker, ...calledMakers]) }), planned)];
       });
+      // Decision 12 (run-replay.ts, THE HAND-OVER RULE): one panel is one step, so it never weighs two releases' wording.
+      replayBook.openStep(plannedSeats.flatMap((entry, seatPosition) => calledSeats[seatPosition] === true && entry.planned !== null
+        ? [{ callSiteKey: `${input.callSiteKey}:${entry.planned.providerRef}`, providerRef: entry.planned.providerRef }] : []),
+      judgeContractHash);
       const panel = await runJudgePanel({
         artifactProducerRef: input.authorProviderRef,
         primary: {
@@ -7949,7 +7955,7 @@ export class WalkingSkeletonRunner {
           answer: answer.statement, forPoints: pointsOf(answer.forKeyPointIds), againstPoints: pointsOf(answer.againstKeyPointIds) })),
         members: [...configuredByProviderRef.values()].map((maker) => ({ provider: sitOutMaker(maker).provider,
           providerRef: maker.providerRef, maker: maker.maker, model: callSubjects?.subjectOf(maker.providerRef).model ?? maker.providerRef })),
-        contractHash: settings.engine.engineContractHash, bound: settings.judgeBound,
+        contractHash: settings.engine.engineContractHash, openReplayStep: (members, contractHash) => replayBook.openStep(members, contractHash), bound: settings.judgeBound,
         keepRoomMicros: rootZeroRoomMicros(true), digKeepRoomMicros: rootZeroRoomMicros(true, WEB_DIG_ROOT_SOURCES_MAX_BYTES), abandon: keepAliveStop, stopsHere: (error) => expansionPhaseStop(error) !== null
       });
       // W4-1: only a step that kept a pack opens the store again; a re-claimed run reads the same packs, so its prompts
@@ -12125,6 +12131,9 @@ export class WalkingSkeletonRunner {
         "The runner failed inside its private-content disclosure lease"
       );
     } finally {
+      if (replayBookInLease.stood > 0) {
+        console.warn(JSON.stringify({ kind: "DEBATEAI_RUN_HANDOVER", event: "ANSWERS_STOOD", runId: claimedRunId, stood: replayBookInLease.stood }));
+      }
       replayBookInLease.close();
     }
     /**
@@ -12161,6 +12170,19 @@ export class WalkingSkeletonRunner {
     return executed;
     });
     } catch (error) {
+      if (error instanceof TypedDomainError && error.code === RUN_HANDOVER_IMPOSSIBLE) {
+        /**
+         * Decision 12 — THE ONE THING THAT CANNOT HAND OVER: a recorded answer this release cannot read, in a step whose other
+         * answers already stand, so asking it again would mix the step. As a version this release cannot run (spec §13 S7):
+         * set aside FAILED with the waiver, none of the person's allowance used, the site's plain sentence. What the AIs
+         * found stays where it is: links, quotes and notes stay on the record after the passage sweep.
+         */
+        keepAlive.stop();
+        const setAside = await this.#work.setAsideWorkItem({ runId: claimedRunId, workItemId: claimed.workItemId,
+          reason: "SETTINGS_VERSION_UNSUPPORTED", readyOnly: false });
+        console.warn(JSON.stringify({ kind: "DEBATEAI_RUN_HANDOVER", event: "IMPOSSIBLE", runId: claimedRunId, setAside }));
+        throw new TypedDomainError("SETTINGS_VERSION_UNSUPPORTED", "SETTINGS_VERSION_UNSUPPORTED");
+      }
       if (!isMonthPausedStop(error)) throw error;
       /**
        * R22 W3-8 (the money rule) — THE MONTH WALL'S PLANNED STOP. The pause is recorded (./month-pause.ts), the arguing
@@ -12699,6 +12721,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RUN_FROZEN_HEAD_READ_FAILED",
   "RUN_HOLD_RECORDER_UNRESOLVED",
   "RUN_LEGACY_ASKER_INVALID",
+  "RUN_HANDOVER_IMPOSSIBLE",
   "RUN_MAKER_COUNT_INVALID",
   "RUN_MONTH_PAUSED",
   "RUN_NOT_FOUND",

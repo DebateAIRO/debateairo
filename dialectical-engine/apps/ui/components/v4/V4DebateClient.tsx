@@ -1453,6 +1453,21 @@ function FailedScreen({ run, classicHref, askHref, catalog, homeCatalog }: Reado
       <p className="v4Serif v4DebStatusQuestion" data-ai-generated="true">{ownWords(run.question_line)}</p>
       <h1 className="v4DebStatusTitle">{t(catalog, "v4.debate.failedTitle")}</h1>
       <p>{runFailureMessage(run.terminal_reason, homeCatalog)}</p>
+      {/* Decision 12: what the AIs found before an update stopped this debate stays readable here. */}
+      {run.found === undefined || run.found.length === 0 ? null : (
+        <section>
+          <h2>{t(catalog, "v4.debate.foundTitle")}</h2>
+          <ul>
+            {run.found.map((page) => (
+              <li key={page.url}>
+                <a className="v4Link" href={page.url} rel="noopener noreferrer" target="_blank">{page.title}</a>
+                {page.note === null ? null : <p data-ai-generated="true">{page.note}</p>}
+                {page.quotes.map((quote) => <blockquote key={quote}>{quote}</blockquote>)}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <div className="v4DebStatusActions">
         <Link className="v4Btn v4BtnPrimary" href={askHref}>{t(catalog, "v4.debate.askNew")}</Link>
         <Link className="v4Link" href={classicHref}>{t(catalog, "v4.common.classicView")}</Link>

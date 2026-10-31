@@ -405,7 +405,8 @@ export class PostgresAskAdmissionGate implements AskAdmissionGate {
   async activeDebates(tx: Pick<PoolClient, "query">): Promise<number> {
     const result = await tx.query<{ active: number }>(
       `SELECT count(DISTINCT run_id)::integer AS active FROM core.work_item
-       WHERE state IN ('READY','CLAIMED') AND run_id IS NOT NULL`
+       WHERE state IN ('READY','CLAIMED') AND run_id IS NOT NULL
+         AND NOT identity.run_work_is_parked(run_id, state, claim_deadline)`
     );
     const active = result.rows[0]?.active;
     if (!Number.isSafeInteger(active) || (active as number) < 0) throw new TypeError("ASK_ADMISSION_GATE_COUNT_INVALID");

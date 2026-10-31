@@ -2926,7 +2926,7 @@ export class RunRepository {
       `SELECT run_id, question_line${contentCiphertextProjection}${argumentLanguageProjection},
               agent_count, discovered_panel, depth_params,
               composition_budget_tier, stranger_sample_rate, envelope_basis,
-              register_version::integer AS register_version
+              identity.run_settings_version_now(run_id)::integer AS register_version
        FROM core.run WHERE run_id = $1`,
       [runId]
     );
@@ -2966,7 +2966,8 @@ export class RunRepository {
   async readRunRegisterVersion(runId: string): Promise<number> {
     const result = await this.pool.query<{ register_version: number }>(
       // The bigint version is cast by the database (an out-of-range one refuses), never coerced in JavaScript.
-      "SELECT register_version::integer AS register_version FROM core.run WHERE run_id = $1",
+      // Decision 12 (0143): after a hand-over, the version the debate was handed to; else its stamp.
+      "SELECT identity.run_settings_version_now(run_id)::integer AS register_version FROM core.run WHERE run_id = $1",
       [runId]
     );
     const row = result.rows[0];

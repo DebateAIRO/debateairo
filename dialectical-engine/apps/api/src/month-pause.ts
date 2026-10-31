@@ -8,7 +8,8 @@ import { exhaustive } from "@debateai/kernel";
  * paused (apps/runner/src/month-pause.ts). The run read says so (`month_pause`), and the person presses Continue
  * (POST /v1/runs/{id}/continue) once the month has reset and the room code finds room in it (`monthHasRoom`); then 0134's
  * resume_paused_run records it, the item is handed to its runner again (`ContinuedRunWake`) and that copy replays what was
- * finished and goes on (true resume: nothing it finished is paid again).
+ * finished and goes on (true resume: nothing it finished is paid again). A debate whose release is no longer this one is
+ * handed over first (`RunHandoverPort`).
  * Before the reset, Continue is refused with RUN_PAUSED_UNTIL_RESET and changes nothing (an upgrade inside the month
  * does not lift a pause early: the contract's refusal names the reset).
  */
@@ -40,8 +41,46 @@ export function monthPauseOf(pause: RunPauseState | null, now: Date, monthHasRoo
   return Object.freeze({ until: until.toISOString(), can_continue: now.getTime() >= until.getTime() && monthHasRoom });
 }
 
+/**
+ * Plan 2026-10-31 decision 12 — THE HAND-OVER. A debate's month pause can outlast its release: uploads come every few days.
+ * Continue therefore moves a debate that is not this release's into this release, in one transaction with the resume
+ * (0143): everything found, answered and paid stays under the same run, and the debate goes on here. It stays on its own
+ * settings version when this release has passed it (the same words, so every answer replays); else on the version a new
+ * debate would start on now. Which recorded answers stand then, and why one step never mixes two wordings, is the runner's
+ * rule (apps/runner/src/run-replay.ts). No new hold is opened and nothing is charged here: the run keeps its one hold.
+ */
+export interface RunHandoverPort {
+  /** Where this debate would move; null when it is already this release's (Continue is the plain resume). */
+  destinationOf(runId: string): Promise<Readonly<{ releaseKey: string; registerVersion: number }> | null>;
+  /** 0143's continue_paused_run_in_release. */
+  resumeInRelease(ownerRef: string, runId: string, releaseKey: string, registerVersion: number)
+    : Promise<"RECORDED" | "NOT_PAUSED" | "NOT_OWNED" | "NOT_CURRENT" | "VERSION_NOT_PASSED">;
+}
+
+/** The port over the API's own parts: this release, the version reads and 0143's two definers. */
+export function runHandoverOf(ports: Readonly<{
+  ownReleaseKey: string;
+  readRunReleaseNow(runId: string): Promise<Readonly<{ releaseKey: string; registerVersion: number }> | null>;
+  versionPassed(registerVersion: number): Promise<boolean>;
+  activeVersion(): Promise<number>;
+  resumeInRelease: RunHandoverPort["resumeInRelease"];
+}>): RunHandoverPort {
+  return Object.freeze({
+    async destinationOf(runId: string) {
+      // A `legacy` process (development, tests) has one release and nothing to hand over to.
+      if (ports.ownReleaseKey === "legacy") return null;
+      const now = await ports.readRunReleaseNow(runId);
+      if (now === null || now.releaseKey === ports.ownReleaseKey) return null;
+      const registerVersion = await ports.versionPassed(now.registerVersion) ? now.registerVersion : await ports.activeVersion();
+      return Object.freeze({ releaseKey: ports.ownReleaseKey, registerVersion });
+    },
+    resumeInRelease: ports.resumeInRelease
+  });
+}
+
 export type ContinueOutcome =
   | Readonly<{ kind: "CONTINUING" }>
+  | Readonly<{ kind: "TRY_AGAIN" }>
   | Readonly<{ kind: "NOT_FOUND" }>
   | Readonly<{ kind: "NOT_PAUSED" }>
   | Readonly<{ kind: "UNTIL_RESET"; until: string }>;
@@ -78,7 +117,7 @@ export function continuedRunWake(ports: Readonly<{
  */
 export async function continuePausedRun(input: Readonly<{ ownerRef: string; runId: string; now: Date }>,
   pauses: MonthPausePort, room: MonthRoomReader, wake?: ContinuedRunWake,
-  log: (line: string) => void = (line) => console.warn(line)): Promise<ContinueOutcome> {
+  log: (line: string) => void = (line) => console.warn(line), handover?: RunHandoverPort): Promise<ContinueOutcome> {
   const pause = await pauses.readPause(input.ownerRef, input.runId);
   if (pause === null) return Object.freeze({ kind: "NOT_FOUND" as const });
   if (pause.state === "RESUMED") return woken(input.runId, wake, log);
@@ -87,8 +126,13 @@ export async function continuePausedRun(input: Readonly<{ ownerRef: string; runI
   if (input.now.getTime() < new Date(shown.until).getTime() || !(await room.monthHasRoom(input.ownerRef, input.now))) {
     return Object.freeze({ kind: "UNTIL_RESET" as const, until: shown.until });
   }
-  const outcome = await pauses.resume(input.ownerRef, input.runId);
+  const destination = handover === undefined ? null : await handover.destinationOf(input.runId);
+  const outcome = destination === null ? await pauses.resume(input.ownerRef, input.runId)
+    : await handover!.resumeInRelease(input.ownerRef, input.runId, destination.releaseKey, destination.registerVersion);
   switch (outcome) {
+    // A switch of releases is under way, or this release has not passed the version: nothing changed, ask again.
+    case "NOT_CURRENT":
+    case "VERSION_NOT_PASSED": return Object.freeze({ kind: "TRY_AGAIN" as const });
     // NOT_PAUSED here: another press recorded the resume first (the read above saw it paused).
     case "RECORDED":
     case "NOT_PAUSED": return woken(input.runId, wake, log);

@@ -327,6 +327,15 @@ function assertWorkLimit(limit: number, what: string): void {
 const NOT_MONTH_PAUSED = (runColumn: string): string =>
   `(${runColumn} IS NULL OR identity.read_run_pause_of_run(${runColumn})->>'state' IS DISTINCT FROM 'PAUSED')`;
 
+/**
+ * Plan 2026-10-31 decision 12 — THE HAND-OVER. A paused debate is not this release's open work: its release retires, and is
+ * never asked to wait for it or to set it aside (`identity.run_work_is_parked`, 0143: its newest pause event is PAUSED and
+ * no copy holds it). The release that owns a run's work is the one it was last handed over to (`identity.run_release_now`),
+ * else its stamp; every fence and list below reads that, and so does its settings version.
+ */
+const NOT_PARKED = (item: string): string => `NOT identity.run_work_is_parked(${item}.run_id, ${item}.state, ${item}.claim_deadline)`;
+const RELEASE_NOW = (runColumn: string): string => `identity.run_release_now(${runColumn})`;
+
 export class WorkItemRepository {
   readonly #fence: Readonly<{ releaseKey: string; workerId: string | null }>;
 
@@ -349,7 +358,7 @@ export class WorkItemRepository {
     const result = await this.pool.query<{ work_item_id: string; run_id: string }>(
       `SELECT item.work_item_id, item.run_id
        FROM core.work_item AS item
-       JOIN core.run AS run ON run.run_id = item.run_id AND run.release_key = $2
+       JOIN core.run AS run ON run.run_id = item.run_id AND ${RELEASE_NOW("run.run_id")} = $2
        WHERE (item.state = 'READY' OR (item.state = 'CLAIMED' AND item.claim_deadline <= clock_timestamp()))
          AND ${NOT_MONTH_PAUSED("item.run_id")}
        ORDER BY item.created_at_seq, item.work_item_id
@@ -369,7 +378,7 @@ export class WorkItemRepository {
    */
   async releaseKeyOf(workItemId: string): Promise<string | null> {
     const result = await this.pool.query<{ release_key: string }>(
-      `SELECT run.release_key
+      `SELECT ${RELEASE_NOW("run.run_id")} AS release_key
        FROM core.work_item AS item
        JOIN core.run AS run ON run.run_id = item.run_id
        WHERE item.work_item_id = $1`,
@@ -390,7 +399,8 @@ export class WorkItemRepository {
   }> | null> {
     const result = await this.pool.query<{ run_id: string; register_version: number; release_key: string }>(
       // The bigint version is cast by the database (an out-of-range one refuses), never coerced in JavaScript.
-      `SELECT run.run_id, run.register_version::integer AS register_version, run.release_key
+      `SELECT run.run_id, identity.run_settings_version_now(run.run_id)::integer AS register_version,
+              ${RELEASE_NOW("run.run_id")} AS release_key
        FROM core.work_item AS item
        JOIN core.run AS run ON run.run_id = item.run_id
        WHERE item.work_item_id = $1`,
@@ -414,10 +424,10 @@ export class WorkItemRepository {
     if (releaseKey === LEGACY_RELEASE_KEY) return Object.freeze([]);
     const result = await this.pool.query<{ register_version: number }>(
       // The bigint version is cast by the database (an out-of-range one refuses), never coerced in JavaScript.
-      `SELECT DISTINCT run.register_version::integer AS register_version
+      `SELECT DISTINCT identity.run_settings_version_now(run.run_id)::integer AS register_version
        FROM core.work_item AS item
        JOIN core.run AS run ON run.run_id = item.run_id
-       WHERE item.state IN ('READY','CLAIMED') AND run.release_key = $1
+       WHERE item.state IN ('READY','CLAIMED') AND ${RELEASE_NOW("run.run_id")} = $1
        ORDER BY register_version`,
       [releaseKey]
     );
@@ -434,7 +444,7 @@ export class WorkItemRepository {
     const result = await this.pool.query<{ work_item_id: string; run_id: string }>(
       `SELECT item.work_item_id, item.run_id
        FROM core.work_item AS item
-       JOIN core.run AS run ON run.run_id = item.run_id AND run.release_key = $2
+       JOIN core.run AS run ON run.run_id = item.run_id AND ${RELEASE_NOW("run.run_id")} = $2
        WHERE item.state = 'CLAIMED' AND item.claim_deadline <= clock_timestamp()
          AND ${NOT_MONTH_PAUSED("item.run_id")}
        ORDER BY item.created_at_seq, item.work_item_id
@@ -472,6 +482,7 @@ export class WorkItemRepository {
        FROM core.work_item AS work
        JOIN ledger.model_spend_hold AS hold ON hold.run_id = work.run_id
        WHERE work.state = 'READY'
+         AND ${NOT_MONTH_PAUSED("work.run_id")}
          AND hold.opened_at <= clock_timestamp() - make_interval(secs => $1)
        ORDER BY work.created_at_seq, work.work_item_id
        LIMIT $2`,
@@ -530,7 +541,7 @@ export class WorkItemRepository {
           SELECT work_item_id FROM core.work_item AS item
           WHERE (state = 'READY' OR (state = 'CLAIMED' AND claim_deadline <= clock_timestamp()))
             AND (item.run_id IS NULL
-              OR EXISTS (SELECT 1 FROM core.run AS run WHERE run.run_id = item.run_id AND run.release_key = $3))
+              OR ${RELEASE_NOW("item.run_id")} = $3)
             AND ${NOT_MONTH_PAUSED("item.run_id")}
           ORDER BY created_at_seq
           FOR UPDATE SKIP LOCKED
@@ -586,7 +597,7 @@ export class WorkItemRepository {
           WHERE work_item_id = $1
             AND (state = 'READY' OR (state = 'CLAIMED' AND claim_deadline <= clock_timestamp()))
             AND (item.run_id IS NULL
-              OR EXISTS (SELECT 1 FROM core.run AS run WHERE run.run_id = item.run_id AND run.release_key = $4))
+              OR ${RELEASE_NOW("item.run_id")} = $4)
             AND ${NOT_MONTH_PAUSED("item.run_id")}
           FOR UPDATE SKIP LOCKED
         )
@@ -796,7 +807,7 @@ export class WorkItemRepository {
          FROM core.run AS run
          WHERE item.work_item_id = $1 AND item.run_id = $2
            AND item.state <> 'DONE' AND item.settled_attempt_id IS NULL
-           AND run.run_id = item.run_id AND run.release_key = $4
+           AND run.run_id = item.run_id AND ${RELEASE_NOW("run.run_id")} = $4
            AND NOT (item.state = 'CLAIMED' AND item.claim_deadline > clock_timestamp()
                     AND item.claimed_by IS DISTINCT FROM $5::text)`,
         [input.workItemId, input.runId, input.reason, this.#fence.releaseKey, this.#fence.workerId]
@@ -822,8 +833,9 @@ export class WorkItemRepository {
       `WITH candidate AS (
          SELECT item.work_item_id
          FROM core.work_item AS item
-         JOIN core.run AS run ON run.run_id = item.run_id AND run.release_key = $1
+         JOIN core.run AS run ON run.run_id = item.run_id AND ${RELEASE_NOW("run.run_id")} = $1
          WHERE item.state IN ('READY','CLAIMED') AND item.settled_attempt_id IS NULL
+           AND ${NOT_PARKED("item")}
            AND NOT (item.state = 'CLAIMED' AND item.claim_deadline > clock_timestamp()
                     AND item.claimed_by IS DISTINCT FROM $4::text)
          ORDER BY item.created_at_seq, item.work_item_id
@@ -870,7 +882,7 @@ export class WorkItemRepository {
        SET state = 'FAILED', claimed_by = NULL, claim_deadline = NULL, terminal_reason = $3
        FROM core.run AS run
        WHERE item.work_item_id = $1 AND item.run_id = $2
-         AND run.run_id = item.run_id AND run.release_key = $4
+         AND run.run_id = item.run_id AND ${RELEASE_NOW("run.run_id")} = $4
          AND item.settled_attempt_id IS NULL
          AND (item.state = 'READY' OR (NOT $6::boolean AND item.state = 'CLAIMED'
               AND NOT (item.claim_deadline > clock_timestamp() AND item.claimed_by IS DISTINCT FROM $5::text)))`,

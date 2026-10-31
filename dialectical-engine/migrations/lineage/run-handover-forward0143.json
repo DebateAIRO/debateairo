@@ -1,0 +1,17 @@
+{
+  "version": "run-handover-forward0143-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0141_path_suggestions.sql",
+    "manifestSha256": "112fb45341a2081fac2129d9130ab47965bba25dd45a4e6b0e48ea0afc4a411f",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0143_run_handover.sql",
+    "sha256": "2056b6d325a371b13a30e11c67d6c1540ef4ee6b9821236c36397a7439265a2e"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  }
+}

@@ -6,7 +6,7 @@ import { questionLanguageReferenceKeyFrom } from "./question-language/reference.
 import {
   admissionSettingsOfVersion, buildAdmissionSiteContext, createAdmissionSettingsCache, decideAskRoomReadiness, createAdmissionView, loadAdmissionSettings, type AdmissionSiteContext
 } from "./admission-settings.js";
-import { createActiveSettingsVersionReader } from "./active-settings-version.js";
+import { createActiveSettingsVersionReader, readActiveSettingsVersionOn } from "./active-settings-version.js";
 import { activeVersionAlarm, checkActiveSettingsVersionAtBoot } from "./admission-alarm.js";
 import { PasswordResetService } from "./password-reset.js";
 import { PasswordResetNotificationWorker, SendmailPasswordResetSender } from "./password-reset-mail.js";
@@ -30,7 +30,7 @@ import { PostgresConsumerSecurityRepository } from "@debateai/db";
 import { PostgresDigModelRepository, PostgresDigPicksRepository, PostgresInvestigationReportRepository, PostgresInvestigationRepository } from "@debateai/db";
 import { investigationReportContentOpener } from "./investigation-report.js";
 import { postgresPurposeLines } from "./purpose-lines.js";
-import { continuedRunWake } from "./month-pause.js";
+import { continuedRunWake, runHandoverOf } from "./month-pause.js";
 import { ConsumerWebAuthnService } from "./consumer-webauthn.js";
 import { PostgresConsumerAuthRepository } from "@debateai/db";
 import { UnixTurnstileVerifier } from "./turnstile.js";
@@ -1695,6 +1695,15 @@ const api = buildApi({
   continuedRunWake: continuedRunWake({
     claimableWorkItemOf: (runId) => new WorkItemRepository(pool).claimableWorkItemOfRun(runId),
     dispatch: (job) => dispatcher.dispatch(job)
+  }),
+  // Decision 12: Continue on a debate of an older release moves it here first (0143), keeping everything it found.
+  runHandover: runHandoverOf({
+    ownReleaseKey: environment.RELEASE_KEY,
+    readRunReleaseNow: (runId) => new PostgresDigModelRepository(pool).readRunReleaseNow(runId),
+    versionPassed: (version) => settingsVersionPassed(pool, environment.RELEASE_KEY, version),
+    activeVersion: () => readActiveSettingsVersionOn(pool, environment.REGISTER_VERSION),
+    resumeInRelease: (ownerRef, runId, releaseKey, registerVersion) =>
+      new PostgresDigModelRepository(pool).resumeInRelease(ownerRef, runId, releaseKey, registerVersion)
   }),
   ...(dataExport === undefined ? {} : { dataExport }),
   /**
