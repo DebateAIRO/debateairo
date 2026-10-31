@@ -13,7 +13,7 @@
   "home.publicDebates": "Offentlige debatter",
   "home.total": "{count} I ALT",
   "home.signInHint": "Log ind eller opret en konto ovenfor for at se dine debatter.",
-  "home.publicIndexingNotice": "Offentliggjorte debatter kan indekseres af søgemaskiner. Kopier kan bestå efter afpublicering.",
+  "home.publicIndexingNotice": "Offentliggjorte debatter kan indekseres af søgemaskiner, og kopier kan forblive andre steder.",
   "home.debateClaim": "Debatpåstand",
   "home.claimPlaceholder": "Indtast en diskutabel påstand eller et spørgsmål...",
   "home.composerHint": "Modeller argumenterer · du dømmer",
@@ -145,6 +145,5 @@
   "home.removal.close": "Luk",
   "home.flag.underReview": "MARKERET · UNDER GENNEMGANG",
   "home.flag.approved": "GODKENDT",
-  "home.flag.refused": "IKKE GODKENDT",
-  "home.takeDown.button": "Tag ned"
+  "home.flag.refused": "IKKE GODKENDT"
 }

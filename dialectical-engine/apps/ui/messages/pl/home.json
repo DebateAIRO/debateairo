@@ -13,7 +13,7 @@
   "home.publicDebates": "Debaty publiczne",
   "home.total": "ŁĄCZNIE {count}",
   "home.signInHint": "Zaloguj się lub utwórz konto powyżej, aby zobaczyć swoje debaty.",
-  "home.publicIndexingNotice": "Opublikowane debaty mogą być indeksowane przez wyszukiwarki. Kopie mogą pozostać dostępne po cofnięciu publikacji.",
+  "home.publicIndexingNotice": "Opublikowane debaty mogą być indeksowane przez wyszukiwarki, a ich kopie mogą pozostać gdzie indziej.",
   "home.debateClaim": "Teza debaty",
   "home.claimPlaceholder": "Wpisz tezę lub pytanie do debaty…",
   "home.composerHint": "Modele argumentują · Ty oceniasz",
@@ -147,6 +147,5 @@
   "home.removal.close": "Zamknij",
   "home.flag.underReview": "OZNACZONA · W TRAKCIE PRZEGLĄDU",
   "home.flag.approved": "ZATWIERDZONA",
-  "home.flag.refused": "NIEZATWIERDZONA",
-  "home.takeDown.button": "Wycofaj"
+  "home.flag.refused": "NIEZATWIERDZONA"
 }

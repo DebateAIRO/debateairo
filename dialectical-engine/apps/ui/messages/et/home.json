@@ -13,7 +13,7 @@
   "home.publicDebates": "Avalikud väitlused",
   "home.total": "{count} KOKKU",
   "home.signInHint": "Oma väitluste vaatamiseks logige sisse või looge ülal konto.",
-  "home.publicIndexingNotice": "Otsingumootorid võivad avaldatud väitlusi indekseerida. Koopiad võivad säilida ka pärast avaldamise tühistamist.",
+  "home.publicIndexingNotice": "Otsingumootorid võivad avaldatud väitlusi indekseerida ja koopiad võivad mujale alles jääda.",
   "home.debateClaim": "Väitluse väide",
   "home.claimPlaceholder": "Sisestage vaieldav väide või küsimus…",
   "home.composerHint": "Mudelid väitlevad · teie hindate",
@@ -145,6 +145,5 @@
   "home.removal.close": "Sulgege",
   "home.flag.underReview": "MÄRGISTATUD · LÄBIVAATAMISEL",
   "home.flag.approved": "HEAKS KIIDETUD",
-  "home.flag.refused": "HEAKS KIITMATA",
-  "home.takeDown.button": "Eemaldage avalikust vaatest"
+  "home.flag.refused": "HEAKS KIITMATA"
 }

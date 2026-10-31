@@ -13,7 +13,7 @@
   "home.publicDebates": "Openbare debatten",
   "home.total": "{count} TOTAAL",
   "home.signInHint": "Meld u hierboven aan of maak een account aan om uw debatten te zien.",
-  "home.publicIndexingNotice": "Gepubliceerde debatten kunnen door zoekmachines worden geïndexeerd. Kopieën kunnen na het intrekken van de publicatie blijven bestaan.",
+  "home.publicIndexingNotice": "Gepubliceerde debatten kunnen door zoekmachines worden geïndexeerd en kopieën kunnen elders blijven bestaan.",
   "home.debateClaim": "Debatstelling",
   "home.claimPlaceholder": "Typ een betwistbare stelling of vraag…",
   "home.composerHint": "Modellen debatteren · u oordeelt",
@@ -145,6 +145,5 @@
   "home.removal.close": "Sluiten",
   "home.flag.underReview": "GEMARKEERD · IN BEOORDELING",
   "home.flag.approved": "GOEDGEKEURD",
-  "home.flag.refused": "NIET GOEDGEKEURD",
-  "home.takeDown.button": "Offline halen"
+  "home.flag.refused": "NIET GOEDGEKEURD"
 }

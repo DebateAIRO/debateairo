@@ -1,7 +1,7 @@
 ---
 id: unpublish-a-debate
 lang: en
-title: "Unpublish a debate"
+title: "Can a published debate be taken back?"
 status: shipped
 sources:
   - apps/api/src/index.ts:137
@@ -10,9 +10,9 @@ sources:
   - apps/api/src/index.ts:1053
   - apps/api/src/index.ts:1071
   - apps/ui/components/PublicAnswerDisclosure.tsx:5
-verified_against: "2b670d30"
-ratified_by: V
-ratified_on: "2026-09-04"
+verified_against: "9db169ab"
+ratified_by: ""
+ratified_on: ""
 ---
 
-To unpublish a debate you own, sign in and open its debate page. Choose the unpublish action, then re-authenticate when the page asks you to. Copies indexed elsewhere may remain after unpublishing.
+A published debate cannot be taken back. There is no unpublish action: once public, a debate stays public, and anyone with credit can add to it. If you erase your account, your name comes off it and it shows "a contributor" instead. Personal details in the text are removed if you ask: write to us. Copies indexed elsewhere may remain.

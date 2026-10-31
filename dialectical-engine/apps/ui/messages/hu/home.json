@@ -13,7 +13,7 @@
   "home.publicDebates": "Nyilvános viták",
   "home.total": "ÖSSZESEN {count}",
   "home.signInHint": "A vitái megtekintéséhez jelentkezzen be, vagy hozzon létre fiókot fent.",
-  "home.publicIndexingNotice": "A keresőmotorok indexelhetik a közzétett vitákat. A másolatok a közzététel visszavonása után is megmaradhatnak.",
+  "home.publicIndexingNotice": "A közzétett vitákat a keresőmotorok indexelhetik, és máshol másolatok maradhatnak.",
   "home.debateClaim": "Vitaállítás",
   "home.claimPlaceholder": "Írjon be egy megvitatható állítást vagy kérdést…",
   "home.composerHint": "A modellek érvelnek · Ön dönt",
@@ -145,6 +145,5 @@
   "home.removal.close": "Bezárás",
   "home.flag.underReview": "MEGJELÖLT · FELÜLVIZSGÁLAT ALATT",
   "home.flag.approved": "JÓVÁHAGYVA",
-  "home.flag.refused": "NEM JÓVÁHAGYVA",
-  "home.takeDown.button": "Levétel"
+  "home.flag.refused": "NEM JÓVÁHAGYVA"
 }

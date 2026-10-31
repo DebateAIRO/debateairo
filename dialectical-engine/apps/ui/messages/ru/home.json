@@ -13,7 +13,7 @@
   "home.publicDebates": "Публичные дебаты",
   "home.total": "ВСЕГО: {count}",
   "home.signInHint": "Войдите или создайте учётную запись выше, чтобы увидеть свои дебаты.",
-  "home.publicIndexingNotice": "Опубликованные дебаты могут индексироваться поисковыми системами. Их копии могут сохраниться после снятия с публикации.",
+  "home.publicIndexingNotice": "Опубликованные дебаты могут индексироваться поисковыми системами, а их копии могут оставаться в других местах.",
   "home.debateClaim": "Тезис дебатов",
   "home.claimPlaceholder": "Введите тезис или вопрос для обсуждения…",
   "home.composerHint": "Модели спорят · вы судите",
@@ -147,6 +147,5 @@
   "home.removal.close": "Закрыть",
   "home.flag.underReview": "ПОМЕЧЕНО · НА РАССМОТРЕНИИ",
   "home.flag.approved": "ОДОБРЕНО",
-  "home.flag.refused": "НЕ ОДОБРЕНО",
-  "home.takeDown.button": "Убрать"
+  "home.flag.refused": "НЕ ОДОБРЕНО"
 }

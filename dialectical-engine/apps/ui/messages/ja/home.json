@@ -13,7 +13,7 @@
   "home.publicDebates": "公開ディベート",
   "home.total": "合計 {count} 件",
   "home.signInHint": "自分のディベートを表示するには、上でログインするかアカウントを作成してください。",
-  "home.publicIndexingNotice": "公開したディベートは検索エンジンに登録される場合があります。公開を取り消した後もコピーが残る可能性があります。",
+  "home.publicIndexingNotice": "公開されたディベートは検索エンジンにインデックスされる場合があり、コピーが他の場所に残ることがあります。",
   "home.debateClaim": "ディベートの主張",
   "home.claimPlaceholder": "議論できる主張または質問を入力…",
   "home.composerHint": "モデルが議論 · あなたが評価",
@@ -144,6 +144,5 @@
   "home.removal.close": "閉じる",
   "home.flag.underReview": "フラグ付き · 審査中",
   "home.flag.approved": "承認されました",
-  "home.flag.refused": "承認されていません",
-  "home.takeDown.button": "取り下げる"
+  "home.flag.refused": "承認されていません"
 }

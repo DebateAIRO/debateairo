@@ -13,7 +13,7 @@
   "home.publicDebates": "Öffentliche Debatten",
   "home.total": "{count} INSGESAMT",
   "home.signInHint": "Melden Sie sich oben an oder erstellen Sie ein Konto, um Ihre Debatten zu sehen.",
-  "home.publicIndexingNotice": "Veröffentlichte Debatten können von Suchmaschinen indexiert werden. Kopien können nach der Aufhebung der Veröffentlichung fortbestehen.",
+  "home.publicIndexingNotice": "Veröffentlichte Debatten können von Suchmaschinen indexiert werden, und Kopien können anderswo bestehen bleiben.",
   "home.debateClaim": "Debattenbehauptung",
   "home.claimPlaceholder": "Geben Sie eine debattierbare Behauptung oder Frage ein…",
   "home.composerHint": "Modelle argumentieren · Sie urteilen",
@@ -145,6 +145,5 @@
   "home.removal.close": "Schließen",
   "home.flag.underReview": "MARKIERT · IN ÜBERPRÜFUNG",
   "home.flag.approved": "GENEHMIGT",
-  "home.flag.refused": "NICHT GENEHMIGT",
-  "home.takeDown.button": "Offline nehmen"
+  "home.flag.refused": "NICHT GENEHMIGT"
 }

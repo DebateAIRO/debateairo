@@ -13,7 +13,7 @@
   "home.publicDebates": "Publiskās debates",
   "home.total": "KOPĀ {count}",
   "home.signInHint": "Pierakstieties vai izveidojiet kontu, lai skatītu savas debates.",
-  "home.publicIndexingNotice": "Publicētās debates var indeksēt meklētājprogrammas. Kopijas var saglabāties arī pēc publikācijas atcelšanas.",
+  "home.publicIndexingNotice": "Publicētas debates var indeksēt meklētājprogrammas, un kopijas var saglabāties citur.",
   "home.debateClaim": "Debašu apgalvojums",
   "home.claimPlaceholder": "Ierakstiet apspriežamu apgalvojumu vai jautājumu…",
   "home.composerHint": "Modeļi argumentē · jūs vērtējat",
@@ -146,6 +146,5 @@
   "home.removal.close": "Aizvērt",
   "home.flag.underReview": "ATZĪMĒTS · TIEK PĀRSKATĪTS",
   "home.flag.approved": "APSTIPRINĀTS",
-  "home.flag.refused": "NAV APSTIPRINĀTS",
-  "home.takeDown.button": "Noņemt"
+  "home.flag.refused": "NAV APSTIPRINĀTS"
 }

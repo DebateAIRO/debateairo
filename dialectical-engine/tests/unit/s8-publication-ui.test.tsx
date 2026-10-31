@@ -41,7 +41,7 @@ describe("S8 duplicated public readers", () => {
       ["public.disclosure.evidenceAsOf", "Evidence as of {date}."],
       [
         "public.disclosure.indexing",
-        "Published debates may be indexed by search engines. Copies may persist after unpublishing."
+        "Published debates may be indexed by search engines, and copies may remain elsewhere."
       ]
     ] as const) {
       expect(disclosureSource).toContain(`t(catalog, "${key}"`);
@@ -55,7 +55,7 @@ describe("S8 duplicated public readers", () => {
       expect(html).toContain("Verdict unavailable in this published serving mode.");
       expect(html).toContain(`Evidence as of ${expectedEvidenceDate}.`);
       expect(html).toContain("may be indexed by search engines");
-      expect(html).toContain("Copies may persist after unpublishing");
+      expect(html).toContain("copies may remain elsewhere");
     }
   });
 });

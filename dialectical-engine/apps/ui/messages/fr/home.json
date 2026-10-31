@@ -13,7 +13,7 @@
   "home.publicDebates": "Débats publics",
   "home.total": "{count} AU TOTAL",
   "home.signInHint": "Connectez-vous ou créez un compte ci-dessus pour voir vos débats.",
-  "home.publicIndexingNotice": "Les débats publiés peuvent être indexés par les moteurs de recherche. Des copies peuvent subsister après le retrait de la publication.",
+  "home.publicIndexingNotice": "Les débats publiés peuvent être indexés par les moteurs de recherche, et des copies peuvent subsister ailleurs.",
   "home.debateClaim": "Affirmation à débattre",
   "home.claimPlaceholder": "Saisissez une affirmation ou une question à débattre…",
   "home.composerHint": "Les modèles argumentent · vous jugez",
@@ -146,6 +146,5 @@
   "home.removal.close": "Fermer",
   "home.flag.underReview": "MARQUÉ · EN COURS D’EXAMEN",
   "home.flag.approved": "APPROUVÉ",
-  "home.flag.refused": "NON APPROUVÉ",
-  "home.takeDown.button": "Retirer"
+  "home.flag.refused": "NON APPROUVÉ"
 }

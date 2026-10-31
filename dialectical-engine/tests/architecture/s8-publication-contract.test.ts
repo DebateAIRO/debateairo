@@ -245,8 +245,8 @@ describe("Accounts S8 publication architecture", () => {
       expect(control).toContain('t(catalog, "public.publication.publishWarning")');
       expect(englishPublicCatalog["public.publication.publishWarning"]).toBe(
         "Publishing makes this debate readable by anyone and may allow search engines to index it. " +
-        "It leaves your private deletion envelope, and public copies may persist even if you later " +
-        "unpublish or delete your account."
+        "Publishing is for good: you cannot take it back, and anyone with credit can add to it. " +
+        "If you erase your account your name comes off it, and personal details in the text are removed if you ask."
       );
     }
     // The home surface fetches the published list and states the indexing
@@ -259,7 +259,7 @@ describe("Accounts S8 publication architecture", () => {
       expect(home).toContain("PublicDebatesBuffer");
       expect(home).toContain('t(catalog, "home.publicIndexingNotice")');
       expect(englishHomeCatalog["home.publicIndexingNotice"]).toBe(
-        "Published debates may be indexed by search engines. Copies may persist after unpublishing."
+        "Published debates may be indexed by search engines, and copies may remain elsewhere."
       );
     }
     expect(publicRows).toContain("/public/debate/");

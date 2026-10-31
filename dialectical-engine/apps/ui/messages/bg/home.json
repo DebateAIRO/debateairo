@@ -13,7 +13,7 @@
   "home.publicDebates": "Публични дебати",
   "home.total": "{count} ОБЩО",
   "home.signInHint": "Влезте или създайте профил по-горе, за да видите дебатите си.",
-  "home.publicIndexingNotice": "Публикуваните дебати могат да бъдат индексирани от търсачките. Копията може да продължат да съществуват след отмяна на публикуването.",
+  "home.publicIndexingNotice": "Публикуваните дебати може да бъдат индексирани от търсачките, а копия може да останат другаде.",
   "home.debateClaim": "Твърдение за дебат",
   "home.claimPlaceholder": "Въведете спорно твърдение или въпрос…",
   "home.composerHint": "Моделите спорят · Вие преценявате",
@@ -145,6 +145,5 @@
   "home.removal.close": "Затваряне",
   "home.flag.underReview": "МАРКИРАНО · В ПРОЦЕС НА ПРЕГЛЕД",
   "home.flag.approved": "ОДОБРЕНО",
-  "home.flag.refused": "НЕОДОБРЕНО",
-  "home.takeDown.button": "Премахване"
+  "home.flag.refused": "НЕОДОБРЕНО"
 }

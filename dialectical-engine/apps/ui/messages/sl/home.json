@@ -13,7 +13,7 @@
   "home.publicDebates": "Javne razprave",
   "home.total": "SKUPAJ {count}",
   "home.signInHint": "Prijavite se ali zgoraj ustvarite račun, da si ogledate svoje razprave.",
-  "home.publicIndexingNotice": "Iskalniki lahko indeksirajo objavljene razprave. Kopije se lahko ohranijo tudi po umiku objave.",
+  "home.publicIndexingNotice": "Objavljene razprave lahko indeksirajo spletni iskalniki, kopije pa lahko ostanejo drugje.",
   "home.debateClaim": "Trditev razprave",
   "home.claimPlaceholder": "Vnesite trditev ali vprašanje za razpravo …",
   "home.composerHint": "Modeli argumentirajo · vi presodite",
@@ -147,6 +147,5 @@
   "home.removal.close": "Zapri",
   "home.flag.underReview": "OZNAČENO · V PREGLEDU",
   "home.flag.approved": "ODOBRENO",
-  "home.flag.refused": "NI ODOBRENO",
-  "home.takeDown.button": "Umakni"
+  "home.flag.refused": "NI ODOBRENO"
 }

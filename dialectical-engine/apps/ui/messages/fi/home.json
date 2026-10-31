@@ -13,7 +13,7 @@
   "home.publicDebates": "Julkiset väittelyt",
   "home.total": "YHTEENSÄ {count}",
   "home.signInHint": "Kirjaudu sisään tai luo tili yllä nähdäksesi väittelysi.",
-  "home.publicIndexingNotice": "Hakukoneet voivat indeksoida julkaistuja väittelyjä. Kopioita voi säilyä julkaisun peruuttamisen jälkeen.",
+  "home.publicIndexingNotice": "Hakukoneet voivat indeksoida julkaistuja väittelyitä, ja kopioita voi jäädä muualle.",
   "home.debateClaim": "Väittelyn väite",
   "home.claimPlaceholder": "Kirjoita väiteltävissä oleva väite tai kysymys…",
   "home.composerHint": "Mallit argumentoivat · sinä arvioit",
@@ -145,6 +145,5 @@
   "home.removal.close": "Sulje",
   "home.flag.underReview": "MERKITTY · TARKASTETTAVANA",
   "home.flag.approved": "HYVÄKSYTTY",
-  "home.flag.refused": "EI HYVÄKSYTTY",
-  "home.takeDown.button": "Poista näkyvistä"
+  "home.flag.refused": "EI HYVÄKSYTTY"
 }
