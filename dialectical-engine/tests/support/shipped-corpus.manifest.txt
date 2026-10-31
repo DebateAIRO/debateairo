@@ -237,6 +237,7 @@ apps/api/src/synthesis-check/verdict.ts
 apps/api/src/synthesis-check/worker.ts
 apps/api/src/turnstile.ts
 apps/api/src/verification-email.ts
+apps/api/src/web-researched.ts
 apps/evaluator-worker/src/index.ts
 apps/observation-agent/src/core/custody.ts
 apps/observation-agent/src/core/database.ts
@@ -449,6 +450,8 @@ apps/runner/src/web-page-text-gateway.ts
 apps/runner/src/web-planner.ts
 apps/runner/src/web-reader-all.ts
 apps/runner/src/web-readers-top.ts
+apps/runner/src/web-researched-read.ts
+apps/runner/src/web-researched.ts
 apps/runner/src/web-reuse.ts
 apps/runner/src/web-step.ts
 apps/scheduler/src/cli.ts
