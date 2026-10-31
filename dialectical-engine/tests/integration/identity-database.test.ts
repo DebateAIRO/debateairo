@@ -65,6 +65,8 @@ describe("S2 identity schema on real PostgreSQL", () => {
       // 0135 a dig's picks: the set and each pick.
       "dig_pick", "dig_pick_set",
       "email_change_request",
+      // 0137 public debates: a free ask, a public dig's contribution, the debate's updates, the report's writer and charges.
+      "free_public_ask",
       // 0133 investigations: a debate and its digs, their closings and the one reserve.
       "investigation", "investigation_closing",
       // 0134 the dig model: each dig's level.
@@ -73,7 +75,9 @@ describe("S2 identity schema on real PostgreSQL", () => {
       // 0136 the investigation's final report: one per closing.
       "investigation_report",
       "investigation_reserve_event",
-      "login_challenge", "mfa_factor",
+      "login_challenge",
+      // 0138 tree updates: the main answer's new versions.
+      "main_answer_update", "mfa_factor",
       "mfa_recovery_control", "mfa_recovery_legacy_cohort", "mfa_recovery_notice", "mfa_recovery_notice_binding",
       "mfa_recovery_source_window", "mfa_recovery_staged_code",
       "page_reading_level",
@@ -85,18 +89,28 @@ describe("S2 identity schema on real PostgreSQL", () => {
       // 0135 the path rewrite's material: the dig's own paths, stored before its turn.
       "path_rewrite_input",
       "path_rewrite_turn",
+      // 0138 tree updates: a path's rewrites that a dig did not start, and the turns that order them.
+      "path_update", "path_update_turn",
       "private_erasure_audit_binding",
+      // 0137 public debates: the public debates' contributions, updates and report charges.
+      "public_contribution", "public_debate_update", "public_report_charge", "public_report_writer",
       "publication_event_binding", "recovery_code", "recovery_email_request", "registration_region", "run_execution_binding",
       // 0134 the month pause of a running debate.
       "run_pause_event",
+      // 0138 tree updates: a run's purpose lines.
+      "run_purpose_lines",
       "runtime_audit_attempt",
       "sensitive_data_consent", "session", "social_enrollment", "social_flow", "social_identity", "staff_webauthn_metadata", "step_up_grant", "synthesis_check_erasure_binding", "user",
       "verification_delivery_reservation", "verification_token_credential",
       // 0132 web evidence store: a debate's searches, pages, transient page texts, readings, extracts, packs, picks, choices.
-      "web_extract", "web_pack", "web_page", "web_page_text", "web_pick",
+      "web_extract", "web_pack", "web_page", "web_page_text",
+      // 0139 passage retention: each deletion of a debate's passages, with its codes and counts.
+      "web_passage_wipe", "web_pick",
       // 0134 the web plan: the planner's decision for each path.
       "web_plan_path",
-      "web_reading", "web_researched", "web_search"
+      "web_reading", "web_reply_text", "web_researched", "web_search",
+      // 0139 passage retention: a debate's shown quotes (kept) and its saved replies (transient).
+      "web_shown_quote"
     ]);
 
     const columns = await database.pool.query<{ table_name: string; column_name: string; data_type: string }>(`

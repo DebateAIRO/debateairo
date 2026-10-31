@@ -40,8 +40,16 @@ const INVESTIGATIONS = "0133_investigations.sql";
 const DIG_MODEL = "0134_dig_model_and_month_pause.sql";
 /** A dig's picks and its path rewrite's material (dig-model revision task W3-7): the step before the last. */
 const DIG_PICKS = "0135_dig_picks.sql";
-/** The investigation's final report (R22 task W5-1): the chain's last step. */
+/** The investigation's final report (R22 task W5-1): five steps from the end. */
 const INVESTIGATION_REPORTS = "0136_investigation_reports.sql";
+/** The public debates (R22 F1, decision 13): four steps from the end. */
+const PUBLIC_DEBATES = "0137_public_debates.sql";
+/** The tree updates (R22 F1, decisions 2, 3 and 5): three steps from the end. */
+const TREE_UPDATES = "0138_tree_updates.sql";
+/** The passage retention (R22 F1, decisions 6 and 7): two steps from the end. */
+const PASSAGE_RETENTION = "0139_passage_retention.sql";
+/** The funded spend kinds (R22 F1, decision 14): the chain's last step. */
+const SPEND_KINDS = "0140_internal_spend_kinds.sql";
 const EXPAND: N1Declaration = Object.freeze({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false, concurrentIndex: null });
 /** A later step with constant digests, as forward-chain-replay-verifiers.test.ts builds its probes, plus its n1 header. */
 function probe(previous: ChainStep, name: string, sql: string, n1: N1Declaration = EXPAND): ChainStep {
@@ -74,20 +82,24 @@ describe("Review Focus 1: a step that fails (or a kill) between steps", () => {
 
   it("a failing step leaves every earlier step committed", async () => {
     const real = (await loadMigrationPlan()).forwardChain.map((step) => step.name);
-    expect(real).toHaveLength(26);
-    expect(real.at(-7)).toBe(RLS);
-    expect(real.at(-6)).toBe(V4);
-    expect(real.at(-5)).toBe(WEB);
-    expect(real.at(-4)).toBe(INVESTIGATIONS);
-    expect(real.at(-3)).toBe(DIG_MODEL);
-    expect(real.at(-2)).toBe(DIG_PICKS);
-    expect(real.at(-1)).toBe(INVESTIGATION_REPORTS);
+    expect(real).toHaveLength(30);
+    expect(real.at(-11)).toBe(RLS);
+    expect(real.at(-10)).toBe(V4);
+    expect(real.at(-9)).toBe(WEB);
+    expect(real.at(-8)).toBe(INVESTIGATIONS);
+    expect(real.at(-7)).toBe(DIG_MODEL);
+    expect(real.at(-6)).toBe(DIG_PICKS);
+    expect(real.at(-5)).toBe(INVESTIGATION_REPORTS);
+    expect(real.at(-4)).toBe(PUBLIC_DEBATES);
+    expect(real.at(-3)).toBe(TREE_UPDATES);
+    expect(real.at(-2)).toBe(PASSAGE_RETENTION);
+    expect(real.at(-1)).toBe(SPEND_KINDS);
     chain.shape = extendedBy((last) => probe(last, "0199_probe_fail.sql", "SELECT 1/0"));
     await expect(migrate(db.pool)).rejects.toMatchObject({ code: "22012" });
     chain.shape = undefined;
-    // All twenty-six real steps were applied by that same run and stay committed; the probe left nothing.
+    // All thirty real steps were applied by that same run and stay committed; the probe left nothing.
     expect(await receipts()).toEqual(real);
-    expect((await db.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration_step")).rows[0].n).toBe(26);
+    expect((await db.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration_step")).rows[0].n).toBe(30);
     expect(await ledger()).toEqual(expect.arrayContaining(real));
     expect(await ledger()).not.toContain("0199_probe_fail.sql");
     // The next run continues where the last one stopped: everything replays, nothing is left to apply.
@@ -113,6 +125,10 @@ describe("Review Focus 2: a page read holding a lock on core.run while 0123's AL
     expect(await ledger()).not.toContain(DIG_MODEL);
     expect(await ledger()).not.toContain(DIG_PICKS);
     expect(await ledger()).not.toContain(INVESTIGATION_REPORTS);
+    expect(await ledger()).not.toContain(PUBLIC_DEBATES);
+    expect(await ledger()).not.toContain(TREE_UPDATES);
+    expect(await ledger()).not.toContain(PASSAGE_RETENTION);
+    expect(await ledger()).not.toContain(SPEND_KINDS);
   }, 300_000);
   afterAll(async () => { await db?.stop(); });
 
