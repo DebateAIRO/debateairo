@@ -238,6 +238,20 @@ export async function writeReport(runId: string, client: Pick<ContractClient, "w
   }
 }
 
+/** W4-4: what became of a press of "Add to researched". READING: kept, the answer will say the outcome. */
+export type AddResearchedResult = "READING" | "WAITS_FOR_RESET" | "TRY_AGAIN";
+
+/** "Add to researched" on one of a path's other pages (a path's id on the map may carry "#2": the position is what the server knows). */
+export async function addToResearched(runId: string, pathId: string, pageRef: string, client: Pick<ContractClient, "addToResearched"> = contractClient): Promise<AddResearchedResult> {
+  try {
+    const answer = await Promise.resolve().then(() => client.addToResearched(runId, { position_ref: pathId.replace(/#[0-9]+$/u, ""), page_ref: pageRef }));
+    if ("state" in answer) return "READING";
+    return answer.error === "WEB_RESEARCHED_WAITS_FOR_RESET" ? "WAITS_FOR_RESET" : "TRY_AGAIN";
+  } catch {
+    return "TRY_AGAIN";
+  }
+}
+
 export type ReopenResult = Readonly<{ kind: "OPEN" }> | Readonly<{ kind: "WRITING" }> | Readonly<{ kind: "FAILED" }>;
 
 /** "Keep digging": reopens a closed investigation; refused (nothing changed) while a version is being written. */

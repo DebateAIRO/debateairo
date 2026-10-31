@@ -176,8 +176,9 @@ export function serveWebEvidence(input: Readonly<{
     if (fields === undefined || quote === null || sources.has(extract.label)) continue;
     const planned = topPages.has(extract.pageId) || weighed.has(extract.pageId) ? PLANNED_READERS.top : PLANNED_READERS.other;
     const fewer = (readersOf.get(extract.pageId)?.size ?? 0) < planned;
+    // W4-4: a page reader 1 could not read when the debate ran has its note, written when it was added, with its quotes.
     const parsed = WebSourceSchema.safeParse({
-      extract_id: extract.label, quote, ...fields, ...(fewer ? { fewer_readers: true } : {})
+      extract_id: extract.label, quote, ...fields, explanation: fields.explanation ?? readingLine(extract.quote), ...(fewer ? { fewer_readers: true } : {})
     });
     if (!parsed.success) continue;
     sources.set(extract.label, parsed.data);

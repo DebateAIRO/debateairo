@@ -126,6 +126,7 @@ The seeded web cases (`web-seed.ts`):
 
 - **Paid, searched** (1111, 5555, 8888, and new paid asks): paths n-mix, n-renew and n-nuclear were searched; **n-smr had no search planned** ("Whether these reactors will be cheap is a forecast; no published report can settle it yet."). Five sources sit under n-renew-cost, n-renew-battery (preview only, fewer readers), n-nuclear-build (two pages) and n-nuclear-clean (abstract only). Six other pages, four of them added to researched, one per outcome; dig suggestions of every kind and both sides.
 - **Failed** (7777, and any new ask with `#webfail` in the question): every path `FAILED`, no sources, no other pages.
+- **"Add to researched"** (task W4-4, `POST /v1/runs/{id}/researched`): works on a paid debate's other pages (1111's n-mix has one untouched page, a guide, and n-nuclear more): READING at once, then the outcome about six seconds later; a guide adds nothing. With `plan=FREE` the page hides the button and the route refuses; with `room=FULL` it answers `WEB_RESEARCHED_WAITS_FOR_RESET`.
 - **Free** (6666, and new asks with `plan_tier: "free"`): every path `NOT_ON_PLAN`, no sources; its suggestions never ask for a web search.
 
 ## The new dig model and the money rule (task W2-7)
@@ -215,7 +216,6 @@ Anything else gets a 404 `NOT_MOCKED` reply. The mock also prints a line like `[
 - **Signing in and up for real**: login, register, password reset, MFA, social sign-in, age check (`/login`, `/sign-up`, `/recover`, …). The mock just says "signed in"; use `/api/__mock/sign-in` for the cookie.
 - **Publishing**: publish, the public debate page `/public/debate/<id>`, deleting a private debate.
 - **The classic page's extra actions**: investigations (`POST /v1/answers/:id/investigations/:gap`) and unlinking memory.
-- **"Add to researched"** (task W4-4): the seeded choices show every outcome, but there is no route to add one yet.
 - **The support assistant** (`/v1/support/*`), the evaluator dev menu (`/v1/dev/evaluator`, shown only when `NEXT_PUBLIC_EVALUATOR_DEV_MENU_ENABLED` is on), and the staff pages (`/v1/admin/*`).
 
 ## Self-check

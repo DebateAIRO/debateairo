@@ -110,6 +110,9 @@ export function previewThinkingStepOf(request: Readonly<{ callSiteKey: string; l
     const site = webSite[1]!;
     return site.startsWith("plan") ? "web_planner" : site.startsWith("read1:") ? "web_reader" : site.startsWith("pick:") ? "web_pick" : "web_reader_top";
   }
+  // W4-4: "Add to researched" is the same readers at the same low level.
+  const researched = /^WEB_RESEARCHED:(read1|read-top:[23])$/u.exec(request.callSiteKey);
+  if (researched !== null) return researched[1] === "read1" ? "web_reader" : "web_reader_top";
   const role = debateRoleFromCallSiteKey(request.callSiteKey);
   if (role === null) return null;
   switch (role) {

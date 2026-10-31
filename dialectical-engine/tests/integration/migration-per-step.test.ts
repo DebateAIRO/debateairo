@@ -52,6 +52,7 @@ const PASSAGE_RETENTION = "0139_passage_retention.sql";
 const SPEND_KINDS = "0140_internal_spend_kinds.sql";
 /** The path suggestions (R22 decision 9): the chain's last step. */
 const PATH_SUGGESTIONS = "0141_path_suggestions.sql";
+const WEB_RESEARCHED_UNSETTLED = "0145_web_researched_unsettled.sql";
 const EXPAND: N1Declaration = Object.freeze({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false, concurrentIndex: null });
 /** A later step with constant digests, as forward-chain-replay-verifiers.test.ts builds its probes, plus its n1 header. */
 function probe(previous: ChainStep, name: string, sql: string, n1: N1Declaration = EXPAND): ChainStep {
@@ -84,19 +85,20 @@ describe("Review Focus 1: a step that fails (or a kill) between steps", () => {
 
   it("a failing step leaves every earlier step committed", async () => {
     const real = (await loadMigrationPlan()).forwardChain.map((step) => step.name);
-    expect(real).toHaveLength(31);
-    expect(real.at(-12)).toBe(RLS);
-    expect(real.at(-11)).toBe(V4);
-    expect(real.at(-10)).toBe(WEB);
-    expect(real.at(-9)).toBe(INVESTIGATIONS);
-    expect(real.at(-8)).toBe(DIG_MODEL);
-    expect(real.at(-7)).toBe(DIG_PICKS);
-    expect(real.at(-6)).toBe(INVESTIGATION_REPORTS);
-    expect(real.at(-5)).toBe(PUBLIC_DEBATES);
-    expect(real.at(-4)).toBe(TREE_UPDATES);
-    expect(real.at(-3)).toBe(PASSAGE_RETENTION);
-    expect(real.at(-2)).toBe(SPEND_KINDS);
-    expect(real.at(-1)).toBe(PATH_SUGGESTIONS);
+    expect(real).toHaveLength(32);
+    expect(real.at(-13)).toBe(RLS);
+    expect(real.at(-12)).toBe(V4);
+    expect(real.at(-11)).toBe(WEB);
+    expect(real.at(-10)).toBe(INVESTIGATIONS);
+    expect(real.at(-9)).toBe(DIG_MODEL);
+    expect(real.at(-8)).toBe(DIG_PICKS);
+    expect(real.at(-7)).toBe(INVESTIGATION_REPORTS);
+    expect(real.at(-6)).toBe(PUBLIC_DEBATES);
+    expect(real.at(-5)).toBe(TREE_UPDATES);
+    expect(real.at(-4)).toBe(PASSAGE_RETENTION);
+    expect(real.at(-3)).toBe(SPEND_KINDS);
+    expect(real.at(-2)).toBe(PATH_SUGGESTIONS);
+    expect(real.at(-1)).toBe(WEB_RESEARCHED_UNSETTLED);
     chain.shape = extendedBy((last) => probe(last, "0199_probe_fail.sql", "SELECT 1/0"));
     await expect(migrate(db.pool)).rejects.toMatchObject({ code: "22012" });
     chain.shape = undefined;
@@ -133,6 +135,7 @@ describe("Review Focus 2: a page read holding a lock on core.run while 0123's AL
     expect(await ledger()).not.toContain(PASSAGE_RETENTION);
     expect(await ledger()).not.toContain(SPEND_KINDS);
     expect(await ledger()).not.toContain(PATH_SUGGESTIONS);
+    expect(await ledger()).not.toContain(WEB_RESEARCHED_UNSETTLED);
   }, 300_000);
   afterAll(async () => { await db?.stop(); });
 

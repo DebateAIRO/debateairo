@@ -289,7 +289,7 @@ type SearchDone = Readonly<{
 }>;
 
 /** A stored page's sealed `about`, read back (`{url, site, title, date}`, serve W3-3's shape). */
-function aboutOf(value: unknown): Readonly<{ url: string; site: string; title: string | null; date: string | null }> | null {
+export function aboutOf(value: unknown): Readonly<{ url: string; site: string; title: string | null; date: string | null }> | null {
   if (typeof value !== "object" || value === null) return null;
   const about = value as Record<string, unknown>;
   if (typeof about.url !== "string" || typeof about.site !== "string") return null;

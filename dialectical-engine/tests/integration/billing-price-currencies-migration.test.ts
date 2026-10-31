@@ -150,7 +150,7 @@ describe("Part C's migration step: the currency of every quote, charge and subsc
       "0124_settings_activation.sql", "0125_italy_specific_approval.sql", "0126_synthesis_check.sql", "0127_publication_review.sql", "0128_threat_reports.sql", "0129_support_answer_scope.sql", "0130_row_level_security.sql",
       "0131_v4_account_memory.sql", "0132_web_evidence.sql", "0133_investigations.sql", "0134_dig_model_and_month_pause.sql", "0135_dig_picks.sql",
       "0136_investigation_reports.sql",
-      "0137_public_debates.sql", "0138_tree_updates.sql", "0139_passage_retention.sql", "0140_internal_spend_kinds.sql", "0141_path_suggestions.sql"]);
+      "0137_public_debates.sql", "0138_tree_updates.sql", "0139_passage_retention.sql", "0140_internal_spend_kinds.sql", "0141_path_suggestions.sql", "0145_web_researched_unsettled.sql"]);
     const step = plan.forwardChain.find((entry) => entry.name === PART_C_STEP)!;
     const netopia = plan.forwardChain.find((entry) => entry.name === NETOPIA_STEP)!;
     const batch = plan.forwardChain.find((entry) => entry.name === BATCH_STEP)!;

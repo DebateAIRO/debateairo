@@ -57,7 +57,7 @@ const PASSAGE_RETENTION = "0139_passage_retention.sql";
 /** The funded spend kinds' step (R22 F1, decision 14): drained, keeping 0130's verifier. */
 const SPEND_KINDS = "0140_internal_spend_kinds.sql";
 /** This code's chain head since the path suggestions' step (R22 decision 9): expand, keeping 0130's verifier. */
-const HEAD_STEP = "0141_path_suggestions.sql";
+const HEAD_STEP = "0145_web_researched_unsettled.sql";
 const AFTER_RLS = [V4, WEB, INVESTIGATIONS, DIG_MODEL, DIG_PICKS, REPORTS, PUBLIC_DEBATES, TREE_UPDATES, PASSAGE_RETENTION, SPEND_KINDS, HEAD_STEP] as const;
 // A newer release's steps come after this code's chain head (0141 since the path suggestions).
 const FIRST = "0142_probe_ahead.sql";

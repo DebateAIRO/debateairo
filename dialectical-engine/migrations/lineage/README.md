@@ -14,9 +14,9 @@ below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116
 
 1. `migrations/NNNN_<name>.sql`: the SQL, forward-only and replayable.
 2. A manifest in `lineage/`, shaped like `billing-netopia-forward111.json`: its version, the recipe's SHA-256,
-   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0141: 0141,
-   `path-suggestions-forward0141.json`, and `verify-effective-capabilities-130.sql`, which supersedes 0111's, which
-   0112 to 0129 keep; 0131 to 0141 keep 0130's),
+   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0145: 0145,
+   `web-researched-unsettled-forward0145.json`, and `verify-effective-capabilities-130.sql`, which supersedes 0111's, which
+   0112 to 0129 keep; 0131 to 0145 keep 0130's),
    and its own migration and verifier. (0111's own `previous` is 0110: `auth-dev-preview-20261006-forward110.json`
    and the sealed `verify-effective-capabilities.sql`.)
 3. A new verifier `lineage/verify-effective-capabilities-NNNN.sql` only when the step adds billing relations or
@@ -620,6 +620,10 @@ The thirtieth step (the plan's known gap and decision 14): `0140_internal_spend_
 ## The path suggestions (0141)
 
 The thirty-first step (decision 9): `0141_path_suggestions.sql` with `path-suggestions-forward0141.json` and `packages/db/src/migration-forward0141.ts` (`loadForward0141`, `MIGRATION_FORWARD0141_` refusals), `-- n1: expand`, `-- n1: keeps-verifier`. `identity.path_suggestions` keeps the AI's suggestions of what to dig into on one path of a debate's map, one row each time they are worked out, append-only, the newest of a path winning: `run_id` is the run whose key seals the content and who paid (the debate itself for a first debate's suggestions, the dig that rewrote the path for a refresh), `debate_run_id` the debate whose map holds the path. One `CONTENT_CARRIERS` entry, bound to `set_id` and checked by 0132's content trigger. The runner writes through `identity.record_path_suggestions` and reads the newest set per path through `identity.read_path_suggestions_of_run`. The erasure role calls `identity.forget_erased_debate_path_suggestions(uuid)`, which takes the rows on either run; the export worker reads `identity.read_data_export_path_suggestions(uuid,uuid)`. If an earlier pending step takes 0141 first, renumber this step by the same recipe before merge.
+
+## The pages waiting after "Add to researched" (0145)
+
+The thirty-second step (dig-model revision W4-4): `0145_web_researched_unsettled.sql` with `web-researched-unsettled-forward0145.json` and `packages/db/src/migration-forward0145.ts` (`loadForward0145`, `MIGRATION_FORWARD0145_` refusals), `-- n1: expand`, `-- n1: keeps-verifier`. `identity.read_unsettled_web_researched(integer)`, on `debateai_runtime`: the runner's list of the pages people added whose readers have not settled, oldest first, so a runner that stopped goes on from them. One function; no table.
 
 ## Replay: every applied step keeps its own checks
 

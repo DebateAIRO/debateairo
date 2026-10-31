@@ -21,6 +21,7 @@ import { V4LevelTrail } from "@/components/v4/V4LevelTrail";
 import { digFor, digsUnder, openCount, pathTitle, resolveSelection, selectionIdOf, TitleText, V4MapTree } from "@/components/v4/V4MapTree";
 import { V4Outline } from "@/components/v4/V4Outline";
 import { V4Panel } from "@/components/v4/V4Panel";
+import type { V4ResearchedPress } from "@/components/v4/V4Sources";
 import { V4ChangedSince } from "@/components/v4/V4PathRewrite";
 import { V4MainAnswer } from "@/components/v4/V4MainAnswer";
 import { V4Rail, type V4DigCounts } from "@/components/v4/V4Rail";
@@ -33,8 +34,9 @@ import { diffSnapshots, isRewriteWord, rewriteNewsOf, selectionForChange, snapsh
 import { effectiveDigMode } from "@/lib/v4/askConfig";
 import { digLinksFor, digParentOf, mergeIndex, readQuestionIndex, type IndexEntry } from "@/lib/v4/digIndex";
 import {
-  currentReportVersion, loadAnswer, loadDigTrail, loadDigView, loadInvestigation, loadStory, loadV4, storyReadFailed, type DigTrail, type V4Load
+  addToResearched, currentReportVersion, loadAnswer, loadDigTrail, loadDigView, loadInvestigation, loadStory, loadV4, storyReadFailed, type DigTrail, type V4Load
 } from "@/lib/v4/load";
+import { researchedWaiting } from "@/lib/v4/web";
 import { buildV4Map, rewriteByDig, rewriteWaiting, uniqueOpenQuestions } from "@/lib/v4/mapModel";
 import {
   borrowLines,
@@ -105,6 +107,8 @@ const STORY_READ_FAILURE_LIMIT = 4;
 const DIG_POLL_MS = 15_000;
 /** W4-6: while a path is being rewritten (or a finished rewrite is not on the map yet), the answer is read this often. */
 const REWRITE_POLL_MS = 15_000;
+/** W4-4: how often the answer is read while an added page is being read (the runner's sweep looks every 15 s). */
+const RESEARCHED_POLL_MS = 5_000;
 /** TIME-8/FIT-3: a dig read as done before its story was written is asked again, at most this many times. */
 const DIG_HEADLESS_TRIES = 30;
 /** TIME-1: a dig whose reads keep failing stops holding back "what changed" after this many failures. */
@@ -777,6 +781,33 @@ function V4Debate({
     };
   }, [servedRunId, rewriteBehind, behind]);
 
+  // ── "Add to researched" (W4-4): the presses the answer does not say yet, kept here only; the answer read again until each has its outcome ────
+  const [researchedPresses, setResearchedPresses] = useState<ReadonlyMap<string, V4ResearchedPress>>(new Map());
+  const pressResearched = useCallback((pathId: string, pageRef: string) => {
+    if (servedRunId === null) return;
+    const press = (state: V4ResearchedPress): void => setResearchedPresses((before) => new Map(before).set(pageRef, state));
+    press("ADDING");
+    void addToResearched(servedRunId, pathId, pageRef).then(press);
+  }, [servedRunId]);
+  const researchedPending = served !== null && (researchedWaiting(served.answer)
+    || (served.answer.web?.paths ?? []).some((path) => path.other_pages.some((page) => page.researched === undefined && researchedPresses.get(page.page_ref) === "READING")));
+  useEffect(() => {
+    if (servedRunId === null || !researchedPending) return;
+    let active = true;
+    let timer: number | undefined;
+    const read = async (): Promise<void> => {
+      const next = await loadAnswer(servedRunId);
+      if (!active) return;
+      if (next !== null) setFreshAnswer(next);
+      timer = window.setTimeout(() => void read(), RESEARCHED_POLL_MS);
+    };
+    timer = window.setTimeout(() => void read(), RESEARCHED_POLL_MS);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [servedRunId, researchedPending]);
+
   // ── Where a dig sits (W4-6): the debates above it, read once, up to the main question ────────────────────────────
   const servedDig = served?.answer.dig ?? null;
   const trailKey = servedDig === null ? null : `${servedDig.parent_run_id}|${servedDig.position_ref ?? ""}`;
@@ -1366,6 +1397,9 @@ function V4Debate({
                 showDigModes={planTier !== "free"}
                 onDig={startDig}
                 digBusy={digBusy}
+                // W4-4: not on Free (owner: paid plans read added pages), and not while new starts wait for a reset.
+                {...(planTier === "free" || startsWait !== null ? {} : { onAddResearched: pressResearched })}
+                researchedPresses={researchedPresses}
                 roomNotice={roomNotice}
                 money={money}
                 digPathLine={trail?.steps.at(-1)?.line ?? null}

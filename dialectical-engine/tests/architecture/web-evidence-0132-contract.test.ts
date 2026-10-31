@@ -58,7 +58,7 @@ const tableBody = (sql: string, table: string): string => {
 
 describe("0132: the web evidence store step", () => {
   it("C-T follows 0131 in the chain's STEPS, with its own loader", async () => {
-    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0131,loadForward0132,loadForward0133,loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140,loadForward0141]");
+    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0131,loadForward0132,loadForward0133,loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140,loadForward0141,loadForward0145]");
     const loader = read("packages/db/src/migration-forward0132.ts");
     expect(loader).toContain(`const NAME = "${NAME}";`);
     expect(loader).toContain('const VERSION = "web-evidence-forward0132-v1";');

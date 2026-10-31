@@ -6,6 +6,7 @@ import {
   prepareLeasedContentEncryptionForRun, withRunContentLease, type CryptoEnvelope, type Pool
 } from "@debateai/db";
 import { pointsOf, storedDigPathsOf } from "./path-rewrite-sources.js";
+import { addedPagesOf } from "./web-researched-read.js";
 
 /**
  * WHAT THE WHOLE DEBATE ALREADY INVESTIGATED (R22 decision 9 and W4-3; owner Q7, 31 Oct: "it should already know the points
@@ -15,7 +16,7 @@ import { pointsOf, storedDigPathsOf } from "./path-rewrite-sources.js";
  * Plain words: every debate of the investigation before this dig, each with its paths' lines and what became of them, their
  * points, what its dig changed, the searches it sent and what reader 1 wrote about each page it read. AI text only (R22
  * decision 6): points, verdicts and notes. NEVER a passage: a stored dig path's `extracts`, a pack and an extract are not
- * opened or read here, and neither is a page's text or its quote.
+ * opened or read here, and neither is a page's text. The one quote read is the 120-character one of a page the person added.
  *
  * - A dig has no story: its paths are the ones 0135 stored for its rewrite, with the lines its rewrite wrote for them. So a
  *   dig below level 1 plans from its parent dig's own AI text.
@@ -33,6 +34,8 @@ export const DIG_INVESTIGATED_MAX_BYTES = 32_000 as const;
 export type InvestigatedPoint = Readonly<{ text: string; side: "for" | "against" | null; disputed: boolean }>;
 export type InvestigatedPath = Readonly<{ line: string; fate: string | null; points: readonly InvestigatedPoint[] }>;
 export type InvestigatedNote = Readonly<{ site: string; title: string | null; note: string }>;
+/** W4-4: a page the person added to researched that added to the argument: reader 1's note and its shown quotes (0139), never a passage. */
+export type InvestigatedAddedPage = Readonly<{ site: string; title: string | null; note: string | null; quotes: readonly string[] }>;
 export type InvestigatedDebate = Readonly<{
   /** 0 for this dig's nearest parent, 1 for the one above it, …; null for a debate that is not in its line of parents. */
   nearness: number | null;
@@ -41,6 +44,8 @@ export type InvestigatedDebate = Readonly<{
   paths: readonly InvestigatedPath[];
   searched: readonly string[];
   notes: readonly InvestigatedNote[];
+  /** W4-4 (owner Q-D9): pages added to researched, which the next dig and report weigh; absent when none. */
+  added?: readonly InvestigatedAddedPage[];
 }>;
 
 const fits = (value: unknown, max: number): boolean => Buffer.byteLength(JSON.stringify(value), "utf8") <= max;
@@ -51,12 +56,13 @@ const fits = (value: unknown, max: number): boolean => Buffer.byteLength(JSON.st
  * then points, then notes and searches. Pure.
  */
 export function investigatedText(debates: readonly InvestigatedDebate[], maxBytes: number = DIG_INVESTIGATED_MAX_BYTES): string {
-  type Shown = { changed: string[]; paths: { line: string; fate: string | null; points: InvestigatedPoint[] }[]; searched: string[]; notes: InvestigatedNote[] };
-  const shown: Shown[] = debates.map(() => ({ changed: [], paths: [], searched: [], notes: [] }));
+  type Shown = { changed: string[]; paths: { line: string; fate: string | null; points: InvestigatedPoint[] }[]; searched: string[]; notes: InvestigatedNote[]; added: InvestigatedAddedPage[] };
+  const shown: Shown[] = debates.map(() => ({ changed: [], paths: [], searched: [], notes: [], added: [] }));
   const order = debates.map((_, at) => at).sort((left, right) =>
     (debates[left]!.nearness ?? Number.MAX_SAFE_INTEGER) - (debates[right]!.nearness ?? Number.MAX_SAFE_INTEGER) || left - right);
   const whole = (): unknown => shown.map((debate) => ({ ...(debate.changed.length === 0 ? {} : { changed: debate.changed }), paths: debate.paths,
-    ...(debate.searched.length === 0 ? {} : { searched: debate.searched }), ...(debate.notes.length === 0 ? {} : { notes: debate.notes }) }));
+    ...(debate.searched.length === 0 ? {} : { searched: debate.searched }), ...(debate.notes.length === 0 ? {} : { notes: debate.notes }),
+    ...(debate.added.length === 0 ? {} : { added: debate.added }) }));
   // One addition at a time, taken back when the whole no longer fits.
   const tryAdd = <T>(list: T[], item: T): void => {
     list.push(item);
@@ -71,6 +77,8 @@ export function investigatedText(debates: readonly InvestigatedDebate[], maxByte
       if (target !== undefined) for (const point of path.points) tryAdd(target.points, point);
     }
   }
+  // W4-4: a page the person chose comes before the notes the readers wrote on every page they read.
+  for (const at of order) for (const page of debates[at]!.added ?? []) tryAdd(shown[at]!.added, page);
   for (const at of order) {
     for (const note of debates[at]!.notes) tryAdd(shown[at]!.notes, note);
     for (const words of debates[at]!.searched) tryAdd(shown[at]!.searched, words);
@@ -139,8 +147,8 @@ async function digTextOf(pool: Pool, runId: string, cutAt: string): Promise<Pick
   return digDebateTextOf(stored.value, opened);
 }
 
-/** What a debate's web step wrote before `cutAt`: the searches it sent and reader 1's note on each page. Never a passage. */
-async function webTextOf(pool: Pool, runId: string, cutAt: string): Promise<Pick<InvestigatedDebate, "searched" | "notes">> {
+/** What a debate's web step wrote before `cutAt`: the searches it sent, reader 1's note on each page and the pages added to researched. Never a passage. */
+async function webTextOf(pool: Pool, runId: string, cutAt: string): Promise<Pick<InvestigatedDebate, "searched" | "notes" | "added">> {
   const evidence = await new PostgresWebEvidenceRepository(pool).read(runId);
   if (evidence === null || evidence.searches.length === 0) return Object.freeze({ searched: Object.freeze([]), notes: Object.freeze([]) });
   const leased = await prepareLeasedContentEncryptionForRun(pool, runId);
@@ -161,8 +169,10 @@ async function webTextOf(pool: Pool, runId: string, cutAt: string): Promise<Pick
       if (!isRecord(line) || typeof line.line !== "string" || !isRecord(about) || typeof about.site !== "string") return [];
       return [Object.freeze({ site: about.site, title: typeof about.title === "string" ? about.title : null, note: line.line })];
     });
+    const added = await addedPagesOf(pool, runId, evidence, (carrier, id, envelope) => decryptLeasedContentForRun<unknown>(leased, carrier, id, envelope, null), cutAt);
     await leased.assertLive();
-    return Object.freeze({ searched: Object.freeze([...new Set(searched)]), notes: Object.freeze(notes) });
+    return Object.freeze({ searched: Object.freeze([...new Set(searched)]), notes: Object.freeze(notes), ...(added.length === 0 ? {} : { added: Object.freeze(added.map((page) => Object.freeze({
+      site: page.site, title: page.title, note: page.note, quotes: page.quotes }))) }) });
   } finally {
     await leased.close();
   }

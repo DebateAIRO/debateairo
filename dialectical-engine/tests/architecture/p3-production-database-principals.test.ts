@@ -1163,6 +1163,13 @@ describe("P3-01 production database-principal manifest", () => {
   "grants": [
     "EXECUTE ON FUNCTION identity.read_data_export_path_suggestions(uuid,uuid)"
   ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0145_web_researched_unsettled.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_unsettled_web_researched(integer)"
+  ]
 }
 ]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))

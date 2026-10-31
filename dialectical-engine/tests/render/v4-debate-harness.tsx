@@ -74,7 +74,9 @@ export const harness = {
   /** R22 W5-1: the investigation's report versions (null: not readable, the first answer stays). */
   investigation: null as InvestigationReports | null,
   loadStory: vi.fn(),
-  loadAnswer: vi.fn()
+  loadAnswer: vi.fn(),
+  /** W4-4: "Add to researched"'s press. */
+  addToResearched: vi.fn<(runId: string, pathId: string, pageRef: string) => Promise<"READING" | "WAITS_FOR_RESET" | "TRY_AGAIN">>()
 };
 
 export function resetHarness(): void {
@@ -95,6 +97,7 @@ export function resetHarness(): void {
   harness.investigation = null;
   harness.loadStory = vi.fn(async () => harness.story);
   harness.loadAnswer = vi.fn(async (runId: string) => harness.fresh ?? harness.answer ?? seededAnswer(runId));
+  harness.addToResearched = vi.fn(async () => "READING" as const);
 }
 resetHarness();
 
@@ -127,6 +130,7 @@ export function loadMock(original: Record<string, unknown>) {
       : { kind: "SERVED", runId: id, answer: harness.answer ?? seededAnswer(id), story: harness.story },
     loadStory: (...args: unknown[]) => harness.loadStory(...args),
     loadAnswer: (runId: string) => harness.loadAnswer(runId),
+    addToResearched: (runId: string, pathId: string, pageRef: string) => harness.addToResearched(runId, pathId, pageRef),
     loadInvestigation: async () => harness.investigation,
     // The trail's own walk up the answers runs; only its reads are the harness's.
     loadDigTrail: (dig: Answer["dig"]) => (original.loadDigTrail as (dig: unknown, client: unknown) => Promise<DigTrail>)(dig, {

@@ -7,6 +7,7 @@ import {
   admitDig, digPathIndexOf, joinAtStart, recordDigPicksAtStart, type DigAdmissionPorts, type DigJoinPort, type DigPathIndex,
   type DigPicksPort, type DigSuggestionTextReader
 } from "./dig-admission.js";
+import { addToResearched } from "./web-researched.js";
 import { continuePausedRun, monthPauseOf, type ContinuedRunWake, type MonthPausePort, type MonthRoomReader } from "./month-pause.js";
 import {
   readInvestigationReports, reopenInvestigation, writeInvestigationReport, type InvestigationReportPorts
@@ -1550,6 +1551,7 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "GET /v1/runs/{id}/investigation", auth: "user", resource: "run-owner", action: "read-investigation" },
   { route: "POST /v1/runs/{id}/report", auth: "user", resource: "run-owner", action: "write-report" },
   { route: "POST /v1/runs/{id}/reopen", auth: "user", resource: "run-owner", action: "reopen-investigation" },
+  { route: "POST /v1/runs/{id}/researched", auth: "user", resource: "run-owner", action: "add-researched" },
   { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" },
   { route: "GET /v1/billing/plans", auth: "public", resource: "billing", action: "read-plans" },
   { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" },
@@ -1908,6 +1910,11 @@ export interface ApiOptions {
    * routes answer the closed 404, as Continue does without `digModel`.
    */
   readonly investigationReports?: InvestigationReportPorts;
+  /** W4-4: "Add to researched" (./web-researched.ts): 0132's writer and 0133's clock. Absent: the route answers the closed 404. */
+  readonly webResearched?: Readonly<{
+    record(ownerRef: string, runId: string, pageId: string): Promise<"RECORDED" | "ALREADY" | "NOT_OWNED" | "NOT_OTHER_PAGE">;
+    markActivity(ownerRef: string, runId: string): Promise<void>;
+  }>;
   readonly accountErasure?: AccountErasureApplication;
   readonly dataExport?: DataExportApplication;
   readonly legacyRunClaim?: LegacyRunClaimApplication;
@@ -4742,6 +4749,38 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       case "OPEN": return reply.send(InvestigationReopenedSchema.parse({ state: "OPEN" }));
       case "WRITING": return reply.status(409).send(InvestigationReportWritingSchema.parse({
         error: INVESTIGATION_REPORT_WRITING, message: INVESTIGATION_REPORT_WRITING, report_version: outcome.reportVersion }));
+      case "NOT_FOUND": return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      default: return exhaustive(outcome);
+    }
+  });
+  // W4-4: "Add to researched" (./web-researched.ts). Another account's debate is the closed 404; 202 READING, the same for a page added before;
+  // the refusals are 409, nothing charged. The room is read as a quick look on the person's own plan: it only asks whether new starts wait.
+  api.post<{ Params: { id: string } }>("/v1/runs/:id/researched", credentialRoutePolicy("POST /v1/runs/{id}/researched"), async (request, reply) => {
+    const target = memoryRunOf(request);
+    const store = options.webResearched;
+    if (target === null || store === undefined) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    const access = ownershipFor(request);
+    const outcome = await addToResearched({ ownerRef: target.ownerRef, runId: target.runId, body: request.body ?? {} }, {
+      readAnswer: (runId) => options.application.readRunAnswer(runId, request.session, access),
+      readRunExists: async (runId) => (await options.application.readRun(runId, request.session, access)) !== null,
+      readRoom: async () => {
+        if (options.askRoom === undefined) return { planId: null, waitsForReset: false };
+        const view = await admissionView();
+        const decided = await decideRoomSettingsAndPlan({ plan_tier: "premium", composition_budget_tier: "low",
+          depth_params: roomDepthParams(AskRoomQuerySchema.parse({ plan_tier: "premium", composition_budget_tier: "low", depth: "1" })) }, target.ownerRef, options.askBilling);
+        const roomPlan = debateShapePlanKeyOf(decided.planId, decided.settings.plan_tier);
+        const room = await options.askRoom.readRoom({ access, ...(view.registerVersion === undefined ? {} : { registerVersion: view.registerVersion }),
+          settingsClass: runSettingsClassOfAsk(normaliseAskForDebateShape(decided.settings, view.debateShapePolicy ?? null, roomPlan,
+            view.lengthGuidancePolicy ?? null), view.previewProviderTestConfig, roomPlan) });
+        return { planId: room.planId, waitsForReset: room.newStarts === "BLOCKED_UNTIL_RESET" };
+      },
+      record: store.record,
+      markActivity: store.markActivity
+    });
+    switch (outcome.kind) {
+      case "ADDED": return reply.status(202).send(outcome.body);
+      case "REFUSED": return reply.status(409).send(outcome.body);
+      case "MALFORMED": return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
       case "NOT_FOUND": return reply.status(404).send({ error: "RUN_NOT_FOUND" });
       default: return exhaustive(outcome);
     }

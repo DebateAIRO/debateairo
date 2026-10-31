@@ -43,7 +43,7 @@ import {
 } from "./V4MapTree";
 import { V4DigCompose, V4MoneyLines, type V4DigChoice } from "./V4DigSuggest";
 import { V4DigPageIntro, V4PathRewrite, V4WhatChanged } from "./V4PathRewrite";
-import { V4OtherPages, V4SearchNote, V4SourceList, V4WebNoteLine } from "./V4Sources";
+import { V4OtherPages, V4SearchNote, V4SourceList, V4WebNoteLine, type V4ResearchedPress } from "./V4Sources";
 import { V4TrustBar } from "./V4TrustBar";
 
 /*
@@ -53,7 +53,7 @@ import { V4TrustBar } from "./V4TrustBar";
  * says. Nothing here fetches or stores anything.
  * Perplexity plan W2-6 (2026-10-30): each point shows its sources at every reading level (V4Sources.tsx); the question
  * shows the debate's web note (Free, a failed search, switched off) and a path its own search note, above the points;
- * a path then lists the other pages its search found, each with "Add to researched" (wired in W4-4).
+ * a path then lists the other pages its search found, each with "Add to researched" (W4-4) where it is offered.
  * Dig model revision W4-6: a path a dig rewrote shows its rewrite under its new text (V4PathRewrite.tsx); a dig's own page
  * says what it looked into and the path it rewrote in place of a short answer (a dig writes no story, owner Q-D13), then its
  * answer text and its points as usual; a dig's panel says what became of its rewrite, or that it is paused at the month wall.
@@ -80,8 +80,10 @@ type PanelProps = Readonly<{
   onDig: (target: DigTarget) => void;
   digBusy: boolean;
   roomNotice?: ReactNode;
-  /** W2-6: "Add to researched" on one of a path's other pages; W4-4 wires it (until then the button cannot be used). */
+  /** W4-4: "Add to researched" on one of a path's other pages; absent where it is not offered (Free, new starts waiting for a reset). */
   onAddResearched?: (pathId: string, pageRef: string) => void;
+  /** W4-4: what the page knows of a press before the answer says so, by page. */
+  researchedPresses?: ReadonlyMap<string, V4ResearchedPress>;
   /** W3-4: choosing what to dig (suggestions, edits, own view, the one-path rule, "Dig here too", the deepest level). */
   choice?: V4DigChoice;
   /** W3-4: the money lines before a dig (its share of today; new starts waiting for the reset). Never a price. */
@@ -518,6 +520,7 @@ function PathBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolve
               actions
               heading={false}
               {...(addResearched === undefined ? {} : { onAddResearched: (pageRef: string) => addResearched(path.id, pageRef) })}
+              {...(panel.researchedPresses === undefined ? {} : { presses: panel.researchedPresses })}
             />
           </Section>
         )

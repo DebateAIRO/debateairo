@@ -284,3 +284,25 @@ describe("W5-1 the final report's dossier", () => {
     expect([PATH_YES, PATH_NO]).toHaveLength(2);
   });
 });
+
+describe("W4-4: pages added to researched", () => {
+  const fieldsOf = dossierFieldsOf;
+  const LONG = "A very long line copied from the page that goes well past the length a quote may be shown at, so that it has to be cut where a word ends, as every quote is.";
+
+  it("the report reads each one's note and shown quote, by its path; a report without any keeps its fields", () => {
+    const without = built();
+    expect(fieldsOf(without).map((field) => field.name)).not.toContain("added_pages");
+    const input = { ...investigationInput(), addedPages: [
+      { path: PATH_YES, site: "added.example", title: "An added page", note: "It is a survey. It found queues. It leaves out winter.", quotes: [LONG] },
+      { path: null, site: "dug.example", title: null, note: null, quotes: ["A quote from a dig's page."] }
+    ] };
+    const field = fieldsOf(built(input)).find((candidate) => candidate.name === "added_pages");
+    const pages = JSON.parse(field!.content) as Array<{ path?: string; site: string; note?: string; quotes: string[] }>;
+    expect(pages.map((page) => [page.site, page.note ?? null])).toEqual([["added.example", "It is a survey. It found queues. It leaves out winter."], ["dug.example", null]]);
+    expect(pages[0]!.path).toEqual(expect.any(String));
+    expect(pages[1]!.path).toBeUndefined();
+    expect(pages[0]!.quotes[0]!.length).toBeLessThanOrEqual(120);
+    expect(field!.content).not.toContain(LONG);
+  });
+});
+

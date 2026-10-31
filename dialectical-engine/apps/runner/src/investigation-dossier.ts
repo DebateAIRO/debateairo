@@ -115,7 +115,12 @@ export type DossierPath = Readonly<{
   current?: DossierText | null;
 }>;
 
+/** W4-4 (owner Q-D9): a page the person added to researched that added to the argument: reader 1's note and its shown quotes. */
+export type DossierAddedPage = Readonly<{ path: string | null; site: string; title: string | null; note: string | null; quotes: readonly string[] }>;
+
 export type DossierInput = Readonly<{
+  /** W4-4: the investigation's added pages (`path`: the first debate's path, the map's id, when it is one); absent: none. */
+  addedPages?: readonly DossierAddedPage[];
   question: PathRewriteQuestion;
   first: Readonly<{
     runId: string;
@@ -424,6 +429,11 @@ function fieldsAt(input: DossierInput, cards: readonly DossierDig[], refs: Refs,
       field("follow_ups", JSON.stringify(followUps)),
       ...(views.length === 0 ? [] : [field("views", JSON.stringify(views))]),
       ...(sources.length === 0 ? [] : [field("sources", JSON.stringify(sources))]),
+      ...((input.addedPages ?? []).length === 0 ? [] : [field("added_pages", JSON.stringify((input.addedPages ?? []).map((page) => {
+        const path = page.path === null ? undefined : refs.pathRef.get(page.path);
+        return { ...(path === undefined ? {} : { path }), site: page.site, ...(page.title === null ? {} : { title: page.title }),
+          ...(page.note === null ? {} : { note: page.note }), quotes: page.quotes.map((quote) => cutQuoteAtWordEdge(quote)) };
+      })))]),
       ...(input.earlier === null ? [] : [field("earlier_report", JSON.stringify({ version: input.earlier.version, answer: [...input.earlier.segments] }))]),
       ...(leftOut === 0 ? [] : [field("left_out", JSON.stringify({ points: pointsLeftOut, follow_ups: cardsLeftOut }))])
     ])

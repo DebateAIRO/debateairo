@@ -4,7 +4,7 @@ import {
   PostgresInvestigationReportRunnerRepository, PostgresInvestigationRunnerRepository, PostgresPassageRetentionRepository,
   PostgresTreeUpdateRunnerRepository, PostgresWebEvidenceRepository, RUN_PURPOSE_LINES_CARRIER, RunRepository, WEB_EVIDENCE_CARRIERS,
   WEB_SHOWN_QUOTE_CARRIER, decryptContentForRun, decryptLeasedContentForRun, encryptAttestedContentForRun,
-  prepareLeasedContentEncryptionForRun, withRunContentLease, type CryptoEnvelope, type InvestigationReportsRead, type PathLineEntry,
+  prepareLeasedContentEncryptionForRun, readMapRootsInForce, withRunContentLease, type CryptoEnvelope, type InvestigationReportsRead, type PathLineEntry,
   type PathRewriteEntry, type Pool, type UnreportedClosing, type WebSealed
 } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
@@ -15,12 +15,13 @@ import {
   storedReportAnswerOf, type InvestigationCloseInput, type InvestigationCloseSettings, type InvestigationCloseSources,
   type InvestigationReportContent, type InvestigationReportPayer, type InvestigationReportSettled
 } from "./investigation-close.js";
-import type { DossierDig, DossierPath, DossierRewrite, DossierSource, DossierText } from "./investigation-dossier.js";
+import type { DossierAddedPage, DossierDig, DossierPath, DossierRewrite, DossierSource, DossierText } from "./investigation-dossier.js";
 import { pathRewriteBodyBytes, type PathRewriteDigPath } from "./path-rewrite-material.js";
 import { PATH_REWRITE_CHECKER_MODEL, PATH_REWRITE_WRITER_MODEL } from "./path-rewrite-composition.js";
 import { backfillShownQuotes } from "./passage-sweep.js";
 import { pointsOf, storedDigPathsOf } from "./path-rewrite-sources.js";
 import { readReplayBook } from "./run-replay.js";
+import { addedPagesOf } from "./web-researched-read.js";
 
 /**
  * THE CLOSING'S SOURCES IN POSTGRESQL, AND THE CLOSING COMPOSED (plan 2026-10-30 task W5-1), on the runner's pool
@@ -123,6 +124,28 @@ async function sourcesOfPoints(pool: Pool, runId: string, pointIds: readonly str
       await cipher.close();
     }
   });
+}
+
+/** W4-4: the investigation's added pages (the first debate's named by their path; a dig's by none), debate by debate, each opened under its own key. */
+async function addedPagesOfInvestigation(pool: Pool, root: string, digs: readonly string[]): Promise<readonly DossierAddedPage[]> {
+  const pages: DossierAddedPage[] = [];
+  for (const runId of [root, ...digs]) {
+    const evidence = await new PostgresWebEvidenceRepository(pool).read(runId);
+    if (evidence === null || !evidence.researched.some((row) => row.outcome === "ADDS")) continue;
+    const rootOf = runId === root ? new Map((await readMapRootsInForce(pool, runId)).map((entry) => [entry.answerId, entry.rootNodeId] as const)) : null;
+    const added = await withRunContentLease(pool, [runId], async () => {
+      const cipher = await prepareLeasedContentEncryptionForRun(pool, runId);
+      try {
+        const opened = await addedPagesOf(pool, runId, evidence, (carrier, id, envelope) => decryptLeasedContentForRun<unknown>(cipher, carrier, id, envelope, null));
+        await cipher.assertLive();
+        return opened;
+      } finally {
+        await cipher.close();
+      }
+    });
+    for (const page of added) pages.push(Object.freeze({ path: rootOf?.get(page.pathRef) ?? null, site: page.site, title: page.title, note: page.note, quotes: page.quotes }));
+  }
+  return Object.freeze(pages);
 }
 
 /** Each path's newest text on one debate when a later update wrote it (0138), and the digs its line says are not to be read. */
@@ -315,7 +338,12 @@ export function postgresInvestigationCloseSources(pool: Pool): InvestigationClos
           readingLevel: readingLevelOf(ask.depthParams), language: null }),
         first: Object.freeze({ runId: root, answer: story?.answer ?? null, paths: Object.freeze(paths) }),
         digs: Object.freeze(digs),
-        earlier: earlierAnswer
+        earlier: earlierAnswer,
+        // W4-4 (owner Q-D9): the pages the person added to researched are weighed here. Absent when there are none, so a report without them keeps its bytes.
+        ...await (async () => {
+          const addedPages = await addedPagesOfInvestigation(pool, root, members.map((member) => member.run_id));
+          return addedPages.length === 0 ? {} : { addedPages };
+        })()
       })
     });
   };

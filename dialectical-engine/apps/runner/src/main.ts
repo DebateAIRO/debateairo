@@ -16,6 +16,7 @@ import { startInvestigationCloseSweep } from "./investigation-close.js";
 import { startPathRewriteSweep } from "./path-rewrite-sweep.js";
 import { startTreeSweep } from "./path-climb.js";
 import { startPassageSweep, wipeInvestigationPassages } from "./passage-sweep.js";
+import { composeWebResearched, startWebResearchedSweep } from "./web-researched.js";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
 import { releaseTaskName, TypedDomainError } from "@debateai/kernel";
 import {
@@ -605,6 +606,14 @@ const investigationCloseSweep = investigationClose === undefined || retireReques
   : startInvestigationCloseSweep({ ...investigationClose, paused: () => retirementSignal.claimsStopped() });
 // R22 decision 7: whole page texts and passages go when nothing runs on a debate; other pages 30 days after last activity.
 const passageSweep = retireRequestStanding ? null : startPassageSweep(pool, { paused: () => retirementSignal.claimsStopped() });
+// W4-4: "Add to researched": the pages people added are read every few seconds, and after a stop; its calls are charged on the climb's
+// never-walled seam, its one search (a page whose text has gone) on the search's. No month pause here: this is not a debate.
+const webResearchedSearch = runnerWebSearchSettings({ pool, previewGate, fetch: previewFetch, guardOf: runnerSite.money === null ? null : runCostEnvelopeGuard });
+const webResearched = composeWebResearched({ pool, targets: providerTargets,
+  members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
+  search: webResearchedSearch.search, searchSeamOf: webResearchedSearch.searchSeamOf });
+const webResearchedSweep = webResearched === undefined || retireRequestStanding ? null
+  : startWebResearchedSweep({ ...webResearched, paused: () => retirementSignal.claimsStopped() });
 announceRunnerReady({
   kind: "DEBATEAI_RUNNER_READY",
   worker: environment.HATCHET_WORKER_NAME,
@@ -656,6 +665,7 @@ const retirement = startRunnerRetirement({
     treeSweep?.stop();
     investigationCloseSweep?.stop();
     passageSweep?.stop();
+    webResearchedSweep?.stop();
     await worker.stop();
     await Promise.allSettled([pool.end(), keepAlivePool.end()]);
   },
@@ -670,4 +680,5 @@ pathRewriteSweep?.stop();
 treeSweep?.stop();
 investigationCloseSweep?.stop();
 passageSweep?.stop();
+webResearchedSweep?.stop();
 retirement.stop();
