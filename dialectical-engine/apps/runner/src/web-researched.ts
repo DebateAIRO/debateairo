@@ -3,8 +3,8 @@
  * "ADD TO RESEARCHED", THE RUNNER'S HALF (dig-model revision task W4-4; owner Q7 and Q-D9; plan 2026-10-31 decision 7).
  *
  * Plain words: a person adds one of a path's "other pages" from the map, outside a debate. Reader 1 already read that page whole
- * when the debate ran and wrote its note, so this buys what it did not: readers 2 and 3 read it now, as they read a top page (about
- * a cent, on the same sealed wording), code keeps what they copied only when the page holds it word for word, and the page's quotes
+ * when the debate ran and wrote its note, so this buys what it did not: readers 2 and 3 read it now, as they read a top page (a
+ * small call, on the same sealed wording), code keeps what they copied only when the page holds it word for word, and the page's quotes
  * join that path. The page then says whether it adds to the argument. It does NOT rewrite the path (Q-D9): the next dig on the path
  * and the report read its note and quotes.
  *
@@ -14,8 +14,8 @@
  *    settled the debate's wipe takes the page's text, the extracts and the replies.
  *  - A page reader 1 could not read has no note. Reader 1 then reads it now (web.read-all.v2, decision 8's sentence). 0132 keeps one
  *    reading per reader and page, so that note is sealed with the page's shown quotes, which is where the page and later AIs read it.
- *  - Once the 30 days have passed the page's text is gone: its one search brings it back for this reading only (owner Q4, about 0.1 of
- *    a cent) and it is not stored. A page the search no longer finds settles FAILED, which the page says plainly.
+ *  - Once the 30 days have passed the page's text is gone: its one search brings it back for this reading only (owner Q4,
+ *    one search's charge) and it is not stored. A page the search no longer finds settles FAILED, which the page says plainly.
  *  - Paid once. Everything is keyed by the run and the page; a call the stopped copy got answered is replayed from the record, free; a
  *    search already recorded is never sent again. A second press is ALREADY at the API, so nothing runs twice.
  *  - The money: each call names the page's own run on the story lane, so it counts for that run's owner and is never walled once started

@@ -13737,7 +13737,7 @@ export function createPostgresProviderGateway(
       // W5-1: the final report's sites spend the report seam (never walled), on the investigation's root run.
       const reportCall = storyScope && investigationReportCallSiteRole(structureRepairOriginalKey(request.callSiteKey)) !== null;
       // W4-4: "Add to researched" is charged like a climb: a small follow-up on the page's own run, counted for its owner, never walled
-      // (PATH_CLIMB rows: a kind of its own would mean redefining 0140's team readers for about a cent).
+      // (PATH_CLIMB rows: a kind of its own would mean redefining 0140's team readers for so small a call).
       const climbCall = storyScope && (pathClimbCallSiteRole(structureRepairOriginalKey(request.callSiteKey)) !== null
         || webResearchedCallSiteRole(structureRepairOriginalKey(request.callSiteKey)) !== null);
       const answerUpdateCall = storyScope && answerUpdateCallSiteRole(structureRepairOriginalKey(request.callSiteKey)) !== null;
