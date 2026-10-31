@@ -40,7 +40,7 @@ describe("the runner reads the engine from the receipt only", () => {
   it("W3-1: the web step runs from one call site, only on an engine-2 run, under the engine seal the boot settings carry", () => {
     expect(RUNNER.split("await runRunnerWebStep(")).toHaveLength(2);
     expect(RUNNER).toContain("if (settings.webSearch !== undefined && settings.engine != null && engine.engine === 2 && shapeMapArgued");
-    expect(RUNNER).toContain("contractHash: settings.engine.engineContractHash, bound: settings.judgeBound,");
+    expect(RUNNER).toContain("contractHash: settings.engine.engineContractHash, openReplayStep: (members, contractHash) => replayBook.openStep(members, contractHash), bound: settings.judgeBound,");
     const step = read("apps/runner/src/web-step.ts");
     for (const name of ["readEngineVersionPolicy", "ENGINE_VERSION_POLICY_ROW_KEY", "readEngineRunnerSettings"]) {
       expect(step).not.toContain(name);

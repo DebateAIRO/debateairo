@@ -489,7 +489,7 @@ describe("execute() reads one debate's settings only (O1): the source scan", () 
     expect(lane).toBeGreaterThan(map);
     expect(keepAlive).toBeGreaterThan(lane);
     const head = execute.indexOf("run = await this.#runs.readFrozenHead(claimedRunId);");
-    const stamp = execute.indexOf("if (resolution !== null && run.registerVersion !== resolution.version) {");
+    const stamp = execute.indexOf("if (resolution !== null && ownedVersion !== resolution.version) {");
     expect(stamp).toBeGreaterThan(head);
     expect(execute.slice(stamp, stamp + 200)).toContain("\"RUN_SETTINGS_VERSION_DRIFT\"");
     expect(execute).toContain(
@@ -508,7 +508,9 @@ describe("the version reads select register_version by id (behaviour: S19)", () 
     const battery = read("packages/battery/src/index.ts");
     const db = read("packages/db/src/index.ts");
     const peek = between(battery, "async peekRunSettingsVersion(", "\n  }\n");
-    expect(peek).toContain("SELECT run.run_id, run.register_version::integer AS register_version, run.release_key");
+    // Decision 12: the version and release that own the debate now, after a hand-over or by its stamp.
+    expect(peek).toContain("SELECT run.run_id, identity.run_settings_version_now(run.run_id)::integer AS register_version,");
+    expect(peek).toContain('${RELEASE_NOW("run.run_id")} AS release_key');
     expect(peek).toContain("JOIN core.run AS run ON run.run_id = item.run_id");
     expect(peek).toContain("WHERE item.work_item_id = $1");
     const byRun = between(db, "async readRunRegisterVersion(", "\n  }\n");
@@ -541,8 +543,8 @@ function scriptedPool(options: Readonly<{
   const answer = (sql: string, params: readonly unknown[] = []) => {
     statements.push(sql.replace(/\s+/gu, " ").trim());
     calls.push({ sql: sql.replace(/\s+/gu, " ").trim(), params });
-    if (sql.includes("SELECT run.release_key")) return { rows: [{ release_key: options.releaseKey ?? RELEASE_KEY }] };
-    if (sql.includes("SELECT run.run_id, run.register_version::integer AS register_version, run.release_key")) {
+    if (sql.includes("SELECT identity.run_release_now(run.run_id) AS release_key")) return { rows: [{ release_key: options.releaseKey ?? RELEASE_KEY }] };
+    if (sql.includes("SELECT run.run_id, identity.run_settings_version_now(run.run_id)::integer AS register_version,")) {
       return { rows: options.peekVersion === null ? [] : [{
         run_id: "run-1", register_version: options.peekVersion, release_key: options.peekReleaseKey ?? RELEASE_KEY
       }] };
@@ -609,7 +611,7 @@ describe("executeWorkItem resolves the debate's own version (side-by-side spec Â
     await expect(runner.executeWorkItem("item-1")).rejects.toBeInstanceOf(TypedDomainError);
     expect(asked).toEqual([VERSION]);
     // The peek came before the claim's transaction.
-    const peekAt = db.statements.findIndex((sql) => sql.startsWith("SELECT run.run_id, run.register_version"));
+    const peekAt = db.statements.findIndex((sql) => sql.startsWith("SELECT run.run_id, identity.run_settings_version_now"));
     expect(peekAt).toBeGreaterThan(-1);
     expect(peekAt).toBeLessThan(db.statements.indexOf("BEGIN"));
     expect(versions.versionOf("run-1")).toBe(VERSION);

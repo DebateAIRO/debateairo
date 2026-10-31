@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { buildFramedPrompt, readPromptFrame } from "@debateai/providers";
-import { Judge, askComparingJudge } from "@debateai/judgement";
+import { ASK_CLARIFY_INSTRUCTION, Judge, askComparingJudge, framedAskClarify } from "@debateai/judgement";
 import { buildSynthesisRolePrompt } from "@debateai/runner";
 import { LENGTH_GUIDANCE_START, argumentLanguageDirective } from "@debateai/kernel";
 import {
@@ -231,7 +231,8 @@ describe("V-BLIND-CONTEXT — the judgement prompt surface withholds authorship"
       .filter((entry) => entry.endsWith(".ts"))
       .map((entry) => readFileSync(`${JUDGEMENT_SRC}/${entry}`, "utf8"))
       .join("\n");
-    expect(source.split(/\bbuildFramedPrompt\(\{/u).length - 1).toBe(BUILDERS.length);
+    // Plus step 2's small call, framed before any debate exists: its own row below.
+    expect(source.split(/\bbuildFramedPrompt\(\{/u).length - 1).toBe(BUILDERS.length + 1);
     // ...and no builder may go back to assembling a packet by hand.
     expect(source.split(/\brole: "system"/u).length - 1).toBe(0);
     expect(source).toContain("argumentLanguageDirective");
@@ -243,6 +244,32 @@ describe("V-BLIND-CONTEXT — the judgement prompt surface withholds authorship"
       BUILDERS.flatMap(({ name }) => [`${name}:initial`, `${name}:repair`])
     );
     expect(captures.every(({ packet }) => packet.messages.length > 0)).toBe(true);
+  });
+
+  it("step 2's small call takes the question and nothing else, so it can name no author (decision 29)", () => {
+    // Its one input is the question's own line: there is no parameter a maker, a seat or a provider could come in by.
+    expect(framedAskClarify).toHaveLength(1);
+    const packet = framedAskClarify(QUESTION_LINE);
+    const frame = readPromptFrame(packet);
+    expect(frame.contractId).toBe("ask.clarify.v1");
+    expect(packet.messages.filter((message) => message.role === "system")).toHaveLength(1);
+    const contents = packet.messages.map((message) => message.content);
+    expect(contents.some((content) => content.includes(QUESTION_LINE))).toBe(true);
+    expect(Object.entries(WITHHELD).filter(([, sentinel]) => contents.some((content) => content.includes(sentinel)))).toEqual([]);
+    expect(ASK_CLARIFY_INSTRUCTION).not.toMatch(/\bmaker\b|\bauthor\b|\bprovider\b/iu);
+  });
+
+  it("the panel's sources variant reads the cited extract as code built it, and names no author (decision 10)", async () => {
+    const captures: Capture[] = [];
+    const gateway = capturingGateway("panel-sources", captures);
+    await expect(new Judge(gateway).assess({ ...SUBJECT,
+      citedExtract: JSON.stringify({ id: "S1-1", quote: "A quoted line.", title: "A page", site: "example.org", date: null, note: "It counts riders." }),
+      length: { words: 60, languageCode: "en", charactersPerWord: LENGTH_GUIDANCE_START.charactersPerWord } })).rejects.toBeDefined();
+    const contents = captures.flatMap((capture) => capture.packet.messages.map((message) => message.content));
+    expect(contents.join("\n")).toContain("judge.panel.length.sources.v1");
+    expect(contents.some((content) => content.includes("A quoted line."))).toBe(true);
+    expect(Object.entries(WITHHELD).filter(([, sentinel]) => contents.some((content) => content.includes(sentinel)))).toEqual([]);
+    expect(contents.join("\n")).not.toMatch(/different maker|another maker/u);
   });
 
   it.each(BUILDERS.map(({ name }) => name))(

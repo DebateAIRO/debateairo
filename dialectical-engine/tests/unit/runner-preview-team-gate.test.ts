@@ -98,7 +98,7 @@ describe('the store applies the API rule on the runner pool', () => {
     expect(queries[0]!.text).toMatch(/state IN \('READY', 'CLAIMED'\)/);
     expect(queries[0]!.text).toMatch(/run_id IS NOT NULL/);
     // Side-by-side spec §3: only this release's runs.
-    expect(queries[0]!.text.replace(/\s+/g, ' ')).toContain('FROM core.work_item AS item JOIN core.run AS run ON run.run_id = item.run_id AND run.release_key = $2');
+    expect(queries[0]!.text.replace(/\s+/g, ' ')).toContain('FROM core.work_item AS item JOIN core.run AS run ON run.run_id = item.run_id AND identity.run_release_now(run.run_id) = $2');
     expect(queries[0]!.values).toEqual([101, ['r1', 'aaaaaaaaaaaa'].join('-')]);
     expect([...await store.teamRuns([run(1), run(2)], [ALICE])]).toEqual([run(1)]);
     expect(queries[1]).toEqual({ text: PREVIEW_TEAM_RUNS_SQL, values: [[run(1), run(2)], [ALICE]] });
@@ -106,7 +106,7 @@ describe('the store applies the API rule on the runner pool', () => {
     // Only what claimById could still take: never a DONE/FAILED job, a live claim or a settled attempt.
     expect(queries[2]!.text.replace(/\s+/g, ' ')).toContain("WHERE work_item_id = $1 AND run_id = $2 AND settled_attempt_id IS NULL AND (state = 'READY' OR (state = 'CLAIMED' AND claim_deadline <= clock_timestamp()))");
     // ...and never another release's job (side-by-side spec §3).
-    expect(queries[2]!.text.replace(/\s+/g, ' ')).toContain('AND EXISTS (SELECT 1 FROM core.run r WHERE r.run_id = $2 AND r.release_key = $4)');
+    expect(queries[2]!.text.replace(/\s+/g, ' ')).toContain('AND identity.run_release_now($2) = $4');
     expect(queries[2]!.values).toEqual([job(1), run(1), 'RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY', ['r1', 'aaaaaaaaaaaa'].join('-')]);
   });
 

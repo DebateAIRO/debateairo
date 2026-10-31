@@ -687,8 +687,8 @@ describe("the boot preload: open debates' and passed versions, never the pointer
     const [sql, values] = queries[0] as [string, unknown[]];
     expect(values).toEqual([KEY]);
     const flatSql = sql.replace(/\s+/gu, " ");
-    expect(flatSql).toContain("SELECT DISTINCT run.register_version::integer AS register_version FROM core.work_item AS item JOIN core.run AS run ON run.run_id = item.run_id");
-    expect(flatSql).toContain("WHERE item.state IN ('READY','CLAIMED') AND run.release_key = $1");
+    expect(flatSql).toContain("SELECT DISTINCT identity.run_settings_version_now(run.run_id)::integer AS register_version FROM core.work_item AS item JOIN core.run AS run ON run.run_id = item.run_id");
+    expect(flatSql).toContain("WHERE item.state IN ('READY','CLAIMED') AND identity.run_release_now(run.run_id) = $1");
     // Legacy: nothing, and no query.
     expect(await new WorkItemRepository(pool).listOpenRunSettingsVersions(LEGACY_RELEASE_KEY)).toEqual([]);
     expect(queries).toHaveLength(1);
