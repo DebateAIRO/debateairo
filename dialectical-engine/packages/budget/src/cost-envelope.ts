@@ -181,6 +181,12 @@ export interface ReportedUsage {
   readonly cacheWriteTokens?: number;
   readonly cacheWriteOneHourTokens?: number;
   readonly cacheReadTokens?: number;
+  /**
+   * F4: `promptTokens` is the projection's guess (the vendor's count could not be read; `chargeableUsage`), not the
+   * vendor's figure. Bytes over two say nothing of the real prompt's size, so a guess never picks the upper price step
+   * and the fallback stays within what the call was admitted at. Not enumerable: the usage reads as its counts alone.
+   */
+  readonly promptFromProjection?: true;
 }
 
 const TOKENS_PER_MILLION = 1_000_000n;
@@ -240,9 +246,9 @@ function assertPrice(price: ProviderTargetPrice): void {
  * F4: the step a prompt of `promptTokens` is billed at — the upper one when the prompt is above its line (every input
  * token counted, cached or not), else the target's own prices with the lower step's cache prices.
  */
-function vendorStepFor(price: ProviderTargetPrice, vendor: ProviderVendorPrices, promptTokens: number):
+function vendorStepFor(price: ProviderTargetPrice, vendor: ProviderVendorPrices, usage: ReportedUsage):
   ProviderCachePrices & Readonly<{ inputMicrosPerMillionTokens: number; outputMicrosPerMillionTokens: number }> {
-  return vendor.upper !== undefined && promptTokens > vendor.upper.abovePromptTokens
+  return vendor.upper !== undefined && usage.promptFromProjection !== true && usage.promptTokens > vendor.upper.abovePromptTokens
     ? vendor.upper
     : { ...vendor.lower, inputMicrosPerMillionTokens: price.inputMicrosPerMillionTokens,
         outputMicrosPerMillionTokens: price.outputMicrosPerMillionTokens };
@@ -273,7 +279,7 @@ export function chargeMicrosForUsage(
   const hour = usage.cacheWriteOneHourTokens === undefined ? write
     : assertCountedInteger(usage.cacheWriteOneHourTokens, "COST_ENVELOPE_USAGE_INVALID");
   if (write + read > promptTokens || hour > write) throw new TypeError("COST_ENVELOPE_USAGE_INVALID");
-  const step = vendorStepFor(price, vendor, promptTokens);
+  const step = vendorStepFor(price, vendor, usage);
   return ceilDivToMicros(promptTokens - write - read, step.inputMicrosPerMillionTokens)
     + ceilDivToMicros(write - hour, step.cacheWriteMicrosPerMillionTokens)
     + ceilDivToMicros(hour, step.cacheWriteOneHourMicrosPerMillionTokens)
@@ -299,9 +305,11 @@ export function projectedCallCeilingMicros(
     bound?.completionTokenCeiling, "COST_ENVELOPE_PROJECTION_INVALID"
   );
   const projectedPromptTokens = Math.ceil(requestBytes / PROJECTED_INPUT_BYTES_PER_TOKEN);
-  // F4: `vendorPrices` changes the CHARGE only. The projection keeps the target's plain prices: its two bytes per token
-  // already over-count a real prompt (Haiku reads 2.3-3.2 bytes a token) by more than a 5-minute write's 1.25x, and
-  // the upper step would wrongly price a 236 KiB story request (about 81,000 real tokens) at five times its bill.
+  // F4: `vendorPrices` changes the CHARGE only. The projection keeps the target's plain prices. Its two bytes per token
+  // over-count a real prompt (Haiku reads 2.3-3.2 bytes a token) by 1.15x-1.6x, about what a 5-minute write's 1.25x
+  // costs on the marked part, and the upper step would wrongly price a 236 KiB story request (about 81,000 real tokens)
+  // at five times its bill. So a prompt that really is over the step can be charged more than this projected: the one
+  // call's shortfall PROJECTED_INPUT_BYTES_PER_TOKEN states.
   return ceilDivToMicros(projectedPromptTokens, price.inputMicrosPerMillionTokens)
     + ceilDivToMicros(completionTokenCeiling, price.outputMicrosPerMillionTokens);
 }
@@ -507,12 +515,14 @@ export function chargeableUsage(
     return read === "MALFORMED" || !readable ? projected : 0;
   };
   const promptTokens = side(parts.promptTokens, Math.ceil(requestBytes / PROJECTED_INPUT_BYTES_PER_TOKEN));
-  return Object.freeze({
+  const charged: ReportedUsage = {
     promptTokens,
     completionTokens: side(parts.completionTokens, completionTokenCeiling),
     // F4: the cache parts only when the vendor's own prompt count was read (a fallback has none to split).
     ...(typeof parts.promptTokens === "number" ? cacheParts(usage, promptTokens) : {})
-  });
+  };
+  if (typeof parts.promptTokens !== "number") Object.defineProperty(charged, "promptFromProjection", { value: true });
+  return Object.freeze(charged);
 }
 
 /**

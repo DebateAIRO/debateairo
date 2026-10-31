@@ -396,16 +396,20 @@ export function previewVendorPrices(row: PreviewModelRow): Readonly<{
 }
 
 /**
- * F4: the price a target's calls are CHARGED at — its declared price, plus, on the preview, the vendor's real prices of
- * its reviewed row (`previewVendorPrices`) when that vendor bills the cache and the prompt's size (Anthropic). The
- * runner and the practice runner both build their money seams' price with it, so the two cannot drift.
+ * F4: the price a target's calls are CHARGED at — its declared price, plus the vendor's real prices of its reviewed row
+ * (`previewVendorPrices`) when that vendor bills the cache and the prompt's size (Anthropic). The runner and the
+ * practice runner both build their money seams' price with it, so the two cannot drift.
+ *
+ * With or without the preview's gate: the vendor's bill does not depend on the gate, and the wire marks the instruction
+ * part on every Anthropic call (anthropicCacheableSystem), so a hosted target with no gate has cache writes and reads
+ * and the 100,000-token step too. The first parameter therefore no longer decides anything.
  */
 export function previewTargetChargePrice<P extends Readonly<{ inputMicrosPerMillionTokens: number; outputMicrosPerMillionTokens: number }>>(
-  previewOn: boolean,
+  _previewOn: boolean,
   target: Readonly<{ baseUrl: string; model: string }>,
   price: P | null
 ): (P & Readonly<{ vendorPrices?: NonNullable<ReturnType<typeof previewVendorPrices>> }>) | null {
-  if (price === null || !previewOn) return price;
+  if (price === null) return price;
   const reviewed = previewModelRowForEndpoint(target.baseUrl, target.model);
   const vendorPrices = reviewed === undefined ? undefined : previewVendorPrices(reviewed);
   return vendorPrices === undefined ? price : Object.freeze({ ...price, vendorPrices });
