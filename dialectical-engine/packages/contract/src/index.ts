@@ -31,7 +31,7 @@ import {
 export * from "./account-memory.js";
 import { AnswerWebSchema, AskParentSchema, DebateInvestigationSchema, DigSharePercentSchema, DigSuggestionSchema, InvestigationCloseRequestSchema,
   ResearchedAddRequestSchema, ResearchedAddedSchema, RoomReserveSchema, WebOtherPageSchema, WebPathSchema, WebSourceSchema,
-  WEB_CONTRACT_LIMITS, AnswerDigSchema, AnswerPathRewritesSchema, DigTooDeepSchema, MonthPauseSchema, PathRewriteSchema,
+  WEB_CONTRACT_LIMITS, AnswerDigSchema, AnswerPathRewritesSchema, DigTooDeepSchema, DigPicksOnePathSchema, DigFreePicksMaxSchema, MonthPauseSchema, PathRewriteSchema,
   PathRewritesSchema, PointOfViewVerdictSchema, RoomNewStartsSchema, RunContinueRefusedSchema, RunContinueRequestSchema,
   RunContinuedSchema, UsageBorrowSchema, UsageBorrowsSchema } from "./web.js";
 export * from "./web.js";
@@ -1893,6 +1893,8 @@ export const contractInventory = Object.freeze({
     "POST /v1/runs/{id}/last-visit",
     "GET /v1/runs/{id}/dig-links",
     "POST /v1/runs/{id}/dig-links",
+    // R22 W3-8 (the money rule): Continue on a debate paused at the month wall, once the month has reset.
+    "POST /v1/runs/{id}/continue",
     "GET /v1/billing/usage",
     "GET /v1/billing/plans",
     "POST /v1/billing/quote",
@@ -1952,6 +1954,8 @@ export const contractInventory = Object.freeze({
     DebateInvestigationSchema, ResearchedAddRequestSchema, ResearchedAddedSchema, InvestigationCloseRequestSchema,
     // W2-7: the dig model's rewrite and nesting shapes and the money rule's words (./web.ts); no route yet.
     PathRewriteSchema, PathRewritesSchema, AnswerPathRewritesSchema, AnswerDigSchema, PointOfViewVerdictSchema, DigTooDeepSchema,
+    // W3-8: the two dig refusals with their own codes (./web.ts).
+    DigPicksOnePathSchema, DigFreePicksMaxSchema,
     MonthPauseSchema, UsageBorrowSchema, RunContinueRequestSchema, RunContinuedSchema, RunContinueRefusedSchema,
     BillingQuoteRequestSchema, BillingQuoteResponseSchema, BillingCheckoutRequestSchema, BillingCheckoutResponseSchema,
     BillingCheckoutPendingErrorSchema, BillingChargeStatusResponseSchema,

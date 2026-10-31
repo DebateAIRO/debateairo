@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { ContractHttpError, DIG_TOO_DEEP, type AskParent, type QuestionLanguageChoice } from "@debateai/contract";
+import {
+  ContractHttpError, DIG_FREE_PICKS_MAX, DIG_PICKS_ONE_PATH, DIG_TOO_DEEP, FREE_DIG_PICKS_MAX, type AskParent, type QuestionLanguageChoice
+} from "@debateai/contract";
 import { COOKIE_SESSION_MARKER, contractClient, createDebate } from "@/lib/api";
 import { readAskRoom, useAskRoom, waitingRoomOf, type AskRoom } from "@/lib/billing/room";
 import {
@@ -57,6 +59,15 @@ export type V4DigRoom = Readonly<{ parentRunId: string; picks: number }>;
 /** W3-4: the API's 409 for a dig that would go past the deepest level (two quick clicks): nothing started, nothing used. */
 function isDigTooDeep(failure: unknown): boolean {
   return failure instanceof ContractHttpError && failure.status === 409 && failure.serverCode === DIG_TOO_DEEP;
+}
+
+/**
+ * R22 W3-8: the API's 400 for a dig the page should never send, each with its own code: picks from more than one path
+ * (DIG_PICKS_ONE_PATH, owner Q-D1) or more picks than Free combines (DIG_FREE_PICKS_MAX). Nothing started, nothing used.
+ */
+function digRefusalCode(failure: unknown): typeof DIG_PICKS_ONE_PATH | typeof DIG_FREE_PICKS_MAX | null {
+  if (!(failure instanceof ContractHttpError) || failure.status !== 400) return null;
+  return failure.serverCode === DIG_PICKS_ONE_PATH || failure.serverCode === DIG_FREE_PICKS_MAX ? failure.serverCode : null;
 }
 
 export function useV4Ask(input: Readonly<{
@@ -265,6 +276,10 @@ export function useV4Ask(input: Readonly<{
     } catch (exc) {
       // W3-4: two quick clicks past the deepest level; the API started nothing and used nothing (label 5.5).
       if (isDigTooDeep(exc)) return refused(t(now.catalog, "v4.nest.tooDeep"));
+      // W3-8: the two dig refusals the page never sends, said plainly where DIG_TOO_DEEP is (drafts for the click-test).
+      const digRefused = digRefusalCode(exc);
+      if (digRefused === DIG_PICKS_ONE_PATH) return refused(t(now.catalog, "v4.nest.picksOnePath"));
+      if (digRefused === DIG_FREE_PICKS_MAX) return refused(t(now.catalog, "v4.nest.freePicksMax", { count: FREE_DIG_PICKS_MAX }));
       if (isCrisisSupportRefusal(exc)) {
         // ASK-4: the API's crisis gate refused a dig: no help pop-up for AI-written text, a plain sentence instead.
         if (dig) return refused(t(now.catalog, "v4.digError.cannotFollow"));

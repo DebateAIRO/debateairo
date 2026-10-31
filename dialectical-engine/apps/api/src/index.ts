@@ -3,7 +3,7 @@ import { registerPasswordResetRoutes, passwordResetPolicyInventory } from "./pas
 import { registerEmailMfaRoutes, emailMfaPolicyInventory } from "./email-mfa-routes.js";
 import { AccountMemoryInputError, type AccountMemoryStore } from "./account-memory.js";
 import { admitDig, digPathIndexOf, joinAtStart, type DigAdmissionPorts, type DigJoinPort, type DigPathIndex } from "./dig-admission.js";
-import { monthPauseOf, type MonthPausePort, type MonthRoomReader } from "./month-pause.js";
+import { continuePausedRun, monthPauseOf, type ContinuedRunWake, type MonthPausePort, type MonthRoomReader } from "./month-pause.js";
 import type { PasswordResetApplication } from "./password-reset.js";
 import { settingsVersionPassed, type ReleaseLifecycleState, type ReleaseState, type ReleaseWatcher } from "./release-state.js";
 import { activeVersionAlarm, journalSettingsCode, type ActiveVersionAlarm } from "./admission-alarm.js";
@@ -126,6 +126,15 @@ import {
   DIG_LEVEL_MAX,
   DIG_TOO_DEEP,
   DigTooDeepSchema,
+  DIG_PICKS_ONE_PATH,
+  DigPicksOnePathSchema,
+  DIG_FREE_PICKS_MAX,
+  DigFreePicksMaxSchema,
+  FREE_DIG_PICKS_MAX,
+  RunContinueRequestSchema,
+  RunContinuedSchema,
+  RunContinueRefusedSchema,
+  RUN_PAUSED_UNTIL_RESET,
   type AskParent
 } from "@debateai/contract";
 import type { Pool, PoolClient, QueryResultRow, QueryResult } from "pg";
@@ -826,6 +835,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RUN_HOLD_RECORDER_UNRESOLVED",
   "RUN_LEGACY_ASKER_INVALID",
   "RUN_MAKER_COUNT_INVALID",
+  "RUN_MONTH_PAUSED",
   "RUN_NOT_FOUND",
   "RUN_OWNER_INVALID",
   "RUN_OWNER_RAW_ID_FORBIDDEN",
@@ -1521,6 +1531,8 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/runs/{id}/last-visit", auth: "user", resource: "run-owner", action: "record-last-visit" },
   { route: "GET /v1/runs/{id}/dig-links", auth: "user", resource: "run-owner", action: "read-dig-links" },
   { route: "POST /v1/runs/{id}/dig-links", auth: "user", resource: "run-owner", action: "record-dig-link" },
+  // R22 W3-8 (the money rule): Continue on a month-paused debate, owner-scoped in the database (0134's resume_paused_run).
+  { route: "POST /v1/runs/{id}/continue", auth: "user", resource: "run-owner", action: "continue-run" },
   { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" },
   { route: "GET /v1/billing/plans", auth: "public", resource: "billing", action: "read-plans" },
   { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" },
@@ -1865,6 +1877,8 @@ export interface ApiOptions {
   readonly investigations?: DigJoinPort;
   /** W3-2: whether a person's month has room again after a month pause (the ask room's `monthHasRoom`). */
   readonly monthRoom?: MonthRoomReader;
+  /** R22 W3-8: after Continue, the paused debate's work item is handed to its runner again (./month-pause.ts). */
+  readonly continuedRunWake?: ContinuedRunWake;
   readonly accountErasure?: AccountErasureApplication;
   readonly dataExport?: DataExportApplication;
   readonly legacyRunClaim?: LegacyRunClaimApplication;
@@ -3397,7 +3411,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   };
   // W3-2: a dig's admission (./dig-admission.ts) before anything is charged; null when the ask may go on. Another
   // account's parent is the closed 404; a parent at the deepest level 409 DIG_TOO_DEEP; picks the page never sends
-  // (more than Free combines, or from more than one path) the plain 400.
+  // (more than Free combines, or from more than one path) a 400 with its own code (W3-8: DIG_FREE_PICKS_MAX, DIG_PICKS_ONE_PATH).
   const digRefusal = async (request: Readonly<{ session: Session; authenticatedSession?: AuthenticatedSession }>,
     reply: FastifyReply, parent: AskParent, settings: Pick<AskRequest, "plan_tier" | "composition_budget_tier" | "depth_params">
   ): Promise<FastifyReply | null> => {
@@ -3415,7 +3429,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       case "NOT_FOUND": return reply.status(404).send({ error: "RUN_NOT_FOUND" });
       case "TOO_DEEP":
         return reply.status(409).send(DigTooDeepSchema.parse({ error: DIG_TOO_DEEP, message: DIG_TOO_DEEP, level_max: DIG_LEVEL_MAX }));
-      case "MALFORMED": return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      // W3-8: each of the two refusals the page never sends has its own code, so the page can say which one it was.
+      case "MALFORMED": return admission.reason === "FREE_PICKS_OVER"
+        ? reply.status(400).send(DigFreePicksMaxSchema.parse({ error: DIG_FREE_PICKS_MAX, message: DIG_FREE_PICKS_MAX, picks_max: FREE_DIG_PICKS_MAX }))
+        : reply.status(400).send(DigPicksOnePathSchema.parse({ error: DIG_PICKS_ONE_PATH, message: DIG_PICKS_ONE_PATH }));
       default: return exhaustive(admission);
     }
   };
@@ -4663,6 +4680,25 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       // Either debate is not the caller's: one closed answer, whichever it was.
       case "NOT_OWNED": return reply.status(404).send({ error: "RUN_NOT_FOUND" });
       case "CONFLICT": return reply.status(409).send({ error: "DIG_LINK_CONFLICT", message: "DIG_LINK_CONFLICT" });
+      default: return exhaustive(outcome);
+    }
+  });
+  // R22 W3-8 (the money rule): Continue on a debate paused at the month wall (./month-pause.ts): another account's debate
+  // is the closed 404, a press before the reset 409 RUN_PAUSED_UNTIL_RESET (nothing changed), a second press CONTINUING.
+  api.post<{ Params: { id: string } }>("/v1/runs/:id/continue", credentialRoutePolicy("POST /v1/runs/{id}/continue"), async (request, reply) => {
+    const target = memoryRunOf(request);
+    if (target === null || options.digModel === undefined) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    if (!RunContinueRequestSchema.safeParse(request.body ?? {}).success) {
+      return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    }
+    const room = options.monthRoom ?? Object.freeze({ monthHasRoom: async () => false });
+    const outcome = await continuePausedRun({ ...target, now: new Date() }, options.digModel, room, options.continuedRunWake);
+    switch (outcome.kind) {
+      case "CONTINUING": return reply.send(RunContinuedSchema.parse({ state: "CONTINUING" }));
+      case "NOT_FOUND": return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      case "NOT_PAUSED": return reply.status(409).send({ error: "RUN_NOT_PAUSED", message: "RUN_NOT_PAUSED" });
+      case "UNTIL_RESET": return reply.status(409).send(RunContinueRefusedSchema.parse({
+        error: RUN_PAUSED_UNTIL_RESET, message: RUN_PAUSED_UNTIL_RESET, until: outcome.until }));
       default: return exhaustive(outcome);
     }
   });

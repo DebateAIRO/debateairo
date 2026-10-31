@@ -232,8 +232,10 @@ describe("the month pause, from the runner's record to the person's Continue", (
       .toBe("NOT_FOUND");
     expect(await continuePausedRun({ ownerRef: person.ownerRef, runId: debate, now: new Date(resumableAt.getTime() + 1) }, apiSide, room))
       .toEqual({ kind: "CONTINUING" });
+    // W3-8: a second press is idempotent (CONTINUING again, nothing recorded again).
     expect((await continuePausedRun({ ownerRef: person.ownerRef, runId: debate, now: new Date(resumableAt.getTime() + 1) }, apiSide, room)).kind)
-      .toBe("NOT_PAUSED");
+      .toBe("CONTINUING");
+    expect((await apiSide.readPause(person.ownerRef, debate))?.state).toBe("RESUMED");
     // The runner's next admission of the debate reads the pause from the database: it is over, so the call goes on.
     const admitted: string[] = [];
     await new MonthPause({ store: runnerSide }).admit(debate, "call", async () => { admitted.push("call"); });

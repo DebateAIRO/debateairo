@@ -335,6 +335,26 @@ export const DigTooDeepSchema = z.object({
 }).strict();
 export type DigTooDeep = z.infer<typeof DigTooDeepSchema>;
 
+/**
+ * R22 W3-8: the 400 body of a dig whose places and picks are not all on ONE path of the parent's map (owner Q-D1): a dig
+ * only combines picks from the same path. Nothing was started and nothing charged.
+ */
+export const DIG_PICKS_ONE_PATH = "DIG_PICKS_ONE_PATH" as const;
+export const DigPicksOnePathSchema = z.object({
+  error: z.literal(DIG_PICKS_ONE_PATH),
+  message: z.literal(DIG_PICKS_ONE_PATH)
+}).strict();
+export type DigPicksOnePath = z.infer<typeof DigPicksOnePathSchema>;
+
+/** R22 W3-8: the 400 body of a Free dig combining more than FREE_DIG_PICKS_MAX picks (owner Q19): nothing started or charged. */
+export const DIG_FREE_PICKS_MAX = "DIG_FREE_PICKS_MAX" as const;
+export const DigFreePicksMaxSchema = z.object({
+  error: z.literal(DIG_FREE_PICKS_MAX),
+  message: z.literal(DIG_FREE_PICKS_MAX),
+  picks_max: z.literal(FREE_DIG_PICKS_MAX)
+}).strict();
+export type DigFreePicksMax = z.infer<typeof DigFreePicksMaxSchema>;
+
 /** Runaway guards for the rewrite's texts (about 5-10 times what the writer is asked for), as STORY_RUNAWAY_LIMITS are. */
 export const DIG_MODEL_LIMITS = Object.freeze({
   lineMaxChars: STORY_RUNAWAY_LIMITS.positionLineMaxChars,
@@ -588,3 +608,4 @@ export const RunContinueRefusedSchema = z.object({
   message: z.literal(RUN_PAUSED_UNTIL_RESET),
   until: z.iso.datetime()
 }).strict();
+export type RunContinueRefused = z.infer<typeof RunContinueRefusedSchema>;
