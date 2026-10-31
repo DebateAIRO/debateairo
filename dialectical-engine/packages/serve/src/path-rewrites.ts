@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import {
-  AnswerDigSchema, AnswerPathRewritesSchema, PathRewriteSchema, PathRewritesSchema, StoryBodySchema, WEB_CONTRACT_LIMITS,
-  trustOfPoint, type AnswerDig, type AnswerPathRewrites, type PathRewrite, type PathRewrites, type RewritePointTrust,
+  AnswerDigSchema, AnswerPathRewritesSchema, DigSuggestionSchema, PathRewriteSchema, PathRewritesSchema, StoryBodySchema, WEB_CONTRACT_LIMITS,
+  trustOfPoint, type AnswerDig, type AnswerPathRewrites, type DigSuggestion, type PathRewrite, type PathRewrites, type RewritePointTrust,
   type TrustRulePoint
 } from "@debateai/contract";
 import type { DigPickAuthor, DigPickKind, PathRewriteEntry } from "@debateai/db";
@@ -121,6 +121,22 @@ function storedText(value: unknown): StoredPathRewriteText | null {
   if (digPaths.some((path) => path === null)) return null;
   return { text: { line, summary, fate }, what_changed: value.what_changed, view_reason: value.view_reason,
     dig_paths: digPaths as StoredPathRewriteText["dig_paths"], rests_on: restsOn };
+}
+
+/**
+ * W4-3: the suggestions a dig's own sealed rewrite offers for one of its paths (the contract's shape, checked one by one;
+ * one that does not parse is left out). None on a text sealed before W4-3, on Free, or at level 10.
+ */
+export function digSuggestionsOf(opened: unknown, positionRef: string): readonly DigSuggestion[] {
+  if (!isRecord(opened) || !Array.isArray(opened.dig_suggestions)) return [];
+  const wanted = lower(positionRef);
+  return opened.dig_suggestions.flatMap((entry: unknown) => {
+    if (!isRecord(entry) || typeof entry.position_ref !== "string" || lower(entry.position_ref) !== wanted || !Array.isArray(entry.suggestions)) return [];
+    return entry.suggestions.flatMap((suggestion: unknown) => {
+      const parsed = DigSuggestionSchema.safeParse(suggestion);
+      return parsed.success ? [parsed.data] : [];
+    });
+  });
 }
 
 /** W4-8: the ids a sealed text rests on: none when it was sealed before W4-8; null when the value is no list of ids. */

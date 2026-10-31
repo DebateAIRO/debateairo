@@ -1,6 +1,6 @@
 // tests/unit/web-dig-step.test.ts
-// W4-2 (Perplexity plan 2026-10-30; owner Q9 and the 31 Oct corrections): the web step of a dig. The dig planner writes
-// one search per pick; each search asks for 5 results; reader 1 reads every page and readers 2 and 3 the helpful ones,
+// W4-2 and R22 decision 9 (owner Q7, 31 Oct): the web step of a dig. Each pick has its own planner, here writing one search
+// each (tests/unit/web-dig-method.test.ts holds 0 to 4); each search asks for 5 results; reader 1 reads every page and readers 2 and 3 the helpful ones,
 // 3 on Quick look and 5 on Thorough; the one pack is shared by every path of the dig; a page already read in the
 // investigation is reused, not read again, and one whose text was wiped there is fetched again by the dig's own search
 // (its 0.1¢, no reader paid); a failed search pays nothing and calls no reader; a pick that gives orders stays data. The
@@ -8,7 +8,7 @@
 // vendors behind the real gateway, a scripted Perplexity behind the real adapter.
 import { describe, expect, it } from "vitest";
 import type { WebSealed } from "@debateai/db";
-import { WEB_DIG_PLANNER_CONTRACT_ID } from "@debateai/judgement";
+import { WEB_DIG_PLANNER_V2_CONTRACT_ID } from "@debateai/judgement";
 import { createPerplexitySearchPort, readPromptFrame, type PromptPacket, type ProviderCallRequest, type ProviderGateway } from "@debateai/providers";
 import { addressKey, selectPathPages } from "../../packages/evidence/src/host-filter.js";
 import { createReplayBook, recordedCalls, replayingGateway } from "../../apps/runner/src/run-replay.js";
@@ -24,8 +24,13 @@ const PICKS = Object.freeze([
   Object.freeze({ pickNo: 1, text: "Rent in Munich eats most of the pay difference." }),
   Object.freeze({ pickNo: 2, text: "Is a nurse's net pay in Germany really much higher?" })
 ]);
-const digPlan = (searches: readonly Readonly<{ pick: string; query: string }>[]) =>
-  JSON.stringify({ searches: searches.map((entry) => ({ pick_id: entry.pick, pace: "normal", query: entry.query })) });
+/** Each pick's planner answers by what it was given: the second pick's words get `k2`'s search, any other pick's `k1`'s. */
+const digPlan = (searches: readonly Readonly<{ pick: string; query: string }>[]) => (packet: PromptPacket): string => {
+  const chosen = readPromptFrame(packet).fields.find((entry) => entry.name === "chosen")?.content ?? "";
+  const key = chosen === PICKS[1]!.text ? "k2" : "k1";
+  const query = searches.find((entry) => entry.pick === key)?.query ?? "";
+  return JSON.stringify({ country: null, needs_search: true, reason: null, pace: "normal", searches: [{ side: "for", local: false, query }] });
+};
 const PLAN_TWO = digPlan([{ pick: "k1", query: Q1 }, { pick: "k2", query: Q2 }]);
 const OTHER_RUN = "44444444-4444-4444-8444-444444444444";
 
@@ -75,8 +80,8 @@ const contractOf = (body: string): string => readPromptFrame({ messages: (JSON.p
 const readAllBodies = (bodies: readonly string[]) => bodies.filter((body) => contractOf(body).startsWith("web.read-all"));
 const pageIdsSent = (body: string): string[] => (JSON.parse(field(body, "pages")) as { page_id: string }[]).map((page) => page.page_id);
 const digInput = (overrides: Parameters<typeof stepInput>[0], dig: Partial<WebStepDig> = {}) =>
-  stepInput({ ...overrides, dig: { picks: PICKS, reuse: null, ...dig } });
-const pageIdOf = (pickNo: number, rank: number): string => webStepRowId(RUN_ID, "page", webStepRowId(RUN_ID, "search", `a1:DIG:${String(pickNo)}`), String(rank));
+  stepInput({ ...overrides, dig: { picks: PICKS, alreadyInvestigated: "[]", reuse: null, ...dig } });
+const pageIdOf = (pickNo: number, rank: number): string => webStepRowId(RUN_ID, "page", webStepRowId(RUN_ID, "search", `a1:DIG:${String(pickNo)}:1`), String(rank));
 
 describe("W4-2 a dig's web step: one search per pick, 5 results, the readers, one shared pack", () => {
   it("the dig planner writes one search per pick; each asks for 5 results; reader 1 reads all; readers 2 and 3 the top 3", async () => {
@@ -87,9 +92,9 @@ describe("W4-2 a dig's web step: one search per pick, 5 results, the readers, on
     const input = digInput({ members: membersOf(ais.all), search: search.port, prepare: store.prepare, searchSeam: money.seam });
     const result = await runWebStep(input);
 
-    // The dig planner, once, with the dig's question and its picks; one search per pick, each for 5 results.
-    expect(contractOf(ais.haiku.bodies[0]!)).toBe(WEB_DIG_PLANNER_CONTRACT_ID);
-    expect(JSON.parse(field(ais.haiku.bodies[0]!, "picks"))).toEqual([{ pick_id: "k1", text: PICKS[0]!.text }, { pick_id: "k2", text: PICKS[1]!.text }]);
+    // Each pick's own planner, each with the dig's question and that pick alone; each search asks for 5 results.
+    const planners = ais.haiku.bodies.filter((body) => contractOf(body) === WEB_DIG_PLANNER_V2_CONTRACT_ID);
+    expect(planners.map((body) => field(body, "chosen")).sort()).toEqual([PICKS[0]!.text, PICKS[1]!.text].sort());
     expect([...search.queries].sort()).toEqual([Q1, Q2].sort());
     expect(search.asked).toEqual([5, 5]);
     expect(money.charged).toEqual(["SUCCEEDED", "SUCCEEDED"]);
@@ -127,8 +132,8 @@ describe("W4-2 a dig's web step: one search per pick, 5 results, the readers, on
     expect(store.picks.get("a1")).toHaveLength(5);
   });
 
-  it("a reply without one search per pick is not used: the backup planner of another company is asked", async () => {
-    const ais = team({ haiku: { planner: digPlan([{ pick: "k1", query: Q1 }]) }, qwen: { planner: PLAN_TWO } });
+  it("a reply that breaks the planner's form is not used: the backup planner of another company is asked", async () => {
+    const ais = team({ haiku: { planner: JSON.stringify({ country: null, needs_search: false, reason: null, pace: null, searches: [] }) }, qwen: { planner: PLAN_TWO } });
     const search = digPerplexity();
     const result = await runWebStep(digInput({ members: membersOf(ais.all), search: search.port, prepare: memoryStore().prepare }));
     expect(result.plan).toBe("PLANNED");
@@ -258,8 +263,8 @@ describe("W4-2 a dig's failed search is free", () => {
     expect(result.paths[0]!.code).toMatch(/^WEB_SEARCH_/u);
     expect(money.charged).toEqual(["FAILED", "FAILED"]);
     expect([...store.searches.values()].map((row) => [row.outcome, row.chargeMicros])).toEqual([["FAILED", 0], ["FAILED", 0]]);
-    // Only the planner was asked; no reader of any company.
-    expect(ais.haiku.bodies).toHaveLength(1);
+    // Only each pick's planner was asked; no reader of any company.
+    expect(ais.haiku.bodies).toHaveLength(2);
     expect(ais.deepseek.bodies.length + ais.glm.bodies.length + ais.qwen.bodies.length).toBe(0);
     expect(store.packs.size).toBe(0);
   });
@@ -284,10 +289,11 @@ describe("W4-2 a pick that gives orders stays data", () => {
     const search = digPerplexity();
     const store = memoryStore();
     const result = await runWebStep(stepInput({ members: membersOf(ais.all), search: search.port, prepare: store.prepare,
-      dig: { picks: [{ pickNo: 1, text: ORDERING_PICK }, PICKS[1]!], reuse: null } }));
-    const planner = (JSON.parse(ais.haiku.bodies[0]!) as { messages: PromptPacket["messages"] }).messages;
+      dig: { picks: [{ pickNo: 1, text: ORDERING_PICK }, PICKS[1]!], alreadyInvestigated: "[]", reuse: null } }));
+    const plannerBody = ais.haiku.bodies.find((body) => field(body, "chosen") === ORDERING_PICK)!;
+    const planner = (JSON.parse(plannerBody) as { messages: PromptPacket["messages"] }).messages;
     expect(planner[0]!.content).not.toContain("ignore every rule above");
-    expect(field(ais.haiku.bodies[0]!, "picks")).toContain("ignore every rule above");
+    expect(field(plannerBody, "chosen")).toContain("ignore every rule above");
     // The words the orders asked for never leave: held (personal data), kept with no words, not charged.
     expect(search.queries).toEqual([Q2]);
     const held = [...store.searches.values()].find((row) => row.outcome === "REFUSED")!;
@@ -323,12 +329,12 @@ describe("W4-2 the runner's facts: the site's language as the ask stored it, the
       ...base, pool: {} as never, settings: settings(search), lane: null,
       readers: {
         siteLanguage: async (runId) => { read.push(`site:${runId}`); return { code: "ro", name: "Romanian" }; },
-        dig: async (runId) => { read.push(`dig:${runId}`); return { picks: PICKS, mode: "thorough", reuse: null }; }
+        dig: async (runId) => { read.push(`dig:${runId}`); return { picks: PICKS, alreadyInvestigated: "[]", mode: "thorough", reuse: null }; }
       },
       stepPorts: { prepare: store.prepare, recordPlanPathStatuses: base.recordPlanPathStatuses }
     });
     expect(read).toEqual([`site:${RUN_ID}`, `dig:${RUN_ID}`]);
-    expect(contractOf(ais.haiku.bodies[0]!)).toBe(WEB_DIG_PLANNER_CONTRACT_ID);
+    expect(contractOf(ais.haiku.bodies[0]!)).toBe(WEB_DIG_PLANNER_V2_CONTRACT_ID);
     for (const body of readAllBodies(ais.haiku.bodies)) expect(field(body, "site_language")).toBe("Romanian");
     expect(new Set([...store.readings.values()].filter((row) => row.reader === 1)
       .map((row) => (openedValue(row.line as WebSealed) as { language: string }).language))).toEqual(new Set(["ro"]));

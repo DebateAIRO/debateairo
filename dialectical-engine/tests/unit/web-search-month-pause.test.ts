@@ -49,8 +49,9 @@ function monthSeam(walled: () => boolean) {
   return { seam, charged, admitted: () => admitted, released: () => released };
 }
 
-const DIG = Object.freeze({ picks: [{ pickNo: 1, text: "Rent in Munich eats most of the pay difference." }], reuse: null });
-const DIG_PLAN = JSON.stringify({ searches: [{ pick_id: "k1", pace: "normal", query: "Munich one-bedroom rent average report" }] });
+const DIG = Object.freeze({ alreadyInvestigated: "[]", picks: [{ pickNo: 1, text: "Rent in Munich eats most of the pay difference." }], reuse: null });
+const DIG_PLAN = JSON.stringify({ country: null, needs_search: true, reason: null, pace: "normal",
+  searches: [{ side: "for", local: false, query: "Munich one-bedroom rent average report" }] });
 
 describe("W4-2 the month pause reaches the web step's searches", () => {
   for (const scene of ["a first debate", "a dig"] as const) {

@@ -49,7 +49,7 @@ export type Vendor = Readonly<{
   name: string; gateway: ProviderGateway; bodies: string[]; prompts: CallPromptRecordInput[]; ledger: ProviderLedgerInput[];
   artifacts: RawArtifactInput[]; requests: ProviderCallRequest[]; record: () => string;
 }>;
-export type Behaviour = Readonly<{ planner?: string; garbled?: boolean; delayMs?: number; inFlight?: { now: number; most: number } }>;
+export type Behaviour = Readonly<{ planner?: string | ((packet: PromptPacket) => string); garbled?: boolean; delayMs?: number; inFlight?: { now: number; most: number } }>;
 
 const opening = (text: string): string => text.slice(0, text.indexOf(".") + 1);
 function fieldOf(packet: PromptPacket, name: string): string {
@@ -66,7 +66,7 @@ export function vendor(name: string, model: string, maker: string, behaviour: Be
   const answer = (packet: PromptPacket): string => {
     if (behaviour.garbled === true) return "{{ not a reply at all";
     const contractId = readPromptFrame(packet).contractId;
-    if (contractId.startsWith("web.plan")) return behaviour.planner ?? PLAN_BOTH;
+    if (contractId.startsWith("web.plan")) return typeof behaviour.planner === "function" ? behaviour.planner(packet) : behaviour.planner ?? PLAN_BOTH;
     const pages = JSON.parse(fieldOf(packet, "pages")) as Array<{ page_id: string; text?: string }>;
     if (contractId.startsWith("web.read-all")) {
       return JSON.stringify({ pages: pages.map((page) => ({ page_id: page.page_id, grade: 2, adds: "It counts ferry riders.",

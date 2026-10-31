@@ -88,6 +88,8 @@ export function previewThinkingStepOf(request: Readonly<{ callSiteKey: string; l
   // are packages/register PATH_REWRITE_THINKING's).
   const rewriteSite = /^PATH_REWRITE:(WRITER|CHECKER):[1-4]$/u.exec(request.callSiteKey);
   if (request.lane === "story" && rewriteSite !== null) return rewriteSite[1] === "WRITER" ? "path_rewrite_writer" : "path_rewrite_checker";
+  // W4-3: the suggestions on a dig's own paths are written by the rewrite's writer, right after it, at the same low level.
+  if (request.lane === "story" && /^PATH_REWRITE:SUGGEST:[0-9]{1,2}$/u.test(request.callSiteKey)) return "path_rewrite_writer";
   // W5-1: the final report over an investigation (packages/story INVESTIGATION_REPORT_CALL_SITE) runs at the owner's four
   // final steps: its answer at answer_writer / answer_checker, its story at story_writer / story_checker.
   const reportSite = /^INVESTIGATION_REPORT:(ANSWER|ANSWER_CHECK|STORY|STORY_CHECK):[1-4]$/u.exec(request.callSiteKey);
@@ -99,10 +101,10 @@ export function previewThinkingStepOf(request: Readonly<{ callSiteKey: string; l
   // MAP:choose; packages/map) build the debate's opening, so they run at the owner's `opening` level, the closest step.
   if (/^MAP:/u.test(request.callSiteKey)) return "opening";
   // Web search (W1-5): the web step's call sites (@debateai/judgement's web-prompts.ts builds them), a seat suffix allowed.
-  const webSite = /^WEB:(plan|read1:\d+:\d+|pick:\d+|read-top:\d+:[23])(?::seat:(?:main|runnerUp))?$/u.exec(request.callSiteKey);
+  const webSite = /^WEB:(plan(?::\d+)?|read1:\d+:\d+|pick:\d+|read-top:\d+:[23])(?::seat:(?:main|runnerUp))?$/u.exec(request.callSiteKey);
   if (webSite !== null) {
     const site = webSite[1]!;
-    return site === "plan" ? "web_planner" : site.startsWith("read1:") ? "web_reader" : site.startsWith("pick:") ? "web_pick" : "web_reader_top";
+    return site.startsWith("plan") ? "web_planner" : site.startsWith("read1:") ? "web_reader" : site.startsWith("pick:") ? "web_pick" : "web_reader_top";
   }
   const role = debateRoleFromCallSiteKey(request.callSiteKey);
   if (role === null) return null;

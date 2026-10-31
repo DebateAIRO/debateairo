@@ -4,6 +4,7 @@ import {
 } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import type { ProviderGateway } from "@debateai/providers";
+import { writeDigSuggestionsOnPool } from "./dig-suggestions-step.js";
 import { createPathRewriteInFlight, type PathRewriteRunnerSettings } from "./path-rewrite.js";
 import { postgresPathRewriteSources } from "./path-rewrite-sources.js";
 import type { PathRewriteSweepSettings } from "./path-rewrite-sweep.js";
@@ -52,7 +53,9 @@ export function composePathRewrite(input: Readonly<{
     checkerRoleRef,
     replayBookOf: (runId: string, workItemId: string) => readReplayBook(pool, runId, workItemId),
     log: input.log,
-    inFlight: createPathRewriteInFlight()
+    inFlight: createPathRewriteInFlight(),
+    // W4-3: the AI's suggestions on the dig's own paths, told what the whole debate already investigated.
+    suggest: writeDigSuggestionsOnPool(pool)
   });
   const members = Object.freeze([...input.members]);
   const picks = new PostgresDigPicksRunnerRepository(pool);

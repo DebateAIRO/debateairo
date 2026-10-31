@@ -169,8 +169,20 @@ export function pathRewriteCallSiteKey(site: PathRewriteSite, round: number): st
   return `PATH_REWRITE:${site}:${String(round)}`;
 }
 
+/**
+ * W4-3: the suggestion call on a dig's own path, `PATH_REWRITE:SUGGEST:{path}` (the writer's, right after the rewrite): the
+ * same lane, role, money and thinking as the writer's, so it is charged to the dig on the never-walled seam.
+ */
+export const PATH_REWRITE_SUGGEST_CALL_SITE = /^PATH_REWRITE:SUGGEST:[1-9][0-9]?$/u;
+
+export function pathRewriteSuggestCallSiteKey(path: number): string {
+  if (!Number.isInteger(path) || path < 1 || path > 99) throw new TypedDomainError("PATH_REWRITE_ROUND_INVALID", "A suggestion's path is 1 to 99");
+  return `PATH_REWRITE:SUGGEST:${String(path)}`;
+}
+
 /** The role a path-rewrite call site carries, or null for any other key. */
 export function pathRewriteCallSiteRole(callSiteKey: string): "SYNTHESIZER" | "EVALUATOR" | null {
+  if (PATH_REWRITE_SUGGEST_CALL_SITE.test(callSiteKey)) return "SYNTHESIZER";
   const site = PATH_REWRITE_CALL_SITE.exec(callSiteKey);
   return site === null ? null : PATH_REWRITE_SITE_ROLES[site[1] as PathRewriteSite];
 }

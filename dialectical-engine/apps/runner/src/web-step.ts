@@ -31,11 +31,12 @@
  * The step's ids (searches, pages, readings, extracts, packs) are worked out by code from the run's id and the frozen
  * plan, so a second copy of the run writes the same rows (ALREADY) instead of new ones.
  *
- * THE DIG (task W4-2; owner Q9, and the 31 Oct corrections: the person writes no search words): a dig is a short
- * follow-up debate on what the person picked on one path. Its web part:
- * - the dig planner writes ONE search per pick (`planDigWebSearches`, web.plan-dig.v1), from the pick's words and the
- *   dig's question, which names the path; code freezes them (`freezeDigQuerySet`: side `dig`, no for-and-against pair,
- *   W1-2's personal-data guard); Free and the off switch make no call, as for a first debate;
+ * THE DIG (R22 decision 9, which replaces W4-2's "one search per pick"; owner Q7, 31 Oct): a dig is a short follow-up debate on
+ * what the person picked on one path, and it works like a first debate. Its web part:
+ * - each pick has its own planner (`planDigWebSearches`, web.plan-dig.v2, all at once), told what the whole debate already
+ *   investigated (`alreadyInvestigated`, AI text only), which decides whether and what to search: none with its reason, or up
+ *   to 4, its local ones in the question's language and country when it judges that worth it; code freezes them
+ *   (`freezeDigQuerySet`: side `dig`, W1-2's guard); Free and the off switch make no call, as for a first debate;
  * - each search asks Perplexity for 5 results (mode DIG); reader 1 reads every page found, and readers 2 and 3 the
  *   helpful ones (grade 1 or more), up to 3 on Quick look and 5 on Thorough (the dig's own mode);
  * - all of the dig's searches are one group kept under the dig's first path, and its one pack is shared by every path of
@@ -43,7 +44,7 @@
  * - a page already read in the investigation is reused, never read again (web-reuse.ts): its readings are carried, its
  *   text kept from the investigation, or, once wiped there, the one this dig's search just brought back (the fetch
  *   again, for that search's 0.1¢);
- * - a dig whose search fails pays nothing for it, and no reader is called for it.
+ * - a search that fails pays nothing for it, and no reader is called for it.
  * THE MONTH PAUSE (W3-8's money rule, wired here): a search refused at the month wall records the pause and stops this
  * copy (RUN_MONTH_PAUSED), for first debates and digs alike; the search is not stored, so the copy that resumes after
  * Continue sends it, and every stored search and replayed reader is never paid twice.
@@ -69,6 +70,7 @@ import type { WebSearchCostSeam } from "@debateai/budget";
 import type { PlanId } from "@debateai/register";
 import { laneSearchPort } from "./call-lane-gateway.js";
 import type { CallScheduler, CallSubject, DebateCallLane } from "./call-scheduler.js";
+import { readAlreadyInvestigated } from "./investigation-digest.js";
 import { isMonthPausedStop } from "./month-pause.js";
 import { runWebPageTextDigest, storedWebPageTextsSentForm, type WebPageTextDigestKey } from "./web-page-text-gateway.js";
 import {
@@ -158,10 +160,11 @@ export type WebStepInput = Readonly<{
 }>;
 
 /**
- * A dig's web input (W4-2): its picks in order (0135: a suggestion, the person's edit of one, or their own view; `text` is
- * the words as sealed there), and where its investigation's read pages are found (null: nothing to reuse).
+ * A dig's web input (W4-2, R22 decision 9): its picks in order (0135: a suggestion, the person's edit of one, or their own
+ * view; `text` is the words as sealed there), what the whole debate already investigated (investigation-digest.ts: AI text
+ * only, never a passage), and where its investigation's read pages are found (null: nothing to reuse).
  */
-export type WebStepDig = Readonly<{ picks: readonly WebDigPlannerInputPick[]; reuse: WebReuseSource | null }>;
+export type WebStepDig = Readonly<{ picks: readonly WebDigPlannerInputPick[]; alreadyInvestigated: string; reuse: WebReuseSource | null }>;
 
 /** A path's web status, the contract's words (WEB_SEARCH_STATUSES). */
 export type WebStepPathStatus = "SEARCHED" | "NO_SEARCH_PLANNED" | "FAILED" | "NOT_ON_PLAN" | "SWITCHED_OFF";
@@ -273,7 +276,7 @@ function aboutOf(value: unknown): Readonly<{ url: string; site: string; title: s
 
 /* ----------------------------------------------------------------- the step */
 
-/** One search as the step sends and stores it: a debate's (for or against, English or local) or a dig's (one per pick). */
+/** One search as the step sends and stores it: a debate's (for or against, English or local) or a dig's (side `dig`). */
 type StepSearch = Readonly<{
   /** The frozen set's id, which the row id is worked out from. */
   key: string;
@@ -288,8 +291,8 @@ type StepSearch = Readonly<{
 }>;
 
 /**
- * One group of searches read together into one pack: a path of a first debate (its own searches), or a whole dig (one
- * search per pick, kept under the dig's first path, its pack shared by every path of the dig).
+ * One group of searches read together into one pack: a path of a first debate (its own searches), or a whole dig (every
+ * pick's searches, kept under the dig's first path, its pack shared by every path of the dig).
  */
 type StepGroup = Readonly<{
   pathRef: string;
@@ -350,28 +353,34 @@ export function webDigAnswer(picks: readonly WebDigPlannerInputPick[]): string {
 }
 
 /**
- * A dig (W4-2): the dig planner, one search per pick, all of them one group kept under the dig's first path, whose pack
+ * A dig (R22 decision 9): every pick's planner, all their searches one group kept under the dig's first path, whose pack
  * every path of the dig shares. Each path's decision: the first PLANNED with the dig's searches, the others PLANNED with
- * none of their own.
+ * none of their own; with no search planned at all, every path NO_SEARCH_PLANNED, saying the first pick's reason.
  */
 async function planDig(input: WebStepInput, dig: WebStepDig, keepRoom: Readonly<{ keepRoomMicros?: number }>): Promise<StepPlan> {
   const pathRefs = input.paths.map((path) => path.pathRef);
   const home = pathRefs[0]!;
   const plan = await planDigWebSearches({
     planId: input.planId ?? "FREE", webSwitchedOn: input.webSwitchedOn, mode: input.mode, runId: input.runId,
-    subjectItemId: input.subjectItemId, question: input.question, questionLanguage: input.questionLanguage, asOf: input.asOf,
-    picks: dig.picks, homePathId: home, seats: webPlannerSeats(input.members), contractHash: input.contractHash, bound: input.bound,
+    subjectItemId: input.subjectItemId, question: input.question, questionLanguage: input.questionLanguage,
+    placeCountry: input.placeCountry, asOf: input.asOf, picks: dig.picks, homePathId: home, alreadyInvestigated: dig.alreadyInvestigated,
+    seats: webPlannerSeats(input.members), contractHash: input.contractHash, bound: input.bound,
     ...keepRoom, abandon: stopperOf(input), ...(input.stopsHere === undefined ? {} : { stopsHere: input.stopsHere })
   });
   if (plan.kind !== "PLANNED") {
     return Object.freeze({ kind: plan.kind, failedCode: plan.kind === "FAILED" ? plan.code : null, groups: Object.freeze([]),
       statuses: Object.freeze(pathRefs.map((pathId) => Object.freeze({ pathId, status: plan.kind, reason: null, searchesToSend: 0 }))) });
   }
+  if (plan.querySet.searches.length === 0) {
+    const reason = plan.picks.find((pick) => pick.reason !== null)?.reason ?? null;
+    return Object.freeze({ kind: plan.kind, failedCode: null, groups: Object.freeze([]), statuses: Object.freeze(pathRefs.map((pathId) =>
+      Object.freeze({ pathId, status: "NO_SEARCH_PLANNED" as const, reason, searchesToSend: 0 }))) });
+  }
   const statuses = Object.freeze(pathRefs.map((pathId, index) => Object.freeze({ pathId, status: "PLANNED" as const, reason: null,
     searchesToSend: index === 0 ? plan.searchesToSend : 0 })));
   const searches = plan.querySet.searches.map((search): StepSearch => Object.freeze({
-    key: search.searchId, status: search.status, text: search.text, side: "dig", scope: "ENGLISH", language: search.language,
-    country: null, afterDate: search.afterDate, lookBack: LOOK_BACK[search.pace] }));
+    key: search.searchId, status: search.status, text: search.text, side: "dig", scope: search.scope, language: search.language,
+    country: search.country, afterDate: search.afterDate, lookBack: LOOK_BACK[search.pace] }));
   const group: StepGroup = Object.freeze({ pathRef: home, index: 0, answer: webDigAnswer(dig.picks), searches, searchMode: "DIG",
     reuse: dig.reuse, serves: Object.freeze([...pathRefs]) });
   return Object.freeze({ kind: plan.kind, failedCode: null, statuses, groups: Object.freeze([group]) });
@@ -428,7 +437,10 @@ export async function runWebStep(input: WebStepInput): Promise<WebStepResult> {
   }
   try {
     await keepDecision(ports.cipher);
-    if (plan.groups.length === 0) return result(statuses.map((entry) => bare(entry.pathId, "NO_SEARCH_PLANNED", null)));
+    if (plan.groups.length === 0) {
+      return result(statuses.map((entry) => bare(entry.pathId, "NO_SEARCH_PLANNED", null)), dig === null ? undefined
+        : Object.freeze({ picks: dig.picks.length, searchesSent: 0, reusedPageIds: Object.freeze([]), refetchedPageIds: Object.freeze([]) }));
+    }
     let stored: WebEvidenceRead | null;
     try {
       stored = await ports.store.read(input.runId);
@@ -837,12 +849,13 @@ export async function postgresWebStepPorts(pool: Pool, runId: string): Promise<W
  * - `siteLanguage`: the language the site was shown in when the person asked. The API keeps it in the run's stored ask
  *   (core.run's ask contract, sealed with the run's content: `question_language.site_language`, decider.ts), set for
  *   every shaped ask; null for an older or unshaped ask. When the client sent none, the API stored its own fallback, "en".
- * - `dig`: a dig's picks (0135, opened under the dig's key), its mode (0133's member row: Quick look or Thorough) and its
- *   investigation's read pages; null for a first debate (no pick set).
+ * - `dig`: a dig's picks (0135, opened under the dig's key), its mode (0133's member row: Quick look or Thorough), what its
+ *   investigation already investigated (investigation-digest.ts) and its read pages; null for a first debate (no pick set).
  */
 export type WebStepRunReaders = Readonly<{
   siteLanguage: (runId: string) => Promise<Readonly<{ code: string; name: string }> | null>;
-  dig: (runId: string) => Promise<Readonly<{ picks: readonly WebDigPlannerInputPick[]; mode: WebMode; reuse: WebReuseSource | null }> | null>;
+  dig: (runId: string) => Promise<Readonly<{ picks: readonly WebDigPlannerInputPick[]; alreadyInvestigated: string; mode: WebMode;
+    reuse: WebReuseSource | null }> | null>;
 }>;
 
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
@@ -870,6 +883,7 @@ export function postgresWebStepRunReaders(pool: Pool): WebStepRunReaders {
       const member = investigation?.members.find((entry) => entry.run_id.toLowerCase() === runId.toLowerCase()) ?? null;
       return Object.freeze({
         picks: Object.freeze(picks.picks.map((pick) => Object.freeze({ pickNo: pick.pickNo, text: pick.text }))),
+        alreadyInvestigated: await readAlreadyInvestigated(pool, runId, member?.joined_at ?? null),
         mode: member?.mode ?? "quick",
         reuse: postgresWebReuseSource(pool, runId)
       });
@@ -923,7 +937,7 @@ export async function runRunnerWebStep(input: Omit<WebStepInput, "planId" | "web
       const digged = await read.dig(rest.runId);
       if (digged !== null) {
         mode = digged.mode;
-        dig = Object.freeze({ picks: digged.picks, reuse: digged.reuse });
+        dig = Object.freeze({ picks: digged.picks, alreadyInvestigated: digged.alreadyInvestigated, reuse: digged.reuse });
       }
     } catch (error) {
       if (stops(error)) throw error;

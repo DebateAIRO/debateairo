@@ -8,6 +8,7 @@ import {
   PATH_REWRITE_CHECKER_PROSE, PATH_REWRITE_PROSE, pathRewriteFailureCode, writePathRewrite, type PathRewriteDraft,
   type PathRewriteWritten, type StoryNodeEnrichment, type StoryRoleMaker, type StoryWriteInput
 } from "@debateai/story";
+import type { DigPathSuggestions, DigSuggestionsJob } from "./dig-suggestions-step.js";
 import { engineContractHash } from "./engine-contracts.js";
 import {
   buildPathRewriteMaterial, pathRewriteDigPathsOf, pathRewriteGuard, type PathRewriteDigPath, type PathRewriteExtract,
@@ -30,7 +31,8 @@ import { replayingGateway, type ReplayBook } from "./run-replay.js";
  *     row: when every writer failed, or the parent path or the dig's own material could not be read, the row is FAILED
  *     and the path keeps its text; otherwise later digs of the path would wait for ever. A turn whose store cannot be read
  *     or written at all is left to the sweep (path-rewrite-sweep.ts, W3-7), which writes it once the store answers.
- *  5. then W4-3's suggestions for the dig's own paths are asked for (the `afterRewrite` hook; none at level 10).
+ *  5. W4-3: between a written rewrite and its row, the AI's suggestions for the dig's own paths (`suggest`; none on Free, none
+ *     at level 10), sealed with the row; then the `afterRewrite` hook.
  *
  * W3-7: before it takes its turn, the dig's own paths are stored (0135's identity.path_rewrite_input, `recordInput`), so
  * a rewrite whose runner stopped is built again by the sweep from the store alone, byte for byte, its answered calls
@@ -119,6 +121,8 @@ export type PathRewriteContent = Readonly<{
    * points and these. A rewrite sealed before W4-8 has none, and reads as resting on none.
    */
   rests_on: readonly string[];
+  /** W4-3: what the AI offers to dig into on each of the dig's own paths; a text sealed before it, or on Free, has none. */
+  dig_suggestions?: readonly DigPathSuggestions[];
 }>;
 
 /** What W4-3's hook is handed once the row is stored. */
@@ -146,10 +150,14 @@ export type PathRewriteRunnerSettings = Readonly<{
   contractHash?: string;
   log?: (event: string, detail: Record<string, unknown>) => void;
   /**
-   * W4-3's hook (not built here): asked once the dig's row is stored and the dig is above level 10, so the suggestions
-   * for the dig's own paths start. None at level 10 (DIG_LEVEL_MAX): a dig there cannot be dug further.
+   * Asked once the dig's row is stored and the dig is above level 10 (DIG_LEVEL_MAX): a dig there cannot be dug further.
    */
   afterRewrite?: (settled: PathRewriteSettled) => Promise<void> | void;
+  /**
+   * W4-3 (dig-suggestions-step.ts): the AI's suggestions for the dig's own paths, once its rewrite is written and before its
+   * row is stored, so they are sealed with it, once, and a rewrite run again replays them free. It never rejects. Absent: none.
+   */
+  suggest?: (input: DigSuggestionsJob) => Promise<readonly DigPathSuggestions[]>;
 }>;
 
 const DEFAULT_WAIT = Object.freeze({ pollMs: 5_000, maxWaitMs: 10 * 60_000 });
@@ -372,7 +380,7 @@ export async function rewriteThePath(settings: PathRewriteRunnerSettings, job: P
   log("PATH_REWRITE_BASE_KEPT_MOVING", { runId: digRunId });
 }
 
-/** W4-3: the suggestions for the dig's own paths start here, once its row is stored; none at level 10. */
+/** The hook, once the dig's row is stored; not at level 10. */
 async function afterRewrite(settings: PathRewriteRunnerSettings, dig: PathRewriteDig, digRunId: string, record: PathRewriteRecord,
   digPaths: readonly PathRewriteDigPath[], log: Log): Promise<void> {
   if (settings.afterRewrite === undefined || dig.level >= DIG_LEVEL_MAX) return;
@@ -457,7 +465,14 @@ async function composeRecord(settings: PathRewriteRunnerSettings, compose: Compo
     return failed(pathRewriteFailureCode(outcome.failureCode), written);
   }
   const served = written.rounds.find((round) => round.round === outcome.servedRound)!;
-  const content = contentOf(outcome.body, built.pointIds, built.digPathRefs);
+  const suggestions = settings.suggest === undefined ? [] : await settings.suggest(Object.freeze({
+    digRunId, workItemId: job.workItemId, level: dig.level, free: dig.free, question: dig.question, digPaths: compose.digPaths,
+    whatChanged: Object.freeze(outcome.body.what_changed.map((sentence) => sentence.text)), writer, send, log
+  })).catch((error: unknown) => {
+    log("DIG_SUGGESTIONS_FAILED", { runId: digRunId, code: codeOf(error) });
+    return [];
+  });
+  const content = contentOf(outcome.body, built.pointIds, built.digPathRefs, suggestions);
   const sealed = await settings.seal(digRunId, rewriteId, content);
   return Object.freeze({
     rewriteId,
@@ -482,7 +497,8 @@ async function composeRecord(settings: PathRewriteRunnerSettings, compose: Compo
  * The draft as it is stored: refs gone (the dig's paths named by their real refs, the points the sentences rest on by
  * their real ids), the reason apart from its codes. Code kept only sentences whose every ref the material gives.
  */
-function contentOf(draft: PathRewriteDraft, pointIds: ReadonlyMap<string, string>, digPathRefs: ReadonlyMap<string, string>): PathRewriteContent {
+function contentOf(draft: PathRewriteDraft, pointIds: ReadonlyMap<string, string>, digPathRefs: ReadonlyMap<string, string>,
+  suggestions: readonly DigPathSuggestions[]): PathRewriteContent {
   const restsOn = [...new Set(draft.what_changed.flatMap((sentence) => sentence.rests_on.flatMap((name) => {
     const id = pointIds.get(name);
     return id === undefined ? [] : [id];
@@ -494,6 +510,7 @@ function contentOf(draft: PathRewriteDraft, pointIds: ReadonlyMap<string, string
     dig_paths: Object.freeze(draft.dig_paths.map((path) => Object.freeze({
       position_ref: digPathRefs.get(path.position_ref) ?? path.position_ref, line: path.line, fate: path.fate
     }))),
-    rests_on: Object.freeze(restsOn)
+    rests_on: Object.freeze(restsOn),
+    ...(suggestions.length === 0 ? {} : { dig_suggestions: suggestions })
   });
 }

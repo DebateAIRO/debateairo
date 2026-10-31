@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildApi, type AskApplication } from "@debateai/api";
 import type { AskParent } from "@debateai/contract";
 import {
+  digSuggestionTextFromAnswer,
   digAnchorOf, digPathIndexOf, digPickAuthorOf, recordDigPicksAtStart, type DigPicksPort
 } from "../../apps/api/src/dig-admission.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
@@ -148,5 +149,37 @@ describe("the asks route keeps the picks after the join", () => {
     expect(response.statusCode).toBe(202);
     expect(recorded).toEqual([]);
     await api.close();
+  });
+});
+
+describe("W4-3 a pick reads as an AI suggestion when it matches what the parent offered", () => {
+  const ANSWER = { web: { paths: [{ suggestions: [{ suggestion_id: "s-1", text: "Do nurses get housing help?" }] }] } };
+  const parent = (text: string, suggestionId: string | null = "s-1") => ({ parent_run_id: "p", places: [], mode: "quick" as const,
+    picks: [suggestionId === null ? { kind: "OWN_VIEW" as const, suggestion_id: null, place: "path:x", text }
+      : { kind: "HELPS_MAIN_QUESTION" as const, suggestion_id: suggestionId, place: "path:x", text }] });
+  async function authorOf(text: string, read: () => Promise<unknown>, suggestionId: string | null = "s-1") {
+    const written: { author: string }[] = [];
+    const outcome = await recordDigPicksAtStart({ ownerRef: "o", parent: parent(text, suggestionId) as never, childRunId: "c", positionRef: "x" },
+      { record: async (input) => { written.push(...input.picks); return "RECORDED"; } },
+      digSuggestionTextFromAnswer(read as never), () => undefined);
+    return { outcome, author: written[0]?.author };
+  }
+
+  it("the same words: AI_SUGGESTION; other words: PERSON_EDITED; the person's own view stays theirs", async () => {
+    expect((await authorOf(" Do nurses get housing help? ", async () => ANSWER)).author).toBe("AI_SUGGESTION");
+    expect((await authorOf("Do nurses get free housing?", async () => ANSWER)).author).toBe("PERSON_EDITED");
+    expect((await authorOf("Rent is the problem", async () => ANSWER, null)).author).toBe("PERSON_OWN_VIEW");
+  });
+  it("an id the parent does not offer, an answer that does not read: PERSON_EDITED, and the picks are still kept", async () => {
+    expect((await authorOf("Do nurses get housing help?", async () => ANSWER, "s-9")).author).toBe("PERSON_EDITED");
+    const failing = await authorOf("Do nurses get housing help?", async () => { throw new Error("down"); });
+    expect([failing.author, failing.outcome]).toEqual(["PERSON_EDITED", "RECORDED"]);
+  });
+  it("the answer is read once for a dig, however many picks", async () => {
+    let reads = 0;
+    const reader = digSuggestionTextFromAnswer(async () => { reads += 1; return ANSWER as never; });
+    await reader("o", "p", "s-1");
+    await reader("o", "p", "s-2");
+    expect(reads).toBe(1);
   });
 });

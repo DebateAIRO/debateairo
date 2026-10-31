@@ -65,7 +65,7 @@ function ledger(charges: readonly Charge[], batched = true) {
   return spend;
 }
 
-function roomWith(input: Readonly<{ plan: PlanId; charges: readonly Charge[]; now: Date; holds?: number; windows?: (now: Date) => ReadonlyArray<PersonWindow> }>) {
+function roomWith(input: Readonly<{ plan: PlanId; charges: readonly Charge[]; now: Date; holds?: number; digWebPart?: (web: Readonly<{ depth: string; digPicks: number }>) => number | null; windows?: (now: Date) => ReadonlyArray<PersonWindow> }>) {
   const spend = { ...ledger(input.charges), readOwnerCountedHoldsMicros: async () => input.holds ?? 0 };
   const windows = input.windows ?? ((now: Date) => windowsOf(input.plan, now));
   return new AskRoom({
@@ -76,7 +76,7 @@ function roomWith(input: Readonly<{ plan: PlanId; charges: readonly Charge[]; no
       waitingForLegacyAsker: async () => [], readWaiting: async () => null, isWaiting: async () => false,
       enterWait: async () => undefined, recordReason: async () => undefined, markStarted: async () => undefined
     },
-    estimator: { estimateMicros: async () => 150_000 },
+    estimator: { estimateMicros: async () => 150_000, ...(input.digWebPart === undefined ? {} : { digWebPartMicros: input.digWebPart }) },
     personAllowance: { read: async (_owner, now) => windows(now) },
     entitlements: null,
     dailyCeilingMicros: 1_000_000_000,
@@ -141,6 +141,29 @@ describe("starts with no hold", () => {
     // 150 000 of a 1 000 000 day: 15%.
     expect(answer.startSharePercent).toBe(15);
     expect(answer.digSharePercent).toBeUndefined();
+  });
+
+  it("R22 decision 9: a dig's share counts its web part by its picks and mode, and holds nothing: the room is what it was", async () => {
+    const asked: unknown[] = [];
+    const room = roomWith({ plan: "PLUS", charges: [], now: at("2026-10-03T12:00:00.000Z"),
+      digWebPart: (web) => { asked.push(web); return web.digPicks * 100_000; } });
+    const one = await room.readRoom({ ...QUESTION, dig: { parentRunId: OWNER, mode: "quick", picks: 1 } });
+    const three = await room.readRoom({ ...QUESTION, dig: { parentRunId: OWNER, mode: "thorough", picks: 3 } });
+    // 150 000 + 100 000 of a 1 000 000 day: 25%; with three picks, 45%. More picks read as more of today.
+    expect([one.digSharePercent, three.digSharePercent]).toEqual([25, 45]);
+    expect(asked).toEqual([{ depth: "QUICK", digPicks: 1 }, { depth: "THOROUGH", digPicks: 3 }]);
+    expect(three).toMatchObject({ room: "FITS", reserve: "KEPT" });
+    // A dig of a page that names no count reads as one pick.
+    expect((await room.readRoom({ ...QUESTION, dig: { parentRunId: OWNER, mode: "quick", picks: null } })).digSharePercent).toBe(25);
+    // A question's own share never counts it.
+    expect((await room.readRoom(QUESTION)).startSharePercent).toBe(15);
+  });
+
+  it("a Free dig's share never counts a web part: Free never searches", async () => {
+    const asked: unknown[] = [];
+    const room = roomWith({ plan: "FREE", charges: [], now: at("2026-10-03T12:00:00.000Z"), digWebPart: (web) => { asked.push(web); return 100_000; } });
+    await room.readRoom({ ...QUESTION, settingsClass: { ...QUESTION.settingsClass, planTier: "free" }, dig: { parentRunId: OWNER, mode: "quick", picks: 3 } });
+    expect(asked).toEqual([]);
   });
 
   it("a dig's read gives the dig's share instead", async () => {
