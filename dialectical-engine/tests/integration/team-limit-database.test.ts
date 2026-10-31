@@ -54,7 +54,7 @@ async function storedProof(a: Actor, binding: Record<string, unknown>, event: st
   return { proofId, alert: { schema: "staff-alert-v1", event, operationId: binding.operationId, envelope: { v: 1, keyId: "fixture-key", nonce: "AAAAAAAAAAAAAAAA", tag: "AAAAAAAAAAAAAAAAAAAAAA==", ct: "YQ==" } } };
 }
 const state = async () => (await database.pool.query("SELECT coalesce(max(revision),0)::int AS revision, coalesce((SELECT amount_micros FROM staff.team_limit_event ORDER BY revision DESC LIMIT 1),0)::bigint AS amount FROM staff.team_limit_event")).rows[0] as { revision: number; amount: string };
-function limitBinding(a: Actor, amount: number, current: number, revision: number, operationId = randomUUID()) {
+function limitBinding(a: Actor, amount: number, current: number, revision: number, operationId: string = randomUUID()) {
   return canonicalTeamLimitActionBinding({ action: "TEAM_LIMIT_SET", amount_micros: amount, current_micros: current, expected_revision: revision, operation_id: operationId },
     a.staffId, { currentMicros: current, expectedRevision: revision }) as unknown as Record<string, unknown>;
 }

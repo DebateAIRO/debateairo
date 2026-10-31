@@ -663,14 +663,20 @@ BEGIN
     EXECUTE format('ALTER FUNCTION %s OWNER TO debateai_staff_security_owner',v_name);
     EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC,debateai_runtime,debateai_staff_recovery',v_name);
   END LOOP;
-  FOREACH v_name IN ARRAY ARRAY['staff.read_team_room(bigint)','staff.read_team_limit_command(jsonb,text)','staff.read_team_limit_page(jsonb,text)',
-    'staff.set_team_limit(jsonb,uuid,jsonb,jsonb,jsonb)','staff.record_team_practice(jsonb,uuid,jsonb,jsonb,jsonb)',
-    'staff.grant_team_limit_partner(jsonb,uuid,jsonb,uuid,uuid,jsonb,jsonb)','staff.revoke_team_limit_partner(jsonb,uuid,jsonb,uuid,uuid,jsonb,jsonb)',
-    'staff.claim_team_limit_notices(integer)','staff.complete_team_limit_notice(uuid,uuid,boolean)','staff.team_limit_notice_user(uuid,uuid)'] LOOP
-    EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO debateai_runtime',v_name);
-  END LOOP;
 END
 $team_limit_grants$;
+
+-- The runtime's grants, one plain line each.
+GRANT EXECUTE ON FUNCTION staff.read_team_room(bigint) TO debateai_runtime;
+GRANT EXECUTE ON FUNCTION staff.read_team_limit_command(jsonb,text) TO debateai_runtime;
+GRANT EXECUTE ON FUNCTION staff.read_team_limit_page(jsonb,text) TO debateai_runtime;
+GRANT EXECUTE ON FUNCTION staff.set_team_limit(jsonb,uuid,jsonb,jsonb,jsonb) TO debateai_runtime;
+GRANT EXECUTE ON FUNCTION staff.record_team_practice(jsonb,uuid,jsonb,jsonb,jsonb) TO debateai_runtime;
+GRANT EXECUTE ON FUNCTION staff.grant_team_limit_partner(jsonb,uuid,jsonb,uuid,uuid,jsonb,jsonb) TO debateai_runtime;
+GRANT EXECUTE ON FUNCTION staff.revoke_team_limit_partner(jsonb,uuid,jsonb,uuid,uuid,jsonb,jsonb) TO debateai_runtime;
+GRANT EXECUTE ON FUNCTION staff.claim_team_limit_notices(integer) TO debateai_runtime;
+GRANT EXECUTE ON FUNCTION staff.complete_team_limit_notice(uuid,uuid,boolean) TO debateai_runtime;
+GRANT EXECUTE ON FUNCTION staff.team_limit_notice_user(uuid,uuid) TO debateai_runtime;
 
 -- 10. THE CONTRACT THIS FILE CLAIMS, checked rather than assumed ---------------------------------------------------------------
 DO $team_limit_contract$

@@ -12,7 +12,7 @@
 export type SpendScope = "SITE_DAY" | "PERSON_DAY" | "PERSON_WEEK" | "PERSON_MONTH" | "PERSON_GRANT" | "TEAM_MONTH";
 
 export type PersonWindow = Readonly<{
-  scope: Exclude<SpendScope, "SITE_DAY">;
+  scope: Exclude<SpendScope, "SITE_DAY" | "TEAM_MONTH">;
   /** The window's limit in USD micro-units: credit × basis points ÷ 10 000, rounded down. */
   limitMicros: number;
   /** Spend recorded at or after this instant counts. */

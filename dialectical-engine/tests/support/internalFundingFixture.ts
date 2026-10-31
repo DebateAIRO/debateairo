@@ -7,6 +7,10 @@ import { createPostgresRegisterPublicationPort, internalAllowancePolicyFromValue
 import { RunRepository, type Pool } from "@debateai/db";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "./discoveredPanel.js";
 export const TASK11_POLICY = internalAllowancePolicyFromValue({enabled:true,funding_policy_version:1,currency:"USD",maximum_grant_micros:1200000,maximum_day_micros:100000,maximum_week_micros:500000,maximum_lifetime_ms:2678400000,finish_allowance_bp:10000},"test:synthetic-funding");
+/** Decision 24: a funded question needs room in the team's month. Tests about something else start with plenty (a made-up amount). */
+export async function plentyOfTeamRoom(pool: Pool): Promise<void> {
+  await pool.query("INSERT INTO staff.team_limit_event(revision,amount_micros,actor_staff_id,operation_id) VALUES(1,9000000000000,gen_random_uuid(),gen_random_uuid()) ON CONFLICT(revision) DO NOTHING");
+}
 export function internalFundingFixture(pool: Pool, runtime: Pool) {
  const database={pool};
  const rawPolicy={enabled:true,funding_policy_version:1,currency:"USD",maximum_grant_micros:1200000,maximum_day_micros:100000,maximum_week_micros:500000,maximum_lifetime_ms:2678400000,finish_allowance_bp:10000};

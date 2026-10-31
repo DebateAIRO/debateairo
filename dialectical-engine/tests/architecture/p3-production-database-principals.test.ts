@@ -1163,6 +1163,25 @@ describe("P3-01 production database-principal manifest", () => {
   "grants": [
     "EXECUTE ON FUNCTION identity.read_data_export_path_suggestions(uuid,uuid)"
   ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0142_team_limit.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION staff.authorize_action(jsonb,text)",
+    "EXECUTE ON FUNCTION staff.begin_owned_webauthn(uuid,uuid,text,text,text,text,text,text,uuid,jsonb,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION staff.read_audit_page(jsonb,text,integer,timestamptz,uuid)",
+    "EXECUTE ON FUNCTION staff.read_team_room(bigint)",
+    "EXECUTE ON FUNCTION staff.read_team_limit_command(jsonb,text)",
+    "EXECUTE ON FUNCTION staff.read_team_limit_page(jsonb,text)",
+    "EXECUTE ON FUNCTION staff.set_team_limit(jsonb,uuid,jsonb,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION staff.record_team_practice(jsonb,uuid,jsonb,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION staff.grant_team_limit_partner(jsonb,uuid,jsonb,uuid,uuid,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION staff.revoke_team_limit_partner(jsonb,uuid,jsonb,uuid,uuid,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION staff.claim_team_limit_notices(integer)",
+    "EXECUTE ON FUNCTION staff.complete_team_limit_notice(uuid,uuid,boolean)",
+    "EXECUTE ON FUNCTION staff.team_limit_notice_user(uuid,uuid)"
+  ]
 }
 ]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))
@@ -1601,6 +1620,24 @@ it("discloses exactly 0136's grants to the runtime role, the API's own role and 
   expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)]).toHaveLength(7);
   expect(sql).not.toMatch(/^GRANT [^\n]+ TO debateai_erasure_runtime;$/mu);
   expect(declared.some(grant => !/^GRANT EXECUTE ON FUNCTION /u.test(grant))).toBe(false);
+});
+
+it("discloses exactly 0142's grants, all to the runtime role (R22 team limit, decisions 14 and 24)", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const sql = await readFile("migrations/0142_team_limit.sql", "utf8");
+  const disclosed = "debateai_runtime|debateai_staff_security_owner|debateai_billing_runtime|debateai_data_export_worker";
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)].map(([statement]) => statement)
+    .filter(statement => new RegExp(`\\bTO\\b.*\\b(?:${disclosed})\\b`, "u").test(statement)
+      && !new RegExp(` TO (?:${disclosed});$`, "u").test(statement))).toEqual([]);
+  const actual = [...sql.matchAll(/^GRANT [^\n]+ TO debateai_runtime;$/gm)]
+    .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0142_team_limit.sql")
+    .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
+  expect(actual).toEqual(declared);
+  // Thirteen GRANT lines in all, every one of them a function grant to the runtime role: the step's tables and its
+  // ownership move are not granted to anyone.
+  expect(declared).toHaveLength(13);
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)]).toHaveLength(13);
 });
 
 it("discloses every 0127 publication review grant, including the run ownership columns", async () => {

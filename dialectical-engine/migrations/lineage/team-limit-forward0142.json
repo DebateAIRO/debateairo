@@ -8,7 +8,7 @@
   },
   "migration": {
     "name": "0142_team_limit.sql",
-    "sha256": "7a3044d62d2db10bd71ebc8db505c5fe3108e1cb6c1864771194136329c869f3"
+    "sha256": "d25913cd121a7b65be939ec41322a1d9b4aefe85651ae761f2fdafe3af4abc89"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-130.sql",

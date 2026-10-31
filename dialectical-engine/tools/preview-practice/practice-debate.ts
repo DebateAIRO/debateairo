@@ -8,6 +8,7 @@
  * call, its format check, its time and tokens; the served answer; the story), the database is deleted, and a report
  * says PASS or why not.
  */
+import { practiceTeamSpendLine, readPracticeTeamSpend } from "./practice-team-spend.js";
 import { randomBytes, randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import type { Pool } from "pg";
@@ -1067,6 +1068,9 @@ export async function runPracticeDebate(input: Readonly<{
       // Before the finally below deletes the database and with it the only way to read the run's sealed text; and before
       // the report's own reading (collect), so a reading that breaks there cannot cost the transcript.
       try {
+        // Decision 14: the practice's money counts for the team; a failed read here never fails the practice.
+        await readPracticeTeamSpend(pool).then((spend) => progress(practiceTeamSpendLine(spend.practiceRef, spend.chargeMicros)),
+          () => progress("team limit: could not read what this practice was charged; take it from the report"));
         const written = await recordPracticeTranscript({
           pool, directory: input.transcriptDirectory, ownerRef, answer: projection, story: storedStory,
           ...(shapeSource === null ? {} : { map: () => readPracticeMap(practiceMapReaders(pool), job.runId) }),

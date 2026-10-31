@@ -77,9 +77,9 @@ describe("a new team question or dig", () => {
     expect(waiting).not.toBeNull();
     // It looks again at the next tick, not on the 1st: a raised limit must not wait for the month.
     expect(new Date(waiting!.personRecheckAt ?? 0).getTime()).toBeLessThanOrEqual(Date.now() + 61000);
+    await expect(r.startWaiting(waiting!, async () => "fake-dispatch")).resolves.toMatchObject({ kind: "PERSON_FULL" });
     await setLimit(p.actor, await spentNow() + 10 * ESTIMATE);
-    await r.decide({ access: p.access, settingsClass } as never, async ({ admission }) => { expect(admission.kind).not.toBe("REFUSE_ALREADY_WAITING"); }).catch(() => undefined);
-    await database.pool.query("INSERT INTO core.run_wait_start(run_id,started_at) SELECT run_id,clock_timestamp() FROM core.run_waiting_v");
+    await expect(r.startWaiting(waiting!, async () => "fake-dispatch")).resolves.toMatchObject({ kind: "STARTED", value: "fake-dispatch" });
   });
   it("a customer with no grant is never held to the team's month, full or not", async () => {
     const p = await funded();

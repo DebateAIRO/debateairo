@@ -47,11 +47,11 @@ export const staffAuthorizationPolicyInventory = Object.freeze([
     { route: 'POST /v1/admin/internal-allowances', auth: 'staff', staffCapability: 'ALLOWANCE_WRITE', resource: 'staff-self', action: 'allowance-configure' },
     { route: 'DELETE /v1/admin/internal-allowances/{grantId}', auth: 'staff', staffCapability: 'ALLOWANCE_WRITE', resource: 'staff-self', action: 'allowance-revoke' },
     // Decision 24: the team-limit authority is no capability, so each handler asks the database (0142's staff.authorize_action) itself.
-    { route: 'GET /v1/admin/team-limit', auth: 'staff', resource: 'team-limit', action: 'read' },
-    { route: 'POST /v1/admin/team-limit', auth: 'staff', resource: 'team-limit', action: 'set' },
-    { route: 'POST /v1/admin/team-limit/partner/{staffId}', auth: 'staff', resource: 'team-limit', action: 'partner-grant' },
-    { route: 'DELETE /v1/admin/team-limit/partner/{staffId}', auth: 'staff', resource: 'team-limit', action: 'partner-revoke' },
-    { route: 'POST /v1/admin/team-limit/practice', auth: 'staff', resource: 'team-limit', action: 'practice-record' }
+    { route: 'GET /v1/admin/team-limit', auth: 'staff', resource: 'staff-team', action: 'read' },
+    { route: 'POST /v1/admin/team-limit', auth: 'staff', resource: 'staff-team', action: 'set' },
+    { route: 'POST /v1/admin/team-limit/partner/{staffId}', auth: 'staff', resource: 'staff-team', action: 'partner-grant' },
+    { route: 'DELETE /v1/admin/team-limit/partner/{staffId}', auth: 'staff', resource: 'staff-team', action: 'partner-revoke' },
+    { route: 'POST /v1/admin/team-limit/practice', auth: 'staff', resource: 'staff-team', action: 'practice-record' }
 ] as const);
 /** Explicit v2 composition only. No ready flags, command prepare/commit, or private content readers. */
 export interface StaffHttpApplication {
