@@ -67,6 +67,9 @@ import {
   type PracticeMapLanguage
 } from "./practice-language.js";
 import { readPracticeInvestigations, type PracticeInvestigationBlock } from "./practice-investigations.js";
+import { readPracticeRewrites, type PracticeRewriteBlock } from "./practice-rewrites.js";
+import { practiceWithSearchStandIn, type PracticeSearchStandIn } from "./practice-search-stand-in.js";
+import { readPracticeWeb, type PracticeWebBlock } from "./practice-web.js";
 import { practiceJudgesBlocks, readPracticeJudges, type PracticeJudgesBlocks } from "./practice-judges.js";
 import { practiceLengthBlock, readPracticeFrozenLength, type PracticeLengthBlock } from "./practice-length.js";
 import type { PracticeParallelBlock } from "./practice-parallel.js";
@@ -253,6 +256,10 @@ export type PracticeDebateResult = Readonly<{
   language?: PracticeDebateLanguageBlock;
   /** R2 (E12, E13): the "cannot assess" reviews and the investigations, counts, money and time (practice-investigations.ts). */
   investigations?: PracticeInvestigationBlock;
+  /** W5-2: the web table, per path (practice-web.ts); absent when the run's web step left no row (today's keys). */
+  web?: PracticeWebBlock;
+  /** W5-2: the rewrite table, per dig under the run (practice-rewrites.ts); absent without a dig (today's keys). */
+  rewrites?: PracticeRewriteBlock;
   /** Engine redesign R2: the comparing judges' votes, the label and its trigger, today's ladder, the judging time, D1's conditional winner (engine 2 only). */
   judges?: PracticeJudgesBlocks;
   /**
@@ -738,6 +745,12 @@ export async function runPracticeDebate(input: Readonly<{
    * the line-up of the version the debate runs on (its previewLineUpPolicy row, else the settings' env line-up).
    */
   lineUp?: PreviewLineUp;
+  /**
+   * W5-2: the Perplexity stand-in (practice-search-stand-in.ts) in the search gate's place: the runner's own search port
+   * (runnerWebSearchSettings, unchanged) then sends its searches through the real adapter and guarded fetch to it, and
+   * nothing is paid for a search. Absent: the practice's own gate ports, as today.
+   */
+  searchStandIn?: PracticeSearchStandIn;
 }>): Promise<PracticeDebateResult> {
   const progress = input.progress ?? (() => undefined);
   const remainingPorts = practiceRemainingPorts(input.settings, input.sockets);
@@ -922,7 +935,9 @@ export async function runPracticeDebate(input: Readonly<{
       // Hosted only: the room's own decision pool (main.ts: API_DATABASE_POOLS.roomDecision).
       ...(hosted ? { roomDecisionPool: database.extraPool() } : {})
     });
-    const runner = await composePracticeRunner({ pool, environment: settings.runner, budgetPorts: input.budgetPorts,
+    // W5-2: the stand-in is one more gate port, beside the watched ones; the runner's settings are composed as main.ts's.
+    const standIn = practiceWithSearchStandIn(settings.runner, input.budgetPorts, input.searchStandIn);
+    const runner = await composePracticeRunner({ pool, environment: standIn.environment, budgetPorts: standIn.budgetPorts,
       remaining: remainingPorts, keepAlivePool: database.extraPool(),
       ...(input.callConcurrency === undefined ? {} : { callConcurrency: input.callConcurrency }),
       ...(input.wait === undefined ? {} : { wait: input.wait }), ...(input.sleep === undefined ? {} : { sleep: input.sleep }) });
@@ -1081,6 +1096,19 @@ export async function runPracticeDebate(input: Readonly<{
     } catch (error) {
       progress(`investigations: could not be read (${codeOf(error)})`);
     }
+    // W5-2: the web table and the rewrite table. A reading that breaks costs only its block, never the report.
+    let web: PracticeWebBlock | undefined;
+    try {
+      web = await readPracticeWeb(pool, job.runId, input.searchStandIn === undefined ? "PERPLEXITY" : "STAND_IN") ?? undefined;
+    } catch (error) {
+      progress(`web table: could not be read (${codeOf(error)})`);
+    }
+    let rewrites: PracticeRewriteBlock | undefined;
+    try {
+      rewrites = await readPracticeRewrites(pool, job.runId) ?? undefined;
+    } catch (error) {
+      progress(`rewrite table: could not be read (${codeOf(error)})`);
+    }
     // R2 B11: the comparing judges, read before the database goes. Engine 1: absent (today's report keys). A reading
     // that breaks costs only this block, never the report.
     let judges: PracticeJudgesBlocks | undefined;
@@ -1181,6 +1209,8 @@ export async function runPracticeDebate(input: Readonly<{
       ...(length === undefined ? {} : { length }),
       ...(language === undefined ? {} : { language }),
       ...(investigations === undefined ? {} : { investigations }),
+      ...(web === undefined ? {} : { web }),
+      ...(rewrites === undefined ? {} : { rewrites }),
       ...(judges === undefined ? {} : { judges }),
       ...(writerPins === undefined ? {} : { writerPins }),
       ...(deployment === undefined ? {} : { deployment })
