@@ -107,7 +107,8 @@ describe("a dig's admission and its join at start", () => {
     const runs = await chain(person, 9);
     const levels = new PostgresDigModelRepository(api);
     expect(await admitDig({ ownerRef: person.ownerRef, parent: parentOf(runs[9]!), free: false }, levels))
-      .toEqual({ kind: "ADMIT", parentLevel: 9 });
+      // W3-7: the admission names the path the dig's places share (its picks are kept on it).
+      .toEqual({ kind: "ADMIT", parentLevel: 9, positionRef: "p1" });
     const tenth = await run(person);
     expect(await joinAtStart({ ownerRef: person.ownerRef, parent: parentOf(runs[9]!), childRunId: tenth },
       new PostgresInvestigationRepository(api))).toBe("JOINED");

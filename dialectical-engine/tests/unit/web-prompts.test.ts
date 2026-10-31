@@ -369,10 +369,11 @@ describe("the seals", () => {
 });
 
 describe("the web steps' call sites and thinking steps", () => {
-  it("names four web thinking steps after today's ten", () => {
-    expect(PREVIEW_THINKING_STEPS).toEqual(["opening", "pros_cons", "cross_exchange", "judge_panel", "reviewer",
+  it("names four web thinking steps after today's ten (W3-7: the path rewrite's two follow them)", () => {
+    expect(PREVIEW_THINKING_STEPS.slice(0, 14)).toEqual(["opening", "pros_cons", "cross_exchange", "judge_panel", "reviewer",
       "answer_writer", "answer_checker", "story_writer", "story_checker", "slip_fix",
       "web_planner", "web_reader", "web_pick", "web_reader_top"]);
+    expect(PREVIEW_THINKING_STEPS.slice(14)).toEqual(["path_rewrite_writer", "path_rewrite_checker"]);
   });
 
   it("each web call site belongs to its step, a structure repair of one to slip_fix", () => {

@@ -180,7 +180,7 @@ describe("0135: a dig's picks and its path rewrite's material", () => {
     expect(repository).toContain('export const DIG_PICK_CARRIER = "identity.dig_pick" as const;');
     expect(repository).toContain('export const PATH_REWRITE_INPUT_CARRIER = "identity.path_rewrite_input" as const;');
     expect(repository).toContain("encryptAttestedContentForRun(this.pool, input.runId, DIG_PICK_CARRIER, String(at + 1),");
-    expect(repository).toContain("encryptAttestedContentForRun(this.pool, runId, PATH_REWRITE_INPUT_CARRIER, runId, value)");
+    expect(repository).toContain("encryptAttestedContentForRun(this.pool, runId, PATH_REWRITE_INPUT_CARRIER, runId.toLowerCase(), value)");
     // Re-exported through dig-model.ts, not the package index (its bytes are pinned by the migration audit).
     expect(read("packages/db/src/dig-model.ts")).toContain('export * from "./dig-picks.js";');
     expect(read("packages/db/src/index.ts")).not.toContain("dig-picks");
