@@ -58,14 +58,15 @@ describe("S04 data export", () => {
       seen.push(params); return { rows: [principal(name, workerCount)] }; } });
     // 0131 (the V4 account memory) adds a tenth worker function, its page-memory reader; 0132 and 0133 (the web evidence
     // store and the investigations) an eleventh and a twelfth; 0134 (the dig model) a thirteenth; 0135 (the dig picks) a
-    // fourteenth.
-    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 14) as never)).resolves.toBeUndefined();
+    // fourteenth; 0136 (the investigation reports) a fifteenth.
+    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 15) as never)).resolves.toBeUndefined();
     expect(seen[1]?.[1]).toContain("identity.read_data_export_threat_reports(uuid,uuid)");
     expect(seen[1]?.[1]).toContain("identity.read_data_export_web_evidence(uuid,uuid)");
     expect(seen[1]?.[1]).toContain("identity.read_data_export_investigations(uuid,uuid)");
     expect(seen[1]?.[1]).toContain("identity.read_data_export_dig_model(uuid,uuid)");
     expect(seen[1]?.[1]).toContain("identity.read_data_export_dig_picks(uuid,uuid)");
-    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 13) as never)).rejects.toThrow("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
-    await expect(assertDataExportDatabaseRoles(pool("request", 1) as never, pool("worker", 14) as never)).rejects.toThrow("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
+    expect(seen[1]?.[1]).toContain("identity.read_data_export_investigation_reports(uuid,uuid)");
+    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 14) as never)).rejects.toThrow("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
+    await expect(assertDataExportDatabaseRoles(pool("request", 1) as never, pool("worker", 15) as never)).rejects.toThrow("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
   });
 });

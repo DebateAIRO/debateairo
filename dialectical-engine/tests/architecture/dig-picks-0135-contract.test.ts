@@ -17,7 +17,7 @@ import {
  * 0135 (dig-model revision 2026-10-30, task W3-7: the path rewrite switched on): a dig's picks (written once by the asks
  * route, each pick's text sealed under the dig's run key), the dig's own paths as its settled run gave them to its path
  * rewrite (sealed too, so the sweep can build the same material again) and the sweep's list of the settled digs whose
- * rewrite has no row. The last step of the chain, `expand`, keeping 0130's verifier. No database here: the behaviour is
+ * rewrite has no row. Followed by the investigation reports' 0136; `expand`, keeping 0130's verifier. No database here: the behaviour is
  * tests/integration/path-rewrite-database.test.ts.
  */
 const NAME = "0135_dig_picks.sql";
@@ -55,8 +55,8 @@ const ROLES = ["debateai_runtime", "debateai_billing_runtime", "debateai_authori
   "debateai_replay", "debateai_data_export_worker"] as const;
 
 describe("0135: a dig's picks and its path rewrite's material", () => {
-  it("C-T is the last step of the chain's STEPS, after 0134, with its own loader", async () => {
-    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0133,loadForward0134,loadForward0135]);");
+  it("C-T follows 0134 in the chain's STEPS (the investigation reports' 0136 comes after it), with its own loader", async () => {
+    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0133,loadForward0134,loadForward0135,loadForward0136]);");
     expect(read("packages/db/src/migration-forward-chain.ts")).toContain("import { loadForward0135 } from './migration-forward0135.js';");
     const loader = read("packages/db/src/migration-forward0135.ts");
     expect(loader).toContain(`const NAME = "${NAME}";`);
@@ -74,9 +74,10 @@ describe("0135: a dig's picks and its path rewrite's material", () => {
     expect(loader).not.toContain('"identity.path_rewrite_turn"');
     expect(loader).toContain("return sha(JSON.stringify({ tables, functions }));");
     const plan = await loadMigrationPlan();
-    expect(plan.forwardChain.slice(-2).map((step) => step.name)).toEqual(["0134_dig_model_and_month_pause.sql", NAME]);
-    expect(plan.forwardChain.at(-1)?.previousName).toBe("0134_dig_model_and_month_pause.sql");
-    expect(plan.forwardChain.at(-1)?.replayVerifierSql).toBeUndefined();
+    const names = plan.forwardChain.map((step) => step.name);
+    expect(names.slice(names.indexOf(NAME) - 1, names.indexOf(NAME) + 1)).toEqual(["0134_dig_model_and_month_pause.sql", NAME]);
+    expect(plan.forwardChain.find((step) => step.name === NAME)?.previousName).toBe("0134_dig_model_and_month_pause.sql");
+    expect(plan.forwardChain.find((step) => step.name === NAME)?.replayVerifierSql).toBeUndefined();
   });
 
   it("C-M is bound to 0134's manifest and to the verifier in force (0130's)", () => {
@@ -276,7 +277,7 @@ describe("0135: a dig's picks and its path rewrite's material", () => {
     const exporter = read("packages/db/src/data-export.ts");
     expect(exporter).toContain(`"${EXPORT_READER}",`);
     expect(exporter.indexOf(`"${EXPORT_READER}",`)).toBeGreaterThan(exporter.indexOf('"identity.read_data_export_dig_model(uuid,uuid)",'));
-    expect(exporter).toContain("worker.worker_count !== 14");
+    expect(exporter).toContain("worker.worker_count !== 15");
     expect(read("packages/db/src/dig-picks.ts")).toContain(`export const READ_DATA_EXPORT_DIG_PICKS = "${EXPORT_READER}" as const;`);
   });
 
@@ -296,7 +297,7 @@ describe("0135: a dig's picks and its path rewrite's material", () => {
   it("C-R is documented as the twenty-fifth step", () => {
     const readme = read("migrations/lineage/README.md");
     expect(readme.replace(/\s+/gu, " ")).toContain(
-      "the dig model with the month pause (0134, below) the twenty-fourth and the dig picks (0135, below) the twenty-fifth.");
+      "the dig model with the month pause (0134, below) the twenty-fourth, the dig picks (0135, below) the twenty-fifth");
     const heading = "## The dig picks (0135)";
     const at = readme.indexOf(heading);
     expect(at).toBeGreaterThan(readme.indexOf("## The dig model and the month pause (0134)"));

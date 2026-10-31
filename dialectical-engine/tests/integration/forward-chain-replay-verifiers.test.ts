@@ -77,7 +77,8 @@ it("keeps NETOPIA's 0111 verifier in force and replaying once the auth DB batch 
     "0116_mail_locale.sql", "0117_debate_shape_map.sql", "0118_language_check_spend.sql", "0119_reclaim_resume.sql",
     "0120_reply_measures.sql", "0121_engine_verdict.sql", "0122_engine_map_check.sql", "0123_side_by_side_releases.sql",
     "0124_settings_activation.sql", "0125_italy_specific_approval.sql", "0126_synthesis_check.sql", "0127_publication_review.sql", "0128_threat_reports.sql", "0129_support_answer_scope.sql", "0130_row_level_security.sql",
-    "0131_v4_account_memory.sql", "0132_web_evidence.sql", "0133_investigations.sql", "0134_dig_model_and_month_pause.sql", "0135_dig_picks.sql"]);
+    "0131_v4_account_memory.sql", "0132_web_evidence.sql", "0133_investigations.sql", "0134_dig_model_and_month_pause.sql", "0135_dig_picks.sql",
+    "0136_investigation_reports.sql"]);
   const [netopia, batch, partC, rotation] = real.forwardChain;
   const applied = new Set(await ledger());
   expect(applied.has(NETOPIA) && applied.has(AUTH_DB_BATCH_MIGRATION) && applied.has(PART_C) && applied.has(ROLE_ROTATION)).toBe(true);
@@ -85,18 +86,19 @@ it("keeps NETOPIA's 0111 verifier in force and replaying once the auth DB batch 
   // reply measures', the engine verdict's, the engine's map answer step's, the side-by-side releases', the settings
   // activation's, the Italy-specific approval's and synthesis-flag's 0126-0129 keep 0111's effective-capability verifier:
   // with 0129 the last of them, the verifier in force is 0111's, byte for byte. 0130's verifier supersedes it: every check 0111's makes,
-  // its row-security clause aside (SPEC-v4 R34), and the V4 account memory's 0131, the web evidence store's 0132, the investigations' 0133, the dig model's 0134 and the dig picks' 0135 keep 0130's, 0135 at the head.
+  // its row-security clause aside (SPEC-v4 R34), and the V4 account memory's 0131, the web evidence store's 0132, the investigations' 0133, the dig model's 0134, the dig picks' 0135 and the investigation reports' 0136 keep 0130's, 0136 at the head.
   expect(batch!.verifierSha256).toBe(netopia!.verifierSha256);
-  expect(real.forwardChain.at(-7)!.verifierSha256).toBe(netopia!.verifierSha256);
-  for (const index of [-6, -5, -4, -3, -2, -1]) {
+  expect(real.forwardChain.at(-8)!.verifierSha256).toBe(netopia!.verifierSha256);
+  for (const index of [-7, -6, -5, -4, -3, -2, -1]) {
     expect(real.forwardChain.at(index)!.verifierPath).toBe("lineage/verify-effective-capabilities-130.sql");
-    expect(real.forwardChain.at(index)!.verifierSha256).toBe(real.forwardChain.at(-6)!.verifierSha256);
+    expect(real.forwardChain.at(index)!.verifierSha256).toBe(real.forwardChain.at(-7)!.verifierSha256);
   }
   expect(real.forwardChain.at(-1)!.verifierSha256).not.toBe(netopia!.verifierSha256);
   expect(partC!.verifierSha256).toBe(netopia!.verifierSha256);
   expect(rotation!.verifierSha256).toBe(netopia!.verifierSha256);
   expect(effectiveForwardVerifierSql(real, new Set([...applied].filter((name) => !["0130_row_level_security.sql", "0131_v4_account_memory.sql",
-    "0132_web_evidence.sql", "0133_investigations.sql", "0134_dig_model_and_month_pause.sql", "0135_dig_picks.sql"].includes(name))))).toBe(netopia!.verifierSql);
+    "0132_web_evidence.sql", "0133_investigations.sql", "0134_dig_model_and_month_pause.sql", "0135_dig_picks.sql",
+    "0136_investigation_reports.sql"].includes(name))))).toBe(netopia!.verifierSql);
   expect(effectiveForwardVerifierSql(real, applied)).toBe(real.forwardChain.at(-1)!.verifierSql);
   // A drift only 0111's verifier knows (a NETOPIA table granted to a wrong role) is refused by migrate() with 0130 last.
   await db.pool.query("GRANT SELECT ON billing.card_token TO debateai_authorization_runtime");

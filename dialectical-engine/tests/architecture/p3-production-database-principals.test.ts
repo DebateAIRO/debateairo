@@ -995,6 +995,30 @@ describe("P3-01 production database-principal manifest", () => {
   "roleName": "debateai_data_export_worker",
   "source": "migrations/0135_dig_picks.sql",
   "grants": ["EXECUTE ON FUNCTION identity.read_data_export_dig_picks(uuid,uuid)"]
+},
+// The investigation's final report (0136; R22 task W5-1): the report's reader for the API's own role, the waiting
+// closings, the members a report waits for, the writer, a debate's reports and the newest unreported closing's time for
+// the shared runtime role (the runner; the API's roles inherit them), and one export reader. No table grant.
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0136_investigation_reports.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.read_investigation_reports(uuid,uuid)"]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0136_investigation_reports.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_unreported_closings(integer)",
+    "EXECUTE ON FUNCTION identity.read_investigation_waiting_of_run(uuid)",
+    "EXECUTE ON FUNCTION identity.record_investigation_report_version(uuid,integer,uuid,text,text,text,uuid,timestamptz,text,smallint,integer,smallint,smallint,jsonb,jsonb,jsonb,bigint,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_investigation_reports_of_run(uuid)",
+    "EXECUTE ON FUNCTION identity.read_closing_since_of_root(uuid)"
+  ]
+},
+{
+  "roleName": "debateai_data_export_worker",
+  "source": "migrations/0136_investigation_reports.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.read_data_export_investigation_reports(uuid,uuid)"]
 }
 ]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))
@@ -1412,6 +1436,26 @@ it("discloses exactly 0135's grants to the runtime role, the API's own role and 
   expect(declared).toHaveLength(5);
   expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)]).toHaveLength(6);
   expect(sql).toMatch(/^GRANT EXECUTE ON FUNCTION identity\.forget_erased_debate_dig_picks\(uuid\) TO debateai_erasure_runtime;$/mu);
+  expect(declared.some(grant => !/^GRANT EXECUTE ON FUNCTION /u.test(grant))).toBe(false);
+});
+
+it("discloses exactly 0136's grants to the runtime role, the API's own role and the export worker (R22 W5-1)", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const sql = await readFile("migrations/0136_investigation_reports.sql", "utf8");
+  const disclosed = "debateai_runtime|debateai_staff_security_owner|debateai_billing_runtime|debateai_data_export_worker";
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)].map(([statement]) => statement)
+    .filter(statement => new RegExp(`\\bTO\\b.*\\b(?:${disclosed})\\b`, "u").test(statement)
+      && !new RegExp(` TO (?:${disclosed});$`, "u").test(statement))).toEqual([]);
+  const actual = [...sql.matchAll(new RegExp(`^GRANT [^\\n]+ TO (?:${disclosed});$`, "gm"))]
+    .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0136_investigation_reports.sql")
+    .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
+  expect(actual).toEqual(declared);
+  // Function grants only: no role holds a table right on the new table. Seven GRANT lines, every one disclosed: the
+  // step adds no deletion function (an erased root's reports go by cascade from 0133's closings), so no erasure grant.
+  expect(declared).toHaveLength(7);
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)]).toHaveLength(7);
+  expect(sql).not.toMatch(/^GRANT [^\n]+ TO debateai_erasure_runtime;$/mu);
   expect(declared.some(grant => !/^GRANT EXECUTE ON FUNCTION /u.test(grant))).toBe(false);
 });
 

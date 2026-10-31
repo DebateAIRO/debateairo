@@ -77,10 +77,11 @@ describe("0128 threat reports contract", () => {
     // Property: the new loader records its own tables, functions, writer trigger and CHECK after 0127.
     const loader = await readFile(new URL("../../packages/db/src/migration-forward0128.ts", import.meta.url), "utf8").catch(() => "");
     const plan = await loadMigrationPlan();
-    expect(plan.forwardChain.slice(-9).map((step) => step.name))
+    expect(plan.forwardChain.slice(-10).map((step) => step.name))
       .toEqual(["0127_publication_review.sql", "0128_threat_reports.sql", "0129_support_answer_scope.sql",
         "0130_row_level_security.sql", "0131_v4_account_memory.sql",
-        "0132_web_evidence.sql", "0133_investigations.sql", "0134_dig_model_and_month_pause.sql", "0135_dig_picks.sql"]);
+        "0132_web_evidence.sql", "0133_investigations.sql", "0134_dig_model_and_month_pause.sql", "0135_dig_picks.sql",
+        "0136_investigation_reports.sql"]);
     for (const name of ["staff.threat_report", "staff.threat_report_event", "staff.threat_report_alert",
       "question_check_spend_writer_only", "model_spend_question_check_is_runless"]) expect(loader).toContain(name);
     expect(loader).not.toContain("staff.commit_owner_command");

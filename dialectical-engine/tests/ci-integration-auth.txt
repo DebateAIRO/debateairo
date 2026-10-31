@@ -85,6 +85,8 @@ tests/integration/investigations-database.test.ts
 tests/integration/dig-model-database.test.ts
 # A dig's picks and its path rewrite's material (0135): the picks written once, the material, the sweep's list, deletions.
 tests/integration/path-rewrite-database.test.ts
+# The investigation's final report (0136): the report written once per closing, the waiting digs, the readers, deletions.
+tests/integration/investigation-report-database.test.ts
 
 # NOT listed: preview-auth-dev-startup.test.ts — red on dev at d1ac3641b (2 of 17: PREVIEW_STAGE_PROCESS_EXITED; it
 # starts the real API/UI stage processes, so it is a deployment rehearsal, not a self-contained suite).
