@@ -4,7 +4,7 @@
 // count only: no real call is ever made, and what the real endpoint answers is seen only on a real run.
 import { describe, expect, it } from "vitest";
 import {
-  ANTHROPIC_MESSAGES_BASE_URL, ANTHROPIC_TOKEN_COUNT_FROM_ESTIMATE, OpenAICompatibleProviderGateway, PROVIDER_SENT_INPUT_OVER_LIMIT, buildFramedPrompt, createAnthropicTokenCounter,
+  ANTHROPIC_MESSAGES_BASE_URL, ANTHROPIC_TOKEN_COUNT, OpenAICompatibleProviderGateway, PROVIDER_SENT_INPUT_OVER_LIMIT, buildFramedPrompt, createAnthropicTokenCounter,
   createPreviewGuardedFetch, estimateWindowTokens, type OpenAICompatibleGatewayOptions, type PromptPacket, type ProviderCallRequest, type TokenCounter
 } from "@debateai/providers";
 import { REPORT_STORY_PROMPT_CONTRACT } from "@debateai/story";
@@ -103,8 +103,8 @@ describe("the gateway, on every attempt as it leaves", () => {
   const close = big(130_000);
 
   it("the sizes under test sit where they should", () => {
-    expect(estimateWindowTokens(small.messages)).toBeLessThan(ANTHROPIC_TOKEN_COUNT_FROM_ESTIMATE);
-    expect(estimateWindowTokens(close.messages)).toBeGreaterThanOrEqual(ANTHROPIC_TOKEN_COUNT_FROM_ESTIMATE);
+    expect(estimateWindowTokens(small.messages)).toBeLessThan(ANTHROPIC_TOKEN_COUNT.fromEstimate);
+    expect(estimateWindowTokens(close.messages)).toBeGreaterThanOrEqual(ANTHROPIC_TOKEN_COUNT.fromEstimate);
     expect(estimateWindowTokens(close.messages)).toBeLessThan(100_000);
   });
 

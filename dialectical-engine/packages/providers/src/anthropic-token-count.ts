@@ -11,15 +11,13 @@ import type { PromptPacket } from "./index.js";
  */
 export type TokenCounter = (input: Readonly<{ packet: PromptPacket; sharedFirstFieldCount?: number }>) => Promise<number | null>;
 
-export const ANTHROPIC_TOKEN_COUNT_TIMEOUT_MS = 15_000;
-/** The line itself: Haiku's price steps up above it. */
-export const ANTHROPIC_TOKEN_LINE = 100_000 as const;
 /**
- * "Close to the line", on the byte guard's own estimate (bytes / 2): from 60,000. The estimate counts a token for every 2 bytes, and real
- * text runs well below that (Latin about 1 for 4, Chinese about 1 for 3), so it is more likely to be too high than too low. A call under
- * 60,000 would pass the line only at more than 0.83 tokens a byte, which no language reaches. Below it there is no extra step.
+ * `line`: Haiku's price steps up above it. `fromEstimate`: "close to the line", on the byte guard's own estimate (bytes / 2). The estimate
+ * counts a token for every 2 bytes, and real text runs well below that (Latin about 1 for 4, Chinese about 1 for 3), so it is more likely
+ * to be too high than too low. A call under 60,000 would pass the line only at more than 0.83 tokens a byte, which no language reaches.
+ * Below it there is no extra step.
  */
-export const ANTHROPIC_TOKEN_COUNT_FROM_ESTIMATE = 60_000 as const;
+export const ANTHROPIC_TOKEN_COUNT = Object.freeze({ line: 100_000, fromEstimate: 60_000, timeoutMs: 15_000 });
 
 export function createAnthropicTokenCounter(options: Readonly<{
   endpoint: string;
@@ -39,7 +37,7 @@ export function createAnthropicTokenCounter(options: Readonly<{
       const response = await fetcher(`${options.endpoint}${ANTHROPIC_COUNT_TOKENS_PATH}`, {
         method: "POST",
         headers: anthropicMessagesRequestHeaders(options.authorizationHeader),
-        signal: AbortSignal.timeout(ANTHROPIC_TOKEN_COUNT_TIMEOUT_MS),
+        signal: AbortSignal.timeout(ANTHROPIC_TOKEN_COUNT.timeoutMs),
         body: anthropicCountTokensRequestBody({ model: options.model, messages: packet.messages,
           ...(sharedFirstFieldCount === undefined ? {} : { sharedFirstFieldCount }) })
       });

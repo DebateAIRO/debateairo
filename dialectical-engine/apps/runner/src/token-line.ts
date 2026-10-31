@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND, ANTHROPIC_TOKEN_COUNT_FROM_ESTIMATE, ANTHROPIC_TOKEN_LINE, buildFramedPrompt, createAnthropicTokenCounter, type PromptContract, type PromptPacket, type TokenCounter } from "@debateai/providers";
+import { ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND, ANTHROPIC_TOKEN_COUNT, buildFramedPrompt, createAnthropicTokenCounter, type PromptContract, type PromptPacket, type TokenCounter } from "@debateai/providers";
 import { PATH_REWRITE_WRITER_V2_PROMPT_CONTRACT, REPORT_STORY_PROMPT_CONTRACT, type ReportAnswerDraft, type ReportCallMaterial } from "@debateai/story";
 import {
   INVESTIGATION_REPORT_ASK_ROOM_BYTES, INVESTIGATION_REPORT_ROUND_TWO_ROOM_BYTES, buildInvestigationDossier, type DossierBuilt, type DossierInput
@@ -11,7 +11,7 @@ import {
 /**
  * R22 DECISION 28, THE REAL COUNT WHERE MATERIAL IS FITTED. Haiku's calls stay under 100,000 tokens, and bytes are only an estimate. The
  * byte ladders (the dossier's, the rewrite's) fit first; then, when the largest call looks close to the line
- * (`ANTHROPIC_TOKEN_COUNT_FROM_ESTIMATE`, on its bytes with the room it must keep for round 2), Anthropic's free count is asked for that
+ * (`ANTHROPIC_TOKEN_COUNT.fromEstimate`, on its bytes with the room it must keep for round 2), Anthropic's free count is asked for that
  * call, and one over the line goes down the same ladder. Every attempt is checked again as it leaves (the gateway's `sentInputTokensBelow`).
  * A small call has no extra step. A failed count stops nothing: the byte guard's answer stands, and the counter logs it.
  *
@@ -34,7 +34,7 @@ export function targetTokenCounter(target: Readonly<{ adapterKind?: string; base
 
 const COUNT_TRIES = 6;
 const roomTokens = (bytes: number): number => Math.ceil(bytes / 2);
-const looksClose = (bytes: number): boolean => bytes / 2 >= ANTHROPIC_TOKEN_COUNT_FROM_ESTIMATE;
+const looksClose = (bytes: number): boolean => bytes / 2 >= ANTHROPIC_TOKEN_COUNT.fromEstimate;
 const countingBytes = (size: number): Buffer => createHash("sha256").update(`debateai.token-count.fence.${String(size)}`, "utf8").digest().subarray(0, Math.min(size, 32));
 
 /** The packet to count: `null` when it cannot be framed under the counted fence (then there is no count, and the byte guard stands). */
@@ -54,7 +54,7 @@ async function reportOver(material: ReportCallMaterial, room: number, tokenCount
   const packet = countedPacket(REPORT_STORY_PROMPT_CONTRACT, material.storyWriterOf(PLACEHOLDER));
   if (packet === null || !looksClose(pathRewriteBodyBytes(packet) + room)) return false;
   const real = await tokenCount({ packet, ...(material.sharedFieldCount === undefined ? {} : { sharedFirstFieldCount: material.sharedFieldCount }) });
-  return real !== null && real + roomTokens(room) >= ANTHROPIC_TOKEN_LINE;
+  return real !== null && real + roomTokens(room) >= ANTHROPIC_TOKEN_COUNT.line;
 }
 
 /** The dossier, on the first ladder place whose largest call the real count also lets through. */
@@ -80,7 +80,7 @@ export async function fitRewriteToTokenLine(input: PathRewriteMaterialInput, tok
     const packet = countedPacket(PATH_REWRITE_WRITER_V2_PROMPT_CONTRACT, built.material.writer);
     if (packet === null || !looksClose(pathRewriteBodyBytes(packet) + PATH_REWRITE_ROUND_TWO_ROOM_BYTES)) return built;
     const real = await tokenCount({ packet });
-    if (real === null || real + roomTokens(PATH_REWRITE_ROUND_TWO_ROOM_BYTES) < ANTHROPIC_TOKEN_LINE) return built;
+    if (real === null || real + roomTokens(PATH_REWRITE_ROUND_TWO_ROOM_BYTES) < ANTHROPIC_TOKEN_COUNT.line) return built;
     log("PATH_REWRITE_OVER_THE_TOKEN_LINE", { ladderStep: built.ladderStep });
     built = buildPathRewriteMaterial(input, { fromStep: built.ladderStep + 1 });
   }

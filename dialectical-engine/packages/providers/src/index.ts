@@ -22,7 +22,7 @@ import {
 import { previewModelRowForEndpoint, previewSamplingMembers } from "./preview-models.js";
 import { ProviderUnbilledRefusal } from "./unbilled-refusal.js";
 import { PROVIDER_SENT_INPUT_OVER_LIMIT, assertSentForm, packetWithPageTexts } from "./sent-form.js";
-import { ANTHROPIC_TOKEN_COUNT_FROM_ESTIMATE, type TokenCounter } from "./anthropic-token-count.js";
+import { ANTHROPIC_TOKEN_COUNT, type TokenCounter } from "./anthropic-token-count.js";
 import { contentRepairsOf, type ModelJsonRepair, type ModelReplyFacts } from "./model-json.js";
 import { replyWordCount } from "./reply-words.js";
 import { replyFailureClassOf, type ReplyFailureClass } from "./reply-fixer.js";
@@ -1492,7 +1492,7 @@ export interface OpenAICompatibleGatewayOptions {
   readonly maxOutputTokens?: number;
   /**
    * R22 decision 28: Anthropic's free token count. A call with `sentInputTokensBelow` whose estimate looks close to the line
-   * (`ANTHROPIC_TOKEN_COUNT_FROM_ESTIMATE`) asks it first, for each attempt's packet as sent. Absent, or a failed count: the estimate alone.
+   * (`ANTHROPIC_TOKEN_COUNT.fromEstimate`) asks it first, for each attempt's packet as sent. Absent, or a failed count: the estimate alone.
    */
   readonly countInputTokens?: TokenCounter;
   /**
@@ -2233,7 +2233,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       const estimate = estimateWindowTokens(sent.messages);
       if (estimate >= request.sentInputTokensBelow) return false;
       const count = this.#options.countInputTokens;
-      if (count === undefined || estimate < ANTHROPIC_TOKEN_COUNT_FROM_ESTIMATE) return true;
+      if (count === undefined || estimate < ANTHROPIC_TOKEN_COUNT.fromEstimate) return true;
       // Bytes are an estimate; near the line the vendor's own count decides. A failed count (null) leaves the estimate's answer.
       const real = await count({ packet: sent, ...(request.sharedFirstFieldCount === undefined ? {} : { sharedFirstFieldCount: request.sharedFirstFieldCount }) });
       return real === null || real < request.sentInputTokensBelow;

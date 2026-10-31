@@ -4,7 +4,7 @@
 // material it ended with. Made-up debates and scripted vendors only: what these prove about the cache is the bytes we send; whether
 // Anthropic really reads them back is seen only in a real call's usage.
 import { describe, expect, it } from "vitest";
-import { ANTHROPIC_DOSSIER_FIRST_SYSTEM, anthropicMessagesRequestBody, previewThinkingStepOf, type ProviderCallRequest } from "@debateai/providers";
+import { ANTHROPIC_DOSSIER_FIRST_SYSTEM, OpenAICompatibleProviderGateway, anthropicMessagesRequestBody, previewThinkingStepOf, type ProviderCallRequest } from "@debateai/providers";
 import {
   REPORT_ASK_MAX_PATHS, REPORT_REPLY_ISSUES, answerUpdateCallSiteKey, answerUpdateCallSiteRole, classifyReportWriterContent, investigationReportCallSiteKey,
   investigationReportCallSiteRole, reportAskSalvaged, writeOverallAnswer, type StoryRoleMaker
@@ -248,6 +248,30 @@ describe("R22 decision 26: a slip in the ask (salvage in code, the smallest foll
     expect(requests.filter((request) => request.callSiteKey === "ANSWER_UPDATE:ANSWER:1")).toHaveLength(1);
     expect(requests.filter((request) => request.callSiteKey === "ANSWER_UPDATE:ANSWER_ASKED:1")).toHaveLength(1);
     expect(written.outcome.outcome).toBe("FAILED");
+  });
+
+  it("through the real gateway: a name not on the list gets the smallest follow-up, then the full re-ask, and the writer goes on", async () => {
+    const [good] = deepNames(dossier);
+    const bodies: string[] = [];
+    const replies = [ask(["G999.D1"]), ask(["G888.D1"]), ask([good!]), ANSWER];
+    const provider = new OpenAICompatibleProviderGateway({ endpoint: "http://fixture/v1", model: "fixture/model", maker: "fixture",
+      fetchImplementation: async (_url, init) => {
+        bodies.push(String(init?.body));
+        return new Response(JSON.stringify({ id: `c${String(bodies.length)}`, model: "fixture/model", choices: [{ message: { content: replies.shift() ?? ANSWER }, finish_reason: "stop" }],
+          usage: { prompt_tokens: 1, completion_tokens: 1 } }));
+      },
+      sleepImplementation: async () => undefined, persistRawArtifact: async (artifact) => artifact.artifactId, appendLedgerEntry: async () => "ledger", assertNoOpenWriteTransaction: () => undefined });
+    const checker = { call: async () => ({ rawArtifactRef: "c", ledgerEntryRef: "l", content: JSON.stringify({ satisfied: true, problem: null, part: null }), provider: "openai-compatible-http" as const, model: "m", maker: "x", modelVersion: "1" }) };
+    const written = await writeOverallAnswer({ runId: null as never, subjectItemId: "s", contractHash: "h", maxRounds: 2, later: false,
+      writer: { provider, providerRef: "ref-haiku" }, checker: { provider: checker, providerRef: "ref-glm" }, backupCandidates: [], material: dossier.material,
+      send: (author, request) => author.provider.call(request), guard: investigationReportGuard, randomBytes: closingRandomBytes(Buffer.alloc(32, 1)), log: () => undefined });
+    expect(written.outcome.outcome).toBe("READY");
+    // The ask, its follow-up (the writer's own reply handed back, naming the code), the full re-ask, then the asked write.
+    expect(bodies).toHaveLength(4);
+    expect(bodies[1]).toContain("G999.D1");
+    expect(bodies[1]).toContain(REPORT_REPLY_ISSUES.askNames);
+    expect(bodies[2]).not.toContain("G888.D1");
+    expect(bodies[3]).toContain("asked_paths");
   });
 
   it("a debate with no list refuses any ask", () => {
