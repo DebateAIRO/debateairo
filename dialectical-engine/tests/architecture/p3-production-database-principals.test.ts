@@ -1141,6 +1141,28 @@ describe("P3-01 production database-principal manifest", () => {
   "grants": [
     "EXECUTE ON FUNCTION staff.read_team_internal_spent(timestamptz,timestamptz)"
   ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0141_path_suggestions.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.record_path_suggestions(uuid,uuid,uuid,text,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_path_suggestions_of_run(uuid)"
+  ]
+},
+{
+  "roleName": "debateai_erasure_runtime",
+  "source": "migrations/0141_path_suggestions.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.forget_erased_debate_path_suggestions(uuid)"
+  ]
+},
+{
+  "roleName": "debateai_data_export_worker",
+  "source": "migrations/0141_path_suggestions.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_data_export_path_suggestions(uuid,uuid)"
+  ]
 }
 ]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))

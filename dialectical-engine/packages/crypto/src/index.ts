@@ -2444,7 +2444,9 @@ export const CONTENT_CARRIERS = Object.freeze([
   "identity.run_purpose_lines",
   // 0139: the quote people see, kept apart from the passage, and a reader's saved reply in its transient store, under the run's key.
   "identity.web_shown_quote",
-  "identity.web_reply_text"
+  "identity.web_reply_text",
+  // 0141: the AI's suggestions of what to dig into on one path, sealed under the run that paid for them and bound to the set's id.
+  "identity.path_suggestions"
 ] as const);
 
 export type ContentCarrier = typeof CONTENT_CARRIERS[number];

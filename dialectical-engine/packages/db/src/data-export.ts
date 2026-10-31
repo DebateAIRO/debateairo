@@ -141,6 +141,9 @@ const WORKER_FUNCTIONS = [
   "identity.read_data_export_public_debates(uuid,uuid)",
   "identity.read_data_export_tree_updates(uuid,uuid)",
   "identity.read_data_export_passage_retention(uuid,uuid)",
+  // A path's suggestions (0141), sealed under each set's run key. Its archive section is not wired yet either; the boot check pins
+  // that the worker reaches it.
+  "identity.read_data_export_path_suggestions(uuid,uuid)",
   "identity.complete_data_export(uuid,uuid,text,text,bigint,timestamp with time zone)",
   "identity.fail_data_export(uuid,uuid,text)",
   "identity.sweep_data_exports()",
@@ -167,7 +170,7 @@ export async function assertDataExportDatabaseRoles(requestPool: Pool, workerPoo
     const [request, worker] = await Promise.all([roleWitness(requestPool), roleWitness(workerPool)]);
     if (request === undefined || worker === undefined || request.principal === worker.principal
       || !request.authorization_member || request.worker_member || request.request_count !== 4 || request.worker_count !== 0
-      || !worker.worker_member || worker.authorization_member || worker.request_count !== 0 || worker.worker_count !== 18
+      || !worker.worker_member || worker.authorization_member || worker.request_count !== 0 || worker.worker_count !== 19
       || request.privileged || worker.privileged) {
       throw new TypeError("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
     }
