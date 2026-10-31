@@ -28,8 +28,12 @@ const ROOT = PATH_REWRITES[DIG_RUNS.root]!;
 const OTHERS = ROOT.paths.filter((path) => path.position_ref !== "n-smr");
 const strip = (): HTMLElement | null => page().querySelector<HTMLElement>(".v4ChangedSince");
 
+/** The seed also holds a page still being read (W4-4), which reads the answer every 5 s of its own; these debates have none, so only a rewrite reads it. */
 function answerWith(runId: string, rewrites: AnswerPathRewrites): Answer {
-  return AnswerSchema.parse(seededAnswer(runId, { path_rewrites: rewrites }));
+  const answer = AnswerSchema.parse(seededAnswer(runId, { path_rewrites: rewrites }));
+  if (answer.web === undefined) return answer;
+  return { ...answer, web: { ...answer.web, paths: answer.web.paths.map((path) => ({ ...path,
+    other_pages: path.other_pages.filter((page) => page.researched?.state !== "READING") })) } };
 }
 
 beforeEach(() => {
