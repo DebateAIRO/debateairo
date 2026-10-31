@@ -80,6 +80,7 @@ const SAME_AS_ENGLISH = {
   // The report's PDF (plan 2026-10-31 decision 17): the same word in these languages.
   "public.report.investigation.version": ["da", "de", "fr", "sv"],
   "public.report.investigation.sources": ["fr"],
+  "public.report.investigation.sideFor": ["da"],
   "home.baseScore": ["it", "pt"],
   "home.crisisSupport.chat": ["cs", "da", "ro", "sk"],
   "home.crisisSupport.website": ["de", "nl"],

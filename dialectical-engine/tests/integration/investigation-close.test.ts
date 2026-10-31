@@ -174,7 +174,7 @@ describe("W5-1 Write my report on real PostgreSQL", () => {
     expect((await reports.readWaiting(root))?.waiting).toEqual([]);
     const first = await sweepInvestigationClosings(settingsFor(root, vendors, contents), 100);
     expect(first.outcomes).toContain("RECORDED");
-    expect(vendors.haiku.requests.map((request) => contractOf(request.packet))).toEqual(["report.answer.v2", "report.story.v1"]);
+    expect(vendors.haiku.requests.map((request) => contractOf(request.packet))).toEqual(["report.answer.v3", "report.story.v1"]);
     for (const request of [...vendors.haiku.requests, ...vendors.glm.requests]) expect(request.runId).toBe(root);
     const afterFirst = (await reports.readOfRun(root))!;
     expect(afterFirst.reports.map((entry) => [entry.report_version, entry.outcome, entry.story_outcome])).toEqual([[1, "READY", "READY"]]);
@@ -194,7 +194,7 @@ describe("W5-1 Write my report on real PostgreSQL", () => {
     expect(await new PostgresModelSpendStore(database.pool).readRunInvestigationReportSpentMicros(root)).toBe(0);
     const later = team();
     expect((await sweepInvestigationClosings(settingsFor(root, later, contents), 100)).outcomes).toContain("RECORDED");
-    expect(contractOf(later.haiku.requests[0]!.packet)).toBe("report.answer.later.v2");
+    expect(contractOf(later.haiku.requests[0]!.packet)).toBe("report.answer.later.v3");
     const both = (await reports.readOfRun(root))!;
     expect(both.reports.map((entry) => [entry.report_version, entry.outcome])).toEqual([[1, "READY"], [2, "READY"]]);
     expect(both.reports[0]!.spent_micros).toBe(spentOne);

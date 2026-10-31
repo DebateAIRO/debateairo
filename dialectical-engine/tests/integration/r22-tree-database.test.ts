@@ -301,8 +301,8 @@ describe("decision 2: a rewrite that really changed a path rewrites the path abo
     const climbedLine = (JSON.parse(fieldsOf(team.sent.glm.filter(isChecker).at(-1)!).get("rewrite")!) as { line: string }).line;
     expect((JSON.parse(fieldsOf(answers[0]!).get("first_debate")!) as { paths: Array<{ line: string; story_line?: string }> }).paths[0]).toMatchObject({ line: climbedLine, story_line: PATH_LINE });
     expect((JSON.parse(fieldsOf(teams[0]!.sent.haiku.find((packet) => contractOf(packet).startsWith("report."))!).get("first_debate")!) as { paths: Array<{ line: string }> }).paths[0]!.line).toMatch(/^Partly: draft/u);
-    expect(answers.map(contractOf)).toEqual(["report.answer.later.v2"]);
-    expect(team.sent.glm.at(-1)!.messages[0]!.content).toContain("report.answer-check.v2");
+    expect(answers.map(contractOf)).toEqual(["report.answer.later.v3"]);
+    expect(team.sent.glm.at(-1)!.messages[0]!.content).toContain("report.answer-check.v3");
     expect(JSON.parse(fieldsOf(answers[0]!).get("earlier_report") ?? "null")).not.toBeNull();
   }, 180_000);
 
@@ -528,7 +528,7 @@ describe("decision 5: the purpose lines reach every rewrite and answer update", 
         expect([fields.get("place"), fields.get("time"), fields.get("purpose")]).toEqual(["Harbour Town", "Before next spring", "A council vote"]);
       }
     }
-    expect(teams[1]!.sent.haiku.map(contractOf).filter((contract) => !contract.startsWith("web.suggest"))).toEqual(["path-rewrite.writer.v2", "path-rewrite.writer.v2", "report.answer.later.v2"]);
+    expect(teams[1]!.sent.haiku.map(contractOf).filter((contract) => !contract.startsWith("web.suggest"))).toEqual(["path-rewrite.writer.v2", "path-rewrite.writer.v2", "report.answer.later.v3"]);
 
     const old = await firstDebate();
     const { teams: [oldTeam] } = await chain(old.root, old.position, 1);

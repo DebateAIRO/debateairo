@@ -198,7 +198,7 @@ describe("the practice runs the shipped composition (drift guard)", () => {
 
   it("W3-7: both compose the path rewrite with the one function, the same members, and hand it to the runner the same way", () => {
     const composed = (source: string) => flat(source).match(/const pathRewrite = composePathRewrite\(\{.*?\}\);/gu);
-    expect(composed(RUNNER_MAIN)).toEqual(["const pathRewrite = composePathRewrite({ pool, targets: providerTargets, members: "
+    expect(composed(RUNNER_MAIN)).toEqual(["const pathRewrite = composePathRewrite({ pool, targets: providerTargets, ...(writerTokenCount === undefined ? {} : { tokenCount: writerTokenCount }), members: "
       + "[providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), "
       + "...providerTopology.additionalMakers], log: storyLog });"]);
     expect(composed(PRACTICE_RUNNER)).toEqual(composed(RUNNER_MAIN));

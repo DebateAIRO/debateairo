@@ -12,6 +12,7 @@ import { configureContentEncryption, createPool, PostgresDigModelRunnerRepositor
 import { MonthPause, monthPaused } from "./month-pause.js";
 import { composePathRewrite, PATH_REWRITE_WRITER_MODEL } from "./path-rewrite-composition.js";
 import { composeInvestigationClose } from "./investigation-close-sources.js";
+import { targetTokenCounter } from "./token-line.js";
 import { startInvestigationCloseSweep } from "./investigation-close.js";
 import { startPathRewriteSweep } from "./path-rewrite-sweep.js";
 import { startTreeSweep } from "./path-climb.js";
@@ -31,7 +32,7 @@ import {
 // ONE line on purpose: `tests/architecture/dev-runner-provider-set.test.ts` pins this
 // import line so `probeTarget` — the persisting probe — cannot enter this module under
 // any local name (codex r2 B1). A multi-line import hides the specifiers from that pin.
-import { createAnthropicTokenCounter, ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, createPreviewBusyCoordinator, previewRunResilience, withPreviewProviderCallPolicy, previewProbeControls, previewSealedRoleFallbackCovered, previewTargetGatewayControls, PREVIEW_GLM_DEADLINE_MS, observeClaimTimeTarget, providerTargetGatewayControls, providerTargetPrice, previewTargetChargePrice, resolveProviderTargetCredentials, previewStructureRepairRoute, previewStructureRepairCeiling, withStructureRepair, previewFinalWriterTierUnreadLine, type PreviewFinalWriterTierUnread, type ProviderGateway, type TokenCounter } from "@debateai/providers";
+import { createPreviewGuardedFetch, createPreviewBudgetRpcPorts, createPreviewBusyCoordinator, previewRunResilience, withPreviewProviderCallPolicy, previewProbeControls, previewSealedRoleFallbackCovered, previewTargetGatewayControls, PREVIEW_GLM_DEADLINE_MS, observeClaimTimeTarget, providerTargetGatewayControls, providerTargetPrice, previewTargetChargePrice, resolveProviderTargetCredentials, previewStructureRepairRoute, previewStructureRepairCeiling, withStructureRepair, previewFinalWriterTierUnreadLine, type PreviewFinalWriterTierUnread, type ProviderGateway } from "@debateai/providers";
 import {
   STORY_SHAPES_DIR_ENV_KEY,
   StoryWriter,
@@ -238,16 +239,6 @@ const previewBusy = createPreviewBusyCoordinator();
  * refused any target with no declared price, so `providerTargetPrice` below cannot be null there — the refusal is kept
  * anyway, because a control that depends on another control having run is one edit away from being none.
  */
-/**
- * R22 decision 28: Anthropic's free token count, by the way each Anthropic target's calls reach it: the same base URL, the same key, the
- * same fetch (on the preview, the guarded fetch to its gate). A count that fails is logged and the byte guard stands.
- */
-function targetTokenCounter(target: (typeof providerTargets)[number]): TokenCounter | undefined {
-  if (target.adapterKind !== ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND) return undefined;
-  return createAnthropicTokenCounter({ endpoint: target.baseUrl, model: target.model,
-    ...(target.authorizationHeader === undefined ? {} : { authorizationHeader: target.authorizationHeader }),
-    ...(previewGate === undefined ? {} : { fetchImplementation: previewFetch }), log: (event, detail) => { storyLog(event, detail); } });
-}
 function targetGateway(target: (typeof providerTargets)[number]): ProviderGateway {
   // Owner answer F4 (2026-10-30): on the preview, a reviewed Anthropic row's calls are charged at the vendor's real
   // prices (cache writes and reads, the 100,000-token step), the same steps its gate settles at.
@@ -255,7 +246,8 @@ function targetGateway(target: (typeof providerTargets)[number]): ProviderGatewa
   if (runnerSite.money !== null && price === null) {
     throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`);
   }
-  const tokenCount = targetTokenCounter(target);
+  // R22 decision 28: Anthropic's free token count, near the 100K line. A count that fails is logged and the byte guard stands.
+  const tokenCount = targetTokenCounter(target, previewGate === undefined ? undefined : previewFetch, storyLog);
   const gateway = createPostgresProviderGateway(pool, {
     ...(previewGate === undefined ? {} : { fetchImplementation: previewFetch }),
     endpoint: target.baseUrl,
@@ -367,7 +359,7 @@ const storyWriter = new StoryWriter({
  */
 const writerTokenCount = (() => {
   const haiku = providerTargets.find((target) => target.model === PATH_REWRITE_WRITER_MODEL);
-  return haiku === undefined ? undefined : targetTokenCounter(haiku);
+  return haiku === undefined ? undefined : targetTokenCounter(haiku, previewGate === undefined ? undefined : previewFetch, storyLog);
 })();
 const pathRewrite = composePathRewrite({ pool, targets: providerTargets, ...(writerTokenCount === undefined ? {} : { tokenCount: writerTokenCount }),
   members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],

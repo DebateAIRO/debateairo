@@ -146,6 +146,10 @@ test("the public namespace exists and covers every public translation call", () 
     usedKeys.add(`public.publicationReview.category.${category}`);
     usedKeys.add(`public.publicationReview.rule.${category}`);
   }
+  // Decision 27: the PDF's trust words, sides and verdicts are chosen through small maps and conditions.
+  for (const match of sources.get("lib/report/investigationReportModel.ts").matchAll(/\bpublic\.report\.(?:trust|investigation)\.[A-Za-z0-9_]+/g)) {
+    usedKeys.add(match[0]);
+  }
   assert.ok(usedKeys.size > 0, "S2-public sources must use public namespace keys");
   for (const key of usedKeys) assert.ok(Object.hasOwn(catalog, key), `missing ${key}`);
   assert.deepEqual([...usedKeys].sort(), Object.keys(catalog).sort(), "public catalog has no unused keys");

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { ANTHROPIC_TOKEN_COUNT_FROM_ESTIMATE, ANTHROPIC_TOKEN_LINE, buildFramedPrompt, type PromptContract, type PromptPacket, type TokenCounter } from "@debateai/providers";
+import { ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND, ANTHROPIC_TOKEN_COUNT_FROM_ESTIMATE, ANTHROPIC_TOKEN_LINE, buildFramedPrompt, createAnthropicTokenCounter, type PromptContract, type PromptPacket, type TokenCounter } from "@debateai/providers";
 import { PATH_REWRITE_WRITER_V2_PROMPT_CONTRACT, REPORT_STORY_PROMPT_CONTRACT, type ReportAnswerDraft, type ReportCallMaterial } from "@debateai/story";
 import {
   INVESTIGATION_REPORT_ASK_ROOM_BYTES, INVESTIGATION_REPORT_ROUND_TWO_ROOM_BYTES, buildInvestigationDossier, type DossierBuilt, type DossierInput
@@ -20,6 +20,18 @@ import {
  *
  * THE FENCE COUNTED is fixed by code, not the call's own random one, so a closing run again counts the same bytes and lands on the same step.
  */
+/**
+ * The count for a target whose calls go on Anthropic's wire, by the way those calls reach it: the same base URL, the same key, the same
+ * fetch (on the preview, the guarded fetch to its gate). Any other target has none.
+ */
+export function targetTokenCounter(target: Readonly<{ adapterKind?: string; baseUrl: string; model: string; authorizationHeader?: string }>,
+  fetchImplementation: typeof fetch | undefined, log: Log): TokenCounter | undefined {
+  if (target.adapterKind !== ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND) return undefined;
+  return createAnthropicTokenCounter({ endpoint: target.baseUrl, model: target.model,
+    ...(target.authorizationHeader === undefined ? {} : { authorizationHeader: target.authorizationHeader }),
+    ...(fetchImplementation === undefined ? {} : { fetchImplementation }), log });
+}
+
 const COUNT_TRIES = 6;
 const roomTokens = (bytes: number): number => Math.ceil(bytes / 2);
 const looksClose = (bytes: number): boolean => bytes / 2 >= ANTHROPIC_TOKEN_COUNT_FROM_ESTIMATE;

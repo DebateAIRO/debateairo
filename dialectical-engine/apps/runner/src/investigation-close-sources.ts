@@ -128,28 +128,24 @@ async function sourcesOfPoints(pool: Pool, runId: string, pointIds: readonly str
 
 /**
  * Decision 27: each point's trust word, by the contract's one rule (`trustOfPoint`), for the stored version's PDF. Unread points have
- * no word; a failed read costs the words, never the report. Never in the writer's material: a word can change with time.
+ * no word (the caller lets a failed read cost the words, never the report). Never in the writer's material: a word can change with time.
  */
-async function trustWordsOf(pool: Pool, runId: string, free: boolean, pointIds: readonly string[]): Promise<ReadonlyMap<string, TrustWord>> {
+export async function trustWordsOf(pool: Pool, runId: string, free: boolean, pointIds: readonly string[]): Promise<ReadonlyMap<string, TrustWord>> {
   const words = new Map<string, TrustWord>();
   if (pointIds.length === 0) return words;
-  try {
-    const liveness = new LivenessRepository(pool);
-    const rows = (await pool.query<{ node_id: string; way_of_knowing: string; locator: string | null; relevant_as_of: Date; outcome: string | null }>(
-      `SELECT node.node_id::text AS node_id, node.way_of_knowing, node.locator, node.relevant_as_of, review.outcome
-         FROM core.node AS node
-         LEFT JOIN LATERAL (SELECT outcome FROM ledger.node_review WHERE node_id = node.node_id ORDER BY at_seq DESC LIMIT 1) AS review ON true
-        WHERE node.run_id = $1 AND node.node_id = ANY($2::uuid[])`, [runId, [...pointIds]])).rows;
-    const quotes = await new PostgresPassageRetentionRepository(pool).readShownQuotes(runId);
-    const labels = new Set((quotes ?? []).map((quote) => quote.label));
-    for (const row of rows) {
-      const staleness = await liveness.readSubjectStaleness({ runId, subjectKind: "NODE", subjectRef: row.node_id, relevantAsOf: row.relevant_as_of });
-      const placed = trustOfPoint({ review: row.outcome === null ? null : { outcome: row.outcome }, staleness_state: staleness.state, way_of_knowing: row.way_of_knowing,
-        looked_up_checked: row.way_of_knowing === "LOOKED_UP" && row.locator !== null && labels.has(row.locator) && row.outcome === "agree" }, { free, fell: false });
-      if (placed.trust !== null) words.set(row.node_id.toLowerCase(), placed.trust);
-    }
-  } catch {
-    return new Map();
+  const liveness = new LivenessRepository(pool);
+  const rows = (await pool.query<{ node_id: string; way_of_knowing: string; locator: string | null; relevant_as_of: Date; outcome: string | null }>(
+    `SELECT node.node_id::text AS node_id, node.way_of_knowing, node.locator, node.relevant_as_of, review.outcome
+       FROM core.node AS node
+       LEFT JOIN LATERAL (SELECT outcome FROM ledger.node_review WHERE node_id = node.node_id ORDER BY at_seq DESC LIMIT 1) AS review ON true
+      WHERE node.run_id = $1 AND node.node_id = ANY($2::uuid[])`, [runId, [...pointIds]])).rows;
+  const quotes = await new PostgresPassageRetentionRepository(pool).readShownQuotes(runId);
+  const labels = new Set((quotes ?? []).map((quote) => quote.label));
+  for (const row of rows) {
+    const staleness = await liveness.readSubjectStaleness({ runId, subjectKind: "NODE", subjectRef: row.node_id, relevantAsOf: row.relevant_as_of });
+    const placed = trustOfPoint({ review: row.outcome === null ? null : { outcome: row.outcome }, staleness_state: staleness.state, way_of_knowing: row.way_of_knowing,
+      looked_up_checked: row.way_of_knowing === "LOOKED_UP" && row.locator !== null && labels.has(row.locator) && row.outcome === "agree" }, { free, fell: false });
+    if (placed.trust !== null) words.set(row.node_id.toLowerCase(), placed.trust);
   }
   return words;
 }
@@ -211,7 +207,7 @@ function storedRewriteOf(value: unknown): StoredRewrite | null {
 export type InvestigationInputReader = (rootRunId: string, earlier: Readonly<{ version: number; segments: readonly string[] }> | null)
   => Promise<InvestigationCloseInput | null>;
 
-export function postgresInvestigationCloseSources(pool: Pool): InvestigationCloseSources & Readonly<{ investigationInputOf: InvestigationInputReader }> {
+export function postgresInvestigationCloseSources(pool: Pool, log?: (event: string, detail: Record<string, unknown>) => void): InvestigationCloseSources & Readonly<{ investigationInputOf: InvestigationInputReader }> {
   const runs = new RunRepository(pool);
   const picks = new PostgresDigPicksRunnerRepository(pool);
   const digModel = new PostgresDigModelRunnerRepository(pool);
@@ -339,10 +335,15 @@ export function postgresInvestigationCloseSources(pool: Pool): InvestigationClos
     const trustWords = new Map<string, TrustWord>();
     if (forReport) {
       const free = ask.planTier === "free";
-      for (const [id, word] of await trustWordsOf(pool, root, free, paths.flatMap((path) => path.points.map((point) => point.id)))) trustWords.set(id, word);
-      for (const dig of digs) {
-        const ids = dig.ownMaterial?.paths.flatMap((path) => path.points.map((point) => point.id)) ?? [];
-        for (const [id, word] of await trustWordsOf(pool, dig.runId, free, ids)) trustWords.set(id, word);
+      try {
+        for (const [id, word] of await trustWordsOf(pool, root, free, paths.flatMap((path) => path.points.map((point) => point.id)))) trustWords.set(id, word);
+        for (const dig of digs) {
+          const ids = dig.ownMaterial?.paths.flatMap((path) => path.points.map((point) => point.id)) ?? [];
+          for (const [id, word] of await trustWordsOf(pool, dig.runId, free, ids)) trustWords.set(id, word);
+        }
+      } catch (error) {
+        log?.("INVESTIGATION_REPORT_TRUST_WORDS_UNREAD", { runId: root, code: error instanceof TypedDomainError ? error.code : error instanceof Error ? error.name : "UNTYPED" });
+        trustWords.clear();
       }
     }
     return Object.freeze({
@@ -414,7 +415,7 @@ export function composeInvestigationClose(input: Readonly<{
   const members = Object.freeze([...input.members]);
   return Object.freeze({
     reports: new PostgresInvestigationReportRunnerRepository(pool),
-    sources: postgresInvestigationCloseSources(pool),
+    sources: postgresInvestigationCloseSources(pool, input.log),
     seal: (rootRunId: string, reportId: string, content: InvestigationReportContent): Promise<WebSealed> =>
       withRunContentLease(pool, [rootRunId], async () => {
         const sealed = await encryptAttestedContentForRun(pool, rootRunId, INVESTIGATION_REPORT_CARRIER, reportId, content);
