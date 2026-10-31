@@ -12,22 +12,29 @@ import {
   type ProviderGateway
 } from "@debateai/providers";
 import {
+  WEB_DIG_PLANNER_PROMPT_CONTRACT,
   WEB_PLAN_CALL_SITE_KEY,
   WEB_PLANNER_V2_PROMPT_CONTRACT,
   WEB_REPLY_SEARCHES_INVALID,
   classifyStructuredArtifact,
   parseStructuredArtifact,
+  webDigPlannerMaterialFields,
+  webDigPlannerReplyIssues,
+  webDigPlannerReplySchema,
   webPlannerV2MaterialFields,
   webPlannerV2ReplyIssues,
   webPlannerV2ReplySchema,
+  type WebDigPlannerReply,
   type WebMode,
   type WebPlannerPoint,
   type WebPlannerV2Reply,
   type WebReplyIssue
 } from "@debateai/judgement";
 import {
+  freezeDigQuerySet,
   freezeWebQuerySet,
   localSearchTarget,
+  type FrozenDigQuerySet,
   type FrozenWebQuerySet,
   type PlannedWebPath,
   type PlannedWebSearch,
@@ -432,6 +439,135 @@ export async function planWebSearches(input: WebPlannerInput): Promise<WebPlanOu
     code: attempts.at(-1)?.code ?? "WEB_PLANNER_NO_SEAT",
     attempts: Object.freeze(attempts)
   });
+}
+
+/* ----------------------------------------------------------------- a dig's planner (W4-2) */
+
+/** One pick of a dig as the planner reads it: its 0135 number and its words (a suggestion, an edit, the person's view). */
+export type WebDigPlannerInputPick = Readonly<{ pickNo: number; text: string }>;
+
+export type WebDigPlannerInput = Omit<WebPlannerInput, "paths" | "placeCountry"> & Readonly<{
+  /** The dig's picks, in their order. */
+  picks: readonly WebDigPlannerInputPick[];
+  /** The dig's path its searches, pages and one pack are kept under (the first path of the dig's map). */
+  homePathId: string;
+}>;
+
+export type WebDigPlanOutcome =
+  | Readonly<{ kind: "NOT_ON_PLAN" }>
+  | Readonly<{ kind: "SWITCHED_OFF" }>
+  | Readonly<{ kind: "FAILED"; code: string; attempts: readonly WebPlannerAttempt[] }>
+  | Readonly<{
+    kind: "PLANNED";
+    querySet: FrozenDigQuerySet;
+    /** The searches the set will send (held ones are not sent and cost nothing). */
+    searchesToSend: number;
+    cap: number;
+    /** Picks past the search cap, in order (none while a dig names at most 16 places). */
+    picksOverCap: readonly number[];
+    callSiteKey: string;
+    maker: string;
+    model: string;
+    rawArtifactRef: string;
+    ledgerEntryRef: string;
+    attempts: readonly WebPlannerAttempt[];
+  }>;
+
+/** The dig planner's pick ids, by code: `k1`, `k2`, … in pick order (never 0135's own numbers). */
+const pickIdOf = (index: number): string => `k${String(index + 1)}`;
+
+/** The dig planner's framed prompt: `web.plan-dig.v1`, the dig's question and its picks, the run's language last. */
+export function webDigPlannerFramedPrompt(input: Readonly<{
+  question: string;
+  questionLanguage: QuestionLanguage | null;
+  picks: readonly WebDigPlannerInputPick[];
+}>): FramedPrompt {
+  const material = webDigPlannerMaterialFields({ question: input.question,
+    picks: input.picks.map((pick, index) => Object.freeze({ pickId: pickIdOf(index), text: pick.text })) });
+  return buildFramedPrompt({ contract: WEB_DIG_PLANNER_PROMPT_CONTRACT, material: withQuestionLanguageField(material, input.questionLanguage) });
+}
+
+/** `pickIds` are the material's (`k<n>`); `pickNumbers` the same picks' 0135 numbers, which the frozen set keys by. */
+type DigPlannerContext = Readonly<{ pickIds: readonly string[]; pickNumbers: readonly string[]; homePathId: string; asOf: Date }>;
+
+/** The full check of one decoded reply: one search per pick, then the search rules (W1-2's guard, no pair rule). */
+function checkedDigPlan(value: WebDigPlannerReply, context: DigPlannerContext):
+  Readonly<{ kind: "OK"; querySet: FrozenDigQuerySet }> | Readonly<{ kind: "ISSUES"; issues: readonly WebReplyIssue[] }> {
+  const formIssues = webDigPlannerReplyIssues(value, context.pickIds);
+  if (formIssues.length > 0) return Object.freeze({ kind: "ISSUES", issues: formIssues });
+  const planned = context.pickIds.map((pickId, index) => {
+    const search = value.searches.find((entry) => entry.pick_id === pickId)!;
+    return Object.freeze({ pickId: context.pickNumbers[index]!, pace: PACE[search.pace], text: search.query });
+  });
+  try {
+    return Object.freeze({ kind: "OK", querySet: freezeDigQuerySet(planned,
+      { pickIds: context.pickNumbers, pathId: context.homePathId, asOf: context.asOf }) });
+  } catch (error) {
+    if (!(error instanceof TypedDomainError)) throw error;
+    // Two picks sending the same words (or a search the rules refuse): the list is asked again, through the follow-up.
+    return Object.freeze({ kind: "ISSUES", issues: Object.freeze([Object.freeze({ code: WEB_REPLY_SEARCHES_INVALID,
+      path: Object.freeze(["searches"]), message: WEB_REPLY_SEARCHES_INVALID })]) });
+  }
+}
+
+/**
+ * A dig's planner (W4-2; owner Q9): ONE search per pick, written from the pick's words and the dig's question, which
+ * names the path the picks are on. The same order as `planWebSearches`: Free and the off switch first (no call), then the
+ * planner and its backup of another company (the same call-site keys: a run is a first debate or a dig, never both), the
+ * slip order (the gateway's smallest follow-up, then a full re-ask), and the debate goes on without the web when every
+ * planner fails. Code then freezes the searches (`freezeDigQuerySet`): W1-2's guard, no for-and-against pair, the
+ * look-back date from each search's pace. Thorough doubles the cap; a dig names at most 16 places, so it never cuts one.
+ */
+export async function planDigWebSearches(input: WebDigPlannerInput): Promise<WebDigPlanOutcome> {
+  if (input.planId === "FREE") return Object.freeze({ kind: "NOT_ON_PLAN" });
+  if (!input.webSwitchedOn) return Object.freeze({ kind: "SWITCHED_OFF" });
+  if (input.picks.length === 0 || input.homePathId.trim() === "") {
+    throw new TypedDomainError("WEB_DIG_PLANNER_INPUT_INVALID", "A dig's planner reads its picks and the path they are kept under");
+  }
+  const cap = WEB_PLAN_SEARCH_CAP_BY_MODE[input.mode];
+  const picks = input.picks.slice(0, cap);
+  const picksOverCap = Object.freeze(input.picks.slice(cap).map((pick) => pick.pickNo));
+  const framed = webDigPlannerFramedPrompt({ question: input.question, questionLanguage: input.questionLanguage, picks });
+  const context: DigPlannerContext = Object.freeze({
+    pickIds: Object.freeze(picks.map((_, index) => pickIdOf(index))),
+    pickNumbers: Object.freeze(picks.map((pick) => String(pick.pickNo))), homePathId: input.homePathId, asOf: input.asOf
+  });
+  const classify = (content: string, reply: ModelReplyFacts | undefined): ContentClassification =>
+    classifyStructuredArtifact(content, webDigPlannerReplySchema, reply, undefined, (value) => {
+      const checked = checkedDigPlan(value, context);
+      return checked.kind === "OK" ? [] : checked.issues;
+    });
+  const attempts: WebPlannerAttempt[] = [];
+  for (const [index, seat] of input.seats.slice(0, PLANNER_KEYS.length).entries()) {
+    const callSiteKey = PLANNER_KEYS[index]!;
+    const reading = rememberingAcceptedReply(classify);
+    try {
+      const response = await seat.provider.call({
+        runId: input.runId, subjectItemId: input.subjectItemId, callSiteKey, role: "JUDGE", lane: "served",
+        bound: input.bound, contractHash: input.contractHash, providerRef: seat.providerRef, packet: framed.packet,
+        classifyContent: reading.classifyContent,
+        buildRepairPacket: (rejected) => buildFramedRepairPrompt(framed, schemaFailureLocator(rejected)),
+        ...(input.keepRoomMicros !== undefined && input.keepRoomMicros > 0 ? { keepRoomMicros: input.keepRoomMicros } : {})
+      });
+      const parsed = parseStructuredArtifact(response.content, webDigPlannerReplySchema, reading.acceptedAs(response.content).reply);
+      const checked = parsed.kind === "PARSED" ? checkedDigPlan(parsed.value, context) : null;
+      if (checked === null || checked.kind !== "OK") {
+        attempts.push(Object.freeze({ callSiteKey, maker: seat.maker, code: "WEB_PLANNER_REPLY_REFUSED" }));
+        continue;
+      }
+      const { querySet } = checked;
+      return Object.freeze({
+        kind: "PLANNED", querySet, searchesToSend: querySet.searches.filter((search) => search.status === "SEND").length, cap,
+        picksOverCap, callSiteKey, maker: response.maker, model: response.model, rawArtifactRef: response.rawArtifactRef,
+        ledgerEntryRef: response.ledgerEntryRef, attempts: Object.freeze([...attempts])
+      });
+    } catch (error) {
+      if (input.abandon?.(error) === true) throw error;
+      attempts.push(Object.freeze({ callSiteKey, maker: seat.maker, code: errorCodeOf(error) }));
+      if (input.stopsHere?.(error) === true) break;
+    }
+  }
+  return Object.freeze({ kind: "FAILED", code: attempts.at(-1)?.code ?? "WEB_PLANNER_NO_SEAT", attempts: Object.freeze(attempts) });
 }
 
 /* ----------------------------------------------------------------- per path, for the page and the web step */

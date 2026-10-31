@@ -21,6 +21,7 @@ export * from "./query-guard.js";
 export * from "./host-filter.js";
 export * from "./window.js";
 export * from "./web-query-set.js";
+export * from "./web-dig-query-set.js";
 export * from "./verbatim.js";
 
 const nonBlank = (value: string, code: string): string => {

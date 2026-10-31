@@ -4,6 +4,7 @@ import {
   COMPARING_JUDGE_SOURCES_PROMPT_CONTRACT,
   PANEL_PROMPT_CONTRACT,
   WEB_STEP_PROMPT_CONTRACTS,
+  WEB_DIG_SEALED_CONTRACTS,
   WEB_WORDING_V2_SEALED_CONTRACTS,
   judgeSourcesSealedContracts,
   judgeConsiderationPromptContract,
@@ -882,7 +883,9 @@ describe("REVIEW ITEM 4 — no prompt anywhere still carries the retired sentenc
     ...[...WEB_STEP_PROMPT_CONTRACTS, ...judgeSourcesSealedContracts(), COMPARING_JUDGE_SOURCES_PROMPT_CONTRACT,
       SYNTHESIZER_LENGTH_SOURCES_PROMPT_CONTRACT, SYNTHESIZER_LENGTH_READER_SOURCES_PROMPT_CONTRACT, ...WEB_WORDING_V2_SEALED_CONTRACTS,
       // W3-5 (dig-model revision): the path rewrite's writer and checker; their texts are pinned below.
-      ...PATH_REWRITE_SEALED_CONTRACTS]
+      ...PATH_REWRITE_SEALED_CONTRACTS,
+      // W4-2: the dig's planner; its text is pinned in tests/unit/web-prompts.test.ts.
+      ...WEB_DIG_SEALED_CONTRACTS]
       .map((contract): [string, typeof contract] => [contract.contractId, contract])
   ])("%s", (_name, contract) => {
     const whole = `${contract.instruction} ${contract.answerForm}`;
