@@ -11,6 +11,7 @@ import {
   type WebRolePrices
 } from "@debateai/budget";
 import { previewModelRow, previewVendorPrices } from "@debateai/providers";
+import { webSitesForAsk } from "../../apps/api/src/engine-ask.js";
 import {
   WEB_HAIKU_PROMPT_TOKEN_LINE,
   WEB_READER_BATCH_TOKENS,
@@ -71,12 +72,12 @@ describe("W2-2 · the web part's counts at the owner's caps", () => {
       readerOneCallsPerPack: 14, topCount: 5 });
   });
 
-  it("a dig (R22 decision 9): up to 4 searches per chosen path, each chosen path's own planner, 5 results each, one shared pack", () => {
-    expect(webSitesOf({ kind: "DIG", depth: "QUICK", digPicks: 3 })).toMatchObject({ packs: 1, searches: 12, resultsPerSearch: 5,
-      pageTokensPerPack: 1_200_000, readerOneCalls: 21, pickCalls: 1, topReaderCalls: 2, plannerCalls: 3 });
+  it("a dig (R22): each chosen path a pack of its own: its planner, up to 4 searches, its reader-1 batches, its pick, its readers 2 and 3", () => {
+    expect(webSitesOf({ kind: "DIG", depth: "QUICK", digPicks: 3 })).toMatchObject({ packs: 3, searches: 12, searchesPerPack: 4, resultsPerSearch: 5,
+      pageTokensPerPack: 400_000, readerOneCalls: 21, pickCalls: 3, topReaderCalls: 6, plannerCalls: 3 });
     // Under the debate's cap: Quick look 20, Thorough 40; a planner per chosen path whatever the cap keeps.
-    expect(webSitesOf({ kind: "DIG", depth: "QUICK", digPicks: 16 })).toMatchObject({ searches: 20, plannerCalls: 16 });
-    expect(webSitesOf({ kind: "DIG", depth: "THOROUGH", digPicks: 16 })).toMatchObject({ searches: 40, plannerCalls: 16, topCount: 5 });
+    expect(webSitesOf({ kind: "DIG", depth: "QUICK", digPicks: 16 })).toMatchObject({ packs: 16, searches: 20, plannerCalls: 16 });
+    expect(webSitesOf({ kind: "DIG", depth: "THOROUGH", digPicks: 16 })).toMatchObject({ packs: 16, searches: 40, plannerCalls: 16, topCount: 5 });
     const refused = expect.objectContaining({ code: "WEB_SITES_INVALID" });
     expect(() => webSitesOf({ kind: "DIG", depth: "QUICK", digPicks: 0 })).toThrow(refused);
     expect(() => webSitesOf({ kind: "DIG", depth: "QUICK", digPicks: 17 })).toThrow(refused);
@@ -172,10 +173,11 @@ describe("W2-2 · the web part's money at R22 prices (never under the caps)", ()
   });
 });
 
-describe("W2-2 · the receipt carries the web part (envelope_basis.web)", () => {
-  const TERMS = Object.freeze({ judgeMaxAttempts: 3, organMaxAttempts: 3, maxRecompose: 1, maxCooldownHoldsPerRun: 2,
+const TERMS = Object.freeze({ judgeMaxAttempts: 3, organMaxAttempts: 3, maxRecompose: 1, maxCooldownHoldsPerRun: 2,
     finalRetryAttempts: 1, branchingFactor: 2, compositionSegmentCap: 4, fixedOrgansPerComposition: 6, reviewerCallsPerNode: 1,
     synthesizerMaxRounds: 3, evaluatorMaxRounds: 3, maxDepth: 5 });
+
+describe("W2-2 · the receipt carries the web part (envelope_basis.web)", () => {
   const WEB = webSitesOf({ kind: "START", depth: "QUICK", paths: 3 });
 
   it("rides last, adds its model calls to the ceiling at a panel member's attempts, and changes no other byte", () => {
@@ -213,6 +215,12 @@ describe("R22 decision 9 · a dig's web part fits up to 4 searches per chosen pa
     expect(one.searchMicros).toBe(4 * 1_000);
     expect(three.searchMicros).toBe(12 * 1_000);
     expect(three.plannerMicros).toBe(3 * one.plannerMicros);
+    // Each chosen path's own readers: 3 times the first reader, the pick and readers 2 and 3.
+    expect(three.readerOneMicros).toBe(3 * one.readerOneMicros);
+    expect(three.pickMicros).toBe(3 * one.pickMicros);
+    expect(three.topReaderMicros).toBe(3 * one.topReaderMicros);
+    // The arguing's reading is bounded at three packs' worth, whatever the picks (web-packs.ts).
+    expect(estimateWebPartMicros(digSites(6), ROLES).packMicros).toBe(three.packMicros);
     expect(one.suggestMicros).toBeGreaterThan(0);
     expect(three.totalMicros).toBeGreaterThan(one.totalMicros);
     // A first debate's part is untouched: no suggestion part, the same total as pinned above.
@@ -226,6 +234,30 @@ describe("R22 decision 9 · a dig's web part fits up to 4 searches per chosen pa
   it("every Haiku call of the part stays under the price line, at the most searches a dig may send", () => {
     const tokens = webCallTokens(webSitesOf({ kind: "DIG", depth: "THOROUGH", digPicks: 16 }));
     for (const call of [tokens.readerOne, tokens.pick, tokens.planner]) expect(call.inputTokens).toBeLessThan(WEB_HAIKU_PROMPT_TOKEN_LINE);
+  });
+});
+
+describe("R22 · the web part reaches the receipt, so the run's attempt ceiling counts the web calls", () => {
+  const BASE = { searchGate: true, shape: { plan: "plus", answers: 4 }, engine: {}, depth: 1, parent: undefined };
+  it("a paid engine-2 debate that can search carries it: Thorough from depth 2; a dig counts its picks in its own mode", () => {
+    expect(webSitesForAsk(BASE)).toMatchObject({ kind: "START", depth: "QUICK", packs: 4 });
+    expect(webSitesForAsk({ ...BASE, depth: 2 })).toMatchObject({ kind: "START", depth: "THOROUGH", topCount: 5 });
+    const pick = { kind: "OWN_VIEW", suggestion_id: null, place: "w", text: "x" } as const;
+    expect(webSitesForAsk({ ...BASE, parent: { mode: "thorough", picks: [pick, pick, pick] } })).toMatchObject({ kind: "DIG", depth: "THOROUGH", packs: 3, plannerCalls: 3 });
+    // A dig with no picks has no pick set on the runner: it plans as a first debate.
+    expect(webSitesForAsk({ ...BASE, parent: { mode: "quick" } })).toMatchObject({ kind: "START" });
+  });
+  it("none on Free, without the search gate, without engine 2 or a map: their receipts keep today's bytes", () => {
+    for (const other of [{ shape: { plan: "free", answers: 2 } }, { searchGate: false }, { engine: null }, { shape: null }]) {
+      expect(webSitesForAsk({ ...BASE, ...other })).toBeNull();
+    }
+  });
+  it("the ceiling grows by the web calls, by exactly what the debate's own web step can make", () => {
+    const today = computeStructuralCeilingBasis({ ...TERMS, panelSize: 3, depth: 2 }) as { max_model_attempts: number };
+    const sites = webSitesOf({ kind: "DIG", depth: "QUICK", digPicks: 3 });
+    const withWeb = computeStructuralCeilingBasis({ ...TERMS, panelSize: 3, depth: 2, web: sites }) as unknown as { max_model_attempts: number; web: { sites: { added_model_attempts: number } } };
+    expect(withWeb.max_model_attempts).toBe(today.max_model_attempts + withWeb.web.sites.added_model_attempts);
+    expect(webModelCalls(sites)).toBe(3 + 21 + 3 + 6);
   });
 });
 

@@ -445,7 +445,7 @@ describe("PATH_REWRITE is never walled", () => {
     expect(ask("story", "STORY:STORYTELLER:1", "SYNTHESIZER")).toBe(true);
   });
 
-  it("the person's windows count it: the owner spend reader reads RUN, STORY, PATH_REWRITE and W5-1's INVESTIGATION_REPORT", async () => {
+  it("the person's windows count it: the owner spend reader reads RUN, STORY, PATH_REWRITE, W5-1's INVESTIGATION_REPORT and F1's three funded kinds", async () => {
     const texts: string[] = [];
     const pool = { query: async (text: string, values: unknown[]) => {
       texts.push(text);
@@ -456,7 +456,7 @@ describe("PATH_REWRITE is never walled", () => {
     await store.readOwnerSpentInRangesMicros(OWNER, [{ from: at("2026-10-01T00:00:00.000Z"), to: at("2026-10-02T00:00:00.000Z") }]);
     await store.readOwnerChargesMicros(OWNER, at("2026-10-01T00:00:00.000Z"), at("2026-10-02T00:00:00.000Z"));
     expect(texts).toHaveLength(3);
-    for (const text of texts) expect(text).toContain("spend.spend_source IN ('RUN','STORY','PATH_REWRITE','INVESTIGATION_REPORT')");
+    for (const text of texts) expect(text).toContain("spend.spend_source IN ('RUN','STORY','PATH_REWRITE','INVESTIGATION_REPORT','PATH_CLIMB','ANSWER_UPDATE','CONTRIBUTION_CHECK')");
   });
 });
 

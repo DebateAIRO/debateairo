@@ -280,9 +280,9 @@ import {
   buildScrutinyLegs, buildShapePlan, shapeLegCanRun, shapePositionCount, shapePositionsForTodaysOpening, shapePositionsFromMap,
   type ShapeLeg, type ShapePlan, type ShapePositionPlan
 } from "./shape-plan.js";
-import { runRunnerWebStep, type WebStepRunnerSettings } from "./web-step.js";
+import { runRunnerWebStep, webModeOfDepth, type WebStepRunnerSettings } from "./web-step.js";
 import {
-  WEB_ROOT_SOURCES_MAX_BYTES, engineSourceWithCitedExtracts, legWithWebSources, readDebateWebPacks, webCitedExtractsOf, webReviewInput,
+  WEB_DIG_ROOT_SOURCES_MAX_BYTES, WEB_ROOT_SOURCES_MAX_BYTES, engineSourceWithCitedExtracts, legWithWebSources, readDebateWebPacks, webCitedExtractsOf, webReviewInput,
   type DebateWebPacks
 } from "./web-packs.js";
 import { EVALUATOR_LENGTH_READER_SOURCES_PROMPT_CONTRACT, EVALUATOR_LENGTH_SOURCES_PROMPT_CONTRACT } from "./answer-checker-sources.js";
@@ -7747,7 +7747,7 @@ export class WalkingSkeletonRunner {
      * case writer that reads its path's pack (engine 2's fixed-words leg under its sources variant, the pack at its cut),
      * so a debate whose web step ran can still pay its first position; the map (before any pack exists) keeps today's.
      */
-    const rootZeroRoomMicros = (withPack = false): number => {
+    const rootZeroRoomMicros = (withPack = false, sourcesChars: number = WEB_ROOT_SOURCES_MAX_BYTES): number => {
       // T12-R0 / T12-R2 / T12-R3: root 0's room, at the dearest member of root 0's OWN seat (and the seat it is handed
       // to when its member sits out); hosted prices only. It covers root 0's first attempt + one retry, the larger of a
       // length retry and a format repair (`rootZeroRoomAttempts`, `rootZeroKeepRoomMicros`), plus, on a routed run, the
@@ -7764,7 +7764,7 @@ export class WalkingSkeletonRunner {
         lengthed: lengthGuidance !== null,
         // Ruling "PF-C5 root-0 bound" (a): with the row, root 0's map material is bounded by the runaway limits (L19).
         // W4-1: kept by the web step, engine 2's case writer with its path's pack at the cut.
-        ...(withPack && rootEngineMaterialChars !== null ? { sourcesChars: WEB_ROOT_SOURCES_MAX_BYTES } : {}),
+        ...(withPack && rootEngineMaterialChars !== null ? { sourcesChars } : {}),
         materialChars: rootEngineMaterialChars ?? rootMaterialChars }),
         structureRepair: repairCeiling === null || repairPrice === undefined ? null : { price: repairPrice,
           attempt: { requestBytes: repairCeiling.requestBytes, completionTokenCeiling: repairCeiling.completionTokenCeiling } } });
@@ -7935,7 +7935,7 @@ export class WalkingSkeletonRunner {
       const webStep = await runRunnerWebStep({
         pool: this.pool, settings: settings.webSearch,
         lane: callScheduler === undefined || callLane === undefined ? null : { lane: callLane, scheduler: callScheduler },
-        runId: run.runId, subjectItemId: claimed.workItemId, mode: "quick", question: run.questionLine,
+        runId: run.runId, subjectItemId: claimed.workItemId, mode: webModeOfDepth(expansionDepth), question: run.questionLine,
         questionLanguage: shapeLanguage, placeCountry: null, asOf: new Date(),
         siteLanguage: shapeLanguage === null ? { code: "en", name: "English" } : { code: shapeLanguage.code, name: shapeLanguage.name },
         paths: debateShapeMap.choice.answers.slice(0, shapeMapPositions.length).map((answer) => ({ pathRef: answer.answerId,
@@ -7943,7 +7943,7 @@ export class WalkingSkeletonRunner {
         members: [...configuredByProviderRef.values()].map((maker) => ({ provider: sitOutMaker(maker).provider,
           providerRef: maker.providerRef, maker: maker.maker, model: callSubjects?.subjectOf(maker.providerRef).model ?? maker.providerRef })),
         contractHash: settings.engine.engineContractHash, bound: settings.judgeBound,
-        keepRoomMicros: rootZeroRoomMicros(true), abandon: keepAliveStop, stopsHere: (error) => expansionPhaseStop(error) !== null
+        keepRoomMicros: rootZeroRoomMicros(true), digKeepRoomMicros: rootZeroRoomMicros(true, WEB_DIG_ROOT_SOURCES_MAX_BYTES), abandon: keepAliveStop, stopsHere: (error) => expansionPhaseStop(error) !== null
       });
       // W4-1: only a step that kept a pack opens the store again; a re-claimed run reads the same packs, so its prompts
       // are the same bytes. No web search happens inside the debate: the legs read what was stored here. W4-7: with the

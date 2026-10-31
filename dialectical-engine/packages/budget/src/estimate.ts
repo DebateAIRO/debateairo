@@ -278,7 +278,11 @@ export class RecentRunsCostEstimator implements CostEstimator {
   }
 }
 
-/** W2-2: the sample's web filter: a web class's own kind, depth, packs and searches; '' for a class without web. */
+/**
+ * W2-2: the sample's web filter: a web class's own kind, depth, packs and searches; '' for a class that names none, which samples
+ * every run of its settings, with or without a web receipt: the room's classes name none (only the quota line prices a dig's web
+ * part), so a minted receipt must not take a paid run out of the sample its own estimate learns from.
+ */
 function webSampleParams(web: WebSiteInput | undefined): readonly [string, string, string, string] {
   if (web === undefined) return ["", "", "", ""];
   const sites = webSitesOf(web);
@@ -333,10 +337,10 @@ export class PostgresRecentRunUsageSource implements RecentRunUsageSource {
              AND COALESCE(run.depth_params->>'scrutiny', '') = $8
              AND COALESCE(run.depth_params->>'answerLength', '') = $9
              AND COALESCE(run.envelope_basis->'shape'->>'plan', '') = $10
-             AND COALESCE(run.envelope_basis->'web'->>'kind', '') = $11
-             AND COALESCE(run.envelope_basis->'web'->>'depth', '') = $12
-             AND COALESCE(run.envelope_basis->'web'->>'packs', '') = $13
-             AND COALESCE(run.envelope_basis->'web'->>'searches', '') = $14
+             AND ($11 = '' OR COALESCE(run.envelope_basis->'web'->>'kind', '') = $11)
+             AND ($12 = '' OR COALESCE(run.envelope_basis->'web'->>'depth', '') = $12)
+             AND ($13 = '' OR COALESCE(run.envelope_basis->'web'->>'packs', '') = $13)
+             AND ($14 = '' OR COALESCE(run.envelope_basis->'web'->>'searches', '') = $14)
              AND EXISTS (SELECT 1 FROM core.work_item AS work WHERE work.run_id = run.run_id)
              AND NOT EXISTS (
                SELECT 1 FROM core.work_item AS work

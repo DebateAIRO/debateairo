@@ -1,4 +1,5 @@
 import {
+  isDigPickPathRef,
   WEB_CONTRACT_LIMITS, WebExplanationSchema, WebOtherPageSchema, WebPathSchema, WebSourceSchema, cutQuoteAtWordEdge,
   type AnswerWeb, type Node, type WebExplanation, type WebOtherPage, type WebPath, type WebReadDepth, type WebResearched,
   type WebSearchStatus, type WebSource
@@ -246,6 +247,21 @@ export function serveWebEvidence(input: Readonly<{
 /** The planner's reason as stored (0134's sealed `{ reason }`, opened), or null when it is not one. */
 export function webPlanReasonOf(value: unknown): string | null {
   return isRecord(value) ? text(value.reason) : null;
+}
+
+/**
+ * R22: a dig keeps each chosen path's searches, pages and top pages under that pick's own path_ref, which no map path names. For the
+ * page they all hang under the first path of the dig's map, as they did when a dig had one group, and once any search answered,
+ * every path of its map has searched: they all read the packs. A first debate's evidence comes back as the same object.
+ */
+export function digPicksAtMapPaths(evidence: WebServeEvidence, planRefs: readonly string[]): WebServeEvidence {
+  const home = planRefs[0];
+  if (home === undefined || !evidence.searches.some((search) => isDigPickPathRef(search.pathRef))) return evidence;
+  const at = <T extends Readonly<{ pathRef: string }>>(row: T): T => isDigPickPathRef(row.pathRef) ? { ...row, pathRef: home } : row;
+  const answered = evidence.searches.some((search) => search.outcome === "FOUND" || search.outcome === "EMPTY");
+  return { ...evidence,
+    searches: [...evidence.searches.map(at), ...(answered ? planRefs.slice(1).map((pathRef) => ({ searchId: `dig-map-${pathRef}`, pathRef, outcome: "FOUND" })) : [])],
+    extracts: evidence.extracts.map(at), picks: evidence.picks.map(at), researched: evidence.researched.map(at) };
 }
 
 /* ----------------------------------------------------------------- path names (W3-6) */

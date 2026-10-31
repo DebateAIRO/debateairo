@@ -376,7 +376,7 @@ describe("the seals", () => {
       // W5-1: the final report's five, after them.
       "report.answer.v1", "report.answer.later.v1", "report.answer-check.v1", "report.story.v1", "report.story-check.v1",
       // R22 decision 9 and W4-3: the dig method's two drafts, last.
-      "web.plan-dig.v2", "web.suggest-dig.v1"
+      "web.plan-dig.v2", "web.suggest-dig.v1", "web.plan-dig.v3"
     ]);
     expect(new Set(ENGINE_SEALED_CONTRACT_IDS).size).toBe(ENGINE_SEALED_CONTRACT_IDS.length);
     // The review is sealed with its edge count at zero, as the judge seal seals the review.

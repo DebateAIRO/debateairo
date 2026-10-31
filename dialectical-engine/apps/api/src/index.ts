@@ -1,4 +1,4 @@
-import { validatePreviewProviderTestConfig, previewLineUpOfConfig, previewPlanTierRosters, previewTeamAdmits, PREVIEW_TEAM_ONLY, PREVIEW_TEAM_RUNS_SQL, type PreviewProviderTestConfig } from "@debateai/providers";
+import { previewGateSocket, validatePreviewProviderTestConfig, previewLineUpOfConfig, previewPlanTierRosters, previewTeamAdmits, PREVIEW_TEAM_ONLY, PREVIEW_TEAM_RUNS_SQL, type PreviewProviderTestConfig } from "@debateai/providers";
 import { registerPasswordResetRoutes, passwordResetPolicyInventory } from "./password-reset-routes.js";
 import { registerEmailMfaRoutes, emailMfaPolicyInventory } from "./email-mfa-routes.js";
 import { AccountMemoryInputError, type AccountMemoryStore } from "./account-memory.js";
@@ -314,7 +314,8 @@ import {
 } from "@debateai/register";
 import type { AdmissionRunMembers } from "./admission-settings.js";
 import { debateShapeForPanel, normaliseAskForDebateShape, roomDepthParams } from "./debate-shape-ask.js";
-import { engineForAsk } from "./engine-ask.js";
+import { engineForAsk, webSitesForAsk } from "./engine-ask.js";
+import type { WebSites } from "@debateai/register";
 import { lengthAnswerWordsFor, lengthGuidanceForAsk } from "./length-guidance-ask.js";
 import type { MfaApplication } from "./mfa.js";
 import type { AuthSourceContext } from "@debateai/db";
@@ -5045,6 +5046,8 @@ export interface RunCreationSettings {
     readonly shape: DebateShapeCeilingInput | null;
     /** Length guidance (spec 2026-10-15 §3.1): the debate's numbers (`lengthGuidanceForAsk`), or null without the row. */
     readonly length: LengthGuidance | null;
+    /** W2-2 (R22): the web part (`webSitesForAsk`), or null where the debate cannot search. */
+    readonly web: WebSites | null;
     /** Engine redesign (INTERFACE §1.4): engine 2's settings for this panel (`engineForAsk`), or null without the row in force. */
     readonly engine: EngineSettings | null;
   }) => Promise<Readonly<Record<string, unknown>>>;
@@ -5369,6 +5372,7 @@ async function admitWithScorecard(input: Readonly<{
       const shape = debateShapeForPanel(settings.debateShapePolicy, ask.depth_params, input.shapePlan, makers);
       // Length guidance (spec 2026-10-15 §3.1): the plan's numbers at the asked length, frozen on the receipt.
       const length = lengthGuidanceForAsk(settings.lengthGuidancePolicy, ask.depth_params, input.shapePlan);
+      const engine = engineForAsk({ policy: settings.engineVersionPolicy, length, makers, mapOpening: shape !== null });
       return await settings.resolveEnvelopeBasis({
         depthParams: ask.depth_params,
         riskTier: risk.effectiveRiskTier,
@@ -5378,7 +5382,8 @@ async function admitWithScorecard(input: Readonly<{
         length,
         // Engine redesign (R1d; INTERFACE §1.4): engine 2's settings for this panel's makers, frozen on the receipt; null
         // without the row in force (engine 1, today's receipt). The answer check is a site only when the map opens the debate.
-        engine: engineForAsk({ policy: settings.engineVersionPolicy, length, makers, mapOpening: shape !== null })
+        engine,
+        web: webOfAsk(settings, ask, shape, engine)
       });
     } catch (error) {
       return markAskRefusal(error);
@@ -5667,6 +5672,7 @@ export async function evaluateAskAdmission(
     const shape = debateShapeForPanel(settings.debateShapePolicy, ask.depth_params, shapePlan, makers);
     // Length guidance (spec 2026-10-15 §3.1): the plan's numbers at the asked length, frozen on the receipt.
     const length = lengthGuidanceForAsk(settings.lengthGuidancePolicy, ask.depth_params, shapePlan);
+    const engine = engineForAsk({ policy: settings.engineVersionPolicy, length, makers, mapOpening: shape !== null });
     envelopeBasis = await settings.resolveEnvelopeBasis({
       depthParams: ask.depth_params,
       riskTier: risk.effectiveRiskTier,
@@ -5676,7 +5682,8 @@ export async function evaluateAskAdmission(
       shape,
       length,
       // Engine redesign (R1d; INTERFACE §1.4): as admitWithScorecard's resolveBasis.
-      engine: engineForAsk({ policy: settings.engineVersionPolicy, length, makers, mapOpening: shape !== null })
+      engine,
+      web: webOfAsk(settings, ask, shape, engine)
     });
   } catch (error) {
     markAskRefusal(error);
@@ -7237,4 +7244,12 @@ export class PostgresAskApplication implements AskApplication {
       settled: row.settled === true
     });
   }
+}
+
+/** W2-2 (R22): the web part an ask's receipt carries (`webSitesForAsk`): the search gate is this site's own, the rest the ask's. */
+function webOfAsk(settings: Pick<RunCreationSettings, "previewProviderTestConfig">, ask: Pick<AskRequest, "depth_params" | "parent">,
+  shape: Readonly<{ plan: string; answers: number }> | null, engine: unknown): WebSites | null {
+  const config = settings.previewProviderTestConfig;
+  return webSitesForAsk({ searchGate: config !== undefined && previewGateSocket(config, "perplexity") !== undefined, shape, engine,
+    depth: Number(ask.depth_params.depth), parent: ask.parent });
 }

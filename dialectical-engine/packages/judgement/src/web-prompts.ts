@@ -756,9 +756,8 @@ export function webDigPlannerReplyIssues(reply: WebDigPlannerReply, pickIds: rea
 
 /* ----------------------------------------------------------------- the dig method (R22 decision 9, W4-3) */
 
-// OWNER WORDING — a DRAFT for the owner's approval (R22 plan, decision 9; owner Q7 and its follow-up, 31 Oct). Written in the
-// planner's own sentences (items 1 and the local sentence): a reworded one is a new contract id, appended.
-/** A dig's planner, one call per chosen path: whether and what to search, up to 4 searches, told what is already known. */
+// WITHDRAWN by the owner's "always a pair" (31 Oct): sealed where it is, called by nothing; web.plan-dig.v3 below replaces it.
+/** A dig's planner as first drafted: up to 2 searches, up to 2 more local. */
 export const WEB_DIG_PLANNER_V2_INSTRUCTION =
   "Below is what the person chose to dig into in a debate, the question it belongs to, and what the whole debate has "
   + "already investigated. Decide whether looking things up on the web could bring a new view or a deeper insight that "
@@ -844,8 +843,8 @@ export function webDigPlannerV2ReplyIssues(reply: WebDigPlannerV2Reply, givenCou
   return Object.freeze(issues);
 }
 
-// OWNER WORDING — a DRAFT for the owner's approval (plan W4-3; owner Q7, 31 Oct: "only new POV or deeper insights that could
-// change the dig path should be included as options"), built on the approved suggestion sentences (§2.1).
+// Approved by the owner on 31 Oct (plan W4-3; owner Q7: "only new POV or deeper insights that could change the dig path should
+// be included as options"), built on the approved suggestion sentences (§2.1).
 /** The suggestions on one of a dig's own paths, after its rewrite: paid plans only, none at level 10. */
 export const WEB_SUGGEST_DIG_INSTRUCTION =
   "Below is one path of a dig in a debate, with its points for and against, what is still disputed, what the dig changed, "
@@ -908,9 +907,54 @@ export const webSuggestDigReplySchema = z.object({
 }).strict();
 export type WebSuggestDigReply = z.infer<typeof webSuggestDigReplySchema>;
 
-/** The dig method's two contracts, in the order the engine seal appends them (after everything before them). */
+// Approved by the owner on 31 Oct: v2's words with "write up to two searches" and "write up to two more searches" made pairs.
+/** A dig's planner, one call per chosen path: none, or a pair, and a local pair when it judges that worth it. OWNER-EDITABLE. */
+export const WEB_DIG_PLANNER_V3_INSTRUCTION = WEB_DIG_PLANNER_V2_INSTRUCTION
+  .replace("write up to two searches", "write two searches")
+  .replace("write up to two more searches like these", "write two more searches like these");
+export const WEB_DIG_PLANNER_V3_CONTRACT_ID = "web.plan-dig.v3" as const;
+
+/** v3's answer form (code's): none, or a pair, and may be a local pair: 0, 2 or 4 searches. */
+export const WEB_DIG_PLANNER_V3_ANSWER_FORM = [
+  STRICT,
+  "{",
+  "  \"country\": a two-letter country code (ISO 3166-1) | null,",
+  `  "needs_search": true | false, "reason": non-empty string | null, "pace": ${union(WEB_SEARCH_PACES)} | null,`,
+  `  "searches": [{ "side": ${union(WEB_SEARCH_SIDES)}, "local": true | false, "query": non-empty string }, ...]`,
+  "}",
+  "country is the country the question is about, or null when it is about no one country; when country is given, it is "
+    + "that code. When needs_search is false, reason says why, pace is null and searches is []. When needs_search is true, "
+    + "searches has 2 entries with local false, one \"for\" and one \"against\", and may have 2 more with local true, one "
+    + "\"for\" and one \"against\", for that country; pace says how fast what they look for goes out of date: \"fast\" "
+    + "(within a year), \"normal\" (within a few years) or \"slow\" (hardly at all)."
+].join("\n");
+
+export const WEB_DIG_PLANNER_V3_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: WEB_DIG_PLANNER_V3_CONTRACT_ID, instruction: WEB_DIG_PLANNER_V3_INSTRUCTION, answerForm: WEB_DIG_PLANNER_V3_ANSWER_FORM
+});
+
+/**
+ * v3's content checks: no search with a reason and no pace; or a pace with one English search per side and, when a country is
+ * known, optionally one local search per side (the first debate's rule): 0, 2 or 4, so an odd number or 5 is refused.
+ */
+export function webDigPlannerV3ReplyIssues(reply: WebDigPlannerV2Reply, givenCountryCode: string | null): readonly WebReplyIssue[] {
+  const issues: WebReplyIssue[] = [];
+  if (givenCountryCode !== null && reply.country !== null && reply.country !== givenCountryCode) {
+    issues.push(issueAt(WEB_REPLY_COUNTRY_INVALID, ["country"]));
+  }
+  const plain = reply.searches.filter((search) => !search.local).map((search) => search.side);
+  const local = reply.searches.filter((search) => search.local).map((search) => search.side);
+  const country = givenCountryCode ?? reply.country;
+  const valid = reply.needs_search
+    ? reply.pace !== null && oneOfEachSide(plain) && (local.length === 0 || (country !== null && oneOfEachSide(local)))
+    : reply.reason !== null && reply.pace === null && reply.searches.length === 0;
+  if (!valid) issues.push(issueAt(WEB_REPLY_SEARCHES_INVALID, ["searches"]));
+  return Object.freeze(issues);
+}
+
+/** The dig method's contracts, in the order the engine seal appends them (after everything before them). */
 export const WEB_DIG_METHOD_SEALED_CONTRACTS: readonly PromptContract[] = Object.freeze([
-  WEB_DIG_PLANNER_V2_PROMPT_CONTRACT, WEB_SUGGEST_DIG_PROMPT_CONTRACT
+  WEB_DIG_PLANNER_V2_PROMPT_CONTRACT, WEB_SUGGEST_DIG_PROMPT_CONTRACT, WEB_DIG_PLANNER_V3_PROMPT_CONTRACT
 ]);
 
 /* ----------------------------------------------------------------- item 5: the arguing legs with sources */

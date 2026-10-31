@@ -108,7 +108,8 @@ export function webCallTokens(sites: WebSites): Readonly<{
       outputTokens: a.plannerOutputTokens }),
     // The pack's reading inside the arguing: input only (the arguing calls' own output is already in the debate's
     // estimate), one figure per pack.
-    pack: Object.freeze({ calls: sites.packs, inputTokens: a.packReadTokensPerPack, outputTokens: 0 })
+    // A dig's legs read all its picks' packs together, at most three packs' worth (apps/runner web-packs.ts `WEB_DIG_SOURCES_BYTES`).
+    pack: Object.freeze({ calls: sites.kind === "DIG" ? Math.min(sites.packs, 3) : sites.packs, inputTokens: a.packReadTokensPerPack, outputTokens: 0 })
   });
 }
 

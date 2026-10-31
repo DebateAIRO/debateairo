@@ -35,7 +35,7 @@ import {
   withWriteTransaction,
   type RunOwnershipInput
 } from "@debateai/db";
-import { AnswerIndexSchema, ConditionMarkSchema, ExecutionLedgerDigestSchema, type Answer, type AnswerIndex, type ConditionMark, type Edge, type ExecutionLedgerDigest, type Inspection, type InvestigationAccepted, type Node, type VerdictState, webRanOnFree } from "@debateai/contract";
+import { AnswerIndexSchema, ConditionMarkSchema, ExecutionLedgerDigestSchema, isDigPickPathRef, type Answer, type AnswerIndex, type ConditionMark, type Edge, type ExecutionLedgerDigest, type Inspection, type InvestigationAccepted, type Node, type VerdictState, webRanOnFree } from "@debateai/contract";
 import { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
 import { judgesComparisonOf, judgesRecountApplies, servedPositionOf } from "./judges-comparison.js";
 import type { EngineVerdictTrigger } from "./engine-verdict.js";
@@ -43,7 +43,7 @@ import { SynthesisCheckRepository, synthesisTextOf, verdictOfRecord } from "./sy
 import { PublicationReviewRepository, reviewStateOf } from "./publication-review.js";
 import { digLeadSuggestions, digLeadsOfPack, webWithDigSuggestions } from "./dig-suggestions.js";
 import {
-  serveWebEvidence, webPathRootsOf, webPathsAtRoots, webPlanReasonOf, withWebSources, type ServedWeb
+  digPicksAtMapPaths, serveWebEvidence, webPathRootsOf, webPathsAtRoots, webPlanReasonOf, withWebSources, type ServedWeb
 } from "./web-sources.js";
 import {
   digSuggestionsOf,
@@ -3831,8 +3831,9 @@ export class ServeRepository {
     try {
       const open = (carrier: (typeof WEB_EVIDENCE_CARRIERS)[keyof typeof WEB_EVIDENCE_CARRIERS] | typeof WEB_PLAN_CARRIER, id: string,
         envelope: CryptoEnvelope | null): unknown => decryptLeasedContentForRun<unknown>(cipher, carrier, id, envelope, null);
+      const planRefs = (plan ?? []).map((decided) => decided.pathRef);
       const served = webPathsAtRoots(serveWebEvidence({
-        evidence: stored === null ? null : {
+        evidence: stored === null ? null : digPicksAtMapPaths({
           searches: stored.searches.map((search) => ({ searchId: search.search_id, pathRef: search.path_ref, outcome: search.outcome })),
           pages: stored.pages.map((page) => ({ pageId: page.page_id, searchId: page.search_id, rank: page.rank,
             readDepth: page.read_depth, about: open(WEB_EVIDENCE_CARRIERS.page, page.page_id, page.content) })),
@@ -3843,7 +3844,7 @@ export class ServeRepository {
             quote: open(WEB_EVIDENCE_CARRIERS.extract, extract.extract_id, extract.content) })),
           picks: stored.picks.map((pick) => ({ pathRef: pick.path_ref, rank: pick.rank, pageId: pick.page_id })),
           researched: stored.researched.map((chosen) => ({ pageId: chosen.page_id, pathRef: chosen.path_ref, outcome: chosen.outcome }))
-        },
+        }, planRefs),
         plan: (plan ?? []).map((decided) => ({ pathId: decided.pathRef, status: decided.status,
           reason: decided.status === "NO_SEARCH_PLANNED" ? webPlanReasonOf(open(WEB_PLAN_CARRIER, decided.pathRef, decided.reason)) : null }))
       }), roots);
@@ -3852,10 +3853,11 @@ export class ServeRepository {
       const own = (await new PostgresDigModelRunnerRepository(this.pool).readPathRewrites(runId))?.own ?? null;
       const rewriteOpened = own === null || own.rewrite_id === null || own.content === null || own.content === undefined ? null
         : decryptLeasedContentForRun<unknown>(cipher, PATH_REWRITE_CARRIER, own.rewrite_id, own.content as CryptoEnvelope, null);
-      const leadsOf = new Map((stored?.packs ?? []).flatMap((pack): (readonly [string, readonly string[]])[] => {
-        const root = roots.get(pack.path_ref);
+      const leadsOf = new Map<string, readonly string[]>();
+      for (const [root, leads] of (stored?.packs ?? []).flatMap((pack): (readonly [string, readonly string[]])[] => {
+        const root = roots.get(isDigPickPathRef(pack.path_ref) ? planRefs[0] ?? "" : pack.path_ref);
         return root === undefined || pack.content === null ? [] : [[root, digLeadsOfPack(open(WEB_EVIDENCE_CARRIERS.pack, pack.pack_id, pack.content))]];
-      }));
+      })) leadsOf.set(root, [...(leadsOf.get(root) ?? []), ...leads]);
       await cipher.assertLive();
       return served === null ? null : { ...served, web: { paths: served.web.paths.map((path) => ({ ...path,
         suggestions: [...digSuggestionsOf(rewriteOpened, path.position_ref),

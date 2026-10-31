@@ -31,16 +31,19 @@
  * The step's ids (searches, pages, readings, extracts, packs) are worked out by code from the run's id and the frozen
  * plan, so a second copy of the run writes the same rows (ALREADY) instead of new ones.
  *
- * THE DIG (R22 decision 9, which replaces W4-2's "one search per pick"; owner Q7, 31 Oct): a dig is a short follow-up debate on
- * what the person picked on one path, and it works like a first debate. Its web part:
- * - each pick has its own planner (`planDigWebSearches`, web.plan-dig.v2, all at once), told what the whole debate already
- *   investigated (`alreadyInvestigated`, AI text only), which decides whether and what to search: none with its reason, or up
- *   to 4, its local ones in the question's language and country when it judges that worth it; code freezes them
- *   (`freezeDigQuerySet`: side `dig`, W1-2's guard); Free and the off switch make no call, as for a first debate;
- * - each search asks Perplexity for 5 results (mode DIG); reader 1 reads every page found, and readers 2 and 3 the
- *   helpful ones (grade 1 or more), up to 3 on Quick look and 5 on Thorough (the dig's own mode);
- * - all of the dig's searches are one group kept under the dig's first path, and its one pack is shared by every path of
- *   the dig (each path's outcome names it);
+ * THE DIG (R22 decision 9; owner Q7 and the answers of 31 Oct: "always a pair"; "top 3 pages for each chosen path, truly like a
+ * first debate"): a dig is a short follow-up debate on what the person chose on one path, and each chosen path (each pick) is
+ * searched and read as a first debate's path is. Its web part:
+ * - each pick has its own planner (`planDigWebSearches`, web.plan-dig.v3, all at once), told what the whole debate already
+ *   investigated (`alreadyInvestigated`, AI text only), which writes none with its reason, or a pair, and a local pair in the
+ *   question's language and country when it judges that worth it; code freezes them (`freezeDigQuerySet`: side `dig`, W1-2's
+ *   guard); Free and the off switch make no call, as for a first debate;
+ * - each pick is its own group, under its own path_ref (`digPickPathRef`): each search asks Perplexity for 5 results (mode DIG);
+ *   reader 1 reads that pick's pages against that pick's words, and readers 2 and 3 its helpful ones, up to 3 on Quick look and 5
+ *   on Thorough (the dig's own mode); its own pack, its own extract labels. One pick's pages can never take another's place;
+ * - every path of the dig's own map reads every pick's pack, each under the words of the pick it belongs to (web-packs.ts): a map
+ *   path is the dig's own answer, not a pick, so which pack bears on it is for the arguing AI to weigh;
+ * - the same words from two picks are one search: sent and paid once, its answer handed to both, each pick's pair whole;
  * - a page already read in the investigation is reused, never read again (web-reuse.ts): its readings are carried, its
  *   text kept from the investigation, or, once wiped there, the one this dig's search just brought back (the fetch
  *   again, for that search's 0.1¢);
@@ -56,7 +59,7 @@ import {
   WEB_EVIDENCE_CARRIERS, WEB_PLAN_CARRIER, decryptLeasedContentForRun, encryptAttestedLeasedContentForRun,
   prepareLeasedContentEncryptionForRun, type CryptoEnvelope, type WebEvidenceRead, type WebPlanPathRecord, type WebSealed
 } from "@debateai/db";
-import { addressKey, findVerbatim, selectPathPages, siteOf } from "@debateai/evidence";
+import { addressKey, digSearchSameAs, findVerbatim, selectPathPages, siteOf } from "@debateai/evidence";
 import {
   WEB_TOP_COUNT_BY_MODE, type WebMode, type WebPlannerPoint
 } from "@debateai/judgement";
@@ -145,6 +148,8 @@ export type WebStepInput = Readonly<{
   bound: CallBound;
   /** Root 0's room, which no web call and no search may cut into. */
   keepRoomMicros?: number;
+  /** A dig's: root 0's room with every pick's packs at their cut (web-packs.ts); absent: `keepRoomMicros`. */
+  digKeepRoomMicros?: number;
   search: PerplexitySearchPort;
   /** A fresh money seam for one search (W2-2), or null where nothing is charged (local mode). */
   searchSeam: (() => WebSearchCostSeam) | null;
@@ -182,7 +187,11 @@ export type WebStepPathOutcome = Readonly<{
   /** Its pack's id and extract ids (`S<path>-<n>`), or null and none when it kept no pack. */
   packId: string | null;
   extractLabels: readonly string[];
+  /** A dig's map path: every pick's pack it reads, in pick order, each with the pick's words; absent on a first debate. */
+  digPacks?: readonly WebStepDigPack[];
 }>;
+/** One pick's pack as a dig's map paths read it. */
+export type WebStepDigPack = Readonly<{ packId: string; chosen: string }>;
 /** A dig's web part (W4-2): its picks, the searches it sent now, and the pages it reused or fetched again. */
 export type WebStepDigSummary = Readonly<{
   picks: number;
@@ -194,13 +203,21 @@ export type WebStepDigSummary = Readonly<{
 }>;
 export type WebStepResult = Readonly<{
   plan: WebPlanOutcome["kind"] | "NO_PATHS";
-  /** Each path's outcome; on a dig every path carries the one shared pack (`packId`, `extractLabels`). */
+  /** Each path's outcome; on a dig every map path names every pick's pack (`digPacks`). */
   paths: readonly WebStepPathOutcome[];
   /** A dig only. */
   dig?: WebStepDigSummary;
 }>;
 
 /* ----------------------------------------------------------------- ids, words and small helpers */
+
+/**
+ * A first debate's mode, from how deep it was asked (the V4 page's Quick look is depth 1, Thorough depth 2; a deeper debate reads
+ * as much as Thorough). A dig's own mode comes from its investigation row, not from here.
+ */
+export function webModeOfDepth(depth: number): WebMode {
+  return depth >= 2 ? "thorough" : "quick";
+}
 
 /** A uuid worked out by code from the run and the row's own key, so every copy of the run names a row the same way. */
 export function webStepRowId(runId: string, kind: string, ...parts: readonly string[]): string {
@@ -288,12 +305,11 @@ type StepSearch = Readonly<{
   country: string | null;
   afterDate: string | null;
   lookBack: "12m" | "3y" | "none";
+  /** A dig's search: what makes it the same request as another pick's, sent once (`digSearchSameAs`). */
+  sameAs?: string | null;
 }>;
 
-/**
- * One group of searches read together into one pack: a path of a first debate (its own searches), or a whole dig (every
- * pick's searches, kept under the dig's first path, its pack shared by every path of the dig).
- */
+/** One group of searches read together into one pack: a path of a first debate, or a pick of a dig (under its own path_ref). */
 type StepGroup = Readonly<{
   pathRef: string;
   /** The call-site and extract-label index (S<index + 1>-<n>). */
@@ -304,8 +320,10 @@ type StepGroup = Readonly<{
   searchMode: PerplexitySearchMode;
   /** W4-2: the investigation's read pages (a dig only). */
   reuse: WebReuseSource | null;
-  /** The paths this group's pack serves: its own, or every path of a dig. */
+  /** The paths this group's pack serves: its own; none directly on a dig, whose map paths read every pick's. */
   serves: readonly string[];
+  /** The chosen words a dig's pick is kept with in its pack (the arguing reads them); null on a first debate. */
+  chosen: string | null;
 }>;
 
 /** What the planner decided, per branch: its kind, each path's decision, and the groups to search. */
@@ -342,28 +360,22 @@ async function planFirstDebate(input: WebStepInput, keepRoom: Readonly<{ keepRoo
       key: search.searchId, status: search.status, text: search.text, side: search.polarity === "SUPPORTING" ? "for" : "against",
       scope: search.scope, language: search.language, country: search.country, afterDate: search.afterDate, lookBack }));
     return [Object.freeze({ pathRef: path.pathRef, index, answer: path.answer, searches, searchMode: "START" as const, reuse: null,
-      serves: Object.freeze([path.pathRef]) })];
+      serves: Object.freeze([path.pathRef]), chosen: null })];
   });
   return Object.freeze({ kind: plan.kind, failedCode: null, statuses, groups: Object.freeze(groups) });
 }
 
-/** What a dig's readers read its pages against: the person's picks, one a line. */
-export function webDigAnswer(picks: readonly WebDigPlannerInputPick[]): string {
-  return picks.map((pick) => pick.text.trim()).join("\n");
-}
-
 /**
- * A dig (R22 decision 9): every pick's planner, all their searches one group kept under the dig's first path, whose pack
- * every path of the dig shares. Each path's decision: the first PLANNED with the dig's searches, the others PLANNED with
- * none of their own; with no search planned at all, every path NO_SEARCH_PLANNED, saying the first pick's reason.
+ * A dig (R22 decision 9): every pick's planner, each pick that plans searches its own group under its own path_ref. Each path of
+ * the dig's own map keeps a decision for the page: the first PLANNED with the dig's searches, the others PLANNED with none of their
+ * own; with no search planned at all, every path NO_SEARCH_PLANNED, saying the first pick's reason.
  */
 async function planDig(input: WebStepInput, dig: WebStepDig, keepRoom: Readonly<{ keepRoomMicros?: number }>): Promise<StepPlan> {
   const pathRefs = input.paths.map((path) => path.pathRef);
-  const home = pathRefs[0]!;
   const plan = await planDigWebSearches({
     planId: input.planId ?? "FREE", webSwitchedOn: input.webSwitchedOn, mode: input.mode, runId: input.runId,
     subjectItemId: input.subjectItemId, question: input.question, questionLanguage: input.questionLanguage,
-    placeCountry: input.placeCountry, asOf: input.asOf, picks: dig.picks, homePathId: home, alreadyInvestigated: dig.alreadyInvestigated,
+    placeCountry: input.placeCountry, asOf: input.asOf, picks: dig.picks, alreadyInvestigated: dig.alreadyInvestigated,
     seats: webPlannerSeats(input.members), contractHash: input.contractHash, bound: input.bound,
     ...keepRoom, abandon: stopperOf(input), ...(input.stopsHere === undefined ? {} : { stopsHere: input.stopsHere })
   });
@@ -378,12 +390,16 @@ async function planDig(input: WebStepInput, dig: WebStepDig, keepRoom: Readonly<
   }
   const statuses = Object.freeze(pathRefs.map((pathId, index) => Object.freeze({ pathId, status: "PLANNED" as const, reason: null,
     searchesToSend: index === 0 ? plan.searchesToSend : 0 })));
-  const searches = plan.querySet.searches.map((search): StepSearch => Object.freeze({
-    key: search.searchId, status: search.status, text: search.text, side: "dig", scope: search.scope, language: search.language,
-    country: search.country, afterDate: search.afterDate, lookBack: LOOK_BACK[search.pace] }));
-  const group: StepGroup = Object.freeze({ pathRef: home, index: 0, answer: webDigAnswer(dig.picks), searches, searchMode: "DIG",
-    reuse: dig.reuse, serves: Object.freeze([...pathRefs]) });
-  return Object.freeze({ kind: plan.kind, failedCode: null, statuses, groups: Object.freeze([group]) });
+  const groups = dig.picks.flatMap((pick, index): StepGroup[] => {
+    const own = plan.querySet.searches.filter((search) => search.pickId === String(pick.pickNo));
+    if (own.length === 0) return [];
+    const searches = own.map((search): StepSearch => Object.freeze({
+      key: search.searchId, status: search.status, text: search.text, side: "dig", scope: search.scope, language: search.language,
+      country: search.country, afterDate: search.afterDate, lookBack: LOOK_BACK[search.pace], sameAs: digSearchSameAs(search) }));
+    return [Object.freeze({ pathRef: own[0]!.pathId, index, answer: pick.text, searches, searchMode: "DIG" as const, reuse: dig.reuse,
+      serves: Object.freeze([]), chosen: pick.text })];
+  });
+  return Object.freeze({ kind: plan.kind, failedCode: null, statuses, groups: Object.freeze(groups) });
 }
 
 /**
@@ -394,9 +410,10 @@ async function planDig(input: WebStepInput, dig: WebStepDig, keepRoom: Readonly<
 export async function runWebStep(input: WebStepInput): Promise<WebStepResult> {
   const log = input.log ?? defaultLog;
   if (input.paths.length === 0) return Object.freeze({ plan: "NO_PATHS", paths: Object.freeze([]) });
-  const keepRoom = input.keepRoomMicros !== undefined && input.keepRoomMicros > 0 ? { keepRoomMicros: input.keepRoomMicros } : {};
-  const stops = stopperOf(input);
   const dig = input.dig !== undefined && input.dig !== null && input.dig.picks.length > 0 ? input.dig : null;
+  const roomMicros = dig === null ? input.keepRoomMicros : input.digKeepRoomMicros ?? input.keepRoomMicros;
+  const keepRoom = roomMicros !== undefined && roomMicros > 0 ? { keepRoomMicros: roomMicros } : {};
+  const stops = stopperOf(input);
 
   const plan = dig === null ? await planFirstDebate(input, keepRoom) : await planDig(input, dig, keepRoom);
   const statuses = plan.statuses;
@@ -453,8 +470,10 @@ export async function runWebStep(input: WebStepInput): Promise<WebStepResult> {
     const evidence = stored;
     const readerOne = input.members.find((member) => member.model === WEB_READER_ONE_MODEL) ?? null;
     const topMembers = WEB_TOP_READER_MODEL_ORDER.flatMap((model) => input.members.filter((member) => member.model === model).slice(0, 1));
+    // The same words from two picks are one search: the first to ask sends it, the other is handed its answer (R22).
+    const oneSearch = new Map<string, Promise<OneSearchAnswer>>();
     const settled = await Promise.allSettled(plan.groups.map((group) =>
-      runGroup({ input, ports, evidence, group, readerOne, topMembers, keepRoom, stops, log })));
+      runGroup({ input, ports, evidence, group, readerOne, topMembers, keepRoom, stops, log, oneSearch })));
     const abandoned = settled.find((entry): entry is PromiseRejectedResult => entry.status === "rejected" && stops(entry.reason));
     if (abandoned !== undefined) throw abandoned.reason;
     const outcomes = new Map<string, Readonly<{ group: StepGroup; outcome: GroupOutcome | null; code: string | null }>>();
@@ -465,26 +484,39 @@ export async function runWebStep(input: WebStepInput): Promise<WebStepResult> {
         code: entry.status === "fulfilled" ? null : codeOf(entry.reason) });
       for (const pathRef of group.serves) outcomes.set(pathRef, done);
     });
-    const paths = input.paths.map((path) => {
-      const done = outcomes.get(path.pathRef);
-      if (done === undefined) return bare(path.pathRef, "NO_SEARCH_PLANNED", null);
-      if (done.outcome === null) return bare(path.pathRef, "FAILED", done.code);
-      // A dig's pack is shared: every path reads the same pack; only the path its searches are kept under sent them.
-      return Object.freeze({ ...done.outcome.path, pathRef: path.pathRef,
-        searchesSent: path.pathRef === done.group.pathRef ? done.outcome.path.searchesSent : 0 });
-    });
-    if (dig === null) return result(paths);
-    const first = settled[0]!;
-    const digged = first.status === "fulfilled" ? first.value : null;
-    return result(paths, Object.freeze({ picks: dig.picks.length, searchesSent: digged?.path.searchesSent ?? 0,
-      reusedPageIds: digged?.reused ?? Object.freeze([]), refetchedPageIds: digged?.refetched ?? Object.freeze([]) }));
+    if (dig === null) {
+      return result(input.paths.map((path) => {
+        const done = outcomes.get(path.pathRef);
+        if (done === undefined) return bare(path.pathRef, "NO_SEARCH_PLANNED", null);
+        if (done.outcome === null) return bare(path.pathRef, "FAILED", done.code);
+        return Object.freeze({ ...done.outcome.path, pathRef: path.pathRef });
+      }));
+    }
+    // A dig: each map path names every pick's pack, in pick order. The searches are counted once, on the first path.
+    const picked = settled.flatMap((entry, at) => entry.status === "fulfilled" ? [Object.freeze({ group: plan.groups[at]!, outcome: entry.value })] : []);
+    const digPacks = Object.freeze(picked.flatMap(({ group, outcome }) => outcome.path.packId === null ? []
+      : [Object.freeze({ packId: outcome.path.packId, chosen: group.chosen ?? "" })]));
+    const allOf = <T>(of: (outcome: GroupOutcome) => readonly T[]): readonly T[] => Object.freeze(picked.flatMap(({ outcome }) => of(outcome)));
+    const answered = picked.some(({ outcome }) => outcome.path.status === "SEARCHED");
+    const firstCode = picked.find(({ outcome }) => outcome.path.code !== null)?.outcome.path.code
+      ?? settled.flatMap((entry) => entry.status === "rejected" ? [codeOf(entry.reason)] : [])[0] ?? null;
+    const searchesSent = picked.reduce((sum, { outcome }) => sum + outcome.path.searchesSent, 0);
+    const paths = input.paths.map((path, at): WebStepPathOutcome => Object.freeze({ pathRef: path.pathRef, status: answered ? "SEARCHED" as const : "FAILED" as const,
+      code: firstCode, searchesSent: at === 0 ? searchesSent : 0, pageIds: allOf((outcome) => outcome.path.pageIds), top: allOf((outcome) => outcome.path.top),
+      packId: digPacks[0]?.packId ?? null, extractLabels: allOf((outcome) => outcome.path.extractLabels), digPacks }));
+    return result(paths, Object.freeze({ picks: dig.picks.length, searchesSent, reusedPageIds: allOf((outcome) => outcome.reused),
+      refetchedPageIds: allOf((outcome) => outcome.refetched) }));
   } finally {
     await ports.close().catch(() => undefined);
   }
 }
 
+/** One search's answer: what the search port said, or that money refused it before it was sent (not stored; nothing sent). */
+type OneSearchAnswer = Readonly<{ refused: string } | { outcome: Awaited<ReturnType<PerplexitySearchPort["search"]>> }>;
+
 type GroupContext = Readonly<{
   input: WebStepInput;
+  oneSearch: Map<string, Promise<OneSearchAnswer>>;
   ports: WebStepPorts;
   evidence: WebEvidenceRead;
   group: StepGroup;
@@ -537,34 +569,47 @@ async function runGroup(context: GroupContext): Promise<GroupOutcome> {
       await searchRow(search, searchId, "REFUSED", 0, 0);
       return { searchId, order, answered: false, failure: "WEB_SEARCH_HELD", sent: false, found: [] };
     }
-    const seam = input.searchSeam?.() ?? null;
-    let admission: Awaited<ReturnType<WebSearchCostSeam["assertSearchAllowed"]>>;
-    try {
-      admission = await seam?.assertSearchAllowed(context.keepRoom);
-    } catch (error) {
-      seam?.releaseInFlight();
-      // The month wall (W3-8): the pause is recorded, this copy stops; never sent and not stored, so the copy that
-      // resumes after Continue sends it.
-      if (stops(error)) throw error;
-      // Refused before sending (money): never sent, costs nothing; not stored, so a later copy may still send it.
-      return { searchId, order, answered: false, failure: codeOf(error), sent: false, found: [] };
-    }
-    const request: PerplexitySearchRequest = Object.freeze({
-      query: search.text!, mode: group.searchMode, afterDate: search.afterDate, language: search.language, country: search.country
-    });
-    const outcome = await input.search.search(request);
+    const sendIt = async (): Promise<OneSearchAnswer> => {
+      const seam = input.searchSeam?.() ?? null;
+      let admission: Awaited<ReturnType<WebSearchCostSeam["assertSearchAllowed"]>>;
+      try {
+        admission = await seam?.assertSearchAllowed(context.keepRoom);
+      } catch (error) {
+        seam?.releaseInFlight();
+        // The month wall (W3-8): the pause is recorded, this copy stops; never sent and not stored, so the copy that
+        // resumes after Continue sends it.
+        if (stops(error)) throw error;
+        // Refused before sending (money): never sent, costs nothing; not stored, so a later copy may still send it.
+        return { refused: codeOf(error) };
+      }
+      const request: PerplexitySearchRequest = Object.freeze({
+        query: search.text!, mode: group.searchMode, afterDate: search.afterDate, language: search.language, country: search.country
+      });
+      const outcome = await input.search.search(request);
+      const answered = outcome.outcome === "FOUND" || outcome.outcome === "EMPTY";
+      try {
+        await seam?.recordSearch({ outcome: answered ? "SUCCEEDED" : "FAILED", ...(admission === undefined ? {} : { admission }) });
+      } catch (error) {
+        if (stops(error)) throw error;
+        log("WEB_SEARCH_CHARGE_NOT_RECORDED", { runId, path: index, code: codeOf(error) });
+      } finally {
+        seam?.releaseInFlight();
+      }
+      return { outcome };
+    };
+    // The same words from another pick of this dig: that one search's answer, for no second charge (its own row says 0).
+    const sameAs = search.sameAs ?? null;
+    const asked = sameAs === null ? undefined : context.oneSearch.get(sameAs);
+    const sending = asked ?? sendIt();
+    if (sameAs !== null && asked === undefined) context.oneSearch.set(sameAs, sending);
+    const answer = await sending;
+    if ("refused" in answer) return { searchId, order, answered: false, failure: answer.refused, sent: false, found: [] };
+    const { outcome } = answer;
     const answered = outcome.outcome === "FOUND" || outcome.outcome === "EMPTY";
-    try {
-      await seam?.recordSearch({ outcome: answered ? "SUCCEEDED" : "FAILED", ...(admission === undefined ? {} : { admission }) });
-    } catch (error) {
-      if (stops(error)) throw error;
-      log("WEB_SEARCH_CHARGE_NOT_RECORDED", { runId, path: index, code: codeOf(error) });
-    } finally {
-      seam?.releaseInFlight();
-    }
-    await searchRow(search, searchId, outcome.outcome, outcome.chargeMicros, outcome.resultCount);
+    const sentHere = asked === undefined;
+    await searchRow(search, searchId, outcome.outcome, sentHere ? outcome.chargeMicros : 0, outcome.resultCount);
     return {
-      searchId, order, answered, sent: true,
+      searchId, order, answered, sent: sentHere,
       failure: outcome.outcome === "FAILED" ? `WEB_SEARCH_${outcome.failure}` : outcome.outcome === "REFUSED" ? `WEB_SEARCH_${outcome.refusal}` : null,
       found: answered ? [...outcome.pages, ...outcome.reused] : []
     };

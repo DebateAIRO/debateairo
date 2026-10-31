@@ -12,8 +12,9 @@
  *    point cites, copied by code from the stored pack; the answer checker reads the extracts the writer read (W4-7);
  *  - "looked up" stays only for a locator that is exactly an extract id of THIS debate's packs (`Judge.judge`'s
  *    `debateExtractIds`); any other locator becomes "reasoning", with the downgrade note the engine already has.
- *  - a dig (W4-2) keeps ONE pack, under its first path, and every path of the dig reads it (W4-7): the step's outcomes
- *    name the pack each path reads, so a dig path with no pack row of its own reads the first path's, the same bytes.
+ *  - a dig keeps one pack per chosen path (R22), and every path of its own map reads them all, each under the words of the
+ *    pick it belongs to and each cut on its own (`webPackShown`'s share), so one pick's pages can't crowd out another's. A
+ *    cross-reply reads them once: its rival reads the same packs.
  * Nothing here searches the web: the debate reads what the web step stored, and only that.
  *
  * The rules it keeps:
@@ -44,6 +45,19 @@ export const WEB_PACK_LIMITS = Object.freeze({ tokens: 3000, bytesPerToken: 4, b
  * it. Root 0's room is framed with this many characters of sources when the web step keeps it (index.ts).
  */
 export const WEB_ROOT_SOURCES_MAX_BYTES = WEB_PACK_LIMITS.bytes + 64;
+/**
+ * A dig's legs (R22): the most bytes of every pick's packs together, and the longest chosen words shown beside each pack. With
+ * up to 3 picks each pack keeps the first debate's size; past that they share this total evenly, so the prompt stays bounded
+ * and no pack is squeezed by another's size. Its `sources` text can never pass WEB_DIG_ROOT_SOURCES_MAX_BYTES.
+ */
+export const WEB_DIG_SOURCES_BYTES = WEB_PACK_LIMITS.bytes * 3;
+export const WEB_DIG_CHOSEN_MAX_CHARS = 300 as const;
+const WEB_DIG_PICKS_MOST = 16 as const;
+export const WEB_DIG_ROOT_SOURCES_MAX_BYTES = WEB_DIG_SOURCES_BYTES + WEB_DIG_PICKS_MOST * (WEB_DIG_CHOSEN_MAX_CHARS * 4 + 64);
+/** Each pick's bytes when `packs` picks kept a pack. */
+export function webDigPackBytes(packs: number): number {
+  return Math.min(WEB_PACK_LIMITS.bytes, Math.floor(WEB_DIG_SOURCES_BYTES / Math.max(packs, 1)));
+}
 
 /* ----------------------------------------------------------------- the stored pack */
 
@@ -92,17 +106,17 @@ type ShownPack = Readonly<{
 const bytesOf = (value: unknown): number => Buffer.byteLength(JSON.stringify(value), "utf8");
 
 /**
- * THE CUT: the pack as a leg reads it, within WEB_PACK_LIMITS.bytes. Pages in the pick's rank, then extracts in the
+ * THE CUT: the pack as a leg reads it, within `limit` (a first debate's: WEB_PACK_LIMITS.bytes). Pages in the pick's rank, then extracts in the
  * pick's rank of their page and the pack's own order; each kept while the whole still fits, a later one still tried.
  * Pure: the same pack gives the same bytes every time.
  */
-export function webPackShown(pack: WebPack): ShownPack {
+export function webPackShown(pack: WebPack, limit: number = WEB_PACK_LIMITS.bytes): ShownPack {
   // The pages first, in rank order, each while the pack still fits (a pack is never over the size, whatever the titles).
   const shownPages: ShownPack["pages"][number][] = [];
   const rankOf = new Map<string, number>();
   for (const page of pack.pages) {
     const entry = Object.freeze({ page: page.rank, title: page.title, site: page.site, date: page.date, read: page.readDepth });
-    if (bytesOf({ pages: [...shownPages, entry], extracts: [] }) > WEB_PACK_LIMITS.bytes) continue;
+    if (bytesOf({ pages: [...shownPages, entry], extracts: [] }) > limit) continue;
     shownPages.push(entry);
     rankOf.set(page.pageId, page.rank);
   }
@@ -113,7 +127,7 @@ export function webPackShown(pack: WebPack): ShownPack {
   const kept: Readonly<{ id: string; page: number; quote: string }>[] = [];
   for (const { extract } of ordered) {
     const entry = Object.freeze({ id: extract.label, page: rankOf.get(extract.pageId)!, quote: extract.quote });
-    if (bytesOf({ pages, extracts: [...kept, entry] }) <= WEB_PACK_LIMITS.bytes) kept.push(entry);
+    if (bytesOf({ pages, extracts: [...kept, entry] }) <= limit) kept.push(entry);
   }
   return Object.freeze({ pages, extracts: Object.freeze(kept) });
 }
@@ -128,29 +142,29 @@ export type DebateWebPacks = Readonly<{
   extractIds: ReadonlySet<string>;
   /** The pack of a path, by its ref (the map's answer id), or undefined when the path kept none. */
   packOf: (pathRef: string) => WebPack | undefined;
+  /** R22: a dig's map path: every pick's pack it reads, in pick order, each with the pick's words; none on a first debate's. */
+  digPacksOf: (pathRef: string) => readonly WebDigPackRead[];
   /** The extract a locator names, exactly, as the reviewer, judges and writers read it; undefined for any other locator. */
   citedExtract: (locator: string | null) => EngineCitedExtract | undefined;
 }>;
 
-/**
- * A path that reads a pack kept under another path's ref (W4-7): on a dig, every path but the first reads the one pack
- * kept under the first (W4-2; 0132 ties a pack to its searches' path, so the others have no pack row of their own).
- */
-export type WebPackShare = Readonly<{ pathRef: string; keptUnder: string }>;
+/** One pick's pack as a dig's map path reads it. */
+export type WebDigPackRead = Readonly<{ chosen: string; pack: WebPack }>;
+/** R22: a path of a dig's own map and the picks' packs it reads, by the pick's path_ref, in pick order. */
+export type WebPackShare = Readonly<{ pathRef: string; reads: readonly Readonly<{ keptUnder: string; chosen: string }>[] }>;
 
 /**
- * The debate's packs, or null when it kept none (then nothing in the debate changes). `shared` names the paths that read
- * a pack kept under another path (a dig's); none on a first debate, where each path reads only its own.
+ * The debate's packs, or null when it kept none (then nothing in the debate changes). `shared` names a dig's map paths and the
+ * picks' packs they read; none on a first debate, where each path reads only its own.
  */
 export function debateWebPacks(packs: readonly WebPack[], shared: readonly WebPackShare[] = []): DebateWebPacks | null {
   const kept = packs.filter((pack) => pack.extracts.length > 0 || pack.pages.length > 0);
   if (kept.length === 0) return null;
   const byPath = new Map(kept.map((pack) => [pack.pathRef, pack] as const));
-  // A path's own pack wins; a shared path reads the very pack object of the path it is kept under (the same cut, the same bytes).
-  for (const share of shared) {
-    const pack = byPath.get(share.keptUnder);
-    if (pack !== undefined && !byPath.has(share.pathRef)) byPath.set(share.pathRef, pack);
-  }
+  const digByPath = new Map(shared.map((share) => [share.pathRef, Object.freeze(share.reads.flatMap((read): WebDigPackRead[] => {
+    const pack = byPath.get(read.keptUnder);
+    return pack === undefined ? [] : [Object.freeze({ chosen: read.chosen, pack })];
+  }))] as const));
   const extracts = new Map<string, EngineCitedExtract>();
   for (const pack of kept) {
     const pageOf = new Map(pack.pages.map((page) => [page.pageId, page] as const));
@@ -162,6 +176,7 @@ export function debateWebPacks(packs: readonly WebPack[], shared: readonly WebPa
   return Object.freeze({
     extractIds: new Set(extracts.keys()),
     packOf: (pathRef) => byPath.get(pathRef),
+    digPacksOf: (pathRef) => digByPath.get(pathRef) ?? Object.freeze([]),
     citedExtract: (locator) => locator === null ? undefined : extracts.get(locator)
   });
 }
@@ -173,8 +188,18 @@ export function debateWebPacks(packs: readonly WebPack[], shared: readonly WebPa
 export function webSourcesText(packs: DebateWebPacks | null,
   entries: readonly Readonly<{ pathRef: string | null; for: WebPackFor }>[]): string | undefined {
   if (packs === null) return undefined;
-  const shown = entries.flatMap((entry) => {
-    const pack = entry.pathRef === null ? undefined : packs.packOf(entry.pathRef);
+  // A dig's map paths all read the same picks' packs: shown once, under the first entry's field, even on a cross-reply (R22).
+  let digShown = false;
+  const shown = entries.flatMap((entry): object[] => {
+    if (entry.pathRef === null) return [];
+    const reads = packs.digPacksOf(entry.pathRef);
+    if (reads.length > 0) {
+      if (digShown) return [];
+      digShown = true;
+      const each = webDigPackBytes(reads.length);
+      return reads.map((read) => Object.freeze({ for: entry.for, chosen: read.chosen.slice(0, WEB_DIG_CHOSEN_MAX_CHARS), ...webPackShown(read.pack, each) }));
+    }
+    const pack = packs.packOf(entry.pathRef);
     return pack === undefined ? [] : [Object.freeze({ for: entry.for, ...webPackShown(pack) })];
   });
   return shown.length === 0 ? undefined : JSON.stringify(shown);
@@ -244,14 +269,14 @@ export function engineSourceWithCitedExtracts(source: EngineMaterialSource, cite
 /* ----------------------------------------------------------------- the store */
 
 /** A path's web step outcome as the packs reader reads it: the pack it names (`WebStepPathOutcome`'s two members). */
-export type WebPackOfPath = Readonly<{ pathRef: string; packId: string | null }>;
+export type WebPackOfPath = Readonly<{ pathRef: string; packId: string | null; digPacks?: readonly Readonly<{ packId: string; chosen: string }>[] }>;
 
 /**
  * The run's packs, read back from the web store (0132) and opened under the run's key on a content lease of their own,
  * closed before returning. A pack that does not open or is not a pack is left out (logged); a store that cannot be read
  * leaves the debate without packs (logged), unless `abandon` names the error (the run must stop). Null when none is kept.
- * W4-7: `paths` are the web step's outcomes; a path whose outcome names a pack kept under another path (every path of a
- * dig but the first) reads that pack. Without them, or on a first debate, each path reads only its own.
+ * W4-7, R22: `paths` are the web step's outcomes; a dig's map path reads every pick's pack its outcome names, in that order. Without
+ * them, or on a first debate, each path reads only its own.
  */
 export async function readDebateWebPacks(input: Readonly<{
   pool: Pool;
@@ -284,10 +309,12 @@ export async function readDebateWebPacks(input: Readonly<{
       keptUnder.set(stored.pack_id, stored.path_ref);
       return [pack];
     });
-    // W4-7: a path whose outcome names a pack kept under another path reads it (a dig's paths after the first).
     const shared = (input.paths ?? []).flatMap((path): WebPackShare[] => {
-      const home = path.packId === null ? undefined : keptUnder.get(path.packId);
-      return home === undefined || home === path.pathRef ? [] : [Object.freeze({ pathRef: path.pathRef, keptUnder: home })];
+      if (path.digPacks === undefined) return [];
+      return [Object.freeze({ pathRef: path.pathRef, reads: Object.freeze(path.digPacks.flatMap((pick) => {
+        const home = keptUnder.get(pick.packId);
+        return home === undefined ? [] : [Object.freeze({ keptUnder: home, chosen: pick.chosen })];
+      })) })];
     });
     // The store's order is its own; the debate reads packs by path, so the order never reaches a prompt.
     return debateWebPacks(packs, shared);

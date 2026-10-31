@@ -61,6 +61,17 @@ export const WEB_CONTRACT_LIMITS = Object.freeze({
 /** Owner answer Q19: Free's cap on the picks one dig combines (WEB_CONTRACT_LIMITS.freeDigPicksMax). */
 export const FREE_DIG_PICKS_MAX = WEB_CONTRACT_LIMITS.freeDigPicksMax;
 
+/**
+ * R22 (owner, 31 Oct: "top 3 pages for each chosen path, truly like a first debate"): the path_ref a dig's chosen path keeps its
+ * searches, pages, top pages and pack under in the web store (0132), one per pick. It names no path of the dig's own map.
+ */
+export function digPickPathRef(pickNo: number): string {
+  return `dig-pick-${String(pickNo)}`;
+}
+export function isDigPickPathRef(pathRef: string): boolean {
+  return /^dig-pick-[0-9]{1,3}$/u.test(pathRef);
+}
+
 /** The ellipsis that marks where a quote was cut. */
 const CUT_MARK = "…";
 
