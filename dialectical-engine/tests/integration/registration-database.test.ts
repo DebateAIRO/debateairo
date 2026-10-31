@@ -4582,7 +4582,8 @@ setTimeout(() => undefined, 500);
       expect(delta).toBeLessThan(ruledToleranceMs);
     }
     console.info(`[S3 R1 RED/GREEN] ${evidence.join(" | ")}`);
-  }, 15_000);
+    // Run time only, not a timing bound: each new account's drain now waits out the equal work.
+  }, 30_000);
 
   it("S3c B3 keeps real route calls refused at production 20/10/3 before saturation", async () => {
     const now = new Date("2026-08-20T00:30:00.000Z");

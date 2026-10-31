@@ -1425,7 +1425,10 @@ export class RegistrationService implements RegistrationApplication {
     let pending!: Promise<void>;
     pending = new Promise<void>((resolve) => setImmediate(resolve))
       .then(async () => {
-        const equalWork = this.sleep(this.dependencies.policy.channel.mailDispatchNoSendEqualWorkMs);
+        // A resend's delivery carries no kind: it has no duplicate arm to match, and its record keeps its place.
+        const equalWork = "kind" in input
+          ? this.sleep(this.dependencies.policy.channel.mailDispatchNoSendEqualWorkMs)
+          : Promise.resolve();
         if (duplicate !== undefined) {
           await equalWork;
           await releaseReservation();
