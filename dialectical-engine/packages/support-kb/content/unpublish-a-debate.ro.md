@@ -1,7 +1,7 @@
 ---
 id: unpublish-a-debate
 lang: ro
-title: "Se poate retrage o dezbatere publicată?"
+title: "Pot retrage publicarea unei dezbateri?"
 status: shipped
 sources:
   - apps/api/src/index.ts:137

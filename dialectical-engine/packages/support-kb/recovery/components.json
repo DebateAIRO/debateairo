@@ -284,14 +284,14 @@
     {
       "id": "unpublish-a-debate",
       "lang": "en",
-      "articleSha256": "946c023a6ddebc6353624feb2fbd23e6ad3232a1e7406793c459d6293fd0fc90",
+      "articleSha256": "806d62ec57c2c10741af2c62355a8f9681915a2acf614d903864dedfa38b710c",
       "modelProjection": "A published debate cannot be taken back or made private again; there is no unpublish control, and anyone with credit can add to it. Erasing an account takes the person's name off and it shows \"a contributor\". Personal details in the text are removed on request by writing to us. Copies indexed elsewhere can remain.",
       "fallback": "A published debate cannot be taken back or made private again. If you erase your account your name comes off it and it shows \"a contributor\". To have personal details in the text removed, write to us. Copies indexed elsewhere may remain."
     },
     {
       "id": "unpublish-a-debate",
       "lang": "ro",
-      "articleSha256": "a9e0854034416df7e5f1a95f46819d59fbae823f96ce84892dabee97e9c32c29",
+      "articleSha256": "c2359c1d2e5dd18f2cf7b4ee9d84f65010470d1314744ddcaa046736a9a4a6d7",
       "modelProjection": "O dezbatere publicată nu poate fi retrasă și nu mai poate deveni privată; nu există control de retragere a publicării, iar oricine are credit poate contribui la ea. Ștergerea contului elimină numele persoanei și în locul lui apare „un contribuitor”. Datele personale din text sunt eliminate la cerere, printr-un mesaj către noi. Copiile indexate în alte locuri pot rămâne.",
       "fallback": "O dezbatere publicată nu poate fi retrasă și nu mai poate deveni privată. Dacă îți ștergi contul, numele tău este eliminat și în locul lui apare „un contribuitor”. Pentru eliminarea datelor personale din text, scrie-ne. Copiile indexate în alte locuri pot rămâne."
     },

@@ -389,7 +389,7 @@
     {
       "id": "unpublish-a-debate",
       "lang": "en",
-      "sha256": "946c023a6ddebc6353624feb2fbd23e6ad3232a1e7406793c459d6293fd0fc90",
+      "sha256": "806d62ec57c2c10741af2c62355a8f9681915a2acf614d903864dedfa38b710c",
       "reviewedBy": "SOL",
       "reviewerSession": "r22-public-lane-2026-11-01",
       "reviewedOn": "2026-11-01",
@@ -398,7 +398,7 @@
     {
       "id": "unpublish-a-debate",
       "lang": "ro",
-      "sha256": "a9e0854034416df7e5f1a95f46819d59fbae823f96ce84892dabee97e9c32c29",
+      "sha256": "c2359c1d2e5dd18f2cf7b4ee9d84f65010470d1314744ddcaa046736a9a4a6d7",
       "reviewedBy": "SOL",
       "reviewerSession": "r22-public-lane-2026-11-01",
       "reviewedOn": "2026-11-01",
@@ -426,7 +426,7 @@
     }
   ],
   "recovery": {
-    "componentFileSha256": "47d52cdb7cea1eda71eea6a45a5c45acee42f6e66f83265969cf83acf5c96909",
+    "componentFileSha256": "008e93863af868d4a9fe8d9505cef197d91c3c6f459b767006fbc645cb10515e",
     "components": [
       {
         "id": "account-access",
@@ -951,7 +951,7 @@
       {
         "id": "unpublish-a-debate",
         "lang": "en",
-        "articleSha256": "946c023a6ddebc6353624feb2fbd23e6ad3232a1e7406793c459d6293fd0fc90",
+        "articleSha256": "806d62ec57c2c10741af2c62355a8f9681915a2acf614d903864dedfa38b710c",
         "modelProjectionSha256": "1733ded34a6099f6145149e59db31eeb6b3f7c6f6d22a0a55144908fc6be6dda",
         "fallbackSha256": "c47eb41da2c698b9c3806df7f69c4a9447b49f63e6221602e1dd243c49128af6",
         "reviewedBy": "SOL",
@@ -964,7 +964,7 @@
       {
         "id": "unpublish-a-debate",
         "lang": "ro",
-        "articleSha256": "a9e0854034416df7e5f1a95f46819d59fbae823f96ce84892dabee97e9c32c29",
+        "articleSha256": "c2359c1d2e5dd18f2cf7b4ee9d84f65010470d1314744ddcaa046736a9a4a6d7",
         "modelProjectionSha256": "7863bcd0615c00cf5f6741b3ff0d973cbc286de801850a2dc6bad15a2af3683f",
         "fallbackSha256": "30a45d25d24e110697410ff5540ec6ac8902197eb072efb6e331d8a645a4fedd",
         "reviewedBy": "SOL",

@@ -1,7 +1,7 @@
 ---
 id: unpublish-a-debate
 lang: en
-title: "Can a published debate be taken back?"
+title: "Can I unpublish a debate?"
 status: shipped
 sources:
   - apps/api/src/index.ts:137
