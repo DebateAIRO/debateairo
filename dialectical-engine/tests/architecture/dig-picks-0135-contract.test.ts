@@ -56,7 +56,7 @@ const ROLES = ["debateai_runtime", "debateai_billing_runtime", "debateai_authori
 
 describe("0135: a dig's picks and its path rewrite's material", () => {
   it("C-T follows 0134 in the chain's STEPS (the investigation reports' 0136 comes after it), with its own loader", async () => {
-    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0133,loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140,loadForward0141]);");
+    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0133,loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140,loadForward0141,loadForward0143]);");
     expect(read("packages/db/src/migration-forward-chain.ts")).toContain("import { loadForward0135 } from './migration-forward0135.js';");
     const loader = read("packages/db/src/migration-forward0135.ts");
     expect(loader).toContain(`const NAME = "${NAME}";`);

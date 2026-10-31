@@ -81,7 +81,7 @@ type Probe = Readonly<{
   expand?: boolean; keepsVerifier?: boolean; head?: string; receipt?: boolean; declared?: boolean;
 }>;
 const first = (changes: Partial<Probe> = {}): Probe =>
-  ({ name: FIRST, previous: plan.forwardChain.at(-1)!.manifestSha256, manifest: hex("1"), source: hex("3"), ...changes });
+  ({ name: FIRST, previous: plan.forwardChain.at(-2)!.manifestSha256, manifest: hex("1"), source: hex("3"), ...changes });
 const second = (changes: Partial<Probe> = {}): Probe => ({ name: SECOND, previous: hex("1"), manifest: hex("2"), source: hex("4"), ...changes });
 async function seed(probe: Probe): Promise<void> {
   await db.pool.query("INSERT INTO public.debateai_schema_migration(name,applied_at) VALUES($1,statement_timestamp())", [probe.name]);
@@ -117,11 +117,11 @@ describe("an older release on a database a newer release moved forward (Review F
     await migrate(db.pool);
     plan = await loadMigrationPlan();
     expect(plan.forwardChain.slice(-DECLARED.length - 12, -12).map((step) => step.name)).toEqual(DECLARED.map(([name]) => name));
-    expect(plan.forwardChain.at(-13)!.verifierSha256).toBe(VERIFIER);
-    expect(plan.forwardChain.at(-12)!.name).toBe(RLS);
-    expect(plan.forwardChain.at(-12)!.verifierSha256).toBe(IN_FORCE_VERIFIER);
-    expect(plan.forwardChain.slice(-11).map((step) => step.name)).toEqual([...AFTER_RLS]);
-    for (const step of plan.forwardChain.slice(-11)) expect(step.verifierSha256).toBe(IN_FORCE_VERIFIER);
+    expect(plan.forwardChain.at(-14)!.verifierSha256).toBe(VERIFIER);
+    expect(plan.forwardChain.at(-13)!.name).toBe(RLS);
+    expect(plan.forwardChain.at(-13)!.verifierSha256).toBe(IN_FORCE_VERIFIER);
+    expect(plan.forwardChain.slice(-12).map((step) => step.name)).toEqual([...AFTER_RLS]);
+    for (const step of plan.forwardChain.slice(-12)) expect(step.verifierSha256).toBe(IN_FORCE_VERIFIER);
   }, 300_000);
   afterAll(async () => { await db?.stop(); });
   afterEach(async () => {
@@ -138,13 +138,13 @@ describe("an older release on a database a newer release moved forward (Review F
     expect((await db.pool.query(`SELECT source_name,n1_expand,keeps_verifier,outside_transaction,chain_head_manifest_sha256,recorded_at
       FROM public.debateai_schema_migration_step_n1 ORDER BY source_name`)).rows).toEqual([...DECLARED.map(([source_name, n1_expand]) => ({
       source_name, n1_expand, keeps_verifier: true, outside_transaction: false,
-      chain_head_manifest_sha256: plan.forwardChain.at(-1)!.manifestSha256, recorded_at: expect.any(Date)
+      chain_head_manifest_sha256: plan.forwardChain.at(-2)!.manifestSha256, recorded_at: expect.any(Date)
     })), {
       source_name: RLS, n1_expand: false, keeps_verifier: false, outside_transaction: false,
-      chain_head_manifest_sha256: plan.forwardChain.at(-1)!.manifestSha256, recorded_at: expect.any(Date)
+      chain_head_manifest_sha256: plan.forwardChain.at(-2)!.manifestSha256, recorded_at: expect.any(Date)
     }, ...AFTER_RLS.map((source_name) => ({
       source_name, n1_expand: source_name !== SPEND_KINDS, keeps_verifier: true, outside_transaction: false,
-      chain_head_manifest_sha256: plan.forwardChain.at(-1)!.manifestSha256, recorded_at: expect.any(Date)
+      chain_head_manifest_sha256: plan.forwardChain.at(-2)!.manifestSha256, recorded_at: expect.any(Date)
     }))]);
   });
 
@@ -191,11 +191,11 @@ describe("an older release on a database a newer release moved forward (Review F
   it("describeForwardSteps describes this code's whole chain with its n1 headers", async () => {
     const steps = await describeForwardSteps();
     expect(steps.map((step) => step.name)).toEqual(plan.forwardChain.map((step) => step.name));
-    expect(steps.at(-12)).toEqual({ name: RLS, manifestSha256: plan.forwardChain.at(-12)!.manifestSha256,
-      sourceSha256: plan.forwardChain.at(-12)!.sourceSha256, verifierSha256: IN_FORCE_VERIFIER, n1Expand: false, keepsVerifier: false, outsideTransaction: false });
+    expect(steps.at(-12)).toEqual({ name: RLS, manifestSha256: plan.forwardChain.at(-13)!.manifestSha256,
+      sourceSha256: plan.forwardChain.at(-13)!.sourceSha256, verifierSha256: IN_FORCE_VERIFIER, n1Expand: false, keepsVerifier: false, outsideTransaction: false });
     // 0130 is drained and supersedes the verifier, so its header omits keeps-verifier (SPEC-v4 R26, R34); 0131 to 0139
     // and 0141 are expand steps that keep 0130's verifier, and 0140 is drained (it keeps the verifier too).
-    expect(steps.slice(-11)).toEqual(plan.forwardChain.slice(-11).map((step) => ({ name: step.name, manifestSha256: step.manifestSha256,
+    expect(steps.slice(-11)).toEqual(plan.forwardChain.slice(-12).map((step) => ({ name: step.name, manifestSha256: step.manifestSha256,
       sourceSha256: step.sourceSha256, verifierSha256: IN_FORCE_VERIFIER, n1Expand: step.name !== SPEND_KINDS, keepsVerifier: true, outsideTransaction: false })));
     expect(steps.slice(-11).map((step) => step.name)).toEqual([...AFTER_RLS]);
     const tail = plan.forwardChain.slice(-DECLARED.length - 12, -12);
@@ -237,7 +237,7 @@ describe("an older release on a database a newer release moved forward (Review F
     await seed(first({ previous: hex("9") }));
     await refused("CHAIN_BROKEN", FIRST);
     await db.pool.query("UPDATE public.debateai_schema_migration_step SET previous_manifest_sha256=$1,base_recipe_sha256=$2 WHERE source_name=$3",
-      [plan.forwardChain.at(-1)!.manifestSha256, hex("9"), FIRST]);
+      [plan.forwardChain.at(-2)!.manifestSha256, hex("9"), FIRST]);
     await refused("CHAIN_BROKEN", FIRST);
     // The second extra must chain from the first one's manifest.
     await db.pool.query("UPDATE public.debateai_schema_migration_step SET base_recipe_sha256=$1 WHERE source_name=$2", [plan.recipeSha256, FIRST]);

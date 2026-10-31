@@ -227,7 +227,7 @@ describe("0114: a forward step, applied once", () => {
       "0130_row_level_security.sql", "0131_v4_account_memory.sql",
       "0132_web_evidence.sql", "0133_investigations.sql", "0134_dig_model_and_month_pause.sql", "0135_dig_picks.sql",
       "0136_investigation_reports.sql",
-      "0137_public_debates.sql", "0138_tree_updates.sql", "0139_passage_retention.sql", "0140_internal_spend_kinds.sql", "0141_path_suggestions.sql"]);
+      "0137_public_debates.sql", "0138_tree_updates.sql", "0139_passage_retention.sql", "0140_internal_spend_kinds.sql", "0141_path_suggestions.sql", "0143_run_handover.sql"]);
     const ledger = async () => (await db().query("SELECT name, applied_at FROM public.debateai_schema_migration ORDER BY name")).rows;
     const before = await ledger();
     expect(before.filter((row) => row.name === STEP)).toHaveLength(1);

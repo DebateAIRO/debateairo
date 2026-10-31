@@ -2,7 +2,7 @@
 // keeps what it found: a recorded answer stands when a release moved the wording, one step never mixes two wordings, and a run that
 // never crossed an upload behaves as before. The whole debate on real PostgreSQL: tests/integration/run-handover-debate.test.ts.
 import { describe, expect, it } from "vitest";
-import type { ContentClassification, ProviderCallRequest, ProviderGateway } from "@debateai/providers";
+import { buildFramedPrompt, type ContentClassification, type ProviderCallRequest, type ProviderGateway } from "@debateai/providers";
 import { TypedDomainError } from "@debateai/kernel";
 import {
   RUN_HANDOVER_IMPOSSIBLE, createReplayBook, recordedCalls, replayingGateway, type RecordedAttempt, type ReplayBook
@@ -110,7 +110,7 @@ describe("the gateway", () => {
   const request = (callSiteKey: string, providerRef: string, marker: string, classifyContent?: (content: string) => ContentClassification): ProviderCallRequest => ({
     runId: "00000000-0000-4000-8000-000000000001", subjectItemId: "item", callSiteKey, role: "JUDGE", lane: "served",
     bound: { maxAttempts: 2, tokenCeiling: 400, deadlineMs: 5_000 }, contractHash: NEW, providerRef,
-    packet: { messages: [{ role: "system", content: marker }] } as ProviderCallRequest["packet"],
+    packet: buildFramedPrompt({ contract: { contractId: "test.handover.v1", instruction: marker, answerForm: "Return one JSON object." }, material: [] }).packet,
     ...(classifyContent === undefined ? {} : { classifyContent })
   } as ProviderCallRequest);
   const counting = () => {

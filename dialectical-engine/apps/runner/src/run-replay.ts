@@ -202,6 +202,8 @@ export function createReplayBook(input: Readonly<{
   calls: readonly RecordedCall[];
   /** Every node earlier copies saved, in save order. */
   earlierNodes: readonly Readonly<{ nodeId: string; provenanceRef: string | null }>[];
+  /** The run, for the one content-free line when answers stood under another release's wording. */
+  runId?: string;
 }>): ReplayBook {
   const pending = [...input.calls];
   const earliestByReply = new Map<string, string>();
@@ -276,6 +278,10 @@ export function createReplayBook(input: Readonly<{
       return Object.freeze([...new Set(pending.filter((call) => matches(call.callSiteKey)).map((call) => call.actorRef))]);
     },
     close() {
+      if (stood > 0 && input.runId !== undefined) {
+        console.warn(JSON.stringify({ kind: "DEBATEAI_RUN_HANDOVER", event: "ANSWERS_STOOD", runId: input.runId, stood }));
+        stood = 0;
+      }
       pending.splice(0, pending.length);
       earliestByReply.clear();
     }
@@ -415,6 +421,7 @@ export async function readReplayBook(pool: Pool, runId: string, workItemId: stri
     });
     await leased.assertLive();
     return createReplayBook({
+      runId,
       calls: recordedCalls(attempts),
       earlierNodes: nodes.rows.map((row) => Object.freeze({ nodeId: row.node_id, provenanceRef: row.provenance_ref }))
     });

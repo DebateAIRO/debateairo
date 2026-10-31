@@ -7,12 +7,12 @@ import { afterAll, afterEach, beforeAll, expect, it } from "vitest";
 import { WorkItemRepository } from "@debateai/battery";
 import { CostEnvelopeGuard, PostgresModelSpendStore, type PersonWindow } from "@debateai/budget";
 import { PostgresDigModelRepository, PostgresDigModelRunnerRepository, migrate, recordReleaseEvent, recordReleaseSwitch } from "@debateai/db";
-import type { ProviderCallRequest, ProviderCostEnvelopeSeam } from "@debateai/providers";
+import type { ProviderCostEnvelopeSeam } from "@debateai/providers";
 import { continuePausedRun, runHandoverOf } from "../../apps/api/src/month-pause.js";
 import { MonthPause, monthPaused } from "../../apps/runner/src/month-pause.js";
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
 import {
-  PANEL_REFS, TARGETS, previewDebateHarness, type PreviewRunnerMoney
+  PANEL_REFS, TARGETS, OLDER_RELEASE_HASH as OLD_HASH, olderReleaseWording as oldWording, previewDebateHarness, type PreviewRunnerMoney
 } from "../support/preview-debate-harness.js";
 import { scriptedAnswers } from "../support/scripted-answers.js";
 import { provisionStoryEncryptedOwner, releaseStoryEncryptedOwner, type StoryEncryptedOwner } from "../support/storyEncryptedOwner.js";
@@ -42,14 +42,6 @@ const EDGE = LIMIT - RESERVE;
 /** Release keys of one settings version, as a code-only upload makes them: each test's own pair (a switch is for ever). */
 const keyOf = (version: number, letter: string, n: number) => `r${String(version)}-${letter.repeat(11)}${(n % 16).toString(16)}`;
 let scenario = 0;
-
-/** What another release's sealed wording sent: other bytes, under another contract hash. */
-const OLD_HASH = "older-release-sealed-contracts";
-const oldWording = (request: ProviderCallRequest): ProviderCallRequest => ({
-  ...request, contractHash: OLD_HASH,
-  packet: { ...request.packet, messages: request.packet.messages.map((message, index) => index === 0
-    ? { ...message, content: `Older wording of this instruction.\n${message.content}` } : message) }
-});
 
 function months(runSpent: () => Promise<number>) {
   const now = Date.now();

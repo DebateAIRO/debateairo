@@ -5637,7 +5637,9 @@ export class WalkingSkeletonRunner {
   }>> {
     const claimed = await this.#work.claimNext({ workerId: this.settings.workerId, claimSeconds: this.settings.claimMs / 1000 });
     if (claimed === null || claimed.runId === null) return Object.freeze({ claimed, resolution: null });
-    const version = await this.#runs.readRunRegisterVersion(claimed.runId);
+    // Decision 12: the version that owns the debate now (after a hand-over, the one it was handed to; else its stamp).
+    const version = (await this.#work.peekRunSettingsVersion(claimed.workItemId))?.registerVersion
+      ?? await this.#runs.readRunRegisterVersion(claimed.runId);
     return Object.freeze({ claimed, resolution: await this.#runSettingsFor(version, settingsForVersion) });
   }
 
@@ -5832,12 +5834,13 @@ export class WalkingSkeletonRunner {
         "The frozen run could not be read through its required content lease"
       );
     }
-    // Side-by-side spec §13 (S6): never happens (`core.run` is insert-only and a hand-over reads the same on both sides),
-    // refused by name if it ever did: the run's stamp is the version this debate's settings came from.
-    if (resolution !== null && run.registerVersion !== resolution.version) {
+    // Side-by-side spec §13 (S6): never happens (`core.run` is insert-only, a hand-over moves a debate only while no copy holds
+    // it), refused by name if it ever did: the version that owns the debate is the one its settings came from.
+    const ownedVersion = resolution === null ? null : (await this.#work.peekRunSettingsVersion(claimed.workItemId))?.registerVersion ?? run.registerVersion;
+    if (resolution !== null && ownedVersion !== resolution.version) {
       throw new TypedDomainError(
         "RUN_SETTINGS_VERSION_DRIFT",
-        `RUN_SETTINGS_VERSION_DRIFT:${String(resolution.version)}:${String(run.registerVersion)}`
+        `RUN_SETTINGS_VERSION_DRIFT:${String(resolution.version)}:${String(ownedVersion)}`
       );
     }
     const preflightHaltedSites = new Map<string, {
@@ -12131,9 +12134,6 @@ export class WalkingSkeletonRunner {
         "The runner failed inside its private-content disclosure lease"
       );
     } finally {
-      if (replayBookInLease.stood > 0) {
-        console.warn(JSON.stringify({ kind: "DEBATEAI_RUN_HANDOVER", event: "ANSWERS_STOOD", runId: claimedRunId, stood: replayBookInLease.stood }));
-      }
       replayBookInLease.close();
     }
     /**

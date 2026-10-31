@@ -215,6 +215,14 @@ export type AdmittedRun = Awaited<ReturnType<ReturnType<typeof previewDebateHarn
  * The harness over the caller's migrated database pool (read when called, so a `beforeAll` may start it) and the
  * caller's list of stub closers (closed by the caller's `afterEach`).
  */
+/** Decision 12: what another release's sealed wording sent: other bytes, under another contract hash. */
+export const OLDER_RELEASE_HASH = "older-release-sealed-contracts";
+export const olderReleaseWording = (request: ProviderCallRequest): ProviderCallRequest => {
+  const messages = request.packet.messages.map((message, index) => index === 0
+    ? { ...message, content: `Older wording of this instruction.\n${message.content}` } : message);
+  return { ...request, contractHash: OLDER_RELEASE_HASH, packet: Object.assign({}, request.packet, { messages }) };
+};
+
 export function previewDebateHarness(input: Readonly<{
   pool: () => Pool;
   stubClosers: (() => Promise<void>)[];

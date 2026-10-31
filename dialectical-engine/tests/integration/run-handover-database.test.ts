@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { WorkItemRepository } from "@debateai/battery";
 import {
   PostgresDigModelRepository, PostgresDigModelRunnerRepository, PostgresInvestigationRepository, PostgresInvestigationRunnerRepository, PostgresWebEvidenceRepository,
-  RunRepository, WEB_EVIDENCE_CARRIERS, encryptAttestedLeasedContentForRun, prepareLeasedContentEncryptionForRun, withRunContentLease, type WebSealed
+  WEB_EVIDENCE_CARRIERS, encryptAttestedLeasedContentForRun, prepareLeasedContentEncryptionForRun, withRunContentLease, type WebSealed
 } from "@debateai/db";
 import { addressKey } from "../../packages/evidence/src/host-filter.js";
 const { countOpenWork } = await import("../../deploy/" + "preview-lifecycle/v1/release-table.mjs") as unknown as {
@@ -146,8 +146,6 @@ describe("Continue moves the debate, once, to the release that is current", () =
     await db().query("SELECT core.record_release_switch($1, $2, now(), 'test', NULL)", [C, B]);
     expect(await pauses().resumeInRelease(owner, paused.runId, C, 2)).toBe("RECORDED");
     expect(await hops(paused.runId)).toMatchObject([{ hop: 1, from_release_key: A, from_register_version: "1", to_release_key: C, to_register_version: "2" }]);
-    const runs = new RunRepository(db());
-    await expect(runs.readRunRegisterVersion(paused.runId)).resolves.toBe(2);
     const fromC = new WorkItemRepository(db(), { releaseKey: C });
     await expect(fromC.peekRunSettingsVersion(paused.workItemId)).resolves.toMatchObject({ registerVersion: 2, releaseKey: C });
     await expect(fromC.listOpenRunSettingsVersions(C)).resolves.toContain(2);

@@ -80,7 +80,7 @@ function sources(directory: URL): string[] {
 
 describe("0134: the dig model and the month pause", () => {
   it("C-T follows 0133 in the chain's STEPS (the dig picks' 0135 comes after it), with its own loader", async () => {
-    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0132,loadForward0133,loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140,loadForward0141]);");
+    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0132,loadForward0133,loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140,loadForward0141,loadForward0143]);");
     const loader = read("packages/db/src/migration-forward0134.ts");
     expect(loader).toContain(`const NAME = "${NAME}";`);
     expect(loader).toContain('const VERSION = "dig-model-forward0134-v1";');

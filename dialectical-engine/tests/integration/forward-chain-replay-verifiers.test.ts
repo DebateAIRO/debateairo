@@ -17,7 +17,7 @@ beforeAll(async () => {
   db = await startTestDatabase(); await migrate(db.pool);
   // Every probe test below builds on the real chain plus a first probe step that changes and checks nothing.
   plan = await loadMigrationPlan();
-  first = probe(plan.forwardChain.at(-1)!, "0199_replay_probe.sql");
+  first = probe(plan.forwardChain.at(-2)!, "0199_replay_probe.sql");
 }, 300_000);
 const NETOPIA = "0111_billing_netopia.sql";
 /** Part C's step, chained after the auth DB batch (spec 2026-10-05 §2.16.6); it keeps 0111's verifier in force too. */
@@ -79,7 +79,7 @@ it("keeps NETOPIA's 0111 verifier in force and replaying once the auth DB batch 
     "0124_settings_activation.sql", "0125_italy_specific_approval.sql", "0126_synthesis_check.sql", "0127_publication_review.sql", "0128_threat_reports.sql", "0129_support_answer_scope.sql", "0130_row_level_security.sql",
     "0131_v4_account_memory.sql", "0132_web_evidence.sql", "0133_investigations.sql", "0134_dig_model_and_month_pause.sql", "0135_dig_picks.sql",
     "0136_investigation_reports.sql",
-    "0137_public_debates.sql", "0138_tree_updates.sql", "0139_passage_retention.sql", "0140_internal_spend_kinds.sql", "0141_path_suggestions.sql"]);
+    "0137_public_debates.sql", "0138_tree_updates.sql", "0139_passage_retention.sql", "0140_internal_spend_kinds.sql", "0141_path_suggestions.sql", "0143_run_handover.sql"]);
   const [netopia, batch, partC, rotation] = real.forwardChain;
   const applied = new Set(await ledger());
   expect(applied.has(NETOPIA) && applied.has(AUTH_DB_BATCH_MIGRATION) && applied.has(PART_C) && applied.has(ROLE_ROTATION)).toBe(true);
@@ -99,7 +99,7 @@ it("keeps NETOPIA's 0111 verifier in force and replaying once the auth DB batch 
   expect(rotation!.verifierSha256).toBe(netopia!.verifierSha256);
   expect(effectiveForwardVerifierSql(real, new Set([...applied].filter((name) => !["0130_row_level_security.sql", "0131_v4_account_memory.sql",
     "0132_web_evidence.sql", "0133_investigations.sql", "0134_dig_model_and_month_pause.sql", "0135_dig_picks.sql",
-    "0136_investigation_reports.sql", "0137_public_debates.sql", "0138_tree_updates.sql", "0139_passage_retention.sql", "0140_internal_spend_kinds.sql", "0141_path_suggestions.sql"].includes(name))))).toBe(netopia!.verifierSql);
+    "0136_investigation_reports.sql", "0137_public_debates.sql", "0138_tree_updates.sql", "0139_passage_retention.sql", "0140_internal_spend_kinds.sql", "0141_path_suggestions.sql", "0143_run_handover.sql"].includes(name))))).toBe(netopia!.verifierSql);
   expect(effectiveForwardVerifierSql(real, applied)).toBe(real.forwardChain.at(-1)!.verifierSql);
   // A drift only 0111's verifier knows (a NETOPIA table granted to a wrong role) is refused by migrate() with 0130 last.
   await db.pool.query("GRANT SELECT ON billing.card_token TO debateai_authorization_runtime");
