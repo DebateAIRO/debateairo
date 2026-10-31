@@ -166,7 +166,7 @@ describe("where the material is fitted", () => {
 
     const events = log();
     // A real count over the line until the material has come down far enough.
-    const over = await fitDossierToTokenLine(input, async ({ packet: asked }) => Math.round(estimateWindowTokens(asked.messages) * 1.5) , events.log) as Dossier;
+    const over = await fitDossierToTokenLine(input, async ({ packet: asked }) => estimateWindowTokens(asked.messages) * 3 , events.log) as Dossier;
     expect(over.ladderAt).toBeGreaterThan(byBytes.ladderAt);
     expect(over.ladderStep).toBeGreaterThan(1);
     expect(over.leftOut).toBeGreaterThan(0);
