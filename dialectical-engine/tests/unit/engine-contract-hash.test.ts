@@ -53,7 +53,9 @@ const ENGINE_SEALED_IDS: readonly string[] = ["verdict.investigate.v1", "verdict
   "report.answer.v1", "report.answer.later.v1", "report.answer-check.v1", "report.story.v1", "report.story-check.v1",
   // R22 decision 9 and W4-3 (DRAFT wordings): a dig's planner per chosen path (web.plan-dig.v1 above stays sealed, withdrawn), and
   // the suggestions on a dig's own paths.
-  "web.plan-dig.v2", "web.suggest-dig.v1"];
+  "web.plan-dig.v2", "web.suggest-dig.v1",
+  // R22 report lane (plan 2026-10-31 decision 4, approved): the overall writer, the later version's and the checker.
+  "report.answer.v2", "report.answer.later.v2", "report.answer-check.v2"];
 /**
  * R1d's seal: sha256 of the header text alone, no trailing newline. Printed once with
  * `printf '%s' debateai.engine-contracts.v1 | shasum -a 256` and pasted here; the test also recomputes it.
@@ -71,8 +73,9 @@ const R1D_ENGINE_CONTRACT_HASH = "b98a45d5933d82205d5c6514082d4151bfb8f3f45b3677
 // (85278722824f1cde050e290bbb7ec507af08a8e7ae8087526aee27b45f1b66aa, history). W4-7 (2026-11-01): + the answer checker's two
 // sources variants (b34eac03a16c921a6a360a4405e38eea8e1c0dbd521d8de4e53a379198f6e716, history). W5-1 (2026-11-01): + the
 // final report's 5 (2c8c3139511ddf6d58aa977e418931b3185ebfe4707282367754e4ffbe6ef41b, history). R22 decision 9 and W4-3
-// (2026-10-31): + a dig's planner per chosen path and the suggestions on a dig's own paths.
-const ENGINE_CONTRACT_HASH_SEALED = "5e91084b2392f6aafd4a6cd9e0ff4ed59295cdda3b9b95760c7e392916dd12eb";
+// (2026-10-31): + a dig's planner per chosen path and the suggestions on a dig's own paths. R22 report lane (2026-10-31): + the
+// overall writer, the later version's and the checker.
+const ENGINE_CONTRACT_HASH_SEALED = "42472256f7e9e6283e2e1e065485dd783906de5a6466cfa1cbaa2c8adcb5e4c7";
 const SELECT = "SELECT value_json FROM register.register_row WHERE register_version=$1 AND row_key=$2";
 const runtime = { nodeVersion: "v26.8.2", pnpmVersion: "11.20.0", sourceRevision: "a".repeat(40), sourceTree: "b".repeat(40),
   operatorSha256: "c".repeat(64), observedAt: "2026-10-16T12:00:00.000Z" };

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { StoryFateSchema } from "./story.js";
 import { WEB_CONTRACT_LIMITS } from "./web.js";
 
 /**
@@ -16,7 +17,10 @@ import { WEB_CONTRACT_LIMITS } from "./web.js";
  *  - never an engine number, a score, a lineage, a round count or a failure code;
  *  - a version still being written may be waiting for the digs still running and their rewrites (owner F7 A): the page
  *    then says so (`waiting_for_digs`, how many);
- *  - a shortened dossier is disclosed with the approved line (owner F13), `shortened: true`.
+ *  - a shortened dossier is disclosed with the approved line (owner F13), `shortened: true`;
+ *  - from R22 on (decision 17, the PDF), each version also keeps the tree of paths as they stood when it was written, and
+ *    each source its address, so a finished report stays as written whatever is erased later (decision 16). Both are
+ *    optional: a version written before them has neither.
  *
  * It imports only zod and the zod-only modules beside it (never ./index.js), for the module-cycle reason web.ts gives.
  */
@@ -28,6 +32,10 @@ export const INVESTIGATION_REPORT_LIMITS = Object.freeze({
   partMaxChars: 8_000,
   stillOpenMax: 12,
   sourcesMax: 200,
+  /** The paths of the whole tree: at most 8 for the first debate and for each dig. */
+  pathsMax: 8 * (1 + WEB_CONTRACT_LIMITS.investigationDigsMax),
+  /** A dig reaches at most level 10. */
+  pathLevelMax: 10,
   versionsMax: WEB_CONTRACT_LIMITS.reportVersionsMax,
   digsMax: WEB_CONTRACT_LIMITS.investigationDigsMax
 });
@@ -63,9 +71,23 @@ export const InvestigationReportSourceSchema = z.object({
   site: z.string().trim().min(1).max(WEB_CONTRACT_LIMITS.siteMaxChars),
   title: z.string().trim().min(1).max(WEB_CONTRACT_LIMITS.titleMaxChars).nullable(),
   quote: z.string().trim().min(1).max(WEB_CONTRACT_LIMITS.quoteMaxChars),
-  line: z.string().trim().min(1).max(WEB_CONTRACT_LIMITS.explanationMaxChars).nullable()
+  line: z.string().trim().min(1).max(WEB_CONTRACT_LIMITS.explanationMaxChars).nullable(),
+  /** The page's address; a version written before R22 has none. */
+  link: z.url({ protocol: /^https?$/u }).max(WEB_CONTRACT_LIMITS.linkMaxChars).nullable().optional()
 }).strict();
 export type InvestigationReportSource = z.infer<typeof InvestigationReportSourceSchema>;
+
+/**
+ * One path as the version was written over it: its latest line and what became of it (null: a dig whose rewrite failed left no
+ * word on it). Level 0: the first debate's; k: a dig's at level k.
+ */
+export const InvestigationReportPathSchema = z.object({
+  line: Part,
+  summary: Part.nullable(),
+  fate: StoryFateSchema.nullable(),
+  level: z.number().int().min(0).max(INVESTIGATION_REPORT_LIMITS.pathLevelMax)
+}).strict();
+export type InvestigationReportPath = z.infer<typeof InvestigationReportPathSchema>;
 
 const VersionBase = {
   report_version: z.number().int().positive(),
@@ -81,6 +103,8 @@ function finishedVersion<S extends "READY" | "READY_WITH_RESERVATION">(state: S)
     answer: InvestigationReportAnswerSchema,
     story: InvestigationReportStorySchema.nullable(),
     sources: z.array(InvestigationReportSourceSchema).max(INVESTIGATION_REPORT_LIMITS.sourcesMax),
+    /** The tree of paths as it stood (decision 17); a version written before R22 has none. */
+    paths: z.array(InvestigationReportPathSchema).max(INVESTIGATION_REPORT_LIMITS.pathsMax).optional(),
     /** The dossier was shortened (ladder steps 2-5): the approved F13 line is shown. */
     shortened: z.boolean()
   }).strict();

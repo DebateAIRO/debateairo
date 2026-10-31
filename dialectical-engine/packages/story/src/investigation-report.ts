@@ -54,6 +54,12 @@ import type { StoryRoleMaker } from "./writer.js";
  *    "Sources"); "Sources" is listed by code from the dossier, so no AI writes it.
  * The answer forms are code's (W0-1: "Code owns the answer forms").
  *
+ * VERSION 2 OF THE WRITER AND THE CHECKER (plan 2026-10-31 decision 4, "Overall view, every point", replacing R4, which the
+ * owner rejected): `report.answer.v2`, `report.answer.later.v2` and `report.answer-check.v2`. They carry the plan's text word
+ * for word, followed by the same approved lines as before. The v1 ids above stay sealed, unused. The final report and every
+ * automatic main-answer update use these through `writeOverallAnswer`; the first answer of a debate keeps approved v3 on
+ * purpose, so both can be compared on real debates. Storyteller and story checker: approved as written, unchanged.
+ *
  * Code checks every reply before the checker sees it: every ref an answer segment rests on is one the dossier gives; the
  * story's paragraphs name follow-up debates the dossier gives, each at most once; refs never reach the person (the
  * runner maps a story's card refs back to dig runs and drops the answer's refs before anything is stored).
@@ -210,6 +216,54 @@ export const REPORT_STORY_CHECK_PROMPT_CONTRACT = contract(REPORT_STORY_CHECK_CO
 export const INVESTIGATION_REPORT_SEALED_CONTRACTS: readonly PromptContract[] = Object.freeze([
   REPORT_ANSWER_PROMPT_CONTRACT, REPORT_ANSWER_LATER_PROMPT_CONTRACT, REPORT_ANSWER_CHECK_PROMPT_CONTRACT,
   REPORT_STORY_PROMPT_CONTRACT, REPORT_STORY_CHECK_PROMPT_CONTRACT
+]);
+
+/** Decision 4, the writer, word for word (the plan's "Report and answer-update wording"). OWNER APPROVED. */
+export const REPORT_OVERALL_WRITER_INSTRUCTION = [
+  "Write the answer the person will read, from the material below. The material holds every path of the debate and every "
+    + "point argued on it. Use all of it: your answer is the overall view that comes from weighing every point, not the case "
+    + "for one path.",
+  "Start with what the whole debate points to for what the person wants to find out, in a few sentences. Then go through what "
+    + "matters: give each point room according to how much it bears on the person's question and its purpose, and how well it "
+    + "held up. A point that decides the question gets its reasons. A point that held only partly gets what it adds and what is "
+    + "doubtful about it. Points that fell or barely bear on the question may be grouped in a sentence that says what was "
+    + "considered and why it counts for little, but leave no path out.",
+  "Name what still stands against the overall view as the price of following it, never as refuted. Never present a disputed "
+    + "point as settled. Call an assumption an assumption. If the view could still change, say so once, naturally, where it "
+    + "fits. The answer must agree with the verdict in the material and must not sound more certain than its label allows. Add "
+    + "no facts.",
+  "Write natural sentences in the question's language, never a translation of these instructions. Write for the person who "
+    + "asked: never print a score or any other number taken from the material, never name the material, its parts or its point "
+    + "references, and never describe how the debate or its reviewers work. A figure that the question or an argument itself "
+    + "states may be repeated. Write about the number of words named in the length target; it is a target, never a reason to "
+    + "leave out a point the answer needs."
+].join("\n\n");
+
+/** Decision 4, the checker, word for word (the plan's "Report and answer-update wording"). OWNER APPROVED. */
+export const REPORT_OVERALL_CHECKER_INSTRUCTION =
+  "Check the candidate answer against the material. It must follow the verdict in the material and be no more certain than its "
+  + "label allows. It must reflect every path, and give each point room according to how much it bears on the person's question "
+  + "and how well it held up: a point that decides the question must be there, and a weak point must not be given the weight of "
+  + "a strong one. It must present no disputed point as settled, add no fact that is not in the material, and carry what still "
+  + "stands as a cost of following the answer, never claiming to refute it. It must speak to the person: no score or other number "
+  + "taken from the material, no names of the material's parts or point references, and no description of how the debate was "
+  + "run. Return an objection only for a problem that would mislead the person or that breaks these rules.";
+
+export const REPORT_ANSWER_V2_CONTRACT_ID = "report.answer.v2" as const;
+export const REPORT_ANSWER_LATER_V2_CONTRACT_ID = "report.answer.later.v2" as const;
+export const REPORT_ANSWER_CHECK_V2_CONTRACT_ID = "report.answer-check.v2" as const;
+
+export const REPORT_ANSWER_V2_PROMPT_CONTRACT = contract(REPORT_ANSWER_V2_CONTRACT_ID,
+  [REPORT_OVERALL_WRITER_INSTRUCTION, REPORT_WRITER_INVESTIGATION_LINES, REPORT_WRITER_REWRITTEN_PATHS_SENTENCE].join("\n\n"), REPORT_ANSWER_FORM);
+export const REPORT_ANSWER_LATER_V2_PROMPT_CONTRACT = contract(REPORT_ANSWER_LATER_V2_CONTRACT_ID,
+  [REPORT_OVERALL_WRITER_INSTRUCTION, REPORT_WRITER_INVESTIGATION_LINES, REPORT_WRITER_REWRITTEN_PATHS_SENTENCE,
+    REPORT_WRITER_LATER_VERSION_LINE].join("\n\n"), REPORT_ANSWER_FORM);
+export const REPORT_ANSWER_CHECK_V2_PROMPT_CONTRACT = contract(REPORT_ANSWER_CHECK_V2_CONTRACT_ID,
+  [REPORT_OVERALL_CHECKER_INSTRUCTION, REPORT_CHECKER_FOLLOW_UP_CRITERION].join("\n\n"), REPORT_ANSWER_CHECK_FORM);
+
+/** Decision 4's three, in the order engineSealedContracts() appends them, at the seal's end. */
+export const REPORT_OVERALL_SEALED_CONTRACTS: readonly PromptContract[] = Object.freeze([
+  REPORT_ANSWER_V2_PROMPT_CONTRACT, REPORT_ANSWER_LATER_V2_PROMPT_CONTRACT, REPORT_ANSWER_CHECK_V2_PROMPT_CONTRACT
 ]);
 
 /* ----------------------------------------------------------------- the call sites */
@@ -377,6 +431,8 @@ export type ReportRunCall = Readonly<{
   free: boolean;
   /** Version 2 and later: the writer reads the earlier report's answer (F8 A). */
   later: boolean;
+  /** The call site of each round; absent: the report's own `INVESTIGATION_REPORT:` sites. */
+  callSiteOf?: (site: ReportSite, round: number) => string;
   writer: StoryRoleMaker;
   checker: StoryRoleMaker;
   backupCandidates: readonly StoryBackupCandidate[];
@@ -424,7 +480,10 @@ type StepCall<D> = Readonly<{
   writerLanguageCheck: ReportLanguageCheck | undefined;
 }>;
 
-function reportRequest(call: ReportRunCall, input: Readonly<{
+/** What one checked step needs of a call: everything but the plan's story bound and the story's own material. */
+type StepRun = Omit<ReportRunCall, "free" | "material" | "storyLanguageCheck"> & Readonly<{ material: Pick<ReportCallMaterial, "index"> }>;
+
+function reportRequest(call: StepRun, input: Readonly<{
   site: ReportSite; round: number; providerRef: string; contract: PromptContract; material: readonly FramedMaterialField[];
   bound: Readonly<{ maxAttempts: number; tokenCeiling: number; deadlineMs: number }>;
   classifyContent: (content: string, reply?: ModelReplyFacts) => ContentClassification;
@@ -438,7 +497,7 @@ function reportRequest(call: ReportRunCall, input: Readonly<{
   return Object.freeze({
     runId: call.runId,
     subjectItemId: call.subjectItemId,
-    callSiteKey: investigationReportCallSiteKey(input.site, input.round),
+    callSiteKey: (call.callSiteOf ?? investigationReportCallSiteKey)(input.site, input.round),
     role: REPORT_SITE_ROLES[input.site],
     lane: "story" as const,
     preferredResponseFormat: "json_object" as const,
@@ -455,7 +514,7 @@ function reportRequest(call: ReportRunCall, input: Readonly<{
 }
 
 /** One checked step: the writer then the checker, `maxRounds` times, then the backup writer's loop (as the rewrite's). */
-async function writeStep<D>(call: ReportRunCall, step: StepCall<D>): Promise<ReportStepWritten<D>> {
+async function writeStep<D>(call: StepRun, step: StepCall<D>): Promise<ReportStepWritten<D>> {
   const draftWriter = new Map<number, StoryRoleMaker>();
   const firstWrite: { failed: boolean; error: unknown } = { failed: false, error: null };
   const classify = (index: ReportIndex) => (content: string, reply?: ModelReplyFacts) =>
@@ -522,6 +581,27 @@ async function writeStep<D>(call: ReportRunCall, step: StepCall<D>): Promise<Rep
   return Object.freeze({ outcome: second, rounds: Object.freeze([...first.rounds, ...second.rounds]), backup });
 }
 
+/** What the overall answer needs: a report call without the story's parts. */
+export type OverallAnswerCall = Omit<ReportRunCall, "free" | "material" | "storyLanguageCheck"> & Readonly<{
+  material: Pick<ReportCallMaterial, "answerWriter" | "answerCheckerOf" | "index">;
+}>;
+
+/**
+ * THE OVERALL ANSWER, the one checked step the final report and every automatic main-answer update share (decisions 3 and 4):
+ * the writer and the checker in their approved v2 wording, the later-version writer when `later`. The caller brings the
+ * material (`buildInvestigationDossier`), the money (`send`), and, when it is not a report, its own `callSiteOf`.
+ * Never throws for a provider or a refused call: it keeps its last checked draft or ends FAILED, as the story loop does.
+ */
+export function writeOverallAnswer(call: OverallAnswerCall): Promise<ReportStepWritten<ReportAnswerDraft>> {
+  return writeStep<ReportAnswerDraft>(call, {
+    writerSite: "ANSWER", checkerSite: "ANSWER_CHECK",
+    writerContract: call.later ? REPORT_ANSWER_LATER_V2_PROMPT_CONTRACT : REPORT_ANSWER_V2_PROMPT_CONTRACT,
+    checkerContract: REPORT_ANSWER_CHECK_V2_PROMPT_CONTRACT, rules: ANSWER_RULES,
+    writerMaterial: call.material.answerWriter, checkerMaterialOf: call.material.answerCheckerOf,
+    writerBound: INVESTIGATION_REPORT_POLICY.answerBound, writerLanguageCheck: call.answerLanguageCheck
+  });
+}
+
 /**
  * The report's two checked steps: the answer, then (only over a served answer) the story. Never throws for a provider, a
  * refused call or the closing's ceiling: a step that stops keeps its last checked draft (READY_WITH_RESERVATION) or ends
@@ -532,13 +612,7 @@ export async function writeInvestigationReport(call: ReportRunCall): Promise<Rep
   if (!Number.isInteger(call.maxRounds) || call.maxRounds < 1 || 2 * call.maxRounds > lastRound) {
     throw new TypedDomainError("INVESTIGATION_REPORT_ROUNDS_INVALID", "A report step runs 1 or 2 rounds, and the backup's after them");
   }
-  const answer = await writeStep<ReportAnswerDraft>(call, {
-    writerSite: "ANSWER", checkerSite: "ANSWER_CHECK",
-    writerContract: call.later ? REPORT_ANSWER_LATER_PROMPT_CONTRACT : REPORT_ANSWER_PROMPT_CONTRACT,
-    checkerContract: REPORT_ANSWER_CHECK_PROMPT_CONTRACT, rules: ANSWER_RULES,
-    writerMaterial: call.material.answerWriter, checkerMaterialOf: call.material.answerCheckerOf,
-    writerBound: INVESTIGATION_REPORT_POLICY.answerBound, writerLanguageCheck: call.answerLanguageCheck
-  });
+  const answer = await writeOverallAnswer(call);
   if (answer.outcome.outcome === "FAILED") return Object.freeze({ answer, story: null });
   const served = answer.outcome.body;
   const story = await writeStep<ReportStoryDraft>(call, {

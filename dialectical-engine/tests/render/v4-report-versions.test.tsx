@@ -243,3 +243,50 @@ describe("the map's answer (owner Q-D11)", () => {
     expect(page().textContent).toContain(CATALOG["v4.panel.answerRoot"]);
   });
 });
+
+/*
+ * R22 decision 17: the current version downloads as its own PDF; earlier versions stay on the page. The route's HEAD says when
+ * the PDF cannot be made (a language the fonts cannot print yet), and the page then says so and leaves its Print.
+ */
+describe("the report's PDF on the page", () => {
+  const fetches: Array<[string, string | undefined]> = [];
+  const headAnswers = (status: number) => vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    fetches.push([String(url), init?.method]);
+    return new Response(null, { status });
+  }));
+  afterEach(() => { vi.unstubAllGlobals(); fetches.length = 0; });
+
+  it("offers the current version's PDF once one stands, in place of the debate's own, whichever version is shown", async () => {
+    headAnswers(200);
+    const runId = crypto.randomUUID();
+    reports.load = vi.fn(async () => investigation(runId, "CLOSED", [finished(1, "2026-10-29T10:00:00.000Z"), finished(2, "2026-10-31T10:00:00.000Z")]));
+    const root = await mountReport(runId);
+    await settle();
+    const link = root.querySelector<HTMLAnchorElement>(".v4RepPdf");
+    expect(link?.getAttribute("href")).toBe(`/v4/debate/${runId}/report/pdf`);
+    expect(link?.textContent).toBe(word("v4.investigation.downloadPdf"));
+    expect(fetches).toContainEqual([`/v4/debate/${runId}/report/pdf`, "HEAD"]);
+    // The debate's own PDF goes from the header.
+    expect(root.querySelector(`a[href="/debate/${runId}/report"]`)).toBeNull();
+  });
+
+  it("says plainly when the PDF cannot be made, and has no link", async () => {
+    headAnswers(404);
+    const runId = crypto.randomUUID();
+    reports.load = vi.fn(async () => investigation(runId, "CLOSED", [finished(1, "2026-10-31T10:00:00.000Z")]));
+    const root = await mountReport(runId);
+    await settle();
+    expect(root.querySelector(".v4RepPdf")).toBeNull();
+    expect(root.textContent).toContain(word("v4.investigation.pdfUnavailable"));
+  });
+
+  it("has no PDF of its own before any finished version", async () => {
+    headAnswers(200);
+    const runId = crypto.randomUUID();
+    reports.load = vi.fn(async () => investigation(runId, "OPEN", []));
+    const root = await mountReport(runId);
+    await settle();
+    expect(root.querySelector(".v4RepPdf")).toBeNull();
+    expect(fetches).toEqual([]);
+  });
+});
