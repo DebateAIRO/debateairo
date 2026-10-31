@@ -3,7 +3,7 @@
   "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
   "previous": {
     "name": "0139_passage_retention.sql",
-    "manifestSha256": "742f6d7e6fdad1493b10d78fc2fb94831c4513982d24883ff3274f0ff474619e",
+    "manifestSha256": "d2c012b1cb52b5e9844cc20fb2050909f0ac06fb67bd68e0bb6295a55159460b",
     "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
   },
   "migration": {

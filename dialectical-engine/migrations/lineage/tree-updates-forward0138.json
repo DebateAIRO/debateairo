@@ -3,12 +3,12 @@
   "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
   "previous": {
     "name": "0137_public_debates.sql",
-    "manifestSha256": "84c084a84fe705f76c2f0292213f35fe38ba91420dda790c11e5c1ce5b5fe5ae",
+    "manifestSha256": "bec84571f02bb8f91430aa436accccb7d1e328f8adf9b857787fd92a521353bc",
     "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
   },
   "migration": {
     "name": "0138_tree_updates.sql",
-    "sha256": "b471dd265688ff71d585f0214ced493424eab29737b4c54376b9e1863b2eac70"
+    "sha256": "4c98f431937527b34a4cc65127b8f434d77ebebcc1b9a3abd5471477f65f3e2d"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-130.sql",

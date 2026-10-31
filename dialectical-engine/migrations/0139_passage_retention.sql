@@ -461,14 +461,27 @@ BEGIN
 END
 $passage_retention_owner$;
 
-REVOKE ALL ON identity.web_shown_quote, identity.web_reply_text, identity.web_passage_wipe FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
+REVOKE ALL ON identity.web_shown_quote FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
+REVOKE ALL ON identity.web_reply_text FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
+REVOKE ALL ON identity.web_passage_wipe FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
 REVOKE ALL ON FUNCTION identity.guard_passage_retention_record() FROM PUBLIC;
-REVOKE ALL ON FUNCTION identity.debate_nothing_runs(uuid), identity.web_page_text_is_passage_bound(uuid,uuid) FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
-REVOKE ALL ON FUNCTION identity.record_web_shown_quote(uuid,uuid,jsonb,bytea), identity.read_web_shown_quotes(uuid), identity.record_web_reply_text(uuid,uuid,jsonb,bytea), identity.read_web_reply_texts(uuid,uuid[]), identity.wipe_debate_passages(uuid,text), identity.read_debates_holding_passages(integer) FROM PUBLIC,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
+REVOKE ALL ON FUNCTION identity.debate_nothing_runs(uuid) FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
+REVOKE ALL ON FUNCTION identity.web_page_text_is_passage_bound(uuid,uuid) FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
+REVOKE ALL ON FUNCTION identity.record_web_shown_quote(uuid,uuid,jsonb,bytea) FROM PUBLIC,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
+REVOKE ALL ON FUNCTION identity.read_web_shown_quotes(uuid) FROM PUBLIC,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
+REVOKE ALL ON FUNCTION identity.record_web_reply_text(uuid,uuid,jsonb,bytea) FROM PUBLIC,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
+REVOKE ALL ON FUNCTION identity.read_web_reply_texts(uuid,uuid[]) FROM PUBLIC,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
+REVOKE ALL ON FUNCTION identity.wipe_debate_passages(uuid,text) FROM PUBLIC,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
+REVOKE ALL ON FUNCTION identity.read_debates_holding_passages(integer) FROM PUBLIC,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
 REVOKE ALL ON FUNCTION identity.close_investigation_keeping_texts(uuid,uuid) FROM PUBLIC,debateai_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
 REVOKE ALL ON FUNCTION identity.forget_erased_debate_passages(uuid) FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_replay,debateai_data_export_worker;
 REVOKE ALL ON FUNCTION identity.read_data_export_passage_retention(uuid,uuid) FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay;
-GRANT EXECUTE ON FUNCTION identity.record_web_shown_quote(uuid,uuid,jsonb,bytea), identity.read_web_shown_quotes(uuid), identity.record_web_reply_text(uuid,uuid,jsonb,bytea), identity.read_web_reply_texts(uuid,uuid[]), identity.wipe_debate_passages(uuid,text), identity.read_debates_holding_passages(integer) TO debateai_runtime;
+GRANT EXECUTE ON FUNCTION identity.record_web_shown_quote(uuid,uuid,jsonb,bytea) TO debateai_runtime;
+GRANT EXECUTE ON FUNCTION identity.read_web_shown_quotes(uuid) TO debateai_runtime;
+GRANT EXECUTE ON FUNCTION identity.record_web_reply_text(uuid,uuid,jsonb,bytea) TO debateai_runtime;
+GRANT EXECUTE ON FUNCTION identity.read_web_reply_texts(uuid,uuid[]) TO debateai_runtime;
+GRANT EXECUTE ON FUNCTION identity.wipe_debate_passages(uuid,text) TO debateai_runtime;
+GRANT EXECUTE ON FUNCTION identity.read_debates_holding_passages(integer) TO debateai_runtime;
 GRANT EXECUTE ON FUNCTION identity.close_investigation_keeping_texts(uuid,uuid) TO debateai_billing_runtime;
 GRANT EXECUTE ON FUNCTION identity.forget_erased_debate_passages(uuid) TO debateai_erasure_runtime;
 GRANT EXECUTE ON FUNCTION identity.read_data_export_passage_retention(uuid,uuid) TO debateai_data_export_worker;

@@ -8,7 +8,7 @@
   },
   "migration": {
     "name": "0137_public_debates.sql",
-    "sha256": "495c4e2777ef7e8374104bd4244880b165daa6cb71d666c09e8189ce9628c950"
+    "sha256": "80e4929da409cb5ebb6e00ced66d8e12fb12665983aa3006292d1a1c384aad56"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-130.sql",
