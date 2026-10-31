@@ -233,6 +233,13 @@ export const ResearchedAddRequestSchema = z.object({ position_ref: PositionRefSc
 export type ResearchedAddRequest = z.infer<typeof ResearchedAddRequestSchema>;
 export const ResearchedAddedSchema = z.object({ state: z.literal("READING") }).strict();
 export type ResearchedAdded = z.infer<typeof ResearchedAddedSchema>;
+/**
+ * W4-4: the 409 of "Add to researched", nothing charged and nothing kept. NOT_NOW: the debate is still running (its map is not settled).
+ * WAITS_FOR_RESET: the day, week or month is full, and new starts wait for its reset (the money rule, point 4). NOT_ON_PLAN: Free reads no added page.
+ */
+export const RESEARCHED_REFUSALS = ["WEB_RESEARCHED_NOT_NOW", "WEB_RESEARCHED_WAITS_FOR_RESET", "WEB_RESEARCHED_NOT_ON_PLAN"] as const;
+export const ResearchedRefusedSchema = z.object({ error: z.enum(RESEARCHED_REFUSALS), message: z.enum(RESEARCHED_REFUSALS) }).strict();
+export type ResearchedRefused = z.infer<typeof ResearchedRefusedSchema>;
 
 /**
  * One pick a dig is made of: a suggestion the person chose (its text as sent, edited or not; the server compares it with

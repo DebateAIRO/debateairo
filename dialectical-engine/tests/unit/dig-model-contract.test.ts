@@ -338,8 +338,9 @@ describe("W2-7 old answers read unchanged; the inventory and the no-number rule"
     const resources = contractInventory.resources as unknown as Record<string, unknown>;
     for (const [name, schema] of Object.entries(NEW)) expect(resources[name], name).toBe(schema);
     // R22 W3-8 later registered one route for these shapes, Continue (POST /v1/runs/{id}/continue): 180 + 1. R22 W5-1 then
-    // registered the final report's three (GET /v1/runs/{id}/investigation, POST /v1/runs/{id}/report and …/reopen): 184.
+    // registered the final report's three (GET /v1/runs/{id}/investigation, POST /v1/runs/{id}/report and …/reopen): the count is the head's, with this one route.
     // R22 owner decision 13 removed the Unpublish route (POST /v1/runs/{id}/unpublish): 183.
-    expect(contractInventory.routes).toHaveLength(183);
+    // W4-4: "Add to researched" (POST /v1/runs/{id}/researched): the count is the head's, with this one route.
+    expect(contractInventory.routes).toHaveLength(190);
   });
 });

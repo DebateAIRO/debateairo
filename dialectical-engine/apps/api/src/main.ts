@@ -27,7 +27,7 @@ import {readConsumerRecoveryPolicy} from "@debateai/register";
 import {SendmailConsumerAccountSender} from "./mail-channel.js";
 import { ConsumerSecurityService } from "./consumer-security.js";
 import { PostgresConsumerSecurityRepository } from "@debateai/db";
-import { PostgresDigModelRepository, PostgresDigPicksRepository, PostgresInvestigationReportRepository, PostgresInvestigationRepository } from "@debateai/db";
+import { PostgresWebResearchedRepository, PostgresDigModelRepository, PostgresDigPicksRepository, PostgresInvestigationReportRepository, PostgresInvestigationRepository } from "@debateai/db";
 import { investigationReportContentOpener } from "./investigation-report.js";
 import { postgresPurposeLines } from "./purpose-lines.js";
 import { ASK_CLARIFY_ROUTE_POLICY, askClarifyTransportFor, createAskClarify } from "./ask-clarify.js";
@@ -1724,6 +1724,13 @@ const api = buildApi({
     investigations,
     owns: async (ownerRef, runId) => (await accountMemory.readLastVisit(ownerRef, runId)) !== null,
     openRootContent: investigationReportContentOpener(pool)
+  },
+  // W4-4: "Add to researched" through 0132's and 0133's definers on the same runtime pool; adding counts as activity for the 30 days (owner F12).
+  webResearched: {
+    record: (ownerRef, runId, pageId) => new PostgresWebResearchedRepository(pool).record(ownerRef, runId, pageId),
+    markActivity: async (ownerRef, runId) => {
+      if (await investigations.open(ownerRef, runId) !== null) await investigations.touch(ownerRef, runId);
+    }
   },
   // W3-7 (0135): a dig's picks, kept at start for its path rewrite, each text sealed under the dig's run key on this pool.
   digPicks: new PostgresDigPicksRepository(pool),

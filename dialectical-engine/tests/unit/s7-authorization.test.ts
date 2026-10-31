@@ -145,6 +145,8 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "GET /v1/runs/{id}/investigation", auth: "user", resource: "run-owner", action: "read-investigation" },
   { route: "POST /v1/runs/{id}/report", auth: "user", resource: "run-owner", action: "write-report" },
   { route: "POST /v1/runs/{id}/reopen", auth: "user", resource: "run-owner", action: "reopen-investigation" },
+  { route: "POST /v1/runs/{id}/researched", auth: "user", resource: "run-owner", action: "add-researched" },
+  { route: "POST /v1/asks/clarify", auth: "user", resource: "run-owner", action: "read-clarifying-questions" },
   { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" },
   { route: "GET /v1/billing/plans", auth: "public", resource: "billing", action: "read-plans" },
   { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" },
@@ -362,7 +364,8 @@ describe("S7 deny-by-default authorization", () => {
     // month-paused debate (POST /v1/runs/{id}/continue). R22 W5-1 adds the final report's three: its versions
     // (GET /v1/runs/{id}/investigation), "Write my report" (POST /v1/runs/{id}/report) and "Keep digging" (POST /v1/runs/{id}/reopen).
     // R22 owner decision 13 removed the Unpublish route (POST /v1/runs/{id}/unpublish): 183. Decision 24 adds the team limit's five.
-    expect(contractInventory.routes).toHaveLength(188);
+    // W4-4: "Add to researched" (POST /v1/runs/{id}/researched), and decision 29's step 2 (POST /v1/asks/clarify).
+    expect(contractInventory.routes).toHaveLength(190);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 

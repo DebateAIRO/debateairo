@@ -46,7 +46,8 @@ export const WEB_EVIDENCE_RUNNER_FUNCTIONS = Object.freeze([
   "identity.record_web_pack(uuid,uuid,text,text[],jsonb,bytea)",
   "identity.read_web_evidence(uuid)",
   "identity.read_web_page_texts(uuid,uuid[])",
-  "identity.settle_web_researched(uuid,uuid,text)"
+  "identity.settle_web_researched(uuid,uuid,text)",
+  "identity.read_unsettled_web_researched(integer)"
 ] as const);
 export const RECORD_WEB_RESEARCHED = "identity.record_web_researched(uuid,uuid,uuid)" as const;
 export const READ_DATA_EXPORT_WEB_EVIDENCE = "identity.read_data_export_web_evidence(uuid,uuid)" as const;
@@ -191,12 +192,20 @@ export class PostgresWebEvidenceRepository {
       searchesToSend: row.searches_to_send, decidedAt: row.decided_at, reason: row.content })));
   }
 
+  /** 0145: the pages people added whose readers have not settled, oldest first (W4-4's sweep); a debate no longer live is left out. */
+  async readUnsettledResearched(limit: number): Promise<readonly WebResearchedUnsettled[]> {
+    return (await this.pool.query<{ waiting: WebResearchedUnsettled[] }>("SELECT identity.read_unsettled_web_researched($1) AS waiting", [limit]))
+      .rows[0]!.waiting;
+  }
+
   /** The readers' outcome of a page the person added to "researched" (W4-4), set once. */
   settleResearched(runId: string, pageId: string, settled: "ADDS" | "DOES_NOT_ADD" | "FAILED"):
     Promise<"SETTLED" | "ALREADY" | "NOT_CHOSEN" | "NOT_LIVE"> {
     return outcome(this.pool, "SELECT identity.settle_web_researched($1,$2,$3) AS outcome", [runId, pageId, settled]);
   }
 }
+
+export type WebResearchedUnsettled = Readonly<{ run_id: string; page_id: string; path_ref: string; chosen_at: string }>;
 
 /** One path's web decision as the runner's webPlanPathStatuses gives it, its reason sealed (NO_SEARCH_PLANNED only). */
 export type WebPlanPathRecord = Readonly<{

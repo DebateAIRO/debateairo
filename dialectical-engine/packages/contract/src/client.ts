@@ -1,6 +1,6 @@
 import { ContractHttpError, type ContractErrorCode, type ContractWaitingRefusal } from "./http-error.js";
 import { AskClarifyResponseSchema, RunContinueRefusedSchema, RunContinueRequestSchema, RunContinuedSchema, type AskClarifyRequest, type AskClarifyResponse, type RunContinued, type RunContinueRefused } from "./web.js";
-import { InvestigationCloseRequestSchema } from "./web.js";
+import { InvestigationCloseRequestSchema, ResearchedAddRequestSchema, ResearchedAddedSchema, ResearchedRefusedSchema, type ResearchedAddRequest, type ResearchedAdded, type ResearchedRefused } from "./web.js";
 import {
   InvestigationReopenRequestSchema, InvestigationReopenedSchema, InvestigationReportAcceptedSchema, InvestigationReportsSchema,
   InvestigationReportWritingSchema, type InvestigationReopened, type InvestigationReportAccepted, type InvestigationReports,
@@ -565,6 +565,8 @@ export interface ContractClient {
   writeReport(runId: string): Promise<InvestigationReportAccepted | InvestigationClosedRefusal>;
   /** R22 W5-1: "Keep digging". While a version is being written the 409 INVESTIGATION_REPORT_WRITING is answered as data. */
   reopenInvestigation(runId: string): Promise<InvestigationReopened | InvestigationReportWriting>;
+  /** W4-4: "Add to researched" (202, READING; the same page again: the same). Its refusals (409) are answered as data. */
+  addToResearched(runId: string, request: ResearchedAddRequest): Promise<ResearchedAdded | ResearchedRefused>;
   readRun(runId: string): Promise<RunProjection>;
   readInspection(answerId: string, version?: number): Promise<Inspection>;
   readLedgerDigest(answerId: string): Promise<ExecutionLedgerDigest>;
@@ -1005,6 +1007,15 @@ export function createContractClient(
       (status, body) => status === 409 && typeof body === "object" && body !== null
         && (body as { error?: unknown }).error === INVESTIGATION_CLOSED
         ? Object.freeze({ error: INVESTIGATION_CLOSED, message: INVESTIGATION_CLOSED }) : null
+    ),
+    addToResearched: (runId: string, request: ResearchedAddRequest) => requestJson<ResearchedAdded | ResearchedRefused>(
+      root.href, fetchImplementation, `/v1/runs/${encodeURIComponent(runId)}/researched`, ResearchedAddedSchema,
+      { method: "POST", body: JSON.stringify(ResearchedAddRequestSchema.parse(request)) }, auth, 202,
+      (status, body) => {
+        if (status !== 409) return null;
+        const refused = ResearchedRefusedSchema.safeParse(body);
+        return refused.success ? refused.data : null;
+      }
     ),
     reopenInvestigation: (runId: string) => requestJson<InvestigationReopened | InvestigationReportWriting>(
       root.href, fetchImplementation, `/v1/runs/${encodeURIComponent(runId)}/reopen`, InvestigationReopenedSchema,

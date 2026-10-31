@@ -57,7 +57,9 @@ import {
   VerdictVoteRepository,
   askComparingJudge,
   type PointInvestigationSeat,
-  type StoredVerdictVote
+  type StoredVerdictVote,
+  WEB_RESEARCHED_CALL_SITE_PREFIX,
+  webResearchedCallSiteRole
 } from "@debateai/judgement";
 import { LedgerRepository, type AppendLedgerInput } from "@debateai/ledger";
 import {
@@ -13566,6 +13568,9 @@ function storyCallSiteRole(callSiteKey: string): ProviderCallRequest["role"] | n
   // R22 decisions 2 and 3: the climb's two sites and the main-answer update's two, each with its one role.
   const climbed = pathClimbCallSiteRole(callSiteKey) ?? answerUpdateCallSiteRole(callSiteKey);
   if (climbed !== null) return climbed;
+  // W4-4: "Add to researched"'s readers.
+  const researched = webResearchedCallSiteRole(callSiteKey);
+  if (researched !== null) return researched;
   const site = STORY_CALL_SITE.exec(callSiteKey);
   if (site === null) return null;
   return site[1] === "STORYTELLER" ? "SYNTHESIZER" : "EVALUATOR";
@@ -13582,7 +13587,7 @@ export function storyCallScopeAgrees(request: Pick<ProviderCallRequest, "lane" |
   const storyScope = request.lane === "story";
   const storyKey = key.startsWith(STORY_CALL_SITE_PREFIX) || key.startsWith(PATH_REWRITE_CALL_SITE_PREFIX)
     || key.startsWith(INVESTIGATION_REPORT_CALL_SITE_PREFIX) || key.startsWith(PATH_CLIMB_CALL_SITE_PREFIX)
-    || key.startsWith(ANSWER_UPDATE_CALL_SITE_PREFIX);
+    || key.startsWith(ANSWER_UPDATE_CALL_SITE_PREFIX) || key.startsWith(WEB_RESEARCHED_CALL_SITE_PREFIX);
   return !((storyScope || storyKey) && (!storyScope || storyCallSiteRole(key) !== request.role));
 }
 
@@ -13754,7 +13759,10 @@ export function createPostgresProviderGateway(
       const pathRewrite = storyScope && isPathRewriteCallSite(structureRepairOriginalKey(request.callSiteKey));
       // W5-1: the final report's sites spend the report seam (never walled), on the investigation's root run.
       const reportCall = storyScope && investigationReportCallSiteRole(structureRepairOriginalKey(request.callSiteKey)) !== null;
-      const climbCall = storyScope && pathClimbCallSiteRole(structureRepairOriginalKey(request.callSiteKey)) !== null;
+      // W4-4: "Add to researched" is charged like a climb: a small follow-up on the page's own run, counted for its owner, never walled
+      // (PATH_CLIMB rows: a kind of its own would mean redefining 0140's team readers for so small a call).
+      const climbCall = storyScope && (pathClimbCallSiteRole(structureRepairOriginalKey(request.callSiteKey)) !== null
+        || webResearchedCallSiteRole(structureRepairOriginalKey(request.callSiteKey)) !== null);
       const answerUpdateCall = storyScope && answerUpdateCallSiteRole(structureRepairOriginalKey(request.callSiteKey)) !== null;
       const storyLaneSeam = answerUpdateCall ? buildAnswerUpdateCostEnvelopeSeam : climbCall ? buildPathClimbCostEnvelopeSeam
         : reportCall ? buildInvestigationReportCostEnvelopeSeam

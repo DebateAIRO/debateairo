@@ -122,6 +122,8 @@ let roomMode: RoomMode = choice("MOCK_ROOM", process.env.MOCK_ROOM, ROOM_MODES, 
 let askMode: AskMode = choice("MOCK_ASK", process.env.MOCK_ASK, ASK_MODES, "AUTO");
 let planMode: PlanMode = choice("MOCK_PLAN", process.env.MOCK_PLAN, PLAN_MODES, "PLUS");
 let usageMode: UsageMode = choice("MOCK_USAGE", process.env.MOCK_USAGE, USAGE_MODES, "NORMAL");
+/** W4-4: how long the mock's readers take over a page added to researched. */
+const RESEARCHED_READ_MS = 6_000;
 let pauseMode: PauseMode = choice("MOCK_PAUSE", process.env.MOCK_PAUSE, PAUSE_MODES, "UNTIL_RESET");
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -1183,6 +1185,31 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       }
       run.monthPaused = false;
       return sendJson(req, res, 200, { state: "CONTINUING" }, DraftRunContinuedSchema);
+    }
+    if (parts[3] === "researched") {
+      // W4-4: "Add to researched". READING at once, then the readers' outcome a few seconds later, as the runner's sweep; a guide adds nothing.
+      const parsed = C.ResearchedAddRequestSchema.safeParse(body);
+      if (!parsed.success) return sendJson(req, res, 400, { error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      if (stateOf(run) !== "SETTLED" || run.answer === undefined) {
+        return sendJson(req, res, 409, { error: "WEB_RESEARCHED_NOT_NOW", message: "WEB_RESEARCHED_NOT_NOW" }, C.ResearchedRefusedSchema);
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const page: any = (run.answer as any).web?.paths.find((path: any) => path.position_ref === parsed.data.position_ref)?.other_pages
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .find((candidate: any) => candidate.page_ref === parsed.data.page_ref);
+      if (page === undefined) return sendJson(req, res, 404, { error: "RUN_NOT_FOUND" });
+      if (page.researched === undefined) {
+        if (planMode === "FREE") return sendJson(req, res, 409, { error: "WEB_RESEARCHED_NOT_ON_PLAN", message: "WEB_RESEARCHED_NOT_ON_PLAN" }, C.ResearchedRefusedSchema);
+        if (roomMode === "FULL" || roomMode === "BLOCKED") return sendJson(req, res, 409, { error: "WEB_RESEARCHED_WAITS_FOR_RESET", message: "WEB_RESEARCHED_WAITS_FOR_RESET" }, C.ResearchedRefusedSchema);
+        page.researched = { state: "READING" };
+        const settle = setTimeout(() => {
+          const { researched: _reading, ...fields } = page;
+          page.researched = /guide/iu.test(String(page.title)) ? { state: "ADDS_NOTHING" } : { state: "ADDS", sources: [{ ...fields, page_ref: undefined,
+            extract_id: `S99-${String(page.page_ref).replace(/[^0-9]/gu, "").slice(0, 3) || "1"}`, quote: "A made-up line this page was found to hold.", published_on: null }] };
+        }, RESEARCHED_READ_MS);
+        settle.unref();
+      }
+      return sendJson(req, res, 202, { state: "READING" }, C.ResearchedAddedSchema);
     }
     if (parts[3] === "dig-links") {
       const parsed = C.DigLinkRecordRequestSchema.safeParse(body);

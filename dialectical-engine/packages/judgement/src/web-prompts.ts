@@ -421,6 +421,22 @@ export function webReadTopCallSiteKey(answerIndex: number, reader: 2 | 3): strin
   return `WEB:read-top:${checkedIndex(answerIndex, "WEB_CALL_SITE_INVALID")}:${String(reader)}`;
 }
 
+/**
+ * "Add to researched" (W4-4; owner Q7, Q-D9): the same readers on the same sealed wording, each call naming the page's own run, outside
+ * the debate. Their own sites so the gateway takes them on the story lane and charges them never walled, as a climb's.
+ */
+export const WEB_RESEARCHED_CALL_SITE_PREFIX = "WEB_RESEARCHED:" as const;
+const WEB_RESEARCHED_CALL_SITE = /^WEB_RESEARCHED:(?:read1|read-top:[23])$/u;
+export const webResearchedReadAllCallSiteKey = (): string => `${WEB_RESEARCHED_CALL_SITE_PREFIX}read1`;
+export function webResearchedReadTopCallSiteKey(reader: 2 | 3): string {
+  if (reader !== 2 && reader !== 3) throw new TypedDomainError("WEB_CALL_SITE_INVALID", "Readers 2 and 3 only");
+  return `${WEB_RESEARCHED_CALL_SITE_PREFIX}read-top:${String(reader)}`;
+}
+/** The role a reader's "Add to researched" site carries (a web reader's), or null for any other key. */
+export function webResearchedCallSiteRole(callSiteKey: string): "JUDGE" | null {
+  return WEB_RESEARCHED_CALL_SITE.test(callSiteKey) ? "JUDGE" : null;
+}
+
 /* ----------------------------------------------------------------- the second wording (owner approvals of 2026-10-30) */
 
 /**

@@ -60,3 +60,8 @@ export function webNoteOf(answer: Answer): V4WebNote | null {
   if (paths.every((path) => path.search.status === "SWITCHED_OFF")) return "SWITCHED_OFF";
   return null;
 }
+
+/** W4-4: an added page the readers have not settled yet: the page reads its answer again while one waits. */
+export function researchedWaiting(answer: Answer): boolean {
+  return (answer.web?.paths ?? []).some((path) => path.other_pages.some((page) => page.researched?.state === "READING"));
+}

@@ -39,7 +39,7 @@ vi.mock("@/lib/v4/storage", async (importActual) => ({
   useReadingLevel: (initial: ReadingLevel | null) => [initial, () => {}]
 }));
 
-import { V4OtherPages, V4SearchNote, V4SourceList, V4WebNoteLine } from "../../apps/ui/components/v4/V4Sources.js";
+import { V4OtherPages, V4SearchNote, V4SourceList, V4WebNoteLine, type V4ResearchedPress } from "../../apps/ui/components/v4/V4Sources.js";
 import { V4Panel } from "../../apps/ui/components/v4/V4Panel.js";
 import { V4ReportClient } from "../../apps/ui/components/v4/V4ReportClient.js";
 
@@ -213,18 +213,15 @@ describe("notes (V4SearchNote, V4WebNoteLine)", () => {
 });
 
 describe("other pages (V4OtherPages)", () => {
-  it("lists each page with its line, never a grade, and 'Add to researched' that waits for W4-4's wiring", () => {
+  it("lists each page with its line, never a grade; with no handler (Free, a full quota) no page offers the button", () => {
     const root = dom(renderToStaticMarkup(<V4OtherPages pages={[other("pg-1"), other("pg-2", { read_depth: "PREVIEW_ONLY" })]} catalog={catalog} locale="en" actions />));
     expect(root.querySelector("h4")!.textContent).toBe(t(catalog, "v4.web.otherPages"));
     const items = [...root.querySelectorAll("li.v4OtherPage")];
     expect(items.map((item) => item.querySelector("a")!.getAttribute("href"))).toEqual(["https://storage-watch.example/pg-1", "https://storage-watch.example/pg-2"]);
     expect(items[0]!.querySelector(".v4SourceWhy")!.textContent).toBe("Why page pg-1 might matter.");
     expect(items[1]!.textContent).toContain(t(catalog, "v4.web.previewOnly"));
-    const buttons = [...root.querySelectorAll("button")];
-    expect(buttons.map((button) => [button.textContent, button.hasAttribute("disabled")])).toEqual([
-      [t(catalog, "v4.web.addResearched"), true],
-      [t(catalog, "v4.web.addResearched"), true]
-    ]);
+    expect(root.querySelectorAll("button")).toHaveLength(0);
+    expect(root.textContent).not.toContain(t(catalog, "v4.web.addResearchedHint"));
     expect(root.textContent).not.toMatch(/grade|score|\b[0-3]\s*\/\s*3\b/iu);
   });
 
@@ -249,6 +246,40 @@ describe("other pages (V4OtherPages)", () => {
     expect(items[0]!.querySelector("[role=status]")).not.toBeNull();
     expect(items[1]!.querySelector("blockquote")!.textContent).toBe("A made-up line from page S1-7.");
     expect(root.querySelectorAll("button")).toHaveLength(0);
+  });
+
+  it("the button's states: offered with its one hint, sending, sent, refused, and what the answer says wins", () => {
+    const render = (presses?: ReadonlyMap<string, V4ResearchedPress>, page = other("pg-1")) => dom(renderToStaticMarkup(
+      <V4OtherPages pages={[page]} catalog={catalog} locale="en" actions onAddResearched={() => undefined} {...(presses === undefined ? {} : { presses })} />));
+    const offered = render();
+    expect(offered.querySelector("button")!.textContent).toBe(t(catalog, "v4.web.addResearched"));
+    expect(offered.querySelector("button")!.hasAttribute("disabled")).toBe(false);
+    expect(offered.textContent).toContain(t(catalog, "v4.web.addResearchedHint"));
+
+    const sending = render(new Map([["pg-1", "ADDING"]])).querySelector("button")!;
+    expect(sending.textContent).toBe(t(catalog, "v4.web.researched.ADDING"));
+    expect(sending.hasAttribute("disabled")).toBe(true);
+
+    const sent = render(new Map([["pg-1", "READING"]]));
+    expect(sent.querySelector("button")).toBeNull();
+    expect(sent.querySelector("[role=status]")!.textContent).toBe(t(catalog, "v4.web.researched.READING"));
+
+    const again = render(new Map([["pg-1", "TRY_AGAIN"]]));
+    expect(again.querySelector("[role=alert]")!.textContent).toBe(t(catalog, "v4.web.researched.tryAgain"));
+    expect(again.querySelector("button")!.hasAttribute("disabled")).toBe(false);
+
+    const waits = render(new Map([["pg-1", "WAITS_FOR_RESET"]]));
+    expect(waits.querySelector("button")).toBeNull();
+    expect(waits.textContent).toContain(t(catalog, "v4.web.researched.waitsForReset"));
+
+    // The answer has moved on: a press still held here says nothing more, and no page is offered twice.
+    const settled = render(new Map([["pg-1", "READING"]]), other("pg-1", { researched: { state: "ADDS_NOTHING" } }));
+    expect(settled.textContent).toContain(t(catalog, "v4.web.researched.ADDS_NOTHING"));
+    expect(settled.textContent).not.toContain(t(catalog, "v4.web.researched.READING"));
+    expect(settled.textContent).not.toContain(t(catalog, "v4.web.addResearchedHint"));
+    for (const words of ["v4.web.addResearchedHint", "v4.web.researched.tryAgain", "v4.web.researched.waitsForReset"]) {
+      expect(t(catalog, words)).not.toMatch(/\d|[$€£¢]|cent/iu);
+    }
   });
 
   it("lists pages without buttons on the report, and calls the handler once W4-4 passes one", async () => {
@@ -287,7 +318,9 @@ describe("the panel (V4Panel) with a web part", () => {
 
   it("lists a searched path's other pages; a path with no search says why, above its points; a failed one says so", () => {
     const map = mapOf(webAnswer(PAID_PATHS));
-    const yes = dom(renderToStaticMarkup(panel(map, "path:n-yes")));
+    const yes = dom(renderToStaticMarkup(panel(map, "path:n-yes", "background", () => undefined)));
+    // Free, or a quota waiting for its reset: the page hands no handler, and the pages stand without a button.
+    expect(dom(renderToStaticMarkup(panel(map, "path:n-yes"))).querySelectorAll(".v4OtherPageAdd")).toHaveLength(0);
     expect(yes.querySelector(".v4WebNote")).toBeNull();
     expect([...yes.querySelectorAll(".v4OtherPage a")].map((link) => link.textContent)).toEqual(["Another made-up page pg-1", "Another made-up page pg-2"]);
     expect(yes.querySelectorAll(".v4OtherPageAdd")).toHaveLength(1);

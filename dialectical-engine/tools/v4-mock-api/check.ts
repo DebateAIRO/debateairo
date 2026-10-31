@@ -453,6 +453,27 @@ await step("a debate paused at the month wall, then Continue", async () => {
 }, (value: string) => value);
 
 // The sign-in helper's cookies must survive the proxy's cookie rules.
+await step("Add to researched: READING, then the outcome; the same page again changes nothing; Free refused", async () => {
+  const answer = await draftAnswer(RUNS.settled);
+  const path = answer.web.paths.find((candidate: Loose) => candidate.other_pages.some((page: Loose) => page.researched === undefined));
+  const page = path.other_pages.find((candidate: Loose) => candidate.researched === undefined);
+  const added = { position_ref: path.position_ref, page_ref: page.page_ref };
+  await mock("/__mock/set?plan=FREE");
+  try {
+    const refused: Loose = await client.addToResearched(RUNS.settled, added);
+    must(refused.error === "WEB_RESEARCHED_NOT_ON_PLAN", `Free: ${String(refused.error)}`);
+  } finally {
+    await mock("/__mock/set?plan=PLUS");
+  }
+  const first: Loose = await client.addToResearched(RUNS.settled, added);
+  must(first.state === "READING", "READING");
+  const again: Loose = await client.addToResearched(RUNS.settled, added);
+  must(again.state === "READING", "READING again");
+  const reading = (await draftAnswer(RUNS.settled)).web.paths.find((candidate: Loose) => candidate.position_ref === path.position_ref)
+    .other_pages.find((candidate: Loose) => candidate.page_ref === page.page_ref);
+  must(reading.researched.state === "READING", "the answer says READING");
+  return `page ${page.page_ref} reading`;
+}, (value: string) => value);
 await step("sign-in cookies pass the proxy", async () => {
   const response: Response = await route.GET(new Request("http://127.0.0.1:3011/api/__mock/sign-in"), { params: Promise.resolve({ path: ["__mock", "sign-in"] }) });
   const cookies = response.headers.getSetCookie().map((cookie) => cookie.split("=", 1)[0] ?? "");

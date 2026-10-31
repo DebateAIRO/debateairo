@@ -30,7 +30,7 @@ import {
 } from "./account-memory.js";
 export * from "./account-memory.js";
 import { AnswerContributionSchema, AnswerMainAnswerSchema, MainAnswerVersionSchema, PublicContributionSchema, PublicDigParentSchema, PublicMainAnswerSchema, PurposeLinesSchema, AskClarifyRequestSchema, AskClarifyResponseSchema, AnswerWebSchema, AskParentSchema, DebateInvestigationSchema, DigSharePercentSchema, DigSuggestionSchema, InvestigationCloseRequestSchema,
-  ResearchedAddRequestSchema, ResearchedAddedSchema, RoomReserveSchema, WebOtherPageSchema, WebPathSchema, WebSourceSchema,
+  ResearchedAddRequestSchema, ResearchedAddedSchema, ResearchedRefusedSchema, RoomReserveSchema, WebOtherPageSchema, WebPathSchema, WebSourceSchema,
   WEB_CONTRACT_LIMITS, AnswerDigSchema, AnswerPathRewritesSchema, DigTooDeepSchema, DigPicksOnePathSchema, DigFreePicksMaxSchema, MonthPauseSchema, PathRewriteSchema,
   PathRewritesSchema, PointOfViewVerdictSchema, RoomNewStartsSchema, RunContinueRefusedSchema, RunContinueRequestSchema,
   RunContinuedSchema, UsageBorrowSchema, UsageBorrowsSchema } from "./web.js";
@@ -1931,6 +1931,8 @@ export const contractInventory = Object.freeze({
     "GET /v1/runs/{id}/investigation",
     "POST /v1/runs/{id}/report",
     "POST /v1/runs/{id}/reopen",
+    // W4-4: "Add to researched": one of a path's other pages, from the map.
+    "POST /v1/runs/{id}/researched",
     "GET /v1/billing/usage",
     "GET /v1/billing/plans",
     "POST /v1/billing/quote",
@@ -1987,7 +1989,7 @@ export const contractInventory = Object.freeze({
     DigLinkRecordSchema, DigLinksSchema, DigLinkRecordRequestSchema, DigLinkRecordedSchema,
     // Plan 2026-10-30 W1-6: the web, dig-suggestion and investigation shapes (./web.ts); no route yet.
     WebSourceSchema, WebOtherPageSchema, WebPathSchema, AnswerWebSchema, DigSuggestionSchema, AskParentSchema,
-    DebateInvestigationSchema, ResearchedAddRequestSchema, ResearchedAddedSchema, InvestigationCloseRequestSchema,
+    DebateInvestigationSchema, ResearchedAddRequestSchema, ResearchedAddedSchema, ResearchedRefusedSchema, InvestigationCloseRequestSchema,
     // W2-7: the dig model's rewrite and nesting shapes and the money rule's words (./web.ts); no route yet.
     PathRewriteSchema, PathRewritesSchema, AnswerPathRewritesSchema, AnswerDigSchema, PointOfViewVerdictSchema, DigTooDeepSchema,
     // W3-8: the two dig refusals with their own codes (./web.ts).

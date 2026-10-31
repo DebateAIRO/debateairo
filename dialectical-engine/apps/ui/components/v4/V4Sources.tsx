@@ -13,7 +13,7 @@ import type { V4WebNote } from "@/lib/v4/types";
  *  - never a grade or a score (the contract carries none);
  *  - Free says "Not checked on the web; paid plans look things up."; a failed search says so.
  * The quote and the page title are the page's own words; reader 1's line and the planner's reason are AI text (marked).
- * "Add to researched" is wired in W4-4: until a page passes `onAddResearched`, the button is shown but cannot be used.
+ * W4-4: "Add to researched" is offered only where the map passes `onAddResearched`: never on Free, on the report or when new starts wait.
  * Nothing here fetches or stores anything.
  */
 
@@ -115,6 +115,30 @@ function ResearchedLine(props: Readonly<{ researched: WebResearched; catalog: Me
   );
 }
 
+/** The button on a page not added yet, and what the page knows of a press the answer does not say yet. */
+function AddResearched(props: Readonly<{ page: string; press: V4ResearchedPress | undefined; onAdd: ((pageRef: string) => void) | undefined; catalog: MessageCatalog; locale: string }>) {
+  const { press, catalog } = props;
+  const onAdd = props.onAdd;
+  if (press === "READING") return <ResearchedLine researched={{ state: "READING" }} catalog={catalog} locale={props.locale} />;
+  if (press === "WAITS_FOR_RESET") return <p className="v4SourceFlag">{t(catalog, "v4.web.researched.waitsForReset")}</p>;
+  if (onAdd === undefined) return null;
+  const adding = press === "ADDING";
+  return (
+    <>
+      {press === "TRY_AGAIN" ? <p className="v4SourceFlag" role="alert">{t(catalog, "v4.web.researched.tryAgain")}</p> : null}
+      <button type="button" className="v4Btn v4OtherPageAdd" disabled={adding} aria-busy={adding} onClick={() => onAdd(props.page)}>
+        {t(catalog, adding ? "v4.web.researched.ADDING" : "v4.web.addResearched")}
+      </button>
+    </>
+  );
+}
+
+/**
+ * What the page knows of a press before the answer says so, kept in the page's state only: sending it, sent (the answer will say READING),
+ * refused with nothing used (try again, or once the quota resets).
+ */
+export type V4ResearchedPress = "ADDING" | "READING" | "TRY_AGAIN" | "WAITS_FOR_RESET";
+
 /**
  * A path's other pages (found outside its top pages): the link, site and reader 1's line, never a grade; on the map each
  * has "Add to researched" (`actions`), the report only lists them.
@@ -125,8 +149,10 @@ export function V4OtherPages(props: Readonly<{
   locale: string;
   /** false on the report (a document): no buttons. */
   actions: boolean;
-  /** W4-4 wires this; without it the button cannot be used yet. */
+  /** Without it (Free, a full quota, the report) no page offers the button; what became of an added page still shows. */
   onAddResearched?: (pageRef: string) => void;
+  /** W4-4: the presses the answer does not say yet, by page. */
+  presses?: ReadonlyMap<string, V4ResearchedPress>;
   /** false when the caller already heads the list. */
   heading?: boolean;
   headingClassName?: string;
@@ -139,6 +165,9 @@ export function V4OtherPages(props: Readonly<{
       {props.heading === false
         ? null
         : <h4 className={props.headingClassName ?? "v4PanelSmallHead"}>{t(catalog, "v4.web.otherPages")}</h4>}
+      {props.actions && onAdd !== undefined && pages.some((page) => page.researched === undefined)
+        ? <p className="v4PanelHint v4Muted">{t(catalog, "v4.web.addResearchedHint")}</p>
+        : null}
       <ul className="v4Sources">
         {pages.map((page) => (
           <li key={page.page_ref} className="v4Source v4OtherPage">
@@ -147,18 +176,7 @@ export function V4OtherPages(props: Readonly<{
             <PreviewOnly page={page} catalog={catalog} />
             {page.researched !== undefined
               ? <ResearchedLine researched={page.researched} catalog={catalog} locale={props.locale} />
-              : props.actions
-                ? (
-                  <button
-                    type="button"
-                    className="v4Btn v4OtherPageAdd"
-                    disabled={onAdd === undefined}
-                    onClick={onAdd === undefined ? undefined : () => onAdd(page.page_ref)}
-                  >
-                    {t(catalog, "v4.web.addResearched")}
-                  </button>
-                )
-                : null}
+              : <AddResearched page={page.page_ref} press={props.presses?.get(page.page_ref)} onAdd={props.actions ? onAdd : undefined} catalog={catalog} locale={props.locale} />}
           </li>
         ))}
       </ul>

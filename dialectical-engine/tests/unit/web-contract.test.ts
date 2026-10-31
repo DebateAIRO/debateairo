@@ -339,8 +339,22 @@ describe("W1-6 inventory and the no-grade rule over every new shape", () => {
     const resources = contractInventory.resources as unknown as Record<string, unknown>;
     for (const [name, schema] of Object.entries(NEW)) expect(resources[name], name).toBe(schema);
     // R22 W3-8 later registered one route for these shapes, Continue (POST /v1/runs/{id}/continue): 180 + 1. R22 W5-1 then
-    // registered the final report's three (GET /v1/runs/{id}/investigation, POST /v1/runs/{id}/report and …/reopen): 184.
+    // registered the final report's three (GET /v1/runs/{id}/investigation, POST /v1/runs/{id}/report and …/reopen): the count is the head's, with this one route.
     // R22 owner decision 13 removed the Unpublish route (POST /v1/runs/{id}/unpublish): 183.
-    expect(contractInventory.routes).toHaveLength(183);
+    // W4-4: "Add to researched" (POST /v1/runs/{id}/researched): the count is the head's, with this one route.
+    expect(contractInventory.routes).toHaveLength(190);
+  });
+});
+
+describe("no search words from the person (the owner's correction of 31 Oct)", () => {
+  const RUN_ID = "44444444-4444-4444-8444-444444444444";
+  const pick = { kind: "OWN_VIEW", suggestion_id: null, place: "path:n-1", text: "Rent eats the difference." };
+  it("a pick and a dig's parent refuse them, so nobody can send them", () => {
+    expect(AskParentSchema.safeParse({ parent_run_id: RUN_ID, places: [], mode: "quick", picks: [pick] }).success).toBe(true);
+    expect(AskParentSchema.safeParse({ parent_run_id: RUN_ID, places: [], mode: "quick", picks: [{ ...pick, search_words: "munich rent" }] }).success).toBe(false);
+    expect(AskParentSchema.safeParse({ parent_run_id: RUN_ID, places: [], mode: "quick", picks: [pick], search_words: "munich rent" }).success).toBe(false);
+  });
+  it("no route suggests them", () => {
+    expect(contractInventory.routes.filter((route) => /search.?word|suggest.?search/iu.test(route))).toEqual([]);
   });
 });
