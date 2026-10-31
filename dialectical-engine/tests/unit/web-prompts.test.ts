@@ -45,7 +45,7 @@ import {
 } from "@debateai/serve";
 import { STORYTELLER_V4_CONTRACT_ID, storyContractForSources } from "@debateai/story";
 import { ENGINE_SEALED_CONTRACT_IDS, engineSealedContracts } from "../../apps/runner/src/engine-contracts.js";
-import { INVESTIGATION_REPORT_SEALED_CONTRACTS, PATH_REWRITE_SEALED_CONTRACTS, PATH_REWRITE_V2_SEALED_CONTRACTS, REPORT_OVERALL_SEALED_CONTRACTS } from "@debateai/story";
+import { INVESTIGATION_REPORT_SEALED_CONTRACTS, PATH_REWRITE_SEALED_CONTRACTS, PATH_REWRITE_V2_SEALED_CONTRACTS, REPORT_DEEPER_SEALED_CONTRACTS, REPORT_WRITER_V4_SEALED_CONTRACTS, REPORT_OVERALL_SEALED_CONTRACTS } from "@debateai/story";
 import { EVALUATOR_SOURCES_SEALED_CONTRACTS } from "../../apps/runner/src/answer-checker-sources.js";
 
 const sha256 = (text: string) => createHash("sha256").update(text).digest("hex");
@@ -362,7 +362,10 @@ describe("the seals", () => {
       // R22: reader 1 v2, the panel's sources variant, the rewrite's v2 pair.
       ...WEB_R22_SEALED_CONTRACTS, ...PATH_REWRITE_V2_SEALED_CONTRACTS,
       // R22 clarify lane (decision 29): dynamic step 2's small call.
-      ASK_CLARIFY_PROMPT_CONTRACT
+      ASK_CLARIFY_PROMPT_CONTRACT,
+      // R22 report 2 (decision 26).
+      ...REPORT_DEEPER_SEALED_CONTRACTS,
+      ...REPORT_WRITER_V4_SEALED_CONTRACTS
     ];
     const sealed = engineSealedContracts();
     expect(sealed.slice(-appended.length)).toEqual(appended);
@@ -387,7 +390,8 @@ describe("the seals", () => {
       "web.plan-dig.v2", "web.suggest-dig.v1", "web.plan-dig.v3",
       // R22 report lane (decision 4).
       "report.answer.v2", "report.answer.later.v2", "report.answer-check.v2",
-      "web.read-all.v2", "judge.panel.length.sources.v1", "path-rewrite.writer.v2", "path-rewrite.checker.v2", "ask.clarify.v1"
+      "web.read-all.v2", "judge.panel.length.sources.v1", "path-rewrite.writer.v2", "path-rewrite.checker.v2", "ask.clarify.v1",
+      "report.answer.v3", "report.answer.later.v3", "report.answer-check.v3", "report.answer.v4", "report.answer.later.v4"
     ]);
     expect(new Set(ENGINE_SEALED_CONTRACT_IDS).size).toBe(ENGINE_SEALED_CONTRACT_IDS.length);
     // The review is sealed with its edge count at zero, as the judge seal seals the review.

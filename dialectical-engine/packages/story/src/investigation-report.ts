@@ -2,6 +2,7 @@ import { z } from "zod";
 import { INVESTIGATION_REPORT_LIMITS, type MakerLineage } from "@debateai/contract";
 import { LENGTH_SENTENCE_ANSWER_CHECKER, TypedDomainError } from "@debateai/kernel";
 import {
+  ANTHROPIC_TOKEN_COUNT,
   buildFramedPrompt,
   buildFramedRepairPrompt,
   buildFramedRevisionPrompt,
@@ -59,6 +60,17 @@ import type { StoryRoleMaker } from "./writer.js";
  * for word, followed by the same approved lines as before. The v1 ids above stay sealed, unused. The final report and every
  * automatic main-answer update use these through `writeOverallAnswer`; the first answer of a debate keeps approved v3 on
  * purpose, so both can be compared on real debates. Storyteller and story checker: approved as written, unchanged.
+ *
+ * VERSION 3 (plan 2026-10-31 decision 26, the owner's design for big debates): `report.answer.v3`, `report.answer.later.v3` and
+ * `report.answer-check.v3`. The writer reads every path down to three levels with every point on them, and a list of deeper paths
+ * with only their line and outcome. It may ask once, for up to 10 of them by name, before it has written any answer: its reply is
+ * then `{ "ask_for": [...] }`, and it is called once more (site ANSWER_ASKED) with those paths in full after the shared fields, so
+ * the shared fields still come from the cache. Everyone after it (the checker, the storyteller, the story checker) reads the
+ * material it ended with (`ReportWritten.material`). A slip follows the owner's order: code salvages what it can (more than 10
+ * names: the first 10; names not on the list: dropped; an ask beside an answer: the answer), then the gateway's follow-up and full
+ * re-ask take what cannot be salvaged (no valid name, or a second ask). The v2 ids stay sealed, unused. The storyteller and the
+ * story checker need no new version: neither says the material holds every path, and a story's paragraph may name only a debate
+ * in follow_ups, which still holds.
  *
  * Code checks every reply before the checker sees it: every ref an answer segment rests on is one the dossier gives; the
  * story's paragraphs name follow-up debates the dossier gives, each at most once; refs never reach the person (the
@@ -266,30 +278,110 @@ export const REPORT_OVERALL_SEALED_CONTRACTS: readonly PromptContract[] = Object
   REPORT_ANSWER_V2_PROMPT_CONTRACT, REPORT_ANSWER_LATER_V2_PROMPT_CONTRACT, REPORT_ANSWER_CHECK_V2_PROMPT_CONTRACT
 ]);
 
+/** Decision 26, the writer's new first lines, word for word. OWNER APPROVED. */
+export const REPORT_DEEPER_OPENING =
+  "The material holds every path down to three levels with every point argued on them, and a list of deeper paths with only their "
+  + "line and outcome. The paths at the top already carry what the levels below changed. If a deeper path could change your answer, "
+  + "ask to see it by naming it. You may ask once, for up to 10 paths.";
+
+/** Decision 4's writer with decision 26's opening in place of its first two sentences; every other word stays (a test pins it). */
+export const REPORT_OVERALL_WRITER_V3_INSTRUCTION = [
+  `${REPORT_DEEPER_OPENING} Use all of it: your answer is the overall view that comes from weighing every point, not the case for one path.`,
+  "Start with what the whole debate points to for what the person wants to find out, in a few sentences. Then go through what "
+    + "matters: give each point room according to how much it bears on the person's question and its purpose, and how well it "
+    + "held up. A point that decides the question gets its reasons. A point that held only partly gets what it adds and what is "
+    + "doubtful about it. Points that fell or barely bear on the question may be grouped in a sentence that says what was "
+    + "considered and why it counts for little, but leave no path out.",
+  "Name what still stands against the overall view as the price of following it, never as refuted. Never present a disputed "
+    + "point as settled. Call an assumption an assumption. If the view could still change, say so once, naturally, where it "
+    + "fits. The answer must agree with the verdict in the material and must not sound more certain than its label allows. Add "
+    + "no facts.",
+  "Write natural sentences in the question's language, never a translation of these instructions. Write for the person who "
+    + "asked: never print a score or any other number taken from the material, never name the material, its parts or its point "
+    + "references, and never describe how the debate or its reviewers work. A figure that the question or an argument itself "
+    + "states may be repeated. Write about the number of words named in the length target; it is a target, never a reason to "
+    + "leave out a point the answer needs."
+].join("\n\n");
+
+/** Decision 4's checker with decision 26's "every path in the material"; every other word stays (a test pins it). */
+export const REPORT_OVERALL_CHECKER_V3_INSTRUCTION =
+  "Check the candidate answer against the material. It must follow the verdict in the material and be no more certain than its "
+  + "label allows. It must reflect every path in the material, and give each point room according to how much it bears on the person's question "
+  + "and how well it held up: a point that decides the question must be there, and a weak point must not be given the weight of "
+  + "a strong one. It must present no disputed point as settled, add no fact that is not in the material, and carry what still "
+  + "stands as a cost of following the answer, never claiming to refute it. It must speak to the person: no score or other number "
+  + "taken from the material, no names of the material's parts or point references, and no description of how the debate was "
+  + "run. Return an objection only for a problem that would mislead the person or that breaks these rules.";
+
+/** How many deeper paths one ask may name (decision 26). */
+export const REPORT_ASK_MAX_PATHS = 10 as const;
+
+/** DRAFT for the owner (code's text): the answer's form with the ask. */
+export const REPORT_ANSWER_V3_FORM = [
+  REPORT_ANSWER_FORM,
+  "Instead of an answer, and only before you have written one, you may ask for deeper paths: return only "
+    + "{ \"ask_for\": [a ref given in deeper_paths, ...] }, with 1 to "
+    + `${String(REPORT_ASK_MAX_PATHS)} refs, copied exactly. You may ask once. When the material already holds asked_paths, return the answer.`
+].join("\n");
+
+export const REPORT_ANSWER_V3_CONTRACT_ID = "report.answer.v3" as const;
+export const REPORT_ANSWER_LATER_V3_CONTRACT_ID = "report.answer.later.v3" as const;
+export const REPORT_ANSWER_CHECK_V3_CONTRACT_ID = "report.answer-check.v3" as const;
+
+export const REPORT_ANSWER_V3_PROMPT_CONTRACT = contract(REPORT_ANSWER_V3_CONTRACT_ID,
+  [REPORT_OVERALL_WRITER_V3_INSTRUCTION, REPORT_WRITER_INVESTIGATION_LINES, REPORT_WRITER_REWRITTEN_PATHS_SENTENCE].join("\n\n"), REPORT_ANSWER_V3_FORM);
+export const REPORT_ANSWER_LATER_V3_PROMPT_CONTRACT = contract(REPORT_ANSWER_LATER_V3_CONTRACT_ID,
+  [REPORT_OVERALL_WRITER_V3_INSTRUCTION, REPORT_WRITER_INVESTIGATION_LINES, REPORT_WRITER_REWRITTEN_PATHS_SENTENCE,
+    REPORT_WRITER_LATER_VERSION_LINE].join("\n\n"), REPORT_ANSWER_V3_FORM);
+export const REPORT_ANSWER_CHECK_V3_PROMPT_CONTRACT = contract(REPORT_ANSWER_CHECK_V3_CONTRACT_ID,
+  [REPORT_OVERALL_CHECKER_V3_INSTRUCTION, REPORT_CHECKER_FOLLOW_UP_CRITERION].join("\n\n"), REPORT_ANSWER_CHECK_FORM);
+
+/** Decision 26's three, in the order engineSealedContracts() appends them, at the seal's end. */
+export const REPORT_DEEPER_SEALED_CONTRACTS: readonly PromptContract[] = Object.freeze([
+  REPORT_ANSWER_V3_PROMPT_CONTRACT, REPORT_ANSWER_LATER_V3_PROMPT_CONTRACT, REPORT_ANSWER_CHECK_V3_PROMPT_CONTRACT
+]);
+
+/**
+ * VERSION 4 (owner, 31 Oct): the v3 writer lost "Write the answer the person will read, from the material below." by mistake; the owner
+ * put it back. `report.answer.v4` and `report.answer.later.v4` open with it, every other word and the form as v3. The v3 two stay sealed,
+ * unused; the checker stays v3.
+ */
+export const REPORT_OVERALL_WRITER_V4_INSTRUCTION = `Write the answer the person will read, from the material below. ${REPORT_OVERALL_WRITER_V3_INSTRUCTION}`;
+export const REPORT_ANSWER_V4_CONTRACT_ID = "report.answer.v4" as const;
+export const REPORT_ANSWER_LATER_V4_CONTRACT_ID = "report.answer.later.v4" as const;
+export const REPORT_ANSWER_V4_PROMPT_CONTRACT = contract(REPORT_ANSWER_V4_CONTRACT_ID,
+  [REPORT_OVERALL_WRITER_V4_INSTRUCTION, REPORT_WRITER_INVESTIGATION_LINES, REPORT_WRITER_REWRITTEN_PATHS_SENTENCE].join("\n\n"), REPORT_ANSWER_V3_FORM);
+export const REPORT_ANSWER_LATER_V4_PROMPT_CONTRACT = contract(REPORT_ANSWER_LATER_V4_CONTRACT_ID,
+  [REPORT_OVERALL_WRITER_V4_INSTRUCTION, REPORT_WRITER_INVESTIGATION_LINES, REPORT_WRITER_REWRITTEN_PATHS_SENTENCE,
+    REPORT_WRITER_LATER_VERSION_LINE].join("\n\n"), REPORT_ANSWER_V3_FORM);
+export const REPORT_WRITER_V4_SEALED_CONTRACTS: readonly PromptContract[] = Object.freeze([
+  REPORT_ANSWER_V4_PROMPT_CONTRACT, REPORT_ANSWER_LATER_V4_PROMPT_CONTRACT
+]);
+
 /* ----------------------------------------------------------------- the call sites */
 
-export type ReportSite = "ANSWER" | "ANSWER_CHECK" | "STORY" | "STORY_CHECK";
+export type ReportSite = "ANSWER" | "ANSWER_ASKED" | "ANSWER_CHECK" | "STORY" | "STORY_CHECK";
 /**
  * `INVESTIGATION_REPORT:{site}:{round}` on the story lane, rounds 1 to 4 (two rounds, then the backup writer's two): the
  * writers are SYNTHESIZER calls, the checkers EVALUATOR calls. Every call names the investigation's ROOT run; its money is
  * spend source INVESTIGATION_REPORT, never walled (packages/budget `investigationReportSeam`).
  */
-export const INVESTIGATION_REPORT_CALL_SITE = /^INVESTIGATION_REPORT:(ANSWER|ANSWER_CHECK|STORY|STORY_CHECK):([1-4])$/u;
+export const INVESTIGATION_REPORT_CALL_SITE = /^INVESTIGATION_REPORT:(ANSWER|ANSWER_ASKED|ANSWER_CHECK|STORY|STORY_CHECK):([1-4])$/u;
 export const INVESTIGATION_REPORT_CALL_SITE_PREFIX = "INVESTIGATION_REPORT:";
 export const INVESTIGATION_REPORT_LAST_ROUND = 4 as const;
 const REPORT_SITE_ROLES = Object.freeze({
-  ANSWER: "SYNTHESIZER", ANSWER_CHECK: "EVALUATOR", STORY: "SYNTHESIZER", STORY_CHECK: "EVALUATOR"
+  ANSWER: "SYNTHESIZER", ANSWER_ASKED: "SYNTHESIZER", ANSWER_CHECK: "EVALUATOR", STORY: "SYNTHESIZER", STORY_CHECK: "EVALUATOR"
 } as const);
 /** The owner's thinking-table step each site runs at (packages/providers preview-thinking.ts). */
 export const INVESTIGATION_REPORT_THINKING_STEPS = Object.freeze({
-  ANSWER: "answer_writer", ANSWER_CHECK: "answer_checker", STORY: "story_writer", STORY_CHECK: "story_checker"
+  ANSWER: "answer_writer", ANSWER_ASKED: "answer_writer", ANSWER_CHECK: "answer_checker", STORY: "story_writer", STORY_CHECK: "story_checker"
 } as const);
 
 /**
  * R22 decisions 3 and 4: the automatic main-answer update runs `writeOverallAnswer`, the report's own answer step (never a copy of its
  * prompts); its sites are its own only so the gateway charges them as ANSWER_UPDATE on the triggering dig's run, never walled.
  */
-export const ANSWER_UPDATE_CALL_SITE = /^ANSWER_UPDATE:(ANSWER|ANSWER_CHECK):([1-4])$/u;
+export const ANSWER_UPDATE_CALL_SITE = /^ANSWER_UPDATE:(ANSWER|ANSWER_ASKED|ANSWER_CHECK):([1-4])$/u;
 export const ANSWER_UPDATE_CALL_SITE_PREFIX = "ANSWER_UPDATE:" as const;
 
 /** The role an answer-update call site carries, or null for any other key. */
@@ -357,7 +449,11 @@ export type ReportIndex = Readonly<{ refs: ReadonlySet<string>; cardRefs: readon
 
 export const REPORT_REPLY_ISSUES = Object.freeze({
   unknownRef: "INVESTIGATION_REPORT_REF_NOT_IN_THE_MATERIAL",
-  card: "INVESTIGATION_REPORT_CARD_INVALID"
+  card: "INVESTIGATION_REPORT_CARD_INVALID",
+  /** An ask naming nothing on the list: nothing to salvage. */
+  askNames: "INVESTIGATION_REPORT_ASK_NAMES_NOTHING_ON_THE_LIST",
+  /** A second ask, or an ask on a revision: the writer has had its one. */
+  askAgain: "INVESTIGATION_REPORT_ASK_NOT_ALLOWED_NOW"
 } as const);
 
 type Issue = Readonly<{ code: "custom"; path: readonly (string | number)[]; message: string }>;
@@ -396,6 +492,32 @@ function decide<T>(content: string, reply: ModelReplyFacts | undefined, schema: 
   const issues = contentIssues.length === 0 ? inQuestionLanguage?.(parsed.data) ?? [] : contentIssues;
   if (issues.length > 0) return { classification: { parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(issues) }, value: null };
   return { classification: parsedWithRepairs(decodedRepairsOf(decoded)), value: parsed.data };
+}
+
+/** A v3 writer's reply as read: an answer (an ask beside it is ignored), or an ask (the names on the list, at most 10, in its order). */
+export const ReportWriterReplySchema = z.object({
+  segments: ReportAnswerReplySchema.shape.segments.optional(),
+  ask_for: z.array(z.string()).max(200).optional()
+}).strict().refine((reply) => reply.segments !== undefined || reply.ask_for !== undefined, { message: "an answer or an ask" });
+export type ReportWriterReply = z.infer<typeof ReportWriterReplySchema>;
+
+/** Slip recovery, step 1 (code, no call): the names on the list, each once, in the reply's order, at most 10. */
+export function reportAskSalvaged(names: readonly string[], askable: ReadonlySet<string>): readonly string[] {
+  const kept = [...new Set(names.map((name) => name.trim()))].filter((name) => askable.has(name));
+  return Object.freeze(kept.slice(0, REPORT_ASK_MAX_PATHS));
+}
+
+function reportWriterIssues(reply: ReportWriterReply, index: ReportIndex, askable: ReadonlySet<string> | null): readonly Issue[] {
+  if (reply.segments !== undefined) return reportAnswerIssues({ segments: reply.segments }, index);
+  if (askable === null) return Object.freeze([issueAt(REPORT_REPLY_ISSUES.askAgain, ["ask_for"])]);
+  return reportAskSalvaged(reply.ask_for ?? [], askable).length === 0
+    ? Object.freeze([issueAt(REPORT_REPLY_ISSUES.askNames, ["ask_for"])]) : Object.freeze([]);
+}
+
+/** How the v3 writer's reply classifies; `askable` null: this write may not ask (a second ask, a revision). */
+export function classifyReportWriterContent(content: string, index: ReportIndex, askable: ReadonlySet<string> | null, reply?: ModelReplyFacts,
+  inQuestionLanguage?: ReportLanguageCheck): ContentClassification {
+  return decide(content, reply, ReportWriterReplySchema, (value) => reportWriterIssues(value, index, askable), inQuestionLanguage).classification;
 }
 
 type CheckerVerdict = Readonly<{ satisfied: boolean; problem: string | null; part: string | null; misleading?: boolean }>;
@@ -439,6 +561,14 @@ export type ReportCallMaterial = Readonly<{
   index: ReportIndex;
   /** F5: how many leading fields every step's material shares, byte for byte (the dossier's): they go first on the Anthropic wire. */
   sharedFieldCount?: number;
+  /** Decision 26: the deeper paths the writer may ask for; absent: nothing to ask for, or it has asked. */
+  deeper?: ReportDeeperPaths;
+}>;
+
+/** The list the writer may ask from, and the material with the asked paths in full after the shared fields (the same bytes before them). */
+export type ReportDeeperPaths = Readonly<{
+  names: ReadonlySet<string>;
+  askFor: (names: readonly string[]) => ReportCallMaterial | Promise<ReportCallMaterial>;
 }>;
 
 export type ReportRunCall = Readonly<{
@@ -478,8 +608,15 @@ export type ReportStepWritten<D> = Readonly<{
   backup: StoryBackupRecord | null;
 }>;
 
+/** The answer's step: what it wrote, and the material it ended with, which everyone after it reads. */
+export type OverallAnswerWritten = ReportStepWritten<ReportAnswerDraft> & Readonly<{
+  material: ReportCallMaterial;
+  /** The artifact of the reply that asked, when the writer asked. */
+  askArtifactRef: string | null;
+}>;
+
 export type ReportWritten = Readonly<{
-  answer: ReportStepWritten<ReportAnswerDraft>;
+  answer: OverallAnswerWritten;
   /** Null when the answer failed: no story is written over no answer. */
   story: ReportStepWritten<ReportStoryDraft> | null;
 }>;
@@ -494,14 +631,25 @@ type StepCall<D> = Readonly<{
   writerContract: PromptContract;
   checkerContract: PromptContract;
   rules: StepRules<D>;
-  writerMaterial: readonly FramedMaterialField[];
+  /** Decision 26: the material may grow once, so every call reads it as it stands now. */
+  writerMaterial: () => readonly FramedMaterialField[];
   checkerMaterialOf: (candidate: D) => readonly FramedMaterialField[];
+  index: () => ReportIndex;
+  /** Decision 26: the writer's reply may be an ask. Absent: a plain draft. */
+  asking?: StepAsking;
   writerBound: Readonly<{ maxAttempts: number; tokenCeiling: number; deadlineMs: number }>;
   writerLanguageCheck: ReportLanguageCheck | undefined;
 }>;
 
+/** The writer's one ask, as one step's calls see it: what it may name now, and what asking does. */
+type StepAsking = Readonly<{
+  askable: () => ReadonlySet<string> | null;
+  /** Grows the material with the asked paths; the next call reads it. */
+  ask: (names: readonly string[], artifactRef: string) => Promise<void>;
+}>;
+
 /** What one checked step needs of a call: everything but the plan's story bound and the story's own material. */
-type StepRun = Omit<ReportRunCall, "free" | "material" | "storyLanguageCheck"> & Readonly<{ material: Pick<ReportCallMaterial, "index" | "sharedFieldCount"> }>;
+type StepRun = Omit<ReportRunCall, "free" | "material" | "storyLanguageCheck"> & Readonly<{ material: Pick<ReportCallMaterial, "sharedFieldCount"> }>;
 
 function reportRequest(call: StepRun, input: Readonly<{
   site: ReportSite; round: number; providerRef: string; contract: PromptContract; material: readonly FramedMaterialField[];
@@ -535,6 +683,8 @@ function reportRequest(call: StepRun, input: Readonly<{
     contractHash: call.contractHash,
     providerRef: input.providerRef,
     packet: call.guard(packet),
+    // Decision 28: near the line the gateway asks the vendor's own count too, for each attempt as sent.
+    sentInputTokensBelow: ANTHROPIC_TOKEN_COUNT.line,
     ...(call.material.sharedFieldCount === undefined ? {} : { sharedFirstFieldCount: call.material.sharedFieldCount }),
     classifyContent: input.classifyContent,
     buildRepairPacket: (rejected: RejectedProviderContent): PromptPacket => call.guard(revision === null
@@ -548,23 +698,46 @@ function reportRequest(call: StepRun, input: Readonly<{
 async function writeStep<D>(call: StepRun, step: StepCall<D>): Promise<ReportStepWritten<D>> {
   const draftWriter = new Map<number, StoryRoleMaker>();
   const firstWrite: { failed: boolean; error: unknown } = { failed: false, error: null };
-  const classify = (index: ReportIndex) => (content: string, reply?: ModelReplyFacts) =>
-    decide(content, reply, step.rules.draft, (value) => step.rules.issues(value, index), step.writerLanguageCheck).classification;
+  type Written = Readonly<{ draft: D | null; ask: readonly string[] | null; issue: Decided<unknown>["classification"] }>;
+  /** One reply as this write reads it: a draft, or (decision 26) an ask, salvaged. */
+  const read = (content: string, reply: ModelReplyFacts | undefined, askable: ReadonlySet<string> | null, language: ReportLanguageCheck | undefined): Written => {
+    if (step.asking === undefined) {
+      const decided = decide(content, reply, step.rules.draft, (value) => step.rules.issues(value, step.index()), language);
+      return { draft: decided.value, ask: null, issue: decided.classification };
+    }
+    const decided = decide(content, reply, ReportWriterReplySchema, (value) => reportWriterIssues(value, step.index(), askable), language);
+    const value = decided.value;
+    if (value === null) return { draft: null, ask: null, issue: decided.classification };
+    if (value.segments !== undefined) return { draft: { segments: value.segments } as unknown as D, ask: null, issue: decided.classification };
+    return { draft: null, ask: reportAskSalvaged(value.ask_for ?? [], askable ?? new Set()), issue: decided.classification };
+  };
   const writeWith = (teller: StoryRoleMaker): StoryLoopDependencies<D>["writeStory"] => async ({ round, priorObjection, priorDraft }) => {
     try {
-      const reading = rememberingAcceptedReply(classify(call.material.index));
       const revision = priorDraft !== null && priorObjection !== null
         ? Object.freeze({ ownDraft: JSON.stringify(priorDraft), problems: priorObjection }) : null;
       const author = revision === null ? teller : (draftWriter.get(round - 1) ?? teller);
-      const request = reportRequest(call, { site: step.writerSite, round, providerRef: author.providerRef, contract: step.writerContract,
-        material: step.writerMaterial, bound: step.writerBound, classifyContent: reading.classifyContent, revision });
-      const result = await call.send(author, request);
+      const once = async (site: "ANSWER" | "ANSWER_ASKED" | "STORY", askable: ReadonlySet<string> | null) => {
+        const reading = rememberingAcceptedReply((content, reply) => read(content, reply, askable, step.writerLanguageCheck).issue);
+        const request = reportRequest(call, { site, round, providerRef: author.providerRef, contract: step.writerContract,
+          material: step.writerMaterial(), bound: step.writerBound, classifyContent: reading.classifyContent, revision });
+        const result = await call.send(author, request);
+        const accepted = reading.acceptedAs(result.content);
+        const written = read(result.content, accepted.reply, askable, undefined);
+        if (written.draft === null && written.ask === null) throw new TypedDomainError("INVESTIGATION_REPORT_CONTENT_INVALID", written.issue.parseStatus);
+        if (accepted.repairs.length > 0) call.log("INVESTIGATION_REPORT_REPLY_REPAIRED", { round, site, repair: accepted.repairs[0]! });
+        return { request, result, written };
+      };
+      // Decision 26: only a first write may ask (a revision answers its problems), and only once in the step.
+      const askable = revision === null ? step.asking?.askable() ?? null : null;
+      let sent = await once(step.writerSite, askable);
+      if (sent.written.ask !== null) {
+        call.log("INVESTIGATION_REPORT_ASKED", { round, site: step.writerSite, names: sent.written.ask.length });
+        await step.asking!.ask(sent.written.ask, sent.result.rawArtifactRef);
+        sent = await once("ANSWER_ASKED", null);
+      }
+      const { request, result, written } = sent;
       draftWriter.set(round, author);
-      const accepted = reading.acceptedAs(result.content);
-      const decided = decide(result.content, accepted.reply, step.rules.draft, (value) => step.rules.issues(value, call.material.index), undefined);
-      if (decided.value === null) throw new TypedDomainError("INVESTIGATION_REPORT_CONTENT_INVALID", decided.classification.parseStatus);
-      if (accepted.repairs.length > 0) call.log("INVESTIGATION_REPORT_REPLY_REPAIRED", { round, site: step.writerSite, repair: accepted.repairs[0]! });
-      return { artifactRef: result.rawArtifactRef, callSiteKey: request.callSiteKey, lineage: lineageOf(result, author.providerRef), body: decided.value };
+      return { artifactRef: result.rawArtifactRef, callSiteKey: request.callSiteKey, lineage: lineageOf(result, author.providerRef), body: written.draft! };
     } catch (error) {
       if (round === 1) {
         firstWrite.failed = true;
@@ -613,24 +786,32 @@ async function writeStep<D>(call: StepRun, step: StepCall<D>): Promise<ReportSte
 }
 
 /** What the overall answer needs: a report call without the story's parts. */
-export type OverallAnswerCall = Omit<ReportRunCall, "free" | "material" | "storyLanguageCheck"> & Readonly<{
-  material: Pick<ReportCallMaterial, "answerWriter" | "answerCheckerOf" | "index" | "sharedFieldCount">;
-}>;
+export type OverallAnswerCall = Omit<ReportRunCall, "free" | "storyLanguageCheck">;
 
 /**
- * THE OVERALL ANSWER, the one checked step the final report and every automatic main-answer update share (decisions 3 and 4):
- * the writer and the checker in their approved v2 wording, the later-version writer when `later`. The caller brings the
+ * THE OVERALL ANSWER, the one checked step the final report and every automatic main-answer update share (decisions 3, 4 and 26):
+ * the writer and the checker in their approved v3 wording, the later-version writer when `later`. The caller brings the
  * material (`buildInvestigationDossier`), the money (`send`), and, when it is not a report, its own `callSiteOf`.
  * Never throws for a provider or a refused call: it keeps its last checked draft or ends FAILED, as the story loop does.
  */
-export function writeOverallAnswer(call: OverallAnswerCall): Promise<ReportStepWritten<ReportAnswerDraft>> {
-  return writeStep<ReportAnswerDraft>(call, {
+export async function writeOverallAnswer(call: OverallAnswerCall): Promise<OverallAnswerWritten> {
+  let material = call.material;
+  let askArtifactRef: string | null = null;
+  const written = await writeStep<ReportAnswerDraft>(call, {
     writerSite: "ANSWER", checkerSite: "ANSWER_CHECK",
-    writerContract: call.later ? REPORT_ANSWER_LATER_V2_PROMPT_CONTRACT : REPORT_ANSWER_V2_PROMPT_CONTRACT,
-    checkerContract: REPORT_ANSWER_CHECK_V2_PROMPT_CONTRACT, rules: ANSWER_RULES,
-    writerMaterial: call.material.answerWriter, checkerMaterialOf: call.material.answerCheckerOf,
+    writerContract: call.later ? REPORT_ANSWER_LATER_V4_PROMPT_CONTRACT : REPORT_ANSWER_V4_PROMPT_CONTRACT,
+    checkerContract: REPORT_ANSWER_CHECK_V3_PROMPT_CONTRACT, rules: ANSWER_RULES,
+    writerMaterial: () => material.answerWriter, checkerMaterialOf: (candidate) => material.answerCheckerOf(candidate), index: () => material.index,
+    asking: {
+      askable: () => material.deeper?.names ?? null,
+      ask: async (names, artifactRef) => {
+        material = await material.deeper!.askFor(names);
+        askArtifactRef = artifactRef;
+      }
+    },
     writerBound: INVESTIGATION_REPORT_POLICY.answerBound, writerLanguageCheck: call.answerLanguageCheck
   });
+  return Object.freeze({ ...written, material, askArtifactRef });
 }
 
 /**
@@ -646,10 +827,12 @@ export async function writeInvestigationReport(call: ReportRunCall): Promise<Rep
   const answer = await writeOverallAnswer(call);
   if (answer.outcome.outcome === "FAILED") return Object.freeze({ answer, story: null });
   const served = answer.outcome.body;
+  // Decision 26: the storyteller and the story checker read the material the writer ended with.
+  const material = answer.material;
   const story = await writeStep<ReportStoryDraft>(call, {
     writerSite: "STORY", checkerSite: "STORY_CHECK",
     writerContract: REPORT_STORY_PROMPT_CONTRACT, checkerContract: REPORT_STORY_CHECK_PROMPT_CONTRACT, rules: STORY_RULES,
-    writerMaterial: call.material.storyWriterOf(served), checkerMaterialOf: (candidate) => call.material.storyCheckerOf(served, candidate),
+    writerMaterial: () => material.storyWriterOf(served), checkerMaterialOf: (candidate) => material.storyCheckerOf(served, candidate), index: () => material.index,
     writerBound: call.free ? INVESTIGATION_REPORT_POLICY.freeStoryBound : INVESTIGATION_REPORT_POLICY.storyBound,
     writerLanguageCheck: call.storyLanguageCheck
   });

@@ -3,7 +3,7 @@ import { DIG_LEVEL_MAX, type MakerLineage, type StoryFate } from "@debateai/cont
 import { webExtractTextRef, type PathLineBaseKind, type PathLineEntry, type PathRewriteRecord, type PostgresDigModelRunnerRepository,
   type PostgresTreeUpdateRunnerRepository, type RewriteTurnRead, type WebSealed } from "@debateai/db";
 import { TypedDomainError, replyLanguageCheckFor } from "@debateai/kernel";
-import type { ProviderCallRequest, ProviderCallResult } from "@debateai/providers";
+import type { ProviderCallRequest, ProviderCallResult, TokenCounter } from "@debateai/providers";
 import { PATH_REWRITE_POLICY } from "@debateai/register";
 import {
   PATH_REWRITE_CHECKER_PROSE, PATH_REWRITE_PROSE, pathRewriteFailureCode, writePathRewrite, type PathRewriteDraft,
@@ -13,8 +13,9 @@ import {
   writeFirstDebateSuggestions, type DigPathSuggestions, type DigSuggestionsJob, type PathSuggestionsRefresh, type PathSuggestionsStore
 } from "./dig-suggestions-step.js";
 import { engineContractHash } from "./engine-contracts.js";
+import { fitRewriteToTokenLine } from "./token-line.js";
 import {
-  buildPathRewriteMaterial, pathRewriteDigPathsOf, pathRewriteGuard, type PathRewriteDigPath, type PathRewriteExtract,
+  pathRewriteDigPathsOf, pathRewriteGuard, type PathRewriteDigPath, type PathRewriteExtract,
   type PathRewriteParentPath, type PathRewritePick, type PathRewriteQuestion
 } from "./path-rewrite-material.js";
 import { holdRunPassages, releaseRunPassages } from "./passage-record.js";
@@ -165,6 +166,8 @@ export type PathRewriteSettled = Readonly<{
 }>;
 
 export type PathRewriteRunnerSettings = Readonly<{
+  /** Decision 28: Anthropic's free token count for the writer's calls; absent: the byte guard alone. */
+  tokenCount?: TokenCounter;
   sources: PathRewriteSources;
   turns: PathRewriteTurns;
   /** Seals the content under the DIG's run key (carrier PATH_REWRITE_CARRIER, primary key the rewrite id). */
@@ -506,7 +509,7 @@ async function composeRecord(settings: PathRewriteRunnerSettings, compose: Compo
   const digRunId = job.digRunId;
   const failed = (failureCode: string, written: PathRewriteWritten | null = null) =>
     failedRecord({ rewriteId, digRunId, parent, baseRewriteId, failureCode, written });
-  const built = buildPathRewriteMaterial({ question: dig.question, parent, picks: dig.picks, digPaths: compose.digPaths });
+  const built = await fitRewriteToTokenLine({ question: dig.question, parent, picks: dig.picks, digPaths: compose.digPaths }, settings.tokenCount, log);
   if (built.kind === "TOO_LARGE") {
     log("PATH_REWRITE_MATERIAL_TOO_LARGE", { runId: digRunId, bodyBytes: built.bodyBytes });
     return failed("PATH_REWRITE_MATERIAL_TOO_LARGE");

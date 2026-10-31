@@ -16,7 +16,7 @@ import {
 import { GraphRepository } from "@debateai/graph";
 import { LedgerRepository } from "@debateai/ledger";
 import { StoryRepository } from "@debateai/story";
-import { postgresInvestigationCloseSources } from "../../apps/runner/src/investigation-close-sources.js";
+import { postgresInvestigationCloseSources, trustWordsOf } from "../../apps/runner/src/investigation-close-sources.js";
 import { buildInvestigationDossier, type Dossier } from "../../apps/runner/src/investigation-dossier.js";
 import { postgresWebStepPorts, webStepRowId } from "../../apps/runner/src/web-step.js";
 import { provisionRlsLogins, type RlsLogins } from "../support/rls-logins.js";
@@ -241,6 +241,19 @@ describe("R22 decisions 2 and 5: what else the report reads", () => {
     const dossier = buildInvestigationDossier(read.input);
     if (dossier.kind !== "BUILT") throw new Error("the dossier did not fit");
     expect(dossier.material.answerWriter.map((field) => field.name).slice(0, 3)).toEqual(["question", "place", "purpose"]);
+  }, 120_000);
+
+  it("decision 27: the runner's own role reads a point's trust word by the contract's rule, for the PDF", async () => {
+    const tree = await debateWithDig();
+    const nodes = (await database.pool.query<{ node_id: string }>("SELECT node_id::text AS node_id FROM core.node WHERE run_id = $1 ORDER BY created_at_seq LIMIT 5", [tree.root])).rows;
+    expect(nodes.length).toBeGreaterThan(0);
+    const ids = nodes.map((node) => node.node_id);
+    const before = await trustWordsOf(runner, tree.root, false, ids);
+    const reviewed = (await database.pool.query<{ node_id: string; outcome: string }>(
+      "SELECT node_id::text AS node_id, outcome FROM ledger.node_review WHERE run_id = $1 AND node_id = ANY($2::uuid[]) ORDER BY at_seq", [tree.root, ids])).rows;
+    // Every reviewed point has its word, and only those.
+    expect([...before.keys()].sort()).toEqual([...new Set(reviewed.map((row) => row.node_id.toLowerCase()))].sort());
+    for (const row of reviewed.filter((entry) => entry.outcome === "dispute")) expect(before.get(row.node_id.toLowerCase())).toBe("STILL_ARGUED");
   }, 120_000);
 
   it("a path's newest text when a climb wrote it", async () => {

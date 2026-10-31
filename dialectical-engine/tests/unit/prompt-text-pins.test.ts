@@ -96,8 +96,15 @@ import {
   INVESTIGATION_REPORT_SEALED_CONTRACTS,
   REPORT_ANSWER_FORM,
   REPORT_ANSWER_CHECK_FORM,
+  REPORT_ANSWER_V3_FORM,
+  REPORT_DEEPER_OPENING,
+  REPORT_DEEPER_SEALED_CONTRACTS,
   REPORT_OVERALL_CHECKER_INSTRUCTION,
+  REPORT_OVERALL_CHECKER_V3_INSTRUCTION,
   REPORT_OVERALL_SEALED_CONTRACTS,
+  REPORT_OVERALL_WRITER_V3_INSTRUCTION,
+  REPORT_OVERALL_WRITER_V4_INSTRUCTION,
+  REPORT_WRITER_V4_SEALED_CONTRACTS,
   REPORT_OVERALL_WRITER_INSTRUCTION,
   REPORT_CHECKER_FOLLOW_UP_CRITERION,
   REPORT_R4_CHECKER_INSTRUCTION,
@@ -909,7 +916,10 @@ describe("REVIEW ITEM 4 — no prompt anywhere still carries the retired sentenc
       // R22 decision 9 and W4-3: the dig method's two drafts; pinned in tests/unit/web-dig-method.test.ts.
       ...WEB_DIG_METHOD_SEALED_CONTRACTS,
       // R22 report lane (decision 4): the overall writer and checker; their texts are pinned below.
-      ...REPORT_OVERALL_SEALED_CONTRACTS]
+      ...REPORT_OVERALL_SEALED_CONTRACTS,
+      // R22 report 2 (decision 26): their texts are pinned below too.
+      ...REPORT_DEEPER_SEALED_CONTRACTS,
+      ...REPORT_WRITER_V4_SEALED_CONTRACTS]
       .map((contract): [string, typeof contract] => [contract.contractId, contract])
   ])("%s", (_name, contract) => {
     const whole = `${contract.instruction} ${contract.answerForm}`;
@@ -1079,5 +1089,47 @@ describe("R22 decision 4 — the overall writer and checker", () => {
     expect(check!.answerForm).toBe(REPORT_ANSWER_CHECK_FORM);
     expect(INVESTIGATION_REPORT_SEALED_CONTRACTS[0]!.contractId).toBe("report.answer.v1");
     expect(INVESTIGATION_REPORT_SEALED_CONTRACTS[0]!.instruction.startsWith(REPORT_R4_WRITER_INSTRUCTION)).toBe(true);
+  });
+});
+
+/*
+ * R22 decision 26 — big debates. Exactly the differences the owner approved from decision 4's text, and no other word: the writer's new
+ * opening in place of its first two sentences, and "every path in the material" in the checker. The opening is typed out from the plan.
+ */
+describe("R22 decision 26 — the writer who may ask, the checker of the material", () => {
+  const OLD_OPENING = "Write the answer the person will read, from the material below. The material holds every path of the debate and every point argued on it.";
+
+  it("the writer's opening is the plan's, word for word, in place of decision 4's first two sentences; nothing else moved", () => {
+    expect(REPORT_DEEPER_OPENING).toBe("The material holds every path down to three levels with every point argued on them, and a list of deeper paths with only their line and outcome. The paths at the top already carry what the levels below changed. If a deeper path could change your answer, ask to see it by naming it. You may ask once, for up to 10 paths.");
+    expect(REPORT_OVERALL_WRITER_INSTRUCTION.startsWith(OLD_OPENING)).toBe(true);
+    expect(REPORT_OVERALL_WRITER_V3_INSTRUCTION).toBe(REPORT_OVERALL_WRITER_INSTRUCTION.replace(OLD_OPENING, REPORT_DEEPER_OPENING));
+  });
+
+  it("v4 opens with the sentence the owner put back; the form and every other word are v3's", () => {
+    expect(REPORT_OVERALL_WRITER_V4_INSTRUCTION).toBe(`Write the answer the person will read, from the material below. ${REPORT_OVERALL_WRITER_V3_INSTRUCTION}`);
+    const [answer, later] = REPORT_WRITER_V4_SEALED_CONTRACTS;
+    expect(REPORT_WRITER_V4_SEALED_CONTRACTS.map((contract) => contract.contractId)).toEqual(["report.answer.v4", "report.answer.later.v4"]);
+    expect(answer!.instruction).toBe([REPORT_OVERALL_WRITER_V4_INSTRUCTION, REPORT_WRITER_INVESTIGATION_LINES, REPORT_WRITER_REWRITTEN_PATHS_SENTENCE].join("\n\n"));
+    expect(later!.instruction).toBe([REPORT_OVERALL_WRITER_V4_INSTRUCTION, REPORT_WRITER_INVESTIGATION_LINES, REPORT_WRITER_REWRITTEN_PATHS_SENTENCE,
+      REPORT_WRITER_LATER_VERSION_LINE].join("\n\n"));
+    expect(answer!.answerForm).toBe(REPORT_ANSWER_V3_FORM);
+  });
+
+  it("the checker differs by the three words only", () => {
+    expect(REPORT_OVERALL_CHECKER_V3_INSTRUCTION).toBe(REPORT_OVERALL_CHECKER_INSTRUCTION.replace("It must reflect every path,", "It must reflect every path in the material,"));
+    expect(REPORT_OVERALL_CHECKER_V3_INSTRUCTION).not.toBe(REPORT_OVERALL_CHECKER_INSTRUCTION);
+  });
+
+  it("the same approved lines follow, under new ids; the form gains only the ask; v2 stays sealed with its own words", () => {
+    const [answer, later, check] = REPORT_DEEPER_SEALED_CONTRACTS;
+    expect(REPORT_DEEPER_SEALED_CONTRACTS.map((contract) => contract.contractId)).toEqual(["report.answer.v3", "report.answer.later.v3", "report.answer-check.v3"]);
+    expect(answer!.instruction).toBe([REPORT_OVERALL_WRITER_V3_INSTRUCTION, REPORT_WRITER_INVESTIGATION_LINES, REPORT_WRITER_REWRITTEN_PATHS_SENTENCE].join("\n\n"));
+    expect(later!.instruction).toBe([REPORT_OVERALL_WRITER_V3_INSTRUCTION, REPORT_WRITER_INVESTIGATION_LINES, REPORT_WRITER_REWRITTEN_PATHS_SENTENCE,
+      REPORT_WRITER_LATER_VERSION_LINE].join("\n\n"));
+    expect(check!.instruction).toBe([REPORT_OVERALL_CHECKER_V3_INSTRUCTION, REPORT_CHECKER_FOLLOW_UP_CRITERION].join("\n\n"));
+    expect(answer!.answerForm.startsWith(`${REPORT_ANSWER_FORM}\n`)).toBe(true);
+    expect(REPORT_ANSWER_V3_FORM.slice(REPORT_ANSWER_FORM.length)).toBe("\nInstead of an answer, and only before you have written one, you may ask for deeper paths: return only { \"ask_for\": [a ref given in deeper_paths, ...] }, with 1 to 10 refs, copied exactly. You may ask once. When the material already holds asked_paths, return the answer.");
+    expect(check!.answerForm).toBe(REPORT_ANSWER_CHECK_FORM);
+    expect(REPORT_OVERALL_SEALED_CONTRACTS[0]!.instruction.startsWith(OLD_OPENING)).toBe(true);
   });
 });

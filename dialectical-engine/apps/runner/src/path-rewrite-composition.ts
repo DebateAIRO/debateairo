@@ -3,7 +3,7 @@ import {
   withRunContentLease, type Pool
 } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
-import type { ProviderGateway } from "@debateai/providers";
+import type { ProviderGateway, TokenCounter } from "@debateai/providers";
 import { postgresPathSuggestionsStore, refreshPathSuggestionsOnPool, writeDigSuggestionsOnPool } from "./dig-suggestions-step.js";
 import { firstDebateSuggestionFacts } from "./investigation-digest.js";
 import { advanceTree, type TreeSweepSettings, type TreeUpdateSettings } from "./path-climb.js";
@@ -40,6 +40,8 @@ export function composePathRewrite(input: Readonly<{
   targets: readonly Readonly<{ providerRef: string; model: string }>[];
   /** The configured members in their order (the story writer's boot resolver's): the sweep's writer, checker and backups. */
   members: readonly Readonly<{ provider: ProviderGateway; providerRef: string; maker: string }>[];
+  /** Decision 28: Anthropic's free token count (main.ts). */
+  tokenCount?: TokenCounter;
   log: (event: string, detail: Record<string, unknown>) => void;
 }>): PathRewriteComposed | undefined {
   const writerRoleRef = input.targets.find((target) => target.model === PATH_REWRITE_WRITER_MODEL)?.providerRef;
@@ -57,7 +59,8 @@ export function composePathRewrite(input: Readonly<{
   });
   const inFlight = createPathRewriteInFlight();
   const refreshSuggestions = refreshPathSuggestionsOnPool(pool);
-  const tree: TreeUpdateSettings = Object.freeze({ ports: postgresTreeUpdatePorts(pool), roles, writerRoleRef, checkerRoleRef, inFlight, log: input.log,
+  const tokenCount = input.tokenCount === undefined ? {} : { tokenCount: input.tokenCount };
+  const tree: TreeUpdateSettings = Object.freeze({ ports: postgresTreeUpdatePorts(pool), roles, writerRoleRef, checkerRoleRef, inFlight, log: input.log, ...tokenCount,
     // Owner Q-D8: a level a climb really changed gets its suggestions worked out again, each level its own set and call site.
     afterLevel: async (level, written) => {
       if (written === null) return;
@@ -66,6 +69,7 @@ export function composePathRewrite(input: Readonly<{
         step: written.step, writer: written.writer, send: written.send, log: written.log }));
     } });
   const settings: PathRewriteRunnerSettings = Object.freeze({
+    ...tokenCount,
     sources: postgresPathRewriteSources(pool),
     turns: new PostgresDigModelRunnerRepository(pool),
     seal: (digRunId: string, rewriteId: string, content: unknown) => withRunContentLease(pool, [digRunId], async () => {

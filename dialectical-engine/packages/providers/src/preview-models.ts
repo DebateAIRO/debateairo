@@ -151,6 +151,8 @@ export const PREVIEW_CONTEXT_WINDOW_TOKENS = 1_048_576 as const;
 /** The Anthropic Messages connection's base URL (the adapter's one lawful base) and its exact call URL. */
 export const PREVIEW_ANTHROPIC_BASE_URL = "https://api.anthropic.com/v1" as const;
 export const PREVIEW_ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages" as const;
+/** R22 decision 28: Anthropic's free token count, through the same gate. */
+export const PREVIEW_ANTHROPIC_COUNT_TOKENS_URL = "https://api.anthropic.com/v1/messages/count_tokens" as const;
 /** Claude Haiku 5.5's window (1M tokens). */
 export const PREVIEW_ANTHROPIC_CONTEXT_WINDOW_TOKENS = 1_000_000 as const;
 /**

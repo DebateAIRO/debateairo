@@ -5,7 +5,7 @@ import type {
   PostgresTreeUpdateRunnerRepository, WebSealed
 } from "@debateai/db";
 import { TypedDomainError, replyLanguageCheckFor } from "@debateai/kernel";
-import type { ProviderCallRequest, ProviderCallResult } from "@debateai/providers";
+import type { ProviderCallRequest, ProviderCallResult, TokenCounter } from "@debateai/providers";
 import { INVESTIGATION_REPORT_POLICY, PATH_REWRITE_POLICY } from "@debateai/register";
 import {
   PATH_REWRITE_CHECKER_PROSE, PATH_REWRITE_PROSE, REPORT_ANSWER_PROSE, REPORT_CHECKER_PROSE, answerUpdateCallSiteKey, investigationReportFailureCode,
@@ -13,9 +13,10 @@ import {
 } from "@debateai/story";
 import { engineContractHash } from "./engine-contracts.js";
 import { closingRandomBytes, type InvestigationCloseInput } from "./investigation-close.js";
-import { buildInvestigationDossier, investigationReportGuard } from "./investigation-dossier.js";
+import { investigationReportGuard } from "./investigation-dossier.js";
+import { fitDossierToTokenLine, fitRewriteToTokenLine } from "./token-line.js";
 import {
-  buildPathRewriteMaterial, pathRewriteGuard, type PathRewriteDigPath, type PathRewriteParentPath, type PathRewritePick
+  pathRewriteGuard, type PathRewriteDigPath, type PathRewriteParentPath, type PathRewritePick
 } from "./path-rewrite-material.js";
 import {
   contentOf, lineageRecord, pathLineFrontOf, type PathLineBase, type PathRewriteContent, type PathRewriteDig, type PathRewriteInFlight,
@@ -136,6 +137,8 @@ export type TreeUpdateSettings = Readonly<{
   writerRoleRef: string;
   checkerRoleRef: string;
   contractHash?: string;
+  /** Decision 28: Anthropic's free token count for the writer's calls; absent: the byte guard alone. */
+  tokenCount?: TokenCounter;
   wait?: Readonly<{ pollMs: number; maxWaitMs: number; sleep?: (ms: number) => Promise<void> }>;
   /** Shared with the rewrite and both sweeps, so nothing runs a second copy beside a live one (paid twice). */
   inFlight?: PathRewriteInFlight;
@@ -369,7 +372,7 @@ async function composeLevel(settings: TreeUpdateSettings, level: Level, updateId
   try {
     const child = await level.lease(() => ports.childOf(level.below));
     if (child === null || child.digPaths.length === 0) return failed("PATH_REWRITE_INPUT_UNREAD");
-    const built = buildPathRewriteMaterial({ question: level.dig.question, parent, picks: child.picks, digPaths: child.digPaths });
+    const built = await fitRewriteToTokenLine({ question: level.dig.question, parent, picks: child.picks, digPaths: child.digPaths }, settings.tokenCount, log);
     if (built.kind === "TOO_LARGE") {
       log("PATH_CLIMB_MATERIAL_TOO_LARGE", { runId, step: level.step, bodyBytes: built.bodyBytes });
       return failed("PATH_REWRITE_MATERIAL_TOO_LARGE");
@@ -479,7 +482,7 @@ async function composeAnswer(settings: TreeUpdateSettings, update: AnswerUpdate,
     const earlier = newest === null || earlierSegments === null ? null : Object.freeze({ version: newest.answer_seq, segments: earlierSegments });
     const read = await update.lease(() => ports.answerInputOf(root, earlier));
     if (read === null) return await failed("MAIN_ANSWER_INPUT_UNREAD", 0, []);
-    const dossier = buildInvestigationDossier(read.input);
+    const dossier = await fitDossierToTokenLine(read.input, settings.tokenCount, log);
     if (dossier.kind === "TOO_LARGE") {
       log("MAIN_ANSWER_DOSSIER_TOO_LARGE", { runId, bodyBytes: dossier.bodyBytes });
       return await failed("MAIN_ANSWER_DOSSIER_TOO_LARGE", 0, []);

@@ -1693,5 +1693,73 @@ class PromptCachingTests(AnthropicTest):
         self.assertEqual((entry['state'], entry['cache_write_requested']), ('settled', '5m'))
         self.assertEqual(Decimal(entry['held_usd']), cost(LOWER, input_tokens=200, read=3000, output=400))
 
+class TokenCountTests(AnthropicTest):
+    """R22 decision 28: the gate's free token count. Nothing is held, charged or recorded, and a failure never halts."""
+
+    def body(self, **changes):
+        value = {'model': HAIKU, 'system': 'Offline synthetic system text', 'messages': [{'role': 'user', 'content': 'Offline synthetic test'}]}
+        value.update(changes)
+        return json.dumps(value)
+
+    def count(self, gate, body, dispatch, **kwargs):
+        options = {'peer_uid': PEER, 'slots': gate.slots, 'dispatch': dispatch, 'key_loader': lambda _private: KEY,
+                   'host': HOST, 'platform': 'linux'}
+        options.update(kwargs)
+        return bridge.count_tokens(gate.private, gate.go_path, {'scope_id': SCOPE, 'requestBody': body}, **options)
+
+    def test_it_sends_the_exact_body_under_the_gates_key_and_answers_only_the_number(self):
+        gate = self.ready()
+        sent = []
+
+        def dispatch(raw, key):
+            sent.append((raw, key))
+            return 200, {'input_tokens': 4321, 'anything_else': 'not passed on'}
+        before = gate.day(DAY)
+        body = self.body()
+        self.assertEqual(self.count(gate, body, dispatch), {'input_tokens': 4321})
+        self.assertEqual(sent, [(body.encode(), KEY)])
+        self.assertEqual(gate.day(DAY), before)  # Nothing reserved, charged or recorded.
+
+    def test_the_marked_forms_a_call_may_send_are_counted_too(self):
+        gate = self.ready()
+        answer = lambda _raw, _key: (200, {'input_tokens': 1})  # noqa: E731
+        self.assertEqual(self.count(gate, self.body(system=cached_system()), answer), {'input_tokens': 1})
+        marked = [{'role': 'user', 'content': [{'type': 'text', 'text': 'Material', 'cache_control': dict(CACHE_MARK)}, {'type': 'text', 'text': 'Rest'}]}]
+        self.assertEqual(self.count(gate, self.body(messages=marked), answer), {'input_tokens': 1})
+
+    def test_it_refuses_what_a_count_may_not_carry_before_any_key_is_read(self):
+        gate = self.ready()
+
+        def never(*_args):
+            raise AssertionError('must not be read or sent')
+        for body in (self.body(max_tokens=1), self.body(tools=[]), self.body(model='claude-opus-5-5'), self.body(messages=[]), 'not json', '[]'):
+            with self.assertRaises(SafetyError):
+                self.count(gate, body, never, key_loader=never)
+        with self.assertRaises(SafetyError):
+            bridge.count_tokens(gate.private, gate.go_path, {'scope_id': 'another', 'requestBody': self.body()}, peer_uid=PEER, slots=gate.slots,
+                                dispatch=never, key_loader=never, host=HOST, platform='linux')
+        with self.assertRaises(SafetyError):
+            self.count(gate, self.body(), never, key_loader=never, peer_uid=PEER + 1)
+
+    def test_a_failed_count_is_a_refusal_and_never_halts_the_gate(self):
+        gate = self.ready()
+        for reply in ((429, {'type': 'error'}), (200, {'input_tokens': 'many'}), (200, {}), (500, {})):
+            with self.assertRaises(SafetyError) as caught:
+                self.count(gate, self.body(), lambda _raw, _key, reply=reply: reply)
+            self.assertEqual(str(caught.exception), 'COUNT_UNAVAILABLE')
+        report = bridge.remaining_report(gate.private, gate.go_path, {'scope_id': SCOPE}, slots=gate.slots, now=gate.clock)
+        self.assertEqual(report['state'], 'active')
+        self.assertEqual(report['remaining_calls'], 600)
+
+    def test_only_the_anthropic_profile_offers_it(self):
+        self.assertEqual(ANTHROPIC.count_path, '/v1/messages/count_tokens')
+        source = (Path(__file__).resolve().parents[2] / 'packages/providers/ops/preview_budget_authority.py').read_text()
+        self.assertIn("count=count,\n", source)  # serve wires /count to the same socket and uid list.
+        self.assertTrue(bridge.helper.path_valid(ANTHROPIC.count_path))
+        for name, profile in bridge.helper.PROFILES.items():
+            if name != 'anthropic':
+                self.assertIsNone(getattr(profile, 'count_path', None), name)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -24,7 +24,13 @@ function versionWith(text: Readonly<{ answer: string; path: string; note: string
     answer: { segments: [text.answer] },
     story: { short_answer: text.path, what_would_change: text.note, how_it_went: [{ dig_run_id: "33333333-3333-4333-8333-333333333333", paragraph: text.note }], still_open: [text.note] },
     sources: [{ site: "city.example.org", title: "Ferry ridership", quote: text.note, line: text.path, link: LINK }],
-    paths: [{ line: text.path, summary: text.note, fate: "PARTLY_HELD", level: 0 }, { line: text.note, summary: null, fate: "HELD_UP", level: 1 }],
+    paths: [
+      { line: text.path, summary: text.note, fate: "PARTLY_HELD", level: 0, points: [{ text: text.answer, trust: "SURE", side: "for", sources: [0] }, { text: text.note, trust: "STILL_ARGUED", side: "against", sources: [] }] },
+      { line: text.note, summary: null, fate: "HELD_UP", level: 1, points: [{ text: text.path, trust: "SURE_FOR_CASE", side: "for", sources: [] }, { text: text.note, trust: "DIDNT_HOLD", side: null, sources: [] }, { text: text.answer, trust: null, side: "against", sources: [] }],
+        dig: { picks: [text.note], own_words: [text.path], view: { outcome: "HELPED", reason: text.note }, changed: [text.answer] } },
+      { line: text.answer, summary: null, fate: null, level: 2, points: [], dig: { picks: [text.path], own_words: [text.note], view: { outcome: "DID_NOT_HELP", reason: text.path }, changed: [] } },
+      { line: text.path, summary: null, fate: "FELL", level: 3, dig: { picks: [text.note], own_words: [text.path], view: { outcome: "NOT_SETTLED", reason: text.note }, changed: [text.note] } }
+    ],
     shortened: false, ...over
   }) as FinishedInvestigationReport;
 }
@@ -94,10 +100,17 @@ describe("what the report's PDF prints", () => {
       question: "Should the city build a pier?", versionLine: "Version 2 · October 31, 2026", shortened: null,
       pointsTo: { title: "What the debate points to", lead: words.path, paragraphs: [words.answer], reservation: null },
       wouldChange: { title: "What would change the answer", text: words.note },
-      paths: { title: "The paths", items: [{ level: 0, fateWords: "Partly held", line: words.path, summary: words.note }, { level: 1, fateWords: "Held up", line: words.note, summary: null }] },
+      paths: { title: "The paths", items: [
+        { level: 0, fateWords: "Partly held", line: words.path, summary: words.note, dig: null, points: [
+          { trustWords: "Sure", sideWords: "For", text: words.answer, marks: "[1]" }, { trustWords: "Still argued", sideWords: "Against", text: words.note, marks: null }] },
+        { level: 1, fateWords: "Held up", line: words.note, summary: null,
+          points: [{ trustWords: "Sure, for the case named", sideWords: "For", text: words.path, marks: null }, { trustWords: "Didn't hold", sideWords: null, text: words.note, marks: null }, { trustWords: null, sideWords: "Against", text: words.answer, marks: null }],
+          dig: { title: "Follow-up debate", picks: [words.note], ownView: { title: "The person's own view", words: [words.path], verdict: `It helped. ${words.note}` }, changed: { title: "What it changed", items: [words.answer] } } },
+        { level: 2, fateWords: null, line: words.answer, points: [], dig: { ownView: { verdict: `It did not help. ${words.path}` }, changed: null } },
+        { level: 3, fateWords: "Fell", points: [], dig: { ownView: { verdict: `It was not settled. ${words.note}` } } }] },
       howItWent: { title: "How the investigation went", paragraphs: [words.note] },
       stillOpen: { title: "What is still open", items: [words.note] },
-      sources: { title: "Sources", items: [{ site: "city.example.org", title: "Ferry ridership", note: words.path, quote: words.note, link: LINK }] }
+      sources: { title: "Sources", items: [{ number: "1", site: "city.example.org", title: "Ferry ridership", note: words.path, quote: words.note, link: LINK }] }
     });
   });
 
@@ -125,11 +138,48 @@ describe("what the report's PDF prints", () => {
       if (typeof value === "string") strings.push(value);
       else if (typeof value === "object" && value !== null) Object.values(value).forEach(visit);
     };
-    visit({ ...model, versionLine: null, footer: null, metadataSubject: null, sources: { ...model.sources, items: model.sources!.items.map((source) => ({ ...source, link: null })) } });
+    // The only numbers beside the version and date: a point's sources' places in the list.
+    visit({ ...model, versionLine: null, footer: null, metadataSubject: null, sources: { ...model.sources, items: model.sources!.items.map((source) => ({ ...source, link: null, number: null })) },
+      paths: { ...model.paths, items: model.paths!.items.map((path) => ({ ...path, points: path.points.map((point) => ({ ...point, marks: null })) })) } });
     const printed = strings.join("\n");
     expect(printed).toContain(words.answer);
     expect(printed).not.toMatch(/[0-9%]/u);
     expect(printed).not.toMatch(/score|ladder|round|lineage|judge/iu);
+  });
+});
+
+describe("a big tree in the PDF (decision 27)", () => {
+  const page = (pdf: Buffer): number => (pdf.toString("latin1").match(/\/Type\s*\/Page\b/gu) ?? []).length;
+  /** Every level down to 10, several digs on each, every path with its points; each source once, each cited. */
+  function bigTree(text: Readonly<{ answer: string; path: string; note: string }>, levels = 10, perLevel = 4) {
+    const sources = Array.from({ length: 12 }, (_, at) => ({ site: `site${String(at)}.example.org`, title: text.path, quote: text.note, line: text.path, link: `https://site${String(at)}.example.org/page` }));
+    const paths = [{ line: text.path, summary: text.note, fate: "HELD_UP", level: 0, points: [{ text: text.answer, trust: "SURE", side: "for", sources: [0, 1] }] }];
+    for (let level = 1; level <= levels; level += 1) {
+      for (let dig = 0; dig < perLevel; dig += 1) {
+        paths.push({ line: `${text.path} ${text.note}`, summary: null, fate: dig % 2 === 0 ? "PARTLY_HELD" : "FELL", level,
+          points: Array.from({ length: 4 }, (_, at) => ({ text: `${text.answer} ${text.note} ${text.answer}`, trust: (["SURE", "SURE_FOR_CASE", "STILL_ARGUED", "DIDNT_HOLD"] as const)[at]!, side: at % 2 === 0 ? "for" : "against", sources: [at] })),
+          dig: { picks: [text.note], own_words: dig === 0 ? [text.path] : [], view: dig === 0 ? { outcome: "HELPED", reason: text.note } : null, changed: [text.answer, text.note] } } as never);
+      }
+    }
+    return versionWith(text, { paths, sources } as never);
+  }
+  const words = { answer: "The whole debate points to rush hour, with winter crowds at half the summer numbers.", path: "Partly: it helps at rush hour.", note: "Winter ridership falls by half across the line." };
+
+  it("flows over many pages, every word of the deepest path printed, no empty box", async () => {
+    const pdf = await renderInvestigationReportPdf({ question: "Should the city build a pier?", version: bigTree(words), catalogs: await catalogsOf("en") });
+    expect(page(pdf)).toBeGreaterThan(8);
+    expect(drawnGlyphs(pdf).filter((glyph) => glyph === "0000")).toEqual([]);
+    const raw = pdf.toString("latin1");
+    // Every source's address, once.
+    expect(raw.match(/\/URI \(/gu)).toHaveLength(12);
+  }, 180_000);
+
+  it("keeps a deep tree's model plain: all 41 paths, indented by their level, the point's numbers its sources' places", async () => {
+    const model = buildInvestigationReportPdfModel({ question: "Q?", version: bigTree(words), catalogs: await catalogsOf("en") });
+    expect(model.paths!.items).toHaveLength(41);
+    expect(model.paths!.items.at(-1)).toMatchObject({ level: 10, fateWords: "Fell" });
+    expect(model.paths!.items[1]!.points.map((point) => point.marks)).toEqual(["[1]", "[2]", "[3]", "[4]"]);
+    expect(model.sources!.items[11]!.number).toBe("12");
   });
 });
 

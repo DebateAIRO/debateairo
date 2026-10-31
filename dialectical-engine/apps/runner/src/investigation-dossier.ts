@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { INVESTIGATION_REPORT_LIMITS, cutQuoteAtWordEdge, type StoryFate } from "@debateai/contract";
+import { INVESTIGATION_REPORT_LIMITS, TRUST_WORDS, cutQuoteAtWordEdge, type StoryFate, type TrustWord } from "@debateai/contract";
 import { TypedDomainError, withQuestionLanguageField, withReaderField } from "@debateai/kernel";
 import { buildFramedPrompt, type FramedMaterialField, type PromptPacket } from "@debateai/providers";
 import {
@@ -49,18 +49,43 @@ import {
  * 5: only for a very large investigation, the oldest one-line entries are left out whole, and counted.
  * Steps 2-5 are disclosed with the approved line (owner F13).
  *
+ * DECISION 26, THE OWNER'S DESIGN FOR BIG DEBATES: the paths are rewritten every time something below changes them, so the best
+ * arguments are already at the top. The material holds the first debate and the digs of levels 1 to 3 whole (`follow_ups`, as above),
+ * and `deeper_paths`: each path of a deeper dig with only its line, its outcome, its name and where it hangs. The person's own views
+ * stay in `views` from every level. The writer may ask once for up to 10 of them by name (`material.deeper.askFor`): the material
+ * then holds `asked_paths` right after the shared fields, so the shared fields stay the same bytes under the same fence and are read
+ * from the cache, and everyone after the writer reads that material. A path with nothing beyond its line and outcome adds nothing.
+ * A list that does not fit leaves first (the deepest, the oldest, the ones that changed nothing go first; counted, and it counts as
+ * shortened): a line of a deep path gives way before any point at levels 1 to 3. Only then the ladder's steps 2-5, on levels 1 to 3.
+ *
  * "IT MUST REFLECT EVERY PATH" (the checker, decision 4) ON THE LADDER: a path's line and fate outlast its points. The first
  * debate's paths stand on every step, and a dig's paths through step 4. Only step 5 takes a path out of the material, and
  * then the writer and checker cannot see it: `left_out` counts the digs gone and the page says the report was shortened.
  */
 
 export const INVESTIGATION_REPORT_INPUT_OVER_LIMIT = "INVESTIGATION_REPORT_INPUT_OVER_LIMIT" as const;
-/** Room for the largest call beyond the answer writer's first packet: the checked answer, the story draft, the problem. */
-export const INVESTIGATION_REPORT_ROUND_TWO_ROOM_BYTES = 80 * 1024;
+/**
+ * Room for the largest call beyond the answer writer's first packet: the checked answer, the story draft, the problem. Measured
+ * (tests/unit/investigation-report-sizes.test.ts): the fullest second round asked for, at 600 words and in the widest scripts, stays
+ * under it. A story beyond it does not fail: the guard refuses the second round and the step keeps its checked draft.
+ */
+export const INVESTIGATION_REPORT_ROUND_TWO_ROOM_BYTES = 72 * 1024;
+/** Room kept for what an ask brings (decision 26); when it brings more, its paths keep fewer whole points, and say so. */
+export const INVESTIGATION_REPORT_ASK_ROOM_BYTES = 24 * 1024;
+/** The dig levels the material holds whole (decision 26); the first debate is level 0. */
+export const INVESTIGATION_REPORT_WHOLE_LEVELS = 3 as const;
 /** The ladder's step 2: the first debate's whole points kept per path, in turn. */
 export const INVESTIGATION_REPORT_POINT_CAPS = Object.freeze([6, 3, 1, 0]);
-/** The words the answer is asked for (the writer's length target). */
-export const INVESTIGATION_REPORT_ANSWER_LENGTH = "about 300 words" as const;
+/**
+ * The words the answer is asked for (the writer's length target; decision 27): about 300 for a debate of up to 8 paths (a first
+ * debate alone), 50 more for every 8 paths beyond them, at most 600 (reached at 49 paths) however big the debate.
+ */
+export const INVESTIGATION_REPORT_ANSWER_WORDS = Object.freeze({ base: 300, step: 50, pathsPerStep: 8, most: 600 });
+export function investigationReportAnswerLength(paths: number): string {
+  const { base, step, pathsPerStep, most } = INVESTIGATION_REPORT_ANSWER_WORDS;
+  const steps = Math.floor(Math.max(0, paths - 1) / pathsPerStep);
+  return `about ${String(Math.min(most, base + step * steps))} words`;
+}
 
 /** Every packet a report call sends passes here before it goes: one over the 100K line is refused, nothing sent. */
 export function investigationReportGuard(packet: PromptPacket): PromptPacket {
@@ -125,12 +150,27 @@ export type DossierInput = Readonly<{
   }>;
   digs: readonly DossierDig[];
   earlier: Readonly<{ version: number; segments: readonly string[] }> | null;
+  /**
+   * Each point's trust word, by its id in lower case, for the stored version's PDF only (decision 27). Never in the fields: a word can
+   * change with time (a point grows dated), and a closing run again must send the same bytes.
+   */
+  trustWords?: ReadonlyMap<string, TrustWord>;
 }>;
 
 /* ----------------------------------------------------------------- the output */
 
+/** A point as the stored version keeps it for the PDF (decision 27): its words, its trust word, its side, which of the sources it cites. */
+export type DossierReportPoint = Readonly<{ text: string; trust: TrustWord | null; side: "for" | "against" | null; sources: readonly number[] }>;
+/** The dig a path's row opens (its first path): what was dug, the person's own words and their verdict, what it changed. */
+export type DossierReportDig = Readonly<{
+  picks: readonly string[];
+  own_words: readonly string[];
+  view: Readonly<{ outcome: "HELPED" | "DID_NOT_HELP" | "NOT_SETTLED"; reason: string }> | null;
+  changed: readonly string[];
+}>;
 /** One path in the stored version: level 0 is the first debate's, level k the paths of a dig at level k. */
-export type DossierReportPath = Readonly<{ line: string; summary: string | null; fate: StoryFate | null; level: number }>;
+export type DossierReportPath = Readonly<{ line: string; summary: string | null; fate: StoryFate | null; level: number;
+  points?: readonly DossierReportPoint[]; dig?: DossierReportDig }>;
 
 export type Dossier = Readonly<{
   kind: "BUILT";
@@ -142,7 +182,9 @@ export type Dossier = Readonly<{
   /** Every path as the stored version lists them, in tree order: a first-debate path, then the paths of the digs under it. */
   paths: readonly DossierReportPath[];
   ladderStep: number;
-  /** Points and cards a shortened dossier left out (step 5 cards, step 2 points). */
+  /** Which ladder place this is, for a caller that must start lower (the real token count, decision 28). */
+  ladderAt: number;
+  /** Points, cards and deeper paths a shortened dossier left out (step 5 cards, step 2 points, the list's lines). */
   leftOut: number;
   /** sha256 of the dossier's fields. */
   fingerprint: string;
@@ -254,7 +296,10 @@ const textJson = (text: DossierText) => ({ line: text.line, ...(text.summary ===
 
 /** How each card is written on a step: whole, short, one line, or left out. */
 type CardForm = "WHOLE" | "SHORT" | "ONE_LINE" | "LEFT_OUT";
-type Step = Readonly<{ pointCap: number; digPointCap: number; forms: ReadonlyMap<string, CardForm> }>;
+type Step = Readonly<{ pointCap: number; digPointCap: number; forms: ReadonlyMap<string, CardForm>; offTheList: ReadonlySet<string> }>;
+
+/** A dig the material holds only as lines on the list of deeper paths (decision 26). */
+const isDeep = (dig: DossierDig): boolean => dig.level > INVESTIGATION_REPORT_WHOLE_LEVELS;
 
 /** A dig's own path on its card: the rewrite's line and fate when it has them (a later update's when one came), else its statement. */
 type CardPath = Readonly<{ positionRef: string; line: string; fate: StoryFate | null; points: readonly PathRewritePoint[] }>;
@@ -331,7 +376,7 @@ function cardJson(dig: DossierDig, form: CardForm, step: Step, input: DossierInp
   };
 }
 
-type Built = Readonly<{ fields: readonly FramedMaterialField[]; refs: ReadonlySet<string>; cardRefs: readonly string[]; leftOut: number }>;
+type Built = Readonly<{ fields: readonly FramedMaterialField[]; refs: ReadonlySet<string>; cardRefs: readonly string[]; leftOut: number; deeperNames: readonly string[] }>;
 
 function fieldsAt(input: DossierInput, cards: readonly DossierDig[], refs: Refs, step: Step): Built {
   const known = new Set<string>();
@@ -369,7 +414,21 @@ function fieldsAt(input: DossierInput, cards: readonly DossierDig[], refs: Refs,
   const followUps: unknown[] = [];
   const cardRefs: string[] = [];
   let cardsLeftOut = 0;
+  let linesLeftOut = 0;
+  const deeperPaths: unknown[] = [];
   for (const dig of cards) {
+    if (isDeep(dig)) {
+      const ref = refs.cardRef.get(lower(dig.runId))!;
+      if (step.offTheList.has(lower(dig.runId))) { linesLeftOut += cardPathsOf(dig).length; continue; }
+      known.add(ref);
+      const { debate, path } = fromJson(dig, input, refs, digPathRefOf);
+      cardPathsOf(dig).forEach((entry, at) => {
+        known.add(`${ref}.D${String(at + 1)}`);
+        deeperPaths.push({ ref: `${ref}.D${String(at + 1)}`, under: path ?? debate, level: dig.level, line: entry.line,
+          ...(entry.fate === null ? {} : { fate: entry.fate }) });
+      });
+      continue;
+    }
     const form = step.forms.get(lower(dig.runId)) ?? "WHOLE";
     if (form === "LEFT_OUT") { cardsLeftOut += 1; pointsLeftOut += cardPathsOf(dig).reduce((sum, path) => sum + path.points.length, 0); continue; }
     const ref = refs.cardRef.get(lower(dig.runId))!;
@@ -387,7 +446,7 @@ function fieldsAt(input: DossierInput, cards: readonly DossierDig[], refs: Refs,
   const views = cards.flatMap((dig) => {
     const words = dig.picks.filter((pick) => pick.by !== "AI_SUGGESTION").map((pick) => pick.text);
     const form = step.forms.get(lower(dig.runId)) ?? "WHOLE";
-    if (words.length === 0 || form === "LEFT_OUT") return [];
+    if (words.length === 0 || form === "LEFT_OUT" || step.offTheList.has(lower(dig.runId))) return [];
     const view = dig.rewrite?.view ?? null;
     return [{ card: refs.cardRef.get(lower(dig.runId))!, words, marked: "PERSON",
       ...(view === null ? {} : { verdict: { outcome: view.outcome, scope: view.scope, reason: view.reason } }) }];
@@ -412,9 +471,10 @@ function fieldsAt(input: DossierInput, cards: readonly DossierDig[], refs: Refs,
       would_change: input.first.answer.change } }),
     paths
   };
-  const leftOut = pointsLeftOut + cardsLeftOut;
+  const leftOut = pointsLeftOut + cardsLeftOut + linesLeftOut;
   return Object.freeze({
     refs: known, cardRefs: Object.freeze(cardRefs), leftOut,
+    deeperNames: Object.freeze(deeperPaths.map((entry) => (entry as { ref: string }).ref)),
     fields: Object.freeze([
       field("question", question.line),
       ...(question.place === null ? [] : [field("place", question.place)]),
@@ -424,8 +484,10 @@ function fieldsAt(input: DossierInput, cards: readonly DossierDig[], refs: Refs,
       field("follow_ups", JSON.stringify(followUps)),
       ...(views.length === 0 ? [] : [field("views", JSON.stringify(views))]),
       ...(sources.length === 0 ? [] : [field("sources", JSON.stringify(sources))]),
+      ...(deeperPaths.length === 0 ? [] : [field("deeper_paths", JSON.stringify(deeperPaths))]),
       ...(input.earlier === null ? [] : [field("earlier_report", JSON.stringify({ version: input.earlier.version, answer: [...input.earlier.segments] }))]),
-      ...(leftOut === 0 ? [] : [field("left_out", JSON.stringify({ points: pointsLeftOut, follow_ups: cardsLeftOut }))])
+      ...(leftOut === 0 ? [] : [field("left_out", JSON.stringify({ points: pointsLeftOut, follow_ups: cardsLeftOut,
+        ...(linesLeftOut === 0 ? {} : { deeper_paths: linesLeftOut }) }))])
     ])
   });
 }
@@ -433,31 +495,85 @@ function fieldsAt(input: DossierInput, cards: readonly DossierDig[], refs: Refs,
 /** The ladder's steps in order, each a pure description (built lazily: a large tree has many sub-steps). */
 function* ladder(input: DossierInput, cards: readonly DossierDig[]): Generator<Readonly<{ number: number; step: Step }>> {
   const whole: ReadonlyMap<string, CardForm> = new Map();
-  yield { number: 1, step: { pointCap: Number.POSITIVE_INFINITY, digPointCap: Number.POSITIVE_INFINITY, forms: whole } };
-  for (const digPointCap of INVESTIGATION_REPORT_POINT_CAPS) yield { number: 2, step: { pointCap: Number.POSITIVE_INFINITY, digPointCap, forms: whole } };
+  const everything: ReadonlySet<string> = new Set();
+  yield { number: 1, step: { pointCap: Number.POSITIVE_INFINITY, digPointCap: Number.POSITIVE_INFINITY, forms: whole, offTheList: everything } };
+  // Decision 26: the list of deeper paths gives way first: the deepest, then those that changed nothing, then the oldest.
+  const listed = [...cards].filter(isDeep).sort((a, b) => b.level - a.level || Number(changedText(a)) - Number(changedText(b))
+    || byTimeThenId({ at: a.finishedAt, id: lower(a.runId) }, { at: b.finishedAt, id: lower(b.runId) }));
+  const off = new Set<string>();
+  const listChunk = Math.max(1, Math.ceil(listed.length / 20));
+  for (let at = 0; at < listed.length; at += listChunk) {
+    for (const dig of listed.slice(at, at + listChunk)) off.add(lower(dig.runId));
+    yield { number: 2, step: { pointCap: Number.POSITIVE_INFINITY, digPointCap: Number.POSITIVE_INFINITY, forms: whole, offTheList: new Set(off) } };
+  }
+  const offTheList: ReadonlySet<string> = new Set(off);
+  const shallow = cards.filter((dig) => !isDeep(dig));
+  for (const digPointCap of INVESTIGATION_REPORT_POINT_CAPS) yield { number: 2, step: { pointCap: Number.POSITIVE_INFINITY, digPointCap, forms: whole, offTheList } };
   const cap = INVESTIGATION_REPORT_POINT_CAPS.at(-1)!;
-  for (const pointCap of INVESTIGATION_REPORT_POINT_CAPS) yield { number: 2, step: { pointCap, digPointCap: cap, forms: whole } };
+  for (const pointCap of INVESTIGATION_REPORT_POINT_CAPS) yield { number: 2, step: { pointCap, digPointCap: cap, forms: whole, offTheList } };
   const winning = input.first.paths[0]?.ref ?? null;
   const onWinning = (dig: DossierDig): boolean => lower(dig.parentRunId) === lower(input.first.runId) && dig.positionRef === winning;
   // Step 3: the other cards short first, then the ones that stay whole longest.
   const forms = new Map<string, CardForm>();
-  for (const dig of cards) if (!onWinning(dig) && !changedFate(dig)) forms.set(lower(dig.runId), "SHORT");
-  yield { number: 3, step: { pointCap: cap, digPointCap: cap, forms: new Map(forms) } };
-  for (const dig of cards) forms.set(lower(dig.runId), "SHORT");
-  yield { number: 3, step: { pointCap: cap, digPointCap: cap, forms: new Map(forms) } };
+  for (const dig of shallow) if (!onWinning(dig) && !changedFate(dig)) forms.set(lower(dig.runId), "SHORT");
+  yield { number: 3, step: { pointCap: cap, digPointCap: cap, forms: new Map(forms), offTheList } };
+  for (const dig of shallow) forms.set(lower(dig.runId), "SHORT");
+  yield { number: 3, step: { pointCap: cap, digPointCap: cap, forms: new Map(forms), offTheList } };
   // Step 4: one line each, the deepest level first.
-  const levels = [...new Set(cards.map((dig) => dig.level))].sort((a, b) => b - a);
+  const levels = [...new Set(shallow.map((dig) => dig.level))].sort((a, b) => b - a);
   for (const level of levels) {
-    for (const dig of cards) if (dig.level === level) forms.set(lower(dig.runId), "ONE_LINE");
-    yield { number: 4, step: { pointCap: cap, digPointCap: cap, forms: new Map(forms) } };
+    for (const dig of shallow) if (dig.level === level) forms.set(lower(dig.runId), "ONE_LINE");
+    yield { number: 4, step: { pointCap: cap, digPointCap: cap, forms: new Map(forms), offTheList } };
   }
   // Step 5: the oldest one-line entries left out, a few at a time.
-  const oldest = [...cards].sort((a, b) => byTimeThenId({ at: a.finishedAt, id: lower(a.runId) }, { at: b.finishedAt, id: lower(b.runId) }));
+  const oldest = [...shallow].sort((a, b) => byTimeThenId({ at: a.finishedAt, id: lower(a.runId) }, { at: b.finishedAt, id: lower(b.runId) }));
   const chunk = Math.max(1, Math.ceil(oldest.length / 20));
   for (let at = 0; at < oldest.length; at += chunk) {
     for (const dig of oldest.slice(at, at + chunk)) forms.set(lower(dig.runId), "LEFT_OUT");
-    yield { number: 5, step: { pointCap: cap, digPointCap: cap, forms: new Map(forms) } };
+    yield { number: 5, step: { pointCap: cap, digPointCap: cap, forms: new Map(forms), offTheList } };
   }
+}
+
+/* ----------------------------------------------------------------- the deeper paths in full (decision 26) */
+
+/** The whole-point caps an ask's paths step down through, after "all of them". */
+const ASK_POINT_CAPS = Object.freeze([Number.POSITIVE_INFINITY, ...INVESTIGATION_REPORT_POINT_CAPS]);
+
+/**
+ * The asked paths in full, in tree order: AI text only (decision 6): the points with their verdicts, reader 1's notes, the short
+ * quotes, and what the dig changed. A path holding nothing more than the list showed is its line alone.
+ */
+function askedJson(names: ReadonlySet<string>, cards: readonly DossierDig[], refs: Refs, pointCap: number): Readonly<{ json: string; refs: readonly string[] }> {
+  const known: string[] = [];
+  const entries = cards.flatMap((dig) => {
+    const ref = refs.cardRef.get(lower(dig.runId))!;
+    const own = dig.ownMaterial;
+    let cardGiven = false;
+    return cardPathsOf(dig).flatMap((path, at) => {
+      const name = `${ref}.D${String(at + 1)}`;
+      if (!names.has(name)) return [];
+      const kept = keptPoints(path.points, pointCap);
+      known.push(...kept.map((point) => refs.pointRef.get(lower(point.id))!));
+      const keptIds = new Set(kept.map((point) => lower(point.id)));
+      const sources = [...new Map((own?.sources ?? []).filter((source) => keptIds.has(lower(source.pointId))).map((source) => {
+        const sourceRef = refs.sourceRef.get(sourceKey(source))!;
+        return [sourceRef, { ref: sourceRef, site: source.site, ...(source.title === null ? {} : { title: source.title }),
+          quote: cutQuoteAtWordEdge(source.quote), ...(source.line === null ? {} : { line: source.line }) }] as const;
+      })).values()];
+      known.push(...sources.map((source) => source.ref));
+      const rewrite = dig.rewrite;
+      const about = cardGiven ? {} : {
+        ...(rewrite === null || rewrite.whatChanged.length === 0 ? {} : { what_changed: [...rewrite.whatChanged] }),
+        ...(rewrite?.view === null || rewrite?.view === undefined ? {} : { view: { outcome: rewrite.view.outcome, scope: rewrite.view.scope, reason: rewrite.view.reason } })
+      };
+      cardGiven = true;
+      return [{ ref: name, line: path.line, ...(path.fate === null ? {} : { fate: path.fate }), ...about,
+        ...(kept.length === 0 ? {} : { points: pointsJson(kept, refs, name) }),
+        ...(sources.length === 0 ? {} : { sources }),
+        ...(kept.length === path.points.length ? {} : { points_left_out: path.points.length - kept.length }) }];
+    });
+  });
+  return Object.freeze({ json: JSON.stringify(entries), refs: Object.freeze(known) });
 }
 
 /** The reader and locked-language fields, last. */
@@ -467,8 +583,34 @@ function closingFields(input: DossierInput, fields: readonly FramedMaterialField
 
 const answerJson = (answer: ReportAnswerDraft): string => JSON.stringify(answer.segments.map((segment) => segment.text));
 
+/** A point as the stored version keeps it: the numbers are its sources' places in the version's list. */
+function reportPointsOf(points: readonly PathRewritePoint[], sources: readonly DossierSource[], refs: Refs,
+  trustWords: ReadonlyMap<string, TrustWord> | undefined): readonly DossierReportPoint[] {
+  const order = new Map(refs.sources.map(({ key }, at) => [key, at] as const));
+  return Object.freeze(points.map((point) => Object.freeze({
+    text: point.text,
+    trust: trustWords?.get(lower(point.id)) ?? (TRUST_WORDS.includes(point.trust as TrustWord) ? point.trust as TrustWord : null),
+    side: point.side,
+    sources: Object.freeze([...new Set(sources.filter((source) => lower(source.pointId) === lower(point.id)).flatMap((source) => {
+      const place = order.get(sourceKey(source));
+      return place === undefined || place >= INVESTIGATION_REPORT_LIMITS.sourcesMax ? [] : [place];
+    }))])
+  })));
+}
+
+/** What a dig's row carries (decision 27): what was dug, the person's words beside their verdict, what it changed. */
+function reportDigOf(dig: DossierDig): DossierReportDig {
+  const view = dig.rewrite?.view ?? null;
+  return Object.freeze({
+    picks: Object.freeze(dig.picks.filter((pick) => pick.by === "AI_SUGGESTION").map((pick) => pick.text)),
+    own_words: Object.freeze(dig.picks.filter((pick) => pick.by !== "AI_SUGGESTION").map((pick) => pick.text)),
+    view: view === null ? null : Object.freeze({ outcome: view.outcome, reason: view.reason }),
+    changed: Object.freeze([...(dig.rewrite?.whatChanged ?? [])])
+  });
+}
+
 /** The paths as the stored version lists them, each under the debate it was dug from: the page and the PDF show this tree. */
-function reportPathsOf(input: DossierInput, cards: readonly DossierDig[]): readonly DossierReportPath[] {
+function reportPathsOf(input: DossierInput, cards: readonly DossierDig[], refs: Refs): readonly DossierReportPath[] {
   const paths: DossierReportPath[] = [];
   const placed = new Set<string>();
   const newestOf = new Map<string, DossierText>();
@@ -485,15 +627,20 @@ function reportPathsOf(input: DossierInput, cards: readonly DossierDig[]): reado
     }
   };
   const visit = (dig: DossierDig): void => {
-    for (const path of cardPathsOf(dig)) {
-      paths.push(Object.freeze({ line: path.line, summary: null, fate: path.fate, level: dig.level }));
+    const about = reportDigOf(dig);
+    const own = cardPathsOf(dig);
+    // A dig with no path of its own still has its row: what was dug and what it changed.
+    if (own.length === 0) paths.push(Object.freeze({ line: dig.picks[0]?.text ?? "-", summary: null, fate: null, level: dig.level, dig: about }));
+    own.forEach((path, at) => {
+      paths.push(Object.freeze({ line: path.line, summary: null, fate: path.fate, level: dig.level,
+        points: reportPointsOf(path.points, dig.ownMaterial?.sources ?? [], refs, input.trustWords), ...(at === 0 ? { dig: about } : {}) }));
       under(dig.runId, path.positionRef);
-    }
+    });
     under(dig.runId, null);
   };
   for (const path of input.first.paths) {
     const current = path.current ?? newestOf.get(path.ref) ?? { line: path.storyLine, summary: null, fate: path.storyFate };
-    paths.push(Object.freeze({ line: current.line, summary: current.summary, fate: current.fate, level: 0 }));
+    paths.push(Object.freeze({ line: current.line, summary: current.summary, fate: current.fate, level: 0, points: reportPointsOf(path.points, path.sources, refs, input.trustWords) }));
     under(input.first.runId, path.ref);
   }
   under(input.first.runId, null);
@@ -519,32 +666,82 @@ function newestRewrite(digs: readonly DossierDig[]): Readonly<{ rewriteId: strin
   return newest;
 }
 
+/** The room the fit keeps beyond the storyteller's first packet: round 2's turn and, when there is a list to ask from, an ask. */
+const roomOf = (deeper: boolean): number => INVESTIGATION_REPORT_ROUND_TWO_ROOM_BYTES + (deeper ? INVESTIGATION_REPORT_ASK_ROOM_BYTES : 0);
+const placeholderAnswer: ReportAnswerDraft = Object.freeze({ segments: [Object.freeze({ text: "-", rests_on: [] })] });
+
+/** How many paths the material holds: the first debate's, the digs' at levels 1 to 3, and the list's (the answer's length, decision 27). */
+function pathsInMaterial(input: DossierInput, cards: readonly DossierDig[]): number {
+  return input.first.paths.length + cards.reduce((sum, dig) => sum + cardPathsOf(dig).length, 0);
+}
+
+/** The storyteller's first packet over `fields`, as the guard measures it (the largest first packet of a step). */
+function storyFirstBytes(input: DossierInput, fields: readonly FramedMaterialField[]): number {
+  const storyFirst = closingFields(input, [...fields, field("answer", answerJson(placeholderAnswer))]);
+  return pathRewriteBodyBytes(buildFramedPrompt({ contract: REPORT_STORY_PROMPT_CONTRACT, material: storyFirst }).packet);
+}
+
+/** The material over the dossier's shared fields, with `asked` right after them when the writer asked. */
+function materialOf(input: DossierInput, dossier: readonly FramedMaterialField[], index: ReportCallMaterial["index"], answerLength: string,
+  asked: FramedMaterialField | null, deeper: ReportCallMaterial["deeper"] | undefined): ReportCallMaterial {
+  const after = asked === null ? [] : [asked];
+  return Object.freeze({
+    answerWriter: closingFields(input, [...dossier, ...after, field("answer_length", answerLength)]),
+    // The approved checker (decision 4) has no length sentence, so it is given no length to read.
+    answerCheckerOf: (candidate: ReportAnswerDraft) => closingFields(input, [...dossier, ...after, field("candidate_answer", JSON.stringify(candidate))]),
+    storyWriterOf: (answer: ReportAnswerDraft) => closingFields(input, [...dossier, ...after, field("answer", answerJson(answer))]),
+    storyCheckerOf: (answer: ReportAnswerDraft, candidate: ReportStoryDraft) => closingFields(input, [...dossier, ...after,
+      field("answer", answerJson(answer)), field("story", JSON.stringify(candidate))]),
+    index,
+    // F5: the dossier's fields lead every step's material; they go first on the Anthropic wire.
+    sharedFieldCount: dossier.length,
+    ...(deeper === undefined ? {} : { deeper })
+  });
+}
+
+export type DossierBuildOptions = Readonly<{
+  /** Start the ladder here (the real count said an earlier place is over the line, decision 28). */
+  fromLadderAt?: number;
+  /** Whether a material with an ask in it may go; absent: the byte guard alone. The first that passes is used. */
+  askedFits?: (material: ReportCallMaterial) => boolean | Promise<boolean>;
+}>;
+
 /**
  * The dossier, at the first ladder step whose largest call fits the guard (measured as the storyteller's first packet over
- * the dossier, plus the room for round 2's turn). Nothing fits: TOO_LARGE, the closing fails.
+ * the dossier, plus the room for round 2's turn and an ask). Nothing fits: TOO_LARGE, the closing fails.
  */
-export function buildInvestigationDossier(input: DossierInput): DossierBuilt {
+export function buildInvestigationDossier(input: DossierInput, options: DossierBuildOptions = {}): DossierBuilt {
   const cards = digsInTreeOrder(input);
   const refs = refsOf(input, cards);
-  const placeholderAnswer: ReportAnswerDraft = Object.freeze({ segments: [Object.freeze({ text: "-", rests_on: [] })] });
+  const answerLength = investigationReportAnswerLength(pathsInMaterial(input, cards));
   let bodyBytes = 0;
+  let at = -1;
   for (const { number, step } of ladder(input, cards)) {
+    at += 1;
+    if (at < (options.fromLadderAt ?? 0)) continue;
     const built = fieldsAt(input, cards, refs, step);
-    const storyFirst = closingFields(input, [...built.fields, field("answer", answerJson(placeholderAnswer))]);
-    bodyBytes = pathRewriteBodyBytes(buildFramedPrompt({ contract: REPORT_STORY_PROMPT_CONTRACT, material: storyFirst }).packet);
-    if (!pathRewriteBodyFits(bodyBytes + INVESTIGATION_REPORT_ROUND_TWO_ROOM_BYTES)) continue;
+    bodyBytes = storyFirstBytes(input, built.fields);
+    if (!pathRewriteBodyFits(bodyBytes + roomOf(built.deeperNames.length > 0))) continue;
     const dossier = built.fields;
-    const material: ReportCallMaterial = Object.freeze({
-      answerWriter: closingFields(input, [...dossier, field("answer_length", INVESTIGATION_REPORT_ANSWER_LENGTH)]),
-      // The approved checker (decision 4) has no length sentence, so it is given no length to read.
-      answerCheckerOf: (candidate: ReportAnswerDraft) => closingFields(input, [...dossier, field("candidate_answer", JSON.stringify(candidate))]),
-      storyWriterOf: (answer: ReportAnswerDraft) => closingFields(input, [...dossier, field("answer", answerJson(answer))]),
-      storyCheckerOf: (answer: ReportAnswerDraft, candidate: ReportStoryDraft) => closingFields(input, [...dossier,
-        field("answer", answerJson(answer)), field("story", JSON.stringify(candidate))]),
-      index: Object.freeze({ refs: built.refs, cardRefs: built.cardRefs }),
-      // F5: the dossier's fields lead every step's material; they go first on the Anthropic wire.
-      sharedFieldCount: dossier.length
-    });
+    const index = Object.freeze({ refs: built.refs, cardRefs: built.cardRefs });
+    const names: ReadonlySet<string> = new Set(built.deeperNames);
+    const askedAt = (asked: readonly string[], capAt: number) => {
+      const given = new Set(asked);
+      const made = askedJson(given, cards, refs, ASK_POINT_CAPS[capAt]!);
+      return materialOf(input, dossier, Object.freeze({ refs: new Set([...built.refs, ...made.refs]), cardRefs: built.cardRefs }), answerLength,
+        field("asked_paths", made.json), undefined);
+    };
+    const askFor = async (asked: readonly string[]): Promise<ReportCallMaterial> => {
+      for (let capAt = 0; capAt < ASK_POINT_CAPS.length; capAt += 1) {
+        const material = askedAt(asked, capAt);
+        const bytes = pathRewriteBodyBytes(buildFramedPrompt({ contract: REPORT_STORY_PROMPT_CONTRACT,
+          material: material.storyWriterOf(placeholderAnswer) }).packet);
+        if (!pathRewriteBodyFits(bytes + INVESTIGATION_REPORT_ROUND_TWO_ROOM_BYTES)) continue;
+        if (options.askedFits === undefined || await options.askedFits(material)) return material;
+      }
+      return askedAt(asked, ASK_POINT_CAPS.length - 1);
+    };
+    const material = materialOf(input, dossier, index, answerLength, null, names.size === 0 ? undefined : Object.freeze({ names, askFor }));
     const cardRuns = new Map<string, string>();
     for (const dig of cards) cardRuns.set(refs.cardRef.get(lower(dig.runId))!, dig.runId);
     const fingerprint = createHash("sha256").update(JSON.stringify(dossier.map((entry) => [entry.name, entry.content])), "utf8").digest("hex");
@@ -552,8 +749,8 @@ export function buildInvestigationDossier(input: DossierInput): DossierBuilt {
       kind: "BUILT" as const, material, cardRuns,
       sources: Object.freeze(refs.sources.slice(0, INVESTIGATION_REPORT_LIMITS.sourcesMax)
         .map(({ source }) => Object.freeze({ site: source.site, link: source.link, title: source.title, quote: source.quote, line: source.line }))),
-      paths: reportPathsOf(input, cards),
-      ladderStep: number, leftOut: built.leftOut, fingerprint, coveredRewrite: newestRewrite(input.digs), bodyBytes
+      paths: reportPathsOf(input, cards, refs),
+      ladderStep: number, ladderAt: at, leftOut: built.leftOut, fingerprint, coveredRewrite: newestRewrite(input.digs), bodyBytes
     });
   }
   return Object.freeze({ kind: "TOO_LARGE" as const, bodyBytes });

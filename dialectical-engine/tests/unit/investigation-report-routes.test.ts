@@ -179,6 +179,19 @@ describe("GET /v1/runs/{id}/investigation", () => {
     await api.close();
   });
 
+  it("decision 27: only the current version carries a path's points and its dig: the PDF prints only that one, and earlier ones stay light", async () => {
+    const detailed = { line: "A made-up path.", summary: null, fate: "HELD_UP", level: 1, points: [{ text: "A made-up point.", trust: "SURE", side: "for", sources: [0] }],
+      dig: { picks: ["A made-up pick."], own_words: [], view: null, changed: ["A made-up change."] } };
+    const world = worldOf({ state: "closed", closings: [closing(1, 1), closing(2, 2)], reports: [report(1, "r-1", "READY", 3), report(2, "r-2", "READY", 4)],
+      sealed: new Map([["r-1", content({ paths: [detailed] })], ["r-2", content({ paths: [detailed] })]]) });
+    const { api } = apiOver(world);
+    const read = InvestigationReportsSchema.parse((await get(api, OWNER, ROOT)).json());
+    const [older, current] = read.versions as Array<{ paths: unknown[] }>;
+    expect(older!.paths).toEqual([{ line: "A made-up path.", summary: null, fate: "HELD_UP", level: 1 }]);
+    expect(current!.paths).toEqual([detailed]);
+    await api.close();
+  });
+
   it("a dig answers its investigation's versions too", async () => {
     const { api } = apiOver(threeVersions());
     const read = InvestigationReportsSchema.parse((await get(api, OWNER, DIG)).json());

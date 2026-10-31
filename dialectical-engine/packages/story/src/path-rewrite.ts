@@ -5,6 +5,7 @@ import {
 } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
 import {
+  ANTHROPIC_TOKEN_COUNT,
   buildFramedPrompt,
   buildFramedRepairPrompt,
   buildFramedRevisionPrompt,
@@ -435,6 +436,8 @@ function rewriteRequest(call: PathRewriteRunCall, input: Readonly<{
     contractHash: call.contractHash,
     providerRef: input.providerRef,
     packet: call.guard(packet),
+    // Decision 28: near the line the gateway asks the vendor's own count too, for each attempt as sent.
+    sentInputTokensBelow: ANTHROPIC_TOKEN_COUNT.line,
     classifyContent: input.classifyContent,
     // The recovery order: code's salvage runs in the classifier; a refused reply gets this follow-up, then the full re-ask.
     buildRepairPacket: (rejected: RejectedProviderContent): PromptPacket => call.guard(revision === null

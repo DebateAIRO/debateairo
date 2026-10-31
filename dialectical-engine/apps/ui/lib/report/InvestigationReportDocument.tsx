@@ -13,6 +13,8 @@ import type { InvestigationReportPdfModel, InvestigationReportPdfPath } from "./
  * a heading sits in an unbreakable View with minPresenceAhead; a right-to-left report gives every text its direction, runs each
  * row from the right and mirrors the indent. Small labels are capitalised by the code, in the report's own locale.
  * The only links leaving the file are the sources' own addresses, printed in full, since a printed link cannot be followed.
+ * Decision 27: a path carries its points, each with its trust word beside it; a dig's first path opens with what was dug. A big tree
+ * flows across pages: a row may break between pages, each row keeps a little of itself ahead, and a deep path stops moving in at four steps.
  */
 const INK = "#29261F";
 const STRONG = "#1A1613";
@@ -24,6 +26,8 @@ const LINK = "#3D5A80";
 const BODY = 10.5;
 const FATE_COLUMN = 92;
 const FATE_GUTTER = 12;
+/** The trust word beside each point. */
+const TRUST_COLUMN = 76;
 /** A follow-up debate's path sits one step in per level, up to four steps: a deep tree keeps room for its words. */
 const LEVEL_INDENT = 14;
 const LEVEL_INDENT_STEPS = 4;
@@ -41,11 +45,18 @@ const styles = StyleSheet.create({
   lead: { fontWeight: 700, fontSize: 13, lineHeight: 1.4, color: STRONG, marginBottom: 8 },
   paragraph: { fontSize: BODY, lineHeight: 1.6, marginBottom: 9 },
   note: { fontSize: 9, lineHeight: 1.5, color: MUTED, marginBottom: 9 },
-  pathRow: { flexDirection: "row", marginBottom: 7 },
+  pathRow: { flexDirection: "row", marginTop: 3, marginBottom: 2 },
   pathFate: { width: FATE_COLUMN, paddingRight: FATE_GUTTER, paddingTop: 2.5, fontWeight: 700, fontSize: 8, lineHeight: 1.35, letterSpacing: 0.6, color: MUTED },
   pathBody: { flex: 1 },
   pathLine: { fontSize: BODY, lineHeight: 1.5 },
   pathSummary: { marginTop: 2, fontSize: 9.5, lineHeight: 1.5, color: TEXT_2 },
+  digBox: { marginTop: 6, marginBottom: 6, paddingLeft: 8, borderLeftWidth: 1, borderLeftColor: LINE },
+  digLabel: { fontWeight: 700, fontSize: 8, lineHeight: 1.35, letterSpacing: 0.6, color: MUTED, marginBottom: 2 },
+  digText: { fontSize: 9.5, lineHeight: 1.5, color: TEXT_2, marginBottom: 3 },
+  pointRow: { flexDirection: "row", marginBottom: 5 },
+  pointWord: { width: TRUST_COLUMN, paddingRight: FATE_GUTTER, paddingTop: 1.5, fontWeight: 700, fontSize: 7.5, lineHeight: 1.3, letterSpacing: 0.4, color: MUTED },
+  pointSide: { width: TRUST_COLUMN, paddingRight: FATE_GUTTER, fontSize: 7.5, lineHeight: 1.3, color: MUTED },
+  pointText: { flex: 1, fontSize: 9.5, lineHeight: 1.45 },
   listRow: { flexDirection: "row", marginBottom: 6 },
   listMark: { width: 14, fontSize: BODY, lineHeight: 1.55, color: ACCENT },
   listText: { flex: 1, fontSize: BODY, lineHeight: 1.55 },
@@ -72,6 +83,8 @@ type Look = Readonly<{
   text: Style;
   row: Style;
   fate: Style;
+  /** The dig's rule and its inset run from the reading side. */
+  digBox: Style;
 }>;
 
 function lookOf(model: InvestigationReportPdfModel): Look {
@@ -85,7 +98,8 @@ function lookOf(model: InvestigationReportPdfModel): Look {
     tracked: layout.trackedCapitals ? {} : { letterSpacing: 0 },
     text: rtl ? { direction: "rtl" } : {},
     row: layout.markerSide === "right" ? { flexDirection: "row-reverse" } : {},
-    fate: layout.markerSide === "right" ? { paddingRight: 0, paddingLeft: FATE_GUTTER } : {}
+    fate: layout.markerSide === "right" ? { paddingRight: 0, paddingLeft: FATE_GUTTER } : {},
+    digBox: layout.markerSide === "right" ? { paddingLeft: 0, paddingRight: 8, borderLeftWidth: 0, borderRightWidth: 1, borderRightColor: LINE } : {}
   };
 }
 
@@ -112,26 +126,75 @@ function Heading({ look, title }: { look: Look; title: string }): JSX.Element {
 
 const capitals = (look: Look, text: string): string => text.toLocaleUpperCase(look.model.language);
 
+/** A small label and the first words it names stay on one page, so a label never ends a page alone; the rest flows. */
+function DigPart({ look, titles, items }: { look: Look; titles: readonly string[]; items: readonly string[] }): JSX.Element {
+  return (
+    <>
+      <View wrap={false}>
+        {titles.map((title, at) => <Words key={at} look={look} style={[styles.digLabel, look.tracked]} text={capitals(look, title)} />)}
+        {items[0] === undefined ? null : <Words look={look} style={styles.digText} text={items[0]} />}
+      </View>
+      {items.slice(1).map((item, at) => <Words key={at} look={look} style={styles.digText} text={item} />)}
+    </>
+  );
+}
+
+function Dig({ look, dig }: { look: Look; dig: NonNullable<InvestigationReportPdfPath["dig"]> }): JSX.Element {
+  // A dig on the person's own words alone has no pick to name: its label rides on the next part's.
+  const leading = dig.picks.length === 0 ? [dig.title] : [];
+  const view = dig.ownView === null ? null
+    : { titles: [...leading, dig.ownView.title], items: [...dig.ownView.words, ...(dig.ownView.verdict === null ? [] : [dig.ownView.verdict])] };
+  const changed = dig.changed === null ? null : { titles: [...(view === null ? leading : []), dig.changed.title], items: dig.changed.items };
+  return (
+    <View style={[styles.digBox, look.digBox]}>
+      {dig.picks.length === 0 ? null : <DigPart look={look} titles={[dig.title]} items={dig.picks} />}
+      {view === null ? null : <DigPart look={look} titles={view.titles} items={view.items} />}
+      {changed === null ? null : <DigPart look={look} titles={changed.titles} items={changed.items} />}
+    </View>
+  );
+}
+
+/** A point is its own row of the page's flow, under its path's text, so a long tree breaks between points, never in a wide gap. */
+function Point({ look, point, inward }: { look: Look; point: InvestigationReportPdfPath["points"][number]; inward: Style }): JSX.Element {
+  const words = point.marks === null ? point.text : `${point.text} ${point.marks}`;
+  return (
+    <View style={[styles.pointRow, look.row, inward]} minPresenceAhead={18}>
+      <View style={{ width: TRUST_COLUMN }}>
+        {point.trustWords === null ? null : <Words look={look} style={[styles.pointWord, look.tracked, look.fate]} text={capitals(look, point.trustWords)} />}
+        {point.sideWords === null ? null : <Words look={look} style={[styles.pointSide, look.fate]} text={point.sideWords} />}
+      </View>
+      <Words look={look} style={styles.pointText} text={words} />
+    </View>
+  );
+}
+
 function PathRow({ look, path }: { look: Look; path: InvestigationReportPdfPath }): JSX.Element {
   const indent = LEVEL_INDENT * Math.min(path.level, LEVEL_INDENT_STEPS);
-  const inward = look.layout.markerSide === "right" ? { marginRight: indent } : { marginLeft: indent };
+  const rtl = look.layout.markerSide === "right";
+  const inward = rtl ? { marginRight: indent } : { marginLeft: indent };
+  // A point sits under its path's words, past the fate column.
+  const under = rtl ? { marginRight: indent + FATE_COLUMN } : { marginLeft: indent + FATE_COLUMN };
   return (
-    <View style={[styles.pathRow, look.row, inward]} minPresenceAhead={36}>
-      {path.fateWords === null
-        ? <View style={[styles.pathFate, look.fate]} />
-        : <Words look={look} style={[styles.pathFate, look.tracked, look.fate]} text={capitals(look, path.fateWords)} />}
-      <View style={styles.pathBody}>
-        <Words look={look} style={styles.pathLine} text={path.line} />
-        {path.summary === null ? null : <Words look={look} style={styles.pathSummary} text={path.summary} />}
+    <>
+      {path.dig === null ? null : <View style={inward}><Dig look={look} dig={path.dig} /></View>}
+      <View style={[styles.pathRow, look.row, inward]} minPresenceAhead={path.points.length === 0 ? 0 : 36}>
+        {path.fateWords === null
+          ? <View style={[styles.pathFate, look.fate]} />
+          : <Words look={look} style={[styles.pathFate, look.tracked, look.fate]} text={capitals(look, path.fateWords)} />}
+        <View style={styles.pathBody}>
+          <Words look={look} style={styles.pathLine} text={path.line} />
+          {path.summary === null ? null : <Words look={look} style={styles.pathSummary} text={path.summary} />}
+        </View>
       </View>
-    </View>
+      {path.points.map((point, at) => <Point key={at} look={look} point={point} inward={under} />)}
+    </>
   );
 }
 
 function Source({ look, source }: { look: Look; source: NonNullable<InvestigationReportPdfModel["sources"]>["items"][number] }): JSX.Element {
   return (
     <View style={styles.source} minPresenceAhead={24}>
-      <Words look={look} style={styles.sourceSite} text={source.site} />
+      <Words look={look} style={styles.sourceSite} text={`${source.number}. ${source.site}`} />
       {source.title === null ? null : <Words look={look} style={styles.sourceTitle} text={source.title} />}
       {source.note === null ? null : <Words look={look} style={styles.sourceNote} text={source.note} />}
       <Words look={look} style={styles.sourceQuote} text={`“${source.quote}”`} />

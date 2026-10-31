@@ -10,8 +10,9 @@ import {
 } from "@debateai/crypto";
 import { configureContentEncryption, createPool, PostgresDigModelRunnerRepository, RUNNER_CAPACITY, RUNNER_DATABASE_POOLS, RunRepository } from "@debateai/db";
 import { MonthPause, monthPaused } from "./month-pause.js";
-import { composePathRewrite } from "./path-rewrite-composition.js";
+import { composePathRewrite, PATH_REWRITE_WRITER_MODEL } from "./path-rewrite-composition.js";
 import { composeInvestigationClose } from "./investigation-close-sources.js";
+import { targetTokenCounter } from "./token-line.js";
 import { startInvestigationCloseSweep } from "./investigation-close.js";
 import { startPathRewriteSweep } from "./path-rewrite-sweep.js";
 import { startTreeSweep } from "./path-climb.js";
@@ -245,11 +246,14 @@ function targetGateway(target: (typeof providerTargets)[number]): ProviderGatewa
   if (runnerSite.money !== null && price === null) {
     throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`);
   }
+  // R22 decision 28: Anthropic's free token count, near the 100K line. A count that fails is logged and the byte guard stands.
+  const tokenCount = targetTokenCounter(target, previewGate === undefined ? undefined : previewFetch, storyLog);
   const gateway = createPostgresProviderGateway(pool, {
     ...(previewGate === undefined ? {} : { fetchImplementation: previewFetch }),
     endpoint: target.baseUrl,
     model: target.model,
     maker: target.maker,
+    ...(tokenCount === undefined ? {} : { countInputTokens: tokenCount }),
     // Model scorecard §2.2/§2.10: the levels this target can set and its window.
     ...providerTargetGatewayControls(target),
     // Contract A §2: on the preview only, max_tokens never exceeds the target's reviewed row bound.
@@ -353,7 +357,11 @@ const storyWriter = new StoryWriter({
  * rewritten in the story's place (apps/runner/src/path-rewrite-composition.ts, the same call as the preview practice's),
  * its calls charged on the never-walled PATH_REWRITE seam above. Undefined when no Haiku or no GLM target is configured.
  */
-const pathRewrite = composePathRewrite({ pool, targets: providerTargets,
+const writerTokenCount = (() => {
+  const haiku = providerTargets.find((target) => target.model === PATH_REWRITE_WRITER_MODEL);
+  return haiku === undefined ? undefined : targetTokenCounter(haiku, previewGate === undefined ? undefined : previewFetch, storyLog);
+})();
+const pathRewrite = composePathRewrite({ pool, targets: providerTargets, ...(writerTokenCount === undefined ? {} : { tokenCount: writerTokenCount }),
   members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
   log: storyLog });
 /**
@@ -362,7 +370,7 @@ const pathRewrite = composePathRewrite({ pool, targets: providerTargets,
  * counts its free models at zero), and charged on the never-walled report seam above. Undefined without Haiku or GLM.
  */
 const closingPrices = buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE);
-const investigationClose = composeInvestigationClose({ pool, targets: providerTargets,
+const investigationClose = composeInvestigationClose({ pool, targets: providerTargets, ...(writerTokenCount === undefined ? {} : { tokenCount: writerTokenCount }),
   members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
   priceOf: (providerRef) => closingPrices.get(providerRef) ?? null,
   // R22 decision 7: a written report takes its investigation's page texts and passages with it. A FAILED one may be written

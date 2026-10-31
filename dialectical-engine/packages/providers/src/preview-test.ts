@@ -12,7 +12,7 @@ import { ProviderUnbilledRefusal } from "./unbilled-refusal.js";
 import { createPreviewRemainingRpcPort, previewGateOffersFinalWriterTier, type PreviewGateRemaining, type PreviewRemainingPort } from "./preview-remaining.js";
 import { NO_BUSY_COORDINATION, type PreviewBusyCoordinator } from "./preview-busy.js";
 import {
-  PREVIEW_ANTHROPIC_MESSAGES_URL, PREVIEW_CALL_TIER_LIMITS, PREVIEW_DEEPINFRA_BASE_URL, PREVIEW_MODEL_ROWS,
+  PREVIEW_ANTHROPIC_COUNT_TOKENS_URL, PREVIEW_ANTHROPIC_MESSAGES_URL, PREVIEW_CALL_TIER_LIMITS, PREVIEW_DEEPINFRA_BASE_URL, PREVIEW_MODEL_ROWS,
   PREVIEW_REQUEST_BODY_MAX_BYTES, previewCallTierOfBody, previewModelRow, previewModelRowForRef, previewNanoUsdText,
   previewRefsAreReviewedSet, previewReservationNanoUsd, previewRostersHonourMakerRule, previewStorytellerOutputCap,
   previewTierOutputBound, type PreviewCallTier, type PreviewEffort, type PreviewModelRow, type PreviewProviderName
@@ -864,6 +864,8 @@ export interface PreviewBudgetExecution {
 /** Root-owned authority reserves atomically before any paid POST, then records or retains its charge. */
 export interface PreviewBudgetPort {
   execute(input: PreviewBudgetExecution, signal?: AbortSignal): Promise<Readonly<{ status: number; body: string }>>;
+  /** R22 decision 28: the gate's free token count (its /count). Absent, or a refusal: the app falls back to its byte guard. */
+  count?(requestBody: string, signal?: AbortSignal): Promise<number>;
 }
 /** Each gate's port (Perplexity plan W2-1: the web search gate's too); a single port (the pre-PR-B form) is the DeepInfra gate's. */
 export type PreviewBudgetPorts = Readonly<Partial<Record<PreviewGateName, PreviewBudgetPort>>>;
@@ -993,6 +995,7 @@ export function createPreviewGuardedFetch(ports: PreviewBudgetPort | PreviewBudg
     if (init?.signal?.aborted) throw new DOMException("Private preview call canceled", "TimeoutError");
     const url = String(input);
     if (url === PERPLEXITY_SEARCH_URL) return previewGuardedSearch(byProvider, init);
+    if (url === PREVIEW_ANTHROPIC_COUNT_TOKENS_URL) return previewGuardedCount(byProvider, init);
     const provider: PreviewProviderName | undefined = url === `${PREVIEW_DEEPINFRA_BASE_URL}/chat/completions` ? "deepinfra"
       : url === PREVIEW_ANTHROPIC_MESSAGES_URL ? "anthropic" : undefined;
     if (provider === undefined || init?.method !== "POST" || typeof init.body !== "string"
@@ -1022,6 +1025,25 @@ export function createPreviewGuardedFetch(ports: PreviewBudgetPort | PreviewBudg
       ...(tier === "FINAL_WRITER" ? { callTier: "FINAL_WRITER" as const } : {}) }, init!.signal ?? undefined);
     return new Response(result.body, { status: result.status, headers: { "content-type": "application/json" } });
   };
+}
+/**
+ * R22 decision 28: one free token count through the Anthropic gate, which holds the key (its /count: nothing reserved or charged).
+ * The body is what a call would send, without `max_tokens` and the effort.
+ */
+async function previewGuardedCount(ports: PreviewBudgetPorts, init: RequestInit | undefined): Promise<Response> {
+  if (init?.method !== "POST" || typeof init.body !== "string"
+    || Buffer.byteLength(init.body, "utf8") > PREVIEW_CALL_TIER_LIMITS.FINAL_WRITER.requestBodyMaxBytes || carriesKeyHeader(init.headers)) refused();
+  const body = init!.body as string;
+  let decoded: unknown; try { decoded = JSON.parse(body); } catch { return refused(); }
+  if (!isPlainObject(decoded)) return refused();
+  const reviewed = previewModelRow(decoded.model) ?? refused();
+  const members = Object.keys(decoded).filter(key => key !== "system").sort().join();
+  if (reviewed.provider !== "anthropic" || members !== "messages,model" || !anthropicMessagesAccepted(decoded.messages)
+    || (Object.hasOwn(decoded, "system") && !anthropicSystemAccepted(decoded.system))) refused();
+  const port = ports.anthropic;
+  if (port?.count === undefined) throw new TypedDomainError("PROVIDER_CALL_FAILED", "Private preview gate for this provider is not configured");
+  const tokens = await port.count(body, init!.signal ?? undefined);
+  return new Response(JSON.stringify({ input_tokens: tokens }), { status: 200, headers: { "content-type": "application/json" } });
 }
 /** Perplexity plan W2-1: one web search through its own gate (see createPreviewGuardedFetch). */
 async function previewGuardedSearch(ports: PreviewBudgetPorts, init: RequestInit | undefined): Promise<Response> {
@@ -1166,7 +1188,32 @@ export function createPreviewBudgetRpcPort(
   // Fix (c): the same gate's read-only `/remaining`, asked only after a STOPPED refusal.
   remaining: PreviewRemainingPort = createPreviewRemainingRpcPort({ budget_socket: socketPath, scope_id: config.scope_id })
 ): PreviewBudgetPort {
-  return Object.freeze({ execute(input: PreviewBudgetExecution, signal?: AbortSignal) {
+  return Object.freeze({ count(requestBody: string, signal?: AbortSignal) {
+    return new Promise<number>((resolve, reject) => {
+      const data = JSON.stringify({ scope_id: config.scope_id, requestBody });
+      const request = httpRequest({ socketPath, path: "/count", method: "POST",
+        headers: { "content-type": "application/json", "content-length": Buffer.byteLength(data) } }, response => {
+        const chunks: Buffer[] = [];
+        const unread = new TypedDomainError("PROVIDER_TOKEN_COUNT_UNAVAILABLE", "No token count");
+        response.on("data", (chunk: Buffer) => { chunks.push(chunk); });
+        response.on("error", () => reject(unread));
+        response.on("close", () => { if (!response.complete) reject(unread); });
+        response.on("end", () => {
+          let tokens: unknown;
+          try { tokens = (JSON.parse(Buffer.concat(chunks).toString("utf8")) as { input_tokens?: unknown }).input_tokens; } catch { reject(unread); return; }
+          if (response.statusCode !== 200 || !Number.isSafeInteger(tokens) || Number(tokens) < 0) { reject(unread); return; }
+          resolve(Number(tokens));
+        });
+      });
+      const canceled = () => request.destroy(new Error("Private preview call canceled"));
+      signal?.addEventListener("abort", canceled, { once: true });
+      if (signal?.aborted) canceled();
+      request.on("close", () => signal?.removeEventListener("abort", canceled));
+      request.setTimeout(PREVIEW_GATE_IPC_TIMEOUT_MS, () => request.destroy());
+      request.on("error", () => reject(new TypedDomainError("PROVIDER_TOKEN_COUNT_UNAVAILABLE", "No token count")));
+      request.end(data);
+    });
+  }, execute(input: PreviewBudgetExecution, signal?: AbortSignal) {
     return new Promise<Readonly<{ status: number; body: string }>>((resolve, reject) => {
       const data = JSON.stringify({ scope_id: config.scope_id, ...input });
       const request = httpRequest({ socketPath, path: "/complete", method: "POST",

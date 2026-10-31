@@ -90,8 +90,9 @@ import { createCallScheduler, type CallSubject } from "../../apps/runner/src/cal
 import { applyPreviewGateCapacities, previewCallSubjects, previewGateNames, structureRepairThroughLane } from "../../apps/runner/src/call-lane-gateway.js";
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
 import { MonthPause, monthPaused } from "../../apps/runner/src/month-pause.js";
-import { composePathRewrite } from "../../apps/runner/src/path-rewrite-composition.js";
+import { composePathRewrite, PATH_REWRITE_WRITER_MODEL } from "../../apps/runner/src/path-rewrite-composition.js";
 import { composeInvestigationClose } from "../../apps/runner/src/investigation-close-sources.js";
+import { targetTokenCounter } from "../../apps/runner/src/token-line.js";
 import {
   createRunnerSettingsCache, createRunSettingsVersions, loadRunnerVersionSettings, preloadRunnerSettings, readRunnerSiteContext,
   runCostEnvelopeGuardOf, runnerSettingsOfVersion, runnerSettingsSummary, runnerWebSearchSettings, runPreviewThinkingLevelsOf,
@@ -248,11 +249,13 @@ export async function composePracticeRunner(input: Readonly<{
     if (runnerSite.money !== null && price === null) {
       throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`);
     }
+    const tokenCount = targetTokenCounter(target, previewFetch, storyLog);
     const gateway = createPostgresProviderGateway(pool, {
       fetchImplementation: previewFetch,
       endpoint: target.baseUrl,
       model: target.model,
       maker: target.maker,
+      ...(tokenCount === undefined ? {} : { countInputTokens: tokenCount }),
       ...providerTargetGatewayControls(target),
       ...previewTargetGatewayControls(previewGate, target),
       inFlight: gatewayInFlight,
@@ -323,12 +326,16 @@ export async function composePracticeRunner(input: Readonly<{
    * rewritten in the story's place (apps/runner/src/path-rewrite-composition.ts, the same call as the preview practice's),
    * its calls charged on the never-walled PATH_REWRITE seam above. Undefined when no Haiku or no GLM target is configured.
    */
-  const pathRewrite = composePathRewrite({ pool, targets: providerTargets,
+  const writerTokenCount = (() => {
+    const haiku = providerTargets.find((target) => target.model === PATH_REWRITE_WRITER_MODEL);
+    return haiku === undefined ? undefined : targetTokenCounter(haiku, previewFetch, storyLog);
+  })();
+  const pathRewrite = composePathRewrite({ pool, targets: providerTargets, ...(writerTokenCount === undefined ? {} : { tokenCount: writerTokenCount }),
     members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
     log: storyLog });
   // W5-1: the closing, composed as main.ts composes it (the practice writes a report only when its script presses it).
   const closingPrices = buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE);
-  const investigationClose = composeInvestigationClose({ pool, targets: providerTargets,
+  const investigationClose = composeInvestigationClose({ pool, targets: providerTargets, ...(writerTokenCount === undefined ? {} : { tokenCount: writerTokenCount }),
     members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
     priceOf: (providerRef) => closingPrices.get(providerRef) ?? null,
     log: storyLog });

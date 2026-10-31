@@ -50,10 +50,10 @@ describe("W5-1 Write my report: the closing", () => {
 
     // The four calls: Haiku writes, GLM checks, on the story lane at the report's own sites, under the engine seal, root run.
     expect(vendors.haiku.requests.map((request) => [request.callSiteKey, request.role, request.lane, contractOf(request.packet)])).toEqual([
-      ["INVESTIGATION_REPORT:ANSWER:1", "SYNTHESIZER", "story", "report.answer.v2"],
+      ["INVESTIGATION_REPORT:ANSWER:1", "SYNTHESIZER", "story", "report.answer.v4"],
       ["INVESTIGATION_REPORT:STORY:1", "SYNTHESIZER", "story", "report.story.v1"]]);
     expect(vendors.glm.requests.map((request) => [request.callSiteKey, request.role, contractOf(request.packet)])).toEqual([
-      ["INVESTIGATION_REPORT:ANSWER_CHECK:1", "EVALUATOR", "report.answer-check.v2"],
+      ["INVESTIGATION_REPORT:ANSWER_CHECK:1", "EVALUATOR", "report.answer-check.v3"],
       ["INVESTIGATION_REPORT:STORY_CHECK:1", "EVALUATOR", "report.story-check.v1"]]);
     for (const request of [...vendors.haiku.requests, ...vendors.glm.requests]) {
       expect(request.runId).toBe(ROOT);
@@ -75,15 +75,17 @@ describe("W5-1 Write my report: the closing", () => {
   });
 
   it("the five report contracts are sealed by the engine hash, appended last", () => {
-    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-16, -11)).toEqual(["report.answer.v1", "report.answer.later.v1", "report.answer-check.v1",
+    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-21, -16)).toEqual(["report.answer.v1", "report.answer.later.v1", "report.answer-check.v1",
       "report.story.v1", "report.story-check.v1"]);
-    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-8, -5)).toEqual(["report.answer.v2", "report.answer.later.v2", "report.answer-check.v2"]);
+    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-13, -10)).toEqual(["report.answer.v2", "report.answer.later.v2", "report.answer-check.v2"]);
+    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-5, -2)).toEqual(["report.answer.v3", "report.answer.later.v3", "report.answer-check.v3"]);
+    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-2)).toEqual(["report.answer.v4", "report.answer.later.v4"]);
   });
 
   it("F5: one fence and canary for the whole closing, so a step's second round opens with its first round's bytes", async () => {
     const store = memoryReports();
     let checks = 0;
-    const vendors = team({ glm: (packet) => (contractOf(packet) === "report.answer-check.v2" && (checks += 1) === 1 ? OBJECTION
+    const vendors = team({ glm: (packet) => (contractOf(packet) === "report.answer-check.v3" && (checks += 1) === 1 ? OBJECTION
       : contractOf(packet) === "report.story-check.v1" ? JSON.stringify({ satisfied: true, problem: null, part: null, misleading: false })
         : JSON.stringify({ satisfied: true, problem: null, part: null })) });
     await closeInvestigation(settingsOver({ store, vendors }), closingOf());
@@ -110,7 +112,7 @@ describe("W5-1 Write my report: the closing", () => {
       expect(body.messages[0]!.content.length).toBeLessThanOrEqual(4);
       return body.messages[0]!.content[0]!;
     });
-    expect(vendors.haiku.requests.map((request) => contractOf(request.packet))).toEqual(["report.answer.v2", "report.story.v1"]);
+    expect(vendors.haiku.requests.map((request) => contractOf(request.packet))).toEqual(["report.answer.v4", "report.story.v1"]);
     expect(firstBlocks[0]).toEqual(firstBlocks[1]);
     expect(firstBlocks[0]!.cache_control).toEqual({ type: "ephemeral" });
   });
@@ -188,7 +190,7 @@ describe("W5-1 Write my report: the closing", () => {
     expect(await closeInvestigation(settingsOver({ store, vendors }), closingOf(2, "2026-10-31T15:00:00.000Z"))).toBe("RECORDED");
     expect(store.records.map((record) => [record.reportVersion, record.outcome])).toEqual([[1, "READY"], [2, "READY"]]);
     expect(store.records[1]!.reportId).not.toBe(store.records[0]!.reportId);
-    expect(contractOf(vendors.haiku.requests[0]!.packet)).toBe("report.answer.later.v2");
+    expect(contractOf(vendors.haiku.requests[0]!.packet)).toBe("report.answer.later.v4");
     expect(JSON.parse(fieldsOf(vendors.haiku.requests[0]!.packet).get("earlier_report")!)).toMatchObject({ version: 1 });
     // A second write of the same closing changes nothing.
     expect(await closeInvestigation(settingsOver({ store, vendors: team() }), closingOf(2))).toBe("ALREADY");
@@ -257,7 +259,7 @@ describe("R22 the report lane: the closing", () => {
     await closeInvestigation(settingsOver({ store, vendors: team() }), closingOf());
     const content = store.contents.get(store.records[0]!.reportId) as InvestigationReportContent;
     expect(content.sources[0]!.link).toBe("https://city.example.org/ferry-ridership");
-    expect(content.paths.map((path) => path.level)).toEqual([0, 1, 0, 1]);
+    expect(content.paths.map((path) => path.level)).toEqual([0, 1, 2, 0, 1]);
     expect(content.paths[0]!.line).toBe("Partly: a second pier helps at rush hour, not in winter.");
     expect(JSON.stringify(content.paths)).not.toMatch(/\b[AGPW][0-9]+\b/u);
   });
@@ -321,8 +323,8 @@ describe("R22 the overall answer, the one module the report and the main-answer 
       guard: investigationReportGuard, log: () => undefined });
     expect(written.outcome.outcome).toBe("READY");
     expect(vendors.haiku.requests.map((request) => [request.callSiteKey, contractOf(request.packet), request.runId]))
-      .toEqual([["ANSWER_UPDATE:ANSWER:1", "report.answer.later.v2", DIG_READY]]);
+      .toEqual([["ANSWER_UPDATE:ANSWER:1", "report.answer.later.v4", DIG_READY]]);
     expect(vendors.glm.requests.map((request) => [request.callSiteKey, contractOf(request.packet)]))
-      .toEqual([["ANSWER_UPDATE:ANSWER_CHECK:1", "report.answer-check.v2"]]);
+      .toEqual([["ANSWER_UPDATE:ANSWER_CHECK:1", "report.answer-check.v3"]]);
   });
 });
