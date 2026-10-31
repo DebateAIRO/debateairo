@@ -26,6 +26,7 @@ import { loadForward0131 } from './migration-forward0131.js';
 import { loadForward0132 } from './migration-forward0132.js';
 import { loadForward0133 } from './migration-forward0133.js';
 import { loadForward0134 } from './migration-forward0134.js';
+import { loadForward0135 } from './migration-forward0135.js';
 
 /**
  * The forward steps after dev's sealed lineage, its 0108 and its 0110 (PR-54, PR-58, migrations/lineage/README.md): an
@@ -82,10 +83,10 @@ export type ChainStep=ForwardStepPlan&Readonly<{n1:N1Declaration}>;
  * synthesis check (0126, S01), publication review (0127, S02), threat reports (0128, S04) and support answer scope
  * (0129, S05), then row-level security (0130, mission row-level-security S01), then the V4 account memory (0131, owner
  * rulings N7 and N11), then the web evidence store (0132) and investigations (0133) of the Perplexity plan (2026-10-30,
- * task W1-3), then the new dig model and the month pause (0134, dig-model revision task W2-8). A new step appends its
- * loader here (README).
+ * task W1-3), then the new dig model and the month pause (0134, dig-model revision task W2-8), then a dig's picks and its
+ * path rewrite's material (0135, task W3-7). A new step appends its loader here (README).
  */
-const STEPS:readonly StepLoader[]=Object.freeze([loadForward111,loadForwardAuthDbBatch,loadForward0113,loadForward0114,loadForward115,loadForward0116,loadForward0117,loadForward0118,loadForward0119,loadForward0120,loadForward0121,loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130,loadForward0131,loadForward0132,loadForward0133,loadForward0134]);
+const STEPS:readonly StepLoader[]=Object.freeze([loadForward111,loadForwardAuthDbBatch,loadForward0113,loadForward0114,loadForward115,loadForward0116,loadForward0117,loadForward0118,loadForward0119,loadForward0120,loadForward0121,loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130,loadForward0131,loadForward0132,loadForward0133,loadForward0134,loadForward0135]);
 
 /** A forward step's file name; the receipt and declaration tables CHECK the same shape. */
 export const FORWARD_STEP_NAME=/^\d{4}_[a-z0-9_]+\.sql$/;

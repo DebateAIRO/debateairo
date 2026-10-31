@@ -56,7 +56,7 @@ const body = (sql: string, name: string): string => {
 
 describe("0133: the investigations step", () => {
   it("C-T follows 0132 in the chain's STEPS (the dig model's 0134 comes after it), with its own loader", async () => {
-    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0131,loadForward0132,loadForward0133,loadForward0134]);");
+    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0131,loadForward0132,loadForward0133,loadForward0134,loadForward0135]);");
     const loader = read("packages/db/src/migration-forward0133.ts");
     expect(loader).toContain(`const NAME = "${NAME}";`);
     expect(loader).toContain('const VERSION = "investigations-forward0133-v1";');

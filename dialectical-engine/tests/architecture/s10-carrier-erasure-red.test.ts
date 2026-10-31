@@ -206,6 +206,9 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // readings, extracts) under that run's own content lease (prepareLeasedContentEncryptionForRun), closed when the
       // step ends; page texts are opened only to fill the vendor's copy of a reader's prompt (W3-0).
       "apps/runner/src/web-step.ts",
+      // A dig's picks (0135, dig-model revision W3-7): the picks and the path rewrite's material are sealed inside
+      // withRunContentLease and opened through prepareLeasedContentEncryptionForRun, both under the dig's own run key.
+      "packages/db/src/dig-picks.ts",
       "packages/db/src/index.ts",
       "packages/evaluator/src/index.ts",
       "packages/evidence/src/index.ts",

@@ -62,6 +62,8 @@ describe("S2 identity schema on real PostgreSQL", () => {
       "data_export",
       // 0131 V4 account memory: the reading level, debate visits and dig links.
       "debate_last_visit", "dig_link",
+      // 0135 a dig's picks: the set and each pick.
+      "dig_pick", "dig_pick_set",
       "email_change_request",
       // 0133 investigations: a debate and its digs, their closings and the one reserve.
       "investigation", "investigation_closing",
@@ -76,7 +78,10 @@ describe("S2 identity schema on real PostgreSQL", () => {
       "password_recovery_retry_lock", "password_recovery_source_window", "password_recovery_staged_code",
       "password_reset_control", "password_reset_notice", "password_reset_notice_binding", "password_reset_source_window",
       // 0134 the dig model: a path's rewrites and the turns that order them.
-      "path_rewrite", "path_rewrite_turn",
+      "path_rewrite",
+      // 0135 the path rewrite's material: the dig's own paths, stored before its turn.
+      "path_rewrite_input",
+      "path_rewrite_turn",
       "private_erasure_audit_binding",
       "publication_event_binding", "recovery_code", "recovery_email_request", "registration_region", "run_execution_binding",
       // 0134 the month pause of a running debate.

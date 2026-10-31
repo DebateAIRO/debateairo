@@ -2838,6 +2838,29 @@
       "grants": [
         "EXECUTE ON FUNCTION identity.read_data_export_dig_model(uuid,uuid)"
       ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0135_dig_picks.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.record_dig_picks(uuid,uuid,uuid,text,jsonb)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0135_dig_picks.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_dig_picks_of_run(uuid)",
+        "EXECUTE ON FUNCTION identity.record_path_rewrite_input(uuid,uuid,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_unwritten_path_rewrites(timestamptz,integer)"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0135_dig_picks.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_dig_picks(uuid,uuid)"
+      ]
     }
   ],
   "deploymentObligations": [

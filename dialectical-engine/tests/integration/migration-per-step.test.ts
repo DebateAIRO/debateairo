@@ -31,13 +31,15 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 const SIDE_BY_SIDE = "0123_side_by_side_releases.sql";
 /** Row-level security (mission row-level-security, SPEC-v4 R26): a chain step after 0123, the one before the last. */
 const RLS = "0130_row_level_security.sql";
-/** The V4 account memory (owner rulings N7 and N11): the chain's fourth step from the end since the Perplexity plan's two and 0134. */
+/** The V4 account memory (owner rulings N7 and N11): the chain's fifth step from the end since the Perplexity plan's two, 0134 and 0135. */
 const V4 = "0131_v4_account_memory.sql";
-/** The Perplexity plan's web evidence store and investigations (task W1-3): the two steps before the last. */
+/** The Perplexity plan's web evidence store and investigations (task W1-3): the two steps before the last two. */
 const WEB = "0132_web_evidence.sql";
 const INVESTIGATIONS = "0133_investigations.sql";
-/** The dig model and the month pause (dig-model revision task W2-8): the chain's last step. */
+/** The dig model and the month pause (dig-model revision task W2-8): the step before the last. */
 const DIG_MODEL = "0134_dig_model_and_month_pause.sql";
+/** A dig's picks and its path rewrite's material (dig-model revision task W3-7): the chain's last step. */
+const DIG_PICKS = "0135_dig_picks.sql";
 const EXPAND: N1Declaration = Object.freeze({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false, concurrentIndex: null });
 /** A later step with constant digests, as forward-chain-replay-verifiers.test.ts builds its probes, plus its n1 header. */
 function probe(previous: ChainStep, name: string, sql: string, n1: N1Declaration = EXPAND): ChainStep {
@@ -70,18 +72,19 @@ describe("Review Focus 1: a step that fails (or a kill) between steps", () => {
 
   it("a failing step leaves every earlier step committed", async () => {
     const real = (await loadMigrationPlan()).forwardChain.map((step) => step.name);
-    expect(real).toHaveLength(24);
-    expect(real.at(-5)).toBe(RLS);
-    expect(real.at(-4)).toBe(V4);
-    expect(real.at(-3)).toBe(WEB);
-    expect(real.at(-2)).toBe(INVESTIGATIONS);
-    expect(real.at(-1)).toBe(DIG_MODEL);
+    expect(real).toHaveLength(25);
+    expect(real.at(-6)).toBe(RLS);
+    expect(real.at(-5)).toBe(V4);
+    expect(real.at(-4)).toBe(WEB);
+    expect(real.at(-3)).toBe(INVESTIGATIONS);
+    expect(real.at(-2)).toBe(DIG_MODEL);
+    expect(real.at(-1)).toBe(DIG_PICKS);
     chain.shape = extendedBy((last) => probe(last, "0199_probe_fail.sql", "SELECT 1/0"));
     await expect(migrate(db.pool)).rejects.toMatchObject({ code: "22012" });
     chain.shape = undefined;
-    // All twenty-four real steps were applied by that same run and stay committed; the probe left nothing.
+    // All twenty-five real steps were applied by that same run and stay committed; the probe left nothing.
     expect(await receipts()).toEqual(real);
-    expect((await db.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration_step")).rows[0].n).toBe(24);
+    expect((await db.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration_step")).rows[0].n).toBe(25);
     expect(await ledger()).toEqual(expect.arrayContaining(real));
     expect(await ledger()).not.toContain("0199_probe_fail.sql");
     // The next run continues where the last one stopped: everything replays, nothing is left to apply.
@@ -95,9 +98,9 @@ describe("Review Focus 2: a page read holding a lock on core.run while 0123's AL
     db = await startTestDatabase();
     // The database a release before 0123 leaves: the chain up to 0123 (then the settings activation 0124, the
     // Italy-specific approval 0125, synthesis-flag's 0126 to 0129, row-level security's 0130, the V4 account memory
-    // 0131, the Perplexity plan's 0132 and 0133 and the dig model's 0134, which migrate() applies after 0123 and which take
-    // no lock on core.run: 0125 alters legal.acceptance only, 0131 to 0134 create identity tables, 0134 also re-adds two
-    // CHECKs on ledger.model_spend, NOT VALID).
+    // 0131, the Perplexity plan's 0132 and 0133, the dig model's 0134 and the dig picks' 0135, which migrate() applies
+    // after 0123 and which take no lock on core.run: 0125 alters legal.acceptance only, 0131 to 0135 create identity
+    // tables, 0134 also re-adds two CHECKs on ledger.model_spend, NOT VALID).
     chain.shape = (steps) => steps.slice(0, (steps as readonly ChainStep[]).findIndex((step) => step.name === SIDE_BY_SIDE));
     try { await migrate(db.pool); } finally { chain.shape = undefined; }
     expect(await ledger()).not.toContain(SIDE_BY_SIDE);
@@ -105,6 +108,7 @@ describe("Review Focus 2: a page read holding a lock on core.run while 0123's AL
     expect(await ledger()).not.toContain(V4);
     expect(await ledger()).not.toContain(INVESTIGATIONS);
     expect(await ledger()).not.toContain(DIG_MODEL);
+    expect(await ledger()).not.toContain(DIG_PICKS);
   }, 300_000);
   afterAll(async () => { await db?.stop(); });
 
