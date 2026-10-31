@@ -4,8 +4,9 @@ import type { Pool } from "pg";
 import { AnswerDigSchema, AnswerPathRewritesSchema, AnswerSchema, type Answer, type AnswerPathRewrites } from "@debateai/contract";
 import { withRunContentLease, type PathRewriteEntry } from "@debateai/db";
 import {
-  changedBelowPathsOf, digLevelsOf, digsBelowOf, latestWrittenReportOf, ownWordsOf, pathHistoryOf, pathRewriteIdOfDig, serveDig,
-  servePathRewrites, storyPathLinesOf, type RewriteTurn, type StoredPathRewriteText
+  changedBelowPathsOf, digLevelsOf, digsBelowOf, latestWrittenReportOf, ownWordsOf, pathHistoryOf, pathRewriteIdOfDig, restsOnOf,
+  rewriteTrustOf, serveDig, servePathRewrites, storyPathLinesOf, storyPathPointsOf, type DebatePoints, type PathTrustSources,
+  type RewriteTurn, type StoredPathRewriteText
 } from "../../packages/serve/src/path-rewrites.js";
 import { ServeRepository } from "../../packages/serve/src/index.js";
 import { pathRewriteIdOf } from "../../apps/runner/src/path-rewrite.js";
@@ -41,7 +42,8 @@ function entry(n: number, overrides: Partial<PathRewriteEntry> = {}): PathRewrit
   };
 }
 
-function text(n: number, overrides: Partial<StoredPathRewriteText["text"]> = {}): StoredPathRewriteText {
+/** A text as W3-5 sealed it before W4-8: no `rests_on` (W4-8's texts carry it, see `textResting`). */
+function text(n: number, overrides: Partial<StoredPathRewriteText["text"]> = {}): Omit<StoredPathRewriteText, "rests_on"> {
   return {
     text: { line: `Rewritten line ${String(n)}.`, summary: `Rewritten summary ${String(n)}.`, fate: "PARTLY_HELD", ...overrides },
     what_changed: [`What dig ${String(n)} changed.`],
@@ -49,6 +51,8 @@ function text(n: number, overrides: Partial<StoredPathRewriteText["text"]> = {})
     dig_paths: [{ position_ref: `dig-${String(n)}-path`, line: `The dig's own path ${String(n)}.`, fate: "FELL" }]
   };
 }
+const textResting = (n: number, restsOn: readonly string[], overrides: Partial<StoredPathRewriteText["text"]> = {}): StoredPathRewriteText =>
+  ({ ...text(n, overrides), rests_on: restsOn });
 
 const turn = (entryValue: PathRewriteEntry, opened: unknown = null, ownWords: readonly string[] | null = [OWN_WORDS]): RewriteTurn =>
   ({ entry: entryValue, opened, ownWords });
@@ -244,6 +248,100 @@ describe("W4-5 · a dig's own answer (Q-D2, Q-D13)", () => {
       reviewer_note: null };
     expect([...storyPathLinesOf(body)]).toEqual([["n1", "First."], ["n1#2", "Again."]]);
     expect(storyPathLinesOf(null).size).toBe(0);
+  });
+});
+
+describe("W4-8 · the rewritten path's trust words, worked out by code (Q-D3)", () => {
+  // The path's own points (the story's: its position and two points) and a dig's, each with its own debate's checks.
+  const NODE = { position: "pos-a", queues: "n-own-queues", cost: "n-own-cost", winter: "n-dig-winter", bridge: "n-dig-bridge", buses: "n-dig-buses" };
+  const point = (over: Record<string, unknown> = {}) => ({ review: { outcome: "agree" }, staleness_state: "FRESH", way_of_knowing: "LOOKED_UP",
+    looked_up_checked: true, ...over });
+  const parentPoints: DebatePoints = { free: false, points: new Map([
+    [NODE.position, point({ way_of_knowing: "REASONING" })], [NODE.queues, point()], [NODE.cost, point({ review: { outcome: "dispute" } })]]) };
+  const digPoints: DebatePoints = { free: false, points: new Map([
+    [NODE.winter, point()], [NODE.bridge, point({ looked_up_checked: false })], [NODE.buses, point()]]) };
+  const sources = (over: Partial<PathTrustSources> = {}): PathTrustSources => ({
+    own: { positionRef: NODE.position, nodeRefs: [NODE.position, NODE.queues, NODE.cost] }, parent: parentPoints,
+    digOf: (digRunId) => (digRunId === DIG(1) ? digPoints : null), ...over
+  });
+  const resting = [NODE.queues, NODE.winter, NODE.bridge];
+  /** `trust` null: the debates' points are not handed in at all (as W4-5 served). */
+  const served = (opened: unknown, trust: PathTrustSources | null = sources(), extra: Partial<PathRewriteEntry> = {}) =>
+    serve([turn(entry(1, extra), opened)], trust === null ? {} : { trustOf: () => trust })!.paths[0]!.history[0]!;
+
+  it("serves the points the rewrite rests on, as sealed, and every point the path counts with its word: its own, then the dig's", () => {
+    const rewrite = served(textResting(1, resting));
+    expect(rewrite).toMatchObject({ state: "READY", rests_on: resting });
+    expect("trust" in rewrite && rewrite.trust).toEqual([
+      { node_id: NODE.position, word: "SURE_FOR_CASE" }, { node_id: NODE.queues, word: "SURE" }, { node_id: NODE.cost, word: "STILL_ARGUED" },
+      { node_id: NODE.winter, word: "SURE" }, { node_id: NODE.bridge, word: "SURE_FOR_CASE" }]);
+    // The dig's point the rewrite does not rest on is not the path's; words only, never a number.
+    expect(JSON.stringify(rewrite)).not.toContain(NODE.buses);
+    if ("trust" in rewrite) for (const counted of rewrite.trust!) expect(Object.keys(counted)).toEqual(["node_id", "word"]);
+    expect(restsOnOf(textResting(1, resting))).toEqual(resting);
+  });
+
+  it("an old row with no rests_on reads as resting on none: its words are the path's own points'", () => {
+    const rewrite = served(text(1));
+    expect(rewrite).toMatchObject({ rests_on: [] });
+    expect("trust" in rewrite && rewrite.trust!.map((counted) => counted.node_id)).toEqual([NODE.position, NODE.queues, NODE.cost]);
+    expect(restsOnOf(text(1))).toEqual([]);
+    // Without the debates' points the rewrite serves as W4-5 did, plus the empty list.
+    const plain = served(text(1), null);
+    expect(plain).toMatchObject({ rests_on: [] });
+    expect(plain).not.toHaveProperty("trust");
+    // A stored list that is not one of ids makes no rewrite.
+    expect(serve([turn(entry(1), { ...text(1), rests_on: [7] })])).toBeNull();
+  });
+
+  it("'Sure' only by a checked extract of the debate that holds the point: the dig's own checks and plan for the dig's points", () => {
+    // The dig's point without the server's checked flag is at most "Sure, for the case named", whatever the parent's flags.
+    const unchecked = served(textResting(1, [NODE.winter]), sources({ digOf: () => ({ free: false, points: new Map([[NODE.winter, point({ looked_up_checked: false })]]) }) }));
+    expect("trust" in unchecked && unchecked.trust!.at(-1)).toEqual({ node_id: NODE.winter, word: "SURE_FOR_CASE" });
+    // A dig that ran on Free never gives "Sure", while the parent's own checked point stays "Sure".
+    const free = served(textResting(1, [NODE.winter]), sources({ digOf: () => ({ ...digPoints, free: true }) }));
+    expect("trust" in free && free.trust!.filter((counted) => counted.word === "SURE").map((counted) => counted.node_id)).toEqual([NODE.queues]);
+    // A rested-on id the dig's points do not hold is left out, never weighed with the parent's checks.
+    const stranger = served(textResting(1, ["n-not-the-digs"]));
+    expect("trust" in stranger && stranger.trust!.map((counted) => counted.node_id)).toEqual([NODE.position, NODE.queues, NODE.cost]);
+  });
+
+  it("the path's position takes the rewrite's FELL; the dig's points never do", () => {
+    const fell = served(textResting(1, [NODE.winter], { fate: "FELL" }), sources(), { fate_after: "FELL" });
+    expect("trust" in fell && fell.trust).toEqual([{ node_id: NODE.position, word: "DIDNT_HOLD" }, { node_id: NODE.queues, word: "SURE" },
+      { node_id: NODE.cost, word: "STILL_ARGUED" }, { node_id: NODE.winter, word: "SURE" }]);
+  });
+
+  it("serves no word when the path's points, its debate's or the dig's it rests on cannot be read", () => {
+    expect(served(textResting(1, resting), sources({ own: null }))).not.toHaveProperty("trust");
+    expect(served(textResting(1, resting), sources({ parent: null }))).not.toHaveProperty("trust");
+    expect(served(textResting(1, resting), sources({ digOf: () => null }))).not.toHaveProperty("trust");
+    // Resting only on the path's own points, the dig's points are not needed.
+    expect(served(textResting(1, [NODE.queues]), sources({ digOf: () => null }))).toHaveProperty("trust");
+    expect(rewriteTrustOf({ fate: "HELD_UP", digRunId: DIG(1), restsOn: [], sources: sources({ own: null }) })).toBeNull();
+  });
+
+  it("a rewrite still writing or failed, and a path no dig rewrote, carry no word: the page counts as before", () => {
+    const writing = entry(2, { state: "WRITING", rewrite_id: null, fate_before: null, fate_after: null, verdict_outcome: null,
+      verdict_scope: null, recorded_at: null, content: null, based_on_rewrite_id: RW(1) });
+    const failedEntry = entry(3, { state: "FAILED", failure_code: "PATH_REWRITE_ALL_WRITERS_FAILED", fate_after: null, verdict_outcome: null,
+      verdict_scope: null, content: null, based_on_rewrite_id: RW(1), fate_before: "PARTLY_HELD" });
+    const path = serve([turn(entry(1), textResting(1, resting)), turn(writing), turn(failedEntry)], { trustOf: () => sources() })!.paths[0]!;
+    expect(path.history.map((rewrite) => ["trust" in rewrite, "rests_on" in rewrite])).toEqual([[true, true], [false, false], [false, false]]);
+    // Only paths a dig took a turn on are listed at all.
+    expect(serve([], { trustOf: () => sources() })).toBeNull();
+  });
+
+  it("names a story path's own points as the map does: its position and the nodes the story names on it", () => {
+    const paragraph = { text: "A paragraph.", node_refs: ["n1"] };
+    const body = { shape_id: "general", short: { headline: "H.", summary: "S.", confidence: "C.", change: paragraph,
+      paths: [{ position_ref: "n1", fate: "HELD_UP", line: "First.", node_refs: ["n1", "n2"] },
+        { position_ref: "n1", fate: "FELL", line: "Again.", node_refs: ["n1", "n3"] }] },
+      why: { reasons: [paragraph] }, long: { sections: ["One", "Two", "Three"].map((title) => ({ title, paragraphs: [paragraph] })) },
+      reviewer_note: null };
+    expect([...storyPathPointsOf(body)]).toEqual([["n1", { positionRef: "n1", nodeRefs: ["n1", "n2"] }],
+      ["n1#2", { positionRef: "n1", nodeRefs: ["n1", "n3"] }]]);
+    expect(storyPathPointsOf(undefined).size).toBe(0);
   });
 });
 

@@ -35,7 +35,7 @@ import {
   withWriteTransaction,
   type RunOwnershipInput
 } from "@debateai/db";
-import { AnswerIndexSchema, ConditionMarkSchema, ExecutionLedgerDigestSchema, type Answer, type AnswerIndex, type ConditionMark, type Edge, type ExecutionLedgerDigest, type Inspection, type InvestigationAccepted, type Node, type VerdictState } from "@debateai/contract";
+import { AnswerIndexSchema, ConditionMarkSchema, ExecutionLedgerDigestSchema, type Answer, type AnswerIndex, type ConditionMark, type Edge, type ExecutionLedgerDigest, type Inspection, type InvestigationAccepted, type Node, type VerdictState, webRanOnFree } from "@debateai/contract";
 import { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
 import { judgesComparisonOf, judgesRecountApplies, servedPositionOf } from "./judges-comparison.js";
 import type { EngineVerdictTrigger } from "./engine-verdict.js";
@@ -45,8 +45,9 @@ import {
   serveWebEvidence, webPathRootsOf, webPathsAtRoots, webPlanReasonOf, withWebSources, type ServedWeb
 } from "./web-sources.js";
 import {
-  changedBelowPathsOf, digLevelsOf, digsBelowOf, latestWrittenReportOf, ownWordsOf, pathHistoryOf, serveDig, servePathRewrites,
-  storyPathLinesOf, type RewriteTurn
+  changedBelowPathsOf, digLevelsOf, digsBelowOf, latestWrittenReportOf, ownWordsOf, pathHistoryOf, restsOnOf, serveDig,
+  servePathRewrites, storyPathLinesOf, storyPathPointsOf, type DebatePoints, type PathTrustSources, type RewriteTurn,
+  type StoryPathPoints
 } from "./path-rewrites.js";
 export { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
 export {
@@ -3679,6 +3680,9 @@ export class ServeRepository {
    * row's ownership check. Each rewrite's text and each dig's picks are opened under that dig's key and the story lines
    * under their debate's, inside one lease over every debate concerned. A debate no dig touched, which is no dig either,
    * costs two reads and serves exactly as before; one erased while it is read is served without its rewrites.
+   * W4-8 (Q-D3): for a finished rewrite, the points of the path's debate and of each dig whose rewrite rests on its own
+   * points are read too, each debate's points with ITS served web (so a checked extract only ever counts for the debate
+   * that holds it), and the rewritten path's trust words are worked out from them by ./path-rewrites.ts.
    */
   async #readPathRewrites(runId: string): Promise<Pick<Answer, "path_rewrites" | "dig">> {
     const store = new PostgresDigModelRunnerRepository(this.pool);
@@ -3725,24 +3729,49 @@ export class ServeRepository {
             const picks = entry.verdict_outcome === null ? null : await picksOf(entry.run_id);
             return { entry, opened, ownWords: picks === null ? null : ownWordsOf(picks.picks) };
           };
-          const storyLinesOf = async (debateRunId: string): Promise<ReadonlyMap<string, string>> => {
+          const storyBodyOf = async (debateRunId: string): Promise<unknown> => {
             const story = (await this.pool.query<{ story_id: string; content: unknown; content_ciphertext: CryptoEnvelope | null }>(
               `SELECT story.story_id::text AS story_id, story.content, story.content_ciphertext
                  FROM serve.answer_story AS story
                 WHERE story.run_id = $1
                 ORDER BY story.answer_version DESC, story.created_at DESC
                 LIMIT 1`, [debateRunId])).rows[0];
-            if (story === undefined) return new Map();
+            if (story === undefined) return undefined;
             const opened = decryptLeasedContentForRun<unknown>(cipherOf(debateRunId), "serve.answer_story", story.story_id,
               story.content_ciphertext, story.content);
-            return storyPathLinesOf(typeof opened === "object" && opened !== null ? (opened as { readonly body?: unknown }).body : undefined);
+            return typeof opened === "object" && opened !== null ? (opened as { readonly body?: unknown }).body : undefined;
+          };
+          const storyLinesOf = async (debateRunId: string): Promise<ReadonlyMap<string, string>> =>
+            storyPathLinesOf(await storyBodyOf(debateRunId));
+          // W4-8: each debate's points as the trust rule reads them, with its own served web, read once per debate.
+          const pointsRead = new Map<string, DebatePoints>();
+          const readPoints = async (debateRunId: string): Promise<void> => {
+            const key = debateRunId.toLowerCase();
+            if (pointsRead.has(key)) return;
+            // The lease's scope names each debate in lower case.
+            const served = await this.#readServedWeb(key);
+            const nodes = withWebSources(await this.readNodesForRun(key), served);
+            pointsRead.set(key, { points: new Map(nodes.map((node) => [node.node_id.toLowerCase(), node] as const)),
+              free: webRanOnFree(served?.web) });
+          };
+          /** W4-8: what the trust words of `debateRunId`'s paths are counted from, when `pathTurns` has a finished rewrite. */
+          const trustSourcesOf = async (debateRunId: string, pathTurns: readonly RewriteTurn[]):
+            Promise<((positionRef: string) => PathTrustSources) | undefined> => {
+            const done = pathTurns.filter((candidate) => candidate.opened !== null);
+            if (done.length === 0) return undefined;
+            const own: ReadonlyMap<string, StoryPathPoints> = storyPathPointsOf(await storyBodyOf(debateRunId));
+            await readPoints(debateRunId);
+            for (const candidate of done) if (restsOnOf(candidate.opened).length > 0) await readPoints(candidate.entry.run_id);
+            const pointsOf = (id: string): DebatePoints | null => pointsRead.get(id.toLowerCase()) ?? null;
+            return (positionRef) => ({ own: own.get(positionRef) ?? null, parent: pointsOf(debateRunId), digOf: pointsOf });
           };
 
           const turns: RewriteTurn[] = [];
           for (const entry of read.paths) turns.push(await turnOf(entry));
+          const trustOf = await trustSourcesOf(runId, turns);
           const pathRewrites = turns.length === 0 ? null : servePathRewrites({
             turns, levelOf, storyLines: await storyLinesOf(runId), changedBelow: changedBelowPathsOf(read.paths, below, finished),
-            report: latestWrittenReportOf(investigation?.closings ?? [])
+            report: latestWrittenReportOf(investigation?.closings ?? []), ...(trustOf === undefined ? {} : { trustOf })
           });
 
           const kept = await picksOf(runId);
@@ -3752,9 +3781,12 @@ export class ServeRepository {
             if (own !== null) {
               const parentHistory: RewriteTurn[] = [];
               for (const entry of parentTurns) parentHistory.push(await turnOf(entry));
-              // The dig's rewrite as its parent's path serves it: written on the same earlier text, so `changed` agrees.
+              const parentTrust = await trustSourcesOf(own.parent_run_id, parentHistory);
+              // The dig's rewrite as its parent's path serves it: written on the same earlier text, so `changed` agrees,
+              // and its trust words are the same (W4-8).
               rewrite = pathHistoryOf({ turns: parentHistory, levelOf,
-                storyLine: (await storyLinesOf(own.parent_run_id)).get(own.position_ref) ?? null })
+                storyLine: (await storyLinesOf(own.parent_run_id)).get(own.position_ref) ?? null,
+                ...(parentTrust === undefined ? {} : { trust: parentTrust(own.position_ref) }) })
                 .find((step) => step.turn.entry.run_id.toLowerCase() === runId.toLowerCase())?.rewrite ?? null;
             }
             const member = members.find((candidate) => candidate.run_id.toLowerCase() === runId.toLowerCase());

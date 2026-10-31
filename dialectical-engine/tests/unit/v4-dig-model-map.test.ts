@@ -78,6 +78,34 @@ describe("the map of a first debate whose paths digs rewrote", () => {
     expect(up.points.find((point) => point.id === "n-nuclear")!.basis).not.toBe("FELL");
   });
 
+  it("W4-8 (Q-D3): a rewritten path counts the words the server worked out; a path no dig rewrote keeps its own counts", () => {
+    const plain = buildV4Map({ runId: "r", answer: answerOf("r"), story });
+    const mixBefore = plain.paths.find((path) => path.id === "n-mix")!;
+    // The server's words: the path's own points as the page places them, plus two dig points the rewrite rests on.
+    const own = mixBefore.points.map((point) => ({ node_id: point.id, word: point.trust }));
+    const unworded: PathRewrite = {
+      rewrite_id: "rw-t", dig_run_id: "d9000000-0000-4000-8000-000000000001", dig_level: 1, dig_finished_at: "2026-10-31T09:00:00.000Z",
+      state: "READY", rewritten_at: "2026-10-31T09:01:00.000Z", changed: true, text: { line: "Partly now.", summary: "Partly.", fate: "HELD_UP" },
+      what_changed: ["It changed."], fate_before: "HELD_UP", view: null, dig_paths: [], rests_on: ["n-dig-a", "n-dig-b"]
+    };
+    const rewrite: PathRewrite = { ...unworded, trust: [...own, { node_id: "n-dig-a", word: "SURE" }, { node_id: "n-dig-b", word: null }] } as PathRewrite;
+    const answer = answerOf("r", { path_rewrites: { paths: [{ position_ref: "n-mix", current: { line: "Partly now.", summary: "Partly.", fate: "HELD_UP" },
+      history: [rewrite] }], changed_since: { count: 1, since_report_version: null } } });
+    const after = buildV4Map({ runId: "r", answer, story });
+    const mix = after.paths.find((path) => path.id === "n-mix")!;
+    expect(mix.counts).toEqual({ ...mixBefore.counts, SURE: mixBefore.counts.SURE + 1 });
+    expect(mix.unchecked).toBe(mixBefore.unchecked + 1);
+    // The points listed under the path stay its own; the other paths keep today's counts.
+    expect(mix.points).toEqual(mixBefore.points);
+    for (const path of after.paths.filter((candidate) => candidate.id !== "n-mix")) {
+      expect(path.counts, path.id).toEqual(plain.paths.find((candidate) => candidate.id === path.id)!.counts);
+    }
+    // A rewrite served without words (before W4-8) leaves the path's own counts.
+    const old = buildV4Map({ runId: "r", answer: answerOf("r", { path_rewrites: { paths: [{ position_ref: "n-mix",
+      current: { line: "Partly now.", summary: "Partly.", fate: "HELD_UP" }, history: [unworded] }], changed_since: { count: 1, since_report_version: null } } }), story });
+    expect(old.paths.find((path) => path.id === "n-mix")!.counts).toEqual(mixBefore.counts);
+  });
+
   it("names the four rewrite states, and says when something is still being rewritten", () => {
     expect(rewriteStateOf(null)).toBeNull();
     const history = PATH_REWRITES[DIG_RUNS.levelTwo]!.paths[0]!.history;

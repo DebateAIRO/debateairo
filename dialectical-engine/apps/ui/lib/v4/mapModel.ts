@@ -8,7 +8,7 @@ import {
   type StoryFate
 } from "@debateai/contract";
 import { pathSuggestionsOf } from "./suggestions.js";
-import { countTrust, pointsOf } from "./trust.js";
+import { countTrust, pointsOf, servedRewriteCounts } from "./trust.js";
 import type { RewriteState, V4Map, V4OpenQuestion, V4Path, V4PathRewrites, V4PathWeb, V4Point } from "./types.js";
 import { pathWebOf, webNoteOf } from "./web.js";
 
@@ -230,7 +230,11 @@ function placePaths(answer: Answer, specs: ReadonlyArray<PathSpec & { rewrites?:
     }
     const path = pathOf(spec.id, spec.fate, spec.line, points, pathWebOf(answer, spec.positionRef),
       diggable ? pathSuggestionsOf(answer, spec.positionRef) : []);
-    return { ...path, positionRef: spec.positionRef, ...(spec.rewrites === undefined ? {} : { rewrites: spec.rewrites }) };
+    // W4-8 (owner Q-D3): a rewritten path counts the words the server worked out (its own points plus the dig's points
+    // its newest rewrite rests on); a path no dig rewrote, or one served without them, keeps its own points' counts.
+    const served = servedRewriteCounts(spec.rewrites?.history);
+    return { ...path, ...(served === null ? {} : served), positionRef: spec.positionRef,
+      ...(spec.rewrites === undefined ? {} : { rewrites: spec.rewrites }) };
   });
 }
 

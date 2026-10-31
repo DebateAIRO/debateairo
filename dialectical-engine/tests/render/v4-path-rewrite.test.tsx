@@ -194,6 +194,44 @@ describe("a rewritten path (desktop)", () => {
   });
 });
 
+describe("a rewritten path's trust words (W4-8, owner Q-D3)", () => {
+  it("counts the words the server worked out for the path, and shows the served word on the dig's points it rests on", async () => {
+    const runId = crypto.randomUUID();
+    const plain = buildV4Map({ runId, answer: answerWith(runId, ROOT), story: seededStory() }).paths.find((path) => path.id === "n-mix")!;
+    const digLink: DigLink = { parentRunId: runId, childRunId: DIG_RUNS.ownView, openQuestionIds: ["path:n-mix"], questions: [], mode: "quick", startedAt: null };
+    const digPoint = doneDig(digLink, OWN_VIEW).points!.find((point) => point.trust === "SURE")!;
+    // The server's words: the path's own points as placed, then the dig's point the rewrite rests on, which it weighed
+    // with the dig's own checks (here: still argued).
+    const served = { ...OWN_VIEW, rests_on: [digPoint.id],
+      trust: [...plain.points.map((point) => ({ node_id: point.id, word: point.trust })), { node_id: digPoint.id, word: "STILL_ARGUED" as const }] };
+    harness.answer = answerWith(runId, { ...ROOT, paths: ROOT.paths.map((path) => (path.position_ref === "n-mix" ? { ...path, history: [served] } : path)) });
+    recordDig(runId, DIG_RUNS.ownView, ["path:n-mix"]);
+    harness.digView = (link) => doneDig(link, served);
+    await mountMap(1280, runId);
+    // The path's bar counts one more still-argued point than the path's own points give.
+    const argued = plain.counts.STILL_ARGUED + 1;
+    const bar = branch(PATHS.mix).querySelector<HTMLElement>(".v4MapPath .v4BarTrack")!;
+    expect(bar.getAttribute("aria-label")).toContain(word("v4.trustCount.STILL_ARGUED", { count: argued }));
+    await openPath(PATHS.mix);
+    await click(buttonNamed(CATALOG["v4.rewrite.seeDigPoints"]!, panel()));
+    const item = [...panel().querySelectorAll<HTMLElement>(".v4RewriteDigPoints li")].find((entry) => entry.textContent!.includes(digPoint.text))!;
+    expect(item.querySelector(".v4RewritePointWord")!.textContent).toBe(CATALOG["v4.trust.STILL_ARGUED"]);
+    expect(item.classList.contains("v4PanelPointSTILL_ARGUED")).toBe(true);
+    // Words only: no number of the engine reaches the page.
+    expect(panel().querySelector(".v4Rewrite")!.textContent).not.toMatch(/\b(?:score|strength|threshold|P\d+)\b/u);
+  });
+
+  it("an unrewritten path keeps the words of its own points", async () => {
+    const runId = crypto.randomUUID();
+    harness.answer = answerWith(runId, ROOT);
+    await mountMap(1280, runId);
+    const plain = buildV4Map({ runId, answer: answerWith(runId, ROOT), story: seededStory() }).paths.find((path) => path.id === "n-nuclear")!;
+    const bar = branch(PATHS.nuclear).querySelector<HTMLElement>(".v4MapPath .v4BarTrack")!;
+    const words = (["SURE", "SURE_FOR_CASE", "STILL_ARGUED", "DIDNT_HOLD"] as const).filter((name) => plain.counts[name] > 0);
+    for (const name of words) expect(bar.getAttribute("aria-label")).toContain(word(`v4.trustCount.${name}`, { count: plain.counts[name] }));
+  });
+});
+
 describe("the four states (draft 5.5)", () => {
   it("rewriting, rewritten, no change and failed, on the cards and in the panel", async () => {
     const runId = crypto.randomUUID();

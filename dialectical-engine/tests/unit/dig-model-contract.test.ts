@@ -4,8 +4,8 @@ import {
   AnswerDigSchema, AnswerPathRewritesSchema, AnswerSchema, AskRoomResponseSchema, BillingUsageResponseSchema, DIG_LEVEL_MAX,
   DIG_PICK_AUTHORS, DIG_TOO_DEEP, DigLevelSchema, DigTooDeepSchema, MonthPauseSchema, PATH_REWRITE_STATES, PathRewriteSchema,
   PathRewritesSchema, POINT_OF_VIEW_OUTCOMES, POINT_OF_VIEW_SCOPES, PointOfViewVerdictSchema, RUN_PAUSED_UNTIL_RESET,
-  RunContinueRefusedSchema, RunContinueRequestSchema, RunContinuedSchema, RunProjectionSchema, UsageBorrowSchema,
-  canDigFromLevel, contractInventory
+  RunContinueRefusedSchema, RunContinueRequestSchema, RunContinuedSchema, RunProjectionSchema, TRUST_WORDS, UsageBorrowSchema,
+  canDigFromLevel, contractInventory, trustOfPoint, webRanOnFree
 } from "../../packages/contract/src/index.js";
 import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
 
@@ -250,6 +250,55 @@ describe("W2-7 the money rule's words: estimate, borrow, month pause, new starts
     expect(RunContinueRequestSchema.safeParse({ pay_again: true }).success).toBe(false);
     expect(RunContinuedSchema.safeParse({ state: "CONTINUING" }).success).toBe(true);
     expect(RunContinueRefusedSchema.safeParse({ error: RUN_PAUSED_UNTIL_RESET, message: RUN_PAUSED_UNTIL_RESET, until: pause.until }).success).toBe(true);
+  });
+});
+
+describe("W4-8 a rewritten path's points and trust words (owner Q-D3)", () => {
+  const SURE_POINT = { review: { outcome: "agree" }, staleness_state: "FRESH", way_of_knowing: "LOOKED_UP", looked_up_checked: true };
+
+  it("a finished rewrite may name the points it rests on and the words of every point the path counts; old ones parse unchanged", () => {
+    const old = ready();
+    expect(PathRewriteSchema.parse(old)).toEqual(old);
+    const served = ready({ rests_on: ["n-1", "n-dig-2"], trust: [{ node_id: "n-1", word: "SURE" }, { node_id: "n-dig-2", word: null }] });
+    expect(PathRewriteSchema.parse(served)).toEqual(served);
+    expect(PathRewriteSchema.safeParse(ready({ rests_on: [] })).success).toBe(true);
+    // A writing or failed rewrite carries neither.
+    expect(PathRewriteSchema.safeParse(writing({ rests_on: [] })).success).toBe(false);
+    expect(PathRewriteSchema.safeParse(failed({ trust: [] })).success).toBe(false);
+  });
+
+  it("each point once; words are the page's four codes or none, never a number", () => {
+    expect(PathRewriteSchema.safeParse(ready({ rests_on: ["n-1", "n-1"] })).success).toBe(false);
+    expect(PathRewriteSchema.safeParse(ready({ trust: [{ node_id: "n-1", word: "SURE" }, { node_id: "n-1", word: "SURE" }] })).success).toBe(false);
+    expect(TRUST_WORDS).toEqual(["SURE", "SURE_FOR_CASE", "STILL_ARGUED", "DIDNT_HOLD"]);
+    for (const word of TRUST_WORDS) expect(PathRewriteSchema.safeParse(ready({ trust: [{ node_id: "n-1", word }] })).success, word).toBe(true);
+    for (const word of ["UNSURE", 0.9, 1]) expect(PathRewriteSchema.safeParse(ready({ trust: [{ node_id: "n-1", word }] })).success, String(word)).toBe(false);
+    expect(PathRewriteSchema.safeParse(ready({ trust: [{ node_id: "n-1", word: "SURE", score: 0.9 }] })).success).toBe(false);
+  });
+
+  it("the one rule: 'Sure' only with the server's checked looked-up flag, a second AI agreeing, fresh, and never on Free", () => {
+    expect(trustOfPoint(SURE_POINT, { free: false, fell: false })).toEqual({ trust: "SURE", basis: "WEB_CHECKED_AND_AGREED" });
+    expect(trustOfPoint({ ...SURE_POINT, looked_up_checked: false }, { free: false, fell: false }))
+      .toEqual({ trust: "SURE_FOR_CASE", basis: "LOOKED_UP_AND_AGREED" });
+    expect(trustOfPoint({ ...SURE_POINT, looked_up_checked: undefined }, { free: false, fell: false }).trust).toBe("SURE_FOR_CASE");
+    expect(trustOfPoint(SURE_POINT, { free: true, fell: false }).trust).toBe("SURE_FOR_CASE");
+    expect(trustOfPoint({ ...SURE_POINT, staleness_state: "STALE" }, { free: false, fell: false }))
+      .toEqual({ trust: "SURE_FOR_CASE", basis: "AGREED_BUT_DATED" });
+    expect(trustOfPoint({ ...SURE_POINT, way_of_knowing: "REASONING" }, { free: false, fell: false }))
+      .toEqual({ trust: "SURE_FOR_CASE", basis: "ARGUED_AND_AGREED" });
+    expect(trustOfPoint({ ...SURE_POINT, review: { outcome: "dispute" } }, { free: false, fell: false }))
+      .toEqual({ trust: "STILL_ARGUED", basis: "DISPUTED" });
+    expect(trustOfPoint({ ...SURE_POINT, review: { outcome: "cannot-assess" } }, { free: false, fell: false }))
+      .toEqual({ trust: "STILL_ARGUED", basis: "COULD_NOT_CHECK" });
+    expect(trustOfPoint({ ...SURE_POINT, review: null }, { free: false, fell: false })).toEqual({ trust: null, basis: null });
+    // The position of a path that fell does not hold, whatever its review said.
+    expect(trustOfPoint({ ...SURE_POINT, review: null }, { free: false, fell: true })).toEqual({ trust: "DIDNT_HOLD", basis: "FELL" });
+  });
+
+  it("a debate ran on Free when its web part has a path not on the plan", () => {
+    expect(webRanOnFree(undefined)).toBe(false);
+    expect(webRanOnFree({ paths: [{ search: { status: "SEARCHED" } }] })).toBe(false);
+    expect(webRanOnFree({ paths: [{ search: { status: "SEARCHED" } }, { search: { status: "NOT_ON_PLAN" } }] })).toBe(true);
   });
 });
 
