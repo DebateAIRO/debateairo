@@ -134,12 +134,8 @@
   "newDebate.plan.current.PLUS": "Planınız: Plus",
   "newDebate.plan.current.PRO": "Planınız: Pro",
   "newDebate.plan.current.MAX": "Planınız: Max",
-  "newDebate.askText.purposeQuestion": "Cevabı ne için istiyorsunuz?",
-  "newDebate.askText.purposeDecide": "Bir karar vermek için",
-  "newDebate.askText.purposeUnderstand": "Konuyu anlamak için",
-  "newDebate.askText.purposeWrite": "Bu konu hakkında yazmak için",
   "newDebate.askText.otherAnswer": "Başka bir cevap…",
-  "newDebate.askText.otherLabel": "Kendi cevabınız",
+  "newDebate.askText.otherLabel": "Kendi ek açıklamanız",
   "newDebate.askText.matters": "Cevaplar farklı yönlere işaret ederse, benim için en çok önemli olan şey: {matters}",
   "newDebate.askText.angles": "Lütfen ayrıca şunlara da bakın: {list}."
 }

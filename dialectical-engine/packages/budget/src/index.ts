@@ -76,7 +76,11 @@ export {
 export {
   CostEnvelopeGuard,
   DEFAULT_RESERVATION_TTL_MS,
+  ASK_CLARIFY_CHARGE_WRITER,
   LANGUAGE_CHECK_SPEND_WRITER,
+  askClarifyChargeWriterPresent,
+  recordAskClarifyCharge,
+  type AskClarifyChargeEntry,
   INVESTIGATION_REPORT_SEAM_CEILING_MICROS,
   QUESTION_CHECK_SPEND_WRITER,
   PostgresModelSpendStore,

@@ -92,7 +92,7 @@ export type ExportSnapshot = Readonly<{
   requestedAt: Date;
   generatedAt: Date;
   account: Readonly<{ account: Row; channels: Row[]; registration_region: Row | null; age_checks: Row[]; erasure_requests: Row[]; kept_questions: Row[];
-    reading_level: Row | null; debate_visits: Row[]; dig_links: Row[]; investigations: Row[]; reserve_events: Row[] }>;
+    reading_level: Row | null; debate_visits: Row[]; dig_links: Row[]; investigations: Row[]; reserve_events: Row[]; question_readings: Row[] }>;
   security: Readonly<{ mfa_factors: Row[]; passkeys: Row[]; recovery_codes: Row | null; sessions: Row[]; social_identities: Row[]; email_changes: Row[]; recovery_email_changes: Row[]; recovery_requests: Row[] }>;
   consents: Readonly<{ legal_acceptances: Row[]; sensitive_data_consents: Row[] }>;
   debates: Readonly<{ debates: DebateEntry[]; web_sources: WebSourceEntry[] }>;

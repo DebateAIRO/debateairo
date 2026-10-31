@@ -30,7 +30,7 @@ import { PostgresConsumerSecurityRepository } from "@debateai/db";
 import { PostgresDigModelRepository, PostgresDigPicksRepository, PostgresInvestigationReportRepository, PostgresInvestigationRepository } from "@debateai/db";
 import { investigationReportContentOpener } from "./investigation-report.js";
 import { postgresPurposeLines } from "./purpose-lines.js";
-import { ASK_CLARIFY_ROUTE_POLICY, ASK_CLARIFY_SPEND_REF, askClarifyTransport, createAskClarify } from "./ask-clarify.js";
+import { ASK_CLARIFY_ROUTE_POLICY, askClarifyTransportFor, createAskClarify } from "./ask-clarify.js";
 import { continuedRunWake, runHandoverOf } from "./month-pause.js";
 import { ConsumerWebAuthnService } from "./consumer-webauthn.js";
 import { PostgresConsumerAuthRepository } from "@debateai/db";
@@ -110,7 +110,9 @@ import {
 import {
   NO_PERSON_ALLOWANCE,
   PostgresModelSpendStore,
+  askClarifyChargeWriterPresent,
   languageCheckSpendWriterPresent,
+  recordAskClarifyCharge,
   questionCheckSpendWriterPresent,
   recordLanguageCheckSpend,
   recordQuestionCheckSpend
@@ -681,26 +683,26 @@ const admissionSite: AdmissionSiteContext = boot.runSync("admission-site", () =>
  */
 const siteAdmission = await loadAdmissionSettings(pool, environment.REGISTER_VERSION, admissionSite, (name, run) => boot.run(name, async () => run()));
 /**
- * Decision 29 (dynamic step 2): the small call before a debate exists takes the language check's one route decision (preview: the gate; hosted: the
- * support target's key, recorded through 0118's writer under its own reference; local: none, so the generic purpose options). Above the support
- * adapter, which clears the key this process keeps. A hosted site with no day ceiling makes no call: nothing here may stop a boot.
+ * Decisions 29 and 31 (dynamic step 2): the small call before a debate exists takes the language check's one route decision (preview: the gate; hosted:
+ * the support target's key; local: none, so no questions) and counts in the person's quota through 0144's writer: without the writer, no call (never
+ * spend unrecorded). Above the support adapter, which clears the key this process keeps. A hosted site with no day ceiling makes no call: nothing here may stop a boot.
  */
 const askClarifyDayCeiling = siteAdmission.costEnvelope?.guardPolicy.dailyCeilingMicros ?? null;
+const askClarifyWriter = await boot.run("ask-clarify-writer", () => onOwnConnections(() => askClarifyChargeWriterPresent(pool)));
 const askClarify = await boot.run("ask-clarify", async () => createAskClarify({
-  transport: previewGate === undefined && askClarifyDayCeiling === null ? null : askClarifyTransport(await questionLanguageSiteRoute({
+  transportFor: !askClarifyWriter || (previewGate === undefined && askClarifyDayCeiling === null) ? null : askClarifyTransportFor(await questionLanguageSiteRoute({
     mode: environment.DEPLOYMENT_MODE,
     policy: ASK_CLARIFY_ROUTE_POLICY,
     dayCeilingMicros: askClarifyDayCeiling,
     previewGate,
     previewFetch,
     readCredential: () => supportAnthropicMessagesKey(supportModelTarget, readSupportCredentialOnce),
-    spend: {
-      writerPresent: () => onOwnConnections(() => languageCheckSpendWriterPresent(pool)),
-      record: (entry) => recordLanguageCheckSpend(pool, { ...entry, providerRef: ASK_CLARIFY_SPEND_REF })
-    },
+    // The route's own recorder goes unused: each call's charge is the person's (`record`, below). The probe above stands for this one.
+    spend: { writerPresent: async () => askClarifyWriter, record: async () => undefined },
     daySpentMicros: (day) => new PostgresModelSpendStore(pool).readDaySpentMicros(day),
     report: (line) => console.error(JSON.stringify(line))
   })),
+  record: (entry) => recordAskClarifyCharge(pool, entry),
   clock: () => new Date(),
   report: (line) => console.error(JSON.stringify(line))
 }));

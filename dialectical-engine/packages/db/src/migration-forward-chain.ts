@@ -35,6 +35,7 @@ import { loadForward0140 } from './migration-forward0140.js';
 import { loadForward0141 } from './migration-forward0141.js';
 import { loadForward0142 } from './migration-forward0142.js';
 import { loadForward0143 } from './migration-forward0143.js';
+import { loadForward0144 } from './migration-forward0144.js';
 
 /**
  * The forward steps after dev's sealed lineage, its 0108 and its 0110 (PR-54, PR-58, migrations/lineage/README.md): an
@@ -52,8 +53,10 @@ import { loadForward0143 } from './migration-forward0143.js';
  * every later migrate() compares that step against its latest amendment instead of its receipt.
  */
 export type ForwardStepAnchor=Readonly<{baseRecipeSha256:string;previousName:string;previousManifestSha256:string;previousVerifierSha256:string}>;
-/** One recorded amendment of an earlier step's postcondition: which step, which relations, which field, its new value, the policies added. */
-export type PostconditionAmendment=Readonly<{step:string;relations:readonly string[];field:'relrowsecurity';value:true;policies:readonly string[]}>;
+/** One recorded amendment of an earlier step's postcondition: which step, which relations, which field, its new value, the policies added; or which functions it redefined. */
+export type PostconditionAmendment=Readonly<{step:string;relations:readonly string[];field:'relrowsecurity';value:true;policies:readonly string[]}>
+ // 0144: a step that redefines functions an earlier step's digest pins names them.
+ |Readonly<{step:string;functions:readonly string[];field:'function_definition'}>;
 export type ForwardStepPlan=Readonly<{
  name:string; version:string; manifestSha256:string; sourceSha256:string; sql:string;
  previousName:string; previousManifestSha256:string; previousVerifierSha256:string;
@@ -93,10 +96,10 @@ export type ChainStep=ForwardStepPlan&Readonly<{n1:N1Declaration}>;
  * rulings N7 and N11), then the web evidence store (0132) and investigations (0133) of the Perplexity plan (2026-10-30,
  * task W1-3), then the new dig model and the month pause (0134, dig-model revision task W2-8), then a dig's picks and its
  * path rewrite's material (0135, task W3-7), then the final report over an investigation (0136, task W5-1), then the owner's changes of
- * 31 Oct: public debates (0137), tree updates (0138), passage retention (0139) and the drained spend kinds (0140), then a path's suggestions (0141), the team's one limit (0142, drained), then the hand-over of a paused debate (0143). A new step
+ * 31 Oct: public debates (0137), tree updates (0138), passage retention (0139) and the drained spend kinds (0140), then a path's suggestions (0141), the team's one limit (0142, drained), then the hand-over of a paused debate (0143), then the drained step that puts step 2's small AI in the person's quota (0144). A new step
  * appends its loader here (README).
  */
-const STEPS:readonly StepLoader[]=Object.freeze([loadForward111,loadForwardAuthDbBatch,loadForward0113,loadForward0114,loadForward115,loadForward0116,loadForward0117,loadForward0118,loadForward0119,loadForward0120,loadForward0121,loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130,loadForward0131,loadForward0132,loadForward0133,loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140,loadForward0141,loadForward0142,loadForward0143]);
+const STEPS:readonly StepLoader[]=Object.freeze([loadForward111,loadForwardAuthDbBatch,loadForward0113,loadForward0114,loadForward115,loadForward0116,loadForward0117,loadForward0118,loadForward0119,loadForward0120,loadForward0121,loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130,loadForward0131,loadForward0132,loadForward0133,loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140,loadForward0141,loadForward0142,loadForward0143,loadForward0144]);
 
 /** A forward step's file name; the receipt and declaration tables CHECK the same shape. */
 export const FORWARD_STEP_NAME=/^\d{4}_[a-z0-9_]+\.sql$/;

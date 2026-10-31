@@ -18,7 +18,7 @@ describe("0143: the hand-over", () => {
   it("is the chain's step after 0142 with its own loader, and its manifest binds the bytes", () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
     expect(chain).toContain("import { loadForward0143 } from './migration-forward0143.js';");
-    expect(chain).toContain("loadForward0142,loadForward0143]");
+    expect(chain).toContain("loadForward0142,loadForward0143,");
     const manifest = JSON.parse(read("migrations/lineage/run-handover-forward0143.json")) as { migration: { name: string; sha256: string };
       previous: { name: string; manifestSha256: string } };
     expect(manifest.migration).toEqual({ name: NAME, sha256: createHash("sha256").update(sql).digest("hex") });

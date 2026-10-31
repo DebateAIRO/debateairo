@@ -48,14 +48,16 @@ const PUBLIC_DEBATES = "0137_public_debates.sql";
 const TREE_UPDATES = "0138_tree_updates.sql";
 /** The passage retention (R22 F1, decisions 6 and 7): four steps from the end. */
 const PASSAGE_RETENTION = "0139_passage_retention.sql";
-/** The funded spend kinds (R22 F1, decision 14): four steps from the end. */
+/** The funded spend kinds (R22 F1, decision 14): five steps from the end. */
 const SPEND_KINDS = "0140_internal_spend_kinds.sql";
-/** The path suggestions (R22 decision 9): three steps from the end. */
+/** The path suggestions (R22 decision 9): four steps from the end. */
 const PATH_SUGGESTIONS = "0141_path_suggestions.sql";
-/** The team's one limit (R22 decisions 14 and 24): two steps from the end. */
+/** The team's one limit (R22 decisions 14 and 24): three steps from the end. */
 const TEAM_LIMIT = "0142_team_limit.sql";
-/** The hand-over of a paused debate (R22 decision 12): the chain's last step. */
+/** The hand-over of a paused debate (R22 decision 12): two steps from the end. */
 const RUN_HANDOVER = "0143_run_handover.sql";
+/** The small AI's quota charge at step 2 (R22 decisions 29 and 31): the chain's last step. */
+const ASK_CLARIFY_CHARGE = "0144_ask_clarify_charge.sql";
 const EXPAND: N1Declaration = Object.freeze({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false, concurrentIndex: null });
 /** A later step with constant digests, as forward-chain-replay-verifiers.test.ts builds its probes, plus its n1 header. */
 function probe(previous: ChainStep, name: string, sql: string, n1: N1Declaration = EXPAND): ChainStep {
@@ -88,27 +90,28 @@ describe("Review Focus 1: a step that fails (or a kill) between steps", () => {
 
   it("a failing step leaves every earlier step committed", async () => {
     const real = (await loadMigrationPlan()).forwardChain.map((step) => step.name);
-    expect(real).toHaveLength(33);
-    expect(real.at(-14)).toBe(RLS);
-    expect(real.at(-13)).toBe(V4);
-    expect(real.at(-12)).toBe(WEB);
-    expect(real.at(-11)).toBe(INVESTIGATIONS);
-    expect(real.at(-10)).toBe(DIG_MODEL);
-    expect(real.at(-9)).toBe(DIG_PICKS);
-    expect(real.at(-8)).toBe(INVESTIGATION_REPORTS);
-    expect(real.at(-7)).toBe(PUBLIC_DEBATES);
-    expect(real.at(-6)).toBe(TREE_UPDATES);
-    expect(real.at(-5)).toBe(PASSAGE_RETENTION);
-    expect(real.at(-4)).toBe(SPEND_KINDS);
-    expect(real.at(-3)).toBe(PATH_SUGGESTIONS);
-    expect(real.at(-2)).toBe(TEAM_LIMIT);
-    expect(real.at(-1)).toBe(RUN_HANDOVER);
+    expect(real).toHaveLength(34);
+    expect(real.at(-15)).toBe(RLS);
+    expect(real.at(-14)).toBe(V4);
+    expect(real.at(-13)).toBe(WEB);
+    expect(real.at(-12)).toBe(INVESTIGATIONS);
+    expect(real.at(-11)).toBe(DIG_MODEL);
+    expect(real.at(-10)).toBe(DIG_PICKS);
+    expect(real.at(-9)).toBe(INVESTIGATION_REPORTS);
+    expect(real.at(-8)).toBe(PUBLIC_DEBATES);
+    expect(real.at(-7)).toBe(TREE_UPDATES);
+    expect(real.at(-6)).toBe(PASSAGE_RETENTION);
+    expect(real.at(-5)).toBe(SPEND_KINDS);
+    expect(real.at(-4)).toBe(PATH_SUGGESTIONS);
+    expect(real.at(-3)).toBe(TEAM_LIMIT);
+    expect(real.at(-2)).toBe(RUN_HANDOVER);
+    expect(real.at(-1)).toBe(ASK_CLARIFY_CHARGE);
     chain.shape = extendedBy((last) => probe(last, "0199_probe_fail.sql", "SELECT 1/0"));
     await expect(migrate(db.pool)).rejects.toMatchObject({ code: "22012" });
     chain.shape = undefined;
-    // All thirty-three real steps were applied by that same run and stay committed; the probe left nothing.
+    // All thirty-four real steps were applied by that same run and stay committed; the probe left nothing.
     expect(await receipts()).toEqual(real);
-    expect((await db.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration_step")).rows[0].n).toBe(33);
+    expect((await db.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration_step")).rows[0].n).toBe(34);
     expect(await ledger()).toEqual(expect.arrayContaining(real));
     expect(await ledger()).not.toContain("0199_probe_fail.sql");
     // The next run continues where the last one stopped: everything replays, nothing is left to apply.
@@ -141,6 +144,7 @@ describe("Review Focus 2: a page read holding a lock on core.run while 0123's AL
     expect(await ledger()).not.toContain(PATH_SUGGESTIONS);
     expect(await ledger()).not.toContain(TEAM_LIMIT);
     expect(await ledger()).not.toContain(RUN_HANDOVER);
+    expect(await ledger()).not.toContain(ASK_CLARIFY_CHARGE);
   }, 300_000);
   afterAll(async () => { await db?.stop(); });
 

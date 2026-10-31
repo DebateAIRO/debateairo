@@ -1,6 +1,6 @@
 // tests/unit/ask-clarify.test.ts
 // R22 decision 29, dynamic step 2: the small call before a debate exists, through a scripted gateway: 0 to 3 questions plus the purpose question,
-// bad replies recovered by the slip order then the generic answer, instructions in a question stay data, the limit per person, nobody's words under
+// bad replies recovered by the slip order then no questions, instructions in a question stay data, the limit per person, nobody's words under
 // another's key; the route's gates; the stored lines reaching the question check and every later AI's material. Data is made up.
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -9,7 +9,9 @@ import { buildApi, type AskApplication } from "@debateai/api";
 import { AskClarifyResponseSchema, PurposeLinesSchema, purposeLinesMaterial, purposeLinesUnsaid, type PurposeLines } from "@debateai/contract";
 import { ASK_CLARIFY_CONTRACT_ID, ASK_CLARIFY_INSTRUCTION, ASK_CLARIFY_PROMPT_CONTRACT, framedAskClarify } from "@debateai/judgement";
 import { parsePreviewProviderTestConfig, type PromptPacket } from "@debateai/providers";
-import { ASK_CLARIFY_MODEL_SETTINGS, ASK_CLARIFY_SPEND_REF, askClarifyTransport, createAskClarify, readAskClarifyReply } from "../../apps/api/src/ask-clarify.js";
+import type { AskClarifyChargeEntry } from "@debateai/budget";
+import { ASK_CLARIFY_MODEL_SETTINGS, type AskClarifyTransportFor, ASK_CLARIFY_SPEND_REF, askClarifyTransportFor, createAskClarify, readAskClarifyReply } from "../../apps/api/src/ask-clarify.js";
+import { AskRoom } from "../../apps/api/src/ask-room.js";
 import { hostedQuestionLanguageRoute } from "../../apps/api/src/question-language/boot.js";
 import { questionWithPurposeLines } from "../../apps/api/src/purpose-lines.js";
 import { engineSealedContracts } from "../../apps/runner/src/engine-contracts.js";
@@ -32,13 +34,14 @@ function gateway(...replies: readonly (string | Error)[]) {
   const reports: string[] = [];
   const left = [...replies];
   const port = createAskClarify({
-    transport: async ({ packet }) => {
+    transportFor: () => async ({ packet }) => {
       packets.push(packet);
       const next = left.shift();
       if (next === undefined) throw new Error("no scripted reply");
       if (next instanceof Error) throw next;
       return next;
     },
+    record: async () => undefined,
     clock: () => new Date("2026-11-01T10:00:00.000Z"),
     report: (line) => reports.push(line.code)
   });
@@ -70,7 +73,7 @@ describe("what the gateway's reply becomes", () => {
   it.each([0, 1, 2, 3])("%i questions plus the purpose question", async (count) => {
     const questions = Array.from({ length: count }, (_, at) => ({ text: `Which part ${at}?`, answers: ["One", "Two"] }));
     const { port, packets } = gateway(reply({ questions, purpose: PURPOSE }));
-    const answer = await port.read(OWNER, QUESTION);
+    const answer = await port.read(OWNER, QUESTION, null);
     expect(answer).toEqual({ source: "AI", questions, purpose: PURPOSE });
     expect(AskClarifyResponseSchema.safeParse(answer).success).toBe(true);
     expect(packets).toHaveLength(1);
@@ -83,7 +86,7 @@ describe("what the gateway's reply becomes", () => {
       `Here it is:\n${reply({ questions: [WHERE], purpose: PURPOSE })}`
     ]) {
       const { port, packets } = gateway(slip);
-      expect(await port.read(OWNER, QUESTION)).toEqual({ source: "AI", questions: [WHERE], purpose: PURPOSE });
+      expect(await port.read(OWNER, QUESTION, null)).toEqual({ source: "AI", questions: [WHERE], purpose: PURPOSE });
       expect(packets).toHaveLength(1);
     }
     const reading = readAskClarifyReply(reply({
@@ -102,7 +105,7 @@ describe("what the gateway's reply becomes", () => {
 
   it("an unreadable reply is asked again once, by code and path only", async () => {
     const { port, packets } = gateway("not JSON at all", reply({ questions: [], purpose: PURPOSE }));
-    expect(await port.read(OWNER, QUESTION)).toEqual({ source: "AI", questions: [], purpose: PURPOSE });
+    expect(await port.read(OWNER, QUESTION, null)).toEqual({ source: "AI", questions: [], purpose: PURPOSE });
     expect(packets).toHaveLength(2);
     const second = packets[1]!.messages.at(-1)!.content;
     expect(second).toContain("ASK_CLARIFY_REPLY_UNREADABLE");
@@ -111,39 +114,49 @@ describe("what the gateway's reply becomes", () => {
 
   it("no purpose question: asked again once for it", async () => {
     const { port, packets } = gateway(reply({ questions: [WHERE] }), reply({ questions: [WHERE], purpose: PURPOSE }));
-    expect(await port.read(OWNER, QUESTION)).toEqual({ source: "AI", questions: [WHERE], purpose: PURPOSE });
+    expect(await port.read(OWNER, QUESTION, null)).toEqual({ source: "AI", questions: [WHERE], purpose: PURPOSE });
     expect(packets[1]!.messages.at(-1)!.content).toContain("ASK_CLARIFY_PURPOSE_MISSING");
   });
 
-  it("two bad replies, or a transport failure: the generic answer, by code, never the words", async () => {
-    const bad = gateway("nope", "still nope");
-    expect(await bad.port.read(OWNER, QUESTION)).toEqual({ source: "GENERIC" });
-    expect(bad.reports).toEqual(["UNREADABLE"]);
+  it("the purpose question still missing after the re-ask: the AI's other questions are kept, whatever the second try did", async () => {
     const twoWithout = gateway(reply({ questions: [WHERE] }), reply({ questions: [WHERE] }));
-    expect(await twoWithout.port.read(OWNER, QUESTION)).toEqual({ source: "GENERIC" });
+    expect(await twoWithout.port.read(OWNER, QUESTION, null)).toEqual({ source: "AI", questions: [WHERE] });
+    const secondBad = gateway(reply({ questions: [WHERE] }), "nope");
+    expect(await secondBad.port.read(OWNER, QUESTION, null)).toEqual({ source: "AI", questions: [WHERE] });
+    const secondDown = gateway(reply({ questions: [WHERE] }), new Error("down"));
+    expect(await secondDown.port.read(OWNER, QUESTION, null)).toEqual({ source: "AI", questions: [WHERE] });
+    expect(AskClarifyResponseSchema.safeParse({ source: "AI", questions: [] }).success).toBe(false);
+  });
+
+  it("two bad replies, or a transport failure: no questions, by code, never the words", async () => {
+    const bad = gateway("nope", "still nope");
+    expect(await bad.port.read(OWNER, QUESTION, null)).toEqual({ source: "NONE" });
+    expect(bad.reports).toEqual(["UNREADABLE"]);
+    const empty = gateway(reply({ questions: [] }), reply({ questions: [] }));
+    expect(await empty.port.read(OWNER, QUESTION, null)).toEqual({ source: "NONE" });
     const down = gateway(new Error(QUESTION));
-    expect(await down.port.read(OWNER, QUESTION)).toEqual({ source: "GENERIC" });
+    expect(await down.port.read(OWNER, QUESTION, null)).toEqual({ source: "NONE" });
     expect(down.reports).toEqual(["TRANSPORT"]);
     expect(JSON.stringify(down.reports)).not.toContain(QUESTION);
   });
 
-  it("a gateway that never answers: the generic answer at the deadline, however the transport behaves", async () => {
+  it("a gateway that never answers: no questions at the deadline, however the transport behaves", async () => {
     vi.useFakeTimers();
     try {
       const reports: string[] = [];
-      const port = createAskClarify({ transport: () => new Promise<string>(() => undefined), clock: () => new Date(), report: (line) => reports.push(line.code) });
-      const pending = port.read(OWNER, QUESTION);
+      const port = createAskClarify({ transportFor: () => () => new Promise<string>(() => undefined), record: async () => undefined, clock: () => new Date(), report: (line) => reports.push(line.code) });
+      const pending = port.read(OWNER, QUESTION, null);
       await vi.advanceTimersByTimeAsync(ASK_CLARIFY_MODEL_SETTINGS.timeoutMs);
-      expect(await pending).toEqual({ source: "GENERIC" });
+      expect(await pending).toEqual({ source: "NONE" });
       expect(reports).toEqual(["DEADLINE"]);
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it("no transport (local mode, no key): the generic answer, nothing sent", async () => {
-    const port = createAskClarify({ transport: null, clock: () => new Date(), report: () => undefined });
-    expect(await port.read(OWNER, QUESTION)).toEqual({ source: "GENERIC" });
+  it("no transport (local mode, no key): no questions, nothing sent", async () => {
+    const port = createAskClarify({ transportFor: null, record: async () => undefined, clock: () => new Date(), report: () => undefined });
+    expect(await port.read(OWNER, QUESTION, null)).toEqual({ source: "NONE" });
   });
 });
 
@@ -152,60 +165,89 @@ describe("what one person can spend", () => {
 
   it("the same text again is answered from memory, for that person only", async () => {
     const { port, packets } = gateway(good, reply({ questions: [WHERE], purpose: PURPOSE }));
-    const first = await port.read(OWNER, QUESTION);
-    expect(await port.read(OWNER, QUESTION)).toEqual(first);
+    const first = await port.read(OWNER, QUESTION, null);
+    expect(await port.read(OWNER, QUESTION, null)).toEqual(first);
     expect(packets).toHaveLength(1);
-    expect(await port.read(OTHER_OWNER, QUESTION)).toEqual({ source: "AI", questions: [WHERE], purpose: PURPOSE });
+    expect(await port.read(OTHER_OWNER, QUESTION, null)).toEqual({ source: "AI", questions: [WHERE], purpose: PURPOSE });
     expect(packets).toHaveLength(2);
   });
 
-  it("past the limit, the generic answer, with no call; another person still gets theirs; the hour passing opens it again", async () => {
+  it("past the limit, no questions, with no call; another person still gets theirs; the hour passing opens it again", async () => {
     let now = Date.parse("2026-11-01T10:00:00.000Z");
     let calls = 0;
     const reports: string[] = [];
-    const port = createAskClarify({ transport: async () => { calls += 1; return good; }, clock: () => new Date(now), report: (line) => reports.push(line.code) });
-    let last = await port.read(OWNER, "Question number 0?");
-    for (let at = 1; last.source === "AI" && at < 500; at += 1) last = await port.read(OWNER, `Question number ${at}?`);
-    expect(last).toEqual({ source: "GENERIC" });
+    const port = createAskClarify({ transportFor: () => async () => { calls += 1; return good; }, record: async () => undefined, clock: () => new Date(now), report: (line) => reports.push(line.code) });
+    let last = await port.read(OWNER, "Question number 0?", null);
+    for (let at = 1; last.source === "AI" && at < 500; at += 1) last = await port.read(OWNER, `Question number ${at}?`, null);
+    expect(last).toEqual({ source: "NONE" });
     expect(reports).toEqual(["RATE_LIMITED"]);
     const spent = calls;
     expect(spent).toBeLessThan(500);
-    expect(await port.read(OWNER, "One more question?")).toEqual({ source: "GENERIC" });
+    expect(await port.read(OWNER, "One more question?", null)).toEqual({ source: "NONE" });
     expect(calls).toBe(spent);
-    expect((await port.read(OTHER_OWNER, "Question number 0?")).source).toBe("AI");
+    expect((await port.read(OTHER_OWNER, "Question number 0?", null)).source).toBe("AI");
     now += 3_600_001;
-    expect((await port.read(OWNER, "Later question?")).source).toBe("AI");
+    expect((await port.read(OWNER, "Later question?", null)).source).toBe("AI");
   });
 
   it("local mode makes no call at all; the route table says none", async () => {
-    expect(askClarifyTransport({ kind: "NONE", reason: "LOCAL_MODE" })).toBeNull();
+    expect(askClarifyTransportFor({ kind: "NONE", reason: "LOCAL_MODE" })).toBeNull();
     const route = await hostedQuestionLanguageRoute({ mode: "local", fastCheck: ASK_CLARIFY_MODEL_SETTINGS, readCredential: () => undefined,
       spend: { writerPresent: async () => true, record: async () => undefined }, dayPot: null, clock: () => new Date(), report: () => undefined });
     expect(route).toEqual({ kind: "NONE", reason: "LOCAL_MODE" });
   });
 
-  it("hosted: the call's real tokens are recorded, a full day pot sends nothing, and the money row's reference is one 0118's writer accepts", async () => {
+  const anthropicReply = () => new Response(JSON.stringify({ id: "m", type: "message", role: "assistant", model: "claude-haiku-5-5", stop_reason: "end_turn",
+    content: [{ type: "text", text: reply({ questions: [], purpose: PURPOSE }) }], usage: { input_tokens: 700, output_tokens: 90 } }), { status: 200 });
+  const GRANT = { kind: "INTERNAL" as const, grantId: "33333333-3333-4333-8333-333333333333", grantEventId: "44444444-4444-4444-8444-444444444444" };
+
+  it("hosted: the person pays for the call's real tokens, under its code, naming the grant of a team member; a full day pot sends nothing", async () => {
     const sent: string[] = [];
-    vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
-      sent.push(String(init.body));
-      return new Response(JSON.stringify({ id: "m", type: "message", role: "assistant", model: "claude-haiku-5-5", stop_reason: "end_turn",
-        content: [{ type: "text", text: reply({ questions: [], purpose: PURPOSE }) }], usage: { input_tokens: 700, output_tokens: 90 } }), { status: 200 });
-    });
+    vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => { sent.push(String(init.body)); return anthropicReply(); });
     try {
-      const usage: unknown[] = [];
+      const entries: AskClarifyChargeEntry[] = [];
       let skip: string | null = null;
-      const transport = askClarifyTransport({ kind: "HOSTED", credential: HOSTED_KEY, recordSpend: async (counted) => { usage.push(counted); }, beforeSend: async () => skip })!;
-      const port = createAskClarify({ transport, clock: () => new Date(), report: () => undefined });
-      expect((await port.read(OWNER, QUESTION)).source).toBe("AI");
-      expect(usage).toEqual([{ inputTokens: 700, outputTokens: 90, projected: false }]);
+      const transportFor = askClarifyTransportFor({ kind: "HOSTED", credential: HOSTED_KEY, recordSpend: async () => undefined, beforeSend: async () => skip })!;
+      const port = createAskClarify({ transportFor, record: async (entry) => { entries.push(entry); }, clock: () => new Date(), report: () => undefined });
+      expect((await port.read(OWNER, QUESTION, null)).source).toBe("AI");
+      expect(entries).toEqual([expect.objectContaining({ ownerRef: OWNER, grant: null, providerRef: ASK_CLARIFY_SPEND_REF, inputTokens: 700, outputTokens: 90 })]);
+      expect(entries[0]!.chargeMicros).toBeGreaterThan(0);
+      expect(JSON.stringify(entries)).not.toContain("pier");
+      expect((await port.read(OTHER_OWNER, "A question from the team?", GRANT)).source).toBe("AI");
+      expect(entries[1]).toMatchObject({ ownerRef: OTHER_OWNER, grant: { grantId: GRANT.grantId, grantEventId: GRANT.grantEventId } });
       expect(JSON.parse(sent[0]!)).toMatchObject({ model: ASK_CLARIFY_MODEL_SETTINGS.model, max_tokens: ASK_CLARIFY_MODEL_SETTINGS.maxOutputTokens });
       skip = "QUESTION_LANGUAGE_FAST_CHECK_SKIPPED_DAY_POT";
-      expect(await port.read(OWNER, "Another question entirely?")).toEqual({ source: "GENERIC" });
-      expect(sent).toHaveLength(1);
+      expect(await port.read(OWNER, "Another question entirely?", null)).toEqual({ source: "NONE" });
+      expect(sent).toHaveLength(2);
+      expect(entries).toHaveLength(2);
     } finally {
       vi.unstubAllGlobals();
     }
-    const writer = /p_provider_ref !~ '([^']+)'/u.exec(readFileSync(resolve(import.meta.dirname, "../../migrations/0118_language_check_spend.sql"), "utf8"))![1]!;
+  });
+
+  it("preview: real counts reach the person's quota through the gate; a send the guarded fetch refused charges nothing", async () => {
+    const entries: AskClarifyChargeEntry[] = [];
+    const refusing = askClarifyTransportFor({ kind: "PREVIEW", fetch: (async () => { throw new Error("refused"); }) as typeof fetch })!;
+    const refused = createAskClarify({ transportFor: refusing, record: async (entry) => { entries.push(entry); }, clock: () => new Date(), report: () => undefined });
+    expect(await refused.read(OWNER, QUESTION, null)).toEqual({ source: "NONE" });
+    expect(entries).toEqual([]);
+    const counted = askClarifyTransportFor({ kind: "PREVIEW", fetch: (async () => anthropicReply()) as typeof fetch })!;
+    const port = createAskClarify({ transportFor: counted, record: async (entry) => { entries.push(entry); }, clock: () => new Date(), report: () => undefined });
+    expect((await port.read(OWNER, QUESTION, null)).source).toBe("AI");
+    expect(entries).toEqual([expect.objectContaining({ inputTokens: 700, outputTokens: 90 })]);
+  });
+
+  it("a record that cannot be written stops the calls (never spend unrecorded), and the person carries on", async () => {
+    let calls = 0;
+    const transportFor: AskClarifyTransportFor = (onUsage) => async () => { calls += 1; await onUsage({ inputTokens: 1, outputTokens: 1, projected: false }); return good; };
+    const port = createAskClarify({ transportFor, record: async () => { throw Object.assign(new Error("no right"), { code: "42501" }); }, clock: () => new Date(), report: () => undefined });
+    expect((await port.read(OWNER, QUESTION, null)).source).toBe("AI");
+    expect(await port.read(OWNER, "Another question?", null)).toEqual({ source: "NONE" });
+    expect(calls).toBe(1);
+  });
+
+  it("the reference is one 0144's writer accepts", () => {
+    const writer = /p_provider_ref !~ '([^']+)'/u.exec(readFileSync(resolve(import.meta.dirname, "../../migrations/0144_ask_clarify_charge.sql"), "utf8"))![1]!;
     expect(ASK_CLARIFY_SPEND_REF).toMatch(new RegExp(writer, "u"));
   });
 });
@@ -214,11 +256,12 @@ describe("POST /v1/asks/clarify", () => {
   const IDENTITY = testHttpIdentity("ask-clarify");
   const headers = testSessionHeaders(IDENTITY, true);
   const application = { submit: async () => { throw new Error("not reached"); } } as unknown as AskApplication;
-  function apiOver(options: Readonly<{ consent?: "given" | "required"; country?: string | null; preview?: boolean }> = {}) {
+  function apiOver(options: Readonly<{ consent?: "given" | "required"; country?: string | null; pool?: () => Promise<Readonly<{ empty: boolean; funding: null }>> }> = {}) {
     const seen: Array<readonly [string, string]> = [];
     const sessions = { ...testSessionApplication([IDENTITY]), readSensitiveDataConsent: async () => options.consent ?? "given" };
     const api = buildApi({ application, sessions, allowedOrigin: TEST_APP_ORIGIN,
       askClarify: { read: async (ownerRef: string, question: string) => { seen.push([ownerRef, question]); return { source: "AI" as const, questions: [], purpose: PURPOSE }; } },
+      ...(options.pool === undefined ? {} : { askRoom: { readPersonPool: options.pool } }),
       ...(options.country === undefined ? {} : { countryGate: { ask: () => options.country, recordedCountry: () => null, record: () => undefined } })
     } as never);
     return { api, seen };
@@ -232,6 +275,12 @@ describe("POST /v1/asks/clarify", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ source: "AI", questions: [], purpose: PURPOSE });
     expect(seen).toEqual([[IDENTITY.authenticated.ownerRef, QUESTION]]);
+    await api.close();
+  });
+  it("with room in the pool, the call goes", async () => {
+    const { api, seen } = apiOver({ pool: async () => ({ empty: false, funding: null }) });
+    expect((await post(api, QUESTION)).json()).toEqual({ source: "AI", questions: [], purpose: PURPOSE });
+    expect(seen).toHaveLength(1);
     await api.close();
   });
   it("nobody signed in: refused, nothing read", async () => {
@@ -249,30 +298,32 @@ describe("POST /v1/asks/clarify", () => {
     await api.close();
   });
   it.each([
+    ["with an empty pool", { pool: async () => ({ empty: true, funding: null }) }, QUESTION],
+    ["with a pool that cannot be read", { pool: async () => { throw new Error("down"); } }, QUESTION],
     ["before the sensitive-data consent", { consent: "required" as const }, QUESTION],
     ["from a blocked country", { country: "COUNTRY_BLOCKED" }, QUESTION],
     ["in the words of a person in crisis", {}, "I want to kill myself tonight"]
-  ])("%s: the generic answer, and the words go to no model", async (_name, options, question) => {
+  ])("%s: no questions, and the words go to no model", async (_name, options, question) => {
     const { api, seen } = apiOver(options);
     const response = await post(api, question);
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ source: "GENERIC" });
+    expect(response.json()).toEqual({ source: "NONE" });
     expect(seen).toEqual([]);
     await api.close();
   });
-  it("on the preview, off its team: the generic answer, and the words go to no model", async () => {
+  it("on the preview, off its team: no questions, and the words go to no model", async () => {
     const seen: string[] = [];
     const sessions = { ...testSessionApplication([IDENTITY]), readSensitiveDataConsent: async () => "given" };
     const api = buildApi({ application, sessions, allowedOrigin: TEST_APP_ORIGIN, previewProviderTestConfig: PREVIEW_CONFIG, previewTeamUserIds: [],
-      askClarify: { read: async (_ownerRef: string, question: string) => { seen.push(question); return { source: "GENERIC" as const }; } } } as never);
-    expect((await post(api, QUESTION)).json()).toEqual({ source: "GENERIC" });
+      askClarify: { read: async (_ownerRef: string, question: string) => { seen.push(question); return { source: "NONE" as const }; } } } as never);
+    expect((await post(api, QUESTION)).json()).toEqual({ source: "NONE" });
     expect(seen).toEqual([]);
     await api.close();
   });
-  it("a deployment built without the call: the generic answer", async () => {
+  it("a deployment built without the call: no questions", async () => {
     const sessions = { ...testSessionApplication([IDENTITY]), readSensitiveDataConsent: async () => "given" };
     const api = buildApi({ application, sessions, allowedOrigin: TEST_APP_ORIGIN } as never);
-    expect((await post(api, QUESTION)).json()).toEqual({ source: "GENERIC" });
+    expect((await post(api, QUESTION)).json()).toEqual({ source: "NONE" });
     await api.close();
   });
 });
@@ -303,10 +354,23 @@ describe("the stored lines (decisions 5 and 29)", () => {
 
 describe("every language has what goes into the question", () => {
   const messages = resolve(import.meta.dirname, "../../apps/ui/messages");
-  const KEYS = ["purposeQuestion", "purposeDecide", "purposeUnderstand", "purposeWrite", "otherAnswer", "otherLabel", "matters", "angles"].map((key) => `newDebate.askText.${key}`);
+  const KEYS = ["otherAnswer", "otherLabel", "matters", "angles"].map((key) => `newDebate.askText.${key}`);
   const english = JSON.parse(readFileSync(resolve(messages, "en/newDebate.json"), "utf8")) as Record<string, string>;
   const locales = readdirSync(messages, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name);
   it("35 languages", () => expect(locales).toHaveLength(35));
+  it("the owner's exact English, and no general purpose choices left in any catalogue (decision 31)", () => {
+    expect(english["newDebate.askText.otherAnswer"]).toBe("Other…");
+    expect(english["newDebate.askText.otherLabel"]).toBe("Your own extra clarification");
+    expect(english["newDebate.askText.matters"]).toBe("If the answers pull in different directions, what matters most to me: {matters}");
+    expect(english["newDebate.askText.angles"]).toBe("Please also look at: {list}.");
+    const v4 = JSON.parse(readFileSync(resolve(messages, "en/v4.json"), "utf8")) as Record<string, string>;
+    expect(v4["v4.read.honestNote"]).toBe("These would help us better understand your question");
+    expect(v4["v4.read.clarifyWaiting"]).toBe("Analyzing your question…");
+    for (const locale of locales) {
+      const keys = Object.keys(JSON.parse(readFileSync(resolve(messages, `${locale}/newDebate.json`), "utf8")) as object);
+      expect(keys.filter((key) => key.startsWith("newDebate.askText.purpose")), locale).toEqual([]);
+    }
+  });
   it.each(locales)("%s", (locale) => {
     const catalog = JSON.parse(readFileSync(resolve(messages, `${locale}/newDebate.json`), "utf8")) as Record<string, string>;
     for (const key of KEYS) {
@@ -316,3 +380,26 @@ describe("every language has what goes into the question", () => {
     }
   });
 });
+
+describe("whether the person's pool has anything left (the room's measure)", () => {
+  const NOW = new Date("2026-11-01T10:00:00.000Z");
+  const windowOf = (scope: "PERSON_DAY" | "PERSON_MONTH", limitMicros: number) => ({ scope, limitMicros, periodStart: new Date(NOW.getTime() - 3_600_000),
+    resetsAt: new Date(NOW.getTime() + 3_600_000), finishBasisPoints: 10_000, closeBasisPoints: 8_000 });
+  const room = (windows: readonly unknown[], spent: number) => new AskRoom({ personAllowance: { read: async () => windows }, entitlements: null, clock: () => NOW, dailyCeilingMicros: 100_000, closeBasisPoints: 9_500, waitingLinePerPerson: 1,
+    spend: { readOwnerSpentMicros: async () => spent, readOwnerCountedHoldsMicros: async () => 1_000_000 } } as never);
+
+  it("nobody has limits: not empty", async () => {
+    expect(await room([], 0).readPersonPool(OWNER, NOW)).toEqual({ empty: false, funding: null });
+  });
+  it("room in every window: not empty, and a running debate's holds do not empty it", async () => {
+    expect((await room([windowOf("PERSON_DAY", 100), windowOf("PERSON_MONTH", 1_000)], 99).readPersonPool(OWNER, NOW)).empty).toBe(false);
+  });
+  it("any window spent to its limit: empty", async () => {
+    expect((await room([windowOf("PERSON_DAY", 100), windowOf("PERSON_MONTH", 1_000)], 100).readPersonPool(OWNER, NOW)).empty).toBe(true);
+  });
+  it("a team member's windows name their grant, so the call is charged to it", async () => {
+    const funding = { kind: "INTERNAL" as const, grantId: "g", grantEventId: "e" };
+    expect((await room([{ ...windowOf("PERSON_MONTH", 100), funding }], 0).readPersonPool(OWNER, NOW)).funding).toEqual(funding);
+  });
+});
+

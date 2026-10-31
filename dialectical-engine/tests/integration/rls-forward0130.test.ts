@@ -47,7 +47,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 const HEAD = "0130_row_level_security.sql";
 /** The chain's last step since the merge into the V4 branch (2026-10-30): the V4 account memory follows 0130, so a
  *  migrate() that reaches 0130 ends at it. */
-const CHAIN_END = "0143_run_handover.sql";
+const CHAIN_END = "0144_ask_clarify_charge.sql";
 const PREVIOUS = "0129_support_answer_scope.sql";
 const MIGRATIONS = new URL("../../migrations/", import.meta.url);
 const MANIFEST = "lineage/row-level-security-forward0130.json";
@@ -383,7 +383,7 @@ describe("S1.2 migration 0130 on an empty database", () => {
 
   it("S1.2-T11 (R28) 0130 records one amendment per earlier step whose postcondition pinned the flag; a disagreeing manifest, an amendment of a later step, a row of an unapplied step and a shared amendment table are refused", async () => {
     const rows = (await db.pool.query(
-      `SELECT source_name,amended_by,amendment FROM public.debateai_schema_migration_step_amendment ORDER BY source_name COLLATE "C"`)).rows;
+      `SELECT source_name,amended_by,amendment FROM public.debateai_schema_migration_step_amendment WHERE amended_by=$1 ORDER BY source_name COLLATE "C"`, [HEAD])).rows;
     expect(rows).toEqual(AMENDMENTS.map((amendment) => ({ source_name: amendment.step, amended_by: HEAD, amendment })));
     const step = await step0130();
     expect(step.amendsPostconditionsOf).toEqual(AMENDMENTS);

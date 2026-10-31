@@ -134,12 +134,8 @@
   "newDebate.plan.current.PLUS": "Gói của bạn: Plus",
   "newDebate.plan.current.PRO": "Gói của bạn: Pro",
   "newDebate.plan.current.MAX": "Gói của bạn: Max",
-  "newDebate.askText.purposeQuestion": "Bạn muốn dùng câu trả lời này để làm gì?",
-  "newDebate.askText.purposeDecide": "Để đưa ra quyết định",
-  "newDebate.askText.purposeUnderstand": "Để hiểu rõ vấn đề",
-  "newDebate.askText.purposeWrite": "Để viết về vấn đề này",
   "newDebate.askText.otherAnswer": "Câu trả lời khác…",
-  "newDebate.askText.otherLabel": "Câu trả lời của riêng bạn",
+  "newDebate.askText.otherLabel": "Lời giải thích thêm của riêng bạn",
   "newDebate.askText.matters": "Nếu các câu trả lời đi theo hướng khác nhau, điều quan trọng nhất đối với tôi là: {matters}",
   "newDebate.askText.angles": "Bạn vui lòng xem thêm: {list}."
 }

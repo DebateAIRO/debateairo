@@ -859,9 +859,9 @@ function effectiveAskMode(): Exclude<AskMode, "AUTO"> {
 }
 
 /**
- * Decision 29, dynamic step 2. The question decides the scene, so a click-test can see each: words ending "#generic" get the generic options, "#fail"
- * a server failure (the page's generic options too), "#slow" no answer for 15 seconds (past the page's limit); "#none" only the purpose question;
- * anything else two questions and the purpose question. Waits a little, so "Reading your question" can be seen.
+ * Decisions 29 and 31, dynamic step 2. The question decides the scene, so a click-test can see each: words ending "#none" get no questions (the AI could
+ * not help), "#fail" a server failure (no questions either), "#slow" no answer for 15 seconds (past the page's limit), "#purposeonly" only the purpose
+ * question, "#nopurpose" no purpose question; anything else two questions and the purpose question. Waits a little, so "Analyzing your question…" can be seen.
  */
 async function postClarify(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const body = C.AskClarifyRequestSchema.safeParse(await readJsonBody(req).catch(() => undefined));
@@ -870,13 +870,13 @@ async function postClarify(req: IncomingMessage, res: ServerResponse): Promise<v
   await new Promise((done) => setTimeout(done, question.endsWith("#slow") ? 15_000 : 900));
   if (res.destroyed) return;
   if (question.endsWith("#fail")) return sendJson(req, res, 503, { error: "MOCK_FAILURE", message: "MOCK_FAILURE" });
-  if (question.endsWith("#generic")) return sendJson(req, res, 200, { source: "GENERIC" }, C.AskClarifyResponseSchema);
+  if (question.endsWith("#none")) return sendJson(req, res, 200, { source: "NONE" }, C.AskClarifyResponseSchema);
   const purpose = { text: "What do you want the answer for?", answers: ["To decide how to vote", "To explain it to someone", "To write about it"] };
-  const questions = question.endsWith("#none") ? [] : [
+  const questions = question.endsWith("#purposeonly") ? [] : [
     { text: "Which country or region is this about?", answers: ["Romania", "The EU as a whole", "Anywhere in general"] },
     { text: "Over what time?", answers: ["The next 5 years", "The next 25 years"] }
   ];
-  return sendJson(req, res, 200, { source: "AI", questions, purpose }, C.AskClarifyResponseSchema);
+  return sendJson(req, res, 200, { source: "AI", questions, ...(question.endsWith("#nopurpose") ? {} : { purpose }) }, C.AskClarifyResponseSchema);
 }
 
 async function postAsk(req: IncomingMessage, res: ServerResponse): Promise<void> {

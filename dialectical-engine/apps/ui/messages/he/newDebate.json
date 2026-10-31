@@ -134,12 +134,8 @@
   "newDebate.plan.current.PLUS": "התוכנית שלכם: Plus",
   "newDebate.plan.current.PRO": "התוכנית שלכם: Pro",
   "newDebate.plan.current.MAX": "התוכנית שלכם: Max",
-  "newDebate.askText.purposeQuestion": "לשם מה דרושה התשובה?",
-  "newDebate.askText.purposeDecide": "כדי לקבל החלטה",
-  "newDebate.askText.purposeUnderstand": "כדי להבין את זה",
-  "newDebate.askText.purposeWrite": "כדי לכתוב על זה",
   "newDebate.askText.otherAnswer": "תשובה אחרת…",
-  "newDebate.askText.otherLabel": "התשובה שלי",
+  "newDebate.askText.otherLabel": "הבהרה נוספת משלך",
   "newDebate.askText.matters": "אם התשובות מושכות לכיוונים שונים, מה שהכי חשוב לי הוא: {matters}",
   "newDebate.askText.angles": "אנא עיינו גם בהיבטים הבאים: {list}."
 }

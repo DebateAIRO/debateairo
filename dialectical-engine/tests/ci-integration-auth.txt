@@ -96,6 +96,8 @@ tests/integration/team-limit-database.test.ts
 tests/integration/team-limit-http.test.ts
 # The team's one limit (0142): the passkey-bound change, the notices and admission (R22 decisions 14 and 24).
 tests/integration/team-limit-admission.test.ts
+# Step 2's small AI in the person's quota (0144): both rows, every spending reader, erasure, export, no request role reads them.
+tests/integration/ask-clarify-charge-database.test.ts
 
 # NOT listed: preview-auth-dev-startup.test.ts — red on dev at d1ac3641b (2 of 17: PREVIEW_STAGE_PROCESS_EXITED; it
 # starts the real API/UI stage processes, so it is a deployment rehearsal, not a self-contained suite).

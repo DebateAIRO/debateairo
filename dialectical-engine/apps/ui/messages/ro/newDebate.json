@@ -134,12 +134,8 @@
   "newDebate.plan.current.PLUS": "Abonamentul dvs.: Plus",
   "newDebate.plan.current.PRO": "Abonamentul dvs.: Pro",
   "newDebate.plan.current.MAX": "Abonamentul dvs.: Max",
-  "newDebate.askText.purposeQuestion": "Pentru ce doriți răspunsul?",
-  "newDebate.askText.purposeDecide": "Pentru a lua o decizie",
-  "newDebate.askText.purposeUnderstand": "Pentru a înțelege subiectul",
-  "newDebate.askText.purposeWrite": "Pentru a scrie pe această temă",
   "newDebate.askText.otherAnswer": "Alt răspuns…",
-  "newDebate.askText.otherLabel": "Răspunsul dumneavoastră",
+  "newDebate.askText.otherLabel": "Propria dumneavoastră explicație suplimentară",
   "newDebate.askText.matters": "Dacă răspunsurile duc în direcții diferite, cel mai important pentru mine este: {matters}",
   "newDebate.askText.angles": "Vă rog să analizați și: {list}."
 }

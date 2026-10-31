@@ -134,12 +134,8 @@
   "newDebate.plan.current.PLUS": "Vaš plan: Plus",
   "newDebate.plan.current.PRO": "Vaš plan: Pro",
   "newDebate.plan.current.MAX": "Vaš plan: Max",
-  "newDebate.askText.purposeQuestion": "Za što vam treba odgovor?",
-  "newDebate.askText.purposeDecide": "Za donošenje odluke",
-  "newDebate.askText.purposeUnderstand": "Za razumijevanje",
-  "newDebate.askText.purposeWrite": "Za pisanje o tome",
   "newDebate.askText.otherAnswer": "Drugi odgovor…",
-  "newDebate.askText.otherLabel": "Vaš vlastiti odgovor",
+  "newDebate.askText.otherLabel": "Vaše vlastito dodatno pojašnjenje",
   "newDebate.askText.matters": "Ako odgovori vode u različitim smjerovima, što mi je najvažnije: {matters}",
   "newDebate.askText.angles": "Molimo, pogledajte i ove aspekte: {list}."
 }

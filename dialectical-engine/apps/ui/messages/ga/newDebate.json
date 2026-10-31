@@ -134,12 +134,8 @@
   "newDebate.plan.current.PLUS": "Do phlean: Plus",
   "newDebate.plan.current.PRO": "Do phlean: Pro",
   "newDebate.plan.current.MAX": "Do phlean: Max",
-  "newDebate.askText.purposeQuestion": "Cad chuige a dteastaíonn an freagra uaibh?",
-  "newDebate.askText.purposeDecide": "Chun cinneadh a dhéanamh",
-  "newDebate.askText.purposeUnderstand": "Chun é a thuiscint",
-  "newDebate.askText.purposeWrite": "Chun scríobh faoi",
   "newDebate.askText.otherAnswer": "Freagra eile…",
-  "newDebate.askText.otherLabel": "Mo fhreagra féin",
+  "newDebate.askText.otherLabel": "Bhur soiléiriú breise féin",
   "newDebate.askText.matters": "Má tá na freagraí ag dul i dtreonna éagsúla, is é an rud is tábhachtaí dom: {matters}",
   "newDebate.askText.angles": "Le bhur dtoil, féachaigí freisin ar: {list}."
 }

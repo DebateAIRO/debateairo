@@ -406,6 +406,8 @@
         "billing.read_internal_run_state",
         "ledger.record_language_check_spend",
         "ledger.record_question_check_spend",
+        "identity.record_ask_clarify_charge",
+        "identity.read_ask_clarify_spent",
         "staff.keep_threat_report",
         "staff.list_threat_reports",
         "staff.count_unread_threat_reports",
@@ -3065,6 +3067,28 @@
       "source": "migrations/0143_run_handover.sql",
       "grants": [
         "EXECUTE ON FUNCTION identity.continue_paused_run_in_release(uuid,uuid,text,bigint)"
+      ]
+    },
+    {
+      "roleName": "debateai_staff_security_owner",
+      "source": "migrations/0144_ask_clarify_charge.sql",
+      "grants": [
+        "SELECT, INSERT ON identity.ask_clarify_charge"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0144_ask_clarify_charge.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.record_ask_clarify_charge(uuid,uuid,uuid,uuid,text,date,bigint,bigint,bigint)",
+        "EXECUTE ON FUNCTION identity.read_ask_clarify_spent(uuid,timestamptz,timestamptz)"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0144_ask_clarify_charge.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_ask_clarify(uuid,uuid)"
       ]
     }
   ],

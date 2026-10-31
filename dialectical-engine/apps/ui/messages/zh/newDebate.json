@@ -134,12 +134,8 @@
   "newDebate.plan.current.PLUS": "您的方案：Plus",
   "newDebate.plan.current.PRO": "您的方案：Pro",
   "newDebate.plan.current.MAX": "您的方案：Max",
-  "newDebate.askText.purposeQuestion": "您想把答案用来做什么？",
-  "newDebate.askText.purposeDecide": "为了做决定",
-  "newDebate.askText.purposeUnderstand": "为了弄明白这件事",
-  "newDebate.askText.purposeWrite": "为了写这方面的内容",
   "newDebate.askText.otherAnswer": "其他答案…",
-  "newDebate.askText.otherLabel": "您自己的答案",
+  "newDebate.askText.otherLabel": "您自己补充的说明",
   "newDebate.askText.matters": "如果几个答案的方向不一样，我最看重的是：{matters}",
   "newDebate.askText.angles": "也请您看看：{list}。"
 }

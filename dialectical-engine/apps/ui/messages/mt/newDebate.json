@@ -134,12 +134,8 @@
   "newDebate.plan.current.PLUS": "Il-pjan tiegħek: Plus",
   "newDebate.plan.current.PRO": "Il-pjan tiegħek: Pro",
   "newDebate.plan.current.MAX": "Il-pjan tiegħek: Max",
-  "newDebate.askText.purposeQuestion": "Għal xiex tixtiequ t-tweġiba?",
-  "newDebate.askText.purposeDecide": "Biex nieħu deċiżjoni",
-  "newDebate.askText.purposeUnderstand": "Biex nifhem dan",
-  "newDebate.askText.purposeWrite": "Biex nikteb dwaru",
   "newDebate.askText.otherAnswer": "Tweġiba oħra…",
-  "newDebate.askText.otherLabel": "It-tweġiba tagħkom stess",
+  "newDebate.askText.otherLabel": "Spjegazzjoni addizzjonali tagħkom",
   "newDebate.askText.matters": "Jekk it-tweġibiet imorru f'direzzjonijiet differenti, l-aktar ħaġa importanti għalija hi: {matters}",
   "newDebate.askText.angles": "Jekk jogħġobkom ħarsu wkoll lejn dawn l-aspetti: {list}."
 }

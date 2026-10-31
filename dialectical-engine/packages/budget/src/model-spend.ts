@@ -79,6 +79,8 @@ export type ModelSpendSource =
   | "LANGUAGE_CHECK"
   /** the pre-start question check: a run-less site cost (0128), written only by ledger.record_question_check_spend */
   | "QUESTION_CHECK"
+  /** step 2's small AI before a debate: run-less, in the site's day and in the person's windows through its own row (0144), written only by identity.record_ask_clarify_charge */
+  | "ASK_CLARIFY"
   /**
    * A dig's path rewrite (0134; plan 2026-10-30 dig-model revision W3-2/W3-5): written after the dig settled, in the
    * story's place (a dig has no story). It names the DIG's run, is inside the dig's estimate, counts in the person's
@@ -167,6 +169,29 @@ export async function questionCheckSpendWriterPresent(pool: Pick<Pool, "query">)
 export async function recordQuestionCheckSpend(pool: Pick<Pool, "query">, entry: QuestionCheckSpendEntry): Promise<void> {
   await pool.query("SELECT ledger.record_question_check_spend($1::uuid,$2::text,$3::date,$4::bigint,$5::bigint,$6::bigint)",
     [entry.spendId, entry.providerRef, entry.chargedOn, entry.chargeMicros, entry.inputTokens, entry.outputTokens]);
+}
+
+/** The writer of step 2's small AI (decisions 29 and 31): the ledger's row and the person's, in one transaction. */
+export const ASK_CLARIFY_CHARGE_WRITER = "identity.record_ask_clarify_charge(uuid,uuid,uuid,uuid,text,date,bigint,bigint,bigint)" as const;
+
+export type AskClarifyChargeEntry = LanguageCheckSpendEntry & Readonly<{
+  ownerRef: string;
+  /** A team member's call names its grant, so the grant's windows and the team's limit count it; null: the person's own plan. */
+  grant: Readonly<{ grantId: string; grantEventId: string }> | null;
+}>;
+
+export async function askClarifyChargeWriterPresent(pool: Pick<Pool, "query">): Promise<boolean> {
+  const result = await pool.query<{ present: unknown }>(
+    `SELECT CASE WHEN NOT has_schema_privilege(current_user, 'identity', 'USAGE') THEN false
+       ELSE coalesce(to_regprocedure($1) IS NOT NULL AND has_function_privilege(current_user, to_regprocedure($1), 'EXECUTE'), false) END AS present`,
+    [ASK_CLARIFY_CHARGE_WRITER]);
+  return result.rows[0]?.present === true;
+}
+
+export async function recordAskClarifyCharge(pool: Pick<Pool, "query">, entry: AskClarifyChargeEntry): Promise<void> {
+  await pool.query("SELECT identity.record_ask_clarify_charge($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,$6::date,$7::bigint,$8::bigint,$9::bigint)",
+    [entry.spendId, entry.ownerRef, entry.grant?.grantId ?? null, entry.grant?.grantEventId ?? null, entry.providerRef, entry.chargedOn,
+      entry.chargeMicros, entry.inputTokens, entry.outputTokens]);
 }
 
 const wholeCount = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
@@ -1303,6 +1328,9 @@ export class PostgresModelSpendStore implements ModelSpendStore {
     if (entry.spendSource === "QUESTION_CHECK") {
       throw new TypedDomainError("MODEL_SPEND_QUESTION_CHECK_FUNCTION_ONLY", "A question check's site cost is written only by ledger.record_question_check_spend");
     }
+    if (entry.spendSource === "ASK_CLARIFY") {
+      throw new TypedDomainError("MODEL_SPEND_ASK_CLARIFY_FUNCTION_ONLY", "Step 2's small AI is written only by identity.record_ask_clarify_charge");
+    }
     if ((entry.spendSource === "RUN" || entry.spendSource === "STORY" || entry.spendSource === "SYNTHESIS_CHECK") && entry.runId === null) {
       throw new TypedDomainError("MODEL_SPEND_RUN_REQUIRED", "A run, story or synthesis check charge must name its run");
     }
@@ -1457,8 +1485,10 @@ export class PostgresModelSpendStore implements ModelSpendStore {
       return this.#total(result.rows[0]?.total);
     }
     // Most runs have no synthesis check. CASE keeps the definer lookup off their spend path.
+    // Decisions 29 and 31: plus step 2's small AI, which has no run (0144).
     const result = await this.pool.query<{ total: string }>(
-      `SELECT coalesce(sum(spend.charge_micros),0)::text AS total ${PostgresModelSpendStore.#ownerSpendFrom}`,
+      `SELECT ((SELECT coalesce(sum(spend.charge_micros),0) ${PostgresModelSpendStore.#ownerSpendFrom})
+         + identity.read_ask_clarify_spent($1::uuid, $2::timestamptz, $3::timestamptz))::text AS total`,
       [ownerRef, from, to]
     );
     return this.#total(result.rows[0]?.total);
@@ -1501,10 +1531,10 @@ export class PostgresModelSpendStore implements ModelSpendStore {
       return Object.freeze(totals);
     }
     const result = await this.pool.query<{ ordinal: string; total: string }>(
-      `SELECT window_range.ordinal::text AS ordinal, (
+      `SELECT window_range.ordinal::text AS ordinal, ((
          SELECT coalesce(sum(spend.charge_micros),0)
          ${PostgresModelSpendStore.#ownerSpendFrom.replaceAll("$2", "window_range.from_at").replaceAll("$3", "window_range.to_at")}
-       )::text AS total
+       ) + identity.read_ask_clarify_spent($1::uuid, window_range.from_at, window_range.to_at))::text AS total
        FROM unnest($2::timestamptz[], $3::timestamptz[]) WITH ORDINALITY AS window_range(from_at, to_at, ordinal)
        ORDER BY window_range.ordinal`,
       [ownerRef, ranges.map((range) => range.from), ranges.map((range) => range.to)]
@@ -1516,7 +1546,7 @@ export class PostgresModelSpendStore implements ModelSpendStore {
   /**
    * The money rule's notice: the person's charges in [from, to), oldest first (recorded time, then id), with the run
    * each belongs to, so the part past a window's limit can be named by the runs that spent it. The same rows as
-   * `readOwnerSpentMicros`; a subscription's only (an internal grant never borrows).
+   * `readOwnerSpentMicros`, less step 2's small AI, which has no run to name; a subscription's only (an internal grant never borrows).
    */
   async readOwnerChargesMicros(ownerRef: string, from: Date, to: Date): Promise<ReadonlyArray<Readonly<{
     runId: string; chargeMicros: number }>>> {

@@ -1,28 +1,32 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { costEnvelopeDay, languageCheckChargeMicros, type AskClarifyChargeEntry } from "@debateai/budget";
 import { AskClarifyResponseSchema, WEB_CONTRACT_LIMITS, type AskClarifyResponse, type ClarifyQuestion } from "@debateai/contract";
 import { framedAskClarify } from "@debateai/judgement";
 import {
   ANTHROPIC_MESSAGES_BASE_URL, ANTHROPIC_MESSAGES_PATH, PREVIEW_ANTHROPIC_MESSAGES_URL, appendFramedRejection, decodeModelJson, type PromptPacket
 } from "@debateai/providers";
-import { exhaustive } from "@debateai/kernel";
+import { exhaustive, type FundingBasis } from "@debateai/kernel";
 import type { QuestionLanguageFastCheck, QuestionLanguagePolicy } from "@debateai/register";
-import type { QuestionLanguagePaidRoute } from "./question-language/boot.js";
+import { hostedLanguageCheckPrice, type QuestionLanguagePaidRoute } from "./question-language/boot.js";
 import type { FastCheckTransport } from "./question-language/fast-check.js";
-import { anthropicFastCheckTransport } from "./question-language/transport.js";
+import { anthropicFastCheckTransport, type FastCheckUsage } from "./question-language/transport.js";
 
 /**
- * DYNAMIC STEP 2 (plan 2026-10-31-r22-owner-changes decision 29): one small Haiku call, before any debate exists, that writes the clarifying
- * questions for the ask page. The page never waits on it past a bound and never fails because of it: every failure here is the GENERIC answer,
- * and the page then shows its generic purpose options.
+ * DYNAMIC STEP 2 (plan 2026-10-31-r22-owner-changes decisions 29 and 31): one small Haiku call, before any debate exists, that writes the clarifying
+ * questions for the ask page. The page never waits on it past a bound and never fails because of it: every failure here is the NONE answer, and the
+ * page then shows no questions, only the person's own-words boxes.
  *
- * Money: no run exists yet, so the call is one run-less site cost, the same as the two other calls made before a debate (the language check and
- * the question check), through the language check's writer (0118) under its own provider reference, so it needs no migration and counts in the
- * day's site pot. It is NOT in the person's quota share: a person's windows are the charges of the runs pinned to them, and a run-less row names
- * nobody. What bounds it per person is the limit below. Preview: the Anthropic gate settles it in its daily pot, like the language check.
+ * Money: the call counts in the person's quota. No run exists yet, so it has its own record (0144): one row naming the person, the cost and the time,
+ * beside a run-less ledger row that keeps it in the site's day. The windows, a team member's grant and the team's one limit all read it. The caller
+ * asks first whether the pool is empty: empty, no call. Every call is recorded from the vendor's real counts, or the projected maximum when a hosted
+ * call may have been billed without readable counts; on the preview the gate settles the money and a refused send costs nothing, so only real counts.
+ * A record that cannot be written stops the calls until a restart (never spend unrecorded).
  *
- * Privacy: nothing here logs the question, the reply or the suggestions, only codes. Nothing is written to a database or a file except the money
- * row (a day, a charge and two counts). The cache below lives in this process's memory for minutes and is keyed by a hash under a per-process key,
- * so it can never answer one person with another's words.
+ * Privacy: nothing here logs the question, the reply or the suggestions, only codes. Nothing is written to a database or a file but the money rows. The
+ * cache below lives in this process's memory for minutes and is keyed by a hash under a per-process key, so it can never answer one person with
+ * another's words.
+ *
+ * The limits (LIMITS, below) live in this file: a guard against a stuck page, not a quota, and the Hide-limits lane may move them to the server.
  */
 
 /** The server's bound on the whole step, retries included. The page gives up a little after it (V4 ASK_CLARIFY_PAGE_WAIT_MS). */
@@ -39,7 +43,8 @@ export const ASK_CLARIFY_MODEL_SETTINGS: QuestionLanguageFastCheck = Object.free
   priceMicrosUsdPerMillionTokens: Object.freeze({ input: 0, output: 0 })
 });
 
-export const ASK_CLARIFY_SPEND_REF = "language-check:ask-clarify:claude-haiku-5-5" as const;
+/** The ledger's code for the call: names no person. 0144's writer refuses any other shape. */
+export const ASK_CLARIFY_SPEND_REF = "ask-clarify:anthropic:claude-haiku-5-5" as const;
 
 /**
  * The route table's input (question-language/boot.ts decides PREVIEW, HOSTED or NONE, one decision for every call before a debate). The route
@@ -49,17 +54,21 @@ export const ASK_CLARIFY_ROUTE_POLICY: QuestionLanguagePolicy = Object.freeze({
   kind: "QUESTION_LANGUAGE_POLICY", version: 1, fastCheck: ASK_CLARIFY_MODEL_SETTINGS, instruction: "Not read: the route takes the model settings only."
 });
 
+/** A transport that reports one call's cost in tokens to `onUsage`. */
+export type AskClarifyTransportFor = (onUsage: (usage: FastCheckUsage) => Promise<void>) => FastCheckTransport;
+
 /**
- * The transport for a route. Local mode has no paid AI (NONE, reason LOCAL_MODE), so its page shows the generic purpose options, as the language
- * check falls back there; a person running it locally loses nothing but the tailored questions. Preview: the guarded fetch through the Anthropic
- * gate, no key, no usage record (the gate settles). Hosted: the support target's key and the day-pot gate, as the language check.
+ * The transports of a route. Local mode has no paid AI (NONE, reason LOCAL_MODE), so its page shows no questions, as the language check makes no call
+ * there. Preview: the guarded fetch through the Anthropic gate, no key; only the vendor's real counts reach the person's quota (a send the guarded
+ * fetch refused cost nothing, and would otherwise read as a projected maximum). Hosted: the support target's key and the day-pot gate, as the language check.
  */
-export function askClarifyTransport(route: QuestionLanguagePaidRoute): FastCheckTransport | null {
+export function askClarifyTransportFor(route: QuestionLanguagePaidRoute): AskClarifyTransportFor | null {
   switch (route.kind) {
     case "NONE": return null;
-    case "PREVIEW": return anthropicFastCheckTransport({ fetch: route.fetch, url: PREVIEW_ANTHROPIC_MESSAGES_URL, credential: undefined, settings: ASK_CLARIFY_MODEL_SETTINGS });
-    case "HOSTED": return anthropicFastCheckTransport({ fetch, url: `${ANTHROPIC_MESSAGES_BASE_URL}${ANTHROPIC_MESSAGES_PATH}`,
-      credential: route.credential, settings: ASK_CLARIFY_MODEL_SETTINGS, onUsage: route.recordSpend, beforeSend: route.beforeSend });
+    case "PREVIEW": return (onUsage) => anthropicFastCheckTransport({ fetch: route.fetch, url: PREVIEW_ANTHROPIC_MESSAGES_URL, credential: undefined,
+      settings: ASK_CLARIFY_MODEL_SETTINGS, onUsage: async (usage) => { if (!usage.projected) await onUsage(usage); } });
+    case "HOSTED": return (onUsage) => anthropicFastCheckTransport({ fetch, url: `${ANTHROPIC_MESSAGES_BASE_URL}${ANTHROPIC_MESSAGES_PATH}`,
+      credential: route.credential, settings: ASK_CLARIFY_MODEL_SETTINGS, onUsage, beforeSend: route.beforeSend });
     default: return exhaustive(route);
   }
 }
@@ -71,13 +80,17 @@ const CACHE = Object.freeze({ ttlMs: 10 * 60_000, entries: 2_000 });
 /** The tables' bound: past it the oldest person is forgotten, which can only give them a fresh limit. */
 const PEOPLE_MAX = 20_000;
 
-export type AskClarifyFallback = "NOT_CONFIGURED" | "RATE_LIMITED" | "DEADLINE" | "TRANSPORT" | "UNREADABLE";
+export type AskClarifyFallback = "RATE_LIMITED" | "DEADLINE" | "TRANSPORT" | "UNREADABLE" | "RECORD_DOWN";
 
 export interface AskClarifyPort {
-  read(ownerRef: string, questionLine: string): Promise<AskClarifyResponse>;
+  /** `funding`: what funds this person now (the room's answer); a team member's call names its grant. */
+  read(ownerRef: string, questionLine: string, funding: FundingBasis | null): Promise<AskClarifyResponse>;
 }
 
-const GENERIC: AskClarifyResponse = Object.freeze({ source: "GENERIC" });
+const NONE: AskClarifyResponse = Object.freeze({ source: "NONE" });
+/** A refusal every later record would meet too latches at once; any other failure after this many in a row. */
+const RECORD_LATCHING_CODES: ReadonlySet<string> = new Set(["42501", "42883", "23514"]);
+const RECORD_FAILURES_IN_A_ROW = 3;
 
 type Reading = Readonly<{ questions: readonly ClarifyQuestion[]; purpose: ClarifyQuestion | null }>;
 
@@ -130,8 +143,7 @@ export function readAskClarifyReply(text: string): Reading | null {
 /**
  * The rest of the slip order (owner 2026-10-12): code reads the reply; a reply with no purpose question, or nothing readable, is asked again once
  * with a code and a path only. The owner's middle step, a smaller follow-up, saves nothing here: the whole reply is smaller than the turn it would
- * resend. What the second try cannot give falls to the generic answer: readable questions with no purpose question are still no answer,
- * because the purpose question is the one the owner asked for always.
+ * resend. If the second try still has no purpose question, the first try's other questions are kept.
  */
 async function readWithRecovery(questionLine: string, transport: FastCheckTransport, signal: AbortSignal): Promise<Reading | null> {
   const packet: PromptPacket = framedAskClarify(questionLine);
@@ -140,23 +152,51 @@ async function readWithRecovery(questionLine: string, transport: FastCheckTransp
   const again = appendFramedRejection(packet, first === null
     ? { code: "ASK_CLARIFY_REPLY_UNREADABLE", path: "reply" }
     : { code: "ASK_CLARIFY_PURPOSE_MISSING", path: "purpose" });
-  return readAskClarifyReply(await transport({ packet: again, signal }));
+  let second: Reading | null;
+  try {
+    second = readAskClarifyReply(await transport({ packet: again, signal }));
+  } catch (failure) {
+    if (first === null || first.questions.length === 0) throw failure;
+    return first;
+  }
+  return second?.purpose !== null && second !== null ? second : second !== null && second.questions.length >= (first?.questions.length ?? 0) ? second : first;
 }
 
 export function createAskClarify(deps: Readonly<{
-  /** Null: this deployment has no paid AI for it (local mode, no gate, no key, no spend writer). */
-  transport: FastCheckTransport | null;
+  /** Null: this deployment has no paid AI for it (local mode, no gate, no key, no writer). */
+  transportFor: AskClarifyTransportFor | null;
+  /** The one writer (0144). A failure stops the calls; it never fails the page. */
+  record: (entry: AskClarifyChargeEntry) => Promise<void>;
   clock: () => Date;
   report: (line: Readonly<{ event: string; code: string }>) => void;
   deadlineMs?: number;
+  newId?: () => string;
 }>): AskClarifyPort {
   const deadlineMs = deps.deadlineMs ?? ASK_CLARIFY_DEADLINE_MS;
   const cacheKey = randomBytes(32);
   const cache = new Map<string, Readonly<{ at: number; answer: AskClarifyResponse }>>();
   const calls = new Map<string, number[]>();
+  const newId = deps.newId ?? randomUUID;
+  let recordDown = false;
+  let recordFailures = 0;
+  /** One call's cost, counted in the person's quota. Never throws: a failed record is one code line, and the breaker. */
+  const charge = async (ownerRef: string, funding: FundingBasis | null, usage: FastCheckUsage): Promise<void> => {
+    try {
+      const price = hostedLanguageCheckPrice(ASK_CLARIFY_MODEL_SETTINGS.priceMicrosUsdPerMillionTokens, ASK_CLARIFY_MODEL_SETTINGS.model, usage.inputTokens);
+      await deps.record(Object.freeze({ spendId: newId(), ownerRef, providerRef: ASK_CLARIFY_SPEND_REF, chargedOn: costEnvelopeDay(deps.clock()),
+        chargeMicros: languageCheckChargeMicros(usage, price), inputTokens: usage.inputTokens, outputTokens: usage.outputTokens,
+        grant: funding?.kind === "INTERNAL" ? Object.freeze({ grantId: funding.grantId, grantEventId: funding.grantEventId }) : null }));
+      recordFailures = 0;
+    } catch (failure) {
+      const code = typeof failure === "object" && failure !== null && "code" in failure ? String(failure.code) : "";
+      recordFailures += 1;
+      if (RECORD_LATCHING_CODES.has(code) || recordFailures >= RECORD_FAILURES_IN_A_ROW) recordDown = true;
+      deps.report({ event: "api.ask_clarify.charge_unrecorded", code: "RECORD_DOWN" });
+    }
+  };
   const fallback = (code: AskClarifyFallback): AskClarifyResponse => {
-    deps.report({ event: "api.ask_clarify.generic", code });
-    return GENERIC;
+    deps.report({ event: "api.ask_clarify.none", code });
+    return NONE;
   };
   /** Takes one call from the person's limits, or says none is left. */
   const admitted = (ownerRef: string, now: number): boolean => {
@@ -172,15 +212,17 @@ export function createAskClarify(deps: Readonly<{
     return true;
   };
   return Object.freeze({
-    async read(ownerRef: string, questionLine: string): Promise<AskClarifyResponse> {
-      const transport = deps.transport;
-      if (transport === null) return GENERIC;
+    async read(ownerRef: string, questionLine: string, funding: FundingBasis | null): Promise<AskClarifyResponse> {
+      const transportFor = deps.transportFor;
+      if (transportFor === null) return NONE;
       const now = deps.clock().getTime();
       const key = createHash("sha256").update(cacheKey).update(ownerRef).update("\0").update(questionLine).digest("base64url");
       const known = cache.get(key);
       if (known !== undefined && now - known.at < CACHE.ttlMs) return known.answer;
       cache.delete(key);
+      if (recordDown) return fallback("RECORD_DOWN");
       if (!admitted(ownerRef, now)) return fallback("RATE_LIMITED");
+      const transport = transportFor((usage) => charge(ownerRef, funding, usage));
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), deadlineMs);
       const abandoned = new Promise<never>((_resolve, reject) => {
@@ -188,8 +230,8 @@ export function createAskClarify(deps: Readonly<{
       });
       try {
         const reading = await Promise.race([readWithRecovery(questionLine, transport, controller.signal), abandoned]);
-        if (reading === null || reading.purpose === null) return fallback("UNREADABLE");
-        const answer = AskClarifyResponseSchema.parse({ source: "AI", questions: reading.questions, purpose: reading.purpose });
+        if (reading === null || (reading.purpose === null && reading.questions.length === 0)) return fallback("UNREADABLE");
+        const answer = AskClarifyResponseSchema.parse({ source: "AI", questions: reading.questions, ...(reading.purpose === null ? {} : { purpose: reading.purpose }) });
         cache.set(key, Object.freeze({ at: now, answer }));
         if (cache.size > CACHE.entries) cache.delete(cache.keys().next().value!);
         return answer;

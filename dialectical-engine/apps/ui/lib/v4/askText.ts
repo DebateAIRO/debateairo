@@ -101,16 +101,9 @@ export function purposeLinesOfGoal(goal: V4Goal): PurposeLines | undefined {
   return { ...(answers.length === 0 ? {} : { answers: [...answers] }), ...(matters.length === 0 ? {} : { matters }), ...(angles.length === 0 ? {} : { angles }) };
 }
 
-/** Decision 29: the generic purpose question, shown when no AI read the question. In the page's language, from `newDebate`, in all 35 languages. */
-export function genericPurposeQuestion(catalog: MessageCatalog): ClarifyQuestion {
-  return { text: t(catalog, "newDebate.askText.purposeQuestion"), answers: [
-    t(catalog, "newDebate.askText.purposeDecide"), t(catalog, "newDebate.askText.purposeUnderstand"), t(catalog, "newDebate.askText.purposeWrite")
-  ] };
-}
-
-/** The questions a reply puts on the page, in order: the AI's, the one about what the answer is for last; or the generic one. */
-export function clarifyingQuestions(reply: AskClarifyResponse, catalog: MessageCatalog): readonly ClarifyQuestion[] {
-  return reply.source === "AI" ? Object.freeze([...reply.questions, reply.purpose]) : Object.freeze([genericPurposeQuestion(catalog)]);
+/** The questions a reply puts on the page, in order: the AI's, the one about what the answer is for last; none when no AI could help (decision 31). */
+export function clarifyingQuestions(reply: AskClarifyResponse): readonly ClarifyQuestion[] {
+  return reply.source === "AI" ? Object.freeze([...reply.questions, ...(reply.purpose === undefined ? [] : [reply.purpose])]) : Object.freeze([]);
 }
 
 /** A changed question: an answer stays only while its question is still asked and, unless the person typed it, still offered. */

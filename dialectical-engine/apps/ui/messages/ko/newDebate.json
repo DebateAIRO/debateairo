@@ -134,12 +134,8 @@
   "newDebate.plan.current.PLUS": "내 요금제: Plus",
   "newDebate.plan.current.PRO": "내 요금제: Pro",
   "newDebate.plan.current.MAX": "내 요금제: Max",
-  "newDebate.askText.purposeQuestion": "어떤 목적으로 답변이 필요하신가요?",
-  "newDebate.askText.purposeDecide": "결정을 내리기 위해",
-  "newDebate.askText.purposeUnderstand": "이해하기 위해",
-  "newDebate.askText.purposeWrite": "그것에 대해 글을 쓰기 위해",
   "newDebate.askText.otherAnswer": "다른 답변…",
-  "newDebate.askText.otherLabel": "직접 입력하는 답변",
+  "newDebate.askText.otherLabel": "직접 쓰는 추가 설명",
   "newDebate.askText.matters": "답변들이 서로 다른 방향으로 갈리면, 제게 가장 중요한 것은: {matters}",
   "newDebate.askText.angles": "다음 관점도 살펴봐 주세요: {list}."
 }

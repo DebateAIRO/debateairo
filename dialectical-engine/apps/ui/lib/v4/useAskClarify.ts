@@ -4,17 +4,16 @@ import { useEffect, useRef, useState } from "react";
 import type { AskClarifyResponse } from "@debateai/contract";
 import { contractClient } from "@/lib/api";
 
-/** The page stops waiting after this and shows the generic purpose options: a little past the server's own 8 seconds (ASK_CLARIFY_DEADLINE_MS). */
+/** The page stops waiting after this and shows no questions: a little past the server's own 8 seconds (ASK_CLARIFY_DEADLINE_MS). */
 export const ASK_CLARIFY_PAGE_WAIT_MS = 10_000;
 /** A question edited at step 2 is read again once the typing has paused this long. */
 const EDIT_PAUSE_MS = 1_200;
 
-const GENERIC: AskClarifyResponse = Object.freeze({ source: "GENERIC" });
+const NONE: AskClarifyResponse = Object.freeze({ source: "NONE" });
 
 /**
- * Decision 29: what step 2 shows for the question. Nothing here can hold the page up: Start works while it waits, and any failure is the generic
- * answer. A text this page already asked about is not asked again (Back and Next, or an edit undone). `mayCall` false (the consent was refused, or
- * the words read as a person in crisis): no call, the generic options.
+ * Decision 29: what step 2 shows for the question. Nothing here can hold the page up: Start works while it waits, and any failure is no questions. A text this page already asked about is not asked again (Back and Next, or an edit undone). `mayCall` false (the consent was refused, or
+ * the words read as a person in crisis): no call, no questions.
  */
 export function useAskClarify(input: Readonly<{ active: boolean; question: string; mayCall: boolean }>): Readonly<{
   reply: AskClarifyResponse | null;
@@ -33,7 +32,7 @@ export function useAskClarify(input: Readonly<{ active: boolean; question: strin
     }
     const seen = known.current.get(question);
     if (seen !== undefined || !mayCall) {
-      setReply(seen ?? GENERIC);
+      setReply(seen ?? NONE);
       setWaiting(false);
       return;
     }
@@ -51,12 +50,12 @@ export function useAskClarify(input: Readonly<{ active: boolean; question: strin
     };
     // The whole wait, the edit's pause included: whatever the network does, the page carries on.
     const giveUp = setTimeout(() => {
-      settle(GENERIC);
+      settle(NONE);
       controller.abort();
     }, ASK_CLARIFY_PAGE_WAIT_MS);
     const ask = (): void => {
       asked.current = true;
-      contractClient.clarifyAsk({ question_line: question }, controller.signal).then(settle, () => settle(GENERIC));
+      contractClient.clarifyAsk({ question_line: question }, controller.signal).then(settle, () => settle(NONE));
     };
     const pause = asked.current ? setTimeout(ask, EDIT_PAUSE_MS) : undefined;
     if (pause === undefined) ask();
