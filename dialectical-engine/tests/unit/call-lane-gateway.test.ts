@@ -612,7 +612,7 @@ describe("the runner's wiring (source pins)", () => {
     expect(claim).toBeGreaterThan(0);
     expect(open).toBeGreaterThan(claim);
     // The outermost finally: it ends the method (then the class), after the story ran inside the try.
-    expect(execute).toMatch(/\} finally \{\s*callLane\?\.close\(\);\s*keepAlive\.stop\(\);\s*\}\s*\}\s*\}\s*$/u);
+    expect(execute).toMatch(/\} finally \{\s*callLane\?\.close\(\);\s*keepAlive\.stop\(\);\s*releaseRunPassages\(claimedRunId\);\s*\}\s*\}\s*\}\s*$/u);
     expect(execute.indexOf("await storyWriter.writeAfterSettle(")).toBeLessThan(execute.lastIndexOf("callLane?.close();"));
     // S20 re-pin — final fix wave S12 (d9d6e73cc): the lane now opens BEFORE the keep-alive starts, so a keep-alive that
     // cannot start closes it in its own catch and rethrows, before the outermost try (whose finally holds the other close)
