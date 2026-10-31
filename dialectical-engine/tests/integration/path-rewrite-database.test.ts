@@ -205,7 +205,8 @@ describe("W3-7 the path rewrite on the database", () => {
     const pass = await sweepPathRewrites({ ...fresh.sweep, now: later });
     expect(pass.rewritten).toBeGreaterThanOrEqual(1);
     expect((await rowOf(dig)).map((row) => row.outcome)).toEqual(["READY"]);
-    expect(again.sent.haiku).toHaveLength(0);
+    // Nothing of the rewrite's writer is sent again; what haiku is asked now is only the suggestions on the dig's own paths (W4-3).
+    expect(again.sent.haiku.filter((packet) => readPromptFrame(packet).contractId !== "web.suggest-dig.v1")).toHaveLength(0);
     expect(again.sent.glm).toHaveLength(1);
     expect(first.sent.haiku).toHaveLength(1);
     expect(await writerEntries(dig)).toBe(1);
