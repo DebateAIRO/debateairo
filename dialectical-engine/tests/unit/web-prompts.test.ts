@@ -44,7 +44,7 @@ import {
 } from "@debateai/serve";
 import { STORYTELLER_V4_CONTRACT_ID, storyContractForSources } from "@debateai/story";
 import { ENGINE_SEALED_CONTRACT_IDS, engineSealedContracts } from "../../apps/runner/src/engine-contracts.js";
-import { INVESTIGATION_REPORT_SEALED_CONTRACTS, PATH_REWRITE_SEALED_CONTRACTS, PATH_REWRITE_V2_SEALED_CONTRACTS } from "@debateai/story";
+import { INVESTIGATION_REPORT_SEALED_CONTRACTS, PATH_REWRITE_SEALED_CONTRACTS, PATH_REWRITE_V2_SEALED_CONTRACTS, REPORT_OVERALL_SEALED_CONTRACTS } from "@debateai/story";
 import { EVALUATOR_SOURCES_SEALED_CONTRACTS } from "../../apps/runner/src/answer-checker-sources.js";
 
 const sha256 = (text: string) => createHash("sha256").update(text).digest("hex");
@@ -354,6 +354,8 @@ describe("the seals", () => {
       ...EVALUATOR_SOURCES_SEALED_CONTRACTS,
       // W5-1: the final report's five, after the dig's planner.
       ...INVESTIGATION_REPORT_SEALED_CONTRACTS,
+      // R22 report lane (decision 4): the overall writer and checker, after them.
+      ...REPORT_OVERALL_SEALED_CONTRACTS,
       // R22: reader 1 v2, the panel's sources variant, the rewrite's v2 pair.
       ...WEB_R22_SEALED_CONTRACTS, ...PATH_REWRITE_V2_SEALED_CONTRACTS
     ];
@@ -375,6 +377,8 @@ describe("the seals", () => {
       "serve.evaluator.length.sources.v1", "serve.evaluator.length.reader.sources.v1",
       // W5-1: the final report's five, after them.
       "report.answer.v1", "report.answer.later.v1", "report.answer-check.v1", "report.story.v1", "report.story-check.v1",
+      // R22 report lane (decision 4).
+      "report.answer.v2", "report.answer.later.v2", "report.answer-check.v2",
       "web.read-all.v2", "judge.panel.length.sources.v1", "path-rewrite.writer.v2", "path-rewrite.checker.v2"
     ]);
     expect(new Set(ENGINE_SEALED_CONTRACT_IDS).size).toBe(ENGINE_SEALED_CONTRACT_IDS.length);

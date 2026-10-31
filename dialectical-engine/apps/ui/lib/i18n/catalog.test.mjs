@@ -77,6 +77,9 @@ test("all 35 locales have exact CLDR plural categories, non-plural keys, and pla
 // Values that equal their English value in a non-English home/public catalogue, measured at 95d36b737
 // (FIX-SF-S01-p1-C): brand and product names, file names, cognates. Any other English value fails.
 const SAME_AS_ENGLISH = {
+  // The report's PDF (plan 2026-10-31 decision 17): the same word in these languages.
+  "public.report.investigation.version": ["da", "de", "fr", "sv"],
+  "public.report.investigation.sources": ["fr"],
   "home.baseScore": ["it", "pt"],
   "home.crisisSupport.chat": ["cs", "da", "ro", "sk"],
   "home.crisisSupport.website": ["de", "nl"],

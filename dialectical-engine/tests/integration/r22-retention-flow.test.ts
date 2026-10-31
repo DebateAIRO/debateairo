@@ -9,7 +9,7 @@ import { addressKey } from "../../packages/evidence/src/host-filter.js";
 import { buildFramedPrompt, type ContentClassification, type PromptContract, type ProviderCallRequest, type ProviderReplyRecord } from "@debateai/providers";
 import { createPostgresProviderGateway } from "../../apps/runner/src/index.js";
 import { holdRunPassages, releaseRunPassages } from "../../apps/runner/src/passage-record.js";
-import { sweepPassages, wipeDebatePassages } from "../../apps/runner/src/passage-sweep.js";
+import { sweepPassages, wipeDebatePassages, wipeInvestigationPassages } from "../../apps/runner/src/passage-sweep.js";
 import { digPathsForStore, postgresPathRewriteSources, storedDigPathsOf } from "../../apps/runner/src/path-rewrite-sources.js";
 import { readReplayBook, replayingGateway } from "../../apps/runner/src/run-replay.js";
 import { postgresWebReuseSource, reusedReadingContent } from "../../apps/runner/src/web-reuse.js";
@@ -179,7 +179,7 @@ describe("the deletion and what later steps read", () => {
     const settled = await debate("DONE");
     // This debate was stopped before its shown quote was written.
     expect(await shownOf(settled.runId)).toEqual([]);
-    await withRunContentLease(db(), [settled.runId], () => sweepPassages(db()));
+    await sweepPassages(db());
     const after = (await new PostgresWebEvidenceRepository(db()).read(settled.runId))!;
     expect(after.extracts).toHaveLength(0);
     expect(after.packs).toHaveLength(0);
@@ -224,7 +224,8 @@ describe("the deletion and what later steps read", () => {
     expect(before.note).toBe("It is a report. It found queues doubled. It leaves out buses.");
     expect(before.extracts.map((extract) => extract.quote)).toEqual(["The harbour report found"]);
     expect(JSON.stringify(reusedReadingContent(before))).not.toContain("queues doubled in the two years");
-    await wipeDebatePassages(db(), runId, "REPORT_WRITTEN");
+    // The report's hook: the settled debate's texts go, the running dig holds on to its own.
+    await wipeInvestigationPassages(db(), runId);
     const after = [...(await found()).values()][0]!;
     expect(after.text).toBeNull();
     expect(after.extracts.map((extract) => extract.quote)).toEqual(["The harbour report found"]);

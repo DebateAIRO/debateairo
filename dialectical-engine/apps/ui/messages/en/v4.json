@@ -414,6 +414,8 @@
   "v4.investigation.waitingDigs.other": "Your report starts when the {n} digs in progress finish.",
   "v4.investigation.failed": "This report could not be written. You can write it again.",
   "v4.investigation.keepDigging": "Keep digging",
+  "v4.investigation.downloadPdf": "Download the current version (PDF)",
+  "v4.investigation.pdfUnavailable": "The PDF isn't available in this language yet. Use Print to save this report.",
   "v4.investigation.fromReport": "From your report, version {n}",
   "v4.investigation.firstAnswer": "See the first debate's answer"
 }

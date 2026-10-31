@@ -209,6 +209,9 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // and the earlier report, each under its own run's key, inside withRunContentLease; each version is sealed under the
       // ROOT run key inside withRunContentLease.
       "apps/runner/src/investigation-close-sources.ts",
+      // R22 decision 7: the sweep writes a shown quote a stopped runner left out, its extract opened and the quote sealed under
+      // that run's key, in a short lease of its own (prepareLeasedContentEncryptionForRun).
+      "apps/runner/src/passage-sweep.ts",
       "apps/runner/src/path-rewrite-composition.ts",
       "apps/runner/src/path-rewrite-sources.ts",
       // Reclaim resume (spec 2026-10-14): the replay book reads the run's recorded prompts and replies through

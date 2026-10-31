@@ -358,13 +358,13 @@ const pathRewrite = composePathRewrite({ pool, targets: providerTargets,
  * counts its free models at zero), and charged on the never-walled report seam above. Undefined without Haiku or GLM.
  */
 const closingPrices = buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE);
-const closingComposed = composeInvestigationClose({ pool, targets: providerTargets,
+const investigationClose = composeInvestigationClose({ pool, targets: providerTargets,
   members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
   priceOf: (providerRef) => closingPrices.get(providerRef) ?? null,
+  // R22 decision 7: a written report takes its investigation's page texts and passages with it. A FAILED one may be written
+  // again; the sweep takes them once nothing runs either way.
+  onReportSettled: (settled) => settled.outcome === "FAILED" ? undefined : wipeInvestigationPassages(pool, settled.rootRunId),
   log: storyLog });
-// R22 decision 7: a written report takes its investigation's page texts and passages with it.
-const investigationClose = closingComposed === undefined ? undefined
-  : Object.freeze({ ...closingComposed, wipePassages: (rootRunId: string) => wipeInvestigationPassages(pool, rootRunId) });
 /**
  * The claim-time probe of one target (both claim probes below). Spec 2026-10-11 busy model §2: on the
  * preview, a gate-proven unbilled refusal gets the one 60-second resend, as at ask time, and the claim

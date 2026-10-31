@@ -16,7 +16,7 @@ import {
 import { BLIND_JUDGE_GRADE_CONTRACT_HASH, DOMAIN_TAGGER_CONTRACT_HASH } from "../../packages/evaluator/src/index.js";
 import { CONSUMER_AGGREGATE_PROMPT_CONTRACT } from "../../packages/evaluator/src/consumer.js";
 import {
-  INVESTIGATION_REPORT_SEALED_CONTRACTS, PATH_REWRITE_SEALED_CONTRACTS, buildStorytellerContract, buildStoryCheckerContract, loadStoryPack, resolveStoryPackDir, storyContractHash
+  INVESTIGATION_REPORT_SEALED_CONTRACTS, PATH_REWRITE_SEALED_CONTRACTS, REPORT_OVERALL_SEALED_CONTRACTS, buildStorytellerContract, buildStoryCheckerContract, loadStoryPack, resolveStoryPackDir, storyContractHash
 } from "@debateai/story";
 import {
   STORYTELLER_V1_CONTRACT_ID,
@@ -55,8 +55,8 @@ describe("S01 seals the content rule", () => {
     }
   });
   // W5-1: and the final report's five.
-  it("R7-b holds for the final report's five contracts", () => {
-    for (const contract of INVESTIGATION_REPORT_SEALED_CONTRACTS) {
+  it("R7-b holds for the final report's contracts", () => {
+    for (const contract of [...INVESTIGATION_REPORT_SEALED_CONTRACTS, ...REPORT_OVERALL_SEALED_CONTRACTS]) {
       expect(promptContractFingerprintText(contract)).toBe([
         "debateai.prompt-frame.v2", RULE, contract.contractId, contract.instruction, contract.answerForm
       ].join("\n"));
