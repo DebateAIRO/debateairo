@@ -398,5 +398,22 @@
   "v4.suggest.ownViewAdd": "Add to this dig",
   "v4.suggest.ownViewTag": "Your view",
   "v4.suggest.remove": "Remove",
-  "v4.money.continueFailed": "We couldn't continue this debate. Please try again."
+  "v4.money.continueFailed": "We couldn't continue this debate. Please try again.",
+  "v4.investigation.heading.answer": "The answer",
+  "v4.investigation.heading.wouldChange": "What would change it",
+  "v4.investigation.heading.howItWent": "How the investigation went",
+  "v4.investigation.heading.stillOpen": "What is still open",
+  "v4.investigation.heading.sources": "Sources",
+  "v4.investigation.shortened": "The investigation was very large, so the report was written from a shortened version of it.",
+  "v4.investigation.noStory": "We couldn't write a short answer this time. The parts below show everything the AIs found.",
+  "v4.investigation.versions": "Report versions",
+  "v4.investigation.versionCurrent": "Version {n} · {date} (current)",
+  "v4.investigation.version": "Version {n} · {date}",
+  "v4.investigation.writing": "Your report is being written. This takes about 5 to 10 minutes.",
+  "v4.investigation.waitingDigs.one": "Your report starts when the dig in progress finishes.",
+  "v4.investigation.waitingDigs.other": "Your report starts when the {n} digs in progress finish.",
+  "v4.investigation.failed": "This report could not be written. You can write it again.",
+  "v4.investigation.keepDigging": "Keep digging",
+  "v4.investigation.fromReport": "From your report, version {n}",
+  "v4.investigation.firstAnswer": "See the first debate's answer"
 }

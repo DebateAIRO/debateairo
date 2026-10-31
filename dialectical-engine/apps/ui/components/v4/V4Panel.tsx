@@ -88,6 +88,11 @@ type PanelProps = Readonly<{
   money?: readonly MoneyLine[];
   /** W4-6: on a dig's own map, the line of the path it dug, on the map above (null: not known yet, or no path). */
   digPathLine?: string | null;
+  /**
+   * R22 W5-1 (owner Q-D11): the answer of the investigation's current report version, shown in place of the first
+   * debate's answer, which stays one click away. Absent or null: no finished report yet.
+   */
+  reportAnswer?: Readonly<{ version: number; segments: readonly string[] }> | null;
   headingRef: RefObject<HTMLHeadingElement | null>;
   catalog: MessageCatalog;
   locale: string;
@@ -388,6 +393,32 @@ function RootBody(props: Readonly<{ panel: PanelProps }>) {
   const writing = map.storyState === "WRITING";
   // W4-6 (Q-D13): a dig has no short answer by design: its answer text is the answer, with nothing said to be missing.
   const noStory = map.storyState === "NONE";
+  const firstAnswer = (
+    <>
+      {headline.length > 0 || summary.length > 0
+        ? (
+          <>
+            <div data-ai-generated="true">
+              {headline.length > 0 ? <p className="v4PanelHeadline v4Serif">{headline}</p> : null}
+              {summary.length > 0 ? <p className="v4PanelText">{summary}</p> : null}
+            </div>
+            {map.reservation ? <p className="v4PanelHint v4Muted">{t(catalog, "v4.story.reservation")}</p> : null}
+          </>
+        )
+        : fallback.length > 0
+          ? (
+            <>
+              <div className="v4PanelFallback" data-ai-generated="true">
+                {fallback.map((paragraph, index) => <p key={index} className="v4PanelText">{paragraph}</p>)}
+              </div>
+              {noStory ? null : (
+                <p className="v4PanelHint v4Muted">{t(catalog, writing ? "v4.panel.fallbackWriting" : "v4.panel.fallbackMissing")}</p>
+              )}
+            </>
+          )
+          : noStory ? null : <p className="v4Muted">{t(catalog, writing ? "v4.panel.storyWriting" : "v4.panel.storyMissing")}</p>}
+    </>
+  );
   return (
     <>
       {addedLines(map.question).length > 0
@@ -406,30 +437,24 @@ function RootBody(props: Readonly<{ panel: PanelProps }>) {
           catalog={catalog}
         />
       ) : null}
-      <Section title={t(catalog, "v4.panel.answerRoot")}>
-        {headline.length > 0 || summary.length > 0
-          ? (
-            <>
-              <div data-ai-generated="true">
-                {headline.length > 0 ? <p className="v4PanelHeadline v4Serif">{headline}</p> : null}
-                {summary.length > 0 ? <p className="v4PanelText">{summary}</p> : null}
-              </div>
-              {map.reservation ? <p className="v4PanelHint v4Muted">{t(catalog, "v4.story.reservation")}</p> : null}
-            </>
-          )
-          : fallback.length > 0
-            ? (
-              <>
-                <div className="v4PanelFallback" data-ai-generated="true">
-                  {fallback.map((paragraph, index) => <p key={index} className="v4PanelText">{paragraph}</p>)}
-                </div>
-                {noStory ? null : (
-                  <p className="v4PanelHint v4Muted">{t(catalog, writing ? "v4.panel.fallbackWriting" : "v4.panel.fallbackMissing")}</p>
-                )}
-              </>
-            )
-            : noStory ? null : <p className="v4Muted">{t(catalog, writing ? "v4.panel.storyWriting" : "v4.panel.storyMissing")}</p>}
-      </Section>
+      {/* R22 W5-1 (Q-D11): the current report version's answer first; the first debate's answer one click away. */}
+      {panel.reportAnswer !== null && panel.reportAnswer !== undefined ? (
+        <Section title={t(catalog, "v4.investigation.fromReport", { n: panel.reportAnswer.version })} className="v4PanelReportAnswer">
+          <div data-ai-generated="true">
+            {panel.reportAnswer.segments.map((segment, index) => <p key={index} className="v4PanelText">{segment}</p>)}
+          </div>
+          <details className="v4PanelFirstAnswer">
+            <summary>{t(catalog, "v4.investigation.firstAnswer")}</summary>
+            <div className="v4PanelFirstAnswerBody">
+              {firstAnswer}
+            </div>
+          </details>
+        </Section>
+      ) : (
+        <Section title={t(catalog, "v4.panel.answerRoot")}>
+          {firstAnswer}
+        </Section>
+      )}
       <V4WebNoteLine note={map.webNote} catalog={catalog} />
       <TrustSection counts={map.counts} points={map.points} unchecked={map.unchecked} panel={panel} />
       {panel.readingLevel === "expert" && map.why.length > 0

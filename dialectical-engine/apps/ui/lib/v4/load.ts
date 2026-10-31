@@ -5,6 +5,8 @@ import {
   type AnswerDig,
   type AnswerStory,
   type ContractClient,
+  type InvestigationReports,
+  type InvestigationReportVersion,
   type RunProjection
 } from "@debateai/contract";
 import { contractClient, isNotFound } from "../api.js";
@@ -201,4 +203,58 @@ export async function loadDigTrail(dig: AnswerDig, client: AnswerClient = contra
     below = above.dig;
   }
   return { steps, complete: false };
+}
+
+/*
+ * R22 W5-1: the final report over an investigation (the debate and all its digs). Its versions are read from
+ * GET /v1/runs/{id}/investigation; "Write my report" and "Keep digging" are the two posts. None of these throws: a read
+ * that fails is null (the page keeps what it shows), a post that fails is FAILED.
+ */
+type InvestigationClient = Pick<ContractClient, "readInvestigation">;
+
+/** The investigation the debate is in and its report versions, oldest first; null while it cannot be read. */
+export async function loadInvestigation(runId: string, client: InvestigationClient = contractClient): Promise<InvestigationReports | null> {
+  try {
+    return await Promise.resolve().then(() => client.readInvestigation(runId));
+  } catch {
+    return null;
+  }
+}
+
+export type WriteReportResult =
+  | Readonly<{ kind: "WRITING"; reportVersion: number; waitingForDigs: number }>
+  /** A finished version stands: the page offers "Keep digging", which reopens the investigation. */
+  | Readonly<{ kind: "CLOSED" }>
+  | Readonly<{ kind: "FAILED" }>;
+
+/** "Write my report": closes the investigation and numbers the version being written (a second press: the same one). */
+export async function writeReport(runId: string, client: Pick<ContractClient, "writeReport"> = contractClient): Promise<WriteReportResult> {
+  try {
+    const answer = await Promise.resolve().then(() => client.writeReport(runId));
+    if ("state" in answer) return { kind: "WRITING", reportVersion: answer.report_version, waitingForDigs: answer.waiting_for_digs };
+    return { kind: "CLOSED" };
+  } catch {
+    return { kind: "FAILED" };
+  }
+}
+
+export type ReopenResult = Readonly<{ kind: "OPEN" }> | Readonly<{ kind: "WRITING" }> | Readonly<{ kind: "FAILED" }>;
+
+/** "Keep digging": reopens a closed investigation; refused (nothing changed) while a version is being written. */
+export async function reopenInvestigation(runId: string, client: Pick<ContractClient, "reopenInvestigation"> = contractClient): Promise<ReopenResult> {
+  try {
+    const answer = await Promise.resolve().then(() => client.reopenInvestigation(runId));
+    return "state" in answer ? { kind: "OPEN" } : { kind: "WRITING" };
+  } catch {
+    return { kind: "FAILED" };
+  }
+}
+
+export type FinishedReportVersion = Extract<InvestigationReportVersion, { state: "READY" | "READY_WITH_RESERVATION" }>;
+
+/** The current (newest finished) version, or null before any. */
+export function currentReportVersion(read: InvestigationReports | null): FinishedReportVersion | null {
+  if (read === null || read.current === null) return null;
+  const version = read.versions.find((candidate) => candidate.report_version === read.current);
+  return version !== undefined && (version.state === "READY" || version.state === "READY_WITH_RESERVATION") ? version : null;
 }

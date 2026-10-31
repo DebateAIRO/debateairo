@@ -198,6 +198,9 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // Both prepare the run's cipher through prepareLeasedContentEncryptionForRun,
       // which establishes or borrows the session content lease (checked below).
       "apps/api/src/index.ts",
+      // The final report over an investigation (0136, R22 W5-1): each written version is opened under the investigation's
+      // ROOT run key inside withRunContentLease (prepareLeasedContentEncryptionForRuns); a root erased meanwhile reads null.
+      "apps/api/src/investigation-report.ts",
       "apps/evaluator-worker/src/index.ts",
       // The path rewrite switched on (dig-model revision W3-7): the composition seals each rewrite's text under the dig's
       // run key inside withRunContentLease; the sources open the parent's story, its nodes, the base rewrite and the

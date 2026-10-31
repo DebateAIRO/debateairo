@@ -38,6 +38,20 @@ const APPROVED_VIEW_LINES: Readonly<Record<string, string>> = Object.freeze({
   "v4.view.why": "Why: {reason}"
 });
 
+/**
+ * R22 W5-1: the final report over an investigation. The section headings are W0-1 §2.6's (owner approved); F13's line on
+ * a shortened dossier and N14's line when no story could be written are the owner's answers, word for word.
+ */
+const APPROVED_REPORT_LINES: Readonly<Record<string, string>> = Object.freeze({
+  "v4.investigation.heading.answer": "The answer",
+  "v4.investigation.heading.wouldChange": "What would change it",
+  "v4.investigation.heading.howItWent": "How the investigation went",
+  "v4.investigation.heading.stillOpen": "What is still open",
+  "v4.investigation.heading.sources": "Sources",
+  "v4.investigation.shortened": "The investigation was very large, so the report was written from a shortened version of it.",
+  "v4.investigation.noStory": "We couldn't write a short answer this time. The parts below show everything the AIs found."
+});
+
 /** Owner Q20: labels drafted for the owner's click-test, not yet approved. */
 const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.web.noSearch",
@@ -146,7 +160,19 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.suggest.ownViewAdd",
   "v4.suggest.ownViewTag",
   "v4.suggest.remove",
-  "v4.money.continueFailed"
+  "v4.money.continueFailed",
+  // R22 W5-1 (31 Oct): the final report's versions, its waits, a failed version, "Keep digging", and the map's answer from
+  // the current version with the first debate's answer one click away (owner Q-D11). "Write my report" is the rail's key.
+  "v4.investigation.versions",
+  "v4.investigation.versionCurrent",
+  "v4.investigation.version",
+  "v4.investigation.writing",
+  "v4.investigation.waitingDigs.one",
+  "v4.investigation.waitingDigs.other",
+  "v4.investigation.failed",
+  "v4.investigation.keepDigging",
+  "v4.investigation.fromReport",
+  "v4.investigation.firstAnswer"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {
@@ -219,7 +245,7 @@ describe("V4 catalogue keys", () => {
     // Owner Q20 (2026-10-30): these labels are drafted in plain English and approved by the owner at the click-test, in
     // place on the map (checkpoints C1 and C2). Until then they are DRAFTS: change their words here and in v4.json together.
     expect(DRAFTED_UNTIL_CLICK_TEST.filter((key) => !(key in catalog))).toEqual([]);
-    expect(DRAFTED_UNTIL_CLICK_TEST.filter((key) => key in APPROVED_LINES || key in APPROVED_VIEW_LINES)).toEqual([]);
+    expect(DRAFTED_UNTIL_CLICK_TEST.filter((key) => key in APPROVED_LINES || key in APPROVED_VIEW_LINES || key in APPROVED_REPORT_LINES)).toEqual([]);
     expect(new Set(DRAFTED_UNTIL_CLICK_TEST).size).toBe(DRAFTED_UNTIL_CLICK_TEST.length);
   });
 
@@ -251,6 +277,15 @@ describe("V4 catalogue keys", () => {
     expect(Object.entries(catalog).filter(([key, value]) => /search ?words/iu.test(`${key} ${value}`))).toEqual([]);
     const levelLabels = ["v4.nest.level", "v4.nest.deepest", "v4.nest.tooDeep"];
     for (const key of levelLabels) expect(catalog[key], key).toContain(String(DIG_LEVEL_MAX));
+  });
+
+  it("W5-1: the final report's approved headings, F13 and N14 lines are in the catalogue word for word", () => {
+    expect(Object.fromEntries(Object.keys(APPROVED_REPORT_LINES).map((key) => [key, catalog[key]]))).toEqual(APPROVED_REPORT_LINES);
+    // N14 is the same approved sentence the debate's own report says when its story could not be written.
+    expect(catalog["v4.investigation.noStory"]).toBe(catalog["v4.report.storyUnavailable"]);
+    // The drafted lines name a version by its number and a wait by how many digs: no engine word, no score.
+    const drafts = DRAFTED_UNTIL_CLICK_TEST.filter((key) => key.startsWith("v4.investigation.")).map((key) => catalog[key]!);
+    expect(drafts.filter((line) => /\b(?:score|strength|threshold|READY|WRITING|FAILED|checker|GLM|Haiku)\b/u.test(line))).toEqual([]);
   });
 
   it("placeholders are well formed", () => {

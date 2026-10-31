@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Answer, AnswerStory, DigLinks } from "@debateai/contract";
+import type { Answer, AnswerStory, DigLinks, InvestigationReports, InvestigationReportVersion } from "@debateai/contract";
 import { AuthGate } from "@/components/AuthGate";
 import { V4Header } from "@/components/v4/V4Header";
 import { V4OtherPages, V4SearchNote, V4SourceList, V4WebNoteLine } from "@/components/v4/V4Sources";
@@ -11,7 +11,9 @@ import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translat
 import { STORY_POLLING, unreadableStory } from "@/lib/v3/useAnswerStory";
 import { addedLines, ownWords, startsWithLabel } from "@/lib/v4/askText";
 import { digLinksFor, readQuestionIndex, type IndexEntry } from "@/lib/v4/digIndex";
-import { loadDigView, loadStory, loadV4, storyReadFailed } from "@/lib/v4/load";
+import {
+  loadDigView, loadInvestigation, loadStory, loadV4, reopenInvestigation, storyReadFailed, writeReport, type FinishedReportVersion
+} from "@/lib/v4/load";
 import { buildV4Map } from "@/lib/v4/mapModel";
 import { mergeDigLinks, readDigRecords } from "@/lib/v4/accountMemory";
 import { levelHref, useReadingLevel } from "@/lib/v4/storage";
@@ -26,6 +28,10 @@ import { basisKey, TRUST_WORDS, type DigLink, type DigView, type ReadingLevel, t
  * failed search, switched off) above the paths, each path's own search note, and at the expert level each point's
  * sources and each path's other pages (listed only: the report has no buttons). The old line "This first version does
  * not search the web for sources yet." gives way to these notes.
+ * R22 W5-1: the final report over the investigation (the debate and all its digs) sits above the debate's own report:
+ * "Write my report", its versions (newest first, the current one marked), the chosen version under the approved
+ * sections (W0-1 §2.6) with its sources, and while the newest is being written the page says so and reads it again on
+ * the story poll's chained timer. Once a finished version stands, "Keep digging" reopens the investigation.
  */
 
 type Props = Readonly<{
@@ -308,6 +314,8 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
           </h1>
         </header>
 
+        <InvestigationReport runId={load.runId} locale={locale} catalog={catalog} />
+
         {sent ? (
           <section className="v4RepSent" aria-labelledby="v4-report-sent">
             <h2 id="v4-report-sent" className="v4Eyebrow v4RepSentLabel">{t(catalog, "v4.report.sentHeading")}</h2>
@@ -487,5 +495,189 @@ function ReportDigItem({ dig, level, catalog }: Readonly<{ dig: ReportDig; level
         </Link>
       ) : null}
     </li>
+  );
+}
+
+const finishedVersion = (version: InvestigationReportVersion | null | undefined): version is FinishedReportVersion =>
+  version !== null && version !== undefined && (version.state === "READY" || version.state === "READY_WITH_RESERVATION");
+
+/** When a version is dated: when it was written (or failed), or, while it is being written, when it was asked for. */
+const versionDate = (version: InvestigationReportVersion): string => version.state === "WRITING" ? version.closed_at : version.written_at;
+
+/**
+ * R22 W5-1: the final report over the investigation. Read on its own (a failed read leaves it out quietly: the debate's
+ * report below stays); "Write my report" and "Keep digging" post, then read it again.
+ */
+function InvestigationReport({ runId, locale, catalog }: Readonly<{ runId: string; locale: string; catalog: MessageCatalog }>) {
+  const [read, setRead] = useState<InvestigationReports | null | undefined>(undefined);
+  const [refresh, setRefresh] = useState(0);
+  const [chosen, setChosen] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => { alive.current = false; };
+  }, []);
+  useEffect(() => {
+    let active = true;
+    loadInvestigation(runId).then((next) => { if (active && next !== null) setRead(next); }, () => undefined);
+    return () => { active = false; };
+  }, [runId, refresh]);
+
+  const newest = read?.versions.at(-1) ?? null;
+  const writingVersion = newest?.state === "WRITING" ? newest.report_version : null;
+  // The story poll's rule (R2TIME-3): a version still being written is read again on a chained timer, never two reads in
+  // flight, 10 s → 20 s → 40 s → 60 s, for about 15 minutes in all; a read that fails keeps what the page shows.
+  useEffect(() => {
+    if (writingVersion === null) return;
+    let active = true;
+    let timer: number | undefined;
+    let delay = STORY_POLL_FIRST_MS;
+    const startedAt = Date.now();
+    const tick = async (): Promise<void> => {
+      const next = await loadInvestigation(runId);
+      if (!active) return;
+      if (next !== null) setRead(next);
+      if (next !== null && next.versions.at(-1)?.state !== "WRITING") return;
+      if (Date.now() - startedAt >= STORY_WAIT_MAX_MS) return;
+      delay = Math.min(STORY_POLL_MAX_MS, delay * 2);
+      timer = window.setTimeout(() => void tick(), delay);
+    };
+    timer = window.setTimeout(() => void tick(), delay);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [runId, writingVersion]);
+
+  if (read === undefined || read === null) return null;
+  const act = (post: (id: string) => Promise<unknown>) => async () => {
+    setBusy(true);
+    await post(runId);
+    if (!alive.current) return;
+    setBusy(false);
+    // The newest version (the one just asked for) is shown next.
+    setChosen(null);
+    setRefresh((value) => value + 1);
+  };
+  // The newest version is shown first (being written, failed, or the current one); any other is one click away.
+  const shownNumber = chosen ?? newest?.report_version ?? null;
+  const shown = read.versions.find((version) => version.report_version === shownNumber) ?? null;
+  // "Write my report" while the investigation is open (a debate in none too), and again after a version that failed.
+  const canWrite = read.state === "OPEN" || newest?.state === "FAILED";
+  const canKeepDigging = read.state === "CLOSED" && finishedVersion(newest);
+  const actions = canWrite || canKeepDigging ? (
+    <div className="v4RepActions v4RepNoPrint">
+      {canWrite ? (
+        <button type="button" className="v4Btn v4BtnPrimary v4RepWrite" disabled={busy} onClick={() => void act(writeReport)()}>
+          {t(catalog, "v4.rail.writeReport")}
+        </button>
+      ) : null}
+      {canKeepDigging ? (
+        <button type="button" className="v4Btn v4RepKeepDigging" disabled={busy} onClick={() => void act(reopenInvestigation)()}>
+          {t(catalog, "v4.investigation.keepDigging")}
+        </button>
+      ) : null}
+    </div>
+  ) : null;
+  if (read.versions.length === 0) return actions;
+  return (
+    <section className="v4RepSection v4RepInvestigation" aria-labelledby="v4-report-versions">
+      <h2 id="v4-report-versions" className="v4RepH2">{t(catalog, "v4.investigation.versions")}</h2>
+      <ul className="v4RepVersions v4RepNoPrint">
+        {[...read.versions].reverse().map((version) => (
+          <li key={version.report_version}>
+            <button
+              type="button"
+              className="v4Link v4RepVersion"
+              aria-pressed={version.report_version === shownNumber}
+              onClick={() => setChosen(version.report_version)}
+            >
+              {t(catalog, version.report_version === read.current ? "v4.investigation.versionCurrent" : "v4.investigation.version", {
+                n: version.report_version,
+                date: formatDate(locale, versionDate(version), { dateStyle: "medium" })
+              })}
+            </button>
+          </li>
+        ))}
+      </ul>
+      {shown !== null ? <ReportVersion version={shown} locale={locale} catalog={catalog} /> : null}
+      {actions}
+    </section>
+  );
+}
+
+function ReportVersion({ version, locale, catalog }: Readonly<{ version: InvestigationReportVersion; locale: string; catalog: MessageCatalog }>) {
+  if (version.state === "WRITING") {
+    return (
+      <div className="v4RepVersionBody" role="status">
+        <p className="v4RepNote">{t(catalog, "v4.investigation.writing")}</p>
+        {version.waiting_for_digs > 0 ? (
+          <p className="v4RepNote">
+            {tPlural(catalog, "v4.investigation.waitingDigs", version.waiting_for_digs, locale, { n: version.waiting_for_digs })}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+  if (version.state === "FAILED") {
+    return <p className="v4RepNote v4RepVersionBody" role="status">{t(catalog, "v4.investigation.failed")}</p>;
+  }
+  const { story } = version;
+  return (
+    <div className="v4RepVersionBody" data-version={version.report_version}>
+      {version.shortened ? <p className="v4RepNote v4RepShortened">{t(catalog, "v4.investigation.shortened")}</p> : null}
+      <div className="v4RepAnswer">
+        <h3 className="v4Eyebrow v4RepAnswerLabel">{t(catalog, "v4.investigation.heading.answer")}</h3>
+        {story !== null ? <p className="v4RepHeadline" data-ai-generated="true">{story.short_answer}</p> : (
+          <>
+            {/* N14 (approved): no story this time; the report's whole answer stands in. */}
+            <p className="v4RepNote v4RepNoStory" role="status">{t(catalog, "v4.investigation.noStory")}</p>
+            <div className="v4RepFallback" data-ai-generated="true">
+              {version.answer.segments.map((segment, at) => <p key={at} className="v4RepProse">{segment}</p>)}
+            </div>
+          </>
+        )}
+        {version.state === "READY_WITH_RESERVATION" ? <p className="v4RepNote">{t(catalog, "v4.story.reservation")}</p> : null}
+      </div>
+      {story !== null ? (
+        <>
+          <h3 className="v4RepH3">{t(catalog, "v4.investigation.heading.wouldChange")}</h3>
+          <p className="v4RepProse" data-ai-generated="true">{story.what_would_change}</p>
+          {story.how_it_went.length > 0 ? (
+            <>
+              <h3 className="v4RepH3">{t(catalog, "v4.investigation.heading.howItWent")}</h3>
+              {story.how_it_went.map((entry) => (
+                <p key={entry.dig_run_id} className="v4RepProse" data-ai-generated="true">{entry.paragraph}</p>
+              ))}
+            </>
+          ) : null}
+          {story.still_open.length > 0 ? (
+            <>
+              <h3 className="v4RepH3">{t(catalog, "v4.investigation.heading.stillOpen")}</h3>
+              <ul className="v4RepList">
+                {story.still_open.map((open, at) => <li key={at} data-ai-generated="true">{open}</li>)}
+              </ul>
+            </>
+          ) : null}
+        </>
+      ) : null}
+      {version.sources.length > 0 ? (
+        <>
+          <h3 className="v4RepH3">{t(catalog, "v4.investigation.heading.sources")}</h3>
+          <ul className="v4RepSources">
+            {version.sources.map((source, at) => (
+              <li key={at} className="v4RepSource">
+                <span className="v4RepSourceSite">{source.site}</span>
+                {source.title !== null ? <b className="v4RepSourceTitle">{source.title}</b> : null}
+                {/* Reader 1's line about the page (owner F9) is the AI's; the quote is the page's own words. */}
+                {source.line !== null ? <p className="v4RepSourceLine" data-ai-generated="true">{source.line}</p> : null}
+                <blockquote className="v4RepSourceQuote">{source.quote}</blockquote>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+    </div>
   );
 }

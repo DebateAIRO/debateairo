@@ -123,6 +123,7 @@ apps/api/src/email-mfa-routes.ts
 apps/api/src/engine-ask.ts
 apps/api/src/graceful-shutdown.ts
 apps/api/src/index.ts
+apps/api/src/investigation-report.ts
 apps/api/src/italy-approval.ts
 apps/api/src/legacy-claim.ts
 apps/api/src/legal.ts
@@ -996,6 +997,7 @@ packages/contract/src/generate.ts
 packages/contract/src/harm-helpline.ts
 packages/contract/src/http-error.ts
 packages/contract/src/index.ts
+packages/contract/src/investigation-report.ts
 packages/contract/src/lineage.ts
 packages/contract/src/locale.ts
 packages/contract/src/map-view.ts

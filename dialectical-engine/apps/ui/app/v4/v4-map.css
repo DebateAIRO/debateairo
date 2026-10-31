@@ -207,14 +207,16 @@
 .v4PanelHeadline { margin: 0 0 6px; font-size: 18px; line-height: 1.35; }
 .v4PanelFallback { display: flex; flex-direction: column; gap: 8px; }
 /* "What we asked the AIs": the full question as sent, with the lines added from the person's choices. */
-.v4PanelSent { border: 1px solid var(--line-2); border-radius: var(--r-card); background: var(--surface); }
-.v4PanelSent > summary {
+.v4PanelSent, .v4PanelFirstAnswer { border: 1px solid var(--line-2); border-radius: var(--r-card); background: var(--surface); }
+.v4PanelSent > summary, .v4PanelFirstAnswer > summary {
   cursor: pointer; font-size: var(--t-ui); font-weight: 600; color: var(--text-2); padding: 10px 14px; min-height: 44px;
   display: flex; align-items: center;
 }
-.v4PanelSent > summary::-webkit-details-marker { display: none; }
-.v4PanelSent > summary::before { content: "▸"; margin-right: 8px; color: var(--text-3); }
-.v4PanelSent[open] > summary::before { content: "▾"; }
+.v4PanelSent > summary::-webkit-details-marker, .v4PanelFirstAnswer > summary::-webkit-details-marker { display: none; }
+.v4PanelSent > summary::before, .v4PanelFirstAnswer > summary::before { content: "▸"; margin-right: 8px; color: var(--text-3); }
+.v4PanelSent[open] > summary::before, .v4PanelFirstAnswer[open] > summary::before { content: "▾"; }
+/* R22 W5-1 (owner Q-D11): under the report's answer, the first debate's answer, one click away. */
+.v4PanelFirstAnswerBody { display: flex; flex-direction: column; gap: 8px; padding: 0 14px 12px; }
 .v4PanelSentText { margin: 0; padding: 0 14px 12px; white-space: pre-wrap; font-size: var(--t-ui); color: var(--text); }
 .v4PanelHint { margin: 0; font-size: var(--t-ui); }
 .v4PanelBar { display: flex; }

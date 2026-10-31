@@ -7,6 +7,9 @@ import {
   type DigPicksPort, type DigSuggestionTextReader
 } from "./dig-admission.js";
 import { continuePausedRun, monthPauseOf, type ContinuedRunWake, type MonthPausePort, type MonthRoomReader } from "./month-pause.js";
+import {
+  readInvestigationReports, reopenInvestigation, writeInvestigationReport, type InvestigationReportPorts
+} from "./investigation-report.js";
 import type { PasswordResetApplication } from "./password-reset.js";
 import { settingsVersionPassed, type ReleaseLifecycleState, type ReleaseState, type ReleaseWatcher } from "./release-state.js";
 import { activeVersionAlarm, journalSettingsCode, type ActiveVersionAlarm } from "./admission-alarm.js";
@@ -136,6 +139,12 @@ import {
   FREE_DIG_PICKS_MAX,
   RunContinueRequestSchema,
   RunContinuedSchema,
+  InvestigationCloseRequestSchema,
+  InvestigationReopenRequestSchema,
+  InvestigationReopenedSchema,
+  InvestigationReportAcceptedSchema,
+  InvestigationReportWritingSchema,
+  INVESTIGATION_REPORT_WRITING,
   RunContinueRefusedSchema,
   RUN_PAUSED_UNTIL_RESET,
   type AskParent
@@ -1536,6 +1545,10 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/runs/{id}/dig-links", auth: "user", resource: "run-owner", action: "record-dig-link" },
   // R22 W3-8 (the money rule): Continue on a month-paused debate, owner-scoped in the database (0134's resume_paused_run).
   { route: "POST /v1/runs/{id}/continue", auth: "user", resource: "run-owner", action: "continue-run" },
+  // R22 W5-1: the final report over an investigation (0133's closings, 0136's report versions), owner-scoped in the database.
+  { route: "GET /v1/runs/{id}/investigation", auth: "user", resource: "run-owner", action: "read-investigation" },
+  { route: "POST /v1/runs/{id}/report", auth: "user", resource: "run-owner", action: "write-report" },
+  { route: "POST /v1/runs/{id}/reopen", auth: "user", resource: "run-owner", action: "reopen-investigation" },
   { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" },
   { route: "GET /v1/billing/plans", auth: "public", resource: "billing", action: "read-plans" },
   { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" },
@@ -1886,6 +1899,12 @@ export interface ApiOptions {
   readonly monthRoom?: MonthRoomReader;
   /** R22 W3-8: after Continue, the paused debate's work item is handed to its runner again (./month-pause.ts). */
   readonly continuedRunWake?: ContinuedRunWake;
+  /**
+   * R22 W5-1: the final report over an investigation (./investigation-report.ts): 0136's reports read, 0133's open, close
+   * and reopen, the ownership check and the opener of what the runner sealed under the ROOT's run key. Absent: the three
+   * routes answer the closed 404, as Continue does without `digModel`.
+   */
+  readonly investigationReports?: InvestigationReportPorts;
   readonly accountErasure?: AccountErasureApplication;
   readonly dataExport?: DataExportApplication;
   readonly legacyRunClaim?: LegacyRunClaimApplication;
@@ -4714,6 +4733,46 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       case "NOT_PAUSED": return reply.status(409).send({ error: "RUN_NOT_PAUSED", message: "RUN_NOT_PAUSED" });
       case "UNTIL_RESET": return reply.status(409).send(RunContinueRefusedSchema.parse({
         error: RUN_PAUSED_UNTIL_RESET, message: RUN_PAUSED_UNTIL_RESET, until: outcome.until }));
+      default: return exhaustive(outcome);
+    }
+  });
+  // R22 W5-1: the final report over an investigation (./investigation-report.ts). Another account's debate is the closed
+  // 404 on all three; "Write my report" answers 202 with the version being written (a second press the same version), 409
+  // INVESTIGATION_CLOSED once a finished version stands (the page offers "Keep digging"); a reopen while a version is being
+  // written is 409 INVESTIGATION_REPORT_WRITING, nothing changed.
+  api.get<{ Params: { id: string } }>("/v1/runs/:id/investigation", routePolicy("GET /v1/runs/{id}/investigation"), async (request, reply) => {
+    const target = memoryRunOf(request);
+    if (target === null || options.investigationReports === undefined) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    const read = await readInvestigationReports(target, options.investigationReports);
+    return read === null ? reply.status(404).send({ error: "RUN_NOT_FOUND" }) : reply.send(read);
+  });
+  api.post<{ Params: { id: string } }>("/v1/runs/:id/report", credentialRoutePolicy("POST /v1/runs/{id}/report"), async (request, reply) => {
+    const target = memoryRunOf(request);
+    if (target === null || options.investigationReports === undefined) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    if (!InvestigationCloseRequestSchema.safeParse(request.body ?? {}).success) {
+      return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    }
+    const outcome = await writeInvestigationReport(target, options.investigationReports);
+    switch (outcome.kind) {
+      case "WRITING": return reply.status(202).send(InvestigationReportAcceptedSchema.parse({
+        state: "WRITING", report_version: outcome.reportVersion, waiting_for_digs: outcome.waitingForDigs }));
+      case "CLOSED": return reply.status(409).send({ error: "INVESTIGATION_CLOSED", message: "INVESTIGATION_CLOSED" });
+      case "NOT_FOUND": return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      default: return exhaustive(outcome);
+    }
+  });
+  api.post<{ Params: { id: string } }>("/v1/runs/:id/reopen", credentialRoutePolicy("POST /v1/runs/{id}/reopen"), async (request, reply) => {
+    const target = memoryRunOf(request);
+    if (target === null || options.investigationReports === undefined) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    if (!InvestigationReopenRequestSchema.safeParse(request.body ?? {}).success) {
+      return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    }
+    const outcome = await reopenInvestigation(target, options.investigationReports);
+    switch (outcome.kind) {
+      case "OPEN": return reply.send(InvestigationReopenedSchema.parse({ state: "OPEN" }));
+      case "WRITING": return reply.status(409).send(InvestigationReportWritingSchema.parse({
+        error: INVESTIGATION_REPORT_WRITING, message: INVESTIGATION_REPORT_WRITING, report_version: outcome.reportVersion }));
+      case "NOT_FOUND": return reply.status(404).send({ error: "RUN_NOT_FOUND" });
       default: return exhaustive(outcome);
     }
   });
