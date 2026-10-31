@@ -142,9 +142,18 @@ export type TreeUpdateSettings = Readonly<{
   log?: (event: string, detail: Record<string, unknown>) => void;
   /**
    * THE ONE PLACE after a climb's rewrite is recorded, whatever it came out as: the path `positionRef` of `parentRunId` has a new row.
-   * Awaited before the climb goes on; must not reject (the DIG lane's "work out this path's suggestions again" is wired here at merge).
+   * Awaited before the climb goes on; must not reject. `written`: what this copy wrote there, when it recorded the row and the path really
+   * changed (owner Q-D8: composePathRewrite works this path's suggestions out again from it); null otherwise, so a level run again pays nothing.
    */
-  afterLevel?: (level: Readonly<{ digRunId: string; parentRunId: string; positionRef: string; updateId: string; outcome: "CHANGED" | "STOPPED" | "LEFT" }>) => Promise<void> | void;
+  afterLevel?: (level: Readonly<{ digRunId: string; parentRunId: string; positionRef: string; updateId: string; outcome: "CHANGED" | "STOPPED" | "LEFT" }>,
+    written: ClimbLevelWritten | null) => Promise<void> | void;
+}>;
+
+/** A level's rewrite as `afterLevel` reads it: the path's new text and its points, the climb's own subject, writer and calls. */
+export type ClimbLevelWritten = Readonly<{
+  step: number; workItemId: string; free: boolean; question: PathRewriteDig["question"]; line: string; points: PathRewriteParentPath["points"];
+  whatChanged: readonly string[]; writer: StoryRoleMaker; send: (maker: StoryRoleMaker, request: ProviderCallRequest) => Promise<ProviderCallResult>;
+  log: Log;
 }>;
 
 /**
@@ -280,14 +289,16 @@ async function writeLevel(settings: TreeUpdateSettings, level: Level, log: Log):
     if (turn === null) return "LEFT";
     if (turn.state === "DONE") return levelOutcome(ports, level, updateId, log);
     const base: PathLineBase | null = turn.base_kind === null || turn.base_id === null ? null : Object.freeze({ kind: turn.base_kind, id: turn.base_id });
-    const record = await composeLevel(settings, level, updateId, base, log);
+    const wrote: { level: ClimbLevelWritten | null } = { level: null };
+    const record = await composeLevel(settings, level, updateId, base, log, (written) => { wrote.level = written; });
     const stored = await ports.tree.record(record);
     log("PATH_CLIMB_STORED", { runId: level.digRunId, step: level.step, outcome: record.outcome, changed: record.changed,
       failureCode: record.failureCode, stored });
     if (stored === "BASE_MOVED" || stored === "WAIT_TURN") continue;
     if (stored === "RECORDED" || stored === "ALREADY") {
       const outcome = stored === "RECORDED" ? (record.changed === true ? "CHANGED" as const : "STOPPED" as const) : await levelOutcome(ports, level, updateId, log);
-      await settings.afterLevel?.(Object.freeze({ digRunId: level.digRunId, parentRunId: level.parentRunId, positionRef: level.positionRef, updateId, outcome }));
+      await settings.afterLevel?.(Object.freeze({ digRunId: level.digRunId, parentRunId: level.parentRunId, positionRef: level.positionRef, updateId, outcome }),
+        stored === "RECORDED" && outcome === "CHANGED" ? wrote.level : null);
       return outcome;
     }
     return "STOPPED";
@@ -342,7 +353,8 @@ function failedLevel(updateId: string, base: PathLineBase | null, fateBefore: St
 export const pathClimbSubjectOf = (updateId: string): string => `path-climb:${updateId}`;
 
 /** The level's row: always one, FAILED when its material cannot be read or every writer failed. */
-async function composeLevel(settings: TreeUpdateSettings, level: Level, updateId: string, base: PathLineBase | null, log: Log): Promise<PathUpdateRecord> {
+async function composeLevel(settings: TreeUpdateSettings, level: Level, updateId: string, base: PathLineBase | null, log: Log,
+  onWritten: (written: ClimbLevelWritten) => void): Promise<PathUpdateRecord> {
   const ports = settings.ports;
   const runId = level.digRunId;
   let parent: PathRewriteParentPath;
@@ -388,7 +400,10 @@ async function composeLevel(settings: TreeUpdateSettings, level: Level, updateId
     }
     const served = written.rounds.find((round) => round.round === outcome.servedRound)!;
     const body = outcome.body;
-    const sealed = await ports.sealUpdate(runId, updateId, contentOf(body, built.pointIds, built.digPathRefs));
+    const content = contentOf(body, built.pointIds, built.digPathRefs);
+    const sealed = await ports.sealUpdate(runId, updateId, content);
+    onWritten(Object.freeze({ step: level.step, workItemId: subject, free: level.dig.free, question, line: body.line, points: parent.points,
+      whatChanged: content.what_changed, writer, send, log: (event: string, detail: Record<string, unknown>) => log(event, { runId, step: level.step, ...detail }) }));
     return Object.freeze({
       updateId, basedOn: base, outcome: outcome.outcome, failureCode: null,
       changed: pathReallyChanged(parent, { line: body.line, summary: body.summary, fate: body.fate }),

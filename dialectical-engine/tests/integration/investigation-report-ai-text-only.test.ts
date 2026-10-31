@@ -132,8 +132,8 @@ async function debateWithDig(): Promise<Tree> {
   const looked = await point(dig, "Winter boats leave half empty.", "S1-1");
   const reasoned = await point(dig, "A pier stands idle for five months.", null);
   await webStep(dig, "dig");
-  // 0135's stored paths: the rewrite right after the debate reads the extract's whole words from here.
-  expect(await new PostgresDigPicksRunnerRepository(runner).recordInput(dig, workItemId, { v: 1, dig_paths: [{ positionRef: digPath, statement: "Winter ridership falls.",
+  // 0135's stored paths, holding the extract's whole words as if a row kept them: no report may read them from here.
+  expect(await new PostgresDigPicksRunnerRepository(runner).recordInput(dig, workItemId, { v: 2, dig_paths: [{ positionRef: digPath, statement: "Winter ridership falls.",
     points: [{ id: looked, text: "Winter boats leave half empty.", onId: null, side: "for", trust: "SURE", disputed: false },
       { id: reasoned, text: "A pier stands idle for five months.", onId: null, side: "against", trust: null, disputed: true }],
     extracts: [{ pointId: looked, label: "S1-1", site: "dig.example.org", title: "Pier queues", quote: passage("dig") }] }] })).toBe("RECORDED");
@@ -199,7 +199,7 @@ describe("R22 decision 6: a report reads AI text only", () => {
     expect(after.sources).toEqual(before.sources);
   }, 180_000);
 
-  it("a debate with no shown quote yet lists no source rather than reading its passage", async () => {
+  it("a debate a stopped runner left with no shown quote gets it first: the source is listed, and nothing past the quote reaches a call", async () => {
     const root = await createEncryptedStoryRun(database.pool, owner, "Should Harbour Town widen the quay?");
     const { answerId } = await persistTerminalRun({ pool: database.pool, runId: root, fixtureKey: randomUUID(), factBundle: FACTS });
     const position = await point(root, "Yes, widen it.", null);
@@ -223,8 +223,8 @@ describe("R22 decision 6: a report reads AI text only", () => {
     const read = await postgresInvestigationCloseSources(runner).inputOf({ investigationId, reportVersion: 1, rootRunId: root, closedAt: "2026-10-31T13:00:00.000Z" }, null);
     const dossier = buildInvestigationDossier(read!.input);
     if (dossier.kind !== "BUILT") throw new Error("the dossier did not fit");
-    expect(dossier.sources).toEqual([]);
-    expect(everything(dossier)).not.toContain("old ");
+    expect(dossier.sources.map((source) => [source.link, source.quote])).toEqual([["https://old.example.org/quay", cutQuoteAtWordEdge(passage("old"))]]);
+    expect(everything(dossier)).not.toContain(PAST_THE_QUOTE);
     expect(everything(dossier)).toContain("The quay is narrow.");
   }, 120_000);
 });

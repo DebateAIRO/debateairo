@@ -289,7 +289,7 @@ describe("W4-7 a dig's web step and its reuse, on real PostgreSQL", () => {
     const parent = await firstDebate();
     const { dig } = await digOf(parent);
     const position = randomUUID();
-    expect(await new PostgresDigPicksRunnerRepository(runner).recordInput(dig, randomUUID(), { v: 1, dig_paths: [{ positionRef: position,
+    expect(await new PostgresDigPicksRunnerRepository(runner).recordInput(dig, randomUUID(), { v: 2, dig_paths: [{ positionRef: position,
       statement: "Winter crossings stay steady.", points: [{ id: randomUUID(), text: "Winter riders held up last year.", onId: null, side: "for", trust: null, disputed: true }],
       extracts: [{ pointId: position, label: "S1-1", site: "example.org", title: null, quote: PASSAGE }] }] })).toBe("RECORDED");
     // The dig below it joins after its parent stored its paths.

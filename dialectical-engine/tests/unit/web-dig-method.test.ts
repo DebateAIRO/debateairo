@@ -282,7 +282,7 @@ describe("a dig's packs in the arguing: each page under the path it belongs to",
   it("a cross-reply reads them once, since its rival reads the same", () => {
     const sections = JSON.parse(webSourcesText(sharing([packOf(1), packOf(2)]),
       [{ pathRef: "a1", for: "own_position" }, { pathRef: "a2", for: "other_makers_position" }])!) as readonly Section[];
-    expect(sections.map((section) => section.for)).toEqual(["own_position", "own_position"]);
+    expect(sections.map((section) => section.for)).toEqual(["own_position, other_makers_position", "own_position, other_makers_position"]);
   });
 
   it("one huge pack can't crowd out another: each is cut on its own, and the whole stays under the bound", () => {
@@ -302,7 +302,8 @@ describe("a dig's packs in the arguing: each page under the path it belongs to",
 
 describe("what the whole debate already investigated: AI text only", () => {
   const PASSAGE = "A whole copied passage from the page that no later step may read.";
-  const storedInput = { v: 1, dig_paths: [{ positionRef: "pos-1", statement: "Rent takes most of the gap.",
+  // Version 2 keeps no words; a row that still held some must not be read for them.
+  const storedInput = { v: 2, dig_paths: [{ positionRef: "pos-1", statement: "Rent takes most of the gap.",
     points: [{ id: "n1", text: "Rents rose fastest.", onId: null, side: "for", trust: null, disputed: true }],
     extracts: [{ pointId: "n1", label: "S1-1", site: "example.org", title: "A report", quote: PASSAGE }] }] };
   const rewrite = { text: { line: "x", summary: "y", fate: "HELD_UP" }, what_changed: ["The gap is smaller than first said."], view_reason: null,
@@ -513,7 +514,7 @@ describe("the approved wording, word for word (OWNER WORDING: a change is a new 
   it("the planner v3, and v2 sealed beside it with only those two phrases different", () => {
     expect(WEB_DIG_PLANNER_V3_INSTRUCTION).toBe(PLANNER_V3);
     expect(WEB_DIG_PLANNER_V2_INSTRUCTION).toBe(PLANNER_V3.replace("write two searches", "write up to two searches").replace("write two more searches", "write up to two more searches"));
-    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-3)).toEqual(["web.plan-dig.v2", "web.suggest-dig.v1", "web.plan-dig.v3"]);
+    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-10, -7)).toEqual(["web.plan-dig.v2", "web.suggest-dig.v1", "web.plan-dig.v3"]);
     expect(ENGINE_SEALED_CONTRACT_IDS).toContain("web.plan-dig.v1");
   });
   it("the suggestions", () => {

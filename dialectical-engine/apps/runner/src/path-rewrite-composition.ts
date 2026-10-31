@@ -56,7 +56,15 @@ export function composePathRewrite(input: Readonly<{
     backupMakers: Object.freeze(members.map((member) => Object.freeze({ providerRef: member.providerRef, maker: member.maker })))
   });
   const inFlight = createPathRewriteInFlight();
-  const tree: TreeUpdateSettings = Object.freeze({ ports: postgresTreeUpdatePorts(pool), roles, writerRoleRef, checkerRoleRef, inFlight, log: input.log });
+  const refreshSuggestions = refreshPathSuggestionsOnPool(pool);
+  const tree: TreeUpdateSettings = Object.freeze({ ports: postgresTreeUpdatePorts(pool), roles, writerRoleRef, checkerRoleRef, inFlight, log: input.log,
+    // Owner Q-D8: a level a climb really changed gets its suggestions worked out again, each level its own set and call site.
+    afterLevel: async (level, written) => {
+      if (written === null) return;
+      await refreshSuggestions(Object.freeze({ digRunId: level.digRunId, workItemId: written.workItemId, free: written.free, question: written.question,
+        debateRunId: level.parentRunId, positionRef: level.positionRef, line: written.line, points: written.points, whatChanged: written.whatChanged,
+        step: written.step, writer: written.writer, send: written.send, log: written.log }));
+    } });
   const settings: PathRewriteRunnerSettings = Object.freeze({
     sources: postgresPathRewriteSources(pool),
     turns: new PostgresDigModelRunnerRepository(pool),
@@ -73,7 +81,7 @@ export function composePathRewrite(input: Readonly<{
     // W4-3: the AI's suggestions on the dig's own paths, told what the whole debate already investigated.
     suggest: writeDigSuggestionsOnPool(pool),
     // Owner Q-D8, and a first debate's own (0141).
-    refreshSuggestions: refreshPathSuggestionsOnPool(pool),
+    refreshSuggestions,
     firstDebateSuggestions: Object.freeze({ store: postgresPathSuggestionsStore(pool), read: firstDebateSuggestionFacts(pool) }),
     line: new PostgresTreeUpdateRunnerRepository(pool),
     afterStored: (digRunId, lease) => advanceTree(tree, digRunId, lease)

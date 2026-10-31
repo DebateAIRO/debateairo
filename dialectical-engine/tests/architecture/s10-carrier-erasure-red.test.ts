@@ -215,10 +215,10 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // R22 decision 9: what the whole debate already investigated, for a dig's planners and its suggestions: each debate's story,
       // rewrite and web notes opened under its own run's key, inside withRunContentLease or through prepareLeasedContentEncryptionForRun.
       "apps/runner/src/investigation-digest.ts",
-      "apps/runner/src/path-climb-sources.ts",
       // R22 decision 7: the sweep writes a shown quote a stopped runner left out, its extract opened and the quote sealed under
       // that run's key, in a short lease of its own (prepareLeasedContentEncryptionForRun).
       "apps/runner/src/passage-sweep.ts",
+      "apps/runner/src/path-climb-sources.ts",
       "apps/runner/src/path-rewrite-composition.ts",
       "apps/runner/src/path-rewrite-sources.ts",
       // Reclaim resume (spec 2026-10-14): the replay book reads the run's recorded prompts and replies through
