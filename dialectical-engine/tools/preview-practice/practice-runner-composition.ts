@@ -37,7 +37,7 @@
  *    the integration test only; the real practice waits for real.
  */
 import type { Pool } from "pg";
-import { RunRepository } from "@debateai/db";
+import { PostgresDigModelRunnerRepository, RunRepository } from "@debateai/db";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
 import { TypedDomainError } from "@debateai/kernel";
 import {
@@ -89,6 +89,7 @@ import { assertRunnerPrimaryProviderConfiguration, createRunnerProviderTopology 
 import { createCallScheduler, type CallSubject } from "../../apps/runner/src/call-scheduler.js";
 import { applyPreviewGateCapacities, previewCallSubjects, previewGateNames, structureRepairThroughLane } from "../../apps/runner/src/call-lane-gateway.js";
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
+import { MonthPause, monthPaused } from "../../apps/runner/src/month-pause.js";
 import {
   createRunnerSettingsCache, createRunSettingsVersions, loadRunnerVersionSettings, preloadRunnerSettings, readRunnerSiteContext,
   runCostEnvelopeGuardOf, runnerSettingsOfVersion, runnerSettingsSummary, runnerWebSearchSettings, runPreviewThinkingLevelsOf,
@@ -185,6 +186,8 @@ export async function composePracticeRunner(input: Readonly<{
   }
   // As main.ts (side-by-side spec §13, S14): both in-flight counters, the gateway's (attempts) and the money guard's.
   const gatewayInFlight = createRunInFlight();
+  // W3-2, as main.ts: at the month wall a debate's planned calls pause until the person continues.
+  const monthPause = new MonthPause({ store: new PostgresDigModelRunnerRepository(pool) });
   const moneyInFlight = createRunInFlight();
   /**
    * As main.ts: the site reads, by the SAME function (`readRunnerSiteContext`, apps/runner/src/run-settings.ts): the
@@ -254,8 +257,10 @@ export async function composePracticeRunner(input: Readonly<{
       // Hosted only, as main.ts: each call charged to the run's envelope (and the story's calls to the story's own).
       // Side-by-side spec §13 (S6), as main.ts: each call charged to its own run's version's guard.
       ...(runnerSite.money === null || price === null ? {} : {
-        buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => runCostEnvelopeGuard(runId).providerSeam({ runId, price, requireReportedUsage: true, phase, sharedWall }),
-        buildStoryCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).storySeam({ runId, price, requireReportedUsage: true })
+        // W3-2, as main.ts: the month pause on a walled call, and a dig's path rewrite on its own seam.
+        buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => monthPaused(runCostEnvelopeGuard(runId).providerSeam({ runId, price, requireReportedUsage: true, phase, sharedWall }), { runId, phase, sharedWall, pause: monthPause }),
+        buildStoryCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).storySeam({ runId, price, requireReportedUsage: true }),
+        buildPathRewriteCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).pathRewriteSeam({ runId, price, requireReportedUsage: true })
       })
     });
     // Spec §3.4, as main.ts: the gate is marked unhealthy on its FIRST unsent refusal, before the resend wait.

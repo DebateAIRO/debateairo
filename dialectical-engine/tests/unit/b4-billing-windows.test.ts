@@ -1,7 +1,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { allowanceVsPlus, computeWindows, personWindowsFor } from "@debateai/billing-core";
-import { decideSharedWall } from "@debateai/budget";
+import { decideMonthWall, decideSharedWall } from "@debateai/budget";
 import {
   BILLING_PLANS_DEPLOYMENT_REGISTER_ROW,
   billingPlansFromValue,
@@ -188,8 +188,11 @@ describe("personWindowsFor: the plan's limits over those windows", () => {
       ["PERSON_DAY", 1_000_000], ["PERSON_WEEK", 2_500_000], ["PERSON_MONTH", 5_000_000]
     ]);
     const computed = computeWindows(anchor, now);
+    // The owner's money rule (31 Oct) reworked billingPlans v4's day: it borrows (running work is never stopped by it)
+    // and carries no overflow of its own any more.
     expect(windows[0]).toMatchObject({ periodStart: computed.day.start, resetsAt: computed.day.end, finishBasisPoints: 10_000,
-      finishOverflowMicros: 200_000, closeBasisPoints: 9_500 });
+      borrows: true, closeBasisPoints: 9_500 });
+    expect(Object.hasOwn(windows[0]!, "finishOverflowMicros")).toBe(false);
     expect(windows[1]).toMatchObject({ periodStart: computed.week.start, resetsAt: computed.week.end });
     expect(windows[2]).toMatchObject({ periodStart: computed.month.start, resetsAt: computed.month.end });
   });
@@ -199,31 +202,35 @@ describe("personWindowsFor: the plan's limits over those windows", () => {
       .toEqual([["PERSON_MONTH", 200_000]]);
   });
 
-  // billingPlans v4 (owner 2026-10-30, Q1 and Q3): "Every limit [...] until of course the monthly limit which is once the
-  // 20 cents, and then waits until the new month starts." Each window may be passed by 20 cents; every overflow is spend
-  // inside the month, so the month's own edge (its limit plus 20 cents, once) holds them all; then the month is FULL.
+  // billingPlans v4 (owner 2026-10-30, Q1 and Q3) gave every window a fixed 20 cents past its limit. The owner's money
+  // rule of 31 Oct replaced that meaning, so these rows changed with it: running work is never stopped by the day or the
+  // week (they borrow from the next one instead, and carry no overflow); the month is the wall, standing at its limit
+  // less the final-answer reserve kept inside it (a paid plan's 20 cents; Free's 5 sit on top of its credit), and its
+  // 20 cents are only the tolerance for a call already in flight there.
   it.each([
-    ["FREE", [["PERSON_MONTH", 400_000]]],
-    ["PLUS", [["PERSON_DAY", 1_200_000], ["PERSON_WEEK", 2_700_000], ["PERSON_MONTH", 5_200_000]]],
-    ["PRO", [["PERSON_DAY", 4_200_000], ["PERSON_WEEK", 10_200_000], ["PERSON_MONTH", 20_200_000]]],
-    ["MAX", [["PERSON_DAY", 30_200_000], ["PERSON_WEEK", 75_200_000], ["PERSON_MONTH", 150_200_000]]]
-  ] as const)("v4 %s: each window's running wall stands exactly 20 cents past its limit", (id, edges) => {
+    ["FREE", 200_000, 0],
+    ["PLUS", 5_000_000, 200_000],
+    ["PRO", 20_000_000, 200_000],
+    ["MAX", 150_000_000, 200_000]
+  ] as const)("v4 %s: the day and week borrow; the month's wall stands at its limit less its reserve, 20 cents of tolerance", (id, limit, reserve) => {
     const windows = personWindowsFor(planById(plans, id), anchor, now, 9_500);
-    expect(windows.map((window) => window.scope)).toEqual(edges.map(([scope]) => scope));
-    windows.forEach((window, index) => {
-      const edge = edges[index]![1];
-      expect(window.finishOverflowMicros, `${id} ${window.scope}`).toBe(200_000);
-      const at = (spentMicros: number) => decideSharedWall({ spentMicros, projectedMicros: 0, limitMicros: window.limitMicros,
-        finishBasisPoints: window.finishBasisPoints, finishOverflowMicros: window.finishOverflowMicros ?? Number.NaN });
-      expect(at(edge), `${id} ${window.scope}`).toBe("WITHIN");
-      expect(at(edge + 1), `${id} ${window.scope}`).toBe("WOULD_CROSS");
-    });
+    for (const window of windows.filter((entry) => entry.scope !== "PERSON_MONTH")) {
+      expect([window.borrows, Object.hasOwn(window, "finishOverflowMicros")], `${id} ${window.scope}`).toEqual([true, false]);
+    }
+    const month = windows.find((window) => window.scope === "PERSON_MONTH")!;
+    expect([month.limitMicros, month.keepsReserveMicros, month.finishOverflowMicros, month.borrows]).toEqual([limit, reserve, 200_000, undefined]);
+    const wall = (spentMicros: number, projectedMicros: number) => decideMonthWall({ spentMicros, projectedMicros,
+      limitMicros: month.limitMicros, keepsReserveMicros: month.keepsReserveMicros!, toleranceMicros: month.finishOverflowMicros! });
+    expect(wall(limit - reserve - 1, 200_001), id).toBe("WITHIN");
+    expect(wall(limit - reserve - 1, 200_002), id).toBe("WOULD_CROSS");
+    expect(wall(limit - reserve, 0), id).toBe("WOULD_CROSS");
   });
 
-  it("v4 after an upgrade: the prorated month and the day and week under it each keep exactly 20 cents (A6)", () => {
+  it("v4 after an upgrade: the prorated month keeps the reserve and the tolerance; the day and week under it borrow (A6)", () => {
     const windows = personWindowsFor(planById(plans, "PRO"), anchor, now, 9_500, 3_000_000);
-    expect(windows.map((window) => [window.limitMicros, window.finishBasisPoints, window.finishOverflowMicros]))
-      .toEqual([[3_000_000, 10_000, 200_000], [3_000_000, 10_000, 200_000], [3_000_000, 10_000, 200_000]]);
+    expect(windows.map((window) => [window.limitMicros, window.finishBasisPoints, window.finishOverflowMicros ?? null,
+      window.keepsReserveMicros ?? null, window.borrows ?? null]))
+      .toEqual([[3_000_000, 10_000, null, null, true], [3_000_000, 10_000, null, null, true], [3_000_000, 10_000, 200_000, 200_000, null]]);
   });
 
   it("a sealed v3 plan keeps its 110% share edge and carries no overflow member", () => {

@@ -23,10 +23,23 @@ export type PersonWindow = Readonly<{
   funding?: import("@debateai/kernel").FundingBasis;
   finishBasisPoints: number;
   /**
-   * billingPlans v4 (owner 2026-10-30, Q1-Q3): a fixed amount a running debate may take this window past its
-   * share edge, in USD micro-units (20 cents). Absent on a v3 plan's window, and on an internal grant: the share alone.
+   * billingPlans v4 (owner 2026-10-30, Q1-Q3), reworked by the owner's money rule of 31 Oct: on the MONTH window only,
+   * the tolerance for calls already in flight when the month reaches its wall (20 cents). No new call starts at the
+   * wall (`decideMonthWall`, ./room.ts). Absent on a v3 plan's window, and on an internal grant: the share alone.
    */
   finishOverflowMicros?: number;
+  /**
+   * The money rule (owner, 31 Oct), on a billingPlans v4 DAY or WEEK window: running work is never stopped by it, and
+   * what it uses past the limit is borrowed from the next window of its kind (derived from the ledger, never stored:
+   * `deriveBorrows`, ./room.ts). New starts still wait for its reset.
+   */
+  borrows?: true;
+  /**
+   * The money rule, on a billingPlans v4 MONTH window: the final-answer reserve kept INSIDE the month (a paid plan's 20
+   * cents; 0 on Free, whose 5 cents sit on top of its credit). New starts and running work stop that far below the
+   * limit, so writing the report is always possible.
+   */
+  keepsReserveMicros?: number;
   closeBasisPoints: number;
 }>;
 

@@ -624,6 +624,23 @@ export function sharedWallReached(scope: SpendScope): TypedDomainError {
       );
 }
 
+/**
+ * The money rule (owner, 31 Oct 2026): the refusal of a call at the MONTH wall of a billingPlans v4 window. Its code is
+ * still PERSON_ALLOWANCE_REACHED and its message the month's own, so wherever nothing pauses the debate it stops the
+ * arguing exactly as before (and the answer is still written). The runner's month-pause seam
+ * (apps/runner/src/month-pause.ts) recognises it, records the pause and holds the debate's remaining planned calls until
+ * the person presses Continue; `resumableAt` is the month's reset. Figure-free, as every wall refusal.
+ */
+export class MonthWallReachedError extends TypedDomainError {
+  constructor(readonly resumableAt: Date) {
+    super(PERSON_ALLOWANCE_REACHED, "A call while arguing would take the run owner's PERSON_MONTH allowance past its finish edge");
+  }
+}
+
+export function isMonthWallReached(error: unknown): error is MonthWallReachedError {
+  return error instanceof MonthWallReachedError;
+}
+
 /** The refusal a hosted answer gets when its vendor reported no usage figures. */
 export function providerUsageUnreported(providerRef: string): TypedDomainError {
   return new TypedDomainError(

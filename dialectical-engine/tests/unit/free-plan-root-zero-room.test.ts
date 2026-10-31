@@ -81,7 +81,7 @@ const MONTH_START = new Date("2026-10-15T00:00:00.000Z");
 function freePerson(spentMicros: number): Readonly<{ persons: PersonAllowanceSource; owners: RunOwnerSpendReader }> {
   const month: PersonWindow = Object.freeze({ scope: "PERSON_MONTH", limitMicros: FREE.monthly_credit_micros, periodStart: MONTH_START,
     resetsAt: new Date("2026-11-15T00:00:00.000Z"), finishBasisPoints: FREE.finish_bp, finishOverflowMicros: FREE.finish_overflow_micros,
-    closeBasisPoints: SITE.admission_close_basis_points });
+    keepsReserveMicros: 0, closeBasisPoints: SITE.admission_close_basis_points });
   return Object.freeze({
     persons: { read: async () => Object.freeze([month]) },
     owners: { readRunChargeOwnerRef: async () => "owner-free", readOwnerSpentMicros: async () => spentMicros }
@@ -123,13 +123,17 @@ describe("Free plan: root 0's kept room against the limits a Free debate actuall
     }
   });
 
-  it("the room is never measured against the Free person's month: with 25 cents spent (past Free's 20, inside its 40-cent edge) the map call is still admitted", async () => {
-    const spent = 250_000;
-    // billingPlans v4 (owner 2026-10-30, Q1): Free's month edge is its 20 cents plus a fixed 20-cent overflow.
-    const wallEdge = FREE.monthly_credit_micros * FREE.finish_bp / 10_000 + FREE.finish_overflow_micros;
-    // The room alone would cross the person's finish edge, so a room counted there would refuse the call.
-    expect(spent + freeRoom(dearest)).toBeGreaterThan(wallEdge);
-    expect(spent + projectedCallCeilingMicros(price(dearest), LIST_PROJECTION)).toBeLessThanOrEqual(wallEdge);
+  // The owner's money rule (31 Oct) replaced "a fixed 20 cents past every limit": Free's month is now a wall at its 20
+  // cents (its 5-cent reserve sits on top, never inside), and the 20 cents are only the tolerance for a call in flight
+  // there. So 25 cents spent, which this row used to admit, now pauses the debate; the row keeps its point (the kept
+  // room is never measured against the person's month) just below the wall.
+  it("the room is never measured against the Free person's month: with 19.9999 cents spent (just under Free's 20-cent wall) the map call is still admitted", async () => {
+    const spent = FREE.monthly_credit_micros - 1;
+    const wall = FREE.monthly_credit_micros;
+    const tolerance = FREE.finish_overflow_micros;
+    // The room alone would cross the person's wall, so a room counted there would refuse the call.
+    expect(spent + freeRoom(dearest)).toBeGreaterThan(wall);
+    expect(spent + projectedCallCeilingMicros(price(dearest), LIST_PROJECTION)).toBeLessThanOrEqual(wall + tolerance);
     expect(await mapCallDecision({ perRunCeilingMicros: PREVIEW_PER_RUN_CEILING_MICROS, model: dearest, room: freeRoom(dearest),
       personSpentMicros: spent })).toBe("ADMITTED");
   });

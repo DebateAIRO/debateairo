@@ -1,11 +1,16 @@
 import { validatePreviewProviderTestConfig, previewPlanTierRosters, type PreviewProviderTestConfig } from "@debateai/providers";
 import type { Pool, PoolClient } from "pg";
-import { PLAN_TIER_ROSTERS, type AskRequest } from "@debateai/contract";
+import { PLAN_TIER_ROSTERS, digSharePercent, type AskRequest, type DigLinkMode } from "@debateai/contract";
 import { exhaustive, TypedDomainError, type FundingBasis, type InternalGrant, type InternalRunFundingState } from "@debateai/kernel";
 import {
+  BORROW_CARRIES_ACROSS_MONTH,
+  borrowPercent,
   costEnvelopeDay,
   decideAdmission,
   decideRoom,
+  deriveBorrows,
+  startLimitMicros,
+  tiledWindows,
   waitingUntil,
   withSpendDecisionLock,
   type Admission,
@@ -67,6 +72,12 @@ export class AskAlreadyWaitingError extends TypedDomainError {
 export type RoomQuestion = Readonly<{
   access: RunOwnershipAccess; settingsClass: RunSettingsClass; fundingBasis?: FundingBasis; registerVersion?: number;
   settingsUnavailable?: true;
+  /**
+   * Plan 2026-10-30 W3-2 (the money rule): a room read asked for a dig (its parent already checked as the person's and
+   * below the deepest level, apps/api/src/dig-admission.ts). Its answer then carries the dig's share of today instead
+   * of a new question's.
+   */
+  dig?: Readonly<{ parentRunId: string; mode: DigLinkMode; picks: number | null }>;
 }>;
 export type RoomDecision = Extract<Admission, { kind: "START" | "WAIT" }>;
 export type RoomDecisionContext = Readonly<{
@@ -111,6 +122,11 @@ export interface AskRoomSpend {
   readOwnerSpentMicros(ownerRef: string, from: Date, to: Date, funding?: FundingBasis, scope?: SpendScope): Promise<number>;
   readOwnerCountedHoldsMicros(ownerRef: string, funding?: FundingBasis): Promise<number>;
   openHold(client: PoolClient, input: Readonly<{ runId: string; heldMicros: number }>): Promise<void>;
+  /** The money rule's borrow chain, in one query (`PostgresModelSpendStore`); absent: one `readOwnerSpentMicros` per window. */
+  readOwnerSpentInRangesMicros?(ownerRef: string, ranges: ReadonlyArray<Readonly<{ from: Date; to: Date }>>,
+    funding?: FundingBasis): Promise<readonly number[]>;
+  /** The money rule's borrow notice: the window's charges, oldest first, with their runs; absent: no notice is named. */
+  readOwnerChargesMicros?(ownerRef: string, from: Date, to: Date): Promise<ReadonlyArray<Readonly<{ runId: string; chargeMicros: number }>>>;
 }
 
 /** B3's `RunWaitRepository`, as the room reads and writes the line. */
@@ -254,6 +270,16 @@ export type AskRoomAnswer = Readonly<{
   planId: PlanId | null;
   funding?: Readonly<{kind:"INTERNAL"; expiresAt:Date}>;
   waitsFor?: WaitsFor;
+  /**
+   * The money rule (owner, 31 Oct; W3-2), on a billingPlans v4 person only. `newStarts`: a person window is full, so new
+   * questions and digs wait for its reset (running work goes on). `startSharePercent` / `digSharePercent`: the
+   * estimate of what is being read for (a new question, or a dig) as a share of today, in steps of 5 (Free: of its
+   * month, its only window). `reserve`: the final-answer reserve is kept (always, under the money rule).
+   */
+  newStarts?: "BLOCKED_UNTIL_RESET";
+  startSharePercent?: number;
+  digSharePercent?: number;
+  reserve?: "KEPT";
 }>;
 
 export interface AskRoomReader {
@@ -334,11 +360,15 @@ export function everyWholeMinute(tick: () => unknown, clock: () => Date = () => 
   });
 }
 
-/** Every scope's room, the person's windows as measured for them, and why a question so measured would wait. */
+/**
+ * Every scope's room, the person's windows as measured for them, and why a question so measured would wait. `moneyRule`:
+ * the person's windows are billingPlans v4's (the owner's money rule of 31 Oct applies to them).
+ */
 type RoomMeasure = Readonly<{
   rooms: ReadonlyArray<ScopeRoom>;
   personUses: ReadonlyArray<RoomWindowUse>;
   waitReason: WaitReason;
+  moneyRule: boolean;
 }>;
 
 type RoomEvaluation = Readonly<{
@@ -346,10 +376,148 @@ type RoomEvaluation = Readonly<{
   rooms: ReadonlyArray<ScopeRoom>;
   personUses: ReadonlyArray<RoomWindowUse>;
   waitReason: WaitReason;
+  moneyRule: boolean;
   estimateMicros: number;
   waiting: ReadonlyArray<WaitingRunRef>;
   expected: Readonly<{ waitsUntil: Date; worstScope: SpendScope; waitsFor?: WaitsFor }>;
 }>;
+
+/** A billingPlans v4 window, under the owner's money rule (31 Oct): a borrowing day or week, or a month with its reserve. */
+export function isMoneyRuleWindow(window: PersonWindow): boolean {
+  return window.borrows === true || window.keepsReserveMicros !== undefined;
+}
+
+/**
+ * The money rule's members of a room read (W3-2): the estimate as a share of today — the person's day, or Free's month
+ * (its only window) — on a dig's read as `digSharePercent`, else as `startSharePercent`; and the reserve, always kept.
+ * Nothing on a read whose windows are not billingPlans v4's.
+ */
+function moneyRuleMembers(question: RoomQuestion, evaluation: RoomEvaluation): Pick<AskRoomAnswer,
+  "startSharePercent" | "digSharePercent" | "reserve"> {
+  if (!evaluation.moneyRule) return {};
+  const today = evaluation.personUses.find((use) => use.scope === "PERSON_DAY")
+    ?? evaluation.personUses.find((use) => use.scope === "PERSON_MONTH");
+  if (today === undefined) return { reserve: "KEPT" };
+  const share = digSharePercent(evaluation.estimateMicros, today.limitMicros);
+  return question.dig === undefined
+    ? { startSharePercent: share, reserve: "KEPT" }
+    : { digSharePercent: share, reserve: "KEPT" };
+}
+
+/** What running work borrowed into one day or week window, and what that window is borrowing from the next. */
+export type WindowBorrow = Readonly<{
+  scope: "PERSON_DAY" | "PERSON_WEEK";
+  /** How much lower this window started: what the windows before it used past their limits. */
+  borrowedMicros: number;
+  /** What this window is using of the NEXT one (its used plus borrowed past its limit). */
+  overMicros: number;
+  /** The next window's limit and start (the plan in force now). */
+  nextLimitMicros: number;
+  nextStartsAt: Date;
+  /** Whether the page says so: the next window is this month's, or the cross-month switch carries the borrow on. */
+  notice: boolean;
+}>;
+
+/**
+ * THE MONEY RULE'S BORROW, DERIVED (owner, 31 Oct, point 3; W2-8's decision: no stored record). The day or week blocks
+ * tile the month from its anchor (`tiledWindows`); each block's limit is the plan's in force at its start, read through
+ * the person's allowance (one read at the month's start; only when that differs from now, one per block); each block's
+ * use is the ledger's spend in it; `deriveBorrows` runs the chain up to `window`, the current one. With the cross-month
+ * switch (`BORROW_CARRIES_ACROSS_MONTH`, default NO) the chain starts in the month before, so its last over carries in.
+ * `currentSpentMicros`: what the caller already read for `window` itself; only the blocks before it are read then.
+ */
+export async function readWindowBorrow(input: Readonly<{
+  ownerRef: string;
+  window: PersonWindow;
+  month: PersonWindow;
+  currentSpentMicros?: number;
+  spend: Pick<AskRoomSpend, "readOwnerSpentMicros" | "readOwnerSpentInRangesMicros">;
+  allowance: PersonAllowanceSource;
+  carriesAcrossMonth?: boolean;
+}>): Promise<WindowBorrow> {
+  const { ownerRef, window, month, spend, allowance } = input;
+  if (window.scope !== "PERSON_DAY" && window.scope !== "PERSON_WEEK") throw new TypeError("ASK_ROOM_BORROW_SCOPE_INVALID");
+  const scope = window.scope;
+  const carries = input.carriesAcrossMonth ?? BORROW_CARRIES_ACROSS_MONTH;
+  const sameScope = (windows: ReadonlyArray<PersonWindow>): PersonWindow | undefined => windows.find((entry) => entry.scope === scope);
+  const limitAt = async (at: Date): Promise<number | null> => {
+    try {
+      return sameScope(await allowance.read(ownerRef, at))?.limitMicros ?? null;
+    } catch {
+      return null;
+    }
+  };
+  type Block = Readonly<{ from: Date; to: Date; limitMicros: number }>;
+  const tiled = tiledWindows(month.periodStart, month.resetsAt, scope)
+    .filter((block) => block.start.getTime() <= window.periodStart.getTime());
+  // A window that is not one of the month's blocks (never, from billing-core) starts a chain of its own.
+  const current = tiled.some((block) => block.start.getTime() === window.periodStart.getTime())
+    ? tiled : [Object.freeze({ start: window.periodStart, end: window.resetsAt })];
+  // Read only when a block comes before the current one (the month's first day or week needs no limit but its own).
+  const monthStartLimit = current.length > 1 ? await limitAt(month.periodStart) : window.limitMicros;
+  const blocks: Block[] = [];
+  for (const block of current) {
+    const isCurrent = block.start.getTime() === window.periodStart.getTime();
+    const limitMicros = isCurrent || monthStartLimit === window.limitMicros ? window.limitMicros
+      : await limitAt(block.start) ?? window.limitMicros;
+    blocks.push(Object.freeze({ from: block.start, to: isCurrent ? window.resetsAt : block.end, limitMicros }));
+  }
+  if (carries) {
+    // The month before, read at its last instant: only when it tiles up to this month's start (the same anchor).
+    const before = await allowance.read(ownerRef, new Date(month.periodStart.getTime() - 1)).catch(() => []);
+    const previousMonth = before.find((entry) => entry.scope === "PERSON_MONTH");
+    const previousLimit = sameScope(before)?.limitMicros;
+    if (previousMonth !== undefined && previousLimit !== undefined
+      && previousMonth.resetsAt.getTime() === month.periodStart.getTime()) {
+      blocks.unshift(...tiledWindows(previousMonth.periodStart, previousMonth.resetsAt, scope)
+        .map((block) => Object.freeze({ from: block.start, to: block.end, limitMicros: previousLimit })));
+    }
+  }
+  // The current block is last; it is read only when the caller has not read it already. No block before it: none read.
+  const known = input.currentSpentMicros;
+  const ranges = (known === undefined ? blocks : blocks.slice(0, -1)).map((block) => Object.freeze({ from: block.from, to: block.to }));
+  const read = ranges.length === 0 ? [] : spend.readOwnerSpentInRangesMicros !== undefined
+    ? await spend.readOwnerSpentInRangesMicros(ownerRef, ranges, window.funding)
+    : await Promise.all(ranges.map((range) => spend.readOwnerSpentMicros(ownerRef, range.from, range.to, window.funding, scope)));
+  const used = known === undefined ? [...read] : [...read, known];
+  if (used.length !== blocks.length) throw new TypeError("ASK_ROOM_BORROW_READ_INCONSISTENT");
+  const chain = deriveBorrows(blocks.map((block, index) => Object.freeze({ limitMicros: block.limitMicros, usedMicros: used[index]! })));
+  const nextStartsAt = window.resetsAt;
+  return Object.freeze({
+    scope,
+    borrowedMicros: chain.borrowedMicros[chain.borrowedMicros.length - 1] ?? 0,
+    overMicros: chain.overMicros,
+    nextLimitMicros: window.limitMicros,
+    nextStartsAt,
+    notice: chain.overMicros > 0 && (carries || nextStartsAt.getTime() < month.resetsAt.getTime())
+  });
+}
+
+/**
+ * The borrow notice's runs (the money rule's point 3, "to finish the current task"): walking the window's charges oldest
+ * first from what it started with (`borrowedMicros`), the part of each charge past the window's limit is that run's
+ * borrow. Each run that borrowed, with its share of the next window (`borrowPercent`), in the order it first borrowed;
+ * at most `limit` of them (the contract's 20).
+ */
+export function borrowersOf(input: Readonly<{
+  charges: ReadonlyArray<Readonly<{ runId: string; chargeMicros: number }>>;
+  startedAtMicros: number;
+  limitMicros: number;
+  nextLimitMicros: number;
+  limit?: number;
+}>): ReadonlyArray<Readonly<{ runId: string; overMicros: number; percent: number }>> {
+  let used = input.startedAtMicros;
+  const over = new Map<string, number>();
+  for (const charge of input.charges) {
+    const before = used;
+    used += charge.chargeMicros;
+    const past = Math.max(0, used - Math.max(before, input.limitMicros));
+    if (past > 0) over.set(charge.runId, (over.get(charge.runId) ?? 0) + past);
+  }
+  return Object.freeze([...over.entries()].slice(0, input.limit ?? 20).map(([runId, overMicros]) => Object.freeze({
+    runId, overMicros, percent: borrowPercent(overMicros, input.nextLimitMicros)
+  })));
+}
 
 /** `waitsFor` as an optional member: present only when there is one. */
 function waitsForOf(expected: Readonly<{ waitsFor?: WaitsFor }>): Readonly<{ waitsFor?: WaitsFor }> {
@@ -602,6 +770,7 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
     const planId = grant !== null || this.#options.entitlements === null || ownerRef === null ? null
       : (await this.#options.entitlements.current(ownerRef, now)).planId;
     const funding = grant === null ? {} : {funding: Object.freeze({kind:"INTERNAL" as const, expiresAt:grant.expiresAt})};
+    const money = grant === null ? moneyRuleMembers(question, evaluation) : {};
     const admission = evaluation.admission;
     switch (admission.kind) {
       case "REFUSE_ALREADY_WAITING":
@@ -611,29 +780,44 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
           resetsAt: evaluation.expected.waitsUntil,
           waitingRunRef: evaluation.waiting[0]?.runId ?? null,
           planId, ...funding,
-          ...waitsForOf(evaluation.expected)
+          ...waitsForOf(evaluation.expected), ...money
         });
-      case "WAIT":
+      case "WAIT": {
+        // The money rule: new starts wait for the reset of a person window full on what was used (and borrowed).
+        const blocked = evaluation.moneyRule && grant === null && admission.worstScope !== "SITE_DAY" && admission.waitsFor === undefined
+          && evaluation.rooms.some((entry) => entry.scope === admission.worstScope && entry.room === "FULL");
         return Object.freeze({
           room: "FULL" as const, scope: admission.worstScope, resetsAt: admission.waitsUntil, waitingRunRef: null, planId, ...funding,
-          ...waitsForOf(admission)
+          ...waitsForOf(admission), ...money, ...(blocked ? { newStarts: "BLOCKED_UNTIL_RESET" as const } : {})
         });
+      }
       case "START": {
         const scope = admission.worstScope;
         if (admission.worst === "FITS" || scope === null) {
-          return Object.freeze({ room: "FITS" as const, scope: null, resetsAt: null, waitingRunRef: null, planId, ...funding });
+          return Object.freeze({ room: "FITS" as const, scope: null, resetsAt: null, waitingRunRef: null, planId, ...funding, ...money });
         }
         return Object.freeze({
           room: "CLOSE" as const,
           scope,
           resetsAt: evaluation.rooms.find((entry) => entry.scope === scope)?.resetsAt ?? null,
           waitingRunRef: null,
-          planId, ...funding
+          planId, ...funding, ...money
         });
       }
       default:
         return exhaustive(admission);
     }
+  }
+
+  /**
+   * The money rule (W3-2): whether the person's month has room again for a debate paused at its wall — what was spent in
+   * it is below its limit less the reserve kept inside it. No personal month (billing off, local mode): room.
+   */
+  async monthHasRoom(ownerRef: string, now: Date = this.#clock()): Promise<boolean> {
+    const month = (await this.#options.personAllowance.read(ownerRef, now)).find((window) => window.scope === "PERSON_MONTH");
+    if (month === undefined) return true;
+    const spent = await this.#options.spend.readOwnerSpentMicros(ownerRef, month.periodStart, month.resetsAt, month.funding, month.scope);
+    return spent < startLimitMicros(month);
   }
 
   /** B7b: one page (a hundred at most) of the runs worth trying this tick, oldest first, after the cursor. */
@@ -909,7 +1093,7 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
   async #evaluate(question: RoomQuestion, now: Date, hold: AdmissionHold | null): Promise<RoomEvaluation> {
     // Side-by-side spec §13 (S10): the question's own version's estimate (precheck, the locked decision, the room read).
     const estimateMicros = await (await this.#estimatorFor(question.registerVersion)).estimateMicros(question.settingsClass);
-    const { rooms, personUses, waitReason } = await this.#measure(question.access, estimateMicros, now);
+    const { rooms, personUses, waitReason, moneyRule } = await this.#measure(question.access, estimateMicros, now);
     const waiting = await this.#waitingOf(question.access);
     const nextTickAt = nextWholeMinute(now);
     // A FULL scope already makes this question wait; the line cannot change that.
@@ -926,7 +1110,7 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
       hold
     });
     return Object.freeze({
-      admission, rooms, personUses, waitReason, estimateMicros, waiting, expected: waitingUntil({ rooms, nextTickAt })
+      admission, rooms, personUses, waitReason, moneyRule, estimateMicros, waiting, expected: waitingUntil({ rooms, nextTickAt })
     });
   }
 
@@ -942,6 +1126,11 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
    * marked `fullOnOwnHolds` (Important 1): the expected start is then the next
    * tick, by the same rule, and the answers say the person's own debates are
    * what the question waits for.
+   * The money rule (owner, 31 Oct; W3-2), on billingPlans v4 windows only: no worst-case hold — the person's counted
+   * holds are not added (a question starts when the windows have room; its estimate is only shown); a day or week is
+   * measured with what running work borrowed into it (`readWindowBorrow`); the month against its limit less the
+   * final-answer reserve kept inside it (`startLimitMicros`). A FULL window so measured is FULL on spend: new starts
+   * wait for its reset.
    */
   async #measure(access: RunOwnershipAccess, estimateMicros: number, now: Date, runId?: string): Promise<RoomMeasure> {
     const day = costEnvelopeDay(now);
@@ -967,18 +1156,25 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
     const windows = ownerRef === null ? [] : runId !== undefined && pinned === null && this.#options.funding !== undefined
       ? await this.#options.funding.readSubscriptionWindows(ownerRef,now)
       : await this.#options.personAllowance.read(ownerRef, now, runId === undefined ? undefined : {runId});
+    const moneyRule = windows.some(isMoneyRuleWindow);
     if (ownerRef !== null && windows.length > 0) {
-      const holds = await this.#options.spend.readOwnerCountedHoldsMicros(ownerRef, windows[0]?.funding);
+      const holds = moneyRule ? 0 : await this.#options.spend.readOwnerCountedHoldsMicros(ownerRef, windows[0]?.funding);
+      const month = windows.find((window) => window.scope === "PERSON_MONTH") ?? null;
       for (const window of windows) {
         const spent = await this.#options.spend.readOwnerSpentMicros(ownerRef, window.periodStart, window.resetsAt, window.funding, window.scope);
-        const usedMicros = spent + holds;
+        const borrowed = window.borrows === true && month !== null
+          ? (await readWindowBorrow({ ownerRef, window, month, currentSpentMicros: spent, spend: this.#options.spend,
+            allowance: this.#options.personAllowance })).borrowedMicros
+          : 0;
+        const limitMicros = moneyRule ? startLimitMicros(window) : window.limitMicros;
+        const usedMicros = spent + borrowed + holds;
         const room = decideRoom({
           usedMicros,
           estimateMicros,
-          limitMicros: window.limitMicros,
+          limitMicros,
           closeBasisPoints: window.closeBasisPoints
         });
-        const fullOnSpend = spent >= window.limitMicros;
+        const fullOnSpend = spent + borrowed >= limitMicros;
         if (room === "FULL") {
           personFull = true;
           if (fullOnSpend && (fullOnSpendUntil === null || window.resetsAt.getTime() > fullOnSpendUntil.getTime())) {
@@ -987,7 +1183,7 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
         }
         personUses.push(Object.freeze({
           scope: window.scope,
-          limitMicros: window.limitMicros,
+          limitMicros,
           usedMicros,
           resetsAt: window.resetsAt,
           closeBasisPoints: window.closeBasisPoints
@@ -1003,7 +1199,7 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
     const waitReason: WaitReason = personFull
       ? Object.freeze({ waitsFor: "PERSON" as const, personRecheckAt: fullOnSpendUntil ?? nextWholeMinute(now) })
       : Object.freeze({ waitsFor: "SITE" as const, personRecheckAt: null });
-    return Object.freeze({ rooms: Object.freeze(rooms), personUses: Object.freeze(personUses), waitReason });
+    return Object.freeze({ rooms: Object.freeze(rooms), personUses: Object.freeze(personUses), waitReason, moneyRule });
   }
 
   #waitingOf(access: RunOwnershipAccess): Promise<ReadonlyArray<WaitingRunRef>> {

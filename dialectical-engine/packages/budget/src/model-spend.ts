@@ -44,6 +44,7 @@ import {
   readReportedUsage,
   runCostEnvelopeReached,
   runCostEnvelopeRoomKept,
+  MonthWallReachedError,
   sharedWallReached,
   storyCostEnvelopeReached,
   type CostEnvelopePhase,
@@ -53,7 +54,7 @@ import {
 import type { FundingBasis, ProviderCallAdmission } from "@debateai/kernel";
 import type { SpendScope } from "./person-allowance.js";
 import type { PersonAllowanceSource } from "./person-allowance.js";
-import { decideSharedWall } from "./room.js";
+import { decideMonthWall, decideSharedWall } from "./room.js";
 import {
   WEB_SEARCH_PROVIDER_REF,
   WEB_SEARCH_REQUEST_MICROS,
@@ -77,7 +78,13 @@ export type ModelSpendSource =
   /** the fast language check before a debate: a run-less site cost (0118), written only by ledger.record_language_check_spend */
   | "LANGUAGE_CHECK"
   /** the pre-start question check: a run-less site cost (0128), written only by ledger.record_question_check_spend */
-  | "QUESTION_CHECK";
+  | "QUESTION_CHECK"
+  /**
+   * A dig's path rewrite (0134; plan 2026-10-30 dig-model revision W3-2/W3-5): written after the dig settled, in the
+   * story's place (a dig has no story). It names the DIG's run, is inside the dig's estimate, counts in the person's
+   * windows like RUN and STORY, and is never walled: a dig that started always gets its rewrite.
+   */
+  | "PATH_REWRITE";
 
 /**
  * Question language, P2L Task 19 (migration 0118): the ONE writer of a LANGUAGE_CHECK row, a SECURITY DEFINER
@@ -189,7 +196,7 @@ export interface ModelSpendEntry {
  */
 export interface ModelSpendStore {
   recordSpend(entry: ModelSpendEntry): Promise<void>;
-  reserveInternalCall?(input: Readonly<{ callId: string; runId: string; projectedMicros: number; spendSource: "RUN" | "STORY"; spendPhase: CostEnvelopePhase | null }>): Promise<boolean>;
+  reserveInternalCall?(input: Readonly<{ callId: string; runId: string; projectedMicros: number; spendSource: MeteredSpendSource; spendPhase: CostEnvelopePhase | null }>): Promise<boolean>;
   settleInternalCall?(callId: string, entry: ModelSpendEntry): Promise<void>;
   /**
    * Everything this ONE run's DEBATE has been charged, across every vendor it
@@ -198,6 +205,12 @@ export interface ModelSpendStore {
   readRunSpentMicros(runId: string): Promise<number>;
   /** Everything this run's verdict STORY has been charged (spend source STORY only). */
   readRunStorySpentMicros(runId: string): Promise<number>;
+  /**
+   * Everything this dig's path rewrite has been charged (spend source PATH_REWRITE only). Optional: a store without it
+   * has no path-rewrite seam (STORY_ENVELOPE_MISSING, the story lane's own refusal), as a version without a story
+   * ceiling has no story seam.
+   */
+  readRunPathRewriteSpentMicros?(runId: string): Promise<number>;
   /** Everything the WHOLE application has been charged on that UTC day. */
   readDaySpentMicros(day: string): Promise<number>;
   /**
@@ -536,8 +549,8 @@ export function assertRunCeilingCoversOneCall(input: Readonly<{
   }
 }
 
-/** The two spend sources a gateway money seam charges (the support chat keeps its own accounting). */
-type MeteredSpendSource = Extract<ModelSpendSource, "RUN" | "STORY">;
+/** The spend sources a gateway money seam charges (the support chat keeps its own accounting). */
+type MeteredSpendSource = Extract<ModelSpendSource, "RUN" | "STORY" | "PATH_REWRITE">;
 
 /** What a metered seam spends against: see `CostEnvelopeGuard.#envelopeFor`. */
 interface MeteredEnvelope {
@@ -689,6 +702,17 @@ export class CostEnvelopeGuard {
    */
   storySeam(input: ProviderSeamInput): ProviderCostSeam {
     return this.#meteredSeam(input, "STORY", null, false);
+  }
+
+  /**
+   * A DIG'S PATH REWRITE — its money seam (plan 2026-10-30 dig-model revision, W3-2 for W3-5). A dig writes no story;
+   * the one writer call (and its checker) that rewrites the parent path takes the story's place, so it is held to the
+   * story's ceiling, summed over PATH_REWRITE charges only, refused with the story's own code, and charges PATH_REWRITE
+   * rows on the dig's run. Like the story it is NEVER walled (the money rule: a dig that started always gets its
+   * rewrite), so neither the person's windows nor the month wall can stop it.
+   */
+  pathRewriteSeam(input: ProviderSeamInput): ProviderCostSeam {
+    return this.#meteredSeam(input, "PATH_REWRITE", null, false);
   }
 
   /**
@@ -992,6 +1016,22 @@ export class CostEnvelopeGuard {
           refusal: storyCostEnvelopeReached
         });
       }
+      case "PATH_REWRITE": {
+        const ceilingMicros = this.#storyCeilingMicros;
+        const read = this.#store.readRunPathRewriteSpentMicros;
+        if (ceilingMicros === null || read === undefined) {
+          throw new TypedDomainError(
+            "STORY_ENVELOPE_MISSING",
+            "A metered path-rewrite seam needs the sealed storyCostEnvelopePolicy row and the rewrite's spent total"
+          );
+        }
+        return Object.freeze({
+          spendSource: "PATH_REWRITE",
+          ceilingMicros,
+          readSpentMicros: (runId: string) => read.call(this.#store, runId),
+          refusal: storyCostEnvelopeReached
+        });
+      }
       default:
         return exhaustive(spendSource);
     }
@@ -1040,6 +1080,24 @@ export class CostEnvelopeGuard {
     const ownerRef = await wall.owners.readRunChargeOwnerRef(runId);
     if (ownerRef === null) return;
     for (const window of await wall.persons.read(ownerRef, now, { runId })) {
+      // The money rule (owner, 31 Oct): a billingPlans v4 day or week never stops running work; what it uses past
+      // the limit is borrowed from the next one (derived by the room code, never stored), so it is not asked here.
+      if (window.borrows === true) continue;
+      // The month is the wall: below its edge (the limit less the reserve kept inside it) with this call's maximum
+      // inside the in-flight tolerance, or the debate's planned work pauses (MonthWallReachedError).
+      if (window.finishOverflowMicros !== undefined && window.scope === "PERSON_MONTH") {
+        if (decideMonthWall({
+          spentMicros: await wall.owners.readOwnerSpentMicros(ownerRef, window.periodStart, window.resetsAt, window.funding, window.scope)
+            + inFlight.person,
+          projectedMicros,
+          limitMicros: window.limitMicros,
+          ...(window.keepsReserveMicros === undefined ? {} : { keepsReserveMicros: window.keepsReserveMicros }),
+          toleranceMicros: window.finishOverflowMicros
+        }) === "WOULD_CROSS") {
+          throw new MonthWallReachedError(window.resetsAt);
+        }
+        continue;
+      }
       if (decideSharedWall({
         spentMicros: await wall.owners.readOwnerSpentMicros(ownerRef, window.periodStart, window.resetsAt, window.funding, window.scope)
           + inFlight.person,
@@ -1164,6 +1222,15 @@ export class PostgresModelSpendStore implements ModelSpendStore {
     return this.#total(result.rows[0]?.total);
   }
 
+  async readRunPathRewriteSpentMicros(runId: string): Promise<number> {
+    const result = await this.pool.query<{ total: string }>(
+      `SELECT coalesce(sum(charge_micros),0)::text AS total FROM ledger.model_spend
+       WHERE run_id = $1 AND spend_source = 'PATH_REWRITE'`,
+      [runId]
+    );
+    return this.#total(result.rows[0]?.total);
+  }
+
   async readDaySpentMicros(day: string): Promise<number> {
     return crossAccount("X23", async () => {
       const result = await this.pool.query<{ total: string }>(
@@ -1240,8 +1307,21 @@ export class PostgresModelSpendStore implements ModelSpendStore {
     }
     // Most runs have no synthesis check. CASE keeps the definer lookup off their spend path.
     const result = await this.pool.query<{ total: string }>(
-      `SELECT coalesce(sum(spend.charge_micros),0)::text AS total
-       FROM billing.run_charge_scope AS scope
+      `SELECT coalesce(sum(spend.charge_micros),0)::text AS total ${PostgresModelSpendStore.#ownerSpendFrom}`,
+      [ownerRef, from, to]
+    );
+    return this.#total(result.rows[0]?.total);
+  }
+
+  /**
+   * Paid-plans spec §2.4.2 (B6), with the money rule's PATH_REWRITE (W3-2): the FROM and WHERE of one person's
+   * subscription spend in [$2, $3): the RUN, STORY and PATH_REWRITE charges of the runs `billing.run_charge_scope` pins to
+   * owner $1 on a subscription, admitted before $3, a premium run removed by its synthesis check excepted, no waiver
+   * (side-by-side C10). `readOwnerSpentMicros` and the money rule's two batch readers below share it. 0123's
+   * `billing.read_internal_grant_spent` (the internal branch) still counts RUN and STORY only: it learns PATH_REWRITE
+   * only through a later drained database step.
+   */
+  static readonly #ownerSpendFrom = `FROM billing.run_charge_scope AS scope
        JOIN ledger.model_spend AS spend ON spend.run_id = scope.run_id
        WHERE scope.owner_ref = $1::uuid AND scope.funding_kind='SUBSCRIPTION'
          AND NOT EXISTS (
@@ -1253,12 +1333,49 @@ export class PostgresModelSpendStore implements ModelSpendStore {
              ) THEN serve.run_removed_by_synthesis_check(run.run_id) ELSE false END
          )
          AND scope.admitted_at < $3
-         AND spend.spend_source IN ('RUN','STORY')
+         AND spend.spend_source IN ('RUN','STORY','PATH_REWRITE')
          AND spend.recorded_at >= $2 AND spend.recorded_at < $3
-         AND NOT EXISTS (SELECT 1 FROM ledger.model_spend_waiver AS waiver WHERE waiver.run_id = spend.run_id)`,
+         AND NOT EXISTS (SELECT 1 FROM ledger.model_spend_waiver AS waiver WHERE waiver.run_id = spend.run_id)`;
+
+  /**
+   * The money rule (owner, 31 Oct): the person's spend in each of several windows of one month, in ONE query, for the
+   * borrow chain (`deriveBorrows`). Exactly `readOwnerSpentMicros` per window (the same rows: RUN, STORY and
+   * PATH_REWRITE of the runs pinned to the owner on a subscription, recorded in [from, to), no waiver), in the order
+   * given. An internal grant has no borrowing windows; its ranges are read one by one through its own reader.
+   */
+  async readOwnerSpentInRangesMicros(ownerRef: string, ranges: ReadonlyArray<Readonly<{ from: Date; to: Date }>>,
+    funding?: FundingBasis): Promise<readonly number[]> {
+    if (funding?.kind === "INTERNAL" || ranges.length === 0) {
+      const totals: number[] = [];
+      for (const range of ranges) totals.push(await this.readOwnerSpentMicros(ownerRef, range.from, range.to, funding));
+      return Object.freeze(totals);
+    }
+    const result = await this.pool.query<{ ordinal: string; total: string }>(
+      `SELECT window_range.ordinal::text AS ordinal, (
+         SELECT coalesce(sum(spend.charge_micros),0)
+         ${PostgresModelSpendStore.#ownerSpendFrom.replaceAll("$2", "window_range.from_at").replaceAll("$3", "window_range.to_at")}
+       )::text AS total
+       FROM unnest($2::timestamptz[], $3::timestamptz[]) WITH ORDINALITY AS window_range(from_at, to_at, ordinal)
+       ORDER BY window_range.ordinal`,
+      [ownerRef, ranges.map((range) => range.from), ranges.map((range) => range.to)]
+    );
+    if (result.rows.length !== ranges.length) throw new TypeError("MODEL_SPEND_RANGES_INCONSISTENT");
+    return Object.freeze(result.rows.map((row) => this.#total(row.total)));
+  }
+
+  /**
+   * The money rule's notice: the person's charges in [from, to), oldest first (recorded time, then id), with the run
+   * each belongs to, so the part past a window's limit can be named by the runs that spent it. The same rows as
+   * `readOwnerSpentMicros`; a subscription's only (an internal grant never borrows).
+   */
+  async readOwnerChargesMicros(ownerRef: string, from: Date, to: Date): Promise<ReadonlyArray<Readonly<{
+    runId: string; chargeMicros: number }>>> {
+    const result = await this.pool.query<{ run_id: string; charge: string }>(
+      `SELECT spend.run_id::text AS run_id, spend.charge_micros::text AS charge ${PostgresModelSpendStore.#ownerSpendFrom}
+       ORDER BY spend.recorded_at, spend.spend_id`,
       [ownerRef, from, to]
     );
-    return this.#total(result.rows[0]?.total);
+    return Object.freeze(result.rows.map((row) => Object.freeze({ runId: row.run_id, chargeMicros: this.#total(row.charge) })));
   }
 
   /**

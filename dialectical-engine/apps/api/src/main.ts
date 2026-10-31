@@ -27,6 +27,7 @@ import {readConsumerRecoveryPolicy} from "@debateai/register";
 import {SendmailConsumerAccountSender} from "./mail-channel.js";
 import { ConsumerSecurityService } from "./consumer-security.js";
 import { PostgresConsumerSecurityRepository } from "@debateai/db";
+import { PostgresDigModelRepository, PostgresInvestigationRepository } from "@debateai/db";
 import { ConsumerWebAuthnService } from "./consumer-webauthn.js";
 import { PostgresConsumerAuthRepository } from "@debateai/db";
 import { UnixTurnstileVerifier } from "./turnstile.js";
@@ -1665,6 +1666,12 @@ const api = buildApi({
   // V4 account memory (owner rulings N7 and N11, migration 0131): 0131's functions on the API's runtime pool, whose
   // principal holds debateai_billing_runtime (the only role granted them); each function checks run ownership itself.
   accountMemory: accountMemoryStoreFrom((text, values) => pool.query(text, values)),
+  // Plan 2026-10-30 dig-model revision W3-2 (0133, 0134): dig levels and the month pause, and the dig's join at start,
+  // through 0134's and 0133's definers on the same runtime pool (debateai_billing_runtime); the month's room again after
+  // a pause is the ask room's (with billing on).
+  digModel: new PostgresDigModelRepository(pool),
+  investigations: new PostgresInvestigationRepository(pool),
+  ...(askRoom === undefined ? {} : { monthRoom: askRoom }),
   ...(dataExport === undefined ? {} : { dataExport }),
   /**
    * Side-by-side spec §13 (S10): what the ACTIVE settings version says to the pages, per request — the room read's shape

@@ -2,6 +2,8 @@ import { validatePreviewProviderTestConfig, previewLineUpOfConfig, previewPlanTi
 import { registerPasswordResetRoutes, passwordResetPolicyInventory } from "./password-reset-routes.js";
 import { registerEmailMfaRoutes, emailMfaPolicyInventory } from "./email-mfa-routes.js";
 import { AccountMemoryInputError, type AccountMemoryStore } from "./account-memory.js";
+import { admitDig, digPathIndexOf, joinAtStart, type DigAdmissionPorts, type DigJoinPort, type DigPathIndex } from "./dig-admission.js";
+import { monthPauseOf, type MonthPausePort, type MonthRoomReader } from "./month-pause.js";
 import type { PasswordResetApplication } from "./password-reset.js";
 import { settingsVersionPassed, type ReleaseLifecycleState, type ReleaseState, type ReleaseWatcher } from "./release-state.js";
 import { activeVersionAlarm, journalSettingsCode, type ActiveVersionAlarm } from "./admission-alarm.js";
@@ -120,7 +122,11 @@ import {
   DigLinksSchema,
   DigLinkRecordRequestSchema,
   DigLinkRecordedSchema,
-  ACCOUNT_MEMORY_LIMITS
+  ACCOUNT_MEMORY_LIMITS,
+  DIG_LEVEL_MAX,
+  DIG_TOO_DEEP,
+  DigTooDeepSchema,
+  type AskParent
 } from "@debateai/contract";
 import type { Pool, PoolClient, QueryResultRow, QueryResult } from "pg";
 import { assertPreviewBudgetAdmits, PreviewGateUnavailableRefusal, type PreviewAdmissionLock, type PreviewBudgetGateSettings } from "./preview-budget-estimate.js";
@@ -1849,6 +1855,16 @@ export interface ApiOptions {
    * ACCOUNT_MEMORY_UNAVAILABLE, and the V4 pages fall back to what they do without memory.
    */
   readonly accountMemory?: AccountMemoryStore;
+  /**
+   * Plan 2026-10-30 dig-model revision W3-2 (0134): each debate's dig level and its month pause, on the API's own pool
+   * (`PostgresDigModelRepository`). Absent: an ask's `parent` is not read (as before W3-2: the page's after-start dig
+   * link is the only one) and no run read carries `month_pause`.
+   */
+  readonly digModel?: Pick<DigAdmissionPorts, "readDigLevel"> & MonthPausePort;
+  /** W3-2 (0133, 0134): at start, a dig joins its parent's investigation (`PostgresInvestigationRepository.join`). */
+  readonly investigations?: DigJoinPort;
+  /** W3-2: whether a person's month has room again after a month pause (the ask room's `monthHasRoom`). */
+  readonly monthRoom?: MonthRoomReader;
   readonly accountErasure?: AccountErasureApplication;
   readonly dataExport?: DataExportApplication;
   readonly legacyRunClaim?: LegacyRunClaimApplication;
@@ -3367,6 +3383,42 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   // `auth: "user"` admits nothing else), so a write can only ever touch the caller's own rows; the run routes below are
   // owner-scoped in the database too. No admission scope, as every account self route: storage is one row per account
   // (the level) or per owned debate (a visit, a dig), so it cannot grow past what the account owns.
+  // Plan 2026-10-30 dig-model revision W3-2 (owner Q-D1): where the parent map's places hang, read from the parent's
+  // story the way the map reads it; null when the parent has no story yet (every point then hangs under the question).
+  const digPathIndexFor = async (request: Readonly<{ session: Session; authenticatedSession?: AuthenticatedSession }>,
+    parentRunId: string): Promise<DigPathIndex | null> => {
+    if (options.stories === undefined) return null;
+    const ownership = ownershipFor(request);
+    const answer = await readOwnerRunAnswer(options, parentRunId, request.session, ownership);
+    if (answer === null) return null;
+    const story = await options.stories.readStory({ answerId: answer.answer_id, answerVersion: answer.answer_version, ownership });
+    const paths = story?.body?.short.paths;
+    return paths === undefined ? null : digPathIndexOf(paths);
+  };
+  // W3-2: a dig's admission (./dig-admission.ts) before anything is charged; null when the ask may go on. Another
+  // account's parent is the closed 404; a parent at the deepest level 409 DIG_TOO_DEEP; picks the page never sends
+  // (more than Free combines, or from more than one path) the plain 400.
+  const digRefusal = async (request: Readonly<{ session: Session; authenticatedSession?: AuthenticatedSession }>,
+    reply: FastifyReply, parent: AskParent, settings: Pick<AskRequest, "plan_tier" | "composition_budget_tier" | "depth_params">
+  ): Promise<FastifyReply | null> => {
+    const digModel = options.digModel;
+    if (digModel === undefined) return null;
+    const ownerRef = request.authenticatedSession?.ownerRef;
+    if (ownerRef === undefined) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    const decided = await decideRoomSettingsAndPlan(settings, ownerRef, options.askBilling);
+    const admission = await admitDig({ ownerRef, parent, free: decided.settings.plan_tier === "free" }, {
+      readDigLevel: (owner, runId) => digModel.readDigLevel(owner, runId),
+      readPathIndex: (_owner, runId) => digPathIndexFor(request, runId)
+    });
+    switch (admission.kind) {
+      case "ADMIT": return null;
+      case "NOT_FOUND": return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      case "TOO_DEEP":
+        return reply.status(409).send(DigTooDeepSchema.parse({ error: DIG_TOO_DEEP, message: DIG_TOO_DEEP, level_max: DIG_LEVEL_MAX }));
+      case "MALFORMED": return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      default: return exhaustive(admission);
+    }
+  };
   const accountMemoryOrRefuse = (reply: FastifyReply): AccountMemoryStore | null => {
     if (options.accountMemory !== undefined) return options.accountMemory;
     void reply.status(503).send({ error: "ACCOUNT_MEMORY_UNAVAILABLE", message: "ACCOUNT_MEMORY_UNAVAILABLE" });
@@ -3949,6 +4001,15 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (Buffer.byteLength(ask.question_line, "utf8") > ASK_QUESTION_MAX_BYTES) {
       return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     }
+    // Plan 2026-10-30 dig-model revision W3-2: a dig's own checks come before the question check (a paid site call) and
+    // before the room, so a refused dig is charged nothing. Without the dig model the parent is not read (as before).
+    const digParent = options.digModel === undefined ? undefined : ask.parent;
+    if (digParent !== undefined) {
+      const refused = await digRefusal(request, reply, digParent, {
+        plan_tier: ask.plan_tier, composition_budget_tier: ask.composition_budget_tier, depth_params: ask.depth_params
+      });
+      if (refused !== null) return refused;
+    }
     if (options.questionCheck === undefined) {
       return reply.status(503).send({ error: "QUESTION_CHECK_UNAVAILABLE", message: "QUESTION_CHECK_UNAVAILABLE" });
     }
@@ -3963,6 +4024,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         : Object.freeze({ kind: "server" as const, userId: request.authenticatedSession.userId,
           ownerRef: request.authenticatedSession.ownerRef })
     ));
+    // W3-2: at start (started or waiting in line) the server writes the dig's link and joins it to its parent's
+    // investigation; a join that does not take leaves the run as it is (the page's own link call is the fallback).
+    const digOwner = request.authenticatedSession?.ownerRef;
+    if (digParent !== undefined && digOwner !== undefined && options.investigations !== undefined) {
+      await joinAtStart({ ownerRef: digOwner, parent: digParent, childRunId: accepted.run_ref }, options.investigations);
+    }
     return reply.status(202).send(accepted);
   });
 
@@ -3976,6 +4043,19 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const query = AskRoomQuerySchema.safeParse(request.query);
     if (!query.success) return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     const access = ownershipFor(request);
+    // Plan 2026-10-30 dig-model revision W3-2: a read for a dig names its parent; the parent is checked as the ask will
+    // check it (the person's, below the deepest level), and the answer gives the dig's share of today.
+    const digParent = query.data.dig_parent;
+    if (digParent !== undefined && options.digModel !== undefined) {
+      const level = access.ownerRef === null ? null : await options.digModel.readDigLevel(access.ownerRef, digParent);
+      if (level === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      if (level >= DIG_LEVEL_MAX) {
+        return reply.status(409).send(DigTooDeepSchema.parse({ error: DIG_TOO_DEEP, message: DIG_TOO_DEEP, level_max: DIG_LEVEL_MAX }));
+      }
+    }
+    const digMember = digParent === undefined ? {} : {
+      dig: Object.freeze({ parentRunId: digParent, mode: query.data.dig_mode ?? "quick" as const, picks: query.data.dig_picks ?? null })
+    };
     // Side-by-side spec §13 (S10): the active version's rows, read once for this request; the room estimates with it.
     const view = await admissionView();
     const versionMember = view.registerVersion === undefined ? {} : { registerVersion: view.registerVersion };
@@ -3988,6 +4068,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       : await options.askRoom.readRoom({
           access,
           ...versionMember,
+          ...digMember,
           settingsClass: await (async () => {
             // B8 (R-28): with billing on, the room is read for the ask the server would run. Debate shape (spec
             // 2026-10-12 §3.2): with the query's shape settings, normalised under the plan key submit would use.
@@ -4012,6 +4093,11 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       plan_id: answer.planId,
       ...(answer.funding === undefined ? {} : {funding:{kind:"INTERNAL",expires_at:answer.funding.expiresAt.toISOString()}}),
       ...(answer.waitsFor === undefined ? {} : { waits_for: answer.waitsFor }),
+      // W3-2 (the money rule): the reserve kept, the estimate as a share of today, and new starts waiting for a reset.
+      ...(answer.reserve === undefined ? {} : { reserve: answer.reserve }),
+      ...(answer.startSharePercent === undefined ? {} : { start_share_percent: answer.startSharePercent }),
+      ...(answer.digSharePercent === undefined ? {} : { dig_share_percent: answer.digSharePercent }),
+      ...(answer.newStarts === undefined ? {} : { new_starts: answer.newStarts }),
       // Debate shape P2c (Contract deviation 7): the same row the normalisation above reads. After P2b, main.ts hands
       // the API only an in-force row (`debateShapeInForce`); without one the member is never written, so the body is
       // today's byte for byte, and the page offers none of the three settings it would drop.
@@ -4295,7 +4381,16 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       options.releaseKey,
       { route: "GET /v1/runs/{id}", id: runId }
     );
-    return run === null ? reply.status(404).send({ error: "RUN_NOT_FOUND" }) : reply.send(run);
+    if (run === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    // W3-2 (the money rule): a debate paused at the month wall says until when, and whether Continue is offered.
+    const ownerRef = request.authenticatedSession?.ownerRef;
+    if (options.digModel === undefined || ownerRef === undefined
+      || !(run.state === "CLAIMED" || run.state === "RUNNING" || run.state === "HOLDING")) return reply.send(run);
+    const pause = await options.digModel.readPause(ownerRef, runId);
+    if (pause?.state !== "PAUSED") return reply.send(run);
+    const now = new Date();
+    const monthPause = monthPauseOf(pause, now, await options.monthRoom?.monthHasRoom(ownerRef, now) ?? false);
+    return reply.send(monthPause === null ? run : RunProjectionSchema.parse({ ...run, month_pause: monthPause }));
   });
   api.get<{ Params: { id: string } }>(
     "/v1/runs/:id/visibility",

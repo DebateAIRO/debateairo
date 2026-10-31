@@ -8,7 +8,8 @@ import {
   loadKekRing,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { configureContentEncryption, createPool, RUNNER_CAPACITY, RUNNER_DATABASE_POOLS, RunRepository } from "@debateai/db";
+import { configureContentEncryption, createPool, PostgresDigModelRunnerRepository, RUNNER_CAPACITY, RUNNER_DATABASE_POOLS, RunRepository } from "@debateai/db";
+import { MonthPause, monthPaused } from "./month-pause.js";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
 import { releaseTaskName, TypedDomainError } from "@debateai/kernel";
 import {
@@ -143,6 +144,8 @@ try {
  * twice against the ceiling (run-in-flight.ts).
  */
 const gatewayInFlight = createRunInFlight();
+// The money rule (owner, 31 Oct; W3-2): at the month wall a debate's planned calls pause until the person continues.
+const monthPause = new MonthPause({ store: new PostgresDigModelRunnerRepository(pool) });
 const moneyInFlight = createRunInFlight();
 /**
  * R1 (final review): EVERY model call of this process in flight — the debate's, the story's, a structure repair, a
@@ -257,11 +260,14 @@ function targetGateway(target: (typeof providerTargets)[number]): ProviderGatewa
       // call is held to the answer's ceiling and every other call to the body's.
       // B9: and whether the call is walled (`providerCallSharedWall`).
       // Side-by-side spec §13 (S6): every call is charged to its OWN run's version's guard (`runCostEnvelopeGuard`).
-      buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => runCostEnvelopeGuard(runId).providerSeam({ runId, price, requireReportedUsage: true, phase, sharedWall }),
+      // W3-2 (the money rule): a walled call (BODY, not the first position's) waits at the month wall (`monthPaused`).
+      buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => monthPaused(runCostEnvelopeGuard(runId).providerSeam({ runId, price, requireReportedUsage: true, phase, sharedWall }), { runId, phase, sharedWall, pause: monthPause }),
       // Verdict story (spec §8): the story's calls spend its OWN envelope, its run's version's story ceiling. A
       // version that sealed no story ceiling refuses inside the guard (STORY_ENVELOPE_MISSING), the code the gateway
       // used to raise without a seam; the story writer refuses before that anyway (no story rows, no story).
-      buildStoryCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).storySeam({ runId, price, requireReportedUsage: true })
+      buildStoryCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).storySeam({ runId, price, requireReportedUsage: true }),
+      // W3-2: a dig's path rewrite (the story lane's PATH_REWRITE: sites) spends its own seam, never walled.
+      buildPathRewriteCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).pathRewriteSeam({ runId, price, requireReportedUsage: true })
     })
   });
   // Spec §3.4: the policy marks the gate unhealthy on its FIRST unsent refusal, before the minute's resend wait.

@@ -210,3 +210,30 @@ describe("B7a GET /v1/asks/room on the wire", () => {
     }
   });
 });
+
+// Plan 2026-10-30 dig-model revision W3-2 (the owner's money rule, 31 Oct): a billingPlans v4 person's read carries the
+// reserve kept, the estimate as a share of today, and, when a person window is full, that new starts wait for its reset.
+describe("W3-2 the money rule's words on the room read", () => {
+  const blocked: AskRoomReader = {
+    readRoom: async (question) => Object.freeze({
+      room: "FULL" as const, scope: "PERSON_DAY" as const, resetsAt: new Date("2026-10-01T09:00:00.000Z"), waitingRunRef: null,
+      planId: "PLUS" as const, newStarts: "BLOCKED_UNTIL_RESET" as const, reserve: "KEPT" as const,
+      ...(question.dig === undefined ? { startSharePercent: 15 } : { digSharePercent: 15 })
+    })
+  };
+
+  it("maps them to the wire, and the contract accepts the read", async () => {
+    const response = await readRoute(blocked);
+    expect(response.statusCode).toBe(200);
+    const body = AskRoomResponseSchema.parse(response.json());
+    expect(body).toMatchObject({ room: "FULL", scope: "PERSON_DAY", new_starts: "BLOCKED_UNTIL_RESET", reserve: "KEPT", start_share_percent: 15 });
+    expect(body).not.toHaveProperty("dig_share_percent");
+  });
+
+  it("a read for a dig carries the dig's share instead (no dig model composed: the parent is not looked up)", async () => {
+    const response = await readRoute(blocked, `${ROOM_URL}&dig_parent=${randomUUID()}&dig_mode=thorough&dig_picks=2`);
+    expect(response.statusCode).toBe(200);
+    expect(AskRoomResponseSchema.parse(response.json())).toMatchObject({ dig_share_percent: 15 });
+    expect(response.json()).not.toHaveProperty("start_share_percent");
+  });
+});

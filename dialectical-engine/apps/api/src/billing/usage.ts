@@ -2,12 +2,16 @@ import type { PersonAllowanceSource, PersonWindow } from "@debateai/budget";
 import { TypedDomainError, type FundingBasis, type InternalGrant } from "@debateai/kernel";
 import type { PlanId } from "@debateai/register";
 import type { BillingUsageReader } from "./index.js";
+import { borrowersOf, readWindowBorrow, type AskRoomSpend } from "../ask-room.js";
 
 /**
  * Paid-plans spec §1.2 (U1) — WHAT THE USAGE BARS SHOW: what the person has spent
  * in each window, as a whole percentage of its limit, rounded DOWN and clamped to
  * 0–110 (a running debate may take a window to its 110% finish edge). Holds are
  * not shown: a bar says what was used, not what is promised to a running debate.
+ * The money rule (owner, 31 Oct; W3-2): a billingPlans v4 day or week shows what was used in it PLUS what running work
+ * borrowed into it (it started lower by that much), and the read names each run that is borrowing from the next day
+ * or week (`borrowed`: "to finish the debate that was running, we used {percent}% of tomorrow's allowance").
  */
 export function usagePercent(spentMicros: number, limitMicros: number): number {
   if (!Number.isSafeInteger(spentMicros) || spentMicros < 0
@@ -27,7 +31,8 @@ export class PersonUsageReader implements BillingUsageReader {
     entitlements: Readonly<{ current(ownerRef: string, now: Date): Promise<Readonly<{ planId: PlanId }>> }>;
     allowance: PersonAllowanceSource;
     funding?: Readonly<{readGrant(ownerRef:string,now:Date):Promise<Pick<InternalGrant,"expiresAt"|"grantId"|"grantEventId">|null>}>;
-    spend: Readonly<{ readOwnerSpentMicros(ownerRef: string, from: Date, to: Date, funding?:FundingBasis, scope?:PersonWindow["scope"]): Promise<number> }>;
+    spend: Readonly<{ readOwnerSpentMicros(ownerRef: string, from: Date, to: Date, funding?:FundingBasis, scope?:PersonWindow["scope"]): Promise<number> }>
+      & Pick<AskRoomSpend, "readOwnerSpentInRangesMicros" | "readOwnerChargesMicros">;
   }>) {}
 
   async read(ownerRef: string, now: Date): Promise<Awaited<ReturnType<BillingUsageReader["read"]>>> {
@@ -39,10 +44,24 @@ export class PersonUsageReader implements BillingUsageReader {
       || window.funding.grantId !== grant.grantId || window.funding.grantEventId !== grant.grantEventId))
       throw new TypedDomainError("RUN_FUNDING_BASIS_CONFLICT","Usage funding changed during its read");
     const rows: Array<Readonly<{ scope: PersonWindow["scope"]; percent: number; resetsAt: Date }>> = [];
+    const borrowed: Array<Readonly<{ scope: "PERSON_DAY" | "PERSON_WEEK"; runRef: string; percent: number; nextWindowStartsAt: Date }>> = [];
+    const month = windows.find((window) => window.scope === "PERSON_MONTH") ?? null;
     for (const window of windows) {
       const spent = await this.options.spend.readOwnerSpentMicros(ownerRef, window.periodStart, window.resetsAt, window.funding, window.scope);
-      rows.push(Object.freeze({ scope: window.scope, percent: Math.min(grant === null ? 110 : 100,usagePercent(spent, window.limitMicros)), resetsAt: window.resetsAt }));
+      const borrow = window.borrows === true && month !== null && grant === null
+        ? await readWindowBorrow({ ownerRef, window, month, currentSpentMicros: spent, spend: this.options.spend,
+          allowance: this.options.allowance }) : null;
+      const used = spent + (borrow?.borrowedMicros ?? 0);
+      rows.push(Object.freeze({ scope: window.scope, percent: Math.min(grant === null ? 110 : 100,usagePercent(used, window.limitMicros)), resetsAt: window.resetsAt }));
+      const charges = this.options.spend.readOwnerChargesMicros;
+      if (borrow === null || !borrow.notice || charges === undefined) continue;
+      for (const run of borrowersOf({ charges: await charges.call(this.options.spend, ownerRef, window.periodStart, window.resetsAt),
+        startedAtMicros: borrow.borrowedMicros, limitMicros: window.limitMicros, nextLimitMicros: borrow.nextLimitMicros,
+        limit: 20 - borrowed.length })) {
+        borrowed.push(Object.freeze({ scope: borrow.scope, runRef: run.runId, percent: run.percent, nextWindowStartsAt: borrow.nextStartsAt }));
+      }
     }
-    return Object.freeze({ planId: entitlement?.planId ?? null, ...(grant === null ? {} : {funding:{kind:"INTERNAL" as const,expiresAt:grant.expiresAt}}), windows: Object.freeze(rows) });
+    return Object.freeze({ planId: entitlement?.planId ?? null, ...(grant === null ? {} : {funding:{kind:"INTERNAL" as const,expiresAt:grant.expiresAt}}), windows: Object.freeze(rows),
+      ...(borrowed.length === 0 ? {} : { borrowed: Object.freeze(borrowed) }) });
   }
 }

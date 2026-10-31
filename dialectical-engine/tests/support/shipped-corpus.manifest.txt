@@ -113,6 +113,7 @@ apps/api/src/data-export/store.ts
 apps/api/src/data-export/types.ts
 apps/api/src/data-export/zip.ts
 apps/api/src/debate-shape-ask.ts
+apps/api/src/dig-admission.ts
 apps/api/src/disclosures.ts
 apps/api/src/email-change.ts
 apps/api/src/email-mfa-mail.ts
@@ -135,6 +136,7 @@ apps/api/src/mail-mime.ts
 apps/api/src/main.ts
 apps/api/src/map-views.ts
 apps/api/src/mfa.ts
+apps/api/src/month-pause.ts
 apps/api/src/onboarding-evidence.ts
 apps/api/src/owner-read.ts
 apps/api/src/password-reset-mail.ts
@@ -391,6 +393,7 @@ apps/runner/src/index.ts
 apps/runner/src/main.ts
 apps/runner/src/map-stage.ts
 apps/runner/src/migrate-cli.ts
+apps/runner/src/month-pause.ts
 apps/runner/src/ordered-recorder.ts
 apps/runner/src/owner-bootstrap-cli.ts
 apps/runner/src/owner-cli.ts
@@ -399,6 +402,7 @@ apps/runner/src/owner-recovery-cli.ts
 apps/runner/src/owner-recovery-custody.ts
 apps/runner/src/owner-recovery-material.ts
 apps/runner/src/path-rewrite-material.ts
+apps/runner/src/path-rewrite-scope.ts
 apps/runner/src/path-rewrite.ts
 apps/runner/src/production-database-principals-cli.ts
 apps/runner/src/production-database-principals.ts
