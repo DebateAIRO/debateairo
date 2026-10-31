@@ -89,6 +89,8 @@ describe("S2 identity schema on real PostgreSQL", () => {
       // 0135 the path rewrite's material: the dig's own paths, stored before its turn.
       "path_rewrite_input",
       "path_rewrite_turn",
+      // 0141 the path suggestions: what to dig into on one path, each time they are worked out.
+      "path_suggestions",
       // 0138 tree updates: a path's rewrites that a dig did not start, and the turns that order them.
       "path_update", "path_update_turn",
       "private_erasure_audit_binding",
