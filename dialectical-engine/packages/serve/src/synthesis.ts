@@ -1285,7 +1285,8 @@ export function buildEvaluatorRequest(input: {
  * the answer text may print none of them anyway (`synthesisWordingIndex`).
  */
 export function toSynthesisPromptMaterial(
-  request: SynthesizerRequest | EvaluatorRequest
+  request: SynthesizerRequest | EvaluatorRequest,
+  options: Readonly<{ checkerReadsExtracts?: boolean }> = {}
 ): readonly { readonly name: string; readonly content: string }[] {
   const codeLabel = {
     verdictLabel: request.codeLabel.verdictLabel,
@@ -1297,10 +1298,12 @@ export function toSynthesisPromptMaterial(
     servedStrength: digestStrength(request.codeLabel.servedStrength),
     margin: request.codeLabel.margin === null ? null : digestStrength(request.codeLabel.margin)
   };
-  // W4-1: the writer reads each looked-up node's cited extract (its sources variant says so, item 7); the checker is told
-  // nothing new, so its digest never carries one and its packet stays today's, byte for byte.
+  // W4-1: the writer reads each looked-up node's cited extract (its sources variant says so, item 7). W4-7: the checker
+  // reads the same extracts only under its own sources variant (`checkerReadsExtracts`, the runner's choice); otherwise
+  // its digest carries none and its packet stays today's, byte for byte.
+  const shown = request.role === "EVALUATOR" && options.checkerReadsExtracts !== true ? withoutExtracts(request.digest) : request.digest;
   const fields = [
-    { name: "digest", content: JSON.stringify(shownDigest(request.role === "EVALUATOR" ? withoutExtracts(request.digest) : request.digest)) },
+    { name: "digest", content: JSON.stringify(shownDigest(shown)) },
     { name: "code_label", content: JSON.stringify(codeLabel) }
   ];
   if (request.role === "EVALUATOR") {

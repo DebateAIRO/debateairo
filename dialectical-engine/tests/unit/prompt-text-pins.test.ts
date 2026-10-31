@@ -34,6 +34,7 @@ import {
   SYNTHESIZER_V3_PROMPT_CONTRACT
 } from "@debateai/serve";
 import { EVALUATOR_LENGTH_PROMPT_CONTRACT, EVALUATOR_PROMPT_CONTRACT, EVALUATOR_V1_PROMPT_CONTRACT } from "@debateai/runner";
+import { EVALUATOR_SOURCES_SEALED_CONTRACTS } from "../../apps/runner/src/answer-checker-sources.js";
 import {
   BLIND_JUDGE_GRADE_PROMPT_CONTRACT,
   DOMAIN_TAGGER_PROMPT_CONTRACT
@@ -885,7 +886,9 @@ describe("REVIEW ITEM 4 — no prompt anywhere still carries the retired sentenc
       // W3-5 (dig-model revision): the path rewrite's writer and checker; their texts are pinned below.
       ...PATH_REWRITE_SEALED_CONTRACTS,
       // W4-2: the dig's planner; its text is pinned in tests/unit/web-prompts.test.ts.
-      ...WEB_DIG_SEALED_CONTRACTS]
+      ...WEB_DIG_SEALED_CONTRACTS,
+      // W4-7: the answer checker's two sources variants; pinned in tests/unit/answer-checker-sources.test.ts.
+      ...EVALUATOR_SOURCES_SEALED_CONTRACTS]
       .map((contract): [string, typeof contract] => [contract.contractId, contract])
   ])("%s", (_name, contract) => {
     const whole = `${contract.instruction} ${contract.answerForm}`;

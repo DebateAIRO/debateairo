@@ -2,7 +2,7 @@
 // who reads which pack. A path's case writer, defender and critic read its pack; a reply to a rival reads its own pack
 // and the rival's; the reviewer, the comparing judges and the answer writer see only the one extract a point cites. Each
 // pack is cut to the plan's ~3,000 tokens by one code rule (the pick's rank, then the extract order). A debate with no
-// packs sends today's prompts, byte for byte.
+// packs sends today's prompts, byte for byte. W4-7: the answer checker reads the extracts the writer read.
 import { describe, expect, it } from "vitest";
 import {
   LENGTH_GUIDANCE_START, engineMaterialOf, type EngineMaterialSource, type LengthGuide
@@ -143,7 +143,7 @@ describe("each leg reads exactly its packs", () => {
     expect(engineSourceWithCitedExtracts(source, new Map())).toBe(source);
   });
 
-  it("the answer writer reads each cited extract on its node under its sources variant; the checker never sees one", () => {
+  it("the answer writer reads each cited extract on its node under its sources variant; the checker reads the same (W4-7)", () => {
     const nodes = (extract: boolean): DigestSourceNode[] => [{ nodeId: "r0", statement: "Yes, the pay is higher.", finalStrength: 0.6,
       wayOfKnowing: "LOOKED_UP", marks: [], polarityRelations: [], isPosition: true, isSurvivingObjection: false,
       ...(extract ? { citedExtract: DEBATE.citedExtract("S1-1")! } : {}) }];
@@ -162,7 +162,10 @@ describe("each leg reads exactly its packs", () => {
     expect(writer(false).contractId).toBe("serve.synthesizer.length.v3");
     const checker = readPromptFrame(buildSynthesisRolePrompt(buildEvaluatorRequest({ controls, round: 1, digest: digest(true), codeLabel,
       candidateStatement: "Yes." }), "English", undefined, length).packet);
-    expect(checker.fields.find((field) => field.name === "digest")!.content).not.toContain("S1-1");
+    // W4-7: the checker reads the digest the writer read, extracts and all, under its own sources variant.
+    expect(checker.contractId).toBe("serve.evaluator.length.sources.v1");
+    expect(checker.fields.find((field) => field.name === "digest")!.content)
+      .toBe(writer(true).fields.find((field) => field.name === "digest")!.content);
   });
 });
 

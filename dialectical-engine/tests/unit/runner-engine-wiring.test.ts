@@ -63,7 +63,9 @@ describe("the runner reads the engine from the receipt only", () => {
 
   it("W4-1: the packs are read once, after the web step kept one, and reach the legs and readers from that one read", () => {
     expect(RUNNER.split("const webStep = await runRunnerWebStep(")).toHaveLength(2);
-    expect(RUNNER.split("webPacks = await readDebateWebPacks({ pool: this.pool, runId: run.runId, abandon: keepAliveStop });")).toHaveLength(2);
+    // W4-7: with the step's outcomes, so every path of a dig reads the one pack kept under its first path.
+    expect(RUNNER.split("webPacks = await readDebateWebPacks({ pool: this.pool, runId: run.runId, paths: webStep.paths, abandon: keepAliveStop });"))
+      .toHaveLength(2);
     expect(RUNNER.indexOf("if (webStep.paths.some((path) => path.packId !== null)) {"))
       .toBeLessThan(RUNNER.indexOf("webPacks = await readDebateWebPacks("));
     // The case writer, the defenders and critics, and the cross-replies (own path, then the rival's).

@@ -561,7 +561,9 @@ describe("V-MINIMUM-PAYLOAD — the synthesis prompt surface withholds the machi
     expect(occurrences(runner,
       "buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, synthesisLength,\n          shapeLanguage, readingLevel)")).toBe(1);
     expect(occurrences(runner, "material: withQuestionLanguageField(withReaderField(")).toBe(1);
-    expect(occurrences(runner, "toSynthesisPromptMaterial(request)")).toBe(1);
+    // W4-7: the one projection is told whether the checker reads the cited extracts (its sources variant), nothing else.
+    expect(occurrences(runner, "toSynthesisPromptMaterial(request, { checkerReadsExtracts: checkerSourced })")).toBe(1);
+    expect(occurrences(runner, "toSynthesisPromptMaterial(")).toBe(1);
     // Debate shape (040ddb9fd): the answer-length variant adds ONE field after that one projection, nothing else.
     // Question language (P2L Task 13, PF-L40): a shaped run's lock adds ONE code-owned field after those, last; the
     // wrapper returns the same array without a lock, so today's material is that one projection still.

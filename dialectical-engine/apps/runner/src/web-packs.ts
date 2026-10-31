@@ -9,9 +9,11 @@
  *  - a path's case writer, defender and critic read its pack (the `sources` field of their sources variant);
  *  - a reply to a rival (the cross-reply) reads its own path's pack and the rival's;
  *  - the reviewer, the comparing judges, the answer writer and the storyteller never see a pack: only the one extract a
- *    point cites, copied by code from the stored pack;
+ *    point cites, copied by code from the stored pack; the answer checker reads the extracts the writer read (W4-7);
  *  - "looked up" stays only for a locator that is exactly an extract id of THIS debate's packs (`Judge.judge`'s
  *    `debateExtractIds`); any other locator becomes "reasoning", with the downgrade note the engine already has.
+ *  - a dig (W4-2) keeps ONE pack, under its first path, and every path of the dig reads it (W4-7): the step's outcomes
+ *    name the pack each path reads, so a dig path with no pack row of its own reads the first path's, the same bytes.
  * Nothing here searches the web: the debate reads what the web step stored, and only that.
  *
  * The rules it keeps:
@@ -130,11 +132,25 @@ export type DebateWebPacks = Readonly<{
   citedExtract: (locator: string | null) => EngineCitedExtract | undefined;
 }>;
 
-/** The debate's packs, or null when it kept none (then nothing in the debate changes). */
-export function debateWebPacks(packs: readonly WebPack[]): DebateWebPacks | null {
+/**
+ * A path that reads a pack kept under another path's ref (W4-7): on a dig, every path but the first reads the one pack
+ * kept under the first (W4-2; 0132 ties a pack to its searches' path, so the others have no pack row of their own).
+ */
+export type WebPackShare = Readonly<{ pathRef: string; keptUnder: string }>;
+
+/**
+ * The debate's packs, or null when it kept none (then nothing in the debate changes). `shared` names the paths that read
+ * a pack kept under another path (a dig's); none on a first debate, where each path reads only its own.
+ */
+export function debateWebPacks(packs: readonly WebPack[], shared: readonly WebPackShare[] = []): DebateWebPacks | null {
   const kept = packs.filter((pack) => pack.extracts.length > 0 || pack.pages.length > 0);
   if (kept.length === 0) return null;
   const byPath = new Map(kept.map((pack) => [pack.pathRef, pack] as const));
+  // A path's own pack wins; a shared path reads the very pack object of the path it is kept under (the same cut, the same bytes).
+  for (const share of shared) {
+    const pack = byPath.get(share.keptUnder);
+    if (pack !== undefined && !byPath.has(share.pathRef)) byPath.set(share.pathRef, pack);
+  }
   const extracts = new Map<string, EngineCitedExtract>();
   for (const pack of kept) {
     const pageOf = new Map(pack.pages.map((page) => [page.pageId, page] as const));
@@ -227,14 +243,20 @@ export function engineSourceWithCitedExtracts(source: EngineMaterialSource, cite
 
 /* ----------------------------------------------------------------- the store */
 
+/** A path's web step outcome as the packs reader reads it: the pack it names (`WebStepPathOutcome`'s two members). */
+export type WebPackOfPath = Readonly<{ pathRef: string; packId: string | null }>;
+
 /**
  * The run's packs, read back from the web store (0132) and opened under the run's key on a content lease of their own,
  * closed before returning. A pack that does not open or is not a pack is left out (logged); a store that cannot be read
  * leaves the debate without packs (logged), unless `abandon` names the error (the run must stop). Null when none is kept.
+ * W4-7: `paths` are the web step's outcomes; a path whose outcome names a pack kept under another path (every path of a
+ * dig but the first) reads that pack. Without them, or on a first debate, each path reads only its own.
  */
 export async function readDebateWebPacks(input: Readonly<{
   pool: Pool;
   runId: string;
+  paths?: readonly WebPackOfPath[];
   ports?: (pool: Pool, runId: string) => Promise<WebStepPorts>;
   abandon?: (error: unknown) => boolean;
   log?: (event: string, detail: Readonly<Record<string, unknown>>) => void;
@@ -244,6 +266,8 @@ export async function readDebateWebPacks(input: Readonly<{
   try {
     ports = await (input.ports ?? postgresWebStepPorts)(input.pool, input.runId);
     const read = await ports.store.read(input.runId);
+    /** Each opened pack's path, by its pack id (the ids the step's outcomes name). */
+    const keptUnder = new Map<string, string>();
     const packs = (read?.packs ?? []).flatMap((stored) => {
       let opened: unknown;
       try {
@@ -257,10 +281,16 @@ export async function readDebateWebPacks(input: Readonly<{
         log("WEB_PACK_INVALID", { runId: input.runId });
         return [];
       }
+      keptUnder.set(stored.pack_id, stored.path_ref);
       return [pack];
     });
+    // W4-7: a path whose outcome names a pack kept under another path reads it (a dig's paths after the first).
+    const shared = (input.paths ?? []).flatMap((path): WebPackShare[] => {
+      const home = path.packId === null ? undefined : keptUnder.get(path.packId);
+      return home === undefined || home === path.pathRef ? [] : [Object.freeze({ pathRef: path.pathRef, keptUnder: home })];
+    });
     // The store's order is its own; the debate reads packs by path, so the order never reaches a prompt.
-    return debateWebPacks(packs);
+    return debateWebPacks(packs, shared);
   } catch (error) {
     if (input.abandon?.(error) === true) throw error;
     log("WEB_PACKS_UNREAD", { runId: input.runId, code: error instanceof TypedDomainError ? error.code : "UNTYPED" });
