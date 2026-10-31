@@ -7,6 +7,7 @@ import {
   type Answer,
   type ArgumentLanguage,
   type AskParent,
+  type PurposeLines,
   type AskRequest,
   type ContractClient,
   type DepthParams,
@@ -499,7 +500,9 @@ export async function createDebate(
    */
   language?: Readonly<{ siteLanguage: SiteLanguage; choice?: QuestionLanguageChoice }>,
   /** Plan 2026-10-30 W3-4: a dig names the debate it digs, its places, mode and picks (AskParentSchema). */
-  parent?: AskParent
+  parent?: AskParent,
+  /** Decision 5 of 31 Oct: the debate's place, time and purpose lines, structured, whatever the page's language. */
+  purposeLines?: PurposeLines
 ): Promise<{ id: string }> {
   const riskTier = requiredString(config, "risk_tier");
   if (!RISK_TIERS.has(riskTier)) throw new Error("ASK_FIELD_REQUIRED: risk_tier must be casual, standard, or high-stakes.");
@@ -538,6 +541,7 @@ export async function createDebate(
     ...(modelStrength === undefined ? {} : { model_strength: modelStrength }),
     ...(language === undefined ? {} : { site_language: language.siteLanguage }),
     ...(language?.choice === undefined ? {} : { question_language_choice: language.choice }),
+    ...(purposeLines === undefined ? {} : { purpose_lines: purposeLines }),
     ...(settingsVersion === undefined ? {} : { settings_version: settingsVersion }),
     ...(parent === undefined ? {} : { parent: AskParentSchema.parse(parent) })
   };

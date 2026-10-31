@@ -12,13 +12,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  * carries three at most. A paid plan keeps every choice. The one new sentence is a v4 catalogue key.
  */
 const tier = vi.hoisted(() => ({ value: "free" as "free" | "premium" }));
+const submitted = vi.hoisted(() => ({ calls: [] as unknown[][] }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/components/AuthGate", () => ({ AuthGate: ({ children }: { children: (token: string) => React.ReactNode }) => children("token") }));
 vi.mock("@/components/billing/RoomNotice", () => ({ RoomNotice: () => null }));
 vi.mock("@/components/v4/V4Header", () => ({ V4Header: () => null }));
 vi.mock("@/lib/api", () => ({ contractClient: { readAnswerIndex: async () => ({ items: [], open_runs: [] }) } }));
 vi.mock("@/lib/v4/useV4Ask", () => ({
-  useV4Ask: () => ({ planTier: tier.value, submit: vi.fn(), flagsCrisis: () => false, room: null, submitting: false, dialogs: null })
+  useV4Ask: () => ({ planTier: tier.value, submit: async (...args: unknown[]) => { submitted.calls.push(args); return { kind: "STOPPED" }; }, flagsCrisis: () => false, room: null, submitting: false, dialogs: null })
 }));
 
 import { V4AskClient } from "../../apps/ui/components/v4/V4AskClient.js";
@@ -35,16 +36,17 @@ afterEach(async () => {
   root = null;
   host = null;
   tier.value = "free";
+  submitted.calls = [];
 });
 
 /** The page at its D2 step, for a question long enough to go on. */
-async function atStepTwo(planTier: "free" | "premium"): Promise<HTMLDivElement> {
+async function atStepTwo(planTier: "free" | "premium", locale = "en"): Promise<HTMLDivElement> {
   tier.value = planTier;
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
   await act(async () => root?.render(
-    <V4AskClient catalog={CATALOG} homeCatalog={{}} newDebateCatalog={{}} billingCatalog={{}} locale="en" crisisCountryHint={null}
+    <V4AskClient catalog={CATALOG} homeCatalog={{}} newDebateCatalog={{}} billingCatalog={{}} locale={locale} crisisCountryHint={null}
       initialQuestion="Should Romania build more nuclear plants?" initialLevel="plain" />
   ));
   await act(async () => buttonNamed(CATALOG["v4.ask.continue"]!).click());
@@ -93,5 +95,30 @@ describe("V4 step 2 on the Free plan: at most 3 choices", () => {
     await press("v4.read.purpose.DECIDE");
     expect((page.querySelector(`input[placeholder="${CATALOG["v4.read.matters.placeholder"]}"]`) as HTMLInputElement).disabled).toBe(false);
     expect((page.querySelector(`input[placeholder="${CATALOG["v4.read.angles.placeholder"]}"]`) as HTMLInputElement).disabled).toBe(false);
+  });
+});
+
+describe("decision 5 of 31 Oct: the place, the time and the purpose go as their own field", () => {
+  const startName = () => CATALOG["v4.read.start"]!;
+  it("Start sends them beside the question, on an English page", async () => {
+    await atStepTwo("premium");
+    await press("v4.read.place.EU");
+    await press("v4.read.purpose.DECIDE");
+    await act(async () => buttonNamed(startName()).click());
+    expect(submitted.calls.at(-1)![4]).toEqual({ place: CATALOG["v4.askText.place.EU"], purpose: CATALOG["v4.askText.purpose.DECIDE"] });
+  });
+  it("off an English page: still offered and sent, though the question stays the person's words; what matters and angles are not offered", async () => {
+    const page = await atStepTwo("premium", "ro");
+    expect(page.querySelector(`[id$="-matters"]`)).toBeNull();
+    await press("v4.read.horizon.NOW");
+    await act(async () => buttonNamed(startName()).click());
+    const call = submitted.calls.at(-1)!;
+    expect(call[0]).toBe("Should Romania build more nuclear plants?");
+    expect(call[4]).toEqual({ time: CATALOG["v4.askText.horizon.NOW"] });
+  });
+  it("no choice: no field", async () => {
+    await atStepTwo("premium");
+    await act(async () => buttonNamed(startName()).click());
+    expect(submitted.calls.at(-1)![4]).toBeUndefined();
   });
 });

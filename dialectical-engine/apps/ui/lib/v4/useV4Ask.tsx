@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import {
-  ContractHttpError, DIG_FREE_PICKS_MAX, DIG_PICKS_ONE_PATH, DIG_TOO_DEEP, FREE_DIG_PICKS_MAX, type AskParent, type QuestionLanguageChoice
+  ContractHttpError, DIG_FREE_PICKS_MAX, DIG_PICKS_ONE_PATH, DIG_TOO_DEEP, FREE_DIG_PICKS_MAX, type AskParent, type PurposeLines, type QuestionLanguageChoice
 } from "@debateai/contract";
 import { COOKIE_SESSION_MARKER, contractClient, createDebate } from "@/lib/api";
 import { readAskRoom, useAskRoom, waitingRoomOf, type AskRoom } from "@/lib/billing/room";
@@ -77,7 +77,7 @@ export function useV4Ask(input: Readonly<{
   dig?: V4DigRoom | null;
 }>): Readonly<{
   /** W3-4: a dig sends its `parent` (the debate it digs, its places, mode and picks); a new question sends none. */
-  submit(questionLine: string, mode: DigMode, origin?: V4AskOrigin, parent?: AskParent | null): Promise<V4AskOutcome>;
+  submit(questionLine: string, mode: DigMode, origin?: V4AskOrigin, parent?: AskParent | null, purposeLines?: PurposeLines): Promise<V4AskOutcome>;
   /** ASK-3: whether this text reads as a person in crisis (the page enables Start for it even when it is short). */
   flagsCrisis(text: string): boolean;
   room: AskRoom | null;
@@ -171,7 +171,7 @@ export function useV4Ask(input: Readonly<{
   });
 
   const submit = React.useCallback(async (questionLine: string, askMode: DigMode, origin: V4AskOrigin = "ask",
-    parent: AskParent | null = null): Promise<V4AskOutcome> => {
+    parent: AskParent | null = null, purposeLines?: PurposeLines): Promise<V4AskOutcome> => {
     if (submitFlight.current) return STOPPED;
     const now = live.current;
     const question = questionLine.trim();
@@ -214,11 +214,11 @@ export function useV4Ask(input: Readonly<{
           // W3-4: a dig's parent rides with every pass of the same press (today's calls when there is none).
           const sentParent = parent ?? undefined;
           debate = !sendsLanguage
-            ? sentParent === undefined
+            ? sentParent === undefined && purposeLines === undefined
               ? await createDebate(next.line, config, COOKIE_SESSION_MARKER)
-              : await createDebate(next.line, config, COOKIE_SESSION_MARKER, undefined, undefined, sentParent)
+              : await createDebate(next.line, config, COOKIE_SESSION_MARKER, undefined, undefined, sentParent, purposeLines)
             : await createDebate(next.line, config, COOKIE_SESSION_MARKER, undefined,
-              next.choice === undefined ? { siteLanguage } : { siteLanguage, choice: next.choice }, sentParent);
+              next.choice === undefined ? { siteLanguage } : { siteLanguage, choice: next.choice }, sentParent, purposeLines);
         } catch (refusal) {
           // Today's one retry after the consent screen; it is not one of the four asks.
           if (isSensitiveDataConsentRefusal(refusal) && !consentRetried) {

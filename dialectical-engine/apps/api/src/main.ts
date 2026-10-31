@@ -29,6 +29,7 @@ import { ConsumerSecurityService } from "./consumer-security.js";
 import { PostgresConsumerSecurityRepository } from "@debateai/db";
 import { PostgresDigModelRepository, PostgresDigPicksRepository, PostgresInvestigationReportRepository, PostgresInvestigationRepository } from "@debateai/db";
 import { investigationReportContentOpener } from "./investigation-report.js";
+import { postgresPurposeLines } from "./purpose-lines.js";
 import { continuedRunWake } from "./month-pause.js";
 import { ConsumerWebAuthnService } from "./consumer-webauthn.js";
 import { PostgresConsumerAuthRepository } from "@debateai/db";
@@ -1686,6 +1687,8 @@ const api = buildApi({
   },
   // W3-7 (0135): a dig's picks, kept at start for its path rewrite, each text sealed under the dig's run key on this pool.
   digPicks: new PostgresDigPicksRepository(pool),
+  // Decision 5 of 31 Oct (0138): a debate's place, time and purpose lines, sealed under its run key on this pool.
+  purposeLines: postgresPurposeLines(pool),
   ...(askRoom === undefined ? {} : { monthRoom: askRoom }),
   // R22 W3-8: after Continue, the paused debate's released work item goes back to its own release's runner through the
   // routed dispatcher (a failed send is only logged: the runner's lapsed re-send takes it within five minutes anyway).
