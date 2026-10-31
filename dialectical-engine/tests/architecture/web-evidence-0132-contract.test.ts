@@ -58,7 +58,7 @@ const tableBody = (sql: string, table: string): string => {
 
 describe("0132: the web evidence store step", () => {
   it("C-T follows 0131 in the chain's STEPS, with its own loader", async () => {
-    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0131,loadForward0132,loadForward0133,loadForward0134]");
+    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0131,loadForward0132,loadForward0133,loadForward0134,loadForward0135]");
     const loader = read("packages/db/src/migration-forward0132.ts");
     expect(loader).toContain(`const NAME = "${NAME}";`);
     expect(loader).toContain('const VERSION = "web-evidence-forward0132-v1";');
@@ -214,13 +214,13 @@ describe("0132: the web evidence store step", () => {
     expect(pageMemory).toBeGreaterThan(0);
     expect([pageMemory, investigation, web, commit].every((value, index, all) => index === 0 || value > all[index - 1]!)).toBe(true);
     expect(read("packages/db/src/account-erasure.ts")).toMatch(
-      /const ERASURE_FUNCTION_SIGNATURES = Object\.freeze\(\[[\s\S]*?FORGET_ERASED_DEBATE_PAGE_MEMORY,\n[^\n]*\n {2}FORGET_ERASED_DEBATE_WEB_EVIDENCE,\n {2}FORGET_ERASED_DEBATE_INVESTIGATION,\n[^\n]*\n {2}FORGET_ERASED_DEBATE_DIG_MODEL\n\] as const\);/u);
+      /const ERASURE_FUNCTION_SIGNATURES = Object\.freeze\(\[[\s\S]*?FORGET_ERASED_DEBATE_PAGE_MEMORY,\n[^\n]*\n {2}FORGET_ERASED_DEBATE_WEB_EVIDENCE,\n {2}FORGET_ERASED_DEBATE_INVESTIGATION,\n[^\n]*\n {2}FORGET_ERASED_DEBATE_DIG_MODEL,\n[^\n]*\n {2}FORGET_ERASED_DEBATE_DIG_PICKS\n\] as const\);/u);
   });
 
   it("C-R is documented as the twenty-second step", () => {
     const readme = read("migrations/lineage/README.md");
     expect(readme.replace(/\s+/gu, " ")).toContain(
-      "the V4 account memory (0131, below) the twenty-first, the web evidence store (0132, below) the twenty-second, the investigations (0133, below) the twenty-third and the dig model with the month pause (0134, below) the twenty-fourth.");
+      "the V4 account memory (0131, below) the twenty-first, the web evidence store (0132, below) the twenty-second, the investigations (0133, below) the twenty-third, the dig model with the month pause (0134, below) the twenty-fourth and the dig picks (0135, below) the twenty-fifth.");
     const heading = "## The web evidence store (0132) and investigations (0133)";
     const at = readme.indexOf(heading);
     expect(at).toBeGreaterThan(readme.indexOf("## The V4 account memory (0131)"));

@@ -90,6 +90,7 @@ import { createCallScheduler, type CallSubject } from "../../apps/runner/src/cal
 import { applyPreviewGateCapacities, previewCallSubjects, previewGateNames, structureRepairThroughLane } from "../../apps/runner/src/call-lane-gateway.js";
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
 import { MonthPause, monthPaused } from "../../apps/runner/src/month-pause.js";
+import { composePathRewrite } from "../../apps/runner/src/path-rewrite-composition.js";
 import {
   createRunnerSettingsCache, createRunSettingsVersions, loadRunnerVersionSettings, preloadRunnerSettings, readRunnerSiteContext,
   runCostEnvelopeGuardOf, runnerSettingsOfVersion, runnerSettingsSummary, runnerWebSearchSettings, runPreviewThinkingLevelsOf,
@@ -311,6 +312,14 @@ export async function composePracticeRunner(input: Readonly<{
     // Charts in the verdict PDF (design 2026-10-28), as main.ts: the practice debate makes the same chart call.
     charts: true
   });
+  /**
+   * Dig-model revision W3-7: THE PATH REWRITE, switched on. A settled dig writes no story; the path it was dug from is
+   * rewritten in the story's place (apps/runner/src/path-rewrite-composition.ts, the same call as the preview practice's),
+   * its calls charged on the never-walled PATH_REWRITE seam above. Undefined when no Haiku or no GLM target is configured.
+   */
+  const pathRewrite = composePathRewrite({ pool, targets: providerTargets,
+    members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
+    log: storyLog });
   function observeClaimTarget(target: (typeof providerTargets)[number]) {
     return observeClaimTimeTarget({
       preview: true,
@@ -356,6 +365,8 @@ export async function composePracticeRunner(input: Readonly<{
       };
     },
     story: storyWriter,
+    // Dig-model revision W3-7: a dig's path rewrite in its story's place (above).
+    ...(pathRewrite === undefined ? {} : { pathRewrite: pathRewrite.settings }),
     providerPrices: buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE),
     // LG-A (Task 14 carry), as main.ts: root 0's room adds the structure-repair call to its first attempt and retry (the sum).
     structureRepairCeiling: previewStructureRepairCeiling(structureRepairRoute),

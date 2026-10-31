@@ -130,6 +130,9 @@ const WORKER_FUNCTIONS = [
   // and the pauses. Its archive section is not wired yet (apps/api/src/data-export); the boot check already pins that
   // the worker reaches it.
   "identity.read_data_export_dig_model(uuid,uuid)",
+  // A dig's picks and its path rewrite's material (0135), sealed under each dig's run key. Its archive section is not
+  // wired yet either; the boot check pins that the worker reaches it.
+  "identity.read_data_export_dig_picks(uuid,uuid)",
   "identity.complete_data_export(uuid,uuid,text,text,bigint,timestamp with time zone)",
   "identity.fail_data_export(uuid,uuid,text)",
   "identity.sweep_data_exports()",
@@ -156,7 +159,7 @@ export async function assertDataExportDatabaseRoles(requestPool: Pool, workerPoo
     const [request, worker] = await Promise.all([roleWitness(requestPool), roleWitness(workerPool)]);
     if (request === undefined || worker === undefined || request.principal === worker.principal
       || !request.authorization_member || request.worker_member || request.request_count !== 4 || request.worker_count !== 0
-      || !worker.worker_member || worker.authorization_member || worker.request_count !== 0 || worker.worker_count !== 13
+      || !worker.worker_member || worker.authorization_member || worker.request_count !== 0 || worker.worker_count !== 14
       || request.privileged || worker.privileged) {
       throw new TypeError("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
     }

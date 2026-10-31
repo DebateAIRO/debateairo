@@ -52,11 +52,11 @@ describe("rls:proof — V's command at the head (PLAN S8.3, A6)", () => {
     run = Object.freeze({ ...result, before, after: await leftovers() });
   }, 1_200_000);
 
-  it("S8.3-a stdout lines 2, 3×16, 4 EXACT and line 1 CONTAINS \"RLS_PROOF cluster=throwaway migrated_to=0134_dig_model_and_month_pause.sql\" and \" in_scope=118\"; exit 0", () => {
+  it("S8.3-a stdout lines 2, 3×16, 4 EXACT and line 1 CONTAINS \"RLS_PROOF cluster=throwaway migrated_to=0135_dig_picks.sql\" and \" in_scope=118\"; exit 0", () => {
     const lines = run.stdout.split("\n");
     expect(lines.at(-1)).toBe("");
     const [first, ...rest] = lines.slice(0, -1);
-    expect(first).toContain("RLS_PROOF cluster=throwaway migrated_to=0134_dig_model_and_month_pause.sql");
+    expect(first).toContain("RLS_PROOF cluster=throwaway migrated_to=0135_dig_picks.sql");
     expect(first).toContain(" in_scope=118");
     expect(rest).toEqual([
       "RLS_PROOF seeded l5f12_relations_with_rows_of_b=6/6",

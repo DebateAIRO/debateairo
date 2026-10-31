@@ -18,7 +18,7 @@ import {
  * 0134 (dig-model revision 2026-10-30, task W2-8, and its money rule of 31 Oct): each dig's level (at most 10) with the
  * nested join that refuses an eleventh, the path rewrite's turns and its encrypted, insert-once rewrites, the search
  * planner's decision for each path, the month pause
- * of a running debate, and the spend source PATH_REWRITE. The last step of the chain, `expand`, keeping 0130's verifier.
+ * of a running debate, and the spend source PATH_REWRITE. Followed by the dig picks' 0135; `expand`, keeping 0130's verifier.
  * No database here: the behaviour is tests/integration/dig-model-database.test.ts.
  */
 const NAME = "0134_dig_model_and_month_pause.sql";
@@ -79,8 +79,8 @@ function sources(directory: URL): string[] {
 }
 
 describe("0134: the dig model and the month pause", () => {
-  it("C-T is the last step of the chain's STEPS, after 0133, with its own loader", async () => {
-    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0132,loadForward0133,loadForward0134]);");
+  it("C-T follows 0133 in the chain's STEPS (the dig picks' 0135 comes after it), with its own loader", async () => {
+    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0132,loadForward0133,loadForward0134,loadForward0135]);");
     const loader = read("packages/db/src/migration-forward0134.ts");
     expect(loader).toContain(`const NAME = "${NAME}";`);
     expect(loader).toContain('const VERSION = "dig-model-forward0134-v1";');
@@ -93,8 +93,9 @@ describe("0134: the dig model and the month pause", () => {
     expect(loader).toContain("pg_get_expr(k.conbin,k.conrelid)");
     expect(loader).not.toContain("model_spend_spend_source_check");
     const plan = await loadMigrationPlan();
-    expect(plan.forwardChain.slice(-2).map((step) => step.name)).toEqual(["0133_investigations.sql", NAME]);
-    expect(plan.forwardChain.at(-1)?.replayVerifierSql).toBeUndefined();
+    const names = plan.forwardChain.map((step) => step.name);
+    expect(names.slice(names.indexOf(NAME) - 1, names.indexOf(NAME) + 1)).toEqual(["0133_investigations.sql", NAME]);
+    expect(plan.forwardChain.find((step) => step.name === NAME)?.replayVerifierSql).toBeUndefined();
   });
 
   it("C-M is bound to 0133's manifest and to the verifier in force (0130's)", () => {
@@ -270,10 +271,10 @@ describe("0134: the dig model and the month pause", () => {
     const digModel = helper.indexOf('"SELECT identity.forget_erased_debate_dig_model($1)"');
     expect(investigation).toBeGreaterThan(0);
     expect(digModel).toBeGreaterThan(investigation);
-    expect(read("packages/db/src/account-erasure.ts")).toContain("FORGET_ERASED_DEBATE_DIG_MODEL\n] as const);");
+    expect(read("packages/db/src/account-erasure.ts")).toContain("FORGET_ERASED_DEBATE_DIG_MODEL,\n");
     const exporter = read("packages/db/src/data-export.ts");
     expect(exporter).toContain(`"${EXPORT_READER}",`);
-    expect(exporter).toContain("worker.worker_count !== 13");
+    expect(exporter).toContain("worker.worker_count !== 14");
   });
 
   it("C-R is documented as the twenty-fourth step", () => {

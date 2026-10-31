@@ -2429,7 +2429,11 @@ export const CONTENT_CARRIERS = Object.freeze([
   // dig's own paths' lines and fates, sealed under the DIG's run key (erasing the dig erases its rewrite).
   "identity.path_rewrite",
   // The web plan (migration 0134): the search planner's reason for a path with no search.
-  "identity.web_plan_path"
+  "identity.web_plan_path",
+  // A dig's picks (migration 0135): each pick's text, the person's own words or the AI suggestion as they sent it, sealed
+  // under the DIG's run key; and the dig's own paths as its settled run gave them to its path rewrite.
+  "identity.dig_pick",
+  "identity.path_rewrite_input"
 ] as const);
 
 export type ContentCarrier = typeof CONTENT_CARRIERS[number];

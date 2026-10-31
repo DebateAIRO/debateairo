@@ -1,5 +1,8 @@
 import type { Pool, PoolClient } from "pg";
 import type { WebSealed } from "./web-evidence.js";
+// 0135 (W3-7): a dig's picks and its path rewrite's material, re-exported here (the package index's bytes are pinned by the
+// migration audit, NATIVE_MIGRATE_MODULE_SHA256).
+export * from "./dig-picks.js";
 
 /**
  * The new dig model and the month pause (migration 0134; plan 2026-10-30 dig-model revision task W2-8 and its money rule

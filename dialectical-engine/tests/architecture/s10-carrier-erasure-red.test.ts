@@ -199,6 +199,11 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // which establishes or borrows the session content lease (checked below).
       "apps/api/src/index.ts",
       "apps/evaluator-worker/src/index.ts",
+      // The path rewrite switched on (dig-model revision W3-7): the composition seals each rewrite's text under the dig's
+      // run key inside withRunContentLease; the sources open the parent's story, its nodes, the base rewrite and the
+      // extracts each under its own run's key, inside withRunContentLease or through prepareLeasedContentEncryptionForRun.
+      "apps/runner/src/path-rewrite-composition.ts",
+      "apps/runner/src/path-rewrite-sources.ts",
       // Reclaim resume (spec 2026-10-14): the replay book reads the run's recorded prompts and replies through
       // prepareLeasedContentEncryptionForRun, which borrows the lease the runner already holds when it is read.
       "apps/runner/src/run-replay.ts",
@@ -206,6 +211,9 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // readings, extracts) under that run's own content lease (prepareLeasedContentEncryptionForRun), closed when the
       // step ends; page texts are opened only to fill the vendor's copy of a reader's prompt (W3-0).
       "apps/runner/src/web-step.ts",
+      // A dig's picks (0135, dig-model revision W3-7): the picks and the path rewrite's material are sealed inside
+      // withRunContentLease and opened through prepareLeasedContentEncryptionForRun, both under the dig's own run key.
+      "packages/db/src/dig-picks.ts",
       "packages/db/src/index.ts",
       "packages/evaluator/src/index.ts",
       "packages/evidence/src/index.ts",

@@ -973,6 +973,28 @@ describe("P3-01 production database-principal manifest", () => {
   "roleName": "debateai_data_export_worker",
   "source": "migrations/0134_dig_model_and_month_pause.sql",
   "grants": ["EXECUTE ON FUNCTION identity.read_data_export_dig_model(uuid,uuid)"]
+},
+// A dig's picks and its path rewrite's material (0135; dig-model revision task W3-7): the picks' writer for the API's own
+// role, the picks' reader, the material's writer and the sweep's list for the shared runtime role (the runner; the API's
+// roles inherit them), and one export reader. No table grant.
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0135_dig_picks.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.record_dig_picks(uuid,uuid,uuid,text,jsonb)"]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0135_dig_picks.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_dig_picks_of_run(uuid)",
+    "EXECUTE ON FUNCTION identity.record_path_rewrite_input(uuid,uuid,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_unwritten_path_rewrites(timestamptz,integer)"
+  ]
+},
+{
+  "roleName": "debateai_data_export_worker",
+  "source": "migrations/0135_dig_picks.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.read_data_export_dig_picks(uuid,uuid)"]
 }
 ]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))
@@ -1370,6 +1392,26 @@ it("discloses exactly 0134's grants to the runtime role, the API's own role and 
   expect(actual).toEqual(declared);
   // Function grants only: no role holds a table right on these tables.
   expect(declared).toHaveLength(17);
+  expect(declared.some(grant => !/^GRANT EXECUTE ON FUNCTION /u.test(grant))).toBe(false);
+});
+
+it("discloses exactly 0135's grants to the runtime role, the API's own role and the export worker (dig-model revision W3-7)", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const sql = await readFile("migrations/0135_dig_picks.sql", "utf8");
+  const disclosed = "debateai_runtime|debateai_staff_security_owner|debateai_billing_runtime|debateai_data_export_worker";
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)].map(([statement]) => statement)
+    .filter(statement => new RegExp(`\\bTO\\b.*\\b(?:${disclosed})\\b`, "u").test(statement)
+      && !new RegExp(` TO (?:${disclosed});$`, "u").test(statement))).toEqual([]);
+  const actual = [...sql.matchAll(new RegExp(`^GRANT [^\\n]+ TO (?:${disclosed});$`, "gm"))]
+    .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0135_dig_picks.sql")
+    .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
+  expect(actual).toEqual(declared);
+  // Function grants only: no role holds a table right on these tables. Six GRANT lines; the erasure role's one (the
+  // deletion) is not a disclosed principal here, as 0134's.
+  expect(declared).toHaveLength(5);
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)]).toHaveLength(6);
+  expect(sql).toMatch(/^GRANT EXECUTE ON FUNCTION identity\.forget_erased_debate_dig_picks\(uuid\) TO debateai_erasure_runtime;$/mu);
   expect(declared.some(grant => !/^GRANT EXECUTE ON FUNCTION /u.test(grant))).toBe(false);
 });
 

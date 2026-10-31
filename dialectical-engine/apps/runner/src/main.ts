@@ -10,6 +10,8 @@ import {
 } from "@debateai/crypto";
 import { configureContentEncryption, createPool, PostgresDigModelRunnerRepository, RUNNER_CAPACITY, RUNNER_DATABASE_POOLS, RunRepository } from "@debateai/db";
 import { MonthPause, monthPaused } from "./month-pause.js";
+import { composePathRewrite } from "./path-rewrite-composition.js";
+import { startPathRewriteSweep } from "./path-rewrite-sweep.js";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
 import { releaseTaskName, TypedDomainError } from "@debateai/kernel";
 import {
@@ -338,6 +340,14 @@ const storyWriter = new StoryWriter({
   charts: true
 });
 /**
+ * Dig-model revision W3-7: THE PATH REWRITE, switched on. A settled dig writes no story; the path it was dug from is
+ * rewritten in the story's place (apps/runner/src/path-rewrite-composition.ts, the same call as the preview practice's),
+ * its calls charged on the never-walled PATH_REWRITE seam above. Undefined when no Haiku or no GLM target is configured.
+ */
+const pathRewrite = composePathRewrite({ pool, targets: providerTargets,
+  members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
+  log: storyLog });
+/**
  * The claim-time probe of one target (both claim probes below). Spec 2026-10-11 busy model §2: on the
  * preview, a gate-proven unbilled refusal gets the one 60-second resend, as at ask time, and the claim
  * keeps the LAST observation (the runner records it). Off the preview: one probe, exactly as before.
@@ -423,6 +433,8 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   },
   // Verdict story (spec §3): written after each settled debate; never inside it.
   story: storyWriter,
+  // Dig-model revision W3-7: a dig's path rewrite in its story's place (above).
+  ...(pathRewrite === undefined ? {} : { pathRewrite: pathRewrite.settings }),
   // Engine money rule, Task M3 (spec §14.4.2): each target's price, so an
   // answer-writing call refused for money tries the cheaper claim-eligible
   // makers first. Hosted only (local mode's map is empty); never sealed.
@@ -555,6 +567,10 @@ const startupReconciliation = retireRequestStanding
       }
     }
   });
+// Dig-model revision W3-7: a dig whose runner stopped mid-rewrite is rewritten again from the store (0135), at boot and
+// every five minutes, its answered calls replayed free; none while this release retires (claims stopped, §4).
+const pathRewriteSweep = pathRewrite === undefined || retireRequestStanding ? null
+  : startPathRewriteSweep({ ...pathRewrite.sweep, paused: () => retirementSignal.claimsStopped() });
 announceRunnerReady({
   kind: "DEBATEAI_RUNNER_READY",
   worker: environment.HATCHET_WORKER_NAME,
@@ -602,6 +618,7 @@ const retirement = startRunnerRetirement({
   // are the SDK's; a live-handle check needs Hatchet and Postgres running, so the unit test pins this wiring instead.
   stopWorker: async () => {
     lapsedResend.stop();
+    pathRewriteSweep?.stop();
     await worker.stop();
     await Promise.allSettled([pool.end(), keepAlivePool.end()]);
   },
@@ -610,6 +627,7 @@ const retirement = startRunnerRetirement({
   emit: (payload) => (process as NodeJS.EventEmitter).emit(RUNNER_RETIRED_PROCESS_EVENT, payload)
 });
 await started;
-// The worker ended (retired, or stopped by a signal): no further re-send pass or retirement read.
+// The worker ended (retired, or stopped by a signal): no further re-send pass, rewrite sweep or retirement read.
 lapsedResend.stop();
+pathRewriteSweep?.stop();
 retirement.stop();

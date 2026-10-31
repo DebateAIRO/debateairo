@@ -27,9 +27,15 @@ import { replayingGateway, type ReplayBook } from "./run-replay.js";
  *  3. the writer (Claude Haiku 5.5, draft 5.1) and the checker (GLM, draft 5.2; Luna later) run at most 2 rounds (1 on
  *     Free, Q-D14), then a backup writer of another maker, as the story does (packages/story/src/path-rewrite.ts);
  *  4. it stores ONE row (identity.record_path_rewrite), its text sealed under the DIG's run key. EVERY turn ends with a
- *     row: when every writer failed, the row is FAILED and the path keeps its text; otherwise later digs of the path would
- *     wait for ever. The only turn left open is one whose store cannot be read or written at all.
+ *     row: when every writer failed, or the parent path or the dig's own material could not be read, the row is FAILED
+ *     and the path keeps its text; otherwise later digs of the path would wait for ever. A turn whose store cannot be read
+ *     or written at all is left to the sweep (path-rewrite-sweep.ts, W3-7), which writes it once the store answers.
  *  5. then W4-3's suggestions for the dig's own paths are asked for (the `afterRewrite` hook; none at level 10).
+ *
+ * W3-7: before it takes its turn, the dig's own paths are stored (0135's identity.path_rewrite_input, `recordInput`), so
+ * a rewrite whose runner stopped is built again by the sweep from the store alone, byte for byte, its answered calls
+ * replayed. WAITING behind an earlier dig holds this task at most `wait.maxWaitMs` (10 minutes, polling every 5 seconds);
+ * past it the turn is left to the sweep, which writes it once it reaches the front.
  *
  * MONEY: every call is the dig's run's, on the story lane at `PATH_REWRITE:WRITER:{round}` / `PATH_REWRITE:CHECKER:{round}`,
  * charged as spend source PATH_REWRITE inside the dig's estimate and never walled. The gateway's scope for those call
@@ -66,7 +72,38 @@ export type PathRewriteSources = Readonly<{
     => Promise<ReadonlyMap<string, Pick<StoryNodeEnrichment, "reviewOutcome">>>;
   /** The checked extracts the dig's own points cite, by point id; absent: none. */
   digExtractsOf?: (runId: string, pointIds: readonly string[]) => Promise<ReadonlyMap<string, readonly PathRewriteExtract[]>>;
+  /** W3-7 (0135): stores the dig's own paths and its work item before it takes its turn; absent: nothing stored. */
+  recordInput?: (runId: string, workItemId: string, digPaths: readonly PathRewriteDigPath[]) => Promise<string>;
+  /** W3-7: what `recordInput` stored, for the sweep; null when nothing was. */
+  storedInputOf?: (runId: string) => Promise<PathRewriteStoredInput | null>;
+  /**
+   * W3-7: the codes a FAILED row needs when the parent path's text cannot be read: the answer version and the fate the
+   * path had, from clear columns only. Absent or failing: UNKNOWN_PARENT_CODES (a FAILED row's fate is never served).
+   */
+  parentCodesOf?: (input: Readonly<{ parentRunId: string; positionRef: string; baseRewriteId: string | null }>)
+    => Promise<Readonly<{ answerVersion: number; fate: StoryFate }>>;
 }>;
+
+/** W3-7: the dig's own paths as its settled run gave them to the rewrite, and the work item its calls name. */
+export type PathRewriteStoredInput = Readonly<{ workItemId: string; digPaths: readonly PathRewriteDigPath[] }>;
+
+/** The members a rewrite may call: the run's own (after settle) or the runner's configured ones (the sweep). */
+export type PathRewriteRoles = Pick<StoryWriteInput, "resolveProvider" | "backupCandidates" | "backupMakers">;
+
+/** W3-7: the digs a rewrite is running for in this process, so the sweep never starts a second copy (paid twice). */
+export type PathRewriteInFlight = Readonly<{ begin: (digRunId: string) => (() => void) | null; has: (digRunId: string) => boolean }>;
+export function createPathRewriteInFlight(): PathRewriteInFlight {
+  const running = new Set<string>();
+  return Object.freeze({
+    begin: (digRunId: string) => {
+      const key = digRunId.toLowerCase();
+      if (running.has(key)) return null;
+      running.add(key);
+      return () => { running.delete(key); };
+    },
+    has: (digRunId: string) => running.has(digRunId.toLowerCase())
+  });
+}
 
 export type PathRewriteTurns = Pick<PostgresDigModelRunnerRepository, "takeRewriteTurn" | "readRewriteTurn" | "recordRewrite">;
 
@@ -95,8 +132,10 @@ export type PathRewriteRunnerSettings = Readonly<{
   checkerRoleRef: string;
   /** The dig's recorded rewrite calls, for a rewrite run again after its runner stopped; absent: nothing replayed. */
   replayBookOf?: (runId: string, workItemId: string) => Promise<ReplayBook>;
-  /** How a turn behind another waits for the front. */
+  /** How a turn behind another waits for the front (W3-7: 5 seconds, at most 10 minutes; then the sweep's). */
   wait?: Readonly<{ pollMs: number; maxWaitMs: number; sleep?: (ms: number) => Promise<void> }>;
+  /** W3-7: shared with the sweep; absent: none kept (a test, or a runner without the sweep). */
+  inFlight?: PathRewriteInFlight;
   /** engineContractHash(): absent, the code's own. */
   contractHash?: string;
   log?: (event: string, detail: Record<string, unknown>) => void;
@@ -107,7 +146,12 @@ export type PathRewriteRunnerSettings = Readonly<{
   afterRewrite?: (settled: PathRewriteSettled) => Promise<void> | void;
 }>;
 
-const DEFAULT_WAIT = Object.freeze({ pollMs: 2_000, maxWaitMs: 30 * 60_000 });
+const DEFAULT_WAIT = Object.freeze({ pollMs: 5_000, maxWaitMs: 10 * 60_000 });
+/**
+ * W3-7: a FAILED row's codes when neither the parent's text nor its clear codes could be read. The table needs a version
+ * and a fate before; a FAILED rewrite changes nothing and its fate is never served (the contract's FAILED entry has none).
+ */
+export const UNKNOWN_PARENT_CODES = Object.freeze({ answerVersion: 1, fate: "SET_ASIDE" as StoryFate });
 const LOG_ERROR_NAME = /^[A-Za-z][A-Za-z0-9_]{0,63}$/u;
 const BARE_STEP = <T>(use: () => Promise<T>): Promise<T> => use();
 
@@ -127,8 +171,9 @@ export function pathRewriteIdOf(digRunId: string): string {
 
 /**
  * The after-settle branch's one call (index.ts): true when the settled run is a dig, whose path rewrite then ran in the
- * story's place (stored, failed, or waiting behind an earlier dig); false when it is none, or when the runner has no
- * rewrite settings, or when whether it is a dig could not be read: the story is written as today. Never rejects.
+ * story's place (stored, failed, or left waiting behind an earlier dig for the sweep); false when it is none, or when the
+ * runner has no rewrite settings, or when whether it is a dig could not be read: the story is written as today. Never
+ * rejects.
  */
 export async function runDigPathRewrite(settings: PathRewriteRunnerSettings | undefined, input: StoryWriteInput): Promise<boolean> {
   if (settings === undefined) return false;
@@ -142,12 +187,49 @@ export async function runDigPathRewrite(settings: PathRewriteRunnerSettings | un
     return false;
   }
   if (dig === null) return false;
+  const release = settings.inFlight === undefined ? () => undefined : settings.inFlight.begin(input.runId);
+  if (release === null) {
+    log("PATH_REWRITE_ALREADY_RUNNING", { runId: input.runId });
+    return true;
+  }
   try {
-    await rewriteThePath(settings, dig, input, log);
+    // The dig's own paths, read once: they are the settled run's, and do not move with the parent's base. A read that
+    // fails still takes the turn and ends it FAILED, so the path's later digs never wait on it.
+    let digPaths: readonly PathRewriteDigPath[] | null = null;
+    try {
+      digPaths = await digPathsOf(settings, input, lease);
+    } catch (error) {
+      log("PATH_REWRITE_DIG_PATHS_UNREAD", { runId: input.runId, code: codeOf(error) });
+    }
+    if (digPaths !== null && settings.sources.recordInput !== undefined) {
+      try {
+        const stored = await lease(() => settings.sources.recordInput!(input.runId, input.workItemId, digPaths!));
+        log("PATH_REWRITE_INPUT_STORED", { runId: input.runId, stored });
+      } catch (error) {
+        // The rewrite goes on; only a runner that stops before its row is then not built again.
+        log("PATH_REWRITE_INPUT_NOT_STORED", { runId: input.runId, code: codeOf(error) });
+      }
+    }
+    await rewriteThePath(settings, Object.freeze({
+      digRunId: input.runId, parentRunId: dig.parentRunId, positionRef: dig.positionRef, dig, workItemId: input.workItemId, digPaths,
+      roles: input, lease, failureCode: digPaths === null ? "PATH_REWRITE_DIG_PATHS_UNREAD" : null
+    }), log);
   } catch (error) {
     log("PATH_REWRITE_NOT_RECORDED", { runId: input.runId, code: codeOf(error) });
+  } finally {
+    release();
   }
   return true;
+}
+
+async function digPathsOf(settings: PathRewriteRunnerSettings, input: StoryWriteInput, lease: StepLease): Promise<readonly PathRewriteDigPath[]> {
+  const digRunId = input.runId;
+  const enrichment = await lease(() => settings.sources.readEnrichment({ runId: digRunId,
+    nodes: input.nodes.map((node) => ({ nodeId: node.nodeId, judgeArtifactRef: input.judgeArtifactRefs.get(node.nodeId) ?? null })) }));
+  const pathsWithoutSources = pathRewriteDigPathsOf(input, enrichment);
+  const extracts = settings.sources.digExtractsOf === undefined ? new Map<string, readonly PathRewriteExtract[]>()
+    : await lease(() => settings.sources.digExtractsOf!(digRunId, pathsWithoutSources.flatMap((path) => path.points.map((point) => point.id))));
+  return pathRewriteDigPathsOf(input, enrichment, extracts);
 }
 
 function safeLog(settings: PathRewriteRunnerSettings): (event: string, detail: Record<string, unknown>) => void {
@@ -162,6 +244,21 @@ function safeLog(settings: PathRewriteRunnerSettings): (event: string, detail: R
 }
 
 type Log = (event: string, detail: Record<string, unknown>) => void;
+type StepLease = <T>(use: () => Promise<T>) => Promise<T>;
+
+/**
+ * One rewrite to write: the dig's turn on its parent's path, with what its material is built from. `dig` and `digPaths`
+ * null: they could not be read, and the turn ends FAILED with `failureCode`.
+ */
+export type PathRewriteJob = Readonly<{
+  digRunId: string; parentRunId: string; positionRef: string;
+  dig: PathRewriteDig | null;
+  workItemId: string;
+  digPaths: readonly PathRewriteDigPath[] | null;
+  roles: PathRewriteRoles;
+  lease: StepLease;
+  failureCode: string | null;
+}>;
 
 /** Waits until the dig's turn is at the front (or done); null when it took none or waited past the bound. */
 async function frontTurn(settings: PathRewriteRunnerSettings, digRunId: string, log: Log): Promise<RewriteTurnRead | null> {
@@ -176,29 +273,53 @@ async function frontTurn(settings: PathRewriteRunnerSettings, digRunId: string, 
     }
     if (turn.state !== "WAITING") return turn;
     if (waited >= wait.maxWaitMs || Date.now() - started >= wait.maxWaitMs) {
-      log("PATH_REWRITE_TURN_WAIT_TIMED_OUT", { runId: digRunId, pathSeq: turn.path_seq, waitingFor: turn.waiting_for });
+      // W3-7: the turn stays taken; the sweep writes it once it reaches the front (path-rewrite-sweep.ts).
+      log("PATH_REWRITE_LEFT_TO_SWEEP", { runId: digRunId, pathSeq: turn.path_seq, waitingFor: turn.waiting_for });
       return null;
     }
     await sleep(wait.pollMs);
   }
 }
 
-async function rewriteThePath(settings: PathRewriteRunnerSettings, dig: PathRewriteDig, input: StoryWriteInput, log: Log): Promise<void> {
-  const digRunId = input.runId;
-  const taken = await settings.turns.takeRewriteTurn(digRunId, dig.parentRunId, dig.positionRef);
+/**
+ * The codes a FAILED row needs: the parent path's own when it reads (`tryText`: the dig's material was what failed), else
+ * the clear columns' (`parentCodesOf`), else UNKNOWN_PARENT_CODES.
+ */
+async function parentCodesFor(settings: PathRewriteRunnerSettings, job: PathRewriteJob, baseRewriteId: string | null, log: Log,
+  tryText: boolean): Promise<PathRewriteParentPath> {
+  let codes: Readonly<{ answerVersion: number; fate: StoryFate }> = UNKNOWN_PARENT_CODES;
+  if (tryText) {
+    try {
+      const parent = await job.lease(() => settings.sources.parentPathOf({ parentRunId: job.parentRunId, positionRef: job.positionRef, baseRewriteId }));
+      return Object.freeze({ ...parent, line: "", summary: null, points: [], extracts: [] });
+    } catch (error) {
+      log("PATH_REWRITE_PARENT_UNREAD", { runId: job.digRunId, code: codeOf(error) });
+    }
+  }
+  if (settings.sources.parentCodesOf !== undefined) {
+    try {
+      codes = await job.lease(() => settings.sources.parentCodesOf!({ parentRunId: job.parentRunId, positionRef: job.positionRef, baseRewriteId }));
+    } catch (error) {
+      log("PATH_REWRITE_PARENT_CODES_UNREAD", { runId: job.digRunId, code: codeOf(error) });
+    }
+  }
+  return Object.freeze({ positionRef: job.positionRef, answerVersion: codes.answerVersion, line: "", summary: null, fate: codes.fate,
+    points: [], extracts: [] });
+}
+
+/**
+ * The dig's turn, from taking it to its row (W3-7: the after-settle branch and the sweep both end here). Throws only when
+ * the store itself cannot be read or written; the turn is then the sweep's.
+ */
+export async function rewriteThePath(settings: PathRewriteRunnerSettings, job: PathRewriteJob, log: Log): Promise<void> {
+  const digRunId = job.digRunId;
+  const taken = await settings.turns.takeRewriteTurn(digRunId, job.parentRunId, job.positionRef);
   if (taken.outcome !== "TAKEN" && taken.outcome !== "ALREADY") {
     log("PATH_REWRITE_TURN_REFUSED", { runId: digRunId, outcome: taken.outcome });
     return;
   }
-  const lease = input.stepLease ?? BARE_STEP;
-  // The dig's own paths, read once: they are the settled run's, and do not move with the parent's base.
-  const enrichment = await lease(() => settings.sources.readEnrichment({ runId: digRunId,
-    nodes: input.nodes.map((node) => ({ nodeId: node.nodeId, judgeArtifactRef: input.judgeArtifactRefs.get(node.nodeId) ?? null })) }));
-  const pathsWithoutSources = pathRewriteDigPathsOf(input, enrichment);
-  const extracts = settings.sources.digExtractsOf === undefined ? new Map<string, readonly PathRewriteExtract[]>()
-    : await lease(() => settings.sources.digExtractsOf!(digRunId, pathsWithoutSources.flatMap((path) => path.points.map((point) => point.id))));
-  const digPaths = pathRewriteDigPathsOf(input, enrichment, extracts);
-  const book = settings.replayBookOf === undefined ? null : await lease(() => settings.replayBookOf!(digRunId, input.workItemId));
+  const book = settings.replayBookOf === undefined || job.dig === null ? null
+    : await job.lease(() => settings.replayBookOf!(digRunId, job.workItemId));
   const rewriteId = pathRewriteIdOf(digRunId);
   // A record that BASE_MOVED (an earlier rewrite landed on the path since the read) is written again on the new base.
   for (let tries = 0; tries < 3; tries += 1) {
@@ -208,20 +329,38 @@ async function rewriteThePath(settings: PathRewriteRunnerSettings, dig: PathRewr
       log("PATH_REWRITE_ALREADY_STORED", { runId: digRunId });
       return;
     }
-    const parent = await lease(() => settings.sources.parentPathOf({ parentRunId: dig.parentRunId, positionRef: dig.positionRef,
-      baseRewriteId: turn.base_rewrite_id }));
+    const baseRewriteId = turn.base_rewrite_id;
     let record: PathRewriteRecord;
-    try {
-      record = await composeRecord(settings, { dig, input, parent, digPaths, rewriteId, baseRewriteId: turn.base_rewrite_id, book, log });
-    } catch (error) {
-      log("PATH_REWRITE_COMPOSE_FAILED", { runId: digRunId, code: codeOf(error) });
-      record = failedRecord({ rewriteId, digRunId, parent, baseRewriteId: turn.base_rewrite_id, failureCode: "PATH_REWRITE_UNEXPECTED_ERROR",
-        written: null });
+    if (job.dig === null || job.digPaths === null) {
+      record = failedRecord({ rewriteId, digRunId, parent: await parentCodesFor(settings, job, baseRewriteId, log, true), baseRewriteId,
+        failureCode: job.failureCode ?? "PATH_REWRITE_DIG_UNREAD", written: null });
+    } else {
+      const dig = job.dig;
+      let parent: PathRewriteParentPath | null = null;
+      try {
+        parent = await job.lease(() => settings.sources.parentPathOf({ parentRunId: dig.parentRunId, positionRef: dig.positionRef, baseRewriteId }));
+      } catch (error) {
+        // W3-7: the path keeps its text, and the turn still ends with its row.
+        log("PATH_REWRITE_PARENT_UNREAD", { runId: digRunId, code: codeOf(error) });
+      }
+      if (parent === null) {
+        record = failedRecord({ rewriteId, digRunId, parent: await parentCodesFor(settings, job, baseRewriteId, log, false), baseRewriteId,
+          failureCode: "PATH_REWRITE_PARENT_UNREAD", written: null });
+      } else {
+        try {
+          record = await composeRecord(settings, { dig, job, parent, digPaths: job.digPaths, rewriteId, baseRewriteId, book, log });
+        } catch (error) {
+          log("PATH_REWRITE_COMPOSE_FAILED", { runId: digRunId, code: codeOf(error) });
+          record = failedRecord({ rewriteId, digRunId, parent, baseRewriteId, failureCode: "PATH_REWRITE_UNEXPECTED_ERROR", written: null });
+        }
+      }
     }
     const stored = await settings.turns.recordRewrite(record);
     log("PATH_REWRITE_STORED", { runId: digRunId, outcome: record.outcome, failureCode: record.failureCode, stored });
     if (stored === "BASE_MOVED" || stored === "WAIT_TURN") continue;
-    if (stored === "RECORDED" || stored === "ALREADY") await afterRewrite(settings, dig, digRunId, record, digPaths, log);
+    if ((stored === "RECORDED" || stored === "ALREADY") && job.dig !== null && job.digPaths !== null) {
+      await afterRewrite(settings, job.dig, digRunId, record, job.digPaths, log);
+    }
     return;
   }
   log("PATH_REWRITE_BASE_KEPT_MOVING", { runId: digRunId });
@@ -240,7 +379,7 @@ async function afterRewrite(settings: PathRewriteRunnerSettings, dig: PathRewrit
 }
 
 type Compose = Readonly<{
-  dig: PathRewriteDig; input: StoryWriteInput; parent: PathRewriteParentPath; digPaths: readonly PathRewriteDigPath[];
+  dig: PathRewriteDig; job: PathRewriteJob; parent: PathRewriteParentPath; digPaths: readonly PathRewriteDigPath[];
   rewriteId: string; baseRewriteId: string | null; book: ReplayBook | null; log: Log;
 }>;
 
@@ -271,8 +410,8 @@ function lineageRecord(lineage: MakerLineage): Readonly<Record<string, unknown>>
 }
 
 async function composeRecord(settings: PathRewriteRunnerSettings, compose: Compose): Promise<PathRewriteRecord> {
-  const { dig, input, parent, rewriteId, baseRewriteId, log } = compose;
-  const digRunId = input.runId;
+  const { dig, job, parent, rewriteId, baseRewriteId, log } = compose;
+  const digRunId = job.digRunId;
   const failed = (failureCode: string, written: PathRewriteWritten | null = null) =>
     failedRecord({ rewriteId, digRunId, parent, baseRewriteId, failureCode, written });
   const built = buildPathRewriteMaterial({ question: dig.question, parent, picks: dig.picks, digPaths: compose.digPaths });
@@ -280,10 +419,10 @@ async function composeRecord(settings: PathRewriteRunnerSettings, compose: Compo
     log("PATH_REWRITE_MATERIAL_TOO_LARGE", { runId: digRunId, bodyBytes: built.bodyBytes });
     return failed("PATH_REWRITE_MATERIAL_TOO_LARGE");
   }
-  const writer = input.resolveProvider?.(settings.writerRoleRef) ?? null;
-  const checker = input.resolveProvider?.(settings.checkerRoleRef) ?? null;
+  const writer = job.roles.resolveProvider?.(settings.writerRoleRef) ?? null;
+  const checker = job.roles.resolveProvider?.(settings.checkerRoleRef) ?? null;
   if (writer === null || checker === null) return failed("PATH_REWRITE_ROLE_UNAVAILABLE");
-  const lease = input.stepLease ?? BARE_STEP;
+  const lease = job.lease;
   const book = compose.book;
   const send = (maker: StoryRoleMaker, request: ProviderCallRequest): Promise<ProviderCallResult> => {
     const gateway = book === null ? maker.provider : replayingGateway(book, maker.provider);
@@ -292,13 +431,13 @@ async function composeRecord(settings: PathRewriteRunnerSettings, compose: Compo
   const questionLine = dig.question.line;
   const written = await writePathRewrite({
     runId: digRunId,
-    subjectItemId: input.workItemId,
+    subjectItemId: job.workItemId,
     contractHash: settings.contractHash ?? engineContractHash(),
     maxRounds: dig.free ? PATH_REWRITE_POLICY.freeMaxRounds : PATH_REWRITE_POLICY.maxRounds,
     writer,
     checker,
-    backupCandidates: input.backupCandidates ?? [],
-    backupMakers: input.backupMakers,
+    backupCandidates: job.roles.backupCandidates ?? [],
+    backupMakers: job.roles.backupMakers,
     material: built.material,
     send,
     guard: pathRewriteGuard,
