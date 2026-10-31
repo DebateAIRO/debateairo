@@ -11,6 +11,7 @@
   "billing.usage.grant": "إجمالي المنحة",
   "billing.usage.expires": "ينتهي في {time}",
   "newDebate.room.internalGrantFull": "استُنفد مخصص المنحة الداخلية. ينتهي في {time}.",
+  "newDebate.room.internalTeamFull": "نفدت مساحة الفريق لهذا الشهر. تنتظر الأسئلة الجديدة حتى يرفعها أحد المالكين أو يبدأ شهر جديد.",
   "newDebate.room.internalWindowFull": "بلغت فترة التمويل الداخلي حدها. تحقق مجددًا في {time}.",
   "newDebate.room.internalClose": "التمويل الداخلي يقترب من حده المحدد.",
   "billing.plans.FREE.name": "المجانية",

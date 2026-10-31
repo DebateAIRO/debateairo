@@ -11,6 +11,7 @@
   "billing.usage.grant": "Total grant",
   "billing.usage.expires": "Expiră {time}",
   "newDebate.room.internalGrantFull": "Alocația grantului intern este epuizată. Expiră {time}.",
+  "newDebate.room.internalTeamFull": "Spațiul echipei pentru această lună s-a epuizat. Întrebările noi așteaptă până când unul dintre proprietari îl mărește sau începe luna următoare.",
   "newDebate.room.internalWindowFull": "Fereastra finanțării interne este plină. Verifică din nou {time}.",
   "newDebate.room.internalClose": "Finanțarea internă se apropie de limita finită.",
   "billing.plans.FREE.name": "Gratuit",

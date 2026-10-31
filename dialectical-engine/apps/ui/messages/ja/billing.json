@@ -11,6 +11,7 @@
   "billing.usage.grant": "助成金の合計",
   "billing.usage.expires": "有効期限 {time}",
   "newDebate.room.internalGrantFull": "内部助成金の利用枠を使い切りました。有効期限は {time} です。",
+  "newDebate.room.internalTeamFull": "今月のチームの枠を使い切りました。新しい質問は、オーナーのいずれかが枠を増やすか、翌月が始まるまで待機します。",
   "newDebate.room.internalWindowFull": "内部資金の期間上限に達しました。{time} に再確認してください。",
   "newDebate.room.internalClose": "内部資金が設定された上限に近づいています。",
   "billing.plans.FREE.name": "無料",

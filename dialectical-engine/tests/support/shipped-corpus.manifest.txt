@@ -193,6 +193,7 @@ apps/api/src/staff/alerts.ts
 apps/api/src/staff/internal-allowances.ts
 apps/api/src/staff/routes.ts
 apps/api/src/staff/runtime.ts
+apps/api/src/staff/team-limit.ts
 apps/api/src/staff/threat-report-alert.ts
 apps/api/src/staff/threat-report-closure.ts
 apps/api/src/staff/threat-reports.ts
@@ -586,6 +587,7 @@ apps/ui/components/StoryPanel.tsx
 apps/ui/components/StoryShortBlocks.tsx
 apps/ui/components/SynthesisHoldRefresher.tsx
 apps/ui/components/SynthesisPanel.tsx
+apps/ui/components/TeamLimitPanel.tsx
 apps/ui/components/ThreatReportsLink.tsx
 apps/ui/components/ThreatReportsPanel.tsx
 apps/ui/components/Toast.tsx
@@ -865,6 +867,7 @@ apps/ui/lib/sixDigitCode.ts
 apps/ui/lib/socialStepUpHandoff.ts
 apps/ui/lib/staffApi.ts
 apps/ui/lib/staffWebAuthn.ts
+apps/ui/lib/teamLimitApi.ts
 apps/ui/lib/termsOfService.ts
 apps/ui/lib/threatReportsApi.ts
 apps/ui/lib/totpQr.ts
@@ -1082,6 +1085,7 @@ packages/db/src/migration-forward0138.ts
 packages/db/src/migration-forward0139.ts
 packages/db/src/migration-forward0140.ts
 packages/db/src/migration-forward0141.ts
+packages/db/src/migration-forward0142.ts
 packages/db/src/migration-forward108.ts
 packages/db/src/migration-forward110.ts
 packages/db/src/migration-forward111.ts
@@ -1116,6 +1120,7 @@ packages/db/src/spend-waiver.ts
 packages/db/src/staff-access.ts
 packages/db/src/support.ts
 packages/db/src/synthesis-check-erasure.ts
+packages/db/src/team-limit.ts
 packages/db/src/team-spend.ts
 packages/db/src/threat-reports.ts
 packages/db/src/tree-updates.ts

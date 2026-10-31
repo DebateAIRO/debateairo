@@ -11,6 +11,7 @@
   "billing.usage.grant": "전체 지원금",
   "billing.usage.expires": "만료 {time}",
   "newDebate.room.internalGrantFull": "내부 지원금 한도를 모두 사용했습니다. {time}에 만료됩니다.",
+  "newDebate.room.internalTeamFull": "이번 달 팀 사용 한도를 모두 썼습니다. 소유자 중 한 명이 한도를 올리거나 새 달이 시작될 때까지 새 질문은 대기합니다.",
   "newDebate.room.internalWindowFull": "내부 지원금의 기간 한도에 도달했습니다. {time}에 다시 확인하세요.",
   "newDebate.room.internalClose": "내부 지원금이 정해진 한도에 가까워지고 있습니다.",
   "billing.plans.FREE.name": "무료",

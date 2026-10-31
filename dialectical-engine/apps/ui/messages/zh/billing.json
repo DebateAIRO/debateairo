@@ -11,6 +11,7 @@
   "billing.usage.grant": "资助总额",
   "billing.usage.expires": "到期时间 {time}",
   "newDebate.room.internalGrantFull": "内部资助额度已用尽，到期时间为 {time}。",
+  "newDebate.room.internalTeamFull": "团队本月的额度已用完。新问题会等待，直到某位所有者提高额度或新的月份开始。",
   "newDebate.room.internalWindowFull": "已达到内部资助周期上限，请在 {time} 再次查看。",
   "newDebate.room.internalClose": "您的内部资助接近设定的上限。",
   "billing.plans.FREE.name": "免费",

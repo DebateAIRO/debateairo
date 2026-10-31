@@ -11,6 +11,7 @@
   "billing.usage.grant": "Totalt bidrag",
   "billing.usage.expires": "Upphör {time}",
   "newDebate.room.internalGrantFull": "Det interna bidraget är förbrukat. Det upphör {time}.",
+  "newDebate.room.internalTeamFull": "Teamets utrymme för den här månaden är slut. Nya frågor väntar tills en av ägarna höjer det eller en ny månad börjar.",
   "newDebate.room.internalWindowFull": "Gränsen för den interna finansieringsperioden har nåtts. Kontrollera igen {time}.",
   "newDebate.room.internalClose": "Din interna finansiering närmar sig sin fastställda gräns.",
   "billing.plans.FREE.name": "Kostnadsfritt",

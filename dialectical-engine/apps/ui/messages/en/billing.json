@@ -11,6 +11,7 @@
   "billing.usage.grant": "Grant total",
   "billing.usage.expires": "Expires {time}",
   "newDebate.room.internalGrantFull": "Internal grant allowance is used up. It expires {time}.",
+  "newDebate.room.internalTeamFull": "The team's room for this month is used up. New questions wait until one of the owners raises it, or the month starts again.",
   "newDebate.room.internalWindowFull": "Your internal funding window is full. Recheck {time}.",
   "newDebate.room.internalClose": "Your internal funding is close to its finite limit.",
   "billing.plans.FREE.name": "Free",

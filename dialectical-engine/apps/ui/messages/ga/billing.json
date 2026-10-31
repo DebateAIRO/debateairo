@@ -11,6 +11,7 @@
   "billing.usage.grant": "Deontas iomlán",
   "billing.usage.expires": "Rachaidh in éag {time}",
   "newDebate.room.internalGrantFull": "Tá an deontas inmheánach ídithe. Rachaidh sé in éag {time}.",
+  "newDebate.room.internalTeamFull": "Tá spás na foirne don mhí seo ídithe. Fanann ceisteanna nua go dtí go n-ardóidh duine de na húinéirí é nó go dtosóidh mí nua.",
   "newDebate.room.internalWindowFull": "Tá teorainn na tréimhse maoinithe inmheánaigh bainte amach. Seiceáil arís {time}.",
   "newDebate.room.internalClose": "Tá do mhaoiniú inmheánach ag druidim lena theorainn shocraithe.",
   "billing.plans.FREE.name": "Saor in aisce",

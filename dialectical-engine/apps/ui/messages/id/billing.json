@@ -11,6 +11,7 @@
   "billing.usage.grant": "Total hibah",
   "billing.usage.expires": "Berakhir {time}",
   "newDebate.room.internalGrantFull": "Alokasi hibah internal telah habis. Berakhir {time}.",
+  "newDebate.room.internalTeamFull": "Kuota tim untuk bulan ini sudah habis. Pertanyaan baru menunggu sampai salah satu pemilik menaikkannya atau bulan baru dimulai.",
   "newDebate.room.internalWindowFull": "Batas periode pendanaan internal telah tercapai. Periksa lagi {time}.",
   "newDebate.room.internalClose": "Pendanaan internal Anda mendekati batas yang ditetapkan.",
   "billing.plans.FREE.name": "Gratis",

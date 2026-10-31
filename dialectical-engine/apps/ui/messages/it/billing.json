@@ -11,6 +11,7 @@
   "billing.usage.grant": "Totale della dotazione",
   "billing.usage.expires": "Scade {time}",
   "newDebate.room.internalGrantFull": "La dotazione interna è esaurita. Scade {time}.",
+  "newDebate.room.internalTeamFull": "Lo spazio del team per questo mese è esaurito. Le nuove domande restano in attesa finché uno dei proprietari non lo aumenta o non inizia il mese successivo.",
   "newDebate.room.internalWindowFull": "È stato raggiunto il limite del periodo di finanziamento interno. Ricontrolla {time}.",
   "newDebate.room.internalClose": "Il tuo finanziamento interno si avvicina al limite stabilito.",
   "billing.plans.FREE.name": "Gratuito",

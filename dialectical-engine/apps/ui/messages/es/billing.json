@@ -11,6 +11,7 @@
   "billing.usage.grant": "Total de la asignación",
   "billing.usage.expires": "Caduca {time}",
   "newDebate.room.internalGrantFull": "La asignación interna se ha agotado. Caduca {time}.",
+  "newDebate.room.internalTeamFull": "El margen del equipo para este mes se ha agotado. Las preguntas nuevas esperan hasta que uno de los propietarios lo amplíe o empiece un nuevo mes.",
   "newDebate.room.internalWindowFull": "Se ha alcanzado el límite del periodo de financiación interna. Vuelve a comprobarlo {time}.",
   "newDebate.room.internalClose": "Tu financiación interna se acerca a su límite definido.",
   "billing.plans.FREE.name": "Gratuito",

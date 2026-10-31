@@ -11,6 +11,7 @@
   "billing.usage.grant": "Skupna dotacija",
   "billing.usage.expires": "Poteče {time}",
   "newDebate.room.internalGrantFull": "Sredstva interne dotacije so porabljena. Poteče {time}.",
+  "newDebate.room.internalTeamFull": "Prostor ekipe za ta mesec je porabljen. Nova vprašanja čakajo, dokler ga eden od lastnikov ne poveča ali se ne začne nov mesec.",
   "newDebate.room.internalWindowFull": "Dosežena je omejitev obdobja internega financiranja. Preverite znova {time}.",
   "newDebate.room.internalClose": "Vaše interno financiranje se približuje določeni omejitvi.",
   "billing.plans.FREE.name": "Brezplačno",

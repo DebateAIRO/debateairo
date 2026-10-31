@@ -11,6 +11,7 @@
   "billing.usage.grant": "Toetuse kogusumma",
   "billing.usage.expires": "Aegub {time}",
   "newDebate.room.internalGrantFull": "Sisemise toetuse maht on kasutatud. See aegub {time}.",
+  "newDebate.room.internalTeamFull": "Meeskonna selle kuu maht on otsas. Uued küsimused ootavad, kuni üks omanikest seda suurendab või algab uus kuu.",
   "newDebate.room.internalWindowFull": "Sisemise rahastuse perioodi piir on saavutatud. Kontrolli uuesti {time}.",
   "newDebate.room.internalClose": "Sisemine rahastus läheneb oma määratud piirile.",
   "billing.plans.FREE.name": "Tasuta",
