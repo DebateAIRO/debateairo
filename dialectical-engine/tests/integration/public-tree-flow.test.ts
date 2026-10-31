@@ -19,7 +19,7 @@ import {
 } from "@debateai/db";
 import { createPostgresProviderGateway } from "@debateai/runner";
 import { readPromptFrame, type PromptPacket } from "@debateai/providers";
-import type { StoryWriteInput } from "@debateai/story";
+import { StoryRepository, type StoryWriteInput } from "@debateai/story";
 import { buildApi, type ApiOptions } from "../../apps/api/src/index.js";
 import { extractCheckedText } from "../../apps/api/src/publication-check/material.js";
 import type { PublicationContentCheck } from "../../apps/api/src/publication-check/check.js";
@@ -92,13 +92,17 @@ function node(id: string, claim: string) {
 /** A debate, published as the transition publishes it: its snapshot under its own publication key, and its visibility event. */
 async function publishedDebate(author: StoryEncryptedOwner): Promise<Readonly<{ root: string; ref: string; position: string; snapshot: PublicDebate }>> {
   const root = await createEncryptedStoryRun(database.pool, author, QUESTION);
-  await persistTerminalRun({ pool: database.pool, runId: root, fixtureKey: randomUUID(), factBundle: FACTS });
+  const { answerId } = await persistTerminalRun({ pool: database.pool, runId: root, fixtureKey: randomUUID(), factBundle: FACTS });
   const position = randomUUID();
   const ref = randomUUID();
   const at = new Date();
   const story = StoryBodySchema.parse({ shape_id: "general", short: { headline: "Headline.", summary: "Summary.", confidence: "Fairly sure.",
     paths: [{ position_ref: position, fate: "HELD_UP", line: PATH_LINE, node_refs: [position, POINT] }], change: { text: "What would change it.", node_refs: [position] } },
     why: { reasons: [{ text: "A paragraph.", node_refs: [position] }] }, long: { sections: ["One", "Two", "Three"].map((title) => ({ title, paragraphs: [{ text: "A paragraph.", node_refs: [position] }] })) }, reviewer_note: null });
+  // The author's own story, private, as a first debate keeps it.
+  expect(await new StoryRepository(database.pool).insert({ runId: root, answerId, answerVersion: 1, outcome: "READY", failureCode: null, shapeId: "general", packVersion: "2026-09-26.1", packFingerprint: "f".repeat(64),
+    storytellerLineage: { maker: "maker-a", model_id: "model-a", transport: "openai-compatible-http", provider_ref: "provider:a" }, checkerLineage: { maker: "maker-b", model_id: "model-b", transport: "openai-compatible-http", provider_ref: "provider:b" },
+    rounds: 1, artifactRefs: [randomUUID()], body: story, reservation: null, verdictBasis: null, pointNumbers: null, languageTag: "en", storytellerRepairs: 0 })).toBe("INSERTED");
   const snapshot = PublicDebateSchema.parse({ public_ref: ref, author_pseudonym: pseudonymOf(author), published_at: at.toISOString(), question: QUESTION,
     answer: { terminal: "COMPONENTS_ONLY", verdict: null, verdict_available: false, confidence_band: null, summary_segments: [{ text: "The first answer." }], badges: [], residual_objections: [], reversal_point: "none",
       as_of: at.toISOString(), nodes: [node(POINT, POINT_TEXT)], edges: [], tree_included: true },
@@ -656,7 +660,7 @@ describe("what a stranger can press is limited, and Free's notice counts only on
     const free = await createEncryptedStoryRun(database.pool, eve, "Free ask?");
     const paid = await createEncryptedStoryRun(database.pool, eve, "Paid ask?");
     const runs = [free, paid];
-    const app = { submit: async () => ({ run_ref: runs.shift()!, state: "STARTED" }), withContentLease: <T>(_id: string, use: () => Promise<T>) => use() } as unknown as ApiOptions["application"];
+    const app = { submit: async () => ({ run_ref: runs.shift()!, status: "QUEUED" }), withContentLease: <T>(_id: string, use: () => Promise<T>) => use() } as unknown as ApiOptions["application"];
     let refuse = false;
     const admission = { configured: () => true, decide: (scope: string) => { decided.push(scope); return refuse ? { allowed: false, retryAfterMs: 60_000, windowMs: 60_000, reason: "FIXTURE" } : { allowed: true }; } } as unknown as ApiOptions["admission"];
     const options = { application: app, sessions: testSessionApplication([identity]), allowedOrigin: TEST_APP_ORIGIN, publications: application() as never, questionCheck: { check: async () => ({ kind: "PASS" }) } as never, admission,
