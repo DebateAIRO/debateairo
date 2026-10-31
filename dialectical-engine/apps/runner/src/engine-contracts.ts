@@ -6,7 +6,7 @@ import {
 import { MAP_ENGINE_CONTRACT_NAMES, mapEnginePromptContracts } from "@debateai/map";
 import { promptContractFingerprintText, type PromptContract } from "@debateai/providers";
 import { SYNTHESIZER_LENGTH_READER_SOURCES_PROMPT_CONTRACT, SYNTHESIZER_LENGTH_SOURCES_PROMPT_CONTRACT } from "@debateai/serve";
-import { INVESTIGATION_REPORT_SEALED_CONTRACTS, PATH_REWRITE_SEALED_CONTRACTS } from "@debateai/story";
+import { INVESTIGATION_REPORT_SEALED_CONTRACTS, PATH_REWRITE_SEALED_CONTRACTS, REPORT_OVERALL_SEALED_CONTRACTS } from "@debateai/story";
 import { EVALUATOR_SOURCES_SEALED_CONTRACTS } from "./answer-checker-sources.js";
 
 /**
@@ -24,7 +24,7 @@ export const ENGINE_CONTRACT_FINGERPRINT_HEADER = "debateai.engine-contracts.v1"
  * v2 pair; R4 the writer's and checker's engine pair; W1-5 (web search, 2026-10-30) the web wording; W1-5b its second
  * wording as new ids (the v1s it supersedes stay sealed, unused); W3-5 (dig-model revision) the path rewrite's writer and
  * checker; W4-2 the dig's planner (one search per pick); W4-7 the answer checker's two sources variants; W5-1 the
- * final report's five. A phase that
+ * final report's five; R22's report lane decision 4's overall writer and checker. A phase that
  * appends moves ENGINE_SEALED_IDS and ENGINE_CONTRACT_HASH_SEALED in tests/unit/engine-contract-hash.test.ts.
  */
 export function engineSealedContracts(): readonly PromptContract[] {
@@ -63,7 +63,10 @@ export function engineSealedContracts(): readonly PromptContract[] {
     // W5-1 (the final report over an investigation; W0-1 §2.6 and draft 5.6 approved, R4's two instructions shown at the
     // first checkpoint (F11), the story's two OWNER WORDING drafts): the answer, the later version's answer, the answer
     // check, the story and the story check (packages/story/src/investigation-report.ts).
-    ...INVESTIGATION_REPORT_SEALED_CONTRACTS
+    ...INVESTIGATION_REPORT_SEALED_CONTRACTS,
+    // R22 report lane (plan 2026-10-31 decision 4, "Overall view, every point"; R4's wording rejected): the writer, the later
+    // version's writer and the checker, v2. report.answer.v1 and friends above stay sealed, unused.
+    ...REPORT_OVERALL_SEALED_CONTRACTS
   ]);
 }
 
