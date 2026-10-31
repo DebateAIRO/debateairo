@@ -1,6 +1,7 @@
 import {
   INVESTIGATION_REPORT_LIMITS,
   InvestigationReportAnswerSchema,
+  InvestigationReportPathSchema,
   InvestigationReportSourceSchema,
   InvestigationReportsSchema,
   InvestigationReportStorySchema,
@@ -42,6 +43,7 @@ export const InvestigationReportContentSchema = z.object({
   answer: InvestigationReportAnswerSchema,
   story: InvestigationReportStorySchema.nullable(),
   sources: z.array(InvestigationReportSourceSchema).max(INVESTIGATION_REPORT_LIMITS.sourcesMax),
+  paths: z.array(InvestigationReportPathSchema).max(INVESTIGATION_REPORT_LIMITS.pathsMax).optional(),
   shortened: z.boolean()
 }).strict();
 export type InvestigationReportContent = z.infer<typeof InvestigationReportContentSchema>;
@@ -107,7 +109,7 @@ async function shapeReports(read: InvestigationReportsOwnerRead, ports: Investig
     const content = contentOf.get(closing.report_version);
     if (report.outcome === "FAILED" || content === undefined) return { ...base, state: "FAILED", written_at: iso(report.recorded_at) };
     return { ...base, state: report.outcome, written_at: iso(report.recorded_at), answer: content.answer, story: content.story,
-      sources: content.sources, shortened: content.shortened };
+      sources: content.sources, ...(content.paths === undefined ? {} : { paths: content.paths }), shortened: content.shortened };
   });
   const digs = investigation.members.filter((member) => member.run_id.toLowerCase() !== rootRunId.toLowerCase()).length;
   return InvestigationReportsSchema.parse({

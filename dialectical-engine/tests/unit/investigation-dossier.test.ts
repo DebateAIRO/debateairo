@@ -90,13 +90,14 @@ describe("W5-1 the final report's dossier", () => {
   it("keeps only the quote people see (at most 120 characters) and reader 1's line; the newest rewrite read is recorded", () => {
     const dossier = built();
     const sources = field(dossier, "sources") as Array<{ ref: string; quote: string; line: string }>;
-    expect(sources).toHaveLength(2);
+    // The two paths cite one page's one quote: one source, cited twice.
+    expect(sources).toHaveLength(1);
     for (const source of sources) {
       expect(Array.from(source.quote).length).toBeLessThanOrEqual(120);
       expect(source.quote.endsWith("…")).toBe(true);
       expect(source.line).toBe("The city's own ridership counts.");
     }
-    expect(dossier.sources.map((source) => source.site)).toEqual(["city.example.org", "city.example.org"]);
+    expect(dossier.sources.map((source) => [source.site, source.link])).toEqual([["city.example.org", "https://city.example.org/ferry-ridership"]]);
     expect(dossier.coveredRewrite).toEqual({ rewriteId: "88888888-8888-4888-8888-888888888888", recordedAt: "2026-10-31T12:05:00.000Z" });
     expect(buildInvestigationDossier(investigationInput({ digs: [] })).kind === "BUILT"
       && (built(investigationInput({ digs: [] })).coveredRewrite)).toBeNull();
@@ -143,12 +144,134 @@ describe("W5-1 the final report's dossier", () => {
       for (const text of texts) expect(given.has(text)).toBe(true);
     }
     // The deepest levels went to one line first: a level-10 card is never fuller than a level-1 card.
-    const form = (card: Record<string, unknown>) => ("also_dug" in card ? 0 : "dig_paths" in (card.rewrite as object) ? 2 : 1);
+    const form = (card: Record<string, unknown>) => ("also_dug" in card ? 0 : "before" in (card.rewrite as object) ? 2 : 1);
     const byLevel = new Map<number, number>();
     for (const card of cards) byLevel.set(card.level as number, Math.max(byLevel.get(card.level as number) ?? 0, form(card)));
     expect(byLevel.get(10) ?? 0).toBeLessThanOrEqual(byLevel.get(1) ?? 0);
     expect(dossierFieldsOf(dossier).some((entry) => entry.name === "left_out")).toBe(dossier.leftOut > 0);
     expect(dossier.ladderStep).toBeGreaterThanOrEqual(4);
+  });
+
+  /* ------------------------------------------------- R22: "every path of the debate and every point argued on it" */
+
+  const pointOf = (id: string, text: string, over: Partial<{ disputed: boolean; trust: string | null }> = {}) =>
+    ({ id, text, onId: null, side: "for" as const, trust: over.trust ?? null, disputed: over.disputed ?? false });
+  const DIG_PATH = "dddddddd-0000-4000-8000-000000000001";
+  const withOwnPoints = (points = [pointOf("dddddddd-0000-4000-8000-0000000000b1", "Winter boats leave half empty.", { trust: "SURE" })]) => readyDig({ ownMaterial: {
+    answer: [],
+    paths: [{ positionRef: DIG_PATH, statement: "Winter ridership falls.", points, extracts: [] }],
+    sources: [{ pointId: points[0]!.id, site: "port.example.org", link: "https://port.example.org/counts", title: null, quote: "Winter counts fell.", line: "The port's own counts." }]
+  } });
+
+  it("holds every point argued on a dig's own path, with its trust word and its source, and the answer may rest on it", () => {
+    const dossier = built(investigationInput({ digs: [withOwnPoints()] }));
+    const [card] = field(dossier, "follow_ups") as Array<{ rewrite: { dig_paths: Array<{ ref: string; line: string; points: Array<{ ref: string; text: string; trust: string }>; sources: string[] }> } }>;
+    const path = card!.rewrite.dig_paths[0]!;
+    expect(path).toMatchObject({ ref: "G1.D1", line: "Winter ridership falls.", fate: "HELD_UP", points: [{ text: "Winter boats leave half empty.", trust: "SURE" }] });
+    expect(dossier.material.index.refs.has(path.points[0]!.ref)).toBe(true);
+    expect(dossier.material.index.refs.has("G1.D1")).toBe(true);
+    const sources = field(dossier, "sources") as Array<{ ref: string; site: string; line: string }>;
+    expect(sources.find((source) => source.ref === path.sources[0])).toMatchObject({ site: "port.example.org", line: "The port's own counts." });
+  });
+
+  it("a dig path only the dig's own material names is still there: no path is dropped", () => {
+    const dig = readyDig({ ownMaterial: { answer: [], sources: [], paths: [
+      { positionRef: DIG_PATH, statement: "Winter ridership falls.", points: [], extracts: [] },
+      { positionRef: "dddddddd-0000-4000-8000-000000000002", statement: "Summer ridership grows.", points: [], extracts: [] }] } });
+    const [card] = field(built(investigationInput({ digs: [dig] })), "follow_ups") as Array<{ rewrite: { dig_paths: Array<{ line: string }> } }>;
+    expect(card!.rewrite.dig_paths.map((path) => path.line)).toEqual(["Winter ridership falls.", "Summer ridership grows."]);
+  });
+
+  it("gives the first debate's label, a later update's newest text over the rewrite's, and the purpose lines; an old debate has none", () => {
+    const paths = investigationInput().first.paths;
+    const input = investigationInput({
+      question: { ...investigationInput().question, place: "In Harbour Town", time: "Next year", purpose: "To vote at the council" },
+      first: { ...investigationInput().first, answer: { headline: "Yes.", summary: "It helps.", change: "Less ridership.", confidence: "Fairly sure." },
+        paths: [{ ...paths[0]!, current: { line: "Newest line, from a climb.", summary: "Climbed.", fate: "FELL" } }, paths[1]!] } });
+    const dossier = built(input);
+    const first = field(dossier, "first_debate") as { answer: { label: string }; paths: Array<{ line: string; fate: string }> };
+    expect(first.answer.label).toBe("Fairly sure.");
+    expect(first.paths[0]).toMatchObject({ line: "Newest line, from a climb.", fate: "FELL" });
+    const names = dossierFieldsOf(dossier).map((entry) => [entry.name, entry.content]);
+    expect(names.slice(0, 4)).toEqual([["question", input.question.line], ["place", "In Harbour Town"], ["time", "Next year"], ["purpose", "To vote at the council"]]);
+    expect(dossierFieldsOf(built()).map((entry) => entry.name)).not.toContain("purpose");
+    expect(dossier.paths[0]).toEqual({ line: "Newest line, from a climb.", summary: "Climbed.", fate: "FELL", level: 0 });
+  });
+
+  it("the checker reads the dossier and the candidate only: its approved wording has no length to read", () => {
+    const dossier = built();
+    const names = dossier.material.answerCheckerOf({ segments: [{ text: "x", rests_on: [] }] }).map((entry) => entry.name);
+    expect(names).toEqual(["question", "first_debate", "follow_ups", "views", "sources", "candidate_answer"]);
+  });
+
+  it("lists the paths for the stored version as a tree: each path, then the paths of the digs under it, by their level", () => {
+    const paths = built(investigationInput({ digs: [nestedDig(), readyDig()] })).paths;
+    expect(paths.map((path) => [path.level, path.line])).toEqual([
+      [0, "Partly: a second pier helps at rush hour, not in winter."],
+      [1, "Winter ridership falls."],
+      [0, "No: the money is better spent on buses."]
+    ]);
+  });
+
+  it("a passage's words past the shown quote reach no field of any call, even when one is handed in by mistake", () => {
+    const secret = "PASSAGE-WORDS-PAST-THE-QUOTE";
+    const passage = `${"Rush-hour ridership grew by a quarter on the harbour line ".repeat(3)}${secret}`;
+    const dig = withOwnPoints();
+    const input = investigationInput({ digs: [{ ...dig, ownMaterial: { ...dig.ownMaterial!, sources: [{ ...dig.ownMaterial!.sources[0]!, quote: passage }],
+      paths: dig.ownMaterial!.paths.map((path) => ({ ...path, extracts: [{ pointId: path.points[0]!.id, label: "S1-1", site: "port.example.org", title: null, quote: passage }] })) } }] });
+    const dossier = built(input);
+    const answer = { segments: [{ text: "x", rests_on: [] }] };
+    const story = { short_answer: "x", what_would_change: "x", how_it_went: [], still_open: [] };
+    const everything = JSON.stringify([dossier.material.answerWriter, dossier.material.answerCheckerOf(answer), dossier.material.storyWriterOf(answer),
+      dossier.material.storyCheckerOf(answer, story), dossier.sources, dossier.paths]);
+    expect(everything).toContain("Rush-hour ridership grew");
+    expect(everything).not.toContain(secret);
+  });
+
+  it("IT MUST REFLECT EVERY PATH: while any card stands, every first-debate path and every dig path keeps its line and fate", () => {
+    // Enough digs, each with whole-paragraph points, that the points go and then the cards go short and to one line.
+    const wide = Array.from({ length: 60 }, (_, at) => {
+      const id = `${String(at).padStart(8, "0")}-0000-4000-8000-000000000000`;
+      const ref = `aaaa${String(at).padStart(4, "0")}-0000-4000-8000-000000000000`;
+      return readyDig({ runId: id, finishedAt: `2026-10-31T10:${String(at).padStart(2, "0")}:00.000Z`,
+        rewrite: { ...readyDig().rewrite!, rewriteId: id.replace(/^./u, "9"), whatChanged: ["y".repeat(800)],
+          digPaths: [{ positionRef: ref, line: `Dig ${String(at)} path line ${"w".repeat(600)}`, fate: "HELD_UP" }] },
+        ownMaterial: { answer: [], sources: [], paths: [{ positionRef: ref, statement: "s", extracts: [],
+          points: Array.from({ length: 8 }, (__, p) => pointOf(`${String(at).padStart(4, "0")}${String(p).padStart(4, "0")}-0000-4000-8000-000000000000`, "z".repeat(900))) }] } });
+    });
+    const dossier = built(investigationInput({ digs: wide }));
+    expect(dossier.ladderStep).toBeGreaterThanOrEqual(2);
+    expect(dossier.ladderStep).toBeLessThan(5);
+    expect(dossier.leftOut).toBeGreaterThan(0);
+    const text = dossierFieldsOf(dossier).map((entry) => entry.content).join("\n");
+    for (let at = 0; at < 60; at += 1) expect(text).toContain(`Dig ${String(at)} path line`);
+    for (const line of ["No: the money is better spent on buses."]) expect(text).toContain(line);
+    const first = field(dossier, "first_debate") as { paths: Array<{ line: string; fate: string }> };
+    expect(first.paths).toHaveLength(2);
+    // Every path, whatever the ladder did, in what the stored version lists.
+    expect(dossier.paths.filter((path) => path.level === 1)).toHaveLength(60);
+  });
+
+  it("AT THE LIMIT: too many digs even as one line each, the oldest are left out whole and counted; the first debate's paths stay", () => {
+    const huge = Array.from({ length: 200 }, (_, at) => {
+      const id = `${String(at).padStart(8, "0")}-0000-4000-8000-000000000000`;
+      return readyDig({ runId: id, finishedAt: new Date(Date.UTC(2026, 9, 31, 10, at)).toISOString(),
+        picks: [{ text: `Pick ${String(at)} ${"p".repeat(1500)}`, by: "AI_SUGGESTION" }],
+        rewrite: { ...readyDig().rewrite!, rewriteId: id.replace(/^./u, "9"), digPaths: [{ positionRef: `aaaa${String(at).padStart(4, "0")}-0000-4000-8000-000000000000`, line: `Dig ${String(at)} path ${"w".repeat(500)}`, fate: "HELD_UP" }] } });
+    });
+    const dossier = built(investigationInput({ digs: huge }));
+    expect(dossier.ladderStep).toBe(5);
+    const leftOut = field(dossier, "left_out") as { follow_ups: number };
+    expect(leftOut.follow_ups).toBeGreaterThan(0);
+    const cards = field(dossier, "follow_ups") as unknown[];
+    expect(cards.length + leftOut.follow_ups).toBe(200);
+    // The oldest went; the newest is there.
+    const text = dossierFieldsOf(dossier).map((entry) => entry.content).join("\n");
+    expect(text).not.toContain("Dig 0 path");
+    expect(text).toContain("Dig 199 path");
+    expect((field(dossier, "first_debate") as { paths: unknown[] }).paths).toHaveLength(2);
+    // The stored version still lists every path.
+    expect(dossier.paths.filter((path) => path.level === 1)).toHaveLength(200);
   });
 
   it("every step of a small investigation is step 1: nothing left out, nothing disclosed", () => {
