@@ -273,6 +273,10 @@ export interface ModelSpendStore {
   readRunPathClimbSpentMicros?(runId: string): Promise<number>;
   /** R22 decision 3: every main-answer update this dig has paid for (spend source ANSWER_UPDATE only). Optional: without it, no seam. */
   readRunAnswerUpdateSpentMicros?(runId: string): Promise<number>;
+  /** Decision 13: every contribution check this dig has paid for (spend source CONTRIBUTION_CHECK only). Optional: without it, no seam. */
+  readRunContributionCheckSpentMicros?(runId: string): Promise<number>;
+  /** Decision 13: what the report being written on this carrier has been charged (spend source PUBLIC_REPORT since the newest report paid for). Optional: without it, no seam. */
+  readRunPublicReportSpentMicros?(runId: string): Promise<number>;
   /** Everything the WHOLE application has been charged on that UTC day. */
   readDaySpentMicros(day: string): Promise<number>;
   /**
@@ -612,7 +616,7 @@ export function assertRunCeilingCoversOneCall(input: Readonly<{
 }
 
 /** The spend sources a gateway money seam charges (the support chat keeps its own accounting). */
-type MeteredSpendSource = Extract<ModelSpendSource, "RUN" | "STORY" | "PATH_REWRITE" | "INVESTIGATION_REPORT" | "PATH_CLIMB" | "ANSWER_UPDATE">;
+type MeteredSpendSource = Extract<ModelSpendSource, "RUN" | "STORY" | "PATH_REWRITE" | "INVESTIGATION_REPORT" | "PATH_CLIMB" | "ANSWER_UPDATE" | "CONTRIBUTION_CHECK" | "PUBLIC_REPORT">;
 
 /** What a metered seam spends against: see `CostEnvelopeGuard.#envelopeFor`. */
 interface MeteredEnvelope {
@@ -815,6 +819,22 @@ export class CostEnvelopeGuard {
    */
   answerUpdateSeam(input: ProviderSeamInput): ProviderCostSeam {
     return this.#meteredSeam(input, "ANSWER_UPDATE", null, false);
+  }
+
+  /**
+   * Decision 13: THE CONTRIBUTION CHECK'S money seam: the AI check on a dig made on a public debate, on that dig's run, NEVER walled (a dig that started always gets its check),
+   * held to the report's safety net summed over CONTRIBUTION_CHECK charges only.
+   */
+  contributionCheckSeam(input: ProviderSeamInput): ProviderCostSeam {
+    return this.#meteredSeam(input, "CONTRIBUTION_CHECK", null, false);
+  }
+
+  /**
+   * Decision 13: A REPORT ON A PUBLIC DEBATE'S money seam: on its carrier run, whose scope never counts these charges (identity.public_report_charge names the writer who
+   * pays), NEVER walled, held to the report's safety net summed over the report being written.
+   */
+  publicReportSeam(input: ProviderSeamInput): ProviderCostSeam {
+    return this.#meteredSeam(input, "PUBLIC_REPORT", null, false);
   }
 
   /**
@@ -1180,6 +1200,30 @@ export class CostEnvelopeGuard {
           refusal: storyCostEnvelopeReached
         });
       }
+      case "CONTRIBUTION_CHECK": {
+        const read = this.#store.readRunContributionCheckSpentMicros;
+        if (read === undefined) {
+          throw new TypedDomainError("STORY_ENVELOPE_MISSING", "A metered contribution check needs its spent total");
+        }
+        return Object.freeze({
+          spendSource: "CONTRIBUTION_CHECK",
+          ceilingMicros: INVESTIGATION_REPORT_SEAM_CEILING_MICROS,
+          readSpentMicros: (runId: string) => read.call(this.#store, runId),
+          refusal: storyCostEnvelopeReached
+        });
+      }
+      case "PUBLIC_REPORT": {
+        const read = this.#store.readRunPublicReportSpentMicros;
+        if (read === undefined) {
+          throw new TypedDomainError("STORY_ENVELOPE_MISSING", "A metered public report needs its spent total");
+        }
+        return Object.freeze({
+          spendSource: "PUBLIC_REPORT",
+          ceilingMicros: INVESTIGATION_REPORT_SEAM_CEILING_MICROS,
+          readSpentMicros: (runId: string) => read.call(this.#store, runId),
+          refusal: storyCostEnvelopeReached
+        });
+      }
       default:
         return exhaustive(spendSource);
     }
@@ -1400,6 +1444,26 @@ export class PostgresModelSpendStore implements ModelSpendStore {
     return this.#total(result.rows[0]?.total);
   }
 
+  async readRunContributionCheckSpentMicros(runId: string): Promise<number> {
+    const result = await this.pool.query<{ total: string }>(
+      `SELECT coalesce(sum(charge_micros),0)::text AS total FROM ledger.model_spend
+       WHERE run_id = $1 AND spend_source = 'CONTRIBUTION_CHECK'`,
+      [runId]
+    );
+    return this.#total(result.rows[0]?.total);
+  }
+
+  /** Reports on one carrier are written one at a time, so what is not yet charged to a writer is the report being written. */
+  async readRunPublicReportSpentMicros(runId: string): Promise<number> {
+    const result = await this.pool.query<{ total: string }>(
+      `SELECT coalesce(sum(charge_micros),0)::text AS total FROM ledger.model_spend AS spend
+       WHERE spend.run_id = $1 AND spend.spend_source = 'PUBLIC_REPORT'
+         AND spend.recorded_at > coalesce(identity.read_public_report_charged_until($1), '-infinity'::timestamptz)`,
+      [runId]
+    );
+    return this.#total(result.rows[0]?.total);
+  }
+
   async readRunInvestigationReportSpentMicros(runId: string): Promise<number> {
     const result = await this.pool.query<{ total: string }>(
       `SELECT coalesce(sum(spend.charge_micros),0)::text AS total FROM ledger.model_spend AS spend
@@ -1488,7 +1552,8 @@ export class PostgresModelSpendStore implements ModelSpendStore {
     // Decisions 29 and 31: plus step 2's small AI, which has no run (0144).
     const result = await this.pool.query<{ total: string }>(
       `SELECT ((SELECT coalesce(sum(spend.charge_micros),0) ${PostgresModelSpendStore.#ownerSpendFrom})
-         + identity.read_ask_clarify_spent($1::uuid, $2::timestamptz, $3::timestamptz))::text AS total`,
+         + identity.read_ask_clarify_spent($1::uuid, $2::timestamptz, $3::timestamptz)
+         + identity.read_public_report_spent($1::uuid, $2::timestamptz, $3::timestamptz))::text AS total`,
       [ownerRef, from, to]
     );
     return this.#total(result.rows[0]?.total);
@@ -1534,7 +1599,8 @@ export class PostgresModelSpendStore implements ModelSpendStore {
       `SELECT window_range.ordinal::text AS ordinal, ((
          SELECT coalesce(sum(spend.charge_micros),0)
          ${PostgresModelSpendStore.#ownerSpendFrom.replaceAll("$2", "window_range.from_at").replaceAll("$3", "window_range.to_at")}
-       ) + identity.read_ask_clarify_spent($1::uuid, window_range.from_at, window_range.to_at))::text AS total
+       ) + identity.read_ask_clarify_spent($1::uuid, window_range.from_at, window_range.to_at)
+         + identity.read_public_report_spent($1::uuid, window_range.from_at, window_range.to_at))::text AS total
        FROM unnest($2::timestamptz[], $3::timestamptz[]) WITH ORDINALITY AS window_range(from_at, to_at, ordinal)
        ORDER BY window_range.ordinal`,
       [ownerRef, ranges.map((range) => range.from), ranges.map((range) => range.to)]

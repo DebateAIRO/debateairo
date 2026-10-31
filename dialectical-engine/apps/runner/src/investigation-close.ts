@@ -12,7 +12,7 @@ import type { ProviderCallRequest, ProviderCallResult, TokenCounter } from "@deb
 import { INVESTIGATION_REPORT_POLICY } from "@debateai/register";
 import {
   REPORT_ANSWER_PROSE, REPORT_CHECKER_PROSE, REPORT_STORY_PROSE, investigationReportFailureCode, writeInvestigationReport,
-  type ReportAnswerDraft, type ReportStepWritten, type ReportStoryDraft, type StoryRoleMaker
+  type ReportAnswerDraft, type ReportSite, type ReportStepWritten, type ReportStoryDraft, type StoryRoleMaker
 } from "@debateai/story";
 import { engineContractHash } from "./engine-contracts.js";
 import { investigationReportGuard, type Dossier, type DossierInput } from "./investigation-dossier.js";
@@ -167,6 +167,8 @@ export type InvestigationCloseSettings = Readonly<{
   onReportSettled?: (settled: InvestigationReportSettled) => Promise<void> | void;
   /** Decision 28: Anthropic's free token count for the writer's calls; absent (no Anthropic target): the byte guard alone. */
   tokenCount?: TokenCounter;
+  /** Decision 13: a report on a public debate: its report id is the row's own (the investigation id names it) and its calls are charged on their own sites. */
+  publicReport?: Readonly<{ callSiteOf: (site: ReportSite, round: number) => string }>;
   /** The closing's one random source (F5); absent: 32 fresh random bytes per closing. Tests pass a fixed one. */
   closingSeed?: () => Buffer;
   contractHash?: string;
@@ -302,7 +304,7 @@ async function spentOf(settings: InvestigationCloseSettings, rootRunId: string, 
 type Composed = Readonly<{ record: InvestigationReportRecord; payer: InvestigationReportPayer | null }>;
 
 async function composeRecord(settings: InvestigationCloseSettings, closing: UnreportedClosing, log: Log): Promise<Composed> {
-  const reportId = investigationReportIdOf(closing.investigationId, closing.reportVersion);
+  const reportId = settings.publicReport !== undefined ? closing.investigationId : investigationReportIdOf(closing.investigationId, closing.reportVersion);
   const root = closing.rootRunId;
   const nothing: Built = Object.freeze({ dossier: null, failureCode: null });
   let read: InvestigationCloseInput | null = null;
@@ -341,6 +343,7 @@ async function composeRecord(settings: InvestigationCloseSettings, closing: Unre
   const language = read.input.question.language;
   const seed = settings.closingSeed?.() ?? cryptoRandomBytes(32);
   const written = await writeInvestigationReport({
+    ...(settings.publicReport === undefined ? {} : { callSiteOf: settings.publicReport.callSiteOf }),
     runId: root, subjectItemId: subject, contractHash: settings.contractHash ?? engineContractHash(),
     maxRounds: payer.free ? INVESTIGATION_REPORT_POLICY.freeMaxRounds : INVESTIGATION_REPORT_POLICY.maxRounds,
     free: payer.free, later: read.input.earlier !== null,

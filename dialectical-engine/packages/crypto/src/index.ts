@@ -2446,7 +2446,12 @@ export const CONTENT_CARRIERS = Object.freeze([
   "identity.web_shown_quote",
   "identity.web_reply_text",
   // 0141: the AI's suggestions of what to dig into on one path, sealed under the run that paid for them and bound to the set's id.
-  "identity.path_suggestions"
+  "identity.path_suggestions",
+  // 0147: the public page sealed again for the runner under a live run's key; the main answer once the root's key is gone, under the dig's; a report on a public
+  // debate under its carrier's. The page's own copies stay under the publication's key.
+  "identity.public_material",
+  "identity.public_answer_update",
+  "identity.public_report"
 ] as const);
 
 export type ContentCarrier = typeof CONTENT_CARRIERS[number];

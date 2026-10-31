@@ -299,7 +299,8 @@ import { holdRunPassages, passageRecordedRequest, releaseRunPassages } from "./p
 import { isMonthPausedStop, RUN_MONTH_PAUSED } from "./month-pause.js";
 import type { RunInFlight } from "./run-in-flight.js";
 import {
-  ANSWER_UPDATE_CALL_SITE_PREFIX, PATH_CLIMB_CALL_SITE_PREFIX, PATH_REWRITE_CALL_SITE_PREFIX, answerUpdateCallSiteRole, isPathRewriteCallSite,
+  ANSWER_UPDATE_CALL_SITE_PREFIX, CONTRIBUTION_CHECK_CALL_SITE_PREFIX, PATH_CLIMB_CALL_SITE_PREFIX, PATH_REWRITE_CALL_SITE_PREFIX, PUBLIC_REPORT_CALL_SITE_PREFIX,
+  answerUpdateCallSiteRole, contributionCheckCallSiteRole, publicReportCallSiteRole, isPathRewriteCallSite,
   pathClimbCallSiteRole, pathRewriteCallSiteRole
 } from "./path-rewrite-scope.js";
 import { INVESTIGATION_REPORT_CALL_SITE_PREFIX, investigationReportCallSiteRole } from "@debateai/story";
@@ -13568,6 +13569,9 @@ function storyCallSiteRole(callSiteKey: string): ProviderCallRequest["role"] | n
   // R22 decisions 2 and 3: the climb's two sites and the main-answer update's two, each with its one role.
   const climbed = pathClimbCallSiteRole(callSiteKey) ?? answerUpdateCallSiteRole(callSiteKey);
   if (climbed !== null) return climbed;
+  // Decision 13: the AI check on a contribution, and a report on a public debate.
+  const publicTree = contributionCheckCallSiteRole(callSiteKey) ?? publicReportCallSiteRole(callSiteKey);
+  if (publicTree !== null) return publicTree;
   // W4-4: "Add to researched"'s readers.
   const researched = webResearchedCallSiteRole(callSiteKey);
   if (researched !== null) return researched;
@@ -13587,7 +13591,8 @@ export function storyCallScopeAgrees(request: Pick<ProviderCallRequest, "lane" |
   const storyScope = request.lane === "story";
   const storyKey = key.startsWith(STORY_CALL_SITE_PREFIX) || key.startsWith(PATH_REWRITE_CALL_SITE_PREFIX)
     || key.startsWith(INVESTIGATION_REPORT_CALL_SITE_PREFIX) || key.startsWith(PATH_CLIMB_CALL_SITE_PREFIX)
-    || key.startsWith(ANSWER_UPDATE_CALL_SITE_PREFIX) || key.startsWith(WEB_RESEARCHED_CALL_SITE_PREFIX);
+    || key.startsWith(ANSWER_UPDATE_CALL_SITE_PREFIX) || key.startsWith(WEB_RESEARCHED_CALL_SITE_PREFIX)
+    || key.startsWith(CONTRIBUTION_CHECK_CALL_SITE_PREFIX) || key.startsWith(PUBLIC_REPORT_CALL_SITE_PREFIX);
   return !((storyScope || storyKey) && (!storyScope || storyCallSiteRole(key) !== request.role));
 }
 
@@ -13694,6 +13699,10 @@ export function createPostgresProviderGateway(
       readonly buildPathClimbCostEnvelopeSeam?: (runId: string) => InFlightReleasingSeam;
       /** R22 decision 3: the main-answer update (story lane, `ANSWER_UPDATE:` sites, the triggering dig's run) spends its own never-walled seam. */
       readonly buildAnswerUpdateCostEnvelopeSeam?: (runId: string) => InFlightReleasingSeam;
+      /** Decision 13: the AI check on a contribution (story lane, `CONTRIBUTION_CHECK:` sites, the dig's run) spends its own never-walled seam. */
+      readonly buildContributionCheckCostEnvelopeSeam?: (runId: string) => InFlightReleasingSeam;
+      /** Decision 13: a report on a public debate (story lane, `PUBLIC_REPORT:` sites, its carrier run) spends its own never-walled seam. */
+      readonly buildPublicReportCostEnvelopeSeam?: (runId: string) => InFlightReleasingSeam;
       /**
        * Parallel AI calls (spec 2026-10-12 §3.5): this process's calls in
        * flight, for the run-wide attempt ceiling. A call bounded by that ceiling
@@ -13707,7 +13716,7 @@ export function createPostgresProviderGateway(
 ): ProviderGateway {
   const { buildCostEnvelopeSeam, ...gatewayOptions } = options;
   const { buildStoryCostEnvelopeSeam, buildPathRewriteCostEnvelopeSeam, buildInvestigationReportCostEnvelopeSeam,
-    buildPathClimbCostEnvelopeSeam, buildAnswerUpdateCostEnvelopeSeam, inFlight,
+    buildPathClimbCostEnvelopeSeam, buildAnswerUpdateCostEnvelopeSeam, buildContributionCheckCostEnvelopeSeam, buildPublicReportCostEnvelopeSeam, inFlight,
     ...httpOptions } = gatewayOptions;
   const ledger = new LedgerRepository(pool);
   const budget = new BudgetRepository(pool);
@@ -13764,7 +13773,10 @@ export function createPostgresProviderGateway(
       const climbCall = storyScope && (pathClimbCallSiteRole(structureRepairOriginalKey(request.callSiteKey)) !== null
         || webResearchedCallSiteRole(structureRepairOriginalKey(request.callSiteKey)) !== null);
       const answerUpdateCall = storyScope && answerUpdateCallSiteRole(structureRepairOriginalKey(request.callSiteKey)) !== null;
-      const storyLaneSeam = answerUpdateCall ? buildAnswerUpdateCostEnvelopeSeam : climbCall ? buildPathClimbCostEnvelopeSeam
+      const originalKey = structureRepairOriginalKey(request.callSiteKey);
+      const storyLaneSeam = storyScope && contributionCheckCallSiteRole(originalKey) !== null ? buildContributionCheckCostEnvelopeSeam
+        : storyScope && publicReportCallSiteRole(originalKey) !== null ? buildPublicReportCostEnvelopeSeam
+        : answerUpdateCall ? buildAnswerUpdateCostEnvelopeSeam : climbCall ? buildPathClimbCostEnvelopeSeam
         : reportCall ? buildInvestigationReportCostEnvelopeSeam
         : pathRewrite ? buildPathRewriteCostEnvelopeSeam : buildStoryCostEnvelopeSeam;
       if (storyScope && storyLaneSeam === undefined

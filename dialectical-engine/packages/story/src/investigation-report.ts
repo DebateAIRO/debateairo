@@ -395,6 +395,20 @@ export function answerUpdateCallSiteKey(site: ReportSite, round: number): string
   return investigationReportCallSiteKey(site, round).replace(INVESTIGATION_REPORT_CALL_SITE_PREFIX, ANSWER_UPDATE_CALL_SITE_PREFIX);
 }
 
+/**
+ * Decision 13: a report on a public debate runs the report's own steps; its sites are its own only so the gateway charges them as PUBLIC_REPORT on the carrier run, never walled and
+ * never counted through that run's owner: identity.public_report_charge names the writer who pays.
+ */
+export const PUBLIC_REPORT_CALL_SITE = /^PUBLIC_REPORT:(ANSWER|ANSWER_ASKED|ANSWER_CHECK|STORY|STORY_CHECK):([1-4])$/u;
+export const PUBLIC_REPORT_CALL_SITE_PREFIX = "PUBLIC_REPORT:" as const;
+export function publicReportCallSiteRole(callSiteKey: string): "SYNTHESIZER" | "EVALUATOR" | null {
+  const site = PUBLIC_REPORT_CALL_SITE.exec(callSiteKey);
+  return site === null ? null : REPORT_SITE_ROLES[site[1] as ReportSite];
+}
+export function publicReportCallSiteKey(site: ReportSite, round: number): string {
+  return investigationReportCallSiteKey(site, round).replace(INVESTIGATION_REPORT_CALL_SITE_PREFIX, PUBLIC_REPORT_CALL_SITE_PREFIX);
+}
+
 export function investigationReportCallSiteKey(site: ReportSite, round: number): string {
   if (!Number.isInteger(round) || round < 1 || round > INVESTIGATION_REPORT_LAST_ROUND) {
     throw new TypedDomainError("INVESTIGATION_REPORT_ROUND_INVALID", "A report round is 1 to 4");

@@ -1,0 +1,17 @@
+{
+  "version": "public-tree-forward0147-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0145_web_researched_unsettled.sql",
+    "manifestSha256": "b820bbf8fb5bc2b58935fced7cd31f82631846882e508e216ec708a2eea3c809",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0147_public_tree.sql",
+    "sha256": "00c9f869c1c2e0afc15e2fba0e08a135f4cb39c384708b63802ba9cc22bbaf32"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  }
+}

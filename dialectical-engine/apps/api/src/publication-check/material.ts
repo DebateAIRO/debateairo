@@ -19,7 +19,12 @@ export const CHECKED_TEXT_PATHS: readonly { path: string; kind: PublicationPartK
   ...["quote", "title", "site", "link", "explanation.text"]
     .map(path => ({ path: `answer.nodes[].sources[].${path}`, kind: "ARGUMENTS" as const })),
   // Decision 13: a contribution's path text, judged with the arguments. Its contributor's pseudonym and date stay out, as the author's do.
-  ...["line", "summary", "what_changed[]"].map(path => ({ path: `contributions[].${path}`, kind: "ARGUMENTS" as const })),
+  ...["line", "summary", "what_changed[]", "dig_paths[].line", "dig_paths[].points[]"].map(path => ({ path: `contributions[].${path}`, kind: "ARGUMENTS" as const })),
+  // Decisions 13 and 16: a report on a public debate, judged part by part. Its writer's pseudonym and dates stay out, as the author's do.
+  { path: "reports[].answer.segments[]", kind: "SUMMARY" },
+  ...["story.short_answer", "story.what_would_change", "story.how_it_went[].paragraph", "story.still_open[]"].map(path => ({ path: `reports[].${path}`, kind: "STORY" as const })),
+  ...["sources[].site", "sources[].title", "sources[].quote", "sources[].line", "sources[].link", "paths[].line", "paths[].summary", "paths[].points[].text",
+    "paths[].dig.picks[]", "paths[].dig.own_words[]", "paths[].dig.view.reason", "paths[].dig.changed[]"].map(path => ({ path: `reports[].${path}`, kind: "ARGUMENTS" as const })),
   { path: "answer.nodes[].review.reasons[]", kind: "REVIEWS" },
   ...["headline", "summary", "confidence", "paths[].line", "change.text", "reviewer_note.text"]
     .map(path => ({ path: `story_short.${path}`, kind: "STORY" as const }))
@@ -28,7 +33,7 @@ export const CHECKED_TEXT_PATHS: readonly { path: string; kind: PublicationPartK
 export function isExcludedTextPath(path: string, schemaType: string): boolean {
   if (schemaType === "enum" || schemaType === "literal") return true;
   if (["public_ref", "published_at", "author_pseudonym", "language", "answer.as_of",
-    "answer.nodes[].sources[].published_on", "contributions[].contributor", "contributions[].contributed_on"].includes(path)) return true;
+    "answer.nodes[].sources[].published_on", "contributions[].contributor", "contributions[].contributed_on", "reports[].writer"].includes(path)) return true;
   if (path === "floor" || path.startsWith("floor.") || path === "answer.edges" || path.startsWith("answer.edges[]")) return true;
   const segments = path.split(".").map(segment => segment.replace(/\[\]$/, ""));
   return segments.some(segment => segment === "maker_lineage" || segment === "reviewer_lineage"

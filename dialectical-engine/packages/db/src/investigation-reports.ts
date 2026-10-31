@@ -2,6 +2,7 @@ import type { Pool, PoolClient } from "pg";
 // The owner's changes of 31 Oct (0137 to 0141), re-exported here (the package index's bytes are pinned by the migration audit,
 // NATIVE_MIGRATE_MODULE_SHA256).
 export * from "./public-debates.js";
+export * from "./public-tree.js";
 export * from "./tree-updates.js";
 export * from "./passage-retention.js";
 export * from "./team-limit.js";

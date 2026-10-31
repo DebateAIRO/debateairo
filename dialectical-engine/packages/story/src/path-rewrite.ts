@@ -203,6 +203,16 @@ export function pathClimbCallSiteRole(callSiteKey: string): "SYNTHESIZER" | "EVA
 }
 
 /**
+ * Decision 13: the AI check on a contribution to a public debate, `CONTRIBUTION_CHECK:CHECKER:{n}` (n 1 and 2: the checker, then one of another maker), an EVALUATOR call on the
+ * dig's own run, charged as CONTRIBUTION_CHECK on its own never-walled seam.
+ */
+export const CONTRIBUTION_CHECK_CALL_SITE = /^CONTRIBUTION_CHECK:CHECKER:([1-2])$/u;
+export const CONTRIBUTION_CHECK_CALL_SITE_PREFIX = "CONTRIBUTION_CHECK:" as const;
+export function contributionCheckCallSiteRole(callSiteKey: string): "EVALUATOR" | null {
+  return CONTRIBUTION_CHECK_CALL_SITE.test(callSiteKey) ? "EVALUATOR" : null;
+}
+
+/**
  * W4-3: the suggestion call on a dig's own path, `PATH_REWRITE:SUGGEST:{path}` (the writer's, right after the rewrite): the
  * same lane, role, money and thinking as the writer's, so it is charged to the dig on the never-walled seam.
  */

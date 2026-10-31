@@ -156,6 +156,8 @@ export type PathRewriteContent = Readonly<{
   rests_on: readonly string[];
   /** W4-3: what the AI offers to dig into on each of the dig's own paths; a text sealed before it, or on Free, has none. */
   dig_suggestions?: readonly DigPathSuggestions[];
+  /** Decision 13: on a public dig's own rewrite, its paths' points, as the page will show them. */
+  public_points?: readonly Readonly<{ position_ref: string; points: readonly PathRewriteDigPath["points"][number][] }>[];
 }>;
 
 /** What W4-3's hook is handed once the row is stored. */
@@ -184,6 +186,8 @@ export type PathRewriteRunnerSettings = Readonly<{
   /** engineContractHash(): absent, the code's own. */
   contractHash?: string;
   log?: (event: string, detail: Record<string, unknown>) => void;
+  /** Decision 13: true when the settled run is a contribution to a public debate, and that pipeline ran for it. Absent: none. */
+  publicDig?: (input: StoryWriteInput, lease: StepLease) => Promise<boolean>;
   /** R22 decision 2: the path's whole line (absent: 0134's rows alone, a runner without the tree's settings). */
   line?: PathRewriteLine;
   /** R22 decisions 2 and 3: once the dig's row is stored, the climb and the main answer (path-climb.ts). Never rejects. */
@@ -240,6 +244,8 @@ export async function runDigPathRewrite(settings: PathRewriteRunnerSettings | un
   if (settings === undefined) return false;
   const log = safeLog(settings);
   const lease = input.stepLease ?? BARE_STEP;
+  // Decision 13: a dig on a public debate is a contribution: its own pipeline (public-contribution.ts), which reads only the public copy. Never rejects.
+  if (settings.publicDig !== undefined && await settings.publicDig(input, lease)) return true;
   let dig: PathRewriteDig | null;
   try {
     dig = await lease(() => settings.sources.digOf(input.runId));
@@ -284,12 +290,12 @@ export async function runDigPathRewrite(settings: PathRewriteRunnerSettings | un
 }
 
 /** R22: this rewrite's prompts record each of the dig's cited passages by name (passage-record.ts). */
-function holdDigPassages(digRunId: string, digPaths: readonly PathRewriteDigPath[]): void {
+export function holdDigPassages(digRunId: string, digPaths: readonly PathRewriteDigPath[]): void {
   holdRunPassages(digRunId, new Map(digPaths.flatMap((path) => path.extracts.map((extract) =>
     [webExtractTextRef(webStepRowId(digRunId, "extract", extract.label)), extract.quote] as const))));
 }
 
-async function digPathsOf(settings: PathRewriteRunnerSettings, input: StoryWriteInput, lease: StepLease): Promise<readonly PathRewriteDigPath[]> {
+export async function digPathsOf(settings: PathRewriteRunnerSettings, input: StoryWriteInput, lease: StepLease): Promise<readonly PathRewriteDigPath[]> {
   const digRunId = input.runId;
   const enrichment = await lease(() => settings.sources.readEnrichment({ runId: digRunId,
     nodes: input.nodes.map((node) => ({ nodeId: node.nodeId, judgeArtifactRef: input.judgeArtifactRefs.get(node.nodeId) ?? null })) }));
