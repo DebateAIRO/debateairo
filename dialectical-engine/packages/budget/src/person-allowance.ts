@@ -9,7 +9,7 @@
  * costEnvelopePolicy band's). An EMPTY list means no personal limit: billing off,
  * local mode, or a legacy asker with no owner_ref.
  */
-export type SpendScope = "SITE_DAY" | "PERSON_DAY" | "PERSON_WEEK" | "PERSON_MONTH" | "PERSON_GRANT";
+export type SpendScope = "SITE_DAY" | "PERSON_DAY" | "PERSON_WEEK" | "PERSON_MONTH" | "PERSON_GRANT" | "TEAM_MONTH";
 
 export type PersonWindow = Readonly<{
   scope: Exclude<SpendScope, "SITE_DAY">;

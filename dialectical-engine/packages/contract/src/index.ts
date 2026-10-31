@@ -312,7 +312,7 @@ export type AskRequest = z.infer<typeof AskRequestSchema>;
  * The same four words as `SpendScope` in @debateai/budget (the contract cannot
  * import it); tests/unit/b6a-waiting-projection.test.ts reads both.
  */
-export const SpendScopeSchema = z.enum(["SITE_DAY", "PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH", "PERSON_GRANT"]);
+export const SpendScopeSchema = z.enum(["SITE_DAY", "PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH", "PERSON_GRANT", "TEAM_MONTH"]);
 
 /**
  * Final review Part 1b, Important 1 — WHY A QUESTION WAITS when no reset is
@@ -563,7 +563,7 @@ const CustomerAskRoomResponseSchema = z.object({
 });
 const InternalFundingUsageSchema = z.object({kind:z.literal("INTERNAL"),expires_at:z.iso.datetime()}).strict();
 const InternalAskRoomResponseSchema = z.object({
-  room:z.enum(["FITS","CLOSE","FULL","ALREADY_WAITING"]),scope:z.enum(["SITE_DAY","PERSON_DAY","PERSON_WEEK","PERSON_GRANT"]).nullable(),
+  room:z.enum(["FITS","CLOSE","FULL","ALREADY_WAITING"]),scope:z.enum(["SITE_DAY","PERSON_DAY","PERSON_WEEK","PERSON_GRANT","TEAM_MONTH"]).nullable(),
   resets_at:z.iso.datetime().nullable(),waiting_run_ref:z.string().min(1).nullable(),plan_id:z.null(),funding:InternalFundingUsageSchema,waits_for:WaitsForSchema.optional(),shape_settings:z.literal(true).optional(),answer_words:AnswerWordsSchema.optional(),length_settings:z.literal(true).optional(),
   // Side-by-side spec §13 (Task S12): as the customer answer's `settings_version`.
   settings_version:SettingsVersionSchema.optional(),

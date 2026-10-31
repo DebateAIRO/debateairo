@@ -2,7 +2,7 @@ import { PLAN_TIER_ROSTERS, type AskApplied, type AskRequest, type PlanTier } fr
 import { previewPlanTierRosters, validatePreviewProviderTestConfig, type PreviewProviderTestConfig } from "@debateai/providers";
 import type { CostEstimator, PersonAllowanceSource } from "@debateai/budget";
 import { TypedDomainError, type FundingBasis } from "@debateai/kernel";
-import { planById, type BillingPlan, type BillingPlans, type DebateShapePlanKey, type PlanId } from "@debateai/register";
+import { planById, TEAM_FEATURE_PLAN_ID, type BillingPlan, type BillingPlans, type DebateShapePlanKey, type PlanId } from "@debateai/register";
 import { runShapeClassOf } from "./debate-shape-ask.js";
 
 /**
@@ -138,7 +138,8 @@ export async function resolveBillingAsk(
   const funding = await billing.funding?.resolveAskFunding(ownerRef,now);
   if (funding?.kind === "INTERNAL") {
     const decided = ask.plan_tier === "premium" ? ask : Object.freeze({...ask,plan_tier:"premium" as const});
-    return Object.freeze({ask:decided,planId:null,entitlementEventId:null,fundingBasis:funding,normalised:decided !== ask});
+    // Decision 14: a funded debate counts as the top plan's features.
+    return Object.freeze({ask:decided,planId:TEAM_FEATURE_PLAN_ID,entitlementEventId:null,fundingBasis:funding,normalised:decided !== ask});
   }
   const entitlement = await billing.entitlements.current(ownerRef, now);
   const plan = planById(billing.plans, entitlement.planId);
@@ -169,7 +170,7 @@ export async function decideRoomSettings<T extends AskSettings>(
 
 /**
  * `decideRoomSettings` with the plan id `submit` would resolve (`resolveBillingAsk`'s `planId`): the entitlement's
- * plan with billing on, null without billing, without an owner, or for internal funding. Debate shape (spec
+ * plan with billing on, the top plan for internal funding (decision 14), null without billing or without an owner. Debate shape (spec
  * 2026-10-12 §3.1): the room read normalises and samples under the same plan key as the ask it advises on.
  */
 export async function decideRoomSettingsAndPlan<T extends AskSettings>(
@@ -182,7 +183,7 @@ export async function decideRoomSettingsAndPlan<T extends AskSettings>(
   if (basis?.kind === "INTERNAL") {
     return Object.freeze({
       settings: settings.plan_tier === "premium" ? settings : Object.freeze({...settings,plan_tier:"premium" as const}),
-      planId: null
+      planId: TEAM_FEATURE_PLAN_ID
     });
   }
   const entitlement = await billing.entitlements.current(ownerRef, billing.clock());

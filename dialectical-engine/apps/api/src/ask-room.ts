@@ -230,6 +230,8 @@ export type AskRoomOptions = Readonly<{
     assertProviderFundingAdmission(runId: string, now: Date): Promise<void>;
     readRunFundingState(runId:string):Promise<InternalRunFundingState>;
     readSubscriptionWindows(ownerRef: string, now: Date): Promise<readonly PersonWindow[]>;
+    /** Decision 24: the team's one month, over every grant. Only a new question or dig asks; a running debate never does. */
+    readTeamRoom?(estimateMicros: number): Promise<"NOT_SET" | "FITS" | "FULL">;
   }>;
   dailyCeilingMicros: number;
   closeBasisPoints: number;
@@ -533,6 +535,8 @@ type PinnedEntitlement = Readonly<{ planId: PlanId; eventId: string }>;
 class DecisionDayTurned extends Error {}
 
 /** The next whole minute: when a question that only waits for the waker starts (budget spec §2.7). */
+function nextUtcMonth(now: Date): Date { return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)); }
+
 export function nextWholeMinute(now: Date): Date {
   const minute = 60_000;
   return new Date(Math.floor(now.getTime() / minute) * minute + minute);
@@ -1217,6 +1221,15 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
           ...(room === "FULL" && !fullOnSpend ? { fullOnOwnHolds: true } : {})
         }));
       }
+    }
+    // Decisions 14 and 24: a funded question also needs room in the team's month, the ceiling over every grant. Its own grant's windows
+    // above still apply; whichever is full names the wait. No limit set: no room. A limit can be raised at any time, so the line looks again
+    // at the next tick, not at the month's reset.
+    if (windows[0]?.funding?.kind === "INTERNAL" && this.#options.funding !== undefined) {
+      const team = await this.#options.funding.readTeamRoom?.(estimateMicros) ?? "NOT_SET";
+      const room = team === "FITS" ? "FITS" as const : "FULL" as const;
+      if (room === "FULL") personFull = true;
+      rooms.push(Object.freeze({ scope: "TEAM_MONTH" as const, room, resetsAt: nextUtcMonth(now) }));
     }
     const waitReason: WaitReason = personFull
       ? Object.freeze({ waitsFor: "PERSON" as const, personRecheckAt: fullOnSpendUntil ?? nextWholeMinute(now) })

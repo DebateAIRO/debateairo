@@ -23,6 +23,7 @@ import {
   type PlanId,
   type StoryPolicy
 } from "@debateai/register";
+import { TEAM_FEATURE_PLAN_ID } from "@debateai/register";
 import {
   CostEnvelopeGuard,
   PostgresModelSpendStore,
@@ -870,10 +871,16 @@ export function runnerWebSearchSettings(input: Readonly<{
     searchSubject: searchCallSubject(input.previewGate),
     searchSeamOf: guardOf === null ? null : (runId: string) => pause === undefined ? guardOf(runId).searchSeam({ runId })
       : withMonthPauseSearch(guardOf(runId).searchSeam({ runId }), runId, pause, () => guardOf(runId).bodyMicrosLeft(runId)),
-    readRunPlan: async (runId: string): Promise<PlanId | null> => {
-      const row = (await input.pool.query<{ plan_id: PlanId | null }>(
-        "SELECT plan_id FROM billing.run_charge_scope WHERE run_id = $1::uuid", [runId])).rows[0];
-      return row?.plan_id ?? null;
-    }
+    readRunPlan: (runId: string) => readWebRunPlan(input.pool, runId)
   });
+}
+
+/**
+ * The plan a run's web step goes by. Decision 14: a funded debate names no plan and counts as the top plan's features, web search among
+ * them; without this it would read as "no plan" and search nothing.
+ */
+export async function readWebRunPlan(pool: Pick<Pool, "query">, runId: string): Promise<PlanId | null> {
+  const row = (await pool.query<{ plan_id: PlanId | null; funding_kind: string }>(
+    "SELECT plan_id, funding_kind FROM billing.run_charge_scope WHERE run_id = $1::uuid", [runId])).rows[0];
+  return row?.funding_kind === "INTERNAL" ? TEAM_FEATURE_PLAN_ID : row?.plan_id ?? null;
 }

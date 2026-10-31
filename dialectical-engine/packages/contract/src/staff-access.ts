@@ -13,7 +13,8 @@ export const ActiveStaffCapabilitiesSchema = z.array(z.enum([
 export const StaffActionSchema = z.enum([
     "TEAM_INVITE", "INVITATION_ACCEPT", "TEAM_GRANT", "TEAM_DISABLE", "EMERGENCY_DISABLE",
     "CREDENTIAL_REGISTER", "CREDENTIAL_REVOKE", "PUBLICATION_REVIEW_APPROVE", "PUBLICATION_REVIEW_REFUSE",
-    "THREAT_REPORT_REPORTED", "THREAT_REPORT_NOT_REPORTED"
+    "THREAT_REPORT_REPORTED", "THREAT_REPORT_NOT_REPORTED",
+    "TEAM_LIMIT_SET", "TEAM_LIMIT_PARTNER_GRANT", "TEAM_LIMIT_PARTNER_REVOKE", "TEAM_PRACTICE_RECORD"
 ]);
 const RevisionSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const DigestSchema = z.string().regex(/^[0-9a-f]{64}$/u);
@@ -107,6 +108,13 @@ export const StaffElevationResponseSchema = z.object({
 }).strict();
 /** Business inputs only: the server derives every binding field and digest. */
 const ActionMutationShape = { expected_revision: RevisionSchema, operation_id: z.uuid(), reason: ReasonSchema };
+/**
+ * Decision 24: the new amount, and the amount and log revision the person is looking at (0 and 0 before any limit), so a page or a
+ * ceremony made against another value never applies. Whole micros; made-up numbers only in examples.
+ */
+const TeamLimitMicrosSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
+const TeamLimitSetShape = { amount_micros: TeamLimitMicrosSchema, current_micros: TeamLimitMicrosSchema, expected_revision: RevisionSchema, operation_id: z.uuid() };
+const TeamPracticeShape = { practice_ref: z.uuid(), charge_micros: TeamLimitMicrosSchema, operation_id: z.uuid() };
 export const StaffActionIntentSchema = z.discriminatedUnion("action", [
     z.object({ action: z.literal("TEAM_INVITE"), target_user_id: z.uuid(), capabilities: DelegatedStaffCapabilitiesSchema, ...ActionMutationShape }).strict(),
     z.object({ action: z.literal("TEAM_GRANT"), target_staff_id: z.uuid(), capabilities: DelegatedStaffCapabilitiesSchema, ...ActionMutationShape }).strict(),
@@ -115,12 +123,34 @@ export const StaffActionIntentSchema = z.discriminatedUnion("action", [
     z.object({ action: z.literal("CREDENTIAL_REGISTER"), operation_id: z.uuid() }).strict(),
     z.object({ action: z.literal("PUBLICATION_REVIEW_APPROVE"), review_ref: z.uuid(), operation_id: z.uuid() }).strict(),
     z.object({ action: z.literal("PUBLICATION_REVIEW_REFUSE"), review_ref: z.uuid(), reason: z.string().trim().min(1).max(500), operation_id: z.uuid() }).strict(),
-    z.object({ action: z.literal("THREAT_REPORT_DECIDE"), target_report_ref: z.uuid(), decision: z.enum(["REPORTED", "NOT_REPORTED"]), expected_revision: RevisionSchema, operation_id: z.uuid() }).strict()
+    z.object({ action: z.literal("THREAT_REPORT_DECIDE"), target_report_ref: z.uuid(), decision: z.enum(["REPORTED", "NOT_REPORTED"]), expected_revision: RevisionSchema, operation_id: z.uuid() }).strict(),
+    z.object({ action: z.literal("TEAM_LIMIT_SET"), ...TeamLimitSetShape }).strict(),
+    z.object({ action: z.literal("TEAM_LIMIT_PARTNER_GRANT"), target_staff_id: z.uuid(), ...ActionMutationShape }).strict(),
+    z.object({ action: z.literal("TEAM_LIMIT_PARTNER_REVOKE"), target_staff_id: z.uuid(), ...ActionMutationShape }).strict(),
+    z.object({ action: z.literal("TEAM_PRACTICE_RECORD"), ...TeamPracticeShape }).strict()
 ]);
 export const StaffActionOptionsRequestSchema = z.object({ intent: StaffActionIntentSchema }).strict();
 export const StaffActionVerifyRequestSchema = z.object({ intent: StaffActionIntentSchema,
     challenge_handle: OpaqueHandleSchema, credential: WebAuthnAuthenticationCredentialSchema
 }).strict().superRefine(ceremonyBodyBound);
+export const TeamLimitSetRequestSchema = z.object({ ...TeamLimitSetShape, proof_handle: OpaqueHandleSchema }).strict();
+export const TeamLimitPartnerRequestSchema = z.object({ ...ActionMutationShape, proof_handle: OpaqueHandleSchema }).strict();
+export const TeamPracticeRequestSchema = z.object({ ...TeamPracticeShape, proof_handle: OpaqueHandleSchema }).strict();
+const TeamLimitLogEntrySchema = z.object({
+    kind: z.enum(["LIMIT", "PARTNER_GRANTED", "PARTNER_REVOKED", "PRACTICE"]), at: z.iso.datetime({ offset: true }),
+    amount_micros: TeamLimitMicrosSchema.optional(), previous_micros: TeamLimitMicrosSchema.nullable().optional(),
+    actor_staff_id: z.uuid().nullable(), subject_staff_id: z.uuid().optional(),
+    cause: z.enum(["OWNER_REVOKED", "STAFF_DISABLED", "ACCOUNT_ERASED", "OWNER_CHANGED"]).optional(),
+    notice: z.enum(["NONE", "WAITING", "SENT", "FAILED"])
+}).strict();
+/** The private team panel: only the two accounts ever receive it. A null amount: no limit yet, so the team has no room. */
+export const TeamLimitPageSchema = z.object({
+    amount_micros: TeamLimitMicrosSchema.nullable(), revision: RevisionSchema, spent_micros: TeamLimitMicrosSchema, committed_micros: TeamLimitMicrosSchema,
+    month_starts_at: z.iso.datetime({ offset: true }), month_ends_at: z.iso.datetime({ offset: true }), is_owner: z.boolean(),
+    partner: z.object({ staff_id: z.uuid(), pseudonym: z.string().regex(/^staff-[0-9a-f]{32}$/u), grant_revision: RevisionSchema }).strict().nullable(),
+    log: z.array(TeamLimitLogEntrySchema).max(100)
+}).strict();
+export type TeamLimitPage = z.infer<typeof TeamLimitPageSchema>;
 export const StaffActionProofResponseSchema = z.object({ proof_handle: OpaqueHandleSchema, expires_at: z.iso.datetime() }).strict();
 const CredentialDescriptorSchema = z.object({ id: CredentialIdSchema, type: z.literal("public-key"), transports: TransportsSchema.optional() }).strict();
 export const StaffRegistrationOptionsResponseSchema = z.object({
@@ -233,7 +263,9 @@ export const staffContractInventory = Object.freeze({
         "GET /v1/admin/publication-reviews", "GET /v1/admin/publication-reviews/{reviewRef}",
         "POST /v1/admin/publication-reviews/{reviewRef}/approve", "POST /v1/admin/publication-reviews/{reviewRef}/refuse",
         "GET /v1/admin/threat-reports", "GET /v1/admin/threat-reports/summary",
-        "GET /v1/admin/threat-reports/{reportRef}", "POST /v1/admin/threat-reports/{reportRef}/decision"
+        "GET /v1/admin/threat-reports/{reportRef}", "POST /v1/admin/threat-reports/{reportRef}/decision",
+        "GET /v1/admin/team-limit", "POST /v1/admin/team-limit", "POST /v1/admin/team-limit/partner/{staffId}",
+        "DELETE /v1/admin/team-limit/partner/{staffId}", "POST /v1/admin/team-limit/practice"
     ]),
     resources: Object.freeze({
         StaffCapabilitySchema, DelegatedStaffCapabilitiesSchema, ActiveStaffCapabilitiesSchema, StaffActionSchema,
@@ -246,7 +278,8 @@ export const staffContractInventory = Object.freeze({
         StaffInviteRequestSchema, StaffInviteResponseSchema, StaffInvitationOptionsRequestSchema, StaffInvitationOptionsResponseSchema, StaffInvitationVerifyRequestSchema,
         StaffInvitationAcceptRequestSchema, StaffTargetParamsSchema, StaffGrantRequestSchema, StaffDisableModeSchema, StaffDisableRequestSchema,
         StaffPageQuerySchema, StaffTeamQuerySchema, StaffAuditQuerySchema, StaffTeamMemberSchema, StaffTeamPageSchema, StaffAuditEventSchema, ThreatReportAuditEventSchema, StaffAuditPageSchema,
-        ThreatReportListSchema, ThreatReportSchema, ThreatReportSummarySchema, ThreatReportDecisionRequestSchema
+        ThreatReportListSchema, ThreatReportSchema, ThreatReportSummarySchema, ThreatReportDecisionRequestSchema,
+        TeamLimitSetRequestSchema, TeamLimitPartnerRequestSchema, TeamPracticeRequestSchema, TeamLimitPageSchema
     })
 });
 

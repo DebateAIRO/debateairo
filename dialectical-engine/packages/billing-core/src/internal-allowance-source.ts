@@ -15,6 +15,8 @@ export interface FundingAllowancePort extends InternalAllowanceReadPort {
   readPolicy(): Promise<FundingPolicyAt | null>;
   /** The sealed funding publication at `registerVersion`, or null when that version is none. */
   readPolicyAt(registerVersion: number): Promise<FundingPolicyAt | null>;
+  /** Decision 24: does this estimate fit the team's month (0142). No amount comes back. Optional only for ports built before it. */
+  readTeamRoom?(estimateMicros: number): Promise<"NOT_SET" | "FITS" | "FULL">;
 }
 type FundingPolicyAt = Readonly<{ registerVersion: number; policy: Extract<InternalAllowancePolicy, { enabled: true }> }>;
 /** Lifetime ceiling of any grant, whatever its version's policy says (31 days). */
@@ -53,6 +55,10 @@ export class FundingAwarePersonAllowanceSource implements PersonAllowanceSource 
     if (basis === null || (basis.kind === "INTERNAL" ? !UUID.test(basis.grantId) || !UUID.test(basis.grantEventId)
       : !["FREE","PLUS","PRO","MAX"].includes(basis.planId) || !UUID.test(basis.entitlementEventId))) throw unavailable();
     return basis;
+  }
+  /** No port, or no limit set: no team room at all, on purpose. A funded debate is never admitted past a limit nobody can read. */
+  async readTeamRoom(estimateMicros: number): Promise<"NOT_SET" | "FITS" | "FULL"> {
+    return await this.options.allowances.readTeamRoom?.(estimateMicros) ?? "NOT_SET";
   }
   async readRunFundingState(runId:string):Promise<InternalRunFundingState> { return this.options.allowances.readRunState(runId); }
   async readFundingForRun(runId: string): Promise<FundingBasis> { return this.checkBasis(await this.options.entitlements.readRunFundingBasis(runId)); }

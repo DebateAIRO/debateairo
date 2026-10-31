@@ -1520,7 +1520,7 @@ export {
 
 export { internalAllowancePolicyValue } from "./internal-allowance-policy.js";
 export {
-  TEAM_FEATURE_PLAN_ID, TEAM_LIMIT_SETTING, teamLimitFromEnvironment, teamLimitWindow, teamRoomMicros, type TeamLimit
+  TEAM_FEATURE_PLAN_ID, teamLimitWindow
 } from "./team-limit.js";
 
 export * from "./consumer-recovery-policy.js";

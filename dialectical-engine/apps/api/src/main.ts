@@ -67,7 +67,7 @@ import {
   PublicationCipher,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository, PostgresThreatReportRepository, SynthesisCheckErasureCoordinator, PostgresSynthesisCheckErasureRepository } from "@debateai/db";
+import { PostgresTeamLimitRepository, AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository, PostgresThreatReportRepository, SynthesisCheckErasureCoordinator, PostgresSynthesisCheckErasureRepository } from "@debateai/db";
 import { recordSpendWaiver } from "@debateai/db";
 import { crossAccount, crossAccountPool, setCrossAccountTarget } from "@debateai/db";
 // FIX-S01-p1b (COR-B1): the boot attestations' routes, from the module itself (packages/db/src/index.ts is hash-pinned
@@ -163,6 +163,7 @@ import { createPublicationContentCheck } from "./publication-check/check.js";
 import { composeQuestionCheck } from "./question-check/compose.js";
 import { readQuestionSubjects } from "./question-check/subjects.js";
 import { startThreatReportAlerts } from "./staff/threat-report-alert.js";
+import { startTeamLimitNotices } from "./staff/team-limit.js";
 import { startThreatReportErasure, threatReportEmailHold } from "./staff/threat-report-closure.js";
 import { threatReportEmailReader } from "./staff/threat-reports.js";
 import { PublicationReviewRefusal, PublicationReviewRepository, SynthesisCheckRepository, originVersionOf, readSynthesisTexts, synthesisTextOf, verdictOfRecord } from "@debateai/serve";
@@ -1020,6 +1021,8 @@ const threatReportRepository = new PostgresThreatReportRepository(pool);
 // Row-level security (X27, merge onto synthesis-flag S04): a staff request reads the reported account's address, another
 // account's identity row, so the reader runs on the cross-account target.
 const readThreatReportRecipientEmail = threatReportEmailReader(crossAccountPool(pool, "X27"), dekStore);
+// Decision 24: 0142's definers only, and the notices open the named account's address through the same reader.
+const teamLimitRepository = new PostgresTeamLimitRepository(pool);
 const readThreatReportStaffEmail = threatReportEmailReader(pool, dekStore, "staff");
 const staffHttp = staffAccess === undefined || staffAlerts === undefined ? undefined : {
   access: staffAccess, sessions, repository: new PostgresStaffRepository(crossAccountPool(pool, "X14")),
@@ -1027,6 +1030,7 @@ const staffHttp = staffAccess === undefined || staffAlerts === undefined ? undef
   intents: staffAlerts.intents, readiness: staffAlerts.readiness,
   targetInvitationTransport: staffAlerts.targetInvitationTransport,
   threatReports: { repository: threatReportRepository, readRecipientEmail: readThreatReportRecipientEmail },
+  teamLimit: { repository: teamLimitRepository },
   ...(staffAlerts.funding === undefined ? {} : { funding: staffAlerts.funding })
 };
 // Self-service profile/recovery capabilities use the existing authorization
@@ -1180,6 +1184,15 @@ const threatReportAlertsTimer = startThreatReportAlerts({
     timeoutMs: authPolicy.channel.transportTimeoutMs
   }),
   readRecipientEmail: readThreatReportStaffEmail
+}, releaseWatcher);
+const teamLimitNoticesTimer = startTeamLimitNotices({
+  repository: teamLimitRepository,
+  mail: new TemplatedMailSender({
+    executable: environment.MAIL_SENDMAIL_PATH,
+    from: environment.MAIL_FROM,
+    timeoutMs: authPolicy.channel.transportTimeoutMs
+  }),
+  readEmail: readThreatReportRecipientEmail
 }, releaseWatcher);
 const threatReportErasureTimer = startThreatReportErasure({ repository: threatReportRepository }, releaseWatcher);
 const privateErasure = new PrivateRunErasureCoordinator(
@@ -1818,6 +1831,7 @@ const supportSweepTimer = gatedInterval(releaseWatcher, () => {
 api.addHook("onClose", async () => clearInterval(supportSweepTimer));
 api.addHook("onClose",async () => clearInterval(erasureReconcileTimer));
 api.addHook("onClose",async () => clearInterval(threatReportAlertsTimer));
+api.addHook("onClose",async () => clearInterval(teamLimitNoticesTimer));
 api.addHook("onClose",async () => clearInterval(threatReportErasureTimer));
 api.addHook("onClose",async () => clearInterval(synthesisCheckTimer));
 api.addHook("onClose",async () => { if (dataExportTimer !== undefined) clearInterval(dataExportTimer); });

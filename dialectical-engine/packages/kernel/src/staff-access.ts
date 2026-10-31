@@ -7,7 +7,13 @@ export type DelegatedStaffCapability = "TEAM_READ" | "AUDIT_READ" | "EMERGENCY_D
 export type StaffAction =
   | "TEAM_INVITE" | "INVITATION_ACCEPT" | "TEAM_GRANT" | "TEAM_DISABLE" | "EMERGENCY_DISABLE"
   | "CREDENTIAL_REGISTER" | "CREDENTIAL_REVOKE" | "ALLOWANCE_CONFIGURE" | "ALLOWANCE_REVOKE"
-  | "PUBLICATION_REVIEW_APPROVE" | "PUBLICATION_REVIEW_REFUSE" | "THREAT_REPORT_REPORTED" | "THREAT_REPORT_NOT_REPORTED";
+  | "PUBLICATION_REVIEW_APPROVE" | "PUBLICATION_REVIEW_REFUSE" | "THREAT_REPORT_REPORTED" | "THREAT_REPORT_NOT_REPORTED"
+  | "TEAM_LIMIT_SET" | "TEAM_LIMIT_PARTNER_GRANT" | "TEAM_LIMIT_PARTNER_REVOKE" | "TEAM_PRACTICE_RECORD";
+/**
+ * Plan 2026-10-31-r22-owner-changes decision 24: the authority over the team's limit. On purpose no StaffCapability: it is in no
+ * capability list, no invite or grant reaches it, and the database answers it from the Owner designation and the one partner row (0142).
+ */
+export type TeamLimitAuthority = "TEAM_LIMIT_SET";
 export type Reason = Readonly<{
   code: "TEAM_ONBOARDING" | "GRANT_CHANGE" | "OFFBOARDING" | "SECURITY_RESPONSE" | "KEY_MAINTENANCE" | "FUNDING_APPROVAL";
   ticketRef?: string;
