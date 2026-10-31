@@ -47,7 +47,7 @@ import { replayingGateway, type ReplayBook } from "./run-replay.js";
 export type PathClimbText = Readonly<{ line: string; summary: string | null; fate: StoryFate }>;
 
 /** How much of a text's words must differ for a rewrite to count as a real change (a rewording of a word or two does not). */
-export const PATH_TEXT_CHANGE_SHARE = 0.2;
+const PATH_TEXT_CHANGE_SHARE = 0.2;
 
 const WORD_SEGMENTER = new Intl.Segmenter("und", { granularity: "word" });
 function wordsOf(text: string): readonly string[] {

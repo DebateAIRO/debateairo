@@ -34,7 +34,7 @@ describe("S04 production composition", () => {
     expect(readFileSync("apps/api/src/question-check/compose.ts", "utf8")).not.toMatch(/keeper|\.keep\(/u);
     expect(readFileSync("apps/api/src/question-check/ask-gate.ts", "utf8")).not.toMatch(/keep\(/u);
     const askRoute = readFileSync("apps/api/src/index.ts", "utf8");
-    const at = askRoute.indexOf("options.questionCheck.check(ask.question_line)");
+    const at = askRoute.indexOf("options.questionCheck.check(questionWithPurposeLines(ask.question_line, ask.purpose_lines))");
     expect(at).toBeGreaterThan(0);
     expect(askRoute.slice(at, at + 1_500)).not.toMatch(/\.keep\(/u);
   });
