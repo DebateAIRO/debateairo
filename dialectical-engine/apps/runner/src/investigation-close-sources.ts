@@ -395,6 +395,13 @@ export function composeInvestigationClose(input: Readonly<{
     replayBookOf: (rootRunId: string, subject: string) => readReplayBook(pool, rootRunId, subject),
     ...(input.payerOf === undefined ? {} : { payerOf: input.payerOf }),
     ...(input.onReportSettled === undefined ? {} : { onReportSettled: input.onReportSettled }),
+    climbsOpen: async (rootRunId: string) => {
+      const tree = new PostgresTreeUpdateRunnerRepository(pool);
+      const members = (await new PostgresInvestigationRunnerRepository(pool).ofRun(rootRunId))?.members ?? [];
+      let open = 0;
+      for (const member of members) open += ((await tree.readLine(member.run_id)) ?? []).filter((entry) => entry.source === "PATH_UPDATE" && entry.state === "WRITING").length;
+      return open;
+    },
     log: input.log
   });
 }

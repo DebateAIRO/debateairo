@@ -285,6 +285,24 @@ export const INVESTIGATION_REPORT_THINKING_STEPS = Object.freeze({
   ANSWER: "answer_writer", ANSWER_CHECK: "answer_checker", STORY: "story_writer", STORY_CHECK: "story_checker"
 } as const);
 
+/**
+ * R22 decisions 3 and 4: the automatic main-answer update runs `writeOverallAnswer`, the report's own answer step (never a copy of its
+ * prompts); its sites are its own only so the gateway charges them as ANSWER_UPDATE on the triggering dig's run, never walled.
+ */
+export const ANSWER_UPDATE_CALL_SITE = /^ANSWER_UPDATE:(ANSWER|ANSWER_CHECK):([1-4])$/u;
+export const ANSWER_UPDATE_CALL_SITE_PREFIX = "ANSWER_UPDATE:" as const;
+
+/** The role an answer-update call site carries, or null for any other key. */
+export function answerUpdateCallSiteRole(callSiteKey: string): "SYNTHESIZER" | "EVALUATOR" | null {
+  const site = ANSWER_UPDATE_CALL_SITE.exec(callSiteKey);
+  return site === null ? null : REPORT_SITE_ROLES[site[1] as ReportSite];
+}
+
+/** The answer update's call site for a report site and round. */
+export function answerUpdateCallSiteKey(site: ReportSite, round: number): string {
+  return investigationReportCallSiteKey(site, round).replace(INVESTIGATION_REPORT_CALL_SITE_PREFIX, ANSWER_UPDATE_CALL_SITE_PREFIX);
+}
+
 export function investigationReportCallSiteKey(site: ReportSite, round: number): string {
   if (!Number.isInteger(round) || round < 1 || round > INVESTIGATION_REPORT_LAST_ROUND) {
     throw new TypedDomainError("INVESTIGATION_REPORT_ROUND_INVALID", "A report round is 1 to 4");

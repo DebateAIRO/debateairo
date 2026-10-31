@@ -201,6 +201,7 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // The final report over an investigation (0136, R22 W5-1): each written version is opened under the investigation's
       // ROOT run key inside withRunContentLease (prepareLeasedContentEncryptionForRuns); a root erased meanwhile reads null.
       "apps/api/src/investigation-report.ts",
+    "apps/api/src/purpose-lines.ts",
       "apps/evaluator-worker/src/index.ts",
       // The path rewrite switched on (dig-model revision W3-7): the composition seals each rewrite's text under the dig's
       // run key inside withRunContentLease; the sources open the parent's story, its nodes, the base rewrite and the
@@ -212,6 +213,7 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // R22 decision 9: what the whole debate already investigated, for a dig's planners and its suggestions: each debate's story,
       // rewrite and web notes opened under its own run's key, inside withRunContentLease or through prepareLeasedContentEncryptionForRun.
       "apps/runner/src/investigation-digest.ts",
+      "apps/runner/src/path-climb-sources.ts",
       "apps/runner/src/path-rewrite-composition.ts",
       "apps/runner/src/path-rewrite-sources.ts",
       // Reclaim resume (spec 2026-10-14): the replay book reads the run's recorded prompts and replies through
@@ -286,6 +288,9 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // Dig-model revision W3-5: the path rewrite sends each writer and checker call through the member gateway the
       // settled run's snapshot hands it (the run-required, leased gateway, or the replay book over it), inside the step
       // lease the runner's post-settle hook gives, naming the dig's run. Its text is sealed through the composition's seal.
+      // R22 decisions 2 and 3: the climb and the answer update send their calls as the rewrite does, naming the dig's run; they read no
+      // content themselves: their sources and seals open and seal under the lease.
+      "apps/runner/src/path-climb.ts",
       "apps/runner/src/path-rewrite.ts",
       // L4-F9 repair: the keep-alive hands each runner call, unchanged, to the
       // gateway it wraps (the run-required, leased gateway), or refuses it before

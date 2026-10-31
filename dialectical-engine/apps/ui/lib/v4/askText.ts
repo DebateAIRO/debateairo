@@ -1,4 +1,4 @@
-import { askQuestionMaxBytes } from "@debateai/contract";
+import { WEB_CONTRACT_LIMITS, askQuestionMaxBytes, type PurposeLines } from "@debateai/contract";
 import { catalogLocale, isLocale } from "../i18n/locales.js";
 import { t, type MessageCatalog } from "../i18n/translate.js";
 import type { DigTarget, GoalHorizon, GoalPlace, GoalPurpose, OpenQuestionKind, V4DigPick, V4Goal } from "./types.js";
@@ -104,6 +104,23 @@ function goalSentences(goal: V4Goal, catalog: MessageCatalog): readonly string[]
   // ASK-6: the template ends the sentence itself, so one closing mark the person typed is not doubled ("waste..").
   if (angles.length > 0) sentences.push(t(catalog, "v4.askText.angles", { list: angles.join("; ").replace(/[.!?。]$/u, "") }));
   return sentences;
+}
+
+/**
+ * Decision 5 of 31 Oct: a goal's place, time and purpose as the ask's structured `purpose_lines`, whatever the page's language: the debate
+ * stores them encrypted and every rewrite, answer update and report reads them. Undefined when none is set (a line is at most the contract's
+ * length). What matters and the angles stay in the question.
+ */
+export function purposeLinesOfGoal(goal: V4Goal, catalog: MessageCatalog): PurposeLines | undefined {
+  const typedPlace = goal.place === "OTHER" ? oneLine(goal.placeOther) : "";
+  const place = goal.place === "OTHER" ? (typedPlace.length > 0 ? t(catalog, "v4.askText.place.OTHER", { place: typedPlace }) : null)
+    : goal.place === null ? null : t(catalog, PLACE_KEYS[goal.place]);
+  const time = goal.horizon === null ? null : t(catalog, HORIZON_KEYS[goal.horizon]);
+  const purpose = goal.purpose === null ? null : t(catalog, PURPOSE_KEYS[goal.purpose]);
+  if (place === null && time === null && purpose === null) return undefined;
+  const line = (text: string): string => text.slice(0, WEB_CONTRACT_LIMITS.purposeLineMaxChars);
+  return Object.freeze({ ...(place === null ? {} : { place: line(place) }), ...(time === null ? {} : { time: line(time) }),
+    ...(purpose === null ? {} : { purpose: line(purpose) }) });
 }
 
 /** ASK-1: the English sentences go only with an English page (all 35 locales load the English v4 file tonight). */

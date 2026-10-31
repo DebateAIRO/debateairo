@@ -22,6 +22,7 @@ import { digFor, digsUnder, openCount, pathTitle, resolveSelection, selectionIdO
 import { V4Outline } from "@/components/v4/V4Outline";
 import { V4Panel } from "@/components/v4/V4Panel";
 import { V4ChangedSince } from "@/components/v4/V4PathRewrite";
+import { V4MainAnswer } from "@/components/v4/V4MainAnswer";
 import { V4Rail, type V4DigCounts } from "@/components/v4/V4Rail";
 import { isNotFound } from "@/lib/api";
 import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
@@ -1320,6 +1321,7 @@ function V4Debate({
           {map.dig !== null && map.dig !== undefined ? (
             <V4LevelTrail level={map.dig.level} trail={trail} linkLevel={chosenLevel} catalog={catalog} />
           ) : null}
+          <V4MainAnswer mainAnswer={served?.answer.main_answer} catalog={catalog} locale={locale} />
           <V4ChangedSince changedSince={map.changedSince} reportHref={reportHref} catalog={catalog} locale={locale} />
           {showChanges ? (
             <V4ChangesBar

@@ -295,7 +295,10 @@ import type { RunnerRetirementSignal, TaskExecutionCounter } from "./runner-reti
 import { EMPTY_REPLAY_BOOK, readReplayBook, replayingGateway, type ReplayBook } from "./run-replay.js";
 import { isMonthPausedStop, RUN_MONTH_PAUSED } from "./month-pause.js";
 import type { RunInFlight } from "./run-in-flight.js";
-import { PATH_REWRITE_CALL_SITE_PREFIX, isPathRewriteCallSite, pathRewriteCallSiteRole } from "./path-rewrite-scope.js";
+import {
+  ANSWER_UPDATE_CALL_SITE_PREFIX, PATH_CLIMB_CALL_SITE_PREFIX, PATH_REWRITE_CALL_SITE_PREFIX, answerUpdateCallSiteRole, isPathRewriteCallSite,
+  pathClimbCallSiteRole, pathRewriteCallSiteRole
+} from "./path-rewrite-scope.js";
 import { INVESTIGATION_REPORT_CALL_SITE_PREFIX, investigationReportCallSiteRole } from "@debateai/story";
 // Side-by-side spec §13 (S6): the per-version settings types (type-only: run-settings.ts imports this module) and the one
 // debate-member mapping, from its own module so this one never loads the loader.
@@ -13526,6 +13529,9 @@ function storyCallSiteRole(callSiteKey: string): ProviderCallRequest["role"] | n
   // W5-1: the final report's four sites (packages/story INVESTIGATION_REPORT_CALL_SITE), each with its one role.
   const report = investigationReportCallSiteRole(callSiteKey);
   if (report !== null) return report;
+  // R22 decisions 2 and 3: the climb's two sites and the main-answer update's two, each with its one role.
+  const climbed = pathClimbCallSiteRole(callSiteKey) ?? answerUpdateCallSiteRole(callSiteKey);
+  if (climbed !== null) return climbed;
   const site = STORY_CALL_SITE.exec(callSiteKey);
   if (site === null) return null;
   return site[1] === "STORYTELLER" ? "SYNTHESIZER" : "EVALUATOR";
@@ -13541,7 +13547,8 @@ export function storyCallScopeAgrees(request: Pick<ProviderCallRequest, "lane" |
   const key = structureRepairOriginalKey(request.callSiteKey);
   const storyScope = request.lane === "story";
   const storyKey = key.startsWith(STORY_CALL_SITE_PREFIX) || key.startsWith(PATH_REWRITE_CALL_SITE_PREFIX)
-    || key.startsWith(INVESTIGATION_REPORT_CALL_SITE_PREFIX);
+    || key.startsWith(INVESTIGATION_REPORT_CALL_SITE_PREFIX) || key.startsWith(PATH_CLIMB_CALL_SITE_PREFIX)
+    || key.startsWith(ANSWER_UPDATE_CALL_SITE_PREFIX);
   return !((storyScope || storyKey) && (!storyScope || storyCallSiteRole(key) !== request.role));
 }
 
@@ -13644,6 +13651,10 @@ export function createPostgresProviderGateway(
       readonly buildPathRewriteCostEnvelopeSeam?: (runId: string) => InFlightReleasingSeam;
       /** W5-1: the final report (story lane, `INVESTIGATION_REPORT:` sites, the root run) spends its own never-walled seam. */
       readonly buildInvestigationReportCostEnvelopeSeam?: (runId: string) => InFlightReleasingSeam;
+      /** R22 decision 2: the climb (story lane, `PATH_CLIMB:` sites, the run of the dig that started it) spends its own never-walled seam. */
+      readonly buildPathClimbCostEnvelopeSeam?: (runId: string) => InFlightReleasingSeam;
+      /** R22 decision 3: the main-answer update (story lane, `ANSWER_UPDATE:` sites, the triggering dig's run) spends its own never-walled seam. */
+      readonly buildAnswerUpdateCostEnvelopeSeam?: (runId: string) => InFlightReleasingSeam;
       /**
        * Parallel AI calls (spec 2026-10-12 §3.5): this process's calls in
        * flight, for the run-wide attempt ceiling. A call bounded by that ceiling
@@ -13656,7 +13667,8 @@ export function createPostgresProviderGateway(
     }
 ): ProviderGateway {
   const { buildCostEnvelopeSeam, ...gatewayOptions } = options;
-  const { buildStoryCostEnvelopeSeam, buildPathRewriteCostEnvelopeSeam, buildInvestigationReportCostEnvelopeSeam, inFlight,
+  const { buildStoryCostEnvelopeSeam, buildPathRewriteCostEnvelopeSeam, buildInvestigationReportCostEnvelopeSeam,
+    buildPathClimbCostEnvelopeSeam, buildAnswerUpdateCostEnvelopeSeam, inFlight,
     ...httpOptions } = gatewayOptions;
   const ledger = new LedgerRepository(pool);
   const budget = new BudgetRepository(pool);
@@ -13706,7 +13718,10 @@ export function createPostgresProviderGateway(
       const pathRewrite = storyScope && isPathRewriteCallSite(structureRepairOriginalKey(request.callSiteKey));
       // W5-1: the final report's sites spend the report seam (never walled), on the investigation's root run.
       const reportCall = storyScope && investigationReportCallSiteRole(structureRepairOriginalKey(request.callSiteKey)) !== null;
-      const storyLaneSeam = reportCall ? buildInvestigationReportCostEnvelopeSeam
+      const climbCall = storyScope && pathClimbCallSiteRole(structureRepairOriginalKey(request.callSiteKey)) !== null;
+      const answerUpdateCall = storyScope && answerUpdateCallSiteRole(structureRepairOriginalKey(request.callSiteKey)) !== null;
+      const storyLaneSeam = answerUpdateCall ? buildAnswerUpdateCostEnvelopeSeam : climbCall ? buildPathClimbCostEnvelopeSeam
+        : reportCall ? buildInvestigationReportCostEnvelopeSeam
         : pathRewrite ? buildPathRewriteCostEnvelopeSeam : buildStoryCostEnvelopeSeam;
       if (storyScope && storyLaneSeam === undefined
         && buildCostEnvelopeSeam !== undefined) {

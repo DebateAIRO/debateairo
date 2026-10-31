@@ -31,6 +31,7 @@ import type { ProfileSession } from "@debateai/db";
 import { runInRequestScope, setRequestCredential } from "@debateai/db";
 import { normalizeManualPhone } from "./phone-profile.js";
 import { answerForOutcome, type AskQuestionCheck } from "./question-check/ask-gate.js";
+import { questionWithPurposeLines, recordPurposeLinesAtAsk, type PurposeLinesPort } from "./purpose-lines.js";
 import { resolveSourceMailLocale } from "./mail-locale.js";
 import { exhaustive, type FundingBasis } from "@debateai/kernel";
 import { AsyncResource } from "node:async_hooks";
@@ -1892,6 +1893,8 @@ export interface ApiOptions {
   readonly investigations?: DigJoinPort;
   /** W3-7 (0135): once a dig joined, what it was made of is kept for its path rewrite (`PostgresDigPicksRepository`). */
   readonly digPicks?: DigPicksPort;
+  /** Decision 5 of 31 Oct (0138): a debate's place, time and purpose lines, sealed under its run key at the ask. */
+  readonly purposeLines?: PurposeLinesPort;
   /** W3-7: a parent's stored dig suggestion, to tell an AI suggestion from the person's edit (W4-3's store; absent: none). */
   readonly digSuggestionText?: DigSuggestionTextReader;
   /** W3-2: whether a person's month has room again after a month pause (the ask room's `monthHasRoom`). */
@@ -4058,7 +4061,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (options.questionCheck === undefined) {
       return reply.status(503).send({ error: "QUESTION_CHECK_UNAVAILABLE", message: "QUESTION_CHECK_UNAVAILABLE" });
     }
-    const outcome = await options.questionCheck.check(ask.question_line);
+    // Decision 5 of 31 Oct: place, time and purpose lines the question does not already say are checked with it.
+    const outcome = await options.questionCheck.check(questionWithPurposeLines(ask.question_line, ask.purpose_lines));
     const answer = answerForOutcome(outcome, edgeCountry(request.headers));
     if (answer !== null) return reply.status(answer.status).send(answer.body);
     const accepted = AskAcceptedSchema.parse(await options.application.submit(
@@ -4080,6 +4084,11 @@ export function buildApi(options: ApiOptions): FastifyInstance {
           options.digPicks, options.digSuggestionText ?? digSuggestionTextFromAnswer((parentRunId) =>
             options.application.readRunAnswer(parentRunId, request.session, ownershipFor(request))));
       }
+    }
+    // Decision 5 of 31 Oct: a new debate's place, time and purpose lines, stored encrypted at the ask. A dig reads its first debate's.
+    if (ask.purpose_lines !== undefined && ask.parent === undefined && ask.public_parent === undefined
+      && digOwner !== undefined && options.purposeLines !== undefined) {
+      await recordPurposeLinesAtAsk({ ownerRef: digOwner, runId: accepted.run_ref, lines: ask.purpose_lines }, options.purposeLines);
     }
     return reply.status(202).send(accepted);
   });

@@ -162,11 +162,25 @@ export const PATH_REWRITE_CALL_SITE = /^PATH_REWRITE:(WRITER|CHECKER):([1-4])$/u
 export const PATH_REWRITE_LAST_ROUND = 4 as const;
 const PATH_REWRITE_SITE_ROLES = Object.freeze({ WRITER: "SYNTHESIZER", CHECKER: "EVALUATOR" } as const);
 
-export function pathRewriteCallSiteKey(site: PathRewriteSite, round: number): string {
+/**
+ * R22 decision 2: the climb's calls are the same writer and checker on the same prompts, a path above rewritten because a path below
+ * really changed. Their own sites only so the gateway charges them as PATH_CLIMB (never walled), on the run of the dig that started it.
+ */
+export const PATH_CLIMB_CALL_SITE = /^PATH_CLIMB:(WRITER|CHECKER):([1-4])$/u;
+export const PATH_CLIMB_CALL_SITE_PREFIX = "PATH_CLIMB:" as const;
+export type PathRewriteSiteFamily = "PATH_REWRITE" | "PATH_CLIMB";
+
+export function pathRewriteCallSiteKey(site: PathRewriteSite, round: number, family: PathRewriteSiteFamily = "PATH_REWRITE"): string {
   if (!Number.isInteger(round) || round < 1 || round > PATH_REWRITE_LAST_ROUND) {
     throw new TypedDomainError("PATH_REWRITE_ROUND_INVALID", `A rewrite round is 1 to ${String(PATH_REWRITE_LAST_ROUND)}`);
   }
-  return `PATH_REWRITE:${site}:${String(round)}`;
+  return `${family}:${site}:${String(round)}`;
+}
+
+/** The role a climb call site carries, or null for any other key. */
+export function pathClimbCallSiteRole(callSiteKey: string): "SYNTHESIZER" | "EVALUATOR" | null {
+  const site = PATH_CLIMB_CALL_SITE.exec(callSiteKey);
+  return site === null ? null : PATH_REWRITE_SITE_ROLES[site[1] as PathRewriteSite];
 }
 
 /**
@@ -350,6 +364,8 @@ export type PathRewriteRunCall = Readonly<{
   contractHash: string;
   /** 2 on a paid plan, 1 on Free (Q-D14). */
   maxRounds: number;
+  /** Which sites the calls name (who is charged what); absent: a dig's own rewrite. */
+  family?: PathRewriteSiteFamily;
   writer: StoryRoleMaker;
   checker: StoryRoleMaker;
   backupCandidates: readonly StoryBackupCandidate[];
@@ -393,7 +409,7 @@ function rewriteRequest(call: PathRewriteRunCall, input: Readonly<{
   return Object.freeze({
     runId: call.runId,
     subjectItemId: call.subjectItemId,
-    callSiteKey: pathRewriteCallSiteKey(input.site, input.round),
+    callSiteKey: pathRewriteCallSiteKey(input.site, input.round, call.family),
     role: PATH_REWRITE_SITE_ROLES[input.site],
     lane: "story" as const,
     preferredResponseFormat: "json_object" as const,

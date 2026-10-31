@@ -14,6 +14,7 @@ import { composePathRewrite } from "./path-rewrite-composition.js";
 import { composeInvestigationClose } from "./investigation-close-sources.js";
 import { startInvestigationCloseSweep } from "./investigation-close.js";
 import { startPathRewriteSweep } from "./path-rewrite-sweep.js";
+import { startTreeSweep } from "./path-climb.js";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
 import { releaseTaskName, TypedDomainError } from "@debateai/kernel";
 import {
@@ -274,7 +275,10 @@ function targetGateway(target: (typeof providerTargets)[number]): ProviderGatewa
       // W3-2: a dig's path rewrite (the story lane's PATH_REWRITE: sites) spends its own seam, never walled.
       buildPathRewriteCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).pathRewriteSeam({ runId, price, requireReportedUsage: true }),
       // W5-1: "Write my report"'s calls (the INVESTIGATION_REPORT: sites, the root run) spend the report seam, never walled.
-      buildInvestigationReportCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).investigationReportSeam({ runId, price, requireReportedUsage: true })
+      buildInvestigationReportCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).investigationReportSeam({ runId, price, requireReportedUsage: true }),
+      // R22 decisions 2 and 3: the climb's and the main-answer update's calls, each on its own never-walled seam, on the dig's run.
+      buildPathClimbCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).pathClimbSeam({ runId, price, requireReportedUsage: true }),
+      buildAnswerUpdateCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).answerUpdateSeam({ runId, price, requireReportedUsage: true })
     })
   });
   // Spec §3.4: the policy marks the gate unhealthy on its FIRST unsent refusal, before the minute's resend wait.
@@ -590,6 +594,9 @@ const pathRewriteSweep = pathRewrite === undefined || retireRequestStanding ? nu
   : startPathRewriteSweep({ ...pathRewrite.sweep, paused: () => retirementSignal.claimsStopped() });
 // W5-1: an unreported closing ("Write my report" pressed) is written at boot and every minute, once its running digs and
 // their rewrites have settled (owner F7 A); none while this release retires.
+// R22 decisions 2 and 3: a climb or an answer update whose runner stopped goes on from the rows already there.
+const treeSweep = pathRewrite === undefined || retireRequestStanding ? null
+  : startTreeSweep({ ...pathRewrite.treeSweep, paused: () => retirementSignal.claimsStopped() });
 const investigationCloseSweep = investigationClose === undefined || retireRequestStanding ? null
   : startInvestigationCloseSweep({ ...investigationClose, paused: () => retirementSignal.claimsStopped() });
 announceRunnerReady({
@@ -640,6 +647,7 @@ const retirement = startRunnerRetirement({
   stopWorker: async () => {
     lapsedResend.stop();
     pathRewriteSweep?.stop();
+    treeSweep?.stop();
     investigationCloseSweep?.stop();
     await worker.stop();
     await Promise.allSettled([pool.end(), keepAlivePool.end()]);
@@ -652,5 +660,6 @@ await started;
 // The worker ended (retired, or stopped by a signal): no further re-send pass, rewrite sweep or retirement read.
 lapsedResend.stop();
 pathRewriteSweep?.stop();
+treeSweep?.stop();
 investigationCloseSweep?.stop();
 retirement.stop();

@@ -11,7 +11,7 @@ import { V4Header } from "@/components/v4/V4Header";
 import { contractClient } from "@/lib/api";
 import { catalogLocale, isLocale } from "@/lib/i18n/locales";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
-import { composeQuestion, FREE_GOAL_CHOICES_MAX, goalChoiceCount, goalWithinPlan, ownWords } from "@/lib/v4/askText";
+import { composeQuestion, FREE_GOAL_CHOICES_MAX, goalChoiceCount, goalWithinPlan, ownWords, purposeLinesOfGoal } from "@/lib/v4/askText";
 import { startShareLine, startsWaitLine, type MoneyLine } from "@/lib/v4/money";
 import { levelHref, useReadingLevel } from "@/lib/v4/storage";
 import {
@@ -179,7 +179,8 @@ function V4AskForm({
     readingLevel: level
   });
 
-  // ASK-1: the D2 choices are added as English sentences, so they are offered only on English pages for now.
+  // ASK-1: "what matters" and the angles are added as English sentences, so they are offered only on English pages for now. Decision 5 of
+  // 31 Oct: the place, the time and the purpose go as their own field, so they are offered on every page.
   const choicesOffered = isLocale(locale) && catalogLocale(locale) === "en";
   // Owner 2026-10-29 (Free plan shape): a Free ask carries at most FREE_GOAL_CHOICES_MAX choices; paid plans have no cap.
   // Once Free's cap is reached, only the choices already set can still be changed. What is sent never carries more.
@@ -235,7 +236,8 @@ function V4AskForm({
     setRefusal(null);
     setPressed(which);
     try {
-      const outcome = await ask.submit(questionLine, askMode, "ask");
+      // "Just answer it" sends the question alone; Start sends the choices too.
+      const outcome = await ask.submit(questionLine, askMode, "ask", null, which === "start" ? purposeLinesOfGoal(sentGoal, catalog) : undefined);
       switch (outcome.kind) {
         case "STARTED":
           router.push(levelHref(`/v4/debate/${encodeURIComponent(outcome.runId)}`, savedLevel ?? draftLevel));
@@ -404,8 +406,7 @@ function V4AskForm({
               ) : null}
             </div>
 
-            {choicesOffered ? (
-              <>
+            <>
                 <h2 className="v4AskSubTitle">
                   {t(catalog, "v4.read.optionalTitle")} <span className="v4Muted v4AskOptional">{t(catalog, "v4.read.optionalNote")}</span>
                 </h2>
@@ -480,6 +481,8 @@ function V4AskForm({
                   </div>
                 </div>
 
+                {choicesOffered ? (
+                <>
                 <div className="v4AskBlock">
                   <label className="v4AskLabel" htmlFor={`${ids}-matters`}>{t(catalog, "v4.read.matters.label")}</label>
                   <input
@@ -538,10 +541,11 @@ function V4AskForm({
                     <p className="v4AskHint v4Muted">{t(catalog, "v4.read.angles.full")}</p>
                   ) : null}
                 </div>
-              </>
-            ) : (
-              <p className="v4AskHint v4Muted">{t(catalog, "v4.read.englishOnlyNote")}</p>
-            )}
+                </>
+                ) : (
+                  <p className="v4AskHint v4Muted">{t(catalog, "v4.read.englishOnlyNote")}</p>
+                )}
+            </>
 
             <div className="v4AskBlock">
               <span className="v4AskLabel" id={`${ids}-sent`}>{t(catalog, "v4.read.sentLabel")}</span>

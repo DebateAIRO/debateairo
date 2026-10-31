@@ -121,10 +121,10 @@ export function V4PointOfView(props: Readonly<{ view: PointOfViewVerdict; catalo
 }
 
 /** "What the dig changed": one to three plain sentences (AI text). */
-export function V4WhatChanged(props: Readonly<{ sentences: readonly string[]; catalog: MessageCatalog }>) {
+export function V4WhatChanged(props: Readonly<{ sentences: readonly string[]; catalog: MessageCatalog; below?: boolean }>) {
   return (
     <section className="v4RewriteChanged">
-      <h3 className="v4PanelH3">{t(props.catalog, "v4.rewrite.whatChanged")}</h3>
+      <h3 className="v4PanelH3">{t(props.catalog, props.below === true ? "v4.rewrite.whatChangedBelow" : "v4.rewrite.whatChanged")}</h3>
       <ul className="v4RewriteSentences" data-ai-generated="true">
         {props.sentences.map((sentence, index) => <li key={index}>{sentence}</li>)}
       </ul>
@@ -212,7 +212,7 @@ export function V4PathRewrite(props: Readonly<{
       {stateKey === undefined ? null : <p className="v4RewriteState" role="status">{t(catalog, stateKey)}</p>}
       {rewritten === null ? null : <p className="v4RewriteWhen v4Muted">{rewritten}</p>}
       {summary.length > 0 ? <p className="v4PanelText" data-ai-generated="true">{summary}</p> : null}
-      {latest !== null ? <V4WhatChanged sentences={latest.what_changed} catalog={catalog} /> : null}
+      {latest !== null ? <V4WhatChanged sentences={latest.what_changed} catalog={catalog} below={latest.cause === "CHILD_PATH"} /> : null}
       {latest !== null && latest.view !== null ? <V4PointOfView view={latest.view} catalog={catalog} /> : null}
       {earlier.length > 0 ? (
         <div className="v4RewriteEarlier">

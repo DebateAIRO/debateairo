@@ -15,8 +15,7 @@ vi.mock("@/lib/v4/accountMemory", async (original) => (await import("./v4-debate
 vi.mock("@/lib/v4/money", async (original) => (await import("./v4-debate-harness.js")).moneyMock(await original()));
 
 /*
- * Dig model revision W4-6 (draft 5.5, "The top of the map"; owner Q-D11): a dig never rewrites the main answer, so the top
- * of the map says how many paths digs changed since the answer was written, with "Write my report"; after a report, how
+ * Dig model revision W4-6 (draft 5.5, "The top of the map"; owner Q-D11): the top of the map says how many paths digs changed since the answer was written, with "Write my report"; after a report, how
  * many changed since that report (its version), and nothing when none did. A later rewrite brings the line back, read
  * while the page is open.
  */

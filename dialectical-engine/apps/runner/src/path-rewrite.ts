@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { DIG_LEVEL_MAX, type MakerLineage, type StoryFate } from "@debateai/contract";
-import type { PathRewriteRecord, PostgresDigModelRunnerRepository, RewriteTurnRead, WebSealed } from "@debateai/db";
+import type { PathLineBaseKind, PathLineEntry, PathRewriteRecord, PostgresDigModelRunnerRepository, PostgresTreeUpdateRunnerRepository,
+  RewriteTurnRead, WebSealed } from "@debateai/db";
 import { TypedDomainError, replyLanguageCheckFor } from "@debateai/kernel";
 import type { ProviderCallRequest, ProviderCallResult } from "@debateai/providers";
 import { PATH_REWRITE_POLICY } from "@debateai/register";
@@ -32,7 +33,9 @@ import { replayingGateway, type ReplayBook } from "./run-replay.js";
  *     and the path keeps its text; otherwise later digs of the path would wait for ever. A turn whose store cannot be read
  *     or written at all is left to the sweep (path-rewrite-sweep.ts, W3-7), which writes it once the store answers.
  *  5. W4-3: between a written rewrite and its row, the AI's suggestions for the dig's own paths (`suggest`; none on Free, none
- *     at level 10), sealed with the row; then the `afterRewrite` hook.
+ *     at level 10), sealed with the row; then the `afterRewrite` hook;
+ *  6. R22 decisions 2 and 3: when the rewrite really changed the path, the path above is rewritten too and, at the first debate, the
+ *     main answer (`afterStored`, path-climb.ts). With the tree's settings the turn in 1 and 2 is held to the path's whole line (0138).
  *
  * W3-7: before it takes its turn, the dig's own paths are stored (0135's identity.path_rewrite_input, `recordInput`), so
  * a rewrite whose runner stopped is built again by the sweep from the store alone, byte for byte, its answered calls
@@ -67,8 +70,11 @@ export type PathRewriteDig = Readonly<{
 export type PathRewriteSources = Readonly<{
   /** The settled run as a dig, or null when it is none (a first debate: it gets its story). */
   digOf: (runId: string) => Promise<PathRewriteDig | null>;
-  /** The parent path on `baseRewriteId` (the newest checked rewrite before the dig's turn; null: the story's line). */
-  parentPathOf: (input: Readonly<{ parentRunId: string; positionRef: string; baseRewriteId: string | null }>) => Promise<PathRewriteParentPath>;
+  /**
+   * The parent path on `baseRewriteId` (the newest checked rewrite before the dig's turn) or `baseUpdateId` (R22: the climb's row that
+   * is the path's newest text); both null: the story's line, or a dig's path as that dig's rewrite wrote it.
+   */
+  parentPathOf: (input: Readonly<{ parentRunId: string; positionRef: string; baseRewriteId: string | null; baseUpdateId?: string | null }>) => Promise<PathRewriteParentPath>;
   /** The second AI's reviews of the dig's points (the story's enrichment reader). */
   readEnrichment: (input: Readonly<{ runId: string; nodes: readonly Readonly<{ nodeId: string; judgeArtifactRef: string | null }>[] }>)
     => Promise<ReadonlyMap<string, Pick<StoryNodeEnrichment, "reviewOutcome">>>;
@@ -108,6 +114,28 @@ export function createPathRewriteInFlight(): PathRewriteInFlight {
 }
 
 export type PathRewriteTurns = Pick<PostgresDigModelRunnerRepository, "takeRewriteTurn" | "readRewriteTurn" | "recordRewrite">;
+
+/** R22 decision 2 (0138): a path's one line across a dig's own rewrite and the climb's rows. */
+export type PathRewriteLine = Pick<PostgresTreeUpdateRunnerRepository, "readLine" | "recordRewriteInLine">;
+export type PathLineBase = Readonly<{ kind: PathLineBaseKind; id: string }>;
+
+/**
+ * Where one turn stands in its path's line, from the line as 0138 lists it (each path's turns in order): how many earlier turns hold it,
+ * and the path's text it writes on (the newest finished, visible one before it), the rule identity.path_line_front keeps. Null: it is not listed.
+ */
+export function pathLineFrontOf(entries: readonly PathLineEntry[], positionRef: string, isOwn: (entry: PathLineEntry) => boolean):
+  Readonly<{ waiting: number; base: PathLineBase | null }> | null {
+  const path = entries.filter((entry) => entry.position_ref === positionRef);
+  const own = path.findIndex(isOwn);
+  if (own < 0) return null;
+  const before = path.slice(0, own);
+  const newest = before.filter((entry) => (entry.state === "READY" || entry.state === "READY_WITH_RESERVATION") && !entry.held && !entry.hidden
+    && entry.entry_id !== null).at(-1);
+  return Object.freeze({
+    waiting: before.filter((entry) => entry.state === "WRITING" || entry.held).length,
+    base: newest === undefined ? null : Object.freeze({ kind: newest.source, id: newest.entry_id! })
+  });
+}
 
 /** The rewrite's text, as it is sealed (refs already turned back into ids; never a ref, never a score). */
 export type PathRewriteContent = Readonly<{
@@ -149,6 +177,10 @@ export type PathRewriteRunnerSettings = Readonly<{
   /** engineContractHash(): absent, the code's own. */
   contractHash?: string;
   log?: (event: string, detail: Record<string, unknown>) => void;
+  /** R22 decision 2: the path's whole line (absent: 0134's rows alone, a runner without the tree's settings). */
+  line?: PathRewriteLine;
+  /** R22 decisions 2 and 3: once the dig's row is stored, the climb and the main answer (path-climb.ts). Never rejects. */
+  afterStored?: (digRunId: string, lease: StepLease) => Promise<unknown>;
   /**
    * Asked once the dig's row is stored and the dig is above level 10 (DIG_LEVEL_MAX): a dig there cannot be dug further.
    */
@@ -258,7 +290,7 @@ function safeLog(settings: PathRewriteRunnerSettings): (event: string, detail: R
 }
 
 type Log = (event: string, detail: Record<string, unknown>) => void;
-type StepLease = <T>(use: () => Promise<T>) => Promise<T>;
+export type StepLease = <T>(use: () => Promise<T>) => Promise<T>;
 
 /**
  * One rewrite to write: the dig's turn on its parent's path, with what its material is built from. `dig` and `digPaths`
@@ -274,8 +306,9 @@ export type PathRewriteJob = Readonly<{
   failureCode: string | null;
 }>;
 
-/** Waits until the dig's turn is at the front (or done); null when it took none or waited past the bound. */
-async function frontTurn(settings: PathRewriteRunnerSettings, digRunId: string, log: Log): Promise<RewriteTurnRead | null> {
+/** Waits until the dig's turn is at the front of the whole line (or done); null when it took none or waited past the bound. */
+async function frontTurn(settings: PathRewriteRunnerSettings, digRunId: string, log: Log):
+  Promise<Readonly<{ turn: RewriteTurnRead; lineBase: PathLineBase | null | undefined }> | null> {
   const wait = settings.wait ?? DEFAULT_WAIT;
   const sleep = settings.wait?.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const started = Date.now();
@@ -285,10 +318,16 @@ async function frontTurn(settings: PathRewriteRunnerSettings, digRunId: string, 
       log("PATH_REWRITE_NO_TURN", { runId: digRunId });
       return null;
     }
-    if (turn.state !== "WAITING") return turn;
+    // R22: 0134's front is its own rows' only; a climb's row earlier on the path holds the turn too, and may be the text it writes on.
+    const line = settings.line === undefined || turn.state !== "FRONT" ? undefined : await settings.line.readLine(turn.parent_run_id);
+    const front = line === undefined || line === null ? null : pathLineFrontOf(line, turn.position_ref,
+      (entry) => entry.source === "PATH_REWRITE" && entry.run_id.toLowerCase() === digRunId.toLowerCase());
+    if (turn.state !== "WAITING" && (front === null || front.waiting === 0)) {
+      return Object.freeze({ turn, lineBase: front === null ? undefined : front.base });
+    }
     if (waited >= wait.maxWaitMs || Date.now() - started >= wait.maxWaitMs) {
       // W3-7: the turn stays taken; the sweep writes it once it reaches the front (path-rewrite-sweep.ts).
-      log("PATH_REWRITE_LEFT_TO_SWEEP", { runId: digRunId, pathSeq: turn.path_seq, waitingFor: turn.waiting_for });
+      log("PATH_REWRITE_LEFT_TO_SWEEP", { runId: digRunId, pathSeq: turn.path_seq, waitingFor: front?.waiting ?? turn.waiting_for });
       return null;
     }
     await sleep(wait.pollMs);
@@ -299,12 +338,12 @@ async function frontTurn(settings: PathRewriteRunnerSettings, digRunId: string, 
  * The codes a FAILED row needs: the parent path's own when it reads (`tryText`: the dig's material was what failed), else
  * the clear columns' (`parentCodesOf`), else UNKNOWN_PARENT_CODES.
  */
-async function parentCodesFor(settings: PathRewriteRunnerSettings, job: PathRewriteJob, baseRewriteId: string | null, log: Log,
+async function parentCodesFor(settings: PathRewriteRunnerSettings, job: PathRewriteJob, baseRewriteId: string | null, baseUpdateId: string | null, log: Log,
   tryText: boolean): Promise<PathRewriteParentPath> {
   let codes: Readonly<{ answerVersion: number; fate: StoryFate }> = UNKNOWN_PARENT_CODES;
   if (tryText) {
     try {
-      const parent = await job.lease(() => settings.sources.parentPathOf({ parentRunId: job.parentRunId, positionRef: job.positionRef, baseRewriteId }));
+      const parent = await job.lease(() => settings.sources.parentPathOf({ parentRunId: job.parentRunId, positionRef: job.positionRef, baseRewriteId, baseUpdateId }));
       return Object.freeze({ ...parent, line: "", summary: null, points: [], extracts: [] });
     } catch (error) {
       log("PATH_REWRITE_PARENT_UNREAD", { runId: job.digRunId, code: codeOf(error) });
@@ -337,28 +376,33 @@ export async function rewriteThePath(settings: PathRewriteRunnerSettings, job: P
   const rewriteId = pathRewriteIdOf(digRunId);
   // A record that BASE_MOVED (an earlier rewrite landed on the path since the read) is written again on the new base.
   for (let tries = 0; tries < 3; tries += 1) {
-    const turn = await frontTurn(settings, digRunId, log);
-    if (turn === null) return;
+    const front = await frontTurn(settings, digRunId, log);
+    if (front === null) return;
+    const turn = front.turn;
     if (turn.state === "DONE") {
       log("PATH_REWRITE_ALREADY_STORED", { runId: digRunId });
       return;
     }
+    // 0134's own base names its newest row; the text is the whole line's newest, which may be a climb's (R22).
     const baseRewriteId = turn.base_rewrite_id;
+    const textRewriteId = front.lineBase === undefined ? baseRewriteId : front.lineBase?.kind === "PATH_REWRITE" ? front.lineBase.id : null;
+    const textUpdateId = front.lineBase?.kind === "PATH_UPDATE" ? front.lineBase.id : null;
     let record: PathRewriteRecord;
     if (job.dig === null || job.digPaths === null) {
-      record = failedRecord({ rewriteId, digRunId, parent: await parentCodesFor(settings, job, baseRewriteId, log, true), baseRewriteId,
+      record = failedRecord({ rewriteId, digRunId, parent: await parentCodesFor(settings, job, textRewriteId, textUpdateId, log, true), baseRewriteId,
         failureCode: job.failureCode ?? "PATH_REWRITE_DIG_UNREAD", written: null });
     } else {
       const dig = job.dig;
       let parent: PathRewriteParentPath | null = null;
       try {
-        parent = await job.lease(() => settings.sources.parentPathOf({ parentRunId: dig.parentRunId, positionRef: dig.positionRef, baseRewriteId }));
+        parent = await job.lease(() => settings.sources.parentPathOf({ parentRunId: dig.parentRunId, positionRef: dig.positionRef,
+          baseRewriteId: textRewriteId, baseUpdateId: textUpdateId }));
       } catch (error) {
         // W3-7: the path keeps its text, and the turn still ends with its row.
         log("PATH_REWRITE_PARENT_UNREAD", { runId: digRunId, code: codeOf(error) });
       }
       if (parent === null) {
-        record = failedRecord({ rewriteId, digRunId, parent: await parentCodesFor(settings, job, baseRewriteId, log, false), baseRewriteId,
+        record = failedRecord({ rewriteId, digRunId, parent: await parentCodesFor(settings, job, textRewriteId, textUpdateId, log, false), baseRewriteId,
           failureCode: "PATH_REWRITE_PARENT_UNREAD", written: null });
       } else {
         try {
@@ -369,11 +413,13 @@ export async function rewriteThePath(settings: PathRewriteRunnerSettings, job: P
         }
       }
     }
-    const stored = await settings.turns.recordRewrite(record);
+    const stored = settings.line === undefined || front.lineBase === undefined ? await settings.turns.recordRewrite(record)
+      : await settings.line.recordRewriteInLine(front.lineBase, record);
     log("PATH_REWRITE_STORED", { runId: digRunId, outcome: record.outcome, failureCode: record.failureCode, stored });
     if (stored === "BASE_MOVED" || stored === "WAIT_TURN") continue;
-    if ((stored === "RECORDED" || stored === "ALREADY") && job.dig !== null && job.digPaths !== null) {
-      await afterRewrite(settings, job.dig, digRunId, record, job.digPaths, log);
+    if (stored === "RECORDED" || stored === "ALREADY") {
+      if (job.dig !== null && job.digPaths !== null) await afterRewrite(settings, job.dig, digRunId, record, job.digPaths, log);
+      await settings.afterStored?.(digRunId, job.lease);
     }
     return;
   }
@@ -419,7 +465,7 @@ function failedRecord(input: Readonly<{ rewriteId: string; digRunId: string; par
   });
 }
 
-function lineageRecord(lineage: MakerLineage): Readonly<Record<string, unknown>> {
+export function lineageRecord(lineage: MakerLineage): Readonly<Record<string, unknown>> {
   return Object.freeze({ ...lineage });
 }
 
@@ -497,8 +543,8 @@ async function composeRecord(settings: PathRewriteRunnerSettings, compose: Compo
  * The draft as it is stored: refs gone (the dig's paths named by their real refs, the points the sentences rest on by
  * their real ids), the reason apart from its codes. Code kept only sentences whose every ref the material gives.
  */
-function contentOf(draft: PathRewriteDraft, pointIds: ReadonlyMap<string, string>, digPathRefs: ReadonlyMap<string, string>,
-  suggestions: readonly DigPathSuggestions[]): PathRewriteContent {
+export function contentOf(draft: PathRewriteDraft, pointIds: ReadonlyMap<string, string>, digPathRefs: ReadonlyMap<string, string>,
+  suggestions: readonly DigPathSuggestions[] = []): PathRewriteContent {
   const restsOn = [...new Set(draft.what_changed.flatMap((sentence) => sentence.rests_on.flatMap((name) => {
     const id = pointIds.get(name);
     return id === undefined ? [] : [id];

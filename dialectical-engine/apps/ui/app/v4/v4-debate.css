@@ -197,6 +197,16 @@
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; min-width: 0;
   border: 1px solid var(--line-strong); border-radius: var(--r-card); padding: 10px 14px; background: var(--surface);
 }
+.v4MainAnswer {
+  min-width: 0; border: 1px solid var(--line-strong); border-radius: var(--r-card); padding: 12px 14px; background: var(--surface);
+}
+.v4MainAnswerTitle { margin: 0 0 6px; font-size: var(--t-ui); font-weight: 600; }
+.v4MainAnswerText p { margin: 0 0 8px; overflow-wrap: anywhere; }
+.v4MainAnswerNote { margin: 4px 0 0; font-size: var(--t-ui); }
+.v4MainAnswerEarlier { margin-top: 8px; font-size: var(--t-ui); }
+.v4MainAnswerEarlier summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; }
+.v4MainAnswerVersion { padding-top: 8px; border-top: 1px solid var(--line-strong); min-width: 0; }
+.v4MainAnswerVersionTitle { margin: 0 0 4px; font-size: var(--t-ui); font-weight: 600; }
 .v4ChangedSinceText { margin: 0; flex: 1 1 240px; min-width: 0; }
 .v4ChangedSinceReport { min-height: 44px; text-decoration: none; }
 .v4Trail { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; min-width: 0; font-size: var(--t-ui); }

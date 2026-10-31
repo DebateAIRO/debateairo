@@ -117,6 +117,8 @@ export type InvestigationCloseSettings = Readonly<{
   /** The reserve per plan; absent: INVESTIGATION_REPORT_POLICY's (20 cents paid, 5 cents Free). */
   reserveMicros?: Readonly<{ paid: number; free: number }>;
   replayBookOf?: (rootRunId: string, subjectItemId: string) => Promise<ReplayBook>;
+  /** R22 decision 2: the tree's climbs still being written; a report waits for them too, within the same bound. Absent: none. */
+  climbsOpen?: (rootRunId: string) => Promise<number>;
   /** How long a closing waits for running digs before it goes on with what is settled (default 6 hours). */
   giveUpWaitingMs?: number;
   /** Who pays and on which plan's rules; absent: the debate's owner, on the root's plan. */
@@ -198,7 +200,8 @@ export async function closeInvestigation(settings: InvestigationCloseSettings, c
   try {
     const now = (settings.now ?? (() => new Date()))();
     const waiting = await settings.reports.readWaiting(closing.rootRunId);
-    const pending = waiting?.waiting ?? [];
+    const climbs = settings.climbsOpen === undefined ? 0 : await settings.climbsOpen(closing.rootRunId);
+    const pending = [...(waiting?.waiting ?? []), ...Array.from({ length: climbs }, () => "climb")];
     const givenUp = now.getTime() - Date.parse(closing.closedAt) >= (settings.giveUpWaitingMs ?? INVESTIGATION_CLOSE_DEFAULTS.giveUpWaitingMs);
     if (pending.length > 0 && !givenUp) {
       log("INVESTIGATION_REPORT_WAITING", { investigationId: closing.investigationId, reportVersion: closing.reportVersion, waiting: pending.length });

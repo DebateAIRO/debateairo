@@ -138,6 +138,17 @@ describe("W5-1 Write my report: the closing", () => {
     expect(store.charged).toBeLessThanOrEqual(FREE_RESERVE);
   });
 
+  it("R22 decision 2: waits while a climb is still being written, within the same bound", async () => {
+    const store = memoryReports();
+    const vendors = team();
+    let open = 1;
+    const settings = { ...settingsOver({ store, vendors }), climbsOpen: async () => open };
+    expect(await closeInvestigation(settings, closingOf())).toBe("WAITING");
+    expect(vendors.haiku.requests).toHaveLength(0);
+    open = 0;
+    expect(await closeInvestigation(settings, closingOf())).toBe("RECORDED");
+  });
+
   it("waits while a dig or its rewrite is still running (F7 A), then writes; after the give-up time it goes on", async () => {
     const store = memoryReports();
     store.waiting.push(DIG_READY);

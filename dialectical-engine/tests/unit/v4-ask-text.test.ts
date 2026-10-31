@@ -1,10 +1,11 @@
-import { askQuestionMaxBytes } from "@debateai/contract";
+import { WEB_CONTRACT_LIMITS, askQuestionMaxBytes } from "@debateai/contract";
 import { describe, expect, it } from "vitest";
 
 import {
   addedLines,
   carriedMatch,
   composeQuestion,
+  purposeLinesOfGoal,
   DIG_ITEM_FLOOR,
   digQuestion,
   digTargetQuestions,
@@ -468,5 +469,21 @@ describe("startsWithLabel", () => {
     expect(startsWithLabel("how sure we are — fairly", "How sure we are:")).toBe(true);
     expect(startsWithLabel("We are fairly sure about the direction.", "How sure we are:")).toBe(false);
     expect(startsWithLabel("Anything", "  :  ")).toBe(false);
+  });
+});
+
+describe("decision 5 of 31 Oct: the goal's place, time and purpose go as their own field", () => {
+  const catalog = { "v4.askText.place.ROMANIA": "This is about Romania.", "v4.askText.place.OTHER": "This is about {place}.",
+    "v4.askText.horizon.NOW": "Time frame: right now.", "v4.askText.purpose.DECIDE": "I need this to make a decision." };
+  it("none set: none sent", () => {
+    expect(purposeLinesOfGoal(EMPTY_GOAL, catalog)).toBeUndefined();
+    expect(purposeLinesOfGoal({ ...EMPTY_GOAL, matters: "cost", angles: ["jobs"] }, catalog)).toBeUndefined();
+    expect(purposeLinesOfGoal({ ...EMPTY_GOAL, place: "OTHER", placeOther: "  " }, catalog)).toBeUndefined();
+  });
+  it("each set one is its own line, a typed place in its words and cut to the contract's length", () => {
+    expect(purposeLinesOfGoal({ ...EMPTY_GOAL, place: "ROMANIA", horizon: "NOW", purpose: "DECIDE" }, catalog))
+      .toEqual({ place: "This is about Romania.", time: "Time frame: right now.", purpose: "I need this to make a decision." });
+    expect(purposeLinesOfGoal({ ...EMPTY_GOAL, place: "OTHER", placeOther: " Harbour \n Town " }, catalog)).toEqual({ place: "This is about Harbour Town." });
+    expect(purposeLinesOfGoal({ ...EMPTY_GOAL, place: "OTHER", placeOther: "x".repeat(900) }, catalog)!.place).toHaveLength(WEB_CONTRACT_LIMITS.purposeLineMaxChars);
   });
 });
