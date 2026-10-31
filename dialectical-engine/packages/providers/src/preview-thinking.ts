@@ -88,6 +88,13 @@ export function previewThinkingStepOf(request: Readonly<{ callSiteKey: string; l
   // are packages/register PATH_REWRITE_THINKING's).
   const rewriteSite = /^PATH_REWRITE:(WRITER|CHECKER):[1-4]$/u.exec(request.callSiteKey);
   if (request.lane === "story" && rewriteSite !== null) return rewriteSite[1] === "WRITER" ? "path_rewrite_writer" : "path_rewrite_checker";
+  // W5-1: the final report over an investigation (packages/story INVESTIGATION_REPORT_CALL_SITE) runs at the owner's four
+  // final steps: its answer at answer_writer / answer_checker, its story at story_writer / story_checker.
+  const reportSite = /^INVESTIGATION_REPORT:(ANSWER|ANSWER_CHECK|STORY|STORY_CHECK):[1-4]$/u.exec(request.callSiteKey);
+  if (request.lane === "story" && reportSite !== null) {
+    return reportSite[1] === "ANSWER" ? "answer_writer" : reportSite[1] === "ANSWER_CHECK" ? "answer_checker"
+      : reportSite[1] === "STORY" ? "story_writer" : "story_checker";
+  }
   // Debate shape (merge of dev into Phase 2, 2026-10-13): the map's calls (MAP:angles, MAP:list:N, MAP:merge, MAP:gap:N,
   // MAP:choose; packages/map) build the debate's opening, so they run at the owner's `opening` level, the closest step.
   if (/^MAP:/u.test(request.callSiteKey)) return "opening";

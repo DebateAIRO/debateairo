@@ -84,7 +84,20 @@ export type ModelSpendSource =
    * story's place (a dig has no story). It names the DIG's run, is inside the dig's estimate, counts in the person's
    * windows like RUN and STORY, and is never walled: a dig that started always gets its rewrite.
    */
-  | "PATH_REWRITE";
+  | "PATH_REWRITE"
+  /**
+   * The final report over an investigation (0136; plan 2026-10-30 task W5-1): "Write my report"'s answer, story and their
+   * checks, written after the person closed the investigation. It names the investigation's ROOT run, counts in the
+   * person's windows like RUN and STORY, and is never walled: it is paid from the reserve the money rule always keeps.
+   */
+  | "INVESTIGATION_REPORT";
+
+/**
+ * W5-1: the report seam's safety net per closing, the largest plan's reserve (20 cents; packages/register
+ * INVESTIGATION_REPORT_POLICY.ceilingMicros, pinned equal by its unit test). The closing itself admits each call against
+ * its own plan's reserve (5 cents on Free) before it is sent.
+ */
+export const INVESTIGATION_REPORT_SEAM_CEILING_MICROS = 200_000 as const;
 
 /**
  * Question language, P2L Task 19 (migration 0118): the ONE writer of a LANGUAGE_CHECK row, a SECURITY DEFINER
@@ -211,6 +224,11 @@ export interface ModelSpendStore {
    * ceiling has no story seam.
    */
   readRunPathRewriteSpentMicros?(runId: string): Promise<number>;
+  /**
+   * W5-1: what the closing now being written has been charged (spend source INVESTIGATION_REPORT on the root run since
+   * that closing began, 0136's identity.read_closing_since_of_root). Optional: without it there is no report seam.
+   */
+  readRunInvestigationReportSpentMicros?(runId: string): Promise<number>;
   /** Everything the WHOLE application has been charged on that UTC day. */
   readDaySpentMicros(day: string): Promise<number>;
   /**
@@ -550,7 +568,7 @@ export function assertRunCeilingCoversOneCall(input: Readonly<{
 }
 
 /** The spend sources a gateway money seam charges (the support chat keeps its own accounting). */
-type MeteredSpendSource = Extract<ModelSpendSource, "RUN" | "STORY" | "PATH_REWRITE">;
+type MeteredSpendSource = Extract<ModelSpendSource, "RUN" | "STORY" | "PATH_REWRITE" | "INVESTIGATION_REPORT">;
 
 /** What a metered seam spends against: see `CostEnvelopeGuard.#envelopeFor`. */
 interface MeteredEnvelope {
@@ -724,6 +742,17 @@ export class CostEnvelopeGuard {
    */
   pathRewriteSeam(input: ProviderSeamInput): ProviderCostSeam {
     return this.#meteredSeam(input, "PATH_REWRITE", null, false);
+  }
+
+  /**
+   * THE FINAL REPORT — its money seam (plan 2026-10-30 task W5-1; the money rule of 31 Oct, point 6). "Write my report"'s
+   * calls name the investigation's root run and are paid from the reserve the money rule always keeps, so they are NEVER
+   * walled (no day, week or month stops them). Held to INVESTIGATION_REPORT_SEAM_CEILING_MICROS per closing (summed over
+   * that closing's INVESTIGATION_REPORT charges only), refused with the story's own code (the step keeps its last
+   * checked draft), and charged as INVESTIGATION_REPORT rows.
+   */
+  investigationReportSeam(input: ProviderSeamInput): ProviderCostSeam {
+    return this.#meteredSeam(input, "INVESTIGATION_REPORT", null, false);
   }
 
   /**
@@ -1043,6 +1072,21 @@ export class CostEnvelopeGuard {
           refusal: storyCostEnvelopeReached
         });
       }
+      case "INVESTIGATION_REPORT": {
+        const read = this.#store.readRunInvestigationReportSpentMicros;
+        if (read === undefined) {
+          throw new TypedDomainError(
+            "STORY_ENVELOPE_MISSING",
+            "A metered report seam needs the closing's spent total"
+          );
+        }
+        return Object.freeze({
+          spendSource: "INVESTIGATION_REPORT",
+          ceilingMicros: INVESTIGATION_REPORT_SEAM_CEILING_MICROS,
+          readSpentMicros: (runId: string) => read.call(this.#store, runId),
+          refusal: storyCostEnvelopeReached
+        });
+      }
       default:
         return exhaustive(spendSource);
     }
@@ -1242,6 +1286,16 @@ export class PostgresModelSpendStore implements ModelSpendStore {
     return this.#total(result.rows[0]?.total);
   }
 
+  async readRunInvestigationReportSpentMicros(runId: string): Promise<number> {
+    const result = await this.pool.query<{ total: string }>(
+      `SELECT coalesce(sum(spend.charge_micros),0)::text AS total FROM ledger.model_spend AS spend
+       WHERE spend.run_id = $1 AND spend.spend_source = 'INVESTIGATION_REPORT'
+         AND spend.recorded_at >= coalesce(identity.read_closing_since_of_root($1), 'infinity'::timestamptz)`,
+      [runId]
+    );
+    return this.#total(result.rows[0]?.total);
+  }
+
   async readDaySpentMicros(day: string): Promise<number> {
     return crossAccount("X23", async () => {
       const result = await this.pool.query<{ total: string }>(
@@ -1344,7 +1398,7 @@ export class PostgresModelSpendStore implements ModelSpendStore {
              ) THEN serve.run_removed_by_synthesis_check(run.run_id) ELSE false END
          )
          AND scope.admitted_at < $3
-         AND spend.spend_source IN ('RUN','STORY','PATH_REWRITE')
+         AND spend.spend_source IN ('RUN','STORY','PATH_REWRITE','INVESTIGATION_REPORT')
          AND spend.recorded_at >= $2 AND spend.recorded_at < $3
          AND NOT EXISTS (SELECT 1 FROM ledger.model_spend_waiver AS waiver WHERE waiver.run_id = spend.run_id)`;
 

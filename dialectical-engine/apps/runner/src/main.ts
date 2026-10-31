@@ -11,6 +11,8 @@ import {
 import { configureContentEncryption, createPool, PostgresDigModelRunnerRepository, RUNNER_CAPACITY, RUNNER_DATABASE_POOLS, RunRepository } from "@debateai/db";
 import { MonthPause, monthPaused } from "./month-pause.js";
 import { composePathRewrite } from "./path-rewrite-composition.js";
+import { composeInvestigationClose } from "./investigation-close-sources.js";
+import { startInvestigationCloseSweep } from "./investigation-close.js";
 import { startPathRewriteSweep } from "./path-rewrite-sweep.js";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
 import { releaseTaskName, TypedDomainError } from "@debateai/kernel";
@@ -270,7 +272,9 @@ function targetGateway(target: (typeof providerTargets)[number]): ProviderGatewa
       // used to raise without a seam; the story writer refuses before that anyway (no story rows, no story).
       buildStoryCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).storySeam({ runId, price, requireReportedUsage: true }),
       // W3-2: a dig's path rewrite (the story lane's PATH_REWRITE: sites) spends its own seam, never walled.
-      buildPathRewriteCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).pathRewriteSeam({ runId, price, requireReportedUsage: true })
+      buildPathRewriteCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).pathRewriteSeam({ runId, price, requireReportedUsage: true }),
+      // W5-1: "Write my report"'s calls (the INVESTIGATION_REPORT: sites, the root run) spend the report seam, never walled.
+      buildInvestigationReportCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).investigationReportSeam({ runId, price, requireReportedUsage: true })
     })
   });
   // Spec §3.4: the policy marks the gate unhealthy on its FIRST unsent refusal, before the minute's resend wait.
@@ -346,6 +350,16 @@ const storyWriter = new StoryWriter({
  */
 const pathRewrite = composePathRewrite({ pool, targets: providerTargets,
   members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
+  log: storyLog });
+/**
+ * W5-1: "WRITE MY REPORT", switched on: the closing (apps/runner/src/investigation-close.ts) on the runner's own pool,
+ * Haiku writing and GLM checking, each call admitted against its plan's reserve at its target's price (hosted; local mode
+ * counts its free models at zero), and charged on the never-walled report seam above. Undefined without Haiku or GLM.
+ */
+const closingPrices = buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE);
+const investigationClose = composeInvestigationClose({ pool, targets: providerTargets,
+  members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
+  priceOf: (providerRef) => closingPrices.get(providerRef) ?? null,
   log: storyLog });
 /**
  * The claim-time probe of one target (both claim probes below). Spec 2026-10-11 busy model §2: on the
@@ -435,6 +449,8 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   story: storyWriter,
   // Dig-model revision W3-7: a dig's path rewrite in its story's place (above).
   ...(pathRewrite === undefined ? {} : { pathRewrite: pathRewrite.settings }),
+  // W5-1: the closing, poked from the story stage when a member of a closing investigation settles.
+  ...(investigationClose === undefined ? {} : { investigationClose }),
   // Engine money rule, Task M3 (spec §14.4.2): each target's price, so an
   // answer-writing call refused for money tries the cheaper claim-eligible
   // makers first. Hosted only (local mode's map is empty); never sealed.
@@ -572,6 +588,10 @@ const startupReconciliation = retireRequestStanding
 // every five minutes, its answered calls replayed free; none while this release retires (claims stopped, §4).
 const pathRewriteSweep = pathRewrite === undefined || retireRequestStanding ? null
   : startPathRewriteSweep({ ...pathRewrite.sweep, paused: () => retirementSignal.claimsStopped() });
+// W5-1: an unreported closing ("Write my report" pressed) is written at boot and every minute, once its running digs and
+// their rewrites have settled (owner F7 A); none while this release retires.
+const investigationCloseSweep = investigationClose === undefined || retireRequestStanding ? null
+  : startInvestigationCloseSweep({ ...investigationClose, paused: () => retirementSignal.claimsStopped() });
 announceRunnerReady({
   kind: "DEBATEAI_RUNNER_READY",
   worker: environment.HATCHET_WORKER_NAME,
@@ -620,6 +640,7 @@ const retirement = startRunnerRetirement({
   stopWorker: async () => {
     lapsedResend.stop();
     pathRewriteSweep?.stop();
+    investigationCloseSweep?.stop();
     await worker.stop();
     await Promise.allSettled([pool.end(), keepAlivePool.end()]);
   },
@@ -631,4 +652,5 @@ await started;
 // The worker ended (retired, or stopped by a signal): no further re-send pass, rewrite sweep or retirement read.
 lapsedResend.stop();
 pathRewriteSweep?.stop();
+investigationCloseSweep?.stop();
 retirement.stop();

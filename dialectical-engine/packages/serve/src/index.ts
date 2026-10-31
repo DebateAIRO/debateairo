@@ -21,7 +21,7 @@ import {
   prepareLeasedContentEncryptionForRuns,
   PostgresDigModelRunnerRepository,
   PostgresDigPicksRunnerRepository,
-  PostgresInvestigationRunnerRepository,
+  PostgresInvestigationReportRunnerRepository, PostgresInvestigationRunnerRepository,
   PostgresWebEvidenceRepository,
   readMapRootsInForce,
   RunRepository,
@@ -3692,6 +3692,9 @@ export class ServeRepository {
     }
     const investigation = await new PostgresInvestigationRunnerRepository(this.pool).ofRun(runId);
     const members = investigation?.members ?? [];
+    // W5-1: each written version's newest covered rewrite (0136), the "changed since" count's cut-off.
+    const coveredByVersion = new Map<number, string | null>(investigation === null ? [] : ((await new PostgresInvestigationReportRunnerRepository(this.pool)
+      .readOfRun(runId).catch(() => null))?.reports ?? []).map((entry) => [entry.report_version, entry.covered_rewrite_recorded_at] as const));
     const levels = digLevelsOf(members);
     const levelOf = (digRunId: string): number | null => levels.get(digRunId.toLowerCase()) ?? null;
     const own = read.own;
@@ -3742,7 +3745,7 @@ export class ServeRepository {
           for (const entry of read.paths) turns.push(await turnOf(entry));
           const pathRewrites = turns.length === 0 ? null : servePathRewrites({
             turns, levelOf, storyLines: await storyLinesOf(runId), changedBelow: changedBelowPathsOf(read.paths, below, finished),
-            report: latestWrittenReportOf(investigation?.closings ?? [])
+            report: latestWrittenReportOf(investigation?.closings ?? [], coveredByVersion)
           });
 
           const kept = await picksOf(runId);

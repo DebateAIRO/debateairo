@@ -19,6 +19,7 @@ import {
 } from "@debateai/story";
 import { STORYTELLER_V2_ANSWER_FORM } from "../../packages/story/src/contracts.js";
 import * as story from "../../packages/story/src/path-rewrite.js";
+import * as report from "../../packages/story/src/investigation-report.js";
 
 /**
  * Verdict story, Task 2 — the two code-owned contracts (spec §5.2). The byte
@@ -214,6 +215,30 @@ it("pins the current storyteller v3 answer form fingerprint",()=>{expect(createH
 
 // W3-5 (dig-model revision 2026-10-30): the path rewrite's two contracts, code's answer forms beside the owner's approved
 // instructions (drafts 5.1 and 5.2; their text is pinned in prompt-text-pins.test.ts).
+// W5-1: the final report's five contracts, code's answer forms beside the instructions (pinned in prompt-text-pins.test.ts).
+describe("final report — the answer, story and check contracts", () => {
+  it("frames for the door, and each answer form names every member its parser enforces", () => {
+    for (const contract of report.INVESTIGATION_REPORT_SEALED_CONTRACTS) {
+      const framed = buildFramedPrompt({ contract, material: [{ name: "question", content: "Should the city fund the tram?" }] });
+      expect(assertFramedPrompt(framed.packet).contractId).toBe(contract.contractId);
+    }
+    for (const member of ["segments", "text", "rests_on", "revision_problems"]) expect(report.REPORT_ANSWER_FORM, member).toContain(member);
+    for (const member of ["short_answer", "what_would_change", "how_it_went", "card", "paragraph", "still_open", "revision_problems"]) {
+      expect(report.REPORT_STORY_FORM, member).toContain(member);
+    }
+    for (const member of ["satisfied", "problem", "part", "misleading"]) expect(report.REPORT_STORY_CHECK_FORM, member).toContain(member);
+    expect(report.REPORT_ANSWER_CHECK_FORM).not.toContain("misleading");
+    expect(Object.keys(report.ReportStoryReplySchema.shape).sort()).toEqual(["how_it_went", "short_answer", "still_open", "what_would_change"]);
+  });
+
+  it("names its four call sites on the story lane with their roles, rounds 1 to 4", () => {
+    expect(report.investigationReportCallSiteKey("ANSWER", 1)).toBe("INVESTIGATION_REPORT:ANSWER:1");
+    expect(report.investigationReportCallSiteRole("INVESTIGATION_REPORT:STORY_CHECK:4")).toBe("EVALUATOR");
+    expect(report.investigationReportCallSiteRole("INVESTIGATION_REPORT:STORY:5")).toBeNull();
+    expect(() => report.investigationReportCallSiteKey("STORY", 5)).toThrow();
+  });
+});
+
 describe("path rewrite — the writer and checker contracts", () => {
   it("puts the owner's wording in the instruction slot and code's form in the answer slot, and frames for the door", () => {
     expect(story.PATH_REWRITE_WRITER_PROMPT_CONTRACT).toEqual({ contractId: "path-rewrite.writer.v1",

@@ -391,6 +391,9 @@ apps/runner/src/hosted-provider-set.ts
 apps/runner/src/hosted-register-publish-cli.ts
 apps/runner/src/hosted-register-publish.ts
 apps/runner/src/index.ts
+apps/runner/src/investigation-close-sources.ts
+apps/runner/src/investigation-close.ts
+apps/runner/src/investigation-dossier.ts
 apps/runner/src/main.ts
 apps/runner/src/map-stage.ts
 apps/runner/src/migrate-cli.ts
@@ -1307,6 +1310,7 @@ packages/story/src/contracts.ts
 packages/story/src/enrichment.ts
 packages/story/src/forms.ts
 packages/story/src/index.ts
+packages/story/src/investigation-report.ts
 packages/story/src/length.ts
 packages/story/src/loop.ts
 packages/story/src/material.ts

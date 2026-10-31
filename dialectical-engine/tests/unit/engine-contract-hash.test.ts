@@ -45,7 +45,10 @@ const ENGINE_SEALED_IDS: readonly string[] = ["verdict.investigate.v1", "verdict
   // W3-5 (dig-model revision 2026-10-30; drafts 5.1 and 5.2, approved as written): the path rewrite's writer and checker.
   "path-rewrite.writer.v1", "path-rewrite.checker.v1",
   // W4-2 (plan 2026-10-30; owner Q9): the dig's planner, one search per pick (a draft wording, approve before switch-on).
-  "web.plan-dig.v1"];
+  "web.plan-dig.v1",
+  // W5-1 (the final report over an investigation): the answer, the later version's answer, the answer check (R4's wording
+  // with W0-1 §2.6 and draft 5.6, approved), the story and the story check (OWNER WORDING drafts).
+  "report.answer.v1", "report.answer.later.v1", "report.answer-check.v1", "report.story.v1", "report.story-check.v1"];
 /**
  * R1d's seal: sha256 of the header text alone, no trailing newline. Printed once with
  * `printf '%s' debateai.engine-contracts.v1 | shasum -a 256` and pasted here; the test also recomputes it.
@@ -59,8 +62,9 @@ const R1D_ENGINE_CONTRACT_HASH = "b98a45d5933d82205d5c6514082d4151bfb8f3f45b3677
 // (ba2f15d5d89b2f7b4c3168e2f7908f5d3130aa55fc4929ad0825b15028500a4d, history). W1-5 (2026-10-30): + the web wording's 20
 // (a5a988393472a0e5a86d01c2a194e4aacb247c4d4407b6d8ad88fe06a818af5c, history). W1-5b (2026-10-30): + the second web wording's 4
 // (64ec9ef0258010b8b63f9a5e270a2c734b7311650c47281eda1fe2fc7b61057a, history). W3-5 (2026-10-31): + the path rewrite's 2
-// (e87152961c68939de279dec08e8c50423e758936db4bc8e7d785a61455151123, history). W4-2 (2026-11-01): + the dig's planner.
-const ENGINE_CONTRACT_HASH_SEALED = "85278722824f1cde050e290bbb7ec507af08a8e7ae8087526aee27b45f1b66aa";
+// (e87152961c68939de279dec08e8c50423e758936db4bc8e7d785a61455151123, history). W4-2 (2026-11-01): + the dig's planner
+// (85278722824f1cde050e290bbb7ec507af08a8e7ae8087526aee27b45f1b66aa, history). W5-1 (2026-11-01): + the final report's 5.
+const ENGINE_CONTRACT_HASH_SEALED = "9854b2de5a4c0000c59044d5ba285599ccc184365d4755fe68cd2d49070bf5a6";
 const SELECT = "SELECT value_json FROM register.register_row WHERE register_version=$1 AND row_key=$2";
 const runtime = { nodeVersion: "v26.8.2", pnpmVersion: "11.20.0", sourceRevision: "a".repeat(40), sourceTree: "b".repeat(40),
   operatorSha256: "c".repeat(64), observedAt: "2026-10-16T12:00:00.000Z" };

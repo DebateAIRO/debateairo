@@ -77,6 +77,7 @@ export {
   CostEnvelopeGuard,
   DEFAULT_RESERVATION_TTL_MS,
   LANGUAGE_CHECK_SPEND_WRITER,
+  INVESTIGATION_REPORT_SEAM_CEILING_MICROS,
   QUESTION_CHECK_SPEND_WRITER,
   PostgresModelSpendStore,
   assertRunCeilingCoversOneCall,

@@ -205,6 +205,10 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // The path rewrite switched on (dig-model revision W3-7): the composition seals each rewrite's text under the dig's
       // run key inside withRunContentLease; the sources open the parent's story, its nodes, the base rewrite and the
       // extracts each under its own run's key, inside withRunContentLease or through prepareLeasedContentEncryptionForRun.
+      // W5-1: the closing's sources open the root's story, its nodes, each dig's rewrite, the extracts with reader 1's line
+      // and the earlier report, each under its own run's key, inside withRunContentLease; each version is sealed under the
+      // ROOT run key inside withRunContentLease.
+      "apps/runner/src/investigation-close-sources.ts",
       "apps/runner/src/path-rewrite-composition.ts",
       "apps/runner/src/path-rewrite-sources.ts",
       // Reclaim resume (spec 2026-10-14): the replay book reads the run's recorded prompts and replies through
@@ -268,6 +272,10 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // It opens no lease and reads no content.
       "apps/runner/src/call-lane-gateway.ts",
       "apps/runner/src/index.ts",
+      // W5-1: the closing sends each answer, story and check call through the configured member's gateway (or the replay
+      // book over it), naming the investigation's root run. It reads no content itself; its sources and its seal open and
+      // seal under the runs' keys inside withRunContentLease (investigation-close-sources.ts above).
+      "apps/runner/src/investigation-close.ts",
       // Debate shape (0117, c5e0b2862): the map stage's caller sends each map call through the member gateway the
       // runner hands it (lane, sit-out book, keep-alive, the run-required leased gateway), naming the run. It opens
       // no lease and reads no content of its own; the map's storage goes through packages/map/src/repository.ts above.

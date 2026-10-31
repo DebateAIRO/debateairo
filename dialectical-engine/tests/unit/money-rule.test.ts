@@ -175,6 +175,7 @@ function guardOver(input: Readonly<{ now: Date; spentByStart: ReadonlyMap<number
     readRunSpentMicros: async () => 0,
     readRunStorySpentMicros: async () => 0,
     readRunPathRewriteSpentMicros: async () => 0,
+    readRunInvestigationReportSpentMicros: async () => 0,
     readDaySpentMicros: async () => 0,
     admitNewRun: async () => Object.freeze({ admitted: true, committedMicros: 0 })
   };
@@ -421,7 +422,7 @@ describe("PATH_REWRITE is never walled", () => {
     expect(ask("story", "STORY:STORYTELLER:1", "SYNTHESIZER")).toBe(true);
   });
 
-  it("the person's windows count it: the owner spend reader reads RUN, STORY and PATH_REWRITE", async () => {
+  it("the person's windows count it: the owner spend reader reads RUN, STORY, PATH_REWRITE and W5-1's INVESTIGATION_REPORT", async () => {
     const texts: string[] = [];
     const pool = { query: async (text: string, values: unknown[]) => {
       texts.push(text);
@@ -432,7 +433,35 @@ describe("PATH_REWRITE is never walled", () => {
     await store.readOwnerSpentInRangesMicros(OWNER, [{ from: at("2026-10-01T00:00:00.000Z"), to: at("2026-10-02T00:00:00.000Z") }]);
     await store.readOwnerChargesMicros(OWNER, at("2026-10-01T00:00:00.000Z"), at("2026-10-02T00:00:00.000Z"));
     expect(texts).toHaveLength(3);
-    for (const text of texts) expect(text).toContain("spend.spend_source IN ('RUN','STORY','PATH_REWRITE')");
+    for (const text of texts) expect(text).toContain("spend.spend_source IN ('RUN','STORY','PATH_REWRITE','INVESTIGATION_REPORT')");
+  });
+});
+
+describe("W5-1 INVESTIGATION_REPORT is never walled", () => {
+  it("\"Write my report\" is admitted with the month far past its wall, and is charged as INVESTIGATION_REPORT on the root run", async () => {
+    const now = at("2026-10-20T12:00:00.000Z");
+    const month = windowsOf("PLUS", now)[2]!;
+    const recorded: ModelSpendEntry[] = [];
+    const guard = guardOver({ now, spentByStart: new Map([[month.periodStart.getTime(), 9 * month.limitMicros]]), recorded });
+    const seam = guard.investigationReportSeam({ runId: "root-run", price: PRICE, requireReportedUsage: true });
+    const admission = await seam.assertCallAllowed(PROJECTION);
+    await seam.recordCall({ providerRef: "anthropic:haiku", usage: { prompt_tokens: 10, completion_tokens: 5 }, projection: PROJECTION,
+      ...(admission === undefined ? {} : { admission }) });
+    expect(recorded.map((entry) => [entry.spendSource, entry.runId, entry.chargeMicros])).toEqual([["INVESTIGATION_REPORT", "root-run", 15]]);
+  });
+
+  it("the gateway's story scope accepts the report's four sites with their roles, and nothing else", () => {
+    const ask = (lane: "story" | "served", callSiteKey: string, role: "SYNTHESIZER" | "EVALUATOR") =>
+      storyCallScopeAgrees({ lane, callSiteKey, role } as Parameters<typeof storyCallScopeAgrees>[0]);
+    for (const round of [1, 2, 3, 4]) {
+      expect(ask("story", `INVESTIGATION_REPORT:ANSWER:${round}`, "SYNTHESIZER")).toBe(true);
+      expect(ask("story", `INVESTIGATION_REPORT:ANSWER_CHECK:${round}`, "EVALUATOR")).toBe(true);
+      expect(ask("story", `INVESTIGATION_REPORT:STORY:${round}`, "SYNTHESIZER")).toBe(true);
+      expect(ask("story", `INVESTIGATION_REPORT:STORY_CHECK:${round}`, "EVALUATOR")).toBe(true);
+    }
+    expect(ask("story", "INVESTIGATION_REPORT:ANSWER:1", "EVALUATOR")).toBe(false);
+    expect(ask("story", "INVESTIGATION_REPORT:ANSWER:5", "SYNTHESIZER")).toBe(false);
+    expect(ask("served", "INVESTIGATION_REPORT:ANSWER:1", "SYNTHESIZER")).toBe(false);
   });
 });
 

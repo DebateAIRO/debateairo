@@ -289,8 +289,8 @@ describe('the real readiness seam', () => {
     expect(announce).toBeGreaterThan(0);
     expect(announce).toBeLessThan(resend); expect(resend).toBeLessThan(retire); expect(retire).toBeLessThan(ended);
     // R22 W3-7: the path rewrite sweep stops beside the re-send pass, both when the worker is told to stop and after it ended.
-    expect(source.slice(ended)).toContain('lapsedResend.stop();\npathRewriteSweep?.stop();\nretirement.stop();');
-    expect(source).toContain('stopWorker: async () => {\n    lapsedResend.stop();\n    pathRewriteSweep?.stop();\n    await worker.stop();\n');
+    expect(source.slice(ended)).toContain('lapsedResend.stop();\npathRewriteSweep?.stop();\ninvestigationCloseSweep?.stop();\nretirement.stop();');
+    expect(source).toContain('stopWorker: async () => {\n    lapsedResend.stop();\n    pathRewriteSweep?.stop();\n    investigationCloseSweep?.stop();\n    await worker.stop();\n');
   });
 
   // R4 (final review): a retired runner's process ends by itself (the public server has no launcher to exit it). The
@@ -298,7 +298,7 @@ describe('the real readiness seam', () => {
   // which Hatchet resolves before its running tasks finish (and a planned stop leaves the exit to Hatchet itself).
   it('runner main ends both pools once the retired worker has stopped, and never at its tail', async () => {
     const source = await readFile(resolve('apps/runner/src/main.ts'), 'utf8');
-    expect(source).toContain('stopWorker: async () => {\n    lapsedResend.stop();\n    pathRewriteSweep?.stop();\n    await worker.stop();\n    await Promise.allSettled([pool.end(), keepAlivePool.end()]);\n  },');
+    expect(source).toContain('stopWorker: async () => {\n    lapsedResend.stop();\n    pathRewriteSweep?.stop();\n    investigationCloseSweep?.stop();\n    await worker.stop();\n    await Promise.allSettled([pool.end(), keepAlivePool.end()]);\n  },');
     expect(source.match(/\.end\(\)/g)).toHaveLength(2);
     expect(source.slice(source.indexOf('await started;'))).not.toContain('.end()');
   });

@@ -168,3 +168,5 @@ export {
 export * from "./status.js";
 export * from "./public.js";
 export * from "./path-rewrite.js";
+// W5-1: the final report over an investigation.
+export * from "./investigation-report.js";

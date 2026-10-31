@@ -1252,7 +1252,9 @@ export {
   type StoryRegisterRowsInput,
   // W3-5 (dig-model revision): the path rewrite's code-owned numbers and its thinking steps.
   PATH_REWRITE_POLICY,
-  PATH_REWRITE_THINKING
+  PATH_REWRITE_THINKING,
+  // W5-1: the final report's code-owned numbers.
+  INVESTIGATION_REPORT_POLICY
 } from "./story-policy.js";
 // A19: the optional model scorecard (absent -> the plan rosters choose the models).
 export {
