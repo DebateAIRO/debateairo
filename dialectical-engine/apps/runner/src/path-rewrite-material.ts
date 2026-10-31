@@ -238,11 +238,12 @@ function closing(input: PathRewriteMaterialInput, fields: readonly FramedMateria
  * The material, at the first ladder step whose first-round writer packet plus round 2's room passes the guard. The refs
  * the reply may rest on are the points that step kept.
  */
-export function buildPathRewriteMaterial(input: PathRewriteMaterialInput): PathRewriteMaterial {
+export function buildPathRewriteMaterial(input: PathRewriteMaterialInput, options: Readonly<{ fromStep?: number }> = {}): PathRewriteMaterial {
   const refs = refsOf(input);
   const personWords = input.picks.some((pick) => pick.by !== "AI_SUGGESTION");
   let bodyBytes = 0;
   for (const [at, step] of PATH_REWRITE_LADDER.entries()) {
+    if (at + 1 < (options.fromStep ?? 1)) continue;
     const { fields, keptRefs } = fieldsAt(input, refs, step);
     const writer = closing(input, fields);
     bodyBytes = pathRewriteBodyBytes(buildFramedPrompt({ contract: PATH_REWRITE_WRITER_V2_PROMPT_CONTRACT, material: writer }).packet);

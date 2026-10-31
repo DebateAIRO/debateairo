@@ -10,7 +10,7 @@ import {
 } from "@debateai/crypto";
 import { configureContentEncryption, createPool, PostgresDigModelRunnerRepository, RUNNER_CAPACITY, RUNNER_DATABASE_POOLS, RunRepository } from "@debateai/db";
 import { MonthPause, monthPaused } from "./month-pause.js";
-import { composePathRewrite } from "./path-rewrite-composition.js";
+import { composePathRewrite, PATH_REWRITE_WRITER_MODEL } from "./path-rewrite-composition.js";
 import { composeInvestigationClose } from "./investigation-close-sources.js";
 import { startInvestigationCloseSweep } from "./investigation-close.js";
 import { startPathRewriteSweep } from "./path-rewrite-sweep.js";
@@ -31,7 +31,7 @@ import {
 // ONE line on purpose: `tests/architecture/dev-runner-provider-set.test.ts` pins this
 // import line so `probeTarget` — the persisting probe — cannot enter this module under
 // any local name (codex r2 B1). A multi-line import hides the specifiers from that pin.
-import { createPreviewGuardedFetch, createPreviewBudgetRpcPorts, createPreviewBusyCoordinator, previewRunResilience, withPreviewProviderCallPolicy, previewProbeControls, previewSealedRoleFallbackCovered, previewTargetGatewayControls, PREVIEW_GLM_DEADLINE_MS, observeClaimTimeTarget, providerTargetGatewayControls, providerTargetPrice, previewTargetChargePrice, resolveProviderTargetCredentials, previewStructureRepairRoute, previewStructureRepairCeiling, withStructureRepair, previewFinalWriterTierUnreadLine, type PreviewFinalWriterTierUnread, type ProviderGateway } from "@debateai/providers";
+import { createAnthropicTokenCounter, ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, createPreviewBusyCoordinator, previewRunResilience, withPreviewProviderCallPolicy, previewProbeControls, previewSealedRoleFallbackCovered, previewTargetGatewayControls, PREVIEW_GLM_DEADLINE_MS, observeClaimTimeTarget, providerTargetGatewayControls, providerTargetPrice, previewTargetChargePrice, resolveProviderTargetCredentials, previewStructureRepairRoute, previewStructureRepairCeiling, withStructureRepair, previewFinalWriterTierUnreadLine, type PreviewFinalWriterTierUnread, type ProviderGateway, type TokenCounter } from "@debateai/providers";
 import {
   STORY_SHAPES_DIR_ENV_KEY,
   StoryWriter,
@@ -238,6 +238,16 @@ const previewBusy = createPreviewBusyCoordinator();
  * refused any target with no declared price, so `providerTargetPrice` below cannot be null there — the refusal is kept
  * anyway, because a control that depends on another control having run is one edit away from being none.
  */
+/**
+ * R22 decision 28: Anthropic's free token count, by the way each Anthropic target's calls reach it: the same base URL, the same key, the
+ * same fetch (on the preview, the guarded fetch to its gate). A count that fails is logged and the byte guard stands.
+ */
+function targetTokenCounter(target: (typeof providerTargets)[number]): TokenCounter | undefined {
+  if (target.adapterKind !== ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND) return undefined;
+  return createAnthropicTokenCounter({ endpoint: target.baseUrl, model: target.model,
+    ...(target.authorizationHeader === undefined ? {} : { authorizationHeader: target.authorizationHeader }),
+    ...(previewGate === undefined ? {} : { fetchImplementation: previewFetch }), log: (event, detail) => { storyLog(event, detail); } });
+}
 function targetGateway(target: (typeof providerTargets)[number]): ProviderGateway {
   // Owner answer F4 (2026-10-30): on the preview, a reviewed Anthropic row's calls are charged at the vendor's real
   // prices (cache writes and reads, the 100,000-token step), the same steps its gate settles at.
@@ -245,11 +255,13 @@ function targetGateway(target: (typeof providerTargets)[number]): ProviderGatewa
   if (runnerSite.money !== null && price === null) {
     throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`);
   }
+  const tokenCount = targetTokenCounter(target);
   const gateway = createPostgresProviderGateway(pool, {
     ...(previewGate === undefined ? {} : { fetchImplementation: previewFetch }),
     endpoint: target.baseUrl,
     model: target.model,
     maker: target.maker,
+    ...(tokenCount === undefined ? {} : { countInputTokens: tokenCount }),
     // Model scorecard §2.2/§2.10: the levels this target can set and its window.
     ...providerTargetGatewayControls(target),
     // Contract A §2: on the preview only, max_tokens never exceeds the target's reviewed row bound.
@@ -353,7 +365,11 @@ const storyWriter = new StoryWriter({
  * rewritten in the story's place (apps/runner/src/path-rewrite-composition.ts, the same call as the preview practice's),
  * its calls charged on the never-walled PATH_REWRITE seam above. Undefined when no Haiku or no GLM target is configured.
  */
-const pathRewrite = composePathRewrite({ pool, targets: providerTargets,
+const writerTokenCount = (() => {
+  const haiku = providerTargets.find((target) => target.model === PATH_REWRITE_WRITER_MODEL);
+  return haiku === undefined ? undefined : targetTokenCounter(haiku);
+})();
+const pathRewrite = composePathRewrite({ pool, targets: providerTargets, ...(writerTokenCount === undefined ? {} : { tokenCount: writerTokenCount }),
   members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
   log: storyLog });
 /**
@@ -362,7 +378,7 @@ const pathRewrite = composePathRewrite({ pool, targets: providerTargets,
  * counts its free models at zero), and charged on the never-walled report seam above. Undefined without Haiku or GLM.
  */
 const closingPrices = buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE);
-const investigationClose = composeInvestigationClose({ pool, targets: providerTargets,
+const investigationClose = composeInvestigationClose({ pool, targets: providerTargets, ...(writerTokenCount === undefined ? {} : { tokenCount: writerTokenCount }),
   members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
   priceOf: (providerRef) => closingPrices.get(providerRef) ?? null,
   // R22 decision 7: a written report takes its investigation's page texts and passages with it. A FAILED one may be written

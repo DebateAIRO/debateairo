@@ -41,6 +41,8 @@ export const ANTHROPIC_API_HOST = "api.anthropic.com" as const;
 export const ANTHROPIC_API_VERSION = "2023-06-01" as const;
 /** Appended to the target's base URL (`https://api.anthropic.com/v1`). */
 export const ANTHROPIC_MESSAGES_PATH = "/messages" as const;
+/** R22 decision 28: Anthropic's free token count, on the same base URL, with the same key. */
+export const ANTHROPIC_COUNT_TOKENS_PATH = "/messages/count_tokens" as const;
 /**
  * The thinking levels this wire can carry, as `output_config.effort` (spec 2026-10-12 §4.4: the reviewed Haiku menu).
  * Claude Haiku 5.5 also has xhigh and max; they are not reviewed, so they are refused before anything is sent.
@@ -246,6 +248,20 @@ export function anthropicMessagesRequestBody(input: Readonly<{
     ...(system === null ? {} : { system: anthropicCacheableSystem(system) }),
     ...effortMember(input.thinkingLevel)
   });
+}
+
+/**
+ * R22 decision 28: the body of a token count for the call this packet would be: the same `messages` and `system`, in the same form
+ * (the count takes the cache marks as a call does), and neither `max_tokens` nor the effort, which the count does not read.
+ */
+export function anthropicCountTokensRequestBody(input: Readonly<{
+  model: string;
+  messages: PromptPacket["messages"];
+  sharedFirstFieldCount?: number;
+}>): string {
+  const sent = JSON.parse(anthropicMessagesRequestBody({ ...input, maxTokens: 1, thinkingLevel: THINKING_LEVEL_DEFAULT_ONLY })) as
+    Readonly<{ model: string; messages: unknown; system?: unknown }>;
+  return JSON.stringify({ model: sent.model, messages: sent.messages, ...(sent.system === undefined ? {} : { system: sent.system }) });
 }
 
 /**

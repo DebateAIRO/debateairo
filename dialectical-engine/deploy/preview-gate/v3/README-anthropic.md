@@ -181,6 +181,12 @@ cache reads.
   gate cannot read, or counts that already price above the amount set aside; and any usage field
   the gate does not know (ruling R3: a new field may be a new way to bill, as `speed` was on
   2026-10-16).
+- **The token count (R22 decision 28).** Close to the 100,000-token line the app asks how many tokens a call would be, through the
+  gate's `/count` on the same socket, for the same peers. The gate holds the key, so this is its second path to Anthropic:
+  `POST /v1/messages/count_tokens`, which Anthropic does not charge for. Only the Anthropic profile offers it, only for an enabled
+  model, only for a body a call could also send. Nothing is reserved, charged, written in the day's ledger or halted, and only the
+  number comes back. A refusal or a failure stops nothing: the app falls back to its own byte estimate. A gate from before this
+  release answers every `/count` with its usual refusal, so the count is simply off until the new helper and bridge hashes are in its GO.
 - **Start check: the addresses only.** Anthropic has no list of models that can be read without
   a key, so there is no model check at start. The start check never sends the key, or any
   request, to Anthropic. Before every start it checks that every address of `api.anthropic.com`

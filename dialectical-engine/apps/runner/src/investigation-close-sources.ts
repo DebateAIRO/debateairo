@@ -9,7 +9,7 @@ import {
 } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import { LivenessRepository } from "@debateai/serve";
-import type { ProviderGateway, ProviderCallRequest } from "@debateai/providers";
+import type { ProviderGateway, ProviderCallRequest, TokenCounter } from "@debateai/providers";
 import { INVESTIGATION_REPORT_POLICY } from "@debateai/register";
 import { projectedCallCeilingMicros, type ProviderTargetPrice } from "@debateai/budget";
 import {
@@ -399,6 +399,8 @@ export function composeInvestigationClose(input: Readonly<{
   members: readonly Readonly<{ provider: ProviderGateway; providerRef: string; maker: string }>[];
   /** Each target's price (hosted); a target without one is counted at zero (local mode: free models). */
   priceOf: (providerRef: string) => ProviderTargetPrice | null;
+  /** Decision 28: Anthropic's free token count for the writer's calls (main.ts). */
+  tokenCount?: TokenCounter;
   /** Who pays when it is not the debate's owner (PUBLIC, decision 13). */
   payerOf?: (closing: UnreportedClosing, read: InvestigationCloseInput) => Promise<InvestigationReportPayer>;
   /** After a closing's row stands (RETENTION's wipe, decision 7; PUBLIC's reopening). */
@@ -435,6 +437,7 @@ export function composeInvestigationClose(input: Readonly<{
     }),
     reserveMicros: INVESTIGATION_REPORT_POLICY.reserveMicros,
     replayBookOf: (rootRunId: string, subject: string) => readReplayBook(pool, rootRunId, subject),
+    ...(input.tokenCount === undefined ? {} : { tokenCount: input.tokenCount }),
     ...(input.payerOf === undefined ? {} : { payerOf: input.payerOf }),
     ...(input.onReportSettled === undefined ? {} : { onReportSettled: input.onReportSettled }),
     climbsOpen: async (rootRunId: string) => {

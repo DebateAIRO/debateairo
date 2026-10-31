@@ -22,6 +22,7 @@ import {
 import { previewModelRowForEndpoint, previewSamplingMembers } from "./preview-models.js";
 import { ProviderUnbilledRefusal } from "./unbilled-refusal.js";
 import { PROVIDER_SENT_INPUT_OVER_LIMIT, assertSentForm, packetWithPageTexts } from "./sent-form.js";
+import { ANTHROPIC_TOKEN_COUNT_FROM_ESTIMATE, type TokenCounter } from "./anthropic-token-count.js";
 import { contentRepairsOf, type ModelJsonRepair, type ModelReplyFacts } from "./model-json.js";
 import { replyWordCount } from "./reply-words.js";
 import { replyFailureClassOf, type ReplyFailureClass } from "./reply-fixer.js";
@@ -1490,6 +1491,11 @@ export interface OpenAICompatibleGatewayOptions {
    */
   readonly maxOutputTokens?: number;
   /**
+   * R22 decision 28: Anthropic's free token count. A call with `sentInputTokensBelow` whose estimate looks close to the line
+   * (`ANTHROPIC_TOKEN_COUNT_FROM_ESTIMATE`) asks it first, for each attempt's packet as sent. Absent, or a failed count: the estimate alone.
+   */
+  readonly countInputTokens?: TokenCounter;
+  /**
    * Length guidance L30 (LG-B): on the Anthropic wire only, send the first user turn's material with the cache mark
    * (anthropic-messages.ts anthropicCacheableMessages). Set by `previewTargetGatewayControls` for the preview's Anthropic
    * rows. Absent: today's body. Refused on any other wire.
@@ -2222,8 +2228,16 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       assertSentForm(recorded, sent);
       return sent;
     };
-    const underSentLine = (sent: PromptPacket): boolean =>
-      request.sentInputTokensBelow === undefined || estimateWindowTokens(sent.messages) < request.sentInputTokensBelow;
+    const underSentLine = async (sent: PromptPacket): Promise<boolean> => {
+      if (request.sentInputTokensBelow === undefined) return true;
+      const estimate = estimateWindowTokens(sent.messages);
+      if (estimate >= request.sentInputTokensBelow) return false;
+      const count = this.#options.countInputTokens;
+      if (count === undefined || estimate < ANTHROPIC_TOKEN_COUNT_FROM_ESTIMATE) return true;
+      // Bytes are an estimate; near the line the vendor's own count decides. A failed count (null) leaves the estimate's answer.
+      const real = await count({ packet: sent, ...(request.sharedFirstFieldCount === undefined ? {} : { sharedFirstFieldCount: request.sharedFirstFieldCount }) });
+      return real === null || real < request.sentInputTokensBelow;
+    };
     /**
      * Whether a repair packet can go out: its sent form can be made, and fits the packet cap (less the body's other
      * members), the declared window and the call's input line. False sends the call on to its next step; nothing is
@@ -2238,7 +2252,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         throw error;
       }
       return Buffer.byteLength(JSON.stringify(sent.messages), "utf8") + PATCH_PACKET_HEADROOM_BYTES <= packetCap
-        && fitsContextWindow(sent, tokenCeiling) && underSentLine(sent);
+        && fitsContextWindow(sent, tokenCeiling) && await underSentLine(sent);
     };
 
     /**
@@ -2317,8 +2331,9 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       // attempt over the call's input line ends the call as one over the window does; the first is refused before
       // anything is sent or recorded.
       const sentPacket = await sentFormOf(attemptPacket);
-      if (attempt > 1 && (!fitsContextWindow(sentPacket, attemptTokenCeiling) || !underSentLine(sentPacket))) break;
-      if (!underSentLine(sentPacket)) {
+      const sentUnderLine = await underSentLine(sentPacket);
+      if (attempt > 1 && (!fitsContextWindow(sentPacket, attemptTokenCeiling) || !sentUnderLine)) break;
+      if (!sentUnderLine) {
         throw new TypedDomainError(PROVIDER_SENT_INPUT_OVER_LIMIT,
           `${request.providerRef}: this call is sent only under ${String(request.sentInputTokensBelow)} input tokens`);
       }
@@ -3265,6 +3280,7 @@ export {
   // Refused-repair salvage (2026-10-16): a reclaim replays an A1-rescued or B-answered call from its recorded rows.
   structureReplayReaders
 } from "./structure-repair.js";
+export * from "./anthropic-token-count.js";
 export * from "./preview-test.js";
 // Perplexity plan 2026-10-30, task W2-1: the web search adapter (a search provider kind, never a model).
 export * from "./perplexity-search.js";
@@ -3286,6 +3302,7 @@ export {
   ANTHROPIC_EFFORT_LEVELS,
   ANTHROPIC_MESSAGES_BASE_URL,
   ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND,
+  ANTHROPIC_COUNT_TOKENS_PATH,
   ANTHROPIC_MESSAGES_PATH,
   ANTHROPIC_PER_CALL_MARKERS_SEPARATOR,
   PROVIDER_CONTENT_REFUSED,
@@ -3293,6 +3310,7 @@ export {
   PROVIDER_REPLY_UNSUPPORTED,
   anthropicCacheableMessages,
   anthropicCacheableSystem,
+  anthropicCountTokensRequestBody,
   anthropicMessagesRequestBody,
   anthropicMessagesRequestHeaders,
   anthropicUsageAsEngineUsage,

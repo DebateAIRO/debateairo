@@ -2076,7 +2076,47 @@ def refusal_body(error):
     return json.dumps({'error': code}).encode()
 
 
-def make_handler(private, allowed_uids, execute, slots, peer_uid_of=linux_peer_uid, now=None, remaining=None):
+COUNT_DEADLINE_SECONDS = 15
+
+
+def count_tokens(private, go_path, input, *, peer_uid, slots, dispatch=None, key_loader=None, host=None, platform=None):
+    """R22 decision 28: Anthropic's token count for a call the app is about to make, close to the 100,000-token line. It is free,
+    so nothing is reserved, charged, recorded or halted: a refusal or a failed count is the same fixed refusal, and the app falls
+    back to its byte guard. Only a profile with a count_path offers it, only for an enabled model, only for a body that a call
+    could also send, only the number comes back, and it runs under this gate's own key, as every call does."""
+    go, _go_sha = load_go(go_path)
+    profile = profile_of(go['provider'])
+    count_path = getattr(profile, 'count_path', None)
+    if count_path is None or not isinstance(input, dict) or set(input) != {'scope_id', 'requestBody'} \
+            or input['scope_id'] != go['scope_id'] or not isinstance(input['requestBody'], str):
+        raise SafetyError('COUNT_REFUSED')
+    try:
+        raw = input['requestBody'].encode()
+        body = json.loads(raw)
+    except (UnicodeError, ValueError):
+        raise SafetyError('COUNT_REFUSED') from None
+    row = profile.rows.get(body.get('model')) if isinstance(body, dict) and isinstance(body.get('model'), str) else None
+    if len(raw) > profile.final_writer_max_request_bytes or row is None or row.model not in go['enabled_models'] \
+            or not profile.count_body_valid(body, row):
+        raise SafetyError('COUNT_REFUSED')
+    host, platform = host or socket.gethostname(), platform or sys.platform
+    if platform != 'linux' or host != go['target_host'] or type(peer_uid) is not int or peer_uid not in go['allowed_peer_uids']:
+        raise SafetyError('EXECUTION_AUTHORITY_REFUSED')
+    if slots.tripped:
+        raise SafetyError('AUTHORITY_STOPPED')
+    key = (key_loader or helper.read_key)(private)
+    key_pattern = getattr(profile, 'key_pattern', None)
+    if key_pattern is not None and not (isinstance(key, str) and re.fullmatch(key_pattern, key)):
+        raise SafetyError('KEY_SHAPE_INVALID')
+    send = dispatch or helper.HttpsTransport(timeout=COUNT_DEADLINE_SECONDS, profile=profile, path=count_path)
+    status, reply = send(raw, key)
+    tokens = reply.get('input_tokens') if isinstance(reply, dict) else None
+    if status != 200 or type(tokens) is not int or tokens < 0:
+        raise SafetyError('COUNT_UNAVAILABLE')
+    return {'input_tokens': tokens}
+
+
+def make_handler(private, allowed_uids, execute, slots, peer_uid_of=linux_peer_uid, now=None, remaining=None, count=None):
     class Handler(BaseHTTPRequestHandler):
         timeout = IPC_READ_TIMEOUT_SECONDS  # An idle or slow client cannot hold a thread forever.
 
@@ -2120,9 +2160,31 @@ def make_handler(private, allowed_uids, execute, slots, peer_uid_of=linux_peer_u
             except BaseException:
                 pass
 
+        def answer_count(self):
+            # Free and unrecorded: nothing is reserved, so a refused or lost reply needs no halt.
+            try:
+                uid = peer_uid_of(self.connection)
+                length = int(self.headers.get('content-length', '0'))
+                if count is None or uid not in allowed_uids or not 1 <= length <= MAX_IPC_BYTES:
+                    raise SafetyError('IPC_REQUEST_REFUSED')
+                encoded = json.dumps(count(json.loads(self.rfile.read(length)), uid), ensure_ascii=True).encode('ascii')
+            except BaseException as error:  # noqa: BLE001 - every refusal is the same fixed body
+                try:
+                    self.reply(409, refusal_body(error))
+                except BaseException:
+                    pass
+                return
+            try:
+                self.reply(200, encoded)
+            except BaseException:
+                pass
+
         def do_POST(self):
             if self.path == '/remaining':
                 self.answer_remaining()
+                return
+            if self.path == '/count':
+                self.answer_count()
                 return
             reserved = []
             try:
@@ -2303,7 +2365,11 @@ def serve(private, go_path, socket_path, platform=None, uid=None, host=None, own
         # this (main) thread takes them with sigwait: no Python signal handler runs at all. A stop
         # signal that came earlier ended the process the default way (the next start recovers).
         signal.pthread_sigmask(signal.SIG_BLOCK, STOP_SIGNALS)
+
+        def count(data, uid):
+            return count_tokens(private, go_path, data, peer_uid=uid, slots=slots)
         server = UnixThreadingServer(str(socket_path), make_handler(private, go['allowed_peer_uids'], execute, slots,
+                                                                    count=count,
                                                                     remaining=RemainingAnswers(private, go_path, slots)),
                                      allowed_uids=frozenset(go['allowed_peer_uids']))
         info = os.stat(socket_path, follow_symlinks=False)

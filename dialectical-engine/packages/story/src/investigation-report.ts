@@ -2,6 +2,7 @@ import { z } from "zod";
 import { INVESTIGATION_REPORT_LIMITS, type MakerLineage } from "@debateai/contract";
 import { LENGTH_SENTENCE_ANSWER_CHECKER, TypedDomainError } from "@debateai/kernel";
 import {
+  ANTHROPIC_TOKEN_LINE,
   buildFramedPrompt,
   buildFramedRepairPrompt,
   buildFramedRevisionPrompt,
@@ -665,6 +666,8 @@ function reportRequest(call: StepRun, input: Readonly<{
     contractHash: call.contractHash,
     providerRef: input.providerRef,
     packet: call.guard(packet),
+    // Decision 28: near the line the gateway asks the vendor's own count too, for each attempt as sent.
+    sentInputTokensBelow: ANTHROPIC_TOKEN_LINE,
     ...(call.material.sharedFieldCount === undefined ? {} : { sharedFirstFieldCount: call.material.sharedFieldCount }),
     classifyContent: input.classifyContent,
     buildRepairPacket: (rejected: RejectedProviderContent): PromptPacket => call.guard(revision === null

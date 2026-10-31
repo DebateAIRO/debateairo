@@ -879,6 +879,8 @@ class AnthropicProfile:
     name = 'anthropic'
     host = 'api.anthropic.com'
     path = '/v1/messages'
+    # R22 decision 28: Anthropic's free token count, this profile's only other path (the gate's /count; no hold, no ledger).
+    count_path = '/v1/messages/count_tokens'
     api_version = '2023-06-01'
     per_call_cap_usd = Decimal('0.25')
     max_request_bytes = 256 * 1024
@@ -956,6 +958,11 @@ class AnthropicProfile:
                 and isinstance(first['cache_control'], dict) and first['cache_control'] == self.CACHE_MARK)
 
     MATERIAL_BLOCKS_MAX = 4
+
+    def count_body_valid(self, body, row):
+        """A token count's body: exactly the model, the messages and an optional system, each as a call's own rule."""
+        return (isinstance(body, dict) and set(body) - {'system'} == {'model', 'messages'} and body['model'] == row.model
+                and ('system' not in body or self.system_valid(body['system'])) and self.messages_valid(body['messages']))
 
     def messages_valid(self, messages):
         """Roles alternating user/assistant, starting and ending with a user turn, each content a text that is not only

@@ -8,14 +8,15 @@ import type {
   UnreportedClosing, WebSealed
 } from "@debateai/db";
 import { TypedDomainError, replyLanguageCheckFor } from "@debateai/kernel";
-import type { ProviderCallRequest, ProviderCallResult } from "@debateai/providers";
+import type { ProviderCallRequest, ProviderCallResult, TokenCounter } from "@debateai/providers";
 import { INVESTIGATION_REPORT_POLICY } from "@debateai/register";
 import {
   REPORT_ANSWER_PROSE, REPORT_CHECKER_PROSE, REPORT_STORY_PROSE, investigationReportFailureCode, writeInvestigationReport,
   type ReportAnswerDraft, type ReportStepWritten, type ReportStoryDraft, type StoryRoleMaker
 } from "@debateai/story";
 import { engineContractHash } from "./engine-contracts.js";
-import { buildInvestigationDossier, investigationReportGuard, type Dossier, type DossierInput } from "./investigation-dossier.js";
+import { investigationReportGuard, type Dossier, type DossierInput } from "./investigation-dossier.js";
+import { fitDossierToTokenLine } from "./token-line.js";
 import type { PathRewriteRoles } from "./path-rewrite.js";
 import { replayingGateway, type ReplayBook } from "./run-replay.js";
 
@@ -164,6 +165,8 @@ export type InvestigationCloseSettings = Readonly<{
    * changes nothing about the report.
    */
   onReportSettled?: (settled: InvestigationReportSettled) => Promise<void> | void;
+  /** Decision 28: Anthropic's free token count for the writer's calls; absent (no Anthropic target): the byte guard alone. */
+  tokenCount?: TokenCounter;
   /** The closing's one random source (F5); absent: 32 fresh random bytes per closing. Tests pass a fixed one. */
   closingSeed?: () => Buffer;
   contractHash?: string;
@@ -312,7 +315,7 @@ async function composeRecord(settings: InvestigationCloseSettings, closing: Unre
   if (read === null) return { record: failedRecord(closing, reportId, "INVESTIGATION_REPORT_INPUT_UNREAD", nothing, 0, null), payer: null };
   const payer: InvestigationReportPayer = settings.payerOf === undefined ? Object.freeze({ ownerRef: null, free: read.free })
     : await settings.payerOf(closing, read);
-  const built = buildInvestigationDossier(read.input);
+  const built = await fitDossierToTokenLine(read.input, settings.tokenCount, log);
   if (built.kind === "TOO_LARGE") {
     log("INVESTIGATION_REPORT_DOSSIER_TOO_LARGE", { runId: root, bodyBytes: built.bodyBytes });
     return { record: failedRecord(closing, reportId, "INVESTIGATION_REPORT_DOSSIER_TOO_LARGE", nothing, 0, null), payer };
