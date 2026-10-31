@@ -78,8 +78,17 @@ describe('independent Owner authority on disposable PostgreSQL',()=>{
   const partner=await ownerCandidate(database.pool),partnerStaff=randomUUID();
   await database.pool.query("INSERT INTO staff.subject(staff_id,user_id,capabilities) VALUES($1,$2,ARRAY['TEAM_READ'])",[partnerStaff,partner.userId]);
   await database.pool.query("INSERT INTO staff.team_limit_holder(staff_id,granted_by_staff_id,granted_operation_id) SELECT $1,staff_id,$2 FROM staff.owner_designation WHERE active",[partnerStaff,randomUUID()]);
+  // Decision 32: every allowance the old Owner gave ends with the recovery too (0146's trigger). Seeded as a row with no ceremony: the giving has its own file (team-allowance-database.test.ts).
+  const allowance=randomUUID(),allowanceEvent=randomUUID(),seed=await database.pool.connect();
+  try{await seed.query('BEGIN');await seed.query("SET LOCAL session_replication_role=replica");
+   await seed.query(`INSERT INTO billing.internal_grant(grant_id,owner_ref,configured_event_id,revision,amount_micros,day_micros,week_micros,starts_at,expires_at,funding_approval_ref,policy_register_version)
+    SELECT $1,u.owner_ref,$2,1,1000,100,500,now()-interval '1 minute',now()+interval '1 day','SYNTHETIC-APPROVAL',1 FROM identity."user" u WHERE u.user_id=$3`,[allowance,allowanceEvent,partner.userId]);
+   await seed.query("INSERT INTO billing.internal_grant_event(event_id,grant_id,event_type,operation_id,revision) VALUES($1,$2,'CONFIGURED',$3,1)",[allowanceEvent,allowance,allowance]);
+   await seed.query('INSERT INTO staff.internal_grant_holder(grant_id,staff_id,given_by_staff_id) SELECT $1,$2,staff_id FROM staff.owner_designation WHERE active',[allowance,partnerStaff]);await seed.query('COMMIT');
+  }finally{seed.release();}
   await jit.query('SELECT staff.commit_owner_command($1,$2::uuid[],$3,$4,$5,$6,$7,$8,$9,$10::jsonb)',[command,receipts,op,'RECOVER_OWNER',winner.nextGeneration,winner.nextVerifier,next,verifier,lineage,{schema:'staff-alert-v1',event:'RECOVER_OWNER',operationId:op,envelope:{v:1,keyId:'fixture',nonce:'AAAAAAAAAAAAAAAA',tag:'AAAAAAAAAAAAAAAAAAAAAA==',ct:'YQ=='}}]);
   expect((await database.pool.query('SELECT active,revoked_cause FROM staff.team_limit_holder WHERE staff_id=$1',[partnerStaff])).rows[0]).toEqual({active:false,revoked_cause:'OWNER_CHANGED'});
+  expect((await database.pool.query('SELECT g.revoked_at IS NOT NULL AS ended,e.cause FROM billing.internal_grant g JOIN staff.internal_grant_end e USING(grant_id) WHERE g.grant_id=$1',[allowance])).rows).toEqual([{ended:true,cause:'OWNER_CHANGED'}]);
   expect((await database.pool.query('SELECT staff.team_limit_authority($1) AS ok',[partnerStaff])).rows[0].ok).toBe(false);
   expect((await database.pool.query("SELECT staff.team_limit_authority(s.staff_id) AS ok FROM staff.subject s WHERE s.user_id=$1",[replacement.userId])).rows[0].ok).toBe(true);
   expect((await database.pool.query("SELECT staff.team_limit_authority(s.staff_id) AS ok FROM staff.subject s WHERE s.user_id=$1",[winner.target.userId])).rows[0].ok).toBe(false);

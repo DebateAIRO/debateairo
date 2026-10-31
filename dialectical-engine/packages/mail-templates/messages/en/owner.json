@@ -53,5 +53,10 @@
   "owner.teamLimit.changed": "Someone with a passkey changed the team's limit for the month. If this was not you or your partner, act at once.",
   "owner.teamLimit.partnerSubject": "Who can change the team limit has changed",
   "owner.teamLimit.partner": "The person who can change the team's limit alongside the Owner has changed. If you did not expect this, act at once.",
-  "owner.teamLimit.open": "Open the private team page to see what changed."
+  "owner.teamLimit.open": "Open the private team page to see what changed.",
+  "owner.teamAllowance.changedSubject": "A team allowance was changed",
+  "owner.teamAllowance.changed": "An allowance on your team was given, taken back or ended. If you did not expect this, act at once.",
+  "owner.teamAllowance.yoursSubject": "Your team allowance changed",
+  "owner.teamAllowance.yours": "The allowance the Owner gave you for your debates has changed.",
+  "owner.teamAllowance.yoursNext": "Sign in to see what you can use now. If you did not expect this, tell the Owner."
 }

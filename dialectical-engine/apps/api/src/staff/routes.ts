@@ -15,6 +15,7 @@ import { PublicationReviewRefusal } from '@debateai/serve';
 import type { PublicationReviewIntent, PublicationReviewStaffService } from '../publication-review/staff.js';
 import { registerThreatReportRoutes, ThreatReportHttpError, type ThreatReportStaffService } from './threat-reports.js';
 import { TypedDomainError } from '@debateai/kernel';
+import { canonicalTeamAllowanceActionBinding, isTeamAllowanceIntent, readTeamAllowanceState, registerTeamAllowanceRoutes, TeamAllowanceHttpError, type TeamAllowanceState } from './team-allowances.js';
 import { canonicalTeamLimitActionBinding, isTeamLimitIntent, registerTeamLimitRoutes, TeamLimitHttpError, type TeamLimitIntent, type TeamLimitStaffService } from './team-limit.js';
 export const staffAuthorizationPolicyInventory = Object.freeze([
     { route: 'GET /v1/admin/enrollment', auth: 'user', resource: 'staff-self', action: 'enrollment' },
@@ -46,6 +47,10 @@ export const staffAuthorizationPolicyInventory = Object.freeze([
     { route: 'POST /v1/admin/publication-reviews/{reviewRef}/refuse', auth: 'staff', staffCapability: 'PUBLICATION_REVIEW', resource: 'staff-publication-review', action: 'refuse' },
     { route: 'POST /v1/admin/internal-allowances', auth: 'staff', staffCapability: 'ALLOWANCE_WRITE', resource: 'staff-self', action: 'allowance-configure' },
     { route: 'DELETE /v1/admin/internal-allowances/{grantId}', auth: 'staff', staffCapability: 'ALLOWANCE_WRITE', resource: 'staff-self', action: 'allowance-revoke' },
+    // Decision 32: the Owner's allowance for a member. ALLOWANCE_WRITE, which only the active Owner ever has; the database asks again.
+    { route: 'GET /v1/admin/team-allowances', auth: 'staff', staffCapability: 'ALLOWANCE_WRITE', resource: 'staff-team', action: 'allowance-read' },
+    { route: 'POST /v1/admin/team-allowances/{staffId}', auth: 'staff', staffCapability: 'ALLOWANCE_WRITE', resource: 'staff-team', action: 'allowance-give' },
+    { route: 'DELETE /v1/admin/team-allowances/{staffId}/{grantId}', auth: 'staff', staffCapability: 'ALLOWANCE_WRITE', resource: 'staff-team', action: 'allowance-take-back' },
     // Decision 24: the team-limit authority is no capability, so each handler asks the database (0142's staff.authorize_action) itself.
     { route: 'GET /v1/admin/team-limit', auth: 'staff', resource: 'staff-team', action: 'read' },
     { route: 'POST /v1/admin/team-limit', auth: 'staff', resource: 'staff-team', action: 'set' },
@@ -146,7 +151,7 @@ export function canonicalInternalAllowanceActionBinding(input: contract.Internal
 function capability(intent: contract.FundedStaffActionIntent): StaffCapability | TeamLimitAuthority | null {
     if (intent.action === 'TEAM_LIMIT_SET' || intent.action === 'TEAM_PRACTICE_RECORD') return 'TEAM_LIMIT_SET';
     if (intent.action === 'TEAM_LIMIT_PARTNER_GRANT' || intent.action === 'TEAM_LIMIT_PARTNER_REVOKE') return 'TEAM_GRANT';
-    if (intent.action === 'ALLOWANCE_CONFIGURE' || intent.action === 'ALLOWANCE_REVOKE') return 'ALLOWANCE_WRITE';
+    if (intent.action === 'ALLOWANCE_CONFIGURE' || intent.action === 'ALLOWANCE_REVOKE' || isTeamAllowanceIntent(intent)) return 'ALLOWANCE_WRITE';
     if (intent.action === 'PUBLICATION_REVIEW_APPROVE' || intent.action === 'PUBLICATION_REVIEW_REFUSE') return 'PUBLICATION_REVIEW';
     if (intent.action === 'THREAT_REPORT_DECIDE') return 'THREAT_REPORT';
     return intent.action === 'CREDENTIAL_REGISTER' ? null : intent.action;
@@ -167,6 +172,7 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
         authentication: StaffAuthentication;
         binding: ActionBinding;
         allowanceState?: InternalAllowanceCommandState;
+        memberState?: TeamAllowanceState;
     }>> {
         const authentication = auth(request), required = capability(intent);
         // Containment (TEAM_DISABLE = OFFBOARD, EMERGENCY_DISABLE = COMPROMISE) stays available while locked.
@@ -174,7 +180,17 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
             await requireUnlocked();
         let binding: ActionBinding;
         let allowanceState: InternalAllowanceCommandState | undefined;
-        if (intent.action === 'ALLOWANCE_CONFIGURE' || intent.action === 'ALLOWANCE_REVOKE') {
+        let memberState: TeamAllowanceState | undefined;
+        if (isTeamAllowanceIntent(intent)) {
+            if (application!.funding === undefined) throw new StaffHttpRefusal(503, 'STAFF_UNAVAILABLE');
+            await application!.funding.requireReady();
+            // The authority first: the state a ceremony is bound to goes to nobody else.
+            await application!.access.requireCapability(authentication, 'ALLOWANCE_WRITE');
+            if (authentication.context.designation !== 'OWNER') refuse();
+            memberState = await readTeamAllowanceState(application!.funding.allowances, authentication, intent);
+            if (intent.action === 'TEAM_ALLOWANCE_CONFIGURE') await application!.funding.requireNewGrantPolicy(memberState.policyRegisterVersion);
+            binding = canonicalTeamAllowanceActionBinding(intent, memberState);
+        } else if (intent.action === 'ALLOWANCE_CONFIGURE' || intent.action === 'ALLOWANCE_REVOKE') {
             if (application!.funding === undefined) throw new StaffHttpRefusal(503, 'STAFF_UNAVAILABLE');
             await application!.funding.requireReady();
             allowanceState = await application!.funding.allowances.readSelfCommand(authentication.context,
@@ -197,7 +213,7 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
         await application!.access.assertCurrent(authentication);
         if (required !== null)
             await application!.access.requireCapability(authentication, required, binding);
-        return { authentication, binding, ...(allowanceState === undefined ? {} : { allowanceState }) };
+        return { authentication, binding, ...(allowanceState === undefined ? {} : { allowanceState }), ...(memberState === undefined ? {} : { memberState }) };
     }
     async function scopedInvitation(request: FastifyRequest, handle: string) {
         const context = await application!.access.readInvitationContext(request.authenticatedSession!, handle);
@@ -220,7 +236,7 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
                 catch (error) {
                     if (error instanceof StaffHttpRefusal)
                         return reply.code(error.status).send({ error: error.code });
-                    if (error instanceof ThreatReportHttpError || error instanceof TeamLimitHttpError)
+                    if (error instanceof ThreatReportHttpError || error instanceof TeamLimitHttpError || error instanceof TeamAllowanceHttpError)
                         return reply.code(error.status).send({ error: error.code });
                     if (error instanceof TypedDomainError && error.code.startsWith('THREAT_REPORT_')) {
                         const status = error.code === 'THREAT_REPORT_NOT_FOUND' ? 404
@@ -334,6 +350,7 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
     });
     registerThreatReportRoutes(route, application?.threatReports, application?.access, auth, actionAuthority);
     registerTeamLimitRoutes(route, () => application!.teamLimit, () => application!.access, () => application!.intents, auth, actionAuthority);
+    registerTeamAllowanceRoutes(route, () => application!.funding, () => application!.access, () => application!.intents, auth, actionAuthority);
     const reviewRef = (request: FastifyRequest): string => {
         const value = (request.params as { reviewRef?: unknown }).reviewRef;
         if (!contract.PublicationReviewQueueItemSchema.shape.review_ref.safeParse(value).success)

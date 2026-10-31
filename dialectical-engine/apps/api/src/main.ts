@@ -1221,6 +1221,16 @@ const teamLimitNoticesTimer = startTeamLimitNotices({
   }),
   readEmail: readThreatReportRecipientEmail
 }, releaseWatcher);
+// Decision 32: the Owner's and the member's notices about an allowance, through the same loop and mail.
+const allowanceNoticesTimer = startTeamLimitNotices({
+  repository: new PostgresInternalAllowanceRepository(pool),
+  mail: new TemplatedMailSender({
+    executable: environment.MAIL_SENDMAIL_PATH,
+    from: environment.MAIL_FROM,
+    timeoutMs: authPolicy.channel.transportTimeoutMs
+  }),
+  readEmail: readThreatReportRecipientEmail
+}, releaseWatcher);
 const threatReportErasureTimer = startThreatReportErasure({ repository: threatReportRepository }, releaseWatcher);
 const privateErasure = new PrivateRunErasureCoordinator(
   new PostgresPrivateRunErasureRepository(erasurePool,auditContextHasher),
@@ -1876,6 +1886,7 @@ api.addHook("onClose", async () => clearInterval(supportSweepTimer));
 api.addHook("onClose",async () => clearInterval(erasureReconcileTimer));
 api.addHook("onClose",async () => clearInterval(threatReportAlertsTimer));
 api.addHook("onClose",async () => clearInterval(teamLimitNoticesTimer));
+api.addHook("onClose",async () => clearInterval(allowanceNoticesTimer));
 api.addHook("onClose",async () => clearInterval(threatReportErasureTimer));
 api.addHook("onClose",async () => clearInterval(synthesisCheckTimer));
 api.addHook("onClose",async () => { if (dataExportTimer !== undefined) clearInterval(dataExportTimer); });

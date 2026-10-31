@@ -310,20 +310,46 @@ function finiteFundingWindow(value: { amount_micros: number; day_micros: number;
 }
 const FundedConfigureIntentSchema = z.object({ action: z.literal("ALLOWANCE_CONFIGURE"), ...FundingConfigureShape }).strict().superRefine(finiteFundingWindow);
 const FundedRevokeIntentSchema = z.object({ action: z.literal("ALLOWANCE_REVOKE"), grant_id: z.uuid(), ...FundingMutationShape }).strict();
-export const FundedStaffActionIntentSchema = z.union([StaffActionIntentSchema, FundedConfigureIntentSchema, FundedRevokeIntentSchema]);
+/** Decision 32: the Owner's allowance for a member. The revision is the one the page was looking at; the database's own is what the proof binds. */
+const TeamAllowanceMemberShape = { target_staff_id: z.uuid(), expected_revision: RevisionSchema };
+const TeamAllowanceConfigureIntentSchema = z.object({ action: z.literal("TEAM_ALLOWANCE_CONFIGURE"), ...TeamAllowanceMemberShape, ...FundingConfigureShape }).strict().superRefine(finiteFundingWindow);
+const TeamAllowanceRevokeIntentSchema = z.object({ action: z.literal("TEAM_ALLOWANCE_REVOKE"), ...TeamAllowanceMemberShape, grant_id: z.uuid(), ...FundingMutationShape }).strict();
+export type TeamAllowanceIntent = z.infer<typeof TeamAllowanceConfigureIntentSchema> | z.infer<typeof TeamAllowanceRevokeIntentSchema>;
+export const FundedStaffActionIntentSchema = z.union([StaffActionIntentSchema, FundedConfigureIntentSchema, FundedRevokeIntentSchema, TeamAllowanceConfigureIntentSchema, TeamAllowanceRevokeIntentSchema]);
 export const FundedStaffActionOptionsRequestSchema = z.object({ intent: FundedStaffActionIntentSchema }).strict();
 export const FundedStaffActionVerifyRequestSchema = z.object({ intent: FundedStaffActionIntentSchema,
     challenge_handle: OpaqueHandleSchema, credential: WebAuthnAuthenticationCredentialSchema }).strict().superRefine(ceremonyBodyBound);
 export const InternalAllowanceConfigureRequestSchema = z.object({ ...FundingConfigureShape, proof_handle: OpaqueHandleSchema }).strict().superRefine(finiteFundingWindow);
 export const InternalAllowanceRevokeRequestSchema = z.object({ ...FundingMutationShape, proof_handle: OpaqueHandleSchema }).strict();
 export const InternalAllowanceTargetParamsSchema = z.object({ grantId: z.uuid() }).strict();
+export const TeamAllowanceConfigureRequestSchema = z.object({ expected_revision: RevisionSchema, ...FundingConfigureShape, proof_handle: OpaqueHandleSchema }).strict().superRefine(finiteFundingWindow);
+export const TeamAllowanceRevokeRequestSchema = z.object({ expected_revision: RevisionSchema, ...FundingMutationShape, proof_handle: OpaqueHandleSchema }).strict();
+export const TeamAllowanceRevokeParamsSchema = z.object({ staffId: z.uuid(), grantId: z.uuid() }).strict();
+const TeamAllowanceMicrosSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
+const TeamAllowanceLogEntrySchema = z.object({
+    kind: z.enum(["GIVEN", "TAKEN_BACK", "ENDED"]), subject_staff_id: z.uuid(), actor_staff_id: z.uuid().nullable(), at: z.string(),
+    amount_micros: FiniteFundingMicrosSchema.optional(), day_micros: FiniteFundingMicrosSchema.optional(), week_micros: FiniteFundingMicrosSchema.optional(), expires_at: z.string().optional(),
+    cause: z.enum(["STAFF_DISABLED", "ACCOUNT_ERASED", "OWNER_CHANGED"]).optional(), notice: z.enum(["NONE", "WAITING", "SENT", "FAILED"])
+}).strict();
+export const TeamAllowancePageSchema = z.object({
+    limits: z.object({ maximum_grant_micros: FiniteFundingMicrosSchema, maximum_day_micros: FiniteFundingMicrosSchema, maximum_week_micros: FiniteFundingMicrosSchema, maximum_lifetime_ms: FiniteFundingMicrosSchema }).strict(),
+    members: z.array(z.object({
+        staff_id: z.uuid(), pseudonym: z.string().regex(/^staff-[0-9a-f]{32}$/u), is_owner: z.boolean(), revision: RevisionSchema,
+        allowance: z.object({ grant_id: z.uuid(), amount_micros: FiniteFundingMicrosSchema, day_micros: FiniteFundingMicrosSchema, week_micros: FiniteFundingMicrosSchema,
+            starts_at: z.string(), expires_at: z.string(), spent_micros: TeamAllowanceMicrosSchema }).strict().nullable()
+    }).strict()).max(100),
+    log: z.array(TeamAllowanceLogEntrySchema).max(100)
+}).strict();
+export type TeamAllowancePage = z.infer<typeof TeamAllowancePageSchema>;
 export type InternalAllowanceIntent = z.infer<typeof FundedConfigureIntentSchema> | z.infer<typeof FundedRevokeIntentSchema>;
 export type FundedStaffActionIntent = z.infer<typeof FundedStaffActionIntentSchema>;
 export const fundedStaffContractInventory = Object.freeze({
     fundingPolicyVersion: 1 as const,
-    routes: Object.freeze(["POST /v1/admin/internal-allowances", "DELETE /v1/admin/internal-allowances/{grantId}"] as const),
+    routes: Object.freeze(["POST /v1/admin/internal-allowances", "DELETE /v1/admin/internal-allowances/{grantId}",
+        "GET /v1/admin/team-allowances", "POST /v1/admin/team-allowances/{staffId}", "DELETE /v1/admin/team-allowances/{staffId}/{grantId}"] as const),
     resources: Object.freeze({ FundedStaffEnrollmentResponseSchema, SelectedStaffEnrollmentResponseSchema, FundedActiveStaffCapabilitiesSchema, FundedStaffActionSchema, FundedActionBindingSchema,
         FundedStaffElevationResponseSchema, FundedStaffTeamMemberSchema, FundedStaffTeamPageSchema,
         FundedStaffActionIntentSchema, FundedStaffActionOptionsRequestSchema, FundedStaffActionVerifyRequestSchema,
-        InternalAllowanceConfigureRequestSchema, InternalAllowanceRevokeRequestSchema, InternalAllowanceTargetParamsSchema })
+        InternalAllowanceConfigureRequestSchema, InternalAllowanceRevokeRequestSchema, InternalAllowanceTargetParamsSchema,
+        TeamAllowanceConfigureRequestSchema, TeamAllowanceRevokeRequestSchema, TeamAllowanceRevokeParamsSchema, TeamAllowancePageSchema })
 });

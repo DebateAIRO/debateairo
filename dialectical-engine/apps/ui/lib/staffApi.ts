@@ -108,7 +108,8 @@ export function createStaffApiClient({ fetchImplementation = fetch, apiBase = AP
     async function mutate(input: contract.FundedStaffActionIntent) {
         const epoch = lifecycle;
         const intent = checked(actionIntentSchema, input);
-        if (intent.action === "CREDENTIAL_REGISTER")
+        // A member's allowance has its own client (teamAllowanceApi.ts), which only asks this one for the proof.
+        if (intent.action === "CREDENTIAL_REGISTER" || intent.action === "TEAM_ALLOWANCE_CONFIGURE" || intent.action === "TEAM_ALLOWANCE_REVOKE")
             throw new contract.ContractHttpError("MALFORMED_REQUEST", 400, "STAFF_INPUT_INVALID");
         const proof = await proveAction(intent);
         assertCurrent(epoch);
