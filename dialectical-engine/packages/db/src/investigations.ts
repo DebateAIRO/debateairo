@@ -1,4 +1,7 @@
 import type { Pool, PoolClient } from "pg";
+// 0136 (W5-1): the final report over an investigation, re-exported here (the package index's bytes are pinned by the
+// migration audit, NATIVE_MIGRATE_MODULE_SHA256).
+export * from "./investigation-reports.js";
 
 /**
  * Investigations and the one reserve (migration 0133; Perplexity plan 2026-10-30, task W1-3; owner answers Q2, Q4, Q5):

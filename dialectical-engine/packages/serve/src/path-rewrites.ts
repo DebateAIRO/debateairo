@@ -65,8 +65,12 @@ export type RewriteTurn = Readonly<{
 /** A dig's picks as 0135 keeps them, each text opened under the dig's key. */
 export type StoredDigPick = Readonly<{ kind: DigPickKind; place: string; author: DigPickAuthor; text: string }>;
 
-/** The newest report written for the investigation (0133's closings): its version and when its report was stored. */
-export type WrittenReport = Readonly<{ version: number; writtenAt: string }>;
+/**
+ * The newest report written for the investigation (0133's closings): its version and when its report was stored. W5-1:
+ * `covered` is the newest rewrite that version read (0136's covered_rewrite_recorded_at): null when it read none;
+ * absent when unknown, and then the written time stands in.
+ */
+export type WrittenReport = Readonly<{ version: number; writtenAt: string; covered?: Readonly<{ recordedAt: string }> | null }>;
 
 /** W4-8: one debate's points as the trust rule reads them, by node id in lower case, and whether it ran on Free. */
 export type DebatePoints = Readonly<{ points: ReadonlyMap<string, TrustRulePoint>; free: boolean }>;
@@ -279,13 +283,15 @@ export function changedBelowPathsOf(turns: readonly Pick<PathRewriteEntry, "run_
 }
 
 /** The investigation's newest written report (0133: a closing whose report the runner stored), or null before any. */
-export function latestWrittenReportOf(closings: readonly Readonly<{ report_version: number; report_written_at: string | null }>[]):
-  WrittenReport | null {
+export function latestWrittenReportOf(closings: readonly Readonly<{ report_version: number; report_written_at: string | null }>[],
+  covered?: ReadonlyMap<number, string | null>): WrittenReport | null {
   let latest: WrittenReport | null = null;
   for (const closing of closings) {
     const writtenAt = isoOf(closing.report_written_at);
     if (writtenAt === null || (latest !== null && closing.report_version <= latest.version)) continue;
-    latest = { version: closing.report_version, writtenAt };
+    const known = covered?.has(closing.report_version) === true;
+    const recordedAt = known ? isoOf(covered!.get(closing.report_version)) : null;
+    latest = { version: closing.report_version, writtenAt, ...(known ? { covered: recordedAt === null ? null : { recordedAt } } : {}) };
   }
   return latest;
 }
@@ -396,7 +402,12 @@ export function servePathRewrites(input: Readonly<{
     if (parsed.success) paths.push(parsed.data);
   }
   if (paths.length === 0) return null;
-  const since = input.report === null ? null : Date.parse(input.report.writtenAt);
+  // W5-1: a report counts the rewrites it covered (the newest one it read, 0136), not those stored before it was written:
+  // 0 right after a report, 1 after the next rewrite. A report that read none counts every rewrite; unknown: its time.
+  const report = input.report;
+  const since = report === null ? null
+    : report.covered === undefined ? Date.parse(report.writtenAt)
+      : report.covered === null ? Number.NEGATIVE_INFINITY : Date.parse(report.covered.recordedAt);
   const count = paths.filter((path) => path.history.some((rewrite) => "rewritten_at" in rewrite
     && (since === null || Date.parse(rewrite.rewritten_at) > since))).length;
   const parsed = AnswerPathRewritesSchema.safeParse({

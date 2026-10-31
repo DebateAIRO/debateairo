@@ -1,5 +1,11 @@
 import { ContractHttpError, type ContractErrorCode, type ContractWaitingRefusal } from "./http-error.js";
 import { RunContinueRefusedSchema, RunContinueRequestSchema, RunContinuedSchema, type RunContinued, type RunContinueRefused } from "./web.js";
+import { InvestigationCloseRequestSchema } from "./web.js";
+import {
+  InvestigationReopenRequestSchema, InvestigationReopenedSchema, InvestigationReportAcceptedSchema, InvestigationReportsSchema,
+  InvestigationReportWritingSchema, type InvestigationReopened, type InvestigationReportAccepted, type InvestigationReports,
+  type InvestigationReportWriting
+} from "./investigation-report.js";
 import {
   ReadingLevelStateSchema, ReadingLevelSaveRequestSchema, LastVisitSchema, LastVisitRecordRequestSchema, LastVisitRecordedSchema,
   DigLinksSchema, DigLinkRecordRequestSchema, DigLinkRecordedSchema,
@@ -362,6 +368,10 @@ function exactPublicMessageSchema<const Message extends string>(message: Message
 
 const RecoveryStartPublicResponseSchema = exactPublicMessageSchema(RECOVERY_START_PUBLIC_MESSAGE);
 
+/** R22 W5-1: "Write my report" refused because a finished report version stands (the page offers "Keep digging"). */
+export const INVESTIGATION_CLOSED = "INVESTIGATION_CLOSED" as const;
+export type InvestigationClosedRefusal = Readonly<{ error: typeof INVESTIGATION_CLOSED; message: typeof INVESTIGATION_CLOSED }>;
+
 export interface ContractClient {
   /** Age gate: answers `refused` (and sets the lockout cookie) for anyone under the minimum age. */
   checkAge(dateOfBirth: string): Promise<AgeCheckResult>;
@@ -545,6 +555,15 @@ export interface ContractClient {
    * refused and nothing changes: the 409 RUN_PAUSED_UNTIL_RESET body is answered as data, with its `until`.
    */
   continueRun(runId: string): Promise<RunContinued | RunContinueRefused>;
+  /** R22 W5-1: the investigation the debate is in and its report versions, oldest first. */
+  readInvestigation(runId: string): Promise<InvestigationReports>;
+  /**
+   * R22 W5-1: "Write my report" (202, the version being written). Once a finished version stands the 409
+   * INVESTIGATION_CLOSED is answered as data: the page then offers "Keep digging".
+   */
+  writeReport(runId: string): Promise<InvestigationReportAccepted | InvestigationClosedRefusal>;
+  /** R22 W5-1: "Keep digging". While a version is being written the 409 INVESTIGATION_REPORT_WRITING is answered as data. */
+  reopenInvestigation(runId: string): Promise<InvestigationReopened | InvestigationReportWriting>;
   readRun(runId: string): Promise<RunProjection>;
   readInspection(answerId: string, version?: number): Promise<Inspection>;
   readLedgerDigest(answerId: string): Promise<ExecutionLedgerDigest>;
@@ -982,6 +1001,23 @@ export function createContractClient(
         if (status !== 409) return null;
         const refused = RunContinueRefusedSchema.safeParse(body);
         return refused.success ? refused.data : null;
+      }
+    ),
+    readInvestigation: (runId: string) => request(`/v1/runs/${encodeURIComponent(runId)}/investigation`, InvestigationReportsSchema),
+    writeReport: (runId: string) => requestJson<InvestigationReportAccepted | InvestigationClosedRefusal>(
+      root.href, fetchImplementation, `/v1/runs/${encodeURIComponent(runId)}/report`, InvestigationReportAcceptedSchema,
+      { method: "POST", body: JSON.stringify(InvestigationCloseRequestSchema.parse({})) }, auth, 202,
+      (status, body) => status === 409 && typeof body === "object" && body !== null
+        && (body as { error?: unknown }).error === INVESTIGATION_CLOSED
+        ? Object.freeze({ error: INVESTIGATION_CLOSED, message: INVESTIGATION_CLOSED }) : null
+    ),
+    reopenInvestigation: (runId: string) => requestJson<InvestigationReopened | InvestigationReportWriting>(
+      root.href, fetchImplementation, `/v1/runs/${encodeURIComponent(runId)}/reopen`, InvestigationReopenedSchema,
+      { method: "POST", body: JSON.stringify(InvestigationReopenRequestSchema.parse({})) }, auth, undefined,
+      (status, body) => {
+        if (status !== 409) return null;
+        const writing = InvestigationReportWritingSchema.safeParse(body);
+        return writing.success ? writing.data : null;
       }
     ),
     readRun: (runId: string) => request(`/v1/runs/${encodeURIComponent(runId)}`, RunProjectionSchema),

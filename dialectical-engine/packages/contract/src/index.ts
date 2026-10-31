@@ -35,6 +35,9 @@ import { AnswerWebSchema, AskParentSchema, DebateInvestigationSchema, DigSharePe
   PathRewritesSchema, PointOfViewVerdictSchema, RoomNewStartsSchema, RunContinueRefusedSchema, RunContinueRequestSchema,
   RunContinuedSchema, UsageBorrowSchema, UsageBorrowsSchema } from "./web.js";
 export * from "./web.js";
+import { InvestigationReopenRequestSchema, InvestigationReopenedSchema, InvestigationReportAcceptedSchema, InvestigationReportsSchema,
+  InvestigationReportWritingSchema } from "./investigation-report.js";
+export * from "./investigation-report.js";
 export * from "./crisis.js";
 export * from "./question-check.js";
 export * from "./harm-helpline.js";
@@ -1895,6 +1898,10 @@ export const contractInventory = Object.freeze({
     "POST /v1/runs/{id}/dig-links",
     // R22 W3-8 (the money rule): Continue on a debate paused at the month wall, once the month has reset.
     "POST /v1/runs/{id}/continue",
+    // R22 W5-1: the final report over an investigation: its versions, "Write my report" and "Keep digging".
+    "GET /v1/runs/{id}/investigation",
+    "POST /v1/runs/{id}/report",
+    "POST /v1/runs/{id}/reopen",
     "GET /v1/billing/usage",
     "GET /v1/billing/plans",
     "POST /v1/billing/quote",
@@ -1957,6 +1964,9 @@ export const contractInventory = Object.freeze({
     // W3-8: the two dig refusals with their own codes (./web.ts).
     DigPicksOnePathSchema, DigFreePicksMaxSchema,
     MonthPauseSchema, UsageBorrowSchema, RunContinueRequestSchema, RunContinuedSchema, RunContinueRefusedSchema,
+    // W5-1: the final report over an investigation (./investigation-report.ts).
+    InvestigationReportsSchema, InvestigationReportAcceptedSchema, InvestigationReopenRequestSchema, InvestigationReopenedSchema,
+    InvestigationReportWritingSchema,
     BillingQuoteRequestSchema, BillingQuoteResponseSchema, BillingCheckoutRequestSchema, BillingCheckoutResponseSchema,
     BillingCheckoutPendingErrorSchema, BillingChargeStatusResponseSchema,
     BillingSubscriptionResponseSchema, BillingDowngradeRequestSchema, BillingInvoicesResponseSchema,

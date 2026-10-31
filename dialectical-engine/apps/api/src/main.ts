@@ -27,7 +27,8 @@ import {readConsumerRecoveryPolicy} from "@debateai/register";
 import {SendmailConsumerAccountSender} from "./mail-channel.js";
 import { ConsumerSecurityService } from "./consumer-security.js";
 import { PostgresConsumerSecurityRepository } from "@debateai/db";
-import { PostgresDigModelRepository, PostgresDigPicksRepository, PostgresInvestigationRepository } from "@debateai/db";
+import { PostgresDigModelRepository, PostgresDigPicksRepository, PostgresInvestigationReportRepository, PostgresInvestigationRepository } from "@debateai/db";
+import { investigationReportContentOpener } from "./investigation-report.js";
 import { continuedRunWake } from "./month-pause.js";
 import { ConsumerWebAuthnService } from "./consumer-webauthn.js";
 import { PostgresConsumerAuthRepository } from "@debateai/db";
@@ -1653,6 +1654,10 @@ if (environment.DATA_EXPORT_STORE_PATH !== undefined) {
   dataExportTimer = gatedInterval(releaseWatcher, triggerDataExportWork, DATA_EXPORT_TICK_MS);
 }
 const admission = new AdmissionLimiter(admissionPolicy);
+// V4 account memory (owner rulings N7 and N11, migration 0131): 0131's functions on the API's runtime pool, whose
+// principal holds debateai_billing_runtime (the only role granted them); each function checks run ownership itself.
+const accountMemory = accountMemoryStoreFrom((text, values) => pool.query(text, values));
+const investigations = new PostgresInvestigationRepository(pool);
 const api = buildApi({
   questionCheck,
   // Addition D16 / ruling R25: keyed on the env's gate part; the configuration is the site version's composed one (its
@@ -1664,14 +1669,21 @@ const api = buildApi({
   // the content-free disclosure record, on the same runtime pool.
   disclosures: ownerDisclosures,
   mapViews,
-  // V4 account memory (owner rulings N7 and N11, migration 0131): 0131's functions on the API's runtime pool, whose
-  // principal holds debateai_billing_runtime (the only role granted them); each function checks run ownership itself.
-  accountMemory: accountMemoryStoreFrom((text, values) => pool.query(text, values)),
+  accountMemory,
   // Plan 2026-10-30 dig-model revision W3-2 (0133, 0134): dig levels and the month pause, and the dig's join at start,
   // through 0134's and 0133's definers on the same runtime pool (debateai_billing_runtime); the month's room again after
   // a pause is the ask room's (with billing on).
   digModel: new PostgresDigModelRepository(pool),
-  investigations: new PostgresInvestigationRepository(pool),
+  investigations,
+  // R22 W5-1: the final report over an investigation, through 0136's and 0133's definers on the same runtime pool; a
+  // debate in no investigation is told from another account's by 0131's ownership rule (the last-visit read answers null
+  // only for a debate that is not this account's); what the runner sealed under the ROOT's run key opens on this pool.
+  investigationReports: {
+    reports: new PostgresInvestigationReportRepository(pool),
+    investigations,
+    owns: async (ownerRef, runId) => (await accountMemory.readLastVisit(ownerRef, runId)) !== null,
+    openRootContent: investigationReportContentOpener(pool)
+  },
   // W3-7 (0135): a dig's picks, kept at start for its path rewrite, each text sealed under the dig's run key on this pool.
   digPicks: new PostgresDigPicksRepository(pool),
   ...(askRoom === undefined ? {} : { monthRoom: askRoom }),

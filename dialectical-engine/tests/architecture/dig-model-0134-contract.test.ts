@@ -80,7 +80,7 @@ function sources(directory: URL): string[] {
 
 describe("0134: the dig model and the month pause", () => {
   it("C-T follows 0133 in the chain's STEPS (the dig picks' 0135 comes after it), with its own loader", async () => {
-    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0132,loadForward0133,loadForward0134,loadForward0135]);");
+    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0132,loadForward0133,loadForward0134,loadForward0135,loadForward0136]);");
     const loader = read("packages/db/src/migration-forward0134.ts");
     expect(loader).toContain(`const NAME = "${NAME}";`);
     expect(loader).toContain('const VERSION = "dig-model-forward0134-v1";');
@@ -274,7 +274,7 @@ describe("0134: the dig model and the month pause", () => {
     expect(read("packages/db/src/account-erasure.ts")).toContain("FORGET_ERASED_DEBATE_DIG_MODEL,\n");
     const exporter = read("packages/db/src/data-export.ts");
     expect(exporter).toContain(`"${EXPORT_READER}",`);
-    expect(exporter).toContain("worker.worker_count !== 14");
+    expect(exporter).toContain("worker.worker_count !== 15");
   });
 
   it("C-R is documented as the twenty-fourth step", () => {

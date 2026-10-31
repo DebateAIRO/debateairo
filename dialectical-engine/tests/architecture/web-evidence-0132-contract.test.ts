@@ -58,7 +58,7 @@ const tableBody = (sql: string, table: string): string => {
 
 describe("0132: the web evidence store step", () => {
   it("C-T follows 0131 in the chain's STEPS, with its own loader", async () => {
-    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0131,loadForward0132,loadForward0133,loadForward0134,loadForward0135]");
+    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0131,loadForward0132,loadForward0133,loadForward0134,loadForward0135,loadForward0136]");
     const loader = read("packages/db/src/migration-forward0132.ts");
     expect(loader).toContain(`const NAME = "${NAME}";`);
     expect(loader).toContain('const VERSION = "web-evidence-forward0132-v1";');
@@ -220,7 +220,7 @@ describe("0132: the web evidence store step", () => {
   it("C-R is documented as the twenty-second step", () => {
     const readme = read("migrations/lineage/README.md");
     expect(readme.replace(/\s+/gu, " ")).toContain(
-      "the V4 account memory (0131, below) the twenty-first, the web evidence store (0132, below) the twenty-second, the investigations (0133, below) the twenty-third, the dig model with the month pause (0134, below) the twenty-fourth and the dig picks (0135, below) the twenty-fifth.");
+      "the V4 account memory (0131, below) the twenty-first, the web evidence store (0132, below) the twenty-second, the investigations (0133, below) the twenty-third, the dig model with the month pause (0134, below) the twenty-fourth, the dig picks (0135, below) the twenty-fifth and the investigation reports (0136, below) the twenty-sixth.");
     const heading = "## The web evidence store (0132) and investigations (0133)";
     const at = readme.indexOf(heading);
     expect(at).toBeGreaterThan(readme.indexOf("## The V4 account memory (0131)"));

@@ -326,3 +326,26 @@ export const PATH_REWRITE_POLICY = Object.freeze({
   writerBound: Object.freeze({ maxAttempts: 3, tokenCeiling: 8192, deadlineMs: 240_000 }),
   checkerBound: Object.freeze({ maxAttempts: 3, tokenCeiling: 2048, deadlineMs: 180_000 })
 } as const);
+
+/**
+ * THE FINAL REPORT OVER AN INVESTIGATION (plan 2026-10-30 task W5-1; design W0-1 with the owner's answers F1-F14).
+ * Code-owned, never a register row, as the path rewrite's: its contracts are sealed by engineContractHash.
+ *  - rounds: the answer and the story at most 2 rounds each on a paid plan; Free's slim report 1 round each (owner F1),
+ *    then a backup writer of another maker the same again, as the story does;
+ *  - output caps (owner F3, his own figures): 16K tokens for the answer, 80K for the story; Free's slim story 16K, so its
+ *    whole report fits its 5-cent reserve (owner F2);
+ *  - money (the money rule of 31 Oct, point 6): the reserve always kept, 20 cents inside a paid month and 5 on top of
+ *    Free's 20, is the closing's ceiling; it is never walled. `ceilingMicros` is the largest (the gateway's safety net);
+ *    the closing admits each call against its own plan's reserve before it is sent.
+ *  - thinking: the four steps are the owner's answer_writer, answer_checker, story_writer and story_checker rows.
+ */
+export const INVESTIGATION_REPORT_POLICY = Object.freeze({
+  maxRounds: 2,
+  freeMaxRounds: 1,
+  answerBound: Object.freeze({ maxAttempts: 3, tokenCeiling: 16_384, deadlineMs: 300_000 }),
+  storyBound: Object.freeze({ maxAttempts: 3, tokenCeiling: 81_920, deadlineMs: 600_000 }),
+  freeStoryBound: Object.freeze({ maxAttempts: 3, tokenCeiling: 16_384, deadlineMs: 300_000 }),
+  checkerBound: Object.freeze({ maxAttempts: 3, tokenCeiling: 8_192, deadlineMs: 300_000 }),
+  reserveMicros: Object.freeze({ paid: 200_000, free: 50_000 }),
+  ceilingMicros: 200_000
+} as const);

@@ -47,7 +47,10 @@ const ENGINE_SEALED_IDS: readonly string[] = ["verdict.investigate.v1", "verdict
   // W4-2 (plan 2026-10-30; owner Q9): the dig's planner, one search per pick (a draft wording, approve before switch-on).
   "web.plan-dig.v1",
   // W4-7 (plan 2026-10-30; design §7.1 item 7): the answer checker's two sources variants, the instruction unchanged.
-  "serve.evaluator.length.sources.v1", "serve.evaluator.length.reader.sources.v1"];
+  "serve.evaluator.length.sources.v1", "serve.evaluator.length.reader.sources.v1",
+  // W5-1 (the final report over an investigation): the answer, the later version's answer, the answer check (R4's wording
+  // with W0-1 §2.6 and draft 5.6, approved), the story and the story check (OWNER WORDING drafts).
+  "report.answer.v1", "report.answer.later.v1", "report.answer-check.v1", "report.story.v1", "report.story-check.v1"];
 /**
  * R1d's seal: sha256 of the header text alone, no trailing newline. Printed once with
  * `printf '%s' debateai.engine-contracts.v1 | shasum -a 256` and pasted here; the test also recomputes it.
@@ -63,8 +66,9 @@ const R1D_ENGINE_CONTRACT_HASH = "b98a45d5933d82205d5c6514082d4151bfb8f3f45b3677
 // (64ec9ef0258010b8b63f9a5e270a2c734b7311650c47281eda1fe2fc7b61057a, history). W3-5 (2026-10-31): + the path rewrite's 2
 // (e87152961c68939de279dec08e8c50423e758936db4bc8e7d785a61455151123, history). W4-2 (2026-11-01): + the dig's planner
 // (85278722824f1cde050e290bbb7ec507af08a8e7ae8087526aee27b45f1b66aa, history). W4-7 (2026-11-01): + the answer checker's two
-// sources variants.
-const ENGINE_CONTRACT_HASH_SEALED = "b34eac03a16c921a6a360a4405e38eea8e1c0dbd521d8de4e53a379198f6e716";
+// sources variants (b34eac03a16c921a6a360a4405e38eea8e1c0dbd521d8de4e53a379198f6e716, history). W5-1 (2026-11-01): + the
+// final report's 5.
+const ENGINE_CONTRACT_HASH_SEALED = "2c8c3139511ddf6d58aa977e418931b3185ebfe4707282367754e4ffbe6ef41b";
 const SELECT = "SELECT value_json FROM register.register_row WHERE register_version=$1 AND row_key=$2";
 const runtime = { nodeVersion: "v26.8.2", pnpmVersion: "11.20.0", sourceRevision: "a".repeat(40), sourceTree: "b".repeat(40),
   operatorSha256: "c".repeat(64), observedAt: "2026-10-16T12:00:00.000Z" };

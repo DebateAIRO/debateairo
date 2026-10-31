@@ -10,13 +10,13 @@ base verifier).
 
 Every migration after 0110 is a forward step in an ordered chain anchored on 0110; 0111 (NETOPIA, PR-54, PR-58) is the
 first, the auth DB batch (0112, below) the second, Part C's prices (0113, below) the third, role rotation (0114,
-below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth, the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, the synthesis check (0126, below) the sixteenth, the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth, the support answer scope (0129, below) the nineteenth, row-level security (0130, below) the twentieth, the V4 account memory (0131, below) the twenty-first, the web evidence store (0132, below) the twenty-second, the investigations (0133, below) the twenty-third, the dig model with the month pause (0134, below) the twenty-fourth and the dig picks (0135, below) the twenty-fifth. A step is added with new files only; NNNN is its number, the step before's number plus one:
+below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth, the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, the synthesis check (0126, below) the sixteenth, the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth, the support answer scope (0129, below) the nineteenth, row-level security (0130, below) the twentieth, the V4 account memory (0131, below) the twenty-first, the web evidence store (0132, below) the twenty-second, the investigations (0133, below) the twenty-third, the dig model with the month pause (0134, below) the twenty-fourth, the dig picks (0135, below) the twenty-fifth and the investigation reports (0136, below) the twenty-sixth. A step is added with new files only; NNNN is its number, the step before's number plus one:
 
 1. `migrations/NNNN_<name>.sql`: the SQL, forward-only and replayable.
 2. A manifest in `lineage/`, shaped like `billing-netopia-forward111.json`: its version, the recipe's SHA-256,
-   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0135: 0135,
-   `dig-picks-forward0135.json`, and `verify-effective-capabilities-130.sql`, which supersedes 0111's, which
-   0112 to 0129 keep; 0131 to 0135 keep 0130's),
+   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0136: 0136,
+   `investigation-reports-forward0136.json`, and `verify-effective-capabilities-130.sql`, which supersedes 0111's, which
+   0112 to 0129 keep; 0131 to 0136 keep 0130's),
    and its own migration and verifier. (0111's own `previous` is 0110: `auth-dev-preview-20261006-forward110.json`
    and the sealed `verify-effective-capabilities.sql`.)
 3. A new verifier `lineage/verify-effective-capabilities-NNNN.sql` only when the step adds billing relations or
@@ -564,6 +564,41 @@ no role holds a table right, so row-level security (0130) leaves them outside it
 takes 0135 first, renumber this step by the same recipe before merge (C1's: every file and constant that carries the
 number, `previous`, the manifest digests, the chain lists).
 
+## The investigation reports (0136)
+
+The twenty-sixth step, after the dig picks (0135), carries the final report the runner writes over an investigation
+(R22, plan task W5-1: the report the runner writes for a closing; owner answer F7 A: the report waits for the digs still
+running and for their path rewrites): `0136_investigation_reports.sql` with `investigation-reports-forward0136.json` and
+`packages/db/src/migration-forward0136.ts` (`loadForward0136`, `MIGRATION_FORWARD0136_` refusals), appended last to
+`STEPS`. It declares `-- n1: expand` (one new table and eleven new functions; no earlier function, table or trigger
+changes, 0133's `identity.record_investigation_report` is called by the new writer, not redefined, and 0133's to 0135's
+tables are only read; `ledger.model_spend`'s shared source list is re-added `NOT VALID` in 0134's pattern with one more
+source, `INVESTIGATION_REPORT`, whose run rule `model_spend_investigation_report_names_its_run` restricts only the new
+source) and `-- n1: keeps-verifier`: no billing relation or function, so `verify-effective-capabilities-130.sql` stays
+in force and it has no `replayVerifierSql`.
+
+It keeps `identity.investigation_report` (one row per closing whose report the runner wrote, insert-once: the 0133
+closing it answers, by investigation and report version, the id that closing records as its report, the
+investigation's root debate, the outcome and the story's, the newest path rewrite the version covered, the dossier's
+fingerprint, the ladder step and how many items were left out, the writer's and checker's lineage, rounds, artifact
+refs and what it cost; its text only in an envelope under the ROOT's run key, a `CONTENT_CARRIERS` entry checked on
+insert by this step's trigger in 0134's shape, 0132's checks called, not redefined). The runner lists the closings
+still waiting for their report (`identity.read_unreported_closings`), reads the members a report still waits for,
+writes the report (`identity.record_investigation_report_version`, which also records it on 0133's closing in the same
+transaction), reads a debate's reports and when the newest closing without a report was made (the money seam sums that
+closing's charges from then on); the API reads the person's reports (`identity.read_investigation_reports`, its own
+role).
+
+Every row names its account's `owner_ref` and its closing with `ON DELETE CASCADE`: an erased root takes its
+investigation and closings with it (0133's `identity.forget_erased_debate_investigation`, in the finalize transaction
+of the run's erasure), and so its reports; an erased dig leaves them, as they are sealed under the root's key and stay
+with the root. So this step adds no deletion function and the erasure role's count is unchanged. The export worker
+reads `identity.read_data_export_investigation_reports(uuid,uuid)` through 0128's lease gate. The table and ten of the
+eleven definers take 0115's export owner (the content trigger keeps the migrator, as 0134's does); no role holds a
+table right, so row-level security (0130) leaves it outside its scope rule. If an earlier pending step takes 0136
+first, renumber this step by the same recipe before merge (C1's: every file and constant that carries the number,
+`previous`, the manifest digests, the chain lists).
+
 ## Replay: every applied step keeps its own checks
 
 On a later `migrate()` EVERY applied step is checked by its receipt and by its postcondition digest (not only the
@@ -575,7 +610,7 @@ changes something an earlier step's verifier pins must change that verifier thro
 cannot silently pass. The effective-capability verifier of the last applied step (after 0129: 0111's, which the batch,
 Part C's step, role rotation, the data export, the mail locale, the debate shape map, the language check's site cost,
 the reclaim resume, the reply measures, the engine verdict, the engine's map answer step, the side-by-side releases,
-the settings activation, the Italy-specific approval, the synthesis check, the publication review, the threat reports and the support answer scope keep; after 0130: `verify-effective-capabilities-130.sql`, which the V4 account memory (0131), the web evidence store (0132), the investigations (0133), the dig model (0134) and the dig picks (0135) keep) still
+the settings activation, the Italy-specific approval, the synthesis check, the publication review, the threat reports and the support answer scope keep; after 0130: `verify-effective-capabilities-130.sql`, which the V4 account memory (0131), the web evidence store (0132), the investigations (0133), the dig model (0134), the dig picks (0135) and the investigation reports (0136) keep) still
 runs at the end of every `migrate()`. A step that changes by design a field an earlier step's postcondition digests
 declares it (`amendsPostconditionsOf`, 0130 below): the earlier step is then compared against its latest recorded
 amendment instead of its receipt.

@@ -91,6 +91,7 @@ import { applyPreviewGateCapacities, previewCallSubjects, previewGateNames, stru
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
 import { MonthPause, monthPaused } from "../../apps/runner/src/month-pause.js";
 import { composePathRewrite } from "../../apps/runner/src/path-rewrite-composition.js";
+import { composeInvestigationClose } from "../../apps/runner/src/investigation-close-sources.js";
 import {
   createRunnerSettingsCache, createRunSettingsVersions, loadRunnerVersionSettings, preloadRunnerSettings, readRunnerSiteContext,
   runCostEnvelopeGuardOf, runnerSettingsOfVersion, runnerSettingsSummary, runnerWebSearchSettings, runPreviewThinkingLevelsOf,
@@ -261,7 +262,9 @@ export async function composePracticeRunner(input: Readonly<{
         // W3-2, as main.ts: the month pause on a walled call, and a dig's path rewrite on its own seam.
         buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => monthPaused(runCostEnvelopeGuard(runId).providerSeam({ runId, price, requireReportedUsage: true, phase, sharedWall }), { runId, phase, sharedWall, pause: monthPause, plannedMicros: () => runCostEnvelopeGuard(runId).bodyMicrosLeft(runId) }),
         buildStoryCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).storySeam({ runId, price, requireReportedUsage: true }),
-        buildPathRewriteCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).pathRewriteSeam({ runId, price, requireReportedUsage: true })
+        buildPathRewriteCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).pathRewriteSeam({ runId, price, requireReportedUsage: true }),
+        // W5-1: "Write my report"'s calls spend the report seam, never walled (main.ts's line).
+        buildInvestigationReportCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).investigationReportSeam({ runId, price, requireReportedUsage: true })
       })
     });
     // Spec §3.4, as main.ts: the gate is marked unhealthy on its FIRST unsent refusal, before the resend wait.
@@ -320,6 +323,12 @@ export async function composePracticeRunner(input: Readonly<{
   const pathRewrite = composePathRewrite({ pool, targets: providerTargets,
     members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
     log: storyLog });
+  // W5-1: the closing, composed as main.ts composes it (the practice writes a report only when its script presses it).
+  const closingPrices = buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE);
+  const investigationClose = composeInvestigationClose({ pool, targets: providerTargets,
+    members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
+    priceOf: (providerRef) => closingPrices.get(providerRef) ?? null,
+    log: storyLog });
   function observeClaimTarget(target: (typeof providerTargets)[number]) {
     return observeClaimTimeTarget({
       preview: true,
@@ -367,6 +376,7 @@ export async function composePracticeRunner(input: Readonly<{
     story: storyWriter,
     // Dig-model revision W3-7: a dig's path rewrite in its story's place (above).
     ...(pathRewrite === undefined ? {} : { pathRewrite: pathRewrite.settings }),
+    ...(investigationClose === undefined ? {} : { investigationClose }),
     providerPrices: buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE),
     // LG-A (Task 14 carry), as main.ts: root 0's room adds the structure-repair call to its first attempt and retry (the sum).
     structureRepairCeiling: previewStructureRepairCeiling(structureRepairRoute),

@@ -2861,6 +2861,31 @@
       "grants": [
         "EXECUTE ON FUNCTION identity.read_data_export_dig_picks(uuid,uuid)"
       ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0136_investigation_reports.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_investigation_reports(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0136_investigation_reports.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_unreported_closings(integer)",
+        "EXECUTE ON FUNCTION identity.read_investigation_waiting_of_run(uuid)",
+        "EXECUTE ON FUNCTION identity.record_investigation_report_version(uuid,integer,uuid,text,text,text,uuid,timestamptz,text,smallint,integer,smallint,smallint,jsonb,jsonb,jsonb,bigint,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_investigation_reports_of_run(uuid)",
+        "EXECUTE ON FUNCTION identity.read_closing_since_of_root(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0136_investigation_reports.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_investigation_reports(uuid,uuid)"
+      ]
     }
   ],
   "deploymentObligations": [

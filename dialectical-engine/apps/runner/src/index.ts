@@ -267,6 +267,7 @@ import {
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
 import { CONTENT_REFUSED_HALT_REASON, buildStoryRunSnapshot, storyAlsoRaisedFrom, storyAnswersNoteFrom, storyBackupCandidatesFrom, storyBackupMakersFrom, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
 import { runDigPathRewrite, type PathRewriteRunnerSettings } from "./path-rewrite.js";
+import { pokeInvestigationClosing, type InvestigationCloseSettings } from "./investigation-close.js";
 import {
   shapeCloseCallExtraSeats, shapeCloseCallFires, shapeCloseCallFold, shapeDistinctMakerOptions, shapeRankScrutiny, shapeSelectChains,
   type ScrutinyCandidate
@@ -295,6 +296,7 @@ import { EMPTY_REPLAY_BOOK, readReplayBook, replayingGateway, type ReplayBook } 
 import { isMonthPausedStop, RUN_MONTH_PAUSED } from "./month-pause.js";
 import type { RunInFlight } from "./run-in-flight.js";
 import { PATH_REWRITE_CALL_SITE_PREFIX, isPathRewriteCallSite, pathRewriteCallSiteRole } from "./path-rewrite-scope.js";
+import { INVESTIGATION_REPORT_CALL_SITE_PREFIX, investigationReportCallSiteRole } from "@debateai/story";
 // Side-by-side spec §13 (S6): the per-version settings types (type-only: run-settings.ts imports this module) and the one
 // debate-member mapping, from its own module so this one never loads the loader.
 import type { RunnerSettingsResolution, RunSettingsVersions } from "./run-settings.js";
@@ -2745,6 +2747,8 @@ export interface WalkingSkeletonSettings {
    * debate: the story, as today.
    */
   readonly pathRewrite?: PathRewriteRunnerSettings;
+  /** W5-1: "Write my report"'s closing, poked when a member of a closing investigation settles (the story stage). */
+  readonly investigationClose?: InvestigationCloseSettings;
   /**
    * ENGINE MONEY RULE (spec 2026-09-26 §14.4.2), TASK M3: each provider
    * target's price (`buildProviderPriceMap`), so a MONEY refusal of an
@@ -12131,6 +12135,9 @@ export class WalkingSkeletonRunner {
             // included: the version sealed no story rows); undefined only without per-version settings (the writer's own).
             await storyWriter.writeAfterSettle(settings.storyPolicy === undefined ? settled.input : Object.freeze({ ...settled.input, policy: settings.storyPolicy }));
           }
+          // W5-1 (owner F7 A): a closing waits for its running digs and their rewrites; this member is now settled, so a
+          // closing of its investigation may start at once rather than at the next sweep. Never rejects.
+          await pokeInvestigationClosing(settings.investigationClose, settled.input.runId);
         } else {
           storyWriter.reportSnapshotFailure(settled);
         }
@@ -13516,6 +13523,9 @@ function storyCallSiteRole(callSiteKey: string): ProviderCallRequest["role"] | n
   if (callSiteKey === STORY_CHARTS_CALL_SITE) return "SYNTHESIZER";
   const rewrite = pathRewriteCallSiteRole(callSiteKey);
   if (rewrite !== null) return rewrite;
+  // W5-1: the final report's four sites (packages/story INVESTIGATION_REPORT_CALL_SITE), each with its one role.
+  const report = investigationReportCallSiteRole(callSiteKey);
+  if (report !== null) return report;
   const site = STORY_CALL_SITE.exec(callSiteKey);
   if (site === null) return null;
   return site[1] === "STORYTELLER" ? "SYNTHESIZER" : "EVALUATOR";
@@ -13530,7 +13540,8 @@ function storyCallSiteRole(callSiteKey: string): ProviderCallRequest["role"] | n
 export function storyCallScopeAgrees(request: Pick<ProviderCallRequest, "lane" | "callSiteKey" | "role">): boolean {
   const key = structureRepairOriginalKey(request.callSiteKey);
   const storyScope = request.lane === "story";
-  const storyKey = key.startsWith(STORY_CALL_SITE_PREFIX) || key.startsWith(PATH_REWRITE_CALL_SITE_PREFIX);
+  const storyKey = key.startsWith(STORY_CALL_SITE_PREFIX) || key.startsWith(PATH_REWRITE_CALL_SITE_PREFIX)
+    || key.startsWith(INVESTIGATION_REPORT_CALL_SITE_PREFIX);
   return !((storyScope || storyKey) && (!storyScope || storyCallSiteRole(key) !== request.role));
 }
 
@@ -13631,6 +13642,8 @@ export function createPostgresProviderGateway(
       readonly buildStoryCostEnvelopeSeam?: (runId: string) => InFlightReleasingSeam;
       /** W3-2: a dig's path rewrite (story lane, `PATH_REWRITE:` sites) spends its own never-walled seam. */
       readonly buildPathRewriteCostEnvelopeSeam?: (runId: string) => InFlightReleasingSeam;
+      /** W5-1: the final report (story lane, `INVESTIGATION_REPORT:` sites, the root run) spends its own never-walled seam. */
+      readonly buildInvestigationReportCostEnvelopeSeam?: (runId: string) => InFlightReleasingSeam;
       /**
        * Parallel AI calls (spec 2026-10-12 §3.5): this process's calls in
        * flight, for the run-wide attempt ceiling. A call bounded by that ceiling
@@ -13643,7 +13656,8 @@ export function createPostgresProviderGateway(
     }
 ): ProviderGateway {
   const { buildCostEnvelopeSeam, ...gatewayOptions } = options;
-  const { buildStoryCostEnvelopeSeam, buildPathRewriteCostEnvelopeSeam, inFlight, ...httpOptions } = gatewayOptions;
+  const { buildStoryCostEnvelopeSeam, buildPathRewriteCostEnvelopeSeam, buildInvestigationReportCostEnvelopeSeam, inFlight,
+    ...httpOptions } = gatewayOptions;
   const ledger = new LedgerRepository(pool);
   const budget = new BudgetRepository(pool);
   const http = new OpenAICompatibleProviderGateway({
@@ -13690,7 +13704,11 @@ export function createPostgresProviderGateway(
       // practice always give both, so in production a version without a story ceiling is refused by its guard's story
       // seam instead (the same STORY_ENVELOPE_MISSING, built below before the provider-failure capture).
       const pathRewrite = storyScope && isPathRewriteCallSite(structureRepairOriginalKey(request.callSiteKey));
-      if (storyScope && (pathRewrite ? buildPathRewriteCostEnvelopeSeam : buildStoryCostEnvelopeSeam) === undefined
+      // W5-1: the final report's sites spend the report seam (never walled), on the investigation's root run.
+      const reportCall = storyScope && investigationReportCallSiteRole(structureRepairOriginalKey(request.callSiteKey)) !== null;
+      const storyLaneSeam = reportCall ? buildInvestigationReportCostEnvelopeSeam
+        : pathRewrite ? buildPathRewriteCostEnvelopeSeam : buildStoryCostEnvelopeSeam;
+      if (storyScope && storyLaneSeam === undefined
         && buildCostEnvelopeSeam !== undefined) {
         throw new TypedDomainError(
           "STORY_ENVELOPE_MISSING",
@@ -13790,7 +13808,7 @@ export function createPostgresProviderGateway(
        * it ends the call before anything is sent, with its own code, uncaptured.
        */
       costEnvelope = storyScope
-        ? (pathRewrite ? buildPathRewriteCostEnvelopeSeam : buildStoryCostEnvelopeSeam)?.(leasedRunId)
+        ? storyLaneSeam?.(leasedRunId)
         : buildCostEnvelopeSeam?.(leasedRunId, costEnvelopePhase, providerCallSharedWall(request));
       try {
         return await http.call({

@@ -31,7 +31,9 @@ import { mergeDigLinks, readDigRecords, readLastVisit, recordDig, recordLastVisi
 import { diffSnapshots, isRewriteWord, rewriteNewsOf, selectionForChange, snapshotItems } from "@/lib/v4/changes";
 import { effectiveDigMode } from "@/lib/v4/askConfig";
 import { digLinksFor, digParentOf, mergeIndex, readQuestionIndex, type IndexEntry } from "@/lib/v4/digIndex";
-import { loadAnswer, loadDigTrail, loadDigView, loadStory, loadV4, storyReadFailed, type DigTrail, type V4Load } from "@/lib/v4/load";
+import {
+  currentReportVersion, loadAnswer, loadDigTrail, loadDigView, loadInvestigation, loadStory, loadV4, storyReadFailed, type DigTrail, type V4Load
+} from "@/lib/v4/load";
 import { buildV4Map, rewriteByDig, rewriteWaiting, uniqueOpenQuestions } from "@/lib/v4/mapModel";
 import {
   borrowLines,
@@ -794,6 +796,24 @@ function V4Debate({
     };
   }, [trailKey]);
 
+  // ── The report's answer (R22 W5-1, owner Q-D11) ──────────────────────────────────────────────────────────────────
+  // On the first debate's map, once its investigation has a finished report version, the panel's answer is that
+  // version's (the first debate's answer one click away). Read once per visit; a failed read leaves the first answer.
+  const [reportAnswer, setReportAnswer] = useState<Readonly<{ version: number; segments: readonly string[] }> | null>(null);
+  const isDig = servedDig !== null;
+  useEffect(() => {
+    if (servedRunId === null || isDig) return;
+    let active = true;
+    void loadInvestigation(servedRunId).then((read) => {
+      const current = currentReportVersion(read);
+      if (!active || read === null || read.root_run_id.toLowerCase() !== servedRunId.toLowerCase()) return;
+      setReportAnswer(current === null ? null : { version: current.report_version, segments: current.answer.segments });
+    });
+    return () => {
+      active = false;
+    };
+  }, [servedRunId, isDig]);
+
   // ── Selection ───────────────────────────────────────────────────────────────────────────────────────────────────
   // W4-6: a link back from a dig names the path it dug (`?path=`); the panel opens there (a path gone: the question).
   const [selected, setSelected] = useState<V4Selection>(() => (initialPath === null ? "root" : `path:${initialPath}`));
@@ -1347,6 +1367,7 @@ function V4Debate({
                 roomNotice={roomNotice}
                 money={money}
                 digPathLine={trail?.steps.at(-1)?.line ?? null}
+                reportAnswer={reportAnswer}
                 {...(choice === undefined ? {} : { choice })}
                 headingRef={headingRef}
                 catalog={catalog}

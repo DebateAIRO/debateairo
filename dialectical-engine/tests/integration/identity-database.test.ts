@@ -69,7 +69,10 @@ describe("S2 identity schema on real PostgreSQL", () => {
       "investigation", "investigation_closing",
       // 0134 the dig model: each dig's level.
       "investigation_dig_level",
-      "investigation_member", "investigation_reserve_event",
+      "investigation_member",
+      // 0136 the investigation's final report: one per closing.
+      "investigation_report",
+      "investigation_reserve_event",
       "login_challenge", "mfa_factor",
       "mfa_recovery_control", "mfa_recovery_legacy_cohort", "mfa_recovery_notice", "mfa_recovery_notice_binding",
       "mfa_recovery_source_window", "mfa_recovery_staged_code",

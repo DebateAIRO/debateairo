@@ -123,6 +123,7 @@ apps/api/src/email-mfa-routes.ts
 apps/api/src/engine-ask.ts
 apps/api/src/graceful-shutdown.ts
 apps/api/src/index.ts
+apps/api/src/investigation-report.ts
 apps/api/src/italy-approval.ts
 apps/api/src/legacy-claim.ts
 apps/api/src/legal.ts
@@ -391,6 +392,9 @@ apps/runner/src/hosted-provider-set.ts
 apps/runner/src/hosted-register-publish-cli.ts
 apps/runner/src/hosted-register-publish.ts
 apps/runner/src/index.ts
+apps/runner/src/investigation-close-sources.ts
+apps/runner/src/investigation-close.ts
+apps/runner/src/investigation-dossier.ts
 apps/runner/src/main.ts
 apps/runner/src/map-stage.ts
 apps/runner/src/migrate-cli.ts
@@ -997,6 +1001,7 @@ packages/contract/src/generate.ts
 packages/contract/src/harm-helpline.ts
 packages/contract/src/http-error.ts
 packages/contract/src/index.ts
+packages/contract/src/investigation-report.ts
 packages/contract/src/lineage.ts
 packages/contract/src/locale.ts
 packages/contract/src/map-view.ts
@@ -1038,6 +1043,7 @@ packages/db/src/erasure-page-memory.ts
 packages/db/src/identity.ts
 packages/db/src/index.ts
 packages/db/src/internal-allowance.ts
+packages/db/src/investigation-reports.ts
 packages/db/src/investigations.ts
 packages/db/src/legacy-claim.ts
 packages/db/src/legal-acceptance.ts
@@ -1068,6 +1074,7 @@ packages/db/src/migration-forward0132.ts
 packages/db/src/migration-forward0133.ts
 packages/db/src/migration-forward0134.ts
 packages/db/src/migration-forward0135.ts
+packages/db/src/migration-forward0136.ts
 packages/db/src/migration-forward108.ts
 packages/db/src/migration-forward110.ts
 packages/db/src/migration-forward111.ts
@@ -1304,6 +1311,7 @@ packages/story/src/contracts.ts
 packages/story/src/enrichment.ts
 packages/story/src/forms.ts
 packages/story/src/index.ts
+packages/story/src/investigation-report.ts
 packages/story/src/length.ts
 packages/story/src/loop.ts
 packages/story/src/material.ts

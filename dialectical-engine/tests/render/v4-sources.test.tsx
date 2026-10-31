@@ -28,7 +28,9 @@ vi.mock("@/lib/v4/load", async (importActual) => ({
   ...(await importActual<typeof import("../../apps/ui/lib/v4/load.js")>()),
   loadV4: async () => mocks.load,
   loadStory: async () => { throw new Error("not read in this test"); },
-  loadDigView: async () => { throw new Error("no digs in this test"); }
+  loadDigView: async () => { throw new Error("no digs in this test"); },
+  // R22 W5-1: no investigation report in these tests.
+  loadInvestigation: async () => null
 }));
 vi.mock("@/lib/v4/digIndex", () => ({ readQuestionIndex: async () => [], digLinksFor: () => [] }));
 vi.mock("@/lib/v4/accountMemory", () => ({ readDigRecords: async () => null, mergeDigLinks: () => [] }));

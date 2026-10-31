@@ -96,7 +96,7 @@ async function extractsOfPoints(pool: Pool, runId: string, pointIds: readonly st
 }
 
 /** The story path's points: each node's own words, in the story's order, the point it argues when that one is here too. */
-async function pointsOf(pool: Pool, runId: string, nodeIds: readonly string[]): Promise<readonly PathRewritePoint[]> {
+export async function pointsOf(pool: Pool, runId: string, nodeIds: readonly string[]): Promise<readonly PathRewritePoint[]> {
   if (nodeIds.length === 0) return [];
   const nodes = (await pool.query<{ node_id: string; claim_text: string; content_ciphertext: CryptoEnvelope | null }>(
     "SELECT node_id::text AS node_id, claim_text, content_ciphertext FROM core.node WHERE run_id = $1 AND node_id = ANY($2::uuid[])",
