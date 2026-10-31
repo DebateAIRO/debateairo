@@ -338,6 +338,7 @@ describe("W1-6 inventory and the no-grade rule over every new shape", () => {
   it("lists every new shape in the contract inventory and adds no route", () => {
     const resources = contractInventory.resources as unknown as Record<string, unknown>;
     for (const [name, schema] of Object.entries(NEW)) expect(resources[name], name).toBe(schema);
-    expect(contractInventory.routes).toHaveLength(180);
+    // R22 W3-8 later registered one route for these shapes, Continue (POST /v1/runs/{id}/continue): 180 + 1.
+    expect(contractInventory.routes).toHaveLength(181);
   });
 });

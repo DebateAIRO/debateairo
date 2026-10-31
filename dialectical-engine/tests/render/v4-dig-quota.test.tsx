@@ -194,19 +194,22 @@ describe("the money lines' own rules (lib/v4/money.ts)", () => {
       .toBe("v4.money.startsWait.PERSON_WEEK");
   });
 
-  it("Continue posts to the run's continue route and reads its three answers", async () => {
+  // R22 W3-8: the route is registered and the page calls it through the typed client (`continueRun`), over the same
+  // same-origin proxy (/api) the browser client uses.
+  it("Continue posts to the run's continue route through the typed client and reads its three answers", async () => {
     const money = await vi.importActual<typeof Money>("../../apps/ui/lib/v4/money.js");
+    const { createBrowserContractClient } = await vi.importActual<typeof import("../../apps/ui/lib/api.js")>("../../apps/ui/lib/api.js");
     const calls: Array<[string, RequestInit | undefined]> = [];
-    const answer = (status: number, body: unknown) => (async (url: string | URL | Request, init?: RequestInit) => {
+    const answer = (status: number, body: unknown) => createBrowserContractClient((async (url: string | URL | Request, init?: RequestInit) => {
       calls.push([String(url), init]);
       return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
-    }) as typeof fetch;
+    }) as typeof fetch);
     expect(await money.continueRun("run-1", answer(200, { state: "CONTINUING" }))).toEqual({ kind: "CONTINUING" });
-    expect(calls[0]![0]).toBe("/api/v1/runs/run-1/continue");
+    expect(new URL(calls[0]![0], "http://localhost").pathname).toBe("/api/v1/runs/run-1/continue");
     expect(calls[0]![1]?.method).toBe("POST");
     expect(await money.continueRun("run-1", answer(409, { error: "RUN_PAUSED_UNTIL_RESET", message: "RUN_PAUSED_UNTIL_RESET", until: NEXT_MONTH })))
       .toEqual({ kind: "TOO_EARLY", until: NEXT_MONTH });
     expect(await money.continueRun("run-1", answer(500, { error: "SERVER_FAILURE" }))).toEqual({ kind: "FAILED" });
-    expect(await money.continueRun("run-1", (async () => { throw new Error("offline"); }) as typeof fetch)).toEqual({ kind: "FAILED" });
+    expect(await money.continueRun("run-1", { continueRun: async () => { throw new Error("offline"); } })).toEqual({ kind: "FAILED" });
   });
 });

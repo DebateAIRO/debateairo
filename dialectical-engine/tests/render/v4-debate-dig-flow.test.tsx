@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AskParentSchema, DIG_LEVEL_MAX } from "../../packages/contract/src/index.js";
+import { AskParentSchema, DIG_LEVEL_MAX, FREE_DIG_PICKS_MAX } from "../../packages/contract/src/index.js";
 import {
   advance, branch, buttonNamed, buttonsNamed, CATALOG, click, digPart, harness, mountMap, openPath, panel, PATHS, resetHarness,
   seededAnswer, settle, text, tray, typeInto, unmountMap
@@ -116,6 +116,19 @@ describe("V4DebateClient's dig flow", () => {
     expect(text()).toContain(CATALOG["v4.nest.tooDeep"]);
     expect(tray()?.textContent).toContain(word("v4.dig.trayPicked.one", { count: 1 }));
   });
+
+  // R22 W3-8: the two dig refusals with their own codes are said where DIG_TOO_DEEP is, and the picks stay too.
+  it.each([["v4.nest.picksOnePath", {}], ["v4.nest.freePicksMax", { count: FREE_DIG_PICKS_MAX }]] as const)(
+    "a dig refused with its own code (%s) says so, and the picks stay", async (key, values) => {
+      harness.submit = vi.fn(async () => ({ kind: "REFUSED" as const, message: word(key, values) }));
+      await mountMap();
+      await click(branch(PATHS.renew).querySelector<HTMLInputElement>(".v4MapLeafSuggestion input[type=checkbox]")!);
+      await click(buttonNamed(CATALOG["v4.panel.dig"]!, tray()!));
+      await advance(10_100);
+      await settle();
+      expect(text()).toContain(word(key, values));
+      expect(tray()?.textContent).toContain(word("v4.dig.trayPicked.one", { count: 1 }));
+    });
 
   it("the deepest level reads no dig room and offers no dig at all", async () => {
     const runId = crypto.randomUUID();

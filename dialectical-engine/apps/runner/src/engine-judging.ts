@@ -141,7 +141,8 @@ export type ComparingJudgesStepResult = Readonly<{
  * judge, a lane stop would be reused by a resumed copy and never asked.
  */
 const ENDS_THIS_COPY: ReadonlySet<string> = new Set([
-  "RUNNER_CLAIM_LOST", "RUNNER_TIME_LIMIT_REACHED", "RUNNER_RETIRING", CALL_LANE_STOPPED
+  // R22 W3-8: the month wall's planned stop (./month-pause.ts) ends this copy too.
+  "RUNNER_CLAIM_LOST", "RUNNER_TIME_LIMIT_REACHED", "RUNNER_RETIRING", "RUN_MONTH_PAUSED", CALL_LANE_STOPPED
 ]);
 export function endsThisCopy(error: unknown): boolean {
   const code = (error as Readonly<{ code?: unknown }> | null)?.code;

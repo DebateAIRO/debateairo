@@ -348,6 +348,8 @@
   "v4.nest.level": "Level {n} of 10",
   "v4.nest.deepest": "This is the deepest level (10). You can still dig from any level above, or write your report.",
   "v4.nest.tooDeep": "This would go deeper than 10 levels, so it wasn't started. Nothing was used from your quota.",
+  "v4.nest.picksOnePath": "Your picks are on different paths, so this dig wasn't started. A dig combines picks from one path only. Nothing was used from your quota.",
+  "v4.nest.freePicksMax": "On the Free plan a dig combines up to {count} picks, so this dig wasn't started. Nothing was used from your quota.",
   "v4.digPage.lookedInto": "This dig looked into: {picks}",
   "v4.digPage.rewrote": "It rewrote this path: {line}",
   "v4.digPage.backToPath": "Back to that path",

@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildApi, type AskApplication } from "@debateai/api";
-import { DIG_LEVEL_MAX, DigTooDeepSchema, type AskParent, type AskRequest } from "@debateai/contract";
+import {
+  DIG_FREE_PICKS_MAX, DIG_LEVEL_MAX, DIG_PICKS_ONE_PATH, DigFreePicksMaxSchema, DigPicksOnePathSchema, DigTooDeepSchema,
+  FREE_DIG_PICKS_MAX, type AskParent, type AskRequest
+} from "@debateai/contract";
 import {
   admitDig, digPathIndexOf, digPicksOnOnePath, joinAtStart, type DigJoinPort
 } from "../../apps/api/src/dig-admission.js";
@@ -83,18 +86,28 @@ describe("the dig level at the asks route", () => {
     await api.close();
   });
 
-  it("Free combines at most 3 picks; picks from two paths are refused (Q-D1); both before anything is charged", async () => {
+  // W3-8: each refusal has its own code (DIG_FREE_PICKS_MAX, DIG_PICKS_ONE_PATH), so the page can say which it was.
+  it("Free combines at most 3 picks; picks from two paths are refused (Q-D1); both before anything is charged, each with its own code", async () => {
     const pick = (place: string) => ({ kind: "OWN_VIEW" as const, suggestion_id: null, place, text: "my view" });
-    for (const [parent, tier] of [
-      [parentOf({ places: [], picks: ["path:a", "path:a", "path:a", "path:a"].map(pick) }), "free"],
-      [parentOf({ places: [], picks: [pick("path:a"), pick("path:b")] }), "premium"]
+    for (const [parent, tier, body] of [
+      [parentOf({ places: [], picks: ["path:a", "path:a", "path:a", "path:a"].map(pick) }), "free",
+        DigFreePicksMaxSchema.parse({ error: DIG_FREE_PICKS_MAX, message: DIG_FREE_PICKS_MAX, picks_max: FREE_DIG_PICKS_MAX })],
+      [parentOf({ places: [], picks: [pick("path:a"), pick("path:b")] }), "premium",
+        DigPicksOnePathSchema.parse({ error: DIG_PICKS_ONE_PATH, message: DIG_PICKS_ONE_PATH })]
     ] as const) {
       const { api, submitted, checked } = apiWith(1);
       const response = await api.inject({ method: "POST", url: "/v1/asks", headers: HEADERS, payload: askOf(parent, tier) });
       expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual(body);
       expect([submitted, checked]).toEqual([[], []]);
       await api.close();
     }
+  });
+
+  it("the refusal codes are plain names, and Free's names its pick limit (3)", () => {
+    expect([DIG_PICKS_ONE_PATH, DIG_FREE_PICKS_MAX, FREE_DIG_PICKS_MAX]).toEqual(["DIG_PICKS_ONE_PATH", "DIG_FREE_PICKS_MAX", 3]);
+    expect(DigPicksOnePathSchema.safeParse({ error: DIG_PICKS_ONE_PATH, message: DIG_PICKS_ONE_PATH, picks_max: 3 }).success).toBe(false);
+    expect(DigFreePicksMaxSchema.safeParse({ error: DIG_FREE_PICKS_MAX, message: DIG_FREE_PICKS_MAX, picks_max: 4 }).success).toBe(false);
   });
 
   it("the room read for a dig is refused the same way at level 10", async () => {

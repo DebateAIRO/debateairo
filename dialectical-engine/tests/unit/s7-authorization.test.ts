@@ -142,6 +142,7 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "POST /v1/runs/{id}/last-visit", auth: "user", resource: "run-owner", action: "record-last-visit" },
   { route: "GET /v1/runs/{id}/dig-links", auth: "user", resource: "run-owner", action: "read-dig-links" },
   { route: "POST /v1/runs/{id}/dig-links", auth: "user", resource: "run-owner", action: "record-dig-link" },
+  { route: "POST /v1/runs/{id}/continue", auth: "user", resource: "run-owner", action: "continue-run" },
   { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" },
   { route: "GET /v1/billing/plans", auth: "public", resource: "billing", action: "read-plans" },
   { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" },
@@ -349,8 +350,9 @@ describe("S7 deny-by-default authorization", () => {
     // Debate shape P2c adds GET /v1/answers/{id}/map. Side-by-side C5 adds GET /livez and GET /readyz. Side-by-side §13
     // addition D24 adds GET /v1/public/ai-providers.
     // The synthesis check adds the once-only removal notice route. The V4 account memory (0131) adds six: the reading level
-    // (read, save), a debate's last visit (read, record) and its dig links (read, record).
-    expect(contractInventory.routes).toHaveLength(180);
+    // (read, save), a debate's last visit (read, record) and its dig links (read, record). R22 W3-8 adds Continue on a
+    // month-paused debate (POST /v1/runs/{id}/continue).
+    expect(contractInventory.routes).toHaveLength(181);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 

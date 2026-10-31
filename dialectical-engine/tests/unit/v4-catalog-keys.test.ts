@@ -86,6 +86,9 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.nest.level",
   "v4.nest.deepest",
   "v4.nest.tooDeep",
+  // R22 W3-8: the two dig refusals with their own codes (DIG_PICKS_ONE_PATH, DIG_FREE_PICKS_MAX), drafted for the click-test.
+  "v4.nest.picksOnePath",
+  "v4.nest.freePicksMax",
   "v4.digPage.lookedInto",
   "v4.digPage.rewrote",
   "v4.digPage.backToPath",
@@ -224,6 +227,12 @@ describe("V4 catalogue keys", () => {
     for (const key of ["v4.digText.suggestion", "v4.digText.ownView"]) expect(catalog[key], key).toContain("{text}");
     // Users see shares of their quota, never prices: no money sign or amount in any V4 line.
     expect(Object.entries(catalog).filter(([, value]) => /[$€£¢]|\b(?:USD|EUR|RON|lei|cents?|dollars?)\b/iu.test(value))).toEqual([]);
+  });
+
+  it("W3-8: the two dig refusals say nothing was used, and Free's reads its cap from the contract into {count}", () => {
+    for (const key of ["v4.nest.picksOnePath", "v4.nest.freePicksMax"]) expect(catalog[key], key).toMatch(/Nothing was used from your quota\./u);
+    expect(catalog["v4.nest.freePicksMax"]).toContain("{count}");
+    expect(catalog["v4.nest.freePicksMax"]).not.toMatch(/\d/u);
   });
 
   it("no search-words label is drafted (the owner's correction of 30 Oct), and the level labels name DIG_LEVEL_MAX", () => {

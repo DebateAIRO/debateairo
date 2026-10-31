@@ -1,13 +1,11 @@
 import {
   RUN_PAUSED_UNTIL_RESET,
-  RunContinuedSchema,
-  RunContinueRefusedSchema,
   type ContractClient,
   type MonthPause,
   type RunProjection,
   type UsageBorrow
 } from "@debateai/contract";
-import { API_BASE, contractClient, readBrowserCsrfCookie } from "../api.js";
+import { contractClient } from "../api.js";
 import type { AskRoom } from "../billing/room.js";
 import { formatDate } from "../i18n/translate.js";
 
@@ -97,26 +95,15 @@ export type ContinueOutcome =
   | Readonly<{ kind: "FAILED" }>;
 
 /**
- * Continue on a month-paused debate: POST /v1/runs/{id}/continue (W2-7's route; the typed client has no method for it
- * yet, so it goes through the same-origin proxy with the CSRF header, as the client's own writes do). True resume:
- * finished work is never paid for again. Never throws.
+ * Continue on a month-paused debate: POST /v1/runs/{id}/continue, through the typed client (R22 W3-8: the route is
+ * registered; the client sends the CSRF header as its other writes do). Pressed before the month reset the API refuses
+ * with its reset (`until`), answered as data. True resume: finished work is never paid for again. Never throws.
  */
-export async function continueRun(runId: string, fetchImplementation: typeof fetch = fetch): Promise<ContinueOutcome> {
+export async function continueRun(runId: string, client: Pick<ContractClient, "continueRun"> = contractClient): Promise<ContinueOutcome> {
   try {
-    const csrf = readBrowserCsrfCookie("__Host-debateai-csrf");
-    const response = await fetchImplementation(`${API_BASE}/v1/runs/${encodeURIComponent(runId)}/continue`, {
-      method: "POST",
-      cache: "no-store",
-      credentials: "same-origin",
-      headers: { "content-type": "application/json", ...(csrf === null ? {} : { "x-csrf-token": csrf }) },
-      body: "{}"
-    });
-    const body: unknown = await response.json().catch(() => null);
-    if (response.ok && RunContinuedSchema.safeParse(body).success) return { kind: "CONTINUING" };
-    const refused = RunContinueRefusedSchema.safeParse(body);
-    if (response.status === 409 && refused.success && refused.data.error === RUN_PAUSED_UNTIL_RESET) {
-      return { kind: "TOO_EARLY", until: refused.data.until };
-    }
+    const answer = await Promise.resolve().then(() => client.continueRun(runId));
+    if ("state" in answer && answer.state === "CONTINUING") return { kind: "CONTINUING" };
+    if ("error" in answer && answer.error === RUN_PAUSED_UNTIL_RESET) return { kind: "TOO_EARLY", until: answer.until };
     return { kind: "FAILED" };
   } catch {
     return { kind: "FAILED" };

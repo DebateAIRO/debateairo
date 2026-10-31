@@ -1,4 +1,5 @@
 import { ContractHttpError, type ContractErrorCode, type ContractWaitingRefusal } from "./http-error.js";
+import { RunContinueRefusedSchema, RunContinueRequestSchema, RunContinuedSchema, type RunContinued, type RunContinueRefused } from "./web.js";
 import {
   ReadingLevelStateSchema, ReadingLevelSaveRequestSchema, LastVisitSchema, LastVisitRecordRequestSchema, LastVisitRecordedSchema,
   DigLinksSchema, DigLinkRecordRequestSchema, DigLinkRecordedSchema,
@@ -539,6 +540,11 @@ export interface ContractClient {
   /** V4 account memory (N11): the dig this debate came from, and the digs made from it. */
   readDigLinks(runId: string): Promise<DigLinks>;
   recordDigLink(parentRunId: string, link: DigLinkRecordRequest): Promise<DigLinkRecorded>;
+  /**
+   * R22 W3-8 (the money rule): Continue on a debate paused at the month wall. Pressed before the month reset it is
+   * refused and nothing changes: the 409 RUN_PAUSED_UNTIL_RESET body is answered as data, with its `until`.
+   */
+  continueRun(runId: string): Promise<RunContinued | RunContinueRefused>;
   readRun(runId: string): Promise<RunProjection>;
   readInspection(answerId: string, version?: number): Promise<Inspection>;
   readLedgerDigest(answerId: string): Promise<ExecutionLedgerDigest>;
@@ -969,6 +975,15 @@ export function createContractClient(
     readDigLinks: (runId: string) => request(`/v1/runs/${encodeURIComponent(runId)}/dig-links`, DigLinksSchema),
     recordDigLink: (parentRunId: string, link: DigLinkRecordRequest) => request(`/v1/runs/${encodeURIComponent(parentRunId)}/dig-links`, DigLinkRecordedSchema,
       { method: "POST", body: JSON.stringify(DigLinkRecordRequestSchema.parse(link)) }),
+    continueRun: (runId: string) => requestJson<RunContinued | RunContinueRefused>(
+      root.href, fetchImplementation, `/v1/runs/${encodeURIComponent(runId)}/continue`, RunContinuedSchema,
+      { method: "POST", body: JSON.stringify(RunContinueRequestSchema.parse({})) }, auth, undefined,
+      (status, body) => {
+        if (status !== 409) return null;
+        const refused = RunContinueRefusedSchema.safeParse(body);
+        return refused.success ? refused.data : null;
+      }
+    ),
     readRun: (runId: string) => request(`/v1/runs/${encodeURIComponent(runId)}`, RunProjectionSchema),
     readInspection: (answerId: string, version?: number) => request(`/v1/answers/${encodeURIComponent(answerId)}/inspection${versionQuery(version)}`, InspectionSchema),
     readLedgerDigest: (answerId: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/ledger-digest`, ExecutionLedgerDigestSchema),

@@ -28,6 +28,7 @@ import {SendmailConsumerAccountSender} from "./mail-channel.js";
 import { ConsumerSecurityService } from "./consumer-security.js";
 import { PostgresConsumerSecurityRepository } from "@debateai/db";
 import { PostgresDigModelRepository, PostgresInvestigationRepository } from "@debateai/db";
+import { continuedRunWake } from "./month-pause.js";
 import { ConsumerWebAuthnService } from "./consumer-webauthn.js";
 import { PostgresConsumerAuthRepository } from "@debateai/db";
 import { UnixTurnstileVerifier } from "./turnstile.js";
@@ -1672,6 +1673,12 @@ const api = buildApi({
   digModel: new PostgresDigModelRepository(pool),
   investigations: new PostgresInvestigationRepository(pool),
   ...(askRoom === undefined ? {} : { monthRoom: askRoom }),
+  // R22 W3-8: after Continue, the paused debate's released work item goes back to its own release's runner through the
+  // routed dispatcher (a failed send is only logged: the runner's lapsed re-send takes it within five minutes anyway).
+  continuedRunWake: continuedRunWake({
+    claimableWorkItemOf: (runId) => new WorkItemRepository(pool).claimableWorkItemOfRun(runId),
+    dispatch: (job) => dispatcher.dispatch(job)
+  }),
   ...(dataExport === undefined ? {} : { dataExport }),
   /**
    * Side-by-side spec §13 (S10): what the ACTIVE settings version says to the pages, per request — the room read's shape

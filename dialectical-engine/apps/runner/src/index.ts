@@ -284,6 +284,7 @@ import {
 import { keepAliveProviderGateway, runKeepAliveScope, startRunKeepAlive, type RunnerTaskControl } from "./run-keep-alive.js";
 import type { RunnerRetirementSignal, TaskExecutionCounter } from "./runner-retirement.js";
 import { EMPTY_REPLAY_BOOK, readReplayBook, replayingGateway, type ReplayBook } from "./run-replay.js";
+import { isMonthPausedStop, RUN_MONTH_PAUSED } from "./month-pause.js";
 import type { RunInFlight } from "./run-in-flight.js";
 import { PATH_REWRITE_CALL_SITE_PREFIX, isPathRewriteCallSite, pathRewriteCallSiteRole } from "./path-rewrite-scope.js";
 // Side-by-side spec §13 (S6): the per-version settings types (type-only: run-settings.ts imports this module) and the one
@@ -545,6 +546,8 @@ const REVIEW_RETHROWN_CODES: readonly string[] = Object.freeze([
   "RUNNER_CLAIM_LOST",
   "RUNNER_TIME_LIMIT_REACHED",
   "RUNNER_RETIRING",
+  // W3-8 (the money rule): the month wall's planned stop ends this copy as a lost claim does.
+  RUN_MONTH_PAUSED,
   CALL_LANE_STOPPED,
   CALL_LANE_HELD_BACK
 ]);
@@ -556,11 +559,13 @@ function callHeldBack(error: unknown): boolean {
 
 /**
  * L4-F9: the keep-alive's refusal — the debate must make no further model call (its claim taken, or its time up; and,
- * side-by-side spec §4, its release retiring).
+ * side-by-side spec §4, its release retiring). R22 W3-8 (the money rule): and the month wall's planned stop
+ * (RUN_MONTH_PAUSED, ./month-pause.ts): this copy ends the same way, nothing more is saved, and `execute` releases the
+ * claim instead of failing the debate, which stays paused in the database until the person continues.
  */
 function keepAliveStop(error: unknown): boolean {
   return error instanceof TypedDomainError && (error.code === "RUNNER_CLAIM_LOST" || error.code === "RUNNER_TIME_LIMIT_REACHED"
-    || error.code === "RUNNER_RETIRING");
+    || error.code === "RUNNER_RETIRING" || error.code === RUN_MONTH_PAUSED);
 }
 
 export function reviewFailureOutcome(error: unknown): ReviewFailureOutcome {
@@ -12064,6 +12069,22 @@ export class WalkingSkeletonRunner {
     }
     return executed;
     });
+    } catch (error) {
+      if (!isMonthPausedStop(error)) throw error;
+      /**
+       * R22 W3-8 (the money rule) — THE MONTH WALL'S PLANNED STOP. The pause is recorded (./month-pause.ts), the arguing
+       * ended as at a lost claim, nothing more was saved and no answer written. The keep-alive stops renewing, the claim
+       * is given up now, fenced on the deadline this copy last set, and the task ends without a failure: no FAILED row,
+       * no Hatchet retry. While the debate is paused no runner claims or re-sends it (packages/battery
+       * `NOT_MONTH_PAUSED`); after Continue the next copy replays every call already answered and goes on. A release
+       * that finds another copy's claim changes nothing.
+       */
+      keepAlive.stop();
+      const released = await this.#work.releaseClaim({
+        workItemId: claimed.workItemId, workerId: claimInput.workerId, heldUntil: keepAlive.heldUntil()
+      });
+      console.warn(JSON.stringify({ kind: "DEBATEAI_RUNNER_CLAIM", event: "MONTH_PAUSED", workItemId: claimed.workItemId, released }));
+      return { kind: "MONTH_PAUSED" };
     } finally {
       callLane?.close();
       keepAlive.stop();
@@ -12099,7 +12120,12 @@ export function settingsJournalCode(code: string): string {
 export type RunnerExecutionResult =
   | { readonly kind: "NO_WORK" }
   | { readonly kind: "COMPLETED"; readonly answerId: string }
-  | { readonly kind: "TERMINAL_FAILED"; readonly artifactRef: string | null };
+  | { readonly kind: "TERMINAL_FAILED"; readonly artifactRef: string | null }
+  /**
+   * R22 W3-8 (the money rule): the debate reached the month wall. Its pause is recorded, its claim released, nothing is
+   * FAILED and no answer written: it stays paused in the database until the person continues (./month-pause.ts).
+   */
+  | { readonly kind: "MONTH_PAUSED" };
 
 export interface RunnerFailureRecorder {
   recordTerminalFailure(input: {
@@ -12582,6 +12608,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RUN_HOLD_RECORDER_UNRESOLVED",
   "RUN_LEGACY_ASKER_INVALID",
   "RUN_MAKER_COUNT_INVALID",
+  "RUN_MONTH_PAUSED",
   "RUN_NOT_FOUND",
   "RUN_OWNER_INVALID",
   "RUN_OWNER_RAW_ID_FORBIDDEN",
@@ -13232,6 +13259,8 @@ export const RUNNER_EXECUTION_LIMIT = "3600s" as const;
  */
 const LEAVES_WORK_ITEM_ALONE: ReadonlySet<string> = new Set([
   "RUNNER_CLAIM_LOST",
+  // R22 W3-8: a month pause `execute` did not get to answer itself (MONTH_PAUSED) is never FAILED either.
+  RUN_MONTH_PAUSED,
   "RUNNER_RELEASE_MISMATCH",
   "RUNNER_RETIRING",
   "SETTINGS_VERSION_UNSUPPORTED"
