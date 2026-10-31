@@ -15,6 +15,8 @@ export const FORGET_ERASED_DEBATE_DIG_PICKS = "identity.forget_erased_debate_dig
 export const FORGET_ERASED_DEBATE_PUBLIC = "identity.forget_erased_debate_public(uuid)" as const;
 export const FORGET_ERASED_DEBATE_TREE_UPDATES = "identity.forget_erased_debate_tree_updates(uuid)" as const;
 export const FORGET_ERASED_DEBATE_PASSAGES = "identity.forget_erased_debate_passages(uuid)" as const;
+/** 0147: one debate's copy of the public page, its check's pass, its climb's mark and an answer version under its key. */
+export const FORGET_ERASED_DEBATE_PUBLIC_TREE = "identity.forget_erased_debate_public_tree(uuid)" as const;
 /** 0141: every path suggestion one debate sealed or holds on its paths. */
 export const FORGET_ERASED_DEBATE_PATH_SUGGESTIONS = "identity.forget_erased_debate_path_suggestions(uuid)" as const;
 
@@ -59,6 +61,7 @@ export async function finalizeWithPageMemory<Outcome extends string>(
         await client.query("SELECT identity.forget_erased_debate_tree_updates($1)", [runId]);
         await client.query("SELECT identity.forget_erased_debate_passages($1)", [runId]);
         await client.query("SELECT identity.forget_erased_debate_path_suggestions($1)", [runId]);
+        await client.query("SELECT identity.forget_erased_debate_public_tree($1)", [runId]);
       }
       await client.query("COMMIT");
       return outcome;

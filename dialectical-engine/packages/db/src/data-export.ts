@@ -139,6 +139,7 @@ const WORKER_FUNCTIONS = [
   // The owner's changes of 31 Oct (0137 to 0139): contributions and Free asks, tree and answer updates, shown quotes and wipes. Their archive
   // sections are not wired yet either; the boot check pins that the worker reaches them.
   "identity.read_data_export_public_debates(uuid,uuid)",
+  "identity.read_data_export_public_tree(uuid,uuid)",
   "identity.read_data_export_tree_updates(uuid,uuid)",
   "identity.read_data_export_passage_retention(uuid,uuid)",
   // A path's suggestions (0141), sealed under each set's run key. Its archive section is not wired yet either; the boot check pins

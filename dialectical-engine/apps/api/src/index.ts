@@ -3498,6 +3498,18 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       default: return exhaustive(admission);
     }
   };
+  // The person's plan and whether new starts wait for a reset, as a quick look on their own plan (W4-4's read, shared with a public report's press).
+  const roomOfPerson = async (request: Readonly<{ session: Session; authenticatedSession?: AuthenticatedSession }>, ownerRef: string): Promise<Readonly<{ planId: string | null; waitsForReset: boolean }>> => {
+    if (options.askRoom === undefined) return { planId: null, waitsForReset: false };
+    const view = await admissionView();
+    const decided = await decideRoomSettingsAndPlan({ plan_tier: "premium", composition_budget_tier: "low",
+      depth_params: roomDepthParams(AskRoomQuerySchema.parse({ plan_tier: "premium", composition_budget_tier: "low", depth: "1" })) }, ownerRef, options.askBilling);
+    const roomPlan = debateShapePlanKeyOf(decided.planId, decided.settings.plan_tier);
+    const room = await options.askRoom.readRoom({ access: ownershipFor(request), ...(view.registerVersion === undefined ? {} : { registerVersion: view.registerVersion }),
+      settingsClass: runSettingsClassOfAsk(normaliseAskForDebateShape(decided.settings, view.debateShapePolicy ?? null, roomPlan,
+        view.lengthGuidancePolicy ?? null), view.previewProviderTestConfig, roomPlan) });
+    return { planId: room.planId, waitsForReset: room.newStarts === "BLOCKED_UNTIL_RESET" };
+  };
   // Decision 13: the page a dig names. `public_parent` is a stranger's (the page is all they know); a `parent` the person owns goes public-side once that debate is public, or is an allowed contribution.
   const publicParentOf = async (ask: AskRequest): Promise<PublicDigParent | null> => {
     if (options.publicTree === undefined) return null;
@@ -3517,7 +3529,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const decided = await decideRoomSettingsAndPlan(settings, ownerRef, options.askBilling);
     const admission = await admitPublicDig({ parent, free: decided.settings.plan_tier === "free" }, { tree: store.tree, readPublicDebate: store.readPublicDebate });
     switch (admission.kind) {
-      case "ADMIT": return { admission };
+      case "ADMIT": {
+        // A spent pool starts no dig on someone else's debate: nothing joins and nothing waits in line on their page.
+        if ((await roomOfPerson(request, ownerRef)).waitsForReset) {
+          return { refused: reply.status(409).send(PublicDebateRefusedSchema.parse({ error: "PUBLIC_DEBATE_WAITS_FOR_RESET", message: "PUBLIC_DEBATE_WAITS_FOR_RESET" })) };
+        }
+        return { admission };
+      }
       case "NOT_FOUND": return { refused: reply.status(404).send({ error: "RUN_NOT_FOUND" }) };
       case "TOO_DEEP": return { refused: reply.status(409).send(DigTooDeepSchema.parse({ error: DIG_TOO_DEEP, message: DIG_TOO_DEEP, level_max: DIG_LEVEL_MAX })) };
       case "WRITING": return { refused: reply.status(409).send(PublicDebateRefusedSchema.parse({ error: "PUBLIC_DEBATE_REPORT_WRITING", message: "PUBLIC_DEBATE_REPORT_WRITING" })) };
@@ -3527,18 +3545,6 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         : reply.status(400).send(DigPicksOnePathSchema.parse({ error: DIG_PICKS_ONE_PATH, message: DIG_PICKS_ONE_PATH })) };
       default: return exhaustive(admission);
     }
-  };
-  // The person's plan and whether new starts wait for a reset, as a quick look on their own plan (W4-4's read, shared with a public report's press).
-  const roomOfPerson = async (request: Readonly<{ session: Session; authenticatedSession?: AuthenticatedSession }>, ownerRef: string): Promise<Readonly<{ planId: string | null; waitsForReset: boolean }>> => {
-    if (options.askRoom === undefined) return { planId: null, waitsForReset: false };
-    const view = await admissionView();
-    const decided = await decideRoomSettingsAndPlan({ plan_tier: "premium", composition_budget_tier: "low",
-      depth_params: roomDepthParams(AskRoomQuerySchema.parse({ plan_tier: "premium", composition_budget_tier: "low", depth: "1" })) }, ownerRef, options.askBilling);
-    const roomPlan = debateShapePlanKeyOf(decided.planId, decided.settings.plan_tier);
-    const room = await options.askRoom.readRoom({ access: ownershipFor(request), ...(view.registerVersion === undefined ? {} : { registerVersion: view.registerVersion }),
-      settingsClass: runSettingsClassOfAsk(normaliseAskForDebateShape(decided.settings, view.debateShapePolicy ?? null, roomPlan,
-        view.lengthGuidancePolicy ?? null), view.previewProviderTestConfig, roomPlan) });
-    return { planId: room.planId, waitsForReset: room.newStarts === "BLOCKED_UNTIL_RESET" };
   };
   const accountMemoryOrRefuse = (reply: FastifyReply): AccountMemoryStore | null => {
     if (options.accountMemory !== undefined) return options.accountMemory;

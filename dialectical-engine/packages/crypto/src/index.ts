@@ -2450,6 +2450,7 @@ export const CONTENT_CARRIERS = Object.freeze([
   // 0147: the public page sealed again for the runner under a live run's key; the main answer once the root's key is gone, under the dig's; a report on a public
   // debate under its carrier's. The page's own copies stay under the publication's key.
   "identity.public_material",
+  "identity.public_dig_input",
   "identity.public_answer_update",
   "identity.public_report"
 ] as const);

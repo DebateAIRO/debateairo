@@ -14,6 +14,7 @@
 --   §1 identity.public_material: the public page as the API read it (under the publication's key), sealed again under a live
 --      run's key for the runner, which holds no publication key: one row per dig (its run's key), one per report (its carrier's
 --      key). It holds only what the page shows, so nothing else can reach a stranger's prompt.
+--      identity.public_dig_input: the dig's own paths, for a stopped runner (0135's table is for a dig with a path on its pick set, and its sweep would take this for its own).
 --   §2 identity.public_contribution_check: the AI check's PASS (0137's settle is then done by the API's publication check, HS-S02,
 --      which is the last step before the page). A refusal or an unavailable check goes straight to 0137's settle.
 --   §3 identity.public_climb_done: the climb (and the main answer) of an allowed contribution has ended, so the sweep and "nothing
@@ -27,14 +28,14 @@
 --      copy). The older text stays on the page.
 -- No question, answer, path or report text is stored in clear: ids, codes, amounts and times.
 --
--- Deleting: public_material, the check row and the climb mark name their account's owner_ref ON DELETE CASCADE, and
+-- Deleting: public_material, public_dig_input, the check row and the climb mark name their account's owner_ref ON DELETE CASCADE, and
 -- identity.forget_erased_debate_public_tree(uuid) takes them for one erased debate. An answer version under an erased dig's key
 -- goes with that dig (the page keeps its copy). A report's row stays with no writer; its content dies with the carrier's key,
 -- and the page keeps its copy under the publication's key, which is never deleted while it is public.
 --
 -- n1 (side-by-side spec §5, the database rule):
 -- n1: expand
---   expand          additive only: seven new tables and new functions; the release before reads and writes none of them. No earlier
+--   expand          additive only: eight new tables and new functions; the release before reads and writes none of them. No earlier
 --                   function, table or trigger changes. 0137's and 0138's tables gain rows only through the same columns their
 --                   own definers write.
 --   row security    outside 0130's scope rule, as 0131 to 0145: no request role can SELECT these tables.
@@ -57,6 +58,21 @@ CREATE TABLE IF NOT EXISTS identity.public_material (
 CREATE INDEX IF NOT EXISTS public_material_owner ON identity.public_material (owner_ref);
 CREATE INDEX IF NOT EXISTS public_material_run ON identity.public_material (run_id);
 SELECT core.install_truncate_guard('identity.public_material');
+
+-- The dig's own paths as its settled run gave them, so a stopped runner writes its rewrite from the store alone. 0135's identity.path_rewrite_input keeps to digs with a path
+-- on their pick set, and its sweep would take this one for a dig of its own: a public dig's set has none (0137's header).
+CREATE TABLE IF NOT EXISTS identity.public_dig_input (
+  dig_run_id uuid PRIMARY KEY,
+  run_id uuid NOT NULL,
+  owner_ref uuid NOT NULL REFERENCES identity."user"(owner_ref) ON DELETE CASCADE,
+  work_item_id text NOT NULL,
+  recorded_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  content_ciphertext jsonb NOT NULL CONSTRAINT public_dig_input_content_size CHECK (octet_length(content_ciphertext::text) <= 1048576),
+  content_attestation bytea NOT NULL,
+  CONSTRAINT public_dig_input_its_own_run CHECK (run_id = dig_run_id)
+);
+CREATE INDEX IF NOT EXISTS public_dig_input_owner ON identity.public_dig_input (owner_ref);
+SELECT core.install_truncate_guard('identity.public_dig_input');
 
 -- 2. The AI check's pass ----------------------------------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS identity.public_contribution_check (
@@ -179,6 +195,9 @@ SELECT core.install_truncate_guard('identity.public_page_skip');
 DROP TRIGGER IF EXISTS aaa_enforce_web_evidence_content ON identity.public_material;
 CREATE TRIGGER aaa_enforce_web_evidence_content BEFORE INSERT ON identity.public_material
 FOR EACH ROW EXECUTE FUNCTION identity.enforce_web_evidence_content('material_id');
+DROP TRIGGER IF EXISTS aaa_enforce_web_evidence_content ON identity.public_dig_input;
+CREATE TRIGGER aaa_enforce_web_evidence_content BEFORE INSERT ON identity.public_dig_input
+FOR EACH ROW EXECUTE FUNCTION identity.enforce_web_evidence_content('dig_run_id');
 DROP TRIGGER IF EXISTS aaa_enforce_web_evidence_content ON identity.public_answer_update;
 CREATE TRIGGER aaa_enforce_web_evidence_content BEFORE INSERT ON identity.public_answer_update
 FOR EACH ROW EXECUTE FUNCTION identity.enforce_web_evidence_content('update_id');
@@ -217,6 +236,9 @@ $$;
 
 DROP TRIGGER IF EXISTS guard_public_tree_record ON identity.public_material;
 CREATE TRIGGER guard_public_tree_record BEFORE UPDATE OR DELETE ON identity.public_material
+FOR EACH ROW EXECUTE FUNCTION identity.guard_public_tree_record();
+DROP TRIGGER IF EXISTS guard_public_tree_record ON identity.public_dig_input;
+CREATE TRIGGER guard_public_tree_record BEFORE UPDATE OR DELETE ON identity.public_dig_input
 FOR EACH ROW EXECUTE FUNCTION identity.guard_public_tree_record();
 DROP TRIGGER IF EXISTS guard_public_tree_record ON identity.public_contribution_check;
 CREATE TRIGGER guard_public_tree_record BEFORE UPDATE OR DELETE ON identity.public_contribution_check
@@ -470,6 +492,39 @@ AS $$
   SELECT jsonb_build_object('run_id', material.run_id, 'publication_ref', material.publication_ref, 'kind', material.kind,
     'recorded_at', material.recorded_at, 'content', material.content_ciphertext)
   FROM identity.public_material AS material WHERE material.material_id = p_material_id
+$$;
+
+-- The dig's own paths, once, under its own key: RECORDED, ALREADY, NOT_LIVE, NOT_A_DIG. And read back: {work_item_id, content}, or null.
+CREATE OR REPLACE FUNCTION identity.record_public_dig_input(p_run_id uuid, p_work_item_id text, p_content jsonb, p_attestation bytea) RETURNS text
+LANGUAGE plpgsql
+VOLATILE
+SECURITY DEFINER
+SET search_path=pg_catalog
+AS $$
+DECLARE
+  v_owner uuid;
+BEGIN
+  IF p_run_id IS NULL OR p_work_item_id IS NULL OR p_content IS NULL OR p_attestation IS NULL THEN
+    RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='PUBLIC_CONTRIBUTION_INVALID';
+  END IF;
+  v_owner := identity.web_evidence_run_owner(p_run_id);
+  IF v_owner IS NULL THEN RETURN 'NOT_LIVE'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM identity.public_contribution AS contribution WHERE contribution.dig_run_id = p_run_id AND contribution.owner_ref = v_owner) THEN RETURN 'NOT_A_DIG'; END IF;
+  IF EXISTS (SELECT 1 FROM identity.public_dig_input AS input WHERE input.dig_run_id = p_run_id) THEN RETURN 'ALREADY'; END IF;
+  INSERT INTO identity.public_dig_input (dig_run_id, run_id, owner_ref, work_item_id, content_ciphertext, content_attestation)
+  VALUES (p_run_id, p_run_id, v_owner, p_work_item_id, p_content, p_attestation);
+  RETURN 'RECORDED';
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION identity.read_public_dig_input(p_run_id uuid) RETURNS jsonb
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path=pg_catalog
+AS $$
+  SELECT jsonb_build_object('work_item_id', input.work_item_id, 'content', input.content_ciphertext)
+  FROM identity.public_dig_input AS input WHERE input.dig_run_id = p_run_id
 $$;
 
 -- A turn on a public path: 0138's table and shape, with the public tree's rule instead of the investigation's. The dig must be live and
@@ -973,6 +1028,8 @@ BEGIN
   PERFORM pg_catalog.set_config('debateai.public_tree_forget', 'on', true);
   DELETE FROM identity.public_material AS material WHERE material.run_id = p_run_id;
   GET DIAGNOSTICS v_step = ROW_COUNT; v_rows := v_rows + v_step;
+  DELETE FROM identity.public_dig_input AS input WHERE input.dig_run_id = p_run_id;
+  GET DIAGNOSTICS v_step = ROW_COUNT; v_rows := v_rows + v_step;
   DELETE FROM identity.public_contribution_check AS passed WHERE passed.dig_run_id = p_run_id;
   GET DIAGNOSTICS v_step = ROW_COUNT; v_rows := v_rows + v_step;
   DELETE FROM identity.public_climb_done AS done WHERE done.dig_run_id = p_run_id;
@@ -984,7 +1041,32 @@ BEGIN
 END;
 $$;
 
--- 12. One owner, then the grants ----------------------------------------------------------------------------------------------------------
+-- 12. The export reader --------------------------------------------------------------------------------------------------------------------
+-- The leased export's account (0128's gate): the dig's own paths and an answer version it wrote, as envelopes under its own key, and the reports it wrote, as codes. The copies of the
+-- page are public and are no one's: they stay out.
+CREATE OR REPLACE FUNCTION identity.read_data_export_public_tree(p_export_id uuid, p_worker uuid) RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path=pg_catalog
+AS $$
+DECLARE
+  v_user uuid;
+  v_owner_ref uuid;
+BEGIN
+  v_user := identity.data_export_lease_user(p_export_id, p_worker);
+  SELECT identity_user.owner_ref INTO v_owner_ref FROM identity."user" AS identity_user WHERE identity_user.user_id = v_user;
+  RETURN jsonb_build_object(
+    'public_dig_inputs', COALESCE((SELECT jsonb_agg(jsonb_build_object('run_id', input.dig_run_id, 'recorded_at', input.recorded_at, 'content', input.content_ciphertext) ORDER BY input.recorded_at, input.dig_run_id)
+      FROM identity.public_dig_input AS input WHERE input.owner_ref = v_owner_ref), '[]'::jsonb),
+    'public_answer_updates', COALESCE((SELECT jsonb_agg(jsonb_build_object('update_id', answer.update_id, 'run_id', answer.run_id, 'answer_seq', answer.answer_seq, 'outcome', answer.outcome, 'recorded_at', answer.recorded_at, 'content', answer.content_ciphertext) ORDER BY answer.recorded_at, answer.update_id)
+      FROM identity.public_answer_update AS answer WHERE answer.owner_ref = v_owner_ref), '[]'::jsonb),
+    'public_reports_written', COALESCE((SELECT jsonb_agg(jsonb_build_object('publication_ref', report.publication_ref, 'report_version', report.report_version, 'requested_at', report.requested_at, 'outcome', report.outcome) ORDER BY report.requested_at, report.report_id)
+      FROM identity.public_report AS report WHERE report.writer_ref = v_owner_ref), '[]'::jsonb));
+END;
+$$;
+
+-- 13. One owner, then the grants ----------------------------------------------------------------------------------------------------------
 DO $public_tree_owner$
 DECLARE
   v_owner name;
@@ -992,7 +1074,7 @@ DECLARE
 BEGIN
   SELECT pg_catalog.pg_get_userbyid(p.proowner) INTO v_owner FROM pg_catalog.pg_proc AS p
   WHERE p.oid = 'identity.read_data_export_snapshot(uuid,uuid)'::regprocedure;
-  FOREACH v_name IN ARRAY ARRAY['identity.public_material', 'identity.public_contribution_check', 'identity.public_climb_done',
+  FOREACH v_name IN ARRAY ARRAY['identity.public_material', 'identity.public_dig_input', 'identity.public_contribution_check', 'identity.public_climb_done',
     'identity.public_answer_update', 'identity.public_report', 'identity.public_debate_report', 'identity.public_page_skip'] LOOP
     EXECUTE pg_catalog.format('ALTER TABLE %s OWNER TO %I', v_name, v_owner);
   END LOOP;
@@ -1005,6 +1087,8 @@ BEGIN
     'identity.open_public_report(uuid,uuid,uuid,boolean)',
     'identity.read_public_tree_of_run(uuid)',
     'identity.read_public_material(uuid)',
+    'identity.record_public_dig_input(uuid,text,jsonb,bytea)',
+    'identity.read_public_dig_input(uuid)',
     'identity.take_public_path_turn(uuid,uuid,uuid,text,text,smallint,text,uuid)',
     'identity.record_public_path_update(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)',
     'identity.read_public_path_line(uuid)',
@@ -1025,7 +1109,8 @@ BEGIN
     'identity.read_public_debate_reports(uuid)',
     'identity.record_public_page_skip(uuid,uuid,text,text)',
     'identity.read_free_debate_owner(uuid)',
-    'identity.forget_erased_debate_public_tree(uuid)'
+    'identity.forget_erased_debate_public_tree(uuid)',
+    'identity.read_data_export_public_tree(uuid,uuid)'
   ] LOOP
     EXECUTE pg_catalog.format('ALTER FUNCTION %s OWNER TO %I', v_name, v_owner);
   END LOOP;
@@ -1033,6 +1118,7 @@ END
 $public_tree_owner$;
 
 REVOKE ALL ON identity.public_material FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
+REVOKE ALL ON identity.public_dig_input FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
 REVOKE ALL ON identity.public_contribution_check FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
 REVOKE ALL ON identity.public_climb_done FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
 REVOKE ALL ON identity.public_answer_update FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
@@ -1047,6 +1133,8 @@ REVOKE ALL ON FUNCTION identity.record_public_material(uuid,uuid,uuid,text,jsonb
 REVOKE ALL ON FUNCTION identity.open_public_report(uuid,uuid,uuid,boolean) FROM PUBLIC,debateai_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
 REVOKE ALL ON FUNCTION identity.read_public_tree_of_run(uuid) FROM PUBLIC,debateai_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
 REVOKE ALL ON FUNCTION identity.read_public_material(uuid) FROM PUBLIC,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
+REVOKE ALL ON FUNCTION identity.record_public_dig_input(uuid,text,jsonb,bytea) FROM PUBLIC,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
+REVOKE ALL ON FUNCTION identity.read_public_dig_input(uuid) FROM PUBLIC,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
 REVOKE ALL ON FUNCTION identity.take_public_path_turn(uuid,uuid,uuid,text,text,smallint,text,uuid) FROM PUBLIC,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
 REVOKE ALL ON FUNCTION identity.record_public_path_update(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea) FROM PUBLIC,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
 REVOKE ALL ON FUNCTION identity.read_public_path_line(uuid) FROM PUBLIC,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
@@ -1067,6 +1155,7 @@ REVOKE ALL ON FUNCTION identity.record_public_debate_report(uuid,integer,uuid,js
 REVOKE ALL ON FUNCTION identity.read_public_debate_reports(uuid) FROM PUBLIC,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
 REVOKE ALL ON FUNCTION identity.record_public_page_skip(uuid,uuid,text,text) FROM PUBLIC,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
 REVOKE ALL ON FUNCTION identity.read_free_debate_owner(uuid) FROM PUBLIC,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
+REVOKE ALL ON FUNCTION identity.read_data_export_public_tree(uuid,uuid) FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay;
 REVOKE ALL ON FUNCTION identity.forget_erased_debate_public_tree(uuid) FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_replay,debateai_data_export_worker;
 GRANT EXECUTE ON FUNCTION identity.read_public_dig_parent(uuid,uuid) TO debateai_billing_runtime;
 GRANT EXECUTE ON FUNCTION identity.join_public_tree(uuid,uuid,uuid,uuid,text) TO debateai_billing_runtime;
@@ -1074,6 +1163,8 @@ GRANT EXECUTE ON FUNCTION identity.record_public_material(uuid,uuid,uuid,text,js
 GRANT EXECUTE ON FUNCTION identity.open_public_report(uuid,uuid,uuid,boolean) TO debateai_billing_runtime;
 GRANT EXECUTE ON FUNCTION identity.read_public_tree_of_run(uuid) TO debateai_billing_runtime;
 GRANT EXECUTE ON FUNCTION identity.read_public_material(uuid) TO debateai_runtime;
+GRANT EXECUTE ON FUNCTION identity.record_public_dig_input(uuid,text,jsonb,bytea) TO debateai_runtime;
+GRANT EXECUTE ON FUNCTION identity.read_public_dig_input(uuid) TO debateai_runtime;
 GRANT EXECUTE ON FUNCTION identity.take_public_path_turn(uuid,uuid,uuid,text,text,smallint,text,uuid) TO debateai_runtime;
 GRANT EXECUTE ON FUNCTION identity.record_public_path_update(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea) TO debateai_runtime;
 GRANT EXECUTE ON FUNCTION identity.read_public_path_line(uuid) TO debateai_runtime;
@@ -1095,14 +1186,17 @@ GRANT EXECUTE ON FUNCTION identity.read_public_debate_reports(uuid) TO debateai_
 GRANT EXECUTE ON FUNCTION identity.record_public_page_skip(uuid,uuid,text,text) TO debateai_runtime;
 GRANT EXECUTE ON FUNCTION identity.read_free_debate_owner(uuid) TO debateai_runtime;
 GRANT EXECUTE ON FUNCTION identity.forget_erased_debate_public_tree(uuid) TO debateai_erasure_runtime;
+GRANT EXECUTE ON FUNCTION identity.read_data_export_public_tree(uuid,uuid) TO debateai_data_export_worker;
+-- 0137's reader of what a person paid for reports on public debates: the API's window readers add it too.
+GRANT EXECUTE ON FUNCTION identity.read_public_report_spent(uuid,timestamptz,timestamptz) TO debateai_billing_runtime;
 
--- 13. THE CONTRACT THIS FILE CLAIMS, checked rather than assumed (0135's closing shape) ---------------------------------------------------
+-- 14. THE CONTRACT THIS FILE CLAIMS, checked rather than assumed (0135's closing shape) ---------------------------------------------------
 DO $public_tree_contract$
 DECLARE
   v_name text;
   v_role text;
 BEGIN
-  FOREACH v_name IN ARRAY ARRAY['identity.public_material', 'identity.public_contribution_check', 'identity.public_climb_done',
+  FOREACH v_name IN ARRAY ARRAY['identity.public_material', 'identity.public_dig_input', 'identity.public_contribution_check', 'identity.public_climb_done',
     'identity.public_answer_update', 'identity.public_report', 'identity.public_debate_report', 'identity.public_page_skip'] LOOP
     IF pg_catalog.to_regclass(v_name) IS NULL
       OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger AS t WHERE t.tgrelid = pg_catalog.to_regclass(v_name)

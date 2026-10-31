@@ -14,6 +14,7 @@ type Executor = Pick<Pool, "query"> | PoolClient;
 
 /** What seals the runner's copy of the public page, the carrier the API and the runner both name. */
 export const PUBLIC_MATERIAL_CARRIER = "identity.public_material" as const;
+export const PUBLIC_DIG_INPUT_CARRIER = "identity.public_dig_input" as const;
 export const PUBLIC_ANSWER_UPDATE_CARRIER = "identity.public_answer_update" as const;
 export const PUBLIC_REPORT_CARRIER = "identity.public_report" as const;
 
@@ -78,6 +79,16 @@ export class PostgresPublicTreeRunnerRepository {
 
   async readMaterial(materialId: string): Promise<PublicMaterialRead | null> {
     return (await this.pool.query<{ material: PublicMaterialRead | null }>("SELECT identity.read_public_material($1) AS material", [materialId])).rows[0]?.material ?? null;
+  }
+
+  /** The dig's own paths, once, sealed by the caller under its key, the run id its binding. */
+  async recordDigInput(runId: string, workItemId: string, sealed: WebSealed): Promise<"RECORDED" | "ALREADY" | "NOT_LIVE" | "NOT_A_DIG"> {
+    return (await this.pool.query<{ outcome: "RECORDED" | "ALREADY" | "NOT_LIVE" | "NOT_A_DIG" }>(
+      "SELECT identity.record_public_dig_input($1,$2,$3::jsonb,$4) AS outcome", [runId, workItemId, JSON.stringify(sealed.envelope), sealed.attestation])).rows[0]!.outcome;
+  }
+
+  async readDigInput(runId: string): Promise<Readonly<{ work_item_id: string; content: CryptoEnvelope }> | null> {
+    return (await this.pool.query<{ input: { work_item_id: string; content: CryptoEnvelope } | null }>("SELECT identity.read_public_dig_input($1) AS input", [runId])).rows[0]?.input ?? null;
   }
 
   async takeTurn(input: Readonly<{ updateId: string; runId: string; parentRunId: string; positionRef: string; kind: PathUpdateKind;

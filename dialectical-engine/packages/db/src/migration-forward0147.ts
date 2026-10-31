@@ -12,7 +12,7 @@ const VERSION = "public-tree-forward0147-v1";
 const MANIFEST_PATH = "lineage/public-tree-forward0147.json";
 const VERIFIER_PATH = "lineage/verify-effective-capabilities-130.sql";
 const PREVIOUS = "0145_web_researched_unsettled.sql";
-const TABLES: readonly string[] = ["identity.public_material", "identity.public_contribution_check", "identity.public_climb_done", "identity.public_answer_update", "identity.public_report", "identity.public_debate_report", "identity.public_page_skip"];
+const TABLES: readonly string[] = ["identity.public_material", "identity.public_dig_input", "identity.public_contribution_check", "identity.public_climb_done", "identity.public_answer_update", "identity.public_report", "identity.public_debate_report", "identity.public_page_skip"];
 const FUNCTIONS: readonly string[] = [
   "identity.guard_public_tree_record()",
   "identity.public_tree_ongoing(uuid)",
@@ -22,6 +22,8 @@ const FUNCTIONS: readonly string[] = [
   "identity.open_public_report(uuid,uuid,uuid,boolean)",
   "identity.read_public_tree_of_run(uuid)",
   "identity.read_public_material(uuid)",
+  "identity.record_public_dig_input(uuid,text,jsonb,bytea)",
+  "identity.read_public_dig_input(uuid)",
   "identity.take_public_path_turn(uuid,uuid,uuid,text,text,smallint,text,uuid)",
   "identity.record_public_path_update(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
   "identity.read_public_path_line(uuid)",
@@ -34,6 +36,7 @@ const FUNCTIONS: readonly string[] = [
   "identity.record_public_answer_update(uuid,uuid,uuid,uuid,text,uuid,text,text,jsonb,jsonb,smallint,jsonb,bigint,jsonb,bytea)",
   "identity.read_public_reports_unwritten(integer)",
   "identity.record_public_report(uuid,text,text,text,text,smallint,integer,smallint,smallint,jsonb,jsonb,jsonb,bigint,jsonb,bytea)",
+  "identity.read_public_report_charged_until(uuid)",
   "identity.read_public_checks_passed(integer)",
   "identity.read_public_page_owed(integer)",
   "identity.read_public_reports_owed(integer)",
@@ -41,7 +44,8 @@ const FUNCTIONS: readonly string[] = [
   "identity.read_public_debate_reports(uuid)",
   "identity.record_public_page_skip(uuid,uuid,text,text)",
   "identity.read_free_debate_owner(uuid)",
-  "identity.forget_erased_debate_public_tree(uuid)"
+  "identity.forget_erased_debate_public_tree(uuid)",
+  "identity.read_data_export_public_tree(uuid,uuid)"
 ];
 const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0147_${detail}`); };
 const sha = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");

@@ -2,7 +2,7 @@ import {
   PublicMaterialSchema, StoryFateSchema, cutQuoteAtWordEdge, readingLevelOf, type PublicMaterial, type PublicMaterialPath, type StoryFate
 } from "@debateai/contract";
 import {
-  MAIN_ANSWER_UPDATE_CARRIER, PATH_UPDATE_CARRIER, PUBLIC_ANSWER_UPDATE_CARRIER, PUBLIC_MATERIAL_CARRIER, PostgresDigPicksRunnerRepository, PostgresPublicDebateRunnerRepository,
+  MAIN_ANSWER_UPDATE_CARRIER, PATH_UPDATE_CARRIER, PUBLIC_ANSWER_UPDATE_CARRIER, PUBLIC_DIG_INPUT_CARRIER, PUBLIC_MATERIAL_CARRIER, PostgresDigPicksRunnerRepository, PostgresPublicDebateRunnerRepository,
   PostgresPublicTreeRunnerRepository, PostgresTreeUpdateRunnerRepository, RunRepository, decryptContentForRun, encryptAttestedContentForRun, withRunContentLease,
   type PathLineEntry, type Pool, type PublicContributionRead, type WebSealed
 } from "@debateai/db";
@@ -11,8 +11,8 @@ import type { InvestigationCloseInput } from "./investigation-close.js";
 import type { DossierDig, DossierInput, DossierPath, DossierText } from "./investigation-dossier.js";
 import type { MainAnswerContent, TreeUpdatePorts } from "./path-climb.js";
 import type { PathRewriteDigPath, PathRewriteExtract, PathRewriteParentPath, PathRewritePoint } from "./path-rewrite-material.js";
-import type { PathRewriteContent, PathRewriteDig } from "./path-rewrite.js";
-import { postgresPathRewriteSources } from "./path-rewrite-sources.js";
+import type { PathRewriteContent, PathRewriteDig, PathRewriteSources } from "./path-rewrite.js";
+import { postgresPathRewriteSources, storedDigPathsOf } from "./path-rewrite-sources.js";
 import { readReplayBook } from "./run-replay.js";
 
 /**
@@ -44,6 +44,16 @@ const pointsOfPath = (path: PublicMaterialPath): readonly PathRewritePoint[] => 
   id: point.id, text: point.text, onId: point.on_id, side: point.side, trust: null, disputed: point.disputed })));
 const extractsOfPath = (path: PublicMaterialPath): readonly PathRewriteExtract[] => Object.freeze(path.extracts.map((extract) => Object.freeze({
   pointId: extract.point_id, label: extract.label, site: extract.site, title: extract.title, quote: extract.quote, ...(extract.note === null ? {} : { note: extract.note }) })));
+
+/** The dig's own paths as its settled run stored them, with each cited extract read again by its label (decision 6: its own passages, right after it). */
+export async function readPublicDigInput(pool: Pool, digRunId: string, extractsOf: PathRewriteSources["digExtractsOf"]): Promise<Readonly<{ workItemId: string; digPaths: readonly PathRewriteDigPath[] }> | null> {
+  const row = await new PostgresPublicTreeRunnerRepository(pool).readDigInput(digRunId);
+  if (row === null) return null;
+  const opened = await withRunContentLease(pool, [digRunId], () => decryptContentForRun<unknown>(pool, digRunId, PUBLIC_DIG_INPUT_CARRIER, digRunId.toLowerCase(), row.content, null));
+  const stored = storedDigPathsOf(opened);
+  const extracts = extractsOf === undefined ? new Map() : await extractsOf(digRunId, stored.flatMap((path) => path.points.map((point) => point.id)));
+  return Object.freeze({ workItemId: row.work_item_id, digPaths: storedDigPathsOf(opened, extracts) });
+}
 
 /** A path of the debate or of an allowed dig, by the map's id. */
 export function publicPathOf(material: PublicMaterial, positionRef: string): PublicMaterialPath | null {
@@ -159,7 +169,8 @@ export function publicTreePortsOf(pool: Pool, digRunId: string): TreeUpdatePorts
       points: pointsOfPath(path), extracts: extractsOfPath(path) });
   };
   /** The dig's own stored paths, for its own rewrite's first level and a climb through it. */
-  const ownPaths = async (): Promise<readonly PathRewriteDigPath[]> => (await own.storedInputOf?.(digRunId))?.digPaths ?? [];
+  const storedInput = async (): Promise<Readonly<{ workItemId: string; digPaths: readonly PathRewriteDigPath[] }> | null> => readPublicDigInput(pool, digRunId, own.digExtractsOf);
+  const ownPaths = async (): Promise<readonly PathRewriteDigPath[]> => (await storedInput())?.digPaths ?? [];
   const ownPathOf = (paths: readonly PathRewriteDigPath[], positionRef: string): PublicMaterialPath | null => {
     const found = paths.find((path) => path.positionRef.toLowerCase() === positionRef.toLowerCase());
     return found === undefined ? null : { ref: found.positionRef, story_line: found.statement, story_fate: "SET_ASIDE", line: found.statement, summary: null, fate: "SET_ASIDE", written_at: null,
@@ -198,8 +209,8 @@ export function publicTreePortsOf(pool: Pool, digRunId: string): TreeUpdatePorts
     childOf: async (runId: string) => {
       if (runId.toLowerCase() === digRunId.toLowerCase()) {
         const kept = await picks.read(runId);
-        const stored = await own.storedInputOf?.(runId);
-        if (kept === null || stored === null || stored === undefined) return null;
+        const stored = await storedInput();
+        if (kept === null || stored === null) return null;
         return Object.freeze({ picks: Object.freeze(kept.picks.map((pick) => Object.freeze({ text: pick.text, by: pick.author }))), digPaths: stored.digPaths });
       }
       // A debate above the dig: an allowed contribution's, or the first debate's, read from the copy; only its paths and points: its person's own words were checked as its rewrite.
@@ -237,10 +248,10 @@ export function publicTreePortsOf(pool: Pool, digRunId: string): TreeUpdatePorts
         for (const [ref, text] of await allowedTextsOf(pool, (await publicTree.readLine(at)) ?? [])) newer.set(ref, text);
         at = (await publicTree.readClimbNext(at))?.parent_run_id ?? null;
       }
-      const stored = await own.storedInputOf?.(digRunId);
+      const stored = await storedInput();
       const kept = await picks.read(digRunId);
       const after = newer.get((contribution.position_ref ?? "").toLowerCase());
-      const ownDig: DossierDig | undefined = stored === null || stored === undefined || after === undefined ? undefined : Object.freeze({
+      const ownDig: DossierDig | undefined = stored === null || after === undefined ? undefined : Object.freeze({
         runId: digRunId, parentRunId: page.publication_ref, positionRef: contribution.position_ref, level: await levelOf(publicTree, digRunId), finishedAt: contribution.contributed_at,
         picks: Object.freeze((kept?.picks ?? []).map((pick) => Object.freeze({ text: pick.text, by: pick.author }))), rewrite: null,
         ownMaterial: Object.freeze({ answer: Object.freeze([]), paths: stored.digPaths, sources: Object.freeze([]) }) });

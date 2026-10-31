@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import {
-  PATH_UPDATE_CARRIER, PUBLIC_REPORT_CARRIER, PostgresPublicDebateRunnerRepository, PostgresPublicTreeRunnerRepository, decryptContentForRun,
+  PATH_UPDATE_CARRIER, PUBLIC_DIG_INPUT_CARRIER, PUBLIC_REPORT_CARRIER, PostgresPublicDebateRunnerRepository, PostgresPublicTreeRunnerRepository, decryptContentForRun,
   encryptAttestedContentForRun, withRunContentLease, type InvestigationReportRecord, type PathLineEntry, type Pool, type PublicContributionRead, type PublicReportUnwritten, type UnreportedClosing, type WebSealed
 } from "@debateai/db";
 import {
@@ -20,6 +20,7 @@ import { investigationReportProjectedMicros } from "./investigation-close-source
 import { climbFrom, pathUpdateIdOf, writePublicDigLevel, type TreeUpdateSettings } from "./path-climb.js";
 import { digPathsOf, holdDigPassages, type PathRewriteDig, type PathRewriteRoles, type PathRewriteRunnerSettings, type StepLease } from "./path-rewrite.js";
 import { PATH_REWRITE_CHECKER_MODEL, PATH_REWRITE_WRITER_MODEL } from "./path-rewrite-composition.js";
+import { digPathsForStore } from "./path-rewrite-sources.js";
 import { releaseRunPassages } from "./passage-record.js";
 import { dossierFromMaterial, openPublicMaterial, publicPathOf, publicTreePortsOf } from "./public-tree-sources.js";
 import { replayingGateway } from "./run-replay.js";
@@ -210,7 +211,10 @@ export function publicDigOnSettle(settings: PublicTreeRunnerSettings, rewrite: (
       if (contribution === null) return false;
       const sources = rewrite();
       const digPaths = await digPathsOf(sources, input, lease);
-      await lease(() => sources.sources.recordInput?.(input.runId, input.workItemId, digPaths) ?? Promise.resolve("NOT_STORED"));
+      await lease(() => withRunContentLease(settings.pool, [input.runId], async () => {
+        const sealed = await encryptAttestedContentForRun(settings.pool, input.runId, PUBLIC_DIG_INPUT_CARRIER, input.runId.toLowerCase(), digPathsForStore(digPaths));
+        if (sealed !== null) await new PostgresPublicTreeRunnerRepository(settings.pool).recordDigInput(input.runId, input.workItemId, sealed);
+      }));
       holdDigPassages(input.runId, digPaths);
       try {
         await advancePublicDig(settings, input.runId, lease);
