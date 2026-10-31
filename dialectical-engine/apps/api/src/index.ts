@@ -3323,7 +3323,6 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // C11.1 (R-16): the schedule request's source carries its mail language into the SCHEDULED row.
     const scheduled=await options.accountErasure.schedule({
       authenticated,grantToken:input.step_up_grant,
-      ...(input.delete_public_debates === true ? { deletePublicDebates:true } : {}),
       source:sourceFor(request)
     });
     if (scheduled==="NOTIFICATION_CHANNEL_REQUIRED") {
@@ -3342,8 +3341,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
     return reply.status(202).send(AccountErasureStatusSchema.parse({
       status:scheduled.status,execute_at:scheduled.executeAt.toISOString(),
-      cancellation_ref:scheduled.cancellationRef,
-      delete_public_debates:scheduled.deletePublicDebates === true
+      cancellation_ref:scheduled.cancellationRef
     }));
   });
   api.get("/v1/account/erasure",routePolicy("GET /v1/account/erasure"),async (request,reply)=>{
@@ -3358,8 +3356,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     return reply.send(AccountErasureStatusSchema.parse(current.status==="NONE"
       ? { status:"NONE" }
       : { status:current.status,execute_at:current.executeAt!.toISOString(),
-          cancellation_ref:current.cancellationRef!,
-          delete_public_debates:current.deletePublicDebates === true }
+          cancellation_ref:current.cancellationRef! }
     ));
   });
   api.post(

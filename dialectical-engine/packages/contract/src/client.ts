@@ -448,12 +448,12 @@ export interface ContractClient {
   publishRun(runId: string, stepUpGrant: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
   requestPublicationReview(runId: string, stepUpGrant: string): Promise<{ state: "UNDER_REVIEW" }>;
   readPublicationReview(runId: string): Promise<PublicationReviewState>;
-  scheduleAccountErasure(stepUpGrant:string,deletePublicDebates?:boolean):Promise<{
-    status:"SCHEDULED"|"DUE"|"PROCESSING";execute_at:string;cancellation_ref:string;delete_public_debates:boolean;
+  scheduleAccountErasure(stepUpGrant:string):Promise<{
+    status:"SCHEDULED"|"DUE"|"PROCESSING";execute_at:string;cancellation_ref:string;
   }>;
   readAccountErasure():Promise<
     | { status:"NONE" }
-    | { status:"SCHEDULED"|"DUE"|"PROCESSING";execute_at:string;cancellation_ref:string;delete_public_debates:boolean }
+    | { status:"SCHEDULED"|"DUE"|"PROCESSING";execute_at:string;cancellation_ref:string }
   >;
   cancelAccountErasure(cancellationRef:string):Promise<{ status:"CANCELLED" }>;
   deletePrivateDebate(runId:string,stepUpGrant:string):Promise<{
@@ -804,11 +804,10 @@ export function createContractClient(
       `/v1/runs/${encodeURIComponent(runId)}/publication-review`,
       PublicationReviewStateSchema
     ),
-    scheduleAccountErasure:(stepUpGrant:string,deletePublicDebates?:boolean)=>request(
+    scheduleAccountErasure:(stepUpGrant:string)=>request(
       "/v1/account",AccountErasureStatusSchema,
       { method:"DELETE",body:JSON.stringify({
-          confirmation:"DELETE MY ACCOUNT",step_up_grant:stepUpGrant,
-          delete_public_debates:deletePublicDebates===true
+          confirmation:"DELETE MY ACCOUNT",step_up_grant:stepUpGrant
         }) }
     ).then((status)=>{
       if (status.status==="NONE") throw new ContractHttpError(
