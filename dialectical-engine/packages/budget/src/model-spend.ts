@@ -690,6 +690,17 @@ export class CostEnvelopeGuard {
   }
 
   /**
+   * The money rule (owner, 31 Oct 2026; R22 W3-8): what the run's arguing may still spend — its body ceiling less what
+   * the run has spent — read when the month wall pauses the debate, as the estimate of the planned work left (0134's
+   * `planned_micros`). Never below zero; nothing is reserved or written.
+   */
+  async bodyMicrosLeft(runId: string): Promise<number> {
+    if (typeof runId !== "string" || runId.trim() === "") throw new TypeError("COST_ENVELOPE_RUN_REQUIRED");
+    const envelope = this.#envelopeFor("RUN", "BODY");
+    return Math.max(0, envelope.ceilingMicros - await envelope.readSpentMicros(runId));
+  }
+
+  /**
    * VERDICT STORY — THE STORY'S OWN MONEY SEAM (spec §8), in the shape the
    * gateway consumes. The per-run seam's rules, built by the same body, with
    * the four differences `#envelopeFor` names and no others: it sums STORY

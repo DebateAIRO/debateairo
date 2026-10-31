@@ -23,7 +23,7 @@ import type { ProviderCostEnvelopeSeam } from "@debateai/providers";
 import { AskRoom, borrowersOf, readWindowBorrow, type AskRoomSpend } from "../../apps/api/src/ask-room.js";
 import { PersonUsageReader } from "../../apps/api/src/billing/usage.js";
 import { continuePausedRun, monthPauseOf, type MonthPausePort } from "../../apps/api/src/month-pause.js";
-import { MonthPause, withMonthPause, type MonthPauseStore } from "../../apps/runner/src/month-pause.js";
+import { MonthPause, RUN_MONTH_PAUSED, withMonthPause, type MonthPauseStore } from "../../apps/runner/src/month-pause.js";
 import { storyCallScopeAgrees } from "../../apps/runner/src/index.js";
 
 /**
@@ -264,42 +264,63 @@ describe("the month wall pauses the remaining calls", () => {
     expect(wall(4_800_000, 0)).toBe("WOULD_CROSS");
   });
 
-  it("the runner records the pause once, holds the call, and holds every later call of the paused debate", async () => {
+  // W3-8: the pause is durable. Nothing waits in memory: at the wall the call ends with the planned stop
+  // RUN_MONTH_PAUSED (the runner releases the claim; the database keeps the debate paused until Continue).
+  it("the runner records the pause once, with the planned work left, and ends the call with the planned stop", async () => {
     let state: "NONE" | "PAUSED" | "RESUMED" = "NONE";
     const pauses: Parameters<MonthPauseStore["recordPause"]>[0][] = [];
     const store: MonthPauseStore = {
       recordPause: async (input) => { pauses.push(input); state = "PAUSED"; return "RECORDED"; },
       readPause: async () => ({ state })
     };
-    let clock = now.getTime();
-    let polls = 0;
-    let walled = true;
-    // The person continues once the month has reset: on the third poll the pause reads RESUMED and the wall has lifted.
-    const pause = new MonthPause({ store, clock: () => new Date(clock), pollMs: 1_000, holdMs: 60_000,
-      sleep: async (ms) => { clock += ms; polls += 1; if (polls === 3) { state = "RESUMED"; walled = false; } } });
-    const admitted: string[] = [];
+    const pause = new MonthPause({ store });
     const seam: ProviderCostEnvelopeSeam = {
-      assertCallAllowed: async () => {
-        if (walled) throw new MonthWallReachedError(month.resetsAt);
-        admitted.push("call");
-        return undefined;
-      },
+      assertCallAllowed: async () => { throw new MonthWallReachedError(month.resetsAt); },
       recordCall: async () => undefined, assertUsageReported: async () => undefined
     };
-    await withMonthPause(seam, "run-1", pause).assertCallAllowed(PROJECTION);
-    expect(pauses).toEqual([{ runId: "run-1", reason: "MONTH_WALL", resumableAt: month.resetsAt, plannedCalls: 1, plannedSearches: 0, plannedMicros: 0 }]);
-    expect(admitted).toEqual(["call"]);
+    expect(await outcome(withMonthPause(seam, "run-1", pause, async () => 1_234_567).assertCallAllowed(PROJECTION))).toBe(RUN_MONTH_PAUSED);
+    expect(pauses).toEqual([{ runId: "run-1", reason: "MONTH_WALL", resumableAt: month.resetsAt, plannedCalls: 1, plannedSearches: 0,
+      plannedMicros: 1_234_567 }]);
   });
 
-  it("a held call that waits past its bound ends with the month's refusal, so the arguing stops as before", async () => {
-    let clock = now.getTime();
-    const pause = new MonthPause({
-      store: { recordPause: async () => "RECORDED", readPause: async () => ({ state: "PAUSED" }) },
-      clock: () => new Date(clock), pollMs: 1_000, holdMs: 5_000, sleep: async (ms) => { clock += ms; }
-    });
+  it("every later walled call of the paused debate ends at once, unasked and unrecorded", async () => {
+    const recordPause = vi.fn(async () => "RECORDED" as const);
+    const pause = new MonthPause({ store: { recordPause, readPause: async () => ({ state: "PAUSED" }) } });
+    const asked = vi.fn(async () => undefined);
+    const seam: ProviderCostEnvelopeSeam = { assertCallAllowed: asked, recordCall: async () => undefined, assertUsageReported: async () => undefined };
+    expect(await outcome(withMonthPause(seam, "run-1", pause).assertCallAllowed(PROJECTION))).toBe(RUN_MONTH_PAUSED);
+    expect(asked).not.toHaveBeenCalled();
+    expect(recordPause).not.toHaveBeenCalled();
+  });
+
+  it("a debate that cannot be paused (no live private debate) ends with the month's own refusal, as before", async () => {
+    const pause = new MonthPause({ store: { recordPause: async () => "NOT_LIVE", readPause: async () => null } });
     const seam: ProviderCostEnvelopeSeam = { assertCallAllowed: async () => { throw new MonthWallReachedError(month.resetsAt); },
       recordCall: async () => undefined, assertUsageReported: async () => undefined };
     expect(await outcome(withMonthPause(seam, "run-1", pause).assertCallAllowed(PROJECTION))).toBe("MONTH_WALL");
+  });
+
+  it("the planned work's estimate is clamped to 0134's bound, and an unreadable one records 0 with one content-free line", async () => {
+    const recorded: number[] = [];
+    const lines: string[] = [];
+    const pause = new MonthPause({ log: (line) => lines.push(line), store: {
+      recordPause: async (input) => { recorded.push(input.plannedMicros); return "RECORDED"; }, readPause: async () => ({ state: "NONE" }) } });
+    const seam: ProviderCostEnvelopeSeam = { assertCallAllowed: async () => { throw new MonthWallReachedError(month.resetsAt); },
+      recordCall: async () => undefined, assertUsageReported: async () => undefined };
+    await outcome(withMonthPause(seam, "run-1", pause, async () => 5_000_000_000).assertCallAllowed(PROJECTION));
+    await outcome(withMonthPause(seam, "run-1", pause, async () => { throw new TypedDomainError("RUN_SETTINGS_VERSION_UNKNOWN", "x"); })
+      .assertCallAllowed(PROJECTION));
+    expect(recorded).toEqual([1_000_000_000, 0]);
+    expect(lines).toEqual([JSON.stringify({ kind: "DEBATEAI_MONTH_PAUSE", event: "PLANNED_MICROS_UNREAD", code: "RUN_SETTINGS_VERSION_UNKNOWN" })]);
+  });
+
+  it("the guard's body room left is its body ceiling less the run's spend, never below zero", async () => {
+    const guardSpent = (spent: number) => new CostEnvelopeGuard({ policy: { perRunCeilingMicros: 250_000, dailyCeilingMicros: 2_000_000 },
+      store: { recordSpend: async () => undefined, readRunSpentMicros: async () => spent, readRunStorySpentMicros: async () => 0,
+        readDaySpentMicros: async () => 0, admitNewRun: async () => Object.freeze({ admitted: true, committedMicros: 0 }) } });
+    expect(await guardSpent(0).bodyMicrosLeft("run-1")).toBe(250_000);
+    expect(await guardSpent(100_000).bodyMicrosLeft("run-1")).toBe(150_000);
+    expect(await guardSpent(300_000).bodyMicrosLeft("run-1")).toBe(0);
   });
 
   it("any other refusal passes through untouched and records no pause", async () => {
@@ -338,29 +359,17 @@ describe("Continue: refused before the reset, after it the debate resumes withou
   });
 
   it("not paused, or not the person's: nothing to continue", async () => {
-    expect((await continuePausedRun({ ownerRef: OWNER, runId: "r", now: at(until) }, pauses("RESUMED").port, room(true))).kind).toBe("NOT_PAUSED");
+    expect((await continuePausedRun({ ownerRef: OWNER, runId: "r", now: at(until) }, pauses("NONE").port, room(true))).kind).toBe("NOT_PAUSED");
     expect((await continuePausedRun({ ownerRef: OWNER, runId: "r", now: at(until) }, pauses(null).port, room(true))).kind).toBe("NOT_FOUND");
   });
 
-  it("the held call is admitted once after Continue and charged once: nothing it had done is redone", async () => {
-    let state: "NONE" | "PAUSED" | "RESUMED" = "NONE";
-    let clock = at("2026-10-31T23:00:00.000Z").getTime();
-    const pause = new MonthPause({
-      store: { recordPause: async () => { state = "PAUSED"; return "RECORDED"; }, readPause: async () => ({ state }) },
-      clock: () => new Date(clock), pollMs: 60_000, holdMs: 7_200_000,
-      sleep: async (ms) => { clock += ms; if (clock >= at(until).getTime()) state = "RESUMED"; }
-    });
-    let asked = 0;
-    const charged: string[] = [];
-    const seam: ProviderCostEnvelopeSeam = {
-      assertCallAllowed: async () => { asked += 1; if (clock < at(until).getTime()) throw new MonthWallReachedError(at(until)); return undefined; },
-      recordCall: async () => { charged.push("charge"); }, assertUsageReported: async () => undefined
-    };
-    const wrapped = withMonthPause(seam, "run-1", pause);
-    await wrapped.assertCallAllowed(PROJECTION);
-    await wrapped.recordCall({ providerRef: "p", usage: {}, projection: PROJECTION });
-    expect(asked).toBe(2);
-    expect(charged).toEqual(["charge"]);
+  it("W3-8: a second press is idempotent (CONTINUING, nothing recorded again), and each press wakes the debate's runner", async () => {
+    const { port, resume } = pauses("RESUMED");
+    const wake = vi.fn(async () => undefined);
+    expect(await continuePausedRun({ ownerRef: OWNER, runId: "run-1", now: at(until) }, port, room(true), { wake }))
+      .toEqual({ kind: "CONTINUING" });
+    expect(resume).not.toHaveBeenCalled();
+    expect(wake).toHaveBeenCalledWith("run-1");
   });
 });
 
