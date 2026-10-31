@@ -4495,6 +4495,60 @@ setTimeout(() => undefined, 500);
     );
   });
 
+  it("holds a new account's delivery audit behind the same equal work as a duplicate's postwork", async () => {
+    const equalWorkMs = basePolicy.channel.mailDispatchNoSendEqualWorkMs;
+    let openEqualWork!: () => void;
+    const equalWork = new Promise<void>((resolve) => { openEqualWork = resolve; });
+    const sentAt = new Date("2026-08-19T12:00:00.000Z");
+    let now = sentAt;
+    const mail = new MemoryMailSender();
+    const flow = buildService({
+      mail,
+      clock: () => now,
+      sleep: (milliseconds) => milliseconds === equalWorkMs ? equalWork : Promise.resolve()
+    });
+    const audits: string[] = [];
+    const recordDelivery = flow.repository.recordVerificationDelivery.bind(flow.repository);
+    flow.repository.recordVerificationDelivery = async (...args) => {
+      audits.push("delivery");
+      return recordDelivery(...args);
+    };
+    const recordDuplicate = flow.repository.recordDuplicateRegistrationPostwork.bind(flow.repository);
+    flow.repository.recordDuplicateRegistrationPostwork = async (...args) => {
+      audits.push("duplicate");
+      return recordDuplicate(...args);
+    };
+    const input = {
+      email: "equal-postwork@example.test",
+      password: "correct horse battery staple",
+      phone: "+40722123456", recoveryEmail: "equal-postwork-recovery@example.test",
+      adultAffirmed: true
+    };
+
+    await flow.service.register(input, source);
+    await flow.service.register(input, source);
+    await vi.waitFor(() => expect(mail.messages).toHaveLength(1));
+    // Each audit starts two Argon2 jobs: run early on one arm only, they would queue ahead of the same burst's
+    // later requests on that arm alone. Nothing may start before the equal work has elapsed.
+    await new Promise<void>((resolve) => setTimeout(resolve, 100));
+    expect(audits).toEqual([]);
+
+    now = new Date(sentAt.getTime() + equalWorkMs);
+    openEqualWork();
+    await flow.service.drainMailDispatches();
+    expect([...audits].sort()).toEqual(["delivery", "duplicate"]);
+    const binding = await database.pool.query<{ delivery_status: string; verification_last_sent_at: Date }>(`
+      SELECT binding.delivery_status,binding.verification_last_sent_at
+      FROM identity.channel_binding AS binding
+      WHERE binding.channel_type='email' AND binding.user_id=(
+        SELECT user_id FROM identity."user" WHERE email_blind_index=$1
+      )
+    `, [createEmailBlindIndex(blindIndexKey, input.email)]);
+    expect(binding.rows[0]!.delivery_status).toBe("sent");
+    // The record says when the mail left, not when its audit was allowed to run.
+    expect(binding.rows[0]!.verification_last_sent_at.getTime()).toBe(sentAt.getTime());
+  }, 30_000);
+
   it("keeps new-vs-existing timing within the ruled tolerance for slow 0/400/1000ms transports", async () => {
     const evidence: string[] = [];
     const ruledToleranceMs = basePolicy.verification.enumerationToleranceMs ?? 100;
