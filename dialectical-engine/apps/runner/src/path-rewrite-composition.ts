@@ -4,7 +4,8 @@ import {
 } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import type { ProviderGateway } from "@debateai/providers";
-import { writeDigSuggestionsOnPool } from "./dig-suggestions-step.js";
+import { postgresPathSuggestionsStore, refreshPathSuggestionsOnPool, writeDigSuggestionsOnPool } from "./dig-suggestions-step.js";
+import { firstDebateSuggestionFacts } from "./investigation-digest.js";
 import { advanceTree, type TreeSweepSettings, type TreeUpdateSettings } from "./path-climb.js";
 import { postgresTreeUpdatePorts, readRecentTreeDigs } from "./path-climb-sources.js";
 import { createPathRewriteInFlight, type PathRewriteRunnerSettings } from "./path-rewrite.js";
@@ -71,6 +72,9 @@ export function composePathRewrite(input: Readonly<{
     inFlight,
     // W4-3: the AI's suggestions on the dig's own paths, told what the whole debate already investigated.
     suggest: writeDigSuggestionsOnPool(pool),
+    // Owner Q-D8, and a first debate's own (0141).
+    refreshSuggestions: refreshPathSuggestionsOnPool(pool),
+    firstDebateSuggestions: Object.freeze({ store: postgresPathSuggestionsStore(pool), read: firstDebateSuggestionFacts(pool) }),
     line: new PostgresTreeUpdateRunnerRepository(pool),
     afterStored: (digRunId, lease) => advanceTree(tree, digRunId, lease)
   });

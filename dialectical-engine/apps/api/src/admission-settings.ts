@@ -517,7 +517,9 @@ export async function loadAdmissionSettings(pool: Pool, version: number, site: A
       // Length guidance (spec 2026-10-15 §3.1): the numbers admission resolved, or none (today's receipt).
       ...(input.length === null ? {} : { length: input.length }),
       // Engine redesign (R1d): engine 2's settings admission resolved for this panel, or none (today's receipt).
-      ...(input.engine === null ? {} : { engine: input.engine })
+      ...(input.engine === null ? {} : { engine: input.engine }),
+      // W2-2 (R22): the web part admission counted, or none (today's receipt).
+      ...(input.web === null ? {} : { web: input.web })
     }),
     resolveRisk(askerRiskTier: RiskTier, askerTierSource: AskRequest["tier_source"], askerProvenanceRef: string) {
       const resolved = resolveEffectiveRiskTier({

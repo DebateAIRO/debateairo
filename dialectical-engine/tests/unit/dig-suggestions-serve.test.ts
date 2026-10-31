@@ -3,7 +3,7 @@
 // at level 10; never an engine number or a passage. Made-up points.
 import { describe, expect, it } from "vitest";
 import { AnswerWebSchema, type AnswerWeb, type Node } from "@debateai/contract";
-import { digLeadSuggestions, digLeadsOfPack, digPointSuggestions, digSuggestionsOf, webWithDigSuggestions } from "@debateai/serve";
+import { digLeadSuggestions, digLeadsOfPack, digPointSuggestions, digPicksAtMapPaths, digSuggestionsOf, pathSuggestionsOfSet, webWithDigSuggestions } from "@debateai/serve";
 
 const node = (id: string, overrides: Partial<Node> = {}): Node => ({ node_id: id, claim: `Point ${id} in plain words.`, way_of_knowing: "LOOKED_UP", review: null,
   sources: [], ...overrides } as Node);
@@ -38,6 +38,30 @@ describe("W4-3 the suggestions code finds", () => {
     expect(JSON.stringify(offered)).not.toContain("a passage");
     expect(digLeadsOfPack(null)).toEqual([]);
   });
+  it("0141's newest set is what the AI offers: it replaces the set sealed with the dig, even when empty; code's kinds stay", () => {
+    const old = { suggestion_id: "s-old", kind: "HELPS_MAIN_QUESTION" as const, side: "FOR" as const, text: "old", places: ["path:root"] };
+    const fresh = { suggestion_id: "s-new", kind: "HELPS_MAIN_QUESTION" as const, side: "AGAINST" as const, text: "new", places: ["path:root"] };
+    const ids = (sets: ReadonlyMap<string, readonly (typeof fresh)[]>) => webWithDigSuggestions(web([old]), NODES, EDGES, 1, sets).paths[0]!.suggestions.map((entry) => entry.kind === "HELPS_MAIN_QUESTION" ? entry.suggestion_id : entry.kind);
+    expect(ids(new Map())).toEqual(["s-old", "CONTRADICTING", "UNDOCUMENTED"]);
+    expect(ids(new Map([["root", [fresh]]]))).toEqual(["s-new", "CONTRADICTING", "UNDOCUMENTED"]);
+    expect(ids(new Map([["root", []]]))).toEqual(["CONTRADICTING", "UNDOCUMENTED"]);
+    expect(pathSuggestionsOfSet({ suggestions: [fresh, { bad: 1 }] })).toEqual([fresh]);
+    expect(pathSuggestionsOfSet(null)).toEqual([]);
+  });
+
+  it("R22: a dig's chosen paths' rows hang under the first path of its map, and every map path has searched; a first debate's come back as they are", () => {
+    const evidence = { searches: [{ searchId: "s1", pathRef: "dig-pick-1", outcome: "FOUND" }, { searchId: "s2", pathRef: "dig-pick-2", outcome: "FOUND" }],
+      pages: [], readings: [], extracts: [{ pageId: "p", pathRef: "dig-pick-2", label: "S2-1", quote: "q" }], picks: [{ pathRef: "dig-pick-2", rank: 1, pageId: "p" }], researched: [] };
+    const out = digPicksAtMapPaths(evidence, ["a1", "a2"]);
+    expect(out.searches.map((search) => search.pathRef)).toEqual(["a1", "a1", "a2"]);
+    expect(out.extracts[0]!.pathRef).toBe("a1");
+    expect(out.picks[0]!.pathRef).toBe("a1");
+    const first = { ...evidence, searches: [{ searchId: "s1", pathRef: "a1", outcome: "FOUND" }] };
+    expect(digPicksAtMapPaths(first, ["a1", "a2"])).toBe(first);
+    const failed = { ...evidence, searches: [{ searchId: "s1", pathRef: "dig-pick-1", outcome: "FAILED" }] };
+    expect(digPicksAtMapPaths(failed, ["a1", "a2"]).searches.map((search) => search.pathRef)).toEqual(["a1"]);
+  });
+
   it("the AI's sealed ones are read by their path; a text sealed before them, or that does not parse, offers none", () => {
     const one = { suggestion_id: "s-1", kind: "HELPS_MAIN_QUESTION", side: "FOR", text: "t", places: ["path:POS"] };
     const opened = { dig_suggestions: [{ position_ref: "POS", suggestions: [one, { suggestion_id: "bad" }] }] };

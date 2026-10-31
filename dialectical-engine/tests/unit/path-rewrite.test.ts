@@ -5,9 +5,9 @@
 // or a pick that stay data, code's checks of the reply (refs, verdict, trust word), and two digs of one path in order.
 import { describe, expect, it } from "vitest";
 import { readPromptFrame, type PromptPacket } from "@debateai/providers";
-import type { DigSuggestionsJob } from "../../apps/runner/src/dig-suggestions-step.js";
+import type { DigSuggestionsJob, PathSuggestionsRefresh } from "../../apps/runner/src/dig-suggestions-step.js";
 import { engineContractHash } from "../../apps/runner/src/engine-contracts.js";
-import { pathRewriteIdOf, runDigPathRewrite } from "../../apps/runner/src/path-rewrite.js";
+import { pathRewriteIdOf, runDigPathRewrite, runFirstDebateSuggestions } from "../../apps/runner/src/path-rewrite.js";
 import {
   AI_PICK, DIG_A, DIG_B, DIG_NODES, OBJECTION, ORDERS, OWN_VIEW, PARENT_POINTS, SATISFIED, dig, digSnapshot, down, fieldsOf,
   fittingRewrite, isChecker, memoryStore, membersOf, parentOf, settingsOver, storyParentPath, team, until, writesFitting,
@@ -78,6 +78,38 @@ describe("W3-5 a dig rewrites the path it was dug from", () => {
       digSnapshot(DIG_A, membersOf(team())));
     expect(failing.rewrites[0]!.outcome).toBe("READY");
     expect(failing.contents.get(failing.rewrites[0]!.rewriteId)).not.toHaveProperty("dig_suggestions");
+  });
+
+  it("Q-D8: once the row is stored, the rewritten path's suggestions again, from its new text; a failed rewrite asks for none", async () => {
+    const store = memoryStore();
+    const asked: PathSuggestionsRefresh[] = [];
+    let storedFirst = false;
+    await runDigPathRewrite(settingsOver({ store, digs: new Map([[DIG_A, dig()]]), extra: { refreshSuggestions: async (input) => { storedFirst = store.rewrites.length === 1; asked.push(input); } } }),
+      digSnapshot(DIG_A, membersOf(team())));
+    expect(storedFirst).toBe(true);
+    expect(asked).toHaveLength(1);
+    expect(asked[0]).toMatchObject({ digRunId: DIG_A, free: false, step: 0, line: "Partly: a second pier helps at rush hour, not in winter.",
+      whatChanged: ["The dig weakened the year-round case: winter ridership falls."] });
+    expect(asked[0]!.points.length).toBeGreaterThan(0);
+
+    const none: PathSuggestionsRefresh[] = [];
+    await runDigPathRewrite(settingsOver({ store: memoryStore(), digs: new Map([[DIG_A, dig()]]), extra: { refreshSuggestions: async (input) => { none.push(input); } } }),
+      digSnapshot(DIG_A, membersOf(team({ haiku: down, deepseek: down, qwen: down }))));
+    expect(none).toEqual([]);
+  });
+
+  it("W4-3: a first debate gets its suggestions after its story; a dig, Free, or no writer none", async () => {
+    const store = { positionsOf: async () => new Set<string>(), record: async () => "RECORDED" };
+    const extra = (free: boolean) => ({ firstDebateSuggestions: { store, read: async () => ({ free, wouldChangeIt: null }) } });
+    const first = team();
+    await runFirstDebateSuggestions(settingsOver({ store: memoryStore(), digs: new Map(), extra: extra(false) }), digSnapshot(DIG_A, membersOf(first)));
+    expect(first.haiku.bodies.length).toBeGreaterThan(0);
+    const free = team();
+    await runFirstDebateSuggestions(settingsOver({ store: memoryStore(), digs: new Map(), extra: extra(true) }), digSnapshot(DIG_A, membersOf(free)));
+    expect(free.haiku.bodies).toEqual([]);
+    const isDig = team();
+    await runFirstDebateSuggestions(settingsOver({ store: memoryStore(), digs: new Map([[DIG_A, dig()]]), extra: extra(false) }), digSnapshot(DIG_A, membersOf(isDig)));
+    expect(isDig.haiku.bodies).toEqual([]);
   });
 
   it("at level 10 the rewrite runs and no suggestions are asked for", async () => {

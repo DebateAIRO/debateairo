@@ -11,10 +11,12 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  configureContentEncryption, contentCipherFor, createPool, PostgresDigPicksRepository, PostgresDigPicksRunnerRepository, PostgresInvestigationRepository,
+  configureContentEncryption, contentCipherFor, createPool, PostgresDigPicksRepository, PATH_SUGGESTIONS_CARRIER, PostgresDigPicksRunnerRepository, PostgresPathSuggestionsRepository, decryptContentForRun, withRunContentLease, PostgresInvestigationRepository,
   PostgresPassageRetentionRepository, WEB_EVIDENCE_CARRIERS, WEB_REPLY_TEXT_CARRIER, migrate, webReplyTextIdOf, type Pool
 } from "@debateai/db";
-import { WEB_DIG_PLANNER_V2_CONTRACT_ID, framedJudgePromptForTest, type JudgeLeg } from "@debateai/judgement";
+import { pathSuggestionsOfSet } from "@debateai/serve";
+import { pathSuggestionsSetIdOf, postgresPathSuggestionsStore } from "../../apps/runner/src/dig-suggestions-step.js";
+import { WEB_DIG_PLANNER_V3_CONTRACT_ID, framedJudgePromptForTest, type JudgeLeg } from "@debateai/judgement";
 import { LENGTH_GUIDANCE_START, type LengthGuide } from "@debateai/kernel";
 import {
   PERPLEXITY_SEARCH_CHARGE_MICROS, createPerplexitySearchPort, readPromptFrame, type PromptPacket, type ProviderCallRequest,
@@ -66,7 +68,8 @@ const PICKS = Object.freeze(["Does winter ridership fall?", "I think tourists ke
 const Q1 = "winter ferry ridership harbour statistics";
 const Q2 = "tourist ferry passengers all year survey";
 const DIG_PLAN = (packet: PromptPacket): string => JSON.stringify({ country: null, needs_search: true, reason: null, pace: "normal",
-  searches: [{ side: "for", local: false, query: readPromptFrame(packet).fields.find((entry) => entry.name === "chosen")?.content === PICKS[1] ? Q2 : Q1 }] });
+  searches: ((query: string) => [{ side: "for", local: false, query }, { side: "against", local: false, query: `${query} doubts` }])(
+    readPromptFrame(packet).fields.find((entry) => entry.name === "chosen")?.content === PICKS[1] ? Q2 : Q1) });
 /** The dig's own paths (its map's answers): the pack is kept under b1, and b2 reads it too. */
 const DIG_PATHS: readonly WebStepPath[] = Object.freeze([
   Object.freeze({ pathRef: "b1", answer: "Yes: winter crossings stay steady.", forPoints: [], againstPoints: [] }),
@@ -187,7 +190,7 @@ async function withStoredReplies(runId: string, attempts: ReturnType<typeof reco
 }
 
 describe("W4-7 a dig's web step and its reuse, on real PostgreSQL", () => {
-  it("one pack under the first path, read by every dig path; a read page reused; claimed again, the same prompts", async () => {
+  it("one pack per chosen path, each read by every dig path; a read page reused; claimed again, the same prompts", async () => {
     const parent = await firstDebate();
     const { dig } = await digOf(parent);
 
@@ -201,10 +204,10 @@ describe("W4-7 a dig's web step and its reuse, on real PostgreSQL", () => {
     const firstSearch = digPerplexity();
     await expect(runnerStep({ runId: dig, question: DIG_QUESTION, paths: DIG_PATHS, members: membersOf(first.all, killed),
       settings: settingsOf(firstSearch.port), abandon: (error) => error instanceof Killed })).rejects.toBeInstanceOf(Killed);
-    expect(contractOf(first.haiku.bodies[0]!)).toBe(WEB_DIG_PLANNER_V2_CONTRACT_ID);
-    expect(first.haiku.bodies.filter((body) => contractOf(body) === WEB_DIG_PLANNER_V2_CONTRACT_ID).map((body) => fieldOf(body, "chosen")).sort())
+    expect(contractOf(first.haiku.bodies[0]!)).toBe(WEB_DIG_PLANNER_V3_CONTRACT_ID);
+    expect(first.haiku.bodies.filter((body) => contractOf(body) === WEB_DIG_PLANNER_V3_CONTRACT_ID).map((body) => fieldOf(body, "chosen")).sort())
       .toEqual([...PICKS].sort());
-    expect([...firstSearch.queries].sort()).toEqual([Q1, Q2].sort());
+    expect([...firstSearch.queries].sort()).toEqual([Q1, `${Q1} doubts`, Q2, `${Q2} doubts`].sort());
 
     // The copy that claims it again: every call the first made is answered by the replay book, so its prompts are the
     // same bytes (the book answers only a byte-identical prompt); only readers 2 and 3 are paid now. No search again.
@@ -222,26 +225,25 @@ describe("W4-7 a dig's web step and its reuse, on real PostgreSQL", () => {
     expect(money.charged).toEqual([]);
     expect(second.haiku.bodies).toHaveLength(0);
     expect(secondAsked.filter((request) => request.providerRef === "ref-haiku")).toHaveLength(first.haiku.requests.length);
-    expect(second.deepseek.bodies.length + second.glm.bodies.length).toBe(2);
+    expect(second.deepseek.bodies.length + second.glm.bodies.length).toBe(4);
 
-    // Stored under the dig's first path: every search, page, extract, pick and its one pack.
+    // Stored under each chosen path's own ref: its searches, pages, extracts, top pages and its pack.
     const kept = await pathsKept(dig);
-    expect(kept.searches).toEqual(["b1", "b1"]);
-    expect(kept.pages).toHaveLength(10);
-    expect(new Set([...kept.pages, ...kept.extracts, ...kept.picks, ...kept.packs])).toEqual(new Set(["b1"]));
-    expect(kept.packs).toEqual(["b1"]);
-    expect((await database.pool.query("SELECT side FROM identity.web_search WHERE run_id = $1", [dig])).rows.map((row) => row.side))
-      .toEqual(["dig", "dig"]);
-    // Every dig path's outcome names that one pack.
+    expect([...kept.searches].sort()).toEqual(["dig-pick-1", "dig-pick-1", "dig-pick-2", "dig-pick-2"]);
+    expect(kept.pages).toHaveLength(20);
+    expect(new Set([...kept.pages, ...kept.extracts, ...kept.picks, ...kept.packs])).toEqual(new Set(["dig-pick-1", "dig-pick-2"]));
+    expect([...kept.packs].sort()).toEqual(["dig-pick-1", "dig-pick-2"]);
+    expect(new Set((await database.pool.query("SELECT side FROM identity.web_search WHERE run_id = $1", [dig])).rows.map((row) => row.side))).toEqual(new Set(["dig"]));
+    // Every dig path's outcome names both packs, in pick order.
     expect(result.paths.map((path) => [path.pathRef, path.status])).toEqual([["b1", "SEARCHED"], ["b2", "SEARCHED"]]);
-    expect(result.paths[1]!.packId).toBe(result.paths[0]!.packId);
-    expect(result.paths[0]!.packId).toBe((await database.pool.query("SELECT pack_id::text FROM identity.web_pack WHERE run_id = $1", [dig])).rows[0].pack_id);
+    expect(result.paths[1]!.digPacks).toEqual(result.paths[0]!.digPacks);
+    expect(result.paths[0]!.digPacks!.map((pack) => pack.chosen)).toEqual([...PICKS]);
 
-    // The page the first debate read is reused: reader 1 was sent the other 9 only, and its reading carries where it was read.
+    // The page the first debate read is reused: reader 1 was sent the other 19 only, and its reading carries where it was read.
     expect(result.dig!.reusedPageIds).toHaveLength(1);
     expect(result.dig!.refetchedPageIds).toEqual([]);
     const reusedId = result.dig!.reusedPageIds[0]!;
-    expect(readAllPageIds(first)).toHaveLength(9);
+    expect(readAllPageIds(first)).toHaveLength(19);
     expect(readAllPageIds(first)).not.toContain(reusedId);
     const ports = await postgresWebStepPorts(runner, dig);
     try {
@@ -254,17 +256,18 @@ describe("W4-7 a dig's web step and its reuse, on real PostgreSQL", () => {
       await ports.close();
     }
 
-    // Every dig path's legs read the one pack, the same bytes for b2 as for b1; W4-1's reading alone left b2 without it.
+    // Every dig path's legs read every pick's pack, the same bytes for b2 as for b1.
     const packs = await readDebateWebPacks({ pool: runner, runId: dig, paths: result.paths });
     const legs = legsOf(packs);
     for (const name of ["case", "defender", "critic"]) {
       expect(sourcesIn(legs[`b1:${name}`]!)).toBeDefined();
       expect(sourcesIn(legs[`b2:${name}`]!)).toBe(sourcesIn(legs[`b1:${name}`]!));
     }
-    expect((JSON.parse(sourcesIn(legs["b2:case"]!)!) as { extracts: { id: string }[] }[])[0]!.extracts.map((extract) => extract.id))
+    expect((JSON.parse(sourcesIn(legs["b2:case"]!)!) as { extracts: { id: string }[] }[]).flatMap((entry) => entry.extracts.map((extract) => extract.id)))
       .toEqual(result.paths[0]!.extractLabels);
-    expect(JSON.parse(sourcesIn(legs["b2:cross"]!)!).map((entry: { for: string }) => entry.for)).toEqual(["own_position, other_makers_position"]);
-    expect((await readDebateWebPacks({ pool: runner, runId: dig }))!.packOf("b2")).toBeUndefined();
+    expect(JSON.parse(sourcesIn(legs["b2:case"]!)!).map((entry: { chosen: string }) => entry.chosen)).toEqual([...PICKS]);
+    expect(JSON.parse(sourcesIn(legs["b2:cross"]!)!).map((entry: { for: string }) => entry.for)).toEqual(["own_position, other_makers_position", "own_position, other_makers_position"]);
+    expect((await readDebateWebPacks({ pool: runner, runId: dig }))!.digPacksOf("b2")).toEqual([]);
 
     // Claimed once more after it finished: nothing is sent, searched or charged, and the legs read the same bytes.
     const third = team({ haiku: { planner: DIG_PLAN } });
@@ -278,7 +281,7 @@ describe("W4-7 a dig's web step and its reuse, on real PostgreSQL", () => {
     expect(thirdAsked.length).toBeGreaterThan(0);
     expect(again.paths).toEqual(result.paths);
     expect(legsOf(await readDebateWebPacks({ pool: runner, runId: dig, paths: again.paths }))).toEqual(legs);
-    expect((await pathsKept(dig)).packs).toEqual(["b1"]);
+    expect([...(await pathsKept(dig)).packs].sort()).toEqual(["dig-pick-1", "dig-pick-2"]);
   });
 
   it("R22 decision 9: a dig below level 1 plans from its parent dig's own AI text and the first debate's notes, never a passage", async () => {
@@ -316,6 +319,23 @@ describe("W4-7 a dig's web step and its reuse, on real PostgreSQL", () => {
     expect(fieldOf(again.haiku.bodies[0]!, "already_investigated")).toBe(known);
   });
 
+  it("W4-3 and Q-D8 (0141): a set kept under the dig that paid, on its parent's path, opens under that dig's key on the runner's store", async () => {
+    const parent = await firstDebate();
+    const { dig } = await digOf(parent);
+    const store = postgresPathSuggestionsStore(runner);
+    const position = randomUUID();
+    const set = pathSuggestionsSetIdOf(dig, parent, position, 0);
+    const content = { suggestions: [{ suggestion_id: "s-1", kind: "HELPS_MAIN_QUESTION", side: "FOR", text: "Is rent capped?", places: [`path:${position}`] }] };
+    const record = () => store.record({ setId: set, runId: dig, debateRunId: parent, positionRef: position, content: content as never });
+    expect(await record()).toBe("RECORDED");
+    expect(await record()).toBe("ALREADY");
+    expect([...await store.positionsOf(parent)]).toEqual([position]);
+    const [row] = (await new PostgresPathSuggestionsRepository(runner).readOfRun(parent))!;
+    expect(row!.run_id.toLowerCase()).toBe(dig.toLowerCase());
+    const opened = await withRunContentLease(runner, [dig], () => decryptContentForRun<unknown>(runner, dig, PATH_SUGGESTIONS_CARRIER, set, row!.content, null));
+    expect(pathSuggestionsOfSet(opened).map((entry) => entry.text)).toEqual(["Is rent capped?"]);
+  });
+
   it("once the investigation's texts are wiped, a dig's own search fetches the page again for its 0.1 cent: no reader paid", async () => {
     const parent = await firstDebate();
     const { dig, investigationId } = await digOf(parent);
@@ -331,11 +351,11 @@ describe("W4-7 a dig's web step and its reuse, on real PostgreSQL", () => {
     const pageId = result.dig!.refetchedPageIds[0]!;
     expect(result.dig!.reusedPageIds).toEqual([pageId]);
     // Reader 1 is not paid for it again; the fetch again is the search itself: one charge per answered search.
-    expect(readAllPageIds(ais)).toHaveLength(9);
+    expect(readAllPageIds(ais)).toHaveLength(19);
     expect(readAllPageIds(ais)).not.toContain(pageId);
-    expect(money.charged).toEqual(["SUCCEEDED", "SUCCEEDED"]);
+    expect(money.charged).toEqual(["SUCCEEDED", "SUCCEEDED", "SUCCEEDED", "SUCCEEDED"]);
     expect((await database.pool.query("SELECT charge_micros FROM identity.web_search WHERE run_id = $1", [dig])).rows
-      .map((row) => Number(row.charge_micros))).toEqual([PERPLEXITY_SEARCH_CHARGE_MICROS, PERPLEXITY_SEARCH_CHARGE_MICROS]);
+      .map((row) => Number(row.charge_micros))).toEqual([PERPLEXITY_SEARCH_CHARGE_MICROS, PERPLEXITY_SEARCH_CHARGE_MICROS, PERPLEXITY_SEARCH_CHARGE_MICROS, PERPLEXITY_SEARCH_CHARGE_MICROS]);
     expect(PERPLEXITY_SEARCH_CHARGE_MICROS).toBe(1_000);
     // The dig keeps the text its own search brought back, sealed under its key.
     const ports = await postgresWebStepPorts(runner, dig);
@@ -345,8 +365,8 @@ describe("W4-7 a dig's web step and its reuse, on real PostgreSQL", () => {
     } finally {
       await ports.close();
     }
-    // Its one pack is still kept under the first path and read by both paths.
-    expect((await pathsKept(dig)).packs).toEqual(["b1"]);
+    // Each chosen path keeps its own pack.
+    expect([...(await pathsKept(dig)).packs].sort()).toEqual(["dig-pick-1", "dig-pick-2"]);
     const packs = await readDebateWebPacks({ pool: runner, runId: dig, paths: result.paths });
     expect(packs!.packOf("b2")).toBe(packs!.packOf("b1"));
   });

@@ -2,7 +2,7 @@
 import { StoryBodySchema } from "@debateai/contract";
 import {
   PATH_REWRITE_CARRIER, PostgresDigModelRunnerRepository, PostgresDigPicksRunnerRepository, PostgresInvestigationRunnerRepository,
-  PostgresWebEvidenceRepository, WEB_EVIDENCE_CARRIERS, decryptContentForRun, decryptLeasedContentForRun,
+  PostgresWebEvidenceRepository, RunRepository, WEB_EVIDENCE_CARRIERS, decryptContentForRun, decryptLeasedContentForRun,
   prepareLeasedContentEncryptionForRun, withRunContentLease, type CryptoEnvelope, type Pool
 } from "@debateai/db";
 import { pointsOf, storedDigPathsOf } from "./path-rewrite-sources.js";
@@ -202,4 +202,20 @@ export async function readAlreadyInvestigated(pool: Pool, runId: string, cutAt: 
     }
   }
   return investigatedText(debates);
+}
+
+/** What a first debate's suggestions need from its stored ask and newest story: Free or not, and the story's "what would change it". */
+export function firstDebateSuggestionFacts(pool: Pool): (runId: string) => Promise<Readonly<{ free: boolean; wouldChangeIt: string | null }>> {
+  return async (runId) => {
+    const ask = await new RunRepository(pool).readStoredAsk(runId);
+    if (ask === null || ask.planTier === "free") return Object.freeze({ free: true, wouldChangeIt: null });
+    const row = (await pool.query<{ story_id: string; content: unknown; content_ciphertext: CryptoEnvelope | null }>(
+      `SELECT story.story_id::text AS story_id, story.content, story.content_ciphertext FROM serve.answer_story AS story
+        WHERE story.run_id = $1 ORDER BY story.answer_version DESC, story.created_at DESC LIMIT 1`, [runId])).rows[0];
+    if (row === undefined) return Object.freeze({ free: false, wouldChangeIt: null });
+    const content = await withRunContentLease(pool, [runId], () =>
+      decryptContentForRun<unknown>(pool, runId, "serve.answer_story", row.story_id, row.content_ciphertext, row.content));
+    const body = StoryBodySchema.nullable().safeParse(isRecord(content) ? content.body : undefined);
+    return Object.freeze({ free: false, wouldChangeIt: body.success ? body.data?.short.change.text ?? null : null });
+  };
 }

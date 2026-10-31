@@ -16,8 +16,9 @@ import { TypedDomainError } from "@debateai/kernel";
  *    for and against, when the planner says local information helps), so up to 20 at 5 paths; Thorough doubles the cap
  *    (8 per path) ("Search cap vs 4 per path", "Thorough", Q10);
  *  - 10 results per search at a debate's start, 5 for a dig (plan W2-1, Q9);
- *  - a dig (R22 decision 9, replacing "one search per chosen suggestion"): each chosen path has its own planner call and up to
- *    4 searches, within the debate's cap (Quick look 20, Thorough 40), and its one pack shared by the dig's paths;
+ *  - a dig (R22 decision 9 and the owner's 31 Oct answer): each chosen path is a pack of its own, as a first debate's path is: its
+ *    own planner call, up to 4 searches within the debate's cap (Quick look 20, Thorough 40), its own reader-1 batches, its
+ *    own pick, its own readers 2 and 3 on its top pages;
  *  - reader 1 reads every page whole, in batches of at most 80,000 tokens, every Haiku call under 100,000 (plan W2-4);
  *  - the top 3 pages per path (Thorough: 5) are read whole by readers 2 and 3 ("Thorough's top 5 vs the approved 3");
  *  - one planner call per debate (plan W2-3), one per chosen path of a dig (decision 9).
@@ -62,7 +63,7 @@ export const WEB_SITES_LIMITS = Object.freeze({ webPathsMax: 10, digPicksMax: 16
 export type WebDepth = "QUICK" | "THOROUGH";
 export type WebKind = "START" | "DIG";
 
-/** What admission knows about the web part: a debate's start (one pack per path) or a dig (one shared pack). */
+/** What admission knows about the web part: a debate's start or a dig, one pack per path or per chosen path. */
 export type WebSiteInput = Readonly<{
   kind: WebKind;
   depth: WebDepth;
@@ -76,7 +77,7 @@ export type WebSiteInput = Readonly<{
 export type WebSites = Readonly<{
   kind: WebKind;
   depth: WebDepth;
-  /** Packs: one per path at a debate's start, one for a dig. */
+  /** Packs: one per path at a debate's start, one per chosen path of a dig. */
   packs: number;
   searchesPerPack: number;
   searches: number;
@@ -136,8 +137,10 @@ export function webSitesOf(input: WebSiteInput): WebSites {
     if (!whole(input.digPicks, 1, WEB_SITES_LIMITS.digPicksMax) || input.paths !== undefined) {
       return invalid("A dig's web part needs its chosen paths (1 to 16) and no debate paths");
     }
-    packs = 1;
-    searchesPerPack = Math.min(input.digPicks * start.digSearchesPerPick, start.digSearchCap[input.depth]);
+    packs = input.digPicks;
+    // The cap is shared out by whole pairs: a dig of many picks may send fewer than 4 for each.
+    const fairShare = Math.ceil(start.digSearchCap[input.depth] / input.digPicks / 2) * 2;
+    searchesPerPack = Math.min(start.digSearchesPerPick, fairShare);
     resultsPerSearch = start.resultsPerSearch.DIG;
     plannerCalls = input.digPicks;
   } else {
@@ -151,7 +154,7 @@ export function webSitesOf(input: WebSiteInput): WebSites {
     depth: input.depth,
     packs,
     searchesPerPack,
-    searches: packs * searchesPerPack,
+    searches: input.kind === "DIG" ? Math.min(packs * searchesPerPack, start.digSearchCap[input.depth]) : packs * searchesPerPack,
     resultsPerSearch,
     pageTokenCap: WEB_SEARCH_PAGE_TOKEN_CAP,
     searchTokenCap: WEB_SEARCH_REQUEST_TOKEN_CAP,
@@ -182,7 +185,7 @@ export const webReceiptSchema = z.object({
   version: z.literal(1),
   kind: z.enum(["START", "DIG"]),
   depth: z.enum(["QUICK", "THOROUGH"]),
-  packs: count(1, WEB_SITES_LIMITS.webPathsMax),
+  packs: count(1, WEB_SITES_LIMITS.digPicksMax),
   searches_per_pack: count(1, 64),
   searches: count(1, 640),
   results_per_search: count(1, 10),

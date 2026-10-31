@@ -89,6 +89,8 @@ tests/integration/path-rewrite-database.test.ts
 tests/integration/investigation-report-database.test.ts
 # The owner's changes of 31 Oct (0137 to 0140): public digs, tree and answer updates, the deletion keeping the quote and notes, the funded spend kinds.
 tests/integration/r22-foundation-database.test.ts
+# A path's suggestions (0141): insert-once, the newest per path, deletion both ways, export, no request role reads them.
+tests/integration/path-suggestions-database.test.ts
 
 # NOT listed: preview-auth-dev-startup.test.ts — red on dev at d1ac3641b (2 of 17: PREVIEW_STAGE_PROCESS_EXITED; it
 # starts the real API/UI stage processes, so it is a deployment rehearsal, not a self-contained suite).

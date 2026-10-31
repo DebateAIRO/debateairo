@@ -32,8 +32,8 @@ import { WEB_SEARCH_REQUEST_MICROS } from "./web-charge.js";
  *  - packReadTokensPerPack: a path's pack read across its arguing calls (design §4.2: about 40,000 tokens).
  *  - digPlannerInputTokens: one chosen path's planner on a dig: what is chosen and what the whole debate already investigated
  *    (apps/runner investigation-digest.ts cuts it at 32,000 bytes, 2 bytes a token).
- *  - digSuggest*: the suggestions on a dig's own paths (W4-3): one small call per path, at the most paths a map has,
- *    reading the same digest and that path's points, on a paid plan only.
+ *  - digSuggest*: the suggestions on a dig's own paths (W4-3): one small call per path, at the most paths a map has, and one for the
+ *    parent path it rewrote (Q-D8), reading the same digest and that path's points, on a paid plan only.
  */
 export const WEB_CALL_ALLOWANCES = Object.freeze({
   instructionTokens: 4_000,
@@ -45,7 +45,7 @@ export const WEB_CALL_ALLOWANCES = Object.freeze({
   plannerOutputTokens: 8_192,
   packReadTokensPerPack: 40_000,
   digPlannerInputTokens: 18_000,
-  digSuggestPaths: 5,
+  digSuggestPaths: 6,
   digSuggestInputTokens: 22_000,
   digSuggestOutputTokens: 1_024
 });
@@ -108,7 +108,8 @@ export function webCallTokens(sites: WebSites): Readonly<{
       outputTokens: a.plannerOutputTokens }),
     // The pack's reading inside the arguing: input only (the arguing calls' own output is already in the debate's
     // estimate), one figure per pack.
-    pack: Object.freeze({ calls: sites.packs, inputTokens: a.packReadTokensPerPack, outputTokens: 0 })
+    // A dig's legs read all its picks' packs together, at most three packs' worth (apps/runner web-packs.ts `WEB_DIG_SOURCES_BYTES`).
+    pack: Object.freeze({ calls: sites.kind === "DIG" ? Math.min(sites.packs, 3) : sites.packs, inputTokens: a.packReadTokensPerPack, outputTokens: 0 })
   });
 }
 

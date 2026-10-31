@@ -15,6 +15,8 @@ export const FORGET_ERASED_DEBATE_DIG_PICKS = "identity.forget_erased_debate_dig
 export const FORGET_ERASED_DEBATE_PUBLIC = "identity.forget_erased_debate_public(uuid)" as const;
 export const FORGET_ERASED_DEBATE_TREE_UPDATES = "identity.forget_erased_debate_tree_updates(uuid)" as const;
 export const FORGET_ERASED_DEBATE_PASSAGES = "identity.forget_erased_debate_passages(uuid)" as const;
+/** 0141: every path suggestion one debate sealed or holds on its paths. */
+export const FORGET_ERASED_DEBATE_PATH_SUGGESTIONS = "identity.forget_erased_debate_path_suggestions(uuid)" as const;
 
 /**
  * R22 item 16 (owner, 2026-10-29: "Yes, delete them too"): deleting one private debate also deletes its V4 page memory
@@ -30,7 +32,7 @@ export const FORGET_ERASED_DEBATE_PASSAGES = "identity.forget_erased_debate_pass
  * path it was dug from falls back to its previous text, and every rewrite and turn of its own paths) and its dig picks
  * (0135: as a dig, its picks and its rewrite's material; the digs dug from it keep theirs), its public contribution and Free ask
  * (0137: a contribution on the page stays with no name), its tree updates (0138: what it caused or sits on, its answer versions and
- * purpose lines) and its quotes and saved replies (0139).
+ * purpose lines), its quotes and saved replies (0139) and its path suggestions (0141: what it sealed and what sits on its paths).
  */
 export async function finalizeWithPageMemory<Outcome extends string>(
   pool: Pool,
@@ -56,6 +58,7 @@ export async function finalizeWithPageMemory<Outcome extends string>(
         await client.query("SELECT identity.forget_erased_debate_public($1)", [runId]);
         await client.query("SELECT identity.forget_erased_debate_tree_updates($1)", [runId]);
         await client.query("SELECT identity.forget_erased_debate_passages($1)", [runId]);
+        await client.query("SELECT identity.forget_erased_debate_path_suggestions($1)", [runId]);
       }
       await client.query("COMMIT");
       return outcome;

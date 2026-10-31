@@ -16,7 +16,7 @@ import {
 /**
  * 0136 (plan task W5-1, owner answer F7 A): the final report over an investigation, one per closing, written once by the
  * runner (its text sealed under the investigation's ROOT run key), the runner's readers, the person's reader, an export
- * reader and the spend source INVESTIGATION_REPORT. Followed by 0137 to 0140, `expand`, keeping 0130's verifier. No
+ * reader and the spend source INVESTIGATION_REPORT. Followed by 0137 to 0141, `expand`, keeping 0130's verifier. No
  * database here: the behaviour is tests/integration/investigation-report-database.test.ts.
  */
 const NAME = "0136_investigation_reports.sql";
@@ -57,9 +57,9 @@ const ROLES = ["debateai_runtime", "debateai_billing_runtime", "debateai_authori
   "debateai_replay", "debateai_data_export_worker"] as const;
 
 describe("0136: the final report over an investigation", () => {
-  it("C-T follows 0135 in the chain's STEPS (0137 to 0140 come after it), with its own loader", async () => {
+  it("C-T follows 0135 in the chain's STEPS (0137 to 0141 come after it), with its own loader", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
-    expect(chain).toContain("loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140]);");
+    expect(chain).toContain("loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140,loadForward0141]);");
     expect(chain).toContain("import { loadForward0136 } from './migration-forward0136.js';");
     const loader = read("packages/db/src/migration-forward0136.ts");
     expect(loader).toContain(`const NAME = "${NAME}";`);
@@ -240,7 +240,7 @@ describe("0136: the final report over an investigation", () => {
   it("C-E the export worker reaches the reader through 0128's lease, and its boot check counts it", () => {
     const exporter = read("packages/db/src/data-export.ts");
     expect(exporter.indexOf(`"${EXPORT_READER}",`)).toBeGreaterThan(exporter.indexOf('"identity.read_data_export_dig_picks(uuid,uuid)",'));
-    expect(exporter).toContain("worker.worker_count !== 18");
+    expect(exporter).toContain("worker.worker_count !== 19");
     expect(read("packages/db/src/investigation-reports.ts")).toContain(`export const READ_DATA_EXPORT_INVESTIGATION_REPORTS = "${EXPORT_READER}" as const;`);
   });
 

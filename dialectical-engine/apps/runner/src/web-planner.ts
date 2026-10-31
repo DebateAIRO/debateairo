@@ -12,14 +12,14 @@ import {
   type ProviderGateway
 } from "@debateai/providers";
 import {
-  WEB_DIG_PLANNER_V2_PROMPT_CONTRACT,
+  WEB_DIG_PLANNER_V3_PROMPT_CONTRACT,
   WEB_PLAN_CALL_SITE_KEY,
   WEB_PLANNER_V2_PROMPT_CONTRACT,
   WEB_REPLY_SEARCHES_INVALID,
   classifyStructuredArtifact,
   parseStructuredArtifact,
   webDigPlannerV2MaterialFields,
-  webDigPlannerV2ReplyIssues,
+  webDigPlannerV3ReplyIssues,
   webDigPlannerV2ReplySchema,
   webPlannerV2MaterialFields,
   webPlannerV2ReplyIssues,
@@ -41,6 +41,7 @@ import {
   type PlannedWebSearch,
   type WebPace
 } from "@debateai/evidence";
+import { digPickPathRef } from "@debateai/contract";
 import type { PlanId } from "@debateai/register";
 
 /**
@@ -450,8 +451,6 @@ export type WebDigPlannerInputPick = Readonly<{ pickNo: number; text: string }>;
 export type WebDigPlannerInput = Omit<WebPlannerInput, "paths"> & Readonly<{
   /** The dig's picks, in their order: each has its own planner. */
   picks: readonly WebDigPlannerInputPick[];
-  /** The dig's path its searches, pages and one pack are kept under (the first path of the dig's map). */
-  homePathId: string;
   /** What the whole debate already investigated (investigation-digest.ts): AI text only, the same bytes on a re-claim. */
   alreadyInvestigated: string;
 }>;
@@ -489,21 +488,21 @@ export function webDigPlanCallSiteKey(pickNo: number, backup: boolean): string {
   return `${WEB_PLAN_CALL_SITE_KEY}:${String(pickNo)}${backup ? ":seat:runnerUp" : ""}`;
 }
 
-/** One pick's framed prompt: `web.plan-dig.v2`, its material, the run's language last. Same input, same bytes. */
+/** One pick's framed prompt: `web.plan-dig.v3`, its material, the run's language last. Same input, same bytes. */
 export function webDigPlannerFramedPrompt(input: Readonly<{
   question: string; placeCountry: string | null; questionLanguage: QuestionLanguage | null; chosen: string; alreadyInvestigated: string;
 }>): FramedPrompt {
   const material = webDigPlannerV2MaterialFields({ question: input.question, countryCode: input.placeCountry, chosen: input.chosen,
     alreadyInvestigated: input.alreadyInvestigated });
-  return buildFramedPrompt({ contract: WEB_DIG_PLANNER_V2_PROMPT_CONTRACT, material: withQuestionLanguageField(material, input.questionLanguage) });
+  return buildFramedPrompt({ contract: WEB_DIG_PLANNER_V3_PROMPT_CONTRACT, material: withQuestionLanguageField(material, input.questionLanguage) });
 }
 
-type DigPickContext = Readonly<{ givenCountryCode: string | null; questionLanguage: QuestionLanguage | null; asOf: Date; pathId: string; pickId: string }>;
+type DigPickContext = Readonly<{ givenCountryCode: string | null; questionLanguage: QuestionLanguage | null; asOf: Date; pickId: string }>;
 
 /**
  * Code's salvage of one reply (the owner's slip-recovery order): the given country kept, a country that is not one
- * dropped, local searches with nowhere to look dropped, a pace on no search dropped. The English searches stay; a reply
- * left with no search at all has its issue named below, so the smallest follow-up asks for it.
+ * dropped, a whole local pair with nowhere to look dropped, a pace on no search dropped. It never fixes an odd number of
+ * searches (the owner: refused, sending none): `checkedDigPick` names that first, so the smallest follow-up asks again.
  */
 function salvageDigReply(reply: WebDigPlannerV2Reply, context: DigPickContext): WebDigPlannerV2Reply {
   const country = context.givenCountryCode ?? (oneCountry(reply.country) ? reply.country : null);
@@ -525,11 +524,13 @@ const plannedDigPick = (pickId: string, reply: WebDigPlannerV2Reply): PlannedDig
 function checkedDigPick(value: WebDigPlannerV2Reply, context: DigPickContext):
   Readonly<{ kind: "OK"; reply: WebDigPlannerV2Reply }> | Readonly<{ kind: "ISSUES"; issues: readonly WebReplyIssue[] }> {
   const reply = salvageDigReply(value, context);
-  const issues = webDigPlannerV2ReplyIssues(reply, context.givenCountryCode);
+  const issues = value.searches.length % 2 === 1
+    ? [Object.freeze({ code: WEB_REPLY_SEARCHES_INVALID, path: Object.freeze(["searches"]), message: WEB_REPLY_SEARCHES_INVALID })]
+    : webDigPlannerV3ReplyIssues(reply, context.givenCountryCode);
   if (issues.length > 0) return Object.freeze({ kind: "ISSUES", issues });
   try {
-    freezeDigQuerySet([plannedDigPick(context.pickId, reply)], { pickIds: [context.pickId], pathId: context.pathId, asOf: context.asOf,
-      questionLanguage: context.questionLanguage?.code ?? null });
+    freezeDigQuerySet([plannedDigPick(context.pickId, reply)], { pickIds: [context.pickId], pathIdOf: () => digPickPathRef(Number(context.pickId)),
+      asOf: context.asOf, questionLanguage: context.questionLanguage?.code ?? null });
   } catch (error) {
     if (!(error instanceof TypedDomainError)) throw error;
     return Object.freeze({ kind: "ISSUES", issues: Object.freeze([Object.freeze({ code: WEB_REPLY_SEARCHES_INVALID,
@@ -546,7 +547,7 @@ async function planOneDigPick(input: WebDigPlannerInput, pick: WebDigPlannerInpu
     questionLanguage: input.questionLanguage, chosen: pick.text, alreadyInvestigated: input.alreadyInvestigated });
   const pickId = String(pick.pickNo);
   const context: DigPickContext = Object.freeze({ givenCountryCode: input.placeCountry, questionLanguage: input.questionLanguage,
-    asOf: input.asOf, pathId: input.homePathId, pickId });
+    asOf: input.asOf, pickId });
   const classify = (content: string, reply: ModelReplyFacts | undefined): ContentClassification =>
     classifyStructuredArtifact(content, webDigPlannerV2ReplySchema, reply, undefined, (value) => {
       const checked = checkedDigPick(value, context);
@@ -588,7 +589,7 @@ async function planOneDigPick(input: WebDigPlannerInput, pick: WebDigPlannerInpu
 
 /**
  * The debate's search cap on a dig (Quick look 20, Thorough 40): every plan keeps its searches while they fit; past it, the
- * last picks lose their local searches first, then their English ones. Code's rule, the same bytes every time.
+ * last picks lose their local pair first, then their English pair, always a whole pair, so the count stays even. Code's rule.
  */
 function cappedDigPicks(picks: readonly PlannedDigPick[], cap: number): Readonly<{ picks: readonly PlannedDigPick[]; over: readonly string[] }> {
   const kept = picks.map((pick) => [...pick.searches]);
@@ -596,12 +597,11 @@ function cappedDigPicks(picks: readonly PlannedDigPick[], cap: number): Readonly
   const over = new Set<string>();
   for (const scope of ["LOCAL", "ENGLISH"] as const) {
     for (let at = kept.length - 1; at >= 0 && total > cap; at -= 1) {
-      for (let one = kept[at]!.length - 1; one >= 0 && total > cap; one -= 1) {
-        if (kept[at]![one]!.scope !== scope) continue;
-        kept[at]!.splice(one, 1);
-        total -= 1;
-        over.add(picks[at]!.pickId);
-      }
+      const without = kept[at]!.filter((search) => search.scope !== scope);
+      if (without.length === kept[at]!.length) continue;
+      total -= kept[at]!.length - without.length;
+      kept[at] = without;
+      over.add(picks[at]!.pickId);
     }
   }
   return Object.freeze({ picks: Object.freeze(picks.map((pick, at) => Object.freeze({ ...pick, searches: Object.freeze(kept[at]!) }))),
@@ -610,17 +610,17 @@ function cappedDigPicks(picks: readonly PlannedDigPick[], cap: number): Readonly
 
 /**
  * A dig's planners (R22 decision 9; owner Q7: "each selected choice would have its own AI who decides if and what to search
- * for"; "up to 4 if the AI decides it's worth searching in that language as well"): Free and the off switch first (no
- * call), then every pick's planner at once, each with its own backup of another company and the slip order. A pick may
- * plan no search, with its reason. A pick whose planners fail sends none and the others go on; only when every one failed is
- * the plan FAILED, and the debate goes on without the web. Code then freezes all their searches together (`freezeDigQuerySet`:
- * W1-2's guard, at most 4 a pick, the same words sent once), under the debate's cap.
+ * for"; "up to 4 if the AI decides it's worth searching in that language as well"; 31 Oct: always a pair): Free and the off
+ * switch first (no call), then every pick's planner at once, each with its own backup of another company and the slip order.
+ * A pick may plan no search, with its reason. A pick whose planners fail sends none and the others go on; only when every one
+ * failed is the plan FAILED, and the debate goes on without the web. Code then freezes all their searches together
+ * (`freezeDigQuerySet`: W1-2's guard, whole pairs, each pick under its own path_ref), under the debate's cap.
  */
 export async function planDigWebSearches(input: WebDigPlannerInput): Promise<WebDigPlanOutcome> {
   if (input.planId === "FREE") return Object.freeze({ kind: "NOT_ON_PLAN" });
   if (!input.webSwitchedOn) return Object.freeze({ kind: "SWITCHED_OFF" });
-  if (input.picks.length === 0 || input.homePathId.trim() === "") {
-    throw new TypedDomainError("WEB_DIG_PLANNER_INPUT_INVALID", "A dig's planner reads its picks and the path they are kept under");
+  if (input.picks.length === 0) {
+    throw new TypedDomainError("WEB_DIG_PLANNER_INPUT_INVALID", "A dig's planner reads its picks");
   }
   if (input.placeCountry !== null && !oneCountry(input.placeCountry)) {
     throw new TypedDomainError("WEB_PLACE_COUNTRY_INVALID", "A place country must be one ISO 3166-1 country code");
@@ -635,9 +635,9 @@ export async function planDigWebSearches(input: WebDigPlannerInput): Promise<Web
   }
   const cap = WEB_PLAN_SEARCH_CAP_BY_MODE[input.mode];
   const capped = cappedDigPicks(done.flatMap((entry) => entry.planned === null ? [] : [entry.planned]), cap);
-  const querySet = freezeDigQuerySet(capped.picks, { pickIds: input.picks.map((pick) => String(pick.pickNo)), pathId: input.homePathId,
-    asOf: input.asOf, questionLanguage: input.questionLanguage?.code ?? null });
-  return Object.freeze({ kind: "PLANNED", querySet, searchesToSend: querySet.searches.filter((search) => search.status === "SEND").length, cap,
+  const querySet = freezeDigQuerySet(capped.picks, { pickIds: input.picks.map((pick) => String(pick.pickNo)),
+    pathIdOf: (pickId) => digPickPathRef(Number(pickId)), asOf: input.asOf, questionLanguage: input.questionLanguage?.code ?? null });
+  return Object.freeze({ kind: "PLANNED", querySet, searchesToSend: querySet.distinctSends, cap,
     picks, picksOverCap: Object.freeze(capped.over.map(Number)) });
 }
 

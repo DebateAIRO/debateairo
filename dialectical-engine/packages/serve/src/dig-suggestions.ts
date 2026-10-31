@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { WEB_CONTRACT_LIMITS, DIG_LEVEL_MAX, type AnswerWeb, type DigSuggestion, type Edge, type Node } from "@debateai/contract";
+import { DigSuggestionSchema, WEB_CONTRACT_LIMITS, DIG_LEVEL_MAX, type AnswerWeb, type DigSuggestion, type Edge, type Node } from "@debateai/contract";
 
 /**
  * THE DIG SUGGESTIONS CODE FINDS (plan 2026-10-30 task W4-3; owner, 30 Oct: "contradicting parts, undocumented parts, things
@@ -50,6 +50,16 @@ function pointsUnder(root: string, nodes: readonly Node[], edges: readonly Pick<
   return found;
 }
 
+/** 0141's opened set: the suggestions that parse, one by one; none when it is not a set. */
+export function pathSuggestionsOfSet(opened: unknown): readonly DigSuggestion[] {
+  const list = typeof opened === "object" && opened !== null ? (opened as { readonly suggestions?: unknown }).suggestions : undefined;
+  if (!Array.isArray(list)) return [];
+  return list.flatMap((entry: unknown) => {
+    const parsed = DigSuggestionSchema.safeParse(entry);
+    return parsed.success ? [parsed.data] : [];
+  });
+}
+
 /** What code finds on the points of one path. */
 export function digPointSuggestions(positionRef: string, points: readonly Node[]): readonly DigSuggestion[] {
   const offer = (kind: "CONTRADICTING" | "UNDOCUMENTED", list: readonly Node[]): DigSuggestion[] =>
@@ -66,11 +76,16 @@ export function digPointSuggestions(positionRef: string, points: readonly Node[]
  * At level 10 no path offers any. A web part with no suggestions to add comes back as the same paths.
  */
 export function webWithDigSuggestions(web: AnswerWeb, nodes: readonly Node[],
-  edges: readonly Pick<Edge, "from_node_ref" | "target_kind" | "target_ref">[], level: number | null): AnswerWeb {
+  edges: readonly Pick<Edge, "from_node_ref" | "target_kind" | "target_ref">[], level: number | null,
+  newest: ReadonlyMap<string, readonly DigSuggestion[]> = new Map()): AnswerWeb {
   if (level !== null && level >= DIG_LEVEL_MAX) return { paths: web.paths.map((path) => ({ ...path, suggestions: [] })) };
   return { paths: web.paths.map((path) => {
     const seen = new Set<string>();
-    const suggestions = [...path.suggestions, ...digPointSuggestions(path.position_ref, pointsUnder(path.position_ref, nodes, edges))]
+    // 0141's newest set is what the AI offers on this path now: a rewrite's refresh replaces the set sealed with the dig, and an old
+    // set is no longer offered, even when the new one is empty (owner Q-D8).
+    const set = newest.get(path.position_ref.toLowerCase());
+    const offered = set === undefined ? path.suggestions : [...path.suggestions.filter((suggestion) => suggestion.kind !== "HELPS_MAIN_QUESTION"), ...set];
+    const suggestions = [...offered, ...digPointSuggestions(path.position_ref, pointsUnder(path.position_ref, nodes, edges))]
       .filter((suggestion) => { if (seen.has(suggestion.suggestion_id)) return false; seen.add(suggestion.suggestion_id); return true; })
       .slice(0, WEB_CONTRACT_LIMITS.suggestionsPerPathMax);
     return { ...path, suggestions };

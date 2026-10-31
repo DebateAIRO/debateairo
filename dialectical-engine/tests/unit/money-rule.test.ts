@@ -445,7 +445,7 @@ describe("PATH_REWRITE is never walled", () => {
     expect(ask("story", "STORY:STORYTELLER:1", "SYNTHESIZER")).toBe(true);
   });
 
-  it("the person's windows count it: the owner spend reader reads RUN, STORY, PATH_REWRITE and W5-1's INVESTIGATION_REPORT", async () => {
+  it("the person's windows count it: the owner spend reader reads RUN, STORY, PATH_REWRITE, W5-1's INVESTIGATION_REPORT and F1's three funded kinds", async () => {
     const texts: string[] = [];
     const pool = { query: async (text: string, values: unknown[]) => {
       texts.push(text);

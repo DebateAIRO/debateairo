@@ -9,7 +9,9 @@ import {
   PATH_REWRITE_CHECKER_PROSE, PATH_REWRITE_PROSE, pathRewriteFailureCode, writePathRewrite, type PathRewriteDraft,
   type PathRewriteWritten, type StoryNodeEnrichment, type StoryRoleMaker, type StoryWriteInput
 } from "@debateai/story";
-import type { DigPathSuggestions, DigSuggestionsJob } from "./dig-suggestions-step.js";
+import {
+  writeFirstDebateSuggestions, type DigPathSuggestions, type DigSuggestionsJob, type PathSuggestionsRefresh, type PathSuggestionsStore
+} from "./dig-suggestions-step.js";
 import { engineContractHash } from "./engine-contracts.js";
 import {
   buildPathRewriteMaterial, pathRewriteDigPathsOf, pathRewriteGuard, type PathRewriteDigPath, type PathRewriteExtract,
@@ -192,6 +194,14 @@ export type PathRewriteRunnerSettings = Readonly<{
    * row is stored, so they are sealed with it, once, and a rewrite run again replays them free. It never rejects. Absent: none.
    */
   suggest?: (input: DigSuggestionsJob) => Promise<readonly DigPathSuggestions[]>;
+  /** Owner Q-D8 (dig-suggestions-step.ts `refreshPathSuggestions`): once the row is stored, the rewritten path's suggestions again. */
+  refreshSuggestions?: (input: PathSuggestionsRefresh) => Promise<void>;
+  /** A first debate's suggestions (0141), once its story is written. Absent: none. */
+  firstDebateSuggestions?: Readonly<{
+    store: PathSuggestionsStore;
+    /** Free or not, and the story's "what would change it". */
+    read: (runId: string) => Promise<Readonly<{ free: boolean; wouldChangeIt: string | null }>>;
+  }>;
 }>;
 
 const DEFAULT_WAIT = Object.freeze({ pollMs: 5_000, maxWaitMs: 10 * 60_000 });
@@ -405,6 +415,7 @@ async function rewriteOnItsTurn(settings: PathRewriteRunnerSettings, job: PathRe
     const textRewriteId = front.lineBase === undefined ? baseRewriteId : front.lineBase?.kind === "PATH_REWRITE" ? front.lineBase.id : null;
     const textUpdateId = front.lineBase?.kind === "PATH_UPDATE" ? front.lineBase.id : null;
     let record: PathRewriteRecord;
+    let refreshAfter: (() => Promise<void>) | null = null;
     if (job.dig === null || job.digPaths === null) {
       record = failedRecord({ rewriteId, digRunId, parent: await parentCodesFor(settings, job, textRewriteId, textUpdateId, log, true), baseRewriteId,
         failureCode: job.failureCode ?? "PATH_REWRITE_DIG_UNREAD", written: null });
@@ -423,7 +434,8 @@ async function rewriteOnItsTurn(settings: PathRewriteRunnerSettings, job: PathRe
           failureCode: "PATH_REWRITE_PARENT_UNREAD", written: null });
       } else {
         try {
-          record = await composeRecord(settings, { dig, job, parent, digPaths: job.digPaths, rewriteId, baseRewriteId, book, log });
+          record = await composeRecord(settings, { dig, job, parent, digPaths: job.digPaths, rewriteId, baseRewriteId, book, log,
+            onStored: (refresh) => { refreshAfter = refresh; } });
         } catch (error) {
           log("PATH_REWRITE_COMPOSE_FAILED", { runId: digRunId, code: codeOf(error) });
           record = failedRecord({ rewriteId, digRunId, parent, baseRewriteId, failureCode: "PATH_REWRITE_UNEXPECTED_ERROR", written: null });
@@ -434,6 +446,7 @@ async function rewriteOnItsTurn(settings: PathRewriteRunnerSettings, job: PathRe
       : await settings.line.recordRewriteInLine(front.lineBase, record);
     log("PATH_REWRITE_STORED", { runId: digRunId, outcome: record.outcome, failureCode: record.failureCode, stored });
     if (stored === "BASE_MOVED" || stored === "WAIT_TURN") continue;
+    if (stored === "RECORDED" && refreshAfter !== null) await (refreshAfter as () => Promise<void>)();
     if (stored === "RECORDED" || stored === "ALREADY") {
       if (job.dig !== null && job.digPaths !== null) await afterRewrite(settings, job.dig, digRunId, record, job.digPaths, log);
       await settings.afterStored?.(digRunId, job.lease);
@@ -458,6 +471,8 @@ async function afterRewrite(settings: PathRewriteRunnerSettings, dig: PathRewrit
 type Compose = Readonly<{
   dig: PathRewriteDig; job: PathRewriteJob; parent: PathRewriteParentPath; digPaths: readonly PathRewriteDigPath[];
   rewriteId: string; baseRewriteId: string | null; book: ReplayBook | null; log: Log;
+  /** What to do once this rewrite's row is stored (the rewritten path's suggestions, owner Q-D8). */
+  onStored: (refresh: () => Promise<void>) => void;
 }>;
 
 function failedRecord(input: Readonly<{ rewriteId: string; digRunId: string; parent: PathRewriteParentPath; baseRewriteId: string | null;
@@ -536,6 +551,11 @@ async function composeRecord(settings: PathRewriteRunnerSettings, compose: Compo
     return [];
   });
   const content = contentOf(outcome.body, built.pointIds, built.digPathRefs, suggestions);
+  const refresh = settings.refreshSuggestions;
+  if (refresh !== undefined) {
+    compose.onStored(() => refresh(Object.freeze({ digRunId, workItemId: job.workItemId, free: dig.free, question: dig.question, debateRunId: dig.parentRunId,
+      positionRef: dig.positionRef, line: outcome.body.line, points: parent.points, whatChanged: content.what_changed, step: 0, writer, send, log })));
+  }
   const sealed = await settings.seal(digRunId, rewriteId, content);
   return Object.freeze({
     rewriteId,
@@ -576,4 +596,33 @@ export function contentOf(draft: PathRewriteDraft, pointIds: ReadonlyMap<string,
     rests_on: Object.freeze(restsOn),
     ...(suggestions.length === 0 ? {} : { dig_suggestions: suggestions })
   });
+}
+
+/**
+ * A first debate's suggestions, once its story is written (index.ts, the after-settle branch): the writer of the rewrite, on the same
+ * never-walled seam. A run that was rewritten as a dig has its own (sealed with its rewrite). No settings, no store or no writer: none.
+ * Never rejects.
+ */
+export async function runFirstDebateSuggestions(settings: PathRewriteRunnerSettings | undefined, input: StoryWriteInput): Promise<void> {
+  const first = settings?.firstDebateSuggestions;
+  if (settings === undefined || first === undefined) return;
+  const log = safeLog(settings);
+  const lease = input.stepLease ?? BARE_STEP;
+  try {
+    const writer = input.resolveProvider?.(settings.writerRoleRef) ?? null;
+    if (writer === null || await lease(() => settings.sources.digOf(input.runId)) !== null) return;
+    const facts = await lease(() => first.read(input.runId));
+    if (facts.free) return;
+    const enrichment = await lease(() => settings.sources.readEnrichment({ runId: input.runId,
+      nodes: input.nodes.map((node) => ({ nodeId: node.nodeId, judgeArtifactRef: input.judgeArtifactRefs.get(node.nodeId) ?? null })) }));
+    const book = settings.replayBookOf === undefined ? null : await lease(() => settings.replayBookOf!(input.runId, input.workItemId));
+    await writeFirstDebateSuggestions(Object.freeze({ runId: input.runId, workItemId: input.workItemId, free: false, question: input.questionLine,
+      language: null, paths: pathRewriteDigPathsOf(input, enrichment), wouldChangeIt: facts.wouldChangeIt, writer, log,
+      send: (maker, request) => {
+        const gateway = book === null ? maker.provider : replayingGateway(book, maker.provider);
+        return lease(() => gateway.call(request));
+      } }), first.store, settings.contractHash ?? engineContractHash());
+  } catch (error) {
+    log("FIRST_DEBATE_SUGGESTIONS_FAILED", { runId: input.runId, code: codeOf(error) });
+  }
 }

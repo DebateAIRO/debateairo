@@ -380,7 +380,8 @@ describe("the seals", () => {
       // W5-1: the final report's five, after them.
       "report.answer.v1", "report.answer.later.v1", "report.answer-check.v1", "report.story.v1", "report.story-check.v1",
       // R22 decision 9 and W4-3: the dig method's two drafts, last.
-      "web.plan-dig.v2", "web.suggest-dig.v1",
+      // The owner's "always a pair" (31 Oct): web.plan-dig.v3 beside them; v2 stays sealed, unused.
+      "web.plan-dig.v2", "web.suggest-dig.v1", "web.plan-dig.v3",
       // R22 report lane (decision 4).
       "report.answer.v2", "report.answer.later.v2", "report.answer-check.v2",
       "web.read-all.v2", "judge.panel.length.sources.v1", "path-rewrite.writer.v2", "path-rewrite.checker.v2"

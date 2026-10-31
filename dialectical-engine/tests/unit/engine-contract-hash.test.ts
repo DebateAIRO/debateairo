@@ -54,6 +54,8 @@ const ENGINE_SEALED_IDS: readonly string[] = ["verdict.investigate.v1", "verdict
   // R22 decision 9 and W4-3 (DRAFT wordings): a dig's planner per chosen path (web.plan-dig.v1 above stays sealed, withdrawn), and
   // the suggestions on a dig's own paths.
   "web.plan-dig.v2", "web.suggest-dig.v1",
+  // The owner's "always a pair" (31 Oct): v2 stays sealed, unused.
+  "web.plan-dig.v3",
   // R22 report lane (plan 2026-10-31 decision 4, approved): the overall writer, the later version's and the checker.
   "report.answer.v2", "report.answer.later.v2", "report.answer-check.v2",
   // R22 retention lane (decisions 8, 10, 11): reader 1's page note, the graders' cited passage, the rewrite without "search words".
@@ -75,10 +77,13 @@ const R1D_ENGINE_CONTRACT_HASH = "b98a45d5933d82205d5c6514082d4151bfb8f3f45b3677
 // (85278722824f1cde050e290bbb7ec507af08a8e7ae8087526aee27b45f1b66aa, history). W4-7 (2026-11-01): + the answer checker's two
 // sources variants (b34eac03a16c921a6a360a4405e38eea8e1c0dbd521d8de4e53a379198f6e716, history). W5-1 (2026-11-01): + the
 // final report's 5 (2c8c3139511ddf6d58aa977e418931b3185ebfe4707282367754e4ffbe6ef41b, history). R22 decision 9 and W4-3
-// (2026-10-31): + a dig's planner per chosen path and the suggestions on a dig's own paths. R22 report lane (2026-10-31): + the
-// overall writer, the later version's and the checker. R22 retention lane: + web.read-all.v2, judge.panel.length.sources.v1 and the
-// path rewrite's v2 pair.
-const ENGINE_CONTRACT_HASH_SEALED = "848092c2fff40b49b15dcaefd4b26a7689b2ec5e8b8e56d2ef0ff41c748d6850";
+// (2026-10-31): + a dig's planner per chosen path and the suggestions on a dig's own paths
+// (5e91084b2392f6aafd4a6cd9e0ff4ed59295cdda3b9b95760c7e392916dd12eb, history). The owner's "always a pair": + web.plan-dig.v3
+// (25e7845643f503581c7da98aa7015209155a90647e1283fd8d59e38c93bd009a, history). R22 report lane (2026-10-31): + the overall writer,
+// the later version's and the checker. R22 retention lane: + web.read-all.v2, judge.panel.length.sources.v1 and the path rewrite's
+// v2 pair (848092c2fff40b49b15dcaefd4b26a7689b2ec5e8b8e56d2ef0ff41c748d6850 without web.plan-dig.v3, history). The lanes met before
+// anything shipped: this order is engineSealedContracts()'s own.
+const ENGINE_CONTRACT_HASH_SEALED = "60469207a7d5dfa9b690dbc2bffaa02b53f848f31b8db06c55e732f2e1a55e20";
 const SELECT = "SELECT value_json FROM register.register_row WHERE register_version=$1 AND row_key=$2";
 const runtime = { nodeVersion: "v26.8.2", pnpmVersion: "11.20.0", sourceRevision: "a".repeat(40), sourceTree: "b".repeat(40),
   operatorSha256: "c".repeat(64), observedAt: "2026-10-16T12:00:00.000Z" };

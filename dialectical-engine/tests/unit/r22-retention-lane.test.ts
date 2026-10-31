@@ -246,7 +246,9 @@ describe("the rewrite's instructions v2 (decision 11)", () => {
 describe("the cross-reply's pack", () => {
   const pack: WebPack = { pathRef: "a1", pages: [{ pageId: "p", rank: 1, title: null, site: "s", date: null, readDepth: "whole" }], extracts: [{ label: "S1-1", pageId: "p", quote: "Q." }] };
   it("is shown once when both paths read the same pack; two packs stay two", () => {
-    const shared = debateWebPacks([pack], [{ pathRef: "a2", keptUnder: "a1" }])!;
+    // A dig's map paths read one pick's pack, kept under the pick's own ref.
+    const reads = [{ keptUnder: "dig-pick-1", chosen: "The chosen path." }];
+    const shared = debateWebPacks([{ ...pack, pathRef: "dig-pick-1" }], [{ pathRef: "a1", reads }, { pathRef: "a2", reads }])!;
     const once = JSON.parse(webSourcesText(shared, [{ pathRef: "a1", for: "own_position" }, { pathRef: "a2", for: "other_makers_position" }])!) as Array<{ for: string }>;
     expect(once.map((entry) => entry.for)).toEqual(["own_position, other_makers_position"]);
     const two = debateWebPacks([pack, { ...pack, pathRef: "a2", extracts: [{ label: "S2-1", pageId: "p", quote: "R." }] }])!;
