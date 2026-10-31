@@ -117,7 +117,10 @@ export function withMonthPause<S extends ProviderCostEnvelopeSeam>(seam: S, runI
   });
 }
 
-/** A web search's money seam under the month pause (for the web step's search seam, W3-1). */
+/**
+ * A web search's money seam under the month pause: run-settings.ts `runnerWebSearchSettings` wraps every search seam with
+ * it (W4-2), so the web step's searches (a first debate's and a dig's) pause at the month wall as the AI calls do.
+ */
 export function withMonthPauseSearch(seam: WebSearchCostSeam, runId: string, pause: MonthPause,
   plannedMicros?: () => Promise<number>): WebSearchCostSeam {
   return Object.freeze({

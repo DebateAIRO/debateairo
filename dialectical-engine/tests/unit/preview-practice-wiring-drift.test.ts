@@ -189,8 +189,9 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     // The step keeps the planner's decision in 0134's store itself (web-step.ts runRunnerWebStep), on the runner's pool.
     const call = (source: string) => withoutComments(source).match(/webSearch: runnerWebSearchSettings\(\{[^}]*\}\)/gu)
       ?.map((text) => text.replace(/\s+/gu, " "));
+    // W4-2: both hand in the process's month pause, so searches pause at the month wall as the AI calls do.
     expect(call(RUNNER_MAIN)).toEqual(["webSearch: runnerWebSearchSettings({ pool, previewGate, fetch: previewFetch, "
-      + "guardOf: runnerSite.money === null ? null : runCostEnvelopeGuard })"]);
+      + "guardOf: runnerSite.money === null ? null : runCostEnvelopeGuard, pause: monthPause })"]);
     expect(call(PRACTICE_RUNNER)).toEqual(call(RUNNER_MAIN));
     for (const source of [RUNNER_MAIN, PRACTICE_RUNNER]) expect(source).not.toContain("recordPlanPathStatuses");
   });

@@ -444,6 +444,7 @@ apps/runner/src/web-page-text-gateway.ts
 apps/runner/src/web-planner.ts
 apps/runner/src/web-reader-all.ts
 apps/runner/src/web-readers-top.ts
+apps/runner/src/web-reuse.ts
 apps/runner/src/web-step.ts
 apps/scheduler/src/cli.ts
 apps/scheduler/src/index.ts
@@ -1109,6 +1110,7 @@ packages/evidence/src/host-filter.ts
 packages/evidence/src/index.ts
 packages/evidence/src/query-guard.ts
 packages/evidence/src/verbatim.ts
+packages/evidence/src/web-dig-query-set.ts
 packages/evidence/src/web-query-set.ts
 packages/evidence/src/window.ts
 packages/geo/src/decide.ts

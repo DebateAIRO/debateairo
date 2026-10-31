@@ -482,9 +482,10 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   // each provider ref's model, vendor and (preview) gate, and the claim renewals on their own pool.
   callScheduler: runnerCallScheduler,
   // Perplexity plan W3-1: the web step after the map's answer check, where this server has a search gate (else every
-  // path is SWITCHED_OFF, no call). Searches are charged to their run's own version's guard, hosted only.
+  // path is SWITCHED_OFF, no call). Searches are charged to their run's own version's guard, hosted only, and pause at
+  // the month wall as the AI calls do (W4-2, the same month pause).
   webSearch: runnerWebSearchSettings({ pool, previewGate, fetch: previewFetch,
-    guardOf: runnerSite.money === null ? null : runCostEnvelopeGuard }),
+    guardOf: runnerSite.money === null ? null : runCostEnvelopeGuard, pause: monthPause }),
   callSubjects: previewGate === undefined ? targetCallSubjects(providerTargets) : previewCallSubjects(previewGate),
   // Ruling R31 (preview only): a call to a busy model waits on the busy coordinator BEFORE it takes any slot.
   ...(previewGate === undefined ? {} : { callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model) }),

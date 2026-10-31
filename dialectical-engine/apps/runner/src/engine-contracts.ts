@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import {
   COMPARING_JUDGE_PROMPT_CONTRACT, COMPARING_JUDGE_SOURCES_PROMPT_CONTRACT, POINT_INVESTIGATION_PROMPT_CONTRACT, WEB_STEP_PROMPT_CONTRACTS,
-  WEB_WORDING_V2_SEALED_CONTRACTS, judgeAssignedRootV2PromptContract, judgeSourcesSealedContracts
+  WEB_DIG_SEALED_CONTRACTS, WEB_WORDING_V2_SEALED_CONTRACTS, judgeAssignedRootV2PromptContract, judgeSourcesSealedContracts
 } from "@debateai/judgement";
 import { MAP_ENGINE_CONTRACT_NAMES, mapEnginePromptContracts } from "@debateai/map";
 import { promptContractFingerprintText, type PromptContract } from "@debateai/providers";
@@ -22,7 +22,7 @@ export const ENGINE_CONTRACT_FINGERPRINT_HEADER = "debateai.engine-contracts.v1"
  * verdict.investigate.v1 and R2b verdict.judge.v1 (R2 plan deviation 1); R3 the map v2 contracts and the assigned-root
  * v2 pair; R4 the writer's and checker's engine pair; W1-5 (web search, 2026-10-30) the web wording; W1-5b its second
  * wording as new ids (the v1s it supersedes stay sealed, unused); W3-5 (dig-model revision) the path rewrite's writer and
- * checker. A phase that
+ * checker; W4-2 the dig's planner (one search per pick). A phase that
  * appends moves ENGINE_SEALED_IDS and ENGINE_CONTRACT_HASH_SEALED in tests/unit/engine-contract-hash.test.ts.
  */
 export function engineSealedContracts(): readonly PromptContract[] {
@@ -50,7 +50,10 @@ export function engineSealedContracts(): readonly PromptContract[] {
     ...WEB_WORDING_V2_SEALED_CONTRACTS,
     // W3-5 (dig-model revision 2026-10-30; drafts 5.1 and 5.2, approved as written): the path rewrite's writer, then its
     // checker (packages/story/src/path-rewrite.ts).
-    ...PATH_REWRITE_SEALED_CONTRACTS
+    ...PATH_REWRITE_SEALED_CONTRACTS,
+    // W4-2 (plan 2026-10-30; owner Q9, the 31 Oct correction): the dig's planner, one search per pick (a draft wording,
+    // OWNER WORDING before switch-on; a reworded one is a new id appended after it).
+    ...WEB_DIG_SEALED_CONTRACTS
   ]);
 }
 

@@ -207,6 +207,10 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // Reclaim resume (spec 2026-10-14): the replay book reads the run's recorded prompts and replies through
       // prepareLeasedContentEncryptionForRun, which borrows the lease the runner already holds when it is read.
       "apps/runner/src/run-replay.ts",
+      // Web search W4-2: a dig reuses the pages its investigation already read; each other member's 0132 rows (page
+      // address, reader 1's line, extracts, a kept text) are opened under that member's own key, one short lease each
+      // (prepareLeasedContentEncryptionForRun), after the dig's searches and before any reader call.
+      "apps/runner/src/web-reuse.ts",
       // Web search (plan 2026-10-30 W3-1): the web step seals and opens one debate's 0132 rows (search words, pages,
       // readings, extracts) under that run's own content lease (prepareLeasedContentEncryptionForRun), closed when the
       // step ends; page texts are opened only to fill the vendor's copy of a reader's prompt (W3-0).
