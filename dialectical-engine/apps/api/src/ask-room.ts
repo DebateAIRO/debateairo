@@ -1256,6 +1256,9 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
       if (spent + borrowed >= (moneyRule ? startLimitMicros(window) : window.limitMicros)) empty = true;
     }
     const funding = windows[0]?.funding ?? null;
+    // Decisions 14, 24 and 29: a funded person also spends the team's month. Full (or no limit set): no call, no questions, and the person carries on.
+    if (funding?.kind === "INTERNAL" && this.#options.funding !== undefined
+      && await this.#options.funding.readTeamRoom?.(1) !== "FITS") empty = true;
     return Object.freeze({ empty, funding });
   }
 

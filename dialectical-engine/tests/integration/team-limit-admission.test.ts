@@ -58,6 +58,8 @@ async function setLimit(actor: Awaited<ReturnType<typeof fixture.fundedActor>>, 
 }
 const spentNow = async () => Number((await runtime.query("SELECT staff.read_team_month_spent(date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC',(date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')+interval '1 month') v").catch(() => database.pool.query("SELECT staff.read_team_month_spent(date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC',(date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')+interval '1 month') v"))).rows[0].v);
 
+const committedNow = async () => Number((await database.pool.query("SELECT staff.read_team_internal_committed() AS v")).rows[0].v);
+
 describe("a new team question or dig", () => {
   it("with no limit set waits, naming the team's month and no amount", async () => {
     const p = await funded(), r = room();
@@ -117,6 +119,17 @@ describe("a running team debate", () => {
     expect(await room().monthHasRoom(p.actor.ownerRef)).toBe(true);
     const outcome = await continuePausedRun({ ownerRef: p.actor.ownerRef, runId, now: new Date(until.getTime() + 1) }, new PostgresDigModelRepository(database.pool), room());
     expect(outcome).toEqual({ kind: "CONTINUING" });
+  });
+
+  it("the small AI at step 2 counts in the team's month, and a full month makes no call: its person carries on", async () => {
+    const p = await funded();
+    await setLimit(p.actor, await spentNow() + await committedNow() + 100);
+    expect(await room().readPersonPool(p.actor.ownerRef, new Date())).toMatchObject({ empty: false });
+    expect(await runtime.query("SELECT staff.read_team_room(100) AS room").then((read) => read.rows[0].room)).toBe("FITS");
+    await runtime.query("SELECT identity.record_ask_clarify_charge($1,$2,$3,$4,'ask-clarify:fixture:model',(now() AT TIME ZONE 'UTC')::date,100,1,1)",
+      [randomUUID(), p.actor.ownerRef, p.grant.grantId, p.grant.grantEventId]);
+    expect(await runtime.query("SELECT staff.read_team_room(1) AS room").then((read) => read.rows[0].room)).toBe("FULL");
+    expect(await room().readPersonPool(p.actor.ownerRef, new Date())).toMatchObject({ empty: true });
   });
 
   it("is never stopped by the team's month, even past it: its calls are held to its grant alone", async () => {

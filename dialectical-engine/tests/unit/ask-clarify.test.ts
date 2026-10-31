@@ -385,7 +385,8 @@ describe("whether the person's pool has anything left (the room's measure)", () 
   const NOW = new Date("2026-11-01T10:00:00.000Z");
   const windowOf = (scope: "PERSON_DAY" | "PERSON_MONTH", limitMicros: number) => ({ scope, limitMicros, periodStart: new Date(NOW.getTime() - 3_600_000),
     resetsAt: new Date(NOW.getTime() + 3_600_000), finishBasisPoints: 10_000, closeBasisPoints: 8_000 });
-  const room = (windows: readonly unknown[], spent: number) => new AskRoom({ personAllowance: { read: async () => windows }, entitlements: null, clock: () => NOW, dailyCeilingMicros: 100_000, closeBasisPoints: 9_500, waitingLinePerPerson: 1,
+  const room = (windows: readonly unknown[], spent: number, teamRoom?: "NOT_SET" | "FITS" | "FULL") => new AskRoom({ personAllowance: { read: async () => windows }, entitlements: null,
+    ...(teamRoom === undefined ? {} : { funding: { readTeamRoom: async () => teamRoom } }), clock: () => NOW, dailyCeilingMicros: 100_000, closeBasisPoints: 9_500, waitingLinePerPerson: 1,
     spend: { readOwnerSpentMicros: async () => spent, readOwnerCountedHoldsMicros: async () => 1_000_000 } } as never);
 
   it("nobody has limits: not empty", async () => {
@@ -396,6 +397,14 @@ describe("whether the person's pool has anything left (the room's measure)", () 
   });
   it("any window spent to its limit: empty", async () => {
     expect((await room([windowOf("PERSON_DAY", 100), windowOf("PERSON_MONTH", 1_000)], 100).readPersonPool(OWNER, NOW)).empty).toBe(true);
+  });
+  it("a full team month, or no limit set, empties a funded person's pool; a customer is never asked about it", async () => {
+    const funding = { kind: "INTERNAL" as const, grantId: "g", grantEventId: "e" };
+    const windows = [{ ...windowOf("PERSON_MONTH", 100), funding }];
+    expect(await room(windows, 0, "FITS").readPersonPool(OWNER, NOW)).toEqual({ empty: false, funding });
+    expect(await room(windows, 0, "FULL").readPersonPool(OWNER, NOW)).toEqual({ empty: true, funding });
+    expect((await room(windows, 0, "NOT_SET").readPersonPool(OWNER, NOW)).empty).toBe(true);
+    expect((await room([windowOf("PERSON_MONTH", 100)], 0, "FULL").readPersonPool(OWNER, NOW)).empty).toBe(false);
   });
   it("a team member's windows name their grant, so the call is charged to it", async () => {
     const funding = { kind: "INTERNAL" as const, grantId: "g", grantEventId: "e" };
