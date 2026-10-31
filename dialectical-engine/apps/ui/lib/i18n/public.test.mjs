@@ -32,6 +32,8 @@ const sourcePaths = [
   "lib/report/reportTables.ts",
   // The PDF download route's refusals (Task 15): short plain lines, `public.report.error.*`.
   "lib/report/reportRoute.ts",
+  // The final report's PDF (plan 2026-10-31 decision 17): `public.report.investigation.*`, the same words as the debate's own.
+  "lib/report/investigationReportModel.ts",
   // The floor answer (Task M6): "Our best answer:" and the thin-basis line, `public.story.floor*`.
   "lib/v3/floorAnswer.ts",
   // Debate shape P2c: "Also raised, not debated" and the position titles, `public.alsoRaised.*` and

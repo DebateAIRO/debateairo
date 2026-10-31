@@ -505,6 +505,7 @@ apps/ui/app/terms/versions/[sha256]/page.tsx
 apps/ui/app/terms/versions/page.tsx
 apps/ui/app/v4/debate/[id]/page.tsx
 apps/ui/app/v4/debate/[id]/report/page.tsx
+apps/ui/app/v4/debate/[id]/report/pdf/route.ts
 apps/ui/app/v4/layout.tsx
 apps/ui/app/v4/page.tsx
 apps/ui/app/verify-backup-email/page.tsx
@@ -831,10 +832,12 @@ apps/ui/lib/publicDebatePresentation.test.mjs
 apps/ui/lib/publicDebatePresentation.ts
 apps/ui/lib/recommendation.test.mjs
 apps/ui/lib/recommendation.ts
+apps/ui/lib/report/InvestigationReportDocument.tsx
 apps/ui/lib/report/ReportChart.tsx
 apps/ui/lib/report/ReportDocument.tsx
 apps/ui/lib/report/ReportTable.tsx
 apps/ui/lib/report/fonts.test.mjs
+apps/ui/lib/report/investigationReportModel.ts
 apps/ui/lib/report/pointNumbers.ts
 apps/ui/lib/report/renderReport.ts
 apps/ui/lib/report/reportCharts.ts

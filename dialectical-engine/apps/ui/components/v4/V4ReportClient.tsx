@@ -32,6 +32,10 @@ import { basisKey, TRUST_WORDS, type DigLink, type DigView, type ReadingLevel, t
  * "Write my report", its versions (newest first, the current one marked), the chosen version under the approved
  * sections (W0-1 §2.6) with its sources, and while the newest is being written the page says so and reads it again on
  * the story poll's chained timer. Once a finished version stands, "Keep digging" reopens the investigation.
+ * R22 decision 17: the current version downloads as its own plain PDF (app/v4/debate/[id]/report/pdf, made by code from the
+ * stored version); every earlier version stays readable here. The route's HEAD says whether that PDF can be made: a language
+ * the fonts cannot print yet (Arabic) offers the browser's Print instead, with a plain line. Until a version stands, the header
+ * keeps the debate's own PDF.
  */
 
 type Props = Readonly<{
@@ -241,7 +245,9 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
   const mapHref = levelHref(`/v4/debate/${encodeURIComponent(id)}`, chosenLevel);
   const classicHref = `/debate/${encodeURIComponent(id)}`;
   // V3's PDF (app/debate/[id]/report/route.ts) resolves an answer id first, then a run id, and serves only READY stories.
-  const pdfReady = map !== null && map.storyState === "READY";
+  // R22 decision 17: once a report version stands, its own PDF (InvestigationReport below) takes the place of the debate's.
+  const [hasReportVersion, setHasReportVersion] = useState(false);
+  const pdfReady = map !== null && map.storyState === "READY" && !hasReportVersion;
 
   const header = (
     <div className="v4RepChrome">
@@ -314,7 +320,7 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
           </h1>
         </header>
 
-        <InvestigationReport runId={load.runId} locale={locale} catalog={catalog} />
+        <InvestigationReport runId={load.runId} locale={locale} catalog={catalog} onCurrent={setHasReportVersion} />
 
         {sent ? (
           <section className="v4RepSent" aria-labelledby="v4-report-sent">
@@ -508,7 +514,12 @@ const versionDate = (version: InvestigationReportVersion): string => version.sta
  * R22 W5-1: the final report over the investigation. Read on its own (a failed read leaves it out quietly: the debate's
  * report below stays); "Write my report" and "Keep digging" post, then read it again.
  */
-function InvestigationReport({ runId, locale, catalog }: Readonly<{ runId: string; locale: string; catalog: MessageCatalog }>) {
+function InvestigationReport({ runId, locale, catalog, onCurrent }: Readonly<{
+  runId: string;
+  locale: string;
+  catalog: MessageCatalog;
+  onCurrent: (has: boolean) => void;
+}>) {
   const [read, setRead] = useState<InvestigationReports | null | undefined>(undefined);
   const [refresh, setRefresh] = useState(0);
   const [chosen, setChosen] = useState<number | null>(null);
@@ -523,6 +534,21 @@ function InvestigationReport({ runId, locale, catalog }: Readonly<{ runId: strin
     loadInvestigation(runId).then((next) => { if (active && next !== null) setRead(next); }, () => undefined);
     return () => { active = false; };
   }, [runId, refresh]);
+
+  const current = read?.current ?? null;
+  useEffect(() => { onCurrent(current !== null); }, [current, onCurrent]);
+  // Whether the current version's PDF can be made. Unknown or a read that failed: it is offered; only a clear refusal hides it.
+  const pdfHref = `/v4/debate/${encodeURIComponent(runId)}/report/pdf`;
+  const [pdfRefused, setPdfRefused] = useState(false);
+  useEffect(() => {
+    if (current === null) return;
+    let active = true;
+    Promise.resolve().then(() => fetch(pdfHref, { method: "HEAD", credentials: "same-origin" })).then(
+      (response) => { if (active) setPdfRefused(response.status === 404); },
+      () => undefined
+    );
+    return () => { active = false; };
+  }, [current, pdfHref]);
 
   const newest = read?.versions.at(-1) ?? null;
   const writingVersion = newest?.state === "WRITING" ? newest.report_version : null;
@@ -602,6 +628,9 @@ function InvestigationReport({ runId, locale, catalog }: Readonly<{ runId: strin
         ))}
       </ul>
       {shown !== null ? <ReportVersion version={shown} locale={locale} catalog={catalog} /> : null}
+      {current === null ? null : pdfRefused
+        ? <p className="v4RepNote v4RepNoPrint" role="status">{t(catalog, "v4.investigation.pdfUnavailable")}</p>
+        : <div className="v4RepActions v4RepNoPrint"><a className="v4Btn v4RepPdf" href={pdfHref}>{t(catalog, "v4.investigation.downloadPdf")}</a></div>}
       {actions}
     </section>
   );
@@ -668,7 +697,9 @@ function ReportVersion({ version, locale, catalog }: Readonly<{ version: Investi
           <ul className="v4RepSources">
             {version.sources.map((source, at) => (
               <li key={at} className="v4RepSource">
-                <span className="v4RepSourceSite">{source.site}</span>
+                {source.link === null || source.link === undefined
+                  ? <span className="v4RepSourceSite">{source.site}</span>
+                  : <a className="v4RepSourceSite v4Link" href={source.link} target="_blank" rel="noopener noreferrer nofollow">{source.site}</a>}
                 {source.title !== null ? <b className="v4RepSourceTitle">{source.title}</b> : null}
                 {/* Reader 1's line about the page (owner F9) is the AI's; the quote is the page's own words. */}
                 {source.line !== null ? <p className="v4RepSourceLine" data-ai-generated="true">{source.line}</p> : null}
