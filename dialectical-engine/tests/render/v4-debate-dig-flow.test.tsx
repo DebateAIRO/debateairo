@@ -3,8 +3,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AskParentSchema, DIG_LEVEL_MAX, FREE_DIG_PICKS_MAX } from "../../packages/contract/src/index.js";
 import {
-  advance, branch, buttonNamed, buttonsNamed, CATALOG, click, digPart, harness, mountMap, openPath, panel, PATHS, resetHarness,
-  seededAnswer, settle, text, tray, typeInto, unmountMap
+  advance, branch, buttonNamed, buttonsNamed, CATALOG, click, digPart, harness, mountMap, openPath, page, panel, PATHS, resetHarness,
+  seededAnswer, seededStory, settle, text, tray, typeInto, unmountMap
 } from "./v4-debate-harness.js";
 
 vi.mock("@/components/AuthGate", async () => (await import("./v4-debate-harness.js")).authGateMock);
@@ -129,6 +129,41 @@ describe("V4DebateClient's dig flow", () => {
       expect(text()).toContain(word(key, values));
       expect(tray()?.textContent).toContain(word("v4.dig.trayPicked.one", { count: 1 }));
     });
+
+  // Dig model revision W4-6 (owner Q-D13): a dig keeps its points and its answer text and writes no story, so its page never
+  // reads one or waits for one: it opens with the dig's own paths and answer text at once, and its card on the map above
+  // says what became of its rewrite, not that a short answer is still to come.
+  it("a dig's own page never reads or waits for a story, and its card says what became of its rewrite", async () => {
+    const parentRunId = await mountMap();
+    await openPath(PATHS.smr);
+    await click(buttonNamed(CATALOG["v4.panel.dig"]!, panel()));
+    await advance(10_100);
+    const childRunId = (await harness.submit.mock.results[0]!.value as { runId: string }).runId;
+    await unmountMap();
+
+    harness.story = { ...seededStory(), status: "WRITING", story: null };
+    harness.answer = seededAnswer(childRunId, {
+      dig: { parent_run_id: parentRunId, position_ref: "n-smr", places: ["path:n-smr"], level: 1, picks: [], rewrite: null }
+    });
+    harness.loadStory.mockClear();
+    await mountMap(1280, childRunId);
+    await advance(60_000);
+    expect(harness.loadStory).not.toHaveBeenCalled();
+    expect(text()).not.toContain(CATALOG["v4.debate.storyWriting"]);
+    expect(text()).not.toContain(CATALOG["v4.panel.fallbackWriting"]);
+    expect(text()).toContain(harness.answer.composed_text[0]!.text);
+    expect(page().querySelectorAll(".v4MapBranch")).toHaveLength(4);
+    await unmountMap();
+
+    // Back on the map above, the dig's card reads its rewrite, never "Its short answer is not written yet."
+    harness.answer = null;
+    harness.story = seededStory();
+    harness.digView = (link) => ({ link, state: "DONE", headline: null, counts: null, rewrite: null, points: [] });
+    await mountMap(1280, parentRunId);
+    expect(branch(PATHS.smr).querySelector(".v4MapDig")!.textContent).toContain(CATALOG["v4.rewrite.digCard.DONE"]);
+    await click(branch(PATHS.smr).querySelector<HTMLButtonElement>(".v4MapDig")!);
+    expect(panel().textContent).not.toContain(CATALOG["v4.panel.digNoHeadline"]);
+  });
 
   it("the deepest level reads no dig room and offers no dig at all", async () => {
     const runId = crypto.randomUUID();

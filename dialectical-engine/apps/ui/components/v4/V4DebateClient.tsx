@@ -2,27 +2,37 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
-import { canDigFromLevel, type AnswerStory, type DigLinks, type DigSuggestion, type RunProjection, type UsageBorrow } from "@debateai/contract";
+import {
+  canDigFromLevel,
+  type Answer,
+  type AnswerStory,
+  type DigLinks,
+  type DigSuggestion,
+  type RunProjection,
+  type UsageBorrow
+} from "@debateai/contract";
 import { AuthGate } from "@/components/AuthGate";
 import { RoomNotice } from "@/components/billing/RoomNotice";
 import { V4ChangesBar } from "@/components/v4/V4ChangesBar";
 import { V4MoneyLines, type V4DigChoice } from "@/components/v4/V4DigSuggest";
 import { V4DigToast, type V4DigNotice } from "@/components/v4/V4DigToast";
 import { V4Header } from "@/components/v4/V4Header";
+import { V4LevelTrail } from "@/components/v4/V4LevelTrail";
 import { digFor, digsUnder, openCount, pathTitle, resolveSelection, selectionIdOf, TitleText, V4MapTree } from "@/components/v4/V4MapTree";
 import { V4Outline } from "@/components/v4/V4Outline";
 import { V4Panel } from "@/components/v4/V4Panel";
+import { V4ChangedSince } from "@/components/v4/V4PathRewrite";
 import { V4Rail, type V4DigCounts } from "@/components/v4/V4Rail";
 import { isNotFound } from "@/lib/api";
 import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { runFailureMessage } from "@/lib/v3/runFailure";
 import { digQuestion, digTargetQuestions, ownWords, parseDigQuestion } from "@/lib/v4/askText";
 import { mergeDigLinks, readDigRecords, readLastVisit, recordDig, recordLastVisit, storableItems } from "@/lib/v4/accountMemory";
-import { diffSnapshots, selectionForChange, snapshotItems } from "@/lib/v4/changes";
+import { diffSnapshots, isRewriteWord, rewriteNewsOf, selectionForChange, snapshotItems } from "@/lib/v4/changes";
 import { effectiveDigMode } from "@/lib/v4/askConfig";
 import { digLinksFor, digParentOf, mergeIndex, readQuestionIndex, type IndexEntry } from "@/lib/v4/digIndex";
-import { loadDigView, loadStory, loadV4, storyReadFailed, type V4Load } from "@/lib/v4/load";
-import { buildV4Map, uniqueOpenQuestions } from "@/lib/v4/mapModel";
+import { loadAnswer, loadDigTrail, loadDigView, loadStory, loadV4, storyReadFailed, type DigTrail, type V4Load } from "@/lib/v4/load";
+import { buildV4Map, rewriteByDig, rewriteWaiting, uniqueOpenQuestions } from "@/lib/v4/mapModel";
 import {
   borrowLines,
   continueRun,
@@ -74,6 +84,10 @@ import { useV4Ask, type V4AskOutcome } from "@/lib/v4/useV4Ask";
  * changed" starts "since your last visit" (from any device) and goes on "while you were here"; and it keeps each dig's
  * link, so digs and the back link come from those records, with the account's question list (by text) only for digs
  * made before the records existed. Every read of that memory can fail; the page then does what it did without it.
+ * Dig model revision W4-6: a dig rewrites the path it came from, so while a rewrite is being written (or a dig finished
+ * and its rewrite is not on this map yet) the page reads its answer again; a finished rewrite is news. A dig writes no
+ * story (owner Q-D13): its own page never waits for one, and shows where it sits ("Level {n} of 10"). The top of the map
+ * says how many paths changed since the answer (or the latest report) was written.
  */
 
 const RUN_POLL_MS = 5_000;
@@ -86,6 +100,8 @@ const STORY_WAIT_LIMIT_MS = 15 * 60_000;
 /** DATA-3: a story read that failed is accepted only after this many failures in a row (V3's readFailureLimit). */
 const STORY_READ_FAILURE_LIMIT = 4;
 const DIG_POLL_MS = 15_000;
+/** W4-6: while a path is being rewritten (or a finished rewrite is not on the map yet), the answer is read this often. */
+const REWRITE_POLL_MS = 15_000;
 /** TIME-8/FIT-3: a dig read as done before its story was written is asked again, at most this many times. */
 const DIG_HEADLESS_TRIES = 30;
 /** TIME-1: a dig whose reads keep failing stops holding back "what changed" after this many failures. */
@@ -116,7 +132,7 @@ type LoadProblem = "NOT_FOUND" | "UNREACHABLE";
 
 /** What the page last read of one dig, and how its reads went. */
 type DigStatus = Readonly<{
-  view: Pick<DigView, "state" | "headline" | "counts"> | null;
+  view: Omit<DigView, "link"> | null;
   /** Failed reads in a row. */
   failures: number;
   /** Reads that found it done but without its story headline yet. */
@@ -136,6 +152,8 @@ const startedThisVisit = new Map<string, VisitDig>();
 
 export type V4DebateClientProps = Readonly<{
   id: string;
+  /** W4-6: the path the address names (`?path=`, a link back from a dig), opened in the panel at first; null: none. */
+  initialPath?: string | null;
   /** The reading level the address names (`?level=`), or null. */
   initialLevel: ReadingLevel | null;
   catalog: MessageCatalog;
@@ -192,11 +210,15 @@ function isRunning(dig: DigView): boolean {
   return dig.state === "WAITING" || dig.state === "RUNNING";
 }
 
-/** No more reads needed: it failed, or it is done with its headline (or we stopped waiting for the headline). */
+/**
+ * No more reads needed: it failed, or it is done with its headline (or we stopped waiting for the headline). W4-6: a dig
+ * of the new model has no headline (no story): it is final once its rewrite is no longer being written.
+ */
 function isFinal(status: DigStatus | undefined): boolean {
   const view = status?.view ?? null;
   if (view === null) return false;
   if (view.state === "FAILED") return true;
+  if (view.state === "DONE" && view.rewrite !== undefined) return view.rewrite === null || view.rewrite.state !== "WRITING";
   return view.state === "DONE" && (view.headline !== null || (status?.headlessTries ?? 0) >= DIG_HEADLESS_TRIES);
 }
 
@@ -236,11 +258,12 @@ function targetOf(map: V4Map, digs: readonly DigView[], selection: V4Selection, 
  * "While you were here" (fix wave 1): which live changes are news. A dig this tab started is not news when it appears
  * (the person just started it), nor is it while it is still going; it is news when it finishes or fails, and a dig that
  * appears from elsewhere (another tab) is news. An open question turning "dug" is told by its dig, not twice.
+ * W4-6: a dig's rewrite of the path it came from is news as it finishes (and the dig finishing, as before).
  */
 function isNews(change: V4Change, startedHere: ReadonlySet<string>): boolean {
   if (change.id.startsWith("dig:")) {
-    if (change.kind === "ADDED") return !startedHere.has(change.id.slice("dig:".length));
-    return change.now === "DONE" || change.now === "FAILED";
+    if (change.kind === "ADDED") return !startedHere.has(change.id.slice("dig:".length)) || isRewriteWord(change.now);
+    return change.now === "DONE" || change.now === "FAILED" || isRewriteWord(change.now);
   }
   if (change.id.startsWith("open:")) return change.kind === "ADDED";
   return true;
@@ -269,6 +292,7 @@ function visitNews(stored: Readonly<Record<string, string>>, now: Readonly<Recor
 
 function V4Debate({
   id,
+  initialPath = null,
   initialLevel,
   catalog,
   homeCatalog,
@@ -322,10 +346,17 @@ function V4Debate({
     };
   }, [id, loadAttempt]);
 
-  const served = load?.kind === "SERVED" ? load : null;
+  const servedLoad = load?.kind === "SERVED" ? load : null;
+  // W4-6: the answer as read again since (paths a dig rewrote), when it is still this debate's.
+  const [freshAnswer, setFreshAnswer] = useState<Answer | null>(null);
+  const served = useMemo(() => (servedLoad === null ? null
+    : freshAnswer !== null && freshAnswer.run_ref === servedLoad.answer.run_ref ? { ...servedLoad, answer: freshAnswer } : servedLoad),
+  [servedLoad, freshAnswer]);
   const runId = load?.runId ?? id;
   const answerId = served?.answer.answer_id ?? null;
   const answerVersion = served?.answer.answer_version ?? 1;
+  /** W4-6 (Q-D13): this debate is a dig of the new model, so it has no story to read or wait for. */
+  const noStory = served?.answer.dig !== undefined && served !== null;
   /** The whole text that was sent for this debate (the person's words plus any added lines). */
   const questionLine = served !== null ? served.answer.question_line : load?.kind === "RUN" ? load.run.question_line : null;
 
@@ -334,7 +365,7 @@ function V4Debate({
   const [storyGaveUp, setStoryGaveUp] = useState(false);
   const story = polledStory !== null && polledStory.answerId === answerId ? polledStory.story : served?.story ?? null;
   const storyFailedRead = story !== null && storyReadFailed(story);
-  const storyPending = served !== null && !storyGaveUp && (story === null || story.status === "WRITING" || storyFailedRead);
+  const storyPending = served !== null && !noStory && !storyGaveUp && (story === null || story.status === "WRITING" || storyFailedRead);
   const storyFailedReadRef = useRef(storyFailedRead);
   useEffect(() => {
     storyFailedReadRef.current = storyFailedRead;
@@ -633,9 +664,11 @@ function V4Debate({
   const digs = useMemo<readonly DigView[]>(
     () => links.map((link) => {
       const view = statuses.get(link.childRunId)?.view ?? STAND_IN;
-      return { link, state: view.state, headline: view.headline, counts: view.counts };
+      // W4-6: once done, this map's record of the dig's rewrite (read with the answer) wins over the dig's own copy.
+      const onMap = map === null || view.state !== "DONE" ? null : rewriteByDig(map, link.childRunId)?.rewrite ?? null;
+      return { link, ...view, ...(onMap === null ? {} : { rewrite: onMap }) };
     }),
-    [links, statuses]
+    [links, statuses, map]
   );
   useEffect(() => {
     digsLiveRef.current = links.some((link) => !isFinal(statuses.get(link.childRunId)));
@@ -678,10 +711,10 @@ function V4Debate({
           next.set(result.childRunId, { ...before, failures: before.failures + 1 });
           continue;
         }
-        const { state, headline, counts } = result.view;
-        const headless = state === "DONE" && headline === null;
+        const { link: _read, ...view } = result.view;
+        const headless = view.state === "DONE" && view.headline === null;
         next.set(result.childRunId, {
-          view: { state, headline, counts },
+          view,
           failures: 0,
           headlessTries: headless ? before.headlessTries + 1 : before.headlessTries
         });
@@ -710,9 +743,61 @@ function V4Debate({
     if (loop !== null && loop.seenKey() !== linkKey) loop.kick();
   }, [linkKey]);
 
+  // ── Rewrites (W4-6): read the answer again while a path is being rewritten, or a dig's rewrite is not on it yet ────
+  // One read in flight; a finished rewrite a dig reports first is fetched at once, a path still being rewritten every 15 s.
+  const behind = map !== null && statuses.size > 0 && links.some((link) => {
+    const view = statuses.get(link.childRunId)?.view ?? null;
+    const own = view?.state === "DONE" ? view.rewrite ?? null : null;
+    if (own === null || own.state === "WRITING") return false;
+    const onMap = rewriteByDig(map, link.childRunId)?.rewrite ?? null;
+    return onMap === null || onMap.rewrite_id !== own.rewrite_id || onMap.state !== own.state;
+  });
+  const rewriteBehind = map !== null && (behind || rewriteWaiting(map));
+  const rewriteBehindRef = useRef(rewriteBehind);
+  useEffect(() => {
+    rewriteBehindRef.current = rewriteBehind;
+  });
+  useEffect(() => {
+    if (servedRunId === null || !rewriteBehind) return;
+    let active = true;
+    let timer: number | undefined;
+    const read = async (): Promise<void> => {
+      const next = await loadAnswer(servedRunId);
+      if (!active) return;
+      if (next !== null) setFreshAnswer(next);
+      if (rewriteBehindRef.current) timer = window.setTimeout(() => void read(), REWRITE_POLL_MS);
+    };
+    timer = window.setTimeout(() => void read(), behind ? 0 : REWRITE_POLL_MS);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [servedRunId, rewriteBehind, behind]);
+
+  // ── Where a dig sits (W4-6): the debates above it, read once, up to the main question ────────────────────────────
+  const servedDig = served?.answer.dig ?? null;
+  const trailKey = servedDig === null ? null : `${servedDig.parent_run_id}|${servedDig.position_ref ?? ""}`;
+  const servedDigRef = useRef(servedDig);
+  useEffect(() => {
+    servedDigRef.current = servedDig;
+  });
+  const [trail, setTrail] = useState<DigTrail | null>(null);
+  useEffect(() => {
+    const dig = servedDigRef.current;
+    if (trailKey === null || dig === null) return;
+    let active = true;
+    void loadDigTrail(dig).then((next) => {
+      if (active) setTrail(next);
+    });
+    return () => {
+      active = false;
+    };
+  }, [trailKey]);
+
   // ── Selection ───────────────────────────────────────────────────────────────────────────────────────────────────
-  const [selected, setSelected] = useState<V4Selection>("root");
-  const [opened, setOpened] = useState<ReadonlySet<string>>(() => new Set(["root"]));
+  // W4-6: a link back from a dig names the path it dug (`?path=`); the panel opens there (a path gone: the question).
+  const [selected, setSelected] = useState<V4Selection>(() => (initialPath === null ? "root" : `path:${initialPath}`));
+  const [opened, setOpened] = useState<ReadonlySet<string>>(() => new Set(["root", ...(initialPath === null ? [] : [`path:${initialPath}`])]));
   const [focusRequest, setFocusRequest] = useState(0);
   const [outlineOpen, setOutlineOpen] = useState(false);
   const headingRef = useRef<HTMLHeadingElement | null>(null);
@@ -998,6 +1083,8 @@ function V4Debate({
   }, [map]);
   // R2TIME-6: the bar and its tour cover the news since the last "Hide this"; the "New" dots cover all news.
   const tourStops = useMemo<readonly V4Selection[]>(() => stopsOf(news.slice(hiddenNews)), [stopsOf, news, hiddenNews]);
+  // W4-6: the finished rewrites among the news the bar shows, told by name.
+  const rewriteNews = useMemo(() => (map === null ? [] : rewriteNewsOf(map, news.slice(hiddenNews))), [map, news, hiddenNews]);
   const changed = useMemo<ReadonlySet<string>>(
     () => new Set(stopsOf(news).filter((stop) => stop !== "root" && !opened.has(stop))),
     [stopsOf, news, opened]
@@ -1137,6 +1224,7 @@ function V4Debate({
     onSelect: select,
     onTogglePick: togglePick,
     catalog,
+    locale,
     ...(choice === undefined ? {} : { choice })
   } as const;
 
@@ -1208,8 +1296,14 @@ function V4Debate({
               ) : t(catalog, "v4.debate.backToEarlier")}
             </Link>
           ) : null}
+          {/* W4-6: a dig's map says where it sits; the top of every map, how many paths changed since the answer. */}
+          {map.dig !== null && map.dig !== undefined ? (
+            <V4LevelTrail level={map.dig.level} trail={trail} linkLevel={chosenLevel} catalog={catalog} />
+          ) : null}
+          <V4ChangedSince changedSince={map.changedSince} reportHref={reportHref} catalog={catalog} locale={locale} />
           {showChanges ? (
             <V4ChangesBar
+              rewrites={rewriteNews}
               stops={tourStops.length}
               sinceLastVisit={hiddenNews < visitNewsCount}
               tourIndex={tourIndex}
@@ -1252,6 +1346,7 @@ function V4Debate({
                 digBusy={digBusy}
                 roomNotice={roomNotice}
                 money={money}
+                digPathLine={trail?.steps.at(-1)?.line ?? null}
                 {...(choice === undefined ? {} : { choice })}
                 headingRef={headingRef}
                 catalog={catalog}

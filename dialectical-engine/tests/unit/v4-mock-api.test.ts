@@ -277,6 +277,22 @@ describe("V4 mock API: the new dig model and the money rule", () => {
     }
   });
 
+  it("W4-6: the first debate shows all four rewrite states for the click-test, and the count leaves out the two unchanged", () => {
+    const root = PATH_REWRITES[DIG_RUNS.root]!;
+    const newest = Object.fromEntries(root.paths.map((path) => [path.position_ref, path.history.at(-1) as Loose]));
+    expect(newest["n-nuclear"]).toMatchObject({ state: "FAILED", dig_run_id: DIG_RUNS.failed });
+    expect(root.paths.find((path) => path.position_ref === "n-nuclear")!.current).toBeNull();
+    expect(newest["n-smr"]).toMatchObject({ state: "READY", changed: false, dig_run_id: DIG_RUNS.noChange });
+    expect(newest["n-smr"].what_changed.length).toBeGreaterThan(0);
+    expect(PATH_REWRITES[DIG_RUNS.levelTwo]!.paths[0]!.history.at(-1)!.state).toBe("WRITING");
+    expect(root.changed_since.count).toBe(2);
+    // Both digs are seeded runs of the first debate, so "Open the dig's map" opens a real page.
+    for (const run of [DIG_RUNS.failed, DIG_RUNS.noChange]) {
+      expect(SEEDED_NEW_DIGS.some((dig) => dig.runRef === run), run).toBe(true);
+      expect(DIG_ANSWERS[run]!.parent_run_id, run).toBe(DIG_RUNS.root);
+    }
+  });
+
   it("W3-4: a dig at the deepest level, for the click-test of the deepest-level line", () => {
     expect(AnswerDigSchema.safeParse(DEEPEST_DIG.dig).success).toBe(true);
     expect(DEEPEST_DIG.dig.level).toBe(DIG_LEVEL_MAX);

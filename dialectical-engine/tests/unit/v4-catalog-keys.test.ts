@@ -81,6 +81,18 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.rewrite.digCard.RUNNING",
   "v4.rewrite.digCard.WAITING",
   "v4.rewrite.digCard.FAILED",
+  // Dig model revision W4-6 (31 Oct): the labels the map needed beyond 5.5's, drafted for the click-test (owner C2b): a dig
+  // card once done (no path rewritten, rewriting, the rewrite failed), a dig paused at the month wall, a failed rewrite's
+  // short line on a path's card, hiding the dig's points again, where the dig's points are when this page has not read
+  // them, and the name of a dig's trail.
+  "v4.rewrite.digCard.DONE",
+  "v4.rewrite.digCard.REWRITING",
+  "v4.rewrite.digCard.REWRITE_FAILED",
+  "v4.rewrite.digCard.PAUSED",
+  "v4.rewrite.card.FAILED",
+  "v4.rewrite.hideDigPoints",
+  "v4.rewrite.digPointsElsewhere",
+  "v4.nest.trailLabel",
   "v4.nest.digHereToo",
   "v4.nest.trailRoot",
   "v4.nest.level",
@@ -248,5 +260,15 @@ describe("V4 catalogue keys", () => {
       expect(opens, key).toBe(closes);
       for (const placeholder of value.matchAll(/\{([^}]*)\}/g)) expect(placeholder[1], key).toMatch(/^[A-Za-z][A-Za-z0-9_]*$/);
     }
+  });
+
+  it("W4-6: the dig card words cover every state a dig of the new model can be in, and none names an engine word", () => {
+    const cards = ["WAITING", "RUNNING", "PAUSED", "FAILED", "DONE", "REWRITING", "CHANGED", "NO_CHANGE", "REWRITE_FAILED"]
+      .map((state) => `v4.rewrite.digCard.${state}`);
+    expect(cards.filter((key) => !(key in catalog))).toEqual([]);
+    for (const key of cards) expect(catalog[key], key).toMatch(/^Dig · /u);
+    // The new lines say what happened in plain words: no score, no state code, no reviewer or checker name.
+    const fresh = DRAFTED_UNTIL_CLICK_TEST.filter((key) => key.startsWith("v4.rewrite.") || key.startsWith("v4.nest.")).map((key) => catalog[key]!);
+    expect(fresh.filter((line) => /\b(?:score|strength|threshold|READY|WRITING|FAILED|checker|GLM|Haiku)\b/u.test(line))).toEqual([]);
   });
 });

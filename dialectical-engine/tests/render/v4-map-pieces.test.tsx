@@ -19,6 +19,7 @@ import type {
   V4Point,
   V4Selection
 } from "../../apps/ui/lib/v4/types.js";
+import type { PathRewrite } from "../../packages/contract/src/index.js";
 import v4English from "../../apps/ui/messages/en/v4.json" with { type: "json" };
 
 /*
@@ -420,5 +421,90 @@ describe("V4 map pieces, fix wave 1", () => {
     const found: DigView = { ...dig("c-found", "RUNNING", ["w"]), link: { ...dig("c-found", "RUNNING", ["w"]).link, mode: null, startedAt: null } };
     expect(panel(buildMap(), "dig:c-found", "plain", { digs: [found] }).querySelector(".v4PanelModeTag")).toBeNull();
     expect(panel(buildMap(), "dig:c-run", "plain").querySelector(".v4PanelModeTag")?.textContent).toBe(t(catalog, "v4.digMode.quick"));
+  });
+});
+
+/*
+ * Dig model revision W4-6 (draft 5.5): a dig's card says what became of it ("Dig · changed this path", …, paused at the
+ * month wall), a rewritten path's card and row carry one line about its rewrite, and the panel shows the whole rewrite.
+ */
+describe("W4-6: dig cards and rewritten paths", () => {
+  const FINISHED = "2026-10-30T09:15:00.000Z";
+  const writing: PathRewrite = { rewrite_id: "rw-1", dig_run_id: "c-done", dig_level: 1, dig_finished_at: FINISHED, state: "WRITING" };
+  const rewritten = (changed: boolean): PathRewrite => ({
+    ...writing, state: "READY", rewritten_at: "2026-10-30T09:18:00.000Z", changed,
+    text: { line: changed ? "The new line for a" : longLine, summary: "The new summary.", fate: "HELD_UP" },
+    what_changed: ["What the dig changed, in one sentence."], fate_before: "HELD_UP", view: null, dig_paths: []
+  });
+  const withRewrite = (rewrite: PathRewrite | null, changedBelow = false): V4Map => {
+    const map = buildMap();
+    const first = map.paths[0]!;
+    const line = rewrite !== null && rewrite.state === "READY" ? rewrite.text.line : first.line;
+    return {
+      ...map,
+      paths: [{ ...first, line, rewrites: { original: { line: first.line, fate: first.fate }, history: rewrite === null ? [] : [rewrite], changedBelow } }, ...map.paths.slice(1)]
+    };
+  };
+  const noteOf = (root: HTMLElement, selector: string) => root.querySelectorAll(selector)[0]!.querySelector(".v4RewriteNote")?.textContent ?? null;
+
+  it("a dig's card says what became of it, in every state", () => {
+    const cases: ReadonlyArray<[DigView, string]> = [
+      [dig("c-wait", "WAITING", ["p:x1"]), "v4.rewrite.digCard.WAITING"],
+      [dig("c-run", "RUNNING", ["p:x1"]), "v4.rewrite.digCard.RUNNING"],
+      [{ ...dig("c-run", "RUNNING", ["p:x1"]), pausedUntil: "2026-11-01T00:00:00.000Z" }, "v4.rewrite.digCard.PAUSED"],
+      [dig("c-fail", "FAILED", ["p:x1"]), "v4.rewrite.digCard.FAILED"],
+      [dig("c-done", "DONE", ["p:x1"]), "v4.rewrite.digCard.DONE"],
+      [{ ...dig("c-done", "DONE", ["p:x1"]), rewrite: writing }, "v4.rewrite.digCard.REWRITING"],
+      [{ ...dig("c-done", "DONE", ["p:x1"]), rewrite: rewritten(true) }, "v4.rewrite.digCard.CHANGED"],
+      [{ ...dig("c-done", "DONE", ["p:x1"]), rewrite: rewritten(false) }, "v4.rewrite.digCard.NO_CHANGE"],
+      [{ ...dig("c-done", "DONE", ["p:x1"]), rewrite: { ...writing, state: "FAILED", failed_at: "2026-10-30T09:20:00.000Z" } }, "v4.rewrite.digCard.REWRITE_FAILED"]
+    ];
+    for (const [view, key] of cases) {
+      const root = tree(buildMap(), "root", { digs: [view] });
+      expect(root.querySelector(".v4MapDig .v4MapNote")?.textContent, key).toBe(t(catalog, key));
+    }
+    // A paused dig does not pulse; a dig rewriting its path does.
+    expect(tree(buildMap(), "root", { digs: [{ ...dig("c-run", "RUNNING", ["p:x1"]), pausedUntil: "2026-11-01T00:00:00.000Z" }] })
+      .querySelector(".v4MapDig .v4MapPulse")).toBeNull();
+    expect(tree(buildMap(), "root", { digs: [{ ...dig("c-done", "DONE", ["p:x1"]), rewrite: writing }] })
+      .querySelector(".v4MapDig .v4MapPulse")).not.toBeNull();
+  });
+
+  it("a paused dig's panel says until when; a new-model dig never waits for a short answer", () => {
+    const paused: DigView = { ...dig("c-run", "RUNNING", ["w"]), pausedUntil: "2026-11-01T12:00:00.000Z" };
+    expect(panel(buildMap(), "dig:c-run", "plain", { digs: [paused] }).textContent)
+      .toContain(t(catalog, "v4.money.paused", { date: new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(new Date(paused.pausedUntil!)) }));
+    const done: DigView = { ...dig("c-new", "DONE", ["w"]), headline: null, rewrite: rewritten(true) };
+    const root = panel(buildMap(), "dig:c-new", "plain", { digs: [done] });
+    expect(root.textContent).not.toContain(t(catalog, "v4.panel.digNoHeadline"));
+    expect(root.textContent).toContain(t(catalog, "v4.rewrite.digCard.CHANGED"));
+    expect(root.querySelector(".v4RewriteChanged")?.textContent).toContain("What the dig changed, in one sentence.");
+  });
+
+  it("a rewritten path's card and outline row carry one line about it; a path with none carries nothing", () => {
+    const outline = (map: V4Map) => dom(renderToStaticMarkup(
+      <V4Outline map={map} digs={[]} selected="root" changed={new Set()} picked={new Set()} onSelect={noop} onTogglePick={noop} catalog={catalog} locale="en" />
+    ));
+    expect(noteOf(tree(buildMap(), "root", { digs: [] }), ".v4MapBranch")).toBeNull();
+    for (const [rewrite, expected] of [
+      [writing, t(catalog, "v4.rewrite.state.WRITING")],
+      [rewritten(true), t(catalog, "v4.rewrite.rewrittenOnce", { date: new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(new Date("2026-10-30T09:18:00.000Z")) })],
+      [rewritten(false), t(catalog, "v4.rewrite.state.NO_CHANGE")],
+      [{ ...writing, state: "FAILED", failed_at: "2026-10-30T09:20:00.000Z" } as PathRewrite, t(catalog, "v4.rewrite.card.FAILED")]
+    ] as const) {
+      expect(noteOf(tree(withRewrite(rewrite), "root", { digs: [] }), ".v4MapBranch"), rewrite.state).toBe(expected);
+      expect(noteOf(outline(withRewrite(rewrite)), ".v4OutPath"), rewrite.state).toBe(expected);
+    }
+    expect(noteOf(tree(withRewrite(null, true), "root", { digs: [] }), ".v4MapBranch")).toBe(t(catalog, "v4.rewrite.changedBelow"));
+    // The card is a button: nothing inside it is a control of its own.
+    expect(tree(withRewrite(rewritten(true), true), "root", { digs: [] }).querySelector(".v4MapPath .v4RewriteNote button, .v4MapPath .v4RewriteNote a")).toBeNull();
+  });
+
+  it("the panel shows the whole rewrite under the path's new text; a path no dig touched shows none", () => {
+    const root = panel(withRewrite(rewritten(true)), "path:a", "plain", { digs: [] });
+    expect(root.querySelector("h2")?.textContent).toBe("The new line for a");
+    expect(root.querySelector(".v4Rewrite .v4RewriteChanged li")?.textContent).toBe("What the dig changed, in one sentence.");
+    expect(root.querySelector(".v4Rewrite a")?.getAttribute("href")).toBe("/v4/debate/c-done?level=plain");
+    expect(panel(buildMap(), "path:a", "plain", { digs: [] }).querySelector(".v4Rewrite")).toBeNull();
   });
 });

@@ -80,11 +80,13 @@ test("the English scanner sees user-visible attributes and TypeScript label tabl
   );
 });
 
-test("the V4 map's dig choice and money lines (W3-4) are scanned, never allowlisted, and carry no hard-coded English", () => {
+test("the V4 map's dig choice, money lines (W3-4) and rewrites (W4-6) are scanned, never allowlisted, and carry no hard-coded English", () => {
   const files = [
     "components/v4/V4DigSuggest.tsx", "components/v4/V4DebateClient.tsx", "components/v4/V4MapTree.tsx",
     "components/v4/V4Outline.tsx", "components/v4/V4Panel.tsx", "components/v4/V4Rail.tsx", "components/v4/V4AskClient.tsx",
-    "lib/v4/suggestions.ts", "lib/v4/money.ts"
+    "lib/v4/suggestions.ts", "lib/v4/money.ts",
+    "components/v4/V4PathRewrite.tsx", "components/v4/V4LevelTrail.tsx", "components/v4/V4ChangesBar.tsx",
+    "lib/v4/mapModel.ts", "lib/v4/changes.ts", "lib/v4/load.ts", "app/v4/debate/[id]/page.tsx"
   ];
   for (const path of files) {
     assert.equal(allowed(path), false, path);

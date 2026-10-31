@@ -7,13 +7,16 @@ import { findOpenQuestion, uniqueOpenQuestions } from "@/lib/v4/mapModel";
 import type { DigView, V4Map, V4OpenQuestion, V4Path, V4Selection } from "@/lib/v4/types";
 import type { PickRefusal } from "@/lib/v4/suggestions";
 import { DigHereTooLeaf, refusalLine, SuggestionLeaves, type V4DigChoice } from "./V4DigSuggest";
+import { V4RewriteCardNote } from "./V4PathRewrite";
 import { V4TrustBar } from "./V4TrustBar";
 
 /*
  * V4 initial (2026-10-28): the map (row D, D3 prototype) as a left-to-right tree drawn with plain HTML and CSS
  * borders: the question, then one card per path, then each path's open questions and digs. Purely presentational:
  * the page owns the data, the selection, the picks and the digs. Visible text says "question", never "path"
- * (decision 9).
+ * (decision 9). W4-6 (dig model revision, draft 5.5): a path a dig rewrote shows its new text and one line about its
+ * rewrite (the panel shows the rest), a path higher up the mark "A dig further down changed part of this.", and a dig's
+ * card says what became of it ("Dig · changed this path", "Dig · no change", …, paused at the month wall).
  */
 
 /** Titles on cards: AI text cut on a word boundary at about 70 characters; the panel shows the full text. */
@@ -130,6 +133,8 @@ export type MapPiecesProps = Readonly<{
    * "Dig here too". Absent: the pieces draw as before W3-4.
    */
   choice?: V4DigChoice;
+  /** W4-6: the page's language, for the dates on rewritten paths (absent: English). */
+  locale?: string;
 }>;
 
 /**
@@ -191,10 +196,27 @@ export function openNote(question: V4OpenQuestion, picked: boolean, catalog: Mes
   return t(catalog, `v4.map.openKind.${question.kind}`);
 }
 
+/**
+ * The dig card's line (draft 5.5): waiting, still being looked into, didn't finish, or once done what became of its
+ * rewrite of the path it came from; a dig of an open question under the main question (no rewrite) and a dig from before
+ * R22 (read by its story) are "done". W4-6 (the money rule): a dig whose own run is paused at the month wall says so.
+ */
 export function digNote(dig: DigView, catalog: MessageCatalog): string {
-  if (dig.state === "FAILED") return t(catalog, "v4.map.digFailed");
-  if (dig.state === "DONE") return t(catalog, "v4.map.digDone");
-  return t(catalog, "v4.map.digging");
+  if (dig.state === "FAILED") return t(catalog, "v4.rewrite.digCard.FAILED");
+  if (dig.state === "WAITING") return t(catalog, "v4.rewrite.digCard.WAITING");
+  if (dig.state === "RUNNING") {
+    return t(catalog, dig.pausedUntil === undefined ? "v4.rewrite.digCard.RUNNING" : "v4.rewrite.digCard.PAUSED");
+  }
+  const rewrite = dig.rewrite ?? null;
+  if (rewrite === null) return t(catalog, "v4.rewrite.digCard.DONE");
+  if (rewrite.state === "WRITING") return t(catalog, "v4.rewrite.digCard.REWRITING");
+  if (rewrite.state === "FAILED") return t(catalog, "v4.rewrite.digCard.REWRITE_FAILED");
+  return t(catalog, rewrite.changed ? "v4.rewrite.digCard.CHANGED" : "v4.rewrite.digCard.NO_CHANGE");
+}
+
+/** A dig still at work: waiting, running, or (W4-6) rewriting the path it came from. */
+export function digWorking(dig: DigView): boolean {
+  return dig.state === "WAITING" || dig.state === "RUNNING" || (dig.state === "DONE" && dig.rewrite?.state === "WRITING");
 }
 
 /**
@@ -267,7 +289,7 @@ function DigCard(props: Readonly<{ dig: DigView; pieces: MapPiecesProps; selecte
   const { dig, pieces } = props;
   const id: V4Selection = `dig:${dig.link.childRunId}`;
   const selected = props.selectedId === id;
-  const working = dig.state === "WAITING" || dig.state === "RUNNING";
+  const working = digWorking(dig) && dig.pausedUntil === undefined;
   return (
     <button
       type="button"
@@ -418,6 +440,7 @@ export function V4MapTree(props: MapPiecesProps) {
                             ? <span className={`v4MapFate v4MapFate${path.fate}`}>{t(catalog, `v4.fate.${path.fate}`)}</span>
                             : null}
                           <V4TrustBar counts={path.counts} unchecked={path.unchecked} catalog={catalog} />
+                          <V4RewriteCardNote path={path} catalog={catalog} locale={props.locale ?? "en"} />
                           {props.changed.has(id) ? <NewDot catalog={catalog} /> : null}
                         </button>
                         <Leaves
