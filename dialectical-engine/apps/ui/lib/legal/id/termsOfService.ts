@@ -171,7 +171,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Pelaporan konten, moderasi, dan pengaduan",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Siapa pun dapat melaporkan konten. Anda tidak memerlukan akun. Kirim surat ke support@dezbatere.ro atau gunakan kendali Laporkan pada debat mana pun yang dipublikasikan. Agar kami dapat bertindak, beri tahu kami: alasan Anda meyakini konten tersebut ilegal atau melanggar Ketentuan ini, dengan rincian yang cukup untuk memahami klaim; lokasi persisnya — URL lengkap dan, jika dapat, kutipannya; nama dan alamat email Anda (tidak diwajibkan untuk laporan materi pelecehan seksual terhadap anak); serta pernyataan bahwa Anda dengan iktikad baik meyakini laporan Anda akurat dan lengkap." },
+      { kind: "p", text: "Siapa pun dapat melaporkan konten. Anda tidak memerlukan akun. Kirim surat ke support@dezbatere.ro. Jika Anda sudah masuk, Anda juga dapat menggunakan tombol Laporkan pada debat publik mana pun. AI membaca laporan yang dibuat dengan tombol itu di samping teks publik. Jika AI setuju, debat langsung disembunyikan dan seseorang meninjaunya. Jika tidak, Anda dapat melaporkan lagi dengan rincian yang lebih lengkap, dan seseorang akan membacanya. Agar kami dapat bertindak, beri tahu kami: alasan Anda meyakini konten tersebut ilegal atau melanggar Ketentuan ini, dengan rincian yang cukup untuk memahami klaim; lokasi persisnya — URL lengkap dan, jika dapat, kutipannya; nama dan alamat email Anda (tidak diwajibkan untuk laporan materi pelecehan seksual terhadap anak); serta pernyataan bahwa Anda dengan iktikad baik meyakini laporan Anda akurat dan lengkap." },
       { kind: "p", text: "Kami mengakui penerimaan setiap laporan tanpa penundaan yang tidak semestinya. Kami menangani laporan secara tepat waktu, cermat, tidak sewenang-wenang, dan objektif, memberi tahu Anda keputusan kami, serta menjelaskan cara menantangnya. Jika kami menggunakan sarana otomatis untuk memproses atau memutuskan laporan, kami menyatakannya. Laporan mengenai gambar intim yang dibagikan tanpa persetujuan ditindaklanjuti dalam waktu 48 jam sejak permintaan yang sah." },
       { kind: "p", text: "Dua jenis keputusan otomatis, yang dipisahkan." },
       {
@@ -241,6 +241,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Pada layanan. Kami terus mengembangkan Dialectical Engine, dan peningkatan rutin, perbaikan, serta perubahan daftar model terjadi tanpa pemberitahuan. Jika kami membuat perubahan yang melampaui upaya mempertahankan fungsi layanan sebagaimana diuraikan, kami melakukannya hanya atas salah satu alasan berikut: mematuhi persyaratan hukum atau peraturan; menanggapi masalah keamanan atau penyalahgunaan; karena penyedia model mengubah, membatasi, atau menarik model maupun fitur yang kami andalkan; beradaptasi dengan lingkungan teknis yang tidak kami kendalikan; atau menambah, meningkatkan, maupun menghentikan fitur dengan cara yang tidak menambah biaya bagi Anda." },
       { kind: "p", text: "Kami memberi tahu Anda terlebih dahulu, pada media tahan lama, mengenai hal yang berubah dan waktu perubahan. Jika perubahan tersebut menimbulkan dampak negatif yang lebih dari kecil terhadap akses ke atau penggunaan layanan oleh Anda, Anda dapat mengakhiri layanan tanpa biaya dalam waktu 30 hari sejak menerima pemberitahuan, atau sejak perubahan berlaku, mana yang lebih akhir, dan kami mengembalikan setiap jumlah yang telah dibayar di muka untuk periode yang tidak digunakan." },
       { kind: "p", text: "Pada Ketentuan ini. Kami dapat mengubah Ketentuan ini untuk jenis alasan yang sama. Untuk perubahan yang tidak mengurangi hak Anda, kami memublikasikan versi baru beserta ringkasan perubahan dan mengirim email kepada Anda sekurang-kurangnya 30 hari sebelum perubahan berlaku; jika Anda terus menggunakan Dialectical Engine setelah tanggal tersebut, berarti Anda menerimanya, dan Anda dapat menutup akun sebelumnya. Untuk perubahan yang mengurangi hak Anda — termasuk kenaikan harga pada paket yang sudah ada, batas yang lebih rendah, fitur yang dihapus, penggunaan baru atas konten Anda, atau perubahan pada tanggung jawab, hukum yang berlaku, maupun penyelesaian sengketa — kami meminta Anda menerima versi baru secara tegas saat masuk berikutnya, dan perubahan hanya berlaku untuk waktu mendatang. Kami tidak pernah memberlakukan perubahan secara surut, dan tidak pernah menggunakan bagian ini untuk mengubah inti dari hal yang telah Anda bayar di tengah masa berlaku tanpa menawarkan jalan keluar. Versi sebelumnya tetap tersedia di dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Versi 2.12 menggantikan versi 2.11: bagian 10 menyatakan bahwa orang yang sudah masuk juga dapat menggunakan tombol Laporkan pada debat publik mana pun, bahwa AI membaca laporan yang dibuat dengan tombol itu di samping teks publik, dan apa yang terjadi setelah itu." },
       { kind: "p", text: "Versi 2.11 menggantikan versi 2.10: bagian 9 menyatakan bahwa kami dapat menyembunyikan debat publik selama kami meninjaunya, dan menghapus atau memperbaiki sebagiannya." },
       { kind: "p", text: "Versi 2.10 menggantikan versi 2.9: bagian 9 menyatakan bahwa debat di paket gratis bersifat publik, bahwa debat publik tidak dapat dibatalkan publikasinya dan tetap publik setelah Anda menutup akun, bahwa siapa pun yang memiliki kredit dapat berkontribusi pada debat publik atau menulis laporan tentangnya, dan bahwa debat publik tetap terbuka setelah penulis pertamanya pergi; bagian 11 menjelaskan apa yang dilakukan penutupan terhadap debat publik Anda." },
       { kind: "p", text: "Versi 2.9 menggantikan versi 2.8: bagian 8 mendapat paragraf baru “Grafik dan statistik yang kami hasilkan”, yang menyatakan siapa pemilik grafik dalam laporan debat dan memberi Anda lisensi untuk menggunakannya." },
@@ -373,12 +374,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.11",
-  sha256: "de02bbe3f6beb4be2ddfa9b11369c0f09fa2f3984cad8faa7fe129f682cbdec4",
-  eyebrow: "KETENTUAN LAYANAN · v2.11 · BERLAKU 1 NOVEMBER 2026",
+  version: "2.12",
+  sha256: "0c760c54d69e98e464a14fb70acbaaec39f2e84963fe3a6638840241c837ddca",
+  eyebrow: "KETENTUAN LAYANAN · v2.12 · BERLAKU 1 NOVEMBER 2026",
   title: "Hal yang Anda setujui",
   lede: "Kontrak antara Anda dan DMS Merchandise Shop S.R.L., dalam bahasa yang mudah dipahami. Sembilan belas bagian dan Lampiran A — gulir hingga akhir.",
-  endMarker: "AKHIR KETENTUAN · v2.11",
+  endMarker: "AKHIR KETENTUAN · v2.12",
   contact: "support@dezbatere.ro",
   bodyLabel: "Teks Ketentuan Layanan",
   sectionIdPrefix: "terms-section-",

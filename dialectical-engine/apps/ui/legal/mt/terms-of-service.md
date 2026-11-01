@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Fil-qosor
-eyebrow: TERMINI TAS-SERVIZZ · v2.11 · EFFETTIVI 1 TA’ NOVEMBRU 2026
+eyebrow: TERMINI TAS-SERVIZZ · v2.12 · EFFETTIVI 1 TA’ NOVEMBRU 2026
 title: Dak li taqbel miegħu
 lede: Il-kuntratt bejnek u DMS Merchandise Shop S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.
-endMarker: TMIEM IT-TERMINI · v2.11
+endMarker: TMIEM IT-TERMINI · v2.12
 bodyLabel: Test tat-Termini tas-Servizz
 annexTitle: Anness A — Termini reġjonali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LIĠI APPLIKABBLI
 -->
 
-**Version 2.11 · Effective 1 ta’ Novembru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
+**Version 2.12 · Effective 1 ta’ Novembru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
 
 **In short.** Irid ikollok 18-il sena jew aktar. Dialectical Engine tibni argumenti b’mudelli tal-IA u dak kollu li tiġġenera jista’ jkun żbaljat — mhuwiex parir. Fuq il-pjan bla ħlas, id-dibattiti tiegħek huma pubbliċi meta jintemmu, wara verifika bl-IA; fuq pjan bi ħlas, huma privati sakemm ma tippubblikahomx. Ladarba jkunu pubbliċi, kulħadd jista’ jaqra dibattitu, u jibqa’ pubbliku. It-test li tissottometti jintbagħat lill-fornituri tal-IA elenkati fir-Reġistru tal-Fornituri tagħna, u ma jintużax għat-taħriġ tal-mudelli. Irrapporta kontenut illegali fuq support@dezbatere.ro kemm jekk għandek kont kif ukoll jekk le. Tapplika l-liġi Rumena, iżda l-protezzjonijiet lokali tiegħek bħala konsumatur jibqgħu japplikaw għalik.
 
@@ -170,7 +170,7 @@ Id-dibattiti fuq pjan bi ħlas huma **privati b’mod awtomatiku**: xejn minn da
 
 ## 10. Rapportar ta’ kontenut, moderazzjoni u lmenti
 
-**Kulħadd jista’ jirrapporta kontenut.** Ma għandekx bżonn kont. Ikteb lil support@dezbatere.ro jew uża l-kontroll **Irrapporta** fuq kwalunkwe dibattitu ppubblikat. Sabiex inkunu nistgħu naġixxu, għidilna: għaliex temmen li l-kontenut huwa illegali jew jikser dawn it-Termini, b’dettall biżżejjed biex nifhmu l-pretensjoni; il-post eżatt — il-URL sħiħ u, jekk tista’, is-silta; ismek u l-indirizz elettroniku tiegħek (mhux meħtieġa għal rapporti ta’ materjal ta’ abbuż sesswali tat-tfal); u li temmen b’rieda tajba li r-rapport tiegħek huwa preċiż u komplut.
+**Kulħadd jista’ jirrapporta kontenut.** Ma għandekx bżonn kont. Ikteb lil support@dezbatere.ro. Jekk int imdaħħal fil-kont tiegħek, tista’ wkoll tuża l-buttuna **Irrapporta** fuq kwalunkwe dibattitu pubbliku. IA taqra rapport magħmul bil-buttuna, ħdejn it-test pubbliku. Jekk l-IA taqbel, id-dibattitu jiġi moħbi minnufih u persuna tirrieżaminah. Jekk l-IA ma taqbilx, tista’ tirrapporta mill-ġdid b’aktar dettalji, u persuna taqrah. Sabiex inkunu nistgħu naġixxu, għidilna: għaliex temmen li l-kontenut huwa illegali jew jikser dawn it-Termini, b’dettall biżżejjed biex nifhmu l-pretensjoni; il-post eżatt — il-URL sħiħ u, jekk tista’, is-silta; ismek u l-indirizz elettroniku tiegħek (mhux meħtieġa għal rapporti ta’ materjal ta’ abbuż sesswali tat-tfal); u li temmen b’rieda tajba li r-rapport tiegħek huwa preċiż u komplut.
 
 Nikkonfermaw li rċevejna kull rapport mingħajr dewmien żejjed. Nittrattaw ir-rapporti fil-ħin, b’diliġenza, b’mod mhux arbitrarju u oġġettiv, ngħidulek id-deċiżjoni tagħna, u ngħidulek kif tista’ tikkontestaha. Fejn nużaw mezzi awtomatizzati biex nipproċessaw jew niddeċiedu rapport, ngħidu dan. Aħna naġixxu fuq rapporti ta’ stampi intimi kondiviżi mingħajr kunsens **fi żmien 48 siegħa** minn talba valida.
 
@@ -250,6 +250,8 @@ Jekk tgħix band’oħra, l-Anness A jiddikjara d-dritt ta’ rtirar jew il-perj
 Ngħidulek minn qabel, fuq mezz durabbli, x’inhu jinbidel u meta. Jekk il-bidla jkollha effett negattiv aktar minn minuri fuq l-aċċess tiegħek għas-servizz jew l-użu tiegħu, tista’ tittermina mingħajr ħlas fi żmien **30 jum** minn meta tiġi avżat, jew minn meta tidħol fis-seħħ il-bidla, skont liema jiġi l-aħħar, u nagħtuk lura kwalunkwe ammont imħallas bil-quddiem għall-perjodu mhux użat.
 
 **F’dawn it-Termini.** Nistgħu nibdlu dawn it-Termini għall-istess tipi ta’ raġunijiet. Għal bidliet li ma jnaqqsux id-drittijiet tiegħek, nippubblikaw il-verżjoni l-ġdida b’sommarju ta’ dak li nbidel u nibagħtulek messaġġ elettroniku mill-inqas **30 jum** qabel ma tidħol fis-seħħ; jekk tkompli tuża Dialectical Engine wara dik id-data, dan ifisser li taċċettaha, u tista’ tagħlaq il-kont tiegħek qabel dak iż-żmien. Għal bidliet li jnaqqsu d-drittijiet tiegħek — inkluż żidiet fil-prezz fuq pjan eżistenti, limiti aktar baxxi, funzjonalitajiet imneħħija, użi ġodda tal-kontenut tiegħek, jew bidliet fir-responsabbiltà, fil-liġi applikabbli jew fis-soluzzjoni tat-tilwim — nitolbuk taċċetta l-verżjoni l-ġdida b’mod espliċitu meta terġa’ tidħol fil-kont, u l-bidla tapplika biss għall-futur. Qatt ma nagħmlu bidla retroattiva, u qatt ma nużaw din it-taqsima biex nibdlu l-qalba ta’ dak li ħallast għalih f’nofs it-terminu mingħajr ma noffrulek mod kif toħroġ. Il-verżjonijiet preċedenti jibqgħu disponibbli fuq dezbatere.ro/terms/versions.
+
+Il-Verżjoni 2.12 issostitwiet il-Verżjoni 2.11: it-taqsima 10 tgħid li persuna mdaħħla fil-kont tagħha tista’ wkoll tuża l-buttuna Irrapporta fuq kwalunkwe dibattitu pubbliku, li IA taqra rapport magħmul biha ħdejn it-test pubbliku, u x’jiġri wara.
 
 Il-Verżjoni 2.11 issostitwiet il-Verżjoni 2.10: it-taqsima 9 tgħid li nistgħu naħbu dibattitu pubbliku temporanjament waqt li nirrieżaminawh, u nneħħu jew nikkoreġu parti minnu.
 

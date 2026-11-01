@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { ContractHttpError, type PublicReviewList, type PublicReviewPage } from "@debateai/contract";
+import { ContractHttpError, type PublicFlagQueue, type PublicReviewList, type PublicReviewPage } from "@debateai/contract";
 import { createPublicReviewClient, publicationRefOf, type PublicReviewClient, type PublicReviewStepInput } from "../lib/publicReviewApi.js";
 import { t, type MessageCatalog } from "../lib/i18n/translate.js";
 import staffEnglish from "../messages/en/staff.json";
@@ -17,11 +17,13 @@ const failureLine = (catalog: MessageCatalog, failure: unknown): string => {
   if (failure instanceof ContractHttpError && failure.serverCode !== null && FAILURE_CODES.has(failure.serverCode)) return t(catalog, `staff.publicReview.failure.${failure.serverCode}`);
   return t(catalog, failure instanceof Error && failure.name === "NotAllowedError" ? "staff.publicReview.failure.passkeyCancelled" : "staff.publicReview.failure.other");
 };
+const SIX_MONTHS_MS = 183 * 24 * 60 * 60_000;
 const when = (at: string) => new Date(at).toISOString().slice(0, 16).replace("T", " ");
 
 export function PublicReviewPanel({ client, catalog = staffEnglish }: Readonly<{ client?: PublicReviewClient; catalog?: MessageCatalog }>) {
   const api = useMemo(() => client ?? createPublicReviewClient(), [client]);
   const [list, setList] = useState<PublicReviewList | null>(null);
+  const [queue, setQueue] = useState<PublicFlagQueue["reports"]>([]);
   const [ref, setRef] = useState<string | null>(null);
   const [page, setPage] = useState<PublicReviewPage | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
@@ -36,6 +38,7 @@ export function PublicReviewPanel({ client, catalog = staffEnglish }: Readonly<{
       const nextList = await api.list();
       if (read !== reads.current) return;
       setList(nextList);
+      setQueue((await api.readReports()).reports);
       setPage(publicationRef === null ? null : await api.read(publicationRef));
     } catch (failure) {
       // Not one of the two: the section stays away, and says nothing.
@@ -47,11 +50,11 @@ export function PublicReviewPanel({ client, catalog = staffEnglish }: Readonly<{
   if (list === null) return null;
 
   async function go(change: Pending) {
-    if (busy || ref === null) return;
+    if (busy) return;
     setBusy(true);
     setMessage(null);
     try {
-      await change.run(api, page, ref);
+      await change.run(api, page, ref ?? "");
       setPending(null);
       setEditing(null);
       setMessage({ text: t(catalog, "staff.publicReview.done"), good: true });
@@ -103,9 +106,27 @@ export function PublicReviewPanel({ client, catalog = staffEnglish }: Readonly<{
       <form onSubmit={open}><div className="staffField"><label htmlFor="public-review-link">{t(catalog, "staff.publicReview.link")}</label><input id="public-review-link" name="link" autoComplete="off" /></div>
         <div className="staffActions"><button className="setBtn" type="submit">{t(catalog, "staff.publicReview.open")}</button></div></form>
       {list.hidden.length === 0 ? <p className="setCardHint">{t(catalog, "staff.publicReview.noneHidden")}</p> : <ul className="staffAuditList" data-review-hidden>
-        {list.hidden.map((row) => <li key={row.publication_ref}><button className="setBtn" type="button" onClick={() => { setRef(row.publication_ref); void load(row.publication_ref); }}>{row.publication_ref}</button> <span className="setCardHint">{t(catalog, "staff.publicReview.hiddenSince", { at: when(row.hidden_at) })}</span></li>)}
+        {list.hidden.map((row) => <li key={row.publication_ref}><button className="setBtn" type="button" onClick={() => { setRef(row.publication_ref); void load(row.publication_ref); }}>{row.publication_ref}</button> <span className="setCardHint">{t(catalog, "staff.publicReview.hiddenSince", { at: when(row.hidden_at) })}</span>{Date.now() - Date.parse(row.hidden_at) > SIX_MONTHS_MS ? <p className="setError" data-review-long-hidden>{t(catalog, "staff.publicReview.longHidden")}</p> : null}</li>)}
       </ul>}
       {page === null ? notice : null}
+    </section>
+    <section className="setCard" data-report-queue>
+      <h2 className="staffSectionTitle">{t(catalog, "staff.publicReports.title")}</h2>
+      <p className="setCardHint">{t(catalog, "staff.publicReports.hint")}</p>
+      {queue.length === 0 ? <p className="setCardHint">{t(catalog, "staff.publicReports.empty")}</p> : <ul className="staffAuditList">
+        {queue.map((report) => <li key={report.flag_id} data-report={report.state}>
+          <strong>{t(catalog, `staff.publicReports.state.${report.state}`)}</strong> <time dateTime={report.created_at}>{when(report.created_at)}</time>
+          <p>{report.reporter === null ? t(catalog, "staff.publicReports.byGone") : t(catalog, "staff.publicReports.by", { name: report.reporter })}</p>
+          {report.claim === null ? <p className="setCardHint">{t(catalog, "staff.publicReports.wordsGone")}</p> : <>
+            <p>{t(catalog, "staff.publicReports.where", { text: report.where ?? "" })}</p><p>{t(catalog, "staff.publicReports.claim", { text: report.claim })}</p></>}
+          <p className="setCardHint">{t(catalog, report.verdict === null ? "staff.publicReports.verdict.none" : `staff.publicReports.verdict.${report.verdict}`)}{report.reason === null ? "" : ` ${t(catalog, `staff.publicReports.reason.${report.reason}`)}`}{report.debate_hidden ? ` ${t(catalog, "staff.publicReports.debateHidden")}` : ""}</p>
+          <div className="staffActions">
+            <button className="setBtn" type="button" onClick={() => { setRef(report.publication_ref); void load(report.publication_ref); }}>{t(catalog, "staff.publicReports.open")}</button>
+            {report.dismissed_at === null ? <button className="setBtn" type="button" disabled={busy} onClick={() => setPending({ line: t(catalog, "staff.publicReports.confirmDismiss"), run: (client2) => client2.dismissReport(report.flag_id) })}>{t(catalog, "staff.publicReports.dismiss")}</button> : <span className="setCardHint">{t(catalog, "staff.publicReports.dismissed")}</span>}
+          </div>
+        </li>)}
+      </ul>}
+      {page === null ? confirm : null}
     </section>
     {page === null ? null : <section className="setCard" data-review-debate={page.hidden ? "HIDDEN" : "PUBLIC"}>
       <h2 className="staffSectionTitle">{page.question}</h2>

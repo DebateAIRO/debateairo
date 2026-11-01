@@ -15,7 +15,7 @@ export const StaffActionSchema = z.enum([
     "CREDENTIAL_REGISTER", "CREDENTIAL_REVOKE", "PUBLICATION_REVIEW_APPROVE", "PUBLICATION_REVIEW_REFUSE",
     "THREAT_REPORT_REPORTED", "THREAT_REPORT_NOT_REPORTED",
     "TEAM_LIMIT_SET", "TEAM_LIMIT_PARTNER_GRANT", "TEAM_LIMIT_PARTNER_REVOKE", "TEAM_PRACTICE_RECORD",
-    "PUBLIC_REVIEW_HIDE", "PUBLIC_REVIEW_STEP"
+    "PUBLIC_REVIEW_HIDE", "PUBLIC_REVIEW_STEP", "PUBLIC_REPORT_DISMISS"
 ]);
 const RevisionSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const DigestSchema = z.string().regex(/^[0-9a-f]{64}$/u);
@@ -139,7 +139,8 @@ export const StaffActionIntentSchema = z.discriminatedUnion("action", [
     z.object({ action: z.literal("TEAM_LIMIT_PARTNER_REVOKE"), target_staff_id: z.uuid(), ...ActionMutationShape }).strict(),
     z.object({ action: z.literal("TEAM_PRACTICE_RECORD"), ...TeamPracticeShape }).strict(),
     z.object({ action: z.literal("PUBLIC_REVIEW_HIDE"), ...PublicReviewHideShape }).strict(),
-    z.object({ action: z.literal("PUBLIC_REVIEW_STEP"), ...PublicReviewStepShape }).strict()
+    z.object({ action: z.literal("PUBLIC_REVIEW_STEP"), ...PublicReviewStepShape }).strict(),
+    z.object({ action: z.literal("PUBLIC_REPORT_DISMISS"), flag_id: z.uuid(), operation_id: z.uuid() }).strict()
 ]);
 export const StaffActionOptionsRequestSchema = z.object({ intent: StaffActionIntentSchema }).strict();
 export const StaffActionVerifyRequestSchema = z.object({ intent: StaffActionIntentSchema,
@@ -186,6 +187,12 @@ export const PublicReviewListSchema = z.object({
     log: z.array(PublicReviewLogEntrySchema.extend({ publication_ref: z.uuid() }).strict()).max(100)
 }).strict();
 export type PublicReviewList = z.infer<typeof PublicReviewListSchema>;
+/** Decision 35: the Report button's queue, for the same two accounts. The reporter's name is here and nowhere else, and each read is logged. `claim` and `where` go null six months after a report closed. */
+export const PublicFlagQueueSchema = z.object({ reports: z.array(z.object({
+    flag_id: z.uuid(), publication_ref: z.uuid(), reporter: z.string().nullable(), state: z.enum(["CHECKING", "QUEUED", "NOT_FOUND", "HIDDEN"]), verdict: z.enum(["AGREE", "NOT_FOUND", "UNSURE", "UNAVAILABLE"]).nullable(), reason: z.enum(["CONTENT", "PERSONAL"]).nullable(),
+    created_at: z.iso.datetime({ offset: true }), judged_at: z.iso.datetime({ offset: true }).nullable(), dismissed_at: z.iso.datetime({ offset: true }).nullable(), where: z.string().nullable(), claim: z.string().nullable(), debate_hidden: z.boolean() }).strict()).max(200) }).strict();
+export type PublicFlagQueue = z.infer<typeof PublicFlagQueueSchema>;
+export const PublicFlagDismissRequestSchema = z.object({ operation_id: z.uuid(), proof_handle: OpaqueHandleSchema }).strict();
 export const StaffActionProofResponseSchema = z.object({ proof_handle: OpaqueHandleSchema, expires_at: z.iso.datetime() }).strict();
 const CredentialDescriptorSchema = z.object({ id: CredentialIdSchema, type: z.literal("public-key"), transports: TransportsSchema.optional() }).strict();
 export const StaffRegistrationOptionsResponseSchema = z.object({
@@ -301,7 +308,8 @@ export const staffContractInventory = Object.freeze({
         "GET /v1/admin/threat-reports/{reportRef}", "POST /v1/admin/threat-reports/{reportRef}/decision",
         "GET /v1/admin/team-limit", "POST /v1/admin/team-limit", "POST /v1/admin/team-limit/partner/{staffId}",
         "DELETE /v1/admin/team-limit/partner/{staffId}", "POST /v1/admin/team-limit/practice",
-        "GET /v1/admin/public-review", "GET /v1/admin/public-review/{id}", "POST /v1/admin/public-review/{id}/hide", "POST /v1/admin/public-review/{id}/step"
+        "GET /v1/admin/public-review", "GET /v1/admin/public-review/{id}", "POST /v1/admin/public-review/{id}/hide", "POST /v1/admin/public-review/{id}/step",
+        "GET /v1/admin/public-reports", "POST /v1/admin/public-reports/{id}/dismiss"
     ]),
     resources: Object.freeze({
         StaffCapabilitySchema, DelegatedStaffCapabilitiesSchema, ActiveStaffCapabilitiesSchema, StaffActionSchema,
@@ -316,7 +324,8 @@ export const staffContractInventory = Object.freeze({
         StaffPageQuerySchema, StaffTeamQuerySchema, StaffAuditQuerySchema, StaffTeamMemberSchema, StaffTeamPageSchema, StaffAuditEventSchema, ThreatReportAuditEventSchema, StaffAuditPageSchema,
         ThreatReportListSchema, ThreatReportSchema, ThreatReportSummarySchema, ThreatReportDecisionRequestSchema,
         TeamLimitSetRequestSchema, TeamLimitPartnerRequestSchema, TeamPracticeRequestSchema, TeamLimitPageSchema,
-        PublicReviewHideRequestSchema, PublicReviewStepRequestSchema, PublicReviewPageSchema, PublicReviewListSchema
+        PublicReviewHideRequestSchema, PublicReviewStepRequestSchema, PublicReviewPageSchema, PublicReviewListSchema,
+        PublicFlagQueueSchema, PublicFlagDismissRequestSchema
     })
 });
 

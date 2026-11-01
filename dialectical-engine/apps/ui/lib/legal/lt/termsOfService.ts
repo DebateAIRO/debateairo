@@ -171,7 +171,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Pranešimai apie turinį, moderavimas ir skundai",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Apie turinį gali pranešti bet kas. Paskyros turėti nereikia. Rašykite adresu support@dezbatere.ro arba bet kuriuose paskelbtuose debatuose naudokite valdiklį Pranešti. Kad galėtume imtis veiksmų, nurodykite: kodėl manote, kad turinys yra neteisėtas arba pažeidžia šias Sąlygas, ir pateikite pakankamai informacijos teiginiui suprasti; tikslią vietą — visą URL ir, jei galite, ištrauką; savo vardą, pavardę ir el. pašto adresą (jų nereikia pranešant apie seksualinės prievartos prieš vaikus medžiagą); ir patvirtinkite, kad sąžiningai manote, jog jūsų pranešimas tikslus ir išsamus." },
+      { kind: "p", text: "Apie turinį gali pranešti bet kas. Paskyros turėti nereikia. Rašykite adresu support@dezbatere.ro. Jei esate prisijungę, taip pat galite naudoti mygtuką Pranešti bet kuriame viešame debate. DI perskaito pranešimą, pateiktą naudojant mygtuką, šalia viešo teksto. Jei DI sutinka, debatas iš karto paslepiamas, o asmuo jį peržiūri. Jei DI nesutinka, galite pranešti dar kartą nurodydami daugiau detalių, ir asmuo tai perskaitys. Kad galėtume imtis veiksmų, nurodykite: kodėl manote, kad turinys yra neteisėtas arba pažeidžia šias Sąlygas, ir pateikite pakankamai informacijos teiginiui suprasti; tikslią vietą — visą URL ir, jei galite, ištrauką; savo vardą, pavardę ir el. pašto adresą (jų nereikia pranešant apie seksualinės prievartos prieš vaikus medžiagą); ir patvirtinkite, kad sąžiningai manote, jog jūsų pranešimas tikslus ir išsamus." },
       { kind: "p", text: "Apie kiekvieno pranešimo gavimą patvirtiname nepagrįstai nedelsdami. Pranešimus nagrinėjame laiku, rūpestingai, nešališkai ir objektyviai, pranešame jums savo sprendimą ir paaiškiname, kaip jį apskųsti. Jei pranešimui nagrinėti arba sprendimui priimti naudojame automatizuotas priemones, apie tai informuojame. Gavę pagrįstą prašymą, dėl be sutikimo bendrintų intymių atvaizdų imamės veiksmų per 48 valandas." },
       { kind: "p", text: "Dviejų rūšių automatizuoti sprendimai, kurie atskiriami vieni nuo kitų." },
       {
@@ -241,6 +241,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Paslaugos pakeitimai. Nuolat tobuliname Dialectical Engine, todėl apie įprastus patobulinimus, pataisas ir modelių sąrašo pakeitimus nepranešame. Pakeitimus, kuriais ne vien palaikomas aprašytas paslaugos veikimas, atliekame tik dėl vienos iš šių priežasčių: kad įvykdytume teisinį ar reguliavimo reikalavimą; reaguotume į saugumo ar piktnaudžiavimo problemą; kai modelio teikėjas pakeičia, apriboja ar pašalina modelį ar funkciją, nuo kurių priklausome; kad prisitaikytume prie mūsų nekontroliuojamos techninės aplinkos; arba kad pridėtume, patobulintume ar pašalintume funkciją taip, kad jums neatsirastų papildomų išlaidų." },
       { kind: "p", text: "Patvariojoje laikmenoje iš anksto pranešame, kas ir kada keisis. Jei pakeitimas turi didesnį nei nedidelį neigiamą poveikį jūsų prieigai prie paslaugos ar naudojimuisi ja, galite nemokamai nutraukti sutartį per 30 dienų nuo pranešimo gavimo arba pakeitimo įsigaliojimo dienos, atsižvelgiant į tai, kuri data vėlesnė, o mes grąžinsime visas iš anksto už nepanaudotą laikotarpį sumokėtas sumas." },
       { kind: "p", text: "Šių Sąlygų pakeitimai. Šias Sąlygas galime keisti dėl tokių pačių priežasčių. Jei pakeitimai nesumažina jūsų teisių, paskelbiame naują versiją su pakeitimų santrauka ir išsiunčiame jums el. laišką bent prieš 30 dienų iki jos įsigaliojimo; jei po tos dienos toliau naudositės Dialectical Engine, tai reikš, kad su pakeitimais sutinkate, o iki tol galite uždaryti paskyrą. Jei pakeitimais sumažinamos jūsų teisės — įskaitant esamo plano kainos padidinimą, mažesnes ribas, pašalintas funkcijas, naujus jūsų turinio naudojimo būdus arba atsakomybės, taikytinos teisės ar ginčų sprendimo pakeitimus — kitą kartą prisijungus prašome aiškiai sutikti su nauja versija, o pakeitimas taikomas tik ateityje. Niekada netaikome pakeitimo atgaline data ir niekada nesinaudojame šiuo skyriumi tam, kad sutarties laikotarpio viduryje pakeistume esminius dalykus, už kuriuos sumokėjote, nepasiūlydami galimybės atsisakyti sutarties. Ankstesnes versijas galima rasti adresu dezbatere.ro/terms/versions." },
+      { kind: "p", text: "2.12 versija pakeitė 2.11 versiją: 10 skyriuje nurodyta, kad prisijungęs asmuo taip pat gali naudoti mygtuką Pranešti bet kuriame viešame debate, kad DI perskaito pranešimą, pateiktą jį naudojant, šalia viešo teksto, ir kas tada įvyksta." },
       { kind: "p", text: "2.11 versija pakeitė 2.10 versiją: 9 skyriuje nurodyta, kad mes galime laikinai paslėpti viešą debatą, kol jį peržiūrime, ir pašalinti arba ištaisyti jo dalį." },
       { kind: "p", text: "2.10 versija pakeitė 2.9 versiją: 9 skyriuje nurodyta, kad nemokamame plane debatai yra vieši, kad viešo debato paskelbimo negalima atšaukti ir jis lieka viešas jums uždarius paskyrą, kad kiekvienas, turintis kredito, gali prisidėti prie viešo debato arba parašyti jo ataskaitą, ir kad viešas debatas lieka atviras po to, kai jo pirmasis autorius pasitraukė; 11 skyriuje nurodyta, ką uždarymas reiškia jūsų viešiems debatams." },
       { kind: "p", text: "2.9 versija pakeitė 2.8 versiją: 8 skyrius papildomas pastraipa „Mūsų generuojamos diagramos ir statistika“, kurioje nurodoma, kam priklauso debatų ataskaitos diagramos, ir suteikiama jums licencija jas naudoti." },
@@ -373,12 +374,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.11",
-  sha256: "eddc63955746926d4a78afad12865dd64bd79af090cdc6a0413cda5dd4200527",
-  eyebrow: "PASLAUGŲ TEIKIMO SĄLYGOS · v2.11 · ĮSIGALIOJA 2026 M. LAPKRIČIO 1 D.",
+  version: "2.12",
+  sha256: "e0a0f5f6f72306daa164b5a9163798d51a701a1cb02defe351a7fcdbe5a51499",
+  eyebrow: "PASLAUGŲ TEIKIMO SĄLYGOS · v2.12 · ĮSIGALIOJA 2026 M. LAPKRIČIO 1 D.",
   title: "Su kuo sutinkate",
   lede: "Jūsų ir DMS Merchandise Shop S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.",
-  endMarker: "SĄLYGŲ PABAIGA · v2.11",
+  endMarker: "SĄLYGŲ PABAIGA · v2.12",
   contact: "support@dezbatere.ro",
   bodyLabel: "Paslaugų teikimo sąlygų tekstas",
   sectionIdPrefix: "terms-section-",

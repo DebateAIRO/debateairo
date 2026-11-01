@@ -75,11 +75,11 @@ describe("W5-1 Write my report: the closing", () => {
   });
 
   it("the five report contracts are sealed by the engine hash, appended last", () => {
-    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-22, -17)).toEqual(["report.answer.v1", "report.answer.later.v1", "report.answer-check.v1",
+    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-23, -18)).toEqual(["report.answer.v1", "report.answer.later.v1", "report.answer-check.v1",
       "report.story.v1", "report.story-check.v1"]);
-    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-14, -11)).toEqual(["report.answer.v2", "report.answer.later.v2", "report.answer-check.v2"]);
-    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-6, -3)).toEqual(["report.answer.v3", "report.answer.later.v3", "report.answer-check.v3"]);
-    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-3, -1)).toEqual(["report.answer.v4", "report.answer.later.v4"]);
+    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-15, -12)).toEqual(["report.answer.v2", "report.answer.later.v2", "report.answer-check.v2"]);
+    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-7, -4)).toEqual(["report.answer.v3", "report.answer.later.v3", "report.answer-check.v3"]);
+    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-4, -2)).toEqual(["report.answer.v4", "report.answer.later.v4"]);
   });
 
   it("F5: one fence and canary for the whole closing, so a step's second round opens with its first round's bytes", async () => {

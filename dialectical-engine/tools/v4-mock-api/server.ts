@@ -126,6 +126,8 @@ let usageMode: UsageMode = choice("MOCK_USAGE", process.env.MOCK_USAGE, USAGE_MO
 /** Decision 33: the mock's review of a public debate, in memory. One dig to take out and any first-snapshot text to replace. */
 type MockReview = { hidden: boolean; removed: boolean; corrected: Map<string, string>; log: { revision: number; action: string; piece_kind: null; actor_staff_id: string; at: string }[] };
 const mockReview = new Map<string, MockReview>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockFlags: any[] = [];
 const MOCK_REVIEWER = "d1000000-0000-4000-8000-000000000001";
 const MOCK_DIG = "d2000000-0000-4000-8000-000000000001";
 const MOCK_POINTERS = ["/question", "/story_short/headline", "/story_short/summary"];
@@ -1262,6 +1264,25 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       if (refused !== null) return sendJson(req, res, 409, { error: refused });
       return sendJson(req, res, 200, { operation_id: crypto.randomUUID(), outcome: "COMPLETED", recorded_at: iso(Date.now()) }, C.SecurityReceiptSchema);
     }
+  }
+  // Decision 35: Report. The word "hide" in the claim hides (the mock's pretend check), "#person" goes to a person, anything else is not found. The queue is the team panel's.
+  if (parts[1] === "public" && parts[2] === "debates" && parts.length === 5 && parts[4] === "flag" && method === "POST") {
+    const body = C.PublicFlagRequestSchema.safeParse(await readJsonBody(req).catch(() => undefined));
+    if (!body.success) return sendJson(req, res, 400, { error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    const ref = parts[3]!;
+    if (!publicDebates.has(ref)) return sendJson(req, res, 200, { state: "NOT_FOUND" }, C.PublicFlagAnswerSchema);
+    const state = body.data.claim.includes("#person") ? "WITH_A_PERSON" as const : body.data.claim.includes("hide") ? "HIDDEN" as const : "NOT_FOUND" as const;
+    mockFlags.push({ flag_id: crypto.randomUUID(), publication_ref: ref, reporter: "Quiet Heron", state: state === "HIDDEN" ? "HIDDEN" : state === "NOT_FOUND" ? "NOT_FOUND" : "QUEUED", verdict: state === "HIDDEN" ? "AGREE" : state === "NOT_FOUND" ? "NOT_FOUND" : null,
+      reason: state === "HIDDEN" ? "CONTENT" : null, created_at: new Date().toISOString(), judged_at: null, dismissed_at: null, where: body.data.where, claim: body.data.claim, debate_hidden: state === "HIDDEN" });
+    if (state === "HIDDEN") {
+      const row = mockReview.get(ref) ?? { hidden: false, removed: false, corrected: new Map<string, string>(), log: [] };
+      mockReview.set(ref, row);
+      mockReviewStep(row, "HIDE");
+    }
+    return sendJson(req, res, 200, { state }, C.PublicFlagAnswerSchema);
+  }
+  if (parts[1] === "admin" && parts[2] === "public-reports") {
+    if (parts.length === 3 && isGet) return sendJson(req, res, 200, { reports: mockFlags }, C.PublicFlagQueueSchema);
   }
   // Decision 13: a public debate, with what contributions changed since its snapshot; a report on it, while nothing is ongoing.
   if (parts[1] === "public" && parts[2] === "debates" && parts.length === 4 && isGet) {

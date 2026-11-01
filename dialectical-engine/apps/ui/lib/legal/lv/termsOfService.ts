@@ -171,7 +171,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Ziņošana par saturu, moderēšana un sūdzības",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Ikviens var ziņot par saturu. Konts nav vajadzīgs. Rakstiet uz support@dezbatere.ro vai izmantojiet vadīklu Ziņot pie jebkurām publicētām debatēm. Lai mēs varētu rīkoties, norādiet: kādēļ uzskatāt, ka saturs ir nelikumīgs vai pārkāpj šos Noteikumus, pietiekami detalizēti, lai varētu saprast prasījumu; precīzu atrašanās vietu — pilnu URL un, ja iespējams, fragmentu; savu vārdu un e-pasta adresi (tas nav nepieciešams ziņojumiem par materiālu, kurā atspoguļota bērnu seksuāla izmantošana); un apliecinājumu, ka labticīgi uzskatāt savu ziņojumu par precīzu un pilnīgu." },
+      { kind: "p", text: "Ikviens var ziņot par saturu. Konts nav vajadzīgs. Rakstiet uz support@dezbatere.ro. Ja esat pieteicies, varat izmantot arī pogu Ziņot jebkurā publiskā debatē. MI lasa ar pogu iesniegtu ziņojumu līdzās publiskajam tekstam. Ja MI piekrīt ziņojumam, debate tiek uzreiz paslēpta, un to pārskata cilvēks. Ja nepiekrīt, varat ziņot vēlreiz un sniegt sīkāku informāciju, un ziņojumu izlasīs cilvēks. Lai mēs varētu rīkoties, norādiet: kādēļ uzskatāt, ka saturs ir nelikumīgs vai pārkāpj šos Noteikumus, pietiekami detalizēti, lai varētu saprast prasījumu; precīzu atrašanās vietu — pilnu URL un, ja iespējams, fragmentu; savu vārdu un e-pasta adresi (tas nav nepieciešams ziņojumiem par materiālu, kurā atspoguļota bērnu seksuāla izmantošana); un apliecinājumu, ka labticīgi uzskatāt savu ziņojumu par precīzu un pilnīgu." },
       { kind: "p", text: "Mēs bez nepamatotas kavēšanās apstiprinām katra ziņojuma saņemšanu. Mēs izskatām ziņojumus savlaicīgi, rūpīgi, nepatvaļīgi un objektīvi, paziņojam jums savu lēmumu un izskaidrojam, kā to apstrīdēt. Ja ziņojuma apstrādei vai lēmuma pieņemšanai izmantojam automatizētus līdzekļus, mēs to norādām. Pēc derīga pieprasījuma par bez piekrišanas kopīgotiem intīmiem attēliem mēs rīkojamies 48 stundu laikā." },
       { kind: "p", text: "Divu veidu automatizēti lēmumi, kas tiek nošķirti." },
       {
@@ -241,6 +241,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Pakalpojuma izmaiņas. Mēs nepārtraukti attīstām Dialectical Engine, un kārtējie uzlabojumi, labojumi un modeļu klāsta izmaiņas notiek bez iepriekšēja paziņojuma. Ja veicam izmaiņas, kas pārsniedz pakalpojuma darbības uzturēšanu atbilstoši aprakstam, mēs to darām tikai kāda no šiem iemesliem dēļ: lai izpildītu juridisku vai regulatīvu prasību; reaģētu uz drošības vai ļaunprātīgas izmantošanas problēmu; jo modeļa pakalpojumu sniedzējs maina, ierobežo vai atsauc modeli vai funkciju, no kuras esam atkarīgi; lai pielāgotos tehniskai videi, kuru nekontrolējam; vai lai pievienotu, uzlabotu vai izbeigtu funkciju tādā veidā, kas jums nerada izmaksas." },
       { kind: "p", text: "Mēs pastāvīgā informācijas nesējā iepriekš paziņojam, kas un kad mainīsies. Ja izmaiņas vairāk nekā nebūtiski nelabvēlīgi ietekmē jūsu piekļuvi pakalpojumam vai tā lietošanu, varat bez maksas izbeigt līgumu 30 dienu laikā pēc paziņojuma saņemšanas vai izmaiņu stāšanās spēkā atkarībā no tā, kurš datums ir vēlāks, un mēs atmaksājam iepriekš samaksāto summu par neizmantoto periodu." },
       { kind: "p", text: "Šo Noteikumu izmaiņas. Mēs varam mainīt šos Noteikumus tādu pašu iemeslu dēļ. Attiecībā uz izmaiņām, kas nesamazina jūsu tiesības, mēs publicējam jauno versiju kopā ar izmaiņu kopsavilkumu un vismaz 30 dienu iepriekš nosūtām jums e-pasta ziņojumu par tās stāšanos spēkā; turpinot lietot Dialectical Engine pēc šī datuma, jūs izmaiņām piekrītat, un pirms tam varat slēgt kontu. Attiecībā uz izmaiņām, kas samazina jūsu tiesības, — tostarp esoša plāna cenas paaugstinājumu, zemākiem ierobežojumiem, noņemtām funkcijām, jauniem jūsu satura lietošanas veidiem vai izmaiņām atbildībā, piemērojamajos tiesību aktos vai strīdu izšķiršanā — mēs lūdzam nākamajā pierakstīšanās reizē skaidri piekrist jaunajai versijai, un izmaiņas attiecas tikai uz turpmāko laiku. Mēs nekad neveicam izmaiņas ar atpakaļejošu spēku un nekad neizmantojam šo sadaļu, lai termiņa vidū mainītu jums apmaksātā pakalpojuma būtību, nepiedāvājot iespēju izstāties. Iepriekšējās versijas ir pieejamas vietnē dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Versija 2.12 aizstāja versiju 2.11: 10. sadaļā teikts, ka pieteikusies persona var arī izmantot pogu „Ziņot” jebkurā publiskā debatē, ka MI lasa ar to iesniegtu ziņojumu līdzās publiskajam tekstam un kas pēc tam notiek." },
       { kind: "p", text: "Versija 2.11 aizstāja versiju 2.10: 9. sadaļā teikts, ka mēs varam uz laiku paslēpt publisku debati, kamēr to pārskatām, un noņemt vai labot tās daļu." },
       { kind: "p", text: "Versija 2.10 aizstāja versiju 2.9: 9. sadaļā teikts, ka bezmaksas plānā debates ir publiskas, ka publiskas debates publikāciju nevar atsaukt un tā paliek publiska pēc konta slēgšanas, ka ikviens, kam ir kredīts, var sniegt ieguldījumu publiskā debatē vai uzrakstīt tai pārskatu, un ka publiska debate paliek atvērta pēc tam, kad tās pirmais autors ir aizgājis; 11. sadaļā teikts, ko slēgšana nozīmē jūsu publiskajām debatēm." },
       { kind: "p", text: "Versija 2.9 aizstāja versiju 2.8: 8. sadaļa tiek papildināta ar rindkopu „Mūsu ģenerētās diagrammas un statistika”, kas nosaka, kam pieder debašu pārskata diagrammas, un piešķir jums licenci tās izmantot." },
@@ -373,12 +374,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.11",
-  sha256: "a50fffa821d97959241a3135853fe916a253b648275f05fddc702cadda7fb8bd",
-  eyebrow: "PAKALPOJUMA NOTEIKUMI · v2.11 · SPĒKĀ NO 2026. GADA 1. NOVEMBRA",
+  version: "2.12",
+  sha256: "b40419c3c9ea21d21af1ffb675aec317e324d7fed8bec3173f92a75b16cf060a",
+  eyebrow: "PAKALPOJUMA NOTEIKUMI · v2.12 · SPĒKĀ NO 2026. GADA 1. NOVEMBRA",
   title: "Kam jūs piekrītat",
   lede: "Līgums starp jums un DMS Merchandise Shop S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.",
-  endMarker: "NOTEIKUMU BEIGAS · v2.11",
+  endMarker: "NOTEIKUMU BEIGAS · v2.12",
   contact: "support@dezbatere.ro",
   bodyLabel: "Pakalpojuma noteikumu teksts",
   sectionIdPrefix: "terms-section-",

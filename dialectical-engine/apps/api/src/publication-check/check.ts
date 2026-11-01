@@ -14,7 +14,7 @@ export class PublicationJudgeFailure extends Error {
 export interface PublicationJudgePort {
   readonly providerRef: string;
   readonly modelId: string;
-  complete(input: { packet: PromptPacket; signal: AbortSignal }): Promise<{ text: string }>;
+  complete(input: { packet: PromptPacket; signal: AbortSignal }): Promise<{ text: string; usage?: Readonly<{ input_tokens?: number; output_tokens?: number; cost_usd?: number }> }>;
 }
 export type PublicationRefusalGround = PublicationRefusalStatement["ground"];
 export type PublicationCheckResult = { outcome: "ALLOW" }

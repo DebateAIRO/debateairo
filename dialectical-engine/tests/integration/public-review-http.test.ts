@@ -53,6 +53,8 @@ function server(options: Readonly<{ allowed?: boolean; proof?: boolean; locked?:
     if (options.databaseSays !== undefined) throw new Error(options.databaseSays);
     return { operationId: input.operationId, outcome: "COMPLETED", recordedAt: new Date("2026-11-02T00:00:00Z") };
   };
+  const flags = { readQueue: async () => [{ flag_id: UPDATE, publication_ref: REF, run_id: RUN, reporter: "Quiet Heron", state: "QUEUED", verdict: null, reason: null, created_at: "2026-10-21T08:00:00.000Z", judged_at: null, dismissed_at: null, content: envelope({ where: "A place.", claim: "A claim." }), debate_hidden: false }],
+    dismiss: write("dismiss") };
   const repository = { readCommand: async () => STATE, read: async () => material, list: async () => ({ hidden: [], log: [] }), act: write("act") };
   const cipher = { decrypt: (value: { opened: unknown }) => value.opened, encrypt: (value: unknown) => ({ sealed: value }) };
   const built = buildApi({ application, sessions, allowedOrigin: TEST_APP_ORIGIN, staffPolicyVersion: 2, staffAccess: access, staff: {
@@ -61,6 +63,7 @@ function server(options: Readonly<{ allowed?: boolean; proof?: boolean; locked?:
     } as never,
     intents: { mutation: async (input: Record<string, unknown>) => { intents.push(input); return { schema: "staff-alert-v1", event: input.event, operationId: input.operationId, envelope: {} }; } } as never,
     readiness: { readIndependentAlertReadiness: async () => options.locked === true ? "UNAVAILABLE" : "READY" },
+    publicFlags: { repository: flags as never, withKey: async (_ref: string, _run: string, use: (c: never) => unknown) => use({ decrypt: (value: { opened: unknown }) => value.opened } as never) },
     publicReview: { repository: repository as never, withKey: async (_ref: string, _run: string, use: (c: never) => unknown) => use(cipher as never) }
   } as never });
   close = () => built.close();
@@ -168,5 +171,38 @@ describe("the steps", () => {
       await close?.();
     }
     close = undefined;
+  });
+});
+
+describe("the Report button's queue (decision 35)", () => {
+  it("the two read it, no-store; anyone else a plain refusal and no name", async () => {
+    const yes = server();
+    const ok = await yes.built.inject({ method: "GET", url: "/v1/admin/public-reports", headers: headers() });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.headers["cache-control"]).toBe("no-store");
+    expect(ok.json().reports[0]).toMatchObject({ reporter: "Quiet Heron", where: "A place.", claim: "A claim." });
+    await close?.();
+    const no = server({ allowed: false, designation: "DELEGATED" });
+    const refused = await no.built.inject({ method: "GET", url: "/v1/admin/public-reports", headers: headers() });
+    expect(refused.statusCode).toBe(403);
+    expect(refused.body).not.toContain("Quiet Heron");
+  });
+  it("a dismissal needs the passkey bound to that report; a delegate is refused; locked tools make it wait", async () => {
+    const dismiss = (built: ReturnType<typeof server>["built"]) => built.inject({ method: "POST", url: `/v1/admin/public-reports/${UPDATE}/dismiss`, headers: headers(true), payload: { operation_id: randomUUID(), proof_handle: handle() } });
+    const yes = server();
+    expect((await dismiss(yes.built)).statusCode).toBe(200);
+    expect(yes.calls[0]).toMatchObject({ name: "dismiss", flagId: UPDATE });
+    expect(yes.bindings[0]).toMatchObject({ action: "PUBLIC_REPORT_DISMISS", targetId: UPDATE });
+    await close?.();
+    const no = server({ allowed: false, designation: "DELEGATED" });
+    expect((await dismiss(no.built)).statusCode).toBe(403);
+    expect(no.calls).toEqual([]);
+    await close?.();
+    const noProof = server({ proof: false });
+    expect((await dismiss(noProof.built)).statusCode).toBe(403);
+    await close?.();
+    const locked = server({ locked: true });
+    expect((await dismiss(locked.built)).statusCode).toBe(503);
+    expect(locked.calls).toEqual([]);
   });
 });

@@ -171,7 +171,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Hlásenie obsahu, moderovanie a sťažnosti",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Obsah môže nahlásiť ktokoľvek. Účet nepotrebujete. Napíšte na support@dezbatere.ro alebo použite ovládací prvok Nahlásiť pri ktorejkoľvek zverejnenej debate. Aby sme mohli konať, oznámte nám: prečo sa domnievate, že je obsah nezákonný alebo porušuje tieto Podmienky, a to dostatočne podrobne, aby sme tvrdenie pochopili; presné umiestnenie — úplnú adresu URL a podľa možnosti príslušnú pasáž; svoje meno a e-mailovú adresu (nevyžaduje sa pri hlásení materiálu zobrazujúceho sexuálne zneužívanie detí); a vyhlásenie, že sa v dobrej viere domnievate, že je vaše hlásenie presné a úplné." },
+      { kind: "p", text: "Obsah môže nahlásiť ktokoľvek. Účet nepotrebujete. Napíšte na support@dezbatere.ro. Ak ste prihlásení, môžete tiež použiť tlačidlo Nahlásiť pri ktorejkoľvek verejnej debate. Umelá inteligencia číta hlásenie podané tlačidlom vedľa verejného textu. Ak umelá inteligencia s hlásením súhlasí, debata sa okamžite skryje a človek ju posúdi. Ak nesúhlasí, môžete hlásiť znovu s ďalšími podrobnosťami a človek ho prečíta. Aby sme mohli konať, oznámte nám: prečo sa domnievate, že je obsah nezákonný alebo porušuje tieto Podmienky, a to dostatočne podrobne, aby sme tvrdenie pochopili; presné umiestnenie — úplnú adresu URL a podľa možnosti príslušnú pasáž; svoje meno a e-mailovú adresu (nevyžaduje sa pri hlásení materiálu zobrazujúceho sexuálne zneužívanie detí); a vyhlásenie, že sa v dobrej viere domnievate, že je vaše hlásenie presné a úplné." },
       { kind: "p", text: "Každé hlásenie potvrdíme bez zbytočného odkladu. Hlásenia vybavujeme včas, starostlivo, objektívne a bez svojvôle, oznámime vám svoje rozhodnutie a spôsob, ako ho napadnúť. Ak na vybavenie hlásenia alebo rozhodnutie o ňom použijeme automatizované prostriedky, informujeme vás o tom. Hlásenia intímnych snímok zdieľaných bez súhlasu vybavíme do 48 hodín od platnej žiadosti." },
       { kind: "p", text: "Dva druhy automatizovaného rozhodovania, ktoré oddeľujeme." },
       {
@@ -241,6 +241,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Zmeny služby. Dialectical Engine priebežne vyvíjame a bežné zlepšenia, opravy a zmeny vo výbere modelov prebiehajú bez predchádzajúceho upozornenia. Ak vykonáme zmenu presahujúcu rámec zachovania funkčnosti služby podľa opisu, urobíme tak iba z niektorého z týchto dôvodov: splnenie právnej alebo regulačnej požiadavky; reakcia na bezpečnostný problém alebo zneužitie; zmena, obmedzenie alebo stiahnutie modelu či funkcie poskytovateľom modelu, od ktorých závisíme; prispôsobenie technickému prostrediu, ktoré neovládame; alebo pridanie, zlepšenie či ukončenie funkcie spôsobom, ktorý vám nezvyšuje náklady." },
       { kind: "p", text: "O tom, čo a kedy sa mení, vás vopred informujeme na trvanlivom médiu. Ak má zmena viac než nepodstatný nepriaznivý vplyv na váš prístup k službe alebo jej používanie, môžete zmluvu bezplatne ukončiť do 30 dní odo dňa, keď ste boli informovaní, alebo odo dňa nadobudnutia účinnosti zmeny, podľa toho, ktorý deň nastane neskôr, a vrátime vám prípadnú predplatenú sumu za nevyužité obdobie." },
       { kind: "p", text: "Zmeny týchto Podmienok. Tieto Podmienky môžeme meniť z rovnakých druhov dôvodov. Pri zmenách, ktoré neobmedzujú vaše práva, zverejníme novú verziu so zhrnutím zmien a najmenej 30 dní pred nadobudnutím účinnosti vám zašleme e-mail; pokračovaním v používaní Dialectical Engine po tomto dátume zmenu prijímate a pred týmto dátumom môžete svoj účet odstrániť. Pri zmenách, ktoré obmedzujú vaše práva — vrátane zvýšenia ceny existujúceho programu, zníženia limitov, odstránenia funkcií, nového spôsobu použitia vášho obsahu alebo zmien zodpovednosti, rozhodného práva či riešenia sporov — vás pri nasledujúcom prihlásení požiadame, aby ste novú verziu výslovne prijali, a zmena platí iba do budúcnosti. Žiadnu zmenu nikdy neuplatníme spätne a túto časť nikdy nepoužijeme na zmenu podstaty toho, za čo ste počas obdobia zaplatili, bez toho, aby sme vám ponúkli možnosť zmluvu ukončiť. Predchádzajúce verzie zostávajú dostupné na adrese dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Verzia 2.12 nahradila verziu 2.11: časť 10 uvádza, že prihlásená osoba môže tiež použiť tlačidlo Nahlásiť pri ktorejkoľvek verejnej debate, že umelá inteligencia číta hlásenie podané týmto tlačidlom vedľa verejného textu a čo sa potom stane." },
       { kind: "p", text: "Verzia 2.11 nahradila verziu 2.10: časť 9 uvádza, že môžeme dočasne skryť verejnú debatu, kým ju posudzujeme, a odstrániť alebo opraviť jej časť." },
       { kind: "p", text: "Verzia 2.10 nahradila verziu 2.9: časť 9 uvádza, že debaty v bezplatnom programe sú verejné, že verejnú debatu nemožno zrušiť zverejnenie a zostáva verejná aj po zrušení vášho účtu, že ktokoľvek s kreditom môže prispievať do verejnej debaty alebo o nej napísať správu a že verejná debata zostáva otvorená aj po odchode jej prvého autora; časť 11 uvádza, čo zrušenie účtu znamená pre vaše verejné debaty." },
       { kind: "p", text: "Verzia 2.9 nahradila verziu 2.8: do časti 8 pribudol odsek „Grafy a štatistiky, ktoré generujeme“, ktorý určuje, komu patria grafy v správe o debate, a udeľuje vám licenciu na ich používanie." },
@@ -373,12 +374,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.11",
-  sha256: "093c65f65d03c05b496450046d5a66800ae9e4ef8d0acd60e2e73f9e00ce7f4d",
-  eyebrow: "PODMIENKY POSKYTOVANIA SLUŽBY · v2.11 · ÚČINNÉ OD 1. NOVEMBRA 2026",
+  version: "2.12",
+  sha256: "d0f8453dc5a2270756bd87371f779109cd0c786776164b03c80cd1ea3d5cf36e",
+  eyebrow: "PODMIENKY POSKYTOVANIA SLUŽBY · v2.12 · ÚČINNÉ OD 1. NOVEMBRA 2026",
   title: "S čím súhlasíte",
   lede: "Zmluva medzi vami a DMS Merchandise Shop S.R.L. zrozumiteľným jazykom. Devätnásť častí a príloha A — prejdite až na koniec.",
-  endMarker: "KONIEC PODMIENOK · v2.11",
+  endMarker: "KONIEC PODMIENOK · v2.12",
   contact: "support@dezbatere.ro",
   bodyLabel: "Text Podmienok poskytovania služby",
   sectionIdPrefix: "terms-section-",

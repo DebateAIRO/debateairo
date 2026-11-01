@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ukratko
-eyebrow: UVJETI KORIŠTENJA · v2.11 · NA SNAZI OD 1. STUDENOGA 2026.
+eyebrow: UVJETI KORIŠTENJA · v2.12 · NA SNAZI OD 1. STUDENOGA 2026.
 title: Na što pristajete
 lede: Ugovor između vas i društva DMS Merchandise Shop S.R.L., jednostavnim jezikom. Devetnaest odjeljaka i Prilog A — pomaknite se do kraja.
-endMarker: KRAJ UVJETA · v2.11
+endMarker: KRAJ UVJETA · v2.12
 bodyLabel: Tekst Uvjeta korištenja
 annexTitle: Prilog A — Regionalni uvjeti
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 MJERODAVNO PRAVO
 -->
 
-**Version 2.11 · Effective 1. studenoga 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
+**Version 2.12 · Effective 1. studenoga 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
 
 **In short.** Morate imati najmanje 18 godina. Dialectical Engine izrađuje argumente pomoću modela umjetne inteligencije i sve što generira može biti pogrešno — to nije savjet. Na besplatnom planu vaše su rasprave javne kada završe, nakon provjere umjetnom inteligencijom; na plaćenom planu privatne su osim ako ih objavite. Kada je rasprava javna, svatko je može pročitati i ona ostaje javna. Tekst koji pošaljete prosljeđuje se pružateljima usluga umjetne inteligencije navedenima u našem Registru pružatelja i ne upotrebljava se za treniranje modela. Nezakonit sadržaj prijavite na support@dezbatere.ro, bez obzira na to imate li račun. Primjenjuje se rumunjsko pravo, ali zadržavate zaštitu potrošača prema svojem lokalnom pravu.
 
@@ -170,7 +170,7 @@ Rasprave na plaćenom planu su **prema zadanim postavkama privatne**: ništa št
 
 ## 10. Prijavljivanje sadržaja, moderiranje i pritužbe
 
-**Svatko može prijaviti sadržaj.** Ne trebate imati račun. Pišite na support@dezbatere.ro ili upotrijebite kontrolu **Prijavite** na bilo kojoj objavljenoj raspravi. Kako bismo mogli postupiti, navedite: zašto smatrate da je sadržaj nezakonit ili da krši ove Uvjete, dovoljno detaljno da možemo razumjeti tvrdnju; točnu lokaciju — puni URL i, ako možete, predmetni odlomak; svoje ime i adresu e-pošte (nije potrebno za prijave materijala seksualnog zlostavljanja djece); te da u dobroj vjeri smatrate kako je vaša prijava točna i potpuna.
+**Svatko može prijaviti sadržaj.** Ne trebate imati račun. Pišite na support@dezbatere.ro. Ako ste prijavljeni, možete upotrijebiti i gumb **Prijavite** na bilo kojoj javnoj raspravi. Umjetna inteligencija čita prijavu podnesenu gumbom uz javni tekst. Ako se s njom slaže, rasprava se odmah skriva, a pregledava je čovjek. Ako se ne slaže, možete ponovno prijaviti s više pojedinosti, a čovjek će je pročitati. Kako bismo mogli postupiti, navedite: zašto smatrate da je sadržaj nezakonit ili da krši ove Uvjete, dovoljno detaljno da možemo razumjeti tvrdnju; točnu lokaciju — puni URL i, ako možete, predmetni odlomak; svoje ime i adresu e-pošte (nije potrebno za prijave materijala seksualnog zlostavljanja djece); te da u dobroj vjeri smatrate kako je vaša prijava točna i potpuna.
 
 Svaku prijavu potvrđujemo bez nepotrebne odgode. Prijave obrađujemo pravodobno, pažljivo, nepristrano i objektivno, priopćujemo vam svoju odluku i objašnjavamo kako je možete osporiti. Ako za obradu prijave ili odlučivanje o njoj upotrebljavamo automatizirana sredstva, to ćemo navesti. Po prijavama intimnih snimki podijeljenih bez privole postupa se **u roku od 48 sati** od valjanog zahtjeva.
 
@@ -250,6 +250,8 @@ Ako živite drugdje, Prilog A navodi pravo na odustanak ili razdoblje za odustan
 Na trajnom mediju unaprijed vas obavještavamo što se mijenja i kada. Ako promjena ima više nego neznatan negativan učinak na vaš pristup usluzi ili njezinu uporabu, možete bez naknade raskinuti ugovor u roku od **30 dana** od obavijesti ili od stupanja promjene na snagu, ovisno o tome što je kasnije, a mi ćemo vratiti svaki unaprijed plaćeni iznos za neiskorišteno razdoblje.
 
 **Promjene ovih Uvjeta.** Ove Uvjete možemo mijenjati zbog istih vrsta razloga. Za promjene koje ne umanjuju vaša prava objavljujemo novu verziju sa sažetkom promjena i šaljemo vam e-poruku najmanje **30 dana** prije njezina stupanja na snagu; nastavak uporabe Dialectical Engine-a nakon tog datuma znači da je prihvaćate, a prije toga možete zatvoriti račun. Za promjene koje umanjuju vaša prava — uključujući povećanja cijena postojećeg plana, niža ograničenja, uklonjene značajke, nove načine uporabe vašeg sadržaja ili promjene odgovornosti, mjerodavnog prava ili rješavanja sporova — tražimo da izričito prihvatite novu verziju pri sljedećoj prijavi, a promjena se primjenjuje samo ubuduće. Promjenu nikada ne primjenjujemo retroaktivno i ovaj odjeljak nikada ne upotrebljavamo za izmjenu bitnog sadržaja onoga što ste platili usred razdoblja bez omogućavanja izlaska iz ugovora. Prethodne verzije ostaju dostupne na dezbatere.ro/terms/versions.
+
+Verzija 2.12 zamijenila je verziju 2.11: odjeljak 10. navodi da prijavljena osoba može upotrijebiti i gumb Prijavite na bilo kojoj javnoj raspravi, da umjetna inteligencija čita prijavu podnesenu tim gumbom uz javni tekst i što se tada događa.
 
 Verzija 2.11 zamijenila je verziju 2.10: odjeljak 9. navodi da javnu raspravu možemo sakriti dok je pregledavamo, a dio nje ukloniti ili ispraviti.
 

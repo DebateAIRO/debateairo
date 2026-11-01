@@ -171,7 +171,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Prijavljivanje sadržaja, moderiranje i pritužbe",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Svatko može prijaviti sadržaj. Ne trebate imati račun. Pišite na support@dezbatere.ro ili upotrijebite kontrolu Prijavite na bilo kojoj objavljenoj raspravi. Kako bismo mogli postupiti, navedite: zašto smatrate da je sadržaj nezakonit ili da krši ove Uvjete, dovoljno detaljno da možemo razumjeti tvrdnju; točnu lokaciju — puni URL i, ako možete, predmetni odlomak; svoje ime i adresu e-pošte (nije potrebno za prijave materijala seksualnog zlostavljanja djece); te da u dobroj vjeri smatrate kako je vaša prijava točna i potpuna." },
+      { kind: "p", text: "Svatko može prijaviti sadržaj. Ne trebate imati račun. Pišite na support@dezbatere.ro. Ako ste prijavljeni, možete upotrijebiti i gumb Prijavite na bilo kojoj javnoj raspravi. Umjetna inteligencija čita prijavu podnesenu gumbom uz javni tekst. Ako se s njom slaže, rasprava se odmah skriva, a pregledava je čovjek. Ako se ne slaže, možete ponovno prijaviti s više pojedinosti, a čovjek će je pročitati. Kako bismo mogli postupiti, navedite: zašto smatrate da je sadržaj nezakonit ili da krši ove Uvjete, dovoljno detaljno da možemo razumjeti tvrdnju; točnu lokaciju — puni URL i, ako možete, predmetni odlomak; svoje ime i adresu e-pošte (nije potrebno za prijave materijala seksualnog zlostavljanja djece); te da u dobroj vjeri smatrate kako je vaša prijava točna i potpuna." },
       { kind: "p", text: "Svaku prijavu potvrđujemo bez nepotrebne odgode. Prijave obrađujemo pravodobno, pažljivo, nepristrano i objektivno, priopćujemo vam svoju odluku i objašnjavamo kako je možete osporiti. Ako za obradu prijave ili odlučivanje o njoj upotrebljavamo automatizirana sredstva, to ćemo navesti. Po prijavama intimnih snimki podijeljenih bez privole postupa se u roku od 48 sati od valjanog zahtjeva." },
       { kind: "p", text: "Dvije odvojene vrste automatiziranih odluka." },
       {
@@ -241,6 +241,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Promjene usluge. Stalno razvijamo Dialectical Engine, a rutinska poboljšanja, ispravci i promjene popisa modela događaju se bez obavijesti. Ako napravimo promjenu koja nadilazi održavanje rada usluge kako je opisano, činimo to samo iz jednog od sljedećih razloga: radi usklađivanja sa zakonskim ili regulatornim zahtjevom; radi odgovora na sigurnosni problem ili zlouporabu; zato što pružatelj modela mijenja, ograničava ili povlači model ili značajku o kojoj ovisimo; radi prilagodbe tehničkom okruženju koje ne kontroliramo; ili radi dodavanja, poboljšavanja ili ukidanja značajke na način koji vam ne stvara dodatne troškove." },
       { kind: "p", text: "Na trajnom mediju unaprijed vas obavještavamo što se mijenja i kada. Ako promjena ima više nego neznatan negativan učinak na vaš pristup usluzi ili njezinu uporabu, možete bez naknade raskinuti ugovor u roku od 30 dana od obavijesti ili od stupanja promjene na snagu, ovisno o tome što je kasnije, a mi ćemo vratiti svaki unaprijed plaćeni iznos za neiskorišteno razdoblje." },
       { kind: "p", text: "Promjene ovih Uvjeta. Ove Uvjete možemo mijenjati zbog istih vrsta razloga. Za promjene koje ne umanjuju vaša prava objavljujemo novu verziju sa sažetkom promjena i šaljemo vam e-poruku najmanje 30 dana prije njezina stupanja na snagu; nastavak uporabe Dialectical Engine-a nakon tog datuma znači da je prihvaćate, a prije toga možete zatvoriti račun. Za promjene koje umanjuju vaša prava — uključujući povećanja cijena postojećeg plana, niža ograničenja, uklonjene značajke, nove načine uporabe vašeg sadržaja ili promjene odgovornosti, mjerodavnog prava ili rješavanja sporova — tražimo da izričito prihvatite novu verziju pri sljedećoj prijavi, a promjena se primjenjuje samo ubuduće. Promjenu nikada ne primjenjujemo retroaktivno i ovaj odjeljak nikada ne upotrebljavamo za izmjenu bitnog sadržaja onoga što ste platili usred razdoblja bez omogućavanja izlaska iz ugovora. Prethodne verzije ostaju dostupne na dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Verzija 2.12 zamijenila je verziju 2.11: odjeljak 10. navodi da prijavljena osoba može upotrijebiti i gumb Prijavite na bilo kojoj javnoj raspravi, da umjetna inteligencija čita prijavu podnesenu tim gumbom uz javni tekst i što se tada događa." },
       { kind: "p", text: "Verzija 2.11 zamijenila je verziju 2.10: odjeljak 9. navodi da javnu raspravu možemo sakriti dok je pregledavamo, a dio nje ukloniti ili ispraviti." },
       { kind: "p", text: "Verzija 2.10 zamijenila je verziju 2.9: odjeljak 9. navodi da su rasprave na besplatnom planu javne, da se javna rasprava ne može povući iz objave ni izbrisati i da ostaje javna nakon što zatvorite račun, da svatko s kreditom može doprinijeti javnoj raspravi ili o njoj napisati izvješće te da javna rasprava ostaje otvorena nakon što je njezin prvi autor otišao; odjeljak 11. navodi što zatvaranje čini s vašim javnim raspravama." },
       { kind: "p", text: "Verzija 2.9 zamijenila je verziju 2.8: odjeljku 8. dodan je odlomak „Grafikoni i statistike koje izrađujemo”, koji određuje kome pripadaju grafikoni u izvješću o raspravi i daje vam licenciju za njihovu upotrebu." },
@@ -373,12 +374,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.11",
-  sha256: "66d61e8ef4a80407016377b2ed1a0c05638564c1f83feea4867e1fc0759cdfff",
-  eyebrow: "UVJETI KORIŠTENJA · v2.11 · NA SNAZI OD 1. STUDENOGA 2026.",
+  version: "2.12",
+  sha256: "a24397d80b9716f3626cb14be8955a9d06f4a65b5cf60f67447cd91cf232cc9e",
+  eyebrow: "UVJETI KORIŠTENJA · v2.12 · NA SNAZI OD 1. STUDENOGA 2026.",
   title: "Na što pristajete",
   lede: "Ugovor između vas i društva DMS Merchandise Shop S.R.L., jednostavnim jezikom. Devetnaest odjeljaka i Prilog A — pomaknite se do kraja.",
-  endMarker: "KRAJ UVJETA · v2.11",
+  endMarker: "KRAJ UVJETA · v2.12",
   contact: "support@dezbatere.ro",
   bodyLabel: "Tekst Uvjeta korištenja",
   sectionIdPrefix: "terms-section-",

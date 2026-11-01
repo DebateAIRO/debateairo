@@ -173,7 +173,8 @@ describe("strict staff wire boundary", () => {
       "POST /v1/admin/team/invitations", "PATCH /v1/admin/team/{staffId}/grants", "POST /v1/admin/team/{staffId}/disable",
       "GET /v1/admin/team-limit", "POST /v1/admin/team-limit", "POST /v1/admin/team-limit/partner/{staffId}",
       "DELETE /v1/admin/team-limit/partner/{staffId}", "POST /v1/admin/team-limit/practice",
-      "GET /v1/admin/public-review", "GET /v1/admin/public-review/{id}", "POST /v1/admin/public-review/{id}/hide", "POST /v1/admin/public-review/{id}/step"
+      "GET /v1/admin/public-review", "GET /v1/admin/public-review/{id}", "POST /v1/admin/public-review/{id}/hide", "POST /v1/admin/public-review/{id}/step",
+      "GET /v1/admin/public-reports", "POST /v1/admin/public-reports/{id}/dismiss"
     ]) expect(contract.contractInventory.routes).toContain(route);
     expect(contract.contractInventory.routes).not.toContain("POST /v1/admin/bootstrap-owner");
     expect(contract.contractInventory.routes).not.toContain("POST /v1/admin/recover-owner");

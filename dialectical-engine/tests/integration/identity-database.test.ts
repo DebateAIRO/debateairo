@@ -100,11 +100,13 @@ describe("S2 identity schema on real PostgreSQL", () => {
       // 0137 public debates: the public debates' contributions, updates and report charges. 0147 the public tree: the sealed copy, a dig's paths, the
       // AI check's pass, the climb's end, the answer's versions, a report and its copy, the skipped texts.
       "public_answer_update", "public_climb_done", "public_contribution", "public_contribution_check", "public_debate_report", "public_debate_update", "public_dig_input",
+      // 0151: a report on a public debate and the queue's log; public_review_purged, below, is the receipt of what six months removed.
+      "public_flag", "public_flag_event",
       "public_material", "public_page_skip", "public_report", "public_report_charge",
       // 0149: a report's publication-check record and the public reference of each update on the page.
       "public_report_check", "public_report_writer",
       // 0150: a public debate under review: its log, its corrections, the digs detached when it was hidden, what each reviewer read.
-      "public_review_correction", "public_review_detached", "public_review_event", "public_review_read", "public_update_ref",
+      "public_review_correction", "public_review_detached", "public_review_event", "public_review_purged", "public_review_read", "public_update_ref",
       "publication_event_binding", "recovery_code", "recovery_email_request", "registration_region", "run_execution_binding",
       // 0143 the hand-over of a paused debate: which release and settings version it moved from and to.
       "run_handover",

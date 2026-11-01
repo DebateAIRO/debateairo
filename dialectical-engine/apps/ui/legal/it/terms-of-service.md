@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In breve
-eyebrow: CONDIZIONI DI SERVIZIO · v2.11 · IN VIGORE DAL 1 NOVEMBRE 2026
+eyebrow: CONDIZIONI DI SERVIZIO · v2.12 · IN VIGORE DAL 1 NOVEMBRE 2026
 title: Ciò che accetti
 lede: Il contratto tra te e DMS Merchandise Shop S.R.L., in un linguaggio chiaro. Diciannove sezioni e Allegato A — scorri fino alla fine.
-endMarker: FINE DELLE CONDIZIONI · v2.11
+endMarker: FINE DELLE CONDIZIONI · v2.12
 bodyLabel: Testo delle Condizioni di servizio
 annexTitle: Allegato A — Condizioni regionali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEGGE APPLICABILE
 -->
 
-**Version 2.11 · Effective 1 novembre 2026 · Versioni precedenti su dezbatere.ro/terms/versions · Lingua: italiano.**
+**Version 2.12 · Effective 1 novembre 2026 · Versioni precedenti su dezbatere.ro/terms/versions · Lingua: italiano.**
 
 **In short.** Devi avere almeno 18 anni. Dialectical Engine costruisce argomentazioni con modelli di IA e tutto ciò che genera può essere errato — non costituisce consulenza. Nel piano gratuito i tuoi dibattiti sono pubblici una volta conclusi, dopo la verifica dell’IA; nel piano a pagamento sono privati, salvo che tu non li pubblichi. Una volta pubblico, chiunque può leggere un dibattito, e questo resta pubblico. Il testo che invii viene trasmesso ai fornitori di IA elencati nel nostro Registro dei fornitori e non viene utilizzato per addestrare i modelli. Segnala i contenuti illegali a support@dezbatere.ro, indipendentemente dal fatto che tu abbia un account. Si applica la legge rumena, ma le tutele locali dei consumatori restano impregiudicate.
 
@@ -170,7 +170,7 @@ Nel piano a pagamento i dibattiti sono **privati per impostazione predefinita**:
 
 ## 10. Segnalazione di contenuti, moderazione e reclami
 
-**Chiunque può segnalare un contenuto.** Non è necessario un account. Scrivi a support@dezbatere.ro oppure utilizza il controllo **Segnala** presente su qualsiasi dibattito pubblicato. Affinché possiamo intervenire, comunicaci: perché ritieni che il contenuto sia illecito o violi le presenti Condizioni, con dettagli sufficienti a comprendere la contestazione; l'ubicazione esatta — l'URL completo e, se possibile, il passaggio; il tuo nome e indirizzo email (non necessari per le segnalazioni di materiale pedopornografico); e che ritieni in buona fede che la segnalazione sia accurata e completa.
+**Chiunque può segnalare un contenuto.** Non è necessario un account. Scrivi a support@dezbatere.ro. Se hai effettuato l'accesso, puoi usare anche il pulsante **Segnala** su qualsiasi dibattito pubblico. Un'IA legge una segnalazione fatta con il pulsante accanto al testo pubblico. Se è d'accordo, il dibattito viene subito nascosto e una persona lo esamina. Se non è d'accordo, puoi segnalare di nuovo con più dettagli, e una persona la leggerà. Affinché possiamo intervenire, comunicaci: perché ritieni che il contenuto sia illecito o violi le presenti Condizioni, con dettagli sufficienti a comprendere la contestazione; l'ubicazione esatta — l'URL completo e, se possibile, il passaggio; il tuo nome e indirizzo email (non necessari per le segnalazioni di materiale pedopornografico); e che ritieni in buona fede che la segnalazione sia accurata e completa.
 
 Confermiamo la ricezione di ogni segnalazione senza ingiustificato ritardo. Trattiamo le segnalazioni in modo tempestivo, diligente, non arbitrario e obiettivo, ti comunichiamo la nostra decisione e ti indichiamo come contestarla. Se utilizziamo strumenti automatizzati per trattare una segnalazione o decidere in merito, lo dichiariamo. In caso di immagini intime condivise senza consenso interveniamo **entro 48 ore** da una richiesta valida.
 
@@ -250,6 +250,8 @@ Se vivi altrove, l'Allegato A indica il diritto di recesso o il periodo di ripen
 Ti comunichiamo anticipatamente, su un supporto durevole, cosa cambia e quando. Se la modifica produce un effetto negativo più che minimo sul tuo accesso al servizio o sul suo utilizzo, puoi recedere gratuitamente entro **30 giorni** dalla comunicazione o dall'entrata in vigore della modifica, se successiva, e rimborsiamo qualsiasi importo prepagato per il periodo non utilizzato.
 
 **Alle presenti Condizioni.** Possiamo modificare le presenti Condizioni per le medesime categorie di motivi. In caso di modifiche che non riducono i tuoi diritti, pubblichiamo la nuova versione con una sintesi delle modifiche e ti inviamo un'email almeno **30 giorni** prima della sua entrata in vigore; continuando a utilizzare Dialectical Engine dopo tale data accetti la modifica e puoi chiudere il tuo account prima di allora. In caso di modifiche che riducono i tuoi diritti — compresi aumenti di prezzo di un piano esistente, limiti inferiori, funzionalità eliminate, nuovi utilizzi dei tuoi contenuti o modifiche alla responsabilità, alla legge applicabile o alla risoluzione delle controversie — ti chiediamo di accettare espressamente la nuova versione al tuo accesso successivo e la modifica si applica soltanto per il futuro. Non apportiamo mai una modifica retroattiva e non utilizziamo mai la presente sezione per modificare, durante il relativo periodo, il nucleo di ciò per cui hai pagato senza offrirti una via d'uscita. Le versioni precedenti restano disponibili all'indirizzo dezbatere.ro/terms/versions.
+
+La versione 2.12 ha sostituito la versione 2.11: la sezione 10 afferma che una persona che ha effettuato l'accesso può usare anche il pulsante Segnala su qualsiasi dibattito pubblico, che un'IA legge una segnalazione fatta con il pulsante accanto al testo pubblico, e che cosa succede poi.
 
 La versione 2.11 ha sostituito la versione 2.10: la sezione 9 afferma che possiamo nascondere temporaneamente un dibattito pubblico mentre lo esaminiamo, e rimuoverne o correggerne una parte.
 

@@ -3187,6 +3187,23 @@
         "EXECUTE ON FUNCTION identity.read_public_review_overlay(uuid)",
         "EXECUTE ON FUNCTION identity.public_review_held(uuid)"
       ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0151_public_flag.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_public_flag_target(uuid)",
+        "EXECUTE ON FUNCTION identity.open_public_flag(uuid,uuid,uuid,jsonb,integer,integer,integer)",
+        "EXECUTE ON FUNCTION identity.settle_public_flag(uuid,text,text,text,text,integer,integer,numeric)",
+        "EXECUTE ON FUNCTION identity.delete_public_flag_words_due()",
+        "EXECUTE ON FUNCTION identity.read_public_review_purge_due(integer)",
+        "EXECUTE ON FUNCTION identity.public_review_purge(uuid,text,uuid,text,integer,jsonb,text)",
+        "EXECUTE ON FUNCTION staff.claim_public_flag_notices(integer)",
+        "EXECUTE ON FUNCTION staff.complete_public_flag_notice(uuid,uuid,boolean)",
+        "EXECUTE ON FUNCTION staff.public_flag_notice_user(uuid,uuid)",
+        "EXECUTE ON FUNCTION staff.read_public_flag_queue(jsonb,text)",
+        "EXECUTE ON FUNCTION staff.public_flag_dismiss(jsonb,uuid,jsonb,uuid,uuid,jsonb)"
+      ]
     }
   ],
   "deploymentObligations": [

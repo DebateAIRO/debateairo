@@ -56,9 +56,9 @@ describe("Privacy Policy 3.8 says what the debate pages keep in the account (R22
   const englishRetain = tableRows("en", 7).length;
 
   it("English has the new rows where the owner placed them", () => {
-    expect(englishCollect).toBe(14);
+    expect(englishCollect).toBe(15);
     expect(cells(tableRows("en", 2)[COLLECT_AT - 1]!)[0]).toBe("**Debate content**");
-    expect(englishRetain).toBe(25);
+    expect(englishRetain).toBe(27);
     const names = tableRows("en", 7).map((row) => cells(row)[0]);
     expect(names.indexOf("Page settings and visits")).toBeGreaterThan(names.indexOf("Provider return records and retrieval references"));
     expect(names.indexOf("Provider return records and retrieval references")).toBeGreaterThanOrEqual(0);
@@ -80,7 +80,7 @@ describe("Privacy Policy 3.8 says what the debate pages keep in the account (R22
     expect(kept[2], `${code}: deletion with the debate points at section 6`).toMatch(/6/u);
     const purpose = cells(tableRows(code, 4)[0]!)[1]!;
     expect(purpose.toLocaleLowerCase(code), `${code}: section 4's first row lists it`).toContain(label.toLocaleLowerCase(code));
-    expect(markdown(code), `${code}: still version 3.10`).toMatch(/v3\.10 /u);
+    expect(markdown(code), `${code}: still version 3.11`).toMatch(/v3\.11 /u);
   });
 
   it.each(Object.entries(PINNED))("%s: the rows and the change-log sentence read exactly as approved", (code, pinned) => {

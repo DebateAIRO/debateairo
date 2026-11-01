@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lyhyesti
-eyebrow: KÄYTTÖEHDOT · v2.11 · VOIMASSA 1. MARRASKUUTA 2026 ALKAEN
+eyebrow: KÄYTTÖEHDOT · v2.12 · VOIMASSA 1. MARRASKUUTA 2026 ALKAEN
 title: Mihin sitoudut
 lede: Sinun ja DMS Merchandise Shop S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.
-endMarker: KÄYTTÖEHTOJEN LOPPU · v2.11
+endMarker: KÄYTTÖEHTOJEN LOPPU · v2.12
 bodyLabel: Käyttöehtojen teksti
 annexTitle: Liite A — Alueelliset ehdot
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 SOVELLETTAVA LAKI
 -->
 
-**Version 2.11 · Effective 1. marraskuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
+**Version 2.12 · Effective 1. marraskuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
 
 **In short.** Sinun on oltava vähintään 18-vuotias. Dialectical Engine muodostaa argumentteja tekoälymalleilla, ja kaikki sen tuottama voi olla virheellistä — se ei ole neuvontaa. Maksuttomassa tilauksessa väittelysi ovat valmistuttuaan julkisia tekoälytarkistuksen jälkeen; maksullisessa tilauksessa ne ovat yksityisiä, ellet julkaise niitä. Kun väittely on julkinen, kuka tahansa voi lukea sen, ja se pysyy julkisena. Lähettämäsi teksti toimitetaan palveluntarjoajarekisterissämme luetelluille tekoälypalveluntarjoajille, eikä sitä käytetä mallien kouluttamiseen. Ilmoita lainvastaisesta sisällöstä osoitteeseen support@dezbatere.ro riippumatta siitä, onko sinulla tiliä. Sopimukseen sovelletaan Romanian lakia, mutta paikallinen kuluttajansuojasi säilyy.
 
@@ -170,7 +170,7 @@ Maksullisessa tilauksessa väittelyt ovat **oletusarvoisesti yksityisiä**: mik�
 
 ## 10. Sisällöstä ilmoittaminen, moderointi ja valitukset
 
-**Kuka tahansa voi ilmoittaa sisällöstä.** Et tarvitse tiliä. Kirjoita osoitteeseen support@dezbatere.ro tai käytä minkä tahansa julkaistun väittelyn **Ilmoita**-toimintoa. Jotta voimme toimia, ilmoita meille: riittävän yksityiskohtaisesti, miksi katsot sisällön olevan lainvastainen tai rikkovan näitä käyttöehtoja; tarkka sijainti — täydellinen URL-osoite ja mahdollisuuksien mukaan kyseinen kohta; nimesi ja sähköpostiosoitteesi (niitä ei edellytetä lasten seksuaaliseen hyväksikäyttöön liittyvää aineistoa koskevissa ilmoituksissa); sekä vakuutus siitä, että vilpittömän käsityksesi mukaan ilmoituksesi on täsmällinen ja täydellinen.
+**Kuka tahansa voi ilmoittaa sisällöstä.** Et tarvitse tiliä. Kirjoita osoitteeseen support@dezbatere.ro. Jos olet kirjautunut sisään, voit käyttää myös minkä tahansa julkisen väittelyn **Ilmoita**-painiketta. Tekoäly lukee Ilmoita-painikkeella tehdyn ilmoituksen julkisen tekstin rinnalla. Jos tekoäly on samaa mieltä, väittely piilotetaan heti ja henkilö tarkistaa sen. Jos se ei ole samaa mieltä, voit ilmoittaa uudelleen tarkemmilla tiedoilla, ja henkilö lukee ilmoituksen. Jotta voimme toimia, ilmoita meille: riittävän yksityiskohtaisesti, miksi katsot sisällön olevan lainvastainen tai rikkovan näitä käyttöehtoja; tarkka sijainti — täydellinen URL-osoite ja mahdollisuuksien mukaan kyseinen kohta; nimesi ja sähköpostiosoitteesi (niitä ei edellytetä lasten seksuaaliseen hyväksikäyttöön liittyvää aineistoa koskevissa ilmoituksissa); sekä vakuutus siitä, että vilpittömän käsityksesi mukaan ilmoituksesi on täsmällinen ja täydellinen.
 
 Vahvistamme jokaisen ilmoituksen vastaanottamisen ilman aiheetonta viivytystä. Käsittelemme ilmoitukset oikea-aikaisesti, huolellisesti, ilman mielivaltaa ja objektiivisesti, ilmoitamme sinulle päätöksestämme ja kerromme, miten voit riitauttaa sen. Jos käytämme automatisoituja keinoja ilmoituksen käsittelyyn tai ratkaisemiseen, kerromme siitä. Ilman suostumusta jaettua intiimiä kuva-aineistoa koskeviin ilmoituksiin reagoidaan **48 tunnin kuluessa** pätevästä pyynnöstä.
 
@@ -250,6 +250,8 @@ Jos asut muualla, liitteessä A ilmoitetaan alueellasi mahdollisesti sovellettav
 Ilmoitamme sinulle etukäteen pysyvällä välineellä, mikä muuttuu ja milloin. Jos muutoksella on vähäistä suurempi kielteinen vaikutus mahdollisuuteesi käyttää palvelua tai palvelun käyttöösi, voit päättää sopimuksen maksutta **30 päivän** kuluessa ilmoituksesta tai muutoksen voimaantulosta sen mukaan, kumpi ajankohta on myöhäisempi, ja palautamme käyttämättömään aikaan kohdistuvat ennakkomaksut.
 
 **Näiden käyttöehtojen muutokset.** Voimme muuttaa näitä käyttöehtoja samanlaisista syistä. Jos muutos ei vähennä oikeuksiasi, julkaisemme uuden version ja yhteenvedon muutoksista sekä lähetämme sinulle sähköpostia vähintään **30 päivää ennen** sen voimaantuloa; Dialectical Engine -palvelun käytön jatkaminen kyseisen ajankohdan jälkeen merkitsee hyväksyntääsi, ja voit sulkea tilisi ennen sitä. Jos muutos vähentää oikeuksiasi — mukaan lukien olemassa olevan tilauksen hinnankorotukset, alhaisemmat rajat, poistetut ominaisuudet, sisältösi uudet käyttötavat tai vastuuta, sovellettavaa lakia tai riidanratkaisua koskevat muutokset — pyydämme sinua hyväksymään uuden version nimenomaisesti seuraavan kirjautumisesi yhteydessä, ja muutosta sovelletaan vain jatkossa. Emme koskaan muuta ehtoja taannehtivasti emmekä käytä tätä kohtaa muuttaaksemme kesken sopimuskauden maksamasi palvelun ydintä tarjoamatta sinulle mahdollisuutta irtautua. Aiemmat versiot säilyvät saatavilla osoitteessa dezbatere.ro/terms/versions.
+
+Versio 2.12 korvasi version 2.11: kohdassa 10 kerrotaan, että kirjautunut henkilö voi myös käyttää Ilmoita-painiketta minkä tahansa julkisen väittelyn kohdalla, että tekoäly lukee sillä tehdyn ilmoituksen julkisen tekstin rinnalla ja mitä sen jälkeen tapahtuu.
 
 Versio 2.11 korvasi version 2.10: kohdan 9 mukaan voimme piilottaa julkisen väittelyn sen tarkistamisen ajaksi sekä poistaa tai korjata osan siitä.
 

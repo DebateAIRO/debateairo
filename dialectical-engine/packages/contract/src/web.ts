@@ -990,6 +990,12 @@ export type PublicMaterialDig = z.infer<typeof PublicMaterialDigSchema>;
 export type PublicMaterialPoint = z.infer<typeof PublicMaterialPointSchema>;
 
 /** POST /v1/public/debates/{id}/report (decision 13): nothing but the press; the writer is the session's. */
+/** Decision 35: "Report" on a public debate: what is wrong, and where. Bound in length: it goes to an AI the site pays for, and is kept. */
+export const PublicFlagRequestSchema = z.object({ where: z.string().trim().min(1).max(300), claim: z.string().trim().min(10).max(2000) }).strict();
+export type PublicFlagRequest = z.infer<typeof PublicFlagRequestSchema>;
+/** NOT_FOUND is every refusal alike. No more than these three leave the server. */
+export const PublicFlagAnswerSchema = z.object({ state: z.enum(["NOT_FOUND", "HIDDEN", "WITH_A_PERSON"]) }).strict();
+export type PublicFlagAnswer = z.infer<typeof PublicFlagAnswerSchema>;
 export const PublicReportRequestSchema = z.object({}).strict();
 export const PublicReportAcceptedSchema = z.object({ state: z.literal("WRITING"), report_version: z.number().int().min(1) }).strict();
 export type PublicReportAccepted = z.infer<typeof PublicReportAcceptedSchema>;

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kort sagt
-eyebrow: ANVÄNDARVILLKOR · v2.11 · GÄLLER FRÅN 1 NOVEMBER 2026
+eyebrow: ANVÄNDARVILLKOR · v2.12 · GÄLLER FRÅN 1 NOVEMBER 2026
 title: Vad du godkänner
 lede: Avtalet mellan dig och DMS Merchandise Shop S.R.L., på ett lättbegripligt språk. Nitton avsnitt och bilaga A — rulla till slutet.
-endMarker: SLUT PÅ VILLKOREN · v2.11
+endMarker: SLUT PÅ VILLKOREN · v2.12
 bodyLabel: Användarvillkorens text
 annexTitle: Bilaga A — Regionala villkor
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TILLÄMPLIG LAG
 -->
 
-**Version 2.11 · Effective 1 november 2026 · Tidigare versioner finns på dezbatere.ro/terms/versions · Språk: svenska.**
+**Version 2.12 · Effective 1 november 2026 · Tidigare versioner finns på dezbatere.ro/terms/versions · Språk: svenska.**
 
 **In short.** Du måste ha fyllt 18 år. Dialectical Engine bygger argument med AI-modeller, och allt som tjänsten genererar kan vara felaktigt — det är inte rådgivning. På det kostnadsfria abonnemanget är dina debatter offentliga när de är klara, efter en AI-kontroll; på ett betalabonnemang är de privata om du inte publicerar dem. När en debatt är offentlig kan vem som helst läsa den, och den förblir offentlig. Text som du skickar in överförs till de AI-leverantörer som anges i vårt register över AI-leverantörer och används inte för att träna modeller. Rapportera olagligt innehåll till support@dezbatere.ro, oavsett om du har ett konto eller inte. Rumänsk lag är tillämplig, men du behåller ditt lokala konsumentskydd.
 
@@ -170,7 +170,7 @@ På ett betalabonnemang är debatter **privata som standard**: ingenting som du 
 
 ## 10. Rapportering av innehåll, moderering och klagomål
 
-**Vem som helst kan rapportera innehåll.** Du behöver inget konto. Skriv till support@dezbatere.ro eller använd knappen **Rapportera** i en publicerad debatt. För att vi ska kunna agera ska du ange: varför du anser att innehållet är olagligt eller bryter mot dessa villkor, med tillräcklig detaljnivå för att vi ska förstå påståendet; den exakta platsen — den fullständiga webbadressen och, om möjligt, avsnittet; ditt namn och din e-postadress (krävs inte för rapporter om material med sexuella övergrepp mot barn); samt att du i god tro anser att din rapport är riktig och fullständig.
+**Vem som helst kan rapportera innehåll.** Du behöver inget konto. Skriv till support@dezbatere.ro. Om du är inloggad kan du också använda knappen **Rapportera** i en offentlig debatt. En AI läser en rapport som gjorts med knappen, bredvid den offentliga texten. Om AI:n håller med döljs debatten direkt och en person granskar den. Om den inte håller med kan du rapportera igen med fler uppgifter, och en person läser rapporten. För att vi ska kunna agera ska du ange: varför du anser att innehållet är olagligt eller bryter mot dessa villkor, med tillräcklig detaljnivå för att vi ska förstå påståendet; den exakta platsen — den fullständiga webbadressen och, om möjligt, avsnittet; ditt namn och din e-postadress (krävs inte för rapporter om material med sexuella övergrepp mot barn); samt att du i god tro anser att din rapport är riktig och fullständig.
 
 Vi bekräftar mottagandet av varje rapport utan onödigt dröjsmål. Vi hanterar rapporter skyndsamt, omsorgsfullt, icke-godtyckligt och objektivt, meddelar dig vårt beslut och talar om hur du kan bestrida det. Om vi använder automatiserade metoder för att behandla eller avgöra en rapport upplyser vi om det. Vi agerar på rapporter om intima bilder som delats utan samtycke **inom 48 timmar** från en giltig begäran.
 
@@ -250,6 +250,8 @@ Om du bor någon annanstans anger bilaga A den ånger- eller betänketid som gä
 Vi underrättar dig i förväg, på ett varaktigt medium, om vad som ändras och när. Om ändringen har mer än en mindre negativ inverkan på din åtkomst till eller användning av tjänsten får du säga upp avtalet utan kostnad inom **30 dagar** från det att du underrättades eller från det att ändringen trädde i kraft, beroende på vilket som inträffar senare, och vi återbetalar eventuellt förskottsbetalt belopp för den oanvända perioden.
 
 **Dessa villkor.** Vi får ändra dessa villkor av samma slags skäl. Vid ändringar som inte minskar dina rättigheter publicerar vi den nya versionen tillsammans med en sammanfattning av ändringarna och skickar e-post till dig minst **30 dagar** innan ändringen träder i kraft; om du fortsätter att använda Dialectical Engine efter det datumet innebär det att du godkänner ändringen, och du får avsluta ditt konto före dess. Vid ändringar som minskar dina rättigheter — däribland prishöjningar för ett befintligt abonnemang, lägre gränser, borttagna funktioner, ny användning av ditt innehåll eller ändringar av ansvar, tillämplig lag eller tvistlösning — ber vi dig uttryckligen godkänna den nya versionen nästa gång du loggar in, och ändringen gäller endast framåt i tiden. Vi gör aldrig en ändring retroaktiv och använder aldrig detta avsnitt för att ändra kärnan i det som du har betalat för under en pågående avtalsperiod utan att erbjuda dig en utväg. Tidigare versioner finns kvar på dezbatere.ro/terms/versions.
+
+Version 2.12 ersatte version 2.11: avsnitt 10 anger att en inloggad person också kan använda knappen Rapportera i en offentlig debatt, att en AI läser en rapport som gjorts med den bredvid den offentliga texten, och vad som sedan händer.
 
 Version 2.11 ersatte version 2.10: avsnitt 9 anger att vi kan dölja en offentlig debatt medan vi granskar den, och ta bort eller rätta en del av den.
 

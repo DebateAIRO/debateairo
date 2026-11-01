@@ -171,7 +171,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "İçerik bildirimi, moderasyon ve şikâyetler",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Herkes içerik bildirebilir. Hesabınızın olması gerekmez. support@dezbatere.ro adresine yazın veya yayımlanmış herhangi bir tartışmadaki Bildir kontrolünü kullanın. İşlem yapabilmemiz için bize şunları bildirin: içeriğin neden hukuka aykırı olduğuna veya bu Koşulları ihlal ettiğine inandığınızı, iddiayı anlayabilmemiz için yeterli ayrıntıyla; tam konumu — tam URL'yi ve mümkünse ilgili kısmı; adınızı ve e-posta adresinizi (çocukların cinsel istismarına ilişkin materyal bildirimlerinde gerekli değildir) ve bildiriminizin doğru ve eksiksiz olduğuna iyi niyetle inandığınızı." },
+      { kind: "p", text: "Herkes içerik bildirebilir. Hesabınızın olması gerekmez. support@dezbatere.ro adresine yazın. Oturum açmışsanız herhangi bir herkese açık tartışmada Bildir düğmesini de kullanabilirsiniz. Bir yapay zekâ, düğmeyle yapılan bildirimi herkese açık metnin yanında okur. Yapay zekâ katılırsa, tartışma hemen görünmez hâle getirilir ve bir kişi onu inceler. Katılmazsa, daha fazla ayrıntıyla yeniden bildirimde bulunabilirsiniz ve bir kişi onu okuyacaktır. İşlem yapabilmemiz için bize şunları bildirin: içeriğin neden hukuka aykırı olduğuna veya bu Koşulları ihlal ettiğine inandığınızı, iddiayı anlayabilmemiz için yeterli ayrıntıyla; tam konumu — tam URL'yi ve mümkünse ilgili kısmı; adınızı ve e-posta adresinizi (çocukların cinsel istismarına ilişkin materyal bildirimlerinde gerekli değildir) ve bildiriminizin doğru ve eksiksiz olduğuna iyi niyetle inandığınızı." },
       { kind: "p", text: "Her bildirimi gereksiz gecikme olmaksızın aldığımızı teyit ederiz. Bildirimleri zamanında, özenli, keyfî olmayan ve nesnel bir biçimde ele alır; kararımızı ve buna nasıl itiraz edebileceğinizi size bildiririz. Bir bildirimi işlemek veya karara bağlamak için otomatik araçlar kullandığımızda bunu belirtiriz. Rıza olmaksızın paylaşılan mahrem görüntülere ilişkin bildirimler, geçerli bir talepten itibaren 48 saat içinde işleme alınır." },
       { kind: "p", text: "Birbirinden ayrı tutulan iki tür otomatik karar." },
       {
@@ -241,6 +241,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Hizmette. Dialectical Engine'i sürekli geliştiririz; rutin iyileştirmeler, düzeltmeler ve model listesi değişiklikleri bildirimsiz yapılır. Hizmeti açıklandığı şekilde çalışır tutmanın ötesine geçen bir değişiklik yaptığımızda bunu yalnızca şu nedenlerden biriyle yaparız: hukuki veya düzenleyici bir gerekliliğe uymak; bir güvenlik veya kötüye kullanım sorununa müdahale etmek; bir model sağlayıcısının bağlı olduğumuz bir modeli veya özelliği değiştirmesi, kısıtlaması veya geri çekmesi; denetlemediğimiz teknik bir ortama uyum sağlamak ya da size ek maliyet getirmeyecek şekilde bir özellik eklemek, iyileştirmek veya kullanımdan kaldırmak." },
       { kind: "p", text: "Neyin ne zaman değişeceğini kalıcı veri saklayıcısıyla önceden bildiririz. Değişiklik, hizmete erişiminiz veya hizmeti kullanımınız üzerinde önemsizden daha fazla olumsuz etkiye sahipse, bildirimin size iletilmesinden veya değişikliğin yürürlüğe girmesinden hangisi daha geç ise o tarihten itibaren 30 gün içinde ücretsiz olarak sözleşmeyi sona erdirebilirsiniz; kullanılmayan dönem için önceden ödenmiş tutarları iade ederiz." },
       { kind: "p", text: "Bu Koşullarda. Bu Koşulları aynı tür nedenlerle değiştirebiliriz. Haklarınızı azaltmayan değişiklikler için yeni sürümü, değişikliklerin özetiyle yayımlar ve yürürlüğe girmesinden en az 30 gün önce size e-posta göndeririz; o tarihten sonra Dialectical Engine'i kullanmaya devam etmeniz değişikliği kabul ettiğiniz anlamına gelir ve hesabınızı o tarihten önce kapatabilirsiniz. Mevcut bir plandaki fiyat artışları, daha düşük sınırlar, kaldırılan özellikler, içeriğinizin yeni kullanım biçimleri veya sorumluluk, uygulanacak hukuk ya da uyuşmazlık çözümüne ilişkin değişiklikler dahil, haklarınızı azaltan değişiklikler için bir sonraki oturum açışınızda yeni sürümü açıkça kabul etmenizi isteriz ve değişiklik yalnızca ileriye dönük uygulanır. Hiçbir değişikliği geriye yürütmeyiz ve size bir çıkış yolu sunmadan, sürenin ortasında ücretini ödediğiniz hususun özünü değiştirmek için bu bölümü kullanmayız. Önceki sürümler dezbatere.ro/terms/versions adresinde erişilebilir kalır." },
+      { kind: "p", text: "Sürüm 2.12, sürüm 2.11'in yerine geçmiştir: 10. bölüm, oturum açmış bir kişinin herkese açık herhangi bir tartışmada Bildir düğmesini de kullanabileceğini, bir yapay zekânın düğmeyle yapılan bildirimi herkese açık metnin yanında okuduğunu ve sonrasında ne olacağını söyler." },
       { kind: "p", text: "Sürüm 2.11, sürüm 2.10'un yerine geçmiştir: 9. bölüm, incelerken herkese açık bir tartışmayı geçici olarak görünmez hâle getirebileceğimizi ve bunun bir kısmını kaldırabileceğimizi veya düzeltebileceğimizi söyler." },
       { kind: "p", text: "Sürüm 2.10, sürüm 2.9'un yerine geçmiştir: 9. bölüm, ücretsiz plandaki tartışmaların herkese açık olduğunu; herkese açık bir tartışmanın yayından kaldırılamayacağını ve hesabınızı kapattıktan sonra da herkese açık kalacağını; kredisi olan herkesin herkese açık bir tartışmaya katkıda bulunabileceğini veya hakkında rapor yazabileceğini; ve herkese açık bir tartışmanın ilk yazarı ayrıldıktan sonra da açık kalacağını söyler; 11. bölüm ise kapatmanın herkese açık tartışmalarınız üzerindeki etkisini açıklar." },
       { kind: "p", text: "Sürüm 2.9, sürüm 2.8'in yerine geçmiştir: 8. bölüme “Ürettiğimiz grafikler ve istatistikler” paragrafı eklenmiştir; bu paragraf bir tartışma raporundaki grafiklerin kime ait olduğunu belirtir ve size bunları kullanmanız için bir lisans verir." },
@@ -373,12 +374,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.11",
-  sha256: "227538af5c6de54baf4ce757d1d89e0fcbf677109604be39c23303eb9057b69e",
-  eyebrow: "HİZMET KOŞULLARI · v2.11 · YÜRÜRLÜK TARİHİ 1 KASIM 2026",
+  version: "2.12",
+  sha256: "78b7d8e587cba1d7c89d80a20d022cf08d504abfbdd954ccdd3b95554cdba368",
+  eyebrow: "HİZMET KOŞULLARI · v2.12 · YÜRÜRLÜK TARİHİ 1 KASIM 2026",
   title: "Kabul ettiğiniz hükümler",
   lede: "Sizinle DMS Merchandise Shop S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.",
-  endMarker: "KOŞULLARIN SONU · v2.11",
+  endMarker: "KOŞULLARIN SONU · v2.12",
   contact: "support@dezbatere.ro",
   bodyLabel: "Hizmet Koşulları metni",
   sectionIdPrefix: "terms-section-",

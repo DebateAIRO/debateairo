@@ -42,8 +42,8 @@ export function createPublicationJudgeTransport(target: SupportModelTarget, opti
             return response;
           }
         });
-        const { text } = await adapter.complete({ ...input, language: "en" });
-        return { text };
+        const { text, usage } = await adapter.complete({ ...input, language: "en" });
+        return { text, ...(usage === undefined ? {} : { usage }) };
       } catch (error) {
         const cause: JudgeFailureCause = error instanceof TypedDomainError && error.code.startsWith("PROMPT_") ? "JUDGE_DOOR_REFUSED"
           : input.signal.aborted ? "JUDGE_DEADLINE"

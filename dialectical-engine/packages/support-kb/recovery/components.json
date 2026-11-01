@@ -284,16 +284,16 @@
     {
       "id": "unpublish-a-debate",
       "lang": "en",
-      "articleSha256": "06fe72c683621e3ae0b9ca0f5979dd8a3d5f7a1ba4cdada309fe8ed376582de4",
-      "modelProjection": "A published debate cannot be taken back or made private again; there is no unpublish control, and anyone with credit can add to it. Erasing an account takes the person's name off and it shows \"a contributor\". If a public debate contains personal details about someone or breaks the Terms, anyone can write to us or use the Report link: we can hide it while we review it, and remove or correct the passage concerned. Copies indexed elsewhere can remain.",
-      "fallback": "A published debate cannot be taken back or made private again. If you erase your account your name comes off it and it shows \"a contributor\". If a public debate contains personal details about you or breaks our Terms, write to us or use the Report link: we can hide it while we review it, and remove or correct the passage concerned. Copies indexed elsewhere may remain."
+      "articleSha256": "5d66f53b182dd9831fe2668fe79220e27983465e9562cfbf95f121a971eb2882",
+      "modelProjection": "A published debate cannot be taken back or made private again; there is no unpublish control, and anyone with credit can add to it. Erasing an account takes the person's name off and it shows \"a contributor\". If a public debate contains personal details about someone or breaks the Terms, a person with an account can use the Report button and anyone can write to us: we can hide it while we review it, and remove or correct the passage concerned. Copies indexed elsewhere can remain.",
+      "fallback": "A published debate cannot be taken back or made private again. If you erase your account your name comes off it and it shows \"a contributor\". If a public debate contains personal details about you or breaks our Terms, use the Report button if you have an account; anyone can write to us. We can hide it while we review it, and remove or correct the passage concerned. Copies indexed elsewhere may remain."
     },
     {
       "id": "unpublish-a-debate",
       "lang": "ro",
-      "articleSha256": "4652f6156deda9edefb53400d2516d10a16813072b8c1669929775c6dcb4157b",
-      "modelProjection": "O dezbatere publicată nu poate fi retrasă și nu mai poate deveni privată; nu există control de retragere a publicării, iar oricine are credit poate contribui la ea. Ștergerea contului elimină numele persoanei și în locul lui apare „un contribuitor”. Dacă o dezbatere publică conține date personale despre cineva sau încalcă Termenii, oricine ne poate scrie sau poate folosi linkul Raportare: o putem ascunde cât timp o verificăm și putem elimina sau corecta partea respectivă. Copiile indexate în alte locuri pot rămâne.",
-      "fallback": "O dezbatere publicată nu poate fi retrasă și nu mai poate deveni privată. Dacă îți ștergi contul, numele tău este eliminat și în locul lui apare „un contribuitor”. Dacă o dezbatere publică conține date personale despre tine sau încalcă Termenii noștri, scrie-ne sau folosește linkul Raportare: o putem ascunde cât timp o verificăm și putem elimina sau corecta partea respectivă. Copiile indexate în alte locuri pot rămâne."
+      "articleSha256": "d1024fe5f2fcc05831717b25c8506ecf00bf894454055a18fbd3ea990ab16e70",
+      "modelProjection": "O dezbatere publicată nu poate fi retrasă și nu mai poate deveni privată; nu există control de retragere a publicării, iar oricine are credit poate contribui la ea. Ștergerea contului elimină numele persoanei și în locul lui apare „un contribuitor”. Dacă o dezbatere publică conține date personale despre cineva sau încalcă Termenii, cine are cont poate folosi butonul Raportare și oricine ne poate scrie: o putem ascunde cât timp o verificăm și putem elimina sau corecta partea respectivă. Copiile indexate în alte locuri pot rămâne.",
+      "fallback": "O dezbatere publicată nu poate fi retrasă și nu mai poate deveni privată. Dacă îți ștergi contul, numele tău este eliminat și în locul lui apare „un contribuitor”. Dacă o dezbatere publică conține date personale despre tine sau încalcă Termenii noștri, folosește butonul Raportare dacă ai cont; oricine ne poate scrie. O putem ascunde cât timp o verificăm și putem elimina sau corecta partea respectivă. Copiile indexate în alte locuri pot rămâne."
     },
     {
       "id": "unsupported-capabilities",

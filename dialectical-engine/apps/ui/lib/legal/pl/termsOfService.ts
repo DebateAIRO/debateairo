@@ -171,7 +171,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Zgłaszanie treści, moderowanie i skargi",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Każdy może zgłosić treść. Konto nie jest wymagane. Napisz na adres support@dezbatere.ro albo użyj funkcji Zgłoś przy dowolnej opublikowanej debacie. Aby umożliwić nam podjęcie działań, wskaż: dlaczego uważasz, że treść jest niezgodna z prawem lub narusza niniejsze Warunki, podając szczegóły pozwalające zrozumieć zarzut; dokładną lokalizację — pełny adres URL i, jeżeli to możliwe, dany fragment; swoje imię i nazwisko oraz adres e-mail (nie jest to wymagane przy zgłoszeniach materiałów przedstawiających seksualne wykorzystywanie dzieci); a także potwierdź, że w dobrej wierze uważasz zgłoszenie za dokładne i kompletne." },
+      { kind: "p", text: "Każdy może zgłosić treść. Konto nie jest wymagane. Napisz na adres support@dezbatere.ro. Jeśli jesteś zalogowany, możesz także użyć przycisku Zgłoś przy dowolnej publicznej debacie. AI czyta zgłoszenie złożone przyciskiem, obok publicznego tekstu. Jeśli AI się zgadza, debata zostaje od razu ukryta, a człowiek ją przegląda. Jeśli się nie zgadza, możesz zgłosić ponownie, podając więcej szczegółów, a człowiek przeczyta zgłoszenie. Aby umożliwić nam podjęcie działań, wskaż: dlaczego uważasz, że treść jest niezgodna z prawem lub narusza niniejsze Warunki, podając szczegóły pozwalające zrozumieć zarzut; dokładną lokalizację — pełny adres URL i, jeżeli to możliwe, dany fragment; swoje imię i nazwisko oraz adres e-mail (nie jest to wymagane przy zgłoszeniach materiałów przedstawiających seksualne wykorzystywanie dzieci); a także potwierdź, że w dobrej wierze uważasz zgłoszenie za dokładne i kompletne." },
       { kind: "p", text: "Niezwłocznie potwierdzamy otrzymanie każdego zgłoszenia. Zgłoszenia rozpatrujemy terminowo, starannie, bez arbitralności i obiektywnie, informujemy Cię o decyzji oraz o sposobie jej zakwestionowania. Jeżeli używamy zautomatyzowanych środków do rozpatrzenia zgłoszenia lub podjęcia decyzji, informujemy o tym. W odniesieniu do zgłoszeń intymnego wizerunku udostępnionego bez zgody podejmujemy działania w ciągu 48 godzin od otrzymania ważnego żądania." },
       { kind: "p", text: "Dwa odrębne rodzaje zautomatyzowanych decyzji." },
       {
@@ -241,6 +241,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Zmiany usługi. Stale rozwijamy Dialectical Engine, a rutynowe ulepszenia, poprawki i zmiany listy modeli są wprowadzane bez powiadomienia. Jeżeli dokonujemy zmiany wykraczającej poza utrzymanie działania usługi zgodnie z opisem, robimy to wyłącznie z jednego z następujących powodów: w celu wykonania obowiązku prawnego lub regulacyjnego; w reakcji na problem dotyczący bezpieczeństwa lub nadużycia; ponieważ dostawca modelu zmienia, ogranicza lub wycofuje model bądź funkcję, od których zależymy; w celu dostosowania się do środowiska technicznego pozostającego poza naszą kontrolą; albo w celu dodania, ulepszenia lub wycofania funkcji w sposób, który nie powoduje po Twojej stronie dodatkowych kosztów." },
       { kind: "p", text: "Z wyprzedzeniem informujemy Cię na trwałym nośniku, co i kiedy ulegnie zmianie. Jeżeli zmiana ma więcej niż nieznaczny negatywny wpływ na Twój dostęp do usługi lub korzystanie z niej, możesz bezpłatnie rozwiązać umowę w terminie 30 dni od otrzymania informacji lub wejścia zmiany w życie — w zależności od tego, która z tych dat jest późniejsza — a my zwrócimy wszelkie kwoty zapłacone z góry za niewykorzystany okres." },
       { kind: "p", text: "Zmiany niniejszych Warunków. Możemy zmieniać niniejsze Warunki z tych samych rodzajów powodów. W przypadku zmian, które nie ograniczają Twoich praw, publikujemy nową wersję wraz z podsumowaniem zmian i wysyłamy Ci wiadomość e-mail co najmniej 30 dni przed jej wejściem w życie; dalsze korzystanie z Dialectical Engine po tej dacie oznacza akceptację zmiany, a przed tą datą możesz zamknąć konto. W przypadku zmian ograniczających Twoje prawa — w tym podwyżek cen w istniejącym planie, obniżenia limitów, usunięcia funkcji, nowych sposobów wykorzystywania Twoich treści albo zmian odpowiedzialności, prawa właściwego lub rozstrzygania sporów — prosimy Cię o wyraźne zaakceptowanie nowej wersji przy kolejnym logowaniu, a zmiana obowiązuje wyłącznie na przyszłość. Nigdy nie wprowadzamy zmian z mocą wsteczną ani nie wykorzystujemy niniejszej sekcji do zmiany w trakcie okresu podstawowego zakresu opłaconej przez Ciebie usługi bez zapewnienia możliwości rezygnacji. Poprzednie wersje pozostają dostępne pod adresem dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Wersja 2.12 zastąpiła wersję 2.11: sekcja 10 mówi, że zalogowana osoba może także użyć przycisku Zgłoś przy dowolnej publicznej debacie, że AI czyta zgłoszenie złożone tym przyciskiem obok publicznego tekstu oraz co wtedy się dzieje." },
       { kind: "p", text: "Wersja 2.11 zastąpiła wersję 2.10: sekcja 9 mówi, że możemy tymczasowo ukryć publiczną debatę podczas jej przeglądu oraz usunąć lub poprawić jej część." },
       { kind: "p", text: "Wersja 2.10 zastąpiła wersję 2.9: sekcja 9 mówi, że debaty w planie bezpłatnym są publiczne, że publicznej debaty nie można wycofać z publikacji i że pozostaje ona publiczna po zamknięciu konta, że każdy, kto ma kredyt, może wnosić wkład do publicznej debaty lub napisać jej raport, oraz że publiczna debata pozostaje otwarta po odejściu jej pierwszego autora; sekcja 11 mówi, co zamknięcie konta oznacza dla Twoich publicznych debat." },
       { kind: "p", text: "Wersja 2.9 zastąpiła wersję 2.8: w sekcji 8 dodano akapit „Wykresy i statystyki, które generujemy”, który określa, do kogo należą wykresy w raporcie z debaty, i udziela Ci licencji na ich wykorzystywanie." },
@@ -373,12 +374,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.11",
-  sha256: "5818ac5b3890d5942141fea97c7dc547263ad167ec2bc710b14bb115fd870a7f",
-  eyebrow: "WARUNKI ŚWIADCZENIA USŁUG · v2.11 · OBOWIĄZUJĄ OD 1 LISTOPADA 2026",
+  version: "2.12",
+  sha256: "35048fb9aa19a958532cab3acc5be19a04e65f69bdbbddeb89675a759876e8a0",
+  eyebrow: "WARUNKI ŚWIADCZENIA USŁUG · v2.12 · OBOWIĄZUJĄ OD 1 LISTOPADA 2026",
   title: "Na co wyrażasz zgodę",
   lede: "Umowa między Tobą a DMS Merchandise Shop S.R.L., napisana prostym językiem. Dziewiętnaście sekcji i załącznik A — przewiń do końca.",
-  endMarker: "KONIEC WARUNKÓW · v2.11",
+  endMarker: "KONIEC WARUNKÓW · v2.12",
   contact: "support@dezbatere.ro",
   bodyLabel: "Treść Warunków świadczenia usług",
   sectionIdPrefix: "terms-section-",

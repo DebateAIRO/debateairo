@@ -108,6 +108,7 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   // Side-by-side §13 addition D24 (owner 2026-10-22): the companies the declared provider targets reach, public.
   { route: "GET /v1/public/ai-providers", auth: "public", resource: "deployment", action: "read-ai-providers" },
   { route: "POST /v1/public/debates/{id}/report", auth: "user", resource: "public-debate", action: "write-report" },
+  { route: "POST /v1/public/debates/{id}/flag", auth: "user", resource: "public-debate", action: "flag" },
   { route: "GET /v1/geo/availability", auth: "public", resource: "geo", action: "read-availability" },
   // One stateless message door. The removed session and case doors have no policy.
   { route: "POST /v1/support/messages", auth: "public", origin: "trusted", session: "optional", resource: "support-message", action: "create" },
@@ -209,6 +210,8 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "GET /v1/admin/public-review/{id}", auth: "staff", resource: "staff-team", action: "public-review-read" },
   { route: "POST /v1/admin/public-review/{id}/hide", auth: "staff", resource: "staff-team", action: "public-review-hide" },
   { route: "POST /v1/admin/public-review/{id}/step", auth: "staff", resource: "staff-team", action: "public-review-step" },
+  { route: "GET /v1/admin/public-reports", auth: "staff", resource: "staff-team", action: "public-report-queue" },
+  { route: "POST /v1/admin/public-reports/{id}/dismiss", auth: "staff", resource: "staff-team", action: "public-report-dismiss" },
   // R22 decision 32 (0146): the Owner's allowance for a member.
   { route: "GET /v1/admin/team-allowances", auth: "staff", staffCapability: "ALLOWANCE_WRITE", resource: "staff-team", action: "allowance-read" },
   { route: "POST /v1/admin/team-allowances/{staffId}", auth: "staff", staffCapability: "ALLOWANCE_WRITE", resource: "staff-team", action: "allowance-give" },
@@ -360,9 +363,9 @@ describe("S7 deny-by-default authorization", () => {
     // The WHOLE inventory, staff rows included, row for row (no route family is filtered out).
     const order=(a:{route:string},b:{route:string})=>a.route<b.route?-1:a.route>b.route?1:0;
     expect([...authorizationPolicyInventory].sort(order)).toEqual([...EXPECTED_AUTHORIZATION_MATRIX].sort(order));
-    // 35 staff contract routes (five of them the team limit's, four decision 33's public review) + the two internal-allowance routes + decision 32's three (the Owner's allowance for a member).
-    expect(EXPECTED_AUTHORIZATION_MATRIX.filter(policy => policy.route.includes(" /v1/admin/"))).toHaveLength(40);
-    expect(staffContractInventory.routes).toHaveLength(35);
+    // 37 staff contract routes (five of them the team limit's, four decision 33's public review, two decision 35's report queue) + the two internal-allowance routes + decision 32's three (the Owner's allowance for a member).
+    expect(EXPECTED_AUTHORIZATION_MATRIX.filter(policy => policy.route.includes(" /v1/admin/"))).toHaveLength(42);
+    expect(staffContractInventory.routes).toHaveLength(37);
     // The merged closed inventory adds the twenty-one external recovery routes to the current ordinary inventory and 20 staff/internal
     // allowance routes; set equality and Fastify mounting above check each one. NETOPIA's card page (N13) adds
     // GET /v1/billing/subscription/card, the auth DB batch's four MFA-recovery wait routes, beside dev's 158, and
@@ -377,8 +380,8 @@ describe("S7 deny-by-default authorization", () => {
     // W4-4: "Add to researched" (POST /v1/runs/{id}/researched), and decision 29's step 2 (POST /v1/asks/clarify).
     // R22 decision 32 adds the three of the Owner's allowance for a member: 193.
     // Decision 13: a report on a public debate (POST /v1/public/debates/{id}/report).
-    // Decision 33 adds the four staff routes of a public debate under review.
-    expect(contractInventory.routes).toHaveLength(198);
+    // Decision 33 adds the four staff routes of a public debate under review. Decision 35 adds the Report button's three.
+    expect(contractInventory.routes).toHaveLength(201);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 

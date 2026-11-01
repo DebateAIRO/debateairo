@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Em resumo
-eyebrow: TERMOS DE SERVIÇO · v2.11 · EM VIGOR DESDE 1 DE NOVEMBRO DE 2026
+eyebrow: TERMOS DE SERVIÇO · v2.12 · EM VIGOR DESDE 1 DE NOVEMBRO DE 2026
 title: Aquilo com que concorda
 lede: O contrato entre si e a DMS Merchandise Shop S.R.L., em linguagem clara. Dezanove secções e o Anexo A — desloque-se até ao fim.
-endMarker: FIM DOS TERMOS · v2.11
+endMarker: FIM DOS TERMOS · v2.12
 bodyLabel: Texto dos Termos de Serviço
 annexTitle: Anexo A — Termos regionais
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEI APLICÁVEL
 -->
 
-**Version 2.11 · Effective 1 de novembro de 2026 · Versões anteriores em dezbatere.ro/terms/versions · Idioma: português.**
+**Version 2.12 · Effective 1 de novembro de 2026 · Versões anteriores em dezbatere.ro/terms/versions · Idioma: português.**
 
 **In short.** Tem de ter pelo menos 18 anos. A Dialectical Engine constrói argumentos com modelos de IA e tudo o que gera pode estar errado — não constitui aconselhamento. No plano gratuito, os seus debates são públicos quando terminam, após uma verificação por IA; num plano pago, são privados, a menos que os publique. Uma vez públicos, qualquer pessoa pode ler um debate, e este mantém-se público. O texto que envia é transmitido aos fornecedores de IA indicados no nosso Registo de Fornecedores e não é utilizado para treinar modelos. Denuncie conteúdos ilegais através de support@dezbatere.ro, tenha ou não uma conta. É aplicável a lei romena, mas as proteções locais de que beneficia enquanto consumidor mantêm-se.
 
@@ -170,7 +170,7 @@ Os debates num plano pago são **privados por predefinição**: nada do que cria
 
 ## 10. Denúncia de conteúdos, moderação e reclamações
 
-**Qualquer pessoa pode denunciar conteúdos.** Não necessita de uma conta. Escreva para support@dezbatere.ro ou utilize o controlo **Denunciar** em qualquer debate publicado. Para que possamos agir, indique-nos: por que motivo considera que o conteúdo é ilegal ou viola estes Termos, com pormenor suficiente para compreendermos o fundamento da denúncia; a localização exata — o URL completo e, se possível, a passagem; o seu nome e endereço de correio eletrónico (não exigidos para denúncias de material de abuso sexual de crianças); e que acredita, de boa-fé, que a sua denúncia é exata e completa.
+**Qualquer pessoa pode denunciar conteúdos.** Não necessita de uma conta. Escreva para support@dezbatere.ro. Se tiver sessão iniciada, também pode utilizar o botão **Denunciar** em qualquer debate público. Uma IA lê uma denúncia feita com o botão, junto ao texto público. Se concordar, o debate é ocultado de imediato e uma pessoa o revê. Se não concordar, pode denunciar de novo, com mais pormenores, e uma pessoa a lerá. Para que possamos agir, indique-nos: por que motivo considera que o conteúdo é ilegal ou viola estes Termos, com pormenor suficiente para compreendermos o fundamento da denúncia; a localização exata — o URL completo e, se possível, a passagem; o seu nome e endereço de correio eletrónico (não exigidos para denúncias de material de abuso sexual de crianças); e que acredita, de boa-fé, que a sua denúncia é exata e completa.
 
 Acusamos a receção de todas as denúncias sem demora injustificada. Tratamos as denúncias de forma atempada, diligente, não arbitrária e objetiva, comunicamos-lhe a nossa decisão e indicamos-lhe como a pode contestar. Quando utilizamos meios automatizados para tratar uma denúncia ou tomar uma decisão sobre a mesma, informamo-lo desse facto. Atuamos relativamente às denúncias de imagens íntimas partilhadas sem consentimento **no prazo de 48 horas** após um pedido válido.
 
@@ -250,6 +250,8 @@ Se residir noutro local, o Anexo A indica o direito de retratação ou o períod
 Informá-lo-emos previamente, num suporte duradouro, sobre o que será alterado e quando. Se a alteração tiver um efeito negativo mais do que ligeiro no seu acesso ao serviço ou na sua utilização, poderá resolver o contrato sem encargos no prazo de **30 dias** após ser informado, ou após a produção de efeitos da alteração, consoante a data que for posterior, e reembolsaremos qualquer montante pré-pago relativo ao período não utilizado.
 
 **A estes Termos.** Podemos alterar estes Termos pelos mesmos tipos de motivos. No caso de alterações que não reduzam os seus direitos, publicamos a nova versão com um resumo das alterações e enviamos-lhe uma mensagem de correio eletrónico pelo menos **30 dias** antes de produzir efeitos; a utilização continuada da Dialectical Engine depois dessa data significa que a aceita; pode encerrar a sua conta antes dessa data. No caso de alterações que reduzam os seus direitos — incluindo aumentos de preço de um plano existente, redução de limites, remoção de funcionalidades, novas utilizações do seu conteúdo ou alterações relativas à responsabilidade, à lei aplicável ou à resolução de litígios — pedimos-lhe que aceite expressamente a nova versão quando voltar a iniciar sessão, e a alteração só se aplica daí em diante. Nunca aplicamos uma alteração retroativamente e nunca utilizamos esta secção para alterar, durante o respetivo prazo, o essencial daquilo por que pagou sem lhe oferecer uma forma de sair. As versões anteriores permanecem disponíveis em dezbatere.ro/terms/versions.
+
+A versão 2.12 substituiu a versão 2.11: a secção 10 indica que uma pessoa com sessão iniciada também pode utilizar o botão Denunciar em qualquer debate público, que uma IA lê uma denúncia feita com ele junto ao texto público, e o que acontece depois.
 
 A versão 2.11 substituiu a versão 2.10: a secção 9 indica que podemos ocultar um debate público enquanto o revemos, e remover ou corrigir parte dele.
 

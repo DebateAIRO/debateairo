@@ -171,7 +171,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Reporting content, moderation and complaints",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Anyone can report content. You do not need an account. Write to support@dezbatere.ro or use the Report control on any published debate. So that we can act, tell us: why you believe the content is illegal or breaches these Terms, in enough detail to understand the claim; the exact location — the full URL and, if you can, the passage; your name and email address (not required for reports of child sexual abuse material); and that you believe in good faith that your report is accurate and complete." },
+      { kind: "p", text: "Anyone can report content. You do not need an account. Write to support@dezbatere.ro. If you are signed in, you can also use the Report button on any public debate. An AI reads a report made with the button beside the public text. If it agrees, the debate is hidden at once and a person reviews it. If it does not, you can report again with more details, and a person will read it. So that we can act, tell us: why you believe the content is illegal or breaches these Terms, in enough detail to understand the claim; the exact location — the full URL and, if you can, the passage; your name and email address (not required for reports of child sexual abuse material); and that you believe in good faith that your report is accurate and complete." },
       { kind: "p", text: "We acknowledge every report without undue delay. We handle reports in a timely, diligent, non-arbitrary and objective way, tell you our decision, and tell you how to challenge it. Where we use automated means to process or decide a report, we say so. Reports of intimate imagery shared without consent are acted on within 48 hours of a valid request." },
       { kind: "p", text: "Two kinds of automated decision, kept apart." },
       {
@@ -241,6 +241,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "To the service. We develop Dialectical Engine continuously, and routine improvements, fixes and model-roster changes happen without notice. Where we make a change that goes beyond keeping the service working as described, we do it only for one of these reasons: to comply with a legal or regulatory requirement; to respond to a security or abuse problem; because a model provider changes, restricts or withdraws a model or feature we depend on; to adapt to a technical environment we do not control; or to add, improve or retire a feature in a way that adds no cost to you." },
       { kind: "p", text: "We tell you in advance, on a durable medium, what is changing and when. If the change has more than a minor negative effect on your access to or use of the service, you may terminate free of charge within 30 days of being told, or of the change taking effect, whichever is later, and we refund any prepaid amount for the unused period." },
       { kind: "p", text: "To these Terms. We may change these Terms for the same kinds of reasons. For changes that do not reduce your rights, we post the new version with a summary of what changed and email you at least 30 days before it takes effect; continuing to use Dialectical Engine after that date means you accept it, and you may close your account before then. For changes that reduce your rights — including price increases on an existing plan, lower limits, removed features, new uses of your content, or changes to liability, governing law or dispute resolution — we ask you to accept the new version expressly at your next sign-in, and the change applies only going forward. We never make a change retroactive, and we never use this section to change the core of what you have paid for mid-term without offering you a way out. Prior versions stay available at dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Version 2.12 replaced version 2.11: section 10 says that a signed-in person can also use the Report button on any public debate, that an AI reads a report made with it beside the public text, and what happens then." },
       { kind: "p", text: "Version 2.11 replaced version 2.10: section 9 says that we can hide a public debate while we review it, and remove or correct part of it." },
       { kind: "p", text: "Version 2.10 replaced version 2.9: section 9 says that debates on the Free plan are public, that a public debate cannot be unpublished and stays public after you close your account, that anyone with credit can contribute to a public debate or write a report on it, and that a public debate stays open after its first author has left; section 11 says what closure does to your public debates." },
       { kind: "p", text: "Version 2.9 replaced version 2.8: section 8 gains the paragraph \"Charts and statistics we generate\", which says who owns the charts in a debate report and gives you a licence to use them." },
@@ -373,12 +374,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.11",
-  sha256: "58ae2f6196b823ec4e1316e1289861fe54b6c3663913fd9617aa0cfdde4b5bdd",
-  eyebrow: "TERMS OF SERVICE · v2.11 · EFFECTIVE 1 NOVEMBER 2026",
+  version: "2.12",
+  sha256: "95dd058c6751ae2a8a65f32144fb51a4baab91568d8970423efa32e8f867564b",
+  eyebrow: "TERMS OF SERVICE · v2.12 · EFFECTIVE 1 NOVEMBER 2026",
   title: "What you agree to",
   lede: "The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.",
-  endMarker: "END OF TERMS · v2.11",
+  endMarker: "END OF TERMS · v2.12",
   contact: "support@dezbatere.ro",
   bodyLabel: "Terms of Service text",
   sectionIdPrefix: "terms-section-",

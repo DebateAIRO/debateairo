@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Röviden
-eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v2.11 · HATÁLYOS 2026. NOVEMBER 1.
+eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v2.12 · HATÁLYOS 2026. NOVEMBER 1.
 title: Amit Ön elfogad
 lede: Az Ön és a DMS Merchandise Shop S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.
-endMarker: A FELTÉTELEK VÉGE · v2.11
+endMarker: A FELTÉTELEK VÉGE · v2.12
 bodyLabel: A Szolgáltatási feltételek szövege
 annexTitle: A. melléklet — Regionális feltételek
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 IRÁNYADÓ JOG
 -->
 
-**Version 2.11 · Effective 2026. november 1. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
+**Version 2.12 · Effective 2026. november 1. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
 
 **In short.** Önnek legalább 18 évesnek kell lennie. A Dialectical Engine mesterségesintelligencia-modellekkel épít fel érveket, és minden általa létrehozott tartalom téves lehet — nem minősül tanácsadásnak. Az ingyenes csomagon az Ön vitái befejezésük után, MI-ellenőrzést követően nyilvánosak; fizetős csomagon bizalmasak, amíg közzé nem teszi őket. Nyilvánossá válva bárki elolvashatja a vitát, és az nyilvános marad. Az Ön által beküldött szöveget továbbítjuk a Szolgáltatói nyilvántartásunkban felsorolt MI-szolgáltatóknak, és azt nem használjuk modellek betanítására. Jogellenes tartalmat a support@dezbatere.ro címen jelenthet be, függetlenül attól, hogy rendelkezik-e fiókkal. A román jog az irányadó, de az Ön helyi fogyasztóvédelmi jogai változatlanul megilletik.
 
@@ -170,7 +170,7 @@ Fizetős csomagon a viták **alapértelmezés szerint bizalmasak**. Az Ön ott l
 
 ## 10. Tartalom bejelentése, moderálás és panaszok
 
-**Bárki bejelenthet tartalmat.** Ehhez nincs szükség fiókra. Írjon a support@dezbatere.ro címre, vagy használja bármely közzétett vitánál a **Bejelentés** vezérlőt. Ahhoz, hogy intézkedhessünk, közölje velünk: kellő részletességgel, miért véli úgy, hogy a tartalom jogellenes vagy sérti e Feltételeket; a pontos helyet — a teljes URL-t, és ha lehetséges, az érintett szövegrészt; nevét és e-mail-címét (a gyermekek szexuális bántalmazását ábrázoló anyag bejelentésénél ez nem szükséges); továbbá azt, hogy jóhiszeműen úgy véli, bejelentése pontos és teljes.
+**Bárki bejelenthet tartalmat.** Ehhez nincs szükség fiókra. Írjon a support@dezbatere.ro címre. Ha be van jelentkezve, bármely nyilvános vitánál a **Bejelentés** gombot is használhatja. Egy MI a gombbal tett bejelentést a nyilvános szöveg mellett olvassa. Ha az MI egyetért, a vitát azonnal elrejtjük, és egy személy felülvizsgálja. Ha nem ért egyet, részletesebben újra bejelentheti, és egy személy elolvassa. Ahhoz, hogy intézkedhessünk, közölje velünk: kellő részletességgel, miért véli úgy, hogy a tartalom jogellenes vagy sérti e Feltételeket; a pontos helyet — a teljes URL-t, és ha lehetséges, az érintett szövegrészt; nevét és e-mail-címét (a gyermekek szexuális bántalmazását ábrázoló anyag bejelentésénél ez nem szükséges); továbbá azt, hogy jóhiszeműen úgy véli, bejelentése pontos és teljes.
 
 Minden bejelentést indokolatlan késedelem nélkül visszaigazolunk. A bejelentéseket időben, gondosan, önkényességtől mentesen és tárgyilagosan kezeljük, közöljük Önnel döntésünket, és tájékoztatjuk annak megtámadási módjáról. Ha egy bejelentés feldolgozásához vagy eldöntéséhez automatizált eszközöket használunk, ezt közöljük. A hozzájárulás nélkül megosztott intim képfelvételekre vonatkozó bejelentések esetén az érvényes kérelemtől számított **48 órán belül** intézkedünk.
 
@@ -250,6 +250,8 @@ Ha Ön máshol él, az A. melléklet határozza meg a régiójában esetlegesen 
 Tartós adathordozón előzetesen közöljük Önnel, mi és mikor változik. Ha a módosítás az Ön szolgáltatáshoz való hozzáférésére vagy annak használatára kisebbnél nagyobb hátrányos hatást gyakorol, Ön az értesítéstől vagy a módosítás hatálybalépésétől számított **30 napon** belül — a kettő közül a későbbi időpontig — díjmentesen megszüntetheti a szerződést, mi pedig visszatérítjük a fel nem használt időszakra előre kifizetett összeget.
 
 **E Feltételek módosítása.** E Feltételeket ugyanezen típusú okokból módosíthatjuk. Az Ön jogait nem csökkentő módosítások esetén legalább **30 nappal** a hatálybalépés előtt közzétesszük az új változatot a módosítások összefoglalásával, és e-mailben értesítjük Önt; ha ezt az időpontot követően tovább használja a Dialectical Engine szolgáltatást, azzal elfogadja a módosítást, fiókját pedig ezt megelőzően megszüntetheti. Az Ön jogait csökkentő módosítások — ideértve egy meglévő csomag árának emelését, az alacsonyabb korlátokat, funkciók eltávolítását, tartalmának új felhasználási módjait, illetve a felelősség, az irányadó jog vagy a vitarendezés módosítását — esetén következő bejelentkezésekor kifejezett elfogadását kérjük, és a módosítás csak a jövőre nézve alkalmazandó. Módosítást soha nem alkalmazunk visszamenőleg, és e szakaszt soha nem használjuk arra, hogy a már kifizetett szolgáltatás lényegét a futamidő alatt megváltoztassuk anélkül, hogy kilépési lehetőséget biztosítanánk. A korábbi változatok továbbra is elérhetők itt: dezbatere.ro/terms/versions.
+
+A 2.12-es verzió a 2.11-es verzió helyébe lépett: a 10. szakasz kimondja, hogy egy bejelentkezett személy a nyilvános vitáknál a Bejelentés gombot is használhatja, hogy egy MI a gombbal tett bejelentést a nyilvános szöveg mellett olvassa, és hogy ezután mi történik.
 
 A 2.11-es verzió a 2.10-es verzió helyébe lépett: a 9. szakasz kimondja, hogy a nyilvános vitát a felülvizsgálat idejére ideiglenesen elrejthetjük, és annak egy részét eltávolíthatjuk vagy kijavíthatjuk.
 

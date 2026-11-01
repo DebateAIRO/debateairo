@@ -43,7 +43,7 @@ import {
   SYNTHESIZER_LENGTH_READER_PROMPT_CONTRACT, SYNTHESIZER_LENGTH_READER_SOURCES_PROMPT_CONTRACT, SYNTHESIZER_LENGTH_SENTENCE,
   SYNTHESIZER_LENGTH_SOURCES_PROMPT_CONTRACT
 } from "@debateai/serve";
-import { PUBLIC_CONTRIBUTION_SEALED_CONTRACTS } from "@debateai/judgement";
+import { PUBLIC_CONTRIBUTION_SEALED_CONTRACTS, PUBLIC_REPORT_CHECK_SEALED_CONTRACTS } from "@debateai/judgement";
 import { STORYTELLER_V4_CONTRACT_ID, storyContractForSources } from "@debateai/story";
 import { ENGINE_SEALED_CONTRACT_IDS, engineSealedContracts } from "../../apps/runner/src/engine-contracts.js";
 import { INVESTIGATION_REPORT_SEALED_CONTRACTS, PATH_REWRITE_SEALED_CONTRACTS, PATH_REWRITE_V2_SEALED_CONTRACTS, REPORT_DEEPER_SEALED_CONTRACTS, REPORT_WRITER_V4_SEALED_CONTRACTS, REPORT_OVERALL_SEALED_CONTRACTS } from "@debateai/story";
@@ -368,7 +368,9 @@ describe("the seals", () => {
       ...REPORT_DEEPER_SEALED_CONTRACTS,
       ...REPORT_WRITER_V4_SEALED_CONTRACTS,
       // R22 public lane (decision 13): the AI check on a contribution.
-      ...PUBLIC_CONTRIBUTION_SEALED_CONTRACTS
+      ...PUBLIC_CONTRIBUTION_SEALED_CONTRACTS,
+      // R22 decision 35: the AI check on a report of a public debate.
+      ...PUBLIC_REPORT_CHECK_SEALED_CONTRACTS
     ];
     const sealed = engineSealedContracts();
     expect(sealed.slice(-appended.length)).toEqual(appended);
@@ -395,7 +397,7 @@ describe("the seals", () => {
       "report.answer.v2", "report.answer.later.v2", "report.answer-check.v2",
       "web.read-all.v2", "judge.panel.length.sources.v1", "path-rewrite.writer.v2", "path-rewrite.checker.v2", "ask.clarify.v1",
       "report.answer.v3", "report.answer.later.v3", "report.answer-check.v3", "report.answer.v4", "report.answer.later.v4",
-      "public.contribution-check.v1"
+      "public.contribution-check.v1", "public.report-check.v1"
     ]);
     expect(new Set(ENGINE_SEALED_CONTRACT_IDS).size).toBe(ENGINE_SEALED_CONTRACT_IDS.length);
     // The review is sealed with its edge count at zero, as the judge seal seals the review.

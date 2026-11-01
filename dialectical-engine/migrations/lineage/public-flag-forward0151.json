@@ -1,0 +1,27 @@
+{
+  "version": "public-flag-forward0151-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0150_public_review.sql",
+    "manifestSha256": "8334cca5bab0c71212733e828dec1ff8bab23ad6325b9e7d5f250e388f31c6d0",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0151_public_flag.sql",
+    "sha256": "072ac16c24316c9d03a74623673472bb6263eec8f3d518b4e79a16f84049091b"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "amendsPostconditionsOf": [
+    {
+      "step": "0142_team_limit.sql",
+      "field": "function_definition",
+      "functions": [
+        "staff.owned_action_allowed(jsonb,jsonb)",
+        "staff.begin_owned_webauthn(uuid,uuid,text,text,text,text,text,text,uuid,jsonb,jsonb,jsonb)"
+      ]
+    }
+  ]
+}
