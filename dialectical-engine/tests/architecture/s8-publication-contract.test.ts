@@ -161,7 +161,7 @@ describe("Accounts S8 publication architecture", () => {
     // and the also-raised claims, never a maker, a count, a mark or a map id.
     expect(schema).toContain("map_view: DebateMapViewSchema.optional()");
     expect([...schema.matchAll(/^  ([a-z_]+):/gmu)].map((match) => match[1]))
-      .toEqual(["public_ref", "author_pseudonym", "question", "published_at", "answer", "story_short", "language", "floor", "map_view", "contributions", "main_answer_update", "author_name_gone", "reports"]);
+      .toEqual(["public_ref", "author_pseudonym", "question", "published_at", "answer", "story_short", "language", "floor", "map_view", "contributions", "main_answer_update", "author_name_gone", "changed_after_review", "reports"]);
     const floorStart = disclosure.indexOf("export const AnswerFloorSchema");
     const floorEnd = disclosure.indexOf("export type AnswerFloor =");
     expect(floorStart).toBeGreaterThan(-1);
@@ -246,7 +246,7 @@ describe("Accounts S8 publication architecture", () => {
       expect(englishPublicCatalog["public.publication.publishWarning"]).toBe(
         "Publishing makes this debate readable by anyone and may allow search engines to index it. " +
         "Publishing is for good: you cannot take it back, and anyone with credit can add to it. " +
-        "If you erase your account your name comes off it."
+        "If you erase your account your name comes off it, and personal details in the text are removed if you ask."
       );
     }
     // The home surface fetches the published list and states the indexing

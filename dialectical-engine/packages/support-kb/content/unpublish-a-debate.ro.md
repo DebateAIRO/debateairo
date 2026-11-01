@@ -15,4 +15,4 @@ ratified_by: ""
 ratified_on: ""
 ---
 
-O dezbatere publicată nu poate fi retrasă. Nu există o acțiune de retragere a publicării: odată publică, dezbaterea rămâne publică, iar oricine are credit poate contribui la ea. Dacă îți ștergi contul, numele tău este eliminat și în locul lui apare „un contribuitor”. Copiile indexate în alte locuri pot rămâne.
+O dezbatere publicată nu poate fi retrasă. Nu există o acțiune de retragere a publicării: odată publică, dezbaterea rămâne publică, iar oricine are credit poate contribui la ea. Dacă îți ștergi contul, numele tău este eliminat și în locul lui apare „un contribuitor”. Dacă o dezbatere publică conține date personale despre tine sau încalcă Termenii noștri, scrie-ne sau folosește linkul Raportare: o putem ascunde cât timp o verificăm și putem elimina sau corecta partea respectivă. Copiile indexate în alte locuri pot rămâne.

@@ -401,24 +401,20 @@
     {
       "id": "unpublish-a-debate",
       "lang": "en",
-      "sha256": "9dfb849df4115b35d8f736dccb902be68f65c77433c58c135e77dd095ce52c07",
-      "reviewedBy": "OWNER",
-      "reviewerSession": "254b8d87-040e-44fc-bef6-c5c6150a7428 (coordinator session, the owner's second public card on 2026-11-01; the owner read this article's English body on the card and chose Approve)",
+      "sha256": "06fe72c683621e3ae0b9ca0f5979dd8a3d5f7a1ba4cdada309fe8ed376582de4",
+      "reviewedBy": "SOL",
+      "reviewerSession": "r22-takedown-2026-11-01 (one sentence restored on the owner's ruling of 2026-11-01; the owner read the version without it, so this text has not had the owner's reading)",
       "reviewedOn": "2026-11-01",
-      "evidence": "docs/missions/support-conversation-20260914/reviews/OWNER-SIGNOFF-r22-public-articles.md",
-      "ratifiedBy": "V",
-      "ratifiedOn": "2026-11-01"
+      "evidence": "docs/missions/support-conversation-20260914/reviews/OWNER-SIGNOFF-r22-public-articles.md"
     },
     {
       "id": "unpublish-a-debate",
       "lang": "ro",
-      "sha256": "71b31a6f7f64ca0147867bc8a4dd85e6fd38fbdc034c85d1d95120b15a188b8d",
-      "reviewedBy": "OWNER",
-      "reviewerSession": "254b8d87-040e-44fc-bef6-c5c6150a7428 (coordinator session, the owner's second public card on 2026-11-01; the card showed the English body only, so the owner approved the article without reading this Romanian text)",
+      "sha256": "4652f6156deda9edefb53400d2516d10a16813072b8c1669929775c6dcb4157b",
+      "reviewedBy": "SOL",
+      "reviewerSession": "r22-takedown-2026-11-01 (one sentence restored on the owner's ruling of 2026-11-01; the owner read the version without it, so this text has not had the owner's reading)",
       "reviewedOn": "2026-11-01",
-      "evidence": "docs/missions/support-conversation-20260914/reviews/OWNER-SIGNOFF-r22-public-articles.md",
-      "ratifiedBy": "V",
-      "ratifiedOn": "2026-11-01"
+      "evidence": "docs/missions/support-conversation-20260914/reviews/OWNER-SIGNOFF-r22-public-articles.md"
     },
     {
       "id": "unsupported-capabilities",
@@ -442,7 +438,7 @@
     }
   ],
   "recovery": {
-    "componentFileSha256": "8f03b90c5369ef02c7b353061176e918a638cf82e48560b6fcacea6ad94be980",
+    "componentFileSha256": "21b8635fe8dc6f74293bd7ab13277a14c20947ce34dd57cbf122297721fc7c24",
     "components": [
       {
         "id": "account-access",
@@ -967,11 +963,11 @@
       {
         "id": "unpublish-a-debate",
         "lang": "en",
-        "articleSha256": "9dfb849df4115b35d8f736dccb902be68f65c77433c58c135e77dd095ce52c07",
-        "modelProjectionSha256": "30c30d9f80f041a0c80b290e5755ae941d3ba1b01cbcc961371c38aa328288e1",
-        "fallbackSha256": "83dd3ad252070dc8804863359ca155991f610de2f2e65a48376efa572c4dd202",
+        "articleSha256": "06fe72c683621e3ae0b9ca0f5979dd8a3d5f7a1ba4cdada309fe8ed376582de4",
+        "modelProjectionSha256": "1d5f0df17fe5edbd2358c164f9356cee590fc339014d94b45e8382baffc3a984",
+        "fallbackSha256": "d619dd505eb135eea2d9fb975bff3883e5b253b20f21306247676c632ca41aad",
         "reviewedBy": "SOL",
-        "reviewerSession": "r22-public2-lane-2026-11-01 (one sentence removed on the owner's ruling of 2026-11-01; no separate editor read it and the owner's card did not show this chat text)",
+        "reviewerSession": "r22-takedown-2026-11-01 (one sentence restored on the owner's ruling of 2026-11-01; no separate editor read it and the owner has not read this chat text)",
         "reviewedOn": "2026-11-01",
         "evidence": "docs/missions/support-conversation-20260914/reviews/OWNER-SIGNOFF-r22-public-articles.md",
         "ratifiedBy": "",
@@ -980,11 +976,11 @@
       {
         "id": "unpublish-a-debate",
         "lang": "ro",
-        "articleSha256": "71b31a6f7f64ca0147867bc8a4dd85e6fd38fbdc034c85d1d95120b15a188b8d",
-        "modelProjectionSha256": "cec6010a9c9282f300696b462389aaf9ce843a877f71745228f019cc985ecf47",
-        "fallbackSha256": "5db84e41dbf8e9d58c292c664865dbc560c602afc075c942794fcfbc4f876cc0",
+        "articleSha256": "4652f6156deda9edefb53400d2516d10a16813072b8c1669929775c6dcb4157b",
+        "modelProjectionSha256": "fcd79a633bc912d69d60abffccb118df5e40b76b9a6971542bd5dc73305edb23",
+        "fallbackSha256": "8ffbaa10ee09b68e481e672f7a398d99ef24089faba0c85eabcf514f571bfff0",
         "reviewedBy": "SOL",
-        "reviewerSession": "r22-public2-lane-2026-11-01 (one sentence removed on the owner's ruling of 2026-11-01; no separate editor read it and the owner's card did not show this chat text)",
+        "reviewerSession": "r22-takedown-2026-11-01 (one sentence restored on the owner's ruling of 2026-11-01; no separate editor read it and the owner has not read this chat text)",
         "reviewedOn": "2026-11-01",
         "evidence": "docs/missions/support-conversation-20260914/reviews/OWNER-SIGNOFF-r22-public-articles.md",
         "ratifiedBy": "",
