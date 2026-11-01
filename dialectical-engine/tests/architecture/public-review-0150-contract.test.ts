@@ -22,7 +22,7 @@ const read = (path: string): string => readFileSync(new URL(path, ROOT), "utf8")
 const sha256 = (text: string): string => createHash("sha256").update(text).digest("hex");
 const code = (sql: string): string => sql.split("\n").map((line) => line.replace(/--.*$/u, "")).join("\n");
 const nameOf = (signature: string): string => signature.slice(0, signature.indexOf("("));
-const escaped = (text: string): string => text.replace(/[.()[\]]/gu, "\\$&");
+const escaped = (text: string): string => text.replace(/[\\.()[\]]/gu, "\\$&");
 
 const RUNTIME = "debateai_runtime";
 /** Every role a 0131-to-0149 step takes care to refuse by name, beside PUBLIC. The request-facing roles are all here. */
