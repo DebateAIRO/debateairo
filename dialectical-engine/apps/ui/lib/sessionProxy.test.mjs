@@ -8,7 +8,7 @@ import { pathToFileURL } from "node:url";
 const outDir = join(process.env.SF_S04_PROXY_TMP_ROOT ?? process.cwd(), ".tmp-s5-api-route-test");
 const RETIRED_DEV_HEADER = ["x", "user", "dev", "token"].join("-");
 
-async function loadRoute() {
+function compileRoute() {
   rmSync(outDir, { recursive: true, force: true });
   const tsc = join(process.cwd(), "node_modules", ".bin", process.platform === "win32" ? "tsc.cmd" : "tsc");
   execFileSync(tsc, [
@@ -19,7 +19,16 @@ async function loadRoute() {
   ], { cwd: process.cwd(), stdio: "pipe" });
   mkdirSync(outDir, { recursive: true });
   copyFileSync("trusted-client-ip.mjs", join(outDir, "trusted-client-ip.mjs"));
-  return import(`${pathToFileURL(join(outDir, "app", "api", "[...path]", "route.js")).href}?${Date.now()}`);
+}
+
+// One compile per file: a compile costs 2-3 s on CI and the source never changes between loads. Each load still
+// evaluates a fresh copy of the route, so it reads the environment its own test set.
+let routeLoads = 0;
+
+async function loadRoute() {
+  if (routeLoads === 0) compileRoute();
+  routeLoads += 1;
+  return import(`${pathToFileURL(join(outDir, "app", "api", "[...path]", "route.js")).href}?${routeLoads}`);
 }
 
 after(() => {
