@@ -360,9 +360,9 @@ describe("S7 deny-by-default authorization", () => {
     // The WHOLE inventory, staff rows included, row for row (no route family is filtered out).
     const order=(a:{route:string},b:{route:string})=>a.route<b.route?-1:a.route>b.route?1:0;
     expect([...authorizationPolicyInventory].sort(order)).toEqual([...EXPECTED_AUTHORIZATION_MATRIX].sort(order));
-    // 31 staff contract routes (five of them the team limit's) + the two internal-allowance routes + decision 32's three (the Owner's allowance for a member).
-    expect(EXPECTED_AUTHORIZATION_MATRIX.filter(policy => policy.route.includes(" /v1/admin/"))).toHaveLength(36);
-    expect(staffContractInventory.routes).toHaveLength(31);
+    // 35 staff contract routes (five of them the team limit's, four decision 33's public review) + the two internal-allowance routes + decision 32's three (the Owner's allowance for a member).
+    expect(EXPECTED_AUTHORIZATION_MATRIX.filter(policy => policy.route.includes(" /v1/admin/"))).toHaveLength(40);
+    expect(staffContractInventory.routes).toHaveLength(35);
     // The merged closed inventory adds the twenty-one external recovery routes to the current ordinary inventory and 20 staff/internal
     // allowance routes; set equality and Fastify mounting above check each one. NETOPIA's card page (N13) adds
     // GET /v1/billing/subscription/card, the auth DB batch's four MFA-recovery wait routes, beside dev's 158, and
@@ -377,7 +377,8 @@ describe("S7 deny-by-default authorization", () => {
     // W4-4: "Add to researched" (POST /v1/runs/{id}/researched), and decision 29's step 2 (POST /v1/asks/clarify).
     // R22 decision 32 adds the three of the Owner's allowance for a member: 193.
     // Decision 13: a report on a public debate (POST /v1/public/debates/{id}/report).
-    expect(contractInventory.routes).toHaveLength(194);
+    // Decision 33 adds the four staff routes of a public debate under review.
+    expect(contractInventory.routes).toHaveLength(198);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 

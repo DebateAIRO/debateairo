@@ -2,32 +2,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ContractHttpError, type PublicReviewList, type PublicReviewPage } from "@debateai/contract";
 import { createPublicReviewClient, publicationRefOf, type PublicReviewClient, type PublicReviewStepInput } from "../lib/publicReviewApi.js";
+import { t, type MessageCatalog } from "../lib/i18n/translate.js";
+import staffEnglish from "../messages/en/staff.json";
 import "./StaffAccessPanel.css";
 
 /**
  * Decision 33, on the private team page, for the two accounts of the team limit: nobody else's page shows it (the list answers them only). Hide a public debate at once, read it piece by piece, take a dig out, replace one
- * text, hide a report, put it back. Each step asks for a passkey, says first what it will do, and goes in the log. English, as the team pages are for these two.
+ * text, hide a report, put it back. Each step asks for a passkey, says first what it will do, and goes in the log.
  */
 type Piece = PublicReviewPage["snapshot"][number];
 type Pending = Readonly<{ line: string; run: (client: PublicReviewClient, page: PublicReviewPage | null, ref: string) => Promise<unknown> }>;
-const FAILURES: Readonly<Record<string, string>> = Object.freeze({
-  PUBLIC_REVIEW_STALE: "Someone else took a step first. Here is the debate as it is now; look again and try once more.",
-  PUBLIC_REVIEW_NOT_HIDDEN: "Hide the debate first. Corrections happen only while it is hidden.",
-  PUBLIC_REVIEW_ALREADY_HIDDEN: "This debate is already hidden.",
-  PUBLIC_REVIEW_NOT_PUBLIC: "No public debate has that link.",
-  PUBLIC_REVIEW_PIECE_UNKNOWN: "That piece cannot take this step.",
-  STAFF_ALERT_UNAVAILABLE: "Team tools are locked, so only hiding works now. Everything else waits until they are back.",
-  STAFF_INPUT_INVALID: "The page could not read that text. Check it and try again."
-});
-const failureLine = (failure: unknown): string => {
-  if (failure instanceof ContractHttpError && failure.serverCode !== null && FAILURES[failure.serverCode] !== undefined) return FAILURES[failure.serverCode]!;
-  return failure instanceof Error && failure.name === "NotAllowedError" ? "The passkey was cancelled. Nothing changed." : "That did not work. Nothing changed.";
+const FAILURE_CODES: ReadonlySet<string> = new Set(["PUBLIC_REVIEW_STALE", "PUBLIC_REVIEW_NOT_HIDDEN", "PUBLIC_REVIEW_ALREADY_HIDDEN", "PUBLIC_REVIEW_NOT_PUBLIC", "PUBLIC_REVIEW_PIECE_UNKNOWN", "STAFF_ALERT_UNAVAILABLE", "STAFF_INPUT_INVALID"]);
+const failureLine = (catalog: MessageCatalog, failure: unknown): string => {
+  if (failure instanceof ContractHttpError && failure.serverCode !== null && FAILURE_CODES.has(failure.serverCode)) return t(catalog, `staff.publicReview.failure.${failure.serverCode}`);
+  return t(catalog, failure instanceof Error && failure.name === "NotAllowedError" ? "staff.publicReview.failure.passkeyCancelled" : "staff.publicReview.failure.other");
 };
-const ACTION_WORDS: Readonly<Record<string, string>> = Object.freeze({ HIDE: "Hid the debate", REPUBLISH: "Put the debate back", REMOVE_DIG: "Took a dig out", PUT_BACK: "Put a piece back on the page", CORRECT: "Replaced a text", HIDE_REPORT: "Hid a report" });
-const STATE_WORDS: Readonly<Record<string, string>> = Object.freeze({ ON_THE_PAGE: "On the page", ITS_DIG_REMOVED: "Off the page: its dig was taken out", AFFECTED: "Affected: written after a dig that was taken out, so it stays off the page until you read it and put it back", HIDDEN: "Hidden by hand" });
 const when = (at: string) => new Date(at).toISOString().slice(0, 16).replace("T", " ");
 
-export function PublicReviewPanel({ client }: Readonly<{ client?: PublicReviewClient }>) {
+export function PublicReviewPanel({ client, catalog = staffEnglish }: Readonly<{ client?: PublicReviewClient; catalog?: MessageCatalog }>) {
   const api = useMemo(() => client ?? createPublicReviewClient(), [client]);
   const [list, setList] = useState<PublicReviewList | null>(null);
   const [ref, setRef] = useState<string | null>(null);
@@ -48,9 +40,9 @@ export function PublicReviewPanel({ client }: Readonly<{ client?: PublicReviewCl
     } catch (failure) {
       // Not one of the two: the section stays away, and says nothing.
       if (failure instanceof ContractHttpError && (failure.status === 403 || failure.status === 401)) { setList(null); return; }
-      setMessage({ text: failureLine(failure), good: false });
+      setMessage({ text: failureLine(catalog, failure), good: false });
     }
-  }, [api]);
+  }, [api, catalog]);
   useEffect(() => { void load(null); return () => { reads.current++; api.cancel(); }; }, [api, load]);
   if (list === null) return null;
 
@@ -62,10 +54,10 @@ export function PublicReviewPanel({ client }: Readonly<{ client?: PublicReviewCl
       await change.run(api, page, ref);
       setPending(null);
       setEditing(null);
-      setMessage({ text: "Done. It is in the log, and both of you get an email that names nothing.", good: true });
+      setMessage({ text: t(catalog, "staff.publicReview.done"), good: true });
     } catch (failure) {
       setPending(null);
-      setMessage({ text: failureLine(failure), good: false });
+      setMessage({ text: failureLine(catalog, failure), good: false });
     } finally {
       await load(ref);
       setBusy(false);
@@ -75,7 +67,7 @@ export function PublicReviewPanel({ client }: Readonly<{ client?: PublicReviewCl
   function open(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const found = publicationRefOf(String(new FormData(event.currentTarget).get("link") ?? ""));
-    if (found === null) { setMessage({ text: "Paste the debate's public link.", good: false }); return; }
+    if (found === null) { setMessage({ text: t(catalog, "staff.publicReview.pasteLink"), good: false }); return; }
     setRef(found);
     setPending(null);
     setMessage(null);
@@ -91,67 +83,67 @@ export function PublicReviewPanel({ client }: Readonly<{ client?: PublicReviewCl
         event.preventDefault();
         const text = String(new FormData(event.currentTarget).get("text") ?? "").trim();
         if (text === "") return;
-        setPending(stepOf("Replace this text. The original stays sealed, for the two of you only.", { step: "CORRECT", pieceKind: kind, pieceId: id, pointer: piece.pointer, text }));
-      }}><div className="staffField"><label htmlFor={`review-${key}`}>New text</label><textarea id={`review-${key}`} name="text" defaultValue={piece.corrected ?? piece.original} rows={3} /></div>
-        <div className="staffActions"><button className="setBtn" type="submit">Replace</button><button className="setBtn" type="button" onClick={() => setEditing(null)}>Cancel</button></div></form>
-        : <div className="staffActions"><button className="setBtn" type="button" disabled={busy} onClick={() => setEditing(key)}>Replace this text</button></div>) : null}
+        setPending(stepOf(t(catalog, "staff.publicReview.confirm.correct"), { step: "CORRECT", pieceKind: kind, pieceId: id, pointer: piece.pointer, text }));
+      }}><div className="staffField"><label htmlFor={`review-${key}`}>{t(catalog, "staff.publicReview.newText")}</label><textarea id={`review-${key}`} name="text" defaultValue={piece.corrected ?? piece.original} rows={3} /></div>
+        <div className="staffActions"><button className="setBtn" type="submit">{t(catalog, "staff.publicReview.replace")}</button><button className="setBtn" type="button" onClick={() => setEditing(null)}>{t(catalog, "staff.publicReview.cancel")}</button></div></form>
+        : <div className="staffActions"><button className="setBtn" type="button" disabled={busy} onClick={() => setEditing(key)}>{t(catalog, "staff.publicReview.replaceThis")}</button></div>) : null}
     </li>;
   };
   const confirm = pending === null ? null : <div className="staffMutation" data-review-confirm>
-    <p>{pending.line}</p><p className="setCardHint">Your passkey confirms this one step.</p>
-    <div className="staffActions"><button className="setBtn setBtnPrimary" type="button" disabled={busy} onClick={() => { void go(pending); }}>Confirm</button>
-      <button className="setBtn" type="button" disabled={busy} onClick={() => setPending(null)}>Cancel</button></div>
+    <p>{pending.line}</p><p className="setCardHint">{t(catalog, "staff.publicReview.passkeyConfirms")}</p>
+    <div className="staffActions"><button className="setBtn setBtnPrimary" type="button" disabled={busy} onClick={() => { void go(pending); }}>{t(catalog, "staff.publicReview.confirm")}</button>
+      <button className="setBtn" type="button" disabled={busy} onClick={() => setPending(null)}>{t(catalog, "staff.publicReview.cancel")}</button></div>
   </div>;
   const notice = message === null ? null : <p className={message.good ? "staffNotice" : "setError"} role="status">{message.text}</p>;
 
   return <div className="setInner staffAccess publicReviewPanel" data-public-review-panel aria-busy={busy}>
     <section className="setCard">
-      <h2 className="staffSectionTitle">Public debates under review</h2>
-      <p className="setCardHint">For a removal order or a report: hide a debate at once. It stays hidden until one of you puts it back. Hiding needs no money and no check, and works even while team tools are locked.</p>
-      <form onSubmit={open}><div className="staffField"><label htmlFor="public-review-link">The debate's public link</label><input id="public-review-link" name="link" autoComplete="off" /></div>
-        <div className="staffActions"><button className="setBtn" type="submit">Open</button></div></form>
-      {list.hidden.length === 0 ? <p className="setCardHint">No debate is hidden now.</p> : <ul className="staffAuditList" data-review-hidden>
-        {list.hidden.map((row) => <li key={row.publication_ref}><button className="setBtn" type="button" onClick={() => { setRef(row.publication_ref); void load(row.publication_ref); }}>{row.publication_ref}</button> <span className="setCardHint">hidden since {when(row.hidden_at)}</span></li>)}
+      <h2 className="staffSectionTitle">{t(catalog, "staff.publicReview.title")}</h2>
+      <p className="setCardHint">{t(catalog, "staff.publicReview.hint")}</p>
+      <form onSubmit={open}><div className="staffField"><label htmlFor="public-review-link">{t(catalog, "staff.publicReview.link")}</label><input id="public-review-link" name="link" autoComplete="off" /></div>
+        <div className="staffActions"><button className="setBtn" type="submit">{t(catalog, "staff.publicReview.open")}</button></div></form>
+      {list.hidden.length === 0 ? <p className="setCardHint">{t(catalog, "staff.publicReview.noneHidden")}</p> : <ul className="staffAuditList" data-review-hidden>
+        {list.hidden.map((row) => <li key={row.publication_ref}><button className="setBtn" type="button" onClick={() => { setRef(row.publication_ref); void load(row.publication_ref); }}>{row.publication_ref}</button> <span className="setCardHint">{t(catalog, "staff.publicReview.hiddenSince", { at: when(row.hidden_at) })}</span></li>)}
       </ul>}
       {page === null ? notice : null}
     </section>
     {page === null ? null : <section className="setCard" data-review-debate={page.hidden ? "HIDDEN" : "PUBLIC"}>
       <h2 className="staffSectionTitle">{page.question}</h2>
-      <p>{page.hidden ? "Hidden. Visitors see only a line that it is under review; no dig or report can start." : "Public. Anyone can read it now."}</p>
+      <p>{page.hidden ? t(catalog, "staff.publicReview.isHidden") : t(catalog, "staff.publicReview.isPublic")}</p>
       <div className="staffActions">
-        {page.hidden ? <button className="setBtn setBtnPrimary" type="button" disabled={busy || pending !== null} onClick={() => setPending(stepOf("Put this debate back on the site, with the corrected text. Digs and reports can start again. If anything was changed, the page says \"Part of this debate was changed after review\", with no reason.", { step: "REPUBLISH" }))}>Put back</button>
-          : <button className="setBtn setBtnPrimary" type="button" disabled={busy || pending !== null} onClick={() => setPending({ line: "Hide this debate now, from every public page. A dig running on it finishes as its person's own and never changes the page.", run: (client2, current, at) => client2.hide(at, current?.revision ?? 0) })}>Hide now</button>}
+        {page.hidden ? <button className="setBtn setBtnPrimary" type="button" disabled={busy || pending !== null} onClick={() => setPending(stepOf(t(catalog, "staff.publicReview.confirm.republish"), { step: "REPUBLISH" }))}>{t(catalog, "staff.publicReview.putBack")}</button>
+          : <button className="setBtn setBtnPrimary" type="button" disabled={busy || pending !== null} onClick={() => setPending({ line: t(catalog, "staff.publicReview.confirm.hide"), run: (client2, current, at) => client2.hide(at, current?.revision ?? 0) })}>{t(catalog, "staff.publicReview.hideNow")}</button>}
       </div>
       {confirm}{notice}
-      <div className="staffField"><label htmlFor="public-review-find">Find words in every piece</label><input id="public-review-find" value={find} onChange={(event) => setFind(event.target.value)} autoComplete="off" /></div>
-      {page.snapshot_unreadable ? <p className="setError">The first snapshot could not be opened.</p> : null}
-      <h3>First snapshot, {when(page.published_at)}</h3>
+      <div className="staffField"><label htmlFor="public-review-find">{t(catalog, "staff.publicReview.find")}</label><input id="public-review-find" value={find} onChange={(event) => setFind(event.target.value)} autoComplete="off" /></div>
+      {page.snapshot_unreadable ? <p className="setError">{t(catalog, "staff.publicReview.snapshotUnreadable")}</p> : null}
+      <h3>{t(catalog, "staff.publicReview.snapshot", { at: when(page.published_at) })}</h3>
       <ul className="staffAuditList" data-review-snapshot>{page.snapshot.map((piece) => pieceRow("SNAPSHOT", page.publication_ref, piece))}</ul>
-      <h3>Digs, each with what it changed</h3>
-      {page.digs.length === 0 ? <p className="setCardHint">No dig has changed this debate.</p> : null}
+      <h3>{t(catalog, "staff.publicReview.digs")}</h3>
+      {page.digs.length === 0 ? <p className="setCardHint">{t(catalog, "staff.publicReview.noDigs")}</p> : null}
       {page.digs.map((dig) => <article key={dig.dig_run_id} data-review-dig={dig.removed ? "REMOVED" : "ALLOWED"}>
-        <h4>{dig.contributor ?? "a contributor"}, {when(dig.contributed_at)}{dig.removed ? ": taken out" : ""}</h4>
-        {page.hidden && !dig.removed ? <div className="staffActions"><button className="setBtn" type="button" disabled={busy || pending !== null} onClick={() => setPending(stepOf(`Take this dig off the page. What was written after it also leaves the page until you read it and put it back. ${dig.contributor ?? "The person"} sees that it was removed after review, with no staff name. This cannot be undone here.`, { step: "REMOVE_DIG", pieceKind: "DIG", pieceId: dig.dig_run_id }))}>Take this dig out</button></div> : null}
+        <h4>{t(catalog, dig.removed ? "staff.publicReview.digHeadingRemoved" : "staff.publicReview.digHeading", { who: dig.contributor ?? t(catalog, "staff.publicReview.contributor"), at: when(dig.contributed_at) })}</h4>
+        {page.hidden && !dig.removed ? <div className="staffActions"><button className="setBtn" type="button" disabled={busy || pending !== null} onClick={() => setPending(stepOf(t(catalog, "staff.publicReview.confirm.removeDig", { who: dig.contributor ?? t(catalog, "staff.publicReview.thePerson") }), { step: "REMOVE_DIG", pieceKind: "DIG", pieceId: dig.dig_run_id }))}>{t(catalog, "staff.publicReview.takeOut")}</button></div> : null}
         {page.updates.filter((row) => row.dig_run_id === dig.dig_run_id).map((row) => <div key={row.update_id} data-review-update={row.state}>
-          <p><strong>{row.kind === "PATH" ? "Path text" : "Main answer version"}</strong> <span className="setCardHint">{when(row.recorded_at)}. {STATE_WORDS[row.state]}</span></p>
-          {row.before === null ? null : <p className="setCardHint">Before it: {row.before}</p>}
+          <p><strong>{t(catalog, row.kind === "PATH" ? "staff.publicReview.kind.PATH" : "staff.publicReview.kind.MAIN")}</strong> <span className="setCardHint">{t(catalog, "staff.publicReview.updateLine", { at: when(row.recorded_at), state: t(catalog, `staff.publicReview.state.${row.state}`) })}</span></p>
+          {row.before === null ? null : <p className="setCardHint">{t(catalog, "staff.publicReview.before", { text: row.before })}</p>}
           <ul className="staffAuditList">{row.pieces.map((piece) => pieceRow("UPDATE", row.update_id, piece))}</ul>
-          {page.hidden && row.state === "AFFECTED" ? <div className="staffActions"><button className="setBtn" type="button" disabled={busy || pending !== null} onClick={() => setPending(stepOf("Put this piece back on the page. You have read it and it does not repeat what was taken out.", { step: "PUT_BACK", pieceKind: "UPDATE", pieceId: row.update_id }))}>Put this back</button></div> : null}
+          {page.hidden && row.state === "AFFECTED" ? <div className="staffActions"><button className="setBtn" type="button" disabled={busy || pending !== null} onClick={() => setPending(stepOf(t(catalog, "staff.publicReview.confirm.putBackUpdate"), { step: "PUT_BACK", pieceKind: "UPDATE", pieceId: row.update_id }))}>{t(catalog, "staff.publicReview.putThisBack")}</button></div> : null}
         </div>)}
       </article>)}
-      <h3>Reports</h3>
-      {page.reports.length === 0 ? <p className="setCardHint">No report on this debate.</p> : null}
+      <h3>{t(catalog, "staff.publicReview.reports")}</h3>
+      {page.reports.length === 0 ? <p className="setCardHint">{t(catalog, "staff.publicReview.noReports")}</p> : null}
       {page.reports.map((report) => <article key={report.report_id} data-review-report={report.state}>
-        <h4>Version {report.report_version}{report.writer === null ? "" : `, by ${report.writer}`}, {when(report.recorded_at)}</h4>
-        <p className="setCardHint">{STATE_WORDS[report.state]}</p>
+        <h4>{report.writer === null ? t(catalog, "staff.publicReview.reportHeading", { version: report.report_version, at: when(report.recorded_at) }) : t(catalog, "staff.publicReview.reportHeadingWriter", { version: report.report_version, writer: report.writer, at: when(report.recorded_at) })}</h4>
+        <p className="setCardHint">{t(catalog, `staff.publicReview.state.${report.state}`)}</p>
         <ul className="staffAuditList">{report.pieces.map((piece) => pieceRow("REPORT", report.report_id, piece))}</ul>
         {page.hidden ? <div className="staffActions">
-          {report.state !== "HIDDEN" ? <button className="setBtn" type="button" disabled={busy || pending !== null} onClick={() => setPending(stepOf("Hide this report version. This cannot be undone here.", { step: "HIDE_REPORT", pieceKind: "REPORT", pieceId: report.report_id }))}>Hide this report</button> : null}
-          {report.state === "AFFECTED" ? <button className="setBtn" type="button" disabled={busy || pending !== null} onClick={() => setPending(stepOf("Put this report back on the page. You have read it and it does not repeat what was taken out.", { step: "PUT_BACK", pieceKind: "REPORT", pieceId: report.report_id }))}>Put this back</button> : null}
+          {report.state !== "HIDDEN" ? <button className="setBtn" type="button" disabled={busy || pending !== null} onClick={() => setPending(stepOf(t(catalog, "staff.publicReview.confirm.hideReport"), { step: "HIDE_REPORT", pieceKind: "REPORT", pieceId: report.report_id }))}>{t(catalog, "staff.publicReview.hideReport")}</button> : null}
+          {report.state === "AFFECTED" ? <button className="setBtn" type="button" disabled={busy || pending !== null} onClick={() => setPending(stepOf(t(catalog, "staff.publicReview.confirm.putBackReport"), { step: "PUT_BACK", pieceKind: "REPORT", pieceId: report.report_id }))}>{t(catalog, "staff.publicReview.putThisBack")}</button> : null}
         </div> : null}
       </article>)}
-      <h3>This debate's log</h3>
-      <ul className="staffAuditList" data-review-log>{[...page.log].reverse().map((entry) => <li key={entry.revision}><strong>{ACTION_WORDS[entry.action]}</strong> <time dateTime={entry.at}>{when(entry.at)}</time> <span className="setCardHint">by staff-{entry.actor_staff_id.replaceAll("-", "")}</span></li>)}</ul>
+      <h3>{t(catalog, "staff.publicReview.log")}</h3>
+      <ul className="staffAuditList" data-review-log>{[...page.log].reverse().map((entry) => <li key={entry.revision}><strong>{t(catalog, `staff.publicReview.action.${entry.action}`)}</strong> <time dateTime={entry.at}>{when(entry.at)}</time> <span className="setCardHint">{t(catalog, "staff.publicReview.logBy", { id: entry.actor_staff_id.replaceAll("-", "") })}</span></li>)}</ul>
     </section>}
   </div>;
 }
