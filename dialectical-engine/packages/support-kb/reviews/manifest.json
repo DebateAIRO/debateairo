@@ -401,18 +401,18 @@
     {
       "id": "unpublish-a-debate",
       "lang": "en",
-      "sha256": "06fe72c683621e3ae0b9ca0f5979dd8a3d5f7a1ba4cdada309fe8ed376582de4",
+      "sha256": "5d66f53b182dd9831fe2668fe79220e27983465e9562cfbf95f121a971eb2882",
       "reviewedBy": "SOL",
-      "reviewerSession": "r22-takedown-2026-11-01 (one sentence restored on the owner's ruling of 2026-11-01; the owner read the version without it, so this text has not had the owner's reading)",
+      "reviewerSession": "r22-report-button-2026-11-01 (the Report link became the Report button, decision 35 of 2026-11-01; the owner has not read this text)",
       "reviewedOn": "2026-11-01",
       "evidence": "docs/missions/support-conversation-20260914/reviews/OWNER-SIGNOFF-r22-public-articles.md"
     },
     {
       "id": "unpublish-a-debate",
       "lang": "ro",
-      "sha256": "4652f6156deda9edefb53400d2516d10a16813072b8c1669929775c6dcb4157b",
+      "sha256": "d1024fe5f2fcc05831717b25c8506ecf00bf894454055a18fbd3ea990ab16e70",
       "reviewedBy": "SOL",
-      "reviewerSession": "r22-takedown-2026-11-01 (one sentence restored on the owner's ruling of 2026-11-01; the owner read the version without it, so this text has not had the owner's reading)",
+      "reviewerSession": "r22-report-button-2026-11-01 (the Report link became the Report button, decision 35 of 2026-11-01; the owner has not read this text)",
       "reviewedOn": "2026-11-01",
       "evidence": "docs/missions/support-conversation-20260914/reviews/OWNER-SIGNOFF-r22-public-articles.md"
     },
@@ -438,7 +438,7 @@
     }
   ],
   "recovery": {
-    "componentFileSha256": "21b8635fe8dc6f74293bd7ab13277a14c20947ce34dd57cbf122297721fc7c24",
+    "componentFileSha256": "5e1db1d1e7c89bb805a90db24f4c036ae8be0df18a59263cf0964cc69d133c58",
     "components": [
       {
         "id": "account-access",
@@ -963,11 +963,11 @@
       {
         "id": "unpublish-a-debate",
         "lang": "en",
-        "articleSha256": "06fe72c683621e3ae0b9ca0f5979dd8a3d5f7a1ba4cdada309fe8ed376582de4",
-        "modelProjectionSha256": "1d5f0df17fe5edbd2358c164f9356cee590fc339014d94b45e8382baffc3a984",
-        "fallbackSha256": "d619dd505eb135eea2d9fb975bff3883e5b253b20f21306247676c632ca41aad",
+        "articleSha256": "5d66f53b182dd9831fe2668fe79220e27983465e9562cfbf95f121a971eb2882",
+        "modelProjectionSha256": "451eb3cecc223c356acfbfc69ce9075913f2228a6695e96808151cd871fbf1f5",
+        "fallbackSha256": "0f43b448db4c3cfa56ca26a07c752b3669d6045560b4f4799068f82a945a4529",
         "reviewedBy": "SOL",
-        "reviewerSession": "r22-takedown-2026-11-01 (one sentence restored on the owner's ruling of 2026-11-01; no separate editor read it and the owner has not read this chat text)",
+        "reviewerSession": "r22-report-button-2026-11-01 (the Report link became the Report button, decision 35 of 2026-11-01; no separate editor read it and the owner has not read this chat text)",
         "reviewedOn": "2026-11-01",
         "evidence": "docs/missions/support-conversation-20260914/reviews/OWNER-SIGNOFF-r22-public-articles.md",
         "ratifiedBy": "",
@@ -976,11 +976,11 @@
       {
         "id": "unpublish-a-debate",
         "lang": "ro",
-        "articleSha256": "4652f6156deda9edefb53400d2516d10a16813072b8c1669929775c6dcb4157b",
-        "modelProjectionSha256": "fcd79a633bc912d69d60abffccb118df5e40b76b9a6971542bd5dc73305edb23",
-        "fallbackSha256": "8ffbaa10ee09b68e481e672f7a398d99ef24089faba0c85eabcf514f571bfff0",
+        "articleSha256": "d1024fe5f2fcc05831717b25c8506ecf00bf894454055a18fbd3ea990ab16e70",
+        "modelProjectionSha256": "015f8508669556550f4d6a8396c46902687594680103a67c22bfba369396a29b",
+        "fallbackSha256": "2a5b85d4046495d06e8a958716d711611f1b7ec339fcf83b627375aa86376db8",
         "reviewedBy": "SOL",
-        "reviewerSession": "r22-takedown-2026-11-01 (one sentence restored on the owner's ruling of 2026-11-01; no separate editor read it and the owner has not read this chat text)",
+        "reviewerSession": "r22-report-button-2026-11-01 (the Report link became the Report button, decision 35 of 2026-11-01; no separate editor read it and the owner has not read this chat text)",
         "reviewedOn": "2026-11-01",
         "evidence": "docs/missions/support-conversation-20260914/reviews/OWNER-SIGNOFF-r22-public-articles.md",
         "ratifiedBy": "",

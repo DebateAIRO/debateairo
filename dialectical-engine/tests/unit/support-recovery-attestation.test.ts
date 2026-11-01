@@ -123,7 +123,7 @@ const QUALITY_SUPPLEMENT_REVIEW = Object.freeze({
 // R22 (2026-11-01): the owner read and approved the four public-debate articles on a question card. That reading covers
 // the English article bodies, so the article records are OWNER; the Romanian records say the card showed English only.
 // The card did not show the chat texts, so these recovery rows are not the owner's: three keep the lane's record, and
-// the fourth pair names the restored sentence. The fourth article changed after that reading, so its records are SOL until the owner reads it.
+// the fourth pair names its later changes. The fourth article changed after that reading, so its records are SOL until the owner reads it.
 const R22_SIGNOFF = "docs/missions/support-conversation-20260914/reviews/OWNER-SIGNOFF-r22-public-articles.md";
 const R22_OWNER_SESSION = "254b8d87-040e-44fc-bef6-c5c6150a7428 (coordinator session, the owner's second public card on 2026-11-01;";
 const R22_CHAT_REVIEW = Object.freeze({
@@ -136,7 +136,7 @@ const R22_CHAT_REVIEW = Object.freeze({
 });
 const R22_UNPUBLISH_CHAT_REVIEW = Object.freeze({
   reviewedBy: "SOL",
-  reviewerSession: "r22-takedown-2026-11-01 (one sentence restored on the owner's ruling of 2026-11-01; no separate editor read it and the owner has not read this chat text)",
+  reviewerSession: "r22-report-button-2026-11-01 (the Report link became the Report button, decision 35 of 2026-11-01; no separate editor read it and the owner has not read this chat text)",
   reviewedOn: "2026-11-01",
   evidence: R22_SIGNOFF,
   ratifiedBy: "",
@@ -191,8 +191,8 @@ const EXPECTED = [
   ["support-cases", "ro", "ad7400b88023ca821b9020ca08e791c6c946f5d6c5fcca00880b9158cd8ff063", "313935a4998ac1747840861ecdfba7d4ac724600c987f704d22623b903ea0c93", "747bb83cfe32d06311ff491d464c80efbba3e1da0066231f0657d6db51c764c9"],
   ["support-status-limits", "en", "f5344e3c0e5f0bec3bb3b5b10dff77b12a85d90233a6d7a7cf8a31f38cc7bfe7", "932f33969c279c6e7db4dc9d0d47fee7eb535b0d1cb593f9b9e9ccc743913385", "875854ecea195464759705f8035052bd5389c71a1acc439713326784bb5e2981"],
   ["support-status-limits", "ro", "ca0b2c95cbce0f684867a92c6f2551829b89c0c18e83b9c1af921a9f8af3d2be", "6976ed6a37edafff50ea7d0e82d31cc2fc82a6ee4f194cc1e13aa911904a093e", "f4a18f49bb1010aa86579a2eac64761a0ac85f6fbbe2afeba8495acbe2e084da"],
-  ["unpublish-a-debate", "en", "06fe72c683621e3ae0b9ca0f5979dd8a3d5f7a1ba4cdada309fe8ed376582de4", "1d5f0df17fe5edbd2358c164f9356cee590fc339014d94b45e8382baffc3a984", "d619dd505eb135eea2d9fb975bff3883e5b253b20f21306247676c632ca41aad"],
-  ["unpublish-a-debate", "ro", "4652f6156deda9edefb53400d2516d10a16813072b8c1669929775c6dcb4157b", "fcd79a633bc912d69d60abffccb118df5e40b76b9a6971542bd5dc73305edb23", "8ffbaa10ee09b68e481e672f7a398d99ef24089faba0c85eabcf514f571bfff0"],
+  ["unpublish-a-debate", "en", "5d66f53b182dd9831fe2668fe79220e27983465e9562cfbf95f121a971eb2882", "451eb3cecc223c356acfbfc69ce9075913f2228a6695e96808151cd871fbf1f5", "0f43b448db4c3cfa56ca26a07c752b3669d6045560b4f4799068f82a945a4529"],
+  ["unpublish-a-debate", "ro", "d1024fe5f2fcc05831717b25c8506ecf00bf894454055a18fbd3ea990ab16e70", "015f8508669556550f4d6a8396c46902687594680103a67c22bfba369396a29b", "2a5b85d4046495d06e8a958716d711611f1b7ec339fcf83b627375aa86376db8"],
   ["unsupported-capabilities", "en", "6e7f19d6d7c00fe4d10660e4dff7ad52e16ae8ff3d85cea13717780af586ec6f", "784bf45291c975c87dd6bb1a11f5b1812ecbefc7f0f52ee5cfb66dbdb4f6e9bd", "4feec8aa3b78a1d52916a3484adce247fb94a68b2107c1d5816fdc9c29e7f41f"],
   ["unsupported-capabilities", "ro", "b2ebdc765ec96488ec564c1b5cd00d9d3f9e390abaf17cd5868ec7b505197f85", "b8d3adac101ca1f2814fa32e3b7cd307ed497f3158881dc834ea7cd2d5136da4", "b223418e6d366bd25ac2d36bfc64b43c40206776c1fc298839327349e721b8d0"],
   ["view-public-debate", "en", "995068c814cec3ba1dd0f0ecf320bea04fc8c66acc9703b8cd70cec72cfca053", "c0185e375681e9d609b041f1e7fbbc1e33bd4c4c6489a3ea715fd52797ba35ab", "6d06676fd87b3c96b5194ea459eec98846f322ef28a7890a1261667a37f71ac5"],
@@ -252,12 +252,12 @@ describe("production Support recovery attestation", () => {
       },
       recovery: {
         componentFileSha256:
-          "21b8635fe8dc6f74293bd7ab13277a14c20947ce34dd57cbf122297721fc7c24",
+          "5e1db1d1e7c89bb805a90db24f4c036ae8be0df18a59263cf0964cc69d133c58",
         components: expectedRows,
       },
     });
     expect(corpus.reviewManifest.articles).toHaveLength(42);
-    // The owner read unpublish-a-debate WITHOUT the sentence restored on the owner's ruling of 2026-11-01. Its records must not claim that reading until the owner reads this text.
+    // The owner read unpublish-a-debate WITHOUT the sentence restored on the owner's ruling of 2026-11-01 and without the Report button. Its records must not claim that reading until the owner reads this text.
     for (const lang of ["en", "ro"] as const) {
       const record = corpus.reviewManifest.articles.find((article) => article.id === "unpublish-a-debate" && article.lang === lang);
       expect(record).toEqual({
@@ -265,7 +265,7 @@ describe("production Support recovery attestation", () => {
         lang,
         sha256: sha256(readFileSync(join(corpusDirectory, `unpublish-a-debate.${lang}.md`))),
         reviewedBy: "SOL",
-        reviewerSession: "r22-takedown-2026-11-01 (one sentence restored on the owner's ruling of 2026-11-01; the owner read the version without it, so this text has not had the owner's reading)",
+        reviewerSession: "r22-report-button-2026-11-01 (the Report link became the Report button, decision 35 of 2026-11-01; the owner has not read this text)",
         reviewedOn: "2026-11-01",
         evidence: R22_SIGNOFF,
       });
