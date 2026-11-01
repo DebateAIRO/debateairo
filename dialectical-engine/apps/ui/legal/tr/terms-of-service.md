@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kısaca
-eyebrow: HİZMET KOŞULLARI · v2.11 · YÜRÜRLÜK TARİHİ 1 KASIM 2026
+eyebrow: HİZMET KOŞULLARI · v2.12 · YÜRÜRLÜK TARİHİ 1 KASIM 2026
 title: Kabul ettiğiniz hükümler
 lede: Sizinle DMS Merchandise Shop S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.
-endMarker: KOŞULLARIN SONU · v2.11
+endMarker: KOŞULLARIN SONU · v2.12
 bodyLabel: Hizmet Koşulları metni
 annexTitle: Ek A — Bölgesel koşullar
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 UYGULANACAK HUKUK
 -->
 
-**Version 2.11 · Effective 1 Kasım 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
+**Version 2.12 · Effective 1 Kasım 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
 
 **In short.** En az 18 yaşında olmalısınız. Dialectical Engine, yapay zekâ modelleriyle argümanlar oluşturur ve ürettiği her şey yanlış olabilir — bunlar tavsiye değildir. Ücretsiz plandaki tartışmalarınız, tamamlandığında ve bir yapay zekâ kontrolünden geçtikten sonra herkese açık olur; ücretli planda ise siz yayımlamadıkça özeldir. Herkese açık olduktan sonra herkes bir tartışmayı okuyabilir ve tartışma herkese açık kalır. Gönderdiğiniz metin, Sağlayıcı Sicilimizde belirtilen yapay zekâ sağlayıcılarına iletilir ve modelleri eğitmek için kullanılmaz. Hesabınız olsun veya olmasın, hukuka aykırı içerikleri support@dezbatere.ro adresine bildirin. Romanya hukuku uygulanır; ancak yerel tüketici korumalarınız saklıdır.
 
@@ -170,7 +170,7 @@ Bir şeye izin verilip verilmediğinden emin değilseniz, göndermeden önce biz
 
 ## 10. İçerik bildirimi, moderasyon ve şikâyetler
 
-**Herkes içerik bildirebilir.** Hesabınızın olması gerekmez. support@dezbatere.ro adresine yazın veya yayımlanmış herhangi bir tartışmadaki **Bildir** kontrolünü kullanın. İşlem yapabilmemiz için bize şunları bildirin: içeriğin neden hukuka aykırı olduğuna veya bu Koşulları ihlal ettiğine inandığınızı, iddiayı anlayabilmemiz için yeterli ayrıntıyla; tam konumu — tam URL'yi ve mümkünse ilgili kısmı; adınızı ve e-posta adresinizi (çocukların cinsel istismarına ilişkin materyal bildirimlerinde gerekli değildir) ve bildiriminizin doğru ve eksiksiz olduğuna iyi niyetle inandığınızı.
+**Herkes içerik bildirebilir.** Hesabınızın olması gerekmez. support@dezbatere.ro adresine yazın. Oturum açmışsanız herhangi bir herkese açık tartışmada **Bildir** düğmesini de kullanabilirsiniz. Bir yapay zekâ, düğmeyle yapılan bildirimi herkese açık metnin yanında okur. Yapay zekâ katılırsa, tartışma hemen görünmez hâle getirilir ve bir kişi onu inceler. Katılmazsa, daha fazla ayrıntıyla yeniden bildirimde bulunabilirsiniz ve bir kişi onu okuyacaktır. İşlem yapabilmemiz için bize şunları bildirin: içeriğin neden hukuka aykırı olduğuna veya bu Koşulları ihlal ettiğine inandığınızı, iddiayı anlayabilmemiz için yeterli ayrıntıyla; tam konumu — tam URL'yi ve mümkünse ilgili kısmı; adınızı ve e-posta adresinizi (çocukların cinsel istismarına ilişkin materyal bildirimlerinde gerekli değildir) ve bildiriminizin doğru ve eksiksiz olduğuna iyi niyetle inandığınızı.
 
 Her bildirimi gereksiz gecikme olmaksızın aldığımızı teyit ederiz. Bildirimleri zamanında, özenli, keyfî olmayan ve nesnel bir biçimde ele alır; kararımızı ve buna nasıl itiraz edebileceğinizi size bildiririz. Bir bildirimi işlemek veya karara bağlamak için otomatik araçlar kullandığımızda bunu belirtiriz. Rıza olmaksızın paylaşılan mahrem görüntülere ilişkin bildirimler, geçerli bir talepten itibaren **48 saat içinde** işleme alınır.
 
@@ -250,6 +250,8 @@ Başka bir yerde yaşıyorsanız bölgenizde geçerli olan cayma veya vazgeçme 
 Neyin ne zaman değişeceğini kalıcı veri saklayıcısıyla önceden bildiririz. Değişiklik, hizmete erişiminiz veya hizmeti kullanımınız üzerinde önemsizden daha fazla olumsuz etkiye sahipse, bildirimin size iletilmesinden veya değişikliğin yürürlüğe girmesinden hangisi daha geç ise o tarihten itibaren **30 gün içinde** ücretsiz olarak sözleşmeyi sona erdirebilirsiniz; kullanılmayan dönem için önceden ödenmiş tutarları iade ederiz.
 
 **Bu Koşullarda.** Bu Koşulları aynı tür nedenlerle değiştirebiliriz. Haklarınızı azaltmayan değişiklikler için yeni sürümü, değişikliklerin özetiyle yayımlar ve yürürlüğe girmesinden en az **30 gün önce** size e-posta göndeririz; o tarihten sonra Dialectical Engine'i kullanmaya devam etmeniz değişikliği kabul ettiğiniz anlamına gelir ve hesabınızı o tarihten önce kapatabilirsiniz. Mevcut bir plandaki fiyat artışları, daha düşük sınırlar, kaldırılan özellikler, içeriğinizin yeni kullanım biçimleri veya sorumluluk, uygulanacak hukuk ya da uyuşmazlık çözümüne ilişkin değişiklikler dahil, haklarınızı azaltan değişiklikler için bir sonraki oturum açışınızda yeni sürümü açıkça kabul etmenizi isteriz ve değişiklik yalnızca ileriye dönük uygulanır. Hiçbir değişikliği geriye yürütmeyiz ve size bir çıkış yolu sunmadan, sürenin ortasında ücretini ödediğiniz hususun özünü değiştirmek için bu bölümü kullanmayız. Önceki sürümler dezbatere.ro/terms/versions adresinde erişilebilir kalır.
+
+Sürüm 2.12, sürüm 2.11'in yerine geçmiştir: 10. bölüm, oturum açmış bir kişinin herkese açık herhangi bir tartışmada Bildir düğmesini de kullanabileceğini, bir yapay zekânın düğmeyle yapılan bildirimi herkese açık metnin yanında okuduğunu ve sonrasında ne olacağını söyler.
 
 Sürüm 2.11, sürüm 2.10'un yerine geçmiştir: 9. bölüm, incelerken herkese açık bir tartışmayı geçici olarak görünmez hâle getirebileceğimizi ve bunun bir kısmını kaldırabileceğimizi veya düzeltebileceğimizi söyler.
 

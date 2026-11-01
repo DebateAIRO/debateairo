@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Pe scurt
-eyebrow: TERMENII SERVICIULUI · v2.11 · ÎN VIGOARE DE LA 1 NOIEMBRIE 2026
+eyebrow: TERMENII SERVICIULUI · v2.12 · ÎN VIGOARE DE LA 1 NOIEMBRIE 2026
 title: Ce acceptați
 lede: Contractul dintre dumneavoastră și DMS Merchandise Shop S.R.L., într-un limbaj clar. Nouăsprezece secțiuni și Anexa A — derulați până la final.
-endMarker: SFÂRȘITUL TERMENILOR · v2.11
+endMarker: SFÂRȘITUL TERMENILOR · v2.12
 bodyLabel: Textul Termenilor serviciului
 annexTitle: Anexa A — Termeni regionali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEGEA APLICABILĂ
 -->
 
-**Version 2.11 · Effective 1 noiembrie 2026 · Versiunile anterioare la dezbatere.ro/terms/versions · Limba: română.**
+**Version 2.12 · Effective 1 noiembrie 2026 · Versiunile anterioare la dezbatere.ro/terms/versions · Limba: română.**
 
 **In short.** Trebuie să aveți cel puțin 18 ani. Dialectical Engine construiește argumente cu modele de inteligență artificială, iar tot ceea ce generează poate fi greșit — nu constituie consultanță. Pe planul gratuit, dezbaterile dumneavoastră sunt publice după ce se încheie, în urma unei verificări cu IA; pe un plan cu plată, sunt private dacă nu le publicați. Odată publică, o dezbatere poate fi citită de oricine și rămâne publică. Textul pe care îl transmiteți este trimis furnizorilor de IA enumerați în Registrul furnizorilor de IA și nu este folosit pentru antrenarea modelelor. Raportați conținutul ilegal la support@dezbatere.ro, indiferent dacă aveți sau nu un cont. Se aplică legea română, însă protecția locală a consumatorilor de care beneficiați se menține.
 
@@ -170,7 +170,7 @@ Dezbaterile de pe un plan cu plată sunt **private în mod implicit**: nimic din
 
 ## 10. Raportarea conținutului, moderarea și reclamațiile
 
-**Oricine poate raporta conținut.** Nu aveți nevoie de un cont. Scrieți la support@dezbatere.ro sau utilizați comanda **Raportare** disponibilă în orice dezbatere publicată. Pentru a putea acționa, comunicați-ne: motivul pentru care considerați că acel conținut este ilegal sau încalcă acești Termeni, suficient de detaliat pentru a înțelege susținerea; localizarea exactă — adresa URL completă și, dacă este posibil, fragmentul; numele și adresa dumneavoastră de e-mail (nu sunt necesare pentru raportarea materialelor privind abuzul sexual asupra copiilor); precum și faptul că apreciați cu bună-credință că raportarea dumneavoastră este exactă și completă.
+**Oricine poate raporta conținut.** Nu aveți nevoie de un cont. Scrieți la support@dezbatere.ro. Dacă sunteți autentificat, puteți folosi și butonul **Raportare** de pe orice dezbatere publică. O IA citește o raportare făcută cu butonul, alături de textul public. Dacă IA este de acord, dezbaterea este ascunsă imediat și o persoană o examinează. Dacă nu este de acord, puteți raporta din nou, cu mai multe detalii, iar o persoană o va citi. Pentru a putea acționa, comunicați-ne: motivul pentru care considerați că acel conținut este ilegal sau încalcă acești Termeni, suficient de detaliat pentru a înțelege susținerea; localizarea exactă — adresa URL completă și, dacă este posibil, fragmentul; numele și adresa dumneavoastră de e-mail (nu sunt necesare pentru raportarea materialelor privind abuzul sexual asupra copiilor); precum și faptul că apreciați cu bună-credință că raportarea dumneavoastră este exactă și completă.
 
 Confirmăm primirea fiecărei raportări fără întârzieri nejustificate. Tratăm raportările în timp util, cu diligență, fără arbitrar și în mod obiectiv, vă comunicăm decizia noastră și vă explicăm cum o puteți contesta. Atunci când folosim mijloace automate pentru a prelucra sau a soluționa o raportare, precizăm acest lucru. În cazul imaginilor intime distribuite fără consimțământ, acționăm **în termen de 48 de ore** de la primirea unei cereri valabile.
 
@@ -250,6 +250,8 @@ Dacă locuiți în altă parte, Anexa A precizează dreptul de retragere sau per
 Vă informăm în avans, pe un suport durabil, ce se modifică și când. Dacă modificarea are un efect negativ mai mult decât minor asupra accesului la serviciu sau a utilizării acestuia, puteți înceta contractul fără costuri în termen de **30 de zile** de la informare sau de la data la care modificarea produce efecte, luându-se în considerare data mai recentă, iar noi rambursăm orice sumă plătită în avans pentru perioada neutilizată.
 
 **Cu privire la acești Termeni.** Putem modifica acești Termeni pentru aceleași tipuri de motive. Pentru modificările care nu vă reduc drepturile, publicăm noua versiune însoțită de un rezumat al modificărilor și vă trimitem un e-mail cu cel puțin **30 de zile** înainte ca aceasta să producă efecte; continuarea utilizării Dialectical Engine după data respectivă înseamnă că o acceptați și vă puteți închide contul înainte de acea dată. Pentru modificările care vă reduc drepturile — inclusiv majorarea prețurilor unui plan existent, reducerea limitelor, eliminarea unor funcții, noi utilizări ale conținutului dumneavoastră sau modificări privind răspunderea, legea aplicabilă ori soluționarea litigiilor — vă solicităm să acceptați în mod expres noua versiune la următoarea autentificare, iar modificarea se aplică numai pentru viitor. Nu aplicăm niciodată retroactiv o modificare și nu folosim niciodată această secțiune pentru a modifica, pe parcursul termenului, esența serviciului pentru care ați plătit fără să vă oferim o posibilitate de încetare. Versiunile anterioare rămân disponibile la dezbatere.ro/terms/versions.
+
+Versiunea 2.12 a înlocuit versiunea 2.11: secțiunea 10 arată că o persoană autentificată poate folosi și butonul Raportare de pe orice dezbatere publică, că o IA citește o raportare făcută cu acesta alături de textul public și ce se întâmplă atunci.
 
 Versiunea 2.11 a înlocuit versiunea 2.10: secțiunea 9 arată că putem ascunde o dezbatere publică, cât timp o examinăm, și că putem elimina sau corecta o parte din ea.
 

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lühidalt
-eyebrow: TEENUSETINGIMUSED · v2.11 · KEHTIB ALATES 1. NOVEMBRIST 2026
+eyebrow: TEENUSETINGIMUSED · v2.12 · KEHTIB ALATES 1. NOVEMBRIST 2026
 title: Millega te nõustute
 lede: Teie ja DMS Merchandise Shop S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.
-endMarker: TINGIMUSTE LÕPP · v2.11
+endMarker: TINGIMUSTE LÕPP · v2.12
 bodyLabel: Teenusetingimuste tekst
 annexTitle: Lisa A — Piirkondlikud tingimused
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 KOHALDATAV ÕIGUS
 -->
 
-**Version 2.11 · Effective 1. november 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
+**Version 2.12 · Effective 1. november 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
 
 **In short.** Peate olema vähemalt 18-aastane. Dialectical Engine koostab tehisintellektimudelite abil argumente ja kõik selle loodud tulemused võivad olla valed — need ei ole nõuanded. Tasuta paketi korral on teie väitlused pärast lõppu avalikud, pärast tehisintellekti kontrolli; tasulise paketi korral on need privaatsed, kui te neid ei avalda. Kui väitlus on avalik, saab seda lugeda igaüks, ja see jääb avalikuks. Teie sisestatud tekst saadetakse meie tehisintellekti pakkujate registris loetletud pakkujatele ja seda ei kasutata mudelite treenimiseks. Teatage ebaseaduslikust sisust aadressil support@dezbatere.ro, olenemata sellest, kas teil on konto. Kohaldatakse Rumeenia õigust, kuid teile jääb teie kohaliku tarbijakaitse tagatud kaitse.
 
@@ -170,7 +170,7 @@ Tasulise paketi väitlused on **vaikimisi privaatsed**: miski, mida seal loote, 
 
 ## 10. Sisust teatamine, modereerimine ja kaebused
 
-**Sisust võib teatada igaüks.** Kontot ei ole vaja. Kirjutage aadressil support@dezbatere.ro või kasutage mis tahes avaldatud väitluse juhtelementi **Teatage**. Et saaksime tegutseda, öelge meile: miks on sisu teie arvates ebaseaduslik või rikub neid Tingimusi, piisavalt üksikasjalikult, et saaksime väitest aru; täpne asukoht — täielik URL ja võimaluse korral vastav lõik; teie nimi ja e-posti aadress (ei ole nõutav laste seksuaalset väärkohtlemist kujutavast materjalist teatamisel); ning kinnitus, et usute heas usus oma teate õigsusesse ja täielikkusse.
+**Sisust võib teatada igaüks.** Kontot ei ole vaja. Kirjutage aadressil support@dezbatere.ro. Kui olete sisse logitud, saate kasutada ka mis tahes avaliku väitluse juures nuppu **Teatage**. Tehisintellekt loeb nupu abil tehtud teadet avaliku teksti kõrval. Kui tehisintellekt nõustub, peidetakse väitlus kohe ning isik vaatab selle üle. Kui tehisintellekt ei nõustu, saate teatada uuesti täpsemate andmetega ja isik loeb teate läbi. Et saaksime tegutseda, öelge meile: miks on sisu teie arvates ebaseaduslik või rikub neid Tingimusi, piisavalt üksikasjalikult, et saaksime väitest aru; täpne asukoht — täielik URL ja võimaluse korral vastav lõik; teie nimi ja e-posti aadress (ei ole nõutav laste seksuaalset väärkohtlemist kujutavast materjalist teatamisel); ning kinnitus, et usute heas usus oma teate õigsusesse ja täielikkusse.
 
 Kinnitame iga teate kättesaamist põhjendamatu viivituseta. Käsitleme teateid aegsasti, hoolikalt, mittemeelevaldselt ja objektiivselt, teatame teile oma otsuse ning selgitame, kuidas seda vaidlustada. Kui kasutame teate töötlemiseks või selle üle otsustamiseks automatiseeritud vahendeid, anname sellest teada. Nõusolekuta jagatud intiimkujutiste teadete alusel tegutsetakse **48 tunni jooksul** pärast kehtiva taotluse saamist.
 
@@ -250,6 +250,8 @@ Kui elate mujal, on lisas A märgitud teie piirkonnas kohaldatav taganemis- või
 Teatame teile püsival andmekandjal ette, mis ja millal muutub. Kui muudatusel on teie juurdepääsule teenusele või selle kasutamisele enam kui vähene negatiivne mõju, võite lepingu tasuta lõpetada **30 päeva** jooksul pärast teate saamist või muudatuse jõustumist, olenevalt sellest, kumb on hilisem, ning tagastame kasutamata ajavahemiku eest ette makstud summa.
 
 **Nende Tingimuste muudatused.** Võime neid Tingimusi samalaadsetel põhjustel muuta. Muudatuste puhul, mis ei vähenda teie õigusi, avaldame uue versiooni koos muudatuste kokkuvõttega ja saadame teile e-kirja vähemalt **30 päeva** enne selle jõustumist; Dialectical Engine kasutamise jätkamine pärast seda kuupäeva tähendab, et nõustute muudatusega, ning võite oma konto enne seda sulgeda. Muudatuste puhul, mis vähendavad teie õigusi — sealhulgas olemasoleva paketi hinnatõus, madalamad kasutuslimiidid, eemaldatud funktsioonid, teie sisu uued kasutusviisid või vastutuse, kohaldatava õiguse või vaidluste lahendamise muudatused — palume teil järgmisel sisselogimisel uue versiooniga sõnaselgelt nõustuda ning muudatust kohaldatakse ainult edaspidi. Me ei kohalda muudatust kunagi tagasiulatuvalt ega kasuta seda jaotist selleks, et muuta tähtaja kestel tasulise teenuse põhiolemust ilma teile väljumisvõimalust pakkumata. Varasemad versioonid jäävad kättesaadavaks aadressil dezbatere.ro/terms/versions.
+
+Versioon 2.12 asendas versiooni 2.11: jaotis 10 ütleb, et sisselogitud isik saab kasutada ka mis tahes avaliku väitluse juures nuppu Teatage, et tehisintellekt loeb nupuga tehtud teadet avaliku teksti kõrval ning mis siis juhtub.
 
 Versioon 2.11 asendas versiooni 2.10: jaotis 9 ütleb, et võime avaliku väitluse läbivaatamise ajaks peita ning eemaldada või parandada selle osa.
 

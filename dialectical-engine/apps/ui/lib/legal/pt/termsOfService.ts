@@ -171,7 +171,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Denúncia de conteúdos, moderação e reclamações",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Qualquer pessoa pode denunciar conteúdos. Não necessita de uma conta. Escreva para support@dezbatere.ro ou utilize o controlo Denunciar em qualquer debate publicado. Para que possamos agir, indique-nos: por que motivo considera que o conteúdo é ilegal ou viola estes Termos, com pormenor suficiente para compreendermos o fundamento da denúncia; a localização exata — o URL completo e, se possível, a passagem; o seu nome e endereço de correio eletrónico (não exigidos para denúncias de material de abuso sexual de crianças); e que acredita, de boa-fé, que a sua denúncia é exata e completa." },
+      { kind: "p", text: "Qualquer pessoa pode denunciar conteúdos. Não necessita de uma conta. Escreva para support@dezbatere.ro. Se tiver sessão iniciada, também pode utilizar o botão Denunciar em qualquer debate público. Uma IA lê uma denúncia feita com o botão, junto ao texto público. Se concordar, o debate é ocultado de imediato e uma pessoa o revê. Se não concordar, pode denunciar de novo, com mais pormenores, e uma pessoa a lerá. Para que possamos agir, indique-nos: por que motivo considera que o conteúdo é ilegal ou viola estes Termos, com pormenor suficiente para compreendermos o fundamento da denúncia; a localização exata — o URL completo e, se possível, a passagem; o seu nome e endereço de correio eletrónico (não exigidos para denúncias de material de abuso sexual de crianças); e que acredita, de boa-fé, que a sua denúncia é exata e completa." },
       { kind: "p", text: "Acusamos a receção de todas as denúncias sem demora injustificada. Tratamos as denúncias de forma atempada, diligente, não arbitrária e objetiva, comunicamos-lhe a nossa decisão e indicamos-lhe como a pode contestar. Quando utilizamos meios automatizados para tratar uma denúncia ou tomar uma decisão sobre a mesma, informamo-lo desse facto. Atuamos relativamente às denúncias de imagens íntimas partilhadas sem consentimento no prazo de 48 horas após um pedido válido." },
       { kind: "p", text: "Dois tipos de decisão automatizada, mantidos separados." },
       {
@@ -241,6 +241,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Ao serviço. Desenvolvemos continuamente a Dialectical Engine, e as melhorias de rotina, correções e alterações ao conjunto de modelos ocorrem sem aviso. Quando introduzimos uma alteração que vai além da manutenção do funcionamento do serviço conforme descrito, fazemo-lo apenas por um dos seguintes motivos: cumprir um requisito legal ou regulamentar; responder a um problema de segurança ou abuso; um fornecedor de modelos alterar, restringir ou retirar um modelo ou uma funcionalidade de que dependemos; adaptar o serviço a um ambiente técnico que não controlamos; ou adicionar, melhorar ou retirar uma funcionalidade sem lhe impor custos." },
       { kind: "p", text: "Informá-lo-emos previamente, num suporte duradouro, sobre o que será alterado e quando. Se a alteração tiver um efeito negativo mais do que ligeiro no seu acesso ao serviço ou na sua utilização, poderá resolver o contrato sem encargos no prazo de 30 dias após ser informado, ou após a produção de efeitos da alteração, consoante a data que for posterior, e reembolsaremos qualquer montante pré-pago relativo ao período não utilizado." },
       { kind: "p", text: "A estes Termos. Podemos alterar estes Termos pelos mesmos tipos de motivos. No caso de alterações que não reduzam os seus direitos, publicamos a nova versão com um resumo das alterações e enviamos-lhe uma mensagem de correio eletrónico pelo menos 30 dias antes de produzir efeitos; a utilização continuada da Dialectical Engine depois dessa data significa que a aceita; pode encerrar a sua conta antes dessa data. No caso de alterações que reduzam os seus direitos — incluindo aumentos de preço de um plano existente, redução de limites, remoção de funcionalidades, novas utilizações do seu conteúdo ou alterações relativas à responsabilidade, à lei aplicável ou à resolução de litígios — pedimos-lhe que aceite expressamente a nova versão quando voltar a iniciar sessão, e a alteração só se aplica daí em diante. Nunca aplicamos uma alteração retroativamente e nunca utilizamos esta secção para alterar, durante o respetivo prazo, o essencial daquilo por que pagou sem lhe oferecer uma forma de sair. As versões anteriores permanecem disponíveis em dezbatere.ro/terms/versions." },
+      { kind: "p", text: "A versão 2.12 substituiu a versão 2.11: a secção 10 indica que uma pessoa com sessão iniciada também pode utilizar o botão Denunciar em qualquer debate público, que uma IA lê uma denúncia feita com ele junto ao texto público, e o que acontece depois." },
       { kind: "p", text: "A versão 2.11 substituiu a versão 2.10: a secção 9 indica que podemos ocultar um debate público enquanto o revemos, e remover ou corrigir parte dele." },
       { kind: "p", text: "A versão 2.10 substituiu a versão 2.9: a secção 9 indica que os debates do plano gratuito são públicos, que um debate público não pode ter a publicação cancelada e continua público depois de encerrar a sua conta, que qualquer pessoa com crédito pode contribuir para um debate público ou escrever um relatório sobre ele, e que um debate público continua aberto depois de o seu primeiro autor ter saído; a secção 11 indica o que o encerramento faz aos seus debates públicos." },
       { kind: "p", text: "A versão 2.9 substituiu a versão 2.8: a secção 8 passa a incluir o parágrafo «Gráficos e estatísticas que geramos», que indica a quem pertencem os gráficos de um relatório de debate e lhe concede uma licença para os utilizar." },
@@ -373,12 +374,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.11",
-  sha256: "e396d8f903baf954a0c943ae5f1e7e29e45c083fc58d588bbfc5e5a394a7eab5",
-  eyebrow: "TERMOS DE SERVIÇO · v2.11 · EM VIGOR DESDE 1 DE NOVEMBRO DE 2026",
+  version: "2.12",
+  sha256: "c770f6423c61fe71e3fb6bd33b6f0ce991e21652c4724bf2b2faebf5b4122a6e",
+  eyebrow: "TERMOS DE SERVIÇO · v2.12 · EM VIGOR DESDE 1 DE NOVEMBRO DE 2026",
   title: "Aquilo com que concorda",
   lede: "O contrato entre si e a DMS Merchandise Shop S.R.L., em linguagem clara. Dezanove secções e o Anexo A — desloque-se até ao fim.",
-  endMarker: "FIM DOS TERMOS · v2.11",
+  endMarker: "FIM DOS TERMOS · v2.12",
   contact: "support@dezbatere.ro",
   bodyLabel: "Texto dos Termos de Serviço",
   sectionIdPrefix: "terms-section-",

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In short
-eyebrow: TERMS OF SERVICE · v2.11 · EFFECTIVE 1 NOVEMBER 2026
+eyebrow: TERMS OF SERVICE · v2.12 · EFFECTIVE 1 NOVEMBER 2026
 title: What you agree to
 lede: The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.
-endMarker: END OF TERMS · v2.11
+endMarker: END OF TERMS · v2.12
 bodyLabel: Terms of Service text
 annexTitle: Annex A — Regional terms
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 GOVERNING LAW
 -->
 
-**Version 2.11 · Effective 1 November 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
+**Version 2.12 · Effective 1 November 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
 
 **In short.** You must be 18 or over. Dialectical Engine builds arguments with AI models and everything it generates may be wrong — it is not advice. On the Free plan your debates are public when finished, after an AI check; on a paid plan they are private unless you publish them. Once public, anyone can read a debate, and it stays public. Text you submit is sent to AI providers listed in our Provider Register, and is not used to train models. Report illegal content at support@dezbatere.ro whether or not you have an account. Romanian law governs, but your local consumer protections stay with you.
 
@@ -170,7 +170,7 @@ Debates on a paid plan are **private by default**: nothing you create there is v
 
 ## 10. Reporting content, moderation and complaints
 
-**Anyone can report content.** You do not need an account. Write to support@dezbatere.ro or use the **Report** control on any published debate. So that we can act, tell us: why you believe the content is illegal or breaches these Terms, in enough detail to understand the claim; the exact location — the full URL and, if you can, the passage; your name and email address (not required for reports of child sexual abuse material); and that you believe in good faith that your report is accurate and complete.
+**Anyone can report content.** You do not need an account. Write to support@dezbatere.ro. If you are signed in, you can also use the **Report** button on any public debate. An AI reads a report made with the button beside the public text. If it agrees, the debate is hidden at once and a person reviews it. If it does not, you can report again with more details, and a person will read it. So that we can act, tell us: why you believe the content is illegal or breaches these Terms, in enough detail to understand the claim; the exact location — the full URL and, if you can, the passage; your name and email address (not required for reports of child sexual abuse material); and that you believe in good faith that your report is accurate and complete.
 
 We acknowledge every report without undue delay. We handle reports in a timely, diligent, non-arbitrary and objective way, tell you our decision, and tell you how to challenge it. Where we use automated means to process or decide a report, we say so. Reports of intimate imagery shared without consent are acted on **within 48 hours** of a valid request.
 
@@ -250,6 +250,8 @@ If you live elsewhere, Annex A states the withdrawal or cooling-off right that a
 We tell you in advance, on a durable medium, what is changing and when. If the change has more than a minor negative effect on your access to or use of the service, you may terminate free of charge within **30 days** of being told, or of the change taking effect, whichever is later, and we refund any prepaid amount for the unused period.
 
 **To these Terms.** We may change these Terms for the same kinds of reasons. For changes that do not reduce your rights, we post the new version with a summary of what changed and email you at least **30 days** before it takes effect; continuing to use Dialectical Engine after that date means you accept it, and you may close your account before then. For changes that reduce your rights — including price increases on an existing plan, lower limits, removed features, new uses of your content, or changes to liability, governing law or dispute resolution — we ask you to accept the new version expressly at your next sign-in, and the change applies only going forward. We never make a change retroactive, and we never use this section to change the core of what you have paid for mid-term without offering you a way out. Prior versions stay available at dezbatere.ro/terms/versions.
+
+Version 2.12 replaced version 2.11: section 10 says that a signed-in person can also use the Report button on any public debate, that an AI reads a report made with it beside the public text, and what happens then.
 
 Version 2.11 replaced version 2.10: section 9 says that we can hide a public debate while we review it, and remove or correct part of it.
 

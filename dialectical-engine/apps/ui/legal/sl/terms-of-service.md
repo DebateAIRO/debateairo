@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Na kratko
-eyebrow: POGOJI UPORABE · v2.11 · VELJAVNI OD 1. NOVEMBRA 2026
+eyebrow: POGOJI UPORABE · v2.12 · VELJAVNI OD 1. NOVEMBRA 2026
 title: S čim soglašate
 lede: Pogodba med vami in družbo DMS Merchandise Shop S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.
-endMarker: KONEC POGOJEV · v2.11
+endMarker: KONEC POGOJEV · v2.12
 bodyLabel: Besedilo Pogojev uporabe
 annexTitle: Priloga A — Regionalni pogoji
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PRAVO, KI SE UPORABLJA
 -->
 
-**Version 2.11 · Effective 1. novembra 2026 · Prejšnje različice so na dezbatere.ro/terms/versions · Jezik: slovenščina.**
+**Version 2.12 · Effective 1. novembra 2026 · Prejšnje različice so na dezbatere.ro/terms/versions · Jezik: slovenščina.**
 
 **In short.** Stari morate biti najmanj 18 let. Dialectical Engine z modeli umetne inteligence oblikuje argumente in vse, kar ustvari, je lahko napačno — to ni nasvet. Na brezplačnem paketu so vaše razprave po zaključku javne, po preverjanju z umetno inteligenco; na plačljivem paketu so zasebne, razen če jih objavite. Ko je razprava javna, jo lahko prebere vsakdo, in ostane javna. Besedilo, ki ga pošljete, se posreduje ponudnikom umetne inteligence, navedenim v našem Registru ponudnikov, in se ne uporablja za učenje modelov. Nezakonito vsebino prijavite na support@dezbatere.ro, ne glede na to, ali imate račun. Uporablja se romunsko pravo, vendar ohranite varstvo potrošnikov po svojem lokalnem pravu.
 
@@ -170,7 +170,7 @@ Na plačljivem paketu so razprave **privzeto zasebne**: nič, kar tam ustvarite,
 
 ## 10. Prijava vsebine, moderiranje in pritožbe
 
-**Vsebino lahko prijavi vsakdo.** Računa ne potrebujete. Pišite na support@dezbatere.ro ali uporabite kontrolnik **Prijavi** pri kateri koli objavljeni razpravi. Da bomo lahko ukrepali, nam sporočite: zakaj menite, da je vsebina nezakonita ali krši te Pogoje, in sicer dovolj podrobno, da bomo razumeli trditev; točno lokacijo — celoten URL in po možnosti odlomek; svoje ime in e-poštni naslov (to ni potrebno pri prijavah gradiva s spolno zlorabo otrok); ter izjavo, da v dobri veri menite, da je vaša prijava točna in popolna.
+**Vsebino lahko prijavi vsakdo.** Računa ne potrebujete. Pišite na support@dezbatere.ro. Če ste prijavljeni, lahko uporabite tudi gumb **Prijavi** pri kateri koli javni razpravi. Umetna inteligenca prebere prijavo, oddano z gumbom, poleg javnega besedila. Če se z njo strinja, se razprava takoj skrije in jo pregleda človek. Če se ne strinja, lahko ponovno prijavite z več podrobnostmi, človek pa jo bo prebral. Da bomo lahko ukrepali, nam sporočite: zakaj menite, da je vsebina nezakonita ali krši te Pogoje, in sicer dovolj podrobno, da bomo razumeli trditev; točno lokacijo — celoten URL in po možnosti odlomek; svoje ime in e-poštni naslov (to ni potrebno pri prijavah gradiva s spolno zlorabo otrok); ter izjavo, da v dobri veri menite, da je vaša prijava točna in popolna.
 
 Vsako prijavo potrdimo brez nepotrebnega odlašanja. Prijave obravnavamo pravočasno, skrbno, nearbitrarno in objektivno, obvestimo vas o svoji odločitvi ter vam povemo, kako jo lahko izpodbijate. Če za obdelavo prijave ali odločitev o njej uporabljamo avtomatizirana sredstva, to navedemo. Na prijave intimnih posnetkov, objavljenih brez privolitve, ukrepamo **v 48 urah** od veljavne zahteve.
 
@@ -250,6 +250,8 @@ Dialectical Engine ponuja brezplačen paket. Na voljo bo plačljivi paket **Prem
 Na trajnem nosilcu vas vnaprej obvestimo, kaj se spreminja in kdaj. Če ima sprememba več kot zgolj manjši negativen vpliv na vaš dostop do storitve ali njeno uporabo, lahko brezplačno odpoveste pogodbo v **30 dneh** od obvestila ali začetka učinkovanja spremembe, kar je pozneje, mi pa vam vrnemo vse vnaprej plačane zneske za neizkoriščeno obdobje.
 
 **Spremembe teh Pogojev.** Te Pogoje lahko spremenimo iz enakih vrst razlogov. Pri spremembah, ki ne zmanjšujejo vaših pravic, objavimo novo različico s povzetkom sprememb in vam najmanj **30 dni** pred začetkom veljavnosti pošljemo e-poštno sporočilo; nadaljnja uporaba Dialectical Engine po tem datumu pomeni, da spremembo sprejemate, pred tem pa lahko zaprete račun. Pri spremembah, ki zmanjšujejo vaše pravice — vključno z zvišanjem cen obstoječega paketa, nižjimi omejitvami, odstranjenimi funkcijami, novimi načini uporabe vaše vsebine ali spremembami odgovornosti, prava, ki se uporablja, oziroma reševanja sporov — vas ob naslednji prijavi prosimo, da novo različico izrecno sprejmete, sprememba pa velja samo za naprej. Sprememb nikoli ne uveljavljamo za nazaj in tega razdelka nikoli ne uporabimo za spremembo bistva tega, kar ste plačali, med trajanjem pogodbe, ne da bi vam ponudili možnost odstopa. Prejšnje različice ostanejo dostopne na dezbatere.ro/terms/versions.
+
+Različica 2.12 je nadomestila različico 2.11: razdelek 10 navaja, da lahko prijavljena oseba tudi uporabi gumb Prijavi pri kateri koli javni razpravi, da umetna inteligenca prebere prijavo, oddano z njim, poleg javnega besedila, in kaj se nato zgodi.
 
 Različica 2.11 je nadomestila različico 2.10: razdelek 9 navaja, da lahko začasno skrijemo javno razpravo, medtem ko jo pregledujemo, ter odstranimo ali popravimo del nje.
 

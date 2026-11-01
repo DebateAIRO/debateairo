@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ringkasnya
-eyebrow: KETENTUAN LAYANAN · v2.11 · BERLAKU 1 NOVEMBER 2026
+eyebrow: KETENTUAN LAYANAN · v2.12 · BERLAKU 1 NOVEMBER 2026
 title: Hal yang Anda setujui
 lede: Kontrak antara Anda dan DMS Merchandise Shop S.R.L., dalam bahasa yang mudah dipahami. Sembilan belas bagian dan Lampiran A — gulir hingga akhir.
-endMarker: AKHIR KETENTUAN · v2.11
+endMarker: AKHIR KETENTUAN · v2.12
 bodyLabel: Teks Ketentuan Layanan
 annexTitle: Lampiran A — Ketentuan regional
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 HUKUM YANG BERLAKU
 -->
 
-**Version 2.11 · Effective 1 November 2026 · Versi sebelumnya di dezbatere.ro/terms/versions · Bahasa: Indonesia.**
+**Version 2.12 · Effective 1 November 2026 · Versi sebelumnya di dezbatere.ro/terms/versions · Bahasa: Indonesia.**
 
 **In short.** Anda harus berusia 18 tahun atau lebih. Dialectical Engine menyusun argumen dengan model AI dan segala sesuatu yang dihasilkannya mungkin salah — ini bukan nasihat. Di paket gratis, debat Anda bersifat publik setelah selesai, setelah pemeriksaan AI; di paket berbayar, debat bersifat privat kecuali Anda memublikasikannya. Setelah publik, siapa pun dapat membaca debat itu, dan debat itu tetap publik. Teks yang Anda kirim diteruskan kepada penyedia AI yang tercantum dalam Daftar Penyedia kami, dan tidak digunakan untuk melatih model. Laporkan konten ilegal ke support@dezbatere.ro, baik Anda memiliki akun maupun tidak. Hukum Rumania berlaku, tetapi perlindungan konsumen setempat Anda tetap berlaku bagi Anda.
 
@@ -170,7 +170,7 @@ Di paket berbayar, debat bersifat **privat secara bawaan**. Tidak ada hal yang A
 
 ## 10. Pelaporan konten, moderasi, dan pengaduan
 
-**Siapa pun dapat melaporkan konten.** Anda tidak memerlukan akun. Kirim surat ke support@dezbatere.ro atau gunakan kendali **Laporkan** pada debat mana pun yang dipublikasikan. Agar kami dapat bertindak, beri tahu kami: alasan Anda meyakini konten tersebut ilegal atau melanggar Ketentuan ini, dengan rincian yang cukup untuk memahami klaim; lokasi persisnya — URL lengkap dan, jika dapat, kutipannya; nama dan alamat email Anda (tidak diwajibkan untuk laporan materi pelecehan seksual terhadap anak); serta pernyataan bahwa Anda dengan iktikad baik meyakini laporan Anda akurat dan lengkap.
+**Siapa pun dapat melaporkan konten.** Anda tidak memerlukan akun. Kirim surat ke support@dezbatere.ro. Jika Anda sudah masuk, Anda juga dapat menggunakan tombol **Laporkan** pada debat publik mana pun. AI membaca laporan yang dibuat dengan tombol itu di samping teks publik. Jika AI setuju, debat langsung disembunyikan dan seseorang meninjaunya. Jika tidak, Anda dapat melaporkan lagi dengan rincian yang lebih lengkap, dan seseorang akan membacanya. Agar kami dapat bertindak, beri tahu kami: alasan Anda meyakini konten tersebut ilegal atau melanggar Ketentuan ini, dengan rincian yang cukup untuk memahami klaim; lokasi persisnya — URL lengkap dan, jika dapat, kutipannya; nama dan alamat email Anda (tidak diwajibkan untuk laporan materi pelecehan seksual terhadap anak); serta pernyataan bahwa Anda dengan iktikad baik meyakini laporan Anda akurat dan lengkap.
 
 Kami mengakui penerimaan setiap laporan tanpa penundaan yang tidak semestinya. Kami menangani laporan secara tepat waktu, cermat, tidak sewenang-wenang, dan objektif, memberi tahu Anda keputusan kami, serta menjelaskan cara menantangnya. Jika kami menggunakan sarana otomatis untuk memproses atau memutuskan laporan, kami menyatakannya. Laporan mengenai gambar intim yang dibagikan tanpa persetujuan ditindaklanjuti **dalam waktu 48 jam** sejak permintaan yang sah.
 
@@ -250,6 +250,8 @@ Jika Anda tinggal di tempat lain, Lampiran A menyatakan hak penarikan diri atau 
 Kami memberi tahu Anda terlebih dahulu, pada media tahan lama, mengenai hal yang berubah dan waktu perubahan. Jika perubahan tersebut menimbulkan dampak negatif yang lebih dari kecil terhadap akses ke atau penggunaan layanan oleh Anda, Anda dapat mengakhiri layanan tanpa biaya dalam waktu **30 hari** sejak menerima pemberitahuan, atau sejak perubahan berlaku, mana yang lebih akhir, dan kami mengembalikan setiap jumlah yang telah dibayar di muka untuk periode yang tidak digunakan.
 
 **Pada Ketentuan ini.** Kami dapat mengubah Ketentuan ini untuk jenis alasan yang sama. Untuk perubahan yang tidak mengurangi hak Anda, kami memublikasikan versi baru beserta ringkasan perubahan dan mengirim email kepada Anda sekurang-kurangnya **30 hari** sebelum perubahan berlaku; jika Anda terus menggunakan Dialectical Engine setelah tanggal tersebut, berarti Anda menerimanya, dan Anda dapat menutup akun sebelumnya. Untuk perubahan yang mengurangi hak Anda — termasuk kenaikan harga pada paket yang sudah ada, batas yang lebih rendah, fitur yang dihapus, penggunaan baru atas konten Anda, atau perubahan pada tanggung jawab, hukum yang berlaku, maupun penyelesaian sengketa — kami meminta Anda menerima versi baru secara tegas saat masuk berikutnya, dan perubahan hanya berlaku untuk waktu mendatang. Kami tidak pernah memberlakukan perubahan secara surut, dan tidak pernah menggunakan bagian ini untuk mengubah inti dari hal yang telah Anda bayar di tengah masa berlaku tanpa menawarkan jalan keluar. Versi sebelumnya tetap tersedia di dezbatere.ro/terms/versions.
+
+Versi 2.12 menggantikan versi 2.11: bagian 10 menyatakan bahwa orang yang sudah masuk juga dapat menggunakan tombol Laporkan pada debat publik mana pun, bahwa AI membaca laporan yang dibuat dengan tombol itu di samping teks publik, dan apa yang terjadi setelah itu.
 
 Versi 2.11 menggantikan versi 2.10: bagian 9 menyatakan bahwa kami dapat menyembunyikan debat publik selama kami meninjaunya, dan menghapus atau memperbaiki sebagiannya.
 

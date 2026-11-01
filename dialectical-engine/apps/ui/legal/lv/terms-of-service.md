@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Īsumā
-eyebrow: PAKALPOJUMA NOTEIKUMI · v2.11 · SPĒKĀ NO 2026. GADA 1. NOVEMBRA
+eyebrow: PAKALPOJUMA NOTEIKUMI · v2.12 · SPĒKĀ NO 2026. GADA 1. NOVEMBRA
 title: Kam jūs piekrītat
 lede: Līgums starp jums un DMS Merchandise Shop S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.
-endMarker: NOTEIKUMU BEIGAS · v2.11
+endMarker: NOTEIKUMU BEIGAS · v2.12
 bodyLabel: Pakalpojuma noteikumu teksts
 annexTitle: A pielikums — Reģionālie noteikumi
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PIEMĒROJAMIE TIESĪBU AKTI
 -->
 
-**Version 2.11 · Effective 2026. gada 1. novembris · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
+**Version 2.12 · Effective 2026. gada 1. novembris · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
 
 **In short.** Jums jābūt vismaz 18 gadus vecam. Dialectical Engine veido argumentus ar MI modeļiem, un viss, ko tas ģenerē, var būt nepareizs — tā nav konsultācija. Bezmaksas plānā jūsu debates kļūst publiskas, kad tās ir pabeigtas, pēc MI pārbaudes; maksas plānā tās ir privātas, ja vien tās nepublicējat. Kad debates ir publiskas, ikviens tās var lasīt, un tās paliek publiskas. Jūsu iesniegtais teksts tiek nosūtīts mūsu Pakalpojumu sniedzēju reģistrā norādītajiem MI pakalpojumu sniedzējiem un netiek izmantots modeļu apmācīšanai. Par nelikumīgu saturu ziņojiet uz support@dezbatere.ro neatkarīgi no tā, vai jums ir konts. Piemēro Rumānijas tiesību aktus, taču jums joprojām ir vietējā patērētāju aizsardzība.
 
@@ -170,7 +170,7 @@ Debates maksas plānā **pēc noklusējuma ir privātas**: nekas no tā, ko tur 
 
 ## 10. Ziņošana par saturu, moderēšana un sūdzības
 
-**Ikviens var ziņot par saturu.** Konts nav vajadzīgs. Rakstiet uz support@dezbatere.ro vai izmantojiet vadīklu **Ziņot** pie jebkurām publicētām debatēm. Lai mēs varētu rīkoties, norādiet: kādēļ uzskatāt, ka saturs ir nelikumīgs vai pārkāpj šos Noteikumus, pietiekami detalizēti, lai varētu saprast prasījumu; precīzu atrašanās vietu — pilnu URL un, ja iespējams, fragmentu; savu vārdu un e-pasta adresi (tas nav nepieciešams ziņojumiem par materiālu, kurā atspoguļota bērnu seksuāla izmantošana); un apliecinājumu, ka labticīgi uzskatāt savu ziņojumu par precīzu un pilnīgu.
+**Ikviens var ziņot par saturu.** Konts nav vajadzīgs. Rakstiet uz support@dezbatere.ro. Ja esat pieteicies, varat izmantot arī pogu **Ziņot** jebkurā publiskā debatē. MI lasa ar pogu iesniegtu ziņojumu līdzās publiskajam tekstam. Ja MI piekrīt ziņojumam, debate tiek uzreiz paslēpta, un to pārskata cilvēks. Ja nepiekrīt, varat ziņot vēlreiz un sniegt sīkāku informāciju, un ziņojumu izlasīs cilvēks. Lai mēs varētu rīkoties, norādiet: kādēļ uzskatāt, ka saturs ir nelikumīgs vai pārkāpj šos Noteikumus, pietiekami detalizēti, lai varētu saprast prasījumu; precīzu atrašanās vietu — pilnu URL un, ja iespējams, fragmentu; savu vārdu un e-pasta adresi (tas nav nepieciešams ziņojumiem par materiālu, kurā atspoguļota bērnu seksuāla izmantošana); un apliecinājumu, ka labticīgi uzskatāt savu ziņojumu par precīzu un pilnīgu.
 
 Mēs bez nepamatotas kavēšanās apstiprinām katra ziņojuma saņemšanu. Mēs izskatām ziņojumus savlaicīgi, rūpīgi, nepatvaļīgi un objektīvi, paziņojam jums savu lēmumu un izskaidrojam, kā to apstrīdēt. Ja ziņojuma apstrādei vai lēmuma pieņemšanai izmantojam automatizētus līdzekļus, mēs to norādām. Pēc derīga pieprasījuma par bez piekrišanas kopīgotiem intīmiem attēliem mēs rīkojamies **48 stundu laikā**.
 
@@ -250,6 +250,8 @@ Ja dzīvojat citviet, A pielikumā norādītas jūsu reģionā piemērojamās at
 Mēs pastāvīgā informācijas nesējā iepriekš paziņojam, kas un kad mainīsies. Ja izmaiņas vairāk nekā nebūtiski nelabvēlīgi ietekmē jūsu piekļuvi pakalpojumam vai tā lietošanu, varat bez maksas izbeigt līgumu **30 dienu laikā** pēc paziņojuma saņemšanas vai izmaiņu stāšanās spēkā atkarībā no tā, kurš datums ir vēlāks, un mēs atmaksājam iepriekš samaksāto summu par neizmantoto periodu.
 
 **Šo Noteikumu izmaiņas.** Mēs varam mainīt šos Noteikumus tādu pašu iemeslu dēļ. Attiecībā uz izmaiņām, kas nesamazina jūsu tiesības, mēs publicējam jauno versiju kopā ar izmaiņu kopsavilkumu un vismaz **30 dienu iepriekš** nosūtām jums e-pasta ziņojumu par tās stāšanos spēkā; turpinot lietot Dialectical Engine pēc šī datuma, jūs izmaiņām piekrītat, un pirms tam varat slēgt kontu. Attiecībā uz izmaiņām, kas samazina jūsu tiesības, — tostarp esoša plāna cenas paaugstinājumu, zemākiem ierobežojumiem, noņemtām funkcijām, jauniem jūsu satura lietošanas veidiem vai izmaiņām atbildībā, piemērojamajos tiesību aktos vai strīdu izšķiršanā — mēs lūdzam nākamajā pierakstīšanās reizē skaidri piekrist jaunajai versijai, un izmaiņas attiecas tikai uz turpmāko laiku. Mēs nekad neveicam izmaiņas ar atpakaļejošu spēku un nekad neizmantojam šo sadaļu, lai termiņa vidū mainītu jums apmaksātā pakalpojuma būtību, nepiedāvājot iespēju izstāties. Iepriekšējās versijas ir pieejamas vietnē dezbatere.ro/terms/versions.
+
+Versija 2.12 aizstāja versiju 2.11: 10. sadaļā teikts, ka pieteikusies persona var arī izmantot pogu „Ziņot” jebkurā publiskā debatē, ka MI lasa ar to iesniegtu ziņojumu līdzās publiskajam tekstam un kas pēc tam notiek.
 
 Versija 2.11 aizstāja versiju 2.10: 9. sadaļā teikts, ka mēs varam uz laiku paslēpt publisku debati, kamēr to pārskatām, un noņemt vai labot tās daļu.
 

@@ -171,7 +171,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Prijava vsebine, moderiranje in pritožbe",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Vsebino lahko prijavi vsakdo. Računa ne potrebujete. Pišite na support@dezbatere.ro ali uporabite kontrolnik Prijavi pri kateri koli objavljeni razpravi. Da bomo lahko ukrepali, nam sporočite: zakaj menite, da je vsebina nezakonita ali krši te Pogoje, in sicer dovolj podrobno, da bomo razumeli trditev; točno lokacijo — celoten URL in po možnosti odlomek; svoje ime in e-poštni naslov (to ni potrebno pri prijavah gradiva s spolno zlorabo otrok); ter izjavo, da v dobri veri menite, da je vaša prijava točna in popolna." },
+      { kind: "p", text: "Vsebino lahko prijavi vsakdo. Računa ne potrebujete. Pišite na support@dezbatere.ro. Če ste prijavljeni, lahko uporabite tudi gumb Prijavi pri kateri koli javni razpravi. Umetna inteligenca prebere prijavo, oddano z gumbom, poleg javnega besedila. Če se z njo strinja, se razprava takoj skrije in jo pregleda človek. Če se ne strinja, lahko ponovno prijavite z več podrobnostmi, človek pa jo bo prebral. Da bomo lahko ukrepali, nam sporočite: zakaj menite, da je vsebina nezakonita ali krši te Pogoje, in sicer dovolj podrobno, da bomo razumeli trditev; točno lokacijo — celoten URL in po možnosti odlomek; svoje ime in e-poštni naslov (to ni potrebno pri prijavah gradiva s spolno zlorabo otrok); ter izjavo, da v dobri veri menite, da je vaša prijava točna in popolna." },
       { kind: "p", text: "Vsako prijavo potrdimo brez nepotrebnega odlašanja. Prijave obravnavamo pravočasno, skrbno, nearbitrarno in objektivno, obvestimo vas o svoji odločitvi ter vam povemo, kako jo lahko izpodbijate. Če za obdelavo prijave ali odločitev o njej uporabljamo avtomatizirana sredstva, to navedemo. Na prijave intimnih posnetkov, objavljenih brez privolitve, ukrepamo v 48 urah od veljavne zahteve." },
       { kind: "p", text: "Dve vrsti avtomatiziranih odločitev, ki ju ločujemo." },
       {
@@ -241,6 +241,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Spremembe storitve. Dialectical Engine nenehno razvijamo, zato običajne izboljšave, popravki in spremembe nabora modelov potekajo brez obvestila. Kadar uvedemo spremembo, ki presega ohranjanje delovanja storitve, kot je opisana, to storimo samo iz enega od naslednjih razlogov: zaradi skladnosti s pravno ali regulativno zahtevo; zaradi odziva na težavo z varnostjo ali zlorabo; ker ponudnik modela spremeni, omeji ali umakne model ali funkcijo, od katere smo odvisni; zaradi prilagoditve tehničnemu okolju, ki ga ne obvladujemo; ali zaradi dodajanja, izboljšanja ali ukinitve funkcije na način, ki vam ne povzroči stroškov." },
       { kind: "p", text: "Na trajnem nosilcu vas vnaprej obvestimo, kaj se spreminja in kdaj. Če ima sprememba več kot zgolj manjši negativen vpliv na vaš dostop do storitve ali njeno uporabo, lahko brezplačno odpoveste pogodbo v 30 dneh od obvestila ali začetka učinkovanja spremembe, kar je pozneje, mi pa vam vrnemo vse vnaprej plačane zneske za neizkoriščeno obdobje." },
       { kind: "p", text: "Spremembe teh Pogojev. Te Pogoje lahko spremenimo iz enakih vrst razlogov. Pri spremembah, ki ne zmanjšujejo vaših pravic, objavimo novo različico s povzetkom sprememb in vam najmanj 30 dni pred začetkom veljavnosti pošljemo e-poštno sporočilo; nadaljnja uporaba Dialectical Engine po tem datumu pomeni, da spremembo sprejemate, pred tem pa lahko zaprete račun. Pri spremembah, ki zmanjšujejo vaše pravice — vključno z zvišanjem cen obstoječega paketa, nižjimi omejitvami, odstranjenimi funkcijami, novimi načini uporabe vaše vsebine ali spremembami odgovornosti, prava, ki se uporablja, oziroma reševanja sporov — vas ob naslednji prijavi prosimo, da novo različico izrecno sprejmete, sprememba pa velja samo za naprej. Sprememb nikoli ne uveljavljamo za nazaj in tega razdelka nikoli ne uporabimo za spremembo bistva tega, kar ste plačali, med trajanjem pogodbe, ne da bi vam ponudili možnost odstopa. Prejšnje različice ostanejo dostopne na dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Različica 2.12 je nadomestila različico 2.11: razdelek 10 navaja, da lahko prijavljena oseba tudi uporabi gumb Prijavi pri kateri koli javni razpravi, da umetna inteligenca prebere prijavo, oddano z njim, poleg javnega besedila, in kaj se nato zgodi." },
       { kind: "p", text: "Različica 2.11 je nadomestila različico 2.10: razdelek 9 navaja, da lahko začasno skrijemo javno razpravo, medtem ko jo pregledujemo, ter odstranimo ali popravimo del nje." },
       { kind: "p", text: "Različica 2.10 je nadomestila različico 2.9: razdelek 9 navaja, da so razprave na brezplačnem paketu javne, da javne razprave ni mogoče umakniti iz objave in ostanejo javne tudi po zaprtju vašega računa, da lahko vsak, ki ima dobroimetje, prispeva k javni razpravi ali napiše poročilo o njej, in da javna razprava ostane odprta tudi potem, ko je njen prvi avtor odšel; razdelek 11 navaja, kaj zaprtje naredi z vašimi javnimi razpravami." },
       { kind: "p", text: "Različica 2.9 je nadomestila različico 2.8: razdelek 8 dobi odstavek »Grafikoni in statistični podatki, ki jih ustvarimo«, ki določa, komu pripadajo grafikoni v poročilu o razpravi, in vam podeljuje licenco za njihovo uporabo." },
@@ -373,12 +374,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.11",
-  sha256: "67d102a45d28260b4c54c7b2882a93bc6eda5cb2c68096050184cb86d5f38892",
-  eyebrow: "POGOJI UPORABE · v2.11 · VELJAVNI OD 1. NOVEMBRA 2026",
+  version: "2.12",
+  sha256: "ab822fef707b2f06100f8cc33536b8ec5f843f62bca73b03a60859df1610a6be",
+  eyebrow: "POGOJI UPORABE · v2.12 · VELJAVNI OD 1. NOVEMBRA 2026",
   title: "S čim soglašate",
   lede: "Pogodba med vami in družbo DMS Merchandise Shop S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.",
-  endMarker: "KONEC POGOJEV · v2.11",
+  endMarker: "KONEC POGOJEV · v2.12",
   contact: "support@dezbatere.ro",
   bodyLabel: "Besedilo Pogojev uporabe",
   sectionIdPrefix: "terms-section-",

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kurz gesagt
-eyebrow: NUTZUNGSBEDINGUNGEN · v2.11 · GÜLTIG AB 1. NOVEMBER 2026
+eyebrow: NUTZUNGSBEDINGUNGEN · v2.12 · GÜLTIG AB 1. NOVEMBER 2026
 title: Womit Sie sich einverstanden erklären
 lede: Der Vertrag zwischen Ihnen und DMS Merchandise Shop S.R.L. in verständlicher Sprache. Neunzehn Abschnitte und Anhang A – scrollen Sie bis zum Ende.
-endMarker: ENDE DER NUTZUNGSBEDINGUNGEN · v2.11
+endMarker: ENDE DER NUTZUNGSBEDINGUNGEN · v2.12
 bodyLabel: Text der Nutzungsbedingungen
 annexTitle: Anhang A – Regionale Bestimmungen
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ANWENDBARES RECHT
 -->
 
-**Version 2.11 · Effective 1. November 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
+**Version 2.12 · Effective 1. November 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
 
 **In short.** Sie müssen mindestens 18 Jahre alt sein. Dialectical Engine erstellt Argumente mithilfe von KI-Modellen, und alles, was es erzeugt, kann falsch sein – es handelt sich nicht um Beratung. Im kostenlosen Tarif sind Ihre Debatten nach Abschluss öffentlich, nach einer KI-Prüfung; im kostenpflichtigen Tarif sind sie privat, sofern Sie sie nicht veröffentlichen. Sobald eine Debatte öffentlich ist, kann jede Person sie lesen, und sie bleibt öffentlich. Von Ihnen übermittelter Text wird an die in unserem Verzeichnis aufgeführten KI-Anbieter gesendet und nicht zum Trainieren von Modellen verwendet. Melden Sie rechtswidrige Inhalte unter support@dezbatere.ro, unabhängig davon, ob Sie ein Konto haben. Es gilt rumänisches Recht, Ihre örtlichen Verbraucherschutzrechte bleiben Ihnen jedoch erhalten.
 
@@ -170,7 +170,7 @@ Im kostenpflichtigen Tarif sind Debatten **standardmäßig privat**: Nichts, was
 
 ## 10. Meldung von Inhalten, Moderation und Beschwerden
 
-**Alle können Inhalte melden.** Sie benötigen kein Konto. Schreiben Sie an support@dezbatere.ro oder verwenden Sie die Schaltfläche **Melden** bei einer veröffentlichten Debatte. Damit wir tätig werden können, teilen Sie uns Folgendes mit: warum Sie den Inhalt für rechtswidrig oder einen Verstoß gegen diese Nutzungsbedingungen halten, und zwar so ausführlich, dass wir die Beanstandung nachvollziehen können; den genauen Ort – die vollständige URL und, soweit möglich, die Passage; Ihren Namen und Ihre E-Mail-Adresse (bei Meldungen von Darstellungen sexuellen Kindesmissbrauchs nicht erforderlich); sowie Ihre nach Treu und Glauben abgegebene Erklärung, dass Ihre Meldung richtig und vollständig ist.
+**Alle können Inhalte melden.** Sie benötigen kein Konto. Schreiben Sie an support@dezbatere.ro. Wenn Sie angemeldet sind, können Sie auch die Schaltfläche **Melden** bei jeder öffentlichen Debatte verwenden. Eine KI liest eine mit der Schaltfläche abgegebene Meldung neben dem öffentlichen Text. Wenn sie zustimmt, wird die Debatte sofort ausgeblendet, und eine Person prüft sie. Wenn nicht, können Sie erneut mit weiteren Details melden, und eine Person wird sie lesen. Damit wir tätig werden können, teilen Sie uns Folgendes mit: warum Sie den Inhalt für rechtswidrig oder einen Verstoß gegen diese Nutzungsbedingungen halten, und zwar so ausführlich, dass wir die Beanstandung nachvollziehen können; den genauen Ort – die vollständige URL und, soweit möglich, die Passage; Ihren Namen und Ihre E-Mail-Adresse (bei Meldungen von Darstellungen sexuellen Kindesmissbrauchs nicht erforderlich); sowie Ihre nach Treu und Glauben abgegebene Erklärung, dass Ihre Meldung richtig und vollständig ist.
 
 Wir bestätigen jede Meldung unverzüglich. Wir bearbeiten Meldungen zeitnah, sorgfältig, objektiv und frei von Willkür, teilen Ihnen unsere Entscheidung mit und erläutern, wie Sie sie anfechten können. Wenn wir eine Meldung mit automatisierten Mitteln bearbeiten oder entscheiden, weisen wir darauf hin. Auf Meldungen intimer Abbildungen, die ohne Einwilligung geteilt wurden, reagieren wir **innerhalb von 48 Stunden** nach Eingang eines wirksamen Antrags.
 
@@ -250,6 +250,8 @@ Wenn Sie anderswo leben, nennt Anhang A das in Ihrer Region gegebenenfalls gelte
 Wir teilen Ihnen im Voraus auf einem dauerhaften Datenträger mit, was sich wann ändert. Hat die Änderung mehr als geringfügige nachteilige Auswirkungen auf Ihren Zugang zum Dienst oder dessen Nutzung, können Sie innerhalb von **30 Tagen** nach der Mitteilung oder nach Inkrafttreten der Änderung, je nachdem, welcher Zeitpunkt später liegt, kostenlos kündigen; wir erstatten alle für den ungenutzten Zeitraum vorausgezahlten Beträge.
 
 **Änderungen dieser Nutzungsbedingungen.** Wir können diese Nutzungsbedingungen aus denselben Arten von Gründen ändern. Bei Änderungen, die Ihre Rechte nicht einschränken, veröffentlichen wir die neue Fassung mit einer Zusammenfassung der Änderungen und senden Ihnen mindestens **30 Tage vor ihrem Inkrafttreten** eine E-Mail; wenn Sie Dialectical Engine nach diesem Datum weiterhin nutzen, stimmen Sie der Änderung zu, und Sie können Ihr Konto vorher schließen. Bei Änderungen, die Ihre Rechte einschränken – darunter Preiserhöhungen für einen bestehenden Tarif, niedrigere Limits, entfernte Funktionen, neue Nutzungen Ihrer Inhalte oder Änderungen der Haftung, des anwendbaren Rechts oder der Streitbeilegung – bitten wir Sie, der neuen Fassung bei Ihrer nächsten Anmeldung ausdrücklich zuzustimmen; die Änderung gilt nur für die Zukunft. Wir nehmen Änderungen niemals rückwirkend vor und verwenden diesen Abschnitt niemals dazu, den Kern Ihrer bereits bezahlten Leistung während der Laufzeit zu ändern, ohne Ihnen eine Beendigungsmöglichkeit einzuräumen. Frühere Fassungen bleiben unter dezbatere.ro/terms/versions verfügbar.
+
+Version 2.12 ersetzte Version 2.11: Abschnitt 10 besagt, dass eine angemeldete Person auch die Schaltfläche Melden bei jeder öffentlichen Debatte verwenden kann, dass eine KI eine damit abgegebene Meldung neben dem öffentlichen Text liest und was dann geschieht.
 
 Version 2.11 ersetzte Version 2.10: Abschnitt 9 besagt, dass wir eine öffentliche Debatte während der Prüfung vorübergehend ausblenden und einen Teil davon entfernen oder korrigieren können.
 

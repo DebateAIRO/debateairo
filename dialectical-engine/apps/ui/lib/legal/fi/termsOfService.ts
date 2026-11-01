@@ -171,7 +171,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Sisällöstä ilmoittaminen, moderointi ja valitukset",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Kuka tahansa voi ilmoittaa sisällöstä. Et tarvitse tiliä. Kirjoita osoitteeseen support@dezbatere.ro tai käytä minkä tahansa julkaistun väittelyn Ilmoita-toimintoa. Jotta voimme toimia, ilmoita meille: riittävän yksityiskohtaisesti, miksi katsot sisällön olevan lainvastainen tai rikkovan näitä käyttöehtoja; tarkka sijainti — täydellinen URL-osoite ja mahdollisuuksien mukaan kyseinen kohta; nimesi ja sähköpostiosoitteesi (niitä ei edellytetä lasten seksuaaliseen hyväksikäyttöön liittyvää aineistoa koskevissa ilmoituksissa); sekä vakuutus siitä, että vilpittömän käsityksesi mukaan ilmoituksesi on täsmällinen ja täydellinen." },
+      { kind: "p", text: "Kuka tahansa voi ilmoittaa sisällöstä. Et tarvitse tiliä. Kirjoita osoitteeseen support@dezbatere.ro. Jos olet kirjautunut sisään, voit käyttää myös minkä tahansa julkisen väittelyn Ilmoita-painiketta. Tekoäly lukee Ilmoita-painikkeella tehdyn ilmoituksen julkisen tekstin rinnalla. Jos tekoäly on samaa mieltä, väittely piilotetaan heti ja henkilö tarkistaa sen. Jos se ei ole samaa mieltä, voit ilmoittaa uudelleen tarkemmilla tiedoilla, ja henkilö lukee ilmoituksen. Jotta voimme toimia, ilmoita meille: riittävän yksityiskohtaisesti, miksi katsot sisällön olevan lainvastainen tai rikkovan näitä käyttöehtoja; tarkka sijainti — täydellinen URL-osoite ja mahdollisuuksien mukaan kyseinen kohta; nimesi ja sähköpostiosoitteesi (niitä ei edellytetä lasten seksuaaliseen hyväksikäyttöön liittyvää aineistoa koskevissa ilmoituksissa); sekä vakuutus siitä, että vilpittömän käsityksesi mukaan ilmoituksesi on täsmällinen ja täydellinen." },
       { kind: "p", text: "Vahvistamme jokaisen ilmoituksen vastaanottamisen ilman aiheetonta viivytystä. Käsittelemme ilmoitukset oikea-aikaisesti, huolellisesti, ilman mielivaltaa ja objektiivisesti, ilmoitamme sinulle päätöksestämme ja kerromme, miten voit riitauttaa sen. Jos käytämme automatisoituja keinoja ilmoituksen käsittelyyn tai ratkaisemiseen, kerromme siitä. Ilman suostumusta jaettua intiimiä kuva-aineistoa koskeviin ilmoituksiin reagoidaan 48 tunnin kuluessa pätevästä pyynnöstä." },
       { kind: "p", text: "Kaksi erilaista automatisoitua päätöstä, jotka pidetään erillään." },
       {
@@ -241,6 +241,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Palvelun muutokset. Kehitämme Dialectical Engine -palvelua jatkuvasti, ja tavanomaiset parannukset, korjaukset ja mallivalikoiman muutokset tehdään ilman ilmoitusta. Jos muutos ylittää sen, mikä on tarpeen palvelun pitämiseksi kuvatulla tavalla toimivana, teemme sen vain jostakin seuraavista syistä: oikeudellisen tai sääntelyvaatimuksen noudattamiseksi; turvallisuus- tai väärinkäytösongelmaan reagoimiseksi; koska mallipalveluntarjoaja muuttaa tai rajoittaa mallia tai ominaisuutta, johon tukeudumme, taikka poistaa sen; mukautuaksemme tekniseen ympäristöön, jota emme hallitse; tai lisätäksemme, parantaaksemme tai poistaaksemme ominaisuuden tavalla, josta ei aiheudu sinulle kustannuksia." },
       { kind: "p", text: "Ilmoitamme sinulle etukäteen pysyvällä välineellä, mikä muuttuu ja milloin. Jos muutoksella on vähäistä suurempi kielteinen vaikutus mahdollisuuteesi käyttää palvelua tai palvelun käyttöösi, voit päättää sopimuksen maksutta 30 päivän kuluessa ilmoituksesta tai muutoksen voimaantulosta sen mukaan, kumpi ajankohta on myöhäisempi, ja palautamme käyttämättömään aikaan kohdistuvat ennakkomaksut." },
       { kind: "p", text: "Näiden käyttöehtojen muutokset. Voimme muuttaa näitä käyttöehtoja samanlaisista syistä. Jos muutos ei vähennä oikeuksiasi, julkaisemme uuden version ja yhteenvedon muutoksista sekä lähetämme sinulle sähköpostia vähintään 30 päivää ennen sen voimaantuloa; Dialectical Engine -palvelun käytön jatkaminen kyseisen ajankohdan jälkeen merkitsee hyväksyntääsi, ja voit sulkea tilisi ennen sitä. Jos muutos vähentää oikeuksiasi — mukaan lukien olemassa olevan tilauksen hinnankorotukset, alhaisemmat rajat, poistetut ominaisuudet, sisältösi uudet käyttötavat tai vastuuta, sovellettavaa lakia tai riidanratkaisua koskevat muutokset — pyydämme sinua hyväksymään uuden version nimenomaisesti seuraavan kirjautumisesi yhteydessä, ja muutosta sovelletaan vain jatkossa. Emme koskaan muuta ehtoja taannehtivasti emmekä käytä tätä kohtaa muuttaaksemme kesken sopimuskauden maksamasi palvelun ydintä tarjoamatta sinulle mahdollisuutta irtautua. Aiemmat versiot säilyvät saatavilla osoitteessa dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Versio 2.12 korvasi version 2.11: kohdassa 10 kerrotaan, että kirjautunut henkilö voi myös käyttää Ilmoita-painiketta minkä tahansa julkisen väittelyn kohdalla, että tekoäly lukee sillä tehdyn ilmoituksen julkisen tekstin rinnalla ja mitä sen jälkeen tapahtuu." },
       { kind: "p", text: "Versio 2.11 korvasi version 2.10: kohdan 9 mukaan voimme piilottaa julkisen väittelyn sen tarkistamisen ajaksi sekä poistaa tai korjata osan siitä." },
       { kind: "p", text: "Versio 2.10 korvasi version 2.9: kohdan 9 mukaan maksuttomassa tilauksessa väittelyt ovat julkisia, julkista väittelyä ei voi perua ja se pysyy julkisena tilin sulkemisen jälkeen, kuka tahansa, jolla on krediittiä, voi osallistua julkiseen väittelyyn tai kirjoittaa siitä raportin, ja julkinen väittely pysyy avoimena ensimmäisen kirjoittajan poistuttua; kohta 11 kertoo, mitä sulkeminen tekee julkisille väittelyillesi." },
       { kind: "p", text: "Versio 2.9 korvasi version 2.8: kohtaan 8 lisätään kappale ”Tuottamamme kaaviot ja tilastot”, jossa kerrotaan, kenelle väittelyraportin kaaviot kuuluvat, ja myönnetään sinulle käyttölupa niiden käyttämiseen." },
@@ -373,12 +374,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.11",
-  sha256: "9314905bc7d94ca293d914ebb809ff0159405227fd579e1b4135befa145dd11b",
-  eyebrow: "KÄYTTÖEHDOT · v2.11 · VOIMASSA 1. MARRASKUUTA 2026 ALKAEN",
+  version: "2.12",
+  sha256: "c1824496cc58e9524ff0b25bfd912b52eadf9f3a799aedbb94f4a628bff7daee",
+  eyebrow: "KÄYTTÖEHDOT · v2.12 · VOIMASSA 1. MARRASKUUTA 2026 ALKAEN",
   title: "Mihin sitoudut",
   lede: "Sinun ja DMS Merchandise Shop S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.",
-  endMarker: "KÄYTTÖEHTOJEN LOPPU · v2.11",
+  endMarker: "KÄYTTÖEHTOJEN LOPPU · v2.12",
   contact: "support@dezbatere.ro",
   bodyLabel: "Käyttöehtojen teksti",
   sectionIdPrefix: "terms-section-",

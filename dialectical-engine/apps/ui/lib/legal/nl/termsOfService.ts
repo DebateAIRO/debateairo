@@ -171,7 +171,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Inhoud melden, moderatie en klachten",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Iedereen kan inhoud melden. U hebt geen account nodig. Schrijf naar support@dezbatere.ro of gebruik de knop Melden bij een gepubliceerd debat. Vertel ons, zodat wij kunnen handelen: waarom u meent dat de inhoud illegaal is of deze Voorwaarden schendt, met voldoende bijzonderheden om de bewering te begrijpen; de exacte locatie — de volledige URL en, indien mogelijk, de passage; uw naam en e-mailadres (niet vereist voor meldingen van materiaal betreffende seksueel misbruik van kinderen); en dat u te goeder trouw meent dat uw melding juist en volledig is." },
+      { kind: "p", text: "Iedereen kan inhoud melden. U hebt geen account nodig. Schrijf naar support@dezbatere.ro. Als u bent ingelogd, kunt u ook de knop Melden gebruiken bij elk openbaar debat. Een AI leest een melding die met de knop is gedaan, naast de openbare tekst. Als de AI het ermee eens is, wordt het debat meteen verborgen en beoordeelt een persoon het. Als dat niet zo is, kunt u opnieuw melden met meer details, en dan leest een persoon de melding. Vertel ons, zodat wij kunnen handelen: waarom u meent dat de inhoud illegaal is of deze Voorwaarden schendt, met voldoende bijzonderheden om de bewering te begrijpen; de exacte locatie — de volledige URL en, indien mogelijk, de passage; uw naam en e-mailadres (niet vereist voor meldingen van materiaal betreffende seksueel misbruik van kinderen); en dat u te goeder trouw meent dat uw melding juist en volledig is." },
       { kind: "p", text: "Wij bevestigen elke melding zonder onnodige vertraging. Wij behandelen meldingen tijdig, zorgvuldig, niet-willekeurig en objectief, delen u onze beslissing mee en vertellen u hoe u deze kunt aanvechten. Wanneer wij geautomatiseerde middelen gebruiken om een melding te verwerken of daarover te beslissen, zeggen wij dat. Naar aanleiding van meldingen van zonder toestemming gedeelde intieme beelden wordt binnen 48 uur na een geldig verzoek gehandeld." },
       { kind: "p", text: "Twee soorten geautomatiseerde beslissingen, van elkaar gescheiden." },
       {
@@ -241,6 +241,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "In de dienst. Wij ontwikkelen Dialectical Engine voortdurend en brengen routinematige verbeteringen, oplossingen en wijzigingen in de reeks modellen zonder kennisgeving aan. Wanneer wij een wijziging aanbrengen die verder gaat dan de dienst te laten werken zoals beschreven, doen wij dat uitsluitend om een van deze redenen: om aan een wettelijke of regelgevende eis te voldoen; om op een beveiligings- of misbruikprobleem te reageren; omdat een modelaanbieder een model of functie waarvan wij afhankelijk zijn wijzigt, beperkt of niet langer aanbiedt; om ons aan te passen aan een technische omgeving waarover wij geen controle hebben; of om een functie zonder extra kosten voor u toe te voegen, te verbeteren of te beëindigen." },
       { kind: "p", text: "Wij vertellen u vooraf, op een duurzame gegevensdrager, wat er verandert en wanneer. Als de wijziging meer dan een gering negatief effect heeft op uw toegang tot of gebruik van de dienst, kunt u binnen 30 dagen nadat u hierover bent geïnformeerd of nadat de wijziging van kracht wordt, afhankelijk van welk moment later valt, de overeenkomst kosteloos beëindigen en betalen wij elk voorafbetaald bedrag voor de ongebruikte periode terug." },
       { kind: "p", text: "In deze Voorwaarden. Wij kunnen deze Voorwaarden om dezelfde soorten redenen wijzigen. Voor wijzigingen die uw rechten niet verminderen, publiceren wij de nieuwe versie met een samenvatting van wat is gewijzigd en sturen wij u ten minste 30 dagen vóór de ingangsdatum een e-mail; als u Dialectical Engine na die datum blijft gebruiken, betekent dit dat u de wijziging aanvaardt, en u kunt uw account voordien sluiten. Voor wijzigingen die uw rechten verminderen — waaronder prijsverhogingen voor een bestaand abonnement, lagere limieten, verwijderde functies, nieuw gebruik van uw inhoud of wijzigingen in aansprakelijkheid, toepasselijk recht of geschillenbeslechting — vragen wij u bij uw volgende aanmelding uitdrukkelijk de nieuwe versie te aanvaarden en geldt de wijziging uitsluitend voor de toekomst. Wij maken een wijziging nooit met terugwerkende kracht en gebruiken dit hoofdstuk nooit om de kern van hetgeen waarvoor u hebt betaald tijdens de looptijd te wijzigen zonder u een uitweg te bieden. Eerdere versies blijven beschikbaar op dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Versie 2.12 verving versie 2.11: hoofdstuk 10 zegt dat een ingelogde persoon ook de knop Melden kan gebruiken bij elk openbaar debat, dat een AI een melding die ermee is gedaan naast de openbare tekst leest, en wat er dan gebeurt." },
       { kind: "p", text: "Versie 2.11 verving versie 2.10: hoofdstuk 9 zegt dat wij een openbaar debat tijdelijk kunnen verbergen terwijl wij het beoordelen, en een deel ervan kunnen verwijderen of corrigeren." },
       { kind: "p", text: "Versie 2.10 verving versie 2.9: hoofdstuk 9 zegt dat debatten op het gratis abonnement openbaar zijn, dat een openbaar debat niet kan worden teruggenomen en na sluiting van uw account openbaar blijft, dat iedereen met tegoed kan bijdragen aan een openbaar debat of er een rapport over kan schrijven, en dat een openbaar debat open blijft nadat de eerste auteur is vertrokken; hoofdstuk 11 zegt wat sluiting met uw openbare debatten doet." },
       { kind: "p", text: "Versie 2.9 verving versie 2.8: hoofdstuk 8 krijgt de alinea „Grafieken en statistieken die wij genereren”, die bepaalt van wie de grafieken in een debatrapport zijn en u een licentie geeft om ze te gebruiken." },
@@ -373,12 +374,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.11",
-  sha256: "ea54f02c3650b6f52250e2e2a7c451d6cffabbef531c6362c61165b4e6d4e1d8",
-  eyebrow: "SERVICEVOORWAARDEN · v2.11 · VAN KRACHT OP 1 NOVEMBER 2026",
+  version: "2.12",
+  sha256: "d9ad8d3acca73f365c2df6f235a0d9ce60678a6b5411d33a09a028a96380b3cb",
+  eyebrow: "SERVICEVOORWAARDEN · v2.12 · VAN KRACHT OP 1 NOVEMBER 2026",
   title: "Waarmee u instemt",
   lede: "De overeenkomst tussen u en DMS Merchandise Shop S.R.L., in begrijpelijke taal. Negentien hoofdstukken en Bijlage A — scrol tot het einde.",
-  endMarker: "EINDE VAN DE VOORWAARDEN · v2.11",
+  endMarker: "EINDE VAN DE VOORWAARDEN · v2.12",
   contact: "support@dezbatere.ro",
   bodyLabel: "Tekst van de Servicevoorwaarden",
   sectionIdPrefix: "terms-section-",

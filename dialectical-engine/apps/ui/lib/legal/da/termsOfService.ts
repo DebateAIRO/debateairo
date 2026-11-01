@@ -171,7 +171,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Anmeldelse af indhold, moderation og klager",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Alle kan anmelde indhold. Du behøver ikke have en konto. Skriv til support@dezbatere.ro, eller brug funktionen Anmeld på en offentliggjort debat. For at vi kan handle, skal du oplyse: hvorfor du mener, at indholdet er ulovligt eller overtræder disse vilkår, tilstrækkeligt detaljeret til, at vi kan forstå påstanden; den nøjagtige placering — den fulde URL og om muligt det relevante tekststykke; dit navn og din e-mailadresse (kræves ikke ved anmeldelser af materiale med seksuelt misbrug af børn); og at du i god tro mener, at din anmeldelse er korrekt og fuldstændig." },
+      { kind: "p", text: "Alle kan anmelde indhold. Du behøver ikke have en konto. Skriv til support@dezbatere.ro. Hvis du er logget ind, kan du også bruge knappen Anmeld på enhver offentlig debat. En AI læser en anmeldelse, der er indsendt med knappen, ved siden af den offentlige tekst. Hvis den er enig, skjules debatten med det samme, og en person gennemgår den. Hvis den ikke er enig, kan du anmelde igen med flere oplysninger, og en person læser anmeldelsen. For at vi kan handle, skal du oplyse: hvorfor du mener, at indholdet er ulovligt eller overtræder disse vilkår, tilstrækkeligt detaljeret til, at vi kan forstå påstanden; den nøjagtige placering — den fulde URL og om muligt det relevante tekststykke; dit navn og din e-mailadresse (kræves ikke ved anmeldelser af materiale med seksuelt misbrug af børn); og at du i god tro mener, at din anmeldelse er korrekt og fuldstændig." },
       { kind: "p", text: "Vi bekræfter modtagelsen af enhver anmeldelse uden unødig forsinkelse. Vi behandler anmeldelser rettidigt, omhyggeligt, ikke-vilkårligt og objektivt, meddeler dig vores afgørelse og oplyser, hvordan du kan anfægte den. Hvis vi bruger automatiserede midler til at behandle eller afgøre en anmeldelse, oplyser vi det. Ved en gyldig anmodning reagerer vi på anmeldelser af intime billeder delt uden samtykke inden for 48 timer." },
       { kind: "p", text: "To former for automatiske afgørelser, som holdes adskilt." },
       {
@@ -241,6 +241,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Tjenesten. Vi udvikler løbende Dialectical Engine, og rutinemæssige forbedringer, rettelser og ændringer i modeludvalget sker uden varsel. Hvis vi foretager en ændring, der går ud over at holde tjenesten i funktion som beskrevet, gør vi det kun af en af følgende grunde: for at overholde et retligt eller regulatorisk krav; for at reagere på et sikkerheds- eller misbrugsproblem; fordi en modeludbyder ændrer, begrænser eller trækker en model eller funktion tilbage, som vi er afhængige af; for at tilpasse os et teknisk miljø, vi ikke kontrollerer; eller for at tilføje, forbedre eller udfase en funktion på en måde, der ikke medfører omkostninger for dig." },
       { kind: "p", text: "Vi oplyser dig på forhånd på et varigt medium om, hvad der ændres og hvornår. Hvis ændringen har mere end en mindre negativ indvirkning på din adgang til eller brug af tjenesten, kan du uden omkostninger opsige inden for 30 dage efter, at du blev underrettet, eller efter at ændringen fik virkning, alt efter hvilken dato der ligger senest, og vi tilbagebetaler eventuelle forudbetalte beløb for den uudnyttede periode." },
       { kind: "p", text: "Disse vilkår. Vi kan ændre disse vilkår af samme type grunde. Ved ændringer, der ikke begrænser dine rettigheder, offentliggør vi den nye version med et resumé af ændringerne og sender dig en e-mail mindst 30 dage, før den får virkning; hvis du fortsætter med at bruge Dialectical Engine efter denne dato, betyder det, at du accepterer den, og du kan lukke din konto inden da. Ved ændringer, der begrænser dine rettigheder — herunder prisstigninger på et eksisterende abonnement, lavere grænser, fjernede funktioner, nye anvendelser af dit indhold eller ændringer af ansvar, lovvalg eller tvistbilæggelse — beder vi dig udtrykkeligt acceptere den nye version ved dit næste login, og ændringen gælder kun fremadrettet. Vi foretager aldrig ændringer med tilbagevirkende kraft, og vi bruger aldrig dette afsnit til at ændre kernen i det, du har betalt for, midt i en periode uden at tilbyde dig en udvej. Tidligere versioner forbliver tilgængelige på dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Version 2.12 erstattede version 2.11: afsnit 10 oplyser, at en person, der er logget ind, også kan bruge knappen Anmeld på enhver offentlig debat, at en AI læser en anmeldelse, der er indsendt med den, ved siden af den offentlige tekst, og hvad der så sker." },
       { kind: "p", text: "Version 2.11 erstattede version 2.10: afsnit 9 oplyser, at vi kan midlertidigt skjule en offentlig debat, mens vi gennemgår den, og fjerne eller rette en del af den." },
       { kind: "p", text: "Version 2.10 erstattede version 2.9: afsnit 9 oplyser, at debatter på det gratis abonnement er offentlige, at en offentlig debat ikke kan få ophævet offentliggørelsen og forbliver offentlig, efter at du har lukket din konto, at alle med kredit kan bidrage til en offentlig debat eller skrive en rapport om den, og at en offentlig debat forbliver åben, efter at dens første forfatter er gået; afsnit 11 oplyser, hvad lukning gør ved dine offentlige debatter." },
       { kind: "p", text: "Version 2.9 erstattede version 2.8: afsnit 8 får stykket »Diagrammer og statistik, som vi genererer«, som angiver, hvem der ejer diagrammerne i en debatrapport, og giver dig en licens til at bruge dem." },
@@ -373,12 +374,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.11",
-  sha256: "3d6713af1d5411ec37f42526db8e23ceaa8ec0904748a110a78808150bd9e241",
-  eyebrow: "TJENESTEVILKÅR · v2.11 · GÆLDENDE FRA 1. NOVEMBER 2026",
+  version: "2.12",
+  sha256: "2a6892265bc4fff828723faa95e0bc0f6330e7d655d1ba7734acdd8ceb38ad78",
+  eyebrow: "TJENESTEVILKÅR · v2.12 · GÆLDENDE FRA 1. NOVEMBER 2026",
   title: "Det, du accepterer",
   lede: "Aftalen mellem dig og DMS Merchandise Shop S.R.L. i et klart sprog. Nitten afsnit og bilag A — rul ned til slutningen.",
-  endMarker: "SLUT PÅ VILKÅRENE · v2.11",
+  endMarker: "SLUT PÅ VILKÅRENE · v2.12",
   contact: "support@dezbatere.ro",
   bodyLabel: "Tjenestevilkårenes tekst",
   sectionIdPrefix: "terms-section-",

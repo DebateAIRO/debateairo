@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Go hachomair
-eyebrow: TÉARMAÍ SEIRBHÍSE · v2.11 · I bhFEIDHM 1 SAMHAIN 2026
+eyebrow: TÉARMAÍ SEIRBHÍSE · v2.12 · I bhFEIDHM 1 SAMHAIN 2026
 title: An méid lena n-aontaíonn tú
 lede: An conradh idir tú agus DMS Merchandise Shop S.R.L., i bhfriotal soiléir. Naoi rannán déag agus Iarscríbhinn A — scrollaigh go dtí an deireadh.
-endMarker: DEIREADH NA dTÉARMAÍ · v2.11
+endMarker: DEIREADH NA dTÉARMAÍ · v2.12
 bodyLabel: Téacs na dTéarmaí Seirbhíse
 annexTitle: Iarscríbhinn A — Téarmaí réigiúnacha
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 AN DLÍ RIALAITHE
 -->
 
-**Version 2.11 · Effective 1 Samhain 2026 · Leaganacha roimhe seo ag dezbatere.ro/terms/versions · Teanga: Gaeilge.**
+**Version 2.12 · Effective 1 Samhain 2026 · Leaganacha roimhe seo ag dezbatere.ro/terms/versions · Teanga: Gaeilge.**
 
 **In short.** Ní mór duit a bheith 18 mbliana d'aois nó os a chionn. Tógann Dialectical Engine argóintí le samhlacha IS agus d'fhéadfadh gach rud a ghineann sé a bheith mícheart — ní comhairle é. Ar an bplean saor in aisce, bíonn do dhíospóireachtaí poiblí nuair a bhíonn siad críochnaithe, tar éis seiceála IS; ar phlean íoctha bíonn siad príobháideach mura bhfoilsíonn tú iad. Nuair a bhíonn díospóireacht phoiblí, is féidir le duine ar bith í a léamh, agus fanann sí poiblí. Seoltar téacs a chuireann tú isteach chuig soláthraithe IS atá liostaithe inár gClár Soláthraithe, agus ní úsáidtear é chun samhlacha a oiliúint. Tuairiscigh ábhar neamhdhleathach ag support@dezbatere.ro cibé acu atá cuntas agat nó nach bhfuil. Is é dlí na Rómáine an dlí rialaithe, ach coimeádann tú do chosaintí áitiúla tomhaltóra.
 
@@ -170,7 +170,7 @@ Bíonn díospóireachtaí ar phlean íoctha **príobháideach mar réamhshocrú*
 
 ## 10. Ábhar a thuairisciú, modhnóireacht agus gearáin
 
-**Is féidir le duine ar bith ábhar a thuairisciú.** Ní gá cuntas a bheith agat. Scríobh chuig support@dezbatere.ro nó úsáid an rialtán **Tuairiscigh** ar aon díospóireacht fhoilsithe. Ionas gur féidir linn gníomhú, inis dúinn: an fáth a gcreideann tú go bhfuil an t-ábhar neamhdhleathach nó go sáraíonn sé na Téarmaí seo, le dóthain sonraí chun an t-éileamh a thuiscint; an suíomh beacht — an URL iomlán agus, más féidir leat, an sliocht; d'ainm agus do sheoladh ríomhphoist (ní theastaíonn siad le haghaidh tuairiscí ar ábhar mí-úsáide gnéasaí leanaí); agus go gcreideann tú de mheon macánta go bhfuil do thuairisc cruinn agus iomlán.
+**Is féidir le duine ar bith ábhar a thuairisciú.** Ní gá cuntas a bheith agat. Scríobh chuig support@dezbatere.ro. Más rud é go bhfuil tú sínithe isteach, is féidir leat an cnaipe **Tuairiscigh** a úsáid freisin ar aon díospóireacht phoiblí. Léann IS tuairisc a dhéantar leis an gcnaipe, taobh leis an téacs poiblí. Má aontaíonn sí, ceiltear an díospóireacht láithreach agus athbhreithníonn duine í. Mura n-aontaíonn sí, is féidir leat tuairisc a dhéanamh arís le tuilleadh sonraí, agus léifidh duine í. Ionas gur féidir linn gníomhú, inis dúinn: an fáth a gcreideann tú go bhfuil an t-ábhar neamhdhleathach nó go sáraíonn sé na Téarmaí seo, le dóthain sonraí chun an t-éileamh a thuiscint; an suíomh beacht — an URL iomlán agus, más féidir leat, an sliocht; d'ainm agus do sheoladh ríomhphoist (ní theastaíonn siad le haghaidh tuairiscí ar ábhar mí-úsáide gnéasaí leanaí); agus go gcreideann tú de mheon macánta go bhfuil do thuairisc cruinn agus iomlán.
 
 Admhaímid gach tuairisc gan moill mhíchuí. Láimhseálaimid tuairiscí ar bhealach tráthúil, dícheallach, neamhthreallach agus oibiachtúil, insímid ár gcinneadh duit, agus insímid duit conas agóid a dhéanamh ina choinne. Nuair a úsáidimid modhanna uathoibrithe chun tuairisc a phróiseáil nó cinneadh a dhéanamh ina leith, deirimid amhlaidh. Gníomhaítear maidir le tuairiscí ar íomhánna dlúthchaidrimh a roinneadh gan toiliú **laistigh de 48 uair an chloig** ó iarratas bailí.
 
@@ -250,6 +250,8 @@ Má tá cónaí ort in áit eile, sonraítear in Iarscríbhinn A cibé ceart tar
 Insímid duit roimh ré, ar mheán marthanach, cad atá ag athrú agus cathain. Má bhíonn éifeacht dhiúltach níos mó ná mionéifeacht ag an athrú ar do rochtain ar an tseirbhís nó ar d'úsáid aisti, féadfaidh tú foirceannadh saor in aisce laistigh de **30 lá** tar éis duit a bheith curtha ar an eolas, nó tar éis don athrú teacht i bhfeidhm, cibé acu is déanaí, agus aisíocaimid aon mhéid réamhíoctha don tréimhse nár úsáideadh.
 
 **Ar na Téarmaí seo.** Féadfaimid na Téarmaí seo a athrú ar na cineálacha céanna cúiseanna. I gcás athruithe nach laghdaíonn do chearta, foilsímid an leagan nua le hachoimre ar an méid a d'athraigh agus seolaimid ríomhphost chugat **30 lá ar a laghad** sula dtagann sé i bhfeidhm; má leanann tú d'úsáid Dialectical Engine tar éis an dáta sin, ciallaíonn sé go nglacann tú leis, agus féadfaidh tú do chuntas a dhúnadh roimhe sin. I gcás athruithe a laghdaíonn do chearta — lena n-áirítear méaduithe praghais ar phlean atá ann cheana, teorainneacha níos ísle, gnéithe a baineadh, úsáidí nua as d'ábhar, nó athruithe ar dhliteanas, ar an dlí rialaithe nó ar réiteach díospóidí — iarraimid ort glacadh go sainráite leis an leagan nua ag do chéad síniú isteach eile, agus ní bhíonn feidhm ag an athrú ach feasta. Ní dhéanaimid athrú aisghníomhach riamh, agus ní úsáidimid an rannán seo riamh chun croílár an mhéid ar íoc tú as a athrú i lár téarma gan bealach amach a thairiscint duit. Fanann leaganacha roimhe seo ar fáil ag dezbatere.ro/terms/versions.
+
+Tháinig leagan 2.12 in ionad leagan 2.11: deir rannán 10 gur féidir le duine atá sínithe isteach an cnaipe Tuairiscigh a úsáid freisin ar aon díospóireacht phoiblí, go léann IS tuairisc a dhéantar leis taobh leis an téacs poiblí, agus cad a tharlaíonn ansin.
 
 Tháinig leagan 2.11 in ionad leagan 2.10: deir rannán 9 gur féidir linn díospóireacht phoiblí a cheilt agus í á hathbhreithniú againn, agus cuid di a bhaint nó a cheartú.
 

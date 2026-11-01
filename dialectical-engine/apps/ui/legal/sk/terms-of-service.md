@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Stručne
-eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v2.11 · ÚČINNÉ OD 1. NOVEMBRA 2026
+eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v2.12 · ÚČINNÉ OD 1. NOVEMBRA 2026
 title: S čím súhlasíte
 lede: Zmluva medzi vami a DMS Merchandise Shop S.R.L. zrozumiteľným jazykom. Devätnásť častí a príloha A — prejdite až na koniec.
-endMarker: KONIEC PODMIENOK · v2.11
+endMarker: KONIEC PODMIENOK · v2.12
 bodyLabel: Text Podmienok poskytovania služby
 annexTitle: Príloha A — Regionálne podmienky
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ROZHODNÉ PRÁVO
 -->
 
-**Version 2.11 · Effective 1. novembra 2026 · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
+**Version 2.12 · Effective 1. novembra 2026 · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
 
 **In short.** Musíte mať aspoň 18 rokov. Dialectical Engine vytvára argumenty pomocou modelov umelej inteligencie a všetko, čo vygeneruje, môže byť nesprávne — nejde o poradenstvo. V bezplatnom programe sú vaše debaty po dokončení verejné, po kontrole umelou inteligenciou; v platenom programe sú súkromné, pokiaľ ich nezverejníte. Keď je debata verejná, môže ju čítať ktokoľvek a zostáva verejná. Text, ktorý zadáte, sa odosiela poskytovateľom umelej inteligencie uvedeným v našom Registri poskytovateľov a nepoužíva sa na trénovanie modelov. Nezákonný obsah nahláste na support@dezbatere.ro bez ohľadu na to, či máte účet. Rozhodným právom je rumunské právo, vaše miestne práva na ochranu spotrebiteľa vám však zostávajú zachované.
 
@@ -170,7 +170,7 @@ V platenom programe sú debaty **v predvolenom nastavení súkromné**: nič, č
 
 ## 10. Hlásenie obsahu, moderovanie a sťažnosti
 
-**Obsah môže nahlásiť ktokoľvek.** Účet nepotrebujete. Napíšte na support@dezbatere.ro alebo použite ovládací prvok **Nahlásiť** pri ktorejkoľvek zverejnenej debate. Aby sme mohli konať, oznámte nám: prečo sa domnievate, že je obsah nezákonný alebo porušuje tieto Podmienky, a to dostatočne podrobne, aby sme tvrdenie pochopili; presné umiestnenie — úplnú adresu URL a podľa možnosti príslušnú pasáž; svoje meno a e-mailovú adresu (nevyžaduje sa pri hlásení materiálu zobrazujúceho sexuálne zneužívanie detí); a vyhlásenie, že sa v dobrej viere domnievate, že je vaše hlásenie presné a úplné.
+**Obsah môže nahlásiť ktokoľvek.** Účet nepotrebujete. Napíšte na support@dezbatere.ro. Ak ste prihlásení, môžete tiež použiť tlačidlo **Nahlásiť** pri ktorejkoľvek verejnej debate. Umelá inteligencia číta hlásenie podané tlačidlom vedľa verejného textu. Ak umelá inteligencia s hlásením súhlasí, debata sa okamžite skryje a človek ju posúdi. Ak nesúhlasí, môžete hlásiť znovu s ďalšími podrobnosťami a človek ho prečíta. Aby sme mohli konať, oznámte nám: prečo sa domnievate, že je obsah nezákonný alebo porušuje tieto Podmienky, a to dostatočne podrobne, aby sme tvrdenie pochopili; presné umiestnenie — úplnú adresu URL a podľa možnosti príslušnú pasáž; svoje meno a e-mailovú adresu (nevyžaduje sa pri hlásení materiálu zobrazujúceho sexuálne zneužívanie detí); a vyhlásenie, že sa v dobrej viere domnievate, že je vaše hlásenie presné a úplné.
 
 Každé hlásenie potvrdíme bez zbytočného odkladu. Hlásenia vybavujeme včas, starostlivo, objektívne a bez svojvôle, oznámime vám svoje rozhodnutie a spôsob, ako ho napadnúť. Ak na vybavenie hlásenia alebo rozhodnutie o ňom použijeme automatizované prostriedky, informujeme vás o tom. Hlásenia intímnych snímok zdieľaných bez súhlasu vybavíme **do 48 hodín** od platnej žiadosti.
 
@@ -250,6 +250,8 @@ Ak žijete inde, príloha A uvádza právo na odstúpenie alebo lehotu na rozmys
 O tom, čo a kedy sa mení, vás vopred informujeme na trvanlivom médiu. Ak má zmena viac než nepodstatný nepriaznivý vplyv na váš prístup k službe alebo jej používanie, môžete zmluvu bezplatne ukončiť do **30 dní** odo dňa, keď ste boli informovaní, alebo odo dňa nadobudnutia účinnosti zmeny, podľa toho, ktorý deň nastane neskôr, a vrátime vám prípadnú predplatenú sumu za nevyužité obdobie.
 
 **Zmeny týchto Podmienok.** Tieto Podmienky môžeme meniť z rovnakých druhov dôvodov. Pri zmenách, ktoré neobmedzujú vaše práva, zverejníme novú verziu so zhrnutím zmien a najmenej **30 dní** pred nadobudnutím účinnosti vám zašleme e-mail; pokračovaním v používaní Dialectical Engine po tomto dátume zmenu prijímate a pred týmto dátumom môžete svoj účet odstrániť. Pri zmenách, ktoré obmedzujú vaše práva — vrátane zvýšenia ceny existujúceho programu, zníženia limitov, odstránenia funkcií, nového spôsobu použitia vášho obsahu alebo zmien zodpovednosti, rozhodného práva či riešenia sporov — vás pri nasledujúcom prihlásení požiadame, aby ste novú verziu výslovne prijali, a zmena platí iba do budúcnosti. Žiadnu zmenu nikdy neuplatníme spätne a túto časť nikdy nepoužijeme na zmenu podstaty toho, za čo ste počas obdobia zaplatili, bez toho, aby sme vám ponúkli možnosť zmluvu ukončiť. Predchádzajúce verzie zostávajú dostupné na adrese dezbatere.ro/terms/versions.
+
+Verzia 2.12 nahradila verziu 2.11: časť 10 uvádza, že prihlásená osoba môže tiež použiť tlačidlo Nahlásiť pri ktorejkoľvek verejnej debate, že umelá inteligencia číta hlásenie podané týmto tlačidlom vedľa verejného textu a čo sa potom stane.
 
 Verzia 2.11 nahradila verziu 2.10: časť 9 uvádza, že môžeme dočasne skryť verejnú debatu, kým ju posudzujeme, a odstrániť alebo opraviť jej časť.
 

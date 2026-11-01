@@ -171,7 +171,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Báo cáo nội dung, kiểm duyệt và khiếu nại",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Bất kỳ ai cũng có thể báo cáo nội dung. Bạn không cần tài khoản. Hãy viết đến support@dezbatere.ro hoặc sử dụng chức năng Báo cáo trên bất kỳ cuộc tranh luận đã công khai nào. Để chúng tôi có thể hành động, hãy cho biết: lý do bạn tin rằng nội dung là bất hợp pháp hoặc vi phạm các Điều khoản này, với đủ chi tiết để hiểu khiếu nại; vị trí chính xác — URL đầy đủ và, nếu có thể, đoạn liên quan; tên và địa chỉ email của bạn (không bắt buộc đối với báo cáo về tài liệu xâm hại tình dục trẻ em); và xác nhận rằng bạn thực sự tin báo cáo của mình là chính xác và đầy đủ." },
+      { kind: "p", text: "Bất kỳ ai cũng có thể báo cáo nội dung. Bạn không cần tài khoản. Hãy viết đến support@dezbatere.ro. Nếu bạn đã đăng nhập, bạn cũng có thể sử dụng nút Báo cáo trên bất kỳ cuộc tranh luận công khai nào. AI đọc báo cáo được gửi bằng nút đó bên cạnh văn bản công khai. Nếu AI đồng ý, cuộc tranh luận bị ẩn ngay lập tức và một người rà soát nó. Nếu không, bạn có thể báo cáo lại kèm thêm chi tiết, và một người sẽ đọc báo cáo đó. Để chúng tôi có thể hành động, hãy cho biết: lý do bạn tin rằng nội dung là bất hợp pháp hoặc vi phạm các Điều khoản này, với đủ chi tiết để hiểu khiếu nại; vị trí chính xác — URL đầy đủ và, nếu có thể, đoạn liên quan; tên và địa chỉ email của bạn (không bắt buộc đối với báo cáo về tài liệu xâm hại tình dục trẻ em); và xác nhận rằng bạn thực sự tin báo cáo của mình là chính xác và đầy đủ." },
       { kind: "p", text: "Chúng tôi xác nhận đã nhận mọi báo cáo mà không trì hoãn quá mức. Chúng tôi xử lý báo cáo một cách kịp thời, thận trọng, không tùy tiện và khách quan, thông báo quyết định và cách bạn có thể phản đối quyết định đó. Khi sử dụng phương tiện tự động để xử lý hoặc quyết định một báo cáo, chúng tôi sẽ nêu rõ. Báo cáo về hình ảnh riêng tư được chia sẻ khi chưa có sự đồng ý sẽ được xử lý trong vòng 48 giờ kể từ khi nhận được yêu cầu hợp lệ." },
       { kind: "p", text: "Hai loại quyết định tự động, được tách biệt." },
       {
@@ -241,6 +241,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Đối với dịch vụ. Chúng tôi liên tục phát triển Dialectical Engine, và những cải tiến thường kỳ, bản sửa lỗi và thay đổi danh sách mô hình diễn ra mà không cần thông báo. Khi thực hiện thay đổi vượt ra ngoài việc duy trì hoạt động của dịch vụ như mô tả, chúng tôi chỉ làm vậy vì một trong các lý do sau: tuân thủ yêu cầu pháp lý hoặc quản lý; ứng phó vấn đề bảo mật hoặc lạm dụng; do nhà cung cấp mô hình thay đổi, hạn chế hoặc rút mô hình hay tính năng mà chúng tôi phụ thuộc; thích ứng với môi trường kỹ thuật nằm ngoài sự kiểm soát của chúng tôi; hoặc thêm, cải thiện hay ngừng một tính năng theo cách không làm phát sinh chi phí cho bạn." },
       { kind: "p", text: "Chúng tôi thông báo trước cho bạn trên một phương tiện bền vững về nội dung và thời điểm thay đổi. Nếu thay đổi có tác động tiêu cực lớn hơn mức không đáng kể đối với khả năng truy cập hoặc sử dụng dịch vụ của bạn, bạn có thể chấm dứt miễn phí trong vòng 30 ngày kể từ khi được thông báo hoặc kể từ khi thay đổi có hiệu lực, tùy thời điểm nào muộn hơn, và chúng tôi hoàn trả mọi khoản đã trả trước cho thời gian chưa sử dụng." },
       { kind: "p", text: "Đối với các Điều khoản này. Chúng tôi có thể thay đổi các Điều khoản này vì các loại lý do tương tự. Đối với thay đổi không làm giảm quyền của bạn, chúng tôi đăng phiên bản mới kèm bản tóm tắt nội dung thay đổi và gửi email cho bạn ít nhất 30 ngày trước khi phiên bản có hiệu lực; tiếp tục sử dụng Dialectical Engine sau ngày đó có nghĩa là bạn chấp nhận phiên bản mới, và bạn có thể đóng tài khoản trước ngày đó. Đối với thay đổi làm giảm quyền của bạn — bao gồm tăng giá đối với gói hiện có, hạ thấp giới hạn, loại bỏ tính năng, cách sử dụng mới đối với nội dung của bạn, hoặc thay đổi về trách nhiệm, luật điều chỉnh hay giải quyết tranh chấp — chúng tôi yêu cầu bạn chấp nhận rõ ràng phiên bản mới vào lần đăng nhập tiếp theo, và thay đổi chỉ áp dụng về sau. Chúng tôi không bao giờ áp dụng thay đổi hồi tố và không bao giờ dùng mục này để thay đổi nội dung cốt lõi mà bạn đã thanh toán giữa kỳ mà không cho bạn một lối thoát. Các phiên bản trước vẫn được cung cấp tại dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Phiên bản 2.12 thay thế phiên bản 2.11: mục 10 nêu rằng người đã đăng nhập cũng có thể sử dụng nút Báo cáo trên bất kỳ cuộc tranh luận công khai nào, rằng AI đọc báo cáo được gửi bằng nút đó bên cạnh văn bản công khai, và điều gì xảy ra sau đó." },
       { kind: "p", text: "Phiên bản 2.11 thay thế phiên bản 2.10: mục 9 nêu rằng chúng tôi có thể tạm ẩn một cuộc tranh luận công khai trong khi rà soát, đồng thời gỡ bỏ hoặc sửa một phần của nó." },
       { kind: "p", text: "Phiên bản 2.10 thay thế phiên bản 2.9: mục 9 nêu rằng các cuộc tranh luận trên gói miễn phí là công khai, rằng một cuộc tranh luận công khai không thể hủy công khai và vẫn công khai sau khi bạn đóng tài khoản, rằng bất kỳ ai có tín dụng đều có thể đóng góp vào một cuộc tranh luận công khai hoặc viết báo cáo về nó, và rằng một cuộc tranh luận công khai vẫn mở sau khi tác giả đầu tiên của nó đã rời đi; mục 11 nêu việc đóng tài khoản tác động thế nào đến các cuộc tranh luận công khai của bạn." },
       { kind: "p", text: "Phiên bản 2.9 thay thế phiên bản 2.8: mục 8 được bổ sung đoạn “Biểu đồ và số liệu thống kê do chúng tôi tạo ra”, quy định ai sở hữu các biểu đồ trong một báo cáo tranh luận và cấp cho bạn giấy phép sử dụng các biểu đồ đó." },
@@ -373,12 +374,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.11",
-  sha256: "185501b422fa5415a4420fb21ac030e8c5568e565a86e61f10f4abc1f83c58be",
-  eyebrow: "ĐIỀU KHOẢN DỊCH VỤ · v2.11 · CÓ HIỆU LỰC 1 THÁNG 11 NĂM 2026",
+  version: "2.12",
+  sha256: "f9b162a34c3f852485a72549bc96f70ee656f09a3c125a32bc48d53cec965e40",
+  eyebrow: "ĐIỀU KHOẢN DỊCH VỤ · v2.12 · CÓ HIỆU LỰC 1 THÁNG 11 NĂM 2026",
   title: "Những điều bạn đồng ý",
   lede: "Hợp đồng giữa bạn và DMS Merchandise Shop S.R.L., được trình bày bằng ngôn ngữ dễ hiểu. Mười chín mục và Phụ lục A — cuộn đến cuối.",
-  endMarker: "HẾT ĐIỀU KHOẢN · v2.11",
+  endMarker: "HẾT ĐIỀU KHOẢN · v2.12",
   contact: "support@dezbatere.ro",
   bodyLabel: "Nội dung Điều khoản dịch vụ",
   sectionIdPrefix: "terms-section-",

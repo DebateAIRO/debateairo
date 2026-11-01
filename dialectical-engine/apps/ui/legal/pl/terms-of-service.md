@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: W skrócie
-eyebrow: WARUNKI ŚWIADCZENIA USŁUG · v2.11 · OBOWIĄZUJĄ OD 1 LISTOPADA 2026
+eyebrow: WARUNKI ŚWIADCZENIA USŁUG · v2.12 · OBOWIĄZUJĄ OD 1 LISTOPADA 2026
 title: Na co wyrażasz zgodę
 lede: Umowa między Tobą a DMS Merchandise Shop S.R.L., napisana prostym językiem. Dziewiętnaście sekcji i załącznik A — przewiń do końca.
-endMarker: KONIEC WARUNKÓW · v2.11
+endMarker: KONIEC WARUNKÓW · v2.12
 bodyLabel: Treść Warunków świadczenia usług
 annexTitle: Załącznik A — Warunki regionalne
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PRAWO WŁAŚCIWE
 -->
 
-**Version 2.11 · Effective 1 listopada 2026 · Poprzednie wersje są dostępne pod adresem dezbatere.ro/terms/versions · Język: polski.**
+**Version 2.12 · Effective 1 listopada 2026 · Poprzednie wersje są dostępne pod adresem dezbatere.ro/terms/versions · Język: polski.**
 
 **In short.** Musisz mieć ukończone 18 lat. Dialectical Engine tworzy argumenty przy użyciu modeli sztucznej inteligencji, a wszystko, co generuje, może być błędne — nie jest to porada. W planie bezpłatnym Twoje debaty stają się publiczne po zakończeniu, po sprawdzeniu przez AI; w płatnym planie są prywatne, chyba że je opublikujesz. Po upublicznieniu każdy może przeczytać debatę, a ona pozostaje publiczna. Przesyłany przez Ciebie tekst jest przekazywany dostawcom AI wymienionym w naszym Rejestrze Dostawców i nie jest wykorzystywany do trenowania modeli. Nielegalne treści zgłaszaj pod adresem support@dezbatere.ro, niezależnie od tego, czy masz konto. Zastosowanie ma prawo rumuńskie, jednak zachowujesz ochronę konsumencką wynikającą z prawa miejscowego.
 
@@ -170,7 +170,7 @@ W płatnym planie debaty są **domyślnie prywatne**: żadna treść utworzona t
 
 ## 10. Zgłaszanie treści, moderowanie i skargi
 
-**Każdy może zgłosić treść.** Konto nie jest wymagane. Napisz na adres support@dezbatere.ro albo użyj funkcji **Zgłoś** przy dowolnej opublikowanej debacie. Aby umożliwić nam podjęcie działań, wskaż: dlaczego uważasz, że treść jest niezgodna z prawem lub narusza niniejsze Warunki, podając szczegóły pozwalające zrozumieć zarzut; dokładną lokalizację — pełny adres URL i, jeżeli to możliwe, dany fragment; swoje imię i nazwisko oraz adres e-mail (nie jest to wymagane przy zgłoszeniach materiałów przedstawiających seksualne wykorzystywanie dzieci); a także potwierdź, że w dobrej wierze uważasz zgłoszenie za dokładne i kompletne.
+**Każdy może zgłosić treść.** Konto nie jest wymagane. Napisz na adres support@dezbatere.ro. Jeśli jesteś zalogowany, możesz także użyć przycisku **Zgłoś** przy dowolnej publicznej debacie. AI czyta zgłoszenie złożone przyciskiem, obok publicznego tekstu. Jeśli AI się zgadza, debata zostaje od razu ukryta, a człowiek ją przegląda. Jeśli się nie zgadza, możesz zgłosić ponownie, podając więcej szczegółów, a człowiek przeczyta zgłoszenie. Aby umożliwić nam podjęcie działań, wskaż: dlaczego uważasz, że treść jest niezgodna z prawem lub narusza niniejsze Warunki, podając szczegóły pozwalające zrozumieć zarzut; dokładną lokalizację — pełny adres URL i, jeżeli to możliwe, dany fragment; swoje imię i nazwisko oraz adres e-mail (nie jest to wymagane przy zgłoszeniach materiałów przedstawiających seksualne wykorzystywanie dzieci); a także potwierdź, że w dobrej wierze uważasz zgłoszenie za dokładne i kompletne.
 
 Niezwłocznie potwierdzamy otrzymanie każdego zgłoszenia. Zgłoszenia rozpatrujemy terminowo, starannie, bez arbitralności i obiektywnie, informujemy Cię o decyzji oraz o sposobie jej zakwestionowania. Jeżeli używamy zautomatyzowanych środków do rozpatrzenia zgłoszenia lub podjęcia decyzji, informujemy o tym. W odniesieniu do zgłoszeń intymnego wizerunku udostępnionego bez zgody podejmujemy działania **w ciągu 48 godzin** od otrzymania ważnego żądania.
 
@@ -250,6 +250,8 @@ Jeżeli mieszkasz w innym miejscu, załącznik A określa prawo odstąpienia lub
 Z wyprzedzeniem informujemy Cię na trwałym nośniku, co i kiedy ulegnie zmianie. Jeżeli zmiana ma więcej niż nieznaczny negatywny wpływ na Twój dostęp do usługi lub korzystanie z niej, możesz bezpłatnie rozwiązać umowę w terminie **30 dni** od otrzymania informacji lub wejścia zmiany w życie — w zależności od tego, która z tych dat jest późniejsza — a my zwrócimy wszelkie kwoty zapłacone z góry za niewykorzystany okres.
 
 **Zmiany niniejszych Warunków.** Możemy zmieniać niniejsze Warunki z tych samych rodzajów powodów. W przypadku zmian, które nie ograniczają Twoich praw, publikujemy nową wersję wraz z podsumowaniem zmian i wysyłamy Ci wiadomość e-mail co najmniej **30 dni** przed jej wejściem w życie; dalsze korzystanie z Dialectical Engine po tej dacie oznacza akceptację zmiany, a przed tą datą możesz zamknąć konto. W przypadku zmian ograniczających Twoje prawa — w tym podwyżek cen w istniejącym planie, obniżenia limitów, usunięcia funkcji, nowych sposobów wykorzystywania Twoich treści albo zmian odpowiedzialności, prawa właściwego lub rozstrzygania sporów — prosimy Cię o wyraźne zaakceptowanie nowej wersji przy kolejnym logowaniu, a zmiana obowiązuje wyłącznie na przyszłość. Nigdy nie wprowadzamy zmian z mocą wsteczną ani nie wykorzystujemy niniejszej sekcji do zmiany w trakcie okresu podstawowego zakresu opłaconej przez Ciebie usługi bez zapewnienia możliwości rezygnacji. Poprzednie wersje pozostają dostępne pod adresem dezbatere.ro/terms/versions.
+
+Wersja 2.12 zastąpiła wersję 2.11: sekcja 10 mówi, że zalogowana osoba może także użyć przycisku Zgłoś przy dowolnej publicznej debacie, że AI czyta zgłoszenie złożone tym przyciskiem obok publicznego tekstu oraz co wtedy się dzieje.
 
 Wersja 2.11 zastąpiła wersję 2.10: sekcja 9 mówi, że możemy tymczasowo ukryć publiczną debatę podczas jej przeglądu oraz usunąć lub poprawić jej część.
 

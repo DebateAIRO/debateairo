@@ -171,7 +171,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Sisust teatamine, modereerimine ja kaebused",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Sisust võib teatada igaüks. Kontot ei ole vaja. Kirjutage aadressil support@dezbatere.ro või kasutage mis tahes avaldatud väitluse juhtelementi Teatage. Et saaksime tegutseda, öelge meile: miks on sisu teie arvates ebaseaduslik või rikub neid Tingimusi, piisavalt üksikasjalikult, et saaksime väitest aru; täpne asukoht — täielik URL ja võimaluse korral vastav lõik; teie nimi ja e-posti aadress (ei ole nõutav laste seksuaalset väärkohtlemist kujutavast materjalist teatamisel); ning kinnitus, et usute heas usus oma teate õigsusesse ja täielikkusse." },
+      { kind: "p", text: "Sisust võib teatada igaüks. Kontot ei ole vaja. Kirjutage aadressil support@dezbatere.ro. Kui olete sisse logitud, saate kasutada ka mis tahes avaliku väitluse juures nuppu Teatage. Tehisintellekt loeb nupu abil tehtud teadet avaliku teksti kõrval. Kui tehisintellekt nõustub, peidetakse väitlus kohe ning isik vaatab selle üle. Kui tehisintellekt ei nõustu, saate teatada uuesti täpsemate andmetega ja isik loeb teate läbi. Et saaksime tegutseda, öelge meile: miks on sisu teie arvates ebaseaduslik või rikub neid Tingimusi, piisavalt üksikasjalikult, et saaksime väitest aru; täpne asukoht — täielik URL ja võimaluse korral vastav lõik; teie nimi ja e-posti aadress (ei ole nõutav laste seksuaalset väärkohtlemist kujutavast materjalist teatamisel); ning kinnitus, et usute heas usus oma teate õigsusesse ja täielikkusse." },
       { kind: "p", text: "Kinnitame iga teate kättesaamist põhjendamatu viivituseta. Käsitleme teateid aegsasti, hoolikalt, mittemeelevaldselt ja objektiivselt, teatame teile oma otsuse ning selgitame, kuidas seda vaidlustada. Kui kasutame teate töötlemiseks või selle üle otsustamiseks automatiseeritud vahendeid, anname sellest teada. Nõusolekuta jagatud intiimkujutiste teadete alusel tegutsetakse 48 tunni jooksul pärast kehtiva taotluse saamist." },
       { kind: "p", text: "Kaks liiki automatiseeritud otsuseid, mida hoitakse lahus." },
       {
@@ -241,6 +241,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Teenuse muudatused. Arendame Dialectical Engine-d pidevalt ning tavapärased täiustused, parandused ja mudelivaliku muudatused toimuvad ette teatamata. Kui teeme muudatuse, mis läheb teenuse kirjeldatud viisil toimivana hoidmisest kaugemale, teeme seda ainult ühel järgmistest põhjustest: õigus- või regulatiivse nõude täitmiseks; turva- või kuritarvitamisprobleemile reageerimiseks; seetõttu, et mudelipakkuja muudab, piirab või kõrvaldab mudeli või funktsiooni, millest sõltume; kohanemiseks tehnilise keskkonnaga, mida me ei kontrolli; või funktsiooni lisamiseks, täiustamiseks või kasutuselt kõrvaldamiseks viisil, mis ei tekita teile lisakulu." },
       { kind: "p", text: "Teatame teile püsival andmekandjal ette, mis ja millal muutub. Kui muudatusel on teie juurdepääsule teenusele või selle kasutamisele enam kui vähene negatiivne mõju, võite lepingu tasuta lõpetada 30 päeva jooksul pärast teate saamist või muudatuse jõustumist, olenevalt sellest, kumb on hilisem, ning tagastame kasutamata ajavahemiku eest ette makstud summa." },
       { kind: "p", text: "Nende Tingimuste muudatused. Võime neid Tingimusi samalaadsetel põhjustel muuta. Muudatuste puhul, mis ei vähenda teie õigusi, avaldame uue versiooni koos muudatuste kokkuvõttega ja saadame teile e-kirja vähemalt 30 päeva enne selle jõustumist; Dialectical Engine kasutamise jätkamine pärast seda kuupäeva tähendab, et nõustute muudatusega, ning võite oma konto enne seda sulgeda. Muudatuste puhul, mis vähendavad teie õigusi — sealhulgas olemasoleva paketi hinnatõus, madalamad kasutuslimiidid, eemaldatud funktsioonid, teie sisu uued kasutusviisid või vastutuse, kohaldatava õiguse või vaidluste lahendamise muudatused — palume teil järgmisel sisselogimisel uue versiooniga sõnaselgelt nõustuda ning muudatust kohaldatakse ainult edaspidi. Me ei kohalda muudatust kunagi tagasiulatuvalt ega kasuta seda jaotist selleks, et muuta tähtaja kestel tasulise teenuse põhiolemust ilma teile väljumisvõimalust pakkumata. Varasemad versioonid jäävad kättesaadavaks aadressil dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Versioon 2.12 asendas versiooni 2.11: jaotis 10 ütleb, et sisselogitud isik saab kasutada ka mis tahes avaliku väitluse juures nuppu Teatage, et tehisintellekt loeb nupuga tehtud teadet avaliku teksti kõrval ning mis siis juhtub." },
       { kind: "p", text: "Versioon 2.11 asendas versiooni 2.10: jaotis 9 ütleb, et võime avaliku väitluse läbivaatamise ajaks peita ning eemaldada või parandada selle osa." },
       { kind: "p", text: "Versioon 2.10 asendas versiooni 2.9: jaotis 9 ütleb, et tasuta paketi väitlused on avalikud, et avaliku väitluse avaldamist ei saa tühistada ja see jääb pärast konto sulgemist avalikuks, et igaüks, kellel on krediiti, võib avalikule väitlusele panustada või selle kohta aruande kirjutada, ning et avalik väitlus jääb avatuks pärast selle esimese autori lahkumist; jaotis 11 ütleb, mida sulgemine teie avalikele väitlustele teeb." },
       { kind: "p", text: "Versioon 2.9 asendas versiooni 2.8: jaotisesse 8 lisandub lõik „Meie loodud diagrammid ja statistika“, mis sätestab, kellele kuuluvad väitluse aruande diagrammid, ja annab teile litsentsi neid kasutada." },
@@ -373,12 +374,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.11",
-  sha256: "0feac00041ff428908b5eaec778d567ea631d094a7d272dcd7947e1af0d5b30a",
-  eyebrow: "TEENUSETINGIMUSED · v2.11 · KEHTIB ALATES 1. NOVEMBRIST 2026",
+  version: "2.12",
+  sha256: "f5bfaee15c7297f6230f0c69e00bf172c19c7ee760d1efd80e37ca3818a8b01f",
+  eyebrow: "TEENUSETINGIMUSED · v2.12 · KEHTIB ALATES 1. NOVEMBRIST 2026",
   title: "Millega te nõustute",
   lede: "Teie ja DMS Merchandise Shop S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.",
-  endMarker: "TINGIMUSTE LÕPP · v2.11",
+  endMarker: "TINGIMUSTE LÕPP · v2.12",
   contact: "support@dezbatere.ro",
   bodyLabel: "Teenusetingimuste tekst",
   sectionIdPrefix: "terms-section-",
