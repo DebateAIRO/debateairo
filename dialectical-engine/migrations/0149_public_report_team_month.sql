@@ -10,11 +10,18 @@
 -- 2. identity.debate_nothing_runs (0139) held a public dig's passages while it had a path and no row. A dig whose API stopped between its join and its copy settles UNAVAILABLE and never
 --    writes a row, so its passages stayed for ever. A SETTLED contribution now holds nothing; an unsettled one with no row still holds them, because its rewrite is still to read them.
 --
+-- 3. A public reference for each update the anonymous page shows: a random uuid (identity.public_update_ref), because the row's own id is worked out from the digger's run id, and whoever
+--    learned a run id could have linked a person to their digs. What a page shows and what a dig names is this reference; nothing else takes it.
+-- 4. Digs no longer wait for a report: a report writes from its sealed copy of the page, so a dig joining meanwhile changes nothing about it, and repeated presses can hold nothing against
+--    digs. A dig waiting in line (no work items yet) is not "ongoing": it holds no report back.
+-- 5. identity.public_report_check: the publication check's record of a report on a public debate names the REPORT. 0081's record names a run, and a report has none of its writer's: naming
+--    its carrier would say a BLOCK was about a debate whose owner wrote nothing.
+--
 -- n1 (side-by-side spec §5, the database rule):
 -- n1: drained
 -- n1: keeps-verifier
---   drained         it redefines 0137's, 0139's and 0142's functions in place. R22 is already a drained upload: no debate runs while it applies. The three steps' receipts are amended.
---   keeps-verifier  no billing relation or billing function; one staff table and identity definers, so lineage/verify-effective-capabilities-130.sql stays in force.
+--   drained         it redefines 0137's, 0139's, 0142's and 0147's functions in place. R22 is already a drained upload: no debate runs while it applies. The four steps' receipts are amended.
+--   keeps-verifier  no billing relation or billing function; one staff table, two identity tables and identity definers, so lineage/verify-effective-capabilities-130.sql stays in force.
 --
 -- Replay-safe in the repository's form, as 0132.
 
@@ -115,6 +122,240 @@ AS $$
     FROM core.work_item AS item WHERE item.run_id = p_run_id) AS work
 $$;
 
+-- The public references. ----------------------------------------------------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS identity.public_update_ref (
+  update_id uuid PRIMARY KEY REFERENCES identity.public_debate_update(update_id),
+  public_ref uuid NOT NULL CONSTRAINT public_update_ref_once UNIQUE
+);
+SELECT core.install_truncate_guard('identity.public_update_ref');
+DROP TRIGGER IF EXISTS reject_mutation ON identity.public_update_ref;
+CREATE TRIGGER reject_mutation BEFORE UPDATE OR DELETE ON identity.public_update_ref
+FOR EACH STATEMENT EXECUTE FUNCTION core.reject_mutation();
+INSERT INTO identity.public_update_ref (update_id, public_ref)
+SELECT update_row.update_id, gen_random_uuid() FROM identity.public_debate_update AS update_row
+ON CONFLICT (update_id) DO NOTHING;
+
+-- 0137's writer, with the reference in the same transaction.
+CREATE OR REPLACE FUNCTION identity.record_public_debate_update(p_update_id uuid, p_publication_ref uuid, p_kind text,
+  p_position_ref text, p_dig_run_id uuid, p_content jsonb)
+RETURNS TABLE (outcome text, update_seq integer)
+LANGUAGE plpgsql
+VOLATILE
+SECURITY DEFINER
+SET search_path=pg_catalog
+AS $$
+#variable_conflict use_column
+DECLARE
+  v_run uuid;
+  v_seq integer;
+BEGIN
+  IF p_update_id IS NULL OR p_publication_ref IS NULL OR p_kind IS NULL OR p_dig_run_id IS NULL OR p_content IS NULL THEN
+    RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='PUBLIC_DEBATE_UPDATE_INVALID';
+  END IF;
+  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('identity:public-update:' || p_publication_ref::text, 0));
+  SELECT existing.update_seq INTO v_seq FROM identity.public_debate_update AS existing WHERE existing.update_id = p_update_id;
+  IF FOUND THEN RETURN QUERY SELECT 'ALREADY'::text, v_seq; RETURN; END IF;
+  v_run := core.run_of_publication(p_publication_ref);
+  IF v_run IS NULL OR NOT core.run_is_published(v_run, p_publication_ref) THEN
+    RETURN QUERY SELECT 'NOT_PUBLIC'::text, NULL::integer; RETURN;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM identity.public_contribution AS contribution WHERE contribution.dig_run_id = p_dig_run_id
+      AND contribution.publication_ref = p_publication_ref AND contribution.outcome = 'ALLOWED') THEN
+    RETURN QUERY SELECT 'NOT_ALLOWED'::text, NULL::integer; RETURN;
+  END IF;
+  SELECT COALESCE(max(existing.update_seq), 0) + 1 INTO v_seq FROM identity.public_debate_update AS existing
+  WHERE existing.publication_ref = p_publication_ref;
+  INSERT INTO identity.public_debate_update (publication_ref, update_seq, update_id, kind, position_ref, dig_run_id, content_ciphertext)
+  VALUES (p_publication_ref, v_seq, p_update_id, p_kind, p_position_ref, p_dig_run_id, p_content);
+  INSERT INTO identity.public_update_ref (update_id, public_ref) VALUES (p_update_id, gen_random_uuid());
+  RETURN QUERY SELECT 'RECORDED'::text, v_seq;
+END;
+$$;
+
+-- 0137's page reader: `update_id` is the public reference.
+CREATE OR REPLACE FUNCTION identity.read_public_debate_updates(p_publication_ref uuid) RETURNS jsonb
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path=pg_catalog
+AS $$
+  SELECT COALESCE(jsonb_agg(jsonb_build_object('update_seq', update_row.update_seq, 'update_id', reference.public_ref,
+      'kind', update_row.kind, 'position_ref', update_row.position_ref, 'recorded_at', update_row.recorded_at,
+      'contributed_at', contribution.contributed_at,
+      'contributor', (SELECT identity_user.pseudonym FROM identity."user" AS identity_user WHERE identity_user.owner_ref = contribution.owner_ref),
+      'content', update_row.content_ciphertext) ORDER BY update_row.update_seq), '[]'::jsonb)
+  FROM identity.public_debate_update AS update_row
+    JOIN identity.public_update_ref AS reference ON reference.update_id = update_row.update_id
+    LEFT JOIN identity.public_contribution AS contribution ON contribution.dig_run_id = update_row.dig_run_id
+  WHERE update_row.publication_ref = p_publication_ref AND core.run_is_published(core.run_of_publication(p_publication_ref), p_publication_ref)
+$$;
+
+-- 0147's two, naming the reference. `writing` stays in the answer, always false: digs no longer wait for a report.
+CREATE OR REPLACE FUNCTION identity.read_public_dig_parent(p_publication_ref uuid, p_dig_update_id uuid) RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path=pg_catalog
+AS $$
+DECLARE
+  v_root uuid;
+  v_parent uuid;
+  v_level integer := 1;
+  v_step uuid;
+  v_hops integer := 0;
+BEGIN
+  IF p_publication_ref IS NULL THEN RETURN NULL; END IF;
+  v_root := core.run_of_publication(p_publication_ref);
+  IF v_root IS NULL OR NOT core.run_is_published(v_root, p_publication_ref) THEN RETURN NULL; END IF;
+  v_parent := v_root;
+  IF p_dig_update_id IS NOT NULL THEN
+    SELECT update_row.dig_run_id INTO v_parent FROM identity.public_update_ref AS reference
+      JOIN identity.public_debate_update AS update_row ON update_row.update_id = reference.update_id
+      JOIN identity.public_contribution AS contribution ON contribution.dig_run_id = update_row.dig_run_id
+    WHERE reference.public_ref = p_dig_update_id AND update_row.publication_ref = p_publication_ref AND update_row.kind = 'PATH'
+      AND contribution.outcome = 'ALLOWED';
+    IF NOT FOUND THEN RETURN NULL; END IF;
+    v_step := v_parent;
+    WHILE v_step <> v_root AND v_hops < 12 LOOP
+      v_level := v_level + 1;
+      v_hops := v_hops + 1;
+      SELECT contribution.parent_run_id INTO v_step FROM identity.public_contribution AS contribution WHERE contribution.dig_run_id = v_step;
+      EXIT WHEN NOT FOUND;
+    END LOOP;
+  END IF;
+  RETURN jsonb_build_object('root_run_id', v_root, 'parent_run_id', v_parent, 'level', v_level, 'writing', false);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION identity.read_public_tree_of_run(p_run_id uuid) RETURNS jsonb
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path=pg_catalog
+AS $$
+  SELECT COALESCE(
+    (SELECT jsonb_build_object('publication_ref', publication.ref, 'dig_update_id', NULL::uuid)
+       FROM (SELECT core.current_publication_of_run(p_run_id) AS ref) AS publication WHERE publication.ref IS NOT NULL),
+    (SELECT jsonb_build_object('publication_ref', contribution.publication_ref, 'dig_update_id',
+        (SELECT reference.public_ref FROM identity.public_debate_update AS update_row
+           JOIN identity.public_update_ref AS reference ON reference.update_id = update_row.update_id
+          WHERE update_row.dig_run_id = contribution.dig_run_id AND update_row.kind = 'PATH' ORDER BY update_row.update_seq LIMIT 1))
+       FROM identity.public_contribution AS contribution
+      WHERE contribution.dig_run_id = p_run_id AND contribution.outcome = 'ALLOWED'
+        AND core.current_publication_of_run(contribution.root_run_id) = contribution.publication_ref))
+$$;
+
+-- 0147's join without the wait for a report. JOINED, ALREADY, NOT_OWNED, NOT_PUBLIC, PARENT_PRIVATE, CONFLICT, TOO_DEEP.
+CREATE OR REPLACE FUNCTION identity.join_public_tree(p_owner_ref uuid, p_publication_ref uuid, p_parent_run_id uuid, p_child_run_id uuid,
+  p_position_ref text)
+RETURNS TABLE (outcome text, dig_level integer)
+LANGUAGE plpgsql
+VOLATILE
+SECURITY DEFINER
+SET search_path=pg_catalog
+AS $$
+#variable_conflict use_column
+DECLARE
+  v_root uuid;
+  v_row identity.public_contribution%ROWTYPE;
+  v_level integer := 1;
+  v_step uuid;
+  v_hops integer := 0;
+BEGIN
+  IF p_owner_ref IS NULL OR p_publication_ref IS NULL OR p_parent_run_id IS NULL OR p_child_run_id IS NULL OR p_parent_run_id = p_child_run_id
+    OR p_position_ref IS NULL OR p_position_ref !~ '^[\x21\x23-\x5b\x5d-\x7e]{1,150}$' THEN
+    RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='PUBLIC_TREE_JOIN_INVALID';
+  END IF;
+  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('identity:public-tree:' || p_publication_ref::text, 0));
+  IF NOT identity.page_memory_run_owned(p_owner_ref, p_child_run_id) THEN
+    RETURN QUERY SELECT 'NOT_OWNED'::text, NULL::integer; RETURN;
+  END IF;
+  v_root := core.run_of_publication(p_publication_ref);
+  IF v_root IS NULL OR NOT core.run_is_published(v_root, p_publication_ref) THEN
+    RETURN QUERY SELECT 'NOT_PUBLIC'::text, NULL::integer; RETURN;
+  END IF;
+  IF p_child_run_id = v_root OR EXISTS (SELECT 1 FROM identity.investigation_member AS member WHERE member.run_id = p_child_run_id) THEN
+    RETURN QUERY SELECT 'CONFLICT'::text, NULL::integer; RETURN;
+  END IF;
+  SELECT * INTO v_row FROM identity.public_contribution AS contribution WHERE contribution.dig_run_id = p_child_run_id;
+  IF FOUND THEN
+    IF v_row.parent_run_id = p_parent_run_id AND v_row.publication_ref = p_publication_ref THEN
+      RETURN QUERY SELECT 'ALREADY'::text, NULL::integer;
+    ELSE
+      RETURN QUERY SELECT 'CONFLICT'::text, NULL::integer;
+    END IF;
+    RETURN;
+  END IF;
+  IF p_parent_run_id <> v_root THEN
+    IF NOT EXISTS (SELECT 1 FROM identity.public_contribution AS contribution WHERE contribution.dig_run_id = p_parent_run_id
+        AND contribution.publication_ref = p_publication_ref AND contribution.outcome = 'ALLOWED') THEN
+      RETURN QUERY SELECT 'PARENT_PRIVATE'::text, NULL::integer; RETURN;
+    END IF;
+    v_step := p_parent_run_id;
+    WHILE v_step <> v_root AND v_hops < 12 LOOP
+      v_level := v_level + 1;
+      v_hops := v_hops + 1;
+      SELECT contribution.parent_run_id INTO v_step FROM identity.public_contribution AS contribution WHERE contribution.dig_run_id = v_step;
+      EXIT WHEN NOT FOUND;
+    END LOOP;
+  END IF;
+  IF v_level > 10 THEN RETURN QUERY SELECT 'TOO_DEEP'::text, NULL::integer; RETURN; END IF;
+  INSERT INTO identity.public_contribution (dig_run_id, owner_ref, publication_ref, root_run_id, parent_run_id, position_ref)
+  VALUES (p_child_run_id, p_owner_ref, p_publication_ref, v_root, p_parent_run_id, p_position_ref);
+  RETURN QUERY SELECT 'JOINED'::text, v_level;
+END;
+$$;
+
+-- 0147's "is anything still happening": a dig with no work items yet is waiting in line, and holds nothing back.
+CREATE OR REPLACE FUNCTION identity.public_tree_ongoing(p_publication_ref uuid) RETURNS boolean
+LANGUAGE sql
+STABLE
+SET search_path=pg_catalog
+AS $$
+  SELECT EXISTS (SELECT 1 FROM identity.public_contribution AS contribution
+      WHERE contribution.publication_ref = p_publication_ref AND identity.web_evidence_run_owner(contribution.dig_run_id) IS NOT NULL
+        AND ((contribution.outcome IS NULL AND EXISTS (SELECT 1 FROM core.work_item AS work WHERE work.run_id = contribution.dig_run_id))
+          OR (contribution.outcome = 'ALLOWED' AND NOT EXISTS (SELECT 1 FROM identity.public_climb_done AS done WHERE done.dig_run_id = contribution.dig_run_id)))
+        AND NOT COALESCE((SELECT pause.kind = 'PAUSED' FROM identity.run_pause_event AS pause WHERE pause.run_id = contribution.dig_run_id
+          ORDER BY pause.event_no DESC LIMIT 1), false))
+    OR EXISTS (SELECT 1 FROM identity.public_report AS report WHERE report.publication_ref = p_publication_ref
+      AND ((report.outcome IS NULL AND identity.web_evidence_run_owner(report.carrier_run_id) IS NOT NULL
+      AND EXISTS (SELECT 1 FROM identity.public_material AS material WHERE material.material_id = report.report_id)) OR (report.outcome <> 'FAILED'
+        AND NOT EXISTS (SELECT 1 FROM identity.public_debate_report AS copy WHERE copy.report_id = report.report_id)
+        AND NOT EXISTS (SELECT 1 FROM identity.public_page_skip AS skip WHERE skip.source_id = report.report_id))))
+$$;
+
+-- The publication check's record of a report: codes and identifiers, as 0081's, naming the report. Insert-only.
+CREATE TABLE IF NOT EXISTS identity.public_report_check (
+  check_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  report_id uuid NOT NULL REFERENCES identity.public_report(report_id),
+  attempted_at timestamptz NOT NULL,
+  outcome text NOT NULL CONSTRAINT public_report_check_outcome_check CHECK (outcome IN ('ALLOW','BLOCK','UNSURE','UNAVAILABLE')),
+  failure_cause text,
+  rules smallint[] NOT NULL,
+  part_kinds text[] NOT NULL,
+  ground text,
+  judge_provider_ref text,
+  judge_model_id text,
+  policy_version text NOT NULL,
+  judge_call_count integer NOT NULL
+);
+CREATE INDEX IF NOT EXISTS public_report_check_report ON identity.public_report_check (report_id);
+SELECT core.install_truncate_guard('identity.public_report_check');
+DROP TRIGGER IF EXISTS reject_mutation ON identity.public_report_check;
+CREATE TRIGGER reject_mutation BEFORE UPDATE OR DELETE ON identity.public_report_check
+FOR EACH STATEMENT EXECUTE FUNCTION core.reject_mutation();
+CREATE OR REPLACE FUNCTION identity.record_public_report_check(p_report_id uuid, p_attempted_at timestamptz, p_outcome text, p_failure_cause text, p_rules smallint[],
+  p_part_kinds text[], p_ground text, p_judge_provider_ref text, p_judge_model_id text, p_policy_version text, p_judge_call_count integer) RETURNS void
+LANGUAGE sql
+VOLATILE
+SECURITY DEFINER
+SET search_path=pg_catalog
+AS $$
+  INSERT INTO identity.public_report_check (report_id, attempted_at, outcome, failure_cause, rules, part_kinds, ground, judge_provider_ref, judge_model_id, policy_version, judge_call_count)
+  VALUES (p_report_id, p_attempted_at, p_outcome, p_failure_cause, p_rules, p_part_kinds, p_ground, p_judge_provider_ref, p_judge_model_id, p_policy_version, p_judge_call_count)
+$$;
+
 -- Owners, then the grants: the redefined functions keep theirs (CREATE OR REPLACE keeps owner and ACL). The team's table and its two private definers are the team's owner's, as 0142's; the
 -- reader of 0137's table is that table's owner's, who may call the two.
 -- n1: reviewed gives only the new table and the new functions their owners; touches no earlier object
@@ -128,6 +369,9 @@ BEGIN
   SELECT pg_catalog.pg_get_userbyid(p.proowner) INTO v_owner FROM pg_catalog.pg_proc AS p
   WHERE p.oid = 'identity.record_public_report_charge(uuid,uuid,uuid,integer,bigint)'::regprocedure;
   EXECUTE pg_catalog.format('ALTER FUNCTION identity.read_public_report_spent_by_funding(uuid,timestamptz,timestamptz,boolean) OWNER TO %I', v_owner);
+  EXECUTE pg_catalog.format('ALTER TABLE identity.public_update_ref OWNER TO %I', v_owner);
+  EXECUTE pg_catalog.format('ALTER TABLE identity.public_report_check OWNER TO %I', v_owner);
+  EXECUTE pg_catalog.format('ALTER FUNCTION identity.record_public_report_check(uuid,timestamptz,text,text,smallint[],text[],text,text,text,text,integer) OWNER TO %I', v_owner);
   EXECUTE pg_catalog.format('GRANT EXECUTE ON FUNCTION identity.team_public_report_record(uuid,uuid,bigint), identity.team_public_report_funded(uuid) TO %I', v_owner);
 END
 $team_report_owner$;
@@ -136,3 +380,7 @@ REVOKE ALL ON FUNCTION identity.team_public_report_record(uuid,uuid,bigint) FROM
 REVOKE ALL ON FUNCTION identity.team_public_report_funded(uuid) FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
 REVOKE ALL ON FUNCTION identity.read_public_report_spent_by_funding(uuid,timestamptz,timestamptz,boolean) FROM PUBLIC,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
 GRANT EXECUTE ON FUNCTION identity.read_public_report_spent_by_funding(uuid,timestamptz,timestamptz,boolean) TO debateai_runtime;
+REVOKE ALL ON identity.public_update_ref FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
+REVOKE ALL ON identity.public_report_check FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
+REVOKE ALL ON FUNCTION identity.record_public_report_check(uuid,timestamptz,text,text,smallint[],text[],text,text,text,text,integer) FROM PUBLIC,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
+GRANT EXECUTE ON FUNCTION identity.record_public_report_check(uuid,timestamptz,text,text,smallint[],text[],text,text,text,text,integer) TO debateai_runtime;

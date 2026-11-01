@@ -507,7 +507,7 @@ export async function createDebate(
   purposeLines?: PurposeLines,
   /** Decision 13: a dig on someone's public debate instead of `parent`, and that this Free ask showed the notice. */
   publicLane?: Readonly<{ publicParent?: PublicDigParent; freePublicNotice?: true }>
-): Promise<{ id: string }> {
+): Promise<{ id: string; public_dig_not_joined?: boolean }> {
   const riskTier = requiredString(config, "risk_tier");
   if (!RISK_TIERS.has(riskTier)) throw new Error("ASK_FIELD_REQUIRED: risk_tier must be casual, standard, or high-stakes.");
   const planTier = requiredString(config, "plan_tier");
@@ -554,9 +554,9 @@ export async function createDebate(
   requireToken(token);
   if (language === undefined) {                                   // today's call, unchanged
     const accepted = await client.submitAsk(ask);
-    return { id: accepted.run_ref };
+    return { id: accepted.run_ref, ...(accepted.public_dig_not_joined === true ? { public_dig_not_joined: true } : {}) };
   }
   const outcome = await client.submitAskOrLanguageChoice(ask);
   if (outcome.kind === "LANGUAGE_CHOICE_NEEDED") throw new QuestionLanguageChoiceNeededError(outcome.offer);
-  return { id: outcome.accepted.run_ref };
+  return { id: outcome.accepted.run_ref, ...(outcome.accepted.public_dig_not_joined === true ? { public_dig_not_joined: true } : {}) };
 }

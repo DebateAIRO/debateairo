@@ -8,7 +8,7 @@
   },
   "migration": {
     "name": "0149_public_report_team_month.sql",
-    "sha256": "aa2019734e906a22f585d69d88c9efd1815ccbc2814140e09faff70b12ce01e8"
+    "sha256": "3089c30cfc9250fa63ac358a91e37c85f1b389346c9f3c89483f780c61b97b57"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-130.sql",
@@ -19,7 +19,9 @@
       "step": "0137_public_debates.sql",
       "field": "function_definition",
       "functions": [
-        "identity.record_public_report_charge(uuid,uuid,uuid,integer,bigint)"
+        "identity.record_public_report_charge(uuid,uuid,uuid,integer,bigint)",
+        "identity.record_public_debate_update(uuid,uuid,text,text,uuid,jsonb)",
+        "identity.read_public_debate_updates(uuid)"
       ]
     },
     {
@@ -34,6 +36,16 @@
       "field": "function_definition",
       "functions": [
         "staff.read_team_month_spent(timestamptz,timestamptz)"
+      ]
+    },
+    {
+      "step": "0147_public_tree.sql",
+      "field": "function_definition",
+      "functions": [
+        "identity.read_public_dig_parent(uuid,uuid)",
+        "identity.read_public_tree_of_run(uuid)",
+        "identity.join_public_tree(uuid,uuid,uuid,uuid,text)",
+        "identity.public_tree_ongoing(uuid)"
       ]
     }
   ]

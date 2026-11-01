@@ -4,20 +4,20 @@ import type { PoolClient } from "pg";
 import type { ForwardStepAnchor, ForwardStepPlan } from "./migration-forward-chain.js";
 
 /**
- * 0149, a funded person's public report in the team's month, and a settled public dig holds no passages (R22, decisions 7, 13, 24; drained): one staff table, one reader, and three
- * functions redefined in place, each declared as an amendment of the step that pins it. It keeps 0130's verifier.
+ * 0149, a funded person's public report in the team's month, and a settled public dig holds no passages (R22, decisions 7, 13, 24; drained): three tables, their definers, and functions redefined in place, each declared as an amendment of the step that pins it. It keeps 0130's verifier.
  */
 const NAME = "0149_public_report_team_month.sql";
 const VERSION = "public-report-team-month-forward0149-v1";
 const MANIFEST_PATH = "lineage/public-report-team-month-forward0149.json";
 const VERIFIER_PATH = "lineage/verify-effective-capabilities-130.sql";
 const PREVIOUS = "0148_erasure_keeps_public.sql";
-const TABLES: readonly string[] = ["staff.team_public_report_spend"];
-const FUNCTIONS: readonly string[] = ["identity.team_public_report_record(uuid,uuid,bigint)", "identity.team_public_report_funded(uuid)", "identity.read_public_report_spent_by_funding(uuid,timestamptz,timestamptz,boolean)", "identity.record_public_report_charge(uuid,uuid,uuid,integer,bigint)", "staff.read_team_month_spent(timestamptz,timestamptz)", "identity.debate_nothing_runs(uuid)"];
+const TABLES: readonly string[] = ["staff.team_public_report_spend", "identity.public_update_ref", "identity.public_report_check"];
+const FUNCTIONS: readonly string[] = ["identity.team_public_report_record(uuid,uuid,bigint)", "identity.team_public_report_funded(uuid)", "identity.read_public_report_spent_by_funding(uuid,timestamptz,timestamptz,boolean)", "identity.record_public_report_charge(uuid,uuid,uuid,integer,bigint)", "staff.read_team_month_spent(timestamptz,timestamptz)", "identity.debate_nothing_runs(uuid)", "identity.record_public_report_check(uuid,timestamptz,text,text,smallint[],text[],text,text,text,text,integer)", "identity.record_public_debate_update(uuid,uuid,text,text,uuid,jsonb)", "identity.read_public_debate_updates(uuid)", "identity.read_public_dig_parent(uuid,uuid)", "identity.read_public_tree_of_run(uuid)", "identity.join_public_tree(uuid,uuid,uuid,uuid,text)", "identity.public_tree_ongoing(uuid)"];
 const AMENDS = [
-  { step: "0137_public_debates.sql", field: "function_definition" as const, functions: ["identity.record_public_report_charge(uuid,uuid,uuid,integer,bigint)"] },
+  { step: "0137_public_debates.sql", field: "function_definition" as const, functions: ["identity.record_public_report_charge(uuid,uuid,uuid,integer,bigint)", "identity.record_public_debate_update(uuid,uuid,text,text,uuid,jsonb)", "identity.read_public_debate_updates(uuid)"] },
   { step: "0139_passage_retention.sql", field: "function_definition" as const, functions: ["identity.debate_nothing_runs(uuid)"] },
-  { step: "0142_team_limit.sql", field: "function_definition" as const, functions: ["staff.read_team_month_spent(timestamptz,timestamptz)"] }
+  { step: "0142_team_limit.sql", field: "function_definition" as const, functions: ["staff.read_team_month_spent(timestamptz,timestamptz)"] },
+  { step: "0147_public_tree.sql", field: "function_definition" as const, functions: ["identity.read_public_dig_parent(uuid,uuid)", "identity.read_public_tree_of_run(uuid)", "identity.join_public_tree(uuid,uuid,uuid,uuid,text)", "identity.public_tree_ongoing(uuid)"] }
 ];
 const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0149_${detail}`); };
 const sha = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");

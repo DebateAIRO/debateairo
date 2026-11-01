@@ -521,3 +521,8 @@ export function carriedMatch(dig: DigDetail, parentQuestionLine: string, catalog
   }
   return dig.carried.length === lines.length ? "EQUAL" : "LEADS";
 }
+
+/** What the page's crisis check reads: the question as typed, or in a dig the person's own views (never the AI's suggestions or the dig's AI-written question). */
+export function crisisWordsOf(origin: "ask" | "dig", question: string, parent: Readonly<{ picks?: readonly Readonly<{ kind: string; text: string }>[] | undefined }> | null): readonly string[] {
+  return origin === "dig" ? (parent?.picks ?? []).filter((pick) => pick.kind === "OWN_VIEW").map((pick) => pick.text) : [question];
+}

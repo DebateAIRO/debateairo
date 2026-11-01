@@ -148,7 +148,6 @@ export type PublicDigAdmission =
   | Readonly<{ kind: "ADMIT"; positionRef: string; parentRunId: string; publicationRef: string; picks: NonNullable<AskParent["picks"]>; places: readonly string[]; mode: "quick" | "thorough" }>
   | Readonly<{ kind: "NOT_FOUND" }>
   | Readonly<{ kind: "TOO_DEEP" }>
-  | Readonly<{ kind: "WRITING" }>
   | Readonly<{ kind: "NEEDS_A_PATH" }>
   | Readonly<{ kind: "MALFORMED"; reason: "FREE_PICKS_OVER" | "PICKS_NOT_ON_ONE_PATH" }>;
 
@@ -162,7 +161,6 @@ export async function admitPublicDig(input: Readonly<{ parent: PublicDigParent; 
   const read = await ports.tree.readDigParent(parent.public_ref, parent.dig_ref ?? null);
   if (read === null) return Object.freeze({ kind: "NOT_FOUND" });
   if (read.level > DIG_LEVEL_MAX) return Object.freeze({ kind: "TOO_DEEP" });
-  if (read.writing) return Object.freeze({ kind: "WRITING" });
   const debate = await ports.readPublicDebate(parent.public_ref);
   if (debate === null) return Object.freeze({ kind: "NOT_FOUND" });
   const index = publicPathIndexOf(debate, parent.dig_ref ?? null);
@@ -247,15 +245,45 @@ export type PublicPageSweepDeps = Readonly<{
   contributions: Pick<PostgresPublicDebateRunnerRepository, "settleCheck" | "recordPageUpdate">;
   tree: Pick<PostgresPublicTreeRepository, "readTreeOfRun">;
   contentCheck: PublicationContentCheck;
+  /** The same check for a report, whose record names the report: `runId` here is the report's id (0149). */
+  reportContentCheck: PublicationContentCheck;
   /** The publication's key, under its content lease, with the run its snapshot names. Null: it is not public now. */
   withPublicationKey: <T>(publicationRef: string, use: (cipher: PreparedPublicationCipher) => T) => Promise<T | null>;
-  /** How long a publication check may stay unavailable before the contribution stays private. */
+  /** How long a publication check may stay unavailable: a contribution then stays private, a later text stays off the page. */
   giveUpMs?: number;
+  /** The same for a report: the writer waited and paid, so it is tried for longer. */
+  reportGiveUpMs?: number;
   now?: () => Date;
   log?: (event: string, detail: Record<string, unknown>) => void;
 }>;
 
-export const PUBLIC_PAGE_SWEEP_DEFAULTS = Object.freeze({ everyMs: 15_000, giveUpMs: 6 * 60 * 60_000 });
+export const PUBLIC_PAGE_SWEEP_DEFAULTS = Object.freeze({ everyMs: 15_000, giveUpMs: 6 * 60 * 60_000, reportGiveUpMs: 24 * 60 * 60_000 });
+
+/**
+ * A judge that is down is no cost loop. Every sweep's check goes through this one: after an UNAVAILABLE (or a check that threw) no judge is called until a wait has passed, doubling from a minute
+ * to an hour; the first answer the judge gives ends it. While the wait runs the sweeps read "unavailable" with no call, so each row's own give-up still comes by its age.
+ */
+export function backedOffContentCheck(check: PublicationContentCheck, input: Readonly<{ now?: () => number; firstWaitMs?: number; longestWaitMs?: number }> = {}): PublicationContentCheck {
+  const now = input.now ?? Date.now;
+  const first = input.firstWaitMs ?? 60_000;
+  const longest = input.longestWaitMs ?? 60 * 60_000;
+  let wait = 0;
+  let until = 0;
+  const failed = (): void => { wait = wait === 0 ? first : Math.min(wait * 2, longest); until = now() + wait; };
+  return { check: async (request) => {
+    if (now() < until) return { outcome: "UNAVAILABLE", cause: "JUDGE_DEADLINE" };
+    let result: PublicationCheckResult;
+    try {
+      result = await check.check(request);
+    } catch (error) {
+      failed();
+      throw error;
+    }
+    if (result.outcome === "UNAVAILABLE") failed();
+    else { wait = 0; until = 0; }
+    return result;
+  } };
+}
 
 const openUnder = (pool: Pool, runId: string, carrier: string, id: string, envelope: CryptoEnvelope | null): Promise<unknown> =>
   withRunContentLease(pool, [runId], () => decryptContentForRun<unknown>(pool, runId, carrier as never, id, envelope, null));
@@ -291,6 +319,8 @@ export function pathCopyOf(value: unknown, input: Readonly<{ ownRewrite: boolean
 export async function sweepPublicPage(deps: PublicPageSweepDeps): Promise<Readonly<{ settled: number; copied: number; reports: number; skipped: number }>> {
   const now = (deps.now ?? (() => new Date()))();
   const giveUp = deps.giveUpMs ?? PUBLIC_PAGE_SWEEP_DEFAULTS.giveUpMs;
+  const reportGiveUp = deps.reportGiveUpMs ?? PUBLIC_PAGE_SWEEP_DEFAULTS.reportGiveUpMs;
+  const tooOld = (at: string, limit: number): boolean => now.getTime() - Date.parse(at) >= limit;
   const log = (event: string, detail: Record<string, unknown>): void => { try { deps.log?.(event, detail); } catch { /* A failing log sink costs nothing. */ } };
   const refused = (result: PublicationCheckResult): boolean => result.outcome === "BLOCK" || result.outcome === "UNSURE";
   let settled = 0, copied = 0, reports = 0, skipped = 0;
@@ -348,7 +378,14 @@ export async function sweepPublicPage(deps: PublicPageSweepDeps): Promise<Readon
           skipped += 1;
           continue;
         }
-        if (result.outcome !== "ALLOW") continue;
+        if (result.outcome !== "ALLOW") {
+          // A judge down this long: the page keeps its older text. What the person paid for stays in their own debate; the dig's page line says so beforehand.
+          if (tooOld(owed.recorded_at, giveUp)) {
+            await deps.page.recordSkip(owed.source_id, owed.publication_ref, owed.kind, "CHECK_UNAVAILABLE");
+            skipped += 1;
+          }
+          continue;
+        }
       }
       const sealed = await deps.withPublicationKey(owed.publication_ref, (cipher) => cipher.encrypt(content));
       if (sealed === null) continue;
@@ -379,13 +416,20 @@ export async function sweepPublicPage(deps: PublicPageSweepDeps): Promise<Readon
       }
       const body = { answer: version.answer.data, story: version.story.data, sources: version.sources.data, ...(version.paths.data === undefined ? {} : { paths: version.paths.data }),
         shortened: isRecord(opened) && opened.shortened === true };
-      const result = await deps.contentCheck.check({ runId: owed.carrier_run_id, snapshot: { reports: [body] } as unknown as PublicDebate });
+      const result = await deps.reportContentCheck.check({ runId: owed.report_id, snapshot: { reports: [body] } as unknown as PublicDebate });
       if (refused(result)) {
         await deps.page.recordSkip(owed.report_id, owed.publication_ref, "REPORT", "REFUSED");
         skipped += 1;
         continue;
       }
-      if (result.outcome !== "ALLOW") continue;
+      if (result.outcome !== "ALLOW") {
+        // A judge down this long: this version never reaches the page, the debate is free again, and anyone may press once more.
+        if (tooOld(owed.recorded_at, reportGiveUp)) {
+          await deps.page.recordSkip(owed.report_id, owed.publication_ref, "REPORT", "CHECK_UNAVAILABLE");
+          skipped += 1;
+        }
+        continue;
+      }
       const sealed = await deps.withPublicationKey(owed.publication_ref, (cipher) => cipher.encrypt(body));
       if (sealed === null) continue;
       if (await deps.page.recordReportCopy(owed.publication_ref, owed.report_version, owed.report_id, sealed) === "RECORDED") reports += 1;

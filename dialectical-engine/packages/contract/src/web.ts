@@ -868,7 +868,7 @@ export type AnswerMainAnswer = z.infer<typeof AnswerMainAnswerSchema>;
 
 /**
  * Decision 13: a dig on a public debate, named by the page it was started from: `public_ref` is all a stranger knows of the debate (never
- * its run id), `dig_ref` the contribution they dig under (a public update's id; absent: the first debate).
+ * its run id), `dig_ref` the contribution they dig under (the update's random public reference, 0149's, from which no run id can be told; absent: the first debate).
  */
 export const PublicDigParentSchema = z.object({
   public_ref: z.uuid(),
@@ -901,7 +901,7 @@ export const PublicContributionSchema = z.object({
   summary: z.string().trim().min(1).max(DIG_MODEL_LIMITS.summaryMaxChars),
   fate: StoryFateSchema,
   what_changed: z.array(z.string().trim().min(1).max(WEB_CONTRACT_LIMITS.reasonMaxChars)).max(DIG_MODEL_LIMITS.whatChangedSentencesMax),
-  // The reference a later dig names (`PublicDigParent.dig_ref`), the dig this came from and whether it is that dig's own rewrite (false: a path above it that changed).
+  // The random reference a later dig names (`PublicDigParent.dig_ref`), never derived from a run id, the dig this came from and whether it is that dig's own rewrite (false: a path above it that changed).
   update_ref: z.uuid().optional(),
   own_rewrite: z.boolean().optional(),
   on_ref: z.uuid().nullable().optional(),

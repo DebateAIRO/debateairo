@@ -13,7 +13,7 @@ import {
   ContentCipher, FileRunContentKeyStore, FileUserDekStore, MemoryPublicationKeyStore, PublicationCipher, generateDek, loadKek
 } from "../../packages/crypto/src/index.js";
 import {
-  PUBLIC_REPORT_CARRIER, PostgresPublicDebateRepository, PostgresPublicDebateRunnerRepository, PostgresPublicPageRepository, PostgresPublicTreeRepository,
+  MAIN_ANSWER_UPDATE_CARRIER, PATH_REWRITE_CARRIER, PUBLIC_REPORT_CARRIER, PostgresTreeUpdateRunnerRepository, encryptAttestedContentForRun, PostgresPublicDebateRepository, PostgresPublicDebateRunnerRepository, PostgresPublicPageRepository, PostgresPublicTreeRepository,
   PostgresInvestigationRepository, PostgresPublicTreeRunnerRepository, PostgresPublicationRepository, PostgresTreeUpdateRepository, configureContentEncryption, createPool,
   decryptContentForRun, migrate, withRunContentLease, type Pool
 } from "@debateai/db";
@@ -27,6 +27,7 @@ import { PostgresPublicationApplication } from "../../apps/api/src/publications.
 import { joinPublicDigAtStart, pressPublicReport, sweepPublicPage, type PublicDigAdmission } from "../../apps/api/src/public-tree.js";
 import { postgresInvestigationCloseSources } from "../../apps/runner/src/investigation-close-sources.js";
 import { PATH_REWRITE_CHECKER_MODEL, PATH_REWRITE_WRITER_MODEL, composePathRewrite } from "../../apps/runner/src/path-rewrite-composition.js";
+import { pathUpdateIdOf } from "../../apps/runner/src/path-climb.js";
 import { runDigPathRewrite } from "../../apps/runner/src/path-rewrite.js";
 import { composePublicReport, sweepPublicTree } from "../../apps/runner/src/public-contribution.js";
 import { DIG_NODES, SATISFIED, digSnapshot, fieldsOf, fittingRewrite, isChecker } from "../support/path-rewrite-world.js";
@@ -162,8 +163,8 @@ function application(): PostgresPublicationApplication {
     authorNameGone: (ref) => new PostgresPublicDebateRunnerRepository(api).isAuthorNameGone(ref)
   });
 }
-async function pageSweep(check: PublicationContentCheck = allowEverything) {
-  return sweepPublicPage({ pool: api, page: new PostgresPublicPageRepository(api), contributions: new PostgresPublicDebateRunnerRepository(api), tree: new PostgresPublicTreeRepository(api), contentCheck: check,
+async function pageSweep(check: PublicationContentCheck = allowEverything, extra: Partial<Parameters<typeof sweepPublicPage>[0]> = {}) {
+  return sweepPublicPage({ pool: api, page: new PostgresPublicPageRepository(api), contributions: new PostgresPublicDebateRunnerRepository(api), tree: new PostgresPublicTreeRepository(api), contentCheck: check, reportContentCheck: check, ...extra,
     withPublicationKey: (ref, use) => application().withPublicationKey(ref, use) });
 }
 const page = async (ref: string): Promise<PublicDebate> => (await application().readPublicDebate(ref))!;
@@ -514,10 +515,11 @@ describe("a report on a public debate", () => {
     await settleAll(world);
     const opened = await pressPublicReport({ ownerRef: eve.ownerRef, publicationRef: debate.ref, reportId: randomUUID(), free: false, now: new Date(), pool: api, tree, readPublicDebate });
     expect(opened).toEqual({ kind: "WRITING", reportVersion: 1 });
-    // A second press answers the same version; a dig waits for it.
+    // A second press answers the same version.
     expect(await pressPublicReport({ ownerRef: dan.ownerRef, publicationRef: debate.ref, reportId: randomUUID(), free: false, now: new Date(), pool: api, tree, readPublicDebate })).toEqual({ kind: "WRITING", reportVersion: 1 });
-    const stray = await createEncryptedStoryRun(database.pool, eve, "During the report?");
-    expect((await tree.join({ ownerRef: eve.ownerRef, publicationRef: debate.ref, parentRunId: debate.root, childRunId: stray, positionRef: debate.position })).outcome).toBe("WRITING");
+    // A dig joins meanwhile: the report writes from its sealed copy, and presses hold nothing against digs. Waiting in line, it holds no later report back either (below).
+    const during = await createEncryptedStoryRun(database.pool, eve, "During the report?");
+    expect((await tree.join({ ownerRef: eve.ownerRef, publicationRef: debate.ref, parentRunId: debate.root, childRunId: during, positionRef: debate.position })).outcome).toBe("JOINED");
     await sweepPublicTree({ ...world.composed.publicTree, reports: world.reports, staleMs: 0 });
     await pageSweep();
     const first = await page(debate.ref);
@@ -725,6 +727,126 @@ describe("a funded person's public report and the team's one limit (0149)", () =
     await seeded([["DELETE FROM identity.public_report_charge WHERE spend_id=$1", [spendId]]]);
     expect(await teamSpent()).toBe(before + 700);
     await expect(runner.query("SELECT * FROM staff.team_public_report_spend")).rejects.toMatchObject({ code: "42501" });
+  });
+});
+
+describe("what the independent review found", () => {
+  it("the author's private main-answer version and private rewrite are in no stranger's prompt and not on the page", async () => {
+    const [ana, dan] = [await account(), await account()];
+    const debate = await publishedDebate(ana);
+    const PRIVATE_ANSWER = "AUTHOR-PRIVATE-ANSWER-VERSION";
+    const PRIVATE_REWRITE = "AUTHOR-PRIVATE-REWRITE-TEXT";
+    // A private dig of hers on the same path, its rewrite on the path's line.
+    const privateDig = await createEncryptedStoryRun(database.pool, ana, "A private dig of hers?");
+    expect((await new PostgresInvestigationRepository(api).join({ ownerRef: ana.ownerRef, parentRunId: debate.root, childRunId: privateDig, places: [`path:${debate.position}`], mode: "quick" })).outcome).toBe("JOINED");
+    await runner.query("SELECT * FROM identity.take_path_rewrite_turn($1,$2,$3)", [privateDig, debate.root, debate.position]);
+    const rewriteId = randomUUID();
+    const lineage = { maker: "maker-a", model_id: "model-a", transport: "openai-compatible-http", provider_ref: "provider:a" };
+    const tree = new PostgresTreeUpdateRunnerRepository(runner);
+    const sealedRewrite = await withRunContentLease(api, [privateDig], () => encryptAttestedContentForRun(api, privateDig, PATH_REWRITE_CARRIER, rewriteId, { text: { line: PRIVATE_REWRITE, summary: PRIVATE_REWRITE, fate: "FELL" } }));
+    expect(await tree.recordRewriteInLine(null, { rewriteId, digRunId: privateDig, parentAnswerVersion: 1, basedOnRewriteId: null, outcome: "READY", failureCode: null, fateBefore: "HELD_UP", fateAfter: "FELL", verdict: null,
+      writerLineage: lineage, checkerLineage: lineage, rounds: 1, artifactRefs: [], content: sealedRewrite! })).toBe("RECORDED");
+    // And the main answer's version it caused, under the root's key.
+    const updateId = randomUUID();
+    const sealedAnswer = await withRunContentLease(api, [debate.root], () => encryptAttestedContentForRun(api, debate.root, MAIN_ANSWER_UPDATE_CARRIER, updateId, { v: 1, segments: [PRIVATE_ANSWER], position_ref: debate.position, trigger: "PATH_REWRITE" }));
+    expect((await tree.recordMainAnswer({ updateId, rootRunId: debate.root, basedOnUpdateId: null, triggerKind: "PATH_REWRITE", triggerId: rewriteId, triggerRunId: privateDig, paidByOwnerRef: ana.ownerRef, outcome: "READY", failureCode: null,
+      writerLineage: lineage, checkerLineage: lineage, rounds: 1, artifactRefs: [], spentMicros: 1, content: sealedAnswer! })).outcome).toBe("RECORDED");
+    const world = vendors();
+    await dig(dan, debate, world);
+    await settleAll(world);
+    const all = everyPromptText(world.sent);
+    // The test reached the part that could leak: an answer update was written.
+    expect(world.sent.some((packet) => contractOf(packet).startsWith("report."))).toBe(true);
+    expect(all).not.toContain(PRIVATE_ANSWER);
+    expect(all).not.toContain(PRIVATE_REWRITE);
+    const shown = await page(debate.ref);
+    expect(shown.main_answer_update?.segments[0]?.text).toContain("The whole debate now points to");
+    expect(JSON.stringify(shown)).not.toContain(PRIVATE_ANSWER);
+    expect(JSON.stringify(shown)).not.toContain(PRIVATE_REWRITE);
+    // A later public version reads the earlier public one, so a public answer's line is kept.
+    const eve = await account();
+    const later = vendors();
+    await dig(eve, debate, later);
+    await settleAll(later);
+    expect(everyPromptText(later.sent)).toContain(shown.main_answer_update!.segments[0]!.text);
+    expect(everyPromptText(later.sent)).not.toContain(PRIVATE_ANSWER);
+  });
+
+  it("the page's reference tells nothing about a run: random, the row's own id is refused, and it is what a dig names", async () => {
+    const [ana, dan] = [await account(), await account()];
+    const debate = await publishedDebate(ana);
+    const world = vendors();
+    const run = await dig(dan, debate, world);
+    await settleAll(world);
+    const own = (await page(debate.ref)).contributions!.find((entry) => entry.own_rewrite === true)!;
+    const internal = pathUpdateIdOf(run, 0);
+    expect(own.update_ref).not.toBe(internal);
+    expect(JSON.stringify(await page(debate.ref))).not.toContain(internal);
+    const tree = new PostgresPublicTreeRepository(api);
+    expect(await tree.readDigParent(debate.ref, own.update_ref!)).toMatchObject({ parent_run_id: run });
+    expect(await tree.readDigParent(debate.ref, internal)).toBeNull();
+    expect(await tree.readTreeOfRun(run)).toMatchObject({ dig_update_id: own.update_ref });
+    expect((await database.pool.query<{ n: string }>("SELECT count(*) AS n FROM identity.public_update_ref WHERE public_ref=$1", [own.update_ref])).rows[0]!.n).toBe("1");
+  });
+
+  it("a store that fails between the run's start and its join says so plainly, instead of a silent private debate", async () => {
+    const [ana, eve] = [await account(), await account()];
+    const debate = await publishedDebate(ana);
+    const base = testHttpIdentity(randomUUID());
+    const identity = { ...base, authenticated: { ...base.authenticated, userId: eve.userId, ownerRef: eve.ownerRef, session: { ...base.authenticated.session, session_id: eve.sessionId, asker_id: `owner:${eve.ownerRef}` } } };
+    const real = new PostgresPublicTreeRepository(api);
+    const run = await createEncryptedStoryRun(database.pool, eve, "Will not join?");
+    const http = buildApi({ application: { submit: async () => ({ run_ref: run, status: "QUEUED" }) } as unknown as ApiOptions["application"], sessions: testSessionApplication([identity]), allowedOrigin: TEST_APP_ORIGIN, publications: application() as never,
+      questionCheck: { check: async () => ({ outcome: "PASS" }) } as never,
+      publicTree: { pool: api, tree: { readDigParent: (a: string, b: string | null) => real.readDigParent(a, b), readTreeOfRun: (a: string) => real.readTreeOfRun(a), join: async () => { throw new Error("STORE_DOWN"); } } as never,
+        contributions: new PostgresPublicDebateRepository(api), readPublicDebate: (ref) => application().readPublicDebate(ref) } });
+    const answer = await http.inject({ method: "POST", url: "/v1/asks", headers: testSessionHeaders(identity, true), payload: { question_line: "Would winter ridership fill it?", risk_tier: "standard", tier_source: "MACHINE_DEFAULT",
+      tier_provenance_ref: "machine:deployment-floor", composition_budget_tier: "low", depth_params: { depth: 1 }, decision_scope: "test-layer scope", as_of: "2026-08-07T00:00:00.000Z", steering_presets: [], plan_tier: "free", steering_annotations: [],
+      public_parent: { public_ref: debate.ref, places: [`path:${debate.position}`], mode: "quick", picks: [{ kind: "OWN_VIEW", suggestion_id: null, place: `path:${debate.position}`, text: "My view." }] } } });
+    expect(answer.statusCode).toBe(202);
+    expect(answer.json()).toMatchObject({ run_ref: run, public_dig_not_joined: true });
+    await http.close();
+  });
+
+  it("a dig waiting in line holds no report back; a judge down past the give-up leaves a plain state; a report's check names the report", async () => {
+    const [ana, dan, eve] = [await account(), await account(), await account()];
+    const debate = await publishedDebate(ana);
+    const tree = new PostgresPublicTreeRepository(api);
+    const readPublicDebate = (ref: string) => application().readPublicDebate(ref);
+    const press = (who: StoryEncryptedOwner) => pressPublicReport({ ownerRef: who.ownerRef, publicationRef: debate.ref, reportId: randomUUID(), free: false, now: new Date(), pool: api, tree, readPublicDebate });
+    // Joined, waiting in line: no work items.
+    const waiting = await createEncryptedStoryRun(database.pool, eve, "Waiting in line?");
+    expect((await tree.join({ ownerRef: eve.ownerRef, publicationRef: debate.ref, parentRunId: debate.root, childRunId: waiting, positionRef: debate.position })).outcome).toBe("JOINED");
+    expect(await press(eve)).toEqual({ kind: "WRITING", reportVersion: 1 });
+    const world = vendors();
+    await sweepPublicTree({ ...world.composed.publicTree, reports: world.reports, staleMs: 3_600_000 });
+    // The judge is down for the report past its give-up: not on the page, and the debate is free again. The record names the report, not its carrier.
+    const down: PublicationContentCheck = { check: async () => ({ outcome: "UNAVAILABLE", cause: "JUDGE_DEADLINE" }) };
+    const seenRuns: string[] = [];
+    const seeing: PublicationContentCheck = { check: async ({ runId }) => { seenRuns.push(runId); return { outcome: "UNAVAILABLE", cause: "JUDGE_DEADLINE" }; } };
+    await pageSweep(down, { reportContentCheck: seeing });
+    const reportId = (await database.pool.query<{ report_id: string }>("SELECT report_id FROM identity.public_report WHERE publication_ref=$1", [debate.ref])).rows[0]!.report_id;
+    expect(seenRuns).toContain(reportId);
+    expect(seenRuns).not.toContain(debate.root);
+    expect(await press(eve)).toEqual({ kind: "ONGOING" });
+    await pageSweep(down, { reportContentCheck: down, reportGiveUpMs: 0 });
+    expect((await page(debate.ref)).reports).toBeUndefined();
+    expect((await database.pool.query<{ code: string }>("SELECT code FROM identity.public_page_skip WHERE source_id=$1", [reportId])).rows[0]!.code).toBe("CHECK_UNAVAILABLE");
+    const page2 = new PostgresPublicPageRepository(runner);
+    await page2.recordReportCheck({ reportId, attemptedAt: new Date(), outcome: "BLOCK", failureCause: null, rules: [1], partKinds: ["SUMMARY"], ground: "TERMS", judgeProviderRef: "p", judgeModelId: "m", policyVersion: "v", judgeCallCount: 1 });
+    expect((await database.pool.query<{ outcome: string }>("SELECT outcome FROM identity.public_report_check WHERE report_id=$1", [reportId])).rows[0]!.outcome).toBe("BLOCK");
+    // A climb's text past the give-up: the page keeps its older text; the digger's own rewrite stands.
+    const deeper = await dig(dan, debate, world);
+    await pageSweep();
+    const beforeClimb = (await page(debate.ref)).contributions!.length;
+    await sweepPublicTree({ ...world.composed.publicTree, reports: world.reports, staleMs: 3_600_000 });
+    await pageSweep(down, { giveUpMs: 0 });
+    expect((await page(debate.ref)).main_answer_update).toBeUndefined();
+    expect((await page(debate.ref)).contributions!.length).toBe(beforeClimb);
+    expect((await database.pool.query<{ code: string }>("SELECT code FROM identity.public_page_skip WHERE kind='MAIN_ANSWER' AND publication_ref=$1", [debate.ref])).rows[0]!.code).toBe("CHECK_UNAVAILABLE");
+    expect(await new PostgresPublicDebateRunnerRepository(runner).readContribution(deeper)).toMatchObject({ outcome: "ALLOWED" });
+    // The contribution's own check past the give-up stays private: this one is what the sweep's step 1 already did.
+    expect(await press(eve)).toEqual({ kind: "WRITING", reportVersion: 2 });
   });
 });
 

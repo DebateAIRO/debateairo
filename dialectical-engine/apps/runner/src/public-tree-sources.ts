@@ -25,6 +25,9 @@ import { readReplayBook } from "./run-replay.js";
  *    ALLOWED counts; the author's private rewrites on the same line, and a held or refused dig, never do. The newer of the two wins (`written_at`); a digger who erased their account
  *    leaves no row, and the page's copy of their text stands.
  *  - What the dig made of itself (its picks, its stored paths) is its own, under its own key.
+ * WHY THE LINE IS SAFE TO READ: 0147's identity.read_public_path_line lists every row of a path, private ones too, and the runner holds every live key, so this is a rule of code, not a
+ * key boundary. It holds in one place: `allowedTextsOf` is the only reader of those rows' text here, and it opens a row only when it is a PATH_UPDATE whose dig's contribution is ALLOWED. A 0134
+ * rewrite of the author's is never opened; its id may stand as a turn's "based on", which is bookkeeping and carries no text. tests/integration/public-tree-flow.test.ts holds this.
  * THE MAIN ANSWER: while the root's key lives, 0138's row under the root's key, so its author's page shows it too. Once it is gone, 0147's row under the dig's key. Either way the API's
  * sweep copies it to the page, under the publication's key.
  */
@@ -230,7 +233,10 @@ export function publicTreePortsOf(pool: Pool, digRunId: string): TreeUpdatePorts
     sealMainAnswer: async (rootRunId: string, updateId: string, content: MainAnswerContent) => (await rootLives(liveTree, rootRunId))
       ? sealUnder(rootRunId, MAIN_ANSWER_UPDATE_CARRIER, updateId, content, "MAIN_ANSWER_ENCRYPTION_REQUIRED")
       : sealUnder(digRunId, PUBLIC_ANSWER_UPDATE_CARRIER, updateId, content, "MAIN_ANSWER_ENCRYPTION_REQUIRED"),
+    // Only a version a public contribution caused is ever opened here. A version from the author's private digs (0138 lists them too, for the bookkeeping of "based on") stays
+    // shut: no prompt holds it, and the page's own main answer stands in for it.
     openMainAnswer: async (rootRunId, row) => {
+      if ((await contributions.readContribution(row.trigger_run_id))?.outcome !== "ALLOWED") return null;
       const lives = await rootLives(liveTree, rootRunId);
       const under = lives ? rootRunId : row.trigger_run_id;
       const opened = await withRunContentLease(pool, [under], () => decryptContentForRun<unknown>(pool, under, lives ? MAIN_ANSWER_UPDATE_CARRIER : PUBLIC_ANSWER_UPDATE_CARRIER,
