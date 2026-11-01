@@ -575,7 +575,7 @@ describe("over HTTP", () => {
     const identity = { ...base, authenticated: { ...base.authenticated, userId: ana.userId, ownerRef: ana.ownerRef,
       session: { ...base.authenticated.session, session_id: ana.sessionId, asker_id: `owner:${ana.ownerRef}` } } };
     const app = { submit, withContentLease: <T>(_id: string, use: () => Promise<T>) => use() } as unknown as ApiOptions["application"];
-    const api2 = buildApi({ application: app, sessions: testSessionApplication([identity]), allowedOrigin: TEST_APP_ORIGIN, publications: application() as never, questionCheck: { check: async () => ({ kind: "PASS" }) } as never,
+    const api2 = buildApi({ application: app, sessions: testSessionApplication([identity]), allowedOrigin: TEST_APP_ORIGIN, publications: application() as never, questionCheck: { check: async () => ({ outcome: "PASS" }) } as never,
       publicTree: { pool: api, tree: new PostgresPublicTreeRepository(api), contributions: new PostgresPublicDebateRepository(api), readPublicDebate: (ref) => application().readPublicDebate(ref) },
       ...(askRoom === undefined ? {} : { askRoom }) });
     return { api2, identity };
@@ -663,7 +663,7 @@ describe("what a stranger can press is limited, and Free's notice counts only on
     const app = { submit: async () => ({ run_ref: runs.shift()!, status: "QUEUED" }), withContentLease: <T>(_id: string, use: () => Promise<T>) => use() } as unknown as ApiOptions["application"];
     let refuse = false;
     const admission = { configured: () => true, decide: (scope: string) => { decided.push(scope); return refuse ? { allowed: false, retryAfterMs: 60_000, windowMs: 60_000, reason: "FIXTURE" } : { allowed: true }; } } as unknown as ApiOptions["admission"];
-    const options = { application: app, sessions: testSessionApplication([identity]), allowedOrigin: TEST_APP_ORIGIN, publications: application() as never, questionCheck: { check: async () => ({ kind: "PASS" }) } as never, admission,
+    const options = { application: app, sessions: testSessionApplication([identity]), allowedOrigin: TEST_APP_ORIGIN, publications: application() as never, questionCheck: { check: async () => ({ outcome: "PASS" }) } as never, admission,
       publicTree: { pool: api, tree: new PostgresPublicTreeRepository(api), contributions: new PostgresPublicDebateRepository(api), readPublicDebate: (ref: string) => application().readPublicDebate(ref) } } as ApiOptions;
     const http = buildApi(options);
     const ask = (planTier: "free" | "premium") => http.inject({ method: "POST", url: "/v1/asks", headers: testSessionHeaders(identity, true), payload: { question_line: "A question of mine?", risk_tier: "standard", tier_source: "MACHINE_DEFAULT",
