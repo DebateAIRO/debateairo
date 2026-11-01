@@ -382,6 +382,17 @@ export function stubChatBody(provider: GateProvider, body: Readonly<Record<strin
   if (provider === "deepinfra") return JSON.stringify(body);
   const joined = (blocks: readonly { text?: unknown }[]): string => blocks.map((block) => typeof block?.text === "string" ? block.text : "").join("");
   // LG-B (L30): a turn sent as text blocks (the marked material) is its blocks' texts joined: today's turn byte for byte.
+  // A report's long material first (packages/providers/src/anthropic-messages.ts, dossierFirstTurns): cached material, the instructions, the rest of the material.
+  const first = (Array.isArray(body.messages) ? body.messages[0] : undefined) as { role?: unknown; content?: { text?: unknown; cache_control?: unknown }[] } | undefined;
+  if (Array.isArray(first?.content) && first.content.length === 3 && first.content[0]?.cache_control !== undefined && typeof body.system === "string") {
+    const [shared, instructions, rest] = first.content.map((block) => String(block.text));
+    // The two fenced parts are one material: one block again, as a frame reader expects.
+    const fence = shared!.slice(0, shared!.indexOf("\n"));
+    const envelope = (text: string) => JSON.parse(text.slice(text.indexOf(fence) + fence.length, text.lastIndexOf(fence))) as { fields: unknown[] };
+    const whole = envelope(shared!);
+    whole.fields.push(...envelope(rest!).fields);
+    return JSON.stringify({ messages: [{ role: "system", content: instructions!.trimStart() }, { role: "user", content: `${fence}\n${JSON.stringify(whole)}\n${fence}` }, ...(body.messages as unknown[]).slice(1)] });
+  }
   const turns = (Array.isArray(body.messages) ? body.messages : []).map((turn: { role?: unknown; content?: unknown }) =>
     Array.isArray(turn?.content) ? { role: turn.role, content: joined(turn.content as { text?: unknown }[]) } : turn);
   const system = typeof body.system === "string" ? body.system
@@ -494,6 +505,8 @@ export async function startPreviewGateStubs(input: Readonly<{
   override?: (request: GateRequest, chat: string) => GateOverride | null;
   enabledModels?: Readonly<Record<GateProvider, readonly string[]>>;
   remainingState?: "active" | "halted";
+  /** What /remaining says is left today (default 9.5 dollars, 1900 calls): a long scenario of many debates asks for more. */
+  remainingToday?: Readonly<{ usd: string; calls: number }>;
   /** Holds each /complete request this long before answering it (a slow vendor), so calls can overlap. */
   delayMs?: (request: GateRequest) => number;
   /**
@@ -553,7 +566,7 @@ export async function startPreviewGateStubs(input: Readonly<{
           const state = provider === "deepinfra" && halt.haltedAt !== null ? "halted" : input.remainingState ?? "active";
           remainingReads.push(Object.freeze({ provider, state }));
           json(200, JSON.stringify({
-            state, window_open: true, remaining_usd: "9.500000000", remaining_calls: 1900,
+            state, window_open: true, remaining_usd: input.remainingToday?.usd ?? "9.500000000", remaining_calls: input.remainingToday?.calls ?? 1900,
             max_concurrent_calls: provider === "anthropic" ? 2 : 10, largest_reservation_usd: "0.214016000",
             enabled_models: enabled[provider]
           }));
