@@ -137,5 +137,6 @@
   "newDebate.askText.otherAnswer": "Alt răspuns…",
   "newDebate.askText.otherLabel": "Propria dumneavoastră explicație suplimentară",
   "newDebate.askText.matters": "Dacă răspunsurile duc în direcții diferite, cel mai important pentru mine este: {matters}",
-  "newDebate.askText.angles": "Vă rog să analizați și: {list}."
+  "newDebate.askText.angles": "Vă rog să analizați și: {list}.",
+  "newDebate.freePublicNotice": "În planul Gratuit, întrebarea dvs. și dezbaterea ei sunt publice. Nu includeți date personale."
 }

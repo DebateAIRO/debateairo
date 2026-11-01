@@ -17,6 +17,7 @@ import { V4ChangesBar } from "@/components/v4/V4ChangesBar";
 import { V4MoneyLines, type V4DigChoice } from "@/components/v4/V4DigSuggest";
 import { V4DigToast, type V4DigNotice } from "@/components/v4/V4DigToast";
 import { V4Header } from "@/components/v4/V4Header";
+import { V4ContributionNote } from "@/components/v4/V4ContributionNote";
 import { V4LevelTrail } from "@/components/v4/V4LevelTrail";
 import { digFor, digsUnder, openCount, pathTitle, resolveSelection, selectionIdOf, TitleText, V4MapTree } from "@/components/v4/V4MapTree";
 import { V4Outline } from "@/components/v4/V4Outline";
@@ -808,6 +809,25 @@ function V4Debate({
     };
   }, [servedRunId, researchedPending]);
 
+  // ── A dig on a public debate (decision 13): the answer read again while the AI check on it runs, until it says how the check went ────
+  const contributionChecking = served?.answer.contribution?.state === "CHECKING";
+  useEffect(() => {
+    if (servedRunId === null || !contributionChecking) return;
+    let active = true;
+    let timer: number | undefined;
+    const read = async (): Promise<void> => {
+      const next = await loadAnswer(servedRunId);
+      if (!active) return;
+      if (next !== null) setFreshAnswer(next);
+      timer = window.setTimeout(() => void read(), REWRITE_POLL_MS);
+    };
+    timer = window.setTimeout(() => void read(), REWRITE_POLL_MS);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [servedRunId, contributionChecking]);
+
   // ── Where a dig sits (W4-6): the debates above it, read once, up to the main question ────────────────────────────
   const servedDig = served?.answer.dig ?? null;
   const trailKey = servedDig === null ? null : `${servedDig.parent_run_id}|${servedDig.position_ref ?? ""}`;
@@ -1352,6 +1372,7 @@ function V4Debate({
           {map.dig !== null && map.dig !== undefined ? (
             <V4LevelTrail level={map.dig.level} trail={trail} linkLevel={chosenLevel} catalog={catalog} />
           ) : null}
+          <V4ContributionNote contribution={served?.answer.contribution} catalog={catalog} />
           <V4MainAnswer mainAnswer={served?.answer.main_answer} catalog={catalog} locale={locale} />
           <V4ChangedSince changedSince={map.changedSince} reportHref={reportHref} catalog={catalog} locale={locale} />
           {showChanges ? (

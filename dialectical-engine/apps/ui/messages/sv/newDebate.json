@@ -137,5 +137,6 @@
   "newDebate.askText.otherAnswer": "Annat svar…",
   "newDebate.askText.otherLabel": "Eget extra förtydligande",
   "newDebate.askText.matters": "Om svaren pekar åt olika håll är det viktigast för mig: {matters}",
-  "newDebate.askText.angles": "Titta gärna också på: {list}."
+  "newDebate.askText.angles": "Titta gärna också på: {list}.",
+  "newDebate.freePublicNotice": "Med det kostnadsfria abonnemanget är din fråga och dess debatt offentliga. Ta inte med personuppgifter."
 }

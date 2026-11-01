@@ -82,6 +82,12 @@
 }
 .v4AskSampleLabel { display: block; margin-bottom: 4px; color: var(--text-3); }
 
+/* Decision 13: the Free notice is a legal line: it reads as one, before the Start press, never as a muted hint. */
+.v4AskPublicNotice {
+  margin: 0; padding: 10px 14px; border-radius: var(--r-btn);
+  background: var(--gold-bg); border-inline-start: 3px solid var(--gold); color: var(--text); font-size: var(--t-ui);
+}
+
 .v4AskActions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
 .v4AskActions .v4BtnPrimary { padding: 0 26px; font-size: 16px; }
 .v4AskJust { font-size: var(--t-ui); min-height: 44px; text-align: left; }

@@ -137,5 +137,6 @@
   "newDebate.askText.otherAnswer": "Jiná odpověď…",
   "newDebate.askText.otherLabel": "Vlastní doplňující upřesnění",
   "newDebate.askText.matters": "Pokud odpovědi vedou různými směry, nejvíc mi záleží na tom: {matters}",
-  "newDebate.askText.angles": "Prosím, podívejte se také na: {list}."
+  "newDebate.askText.angles": "Prosím, podívejte se také na: {list}.",
+  "newDebate.freePublicNotice": "V plánu Zdarma jsou vaše otázka a debata o ní veřejné. Neuvádějte osobní údaje."
 }

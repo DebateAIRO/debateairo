@@ -137,5 +137,6 @@
   "newDebate.askText.otherAnswer": "Andere Antwort…",
   "newDebate.askText.otherLabel": "Ihre eigene zusätzliche Klarstellung",
   "newDebate.askText.matters": "Wenn die Antworten in verschiedene Richtungen gehen, ist mir am wichtigsten: {matters}",
-  "newDebate.askText.angles": "Bitte schauen Sie sich außerdem noch an: {list}."
+  "newDebate.askText.angles": "Bitte schauen Sie sich außerdem noch an: {list}.",
+  "newDebate.freePublicNotice": "Im kostenlosen Tarif sind Ihre Frage und die zugehörige Debatte öffentlich. Geben Sie keine personenbezogenen Daten an."
 }

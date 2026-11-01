@@ -1,4 +1,4 @@
-import type { JSX } from "react";
+import type { JSX, ReactNode } from "react";
 import { localeDirection } from "@/lib/i18n/questionLocale";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { morePathsWords, storyFateWords, type StoryFateValue } from "@/lib/v3/storyWords";
@@ -39,13 +39,16 @@ export function StoryShortBlocks({
   catalog,
   locale,
   className,
-  headlineAs = "p"
+  headlineAs = "p",
+  pathNote
 }: {
   story: StoryShortContent;
   catalog: MessageCatalog;
   locale: string;
   className: string;
   headlineAs?: "p" | "h2";
+  /** Decision 13: what the public page shows under a path (who added to it, its digs, its Dig action). */
+  pathNote?: (positionRef: string) => ReactNode;
 }): JSX.Element {
   const more = morePathsWords(story.morePaths, catalog, locale);
   const Headline = headlineAs;
@@ -59,6 +62,7 @@ export function StoryShortBlocks({
           <li key={`${index}:${path.positionRef}`} className="storyPath">
             <span className="storyFate" data-fate={path.fate}>{storyFateWords(path.fate, catalog)}</span>
             <span className="storyPathLine">{path.line}</span>
+            {pathNote?.(path.positionRef)}
           </li>
         ))}
         {more === null ? null : <li className="storyPath storyPathMore">{more}</li>}

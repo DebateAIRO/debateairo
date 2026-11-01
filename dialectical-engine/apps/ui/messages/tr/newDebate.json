@@ -137,5 +137,6 @@
   "newDebate.askText.otherAnswer": "Başka bir cevap…",
   "newDebate.askText.otherLabel": "Kendi ek açıklamanız",
   "newDebate.askText.matters": "Cevaplar farklı yönlere işaret ederse, benim için en çok önemli olan şey: {matters}",
-  "newDebate.askText.angles": "Lütfen ayrıca şunlara da bakın: {list}."
+  "newDebate.askText.angles": "Lütfen ayrıca şunlara da bakın: {list}.",
+  "newDebate.freePublicNotice": "Ücretsiz planda sorunuz ve tartışması herkese açıktır. Kişisel bilgi eklemeyin."
 }

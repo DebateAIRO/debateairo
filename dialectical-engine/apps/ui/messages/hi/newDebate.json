@@ -137,5 +137,6 @@
   "newDebate.askText.otherAnswer": "कोई और जवाब…",
   "newDebate.askText.otherLabel": "आपका अपना अतिरिक्त स्पष्टीकरण",
   "newDebate.askText.matters": "अगर जवाब अलग-अलग दिशाओं में जाएँ, तो मेरे लिए सबसे अहम बात है: {matters}",
-  "newDebate.askText.angles": "कृपया इन पहलुओं को भी देखें: {list}।"
+  "newDebate.askText.angles": "कृपया इन पहलुओं को भी देखें: {list}।",
+  "newDebate.freePublicNotice": "निःशुल्क योजना में आपका प्रश्न और उस पर वाद-विवाद सार्वजनिक होते हैं। व्यक्तिगत जानकारी शामिल न करें।"
 }

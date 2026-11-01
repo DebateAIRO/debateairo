@@ -137,5 +137,6 @@
   "newDebate.askText.otherAnswer": "תשובה אחרת…",
   "newDebate.askText.otherLabel": "הבהרה נוספת משלך",
   "newDebate.askText.matters": "אם התשובות מושכות לכיוונים שונים, מה שהכי חשוב לי הוא: {matters}",
-  "newDebate.askText.angles": "אנא עיינו גם בהיבטים הבאים: {list}."
+  "newDebate.askText.angles": "אנא עיינו גם בהיבטים הבאים: {list}.",
+  "newDebate.freePublicNotice": "בתוכנית החינמית, השאלה שלכם והדיון בה הם פומביים. אל תכללו פרטים אישיים."
 }

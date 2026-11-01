@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import {
-  ContractHttpError, DIG_FREE_PICKS_MAX, DIG_PICKS_ONE_PATH, DIG_TOO_DEEP, FREE_DIG_PICKS_MAX, type AskParent, type PurposeLines, type QuestionLanguageChoice
+  ContractHttpError, DIG_FREE_PICKS_MAX, DIG_PICKS_ONE_PATH, DIG_TOO_DEEP, FREE_DIG_PICKS_MAX, type AskParent, type PublicDigParent, type PurposeLines, type QuestionLanguageChoice
 } from "@debateai/contract";
 import { COOKIE_SESSION_MARKER, contractClient, createDebate } from "@/lib/api";
 import { readAskRoom, useAskRoom, waitingRoomOf, type AskRoom } from "@/lib/billing/room";
@@ -19,6 +19,7 @@ import { useQuestionLanguageChoice } from "@/components/QuestionLanguageChoice";
 import { catalogLocale, isLocale, type LocaleCode } from "@/lib/i18n/locales";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { effectiveDigMode, v4AskConfig, v4RoomQuery, type V4AskSettings } from "./askConfig";
+import { publicDigRefusalWords } from "./publicPage";
 import type { DigMode, ReadingLevel } from "./types";
 
 /*
@@ -76,14 +77,22 @@ export function useV4Ask(input: Readonly<{
   /** W3-4: on the map page, the dig its room read is for; absent (the ask page), the read is for a new question. */
   dig?: V4DigRoom | null;
 }>): Readonly<{
-  /** W3-4: a dig sends its `parent` (the debate it digs, its places, mode and picks); a new question sends none. */
-  submit(questionLine: string, mode: DigMode, origin?: V4AskOrigin, parent?: AskParent | null, purposeLines?: PurposeLines): Promise<V4AskOutcome>;
+  /**
+   * W3-4: a dig sends its `parent` (the debate it digs, its places, mode and picks); a new question sends none.
+   * Decision 13: a dig on a public page sends a `public_parent` the same way (the page's own reference, never a run id).
+   */
+  submit(questionLine: string, mode: DigMode, origin?: V4AskOrigin, parent?: AskParent | PublicDigParent | null, purposeLines?: PurposeLines): Promise<V4AskOutcome>;
   /** Decision 29: the one-time sensitive-data consent, asked before the question goes to step 2's AI. The dialog is in `dialogs`. */
   ensureConsent(): Promise<boolean>;
   /** ASK-3: whether this text reads as a person in crisis (the page enables Start for it even when it is short). */
   flagsCrisis(text: string): boolean;
   room: AskRoom | null;
   planTier: "free" | "premium";
+  /**
+   * Decision 13: show the notice that a Free debate is public, and send that it was shown. Only a plan the server named as Free: `planTier` is also
+   * "free" before the read answers and on a site with no plans (a local run), where nothing goes public.
+   */
+  freePublicNotice: boolean;
   submitting: boolean;
   dialogs: React.ReactNode;
 }> {
@@ -120,6 +129,7 @@ export function useV4Ask(input: Readonly<{
   // V4 has no plan chooser: the tier is the decided one, Free until the server says otherwise (/new's default).
   const planTier: "free" | "premium" = internalFunding !== null
     ? "premium" : decidedPlan === null || decidedPlan === "FREE" ? "free" : "premium";
+  const freePublicNotice = internalFunding === null && decidedPlan === "FREE";
 
   // Side-by-side spec §13 (Task S12): the settings version the switches above were read under, sent back with the ask.
   const settingsVersion = React.useRef<number | undefined>(undefined);
@@ -165,15 +175,15 @@ export function useV4Ask(input: Readonly<{
   }, [room, adoptSettingsRead]);
 
   // The latest state, for a submit fired later (a dig sends after its 10-second Undo): never a stale closure.
-  const live = React.useRef({ planTier, shapeSettings, lengthSettings, readingLevel, room, catalog, newDebateCatalog,
+  const live = React.useRef({ planTier, freePublicNotice, shapeSettings, lengthSettings, readingLevel, room, catalog, newDebateCatalog,
     pageLocale, consent, crisis, languageChoice });
   React.useEffect(() => {
-    live.current = { planTier, shapeSettings, lengthSettings, readingLevel, room, catalog, newDebateCatalog,
+    live.current = { planTier, freePublicNotice, shapeSettings, lengthSettings, readingLevel, room, catalog, newDebateCatalog,
       pageLocale, consent, crisis, languageChoice };
   });
 
   const submit = React.useCallback(async (questionLine: string, askMode: DigMode, origin: V4AskOrigin = "ask",
-    parent: AskParent | null = null, purposeLines?: PurposeLines): Promise<V4AskOutcome> => {
+    parent: AskParent | PublicDigParent | null = null, purposeLines?: PurposeLines): Promise<V4AskOutcome> => {
     if (submitFlight.current) return STOPPED;
     const now = live.current;
     const question = questionLine.trim();
@@ -214,13 +224,16 @@ export function useV4Ask(input: Readonly<{
         const sendsLanguage = askSettings.shapeSettings;
         try {
           // W3-4: a dig's parent rides with every pass of the same press (today's calls when there is none).
-          const sentParent = parent ?? undefined;
+          const sentParent = parent !== null && "parent_run_id" in parent ? parent : undefined;
+          // Decision 13: a public page's dig, or that this new question showed the Free notice (the notice is never about a dig).
+          const publicLane = parent !== null && "public_ref" in parent ? { publicParent: parent }
+            : !dig && now.freePublicNotice ? { freePublicNotice: true as const } : undefined;
           debate = !sendsLanguage
-            ? sentParent === undefined && purposeLines === undefined
+            ? sentParent === undefined && purposeLines === undefined && publicLane === undefined
               ? await createDebate(next.line, config, COOKIE_SESSION_MARKER)
-              : await createDebate(next.line, config, COOKIE_SESSION_MARKER, undefined, undefined, sentParent, purposeLines)
+              : await createDebate(next.line, config, COOKIE_SESSION_MARKER, undefined, undefined, sentParent, purposeLines, publicLane)
             : await createDebate(next.line, config, COOKIE_SESSION_MARKER, undefined,
-              next.choice === undefined ? { siteLanguage } : { siteLanguage, choice: next.choice }, sentParent, purposeLines);
+              next.choice === undefined ? { siteLanguage } : { siteLanguage, choice: next.choice }, sentParent, purposeLines, publicLane);
         } catch (refusal) {
           // Today's one retry after the consent screen; it is not one of the four asks.
           if (isSensitiveDataConsentRefusal(refusal) && !consentRetried) {
@@ -276,6 +289,9 @@ export function useV4Ask(input: Readonly<{
       }
       return { kind: "STARTED", runId: debate.id };
     } catch (exc) {
+      // Decision 13: a public page's dig says its refusals in its own words: no level, no count, no code.
+      const publicRefusal = parent !== null && "public_ref" in parent ? publicDigRefusalWords(exc, now.catalog, now.room, now.pageLocale) : null;
+      if (publicRefusal !== null) return refused(publicRefusal);
       // W3-4: two quick clicks past the deepest level; the API started nothing and used nothing (label 5.5).
       if (isDigTooDeep(exc)) return refused(t(now.catalog, "v4.nest.tooDeep"));
       // W3-8: the two dig refusals the page never sends, said plainly where DIG_TOO_DEEP is (drafts for the click-test).
@@ -336,5 +352,5 @@ export function useV4Ask(input: Readonly<{
   );
 
   const ensureConsent = React.useCallback(() => live.current.consent.ensureConsent(), []);
-  return { submit, ensureConsent, flagsCrisis, room, planTier, submitting, dialogs };
+  return { submit, ensureConsent, flagsCrisis, room, planTier, freePublicNotice, submitting, dialogs };
 }

@@ -418,7 +418,9 @@ describe("/new hides the plan chooser and names the plan the server decided (spe
     expect(mocks.createDebate).toHaveBeenCalledWith(
       "Cities should ban cars downtown",
       expect.objectContaining({ plan_tier: "free", risk_tier: "standard", composition_budget_tier: "low", depth: 2 }),
-      "test-token"
+      "test-token",
+      // Decision 13: this Free person read the public notice, and the ask says so.
+      undefined, undefined, undefined, undefined, { freePublicNotice: true }
     );
   });
 
@@ -450,6 +452,28 @@ describe("/new hides the plan chooser and names the plan the server decided (spe
     expect(tierChosen(container, "premium")).toBe(true);
     await click(container, "#planTier-free");
     expect(tierChosen(container, "free")).toBe(true);
+  });
+
+  it("decision 13: a person the server named as Free reads the public notice before Start, and the ask says it was shown", async () => {
+    mocks.getAskRoom.mockResolvedValue(room({ plan_id: "FREE" }));
+    mocks.createDebate.mockResolvedValue({ id: "run:new" });
+    const container = await mount(newPage());
+    expect(container.querySelector(".ndPublicNotice")?.textContent).toBe("On the Free plan your question and its debate are public. Don't include personal details.");
+    await type(container.querySelector<HTMLTextAreaElement>("#topic")!, "Should cities ban cars downtown on Sundays?");
+    await submitForm(container);
+    expect(mocks.createDebate).toHaveBeenCalledTimes(1);
+    expect(mocks.createDebate.mock.calls[0]![7]).toEqual({ freePublicNotice: true });
+  });
+
+  it.each([["a paid plan", "PLUS"], ["no plans (a local site)", null]])("decision 13: %s shows no notice and sends no flag", async (_name, planId) => {
+    mocks.getAskRoom.mockResolvedValue(room({ plan_id: planId }));
+    mocks.createDebate.mockResolvedValue({ id: "run:new" });
+    const container = await mount(newPage());
+    expect(container.querySelector(".ndPublicNotice")).toBeNull();
+    await type(container.querySelector<HTMLTextAreaElement>("#topic")!, "Should cities ban cars downtown on Sundays?");
+    await submitForm(container);
+    expect(mocks.createDebate).toHaveBeenCalledTimes(1);
+    expect(mocks.createDebate.mock.calls[0]![7]).toBeUndefined();
   });
 
   it("keeps the chooser hidden after a later read fails: the decided plan is remembered", async () => {

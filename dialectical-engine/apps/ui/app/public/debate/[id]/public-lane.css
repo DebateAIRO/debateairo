@@ -1,0 +1,30 @@
+/* Decisions 13, 16 and 22: the public page's contributions and reports, in V4's look. It sits inside a page of the classic layout, so .v4Root gives only its tokens here. */
+.v4Root.v4PublicLane { min-height: 0; background: none; font-size: inherit; }
+
+.v4PubPathNote { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.v4PubSummary { margin: 0; color: var(--text); font-size: 13.5px; line-height: 1.5; }
+.v4PubChanged { margin: 0; padding-inline-start: 18px; color: var(--text-2); font-size: 13px; }
+.v4PubAddedBy { margin: 0; color: var(--text-3); font-size: 12px; }
+.v4PubAction { align-self: flex-start; font-size: 13px; }
+
+.v4PubDig { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--line-2); border-radius: var(--r-btn); background: var(--surface); }
+.v4PubDigField { display: flex; flex-direction: column; gap: 4px; }
+.v4PubDigActions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.v4PubHint { margin: 0; color: var(--text-2); font-size: 13px; }
+.v4PubLabel { margin: 0; color: var(--text-2); font-size: 12px; font-weight: 700; }
+.v4PubText { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--r-btn); background: var(--bg); color: var(--text); font: inherit; font-size: 14px; resize: vertical; }
+
+.v4PubDigPaths { display: flex; flex-direction: column; gap: 6px; padding-inline-start: 12px; border-inline-start: 2px solid var(--line-2); }
+.v4PubDigPathList { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.v4PubDigPathLine { margin: 0; color: var(--text); font-size: 13.5px; }
+
+.v4PubReports { display: flex; flex-direction: column; gap: 12px; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line-2); }
+.v4PubHeading { margin: 0; font-size: 18px; font-weight: 700; color: var(--text); }
+.v4PubEarlier summary { cursor: pointer; color: var(--text-2); font-size: 13.5px; }
+.v4PubEarlier[open] { display: flex; flex-direction: column; gap: 10px; }
+.v4PubReportPress { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+
+.publicMainUpdate { display: flex; flex-direction: column; gap: 8px; }
+.publicMainUpdateNote { margin: 0; color: var(--muted); font-size: 12px; }
+.publicFirstAnswer summary { cursor: pointer; color: var(--text-2); font-size: 13.5px; }
+.publicFirstAnswer[open] summary { margin-bottom: 8px; }

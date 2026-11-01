@@ -137,5 +137,6 @@
   "newDebate.askText.otherAnswer": "Jawaban lain…",
   "newDebate.askText.otherLabel": "Penjelasan tambahan Anda sendiri",
   "newDebate.askText.matters": "Jika jawaban-jawabannya mengarah ke arah yang berbeda, yang paling penting bagi saya: {matters}",
-  "newDebate.askText.angles": "Mohon juga perhatikan aspek berikut: {list}."
+  "newDebate.askText.angles": "Mohon juga perhatikan aspek berikut: {list}.",
+  "newDebate.freePublicNotice": "Pada paket Gratis, pertanyaan Anda dan debatnya bersifat publik. Jangan sertakan data pribadi."
 }

@@ -137,5 +137,6 @@
   "newDebate.askText.otherAnswer": "Άλλη απάντηση…",
   "newDebate.askText.otherLabel": "Η δική σας επιπλέον διευκρίνιση",
   "newDebate.askText.matters": "Αν οι απαντήσεις οδηγούν σε διαφορετικές κατευθύνσεις, για μένα το πιο σημαντικό είναι: {matters}",
-  "newDebate.askText.angles": "Παρακαλώ, δείτε επίσης: {list}."
+  "newDebate.askText.angles": "Παρακαλώ, δείτε επίσης: {list}.",
+  "newDebate.freePublicNotice": "Στο δωρεάν πρόγραμμα, η ερώτησή σας και η αντιπαράθεσή της είναι δημόσιες. Μην συμπεριλαμβάνετε προσωπικά στοιχεία."
 }
