@@ -679,6 +679,14 @@ describe("preview practice: debate mode", () => {
       expect(report.byModelAndSite.some((row) => row.model === model && row.site === "PANEL")).toBe(true);
     }
     expect(stubs.requests.filter((request) => request.kind === "UNKNOWN")).toEqual([]);
+    // The calls after the story are really made and really answered, and the report names them (the 2026-11-01 reds: both
+    // were a billed 500 at the stand-in, and the report's UNMAPPED row): one chart call, one suggestion per path.
+    expect(stubs.requests.filter((request) => request.kind === "STORY_CHARTS").map((request) => request.answer)).toEqual(["OK"]);
+    expect(stubs.requests.filter((request) => request.kind === "SUGGESTIONS").length).toBeGreaterThan(0);
+    expect(stubs.requests.filter((request) => request.kind === "SUGGESTIONS").every((request) => request.answer === "OK")).toBe(true);
+    const sites = new Set(report.byModelAndSite.map((row) => row.site));
+    expect(["STORY_CHARTS", "SUGGESTIONS"].filter((site) => !sites.has(site))).toEqual([]);
+    expect(sites.has("UNMAPPED")).toBe(false);
     // Without --transcript nothing but the two report files.
     expect(existsSync(join(out, "transcript.json"))).toBe(false);
   }, 600_000);

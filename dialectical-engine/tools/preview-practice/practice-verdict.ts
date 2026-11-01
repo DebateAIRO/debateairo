@@ -214,6 +214,11 @@ export type PracticeVerdictInput = Readonly<{
    */
   pinsNotHeld?: readonly string[];
   /**
+   * Call-site keys the report has no name for (practice-lanes.ts `callFamilyOf`): a call added since the practice was last
+   * told. Not a failure of the debate: NOT_PROVEN, as nothing was shown about that call. Optional: none when absent.
+   */
+  unmappedCallSites?: readonly string[];
+  /**
    * Openings (ruling R3-T17a.4): each requested arm that ended on a practice refusal, as `<arm>:<question>:<code>` in run
    * order. Not a failure: NOT_PROVEN, as the comparison it was asked for did not run; listed first, since it is the cause.
    * Optional: none when absent.
@@ -263,7 +268,8 @@ export function practiceVerdict(input: PracticeVerdictInput): PracticeVerdictRes
     ...[...new Set(input.notExercisedModels)].filter((model) => !busy.includes(model)).sort().map((model) => `MODEL_NOT_EXERCISED:${model}`),
     ...[...(input.gatePauses ?? [])].sort().map((pause) => `GATE_PAUSED:${pause}`),
     ...[...(input.shapeNotExercised ?? [])].sort().map((why) => `SHAPE_NOT_EXERCISED:${why}`),
-    ...[...(input.pinsNotHeld ?? [])].sort().map((role) => `PRACTICE_PIN_NOT_HELD:${role}`)
+    ...[...(input.pinsNotHeld ?? [])].sort().map((role) => `PRACTICE_PIN_NOT_HELD:${role}`),
+    ...[...(input.unmappedCallSites ?? [])].sort().map((key) => `CALL_SITE_UNMAPPED:${key}`)
   ];
   if (input.interrupted === true) notProven.push("RUN_INTERRUPTED");
   const warn: string[] = [];

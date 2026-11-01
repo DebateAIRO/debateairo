@@ -424,7 +424,9 @@ runs it.
 
 `report.json` carries `tokensByModelAndStep` and `lengthByModelAndStep`, and `report.md` shows them as two tables, one
 row per AI and step (opening, pros_cons, cross_exchange, judge_panel, reviewer, answer_writer, answer_checker,
-story_writer, story_checker, map, structure_repair, and UNMAPPED for a call of no step):
+story_writer, story_checker, map, structure_repair, the later calls by their family (web, web_researched, story_charts,
+suggestions, path_rewrite, path_climb, report, answer_update, public_report, contribution_check), and UNMAPPED for a call of
+no step. A call whose key the practice has no name for also keeps the verdict at NOT_PROVEN (`CALL_SITE_UNMAPPED:<key>`)):
 - tokens: how many tries (each try whose reply was stored; a call's retries count apart); thinking and answer tokens
   (p50 / p90 / max); the share of the input the vendor read from its cache; how many length retries thought one level
   lower because thinking had used up the answer's room; how many tries asked for more than the standard 32,768 tokens

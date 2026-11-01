@@ -19,9 +19,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { argumentLanguageDirective, detectArgumentLanguage, questionLanguageSentence } from "@debateai/kernel";
 import { mapContractNameOf, mapEngineContractNameOf } from "@debateai/map";
-import { COMPARING_JUDGE_CONTRACT_ID, POINT_INVESTIGATION_CONTRACT_ID } from "@debateai/judgement";
+import { COMPARING_JUDGE_CONTRACT_ID, COMPARING_JUDGE_SOURCES_CONTRACT_ID, POINT_INVESTIGATION_CONTRACT_ID } from "@debateai/judgement";
 import { STORY_CHECKER_CONTRACT_ID, STORY_CHECKER_V4_CONTRACT_ID, STORYTELLER_CONTRACT_ID, STORYTELLER_V4_CONTRACT_ID } from "@debateai/story";
 import { engineMapScriptedContent } from "./engine-map-script.js";
+import { LATER_CONTRACT_KINDS, laterStepContent, type LaterGateKind } from "./gate-later-steps.js";
 import { readFramedMaterial, wirePacket } from "./framed-packet.js";
 import { reviewArtifact, withRequestDerivedBearings } from "./reviewBearings.js";
 import { QUESTION_LANGUAGE_CHECK_CONTRACT_ID } from "../../apps/api/src/question-language/fast-check.js";
@@ -29,7 +30,7 @@ import { openingsDryContent } from "../../tools/preview-practice/practice-openin
 
 export type GateProvider = "deepinfra" | "anthropic";
 export type GateRequestKind = "PROBE" | "STORYTELLER" | "STORY_CHECKER" | "MAP" | "QUESTION_LANGUAGE" | "PANEL" | "REVIEW" | "JUDGE" | "EVALUATOR" | "COMPOSE"
-  | "VERDICT_JUDGE" | "INVESTIGATE";
+  | "VERDICT_JUDGE" | "INVESTIGATE" | LaterGateKind;
 /** A /complete request as the gate saw it (what a scenario's `override` is handed). */
 export type GateRequest = Readonly<{ provider: GateProvider; model: string; kind: GateRequestKind | "UNKNOWN"; body: Readonly<Record<string, unknown>> }>;
 /**
@@ -405,8 +406,12 @@ export function classifyGateRequest(chat: string): GateRequestKind | "UNKNOWN" {
   if (contractId === QUESTION_LANGUAGE_CHECK_CONTRACT_ID) return "QUESTION_LANGUAGE";
   // Engine redesign R2 (plan Task B12): the comparing judge and the point investigation, by their contract ids, before
   // any instruction sniffing (their instructions name none of the keys below).
-  if (contractId === COMPARING_JUDGE_CONTRACT_ID) return "VERDICT_JUDGE";
+  if (contractId === COMPARING_JUDGE_CONTRACT_ID || contractId === COMPARING_JUDGE_SOURCES_CONTRACT_ID) return "VERDICT_JUDGE";
   if (contractId === POINT_INVESTIGATION_CONTRACT_ID) return "INVESTIGATE";
+  // The calls beyond the arguing and the story (tests/support/gate-later-steps.ts), one row per contract id. Nothing here has a
+  // silent default: a contract on no row falls through to UNKNOWN, a billed 500 every practice test refuses, and
+  // tests/unit/preview-gate-stand-in-coverage.test.ts names it first.
+  if (Object.hasOwn(LATER_CONTRACT_KINDS, contractId)) return LATER_CONTRACT_KINDS[contractId]!;
   const instruction = stripLanguageDirectiveForTest(messages[0]?.content ?? "");
   // The panel's assessment is the judge's schema WITHOUT restatement_text (tests/unit/t03-judge-panel.test.ts).
   if (instruction.includes("fatalFlags") && !instruction.includes("restatement_text")) return "PANEL";
@@ -531,7 +536,8 @@ export async function startPreviewGateStubs(input: Readonly<{
       case "QUESTION_LANGUAGE": return stubQuestionLanguageContent(chat);
       case "VERDICT_JUDGE": return stubComparingJudgeVote("A", { language });
       case "INVESTIGATE": return stubPointInvestigation("dead_end", language);
-      default: return null;
+      case "UNKNOWN": return null;
+      default: return laterStepContent(kind, chat, language);
     }
   };
   const socketFor = async (provider: GateProvider): Promise<string> => {
