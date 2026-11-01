@@ -318,8 +318,10 @@ export class SendmailRecoveryEmailMailSender implements RecoveryEmailMailSender 
     readonly from: string;
     readonly publicAppUrl: string;
     readonly timeoutMs: number;
+    readonly gate: OutboundMailAuthorizer;
   }) {
-    if (!/^noreply@[A-Za-z0-9.-]+$/.test(options.from) || !options.executable.trim() || !isPublicAppUrl(options.publicAppUrl) || !Number.isInteger(options.timeoutMs) || options.timeoutMs <= 0)
+    if (!isOutboundMailAuthorizer(options.gate)
+      || !/^noreply@[A-Za-z0-9.-]+$/.test(options.from) || !options.executable.trim() || !isPublicAppUrl(options.publicAppUrl) || !Number.isInteger(options.timeoutMs) || options.timeoutMs <= 0)
       throw new TypeError("OWN_MAIL_CONFIGURATION_INVALID");
   }
   async sendRecoveryEmail(mail: RecoveryEmailMail): Promise<void> {

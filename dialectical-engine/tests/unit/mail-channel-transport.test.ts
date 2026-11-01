@@ -33,6 +33,11 @@ const senders = [
   }
 ];
 
+/** The sender asks the outbound mail gate first, so the child exists a few microtasks after the call. */
+async function spawned(): Promise<void> {
+  for (let turn = 0; turn < 1000 && transport.spawn.mock.calls.length === 0; turn += 1) await Promise.resolve();
+}
+
 function controlledChild() {
   const child = Object.assign(new EventEmitter(), {
     stdin: new PassThrough(), stdout: null, stderr: null,
@@ -57,6 +62,7 @@ describe.each(senders)("shared transport via $name", sender => {
     vi.useFakeTimers();
     const child = controlledChild();
     const result = sender.send().catch(error => error);
+    await spawned();
     child.emit("error", new Error("controlled exec failure"));
     expect(await result).toMatchObject({ operatorCode: "SENDMAIL_EXEC_FAILED" });
     expect(vi.getTimerCount()).toBe(0);
@@ -75,6 +81,7 @@ describe.each(senders)("shared transport via $name", sender => {
     vi.useFakeTimers();
     const child = controlledChild();
     const result = sender.send().catch(error => error);
+    await spawned();
     child.stdin.emit("error", new Error("controlled stdin failure"));
     expect(await result).toMatchObject({ operatorCode: "SENDMAIL_STDIN_FAILED" });
     expect(vi.getTimerCount()).toBe(0);
@@ -94,6 +101,7 @@ describe.each(senders)("shared transport via $name", sender => {
     vi.useFakeTimers();
     const child = controlledChild();
     const result = sender.send().catch(error => error);
+    await spawned();
     child.emit("exit", null, "SIGTERM");
     expect(await result).toMatchObject({ operatorCode: sender.signalCode });
     expect(vi.getTimerCount()).toBe(0);
@@ -105,6 +113,7 @@ describe.each(senders)("shared transport via $name", sender => {
     // A controlled immediate exit also probes re-entrant settlement during kill.
     child.kill.mockImplementation(() => { child.emit("exit", 0, null); return true; });
     const result = sender.send().catch(error => error);
+    await spawned();
     await vi.advanceTimersByTimeAsync(24);
     expect(child.kill).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
@@ -118,6 +127,7 @@ describe.each(senders)("shared transport via $name", sender => {
     vi.useFakeTimers();
     const child = controlledChild();
     const result = sender.send();
+    await spawned();
     child.emit("exit", 0, null);
     await expect(result).resolves.toBeUndefined();
     expect(vi.getTimerCount()).toBe(0);

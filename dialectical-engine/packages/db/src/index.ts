@@ -18,7 +18,6 @@ import { MODEL_STRENGTHS, TypedDomainError, parseReleaseKey, type ActivationStat
 
 export * from "./publication-check.js";
 export * from "./synthesis-check-erasure.js";
-export { PostgresOutboundMailStore, type OutboundMailAlertKind, type OutboundMailClass } from "./outbound-mail.js";
 export { PostgresThreatReportRepository, type ThreatReportDecision, type ThreatReportListRow, type ThreatReportReadRow, type ThreatReportAlertClaim } from "./threat-reports.js";
 // Row-level security S01 (PLAN §0.3): the request scope and the cross-account routing createPool applies.
 export {

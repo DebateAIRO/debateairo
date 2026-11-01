@@ -82,11 +82,11 @@ describe("the outbound mail gate", () => {
   it("the suppression list only ever sees a 32-byte keyed digest, never the address", async () => {
     const seen: Buffer[] = [];
     const h = harness({ suppression: { isSuppressed: async (digest) => { seen.push(Buffer.from(digest)); return false; } } });
-    await h.gate.authorize({ recipient: "secret.person@example.com", purpose: "verification" });
+    await h.gate.authorize({ recipient: "hidden.person@example.com", purpose: "verification" });
     expect(seen).toHaveLength(1);
     expect(seen[0]!.byteLength).toBe(32);
-    expect(seen[0]!.toString("latin1")).not.toContain("secret");
-    expect(seen[0]).toEqual(createEmailBlindIndex(KEY, "secret.person@example.com"));
+    expect(seen[0]!.toString("latin1")).not.toContain("hidden");
+    expect(seen[0]).toEqual(createEmailBlindIndex(KEY, "hidden.person@example.com"));
   });
 
   it("stops standard mail at the limit minus the reserve, and security mail at the limit", async () => {

@@ -49,6 +49,6 @@ it("recovery invalid dates retain the opaque pre-spawn input failure", async () 
 
 describe("configured credential origins", () => {
   it.each(["https://", "https://user:password@dezbatere.ro", "https://dezbatere.ro?token=override", "https://dezbatere.ro#token=override", "https://dezbatere.ro\r\n"])("rejects unsafe configuration %s", publicAppUrl => {
-    for (const Sender of [SendmailMailSender, SendmailRecoveryEmailMailSender, SendmailEmailChangeMailSender]) expect(() => new Sender({ executable: "/definitely/no/spawn", from: "noreply@dezbatere.ro", publicAppUrl, timeoutMs: 1000 })).toThrow("OWN_MAIL_CONFIGURATION_INVALID");
+    for (const Sender of [SendmailMailSender, SendmailRecoveryEmailMailSender, SendmailEmailChangeMailSender]) expect(() => new Sender({ gate: testOutboundMailGate(), executable: "/definitely/no/spawn", from: "noreply@dezbatere.ro", publicAppUrl, timeoutMs: 1000 })).toThrow("OWN_MAIL_CONFIGURATION_INVALID");
   });
 });

@@ -22,7 +22,7 @@
 --   expand          two new tables and four new functions; the release before reads none of them.
 --   keeps-verifier  no billing relation or function, so lineage/verify-effective-capabilities-130.sql stays in force.
 
-CREATE TABLE identity.outbound_mail_daily_count (
+CREATE TABLE IF NOT EXISTS identity.outbound_mail_daily_count (
   day date PRIMARY KEY,
   standard_sent integer NOT NULL DEFAULT 0 CHECK (standard_sent >= 0),
   security_sent integer NOT NULL DEFAULT 0 CHECK (security_sent >= 0),
@@ -31,7 +31,7 @@ CREATE TABLE identity.outbound_mail_daily_count (
   daily_limit_at timestamptz
 );
 
-CREATE TABLE identity.outbound_mail_suppression (
+CREATE TABLE IF NOT EXISTS identity.outbound_mail_suppression (
   recipient_digest bytea PRIMARY KEY CHECK (octet_length(recipient_digest) = 32),
   reason text NOT NULL CHECK (reason IN ('HARD_BOUNCE', 'COMPLAINT')),
   first_at timestamptz NOT NULL,
@@ -43,7 +43,7 @@ SELECT core.install_truncate_guard('identity.outbound_mail_daily_count');
 SELECT core.install_truncate_guard('identity.outbound_mail_suppression');
 
 -- Counts one hand-off only while the day's total, both classes together, is below p_ceiling.
-CREATE FUNCTION identity.reserve_outbound_mail(p_class text, p_ceiling integer)
+CREATE OR REPLACE FUNCTION identity.reserve_outbound_mail(p_class text, p_ceiling integer)
 RETURNS TABLE (admitted boolean, total_sent integer, count_day date)
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog AS $$
 DECLARE
@@ -72,7 +72,7 @@ END
 $$;
 
 -- The day's count, for the question sign-up and resend ask before any account work.
-CREATE FUNCTION identity.outbound_mail_today()
+CREATE OR REPLACE FUNCTION identity.outbound_mail_today()
 RETURNS TABLE (total_sent integer, count_day date)
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog AS $$
 DECLARE
@@ -83,7 +83,7 @@ END
 $$;
 
 -- True for exactly one caller per kind per day. The day is the count's own day, so an alert taken across midnight stays on the day it is about.
-CREATE FUNCTION identity.claim_outbound_mail_alert(p_kind text, p_day date)
+CREATE OR REPLACE FUNCTION identity.claim_outbound_mail_alert(p_kind text, p_day date)
 RETURNS boolean
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog AS $$
 DECLARE
@@ -105,7 +105,7 @@ BEGIN
 END
 $$;
 
-CREATE FUNCTION identity.outbound_mail_recipient_suppressed(p_digest bytea)
+CREATE OR REPLACE FUNCTION identity.outbound_mail_recipient_suppressed(p_digest bytea)
 RETURNS boolean
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog AS $$
 BEGIN
