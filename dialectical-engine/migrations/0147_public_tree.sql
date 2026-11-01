@@ -634,7 +634,10 @@ BEGIN
       WHERE contribution.dig_run_id = p_run_id AND core.current_publication_of_run(contribution.root_run_id) = contribution.publication_ref) THEN
     RETURN NULL;
   END IF;
-  RETURN identity.path_line_json(p_run_id, true);
+  -- A text the publication check refused stays on the line for its turn's sake, and is marked hidden, so no later prompt reads it as the path's text.
+  RETURN (SELECT COALESCE(jsonb_agg(CASE WHEN EXISTS (SELECT 1 FROM identity.public_page_skip AS skip WHERE skip.source_id = (entry.value->>'entry_id')::uuid)
+      THEN entry.value || '{"hidden":true}'::jsonb ELSE entry.value END ORDER BY entry.ordinality), '[]'::jsonb)
+    FROM jsonb_array_elements(identity.path_line_json(p_run_id, true)) WITH ORDINALITY AS entry(value, ordinality));
 END;
 $$;
 

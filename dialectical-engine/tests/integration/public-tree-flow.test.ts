@@ -317,6 +317,28 @@ describe("a stranger's dig on a public debate", () => {
     expect(seen).toEqual(expect.arrayContaining(["The dig weakened the year-round case: winter ridership falls.", "Winter ridership falls."]));
   });
 
+  it("a climb's text the publication check refuses never reaches the page or a later dig's path", async () => {
+    const [ana, dan, eve, zed] = [await account(), await account(), await account(), await account()];
+    const debate = await publishedDebate(ana);
+    const world = vendors();
+    const first = await dig(dan, debate, world);
+    await settleAll(world);
+    const contribution = (await page(debate.ref)).contributions!.find((entry) => entry.own_rewrite === true)!;
+    const marked = vendors({ writeWith: "CLIMB-MARK" });
+    await dig(eve, { ref: debate.ref, position: contribution.dig_paths![0]!.position_ref, parentRunId: first }, marked);
+    // Eve's own rewrite passes; the path above that her climb rewrote does not.
+    const blockClimbs: PublicationContentCheck = { check: async ({ snapshot }) => (snapshot.contributions?.[0]?.position_ref === debate.position
+      ? { outcome: "BLOCK", statement: { outcome: "BLOCK", parts: ["ARGUMENTS"], ground: "TERMS", automated: true, visibility: "PRIVATE" } } : { outcome: "ALLOW" }) };
+    await settleAll(marked, blockClimbs);
+    const shown = await page(debate.ref);
+    expect(shown.contributions!.filter((entry) => entry.position_ref === debate.position).map((entry) => entry.line)).toEqual([contribution.line]);
+    const next = vendors();
+    await dig(zed, debate, next);
+    const writer = next.sent.find((packet) => contractOf(packet).includes("rewrite") && !isChecker(packet))!;
+    expect(fieldsOf(writer).get("path")).toContain(contribution.line);
+    expect(fieldsOf(writer).get("path")).not.toContain("CLIMB-MARK");
+  });
+
   it("a check that cannot run keeps it private and leaves the path free", async () => {
     const [ana, dan, eve] = [await account(), await account(), await account()];
     const debate = await publishedDebate(ana);
