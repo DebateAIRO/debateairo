@@ -39,7 +39,7 @@ import {
 } from "@debateai/providers";
 import {
   canonicalRegisterJson, createPostgresRegisterPublicationPort, debateShapePolicyStartValues, engineVersionPolicyStartValues, lengthGuidancePolicyStartValues,
-  loadBootstrapRegister, parseRegisterVersionText, readPanelDiscoveryPolicy, readPreviewLineUpPolicy
+  loadBootstrapRegister, parseRegisterVersionText, readPanelDiscoveryPolicy, readPreviewLineUpPolicy, registerVersionToSafeLegacyNumber
 } from "@debateai/register";
 import { buildProviderPriceMap } from "@debateai/runner";
 import { StoryRepository, loadStoryPack, resolveStoryPackDir } from "@debateai/story";
@@ -152,7 +152,7 @@ export async function startR22World(options: Readonly<{ log?: (line: string) => 
     engineVersion: engineVersionPolicyStartValues() } as never);
   const next = await composePracticeHostedNextRegisterVersion(document, inputs.hostedBilling!, inputs.choices);
   const receipt = await importPracticeRegister(database.pool, document, next);
-  const nextVersion = Number(receipt.registerVersion);
+  const nextVersion = registerVersionToSafeLegacyNumber(parseRegisterVersionText(receipt.registerVersion));
   const parsed = parsePracticeSettings(settingsText(), { sourceRevision: SOURCE_REVISION });
   const versioned = Object.freeze({ ...parsed, runner: Object.freeze({ ...parsed.runner, REGISTER_VERSION: nextVersion, RELEASE_KEY: practiceReleaseKeyAt(parsed.runner.RELEASE_KEY, nextVersion, "hosted"), DEPLOYMENT_MODE: "hosted" as const }) });
   const settings = practiceSettingsWithLineUp(versioned, await readPreviewLineUpPolicy(database.pool, nextVersion), { trial: false });
