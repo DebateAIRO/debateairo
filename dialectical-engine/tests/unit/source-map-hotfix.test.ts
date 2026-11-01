@@ -22,6 +22,64 @@ beforeAll(async () => {
 const environmentAt = (now: number, environment: NodeJS.ProcessEnv = {}, text = workspace, locked = lock) =>
   hotfix.childEnvironment({ environment, now, workspace: text, lock: locked });
 
+describe("the exact expiring 2026-11-01 process allowance", () => {
+  const approved = Date.parse("2026-11-01T00:00:00.000Z");
+  const pins = {
+    "follow-redirects@1.16.2": Date.parse("2026-11-01T21:32:25.963Z"),
+    "@isaacs/nonrecursive-glob-match@1.0.1": Date.parse("2026-11-03T04:24:52.559Z"),
+    "path-scurry@3.0.0": Date.parse("2026-11-03T21:14:48.842Z"),
+    "glob@14.0.2": Date.parse("2026-11-03T22:07:00.325Z"),
+    "minimatch@11.0.1": Date.parse("2026-11-03T22:26:03.755Z")
+  };
+  const granted = (now: number, text = workspace, locked = lock) =>
+    JSON.parse(environmentAt(now, {}, text, locked).PNPM_CONFIG_MINIMUM_RELEASE_AGE_EXCLUDE ?? "[]") as string[];
+
+  it("grants nothing before the owner's approval day", () => {
+    expect(environmentAt(approved - 1)).toEqual({});
+  });
+  it("grants all five exact versions from the approval day", () => {
+    expect(granted(approved).sort()).toEqual(Object.keys(pins).sort());
+  });
+  it.each(Object.entries(pins))("drops %s the moment it turns seven days old", (pin, maturity) => {
+    expect(granted(maturity - 1)).toContain(pin);
+    expect(granted(maturity)).not.toContain(pin);
+  });
+  it("is empty once the last version is seven days old", () => {
+    expect(environmentAt(pins["minimatch@11.0.1"])).toEqual({});
+  });
+  it("keeps refusing a committed exclusion or any wider ambient list while granting", () => {
+    expect(() => environmentAt(approved, {}, `${workspace}\nminimumReleaseAgeExclude: []\n`)).toThrow("SOURCE_MAP_HOTFIX_REFUSED");
+    expect(() => environmentAt(approved, { PNPM_CONFIG_MINIMUM_RELEASE_AGE_EXCLUDE: '["glob@14.0.2","other-package@1.0.0"]' })).toThrow("SOURCE_MAP_HOTFIX_REFUSED");
+    expect(() => environmentAt(approved, { PNPM_CONFIG_MINIMUM_RELEASE_AGE_EXCLUDE: '["glob@*"]' })).toThrow("SOURCE_MAP_HOTFIX_REFUSED");
+    expect(() => environmentAt(approved, { PNPM_CONFIG_MINIMUM_RELEASE_AGE: "0" })).toThrow("SOURCE_MAP_HOTFIX_REFUSED");
+  });
+  it("replaces an inherited list of the approved versions with its own", () => {
+    expect(JSON.parse(environmentAt(pins["glob@14.0.2"] - 1, { pnpm_config_minimum_release_age_exclude: '["minimatch@11.0.1","glob@14.0.2"]' }).PNPM_CONFIG_MINIMUM_RELEASE_AGE_EXCLUDE ?? "[]").sort())
+      .toEqual(["glob@14.0.2", "minimatch@11.0.1"]);
+  });
+  it.each([
+    ["follow-redirects", "1.16.2", "1.16.3"],
+    ["glob", "14.0.2", "14.0.3"],
+    ["minimatch", "11.0.1", "11.0.2"],
+    ["path-scurry", "3.0.0", "3.0.1"],
+    ["@isaacs/nonrecursive-glob-match", "1.0.1", "1.0.2"]
+  ])("refuses while granting if the lockfile moves %s off the approved version", (name, version, other) => {
+    expect(() => environmentAt(approved, {}, workspace, lock.replaceAll(`${name}@${version}`, `${name}@${other}`))).toThrow("SOURCE_MAP_HOTFIX_REFUSED");
+  });
+  it.each(["sha512-/kVP2U8z", "sha512-vfMgTR2d", "sha512-t+Vn6DX4", "sha512-1pTbQqH1", "sha512-rNKPuTXB"])("refuses while granting if the download fingerprint %s changes", (start) => {
+    expect(lock).toContain(start);
+    expect(() => environmentAt(approved, {}, workspace, lock.replace(start, "sha512-other"))).toThrow("SOURCE_MAP_HOTFIX_REFUSED");
+    expect(environmentAt(pins["minimatch@11.0.1"], {}, workspace, lock.replace(start, "sha512-other"))).toEqual({});
+  });
+  it.each(["follow-redirects", "glob", "minimatch"])("refuses while granting if the %s floor is gone", (name) => {
+    const entry = new RegExp(`^  '?${name}@[^\\n]*(?:1\\.16\\.2|14\\.0\\.2|11\\.0\\.1)'?\\n`, "m");
+    expect(workspace).toMatch(entry);
+    expect(() => environmentAt(approved, {}, workspace.replace(entry, ""))).toThrow("SOURCE_MAP_HOTFIX_REFUSED");
+    expect(lock).toMatch(entry);
+    expect(() => environmentAt(approved, {}, workspace, lock.replace(entry, ""))).toThrow("SOURCE_MAP_HOTFIX_REFUSED");
+  });
+});
+
 describe("the exact expiring SourceMap process allowance", () => {
   it("grants one JSON-array package before the actual maturity boundary", () => {
     expect(environmentAt(expiry - 1, { PATH: "kept", OTHER_SETTING: "unchanged" })).toEqual({
@@ -90,7 +148,8 @@ describe("the exact expiring SourceMap process allowance", () => {
       writeFileSync(join(scratch, "pnpm"), '#!/usr/bin/env node\nconsole.log(JSON.stringify({argv:process.argv.slice(2),exclude:process.env.PNPM_CONFIG_MINIMUM_RELEASE_AGE_EXCLUDE??null,other:process.env.HOTFIX_TEST_SETTING}));process.exit(37);\n', { mode: 0o700 });
       const result = spawnSync(process.execPath, [script, "floor"], { cwd: root, env: { ...process.env, PATH: `${scratch}${delimiter}${process.env.PATH}`, HOTFIX_TEST_SETTING: "kept" }, encoding: "utf8" });
       expect(result.status).toBe(37);
-      expect(JSON.parse(result.stdout)).toEqual({ argv: ["exec", "vitest", "run", "tests/architecture/dependency-floors.test.ts"], exclude: Date.now() < expiry ? '["source-map-js@1.2.2"]' : null, other: "kept" });
+      const live = environmentAt(Date.now()).PNPM_CONFIG_MINIMUM_RELEASE_AGE_EXCLUDE ?? null;
+      expect(JSON.parse(result.stdout)).toEqual({ argv: ["exec", "vitest", "run", "tests/architecture/dependency-floors.test.ts"], exclude: live, other: "kept" });
       const refused = spawnSync(process.execPath, [script, "floor", "extra"], { cwd: root, env: { ...process.env, PATH: `${scratch}${delimiter}${process.env.PATH}` }, encoding: "utf8" });
       expect(refused.status).toBe(1);
       expect(refused.stdout).toBe("");
