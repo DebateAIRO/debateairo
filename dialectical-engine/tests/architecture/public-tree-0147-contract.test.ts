@@ -172,7 +172,7 @@ describe("0147: the public tree", () => {
     const granted = [...sql.matchAll(/^GRANT EXECUTE ON FUNCTION (\S+) TO ([a-z_]+);$/gmu)].map((match) => [match[1], match[2]]);
     expect(Object.fromEntries(granted)).toEqual(GRANTED);
     for (const [signature, role] of Object.entries(GRANTED)) {
-      const revoke = new RegExp(`^REVOKE ALL ON FUNCTION ${signature.replace(/[.()]/gu, "\\$&")} FROM ([^;\\n]+);$`, "mu").exec(sql);
+      const revoke = new RegExp(`^REVOKE ALL ON FUNCTION ${signature.replace(/[\\.()]/gu, "\\$&")} FROM ([^;\\n]+);$`, "mu").exec(sql);
       expect(revoke?.[1]?.split(",").sort(), signature).toEqual(["PUBLIC", ...ROLES.filter((other) => other !== role)].sort());
     }
     expect(sql).toMatch(/^REVOKE ALL ON FUNCTION identity\.guard_public_tree_record\(\) FROM PUBLIC;$/mu);
