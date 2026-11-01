@@ -96,7 +96,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0142_team_limit.sql",
       "0143_run_handover.sql",
       "0144_ask_clarify_charge.sql",
-      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql"
+      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql"
     ]);
     const [step] = plan.forwardChain;
     // 0110 runs the sealed effective-capability verifier after its SQL (applyForward110) and its own manifest names it
@@ -172,7 +172,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0142_team_limit.sql",
       "0143_run_handover.sql",
       "0144_ask_clarify_charge.sql",
-      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql"
+      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql"
     ]);
     // The verifier in force after 0112 is the one 0112's manifest names (it adds no billing object): 0111's.
     const batchManifest = JSON.parse((await bytesOf("lineage/auth-db-batch-forward.json")).toString("utf8"));
@@ -242,7 +242,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0142_team_limit.sql",
       "0143_run_handover.sql",
       "0144_ask_clarify_charge.sql",
-      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql"
+      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql"
     ]);
     expect(partC!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/role-rotation-forward0114.json")).toString("utf8"));
@@ -308,7 +308,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0142_team_limit.sql",
       "0143_run_handover.sql",
       "0144_ask_clarify_charge.sql",
-      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql"
+      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql"
     ]);
     expect(mailLocale!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/debate-shape-map-forward0117.json")).toString("utf8"));
@@ -374,7 +374,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0142_team_limit.sql",
       "0143_run_handover.sql",
       "0144_ask_clarify_charge.sql",
-      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql"
+      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql"
     ]);
     expect(mapStep!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/language-check-spend-forward0118.json")).toString("utf8"));
@@ -440,7 +440,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0142_team_limit.sql",
       "0143_run_handover.sql",
       "0144_ask_clarify_charge.sql",
-      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql"
+      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql"
     ]);
     expect(languageStep!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/reclaim-resume-forward0119.json")).toString("utf8"));

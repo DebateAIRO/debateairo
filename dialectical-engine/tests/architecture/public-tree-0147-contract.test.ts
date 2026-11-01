@@ -241,9 +241,9 @@ describe("0147: the public tree", () => {
     const at = readme.indexOf(heading);
     expect(at).toBeGreaterThan(-1);
     const section = readme.slice(at, readme.indexOf("\n## ", at + heading.length)).replace(/\s+/gu, " ");
-    for (const needle of ["thirty-sixth", NAME, "public-tree-forward0147.json", "packages/db/src/migration-forward0147.ts",
+    for (const needle of ["thirty-seventh", NAME, "public-tree-forward0147.json", "packages/db/src/migration-forward0147.ts",
       "`loadForward0147`", "MIGRATION_FORWARD0147_", "-- n1: expand", "-- n1: keeps-verifier"]) expect(section, needle).toContain(needle);
-    expect(read("deploy/preview-auth-dev/v1/README.md")).toContain("`migrations/0147_public_tree.sql` (after `0145_web_researched_unsettled.sql`, `n1: expand`)");
+    expect(read("deploy/preview-auth-dev/v1/README.md")).toContain("`migrations/0147_public_tree.sql` (after `0146_team_allowances.sql`, `n1: expand`)");
   });
 });
 
@@ -283,7 +283,7 @@ describe("0148: an erased account keeps its public debates", () => {
     const at = readme.indexOf(heading);
     expect(at).toBeGreaterThan(-1);
     const section = readme.slice(at, readme.indexOf("\n## ", at + heading.length)).replace(/\s+/gu, " ");
-    for (const needle of ["thirty-seventh", NEXT, "erasure-keeps-public-forward0148.json", "`loadForward0148`", "-- n1: drained", "-- n1: keeps-verifier"]) {
+    for (const needle of ["thirty-eighth", NEXT, "erasure-keeps-public-forward0148.json", "`loadForward0148`", "-- n1: drained", "-- n1: keeps-verifier"]) {
       expect(section, needle).toContain(needle);
     }
     expect(read("deploy/preview-auth-dev/v1/README.md")).toContain("`migrations/0148_erasure_keeps_public.sql` (after `0147_public_tree.sql`, `n1: drained`)");
