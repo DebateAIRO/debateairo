@@ -629,6 +629,38 @@ describe("over HTTP", () => {
   });
 });
 
+describe("what a public dig does and does not buy", () => {
+  it("Free's cap of picks holds on a stranger's dig; a joined dig with no copy of the page stays private and holds nothing; a finished dig's texts go when nothing runs", async () => {
+    const [ana, dan, eve] = [await account(), await account(), await account()];
+    const debate = await publishedDebate(ana);
+    // The cap: the same rule as their plan.
+    const { admitPublicDig } = await import("../../apps/api/src/public-tree.js");
+    const pick = { kind: "OWN_VIEW" as const, suggestion_id: null, place: `path:${debate.position}`, text: "A view." };
+    const ports = { tree: new PostgresPublicTreeRepository(api), readPublicDebate: (ref: string) => application().readPublicDebate(ref) };
+    const parent = { public_ref: debate.ref, places: [pick.place], mode: "quick" as const, picks: [pick, pick, pick, pick] };
+    expect(await admitPublicDig({ parent, free: true }, ports)).toEqual({ kind: "MALFORMED", reason: "FREE_PICKS_OVER" });
+    expect((await admitPublicDig({ parent, free: false }, ports)).kind).toBe("ADMIT");
+    // The API stopped between the join and the copy.
+    const orphan = await createEncryptedStoryRun(database.pool, dan, "A dig with no copy?");
+    expect((await new PostgresPublicTreeRepository(api).join({ ownerRef: dan.ownerRef, publicationRef: debate.ref, parentRunId: debate.root, childRunId: orphan, positionRef: debate.position })).outcome).toBe("JOINED");
+    await persistTerminalRun({ pool: database.pool, runId: orphan, fixtureKey: randomUUID(), factBundle: FACTS });
+    const world = vendors();
+    await sweepPublicTree({ ...world.composed.publicTree, reports: world.reports, staleMs: 0, now: () => new Date(Date.now() + 60_000) });
+    expect(await new PostgresPublicDebateRunnerRepository(runner).readContribution(orphan)).toMatchObject({ outcome: "UNAVAILABLE" });
+    expect(await countOf(orphan)).toBe(0);
+    // A contribution buys no first debate's suggestions, and when nothing runs its texts may go.
+    const run = await dig(eve, debate, world);
+    await settleAll(world);
+    const suggested = world.sent.filter((packet) => contractOf(packet).startsWith("web.suggest"));
+    const { runFirstDebateSuggestions } = await import("../../apps/runner/src/path-rewrite.js");
+    await runFirstDebateSuggestions(world.composed.settings, ownNodes(digSnapshot(run, { resolve: (ref: string) => { const member = world.members.find((entry) => entry.providerRef === ref);
+      return member === undefined ? null : { provider: member.provider, providerRef: member.providerRef }; }, backups: world.members }), run));
+    expect(world.sent.filter((packet) => contractOf(packet).startsWith("web.suggest"))).toEqual(suggested);
+    const { PostgresPassageRetentionRepository } = await import("@debateai/db");
+    expect((await new PostgresPassageRetentionRepository(runner).wipe(run, "NOTHING_RUNS")).outcome).toBe("WIPED");
+  });
+});
+
 describe("the author's own private report", () => {
   it("never holds a refused contribution: its text is hidden on the line; an allowed one's is the path's current text", async () => {
     const [ana, dan, eve] = [await account(), await account(), await account()];

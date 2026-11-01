@@ -188,6 +188,7 @@ export type PathRewriteRunnerSettings = Readonly<{
   log?: (event: string, detail: Record<string, unknown>) => void;
   /** Decision 13: true when the settled run is a contribution to a public debate, and that pipeline ran for it. Absent: none. */
   publicDig?: (input: StoryWriteInput, lease: StepLease) => Promise<boolean>;
+  isPublicDig?: (runId: string) => Promise<boolean>;
   /** R22 decision 2: the path's whole line (absent: 0134's rows alone, a runner without the tree's settings). */
   line?: PathRewriteLine;
   /** R22 decisions 2 and 3: once the dig's row is stored, the climb and the main answer (path-climb.ts). Never rejects. */
@@ -620,6 +621,8 @@ export async function runFirstDebateSuggestions(settings: PathRewriteRunnerSetti
   try {
     const writer = input.resolveProvider?.(settings.writerRoleRef) ?? null;
     if (writer === null || await lease(() => settings.sources.digOf(input.runId)) !== null) return;
+    // Decision 13: a contribution to a public debate is a dig too, with no path on its pick set: it buys no first debate's suggestions.
+    if (settings.isPublicDig !== undefined && await lease(() => settings.isPublicDig!(input.runId))) return;
     const facts = await lease(() => first.read(input.runId));
     if (facts.free) return;
     const enrichment = await lease(() => settings.sources.readEnrichment({ runId: input.runId,

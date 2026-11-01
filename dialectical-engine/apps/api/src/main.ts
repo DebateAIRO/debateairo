@@ -1875,9 +1875,8 @@ const api = buildApi({
 // last-in-first-out, so an onClose here would run after every stop below; preClose runs before all of them, so no
 // one-shot pass can start a runtime the hooks below have already stopped.
 api.addHook("preClose",async () => endBecameCurrent?.());
-if (publicPageTimer !== undefined) {
-  api.addHook("onClose",async () => clearInterval(publicPageTimer));
-}
+// Assigned once listening; clearing an unset timer does nothing.
+api.addHook("onClose",async () => clearInterval(publicPageTimer));
 if (publicationCleanupTimer !== undefined) {
   api.addHook("onClose",async () => clearInterval(publicationCleanupTimer));
 }

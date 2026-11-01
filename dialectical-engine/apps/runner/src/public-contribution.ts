@@ -139,7 +139,8 @@ function checkTextOf(content: unknown): Readonly<{ line: string; summary: string
 async function rewriteAndCheck(settings: PublicTreeRunnerSettings, digRunId: string, contribution: PublicContributionRead, lease: StepLease): Promise<void> {
   const contributions = new PostgresPublicDebateRunnerRepository(settings.pool);
   const tree = treeSettingsOf(settings, digRunId);
-  const dig = await tree.ports.digOf(digRunId);
+  // The API stopped between the join and the copy: with nothing public to read, it never reaches the page, and holds nothing.
+  const dig = await openPublicMaterial(settings.pool, digRunId) === null ? null : await tree.ports.digOf(digRunId);
   if (dig === null) {
     // No path: a dig with nowhere to land never reaches the page, and holds nothing.
     await contributions.settleCheck(digRunId, "UNAVAILABLE", null);

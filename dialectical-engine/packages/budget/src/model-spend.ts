@@ -1544,7 +1544,8 @@ export class PostgresModelSpendStore implements ModelSpendStore {
   async readOwnerSpentMicros(ownerRef: string, from: Date, to: Date, funding?: FundingBasis, scope?: SpendScope): Promise<number> {
     if (funding?.kind === "INTERNAL") {
       const result = await this.pool.query<{ total: string }>(
-        "SELECT billing.read_internal_grant_spent($1::uuid,$4::uuid,$5::uuid,$2::timestamptz,$3::timestamptz,$6::boolean)::text AS total",
+        // Decision 13: a report a funded person wrote on someone else's public debate has no grant to name (0140), so it counts here, in their own windows.
+        "SELECT (billing.read_internal_grant_spent($1::uuid,$4::uuid,$5::uuid,$2::timestamptz,$3::timestamptz,$6::boolean) + identity.read_public_report_spent($1::uuid,$2::timestamptz,$3::timestamptz))::text AS total",
         [ownerRef,from,to,funding.grantId,funding.grantEventId,scope === "PERSON_GRANT"]);
       return this.#total(result.rows[0]?.total);
     }

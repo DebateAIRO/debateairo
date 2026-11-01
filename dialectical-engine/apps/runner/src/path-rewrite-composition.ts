@@ -1,5 +1,5 @@
 import {
-  PATH_REWRITE_CARRIER, PostgresDigModelRunnerRepository, PostgresDigPicksRunnerRepository, PostgresTreeUpdateRunnerRepository, encryptAttestedContentForRun,
+  PATH_REWRITE_CARRIER, PostgresDigModelRunnerRepository, PostgresDigPicksRunnerRepository, PostgresPublicDebateRunnerRepository, PostgresTreeUpdateRunnerRepository, encryptAttestedContentForRun,
   withRunContentLease, type Pool
 } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
@@ -74,6 +74,7 @@ export function composePathRewrite(input: Readonly<{
   const settings: PathRewriteRunnerSettings = Object.freeze({
     ...tokenCount,
     publicDig: publicDigOnSettle(publicTree, () => settings),
+    isPublicDig: async (runId: string) => (await new PostgresPublicDebateRunnerRepository(pool).readContribution(runId)) !== null,
     sources: postgresPathRewriteSources(pool),
     turns: new PostgresDigModelRunnerRepository(pool),
     seal: (digRunId: string, rewriteId: string, content: unknown) => withRunContentLease(pool, [digRunId], async () => {
