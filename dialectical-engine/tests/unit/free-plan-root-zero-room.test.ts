@@ -33,7 +33,7 @@ import {
  *    `assertCallAllowed`); root 0's own call is exempt from that wall, so it is always paid;
  *  - so at a preview-sized per-run ceiling (made up here; the real one is the hosted-billing choice in the owner's plan), a Free
  *    engine-2 debate keeps root 0's room and builds its map at every Free AI, even with most of the month spent;
- *  - the skip happens only on a version whose per-run ceiling is about 25 cents (the code's start value), and then on
+ *  - the skip happens only on a version whose per-run ceiling is near the code's start value, and then on
  *    EVERY plan alike: the room alone is larger than that body.
  */
 const SITE = COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW.value;
@@ -138,7 +138,7 @@ describe("Free plan: root 0's kept room against the limits a Free debate actuall
       personSpentMicros: spent })).toBe("ADMITTED");
   });
 
-  it("only a per-run ceiling near the code's 25-cent start value skips the map, and then on every plan alike", async () => {
+  it("only a per-run ceiling near the code's start value skips the map, and then on every plan alike", async () => {
     expect(SITE.per_run_ceiling_micros).toBe(250_000);
     expect(freeRoom(dearest)).toBeGreaterThan(bodyAt(SITE.per_run_ceiling_micros));
     expect(await mapCallDecision({ perRunCeilingMicros: SITE.per_run_ceiling_micros, model: dearest, room: freeRoom(dearest),
