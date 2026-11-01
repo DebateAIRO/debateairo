@@ -394,6 +394,7 @@ const PURPOSE_KEYS: Readonly<Record<ProviderPurpose, string>> = {
   search: "legal.providers.purpose.search",
   synthesisCheck: "legal.providers.purpose.synthesisCheck",
   questionCheck: "legal.providers.purpose.questionCheck",
+  reportCheck: "legal.providers.purpose.reportCheck",
   support: "legal.providers.purpose.support"
 };
 

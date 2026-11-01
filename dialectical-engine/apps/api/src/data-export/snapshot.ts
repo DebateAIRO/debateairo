@@ -21,6 +21,8 @@ export const RAW_SECTIONS = [
   "web_evidence", "investigations", "reserve_events",
   // When step 2's small AI read the person's question (0144, identity.read_data_export_ask_clarify): the time only (README C5).
   "ask_clarify_calls",
+  // The reports the person made with the Report button (0152, identity.read_data_export_public_flags). Not what the AI answered.
+  "public_flags",
 ] as const;
 export type RawSection = typeof RAW_SECTIONS[number];
 export type RawExportRows = Readonly<Record<RawSection, unknown>>;
@@ -53,6 +55,8 @@ export type SupportContentContext = Readonly<Record<string, unknown>>;
 export type WebExportCarrier = "identity.web_search" | "identity.web_page" | "identity.web_reading" | "identity.web_extract" | "identity.web_shown_quote";
 export type RunContentItem = Readonly<{ carrier: WebExportCarrier; primaryKey: string; envelope: unknown }>;
 export interface ExportDecryptors {
+  /** A report's own words, under its debate's publication key (0151). Throws when they cannot be opened: an export refuses rather than leave them out. */
+  openPublicFlag(publicationRef: string, runId: string, envelope: unknown): Promise<unknown>;
   openUserField(userId: string, field: UserDekField, envelope: unknown): Promise<string>;
   openRecord(aad: RecordAad, ciphertext: Buffer): string;
   openSupport(keyRef: SupportKeyHandle, wrapped: Buffer, context: SupportContentContext, ciphertext: Buffer): Promise<string>;
@@ -514,7 +518,13 @@ export async function collectSnapshot(input: {
     const legalAcceptances: Row[] = [];
     for (const source of rows(raw.legal_acceptances)) legalAcceptances.push(plain(project(source, KEEP_COLUMNS.legal_acceptances), "evidence_ciphertext", "evidence",
       openedRecord(decrypt, source, "evidence_ciphertext", { table: "legal.acceptance", column: "evidence_ciphertext", rowId: string(source.acceptance_id) })));
-    const simple = <K extends Exclude<RawSection, "billing" | "web_evidence" | "investigations">>(section: K): Row[] => rows(raw[section]).map((source) => project(source, KEEP_COLUMNS[section]));
+    const reportsYouMade: Row[] = [];
+    for (const source of rows(raw.public_flags)) {
+      // Null once the six months are over: only the record of the report stays.
+      const words = source.content == null ? null : await decrypt.openPublicFlag(string(source.publication_ref), string(source.run_id), source.content) as Readonly<{ where?: unknown; claim?: unknown }>;
+      reportsYouMade.push({ debate_reference: string(source.publication_ref), made_at: source.created_at, outcome: source.state, closed_at: source.dismissed_at ?? null, where: words?.where ?? null, what_you_wrote: words?.claim ?? null });
+    }
+    const simple = <K extends Exclude<RawSection, "billing" | "web_evidence" | "investigations" | "public_flags">>(section: K): Row[] => rows(raw[section]).map((source) => project(source, KEEP_COLUMNS[section]));
     return utcTimestampStrings({
       exportId: claim.exportId, userId: claim.userId, locale: claim.locale,
       requestedAt: claim.requestedAt, generatedAt: input.now(), recipient: email ?? "",
@@ -535,6 +545,7 @@ export async function collectSnapshot(input: {
         investigations: collectInvestigations(raw),
         reserve_events: simple("reserve_events"),
         question_readings: simple("ask_clarify_calls"),
+        reports_you_made: reportsYouMade,
       },
       security: {
         mfa_factors: simple("mfa_factors"), passkeys: simple("passkey_credentials"),

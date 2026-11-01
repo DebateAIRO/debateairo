@@ -1499,4 +1499,28 @@ async function delegate(): Promise<Actor> {
     expect(hit.json()).toEqual({ state: "HIDDEN" });
     await http.close();
   }, 90_000);
+
+  it("a reporter's own export holds their reports: the words while kept, where, when, what became of it; not what the AI said, and nobody else's; and a check's usage is recorded by row", async () => {
+    const [ana, rea, sam] = [await account(), await account(), await account()];
+    const debate = await publishedDebate(ana);
+    expect(await press(rea, debate.ref, "My own words about the first path.", notFound().port)).toBe("NOT_FOUND");
+    expect(await press(sam, debate.ref, "Somebody else's words about it.", null)).toBe("WITH_A_PERSON");
+    const exportId = randomUUID(), workerId = randomUUID();
+    await q().query(`INSERT INTO identity.data_export(export_id,user_id,session_id,locale,status,requested_at,attempts,lease_owner,lease_until) VALUES ($1,$2,$3,'en','PREPARING',clock_timestamp(),1,$4,clock_timestamp()+interval '1 minute')`, [exportId, rea.userId, randomUUID(), workerId]);
+    // Through the worker's own role, with no table privilege: the definer is the only way.
+    const read = (await (logins!.loginPool as (id: string) => Pool)("DATA_EXPORT_DATABASE_URL").query<{ value: Record<string, unknown>[] }>("SELECT identity.read_data_export_public_flags($1,$2) AS value", [exportId, workerId])).rows[0]!.value;
+    expect(read).toHaveLength(1);
+    expect(Object.keys(read[0]!).sort()).toEqual(["content", "created_at", "dismissed_at", "publication_ref", "run_id", "state"]);
+    expect(read[0]).toMatchObject({ publication_ref: debate.ref, run_id: debate.root, state: "NOT_FOUND" });
+    const words = await application().withReviewKey(debate.ref, debate.root, (cipher) => cipher.decrypt(read[0]!.content as never));
+    expect(words).toEqual({ where: "The first path", claim: "My own words about the first path." });
+    // A lease is the only door: someone else's worker id reads nothing.
+    await expect(q().query("SELECT identity.read_data_export_public_flags($1,$2) AS value", [exportId, randomUUID()])).rejects.toBeDefined();
+    const repository = new PostgresPublicFlagRepository(api);
+    const subject = randomUUID();
+    await repository.recordCheckUsage({ subjectKind: "PUBLIC_REPORT", subjectId: subject, attemptedAt: new Date(), calls: 3, inputTokens: 30, outputTokens: 9, costUsd: 0.5 });
+    expect((await q().query("SELECT subject_kind,judge_call_count,input_tokens,output_tokens FROM identity.public_check_usage WHERE subject_id=$1", [subject])).rows).toEqual([{ subject_kind: "PUBLIC_REPORT", judge_call_count: 3, input_tokens: 30, output_tokens: 9 }]);
+    await expect(api.query("SELECT * FROM identity.public_check_usage")).rejects.toMatchObject({ code: "42501" });
+    await expect(q().query("DELETE FROM identity.public_check_usage")).rejects.toBeDefined();
+  }, 60_000);
 });
