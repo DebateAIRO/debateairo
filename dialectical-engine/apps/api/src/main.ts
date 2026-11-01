@@ -161,7 +161,7 @@ import { StaffWebAuthnService } from "./staff/webauthn.js";
 import { StaffAccessService } from "./staff/access.js";
 import { createStaffRuntime } from "./staff/runtime.js";
 import { PostgresPublicationApplication, buildPublicDebateBody } from "./publications.js";
-import { FREE_PUBLICATION_STORY_WAIT_MS, PUBLIC_PAGE_SWEEP_DEFAULTS, sweepFreePublications, sweepPublicPage } from "./public-tree.js";
+import { FREE_PUBLICATION_STORY_WAIT_MS, PUBLIC_PAGE_SWEEP_DEFAULTS, backedOffContentCheck, sweepFreePublications, sweepPublicPage } from "./public-tree.js";
 import { createPublicationReviewStaffService } from "./publication-review/staff.js";
 import { createPublicationContentCheck } from "./publication-check/check.js";
 import { composeQuestionCheck } from "./question-check/compose.js";
@@ -1392,6 +1392,14 @@ const publicationContentCheck = createPublicationContentCheck({
   clock: () => new Date(),
   deadlineMs: publicationCheckPolicy.deadlineMs
 });
+// Decision 13: the same judge on a report on a public debate; its record names the report (0149).
+const publicReportContentCheck = createPublicationContentCheck({
+  judge: publicationJudgeSwitch.current,
+  recorder: { record: (row) => new PostgresPublicPageRepository(pool).recordReportCheck({ reportId: row.run_id, attemptedAt: row.attempted_at, outcome: row.outcome, failureCause: row.failure_cause, rules: row.rules, partKinds: row.part_kinds, ground: row.ground, judgeProviderRef: row.judge_provider_ref, judgeModelId: row.judge_model_id, policyVersion: row.policy_version, judgeCallCount: row.judge_call_count }) },
+  clock: () => new Date(),
+  deadlineMs: publicationCheckPolicy.deadlineMs
+});
+const REPORT_CHECK_PREFIX = "report:";
 const questionCheckPolicy = await boot.run("question-check-policy", () =>
   readQuestionCheckPolicy(pool, environment.REGISTER_VERSION));
 // V, 2026-10-28: the question check's subjects come from one file; a bad file stops the boot.
@@ -2000,8 +2008,13 @@ if (publications !== undefined) {
   const publicPage = new PostgresPublicPageRepository(pool);
   const publicContributions = new PostgresPublicDebateRunnerRepository(pool);
   const publicTreeRepository = new PostgresPublicTreeRepository(pool);
+  // One wait for all three: they ask the same judge.
+  const judgeGate = backedOffContentCheck({ check: async (request) => request.runId.startsWith(REPORT_CHECK_PREFIX)
+    ? publicReportContentCheck.check({ runId: request.runId.slice(REPORT_CHECK_PREFIX.length), snapshot: request.snapshot }) : publicationContentCheck.check(request) });
+  const sweepContentCheck = judgeGate;
+  const sweepReportCheck = { check: (request: Parameters<typeof judgeGate.check>[0]) => judgeGate.check({ runId: `${REPORT_CHECK_PREFIX}${request.runId}`, snapshot: request.snapshot }) };
   const triggerPublicPage = createSingleFlightErasureReconciler(async () => {
-    await sweepPublicPage({ pool, page: publicPage, contributions: publicContributions, tree: publicTreeRepository, contentCheck: publicationContentCheck,
+    await sweepPublicPage({ pool, page: publicPage, contributions: publicContributions, tree: publicTreeRepository, contentCheck: sweepContentCheck, reportContentCheck: sweepReportCheck,
       withPublicationKey: (publicationRef, use) => publications.withPublicationKey(publicationRef, use) });
     await sweepFreePublications({ contributions: publicContributions, publishOne: async (waiting) => {
       const owner = await publicPage.readFreeOwner(waiting.run_id);
@@ -2016,7 +2029,7 @@ if (publications !== undefined) {
       const story = await lease.run(() => new RepositoryPublicationStoryReader(storyRepository).readStoryShort({ answerId: answer.answer_id, answerVersion: answer.answer_version, ownerRef: owner.owner_ref }));
       if (story === null && Date.now() - Date.parse(waiting.notice_at) < FREE_PUBLICATION_STORY_WAIT_MS) return "WAITING_FOR_STORY";
       const lines = await readPurposeLinesOf(pool, owner.owner_ref, waiting.run_id);
-      return publications.publishFreeDebate({ runId: waiting.run_id, answer, owner: { userId: owner.user_id, ownerRef: owner.owner_ref }, purposeLines: lines, contentCheck: publicationContentCheck,
+      return publications.publishFreeDebate({ runId: waiting.run_id, answer, owner: { userId: owner.user_id, ownerRef: owner.owner_ref }, purposeLines: lines, contentCheck: sweepContentCheck,
         source: { ip: "", userAgent: "", requestId: "free-publication-sweep" }, lease,
         store: { prepare: (runId, ref) => publicContributions.prepareFreePublication(runId, ref),
           publish: (input) => publicContributions.publishFree({ runId: input.runId, publicationRef: input.publicationRef, grantTokenHash: input.grantTokenHash, content: input.content, presentedAt: input.presentedAt }),

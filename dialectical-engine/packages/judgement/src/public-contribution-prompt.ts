@@ -5,7 +5,7 @@ import { z } from "zod";
  * THE AI CHECK ON A CONTRIBUTION TO A PUBLIC DEBATE (plan 2026-10-31-r22-owner-changes decision 13; owner: "The AIs do the checking"). A person dug into a path of someone's
  * public debate, the AIs argued it, and a writer rewrote the path. Before that text can change the public page, this one call reads what would go public and what the person
  * wrote. It answers one question: may this be on a public page? It does not judge whether the person is right: the debate did that. DRAFT wording, shown to the owner with the
- * lane's report; a change of words is a new id appended to the seal. The person's words and the writer's text travel only inside the fence: evidence, never orders.
+ * a change of words is a new id appended to the seal. Approved by the owner as shown, 1 Nov. The person's words and the writer's text travel only inside the fence: evidence, never orders.
  */
 export const PUBLIC_CONTRIBUTION_CHECK_CONTRACT_ID = "public.contribution-check.v1" as const;
 

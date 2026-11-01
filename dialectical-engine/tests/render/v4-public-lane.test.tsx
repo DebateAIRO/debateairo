@@ -177,7 +177,7 @@ describe("Dig into this", () => {
   it("says what it costs and what the check does; nothing starts with an empty box", async () => {
     await mount(debate());
     await click(firstOpen());
-    expect(text()).toContain("This dig uses your own quota. An AI checks its result before it can change this public page. If it doesn't pass, it stays private to you and the page is unchanged.");
+    expect(text()).toContain("This dig uses your own quota. An AI checks its result before it can change this public page. If it doesn't pass, it stays private to you and the page is unchanged. If a later part of the update doesn't pass, the page keeps its older text and that part still counts in your quota.");
     expect(buttons(V4["v4.public.dig.start"]!)[0]!.disabled).toBe(true);
     expect(lane.submit).not.toHaveBeenCalled();
   });
@@ -236,6 +236,16 @@ describe("Dig into this", () => {
     await click(buttons(V4["v4.public.dig.start"]!)[0]!);
     expect(host!.querySelector("[role=alert]")!.textContent).toBe("Plain words.");
     expect(field.value).toBe("Mine.");
+    expect(lane.push).not.toHaveBeenCalled();
+  });
+
+  it("a dig that could not join says it runs as the person's own private debate, and goes nowhere", async () => {
+    lane.submit = vi.fn(async () => ({ kind: "STARTED", runId: "99999999-9999-4999-8999-999999999999", notJoined: true }));
+    await mount(debate());
+    await click(firstOpen());
+    await write(host!.querySelector<HTMLTextAreaElement>(".v4PubText")!, "Mine.");
+    await click(buttons(V4["v4.public.dig.start"]!)[0]!);
+    expect(host!.querySelector("[role=alert]")!.textContent).toBe(V4["v4.public.dig.notJoined"]);
     expect(lane.push).not.toHaveBeenCalled();
   });
 });

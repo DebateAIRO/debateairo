@@ -1295,6 +1295,14 @@ describe("P3-01 production database-principal manifest", () => {
   "grants": [
     "EXECUTE ON FUNCTION identity.read_data_export_public_tree(uuid,uuid)"
   ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0149_public_report_team_month.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_public_report_spent_by_funding(uuid,timestamptz,timestamptz,boolean)",
+    "EXECUTE ON FUNCTION identity.record_public_report_check(uuid,timestamptz,text,text,smallint[],text[],text,text,text,text,integer)"
+  ]
 }
 ]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))

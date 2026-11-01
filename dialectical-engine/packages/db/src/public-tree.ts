@@ -19,7 +19,7 @@ export const PUBLIC_ANSWER_UPDATE_CARRIER = "identity.public_answer_update" as c
 export const PUBLIC_REPORT_CARRIER = "identity.public_report" as const;
 
 export type PublicDigParentRead = Readonly<{ root_run_id: string; parent_run_id: string; level: number; writing: boolean }>;
-export type PublicTreeJoinOutcome = "JOINED" | "ALREADY" | "NOT_OWNED" | "NOT_PUBLIC" | "PARENT_PRIVATE" | "WRITING" | "CONFLICT" | "TOO_DEEP";
+export type PublicTreeJoinOutcome = "JOINED" | "ALREADY" | "NOT_OWNED" | "NOT_PUBLIC" | "PARENT_PRIVATE" | "CONFLICT" | "TOO_DEEP";
 export type PublicReportOpened = Readonly<{
   outcome: "OPENED" | "WRITING" | "ONGOING" | "NOT_PUBLIC" | "NO_CARRIER"; reportId: string | null; reportVersion: number | null; carrierRunId: string | null;
 }>;
@@ -199,6 +199,13 @@ export class PostgresPublicPageRepository {
 
   async recordSkip(sourceId: string, publicationRef: string, kind: "PATH" | "MAIN_ANSWER" | "REPORT", code: string): Promise<"RECORDED" | "ALREADY"> {
     return (await this.pool.query<{ outcome: "RECORDED" | "ALREADY" }>("SELECT identity.record_public_page_skip($1,$2,$3,$4) AS outcome", [sourceId, publicationRef, kind, code])).rows[0]!.outcome;
+  }
+
+  /** The publication check's record of a report (0147's report, never a run: 0081's record would name a debate whose owner wrote nothing). */
+  async recordReportCheck(row: Readonly<{ reportId: string; attemptedAt: Date; outcome: string; failureCause: string | null; rules: readonly number[]; partKinds: readonly string[];
+    ground: string | null; judgeProviderRef: string | null; judgeModelId: string | null; policyVersion: string; judgeCallCount: number }>): Promise<void> {
+    await this.pool.query("SELECT identity.record_public_report_check($1,$2,$3,$4,$5::smallint[],$6::text[],$7,$8,$9,$10,$11)",
+      [row.reportId, row.attemptedAt, row.outcome, row.failureCause, [...row.rules], [...row.partKinds], row.ground, row.judgeProviderRef, row.judgeModelId, row.policyVersion, row.judgeCallCount]);
   }
 
   /** The account a Free debate is published under, while its ask waits. */

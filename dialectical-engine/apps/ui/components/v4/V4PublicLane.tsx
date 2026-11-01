@@ -66,6 +66,7 @@ function SignedInActions({ debate, lane, signInHref, children }: Readonly<{ deba
     try {
       const outcome = await submit(sent.questionLine, "quick", "dig", sent.parent);
       if (outcome.kind === "REFUSED") return outcome.message;
+      if (outcome.kind === "STARTED" && outcome.notJoined === true) return t(catalog, "v4.public.dig.notJoined");
       if (outcome.kind === "STARTED") {
         setStarted(true);
         router.push(levelHref(`/v4/debate/${encodeURIComponent(outcome.runId)}`, savedLevel));

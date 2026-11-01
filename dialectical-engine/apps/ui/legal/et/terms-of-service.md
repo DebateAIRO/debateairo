@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lühidalt
-eyebrow: TEENUSETINGIMUSED · v2.9 · KEHTIB ALATES 12. OKTOOBRIST 2026
+eyebrow: TEENUSETINGIMUSED · v2.10 · KEHTIB ALATES 1. NOVEMBRIST 2026
 title: Millega te nõustute
 lede: Teie ja DMS Merchandise Shop S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.
-endMarker: TINGIMUSTE LÕPP · v2.9
+endMarker: TINGIMUSTE LÕPP · v2.10
 bodyLabel: Teenusetingimuste tekst
 annexTitle: Lisa A — Piirkondlikud tingimused
 jumps:
@@ -21,9 +21,9 @@ jumps:
 18 KOHALDATAV ÕIGUS
 -->
 
-**Version 2.9 · Effective 12. oktoober 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
+**Version 2.10 · Effective 1. november 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
 
-**In short.** Peate olema vähemalt 18-aastane. Dialectical Engine koostab tehisintellektimudelite abil argumente ja kõik selle loodud tulemused võivad olla valed — need ei ole nõuanded. Teie väitlused on privaatsed, kui te neid ei avalda; avaldamise korral saab igaüks neid lugeda. Teie sisestatud tekst saadetakse meie tehisintellekti pakkujate registris loetletud pakkujatele ja seda ei kasutata mudelite treenimiseks. Teatage ebaseaduslikust sisust aadressil support@dezbatere.ro, olenemata sellest, kas teil on konto. Kohaldatakse Rumeenia õigust, kuid teile jääb teie kohaliku tarbijakaitse tagatud kaitse.
+**In short.** Peate olema vähemalt 18-aastane. Dialectical Engine koostab tehisintellektimudelite abil argumente ja kõik selle loodud tulemused võivad olla valed — need ei ole nõuanded. Tasuta paketi korral on teie väitlused pärast lõppu avalikud, pärast tehisintellekti kontrolli; tasulise paketi korral on need privaatsed, kui te neid ei avalda. Kui väitlus on avalik, saab seda lugeda igaüks, ja see jääb avalikuks. Teie sisestatud tekst saadetakse meie tehisintellekti pakkujate registris loetletud pakkujatele ja seda ei kasutata mudelite treenimiseks. Teatage ebaseaduslikust sisust aadressil support@dezbatere.ro, olenemata sellest, kas teil on konto. Kohaldatakse Rumeenia õigust, kuid teile jääb teie kohaliku tarbijakaitse tagatud kaitse.
 
 ## 1. Kes me oleme ja kuidas meiega ühendust võtta
 
@@ -142,17 +142,25 @@ Kui te ei ole kindel, kas miski on lubatud, küsige meilt enne selle postitamist
 
 ## 9. Väitluse avaldamine
 
-Väitlused on **vaikimisi privaatsed**. Miski teie loodust ei ole teistele nähtav, kui te seda ei avalda.
+Tasulise paketi väitlused on **vaikimisi privaatsed**: miski, mida seal loote, ei ole teistele nähtav, kui te seda ei avalda. Tasuta paketi väitlused on avalikud, nagu käesolevas jaotises öeldud.
 
 **Mida avaldamine teeb.** Avaldamine on tahtlik ja eraldi kinnitatav toiming. Avaldamisel loome väitluse fikseeritud hetktõmmise ja teeme selle kõigile ilma kontota loetavaks. Otsingumootorid võivad selle indekseerida. Hetktõmmisel näidatakse teie **pseudonüümi**, küsimust sellisel kujul, nagu te selle kirjutasite, argumendipuud, hindeid, otsust ja kindlusastet ning sellel on nähtav märgis, et sisu on tehisintellekti loodud. Sellel ei näidata teie e-posti aadressi, seansikirjeid ega konto ajalugu.
 
-**Avaldamine on praktikas sisuliselt pöördumatu.** Kui väitlus on avalik, saavad teised inimesed seda lugeda, tsiteerida, ekraanitõmmisele jäädvustada, arhiveerida ja vahemällu salvestada. Avaldamise tühistamisel eemaldatakse see Dialectical Engine-st ja hävitatakse meie koopia võti, kuid juba mujal olevaid koopiaid ei saa sellega kõrvaldada. Ärge avaldage midagi, mille püsivat seostamist oma pseudonüümiga te ei soovi.
+**Tasuta väitlused on avalikud.** Tasuta paketi korral on teie küsimus ja selle väitlus avalikud. Me ütleme seda teile enne, kui küsite. Kui väitlus on lõppenud, kontrollib seda tehisintellekt; kui kontroll lubab, saab seda igaüks lugeda ja otsingumootorid võivad seda indekseerida. Kui kontroll keeldub, jääb see teile privaatseks. Ärge lisage tasuta paketi küsimusse isikuandmeid.
+
+**Tagasipööramist ei ole.** Kui väitlus on avalik, jääb see avalikuks. Selle avaldamist ei saa tühistada ega seda kustutada ning konto kustutamine seda ei eemalda. Teiste tehtud koopiad ei ole meie kontrolli all. Teised inimesed saavad seda lugeda, tsiteerida, ekraanitõmmisele jäädvustada, arhiveerida ja vahemällu salvestada. Ärge avaldage midagi, mille püsivat seostamist oma pseudonüümiga te ei soovi.
 
 **Märgistatud väitlus vajab meie heakskiitu.** Kui väitlus lõpeb, loeb automatiseeritud kontroll selle sünteesi jaotises 8 nimetatud nelja kategooria suhtes. Väitluse, mille kontroll märgistab, saab avaldada ainult meie heakskiidul ning märgistust ei näidata kellelegi peale teie ja, kui palute meie heakskiitu, nende meie meeskonna liikmete, kellel on luba avaldamisi läbi vaadata; väitlus, mille kontroll leiab puudutavat teemat „kalduvused enesetapule või teiste inimeste kahjustamisele“, kustutatakse selle asemel, nagu järgmine lõik ütleb. Kui palute meie heakskiitu väitluse lehel, saab meie meeskonna liige, kellel on konkreetne luba avaldamisi läbi vaadata, lugeda väitlust sellisel kujul, nagu see avaldataks, ilma teie pseudonüümita. Kui kiidame heaks, on nupp Avaldage teile jälle kättesaadav ning kontroll, mille iga avaldamine läbib, kehtib endiselt. Kui keeldume, jääb väitlus privaatseks ja esitame teile põhjenduse (jaotis 10). Pärast keeldumist võite paluda veel kord ning otsustab meie meeskonna liige, kes esimese taotluse üle ei otsustanud; võite kasutada ka jaotises 10 kirjeldatud kaebuste esitamise kanalit. Pärast teist keeldumist ei saa te enam paluda, kuid saate otsuse siiski viia vaidluste kohtuvälise lahendamise organi või kohtu ette (jaotis 10). Heakskiit hõlmab sünteesi, mille läbivaataja luges, sealhulgas väitluse hilisemat versiooni, mis seda sõna-sõnalt kordab; ümberkirjutatud süntees kontrollitakse avaldamisel uuesti ning kui see märgistatakse, vajab see oma heakskiitu. Kui avaldate märgistatud väitluse pärast meie heakskiitu, saate selle uuesti avalikust vaatest eemaldada nupuga Eemaldage avalikust vaatest selle kaardil jaotises Teie väitlused.
 
 **Väitlused, mille meie kontroll kustutab.** Kui meie automaatne kontroll leiab, et väitluse süntees puudutab teemat „kalduvused enesetapule või teiste inimeste kahjustamisele“, kustutame väitluse automaatselt ega säilita seda, isegi kui see oli juba avaldatud. Süntees loetakse teiste inimeste kahjustamiseks, kui see õhutab või kavandab kahju tegemist inimesele või kui see järeldab, et riik, armee, politsei või keegi muu peaks kasutama jõudu inimeste vastu; väitlus vägivallast kui ajaloo, õiguse, eetika, poliitika, päevakajaliste sündmuste või avaliku poliitika teemast ei kuulu siia ainuüksi oma teema tõttu. Keegi ei loe väitlust enne ja seda ei saa taastada. Pärast väitluse lõppu ei näidata teile väitluse vastust, välja arvatud juhul, kui kontroll ei suutnud õigel ajal vastata: iga lõppenud väitlus hoitakse kinni, kuni kontroll on vastanud (jaotis 8), samal ajal kui käimasoleva väitluse leht näitab argumente ja lõppjäreldust nii, nagu need koostatakse; kui kontroll ei suutnud õigel ajal vastata, kontrollitakse väitlust uuesti, kui vajutate nupule Avaldage. Anname teile sellest teada ühe korra, ekraanil, koos põhjenduse ja abinumbritega. Saate siiski kaevata jaotises 10 kirjeldatud kanali kaudu, kuid kaebus ei saa väitlust taastada. Selliselt kustutatud premium-väitlus ei kulu teie paketi limiidist.
 
-**Avaldatud väitlused konto sulgemisel.** Kui kavandate oma konto sulgemise, valite, mis saab teie avaldatud väitlustest. Kui märgite **„Kustuta ka minu avalikud väitlused“**, eemaldame need kõik Dialectical Engine-st ja hävitame sulgemise ajal oma koopia võtme, nagu avaldamise lõpetamisel, välja arvatud juhul, kui seadus nõuab konkreetse kirje säilitamist. Kui jätate ruudu märkimata, jäävad väitlused avalikuks kasutuselt kõrvaldatud pseudonüümi all. Teiste enne eemaldamist tehtud koopiad ei ole meie kontrolli all. Kui soovite eemaldatavat väitlust endale alles jätta, laadige see enne alla.
+**Teie nimi.** Teie pseudonüüm kuvatakse teie avaldatud väitluse autorina, igal marsruudil, millele panustasite, koos kuupäevaga, ning viitena teie kirjutatud aruandel. Kui kustutate oma konto, eemaldatakse teie pseudonüüm kõikjalt ning lehel kuvatakse selle asemel „kaasautor“.
+
+**Panused.** Igaüks, kellel on krediiti, nii tasuta kui tasulise paketi korral, võib oma kvoodi arvel süveneda avalikku väitlusse. Seda, mida te seal kirjutate, ja seda, mida tehisintellektid sellest kirjutavad, kontrollib tehisintellekt enne, kui see võib avalikku lehte muuta. Kui see lubatakse, muudab see lehte kõigi jaoks teie pseudonüümi all ning jääb avalikuks samade reeglite alusel nagu väitlus: seda ei saa tagasi võtta. Kui see lükatakse tagasi, jääb see teile privaatseks ja leht ei muutu. Te ei tohi kirjutada midagi, mida teil ei ole õigust avaldada, ega kellegi isikuandmeid.
+
+**Aruanded igaühelt.** Igaüks, kellel on krediiti, võib kirjutada avaliku väitluse kohta aruande, kui sellele ei lisata enam midagi, kasutades oma kvooti. Aruanne on avalik. Autori pseudonüüm on ainult viide: aruande kirjutavad tehisintellektid lehel näidatu põhjal ja see ei ole autori seisukoht. Varasemad aruanded jäävad loetavaks.
+
+**Pärast autori lahkumist.** Avalik väitlus jääb uutele panustele avatuks pärast seda, kui selle esimene autor on oma konto kustutanud. Uued panused töötavad avalikust koopiast lähtudes.
 
 **Võime avaldatud sisu alati eemaldada.** Võime avaldatud väitluse eemaldada või sellele juurdepääsu piirata, kui seda nõuab seadus või kohus või pädev asutus või kui väitlus rikub neid Tingimusi või on ebaseaduslik. Miski selles jaotises ei takista meil tegutseda jaotise 10 kohase kehtiva teate alusel ega luba, et avaldatud väitlus jääb kättesaadavaks.
 
@@ -197,7 +205,7 @@ Kui rikkumine ei ole tõsine, seadus ei nõua viivitamatut tegutsemist ega viivi
 
 Kui sulgeme teenuse täielikult või lõpetame selle pakkumise teie riigis, teatame sellest vähemalt **30 päeva ette**, tagastame pärast sulgemist jääva ajavahemiku eest ette makstud summa ja anname teile esmalt võimaluse oma väitlused eksportida.
 
-**Mida sulgemine teeb.** Konto sulgemisel hävitame teie kontoandmete ja privaatsete väitluste krüpteerimisvõtmed, mistõttu muutuvad need jäädavalt loetamatuks, kustutame teie kontokirje ning eemaldame teie valiku korral teie avaldatud väitlused avalikust juurdepääsust jaotises 9 kirjeldatud viisil. Teatud andmed säilivad ja peaksite teadma, millised: meie auditi- ja turbelogide kirjed, mis on ainult lisatavad ja mida säilitatakse meie enda õiguslike ja turvakohustuste täitmiseks; kirjed, mida oleme seaduse järgi kohustatud säilitama, sealhulgas nõustumis- ja nõusolekukirjed; ning väikese arvu vanemate, meie krüpteerimisskeemile eelnenud väitluste puhul kirjed, mille kustutamise võimalus on piiratum — anname teile teada, kui see kehtib teie konto kohta. Privaatsuspoliitikas kirjeldatakse seda kõike andmekaitse seisukohast ja selgitatakse teie õigust andmete kustutamisele.
+**Mida sulgemine teeb.** Konto sulgemisel hävitame teie kontoandmete ja privaatsete väitluste krüpteerimisvõtmed, mistõttu muutuvad need jäädavalt loetamatuks, kustutame teie kontokirje ning eemaldame teie pseudonüümi teie avalikelt väitlustelt, mis jäävad avalikuks, jaotises 9 kirjeldatud viisil. Teatud andmed säilivad ja peaksite teadma, millised: meie auditi- ja turbelogide kirjed, mis on ainult lisatavad ja mida säilitatakse meie enda õiguslike ja turvakohustuste täitmiseks; kirjed, mida oleme seaduse järgi kohustatud säilitama, sealhulgas nõustumis- ja nõusolekukirjed; ning väikese arvu vanemate, meie krüpteerimisskeemile eelnenud väitluste puhul kirjed, mille kustutamise võimalus on piiratum — anname teile teada, kui see kehtib teie konto kohta. Privaatsuspoliitikas kirjeldatakse seda kõike andmekaitse seisukohast ja selgitatakse teie õigust andmete kustutamisele.
 
 Jaotised 8 (juba avaldatud sisu kohta), 15, 16 ja 18 jäävad pärast lõpetamist kehtima.
 
@@ -242,6 +250,8 @@ Kui elate mujal, on lisas A märgitud teie piirkonnas kohaldatav taganemis- või
 Teatame teile püsival andmekandjal ette, mis ja millal muutub. Kui muudatusel on teie juurdepääsule teenusele või selle kasutamisele enam kui vähene negatiivne mõju, võite lepingu tasuta lõpetada **30 päeva** jooksul pärast teate saamist või muudatuse jõustumist, olenevalt sellest, kumb on hilisem, ning tagastame kasutamata ajavahemiku eest ette makstud summa.
 
 **Nende Tingimuste muudatused.** Võime neid Tingimusi samalaadsetel põhjustel muuta. Muudatuste puhul, mis ei vähenda teie õigusi, avaldame uue versiooni koos muudatuste kokkuvõttega ja saadame teile e-kirja vähemalt **30 päeva** enne selle jõustumist; Dialectical Engine kasutamise jätkamine pärast seda kuupäeva tähendab, et nõustute muudatusega, ning võite oma konto enne seda sulgeda. Muudatuste puhul, mis vähendavad teie õigusi — sealhulgas olemasoleva paketi hinnatõus, madalamad kasutuslimiidid, eemaldatud funktsioonid, teie sisu uued kasutusviisid või vastutuse, kohaldatava õiguse või vaidluste lahendamise muudatused — palume teil järgmisel sisselogimisel uue versiooniga sõnaselgelt nõustuda ning muudatust kohaldatakse ainult edaspidi. Me ei kohalda muudatust kunagi tagasiulatuvalt ega kasuta seda jaotist selleks, et muuta tähtaja kestel tasulise teenuse põhiolemust ilma teile väljumisvõimalust pakkumata. Varasemad versioonid jäävad kättesaadavaks aadressil dezbatere.ro/terms/versions.
+
+Versioon 2.10 asendas versiooni 2.9: jaotis 9 ütleb, et tasuta paketi väitlused on avalikud, et avaliku väitluse avaldamist ei saa tühistada ja see jääb pärast konto sulgemist avalikuks, et igaüks, kellel on krediiti, võib avalikule väitlusele panustada või selle kohta aruande kirjutada, ning et avalik väitlus jääb avatuks pärast selle esimese autori lahkumist; jaotis 11 ütleb, mida sulgemine teie avalikele väitlustele teeb.
 
 Versioon 2.9 asendas versiooni 2.8: jaotisesse 8 lisandub lõik „Meie loodud diagrammid ja statistika“, mis sätestab, kellele kuuluvad väitluse aruande diagrammid, ja annab teile litsentsi neid kasutada.
 

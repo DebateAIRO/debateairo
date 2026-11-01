@@ -4,6 +4,7 @@ import * as React from "react";
 import {
   ContractHttpError, DIG_FREE_PICKS_MAX, DIG_PICKS_ONE_PATH, DIG_TOO_DEEP, FREE_DIG_PICKS_MAX, type AskParent, type PublicDigParent, type PurposeLines, type QuestionLanguageChoice
 } from "@debateai/contract";
+import { crisisWordsOf } from "./askText.js";
 import { COOKIE_SESSION_MARKER, contractClient, createDebate } from "@/lib/api";
 import { readAskRoom, useAskRoom, waitingRoomOf, type AskRoom } from "@/lib/billing/room";
 import {
@@ -37,7 +38,7 @@ const LANGUAGE_ASKS_PER_PRESS = 4;
 const QUESTION_MIN_LENGTH = 7;
 
 export type V4AskOutcome =
-  | Readonly<{ kind: "STARTED"; runId: string }>
+  | Readonly<{ kind: "STARTED"; runId: string; notJoined?: boolean }>
   | Readonly<{ kind: "STOPPED" }>
   /** ASK-5 (V3 ruling L-USE-STICKS): `acceptedQuestion` is the rewrite the person chose ("Use this version") before the
    * refusal, so the next Start can send it again instead of asking a second time. */
@@ -45,6 +46,7 @@ export type V4AskOutcome =
 
 /** Where an ask comes from: the ask page, or a dig button (AI-written text around the person's earlier question). */
 export type V4AskOrigin = "ask" | "dig";
+
 
 type DecidedPlan = NonNullable<AskRoom["plan_id"]>;
 type InternalFunding = Readonly<{ kind: "INTERNAL"; expires_at: string }>;
@@ -189,9 +191,9 @@ export function useV4Ask(input: Readonly<{
     const question = questionLine.trim();
     const dig = origin === "dig";
     // V, 2026-09-30: a question that reads as a person in crisis gets help numbers, never a debate — before anything else.
-    // ASK-4: a dig is AI-written text around a question that already passed this check, so the page's check is skipped
-    // for it (the API's own gate still runs; its refusal is answered below without the help pop-up).
-    if (!dig && now.crisis.offerIfCrisis(question)) return STOPPED;
+    // ASK-4: a dig's question is AI-written text around a question that already passed this check, so that text is not read here. The
+    // person's own views in a dig are their words: the owner, 1 Nov: the same pop-up on public digs and on own views on the map.
+    if (crisisWordsOf(origin, question, parent).some((words) => now.crisis.offerIfCrisis(words))) return STOPPED;
     if (question.length < QUESTION_MIN_LENGTH) return { kind: "REFUSED", message: t(now.catalog, "v4.askError.tooShort") };
     // Sentence D: one question already waits.
     if (now.room?.room === "ALREADY_WAITING") return { kind: "REFUSED", message: t(now.catalog, "v4.askError.alreadyWaiting") };
@@ -214,7 +216,7 @@ export function useV4Ask(input: Readonly<{
       let offerShown = false;
       let rechecked = false;
       let settingsRetried = false;
-      let debate: { id: string } | null = null;
+      let debate: { id: string; public_dig_not_joined?: boolean } | null = null;
       while (debate === null) {
         // Rebuilt on every pass: the one retry after a 409 settings-changed (ASK-7) sends the adopted switches.
         const config = v4AskConfig(askMode, now.readingLevel, askSettings, new Date(), now.newDebateCatalog);
@@ -287,7 +289,7 @@ export function useV4Ask(input: Readonly<{
           throw refusal;
         }
       }
-      return { kind: "STARTED", runId: debate.id };
+      return { kind: "STARTED", runId: debate.id, ...(debate.public_dig_not_joined === true ? { notJoined: true } : {}) };
     } catch (exc) {
       // Decision 13: a public page's dig says its refusals in its own words: no level, no count, no code.
       const publicRefusal = parent !== null && "public_ref" in parent ? publicDigRefusalWords(exc, now.catalog, now.room, now.pageLocale) : null;

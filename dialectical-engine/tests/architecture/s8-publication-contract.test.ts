@@ -246,7 +246,7 @@ describe("Accounts S8 publication architecture", () => {
       expect(englishPublicCatalog["public.publication.publishWarning"]).toBe(
         "Publishing makes this debate readable by anyone and may allow search engines to index it. " +
         "Publishing is for good: you cannot take it back, and anyone with credit can add to it. " +
-        "If you erase your account your name comes off it, and personal details in the text are removed if you ask."
+        "If you erase your account your name comes off it."
       );
     }
     // The home surface fetches the published list and states the indexing

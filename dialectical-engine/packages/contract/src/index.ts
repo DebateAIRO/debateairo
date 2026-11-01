@@ -357,6 +357,8 @@ export const AskAcceptedSchema = z.object({
   // Final review Part 1b, Important 1: only on a WAITING answer whose person's
   // own running debates are all that fill their windows (a person scope).
   waits_for: WaitsForSchema.optional(),
+  // Decision 13: a dig on a public debate that could not join its tree (a failure of the store between the run's start and its join): it runs as the person's own private debate.
+  public_dig_not_joined: z.literal(true).optional(),
   applied: AskAppliedSchema.optional(),
   // Model-scorecard design, cost estimate before a run: the strength the picker applied, and
   // whether the per-run money ceiling stepped it down. Optional, so an accepted ask without

@@ -3540,7 +3540,6 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       }
       case "NOT_FOUND": return { refused: reply.status(404).send({ error: "RUN_NOT_FOUND" }) };
       case "TOO_DEEP": return { refused: reply.status(409).send(DigTooDeepSchema.parse({ error: DIG_TOO_DEEP, message: DIG_TOO_DEEP, level_max: DIG_LEVEL_MAX })) };
-      case "WRITING": return { refused: reply.status(409).send(PublicDebateRefusedSchema.parse({ error: "PUBLIC_DEBATE_REPORT_WRITING", message: "PUBLIC_DEBATE_REPORT_WRITING" })) };
       case "NEEDS_A_PATH": return { refused: reply.status(400).send(PublicDebateRefusedSchema.parse({ error: "PUBLIC_DIG_NEEDS_A_PATH", message: "PUBLIC_DIG_NEEDS_A_PATH" })) };
       case "MALFORMED": return { refused: admission.reason === "FREE_PICKS_OVER"
         ? reply.status(400).send(DigFreePicksMaxSchema.parse({ error: DIG_FREE_PICKS_MAX, message: DIG_FREE_PICKS_MAX, picks_max: FREE_DIG_PICKS_MAX }))
@@ -4199,8 +4198,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
     // Decision 13: a public dig's own run joins the public tree, with its copy of the page and its picks.
     if (publicAdmission !== null && digOwner !== undefined && options.publicTree !== undefined) {
-      await joinPublicDigAtStart({ ownerRef: digOwner, childRunId: accepted.run_ref, admission: publicAdmission, now: new Date(), pool: options.publicTree.pool, tree: options.publicTree.tree,
+      const joined = await joinPublicDigAtStart({ ownerRef: digOwner, childRunId: accepted.run_ref, admission: publicAdmission, now: new Date(), pool: options.publicTree.pool, tree: options.publicTree.tree,
         contributions: options.publicTree.contributions, readPublicDebate: options.publicTree.readPublicDebate });
+      // By the rules a join admitted a moment ago cannot be refused now; a store that failed in between can only be said plainly: the debate runs as the person's own, the page is left alone.
+      if (joined !== "JOINED" && joined !== "ALREADY") return reply.status(202).send({ ...accepted, public_dig_not_joined: true });
     }
     // Decision 13: the page showed the Free notice, on the Free plan: this debate goes public when finished, after the AI check. A dig is a contribution instead; a paid plan's flag means nothing.
     if (ask.free_public_notice === true && ask.parent === undefined && ask.public_parent === undefined && digOwner !== undefined && options.publicTree !== undefined) {

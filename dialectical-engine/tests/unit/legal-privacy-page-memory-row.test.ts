@@ -77,7 +77,7 @@ describe("Privacy Policy 3.8 says what the debate pages keep in the account (R22
     expect(kept[2], `${code}: deletion with the debate points at section 6`).toMatch(/6/u);
     const purpose = cells(tableRows(code, 4)[0]!)[1]!;
     expect(purpose.toLocaleLowerCase(code), `${code}: section 4's first row lists it`).toContain(label.toLocaleLowerCase(code));
-    expect(markdown(code), `${code}: still version 3.8`).toMatch(/v3\.8 /u);
+    expect(markdown(code), `${code}: still version 3.9`).toMatch(/v3\.9 /u);
   });
 
   it.each(Object.entries(PINNED))("%s: the rows and the change-log sentence read exactly as approved", (code, pinned) => {

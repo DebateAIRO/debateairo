@@ -69,12 +69,12 @@ describe("legal documents — generated data", () => {
   describe("Terms of Service", () => {
     it("carries the modal chrome derived from the draft's version line", () => {
       expect(TERMS_OF_SERVICE.key).toBe("terms");
-      expect(TERMS_OF_SERVICE.eyebrow).toBe("TERMS OF SERVICE · v2.9 · EFFECTIVE 12 OCTOBER 2026");
+      expect(TERMS_OF_SERVICE.eyebrow).toBe("TERMS OF SERVICE · v2.10 · EFFECTIVE 1 NOVEMBER 2026");
       expect(TERMS_OF_SERVICE.title).toBe("What you agree to");
       expect(TERMS_OF_SERVICE.lede).toBe(
         "The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end."
       );
-      expect(TERMS_OF_SERVICE.endMarker).toBe("END OF TERMS · v2.9");
+      expect(TERMS_OF_SERVICE.endMarker).toBe("END OF TERMS · v2.10");
       expect(TERMS_OF_SERVICE.contact).toBe("support@dezbatere.ro");
       expect(TERMS_OF_SERVICE.bodyLabel).toBe("Terms of Service text");
       expect(TERMS_OF_SERVICE.sectionIdPrefix).toBe("terms-section-");
@@ -340,12 +340,12 @@ describe("legal documents — generated data", () => {
   describe("Privacy Policy", () => {
     it("carries the modal chrome derived from the draft's version line", () => {
       expect(PRIVACY_POLICY.key).toBe("privacy");
-      expect(PRIVACY_POLICY.eyebrow).toBe("PRIVACY POLICY · v3.8 · EFFECTIVE 12 OCTOBER 2026");
+      expect(PRIVACY_POLICY.eyebrow).toBe("PRIVACY POLICY · v3.9 · EFFECTIVE 1 NOVEMBER 2026");
       expect(PRIVACY_POLICY.title).toBe("What we store, and why");
       expect(PRIVACY_POLICY.lede).toBe(
         "Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Fourteen sections and Annex B — scroll to the end."
       );
-      expect(PRIVACY_POLICY.endMarker).toBe("END OF POLICY · GDPR (EU) 2016/679 · v3.8");
+      expect(PRIVACY_POLICY.endMarker).toBe("END OF POLICY · GDPR (EU) 2016/679 · v3.9");
       expect(PRIVACY_POLICY.contact).toBe("privacy@dezbatere.ro");
       expect(PRIVACY_POLICY.bodyLabel).toBe("Privacy Policy text");
       expect(PRIVACY_POLICY.sectionIdPrefix).toBe("policy-section-");
@@ -377,7 +377,7 @@ describe("legal documents — generated data", () => {
     // (2026-10-29) adds "Page settings and visits" after "Debate content": fourteen.
     it("turns the collection table into fourteen rows joined with em dashes", () => {
       const collect = section(PRIVACY_POLICY, "02");
-      expect(collect.blocks.map((block) => block.kind)).toEqual(["p", "list", "p", "p"]);
+      expect(collect.blocks.map((block) => block.kind)).toEqual(["p", "list", "p", "p", "p"]);
       const table = collect.blocks[1]!;
       if (table.kind !== "list") throw new Error("unreachable");
       expect(table.items).toHaveLength(14);

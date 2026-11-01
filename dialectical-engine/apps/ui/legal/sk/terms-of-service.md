@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Stručne
-eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v2.9 · ÚČINNÉ OD 12. OKTÓBRA 2026
+eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v2.10 · ÚČINNÉ OD 1. NOVEMBRA 2026
 title: S čím súhlasíte
 lede: Zmluva medzi vami a DMS Merchandise Shop S.R.L. zrozumiteľným jazykom. Devätnásť častí a príloha A — prejdite až na koniec.
-endMarker: KONIEC PODMIENOK · v2.9
+endMarker: KONIEC PODMIENOK · v2.10
 bodyLabel: Text Podmienok poskytovania služby
 annexTitle: Príloha A — Regionálne podmienky
 jumps:
@@ -21,9 +21,9 @@ jumps:
 18 ROZHODNÉ PRÁVO
 -->
 
-**Version 2.9 · Effective 12. októbra 2026 · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
+**Version 2.10 · Effective 1. novembra 2026 · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
 
-**In short.** Musíte mať aspoň 18 rokov. Dialectical Engine vytvára argumenty pomocou modelov umelej inteligencie a všetko, čo vygeneruje, môže byť nesprávne — nejde o poradenstvo. Vaše debaty sú súkromné, pokiaľ ich nezverejníte; ak ich zverejníte, môže ich čítať ktokoľvek. Text, ktorý zadáte, sa odosiela poskytovateľom umelej inteligencie uvedeným v našom Registri poskytovateľov a nepoužíva sa na trénovanie modelov. Nezákonný obsah nahláste na support@dezbatere.ro bez ohľadu na to, či máte účet. Rozhodným právom je rumunské právo, vaše miestne práva na ochranu spotrebiteľa vám však zostávajú zachované.
+**In short.** Musíte mať aspoň 18 rokov. Dialectical Engine vytvára argumenty pomocou modelov umelej inteligencie a všetko, čo vygeneruje, môže byť nesprávne — nejde o poradenstvo. V bezplatnom programe sú vaše debaty po dokončení verejné, po kontrole umelou inteligenciou; v platenom programe sú súkromné, pokiaľ ich nezverejníte. Keď je debata verejná, môže ju čítať ktokoľvek a zostáva verejná. Text, ktorý zadáte, sa odosiela poskytovateľom umelej inteligencie uvedeným v našom Registri poskytovateľov a nepoužíva sa na trénovanie modelov. Nezákonný obsah nahláste na support@dezbatere.ro bez ohľadu na to, či máte účet. Rozhodným právom je rumunské právo, vaše miestne práva na ochranu spotrebiteľa vám však zostávajú zachované.
 
 ## 1. Kto sme a ako nás kontaktovať
 
@@ -142,17 +142,25 @@ Ak si nie ste istí, či je niečo dovolené, opýtajte sa nás pred zverejnení
 
 ## 9. Zverejnenie debaty
 
-Debaty sú **v predvolenom nastavení súkromné**. Nič z toho, čo vytvoríte, nie je viditeľné nikomu inému, pokiaľ to nezverejníte.
+V platenom programe sú debaty **v predvolenom nastavení súkromné**: nič, čo tam vytvoríte, nie je viditeľné nikomu inému, pokiaľ to nezverejníte. Debaty v bezplatnom programe sú verejné, ako uvádza táto časť.
 
 **Čo zverejnenie spôsobí.** Zverejnenie je úmyselný, samostatne potvrdený úkon. Pri zverejnení vytvoríme nemennú snímku debaty a sprístupníme ju komukoľvek na čítanie bez účtu. Vyhľadávače ju môžu indexovať. Snímka zobrazuje váš **pseudonym**, otázku tak, ako ste ju napísali, strom argumentov, hodnotenia, verdikt a pásmo spoľahlivosti a nesie viditeľné označenie, že obsah vytvorila umelá inteligencia. Nezobrazuje vašu e-mailovú adresu, záznamy relácií ani históriu účtu.
 
-**Zverejnenie je v praxi fakticky nezvratné.** Keď sa debata stane verejnou, iné osoby ju môžu čítať, citovať, vytvárať z nej snímky obrazovky, archivovať ju a ukladať do vyrovnávacej pamäte. Zrušenie zverejnenia odstráni debatu z Dialectical Engine a zničí kľúč k našej kópii, nemôže však odstrániť kópie, ktoré už existujú inde. Nezverejňujte nič, čo by ste nechceli mať trvalo spojené so svojím pseudonymom.
+**Debaty v bezplatnom programe sú verejné.** V bezplatnom programe sú vaša otázka a jej debata verejné. Upozorňujeme vás na to skôr, než sa spýtate. Keď je debata hotová, skontroluje ju umelá inteligencia; ak kontrola dovolí jej zverejnenie, ktokoľvek ju môže čítať a vyhľadávače ju môžu indexovať. Ak kontrola zamietne, zostáva súkromná pre vás. Do otázky v bezplatnom programe neuvádzajte osobné údaje.
+
+**Nedá sa vrátiť späť.** Akonáhle je debata verejná, zostáva verejná. Nemôžete zrušiť jej zverejnenie ani ju vymazať a vymazanie vášho účtu ju neodstráni. Kópie, ktoré vytvorili iní, sú mimo našej kontroly. Iné osoby ju môžu čítať, citovať, vytvárať z nej snímky obrazovky, archivovať ju a ukladať do vyrovnávacej pamäte. Nezverejňujte nič, čo by ste nechceli mať trvalo spojené so svojím pseudonymom.
 
 **Označená debata vyžaduje naše schválenie.** Keď debata skončí, automatizovaná kontrola prečíta jej syntézu z hľadiska štyroch kategórií uvedených v časti 8. Debatu, ktorú kontrola označí, možno zverejniť len s naším schválením a označenie sa zobrazí iba vám a, ak požiadate o naše schválenie, členom nášho tímu, ktorí majú oprávnenie posudzovať zverejnenia; debata, ktorej syntéza sa podľa kontroly dotýka kategórie „sklony k samovražde alebo k ubližovaniu iným ľuďom“, sa namiesto toho odstráni, ako uvádza nasledujúci odsek. Ak o naše schválenie požiadate na stránke debaty, člen nášho tímu, ktorý má osobitné oprávnenie posudzovať zverejnenia, si môže prečítať debatu v podobe, v akej by sa zverejnila, bez vášho pseudonymu. Ak schválime, tlačidlo Zverejniť vám bude opäť dostupné a kontrola, ktorou prechádza každé zverejnenie, naďalej platí. Ak zamietneme, debata zostane súkromná a poskytneme vám odôvodnenie (časť 10). Po zamietnutí môžete požiadať ešte raz a rozhodne člen nášho tímu, ktorý o prvej žiadosti nerozhodoval; môžete tiež využiť postup vybavovania sťažností podľa časti 10. Po druhom zamietnutí už nemôžete požiadať znova, ale rozhodnutie môžete stále predložiť orgánu mimosúdneho riešenia sporov alebo súdu (časť 10). Schválenie sa vzťahuje na syntézu, ktorú posudzovateľ prečítal, vrátane každej neskoršej verzie debaty, ktorá ju opakuje slovo od slova; prepísaná syntéza sa pri zverejnení znova skontroluje a ak sa označí, vyžaduje vlastné schválenie. Ak po našom schválení zverejníte označenú debatu, môžete ju znova stiahnuť tlačidlom Stiahnuť na jej karte v zobrazení Vaše debaty.
 
 **Debaty, ktoré naša kontrola odstráni.** Ak naša automatická kontrola zistí, že syntéza debaty sa dotýka kategórie „sklony k samovražde alebo k ubližovaniu iným ľuďom“, debatu automaticky odstránime a neuchovávame ju, aj keď už bola zverejnená. Syntéza sa považuje za ubližovanie iným ľuďom, keď vyzýva na ublíženie osobe alebo ho plánuje, alebo keď dospeje k záveru, že štát, armáda, polícia alebo ktokoľvek iný má použiť silu proti ľuďom; debata o násilí ako o téme dejín, práva, etiky, politiky, aktuálneho diania alebo verejnej politiky sa tak nepovažuje len pre svoju tému. Žiadny človek debatu vopred nečíta a nemožno ju obnoviť. Keď debata skončí, odpoveď debaty sa vám nezobrazí, okrem prípadu, keď kontrola nemohla odpovedať včas: každá dokončená debata sa zadrží, kým kontrola neodpovie (časť 8), zatiaľ čo stránka prebiehajúcej debaty zobrazuje argumenty a záver tak, ako vznikajú; ak kontrola nemohla odpovedať včas, debata sa znova skontroluje, keď stlačíte tlačidlo Zverejniť. Povieme vám to raz na obrazovke, s odôvodnením a číslami pomoci. Stále môžete podať sťažnosť postupom v časti 10, ale sťažnosť debatu neobnoví. Prémiová debata odstránená týmto spôsobom sa nezapočítava do limitu vášho plánu.
 
-**Zverejnené debaty pri odstránení účtu.** Keď naplánujete odstránenie účtu, vyberiete si, čo sa stane s debatami, ktoré ste zverejnili. Ak zaškrtnete **„Odstrániť aj moje verejné debaty“**, pri odstránení účtu každú z nich stiahneme z Dialectical Engine a zničíme kľúč k našej kópii, tak ako pri zrušení zverejnenia, pokiaľ nám zákon neprikazuje ponechať si konkrétnu položku. Ak políčko nezaškrtnete, debaty zostanú verejné pod vaším vyradeným pseudonymom. Kópie vytvorené inými pred odstránením nemáme pod kontrolou. Ak si chcete odstránenú debatu ponechať dostupnú, najprv si ju stiahnite.
+**Vaše meno.** Váš pseudonym sa uvádza ako autor debaty, ktorú ste zverejnili, pri každej ceste, do ktorej ste prispeli, s dátumom, a ako odkaz v správe, ktorú ste napísali. Ak vymažete svoj účet, váš pseudonym sa odstráni všade a na stránke sa namiesto toho zobrazí „prispievateľ“.
+
+**Príspevky.** Ktokoľvek s kreditom, v bezplatnom alebo platenom programe, môže preskúmať verejnú debatu pomocou vlastnej kvóty. To, čo tam napíšete, a to, čo z nej napíše umelá inteligencia, kontroluje umelá inteligencia skôr, než môže zmeniť verejnú stránku. Ak je to povolené, zmení stránku pre všetkých pod vaším pseudonymom a zostáva verejná podľa tých istých pravidiel ako debata: nemôžete to vziať späť. Ak je to zamietnuté, zostáva to súkromné pre vás a stránka sa nezmení. Nesmiete napísať nič, čo nemáte právo zverejniť, ani osobné údaje ktoréhokoľvek človeka.
+
+**Správy od kohokoľvek.** Ktokoľvek s kreditom môže napísať správu o verejnej debate, kým sa k nej nič nepridáva, pomocou vlastnej kvóty. Správa je verejná. Pseudonym autora je len odkaz: správu píšu umelé inteligencie na základe toho, čo zobrazuje stránka, a nie je to vyjadrenie autora. Staršie správy zostávajú čitateľné.
+
+**Keď autor odíde.** Verejná debata zostáva otvorená pre príspevky aj potom, čo jej prvý autor vymazal svoj účet. Nové príspevky pracujú z verejnej kópie.
 
 **Zverejnený obsah môžeme vždy odstrániť.** Zverejnenú debatu môžeme odstrániť alebo k nej obmedziť prístup, ak to vyžaduje zákon, nariadi súd alebo príslušný orgán, alebo ak porušuje tieto Podmienky či je nezákonná. Nič v tejto časti nám nebráni konať na základe platného oznámenia podľa časti 10 a nič v nej nepredstavuje prísľub, že zverejnená debata zostane dostupná.
 
@@ -197,7 +205,7 @@ S výnimkou prípadov, keď je porušenie závažné, zákon vyžaduje okamžit�
 
 Ak službu úplne ukončíme alebo ju prestaneme poskytovať vo vašej krajine, upozorníme vás najmenej **30 dní vopred**, vrátime vám prípadnú predplatenú sumu za obdobie po ukončení a predtým vám umožníme exportovať debaty.
 
-**Čo spôsobí odstránenie účtu.** Po odstránení účtu zničíme šifrovacie kľúče k údajom vášho účtu a vašim súkromným debatám, čím sa stanú natrvalo nečitateľnými, vymažeme záznam účtu a ak ste si to zvolili, stiahneme vaše zverejnené debaty z verejného prístupu, ako opisuje časť 9. Niektoré údaje pretrvajú a mali by ste vedieť ktoré: záznamy v našich auditných a bezpečnostných protokoloch, ktoré možno iba dopĺňať a ktoré uchovávame na účely plnenia vlastných právnych a bezpečnostných povinností; záznamy, ktoré sme zo zákona povinní uchovávať, vrátane záznamov o prijatí a súhlasoch; a pri malom počte starších debát vytvorených pred zavedením nášho šifrovacieho systému záznamy, ktorých vymazanie je obmedzenejšie — ak sa to týka vášho účtu, informujeme vás. Zásady ochrany osobných údajov opisujú všetko z hľadiska ochrany osobných údajov a vysvetľujú vaše právo na vymazanie.
+**Čo spôsobí odstránenie účtu.** Po odstránení účtu zničíme šifrovacie kľúče k údajom vášho účtu a vašim súkromným debatám, čím sa stanú natrvalo nečitateľnými, vymažeme záznam účtu a váš pseudonym odstránime z vašich verejných debát, ktoré zostávajú verejné, ako opisuje časť 9. Niektoré údaje pretrvajú a mali by ste vedieť ktoré: záznamy v našich auditných a bezpečnostných protokoloch, ktoré možno iba dopĺňať a ktoré uchovávame na účely plnenia vlastných právnych a bezpečnostných povinností; záznamy, ktoré sme zo zákona povinní uchovávať, vrátane záznamov o prijatí a súhlasoch; a pri malom počte starších debát vytvorených pred zavedením nášho šifrovacieho systému záznamy, ktorých vymazanie je obmedzenejšie — ak sa to týka vášho účtu, informujeme vás. Zásady ochrany osobných údajov opisujú všetko z hľadiska ochrany osobných údajov a vysvetľujú vaše právo na vymazanie.
 
 Časti 8 (pokiaľ ide o už zverejnený obsah), 15, 16 a 18 zostávajú v platnosti aj po ukončení.
 
@@ -242,6 +250,8 @@ Ak žijete inde, príloha A uvádza právo na odstúpenie alebo lehotu na rozmys
 O tom, čo a kedy sa mení, vás vopred informujeme na trvanlivom médiu. Ak má zmena viac než nepodstatný nepriaznivý vplyv na váš prístup k službe alebo jej používanie, môžete zmluvu bezplatne ukončiť do **30 dní** odo dňa, keď ste boli informovaní, alebo odo dňa nadobudnutia účinnosti zmeny, podľa toho, ktorý deň nastane neskôr, a vrátime vám prípadnú predplatenú sumu za nevyužité obdobie.
 
 **Zmeny týchto Podmienok.** Tieto Podmienky môžeme meniť z rovnakých druhov dôvodov. Pri zmenách, ktoré neobmedzujú vaše práva, zverejníme novú verziu so zhrnutím zmien a najmenej **30 dní** pred nadobudnutím účinnosti vám zašleme e-mail; pokračovaním v používaní Dialectical Engine po tomto dátume zmenu prijímate a pred týmto dátumom môžete svoj účet odstrániť. Pri zmenách, ktoré obmedzujú vaše práva — vrátane zvýšenia ceny existujúceho programu, zníženia limitov, odstránenia funkcií, nového spôsobu použitia vášho obsahu alebo zmien zodpovednosti, rozhodného práva či riešenia sporov — vás pri nasledujúcom prihlásení požiadame, aby ste novú verziu výslovne prijali, a zmena platí iba do budúcnosti. Žiadnu zmenu nikdy neuplatníme spätne a túto časť nikdy nepoužijeme na zmenu podstaty toho, za čo ste počas obdobia zaplatili, bez toho, aby sme vám ponúkli možnosť zmluvu ukončiť. Predchádzajúce verzie zostávajú dostupné na adrese dezbatere.ro/terms/versions.
+
+Verzia 2.10 nahradila verziu 2.9: časť 9 uvádza, že debaty v bezplatnom programe sú verejné, že verejnú debatu nemožno zrušiť zverejnenie a zostáva verejná aj po zrušení vášho účtu, že ktokoľvek s kreditom môže prispievať do verejnej debaty alebo o nej napísať správu a že verejná debata zostáva otvorená aj po odchode jej prvého autora; časť 11 uvádza, čo zrušenie účtu znamená pre vaše verejné debaty.
 
 Verzia 2.9 nahradila verziu 2.8: do časti 8 pribudol odsek „Grafy a štatistiky, ktoré generujeme“, ktorý určuje, komu patria grafy v správe o debate, a udeľuje vám licenciu na ich používanie.
 

@@ -1545,7 +1545,7 @@ export class PostgresModelSpendStore implements ModelSpendStore {
     if (funding?.kind === "INTERNAL") {
       const result = await this.pool.query<{ total: string }>(
         // Decision 13: a report a funded person wrote on someone else's public debate has no grant to name (0140), so it counts here, in their own windows.
-        "SELECT (billing.read_internal_grant_spent($1::uuid,$4::uuid,$5::uuid,$2::timestamptz,$3::timestamptz,$6::boolean) + identity.read_public_report_spent($1::uuid,$2::timestamptz,$3::timestamptz))::text AS total",
+        "SELECT (billing.read_internal_grant_spent($1::uuid,$4::uuid,$5::uuid,$2::timestamptz,$3::timestamptz,$6::boolean) + identity.read_public_report_spent_by_funding($1::uuid,$2::timestamptz,$3::timestamptz,true))::text AS total",
         [ownerRef,from,to,funding.grantId,funding.grantEventId,scope === "PERSON_GRANT"]);
       return this.#total(result.rows[0]?.total);
     }
@@ -1554,7 +1554,7 @@ export class PostgresModelSpendStore implements ModelSpendStore {
     const result = await this.pool.query<{ total: string }>(
       `SELECT ((SELECT coalesce(sum(spend.charge_micros),0) ${PostgresModelSpendStore.#ownerSpendFrom})
          + identity.read_ask_clarify_spent($1::uuid, $2::timestamptz, $3::timestamptz)
-         + identity.read_public_report_spent($1::uuid, $2::timestamptz, $3::timestamptz))::text AS total`,
+         + identity.read_public_report_spent_by_funding($1::uuid, $2::timestamptz, $3::timestamptz, false))::text AS total`,
       [ownerRef, from, to]
     );
     return this.#total(result.rows[0]?.total);
@@ -1601,7 +1601,7 @@ export class PostgresModelSpendStore implements ModelSpendStore {
          SELECT coalesce(sum(spend.charge_micros),0)
          ${PostgresModelSpendStore.#ownerSpendFrom.replaceAll("$2", "window_range.from_at").replaceAll("$3", "window_range.to_at")}
        ) + identity.read_ask_clarify_spent($1::uuid, window_range.from_at, window_range.to_at)
-         + identity.read_public_report_spent($1::uuid, window_range.from_at, window_range.to_at))::text AS total
+         + identity.read_public_report_spent_by_funding($1::uuid, window_range.from_at, window_range.to_at, false))::text AS total
        FROM unnest($2::timestamptz[], $3::timestamptz[]) WITH ORDINALITY AS window_range(from_at, to_at, ordinal)
        ORDER BY window_range.ordinal`,
       [ownerRef, ranges.map((range) => range.from), ranges.map((range) => range.to)]

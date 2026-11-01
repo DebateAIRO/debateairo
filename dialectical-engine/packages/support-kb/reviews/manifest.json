@@ -154,19 +154,23 @@
       "id": "delete-a-private-debate",
       "lang": "en",
       "sha256": "ecb340c8a317b82fbaa060c1d1b8840ef03b57f28fd2d78864bfd348371afce0",
-      "reviewedBy": "SOL",
-      "reviewerSession": "r22-public-lane-2026-11-01",
+      "reviewedBy": "OWNER",
+      "reviewerSession": "254b8d87-040e-44fc-bef6-c5c6150a7428 (coordinator session, the owner's second public card on 2026-11-01; the owner read this article's English body on the card and chose Approve)",
       "reviewedOn": "2026-11-01",
-      "evidence": "docs/superpowers/plans/2026-10-31-r22-owner-changes.md decision 13"
+      "evidence": "docs/missions/support-conversation-20260914/reviews/OWNER-SIGNOFF-r22-public-articles.md",
+      "ratifiedBy": "V",
+      "ratifiedOn": "2026-11-01"
     },
     {
       "id": "delete-a-private-debate",
       "lang": "ro",
       "sha256": "77a76700d6e7dddc43505d46d1eb292f84621e8b9f70306fc108dfe1061adfc8",
-      "reviewedBy": "SOL",
-      "reviewerSession": "r22-public-lane-2026-11-01",
+      "reviewedBy": "OWNER",
+      "reviewerSession": "254b8d87-040e-44fc-bef6-c5c6150a7428 (coordinator session, the owner's second public card on 2026-11-01; the card showed the English body only, so the owner approved the article without reading this Romanian text)",
       "reviewedOn": "2026-11-01",
-      "evidence": "docs/superpowers/plans/2026-10-31-r22-owner-changes.md decision 13"
+      "evidence": "docs/missions/support-conversation-20260914/reviews/OWNER-SIGNOFF-r22-public-articles.md",
+      "ratifiedBy": "V",
+      "ratifiedOn": "2026-11-01"
     },
     {
       "id": "export-json",
@@ -270,37 +274,45 @@
       "id": "public-answer-disclosure",
       "lang": "en",
       "sha256": "61d56f01ff035362e1f914c60421fe1c782a3056ade12614b149f05ee76a13af",
-      "reviewedBy": "SOL",
-      "reviewerSession": "r22-public-lane-2026-11-01",
+      "reviewedBy": "OWNER",
+      "reviewerSession": "254b8d87-040e-44fc-bef6-c5c6150a7428 (coordinator session, the owner's second public card on 2026-11-01; the owner read this article's English body on the card and chose Approve)",
       "reviewedOn": "2026-11-01",
-      "evidence": "docs/superpowers/plans/2026-10-31-r22-owner-changes.md decision 13"
+      "evidence": "docs/missions/support-conversation-20260914/reviews/OWNER-SIGNOFF-r22-public-articles.md",
+      "ratifiedBy": "V",
+      "ratifiedOn": "2026-11-01"
     },
     {
       "id": "public-answer-disclosure",
       "lang": "ro",
       "sha256": "30008ba74a9957ef8ae51bd1fdf9c9e42b556dfd3d6ef21e0fbf02326304cca4",
-      "reviewedBy": "SOL",
-      "reviewerSession": "r22-public-lane-2026-11-01",
+      "reviewedBy": "OWNER",
+      "reviewerSession": "254b8d87-040e-44fc-bef6-c5c6150a7428 (coordinator session, the owner's second public card on 2026-11-01; the card showed the English body only, so the owner approved the article without reading this Romanian text)",
       "reviewedOn": "2026-11-01",
-      "evidence": "docs/superpowers/plans/2026-10-31-r22-owner-changes.md decision 13"
+      "evidence": "docs/missions/support-conversation-20260914/reviews/OWNER-SIGNOFF-r22-public-articles.md",
+      "ratifiedBy": "V",
+      "ratifiedOn": "2026-11-01"
     },
     {
       "id": "publish-a-debate",
       "lang": "en",
       "sha256": "de9b228a97db85a2d698261244fd673b59f901e528353e48b3d7f517b20cec72",
-      "reviewedBy": "SOL",
-      "reviewerSession": "r22-public-lane-2026-11-01",
+      "reviewedBy": "OWNER",
+      "reviewerSession": "254b8d87-040e-44fc-bef6-c5c6150a7428 (coordinator session, the owner's second public card on 2026-11-01; the owner read this article's English body on the card and chose Approve)",
       "reviewedOn": "2026-11-01",
-      "evidence": "docs/superpowers/plans/2026-10-31-r22-owner-changes.md decision 13"
+      "evidence": "docs/missions/support-conversation-20260914/reviews/OWNER-SIGNOFF-r22-public-articles.md",
+      "ratifiedBy": "V",
+      "ratifiedOn": "2026-11-01"
     },
     {
       "id": "publish-a-debate",
       "lang": "ro",
       "sha256": "f84f19deb5e5465871020b36370ed37b4c932ff6e896eec6354d5e13748bad28",
-      "reviewedBy": "SOL",
-      "reviewerSession": "r22-public-lane-2026-11-01",
+      "reviewedBy": "OWNER",
+      "reviewerSession": "254b8d87-040e-44fc-bef6-c5c6150a7428 (coordinator session, the owner's second public card on 2026-11-01; the card showed the English body only, so the owner approved the article without reading this Romanian text)",
       "reviewedOn": "2026-11-01",
-      "evidence": "docs/superpowers/plans/2026-10-31-r22-owner-changes.md decision 13"
+      "evidence": "docs/missions/support-conversation-20260914/reviews/OWNER-SIGNOFF-r22-public-articles.md",
+      "ratifiedBy": "V",
+      "ratifiedOn": "2026-11-01"
     },
     {
       "id": "risk-tier-choice",
@@ -389,20 +401,24 @@
     {
       "id": "unpublish-a-debate",
       "lang": "en",
-      "sha256": "806d62ec57c2c10741af2c62355a8f9681915a2acf614d903864dedfa38b710c",
-      "reviewedBy": "SOL",
-      "reviewerSession": "r22-public-lane-2026-11-01",
+      "sha256": "9dfb849df4115b35d8f736dccb902be68f65c77433c58c135e77dd095ce52c07",
+      "reviewedBy": "OWNER",
+      "reviewerSession": "254b8d87-040e-44fc-bef6-c5c6150a7428 (coordinator session, the owner's second public card on 2026-11-01; the owner read this article's English body on the card and chose Approve)",
       "reviewedOn": "2026-11-01",
-      "evidence": "docs/superpowers/plans/2026-10-31-r22-owner-changes.md decision 13"
+      "evidence": "docs/missions/support-conversation-20260914/reviews/OWNER-SIGNOFF-r22-public-articles.md",
+      "ratifiedBy": "V",
+      "ratifiedOn": "2026-11-01"
     },
     {
       "id": "unpublish-a-debate",
       "lang": "ro",
-      "sha256": "c2359c1d2e5dd18f2cf7b4ee9d84f65010470d1314744ddcaa046736a9a4a6d7",
-      "reviewedBy": "SOL",
-      "reviewerSession": "r22-public-lane-2026-11-01",
+      "sha256": "71b31a6f7f64ca0147867bc8a4dd85e6fd38fbdc034c85d1d95120b15a188b8d",
+      "reviewedBy": "OWNER",
+      "reviewerSession": "254b8d87-040e-44fc-bef6-c5c6150a7428 (coordinator session, the owner's second public card on 2026-11-01; the card showed the English body only, so the owner approved the article without reading this Romanian text)",
       "reviewedOn": "2026-11-01",
-      "evidence": "docs/superpowers/plans/2026-10-31-r22-owner-changes.md decision 13"
+      "evidence": "docs/missions/support-conversation-20260914/reviews/OWNER-SIGNOFF-r22-public-articles.md",
+      "ratifiedBy": "V",
+      "ratifiedOn": "2026-11-01"
     },
     {
       "id": "unsupported-capabilities",
@@ -426,7 +442,7 @@
     }
   ],
   "recovery": {
-    "componentFileSha256": "008e93863af868d4a9fe8d9505cef197d91c3c6f459b767006fbc645cb10515e",
+    "componentFileSha256": "8f03b90c5369ef02c7b353061176e918a638cf82e48560b6fcacea6ad94be980",
     "components": [
       {
         "id": "account-access",
@@ -951,26 +967,26 @@
       {
         "id": "unpublish-a-debate",
         "lang": "en",
-        "articleSha256": "806d62ec57c2c10741af2c62355a8f9681915a2acf614d903864dedfa38b710c",
-        "modelProjectionSha256": "1733ded34a6099f6145149e59db31eeb6b3f7c6f6d22a0a55144908fc6be6dda",
-        "fallbackSha256": "c47eb41da2c698b9c3806df7f69c4a9447b49f63e6221602e1dd243c49128af6",
+        "articleSha256": "9dfb849df4115b35d8f736dccb902be68f65c77433c58c135e77dd095ce52c07",
+        "modelProjectionSha256": "30c30d9f80f041a0c80b290e5755ae941d3ba1b01cbcc961371c38aa328288e1",
+        "fallbackSha256": "83dd3ad252070dc8804863359ca155991f610de2f2e65a48376efa572c4dd202",
         "reviewedBy": "SOL",
-        "reviewerSession": "r22-public-lane-2026-11-01",
+        "reviewerSession": "r22-public2-lane-2026-11-01 (one sentence removed on the owner's ruling of 2026-11-01; no separate editor read it and the owner's card did not show this chat text)",
         "reviewedOn": "2026-11-01",
-        "evidence": "docs/superpowers/plans/2026-10-31-r22-owner-changes.md decision 13",
+        "evidence": "docs/missions/support-conversation-20260914/reviews/OWNER-SIGNOFF-r22-public-articles.md",
         "ratifiedBy": "",
         "ratifiedOn": ""
       },
       {
         "id": "unpublish-a-debate",
         "lang": "ro",
-        "articleSha256": "c2359c1d2e5dd18f2cf7b4ee9d84f65010470d1314744ddcaa046736a9a4a6d7",
-        "modelProjectionSha256": "7863bcd0615c00cf5f6741b3ff0d973cbc286de801850a2dc6bad15a2af3683f",
-        "fallbackSha256": "30a45d25d24e110697410ff5540ec6ac8902197eb072efb6e331d8a645a4fedd",
+        "articleSha256": "71b31a6f7f64ca0147867bc8a4dd85e6fd38fbdc034c85d1d95120b15a188b8d",
+        "modelProjectionSha256": "cec6010a9c9282f300696b462389aaf9ce843a877f71745228f019cc985ecf47",
+        "fallbackSha256": "5db84e41dbf8e9d58c292c664865dbc560c602afc075c942794fcfbc4f876cc0",
         "reviewedBy": "SOL",
-        "reviewerSession": "r22-public-lane-2026-11-01",
+        "reviewerSession": "r22-public2-lane-2026-11-01 (one sentence removed on the owner's ruling of 2026-11-01; no separate editor read it and the owner's card did not show this chat text)",
         "reviewedOn": "2026-11-01",
-        "evidence": "docs/superpowers/plans/2026-10-31-r22-owner-changes.md decision 13",
+        "evidence": "docs/missions/support-conversation-20260914/reviews/OWNER-SIGNOFF-r22-public-articles.md",
         "ratifiedBy": "",
         "ratifiedOn": ""
       },

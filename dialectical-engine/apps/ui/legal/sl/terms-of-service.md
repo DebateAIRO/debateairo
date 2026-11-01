@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Na kratko
-eyebrow: POGOJI UPORABE · v2.9 · VELJAVNI OD 12. OKTOBRA 2026
+eyebrow: POGOJI UPORABE · v2.10 · VELJAVNI OD 1. NOVEMBRA 2026
 title: S čim soglašate
 lede: Pogodba med vami in družbo DMS Merchandise Shop S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.
-endMarker: KONEC POGOJEV · v2.9
+endMarker: KONEC POGOJEV · v2.10
 bodyLabel: Besedilo Pogojev uporabe
 annexTitle: Priloga A — Regionalni pogoji
 jumps:
@@ -21,9 +21,9 @@ jumps:
 18 PRAVO, KI SE UPORABLJA
 -->
 
-**Version 2.9 · Effective 12. oktobra 2026 · Prejšnje različice so na dezbatere.ro/terms/versions · Jezik: slovenščina.**
+**Version 2.10 · Effective 1. novembra 2026 · Prejšnje različice so na dezbatere.ro/terms/versions · Jezik: slovenščina.**
 
-**In short.** Stari morate biti najmanj 18 let. Dialectical Engine z modeli umetne inteligence oblikuje argumente in vse, kar ustvari, je lahko napačno — to ni nasvet. Vaše razprave so zasebne, razen če jih objavite; če jih objavite, jih lahko prebere vsakdo. Besedilo, ki ga pošljete, se posreduje ponudnikom umetne inteligence, navedenim v našem Registru ponudnikov, in se ne uporablja za učenje modelov. Nezakonito vsebino prijavite na support@dezbatere.ro, ne glede na to, ali imate račun. Uporablja se romunsko pravo, vendar ohranite varstvo potrošnikov po svojem lokalnem pravu.
+**In short.** Stari morate biti najmanj 18 let. Dialectical Engine z modeli umetne inteligence oblikuje argumente in vse, kar ustvari, je lahko napačno — to ni nasvet. Na brezplačnem paketu so vaše razprave po zaključku javne, po preverjanju z umetno inteligenco; na plačljivem paketu so zasebne, razen če jih objavite. Ko je razprava javna, jo lahko prebere vsakdo, in ostane javna. Besedilo, ki ga pošljete, se posreduje ponudnikom umetne inteligence, navedenim v našem Registru ponudnikov, in se ne uporablja za učenje modelov. Nezakonito vsebino prijavite na support@dezbatere.ro, ne glede na to, ali imate račun. Uporablja se romunsko pravo, vendar ohranite varstvo potrošnikov po svojem lokalnem pravu.
 
 ## 1. Kdo smo in kako lahko stopite v stik z nami
 
@@ -142,17 +142,25 @@ Ta pravila veljajo za vsebino, ki jo pošljete in objavite, ter za način uporab
 
 ## 9. Objava razprave
 
-Razprave so **privzeto zasebne**. Nič, kar ustvarite, ni vidno drugim, razen če to objavite.
+Na plačljivem paketu so razprave **privzeto zasebne**: nič, kar tam ustvarite, ni vidno drugim, razen če to objavite. Razprave na brezplačnem paketu so javne, kot pove ta razdelek.
 
 **Kaj povzroči objava.** Objava je namerno dejanje, ki ga potrdite ločeno. Ko objavite, ustvarimo nespremenljiv posnetek razprave in omogočimo, da ga brez računa prebere vsakdo. Iskalniki lahko indeksirajo ta posnetek. Posnetek prikazuje vaš **psevdonim**, vaše vprašanje, kot ste ga zapisali, drevo argumentov, ocene, razsodbo in pas gotovosti ter ima vidno oznako, da je vsebino ustvarila umetna inteligenca. Ne prikazuje vašega e-poštnega naslova, zapisov o sejah ali zgodovine računa.
 
-**Objava je v praksi dejansko nepovratna.** Ko razprava postane javna, jo lahko drugi berejo, citirajo, zajamejo v posnetek zaslona, arhivirajo in shranijo v predpomnilnik. Umik objave jo odstrani iz Dialectical Engine in uniči ključ do našega izvoda, vendar ne more doseči izvodov, ki že obstajajo drugje. Ne objavljajte ničesar, za kar ne bi želeli, da je trajno povezano z vašim psevdonimom.
+**Razprave na brezplačnem paketu so javne.** Na brezplačnem paketu sta vaše vprašanje in njegova razprava javna. To vam povemo, preden vprašate. Ko je razprava zaključena, jo preveri umetna inteligenca; če preverjanje to dovoli, jo lahko prebere vsakdo in iskalniki jo lahko indeksirajo. Če preverjanje to zavrne, ostane zasebna za vas. Na brezplačnem paketu v vprašanje ne vključujte osebnih podatkov.
+
+**Ni možnosti za preklic.** Ko je razprava javna, ostane javna. Ni je mogoče umakniti iz objave ali izbrisati, izbris računa pa je ne odstrani. Kopije, ki jih naredijo drugi, niso pod našim nadzorom. Drugi jo lahko berejo, citirajo, zajamejo v posnetek zaslona, arhivirajo in shranijo v predpomnilnik. Ne objavljajte ničesar, za kar ne bi želeli, da je trajno povezano z vašim psevdonimom.
 
 **Označena razprava potrebuje našo odobritev.** Ko se razprava zaključi, avtomatizirano preverjanje prebere njeno sintezo glede štirih kategorij iz razdelka 8. Razpravo, ki jo preverjanje označi, je mogoče objaviti samo z našo odobritvijo, oznaka pa je prikazana samo vam in, če zaprosite za našo odobritev, članom naše ekipe, ki imajo dovoljenje za pregledovanje objav; razprava, katere sinteza se po ugotovitvi preverjanja dotika kategorije »nagnjenja k samomoru ali škodovanju drugim ljudem«, se namesto tega izbriše, kot pojasnjuje naslednji odstavek. Če za našo odobritev zaprosite na strani razprave, lahko član naše ekipe, ki ima posebno dovoljenje za pregledovanje objav, prebere razpravo v obliki, v kateri bi bila objavljena, brez vašega psevdonima. Če odobrimo, je gumb Objavi spet na voljo, preverjanje, skozi katero gre vsaka objava, pa še vedno velja. Če zavrnemo, razprava ostane zasebna in vam zagotovimo obrazložitev (razdelek 10). Po zavrnitvi lahko zaprosite še enkrat, odloča pa član naše ekipe, ki o prvi zahtevi ni odločal; uporabite lahko tudi pritožbeni postopek iz razdelka 10. Po drugi zavrnitvi ne morete več zaprositi, odločitev pa lahko še vedno predložite organu za izvensodno reševanje sporov ali sodišču (razdelek 10). Odobritev zajema sintezo, ki jo je pregledovalec prebral, vključno z vsako poznejšo različico razprave, ki jo ponovi dobesedno; prepisana sinteza se ob objavi znova preveri in, če je označena, potrebuje lastno odobritev. Če po naši odobritvi objavite označeno razpravo, jo lahko znova umaknete z gumbom Umakni na njeni kartici v pogledu Vaše razprave.
 
 **Razprave, ki jih naše preverjanje izbriše.** Če naše samodejno preverjanje ugotovi, da se sinteza razprave dotika kategorije »nagnjenja k samomoru ali škodovanju drugim ljudem«, razpravo samodejno izbrišemo in je ne hranimo, tudi če je bila že objavljena. Sinteza velja za škodovanje drugim ljudem, kadar poziva k škodovanju osebi ali ga načrtuje ali kadar sklene, da naj država, vojska, policija ali kdor koli drug uporabi silo proti ljudem; razprava o nasilju kot temi zgodovine, prava, etike, politike, aktualnih dogodkov ali javne politike zaradi same teme ne šteje tako. Nobena oseba razprave ne prebere vnaprej in je ni mogoče obnoviti. Ko se razprava zaključi, vam odgovor razprave ni prikazan, z izjemo primera, ko preverjanje ni moglo odgovoriti pravočasno: vsaka zaključena razprava je zadržana, dokler preverjanje ne odgovori (razdelek 8), medtem ko stran razprave, ki še poteka, prikazuje argumente in sklep, kakor nastajajo; če preverjanje ni moglo odgovoriti pravočasno, se razprava znova preveri, ko pritisnete gumb Objavi. Povemo vam enkrat, na zaslonu, z obrazložitvijo in številkami za pomoč. Še vedno se lahko pritožite po postopku iz razdelka 10, vendar pritožba razprave ne obnovi. Premium razprava, izbrisana na ta način, se ne všteva v omejitev vašega paketa.
 
-**Objavljene razprave ob zaprtju računa.** Ko načrtujete zaprtje računa, izberete, kaj se zgodi z razpravami, ki ste jih objavili. Če označite **»Izbriši tudi moje javne razprave«**, ob zaprtju vsako odstranimo iz Dialectical Engine in uničimo ključ do naše kopije, kot pri preklicu objave, razen če zakon zahteva, da ohranimo določeno vsebino. Če polja ne označite, razprave ostanejo javne pod umaknjenim psevdonimom. Kopije, ki so jih drugi naredili pred odstranitvijo, niso pod našim nadzorom. Če želite razpravo, ki jo odstranjujete, obdržati na voljo sebi, jo najprej prenesite.
+**Vaše ime.** Vaš psevdonim se pojavi kot avtor razprave, ki ste jo objavili, na vsaki poti, k kateri ste prispevali, z datumom, in kot sklic v poročilu, ki ste ga napisali. Če izbrišete račun, se vaš psevdonim odstrani povsod in na strani se namesto tega prikaže »sodelavec«.
+
+**Prispevki.** Vsak, ki ima dobroimetje, na brezplačnem ali plačljivem paketu, lahko raziskuje javno razpravo z uporabo lastne kvote. Kar tam napišete in kar umetna inteligenca napiše na tej podlagi, preveri umetna inteligenca, preden lahko spremeni javno stran. Če je dovoljeno, spremeni stran za vse, pod vašim psevdonimom, in ostane javno po enakih pravilih kot razprava: ne morete je umakniti. Če je zavrnjeno, ostane zasebno za vas in stran se ne spremeni. Ne smete napisati ničesar, za kar nimate pravice objaviti, ali osebnih podatkov o kom koli.
+
+**Poročila vseh.** Vsak, ki ima dobroimetje, lahko napiše poročilo o javni razpravi, dokler se k njej ničesar več ne dodaja, z uporabo lastne kvote. Poročilo je javno. Psevdonim pisca je zgolj sklic: poročilo napišejo umetne inteligence iz tistega, kar stran prikazuje, in ni izjava pisca. Prejšnja poročila ostanejo berljiva.
+
+**Ko avtor odide.** Javna razprava ostane odprta za prispevke tudi potem, ko je njen prvi avtor izbrisal svoj račun. Novi prispevki delujejo na podlagi javnega izvoda.
 
 **Objavljeno vsebino lahko vedno odstranimo.** Objavljeno razpravo lahko odstranimo ali omejimo dostop do nje, kadar to zahteva zakon, odredi sodišče ali pristojni organ oziroma kadar krši te Pogoje ali je nezakonita. Nič v tem razdelku nam ne preprečuje ukrepanja na podlagi veljavnega obvestila po razdelku 10 in nič v njem ne pomeni obljube, da bo objavljena razprava ostala dostopna.
 
@@ -197,7 +205,7 @@ Razen kadar je kršitev resna, zakon zahteva takojšnje ukrepanje ali bi odlaša
 
 Če storitev v celoti ukinemo ali jo umaknemo iz vaše države, vas obvestimo najmanj **30 dni vnaprej**, vrnemo vse vnaprej plačane zneske za obdobje po ukinitvi in vam pred tem omogočimo izvoz razprav.
 
-**Posledice zaprtja.** Ko je račun zaprt, uničimo šifrirne ključe za podatke vašega računa in zasebne razprave, zaradi česar postanejo trajno neberljivi, izbrišemo zapis računa ter, če ste to izbrali, odstranimo vaše objavljene razprave iz javnega dostopa, kot je opisano v razdelku 9. Nekatere stvari se ohranijo in vedeti morate, katere: vnosi v naših revizijskih in varnostnih dnevnikih, ki omogočajo samo dodajanje in se hranijo zaradi izpolnjevanja naših pravnih in varnostnih obveznosti; zapisi, ki jih moramo hraniti po zakonu, vključno z zapisi o sprejetju in privolitvah; ter zapisi majhnega števila starejših razprav iz časa pred našo shemo šifriranja, pri katerih je brisanje bolj omejeno — če to velja za vaš račun, vas o tem obvestimo. Pravilnik o zasebnosti vse to opisuje z vidika varstva podatkov in pojasnjuje vašo pravico do izbrisa.
+**Posledice zaprtja.** Ko je račun zaprt, uničimo šifrirne ključe za podatke vašega računa in zasebne razprave, zaradi česar postanejo trajno neberljivi, izbrišemo zapis računa ter odstranimo vaš psevdonim iz vaših javnih razprav, ki ostanejo javne, kot je opisano v razdelku 9. Nekatere stvari se ohranijo in vedeti morate, katere: vnosi v naših revizijskih in varnostnih dnevnikih, ki omogočajo samo dodajanje in se hranijo zaradi izpolnjevanja naših pravnih in varnostnih obveznosti; zapisi, ki jih moramo hraniti po zakonu, vključno z zapisi o sprejetju in privolitvah; ter zapisi majhnega števila starejših razprav iz časa pred našo shemo šifriranja, pri katerih je brisanje bolj omejeno — če to velja za vaš račun, vas o tem obvestimo. Pravilnik o zasebnosti vse to opisuje z vidika varstva podatkov in pojasnjuje vašo pravico do izbrisa.
 
 Razdelki 8 (glede že objavljene vsebine), 15, 16 in 18 ostanejo v veljavi tudi po prenehanju.
 
@@ -242,6 +250,8 @@ Dialectical Engine ponuja brezplačen paket. Na voljo bo plačljivi paket **Prem
 Na trajnem nosilcu vas vnaprej obvestimo, kaj se spreminja in kdaj. Če ima sprememba več kot zgolj manjši negativen vpliv na vaš dostop do storitve ali njeno uporabo, lahko brezplačno odpoveste pogodbo v **30 dneh** od obvestila ali začetka učinkovanja spremembe, kar je pozneje, mi pa vam vrnemo vse vnaprej plačane zneske za neizkoriščeno obdobje.
 
 **Spremembe teh Pogojev.** Te Pogoje lahko spremenimo iz enakih vrst razlogov. Pri spremembah, ki ne zmanjšujejo vaših pravic, objavimo novo različico s povzetkom sprememb in vam najmanj **30 dni** pred začetkom veljavnosti pošljemo e-poštno sporočilo; nadaljnja uporaba Dialectical Engine po tem datumu pomeni, da spremembo sprejemate, pred tem pa lahko zaprete račun. Pri spremembah, ki zmanjšujejo vaše pravice — vključno z zvišanjem cen obstoječega paketa, nižjimi omejitvami, odstranjenimi funkcijami, novimi načini uporabe vaše vsebine ali spremembami odgovornosti, prava, ki se uporablja, oziroma reševanja sporov — vas ob naslednji prijavi prosimo, da novo različico izrecno sprejmete, sprememba pa velja samo za naprej. Sprememb nikoli ne uveljavljamo za nazaj in tega razdelka nikoli ne uporabimo za spremembo bistva tega, kar ste plačali, med trajanjem pogodbe, ne da bi vam ponudili možnost odstopa. Prejšnje različice ostanejo dostopne na dezbatere.ro/terms/versions.
+
+Različica 2.10 je nadomestila različico 2.9: razdelek 9 navaja, da so razprave na brezplačnem paketu javne, da javne razprave ni mogoče umakniti iz objave in ostanejo javne tudi po zaprtju vašega računa, da lahko vsak, ki ima dobroimetje, prispeva k javni razpravi ali napiše poročilo o njej, in da javna razprava ostane odprta tudi potem, ko je njen prvi avtor odšel; razdelek 11 navaja, kaj zaprtje naredi z vašimi javnimi razpravami.
 
 Različica 2.9 je nadomestila različico 2.8: razdelek 8 dobi odstavek »Grafikoni in statistični podatki, ki jih ustvarimo«, ki določa, komu pripadajo grafikoni v poročilu o razpravi, in vam podeljuje licenco za njihovo uporabo.
 

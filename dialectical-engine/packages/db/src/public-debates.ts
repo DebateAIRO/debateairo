@@ -13,8 +13,7 @@ import type { CryptoEnvelope } from "@debateai/crypto";
  *   must end in `settleCheck` (UNAVAILABLE when the check could not run), or the path's later rewrites wait for ever.
  * - An ALLOWED contribution's public text is copied with `recordPageUpdate`, sealed under the PUBLICATION's key (the API's
  *   PublicationCipher, keyId `publication-snapshot:<ref>:v1`), so the page outlives the digger's run key. The page shows the first
- *   snapshot, then `readPageUpdates` in order; a newer update of a path replaces the older on the page (also how personal details
- *   are removed on request: a new update, the old row stays sealed).
+ *   snapshot, then `readPageUpdates` in order; a newer update of a path replaces the older on the page.
  * - The names: `contributor` is read live from the account, null once it went: the page says "a contributor". Same for the first
  *   author: `isAuthorNameGone` says the snapshot's sealed pseudonym must not be shown.
  * - A Free ask that showed the notice calls `recordFreeNotice`; only those debates ever go public. The sweep lists them
