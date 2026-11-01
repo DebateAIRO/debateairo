@@ -22,7 +22,7 @@
 //       --source-manifest <candidate api source manifest> [--proposal <plan output> --approved-delta-sha256 <owner's yes>]
 //       [--publication <publish output>] [--checker glm|deepseek --deepseek-enabled-on-gate yes] --out <file>
 //       [--role-rotation on|off] [--call-concurrency '<JSON object>'] [--debate-shape off|'<JSON object>'] [--question-language '<JSON object>']
-//       [--length-guidance '<JSON object>'] [--line-up <line-up file>] [--answer-seats '<JSON object>']
+//       [--length-guidance '<JSON object>'] [--engine-version off|'<JSON object>'] [--line-up <line-up file>] [--answer-seats '<JSON object>']
 //       [--hosted-billing '<JSON object>']
 //       (--checker, --role-rotation, --call-concurrency and --hosted-billing only with --operation plan; publish carries the plan's choices;
 //        defaults glm, on and the base's call-concurrency row kept as it is (or none); --role-rotation off publishes the rotation row disabled: the preview's rollback;
@@ -36,6 +36,8 @@
 //        policy switches the fast language check off)
 //       (--length-guidance only with --operation plan; publish carries the plan's choice; default: the base's length-guidance row
 //        kept as it is, or none)
+//       (--engine-version only with --operation plan; publish carries the plan's choice; default: the base's engine row kept as it is,
+//        or none (engine 1); --engine-version off publishes the row disabled, the rollback. The row needs the length row beside it)
 //       (--line-up and --answer-seats only with --operation plan; publish carries the plan's choices (side-by-side spec §13
 //        addition D23): --line-up names a root-owned 0644 JSON file in the artifacts folder holding the plan member that
 //        check-thinking-levels.ts --print-line-up prints ({"lineUp":{…}}) or the bare line-up; default: the base's
@@ -124,7 +126,7 @@ const COMMANDS = Object.freeze({
   verify: { required: ['--source'], optional: ['--ui-build'] },
   'operator-digest': { required: ['--source'], optional: [] },
   'launch-plan': { required: ['--service', '--slot', '--from', '--root', '--source-manifest', '--native-attestation', '--out'], optional: ['--ui-build', '--publication'] },
-  'native-plan': { required: ['--operation', '--from', '--source-manifest', '--out'], optional: ['--proposal', '--approved-delta-sha256', '--publication', '--checker', '--deepseek-enabled-on-gate', '--role-rotation', '--call-concurrency', '--debate-shape', '--question-language', '--length-guidance', '--line-up', '--answer-seats', '--hosted-billing'] },
+  'native-plan': { required: ['--operation', '--from', '--source-manifest', '--out'], optional: ['--proposal', '--approved-delta-sha256', '--publication', '--checker', '--deepseek-enabled-on-gate', '--role-rotation', '--call-concurrency', '--debate-shape', '--question-language', '--length-guidance', '--engine-version', '--line-up', '--answer-seats', '--hosted-billing'] },
   'database-ahead': { required: ['--older-source-manifest', '--newer-source-manifest', '--out'], optional: [] }
 });
 
@@ -499,6 +501,12 @@ async function nativePlanCommand(options, { layout, deps }) {
   if (lengthText !== undefined && operation !== 'plan') refuse('ARGUMENTS_REFUSED', ['--length-guidance']);
   let lengthValue;
   if (lengthText !== undefined) try { lengthValue = strictJson(Buffer.from(lengthText, 'utf8')); } catch { refuse('ARGUMENTS_REFUSED', ['--length-guidance']); }
+  // The engine row (owner E5: engine 2 goes on with R22): for a new `plan` only, the word off or one JSON object (validateEngineVersionChoice below).
+  const engineText = options['--engine-version'];
+  if (engineText !== undefined && operation !== 'plan') refuse('ARGUMENTS_REFUSED', ['--engine-version']);
+  let engineValue;
+  if (engineText === 'off') engineValue = 'off';
+  else if (engineText !== undefined) try { engineValue = strictJson(Buffer.from(engineText, 'utf8')); } catch { refuse('ARGUMENTS_REFUSED', ['--engine-version']); }
   // Line-up and answer seats (side-by-side spec §13, addition D23): for a new `plan` only. --line-up names a JSON file (read
   // below); --answer-seats is one JSON object, one way to set the checker (never beside --checker). native-operator.mjs
   // validateLineUpChoice / validateAnswerSeatsChoice below; the kit's parsers check the values again before any row is built.
@@ -537,6 +545,11 @@ async function nativePlanCommand(options, { layout, deps }) {
   if (lengthText !== undefined) {
     const check = deps.validateLengthGuidanceChoice ?? (await nativeOperator()).validateLengthGuidanceChoice;
     try { lengthChoice = check(lengthValue); } catch { refuse('ARGUMENTS_REFUSED', ['--length-guidance']); }
+  }
+  let engineChoice;
+  if (engineText !== undefined) {
+    const check = deps.validateEngineVersionChoice ?? (await nativeOperator()).validateEngineVersionChoice;
+    try { engineChoice = check(engineValue); } catch { refuse('ARGUMENTS_REFUSED', ['--engine-version']); }
   }
   let lineUpChoice;
   if (lineUpPath !== undefined) {
@@ -617,6 +630,8 @@ async function nativePlanCommand(options, { layout, deps }) {
   const questionLanguage = operation === 'plan' ? languageChoice : operation === 'publish' ? from.value.questionLanguage : undefined;
   // The same for the length-guidance policy (LG-C): the policy object the plan's operator gave.
   const lengthGuidance = operation === 'plan' ? lengthChoice : operation === 'publish' ? from.value.lengthGuidance : undefined;
+  // The same for the engine row (owner E5): the word off or the policy object the plan's operator gave.
+  const engineVersion = operation === 'plan' ? engineChoice : operation === 'publish' ? from.value.engineVersion : undefined;
   // The same for the line-up and the answer seats (addition D23): the values the plan's operator gave.
   const lineUp = operation === 'plan' ? lineUpChoice : operation === 'publish' ? from.value.lineUp : undefined;
   const answerSeats = operation === 'plan' ? seatsChoice : operation === 'publish' ? from.value.answerSeats : undefined;
@@ -633,6 +648,7 @@ async function nativePlanCommand(options, { layout, deps }) {
     ...(debateShape === undefined ? {} : { debateShape }),
     ...(questionLanguage === undefined ? {} : { questionLanguage }),
     ...(lengthGuidance === undefined ? {} : { lengthGuidance }),
+    ...(engineVersion === undefined ? {} : { engineVersion }),
     ...(lineUp === undefined ? {} : { lineUp }),
     ...(answerSeats === undefined ? {} : { answerSeats }),
     ...(hostedBilling === undefined ? {} : { hostedBilling })
