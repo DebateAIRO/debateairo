@@ -992,6 +992,7 @@ export type PublicMaterialPoint = z.infer<typeof PublicMaterialPointSchema>;
 /** POST /v1/public/debates/{id}/report (decision 13): nothing but the press; the writer is the session's. */
 export const PublicReportRequestSchema = z.object({}).strict();
 export const PublicReportAcceptedSchema = z.object({ state: z.literal("WRITING"), report_version: z.number().int().min(1) }).strict();
+export type PublicReportAccepted = z.infer<typeof PublicReportAcceptedSchema>;
 export const PublicDebateRefusedSchema = z.object({
   error: z.enum(["PUBLIC_DEBATE_ONGOING", "PUBLIC_DEBATE_NO_CARRIER", "PUBLIC_DEBATE_WAITS_FOR_RESET", "PUBLIC_DEBATE_REPORT_WRITING", "PUBLIC_DIG_NEEDS_A_PATH"]),
   message: z.string()

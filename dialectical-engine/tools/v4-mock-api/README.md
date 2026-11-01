@@ -211,18 +211,35 @@ An unknown run id gets 404 on every run route, as the real API answers a debate 
 
 Anything else gets a 404 `NOT_MOCKED` reply. The mock also prints a line like `[mock] GET /v1/billing/subscription 404 <- NOT MOCKED`, so you can see at once what the website asked for that is missing.
 
+## Public debates (decisions 13, 16 and 22)
+
+Made-up debates from `public-seed.ts`, read at `GET /v1/public/debates/:id`. The public page is drawn on the server, so it needs nothing but the mock.
+
+| Page | What you see |
+|---|---|
+| `/public/debate/f1000000-0000-4000-8000-000000000001` | A changed main answer (the first answer one click away), one contribution by "Quiet Heron" on a path, the dig's own path under it, one report. |
+| `/public/debate/f1000000-0000-4000-8000-000000000002` | The author's name went ("a contributor"), no dig on it: "Write a report" is refused (the first author has left). |
+
+- **Dig into this** (a path, or the dig's own path): `POST /v1/asks` with `public_parent`. It goes to the dig's own page, which says "checking" and about 10 seconds after the run finishes either changes the public page, or, with `#refuse` in the view, stays private.
+- **Write a report**: `POST /v1/public/debates/:id/report` answers 202; the new version appears on the page about 8 seconds later.
+- **The digger's three states**, seeded: `c1000000-0000-4000-8000-000000000001` CHECKING, `…002` ON_THE_PAGE, `…003` KEPT_PRIVATE, at `/v4/debate/<id>`.
+- **Refusals**: `/__mock/set?public=ONGOING` (a report waits), `public=REPORT_WRITING` and `public=TOO_DEEP` (a dig is refused), `public=OPEN` (back to normal), `room=FULL` (a used-up limit), more than three views with `plan=FREE`.
+- **A stranger**: `/__mock/set?session=OUT` shows a sign-in link in place of each press; `session=IN` to go back. The V4 pages then send you to sign in, as they do for a stranger.
+
+**The Free notice**: `/__mock/set?plan=FREE`, then open `/v4` or `/new`: the notice shows before each Start press, and an ask that showed it sends `free_public_notice` (`/__mock/state` counts them as `free_notices`). Any paid plan shows no notice.
+
 ## Not mocked (the website may call these)
 
 - **Billing pages**: subscription, invoices, charge status, card details and card change, checkout, quote, upgrade, downgrade, cancel, withdraw (`/settings`, `/pricing` buying, `/checkout`, `/settings/card`, `/cancel`, `/withdraw`).
 - **Account and security settings**: sessions list, sign-in methods, social links, email change, recovery email, phone, data export, account erasure (`/settings`, `/settings/security`, `/export`).
 - **Signing in and up for real**: login, register, password reset, MFA, social sign-in, age check (`/login`, `/sign-up`, `/recover`, …). The mock just says "signed in"; use `/api/__mock/sign-in` for the cookie.
-- **Publishing**: publish, the public debate page `/public/debate/<id>`, deleting a private debate.
+- **Publishing**: publish, the list of public debates, deleting a private debate. The public debate page itself is mocked (see "Public debates").
 - **The classic page's extra actions**: investigations (`POST /v1/answers/:id/investigations/:gap`) and unlinking memory.
 - **The support assistant** (`/v1/support/*`), the evaluator dev menu (`/v1/dev/evaluator`, shown only when `NEXT_PUBLIC_EVALUATOR_DEV_MENU_ENABLED` is on), and the staff pages (`/v1/admin/*`).
 
 ## Self-check
 
-With the mock running, this reads every endpoint through the website's own proxy code and typed client, draws the seeded debates with the V4 map builder, and reads the draft fields. It does not start the website. It posts three asks (so three extra debates appear in the mock) and one dig past the deepest level (refused, so nothing appears), saves the reading level, records a last visit and a dig link, closes run 7777's investigation, switches the plan, the room and the usage and back, and continues the paused debate (then pauses it again). Since W2-7 it also reads the rewritten paths, the verdict and the dig trail.
+With the mock running, this reads every endpoint through the website's own proxy code and typed client, draws the seeded debates with the V4 map builder, and reads the draft fields. It does not start the website. It posts six asks (so six extra debates appear in the mock), two of them digs on a public debate and one with the Free notice, presses one report and one dig past the deepest level (refused, so nothing appears), saves the reading level, records a last visit and a dig link, closes run 7777's investigation, switches the plan, the room and the usage and back, and continues the paused debate (then pauses it again). Since W2-7 it also reads the rewritten paths, the verdict and the dig trail.
 
 ```sh
 cd dialectical-engine/apps/ui && ../../node_modules/.bin/tsx ../../tools/v4-mock-api/check.ts
