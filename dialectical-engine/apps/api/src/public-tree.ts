@@ -275,13 +275,13 @@ export async function pressPublicReport(input: Readonly<{ ownerRef: string; publ
 
 /**
  * The digger's own page (decision 13): their rewrite of the path, as they alone see it, whatever the check said. Read from the parent's line, and only the row of this dig's own turn is opened, under this dig's own key: the first author's
- * private rewrites on the same line are never touched, and no run id leaves here. Null when it is not written, or when a review closed the row (hidden, or taken out): the reader of the line gives no text then. Never throws.
+ * private rewrites on the same line are never touched, and no run id leaves here. Null when it is not written, or when a review closed the row (the reader of the line gives no content then). A refused dig's row is hidden from others, not from its own digger. Never throws.
  */
 export async function ownDigRewriteOf(pool: Pool, digRunId: string, parentRunId: string): Promise<NonNullable<AnswerContribution["rewrite"]> | null> {
   try {
     const line = await new PostgresPublicTreeRunnerRepository(pool).readLine(parentRunId);
     const own = (line ?? []).find((entry) => entry.source === "PATH_UPDATE" && entry.kind === "PUBLIC_DIG" && entry.run_id.toLowerCase() === digRunId.toLowerCase());
-    if (own === undefined || own.entry_id === null || own.content === null || own.hidden === true || (own.state !== "READY" && own.state !== "READY_WITH_RESERVATION")) return null;
+    if (own === undefined || own.entry_id === null || own.content === null || (own.state !== "READY" && own.state !== "READY_WITH_RESERVATION")) return null;
     const copy = pathCopyOf(await openUnder(pool, digRunId, PATH_UPDATE_CARRIER, own.entry_id, own.content), { ownRewrite: false, writtenAt: new Date(0).toISOString(), onRef: null });
     return copy === null ? null : Object.freeze({ line: copy.line, summary: copy.summary, fate: copy.fate, what_changed: [...copy.what_changed] });
   } catch {
