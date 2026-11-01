@@ -84,7 +84,7 @@ export function engineSealedContracts(): readonly PromptContract[] {
     ...REPORT_DEEPER_SEALED_CONTRACTS,
     // The owner put back the v3 writer's lost first sentence: v4, its later version. The v3 two stay sealed, unused.
     ...REPORT_WRITER_V4_SEALED_CONTRACTS,
-    // R22 public lane (plan 2026-10-31 decision 13; a DRAFT wording, OWNER WORDING before switch-on): the AI check on a contribution to a public debate.
+    // R22 public lane (plan 2026-10-31 decision 13; wording approved by the owner, 1 Nov): the AI check on a contribution to a public debate.
     ...PUBLIC_CONTRIBUTION_SEALED_CONTRACTS
   ]);
 }

@@ -189,9 +189,10 @@ export function useV4Ask(input: Readonly<{
     const question = questionLine.trim();
     const dig = origin === "dig";
     // V, 2026-09-30: a question that reads as a person in crisis gets help numbers, never a debate — before anything else.
-    // ASK-4: a dig is AI-written text around a question that already passed this check, so the page's check is skipped
-    // for it (the API's own gate still runs; its refusal is answered below without the help pop-up).
-    if (!dig && now.crisis.offerIfCrisis(question)) return STOPPED;
+    // ASK-4: a dig's question is AI-written text around a question that already passed this check, so that text is not read here. The
+    // person's own views in a dig are their words: the owner, 1 Nov: the same pop-up on public digs and on own views on the map.
+    const ownViews = dig ? (parent?.picks ?? []).filter((pick) => pick.kind === "OWN_VIEW").map((pick) => pick.text) : [question];
+    if (ownViews.some((words) => now.crisis.offerIfCrisis(words))) return STOPPED;
     if (question.length < QUESTION_MIN_LENGTH) return { kind: "REFUSED", message: t(now.catalog, "v4.askError.tooShort") };
     // Sentence D: one question already waits.
     if (now.room?.room === "ALREADY_WAITING") return { kind: "REFUSED", message: t(now.catalog, "v4.askError.alreadyWaiting") };

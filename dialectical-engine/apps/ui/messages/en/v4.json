@@ -428,7 +428,7 @@
   "v4.public.digPaths": "Paths from this dig",
   "v4.public.dig.open": "Dig into this",
   "v4.public.dig.signIn": "Sign in to dig into this",
-  "v4.public.dig.terms": "This dig uses your own quota. An AI checks its result before it can change this public page. If it doesn't pass, it stays private to you and the page is unchanged.",
+  "v4.public.dig.terms": "This dig uses your own quota. An AI checks its result before it can change this public page. If it doesn't pass, it stays private to you and the page is unchanged. If a later part of the update doesn't pass, the page keeps its older text and that part still counts in your quota.",
   "v4.public.dig.addView": "Add another view",
   "v4.public.dig.viewsFull": "That's as many views as one dig can combine on your plan.",
   "v4.public.dig.start": "Start the dig",

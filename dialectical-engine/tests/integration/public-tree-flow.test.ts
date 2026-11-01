@@ -666,10 +666,15 @@ describe("what a public dig does and does not buy", () => {
     const orphan = await createEncryptedStoryRun(database.pool, dan, "A dig with no copy?");
     expect((await new PostgresPublicTreeRepository(api).join({ ownerRef: dan.ownerRef, publicationRef: debate.ref, parentRunId: debate.root, childRunId: orphan, positionRef: debate.position })).outcome).toBe("JOINED");
     await persistTerminalRun({ pool: database.pool, runId: orphan, fixtureKey: randomUUID(), factBundle: FACTS });
+    const retention = new (await import("@debateai/db")).PostgresPassageRetentionRepository(runner);
+    // Not settled, no row: its rewrite may still need its passages.
+    expect((await retention.wipe(orphan, "NOTHING_RUNS")).outcome).toBe("STILL_RUNNING");
     const world = vendors();
     await sweepPublicTree({ ...world.composed.publicTree, reports: world.reports, staleMs: 0, now: () => new Date(Date.now() + 60_000) });
     expect(await new PostgresPublicDebateRunnerRepository(runner).readContribution(orphan)).toMatchObject({ outcome: "UNAVAILABLE" });
     expect(await countOf(orphan)).toBe(0);
+    // Settled with no row: nothing will ever read them. One crash never holds a dig's passages for ever (0149).
+    expect((await retention.wipe(orphan, "NOTHING_RUNS")).outcome).toBe("WIPED");
     // A contribution buys no first debate's suggestions, and when nothing runs its texts may go.
     const run = await dig(eve, debate, world);
     await settleAll(world);
@@ -680,6 +685,46 @@ describe("what a public dig does and does not buy", () => {
     expect(world.sent.filter((packet) => contractOf(packet).startsWith("web.suggest"))).toEqual(suggested);
     const { PostgresPassageRetentionRepository } = await import("@debateai/db");
     expect((await new PostgresPassageRetentionRepository(runner).wipe(run, "NOTHING_RUNS")).outcome).toBe("WIPED");
+  });
+});
+
+describe("a funded person's public report and the team's one limit (0149)", () => {
+  async function grantFor(who: StoryEncryptedOwner, live: boolean): Promise<Readonly<{ grantId: string; grantEventId: string }>> {
+    const [grantId, grantEventId] = [randomUUID(), randomUUID()];
+    await seeded([
+      [`INSERT INTO billing.internal_grant (grant_id,owner_ref,configured_event_id,revision,amount_micros,day_micros,week_micros,starts_at,expires_at,funding_approval_ref,policy_register_version)
+        VALUES ($1,$2,$3,1,1000000,1000000,1000000,now()-interval '2 days',now()+$4::interval,'fixture',1)`, [grantId, who.ownerRef, grantEventId, live ? "1 day" : "-1 day"]]]);
+    return { grantId, grantEventId };
+  }
+  const teamSpent = async (): Promise<number> => Number((await database.pool.query<{ total: string }>("SELECT staff.read_team_month_spent(now()-interval '1 hour',now()+interval '1 hour')::text AS total")).rows[0]!.total);
+  const window = { from: new Date(Date.now() - 3_600_000), to: new Date(Date.now() + 3_600_000) };
+
+  it("funded when the charge is recorded: in the team's month once, in the person's funded window, never in a plan's window; unfunded: the other way round", async () => {
+    const [member, former, stranger] = [await account(), await account(), await account()];
+    const grant = await grantFor(member, true);
+    await grantFor(former, false);
+    const charges = new PostgresPublicDebateRunnerRepository(runner);
+    const store = new PostgresModelSpendStore(runner);
+    const before = await teamSpent();
+    const charge = (who: StoryEncryptedOwner, micros: number, spendId = randomUUID()) => charges.recordReportCharge({ spendId, ownerRef: who.ownerRef, investigationId: randomUUID(), reportVersion: 1, chargeMicros: micros });
+    const spendId = randomUUID();
+    expect(await charge(member, 700, spendId)).toBe("RECORDED");
+    expect(await teamSpent()).toBe(before + 700);
+    // Asked again: once.
+    expect(await charge(member, 700, spendId)).toBe("ALREADY");
+    expect(await teamSpent()).toBe(before + 700);
+    expect(await store.readOwnerSpentMicros(member.ownerRef, window.from, window.to)).toBe(0);
+    expect(await store.readOwnerSpentMicros(member.ownerRef, window.from, window.to, { kind: "INTERNAL", ...grant })).toBe(700);
+    // A grant that has ended is no funding; nor is having none.
+    await charge(former, 50);
+    await charge(stranger, 30);
+    expect(await teamSpent()).toBe(before + 700);
+    expect(await store.readOwnerSpentMicros(former.ownerRef, window.from, window.to)).toBe(50);
+    expect(await store.readOwnerSpentMicros(stranger.ownerRef, window.from, window.to)).toBe(30);
+    // What the team spent stands when the person's own charge row goes with their account.
+    await seeded([["DELETE FROM identity.public_report_charge WHERE spend_id=$1", [spendId]]]);
+    expect(await teamSpent()).toBe(before + 700);
+    await expect(runner.query("SELECT * FROM staff.team_public_report_spend")).rejects.toMatchObject({ code: "42501" });
   });
 });
 
