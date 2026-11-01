@@ -120,6 +120,30 @@ const QUALITY_SUPPLEMENT_REVIEW = Object.freeze({
     ".hermes/reports/support-conversation-20260914/evidence/GUIDE_QUALITY_REVIEW-wording-supplement.json",
 });
 
+// R22 (2026-11-01): the owner read and approved the four public-debate articles on a question card. That reading covers
+// the English article bodies, so the article records are OWNER; the Romanian records say the card showed English only.
+// The card did not show the chat texts, so these recovery rows are not the owner's: three keep the lane's record, and
+// the fourth pair names the removal of the promise sentence on the owner's ruling. See the sign-off note.
+const R22_SIGNOFF = "docs/missions/support-conversation-20260914/reviews/OWNER-SIGNOFF-r22-public-articles.md";
+const R22_OWNER_SESSION = "254b8d87-040e-44fc-bef6-c5c6150a7428 (coordinator session, the owner's second public card on 2026-11-01;";
+const R22_CHAT_REVIEW = Object.freeze({
+  reviewedBy: "SOL",
+  reviewerSession: "r22-public-lane-2026-11-01",
+  reviewedOn: "2026-11-01",
+  evidence: "docs/superpowers/plans/2026-10-31-r22-owner-changes.md decision 13",
+  ratifiedBy: "",
+  ratifiedOn: "",
+});
+const R22_UNPUBLISH_CHAT_REVIEW = Object.freeze({
+  reviewedBy: "SOL",
+  reviewerSession: "r22-public2-lane-2026-11-01 (one sentence removed on the owner's ruling of 2026-11-01; no separate editor read it and the owner's card did not show this chat text)",
+  reviewedOn: "2026-11-01",
+  evidence: R22_SIGNOFF,
+  ratifiedBy: "",
+  ratifiedOn: "",
+});
+const R22_CHAT_IDS = new Set(["publish-a-debate", "delete-a-private-debate", "public-answer-disclosure"]);
+
 const GUIDE_IDS = new Set([
   "app-navigation",
   "settings-help-menus",
@@ -143,8 +167,8 @@ const EXPECTED = [
   ["debate-topic-and-description", "ro", "1a07bb0133eca4b8039984945b3f58137f1b6c1d77d74b59b30c37cb2aec2a64", "0dfb64e716c3c402ff62538e682d8b2ca04edfc45d840a140f20e4120585db32", "7b8d200c8c31b60c633111556f4957847a0194069c4596be88600383d554cc6c"],
   ["debate-workspace-menus", "en", "e3f92be13a7d880e259c331e2c5dc3881abd9693e1846b90fcddafeda151170d", "d4da3f54b348b1c78dad80b67cbe1db12d196f396e6385c2dc0d2fd0ef5d0f34", "28525e3135cc7b623a00f52d7f9aa520579959f4238bb51117866ad3ba89bcce"],
   ["debate-workspace-menus", "ro", "8ad990c00886c52fb547cac2d5f4d3351d5c0fc48b937d36ec8e3459fedbf6b1", "b9a0bf0de664fcb0b6548121e532e4bcbf27861d68614fef9cbb00563f3f87ec", "5e558ff25dda284435df41eca3e9de5f6b1f940f95cb0b8a3126801bba415e97"],
-  ["delete-a-private-debate", "en", "7c37881f26d875f87a0177bc35593d9f52a1739b25a848df98ad2d478c7bdb26", "9ae0d23732c129d4b3e3e06b4c81833a5546b214506ecc53c3b531b4856dc49c", "92409ee15ce6ed5f380136ab090d3ce2a82ee355e379e7d068609baf9e92365b"],
-  ["delete-a-private-debate", "ro", "afc631bec586e463df1b217d79fc9ea694f873f5690b028c7b79aa65d83cfaa9", "1f4b3b1719c76d8223159dd73049c47761dd4fd6482103d40cf31d53fd2b54a3", "46037245889b3c11b737e40222ce1c6d1b800020a92ee4e92725ad03d8338727"],
+  ["delete-a-private-debate", "en", "ecb340c8a317b82fbaa060c1d1b8840ef03b57f28fd2d78864bfd348371afce0", "233cc1a4385cb709cbb5c23b345c3d2c215aec3507fae93b7bd9c8d9a7c5969e", "a3ef34c66ac4cd438be2d1ca36bd551aeaa8062e66f3a19641f184368f5ca2b6"],
+  ["delete-a-private-debate", "ro", "77a76700d6e7dddc43505d46d1eb292f84621e8b9f70306fc108dfe1061adfc8", "48a79bb15437ff9aee066e2d7bc43d50ffa1e0a3ddf846e22c19fdd949825212", "982b1328852aa5e134c264786a6134de1b4d5d4166c2aad6569bf4f07b38bdaa"],
   ["export-json", "en", "c31c5bd3a2eb80e1352f27431e459f8272ae37605a9988210cff2aa82d6b7ea5", "690569195ed4098fd00b5bf102658f9bd26b2610897ca816163f8abb2a47946d", "6abec339af9fc96715c8964a17341461db4042701acb1f54e1e9deea37421afb"],
   ["export-json", "ro", "5016b1370fbbd83ed2e647cfdeb8a2c10b4052ef8861807abed2ee4b0ae8f02b", "70c63bd09f0577e45c6c20ab542013cf6caba0e2f0290782f4d6589ef868720f", "78dc48a23f8a2de1e4af205d26f1d743a9000ed2c375437b0cfe2acb66d82cd3"],
   ["getting-started-debate", "en", "a438b7c7a91342dee7c5edb2efe48e586be2cc33d9a2eafabaadad2882f6f9e8", "059900a11c6ec871145ee61e4aaca7214c76c02e8dab61dbec67eb08e6a3017e", "c844161c3430edcfb0a195df7ffff6bcf82c0826ab454bf817631933649bed48"],
@@ -155,10 +179,10 @@ const EXPECTED = [
   ["privacy-consent", "ro", "a25a5f56268e7bdda4d1cbc0264e53cb332acfe592acc7260e6c1ff16f4d7eb6", "e64bb25be8385d23793bf41fb6e5c9d439ae56e47b9568fc9fba0d13bd407b33", "d90423906e3d6502ae6585462f2a8e4fca9608c6c2bc99fba4be6e4c74ea0c4c"],
   ["product-identity", "en", "3841870d3e2310a8fbee6325e59b4c25e92437b644b6a311910ade1e304ef4aa", "797d3ca04d545f868a633dd67d7f52a9758ddb86fa26aaf87d3d87ee5ff32d64", "0f08312a2f6fcd13a67f7694dfefe1ac084bbda210df900eda65ec589cc4c032"],
   ["product-identity", "ro", "d05337815983d83f075964b6db5063dfbff40721a720013aaeeff19c98262391", "5ca60396146b9390d5f2848c703a221d75e0f3e2c88740cc44d1abde6c77ae40", "d2102ff844843efc368e4458e7928fbb6ccd64675cb3c8d4b1657ff015acf812"],
-  ["public-answer-disclosure", "en", "e67c271558e6bb5b4100fa735059e781e453c268808d555c6e85af36e3e678ea", "1ee826de541e74d701fd502bfe70e85c009da2b94d3e6d38c1fc98924f251670", "9c733e8f40697f0cd9f15f5984947edaff532a10bc3375d10ca94747e10cc569"],
-  ["public-answer-disclosure", "ro", "6e845c95414ae5b9190cf5917136776d7af931eaf626b2da4a0540b3bf7925f1", "4ee30438ed6e75bb79f2e458bb78a6e8e8b79d3271e59c372dff626ce23a3819", "903906d5fc6d89668a42a2108cf30e21b1ec166a9fdce9e7aeff1bf4882fa45d"],
-  ["publish-a-debate", "en", "9385f0dd00f8014e3445d1ee4c8c5230dc12d0379766d35c9c7845814f288e29", "83119e6803f854c04ad0153b55cc69212563a92f6b7e350ef29f656ff6c90a3c", "b2974fdf83f15e7142380698b7b21a95bd9efe7cbcfaa5d07028f292bcfd53ef"],
-  ["publish-a-debate", "ro", "41858b13ebb6bcec19430b6a63cae6f5854b25ad02e8ac74617d83b087355c3c", "834ec781e6645753549cfca72d8d7bdc70ecb425f1eba125b25c5e04410ea598", "a6f1ef4a94b53df2d77fdd63a14c3f596adaac6b437ab3586424d21815284b26"],
+  ["public-answer-disclosure", "en", "61d56f01ff035362e1f914c60421fe1c782a3056ade12614b149f05ee76a13af", "60a27bba95e78ac17fc1216c033643bbe1d72f65165b52c11e648dbdc269edf5", "97aacd2bedecdd8d85d11d40e5d50f19133b40f208c19fe5596a275310ed2449"],
+  ["public-answer-disclosure", "ro", "30008ba74a9957ef8ae51bd1fdf9c9e42b556dfd3d6ef21e0fbf02326304cca4", "1383cecd46eeada55d783e65e39f8d8d2717e7c46de79165153fc04a81e9ae64", "4963b641418c33acf975d910260a45c20ae29efed8d802ea7a02ff767501f02d"],
+  ["publish-a-debate", "en", "de9b228a97db85a2d698261244fd673b59f901e528353e48b3d7f517b20cec72", "7b5a96bd61e669dc0251d91c0c34bd7dbe1913b33f0cec72ca35eabd1c2eb39a", "e4a1f1ff700c9ed6fe6ddb8351ede30de6e8d8b6f0e9145a9a0ccd30e3aecc1a"],
+  ["publish-a-debate", "ro", "f84f19deb5e5465871020b36370ed37b4c932ff6e896eec6354d5e13748bad28", "2e4c0469601c8391568029df044c634eef61de4e9997b656efb869e41bdcbae7", "d147192e989cdda9b24a145e67d7ba59529ab910f059596696a36eeca7d2802b"],
   ["risk-tier-choice", "en", "3ca67a93a3b159c0b284b2bd75093fd9bc70e20d03c357f4ac1fdcb3df522715", "37a5e399d53e5c284febfd79f40fe36bfc611eddb254ccb9a758469e66557929", "7908d0b36c5c62a863ee064095bc3f528792d9588fba9f88c523ea978dffb7f2"],
   ["risk-tier-choice", "ro", "00cffb0532c7f79072da508618c3f2f0b5d93fac02dc5c574b662f3355032173", "cbdf51987dff98813c12728216ba81b88559869d2e165018698ed286dcb928a5", "3d938be89e4673f9958381aa1e652ce2ee377d38cb5701c689701391f8774874"],
   ["settings-help-menus", "en", "95f8dcb1ca768508b109f34c97b12642f0ce1659fd7115acc8783bc365a5e417", "022b625b96e3ee87a83fbfe30a374f6dee48eebed9cad33087640af70d4c6396", "022b625b96e3ee87a83fbfe30a374f6dee48eebed9cad33087640af70d4c6396"],
@@ -167,8 +191,8 @@ const EXPECTED = [
   ["support-cases", "ro", "ad7400b88023ca821b9020ca08e791c6c946f5d6c5fcca00880b9158cd8ff063", "313935a4998ac1747840861ecdfba7d4ac724600c987f704d22623b903ea0c93", "747bb83cfe32d06311ff491d464c80efbba3e1da0066231f0657d6db51c764c9"],
   ["support-status-limits", "en", "f5344e3c0e5f0bec3bb3b5b10dff77b12a85d90233a6d7a7cf8a31f38cc7bfe7", "932f33969c279c6e7db4dc9d0d47fee7eb535b0d1cb593f9b9e9ccc743913385", "875854ecea195464759705f8035052bd5389c71a1acc439713326784bb5e2981"],
   ["support-status-limits", "ro", "ca0b2c95cbce0f684867a92c6f2551829b89c0c18e83b9c1af921a9f8af3d2be", "6976ed6a37edafff50ea7d0e82d31cc2fc82a6ee4f194cc1e13aa911904a093e", "f4a18f49bb1010aa86579a2eac64761a0ac85f6fbbe2afeba8495acbe2e084da"],
-  ["unpublish-a-debate", "en", "70e53322f323778974e50ca4f4342a4e8cba5c41d5139d51452530a40c7563a2", "64f871c823dd78f05d18f50ec45373fa07a9ad79f72b4234c8adc9aae443db0b", "db2b5340f4c9089567e0c8b4559cc9ac4749039b91bd3a8b2fbbd5c799991c1f"],
-  ["unpublish-a-debate", "ro", "a741f94571245aadbb6f25d6da5c3c5b87bdf5bf72fa4c5aaf8e03980abce9d0", "9be645d5de8cd8f8c26603966f9e9b8f3d58b7cb7c8a95e9cb7b0fd71289fe25", "b8e1ec1cf886a71658412f2b4bcfdb0dd8c91cd424c94aad3df4c377ecd2af7f"],
+  ["unpublish-a-debate", "en", "9dfb849df4115b35d8f736dccb902be68f65c77433c58c135e77dd095ce52c07", "30c30d9f80f041a0c80b290e5755ae941d3ba1b01cbcc961371c38aa328288e1", "83dd3ad252070dc8804863359ca155991f610de2f2e65a48376efa572c4dd202"],
+  ["unpublish-a-debate", "ro", "71b31a6f7f64ca0147867bc8a4dd85e6fd38fbdc034c85d1d95120b15a188b8d", "cec6010a9c9282f300696b462389aaf9ce843a877f71745228f019cc985ecf47", "5db84e41dbf8e9d58c292c664865dbc560c602afc075c942794fcfbc4f876cc0"],
   ["unsupported-capabilities", "en", "6e7f19d6d7c00fe4d10660e4dff7ad52e16ae8ff3d85cea13717780af586ec6f", "784bf45291c975c87dd6bb1a11f5b1812ecbefc7f0f52ee5cfb66dbdb4f6e9bd", "4feec8aa3b78a1d52916a3484adce247fb94a68b2107c1d5816fdc9c29e7f41f"],
   ["unsupported-capabilities", "ro", "b2ebdc765ec96488ec564c1b5cd00d9d3f9e390abaf17cd5868ec7b505197f85", "b8d3adac101ca1f2814fa32e3b7cd307ed497f3158881dc834ea7cd2d5136da4", "b223418e6d366bd25ac2d36bfc64b43c40206776c1fc298839327349e721b8d0"],
   ["view-public-debate", "en", "995068c814cec3ba1dd0f0ecf320bea04fc8c66acc9703b8cd70cec72cfca053", "c0185e375681e9d609b041f1e7fbbc1e33bd4c4c6489a3ea715fd52797ba35ab", "6d06676fd87b3c96b5194ea459eec98846f322ef28a7890a1261667a37f71ac5"],
@@ -202,7 +226,7 @@ describe("production Support recovery attestation", () => {
         articleSha256,
         modelProjectionSha256,
         fallbackSha256,
-        ...(["support-cases","settings-help-menus","app-navigation","ai-transparency"].includes(id) ? S05_R2_OWNER_REVIEW : ["account-access","account-settings"].includes(id) ? ACCOUNT_FLOW_REVIEW : S05_KEYS.has(`${id}.${lang}`)
+        ...(id === "unpublish-a-debate" ? R22_UNPUBLISH_CHAT_REVIEW : R22_CHAT_IDS.has(id) ? R22_CHAT_REVIEW : ["support-cases","settings-help-menus","app-navigation","ai-transparency"].includes(id) ? S05_R2_OWNER_REVIEW : ["account-access","account-settings"].includes(id) ? ACCOUNT_FLOW_REVIEW : S05_KEYS.has(`${id}.${lang}`)
           ? S05_OWNER_REVIEW
           : S02_IDS.has(id)
           ? S02_OWNER_REVIEW
@@ -228,19 +252,37 @@ describe("production Support recovery attestation", () => {
       },
       recovery: {
         componentFileSha256:
-          "a5092b830127f79624bc82da8cfc6505a6fa846c8e7a5020a6533a1cd0aa0f8a",
+          "8f03b90c5369ef02c7b353061176e918a638cf82e48560b6fcacea6ad94be980",
         components: expectedRows,
       },
     });
-    expect(corpus.reviewManifest.articles).toHaveLength(34);
+    expect(corpus.reviewManifest.articles).toHaveLength(42);
+    for (const id of ["unpublish-a-debate", ...R22_CHAT_IDS]) {
+      for (const lang of ["en", "ro"] as const) {
+        const record = corpus.reviewManifest.articles.find((article) => article.id === id && article.lang === lang);
+        expect(record).toMatchObject({
+          sha256: sha256(readFileSync(join(corpusDirectory, `${id}.${lang}.md`))),
+          reviewedBy: "OWNER",
+          reviewedOn: "2026-11-01",
+          evidence: R22_SIGNOFF,
+          ratifiedBy: "V",
+          ratifiedOn: "2026-11-01",
+        });
+        expect(record?.reviewerSession.startsWith(R22_OWNER_SESSION)).toBe(true);
+        expect(record?.reviewerSession).toContain(lang === "en"
+          ? "the owner read this article's English body on the card"
+          : "the card showed the English body only, so the owner approved the article without reading this Romanian text");
+      }
+    }
     expect(corpus.entries.map(({ id, lang }) => `${id}.${lang}`)).toEqual(
       EXPECTED.map(([id, lang]) => `${id}.${lang}`),
     );
     expect(corpus).toMatchObject({
       shippedCount: 23,
       ignoredCount: 0,
-      previewReviewedCount: 17,
-      ownerRatifiedCount: 6,
+      // These two count front matter and the review file: the four R22 articles are signed in the review file, their front matter stays blank.
+      previewReviewedCount: 21,
+      ownerRatifiedCount: 2,
       recoveryReviewedCount: 23,
       recoveryOwnerRatifiedCount: 6,
     });
