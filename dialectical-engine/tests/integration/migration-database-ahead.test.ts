@@ -133,7 +133,7 @@ describe("an older release on a database a newer release moved forward (Review F
     await migrate(db.pool);
     plan = await loadMigrationPlan();
     expect(plan.forwardChain.slice(-DECLARED.length - 20, -20).map((step) => step.name)).toEqual(DECLARED.map(([name]) => name));
-    expect(plan.forwardChain.at(-20)!.verifierSha256).toBe(VERIFIER);
+    expect(plan.forwardChain.at(-21)!.verifierSha256).toBe(VERIFIER);
     expect(plan.forwardChain.at(-20)!.name).toBe(RLS);
     expect(plan.forwardChain.at(-20)!.verifierSha256).toBe(IN_FORCE_VERIFIER);
     expect(plan.forwardChain.slice(-19).map((step) => step.name)).toEqual([...AFTER_RLS]);
@@ -219,7 +219,7 @@ describe("an older release on a database a newer release moved forward (Review F
       manifestSha256: tail[index]!.manifestSha256, sourceSha256: tail[index]!.sourceSha256, verifierSha256: VERIFIER,
       n1Expand, keepsVerifier: true, outsideTransaction: false })));
     // 0122 and earlier declare nothing (all false).
-    expect(steps.slice(0, -DECLARED.length - 19).every((step) => !step.n1Expand && !step.keepsVerifier && !step.outsideTransaction)).toBe(true);
+    expect(steps.slice(0, -DECLARED.length - 20).every((step) => !step.n1Expand && !step.keepsVerifier && !step.outsideTransaction)).toBe(true);
   });
 
   it("half a newer release is accepted", async () => {
