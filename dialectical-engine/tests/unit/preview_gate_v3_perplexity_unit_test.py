@@ -214,7 +214,7 @@ class ReadmeTests(unittest.TestCase):
 
     def test_readme_names_the_paths_the_price_the_pot_and_the_key_command(self):
         for name in (OPERATOR, PRIVATE, GO, SOCKET, DROPIN, 'preview-provider-budget-go-v3', '"perplexity"',
-                     'perplexity-search-fast', '$0.001', '"1.00"', '1000', '$17.00', 'TEAM_TOTAL_BUDGET_EXCEEDED',
+                     'perplexity-search-fast', '$0.001', 'TEAM_TOTAL_BUDGET_EXCEEDED',
                      'preview_key.py install perplexity', 'perplexity_budget_socket', 'api.perplexity.ai', '/search',
                      'search_type', '"fast"', 'getent ahostsv4 api.perplexity.ai', 'perplexity_addresses.py render',
                      'PERPLEXITY_ADDRESSES_CHANGED', 'MODEL_COOLING', 'PROVIDER_REFUSED_UNBILLED', 'PROVIDER_ERROR_UNBILLED',
@@ -223,9 +223,9 @@ class ReadmeTests(unittest.TestCase):
             self.assertIn(name, self.readme)
         self.assertIn('README-perplexity.md', (V3 / 'README.md').read_text())
 
-    def test_the_go_is_the_owners_pot(self):
+    def test_the_go_takes_the_owners_figures_from_the_server(self):
         go = re.search(r"jq -n [^\n]*provider:\"perplexity\"[^\n]*", self.readme).group(0)
-        for field in ('daily_budget_usd:"1.00"', 'max_paid_posts_per_day:1000', 'max_concurrent_calls:10',
+        for field in ('daily_budget_usd:$d', 'max_paid_posts_per_day:$c', 'max_concurrent_calls:10',
                       'enabled_models:["perplexity-search-fast"]'):
             self.assertIn(field, go)
         self.assertNotIn('max_final_writer_calls', go)

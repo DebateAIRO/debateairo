@@ -861,7 +861,7 @@ also-raised claims are sent whole (LG-C part 2, Task 15).
   to 2 hours, plus the same.
 - openings, all 12 questions and all four arms: about 350 calls. Cost: roughly $0.5 to $1 in all, a planning
   estimate, not yet measured (the first real run's report gives the real figure). The tighter pot is Haiku's: the test
-  budget is $5 a day for DeepInfra but only $1 a day for Haiku, so check Haiku's share in the first run's report before
+  budget a day (the owner's figures, not in this repository) is much smaller for Haiku than for DeepInfra, so check Haiku's share in the first run's report before
   running again the same day. `report.md` shows each gate's spend by the gate's own count ("spent by the gate's count"
   on its line under "Gates"), and Haiku is the only AI on the Anthropic gate, so the `anthropic` line is Haiku's share. The steps of one arm go one after another, so it takes several hours (the slow models
   take 30 to 170 seconds a call). That is why S-6 runs it in two halves (see there). `--dry` spends nothing.
@@ -878,7 +878,7 @@ also-raised claims are sent whole (LG-C part 2, Task 15).
   `lang-ro-en-mix` debate, about $1.9 to $4.3 in all with
   day 1's formats; a pair run again adds about $0.45 to $1, so allow up to about $6 for reruns.
 - hosted preview: the same calls and cost; the debate is also held to the register's per-debate ceiling (the owner's
-  value, suggested $3) and its story to the story ceiling ($0.05), as on the server.
+  value) and its story to the story ceiling, as on the server.
 
 ## Operator steps
 
@@ -1188,10 +1188,10 @@ upload right after the proof. Same `D` and `P` as in S-5.
 
    Never re-run S-5's full copy (`scp ".../practice/*"`) now: it would overwrite the merged `$P/settings.env` with the
    server's and drop B-1. Re-run the checker (step 1's last line) before each run; it must still show the four
-   `story_writer` levels. Check: each gate `state` `active`; the
-   DeepInfra GO's `daily_budget_usd` `"12.00"` and the Anthropic one's `"4.00"`; the Anthropic gate's
+   `story_writer` levels. Check: each gate `state` `active`; each
+   gate's GO `daily_budget_usd` the owner's figure; the Anthropic gate's
    `remaining_today_usd` at least $1.60 (a final writer's hold of $1.22 plus the run's Haiku calls); and each gate's
-   `today_spend_usd` plus the run's rough cost inside the testing day's limits ($5 DeepInfra, $1 Haiku). Otherwise stop.
+   `today_spend_usd` plus the run's rough cost inside the testing day's limits (the owner's figures). Otherwise stop.
 3. The formats run (Haiku writes a story at least once). It runs with `--sequential`: formats mode sends its calls
    without the runner's call queue, so with DeepSeek and MiMo both on final-writer jobs a second final writer would
    wait at the DeepInfra gate's one final-writer slot (up to 60 seconds) and be refused. One call at a time avoids
@@ -1319,7 +1319,7 @@ Money and time, within the owners' daily test budget:
   - Run that debate first thing the next Bucharest day, into the same folder.
   - Note in your own log that the pair was split over two days.
 - **Daily stop.** After every run, read the "spent by the gate's count" on each gate's line in `report.md`. Stop for
-  the day once the day's runs add up to $4.50 DeepInfra or $0.90 Anthropic. Haiku is the only AI on the Anthropic gate,
+  the day once the day's runs come close to the testing day's limit on either gate (the owner's figures). Haiku is the only AI on the Anthropic gate,
   so its line is Haiku's share.
 - **Time.** Both debates of a pair run with the same call setting: the same `--call-concurrency` value on both
   commands, or none on either. The commands below give none, so they use the register's own setting, which on today's

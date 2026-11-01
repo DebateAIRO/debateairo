@@ -20,9 +20,9 @@ gate gets the new files and a new GO at the same upload ("New code for every gat
 ### The owner's decisions (2026-10-30)
 
 - **Fast search, $0.001 a search**, page text included (Perplexity charges per request, not per word).
-- **A $1.00 pot a day** for Perplexity. The team total rises from $16.00 to **$17.00**: DeepInfra $12.00, Anthropic
-  $4.00, Perplexity $1.00 (owner answer Q12). `activate` refuses when all gates' GO files add up to more than $17.00
-  (`TEAM_TOTAL_BUDGET_EXCEEDED`).
+- **Its own pot a day** for Perplexity: the owner's figure, in its GO on the server and nowhere in this repository (R22
+  decision 18). `activate` refuses when all gates' GO files add up to more than the team total
+  (`TEAM_TOTAL_BUDGET_EXCEEDED`; the caps file, README.md "Money: DeepInfra's share of the team total").
 - **Web search on or off is a settings switch** (owner answer Q16): the app's own setting turns the web step on or off
   without an upload. That switch lives in the app's settings, not in this gate. This gate is the money fuse under it:
   its `stop` (below, "Emergency off") also turns web search off at once, and debates then run without it.
@@ -116,20 +116,20 @@ below, whose name is what the records, `status` and `/remaining` show.
 ## New code for every gate
 
 The gate code is shared, and each GO binds the hashes of its gate's two code files. This release changes both files
-(the Perplexity profile, the per-search price rule, the $17.00 team total and the Perplexity folder in the table of
+(the Perplexity profile, the per-search price rule, the team total and the Perplexity folder in the table of
 gates). So at this upload **all three gates** get the new files and a new GO with the two new hashes, then `activate`
 (owner answer Q13: these extra server steps are in the upload, each with the owner's yes). For the DeepInfra and
 Anthropic gates that is README.md "Redeploy (2026-10-12)" steps 1-4 (copy the files, write the GO again changing only
 the two hashes, restart, `activate`), each with its own folder and GO. Order: those two first, then this gate. An older
-gate's code still counts a team total of $16.00, so this gate's `activate` comes after the other two run the new code;
-until then a $1.00 Perplexity GO beside $12.00 and $4.00 would be refused by their `activate`
+gate's code still counts its older team total, so this gate's `activate` comes after the other two run the new code;
+until then a Perplexity GO beside the other two could be refused by their `activate`
 (`TEAM_TOTAL_BUDGET_EXCEEDED`).
 
 ## Install (operator, as root: `sudo -i`, in this order)
 
 **0. In the Perplexity console (the OWNER, in a browser).**
-1. Use an API group for the preview only, and set its own monthly spend limit there if the console offers one: about
-   $35 a month covers the $1.00 a day pot with a small margin. This is Perplexity's own fuse, independent of the gate.
+1. Use an API group for the preview only, and set its own monthly spend limit there if the console offers one: a little
+   over 31 times the daily pot leaves a small margin. This is Perplexity's own fuse, independent of the gate.
 2. Create one API key for it. Keep the browser tab open until step 4; do not paste the key anywhere else.
 
 **1. Gate folder.** Set `R` to the reviewed release's `dialectical-engine` folder on the server; the second command
@@ -209,7 +209,8 @@ What to expect: one line with `"status": "installed"`, `"mode": "600"`, `"owner"
 `KEY_SHAPE_INVALID` for anything that does not start with `pplx-`, and `KEY_USED_BY_OTHER_PROVIDER` for another gate's
 key. Nothing is written then.
 
-**5. The GO (the owner's limits; it holds no secret).** Proposed values:
+**5. The GO (the owner's limits; it holds no secret).** The caps file must already be on this server (README.md, "Money:
+DeepInfra's share of the team total"). Proposed values:
 
 | Field | Value | Why |
 |---|---|---|
@@ -219,8 +220,8 @@ key. Nothing is written then.
 | `scope_id` | `preview-deepinfra-v3-20261010` | The SAME `scope_id` as the app's preview configuration: the app asks every gate with its one `scope_id`. |
 | `target_host` | `vps-a156d797` | The server's host name, as in the other GOs. The gate refuses to run anywhere else. |
 | `allowed_peer_uids` | `[994, 992]` | The API (994) and the runner (992), as for the other gates. |
-| `daily_budget_usd` | `"1.00"` | The owner's Perplexity pot (owner answer Q12, 2026-10-30). With DeepInfra's $12.00 and Anthropic's $4.00: $17.00, the team total. |
-| `max_paid_posts_per_day` | `1000` | A second fuse: the pot divided by the price (1,000 searches at $0.001). **Owner to confirm** (the plan's first proposal was 500 with a $2.00 pot). |
+| `daily_budget_usd` | the owner's figure | The owner's Perplexity pot. With the other gates' pots it may not pass the team total. |
+| `max_paid_posts_per_day` | the owner's figure | A second fuse: the pot divided by the price of a search. |
 | `max_concurrent_calls` | `10` | 10 x $0.001 = $0.01 must fit in the pot. |
 | `open_days` | `31` | The maximum. After that the gate halts by itself, and you run `activate` again. |
 
@@ -229,8 +230,9 @@ There is no `max_final_writer_calls`: a search has no final-writer tier, and a G
 ```sh
 G=/opt/debateai-v3-preview/operator/perplexity-budget-v1
 BR=$(sha256sum $G/preview_budget_authority.py | cut -d' ' -f1); HE=$(sha256sum $G/preview_budget_helper.py | cut -d' ' -f1)
+DAILY_BUDGET=<the owner's figure>; DAILY_CALLS=<the owner's figure>
 umask 077
-jq -n --arg b "$BR" --arg h "$HE" '{schema:"preview-provider-budget-go-v3",allow_paid_calls:true,bridge_sha256:$b,helper_sha256:$h,provider:"perplexity",enabled_models:["perplexity-search-fast"],scope_id:"preview-deepinfra-v3-20261010",target_host:"vps-a156d797",allowed_peer_uids:[994,992],daily_budget_usd:"1.00",max_paid_posts_per_day:1000,max_concurrent_calls:10,open_days:31}' > /root/preview-archive/provider-perplexity-go-v1.json
+jq -n --arg b "$BR" --arg h "$HE" --arg d "$DAILY_BUDGET" --argjson c "$DAILY_CALLS" '{schema:"preview-provider-budget-go-v3",allow_paid_calls:true,bridge_sha256:$b,helper_sha256:$h,provider:"perplexity",enabled_models:["perplexity-search-fast"],scope_id:"preview-deepinfra-v3-20261010",target_host:"vps-a156d797",allowed_peer_uids:[994,992],daily_budget_usd:$d,max_paid_posts_per_day:$c,max_concurrent_calls:10,open_days:31}' > /root/preview-archive/provider-perplexity-go-v1.json
 install -o root -g root -m 0600 /root/preview-archive/provider-perplexity-go-v1.json /etc/debateai-v3-preview/provider-perplexity-go-v1.json
 jq -c . /etc/debateai-v3-preview/provider-perplexity-go-v1.json
 ```
@@ -245,9 +247,9 @@ P=/var/lib/debateai-v3-preview/provider-perplexity-authority-v1; GO=/etc/debatea
 ```
 
 What to expect: `init` prints `"state": "initialized"` and `"provider": "perplexity"`; `activate` prints
-`"state": "active"`, `"window_open": true` and `"daily_budget_usd": "1.00"`. A refusal is one line with
-`"status": "refused"` and a code, for example `ROOT_GO_INVALID` (a GO field or a file hash), `HELPER_CUSTODY_INVALID`,
-or `TEAM_TOTAL_BUDGET_EXCEEDED` (all pots together are above $17.00: lower one first).
+`"state": "active"`, `"window_open": true` and `daily_budget_usd` the figure you wrote. A refusal is one line with
+`"status": "refused"` and a code, for example `ROOT_CAPS_REQUIRED` or `ROOT_CAPS_INVALID` (the caps file), `ROOT_GO_INVALID` (a GO field or a file hash),
+`HELPER_CUSTODY_INVALID`, or `TEAM_TOTAL_BUDGET_EXCEEDED` (all pots together are above the team total: lower one first).
 
 **7. Install the units and start the gate.** The boot drop-in comes later ("Switch it on").
 
@@ -360,8 +362,8 @@ journalctl -u debateai-preview-perplexity-addresses -n 5 -o cat
 ```
 
 **Change the pot or another limit.** Write the new GO by changing only that value in the current GO (as README.md
-"Change the daily budget or another limit" shows, with its `cmp` check), then `stop` and `activate`. The team total of
-$17.00 still holds: to raise this pot, first lower another.
+"Change the daily budget or another limit" shows, with its `cmp` check), then `stop` and `activate`. The team total
+still holds: to raise this pot, first lower another.
 
 ## Other hosted servers
 

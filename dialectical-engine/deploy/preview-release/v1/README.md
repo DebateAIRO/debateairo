@@ -552,6 +552,11 @@ echo "anthropic state $(/usr/bin/python3 -I /opt/debateai-v3-preview/operator/an
 
 Anything else means stop: do not publish the row until both gates run the new code.
 
+Since R22 the gate code holds no money caps: every gate reads them from the root-only caps file
+`/etc/debateai-v3-preview/provider-budget-caps-v1.json` (`deploy/preview-gate/v3/README.md`, "Money: DeepInfra's share of the
+team total"), so that file must be on the server BEFORE any gate restarts on the R22 files. Old gate code ignores it, so
+writing it first is safe. Without it the restarted gates refuse (`ROOT_CAPS_REQUIRED`) and every call stops.
+
 Then add one option to step 1's `plan` command and follow the same steps 1 to 6: the plan carries the policy, the owner
 sees `callConcurrencyPolicy` in the delta (`added` the first time, `changed` for a new value),
 `publish` copies it from the plan. The runner is the only reader of this row, so do not skip
