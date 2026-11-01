@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lyhyesti
-eyebrow: KÄYTTÖEHDOT · v2.10 · VOIMASSA 1. MARRASKUUTA 2026 ALKAEN
+eyebrow: KÄYTTÖEHDOT · v2.11 · VOIMASSA 1. MARRASKUUTA 2026 ALKAEN
 title: Mihin sitoudut
 lede: Sinun ja DMS Merchandise Shop S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.
-endMarker: KÄYTTÖEHTOJEN LOPPU · v2.10
+endMarker: KÄYTTÖEHTOJEN LOPPU · v2.11
 bodyLabel: Käyttöehtojen teksti
 annexTitle: Liite A — Alueelliset ehdot
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 SOVELLETTAVA LAKI
 -->
 
-**Version 2.10 · Effective 1. marraskuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
+**Version 2.11 · Effective 1. marraskuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
 
 **In short.** Sinun on oltava vähintään 18-vuotias. Dialectical Engine muodostaa argumentteja tekoälymalleilla, ja kaikki sen tuottama voi olla virheellistä — se ei ole neuvontaa. Maksuttomassa tilauksessa väittelysi ovat valmistuttuaan julkisia tekoälytarkistuksen jälkeen; maksullisessa tilauksessa ne ovat yksityisiä, ellet julkaise niitä. Kun väittely on julkinen, kuka tahansa voi lukea sen, ja se pysyy julkisena. Lähettämäsi teksti toimitetaan palveluntarjoajarekisterissämme luetelluille tekoälypalveluntarjoajille, eikä sitä käytetä mallien kouluttamiseen. Ilmoita lainvastaisesta sisällöstä osoitteeseen support@dezbatere.ro riippumatta siitä, onko sinulla tiliä. Sopimukseen sovelletaan Romanian lakia, mutta paikallinen kuluttajansuojasi säilyy.
 
@@ -148,7 +148,7 @@ Maksullisessa tilauksessa väittelyt ovat **oletusarvoisesti yksityisiä**: mik�
 
 **Maksuttomat väittelyt ovat julkisia.** Maksuttomassa tilauksessa kysymyksesi ja sen väittely ovat julkisia. Kerromme tämän ennen kuin esität kysymyksen. Kun väittely on valmis, tekoäly tarkistaa sen; jos tarkistus sallii sen, kuka tahansa voi lukea sen ja hakukoneet voivat indeksoida sen. Jos tarkistus hylkää sen, se pysyy sinulle yksityisenä. Älä sisällytä henkilötietoja kysymykseen maksuttomassa tilauksessa.
 
-**Ei takaisinvetoa.** Kun väittely on julkinen, se pysyy julkisena. Sitä ei voi perua eikä poistaa, eikä tilin poistaminen poista sitä. Muiden tekemät kopiot ovat meidän hallintamme ulkopuolella. Muut voivat lukea, lainata, kuvakaapata, arkistoida ja tallentaa sen välimuistiin. Älä julkaise mitään, jonka et halua yhdistyvän pysyvästi nimimerkkiisi.
+**Ei takaisinvetoa.** Kun väittely on julkinen, se pysyy julkisena. Sitä ei voi perua eikä poistaa, eikä tilin poistaminen poista sitä. Voimme piilottaa sen tarkistuksen ajaksi sekä poistaa tai korjata osan siitä, siltä osin kuin tämä kohta sallii. Muiden tekemät kopiot ovat meidän hallintamme ulkopuolella. Muut voivat lukea, lainata, kuvakaapata, arkistoida ja tallentaa sen välimuistiin. Älä julkaise mitään, jonka et halua yhdistyvän pysyvästi nimimerkkiisi.
 
 **Merkitty väittely tarvitsee hyväksyntämme.** Kun väittely päättyy, automaattinen tarkistus lukee sen synteesin kohdan 8 neljän luokan osalta. Väittelyn, jonka tarkistus merkitsee, voi julkaista vain hyväksyntämme kanssa, ja merkintä näytetään vain sinulle ja, jos pyydät hyväksyntäämme, tiimimme jäsenille, joilla on oikeus tarkastaa julkaisuja; väittely, jonka tarkistus havaitsee koskevan aihetta ”taipumukset itsemurhaan tai muiden ihmisten vahingoittamiseen”, poistetaan sen sijaan, kuten seuraava kappale kertoo. Jos pyydät hyväksyntäämme väittelyn sivulla, tiimimme jäsen, jolla on erityinen oikeus tarkastaa julkaisuja, voi lukea väittelyn sellaisena kuin se julkaistaisiin, ilman nimimerkkiäsi. Jos hyväksymme, Julkaise-painike on jälleen käytettävissäsi, ja tarkistus, jonka jokainen julkaisu läpäisee, on edelleen voimassa. Jos kieltäydymme, väittely pysyy yksityisenä ja annamme sinulle perustelut (kohta 10). Kieltäytymisen jälkeen voit pyytää vielä kerran, ja tiimimme jäsen, joka ei päättänyt ensimmäisestä pyynnöstä, päättää; voit myös käyttää kohdan 10 valitusreittiä. Toisen kieltäytymisen jälkeen et voi pyytää uudelleen, mutta voit edelleen viedä päätöksen tuomioistuinten ulkopuoliseen riidanratkaisuelimeen tai tuomioistuimeen (kohta 10). Hyväksyntä kattaa synteesin, jonka tarkastaja luki, mukaan lukien väittelyn myöhemmän version, joka toistaa sen sanasta sanaan; uudelleen kirjoitettu synteesi tarkistetaan uudelleen, kun julkaiset, ja jos se merkitään, se tarvitsee oman hyväksyntänsä. Jos julkaiset merkityn väittelyn hyväksyntämme jälkeen, voit poistaa sen taas näkyvistä painikkeella Poista näkyvistä sen kortissa kohdassa Omat väittelysi.
 
@@ -250,6 +250,8 @@ Jos asut muualla, liitteessä A ilmoitetaan alueellasi mahdollisesti sovellettav
 Ilmoitamme sinulle etukäteen pysyvällä välineellä, mikä muuttuu ja milloin. Jos muutoksella on vähäistä suurempi kielteinen vaikutus mahdollisuuteesi käyttää palvelua tai palvelun käyttöösi, voit päättää sopimuksen maksutta **30 päivän** kuluessa ilmoituksesta tai muutoksen voimaantulosta sen mukaan, kumpi ajankohta on myöhäisempi, ja palautamme käyttämättömään aikaan kohdistuvat ennakkomaksut.
 
 **Näiden käyttöehtojen muutokset.** Voimme muuttaa näitä käyttöehtoja samanlaisista syistä. Jos muutos ei vähennä oikeuksiasi, julkaisemme uuden version ja yhteenvedon muutoksista sekä lähetämme sinulle sähköpostia vähintään **30 päivää ennen** sen voimaantuloa; Dialectical Engine -palvelun käytön jatkaminen kyseisen ajankohdan jälkeen merkitsee hyväksyntääsi, ja voit sulkea tilisi ennen sitä. Jos muutos vähentää oikeuksiasi — mukaan lukien olemassa olevan tilauksen hinnankorotukset, alhaisemmat rajat, poistetut ominaisuudet, sisältösi uudet käyttötavat tai vastuuta, sovellettavaa lakia tai riidanratkaisua koskevat muutokset — pyydämme sinua hyväksymään uuden version nimenomaisesti seuraavan kirjautumisesi yhteydessä, ja muutosta sovelletaan vain jatkossa. Emme koskaan muuta ehtoja taannehtivasti emmekä käytä tätä kohtaa muuttaaksemme kesken sopimuskauden maksamasi palvelun ydintä tarjoamatta sinulle mahdollisuutta irtautua. Aiemmat versiot säilyvät saatavilla osoitteessa dezbatere.ro/terms/versions.
+
+Versio 2.11 korvasi version 2.10: kohdan 9 mukaan voimme piilottaa julkisen väittelyn sen tarkistamisen ajaksi sekä poistaa tai korjata osan siitä.
 
 Versio 2.10 korvasi version 2.9: kohdan 9 mukaan maksuttomassa tilauksessa väittelyt ovat julkisia, julkista väittelyä ei voi perua ja se pysyy julkisena tilin sulkemisen jälkeen, kuka tahansa, jolla on krediittiä, voi osallistua julkiseen väittelyyn tai kirjoittaa siitä raportin, ja julkinen väittely pysyy avoimena ensimmäisen kirjoittajan poistuttua; kohta 11 kertoo, mitä sulkeminen tekee julkisille väittelyillesi.
 

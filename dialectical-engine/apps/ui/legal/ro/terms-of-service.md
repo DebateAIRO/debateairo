@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Pe scurt
-eyebrow: TERMENII SERVICIULUI · v2.10 · ÎN VIGOARE DE LA 1 NOIEMBRIE 2026
+eyebrow: TERMENII SERVICIULUI · v2.11 · ÎN VIGOARE DE LA 1 NOIEMBRIE 2026
 title: Ce acceptați
 lede: Contractul dintre dumneavoastră și DMS Merchandise Shop S.R.L., într-un limbaj clar. Nouăsprezece secțiuni și Anexa A — derulați până la final.
-endMarker: SFÂRȘITUL TERMENILOR · v2.10
+endMarker: SFÂRȘITUL TERMENILOR · v2.11
 bodyLabel: Textul Termenilor serviciului
 annexTitle: Anexa A — Termeni regionali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEGEA APLICABILĂ
 -->
 
-**Version 2.10 · Effective 1 noiembrie 2026 · Versiunile anterioare la dezbatere.ro/terms/versions · Limba: română.**
+**Version 2.11 · Effective 1 noiembrie 2026 · Versiunile anterioare la dezbatere.ro/terms/versions · Limba: română.**
 
 **In short.** Trebuie să aveți cel puțin 18 ani. Dialectical Engine construiește argumente cu modele de inteligență artificială, iar tot ceea ce generează poate fi greșit — nu constituie consultanță. Pe planul gratuit, dezbaterile dumneavoastră sunt publice după ce se încheie, în urma unei verificări cu IA; pe un plan cu plată, sunt private dacă nu le publicați. Odată publică, o dezbatere poate fi citită de oricine și rămâne publică. Textul pe care îl transmiteți este trimis furnizorilor de IA enumerați în Registrul furnizorilor de IA și nu este folosit pentru antrenarea modelelor. Raportați conținutul ilegal la support@dezbatere.ro, indiferent dacă aveți sau nu un cont. Se aplică legea română, însă protecția locală a consumatorilor de care beneficiați se menține.
 
@@ -148,7 +148,7 @@ Dezbaterile de pe un plan cu plată sunt **private în mod implicit**: nimic din
 
 **Dezbaterile de pe planul gratuit sunt publice.** Pe planul gratuit, întrebarea dumneavoastră și dezbaterea ei sunt publice. Vă informăm despre aceasta înainte să întrebați. Când dezbaterea se încheie, o IA o verifică; dacă verificarea o permite, oricine o poate citi, iar motoarele de căutare o pot indexa. Dacă verificarea o refuză, rămâne privată pentru dumneavoastră. Nu includeți date personale într-o întrebare de pe planul gratuit.
 
-**Nu se poate da înapoi.** Odată ce o dezbatere este publică, rămâne publică. Nu o puteți retrage din publicare sau șterge, iar ștergerea contului nu o elimină. Copiile făcute de alții sunt în afara controlului nostru. Alte persoane o pot citi, cita, captura ca imagine, arhiva și stoca în memoria cache. Nu publicați nimic ce nu ați dori să fie asociat permanent pseudonimului dumneavoastră.
+**Nu se poate da înapoi.** Odată ce o dezbatere este publică, rămâne publică. Nu o puteți retrage din publicare sau șterge, iar ștergerea contului nu o elimină. Putem ascunde dezbaterea cât timp o examinăm și putem elimina sau corecta o parte din ea, în cazurile permise de această secțiune. Copiile făcute de alții sunt în afara controlului nostru. Alte persoane o pot citi, cita, captura ca imagine, arhiva și stoca în memoria cache. Nu publicați nimic ce nu ați dori să fie asociat permanent pseudonimului dumneavoastră.
 
 **O dezbatere marcată are nevoie de aprobarea noastră.** Când o dezbatere se încheie, o verificare automată îi citește sinteza pentru cele patru categorii din secțiunea 8. O dezbatere pe care o marchează verificarea poate fi publicată numai cu aprobarea noastră, iar marcajul nu este afișat nimănui în afară de dumneavoastră și, dacă solicitați aprobarea noastră, membrilor echipei noastre care dețin permisiunea de examinare a publicărilor; o dezbatere pe care verificarea o constată ca încadrându-se în „tendințe de sinucidere sau de a face rău altor persoane” este în schimb ștearsă, așa cum arată paragraful următor. Dacă solicitați aprobarea noastră pe pagina dezbaterii, un membru al echipei noastre care deține o permisiune specifică de examinare a publicărilor poate citi dezbaterea așa cum ar fi publicată, fără pseudonimul dumneavoastră. Dacă aprobăm, Publicați vă devine din nou disponibil, iar verificarea prin care trece orice publicare se aplică în continuare. Dacă refuzăm, dezbaterea rămâne privată și vă furnizăm o expunere a motivelor (secțiunea 10). După un refuz puteți solicita încă o dată, iar decide un membru al echipei noastre care nu a decis prima cerere; puteți recurge, de asemenea, la procedura de reclamații din secțiunea 10. După un al doilea refuz nu mai puteți solicita, dar puteți totuși supune decizia unui organism de soluționare extrajudiciară a litigiilor sau instanței (secțiunea 10). O aprobare acoperă sinteza citită de examinator, inclusiv orice versiune ulterioară a dezbaterii care o repetă cuvânt cu cuvânt; o sinteză rescrisă este verificată din nou când publicați și, dacă este marcată, are nevoie de propria aprobare. Dacă publicați o dezbatere marcată după aprobarea noastră, o puteți retrage din nou cu Retrageți pe cardul ei din Dezbaterile dvs.
 
@@ -250,6 +250,8 @@ Dacă locuiți în altă parte, Anexa A precizează dreptul de retragere sau per
 Vă informăm în avans, pe un suport durabil, ce se modifică și când. Dacă modificarea are un efect negativ mai mult decât minor asupra accesului la serviciu sau a utilizării acestuia, puteți înceta contractul fără costuri în termen de **30 de zile** de la informare sau de la data la care modificarea produce efecte, luându-se în considerare data mai recentă, iar noi rambursăm orice sumă plătită în avans pentru perioada neutilizată.
 
 **Cu privire la acești Termeni.** Putem modifica acești Termeni pentru aceleași tipuri de motive. Pentru modificările care nu vă reduc drepturile, publicăm noua versiune însoțită de un rezumat al modificărilor și vă trimitem un e-mail cu cel puțin **30 de zile** înainte ca aceasta să producă efecte; continuarea utilizării Dialectical Engine după data respectivă înseamnă că o acceptați și vă puteți închide contul înainte de acea dată. Pentru modificările care vă reduc drepturile — inclusiv majorarea prețurilor unui plan existent, reducerea limitelor, eliminarea unor funcții, noi utilizări ale conținutului dumneavoastră sau modificări privind răspunderea, legea aplicabilă ori soluționarea litigiilor — vă solicităm să acceptați în mod expres noua versiune la următoarea autentificare, iar modificarea se aplică numai pentru viitor. Nu aplicăm niciodată retroactiv o modificare și nu folosim niciodată această secțiune pentru a modifica, pe parcursul termenului, esența serviciului pentru care ați plătit fără să vă oferim o posibilitate de încetare. Versiunile anterioare rămân disponibile la dezbatere.ro/terms/versions.
+
+Versiunea 2.11 a înlocuit versiunea 2.10: secțiunea 9 arată că putem ascunde o dezbatere publică, cât timp o examinăm, și că putem elimina sau corecta o parte din ea.
 
 Versiunea 2.10 a înlocuit versiunea 2.9: secțiunea 9 arată că dezbaterile de pe planul gratuit sunt publice, că o dezbatere publică nu poate fi retrasă din publicare și rămâne publică după ce vă închideți contul, că oricine are credit poate contribui la o dezbatere publică sau poate scrie un raport despre ea și că o dezbatere publică rămâne deschisă după ce primul ei autor a plecat; secțiunea 11 arată ce face închiderea cu dezbaterile dumneavoastră publice.
 

@@ -32,9 +32,9 @@ const tableRows = (locale: string, from: number): string[] =>
 
 const cells = (row: string): string[] => row.split("|").slice(1, -1).map((cell) => cell.trim());
 
-/** Where the new rows sit: section 2's ninth row (after "Debate content"), section 7's thirteenth. */
+/** Where the new rows sit: section 2's ninth row (after "Debate content"), section 7's fifteenth (Privacy 3.9 added two rows before it). */
 const COLLECT_AT = 8;
-const RETAIN_AT = 12;
+const RETAIN_AT = 14;
 
 const PINNED = {
   en: {
@@ -58,8 +58,8 @@ describe("Privacy Policy 3.8 says what the debate pages keep in the account (R22
   it("English has the new rows where the owner placed them", () => {
     expect(englishCollect).toBe(14);
     expect(cells(tableRows("en", 2)[COLLECT_AT - 1]!)[0]).toBe("**Debate content**");
-    expect(englishRetain).toBe(23);
-    expect(cells(tableRows("en", 7)[RETAIN_AT - 1]!)[0]).toBe("Provider return records and retrieval references");
+    expect(englishRetain).toBe(25);
+    expect(cells(tableRows("en", 7)[RETAIN_AT - 1]!)[0]).toBe("Search words, the link, site, title and date of each page, the short quotes (at most 120 characters) and the AI's notes on each page");
   });
 
   it.each(LOCALES.map(({ code }) => [code]))("%s: the same three changes at the same places", (code) => {
@@ -77,7 +77,7 @@ describe("Privacy Policy 3.8 says what the debate pages keep in the account (R22
     expect(kept[2], `${code}: deletion with the debate points at section 6`).toMatch(/6/u);
     const purpose = cells(tableRows(code, 4)[0]!)[1]!;
     expect(purpose.toLocaleLowerCase(code), `${code}: section 4's first row lists it`).toContain(label.toLocaleLowerCase(code));
-    expect(markdown(code), `${code}: still version 3.9`).toMatch(/v3\.9 /u);
+    expect(markdown(code), `${code}: still version 3.10`).toMatch(/v3\.10 /u);
   });
 
   it.each(Object.entries(PINNED))("%s: the rows and the change-log sentence read exactly as approved", (code, pinned) => {

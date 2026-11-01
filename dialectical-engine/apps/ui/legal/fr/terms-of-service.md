@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: En bref
-eyebrow: CONDITIONS D’UTILISATION · v2.10 · PRISE D’EFFET 1ER NOVEMBRE 2026
+eyebrow: CONDITIONS D’UTILISATION · v2.11 · PRISE D’EFFET 1ER NOVEMBRE 2026
 title: Ce que vous acceptez
 lede: Le contrat entre vous et DMS Merchandise Shop S.R.L., en termes clairs. Dix-neuf sections et l’annexe A — faites défiler jusqu’à la fin.
-endMarker: FIN DES CONDITIONS · v2.10
+endMarker: FIN DES CONDITIONS · v2.11
 bodyLabel: Texte des Conditions d’utilisation
 annexTitle: Annexe A — Conditions régionales
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 DROIT APPLICABLE
 -->
 
-**Version 2.10 · Effective 1er novembre 2026 · Versions précédentes sur dezbatere.ro/terms/versions · Langue : français.**
+**Version 2.11 · Effective 1er novembre 2026 · Versions précédentes sur dezbatere.ro/terms/versions · Langue : français.**
 
 **In short.** Vous devez avoir au moins 18 ans. Dialectical Engine construit des arguments à l’aide de modèles d’IA et tout ce qu’il génère peut être erroné — il ne s’agit pas d’un conseil. Sur la formule gratuite, vos débats deviennent publics une fois terminés, après une vérification par IA ; sur une formule payante, ils restent privés, sauf si vous les publiez. Un débat public peut être lu par tous, et il reste public. Le texte que vous soumettez est transmis aux fournisseurs d’IA inscrits dans notre Registre des fournisseurs et n’est pas utilisé pour entraîner des modèles. Signalez tout contenu illicite à support@dezbatere.ro, que vous ayez ou non un compte. Le droit roumain s’applique, mais les protections locales dont vous bénéficiez en tant que consommateur demeurent acquises.
 
@@ -148,7 +148,7 @@ Sur une formule payante, les débats sont **privés par défaut** : rien de ce q
 
 **Les débats gratuits sont publics.** Sur la formule gratuite, votre question et son débat sont publics. Nous vous le signalons avant que vous ne posiez votre question. Une fois le débat terminé, une IA le vérifie ; si la vérification l’autorise, toute personne peut le lire et les moteurs de recherche peuvent l’indexer. Si la vérification le refuse, il reste privé pour vous. N’incluez pas de données personnelles dans une question posée sur la formule gratuite.
 
-**Pas de retour possible.** Une fois qu’un débat est public, il reste public. Vous ne pouvez ni retirer sa publication ni le supprimer, et la suppression de votre compte ne l’efface pas. Les copies faites par d’autres échappent à notre contrôle. D’autres personnes peuvent le lire, le citer, en faire des captures d’écran, l’archiver et le mettre en cache. Ne publiez rien que vous ne seriez pas disposé à voir associé de manière permanente à votre pseudonyme.
+**Pas de retour possible.** Une fois qu’un débat est public, il reste public. Vous ne pouvez ni retirer sa publication ni le supprimer, et la suppression de votre compte ne l’efface pas. Nous pouvons le masquer pendant que nous l’examinons, et en supprimer ou corriger une partie, lorsque la présente section le permet. Les copies faites par d’autres échappent à notre contrôle. D’autres personnes peuvent le lire, le citer, en faire des captures d’écran, l’archiver et le mettre en cache. Ne publiez rien que vous ne seriez pas disposé à voir associé de manière permanente à votre pseudonyme.
 
 **Un débat marqué nécessite notre approbation.** Lorsqu’un débat se termine, une vérification automatisée lit sa synthèse au regard des quatre catégories de la section 8. Un débat que la vérification marque ne peut être publié qu’avec notre approbation, et le marquage n’est montré qu’à vous et, si vous demandez notre approbation, aux membres de notre équipe titulaires de l’autorisation d’examiner les publications ; un débat dont la synthèse relève, selon la vérification, de la catégorie « tendances au suicide ou à nuire à autrui » est supprimé à la place, comme l’explique le paragraphe suivant. Si vous demandez notre approbation sur la page du débat, un membre de notre équipe titulaire d’une autorisation spécifique d’examiner les publications peut lire le débat tel qu’il serait publié, sans votre pseudonyme. Si nous approuvons, Publier vous est de nouveau accessible, et la vérification que subit chaque publication continue de s’appliquer. Si nous refusons, le débat reste privé et nous vous fournissons un exposé des motifs (section 10). Après un refus, vous pouvez demander une fois de plus, et un membre de notre équipe qui n’a pas statué sur la première demande statue ; vous pouvez aussi recourir à la procédure de réclamation prévue à la section 10. Après un second refus, vous ne pouvez plus demander, mais vous pouvez encore porter la décision devant un organe de règlement extrajudiciaire des litiges ou devant une juridiction (section 10). Une approbation couvre la synthèse lue par l’examinateur, y compris toute version ultérieure du débat qui la reprend mot pour mot ; une synthèse réécrite est de nouveau vérifiée lorsque vous publiez et, si elle est marquée, requiert sa propre approbation. Si vous publiez un débat marqué après notre approbation, vous pouvez le retirer de nouveau avec Retirer sur sa carte dans Vos débats.
 
@@ -250,6 +250,8 @@ Si vous résidez ailleurs, l’annexe A précise le droit de rétractation ou le
 Nous vous informons à l’avance, sur un support durable, de la modification et de sa date. Si celle-ci a une incidence négative plus que mineure sur votre accès au service ou son utilisation, vous pouvez résilier sans frais dans un délai de **30 jours** à compter du jour où vous en avez été informé ou de son entrée en vigueur, la date la plus tardive étant retenue, et nous remboursons tout montant payé d’avance pour la période non utilisée.
 
 **Modifications des présentes Conditions.** Nous pouvons modifier les présentes Conditions pour les mêmes types de motifs. Pour les modifications qui ne réduisent pas vos droits, nous publions la nouvelle version avec un résumé des changements et vous envoyons un e-mail au moins **30 jours** avant son entrée en vigueur ; la poursuite de l’utilisation de Dialectical Engine après cette date vaut acceptation et vous pouvez clôturer votre compte avant celle-ci. Pour les modifications qui réduisent vos droits — notamment les hausses de prix d’une formule existante, les diminutions de limites, la suppression de fonctionnalités, les nouvelles utilisations de votre contenu ou les modifications relatives à la responsabilité, au droit applicable ou au règlement des litiges —, nous vous demandons d’accepter expressément la nouvelle version lors de votre prochaine connexion et la modification ne s’applique que pour l’avenir. Nous n’appliquons jamais une modification rétroactivement et n’utilisons jamais la présente section pour modifier, pendant sa durée, l’essence de ce pour quoi vous avez payé sans vous offrir une possibilité de résiliation. Les versions antérieures restent disponibles à l’adresse dezbatere.ro/terms/versions.
+
+La version 2.11 a remplacé la version 2.10 : la section 9 indique que nous pouvons masquer un débat public pendant que nous l’examinons, et supprimer ou corriger une partie de celui-ci.
 
 La version 2.10 a remplacé la version 2.9 : la section 9 indique que les débats de la formule gratuite sont publics, qu’un débat public ne peut pas être retiré de la publication et reste public après la clôture de votre compte, que toute personne disposant de crédit peut contribuer à un débat public ou rédiger un rapport à son sujet, et qu’un débat public reste ouvert après le départ de son premier auteur ; la section 11 indique ce que la clôture implique pour vos débats publics.
 

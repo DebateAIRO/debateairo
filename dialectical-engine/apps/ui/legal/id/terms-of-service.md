@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ringkasnya
-eyebrow: KETENTUAN LAYANAN · v2.10 · BERLAKU 1 NOVEMBER 2026
+eyebrow: KETENTUAN LAYANAN · v2.11 · BERLAKU 1 NOVEMBER 2026
 title: Hal yang Anda setujui
 lede: Kontrak antara Anda dan DMS Merchandise Shop S.R.L., dalam bahasa yang mudah dipahami. Sembilan belas bagian dan Lampiran A — gulir hingga akhir.
-endMarker: AKHIR KETENTUAN · v2.10
+endMarker: AKHIR KETENTUAN · v2.11
 bodyLabel: Teks Ketentuan Layanan
 annexTitle: Lampiran A — Ketentuan regional
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 HUKUM YANG BERLAKU
 -->
 
-**Version 2.10 · Effective 1 November 2026 · Versi sebelumnya di dezbatere.ro/terms/versions · Bahasa: Indonesia.**
+**Version 2.11 · Effective 1 November 2026 · Versi sebelumnya di dezbatere.ro/terms/versions · Bahasa: Indonesia.**
 
 **In short.** Anda harus berusia 18 tahun atau lebih. Dialectical Engine menyusun argumen dengan model AI dan segala sesuatu yang dihasilkannya mungkin salah — ini bukan nasihat. Di paket gratis, debat Anda bersifat publik setelah selesai, setelah pemeriksaan AI; di paket berbayar, debat bersifat privat kecuali Anda memublikasikannya. Setelah publik, siapa pun dapat membaca debat itu, dan debat itu tetap publik. Teks yang Anda kirim diteruskan kepada penyedia AI yang tercantum dalam Daftar Penyedia kami, dan tidak digunakan untuk melatih model. Laporkan konten ilegal ke support@dezbatere.ro, baik Anda memiliki akun maupun tidak. Hukum Rumania berlaku, tetapi perlindungan konsumen setempat Anda tetap berlaku bagi Anda.
 
@@ -148,7 +148,7 @@ Di paket berbayar, debat bersifat **privat secara bawaan**. Tidak ada hal yang A
 
 **Debat di paket gratis bersifat publik.** Di paket gratis, pertanyaan dan debat Anda bersifat publik. Kami memberi tahu Anda hal ini sebelum Anda mengajukan pertanyaan. Ketika debat selesai, AI memeriksanya; jika pemeriksaan mengizinkan, siapa pun dapat membacanya dan mesin pencari dapat mengindeksnya. Jika pemeriksaan menolaknya, debat itu tetap privat bagi Anda. Jangan sertakan detail pribadi dalam pertanyaan di paket gratis.
 
-**Tidak ada pembatalan.** Setelah debat bersifat publik, debat itu tetap publik. Anda tidak dapat membatalkan publikasinya atau menghapusnya, dan menghapus akun Anda juga tidak menghapusnya. Salinan yang dibuat orang lain berada di luar kendali kami. Orang lain dapat membaca, mengutip, mengambil tangkapan layar, mengarsipkan, dan menyimpannya dalam tembolok. Jangan memublikasikan apa pun yang tidak ingin Anda kaitkan secara permanen dengan nama samaran Anda.
+**Tidak ada pembatalan.** Setelah debat bersifat publik, debat itu tetap publik. Anda tidak dapat membatalkan publikasinya atau menghapusnya, dan menghapus akun Anda juga tidak menghapusnya. Kami dapat menyembunyikannya selama kami meninjaunya, dan menghapus atau memperbaiki sebagiannya jika bagian ini memungkinkan. Salinan yang dibuat orang lain berada di luar kendali kami. Orang lain dapat membaca, mengutip, mengambil tangkapan layar, mengarsipkan, dan menyimpannya dalam tembolok. Jangan memublikasikan apa pun yang tidak ingin Anda kaitkan secara permanen dengan nama samaran Anda.
 
 **Debat yang ditandai memerlukan persetujuan kami.** Ketika suatu debat selesai, pemeriksaan otomatis membaca sintesisnya untuk empat kategori pada bagian 8. Debat yang ditandai oleh pemeriksaan hanya dapat dipublikasikan dengan persetujuan kami, dan tanda itu tidak ditampilkan kepada siapa pun selain Anda dan, jika Anda meminta persetujuan kami, anggota tim kami yang memegang izin untuk meninjau publikasi; debat yang oleh pemeriksaan ditemukan termasuk dalam kategori “kecenderungan bunuh diri atau menyakiti orang lain” dihapus, sebagaimana dijelaskan paragraf berikutnya. Jika Anda meminta persetujuan kami pada halaman debat, anggota tim kami yang memegang izin khusus untuk meninjau publikasi dapat membaca debat sebagaimana akan dipublikasikan, tanpa nama samaran Anda. Jika kami menyetujui, “Terbitkan” tersedia lagi bagi Anda, dan pemeriksaan yang dilalui setiap publikasi tetap berlaku. Jika kami menolak, debat tetap privat dan kami memberi Anda pernyataan alasan (bagian 10). Setelah penolakan, Anda dapat meminta sekali lagi, dan anggota tim kami yang tidak memutuskan permintaan pertama yang memutuskan; Anda juga dapat menggunakan jalur pengaduan pada bagian 10. Setelah penolakan kedua, Anda tidak dapat meminta lagi, tetapi Anda tetap dapat membawa keputusan tersebut ke badan penyelesaian sengketa di luar pengadilan atau ke pengadilan (bagian 10). Persetujuan mencakup sintesis yang dibaca peninjau, termasuk versi debat yang lebih baru yang mengulang sintesis tersebut kata demi kata; sintesis yang ditulis ulang diperiksa lagi saat Anda memublikasikan dan, jika ditandai, memerlukan persetujuan tersendiri. Jika Anda memublikasikan debat yang ditandai setelah persetujuan kami, Anda dapat menurunkannya kembali dengan “Turunkan” pada kartunya di “Debat Anda”.
 
@@ -250,6 +250,8 @@ Jika Anda tinggal di tempat lain, Lampiran A menyatakan hak penarikan diri atau 
 Kami memberi tahu Anda terlebih dahulu, pada media tahan lama, mengenai hal yang berubah dan waktu perubahan. Jika perubahan tersebut menimbulkan dampak negatif yang lebih dari kecil terhadap akses ke atau penggunaan layanan oleh Anda, Anda dapat mengakhiri layanan tanpa biaya dalam waktu **30 hari** sejak menerima pemberitahuan, atau sejak perubahan berlaku, mana yang lebih akhir, dan kami mengembalikan setiap jumlah yang telah dibayar di muka untuk periode yang tidak digunakan.
 
 **Pada Ketentuan ini.** Kami dapat mengubah Ketentuan ini untuk jenis alasan yang sama. Untuk perubahan yang tidak mengurangi hak Anda, kami memublikasikan versi baru beserta ringkasan perubahan dan mengirim email kepada Anda sekurang-kurangnya **30 hari** sebelum perubahan berlaku; jika Anda terus menggunakan Dialectical Engine setelah tanggal tersebut, berarti Anda menerimanya, dan Anda dapat menutup akun sebelumnya. Untuk perubahan yang mengurangi hak Anda — termasuk kenaikan harga pada paket yang sudah ada, batas yang lebih rendah, fitur yang dihapus, penggunaan baru atas konten Anda, atau perubahan pada tanggung jawab, hukum yang berlaku, maupun penyelesaian sengketa — kami meminta Anda menerima versi baru secara tegas saat masuk berikutnya, dan perubahan hanya berlaku untuk waktu mendatang. Kami tidak pernah memberlakukan perubahan secara surut, dan tidak pernah menggunakan bagian ini untuk mengubah inti dari hal yang telah Anda bayar di tengah masa berlaku tanpa menawarkan jalan keluar. Versi sebelumnya tetap tersedia di dezbatere.ro/terms/versions.
+
+Versi 2.11 menggantikan versi 2.10: bagian 9 menyatakan bahwa kami dapat menyembunyikan debat publik selama kami meninjaunya, dan menghapus atau memperbaiki sebagiannya.
 
 Versi 2.10 menggantikan versi 2.9: bagian 9 menyatakan bahwa debat di paket gratis bersifat publik, bahwa debat publik tidak dapat dibatalkan publikasinya dan tetap publik setelah Anda menutup akun, bahwa siapa pun yang memiliki kredit dapat berkontribusi pada debat publik atau menulis laporan tentangnya, dan bahwa debat publik tetap terbuka setelah penulis pertamanya pergi; bagian 11 menjelaskan apa yang dilakukan penutupan terhadap debat publik Anda.
 

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Stručne
-eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v2.10 · ÚČINNÉ OD 1. NOVEMBRA 2026
+eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v2.11 · ÚČINNÉ OD 1. NOVEMBRA 2026
 title: S čím súhlasíte
 lede: Zmluva medzi vami a DMS Merchandise Shop S.R.L. zrozumiteľným jazykom. Devätnásť častí a príloha A — prejdite až na koniec.
-endMarker: KONIEC PODMIENOK · v2.10
+endMarker: KONIEC PODMIENOK · v2.11
 bodyLabel: Text Podmienok poskytovania služby
 annexTitle: Príloha A — Regionálne podmienky
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ROZHODNÉ PRÁVO
 -->
 
-**Version 2.10 · Effective 1. novembra 2026 · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
+**Version 2.11 · Effective 1. novembra 2026 · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
 
 **In short.** Musíte mať aspoň 18 rokov. Dialectical Engine vytvára argumenty pomocou modelov umelej inteligencie a všetko, čo vygeneruje, môže byť nesprávne — nejde o poradenstvo. V bezplatnom programe sú vaše debaty po dokončení verejné, po kontrole umelou inteligenciou; v platenom programe sú súkromné, pokiaľ ich nezverejníte. Keď je debata verejná, môže ju čítať ktokoľvek a zostáva verejná. Text, ktorý zadáte, sa odosiela poskytovateľom umelej inteligencie uvedeným v našom Registri poskytovateľov a nepoužíva sa na trénovanie modelov. Nezákonný obsah nahláste na support@dezbatere.ro bez ohľadu na to, či máte účet. Rozhodným právom je rumunské právo, vaše miestne práva na ochranu spotrebiteľa vám však zostávajú zachované.
 
@@ -148,7 +148,7 @@ V platenom programe sú debaty **v predvolenom nastavení súkromné**: nič, č
 
 **Debaty v bezplatnom programe sú verejné.** V bezplatnom programe sú vaša otázka a jej debata verejné. Upozorňujeme vás na to skôr, než sa spýtate. Keď je debata hotová, skontroluje ju umelá inteligencia; ak kontrola dovolí jej zverejnenie, ktokoľvek ju môže čítať a vyhľadávače ju môžu indexovať. Ak kontrola zamietne, zostáva súkromná pre vás. Do otázky v bezplatnom programe neuvádzajte osobné údaje.
 
-**Nedá sa vrátiť späť.** Akonáhle je debata verejná, zostáva verejná. Nemôžete zrušiť jej zverejnenie ani ju vymazať a vymazanie vášho účtu ju neodstráni. Kópie, ktoré vytvorili iní, sú mimo našej kontroly. Iné osoby ju môžu čítať, citovať, vytvárať z nej snímky obrazovky, archivovať ju a ukladať do vyrovnávacej pamäte. Nezverejňujte nič, čo by ste nechceli mať trvalo spojené so svojím pseudonymom.
+**Nedá sa vrátiť späť.** Akonáhle je debata verejná, zostáva verejná. Nemôžete zrušiť jej zverejnenie ani ju vymazať a vymazanie vášho účtu ju neodstráni. Môžeme ju dočasne skryť, kým ju posudzujeme, a odstrániť alebo opraviť jej časť, v prípadoch, ktoré táto časť umožňuje. Kópie, ktoré vytvorili iní, sú mimo našej kontroly. Iné osoby ju môžu čítať, citovať, vytvárať z nej snímky obrazovky, archivovať ju a ukladať do vyrovnávacej pamäte. Nezverejňujte nič, čo by ste nechceli mať trvalo spojené so svojím pseudonymom.
 
 **Označená debata vyžaduje naše schválenie.** Keď debata skončí, automatizovaná kontrola prečíta jej syntézu z hľadiska štyroch kategórií uvedených v časti 8. Debatu, ktorú kontrola označí, možno zverejniť len s naším schválením a označenie sa zobrazí iba vám a, ak požiadate o naše schválenie, členom nášho tímu, ktorí majú oprávnenie posudzovať zverejnenia; debata, ktorej syntéza sa podľa kontroly dotýka kategórie „sklony k samovražde alebo k ubližovaniu iným ľuďom“, sa namiesto toho odstráni, ako uvádza nasledujúci odsek. Ak o naše schválenie požiadate na stránke debaty, člen nášho tímu, ktorý má osobitné oprávnenie posudzovať zverejnenia, si môže prečítať debatu v podobe, v akej by sa zverejnila, bez vášho pseudonymu. Ak schválime, tlačidlo Zverejniť vám bude opäť dostupné a kontrola, ktorou prechádza každé zverejnenie, naďalej platí. Ak zamietneme, debata zostane súkromná a poskytneme vám odôvodnenie (časť 10). Po zamietnutí môžete požiadať ešte raz a rozhodne člen nášho tímu, ktorý o prvej žiadosti nerozhodoval; môžete tiež využiť postup vybavovania sťažností podľa časti 10. Po druhom zamietnutí už nemôžete požiadať znova, ale rozhodnutie môžete stále predložiť orgánu mimosúdneho riešenia sporov alebo súdu (časť 10). Schválenie sa vzťahuje na syntézu, ktorú posudzovateľ prečítal, vrátane každej neskoršej verzie debaty, ktorá ju opakuje slovo od slova; prepísaná syntéza sa pri zverejnení znova skontroluje a ak sa označí, vyžaduje vlastné schválenie. Ak po našom schválení zverejníte označenú debatu, môžete ju znova stiahnuť tlačidlom Stiahnuť na jej karte v zobrazení Vaše debaty.
 
@@ -250,6 +250,8 @@ Ak žijete inde, príloha A uvádza právo na odstúpenie alebo lehotu na rozmys
 O tom, čo a kedy sa mení, vás vopred informujeme na trvanlivom médiu. Ak má zmena viac než nepodstatný nepriaznivý vplyv na váš prístup k službe alebo jej používanie, môžete zmluvu bezplatne ukončiť do **30 dní** odo dňa, keď ste boli informovaní, alebo odo dňa nadobudnutia účinnosti zmeny, podľa toho, ktorý deň nastane neskôr, a vrátime vám prípadnú predplatenú sumu za nevyužité obdobie.
 
 **Zmeny týchto Podmienok.** Tieto Podmienky môžeme meniť z rovnakých druhov dôvodov. Pri zmenách, ktoré neobmedzujú vaše práva, zverejníme novú verziu so zhrnutím zmien a najmenej **30 dní** pred nadobudnutím účinnosti vám zašleme e-mail; pokračovaním v používaní Dialectical Engine po tomto dátume zmenu prijímate a pred týmto dátumom môžete svoj účet odstrániť. Pri zmenách, ktoré obmedzujú vaše práva — vrátane zvýšenia ceny existujúceho programu, zníženia limitov, odstránenia funkcií, nového spôsobu použitia vášho obsahu alebo zmien zodpovednosti, rozhodného práva či riešenia sporov — vás pri nasledujúcom prihlásení požiadame, aby ste novú verziu výslovne prijali, a zmena platí iba do budúcnosti. Žiadnu zmenu nikdy neuplatníme spätne a túto časť nikdy nepoužijeme na zmenu podstaty toho, za čo ste počas obdobia zaplatili, bez toho, aby sme vám ponúkli možnosť zmluvu ukončiť. Predchádzajúce verzie zostávajú dostupné na adrese dezbatere.ro/terms/versions.
+
+Verzia 2.11 nahradila verziu 2.10: časť 9 uvádza, že môžeme dočasne skryť verejnú debatu, kým ju posudzujeme, a odstrániť alebo opraviť jej časť.
 
 Verzia 2.10 nahradila verziu 2.9: časť 9 uvádza, že debaty v bezplatnom programe sú verejné, že verejnú debatu nemožno zrušiť zverejnenie a zostáva verejná aj po zrušení vášho účtu, že ktokoľvek s kreditom môže prispievať do verejnej debaty alebo o nej napísať správu a že verejná debata zostáva otvorená aj po odchode jej prvého autora; časť 11 uvádza, čo zrušenie účtu znamená pre vaše verejné debaty.
 

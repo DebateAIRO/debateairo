@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In short
-eyebrow: TERMS OF SERVICE · v2.10 · EFFECTIVE 1 NOVEMBER 2026
+eyebrow: TERMS OF SERVICE · v2.11 · EFFECTIVE 1 NOVEMBER 2026
 title: What you agree to
 lede: The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.
-endMarker: END OF TERMS · v2.10
+endMarker: END OF TERMS · v2.11
 bodyLabel: Terms of Service text
 annexTitle: Annex A — Regional terms
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 GOVERNING LAW
 -->
 
-**Version 2.10 · Effective 1 November 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
+**Version 2.11 · Effective 1 November 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
 
 **In short.** You must be 18 or over. Dialectical Engine builds arguments with AI models and everything it generates may be wrong — it is not advice. On the Free plan your debates are public when finished, after an AI check; on a paid plan they are private unless you publish them. Once public, anyone can read a debate, and it stays public. Text you submit is sent to AI providers listed in our Provider Register, and is not used to train models. Report illegal content at support@dezbatere.ro whether or not you have an account. Romanian law governs, but your local consumer protections stay with you.
 
@@ -148,7 +148,7 @@ Debates on a paid plan are **private by default**: nothing you create there is v
 
 **Free debates are public.** On the Free plan your question and its debate are public. We tell you this before you ask. When the debate is finished, an AI checks it; if the check allows it, anyone can read it and search engines may index it. If the check refuses it, it stays private to you. Do not include personal details in a question on the Free plan.
 
-**No take-back.** Once a debate is public it stays public. You cannot unpublish it or delete it, and erasing your account does not remove it. Copies others made are outside our control. Other people can read, quote, screenshot, archive and cache it. Do not publish anything you would be unwilling to have permanently associated with your pseudonym.
+**No take-back.** Once a debate is public it stays public. You cannot unpublish it or delete it, and erasing your account does not remove it. We can hide it while we review it, and remove or correct part of it, where this section allows. Copies others made are outside our control. Other people can read, quote, screenshot, archive and cache it. Do not publish anything you would be unwilling to have permanently associated with your pseudonym.
 
 **A flagged debate needs our approval.** When a debate finishes, an automated check reads its synthesis for the four categories in section 8. A debate the check flags can be published only with our approval, and the flag is shown to nobody but you and, if you ask for our approval, the members of our team who hold the permission to review publications; a debate the check finds touching “tendencies to suicide or harming other people” is deleted instead, as the next paragraph says. If you ask for our approval on the debate's page, a member of our team who holds a specific permission to review publications can read the debate as it would be published, without your pseudonym. If we approve, Publish is available to you again, and the check that every publication goes through still applies. If we refuse, the debate stays private and we give you a statement of reasons (section 10). After a refusal you may ask once more, and a member of our team who did not decide the first request decides; you can also use the complaints route in section 10. After a second refusal you cannot ask again, but you can still take the decision to an out-of-court dispute settlement body or to court (section 10). An approval covers the synthesis the reviewer read, including any later version of the debate that repeats it word for word; a rewritten synthesis is checked again when you publish and, if it is flagged, needs its own approval. If you publish a flagged debate after our approval, you can take it down again with Take down on its card in Your debates.
 
@@ -250,6 +250,8 @@ If you live elsewhere, Annex A states the withdrawal or cooling-off right that a
 We tell you in advance, on a durable medium, what is changing and when. If the change has more than a minor negative effect on your access to or use of the service, you may terminate free of charge within **30 days** of being told, or of the change taking effect, whichever is later, and we refund any prepaid amount for the unused period.
 
 **To these Terms.** We may change these Terms for the same kinds of reasons. For changes that do not reduce your rights, we post the new version with a summary of what changed and email you at least **30 days** before it takes effect; continuing to use Dialectical Engine after that date means you accept it, and you may close your account before then. For changes that reduce your rights — including price increases on an existing plan, lower limits, removed features, new uses of your content, or changes to liability, governing law or dispute resolution — we ask you to accept the new version expressly at your next sign-in, and the change applies only going forward. We never make a change retroactive, and we never use this section to change the core of what you have paid for mid-term without offering you a way out. Prior versions stay available at dezbatere.ro/terms/versions.
+
+Version 2.11 replaced version 2.10: section 9 says that we can hide a public debate while we review it, and remove or correct part of it.
 
 Version 2.10 replaced version 2.9: section 9 says that debates on the Free plan are public, that a public debate cannot be unpublished and stays public after you close your account, that anyone with credit can contribute to a public debate or write a report on it, and that a public debate stays open after its first author has left; section 11 says what closure does to your public debates.
 
