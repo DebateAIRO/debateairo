@@ -218,11 +218,11 @@ describe("0114: a forward step, applied once", () => {
     // side-by-side releases (0123, spec 2026-10-21 side-by-side uploads), then the settings activation (0124)
     // (side-by-side spec §13), then the Italy-specific approval (0125), then synthesis-flag's 0126-0129, then row-level
     // security (0130), last (mission row-level-security, SPEC-v4 R26).
-    expect(steps.slice(-18)).toEqual(["0113_billing_price_currencies.sql", STEP, "0115_data_export.sql", "0116_mail_locale.sql",
+    expect(steps.slice(-19)).toEqual(["0113_billing_price_currencies.sql", STEP, "0115_data_export.sql", "0116_mail_locale.sql",
       "0117_debate_shape_map.sql", "0118_language_check_spend.sql", "0119_reclaim_resume.sql", "0120_reply_measures.sql",
       "0121_engine_verdict.sql", "0122_engine_map_check.sql", "0123_side_by_side_releases.sql", "0124_settings_activation.sql",
       "0125_italy_specific_approval.sql", "0126_synthesis_check.sql", "0127_publication_review.sql", "0128_threat_reports.sql", "0129_support_answer_scope.sql",
-      "0130_row_level_security.sql"]);
+      "0130_row_level_security.sql", "0153_outbound_mail_limit.sql"]);
     const ledger = async () => (await db().query("SELECT name, applied_at FROM public.debateai_schema_migration ORDER BY name")).rows;
     const before = await ledger();
     expect(before.filter((row) => row.name === STEP)).toHaveLength(1);

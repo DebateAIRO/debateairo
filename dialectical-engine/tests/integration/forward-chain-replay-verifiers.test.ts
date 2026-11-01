@@ -86,12 +86,12 @@ it("keeps NETOPIA's 0111 verifier in force and replaying once the auth DB batch 
   // with 0129 the last of them, the verifier in force is 0111's, byte for byte. 0130's verifier supersedes it at the head: every check 0111's makes,
   // its row-security clause aside (SPEC-v4 R34).
   expect(batch!.verifierSha256).toBe(netopia!.verifierSha256);
-  expect(real.forwardChain.at(-2)!.verifierSha256).toBe(netopia!.verifierSha256);
+  expect(real.forwardChain.at(-3)!.verifierSha256).toBe(netopia!.verifierSha256);
   expect(real.forwardChain.at(-1)!.verifierPath).toBe("lineage/verify-effective-capabilities-130.sql");
   expect(real.forwardChain.at(-1)!.verifierSha256).not.toBe(netopia!.verifierSha256);
   expect(partC!.verifierSha256).toBe(netopia!.verifierSha256);
   expect(rotation!.verifierSha256).toBe(netopia!.verifierSha256);
-  expect(effectiveForwardVerifierSql(real, new Set([...applied].filter((name) => name !== "0130_row_level_security.sql")))).toBe(netopia!.verifierSql);
+  expect(effectiveForwardVerifierSql(real, new Set([...applied].filter((name) => name !== "0130_row_level_security.sql" && name !== "0153_outbound_mail_limit.sql")))).toBe(netopia!.verifierSql);
   expect(effectiveForwardVerifierSql(real, applied)).toBe(real.forwardChain.at(-1)!.verifierSql);
   // A drift only 0111's verifier knows (a NETOPIA table granted to a wrong role) is refused by migrate() with 0130 last.
   await db.pool.query("GRANT SELECT ON billing.card_token TO debateai_authorization_runtime");

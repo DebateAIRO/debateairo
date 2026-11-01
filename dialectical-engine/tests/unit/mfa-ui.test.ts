@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { testOutboundMailGate } from "../support/outboundMailGate.js";
 import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -76,7 +77,7 @@ describe("S4 mailed-token enrolment UI", () => {
     const messageFile = join(root, "message.txt");
     await writeFile(executable, `#!/bin/sh\ncat > "${messageFile}"\n`, "utf8");
     await chmod(executable, 0o700);
-    const mail = new SendmailMailSender({
+    const mail = new SendmailMailSender({ gate: testOutboundMailGate(),
       executable,
       from: "noreply@debateai.test",
       publicAppUrl: "https://debate.test",

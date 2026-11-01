@@ -50,6 +50,7 @@ const THREAT_REPORT_MIGRATION = "0128_threat_reports.sql";
 const SUPPORT_ANSWER_SCOPE_MIGRATION = "0129_support_answer_scope.sql";
 /** Row-level security (mission row-level-security, SPEC-v4 R26), chained after the support answer scope's; migrate() applies it last. */
 const RLS_MIGRATION = "0130_row_level_security.sql";
+const OUTBOUND_MAIL_MIGRATION = "0153_outbound_mail_limit.sql";
 const CHAIN = [NETOPIA_MIGRATION, AUTH_DB_BATCH, PART_C_MIGRATION, ROLE_ROTATION_MIGRATION, EXPORT_MIGRATION, MAIL_LOCALE_MIGRATION, MAP_MIGRATION, LANGUAGE_CHECK_MIGRATION, RECLAIM_MIGRATION, REPLY_MEASURES_MIGRATION, ENGINE_VERDICT_MIGRATION, ENGINE_MAP_CHECK_MIGRATION, SIDE_BY_SIDE_MIGRATION, SETTINGS_ACTIVATION_MIGRATION, ITALY_APPROVAL_MIGRATION, SYNTHESIS_CHECK_MIGRATION, PUBLICATION_REVIEW_MIGRATION, THREAT_REPORT_MIGRATION, SUPPORT_ANSWER_SCOPE_MIGRATION, RLS_MIGRATION] as const;
 const DEV_110 = "0110_account_erasure_public_debates.sql";
 const SUPERSEDING_VERIFIER = "lineage/verify-effective-capabilities-111.sql";
@@ -736,7 +737,7 @@ describe("F10 — 0111 is the forward step after dev's 0110, with its receipt an
         { name: SETTINGS_ACTIVATION_MIGRATION, n: 1 }, { name: ITALY_APPROVAL_MIGRATION, n: 1 },
         { name: SYNTHESIS_CHECK_MIGRATION, n: 1 },
         { name: PUBLICATION_REVIEW_MIGRATION, n: 1 }, { name: THREAT_REPORT_MIGRATION, n: 1 }, { name: SUPPORT_ANSWER_SCOPE_MIGRATION, n: 1 },
-        { name: RLS_MIGRATION, n: 1 }]);
+        { name: RLS_MIGRATION, n: 1 }, { name: OUTBOUND_MAIL_MIGRATION, n: 1 }]);
       const receipt110 = (await older.pool.query("SELECT source_name, chain_manifest_sha256 FROM public.debateai_schema_migration_forward110")).rows;
       expect(receipt110).toEqual([{ source_name: DEV_110, chain_manifest_sha256: plan.forward108.manifestSha256 }]);
       const receipts = await receiptOf(older.pool);
@@ -761,6 +762,7 @@ describe("F10 — 0111 is the forward step after dev's 0110, with its receipt an
       expect(receipts[17]).toMatchObject({ source_name: THREAT_REPORT_MIGRATION, previous_manifest_sha256: plan.forwardChain[16]!.manifestSha256 });
       expect(receipts[18]).toMatchObject({ source_name: SUPPORT_ANSWER_SCOPE_MIGRATION, previous_manifest_sha256: plan.forwardChain[17]!.manifestSha256 });
       expect(receipts[19]).toMatchObject({ source_name: RLS_MIGRATION, previous_manifest_sha256: plan.forwardChain[18]!.manifestSha256 });
+      expect(receipts[20]).toMatchObject({ source_name: OUTBOUND_MAIL_MIGRATION, previous_manifest_sha256: plan.forwardChain[19]!.manifestSha256 });
       const before = (await older.pool.query("SELECT name, applied_at FROM public.debateai_schema_migration ORDER BY name")).rows;
       await migrate(older.pool);
       expect((await older.pool.query("SELECT name, applied_at FROM public.debateai_schema_migration ORDER BY name")).rows).toEqual(before);

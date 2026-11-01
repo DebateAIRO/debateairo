@@ -48,5 +48,13 @@
   "owner.O4.listed": "At most one such email is sent an hour; the owner summary (the quarterly email, or the tax summary command) counts every kept message by day.",
   "owner.threatReport.subject": "A threat report is waiting",
   "owner.threatReport.waiting": "A question our automatic check refused has been kept as a threat report and is waiting to be read.",
-  "owner.threatReport.open": "Open the staff console and go to Threat reports to read it."
+  "owner.threatReport.open": "Open the staff console and go to Threat reports to read it.",
+  "owner.outboundMail.share.subject": "Half of today's mail limit is used",
+  "owner.outboundMail.share.body": "The site has sent half of the mail it may send today. Nothing has stopped: this is only a warning.",
+  "owner.outboundMail.signUpStopped.subject": "Sign-up mail has stopped for today",
+  "owner.outboundMail.signUpStopped.body": "The site reached the part of today's mail limit open to ordinary mail. New sign-ups and resends are told to try later, and other ordinary mail waits. Security mail still goes out.",
+  "owner.outboundMail.allStopped.subject": "All mail has stopped for today",
+  "owner.outboundMail.allStopped.body": "The site reached today's whole mail limit, so security mail has stopped too. Password resets and security notices wait until the count starts again.",
+  "owner.outboundMail.count": "Day (UTC): {day}. Mails sent: {total}. Daily limit: {limit}.",
+  "owner.outboundMail.resets": "The count starts again at midnight UTC."
 }

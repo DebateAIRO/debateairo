@@ -10,7 +10,7 @@ base verifier).
 
 Every migration after 0110 is a forward step in an ordered chain anchored on 0110; 0111 (NETOPIA, PR-54, PR-58) is the
 first, the auth DB batch (0112, below) the second, Part C's prices (0113, below) the third, role rotation (0114,
-below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth, the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, the synthesis check (0126, below) the sixteenth, the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth, the support answer scope (0129, below) the nineteenth and row-level security (0130, below) the twentieth. A step is added with new files only; NNNN is its number, the step before's number plus one:
+below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth, the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, the synthesis check (0126, below) the sixteenth, the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth, the support answer scope (0129, below) the nineteenth and row-level security (0130, below) the twentieth, and the daily outbound mail limit (0153, below) the twenty-first. A step is added with new files only; NNNN is its number, the step before's number plus one:
 
 1. `migrations/NNNN_<name>.sql`: the SQL, forward-only and replayable.
 2. A manifest in `lineage/`, shaped like `billing-netopia-forward111.json`: its version, the recipe's SHA-256,
@@ -563,3 +563,19 @@ constants, then every exact-chain test). The preview's native verify never appli
 the native operator's `apply-and-plan` applies one, with the owner's yes.
 
 Recompute a digest with `node -e 'console.log(require("node:crypto").createHash("sha256").update(require("node:fs").readFileSync(process.argv[1])).digest("hex"))' <file>`.
+
+## The daily outbound mail limit (0153)
+
+The twenty-first chain step, after row-level security's 0130 (owner's rulings of 2026-11-01; it replaces closed PR #113, whose
+count lived in the API's memory): `0153_outbound_mail_limit.sql`, `outbound-mail-limit-forward0153.json`,
+`packages/db/src/migration-forward0153.ts` (`loadForward0153`, appended last to `STEPS`, `MIGRATION_FORWARD0153_*` refusals). It
+adds `identity.outbound_mail_daily_count` (one row per UTC day: counts and alert times only) and
+`identity.outbound_mail_suppression` (keyed digests only), and four `SECURITY DEFINER` functions, EXECUTE for `debateai_runtime`
+only. No login holds a right on the tables, so they are outside row-level security's rule (SPEC-v4 R1). The bounce and complaint
+feed that fills the suppression list is still owed; until it lands the list stays empty. No billing object, so
+`verify-effective-capabilities-130.sql` stays in force; no `replayVerifierSql`: its checks are its postcondition digest.
+
+Its number skips 0131 to 0152 on purpose: the open V4 work (#224) holds them, and the chain only asks that each name sorts after
+the one before. If #224 merges first, this step keeps its number and its manifest's `previous` is re-chained to #224's last step
+(recompute the manifest and the chain pins). If this step reaches a database first, #224 must renumber above it, because an
+applied chain cannot take a step before one it already holds.

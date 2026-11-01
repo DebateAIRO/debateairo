@@ -29,8 +29,10 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * directory; run it alone.
  */
 const SIDE_BY_SIDE = "0123_side_by_side_releases.sql";
-/** Row-level security (mission row-level-security, SPEC-v4 R26): the chain's step after 0123, its last. */
+/** Row-level security (mission row-level-security, SPEC-v4 R26): the chain's step after 0129. */
 const RLS = "0130_row_level_security.sql";
+/** The daily outbound mail limit, the chain's last step. */
+const HEAD_STEP = "0153_outbound_mail_limit.sql";
 const EXPAND: N1Declaration = Object.freeze({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false, concurrentIndex: null });
 /** A later step with constant digests, as forward-chain-replay-verifiers.test.ts builds its probes, plus its n1 header. */
 function probe(previous: ChainStep, name: string, sql: string, n1: N1Declaration = EXPAND): ChainStep {
@@ -63,14 +65,15 @@ describe("Review Focus 1: a step that fails (or a kill) between steps", () => {
 
   it("a failing step leaves every earlier step committed", async () => {
     const real = (await loadMigrationPlan()).forwardChain.map((step) => step.name);
-    expect(real).toHaveLength(20);
-    expect(real.at(-1)).toBe(RLS);
+    expect(real).toHaveLength(21);
+    expect(real.at(-2)).toBe(RLS);
+    expect(real.at(-1)).toBe(HEAD_STEP);
     chain.shape = extendedBy((last) => probe(last, "0199_probe_fail.sql", "SELECT 1/0"));
     await expect(migrate(db.pool)).rejects.toMatchObject({ code: "22012" });
     chain.shape = undefined;
-    // All twenty real steps were applied by that same run and stay committed; the probe left nothing.
+    // All twenty-one real steps were applied by that same run and stay committed; the probe left nothing.
     expect(await receipts()).toEqual(real);
-    expect((await db.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration_step")).rows[0].n).toBe(20);
+    expect((await db.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration_step")).rows[0].n).toBe(21);
     expect(await ledger()).toEqual(expect.arrayContaining(real));
     expect(await ledger()).not.toContain("0199_probe_fail.sql");
     // The next run continues where the last one stopped: everything replays, nothing is left to apply.

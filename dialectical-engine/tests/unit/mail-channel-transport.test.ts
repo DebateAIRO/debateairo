@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { testOutboundMailGate } from "../support/outboundMailGate.js";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -17,17 +18,17 @@ const expiresAt = new Date("2026-10-05T12:00:00.000Z");
 const options = { executable: "/controlled/sendmail", from: "noreply@dezbatere.ro", publicAppUrl: "https://dezbatere.ro", timeoutMs: 25 };
 const senders = [
   { name: "verification", exitCode: "SENDMAIL_EXIT_42", signalCode: "SENDMAIL_SIGNAL_SIGTERM",
-    send: (overrides: Partial<typeof options> = {}) => new SendmailMailSender({ ...options, ...overrides }).sendVerification({ attemptId: "opaque", recipient, token, expiresAt }) },
+    send: (overrides: Partial<typeof options> = {}) => new SendmailMailSender({ gate: testOutboundMailGate(), ...options, ...overrides }).sendVerification({ attemptId: "opaque", recipient, token, expiresAt }) },
   { name: "security notification", exitCode: "SENDMAIL_EXIT_42", signalCode: "SENDMAIL_SIGNAL_SIGTERM",
-    send: (overrides: Partial<typeof options> = {}) => new SendmailSecurityNotificationSender({ ...options, ...overrides }).sendSecurityNotification({ messageId: "11111111-1111-4111-8111-111111111111", recipient, eventKind: "SCHEDULED", executeAt: expiresAt, display: { locale: "en", timeZone: null } }) },
+    send: (overrides: Partial<typeof options> = {}) => new SendmailSecurityNotificationSender({ gate: testOutboundMailGate(), ...options, ...overrides }).sendSecurityNotification({ messageId: "11111111-1111-4111-8111-111111111111", recipient, eventKind: "SCHEDULED", executeAt: expiresAt, display: { locale: "en", timeZone: null } }) },
   {
     name: "email change", exitCode: "SENDMAIL_EXIT_42", signalCode: "SENDMAIL_SIGNAL_SIGTERM",
-    send: (overrides: Partial<typeof options> = {}) => new SendmailEmailChangeMailSender({ ...options, ...overrides })
+    send: (overrides: Partial<typeof options> = {}) => new SendmailEmailChangeMailSender({ gate: testOutboundMailGate(), ...options, ...overrides })
       .sendEmailChange({ kind: "confirmation", recipient, token, expiresAt })
   },
   {
     name: "recovery email", exitCode: "SENDMAIL_EXIT_FAILED", signalCode: "SENDMAIL_EXIT_FAILED",
-    send: (overrides: Partial<typeof options> = {}) => new SendmailRecoveryEmailMailSender({ ...options, ...overrides })
+    send: (overrides: Partial<typeof options> = {}) => new SendmailRecoveryEmailMailSender({ gate: testOutboundMailGate(), ...options, ...overrides })
       .sendRecoveryEmail({ kind: "confirmation", recipient, token, expiresAt })
   }
 ];

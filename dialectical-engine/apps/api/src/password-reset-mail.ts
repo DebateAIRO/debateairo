@@ -4,7 +4,8 @@ import { decrypt, type ReadableUserDekStore } from "@debateai/crypto";
 import type { AuthPolicy } from "@debateai/register";
 import type { PasswordResetPolicy } from "../../../packages/register/src/password-reset-policy.js";
 import { PostgresPasswordResetRepository } from "../../../packages/db/src/password-reset.js";
-import { isSingleDeliverableRecipient, MailDeliveryError } from "./mail-channel.js";
+import { authorizeOutboundMail, isOutboundMailAuthorizer, isSingleDeliverableRecipient, MailDeliveryError } from "./mail-channel.js";
+import type { OutboundMailAuthorizer } from "./outbound-mail-gate.js";
 import { passwordResetNoticeAad } from "./password-reset.js";
 import { copyOf } from "@debateai/mail-templates";
 import { catalogLocaleOf, MAIL_LOCALE_VALUES } from "./mail-locale.js";
@@ -61,12 +62,15 @@ export class SendmailPasswordResetSender implements PasswordResetMailSender {
     from: string;
     publicAppUrl: string;
     timeoutMs: number;
+    gate: OutboundMailAuthorizer;
   }>) {
-    if (!options.executable || !Number.isInteger(options.timeoutMs) || options.timeoutMs < 1)
+    if (!options.executable || !Number.isInteger(options.timeoutMs) || options.timeoutMs < 1 || !isOutboundMailAuthorizer(options.gate))
       throw new MailDeliveryError("PASSWORD_RESET_MAIL_CONFIGURATION_INVALID");
   }
   async send(mail: PasswordResetMail) {
     const message = renderPasswordResetMail(mail, this.options);
+    // The outbound mail gate, last, before the spawn (security class: inside the reserve).
+    if (!(await authorizeOutboundMail(this.options.gate, mail.recipient, "password-reset"))) return;
     await new Promise<void>((resolve, reject) => {
       const child = spawn(this.options.executable, ["-i", "-t", "-f", this.options.from], { stdio: ["pipe", "ignore", "ignore"] });
       let settled = false;

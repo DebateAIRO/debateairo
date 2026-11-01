@@ -16,7 +16,7 @@ import {
 type Row = { rowKey: string; valueJsonText: string; sourceRef: string };
 const sha = (text: string) => createHash('sha256').update(text).digest('hex');
 const runtime = { nodeVersion: 'v26.8.2', pnpmVersion: '11.20.0', sourceRevision: 'a'.repeat(40), sourceTree: 'b'.repeat(40), operatorSha256: 'c'.repeat(64), observedAt: '2026-10-10T12:00:00.000Z' };
-const V1_ADDITIONS = ['consumerRecoveryPolicy', 'publicationCheckPolicy', 'questionCheckPolicy', 'taxAuthorities'];
+const V1_ADDITIONS = ['consumerRecoveryPolicy', 'outboundMailPolicy', 'publicationCheckPolicy', 'questionCheckPolicy', 'taxAuthorities'];
 const canonical = (value: unknown) => parseCanonicalRegisterJson(Buffer.from(JSON.stringify(value))) as string;
 const owned = () => [STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map(row => ({ rowKey: row.rowKey, valueJsonText: canonicalRegisterJson(row.valueAst), sourceRef: row.sourceRef }));
 const sorted = (rows: Row[]) => [...rows].sort((a, b) => a.rowKey.localeCompare(b.rowKey, 'en'));
@@ -96,7 +96,7 @@ describe('publish kit v2: composing from the current version', () => {
     const v2 = compose(f.source, f.v8, '8');
     expect(v2.rows.map(row => row.rowKey)).toEqual([...v1.rows.map(row => row.rowKey), ROTATION_KEY, 'engineContractHash', 'mapContractHash'].sort((a, b) => a.localeCompare(b, 'en')));
     for (const row of v2.rows) if (!MULTI_MODEL_KEYS.includes(row.rowKey) && row.rowKey !== ROTATION_KEY && row.rowKey !== 'mapContractHash' && row.rowKey !== 'engineContractHash') expect(row).toEqual(v1.rows.find(old => old.rowKey === row.rowKey));
-    expect(v2.addedKeys).toEqual([ROTATION_KEY, 'consumerRecoveryPolicy', 'engineContractHash', 'mapContractHash', 'publicationCheckPolicy', 'questionCheckPolicy', 'taxAuthorities']);
+    expect(v2.addedKeys).toEqual([ROTATION_KEY, 'consumerRecoveryPolicy', 'engineContractHash', 'mapContractHash', 'outboundMailPolicy', 'publicationCheckPolicy', 'questionCheckPolicy', 'taxAuthorities']);
     expect(v2.changedKeys).toEqual(['configuredProviderSet', 'nodeRuntimeVersion', 'providerFamilyMap']);
     for (const key of V1_ADDITIONS) {
       const entry = v2.delta.find(row => row.rowKey === key)!;

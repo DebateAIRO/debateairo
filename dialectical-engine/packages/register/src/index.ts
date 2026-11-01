@@ -1207,6 +1207,14 @@ export {
   type PublicationCheckPolicyValue
 } from "./publication-check-policy.js";
 export {
+  OUTBOUND_MAIL_POLICY_DEPLOYMENT_REGISTER_ROW,
+  OUTBOUND_MAIL_POLICY_ROW_KEY,
+  outboundMailPolicyFromValue,
+  readOutboundMailPolicy,
+  type OutboundMailPolicy,
+  type OutboundMailPolicyValue
+} from "./outbound-mail-policy.js";
+export {
   QUESTION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW,
   QUESTION_CHECK_POLICY_ROW_KEY,
   questionCheckPolicyFromValue,

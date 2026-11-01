@@ -1,6 +1,6 @@
 // Preview register publish kit v2.
 //
-// Plain words: v1 (publish-register.ts, unchanged but for S04's questionCheckPolicy, which the API reads at start-up) could
+// Plain words: v1 (publish-register.ts, unchanged but for S04's questionCheckPolicy and the mail limit's outboundMailPolicy, which the API reads at start-up) could
 // only make ONE publication: a 67-row source on top of a 65-row base, adding exactly four fixed
 // keys. From the live v9 (68 rows) it refuses, and it can never add a further key.
 // v2 composes the next snapshot from the CURRENT published version plus the reviewed source rows:
@@ -85,7 +85,7 @@ const FORBIDDEN_KEYS = Object.freeze(['modelScorecard','supportActivation']);
 /**
  * The reviewed source closure: exactly the keys buildPreviewSourceRowsV2 must produce (69: the 67 at
  * dev 5109a5501 plus role rotation — the 66 of dev b75e4c294 and answerRoleRotationPolicy — mapContractHash, the
- * debate shape's sealed map prompts (P2b Task 6), and engineContractHash, engine 2's seal (engine redesign R1d Task 4);
+ * debate shape's sealed map prompts (P2b Task 6), and engineContractHash, engine 2's seal (engine redesign R1d Task 4), and outboundMailPolicy, the daily mail limit (70 since 2026-11-01);
  * the same keys the live v9 holds minus the two base-owned ones, plus those three rows once they are published).
  * A new register row reaches the preview only by being added here.
  */
@@ -95,7 +95,7 @@ export const PREVIEW_SOURCE_ROW_KEYS_V2 = Object.freeze([
   'configuredProviderSet','conformanceContractHash','consumerRecoveryPolicy','costEnvelopePolicy','countryPolicy','disagreementQuantity',
   'disagreementThreshold','dispersionScale','downgradeBands','engineContractHash','envelopeFormulaInputs','evaluatorCallBound','evaluatorLoopMaxRounds',
   'evaluatorRoleRef','globalStopDelta','hiddenNodeScoreThreshold','judgeContractHash','judgementSelectionPolicy','livenessPolicy',
-  'mapContractHash','mfaPolicy','mfaRecoveryPolicy','nodeRuntimeVersion','panelDiscoveryPolicy','passwordPolicy','passwordResetPolicy',
+  'mapContractHash','mfaPolicy','mfaRecoveryPolicy','nodeRuntimeVersion','outboundMailPolicy','panelDiscoveryPolicy','passwordPolicy','passwordResetPolicy',
   'pnpmVersion','postgresMajorVersion','productRolePolicy','propagationContractHash','providerFamilyMap','publicationCheckPolicy','questionCheckPolicy',
   'rateLimitPolicy','recoveryPolicy','repeatedFamilyMultiplier','riskTier','runDeathPolicy','scoringOperator',
   'serveContractHash','sessionPolicy','storyCheckerCallBound','storyCheckerRoleRef','storyLoopMaxRounds','storyMaterialBudget',

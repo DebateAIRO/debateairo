@@ -1,4 +1,5 @@
 import { mailAlternatives } from "../support/accountMail.js";
+import { testOutboundMailGate } from "../support/outboundMailGate.js";
 import { mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -21,7 +22,7 @@ it("sends a purpose-limited fragment link through stdin without recipient argv",
     mode: 0o700
   });
   try {
-    const sender = new SendmailRecoveryEmailMailSender({
+    const sender = new SendmailRecoveryEmailMailSender({ gate: testOutboundMailGate(),
       executable, from: "noreply@dezbatere.ro", publicAppUrl: "https://dezbatere.ro", timeoutMs: 30000
     });
     await sender.sendRecoveryEmail({

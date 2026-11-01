@@ -27,6 +27,7 @@ import {readConsumerRecoveryPolicy} from "@debateai/register";
 import {SendmailConsumerAccountSender} from "./mail-channel.js";
 import { ConsumerSecurityService } from "./consumer-security.js";
 import { PostgresConsumerSecurityRepository } from "@debateai/db";
+import { PostgresOutboundMailStore } from "@debateai/db";
 import { ConsumerWebAuthnService } from "./consumer-webauthn.js";
 import { PostgresConsumerAuthRepository } from "@debateai/db";
 import { UnixTurnstileVerifier } from "./turnstile.js";
@@ -91,6 +92,7 @@ import {
   readAuthPolicy,
   readMfaPolicy,
   readProductRolePolicy,
+  readOutboundMailPolicy,
   readPublicationCheckPolicy,
   readQuestionCheckPolicy,
   readSupportNoSourceCheckPolicy,
@@ -177,6 +179,7 @@ import { StoryRepository } from "@debateai/story";
 import { PostgresLegacyRunClaimApplication } from "./legacy-claim.js";
 import { SendmailRecoveryEmailMailSender, SendmailEmailChangeMailSender, SendmailMailSender, SendmailSecurityNotificationSender, TemplatedMailSender } from "./mail-channel.js";
 import { systemMailDomainCheck } from "./mail-domain-check.js";
+import { OutboundMailGate, outboundMailReport } from "./outbound-mail-gate.js";
 import { EmailChangeService } from "./email-change.js";
 import { billingMailAttachmentResolvers } from "./mail-attachments.js";
 import {
@@ -922,6 +925,31 @@ const socialRepository = new PostgresSocialIdentityRepository(authorizationPool,
 // Open sign-up mail (owner decision G5, 2026-10-09): the DNS question at the three entry points, 2 s, fail open.
 // Ruling 2026-10-09: outside local mode the special-use endings (.test .example .invalid .localhost) are refused.
 const mailDomainCheck = systemMailDomainCheck(environment.DEPLOYMENT_MODE);
+// The daily outbound mail limit (owner's rulings of 2026-11-01): every account-mail sender below asks this one gate just
+// before it starts MAIL_SENDMAIL_PATH (address rule, suppression, the day's count). The limits are the register's
+// outboundMailPolicy row (a version without it refuses here, OUTBOUND_MAIL_POLICY_UNRESOLVED). The count is in the
+// database (migration 0153), so it survives restarts and uploads and every API copy shares it.
+const outboundMailPolicy = await boot.run("outbound-mail-policy", () => readOutboundMailPolicy(pool, environment.REGISTER_VERSION));
+const outboundMailStore = new PostgresOutboundMailStore(pool);
+// A login that cannot read the count would refuse every mail at run time; say so at the start instead.
+await boot.run("outbound-mail-store", () => attestEveryRoute(() => outboundMailStore.today()));
+const outboundMailGate: OutboundMailGate = new OutboundMailGate({
+  policy: outboundMailPolicy,
+  blindIndexKey,
+  ledger: outboundMailStore,
+  suppression: outboundMailStore,
+  report: (event) => { reportOutboundMail(event); }
+});
+// The owner's alert goes to the billing owner's address when the site has one; otherwise the journal line is the alert.
+const reportOutboundMail = outboundMailReport({
+  ownerAddress: billingConnectors?.ownerReportEmail,
+  mail: new TemplatedMailSender({
+    executable: environment.MAIL_SENDMAIL_PATH,
+    from: environment.MAIL_FROM,
+    timeoutMs: authPolicy.channel.transportTimeoutMs,
+    gate: outboundMailGate
+  })
+});
 const registration = new RegistrationService({
   repository: identityRepository,
   socialRepository,
@@ -929,7 +957,8 @@ const registration = new RegistrationService({
     executable: environment.MAIL_SENDMAIL_PATH,
     from: environment.MAIL_FROM,
     publicAppUrl: environment.PUBLIC_APP_URL,
-    timeoutMs: authPolicy.channel.transportTimeoutMs
+    timeoutMs: authPolicy.channel.transportTimeoutMs,
+    gate: outboundMailGate
   }),
   dekStore,
   blindIndexKey,
@@ -942,7 +971,9 @@ const registration = new RegistrationService({
   argon2: argon2Pool,
   // Paid plans L3b: the acceptance record's evidence is sealed under the records key (L1).
   legalAcceptance: { recordsKey },
-  mailDomainCheck
+  mailDomainCheck,
+  // At the limit, sign-up and resend answer MAIL_DAILY_LIMIT ("try later") before any account work.
+  outboundMail: outboundMailGate
 });
 // Paid plans L4: re-acceptance of the Terms and the Privacy Policy, over the acceptance record.
 // Hosted: an account with no record owes both documents (it must accept before it can pay).
@@ -969,7 +1000,7 @@ const sessions = await boot.run("session-service", () => SessionService.create({
   blindIndexKey
 }));
 const socialAuth = new SocialAuthService(socialRepository,socialProviders,sessions.consumerProducer(),{registration,security:new PostgresConsumerSecurityRepository(authorizationPool,auditContextHasher),authPolicy,blindIndexKey});
-const consumerAccountMail=new SendmailConsumerAccountSender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,timeoutMs:authPolicy.channel.transportTimeoutMs,publicAppUrl:environment.PUBLIC_APP_URL});
+const consumerAccountMail=new SendmailConsumerAccountSender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,timeoutMs:authPolicy.channel.transportTimeoutMs,publicAppUrl:environment.PUBLIC_APP_URL,gate:outboundMailGate});
 const consumerRecovery=new ConsumerRecoveryService(new PostgresConsumerRecoveryRepository(authorizationPool,auditContextHasher),sessions.consumerProducer(),{publicAppUrl:environment.PUBLIC_APP_URL,users:dekStore,argon2:argon2Pool,mfaPolicy,authPolicy,policy:consumerRecoveryPolicy,blindIndexKey,mail:consumerAccountMail,onMailFailure:()=>console.error('[CONSUMER_RECOVERY_MAIL_FAILED]')});
 const onboardingEvidence=new OnboardingEvidenceService(new PostgresOnboardingEvidenceRepository(authorizationPool,auditContextHasher),sessions.consumerProducer(),recordsKey);
 const consumerSecurityNotices=new ConsumerSecurityNoticeReconciler(new PostgresConsumerSecurityNoticeRepository(authorizationPool),dekStore,consumerAccountMail);
@@ -977,7 +1008,7 @@ const passwordResetRepository=passwordResetPolicy?new PostgresPasswordResetRepos
 // COR-B1, V-12: the request path runs on the T1 login, the notification worker on the target: both are attested.
 if(passwordResetRepository)await boot.run("password-reset-role",()=>attestEveryRoute(()=>passwordResetRepository.assertRole()));
 const passwordReset=passwordResetRepository&&passwordResetPolicy?new PasswordResetService({repository:passwordResetRepository,users:dekStore,argon2:argon2Pool,authPolicy,mfaPolicy,passwordResetPolicy,blindIndexKey,reportDiagnostic:code=>console.error(`[${code}]`)}):undefined;
-const passwordResetNotices=passwordResetRepository&&passwordResetPolicy?new PasswordResetNotificationWorker({repository:passwordResetRepository,users:dekStore,sender:new SendmailPasswordResetSender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,publicAppUrl:environment.PUBLIC_APP_URL,timeoutMs:authPolicy.channel.transportTimeoutMs}),authPolicy,passwordResetPolicy,dispatch:operation=>registration.dispatchRecoveryMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)}):undefined;
+const passwordResetNotices=passwordResetRepository&&passwordResetPolicy?new PasswordResetNotificationWorker({repository:passwordResetRepository,users:dekStore,sender:new SendmailPasswordResetSender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,publicAppUrl:environment.PUBLIC_APP_URL,timeoutMs:authPolicy.channel.transportTimeoutMs,gate:outboundMailGate}),authPolicy,passwordResetPolicy,dispatch:operation=>registration.dispatchRecoveryMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)}):undefined;
 const triggerPasswordResetReconciliation=passwordResetNotices?createSingleFlightErasureReconciler(()=>passwordResetNotices.reconcile(100),()=>console.error("[PASSWORD_RESET_RECONCILIATION_PENDING]")):undefined;
 let passwordResetTimer:ReturnType<typeof setInterval>|undefined;
 const backupEmailRepository=backupEmailPolicy?new PostgresBackupEmailRepository(pool,auditContextHasher,environment.REGISTER_VERSION):undefined;
@@ -986,7 +1017,7 @@ if(backupEmailRepository)await boot.run("backup-email-role",()=>attestEveryRoute
 if(mfaRecoveryRepository)await boot.run("mfa-recovery-role",()=>attestEveryRoute(()=>mfaRecoveryRepository.assertRole()));
 const backupEmail=backupEmailRepository&&backupEmailPolicy?new BackupEmailService({repository:backupEmailRepository,users:dekStore,argon2:argon2Pool,authPolicy,mfaPolicy,policy:backupEmailPolicy}):undefined;
 const mfaRecovery=mfaRecoveryRepository&&mfaRecoveryPolicy?new MfaRecoveryService({repository:mfaRecoveryRepository,users:dekStore,argon2:argon2Pool,authPolicy,mfaPolicy,policy:mfaRecoveryPolicy,blindIndexKey}):undefined;
-const emailRecoverySender=new SendmailEmailRecoverySender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,publicAppUrl:environment.PUBLIC_APP_URL,timeoutMs:authPolicy.channel.transportTimeoutMs});
+const emailRecoverySender=new SendmailEmailRecoverySender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,publicAppUrl:environment.PUBLIC_APP_URL,timeoutMs:authPolicy.channel.transportTimeoutMs,gate:outboundMailGate});
 const emailRecoveryWorkers=[...(backupEmailRepository?[new EmailRecoveryNotificationWorker({flow:"backup_email",repository:backupEmailRepository,users:dekStore,sender:emailRecoverySender,authPolicy,dispatch:operation=>registration.dispatchRecoveryMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)})]:[]),...(mfaRecoveryRepository?[new EmailRecoveryNotificationWorker({flow:"mfa_recovery",repository:mfaRecoveryRepository,users:dekStore,sender:emailRecoverySender,authPolicy,dispatch:operation=>registration.dispatchRecoveryMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)})]:[])];
 const triggerEmailRecoveryReconciliation=emailRecoveryWorkers.length?createSingleFlightErasureReconciler(async()=>{for(const worker of emailRecoveryWorkers)await worker.reconcile(100);},()=>console.error("[EMAIL_RECOVERY_RECONCILIATION_PENDING]")):undefined;
 let emailRecoveryTimer:ReturnType<typeof setInterval>|undefined;
@@ -1037,7 +1068,8 @@ const recoveryEmail = new RecoveryEmailService({
     executable: environment.MAIL_SENDMAIL_PATH,
     from: environment.MAIL_FROM,
     publicAppUrl: environment.PUBLIC_APP_URL,
-    timeoutMs: authPolicy.channel.transportTimeoutMs
+    timeoutMs: authPolicy.channel.transportTimeoutMs,
+    gate: outboundMailGate
   }),
   mailDomainCheck
 });
@@ -1049,7 +1081,8 @@ const emailChange = new EmailChangeService({
     executable: environment.MAIL_SENDMAIL_PATH,
     from: environment.MAIL_FROM,
     publicAppUrl: environment.PUBLIC_APP_URL,
-    timeoutMs: authPolicy.channel.transportTimeoutMs
+    timeoutMs: authPolicy.channel.transportTimeoutMs,
+    gate: outboundMailGate
   }),
   mailDomainCheck
 });
@@ -1171,7 +1204,8 @@ const threatReportAlertsTimer = startThreatReportAlerts({
   mail: new TemplatedMailSender({
     executable: environment.MAIL_SENDMAIL_PATH,
     from: environment.MAIL_FROM,
-    timeoutMs: authPolicy.channel.transportTimeoutMs
+    timeoutMs: authPolicy.channel.transportTimeoutMs,
+    gate: outboundMailGate
   }),
   readRecipientEmail: readThreatReportStaffEmail
 }, releaseWatcher);
@@ -1190,7 +1224,8 @@ const erasureNotifications = new AccountErasureNotificationReconciler(
   accountErasureRepository,dekStore,new SendmailSecurityNotificationSender({
     executable:environment.MAIL_SENDMAIL_PATH,
     from:environment.MAIL_FROM,
-    timeoutMs:authPolicy.channel.transportTimeoutMs
+    timeoutMs:authPolicy.channel.transportTimeoutMs,
+    gate:outboundMailGate
   })
 );
 const reconciliationSource = () => Object.freeze({
@@ -1552,7 +1587,8 @@ const billingRuntime = billingConnectors === null
         sender: new TemplatedMailSender({
           executable: environment.MAIL_SENDMAIL_PATH,
           from: environment.MAIL_FROM,
-          timeoutMs: authPolicy.channel.transportTimeoutMs
+          timeoutMs: authPolicy.channel.transportTimeoutMs,
+          gate: outboundMailGate
         }),
         attachments: billingMailAttachmentResolvers({ audit: consoleBillingAudit })
       },
@@ -1606,7 +1642,8 @@ if (environment.DATA_EXPORT_STORE_PATH !== undefined) {
   const mail = new TemplatedDataExportMail(new TemplatedMailSender({
     executable: environment.MAIL_SENDMAIL_PATH,
     from: environment.MAIL_FROM,
-    timeoutMs: authPolicy.channel.transportTimeoutMs
+    timeoutMs: authPolicy.channel.transportTimeoutMs,
+    gate: outboundMailGate
   }));
   const ownerDeps = { application, stories: ownerStories, disclosures: ownerDisclosures, synthesisAnswerAccess };
   dataExport = new DataExportApplication({

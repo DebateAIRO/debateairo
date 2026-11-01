@@ -75,7 +75,7 @@ describe('isolated PG18 native preview publication (source evidence, not Linux s
     await migrate(pool);
     expect((await pool.query('SELECT name,applied_at FROM public.debateai_schema_migration WHERE name=ANY($1::text[]) ORDER BY name',[history.map(row=>row.name)])).rows).toEqual(history);
     const source=await buildPreviewSourceRows(await loadBootstrapRegister(),observation);
-    const base=[...source.filter(row=>!['consumerRecoveryPolicy','publicationCheckPolicy','questionCheckPolicy','taxAuthorities'].includes(row.rowKey)),...[STAFF_ACCESS_POLICY_REGISTER_ROW,INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef}))];
+    const base=[...source.filter(row=>!['consumerRecoveryPolicy','outboundMailPolicy','publicationCheckPolicy','questionCheckPolicy','taxAuthorities'].includes(row.rowKey)),...[STAFF_ACCESS_POLICY_REGISTER_ROW,INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef}))];
     // Historical import is synthetic fixture setup only; the operator never seeds development/bootstrap.
     await createPostgresRegisterPublicationPort(pool).importHistorical({registerVersion:parseRegisterVersionText('4'),rows:base});
     const sealedBefore=await readSealedSnapshot(pool,'4');
@@ -124,7 +124,7 @@ describe('the preview verify never applies a database step (PR-57)',()=>{
    const forward108=async()=>(await selected!.query('SELECT count(*)::int n FROM public.debateai_schema_migration_forward')).rows[0].n;
    // The register is already published on the preview; verify replays the actual receipt.
    const source=await buildPreviewSourceRows(await loadBootstrapRegister(),observation);
-   const base=[...source.filter(row=>!['consumerRecoveryPolicy','publicationCheckPolicy','questionCheckPolicy','taxAuthorities'].includes(row.rowKey)),...[STAFF_ACCESS_POLICY_REGISTER_ROW,INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef}))];
+   const base=[...source.filter(row=>!['consumerRecoveryPolicy','outboundMailPolicy','publicationCheckPolicy','questionCheckPolicy','taxAuthorities'].includes(row.rowKey)),...[STAFF_ACCESS_POLICY_REGISTER_ROW,INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef}))];
    await createPostgresRegisterPublicationPort(selected).importHistorical({registerVersion:parseRegisterVersionText('4'),rows:base});
    const sealed=await readSealedSnapshot(selected,'4');
    const snapshot=composePreviewSnapshot({sourceRows:source,baseRows:sealed.rows,baseRegisterVersion:'4',baseSnapshotSha256:computeRegisterSnapshotSha256(base)});
@@ -181,7 +181,8 @@ describe('the general preview guard on each complete 0108 lineage (PR-59)',()=>{
     '0127_publication_review.sql',
     '0128_threat_reports.sql',
     '0129_support_answer_scope.sql',
-    '0130_row_level_security.sql'
+    '0130_row_level_security.sql',
+    '0153_outbound_mail_limit.sql'
    ]);
    const ledger=async(client:{query:pg.Pool['query']}=db.pool)=>(await client.query('SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name')).rows;
    const resolutionTable=async()=>(await db.pool.query("SELECT to_regclass('public.debateai_schema_migration_resolution') IS NOT NULL present")).rows[0].present as boolean;

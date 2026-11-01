@@ -10,7 +10,8 @@ export const MAIL_TEMPLATE_IDS = Object.freeze([
   "M1", "M2_INVOICE_LINK", "M2_INVOICE_ATTACHED", "M3", "M4", "M5A", "M5B", "M5C",
   "M6", "M7", "M8", "M8_RECEIVED", "M9", "M10", "M10_ENDED", "M11", "M11_DUPLICATE", "M12", "O1", "O2", "O2_WITHDRAWAL",
   "O2_REFUND_DUE", "O2_REFUND_REMINDER", "O3", "O4",
-  "DATA_EXPORT", "THREAT_REPORT_WAITING"
+  "DATA_EXPORT", "THREAT_REPORT_WAITING",
+  "OUTBOUND_MAIL_SHARE", "OUTBOUND_MAIL_SIGN_UP_STOPPED", "OUTBOUND_MAIL_ALL_STOPPED"
 ] as const);
 
 export type MailTemplateId = (typeof MAIL_TEMPLATE_IDS)[number];
@@ -372,5 +373,21 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
   THREAT_REPORT_WAITING: define({
     catalogue: "owner", subject: "owner.threatReport.subject",
     paragraphs: ["owner.threatReport.waiting", "owner.threatReport.open"], params: {}
+  }),
+  // The daily outbound mail limit (owner's rulings of 2026-11-01): counts and the UTC day only, never an address.
+  OUTBOUND_MAIL_SHARE: define({
+    catalogue: "owner", subject: "owner.outboundMail.share.subject",
+    paragraphs: ["owner.outboundMail.share.body", "owner.outboundMail.count"],
+    params: { day: "text", total: "text", limit: "text" }
+  }),
+  OUTBOUND_MAIL_SIGN_UP_STOPPED: define({
+    catalogue: "owner", subject: "owner.outboundMail.signUpStopped.subject",
+    paragraphs: ["owner.outboundMail.signUpStopped.body", "owner.outboundMail.count", "owner.outboundMail.resets"],
+    params: { day: "text", total: "text", limit: "text" }
+  }),
+  OUTBOUND_MAIL_ALL_STOPPED: define({
+    catalogue: "owner", subject: "owner.outboundMail.allStopped.subject",
+    paragraphs: ["owner.outboundMail.allStopped.body", "owner.outboundMail.count", "owner.outboundMail.resets"],
+    params: { day: "text", total: "text", limit: "text" }
   })
 });
