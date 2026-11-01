@@ -62,7 +62,7 @@ function fakeStore(): { store: ModelSpendStore; written: ModelSpendEntry[] } {
 
 function guardOver(store: ModelSpendStore): CostEnvelopeGuard {
   return new CostEnvelopeGuard({ store, clock: () => NOW,
-    policy: { perRunCeilingMicros: 50_000_000, dailyCeilingMicros: 900_000_000, perStoryCeilingMicros: 50_000_000 } });
+    policy: { perRunCeilingMicros: 50_000_000, dailyCeilingMicros: 900_000_000, perStoryCeilingMicros: 50_000_000, closingCeilingMicros: 50_000_000 } });
 }
 
 /** The real gateway on the Anthropic wire, the vendor scripted one reply per POST. */

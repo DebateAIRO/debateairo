@@ -17,7 +17,7 @@ const OWNER = testHttpIdentity("b7a-usage-owner");
 const NOW = new Date("2026-09-30T18:00:00.000Z");
 const window = (scope: PersonWindow["scope"], limitMicros: number, resetsAt: string): PersonWindow => Object.freeze({
   scope, limitMicros, periodStart: new Date("2026-09-29T09:00:00.000Z"), resetsAt: new Date(resetsAt),
-  finishBasisPoints: 11_000, closeBasisPoints: 9_500
+  finishBasisPoints: 12_100, closeBasisPoints: 9_500
 });
 
 function fixtureApplication(): AskApplication {
@@ -72,21 +72,21 @@ describe("B7a usage as a percentage (paid-plans spec §1.2, U1)", () => {
   it("reads each window's spend in [periodStart, resetsAt), and orders day, week, month", async () => {
     const reads: Array<[string, Date, Date]> = [];
     const windows = [
-      window("PERSON_MONTH", 5_000_000, "2026-10-29T09:00:00.000Z"),
-      window("PERSON_DAY", 1_000_000, "2026-10-01T09:00:00.000Z"),
-      window("PERSON_WEEK", 2_500_000, "2026-10-06T09:00:00.000Z")
+      window("PERSON_MONTH", 4_400_000, "2026-10-29T09:00:00.000Z"),
+      window("PERSON_DAY", 1_100_000, "2026-10-01T09:00:00.000Z"),
+      window("PERSON_WEEK", 2_200_000, "2026-10-06T09:00:00.000Z")
     ];
     const reader = new PersonUsageReader({
       entitlements: { current: async () => ({ planId: "PLUS" }) },
       allowance: { read: async () => windows },
-      spend: { readOwnerSpentMicros: async (ownerRef, from, to) => { reads.push([ownerRef, from, to]); return 400_000; } }
+      spend: { readOwnerSpentMicros: async (ownerRef, from, to) => { reads.push([ownerRef, from, to]); return 440_000; } }
     });
     await expect(reader.read("owner:a", NOW)).resolves.toEqual({
       planId: "PLUS",
       windows: [
         { scope: "PERSON_DAY", percent: 40, resetsAt: new Date("2026-10-01T09:00:00.000Z") },
-        { scope: "PERSON_WEEK", percent: 16, resetsAt: new Date("2026-10-06T09:00:00.000Z") },
-        { scope: "PERSON_MONTH", percent: 8, resetsAt: new Date("2026-10-29T09:00:00.000Z") }
+        { scope: "PERSON_WEEK", percent: 20, resetsAt: new Date("2026-10-06T09:00:00.000Z") },
+        { scope: "PERSON_MONTH", percent: 10, resetsAt: new Date("2026-10-29T09:00:00.000Z") }
       ]
     });
     expect(reads).toContainEqual(["owner:a", new Date("2026-09-29T09:00:00.000Z"), new Date("2026-10-01T09:00:00.000Z")]);

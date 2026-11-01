@@ -78,6 +78,7 @@ import { countryPolicyInForce } from "../../apps/api/src/country-gate.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { everyCountryClosedPolicyValue } from "../support/billingFixtures.js";
 import { importHistoricalRegisterFixture, registerFixtureRow } from "../support/registerFixtures.js";
+import { TEST_OWNER_LIMIT_ROWS } from "../support/hostedRegisterRows.js";
 
 let database: TestDatabase;
 const temporaryRoots: string[] = [];
@@ -102,6 +103,7 @@ function hostedFile(perRunCeilingMicros = 250_000): Record<string, unknown> {
   return {
     format: HOSTED_REGISTER_FILE_FORMAT,
     sourceRef: "task-14b integration: first hosted register",
+    ...structuredClone(TEST_OWNER_LIMIT_ROWS),
     configuredProviderSet: {
       requiredDistinctMakers: 2,
       providers: [

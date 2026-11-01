@@ -36,6 +36,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { execFileSync, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { startTestDatabase } from "../support/testDatabase.js";
+import { TEST_OWNER_LIMIT_ROWS } from "../support/hostedRegisterRows.js";
 
 const MIMO = "XiaomiMiMo/MiMo-V2.6-Pro";
 const GLM = "zai-org/GLM-5.3-Flash";
@@ -691,8 +692,8 @@ describe("preview practice: debate mode", () => {
         "NETOPIA_API_BASE_URL=https://secure-sandbox.netopia-payments.com", "NETOPIA_API_KEY_PATH=/etc/debateai-v3-preview/billing/netopia-api-key",
         "NETOPIA_IPN_KEYS_PATH=/etc/debateai-v3-preview/billing/netopia-ipn-keys.pem", ""].join("\n"));
     const logged: string[] = [];
-    const hostedBilling = JSON.stringify({ billing: "on", perRunCeilingMicros: 3_000_000, dailyCeilingMicros: 10_000_000,
-      askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 } });
+    const hostedBilling = JSON.stringify({ billing: "on", perRunCeilingMicros: 3_300_000, dailyCeilingMicros: 11_000_000,
+      askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 }, ...TEST_OWNER_LIMIT_ROWS });
     const args = common.map((arg) => arg.endsWith("settings.env") ? hostedSettings : arg);
     const outcome = await runPractice(["debate", ...args, "--register-export", registerExportPath, "--depth", "1", "--register-next",
       "--hosted-billing", hostedBilling], env, { ...quiet, log: (line) => logged.push(line) });
@@ -711,7 +712,7 @@ describe("preview practice: debate mode", () => {
     expect(report.register.codeNext.changedKeys).toEqual(expect.arrayContaining(["admissionPolicy", "billingPolicy", "costEnvelopePolicy"]));
     expect(report.deployment).toEqual({ mode: "hosted", room: true, billingInRegister: "on", billingInPractice: "off",
       setAsideSettings: ["GEOIP_COUNTRY_DB_PATH", "TOR_EXIT_LIST_PATH", "NETOPIA_API_BASE_URL", "NETOPIA_API_KEY_PATH", "NETOPIA_IPN_KEYS_PATH"],
-      ceilings: { perRunCeilingMicros: 3_000_000, dailyCeilingMicros: 10_000_000, perStoryCeilingMicros: 50_000, band: true, billingPlansSealed: true } });
+      ceilings: { perRunCeilingMicros: 3_300_000, dailyCeilingMicros: 11_000_000, perStoryCeilingMicros: 50_000, band: true, billingPlansSealed: true } });
     expect(report.admission.admitted).toBe(true);
     expect(report.admission.panel.map((member) => member.modelId).sort()).toEqual([...FIVE].sort());
     expect(report.run).toMatchObject({ workItemOutcome: "COMPLETED", answer: { served: true }, story: { outcome: "READY" } });
@@ -734,7 +735,7 @@ describe("preview practice: debate mode", () => {
     await writeFile(hostedSettings, settingsText().replace("DEBATEAI_DEPLOYMENT_MODE=local", "DEBATEAI_DEPLOYMENT_MODE=hosted"));
     const args = common.map((arg) => arg.endsWith("settings.env") ? hostedSettings : arg);
     const outcome = await runPractice(["debate", ...args, "--register-export", registerExportPath, "--register-next", "--hosted-billing",
-      JSON.stringify({ billing: "off", perRunCeilingMicros: 1, dailyCeilingMicros: 10_000_000, askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 } })],
+      JSON.stringify({ billing: "off", perRunCeilingMicros: 1, dailyCeilingMicros: 11_000_000, askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 }, ...TEST_OWNER_LIMIT_ROWS })],
     env, quiet);
     expect(outcome.exitCode).toBe(20);
     expect(outcome.report).toMatchObject({ verdict: "FAIL", admission: { admitted: true },
@@ -1057,8 +1058,8 @@ describe("preview practice: debate mode, the new debate shape (spec 2026-10-12 Â
     const hostedSettings = join(folder, `hosted-settings-${randomUUID()}.env`);
     await writeFile(hostedSettings, settingsText().replace("DEBATEAI_DEPLOYMENT_MODE=local", "DEBATEAI_DEPLOYMENT_MODE=hosted"));
     const args = common.map((arg) => arg.endsWith("settings.env") ? hostedSettings : arg);
-    const hostedBilling = JSON.stringify({ billing: "off", perRunCeilingMicros: 3_000_000, dailyCeilingMicros: 10_000_000,
-      askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 } });
+    const hostedBilling = JSON.stringify({ billing: "off", perRunCeilingMicros: 3_300_000, dailyCeilingMicros: 11_000_000,
+      askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 }, ...TEST_OWNER_LIMIT_ROWS });
     const outcome = await runPractice(["debate", ...args, "--register-export", registerExportPath, "--register-next", "--hosted-billing",
       hostedBilling, "--depth", "1", "--shape-policy", SHAPE_POLICY_START], env, quiet);
     const report = outcome.report as unknown as ShapeReport & {

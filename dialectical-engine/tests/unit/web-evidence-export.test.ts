@@ -71,9 +71,9 @@ function rawRows() {
     closings: [{ report_version: 1, closed_at: "2026-10-30T09:30:00+00:00", reopened_at: null, report_ref: REPORT,
       report_written_at: "2026-10-30T09:35:00+00:00" }] }];
   raw.reserve_events = [
-    { event_no: 1, kind: "HELD", amount_micros: 200000, investigation_id: null, report_version: null, blocked_window: null,
+    { event_no: 1, kind: "HELD", amount_micros: 440000, investigation_id: null, report_version: null, blocked_window: null,
       blocked_until: null, recorded_at: "2026-10-30T07:00:00+00:00" },
-    { event_no: 2, kind: "USED", amount_micros: 200000, investigation_id: INVESTIGATION, report_version: 1, blocked_window: null,
+    { event_no: 2, kind: "USED", amount_micros: 440000, investigation_id: INVESTIGATION, report_version: 1, blocked_window: null,
       blocked_until: null, recorded_at: "2026-10-30T09:30:00+00:00" },
     { event_no: 3, kind: "BLOCKED", amount_micros: null, investigation_id: null, report_version: null, blocked_window: "month",
       blocked_until: "2026-11-01T02:00:00+02:00", recorded_at: "2026-10-30T09:30:01+00:00" }];
@@ -180,9 +180,9 @@ describe("web sources, investigations and the reserve in the data export", () =>
       report_versions: [{ report_version: 1, closed_at: "2026-10-30T09:30:00.000Z", reopened_at: null, report_reference: REPORT,
         report_written_at: "2026-10-30T09:35:00.000Z" }] }]);
     expect(account.reserve_events).toEqual([
-      { event_no: 1, kind: "HELD", amount_micros: 200000, investigation_id: null, report_version: null, blocked_window: null,
+      { event_no: 1, kind: "HELD", amount_micros: 440000, investigation_id: null, report_version: null, blocked_window: null,
         blocked_until: null, recorded_at: "2026-10-30T07:00:00.000Z" },
-      { event_no: 2, kind: "USED", amount_micros: 200000, investigation_id: INVESTIGATION, report_version: 1, blocked_window: null,
+      { event_no: 2, kind: "USED", amount_micros: 440000, investigation_id: INVESTIGATION, report_version: 1, blocked_window: null,
         blocked_until: null, recorded_at: "2026-10-30T09:30:00.000Z" },
       { event_no: 3, kind: "BLOCKED", amount_micros: null, investigation_id: null, report_version: null, blocked_window: "month",
         blocked_until: "2026-11-01T00:00:00.000Z", recorded_at: "2026-10-30T09:30:01.000Z" }]);

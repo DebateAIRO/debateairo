@@ -9011,7 +9011,7 @@ function b9WallGuard(input: Readonly<{
       limitMicros: 1_000_000,
       periodStart: new Date(Date.now() - 86_400_000),
       resetsAt: new Date(Date.now() + 86_400_000),
-      finishBasisPoints: 11_000,
+      finishBasisPoints: 12_100,
       closeBasisPoints: 9_500
     })] : [])
   };

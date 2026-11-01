@@ -28,12 +28,14 @@ const PREVIEW_CONFIG = parsePreviewProviderTestConfig(JSON.stringify({
   budget_socket: "/run/debateai-v3-preview/provider-budget.sock", scope_id: "fixture"
 }))!
 const HOSTED_KEY = "sk-ant-api03-ABCDEFGH12345678";
+/** Made up: the register's abuseLimits row gives the real ones to the running API. */
+const ASK_LIMITS = Object.freeze({ perHour: 11, perDay: 22 });
 
 function gateway(...replies: readonly (string | Error)[]) {
   const packets: PromptPacket[] = [];
   const reports: string[] = [];
   const left = [...replies];
-  const port = createAskClarify({
+  const port = createAskClarify({ limits: ASK_LIMITS,
     transportFor: () => async ({ packet }) => {
       packets.push(packet);
       const next = left.shift();
@@ -144,7 +146,7 @@ describe("what the gateway's reply becomes", () => {
     vi.useFakeTimers();
     try {
       const reports: string[] = [];
-      const port = createAskClarify({ transportFor: () => () => new Promise<string>(() => undefined), record: async () => undefined, clock: () => new Date(), report: (line) => reports.push(line.code) });
+      const port = createAskClarify({ limits: ASK_LIMITS, transportFor: () => () => new Promise<string>(() => undefined), record: async () => undefined, clock: () => new Date(), report: (line) => reports.push(line.code) });
       const pending = port.read(OWNER, QUESTION, null);
       await vi.advanceTimersByTimeAsync(ASK_CLARIFY_MODEL_SETTINGS.timeoutMs);
       expect(await pending).toEqual({ source: "NONE" });
@@ -155,7 +157,7 @@ describe("what the gateway's reply becomes", () => {
   });
 
   it("no transport (local mode, no key): no questions, nothing sent", async () => {
-    const port = createAskClarify({ transportFor: null, record: async () => undefined, clock: () => new Date(), report: () => undefined });
+    const port = createAskClarify({ limits: ASK_LIMITS, transportFor: null, record: async () => undefined, clock: () => new Date(), report: () => undefined });
     expect(await port.read(OWNER, QUESTION, null)).toEqual({ source: "NONE" });
   });
 });
@@ -176,18 +178,39 @@ describe("what one person can spend", () => {
     let now = Date.parse("2026-11-01T10:00:00.000Z");
     let calls = 0;
     const reports: string[] = [];
-    const port = createAskClarify({ transportFor: () => async () => { calls += 1; return good; }, record: async () => undefined, clock: () => new Date(now), report: (line) => reports.push(line.code) });
+    const port = createAskClarify({ limits: ASK_LIMITS, transportFor: () => async () => { calls += 1; return good; }, record: async () => undefined, clock: () => new Date(now), report: (line) => reports.push(line.code) });
     let last = await port.read(OWNER, "Question number 0?", null);
     for (let at = 1; last.source === "AI" && at < 500; at += 1) last = await port.read(OWNER, `Question number ${at}?`, null);
     expect(last).toEqual({ source: "NONE" });
     expect(reports).toEqual(["RATE_LIMITED"]);
     const spent = calls;
-    expect(spent).toBeLessThan(500);
+    expect(spent).toBe(ASK_LIMITS.perHour);
     expect(await port.read(OWNER, "One more question?", null)).toEqual({ source: "NONE" });
     expect(calls).toBe(spent);
     expect((await port.read(OTHER_OWNER, "Question number 0?", null)).source).toBe("AI");
     now += 3_600_001;
     expect((await port.read(OWNER, "Later question?", null)).source).toBe("AI");
+  });
+
+  it("the limits are the ones it is given: one past the hour's falls back, and one past the day's, whatever the hours", async () => {
+    let now = Date.parse("2026-11-01T10:00:00.000Z");
+    const reports: string[] = [];
+    let calls = 0;
+    const port = createAskClarify({ limits: { perHour: 2, perDay: 3 }, transportFor: () => async () => { calls += 1; return good; }, record: async () => undefined,
+      clock: () => new Date(now), report: (line) => reports.push(line.code) });
+    const ask = async (text: string) => (await port.read(OWNER, text, null)).source;
+    expect([await ask("First question?"), await ask("Second question?")]).toEqual(["AI", "AI"]);
+    expect(await ask("Third question, past the hour's limit?")).toBe("NONE");
+    expect(calls).toBe(2);
+    now += 3_600_001;
+    expect(await ask("Third question, an hour later?")).toBe("AI");
+    expect(calls).toBe(3);
+    now += 3_600_001;
+    expect(await ask("Fourth question, past the day's limit?")).toBe("NONE");
+    expect(calls).toBe(3);
+    expect(reports).toEqual(["RATE_LIMITED", "RATE_LIMITED"]);
+    now += 86_400_001;
+    expect(await ask("A question the next day?")).toBe("AI");
   });
 
   it("local mode makes no call at all; the route table says none", async () => {
@@ -208,7 +231,7 @@ describe("what one person can spend", () => {
       const entries: AskClarifyChargeEntry[] = [];
       let skip: string | null = null;
       const transportFor = askClarifyTransportFor({ kind: "HOSTED", credential: HOSTED_KEY, recordSpend: async () => undefined, beforeSend: async () => skip })!;
-      const port = createAskClarify({ transportFor, record: async (entry) => { entries.push(entry); }, clock: () => new Date(), report: () => undefined });
+      const port = createAskClarify({ limits: ASK_LIMITS, transportFor, record: async (entry) => { entries.push(entry); }, clock: () => new Date(), report: () => undefined });
       expect((await port.read(OWNER, QUESTION, null)).source).toBe("AI");
       expect(entries).toEqual([expect.objectContaining({ ownerRef: OWNER, grant: null, providerRef: ASK_CLARIFY_SPEND_REF, inputTokens: 700, outputTokens: 90 })]);
       expect(entries[0]!.chargeMicros).toBeGreaterThan(0);
@@ -228,11 +251,11 @@ describe("what one person can spend", () => {
   it("preview: real counts reach the person's quota through the gate; a send the guarded fetch refused charges nothing", async () => {
     const entries: AskClarifyChargeEntry[] = [];
     const refusing = askClarifyTransportFor({ kind: "PREVIEW", fetch: (async () => { throw new Error("refused"); }) as typeof fetch })!;
-    const refused = createAskClarify({ transportFor: refusing, record: async (entry) => { entries.push(entry); }, clock: () => new Date(), report: () => undefined });
+    const refused = createAskClarify({ limits: ASK_LIMITS, transportFor: refusing, record: async (entry) => { entries.push(entry); }, clock: () => new Date(), report: () => undefined });
     expect(await refused.read(OWNER, QUESTION, null)).toEqual({ source: "NONE" });
     expect(entries).toEqual([]);
     const counted = askClarifyTransportFor({ kind: "PREVIEW", fetch: (async () => anthropicReply()) as typeof fetch })!;
-    const port = createAskClarify({ transportFor: counted, record: async (entry) => { entries.push(entry); }, clock: () => new Date(), report: () => undefined });
+    const port = createAskClarify({ limits: ASK_LIMITS, transportFor: counted, record: async (entry) => { entries.push(entry); }, clock: () => new Date(), report: () => undefined });
     expect((await port.read(OWNER, QUESTION, null)).source).toBe("AI");
     expect(entries).toEqual([expect.objectContaining({ inputTokens: 700, outputTokens: 90 })]);
   });
@@ -240,7 +263,7 @@ describe("what one person can spend", () => {
   it("a record that cannot be written stops the calls (never spend unrecorded), and the person carries on", async () => {
     let calls = 0;
     const transportFor: AskClarifyTransportFor = (onUsage) => async () => { calls += 1; await onUsage({ inputTokens: 1, outputTokens: 1, projected: false }); return good; };
-    const port = createAskClarify({ transportFor, record: async () => { throw Object.assign(new Error("no right"), { code: "42501" }); }, clock: () => new Date(), report: () => undefined });
+    const port = createAskClarify({ limits: ASK_LIMITS, transportFor, record: async () => { throw Object.assign(new Error("no right"), { code: "42501" }); }, clock: () => new Date(), report: () => undefined });
     expect((await port.read(OWNER, QUESTION, null)).source).toBe("AI");
     expect(await port.read(OWNER, "Another question?", null)).toEqual({ source: "NONE" });
     expect(calls).toBe(1);

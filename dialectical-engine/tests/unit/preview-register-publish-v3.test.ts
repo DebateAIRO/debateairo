@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, BILLING_POLICY_DEPLOYMENT_REGISTER_ROW, DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, QUESTION_LANGUAGE_POLICY_ROW_KEY, questionLanguagePolicyStartValues, LENGTH_GUIDANCE_POLICY_ROW_KEY, lengthGuidancePolicyStartValues, ENGINE_CONTRACT_HASH_ROW_KEY, ENGINE_VERSION_POLICY_ROW_KEY, engineVersionPolicyStartValues, PREVIEW_LINE_UP_POLICY_ROW_KEY, COST_ESTIMATE_START_POLICY_ROW_KEY, COST_ESTIMATE_START_POLICY_DEPLOYMENT_REGISTER_ROW } from '@debateai/register';
+import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, BILLING_POLICY_DEPLOYMENT_REGISTER_ROW, DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, QUESTION_LANGUAGE_POLICY_ROW_KEY, questionLanguagePolicyStartValues, LENGTH_GUIDANCE_POLICY_ROW_KEY, lengthGuidancePolicyStartValues, ENGINE_CONTRACT_HASH_ROW_KEY, ENGINE_VERSION_POLICY_ROW_KEY, engineVersionPolicyStartValues, PREVIEW_LINE_UP_POLICY_ROW_KEY, COST_ESTIMATE_START_POLICY_ROW_KEY, COST_ESTIMATE_START_POLICY_DEPLOYMENT_REGISTER_ROW } from '@debateai/register';
 import { engineContractHash } from '../../apps/runner/src/engine-contracts.js';
 import { mapPromptContractHash } from '@debateai/map';
 import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from '../../packages/register/src/staff-access-policy.js';
@@ -13,16 +13,18 @@ import {
 } from '../../deploy/preview-auth-dev/v1/publish-register-v3.js';
 import { assertBaseIsActive, BASE_NOT_ACTIVE, PreviewRegisterBaseNotActiveError } from '../../deploy/preview-auth-dev/v1/publish-register-base.js';
 
+import { TEST_OWNER_LIMIT_ROWS } from '../support/hostedRegisterRows.js';
+
 type Row = { rowKey: string; valueJsonText: string; sourceRef: string };
 const sha = (text: string) => createHash('sha256').update(text).digest('hex');
 const runtime = { nodeVersion: 'v26.8.2', pnpmVersion: '11.20.0', sourceRevision: 'a'.repeat(40), sourceTree: 'b'.repeat(40), operatorSha256: 'c'.repeat(64), observedAt: '2026-10-13T12:00:00.000Z' };
 const canonical = (value: unknown) => parseCanonicalRegisterJson(Buffer.from(JSON.stringify(value))) as string;
 const owned = () => [STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map(row => ({ rowKey: row.rowKey, valueJsonText: canonicalRegisterJson(row.valueAst), sourceRef: row.sourceRef }));
 const sorted = (rows: Row[]) => [...rows].sort((a, b) => a.rowKey.localeCompare(b.rowKey, 'en'));
-/** The owner's suggested values (pending confirmation): $3 per debate, $10 per day; the kit's example room-read budget. */
-const ON = { billing: 'on', perRunCeilingMicros: 3_000_000, dailyCeilingMicros: 10_000_000, askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 } } as const;
+/** Made-up owner's inputs: the ceilings, the kit's example room-read budget, and the plans and abuse limits his plan must carry (R22 decision 18). */
+const ON = { billing: 'on', perRunCeilingMicros: 3_300_000, dailyCeilingMicros: 11_000_000, askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 }, ...TEST_OWNER_LIMIT_ROWS } as const;
 const OFF = { ...ON, billing: 'off' } as const;
-const OWNER_KEYS = ['admissionPolicy', 'billingPolicy', 'costEnvelopePolicy'];
+const OWNER_KEYS = ['abuseLimits', 'admissionPolicy', 'billingPlans', 'billingPolicy', 'costEnvelopePolicy'];
 /** The two code-owned rows only a hosted build seals: the estimate's starting figures (2026-10-22) and the story's money row. */
 const HOSTED_ADDED = [COST_ESTIMATE_START_POLICY_ROW_KEY, STORY_COST_ENVELOPE_POLICY_ROW_KEY];
 /** A register refusal is a TypedDomainError (its code on `.code`) or a TypeError whose message is the code. */
@@ -39,14 +41,14 @@ async function fixture() {
 const compose = (source: readonly Row[], base: Row[], version = '12') => composePreviewSnapshotV3({ sourceRows: source as any, baseRows: base as any, baseRegisterVersion: version, baseSnapshotSha256: computeRegisterSnapshotSha256(base as any) });
 
 describe('publish kit v3: the hosted source', () => {
-  it('is v2\'s source with the two hosted rows added and only the three owner rows changed', async () => {
+  it('is v2\'s source with the two hosted rows added and only the five owner rows changed', async () => {
     const f = await fixture();
     for (const choice of [ON, OFF]) {
       const rows = [...await buildPreviewSourceRowsV3(f.bootstrap, runtime, choice)] as Row[];
       expect(rows.map(row => row.rowKey).sort()).toEqual([...PREVIEW_SOURCE_ROW_KEYS_V3].sort());
       expect(PREVIEW_SOURCE_ROW_KEYS_V3).toEqual([...PREVIEW_SOURCE_ROW_KEYS_V2, ...HOSTED_ADDED].sort());
       const differing = rows.filter(row => JSON.stringify(row) !== JSON.stringify(f.v2.find(old => old.rowKey === row.rowKey))).map(row => row.rowKey).sort();
-      expect(differing).toEqual(choice.billing === 'on' ? [...OWNER_KEYS, ...HOSTED_ADDED].sort() : ['admissionPolicy', 'costEnvelopePolicy', ...HOSTED_ADDED].sort());
+      expect(differing).toEqual(choice.billing === 'on' ? [...OWNER_KEYS, ...HOSTED_ADDED].sort() : ['abuseLimits', 'admissionPolicy', 'billingPlans', 'costEnvelopePolicy', ...HOSTED_ADDED].sort());
     }
   });
 
@@ -54,7 +56,7 @@ describe('publish kit v3: the hosted source', () => {
     const f = await fixture();
     const rows = [...await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON)] as Row[];
     const cost = value(rows, 'costEnvelopePolicy'), oldCost = value(f.v2, 'costEnvelopePolicy');
-    expect(cost).toMatchObject({ per_run_ceiling_micros: 3_000_000, daily_ceiling_micros: 10_000_000, provisional: true });
+    expect(cost).toMatchObject({ per_run_ceiling_micros: 3_300_000, daily_ceiling_micros: 11_000_000, provisional: true });
     for (const member of ['admission_close_basis_points', 'finish_up_to_basis_points', 'waiting_line_per_person', 'serve_reserve_basis_points', 'serve_overrun_basis_points', 'currency', 'kind', 'minor_units_per_unit'])
       expect(cost[member]).toEqual(oldCost[member]);
     expect([oldCost.admission_close_basis_points, oldCost.finish_up_to_basis_points, oldCost.waiting_line_per_person]).toEqual([9500, 11500, 1]);
@@ -81,27 +83,43 @@ describe('publish kit v3: the hosted source', () => {
     ['no choice', undefined, 'hosted-billing-choice'],
     ['an extra key', { ...ON, extra: true }, 'hosted-billing-choice'],
     ['billing that is not on or off', { ...ON, billing: 'yes' }, 'hosted-billing-choice'],
-    ['a per-run ceiling above the day', { ...ON, perRunCeilingMicros: 11_000_000 }, 'hosted-billing-ceilings'],
+    ['a per-run ceiling above the day', { ...ON, perRunCeilingMicros: 11_000_001 }, 'hosted-billing-ceilings'],
     ['a zero ceiling', { ...ON, perRunCeilingMicros: 0 }, 'hosted-billing-ceilings'],
-    ['a fractional ceiling', { ...ON, dailyCeilingMicros: 10_000_000.5 }, 'hosted-billing-ceilings'],
-    ['a ceiling in dollars typed as text', { ...ON, perRunCeilingMicros: '3000000' }, 'hosted-billing-ceilings'],
+    ['a fractional ceiling', { ...ON, dailyCeilingMicros: 11_000_000.5 }, 'hosted-billing-ceilings'],
+    ['a ceiling in dollars typed as text', { ...ON, perRunCeilingMicros: '3300000' }, 'hosted-billing-ceilings'],
     ['a per-run ceiling past the sanity bound (an extra digit)', { ...ON, perRunCeilingMicros: PREVIEW_HOSTED_CEILING_BOUNDS.perRunMaxMicros + 1, dailyCeilingMicros: PREVIEW_HOSTED_CEILING_BOUNDS.dailyMaxMicros }, 'hosted-billing-ceilings'],
     ['a daily ceiling past the sanity bound', { ...ON, dailyCeilingMicros: PREVIEW_HOSTED_CEILING_BOUNDS.dailyMaxMicros + 1 }, 'hosted-billing-ceilings'],
     ['a room-read budget without its capacity', { ...ON, askRoomReads: { limit: 60, windowMs: 60_000 } }, 'hosted-billing-ask-room-reads'],
     ['a room-read budget in the register\'s spelling', { ...ON, askRoomReads: { key: 'owner', limit: 60, window_ms: 60_000, capacity: 65_536 } }, 'hosted-billing-ask-room-reads'],
-    ['a room-read window over a day', { ...ON, askRoomReads: { ...ON.askRoomReads, windowMs: 86_400_001 } }, 'hosted-billing-ask-room-reads']
+    ['a room-read window over a day', { ...ON, askRoomReads: { ...ON.askRoomReads, windowMs: 86_400_001 } }, 'hosted-billing-ask-room-reads'],
+    // R22 decision 18: the owner's plan is the only home of the real plans and abuse limits.
+    ['a choice without the plans', (({ billingPlans: _gone, ...rest }) => rest)(ON), 'hosted-billing-choice'],
+    ['a choice without the abuse limits', (({ abuseLimits: _gone, ...rest }) => rest)(ON), 'hosted-billing-choice'],
+    ['the code\'s made-up plans with billing on', { ...ON, billingPlans: BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value }, 'hosted-billing-plans-made-up']
   ])('refuses %s before anything is built', async (_name, choice, rule) => {
     const f = await fixture();
     expect(() => previewHostedBillingChoice(choice)).toThrow(`PREVIEW_REGISTER_SNAPSHOT_REFUSED: ${rule}`);
     await expect(buildPreviewSourceRowsV3(f.bootstrap, runtime, choice)).rejects.toThrow(`PREVIEW_REGISTER_SNAPSHOT_REFUSED: ${rule}`);
   });
 
+  it('R22 decision 18: the made-up plans pass with billing off; a typing slip in either row stops at the register\'s own parser', async () => {
+    const f = await fixture();
+    expect(previewHostedBillingChoice({ ...OFF, billingPlans: BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value }).billing).toBe('off');
+    expect(refusal(() => previewHostedBillingChoice({ ...ON, billingPlans: { kind: 'BILLING_PLANS' } }))).toContain('BILLING_PLANS_INVALID');
+    expect(refusal(() => previewHostedBillingChoice({ ...OFF, abuseLimits: { ...ON.abuseLimits, clarify_per_hour: 0 } }))).toContain('ABUSE_LIMITS_INVALID');
+    // The owner's two rows are what is sealed, under the owner's source, never the code's.
+    const rows = [...await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON)] as Row[];
+    expect(value(rows, 'billingPlans')).toEqual(JSON.parse(JSON.stringify(ON.billingPlans)));
+    expect(value(rows, 'abuseLimits')).toEqual(JSON.parse(JSON.stringify(ON.abuseLimits)));
+    for (const key of ['billingPlans', 'abuseLimits']) expect(rows.find(row => row.rowKey === key)!.sourceRef).toContain('the hosted preview publish plan');
+  });
+
   it('refuses a day that cannot hold one run plus its story (the API\'s own boot rule)', async () => {
     const f = await fixture();
-    // 3.00 + the answer's 20% overrun is 3.60, plus the story's 0.06: a 3.65 day holds no full run.
-    const tight = [...await buildPreviewSourceRowsV3(f.bootstrap, runtime, { ...ON, dailyCeilingMicros: 3_650_000 })] as Row[];
+    // 3.30 + the answer's 20% overrun is 3.96, plus the story's 0.06: a 4.01 day holds no full run.
+    const tight = [...await buildPreviewSourceRowsV3(f.bootstrap, runtime, { ...ON, dailyCeilingMicros: 4_010_000 })] as Row[];
     expect(refusal(() => compose(tight, f.v12))).toContain('STORY_DAILY_CEILING_INSUFFICIENT');
-    await expect(buildPreviewSourceRowsV3(f.bootstrap, runtime, { ...ON, dailyCeilingMicros: 3_660_000 }).then(rows => compose([...rows] as Row[], f.v12))).resolves.toBeTruthy();
+    await expect(buildPreviewSourceRowsV3(f.bootstrap, runtime, { ...ON, dailyCeilingMicros: 4_020_000 }).then(rows => compose([...rows] as Row[], f.v12))).resolves.toBeTruthy();
   });
 
   it('keeps v2\'s runtime gate', async () => {
@@ -132,7 +150,7 @@ describe('publish kit v3: composing from the current version', () => {
     const f = await fixture();
     const plan = compose([...await buildPreviewSourceRowsV3(f.bootstrap, runtime, OFF)] as Row[], f.v12);
     expect(plan.addedKeys).toEqual(HOSTED_ADDED);
-    expect(plan.changedKeys).toEqual(['admissionPolicy', 'costEnvelopePolicy']);
+    expect(plan.changedKeys).toEqual(['abuseLimits', 'admissionPolicy', 'billingPlans', 'costEnvelopePolicy']);
   });
 
   it('then billing on over that version changes the billing row alone; billing off again is a republish; v2 can no longer compose on it', async () => {
@@ -183,6 +201,7 @@ describe('publish kit v3: composing from the current version', () => {
     ['the country gate\'s scope', (rows: Row[]) => edit(rows, 'admissionPolicy', v => { delete v.geo_availability; }), 'GEO_AVAILABILITY_ADMISSION_UNSEALED'],
     ['the budget band', (rows: Row[]) => edit(rows, 'costEnvelopePolicy', v => { delete v.admission_close_basis_points; delete v.finish_up_to_basis_points; delete v.waiting_line_per_person; }), 'BILLING_REQUIRES_ENVELOPE_MEMBERS'],
     ['the story money row', (rows: Row[]) => rows.filter(row => row.rowKey !== STORY_COST_ENVELOPE_POLICY_ROW_KEY), 'hosted-story-money-row'],
+    ['a sound abuse limits row', (rows: Row[]) => edit(rows, 'abuseLimits', v => { delete v.clarify_per_hour; }), 'ABUSE_LIMITS_INVALID'],
     ['the country policy while billing is on', (rows: Row[]) => rows.filter(row => row.rowKey !== 'countryPolicy'), 'BILLING_CONFIGURATION_INCOMPLETE']
   ])('the hosted boot questions refuse a version without %s', async (_name, tamper, code) => {
     const f = await fixture();

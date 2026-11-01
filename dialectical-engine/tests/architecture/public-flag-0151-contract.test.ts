@@ -205,9 +205,10 @@ describe("0151: the Report button and the sealed originals' six months", () => {
 
   it("no number from the limits is in the SQL: open_public_flag takes them as arguments and compares its counts with them", () => {
     const source = read("apps/api/src/public-flag.ts");
-    const limits = /PUBLIC_FLAG_LIMITS = Object\.freeze\(\{([^}]+)\}\)/u.exec(source)?.[1];
-    expect(limits).toBeDefined();
-    const numbers = [...limits!.matchAll(/\b(\w+): (\d+)/gu)].map((match) => Number(match[2]));
+    // R22 decision 18: the limits are the register's abuseLimits row; no constant stands in for it in the code.
+    expect(source).not.toContain("PUBLIC_FLAG_LIMITS");
+    const row = read("packages/register/src/abuse-limits.ts");
+    const numbers = [...row.matchAll(/\bflag_per_\w+: (\d+)/gu)].map((match) => Number(match[1]));
     expect(numbers).toHaveLength(3);
     const sql = code(read(SQL_PATH));
     const open = bodyOf(sql, "identity.open_public_flag");
@@ -218,7 +219,7 @@ describe("0151: the Report button and the sealed originals' six months", () => {
     expect(sql).not.toMatch(/count\(\*\)[^;]*?\)\s*(?:>=|<=|>|<|=)\s*\d/u);
     for (const value of numbers) expect(open, `limit value ${value}`).not.toMatch(new RegExp(`(?<![\\w'-])${value}(?![\\w'-])`, "u"));
     // And the API is what passes them.
-    expect(source).toContain("limits: ports.limits ?? PUBLIC_FLAG_LIMITS");
+    expect(source).toContain("limits: ports.limits }");
   });
 
   it("only AGREE on a debate never hidden hides, through 0150's own hide, under the nil staff id", () => {

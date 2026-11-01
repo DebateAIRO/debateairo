@@ -194,6 +194,9 @@ export const memoryReports = (): ReportStore => ({ records: [], contents: new Ma
 export const closingOf = (version = 1, closedAt = "2026-10-31T13:00:00.000Z"): UnreportedClosing =>
   Object.freeze({ investigationId: INVESTIGATION, reportVersion: version, rootRunId: ROOT, closedAt });
 
+/** Made up, the row's: billingPlans' reserves, as `closingReservesOf` gives them to the running closing. */
+export const CLOSING_RESERVES = Object.freeze({ paid: 440_000, free: 88_000 });
+
 export function settingsOver(input: Readonly<{
   store: ReportStore;
   vendors: ReturnType<typeof team>;
@@ -201,6 +204,7 @@ export function settingsOver(input: Readonly<{
   free?: boolean;
   now?: string;
   logged?: Array<{ event: string; detail: Record<string, unknown> }>;
+  reserveMicros?: Readonly<{ paid: number; free: number }>;
 }>): InvestigationCloseSettings {
   const { store, vendors } = input;
   const projected = (request: ProviderCallRequest) => projectedCallCeilingMicros(PRICES[request.providerRef]!,
@@ -252,6 +256,7 @@ export function settingsOver(input: Readonly<{
     writerRoleRef: "ref-haiku",
     checkerRoleRef: "ref-glm",
     admission: { spentMicros: async () => store.charged, projectedMicros: projected },
+    reserveMicros: input.reserveMicros ?? CLOSING_RESERVES,
     closingSeed: () => Buffer.alloc(32, 7),
     now: () => new Date(input.now ?? "2026-10-31T13:05:00.000Z"),
     ...(input.logged === undefined ? {} : { log: (event: string, detail: Record<string, unknown>) => { input.logged!.push({ event, detail }); } })

@@ -17,8 +17,11 @@ import {
  *
  * The owner's Free month: question 1 at depth 1 + 1 dig, question 2 at depth 1 + 1 dig, each with the final written
  * answer (and a PDF, which is page work and costs no AI). A V4 dig is a follow-up question asked as a new debate
- * (apps/ui/lib/v4/askText.ts), so the month is FOUR depth-1 Free debates. Free's allowance is 20 cents a month
- * (billingPlans FREE `monthly_credit_micros` 200,000).
+ * (apps/ui/lib/v4/askText.ts), so the month is FOUR depth-1 Free debates.
+ *
+ * R22 decision 18: the row's credit is MADE UP and the real one is on the owner's server, so these tests prove what the
+ * ENGINE would charge for a Free month, and hold it against the made-up credit only to pin the arithmetic. Whether four
+ * Free debates fit the REAL credit is no longer proved here: the owner checks that figure against his server's values.
  *
  * How one debate is counted (assumptions, all the engine's own):
  *  - SHAPE: the debate-shape row's Free start values (3 map AIs, 3 answers, 2 graders, 3 points per answer, 1 gap round,
@@ -29,9 +32,7 @@ import {
  *    only for a close call). The answer is one writer call and one checker call (one round; the receipt allows 3), and
  *    the story one storyteller call and one story-checker call (one round);
  *  - TOKENS: the engine's calibrated estimate at its starting point (`calibratedEstimatePricer([])`: 4,000 tokens in and
- *    1,200 out per call, at each AI's list price), the figure the estimate uses before it has measured 20 calls of a kind.
- *    Cross-check: the R21 practice debate (depth 1, five AIs, engine 1) made 218 calls for $0.297 by the gates' count,
- *    0.136 cents a call; the calibrated start averages 0.148 cents a call over the Free line-up;
+ *    1,200 out per call, at each AI's list price), the figure the estimate uses before it has measured 20 calls of a kind;
  *  - WHO: every arguing call shared evenly by the five Free AIs (the seat book without a scorecard seats every debater
  *    in every role); the answer and the story written by Haiku and checked by DeepSeek (the owner's final-step design:
  *    Haiku writes, a cheap checker until Luna is reachable).
@@ -94,13 +95,12 @@ describe("one Free month at the owner's shape (2 x (question at depth 1 + 1 dig)
     expect(mean(FREE_LINE_UP, callMicros)).toBeCloseTo(1479, 0);
   });
 
-  it("one debate is about 12 cents expected (16 at the receipt's count); a month of four is about 47 cents: it does NOT fit 20", () => {
-    expect(today.expectedMicros).toBe(117_444);
-    expect(today.ceilingMicros).toBe(161_814);
-    expect(DEBATES_PER_MONTH * today.expectedMicros).toBe(469_776);
+  it("one debate is its calls at the mean price plus the final step; a month of four does NOT fit the row's made-up credit", () => {
+    // The final step: Haiku writes and DeepSeek checks, the answer and the story.
+    const finalStep = 2 * (1000 + 1520);
+    expect(today.expectedMicros).toBe(Math.ceil(76 * 1479 + finalStep));
+    expect(today.ceilingMicros).toBe(Math.ceil(106 * 1479 + finalStep));
     expect(DEBATES_PER_MONTH * today.expectedMicros).toBeGreaterThan(FREE_MONTH_MICROS);
-    // Even one question and its dig cross 20 cents.
-    expect(2 * today.expectedMicros).toBeGreaterThan(FREE_MONTH_MICROS);
     // The realistic worst case (the preview estimate's active mode) is far above.
     expect(today.worstMicros).toBe(1_001_165);
   });
@@ -111,7 +111,7 @@ describe("one Free month at the owner's shape (2 x (question at depth 1 + 1 dig)
    * engine 2's own sites unchanged. It is a DEBATE settings row, so it can be activated without an upload. (The owner
    * chose the same shape on four AIs, MiMo out, on 2026-10-29: the last block below.)
    */
-  it("a leaner Free (smallest shape, three cheapest AIs) is about 4.3 cents a debate: four fit in 20 cents", () => {
+  it("a leaner Free (smallest shape, three cheapest AIs) charges 37 calls at their mean price: four fit the row's made-up credit", () => {
     const start = debateShapePolicyStartValues();
     const lean = parseDebateShapePolicy({ ...start, plans: { ...start.plans,
       free: { ...start.plans.free, mapAIs: 2, answers: 2, graders: 1, pointsPerAnswer: 2, gapRoundsMax: 0, closeCallExtraGraders: 0 } } });
@@ -120,10 +120,11 @@ describe("one Free month at the owner's shape (2 x (question at depth 1 + 1 dig)
     const leaner = freeDebate(lean, cheapest);
     expect(leaner.ceilingCalls).toBe(37);
     expect(leaner.expectedCalls).toBe(37);
-    expect(leaner.expectedMicros).toBe(43_409);
+    // Qwen 911, Haiku 1,000, GLM 1,200 a call; the final step as above.
+    expect(leaner.expectedMicros).toBe(Math.ceil(37 * (911 + 1000 + 1200) / 3 + 2 * (1000 + 1520)));
     expect(DEBATES_PER_MONTH * leaner.expectedMicros).toBeLessThanOrEqual(FREE_MONTH_MICROS);
-    // The same lean shape on all five Free AIs (MiMo included) does not fit.
-    expect(DEBATES_PER_MONTH * freeDebate(lean, FREE_LINE_UP).expectedMicros).toBeGreaterThan(FREE_MONTH_MICROS);
+    // The same lean shape on all five Free AIs (MiMo included) costs more.
+    expect(freeDebate(lean, FREE_LINE_UP).expectedMicros).toBeGreaterThan(leaner.expectedMicros);
   });
 });
 
@@ -145,7 +146,7 @@ describe("one Free month at the owner's shape (2 x (question at depth 1 + 1 dig)
 const LEAN_FREE_SHAPE_SV1 = '{"kind":"DEBATE_SHAPE_POLICY","version":1,"plans":{"free":{"mapAIs":2,"answers":2,"graders":1,"pointsPerAnswer":2,"deeperTopPoints":1,"gapRoundsMax":0,"closeCallExtraGraders":0,"fixedDepthAllowed":false,"scrutiny":{"deep":null,"exhaustive":null,"scrutinyLeverageMin":0.05,"scrutinyWeakBelow":0.5},"opening":"ANGLE_MAP"},"plus":{"mapAIs":4,"answers":3,"graders":3,"pointsPerAnswer":4,"deeperTopPoints":2,"gapRoundsMax":2,"closeCallExtraGraders":2,"fixedDepthAllowed":true,"scrutiny":{"deep":{"roundsPerPoint":2,"pointsPerDebate":6},"exhaustive":{"roundsPerPoint":3,"pointsPerDebate":15},"scrutinyLeverageMin":0.05,"scrutinyWeakBelow":0.5},"opening":"ANGLE_MAP"},"pro":{"mapAIs":5,"answers":4,"graders":3,"pointsPerAnswer":4,"deeperTopPoints":2,"gapRoundsMax":2,"closeCallExtraGraders":2,"fixedDepthAllowed":true,"scrutiny":{"deep":{"roundsPerPoint":2,"pointsPerDebate":6},"exhaustive":{"roundsPerPoint":3,"pointsPerDebate":15},"scrutinyLeverageMin":0.05,"scrutinyWeakBelow":0.5},"opening":"ANGLE_MAP"},"max":{"mapAIs":7,"answers":4,"graders":3,"pointsPerAnswer":4,"deeperTopPoints":2,"gapRoundsMax":2,"closeCallExtraGraders":2,"fixedDepthAllowed":true,"scrutiny":{"deep":{"roundsPerPoint":2,"pointsPerDebate":6},"exhaustive":{"roundsPerPoint":3,"pointsPerDebate":15},"scrutinyLeverageMin":0.05,"scrutinyWeakBelow":0.5},"opening":"ANGLE_MAP"},"premium":{"mapAIs":5,"answers":4,"graders":3,"pointsPerAnswer":4,"deeperTopPoints":2,"gapRoundsMax":2,"closeCallExtraGraders":2,"fixedDepthAllowed":true,"scrutiny":{"deep":{"roundsPerPoint":2,"pointsPerDebate":6},"exhaustive":{"roundsPerPoint":3,"pointsPerDebate":15},"scrutinyLeverageMin":0.05,"scrutinyWeakBelow":0.5},"opening":"ANGLE_MAP"}},"answerLength":{"short":{"words":200,"writerBound":8192},"standard":{"words":350,"writerBound":12288},"detailed":{"words":1000,"writerBound":16384}},"mapStepBounds":{"merge":32768,"choose":32768}}';
 const LEAN_FREE_MODEL_IDS = ["zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash", "Qwen/Qwen3.8-Flash", "claude-haiku-5-5"] as const;
 
-describe("the owner's leaner Free (R22 item 11): four Free debates a month fit in 20 cents, with these exact settings", () => {
+describe("the owner's leaner Free (R22 item 11): what four Free debates a month charge, with these exact settings", () => {
   const lean = parseDebateShapePolicy(JSON.parse(LEAN_FREE_SHAPE_SV1));
   const debate = freeDebate(lean, LEAN_FREE_MODEL_IDS);
 
@@ -177,19 +178,18 @@ describe("the owner's leaner Free (R22 item 11): four Free debates a month fit i
     expect(debate.expectedCalls).toBe(37);
   });
 
-  it("about 4.8 cents a debate; the owner's month (2 questions + 2 digs) about 19.2 cents: under Free's 20, and under the 40-cent finish edge", () => {
+  it("the engine's own charge for the owner's month (2 questions + 2 digs) is four debates of 37 calls and a final step; the row's made-up edge is its credit plus its overflow", () => {
     // GLM 1,200, DeepSeek 1,520, Qwen 911, Haiku 1,000 micro-dollars a call at the calibrated start: 1,157.75 on average.
     expect(mean(LEAN_FREE_MODEL_IDS, callMicros)).toBeCloseTo(1157.75, 2);
-    // 37 x 1,157.75 + the final step (Haiku writes and DeepSeek checks, the answer and the story): 4.79 cents.
-    expect(debate.expectedMicros).toBe(47_877);
+    // 37 x 1,157.75 + the final step (Haiku writes and DeepSeek checks, the answer and the story).
+    expect(debate.expectedMicros).toBe(Math.ceil(37 * 1157.75 + 2 * (1000 + 1520)));
     expect(debate.ceilingMicros).toBe(debate.expectedMicros);
     const month = DEBATES_PER_MONTH * debate.expectedMicros;
-    expect(month).toBe(191_508);
     expect(month).toBeLessThan(FREE_MONTH_MICROS);
-    // billingPlans v4 (owner 2026-10-30, Q1): Free's month may be passed by a fixed 20 cents, so its edge is 40 cents.
+    // billingPlans v4 (owner 2026-10-30, Q1): Free's month may be passed by a fixed overflow; on the made-up row, 330,000 + 220,000.
     const free = BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value.plans.find((plan) => plan.plan_id === "FREE")!;
     const finishEdge = FREE_MONTH_MICROS * free.finish_bp / 10_000 + free.finish_overflow_micros;
-    expect(finishEdge).toBe(400_000);
+    expect(finishEdge).toBe(550_000);
     expect(month).toBeLessThan(finishEdge);
     // The realistic worst case (64 KiB in, 8,192 out on every call) is still far above: the calibrated start is the plan.
     expect(debate.worstMicros).toBe(299_069);

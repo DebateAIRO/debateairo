@@ -294,7 +294,7 @@ describe("the runner's read-only path (A20)", () => {
     const allowance = new BillingPersonAllowanceSource({ entitlements: entitlements.readOnlyPort(), plans, closeBasisPoints: 9_500 });
     // Ten days after the lapse is inside Free's first month, which opens at paid_through.
     expect(await allowance.read(ownerRef, now)).toEqual([expect.objectContaining({
-      scope: "PERSON_MONTH", limitMicros: 200_000, periodStart: paidThrough
+      scope: "PERSON_MONTH", limitMicros: 330_000, periodStart: paidThrough
     })]);
   });
 });

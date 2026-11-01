@@ -71,6 +71,7 @@ function service(clock: { now: Date }, pool: Pool = database.pool) {
     identities: new PostgresIdentityRepository(pool, { hash: async () => randomBytes(32) } as never),
     blindIndexKey: BLIND_INDEX_KEY,
     recordsKey: TEST_RECORDS_KEY,
+    linksPerDay: 2, // made up: the register's abuseLimits row gives the real one to the running API
     recipients: new DekBillingRecipientReader(pool, dekStore),
     mail: { sendTemplated: async (mail) => { mails.push(mail); } },
     publicAppUrl: TEST_PUBLIC_APP_URL,
@@ -200,17 +201,17 @@ describe("P13 the cancel link on real PostgreSQL", () => {
     expect(audit.events).toEqual([]);
   });
 
-  it("sends at most three links per account in 24 hours, then again the next day (A25)", async () => {
+  it("sends at most the row's number of links per account in 24 hours, then again the next day (A25)", async () => {
     const clock = { now: new Date() };
     const { links, mails } = service(clock);
     const ownerRef = await account("often@example.test");
     await seedNetopiaSubscription(database.pool, { ownerRef, planId: "PRO", activatedAt: new Date(Date.now() - DAY), taxCountry: "DE" });
     const outcomes = [];
-    for (let attempt = 0; attempt < 4; attempt += 1) outcomes.push(await links.request("often@example.test"));
-    expect(outcomes).toEqual(["SENT", "SENT", "SENT", "SILENT"]);
+    for (let attempt = 0; attempt < 3; attempt += 1) outcomes.push(await links.request("often@example.test"));
+    expect(outcomes).toEqual(["SENT", "SENT", "SILENT"]);
     clock.now = new Date(clock.now.getTime() + DAY + 60_000);
     expect(await links.request("often@example.test")).toBe("SENT");
-    expect(mails).toHaveLength(4);
+    expect(mails).toHaveLength(3);
   });
 
   it("refuses a token after 24 hours", async () => {

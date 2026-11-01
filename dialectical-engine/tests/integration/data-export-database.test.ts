@@ -499,7 +499,7 @@ describe("data export database authority", () => {
       quote: await sealed("identity.web_extract", extract, "cXVvdGU=") })).toBe("RECORDED");
     const investigations = new PostgresInvestigationRepository(db.pool);
     const investigationId = (await investigations.open(owner, runId))!;
-    expect(await investigations.recordReserveEvent(owner, { kind: "HELD", amountMicros: 200_000 })).toBe("RECORDED");
+    expect(await investigations.recordReserveEvent(owner, { kind: "HELD", amountMicros: 440_000 })).toBe("RECORDED");
     await db.pool.query(`INSERT INTO identity.data_export(export_id,user_id,session_id,locale,status,requested_at,attempts,lease_owner,lease_until)
       VALUES($1,$2,$3,'en','PREPARING',clock_timestamp(),1,$4,clock_timestamp()+interval '45 seconds')`, [exportId, a.user, a.session, worker]);
     try {
@@ -514,7 +514,7 @@ describe("data export database authority", () => {
       expect(JSON.stringify(raw)).not.toContain("eC13ZWItcGFnZS10ZXh0");
       expect(raw.investigations.map((item: { investigation_id: string; root_run_id: string }) => [item.investigation_id, item.root_run_id]))
         .toEqual([[investigationId, runId]]);
-      expect(raw.reserve_events.map((item: { kind: string; amount_micros: number }) => [item.kind, item.amount_micros])).toEqual([["HELD", 200_000]]);
+      expect(raw.reserve_events.map((item: { kind: string; amount_micros: number }) => [item.kind, item.amount_micros])).toEqual([["HELD", 440_000]]);
     } finally {
       await db.pool.query("UPDATE identity.data_export SET status='CANCELLED',closed_at=clock_timestamp(),lease_owner=NULL,lease_until=NULL WHERE export_id=$1", [exportId]);
     }

@@ -98,7 +98,7 @@ describe("the money: never walled, each under its own source", () => {
       readDaySpentMicros: async () => 0,
       admitNewRun: async () => Object.freeze({ admitted: true, committedMicros: 0 })
     };
-    return new CostEnvelopeGuard({ store, policy: { perRunCeilingMicros: 250_000, dailyCeilingMicros: 2_000_000, perStoryCeilingMicros: STORY_CEILING },
+    return new CostEnvelopeGuard({ store, policy: { perRunCeilingMicros: 250_000, dailyCeilingMicros: 2_000_000, perStoryCeilingMicros: STORY_CEILING, closingCeilingMicros: 440_000 },
       clock: () => new Date("2026-10-10T12:00:00.000Z"),
       sharedWall: { finishBasisPoints: null, persons: ALLOWANCE,
         owners: { readRunChargeOwnerRef: async () => "owner", readOwnerSpentMicros: async () => 1_000_000_000 } } });

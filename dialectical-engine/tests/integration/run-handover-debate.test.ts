@@ -35,9 +35,9 @@ afterAll(async () => {
 });
 
 const PRICE = Object.freeze({ inputMicrosPerMillionTokens: 1_000_000, outputMicrosPerMillionTokens: 1_000_000 });
-const LIMIT = 5_000_000;
-const RESERVE = 200_000;
-const TOLERANCE = 200_000;
+const LIMIT = 6_600_000; // made up, the row's
+const RESERVE = 440_000;
+const TOLERANCE = 220_000;
 const EDGE = LIMIT - RESERVE;
 /** Release keys of one settings version, as a code-only upload makes them: each test's own pair (a switch is for ever). */
 const keyOf = (version: number, letter: string, n: number) => `r${String(version)}-${letter.repeat(11)}${(n % 16).toString(16)}`;

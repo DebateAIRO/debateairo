@@ -6,10 +6,9 @@ import {
   type Pool, type UnreportedClosing, type WebSealed
 } from "@debateai/db";
 import type { ProviderCallRequest, ProviderCallResult } from "@debateai/providers";
-import { INVESTIGATION_REPORT_POLICY } from "@debateai/register";
 import { sweepInvestigationClosings, type InvestigationCloseSettings } from "../../apps/runner/src/investigation-close.js";
 import { investigationReportProjectedMicros } from "../../apps/runner/src/investigation-close-sources.js";
-import { PRICES, contractOf, investigationInput, team } from "../support/investigation-close-world.js";
+import { CLOSING_RESERVES, PRICES, contractOf, investigationInput, team } from "../support/investigation-close-world.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
@@ -134,6 +133,7 @@ function settingsFor(root: string, vendors: ReturnType<typeof team>, contents: M
       backupMakers: members.map((member) => ({ providerRef: member.providerRef, maker: member.maker })) },
     writerRoleRef: "ref-haiku",
     checkerRoleRef: "ref-glm",
+    reserveMicros: CLOSING_RESERVES,
     admission: {
       spentMicros: (rootRunId: string) => spend.readRunInvestigationReportSpentMicros(rootRunId),
       projectedMicros: (request: ProviderCallRequest) => investigationReportProjectedMicros(request, PRICES[request.providerRef]!)
@@ -182,7 +182,7 @@ describe("W5-1 Write my report on real PostgreSQL", () => {
     // The money: what the closing spent is the ledger's, inside the reserve; the closing is marked written.
     const spentOne = afterFirst.reports[0]!.spent_micros;
     expect(spentOne).toBeGreaterThan(0);
-    expect(spentOne).toBeLessThanOrEqual(INVESTIGATION_REPORT_POLICY.reserveMicros.paid);
+    expect(spentOne).toBeLessThanOrEqual(CLOSING_RESERVES.paid);
     const written = (await investigations.read(person.ownerRef, root))!;
     expect(written.state).toBe("closed");
     expect(written.closings[0]!.report_ref).toBe(afterFirst.reports[0]!.report_id);
@@ -198,7 +198,7 @@ describe("W5-1 Write my report on real PostgreSQL", () => {
     const both = (await reports.readOfRun(root))!;
     expect(both.reports.map((entry) => [entry.report_version, entry.outcome])).toEqual([[1, "READY"], [2, "READY"]]);
     expect(both.reports[0]!.spent_micros).toBe(spentOne);
-    expect(both.reports[1]!.spent_micros).toBeLessThanOrEqual(INVESTIGATION_REPORT_POLICY.reserveMicros.paid);
+    expect(both.reports[1]!.spent_micros).toBeLessThanOrEqual(CLOSING_RESERVES.paid);
     // A second pass writes nothing more.
     expect((await sweepInvestigationClosings(settingsFor(root, team(), contents), 100)).outcomes.filter((outcome) => outcome === "RECORDED")).toEqual([]);
   }, 120_000);

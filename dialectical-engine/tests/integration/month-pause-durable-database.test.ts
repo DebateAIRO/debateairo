@@ -1,7 +1,7 @@
 // R22 W3-8 — THE MONTH PAUSE IS DURABLE (the money rule, owner 31 Oct 2026: "pause any 'future' AI calls/searches … with
 // the possibility to resume once the monthly quota is back", resumed "with a click", true resume). On real PostgreSQL,
 // with the preview harness's scripted vendors and a hosted runner's REAL money guard (CostEnvelopeGuard with a
-// billingPlans v4 month window: its limit, the 20-cent final-answer reserve kept inside it, the 20-cent in-flight
+// billingPlans v4 month window: its limit, the final-answer reserve kept inside it, the in-flight
 // tolerance), one encrypted owner's debate:
 //  1. reaches the month wall while arguing: the pause is recorded (0134, with the planned work's estimate), the copy
 //     stops as a planned stop — the work item is released, never FAILED, and no answer is written;
@@ -53,10 +53,10 @@ afterAll(async () => {
 });
 
 const PRICE = Object.freeze({ inputMicrosPerMillionTokens: 1_000_000, outputMicrosPerMillionTokens: 1_000_000 });
-/** A paid plan's month (billingPlans v4): $5, its 20-cent final-answer reserve kept inside, the 20-cent in-flight tolerance. */
-const LIMIT = 5_000_000;
-const RESERVE = 200_000;
-const TOLERANCE = 200_000;
+/** A paid plan's month (billingPlans v4), on made-up figures: its limit, its final-answer reserve kept inside, the in-flight tolerance. */
+const LIMIT = 6_600_000; // made up, the row's
+const RESERVE = 440_000;
+const TOLERANCE = 220_000;
 const EDGE = LIMIT - RESERVE;
 /** The month reaches its wall right after the debate's third review is answered. */
 const WALL_AT_REVIEW = 3;
@@ -176,8 +176,8 @@ async function pausedAndResumed(label: string, callConcurrency?: CallConcurrency
   else expect(plannedMicros).toBeGreaterThanOrEqual(50_000_000 - spentAtPause);
   expect(await workItemOf(debate.workItemId)).toEqual({ state: "CLAIMED", terminal_reason: null, lapsed: true });
   expect(await answersOf(debate.runId)).toBe(0);
-  // The reserve is untouched: the month stood at its edge (the limit less the 20-cent reserve); only calls already in
-  // flight when it got there (calls together) finished past it, within the 20-cent tolerance.
+  // The reserve is untouched: the month stood at its edge (the limit less the reserve); only calls already in
+  // flight when it got there (calls together) finished past it, within the tolerance.
   if (serial) expect(await wall.spentInMonth()).toBe(EDGE);
   expect(await wall.spentInMonth()).toBeGreaterThanOrEqual(EDGE);
   expect(await wall.spentInMonth()).toBeLessThanOrEqual(EDGE + TOLERANCE);

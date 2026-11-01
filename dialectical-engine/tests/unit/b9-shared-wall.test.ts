@@ -55,7 +55,7 @@ function window(scope: PersonWindow["scope"], periodStart: Date, limitMicros: nu
   return Object.freeze({
     scope, limitMicros, periodStart,
     resetsAt: new Date(periodStart.getTime() + 7 * 86_400_000),
-    finishBasisPoints: 11_000,
+    finishBasisPoints: 12_100,
     closeBasisPoints: 9_500
   });
 }
@@ -162,11 +162,11 @@ describe("B9a · the site's day, walled at its finish edge while arguing", () =>
   });
 });
 
-describe("B9a · each of the run owner's windows, walled at its own finish edge (110%)", () => {
+describe("B9a · each of the run owner's windows, walled at its own finish edge (a made-up 121%)", () => {
   const WINDOWS = [
-    window("PERSON_DAY", DAY_START, 100_000),     // edge 110 000
-    window("PERSON_WEEK", WEEK_START, 250_000),   // edge 275 000
-    window("PERSON_MONTH", MONTH_START, 1_000_000) // edge 1 100 000
+    window("PERSON_DAY", DAY_START, 100_000),     // edge 121 000
+    window("PERSON_WEEK", WEEK_START, 250_000),   // edge 302 500
+    window("PERSON_MONTH", MONTH_START, 1_000_000) // edge 1 210 000
   ];
 
   function guardFor(spent: ReadonlyMap<number, number>) {
@@ -179,16 +179,16 @@ describe("B9a · each of the run owner's windows, walled at its own finish edge 
   }
 
   it("admits exact equality at a window's edge and refuses one micro-unit more, naming the window", async () => {
-    expect(await decide(guardFor(new Map([[DAY_START.getTime(), 110_000 - PROJECTED]])).guard, "BODY")).toBe("ADMITTED");
-    const refused = guardFor(new Map([[DAY_START.getTime(), 110_000 - PROJECTED + 1]]));
+    expect(await decide(guardFor(new Map([[DAY_START.getTime(), 121_000 - PROJECTED]])).guard, "BODY")).toBe("ADMITTED");
+    const refused = guardFor(new Map([[DAY_START.getTime(), 121_000 - PROJECTED + 1]]));
     await expect(refused.guard.providerSeam({ runId: "run-1", price: PRICE, requireReportedUsage: true, phase: "BODY" })
       .assertCallAllowed(PROJECTION)).rejects.toThrowError(expect.objectContaining({
       code: PERSON_ALLOWANCE_REACHED,
       message: expect.stringContaining("PERSON_DAY")
     }));
-    expect(await decide(guardFor(new Map([[WEEK_START.getTime(), 275_000 - PROJECTED + 1]])).guard, "BODY"))
+    expect(await decide(guardFor(new Map([[WEEK_START.getTime(), 302_500 - PROJECTED + 1]])).guard, "BODY"))
       .toBe("PERSON_ALLOWANCE_REACHED");
-    expect(await decide(guardFor(new Map([[MONTH_START.getTime(), 1_100_000 - PROJECTED + 1]])).guard, "BODY"))
+    expect(await decide(guardFor(new Map([[MONTH_START.getTime(), 1_210_000 - PROJECTED + 1]])).guard, "BODY"))
       .toBe("PERSON_ALLOWANCE_REACHED");
   });
 
@@ -224,7 +224,7 @@ describe("B9a · each of the run owner's windows, walled at its own finish edge 
   // half stands, so a run billing pinned an owner on is still held to that owner's windows (ruling R-19).
   it("walls the owner's windows with no site-day wall when the guard has no site finish edge (null)", async () => {
     const spend = store({ daySpent: 10_000_000 });
-    const pinned = owner("owner-1", WINDOWS, new Map([[DAY_START.getTime(), 110_000 - PROJECTED + 1]]));
+    const pinned = owner("owner-1", WINDOWS, new Map([[DAY_START.getTime(), 121_000 - PROJECTED + 1]]));
     const guard = new CostEnvelopeGuard({
       store: spend.spend, policy: POLICY, clock: () => NOW,
       sharedWall: { finishBasisPoints: null, persons: pinned.persons, owners: pinned.owners }
@@ -247,21 +247,21 @@ describe("B9a · each of the run owner's windows, walled at its own finish edge 
   });
 });
 
-// billingPlans v4 (owner 2026-10-30, Q1 and Q3) gave each window a FIXED 20 cents past its limit. The owner's money rule
+// billingPlans v4 (owner 2026-10-30, Q1 and Q3) gave each window a FIXED amount past its limit. The owner's money rule
 // of 31 Oct changed that meaning, and these rows with it: running work is never stopped by the day or the week (they
 // `borrow`, and the wall does not ask them); the month is the wall, at its limit less the reserve kept inside it, and its
-// 20 cents (`finishOverflowMicros`) are only the tolerance for a call in flight there. At the wall the refusal is the
+// overflow (`finishOverflowMicros`) is only the tolerance for a call in flight there. At the wall the refusal is the
 // month's own (MonthWallReachedError, still PERSON_ALLOWANCE_REACHED), which the runner turns into a pause.
 describe("B9a · billingPlans v4 windows under the money rule (the day and week borrow, the month is the wall)", () => {
   const borrowing = (scope: PersonWindow["scope"], periodStart: Date, limitMicros: number): PersonWindow => Object.freeze({
     ...window(scope, periodStart, limitMicros), finishBasisPoints: 10_000, borrows: true as const
   });
   const WINDOWS = [
-    borrowing("PERSON_DAY", DAY_START, 1_000_000),
-    borrowing("PERSON_WEEK", WEEK_START, 2_500_000),
-    // wall 4 800 000 (the limit less the 20-cent reserve), tolerance 200 000
-    Object.freeze({ ...window("PERSON_MONTH", MONTH_START, 5_000_000), finishBasisPoints: 10_000, finishOverflowMicros: 200_000,
-      keepsReserveMicros: 200_000 })
+    borrowing("PERSON_DAY", DAY_START, 726_000),
+    borrowing("PERSON_WEEK", WEEK_START, 2_904_000),
+    // wall 6 160 000 (the made-up limit less the made-up reserve), tolerance 220 000
+    Object.freeze({ ...window("PERSON_MONTH", MONTH_START, 6_600_000), finishBasisPoints: 10_000, finishOverflowMicros: 220_000,
+      keepsReserveMicros: 440_000 })
   ];
   const guardFor = (spent: ReadonlyMap<number, number>) => {
     const persons = owner("owner-1", WINDOWS, spent);
@@ -276,12 +276,12 @@ describe("B9a · billingPlans v4 windows under the money rule (the day and week 
   });
 
   it("PERSON_MONTH: admits a call one micro-unit below the wall (its worst case inside the tolerance) and refuses one at it", async () => {
-    expect(await decide(guardFor(new Map([[MONTH_START.getTime(), 4_800_000 - 1]])), "BODY")).toBe("ADMITTED");
-    expect(await decide(guardFor(new Map([[MONTH_START.getTime(), 4_800_000]])), "BODY")).toBe("PERSON_ALLOWANCE_REACHED");
+    expect(await decide(guardFor(new Map([[MONTH_START.getTime(), 6_160_000 - 1]])), "BODY")).toBe("ADMITTED");
+    expect(await decide(guardFor(new Map([[MONTH_START.getTime(), 6_160_000]])), "BODY")).toBe("PERSON_ALLOWANCE_REACHED");
   });
 
   it("a day still under its limit stops once the month reaches its wall", async () => {
-    const spent = new Map([[DAY_START.getTime(), 100_000], [MONTH_START.getTime(), 4_800_000]]);
+    const spent = new Map([[DAY_START.getTime(), 100_000], [MONTH_START.getTime(), 6_160_000]]);
     expect(await decide(guardFor(spent), "BODY")).toBe("PERSON_ALLOWANCE_REACHED");
   });
 });

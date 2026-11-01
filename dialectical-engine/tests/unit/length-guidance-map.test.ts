@@ -180,18 +180,21 @@ describe("a lengthed map call", () => {
    */
   describe("with the row: root 0's kept room and one lengthed map list call, on Free and at the paid start ceiling (Ruling I1)", () => {
     const site = COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW.value;
-    /** A plan's run policy: the site's start per-run ceiling cut to the plan's monthly credit; and its BODY ceiling. */
-    const planMoney = (planId: "FREE" | "PLUS") => {
-      const plan = BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value.plans.find((row) => row.plan_id === planId)!;
-      const policy = Object.freeze({ perRunCeilingMicros: Math.min(site.per_run_ceiling_micros, plan.monthly_credit_micros),
+    /**
+     * A plan's run policy: the site's start per-run ceiling cut to the plan's monthly credit; and its BODY ceiling. R22
+     * decision 18: the credits are made up. "Free" here is a plan whose credit (a made-up 220,000) cuts the run ceiling,
+     * the case these rows are about; the row's own made-up Free credit stands above the ceiling and would cut nothing.
+     */
+    const planMoney = (monthlyCreditMicros: number) => {
+      const policy = Object.freeze({ perRunCeilingMicros: Math.min(site.per_run_ceiling_micros, monthlyCreditMicros),
         dailyCeilingMicros: site.daily_ceiling_micros, serveReserveBasisPoints: site.serve_reserve_basis_points,
         serveOverrunBasisPoints: site.serve_overrun_basis_points });
       const body = costEnvelopeCeilings({ perRunCeilingMicros: policy.perRunCeilingMicros,
         serveReserveBasisPoints: policy.serveReserveBasisPoints }).bodyMicros;
       return Object.freeze({ policy, body });
     };
-    const free = planMoney("FREE");
-    const paid = planMoney("PLUS");
+    const free = planMoney(220_000);
+    const paid = planMoney(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value.plans.find((row) => row.plan_id === "PLUS")!.monthly_credit_micros);
     const price = (model: string) => {
       const row = previewModelRow(model)!;
       return Object.freeze({ inputMicrosPerMillionTokens: row.inputPriceMicrosPerMillion, outputMicrosPerMillionTokens: row.outputPriceMicrosPerMillion });

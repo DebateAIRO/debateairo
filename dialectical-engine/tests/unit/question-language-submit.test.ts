@@ -66,7 +66,7 @@ const PANEL = [...PLAN_TIER_ROSTERS.free, ...PLAN_TIER_ROSTERS.premium].map((mod
 // estimate (a free ask or no window returns before any of them, and the CR-1 spies would watch nothing).
 const ROOMY_WINDOW: PersonWindow = Object.freeze({ scope: "PERSON_MONTH", limitMicros: 1_000_000_000,
   periodStart: new Date("2026-10-01T00:00:00.000Z"), resetsAt: new Date("2026-11-01T00:00:00.000Z"),
-  finishBasisPoints: 11_000, closeBasisPoints: 9_500 });
+  finishBasisPoints: 12_100, closeBasisPoints: 9_500 });
 
 function billingFor(planId: PlanId, windows: readonly PersonWindow[] = []) {
   const estimateMicros = vi.fn(async (_settings: unknown) => 1_000);

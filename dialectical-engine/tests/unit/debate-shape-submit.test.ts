@@ -124,7 +124,7 @@ function billingFor(planId: PlanId, day: Readonly<{ spent: number; limit: number
       personAllowance: {
         read: async () => day === null ? [] : [{
           scope: "PERSON_DAY" as const, limitMicros: day.limit, periodStart: new Date("2026-10-13T00:00:00.000Z"),
-          resetsAt: new Date("2026-10-14T00:00:00.000Z"), finishBasisPoints: 11_000, closeBasisPoints: 9_500
+          resetsAt: new Date("2026-10-14T00:00:00.000Z"), finishBasisPoints: 12_100, closeBasisPoints: 9_500
         }]
       },
       spend: { readOwnerSpentMicros: async () => day?.spent ?? 0, readOwnerCountedHoldsMicros: async () => 0 },

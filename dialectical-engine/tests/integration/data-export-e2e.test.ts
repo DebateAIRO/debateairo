@@ -989,7 +989,7 @@ describe("data export over a real database and encrypted file store", () => {
       const joined = await investigations.join({ ownerRef: a.ownerRef, parentRunId: runId, childRunId: dig, places: ["pos-1"], mode: "quick" });
       expect(joined.outcome).toBe("JOINED");
       const closed = (await investigations.open(a.ownerRef, closedRoot))!;
-      expect(await investigations.recordReserveEvent(a.ownerRef, { kind: "HELD", amountMicros: 200_000 })).toBe("RECORDED");
+      expect(await investigations.recordReserveEvent(a.ownerRef, { kind: "HELD", amountMicros: 440_000 })).toBe("RECORDED");
       expect(await investigations.close(a.ownerRef, closed)).toMatchObject({ outcome: "CLOSED", reportVersion: 1 });
       expect(await investigations.recordReserveEvent(a.ownerRef, { kind: "USED", investigationId: closed, reportVersion: 1 })).toBe("RECORDED");
       const ownerView: OwnerViewPort = {
@@ -1027,8 +1027,8 @@ describe("data export over a real database and encrypted file store", () => {
           members: [{ debate_reference: closedRoot, dug_from_reference: null }],
           report_versions: [{ report_version: 1, reopened_at: null, report_reference: null }] }]);
       expect(account.reserve_events).toMatchObject([
-        { event_no: 1, kind: "HELD", amount_micros: 200_000, investigation_id: null },
-        { event_no: 2, kind: "USED", amount_micros: 200_000, investigation_id: closed, report_version: 1 }]);
+        { event_no: 1, kind: "HELD", amount_micros: 440_000, investigation_id: null },
+        { event_no: 2, kind: "USED", amount_micros: 440_000, investigation_id: closed, report_version: 1 }]);
     } finally { await seedPool.end(); }
   });
 });

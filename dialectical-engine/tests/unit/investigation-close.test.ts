@@ -1,16 +1,15 @@
 // tests/unit/investigation-close.test.ts
 // W5-1: "Write my report" — the closing over the dossier: the answer (Haiku) and its check (GLM), the story and its check,
 // at most 2 rounds each (Free's slim report 1), output caps 16K / 80K, one fence for the whole closing (F5), every Haiku
-// call under 100K tokens, the cost by the engine's own counting inside the plan's reserve (20 cents paid, 5 Free; the
-// owner's 10-20 cent cap), the wait for running digs and their rewrites (F7 A), versions (the later one reads the earlier
+// call under 100K tokens, the cost by the engine's own counting inside the plan's reserve (read from the plans), the
+// wait for running digs and their rewrites (F7 A), versions (the later one reads the earlier
 // answer, F8 A), the newest rewrite covered, and the "paths changed since your report" count 0 right after a report and 1
 // after the next rewrite. The wipe on close is 0133's, in the same transaction as the close (the integration test).
 import { describe, expect, it } from "vitest";
 import { InvestigationReportStorySchema } from "@debateai/contract";
 import type { PathRewriteEntry } from "@debateai/db";
 import { ANTHROPIC_DOSSIER_FIRST_SYSTEM, anthropicMessagesRequestBody, previewThinkingStepOf, readPromptFrame } from "@debateai/providers";
-import { INVESTIGATION_REPORT_POLICY } from "@debateai/register";
-import { INVESTIGATION_REPORT_SEAM_CEILING_MICROS } from "@debateai/budget";
+import { BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, closingReservesOf } from "@debateai/register";
 import { engineContractHash, ENGINE_SEALED_CONTRACT_IDS } from "../../apps/runner/src/engine-contracts.js";
 import {
   closeInvestigation, closingRandomBytes, investigationReportIdOf, type InvestigationReportContent, type InvestigationReportSettled
@@ -20,12 +19,12 @@ import { writeOverallAnswer, type StoryRoleMaker } from "@debateai/story";
 import { pathRewriteBodyBytes, pathRewriteBodyFits } from "../../apps/runner/src/path-rewrite-material.js";
 import { latestWrittenReportOf, servePathRewrites, type RewriteTurn } from "../../packages/serve/src/path-rewrites.js";
 import {
-  DIG_FAILED, DIG_NESTED, DIG_READY, INVESTIGATION, OBJECTION, ROOT, STORY_OBJECTION, closingOf, contractOf, deepChain, fieldsOf,
+  CLOSING_RESERVES, DIG_FAILED, DIG_NESTED, DIG_READY, INVESTIGATION, OBJECTION, ROOT, STORY_OBJECTION, closingOf, contractOf, deepChain, fieldsOf,
   investigationInput, memoryReports, settingsOver, team
 } from "../support/investigation-close-world.js";
 
-const PAID_RESERVE = INVESTIGATION_REPORT_POLICY.reserveMicros.paid;
-const FREE_RESERVE = INVESTIGATION_REPORT_POLICY.reserveMicros.free;
+const PAID_RESERVE = CLOSING_RESERVES.paid;
+const FREE_RESERVE = CLOSING_RESERVES.free;
 
 describe("W5-1 Write my report: the closing", () => {
   it("writes the answer, its check, the story and its check, and stores one version sealed under the root's key", async () => {
@@ -127,14 +126,14 @@ describe("W5-1 Write my report: the closing", () => {
     }
   });
 
-  it("the cost, by the engine's own counting, stays inside the 10-20 cent cap; the worst case is stopped by the reserve", async () => {
+  it("the cost, by the engine's own counting, stays inside the plan's reserve; the worst case is stopped by the reserve", async () => {
     // Typical: one round each, every call charged at its full projection (bytes / 2 in, the output cap out).
     const typical = memoryReports();
     await closeInvestigation(settingsOver({ store: typical, vendors: team() }), closingOf());
     expect(typical.charged).toBeLessThanOrEqual(PAID_RESERVE);
     expect(typical.charged).toBeGreaterThan(0);
-    // Worst: every check objects, so every step asks for its second round; the closing admits each call against the 20
-    // cents and serves the last checked draft when the next would not fit.
+    // Worst: every check objects, so every step asks for its second round; the closing admits each call against the
+    // reserve and serves the last checked draft when the next would not fit.
     const worst = memoryReports();
     const logged: Array<{ event: string; detail: Record<string, unknown> }> = [];
     await closeInvestigation(settingsOver({ store: worst, logged, dossier: investigationInput({ digs: deepChain(10) }),
@@ -143,12 +142,11 @@ describe("W5-1 Write my report: the closing", () => {
     expect(worst.charged).toBeGreaterThanOrEqual(100_000);
     expect(worst.records[0]).toMatchObject({ outcome: "READY_WITH_RESERVATION" });
     expect(worst.records[0]!.spentMicros).toBe(worst.charged);
-    // The gateway's seam is the same 20 cents, the register's.
-    expect(INVESTIGATION_REPORT_SEAM_CEILING_MICROS).toBe(INVESTIGATION_REPORT_POLICY.ceilingMicros);
-    expect(INVESTIGATION_REPORT_POLICY.ceilingMicros).toBe(PAID_RESERVE);
+    // The gateway's seam is the same figure, the largest of the plans' reserves (hide-limits-settings.test.ts builds the seam).
+    expect(closingReservesOf(billingPlansFromValue(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value, "test"))).toEqual({ ...CLOSING_RESERVES, ceilingMicros: PAID_RESERVE });
   });
 
-  it("Free's slim report: one round of each, the slim story cap, and never more than its 5-cent reserve", async () => {
+  it("Free's slim report: one round of each, the slim story cap, and never more than its reserve", async () => {
     const store = memoryReports();
     const vendors = team({ glm: (packet) => (contractOf(packet) === "report.story-check.v1" ? STORY_OBJECTION : OBJECTION) });
     await closeInvestigation(settingsOver({ store, vendors, free: true }), closingOf());

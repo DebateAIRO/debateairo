@@ -236,7 +236,7 @@ describe("0133 an investigation and its digs", () => {
 });
 
 describe("0133 the one reserve", () => {
-  const amount = 200_000;
+  const amount = 440_000;
   it("R1 is held once, used by a closing, refilled, released; the order is the database's", async () => {
     const person = await account();
     const investigations = new PostgresInvestigationRepository(api);
@@ -332,7 +332,7 @@ describe("0133 deleting", () => {
     const { investigationId } = await investigations.join({ ownerRef: person.ownerRef, parentRunId: root, childRunId: dig, places: [], mode: "quick" });
     await investigations.join({ ownerRef: person.ownerRef, parentRunId: dig, childRunId: deeper, places: [], mode: "quick" });
     await investigations.join({ ownerRef: person.ownerRef, parentRunId: root, childRunId: sibling, places: [], mode: "quick" });
-    await investigations.recordReserveEvent(person.ownerRef, { kind: "HELD", amountMicros: 200_000 });
+    await investigations.recordReserveEvent(person.ownerRef, { kind: "HELD", amountMicros: 440_000 });
     expect(await sqlError(() => erasure.query("SELECT identity.forget_erased_debate_investigation($1)", [dig])))
       .toMatchObject({ code: "55000", message: "INVESTIGATION_DEBATE_NOT_ERASED" });
     await seedTombstone(dig);
@@ -354,7 +354,7 @@ describe("0133 deleting", () => {
     const investigations = new PostgresInvestigationRepository(api);
     for (const owner of [person, keeper]) {
       const { investigationId } = await investigations.join({ ownerRef: owner.ownerRef, parentRunId: await run(owner), childRunId: await run(owner), places: [], mode: "quick" });
-      await investigations.recordReserveEvent(owner.ownerRef, { kind: "HELD", amountMicros: 200_000 });
+      await investigations.recordReserveEvent(owner.ownerRef, { kind: "HELD", amountMicros: 440_000 });
       await investigations.close(owner.ownerRef, investigationId!);
       await investigations.recordReserveEvent(owner.ownerRef, { kind: "USED", investigationId: investigationId!, reportVersion: 1 });
     }
@@ -372,14 +372,14 @@ describe("0133 deleting", () => {
     const investigations = new PostgresInvestigationRepository(api);
     const root = await run(person);
     const investigationId = (await investigations.open(person.ownerRef, root))!;
-    await investigations.recordReserveEvent(person.ownerRef, { kind: "HELD", amountMicros: 200_000 });
+    await investigations.recordReserveEvent(person.ownerRef, { kind: "HELD", amountMicros: 440_000 });
     const exportId = randomUUID();
     const lease = randomUUID();
     await database.pool.query(`INSERT INTO identity.data_export(export_id,user_id,session_id,locale,status,requested_at,attempts,lease_owner,lease_until)
       VALUES ($1,$2,$3,'en','PREPARING',clock_timestamp(),1,$4,clock_timestamp()+interval '1 minute')`, [exportId, person.userId, randomUUID(), lease]);
     const exported = (await worker.query("SELECT identity.read_data_export_investigations($1,$2) AS e", [exportId, lease])).rows[0].e;
     expect(exported.investigations).toEqual([expect.objectContaining({ investigation_id: investigationId, root_run_id: root, state: "open" })]);
-    expect(exported.reserve_events).toEqual([expect.objectContaining({ event_no: 1, kind: "HELD", amount_micros: 200_000 })]);
+    expect(exported.reserve_events).toEqual([expect.objectContaining({ event_no: 1, kind: "HELD", amount_micros: 440_000 })]);
     expect(await sqlError(() => worker.query("SELECT identity.read_data_export_investigations($1,$2)", [exportId, randomUUID()])))
       .toMatchObject({ code: "P0001", message: "DATA_EXPORT_LEASE_INVALID" });
   });

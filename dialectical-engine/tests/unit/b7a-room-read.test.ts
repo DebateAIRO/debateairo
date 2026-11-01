@@ -81,7 +81,7 @@ function roomWith(input: {
 
 const month = (limitMicros: number): PersonWindow => Object.freeze({
   scope: "PERSON_MONTH", limitMicros, periodStart: new Date("2026-09-29T09:00:00.000Z"), resetsAt: MONTH_RESET,
-  finishBasisPoints: 11_000, closeBasisPoints: 9_500
+  finishBasisPoints: 12_100, closeBasisPoints: 9_500
 });
 
 const MINE = Object.freeze({

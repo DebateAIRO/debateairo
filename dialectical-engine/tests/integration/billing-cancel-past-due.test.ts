@@ -109,7 +109,7 @@ describe("P12b a cancel while PAST_DUE ends the plan and every retry", () => {
     }));
     const links = new CancelLinkService({
       billing: h.repository, jobs: h.jobs, entitlements: h.entitlements,
-      identities: { ownerRefByEmailBlindIndex: async () => null }, blindIndexKey: Buffer.alloc(32, 3),
+      identities: { ownerRefByEmailBlindIndex: async () => null }, blindIndexKey: Buffer.alloc(32, 3), linksPerDay: 11,
       recordsKey: h.recordsKey, recipients: PROFILE_ADDRESS_ONLY, mail: undefined, publicAppUrl: TEST_PUBLIC_APP_URL,
       audit: h.audit, clock: h.clock.read
     });

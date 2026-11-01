@@ -28,10 +28,10 @@ import billingRomanian from "../../apps/ui/messages/ro/billing.json" with { type
 const PLANS = Object.freeze({
   currency: "USD" as const,
   plans: [
-    { plan_id: "FREE" as const, net_prices: { USD: "0.00", EUR: "0.00", RON: "0.00" }, allowance_vs_plus: "0.04" },
+    { plan_id: "FREE" as const, net_prices: { USD: "0.00", EUR: "0.00", RON: "0.00" }, allowance_vs_plus: "0.05" },
     { plan_id: "PLUS" as const, net_prices: { USD: "20.00", EUR: "20.00", RON: "100.00" }, allowance_vs_plus: "1" },
-    { plan_id: "PRO" as const, net_prices: { USD: "50.00", EUR: "50.00", RON: "250.00" }, allowance_vs_plus: "4" },
-    { plan_id: "MAX" as const, net_prices: { USD: "200.00", EUR: "200.00", RON: "1000.00" }, allowance_vs_plus: "30" }
+    { plan_id: "PRO" as const, net_prices: { USD: "50.00", EUR: "50.00", RON: "250.00" }, allowance_vs_plus: "5" },
+    { plan_id: "MAX" as const, net_prices: { USD: "200.00", EUR: "200.00", RON: "1000.00" }, allowance_vs_plus: "33" }
   ]
 });
 /** Spec 2026-10-05 §2.16.5: the sentence under the cards (it names no currency). */
@@ -58,8 +58,8 @@ describe("P18 /pricing", () => {
     expect(plus.textContent).toContain("The Plus allowance");
     expect(plus.querySelector("a")?.getAttribute("href")).toBe("/checkout?plan=PLUS");
     expect(plus.querySelector("a")?.textContent).toBe("Choose Plus");
-    expect(document.querySelector('[data-plan="PRO"]')?.textContent).toContain("4× the Plus allowance");
-    expect(document.querySelector('[data-plan="MAX"]')?.textContent).toContain("30× the Plus allowance");
+    expect(document.querySelector('[data-plan="PRO"]')?.textContent).toContain("5× the Plus allowance");
+    expect(document.querySelector('[data-plan="MAX"]')?.textContent).toContain("33× the Plus allowance");
     const free = document.querySelector('[data-plan="FREE"]')!;
     expect(free.textContent).toContain("A small monthly allowance");
     expect(free.querySelector("a")?.getAttribute("href")).toBe("/sign-up");
@@ -84,7 +84,7 @@ describe("P18 /pricing", () => {
   it("never shows a dollar amount of AI credit", async () => {
     mocks.getBillingPlans.mockResolvedValue(PLANS);
     const text = (await renderPricing()).body.textContent ?? "";
-    for (const credit of ["$0.20", "$5.00", "$150.00", "0.04"]) expect(text).not.toContain(credit);
+    for (const credit of ["$0.33", "$6.60", "$220.00", "0.05"]) expect(text).not.toContain(credit);
   });
 
   it("is not found when billing is off, and says so plainly when the plans cannot be read", async () => {

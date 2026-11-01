@@ -1301,6 +1301,7 @@ packages/providers/src/sent-form.ts
 packages/providers/src/structure-repair.ts
 packages/providers/src/unbilled-refusal.ts
 packages/published-arithmetic/src/index.ts
+packages/register/src/abuse-limits.ts
 packages/register/src/algorithm-policy.ts
 packages/register/src/answer-role-rotation-policy.ts
 packages/register/src/auth-policy.ts

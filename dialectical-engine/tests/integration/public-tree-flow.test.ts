@@ -33,7 +33,7 @@ import { composePublicReport, sweepPublicTree } from "../../apps/runner/src/publ
 import { DIG_NODES, SATISFIED, digSnapshot, fieldsOf, fittingRewrite, isChecker } from "../support/path-rewrite-world.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
 import { provisionRlsLogins, type RlsLogins } from "../support/rls-logins.js";
-import { canonicalPublicFlagBinding, PUBLIC_FLAG_LIMITS, pressPublicFlag, sweepPublicReviewPurge } from "../../apps/api/src/public-flag.js";
+import { canonicalPublicFlagBinding, pressPublicFlag, sweepPublicReviewPurge } from "../../apps/api/src/public-flag.js";
 import { canonicalPublicReviewBinding } from "../../apps/api/src/staff/public-review.js";
 import { drainTeamLimitNotices } from "../../apps/api/src/staff/team-limit.js";
 import { authorizeStaffAlertFixture } from "../support/staffAlertReadiness.js";
@@ -154,7 +154,7 @@ function vendors(script: Script = {}) {
   const members = [{ provider: gateway("haiku", PATH_REWRITE_WRITER_MODEL, "Anthropic"), providerRef: "ref-haiku", maker: "Anthropic" },
     { provider: gateway("glm", PATH_REWRITE_CHECKER_MODEL, "Z.AI"), providerRef: "ref-glm", maker: "Z.AI" }];
   const composed = composePathRewrite({ pool: runner, members, log: debugLog, targets: [{ providerRef: "ref-haiku", model: PATH_REWRITE_WRITER_MODEL }, { providerRef: "ref-glm", model: PATH_REWRITE_CHECKER_MODEL }] })!;
-  const reports = composePublicReport({ pool: runner, members, log: debugLog, priceOf: () => null, targets: [{ providerRef: "ref-haiku", model: PATH_REWRITE_WRITER_MODEL }, { providerRef: "ref-glm", model: PATH_REWRITE_CHECKER_MODEL }] });
+  const reports = composePublicReport({ pool: runner, members, reserveMicros: { paid: 440_000, free: 88_000 }, log: debugLog, priceOf: () => null, targets: [{ providerRef: "ref-haiku", model: PATH_REWRITE_WRITER_MODEL }, { providerRef: "ref-glm", model: PATH_REWRITE_CHECKER_MODEL }] });
   return { sent, members, composed, reports };
 }
 
@@ -1234,10 +1234,11 @@ async function delegate(): Promise<Actor> {
       return { text, usage: { input_tokens: 11, output_tokens: 7, cost_usd: 0.25 } };
     } } };
   };
-  const flagPorts = (judge: ReturnType<typeof scriptedJudge>["port"] | null, limits?: PublicFlagLimits) => ({
+  const FLAG_LIMITS: PublicFlagLimits = Object.freeze({ personHour: 11, debateDay: 22, siteDay: 99 }); // made up, like the register's row
+  const flagPorts = (judge: ReturnType<typeof scriptedJudge>["port"] | null, limits: PublicFlagLimits = FLAG_LIMITS) => ({
     repository: new PostgresPublicFlagRepository(api), judge: () => judge, seal: (ref: string, run: string, value: unknown) => application().withReviewKey(ref, run, (cipher) => cipher.encrypt(value)),
-    readPublicDebate: (ref: string) => application().readPublicDebate(ref), ...(limits === undefined ? {} : { limits }) });
-  const press = (who: StoryEncryptedOwner, ref: string, claim = "This path names a private person's home address.", judge: ReturnType<typeof scriptedJudge>["port"] | null = null, limits?: PublicFlagLimits) =>
+    readPublicDebate: (ref: string) => application().readPublicDebate(ref), limits });
+  const press = (who: StoryEncryptedOwner, ref: string, claim = "This path names a private person's home address.", judge: ReturnType<typeof scriptedJudge>["port"] | null = null, limits: PublicFlagLimits = FLAG_LIMITS) =>
     pressPublicFlag({ ownerRef: who.ownerRef, publicationRef: ref, flagId: randomUUID(), where: "The first path", claim }, flagPorts(judge, limits));
   const agree = (quote = POINT_TEXT) => scriptedJudge(() => JSON.stringify({ verdict: "AGREE", reason: "PERSONAL", quote }));
   const notFound = () => scriptedJudge(() => JSON.stringify({ verdict: "NOT_FOUND", reason: null, quote: null }));
@@ -1270,7 +1271,7 @@ async function delegate(): Promise<Actor> {
     const late = randomUUID();
     const repository = new PostgresPublicFlagRepository(api);
     const envelope = await application().withReviewKey(raced.ref, raced.root, (cipher) => cipher.encrypt({ where: "x", claim: "y" }));
-    expect(await repository.open({ ownerRef: sam.ownerRef, publicationRef: raced.ref, flagId: late, content: envelope, limits: PUBLIC_FLAG_LIMITS })).toBe("CHECK");
+    expect(await repository.open({ ownerRef: sam.ownerRef, publicationRef: raced.ref, flagId: late, content: envelope, limits: FLAG_LIMITS })).toBe("CHECK");
     await act(owner, raced, "HIDE");
     await act(owner, raced, "REPUBLISH");
     expect(await repository.settle({ flagId: late, verdict: "AGREE", reason: "PERSONAL", providerRef: "p", modelId: "m", inputTokens: null, outputTokens: null, costUsd: null })).toBe("QUEUED");
@@ -1309,27 +1310,28 @@ async function delegate(): Promise<Actor> {
     expect(frame.fields.find((field) => field.name === "public_text")!.content).not.toContain("Ignore your rules");
   }, 60_000);
 
-  it("the limits: three an hour per person, from the rows; a person's second report goes to a person; a debate's checks run out into the queue; every refusal answers the same", async () => {
+  it("the limits: an hour's count per person, from the rows; a person's second report goes to a person; a debate's checks run out into the queue; every refusal answers the same", async () => {
     const [ana, rea, sam] = [await account(), await account(), await account()];
     const debates = [await publishedDebate(ana), await publishedDebate(ana), await publishedDebate(ana), await publishedDebate(ana)];
     const silent = notFound();
-    expect(await press(rea, debates[0]!.ref, undefined, silent.port)).toBe("NOT_FOUND");
+    // A made-up limit of two an hour, so the third press is the one refused.
+    const twoAnHour: PublicFlagLimits = { ...FLAG_LIMITS, personHour: 2 };
+    expect(await press(rea, debates[0]!.ref, undefined, silent.port, twoAnHour)).toBe("NOT_FOUND");
     expect(silent.sent).toHaveLength(1);
     // With more details: a person reads it, nothing is hidden, no second call.
-    expect(await press(rea, debates[0]!.ref, "More details, about the second sentence.", silent.port)).toBe("WITH_A_PERSON");
+    expect(await press(rea, debates[0]!.ref, "More details, about the second sentence.", silent.port, twoAnHour)).toBe("WITH_A_PERSON");
     expect(silent.sent).toHaveLength(1);
-    expect(await press(rea, debates[1]!.ref, undefined, silent.port)).toBe("NOT_FOUND");
     const before = (await flagsOf(debates[2]!.ref)).length;
-    // The fourth in the hour: refused, written nowhere, called nobody; the same answer as anything else refused. A new repository: the count is the database's.
+    // The third in the hour: refused, written nowhere, called nobody; the same answer as anything else refused. A new repository: the count is the database's.
     const stopped = agree();
-    expect(await press(rea, debates[2]!.ref, undefined, stopped.port)).toBe("NOT_FOUND");
+    expect(await press(rea, debates[2]!.ref, undefined, stopped.port, twoAnHour)).toBe("NOT_FOUND");
     expect(stopped.sent).toHaveLength(0);
     expect((await flagsOf(debates[2]!.ref)).length).toBe(before);
     expect(await application().readPublicDebate(debates[2]!.ref)).not.toBeNull();
     // Guessed: the same answer. A debate that was never published has no reference to guess.
     expect(await press(sam, randomUUID(), undefined, agree().port)).toBe("NOT_FOUND");
     // The debate's checks run out: a made-up limit of one here, so the next press calls nobody.
-    const limits = { personHour: 3, debateDay: 1, siteDay: 200 };
+    const limits = { ...FLAG_LIMITS, debateDay: 1 };
     const spent = notFound();
     expect(await press(sam, debates[3]!.ref, undefined, spent.port, limits)).toBe("NOT_FOUND");
     const over = agree();
@@ -1349,7 +1351,7 @@ async function delegate(): Promise<Actor> {
     expect(await press(tom, debate.ref, undefined, scriptedJudge(() => "not json").port)).toBe("WITH_A_PERSON");
     expect(await press(await account(), debate.ref, undefined, scriptedJudge(() => JSON.stringify({ verdict: "UNSURE", reason: null, quote: null })).port)).toBe("WITH_A_PERSON");
     const crash = await publishedDebate(ana);
-    await new PostgresPublicFlagRepository(api).open({ ownerRef: rea.ownerRef, publicationRef: crash.ref, flagId: randomUUID(), content: await application().withReviewKey(crash.ref, crash.root, (cipher) => cipher.encrypt({ where: "w", claim: "c" })), limits: PUBLIC_FLAG_LIMITS });
+    await new PostgresPublicFlagRepository(api).open({ ownerRef: rea.ownerRef, publicationRef: crash.ref, flagId: randomUUID(), content: await application().withReviewKey(crash.ref, crash.root, (cipher) => cipher.encrypt({ where: "w", claim: "c" })), limits: FLAG_LIMITS });
     expect(await application().readPublicDebate(debate.ref)).not.toBeNull();
     const rows = await new PostgresPublicFlagRepository(api).readQueue(owner.context as never, hash(owner.sessionId));
     const mine = rows.filter((row) => row.publication_ref === debate.ref);

@@ -245,7 +245,7 @@ describe("CI security gates (F-03)", () => {
   it("pins every action to a full commit SHA with its release tag as a comment (L6-F7)", () => {
     // n1-compatibility.yml: side-by-side spec §5, plan A task A10 (pinned and checked in tests/architecture/n1-baseline.test.ts).
     expect(workflowFiles()).toEqual([
-      ".github/workflows/n1-compatibility.yml", ".github/workflows/registration-integration.yml", ".github/workflows/security.yml"
+      ".github/workflows/limits-check.yml", ".github/workflows/n1-compatibility.yml", ".github/workflows/registration-integration.yml", ".github/workflows/security.yml"
     ]);
     for (const workflow of workflowFiles()) {
       const uses = read(workflow).split("\n").filter((line) => /^\s*-?\s*uses:/.test(line));
