@@ -2,7 +2,7 @@
  * Fresh-site estimate (owner rulings 2026-10-22), on a real (embedded) PostgreSQL.
  *
  * On a fresh hosted site no debate has settled, so before the costEstimateStartPolicy row every estimate was the run's
- * maximum ($4.02 here: a made-up per-run $3.30 × 1.2 plus story $0.05 × 1.2). A Plus person's made-up day allowance is $0.726,
+ * maximum (here a made-up per-run ceiling and the story's, each with its overrun). A Plus person's made-up day limit is far below it,
  * so every room read said CLOSE and every premium ask was swapped to the Free AIs. This test publishes a HOSTED
  * register (the same builder the hosted publish and the preview kit v3 use), reads the row back at that version, and
  * asks the room and the coarse fit for a Plus depth-1 premium ask on the fresh database: FITS and AS_ASKED. The control
