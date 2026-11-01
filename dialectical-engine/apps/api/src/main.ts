@@ -1423,6 +1423,7 @@ const publicationJudgeSwitch = createPublicationJudgeSwitch(supportModelTarget =
   }), { offFlagPath: publicationJudgeOffFlag });
 const publicationContentCheck = createPublicationContentCheck({
   judge: publicationJudgeSwitch.current,
+  recordUsage: (row) => new PostgresPublicFlagRepository(pool).recordCheckUsage({ subjectKind: "RUN", subjectId: row.subject_id, attemptedAt: row.attempted_at, calls: row.judge_call_count, inputTokens: row.input_tokens, outputTokens: row.output_tokens, costUsd: row.cost_usd }),
   recorder: new PostgresPublicationCheckRecordRepository(pool),
   clock: () => new Date(),
   deadlineMs: publicationCheckPolicy.deadlineMs
@@ -1430,6 +1431,7 @@ const publicationContentCheck = createPublicationContentCheck({
 // Decision 13: the same judge on a report on a public debate; its record names the report (0149).
 const publicReportContentCheck = createPublicationContentCheck({
   judge: publicationJudgeSwitch.current,
+  recordUsage: (row) => new PostgresPublicFlagRepository(pool).recordCheckUsage({ subjectKind: "PUBLIC_REPORT", subjectId: row.subject_id, attemptedAt: row.attempted_at, calls: row.judge_call_count, inputTokens: row.input_tokens, outputTokens: row.output_tokens, costUsd: row.cost_usd }),
   recorder: { record: (row) => new PostgresPublicPageRepository(pool).recordReportCheck({ reportId: row.run_id, attemptedAt: row.attempted_at, outcome: row.outcome, failureCause: row.failure_cause, rules: row.rules, partKinds: row.part_kinds, ground: row.ground, judgeProviderRef: row.judge_provider_ref, judgeModelId: row.judge_model_id, policyVersion: row.policy_version, judgeCallCount: row.judge_call_count }) },
   clock: () => new Date(),
   deadlineMs: publicationCheckPolicy.deadlineMs
@@ -1723,6 +1725,10 @@ if (environment.DATA_EXPORT_STORE_PATH !== undefined) {
       claim, workerId, source,
       ownerView: new OwnerViewAdapter(ownerDeps, runKeyStore, publicationReviewRepository, claim.sessionId),
       decrypt: {
+        openPublicFlag: async (publicationRef, runId, envelope) => {
+          if (publications === undefined) throw new Error("DATA_EXPORT_PUBLICATION_KEY_UNAVAILABLE");
+          return publications.withReviewKey(publicationRef, runId, (cipher) => cipher.decrypt(envelope as never));
+        },
         openUserField: async (userId, field, envelope) => {
           const dek = await dekStore.load(userId);
           let plain: Buffer | undefined;

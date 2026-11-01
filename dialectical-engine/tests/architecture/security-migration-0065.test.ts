@@ -345,8 +345,10 @@ describe("0065 TRUNCATE and mutation guards discovered from the catalog (DL5-F2)
 
     // 3. Definer path: no SECURITY DEFINER function an application role can call carries TRUNCATE or switches the
     //    guard off (DISABLE TRIGGER, session_replication_role) — the only way to act as a NOLOGIN owner.
-    //    The one named exception, decision 36 (0151): the six months' purge replaces a sealed original in place, so its two definers switch reject_mutation off and on again
-    //    inside the call's own transaction, and refuse anything not due. tests/architecture/public-flag-0151-contract.test.ts pins the four tables they touch. A third is a failure here.
+    //    The one named exception, decision 36 (0151), kept by the coordinator's decision of 1 Nov and on the go-live list: the law says a sealed original must really be deleted after six
+    //    months, and those rows are append-only by trigger, so its two definers switch reject_mutation off and on again inside the call's own transaction. It's allowed because it's bounded:
+    //    the purge refuses anything not six months old (NOT_DUE, in the database), so a compromised API can only rewrite a piece already due to go.
+    //    tests/architecture/public-flag-0151-contract.test.ts pins the four tables they touch. A third definer is a failure here.
     const definers = await database.pool.query<{ fn: string }>(`
       SELECT p.oid::regprocedure::text AS fn FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
       WHERE n.nspname=ANY($1::text[]) AND p.prosecdef
@@ -672,7 +674,7 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
       "0142_team_limit.sql",
       "0143_run_handover.sql",
       "0144_ask_clarify_charge.sql",
-      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql"
+      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql"
     ]);
     expect(plan.forwardChain[1]!.name).toBe(AUTH_DB_BATCH_MIGRATION);
   });

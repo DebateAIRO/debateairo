@@ -128,6 +128,7 @@
   "legal.providers.purpose.judging": "Text der Debatte – zur Bewertung und Prüfung der Argumente",
   "legal.providers.purpose.story": "Die abgeschlossene Debatte – zum Verfassen der Geschichte hinter dem Urteil",
   "legal.providers.purpose.synthesisCheck": "Die Synthese einer abgeschlossenen Debatte – zur Prüfung auf vier Kategorien",
+  "legal.providers.purpose.reportCheck": "Eine mit der Schaltfläche Melden abgegebene Meldung und der öffentliche Text der Debatte – zur Prüfung der Meldung",
   "legal.providers.purpose.questionCheck": "Eine Frage, bevor eine Debatte beginnt – zur Prüfung, ob die Debatte beginnen darf",
   "legal.providers.purpose.search": "Suchanfragen, die die Modelle aus der Debatte formulieren – um Belege im Web zu finden",
   "legal.providers.purpose.support": "Was Sie in den Support-Chat eingeben – um Ihnen zu antworten",

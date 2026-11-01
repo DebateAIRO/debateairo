@@ -32,6 +32,8 @@ function harness() {
     resolveRunRef: vi.fn(async (run: string) => run),
   };
   const decrypt = {
+    // raw-a.json's one report has no words left, so this is never reached there.
+    openPublicFlag: vi.fn(async (_publication: string, _run: string, _envelope: unknown): Promise<unknown> => { throw new Error("no sealed report in this fixture"); }),
     openUserField: vi.fn(async (_user: string, field: string) => `PLAIN:${field}`),
     openRecord: vi.fn((_aad: unknown, _bytes: Buffer) => "PLAIN:record"),
     openSupport: vi.fn(async (_key: unknown, _wrapped: Buffer, _context: unknown, _bytes: Buffer) => "PLAIN:support"),

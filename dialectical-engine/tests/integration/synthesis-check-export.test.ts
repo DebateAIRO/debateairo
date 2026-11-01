@@ -44,7 +44,7 @@ function exportHarness() {
     claim: { exportId: "export-1", userId: "user-1", ownerRef, sessionId: "session-1", locale,
       requestedAt: new Date("2026-10-07T00:00:00.000Z"), attempt: 1 },
     workerId: "worker-1", source: { readRaw: async () => raw as RawExportRows }, ownerView,
-    decrypt: { openUserField: async () => "owner@example.test", openRecord: () => "record", openSupport: async () => "support",
+    decrypt: { openPublicFlag: async () => { throw new Error("no report in this fixture"); }, openUserField: async () => "owner@example.test", openRecord: () => "record", openSupport: async () => "support",
       openRunContent: async () => [] },
     now: () => new Date("2026-10-07T01:00:00.000Z"),
   });

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { RAW_SECTIONS, KEEP_COLUMNS, collectSnapshot } from "../../apps/api/src/data-export/snapshot.js";
 import { buildArchive } from "../../apps/api/src/data-export/archive.js";
 import { loadArchiveCatalog } from "../../apps/api/src/data-export/archive-catalog.js";
@@ -29,12 +29,15 @@ function rawRows() {
   return raw;
 }
 
-async function collect(raw: Record<string, unknown>) {
+/** No report in the ordinary fixture: opening one would be a fault. */
+const NO_REPORT = async (): Promise<unknown> => { throw new Error("no report in this fixture"); };
+
+async function collect(raw: Record<string, unknown>, openPublicFlag: (publicationRef: string, runId: string, envelope: unknown) => Promise<unknown> = NO_REPORT) {
   return collectSnapshot({
     claim: { exportId: "export", userId: "user", ownerRef: "owner", sessionId: "session",
       locale: "en", requestedAt: new Date("2026-10-29T10:00:00.000Z"), attempt: 1 }, workerId: "worker",
     source: { readRaw: async () => raw as never }, ownerView: {} as never,
-    decrypt: { openUserField: async () => "ada@example.test", openRecord: () => "", openSupport: async () => "", openRunContent: async () => [] },
+    decrypt: { openPublicFlag, openUserField: async () => "ada@example.test", openRecord: () => "", openSupport: async () => "", openRunContent: async () => [] },
     now: () => new Date("2026-10-29T11:00:00.000Z")
   });
 }
@@ -60,6 +63,56 @@ describe("V4 account memory in the data export", () => {
     raw.ask_clarify_calls = [{ recorded_at: "2026-10-29T08:00:00+00:00", charge_micros: 40, owner_ref: "secret-owner" }];
     const snapshot = await collect(raw);
     expect(snapshot.account.question_readings).toEqual([{ recorded_at: "2026-10-29T08:00:00.000Z" }]);
+  });
+
+  describe("the reports the person made (0152)", () => {
+    const PUBLICATION = "33333333-3333-4333-8333-333333333333";
+    const RUN_BEHIND_IT = "44444444-4444-4444-8444-444444444444";
+    const SEALED = { ciphertext: "SEALED-WORDS", key_ref: "SEALED-KEY" };
+    const report = (changes: Record<string, unknown> = {}) => ({ publication_ref: PUBLICATION, run_id: RUN_BEHIND_IT, created_at: "2026-10-29T10:30:00+02:00",
+      state: "QUEUED", dismissed_at: "2026-10-30T08:00:00+00:00", content: SEALED, ...changes });
+    const accountOf = async (raw: Record<string, unknown>, open: (publicationRef: string, runId: string, envelope: unknown) => Promise<unknown>) =>
+      readZip(buildArchive(await collect(raw, open), loadArchiveCatalog("en")).zip).find(entry => entry.name === "account.json")!.bytes.toString("utf8");
+
+    it("projects a report under the archive's names, opens its words under the debate's key, and shows no run id and no ciphertext", async () => {
+      const raw = rawRows();
+      raw.public_flags = [report()];
+      const open = vi.fn(async () => ({ where: "The second paragraph.", claim: "This line gives a home address.", verdict: "AGREE", reason: "SECRET-REASON" }));
+      const text = await accountOf(raw, open);
+      expect(open.mock.calls).toEqual([[PUBLICATION, RUN_BEHIND_IT, SEALED]]);
+      expect(JSON.parse(text).reports_you_made).toEqual([{ debate_reference: PUBLICATION, made_at: "2026-10-29T08:30:00.000Z", outcome: "QUEUED",
+        closed_at: "2026-10-30T08:00:00.000Z", where: "The second paragraph.", what_you_wrote: "This line gives a home address." }]);
+      for (const absent of ["run_id", RUN_BEHIND_IT, "SEALED-WORDS", "SEALED-KEY", "ciphertext", "SECRET-REASON", "AGREE"]) expect(text, absent).not.toContain(absent);
+    });
+
+    it("a report still open has no closing time", async () => {
+      const raw = rawRows();
+      raw.public_flags = [report({ state: "CHECKING", dismissed_at: null })];
+      const snapshot = await collect(raw, async () => ({ where: "w", claim: "c" }));
+      expect(snapshot.account.reports_you_made).toMatchObject([{ outcome: "CHECKING", closed_at: null, where: "w", what_you_wrote: "c" }]);
+    });
+
+    it("a report whose words are gone keeps its record, with null words, and opens nothing", async () => {
+      const raw = rawRows();
+      raw.public_flags = [report({ content: null })];
+      const open = vi.fn(NO_REPORT);
+      const snapshot = await collect(raw, open);
+      expect(open).not.toHaveBeenCalled();
+      expect(snapshot.account.reports_you_made).toEqual([{ debate_reference: PUBLICATION, made_at: "2026-10-29T08:30:00.000Z", outcome: "QUEUED",
+        closed_at: "2026-10-30T08:00:00.000Z", where: null, what_you_wrote: null }]);
+    });
+
+    it("words that cannot be opened fail the export rather than leave the report out", async () => {
+      const raw = rawRows();
+      raw.public_flags = [report({ content: null }), report()];
+      await expect(collect(raw, async () => { throw new Error("key gone"); })).rejects.toMatchObject({ code: "DATA_EXPORT_DECRYPT_FAILED" });
+    });
+
+    it("refuses a raw source that lacks the section", async () => {
+      const raw = rawRows();
+      delete raw.public_flags;
+      await expect(collect(raw)).rejects.toMatchObject({ code: "DATA_EXPORT_SOURCE_FAILED" });
+    });
   });
 
   it("reads an account with nothing saved as no level and empty lists", async () => {
@@ -91,23 +144,23 @@ describe("V4 account memory in the data export", () => {
   });
 
   // Ten with 0131; twelve since the Perplexity plan's 0132 and 0133 added their two readers; thirteen with 0134's;
-  // fourteen with 0135's; fifteen with 0136's; eighteen with 0137 to 0139's (three readers); nineteen with 0141's; twenty-one with 0144's and 0147's.
-  it("requires the page memory reader in the worker role witness (twenty-one functions)", async () => {
+  // fourteen with 0135's; fifteen with 0136's; eighteen with 0137 to 0139's (three readers); nineteen with 0141's; twenty-one with 0144's and 0147's; twenty-two with 0152's.
+  it("requires the page memory reader in the worker role witness (twenty-two functions)", async () => {
     const seen: unknown[][] = [];
     const principal = (name: string, workerCount: number) => ({
       principal: name, authorization_member: name === "request", worker_member: name === "worker",
       request_count: name === "request" ? 4 : 0, worker_count: workerCount, privileged: false });
     const pool = (name: string, workerCount: number) => ({ query: async (_sql: string, params: unknown[]) => {
       seen.push(params); return { rows: [principal(name, workerCount)] }; } });
-    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 21) as never)).resolves.toBeUndefined();
+    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 22) as never)).resolves.toBeUndefined();
     expect(seen[1]?.[1]).toContain("identity.read_data_export_page_memory(uuid,uuid)");
-    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 20) as never)).rejects.toThrow("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
+    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 21) as never)).rejects.toThrow("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
   });
 
   it("names the new account records in the README", () => {
     expect(renderReadme()).toContain(
       // 0132/0133 (the Perplexity plan) append the investigations and the reserve events to the same line.
       "account.json — account, channels, region, age checks, erasure requests, kept questions, reading level, debate visits, dig links, "
-        + "investigations and reserve events, and when an AI read your question before a debate.");
+        + "investigations and reserve events, and when an AI read your question before a debate, and the reports you made with the Report button.");
   });
 });

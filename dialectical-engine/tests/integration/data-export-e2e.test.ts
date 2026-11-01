@@ -135,7 +135,8 @@ describe("data export over a real database and encrypted file store", () => {
     const app = new DataExportApplication({ repository: repo, store,
       collect: async (claim, worker) => {
         try { return await collectSnapshot({ claim, workerId: worker, source, ownerView: actualOwnerView ?? ownerView,
-        decrypt: { openUserField: async (userId, field, envelope) => userKey === undefined
+        decrypt: { openPublicFlag: async () => { throw new Error("no report in this fixture"); },
+          openUserField: async (userId, field, envelope) => userKey === undefined
           ? (envelope as { test_email?: string })?.test_email ?? (field === "user.recovery_email_ciphertext" ? (recoveryEmail ?? email) : email)
           : decrypt(userKey, envelope as Parameters<typeof decrypt>[1],
             ["identity", field, userId, "run:none", userId, `user-dek:${userId}`, "1"]).toString("utf8"),

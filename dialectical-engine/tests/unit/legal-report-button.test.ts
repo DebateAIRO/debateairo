@@ -18,7 +18,11 @@ describe("the Report button and the six months in the legal texts", () => {
     expect(body).toContain("**Anyone can report content.** You do not need an account. Write to support@dezbatere.ro. If you are signed in, you can also use the **Report** button on any public debate. An AI reads a report made with the button beside the public text. If it agrees, the debate is hidden at once and a person reviews it. If it does not, you can report again with more details, and a person will read it. So that we can act, tell us:");
     expect(read("en", "privacy-policy.md")).toContain("Write to **privacy@dezbatere.ro**, or use the **Report** button on any public debate if you have an account. A public debate stays public, but if its text contains personal details about you or breaks our Terms, write to us, or use the Report button if you have an account: we can hide it");
     const decision36 = privacy("en").find((line) => line.startsWith("| The original of a corrected or removed passage |"));
-    expect(cells(decision36!).join(" ").toLowerCase()).toContain("the original of a corrected or removed passage stays sealed, readable only by the two people who review, for 6 months then it is deleted.");
+    expect(cells(decision36!).join(" ").toLowerCase()).toContain("the original of a corrected or removed passage stays sealed, readable only by admins who review, for 6 months then it is deleted. a log entry stays, with a digest and no text");
+    const reportsRow = privacy("en").find((line) => line.startsWith("| **Reports you make** |"));
+    expect(cells(reportsRow!)[1]).toContain("Only admins who review can see your name");
+    expect(read("en", "privacy-policy.md")).not.toMatch(/two people/iu);
+    expect(privacy("en")[95]).toContain("If you use the Report button on a public debate, we send the words of your report and the public text of the debate to an AI, which checks the report; we add nothing that identifies you or your account.");
   });
 
   it("nothing in the English live text still calls it a control, and only the 3.10 history still calls it a link", () => {
@@ -40,7 +44,13 @@ describe("the Report button and the six months in the legal texts", () => {
     expect(policy[158]!, `${code}: the new rows sit before the support chat's`).toContain("Anthropic");
     expect(cells(policy[157]!).join(" "), `${code}: decision 36's six months`).toContain("6");
     expect(policy[89]!, `${code}: section 4 points at section 5`).toMatch(/5/u);
-    expect(policy[95]!, `${code}: section 5 names the model twice or more`).toMatch(/Claude Haiku 5\.5[^]*Claude Haiku 5\.5[^]*Claude Haiku 5\.5/u);
+    // The paragraph still names the model for the two other checks, so the marker is the count: the report sentence, which comes last, adds no third mention.
+    const section5 = policy[95]!;
+    const mentions = [...section5.matchAll(/Claude Haiku 5\.5/gu)].map((match) => match.index);
+    expect(mentions, `${code}: section 5 names the model for the synthesis and the question checks only`).toHaveLength(2);
+    expect(section5.match(/Haiku/gu), `${code}: no other spelling of the model`).toHaveLength(2);
+    // ...and the report sentence is still there after the last mention: what follows it is longer than the stretch between the two mentions. Without the sentence it is at most 0.7 of that in every language, with it at least 1.36.
+    expect(section5.length - mentions[1]!, `${code}: the report sentence follows the question check's`).toBeGreaterThan(mentions[1]! - mentions[0]!);
     const log = policy.find((line) => line.includes("3.11") && line.includes("3.10") && line.includes("3.9"));
     expect(log, `${code}: the change log`).toBeDefined();
     expect(log!.indexOf("3.11"), `${code}: newest first`).toBeLessThan(log!.indexOf("3.9"));

@@ -99,7 +99,10 @@ describe("S2 identity schema on real PostgreSQL", () => {
       "private_erasure_audit_binding",
       // 0137 public debates: the public debates' contributions, updates and report charges. 0147 the public tree: the sealed copy, a dig's paths, the
       // AI check's pass, the climb's end, the answer's versions, a report and its copy, the skipped texts.
-      "public_answer_update", "public_climb_done", "public_contribution", "public_contribution_check", "public_debate_report", "public_debate_update", "public_dig_input",
+      "public_answer_update",
+      // 0152: what the AI checks on public rows used.
+      "public_check_usage",
+      "public_climb_done", "public_contribution", "public_contribution_check", "public_debate_report", "public_debate_update", "public_dig_input",
       // 0151: a report on a public debate and the queue's log; public_review_purged, below, is the receipt of what six months removed.
       "public_flag", "public_flag_event",
       "public_material", "public_page_skip", "public_report", "public_report_charge",

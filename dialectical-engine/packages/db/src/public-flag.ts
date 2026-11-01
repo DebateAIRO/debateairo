@@ -56,6 +56,10 @@ export class PostgresPublicFlagRepository {
     return await this.one("SELECT identity.public_review_purge($1::uuid,$2,$3::uuid,$4,$5,$6::jsonb,$7) AS value",
       [input.publicationRef, input.pieceKind, input.pieceId, input.mode, input.upToRevision, JSON.stringify(input.content), input.originalSha256]) as "PURGED" | "ALREADY" | "NOT_DUE";
   }
+  /** The first-run measure: what one AI check of a public row used. */
+  async recordCheckUsage(input: Readonly<{ subjectKind: "RUN" | "PUBLIC_REPORT"; subjectId: string; attemptedAt: Date; calls: number; inputTokens: number | null; outputTokens: number | null; costUsd: number | null }>): Promise<void> {
+    await this.pool.query("SELECT identity.record_public_check_usage($1,$2::uuid,$3,$4,$5,$6,$7)", [input.subjectKind, input.subjectId, input.attemptedAt, input.calls, input.inputTokens, input.outputTokens, input.costUsd]);
+  }
   async claimNotices(limit: number): Promise<readonly PublicFlagNoticeClaim[]> {
     return (await this.pool.query<PublicFlagNoticeClaim>("SELECT notice_id,kind,recipient_staff_id,claim_token FROM staff.claim_public_flag_notices($1)", [limit])).rows;
   }
