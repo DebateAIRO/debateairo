@@ -853,7 +853,7 @@ describe("(SA6) on the preview an ask is admitted on its version's line-up (addi
       plans: billingPlansFromValue(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value, BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.sourceRef),
       entitlements: { current: async () => ({ planId: "PLUS" as const, eventId: "55555555-5555-4555-8555-555555555555" }) },
       coarseFit: Object.freeze({
-        personAllowance: { read: async () => [{ scope: "PERSON_DAY" as const, limitMicros: 1_000_000,
+        personAllowance: { read: async () => [{ scope: "PERSON_DAY" as const, limitMicros: 1_100_000,
           periodStart: new Date("2026-10-22T00:00:00.000Z"), resetsAt: new Date("2026-10-23T00:00:00.000Z"),
           finishBasisPoints: 12_100, closeBasisPoints: 9_500 }] },
         spend: { readOwnerSpentMicros: async () => 0, readOwnerCountedHoldsMicros: async () => 0 },

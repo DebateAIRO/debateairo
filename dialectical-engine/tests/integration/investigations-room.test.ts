@@ -177,16 +177,16 @@ describe("the money rule over the real ledger", () => {
     const yesterdayRun = await run(person);
     const dig = await run(person);
     await pin([yesterdayRun, dig], person.ownerRef, anchor);
-    // Yesterday a running debate used 1.3 of the 1.0 day; today a dig's path rewrite used 0.75.
-    await charge(yesterdayRun, "RUN", 1_300_000, new Date(today!.periodStart.getTime() - 3_600_000));
-    await charge(dig, "PATH_REWRITE", 750_000, new Date(Math.min(today!.periodStart.getTime() + 60_000, now.getTime() - 1_000)));
+    // Yesterday a running debate used 330,000 past the made-up day of 726,000; today a dig's path rewrite used 432,300.
+    await charge(yesterdayRun, "RUN", 1_056_000, new Date(today!.periodStart.getTime() - 3_600_000));
+    await charge(dig, "PATH_REWRITE", 432_300, new Date(Math.min(today!.periodStart.getTime() + 60_000, now.getTime() - 1_000)));
     // The ledger's readers on the owner pool, as the B9 database suite reads them (the API's own spend pool is composed
     // in main.ts); the dig and pause definers below run on the API's runtime role.
     const store = new PostgresModelSpendStore(database.pool);
-    expect(await store.readOwnerSpentMicros(person.ownerRef, today!.periodStart, today!.resetsAt)).toBe(750_000);
+    expect(await store.readOwnerSpentMicros(person.ownerRef, today!.periodStart, today!.resetsAt)).toBe(432_300);
     const ranges = [{ from: anchor, to: today!.periodStart }, { from: today!.periodStart, to: today!.resetsAt }];
-    expect(await store.readOwnerSpentInRangesMicros(person.ownerRef, ranges)).toEqual([1_300_000, 750_000]);
-    expect(await store.readOwnerChargesMicros(person.ownerRef, today!.periodStart, today!.resetsAt)).toEqual([{ runId: dig, chargeMicros: 750_000 }]);
+    expect(await store.readOwnerSpentInRangesMicros(person.ownerRef, ranges)).toEqual([1_056_000, 432_300]);
+    expect(await store.readOwnerChargesMicros(person.ownerRef, today!.periodStart, today!.resetsAt)).toEqual([{ runId: dig, chargeMicros: 432_300 }]);
 
     const room = new AskRoom({
       lockPool: { connect: vi.fn() } as unknown as Pool,
@@ -206,7 +206,7 @@ describe("the money rule over the real ledger", () => {
     });
     const answer = await room.readRoom({ access: { ownerRef: person.ownerRef, legacyAskerId: null },
       settingsClass: { planTier: "premium", compositionBudgetTier: "low", makerCount: 2, depth: 1 } });
-    // 0.3 borrowed + 0.75 used of a 1.0 day: full until the day resets.
+    // 330,000 borrowed + 432,300 used of a 726,000 day: full until the day resets.
     expect(answer).toMatchObject({ room: "FULL", scope: "PERSON_DAY", resetsAt: today!.resetsAt, newStarts: "BLOCKED_UNTIL_RESET", reserve: "KEPT" });
     const usage = await new PersonUsageReader({ entitlements: { current: async () => ({ planId: "PLUS" as const }) }, allowance, spend: store })
       .read(person.ownerRef, now);

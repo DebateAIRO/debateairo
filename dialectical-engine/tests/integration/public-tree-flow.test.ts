@@ -131,7 +131,7 @@ const PRICE = Object.freeze({ inputMicrosPerMillionTokens: 1_000_000, outputMicr
 const debugLog = (event: string, detail: Record<string, unknown>): void => { if (process.env.PUBLIC_TREE_DEBUG === "1") console.error(event, JSON.stringify(detail)); };
 function vendors(script: Script = {}) {
   const sent: PromptPacket[] = [];
-  const guard = () => new CostEnvelopeGuard({ store: new PostgresModelSpendStore(runner), policy: { perRunCeilingMicros: 250_000, dailyCeilingMicros: 2_000_000, perStoryCeilingMicros: 100_000 } });
+  const guard = () => new CostEnvelopeGuard({ store: new PostgresModelSpendStore(runner), policy: { perRunCeilingMicros: 250_000, closingCeilingMicros: 440_000, dailyCeilingMicros: 2_000_000, perStoryCeilingMicros: 100_000 } });
   const gateway = (name: string, model: string, maker: string) => createPostgresProviderGateway(runner, {
     endpoint: "http://fixture/v1", model, maker,
     buildPathRewriteCostEnvelopeSeam: (runId: string) => guard().pathRewriteSeam({ runId, price: PRICE, requireReportedUsage: true }),

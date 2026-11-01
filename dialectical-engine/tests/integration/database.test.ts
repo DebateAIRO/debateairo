@@ -8986,7 +8986,7 @@ function b9WallGuard(input: Readonly<{
   prices?: B9WallPrices;
   moveWindowReads?: number;
 }>) {
-  const edge = input.scope === "SITE_DAY" ? 2_300_000 : 1_100_000;
+  const edge = input.scope === "SITE_DAY" ? 2_300_000 : 1_210_000;
   const moveWindowReads = input.prices === undefined ? 0 : input.moveWindowReads ?? 0;
   const builds: { maker: B9Maker; phase: CostEnvelopePhase; sharedWall: SharedWallApplication }[] = [];
   const reads: Readonly<{ callSiteKey: string; maker: B9Maker }>[] = [];

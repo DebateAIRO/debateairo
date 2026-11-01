@@ -121,12 +121,12 @@ describe("P23 paid plans, end to end on the fake stack", () => {
     );
     expect(succeeded.rows[0]!.count).toBe("1");
 
-    // Usage: 0.50 of Plus's 1.00 day, 2.50 week and 5.00 month.
-    await stack.spend(person, 500_000);
+    // Usage: half of Plus's made-up day of 726,000; its week is 2,904,000 and its month 6,600,000.
+    await stack.spend(person, 363_000);
     const usage = await stack.get(person, "/v1/billing/usage");
     expect(usage.status).toBe(200);
     const percent = Object.fromEntries((usage.body.windows as Array<{ scope: string; percent: number }>).map((w) => [w.scope, w.percent]));
-    expect(percent).toEqual({ PERSON_DAY: 50, PERSON_WEEK: 20, PERSON_MONTH: 10 });
+    expect(percent).toEqual({ PERSON_DAY: 50, PERSON_WEEK: 12, PERSON_MONTH: 5 });
     expect(usage.text).not.toMatch(/micros|\$|"0\.5/u);
 
     // Renewal: the period ends, the saved card is charged again, the plan stays. C-18: the tax service is watched
@@ -194,7 +194,7 @@ describe("P23 paid plans, end to end on the fake stack", () => {
       "SELECT total_micros::text FROM billing.charge WHERE charge_id = $1", [chargeRef]
     );
     const paidCents = Number(paid.rows[0]!.total_micros) / 10_000;
-    await stack.spend(person, 2_000_000);              // 10% of Pro's 20.00 month (testBillingPlans)
+    await stack.spend(person, 3_300_000);              // 10% of Pro's made-up month (testBillingPlans)
     stack.advanceDays(2);                               // 2 days of a 28–31-day period: under 10%
     const stepped = await stack.post(person, "/v1/auth/step-up", {
       password: "not-checked-by-the-stack", code: "000000", authorization: { action: "WITHDRAW_SUBSCRIPTION" }
