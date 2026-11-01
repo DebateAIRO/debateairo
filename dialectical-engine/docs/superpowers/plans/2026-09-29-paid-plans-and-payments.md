@@ -28,7 +28,7 @@ These are copied from the spec. Every task includes them implicitly.
 
 **Plans and limits**
 
-- Plans are exactly FREE / PLUS / PRO / MAX. Net prices are 0 / 20.00 / 50.00 / 200.00 USD. Monthly credit is the plan's limit.
+- Plans are exactly FREE / PLUS / PRO / MAX. Net prices are the public ones. Monthly credit is the plan's limit.
 - Paid plans get a day cap of 2000 basis points and a week cap of 5000 basis points of the monthly credit. Free has only its monthly credit.
 - Every person window has a finish edge of <amount> basis points (<amount>). The site day keeps <amount> (<amount>), and the close edge is <amount> (<amount>).
 - One waiting question per person.
