@@ -389,7 +389,7 @@ export interface SharedWallInput {
   readonly finishBasisPoints: number | null;
   /**
    * The run owner's windows, each carrying its own finish edge (v3: 11 000; billingPlans v4: 10 000 plus a fixed
-   * 20-cent overflow); `NO_PERSON_ALLOWANCE` supplies none.
+   * overflow); `NO_PERSON_ALLOWANCE` supplies none.
    */
   readonly persons: PersonAllowanceSource;
   readonly owners: RunOwnerSpendReader;
@@ -1255,8 +1255,8 @@ export class CostEnvelopeGuard {
    *    `finishBasisPoints: null` there is no site-day wall and the day is not
    *    read.
    *  · each of the run owner's windows: the owner's RUN + STORY spend inside the
-   *    window plus this call, against that window's own finish edge (v3: 110%;
-   *    billingPlans v4: the limit plus its fixed 20-cent overflow),
+   *    window plus this call, against that window's own finish edge (v3: a share of it;
+   *    billingPlans v4: the limit plus its fixed overflow),
    *    with or without the band (ruling R-19: the person wall applies iff the
    *    run has a charge scope).
    *

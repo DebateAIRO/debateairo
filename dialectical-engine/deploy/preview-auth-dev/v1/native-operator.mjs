@@ -114,7 +114,8 @@ export const HOSTED_CEILING_BOUNDS=Object.freeze({perRunMaxMicros:50_000_000,dai
 /**
  * The owner's hosted-preview inputs (publish-register-v3.ts PreviewHostedBillingChoice, owner rulings 2026-10-13):
  * exactly `billing` ('on' or 'off'), `perRunCeilingMicros` and `dailyCeilingMicros` (whole micro-dollars, per run at
- * most the day) and `askRoomReads` ({limit, windowMs, capacity}: the room read's budget, the register's own bounds).
+ * most the day), `askRoomReads` ({limit, windowMs, capacity}: the room read's budget, the register's own bounds), and
+ * `billingPlans` and `abuseLimits` (R22 decision 18: the real rows, parsed by the kit, whose only home is this plan).
  * A plan that carries it composes with kit v3 (hosted rows); without it, with kit v2 (local rows, billing off). The
  * kit checks it again before it builds a row. Returns the choice in one fixed key order.
  */

@@ -123,7 +123,7 @@ practice takes the same inputs, checked by the release tool's own rules, and com
 own code (`buildPreviewSourceRowsV3`, `composePreviewSnapshotV3`):
 
 - `--hosted-billing '<JSON>'`: exactly the plan's value, for example
-  `'{"billing":"off","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'`
+  `"$(jq -c '.billing="off"' /etc/debateai-v3-preview/hosted-billing-v1.json)"`
   (use the owner's values; H7's is the same with `"billing":"on"`). It selects kit v3 and runs the practice in hosted
   mode, also on a local-mode settings file: that is how to practise the switch itself (runbook H6) before it happens.
 - `--checker glm|deepseek` (deepseek only with `--deepseek-enabled-on-gate yes`), `--role-rotation on|off`,
@@ -147,7 +147,7 @@ own code (`buildPreviewSourceRowsV3`, `composePreviewSnapshotV3`):
   rotation), and refuses on a hosted preview (`PRACTICE_REGISTER_NEXT_HOSTED_BILLING_REQUIRED`).
 
 ```sh
-HB='{"billing":"off","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
+HB="$(jq -c '.billing="off"' /etc/debateai-v3-preview/hosted-billing-v1.json)"
 PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --depth 1 --question ro --register-next --hosted-billing "$HB" --out "$P/debate-report"
 echo "exit: $?"
 ```

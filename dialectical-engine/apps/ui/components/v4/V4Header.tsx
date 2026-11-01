@@ -23,7 +23,7 @@ function useDayPercent(): number | null {
     void readBillingUsage(contractClient).then((usage) => {
       if (!active || usage === null) return;
       const day = usage.windows.find((window) => window.scope === "PERSON_DAY");
-      // 110% is a running debate's finish leeway (UsageBars); the person reads "100% used".
+      // Past 100% is a running debate's finish leeway (UsageBars); the person reads "100% used".
       setPercent(day === undefined ? null : Math.min(100, Math.max(0, Math.round(day.percent))));
     });
     return () => { active = false; };

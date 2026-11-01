@@ -46,7 +46,7 @@ import { replayingGateway, type ReplayBook } from "./run-replay.js";
  * MONEY (the money rule, point 6): the reserve always kept, inside a paid month and on top of Free's credit, pays
  * the closing; it is never walled (no day, week or month stops it). Every call names the investigation's ROOT run on the
  * story lane at an `INVESTIGATION_REPORT:` site, so the gateway charges it as spend source INVESTIGATION_REPORT on the
- * never-walled seam (packages/budget `investigationReportSeam`, a 20-cent safety net per closing). Before each call the
+ * never-walled seam (packages/budget `investigationReportSeam`, the plans' largest reserve as a safety net per closing). Before each call the
  * closing admits it against its OWN plan's reserve: what this closing has spent plus the call's projected maximum must fit,
  * or the call is refused before it is sent, and the step keeps its last checked draft (the story loop's rule).
  *
@@ -59,7 +59,7 @@ import { replayingGateway, type ReplayBook } from "./run-replay.js";
 export type InvestigationCloseInput = Readonly<{
   /** The dossier's input, read from the store; null when the investigation's root cannot be read (the closing FAILS). */
   input: DossierInput;
-  /** Free's slim report: 1 round each, its 5-cent reserve (owner F1, F2). */
+  /** Free's slim report: 1 round each, its plan's reserve (owner F1, F2). */
   free: boolean;
   /** The question's line and locked language, for the replies' language check. */
   questionLine: string;

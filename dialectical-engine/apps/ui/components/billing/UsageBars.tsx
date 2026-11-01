@@ -34,7 +34,7 @@ function windowsOf(usage: BillingUsage | null): readonly UsageWindow[] {
 /**
  * Paid-plans spec §1.2 and §2.10: the person's day, week and month as a percent
  * with the reset time under each. No dollar amount of credit is shown anywhere.
- * 110% is a running debate's finish leeway; the bar is then full.
+ * Past 100% is a running debate's finish leeway; the bar is then full.
  */
 export function UsageBars({
   catalog,

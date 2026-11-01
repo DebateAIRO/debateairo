@@ -24,7 +24,7 @@ export type PersonWindow = Readonly<{
   finishBasisPoints: number;
   /**
    * billingPlans v4 (owner 2026-10-30, Q1-Q3), reworked by the owner's money rule of 31 Oct: on the MONTH window only,
-   * the tolerance for calls already in flight when the month reaches its wall (20 cents). No new call starts at the
+   * the tolerance for calls already in flight when the month reaches its wall. No new call starts at the
    * wall (`decideMonthWall`, ./room.ts). Absent on a v3 plan's window, and on an internal grant: the share alone.
    */
   finishOverflowMicros?: number;
@@ -35,8 +35,8 @@ export type PersonWindow = Readonly<{
    */
   borrows?: true;
   /**
-   * The money rule, on a billingPlans v4 MONTH window: the final-answer reserve kept INSIDE the month (a paid plan's 20
-   * cents; 0 on Free, whose 5 cents sit on top of its credit). New starts and running work stop that far below the
+   * The money rule, on a billingPlans v4 MONTH window: the final-answer reserve kept INSIDE the month (a paid plan's
+   * reserve; 0 on Free, whose reserve sits on top of its credit). New starts and running work stop that far below the
    * limit, so writing the report is always possible.
    */
   keepsReserveMicros?: number;

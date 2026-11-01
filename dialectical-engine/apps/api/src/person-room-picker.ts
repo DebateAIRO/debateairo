@@ -119,7 +119,7 @@ export function personRoomMicrosAt(uses: ReadonlyArray<RoomWindowUse>, at: Date)
 /**
  * The picker's limits: the site's body share cut from min(site per-run ceiling,
  * room); the whole run held to the site's serve share, and with a person scope
- * to the room itself — spec §2.6 item 2's "at 100%": the finish edge (110 %) is
+ * to the room itself — spec §2.6 item 2's "at 100%": the finish edge is
  * for running debates, never for planning one.
  */
 export function pickerMoneyLimits(input: Readonly<{

@@ -7,7 +7,7 @@ import { borrowersOf, readWindowBorrow, type AskRoomSpend } from "../ask-room.js
 /**
  * Paid-plans spec §1.2 (U1) — WHAT THE USAGE BARS SHOW: what the person has spent
  * in each window, as a whole percentage of its limit, rounded DOWN and clamped to
- * 0–110 (a running debate may take a window to its 110% finish edge). Holds are
+ * 0–110 (a running debate may take a window to its finish edge). Holds are
  * not shown: a bar says what was used, not what is promised to a running debate.
  * The money rule (owner, 31 Oct; W3-2): a billingPlans v4 day or week shows what was used in it PLUS what running work
  * borrowed into it (it started lower by that much), and the read names each run that is borrowing from the next day

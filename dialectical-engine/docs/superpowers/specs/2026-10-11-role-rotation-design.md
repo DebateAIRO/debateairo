@@ -143,7 +143,7 @@ At boot, the preview configuration already refuses a free or premium model list 
 
 Pricing the dearest member rather than the actual pick also means the decision "fits / does not fit" never depends on whose turn it is: the same ask on the same day gets the same answer.
 
-**The re-pinned room table** (preview, depth 1-3, largest story size, realistic worst case, × 1.15, plus each gate's in-flight hold; pots DeepInfra $10.00 / 2,000 calls, Anthropic $2.00 / 600 calls). Computed on 2026-10-11 by running the shipped estimate functions with the roles placed at each gate's dearest member, as above (a scratch run; the same scratch, with today's roles, reproduced the currently pinned table exactly):
+**The re-pinned room table** (preview, depth 1-3, largest story size, realistic worst case, × 1.15, plus each gate's in-flight hold; pots DeepInfra <amount>0 / 2,000 calls, Anthropic <amount>0 / 600 calls). Computed on 2026-10-11 by running the shipped estimate functions with the roles placed at each gate's dearest member, as above (a scratch run; the same scratch, with today's roles, reproduced the currently pinned table exactly):
 
 | Depth | Free (GLM + DeepSeek) | Premium (4 on DeepInfra) | All five: DeepInfra share | All five: Anthropic share |
 |---|---|---|---|---|
