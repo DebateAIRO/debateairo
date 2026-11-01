@@ -213,7 +213,7 @@ describe("the shape half: what is knowable without a list", () => {
 
   it("leaves a public price and a vendor's price alone: no limit word, no refusal", () => {
     const base = git("rev-parse", "HEAD");
-    put("notes.md", "Plus costs $20 a month.\n| some-model | maker | $0.20 / $0.60 |\nThe query binds $5 and $6.\n");
+    put("notes.md", "Plus costs $20 a month.\n| some-model | maker | $0.31 / $0.62 |\nThe query binds $5 and $6.\n");
     commit();
     expect(check(base).code).toBe(0);
   });
