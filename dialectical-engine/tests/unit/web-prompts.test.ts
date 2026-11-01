@@ -395,7 +395,7 @@ describe("the seals", () => {
       "report.answer.v2", "report.answer.later.v2", "report.answer-check.v2",
       "web.read-all.v2", "judge.panel.length.sources.v1", "path-rewrite.writer.v2", "path-rewrite.checker.v2", "ask.clarify.v1",
       "report.answer.v3", "report.answer.later.v3", "report.answer-check.v3", "report.answer.v4", "report.answer.later.v4",
-      "public.contribution-check.v1"
+      "public.contribution-check.v1", "public.report-check.v1"
     ]);
     expect(new Set(ENGINE_SEALED_CONTRACT_IDS).size).toBe(ENGINE_SEALED_CONTRACT_IDS.length);
     // The review is sealed with its edge count at zero, as the judge seal seals the review.

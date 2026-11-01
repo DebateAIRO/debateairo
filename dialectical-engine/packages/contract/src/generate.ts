@@ -32,6 +32,8 @@ const variants = (...names: EndpointSchemaName[]) => ({ anyOf: names.map(referen
 const request = (schema: unknown) => ({ requestBody: { required: true, content: { "application/json": { schema } } } });
 const response = (schema: unknown, status = "200") => ({ responses: { [status]: { description: status === "202" ? "Generic verification acknowledgement" : "Current selected policy response", content: { "application/json": { schema } } } } });
 const staffEndpointContracts: Record<string, Record<string, unknown>> = {
+  // Decision 33: a public debate hidden under review answers 410, with no text of it.
+  "GET /v1/public/debates/{id}": { responses: { "200": { description: "The public debate" }, "404": { description: "No public debate here" }, "410": { description: "Hidden under review: error DEBATE_UNDER_REVIEW, no-store" } } },
   "POST /v1/auth/social/login/status": {...request(reference("SocialLoginStatusRequestSchema")),...response(reference("SocialLoginStatusResponseSchema"))},
   "POST /v1/auth/recovery/prove": {...request(reference("ConsumerRecoveryProveRequestSchema")),...response(reference("ConsumerRecoveryProofResponseSchema"))},
   "POST /v1/auth/recovery/enrollment/options": {...request(reference("RecoveryEnrollmentBeginRequestSchema")),...response(reference("RecoveryEnrollmentOptionsResponseSchema"))},

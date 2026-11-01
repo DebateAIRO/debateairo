@@ -16,6 +16,7 @@ import type { PublicationReviewIntent, PublicationReviewStaffService } from '../
 import { registerThreatReportRoutes, ThreatReportHttpError, type ThreatReportStaffService } from './threat-reports.js';
 import { TypedDomainError } from '@debateai/kernel';
 import { canonicalTeamAllowanceActionBinding, isTeamAllowanceIntent, readTeamAllowanceState, registerTeamAllowanceRoutes, TeamAllowanceHttpError, type TeamAllowanceState } from './team-allowances.js';
+import { canonicalPublicFlagBinding, isPublicFlagIntent, publicFlagQueueOf, type PublicFlagIntent, type PublicFlagStaffService } from '../public-flag.js';
 import { canonicalPublicReviewBinding, isPublicReviewIntent, PublicReviewHttpError, registerPublicReviewRoutes, type PublicReviewIntent, type PublicReviewStaffService } from './public-review.js';
 import { canonicalTeamLimitActionBinding, isTeamLimitIntent, registerTeamLimitRoutes, TeamLimitHttpError, type TeamLimitIntent, type TeamLimitStaffService } from './team-limit.js';
 export const staffAuthorizationPolicyInventory = Object.freeze([
@@ -62,7 +63,9 @@ export const staffAuthorizationPolicyInventory = Object.freeze([
     { route: 'GET /v1/admin/public-review', auth: 'staff', resource: 'staff-team', action: 'public-review-list' },
     { route: 'GET /v1/admin/public-review/{id}', auth: 'staff', resource: 'staff-team', action: 'public-review-read' },
     { route: 'POST /v1/admin/public-review/{id}/hide', auth: 'staff', resource: 'staff-team', action: 'public-review-hide' },
-    { route: 'POST /v1/admin/public-review/{id}/step', auth: 'staff', resource: 'staff-team', action: 'public-review-step' }
+    { route: 'POST /v1/admin/public-review/{id}/step', auth: 'staff', resource: 'staff-team', action: 'public-review-step' },
+    { route: 'GET /v1/admin/public-reports', auth: 'staff', resource: 'staff-team', action: 'public-report-queue' },
+    { route: 'POST /v1/admin/public-reports/{id}/dismiss', auth: 'staff', resource: 'staff-team', action: 'public-report-dismiss' }
 ] as const);
 /** Explicit v2 composition only. No ready flags, command prepare/commit, or private content readers. */
 export interface StaffHttpApplication {
@@ -77,6 +80,7 @@ export interface StaffHttpApplication {
     threatReports?: ThreatReportStaffService;
     teamLimit?: TeamLimitStaffService;
     publicReview?: PublicReviewStaffService;
+    publicFlags?: PublicFlagStaffService;
     /** Early lock check before any key ceremony (not the authority: the alert producer and the DB guard
      * still check every mutation). Production passes the runtime's readiness; absent, only those run. */
     readiness?: Readonly<{ readIndependentAlertReadiness(): Promise<'READY' | 'UNAVAILABLE'> }>;
@@ -115,7 +119,7 @@ const ordinary = (base: AuthenticatedSession) => ({ userId: base.userId, ordinar
 const reason = (wire: z.infer<typeof contract.ReasonSchema>): Reason => ({ code: wire.code, ...(wire.ticket_ref === undefined ? {} : { ticketRef: wire.ticket_ref }) });
 const receipt = (value: SecurityReceipt) => ({ operation_id: value.operationId, outcome: value.outcome, recorded_at: value.recordedAt.toISOString() });
 /** Fixed field order + sorted sets make the proof independent of browser object/key ordering. */
-export function canonicalStaffActionBinding(intent: Exclude<contract.StaffActionIntent, PublicationReviewIntent | TeamLimitIntent | PublicReviewIntent>, auth: StaffAuthentication): ActionBinding {
+export function canonicalStaffActionBinding(intent: Exclude<contract.StaffActionIntent, PublicationReviewIntent | TeamLimitIntent | PublicReviewIntent | PublicFlagIntent>, auth: StaffAuthentication): ActionBinding {
     if (intent.action === 'THREAT_REPORT_DECIDE') {
         const action = `THREAT_REPORT_${intent.decision}` as const;
         const body = { action, target_id: intent.target_report_ref, decision: intent.decision,
@@ -156,7 +160,7 @@ export function canonicalInternalAllowanceActionBinding(input: contract.Internal
         bodySha256: createHash('sha256').update(parseCanonicalRegisterJson(Buffer.from(JSON.stringify(body)))).digest('hex') };
 }
 function capability(intent: contract.FundedStaffActionIntent): StaffCapability | TeamLimitAuthority | null {
-    if (intent.action === 'TEAM_LIMIT_SET' || intent.action === 'TEAM_PRACTICE_RECORD' || intent.action === 'PUBLIC_REVIEW_HIDE' || intent.action === 'PUBLIC_REVIEW_STEP') return 'TEAM_LIMIT_SET';
+    if (intent.action === 'TEAM_LIMIT_SET' || intent.action === 'TEAM_PRACTICE_RECORD' || intent.action === 'PUBLIC_REVIEW_HIDE' || intent.action === 'PUBLIC_REVIEW_STEP' || intent.action === 'PUBLIC_REPORT_DISMISS') return 'TEAM_LIMIT_SET';
     if (intent.action === 'TEAM_LIMIT_PARTNER_GRANT' || intent.action === 'TEAM_LIMIT_PARTNER_REVOKE') return 'TEAM_GRANT';
     if (intent.action === 'ALLOWANCE_CONFIGURE' || intent.action === 'ALLOWANCE_REVOKE' || isTeamAllowanceIntent(intent)) return 'ALLOWANCE_WRITE';
     if (intent.action === 'PUBLICATION_REVIEW_APPROVE' || intent.action === 'PUBLICATION_REVIEW_REFUSE') return 'PUBLICATION_REVIEW';
@@ -216,6 +220,10 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
             await application!.access.requireCapability(authentication, required!);
             binding = canonicalTeamLimitActionBinding(intent, authentication.context.staffId,
                 intent.action === 'TEAM_LIMIT_SET' ? await application!.teamLimit.repository.readCommand(authentication.context, authentication.baseSession.tokenHash) : null);
+        } else if (isPublicFlagIntent(intent)) {
+            if (application!.publicFlags === undefined) throw new StaffHttpRefusal(503, 'STAFF_UNAVAILABLE');
+            await application!.access.requireCapability(authentication, required!);
+            binding = canonicalPublicFlagBinding(intent);
         } else if (isPublicReviewIntent(intent)) {
             if (application!.publicReview === undefined) throw new StaffHttpRefusal(503, 'STAFF_UNAVAILABLE');
             // The authority first: the state a ceremony is bound to goes to nobody else.
@@ -361,6 +369,35 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
         return project(contract.StaffAuditPageSchema, await application!.repository.readAuditPage({ context: authentication.context, ordinaryTokenHash: authentication.baseSession.tokenHash, limit: query.limit, ...(query.cursor === undefined ? {} : { cursor: query.cursor }) }));
     });
     registerThreatReportRoutes(route, application?.threatReports, application?.access, auth, actionAuthority);
+    // Decision 35: the Report button's queue. The same two accounts; a dismissal takes a passkey and waits while team tools are locked.
+    route('GET', '/v1/admin/public-reports', async (request, reply) => {
+        reply.header('Cache-Control', 'no-store');
+        const authentication = auth(request);
+        await application!.access.requireCapability(authentication, 'TEAM_LIMIT_SET');
+        const service = application!.publicFlags;
+        if (service === undefined) throw new StaffHttpRefusal(503, 'STAFF_UNAVAILABLE');
+        return publicFlagQueueOf(service, await service.repository.readQueue(authentication.context, authentication.baseSession.tokenHash));
+    });
+    route('POST', '/v1/admin/public-reports/:id/dismiss', async (request, reply) => {
+        reply.header('Cache-Control', 'no-store');
+        const flagId = parse(contract.PublicReviewPageSchema.shape.publication_ref, (request.params as { id?: unknown }).id);
+        const input = parse(contract.PublicFlagDismissRequestSchema, request.body);
+        const service = application!.publicFlags;
+        if (service === undefined) throw new StaffHttpRefusal(503, 'STAFF_UNAVAILABLE');
+        const { authentication, binding } = await actionAuthority(request, { action: 'PUBLIC_REPORT_DISMISS', flag_id: flagId, operation_id: input.operation_id });
+        const proof = await application!.access.readActionProof(authentication, input.proof_handle, binding);
+        if (proof === null) throw new StaffHttpRefusal(403, 'STAFF_REQUEST_REFUSED');
+        const alertIntent = await application!.intents.mutation({ event: 'PUBLIC_REVIEW_CHANGED', operationId: binding.operationId, keyUserId: authentication.context.userId, actorStaffId: authentication.context.staffId, subjectStaffId: authentication.context.staffId, reason: { code: 'SECURITY_RESPONSE' } });
+        try {
+            const done = await service.repository.dismiss({ actor: authentication.context, proof, flagId, operationId: input.operation_id, alertIntent });
+            return { operation_id: done.operationId, outcome: done.outcome, recorded_at: done.recordedAt.toISOString() };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : '';
+            if (message === 'PUBLIC_FLAG_ALREADY_DISMISSED') throw new StaffHttpRefusal(409, message);
+            if (message === 'PUBLIC_REVIEW_PIECE_UNKNOWN') throw new StaffHttpRefusal(404, message);
+            throw error;
+        }
+    });
     registerPublicReviewRoutes(route, () => application!.publicReview, () => application!.access, () => application!.intents, auth,
         async () => { try { await requireUnlocked(); return true; } catch { return false; } }, actionAuthority);
     registerTeamLimitRoutes(route, () => application!.teamLimit, () => application!.access, () => application!.intents, auth, actionAuthority);

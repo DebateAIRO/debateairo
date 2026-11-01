@@ -25,9 +25,17 @@ export function createPublicReviewClient({ fetchImplementation = fetch, apiBase 
   const origin = typeof window === "undefined" ? "http://localhost" : window.location.origin;
   let generation = 0;
   const request = privateAdminRequester("/v1/admin/public-review", transport, origin, () => generation);
+  const reports = privateAdminRequester("/v1/admin/public-reports", transport, origin, () => generation);
   return Object.freeze({
     cancel: () => { generation++; staff.cancel(); },
     list: () => request("", contract.PublicReviewListSchema),
+    /** Decision 35: the Report button's queue. Each read is logged: reporters' names are on it. */
+    readReports: () => reports("", contract.PublicFlagQueueSchema),
+    async dismissReport(flagId: string) {
+      const operation_id = crypto.randomUUID();
+      const proof = await staff.proveAction({ action: "PUBLIC_REPORT_DISMISS", flag_id: flagId, operation_id });
+      return reports(`/${encodeURIComponent(flagId)}/dismiss`, contract.SecurityReceiptSchema, "POST", contract.PublicFlagDismissRequestSchema.parse({ operation_id, proof_handle: proof.proof_handle }));
+    },
     read: (publicationRef: string) => request(`/${encodeURIComponent(publicationRef)}`, contract.PublicReviewPageSchema),
     async hide(publicationRef: string, revision: number) {
       const fields = { expected_revision: revision, operation_id: crypto.randomUUID() };

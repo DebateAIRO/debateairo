@@ -19,7 +19,7 @@ const pageOf = (hidden: boolean, removed = false): PublicReviewPage => PublicRev
 let root: Root | undefined, host: HTMLDivElement | undefined;
 afterEach(() => { act(() => root?.unmount()); host?.remove(); });
 function client(change: Partial<PublicReviewClient> = {}) {
-  return { cancel: vi.fn(), list: vi.fn(async () => ({ hidden: [], log: [] })), read: vi.fn(async () => pageOf(false)), hide: vi.fn(async () => ({})), step: vi.fn(async () => ({})), ...change } as unknown as PublicReviewClient;
+  return { cancel: vi.fn(), readReports: vi.fn(async () => ({ reports: [{ flag_id: LATER, publication_ref: REF, reporter: "Quiet Heron", state: "HIDDEN", verdict: "AGREE", reason: "PERSONAL", created_at: "2026-11-01T08:00:00.000Z", judged_at: null, dismissed_at: null, where: "A place.", claim: "A claim to read.", debate_hidden: true }] })), dismissReport: vi.fn(async () => ({})), list: vi.fn(async () => ({ hidden: [], log: [] })), read: vi.fn(async () => pageOf(false)), hide: vi.fn(async () => ({})), step: vi.fn(async () => ({})), ...change } as unknown as PublicReviewClient;
 }
 async function mount(api: PublicReviewClient) {
   host = document.body.appendChild(document.createElement("div"));
@@ -79,6 +79,20 @@ describe("the review panel", () => {
     await press("Hide now");
     await press("Confirm");
     expect(host!.textContent).toContain("Someone else took a step first");
+  });
+  it("the queue shows each report with its claim, what the AI said and the reporter; open goes to the review tool; a dismissal says what it does first", async () => {
+    const api = client();
+    await mount(api);
+    const row = host!.querySelector("[data-report]")!;
+    expect(row.getAttribute("data-report")).toBe("HIDDEN");
+    expect(row.textContent).toContain("Quiet Heron");
+    expect(row.textContent).toContain("A claim to read.");
+    await press("Open in the review tool");
+    expect(api.read).toHaveBeenCalledWith(REF);
+    await press("Dismiss");
+    expect(api.dismissReport).not.toHaveBeenCalled();
+    await press("Confirm");
+    expect(api.dismissReport).toHaveBeenCalledWith(LATER);
   });
   it("a public link or a bare reference names the debate; anything else is nothing", () => {
     expect(publicationRefOf(`https://dezbatere.ro/public/debate/${REF}?x=1`)).toBe(REF);

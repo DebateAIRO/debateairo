@@ -28,6 +28,7 @@ import type { AuthSourceAdmission } from "./registration.js";
 import { requireTurnstileProof, TurnstileGateError, type TurnstileVerifier } from "./turnstile.js";
 import { AccountProfileError, type AccountProfileService } from "./account-profile.js";
 import { RecoveryEmailError, type RecoveryEmailService } from "./recovery-email.js";
+import { pressPublicFlag, type PublicFlagPorts } from "./public-flag.js";
 import type { PostgresPublicDebateRepository, PostgresPublicTreeRepository, ProfileSession, PublicContributionRead } from "@debateai/db";
 import { runInRequestScope, setRequestCredential } from "@debateai/db";
 import { normalizeManualPhone } from "./phone-profile.js";
@@ -80,6 +81,8 @@ import {
   PublicDebateSchema,
   PublicDebateRefusedSchema,
   PublicReportAcceptedSchema,
+  PublicFlagAnswerSchema,
+  PublicFlagRequestSchema,
   PublicReportRequestSchema,
   type PublicDebate,
   type PublicDigParent,
@@ -1522,6 +1525,7 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "GET /v1/public/ai-providers", auth: "public", resource: "deployment", action: "read-ai-providers" },
   // Decision 13: a report on a public debate, by a signed-in person with credit.
   { route: "POST /v1/public/debates/{id}/report", auth: "user", resource: "public-debate", action: "write-report" },
+  { route: "POST /v1/public/debates/{id}/flag", auth: "user", resource: "public-debate", action: "flag" },
   { route: "GET /v1/geo/availability", auth: "public", resource: "geo", action: "read-availability" },
   // Anonymous support writes require the exact first-party Origin.
   { route: "POST /v1/support/messages", auth: "public", origin: "trusted", session: "optional", resource: "support-message", action: "create" },
@@ -1922,6 +1926,7 @@ export interface ApiOptions {
   readonly digPicks?: DigPicksPort;
   /** Decision 13: digs and reports on a public debate, by anyone with credit (./public-tree.ts); absent: only the first snapshot is readable. */
   readonly publicTree?: PublicTreeOptions;
+  readonly publicFlags?: PublicFlagPorts;
   /** Decision 5 of 31 Oct (0138): a debate's place, time and purpose lines, sealed under its run key at the ask. */
   readonly purposeLines?: PurposeLinesPort;
   /** Decision 29: dynamic step 2's small call. Absent: every page gets the generic purpose options. */
@@ -3859,6 +3864,19 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       return reply.status(404).send({ error: "DEBATE_NOT_FOUND" });
     }
   );
+  // Decision 35: Report on a public debate, signed in. One answer shape; every refusal reads the same, so nothing about the check, the limits or the debate leaks.
+  api.post<{ Params: { id: string } }>("/v1/public/debates/:id/flag", credentialRoutePolicy("POST /v1/public/debates/{id}/flag"), async (request, reply) => {
+    const ownerRef = request.authenticatedSession?.ownerRef;
+    const body = PublicFlagRequestSchema.safeParse(request.body ?? {});
+    if (ownerRef === undefined || options.publicFlags === undefined) return reply.status(404).send({ error: "DEBATE_NOT_FOUND" });
+    if (!body.success) return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    if (!admitOrRefuse(reply, "asks", "POST /v1/public/debates/{id}/flag", ownerRef)) return reply;
+    reply.header("Cache-Control", "no-store");
+    const publicationRef = ResourceIdSchema.safeParse(request.params.id);
+    if (!publicationRef.success) return reply.send(PublicFlagAnswerSchema.parse({ state: "NOT_FOUND" }));
+    const state = await pressPublicFlag({ ownerRef, publicationRef: publicationRef.data, flagId: randomUUID(), where: body.data.where, claim: body.data.claim }, options.publicFlags);
+    return reply.send(PublicFlagAnswerSchema.parse({ state }));
+  });
   // Decisions 13 and 16: a report on a public debate, by anyone with credit, while nothing is ongoing. The asks' budget: a stranger can press it. Their username is only a reference, and they pay.
   api.post<{ Params: { id: string } }>("/v1/public/debates/:id/report", credentialRoutePolicy("POST /v1/public/debates/{id}/report"), async (request, reply) => {
     const ownerRef = request.authenticatedSession?.ownerRef;

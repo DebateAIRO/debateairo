@@ -9,7 +9,7 @@ export type StaffAction =
   | "CREDENTIAL_REGISTER" | "CREDENTIAL_REVOKE" | "ALLOWANCE_CONFIGURE" | "ALLOWANCE_REVOKE"
   | "PUBLICATION_REVIEW_APPROVE" | "PUBLICATION_REVIEW_REFUSE" | "THREAT_REPORT_REPORTED" | "THREAT_REPORT_NOT_REPORTED"
   | "TEAM_LIMIT_SET" | "TEAM_LIMIT_PARTNER_GRANT" | "TEAM_LIMIT_PARTNER_REVOKE" | "TEAM_PRACTICE_RECORD"
-  | "PUBLIC_REVIEW_HIDE" | "PUBLIC_REVIEW_STEP";
+  | "PUBLIC_REVIEW_HIDE" | "PUBLIC_REVIEW_STEP" | "PUBLIC_REPORT_DISMISS";
 /**
  * Plan 2026-10-31-r22-owner-changes decision 24: the authority over the team's limit. On purpose no StaffCapability: it is in no
  * capability list, no invite or grant reaches it, and the database answers it from the Owner designation and the one partner row (0142).

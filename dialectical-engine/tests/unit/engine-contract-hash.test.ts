@@ -67,7 +67,9 @@ const ENGINE_SEALED_IDS: readonly string[] = ["verdict.investigate.v1", "verdict
   // The owner put back the v3 writer's lost first sentence.
   "report.answer.v4", "report.answer.later.v4",
   // R22 public lane (decision 13; a draft wording, the owner's before switch-on): the AI check on a contribution to a public debate.
-  "public.contribution-check.v1"];
+  "public.contribution-check.v1",
+  // R22 decision 35: the AI check on a report of a public debate.
+  "public.report-check.v1"];
 /**
  * R1d's seal: sha256 of the header text alone, no trailing newline. Printed once with
  * `printf '%s' debateai.engine-contracts.v1 | shasum -a 256` and pasted here; the test also recomputes it.

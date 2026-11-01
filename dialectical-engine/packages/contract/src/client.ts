@@ -1,6 +1,6 @@
 import { ContractHttpError, type ContractErrorCode, type ContractWaitingRefusal } from "./http-error.js";
 import { AskClarifyResponseSchema, RunContinueRefusedSchema, RunContinueRequestSchema, RunContinuedSchema, type AskClarifyRequest, type AskClarifyResponse, type RunContinued, type RunContinueRefused } from "./web.js";
-import { InvestigationCloseRequestSchema, PublicDebateRefusedSchema, PublicReportAcceptedSchema, PublicReportRequestSchema, ResearchedAddRequestSchema, ResearchedAddedSchema, ResearchedRefusedSchema, type PublicDebateRefused, type PublicReportAccepted, type ResearchedAddRequest, type ResearchedAdded, type ResearchedRefused } from "./web.js";
+import { InvestigationCloseRequestSchema, PublicDebateRefusedSchema, PublicReportAcceptedSchema, PublicFlagAnswerSchema, PublicFlagRequestSchema, type PublicFlagAnswer, type PublicFlagRequest, PublicReportRequestSchema, ResearchedAddRequestSchema, ResearchedAddedSchema, ResearchedRefusedSchema, type PublicDebateRefused, type PublicReportAccepted, type ResearchedAddRequest, type ResearchedAdded, type ResearchedRefused } from "./web.js";
 import {
   InvestigationReopenRequestSchema, InvestigationReopenedSchema, InvestigationReportAcceptedSchema, InvestigationReportsSchema,
   InvestigationReportWritingSchema, type InvestigationReopened, type InvestigationReportAccepted, type InvestigationReports,
@@ -569,6 +569,7 @@ export interface ContractClient {
   addToResearched(runId: string, request: ResearchedAddRequest): Promise<ResearchedAdded | ResearchedRefused>;
   /** Decision 13: "Write a report" on a public page. A 409 comes back as data (nothing started); a 404 and the rest throw. */
   writePublicReport(publicationRef: string): Promise<PublicReportAccepted | PublicDebateRefused>;
+  flagPublicDebate(publicationRef: string, body: PublicFlagRequest): Promise<PublicFlagAnswer>;
   readRun(runId: string): Promise<RunProjection>;
   readInspection(answerId: string, version?: number): Promise<Inspection>;
   readLedgerDigest(answerId: string): Promise<ExecutionLedgerDigest>;
@@ -1017,6 +1018,10 @@ export function createContractClient(
         const refused = ResearchedRefusedSchema.safeParse(body);
         return refused.success ? refused.data : null;
       }
+    ),
+    flagPublicDebate: (publicationRef: string, body: PublicFlagRequest) => requestJson<PublicFlagAnswer>(
+      root.href, fetchImplementation, `/v1/public/debates/${encodeURIComponent(publicationRef)}/flag`, PublicFlagAnswerSchema,
+      { method: "POST", body: JSON.stringify(PublicFlagRequestSchema.parse(body)) }, auth
     ),
     writePublicReport: (publicationRef: string) => requestJson<PublicReportAccepted | PublicDebateRefused>(
       root.href, fetchImplementation, `/v1/public/debates/${encodeURIComponent(publicationRef)}/report`, PublicReportAcceptedSchema,

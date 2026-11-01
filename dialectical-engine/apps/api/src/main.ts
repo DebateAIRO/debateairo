@@ -69,7 +69,7 @@ import {
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
 import type { PreparedPublicationCipher } from "@debateai/crypto";
-import { PostgresPublicReviewRepository, PostgresTeamLimitRepository, AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository, PostgresThreatReportRepository, SynthesisCheckErasureCoordinator, PostgresSynthesisCheckErasureRepository } from "@debateai/db";
+import { PostgresPublicFlagRepository, PostgresPublicReviewRepository, PostgresTeamLimitRepository, AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository, PostgresThreatReportRepository, SynthesisCheckErasureCoordinator, PostgresSynthesisCheckErasureRepository } from "@debateai/db";
 import { recordSpendWaiver } from "@debateai/db";
 import { crossAccount, crossAccountPool, setCrossAccountTarget } from "@debateai/db";
 // FIX-S01-p1b (COR-B1): the boot attestations' routes, from the module itself (packages/db/src/index.ts is hash-pinned
@@ -162,6 +162,7 @@ import { StaffWebAuthnService } from "./staff/webauthn.js";
 import { StaffAccessService } from "./staff/access.js";
 import { createStaffRuntime } from "./staff/runtime.js";
 import { PostgresPublicationApplication, buildPublicDebateBody } from "./publications.js";
+import { PUBLIC_REVIEW_PURGE_EVERY_MS, sweepPublicReviewPurge } from "./public-flag.js";
 import { FREE_PUBLICATION_STORY_WAIT_MS, PUBLIC_PAGE_SWEEP_DEFAULTS, backedOffContentCheck, sweepFreePublications, sweepPublicPage } from "./public-tree.js";
 import { createPublicationReviewStaffService } from "./publication-review/staff.js";
 import { createPublicationContentCheck } from "./publication-check/check.js";
@@ -1053,6 +1054,7 @@ const readThreatReportRecipientEmail = threatReportEmailReader(crossAccountPool(
 // Decision 24: 0142's definers only, and the notices open the named account's address through the same reader.
 const teamLimitRepository = new PostgresTeamLimitRepository(pool);
 const publicReviewRepository = new PostgresPublicReviewRepository(pool);
+const publicFlagRepository = new PostgresPublicFlagRepository(pool);
 const readThreatReportStaffEmail = threatReportEmailReader(pool, dekStore, "staff");
 const staffHttp = staffAccess === undefined || staffAlerts === undefined ? undefined : {
   access: staffAccess, sessions, repository: new PostgresStaffRepository(crossAccountPool(pool, "X14")),
@@ -1061,6 +1063,10 @@ const staffHttp = staffAccess === undefined || staffAlerts === undefined ? undef
   targetInvitationTransport: staffAlerts.targetInvitationTransport,
   threatReports: { repository: threatReportRepository, readRecipientEmail: readThreatReportRecipientEmail },
   teamLimit: { repository: teamLimitRepository },
+  publicFlags: { repository: publicFlagRepository, withKey: async <T,>(publicationRef: string, runId: string, use: (cipher: PreparedPublicationCipher) => T): Promise<T> => {
+    if (publications === undefined) throw new Error("STAFF_UNAVAILABLE");
+    return publications.withReviewKey(publicationRef, runId, use);
+  } },
   publicReview: { repository: publicReviewRepository, withKey: async <T,>(publicationRef: string, runId: string, use: (cipher: PreparedPublicationCipher) => T): Promise<T> => {
     if (publications === undefined) throw new Error("STAFF_UNAVAILABLE");
     return publications.withReviewKey(publicationRef, runId, use);
@@ -1182,6 +1188,7 @@ await boot.run("active-settings-version-check", () => checkActiveSettingsVersion
 }));
 let publicationCleanupTimer: ReturnType<typeof setInterval> | undefined;
 let publicPageTimer: ReturnType<typeof setInterval> | undefined;
+let publicReviewPurgeTimer: ReturnType<typeof setInterval> | undefined;
 if (publications !== undefined) {
   // Crash-orphan publication keys are claimed and removed before the process
   // can accept traffic. Both bounded outboxes continue reconciling while the
@@ -1250,6 +1257,16 @@ const allowanceNoticesTimer = startTeamLimitNotices({
 // Decision 33: both accounts hear of every review step, content-free, through the same loop.
 const publicReviewNoticesTimer = startTeamLimitNotices({
   repository: publicReviewRepository,
+  mail: new TemplatedMailSender({
+    executable: environment.MAIL_SENDMAIL_PATH,
+    from: environment.MAIL_FROM,
+    timeoutMs: authPolicy.channel.transportTimeoutMs
+  }),
+  readEmail: readThreatReportRecipientEmail
+}, releaseWatcher);
+// Decision 35: both accounts hear that a debate was hidden automatically or a report waits, content-free.
+const publicFlagNoticesTimer = startTeamLimitNotices({
+  repository: publicFlagRepository,
   mail: new TemplatedMailSender({
     executable: environment.MAIL_SENDMAIL_PATH,
     from: environment.MAIL_FROM,
@@ -1781,6 +1798,12 @@ const api = buildApi({
   // Decision 5 of 31 Oct (0138): a debate's place, time and purpose lines, sealed under its run key on this pool.
   purposeLines: postgresPurposeLines(pool),
   // Decision 13 (0147): digs and reports on a public debate, by anyone with credit, read from the public copy.
+  ...(publications === undefined ? {} : { publicFlags: {
+    repository: publicFlagRepository, judge: publicationJudgeSwitch.current,
+    seal: (publicationRef: string, runId: string, value: unknown) => publications.withReviewKey(publicationRef, runId, (cipher) => cipher.encrypt(value)),
+    readPublicDebate: (publicationRef: string) => publications.readPublicDebate(publicationRef),
+    log: (event: string, detail: Record<string, unknown>) => { console.error(JSON.stringify({ event, ...detail })); }
+  } }),
   ...(publications === undefined ? {} : { publicTree: {
     pool, tree: new PostgresPublicTreeRepository(pool), contributions: new PostgresPublicDebateRepository(pool),
     readPublicDebate: (publicationRef: string) => publications.readPublicDebate(publicationRef)
@@ -1913,6 +1936,7 @@ const api = buildApi({
 api.addHook("preClose",async () => endBecameCurrent?.());
 // Assigned once listening; clearing an unset timer does nothing.
 api.addHook("onClose",async () => clearInterval(publicPageTimer));
+api.addHook("onClose",async () => clearInterval(publicReviewPurgeTimer));
 if (publicationCleanupTimer !== undefined) {
   api.addHook("onClose",async () => clearInterval(publicationCleanupTimer));
 }
@@ -1928,6 +1952,7 @@ api.addHook("onClose",async () => clearInterval(erasureReconcileTimer));
 api.addHook("onClose",async () => clearInterval(threatReportAlertsTimer));
 api.addHook("onClose",async () => clearInterval(teamLimitNoticesTimer));
 api.addHook("onClose",async () => clearInterval(publicReviewNoticesTimer));
+api.addHook("onClose",async () => clearInterval(publicFlagNoticesTimer));
 api.addHook("onClose",async () => clearInterval(allowanceNoticesTimer));
 api.addHook("onClose",async () => clearInterval(threatReportErasureTimer));
 api.addHook("onClose",async () => clearInterval(synthesisCheckTimer));
@@ -2056,6 +2081,9 @@ if (publications !== undefined) {
     } });
   }, () => console.error("[PUBLIC_PAGE_WORK_PENDING]"));
   publicPageTimer = gatedInterval(releaseWatcher, triggerPublicPage, PUBLIC_PAGE_SWEEP_DEFAULTS.everyMs);
+  // Decision 36: sealed originals and reports' words past their six months.
+  publicReviewPurgeTimer = gatedInterval(releaseWatcher, () => { void sweepPublicReviewPurge({ repository: publicFlagRepository, withKey: (publicationRef, runId, use) => publications.withReviewKey(publicationRef, runId, use),
+    log: (event, detail) => { console.error(JSON.stringify({ event, ...detail })); } }).catch(() => undefined); }, PUBLIC_REVIEW_PURGE_EVERY_MS);
 }
 if(triggerPasswordResetReconciliation)passwordResetTimer=gatedInterval(releaseWatcher,triggerPasswordResetReconciliation,30_000);
 if(triggerEmailRecoveryReconciliation)emailRecoveryTimer=gatedInterval(releaseWatcher,triggerEmailRecoveryReconciliation,30_000);

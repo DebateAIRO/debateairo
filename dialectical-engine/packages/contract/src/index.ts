@@ -1897,6 +1897,7 @@ export const contractInventory = Object.freeze({
     "GET /v1/public/ai-providers",
     // Decision 13: a report on a public debate.
     "POST /v1/public/debates/{id}/report",
+    "POST /v1/public/debates/{id}/flag",
     "GET /v1/geo/availability",
     "POST /v1/support/messages",
     "GET /v1/support/status",

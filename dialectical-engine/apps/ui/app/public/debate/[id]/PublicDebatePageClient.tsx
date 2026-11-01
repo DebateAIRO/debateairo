@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import type { PublicDebate } from "@debateai/contract";
 import DebatePageClient from "@/app/debate/[id]/DebatePageClient";
+import { V4PublicFlag } from "@/components/v4/V4PublicFlag";
 import { PublicAnswerDisclosure } from "@/components/PublicAnswerDisclosure";
 import { PublicDebateOverview } from "@/components/PublicDebateOverview";
 import { PublicHonestyDrawer } from "@/components/PublicHonestyDrawer";
@@ -139,7 +140,7 @@ export function PublicDebatePageClient({
   return (
     <>
       {debate.changed_after_review === true ? <p className="publicChangedAfterReview" role="status" data-public-changed>{t(v4Catalog, "v4.public.changedAfterReview")}</p> : null}
-      <p className="publicReportLink"><a data-public-report href={`mailto:support@dezbatere.ro?subject=${encodeURIComponent(`Report: public debate ${debate.public_ref}`)}`}>{t(v4Catalog, "v4.public.report")}</a></p>
+      <V4PublicFlag publicRef={debate.public_ref} catalog={v4Catalog} />
       <DebatePageClient
       id={debate.public_ref}
       initialDebate={projection.detail}

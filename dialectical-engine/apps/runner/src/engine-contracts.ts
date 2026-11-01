@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import {
-  ASK_CLARIFY_SEALED_CONTRACTS, PUBLIC_CONTRIBUTION_SEALED_CONTRACTS, COMPARING_JUDGE_PROMPT_CONTRACT, COMPARING_JUDGE_SOURCES_PROMPT_CONTRACT, POINT_INVESTIGATION_PROMPT_CONTRACT, WEB_STEP_PROMPT_CONTRACTS,
+  ASK_CLARIFY_SEALED_CONTRACTS, PUBLIC_CONTRIBUTION_SEALED_CONTRACTS, PUBLIC_REPORT_CHECK_SEALED_CONTRACTS, COMPARING_JUDGE_PROMPT_CONTRACT, COMPARING_JUDGE_SOURCES_PROMPT_CONTRACT, POINT_INVESTIGATION_PROMPT_CONTRACT, WEB_STEP_PROMPT_CONTRACTS,
   WEB_DIG_METHOD_SEALED_CONTRACTS, WEB_DIG_SEALED_CONTRACTS, WEB_R22_SEALED_CONTRACTS, WEB_WORDING_V2_SEALED_CONTRACTS, judgeAssignedRootV2PromptContract,
   judgeSourcesSealedContracts
 } from "@debateai/judgement";
@@ -85,7 +85,9 @@ export function engineSealedContracts(): readonly PromptContract[] {
     // The owner put back the v3 writer's lost first sentence: v4, its later version. The v3 two stay sealed, unused.
     ...REPORT_WRITER_V4_SEALED_CONTRACTS,
     // R22 public lane (plan 2026-10-31 decision 13; wording approved by the owner, 1 Nov): the AI check on a contribution to a public debate.
-    ...PUBLIC_CONTRIBUTION_SEALED_CONTRACTS
+    ...PUBLIC_CONTRIBUTION_SEALED_CONTRACTS,
+    // R22 decision 35 (draft wording, the owner's): the AI check on a report of a public debate.
+    ...PUBLIC_REPORT_CHECK_SEALED_CONTRACTS
   ]);
 }
 
