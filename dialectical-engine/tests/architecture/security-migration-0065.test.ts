@@ -670,7 +670,7 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
       "0142_team_limit.sql",
       "0143_run_handover.sql",
       "0144_ask_clarify_charge.sql",
-      "0145_web_researched_unsettled.sql"
+      "0145_web_researched_unsettled.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql"
     ]);
     expect(plan.forwardChain[1]!.name).toBe(AUTH_DB_BATCH_MIGRATION);
   });

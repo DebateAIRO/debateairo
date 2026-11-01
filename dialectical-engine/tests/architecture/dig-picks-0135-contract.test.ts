@@ -56,7 +56,7 @@ const ROLES = ["debateai_runtime", "debateai_billing_runtime", "debateai_authori
 
 describe("0135: a dig's picks and its path rewrite's material", () => {
   it("C-T follows 0134 in the chain's STEPS (the investigation reports' 0136 comes after it), with its own loader", async () => {
-    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0133,loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140,loadForward0141,loadForward0142,loadForward0143,loadForward0144,loadForward0145]);");
+    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0133,loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140,loadForward0141,loadForward0142,loadForward0143,loadForward0144,loadForward0145,loadForward0147,loadForward0148]);");
     expect(read("packages/db/src/migration-forward-chain.ts")).toContain("import { loadForward0135 } from './migration-forward0135.js';");
     const loader = read("packages/db/src/migration-forward0135.ts");
     expect(loader).toContain(`const NAME = "${NAME}";`);
@@ -270,14 +270,14 @@ describe("0135: a dig's picks and its path rewrite's material", () => {
     expect(helper).toContain(`export const FORGET_ERASED_DEBATE_DIG_PICKS = "${FORGET}" as const;`);
     expect(read("packages/db/src/dig-picks.ts")).toContain(`export const FORGET_ERASED_DEBATE_DIG_PICKS = "${FORGET}" as const;`);
     expect(read("packages/db/src/account-erasure.ts")).toMatch(
-      /FORGET_ERASED_DEBATE_DIG_MODEL,\n[^\n]*\n {2}FORGET_ERASED_DEBATE_DIG_PICKS,\n[^\n]*\n {2}FORGET_ERASED_DEBATE_PUBLIC,\n {2}FORGET_ERASED_DEBATE_TREE_UPDATES,\n {2}FORGET_ERASED_DEBATE_PASSAGES,\n[^\n]*\n {2}FORGET_ERASED_DEBATE_PATH_SUGGESTIONS\n\] as const\);/u);
+      /FORGET_ERASED_DEBATE_DIG_MODEL,\n[^\n]*\n {2}FORGET_ERASED_DEBATE_DIG_PICKS,\n[^\n]*\n {2}FORGET_ERASED_DEBATE_PUBLIC,\n {2}FORGET_ERASED_DEBATE_TREE_UPDATES,\n {2}FORGET_ERASED_DEBATE_PASSAGES,\n[^\n]*\n {2}FORGET_ERASED_DEBATE_PATH_SUGGESTIONS,\n[^\n]*\n {2}FORGET_ERASED_DEBATE_PUBLIC_TREE\n\] as const\);/u);
   });
 
   it("C-E the export worker reaches the reader through 0128's lease, and its boot check counts it", () => {
     const exporter = read("packages/db/src/data-export.ts");
     expect(exporter).toContain(`"${EXPORT_READER}",`);
     expect(exporter.indexOf(`"${EXPORT_READER}",`)).toBeGreaterThan(exporter.indexOf('"identity.read_data_export_dig_model(uuid,uuid)",'));
-    expect(exporter).toContain("worker.worker_count !== 20");
+    expect(exporter).toContain("worker.worker_count !== 21");
     expect(read("packages/db/src/dig-picks.ts")).toContain(`export const READ_DATA_EXPORT_DIG_PICKS = "${EXPORT_READER}" as const;`);
   });
 

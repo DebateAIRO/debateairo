@@ -201,6 +201,8 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // The final report over an investigation (0136, R22 W5-1): each written version is opened under the investigation's
       // ROOT run key inside withRunContentLease (prepareLeasedContentEncryptionForRuns); a root erased meanwhile reads null.
       "apps/api/src/investigation-report.ts",
+      // The public tree (0147): the page's copy sealed under a live run's key for the runner, and the runner's text opened for the page, each inside withRunContentLease.
+      "apps/api/src/public-tree.ts",
     "apps/api/src/purpose-lines.ts",
       "apps/evaluator-worker/src/index.ts",
       // The path rewrite switched on (dig-model revision W3-7): the composition seals each rewrite's text under the dig's
@@ -221,6 +223,9 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       "apps/runner/src/path-climb-sources.ts",
       "apps/runner/src/path-rewrite-composition.ts",
       "apps/runner/src/path-rewrite-sources.ts",
+      // The public tree (0147): a dig's or a report's material opened, and a dig's paths and a report sealed, under the dig's or the carrier's key inside withRunContentLease.
+      "apps/runner/src/public-contribution.ts",
+      "apps/runner/src/public-tree-sources.ts",
       // Reclaim resume (spec 2026-10-14): the replay book reads the run's recorded prompts and replies through
       // prepareLeasedContentEncryptionForRun, which borrows the lease the runner already holds when it is read.
       "apps/runner/src/run-replay.ts",
@@ -299,6 +304,8 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // content themselves: their sources and seals open and seal under the lease.
       "apps/runner/src/path-climb.ts",
       "apps/runner/src/path-rewrite.ts",
+      // The public tree (0147): the AI check on a contribution goes through the gateway the settled dig's snapshot hands it, naming the dig's run.
+      "apps/runner/src/public-contribution.ts",
       // L4-F9 repair: the keep-alive hands each runner call, unchanged, to the
       // gateway it wraps (the run-required, leased gateway), or refuses it before
       // anything is sent. It opens no lease and reads no content of its own.

@@ -58,8 +58,8 @@ describe("S04 data export", () => {
       seen.push(params); return { rows: [principal(name, workerCount)] }; } });
     // 0131 (the V4 account memory) adds a tenth worker function, its page-memory reader; 0132 and 0133 (the web evidence
     // store and the investigations) an eleventh and a twelfth; 0134 (the dig model) a thirteenth; 0135 (the dig picks) a
-    // fourteenth; 0136 (the investigation reports) a fifteenth; 0137 to 0139 (the public debates, the tree updates and the passage retention) the sixteenth to the eighteenth; 0141 (the path suggestions) a nineteenth.
-    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 20) as never)).resolves.toBeUndefined();
+    // fourteenth; 0136 (the investigation reports) a fifteenth; 0137 to 0139 (the public debates, the tree updates and the passage retention) the sixteenth to the eighteenth; 0141 (the path suggestions) a nineteenth; 0144 (the small AI's charges) a twentieth; 0147 (the public tree) a twenty-first.
+    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 21) as never)).resolves.toBeUndefined();
     expect(seen[1]?.[1]).toContain("identity.read_data_export_threat_reports(uuid,uuid)");
     expect(seen[1]?.[1]).toContain("identity.read_data_export_web_evidence(uuid,uuid)");
     expect(seen[1]?.[1]).toContain("identity.read_data_export_investigations(uuid,uuid)");
@@ -70,7 +70,8 @@ describe("S04 data export", () => {
     expect(seen[1]?.[1]).toContain("identity.read_data_export_tree_updates(uuid,uuid)");
     expect(seen[1]?.[1]).toContain("identity.read_data_export_passage_retention(uuid,uuid)");
     expect(seen[1]?.[1]).toContain("identity.read_data_export_path_suggestions(uuid,uuid)");
-    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 19) as never)).rejects.toThrow("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
-    await expect(assertDataExportDatabaseRoles(pool("request", 1) as never, pool("worker", 20) as never)).rejects.toThrow("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
+    expect(seen[1]?.[1]).toContain("identity.read_data_export_public_tree(uuid,uuid)");
+    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 20) as never)).rejects.toThrow("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
+    await expect(assertDataExportDatabaseRoles(pool("request", 1) as never, pool("worker", 21) as never)).rejects.toThrow("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
   });
 });

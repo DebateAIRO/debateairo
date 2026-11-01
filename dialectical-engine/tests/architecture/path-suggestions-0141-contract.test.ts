@@ -120,7 +120,7 @@ describe("0141: a path's suggestions", () => {
 
   it("C-E the erasure role and the export worker reach their functions", () => {
     expect(read("packages/db/src/erasure-page-memory.ts")).toContain('"SELECT identity.forget_erased_debate_path_suggestions($1)"');
-    expect(read("packages/db/src/account-erasure.ts")).toContain("FORGET_ERASED_DEBATE_PATH_SUGGESTIONS\n] as const");
+    expect(read("packages/db/src/account-erasure.ts")).toContain("FORGET_ERASED_DEBATE_PATH_SUGGESTIONS,\n");
     expect(read("packages/db/src/data-export.ts")).toContain('"identity.read_data_export_path_suggestions(uuid,uuid)",');
   });
 

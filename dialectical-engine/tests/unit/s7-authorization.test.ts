@@ -107,6 +107,7 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "GET /v1/public/debates/{id}", auth: "public", resource: "public-debate", action: "read" },
   // Side-by-side §13 addition D24 (owner 2026-10-22): the companies the declared provider targets reach, public.
   { route: "GET /v1/public/ai-providers", auth: "public", resource: "deployment", action: "read-ai-providers" },
+  { route: "POST /v1/public/debates/{id}/report", auth: "user", resource: "public-debate", action: "write-report" },
   { route: "GET /v1/geo/availability", auth: "public", resource: "geo", action: "read-availability" },
   // One stateless message door. The removed session and case doors have no policy.
   { route: "POST /v1/support/messages", auth: "public", origin: "trusted", session: "optional", resource: "support-message", action: "create" },
@@ -365,7 +366,8 @@ describe("S7 deny-by-default authorization", () => {
     // (GET /v1/runs/{id}/investigation), "Write my report" (POST /v1/runs/{id}/report) and "Keep digging" (POST /v1/runs/{id}/reopen).
     // R22 owner decision 13 removed the Unpublish route (POST /v1/runs/{id}/unpublish): 183. Decision 24 adds the team limit's five.
     // W4-4: "Add to researched" (POST /v1/runs/{id}/researched), and decision 29's step 2 (POST /v1/asks/clarify).
-    expect(contractInventory.routes).toHaveLength(190);
+    // Decision 13: a report on a public debate (POST /v1/public/debates/{id}/report).
+    expect(contractInventory.routes).toHaveLength(191);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 

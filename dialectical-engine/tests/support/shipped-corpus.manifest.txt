@@ -148,6 +148,7 @@ apps/api/src/person-room-picker.ts
 apps/api/src/phone-profile.ts
 apps/api/src/preview-budget-estimate.ts
 apps/api/src/provider-discovery.ts
+apps/api/src/public-tree.ts
 apps/api/src/publication-check/check.ts
 apps/api/src/publication-check/judge-transport.ts
 apps/api/src/publication-check/material.ts
@@ -426,6 +427,8 @@ apps/runner/src/production-database-principals-cli.ts
 apps/runner/src/production-database-principals.ts
 apps/runner/src/production-database-url.ts
 apps/runner/src/provider-topology.ts
+apps/runner/src/public-contribution.ts
+apps/runner/src/public-tree-sources.ts
 apps/runner/src/rotate-kek-cli.ts
 apps/runner/src/rotate-kek.ts
 apps/runner/src/run-debate-members.ts
@@ -1103,6 +1106,8 @@ packages/db/src/migration-forward0142.ts
 packages/db/src/migration-forward0143.ts
 packages/db/src/migration-forward0144.ts
 packages/db/src/migration-forward0145.ts
+packages/db/src/migration-forward0147.ts
+packages/db/src/migration-forward0148.ts
 packages/db/src/migration-forward108.ts
 packages/db/src/migration-forward110.ts
 packages/db/src/migration-forward111.ts
@@ -1119,6 +1124,7 @@ packages/db/src/path-suggestions.ts
 packages/db/src/pool-budget.ts
 packages/db/src/private-stream.ts
 packages/db/src/public-debates.ts
+packages/db/src/public-tree.ts
 packages/db/src/publication-check.ts
 packages/db/src/publication-lease.ts
 packages/db/src/publication.ts
@@ -1170,6 +1176,7 @@ packages/judgement/src/honest-score.ts
 packages/judgement/src/index.ts
 packages/judgement/src/investigation.ts
 packages/judgement/src/prompts.ts
+packages/judgement/src/public-contribution-prompt.ts
 packages/judgement/src/s04.ts
 packages/judgement/src/web-prompts.ts
 packages/kernel/src/argument-language.ts
