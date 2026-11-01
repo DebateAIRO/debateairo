@@ -45,7 +45,7 @@ import {
   effectiveCallConcurrency,
   readCallConcurrencyPolicy,
   type CallConcurrencyPolicy,
-  type DeploymentMode
+  type DeploymentMode,
   closingReservesOf,
   readBillingPlans,
 } from "@debateai/register";

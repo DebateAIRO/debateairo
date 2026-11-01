@@ -233,8 +233,8 @@ export const HOSTED_REGISTER_DEPLOYMENT_REF = "hosted-register-publication" as c
  * is deliberately one no operator would write for a real review.
  */
 export const HOSTED_REGISTER_EXAMPLE_SOURCE_REF =
-  "V-28 provisional cost envelopes and V-9 vetted vendors: first hosted register"
-  + " (EXAMPLE vendors, replace before publishing)";
+  "EXAMPLE: every limit and vendor here is MADE UP. The real file stays on the server;"
+  + " replace all of them before publishing";
 export const HOSTED_REGISTER_EXAMPLE_VETTING_DATE = "2000-01-01" as const;
 const EXAMPLE_PROVIDER_REF_PREFIX = "vendor:example-";
 const EXAMPLE_MAKER_PREFIX = "Example";
