@@ -363,6 +363,18 @@ function limiterMemoryOccupancy(limiter: InProcessAuthRateLimiter): Readonly<{
   });
 }
 
+// A balancing flow only evens out each round's send count; it is not the flow under measurement. Its delivery audit
+// skips the equal work and runs as its mail leaves: after the equal work it would start two Argon2 jobs 700 ms before
+// the next scored grant, on one arm's rounds only.
+function buildBalancingFlow(mail: MailSender) {
+  return buildService({
+    mail,
+    sleep: (milliseconds) => milliseconds === basePolicy.channel.mailDispatchNoSendEqualWorkMs
+      ? Promise.resolve()
+      : new Promise((resolve) => setTimeout(resolve, milliseconds))
+  });
+}
+
 function buildService(input: {
   readonly legalAcceptance?: boolean;
   readonly mail?: MailSender;
@@ -3015,7 +3027,7 @@ setTimeout(() => undefined, 500);
     const mail = new BoundaryMailSender();
     const balancingMail = new BoundaryMailSender();
     const flow = buildService({ mail });
-    const balancingFlow = buildService({ mail: balancingMail });
+    const balancingFlow = buildBalancingFlow(balancingMail);
     const instrumentedService = flow.service as unknown as {
       activateMailDispatch(
         enforceMinimum?: boolean,
@@ -3471,7 +3483,7 @@ setTimeout(() => undefined, 500);
         async destroy(userId) { return durableStore.destroy(userId); }
       }
     });
-    const balancingFlow = buildService({ mail: balancingMail });
+    const balancingFlow = buildBalancingFlow(balancingMail);
     const instrumentedService = flow.service as unknown as {
       activateMailDispatch(
         enforceMinimum?: boolean,
