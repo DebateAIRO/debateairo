@@ -238,6 +238,16 @@ describe("Dig into this", () => {
     expect(field.value).toBe("Mine.");
     expect(lane.push).not.toHaveBeenCalled();
   });
+
+  it("a dig that could not join says it runs as the person's own private debate, and goes nowhere", async () => {
+    lane.submit = vi.fn(async () => ({ kind: "STARTED", runId: "99999999-9999-4999-8999-999999999999", notJoined: true }));
+    await mount(debate());
+    await click(firstOpen());
+    await write(host!.querySelector<HTMLTextAreaElement>(".v4PubText")!, "Mine.");
+    await click(buttons(V4["v4.public.dig.start"]!)[0]!);
+    expect(host!.querySelector("[role=alert]")!.textContent).toBe(V4["v4.public.dig.notJoined"]);
+    expect(lane.push).not.toHaveBeenCalled();
+  });
 });
 
 describe("Write a report", () => {
