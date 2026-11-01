@@ -38,13 +38,17 @@ beforeAll(async () => {
 }, 240_000);
 afterAll(async () => { await runner?.end(); await api?.end(); await bare?.end(); await database?.stop(); });
 
-/** An active subscription person (the free plan, no entitlement event), as b6a-room-decisions seeds one. */
+/**
+ * An active subscription person (the free plan, no entitlement event), as b6a-room-decisions seeds one. Signed up a minute
+ * ago: the entitlement reader looks up to a JavaScript time in whole milliseconds, and a sign-up in the same millisecond
+ * came out "not signed up yet" (BILLING_OWNER_UNKNOWN), once in a whole-suite run.
+ */
 async function subscriptionPerson(): Promise<string> {
   const ownerRef = randomUUID();
   await database.pool.query(
     `INSERT INTO identity."user" (user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,phone_ciphertext,
        password_hash,pseudonym,audit_token,owner_ref,state,adult_affirmed_at,created_at)
-     VALUES ($1,$2,'{}'::jsonb,'{}'::jsonb,NULL,'test-password-hash',$3,$4,$5,'active',now(),now())`,
+     VALUES ($1,$2,'{}'::jsonb,'{}'::jsonb,NULL,'test-password-hash',$3,$4,$5,'active',now(),now() - interval '1 minute')`,
     [randomUUID(), randomBytes(32), `waiver-${randomUUID()}`, randomUUID(), ownerRef]
   );
   return ownerRef;
