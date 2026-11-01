@@ -542,6 +542,7 @@ interface VerificationDeliveryRecord {
   readonly userId: string;
   readonly channelBindingId: string;
   readonly source: AuthSourceContext;
+  readonly sentAt: Date;
   readonly errorCode: string | null;
 }
 
@@ -1424,8 +1425,12 @@ export class RegistrationService implements RegistrationApplication {
     let pending!: Promise<void>;
     pending = new Promise<void>((resolve) => setImmediate(resolve))
       .then(async () => {
+        // A resend's delivery carries no kind: it has no duplicate arm to match, and its record keeps its place.
+        const equalWork = "kind" in input
+          ? this.sleep(this.dependencies.policy.channel.mailDispatchNoSendEqualWorkMs)
+          : Promise.resolve();
         if (duplicate !== undefined) {
-          await this.sleep(this.dependencies.policy.channel.mailDispatchNoSendEqualWorkMs);
+          await equalWork;
           await releaseReservation();
           await this.dependencies.repository.recordDuplicateRegistrationPostwork({
             userId: duplicate.userId,
@@ -1437,6 +1442,10 @@ export class RegistrationService implements RegistrationApplication {
         const deliveryRecord = await this.attemptVerificationDelivery(delivery!);
         delivery = undefined;
         await releaseReservation();
+        // Each audit starts two Argon2 jobs on the workers the next requests need. Written as soon as the mail left, a
+        // new account's would queue ahead of its own burst while a duplicate's waits out the equal work, and that
+        // queue was the measured gap between the arms once a burst outgrew the response clamp (N>=4). Same wait, same load.
+        await equalWork;
         await this.recordVerificationDelivery(deliveryRecord);
       })
       .catch(() => {
@@ -1643,6 +1652,7 @@ export class RegistrationService implements RegistrationApplication {
       userId: input.userId,
       channelBindingId: input.channelBindingId,
       source: input.source,
+      sentAt: this.clock(),
       errorCode
     });
   }
@@ -1651,7 +1661,7 @@ export class RegistrationService implements RegistrationApplication {
     try {
       await this.dependencies.repository.recordVerificationDelivery({
         userId: input.userId,
-        occurredAt: this.clock(),
+        occurredAt: input.sentAt,
         source: input.source,
         success: input.errorCode === null,
         errorCode: input.errorCode
