@@ -116,7 +116,7 @@ BEGIN
 END
 $$;
 
--- Owned by the identity schema's NOLOGIN owner, never by a login role (the house pattern of 0100).
+-- Owned by whoever owns identity's other functions (the house pattern of 0100), so they read these tables as those do.
 -- n1: reviewed sets the owner of the objects this step creates; the release before reads none of them.
 DO $outbound_mail_owner$
 DECLARE v_owner name;

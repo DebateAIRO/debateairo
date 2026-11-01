@@ -8,7 +8,7 @@
   },
   "migration": {
     "name": "0153_outbound_mail_limit.sql",
-    "sha256": "a12fb9fa8218e71e8d3a582c781909accc91005932cead8cdd5a8cd7e5bbc913"
+    "sha256": "1ee8152be4f0e9f632168effdbf991146bd9eb90ee7045902eeee4fe6e0f14a4"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-130.sql",

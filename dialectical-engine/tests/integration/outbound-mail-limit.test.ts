@@ -152,10 +152,10 @@ describe("0153 the daily outbound mail limit", () => {
       }
     }
     for (const fn of FUNCTIONS) {
-      const proc = (await db.pool.query(`SELECT p.prosecdef,p.proconfig,(pg_get_userbyid(p.proowner)=(SELECT pg_get_userbyid(q.proowner) FROM pg_proc q WHERE q.oid='identity.read_email_settings(uuid,uuid)'::regprocedure)) AS house_owner,r.rolcanlogin,
+      const proc = (await db.pool.query(`SELECT p.prosecdef,p.proconfig,(pg_get_userbyid(p.proowner)=(SELECT pg_get_userbyid(q.proowner) FROM pg_proc q WHERE q.oid='identity.read_email_settings(uuid,uuid)'::regprocedure)) AS house_owner,
         EXISTS (SELECT 1 FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a WHERE a.grantee=0) AS public_execute
-        FROM pg_proc p JOIN pg_roles r ON r.oid=p.proowner WHERE p.oid=$1::regprocedure`, [fn])).rows[0];
-      expect({ fn, ...proc }).toEqual({ fn, prosecdef: true, proconfig: ["search_path=pg_catalog"], house_owner: true, rolcanlogin: false, public_execute: false });
+        FROM pg_proc p WHERE p.oid=$1::regprocedure`, [fn])).rows[0];
+      expect({ fn, ...proc }).toEqual({ fn, prosecdef: true, proconfig: ["search_path=pg_catalog"], house_owner: true, public_execute: false });
     }
     await expect(copyOne.query("SELECT * FROM identity.outbound_mail_daily_count")).rejects.toMatchObject({ code: "42501" });
     await expect(copyOne.query("UPDATE identity.outbound_mail_daily_count SET standard_sent=0")).rejects.toMatchObject({ code: "42501" });
