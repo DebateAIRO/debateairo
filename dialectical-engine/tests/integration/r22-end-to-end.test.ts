@@ -346,8 +346,8 @@ describe("R22 on the real API", () => {
     const page = await world.stranger.readPublicDebate(publicRef);
     const views = publicPathViews(page);
     expect(views.length).toBeGreaterThan(0);
-    const send = (view: string) => { const built = publicDigAsk({ publicRef, question: page.question, path: views[0]!, views: [view], catalog: v4Catalog, locale: "en" }); expect(built).not.toBeNull();
-      return ask(dan, built!.questionLine, { settings: FREE, publicLane: { publicParent: built!.parent } }); };
+    const send = (view: string, who: R22Account = dan) => { const built = publicDigAsk({ publicRef, question: page.question, path: views[0]!, views: [view], catalog: v4Catalog, locale: "en" }); expect(built).not.toBeNull();
+      return ask(who, built!.questionLine, { settings: FREE, publicLane: { publicParent: built!.parent } }); };
     const allowed = await send("Winter stalls would need heating.");
     expect(allowed.public_dig_not_joined).toBeUndefined();
     await world.settle();
@@ -366,11 +366,28 @@ describe("R22 on the real API", () => {
     expect(unchanged.contributions).toHaveLength(contributions);
     expect(JSON.stringify(unchanged)).not.toContain("REFUSED-WORDS");
     const own = await readPage(dan, refused.id);
-    // What the page has for its own reader: the digger's points; no `dig` part and a story that never comes (reported to the owner: a public dig's own page shows no rewrite and no refusal).
+    // Their own page: the rewrite, the plain line, no story, and nothing that names the debate above it.
+    expect(own.answer.contribution).toMatchObject({ public_ref: publicRef, state: "KEPT_PRIVATE" });
+    expect(own.answer.contribution!.rewrite?.line).toEqual(expect.any(String));
     expect(own.answer.dig).toBeUndefined();
-    expect(own.story?.status).toBe("WRITING");
+    expect(own.map.storyState).toBe("NONE");
+    const ownAllowed = await readPage(dan, allowed.id);
+    expect(ownAllowed.answer.contribution).toMatchObject({ public_ref: publicRef, state: "ON_THE_PAGE" });
+    expect(ownAllowed.answer.contribution!.rewrite?.line).toBe(shown.contributions![0]!.line);
+    expect(ownAllowed.map.storyState).toBe("NONE");
+    // Three fields, none a run id, and the first author's run id nowhere on the digger's page.
+    expect(JSON.stringify(ownAllowed.answer)).not.toContain(publicRunIds.get(publicRef)!);
+    expect(Object.keys(ownAllowed.answer.contribution!).sort()).toEqual(["public_ref", "rewrite", "state"]);
+    // The first author's own dig on their own public debate behaves the same.
+    const authors = await send("My own second thought, as its author.", bea);
+    await world.settle();
+    const authorsOwn = await readPage(bea, authors.id);
+    expect(authorsOwn.answer.contribution).toMatchObject({ public_ref: publicRef, state: "KEPT_PRIVATE" });
+    expect(authorsOwn.answer.contribution!.rewrite?.line).toEqual(expect.any(String));
+    expect(authorsOwn.answer.dig).toBeUndefined();
+    expect(authorsOwn.map.storyState).toBe("NONE");
     expect(await spendOf(refused.id)).toBeGreaterThan(0);
-    saw("8", `allowed: ${String(contributions)} contribution under ${dan.pseudonym}, line "${after[0]!.line}", the digger's run paid ${String(await spendOf(allowed.id))} micros; refused: page unchanged; the digger's own page has their points but no rewrite and no word of the refusal (no dig part, story WRITING)`);
+    saw("8", `allowed: ${String(contributions)} contribution under ${dan.pseudonym}, line "${after[0]!.line}", the digger's run paid ${String(await spendOf(allowed.id))} micros; refused: page unchanged; the digger's own page has their rewrite and the kept-private line, no story; earlier no word of the refusal (no dig part, story WRITING)`);
   }, 300_000);
 
   it("path 9: a report by a stranger on a public debate", async () => {

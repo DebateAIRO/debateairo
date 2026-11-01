@@ -419,6 +419,8 @@
   "v4.investigation.firstAnswer": "See the first debate's answer",
   "v4.contribution.CHECKING": "An AI is checking this before it can change the public page.",
   "v4.contribution.ON_THE_PAGE": "This changed the public page.",
+  "v4.contribution.rewriteTitle": "Your rewrite of this path",
+  "v4.contribution.rewriteWriting": "Your rewrite is still being written.",
   "v4.contribution.REMOVED_AFTER_REVIEW": "This was removed from the public page after review. It stays here, as your own.",
   "v4.public.underReview": "This debate is under review and can't be read for now.",
   "v4.public.changedAfterReview": "Part of this debate was changed after review.",

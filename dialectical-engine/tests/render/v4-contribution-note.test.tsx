@@ -18,8 +18,9 @@ vi.mock("@/lib/v4/money", async (original) => (await import("./v4-debate-harness
  */
 const PUBLIC_REF = "f1000000-0000-4000-8000-000000000001";
 const RUN = "c1000000-0000-4000-8000-000000000009";
-const dig = (state: "CHECKING" | "ON_THE_PAGE" | "KEPT_PRIVATE"): Answer => {
-  const answer = seededAnswer(RUN, { dig: digPart("11111111-1111-4111-8111-111111111111", 1), contribution: { public_ref: PUBLIC_REF, state } } as never);
+const REWRITE = { line: "A rewritten line.", summary: "What the rewrite says.", fate: "PARTLY_HELD", what_changed: ["One thing changed."] };
+const dig = (state: "CHECKING" | "ON_THE_PAGE" | "KEPT_PRIVATE" | "REMOVED_AFTER_REVIEW", rewrite: typeof REWRITE | null = null, part: object = { dig: digPart("11111111-1111-4111-8111-111111111111", 1) }): Answer => {
+  const answer = seededAnswer(RUN, { ...part, contribution: { public_ref: PUBLIC_REF, state, rewrite } } as never);
   // The seeded debate has a page still being read, which reads the answer again for its own reason: settled here, so a read below is the check's.
   return { ...answer, web: { paths: answer.web!.paths.map((path) => ({ ...path, other_pages: path.other_pages.map((other) =>
     other.researched?.state === "READING" ? { ...other, researched: { state: "ADDS_NOTHING" as const } } : other) })) } };
@@ -47,6 +48,32 @@ describe("the digger's view of a dig on a public debate", () => {
     harness.loadAnswer.mockClear();
     await advance(60_000);
     expect(harness.loadAnswer).not.toHaveBeenCalled();
+  });
+
+  it("a dig on a public debate, with no `dig` part (as the API serves it): its rewrite, its state, and no story being written or waited for", async () => {
+    harness.answer = dig("KEPT_PRIVATE", REWRITE, {});
+    await mountMap(1280, RUN);
+    expect(note()!.textContent).toBe(CATALOG["v4.contribution.KEPT_PRIVATE"]);
+    const rewrite = page().querySelector<HTMLElement>("[data-contribution-rewrite=READY]")!;
+    expect(rewrite.textContent).toContain("Your rewrite of this path");
+    expect(rewrite.textContent).toContain("A rewritten line.");
+    expect(rewrite.textContent).toContain("One thing changed.");
+    expect(page().textContent).not.toContain(CATALOG["v4.panel.storyWriting"]);
+  });
+
+  it("while it is checked with no rewrite yet it says it is being written; on the page it links; removed says so, with no rewrite", async () => {
+    harness.answer = dig("CHECKING", null, {});
+    await mountMap(1280, RUN);
+    expect(page().querySelector("[data-contribution-rewrite=WRITING]")!.textContent).toBe("Your rewrite is still being written.");
+    await unmountMap();
+    harness.answer = dig("ON_THE_PAGE", REWRITE, {});
+    await mountMap(1280, RUN);
+    expect(note()!.querySelector("a")!.getAttribute("href")).toBe(`/public/debate/${PUBLIC_REF}`);
+    await unmountMap();
+    harness.answer = dig("REMOVED_AFTER_REVIEW", null, {});
+    await mountMap(1280, RUN);
+    expect(note()!.textContent).toBe(CATALOG["v4.contribution.REMOVED_AFTER_REVIEW"]);
+    expect(page().querySelector("[data-contribution-rewrite]")).toBeNull();
   });
 
   it("KEPT_PRIVATE says it stayed private and only they see it, with no reason and no link", async () => {

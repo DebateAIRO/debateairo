@@ -316,7 +316,8 @@ export function buildV4Map(input: Readonly<{
 }>): V4Map {
   const { answer } = input;
   // W4-6 (owner Q-D13): a dig writes no story, so its map never reads one, nor waits for one.
-  const isDig = answer.dig !== undefined;
+  // A dig on a public debate has no `dig` part (it would name the debate above it) and writes no story either: its `contribution` says it is one.
+  const isDig = answer.dig !== undefined || answer.contribution !== undefined;
   const story = isDig ? null : input.story;
   const body = readyBody(story);
   const specs = applyRewrites(answer, isDig ? digSpecs(answer) : storySpecs(body));
