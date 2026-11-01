@@ -201,7 +201,7 @@ class GoValidationTests(GateTest):
         return gate, gate.write_go(name='candidate.json', **changes)
 
     def test_valid_go_is_accepted_with_bounds_inclusive(self):
-        for changes in ({}, {'daily_budget_usd': '0.01'}, {'daily_budget_usd': '12.00'},
+        for changes in ({}, {'daily_budget_usd': '0.01'}, {'daily_budget_usd': '33.00'},
                         {'max_paid_posts_per_day': 1}, {'max_paid_posts_per_day': 5000},
                         {'max_concurrent_calls': 1}, {'max_concurrent_calls': 10},
                         {'open_days': 1}, {'open_days': 31}, {'scope_id': 'a'}, {'scope_id': 'a' + 'b' * 95},
@@ -218,8 +218,8 @@ class GoValidationTests(GateTest):
             {'scope_id': 'a' * 97}, {'scope_id': 7}, {'target_host': ''}, {'target_host': 'bad host'},
             {'target_host': 'h' * 129}, {'allowed_peer_uids': []}, {'allowed_peer_uids': [-1]},
             {'allowed_peer_uids': [True]}, {'allowed_peer_uids': ['994']}, {'allowed_peer_uids': 994},
-            {'daily_budget_usd': '0.00'}, {'daily_budget_usd': '12.01'}, {'daily_budget_usd': '50.00'},
-            {'daily_budget_usd': '16.00'}, {'daily_budget_usd': '5'},
+            {'daily_budget_usd': '0.00'}, {'daily_budget_usd': '33.01'}, {'daily_budget_usd': '50.00'},
+            {'daily_budget_usd': '44.00'}, {'daily_budget_usd': '5'},
             {'daily_budget_usd': '5.001'}, {'daily_budget_usd': 5.0}, {'daily_budget_usd': '-1.00'},
             {'daily_budget_usd': 'NaN'}, {'daily_budget_usd': '1e1'}, {'max_paid_posts_per_day': 0},
             {'max_paid_posts_per_day': 5001}, {'max_paid_posts_per_day': True}, {'max_paid_posts_per_day': 2.0},
@@ -291,13 +291,13 @@ class PhaseTests(GateTest):
 
     def test_changed_go_is_refused_until_stop_and_reactivation_binds_it(self):
         gate = self.gate().ready()
-        gate.go_path = gate.write_go(name='lowered.json', daily_budget_usd='4.00')
+        gate.go_path = gate.write_go(name='lowered.json', daily_budget_usd='4.40')
         with self.refused('AUTHORITY_STOPPED'):
             gate.call('op-before')
         bridge.stop_authority(gate.private, now=gate.clock)
         gate.activate()
         self.assertEqual(gate.call('op-after')['status'], 200)
-        self.assertEqual(gate.status()['daily_budget_usd'], '4.00')
+        self.assertEqual(gate.status()['daily_budget_usd'], '4.40')
 
     def test_stop_halts_with_operator_stop_and_later_calls_refuse(self):
         gate = self.gate().ready()
@@ -328,8 +328,8 @@ class PhaseTests(GateTest):
             'provider': 'deepinfra', 'enabled_models': [MODEL],
             'today_by_model': {MODEL: {'spend_usd': '0.01', 'posts': 1}},
             'open_until_utc': '2026-10-15T09:00:00+00:00', 'window_open': True,
-            'today': '2026-10-08', 'daily_budget_usd': '5.00', 'today_spend_usd': '0.01',
-            'remaining_today_usd': '4.99', 'today_posts': 1, 'max_paid_posts_per_day': 500, 'in_flight': 0,
+            'today': '2026-10-08', 'daily_budget_usd': '5.50', 'today_spend_usd': '0.01',
+            'remaining_today_usd': '5.49', 'today_posts': 1, 'max_paid_posts_per_day': 500, 'in_flight': 0,
             'today_unbilled_releases': 0, 'cooling': {}, 'today_booked_max': 0, 'today_booked_max_usd': '0',
             'today_uncertain': 0, 'halts': [], 'halts_dropped': 0})
 

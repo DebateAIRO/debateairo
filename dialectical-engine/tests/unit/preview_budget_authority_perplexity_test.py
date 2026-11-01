@@ -5,7 +5,7 @@ is a made-up value in Perplexity's key shape, built from pieces so a secret scan
 in the replies are made up (no saved page text is used).
 
 Perplexity charges per request and reports no usage: each search reserves, and is charged, exactly $0.001 (owner,
-2026-10-30: fast mode, a $1.00 daily pot, the team total raised from $16.00 to $17.00).
+2026-10-30: fast mode, its own daily pot inside the team total).
 """
 import contextlib
 import hashlib
@@ -96,9 +96,9 @@ class PerplexityTest(unittest.TestCase):
             gate.close()
 
     def gate(self, **changes):
-        # The proposed GO (README-perplexity.md): $1.00 and 1,000 searches a day, 10 at once.
-        go = {'provider': 'perplexity', 'enabled_models': [SEARCH], 'daily_budget_usd': '1.00',
-              'max_paid_posts_per_day': 1000, 'max_concurrent_calls': 10, **changes}
+        # A made-up pot and call count (the real ones live only on the server), 10 at once.
+        go = {'provider': 'perplexity', 'enabled_models': [SEARCH], 'daily_budget_usd': '1.10',
+              'max_paid_posts_per_day': 1100, 'max_concurrent_calls': 10, **changes}
         gate = Gate(bridge, **go)
         self.gates.append(gate)
         return gate
@@ -231,26 +231,25 @@ class TeamTotalTests(PerplexityTest):
         os.chmod(path, 0o600)
         return path
 
-    def test_the_owners_pots_twelve_four_and_one_reach_seventeen_and_one_cent_more_refuses(self):
-        # Owner answers of 2026-10-30 (Q12): Perplexity $1.00 a day; the team total rises from $16.00 to $17.00.
-        self.assertEqual((bridge.TEAM_TOTAL_BUDGET_USD, bridge.MAX_GO_BUDGET_USD), (Decimal('17.00'), Decimal('12.00')))
+    def test_three_pots_reach_the_team_total_and_one_cent_more_refuses(self):
+        # The fixture's made-up caps: 1.10 + 22.00 + 20.90 = the team total of 44.00 exactly.
         gate = self.gate()
         gate.init()
-        self.other_go(gate, 'deepinfra', '12.00')
-        self.other_go(gate, 'anthropic', '4.00')
-        self.assertEqual(gate.activate()['state'], 'active')  # 1.00 + 12.00 + 4.00 = 17.00 exactly.
-        gate = self.gate(daily_budget_usd='1.01')
+        self.other_go(gate, 'deepinfra', '22.00')
+        self.other_go(gate, 'anthropic', '20.90')
+        self.assertEqual(gate.activate()['state'], 'active')
+        gate = self.gate(daily_budget_usd='1.11')
         gate.init()
-        self.other_go(gate, 'deepinfra', '12.00')
-        self.other_go(gate, 'anthropic', '4.00')
-        with self.refused('TEAM_TOTAL_BUDGET_EXCEEDED'):  # 1.01 + 12.00 + 4.00 = 17.01.
+        self.other_go(gate, 'deepinfra', '22.00')
+        self.other_go(gate, 'anthropic', '20.90')
+        with self.refused('TEAM_TOTAL_BUDGET_EXCEEDED'):  # One cent over.
             gate.activate()
         self.assertEqual(gate.control()['state'], 'initialized')
         # The same sum seen from the DeepInfra side: Perplexity's GO is counted there too.
-        deepinfra = {'provider': 'deepinfra', 'daily_budget_usd': '12.00'}
-        self.assertEqual(bridge.team_total(deepinfra, {'anthropic': str(self.other_go(gate, 'anthropic', '4.00')),
-                                                       'perplexity': str(self.other_go(gate, 'perplexity', '1.01'))},
-                                           os.getuid()), Decimal('17.01'))
+        deepinfra = {'provider': 'deepinfra', 'daily_budget_usd': '22.00'}
+        self.assertEqual(bridge.team_total(deepinfra, {'anthropic': str(self.other_go(gate, 'anthropic', '20.90')),
+                                                       'perplexity': str(self.other_go(gate, 'perplexity', '1.11'))},
+                                           os.getuid()), Decimal('44.01'))
 
     def test_the_gate_table_names_the_perplexity_folder_and_go(self):
         self.assertEqual(bridge.GATE_PATHS['perplexity'],
@@ -444,7 +443,7 @@ class PotTests(PerplexityTest):
         gate = self.ready()
         self.call(gate)
         report = bridge.remaining_report(gate.private, gate.go_path, {'scope_id': SCOPE}, slots=gate.slots, now=gate.clock)
-        self.assertEqual(report, {'state': 'active', 'window_open': True, 'remaining_usd': '0.999', 'remaining_calls': 999,
+        self.assertEqual(report, {'state': 'active', 'window_open': True, 'remaining_usd': '1.099', 'remaining_calls': 1099,
                                   'max_concurrent_calls': 10, 'largest_reservation_usd': '0.001',
                                   'enabled_models': [SEARCH]})
 
