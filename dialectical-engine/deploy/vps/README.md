@@ -1536,6 +1536,8 @@ on this server nothing activates anything before Phase 3.
 
 ### Upgrading to the daily mail limit (migration 0153)
 
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
+
 Every account mail now asks one gate before it goes: is the address on the suppression list, and is there room in today's
 shared count? The count is in the database, so it survives restarts and uploads and every API copy shares it.
 
