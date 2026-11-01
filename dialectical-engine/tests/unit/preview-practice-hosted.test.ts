@@ -38,6 +38,8 @@ import {
 import { parsePracticeSettings, PRACTICE_HOSTED_SET_ASIDE_KEYS, practiceSettingsWithLineUp } from "../../tools/preview-practice/practice-settings.js";
 import { runPractice } from "../../tools/preview-practice/practice.js";
 
+import { TEST_OWNER_LIMIT_ROWS } from "../support/hostedRegisterRows.js";
+
 type Row = { rowKey: string; valueJsonText: string; sourceRef: string };
 const read = (relative: string) => readFileSync(new URL(`../../${relative}`, import.meta.url), "utf8");
 const canonical = (value: unknown) => parseCanonicalRegisterJson(Buffer.from(JSON.stringify(value))) as string;
@@ -46,9 +48,9 @@ const owned = (): Row[] => [STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE
   .map((row) => ({ rowKey: row.rowKey, valueJsonText: canonicalRegisterJson(row.valueAst), sourceRef: row.sourceRef }));
 const runtime = { nodeVersion: "v26.8.2", pnpmVersion: "11.20.0", sourceRevision: "a".repeat(40), sourceTree: "b".repeat(40),
   operatorSha256: "c".repeat(64), observedAt: "2026-10-13T12:00:00.000Z" };
-/** The runbook's suggested inputs (pending the owner's yes): $3 per debate, $10 per day, the kit's room-read example. */
-const ON = { billing: "on", perRunCeilingMicros: 3_000_000, dailyCeilingMicros: 10_000_000,
-  askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 } } as const;
+/** Made-up owner's inputs: the ceilings, the kit's room-read example, and the plans and abuse limits the owner's plan must carry. */
+const ON = { billing: "on", perRunCeilingMicros: 3_300_000, dailyCeilingMicros: 11_000_000,
+  askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 }, ...TEST_OWNER_LIMIT_ROWS } as const;
 const OFF = { ...ON, billing: "off" } as const;
 const DEEPSEEK = { checker: "deepseek", deepseekEnabledOnGate: true } as const;
 const value = (rows: readonly Row[], key: string) => JSON.parse(rows.find((row) => row.rowKey === key)!.valueJsonText);
@@ -162,8 +164,8 @@ describe("--register-next on the hosted preview: publish kit v3, as the server's
     expect(next.snapshotSha256).toBe(server.snapshotSha256);
     expect(next.deltaSha256).toBe(server.deltaSha256);
     expect(next).toMatchObject({ composer: "preview-register-composer-v3", checker: "glm", roleRotation: "on", hostedBilling: OFF, notes: [],
-      addedKeys: [COST_ESTIMATE_START_POLICY_ROW_KEY, STORY_COST_ENVELOPE_POLICY_ROW_KEY], changedKeys: ["admissionPolicy", "costEnvelopePolicy"] });
-    expect(value(next.rows as readonly Row[], "costEnvelopePolicy")).toMatchObject({ per_run_ceiling_micros: 3_000_000, daily_ceiling_micros: 10_000_000 });
+      addedKeys: [COST_ESTIMATE_START_POLICY_ROW_KEY, STORY_COST_ENVELOPE_POLICY_ROW_KEY], changedKeys: ["abuseLimits", "admissionPolicy", "billingPlans", "costEnvelopePolicy"] });
+    expect(value(next.rows as readonly Row[], "costEnvelopePolicy")).toMatchObject({ per_run_ceiling_micros: 3_300_000, daily_ceiling_micros: 11_000_000 });
     expect(value(next.rows as readonly Row[], "billingPolicy").enabled).toBe(false);
   });
 
@@ -252,7 +254,7 @@ describe("--register-next inputs: the release tool's own rules (native-operator.
   it("--hosted-billing selects kit v3 and is checked by the plan's validator", async () => {
     expect(await parsePracticeNextRegisterInputs({})).toEqual({ kit: "v2", hostedBilling: null, choices: {} });
     expect(await parsePracticeNextRegisterInputs({ hostedBilling: hostedText })).toMatchObject({ kit: "v3", hostedBilling: ON });
-    for (const bad of ["{", JSON.stringify({ ...ON, extra: 1 }), JSON.stringify({ ...ON, perRunCeilingMicros: 11_000_000 }),
+    for (const bad of ["{", JSON.stringify({ ...ON, extra: 1 }), JSON.stringify({ ...ON, perRunCeilingMicros: 11_000_001 }),
       JSON.stringify({ ...ON, askRoomReads: { limit: 60, windowMs: 60_000 } })]) {
       await expect(parsePracticeNextRegisterInputs({ hostedBilling: bad }))
         .rejects.toMatchObject({ code: "PRACTICE_REGISTER_NEXT_INPUT_INVALID", message: "PRACTICE_REGISTER_NEXT_INPUT_INVALID: --hosted-billing" });

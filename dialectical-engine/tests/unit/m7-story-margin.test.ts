@@ -270,7 +270,7 @@ describe("M7 · both boots run the one check, on the rows they already read", ()
     expect(main).not.toContain("new CostEnvelopeGuard(");
     expect(loader.split("new CostEnvelopeGuard(")).toHaveLength(2);
     const guard = loader.slice(loader.indexOf("new CostEnvelopeGuard("), loader.indexOf("const loaded: RunnerVersionSettings"));
-    expect(guard).toContain("policy: costEnvelopeGuardPolicy(debateEnvelope, storyPolicy),");
+    expect(guard).toContain("policy: costEnvelopeGuardPolicy(debateEnvelope, storyPolicy, closingReserves?.ceilingMicros),");
     expect(loader).toContain("composeDebateCostEnvelope(siteCostEnvelopePolicy, await readCostEnvelopePolicy(pool, version))");
     expect(loader).toContain("const storyPolicy = await readStoryPolicyFromRegister(pool, version)");
   });

@@ -84,7 +84,7 @@ function plan(planId: "FREE" | "PLUS" | "PRO" | "MAX", monthlyCreditMicros: numb
   const free = planId === "FREE";
   return Object.freeze({
     planId, tier: free ? "free" as const : "premium" as const, netPrices: Object.freeze({ USD: 0, EUR: 0, RON: 0 }), monthlyCreditMicros,
-    dayBasisPoints: free ? null : 2000, weekBasisPoints: free ? null : 5000, finishBasisPoints: 11000,
+    dayBasisPoints: free ? null : 1100, weekBasisPoints: free ? null : 4400, finishBasisPoints: 12100,
     finishOverflowMicros: null, reserveMicros: null, reserveHeld: null,
     // R-11: Free's fixed risk tier is "standard" (what /new sends today).
     fixedGauges: free ? Object.freeze({ riskTier: "standard" as const, compositionBudgetTier: "low" as const, depth: 2 }) : null
@@ -93,7 +93,7 @@ function plan(planId: "FREE" | "PLUS" | "PRO" | "MAX", monthlyCreditMicros: numb
 const PLANS: BillingPlans = Object.freeze({
   creditCurrency: "USD",
   currencyByCountry: Object.freeze({ defaultCurrency: "USD", countries: Object.freeze({}) }),
-  plans: Object.freeze([plan("FREE", 200_000), plan("PLUS", 5_000_000), plan("PRO", 20_000_000), plan("MAX", 150_000_000)]),
+  plans: Object.freeze([plan("FREE", 330_000), plan("PLUS", 10_000_000), plan("PRO", 33_000_000), plan("MAX", 220_000_000)]),
   sourceRef: "test:s2-plans"
 });
 
@@ -230,8 +230,8 @@ describe("S2 · the person's room on the picker path (hosted, VALID scorecard)",
   });
 
   it("gives a person with a small room ECONOMY models", async () => {
-    // Today 990 000 of 1 000 000: a room of 10 000 — body 7 000, and the whole run held to the 10 000 itself.
-    const ref = await owner("PLUS", 990_000);
+    // Today 1 090 000 of a made-up 1 100 000: a room of 10 000 — body 7 000, and the whole run held to the 10 000 itself.
+    const ref = await owner("PLUS", 1_090_000);
     const preview = await previewOf(ref);
     expect(preview.admission.kind).toBe("START");
     const admitted = await evaluateAskAdmission(settings(), ask("premium"), personRoomOf(preview));
@@ -242,8 +242,8 @@ describe("S2 · the person's room on the picker path (hosted, VALID scorecard)",
   });
 
   it("starts a person whose room is below even ECONOMY at ECONOMY, never refused (A5)", async () => {
-    // Today 999 700 of 1 000 000: a room of 300 — ECONOMY's 480 while arguing is over its body of 210.
-    const ref = await owner("PLUS", 999_700);
+    // Today 1 099 700 of 1 100 000: a room of 300 — ECONOMY's 480 while arguing is over its body of 210.
+    const ref = await owner("PLUS", 1_099_700);
     const preview = await previewOf(ref);
     expect(preview.admission.kind).toBe("START");
     const admitted = await evaluateAskAdmission(settings(), ask("premium"), personRoomOf(preview));
@@ -254,7 +254,7 @@ describe("S2 · the person's room on the picker path (hosted, VALID scorecard)",
   });
 
   it("lets a person with a FULL window wait, plans the question for the room it wakes to, and plans it for NOW too", async () => {
-    const ref = await owner("PLUS", 1_000_000);
+    const ref = await owner("PLUS", 1_100_000);
     const preview = await previewOf(ref);
     expect(preview.admission.kind).toBe("WAIT");
     if (preview.admission.kind !== "WAIT") return;
@@ -275,12 +275,12 @@ describe("S2 · the person's room on the picker path (hosted, VALID scorecard)",
   });
 
   it("plans a wait that only the person's own live debate causes for the next minute, never for the day's reset", async () => {
-    // Today 550 000 spent of 1 000 000, and a live debate holding 550 000 more: the day is FULL on holds, not on
+    // Today 605 000 spent of 1 100 000, and a live debate holding 605 000 more: the day is FULL on holds, not on
     // spend, so B6a looks again at the next whole minute (the live debate may end any time) — long before the day
     // resets. A wake plan sized for a whole new day (BEST) could start at that minute into what the live debate
-    // left, past the owner's 110 % leeway; the plan is made for the room as measured instead.
-    const ref = await owner("PLUS", 550_000);
-    await liveDebateHolding(ref, 550_000);
+    // left, past the plan's leeway; the plan is made for the room as measured instead.
+    const ref = await owner("PLUS", 605_000);
+    await liveDebateHolding(ref, 605_000);
     const preview = await previewOf(ref);
     expect(preview.admission.kind).toBe("WAIT");
     if (preview.admission.kind !== "WAIT") return;
@@ -385,8 +385,8 @@ describe("P3-I1 · A5 starts at the cheapest choice when ECONOMY is not the chea
   });
 
   it("STARTS a person short on room on the cheapest plan the site allows (BALANCED), never the site's refusal", async () => {
-    // Today 995 000 of 1 000 000: a room of 5000 (arguing 3500) — no strength fits the person.
-    const ref = await owner("PLUS", 995_000);
+    // Today 1 095 000 of 1 100 000: a room of 5000 (arguing 3500) — no strength fits the person.
+    const ref = await owner("PLUS", 1_095_000);
     const preview = await previewOf(ref);
     expect(preview.admission.kind).toBe("START");
     const admitted = await evaluateAskAdmission(settings(site20k, world), ask("premium"), personRoomOf(preview));
@@ -398,7 +398,7 @@ describe("P3-I1 · A5 starts at the cheapest choice when ECONOMY is not the chea
   });
 
   it("lets a person with a FULL window WAIT, and plans NOW on the cheapest plan the site allows — never a refusal", async () => {
-    const ref = await owner("PLUS", 1_000_000);
+    const ref = await owner("PLUS", 1_100_000);
     const preview = await previewOf(ref);
     expect(preview.admission.kind).toBe("WAIT");
     const admitted = await evaluateAskAdmission(settings(site20k, world), ask("premium"), personRoomOf(preview));
@@ -412,7 +412,7 @@ describe("P3-I1 · A5 starts at the cheapest choice when ECONOMY is not the chea
   });
 
   it("starts a short person on BALANCED's 9000, not ECONOMY's 30 000, when the site allows every strength", async () => {
-    const ref = await owner("PLUS", 995_000);
+    const ref = await owner("PLUS", 1_095_000);
     const admitted = await evaluateAskAdmission(settings(SITE, world), ask("premium"), await roomOf(ref));
     expect(admitted.modelAssignment?.appliedStrength).toBe("BALANCED");
     expect(admitted.personRoomTight).toBe(true);
@@ -425,7 +425,7 @@ describe("P3-I1 · A5 starts at the cheapest choice when ECONOMY is not the chea
     const withoutPerson = await evaluateAskAdmission(settings(smallSite, world), ask("premium"), null).then(() => null, (error: unknown) => error);
     expect(withoutPerson).toBeInstanceOf(AskRefusal);
     expect(withoutPerson).toMatchObject({ code: "ASK_MODEL_STRENGTH_BUDGET_TOO_SMALL" });
-    const ref = await owner("PLUS", 995_000);
+    const ref = await owner("PLUS", 1_095_000);
     const withPerson = await evaluateAskAdmission(settings(smallSite, world), ask("premium"), await roomOf(ref)).then(() => null, (error: unknown) => error);
     expect(withPerson).toBeInstanceOf(AskRefusal);
     expect(withPerson).toMatchObject({ code: "ASK_MODEL_STRENGTH_BUDGET_TOO_SMALL" });

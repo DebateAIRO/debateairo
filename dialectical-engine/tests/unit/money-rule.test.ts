@@ -76,7 +76,7 @@ function roomWith(input: Readonly<{ plan: PlanId; charges: readonly Charge[]; no
       waitingForLegacyAsker: async () => [], readWaiting: async () => null, isWaiting: async () => false,
       enterWait: async () => undefined, recordReason: async () => undefined, markStarted: async () => undefined
     },
-    estimator: { estimateMicros: async () => 150_000, ...(input.digWebPart === undefined ? {} : { digWebPartMicros: input.digWebPart }),
+    estimator: { estimateMicros: async () => 145_200, ...(input.digWebPart === undefined ? {} : { digWebPartMicros: input.digWebPart }),
       ...(input.digUpdates === undefined ? {} : { digUpdatesPartMicros: input.digUpdates }) },
     personAllowance: { read: async (_owner, now) => windows(now) },
     entitlements: null,
@@ -110,10 +110,10 @@ describe("the money rule's pieces (pure)", () => {
   });
 
   it("shows a borrow as a whole share of the next window, rounded up", () => {
-    expect(borrowPercent(0, 1_000_000)).toBe(0);
-    expect(borrowPercent(1, 1_000_000)).toBe(1);
-    expect(borrowPercent(50_000, 1_000_000)).toBe(5);
-    expect(borrowPercent(5_000_000, 1_000_000)).toBe(100);
+    expect(borrowPercent(0, 1_100_000)).toBe(0);
+    expect(borrowPercent(1, 1_100_000)).toBe(1);
+    expect(borrowPercent(55_000, 1_100_000)).toBe(5);
+    expect(borrowPercent(5_500_000, 1_100_000)).toBe(100);
   });
 
   it("the cross-month switch is ONE named constant, and NO until the owner rules", () => {
@@ -122,13 +122,13 @@ describe("the money rule's pieces (pure)", () => {
 });
 
 describe("the v4 windows (billing-core): day and week borrow, the month is the wall with its reserve", () => {
-  it("a paid plan's day and week borrow and carry no overflow; its month keeps 20 cents inside and 20 cents of tolerance", () => {
+  it("a paid plan's day and week borrow and carry no overflow; its month keeps its reserve inside and its overflow as tolerance", () => {
     const windows = windowsOf("PLUS", at("2026-10-03T12:00:00.000Z"));
     expect(windows.map((window) => [window.scope, window.borrows ?? null, window.finishOverflowMicros ?? null, window.keepsReserveMicros ?? null]))
-      .toEqual([["PERSON_DAY", true, null, null], ["PERSON_WEEK", true, null, null], ["PERSON_MONTH", null, 200_000, 200_000]]);
+      .toEqual([["PERSON_DAY", true, null, null], ["PERSON_WEEK", true, null, null], ["PERSON_MONTH", null, 220_000, 440_000]]);
   });
 
-  it("Free's month keeps no reserve inside: its 5 cents sit on top of its 20", () => {
+  it("Free's month keeps no reserve inside: its reserve sits on top of its credit", () => {
     expect(windowsOf("FREE", at("2026-10-03T12:00:00.000Z")).map((window) => [window.scope, window.keepsReserveMicros]))
       .toEqual([["PERSON_MONTH", 0]]);
   });
@@ -139,25 +139,25 @@ describe("starts with no hold", () => {
     const room = roomWith({ plan: "PLUS", charges: [], now: at("2026-10-03T12:00:00.000Z"), holds: 9_000_000 });
     const answer = await room.readRoom(QUESTION);
     expect(answer).toMatchObject({ room: "FITS", scope: null, reserve: "KEPT" });
-    // 150 000 of a 1 000 000 day: 15%.
-    expect(answer.startSharePercent).toBe(15);
+    // 145 200 of the made-up 726 000 day: 20%.
+    expect(answer.startSharePercent).toBe(20);
     expect(answer.digSharePercent).toBeUndefined();
   });
 
   it("R22 decision 9: a dig's share counts its web part by its picks and mode, and holds nothing: the room is what it was", async () => {
     const asked: unknown[] = [];
     const room = roomWith({ plan: "PLUS", charges: [], now: at("2026-10-03T12:00:00.000Z"),
-      digWebPart: (web) => { asked.push(web); return web.digPicks * 100_000; } });
+      digWebPart: (web) => { asked.push(web); return web.digPicks * 72_600; } });
     const one = await room.readRoom({ ...QUESTION, dig: { parentRunId: OWNER, mode: "quick", picks: 1 } });
     const three = await room.readRoom({ ...QUESTION, dig: { parentRunId: OWNER, mode: "thorough", picks: 3 } });
-    // 150 000 + 100 000 of a 1 000 000 day: 25%; with three picks, 45%. More picks read as more of today.
-    expect([one.digSharePercent, three.digSharePercent]).toEqual([25, 45]);
+    // 145 200 + 72 600 of a 726 000 day: 30%; with three picks, 50%. More picks read as more of today.
+    expect([one.digSharePercent, three.digSharePercent]).toEqual([30, 50]);
     expect(asked).toEqual([{ depth: "QUICK", digPicks: 1 }, { depth: "THOROUGH", digPicks: 3 }]);
     expect(three).toMatchObject({ room: "FITS", reserve: "KEPT" });
     // A dig of a page that names no count reads as one pick.
-    expect((await room.readRoom({ ...QUESTION, dig: { parentRunId: OWNER, mode: "quick", picks: null } })).digSharePercent).toBe(25);
+    expect((await room.readRoom({ ...QUESTION, dig: { parentRunId: OWNER, mode: "quick", picks: null } })).digSharePercent).toBe(30);
     // A question's own share never counts it.
-    expect((await room.readRoom(QUESTION)).startSharePercent).toBe(15);
+    expect((await room.readRoom(QUESTION)).startSharePercent).toBe(20);
   });
 
   it("a Free dig's share never counts a web part: Free never searches", async () => {
@@ -169,16 +169,16 @@ describe("starts with no hold", () => {
 
   it("the owner's ruling: a dig's share counts what follows it from its level, and holds nothing; Free's the same", async () => {
     const asked: unknown[] = [];
-    const digUpdates = (dig: Readonly<{ level: number; free: boolean }>) => { asked.push(dig); return dig.level * 100_000; };
-    const room = roomWith({ plan: "PLUS", charges: [], now: at("2026-10-03T12:00:00.000Z"), digWebPart: () => 100_000, digUpdates });
+    const digUpdates = (dig: Readonly<{ level: number; free: boolean }>) => { asked.push(dig); return dig.level * 72_600; };
+    const room = roomWith({ plan: "PLUS", charges: [], now: at("2026-10-03T12:00:00.000Z"), digWebPart: () => 72_600, digUpdates });
     const first = await room.readRoom({ ...QUESTION, dig: { parentRunId: OWNER, mode: "quick", picks: 1, level: 1 } });
     const deep = await room.readRoom({ ...QUESTION, dig: { parentRunId: OWNER, mode: "quick", picks: 1, level: 4 } });
-    // 150 000 + 100 000 of web + 100 000 of updates of a 1 000 000 day: 35%; at level 4, 65%.
-    expect([first.digSharePercent, deep.digSharePercent]).toEqual([35, 65]);
+    // 145 200 + 72 600 of web + 72 600 of updates of a 726 000 day: 40%; at level 4, 70%.
+    expect([first.digSharePercent, deep.digSharePercent]).toEqual([40, 70]);
     expect(deep).toMatchObject({ room: "FITS", reserve: "KEPT" });
     // A page that names no level reads as level 1; a question's own share never counts it.
-    expect((await room.readRoom({ ...QUESTION, dig: { parentRunId: OWNER, mode: "quick", picks: 1 } })).digSharePercent).toBe(35);
-    expect((await room.readRoom(QUESTION)).startSharePercent).toBe(15);
+    expect((await room.readRoom({ ...QUESTION, dig: { parentRunId: OWNER, mode: "quick", picks: 1 } })).digSharePercent).toBe(40);
+    expect((await room.readRoom(QUESTION)).startSharePercent).toBe(20);
     expect(asked).toEqual([{ level: 1, free: false }, { level: 4, free: false }, { level: 1, free: false }]);
 
     const askedFree: unknown[] = [];
@@ -193,7 +193,7 @@ describe("starts with no hold", () => {
   it("a dig's read gives the dig's share instead", async () => {
     const room = roomWith({ plan: "PLUS", charges: [], now: at("2026-10-03T12:00:00.000Z") });
     const answer = await room.readRoom({ ...QUESTION, dig: { parentRunId: OWNER, mode: "quick", picks: 2 } });
-    expect(answer.digSharePercent).toBe(15);
+    expect(answer.digSharePercent).toBe(20);
     expect(answer.startSharePercent).toBeUndefined();
   });
 
@@ -227,7 +227,7 @@ function guardOver(input: Readonly<{ now: Date; spentByStart: ReadonlyMap<number
     admitNewRun: async () => Object.freeze({ admitted: true, committedMicros: 0 })
   };
   return new CostEnvelopeGuard({
-    store, policy: { perRunCeilingMicros: 250_000, dailyCeilingMicros: 2_000_000, perStoryCeilingMicros: 100_000 },
+    store, policy: { perRunCeilingMicros: 250_000, dailyCeilingMicros: 2_000_000, perStoryCeilingMicros: 100_000, closingCeilingMicros: 440_000 },
     clock: () => input.now,
     sharedWall: {
       finishBasisPoints: null, persons: allowanceOf("PLUS"),
@@ -252,24 +252,24 @@ describe("running work passes the day and the week, and the borrow is computed",
   });
 
   it("what a day used past its limit lowers the next day: derived from the ledger, never stored", async () => {
-    // 7 Oct: a running debate used 1.3 of the 1.0 day. 8 Oct (the first day of the second week) starts at 0.3.
-    const charges: Charge[] = [{ at: at("2026-10-07T20:00:00.000Z"), runId: "run-a", micros: 1_300_000 }];
+    // 7 Oct: a running debate used 330,000 past the made-up day of 726,000. 8 Oct (the first day of the second week) starts 330,000 lower.
+    const charges: Charge[] = [{ at: at("2026-10-07T20:00:00.000Z"), runId: "run-a", micros: 1_056_000 }];
     const today = windowsOf("PLUS", at("2026-10-08T12:00:00.000Z"));
     for (const batched of [true, false]) {
       const borrow = await readWindowBorrow({ ownerRef: OWNER, window: today[0]!, month: today[2]!, spend: ledger(charges, batched), allowance: allowanceOf("PLUS") });
-      expect(borrow).toMatchObject({ scope: "PERSON_DAY", borrowedMicros: 300_000, overMicros: 0, notice: false });
+      expect(borrow).toMatchObject({ scope: "PERSON_DAY", borrowedMicros: 330_000, overMicros: 0, notice: false });
     }
   });
 });
 
 describe("new starts wait for the reset", () => {
   const charges: Charge[] = [
-    { at: at("2026-10-07T20:00:00.000Z"), runId: "run-a", micros: 1_300_000 },
-    { at: at("2026-10-08T09:00:00.000Z"), runId: "run-b", micros: 750_000 }
+    { at: at("2026-10-07T20:00:00.000Z"), runId: "run-a", micros: 1_056_000 },
+    { at: at("2026-10-08T09:00:00.000Z"), runId: "run-b", micros: 432_300 }
   ];
   const now = at("2026-10-08T12:00:00.000Z");
 
-  it("a day that started 0.3 lower and used 0.75 is full: new questions wait for its reset", async () => {
+  it("a day that started 330,000 lower and used 432,300 is full: new questions wait for its reset", async () => {
     const answer = await roomWith({ plan: "PLUS", charges, now }).readRoom(QUESTION);
     expect(answer).toMatchObject({ room: "FULL", scope: "PERSON_DAY", resetsAt: at("2026-10-09T00:00:00.000Z"), newStarts: "BLOCKED_UNTIL_RESET" });
   });
@@ -279,7 +279,7 @@ describe("new starts wait for the reset", () => {
       entitlements: { current: async () => ({ planId: "PLUS" as const }) }, allowance: allowanceOf("PLUS"), spend: ledger(charges)
     }).read(OWNER, now);
     expect(usage.windows[0]).toMatchObject({ scope: "PERSON_DAY", percent: 105 });
-    // 0.3 + 0.75 = 1.05 of a 1.0 day: run-b is using 0.05 of tomorrow, 5%.
+    // 330,000 + 432,300 = 762,300, which is 105% of a 726,000 day: run-b is using 36,300 of tomorrow, 5%.
     expect(usage.borrowed).toEqual([{ scope: "PERSON_DAY", runRef: "run-b", percent: 5, nextWindowStartsAt: at("2026-10-09T00:00:00.000Z") }]);
   });
 
@@ -295,21 +295,21 @@ describe("the month wall pauses the remaining calls", () => {
   const month = windowsOf("PLUS", now)[2]!;
   const at_ = (spent: number) => guardOver({ now, spentByStart: new Map([[month.periodStart.getTime(), spent]]) });
 
-  it("below the wall (the month less its 20-cent reserve) a call is admitted; at it, the month's own refusal", async () => {
-    expect(await outcome(bodyCall(at_(4_800_000 - 1)))).toBe("ADMITTED");
-    expect(await outcome(bodyCall(at_(4_800_000)))).toBe("MONTH_WALL");
-    const refusal = await bodyCall(at_(4_800_000)).catch((error: unknown) => error);
+  it("below the wall (the month less its reserve) a call is admitted; at it, the month's own refusal", async () => {
+    expect(await outcome(bodyCall(at_(6_160_000 - 1)))).toBe("ADMITTED");
+    expect(await outcome(bodyCall(at_(6_160_000)))).toBe("MONTH_WALL");
+    const refusal = await bodyCall(at_(6_160_000)).catch((error: unknown) => error);
     expect(refusal).toBeInstanceOf(MonthWallReachedError);
     expect((refusal as MonthWallReachedError).code).toBe("PERSON_ALLOWANCE_REACHED");
     expect((refusal as MonthWallReachedError).resumableAt).toEqual(month.resetsAt);
   });
 
-  it("the old 20 cents are only the tolerance for a call in flight: its worst case may pass the wall by at most that", () => {
-    const wall = (spentMicros: number, projectedMicros: number) => decideMonthWall({ spentMicros, projectedMicros, limitMicros: 5_000_000,
-      keepsReserveMicros: 200_000, toleranceMicros: 200_000 });
-    expect(wall(4_799_999, 200_001)).toBe("WITHIN");
-    expect(wall(4_799_999, 200_002)).toBe("WOULD_CROSS");
-    expect(wall(4_800_000, 0)).toBe("WOULD_CROSS");
+  it("the overflow is only the tolerance for a call in flight: its worst case may pass the wall by at most that", () => {
+    const wall = (spentMicros: number, projectedMicros: number) => decideMonthWall({ spentMicros, projectedMicros, limitMicros: 6_600_000,
+      keepsReserveMicros: 440_000, toleranceMicros: 220_000 });
+    expect(wall(6_159_999, 220_001)).toBe("WITHIN");
+    expect(wall(6_159_999, 220_002)).toBe("WOULD_CROSS");
+    expect(wall(6_160_000, 0)).toBe("WOULD_CROSS");
   });
 
   // W3-8: the pause is durable. Nothing waits in memory: at the wall the call ends with the planned stop
@@ -422,17 +422,17 @@ describe("Continue: refused before the reset, after it the debate resumes withou
 });
 
 describe("the final-answer reserve is always left", () => {
-  it("a paid month's new starts and its wall stop 20 cents short of the limit", async () => {
+  it("a paid month's new starts and its wall stop its reserve short of the limit", async () => {
     const month = windowsOf("PRO", at("2026-10-20T12:00:00.000Z"))[2]!;
-    expect(startLimitMicros(month)).toBe(month.limitMicros - 200_000);
-    expect(decideMonthWall({ spentMicros: month.limitMicros - 200_000, projectedMicros: 0, limitMicros: month.limitMicros,
+    expect(startLimitMicros(month)).toBe(month.limitMicros - 440_000);
+    expect(decideMonthWall({ spentMicros: month.limitMicros - 440_000, projectedMicros: 0, limitMicros: month.limitMicros,
       keepsReserveMicros: month.keepsReserveMicros!, toleranceMicros: month.finishOverflowMicros! })).toBe("WOULD_CROSS");
   });
 
-  it("the room is full at the reserve: a month with 19 cents left starts nothing new", async () => {
+  it("the room is full at the reserve: a month with less than its reserve left starts nothing new", async () => {
     const now = at("2026-10-20T12:00:00.000Z");
     const windows = (when: Date) => windowsOf("PLUS", when).filter((window) => window.scope === "PERSON_MONTH");
-    const charges: Charge[] = [{ at: at("2026-10-19T12:00:00.000Z"), runId: "run-a", micros: 4_810_000 }];
+    const charges: Charge[] = [{ at: at("2026-10-19T12:00:00.000Z"), runId: "run-a", micros: 6_182_000 }];
     const answer = await roomWith({ plan: "PLUS", charges, now, windows }).readRoom(QUESTION);
     expect(answer).toMatchObject({ room: "FULL", scope: "PERSON_MONTH", newStarts: "BLOCKED_UNTIL_RESET", reserve: "KEPT" });
     expect(await roomWith({ plan: "PLUS", charges, now, windows }).monthHasRoom(OWNER, now)).toBe(false);
@@ -513,10 +513,10 @@ describe("W5-1 INVESTIGATION_REPORT is never walled", () => {
 });
 
 describe("the cross-month switch, both ways", () => {
-  // 31 Oct: a running debate used 1.3 of the 1.0 day, the last day of the month (anchor 1 Oct).
-  const charges: Charge[] = [{ at: at("2026-10-31T20:00:00.000Z"), runId: "run-a", micros: 1_300_000 }];
+  // 31 Oct: a running debate used 330,000 past the made-up day of 726,000, the last day of the month (anchor 1 Oct).
+  const charges: Charge[] = [{ at: at("2026-10-31T20:00:00.000Z"), runId: "run-a", micros: 1_056_000 }];
 
-  it.each([[false, 0], [true, 300_000]] as const)("carries %s: the new month's first day starts %i lower", async (carries, borrowed) => {
+  it.each([[false, 0], [true, 330_000]] as const)("carries %s: the new month's first day starts %i lower", async (carries, borrowed) => {
     const windows = windowsOf("PLUS", at("2026-11-01T06:00:00.000Z"));
     const borrow = await readWindowBorrow({ ownerRef: OWNER, window: windows[0]!, month: windows[2]!, spend: ledger(charges),
       allowance: allowanceOf("PLUS"), carriesAcrossMonth: carries });
@@ -527,6 +527,6 @@ describe("the cross-month switch, both ways", () => {
     const windows = windowsOf("PLUS", at("2026-10-31T22:00:00.000Z"));
     const borrow = await readWindowBorrow({ ownerRef: OWNER, window: windows[0]!, month: windows[2]!, spend: ledger(charges),
       allowance: allowanceOf("PLUS"), carriesAcrossMonth: carries });
-    expect(borrow).toMatchObject({ overMicros: 300_000, notice });
+    expect(borrow).toMatchObject({ overMicros: 330_000, notice });
   });
 });

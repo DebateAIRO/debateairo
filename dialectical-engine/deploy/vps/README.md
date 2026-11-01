@@ -2300,10 +2300,10 @@ Every charged call is one row in `ledger.model_spend`, and every limit is a sum 
 
 | Row member | Value | Meaning |
 |---|---|---|
-| `per_run_ceiling_micros` | `250000` | 0.25 USD per debate |
-| `daily_ceiling_micros` | `2000000` | 2.00 USD per UTC day |
-| `serve_reserve_basis_points` | `3000` | 30% of each debate's money is kept for writing the answer |
-| `serve_overrun_basis_points` | `2000` | writing the answer may go 20% over the per-debate ceiling |
+| `per_run_ceiling_micros` | `440000` | made up: 0.44 USD per debate |
+| `daily_ceiling_micros` | `5500000` | made up: 5.50 USD per UTC day |
+| `serve_reserve_basis_points` | `3300` | made up: 33% of each debate's money is kept for writing the answer |
+| `serve_overrun_basis_points` | `2200` | made up: writing the answer may go 22% over the per-debate ceiling |
 | `admission_close_basis_points` | `9500` | from 95% of a limit, the ask page says the limit is close |
 | `finish_up_to_basis_points` | `11500` | a debate already running may take the site's day up to 115% so it can finish |
 | `waiting_line_per_person` | `1` | one question per person may wait for the reset |
@@ -2314,9 +2314,9 @@ Basis points are hundredths of a percent, so `10000` is the whole limit.
 
 The reserve and the overrun keep money for writing the answer (spec 2026-09-26 §14.4.1).
 
-- **The split.** With the values above, the calls made while a debate is argued may spend up to 70% of the per-debate ceiling (0.175 USD). The calls that write the answer may take the same debate's total up to 120% of it (0.30 USD). Both count the same running total, so the reserve is simply the part the arguing may not touch.
-- **The day must hold one debate at its maximum** (0.30 USD), or the row is refused (`COST_ENVELOPE_POLICY_INVALID`).
-- **The verdict story** has a code-owned cap that the publication seals for you (`storyCostEnvelopePolicy`: 0.05 USD, with a 20% margin, 0.06 USD). The day must hold one debate AND its story, here 0.36 USD, or publishing and both services refuse (`STORY_DAILY_CEILING_INSUFFICIENT`).
+- **The split.** With the values above, the calls made while a debate is argued may spend up to 67% of the per-debate ceiling. The calls that write the answer may take the same debate's total up to 122% of it. Both count the same running total, so the reserve is simply the part the arguing may not touch.
+- **The day must hold one debate at its maximum**, or the row is refused (`COST_ENVELOPE_POLICY_INVALID`).
+- **The verdict story** has a code-owned cap that the publication seals for you (`storyCostEnvelopePolicy`). The day must hold one debate AND its story, or publishing and both services refuse (`STORY_DAILY_CEILING_INSUFFICIENT`).
 - **Every debate charge records its part** (`spend_phase` in `ledger.model_spend`: `BODY` while arguing, `SERVE` while writing the answer).
 - **A version without the two members means 0:** no money is kept back and the margin is off (go-live checklist line 12). The file format stays `debateai.hosted-register.v1`.
 
@@ -2336,7 +2336,7 @@ The last three rows switch on the budget rule of `docs/superpowers/specs/2026-09
   - From 95%, or when the question would cross 100%, the debate still starts, and the ask page says the limit is close.
   - From 100%, the question is accepted (`202`, `WAITING`) and **waits in line**. The API's 60-second waker starts it by itself at the reset, oldest first and one per person.
   - A second waiting question from the same person is refused `422 ASK_ALREADY_WAITING`, and the page names the time the first will start.
-- **While a debate runs** it is measured against real spend only, up to the **finish edge**: 115% of the site's day, 110% of a person's window.
+- **While a debate runs** it is measured against real spend only, up to the **finish edge** of the site's day (`finish_up_to_basis_points`) and of a person's window.
   - An arguing call that would cross it is retried on the debate's cheaper models first.
   - Only when none fits does the arguing stop, and the answer is still written.
   - The opening position and the answer are exempt.
@@ -2375,7 +2375,7 @@ The publish command asks the same question before anything is sealed, a dry run 
 #### Each person's windows (billing)
 
 **Do not switch `billingPolicy` on before Part 2 (plans and payments) is deployed.** Nothing in this release stops you, but with billing on now:
-- every signed-in person becomes Free: 0.20 USD of credit a month, the sealed fixed settings and the Free plan's two models;
+- every signed-in person becomes Free: the plan's monthly credit, the sealed fixed settings and the Free plan's two models;
 - there is no way to subscribe, because checkout is Part 2;
 - the "See plans" link under the full-limit sentences (Free's ends "or choose a plan to continue now") goes to `/pricing`, a page that does not exist yet.
 
@@ -2389,7 +2389,7 @@ With billing on (hosted, and a published `billingPolicy` saying `enabled: true`)
 All are in UTC, and each person sees them in their own time zone.
 
 - **The limits** come from the `billingPlans` row: the plan's monthly credit, and for paid plans a day and a week share of it. Free has its month only.
-- **A running debate may finish past a person window's limit.** On a version that sealed billingPlans v3 that is up to 110% of any person window (`finish_bp` `11000`). Since billingPlans v4 (owner 2026-10-30) it is a fixed 20 cents past every day, week and month limit on every plan, Free included (`finish_bp` `10000`, `finish_overflow_micros` `200000`). Every overflow is spend inside the month too, so the month's own 20 cents hold them all; once the month is full, every new question waits for the new month. The extra is on the site; it is not taken from the next month.
+- **A running debate may finish past a person window's limit.** On a version that sealed billingPlans v3 that is a share past any person window (`finish_bp`). Since billingPlans v4 (owner 2026-10-30) it is a fixed amount past every day, week and month limit on every plan, Free included (`finish_bp` `10000`, `finish_overflow_micros`). Every overflow is spend inside the month too, so the month's own edge holds them all; once the month is full, every new question waits for the new month. The extra is on the site; it is not taken from the next month.
 - **The server decides the ask:**
   - the plan's tier;
   - for Free, the sealed fixed gauges;
@@ -2401,7 +2401,7 @@ All are in UTC, and each person sees them in their own time zone.
   - `BILLING_PLANS_UNRESOLVED` when it seals no `billingPlans`.
 - **The publish command warns** `warning=BILLING_PLAN_WINDOW_BELOW_RUN_CEILING:<plan>` when a plan's smallest window (its day cap, or Free's whole month) is below the per-run ceiling.
   - It does not refuse: admission uses the estimate, so a small window still fits a small debate.
-  - At today's 0.25 USD per debate, Free's 0.20 USD month triggers it. Publish realistic per-run and daily ceilings before switching billing on.
+  - Publish realistic per-run and daily ceilings before switching billing on.
 - **The site's daily ceiling protects the company, not the person.** At launch it must be at least the expected daily spend of all subscribers: subscribers × each plan's day cap × 0.3, or better, the measured figure.
 
 #### The provisional values
@@ -2478,7 +2478,7 @@ journalctl -u 'debateai-runner@*' --since today -o cat | grep -E 'DEBATEAI_SERVE
 | `"kind":"DEBATEAI_STORY"`, `"event":"STORY_PACK_INVALID"`, with `reason` (once, when the runner starts) | The story shapes (`story-shapes/`, or the directory `DEBATEAI_STORY_SHAPES_DIR` names) broke a rule or could not be read. `reason` names the rule, for example `STORY_PACK_DIR_UNRESOLVED`. The runner starts anyway, but every story is then stored as failed (`STORY_PACK_INVALID`) and the pages show the answer without one. | Fix the files or the variable, then restart the runner. |
 | `"event":"STORY_POLICY_UNREADABLE"`, with `code` (once, when the runner starts) | The register version pinned by `REGISTER_VERSION` holds the story's rows only in part, or malformed. Every story is then stored as failed with `STORY_NOT_CONFIGURED`. | Publish a new register version (the publication seals the story's code-owned rows whole) and pin it (§5 "A new register version is a new release"). |
 | `"event":"STORY_STORED"` with `"failureCode":"STORY_NOT_CONFIGURED"` (per debate) | The pinned register version has no story rows at all, as with every version published before the verdict story. **This is expected on this host until the next hosted publish** (`pnpm register:publish-hosted`, below), which seals them. No model is called for the story, and the pages show the answer without one. | Publish once and pin the new version: a new release (§5 "A new register version is a new release"). |
-| `"event":"STORY_LOOP_FAILED"` or `"STORY_STORED"` with `"failureCode":"STORY_ENVELOPE_EXHAUSTED"` (per debate) | The story's own money cap (0.05 USD, or 0.06 with its margin) could not pay for a call on any of the debate's models. **This is expected at premium prices**: the storyteller's output bound of 12,000 tokens can cost more than the whole cap. The answer is untouched, and the page shows it without a story. | Nothing, unless every story fails this way. The cap is a code-owned row, so changing it is a code change and a new publish. |
+| `"event":"STORY_LOOP_FAILED"` or `"STORY_STORED"` with `"failureCode":"STORY_ENVELOPE_EXHAUSTED"` (per debate) | The story's own money cap could not pay for a call on any of the debate's models. **This is expected at premium prices**: the storyteller's output bound of 12,000 tokens can cost more than the whole cap. The answer is untouched, and the page shows it without a story. | Nothing, unless every story fails this way. The cap is a code-owned row, so changing it is a code change and a new publish. |
 | `"kind":"DEBATEAI_BODY_COST_FALLBACK"`, `"event":"RUN_COST_SUBSTITUTION_WRITE_FAILED"`, with `code`, `sqlState`, `runId`, `callSiteKey` | An arguing call was moved to one of the debate's cheaper models (the `runner.body.cheaper_model` line just before it), and the owner's record of that move (`core.run_cost_substitution`) could not be written. The debate is exactly what it would have been. What is lost is that one row, so the operator's run report and the owner's read do not show that move. | Nothing writes the row later. A typed `code` is a defect to report. `UNTYPED` with a `sqlState` is the database refusing or a lost connection. More than one in a day is worth investigating. |
 | `{"kind":"DEBATEAI_PERSON_WALL","event":"PLANS_UNRESOLVED"}` (once, when the runner starts) | The pinned register version has a `costEnvelopePolicy` row but no `billingPlans` row, so the runner cannot read a person's windows. A debate pinned to a person (billing on at the API) would then have every walled arguing call refused as that person's month: the arguing stops and the answer is still written. A debate with no person pin, which is every debate while billing is off, is untouched. **This is expected on this host until the next hosted publish** (`pnpm register:publish-hosted`, below), which seals the engine's own billing rows (billing off). | While billing is off: nothing; it stops once you publish and pin the new version (a new release, §5 "A new register version is a new release"). After billing is switched on it means the API and the runner are on different register versions, which one release's overlays never allow: check that both overlays of the current release name the same `REGISTER_VERSION`. |
 | `"kind":"DEBATEAI_POINT_INVESTIGATION"`, `"event":"INVESTIGATION_UNAVAILABLE"`, with `runId`, `callSiteKey`, `code` (engine 2 only: never while no register version carries the engine row) | Written once per investigation that ended unavailable: one more AI was to look into a point a reviewer could not assess, and no usable answer came back (the call failed or was refused, the money stopped it, or `code` `INVESTIGATOR_SEAT_UNPLANNED`: no investigator was planned). `code` is the error's code or class name, never AI or vendor text. The point keeps its reduced "cannot assess" weight and the debate goes on; the investigation's record says unavailable. | A single one: nothing. Many in a day: read the vendor's status and the runner's other lines from the same minutes. |
@@ -2619,8 +2619,11 @@ vendor, the real ceilings after the owner's first paid run — opens a migrator 
 | `PROVIDER_TARGET_LOOPBACK_REFUSED:` / `PROVIDER_BASE_URL_TLS_REQUIRED:` / `PROVIDER_INLINE_CREDENTIAL_REFUSED:` + ref | a relay, a local or private address, cleartext, or a credential written into the file |
 | `PROVIDER_VENDOR_NOT_VETTED:` + ref | the vendor's V-9(4) record is missing or incomplete |
 | `COST_ENVELOPE_POLICY_INVALID` | the ceilings are not whole micro-units; the daily ceiling is below the per-run one plus the answer's overrun; or `serve_reserve_basis_points` is not a whole number from 0 to 9999, or `serve_overrun_basis_points` not one from 0 to 10000; or the budget rule's three members are not all present or all absent, or one is out of range (`admission_close_basis_points` from 5000 to 10000, `finish_up_to_basis_points` from 10000 to 20000, `waiting_line_per_person` from 1 to 10) |
-| `STORY_DAILY_CEILING_INSUFFICIENT` | the daily ceiling holds one debate but not its verdict story too (the story's code-owned cap and margin, 0.06 USD); raise `daily_ceiling_micros` |
+| `STORY_DAILY_CEILING_INSUFFICIENT` | the daily ceiling holds one debate but not its verdict story too (the story's code-owned cap and margin); raise `daily_ceiling_micros` |
 | `RUN_CEILING_BELOW_ONE_CALL` | with the budget rule's three members in `costEnvelopePolicy`, the arguing ceiling cannot pay for the opening position's call at the cheapest price among one plan's models, priced on `providerTargets` (the start-up check, "The boot check" under the cost envelopes above); raise `per_run_ceiling_micros` or lower `serve_reserve_basis_points` |
+| `HOSTED_REGISTER_ROW_MISSING:billingPlans` / `HOSTED_REGISTER_ROW_MISSING:abuseLimits` | R22 decision 18: the code holds only made-up limits, so the file must carry the real ones. Add the member (`deploy/vps/register/README.md`); keep the file on the server, never in the repository |
+| `HOSTED_REGISTER_BILLING_PLANS_MADE_UP` | billing is on and a plan still has a monthly credit of the code's made-up row, as a copy of the example does: put your real limits in the file |
+| `ABUSE_LIMITS_INVALID` / `ABUSE_LIMITS_UNRESOLVED` | the `abuseLimits` member is malformed, or the API's register version has no such row, so the API refuses to start: publish a version from a file that carries it |
 | `BILLING_PLANS_INVALID` / `BILLING_POLICY_INVALID` | a billing row in the file is not the register's shape: prices in whole cents, plans FREE, PLUS, PRO, MAX in price order; the policy is strict (no payment environment, no owner address: the environment follows `NETOPIA_API_BASE_URL`) |
 | `BILLING_REQUIRES_ENVELOPE_MEMBERS` / `BILLING_PLANS_UNRESOLVED` | billing is switched on without the three budget members in `costEnvelopePolicy`, or without plans |
 | `ASK_ROOM_ADMISSION_UNSEALED` | the file seals the band (the budget rule's three members in `costEnvelopePolicy`) without `askRoomReads`, the room read's budget. Refused by the plan (a dry run included), by the publish's boot check as `HOSTED_REGISTER_BOOT_CHECK_FAILED:ASK_ROOM_ADMISSION_UNSEALED`, and when the API starts. Add `askRoomReads` to the same file (go-live line 13, "Publishing them" under the cost envelopes above) |
@@ -3206,7 +3209,8 @@ on every billing page, with the exact text "IP Geolocation by DB-IP", linking to
 
 The hosted register file (§11) has four billing members:
 
-- `billingPlans`: the prices and monthly credits;
+- `billingPlans`: the prices and monthly credits. Required (R22 decision 18): the real limits live only in your file on
+  the server;
 - `billingPolicy`: `enabled`, the retry days and the withdrawal days. Never shorten `dunning_retry_days` while any plan
   is PAST_DUE (a spent dunning then ends at once, before the retry date its last email promised);
 - `countryPolicy`: each country's two switches (left out, that version has no country gate at all, and billing
@@ -3214,7 +3218,8 @@ The hosted register file (§11) has four billing members:
 - `taxAuthorities`: where each tax is paid, for the summary.
 
 The kit's example (`deploy/vps/register/hosted-register.example.json`) carries `billingPlans` and `billingPolicy`
-with the spec's values and billing **off**: copy those two into `/etc/debateai/register/hosted-register.json`. It
+with made-up limits and billing **off**: copy those two into `/etc/debateai/register/hosted-register.json` and write your
+real limits over the made-up ones. It
 also carries `taxAuthorities`, equal to the code-owned text; copy that member only to correct the text (the register
 README's `taxAuthorities` row says what carrying it costs). `countryPolicy` is not in that example: it lives in
 `deploy/vps/register/country-policy.example.json`, and goes into the hosted file only once every condition of §5

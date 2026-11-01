@@ -4,6 +4,7 @@ import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync,
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { TEST_OWNER_LIMIT_ROWS } from '../support/hostedRegisterRows.js';
 const tool = await import('../../deploy/' + 'preview-release/v1/release-artifacts.mjs');
 const manifestModule = await import('../../deploy/' + 'preview-auth-dev/v1/source-manifest.mjs');
 const plans = await import('../../deploy/' + 'preview-auth-dev/v1/launch-plan.mjs');
@@ -1150,22 +1151,24 @@ describe('native-plan: the hosted preview (publish kit v3, owner rulings 2026-10
   const observedAt = '2026-10-13T12:00:00.000Z';
   const newId = '44444444-4444-4444-8444-444444444444';
   const operatorDigest = manifestModule.operatorManifestSha256(sourceManifest('api'));
-  /** The owner's suggested ceilings (pending confirmation): $3 per debate, $10 per day; the kit's example room-read budget. */
-  const HOSTED = { billing: 'off', perRunCeilingMicros: 3_000_000, dailyCeilingMicros: 10_000_000, askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 } };
+  /** Made-up owner's inputs: the ceilings, the kit's example room-read budget, and his plans and abuse limits (R22 decision 18). */
+  const HOSTED = { billing: 'off', perRunCeilingMicros: 3_300_000, dailyCeilingMicros: 11_000_000, askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 }, ...TEST_OWNER_LIMIT_ROWS };
   const HOSTED_ON = { ...HOSTED, billing: 'on' };
   const BAD_HOSTED: [string, unknown][] = [
     ['billing as a boolean', { ...HOSTED, billing: true }],
     ['billing in upper case', { ...HOSTED, billing: 'ON' }],
-    ['a per-run ceiling above the day', { ...HOSTED, perRunCeilingMicros: 10_000_001 }],
+    ['a per-run ceiling above the day', { ...HOSTED, perRunCeilingMicros: 11_000_001 }],
     ['a zero day', { ...HOSTED, dailyCeilingMicros: 0 }],
-    ['a ceiling as text', { ...HOSTED, perRunCeilingMicros: '3000000' }],
-    ['a fractional ceiling', { ...HOSTED, perRunCeilingMicros: 2_999_999.5 }],
+    ['a ceiling as text', { ...HOSTED, perRunCeilingMicros: '3300000' }],
+    ['a fractional ceiling', { ...HOSTED, perRunCeilingMicros: 3_299_999.5 }],
     ['a day past the sanity bound', { ...HOSTED, dailyCeilingMicros: 200_000_001 }],
     ['a run past the sanity bound', { ...HOSTED, perRunCeilingMicros: 50_000_001, dailyCeilingMicros: 200_000_000 }],
     ['the room read in the register spelling', { ...HOSTED, askRoomReads: { key: 'owner', limit: 60, window_ms: 60_000, capacity: 65_536 } }],
     ['the room read without its window', { ...HOSTED, askRoomReads: { limit: 60, capacity: 65_536 } }],
     ['a room-read capacity past the register bound', { ...HOSTED, askRoomReads: { ...HOSTED.askRoomReads, capacity: 1_048_577 } }],
-    ['a missing key', { billing: 'off', perRunCeilingMicros: 3_000_000, askRoomReads: HOSTED.askRoomReads }],
+    ['a missing key', { billing: 'off', perRunCeilingMicros: 3_300_000, askRoomReads: HOSTED.askRoomReads, ...TEST_OWNER_LIMIT_ROWS }],
+    ['no plans', { billing: 'off', perRunCeilingMicros: 3_300_000, dailyCeilingMicros: 11_000_000, askRoomReads: HOSTED.askRoomReads, abuseLimits: TEST_OWNER_LIMIT_ROWS.abuseLimits }],
+    ['no abuse limits', { billing: 'off', perRunCeilingMicros: 3_300_000, dailyCeilingMicros: 11_000_000, askRoomReads: HOSTED.askRoomReads, billingPlans: TEST_OWNER_LIMIT_ROWS.billingPlans }],
     ['an extra key', { ...HOSTED, stageClockOffsetDays: 31 }],
     ['null', null],
     ['an array', [HOSTED]]
@@ -1200,14 +1203,14 @@ describe('native-plan: the hosted preview (publish kit v3, owner rulings 2026-10
     expect(t.plan).toEqual({ ...oldNativePlan(), operation: 'plan', sourceRoot: NEW_ROOT.api, sourceRevision: newRevision, sourceTree: newTree,
       sourceManifest: { path: t.source.path, sha256: t.source.sha256 }, operatorManifestSha256: operatorDigest,
       selectedBaseRegisterVersion: '12', selectedBaseSnapshotSha256: t.live.snapshotSha256, approval: null, hostedBilling: HOSTED });
-    expect(Object.keys(t.plan.hostedBilling)).toEqual(['billing', 'perRunCeilingMicros', 'dailyCeilingMicros', 'askRoomReads']);
+    expect(Object.keys(t.plan.hostedBilling)).toEqual(['billing', 'perRunCeilingMicros', 'dailyCeilingMicros', 'askRoomReads', 'billingPlans', 'abuseLimits']);
     expect(operator.validateNativePlan(t.plan)).toEqual(t.plan);
-    const typed = JSON.stringify({ askRoomReads: { capacity: 65_536, windowMs: 60_000, limit: 60 }, dailyCeilingMicros: 10_000_000, perRunCeilingMicros: 3_000_000, billing: 'off' });
+    const typed = JSON.stringify({ abuseLimits: TEST_OWNER_LIMIT_ROWS.abuseLimits, billingPlans: TEST_OWNER_LIMIT_ROWS.billingPlans, askRoomReads: { capacity: 65_536, windowMs: 60_000, limit: 60 }, dailyCeilingMicros: 11_000_000, perRunCeilingMicros: 3_300_000, billing: 'off' });
     expect(read(await run(t.nativePlan('plan', ['--hosted-billing', typed]).with(-1, join(t.s.art, 'native-plan-typed.json')), t.s.layout))).toEqual(t.plan);
     const proposal = t.proposalOf();
     expect(proposal.composer).toBe('preview-register-composer-v3');
     expect(proposal.addedKeys).toEqual(['costEstimateStartPolicy', 'storyCostEnvelopePolicy']);
-    expect(proposal.changedKeys).toEqual(['admissionPolicy', 'costEnvelopePolicy', 'nodeRuntimeVersion']);
+    expect(proposal.changedKeys).toEqual(['abuseLimits', 'admissionPolicy', 'billingPlans', 'costEnvelopePolicy', 'nodeRuntimeVersion']);
   });
 
   it('publish carries the inputs on; verify after publish carries them so a restart composes from the hosted base with kit v3', async () => {
@@ -1217,7 +1220,7 @@ describe('native-plan: the hosted preview (publish kit v3, owner rulings 2026-10
     expect(read(publishPlan)).toEqual({ ...t.plan, operation: 'publish', publicationId: newId,
       approval: { runtimeObservedAt: observedAt, baseRegisterVersion: '12', baseSnapshotSha256: t.snapshot.baseSnapshotSha256, snapshotSha256: t.snapshot.snapshotSha256, deltaSha256: t.snapshot.deltaSha256 } });
     expect(read(publishPlan).hostedBilling).toEqual(HOSTED_ON);
-    expect(t.proposalOf().changedKeys).toEqual(['admissionPolicy', 'billingPolicy', 'costEnvelopePolicy', 'nodeRuntimeVersion']);
+    expect(t.proposalOf().changedKeys).toEqual(['abuseLimits', 'admissionPolicy', 'billingPlans', 'billingPolicy', 'costEnvelopePolicy', 'nodeRuntimeVersion']);
     const published = t.s.write(join(t.s.art, 'native-publish.json'), `${JSON.stringify(attestation({ publication: t.newPublication }))}\n`);
     const verify = read(await run(t.nativePlan('verify', ['--publication', published.path], publishPlan.path), t.s.layout));
     expect(verify).toEqual({ ...read(publishPlan), operation: 'verify', approval: { ...read(publishPlan).approval, publication: t.newPublication } });
@@ -1252,7 +1255,7 @@ describe('native-plan: the hosted preview (publish kit v3, owner rulings 2026-10
 
   it.each([
     ['text that is not JSON', 'plan', ['--hosted-billing', 'billing=on']],
-    ['JSON with a duplicate key', 'plan', ['--hosted-billing', '{"billing":"on","billing":"off","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}']],
+    ['JSON with a duplicate key', 'plan', ['--hosted-billing', '{"billing":"on","billing":"off","perRunCeilingMicros":3300000,"dailyCeilingMicros":11000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}']],
     ...BAD_HOSTED.map(([name, value]) => [name, 'plan', ['--hosted-billing', JSON.stringify(value)]] as [string, string, string[]]),
     ['the option on verify', 'verify', ['--hosted-billing', JSON.stringify(HOSTED)]],
     ['the option on apply-and-plan', 'apply-and-plan', ['--hosted-billing', JSON.stringify(HOSTED)]]

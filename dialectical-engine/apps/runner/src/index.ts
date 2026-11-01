@@ -410,7 +410,7 @@ export const ENVELOPE_STOP_CODES = Object.freeze({
   DAILY_COST_ENVELOPE_REACHED: "DAILY",
   /**
    * B9 (budget spec §2.9, paid-plans spec §2.4.1): one of the run owner's
-   * allowance windows would be crossed at its finish edge (110%). Its OWN
+   * allowance windows would be crossed at its finish edge. Its OWN
    * kind, for ruling R-C's reason: it is lifted by the person's window
    * resetting or a larger plan, not by the site's day or the run's ceiling.
    */

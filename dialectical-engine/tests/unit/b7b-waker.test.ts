@@ -779,7 +779,7 @@ describe("B7b AskRoom.startWaiting decides like an admission, under the same loc
       personAllowance: {
         read: async () => [{
           scope: "PERSON_MONTH", limitMicros: 1_000, periodStart: new Date("2026-09-15T00:00:00.000Z"),
-          resetsAt: MONTH_RESET, finishBasisPoints: 11_000, closeBasisPoints: 9_500
+          resetsAt: MONTH_RESET, finishBasisPoints: 12_100, closeBasisPoints: 9_500
         }]
       },
       entitlements: input.entitlements ?? null,

@@ -15,10 +15,10 @@ import { TEST_APP_ORIGIN } from "../support/httpSession.js";
 const NOW = new Date("2026-10-01T10:00:00.000Z");
 /** testBillingPlans' prices (the regional fixture shares them): every plan in every currency. */
 const PLANS_ANSWER = [
-  { plan_id: "FREE", net_prices: { USD: "0.00", EUR: "0.00", RON: "0.00" }, allowance_vs_plus: "0.04" },
+  { plan_id: "FREE", net_prices: { USD: "0.00", EUR: "0.00", RON: "0.00" }, allowance_vs_plus: "0.05" },
   { plan_id: "PLUS", net_prices: { USD: "20.00", EUR: "20.00", RON: "100.00" }, allowance_vs_plus: "1" },
-  { plan_id: "PRO", net_prices: { USD: "50.00", EUR: "50.00", RON: "250.00" }, allowance_vs_plus: "4" },
-  { plan_id: "MAX", net_prices: { USD: "200.00", EUR: "200.00", RON: "1000.00" }, allowance_vs_plus: "30" }
+  { plan_id: "PRO", net_prices: { USD: "50.00", EUR: "50.00", RON: "250.00" }, allowance_vs_plus: "5" },
+  { plan_id: "MAX", net_prices: { USD: "200.00", EUR: "200.00", RON: "1000.00" }, allowance_vs_plus: "33.33" }
 ] as const;
 const billing = (): BillingRouteOptions => ({
   plans: testBillingPlans, legal: { requiresReacceptance: async () => false }, clock: () => NOW
@@ -42,10 +42,10 @@ describe("P8a GET /v1/billing/plans", () => {
     const response = await api.inject({ method: "GET", url: "/v1/billing/plans" });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ currency: "USD", plans: PLANS_ANSWER });
-    expect(response.body).not.toMatch(/credit|5\.00|150\.00|0\.20/);
+    expect(response.body).not.toMatch(/credit|6\.60|220\.00|0\.33/);
     expect(BillingPlansResponseSchema.safeParse({
       ...response.json<Record<string, unknown>>(),
-      plans: [{ plan_id: "PLUS", net_prices: PLANS_ANSWER[1]!.net_prices, allowance_vs_plus: "1", credit: "5.00" }]
+      plans: [{ plan_id: "PLUS", net_prices: PLANS_ANSWER[1]!.net_prices, allowance_vs_plus: "1", credit: "6.60" }]
     }).success).toBe(false);
     // Part C: one price per plan is gone; every plan carries all three.
     expect(BillingPlansResponseSchema.safeParse({
@@ -284,6 +284,7 @@ describe("side-by-side C7 the billing runtime's loops run only while the release
     const query = async () => { touches.count += 1; throw new Error("COUNTING_POOL_ANSWERS_NOTHING"); };
     const pool = { query, connect: query } as unknown as BillingRuntimeDeps["pool"];
     const runtime = createBillingRuntime({
+      cancelLinksPerDay: 11,
       pool,
       connectors: {
         payments: {}, noticeTrust: {}, paymentEnvironment: "sandbox", tax: {}, invoiceRo: {}, recordsKey: Buffer.alloc(32, 7),

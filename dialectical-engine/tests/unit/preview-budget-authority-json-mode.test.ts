@@ -46,13 +46,13 @@ describe('production preview spending guard optional JSON mode', () => {
     const result = runPython('tests/unit/preview_budget_authority_v3_test.py', 30000);
     const last = result.stderr.split('\n').filter(line => line.trim()).slice(-12).join(' | ');
     expect(result.status, `status=${result.status} signal=${result.signal} ${String(result.error ?? '')} LAST: ${last}\n${result.stderr.slice(-6000)}`).toBe(0);
-    expect(result.stderr).toContain('Ran 153 tests');
+    expect(result.stderr).toContain('Ran 160 tests');
     expect(summaryLine(result.stderr)).toBe('OK');
   });
   it('checks the reviewed gate v3 systemd files and the enabled-model start check offline', () => {
     const result = runPython('tests/unit/preview_gate_v3_unit_test.py', 10000);
     expect(result.status, result.stderr).toBe(0);
-    expect(result.stderr).toContain('Ran 15 tests');
+    expect(result.stderr).toContain('Ran 16 tests');
     expect(summaryLine(result.stderr)).toBe('OK');
   });
   it('runs the Anthropic profile: parity, both price steps, usage shapes, unbilled errors and probe offline', () => {
@@ -75,7 +75,7 @@ describe('production preview spending guard optional JSON mode', () => {
     expect(summaryLine(result.stderr)).toBe('OK');
   });
   it('runs the Perplexity search profile: parity, the per-search price, closed request and reply fields, refusals and probe offline', () => {
-    // Plan 2026-10-30, task W1-1: the web search gate ($0.001 a search, a $1.00 pot, the $17.00 team total).
+    // Plan 2026-10-30, task W1-1: the web search gate ($0.001 a search, its own pot, the team total).
     const result = runPython('tests/unit/preview_budget_authority_perplexity_test.py', 30000);
     const last = result.stderr.split('\n').filter(line => line.trim()).slice(-12).join(' | ');
     expect(result.status, `status=${result.status} signal=${result.signal} ${String(result.error ?? '')} LAST: ${last}\n${result.stderr.slice(-6000)}`).toBe(0);

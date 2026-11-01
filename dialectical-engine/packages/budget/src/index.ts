@@ -81,7 +81,6 @@ export {
   askClarifyChargeWriterPresent,
   recordAskClarifyCharge,
   type AskClarifyChargeEntry,
-  INVESTIGATION_REPORT_SEAM_CEILING_MICROS,
   QUESTION_CHECK_SPEND_WRITER,
   PostgresModelSpendStore,
   assertRunCeilingCoversOneCall,

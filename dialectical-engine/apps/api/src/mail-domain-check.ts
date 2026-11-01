@@ -34,7 +34,6 @@ const MAIL_DOMAIN_CHECK_TIMEOUT_MS = 2_000;
  * lookups at someone else's name servers.
  */
 const MAIL_DOMAIN_CHECK_MAX_IN_FLIGHT = 8;
-const MAIL_DOMAIN_CHECK_MAX_PER_MINUTE = 120;
 const MINUTE_MS = 60_000;
 /**
  * Special-use names (RFC 2606, RFC 6761) are never asked about: they never resolve. In LOCAL mode they are what the
@@ -103,9 +102,7 @@ export function createMailDomainCheck(
 /** Wraps a check in the process-wide brakes above. Over a brake: UNKNOWN, and no query is sent. */
 export function limitMailDomainCheck(
   check: MailDomainCheck,
-  limits: Readonly<{ maxInFlight: number; maxPerMinute: number; now?: () => number }> = {
-    maxInFlight: MAIL_DOMAIN_CHECK_MAX_IN_FLIGHT, maxPerMinute: MAIL_DOMAIN_CHECK_MAX_PER_MINUTE
-  }
+  limits: Readonly<{ maxInFlight: number; maxPerMinute: number; now?: () => number }>
 ): MailDomainCheck {
   const now = limits.now ?? (() => Date.now());
   let inFlight = 0;
@@ -128,7 +125,7 @@ export function limitMailDomainCheck(
  * The running API's resolver: the system's DNS servers, one try each, bounded by the same deadline. One Resolver
  * per question, because `cancel()` abandons every query of its Resolver and must not cut another visitor's check.
  */
-export function systemMailDomainCheck(deploymentMode: "local" | "hosted"): MailDomainCheck {
+export function systemMailDomainCheck(deploymentMode: "local" | "hosted", maxPerMinute: number): MailDomainCheck {
   const specialUse = deploymentMode === "local" ? "ALLOW" as const : "REFUSE" as const;
   const limited = limitMailDomainCheck((domain: string) => {
     const resolver = new Resolver({ timeout: MAIL_DOMAIN_CHECK_TIMEOUT_MS, tries: 1 });
@@ -138,7 +135,7 @@ export function systemMailDomainCheck(deploymentMode: "local" | "hosted"): MailD
       resolve6: (name) => resolver.resolve6(name),
       cancel: () => resolver.cancel()
     }, MAIL_DOMAIN_CHECK_TIMEOUT_MS, specialUse)(domain);
-  });
+  }, { maxInFlight: MAIL_DOMAIN_CHECK_MAX_IN_FLIGHT, maxPerMinute });
   // A special-use name is decided without DNS, so the brakes never turn a hosted refusal into a pass.
   return async (domain: string) => specialUse === "REFUSE" && SPECIAL_USE_TOP_LEVEL.has(domain.slice(domain.lastIndexOf(".") + 1).toLowerCase())
     ? "UNDELIVERABLE" : limited(domain);

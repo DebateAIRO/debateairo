@@ -1,0 +1,27 @@
+# .github/workflows/limits-check.yml
+# R22 decision 18: the site's real limits live only on the server. This job refuses them in the text a change adds
+# (tools/limits-check.mjs). The list of real figures is the LIMITS_CHECK_LIST secret; the script never prints it, nor a line
+# that matched it. Without the secret (not added yet, or a fork's pull request, which never receives secrets) the list half
+# passes with a plain note and the shape half still runs. pull_request, never its _target form: a fork's code must never run
+# beside the secret. No dependency is installed: the script is plain Node.
+name: limits-check
+on:
+  push: { branches: [main, dev] }
+  pull_request:
+permissions: { contents: read }
+concurrency: { group: "limits-check-${{ github.ref }}", cancel-in-progress: true }
+jobs:
+  limits-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults: { run: { working-directory: dialectical-engine } }
+    steps:
+      # Full history: the check compares with the base commit.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with: { node-version: 26.8.2 }
+      - env:
+          LIMITS_CHECK_LIST: ${{ secrets.LIMITS_CHECK_LIST }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: node tools/limits-check.mjs --base "$BASE"

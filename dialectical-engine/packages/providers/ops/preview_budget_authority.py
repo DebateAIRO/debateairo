@@ -161,10 +161,11 @@ an upload an older release's debate may still ask for a row or a price the new G
 reads either as that model sitting out, never as money). Every other refusal, among them every
 failure after a reservation, is the opaque PREVIEW_TEST_AUTHORITY_STOPPED.
 
-Team total (owner, 2026-10-10; raised by owner answer M1, 2026-10-15, and by owner answer Q12, 2026-10-30): one GO's
-daily_budget_usd is at most MAX_GO_BUDGET_USD ($12.00, the DeepInfra pot), and activate (root, in a shell, so outside
-every unit's sandbox) also adds the daily_budget_usd of the other provider gates' GO files (GATE_PATHS) and refuses when
-the sum is over TEAM_TOTAL_BUDGET_USD ($17.00: DeepInfra $12.00 + Anthropic $4.00 + Perplexity $1.00).
+Team total: one GO's daily_budget_usd is at most the per-GO cap, and activate (root, in a shell, so outside every unit's
+sandbox) also adds the daily_budget_usd of the other provider gates' GO files (GATE_PATHS) and refuses when the sum is over
+the team total. Both figures live only in the root-owned settings file CAPS_PATH on the server, never in this public
+repository, and there is no default: read_caps refuses without that file (ROOT_CAPS_REQUIRED, ROOT_CAPS_INVALID), so no GO
+loads. A caller sees the opaque refusal; the codes are for the operator. A GO's author cannot move a cap by editing the GO.
 
 Probe fence: a probe refuses (PROBE_FENCE_REQUIRED) unless it runs inside the fenced transient
 unit the README gives (check_probe_fence), so a bare run never reads the key without the network
@@ -207,8 +208,8 @@ GO_SCHEMA = 'preview-provider-budget-go-v3'
 CONTROL_SCHEMA = 'preview-provider-budget-control-v3'
 DAY_SCHEMA = 'preview-provider-budget-day-v3'
 RESERVATION_OVERHEAD_BYTES = 2048  # Bytes the provider may add around the request (the app reserves the same).
-# Outer bounds on what a profile may declare as its own per-call cap and request size (DeepInfra:
-# $0.25 and 256 KiB, owner ruling 2026-10-10). A unit test pins every reviewed row under its profile's cap.
+# Outer bounds on what a profile may declare as its own per-call cap and request size: typing guards, not limits the site
+# runs at (each profile's own per-call cap, in the helper, is the real one). A unit test pins every reviewed row under it.
 MAX_PROFILE_CALL_CAP_USD = Decimal('1.00')
 MAX_PROFILE_REQUEST_BYTES = 1024 * 1024
 MAX_PRICE_USD_PER_M = Decimal('10.00')  # A price above this is a typo, not a preview model.
@@ -299,11 +300,14 @@ ENTRY_STATES = ('pending', 'settled', 'uncertain', 'released_unbilled', BOOKED_M
 # sent (socket timeouts, resets, TLS errors, a closed or cut reply). Only these are booked at the
 # reservation; anything else after the reservation stays uncertain and halts.
 BOOKABLE_TRANSPORT_FAILURES = (OSError, http.client.HTTPException)
-# Owner ruling 2026-10-10, raised by owner answer M1 (2026-10-15) and owner answer Q12 (2026-10-30): one GO may ask for at
-# most $12.00 a day (the DeepInfra pot), and the daily team total over every provider gate's pot is $17.00 (DeepInfra
-# $12.00 + Anthropic $4.00 + Perplexity $1.00; it was $16.00 before the Perplexity gate).
-MAX_GO_BUDGET_USD = Decimal('12.00')
-TEAM_TOTAL_BUDGET_USD = Decimal('17.00')  # Checked only by activate's sum over every gate's GO.
+# What one GO may ask for a day, and the daily total over every provider gate's pot, are the owner's and live only in this
+# file on the server (this repository is public): read_caps, no default here. It sits beside the GOs, and no unit hides it.
+CAPS_PATH = '/etc/debateai-v3-preview/provider-budget-caps-v1.json'
+CAPS_OWNER_UID = 0  # The offline tests' seam, with CAPS_PATH; main() never changes either.
+CAPS_SCHEMA = 'preview-provider-budget-caps-v1'
+CAPS_MEMBERS = frozenset({'schema', 'max_go_budget_usd', 'team_total_budget_usd'})
+CAPS_BYTES = 4 * 1024
+CAPS_USD_PATTERN = re.compile(r'(0|[1-9][0-9]{0,4})\.[0-9]{2}')
 TEAM_GO_BYTES = 64 * 1024
 # Every provider gate on the preview host, by GO provider: (private folder, GO file). Reviewed:
 # activate sums the other gates' GOs from here, and the probe fence checks every other gate's
@@ -658,6 +662,43 @@ def final_writer_models_valid(profile, models):
         getattr(profile.rows[model], 'final_writer_output_bound', None) is not None for model in models)
 
 
+def read_caps():
+    """(the most one GO may ask for a day, the team's daily total), read fresh from CAPS_PATH.
+
+    The custody a GO of another gate gets (other_gate_budget): a regular file (not a symlink: O_NOFOLLOW; NONBLOCK: a FIFO
+    cannot hang it) owned by root that group and others cannot write, no larger than CAPS_BYTES. It must hold exactly
+    CAPS_MEMBERS: this schema and two amounts as strings with two decimals, the per-GO cap at least one cent and at most the
+    total. Absent: ROOT_CAPS_REQUIRED. Anything else: ROOT_CAPS_INVALID. There is no default, so a server without the file
+    loads no GO at all; stop, status and halt need no GO, so they still work."""
+    try:
+        fd = os.open(CAPS_PATH, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except FileNotFoundError:
+        raise SafetyError('ROOT_CAPS_REQUIRED') from None
+    except OSError:
+        raise SafetyError('ROOT_CAPS_INVALID') from None
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != CAPS_OWNER_UID or info.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+            raise SafetyError('ROOT_CAPS_INVALID')
+        with os.fdopen(os.dup(fd), 'rb') as stream:
+            raw = stream.read(CAPS_BYTES + 1)
+        caps = json.loads(raw) if len(raw) <= CAPS_BYTES else None
+    except SafetyError:
+        raise
+    except (OSError, ValueError, TypeError, RecursionError):
+        raise SafetyError('ROOT_CAPS_INVALID') from None
+    finally:
+        os.close(fd)
+    if not (isinstance(caps, dict) and set(caps) == CAPS_MEMBERS and caps['schema'] == CAPS_SCHEMA
+            and all(isinstance(caps[name], str) and CAPS_USD_PATTERN.fullmatch(caps[name])
+                    for name in ('max_go_budget_usd', 'team_total_budget_usd'))):
+        raise SafetyError('ROOT_CAPS_INVALID')
+    max_go, total = Decimal(caps['max_go_budget_usd']), Decimal(caps['team_total_budget_usd'])
+    if not Decimal('0.01') <= max_go <= total:
+        raise SafetyError('ROOT_CAPS_INVALID')
+    return max_go, total
+
+
 def valid_go(go):
     if not isinstance(go, dict) or not GO_REQUIRED <= set(go) or not set(go) <= GO_REQUIRED | GO_OPTIONAL:
         return False
@@ -672,7 +713,7 @@ def valid_go(go):
         and isinstance(go['target_host'], str) and re.fullmatch(r'[A-Za-z0-9.-]{1,128}', go['target_host'])
         and isinstance(uids, list) and uids and all(type(uid) is int and uid >= 0 for uid in uids)
         and isinstance(budget, str) and re.fullmatch(r'(0|[1-9][0-9]?)\.[0-9]{2}', budget)
-        and Decimal('0.01') <= Decimal(budget) <= MAX_GO_BUDGET_USD
+        and Decimal('0.01') <= Decimal(budget) <= read_caps()[0]
         and _int_in(go['max_paid_posts_per_day'], 1, 5000) and _int_in(go['max_concurrent_calls'], 1, MAX_CONCURRENT_CALLS)
         and ('max_final_writer_calls' not in go or (_int_in(go['max_final_writer_calls'], 1, go['max_concurrent_calls'])
                                                     and final_writer_models_valid(profile, go['enabled_models'])))
@@ -1016,7 +1057,7 @@ def other_gate_budget(path, provider, owner_uid=0):
     budget = go.get('daily_budget_usd') if isinstance(go, dict) else None
     if not (isinstance(go, dict) and go.get('schema') == GO_SCHEMA and go.get('provider') == provider
             and isinstance(budget, str) and re.fullmatch(r'(0|[1-9][0-9]?)\.[0-9]{2}', budget)
-            and Decimal('0.01') <= Decimal(budget) <= MAX_GO_BUDGET_USD):
+            and Decimal('0.01') <= Decimal(budget) <= read_caps()[0]):
         raise SafetyError('TEAM_TOTAL_UNVERIFIABLE')
     return Decimal(budget)
 
@@ -1045,7 +1086,7 @@ def activate(private, go_path, host=None, platform=None, now=None, gate_go_paths
             > Decimal(go['daily_budget_usd']):
         raise SafetyError('CONCURRENCY_EXCEEDS_BUDGET')
     # Root runs activate in a shell, outside the units that hide the gates' GOs from each other.
-    if team_total(go, gate_go_paths, owner_uid) > TEAM_TOTAL_BUDGET_USD:
+    if team_total(go, gate_go_paths, owner_uid) > read_caps()[1]:
         raise SafetyError('TEAM_TOTAL_BUDGET_EXCEEDED')
     with TeamStore(private) as store:
         control = store.control()

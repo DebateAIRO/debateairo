@@ -51,7 +51,7 @@ emails, cancelling and withdrawal rules. Billing stays switched off until you sw
 
 ### 1.3 What stays exactly the same
 
-The plans and their credit, the daily, weekly and monthly limits with the 110% leeway, the models chosen to fit, the
+The plans and their credit, the daily, weekly and monthly limits with the <amount> leeway, the models chosen to fit, the
 tax worked out by Quaderno, one legal invoice per payment (SmartBill for Romania, Quaderno for everyone else), the
 reminders after a failed payment (after 1, 3 and 7 days), every email, cancelling, the 14-day withdrawal and its
 formula, the dispute pause, account deletion, the quarterly tax summary and the owner commands.
@@ -1175,7 +1175,7 @@ changes a price or the rule by publishing a new register version; a published ve
   "minor_units_per_unit": 1000000,
   "currency_by_country": { "default": "USD", "countries": { "RO": "RON", "AT": "EUR", "…": "…", "GB": "EUR" } },
   "plans": [
-    { "plan_id": "FREE", "tier": "free", "net_prices": { "USD": 0, "EUR": 0, "RON": 0 }, "monthly_credit_micros": 200000, "…": "…" },
+    { "plan_id": "FREE", "tier": "free", "net_prices": { "USD": 0, "EUR": 0, "RON": 0 }, "monthly_credit_micros": <the plan's limit> "…": "…" },
     { "plan_id": "PLUS", "tier": "premium", "net_prices": { "USD": 20000000, "EUR": 20000000, "RON": 100000000 }, "…": "…" }
   ]
 }

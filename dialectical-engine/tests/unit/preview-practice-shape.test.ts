@@ -42,6 +42,7 @@ import {
   practiceShapeVersionRows,
   practiceVersionRows
 } from "../../tools/preview-practice/practice-register-import.js";
+import { TEST_OWNER_LIMIT_ROWS } from "../support/hostedRegisterRows.js";
 
 const START_TEXT = readFileSync(new URL("../../tools/preview-practice/shape-policy-start.json", import.meta.url), "utf8");
 const flags = (entries: Readonly<Record<string, string>>): ReadonlyMap<string, string> => new Map(Object.entries(entries));
@@ -226,8 +227,8 @@ describe("practice debate shape: the throwaway register version", () => {
         snapshot_sha256: null, publication_kind: "GENERAL", recorded_at: null }],
       rows: base.map((entry) => ({ register_version: "12", row_key: entry.rowKey, value_json: entry.valueJsonText, source_ref: entry.sourceRef }))
     }));
-    const hosted = { billing: "off", perRunCeilingMicros: 3_000_000, dailyCeilingMicros: 10_000_000,
-      askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 } } as const;
+    const hosted = { billing: "off", perRunCeilingMicros: 3_300_000, dailyCeilingMicros: 11_000_000,
+      askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 }, ...TEST_OWNER_LIMIT_ROWS } as const;
     const policy = debateShapePolicyStartValues();
     const without = await composePracticeHostedNextRegisterVersion(document, hosted);
     expect(without.addedKeys).not.toContain(DEBATE_SHAPE_POLICY_ROW_KEY);

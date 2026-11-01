@@ -133,7 +133,7 @@ describe("B9a · the person's wall over the real ledger", () => {
       limitMicros: 100_000,
       periodStart: new Date(now.getTime() - 3_600_000),
       resetsAt: new Date(now.getTime() + 82_800_000),
-      finishBasisPoints: 11_000,
+      finishBasisPoints: 12_100,
       closeBasisPoints: 9_500
     });
     const persons: PersonAllowanceSource = { read: async () => [window] };
@@ -144,9 +144,9 @@ describe("B9a · the person's wall over the real ledger", () => {
       sharedWall: { finishBasisPoints: 11_500, persons, owners: store }
     });
 
-    // 110 000 is floor(100 000 x 110%). Another owner's run spending plenty does not count.
+    // 121 000 is floor(100 000 x a made-up 121%). Another owner's run spending plenty does not count.
     await charge(store, otherRun, "RUN", 5_000_000);
-    await charge(store, runId, "RUN", 110_000 - PROJECTED);
+    await charge(store, runId, "RUN", 121_000 - PROJECTED);
     expect(await decide(guard, runId)).toBe("ADMITTED");
     // One micro-unit of STORY spend is the owner's too.
     await charge(store, runId, "STORY", 1);
@@ -163,16 +163,16 @@ describe("B9a · the person's wall over the real ledger", () => {
       plans: billingPlansFromValue(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value, BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.sourceRef),
       closeBasisPoints: 9_500
     });
-    // Free has one window, the month. billingPlans v4 first put its edge at its limit plus a fixed 20 cents; the owner's
-    // money rule (31 Oct) changed that meaning, and this row with it: the month is a wall at its 20 cents (Free keeps no
-    // reserve inside, its 5 cents sit on top), and the 20 cents are only the tolerance for a call in flight there.
+    // Free has one window, the month. billingPlans v4 first put its edge at its limit plus a fixed overflow; the owner's
+    // money rule (31 Oct) changed that meaning, and this row with it: the month is a wall at its credit (Free keeps no
+    // reserve inside, its own sits on top), and the overflow is only the tolerance for a call in flight there. The figures are the row's made-up ones.
     const windows = await persons.read(ownerRef, new Date());
     expect(windows.map((entry) => entry.scope)).toEqual(["PERSON_MONTH"]);
     const month = windows[0]!;
-    expect([month.keepsReserveMicros, month.finishOverflowMicros]).toEqual([0, 200_000]);
+    expect([month.keepsReserveMicros, month.finishOverflowMicros]).toEqual([0, 220_000]);
     const wall = month.limitMicros - (month.keepsReserveMicros ?? 0);
-    expect(wall).toBe(200_000);
-    // The run's own ceiling stands above the 20-cent wall, so the person's month is the wall this asks.
+    expect(wall).toBe(330_000);
+    // The run's own ceiling stands above the wall, so the person's month is the wall this asks.
     const guard = new CostEnvelopeGuard({
       store,
       policy: { perRunCeilingMicros: 1_000_000, dailyCeilingMicros: 1_000_000_000 },

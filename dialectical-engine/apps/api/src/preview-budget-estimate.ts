@@ -491,7 +491,7 @@ export type PreviewPricingMode = "REALISTIC_WORST_CASE" | "CALIBRATED_ESTIMATE" 
  * THE ACTIVE PRICING MODE: REALISTIC_WORST_CASE (owner ruling, 2026-10-10, replacing the calibrated
  * average of option 2). Why, in one sentence: an average could let a debate start that then runs out
  * of money half-way, while a realistic worst case per step (64 KiB in, the full answer out) still fits
- * a whole debate in the $10.00 day, so a started debate is not cut off for money.
+ * a whole debate in the day, so a started debate is not cut off for money.
  * To switch (back to CALIBRATED_ESTIMATE, to STRICT_BOUND, or to a mode added beside these), change
  * this one constant; previewEstimatePricer and previewDebateCallCount follow it, nothing else reads it.
  * The calibrated average ignores a shaped run's writer and map step bounds, and a length receipt's guided allowance

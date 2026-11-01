@@ -440,7 +440,7 @@ describe("a member's debate, end to end at database level", () => {
   it("every kind and the clarify charge go on their grant alone, in the team's month, and on the page", async () => {
     const m = await member(), other = await member(), grantId = await give(owner, m), otherGrant = await give(owner, other), grant = (await current(m))!, runId = await pinnedRun(m, grantId);
     const before = await spentNow(), store = new PostgresModelSpendStore(runtime);
-    const guard = new CostEnvelopeGuard({ store, policy: { perRunCeilingMicros: 250000, dailyCeilingMicros: 10000000, perStoryCeilingMicros: 250000 } } as never);
+    const guard = new CostEnvelopeGuard({ store, policy: { closingCeilingMicros: 440000, perRunCeilingMicros: 250000, dailyCeilingMicros: 10000000, perStoryCeilingMicros: 250000 } } as never);
     const projection = { requestBytes: 2, completionTokenCeiling: 1 };
     for (const [, seamOf] of kinds) {
       const seam = seamOf(guard, runId), admission = await seam.assertCallAllowed(projection);

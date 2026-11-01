@@ -371,7 +371,7 @@ printed line. In a script, test it: `OUT=$(nat …); [ "$OUT" = "exit 0" ] || { 
    billing off:
 
    ```sh
-   HB_ON='{"billing":"on","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
+   HB_ON="$(jq -c '.billing="on"' /etc/debateai-v3-preview/hosted-billing-v1.json)"
    rel native-plan --operation plan --from "$S/native-plan.before.json" --source-manifest "$ART/candidate-api-source.json" --checker deepseek --deepseek-enabled-on-gate yes --hosted-billing "$HB_ON" --out "$ART/native-plan-plan.json"
    ```
 
@@ -552,6 +552,11 @@ echo "anthropic state $(/usr/bin/python3 -I /opt/debateai-v3-preview/operator/an
 
 Anything else means stop: do not publish the row until both gates run the new code.
 
+Since R22 the gate code holds no money caps: every gate reads them from the root-only caps file
+`/etc/debateai-v3-preview/provider-budget-caps-v1.json` (`deploy/preview-gate/v3/README.md`, "Money: DeepInfra's share of the
+team total"), so that file must be on the server BEFORE any gate restarts on the R22 files. Old gate code ignores it, so
+writing it first is safe. Without it the restarted gates refuse (`ROOT_CAPS_REQUIRED`) and every call stops.
+
 Then add one option to step 1's `plan` command and follow the same steps 1 to 6: the plan carries the policy, the owner
 sees `callConcurrencyPolicy` in the delta (`added` the first time, `changed` for a new value),
 `publish` copies it from the plan. The runner is the only reader of this row, so do not skip
@@ -650,13 +655,21 @@ What the repository adds for it (each in `deploy/preview-auth-dev/v1/README.md`)
 - Moving the billing clock (`BILLING_STAGE_CLOCK_OFFSET_DAYS`) stays refused (the owner is still
   deciding), so a renewal cannot be tested on this host yet.
 
-**The owner's inputs.** Decide them before step H6. Amounts are micro-dollars: $1 is `1000000`.
+**Since R22, two more inputs, always required, and a new file on the server.** `billingPlans` and `abuseLimits` hold real
+limits, so the code's rows are made up and a plan without them is refused (`PREVIEW_NATIVE_PLAN_REFUSED`). A hosted plan with
+billing on and a credit of the code's made-up row refuses too (`hosted-billing-plans-made-up`).
 
-| Input | Where it goes | The preview's value (the owner, 14 October 2026) |
+**The owner's inputs.** Decide them before step H6. Amounts are micro-dollars: $1 is `1000000`. Since R22 they live only in a
+root-owned file on the server, `/etc/debateai-v3-preview/hosted-billing-v1.json` (mode `0600`), never in this repository. It is
+the JSON object the table below describes, with `billing` set to anything: the steps set it. Every `HB` line below reads it.
+
+| Input | Where it goes | Its value |
 |---|---|---|
-| Ceiling per debate | `perRunCeilingMicros` in `--hosted-billing` | `3000000` ($3) |
-| Ceiling per day, for the whole site | `dailyCeilingMicros` in `--hosted-billing` | `10000000` ($10) |
-| The room read's budget (`GET /v1/asks/room`) | `askRoomReads` in `--hosted-billing` | `{"limit":60,"windowMs":60000,"capacity":65536}` (the hosted kit's example) |
+| Ceiling per debate | `perRunCeilingMicros` in `--hosted-billing` | your value, in the private file below |
+| Ceiling per day, for the whole site | `dailyCeilingMicros` in `--hosted-billing` | your value, in the private file below |
+| The room read's budget (`GET /v1/asks/room`) | `askRoomReads` in `--hosted-billing` | your value, in the private file below |
+| The plans, with their real limits | `billingPlans` in `--hosted-billing` | the whole `billingPlans` value; see `deploy/vps/register/hosted-register.example.json` for its shape (the example's limits are made up) |
+| The abuse limits | `abuseLimits` in `--hosted-billing` | the whole `abuseLimits` value; same shape as that example |
 | NETOPIA sandbox POS signature, API key, public key | step H6, step H5 | from NETOPIA's sandbox admin |
 | Quaderno sandbox account (its label) and API key | steps H3 and H7, step H5 | the label in `https://<label>.sandbox-quadernoapp.com/api` |
 | SmartBill series | step H7 | `DBAI` (the dummy never receives it) |
@@ -664,7 +677,7 @@ What the repository adds for it (each in `deploy/preview-auth-dev/v1/README.md`)
 
 The kit refuses a debate ceiling above the day's and, as a typing guard only, above $50 per debate or
 $200 per day (`ARGUMENTS_REFUSED` naming `--hosted-billing`). The day must also hold one full debate
-plus its story: with $3 per debate that is at least $3.66, and the plan refuses a smaller day
+plus its story, and the plan refuses a smaller day
 (`STORY_DAILY_CEILING_INSUFFICIENT`, from the API's own boot rule).
 
 ### H0. Server work this section only names
@@ -1017,12 +1030,12 @@ R18's plans), so both hosted plans carried it. The call-concurrency row is carri
 always:
 
 ```sh
-HB='{"billing":"off","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
+HB="$(jq -c '.billing="off"' /etc/debateai-v3-preview/hosted-billing-v1.json)"
 rel native-plan --operation plan --from "$S/native-plan.before.json" --source-manifest "$ART/candidate-api-source.json" --checker deepseek --deepseek-enabled-on-gate yes --hosted-billing "$HB" --out "$ART1/native-plan-plan.json"
 ```
 
 **Step 2, the owner's review.** Besides what the release itself changes, expect exactly:
-- `storyCostEnvelopePolicy` added (the story's money row: $0.05 per story, 20% over at most);
+- `storyCostEnvelopePolicy` added (the story's money row);
 - `costEnvelopePolicy` changed, reason `owner-hosted-billing-input`: the two ceilings become the
   owner's values and `provisional_reason` names them as the preview's sandbox ceilings (`provisional`
   stays `true`); every other member (the band 9500 / 11500 / 1 among them) stays;
@@ -1118,7 +1131,7 @@ Start a short debate as usual: it must finish as it did in local mode.
    ART2="$ART-billing-on"; ( set -euo pipefail; [ ! -e "$ART2" ]; install -d -o root -g root -m 0755 "$ART2"; echo "created $ART2" )
    ( set -euo pipefail; for F in api.env.before-billing-on runner.env.before-billing-on release-lock.before-billing-on.json; do [ ! -e "$S/$F" ]; done
      cp -a "$E/api.env" "$S/api.env.before-billing-on"; cp -a "$E/runner.env" "$S/runner.env.before-billing-on"; cp -a /etc/debateai-v3-preview/lifecycle/release-lock.json "$S/release-lock.before-billing-on.json"; echo "billing-off state kept" )
-   HB='{"billing":"on","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
+   HB="$(jq -c '.billing="on"' /etc/debateai-v3-preview/hosted-billing-v1.json)"
    rel native-plan --operation plan --from "$S/native-plan.before.json" --source-manifest "$ART/candidate-api-source.json" --checker deepseek --deepseek-enabled-on-gate yes --hosted-billing "$HB" --out "$ART2/native-plan-plan.json"
    ```
 
@@ -1381,7 +1394,7 @@ section is that recipe, written so that any later release can follow it.
 billing, the ceilings and the answer checker from the plan every time, never from the base:
 
 ```sh
-HB_ON='{"billing":"on","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
+HB_ON="$(jq -c '.billing="on"' /etc/debateai-v3-preview/hosted-billing-v1.json)"
 ```
 
 - Every plan carries `--hosted-billing "$HB_ON" --checker deepseek --deepseek-enabled-on-gate yes`.
@@ -1526,7 +1539,7 @@ E=/etc/debateai-v3-preview/auth-dev-v1
 NP=$E/native-plan.json
 LOCK=/etc/debateai-v3-preview/lifecycle/release-lock.json
 AU=$(systemctl show -p User --value debateai-preview-api); AGRP=$(id -gn "$AU")
-HB_ON='{"billing":"on","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
+HB_ON="$(jq -c '.billing="on"' /etc/debateai-v3-preview/hosted-billing-v1.json)"
 GD=/opt/debateai-v3-preview/operator/deepinfra-budget-v3
 PD=/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3
 GAN=/opt/debateai-v3-preview/operator/anthropic-budget-v1
@@ -1681,7 +1694,7 @@ echo A5_DONE
 set -euo pipefail
 . /root/preview-archive/rNN-names.sh
 # A8: the plan (billing-on inputs, the live checker), the native operator's proposal, the live verify plan put back at once.
-[ "$(jq -cS . <<<"$HB_ON")" = '{"askRoomReads":{"capacity":65536,"limit":60,"windowMs":60000},"billing":"on","dailyCeilingMicros":10000000,"perRunCeilingMicros":3000000}' ] || { echo "A8_NOT_DONE: HB_ON is not the billing-on JSON"; exit 1; }
+[ "$(jq -r .billing <<<"$HB_ON")" = on ] || { echo "A8_NOT_DONE: HB_ON is not the billing-on JSON"; exit 1; }
 cmp -s "$S/native-plan.before.json" "$NP" || { echo "A8_NOT_DONE: native-plan.json moved since A1"; exit 1; }
 [ "$(psqlq "SELECT count(*) FROM core.work_item WHERE state IN ('READY', 'CLAIMED')")" = 0 ] || { echo "A8_NOT_DONE: a debate is queued or running"; exit 1; }
 [ ! -e "$ART/native-plan-plan.json" ] && [ ! -e "$ART/register-proposal.json" ] || { echo "A8_NOT_DONE: an earlier plan or proposal exists (look first)"; exit 1; }
@@ -1740,7 +1753,7 @@ exactly `REV`, with the live register exported from the server (S-1), and with t
 as in S-5 and S-6):
 
 ```sh
-HB_ON='{"billing":"on","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
+HB_ON="$(jq -c '.billing="on"' /etc/debateai-v3-preview/hosted-billing-v1.json)"
 PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --depth 1 --question en-nuclear --register-next --hosted-billing "$HB_ON" --checker deepseek --deepseek-enabled-on-gate yes --transcript --out "$P/debate-report"
 ```
 
@@ -2296,7 +2309,7 @@ NP=$E/native-plan-$LABEL.json
 CAPI=/opt/debateai-v3-preview/releases/auth-dev-candidate-$LABEL-api
 ART=/opt/debateai-v3-preview/artifacts/auth-dev-$LABEL
 L=/opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1
-HB_ON='{"billing":"on","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
+HB_ON="$(jq -c '.billing="on"' /etc/debateai-v3-preview/hosted-billing-v1.json)"
 rel() { /usr/bin/env -i PATH=/usr/local/bin:/usr/bin:/bin TZ=UTC /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node "$CAPI/dialectical-engine/deploy/preview-release/v1/release-artifacts.mjs" "$@"; }
 nat() { ( cd "$CAPI/dialectical-engine" && /bin/sh -c 'exec 5<&0; p=$1; shift; printf %s "$p" 5<&- | "$@" 3<&0 0<&5 5<&-' sh '{"peerUrl":"postgresql://postgres@localhost/debateai?host=/run/debateai-v3-preview/postgresql&port=5434"}' /usr/sbin/runuser -u postgres -- /usr/bin/env -i PATH=/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin:/usr/local/bin:/usr/bin:/bin LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node "$CAPI/dialectical-engine/deploy/preview-auth-dev/v1/native-operator.mjs" --credential-fd 3 < /dev/null > "$1" ); echo "exit $?"; }
 put() { install -o root -g root -m 0644 "$1" "$NP.new" && mv "$NP.new" "$NP" && cmp "$1" "$NP"; }
@@ -3127,7 +3140,7 @@ ONP=$E/native-plan.json
 LOCK=/etc/debateai-v3-preview/lifecycle/release-lock.json
 C=/etc/debateai-v3-preview/public/Caddyfile
 EDGE=/etc/debateai-v3-preview/ui-edge.caddy.secret
-HB_ON='{"billing":"on","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
+HB_ON="$(jq -c '.billing="on"' /etc/debateai-v3-preview/hosted-billing-v1.json)"
 GD=/opt/debateai-v3-preview/operator/deepinfra-budget-v3
 PD=/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3
 GAN=/opt/debateai-v3-preview/operator/anthropic-budget-v1
@@ -3182,7 +3195,7 @@ set -euo pipefail
 . /root/preview-archive/rNN-names.sh
 # TA8: the plan (billing-on inputs, the live checker) and the native operator's proposal, in T's own native-plan file.
 REG0=$(cat "$S/register-before")
-[ "$(jq -cS . <<<"$HB_ON")" = '{"askRoomReads":{"capacity":65536,"limit":60,"windowMs":60000},"billing":"on","dailyCeilingMicros":10000000,"perRunCeilingMicros":3000000}' ] || { echo "TA8_NOT_DONE: HB_ON is not the billing-on JSON"; exit 1; }
+[ "$(jq -r .billing <<<"$HB_ON")" = on ] || { echo "TA8_NOT_DONE: HB_ON is not the billing-on JSON"; exit 1; }
 cmp -s "$S/native-plan.before.json" "$ONP" || { echo "TA8_NOT_DONE: the live native-plan.json moved since TA1"; exit 1; }
 [ ! -e "$NP" ] || { echo "TA8_NOT_DONE: $NP exists (look first)"; exit 1; }
 [ ! -e "$ART/native-plan-plan.json" ] && [ ! -e "$ART/register-proposal.json" ] || { echo "TA8_NOT_DONE: an earlier plan or proposal exists (look first)"; exit 1; }
@@ -4130,7 +4143,7 @@ ONP=$E/native-plan-$OLABEL.json
 LOCK=/etc/debateai-v3-preview/lifecycle/release-lock.json
 C=/etc/debateai-v3-preview/public/Caddyfile
 EDGE=/etc/debateai-v3-preview/ui-edge.caddy.secret
-HB_ON='{"billing":"on","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
+HB_ON="$(jq -c '.billing="on"' /etc/debateai-v3-preview/hosted-billing-v1.json)"
 GD=/opt/debateai-v3-preview/operator/deepinfra-budget-v3
 PD=/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3
 GAN=/opt/debateai-v3-preview/operator/anthropic-budget-v1
@@ -4196,7 +4209,7 @@ As "The practice" of the hosted-base recipe, on exactly `REV`, with the live reg
 quiet hour (it shares the gates' slots and daily pots with users, and counts toward the cap of 8 debates):
 
 ```sh
-HB_ON='{"billing":"on","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
+HB_ON="$(jq -c '.billing="on"' /etc/debateai-v3-preview/hosted-billing-v1.json)"
 PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --depth 1 --question en-nuclear --register-next --hosted-billing "$HB_ON" --checker deepseek --deepseek-enabled-on-gate yes --transcript --out "$P/debate-report"
 ```
 
@@ -4213,7 +4226,7 @@ set -euo pipefail
 # SB3: the plan (billing-on inputs, the live checker) and the native operator's proposal, in the new release's own native-plan file.
 LINEUP=''                                                 # the first upload with the line-up row (T+1) only: "$ART/line-up.json"; else empty
 REG0=$(cat "$S/register-before"); AV=$(cat "$S/active-before"); OSITE=${OKEY%%-*}; OSITE=${OSITE#r}
-[ "$(jq -cS . <<<"$HB_ON")" = '{"askRoomReads":{"capacity":65536,"limit":60,"windowMs":60000},"billing":"on","dailyCeilingMicros":10000000,"perRunCeilingMicros":3000000}' ] || { echo "SB3_NOT_DONE: HB_ON is not the billing-on JSON"; exit 1; }
+[ "$(jq -r .billing <<<"$HB_ON")" = on ] || { echo "SB3_NOT_DONE: HB_ON is not the billing-on JSON"; exit 1; }
 cmp -s "$S/native-plan.before.json" "$ONP" || { echo "SB3_NOT_DONE: the old release's verify plan moved since SB1"; exit 1; }
 [ ! -e "$NP" ] || { echo "SB3_NOT_DONE: $NP exists (look first)"; exit 1; }
 [ ! -e "$ART/native-plan-plan.json" ] && [ ! -e "$ART/register-proposal.json" ] || { echo "SB3_NOT_DONE: an earlier plan or proposal exists (look first)"; exit 1; }

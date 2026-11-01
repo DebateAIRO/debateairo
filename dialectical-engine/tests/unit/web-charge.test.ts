@@ -104,16 +104,16 @@ describe("W2-2 · the search seam writes one RUN row per successful search", () 
   });
 
   it("is walled by the person's windows at their edges, like any call made while arguing", async () => {
-    const day: PersonWindow = Object.freeze({ scope: "PERSON_DAY", limitMicros: 1_000_000, periodStart: new Date("2026-10-30T00:00:00.000Z"),
-      resetsAt: new Date("2026-10-31T00:00:00.000Z"), finishBasisPoints: 10_000, finishOverflowMicros: 200_000, closeBasisPoints: 9_500 });
+    const day: PersonWindow = Object.freeze({ scope: "PERSON_DAY", limitMicros: 1_100_000, periodStart: new Date("2026-10-30T00:00:00.000Z"),
+      resetsAt: new Date("2026-10-31T00:00:00.000Z"), finishBasisPoints: 10_000, finishOverflowMicros: 220_000, closeBasisPoints: 9_500 });
     const at = (ownerSpent: number) => {
       const owners: RunOwnerSpendReader = { readRunChargeOwnerRef: async () => "owner-1", readOwnerSpentMicros: async () => ownerSpent };
       const persons: PersonAllowanceSource = { read: async () => [day] };
       return new CostEnvelopeGuard({ store: store().spend, policy: POLICY, clock: () => NOW,
         sharedWall: { finishBasisPoints: null, persons, owners } }).searchSeam({ runId: "run-1" }).assertSearchAllowed();
     };
-    expect(await code(at(1_200_000 - 1_000))).toBe("ADMITTED");
-    expect(await code(at(1_200_000 - 999))).toBe("PERSON_ALLOWANCE_REACHED");
+    expect(await code(at(1_320_000 - 1_000))).toBe("ADMITTED");
+    expect(await code(at(1_320_000 - 999))).toBe("PERSON_ALLOWANCE_REACHED");
   });
 
   it("counts the search in flight at its price until it is recorded, and releases a refused one", async () => {

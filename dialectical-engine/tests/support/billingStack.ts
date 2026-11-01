@@ -390,6 +390,7 @@ export async function startBillingStack(): Promise<BillingStack> {
     connectors,
     policy: testBillingPolicy,
     plans: testBillingPlans,
+    cancelLinksPerDay: 11,
     countryPolicy,
     geo,
     dekStore: deks,

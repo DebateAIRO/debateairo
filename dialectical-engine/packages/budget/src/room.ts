@@ -137,7 +137,7 @@ export function decideSharedWall(input: Readonly<{
   projectedMicros: number;
   limitMicros: number;
   finishBasisPoints: number;
-  /** billingPlans v4: a fixed amount past the share edge (20 cents); absent is none. */
+  /** billingPlans v4: a fixed amount past the share edge; absent is none. */
   finishOverflowMicros?: number;
 }>): Wall {
   const spent = wholeMicros(input?.spentMicros, "BUDGET_WALL_SPENT_INVALID");
@@ -248,8 +248,8 @@ export function decideAdmission(input: Readonly<{
 //  2. Running work is never stopped by the day or week: what it uses past them is BORROWED from the next day or week,
 //     which starts lower by that much. New starts wait for the reset.
 //  3. The month is the wall: no new start, and a running debate's remaining planned calls and searches pause. Only the
-//     calls already in flight may finish, within the month's tolerance (the old fixed 20-cent overflow).
-//  4. The final-answer reserve is always kept: a paid plan's 20 cents inside its month.
+//     calls already in flight may finish, within the month's tolerance (the old fixed overflow).
+//  4. The final-answer reserve is always kept: a paid plan's reserve inside its month.
 // ---------------------------------------------------------------------------------------------------------------------
 
 /**
@@ -328,7 +328,7 @@ export function startLimitMicros(window: Readonly<{ limitMicros: number; keepsRe
  * THE MONTH WALL for one call while a debate is argued (money rule point 3). The wall's edge is the month's limit less
  * the reserve kept inside it. A call is WITHIN when the month (real spend plus the run's other calls in flight, both in
  * `spentMicros`) is still below that edge, AND its own projected maximum stays within the edge plus the tolerance for
- * calls in flight (billingPlans v4's `finish_overflow_micros`, 20 cents). Otherwise it WOULD_CROSS: the runner pauses
+ * calls in flight (billingPlans v4's `finish_overflow_micros`). Otherwise it WOULD_CROSS: the runner pauses
  * the debate's remaining planned work instead of sending it.
  */
 export function decideMonthWall(input: Readonly<{

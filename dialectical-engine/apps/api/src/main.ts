@@ -99,6 +99,7 @@ import {
   readMfaPolicy,
   readProductRolePolicy,
   readPublicationCheckPolicy,
+  readAbuseLimits,
   readQuestionCheckPolicy,
   readSupportNoSourceCheckPolicy,
   supportNoSourceCheckPolicyStartValues,
@@ -692,7 +693,10 @@ const siteAdmission = await loadAdmissionSettings(pool, environment.REGISTER_VER
  */
 const askClarifyDayCeiling = siteAdmission.costEnvelope?.guardPolicy.dailyCeilingMicros ?? null;
 const askClarifyWriter = await boot.run("ask-clarify-writer", () => onOwnConnections(() => askClarifyChargeWriterPresent(pool)));
+// R22 decision 18: the abuse limits are the register's, on the server's own row; a version without it refuses here (ABUSE_LIMITS_UNRESOLVED).
+const abuseLimits = await boot.run("abuse-limits", () => readAbuseLimits(pool, environment.REGISTER_VERSION));
 const askClarify = await boot.run("ask-clarify", async () => createAskClarify({
+  limits: abuseLimits.askClarify,
   transportFor: !askClarifyWriter || (previewGate === undefined && askClarifyDayCeiling === null) ? null : askClarifyTransportFor(await questionLanguageSiteRoute({
     mode: environment.DEPLOYMENT_MODE,
     policy: ASK_CLARIFY_ROUTE_POLICY,
@@ -958,7 +962,7 @@ const socialProviders = (()=>{try{return new SocialProviders(socialConfiguration
 const socialRepository = new PostgresSocialIdentityRepository(authorizationPool,auditContextHasher,pool);
 // Open sign-up mail (owner decision G5, 2026-10-09): the DNS question at the three entry points, 2 s, fail open.
 // Ruling 2026-10-09: outside local mode the special-use endings (.test .example .invalid .localhost) are refused.
-const mailDomainCheck = systemMailDomainCheck(environment.DEPLOYMENT_MODE);
+const mailDomainCheck = systemMailDomainCheck(environment.DEPLOYMENT_MODE, abuseLimits.mailDomainChecksPerMinute);
 const registration = new RegistrationService({
   repository: identityRepository,
   socialRepository,
@@ -1654,6 +1658,7 @@ const billingRuntime = billingConnectors === null
         payments: new TimeShiftedCardPayments(billingConnectors.payments, stageOffsetDays)
       });
     return createBillingRuntime({
+      cancelLinksPerDay: abuseLimits.cancelLinksPerDay,
       pool: crossAccountPool(pool, "X11"), connectors: runtimeConnectors, policy: billingPolicy, plans: billingPlans, countryPolicy,
       geo: geoLookup, legal, dekStore,
       // P17 (spec §2.5.10): the EMAIL jobs send through the same sendmail path, sender and timeout as the mail above.
@@ -1805,6 +1810,7 @@ const api = buildApi({
   purposeLines: postgresPurposeLines(pool),
   // Decision 13 (0147): digs and reports on a public debate, by anyone with credit, read from the public copy.
   ...(publications === undefined ? {} : { publicFlags: {
+    limits: abuseLimits.publicFlag,
     repository: publicFlagRepository, judge: publicationJudgeSwitch.current,
     seal: (publicationRef: string, runId: string, value: unknown) => publications.withReviewKey(publicationRef, runId, (cipher) => cipher.encrypt(value)),
     readPublicDebate: (publicationRef: string) => publications.readPublicDebate(publicationRef),

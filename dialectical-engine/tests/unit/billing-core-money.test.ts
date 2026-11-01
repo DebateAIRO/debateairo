@@ -69,7 +69,7 @@ describe("P2 — upgrade proration", () => {
 describe("P2 — withdrawal refund (the larger of days used or credit used)", () => {
   const base = {
     paidTotalMicros: 24_200_000, periodStart: start, periodEnd: end30,
-    creditSpentMicros: 0, monthlyCreditMicros: 5_000_000
+    creditSpentMicros: 0, monthlyCreditMicros: 6_600_000
   };
   it("refunds the unused share of the period to the millisecond, floored to cents (a started day is NOT a used day)", () => {
     expect(withdrawalRefundMicros({ ...base, now: start })).toBe(24_200_000);
@@ -79,11 +79,11 @@ describe("P2 — withdrawal refund (the larger of days used or credit used)", ()
     expect(withdrawalRefundMicros({ ...base, now: plus30(10 * day) })).toBe(16_130_000);
   });
   it("uses the credit share when it is larger", () => {
-    expect(withdrawalRefundMicros({ ...base, now: plus30(1), creditSpentMicros: 2_500_000 })).toBe(12_100_000);
-    expect(withdrawalRefundMicros({ ...base, now: plus30(1), creditSpentMicros: 4_999_999 })).toBe(0);
+    expect(withdrawalRefundMicros({ ...base, now: plus30(1), creditSpentMicros: 3_300_000 })).toBe(12_100_000);
+    expect(withdrawalRefundMicros({ ...base, now: plus30(1), creditSpentMicros: 6_599_999 })).toBe(0);
   });
   it("never goes below zero: leeway spending, the period's end, or later", () => {
-    expect(withdrawalRefundMicros({ ...base, now: plus30(1), creditSpentMicros: 5_500_000 })).toBe(0);
+    expect(withdrawalRefundMicros({ ...base, now: plus30(1), creditSpentMicros: 7_260_000 })).toBe(0);
     expect(withdrawalRefundMicros({ ...base, now: end30 })).toBe(0);
     expect(withdrawalRefundMicros({ ...base, now: plus30(45 * day) })).toBe(0);
   });
@@ -107,14 +107,14 @@ describe("W6 (P2-I8) — withdrawal refund per paid transaction, each over the d
   const plus = { paidMicros: 24_200_000, coverageStart: start, coverageEnd: end30 };
   const max = { paidMicros: 123_420_000, coverageStart: plus30(13 * day), coverageEnd: end30 };
   const withdrewAt = plus30(13.5 * day);
-  // A6: the month credit in force after the upgrade, Plus's 5.00 plus Max's extra 145.00 for the 17 days left.
+  // A6: the month credit in force after the upgrade, on made-up credits: Plus's 6.60 plus Max's extra 213.40 for the 17 days left.
   const creditAfterUpgrade = upgradeMonthCreditOverrideMicros({
-    currentMonthCreditMicros: 5_000_000, oldPlanCreditMicros: 5_000_000, newPlanCreditMicros: 150_000_000,
+    currentMonthCreditMicros: 6_600_000, oldPlanCreditMicros: 6_600_000, newPlanCreditMicros: 220_000_000,
     periodStart: start, periodEnd: end30, at: plus30(13 * day)
   });
 
   it("refunds each payment the share of its own days still unused: 13.31 of Plus and 119.79 of Max", () => {
-    expect(creditAfterUpgrade).toBe(87_166_666);
+    expect(creditAfterUpgrade).toBe(127526666);
     // Plus keeps 13.5 of 30 days (10.89); Max keeps half a day of its 17 (123.42 × 0.5/17 ≈ 3.63).
     expect(withdrawalRefundPerPaymentMicros({
       payments: [plus, max], now: withdrewAt, creditSpentMicros: 0, monthlyCreditMicros: creditAfterUpgrade
@@ -126,12 +126,12 @@ describe("W6 (P2-I8) — withdrawal refund per paid transaction, each over the d
     })).toBe(81_190_000);
   });
 
-  it("takes the larger of the days share and the credit share for each payment on its own (3.00 of credit spent)", () => {
-    // Plus: the days share 13.5/30 is larger than the credit share 3.00/87.17, so 13.31 back. Max: half a day of 17
-    // (2.94 %) is smaller than the credit share (3.44 %), so 123.42 × (1 − 3.00/87.17) = 119.17 back. 132.48 in all.
+  it("takes the larger of the days share and the credit share for each payment on its own (4.40 of credit spent)", () => {
+    // Plus: the days share 13.5/30 is larger than the credit share 4.40/127.53, so 13.31 back. Max: half a day of 17
+    // (2.94 %) is smaller than the credit share (3.45 %), so 123.42 × (1 − 4.40/127.53) = 119.16 back. 132.47 in all.
     expect(withdrawalRefundPerPaymentMicros({
-      payments: [plus, max], now: withdrewAt, creditSpentMicros: 3_000_000, monthlyCreditMicros: creditAfterUpgrade
-    })).toBe(132_480_000);
+      payments: [plus, max], now: withdrewAt, creditSpentMicros: 4_400_000, monthlyCreditMicros: creditAfterUpgrade
+    })).toBe(132470000);
     // The whole credit spent: nothing comes back from either payment.
     expect(withdrawalRefundPerPaymentMicros({
       payments: [plus, max], now: withdrewAt, creditSpentMicros: creditAfterUpgrade, monthlyCreditMicros: creditAfterUpgrade
@@ -161,7 +161,7 @@ describe("W6 (P2-I8) — withdrawal refund per paid transaction, each over the d
   it("is today's single-payment result when there was no upgrade", () => {
     fc.assert(fc.property(
       fc.integer({ min: 0, max: 100_000 }), fc.integer({ min: 1, max: 40 * day }), fc.integer({ min: -day, max: 45 * day }),
-      fc.integer({ min: 0, max: 200_000_000 }), fc.integer({ min: 0, max: 150_000_000 }),
+      fc.integer({ min: 0, max: 200_000_000 }), fc.integer({ min: 0, max: 220_000_000 }),
       (cents, spanMs, offsetMs, spent, credit) => {
         const paidMicros = cents * 10_000;
         const periodEnd = plus30(spanMs);

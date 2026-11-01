@@ -2338,14 +2338,14 @@ and those asks would be refused `ASK_MODEL_CANDIDATE_UNAVAILABLE`.
       const targets = FREE_ROSTER_TARGETS.map((target) => ({ ...target, contextWindowTokens: 9_000 * 4 + CALL_TOKEN_CEILINGS.synthesizer }));
       const scored = () => poolWithRow({ value_json: followingTheCapRules(freeRosterScored(scorecardJson(5))), source_ref: HOSTED_SOURCE_REF });
       const run = (debateShapePolicy: DebateShapePolicy | null | undefined) => compose({
-        pool: scored(), deploymentMode: "hosted", perRunCeilingMicros: 1_000_000, ...sellingPlans, targets,
+        pool: scored(), deploymentMode: "hosted", perRunCeilingMicros: <the plan's limit> ...sellingPlans, targets,
         ...(debateShapePolicy === undefined ? {} : { debateShapePolicy })
       }).settled;
       expect((await run(undefined)).plansSold).toBe(true);
       await expect(run(policy)).rejects.toThrowError("SCORECARD_FREE_ANSWER_UNSCORED");
       expect((await run(debateShapeInForce({ ...policy, enabled: false }))).plansSold).toBe(true);
       const roomy = FREE_ROSTER_TARGETS.map((target) => ({ ...target, contextWindowTokens: 9_000 * 4 + policy.answerLength.detailed.writerBound }));
-      expect((await compose({ pool: scored(), deploymentMode: "hosted", perRunCeilingMicros: 1_000_000, ...sellingPlans, targets: roomy,
+      expect((await compose({ pool: scored(), deploymentMode: "hosted", perRunCeilingMicros: <the plan's limit> ...sellingPlans, targets: roomy,
         debateShapePolicy: policy }).settled).plansSold).toBe(true);
     });
 ```

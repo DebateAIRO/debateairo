@@ -35,21 +35,21 @@ describe("BillingPersonAllowanceSource (spec §2.4.1)", () => {
     const windows = await allowance.read(OWNER, now);
     expect(current).toHaveBeenCalledWith(OWNER, now);
     // billingPlans v4 under the owner's money rule (31 Oct), which replaced "each window's edge is its limit plus a fixed
-    // 20 cents": the day and the week borrow and carry no overflow; the month keeps the 20 cents as the tolerance for
-    // calls in flight at its wall, and its 20-cent reserve inside.
+    // overflow": the day and the week borrow and carry no overflow; the month keeps the overflow as the tolerance for
+    // calls in flight at its wall, and its reserve inside. The figures are the row's made-up ones.
     expect(windows.map((window) => [window.scope, window.limitMicros, window.closeBasisPoints, window.finishBasisPoints,
       window.finishOverflowMicros ?? null, window.borrows ?? null, window.keepsReserveMicros ?? null])).toEqual([
-      ["PERSON_DAY", 1_000_000, 9_500, 10_000, null, true, null],
-      ["PERSON_WEEK", 2_500_000, 9_500, 10_000, null, true, null],
-      ["PERSON_MONTH", 5_000_000, 9_500, 10_000, 200_000, null, 200_000]
+      ["PERSON_DAY", 726_000, 9_500, 10_000, null, true, null],
+      ["PERSON_WEEK", 2_904_000, 9_500, 10_000, null, true, null],
+      ["PERSON_MONTH", 6_600_000, 9_500, 10_000, 220_000, null, 440_000]
     ]);
     expect(windows[2]!.resetsAt).toEqual(computeWindows(anchor, now).month.end);
   });
 
   it("gives Free its month only, passes the A6 override through, and has no windows without an entitlement", async () => {
     expect((await source("FREE").allowance.read(OWNER, now)).map((window) => window.scope)).toEqual(["PERSON_MONTH"]);
-    expect((await source("PRO", 12_500_000).allowance.read(OWNER, now)).map((window) => window.limitMicros))
-      .toEqual([4_000_000, 10_000_000, 12_500_000]);
+    expect((await source("PRO", 19_800_000).allowance.read(OWNER, now)).map((window) => window.limitMicros))
+      .toEqual([3_630_000, 14_520_000, 19_800_000]);
     expect(await source(null).allowance.read(OWNER, now)).toEqual([]);
   });
 
@@ -66,7 +66,7 @@ describe("an entitlement anchored just after the caller's clock (the view's cloc
     const windows = await source("PLUS", null, justAfter).allowance.read(OWNER, now);
     const opened = computeWindows(justAfter, justAfter);
     expect(windows.map((window) => [window.scope, window.limitMicros])).toEqual([
-      ["PERSON_DAY", 1_000_000], ["PERSON_WEEK", 2_500_000], ["PERSON_MONTH", 5_000_000]
+      ["PERSON_DAY", 726_000], ["PERSON_WEEK", 2_904_000], ["PERSON_MONTH", 6_600_000]
     ]);
     expect(windows.map((window) => window.periodStart)).toEqual([justAfter, justAfter, justAfter]);
     expect(windows.map((window) => window.resetsAt)).toEqual([opened.day.end, opened.week.end, opened.month.end]);
@@ -77,7 +77,7 @@ describe("an entitlement anchored just after the caller's clock (the view's cloc
     // FREE, anchored at paid_through, which is after the runner's own `now`.
     const windows = await source("FREE", null, justAfter).allowance.read(OWNER, now);
     expect(windows).toEqual([expect.objectContaining({
-      scope: "PERSON_MONTH", limitMicros: 200_000, periodStart: justAfter,
+      scope: "PERSON_MONTH", limitMicros: 330_000, periodStart: justAfter,
       resetsAt: computeWindows(justAfter, justAfter).month.end
     })]);
   });

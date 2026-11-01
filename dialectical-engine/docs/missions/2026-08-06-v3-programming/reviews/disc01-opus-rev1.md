@@ -95,7 +95,7 @@ file lives under `acceptance/`, the 41-test acceptance suite was run as well.
 | **T1** | `discoverPanel` truncates its result to the first two targets | `dr181-discovery` | **RED** — 3 failed (panels of 3 and 4, and the dead-CLI case) |
 | **T2** | `probeProvider` re-throws `CliRelayFailure` instead of recording ABSENT | `dr181-discovery` | **RED** — the ABSENT row loses its loud per-adapter code |
 | **T3** | `parseCodexCompletion` returns a hardcoded `"gpt-5.6-sol"` (D1 resurrection) | `dr181-discovery`, `model-shim` | **RED** |
-| **T4** | `RunRepository.startRun` binds a literal `2` instead of `jsonb_array_length($12::jsonb)` | `integration/database` (real PG) | **RED** — 24 failed; `run_panel_count_identity` rejects the insert |
+| **T4** | `RunRepository.startRun` binds a literal `2` instead of `jsonb_array_length(<amount>::jsonb)` | `integration/database` (real PG) | **RED** — 24 failed; `run_panel_count_identity` rejects the insert |
 | **T5** | freshness window multiplied ×1000 (never re-probe a stale record) | `dr181-discovery` | **RED** |
 | **T5b** | freshness check forced false (re-probe every provider every ask) | `dr181-discovery` | **RED** — the spawn-count assertion fires |
 | **T6a** | `applySingleLineageBandCap` returns the candidate band uncapped | `integration/database` (real PG) | **RED** — mono answer no longer `TEST_CAPPED_BAND` |

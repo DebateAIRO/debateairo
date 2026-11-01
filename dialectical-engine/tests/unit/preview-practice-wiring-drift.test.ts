@@ -356,7 +356,7 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       "const debateEnvelope = siteCostEnvelopePolicy === null ? null : composeDebateCostEnvelope(siteCostEnvelopePolicy, await readCostEnvelopePolicy(pool, version)); if (debateEnvelope !== null && envelopeBand !== null) { const firstCalls = firstPositionCallProjections({ targets: declaredProviderTargets,",
       "bodyCeilingMicros: costEnvelopeCeilings(debateEnvelope).bodyMicros,",
       // Side-by-side spec §13 (S6): each version's guard, over the site's one store, counter and wall.
-      "store: money.store, policy: costEnvelopeGuardPolicy(debateEnvelope, storyPolicy), ...(money.sharedWall === undefined ? {} : { sharedWall: money.sharedWall }), ...(money.fundingAdmission === undefined ? {} : { fundingAdmission: money.fundingAdmission }), inFlight: money.inFlight"
+      "store: money.store, policy: costEnvelopeGuardPolicy(debateEnvelope, storyPolicy, closingReserves?.ceilingMicros), ...(money.sharedWall === undefined ? {} : { sharedWall: money.sharedWall }), ...(money.fundingAdmission === undefined ? {} : { fundingAdmission: money.fundingAdmission }), inFlight: money.inFlight"
     ]) expect(loader, statement).toContain(statement);
     // The local-only refusal is gone; local mode builds no guard: the site reads give it no money (S14: the practice's
     // own money composition is gone, it reads the site as main.ts does).

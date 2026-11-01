@@ -136,7 +136,7 @@ describe("a running team debate", () => {
     const p = await funded(), runId = await pinnedRun(p);
     await setLimit(p.actor, 0);
     expect(await room().readRoom({ access: p.access, settingsClass } as never)).toMatchObject({ room: "FULL", scope: "TEAM_MONTH" });
-    const guard = new CostEnvelopeGuard({ store: new PostgresModelSpendStore(runtime), policy: { perRunCeilingMicros: 250000, dailyCeilingMicros: 10000000 } });
+    const guard = new CostEnvelopeGuard({ store: new PostgresModelSpendStore(runtime), policy: { closingCeilingMicros: 440000, perRunCeilingMicros: 250000, dailyCeilingMicros: 10000000 } });
     const seam = guard.providerSeam({ runId, phase: "BODY", sharedWall: "EXEMPT", requireReportedUsage: true, price } as never);
     const projection = { requestBytes: 2, completionTokenCeiling: 1 };
     const admission = await seam.assertCallAllowed(projection);
@@ -157,7 +157,7 @@ describe("every kind a team member spends is charged to the grant and counts for
   for (const [name, source, seamOf] of kinds) {
     it(name, async () => {
       const p = await funded(), runId = await pinnedRun(p), store = new PostgresModelSpendStore(runtime);
-      const guard = new CostEnvelopeGuard({ store, policy: { perRunCeilingMicros: 250000, dailyCeilingMicros: 10000000, perStoryCeilingMicros: 250000 } } as never);
+      const guard = new CostEnvelopeGuard({ store, policy: { closingCeilingMicros: 440000, perRunCeilingMicros: 250000, dailyCeilingMicros: 10000000, perStoryCeilingMicros: 250000 } } as never);
       const before = await spentNow(), seam = seamOf(guard, runId), projection = { requestBytes: 2, completionTokenCeiling: 1 };
       const admission = await seam.assertCallAllowed(projection);
       expect(admission).toMatchObject({ kind: "INTERNAL" });

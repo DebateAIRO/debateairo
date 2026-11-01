@@ -84,7 +84,7 @@ export function computeWindows(
  * limit" of 30 October (Q1-Q3):
  *  - the DAY and the WEEK carry `borrows`: running work is never stopped by
  *    them, and what it uses past them is borrowed from the next one;
- *  - the MONTH is the wall: its `finishOverflowMicros` (20 cents) is only the
+ *  - the MONTH is the wall: its `finishOverflowMicros` is only the
  *    tolerance for calls already in flight there, and `keepsReserveMicros` is the
  *    final-answer reserve kept inside it (a paid plan's `reserve_micros`, held
  *    INSIDE_LIMITS; 0 on Free, whose reserve sits ON_TOP_OF_CREDIT).

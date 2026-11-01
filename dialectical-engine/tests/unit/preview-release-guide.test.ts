@@ -673,7 +673,7 @@ const VARS: Readonly<Record<string, string>> = Object.freeze({
   E: '/etc/debateai-v3-preview/auth-dev-v1', C: '/etc/debateai-v3-preview/public/Caddyfile',
   CAPI: `${RELS}/auth-dev-candidate-${LABEL}-api`, CUI: `${RELS}/auth-dev-candidate-${LABEL}-ui`, CRUN: `${RELS}/auth-dev-candidate-${LABEL}-runner`,
   OLDA: `${OART}/api-launch.json`, OLDU: `${OART}/ui-launch.json`, OLDR: `${OART}/runner-launch.json`, PLAN: `${ART}/api-launch.json`,
-  HB_ON: '{"billing":"on","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}',
+  HB_ON: '{"billing":"on","perRunCeilingMicros":3300000,"dailyCeilingMicros":11000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}',
   YES: 'ab'.repeat(32), GRR: '01'.repeat(32), LIFE: 'yes',
   // Side-by-side spec §13 (Task S18): the switch's settings version, and the settings-activation section's names.
   ACT: '18', V: '19', OLDV: '18', BY: 'Stefan Nour', WHY: 'shorter answers for the test team',
@@ -681,7 +681,7 @@ const VARS: Readonly<Record<string, string>> = Object.freeze({
   AVN: '17',
   FROM: '/opt/debateai-v3-preview/artifacts/settings-v18/native-plan-verify.json',
   SART: '/opt/debateai-v3-preview/artifacts/settings-20261023t120000z', VART: '/opt/debateai-v3-preview/artifacts/settings-v19',
-  HB: '{"billing":"on","perRunCeilingMicros":2500000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}',
+  HB: '{"billing":"on","perRunCeilingMicros":2200000,"dailyCeilingMicros":11000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}',
   LINEUP: '/opt/debateai-v3-preview/artifacts/settings-20261023t120000z/line-up.json',
   CC: '{"perDebate":12,"perModelPerDebate":3,"perModelPerRunner":{"default":50}}',
   LG: '{"kind":"LENGTH_GUIDANCE_POLICY"}', SHAPE: 'off',

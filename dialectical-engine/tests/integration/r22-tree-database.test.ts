@@ -112,7 +112,7 @@ const PRICE = Object.freeze({ inputMicrosPerMillionTokens: 1_000_000, outputMicr
 /** The money seams as main.ts builds them, on the ledger, with made-up ceilings. */
 function meteredSeams() {
   const guard = () => new CostEnvelopeGuard({ store: new PostgresModelSpendStore(runner),
-    policy: { perRunCeilingMicros: 250_000, dailyCeilingMicros: 2_000_000, perStoryCeilingMicros: 100_000 } });
+    policy: { perRunCeilingMicros: 250_000, dailyCeilingMicros: 2_000_000, perStoryCeilingMicros: 100_000, closingCeilingMicros: 440_000 } });
   return {
     buildPathRewriteCostEnvelopeSeam: (runId: string) => guard().pathRewriteSeam({ runId, price: PRICE, requireReportedUsage: true }),
     buildPathClimbCostEnvelopeSeam: (runId: string) => guard().pathClimbSeam({ runId, price: PRICE, requireReportedUsage: true }),

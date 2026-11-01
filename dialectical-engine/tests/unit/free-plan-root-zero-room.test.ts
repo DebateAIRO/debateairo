@@ -21,9 +21,9 @@ import {
 /**
  * Free plan, R22 (owner rulings 2026-10-29, "#1 Free reserve sized for Free's AIs"; MORNING-2026-10-17 item 1).
  *
- * The morning page said: on Free, root 0's kept room (about 16-18 cents with engine 2) is more than Free's whole-debate
- * limit of 14 cents, so a Free engine-2 debate skips the map. That 14 cents is a MODEL (tests/unit/length-guidance-map.test.ts
- * "Ruling I1": the site's per-run ceiling cut to Free's monthly credit, as the API's picker cuts it, then the body share).
+ * The morning page said: on Free, root 0's kept room with engine 2 is more than Free's whole-debate limit, so a Free
+ * engine-2 debate skips the map. That limit is a MODEL (tests/unit/length-guidance-map.test.ts "Ruling I1": the site's
+ * per-run ceiling cut to Free's monthly credit, as the API's picker cuts it, then the body share).
  * These cases pin what the RUNNER actually does with a Free debate:
  *  - root 0's room is priced at the members of root 0's own seat (`rootZeroRoomRefs`), so on a Free debate it is priced
  *    at Free's own line-up; at the dearest Free AI (MiMo, which the preview's Free line-up includes) it is the largest;
@@ -31,16 +31,16 @@ import {
  *    (apps/runner/src/run-settings.ts builds one guard per register version, never per plan). The Free person's month
  *    window is the shared wall, which measures each map call alone and never the room (packages/budget/src/model-spend.ts
  *    `assertCallAllowed`); root 0's own call is exempt from that wall, so it is always paid;
- *  - so at the preview's per-run ceiling ($3.00, the hosted-billing choice every release since R19 published), a Free
+ *  - so at a preview-sized per-run ceiling (made up here; the real one is the hosted-billing choice in the owner's plan), a Free
  *    engine-2 debate keeps root 0's room and builds its map at every Free AI, even with most of the month spent;
  *  - the skip happens only on a version whose per-run ceiling is about 25 cents (the code's start value), and then on
  *    EVERY plan alike: the room alone is larger than that body.
  */
 const SITE = COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW.value;
 const FREE = BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value.plans.find((plan) => plan.plan_id === "FREE")!;
-/** The preview's hosted-billing choice (docs/operations/preview-release-r21/scripts-2/sb1.sh `HB_ON`), as R22 publishes it. */
-const PREVIEW_PER_RUN_CEILING_MICROS = 3_000_000;
-const PREVIEW_DAILY_CEILING_MICROS = 10_000_000;
+/** Made up, the size of a hosted-billing choice; the real one is in the owner's plan on the server. */
+const PREVIEW_PER_RUN_CEILING_MICROS = 3_300_000;
+const PREVIEW_DAILY_CEILING_MICROS = 11_000_000;
 const policyAt = (perRunCeilingMicros: number) => Object.freeze({ perRunCeilingMicros, dailyCeilingMicros: PREVIEW_DAILY_CEILING_MICROS,
   serveReserveBasisPoints: SITE.serve_reserve_basis_points, serveOverrunBasisPoints: SITE.serve_overrun_basis_points });
 const bodyAt = (perRunCeilingMicros: number) => costEnvelopeCeilings({ perRunCeilingMicros,
@@ -107,11 +107,11 @@ describe("Free plan: root 0's kept room against the limits a Free debate actuall
   const dearest = FREE_LINE_UP.reduce((most, model) => (freeRoom(model) > freeRoom(most) ? model : most));
   const freeModelBody = bodyAt(Math.min(SITE.per_run_ceiling_micros, FREE.monthly_credit_micros));
 
-  it("the room is priced at root 0's own seat: Free's dearest AI (MiMo) gives the largest room, above the 14-cent Free model", () => {
+  it("the room is priced at root 0's own seat: Free's dearest AI (MiMo) gives the largest room, above the Free model", () => {
     expect(dearest).toBe("XiaomiMiMo/MiMo-V2.6-Pro");
-    expect(freeModelBody).toBe(140_000);
+    expect(freeModelBody).toBe(175_000); // the row's made-up credit is above the per-run ceiling, so 250,000 less the 30% reserve
     expect(freeRoom(dearest)).toBeGreaterThan(freeModelBody);
-    // The cheapest Free AIs' rooms fit the 14-cent model; the dearest does not.
+    // The cheapest Free AIs' rooms fit the model; the dearest does not.
     expect(freeRoom("Qwen/Qwen3.8-Flash")).toBeLessThan(freeModelBody);
     expect(freeRoom("zai-org/GLM-5.3-Flash")).toBeLessThan(freeModelBody);
   });
@@ -123,11 +123,11 @@ describe("Free plan: root 0's kept room against the limits a Free debate actuall
     }
   });
 
-  // The owner's money rule (31 Oct) replaced "a fixed 20 cents past every limit": Free's month is now a wall at its 20
-  // cents (its 5-cent reserve sits on top, never inside), and the 20 cents are only the tolerance for a call in flight
-  // there. So 25 cents spent, which this row used to admit, now pauses the debate; the row keeps its point (the kept
-  // room is never measured against the person's month) just below the wall.
-  it("the room is never measured against the Free person's month: with 19.9999 cents spent (just under Free's 20-cent wall) the map call is still admitted", async () => {
+  // The owner's money rule (31 Oct) replaced "a fixed overflow past every limit": Free's month is now a wall at its credit
+  // (its reserve sits on top, never inside), and the overflow is only the tolerance for a call in flight there. So spend
+  // past the credit, which this row used to admit, now pauses the debate; the row keeps its point (the kept room is never
+  // measured against the person's month) just below the wall.
+  it("the room is never measured against the Free person's month: with one micro-unit under Free's wall spent, the map call is still admitted", async () => {
     const spent = FREE.monthly_credit_micros - 1;
     const wall = FREE.monthly_credit_micros;
     const tolerance = FREE.finish_overflow_micros;

@@ -11,12 +11,13 @@ import { verifyHostedRegisterBootReadiness } from '../../apps/runner/src/hosted-
 import { buildPreviewSourceRowsV2 } from '../../deploy/preview-auth-dev/v1/publish-register-v2.js';
 import { buildPreviewSourceRowsV3, composePreviewSnapshotV3, publishPreviewRegisterV3, readSealedSnapshot } from '../../deploy/preview-auth-dev/v1/publish-register-v3.js';
 import { startTestDatabase } from '../support/testDatabase.js';
+import { TEST_OWNER_LIMIT_ROWS } from '../support/hostedRegisterRows.js';
 
 const observation = { nodeVersion: 'v26.8.2', pnpmVersion: '11.20.0', sourceRevision: 'a'.repeat(40), sourceTree: 'b'.repeat(40), operatorSha256: 'c'.repeat(64), observedAt: '2026-10-13T12:00:00.000Z' };
 const approvalOf = (s: { baseRegisterVersion: string; baseSnapshotSha256: string; snapshotSha256: string; deltaSha256: string }) =>
   ({ baseRegisterVersion: s.baseRegisterVersion, baseSnapshotSha256: s.baseSnapshotSha256, snapshotSha256: s.snapshotSha256, deltaSha256: s.deltaSha256 });
-/** The owner's suggested values (pending confirmation): $3 per debate, $10 per day; the kit's example room-read budget. */
-const OFF = { billing: 'off', perRunCeilingMicros: 3_000_000, dailyCeilingMicros: 10_000_000, askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 } } as const;
+/** Made-up owner's inputs: the ceilings, the kit's example room-read budget, and his plans and abuse limits (R22 decision 18). */
+const OFF = { billing: 'off', perRunCeilingMicros: 3_300_000, dailyCeilingMicros: 11_000_000, askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 }, ...TEST_OWNER_LIMIT_ROWS } as const;
 const ON = { ...OFF, billing: 'on' } as const;
 /** The preview's own provider targets, as the hosted boot reads them (every reviewed ref, priced, https). */
 const TARGETS = JSON.stringify(PREVIEW_REVIEWED_PROVIDER_REFS.map(previewTargetJsonRow));
@@ -45,7 +46,7 @@ describe('publish kit v3 on PostgreSQL 18 (source evidence, not the Linux operat
       await verifyHostedRegisterBootReadiness(pool, parseRegisterVersionText('5'), TARGETS);
       expect((await readBillingPolicy(pool, 5))?.enabled).toBe(false);
       const envelope = await readCostEnvelopePolicy(pool, 5);
-      expect([envelope.perRunCeilingMicros, envelope.dailyCeilingMicros]).toEqual([3_000_000, 10_000_000]);
+      expect([envelope.perRunCeilingMicros, envelope.dailyCeilingMicros]).toEqual([3_300_000, 11_000_000]);
       expect(costEnvelopeBand(envelope)).not.toBeNull();
       expect((await readAdmissionPolicy(pool, 5)).askRoomReads).toEqual({ key: 'owner', limit: 60, windowMs: 60_000, capacity: 65_536 });
       expect((await readStoryPolicyFromRegister(pool, 5))?.perStoryCeilingMicros).toBe(50_000);

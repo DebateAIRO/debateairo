@@ -1174,6 +1174,8 @@ export {
 // Paid plans (spec 2026-09-29 §2.5.1): the plans row and the billing switch.
 export {
   BILLING_PLANS_DEPLOYMENT_REGISTER_ROW,
+  billingPlansAreMadeUp,
+  closingReservesOf,
   BILLING_PLANS_ROW_KEY,
   BILLING_PLANS_MEMBERS,
   PLAN_IDS,
@@ -1583,3 +1585,10 @@ export {
   type SettingsCallBound,
   type SettingsSeatableGateModel
 } from "./settings-check-seatable.js";
+export {
+  ABUSE_LIMITS_DEPLOYMENT_REGISTER_ROW,
+  ABUSE_LIMITS_ROW_KEY,
+  abuseLimitsFromValue,
+  readAbuseLimits,
+  type AbuseLimits
+} from "./abuse-limits.js";

@@ -40,9 +40,9 @@ describe("B1 decideRoom — FITS, CLOSE, FULL", () => {
   });
 
   it("A5: an estimate far above the whole limit is CLOSE, never FULL, while nothing is used", () => {
-    // Free's cold-start estimate is the run maximum (about 0.36 USD) against a 0.20 USD month.
+    // Free's cold-start estimate is the run maximum, above its whole month.
     expect(decideRoom({
-      usedMicros: 0, estimateMicros: 360_000, limitMicros: 200_000, closeBasisPoints: CLOSE
+      usedMicros: 0, estimateMicros: 360_000, limitMicros: 330_000, closeBasisPoints: CLOSE
     })).toBe("CLOSE");
   });
 
@@ -71,9 +71,9 @@ describe("B1 decideSharedWall — the running wall, real spend only", () => {
   const wall = (spentMicros: number, finishBasisPoints: number) =>
     decideSharedWall({ spentMicros, projectedMicros: 0, limitMicros: LIMIT, finishBasisPoints });
 
-  it.each([[109_990, "WITHIN"], [110_000, "WITHIN"], [110_010, "WOULD_CROSS"]] as const)(
-    "a person window (finish 110 percent): %i spent is %s", (spent, expected) => {
-      expect(wall(spent, 11_000)).toBe(expected);
+  it.each([[120_990, "WITHIN"], [121_000, "WITHIN"], [121_010, "WOULD_CROSS"]] as const)(
+    "a person window (a made-up finish of 121 percent): %i spent is %s", (spent, expected) => {
+      expect(wall(spent, 12_100)).toBe(expected);
     }
   );
 
@@ -84,16 +84,16 @@ describe("B1 decideSharedWall — the running wall, real spend only", () => {
   );
 
   it("adds the projected call to what is spent", () => {
-    expect(decideSharedWall({ spentMicros: 100_000, projectedMicros: 10_000, limitMicros: LIMIT, finishBasisPoints: 11_000 }))
+    expect(decideSharedWall({ spentMicros: 100_000, projectedMicros: 21_000, limitMicros: LIMIT, finishBasisPoints: 12_100 }))
       .toBe("WITHIN");
-    expect(decideSharedWall({ spentMicros: 100_000, projectedMicros: 10_001, limitMicros: LIMIT, finishBasisPoints: 11_000 }))
+    expect(decideSharedWall({ spentMicros: 100_000, projectedMicros: 21_001, limitMicros: LIMIT, finishBasisPoints: 12_100 }))
       .toBe("WOULD_CROSS");
   });
 
   it("rounds the finish edge DOWN", () => {
-    // 3 × 11 000 / 10 000 = 3.3 → 3.
-    expect(decideSharedWall({ spentMicros: 3, projectedMicros: 0, limitMicros: 3, finishBasisPoints: 11_000 })).toBe("WITHIN");
-    expect(decideSharedWall({ spentMicros: 3, projectedMicros: 1, limitMicros: 3, finishBasisPoints: 11_000 })).toBe("WOULD_CROSS");
+    // 3 × 12 100 / 10 000 = 3.63 → 3.
+    expect(decideSharedWall({ spentMicros: 3, projectedMicros: 0, limitMicros: 3, finishBasisPoints: 12_100 })).toBe("WITHIN");
+    expect(decideSharedWall({ spentMicros: 3, projectedMicros: 1, limitMicros: 3, finishBasisPoints: 12_100 })).toBe("WOULD_CROSS");
   });
 
   it("refuses a finish edge below the limit or above twice it", () => {
@@ -103,20 +103,20 @@ describe("B1 decideSharedWall — the running wall, real spend only", () => {
     expect(wall(0, 20_000)).toBe("WITHIN");
   });
 
-  // billingPlans v4 (owner 2026-10-30, Q1 and Q3): every person limit may be passed by a FIXED 20 cents, not a share.
-  it("adds a fixed overflow in micro-units past the limit's edge (billingPlans v4: 20 cents past every limit)", () => {
+  // billingPlans v4 (owner 2026-10-30, Q1 and Q3): every person limit may be passed by a FIXED amount, not a share.
+  it("adds a fixed overflow in micro-units past the limit's edge (billingPlans v4)", () => {
     const overflow = (spentMicros: number, finishOverflowMicros: number, finishBasisPoints = 10_000) =>
       decideSharedWall({ spentMicros, projectedMicros: 0, limitMicros: LIMIT, finishBasisPoints, finishOverflowMicros });
-    expect(overflow(300_000, 200_000)).toBe("WITHIN");
-    expect(overflow(300_001, 200_000)).toBe("WOULD_CROSS");
-    expect(decideSharedWall({ spentMicros: 299_000, projectedMicros: 1_000, limitMicros: LIMIT, finishBasisPoints: 10_000,
-      finishOverflowMicros: 200_000 })).toBe("WITHIN");
-    expect(decideSharedWall({ spentMicros: 299_000, projectedMicros: 1_001, limitMicros: LIMIT, finishBasisPoints: 10_000,
-      finishOverflowMicros: 200_000 })).toBe("WOULD_CROSS");
-    // The overflow is added to the rounded-down share edge: floor(3 x 11 000 / 10 000) + 2 = 5.
-    expect(decideSharedWall({ spentMicros: 5, projectedMicros: 0, limitMicros: 3, finishBasisPoints: 11_000, finishOverflowMicros: 2 }))
+    expect(overflow(320_000, 220_000)).toBe("WITHIN");
+    expect(overflow(320_001, 220_000)).toBe("WOULD_CROSS");
+    expect(decideSharedWall({ spentMicros: 319_000, projectedMicros: 1_000, limitMicros: LIMIT, finishBasisPoints: 10_000,
+      finishOverflowMicros: 220_000 })).toBe("WITHIN");
+    expect(decideSharedWall({ spentMicros: 319_000, projectedMicros: 1_001, limitMicros: LIMIT, finishBasisPoints: 10_000,
+      finishOverflowMicros: 220_000 })).toBe("WOULD_CROSS");
+    // The overflow is added to the rounded-down share edge: floor(3 x 12 100 / 10 000) + 2 = 5.
+    expect(decideSharedWall({ spentMicros: 5, projectedMicros: 0, limitMicros: 3, finishBasisPoints: 12_100, finishOverflowMicros: 2 }))
       .toBe("WITHIN");
-    expect(decideSharedWall({ spentMicros: 6, projectedMicros: 0, limitMicros: 3, finishBasisPoints: 11_000, finishOverflowMicros: 2 }))
+    expect(decideSharedWall({ spentMicros: 6, projectedMicros: 0, limitMicros: 3, finishBasisPoints: 12_100, finishOverflowMicros: 2 }))
       .toBe("WOULD_CROSS");
     // Absent or 0 is the share edge alone, as before.
     expect(overflow(100_000, 0)).toBe("WITHIN");
@@ -181,7 +181,7 @@ describe("B1 decideAdmission — START, WAIT, REFUSE_ALREADY_WAITING", () => {
   });
 
   it("A5: the Free month whose estimate crosses the limit is CLOSE, and the question STARTS", () => {
-    const monthRoom = decideRoom({ usedMicros: 0, estimateMicros: 360_000, limitMicros: 200_000, closeBasisPoints: CLOSE });
+    const monthRoom = decideRoom({ usedMicros: 0, estimateMicros: 360_000, limitMicros: 330_000, closeBasisPoints: CLOSE });
     expect(admit([site("FITS"), month(monthRoom)])).toEqual({ kind: "START", worst: "CLOSE", worstScope: "PERSON_MONTH" });
   });
 
