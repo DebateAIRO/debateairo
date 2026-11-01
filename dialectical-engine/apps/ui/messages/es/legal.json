@@ -128,6 +128,7 @@
   "legal.providers.purpose.judging": "Texto del debate — para juzgar y verificar los argumentos",
   "legal.providers.purpose.story": "El debate terminado — para redactar la historia del veredicto",
   "legal.providers.purpose.synthesisCheck": "La síntesis de un debate terminado — para comprobarla respecto de cuatro categorías",
+  "legal.providers.purpose.reportCheck": "Una denuncia hecha con el botón Denunciar y el texto público del debate — para verificar la denuncia",
   "legal.providers.purpose.questionCheck": "Una pregunta antes de que empiece un debate — para comprobar si el debate puede empezar",
   "legal.providers.purpose.search": "Consultas de búsqueda que los modelos redactan a partir del debate — para encontrar pruebas en la web",
   "legal.providers.purpose.support": "Lo que usted escribe en el chat de soporte — para responderle",

@@ -128,6 +128,7 @@
   "legal.providers.purpose.judging": "Tekst debaty — do oceniania i sprawdzania argumentów",
   "legal.providers.purpose.story": "Zakończona debata — do napisania historii werdyktu",
   "legal.providers.purpose.synthesisCheck": "Synteza zakończonej debaty — do sprawdzenia jej pod kątem czterech kategorii",
+  "legal.providers.purpose.reportCheck": "Zgłoszenie złożone przyciskiem Zgłoś i publiczny tekst debaty — do sprawdzenia zgłoszenia",
   "legal.providers.purpose.questionCheck": "Pytanie przed rozpoczęciem debaty — do sprawdzenia, czy debata może się rozpocząć",
   "legal.providers.purpose.search": "Zapytania wyszukiwania, które modele formułują na podstawie debaty — do znajdowania dowodów w internecie",
   "legal.providers.purpose.support": "To, co wpisujesz na czacie wsparcia — aby Ci odpowiedzieć",

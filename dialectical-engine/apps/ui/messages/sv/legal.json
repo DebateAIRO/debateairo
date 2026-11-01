@@ -128,6 +128,7 @@
   "legal.providers.purpose.judging": "Debattext — för att bedöma och kontrollera argumenten",
   "legal.providers.purpose.story": "Den avslutade debatten — för att skriva berättelsen om utslaget",
   "legal.providers.purpose.synthesisCheck": "Syntesen av en avslutad debatt — för att kontrollera den avseende fyra kategorier",
+  "legal.providers.purpose.reportCheck": "En rapport gjord med knappen Rapportera, och debattens offentliga text — för att kontrollera rapporten",
   "legal.providers.purpose.questionCheck": "En fråga innan en debatt startar — för att kontrollera om debatten får starta",
   "legal.providers.purpose.search": "Sökfrågor som modellerna formulerar utifrån debatten — för att hitta belägg på webben",
   "legal.providers.purpose.support": "Det du skriver i supportsamtalet — för att svara dig",

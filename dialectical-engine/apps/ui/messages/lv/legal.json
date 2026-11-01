@@ -128,6 +128,7 @@
   "legal.providers.purpose.judging": "Debašu teksts — lai novērtētu un pārbaudītu argumentus",
   "legal.providers.purpose.story": "Pabeigtās debates — lai uzrakstītu sprieduma stāstu",
   "legal.providers.purpose.synthesisCheck": "Pabeigto debašu sintēze — lai to pārbaudītu pēc četrām kategorijām",
+  "legal.providers.purpose.reportCheck": "Ziņojums, kas iesniegts ar pogu „Ziņot”, un debates publiskais teksts — lai pārbaudītu ziņojumu",
   "legal.providers.purpose.questionCheck": "Jautājums pirms debašu sākuma — lai pārbaudītu, vai debates drīkst sākties",
   "legal.providers.purpose.search": "Modeļu no debatēm izveidotie meklēšanas vaicājumi — lai atrastu pierādījumus tīmeklī",
   "legal.providers.purpose.support": "Atbalsta sarunā ievadītais teksts — lai jums atbildētu",
