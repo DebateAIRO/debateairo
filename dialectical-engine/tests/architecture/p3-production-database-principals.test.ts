@@ -1335,6 +1335,20 @@ describe("P3-01 production database-principal manifest", () => {
     "EXECUTE ON FUNCTION staff.read_public_flag_queue(jsonb,text)",
     "EXECUTE ON FUNCTION staff.public_flag_dismiss(jsonb,uuid,jsonb,uuid,uuid,jsonb)"
   ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0152_report_export_and_check_usage.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.record_public_check_usage(text,uuid,timestamptz,integer,integer,integer,numeric)"
+  ]
+},
+{
+  "roleName": "debateai_data_export_worker",
+  "source": "migrations/0152_report_export_and_check_usage.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_data_export_public_flags(uuid,uuid)"
+  ]
 }
 ]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))

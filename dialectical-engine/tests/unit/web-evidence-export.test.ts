@@ -88,7 +88,7 @@ function harness(raw = rawRows()) {
     claim: { exportId: "export", userId: "user", ownerRef: "owner", sessionId: "session",
       locale: "en", requestedAt: new Date("2026-10-30T10:00:00.000Z"), attempt: 1 }, workerId: "worker",
     source: { readRaw: async () => raw as never }, ownerView: ownerView as never,
-    decrypt: { openUserField: async () => "ada@example.test", openRecord: () => "", openSupport: async () => "", openRunContent },
+    decrypt: { openPublicFlag: async () => { throw new Error("no report in this fixture"); }, openUserField: async () => "ada@example.test", openRecord: () => "", openSupport: async () => "", openRunContent },
     now: () => new Date("2026-10-30T11:00:00.000Z")
   });
   return { raw, ownerView, openRunContent, collect };
@@ -233,7 +233,7 @@ describe("web sources, investigations and the reserve in the data export", () =>
   it("names the new records and the page-text choice in the README", () => {
     const readme = renderReadme();
     expect(readme).toContain("account.json — account, channels, region, age checks, erasure requests, kept questions, reading level, "
-      + "debate visits, dig links, investigations and reserve events, and when an AI read your question before a debate.");
+      + "debate visits, dig links, investigations and reserve events, and when an AI read your question before a debate, and the reports you made with the Report button.");
     expect(readme).toContain("debates.json — owned debates, their content status, answer versions, each debate's model rotation record "
       + "and its web sources: searches, pages found, readers' lines, short quotes and pages added to researched.");
     expect(README_EXCLUSION_LINES.filter(line => /^W\d:/.test(line))).toEqual([

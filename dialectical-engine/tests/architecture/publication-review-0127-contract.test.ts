@@ -109,7 +109,7 @@ describe("0127 publication review contract", () => {
       "subject_capabilities_check"
     ]) expect(source, shared).not.toContain(shared);
     const chain = await readFile(new URL("../../packages/db/src/migration-forward-chain.ts", import.meta.url), "utf8");
-    expect(chain).toContain("loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130,loadForward0131,loadForward0132,loadForward0133,loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140,loadForward0141,loadForward0142,loadForward0143,loadForward0144,loadForward0145,loadForward0146,loadForward0147,loadForward0148,loadForward0149,loadForward0150,loadForward0151]");
+    expect(chain).toContain("loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130,loadForward0131,loadForward0132,loadForward0133,loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140,loadForward0141,loadForward0142,loadForward0143,loadForward0144,loadForward0145,loadForward0146,loadForward0147,loadForward0148,loadForward0149,loadForward0150,loadForward0151,loadForward0152]");
   });
 });
 

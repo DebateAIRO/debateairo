@@ -44,6 +44,7 @@ import { SiteFooter } from "../../apps/ui/components/SiteFooter.js";
  */
 
 const source = (path: string): string => readFileSync(resolve(process.cwd(), path), "utf8");
+const REPORT_CHECK_LINE = legalEnglish["legal.providers.purpose.reportCheck"];
 
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
@@ -549,7 +550,7 @@ describe("the model providers page lists the companies the API's targets reach (
     }
   });
 
-  it("names the seven jobs a provider can be given, and brackets every job nobody has confirmed", () => {
+  it("names the eight jobs a provider can be given, and brackets every job nobody has confirmed", () => {
     const view = render(<LegalProvidersBody legalCatalog={legalEnglish} entries={WITH_UNCHECKED} />);
     const jobs = new Set(texts(view.querySelectorAll(".legalProviderPurposes li")));
     expect([...jobs].sort()).toEqual(
@@ -560,6 +561,7 @@ describe("the model providers page lists the companies the API's targets reach (
         "Search questions the models write from the debate — to find evidence on the web",
         "The synthesis of a finished debate — to check it for four categories",
         "A question before a debate starts — to check whether the debate may start",
+        REPORT_CHECK_LINE,
         "What you type in the support chat — to answer you"
       ].sort()
     );
@@ -568,6 +570,22 @@ describe("the model providers page lists the companies the API's targets reach (
       expect(note === null).toBe(entry.purposesConfirmed);
     });
     expect(WITH_UNCHECKED.some((entry) => !entry.purposesConfirmed)).toBe(true);
+  });
+
+  // R22 decision 35: the check on a report runs on the same judge as the synthesis check, so its line stands on the same row.
+  it.each([
+    ["no answer from the API (the whole reviewed catalogue)", null],
+    ["targets on DeepInfra only", ["deepinfra"]],
+    ["targets on Anthropic and DeepInfra", ["anthropic", "deepinfra"]]
+  ] as const)("shows the report check's line on the row that shows the synthesis check's: %s", (_build, companies) => {
+    const register = providerRegister(companies);
+    const view = render(<LegalProvidersBody legalCatalog={legalEnglish} entries={register} />);
+    const entries = [...view.querySelectorAll(".legalProviderEntry")];
+    const showing = (line: string) => entries.flatMap((entry, index) => texts(entry.querySelectorAll(".legalProviderPurposes li")).includes(line) ? [register[index]!.key] : []);
+    const synthesisRows = showing(legalEnglish["legal.providers.purpose.synthesisCheck"]);
+    expect(synthesisRows).toHaveLength(1);
+    expect(showing(REPORT_CHECK_LINE)).toEqual(synthesisRows);
+    expect(register.filter((entry) => entry.purposes.includes("reportCheck")).map((entry) => entry.key)).toEqual(synthesisRows);
   });
 
   // FIX-SF-S03-p1 (t_566873aa): both checks always call Claude Haiku 5.5 on Anthropic (S01-R9, S04-R5), so every
@@ -579,7 +597,7 @@ describe("the model providers page lists the companies the API's targets reach (
     ["a target on a host no catalogue row knows", ["host:api.acme.example"]]
   ] as const)("names Anthropic's Claude Haiku 5.5 for both checks on exactly one row: %s", (_build, companies) => {
     const register = providerRegister(companies);
-    for (const purpose of ["synthesisCheck", "questionCheck"] as const) {
+    for (const purpose of ["synthesisCheck", "questionCheck", "reportCheck"] as const) {
       const rows = register.filter((entry) => entry.purposes.includes(purpose));
       expect(rows.map((entry) => entry.key), purpose).toHaveLength(1);
       expect(rows[0]).toMatchObject({ models: "Claude Haiku 5.5", entity: "Anthropic Ireland, Limited" });

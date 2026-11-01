@@ -714,7 +714,7 @@ describe("hate-speech S02 publish path", () => {
     function checkComposition(): string {
       return checkCompositions()[0]!;
     }
-    it("the report's check shares the publish check's one judge switch and the register's D: only the recorder differs", () => {
+    it("the report's check shares the publish check's one judge switch and the register's D: only the recorder and the usage row's subject kind differ", () => {
       for (const composition of checkCompositions()) {
         expect(composition).toContain("judge: publicationJudgeSwitch.current");
         expect(composition.match(/deadlineMs\s*:\s*([^,\n}]+)/gu)).toEqual(["deadlineMs: publicationCheckPolicy.deadlineMs"]);
@@ -723,7 +723,10 @@ describe("hate-speech S02 publish path", () => {
       expect(main.split("createPublicationJudgeTransport(").length - 1).toBe(1);
       expect(main.split("createPublicationJudgeSwitch(").length - 1).toBe(1);
       const [publish, report] = checkCompositions() as [string, string];
-      expect(publish.replace(/recorder:[^\n]*\n/u, "")).toBe(report.replace(/recorder:[^\n]*\n/u, ""));
+      expect(publish).toContain('recordUsage: (row) => new PostgresPublicFlagRepository(pool).recordCheckUsage({ subjectKind: "RUN", subjectId: row.subject_id,');
+      expect(report).toContain('recordUsage: (row) => new PostgresPublicFlagRepository(pool).recordCheckUsage({ subjectKind: "PUBLIC_REPORT", subjectId: row.subject_id,');
+      const shared = (composition: string) => composition.replace(/recorder:[^\n]*\n/u, "").replace(/subjectKind: "[A-Z_]+"/u, 'subjectKind: "?"');
+      expect(shared(publish)).toBe(shared(report));
     });
     it("main.ts wires D from the register's publicationCheckPolicy row into the check and the judge transport, and nothing else", () => {
       const composition = checkComposition();
