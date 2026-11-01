@@ -13,7 +13,7 @@
   "home.publicDebates": "דיונים ציבוריים",
   "home.total": "סה״כ {count}",
   "home.signInHint": "יש להתחבר או ליצור חשבון למעלה כדי לראות את הדיונים שלכם.",
-  "home.publicIndexingNotice": "מנועי חיפוש עשויים להוסיף דיונים שפורסמו לאינדקס. עותקים עשויים להישאר גם לאחר ביטול הפרסום.",
+  "home.publicIndexingNotice": "מנועי חיפוש עשויים לאנדקס דיונים שפורסמו, ועותקים עשויים להישאר במקומות אחרים.",
   "home.debateClaim": "טענת הדיון",
   "home.claimPlaceholder": "הקלידו טענה או שאלה שאפשר לדון בה…",
   "home.composerHint": "המודלים מתדיינים · אתם מעריכים",
@@ -146,6 +146,5 @@
   "home.removal.close": "סגירה",
   "home.flag.underReview": "סומן · בבחינה",
   "home.flag.approved": "אושר",
-  "home.flag.refused": "לא אושר",
-  "home.takeDown.button": "הסרה"
+  "home.flag.refused": "לא אושר"
 }

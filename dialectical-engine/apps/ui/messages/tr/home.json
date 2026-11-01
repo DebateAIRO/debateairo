@@ -13,7 +13,7 @@
   "home.publicDebates": "Herkese açık tartışmalar",
   "home.total": "Toplam {count}",
   "home.signInHint": "Tartışmalarınızı görmek için yukarıdan oturum açın veya hesap oluşturun.",
-  "home.publicIndexingNotice": "Yayımlanmış tartışmalar arama motorlarınca dizine eklenebilir. Yayımdan kaldırıldıktan sonra kopyaları kalabilir.",
+  "home.publicIndexingNotice": "Yayımlanan tartışmalar arama motorlarınca dizine eklenebilir ve kopyaları başka yerlerde kalabilir.",
   "home.debateClaim": "Tartışma iddiası",
   "home.claimPlaceholder": "Tartışılabilir bir iddia veya soru yazın…",
   "home.composerHint": "Modeller tartışır · siz değerlendirirsiniz",
@@ -145,6 +145,5 @@
   "home.removal.close": "Kapat",
   "home.flag.underReview": "İŞARETLENDİ · İNCELENİYOR",
   "home.flag.approved": "ONAYLANDI",
-  "home.flag.refused": "ONAYLANMADI",
-  "home.takeDown.button": "Yayından kaldır"
+  "home.flag.refused": "ONAYLANMADI"
 }

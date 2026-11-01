@@ -13,7 +13,7 @@
   "home.publicDebates": "Dibattiti pubblici",
   "home.total": "{count} IN TOTALE",
   "home.signInHint": "Accedi o crea un account qui sopra per vedere i tuoi dibattiti.",
-  "home.publicIndexingNotice": "I dibattiti pubblicati possono essere indicizzati dai motori di ricerca. Eventuali copie potrebbero permanere anche dopo la revoca della pubblicazione.",
+  "home.publicIndexingNotice": "I dibattiti pubblicati possono essere indicizzati dai motori di ricerca e possono restarne copie altrove.",
   "home.debateClaim": "Affermazione del dibattito",
   "home.claimPlaceholder": "Inserisci un’affermazione o una domanda discutibile…",
   "home.composerHint": "I modelli argomentano · tu giudichi",
@@ -146,6 +146,5 @@
   "home.removal.close": "Chiudi",
   "home.flag.underReview": "CONTRASSEGNATO · IN REVISIONE",
   "home.flag.approved": "APPROVATO",
-  "home.flag.refused": "NON APPROVATO",
-  "home.takeDown.button": "Rimuovi"
+  "home.flag.refused": "NON APPROVATO"
 }

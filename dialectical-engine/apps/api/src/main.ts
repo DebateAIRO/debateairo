@@ -27,9 +27,9 @@ import {readConsumerRecoveryPolicy} from "@debateai/register";
 import {SendmailConsumerAccountSender} from "./mail-channel.js";
 import { ConsumerSecurityService } from "./consumer-security.js";
 import { PostgresConsumerSecurityRepository } from "@debateai/db";
-import { PostgresWebResearchedRepository, PostgresDigModelRepository, PostgresDigPicksRepository, PostgresInvestigationReportRepository, PostgresInvestigationRepository } from "@debateai/db";
+import { PostgresPublicDebateRepository, PostgresPublicDebateRunnerRepository, PostgresPublicPageRepository, PostgresPublicTreeRepository, PostgresWebResearchedRepository, PostgresDigModelRepository, PostgresDigPicksRepository, PostgresInvestigationReportRepository, PostgresInvestigationRepository } from "@debateai/db";
 import { investigationReportContentOpener } from "./investigation-report.js";
-import { postgresPurposeLines } from "./purpose-lines.js";
+import { postgresPurposeLines, readPurposeLinesOf } from "./purpose-lines.js";
 import { ASK_CLARIFY_ROUTE_POLICY, askClarifyTransportFor, createAskClarify } from "./ask-clarify.js";
 import { continuedRunWake, runHandoverOf } from "./month-pause.js";
 import { ConsumerWebAuthnService } from "./consumer-webauthn.js";
@@ -161,6 +161,7 @@ import { StaffWebAuthnService } from "./staff/webauthn.js";
 import { StaffAccessService } from "./staff/access.js";
 import { createStaffRuntime } from "./staff/runtime.js";
 import { PostgresPublicationApplication, buildPublicDebateBody } from "./publications.js";
+import { FREE_PUBLICATION_STORY_WAIT_MS, PUBLIC_PAGE_SWEEP_DEFAULTS, sweepFreePublications, sweepPublicPage } from "./public-tree.js";
 import { createPublicationReviewStaffService } from "./publication-review/staff.js";
 import { createPublicationContentCheck } from "./publication-check/check.js";
 import { composeQuestionCheck } from "./question-check/compose.js";
@@ -1147,7 +1148,13 @@ const publications = publicationCipher === undefined
       new RepositoryPublicationStoryReader(storyRepository),
       mapViews,
       // Final fix wave P5: an unparsable public snapshot is a newer release's only when its run is stamped by one.
-      { ownReleaseKey: environment.RELEASE_KEY, readRunReleaseKey: (runId) => application.readRunReleaseKey(runId) }
+      { ownReleaseKey: environment.RELEASE_KEY, readRunReleaseKey: (runId) => application.readRunReleaseKey(runId) },
+      // Decision 13: what contributions and reports added to the page since its first snapshot.
+      {
+        readUpdates: (publicationRef) => new PostgresPublicDebateRunnerRepository(pool).readPageUpdates(publicationRef),
+        readReports: (publicationRef) => new PostgresPublicPageRepository(pool).readReports(publicationRef),
+        authorNameGone: (publicationRef) => new PostgresPublicDebateRunnerRepository(pool).isAuthorNameGone(publicationRef)
+      }
     );
 // Side-by-side spec §4 (plan C3): the first read is awaited (a failure is recorded, never thrown), then it polls.
 await boot.run("release-watcher", () => releaseWatcher.start());
@@ -1166,6 +1173,7 @@ await boot.run("active-settings-version-check", () => checkActiveSettingsVersion
   log: (line) => { console.error(line); }
 }));
 let publicationCleanupTimer: ReturnType<typeof setInterval> | undefined;
+let publicPageTimer: ReturnType<typeof setInterval> | undefined;
 if (publications !== undefined) {
   // Crash-orphan publication keys are claimed and removed before the process
   // can accept traffic. Both bounded outboxes continue reconciling while the
@@ -1746,6 +1754,11 @@ const api = buildApi({
   digPicks: new PostgresDigPicksRepository(pool),
   // Decision 5 of 31 Oct (0138): a debate's place, time and purpose lines, sealed under its run key on this pool.
   purposeLines: postgresPurposeLines(pool),
+  // Decision 13 (0147): digs and reports on a public debate, by anyone with credit, read from the public copy.
+  ...(publications === undefined ? {} : { publicTree: {
+    pool, tree: new PostgresPublicTreeRepository(pool), contributions: new PostgresPublicDebateRepository(pool),
+    readPublicDebate: (publicationRef: string) => publications.readPublicDebate(publicationRef)
+  } }),
   askClarify,
   ...(askRoom === undefined ? {} : { monthRoom: askRoom }),
   // R22 W3-8: after Continue, the paused debate's released work item goes back to its own release's runner through the
@@ -1872,6 +1885,8 @@ const api = buildApi({
 // last-in-first-out, so an onClose here would run after every stop below; preClose runs before all of them, so no
 // one-shot pass can start a runtime the hooks below have already stopped.
 api.addHook("preClose",async () => endBecameCurrent?.());
+// Assigned once listening; clearing an unset timer does nothing.
+api.addHook("onClose",async () => clearInterval(publicPageTimer));
 if (publicationCleanupTimer !== undefined) {
   api.addHook("onClose",async () => clearInterval(publicationCleanupTimer));
 }
@@ -1979,6 +1994,37 @@ console.info(`DEBATEAI_API_READY ${JSON.stringify({ releaseKey: environment.RELE
 // Side-by-side spec §4 (plan C7): the timers started here, like every timer above, run their work only while this
 // release is current; the ask waker's whole-minute tick (with its stalled-start re-send) is gated the same way.
 if (askRoom !== undefined) askWaker = everyWholeMinute(gatedTrigger(releaseWatcher, triggerAskWake));
+// Decision 13: what allowed contributions wrote goes on the public page, and a finished Free debate goes public. Single-flight, gated: rows are claimed by what they already say, so an overlap at a
+// switch copies nothing twice.
+if (publications !== undefined) {
+  const publicPage = new PostgresPublicPageRepository(pool);
+  const publicContributions = new PostgresPublicDebateRunnerRepository(pool);
+  const publicTreeRepository = new PostgresPublicTreeRepository(pool);
+  const triggerPublicPage = createSingleFlightErasureReconciler(async () => {
+    await sweepPublicPage({ pool, page: publicPage, contributions: publicContributions, tree: publicTreeRepository, contentCheck: publicationContentCheck,
+      withPublicationKey: (publicationRef, use) => publications.withPublicationKey(publicationRef, use) });
+    await sweepFreePublications({ contributions: publicContributions, publishOne: async (waiting) => {
+      const owner = await publicPage.readFreeOwner(waiting.run_id);
+      if (owner === null) return "NOT_WAITING";
+      const session = ownerSession(owner.owner_ref, "00000000-0000-0000-0000-000000000000");
+      const ownership = { ownerRef: owner.owner_ref, legacyAskerId: null };
+      const lease = { run: <T>(use: () => Promise<T>) => application.withContentLease(waiting.run_id, use),
+        readAnswer: () => application.readRunAnswer(waiting.run_id, session, ownership) };
+      const answer = await lease.run(lease.readAnswer);
+      if (answer === null) return "NO_ANSWER_YET";
+      // Wait a while for the story, so the page goes out with its short answer.
+      const story = await lease.run(() => new RepositoryPublicationStoryReader(storyRepository).readStoryShort({ answerId: answer.answer_id, answerVersion: answer.answer_version, ownerRef: owner.owner_ref }));
+      if (story === null && Date.now() - Date.parse(waiting.notice_at) < FREE_PUBLICATION_STORY_WAIT_MS) return "WAITING_FOR_STORY";
+      const lines = await readPurposeLinesOf(pool, owner.owner_ref, waiting.run_id);
+      return publications.publishFreeDebate({ runId: waiting.run_id, answer, owner: { userId: owner.user_id, ownerRef: owner.owner_ref }, purposeLines: lines, contentCheck: publicationContentCheck,
+        source: { ip: "", userAgent: "", requestId: "free-publication-sweep" }, lease,
+        store: { prepare: (runId, ref) => publicContributions.prepareFreePublication(runId, ref),
+          publish: (input) => publicContributions.publishFree({ runId: input.runId, publicationRef: input.publicationRef, grantTokenHash: input.grantTokenHash, content: input.content, presentedAt: input.presentedAt }),
+          refuse: (runId) => publicContributions.refuseFree(runId) } });
+    } });
+  }, () => console.error("[PUBLIC_PAGE_WORK_PENDING]"));
+  publicPageTimer = gatedInterval(releaseWatcher, triggerPublicPage, PUBLIC_PAGE_SWEEP_DEFAULTS.everyMs);
+}
 if(triggerPasswordResetReconciliation)passwordResetTimer=gatedInterval(releaseWatcher,triggerPasswordResetReconciliation,30_000);
 if(triggerEmailRecoveryReconciliation)emailRecoveryTimer=gatedInterval(releaseWatcher,triggerEmailRecoveryReconciliation,30_000);
 // Side-by-side spec §4 (plan C7): the post-listen one-shots, in their order, run each time this release BECOMES current

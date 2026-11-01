@@ -13,7 +13,7 @@
   "home.publicDebates": "सार्वजनिक वाद-विवाद",
   "home.total": "कुल {count}",
   "home.signInHint": "अपने वाद-विवाद देखने के लिए ऊपर साइन इन करें या खाता बनाएँ।",
-  "home.publicIndexingNotice": "प्रकाशित वाद-विवादों को खोज इंजन अनुक्रमित कर सकते हैं। अप्रकाशित करने के बाद भी उनकी प्रतियाँ बनी रह सकती हैं।",
+  "home.publicIndexingNotice": "प्रकाशित वाद-विवादों को खोज इंजन अनुक्रमित कर सकते हैं, और उनकी प्रतियां कहीं और बनी रह सकती हैं।",
   "home.debateClaim": "वाद-विवाद का दावा",
   "home.claimPlaceholder": "विचार योग्य दावा या प्रश्न लिखें…",
   "home.composerHint": "मॉडल वाद-विवाद करते हैं · निर्णय आप लेते हैं",
@@ -145,6 +145,5 @@
   "home.removal.close": "बंद करें",
   "home.flag.underReview": "चिह्नित · समीक्षाधीन",
   "home.flag.approved": "अनुमोदित",
-  "home.flag.refused": "अनुमोदित नहीं",
-  "home.takeDown.button": "हटाएँ"
+  "home.flag.refused": "अनुमोदित नहीं"
 }

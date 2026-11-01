@@ -153,7 +153,7 @@ describe("0121: the engine verdict, R2's one migration", () => {
   });
 
   it("follows the reply measures in the chain, with its own loader", () => {
-    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0120,loadForward0121,loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130,loadForward0131,loadForward0132,loadForward0133,loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140,loadForward0141,loadForward0142,loadForward0143,loadForward0144,loadForward0145,loadForward0146]");
+    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0120,loadForward0121,loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130,loadForward0131,loadForward0132,loadForward0133,loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140,loadForward0141,loadForward0142,loadForward0143,loadForward0144,loadForward0145,loadForward0146,loadForward0147,loadForward0148]");
     const loader = read("packages/db/src/migration-forward0121.ts");
     expect(loader).toContain("const PREVIOUS='0120_reply_measures.sql';");
     expect(loader).toContain("const NAME='0121_engine_verdict.sql';");

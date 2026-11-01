@@ -281,6 +281,10 @@ function V4AskForm({
     </>
   );
   const shortHint = trimmed.length > 0 && !longEnough && !crisisText;
+  // Decision 13: before every Start press of a Free person, in their language (the sentence is in all 35 catalogues). The ask then says it was shown.
+  const publicNotice = ask.freePublicNotice === true
+    ? <p className="v4AskPublicNotice" role="note">{t(newDebateCatalog, "newDebate.freePublicNotice")}</p>
+    : null;
 
   // Changing step moves focus to the new step's heading or the question, and back to the top.
   useEffect(() => {
@@ -424,6 +428,7 @@ function V4AskForm({
             </fieldset>
           ) : null}
 
+          {publicNotice}
           <div className="v4AskActions">
             <button type="button" className="v4Btn v4BtnPrimary" onClick={() => void goOn()} disabled={!canGoOn || busy}>
               {t(catalog, "v4.ask.continue")}
@@ -581,6 +586,7 @@ function V4AskForm({
 
           <div className="v4AskBar">
             <p className="v4AskBarGet">{t(catalog, "v4.read.youGet")}</p>
+            {publicNotice}
             <div className="v4AskBarRow">
               {/* Owner N13: Free has no Quick look / Thorough choice (askConfig sends every Free ask as a quick look). */}
               {ask.planTier === "free" ? null : (

@@ -133,11 +133,11 @@ describe("S10 rendered erasure boundaries",()=>{
       const readAccountErasure=vi.fn()
         .mockResolvedValueOnce({
           status:"SCHEDULED",execute_at:"2026-08-31T00:00:00.000Z",
-          cancellation_ref:CANCELLATION_REF,delete_public_debates:false
+          cancellation_ref:CANCELLATION_REF
         })
         .mockResolvedValue({
           status:"PROCESSING",execute_at:"2026-08-31T00:00:00.000Z",
-          cancellation_ref:CANCELLATION_REF,delete_public_debates:false
+          cancellation_ref:CANCELLATION_REF
         });
       const client={
         readAccountErasure,
@@ -175,7 +175,7 @@ describe("S10 rendered erasure boundaries",()=>{
     } });
     const erasureClient=(getBillingSubscription:()=>Promise<unknown>,scheduled=false)=>({
       readAccountErasure:vi.fn(async ()=>scheduled
-        ? { status:"SCHEDULED" as const,execute_at:"2026-08-31T00:00:00.000Z",cancellation_ref:CANCELLATION_REF,delete_public_debates:false }
+        ? { status:"SCHEDULED" as const,execute_at:"2026-08-31T00:00:00.000Z",cancellation_ref:CANCELLATION_REF }
         : { status:"NONE" as const }),
       stepUp:vi.fn(),scheduleAccountErasure:vi.fn(),cancelAccountErasure:vi.fn(),
       getBillingSubscription:vi.fn(getBillingSubscription)

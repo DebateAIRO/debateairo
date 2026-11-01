@@ -3110,6 +3110,60 @@
         "EXECUTE ON FUNCTION staff.complete_allowance_notice(uuid,uuid,boolean)",
         "EXECUTE ON FUNCTION staff.allowance_notice_user(uuid,uuid)"
       ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0147_public_tree.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_public_dig_parent(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.join_public_tree(uuid,uuid,uuid,uuid,text)",
+        "EXECUTE ON FUNCTION identity.record_public_material(uuid,uuid,uuid,text,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.open_public_report(uuid,uuid,uuid,boolean)",
+        "EXECUTE ON FUNCTION identity.read_public_tree_of_run(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0147_public_tree.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_public_material(uuid)",
+        "EXECUTE ON FUNCTION identity.record_public_dig_input(uuid,text,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_public_dig_input(uuid)",
+        "EXECUTE ON FUNCTION identity.take_public_path_turn(uuid,uuid,uuid,text,text,smallint,text,uuid)",
+        "EXECUTE ON FUNCTION identity.record_public_path_update(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_public_path_line(uuid)",
+        "EXECUTE ON FUNCTION identity.read_public_climb_next(uuid)",
+        "EXECUTE ON FUNCTION identity.record_public_check_passed(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.read_public_digs_unsettled(timestamptz,integer)",
+        "EXECUTE ON FUNCTION identity.read_public_climbs_owed(integer)",
+        "EXECUTE ON FUNCTION identity.mark_public_climb_done(uuid)",
+        "EXECUTE ON FUNCTION identity.read_public_answer_updates(uuid)",
+        "EXECUTE ON FUNCTION identity.record_public_answer_update(uuid,uuid,uuid,uuid,text,uuid,text,text,jsonb,jsonb,smallint,jsonb,bigint,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_public_reports_unwritten(integer)",
+        "EXECUTE ON FUNCTION identity.record_public_report(uuid,text,text,text,text,smallint,integer,smallint,smallint,jsonb,jsonb,jsonb,bigint,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_public_report_charged_until(uuid)",
+        "EXECUTE ON FUNCTION identity.read_public_checks_passed(integer)",
+        "EXECUTE ON FUNCTION identity.read_public_page_owed(integer)",
+        "EXECUTE ON FUNCTION identity.read_public_reports_owed(integer)",
+        "EXECUTE ON FUNCTION identity.record_public_debate_report(uuid,integer,uuid,jsonb)",
+        "EXECUTE ON FUNCTION identity.read_public_debate_reports(uuid)",
+        "EXECUTE ON FUNCTION identity.record_public_page_skip(uuid,uuid,text,text)",
+        "EXECUTE ON FUNCTION identity.read_free_debate_owner(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_erasure_runtime",
+      "source": "migrations/0147_public_tree.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.forget_erased_debate_public_tree(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0147_public_tree.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_public_tree(uuid,uuid)"
+      ]
     }
   ],
   "deploymentObligations": [

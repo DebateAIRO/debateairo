@@ -63,7 +63,12 @@ export const WEB_CONTRACT_LIMITS = Object.freeze({
   /** The main answer's automatic versions served with it, newest last (decision 3). */
   mainAnswerVersionsMax: 200,
   /** A public debate's listed contributions (decision 13). */
-  publicContributionsMax: 500
+  publicContributionsMax: 500,
+  /** The points a public contribution lists on one of its dig's paths, and how long one may be. */
+  publicPointsMax: 60,
+  publicPointMaxChars: 4_000,
+  /** A public debate's report versions served with it (decisions 13, 16). */
+  publicReportsMax: 200
 });
 
 /** Owner answer Q19: Free's cap on the picks one dig combines (WEB_CONTRACT_LIMITS.freeDigPicksMax). */
@@ -895,7 +900,18 @@ export const PublicContributionSchema = z.object({
   line: z.string().trim().min(1).max(STORY_RUNAWAY_LIMITS.positionLineMaxChars),
   summary: z.string().trim().min(1).max(DIG_MODEL_LIMITS.summaryMaxChars),
   fate: StoryFateSchema,
-  what_changed: z.array(z.string().trim().min(1).max(WEB_CONTRACT_LIMITS.reasonMaxChars)).max(DIG_MODEL_LIMITS.whatChangedSentencesMax)
+  what_changed: z.array(z.string().trim().min(1).max(WEB_CONTRACT_LIMITS.reasonMaxChars)).max(DIG_MODEL_LIMITS.whatChangedSentencesMax),
+  // The reference a later dig names (`PublicDigParent.dig_ref`), the dig this came from and whether it is that dig's own rewrite (false: a path above it that changed).
+  update_ref: z.uuid().optional(),
+  own_rewrite: z.boolean().optional(),
+  on_ref: z.uuid().nullable().optional(),
+  // The dig's own paths, for a later dig on one of them: their lines and the points argued on them, all checked before they got here.
+  dig_paths: z.array(z.object({
+    position_ref: PositionRefSchema,
+    line: z.string().trim().min(1).max(STORY_RUNAWAY_LIMITS.positionLineMaxChars),
+    fate: StoryFateSchema,
+    points: z.array(z.string().trim().min(1).max(WEB_CONTRACT_LIMITS.publicPointMaxChars)).max(WEB_CONTRACT_LIMITS.publicPointsMax)
+  }).strict()).max(WEB_CONTRACT_LIMITS.pathsMax).optional()
 }).strict();
 export type PublicContribution = z.infer<typeof PublicContributionSchema>;
 
@@ -905,3 +921,80 @@ export const PublicMainAnswerSchema = z.object({
   segments: z.array(MainAnswerSegmentSchema).min(1).max(2)
 }).strict();
 export type PublicMainAnswer = z.infer<typeof PublicMainAnswerSchema>;
+
+/**
+ * Decision 13: what the runner may read of a public debate: the page and nothing else, sealed for it by the API under a live run's key
+ * (0147's identity.public_material), because the runner holds no publication key and a stranger's AI work must read nothing private. Ids
+ * here are the page's own: never a run id.
+ */
+const MaterialTextSchema = z.string().min(1).max(40_000);
+export const PublicMaterialPointSchema = z.object({
+  id: z.string().min(1).max(200),
+  text: MaterialTextSchema,
+  on_id: z.string().min(1).max(200).nullable(),
+  side: z.enum(["for", "against"]).nullable(),
+  disputed: z.boolean()
+}).strict();
+export const PublicMaterialExtractSchema = z.object({
+  point_id: z.string().min(1).max(200),
+  label: z.string().min(1).max(32),
+  site: z.string().min(1).max(500),
+  title: z.string().max(2_000).nullable(),
+  link: z.string().max(4_000).nullable(),
+  quote: z.string().min(1).max(4_000),
+  note: z.string().max(4_000).nullable()
+}).strict();
+export const PublicMaterialPathSchema = z.object({
+  ref: PositionRefSchema,
+  story_line: MaterialTextSchema,
+  story_fate: StoryFateSchema,
+  /** Its newest text on the page, when a contribution changed it. */
+  line: MaterialTextSchema,
+  summary: MaterialTextSchema.nullable(),
+  fate: StoryFateSchema,
+  /** When that text was written (the source's time); null: the first snapshot's. */
+  written_at: z.iso.datetime().nullable(),
+  points: z.array(PublicMaterialPointSchema),
+  extracts: z.array(PublicMaterialExtractSchema)
+}).strict();
+export const PublicMaterialDigSchema = z.object({
+  ref: z.uuid(),
+  /** The dig it was dug from (its reference), or null: the first debate. */
+  parent_ref: z.uuid().nullable(),
+  position_ref: PositionRefSchema,
+  level: z.number().int().min(1).max(DIG_LEVEL_MAX),
+  contributed_at: z.iso.datetime(),
+  line: MaterialTextSchema,
+  summary: MaterialTextSchema,
+  fate: StoryFateSchema,
+  what_changed: z.array(MaterialTextSchema),
+  paths: z.array(PublicMaterialPathSchema)
+}).strict();
+export const PublicMaterialSchema = z.object({
+  v: z.literal(1),
+  publication_ref: z.uuid(),
+  as_of: z.iso.datetime(),
+  question: MaterialTextSchema,
+  language: z.string().max(64).nullable(),
+  answer: z.object({ headline: MaterialTextSchema, summary: MaterialTextSchema, change: MaterialTextSchema, confidence: MaterialTextSchema.nullable() }).strict().nullable(),
+  /** The main answer as the page shows it now, with how many versions led to it; null: the first snapshot's still stands. */
+  main_answer: z.object({ version: z.number().int().min(1), segments: z.array(MaterialTextSchema).min(1) }).strict().nullable(),
+  paths: z.array(PublicMaterialPathSchema),
+  digs: z.array(PublicMaterialDigSchema),
+  /** The newest report's answer on the page, for a later version's writer (decision 26's "earlier" line). */
+  earlier_report: z.object({ version: z.number().int().min(1), segments: z.array(MaterialTextSchema).min(1) }).strict().nullable()
+}).strict();
+export type PublicMaterial = z.infer<typeof PublicMaterialSchema>;
+export type PublicMaterialPath = z.infer<typeof PublicMaterialPathSchema>;
+export type PublicMaterialDig = z.infer<typeof PublicMaterialDigSchema>;
+export type PublicMaterialPoint = z.infer<typeof PublicMaterialPointSchema>;
+
+/** POST /v1/public/debates/{id}/report (decision 13): nothing but the press; the writer is the session's. */
+export const PublicReportRequestSchema = z.object({}).strict();
+export const PublicReportAcceptedSchema = z.object({ state: z.literal("WRITING"), report_version: z.number().int().min(1) }).strict();
+export type PublicReportAccepted = z.infer<typeof PublicReportAcceptedSchema>;
+export const PublicDebateRefusedSchema = z.object({
+  error: z.enum(["PUBLIC_DEBATE_ONGOING", "PUBLIC_DEBATE_NO_CARRIER", "PUBLIC_DEBATE_WAITS_FOR_RESET", "PUBLIC_DEBATE_REPORT_WRITING", "PUBLIC_DIG_NEEDS_A_PATH"]),
+  message: z.string()
+}).strict();
+export type PublicDebateRefused = z.infer<typeof PublicDebateRefusedSchema>;

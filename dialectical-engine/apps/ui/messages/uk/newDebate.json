@@ -137,5 +137,6 @@
   "newDebate.askText.otherAnswer": "Інша відповідь…",
   "newDebate.askText.otherLabel": "Ваше власне додаткове уточнення",
   "newDebate.askText.matters": "Якщо відповіді тягнуть у різні боки, для мене найважливіше: {matters}",
-  "newDebate.askText.angles": "Будь ласка, також погляньте на: {list}."
+  "newDebate.askText.angles": "Будь ласка, також погляньте на: {list}.",
+  "newDebate.freePublicNotice": "На безкоштовному плані ваше запитання та його дебати є публічними. Не вказуйте персональні дані."
 }

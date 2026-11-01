@@ -168,7 +168,7 @@ describe("SUP-01 support eval release gate", () => {
     const executor = await createInProcessSupportEvalExecutor();
     try {
       expect(executor.kbVersion).toBe(
-        "cd87db4867b8fe5b2435b1b83cc93b0f9a0a943130ee72d6e4850ecdf1392537"
+        "842da910d71dc3dc64389b11e55e036f369d04ab22b0c30c84bbcd56201eec12"
       );
       const report = await runSupportEval({
         caseDirectory: CASE_DIRECTORY,runs: 1,mode: "deterministic-structural",

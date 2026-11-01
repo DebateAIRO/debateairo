@@ -310,6 +310,8 @@ function NewDebateForm({
   useEffect(() => {
     if (room !== null) { rememberPlan(room.plan_id); rememberFunding("funding" in room ? room.funding : null); }
   }, [room, rememberPlan, rememberFunding]);
+  // Decision 13: only a plan the server named as Free shows the notice and sends that it was shown; no plans (a local site), no notice.
+  const freePublicNotice = internalFunding === null && decidedPlan === "FREE";
   const decidedTier: PlanTier | null = internalFunding !== null ? "premium" : decidedPlan === null ? null : decidedPlan === "FREE" ? "free" : "premium";
   // Follow the decided tier ONCE per decision. Moving the form's tier changes
   // the room query and the room is read again; the guard keeps that re-read
@@ -418,9 +420,12 @@ function NewDebateForm({
       while (debate === null) {
         try {
           debate = !sendsLanguage
-            ? await createDebate(next.line, config, token)
+            ? freePublicNotice
+              ? await createDebate(next.line, config, token, undefined, undefined, undefined, undefined, { freePublicNotice: true })
+              : await createDebate(next.line, config, token)
             : await createDebate(next.line, config, token, undefined,
-              next.choice === undefined ? { siteLanguage } : { siteLanguage, choice: next.choice });
+              next.choice === undefined ? { siteLanguage } : { siteLanguage, choice: next.choice }, undefined, undefined,
+              freePublicNotice ? { freePublicNotice: true } : undefined);
         } catch (refusal) {
           // Today's one retry after the consent screen; it is not one of the four asks.
           if (isSensitiveDataConsentRefusal(refusal) && !consentRetried) {
@@ -714,6 +719,7 @@ function NewDebateForm({
           ) : null}
 
           <RoomNotice room={room} catalog={{...catalog,...billingCatalog}} locale={locale} />
+          {freePublicNotice ? <p className="ndPublicNotice" role="note">{t(catalog, "newDebate.freePublicNotice")}</p> : null}
           <div className="ndActions">
             <button data-support-primary-control type="submit" className="ndStart" disabled={!(ready || crisis.flags(topic)) || submitting || (room?.room === "ALREADY_WAITING" && !crisis.flags(topic))}>
               {t(catalog, submitting ? "newDebate.starting" : "newDebate.startRun")} <span aria-hidden>→</span>

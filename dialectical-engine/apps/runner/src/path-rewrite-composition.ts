@@ -1,5 +1,5 @@
 import {
-  PATH_REWRITE_CARRIER, PostgresDigModelRunnerRepository, PostgresDigPicksRunnerRepository, PostgresTreeUpdateRunnerRepository, encryptAttestedContentForRun,
+  PATH_REWRITE_CARRIER, PostgresDigModelRunnerRepository, PostgresDigPicksRunnerRepository, PostgresPublicDebateRunnerRepository, PostgresTreeUpdateRunnerRepository, encryptAttestedContentForRun,
   withRunContentLease, type Pool
 } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
@@ -9,6 +9,7 @@ import { firstDebateSuggestionFacts } from "./investigation-digest.js";
 import { advanceTree, type TreeSweepSettings, type TreeUpdateSettings } from "./path-climb.js";
 import { postgresTreeUpdatePorts, readRecentTreeDigs } from "./path-climb-sources.js";
 import { createPathRewriteInFlight, type PathRewriteRunnerSettings } from "./path-rewrite.js";
+import { publicDigOnSettle, type PublicTreeRunnerSettings } from "./public-contribution.js";
 import { postgresPathRewriteSources } from "./path-rewrite-sources.js";
 import type { PathRewriteSweepSettings } from "./path-rewrite-sweep.js";
 import { readReplayBook } from "./run-replay.js";
@@ -32,7 +33,7 @@ import { readReplayBook } from "./run-replay.js";
 export const PATH_REWRITE_WRITER_MODEL = "claude-haiku-5-5" as const;
 export const PATH_REWRITE_CHECKER_MODEL = "zai-org/GLM-5.3-Flash" as const;
 
-export type PathRewriteComposed = Readonly<{ settings: PathRewriteRunnerSettings; sweep: PathRewriteSweepSettings; treeSweep: TreeSweepSettings }>;
+export type PathRewriteComposed = Readonly<{ settings: PathRewriteRunnerSettings; sweep: PathRewriteSweepSettings; treeSweep: TreeSweepSettings; publicTree: PublicTreeRunnerSettings }>;
 
 export function composePathRewrite(input: Readonly<{
   pool: Pool;
@@ -68,8 +69,12 @@ export function composePathRewrite(input: Readonly<{
         debateRunId: level.parentRunId, positionRef: level.positionRef, line: written.line, points: written.points, whatChanged: written.whatChanged,
         step: written.step, writer: written.writer, send: written.send, log: written.log }));
     } });
+  // Decision 13: a dig on a public debate is a contribution, on its own pipeline (public-contribution.ts), read only from the public copy.
+  const publicTree: PublicTreeRunnerSettings = Object.freeze({ pool, roles, writerRoleRef, checkerRoleRef, inFlight, log: input.log, ...tokenCount });
   const settings: PathRewriteRunnerSettings = Object.freeze({
     ...tokenCount,
+    publicDig: publicDigOnSettle(publicTree, () => settings),
+    isPublicDig: async (runId: string) => (await new PostgresPublicDebateRunnerRepository(pool).readContribution(runId)) !== null,
     sources: postgresPathRewriteSources(pool),
     turns: new PostgresDigModelRunnerRepository(pool),
     seal: (digRunId: string, rewriteId: string, content: unknown) => withRunContentLease(pool, [digRunId], async () => {
@@ -93,6 +98,7 @@ export function composePathRewrite(input: Readonly<{
   const picks = new PostgresDigPicksRunnerRepository(pool);
   return Object.freeze({
     settings,
+    publicTree,
     sweep: Object.freeze({
       rewrite: settings,
       list: (before: Date, limit: number) => picks.readUnwritten(before, limit),

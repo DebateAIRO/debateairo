@@ -18,6 +18,10 @@ import type { LocaleCode } from "@/lib/i18n/locales";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import composeEnglish from "@/messages/en/compose.json";
 import { useDebateTextLang } from "@/components/debateTextLang";
+import { formatDate } from "@/lib/i18n/translate";
+import v4English from "@/messages/en/v4.json";
+import { V4PublicLaneProvider, V4PublicPathNote, V4PublicReports, type V4PublicLaneConfig } from "@/components/v4/V4PublicLane";
+import { publicPathViews, type PublicPathView } from "@/lib/v4/publicPage";
 
 function verdictLabel(
   verdict: PublicDebate["answer"]["verdict"],
@@ -128,6 +132,14 @@ function publicStoryContent(story: PublicStoryShort, answer: PublicDebate["answe
   };
 }
 
+/** Decision 13: the same story with each path at its newest text; the first text stays in `publicStoryContent`, for the first answer. */
+function newestPaths(content: StoryShortContent, views: readonly PublicPathView[]): StoryShortContent {
+  return { ...content, paths: content.paths.map((path) => {
+    const view = views.find((candidate) => candidate.ref === path.positionRef);
+    return view === undefined ? path : { ...path, line: view.line, fate: view.fate };
+  }) };
+}
+
 export function PublicDebateOverview({
   debate,
   catalog,
@@ -135,6 +147,8 @@ export function PublicDebateOverview({
   storyLocale,
   composeCatalog = composeEnglish,
   viewingNote = "PUBLIC",
+  locale = storyLocale,
+  lane,
   onDetails,
   onRead
 }: {
@@ -150,6 +164,10 @@ export function PublicDebateOverview({
   /** The interface locale's `compose` catalogue: V3 score copy and model family names. */
   composeCatalog?: MessageCatalog;
   viewingNote?: "PUBLIC" | "NONE";
+  /** The reader's locale, for the dates of contributions and reports. */
+  locale?: string;
+  /** Decision 13: on the live public page, what a signed-in person can press. Absent (a publication review): the page's text alone. */
+  lane?: V4PublicLaneConfig;
   onDetails: () => void;
   onRead: (nodeId: string) => void;
 }) {
@@ -166,8 +184,24 @@ export function PublicDebateOverview({
   const storyVerdict = floor !== null ? floor.label : story === undefined ? null : debate.answer.verdict;
   const returnPath = `/public/debate/${encodeURIComponent(debate.public_ref)}`;
   const signInHref = `/login?next=${encodeURIComponent(returnPath)}`;
+  const v4Catalog = lane?.catalog ?? v4English;
+  const pathViews = publicPathViews(debate);
+  const pathNote = (positionRef: string) => {
+    const view = pathViews.find((candidate) => candidate.ref === positionRef);
+    return view === undefined ? null : <V4PublicPathNote path={view} catalog={v4Catalog} locale={locale} actions={lane !== undefined} />;
+  };
+  // Decision 13: a contribution that changed the main answer shows first; the first answer, sealed as it was, stays one click away. Its story's paths stay
+  // on the page at their newest text, with who added to them.
+  const update = debate.main_answer_update;
+  const firstAnswer = story !== undefined
+    ? <StoryShortBlocks story={publicStoryContent(story, debate.answer)} catalog={storyCatalog} locale={storyLocale} className="publicStory" />
+    : floorView !== null
+      ? <FloorAnswer view={floorView} showLabel={false} />
+      : presentation.summary.length > 0
+        ? presentation.summary.map((paragraph, index) => <p key={index}>{paragraph}</p>)
+        : <p>{t(catalog, "public.overview.composedVerdictUnavailable")}</p>;
 
-  return (
+  const overview = (
     <div className="publicOverviewScroll scroll" data-design-turn="3b">
       <div className="publicOverview">
         <div className="publicOverviewInner">
@@ -201,13 +235,31 @@ export function PublicDebateOverview({
               </button>
             </div>
             <div className="publicVerdictText">
-              {story !== undefined
-                ? <StoryShortBlocks story={publicStoryContent(story, debate.answer)} catalog={storyCatalog} locale={storyLocale} className="publicStory" />
-                : floorView !== null
-                  ? <FloorAnswer view={floorView} showLabel={false} />
-                  : presentation.summary.length > 0
-                    ? presentation.summary.map((paragraph, index) => <p key={index}>{paragraph}</p>)
-                    : <p>{t(catalog, "public.overview.composedVerdictUnavailable")}</p>}
+              {update !== undefined ? (
+                <>
+                  <div className="publicMainUpdate">
+                    {update.segments.map((segment, index) => <p key={index} dir="auto">{segment.text}</p>)}
+                    <p className="publicMainUpdateNote">
+                      {t(v4Catalog, "v4.public.mainUpdated", { date: formatDate(locale, update.updated_at, { year: "numeric", month: "long", day: "numeric" }) })}
+                    </p>
+                  </div>
+                  {story === undefined ? null : (
+                    <StoryShortBlocks
+                      story={{ ...newestPaths(publicStoryContent(story, debate.answer), pathViews), headline: null, confidence: null, summary: null, change: null, reviewerNote: null, reservation: false }}
+                      catalog={storyCatalog}
+                      locale={storyLocale}
+                      className="publicStory"
+                      pathNote={pathNote}
+                    />
+                  )}
+                  <details className="publicFirstAnswer">
+                    <summary>{t(v4Catalog, "v4.public.firstAnswer")}</summary>
+                    {firstAnswer}
+                  </details>
+                </>
+              ) : story !== undefined ? (
+                <StoryShortBlocks story={newestPaths(publicStoryContent(story, debate.answer), pathViews)} catalog={storyCatalog} locale={storyLocale} className="publicStory" pathNote={pathNote} />
+              ) : firstAnswer}
               {story !== undefined && floorView !== null && floorView.thinBasis !== null ? (
                 <p className="floorAnswerNote" lang={floorView.locale} dir={floorView.direction}>{floorView.thinBasis}</p>
               ) : null}
@@ -248,6 +300,8 @@ export function PublicDebateOverview({
         {/* Debate shape P2c: what came up but was not debated, in the question's language. */}
         <AlsoRaisedList view={debate.map_view} catalog={storyCatalog} locale={storyLocale} />
 
+        <V4PublicReports debate={debate} catalog={v4Catalog} locale={locale} />
+
         {viewingNote === "PUBLIC" ? <p className="publicUnlockNote">
           <span aria-hidden>🔒</span> {t(catalog, "public.overview.publicViewingNotice")} {" "}
           <Link href={signInHref}>{t(catalog, "public.overview.unlockActions")} <span aria-hidden>→</span></Link>
@@ -256,4 +310,5 @@ export function PublicDebateOverview({
       </div>
     </div>
   );
+  return lane === undefined ? overview : <V4PublicLaneProvider debate={debate} lane={lane}>{overview}</V4PublicLaneProvider>;
 }

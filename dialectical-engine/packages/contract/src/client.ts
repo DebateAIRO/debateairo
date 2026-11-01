@@ -1,6 +1,6 @@
 import { ContractHttpError, type ContractErrorCode, type ContractWaitingRefusal } from "./http-error.js";
 import { AskClarifyResponseSchema, RunContinueRefusedSchema, RunContinueRequestSchema, RunContinuedSchema, type AskClarifyRequest, type AskClarifyResponse, type RunContinued, type RunContinueRefused } from "./web.js";
-import { InvestigationCloseRequestSchema, ResearchedAddRequestSchema, ResearchedAddedSchema, ResearchedRefusedSchema, type ResearchedAddRequest, type ResearchedAdded, type ResearchedRefused } from "./web.js";
+import { InvestigationCloseRequestSchema, PublicDebateRefusedSchema, PublicReportAcceptedSchema, PublicReportRequestSchema, ResearchedAddRequestSchema, ResearchedAddedSchema, ResearchedRefusedSchema, type PublicDebateRefused, type PublicReportAccepted, type ResearchedAddRequest, type ResearchedAdded, type ResearchedRefused } from "./web.js";
 import {
   InvestigationReopenRequestSchema, InvestigationReopenedSchema, InvestigationReportAcceptedSchema, InvestigationReportsSchema,
   InvestigationReportWritingSchema, type InvestigationReopened, type InvestigationReportAccepted, type InvestigationReports,
@@ -448,12 +448,12 @@ export interface ContractClient {
   publishRun(runId: string, stepUpGrant: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
   requestPublicationReview(runId: string, stepUpGrant: string): Promise<{ state: "UNDER_REVIEW" }>;
   readPublicationReview(runId: string): Promise<PublicationReviewState>;
-  scheduleAccountErasure(stepUpGrant:string,deletePublicDebates?:boolean):Promise<{
-    status:"SCHEDULED"|"DUE"|"PROCESSING";execute_at:string;cancellation_ref:string;delete_public_debates:boolean;
+  scheduleAccountErasure(stepUpGrant:string):Promise<{
+    status:"SCHEDULED"|"DUE"|"PROCESSING";execute_at:string;cancellation_ref:string;
   }>;
   readAccountErasure():Promise<
     | { status:"NONE" }
-    | { status:"SCHEDULED"|"DUE"|"PROCESSING";execute_at:string;cancellation_ref:string;delete_public_debates:boolean }
+    | { status:"SCHEDULED"|"DUE"|"PROCESSING";execute_at:string;cancellation_ref:string }
   >;
   cancelAccountErasure(cancellationRef:string):Promise<{ status:"CANCELLED" }>;
   deletePrivateDebate(runId:string,stepUpGrant:string):Promise<{
@@ -567,6 +567,8 @@ export interface ContractClient {
   reopenInvestigation(runId: string): Promise<InvestigationReopened | InvestigationReportWriting>;
   /** W4-4: "Add to researched" (202, READING; the same page again: the same). Its refusals (409) are answered as data. */
   addToResearched(runId: string, request: ResearchedAddRequest): Promise<ResearchedAdded | ResearchedRefused>;
+  /** Decision 13: "Write a report" on a public page. A 409 comes back as data (nothing started); a 404 and the rest throw. */
+  writePublicReport(publicationRef: string): Promise<PublicReportAccepted | PublicDebateRefused>;
   readRun(runId: string): Promise<RunProjection>;
   readInspection(answerId: string, version?: number): Promise<Inspection>;
   readLedgerDigest(answerId: string): Promise<ExecutionLedgerDigest>;
@@ -804,11 +806,10 @@ export function createContractClient(
       `/v1/runs/${encodeURIComponent(runId)}/publication-review`,
       PublicationReviewStateSchema
     ),
-    scheduleAccountErasure:(stepUpGrant:string,deletePublicDebates?:boolean)=>request(
+    scheduleAccountErasure:(stepUpGrant:string)=>request(
       "/v1/account",AccountErasureStatusSchema,
       { method:"DELETE",body:JSON.stringify({
-          confirmation:"DELETE MY ACCOUNT",step_up_grant:stepUpGrant,
-          delete_public_debates:deletePublicDebates===true
+          confirmation:"DELETE MY ACCOUNT",step_up_grant:stepUpGrant
         }) }
     ).then((status)=>{
       if (status.status==="NONE") throw new ContractHttpError(
@@ -1014,6 +1015,15 @@ export function createContractClient(
       (status, body) => {
         if (status !== 409) return null;
         const refused = ResearchedRefusedSchema.safeParse(body);
+        return refused.success ? refused.data : null;
+      }
+    ),
+    writePublicReport: (publicationRef: string) => requestJson<PublicReportAccepted | PublicDebateRefused>(
+      root.href, fetchImplementation, `/v1/public/debates/${encodeURIComponent(publicationRef)}/report`, PublicReportAcceptedSchema,
+      { method: "POST", body: JSON.stringify(PublicReportRequestSchema.parse({})) }, auth, 202,
+      (status, body) => {
+        if (status !== 409) return null;
+        const refused = PublicDebateRefusedSchema.safeParse(body);
         return refused.success ? refused.data : null;
       }
     ),

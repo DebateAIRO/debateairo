@@ -137,5 +137,6 @@
   "newDebate.askText.otherAnswer": "別の回答…",
   "newDebate.askText.otherLabel": "ご自身の補足説明",
   "newDebate.askText.matters": "回答同士が食い違うとき、私にとって一番大事なのは：{matters}",
-  "newDebate.askText.angles": "次の観点も見てください：{list}。"
+  "newDebate.askText.angles": "次の観点も見てください：{list}。",
+  "newDebate.freePublicNotice": "無料プランでは、お客様の質問とそのディベートは公開されます。個人情報を含めないでください。"
 }

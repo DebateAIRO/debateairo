@@ -1,5 +1,6 @@
 import {
   AskParentSchema,
+  PublicDigParentSchema,
   ContractHttpError,
   createContractClient,
   DepthParamsSchema,
@@ -7,6 +8,7 @@ import {
   type Answer,
   type ArgumentLanguage,
   type AskParent,
+  type PublicDigParent,
   type PurposeLines,
   type AskRequest,
   type ContractClient,
@@ -502,7 +504,9 @@ export async function createDebate(
   /** Plan 2026-10-30 W3-4: a dig names the debate it digs, its places, mode and picks (AskParentSchema). */
   parent?: AskParent,
   /** Decision 5 of 31 Oct: the debate's place, time and purpose lines, structured, whatever the page's language. */
-  purposeLines?: PurposeLines
+  purposeLines?: PurposeLines,
+  /** Decision 13: a dig on someone's public debate instead of `parent`, and that this Free ask showed the notice. */
+  publicLane?: Readonly<{ publicParent?: PublicDigParent; freePublicNotice?: true }>
 ): Promise<{ id: string }> {
   const riskTier = requiredString(config, "risk_tier");
   if (!RISK_TIERS.has(riskTier)) throw new Error("ASK_FIELD_REQUIRED: risk_tier must be casual, standard, or high-stakes.");
@@ -543,7 +547,9 @@ export async function createDebate(
     ...(language?.choice === undefined ? {} : { question_language_choice: language.choice }),
     ...(purposeLines === undefined ? {} : { purpose_lines: purposeLines }),
     ...(settingsVersion === undefined ? {} : { settings_version: settingsVersion }),
-    ...(parent === undefined ? {} : { parent: AskParentSchema.parse(parent) })
+    ...(parent === undefined ? {} : { parent: AskParentSchema.parse(parent) }),
+    ...(publicLane?.publicParent === undefined ? {} : { public_parent: PublicDigParentSchema.parse(publicLane.publicParent) }),
+    ...(publicLane?.freePublicNotice === true ? { free_public_notice: true as const } : {})
   };
   requireToken(token);
   if (language === undefined) {                                   // today's call, unchanged

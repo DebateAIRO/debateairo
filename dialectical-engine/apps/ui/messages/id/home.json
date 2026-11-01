@@ -13,7 +13,7 @@
   "home.publicDebates": "Debat publik",
   "home.total": "TOTAL {count}",
   "home.signInHint": "Masuk atau buat akun di atas untuk melihat debat Anda.",
-  "home.publicIndexingNotice": "Debat yang diterbitkan dapat diindeks oleh mesin pencari. Salinannya mungkin tetap ada setelah publikasinya dibatalkan.",
+  "home.publicIndexingNotice": "Debat yang diterbitkan dapat diindeks mesin pencari, dan salinannya dapat tetap ada di tempat lain.",
   "home.debateClaim": "Klaim debat",
   "home.claimPlaceholder": "Ketik klaim atau pertanyaan yang dapat diperdebatkan…",
   "home.composerHint": "Model berdebat · Anda menilai",
@@ -144,6 +144,5 @@
   "home.removal.close": "Tutup",
   "home.flag.underReview": "DITANDAI · DALAM PENINJAUAN",
   "home.flag.approved": "DISETUJUI",
-  "home.flag.refused": "TIDAK DISETUJUI",
-  "home.takeDown.button": "Turunkan"
+  "home.flag.refused": "TIDAK DISETUJUI"
 }

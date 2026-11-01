@@ -16,6 +16,7 @@ import { targetTokenCounter } from "./token-line.js";
 import { startInvestigationCloseSweep } from "./investigation-close.js";
 import { startPathRewriteSweep } from "./path-rewrite-sweep.js";
 import { startTreeSweep } from "./path-climb.js";
+import { composePublicReport, startPublicTreeSweep } from "./public-contribution.js";
 import { startPassageSweep, wipeInvestigationPassages } from "./passage-sweep.js";
 import { composeWebResearched, startWebResearchedSweep } from "./web-researched.js";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
@@ -284,7 +285,10 @@ function targetGateway(target: (typeof providerTargets)[number]): ProviderGatewa
       buildInvestigationReportCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).investigationReportSeam({ runId, price, requireReportedUsage: true }),
       // R22 decisions 2 and 3: the climb's and the main-answer update's calls, each on its own never-walled seam, on the dig's run.
       buildPathClimbCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).pathClimbSeam({ runId, price, requireReportedUsage: true }),
-      buildAnswerUpdateCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).answerUpdateSeam({ runId, price, requireReportedUsage: true })
+      buildAnswerUpdateCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).answerUpdateSeam({ runId, price, requireReportedUsage: true }),
+      // Decision 13: the AI check on a contribution and a report on a public debate, each on its own never-walled seam.
+      buildContributionCheckCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).contributionCheckSeam({ runId, price, requireReportedUsage: true }),
+      buildPublicReportCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).publicReportSeam({ runId, price, requireReportedUsage: true })
     })
   });
   // Spec §3.4: the policy marks the gate unhealthy on its FIRST unsent refusal, before the minute's resend wait.
@@ -610,6 +614,12 @@ const pathRewriteSweep = pathRewrite === undefined || retireRequestStanding ? nu
 // R22 decisions 2 and 3: a climb or an answer update whose runner stopped goes on from the rows already there.
 const treeSweep = pathRewrite === undefined || retireRequestStanding ? null
   : startTreeSweep({ ...pathRewrite.treeSweep, paused: () => retirementSignal.claimsStopped() });
+// Decision 13: a contribution to a public debate that stopped goes on, an allowed one climbs, and a report on a public debate is written. None while retiring.
+const publicReports = composePublicReport({ pool, targets: providerTargets, ...(writerTokenCount === undefined ? {} : { tokenCount: writerTokenCount }),
+  members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
+  priceOf: (providerRef) => closingPrices.get(providerRef) ?? null, log: storyLog });
+const publicTreeSweep = pathRewrite === undefined || retireRequestStanding ? null
+  : startPublicTreeSweep({ ...pathRewrite.publicTree, reports: publicReports, paused: () => retirementSignal.claimsStopped() });
 const investigationCloseSweep = investigationClose === undefined || retireRequestStanding ? null
   : startInvestigationCloseSweep({ ...investigationClose, paused: () => retirementSignal.claimsStopped() });
 // R22 decision 7: whole page texts and passages go when nothing runs on a debate; other pages 30 days after last activity.
@@ -671,6 +681,7 @@ const retirement = startRunnerRetirement({
     lapsedResend.stop();
     pathRewriteSweep?.stop();
     treeSweep?.stop();
+    publicTreeSweep?.stop();
     investigationCloseSweep?.stop();
     passageSweep?.stop();
     webResearchedSweep?.stop();
@@ -686,6 +697,7 @@ await started;
 lapsedResend.stop();
 pathRewriteSweep?.stop();
 treeSweep?.stop();
+publicTreeSweep?.stop();
 investigationCloseSweep?.stop();
 passageSweep?.stop();
 webResearchedSweep?.stop();

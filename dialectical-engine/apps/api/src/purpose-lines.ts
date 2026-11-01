@@ -1,6 +1,6 @@
-import { purposeLinesUnsaid, type PurposeLines } from "@debateai/contract";
+import { PurposeLinesSchema, purposeLinesUnsaid, type PurposeLines } from "@debateai/contract";
 import {
-  PostgresTreeUpdateRepository, RUN_PURPOSE_LINES_CARRIER, encryptAttestedContentForRun, withRunContentLease, type Pool
+  PostgresTreeUpdateRepository, RUN_PURPOSE_LINES_CARRIER, decryptContentForRun, encryptAttestedContentForRun, withRunContentLease, type Pool
 } from "@debateai/db";
 
 /**
@@ -21,6 +21,19 @@ export function postgresPurposeLines(pool: Pool): PurposeLinesPort {
       return sealed === null ? "NOT_SEALED" as const : store.recordPurposeLines(ownerRef, runId, sealed);
     })
   });
+}
+
+/** Decision 13: a debate's lines opened under its key, for what a Free debate publishes with its question; null when it has none or they cannot be read. */
+export async function readPurposeLinesOf(pool: Pool, ownerRef: string, runId: string): Promise<PurposeLines | null> {
+  try {
+    const sealed = await new PostgresTreeUpdateRepository(pool).readPurposeLines(ownerRef, runId);
+    if (sealed === null) return null;
+    const opened = await withRunContentLease(pool, [runId], () => decryptContentForRun<unknown>(pool, runId, RUN_PURPOSE_LINES_CARRIER, runId, sealed, null));
+    const parsed = PurposeLinesSchema.safeParse(opened);
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Stores the lines; a failure is logged by code and the ask goes on. Never rejects. */

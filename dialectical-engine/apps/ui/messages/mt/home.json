@@ -13,7 +13,7 @@
   "home.publicDebates": "Dibattiti pubbliċi",
   "home.total": "TOTAL TA’ {count}",
   "home.signInHint": "Idħol fil-kont jew oħloq wieħed hawn fuq biex tara d-dibattiti tiegħek.",
-  "home.publicIndexingNotice": "Id-dibattiti ppubblikati jistgħu jiġu indiċjati mill-magni tat-tiftix. Kopji jistgħu jibqgħu jeżistu wara li titneħħa l-pubblikazzjoni.",
+  "home.publicIndexingNotice": "Id-dibattiti ppubblikati jistgħu jiġu indiċjati mill-magni tat-tfittxija, u jistgħu jibqgħu kopji x’imkien ieħor.",
   "home.debateClaim": "Pretensjoni tad-dibattitu",
   "home.claimPlaceholder": "Ikteb pretensjoni jew mistoqsija li tista’ tiġi diskussa…",
   "home.composerHint": "Il-mudelli jargumentaw · inti tiġġudika",
@@ -148,6 +148,5 @@
   "home.removal.close": "Agħlaq",
   "home.flag.underReview": "IMMARKAT · TAĦT RIEŻAMI",
   "home.flag.approved": "APPROVAT",
-  "home.flag.refused": "MHUX APPROVAT",
-  "home.takeDown.button": "Neħħi"
+  "home.flag.refused": "MHUX APPROVAT"
 }

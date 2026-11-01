@@ -274,15 +274,26 @@ export async function climbFrom(settings: TreeUpdateSettings, start: ClimbStart,
 
 type Level = Readonly<{
   digRunId: string; dig: PathRewriteDig; step: number; below: string; parentRunId: string; positionRef: string;
-  cause: ClimbStart["cause"]; lease: StepLease;
+  cause: ClimbStart["cause"] | null; lease: StepLease;
 }>;
+
+/**
+ * Decision 13: a dig on a public debate writes its own rewrite here, as step 0 of its line (kind PUBLIC_DIG, 0138): the same writer and checker as a level above, the dig itself
+ * as "the debate below", sealed under the dig's key. It holds the path until 0137's check settles. The caller reads what its row came out as.
+ */
+export async function writePublicDigLevel(settings: TreeUpdateSettings, input: Readonly<{ digRunId: string; dig: PathRewriteDig; lease?: StepLease }>):
+  Promise<"CHANGED" | "STOPPED" | "LEFT"> {
+  return writeLevel(settings, { digRunId: input.digRunId, dig: input.dig, step: 0, below: input.digRunId, parentRunId: input.dig.parentRunId,
+    positionRef: input.dig.positionRef, cause: null, lease: input.lease ?? BARE_STEP }, safeLog(settings));
+}
 
 /** One level: its turn, the wait for the front, its row. CHANGED: go on; STOPPED: it came out unchanged or failed; LEFT: the sweep's. */
 async function writeLevel(settings: TreeUpdateSettings, level: Level, log: Log): Promise<"CHANGED" | "STOPPED" | "LEFT"> {
   const ports = settings.ports;
   const updateId = pathUpdateIdOf(level.digRunId, level.step);
   const taken = await ports.tree.takeTurn({ updateId, runId: level.digRunId, parentRunId: level.parentRunId, positionRef: level.positionRef,
-    kind: "CLIMB", climbStep: level.step, causeKind: level.cause.kind satisfies PathUpdateCauseKind, causeId: level.cause.id });
+    kind: level.cause === null ? "PUBLIC_DIG" : "CLIMB", climbStep: level.step, causeKind: level.cause === null ? "DIG_SETTLED" : level.cause.kind satisfies PathUpdateCauseKind,
+    causeId: level.cause?.id ?? null });
   if (taken !== "TAKEN" && taken !== "ALREADY") {
     log("PATH_CLIMB_TURN_REFUSED", { runId: level.digRunId, step: level.step, outcome: taken });
     return "STOPPED";
@@ -403,7 +414,10 @@ async function composeLevel(settings: TreeUpdateSettings, level: Level, updateId
     }
     const served = written.rounds.find((round) => round.round === outcome.servedRound)!;
     const body = outcome.body;
-    const content = contentOf(body, built.pointIds, built.digPathRefs);
+    // Decision 13: a public dig's own rewrite also seals its paths' points: what goes on the page beside it, for a later dig to read.
+    const content: PathRewriteContent = level.cause !== null ? contentOf(body, built.pointIds, built.digPathRefs)
+      : Object.freeze({ ...contentOf(body, built.pointIds, built.digPathRefs),
+        public_points: Object.freeze(child.digPaths.map((path) => Object.freeze({ position_ref: path.positionRef, points: Object.freeze(path.points) }))) });
     const sealed = await ports.sealUpdate(runId, updateId, content);
     onWritten(Object.freeze({ step: level.step, workItemId: subject, free: level.dig.free, question, line: body.line, points: parent.points,
       whatChanged: content.what_changed, writer, send, log: (event: string, detail: Record<string, unknown>) => log(event, { runId, step: level.step, ...detail }) }));

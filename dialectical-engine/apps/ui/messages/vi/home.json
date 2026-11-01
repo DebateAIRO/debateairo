@@ -13,7 +13,7 @@
   "home.publicDebates": "Các cuộc tranh luận công khai",
   "home.total": "Tổng cộng {count}",
   "home.signInHint": "Đăng nhập hoặc tạo tài khoản ở trên để xem các cuộc tranh luận của bạn.",
-  "home.publicIndexingNotice": "Các cuộc tranh luận đã xuất bản có thể được công cụ tìm kiếm lập chỉ mục. Các bản sao có thể vẫn tồn tại sau khi hủy xuất bản.",
+  "home.publicIndexingNotice": "Các cuộc tranh luận đã xuất bản có thể được công cụ tìm kiếm lập chỉ mục, và bản sao có thể còn ở nơi khác.",
   "home.debateClaim": "Luận điểm tranh luận",
   "home.claimPlaceholder": "Nhập một luận điểm hoặc câu hỏi có thể tranh luận…",
   "home.composerHint": "Các mô hình tranh luận · bạn đánh giá",
@@ -144,6 +144,5 @@
   "home.removal.close": "Đóng",
   "home.flag.underReview": "BỊ GẮN CỜ · ĐANG XEM XÉT",
   "home.flag.approved": "ĐÃ ĐƯỢC PHÊ DUYỆT",
-  "home.flag.refused": "KHÔNG ĐƯỢC PHÊ DUYỆT",
-  "home.takeDown.button": "Gỡ xuống"
+  "home.flag.refused": "KHÔNG ĐƯỢC PHÊ DUYỆT"
 }

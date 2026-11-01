@@ -137,5 +137,6 @@
   "newDebate.askText.otherAnswer": "Et andet svar…",
   "newDebate.askText.otherLabel": "Din egen uddybning",
   "newDebate.askText.matters": "Hvis svarene peger i forskellige retninger, er det vigtigst for mig: {matters}",
-  "newDebate.askText.angles": "Kig gerne også på: {list}."
+  "newDebate.askText.angles": "Kig gerne også på: {list}.",
+  "newDebate.freePublicNotice": "Med Gratis-abonnementet er dit spørgsmål og debatten om det offentlige. Medtag ikke personlige oplysninger."
 }

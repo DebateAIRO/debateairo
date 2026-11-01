@@ -13,7 +13,7 @@
   "home.publicDebates": "Díospóireachtaí poiblí",
   "home.total": "{count} SAN IOMLÁN",
   "home.signInHint": "Sínigh isteach nó cruthaigh cuntas thuas chun do chuid díospóireachtaí a fheiceáil.",
-  "home.publicIndexingNotice": "Féadfaidh innill chuardaigh díospóireachtaí foilsithe a innéacsú. D’fhéadfadh cóipeanna fanacht ann tar éis dífhoilsithe.",
+  "home.publicIndexingNotice": "Is féidir le hinnill chuardaigh díospóireachtaí foilsithe a innéacsú, agus d’fhéadfadh cóipeanna fanacht in áiteanna eile.",
   "home.debateClaim": "Maíomh díospóireachta",
   "home.claimPlaceholder": "Clóscríobh maíomh nó ceist ar féidir díospóireacht a dhéanamh uirthi…",
   "home.composerHint": "Áitíonn samhlacha · déanann tusa breithiúnas",
@@ -148,6 +148,5 @@
   "home.removal.close": "Dún",
   "home.flag.underReview": "MARCÁILTE · FAOI ATHBHREITHNIÚ",
   "home.flag.approved": "FORMHEASTA",
-  "home.flag.refused": "GAN FORMHEAS",
-  "home.takeDown.button": "Bain anuas"
+  "home.flag.refused": "GAN FORMHEAS"
 }

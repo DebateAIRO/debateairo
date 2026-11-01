@@ -197,6 +197,9 @@
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; min-width: 0;
   border: 1px solid var(--line-strong); border-radius: var(--r-card); padding: 10px 14px; background: var(--surface);
 }
+/* Decision 13: what became of a dig on a public debate, to the digger only. */
+.v4ContributionNote { margin: 0 0 12px; padding: 10px 14px; border-radius: var(--r-btn); background: var(--surface-2); color: var(--text); font-size: var(--t-ui); }
+
 .v4MainAnswer {
   min-width: 0; border: 1px solid var(--line-strong); border-radius: var(--r-card); padding: 12px 14px; background: var(--surface);
 }

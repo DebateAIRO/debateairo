@@ -1,5 +1,7 @@
 import {
-  ANSWER_UPDATE_CALL_SITE_PREFIX as STORY_ANSWER_UPDATE_CALL_SITE_PREFIX, PATH_CLIMB_CALL_SITE_PREFIX as STORY_PATH_CLIMB_CALL_SITE_PREFIX,
+  ANSWER_UPDATE_CALL_SITE_PREFIX as STORY_ANSWER_UPDATE_CALL_SITE_PREFIX, CONTRIBUTION_CHECK_CALL_SITE_PREFIX as STORY_CONTRIBUTION_CHECK_CALL_SITE_PREFIX,
+  PATH_CLIMB_CALL_SITE_PREFIX as STORY_PATH_CLIMB_CALL_SITE_PREFIX, PUBLIC_REPORT_CALL_SITE_PREFIX as STORY_PUBLIC_REPORT_CALL_SITE_PREFIX,
+  contributionCheckCallSiteRole as storyContributionCheckCallSiteRole, publicReportCallSiteRole as storyPublicReportCallSiteRole,
   answerUpdateCallSiteRole as storyAnswerUpdateCallSiteRole, pathClimbCallSiteRole as storyPathClimbCallSiteRole,
   pathRewriteCallSiteRole as storyPathRewriteCallSiteRole
 } from "@debateai/story";
@@ -25,6 +27,12 @@ export const pathClimbCallSiteRole = storyPathClimbCallSiteRole;
 /** R22 decision 3: the main-answer update's sites, charged on their own never-walled ANSWER_UPDATE seam. */
 export const ANSWER_UPDATE_CALL_SITE_PREFIX = STORY_ANSWER_UPDATE_CALL_SITE_PREFIX;
 export const answerUpdateCallSiteRole = storyAnswerUpdateCallSiteRole;
+
+/** Decision 13: the AI check on a contribution, and a report on a public debate, each on its own never-walled seam. */
+export const CONTRIBUTION_CHECK_CALL_SITE_PREFIX = STORY_CONTRIBUTION_CHECK_CALL_SITE_PREFIX;
+export const contributionCheckCallSiteRole = storyContributionCheckCallSiteRole;
+export const PUBLIC_REPORT_CALL_SITE_PREFIX = STORY_PUBLIC_REPORT_CALL_SITE_PREFIX;
+export const publicReportCallSiteRole = storyPublicReportCallSiteRole;
 
 export function isPathRewriteCallSite(callSiteKey: string): boolean {
   return pathRewriteCallSiteRole(callSiteKey) !== null;

@@ -652,6 +652,15 @@ function ReportVersion({ version, locale, catalog }: Readonly<{ version: Investi
   if (version.state === "FAILED") {
     return <p className="v4RepNote v4RepVersionBody" role="status">{t(catalog, "v4.investigation.failed")}</p>;
   }
+  return <FinishedReportBody version={version} state={version.state} catalog={catalog} />;
+}
+
+/** One finished report's text: the owner's page, and any version on a public page (decision 13), the same. */
+export function FinishedReportBody({ version, state, catalog }: Readonly<{
+  version: Pick<Extract<InvestigationReportVersion, { state: "READY" }>, "report_version" | "shortened" | "story" | "answer" | "sources">;
+  state: "READY" | "READY_WITH_RESERVATION";
+  catalog: MessageCatalog;
+}>) {
   const { story } = version;
   return (
     <div className="v4RepVersionBody" data-version={version.report_version}>
@@ -667,7 +676,7 @@ function ReportVersion({ version, locale, catalog }: Readonly<{ version: Investi
             </div>
           </>
         )}
-        {version.state === "READY_WITH_RESERVATION" ? <p className="v4RepNote">{t(catalog, "v4.story.reservation")}</p> : null}
+        {state === "READY_WITH_RESERVATION" ? <p className="v4RepNote">{t(catalog, "v4.story.reservation")}</p> : null}
       </div>
       {story !== null ? (
         <>

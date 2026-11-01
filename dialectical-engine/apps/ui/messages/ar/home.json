@@ -13,7 +13,7 @@
   "home.publicDebates": "المناظرات العامة",
   "home.total": "المجموع {count}",
   "home.signInHint": "سجّل الدخول أو أنشئ حسابًا أعلاه لرؤية مناظراتك.",
-  "home.publicIndexingNotice": "قد تفهرس محركات البحث المناظرات المنشورة. وقد تبقى نسخ منها بعد إلغاء نشرها.",
+  "home.publicIndexingNotice": "قد تفهرس محركات البحث المناظرات المنشورة، وقد تبقى منها نسخ في أماكن أخرى.",
   "home.debateClaim": "ادعاء المناظرة",
   "home.claimPlaceholder": "اكتب ادعاءً أو سؤالًا قابلًا للمناظرة…",
   "home.composerHint": "النماذج تتناظر · وأنت تقيّم",
@@ -149,6 +149,5 @@
   "home.removal.close": "إغلاق",
   "home.flag.underReview": "مُعلَّم · قيد المراجعة",
   "home.flag.approved": "معتمد",
-  "home.flag.refused": "غير معتمد",
-  "home.takeDown.button": "إزالة"
+  "home.flag.refused": "غير معتمد"
 }

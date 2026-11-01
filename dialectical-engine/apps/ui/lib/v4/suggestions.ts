@@ -1,12 +1,14 @@
 import {
   ACCOUNT_MEMORY_LIMITS,
   AskParentSchema,
+  PublicDigParentSchema,
   DIG_PLACE_PATTERN,
   DIG_SUGGESTION_KINDS,
   FREE_DIG_PICKS_MAX,
   WEB_CONTRACT_LIMITS,
   type Answer,
   type AskParent,
+  type PublicDigParent,
   type DigPick,
   type DigSuggestion
 } from "@debateai/contract";
@@ -209,6 +211,13 @@ function digPickOf(pick: V4DigPick): DigPick | null {
   return { kind: pick.suggestion.kind, suggestion_id: pick.suggestion.suggestion_id, place: placeOf(pick), text };
 }
 
+/** The picks a dig of `target` sends (open questions travel in its places instead). */
+function digPicksOf(target: DigTarget): readonly DigPick[] {
+  return target.kind === "picks"
+    ? target.picks.map(digPickOf).filter((pick): pick is DigPick => pick !== null).slice(0, WEB_CONTRACT_LIMITS.digPicksMax)
+    : [];
+}
+
 /**
  * The ask's `parent` for a dig of `target` from `parentRunId`: its places, its mode, and its picks (only the suggestions
  * and own views; absent when it has none, as the contract asks). Checked against AskParentSchema, so a page can never
@@ -216,11 +225,25 @@ function digPickOf(pick: V4DigPick): DigPick | null {
  * after start as before).
  */
 export function askParentOf(parentRunId: string, target: DigTarget, mode: DigMode): AskParent | null {
-  const picks = target.kind === "picks"
-    ? target.picks.map(digPickOf).filter((pick): pick is DigPick => pick !== null).slice(0, WEB_CONTRACT_LIMITS.digPicksMax)
-    : [];
+  const picks = digPicksOf(target);
   const parsed = AskParentSchema.safeParse({
     parent_run_id: parentRunId,
+    places: [...placesOf(target)],
+    mode,
+    ...(picks.length === 0 ? {} : { picks })
+  });
+  return parsed.success ? parsed.data : null;
+}
+
+/**
+ * Decision 13: the same dig named by a public page instead: `public_ref` is all a stranger knows of the debate, `dig_ref` the contribution they dig under
+ * (null: the first debate). Null when it does not pass PublicDigParentSchema.
+ */
+export function publicParentOf(publicRef: string, digRef: string | null, target: DigTarget, mode: DigMode): PublicDigParent | null {
+  const picks = digPicksOf(target);
+  const parsed = PublicDigParentSchema.safeParse({
+    public_ref: publicRef,
+    ...(digRef === null ? {} : { dig_ref: digRef }),
     places: [...placesOf(target)],
     mode,
     ...(picks.length === 0 ? {} : { picks })

@@ -137,5 +137,6 @@
   "newDebate.askText.otherAnswer": "Un'altra risposta…",
   "newDebate.askText.otherLabel": "Il Suo chiarimento aggiuntivo",
   "newDebate.askText.matters": "Se le risposte vanno in direzioni diverse, per me conta soprattutto: {matters}",
-  "newDebate.askText.angles": "La prego di esaminare anche questi aspetti: {list}."
+  "newDebate.askText.angles": "La prego di esaminare anche questi aspetti: {list}.",
+  "newDebate.freePublicNotice": "Con il piano Gratuito la tua domanda e il relativo dibattito sono pubblici. Non includere dati personali."
 }

@@ -17,6 +17,7 @@ import { publicFloorHost, resolveFloor } from "@/lib/v3/floorAnswer";
 import { buildPublicAnswerExport } from "@/lib/v3/publicAnswerExport";
 import type { LocaleCode } from "@/lib/i18n/locales";
 import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
+import v4English from "@/messages/en/v4.json";
 
 /**
  * A published debate is the private workspace seen by a stranger. This is a
@@ -36,7 +37,10 @@ export function PublicDebatePageClient({
   debateDrawersCatalog,
   miscCatalog,
   composeCatalog,
-  homeCatalog
+  homeCatalog,
+  v4Catalog = v4English,
+  newDebateCatalog,
+  crisisCountryHint = null
 }: {
   debate: PublicDebate;
   locale: LocaleCode;
@@ -51,6 +55,10 @@ export function PublicDebatePageClient({
   miscCatalog: MessageCatalog;
   composeCatalog: MessageCatalog;
   homeCatalog: MessageCatalog;
+  /** Decision 13: the contributions, reports and dig box, and what a dig's ask reads. */
+  v4Catalog?: MessageCatalog;
+  newDebateCatalog?: MessageCatalog;
+  crisisCountryHint?: string | null;
 }) {
   // Publications made before trees were carried have no nodes. That is not an
   // error: the verdict, the summary and the honesty surface are still the
@@ -107,7 +115,8 @@ export function PublicDebatePageClient({
     <details className="publicationDetails">
       <summary>
         {t(publicCatalog, "public.header.summary", {
-          author: debate.author_pseudonym,
+          // Decision 13: the first author's account is gone: the name went, and the page says so in its own words.
+          author: debate.author_name_gone === true ? t(v4Catalog, "v4.public.aContributor") : debate.author_pseudonym,
           date: formatDate(locale, debate.published_at)
         })}
       </summary>
@@ -157,6 +166,8 @@ export function PublicDebatePageClient({
           storyCatalog={storyCatalog}
           storyLocale={storyLocale}
           composeCatalog={composeCatalog}
+          locale={locale}
+          lane={{ catalog: v4Catalog, homeCatalog, newDebateCatalog, locale, crisisCountryHint }}
           onDetails={onDetails}
           onRead={onRead}
         />

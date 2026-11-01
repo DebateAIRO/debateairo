@@ -137,5 +137,6 @@
   "newDebate.askText.otherAnswer": "Otra respuesta…",
   "newDebate.askText.otherLabel": "Su propia aclaración adicional",
   "newDebate.askText.matters": "Si las respuestas apuntan en direcciones distintas, lo que más me importa es: {matters}",
-  "newDebate.askText.angles": "Por favor, eche también un vistazo a: {list}."
+  "newDebate.askText.angles": "Por favor, eche también un vistazo a: {list}.",
+  "newDebate.freePublicNotice": "En el plan Gratuito, su pregunta y su debate son públicos. No incluya datos personales."
 }

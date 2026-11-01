@@ -1,11 +1,12 @@
 // apps/runner/src/investigation-digest.ts
-import { StoryBodySchema } from "@debateai/contract";
+import { StoryBodySchema, type PublicMaterial, type PublicMaterialPath } from "@debateai/contract";
 import {
   PATH_REWRITE_CARRIER, PostgresDigModelRunnerRepository, PostgresDigPicksRunnerRepository, PostgresInvestigationRunnerRepository,
   PostgresWebEvidenceRepository, RunRepository, WEB_EVIDENCE_CARRIERS, decryptContentForRun, decryptLeasedContentForRun,
   prepareLeasedContentEncryptionForRun, withRunContentLease, type CryptoEnvelope, type Pool
 } from "@debateai/db";
 import { pointsOf, storedDigPathsOf } from "./path-rewrite-sources.js";
+import { openPublicMaterial } from "./public-tree-sources.js";
 import { addedPagesOf } from "./web-researched-read.js";
 
 /**
@@ -178,11 +179,23 @@ async function webTextOf(pool: Pool, runId: string, cutAt: string): Promise<Pick
   }
 }
 
+/** What the public copy says was investigated, in the digest's own shape: the first debate's paths and each allowed dig's. */
+function publicDebatesOf(copy: PublicMaterial): readonly InvestigatedDebate[] {
+  const pathsOf = (paths: readonly PublicMaterialPath[]) => Object.freeze(paths.map((path) => Object.freeze({ line: path.line, fate: path.fate, points: Object.freeze(path.points.map((point) => Object.freeze({ text: point.text, side: point.side, disputed: point.disputed }))) })));
+  return Object.freeze([
+    Object.freeze({ nearness: null, changed: Object.freeze([]), paths: pathsOf(copy.paths), notes: Object.freeze(copy.paths.flatMap((path) => path.extracts.flatMap((extract) => extract.note === null ? [] : [{ site: extract.site, title: extract.title, note: extract.note }]))), searched: Object.freeze([]) }),
+    ...copy.digs.map((dig) => Object.freeze({ nearness: null, changed: Object.freeze([...dig.what_changed]), paths: pathsOf(dig.paths), notes: Object.freeze([]), searched: Object.freeze([]) }))
+  ]);
+}
+
 /**
  * The digest for `runId`, on the runner's pool: the investigation's other debates that joined by `cutAt`. Null `cutAt`
  * (the run is in no investigation yet): nothing known, "[]".
  */
 export async function readAlreadyInvestigated(pool: Pool, runId: string, cutAt: string | null): Promise<string> {
+  // Decision 13: a dig on a public debate knows what the page shows and nothing else: never a private dig, never someone's refused one.
+  const copy = await openPublicMaterial(pool, runId).catch(() => null);
+  if (copy !== null) return investigatedText(publicDebatesOf(copy));
   if (cutAt === null) return "[]";
   const investigation = await new PostgresInvestigationRunnerRepository(pool).ofRun(runId);
   if (investigation === null) return "[]";

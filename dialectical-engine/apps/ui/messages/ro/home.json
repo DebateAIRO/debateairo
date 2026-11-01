@@ -13,7 +13,7 @@
   "home.publicDebates": "Dezbateri publice",
   "home.total": "{count} ÎN TOTAL",
   "home.signInHint": "Autentificați-vă sau creați un cont mai sus pentru a vă vedea dezbaterile.",
-  "home.publicIndexingNotice": "Dezbaterile publicate pot fi indexate de motoarele de căutare. Copiile pot persista după retragerea publicării.",
+  "home.publicIndexingNotice": "Dezbaterile publicate pot fi indexate de motoarele de căutare, iar copii pot rămâne în alte locuri.",
   "home.debateClaim": "Afirmația dezbaterii",
   "home.claimPlaceholder": "Introduceți o afirmație sau o întrebare discutabilă…",
   "home.composerHint": "Modelele argumentează · dvs. judecați",
@@ -146,6 +146,5 @@
   "home.removal.close": "Închideți",
   "home.flag.underReview": "MARCATĂ · ÎN CURS DE EXAMINARE",
   "home.flag.approved": "APROBATĂ",
-  "home.flag.refused": "NEAPROBATĂ",
-  "home.takeDown.button": "Retrageți"
+  "home.flag.refused": "NEAPROBATĂ"
 }

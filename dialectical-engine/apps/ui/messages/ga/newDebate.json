@@ -137,5 +137,6 @@
   "newDebate.askText.otherAnswer": "Freagra eile…",
   "newDebate.askText.otherLabel": "Bhur soiléiriú breise féin",
   "newDebate.askText.matters": "Má tá na freagraí ag dul i dtreonna éagsúla, is é an rud is tábhachtaí dom: {matters}",
-  "newDebate.askText.angles": "Le bhur dtoil, féachaigí freisin ar: {list}."
+  "newDebate.askText.angles": "Le bhur dtoil, féachaigí freisin ar: {list}.",
+  "newDebate.freePublicNotice": "Ar an bplean saor in aisce, tá do cheist agus an díospóireacht uirthi poiblí. Ná cuir sonraí pearsanta san áireamh."
 }

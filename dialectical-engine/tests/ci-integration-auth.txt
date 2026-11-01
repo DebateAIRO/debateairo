@@ -103,6 +103,8 @@ tests/integration/web-researched-database.test.ts
 # The Owner's allowance for a member (0146): only the Owner, the proof bound to the member and the amounts, the ends, a member's debate charged and counted.
 tests/integration/team-allowance-database.test.ts
 tests/integration/team-allowance-http.test.ts
+# The public tree (0147, 0148): strangers' digs, the check, the page's copies, reports and the first author leaving, through the real gateway on scripted vendors.
+tests/integration/public-tree-flow.test.ts
 
 # NOT listed: preview-auth-dev-startup.test.ts — red on dev at d1ac3641b (2 of 17: PREVIEW_STAGE_PROCESS_EXITED; it
 # starts the real API/UI stage processes, so it is a deployment rehearsal, not a self-contained suite).

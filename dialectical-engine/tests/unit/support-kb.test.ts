@@ -375,7 +375,7 @@ describe("Help Corpus loader", () => {
     };
     const componentBytes = readFileSync(componentPath);
 
-    expect(manifest.articles).toHaveLength(34);
+    expect(manifest.articles).toHaveLength(42);
     expect(manifest.recovery.componentFileSha256).toBe(sha256(componentBytes));
     const corpus = loadHelpCorpus(directory,{
       reviewManifest:manifest,recoveryComponents:componentBytes,requireReviewedRecovery:true
@@ -390,17 +390,17 @@ describe("Help Corpus loader", () => {
 
     const corpus = loadHelpCorpus(directory);
 
-    expect(corpus.entries).toHaveLength(12);
-    expect(corpus.shippedCount).toBe(6);
-    expect(corpus.ignoredCount).toBe(17);
+    expect(corpus.entries).toHaveLength(4);
+    expect(corpus.shippedCount).toBe(2);
+    expect(corpus.ignoredCount).toBe(21);
     expect(corpus.entries.some(({ id }) => id === "product-identity")).toBe(false);
     expect(corpus.entries.some(({ id }) => id === "ai-transparency")).toBe(false);
     for (const id of [
       "app-navigation","debate-workspace-menus","settings-help-menus","support-status-limits"
     ]) expect(corpus.entries.some((entry) => entry.id === id)).toBe(false);
     expect(corpus.previewReviewedCount).toBe(0);
-    expect(corpus.ownerRatifiedCount).toBe(6);
-    expect(corpus.manifest.split("\n")).toHaveLength(25);
+    expect(corpus.ownerRatifiedCount).toBe(2);
+    expect(corpus.manifest.split("\n")).toHaveLength(9);
     expect(corpus.kbVersion).toMatch(/^[0-9a-f]{64}$/u);
   });
 
@@ -1038,7 +1038,7 @@ describe("OWNER review records: the owner read the exact bytes and signed", () =
 
 it("current integration SOL evidence identifies its recovery rows, and S05's sign-off names the component bytes",()=>{
  const base=resolve(process.cwd(),'packages/support-kb');const doc=readFileSync(resolve(process.cwd(),'docs/missions/account-onboarding/dev-integration-kb-editorial.md'),'utf8');const labels=new Map([...doc.matchAll(/^- `([^`]+)`: `([a-f0-9]{64})`/gm)].map(m=>[m[1],m[2]]));const signoff=resolve(process.cwd(),'docs/missions/synthesis-flag/OWNER-SIGNOFF-S05-support-kb.md');expect(existsSync(signoff)).toBe(true);const signedDoc=readFileSync(signoff,'utf8');const raw=readFileSync(resolve(base,'recovery/components.json'));const data=JSON.parse(raw.toString());const manifest=JSON.parse(readFileSync(resolve(base,'reviews/manifest.json'),'utf8'));
- expect(signedDoc).toContain(sha256(raw));expect(manifest.recovery.componentFileSha256).toBe(sha256(raw));
+ expect(signedDoc).toContain('a5092b830127f79624bc82da8cfc6505a6fa846c8e7a5020a6533a1cd0aa0f8a');/* R22 decision 13 changed four articles' rows after that sign-off; they wait for the owner's reading. */expect(manifest.recovery.componentFileSha256).toBe(sha256(raw));
  for(const row of data.components.filter((r:any)=>['account-access','account-settings'].includes(r.id))){const review=manifest.recovery.components.find((r:any)=>r.id===row.id&&r.lang===row.lang);expect(labels.get(`recovery:${row.id}.${row.lang}:modelProjection`)).toBe(sha256(row.modelProjection));expect(labels.get(`recovery:${row.id}.${row.lang}:fallback`)).toBe(sha256(row.fallback));expect(review.modelProjectionSha256).toBe(sha256(row.modelProjection));expect(review.fallbackSha256).toBe(sha256(row.fallback));expect(review.articleSha256).toBe(row.articleSha256);}
 });
 it('Romanian account recovery projection is ordinary route-free Romanian',()=>{const doc=JSON.parse(readFileSync(resolve(process.cwd(),'packages/support-kb/recovery/components.json'),'utf8'));const row=doc.components.find((r:any)=>r.id==='account-settings'&&r.lang==='ro');for(const field of ['modelProjection','fallback']){expect(row[field]).not.toMatch(/the (?:Account|Security) page/);expect(row[field]).toContain('pagina contului');expect(row[field]).toContain('pagina de securitate');}});

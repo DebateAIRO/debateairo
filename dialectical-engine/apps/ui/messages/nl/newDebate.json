@@ -137,5 +137,6 @@
   "newDebate.askText.otherAnswer": "Een ander antwoord…",
   "newDebate.askText.otherLabel": "Uw eigen aanvullende toelichting",
   "newDebate.askText.matters": "Als de antwoorden in verschillende richtingen wijzen, vind ik het belangrijkst: {matters}",
-  "newDebate.askText.angles": "Kijkt u ook alstublieft naar deze invalshoeken: {list}."
+  "newDebate.askText.angles": "Kijkt u ook alstublieft naar deze invalshoeken: {list}.",
+  "newDebate.freePublicNotice": "Met het gratis abonnement zijn uw vraag en het bijbehorende debat openbaar. Neem geen persoonsgegevens op."
 }

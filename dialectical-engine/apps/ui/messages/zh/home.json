@@ -13,7 +13,7 @@
   "home.publicDebates": "公开辩论",
   "home.total": "共 {count} 个",
   "home.signInHint": "请在上方登录或创建账户，以查看您的辩论。",
-  "home.publicIndexingNotice": "已发布的辩论可能被搜索引擎编入索引。取消发布后，副本仍可能留存。",
+  "home.publicIndexingNotice": "已发布的辩论可能被搜索引擎编入索引，副本也可能留存在其他地方。",
   "home.debateClaim": "辩论主张",
   "home.claimPlaceholder": "输入一个可辩论的主张或问题…",
   "home.composerHint": "模型辩论 · 您来评判",
@@ -144,6 +144,5 @@
   "home.removal.close": "关闭",
   "home.flag.underReview": "已标记 · 审核中",
   "home.flag.approved": "已批准",
-  "home.flag.refused": "未获批准",
-  "home.takeDown.button": "撤下"
+  "home.flag.refused": "未获批准"
 }

@@ -113,7 +113,7 @@ describe("Support knowledge context", () => {
     // 2026-10-05: changed menu/article/recovery bytes have SOL evidence; unchanged legal entries retain OWNER signatures.
     // Prior 2026-09-29: the owner signed the catalogue with the seven Turn 15 legal pages.
     // DONE S05 r2: the words check pins the reviewed article and catalogue bytes.
-    expect(corpus.kbVersion).toBe("d1d7500ead3325a16f22ef509e21c798ac2480972f28ed4e215f2fcf1e615a20");
+    expect(corpus.kbVersion).toBe("f75be8f38d7bd47ce1b2ef6dc00c2c2b0ba87591fbb46fd7d88602a8229a735d");
     expect(Object.isFrozen(corpus)).toBe(true);
     expect(Object.isFrozen(corpus.entries)).toBe(true);
 

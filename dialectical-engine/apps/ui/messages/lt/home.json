@@ -13,7 +13,7 @@
   "home.publicDebates": "Vieši debatai",
   "home.total": "IŠ VISO {count}",
   "home.signInHint": "Prisijunkite arba aukščiau susikurkite paskyrą, kad matytumėte savo debatus.",
-  "home.publicIndexingNotice": "Paieškos sistemos gali indeksuoti paskelbtus debatus. Jų kopijos gali išlikti net atšaukus paskelbimą.",
+  "home.publicIndexingNotice": "Paieškos sistemos gali indeksuoti paskelbtus debatus, o kopijos gali likti kitur.",
   "home.debateClaim": "Debatų teiginys",
   "home.claimPlaceholder": "Įveskite diskutuotiną teiginį arba klausimą…",
   "home.composerHint": "Modeliai argumentuoja · jūs vertinate",
@@ -147,6 +147,5 @@
   "home.removal.close": "Uždaryti",
   "home.flag.underReview": "PAŽYMĖTA · PERŽIŪRIMA",
   "home.flag.approved": "PRITARTA",
-  "home.flag.refused": "NEPRITARTA",
-  "home.takeDown.button": "Nuimti"
+  "home.flag.refused": "NEPRITARTA"
 }

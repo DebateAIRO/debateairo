@@ -304,7 +304,7 @@ describe("lists", () => {
   ] satisfies PublicDebateSummary[];
 
   const disclosure =
-    "Published debates may be indexed by search engines. Copies may persist after unpublishing.";
+    "Published debates may be indexed by search engines, and copies may remain elsewhere.";
 
   beforeEach(() => {
     routeMocks.sessionCookie = "t".repeat(43);

@@ -50,7 +50,6 @@ export class PostgresAccountErasureApplication implements AccountErasureApplicat
   async schedule(input:Readonly<{
     authenticated:AuthenticatedSession;
     grantToken:string;
-    deletePublicDebates?:boolean;
     source?:AuthSourceContext;
   }>):Promise<AccountErasureView|"NOTIFICATION_CHANNEL_REQUIRED"|null> {
     let scheduled:Awaited<ReturnType<PostgresAccountErasureRepository["schedule"]>>;
@@ -60,7 +59,6 @@ export class PostgresAccountErasureApplication implements AccountErasureApplicat
         ownerRef:input.authenticated.ownerRef,
         sessionId:input.authenticated.session.session_id,
         grantTokenHash:hashToken("step-up-grant", input.grantToken),
-        deletePublicDebates:input.deletePublicDebates === true,
         ...(input.source === undefined ? {} : { source:input.source })
       });
     } catch (error) {
@@ -73,8 +71,7 @@ export class PostgresAccountErasureApplication implements AccountErasureApplicat
     return scheduled===null ? null : Object.freeze({
       status:scheduled.status,
       executeAt:scheduled.executeAt,
-      cancellationRef:scheduled.cancellationRef,
-      deletePublicDebates:scheduled.deletePublicDebates
+      cancellationRef:scheduled.cancellationRef
     });
   }
 
@@ -86,8 +83,7 @@ export class PostgresAccountErasureApplication implements AccountErasureApplicat
     });
     return current===null ? Object.freeze({ status:"NONE" }) : Object.freeze({
       status:current.status,executeAt:current.executeAt,
-      cancellationRef:current.cancellationRef,
-      deletePublicDebates:current.deletePublicDebates
+      cancellationRef:current.cancellationRef
     });
   }
 

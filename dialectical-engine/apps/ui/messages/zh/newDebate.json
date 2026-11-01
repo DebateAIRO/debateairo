@@ -137,5 +137,6 @@
   "newDebate.askText.otherAnswer": "其他答案…",
   "newDebate.askText.otherLabel": "您自己补充的说明",
   "newDebate.askText.matters": "如果几个答案的方向不一样，我最看重的是：{matters}",
-  "newDebate.askText.angles": "也请您看看：{list}。"
+  "newDebate.askText.angles": "也请您看看：{list}。",
+  "newDebate.freePublicNotice": "在免费版中，您的问题及其辩论是公开的。请勿包含个人信息。"
 }

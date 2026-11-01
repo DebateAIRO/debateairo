@@ -137,5 +137,6 @@
   "newDebate.askText.otherAnswer": "Tweġiba oħra…",
   "newDebate.askText.otherLabel": "Spjegazzjoni addizzjonali tagħkom",
   "newDebate.askText.matters": "Jekk it-tweġibiet imorru f'direzzjonijiet differenti, l-aktar ħaġa importanti għalija hi: {matters}",
-  "newDebate.askText.angles": "Jekk jogħġobkom ħarsu wkoll lejn dawn l-aspetti: {list}."
+  "newDebate.askText.angles": "Jekk jogħġobkom ħarsu wkoll lejn dawn l-aspetti: {list}.",
+  "newDebate.freePublicNotice": "Fuq il-pjan B’xejn, il-mistoqsija tiegħek u d-dibattitu tagħha huma pubbliċi. Tinkludix dettalji personali."
 }

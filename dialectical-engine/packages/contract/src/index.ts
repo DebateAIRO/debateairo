@@ -29,14 +29,14 @@ import {
   DigLinkRecordSchema, DigLinksSchema, DigLinkRecordRequestSchema, DigLinkRecordedSchema, DigLinkModeSchema
 } from "./account-memory.js";
 export * from "./account-memory.js";
-import { AnswerContributionSchema, AnswerMainAnswerSchema, MainAnswerVersionSchema, PublicContributionSchema, PublicDigParentSchema, PublicMainAnswerSchema, PurposeLinesSchema, AskClarifyRequestSchema, AskClarifyResponseSchema, AnswerWebSchema, AskParentSchema, DebateInvestigationSchema, DigSharePercentSchema, DigSuggestionSchema, InvestigationCloseRequestSchema,
+import { PublicDebateRefusedSchema, PublicReportAcceptedSchema, PublicReportRequestSchema, AnswerContributionSchema, AnswerMainAnswerSchema, MainAnswerVersionSchema, PublicContributionSchema, PublicDigParentSchema, PublicMainAnswerSchema, PurposeLinesSchema, AskClarifyRequestSchema, AskClarifyResponseSchema, AnswerWebSchema, AskParentSchema, DebateInvestigationSchema, DigSharePercentSchema, DigSuggestionSchema, InvestigationCloseRequestSchema,
   ResearchedAddRequestSchema, ResearchedAddedSchema, ResearchedRefusedSchema, RoomReserveSchema, WebOtherPageSchema, WebPathSchema, WebSourceSchema,
   WEB_CONTRACT_LIMITS, AnswerDigSchema, AnswerPathRewritesSchema, DigTooDeepSchema, DigPicksOnePathSchema, DigFreePicksMaxSchema, MonthPauseSchema, PathRewriteSchema,
   PathRewritesSchema, PointOfViewVerdictSchema, RoomNewStartsSchema, RunContinueRefusedSchema, RunContinueRequestSchema,
   RunContinuedSchema, UsageBorrowSchema, UsageBorrowsSchema } from "./web.js";
 export * from "./web.js";
 import { InvestigationReopenRequestSchema, InvestigationReopenedSchema, InvestigationReportAcceptedSchema, InvestigationReportsSchema,
-  InvestigationReportWritingSchema } from "./investigation-report.js";
+  InvestigationReportWritingSchema, PublicReportVersionSchema } from "./investigation-report.js";
 export * from "./investigation-report.js";
 export * from "./crisis.js";
 export * from "./question-check.js";
@@ -1154,16 +1154,14 @@ export const PublishDebateRequestSchema = z.object({
 const StepUpGrantTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
 export const AccountErasureScheduleRequestSchema = z.object({
   confirmation: z.literal("DELETE MY ACCOUNT"),
-  step_up_grant: StepUpGrantTokenSchema,
-  delete_public_debates: z.boolean().optional()
+  step_up_grant: StepUpGrantTokenSchema
 }).strict();
 export const AccountErasureStatusSchema = z.discriminatedUnion("status", [
   z.object({ status:z.literal("NONE") }).strict(),
   z.object({
     status:z.enum(["SCHEDULED","DUE","PROCESSING"]),
     execute_at:z.iso.datetime(),
-    cancellation_ref:z.uuid(),
-    delete_public_debates:z.boolean()
+    cancellation_ref:z.uuid()
   }).strict()
 ]);
 export const AccountErasureCancelRequestSchema = z.object({
@@ -1578,7 +1576,11 @@ export const PublicDebateSchema = z.object({
   // Decision 13 of 31 Oct: what contributions changed since this snapshot (the snapshot itself never changes; these are read from
   // 0137's sealed updates at each read). Optional: every snapshot published before them parses, and the API adds them, never the seal.
   contributions: z.array(PublicContributionSchema).max(WEB_CONTRACT_LIMITS.publicContributionsMax).optional(),
-  main_answer_update: PublicMainAnswerSchema.optional()
+  main_answer_update: PublicMainAnswerSchema.optional(),
+  // Decision 13: the first author's account is gone: `author_pseudonym` then reads "a contributor" and the page says it in its own language.
+  author_name_gone: z.literal(true).optional(),
+  // Decisions 13 and 16: every report anyone wrote on it, oldest first; the newest is current, the earlier ones stay readable.
+  reports: z.array(PublicReportVersionSchema).max(WEB_CONTRACT_LIMITS.publicReportsMax).optional()
 }).strict();
 export type PublicDebate = z.infer<typeof PublicDebateSchema>;
 
@@ -1889,6 +1891,8 @@ export const contractInventory = Object.freeze({
     "GET /v1/public/debates/{id}",
     // Addition D24: the companies the declared provider targets reach, for the "AI providers" page.
     "GET /v1/public/ai-providers",
+    // Decision 13: a report on a public debate.
+    "POST /v1/public/debates/{id}/report",
     "GET /v1/geo/availability",
     "POST /v1/support/messages",
     "GET /v1/support/status",
@@ -2000,7 +2004,7 @@ export const contractInventory = Object.freeze({
     InvestigationReportWritingSchema,
     // The owner's changes of 31 Oct (./web.ts): the shapes the Tree and Public lanes fill; no route yet.
     PurposeLinesSchema, MainAnswerVersionSchema, AnswerMainAnswerSchema, PublicDigParentSchema, AnswerContributionSchema,
-    PublicContributionSchema, PublicMainAnswerSchema,
+    PublicContributionSchema, PublicMainAnswerSchema, PublicReportVersionSchema, PublicReportRequestSchema, PublicReportAcceptedSchema, PublicDebateRefusedSchema,
     // Decision 29: dynamic step 2.
     AskClarifyRequestSchema, AskClarifyResponseSchema,
     BillingQuoteRequestSchema, BillingQuoteResponseSchema, BillingCheckoutRequestSchema, BillingCheckoutResponseSchema,

@@ -28,6 +28,7 @@ import {
 } from "./web-draft.js";
 import { borrowNotice, DEEPEST_DIG, DIG_ANSWERS, DIG_RUNS, monthPause, PATH_REWRITES, RUN_PAUSED, SEEDED_NEW_DIGS } from "./rewrite-seed.js";
 import type { WebCase } from "./web-seed.js";
+import { contributionOf, PUBLIC_MODES, PUBLIC_REF, seedPublicDebates, writtenReport, type PublicMode } from "./public-seed.js";
 
 // ---------------------------------------------------------------------------------------------------------------
 // Find the repository (no machine path is written here): MOCK_ENGINE_DIR, else the dialectical-engine folder this file
@@ -122,6 +123,11 @@ let roomMode: RoomMode = choice("MOCK_ROOM", process.env.MOCK_ROOM, ROOM_MODES, 
 let askMode: AskMode = choice("MOCK_ASK", process.env.MOCK_ASK, ASK_MODES, "AUTO");
 let planMode: PlanMode = choice("MOCK_PLAN", process.env.MOCK_PLAN, PLAN_MODES, "PLUS");
 let usageMode: UsageMode = choice("MOCK_USAGE", process.env.MOCK_USAGE, USAGE_MODES, "NORMAL");
+/** Decision 13: what a public page's dig or report waits on (the click-test's switch), and how long the mock's check and report writer take. */
+let publicMode: PublicMode = choice("MOCK_PUBLIC", process.env.MOCK_PUBLIC, PUBLIC_MODES, "OPEN");
+let sessionOut = false;
+const PUBLIC_CHECK_MS = 10_000;
+const PUBLIC_REPORT_MS = 8_000;
 /** W4-4: how long the mock's readers take over a page added to researched. */
 const RESEARCHED_READ_MS = 6_000;
 let pauseMode: PauseMode = choice("MOCK_PAUSE", process.env.MOCK_PAUSE, PAUSE_MODES, "UNTIL_RESET");
@@ -268,6 +274,26 @@ settledRun({
   runRef: DEEPEST_DIG.runRef, answerId: DEEPEST_DIG.answerId, seq: DEEPEST_DIG.seq, web: "PAID", question: DEEPEST_DIG.question,
   askedAt: Date.parse(DEEPEST_DIG.askedAt), settleAt: Date.parse(DEEPEST_DIG.settledAt), storyReadyAt: 0, dig: DEEPEST_DIG.dig
 });
+
+// Decision 13: the public debates, and a digger's three digs on one, each in one state of its check (seeded under the first public debate's path).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const publicDebates = new Map<string, any>(seedPublicDebates().map((debate) => [debate.public_ref as string, structuredClone(debate)]));
+const SEEDED_CONTRIBUTION_DIGS = [
+  { state: "CHECKING", runRef: "c1000000-0000-4000-8000-000000000001", answerId: "aaaac100-0000-4000-8000-000000000001" },
+  { state: "ON_THE_PAGE", runRef: "c1000000-0000-4000-8000-000000000002", answerId: "aaaac100-0000-4000-8000-000000000002" },
+  { state: "KEPT_PRIVATE", runRef: "c1000000-0000-4000-8000-000000000003", answerId: "aaaac100-0000-4000-8000-000000000003" }
+] as const;
+for (const [at, seeded] of SEEDED_CONTRIBUTION_DIGS.entries()) {
+  const run = settledRun({
+    runRef: seeded.runRef, answerId: seeded.answerId, seq: 30 + at, web: "PAID",
+    question: `Look deeper into this part of the answer: free fares for everyone. (a dig on a public debate, ${seeded.state})`,
+    askedAt: Date.parse("2026-10-29T08:00:00.000Z"), settleAt: Date.parse("2026-10-29T08:12:00.000Z"), storyReadyAt: 0,
+    dig: { parent_run_id: RUN_SETTLED, position_ref: "n-mix", places: ["path:n-mix"], level: 1,
+      picks: [{ kind: "OWN_VIEW", place: "path:n-mix", text: "Small towns behave differently.", by: "PERSON_OWN_VIEW" }], rewrite: null }
+  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (run.answer as any).contribution = { public_ref: PUBLIC_REF, state: seeded.state };
+}
 
 type RunState = "QUEUED" | "WAITING" | "CLAIMED" | "RUNNING" | "HOLDING" | "SETTLED" | "FAILED";
 
@@ -654,6 +680,7 @@ function startupCheck(): number {
   check("GET /v1/geo/availability", C.GeoAvailabilityResponseSchema, { signup: true, pay: true, service: true });
   check("GET /v1/public/ai-providers", C.PublicAiProvidersResponseSchema, { companies: ["anthropic", "openai", "xai"] });
   check("GET /v1/public/debates", C.PublicDebateListSchema, { items: [], total: 0 });
+  for (const debate of publicDebates.values()) check(`GET /v1/public/debates/${String(debate.public_ref)}`, C.PublicDebateSchema, debate);
   check("GET /v1/deployment", C.DeploymentSchema, DEPLOYMENT);
   // A draft body must pass the draft schema whole, and today's contract once its draft fields are held back.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -881,6 +908,46 @@ async function postClarify(req: IncomingMessage, res: ServerResponse): Promise<v
   return sendJson(req, res, 200, { source: "AI", questions, ...(question.endsWith("#nopurpose") ? {} : { purpose }) }, C.AskClarifyResponseSchema);
 }
 
+const publicReportsWriting = new Map<string, number>();
+/** Decision 13: the Free notices the asks said they showed, for the click-test to read in `/__mock/state`. */
+let freeNotices = 0;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function publicDigRefusal(parent: any, planTier: string): Readonly<{ status: number; error: string; extra: object }> | null {
+  const debate = publicDebates.get(parent.public_ref);
+  if (debate === undefined) return { status: 404, error: "RUN_NOT_FOUND", extra: {} };
+  if (planTier === "free" && (parent.picks?.length ?? 0) > C.FREE_DIG_PICKS_MAX) return { status: 400, error: C.DIG_FREE_PICKS_MAX, extra: { picks_max: C.FREE_DIG_PICKS_MAX } };
+  if (publicMode === "TOO_DEEP") return { status: 409, error: C.DIG_TOO_DEEP, extra: { level_max: C.DIG_LEVEL_MAX } };
+  if (publicMode === "REPORT_WRITING") return { status: 409, error: "PUBLIC_DEBATE_REPORT_WRITING", extra: {} };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const shown: readonly any[] = parent.dig_ref === undefined ? debate.story_short?.paths ?? []
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    : (debate.contributions ?? []).find((contribution: any) => contribution.update_ref === parent.dig_ref)?.dig_paths ?? [];
+  const place = (parent.places as readonly string[]).find((candidate) => candidate.startsWith("path:"))?.slice("path:".length);
+  if (place === undefined || !shown.some((path) => path.position_ref === place)) return { status: 400, error: "PUBLIC_DIG_NEEDS_A_PATH", extra: {} };
+  if (roomMode === "FULL" || roomMode === "BLOCKED" || roomMode === "WAIT_RESET") return { status: 409, error: "PUBLIC_DEBATE_WAITS_FOR_RESET", extra: {} };
+  return null;
+}
+
+/** CHECKING while the dig runs and for a few seconds after; then ON_THE_PAGE and the page changes, or, with "#refuse" in the view, KEPT_PRIVATE and it does not. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function startPublicCheck(run: MockRun, parent: any, question: string, settleAt: number): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const answer = run.answer as any;
+  answer.contribution = { public_ref: parent.public_ref, state: "CHECKING" };
+  const settle = setTimeout(() => {
+    if (/#refuse/iu.test(question)) {
+      answer.contribution = { public_ref: parent.public_ref, state: "KEPT_PRIVATE" };
+      return;
+    }
+    answer.contribution = { public_ref: parent.public_ref, state: "ON_THE_PAGE" };
+    const place = (parent.places as readonly string[]).find((candidate) => candidate.startsWith("path:"))!.slice("path:".length);
+    const debate = publicDebates.get(parent.public_ref);
+    debate.contributions = [...(debate.contributions ?? []), contributionOf(place, parent.dig_ref ?? null, randomUUID(), iso(Date.now()).slice(0, 10), parent.picks?.[0]?.text ?? "")];
+  }, Math.max(0, settleAt - Date.now()) + PUBLIC_CHECK_MS);
+  settle.unref();
+}
+
 async function postAsk(req: IncomingMessage, res: ServerResponse): Promise<void> {
   let body: unknown;
   try {
@@ -915,6 +982,17 @@ async function postAsk(req: IncomingMessage, res: ServerResponse): Promise<void>
     return;
   }
   const parent: DraftAskParent | null = parentParsed === null ? null : parentParsed.data as DraftAskParent;
+  // Decision 13: a dig named by a public page, refused as POST /v1/asks refuses it, before anything starts.
+  const publicParent = parsed.data.public_parent;
+  if (publicParent !== undefined) {
+    const refusal = publicDigRefusal(publicParent, parsed.data.plan_tier);
+    if (refusal !== null) {
+      log(`REFUSED_${refusal.error}`, null);
+      sendJson(req, res, refusal.status, { error: refusal.error, ...(refusal.error === "RUN_NOT_FOUND" ? {} : { message: refusal.error }), ...refusal.extra });
+      return;
+    }
+  }
+  if (parsed.data.free_public_notice === true && parent === null && publicParent === undefined) freeNotices += 1;
   if (parent !== null && !runs.has(parent.parent_run_id)) {
     log("PARENT_NOT_FOUND", null);
     sendJson(req, res, 404, { error: "RUN_NOT_FOUND", message: "RUN_NOT_FOUND" });
@@ -965,8 +1043,11 @@ async function postAsk(req: IncomingMessage, res: ServerResponse): Promise<void>
     runRef, answerId: randomUUID(), question, seq, askedAt: now, settleAt,
     storyReadyAt: settleAt + POSTED_STORY_SECONDS * 1000, web,
     // W3-4: a dig's answer says its level and its picks, so its own map knows how deep it is.
-    ...(parent === null ? {} : { dig: digPartOf(parent, digLevel) })
+    ...(parent === null ? {} : { dig: digPartOf(parent, digLevel) }),
+    // A stranger's dig names no run; the answer still needs a parent, so it hangs under the mock's first debate. The page never reads it.
+    ...(publicParent === undefined ? {} : { dig: digPartOf({ parent_run_id: RUN_SETTLED, places: publicParent.places, mode: publicParent.mode, picks: publicParent.picks } as DraftAskParent, 1) })
   });
+  if (publicParent !== undefined) startPublicCheck(run, publicParent, question, settleAt);
   join(runRef);
   log(parent === null ? "QUEUED" : "QUEUED_DIG", runRef);
   sendJson(req, res, 202, askAccepted(run, false), C.AskAcceptedSchema);
@@ -984,6 +1065,9 @@ function mockState() {
     plan: planMode,
     usage: usageMode,
     pause: pauseMode,
+    public: publicMode,
+    session: sessionOut ? "OUT" : "IN",
+    free_notices: freeNotices,
     ask_effective: effectiveAskMode(),
     now: iso(now),
     reading_level: readingLevel,
@@ -1050,10 +1134,14 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
         const plan = url.searchParams.get("plan");
         const usage = url.searchParams.get("usage");
         const pause = url.searchParams.get("pause");
+        const publicSetting = url.searchParams.get("public");
         if (room !== null) roomMode = choice("room", room, ROOM_MODES, roomMode);
         if (ask !== null) askMode = choice("ask", ask, ASK_MODES, askMode);
         if (plan !== null) planMode = choice("plan", plan, PLAN_MODES, planMode);
         if (usage !== null) usageMode = choice("usage", usage, USAGE_MODES, usageMode);
+        if (publicSetting !== null) publicMode = choice("public", publicSetting, PUBLIC_MODES, publicMode);
+        const sessionSetting = url.searchParams.get("session");
+        if (sessionSetting !== null) sessionOut = choice("session", sessionSetting, ["IN", "OUT"] as const, sessionOut ? "OUT" : "IN") === "OUT";
         if (pause !== null) {
           pauseMode = choice("pause", pause, PAUSE_MODES, pauseMode);
           // Setting the pause again pauses the seeded debate again (after a Continue), so a click-test can be repeated.
@@ -1062,7 +1150,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       } catch (failure) {
         // The detail goes to the mock's log, never into the reply (CodeQL js/stack-trace-exposure, PR #224).
         process.stderr.write(`[mock] setting refused: ${failure instanceof Error ? failure.message : String(failure)}\n`);
-        return sendJson(req, res, 400, { error: "MOCK_SETTING_INVALID", message: "Unknown value for room, ask, plan, usage or pause; see the mock's log." });
+        return sendJson(req, res, 400, { error: "MOCK_SETTING_INVALID", message: "Unknown value for room, ask, plan, usage, pause or public; see the mock's log." });
       }
       return sendJson(req, res, 200, mockState());
     }
@@ -1072,7 +1160,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (parts[1] === "sign-out" && isGet) {
       return sendJson(req, res, 200, { signed_in: false }, undefined, { "set-cookie": clearedSessionCookies() });
     }
-    return notFound(req, res, "MOCK_CONTROL_NOT_FOUND", "Known: /__mock/state, /__mock/set?room=&ask=&plan=&usage=&pause=, /__mock/draft/v1/..., /__mock/sign-in, /__mock/sign-out");
+    return notFound(req, res, "MOCK_CONTROL_NOT_FOUND", "Known: /__mock/state, /__mock/set?room=&ask=&plan=&usage=&pause=&public=, /__mock/draft/v1/..., /__mock/sign-in, /__mock/sign-out");
   }
 
   // ---- the website edge's readiness probe (server.mjs /readyz forwards to <API>/readyz) ----
@@ -1081,6 +1169,8 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (parts[0] !== "v1") return notFound(req, res, "NOT_FOUND", `The mock serves /v1/... only (got ${path}).`);
 
   // ---- session, gates, public reads ----
+  // Decision 13: `session=OUT` shows a public page as a stranger sees it (a sign-in link in place of each press).
+  if (path === "/v1/session" && isGet && sessionOut) return sendJson(req, res, 401, { error: "SESSION_REQUIRED" });
   if (path === "/v1/session" && isGet) return sendJson(req, res, 200, SESSION, C.SessionSchema);
   if (path === "/v1/auth/age-confirmation" && isGet) return sendJson(req, res, 200, { status: "confirmed" }, C.AgeConfirmationStatusSchema);
   if (path === "/v1/account/sensitive-data-consent" && (isGet || method === "POST")) {
@@ -1104,6 +1194,28 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     return sendJson(req, res, 200, { companies: ["anthropic", "openai", "xai"] }, C.PublicAiProvidersResponseSchema);
   }
   if (path === "/v1/public/debates" && isGet) return sendJson(req, res, 200, { items: [], total: 0 }, C.PublicDebateListSchema);
+  // Decision 13: a public debate, with what contributions changed since its snapshot; a report on it, while nothing is ongoing.
+  if (parts[1] === "public" && parts[2] === "debates" && parts.length === 4 && isGet) {
+    const debate = publicDebates.get(parts[3]!);
+    if (debate === undefined) return sendJson(req, res, 404, { error: "DEBATE_NOT_FOUND", message: "DEBATE_NOT_FOUND" });
+    return sendJson(req, res, 200, debate, C.PublicDebateSchema);
+  }
+  if (parts[1] === "public" && parts[2] === "debates" && parts.length === 5 && parts[4] === "report" && method === "POST") {
+    const debate = publicDebates.get(parts[3]!);
+    if (debate === undefined) return sendJson(req, res, 404, { error: "DEBATE_NOT_FOUND" });
+    const refuse = (error: string) => sendJson(req, res, 409, { error, message: error }, C.PublicDebateRefusedSchema);
+    if (roomMode === "FULL" || roomMode === "BLOCKED" || roomMode === "WAIT_RESET") return refuse("PUBLIC_DEBATE_WAITS_FOR_RESET");
+    if (publicMode === "ONGOING") return refuse("PUBLIC_DEBATE_ONGOING");
+    if (debate.author_name_gone === true && (debate.contributions ?? []).length === 0) return refuse("PUBLIC_DEBATE_NO_CARRIER");
+    const version = (debate.reports ?? []).length + 1 + (publicReportsWriting.get(parts[3]!) ?? 0);
+    publicReportsWriting.set(parts[3]!, (publicReportsWriting.get(parts[3]!) ?? 0) + 1);
+    const written = setTimeout(() => {
+      publicReportsWriting.set(debate.public_ref, (publicReportsWriting.get(debate.public_ref) ?? 1) - 1);
+      debate.reports = [...(debate.reports ?? []), writtenReport(version, iso(Date.now()))];
+    }, PUBLIC_REPORT_MS);
+    written.unref();
+    return sendJson(req, res, 202, { state: "WRITING", report_version: version }, C.PublicReportAcceptedSchema);
+  }
   if (path === "/v1/deployment" && isGet) return sendJson(req, res, 200, DEPLOYMENT, C.DeploymentSchema);
 
   // ---- asking ----

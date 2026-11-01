@@ -137,5 +137,6 @@
   "newDebate.askText.otherAnswer": "Kitas atsakymas…",
   "newDebate.askText.otherLabel": "Jūsų pačių papildomas paaiškinimas",
   "newDebate.askText.matters": "Jei atsakymai veda į skirtingas puses, man svarbiausia: {matters}",
-  "newDebate.askText.angles": "Prašau taip pat pažvelgti į šiuos aspektus: {list}."
+  "newDebate.askText.angles": "Prašau taip pat pažvelgti į šiuos aspektus: {list}.",
+  "newDebate.freePublicNotice": "Nemokamame plane jūsų klausimas ir jo debatai yra vieši. Neįtraukite asmeninių duomenų."
 }

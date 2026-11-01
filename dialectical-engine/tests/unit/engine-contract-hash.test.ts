@@ -65,7 +65,9 @@ const ENGINE_SEALED_IDS: readonly string[] = ["verdict.investigate.v1", "verdict
   // R22 report 2 (decision 26): the writer who may ask once, the later version's, the checker of "every path in the material".
   "report.answer.v3", "report.answer.later.v3", "report.answer-check.v3",
   // The owner put back the v3 writer's lost first sentence.
-  "report.answer.v4", "report.answer.later.v4"];
+  "report.answer.v4", "report.answer.later.v4",
+  // R22 public lane (decision 13; a draft wording, the owner's before switch-on): the AI check on a contribution to a public debate.
+  "public.contribution-check.v1"];
 /**
  * R1d's seal: sha256 of the header text alone, no trailing newline. Printed once with
  * `printf '%s' debateai.engine-contracts.v1 | shasum -a 256` and pasted here; the test also recomputes it.
@@ -91,8 +93,8 @@ const R1D_ENGINE_CONTRACT_HASH = "b98a45d5933d82205d5c6514082d4151bfb8f3f45b3677
 // anything shipped: this order is engineSealedContracts()'s own
 // (60469207a7d5dfa9b690dbc2bffaa02b53f848f31b8db06c55e732f2e1a55e20, history). R22 clarify lane (decision 29): + dynamic step 2's small call.
 // R22 report 2 (decision 26): + the writer who may ask, its later version and the checker of "every path in the material"; then the
-// writer's v4 with the first sentence the owner put back.
-const ENGINE_CONTRACT_HASH_SEALED = "18279626b9733e6d58b90001d757d9336db72ebb70177eff493129817c434a65";
+// writer's v4 with the first sentence the owner put back. R22 public lane (decision 13): + the AI check on a contribution to a public debate.
+const ENGINE_CONTRACT_HASH_SEALED = "e1e6168de89965c88917259fab98914b372dac6a4fe16c907ad9d9797aad613c";
 const SELECT = "SELECT value_json FROM register.register_row WHERE register_version=$1 AND row_key=$2";
 const runtime = { nodeVersion: "v26.8.2", pnpmVersion: "11.20.0", sourceRevision: "a".repeat(40), sourceTree: "b".repeat(40),
   operatorSha256: "c".repeat(64), observedAt: "2026-10-16T12:00:00.000Z" };

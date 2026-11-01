@@ -13,7 +13,7 @@
   "home.publicDebates": "Offentliga debatter",
   "home.total": "TOTALT {count}",
   "home.signInHint": "Logga in eller skapa ett konto ovan för att se dina debatter.",
-  "home.publicIndexingNotice": "Publicerade debatter kan indexeras av sökmotorer. Kopior kan finnas kvar efter att publiceringen har återkallats.",
+  "home.publicIndexingNotice": "Publicerade debatter kan indexeras av sökmotorer, och kopior kan finnas kvar på andra ställen.",
   "home.debateClaim": "Debattpåstående",
   "home.claimPlaceholder": "Skriv ett påstående eller en fråga som går att debattera…",
   "home.composerHint": "Modellerna argumenterar · du bedömer",
@@ -145,6 +145,5 @@
   "home.removal.close": "Stäng",
   "home.flag.underReview": "MARKERAD · UNDER GRANSKNING",
   "home.flag.approved": "GODKÄND",
-  "home.flag.refused": "EJ GODKÄND",
-  "home.takeDown.button": "Ta ned"
+  "home.flag.refused": "EJ GODKÄND"
 }

@@ -13,7 +13,7 @@
   "home.publicDebates": "공개 토론",
   "home.total": "총 {count}개",
   "home.signInHint": "내 토론을 보려면 위에서 로그인하거나 계정을 만드세요.",
-  "home.publicIndexingNotice": "게시된 토론은 검색 엔진에 색인될 수 있습니다. 게시를 취소해도 사본이 남을 수 있습니다.",
+  "home.publicIndexingNotice": "게시된 토론은 검색 엔진에 색인될 수 있으며, 사본이 다른 곳에 남을 수 있습니다.",
   "home.debateClaim": "토론 주장",
   "home.claimPlaceholder": "토론할 수 있는 주장이나 질문을 입력하세요…",
   "home.composerHint": "모델이 토론하고 · 사용자가 평가합니다",
@@ -144,6 +144,5 @@
   "home.removal.close": "닫기",
   "home.flag.underReview": "플래그 표시됨 · 검토 중",
   "home.flag.approved": "승인됨",
-  "home.flag.refused": "승인되지 않음",
-  "home.takeDown.button": "내리기"
+  "home.flag.refused": "승인되지 않음"
 }

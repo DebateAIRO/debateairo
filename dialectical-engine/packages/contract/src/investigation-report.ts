@@ -194,3 +194,19 @@ export const InvestigationReportWritingSchema = z.object({
   report_version: z.number().int().positive()
 }).strict();
 export type InvestigationReportWriting = z.infer<typeof InvestigationReportWritingSchema>;
+
+/**
+ * Decisions 13 and 16: a report on a public debate as its page shows it. `writer`: a pseudonym, only a reference, or null once the name went ("a contributor"). Every string is in the HS-S02
+ * lists (apps/api/src/publication-check/material.ts). A story's `dig_run_id` here is the contribution's public reference, never a run id.
+ */
+export const PublicReportVersionSchema = z.object({
+  report_version: z.number().int().min(1),
+  written_at: z.iso.datetime(),
+  writer: z.string().trim().min(1).nullable(),
+  answer: InvestigationReportAnswerSchema,
+  story: InvestigationReportStorySchema.nullable(),
+  sources: z.array(InvestigationReportSourceSchema).max(INVESTIGATION_REPORT_LIMITS.sourcesMax),
+  paths: z.array(InvestigationReportPathSchema).max(INVESTIGATION_REPORT_LIMITS.pathsMax).optional(),
+  shortened: z.boolean()
+}).strict();
+export type PublicReportVersion = z.infer<typeof PublicReportVersionSchema>;

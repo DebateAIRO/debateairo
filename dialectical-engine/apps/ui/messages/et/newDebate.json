@@ -137,5 +137,6 @@
   "newDebate.askText.otherAnswer": "Muu vastus…",
   "newDebate.askText.otherLabel": "Teie enda täiendav selgitus",
   "newDebate.askText.matters": "Kui vastused lähevad eri suundades, on mulle kõige olulisem: {matters}",
-  "newDebate.askText.angles": "Palun vaadake ka: {list}."
+  "newDebate.askText.angles": "Palun vaadake ka: {list}.",
+  "newDebate.freePublicNotice": "Tasuta paketis on teie küsimus ja selle väitlus avalikud. Ärge lisage isikuandmeid."
 }

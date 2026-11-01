@@ -13,7 +13,7 @@
   "home.publicDebates": "Verejné debaty",
   "home.total": "CELKOM {count}",
   "home.signInHint": "Prihláste sa alebo si vyššie vytvorte účet, aby ste videli svoje debaty.",
-  "home.publicIndexingNotice": "Zverejnené debaty môžu indexovať vyhľadávače. Ich kópie môžu pretrvať aj po zrušení zverejnenia.",
+  "home.publicIndexingNotice": "Zverejnené debaty môžu indexovať vyhľadávače a ich kópie môžu zostať inde.",
   "home.debateClaim": "Tvrdenie debaty",
   "home.claimPlaceholder": "Zadajte tvrdenie alebo otázku vhodnú na debatu…",
   "home.composerHint": "Modely argumentujú · vy posudzujete",
@@ -147,6 +147,5 @@
   "home.removal.close": "Zavrieť",
   "home.flag.underReview": "OZNAČENÉ · NA POSÚDENÍ",
   "home.flag.approved": "SCHVÁLENÉ",
-  "home.flag.refused": "NESCHVÁLENÉ",
-  "home.takeDown.button": "Stiahnuť"
+  "home.flag.refused": "NESCHVÁLENÉ"
 }

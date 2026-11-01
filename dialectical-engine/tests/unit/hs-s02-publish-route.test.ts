@@ -682,6 +682,8 @@ describe("hate-speech S02 publish path", () => {
         "acceptance/hs-eval-s02.ts",
         "apps/api/src/index.ts",
         "apps/api/src/main.ts",
+        // Decision 13: the page's sweep runs a contribution's and a report's text through the same check.
+        "apps/api/src/public-tree.ts",
         "apps/api/src/publications.ts",
         "apps/api/src/question-check/compose.ts",
         "apps/api/src/question-check/transport.ts",

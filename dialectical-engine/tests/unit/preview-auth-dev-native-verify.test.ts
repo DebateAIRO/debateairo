@@ -54,9 +54,9 @@ describe('native verify and pending forward steps',()=>{
 // Side-by-side spec §5 ("database ahead", G6): an older release's verify accepts a database a newer release moved forward
 // by n1-expand steps only against the newer release's root-pinned database-ahead file, and says so in its proof.
 const H='e'.repeat(64),S1='1'.repeat(64),S2='2'.repeat(64);
-// Probe names after this source's chain head (0146, the Owner's allowances for team members, after the pages waiting after "Add to researched" 0145, after the small AI's quota charge 0144, the hand-over 0143, the team's one limit 0142, the path suggestions 0141 and the funded spend
+// Probe names after this source's chain head (0148, an erased account keeping a public debate, after the public tree 0147, the Owner's allowances for team members 0146, the pages waiting after "Add to researched" 0145, the small AI's quota charge 0144, the hand-over 0143, the team's one limit 0142, the path suggestions 0141 and the funded spend
 // kinds 0140): a newer release's steps.
-const NEXT='0147_side_next.sql',MORE='0148_more.sql';
+const NEXT='0149_side_next.sql',MORE='0150_more.sql';
 const ROW={rowKey:'fixtureRow',valueJsonText:'1',sourceRef:'native verify fixture'};
 const SNAPSHOT=computeRegisterSnapshotSha256([ROW] as unknown as Parameters<typeof computeRegisterSnapshotSha256>[0]);
 const publication={publicationId:'11111111-1111-4111-8111-111111111111',publicationKind:'GENERAL',baseRegisterVersion:'11',registerVersion:'12',requestSha256:'a'.repeat(64),snapshotSha256:SNAPSHOT,rowCount:1,recordedAt:'2026-10-21T12:00:00.000Z'} as const;
@@ -135,7 +135,7 @@ describe('native verify on a database ahead of this source (side-by-side spec §
  });
  it('refuses an extra step that is not in the pinned list, or out of its order',async()=>{
   const verifyDatabaseAhead=vi.fn();
-  for(const ledger of [[...KNOWN,'0147_other.sql'],[...KNOWN,MORE],[...KNOWN,NEXT,MORE,'0149_third.sql']]){
+  for(const ledger of [[...KNOWN,'0149_other.sql'],[...KNOWN,MORE],[...KNOWN,NEXT,MORE,'0151_third.sql']]){
    const refusal=await verifyNativeState(poolWithLedger(ledger),binding,{databaseAhead:pinned(),verifyDatabaseAhead}).then(()=>undefined,(error:unknown)=>error);
    expect(refusal).toMatchObject({code:'DATABASE_AHEAD_NOT_ACCEPTED'});
    expect((refusal as Error).message).toMatch(/^DATABASE_AHEAD_NOT_ACCEPTED NOT_PINNED \d{4}_[a-z0-9_]+\.sql$/);
@@ -143,7 +143,7 @@ describe('native verify on a database ahead of this source (side-by-side spec §
   expect(verifyDatabaseAhead).not.toHaveBeenCalled();
  });
  it('passes plan A\'s refusal through, and refuses a report that names other steps than the ledger',async()=>{
-  const refusal=Object.assign(new Error('DATABASE_AHEAD_NOT_ACCEPTED CHAIN_BROKEN 0147_side_next.sql'),{code:'DATABASE_AHEAD_NOT_ACCEPTED'});
+  const refusal=Object.assign(new Error('DATABASE_AHEAD_NOT_ACCEPTED CHAIN_BROKEN 0149_side_next.sql'),{code:'DATABASE_AHEAD_NOT_ACCEPTED'});
   await expect(verifyNativeState(poolWithLedger([...KNOWN,NEXT]),binding,{databaseAhead:pinned(),verifyDatabaseAhead:vi.fn(async()=>{throw refusal;})})).rejects.toBe(refusal);
   const other=vi.fn(async()=>({mode:'AHEAD' as const,knownSteps:OWN_CHAIN.length,extraSteps:[NEXT,MORE]}));
   await expect(verifyNativeState(poolWithLedger([...KNOWN,NEXT]),binding,{databaseAhead:pinned(),verifyDatabaseAhead:other})).rejects.toThrow('PREVIEW_NATIVE_VERIFICATION_REFUSED');
@@ -156,7 +156,7 @@ describe('native verify on a database ahead of this source (side-by-side spec §
   }
   migrate.mockResolvedValueOnce({appliedSteps:['0123_side_by_side_releases.sql'],extraSteps:[]});
   await expect(verifyNativeState(poolWithLedger(KNOWN),binding)).rejects.toThrow('PREVIEW_NATIVE_VERIFICATION_REFUSED');
-  const refusal=Object.assign(new Error('DATABASE_AHEAD_NOT_ACCEPTED NEWER_CHAIN_MISMATCH 0147_side_next.sql'),{code:'DATABASE_AHEAD_NOT_ACCEPTED'});
+  const refusal=Object.assign(new Error('DATABASE_AHEAD_NOT_ACCEPTED NEWER_CHAIN_MISMATCH 0149_side_next.sql'),{code:'DATABASE_AHEAD_NOT_ACCEPTED'});
   migrate.mockRejectedValueOnce(refusal);
   await expect(verifyNativeState(poolWithLedger([...KNOWN,NEXT]),binding,{databaseAhead:pinned(),verifyDatabaseAhead:accepted})).rejects.toBe(refusal);
  });

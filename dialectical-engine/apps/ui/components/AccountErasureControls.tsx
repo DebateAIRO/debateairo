@@ -48,7 +48,6 @@ export function confirmationPhraseMatches(typed: string, phrase: string, locale:
 }
 
 type ErasureStatus = Awaited<ReturnType<ContractClient["readAccountErasure"]>>;
-const DEBATEAI_BRAND = "Dialectical Engine";
 /**
  * `getBillingSubscription` is optional: without it (or with billing off, a 404) the panel says nothing about a plan.
  * The default client has it.
@@ -80,7 +79,6 @@ export function AccountErasureControls({
   const [status, setStatus] = useState<ErasureStatus | null>(null);
   const authCatalog=useSelectedAuthCatalog(locale),[confirming,setConfirming]=useState(false);
   const [confirmation, setConfirmation] = useState("");
-  const [deletePublicDebates, setDeletePublicDebates] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   // W7 (P2-I10): an ACTIVE paid plan keeps working until the deletion runs; the panel says so in one sentence.
@@ -129,10 +127,6 @@ export function AccountErasureControls({
     return () => { active = false; window.clearInterval(timer); };
   }, [catalog, client]);
 
-  useEffect(() => {
-    if (status !== null && status.status !== "NONE") setDeletePublicDebates(false);
-  }, [status]);
-
   async function schedule(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (!confirmed || busy) return;
@@ -144,14 +138,11 @@ export function AccountErasureControls({
     setBusy(true);setMessage(null);
     try {
       const grant=result.step_up_grant;
-      const scheduled = await (deletePublicDebates
-        ? client.scheduleAccountErasure(grant.token, true)
-        : client.scheduleAccountErasure(grant.token));
+      const scheduled = await client.scheduleAccountErasure(grant.token);
       setStatus(scheduled);
       setConfirming(false);
       returnFocus.current = true;
       setConfirmation("");
-      setDeletePublicDebates(false);
       setMessage(t(catalog, "settings.erasure.scheduled"));
     } catch (failure) {
       setMessage(failureMessage(failure, catalog));
@@ -180,8 +171,6 @@ export function AccountErasureControls({
   }
 
   const scheduled = status !== null && status.status !== "NONE" ? status : null;
-  const storedRemove = scheduled !== null && scheduled.delete_public_debates;
-  const removalChosen = scheduled !== null ? storedRemove : deletePublicDebates;
 
   return (
     <section className="setCard setCardDanger" aria-labelledby="account-deletion-heading">
@@ -192,9 +181,7 @@ export function AccountErasureControls({
         {t(catalog, "settings.erasure.hint")} {t(catalog, "settings.erasure.endsContract")}
       </p>
       <p className="setCardNote">
-        {removalChosen
-          ? t(catalog, "settings.erasure.dataWarningRemove", { brand: DEBATEAI_BRAND })
-          : t(catalog, "settings.erasure.dataWarning")}
+        {t(catalog, "settings.erasure.dataWarning")}
       </p>
       {paidPlanLive ? (
         <p className="setCardNote">
@@ -211,11 +198,6 @@ export function AccountErasureControls({
               status: scheduled.status,
               time: formatDate(locale, scheduled.execute_at, { dateStyle: "medium", timeStyle: "short" })
             })}
-          </p>
-          <p className="setCardNote">
-            {storedRemove
-              ? t(catalog, "settings.erasure.publicDebatesRemove")
-              : t(catalog, "settings.erasure.publicDebatesKeep")}
           </p>
           {scheduled.status === "PROCESSING" ? (
             <p className="setCardNote">
@@ -248,18 +230,6 @@ export function AccountErasureControls({
                 required aria-invalid="false"
               />
             </div>
-          </div>
-          <div className="setCardRow">
-            <input
-              type="checkbox"
-              id="account-deletion-public-debates"
-              className="consentBox"
-              checked={deletePublicDebates}
-              onChange={(event) => setDeletePublicDebates(event.currentTarget.checked)}
-            />
-            <label htmlFor="account-deletion-public-debates" className="consentText">
-              {t(catalog, "settings.erasure.deletePublicDebates")}
-            </label>
           </div>
           <div className="setCardRow">
             <button

@@ -16,6 +16,7 @@ import {
   FORGET_ERASED_DEBATE_TREE_UPDATES,
   FORGET_ERASED_DEBATE_PASSAGES,
   FORGET_ERASED_DEBATE_PATH_SUGGESTIONS,
+  FORGET_ERASED_DEBATE_PUBLIC_TREE,
   FORGET_ERASED_DEBATE_INVESTIGATION,
   FORGET_ERASED_DEBATE_PAGE_MEMORY,
   FORGET_ERASED_DEBATE_WEB_EVIDENCE,
@@ -67,7 +68,9 @@ const ERASURE_FUNCTION_SIGNATURES = Object.freeze([
   FORGET_ERASED_DEBATE_TREE_UPDATES,
   FORGET_ERASED_DEBATE_PASSAGES,
   // 0141: its path suggestions.
-  FORGET_ERASED_DEBATE_PATH_SUGGESTIONS
+  FORGET_ERASED_DEBATE_PATH_SUGGESTIONS,
+  // 0147: its copy of the public page, its check's pass, its climb's mark and an answer version under its key.
+  FORGET_ERASED_DEBATE_PUBLIC_TREE
 ] as const);
 const ERASURE_FORBIDDEN_ROLES = Object.freeze([
   "public","debateai_runtime","debateai_authorization_runtime",
@@ -93,7 +96,6 @@ export type CurrentAccountErasure = Readonly<{
   status: "SCHEDULED" | "DUE" | "PROCESSING";
   executeAt: Date;
   cancellationRef: string;
-  deletePublicDebates: boolean;
 }>;
 
 export type AccountErasurePreview = Readonly<{
@@ -107,7 +109,6 @@ export type AccountErasurePreview = Readonly<{
 type AccountErasureCleanupManifest = AccountErasurePreview & Readonly<{
   currentPublicationRefs: readonly string[];
   cleanupPublicationRefs: readonly string[];
-  deletePublicDebates: boolean;
 }>;
 
 export type RunKeyProvisionCleanup = Readonly<{
@@ -425,22 +426,21 @@ export class PostgresAccountErasureRepository {
     ownerRef: string;
     sessionId: string;
     grantTokenHash: string;
-    deletePublicDebates?: boolean;
     source?: AuthSourceContext;
   }>): Promise<CurrentAccountErasure | null> {
     // C11.1 (R-16, D-3 row 10): the SCHEDULED row takes the schedule request's language; a request with no value writes en (V-23).
     const result = await withMailLocale(this.pool, input.source?.mailLocale ?? "en", (client) => client.query<{
       erasure_id:string;status:"SCHEDULED"|"DUE"|"PROCESSING";execute_at:Date;
-      cancellation_ref:string;delete_public_debates:boolean;
+      cancellation_ref:string;
     }>(
-      "SELECT * FROM identity.schedule_account_erasure($1,$2,$3,$4,$5)",
-      [input.userId,input.ownerRef,input.sessionId,input.grantTokenHash,
-        input.deletePublicDebates === true]
+      // R22 decision 21: erasing an account never removes a public debate. 0110's parameter stays (migrations are frozen); it is always false.
+      "SELECT * FROM identity.schedule_account_erasure($1,$2,$3,$4,false)",
+      [input.userId,input.ownerRef,input.sessionId,input.grantTokenHash]
     ));
     const row=result.rows[0];
     return row===undefined ? null : Object.freeze({
       erasureId:row.erasure_id,status:row.status,executeAt:row.execute_at,
-      cancellationRef:row.cancellation_ref,deletePublicDebates:row.delete_public_debates
+      cancellationRef:row.cancellation_ref
     });
   }
 
@@ -454,7 +454,6 @@ export class PostgresAccountErasureRepository {
       status: "SCHEDULED" | "DUE" | "PROCESSING";
       execute_at: Date;
       cancellation_ref: string;
-      delete_public_debates: boolean;
     }>("SELECT * FROM identity.current_account_erasure_with_choice($1,$2,$3)", [
       input.userId,input.ownerRef,input.sessionId
     ]);
@@ -463,8 +462,7 @@ export class PostgresAccountErasureRepository {
       erasureId: row.erasure_id,
       status: row.status,
       executeAt: row.execute_at,
-      cancellationRef: row.cancellation_ref,
-      deletePublicDebates: row.delete_public_debates
+      cancellationRef: row.cancellation_ref
     });
   }
 
@@ -534,7 +532,6 @@ export class PostgresAccountErasureRepository {
       published_run_ids: string[];
       current_publication_refs: string[];
       cleanup_publication_refs: string[];
-      delete_public_debates: boolean;
     }>("SELECT * FROM identity.account_erasure_cleanup_manifest_with_choice($1)", [erasureId]);
     const row = result.rows[0];
     return row === undefined ? null : Object.freeze({
@@ -544,8 +541,7 @@ export class PostgresAccountErasureRepository {
       legacyRunIds: Object.freeze([...row.legacy_run_ids]),
       publishedRunIds: Object.freeze([...row.published_run_ids]),
       currentPublicationRefs: Object.freeze([...row.current_publication_refs]),
-      cleanupPublicationRefs: Object.freeze([...row.cleanup_publication_refs]),
-      deletePublicDebates: row.delete_public_debates
+      cleanupPublicationRefs: Object.freeze([...row.cleanup_publication_refs])
     });
   }
 
@@ -776,15 +772,10 @@ export class AccountErasureCoordinator {
         || cleanup.cleanupPublicationRefs.length > 0)
       && this.publications === undefined) return "INVALID_EVIDENCE";
     for (const publicationRef of cleanup.currentPublicationRefs) {
-      const ok = await this.repository.withPublicationLease(publicationRef,async () => {
-        if (!cleanup.deletePublicDebates) {
-          return await this.publications!.exists(publicationRef)
-            && await this.publications!.keyReadable(publicationRef);
-        }
-        await this.publications!.destroy(publicationRef);
-        return !await this.publications!.exists(publicationRef)
-          && !await this.publications!.keyReadable(publicationRef);
-      });
+      // R22 decision 21: a current public debate outlives its account; its key is only checked, never destroyed here.
+      const ok = await this.repository.withPublicationLease(publicationRef,async () =>
+        await this.publications!.exists(publicationRef)
+          && await this.publications!.keyReadable(publicationRef));
       if (!ok) return "INVALID_EVIDENCE";
     }
     for (const publicationRef of cleanup.cleanupPublicationRefs) {

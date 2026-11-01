@@ -137,5 +137,6 @@
   "newDebate.askText.otherAnswer": "Más válasz…",
   "newDebate.askText.otherLabel": "Saját kiegészítő pontosítás",
   "newDebate.askText.matters": "Ha a válaszok különböző irányba mutatnak, nekem a legfontosabb: {matters}",
-  "newDebate.askText.angles": "Kérem, nézze meg ezeket a szempontokat is: {list}."
+  "newDebate.askText.angles": "Kérem, nézze meg ezeket a szempontokat is: {list}.",
+  "newDebate.freePublicNotice": "Az ingyenes szinten a kérdése és a hozzá tartozó vita nyilvános. Ne adjon meg személyes adatokat."
 }

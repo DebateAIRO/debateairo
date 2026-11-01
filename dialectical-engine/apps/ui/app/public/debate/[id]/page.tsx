@@ -4,6 +4,11 @@ import { cookies } from "next/headers";
 import { ContractHttpError } from "@debateai/contract";
 import { createServerContractClient, readTrustedClientIp } from "@/lib/serverApi";
 import { MADE_BY_NEWER_RELEASE } from "@/lib/v3/releaseWatch";
+import { readCrisisCountryHint } from "@/lib/crisisLines";
+import "@/app/v4/v4-base.css";
+import "@/app/v4/v4-ask.css";
+import "@/app/v4/v4-report.css";
+import "./public-lane.css";
 import { MadeByNewerRelease } from "./MadeByNewerRelease";
 import { PublicDebatePageClient } from "./PublicDebatePageClient";
 import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
@@ -16,14 +21,17 @@ export default async function PublicDebatePage({ params }: { params: Promise<{ i
   const { id } = await params;
   const requestedLocale = (await cookies()).get(LOCALE_COOKIE)?.value;
   const locale = isLocale(requestedLocale) ? requestedLocale : "en";
-  const [publicCatalog, timeCatalog, debateChromeCatalog, debateDrawersCatalog, miscCatalog, composeCatalog, homeCatalog] = await Promise.all([
+  const [publicCatalog, timeCatalog, debateChromeCatalog, debateDrawersCatalog, miscCatalog, composeCatalog, homeCatalog, v4Catalog, newDebateCatalog] = await Promise.all([
     loadNamespace(locale, "public"),
     loadNamespace(locale, "time"),
     loadNamespace(locale, "debateChrome"),
     loadNamespace(locale, "debateDrawers"),
     loadNamespace(locale, "misc"),
     loadNamespace(locale, "compose"),
-    loadNamespace(locale, "home")
+    loadNamespace(locale, "home"),
+    // Decision 13: the page's contributions, reports and dig box (English for R22, owner N10), and what the ask reads.
+    loadNamespace(locale, "v4"),
+    loadNamespace(locale, "newDebate")
   ]);
   let debate;
   try {
@@ -57,6 +65,9 @@ export default async function PublicDebatePage({ params }: { params: Promise<{ i
       miscCatalog={miscCatalog}
       composeCatalog={composeCatalog}
       homeCatalog={homeCatalog}
+      v4Catalog={v4Catalog}
+      newDebateCatalog={newDebateCatalog}
+      crisisCountryHint={readCrisisCountryHint(await headers())}
     />
   );
 }

@@ -139,6 +139,7 @@ const WORKER_FUNCTIONS = [
   // The owner's changes of 31 Oct (0137 to 0139): contributions and Free asks, tree and answer updates, shown quotes and wipes. Their archive
   // sections are not wired yet either; the boot check pins that the worker reaches them.
   "identity.read_data_export_public_debates(uuid,uuid)",
+  "identity.read_data_export_public_tree(uuid,uuid)",
   "identity.read_data_export_tree_updates(uuid,uuid)",
   "identity.read_data_export_passage_retention(uuid,uuid)",
   // A path's suggestions (0141), sealed under each set's run key. Its archive section is not wired yet either; the boot check pins
@@ -172,7 +173,7 @@ export async function assertDataExportDatabaseRoles(requestPool: Pool, workerPoo
     const [request, worker] = await Promise.all([roleWitness(requestPool), roleWitness(workerPool)]);
     if (request === undefined || worker === undefined || request.principal === worker.principal
       || !request.authorization_member || request.worker_member || request.request_count !== 4 || request.worker_count !== 0
-      || !worker.worker_member || worker.authorization_member || worker.request_count !== 0 || worker.worker_count !== 20
+      || !worker.worker_member || worker.authorization_member || worker.request_count !== 0 || worker.worker_count !== 21
       || request.privileged || worker.privileged) {
       throw new TypeError("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
     }

@@ -452,6 +452,82 @@ await step("a debate paused at the month wall, then Continue", async () => {
   return `paused until ${before.month_pause?.until ?? ready.month_pause.until}; Continue refused early, then resumed`;
 }, (value: string) => value);
 
+// Decision 13: the public-debates lane. It runs last among the asks: it adds two digs and one report to the mock.
+const PUBLIC = { debate: "f1000000-0000-4000-8000-000000000001", authorGone: "f1000000-0000-4000-8000-000000000002", update: "f2000000-0000-4000-8000-000000000001" };
+const CONTRIBUTION_DIGS = { CHECKING: "c1000000-0000-4000-8000-000000000001", ON_THE_PAGE: "c1000000-0000-4000-8000-000000000002", KEPT_PRIVATE: "c1000000-0000-4000-8000-000000000003" };
+const publicAsk = (publicParent: Loose | null, extra: Loose = {}): Loose => ({
+  question_line: "Look deeper into this part of the answer: free fares.", plan_tier: "free", risk_tier: "standard", tier_source: "ASKER", tier_provenance_ref: "mock-check",
+  composition_budget_tier: "low", depth_params: { depth: 1 }, decision_scope: "personal", as_of: new Date().toISOString(), steering_presets: [], steering_annotations: [],
+  ...(publicParent === null ? {} : { public_parent: publicParent }), ...extra
+});
+const ownView = (place: string, count = 1): Loose[] => Array.from({ length: count }, (_, at) => ({ kind: "OWN_VIEW", suggestion_id: null, place, text: `My own view ${String(at + 1)}` }));
+await step("a public debate with one contribution, a changed main answer, one report", async () => {
+  const debate: Loose = await client.readPublicDebate(PUBLIC.debate);
+  must(debate.contributions.length >= 1 && debate.contributions[0].dig_paths.length === 1, "one contribution with its dig's paths");
+  must(debate.main_answer_update !== undefined, "the main answer changed");
+  must(debate.reports.length >= 1 && debate.reports[0].writer !== null, "one report, with its writer as a reference");
+  const gone: Loose = await client.readPublicDebate(PUBLIC.authorGone);
+  must(gone.author_name_gone === true, "the author's name went");
+  return `${String(debate.contributions.length)} contribution(s), ${String(debate.reports.length)} report(s)`;
+}, (value: string) => value);
+await expectCode("a public debate nobody published", () => client.readPublicDebate("f1000000-0000-4000-8000-00000000ffff"), "NOT_FOUND");
+await step("the digger's three states", async () => {
+  for (const [state, runId] of Object.entries(CONTRIBUTION_DIGS)) {
+    const answer: Loose = await client.readRunAnswer(runId);
+    must(answer.contribution.state === state && answer.contribution.public_ref === PUBLIC.debate, `${state}: ${JSON.stringify(answer.contribution)}`);
+  }
+  return "CHECKING, ON_THE_PAGE, KEPT_PRIVATE";
+}, (value: string) => value);
+await step("a dig on a public page: its refusals, then it starts and checks", async () => {
+  await expectCode("nobody's page", () => client.submitAsk(publicAsk({ public_ref: "f1000000-0000-4000-8000-00000000ffff", places: ["path:p-fares"], mode: "quick", picks: ownView("path:p-fares") })), "NOT_FOUND");
+  await expectCode("a path the page does not show", () => client.submitAsk(publicAsk({ public_ref: PUBLIC.debate, places: ["path:not-here"], mode: "quick", picks: ownView("path:not-here") })), "MALFORMED_REQUEST");
+  await expectCode("too many views on Free", () => client.submitAsk(publicAsk({ public_ref: PUBLIC.debate, places: ["path:p-fares"], mode: "quick", picks: ownView("path:p-fares", 4) })), "MALFORMED_REQUEST");
+  await mock("/__mock/set?room=FULL");
+  try {
+    await expectCode("a used-up limit", () => client.submitAsk(publicAsk({ public_ref: PUBLIC.debate, places: ["path:p-fares"], mode: "quick", picks: ownView("path:p-fares") })), "SERVER_FAILURE"); // A 409's own word is in serverCode; the website's tests read it.
+  } finally {
+    await mock("/__mock/set?room=FITS");
+  }
+  const onDigPath: Loose = await client.submitAsk(publicAsk({ public_ref: PUBLIC.debate, dig_ref: PUBLIC.update, places: ["path:p-towns"], mode: "quick", picks: ownView("path:p-towns") }));
+  const accepted: Loose = await client.submitAsk(publicAsk({ public_ref: PUBLIC.debate, places: ["path:p-fares"], mode: "quick", picks: ownView("path:p-fares") }));
+  return `started ${String(accepted.run_ref)} and ${String(onDigPath.run_ref)}`;
+}, (value: string) => value);
+await step("the Free notice: a Free room says so, and an ask that showed it is counted", async () => {
+  await mock("/__mock/set?plan=FREE");
+  try {
+    const room: Loose = await client.getAskRoom({ plan_tier: "free", composition_budget_tier: "low", depth: 1 });
+    must(room.plan_id === "FREE", `plan ${String(room.plan_id)}`);
+    const before: Loose = await (await fetch(`${process.env.DIALECTICAL_API_BASE}/__mock/state`)).json();
+    await client.submitAsk(publicAsk(null, { free_public_notice: true }));
+    const after: Loose = await (await fetch(`${process.env.DIALECTICAL_API_BASE}/__mock/state`)).json();
+    must(after.free_notices === before.free_notices + 1, "counted");
+  } finally {
+    await mock("/__mock/set?plan=PLUS");
+  }
+  return "counted";
+}, (value: string) => value);
+await step("Write a report: 202 and its refusals", async () => {
+  const noCarrier: Loose = await client.writePublicReport(PUBLIC.authorGone);
+  must(noCarrier.error === "PUBLIC_DEBATE_NO_CARRIER", `author gone: ${JSON.stringify(noCarrier)}`);
+  await mock("/__mock/set?public=ONGOING");
+  try {
+    const ongoing: Loose = await client.writePublicReport(PUBLIC.debate);
+    must(ongoing.error === "PUBLIC_DEBATE_ONGOING", `ongoing: ${JSON.stringify(ongoing)}`);
+  } finally {
+    await mock("/__mock/set?public=OPEN");
+  }
+  await mock("/__mock/set?room=FULL");
+  try {
+    const waits: Loose = await client.writePublicReport(PUBLIC.debate);
+    must(waits.error === "PUBLIC_DEBATE_WAITS_FOR_RESET", `used up: ${JSON.stringify(waits)}`);
+  } finally {
+    await mock("/__mock/set?room=FITS");
+  }
+  const accepted: Loose = await client.writePublicReport(PUBLIC.debate);
+  must(accepted.state === "WRITING" && accepted.report_version >= 2, `written: ${JSON.stringify(accepted)}`);
+  return `version ${String(accepted.report_version)} writing`;
+}, (value: string) => value);
+
 // The sign-in helper's cookies must survive the proxy's cookie rules.
 await step("Add to researched: READING, then the outcome; the same page again changes nothing; Free refused", async () => {
   const answer = await draftAnswer(RUNS.settled);

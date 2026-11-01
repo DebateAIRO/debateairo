@@ -13,7 +13,7 @@
   "home.publicDebates": "Public debates",
   "home.total": "{count} TOTAL",
   "home.signInHint": "Sign in or create an account above to see your debates.",
-  "home.publicIndexingNotice": "Published debates may be indexed by search engines. Copies may persist after unpublishing.",
+  "home.publicIndexingNotice": "Published debates may be indexed by search engines, and copies may remain elsewhere.",
   "home.debateClaim": "Debate claim",
   "home.claimPlaceholder": "Type a debatable claim or question…",
   "home.composerHint": "Models argue · you judge",
@@ -145,6 +145,5 @@
   "home.questionRefusal.months": "six months",
   "home.flag.underReview": "FLAGGED · UNDER REVIEW",
   "home.flag.approved": "APPROVED",
-  "home.flag.refused": "NOT APPROVED",
-  "home.takeDown.button": "Take down"
+  "home.flag.refused": "NOT APPROVED"
 }

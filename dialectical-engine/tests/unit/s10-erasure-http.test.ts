@@ -155,7 +155,7 @@ describe("S10 erasure HTTP boundary",()=>{
     expect(scheduled.statusCode).toBe(202);
     expect(scheduled.json()).toEqual({
       status:"SCHEDULED",execute_at:"2026-08-31T00:00:00.000Z",
-      cancellation_ref:CANCELLATION_REF,delete_public_debates:false
+      cancellation_ref:CANCELLATION_REF
     });
     expect(schedule).toHaveBeenCalledWith({ authenticated,grantToken:GRANT_TOKEN,
       source:{ ip:"127.0.0.1",mailLocale:"en",requestId:"req-4",userAgent:"s10-test-browser" } });
@@ -215,7 +215,7 @@ describe("S10 erasure HTTP boundary",()=>{
     });
     expect(status.json()).toEqual({
       status:"DUE",execute_at:"2026-08-31T00:00:00.000Z",
-      cancellation_ref:CANCELLATION_REF,delete_public_debates:false
+      cancellation_ref:CANCELLATION_REF
     });
     const cancelled=await api.inject({
       method:"POST",url:"/v1/account/erasure/cancel",headers,
@@ -251,7 +251,7 @@ describe("S10 erasure HTTP boundary",()=>{
     expect(status.statusCode).toBe(200);
     expect(status.json()).toEqual({
       status:"PROCESSING",execute_at:"2026-08-31T00:00:00.000Z",
-      cancellation_ref:CANCELLATION_REF,delete_public_debates:false
+      cancellation_ref:CANCELLATION_REF
     });
     const ordinary=await api.inject({
       method:"GET",url:"/v1/session",headers:{ cookie,"user-agent":"s10-test-browser" }
