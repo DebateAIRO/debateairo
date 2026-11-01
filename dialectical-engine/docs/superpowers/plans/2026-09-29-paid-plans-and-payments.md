@@ -28,7 +28,7 @@ These are copied from the spec. Every task includes them implicitly.
 
 **Plans and limits**
 
-- Plans are exactly FREE / PLUS / PRO / MAX. Net prices are 0 / 20.00 / 50.00 / 200.00 USD. Monthly credit is 0.20 / 5.00 / 20.00 / <amount>.
+- Plans are exactly FREE / PLUS / PRO / MAX. Net prices are 0 / 20.00 / 50.00 / 200.00 USD. Monthly credit is the plan's limit.
 - Paid plans get a day cap of 2000 basis points and a week cap of 5000 basis points of the monthly credit. Free has only its monthly credit.
 - Every person window has a finish edge of <amount> basis points (<amount>). The site day keeps <amount> (<amount>), and the close edge is <amount> (<amount>).
 - One waiting question per person.
@@ -27160,7 +27160,7 @@ The reserve and the overrun keep money for writing the answer (spec 2026-09-26 Â
 
 - **The split.** With the values above, the calls made while a debate is argued may spend up to 70% of the per-debate ceiling (0.175 USD). The calls that write the answer may take the same debate's total up to 120% of it (0.30 USD). Both count the same running total, so the reserve is simply the part the arguing may not touch.
 - **The day must hold one debate at its maximum** (0.30 USD), or the row is refused (`COST_ENVELOPE_POLICY_INVALID`).
-- **The verdict story** has a code-owned cap that the publication seals for you (`storyCostEnvelopePolicy`: <amount>, with a 20% margin, 0.06 USD). The day must hold one debate AND its story, here 0.36 USD, or publishing and both services refuse (`STORY_DAILY_CEILING_INSUFFICIENT`).
+- **The verdict story** has a code-owned cap that the publication seals for you (`storyCostEnvelopePolicy`). The day must hold one debate AND its story, or publishing and both services refuse (`STORY_DAILY_CEILING_INSUFFICIENT`).
 - **Every debate charge records its part** (`spend_phase` in `ledger.model_spend`: `BODY` while arguing, `SERVE` while writing the answer).
 - **A version without the two members means 0:** no money is kept back and the margin is off (go-live checklist line 12). The file format stays `debateai.hosted-register.v1`.
 

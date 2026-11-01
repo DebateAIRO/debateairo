@@ -119,7 +119,7 @@ are never the reason.
   always ended without an answer. Now the engine shortens what it sends. As a last resort it keeps
   the positions and the most important points, and counts the rest. The report then says "The
   debate was very large, so the answer was written from its most important points."
-- **The story has its own small budget:** <amount> per story, plus a 20% margin, so $0.06. If that
+- **The story has its own small budget:** a fixed amount per story, plus a margin. If that
   is not enough, it also tries a cheaper model. If even that fails, the page simply shows the answer
   without a story.
 - **Your records.** For every answer, the engine keeps a note of the model that was planned, the

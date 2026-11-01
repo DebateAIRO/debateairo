@@ -202,8 +202,8 @@ describe("the shape half: what is knowable without a list", () => {
 
   it("refuses a sentence that puts a money amount beside a plan's limit, in any file", () => {
     const base = git("rev-parse", "HEAD");
-    put("notes.md", "Free's monthly credit is 8.76 USD.\n");
-    put("code.ts", "// the plan's reserve: 4 cents.\n");
+    put("notes.md", "Free's monthly credit is 8.76 USD.\n"); // limits-check-ok: the shape half's own made-up hit
+    put("code.ts", "// the plan's reserve: 4 cents.\n"); // limits-check-ok: the shape half's own made-up hit
     commit();
     const run = check(base);
     expect(run.code).toBe(1);
@@ -227,7 +227,7 @@ describe("the shape half: what is knowable without a list", () => {
 
   it("runs both halves together: the note about a missing list never hides a shape refusal", () => {
     const base = git("rev-parse", "HEAD");
-    put("notes.md", "The team's limit is $6.54 a month.\n");
+    put("notes.md", "The team's limit is $6.54 a month.\n"); // limits-check-ok: the shape half's own made-up hit
     commit();
     const run = check(base);
     expect(run.code).toBe(1);

@@ -36,7 +36,7 @@ These are copied from the specs. Every task includes them implicitly.
 
 **Plans and limits (unchanged from the 29 September design)**
 
-- Plans FREE / PLUS / PRO / MAX; net prices 0 / 20.00 / 50.00 / 200.00 USD, and from Part C a price in each of RON, EUR and USD per plan, set by the owner in the register (spec §2.16); monthly AI credit 0.20 / 5.00 / 20.00 / <amount>, always in USD.
+- Plans FREE / PLUS / PRO / MAX; net prices 0 / 20.00 / 50.00 / 200.00 USD, and from Part C a price in each of RON, EUR and USD per plan, set by the owner in the register (spec §2.16); monthly AI credit is the plan's limit, always in USD.
 - Day 2000 bp, week 5000 bp, finish edge 11000 bp; retries at +1, +3, +7 days; the Q-1 72-hour hold; A7's 7-business-day notice; withdrawal within 14 days for EU/EEA/UK tax countries with the per-payment formula of A29 (i).
 
 **Code laws**
