@@ -162,7 +162,9 @@ export function createPublicationContentCheck(deps: {
       policy_version: PUBLICATION_CHECK_POLICY_VERSION, judge_call_count: judged.judgeCallCount
     });
     if (judged.judgeCallCount > 0) {
-      await deps.recordUsage?.({ subject_id: runId, attempted_at: attemptedAt, judge_call_count: judged.judgeCallCount, input_tokens: judged.usage?.input_tokens ?? null, output_tokens: judged.usage?.output_tokens ?? null, cost_usd: judged.usage?.cost_usd ?? null }).catch(() => undefined);
+      try {
+        await deps.recordUsage?.({ subject_id: runId, attempted_at: attemptedAt, judge_call_count: judged.judgeCallCount, input_tokens: judged.usage?.input_tokens ?? null, output_tokens: judged.usage?.output_tokens ?? null, cost_usd: judged.usage?.cost_usd ?? null });
+      } catch { /* Only a measure: the check's answer stands without it. */ }
     }
     return judged.result;
   } };
