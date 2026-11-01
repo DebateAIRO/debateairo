@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kısaca
-eyebrow: HİZMET KOŞULLARI · v2.10 · YÜRÜRLÜK TARİHİ 1 KASIM 2026
+eyebrow: HİZMET KOŞULLARI · v2.11 · YÜRÜRLÜK TARİHİ 1 KASIM 2026
 title: Kabul ettiğiniz hükümler
 lede: Sizinle DMS Merchandise Shop S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.
-endMarker: KOŞULLARIN SONU · v2.10
+endMarker: KOŞULLARIN SONU · v2.11
 bodyLabel: Hizmet Koşulları metni
 annexTitle: Ek A — Bölgesel koşullar
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 UYGULANACAK HUKUK
 -->
 
-**Version 2.10 · Effective 1 Kasım 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
+**Version 2.11 · Effective 1 Kasım 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
 
 **In short.** En az 18 yaşında olmalısınız. Dialectical Engine, yapay zekâ modelleriyle argümanlar oluşturur ve ürettiği her şey yanlış olabilir — bunlar tavsiye değildir. Ücretsiz plandaki tartışmalarınız, tamamlandığında ve bir yapay zekâ kontrolünden geçtikten sonra herkese açık olur; ücretli planda ise siz yayımlamadıkça özeldir. Herkese açık olduktan sonra herkes bir tartışmayı okuyabilir ve tartışma herkese açık kalır. Gönderdiğiniz metin, Sağlayıcı Sicilimizde belirtilen yapay zekâ sağlayıcılarına iletilir ve modelleri eğitmek için kullanılmaz. Hesabınız olsun veya olmasın, hukuka aykırı içerikleri support@dezbatere.ro adresine bildirin. Romanya hukuku uygulanır; ancak yerel tüketici korumalarınız saklıdır.
 
@@ -148,7 +148,7 @@ Bir şeye izin verilip verilmediğinden emin değilseniz, göndermeden önce biz
 
 **Ücretsiz plandaki tartışmalar herkese açıktır.** Ücretsiz planda sorunuz ve bu soruya ait tartışma herkese açıktır. Bunu sormadan önce size söylüyoruz. Tartışma tamamlandığında bir yapay zekâ onu kontrol eder; kontrol buna izin verirse herkes okuyabilir ve arama motorları onu dizine ekleyebilir. Kontrol reddederse, tartışma yalnızca size açık kalır. Ücretsiz planda bir soruya kişisel ayrıntılar yazmayın.
 
-**Geri alma yok.** Bir tartışma herkese açık olduğunda herkese açık kalır. Onu yayından kaldıramaz ya da silemezsiniz; hesabınızı silmek de onu kaldırmaz. Başkalarının yaptığı kopyalar kontrolümüzün dışındadır. Başkaları onu okuyabilir, alıntılayabilir, ekran görüntüsünü alabilir, arşivleyebilir ve önbelleğe kaydedebilir. Takma adınızla kalıcı olarak ilişkilendirilmesini istemeyeceğiniz hiçbir şeyi yayımlamayın.
+**Geri alma yok.** Bir tartışma herkese açık olduğunda herkese açık kalır. Onu yayından kaldıramaz ya da silemezsiniz; hesabınızı silmek de onu kaldırmaz. Onu incelerken geçici olarak görünmez hâle getirebiliriz ve bu bölümün izin verdiği ölçüde bunun bir kısmını kaldırabilir veya düzeltebiliriz. Başkalarının yaptığı kopyalar kontrolümüzün dışındadır. Başkaları onu okuyabilir, alıntılayabilir, ekran görüntüsünü alabilir, arşivleyebilir ve önbelleğe kaydedebilir. Takma adınızla kalıcı olarak ilişkilendirilmesini istemeyeceğiniz hiçbir şeyi yayımlamayın.
 
 **İşaretlenmiş bir tartışma onayımızı gerektirir.** Bir tartışma bittiğinde otomatik bir kontrol, sentezini 8. bölümdeki dört kategori bakımından okur. Kontrolün işaretlediği bir tartışma yalnızca onayımızla yayımlanabilir ve işaret sizden ve onayımızı isterseniz ekibimizden yayımları incelemeye ilişkin yetkiye sahip üyelerden başka hiç kimseye gösterilmez; kontrolün “intihara veya başkalarına zarar vermeye yönelik eğilimler” kategorisine girdiğini tespit ettiği bir tartışma ise bunun yerine, sonraki paragrafın söylediği şekilde silinir. Onayımızı tartışmanın sayfasından isterseniz, ekibimizden yayımları incelemeye ilişkin belirli bir yetkiye sahip bir üye tartışmayı yayımlanacağı hâliyle, takma adınız olmadan okuyabilir. Onaylarsak Yayımla seçeneği yeniden kullanımınıza açılır ve her yayımlamanın tabi olduğu kontrol yine uygulanır. Reddedersek tartışma özel kalır ve size bir gerekçe bildirimi sunarız (10. bölüm). Retten sonra bir kez daha talepte bulunabilirsiniz ve ilk talebe karar vermemiş bir ekip üyemiz karar verir; ayrıca 10. bölümdeki şikâyet yolunu da kullanabilirsiniz. İkinci retten sonra yeniden talepte bulunamazsınız, ancak kararı yine de mahkeme dışı bir uyuşmazlık çözüm organına veya mahkemeye taşıyabilirsiniz (10. bölüm). Onay, inceleme görevlisinin okuduğu sentezi ve onu kelimesi kelimesine tekrar eden tartışmanın sonraki her sürümünü kapsar; yeniden yazılmış bir sentez yayımladığınızda yeniden kontrol edilir ve işaretlenirse kendi onayına ihtiyaç duyar. İşaretlenmiş bir tartışmayı onayımızdan sonra yayımlarsanız, Tartışmalarınız bölümünde kartındaki Yayından kaldır düğmesiyle onu yeniden yayından kaldırabilirsiniz.
 
@@ -250,6 +250,8 @@ Başka bir yerde yaşıyorsanız bölgenizde geçerli olan cayma veya vazgeçme 
 Neyin ne zaman değişeceğini kalıcı veri saklayıcısıyla önceden bildiririz. Değişiklik, hizmete erişiminiz veya hizmeti kullanımınız üzerinde önemsizden daha fazla olumsuz etkiye sahipse, bildirimin size iletilmesinden veya değişikliğin yürürlüğe girmesinden hangisi daha geç ise o tarihten itibaren **30 gün içinde** ücretsiz olarak sözleşmeyi sona erdirebilirsiniz; kullanılmayan dönem için önceden ödenmiş tutarları iade ederiz.
 
 **Bu Koşullarda.** Bu Koşulları aynı tür nedenlerle değiştirebiliriz. Haklarınızı azaltmayan değişiklikler için yeni sürümü, değişikliklerin özetiyle yayımlar ve yürürlüğe girmesinden en az **30 gün önce** size e-posta göndeririz; o tarihten sonra Dialectical Engine'i kullanmaya devam etmeniz değişikliği kabul ettiğiniz anlamına gelir ve hesabınızı o tarihten önce kapatabilirsiniz. Mevcut bir plandaki fiyat artışları, daha düşük sınırlar, kaldırılan özellikler, içeriğinizin yeni kullanım biçimleri veya sorumluluk, uygulanacak hukuk ya da uyuşmazlık çözümüne ilişkin değişiklikler dahil, haklarınızı azaltan değişiklikler için bir sonraki oturum açışınızda yeni sürümü açıkça kabul etmenizi isteriz ve değişiklik yalnızca ileriye dönük uygulanır. Hiçbir değişikliği geriye yürütmeyiz ve size bir çıkış yolu sunmadan, sürenin ortasında ücretini ödediğiniz hususun özünü değiştirmek için bu bölümü kullanmayız. Önceki sürümler dezbatere.ro/terms/versions adresinde erişilebilir kalır.
+
+Sürüm 2.11, sürüm 2.10'un yerine geçmiştir: 9. bölüm, incelerken herkese açık bir tartışmayı geçici olarak görünmez hâle getirebileceğimizi ve bunun bir kısmını kaldırabileceğimizi veya düzeltebileceğimizi söyler.
 
 Sürüm 2.10, sürüm 2.9'un yerine geçmiştir: 9. bölüm, ücretsiz plandaki tartışmaların herkese açık olduğunu; herkese açık bir tartışmanın yayından kaldırılamayacağını ve hesabınızı kapattıktan sonra da herkese açık kalacağını; kredisi olan herkesin herkese açık bir tartışmaya katkıda bulunabileceğini veya hakkında rapor yazabileceğini; ve herkese açık bir tartışmanın ilk yazarı ayrıldıktan sonra da açık kalacağını söyler; 11. bölüm ise kapatmanın herkese açık tartışmalarınız üzerindeki etkisini açıklar.
 

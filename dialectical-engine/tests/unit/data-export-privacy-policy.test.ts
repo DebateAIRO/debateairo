@@ -118,7 +118,7 @@ describe("data export privacy policy", () => {
     const manifest = JSON.parse(
       readFileSync(join(root, "packages/legal-manifest/src/manifest.json"), "utf8"),
     ) as { reacceptance: { PRIVACY: string } };
-    expect(PRIVACY_POLICY.version).toBe("3.9");
+    expect(PRIVACY_POLICY.version).toBe("3.10");
     expect(manifest.reacceptance.PRIVACY).toBe("3.2");
   });
 });

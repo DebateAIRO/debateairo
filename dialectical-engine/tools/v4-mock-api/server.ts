@@ -123,6 +123,46 @@ let roomMode: RoomMode = choice("MOCK_ROOM", process.env.MOCK_ROOM, ROOM_MODES, 
 let askMode: AskMode = choice("MOCK_ASK", process.env.MOCK_ASK, ASK_MODES, "AUTO");
 let planMode: PlanMode = choice("MOCK_PLAN", process.env.MOCK_PLAN, PLAN_MODES, "PLUS");
 let usageMode: UsageMode = choice("MOCK_USAGE", process.env.MOCK_USAGE, USAGE_MODES, "NORMAL");
+/** Decision 33: the mock's review of a public debate, in memory. One dig to take out and any first-snapshot text to replace. */
+type MockReview = { hidden: boolean; removed: boolean; corrected: Map<string, string>; log: { revision: number; action: string; piece_kind: null; actor_staff_id: string; at: string }[] };
+const mockReview = new Map<string, MockReview>();
+const MOCK_REVIEWER = "d1000000-0000-4000-8000-000000000001";
+const MOCK_DIG = "d2000000-0000-4000-8000-000000000001";
+const MOCK_POINTERS = ["/question", "/story_short/headline", "/story_short/summary"];
+const mockAt = (value: unknown, pointer: string): string => String(pointer.split("/").slice(1).reduce((at: any, step) => at?.[step], value)); // eslint-disable-line @typescript-eslint/no-explicit-any
+function mockReviewStep(row: MockReview, action: string, pointer?: string, text?: string): string | null {
+  if (action === "HIDE") row.hidden = true;
+  else if (action === "REPUBLISH") row.hidden = false;
+  else if (!row.hidden) return "PUBLIC_REVIEW_NOT_HIDDEN";
+  else if (action === "REMOVE_DIG") row.removed = true;
+  else if (action === "CORRECT") row.corrected.set(pointer!, text!);
+  row.log.push({ revision: row.log.length + 1, action, piece_kind: null, actor_staff_id: MOCK_REVIEWER, at: new Date().toISOString() });
+  return null;
+}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mockReviewed(debate: any): any {
+  const row = mockReview.get(String(debate.public_ref));
+  if (row === undefined || !row.log.some((entry) => entry.action === "CORRECT" || entry.action === "REMOVE_DIG")) return debate;
+  const copy = structuredClone(debate);
+  for (const [pointer, text] of row.corrected) {
+    const steps = pointer.split("/").slice(1);
+    const parent = steps.slice(0, -1).reduce((at: any, step) => at[step], copy); // eslint-disable-line @typescript-eslint/no-explicit-any
+    parent[steps.at(-1)!] = text;
+  }
+  if (row.removed) { delete copy.contributions; delete copy.main_answer_update; delete copy.reports; }
+  return { ...copy, changed_after_review: true };
+}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mockReviewPage(ref: string, debate: any, row: MockReview) {
+  const contribution = (debate.contributions ?? [])[0];
+  return { publication_ref: ref, hidden: row.hidden, revision: row.log.length, question: String(debate.question), published_at: String(debate.published_at), snapshot_unreadable: false,
+    snapshot: MOCK_POINTERS.map((pointer) => ({ pointer, original: mockAt(debate, pointer), corrected: row.corrected.get(pointer) ?? null })),
+    digs: contribution === undefined ? [] : [{ dig_run_id: MOCK_DIG, parent_run_id: MOCK_DIG, position_ref: contribution.position_ref, contributor: contribution.contributor, contributed_at: `${String(contribution.contributed_on)}T10:00:00.000Z`, removed: row.removed }],
+    updates: contribution === undefined ? [] : [{ update_id: MOCK_DIG, update_seq: 1, dig_run_id: MOCK_DIG, kind: "PATH", position_ref: contribution.position_ref, recorded_at: `${String(contribution.contributed_on)}T10:00:00.000Z`,
+      state: row.removed ? "ITS_DIG_REMOVED" : "ON_THE_PAGE", before: null, pieces: [{ pointer: "/line", original: String(contribution.line), corrected: null }] }],
+    reports: [], log: row.log };
+}
+
 /** Decision 13: what a public page's dig or report waits on (the click-test's switch), and how long the mock's check and report writer take. */
 let publicMode: PublicMode = choice("MOCK_PUBLIC", process.env.MOCK_PUBLIC, PUBLIC_MODES, "OPEN");
 let sessionOut = false;
@@ -281,7 +321,8 @@ const publicDebates = new Map<string, any>(seedPublicDebates().map((debate) => [
 const SEEDED_CONTRIBUTION_DIGS = [
   { state: "CHECKING", runRef: "c1000000-0000-4000-8000-000000000001", answerId: "aaaac100-0000-4000-8000-000000000001" },
   { state: "ON_THE_PAGE", runRef: "c1000000-0000-4000-8000-000000000002", answerId: "aaaac100-0000-4000-8000-000000000002" },
-  { state: "KEPT_PRIVATE", runRef: "c1000000-0000-4000-8000-000000000003", answerId: "aaaac100-0000-4000-8000-000000000003" }
+  { state: "KEPT_PRIVATE", runRef: "c1000000-0000-4000-8000-000000000003", answerId: "aaaac100-0000-4000-8000-000000000003" },
+  { state: "REMOVED_AFTER_REVIEW", runRef: "c1000000-0000-4000-8000-000000000004", answerId: "aaaac100-0000-4000-8000-000000000004" }
 ] as const;
 for (const [at, seeded] of SEEDED_CONTRIBUTION_DIGS.entries()) {
   const run = settledRun({
@@ -1127,6 +1168,14 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   // ---- mock controls (not part of the real API) ----
   if (parts[0] === "__mock") {
     if (parts[1] === "state" && isGet) return sendJson(req, res, 200, mockState());
+    // Decision 33: a passkey cannot be pressed on the mock, so this does what the panel's Confirm would: /__mock/review?ref=<public ref>&step=HIDE|REMOVE_DIG|CORRECT|REPUBLISH[&pointer=/question&text=...]
+    if (parts[1] === "review") {
+      const ref = url.searchParams.get("ref") ?? PUBLIC_REF;
+      const row = mockReview.get(ref) ?? { hidden: false, removed: false, corrected: new Map<string, string>(), log: [] };
+      mockReview.set(ref, row);
+      const refused = mockReviewStep(row, url.searchParams.get("step") ?? "HIDE", url.searchParams.get("pointer") ?? "/story_short/summary", url.searchParams.get("text") ?? "A corrected text.");
+      return sendJson(req, res, refused === null ? 200 : 409, { refused, hidden: row.hidden, revision: row.log.length });
+    }
     if (parts[1] === "set" && (isGet || method === "POST")) {
       try {
         const room = url.searchParams.get("room");
@@ -1194,11 +1243,33 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     return sendJson(req, res, 200, { companies: ["anthropic", "openai", "xai"] }, C.PublicAiProvidersResponseSchema);
   }
   if (path === "/v1/public/debates" && isGet) return sendJson(req, res, 200, { items: [], total: 0 }, C.PublicDebateListSchema);
+  // Decision 33: the private team panel's reads and steps. The passkey is the mock's usual pretend one.
+  if (parts[1] === "admin" && parts[2] === "public-review") {
+    if (parts.length === 3 && isGet) {
+      return sendJson(req, res, 200, { hidden: [...mockReview.entries()].filter(([, row]) => row.hidden).map(([publication_ref, row]) => ({ publication_ref, hidden_at: row.log.at(-1)!.at })),
+        log: [...mockReview.entries()].flatMap(([publication_ref, row]) => row.log.map((entry) => ({ ...entry, publication_ref }))).slice(-100) }, C.PublicReviewListSchema);
+    }
+    const ref = parts[3]!;
+    const debate = publicDebates.get(ref);
+    if (debate === undefined) return sendJson(req, res, 404, { error: "PUBLIC_REVIEW_NOT_PUBLIC" });
+    const row = mockReview.get(ref) ?? { hidden: false, removed: false, corrected: new Map<string, string>(), log: [] };
+    mockReview.set(ref, row);
+    if (parts.length === 4 && isGet) return sendJson(req, res, 200, mockReviewPage(ref, debate, row), C.PublicReviewPageSchema);
+    if (parts.length === 5 && method === "POST") {
+      const body = await readJsonBody(req) as { step?: string; pointer?: string; text?: string; expected_revision?: number };
+      if (body.expected_revision !== row.log.length) return sendJson(req, res, 409, { error: "PUBLIC_REVIEW_STALE" });
+      const refused = mockReviewStep(row, parts[4] === "hide" ? "HIDE" : body.step!, body.pointer, body.text);
+      if (refused !== null) return sendJson(req, res, 409, { error: refused });
+      return sendJson(req, res, 200, { operation_id: crypto.randomUUID(), outcome: "COMPLETED", recorded_at: iso(Date.now()) }, C.SecurityReceiptSchema);
+    }
+  }
   // Decision 13: a public debate, with what contributions changed since its snapshot; a report on it, while nothing is ongoing.
   if (parts[1] === "public" && parts[2] === "debates" && parts.length === 4 && isGet) {
     const debate = publicDebates.get(parts[3]!);
     if (debate === undefined) return sendJson(req, res, 404, { error: "DEBATE_NOT_FOUND", message: "DEBATE_NOT_FOUND" });
-    return sendJson(req, res, 200, debate, C.PublicDebateSchema);
+    // Decision 33: hidden under review, the plain line. The mock's own switch below hides, corrects and puts back.
+    if (mockReview.get(parts[3]!)?.hidden === true) return sendJson(req, res, 410, { error: "DEBATE_UNDER_REVIEW" });
+    return sendJson(req, res, 200, mockReviewed(debate), C.PublicDebateSchema);
   }
   if (parts[1] === "public" && parts[2] === "debates" && parts.length === 5 && parts[4] === "report" && method === "POST") {
     const debate = publicDebates.get(parts[3]!);

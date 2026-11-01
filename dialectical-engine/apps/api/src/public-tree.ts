@@ -33,16 +33,51 @@ export type PublicAnswerCopy = Readonly<{ v: 1; segments: readonly string[]; wri
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> => typeof value === "object" && value !== null && !Array.isArray(value);
 const dayOf = (at: string): string => new Date(at).toISOString().slice(0, 10);
 
-/** The page as it reads now: the first snapshot, then each copy in order. A copy that does not open is left out, whatever it was. */
-export function mergedPublicDebate(snapshot: PublicDebate, input: Readonly<{
-  updates: readonly PublicPageUpdateRead[]; reports: readonly PublicReportCopyRead[]; authorNameGone: boolean; open: (envelope: CryptoEnvelope) => unknown;
+/** Decision 33: what a review changed. A correction replaces one string of one piece; the piece itself never changes. `piece_key`: the page's own name for it. */
+export type PublicReviewOverlay = Readonly<{ changed: boolean; corrections: readonly Readonly<{ piece_kind: "SNAPSHOT" | "UPDATE" | "REPORT"; piece_key: string; pointer: string; content: CryptoEnvelope }>[] }>;
+
+/** Keys that hold words a person reads. An id, a code, a date or a model is no piece of text. */
+const NOT_TEXT = /(_ref|_refs|_id|_ids|_at|_on|_sha256|^v$|^kind$|state|fate|relation|outcome|verdict|language|confidence|band|lineage|model|provider|contract|version|mode|target|lane)/iu;
+/** Every string a person reads in a piece, by its pointer. Only these can be corrected. */
+export function textPiecesOf(value: unknown, at = ""): readonly Readonly<{ pointer: string; text: string }>[] {
+  if (typeof value === "string") return at === "" ? [] : [{ pointer: at, text: value }];
+  if (Array.isArray(value)) return value.flatMap((item, index) => textPiecesOf(item, `${at}/${String(index)}`));
+  if (!isRecord(value)) return [];
+  return Object.entries(value).flatMap(([key, item]) => NOT_TEXT.test(key) || !/^[A-Za-z0-9_]{1,64}$/u.test(key) ? [] : textPiecesOf(item, `${at}/${key}`));
+}
+/** The piece with its corrections. A pointer that no longer lands on a string is an error: the caller fails shut. */
+export function correctedPiece<T>(value: T, corrections: readonly Readonly<{ pointer: string; text: string }>[]): T {
+  if (corrections.length === 0) return value;
+  const copy = structuredClone(value) as unknown;
+  for (const { pointer, text } of corrections) {
+    const steps = pointer.split("/").slice(1);
+    let at: unknown = copy;
+    for (const step of steps.slice(0, -1)) at = isRecord(at) || Array.isArray(at) ? (at as Record<string, unknown>)[step] : undefined;
+    const last = steps.at(-1)!;
+    if ((!isRecord(at) && !Array.isArray(at)) || typeof (at as Record<string, unknown>)[last] !== "string") throw new Error("PUBLIC_REVIEW_POINTER_LOST");
+    (at as Record<string, unknown>)[last] = text;
+  }
+  return copy as T;
+}
+
+/** The page as it reads now: the first snapshot, then each copy in order, each with its corrections. A copy that does not open is left out, whatever it was. */
+export function mergedPublicDebate(firstSnapshot: PublicDebate, input: Readonly<{
+  updates: readonly PublicPageUpdateRead[]; reports: readonly PublicReportCopyRead[]; authorNameGone: boolean; overlay?: PublicReviewOverlay; open: (envelope: CryptoEnvelope) => unknown;
 }>): PublicDebate {
+  const opened = (input.overlay?.corrections ?? []).map((correction) => {
+    const text = input.open(correction.content);
+    if (!isRecord(text) || typeof text.text !== "string") throw new Error("PUBLIC_REVIEW_CORRECTION_UNREAD");
+    return { kind: correction.piece_kind, key: correction.piece_key, pointer: correction.pointer, text: text.text };
+  });
+  const correctionsOf = (kind: "SNAPSHOT" | "UPDATE" | "REPORT", key: string | null) => opened.filter((correction) => correction.kind === kind && (key === null || correction.key === key));
+  const snapshot = PublicDebateSchema.parse(correctedPiece(firstSnapshot, correctionsOf("SNAPSHOT", null)));
   const contributions: PublicContribution[] = [];
   let main: PublicMainAnswer | null = null;
   for (const update of input.updates) {
-    let opened: unknown;
-    try { opened = input.open(update.content); } catch { continue; }
-    if (!isRecord(opened)) continue;
+    let row: unknown;
+    try { row = correctedPiece(input.open(update.content), correctionsOf("UPDATE", update.update_id)); } catch { continue; }
+    if (!isRecord(row)) continue;
+    const opened = row;
     if (update.kind === "MAIN_ANSWER") {
       const parsed = PublicDebateSchema.shape.main_answer_update.safeParse({ updated_at: new Date(update.recorded_at).toISOString(),
         segments: Array.isArray(opened.segments) ? opened.segments.map((text) => ({ text })) : [] });
@@ -58,11 +93,12 @@ export function mergedPublicDebate(snapshot: PublicDebate, input: Readonly<{
   const reports: PublicReportVersion[] = [];
   for (const report of input.reports) {
     let opened: unknown;
-    try { opened = input.open(report.content); } catch { continue; }
+    try { opened = correctedPiece(input.open(report.content), correctionsOf("REPORT", String(report.report_version))); } catch { continue; }
     const parsed = PublicReportVersionSchema.safeParse({ ...(isRecord(opened) ? opened : {}), report_version: report.report_version, written_at: new Date(report.recorded_at).toISOString(), writer: report.writer });
     if (parsed.success) reports.push(parsed.data);
   }
   return PublicDebateSchema.parse({ ...snapshot,
+    ...(input.overlay?.changed === true ? { changed_after_review: true } : {}),
     ...(input.authorNameGone ? { author_pseudonym: "a contributor", author_name_gone: true } : {}),
     ...(contributions.length === 0 ? {} : { contributions }),
     ...(main === null ? {} : { main_answer_update: main }),

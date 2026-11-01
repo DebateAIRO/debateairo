@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Fil-qosor
-eyebrow: TERMINI TAS-SERVIZZ · v2.10 · EFFETTIVI 1 TA’ NOVEMBRU 2026
+eyebrow: TERMINI TAS-SERVIZZ · v2.11 · EFFETTIVI 1 TA’ NOVEMBRU 2026
 title: Dak li taqbel miegħu
 lede: Il-kuntratt bejnek u DMS Merchandise Shop S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.
-endMarker: TMIEM IT-TERMINI · v2.10
+endMarker: TMIEM IT-TERMINI · v2.11
 bodyLabel: Test tat-Termini tas-Servizz
 annexTitle: Anness A — Termini reġjonali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LIĠI APPLIKABBLI
 -->
 
-**Version 2.10 · Effective 1 ta’ Novembru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
+**Version 2.11 · Effective 1 ta’ Novembru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
 
 **In short.** Irid ikollok 18-il sena jew aktar. Dialectical Engine tibni argumenti b’mudelli tal-IA u dak kollu li tiġġenera jista’ jkun żbaljat — mhuwiex parir. Fuq il-pjan bla ħlas, id-dibattiti tiegħek huma pubbliċi meta jintemmu, wara verifika bl-IA; fuq pjan bi ħlas, huma privati sakemm ma tippubblikahomx. Ladarba jkunu pubbliċi, kulħadd jista’ jaqra dibattitu, u jibqa’ pubbliku. It-test li tissottometti jintbagħat lill-fornituri tal-IA elenkati fir-Reġistru tal-Fornituri tagħna, u ma jintużax għat-taħriġ tal-mudelli. Irrapporta kontenut illegali fuq support@dezbatere.ro kemm jekk għandek kont kif ukoll jekk le. Tapplika l-liġi Rumena, iżda l-protezzjonijiet lokali tiegħek bħala konsumatur jibqgħu japplikaw għalik.
 
@@ -148,7 +148,7 @@ Id-dibattiti fuq pjan bi ħlas huma **privati b’mod awtomatiku**: xejn minn da
 
 **Dibattiti bla ħlas huma pubbliċi.** Fuq il-pjan bla ħlas, il-mistoqsija tiegħek u d-dibattitu tagħha huma pubbliċi. Aħna ngħidulek dan qabel tistaqsi. Meta d-dibattitu jintemm, IA tivverifikah; jekk il-verifika tippermettih, kulħadd jista’ jaqrah u l-magni tat-tiftix jistgħu jindiċjawh. Jekk il-verifika tirrifiutah, jibqa’ privat għalik. Tinkludix dettalji personali f’mistoqsija fuq il-pjan bla ħlas.
 
-**Ma tistax titreġġa’ lura.** Ladarba dibattitu jkun pubbliku, jibqa’ pubbliku. Ma tistax tneħħi l-pubblikazzjoni tiegħu jew tħassru, u t-tħassir tal-kont tiegħek ma jneħħihx. Kopji li għamlu oħrajn huma barra mill-kontroll tagħna. Persuni oħra jistgħu jaqrawh, jikkwotawh, jieħdu kopji tal-iskrin tiegħu, jarkivjawh u jaħżnuh temporanjament. Tippubblikax xi ħaġa li ma tkunx lest li tkun assoċjata b’mod permanenti mal-psewdonimu tiegħek.
+**Ma tistax titreġġa’ lura.** Ladarba dibattitu jkun pubbliku, jibqa’ pubbliku. Ma tistax tneħħi l-pubblikazzjoni tiegħu jew tħassru, u t-tħassir tal-kont tiegħek ma jneħħihx. Nistgħu naħbuh temporanjament waqt li nirrieżaminawh, u nneħħu jew nikkoreġu parti minnu, sa fejn tippermetti din it-taqsima. Kopji li għamlu oħrajn huma barra mill-kontroll tagħna. Persuni oħra jistgħu jaqrawh, jikkwotawh, jieħdu kopji tal-iskrin tiegħu, jarkivjawh u jaħżnuh temporanjament. Tippubblikax xi ħaġa li ma tkunx lest li tkun assoċjata b’mod permanenti mal-psewdonimu tiegħek.
 
 **Dibattitu mmarkat jeħtieġ l-approvazzjoni tagħna.** Meta jintemm dibattitu, verifika awtomatizzata taqra s-sinteżi tiegħu għall-erba’ kategoriji fit-taqsima 8. Dibattitu li l-verifika timmarkah jista’ jiġi ppubblikat biss bl-approvazzjoni tagħna, u l-marka tintwera biss lilek u, jekk titlob l-approvazzjoni tagħna, lill-membri tat-tim tagħna li għandhom il-permess biex jirrieżaminaw il-pubblikazzjonijiet; dibattitu li l-verifika ssib li s-sinteżi tiegħu taqa’ fil-kategorija “tendenzi lejn is-suwiċidju jew lejn it-tagħmil ta’ ħsara lil persuni oħra” jitħassar minflok, kif tgħid il-parti li jmiss. Jekk titlob l-approvazzjoni tagħna fuq il-paġna tad-dibattitu, membru tat-tim tagħna li għandu permess speċifiku biex jirrieżamina l-pubblikazzjonijiet jista’ jaqra d-dibattitu kif kien jiġi ppubblikat, mingħajr il-psewdonimu tiegħek. Jekk napprovaw, Ippubblika terġa’ tkun disponibbli għalik, u l-verifika li tgħaddi minnha kull pubblikazzjoni tibqa’ tapplika. Jekk nirrifjutaw, id-dibattitu jibqa’ privat u nagħtuk dikjarazzjoni tar-raġunijiet (taqsima 10). Wara rifjut tista’ titlob darba oħra, u jiddeċiedi membru tat-tim tagħna li ma ddeċidiex fuq l-ewwel talba; tista’ wkoll tuża l-proċedura tal-ilmenti fit-taqsima 10. Wara t-tieni rifjut ma tistax titlob mill-ġdid, iżda xorta tista’ tressaq id-deċiżjoni quddiem korp għas-soluzzjoni tat-tilwim barra mill-qorti jew quddiem qorti (taqsima 10). L-approvazzjoni tkopri s-sinteżi li qara r-rieżaminatur, inkluża kwalunkwe verżjoni aktar tard tad-dibattitu li tirrepetiha kelma b’kelma; sinteżi miktuba mill-ġdid tiġi vverifikata mill-ġdid meta tippubblika u, jekk tiġi mmarkata, teħtieġ approvazzjoni tagħha stess. Jekk tippubblika dibattitu mmarkat wara l-approvazzjoni tagħna, tista’ terġa’ tneħħih bil-buttuna Neħħi fuq il-karta tiegħu fil-paġna Id-dibattiti tiegħek.
 
@@ -250,6 +250,8 @@ Jekk tgħix band’oħra, l-Anness A jiddikjara d-dritt ta’ rtirar jew il-perj
 Ngħidulek minn qabel, fuq mezz durabbli, x’inhu jinbidel u meta. Jekk il-bidla jkollha effett negattiv aktar minn minuri fuq l-aċċess tiegħek għas-servizz jew l-użu tiegħu, tista’ tittermina mingħajr ħlas fi żmien **30 jum** minn meta tiġi avżat, jew minn meta tidħol fis-seħħ il-bidla, skont liema jiġi l-aħħar, u nagħtuk lura kwalunkwe ammont imħallas bil-quddiem għall-perjodu mhux użat.
 
 **F’dawn it-Termini.** Nistgħu nibdlu dawn it-Termini għall-istess tipi ta’ raġunijiet. Għal bidliet li ma jnaqqsux id-drittijiet tiegħek, nippubblikaw il-verżjoni l-ġdida b’sommarju ta’ dak li nbidel u nibagħtulek messaġġ elettroniku mill-inqas **30 jum** qabel ma tidħol fis-seħħ; jekk tkompli tuża Dialectical Engine wara dik id-data, dan ifisser li taċċettaha, u tista’ tagħlaq il-kont tiegħek qabel dak iż-żmien. Għal bidliet li jnaqqsu d-drittijiet tiegħek — inkluż żidiet fil-prezz fuq pjan eżistenti, limiti aktar baxxi, funzjonalitajiet imneħħija, użi ġodda tal-kontenut tiegħek, jew bidliet fir-responsabbiltà, fil-liġi applikabbli jew fis-soluzzjoni tat-tilwim — nitolbuk taċċetta l-verżjoni l-ġdida b’mod espliċitu meta terġa’ tidħol fil-kont, u l-bidla tapplika biss għall-futur. Qatt ma nagħmlu bidla retroattiva, u qatt ma nużaw din it-taqsima biex nibdlu l-qalba ta’ dak li ħallast għalih f’nofs it-terminu mingħajr ma noffrulek mod kif toħroġ. Il-verżjonijiet preċedenti jibqgħu disponibbli fuq dezbatere.ro/terms/versions.
+
+Il-Verżjoni 2.11 issostitwiet il-Verżjoni 2.10: it-taqsima 9 tgħid li nistgħu naħbu dibattitu pubbliku temporanjament waqt li nirrieżaminawh, u nneħħu jew nikkoreġu parti minnu.
 
 Il-Verżjoni 2.10 issostitwiet il-Verżjoni 2.9: it-taqsima 9 tgħid li d-dibattiti fuq il-pjan bla ħlas huma pubbliċi, li dibattitu pubbliku ma jistax jitneħħa mill-pubbliku u jibqa’ pubbliku wara li tagħlaq il-kont tiegħek, li kull min għandu kreditu jista’ jikkontribwixxi għal dibattitu pubbliku jew jikteb rapport dwaru, u li dibattitu pubbliku jibqa’ miftuħ wara li l-ewwel awtur tiegħu jitlaq; it-taqsima 11 tgħid x’jagħmel l-għeluq għad-dibattiti pubbliċi tiegħek.
 

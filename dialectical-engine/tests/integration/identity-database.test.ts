@@ -102,7 +102,9 @@ describe("S2 identity schema on real PostgreSQL", () => {
       "public_answer_update", "public_climb_done", "public_contribution", "public_contribution_check", "public_debate_report", "public_debate_update", "public_dig_input",
       "public_material", "public_page_skip", "public_report", "public_report_charge",
       // 0149: a report's publication-check record and the public reference of each update on the page.
-      "public_report_check", "public_report_writer", "public_update_ref",
+      "public_report_check", "public_report_writer",
+      // 0150: a public debate under review: its log, its corrections, the digs detached when it was hidden, what each reviewer read.
+      "public_review_correction", "public_review_detached", "public_review_event", "public_review_read", "public_update_ref",
       "publication_event_binding", "recovery_code", "recovery_email_request", "registration_region", "run_execution_binding",
       // 0143 the hand-over of a paused debate: which release and settings version it moved from and to.
       "run_handover",

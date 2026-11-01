@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kort fortalt
-eyebrow: TJENESTEVILKÅR · v2.10 · GÆLDENDE FRA 1. NOVEMBER 2026
+eyebrow: TJENESTEVILKÅR · v2.11 · GÆLDENDE FRA 1. NOVEMBER 2026
 title: Det, du accepterer
 lede: Aftalen mellem dig og DMS Merchandise Shop S.R.L. i et klart sprog. Nitten afsnit og bilag A — rul ned til slutningen.
-endMarker: SLUT PÅ VILKÅRENE · v2.10
+endMarker: SLUT PÅ VILKÅRENE · v2.11
 bodyLabel: Tjenestevilkårenes tekst
 annexTitle: Bilag A — Regionale vilkår
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LOVVALG
 -->
 
-**Version 2.10 · Effective 1. november 2026 · Tidligere versioner på dezbatere.ro/terms/versions · Sprog: Dansk.**
+**Version 2.11 · Effective 1. november 2026 · Tidligere versioner på dezbatere.ro/terms/versions · Sprog: Dansk.**
 
 **In short.** Du skal være fyldt 18 år. Dialectical Engine opbygger argumenter ved hjælp af AI-modeller, og alt, hvad tjenesten genererer, kan være forkert — det er ikke rådgivning. På det gratis abonnement er dine debatter offentlige, når de er afsluttet, efter en AI-kontrol; på et betalt abonnement er de private, medmindre du offentliggør dem. Når en debat er offentlig, kan alle læse den, og den forbliver offentlig. Tekst, du indsender, sendes til de AI-udbydere, der er anført i vores udbyderregister, og bruges ikke til at træne modeller. Anmeld ulovligt indhold på support@dezbatere.ro, uanset om du har en konto eller ej. Rumænsk ret finder anvendelse, men du bevarer din lokale forbrugerbeskyttelse.
 
@@ -148,7 +148,7 @@ Debatter på et betalt abonnement er **private som standard**: intet, du oprette
 
 **Debatter på det gratis abonnement er offentlige.** På det gratis abonnement er dit spørgsmål og dets debat offentlige. Vi fortæller dig dette, før du stiller spørgsmålet. Når debatten er afsluttet, kontrolleres den af en AI; hvis kontrollen tillader det, kan alle læse den, og søgemaskiner kan indeksere den. Hvis kontrollen afviser den, forbliver den privat for dig. Medtag ikke personlige oplysninger i et spørgsmål på det gratis abonnement.
 
-**Ingen fortrydelse.** Når en debat er offentlig, forbliver den offentlig. Du kan hverken ophæve offentliggørelsen eller slette den, og sletning af din konto fjerner den heller ikke. Kopier, andre har lavet, er uden for vores kontrol. Andre kan læse, citere, tage skærmbilleder af, arkivere og cache den. Offentliggør ikke noget, som du ikke vil have permanent knyttet til dit pseudonym.
+**Ingen fortrydelse.** Når en debat er offentlig, forbliver den offentlig. Du kan hverken ophæve offentliggørelsen eller slette den, og sletning af din konto fjerner den heller ikke. Vi kan midlertidigt skjule den, mens vi gennemgår den, og fjerne eller rette en del af den, hvor dette afsnit tillader det. Kopier, andre har lavet, er uden for vores kontrol. Andre kan læse, citere, tage skærmbilleder af, arkivere og cache den. Offentliggør ikke noget, som du ikke vil have permanent knyttet til dit pseudonym.
 
 **En markeret debat kræver vores godkendelse.** Når en debat er afsluttet, læser en automatiseret kontrol dens syntese for de fire kategorier i afsnit 8. En debat, som kontrollen markerer, kan kun offentliggøres med vores godkendelse, og markeringen vises for ingen andre end dig og, hvis du beder om vores godkendelse, de medlemmer af vores team, der har tilladelse til at gennemgå offentliggørelser; en debat, som kontrollen finder berører »tendenser til selvmord eller til at skade andre mennesker«, slettes i stedet, som næste stykke angiver. Hvis du beder om vores godkendelse på debattens side, kan et medlem af vores team, der har en bestemt tilladelse til at gennemgå offentliggørelser, læse debatten, som den ville blive offentliggjort, uden dit pseudonym. Hvis vi godkender, er knappen Offentliggør igen tilgængelig for dig, og den kontrol, som enhver offentliggørelse gennemgår, gælder stadig. Hvis vi afviser, forbliver debatten privat, og vi giver dig en begrundelse (afsnit 10). Efter en afvisning kan du bede om det en gang til, og et medlem af vores team, der ikke traf afgørelse om den første anmodning, træffer afgørelsen; du kan også bruge klageordningen i afsnit 10. Efter en anden afvisning kan du ikke bede om det igen, men du kan stadig indbringe afgørelsen for et udenretsligt tvistbilæggelsesorgan eller for en domstol (afsnit 10). En godkendelse dækker den syntese, som moderatoren har læst, herunder enhver senere version af debatten, der gentager den ord for ord; en omskrevet syntese kontrolleres igen, når du offentliggør, og kræver, hvis den markeres, sin egen godkendelse. Hvis du offentliggør en markeret debat efter vores godkendelse, kan du tage den ned igen med knappen Tag ned på dens kort i Dine debatter.
 
@@ -250,6 +250,8 @@ Hvis du bor et andet sted, angiver bilag A den fortrydelsesret eller betænkning
 Vi oplyser dig på forhånd på et varigt medium om, hvad der ændres og hvornår. Hvis ændringen har mere end en mindre negativ indvirkning på din adgang til eller brug af tjenesten, kan du uden omkostninger opsige inden for **30 dage** efter, at du blev underrettet, eller efter at ændringen fik virkning, alt efter hvilken dato der ligger senest, og vi tilbagebetaler eventuelle forudbetalte beløb for den uudnyttede periode.
 
 **Disse vilkår.** Vi kan ændre disse vilkår af samme type grunde. Ved ændringer, der ikke begrænser dine rettigheder, offentliggør vi den nye version med et resumé af ændringerne og sender dig en e-mail mindst **30 dage**, før den får virkning; hvis du fortsætter med at bruge Dialectical Engine efter denne dato, betyder det, at du accepterer den, og du kan lukke din konto inden da. Ved ændringer, der begrænser dine rettigheder — herunder prisstigninger på et eksisterende abonnement, lavere grænser, fjernede funktioner, nye anvendelser af dit indhold eller ændringer af ansvar, lovvalg eller tvistbilæggelse — beder vi dig udtrykkeligt acceptere den nye version ved dit næste login, og ændringen gælder kun fremadrettet. Vi foretager aldrig ændringer med tilbagevirkende kraft, og vi bruger aldrig dette afsnit til at ændre kernen i det, du har betalt for, midt i en periode uden at tilbyde dig en udvej. Tidligere versioner forbliver tilgængelige på dezbatere.ro/terms/versions.
+
+Version 2.11 erstattede version 2.10: afsnit 9 oplyser, at vi kan midlertidigt skjule en offentlig debat, mens vi gennemgår den, og fjerne eller rette en del af den.
 
 Version 2.10 erstattede version 2.9: afsnit 9 oplyser, at debatter på det gratis abonnement er offentlige, at en offentlig debat ikke kan få ophævet offentliggørelsen og forbliver offentlig, efter at du har lukket din konto, at alle med kredit kan bidrage til en offentlig debat eller skrive en rapport om den, og at en offentlig debat forbliver åben, efter at dens første forfatter er gået; afsnit 11 oplyser, hvad lukning gør ved dine offentlige debatter.
 

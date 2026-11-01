@@ -605,7 +605,7 @@ export class PostgresPublicationRepository {
           FROM core.run_visibility_event AS event
           ORDER BY event.run_id,event.at_seq DESC
         ), published AS (
-          SELECT publication_ref,at_seq FROM latest WHERE state='PUBLISHED'
+          SELECT publication_ref,at_seq FROM latest WHERE state='PUBLISHED' AND NOT identity.public_review_held(publication_ref)
         ), page AS (
           SELECT publication_ref,at_seq FROM published
           ORDER BY at_seq DESC,publication_ref

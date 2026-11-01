@@ -14,7 +14,8 @@ export const StaffActionSchema = z.enum([
     "TEAM_INVITE", "INVITATION_ACCEPT", "TEAM_GRANT", "TEAM_DISABLE", "EMERGENCY_DISABLE",
     "CREDENTIAL_REGISTER", "CREDENTIAL_REVOKE", "PUBLICATION_REVIEW_APPROVE", "PUBLICATION_REVIEW_REFUSE",
     "THREAT_REPORT_REPORTED", "THREAT_REPORT_NOT_REPORTED",
-    "TEAM_LIMIT_SET", "TEAM_LIMIT_PARTNER_GRANT", "TEAM_LIMIT_PARTNER_REVOKE", "TEAM_PRACTICE_RECORD"
+    "TEAM_LIMIT_SET", "TEAM_LIMIT_PARTNER_GRANT", "TEAM_LIMIT_PARTNER_REVOKE", "TEAM_PRACTICE_RECORD",
+    "PUBLIC_REVIEW_HIDE", "PUBLIC_REVIEW_STEP"
 ]);
 const RevisionSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const DigestSchema = z.string().regex(/^[0-9a-f]{64}$/u);
@@ -115,6 +116,15 @@ const ActionMutationShape = { expected_revision: RevisionSchema, operation_id: z
 const TeamLimitMicrosSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const TeamLimitSetShape = { amount_micros: TeamLimitMicrosSchema, current_micros: TeamLimitMicrosSchema, expected_revision: RevisionSchema, operation_id: z.uuid() };
 const TeamPracticeShape = { practice_ref: z.uuid(), charge_micros: TeamLimitMicrosSchema, operation_id: z.uuid() };
+/**
+ * Decision 33: a public debate under review. Each passkey is bound to the debate, the step, the piece and the log's revision (and to the text's digest for a correction, whose words never enter the proof).
+ */
+export const PublicReviewPieceKindSchema = z.enum(["SNAPSHOT", "UPDATE", "REPORT", "DIG"]);
+export const PublicReviewStepSchema = z.enum(["REPUBLISH", "REMOVE_DIG", "PUT_BACK", "CORRECT", "HIDE_REPORT"]);
+const PublicReviewPointerSchema = z.string().regex(/^(\/[A-Za-z0-9_]{1,64}){1,12}$/u);
+const PublicReviewHideShape = { publication_ref: z.uuid(), expected_revision: RevisionSchema, operation_id: z.uuid() };
+const PublicReviewStepShape = { ...PublicReviewHideShape, step: PublicReviewStepSchema, piece_kind: PublicReviewPieceKindSchema.nullable(), piece_id: z.uuid().nullable(),
+    pointer: PublicReviewPointerSchema.nullable(), text_sha256: z.string().regex(/^[0-9a-f]{64}$/u).nullable() };
 export const StaffActionIntentSchema = z.discriminatedUnion("action", [
     z.object({ action: z.literal("TEAM_INVITE"), target_user_id: z.uuid(), capabilities: DelegatedStaffCapabilitiesSchema, ...ActionMutationShape }).strict(),
     z.object({ action: z.literal("TEAM_GRANT"), target_staff_id: z.uuid(), capabilities: DelegatedStaffCapabilitiesSchema, ...ActionMutationShape }).strict(),
@@ -127,7 +137,9 @@ export const StaffActionIntentSchema = z.discriminatedUnion("action", [
     z.object({ action: z.literal("TEAM_LIMIT_SET"), ...TeamLimitSetShape }).strict(),
     z.object({ action: z.literal("TEAM_LIMIT_PARTNER_GRANT"), target_staff_id: z.uuid(), ...ActionMutationShape }).strict(),
     z.object({ action: z.literal("TEAM_LIMIT_PARTNER_REVOKE"), target_staff_id: z.uuid(), ...ActionMutationShape }).strict(),
-    z.object({ action: z.literal("TEAM_PRACTICE_RECORD"), ...TeamPracticeShape }).strict()
+    z.object({ action: z.literal("TEAM_PRACTICE_RECORD"), ...TeamPracticeShape }).strict(),
+    z.object({ action: z.literal("PUBLIC_REVIEW_HIDE"), ...PublicReviewHideShape }).strict(),
+    z.object({ action: z.literal("PUBLIC_REVIEW_STEP"), ...PublicReviewStepShape }).strict()
 ]);
 export const StaffActionOptionsRequestSchema = z.object({ intent: StaffActionIntentSchema }).strict();
 export const StaffActionVerifyRequestSchema = z.object({ intent: StaffActionIntentSchema,
@@ -151,6 +163,29 @@ export const TeamLimitPageSchema = z.object({
     log: z.array(TeamLimitLogEntrySchema).max(100)
 }).strict();
 export type TeamLimitPage = z.infer<typeof TeamLimitPageSchema>;
+export const PublicReviewHideRequestSchema = z.object({ expected_revision: RevisionSchema, operation_id: z.uuid(), proof_handle: OpaqueHandleSchema }).strict();
+export const PublicReviewStepRequestSchema = z.object({ step: PublicReviewStepSchema, piece_kind: PublicReviewPieceKindSchema.nullable(), piece_id: z.uuid().nullable(),
+    pointer: PublicReviewPointerSchema.nullable(), text: z.string().trim().min(1).max(20000).nullable(), expected_revision: RevisionSchema, operation_id: z.uuid(), proof_handle: OpaqueHandleSchema }).strict();
+const PublicReviewPieceSchema = z.object({ pointer: PublicReviewPointerSchema, original: z.string(), corrected: z.string().nullable() }).strict();
+const PublicReviewLogEntrySchema = z.object({ revision: z.number().int().positive(), action: z.enum(["HIDE", "REPUBLISH", "REMOVE_DIG", "PUT_BACK", "CORRECT", "HIDE_REPORT"]), piece_kind: PublicReviewPieceKindSchema.nullable(),
+    actor_staff_id: z.uuid(), at: z.iso.datetime({ offset: true }) }).strict();
+/** The whole debate for the two accounts. The originals are here and nowhere else now: no-store, and each read is logged. */
+export const PublicReviewPageSchema = z.object({
+    publication_ref: z.uuid(), hidden: z.boolean(), revision: RevisionSchema, question: z.string(), published_at: z.iso.datetime({ offset: true }),
+    snapshot_unreadable: z.boolean(), snapshot: z.array(PublicReviewPieceSchema),
+    digs: z.array(z.object({ dig_run_id: z.uuid(), parent_run_id: z.uuid(), position_ref: z.string().nullable(), contributor: z.string().nullable(), contributed_at: z.iso.datetime({ offset: true }), removed: z.boolean() }).strict()),
+    updates: z.array(z.object({ update_id: z.uuid(), update_seq: z.number().int().positive(), dig_run_id: z.uuid().nullable(), kind: z.enum(["PATH", "MAIN_ANSWER"]), position_ref: z.string().nullable(), recorded_at: z.iso.datetime({ offset: true }),
+        state: z.enum(["ON_THE_PAGE", "ITS_DIG_REMOVED", "AFFECTED"]), before: z.string().nullable(), pieces: z.array(PublicReviewPieceSchema) }).strict()),
+    reports: z.array(z.object({ report_id: z.uuid(), report_version: z.number().int().positive(), writer: z.string().nullable(), requested_at: z.iso.datetime({ offset: true }), recorded_at: z.iso.datetime({ offset: true }),
+        state: z.enum(["ON_THE_PAGE", "HIDDEN", "AFFECTED"]), pieces: z.array(PublicReviewPieceSchema) }).strict()),
+    log: z.array(PublicReviewLogEntrySchema)
+}).strict();
+export type PublicReviewPage = z.infer<typeof PublicReviewPageSchema>;
+export const PublicReviewListSchema = z.object({
+    hidden: z.array(z.object({ publication_ref: z.uuid(), hidden_at: z.iso.datetime({ offset: true }) }).strict()),
+    log: z.array(PublicReviewLogEntrySchema.extend({ publication_ref: z.uuid() }).strict()).max(100)
+}).strict();
+export type PublicReviewList = z.infer<typeof PublicReviewListSchema>;
 export const StaffActionProofResponseSchema = z.object({ proof_handle: OpaqueHandleSchema, expires_at: z.iso.datetime() }).strict();
 const CredentialDescriptorSchema = z.object({ id: CredentialIdSchema, type: z.literal("public-key"), transports: TransportsSchema.optional() }).strict();
 export const StaffRegistrationOptionsResponseSchema = z.object({
@@ -265,7 +300,8 @@ export const staffContractInventory = Object.freeze({
         "GET /v1/admin/threat-reports", "GET /v1/admin/threat-reports/summary",
         "GET /v1/admin/threat-reports/{reportRef}", "POST /v1/admin/threat-reports/{reportRef}/decision",
         "GET /v1/admin/team-limit", "POST /v1/admin/team-limit", "POST /v1/admin/team-limit/partner/{staffId}",
-        "DELETE /v1/admin/team-limit/partner/{staffId}", "POST /v1/admin/team-limit/practice"
+        "DELETE /v1/admin/team-limit/partner/{staffId}", "POST /v1/admin/team-limit/practice",
+        "GET /v1/admin/public-review", "GET /v1/admin/public-review/{id}", "POST /v1/admin/public-review/{id}/hide", "POST /v1/admin/public-review/{id}/step"
     ]),
     resources: Object.freeze({
         StaffCapabilitySchema, DelegatedStaffCapabilitiesSchema, ActiveStaffCapabilitiesSchema, StaffActionSchema,
@@ -279,7 +315,8 @@ export const staffContractInventory = Object.freeze({
         StaffInvitationAcceptRequestSchema, StaffTargetParamsSchema, StaffGrantRequestSchema, StaffDisableModeSchema, StaffDisableRequestSchema,
         StaffPageQuerySchema, StaffTeamQuerySchema, StaffAuditQuerySchema, StaffTeamMemberSchema, StaffTeamPageSchema, StaffAuditEventSchema, ThreatReportAuditEventSchema, StaffAuditPageSchema,
         ThreatReportListSchema, ThreatReportSchema, ThreatReportSummarySchema, ThreatReportDecisionRequestSchema,
-        TeamLimitSetRequestSchema, TeamLimitPartnerRequestSchema, TeamPracticeRequestSchema, TeamLimitPageSchema
+        TeamLimitSetRequestSchema, TeamLimitPartnerRequestSchema, TeamPracticeRequestSchema, TeamLimitPageSchema,
+        PublicReviewHideRequestSchema, PublicReviewStepRequestSchema, PublicReviewPageSchema, PublicReviewListSchema
     })
 });
 

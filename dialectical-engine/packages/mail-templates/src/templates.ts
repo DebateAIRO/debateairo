@@ -10,7 +10,7 @@ export const MAIL_TEMPLATE_IDS = Object.freeze([
   "M1", "M2_INVOICE_LINK", "M2_INVOICE_ATTACHED", "M3", "M4", "M5A", "M5B", "M5C",
   "M6", "M7", "M8", "M8_RECEIVED", "M9", "M10", "M10_ENDED", "M11", "M11_DUPLICATE", "M12", "O1", "O2", "O2_WITHDRAWAL",
   "O2_REFUND_DUE", "O2_REFUND_REMINDER", "O3", "O4",
-  "DATA_EXPORT", "THREAT_REPORT_WAITING", "TEAM_LIMIT_CHANGED", "TEAM_LIMIT_PARTNER_CHANGED", "TEAM_ALLOWANCE_CHANGED", "TEAM_ALLOWANCE_YOURS"
+  "DATA_EXPORT", "THREAT_REPORT_WAITING", "TEAM_LIMIT_CHANGED", "TEAM_LIMIT_PARTNER_CHANGED", "TEAM_ALLOWANCE_CHANGED", "TEAM_ALLOWANCE_YOURS", "PUBLIC_REVIEW_CHANGED"
 ] as const);
 
 export type MailTemplateId = (typeof MAIL_TEMPLATE_IDS)[number];
@@ -386,6 +386,11 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
   TEAM_ALLOWANCE_CHANGED: define({
     catalogue: "owner", subject: "owner.teamAllowance.changedSubject",
     paragraphs: ["owner.teamAllowance.changed", "owner.teamLimit.open"], params: {}
+  }),
+  // Decision 33, under the same rule: no debate, no text, no name.
+  PUBLIC_REVIEW_CHANGED: define({
+    catalogue: "owner", subject: "owner.publicReview.subject",
+    paragraphs: ["owner.publicReview.changed", "owner.teamLimit.open"], params: {}
   }),
   TEAM_ALLOWANCE_YOURS: define({
     catalogue: "owner", subject: "owner.teamAllowance.yoursSubject",

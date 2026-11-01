@@ -32,6 +32,9 @@ export type PublicContributionRead = Readonly<{
   contributed_at: string; outcome: PublicContributionOutcome | null; checked_at: string | null;
   /** The digger's pseudonym, read live; null once the name went ("a contributor"). */
   contributor: string | null;
+  /** Decision 33, on the person's own read only: their dig was taken off the page after a review; or it was running when the debate was hidden, and stays their own. */
+  removed_after_review?: boolean;
+  kept_private_after_review?: boolean;
 }>;
 export type PublicJoinOutcome = "JOINED" | "ALREADY" | "NOT_OWNED" | "NOT_PUBLIC" | "PARENT_PRIVATE" | "CLOSED" | "CONFLICT" | "TOO_DEEP";
 export type PublicDigPick = Readonly<{

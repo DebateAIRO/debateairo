@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: En resumen
-eyebrow: TÉRMINOS DE SERVICIO · v2.10 · EN VIGOR DESDE 1 DE NOVIEMBRE DE 2026
+eyebrow: TÉRMINOS DE SERVICIO · v2.11 · EN VIGOR DESDE 1 DE NOVIEMBRE DE 2026
 title: Lo que usted acepta
 lede: El contrato entre usted y DMS Merchandise Shop S.R.L., en lenguaje claro. Diecinueve secciones y el anexo A — desplácese hasta el final.
-endMarker: FIN DE LOS TÉRMINOS · v2.10
+endMarker: FIN DE LOS TÉRMINOS · v2.11
 bodyLabel: Texto de los Términos de servicio
 annexTitle: Anexo A — Términos regionales
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEY APLICABLE
 -->
 
-**Version 2.10 · Effective 1 de noviembre de 2026 · Versiones anteriores en dezbatere.ro/terms/versions · Idioma: español.**
+**Version 2.11 · Effective 1 de noviembre de 2026 · Versiones anteriores en dezbatere.ro/terms/versions · Idioma: español.**
 
 **In short.** Debe tener al menos 18 años. Dialectical Engine elabora argumentos mediante modelos de IA y todo lo que genera puede ser erróneo; no constituye asesoramiento. En el plan gratuito, sus debates son públicos cuando terminan, tras una comprobación de IA; en un plan de pago son privados salvo que los publique. Una vez públicos, cualquiera puede leer un debate, y sigue siendo público. El texto que envía se remite a los proveedores de IA incluidos en nuestro Registro de proveedores y no se utiliza para entrenar modelos. Denuncie contenido ilícito en support@dezbatere.ro, tenga o no una cuenta. Se aplica la legislación rumana, pero usted conserva la protección local que le corresponda como consumidor.
 
@@ -148,7 +148,7 @@ Los debates de un plan de pago son **privados por defecto**: nada de lo que cree
 
 **Los debates gratuitos son públicos.** En el plan gratuito, su pregunta y su debate son públicos. Se lo indicamos antes de que pregunte. Cuando el debate termina, una IA lo comprueba; si la comprobación lo permite, cualquiera puede leerlo y los motores de búsqueda pueden indexarlo. Si la comprobación lo rechaza, sigue siendo privado para usted. No incluya datos personales en una pregunta del plan gratuito.
 
-**Sin marcha atrás.** Una vez que un debate es público, sigue siendo público. No puede retirar su publicación ni eliminarlo, y eliminar su cuenta no lo elimina. Las copias que otros hayan hecho quedan fuera de nuestro control. Otras personas pueden leerlo, citarlo, hacer capturas de pantalla, archivarlo y almacenarlo en caché. No publique nada que no desearía que quedase asociado permanentemente a su seudónimo.
+**Sin marcha atrás.** Una vez que un debate es público, sigue siendo público. No puede retirar su publicación ni eliminarlo, y eliminar su cuenta no lo elimina. Podemos ocultarlo mientras lo revisamos, y eliminar o corregir parte de él, cuando esta sección lo permita. Las copias que otros hayan hecho quedan fuera de nuestro control. Otras personas pueden leerlo, citarlo, hacer capturas de pantalla, archivarlo y almacenarlo en caché. No publique nada que no desearía que quedase asociado permanentemente a su seudónimo.
 
 **Un debate marcado necesita nuestra aprobación.** Cuando un debate termina, una comprobación automatizada lee su síntesis para detectar las cuatro categorías de la sección 8. Un debate que marca la comprobación solo puede publicarse con nuestra aprobación, y la marca no se muestra a nadie más que a usted y, si solicita nuestra aprobación, a los miembros de nuestro equipo que tienen el permiso para revisar publicaciones; un debate cuya síntesis, según la comprobación, se incluye en la categoría «tendencias al suicidio o a dañar a otras personas» se elimina en su lugar, como indica el párrafo siguiente. Si solicita nuestra aprobación en la página del debate, un miembro de nuestro equipo que tenga un permiso específico para revisar publicaciones puede leer el debate tal como se publicaría, sin su seudónimo. Si lo aprobamos, Publicar vuelve a estar disponible para usted, y la comprobación por la que pasa toda publicación sigue aplicándose. Si lo rechazamos, el debate sigue siendo privado y le facilitamos una exposición de motivos (sección 10). Tras un rechazo, puede volver a solicitarla una vez más, y decide un miembro de nuestro equipo que no decidió la primera solicitud; también puede utilizar la vía de reclamación de la sección 10. Tras un segundo rechazo no puede volver a solicitarla, pero aún puede llevar la decisión ante un órgano de resolución extrajudicial de litigios o ante los tribunales (sección 10). Una aprobación abarca la síntesis que leyó el revisor, incluida cualquier versión posterior del debate que la repita palabra por palabra; una síntesis reescrita se comprueba de nuevo cuando usted publica y, si queda marcada, necesita su propia aprobación. Si publica un debate marcado tras nuestra aprobación, puede volver a retirarlo con Retirar en su tarjeta en Sus debates.
 
@@ -250,6 +250,8 @@ Si vive en otro lugar, el anexo A indica el derecho de desistimiento o período 
 Le informaremos de antemano, en un soporte duradero, de qué va a cambiar y cuándo. Si el cambio tiene un efecto negativo que no sea menor sobre su acceso al servicio o su uso, podrá resolver el contrato sin coste alguno en un plazo de **30 días** desde que se le informe o desde que el cambio surta efecto, si esta fecha es posterior, y le reembolsaremos cualquier importe pagado por adelantado correspondiente al período no utilizado.
 
 **En estos Términos.** Podemos modificar estos Términos por los mismos tipos de motivos. Para los cambios que no reduzcan sus derechos, publicaremos la nueva versión con un resumen de las modificaciones y le enviaremos un correo electrónico al menos **30 días** antes de que entre en vigor; si continúa utilizando Dialectical Engine después de esa fecha, se entenderá que la acepta, y puede cerrar su cuenta antes de entonces. Para los cambios que reduzcan sus derechos —incluidos aumentos de precio de un plan existente, límites inferiores, funciones retiradas, nuevos usos de su contenido o cambios en la responsabilidad, la ley aplicable o la resolución de controversias—, le pediremos que acepte expresamente la nueva versión la próxima vez que inicie sesión, y el cambio solo se aplicará en lo sucesivo. Nunca aplicamos cambios con carácter retroactivo ni utilizamos esta sección para modificar, durante la vigencia del contrato, la esencia de aquello por lo que ha pagado sin ofrecerle una vía de salida. Las versiones anteriores seguirán disponibles en dezbatere.ro/terms/versions.
+
+La versión 2.11 sustituyó a la versión 2.10: la sección 9 indica que podemos ocultar un debate público mientras lo revisamos, y eliminar o corregir parte de él.
 
 La versión 2.10 sustituyó a la versión 2.9: la sección 9 indica que los debates del plan gratuito son públicos, que un debate público no puede retirarse de la publicación y sigue siendo público tras cerrar su cuenta, que cualquiera con crédito puede aportar a un debate público o redactar un informe sobre él, y que un debate público sigue abierto tras la marcha de su primer autor; la sección 11 indica qué efecto tiene el cierre sobre sus debates públicos.
 

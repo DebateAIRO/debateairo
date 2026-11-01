@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In breve
-eyebrow: CONDIZIONI DI SERVIZIO · v2.10 · IN VIGORE DAL 1 NOVEMBRE 2026
+eyebrow: CONDIZIONI DI SERVIZIO · v2.11 · IN VIGORE DAL 1 NOVEMBRE 2026
 title: Ciò che accetti
 lede: Il contratto tra te e DMS Merchandise Shop S.R.L., in un linguaggio chiaro. Diciannove sezioni e Allegato A — scorri fino alla fine.
-endMarker: FINE DELLE CONDIZIONI · v2.10
+endMarker: FINE DELLE CONDIZIONI · v2.11
 bodyLabel: Testo delle Condizioni di servizio
 annexTitle: Allegato A — Condizioni regionali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEGGE APPLICABILE
 -->
 
-**Version 2.10 · Effective 1 novembre 2026 · Versioni precedenti su dezbatere.ro/terms/versions · Lingua: italiano.**
+**Version 2.11 · Effective 1 novembre 2026 · Versioni precedenti su dezbatere.ro/terms/versions · Lingua: italiano.**
 
 **In short.** Devi avere almeno 18 anni. Dialectical Engine costruisce argomentazioni con modelli di IA e tutto ciò che genera può essere errato — non costituisce consulenza. Nel piano gratuito i tuoi dibattiti sono pubblici una volta conclusi, dopo la verifica dell’IA; nel piano a pagamento sono privati, salvo che tu non li pubblichi. Una volta pubblico, chiunque può leggere un dibattito, e questo resta pubblico. Il testo che invii viene trasmesso ai fornitori di IA elencati nel nostro Registro dei fornitori e non viene utilizzato per addestrare i modelli. Segnala i contenuti illegali a support@dezbatere.ro, indipendentemente dal fatto che tu abbia un account. Si applica la legge rumena, ma le tutele locali dei consumatori restano impregiudicate.
 
@@ -148,7 +148,7 @@ Nel piano a pagamento i dibattiti sono **privati per impostazione predefinita**:
 
 **Nel piano gratuito i dibattiti sono pubblici.** Nel piano gratuito la tua domanda e il relativo dibattito sono pubblici. Te lo diciamo prima che tu faccia la domanda. Quando il dibattito è concluso, lo verifica un’IA; se la verifica lo consente, chiunque può leggerlo e i motori di ricerca possono indicizzarlo. Se la verifica lo respinge, resta privato per te. Nel piano gratuito non inserire dati personali nella domanda.
 
-**Nessuna possibilità di ripensamento.** Una volta che un dibattito è pubblico, resta pubblico. Non puoi revocarne la pubblicazione né cancellarlo, e la cancellazione del tuo account non lo rimuove. Le copie create da altri sono fuori dal nostro controllo. Altre persone possono leggerlo, citarlo, acquisirne schermate, archiviarlo e memorizzarlo nella cache. Non pubblicare nulla che non saresti disposto ad associare permanentemente al tuo pseudonimo.
+**Nessuna possibilità di ripensamento.** Una volta che un dibattito è pubblico, resta pubblico. Non puoi revocarne la pubblicazione né cancellarlo, e la cancellazione del tuo account non lo rimuove. Possiamo nasconderlo temporaneamente mentre lo esaminiamo, e rimuoverne o correggerne una parte, ove lo consenta questa sezione. Le copie create da altri sono fuori dal nostro controllo. Altre persone possono leggerlo, citarlo, acquisirne schermate, archiviarlo e memorizzarlo nella cache. Non pubblicare nulla che non saresti disposto ad associare permanentemente al tuo pseudonimo.
 
 **Un dibattito contrassegnato richiede la nostra approvazione.** Quando un dibattito si conclude, una verifica automatizzata ne legge la sintesi rispetto alle quattro categorie di cui alla sezione 8. Un dibattito che la verifica contrassegna può essere pubblicato solo con la nostra approvazione e il contrassegno non viene mostrato a nessuno tranne te e, se chiedi la nostra approvazione, i membri del nostro team che detengono il permesso di revisione delle pubblicazioni; un dibattito la cui sintesi, secondo la verifica, rientra nella categoria «tendenze al suicidio o a nuocere ad altre persone» viene invece cancellato, come spiega il paragrafo successivo. Se chiedi la nostra approvazione nella pagina del dibattito, un membro del nostro team che detiene uno specifico permesso di revisione delle pubblicazioni può leggere il dibattito così come verrebbe pubblicato, senza il tuo pseudonimo. Se approviamo, «Pubblica» torna a essere disponibile per te e la verifica a cui è sottoposta ogni pubblicazione continua ad applicarsi. Se rifiutiamo, il dibattito resta privato e ti forniamo una motivazione (sezione 10). Dopo un rifiuto puoi chiedere ancora una volta e decide un membro del nostro team che non ha deciso la prima richiesta; puoi anche utilizzare la procedura di reclamo di cui alla sezione 10. Dopo un secondo rifiuto non puoi chiedere di nuovo, ma puoi comunque sottoporre la decisione a un organismo di risoluzione extragiudiziale delle controversie o a un tribunale (sezione 10). Un'approvazione copre la sintesi letta dal revisore, compresa ogni versione successiva del dibattito che la ripete parola per parola; una sintesi riscritta viene verificata di nuovo quando pubblichi e, se è contrassegnata, richiede una propria approvazione. Se pubblichi un dibattito contrassegnato dopo la nostra approvazione, puoi rimuoverlo di nuovo con «Rimuovi» sulla sua scheda in «I tuoi dibattiti».
 
@@ -250,6 +250,8 @@ Se vivi altrove, l'Allegato A indica il diritto di recesso o il periodo di ripen
 Ti comunichiamo anticipatamente, su un supporto durevole, cosa cambia e quando. Se la modifica produce un effetto negativo più che minimo sul tuo accesso al servizio o sul suo utilizzo, puoi recedere gratuitamente entro **30 giorni** dalla comunicazione o dall'entrata in vigore della modifica, se successiva, e rimborsiamo qualsiasi importo prepagato per il periodo non utilizzato.
 
 **Alle presenti Condizioni.** Possiamo modificare le presenti Condizioni per le medesime categorie di motivi. In caso di modifiche che non riducono i tuoi diritti, pubblichiamo la nuova versione con una sintesi delle modifiche e ti inviamo un'email almeno **30 giorni** prima della sua entrata in vigore; continuando a utilizzare Dialectical Engine dopo tale data accetti la modifica e puoi chiudere il tuo account prima di allora. In caso di modifiche che riducono i tuoi diritti — compresi aumenti di prezzo di un piano esistente, limiti inferiori, funzionalità eliminate, nuovi utilizzi dei tuoi contenuti o modifiche alla responsabilità, alla legge applicabile o alla risoluzione delle controversie — ti chiediamo di accettare espressamente la nuova versione al tuo accesso successivo e la modifica si applica soltanto per il futuro. Non apportiamo mai una modifica retroattiva e non utilizziamo mai la presente sezione per modificare, durante il relativo periodo, il nucleo di ciò per cui hai pagato senza offrirti una via d'uscita. Le versioni precedenti restano disponibili all'indirizzo dezbatere.ro/terms/versions.
+
+La versione 2.11 ha sostituito la versione 2.10: la sezione 9 afferma che possiamo nascondere temporaneamente un dibattito pubblico mentre lo esaminiamo, e rimuoverne o correggerne una parte.
 
 La versione 2.10 ha sostituito la versione 2.9: la sezione 9 afferma che i dibattiti del piano gratuito sono pubblici, che un dibattito pubblico non può essere oggetto di revoca della pubblicazione e resta pubblico dopo la chiusura dell’account, che chiunque abbia credito può contribuire a un dibattito pubblico o scrivere un report su di esso, e che un dibattito pubblico resta aperto dopo l’uscita del suo primo autore; la sezione 11 spiega che cosa comporta la chiusura per i tuoi dibattiti pubblici.
 

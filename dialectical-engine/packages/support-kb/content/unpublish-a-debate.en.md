@@ -15,4 +15,4 @@ ratified_by: ""
 ratified_on: ""
 ---
 
-A published debate cannot be taken back. There is no unpublish action: once public, a debate stays public, and anyone with credit can add to it. If you erase your account, your name comes off it and it shows "a contributor" instead. Copies indexed elsewhere may remain.
+A published debate cannot be taken back. There is no unpublish action: once public, a debate stays public, and anyone with credit can add to it. If you erase your account, your name comes off it and it shows "a contributor" instead. If a public debate contains personal details about you or breaks our Terms, write to us or use the Report link: we can hide it while we review it, and remove or correct the passage concerned. Copies indexed elsewhere may remain.

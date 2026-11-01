@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Go hachomair
-eyebrow: TÉARMAÍ SEIRBHÍSE · v2.10 · I bhFEIDHM 1 SAMHAIN 2026
+eyebrow: TÉARMAÍ SEIRBHÍSE · v2.11 · I bhFEIDHM 1 SAMHAIN 2026
 title: An méid lena n-aontaíonn tú
 lede: An conradh idir tú agus DMS Merchandise Shop S.R.L., i bhfriotal soiléir. Naoi rannán déag agus Iarscríbhinn A — scrollaigh go dtí an deireadh.
-endMarker: DEIREADH NA dTÉARMAÍ · v2.10
+endMarker: DEIREADH NA dTÉARMAÍ · v2.11
 bodyLabel: Téacs na dTéarmaí Seirbhíse
 annexTitle: Iarscríbhinn A — Téarmaí réigiúnacha
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 AN DLÍ RIALAITHE
 -->
 
-**Version 2.10 · Effective 1 Samhain 2026 · Leaganacha roimhe seo ag dezbatere.ro/terms/versions · Teanga: Gaeilge.**
+**Version 2.11 · Effective 1 Samhain 2026 · Leaganacha roimhe seo ag dezbatere.ro/terms/versions · Teanga: Gaeilge.**
 
 **In short.** Ní mór duit a bheith 18 mbliana d'aois nó os a chionn. Tógann Dialectical Engine argóintí le samhlacha IS agus d'fhéadfadh gach rud a ghineann sé a bheith mícheart — ní comhairle é. Ar an bplean saor in aisce, bíonn do dhíospóireachtaí poiblí nuair a bhíonn siad críochnaithe, tar éis seiceála IS; ar phlean íoctha bíonn siad príobháideach mura bhfoilsíonn tú iad. Nuair a bhíonn díospóireacht phoiblí, is féidir le duine ar bith í a léamh, agus fanann sí poiblí. Seoltar téacs a chuireann tú isteach chuig soláthraithe IS atá liostaithe inár gClár Soláthraithe, agus ní úsáidtear é chun samhlacha a oiliúint. Tuairiscigh ábhar neamhdhleathach ag support@dezbatere.ro cibé acu atá cuntas agat nó nach bhfuil. Is é dlí na Rómáine an dlí rialaithe, ach coimeádann tú do chosaintí áitiúla tomhaltóra.
 
@@ -148,7 +148,7 @@ Bíonn díospóireachtaí ar phlean íoctha **príobháideach mar réamhshocrú*
 
 **Is poiblí díospóireachtaí saor in aisce.** Ar an bplean saor in aisce bíonn do cheist agus a díospóireacht poiblí. Insímid duit é seo sula gcuireann tú do cheist. Nuair a bhíonn an díospóireacht críochnaithe, seiceálann IS í; má cheadaíonn an tseiceáil í, is féidir le duine ar bith í a léamh agus b'fhéidir go n-innéacsóidh innill chuardaigh í. Má dhiúltaíonn an tseiceáil í, fanann sí príobháideach duitse. Ná cuir sonraí pearsanta i do cheist ar an bplean saor in aisce.
 
-**Gan aisghairm.** Nuair a bhíonn díospóireacht phoiblí, fanann sí poiblí. Ní féidir í a dhífhoilsiú ná a scriosadh, agus ní scriosann scriosadh do chuntais í. Níl na cóipeanna a rinne daoine eile faoinár smacht. Is féidir le daoine eile í a léamh, a lua, gabháil scáileáin a dhéanamh di, í a chartlannú agus í a chur i dtaisce. Ná foilsigh aon ní nach mbeifeá sásta go mbeadh baint bhuan aige le d'ainm cleite.
+**Gan aisghairm.** Nuair a bhíonn díospóireacht phoiblí, fanann sí poiblí. Ní féidir í a dhífhoilsiú ná a scriosadh, agus ní scriosann scriosadh do chuntais í. Is féidir linn í a cheilt agus í á hathbhreithniú againn, agus cuid di a bhaint nó a cheartú, sna cásanna a cheadaíonn an rannán seo. Níl na cóipeanna a rinne daoine eile faoinár smacht. Is féidir le daoine eile í a léamh, a lua, gabháil scáileáin a dhéanamh di, í a chartlannú agus í a chur i dtaisce. Ná foilsigh aon ní nach mbeifeá sásta go mbeadh baint bhuan aige le d'ainm cleite.
 
 **Teastaíonn ár bhformheas ó dhíospóireacht mharcáilte.** Nuair a chríochnaíonn díospóireacht, léann seiceáil uathoibrithe a sintéis chun na ceithre chatagóir i rannán 8 a bhrath. Ní féidir díospóireacht a mharcálann an tseiceáil a fhoilsiú ach lenár bhformheas, agus ní thaispeántar an marc d'aon duine ach duit agus, má iarrann tú ár bhformheas, do na baill dár bhfoireann a bhfuil an cead acu foilseacháin a athbhreithniú; scriostar in ionad sin díospóireacht a bhfaigheann an tseiceáil a sintéis ag baint leis an gcatagóir «claonta féinmharfacha nó claonta chun dochar a dhéanamh do dhaoine eile», mar a deir an chéad mhír eile. Má iarrann tú ár bhformheas ar leathanach na díospóireachta, is féidir le ball dár bhfoireann a bhfuil cead sonrach aige foilseacháin a athbhreithniú an díospóireacht a léamh mar a bheadh sí foilsithe, gan d'ainm cleite. Má fhormheasaimid í, tá Foilsigh ar fáil duit arís, agus tá feidhm fós ag an tseiceáil a dtéann gach foilseachán tríthi. Má dhiúltaímid di, fanann an díospóireacht príobháideach agus tugaimid ráiteas ar chúiseanna duit (rannán 10). Tar éis diúltaithe, féadfaidh tú iarraidh uair amháin eile, agus cinneann ball dár bhfoireann nár chinn an chéad iarratas; féadfaidh tú freisin an bealach gearán i rannán 10 a úsáid. Tar éis an dara diúltaithe, ní féidir leat iarraidh arís, ach is féidir leat fós an cinneadh a thabhairt chuig comhlacht um réiteach díospóidí lasmuigh den chúirt nó chuig cúirt (rannán 10). Clúdaíonn formheas an tsintéis a léigh an t-athbhreithneoir, lena n-áirítear aon leagan níos déanaí den díospóireacht a bhfuil an tsintéis sin ann focal ar fhocal; seiceáiltear sintéis athscríofa arís nuair a fhoilsíonn tú an díospóireacht agus, má mharcáiltear í, teastaíonn formheas dá cuid féin uaithi. Má fhoilsíonn tú díospóireacht mharcáilte tar éis ár bhformheasa, is féidir leat í a bhaint anuas arís le Bain anuas ar a cárta i Do chuid díospóireachtaí.
 
@@ -250,6 +250,8 @@ Má tá cónaí ort in áit eile, sonraítear in Iarscríbhinn A cibé ceart tar
 Insímid duit roimh ré, ar mheán marthanach, cad atá ag athrú agus cathain. Má bhíonn éifeacht dhiúltach níos mó ná mionéifeacht ag an athrú ar do rochtain ar an tseirbhís nó ar d'úsáid aisti, féadfaidh tú foirceannadh saor in aisce laistigh de **30 lá** tar éis duit a bheith curtha ar an eolas, nó tar éis don athrú teacht i bhfeidhm, cibé acu is déanaí, agus aisíocaimid aon mhéid réamhíoctha don tréimhse nár úsáideadh.
 
 **Ar na Téarmaí seo.** Féadfaimid na Téarmaí seo a athrú ar na cineálacha céanna cúiseanna. I gcás athruithe nach laghdaíonn do chearta, foilsímid an leagan nua le hachoimre ar an méid a d'athraigh agus seolaimid ríomhphost chugat **30 lá ar a laghad** sula dtagann sé i bhfeidhm; má leanann tú d'úsáid Dialectical Engine tar éis an dáta sin, ciallaíonn sé go nglacann tú leis, agus féadfaidh tú do chuntas a dhúnadh roimhe sin. I gcás athruithe a laghdaíonn do chearta — lena n-áirítear méaduithe praghais ar phlean atá ann cheana, teorainneacha níos ísle, gnéithe a baineadh, úsáidí nua as d'ábhar, nó athruithe ar dhliteanas, ar an dlí rialaithe nó ar réiteach díospóidí — iarraimid ort glacadh go sainráite leis an leagan nua ag do chéad síniú isteach eile, agus ní bhíonn feidhm ag an athrú ach feasta. Ní dhéanaimid athrú aisghníomhach riamh, agus ní úsáidimid an rannán seo riamh chun croílár an mhéid ar íoc tú as a athrú i lár téarma gan bealach amach a thairiscint duit. Fanann leaganacha roimhe seo ar fáil ag dezbatere.ro/terms/versions.
+
+Tháinig leagan 2.11 in ionad leagan 2.10: deir rannán 9 gur féidir linn díospóireacht phoiblí a cheilt agus í á hathbhreithniú againn, agus cuid di a bhaint nó a cheartú.
 
 Tháinig leagan 2.10 in ionad leagan 2.9: deir rannán 9 go bhfuil díospóireachtaí ar an bplean saor in aisce poiblí, nach féidir díospóireacht phoiblí a dhífhoilsiú agus go bhfanann sí poiblí tar éis duit do chuntas a dhúnadh, go bhféadfaidh duine ar bith a bhfuil creidmheas aige rannchuidiú le díospóireacht phoiblí nó tuarascáil a scríobh uirthi, agus go bhfanann díospóireacht phoiblí ar oscailt tar éis don chéad údar imeacht; deir rannán 11 cad a dhéanann dúnadh do do dhíospóireachtaí poiblí.
 

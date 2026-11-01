@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Na kratko
-eyebrow: POGOJI UPORABE · v2.10 · VELJAVNI OD 1. NOVEMBRA 2026
+eyebrow: POGOJI UPORABE · v2.11 · VELJAVNI OD 1. NOVEMBRA 2026
 title: S čim soglašate
 lede: Pogodba med vami in družbo DMS Merchandise Shop S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.
-endMarker: KONEC POGOJEV · v2.10
+endMarker: KONEC POGOJEV · v2.11
 bodyLabel: Besedilo Pogojev uporabe
 annexTitle: Priloga A — Regionalni pogoji
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PRAVO, KI SE UPORABLJA
 -->
 
-**Version 2.10 · Effective 1. novembra 2026 · Prejšnje različice so na dezbatere.ro/terms/versions · Jezik: slovenščina.**
+**Version 2.11 · Effective 1. novembra 2026 · Prejšnje različice so na dezbatere.ro/terms/versions · Jezik: slovenščina.**
 
 **In short.** Stari morate biti najmanj 18 let. Dialectical Engine z modeli umetne inteligence oblikuje argumente in vse, kar ustvari, je lahko napačno — to ni nasvet. Na brezplačnem paketu so vaše razprave po zaključku javne, po preverjanju z umetno inteligenco; na plačljivem paketu so zasebne, razen če jih objavite. Ko je razprava javna, jo lahko prebere vsakdo, in ostane javna. Besedilo, ki ga pošljete, se posreduje ponudnikom umetne inteligence, navedenim v našem Registru ponudnikov, in se ne uporablja za učenje modelov. Nezakonito vsebino prijavite na support@dezbatere.ro, ne glede na to, ali imate račun. Uporablja se romunsko pravo, vendar ohranite varstvo potrošnikov po svojem lokalnem pravu.
 
@@ -148,7 +148,7 @@ Na plačljivem paketu so razprave **privzeto zasebne**: nič, kar tam ustvarite,
 
 **Razprave na brezplačnem paketu so javne.** Na brezplačnem paketu sta vaše vprašanje in njegova razprava javna. To vam povemo, preden vprašate. Ko je razprava zaključena, jo preveri umetna inteligenca; če preverjanje to dovoli, jo lahko prebere vsakdo in iskalniki jo lahko indeksirajo. Če preverjanje to zavrne, ostane zasebna za vas. Na brezplačnem paketu v vprašanje ne vključujte osebnih podatkov.
 
-**Ni možnosti za preklic.** Ko je razprava javna, ostane javna. Ni je mogoče umakniti iz objave ali izbrisati, izbris računa pa je ne odstrani. Kopije, ki jih naredijo drugi, niso pod našim nadzorom. Drugi jo lahko berejo, citirajo, zajamejo v posnetek zaslona, arhivirajo in shranijo v predpomnilnik. Ne objavljajte ničesar, za kar ne bi želeli, da je trajno povezano z vašim psevdonimom.
+**Ni možnosti za preklic.** Ko je razprava javna, ostane javna. Ni je mogoče umakniti iz objave ali izbrisati, izbris računa pa je ne odstrani. Lahko jo začasno skrijemo, medtem ko jo pregledujemo, ter odstranimo ali popravimo del nje, kjer to dovoljuje ta razdelek. Kopije, ki jih naredijo drugi, niso pod našim nadzorom. Drugi jo lahko berejo, citirajo, zajamejo v posnetek zaslona, arhivirajo in shranijo v predpomnilnik. Ne objavljajte ničesar, za kar ne bi želeli, da je trajno povezano z vašim psevdonimom.
 
 **Označena razprava potrebuje našo odobritev.** Ko se razprava zaključi, avtomatizirano preverjanje prebere njeno sintezo glede štirih kategorij iz razdelka 8. Razpravo, ki jo preverjanje označi, je mogoče objaviti samo z našo odobritvijo, oznaka pa je prikazana samo vam in, če zaprosite za našo odobritev, članom naše ekipe, ki imajo dovoljenje za pregledovanje objav; razprava, katere sinteza se po ugotovitvi preverjanja dotika kategorije »nagnjenja k samomoru ali škodovanju drugim ljudem«, se namesto tega izbriše, kot pojasnjuje naslednji odstavek. Če za našo odobritev zaprosite na strani razprave, lahko član naše ekipe, ki ima posebno dovoljenje za pregledovanje objav, prebere razpravo v obliki, v kateri bi bila objavljena, brez vašega psevdonima. Če odobrimo, je gumb Objavi spet na voljo, preverjanje, skozi katero gre vsaka objava, pa še vedno velja. Če zavrnemo, razprava ostane zasebna in vam zagotovimo obrazložitev (razdelek 10). Po zavrnitvi lahko zaprosite še enkrat, odloča pa član naše ekipe, ki o prvi zahtevi ni odločal; uporabite lahko tudi pritožbeni postopek iz razdelka 10. Po drugi zavrnitvi ne morete več zaprositi, odločitev pa lahko še vedno predložite organu za izvensodno reševanje sporov ali sodišču (razdelek 10). Odobritev zajema sintezo, ki jo je pregledovalec prebral, vključno z vsako poznejšo različico razprave, ki jo ponovi dobesedno; prepisana sinteza se ob objavi znova preveri in, če je označena, potrebuje lastno odobritev. Če po naši odobritvi objavite označeno razpravo, jo lahko znova umaknete z gumbom Umakni na njeni kartici v pogledu Vaše razprave.
 
@@ -250,6 +250,8 @@ Dialectical Engine ponuja brezplačen paket. Na voljo bo plačljivi paket **Prem
 Na trajnem nosilcu vas vnaprej obvestimo, kaj se spreminja in kdaj. Če ima sprememba več kot zgolj manjši negativen vpliv na vaš dostop do storitve ali njeno uporabo, lahko brezplačno odpoveste pogodbo v **30 dneh** od obvestila ali začetka učinkovanja spremembe, kar je pozneje, mi pa vam vrnemo vse vnaprej plačane zneske za neizkoriščeno obdobje.
 
 **Spremembe teh Pogojev.** Te Pogoje lahko spremenimo iz enakih vrst razlogov. Pri spremembah, ki ne zmanjšujejo vaših pravic, objavimo novo različico s povzetkom sprememb in vam najmanj **30 dni** pred začetkom veljavnosti pošljemo e-poštno sporočilo; nadaljnja uporaba Dialectical Engine po tem datumu pomeni, da spremembo sprejemate, pred tem pa lahko zaprete račun. Pri spremembah, ki zmanjšujejo vaše pravice — vključno z zvišanjem cen obstoječega paketa, nižjimi omejitvami, odstranjenimi funkcijami, novimi načini uporabe vaše vsebine ali spremembami odgovornosti, prava, ki se uporablja, oziroma reševanja sporov — vas ob naslednji prijavi prosimo, da novo različico izrecno sprejmete, sprememba pa velja samo za naprej. Sprememb nikoli ne uveljavljamo za nazaj in tega razdelka nikoli ne uporabimo za spremembo bistva tega, kar ste plačali, med trajanjem pogodbe, ne da bi vam ponudili možnost odstopa. Prejšnje različice ostanejo dostopne na dezbatere.ro/terms/versions.
+
+Različica 2.11 je nadomestila različico 2.10: razdelek 9 navaja, da lahko začasno skrijemo javno razpravo, medtem ko jo pregledujemo, ter odstranimo ali popravimo del nje.
 
 Različica 2.10 je nadomestila različico 2.9: razdelek 9 navaja, da so razprave na brezplačnem paketu javne, da javne razprave ni mogoče umakniti iz objave in ostanejo javne tudi po zaprtju vašega računa, da lahko vsak, ki ima dobroimetje, prispeva k javni razpravi ali napiše poročilo o njej, in da javna razprava ostane odprta tudi potem, ko je njen prvi avtor odšel; razdelek 11 navaja, kaj zaprtje naredi z vašimi javnimi razpravami.
 

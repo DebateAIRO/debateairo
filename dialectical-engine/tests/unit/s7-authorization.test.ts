@@ -204,6 +204,11 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "POST /v1/admin/team-limit/partner/{staffId}", auth: "staff", resource: "staff-team", action: "partner-grant" },
   { route: "DELETE /v1/admin/team-limit/partner/{staffId}", auth: "staff", resource: "staff-team", action: "partner-revoke" },
   { route: "POST /v1/admin/team-limit/practice", auth: "staff", resource: "staff-team", action: "practice-record" },
+  // R22 decision 33 (0150): the same two accounts; each handler asks the database itself.
+  { route: "GET /v1/admin/public-review", auth: "staff", resource: "staff-team", action: "public-review-list" },
+  { route: "GET /v1/admin/public-review/{id}", auth: "staff", resource: "staff-team", action: "public-review-read" },
+  { route: "POST /v1/admin/public-review/{id}/hide", auth: "staff", resource: "staff-team", action: "public-review-hide" },
+  { route: "POST /v1/admin/public-review/{id}/step", auth: "staff", resource: "staff-team", action: "public-review-step" },
   // R22 decision 32 (0146): the Owner's allowance for a member.
   { route: "GET /v1/admin/team-allowances", auth: "staff", staffCapability: "ALLOWANCE_WRITE", resource: "staff-team", action: "allowance-read" },
   { route: "POST /v1/admin/team-allowances/{staffId}", auth: "staff", staffCapability: "ALLOWANCE_WRITE", resource: "staff-team", action: "allowance-give" },
@@ -355,9 +360,9 @@ describe("S7 deny-by-default authorization", () => {
     // The WHOLE inventory, staff rows included, row for row (no route family is filtered out).
     const order=(a:{route:string},b:{route:string})=>a.route<b.route?-1:a.route>b.route?1:0;
     expect([...authorizationPolicyInventory].sort(order)).toEqual([...EXPECTED_AUTHORIZATION_MATRIX].sort(order));
-    // 31 staff contract routes (five of them the team limit's) + the two internal-allowance routes + decision 32's three (the Owner's allowance for a member).
-    expect(EXPECTED_AUTHORIZATION_MATRIX.filter(policy => policy.route.includes(" /v1/admin/"))).toHaveLength(36);
-    expect(staffContractInventory.routes).toHaveLength(31);
+    // 35 staff contract routes (five of them the team limit's, four decision 33's public review) + the two internal-allowance routes + decision 32's three (the Owner's allowance for a member).
+    expect(EXPECTED_AUTHORIZATION_MATRIX.filter(policy => policy.route.includes(" /v1/admin/"))).toHaveLength(40);
+    expect(staffContractInventory.routes).toHaveLength(35);
     // The merged closed inventory adds the twenty-one external recovery routes to the current ordinary inventory and 20 staff/internal
     // allowance routes; set equality and Fastify mounting above check each one. NETOPIA's card page (N13) adds
     // GET /v1/billing/subscription/card, the auth DB batch's four MFA-recovery wait routes, beside dev's 158, and
@@ -372,7 +377,8 @@ describe("S7 deny-by-default authorization", () => {
     // W4-4: "Add to researched" (POST /v1/runs/{id}/researched), and decision 29's step 2 (POST /v1/asks/clarify).
     // R22 decision 32 adds the three of the Owner's allowance for a member: 193.
     // Decision 13: a report on a public debate (POST /v1/public/debates/{id}/report).
-    expect(contractInventory.routes).toHaveLength(194);
+    // Decision 33 adds the four staff routes of a public debate under review.
+    expect(contractInventory.routes).toHaveLength(198);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 

@@ -1303,6 +1303,21 @@ describe("P3-01 production database-principal manifest", () => {
     "EXECUTE ON FUNCTION identity.read_public_report_spent_by_funding(uuid,timestamptz,timestamptz,boolean)",
     "EXECUTE ON FUNCTION identity.record_public_report_check(uuid,timestamptz,text,text,smallint[],text[],text,text,text,text,integer)"
   ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0150_public_review.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION staff.read_public_review_command(jsonb,text,uuid)",
+    "EXECUTE ON FUNCTION staff.read_public_review(jsonb,text,uuid)",
+    "EXECUTE ON FUNCTION staff.read_public_review_list(jsonb,text)",
+    "EXECUTE ON FUNCTION staff.public_review_act(jsonb,uuid,jsonb,jsonb,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION staff.claim_public_review_notices(integer)",
+    "EXECUTE ON FUNCTION staff.complete_public_review_notice(uuid,uuid,boolean)",
+    "EXECUTE ON FUNCTION staff.public_review_notice_user(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.read_public_review_overlay(uuid)",
+    "EXECUTE ON FUNCTION identity.public_review_held(uuid)"
+  ]
 }
 ]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))

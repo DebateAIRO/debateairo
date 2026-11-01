@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kurz gesagt
-eyebrow: NUTZUNGSBEDINGUNGEN · v2.10 · GÜLTIG AB 1. NOVEMBER 2026
+eyebrow: NUTZUNGSBEDINGUNGEN · v2.11 · GÜLTIG AB 1. NOVEMBER 2026
 title: Womit Sie sich einverstanden erklären
 lede: Der Vertrag zwischen Ihnen und DMS Merchandise Shop S.R.L. in verständlicher Sprache. Neunzehn Abschnitte und Anhang A – scrollen Sie bis zum Ende.
-endMarker: ENDE DER NUTZUNGSBEDINGUNGEN · v2.10
+endMarker: ENDE DER NUTZUNGSBEDINGUNGEN · v2.11
 bodyLabel: Text der Nutzungsbedingungen
 annexTitle: Anhang A – Regionale Bestimmungen
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ANWENDBARES RECHT
 -->
 
-**Version 2.10 · Effective 1. November 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
+**Version 2.11 · Effective 1. November 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
 
 **In short.** Sie müssen mindestens 18 Jahre alt sein. Dialectical Engine erstellt Argumente mithilfe von KI-Modellen, und alles, was es erzeugt, kann falsch sein – es handelt sich nicht um Beratung. Im kostenlosen Tarif sind Ihre Debatten nach Abschluss öffentlich, nach einer KI-Prüfung; im kostenpflichtigen Tarif sind sie privat, sofern Sie sie nicht veröffentlichen. Sobald eine Debatte öffentlich ist, kann jede Person sie lesen, und sie bleibt öffentlich. Von Ihnen übermittelter Text wird an die in unserem Verzeichnis aufgeführten KI-Anbieter gesendet und nicht zum Trainieren von Modellen verwendet. Melden Sie rechtswidrige Inhalte unter support@dezbatere.ro, unabhängig davon, ob Sie ein Konto haben. Es gilt rumänisches Recht, Ihre örtlichen Verbraucherschutzrechte bleiben Ihnen jedoch erhalten.
 
@@ -148,7 +148,7 @@ Im kostenpflichtigen Tarif sind Debatten **standardmäßig privat**: Nichts, was
 
 **Debatten im kostenlosen Tarif sind öffentlich.** Im kostenlosen Tarif sind Ihre Frage und deren Debatte öffentlich. Wir sagen Ihnen das, bevor Sie fragen. Wenn die Debatte abgeschlossen ist, prüft eine KI sie; erlaubt die Prüfung es, kann jede Person sie lesen, und Suchmaschinen können sie indexieren. Lehnt die Prüfung sie ab, bleibt sie nur für Sie privat. Nennen Sie im kostenlosen Tarif keine persönlichen Angaben in einer Frage.
 
-**Kein Zurück.** Sobald eine Debatte öffentlich ist, bleibt sie öffentlich. Sie können die Veröffentlichung weder aufheben noch sie löschen, und auch das Löschen Ihres Kontos entfernt sie nicht. Kopien, die andere angefertigt haben, liegen außerhalb unserer Kontrolle. Andere Personen können sie lesen, zitieren, als Bildschirmfoto aufnehmen, archivieren und zwischenspeichern. Veröffentlichen Sie nichts, was Sie nicht dauerhaft mit Ihrem Pseudonym in Verbindung gebracht sehen möchten.
+**Kein Zurück.** Sobald eine Debatte öffentlich ist, bleibt sie öffentlich. Sie können die Veröffentlichung weder aufheben noch sie löschen, und auch das Löschen Ihres Kontos entfernt sie nicht. Wir können sie während der Prüfung vorübergehend ausblenden und einen Teil davon entfernen oder korrigieren, soweit dieser Abschnitt es zulässt. Kopien, die andere angefertigt haben, liegen außerhalb unserer Kontrolle. Andere Personen können sie lesen, zitieren, als Bildschirmfoto aufnehmen, archivieren und zwischenspeichern. Veröffentlichen Sie nichts, was Sie nicht dauerhaft mit Ihrem Pseudonym in Verbindung gebracht sehen möchten.
 
 **Eine markierte Debatte benötigt unsere Genehmigung.** Wenn eine Debatte abgeschlossen ist, liest eine automatisierte Prüfung deren Synthese auf die vier Kategorien in Abschnitt 8. Eine Debatte, die die Prüfung markiert, kann nur mit unserer Genehmigung veröffentlicht werden, und die Markierung wird niemandem außer Ihnen und, wenn Sie um unsere Genehmigung bitten, den Mitgliedern unseres Teams angezeigt, die die Berechtigung zur Überprüfung von Veröffentlichungen besitzen; eine Debatte, deren Synthese nach dem Befund der Prüfung in die Kategorie „Neigungen zu Suizid oder zur Schädigung anderer Menschen“ fällt, wird stattdessen gelöscht, wie der nächste Absatz beschreibt. Wenn Sie auf der Seite der Debatte um unsere Genehmigung bitten, kann ein Mitglied unseres Teams, das eine besondere Berechtigung zur Überprüfung von Veröffentlichungen besitzt, die Debatte so lesen, wie sie veröffentlicht würde, ohne Ihr Pseudonym. Genehmigen wir, steht Ihnen die Schaltfläche Veröffentlichen wieder zur Verfügung, und die Prüfung, die jede Veröffentlichung durchläuft, gilt weiterhin. Lehnen wir ab, bleibt die Debatte privat, und wir geben Ihnen eine Begründung (Abschnitt 10). Nach einer Ablehnung dürfen Sie noch einmal darum bitten, und ein Mitglied unseres Teams, das nicht über die erste Anfrage entschieden hat, entscheidet; Sie können auch den Beschwerdeweg in Abschnitt 10 nutzen. Nach einer zweiten Ablehnung dürfen Sie nicht erneut darum bitten, können die Entscheidung aber weiterhin einer außergerichtlichen Streitbeilegungsstelle oder einem Gericht vorlegen (Abschnitt 10). Eine Genehmigung gilt für die Synthese, die die prüfende Person gelesen hat, einschließlich jeder späteren Fassung der Debatte, die sie wörtlich wiederholt; eine umgeschriebene Synthese wird bei der Veröffentlichung erneut geprüft und benötigt, falls sie markiert wird, eine eigene Genehmigung. Wenn Sie eine markierte Debatte nach unserer Genehmigung veröffentlichen, können Sie sie mit der Schaltfläche Offline nehmen auf ihrer Karte im Bereich Ihre Debatten wieder offline nehmen.
 
@@ -250,6 +250,8 @@ Wenn Sie anderswo leben, nennt Anhang A das in Ihrer Region gegebenenfalls gelte
 Wir teilen Ihnen im Voraus auf einem dauerhaften Datenträger mit, was sich wann ändert. Hat die Änderung mehr als geringfügige nachteilige Auswirkungen auf Ihren Zugang zum Dienst oder dessen Nutzung, können Sie innerhalb von **30 Tagen** nach der Mitteilung oder nach Inkrafttreten der Änderung, je nachdem, welcher Zeitpunkt später liegt, kostenlos kündigen; wir erstatten alle für den ungenutzten Zeitraum vorausgezahlten Beträge.
 
 **Änderungen dieser Nutzungsbedingungen.** Wir können diese Nutzungsbedingungen aus denselben Arten von Gründen ändern. Bei Änderungen, die Ihre Rechte nicht einschränken, veröffentlichen wir die neue Fassung mit einer Zusammenfassung der Änderungen und senden Ihnen mindestens **30 Tage vor ihrem Inkrafttreten** eine E-Mail; wenn Sie Dialectical Engine nach diesem Datum weiterhin nutzen, stimmen Sie der Änderung zu, und Sie können Ihr Konto vorher schließen. Bei Änderungen, die Ihre Rechte einschränken – darunter Preiserhöhungen für einen bestehenden Tarif, niedrigere Limits, entfernte Funktionen, neue Nutzungen Ihrer Inhalte oder Änderungen der Haftung, des anwendbaren Rechts oder der Streitbeilegung – bitten wir Sie, der neuen Fassung bei Ihrer nächsten Anmeldung ausdrücklich zuzustimmen; die Änderung gilt nur für die Zukunft. Wir nehmen Änderungen niemals rückwirkend vor und verwenden diesen Abschnitt niemals dazu, den Kern Ihrer bereits bezahlten Leistung während der Laufzeit zu ändern, ohne Ihnen eine Beendigungsmöglichkeit einzuräumen. Frühere Fassungen bleiben unter dezbatere.ro/terms/versions verfügbar.
+
+Version 2.11 ersetzte Version 2.10: Abschnitt 9 besagt, dass wir eine öffentliche Debatte während der Prüfung vorübergehend ausblenden und einen Teil davon entfernen oder korrigieren können.
 
 Version 2.10 ersetzte Version 2.9: Abschnitt 9 besagt, dass Debatten im kostenlosen Tarif öffentlich sind, dass eine öffentliche Debatte nicht unveröffentlicht werden kann und nach der Schließung Ihres Kontos öffentlich bleibt, dass jede Person mit Guthaben zu einer öffentlichen Debatte beitragen oder einen Bericht über sie schreiben kann und dass eine öffentliche Debatte offen bleibt, nachdem ihr erster Verfasser ausgeschieden ist; Abschnitt 11 beschreibt, was die Schließung mit Ihren öffentlichen Debatten macht.
 

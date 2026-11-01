@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Trumpai
-eyebrow: PASLAUGŲ TEIKIMO SĄLYGOS · v2.10 · ĮSIGALIOJA 2026 M. LAPKRIČIO 1 D.
+eyebrow: PASLAUGŲ TEIKIMO SĄLYGOS · v2.11 · ĮSIGALIOJA 2026 M. LAPKRIČIO 1 D.
 title: Su kuo sutinkate
 lede: Jūsų ir DMS Merchandise Shop S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.
-endMarker: SĄLYGŲ PABAIGA · v2.10
+endMarker: SĄLYGŲ PABAIGA · v2.11
 bodyLabel: Paslaugų teikimo sąlygų tekstas
 annexTitle: A priedas — Regioninės sąlygos
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TAIKYTINA TEISĖ
 -->
 
-**Version 2.10 · Effective 2026 m. lapkričio 1 d. · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
+**Version 2.11 · Effective 2026 m. lapkričio 1 d. · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
 
 **In short.** Turite būti ne jaunesni kaip 18 metų. Dialectical Engine kuria argumentus naudodama DI modelius, todėl viskas, ką ji sugeneruoja, gali būti klaidinga — tai nėra konsultacija. Nemokamame plane jūsų debatai tampa vieši, kai jie baigiami, po DI patikros; mokamame plane jie yra privatūs, nebent juos paskelbiate. Viešus tapusius debatus gali skaityti bet kas, ir jie lieka vieši. Jūsų pateiktas tekstas siunčiamas mūsų Paslaugų teikėjų registre nurodytiems DI paslaugų teikėjams ir nenaudojamas modeliams mokyti. Apie neteisėtą turinį praneškite adresu support@dezbatere.ro, nesvarbu, ar turite paskyrą. Taikoma Rumunijos teisė, tačiau jums ir toliau taikoma vietos vartotojų apsauga.
 
@@ -148,7 +148,7 @@ Mokamame plane debatai yra **privatūs pagal numatytuosius nustatymus**: niekas,
 
 **Nemokami debatai yra vieši.** Nemokamame plane jūsų klausimas ir jo debatas yra vieši. Apie tai pranešame, prieš jums užduodant klausimą. Kai debatas baigiamas, jį patikrina DI; jei patikra leidžia, jį gali skaityti bet kas, o paieškos sistemos gali jį indeksuoti. Jei patikra jo neleidžia, jis lieka privatus tik jums. Nemokamame plane klausime nenurodykite asmeninių duomenų.
 
-**Atšaukti negalima.** Kai debatas tampa viešas, jis lieka viešas. Jo negalima atšaukti ar ištrinti, o ištrynus paskyrą jis nėra pašalinamas. Kopijų, kurias padarė kiti, mes nekontroliuojame. Kiti žmonės gali jį skaityti, cituoti, daryti ekrano kopijas, archyvuoti ir išsaugoti podėlyje. Neskelbkite nieko, ko nenorėtumėte visam laikui susieti su savo slapyvardžiu.
+**Atšaukti negalima.** Kai debatas tampa viešas, jis lieka viešas. Jo negalima atšaukti ar ištrinti, o ištrynus paskyrą jis nėra pašalinamas. Mes galime laikinai paslėpti jį, kol jį peržiūrime, ir pašalinti arba ištaisyti jo dalį, kiek tai leidžia šis skyrius. Kopijų, kurias padarė kiti, mes nekontroliuojame. Kiti žmonės gali jį skaityti, cituoti, daryti ekrano kopijas, archyvuoti ir išsaugoti podėlyje. Neskelbkite nieko, ko nenorėtumėte visam laikui susieti su savo slapyvardžiu.
 
 **Pažymėtiems debatams reikia mūsų pritarimo.** Kai debatai pasibaigia, automatizuota patikra perskaito jų apibendrinimą pagal keturias 8 skyriuje nurodytas kategorijas. Debatus, kuriuos patikra pažymi, galima paskelbti tik gavus mūsų pritarimą, o žymę mato tik jūs ir, jei paprašote mūsų pritarimo, mūsų komandos nariai, turintys leidimą peržiūrėti paskelbimus; debatai, kuriuos patikra nustato kaip patenkančius į kategoriją „polinkiai į savižudybę arba kenkimą kitiems žmonėms“, vietoje to ištrinami, kaip nurodyta kitoje pastraipoje. Jei paprašote mūsų pritarimo debatų puslapyje, mūsų komandos narys, turintis konkretų leidimą peržiūrėti paskelbimus, gali perskaityti debatus tokius, kokie būtų paskelbti, be jūsų slapyvardžio. Jei pritariame, mygtukas „Paskelbti“ jums vėl tampa prieinamas, o patikra, kurią praeina kiekvienas paskelbimas, vis tiek taikoma. Jei atsisakome, debatai lieka privatūs ir pateikiame jums motyvų pareiškimą (10 skyrius). Po atsisakymo galite paprašyti dar kartą, ir sprendimą priima mūsų komandos narys, nepriėmęs sprendimo dėl pirmojo prašymo; taip pat galite pasinaudoti 10 skyriuje nurodyta skundų teikimo tvarka. Po antrojo atsisakymo daugiau prašyti negalite, tačiau sprendimą vis tiek galite perduoti neteisminio ginčų sprendimo įstaigai arba teismui (10 skyrius). Pritarimas apima apibendrinimą, kurį perskaitė recenzentas, įskaitant bet kurią vėlesnę debatų versiją, žodis žodin jį kartojančią; perrašytas apibendrinimas tikrinamas dar kartą, kai skelbiate, ir, jei jis pažymimas, jam reikia atskiro pritarimo. Jei pažymėtus debatus paskelbiate gavę mūsų pritarimą, galite juos vėl nuimti naudodami „Nuimti“ jų kortelėje skiltyje „Jūsų debatai“.
 
@@ -250,6 +250,8 @@ Jei gyvenate kitur, A priede nurodyta jūsų regione taikoma teisė atsisakyti s
 Patvariojoje laikmenoje iš anksto pranešame, kas ir kada keisis. Jei pakeitimas turi didesnį nei nedidelį neigiamą poveikį jūsų prieigai prie paslaugos ar naudojimuisi ja, galite nemokamai nutraukti sutartį per **30 dienų** nuo pranešimo gavimo arba pakeitimo įsigaliojimo dienos, atsižvelgiant į tai, kuri data vėlesnė, o mes grąžinsime visas iš anksto už nepanaudotą laikotarpį sumokėtas sumas.
 
 **Šių Sąlygų pakeitimai.** Šias Sąlygas galime keisti dėl tokių pačių priežasčių. Jei pakeitimai nesumažina jūsų teisių, paskelbiame naują versiją su pakeitimų santrauka ir išsiunčiame jums el. laišką bent prieš **30 dienų** iki jos įsigaliojimo; jei po tos dienos toliau naudositės Dialectical Engine, tai reikš, kad su pakeitimais sutinkate, o iki tol galite uždaryti paskyrą. Jei pakeitimais sumažinamos jūsų teisės — įskaitant esamo plano kainos padidinimą, mažesnes ribas, pašalintas funkcijas, naujus jūsų turinio naudojimo būdus arba atsakomybės, taikytinos teisės ar ginčų sprendimo pakeitimus — kitą kartą prisijungus prašome aiškiai sutikti su nauja versija, o pakeitimas taikomas tik ateityje. Niekada netaikome pakeitimo atgaline data ir niekada nesinaudojame šiuo skyriumi tam, kad sutarties laikotarpio viduryje pakeistume esminius dalykus, už kuriuos sumokėjote, nepasiūlydami galimybės atsisakyti sutarties. Ankstesnes versijas galima rasti adresu dezbatere.ro/terms/versions.
+
+2.11 versija pakeitė 2.10 versiją: 9 skyriuje nurodyta, kad mes galime laikinai paslėpti viešą debatą, kol jį peržiūrime, ir pašalinti arba ištaisyti jo dalį.
 
 2.10 versija pakeitė 2.9 versiją: 9 skyriuje nurodyta, kad nemokamame plane debatai yra vieši, kad viešo debato paskelbimo negalima atšaukti ir jis lieka viešas jums uždarius paskyrą, kad kiekvienas, turintis kredito, gali prisidėti prie viešo debato arba parašyti jo ataskaitą, ir kad viešas debatas lieka atviras po to, kai jo pirmasis autorius pasitraukė; 11 skyriuje nurodyta, ką uždarymas reiškia jūsų viešiems debatams.
 

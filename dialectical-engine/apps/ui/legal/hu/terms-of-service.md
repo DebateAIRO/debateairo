@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Röviden
-eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v2.10 · HATÁLYOS 2026. NOVEMBER 1.
+eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v2.11 · HATÁLYOS 2026. NOVEMBER 1.
 title: Amit Ön elfogad
 lede: Az Ön és a DMS Merchandise Shop S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.
-endMarker: A FELTÉTELEK VÉGE · v2.10
+endMarker: A FELTÉTELEK VÉGE · v2.11
 bodyLabel: A Szolgáltatási feltételek szövege
 annexTitle: A. melléklet — Regionális feltételek
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 IRÁNYADÓ JOG
 -->
 
-**Version 2.10 · Effective 2026. november 1. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
+**Version 2.11 · Effective 2026. november 1. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
 
 **In short.** Önnek legalább 18 évesnek kell lennie. A Dialectical Engine mesterségesintelligencia-modellekkel épít fel érveket, és minden általa létrehozott tartalom téves lehet — nem minősül tanácsadásnak. Az ingyenes csomagon az Ön vitái befejezésük után, MI-ellenőrzést követően nyilvánosak; fizetős csomagon bizalmasak, amíg közzé nem teszi őket. Nyilvánossá válva bárki elolvashatja a vitát, és az nyilvános marad. Az Ön által beküldött szöveget továbbítjuk a Szolgáltatói nyilvántartásunkban felsorolt MI-szolgáltatóknak, és azt nem használjuk modellek betanítására. Jogellenes tartalmat a support@dezbatere.ro címen jelenthet be, függetlenül attól, hogy rendelkezik-e fiókkal. A román jog az irányadó, de az Ön helyi fogyasztóvédelmi jogai változatlanul megilletik.
 
@@ -148,7 +148,7 @@ Fizetős csomagon a viták **alapértelmezés szerint bizalmasak**. Az Ön ott l
 
 **Az ingyenes csomagon a viták nyilvánosak.** Az ingyenes csomagon az Ön kérdése és annak vitája nyilvános. Ezt még a kérdés feltevése előtt közöljük Önnel. Amikor a vita befejeződik, MI ellenőrzi; ha az ellenőrzés engedi, bárki elolvashatja, és a keresőmotorok indexelhetik. Ha az ellenőrzés elutasítja, az Ön számára bizalmas marad. Az ingyenes csomagon ne írjon személyes adatokat a kérdésbe.
 
-**Nincs visszavonás.** Amint egy vita nyilvánossá válik, az nyilvános marad. Nem vonhatja vissza a közzétételét, és nem törölheti; fiókja törlése sem távolítja el. Mások által készített másolatok ellenőrzésünkön kívül esnek. Mások elolvashatják, idézhetik, képernyőképet készíthetnek róla, archiválhatják és gyorsítótárba menthetik. Ne tegyen közzé semmit, amit nem szeretne tartósan az álnevéhez kapcsolva látni.
+**Nincs visszavonás.** Amint egy vita nyilvánossá válik, az nyilvános marad. Nem vonhatja vissza a közzétételét, és nem törölheti; fiókja törlése sem távolítja el. A felülvizsgálat idejére ideiglenesen elrejthetjük, és – ha ez a szakasz lehetővé teszi – annak egy részét eltávolíthatjuk vagy kijavíthatjuk. Mások által készített másolatok ellenőrzésünkön kívül esnek. Mások elolvashatják, idézhetik, képernyőképet készíthetnek róla, archiválhatják és gyorsítótárba menthetik. Ne tegyen közzé semmit, amit nem szeretne tartósan az álnevéhez kapcsolva látni.
 
 **A megjelölt vitához a jóváhagyásunk szükséges.** Amikor egy vita véget ér, egy automatizált ellenőrzés elolvassa a szintézisét a 8. szakaszban szereplő négy kategória szempontjából. Az ellenőrzés által megjelölt vita csak a jóváhagyásunkkal tehető közzé, és a jelölést csak Ön látja, illetve — ha Ön kéri a jóváhagyásunkat — csapatunk azon tagjai, akik rendelkeznek a közzétételek felülvizsgálatára szóló jogosultsággal; azt a vitát, amelyet az ellenőrzés az „öngyilkosságra vagy mások bántására irányuló hajlamok” kategóriát érintőnek talál, ehelyett töröljük, ahogyan a következő bekezdés ismerteti. Ha a jóváhagyásunkat a vita oldalán kéri, csapatunk egy tagja, aki külön jogosultsággal rendelkezik a közzétételek felülvizsgálatára, elolvashatja a vitát olyan formában, ahogyan közzétételre kerülne, az Ön álneve nélkül. Ha jóváhagyjuk, a Közzététel gomb ismét elérhető az Ön számára, és az az ellenőrzés, amelyen minden közzététel átmegy, továbbra is érvényes. Ha elutasítjuk, a vita privát marad, és indokolást adunk Önnek (10. szakasz). Elutasítás után még egyszer kérheti, és csapatunk egy olyan tagja dönt, aki az első kérésről nem döntött; igénybe veheti a 10. szakasz szerinti panaszkezelési utat is. A második elutasítás után már nem kérheti újra, de a döntést továbbra is peren kívüli vitarendezési testület vagy bíróság elé viheti (10. szakasz). A jóváhagyás arra a szintézisre vonatkozik, amelyet a felülvizsgáló elolvasott, beleértve a vita minden későbbi változatát, amely azt szóról szóra megismétli; az átírt szintézist közzétételkor ismét ellenőrizzük, és ha megjelölik, külön jóváhagyásra van szüksége. Ha a jóváhagyásunk után közzétesz egy megjelölt vitát, a Saját viták között a kártyáján lévő Levétel gombbal ismét leveheti.
 
@@ -250,6 +250,8 @@ Ha Ön máshol él, az A. melléklet határozza meg a régiójában esetlegesen 
 Tartós adathordozón előzetesen közöljük Önnel, mi és mikor változik. Ha a módosítás az Ön szolgáltatáshoz való hozzáférésére vagy annak használatára kisebbnél nagyobb hátrányos hatást gyakorol, Ön az értesítéstől vagy a módosítás hatálybalépésétől számított **30 napon** belül — a kettő közül a későbbi időpontig — díjmentesen megszüntetheti a szerződést, mi pedig visszatérítjük a fel nem használt időszakra előre kifizetett összeget.
 
 **E Feltételek módosítása.** E Feltételeket ugyanezen típusú okokból módosíthatjuk. Az Ön jogait nem csökkentő módosítások esetén legalább **30 nappal** a hatálybalépés előtt közzétesszük az új változatot a módosítások összefoglalásával, és e-mailben értesítjük Önt; ha ezt az időpontot követően tovább használja a Dialectical Engine szolgáltatást, azzal elfogadja a módosítást, fiókját pedig ezt megelőzően megszüntetheti. Az Ön jogait csökkentő módosítások — ideértve egy meglévő csomag árának emelését, az alacsonyabb korlátokat, funkciók eltávolítását, tartalmának új felhasználási módjait, illetve a felelősség, az irányadó jog vagy a vitarendezés módosítását — esetén következő bejelentkezésekor kifejezett elfogadását kérjük, és a módosítás csak a jövőre nézve alkalmazandó. Módosítást soha nem alkalmazunk visszamenőleg, és e szakaszt soha nem használjuk arra, hogy a már kifizetett szolgáltatás lényegét a futamidő alatt megváltoztassuk anélkül, hogy kilépési lehetőséget biztosítanánk. A korábbi változatok továbbra is elérhetők itt: dezbatere.ro/terms/versions.
+
+A 2.11-es verzió a 2.10-es verzió helyébe lépett: a 9. szakasz kimondja, hogy a nyilvános vitát a felülvizsgálat idejére ideiglenesen elrejthetjük, és annak egy részét eltávolíthatjuk vagy kijavíthatjuk.
 
 A 2.10-es verzió a 2.9-es verzió helyébe lépett: a 9. szakasz kimondja, hogy az ingyenes csomagon a viták nyilvánosak, hogy a nyilvános vita nem vonható vissza, és a fiók megszüntetése után is nyilvános marad, hogy bárki, akinek kreditje van, közreműködhet egy nyilvános vitában vagy jelentést írhat róla, és hogy a nyilvános vita az első szerző távozása után is nyitva marad; a 11. szakasz kimondja, mit jelent a megszüntetés a nyilvános vitáira nézve.
 

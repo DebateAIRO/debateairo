@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In het kort
-eyebrow: SERVICEVOORWAARDEN · v2.10 · VAN KRACHT OP 1 NOVEMBER 2026
+eyebrow: SERVICEVOORWAARDEN · v2.11 · VAN KRACHT OP 1 NOVEMBER 2026
 title: Waarmee u instemt
 lede: De overeenkomst tussen u en DMS Merchandise Shop S.R.L., in begrijpelijke taal. Negentien hoofdstukken en Bijlage A — scrol tot het einde.
-endMarker: EINDE VAN DE VOORWAARDEN · v2.10
+endMarker: EINDE VAN DE VOORWAARDEN · v2.11
 bodyLabel: Tekst van de Servicevoorwaarden
 annexTitle: Bijlage A — Regionale voorwaarden
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TOEPASSELIJK RECHT
 -->
 
-**Version 2.10 · Effective 1 november 2026 · Eerdere versies op dezbatere.ro/terms/versions · Taal: Nederlands.**
+**Version 2.11 · Effective 1 november 2026 · Eerdere versies op dezbatere.ro/terms/versions · Taal: Nederlands.**
 
 **In short.** U moet 18 jaar of ouder zijn. Dialectical Engine stelt met AI-modellen argumenten op en alles wat het genereert kan onjuist zijn — het is geen advies. Op het gratis abonnement worden uw debatten openbaar wanneer ze zijn afgerond, na een AI-controle; op een betaald abonnement zijn ze privé, tenzij u ze publiceert. Eenmaal openbaar kan iedereen een debat lezen, en het blijft openbaar. Tekst die u indient, wordt verzonden naar de AI-aanbieders in ons Register van aanbieders en wordt niet gebruikt om modellen te trainen. Meld illegale inhoud via support@dezbatere.ro, ongeacht of u een account hebt. Het Roemeense recht is van toepassing, maar uw lokale consumentenbescherming blijft voor u gelden.
 
@@ -148,7 +148,7 @@ Debatten op een betaald abonnement zijn **standaard privé**: niets wat u daar m
 
 **Gratis debatten zijn openbaar.** Op het gratis abonnement zijn uw vraag en het debat daarvan openbaar. Wij vertellen u dit voordat u vraagt. Wanneer het debat is afgerond, controleert een AI het; als de controle het toestaat, kan iedereen het lezen en kunnen zoekmachines het indexeren. Als de controle het weigert, blijft het alleen voor u privé. Neem geen persoonlijke gegevens op in een vraag op het gratis abonnement.
 
-**Niet terug te nemen.** Zodra een debat openbaar is, blijft het openbaar. U kunt het niet intrekken of verwijderen, en het wissen van uw account verwijdert het ook niet. Kopieën die anderen hebben gemaakt, vallen buiten onze controle. Anderen kunnen het lezen, citeren, vastleggen in schermafbeeldingen, archiveren en in een cache opslaan. Publiceer niets waarvan u niet wilt dat het permanent met uw pseudoniem in verband wordt gebracht.
+**Niet terug te nemen.** Zodra een debat openbaar is, blijft het openbaar. U kunt het niet intrekken of verwijderen, en het wissen van uw account verwijdert het ook niet. Wij kunnen het tijdelijk verbergen terwijl wij het beoordelen, en een deel ervan verwijderen of corrigeren, voor zover dit hoofdstuk dat toestaat. Kopieën die anderen hebben gemaakt, vallen buiten onze controle. Anderen kunnen het lezen, citeren, vastleggen in schermafbeeldingen, archiveren en in een cache opslaan. Publiceer niets waarvan u niet wilt dat het permanent met uw pseudoniem in verband wordt gebracht.
 
 **Een gemarkeerd debat heeft onze goedkeuring nodig.** Wanneer een debat is afgerond, leest een geautomatiseerde controle de synthese ervan op de vier categorieën in hoofdstuk 8. Een debat dat de controle markeert, kan alleen met onze goedkeuring worden gepubliceerd, en de markering wordt aan niemand getoond behalve aan u en, als u om onze goedkeuring vraagt, aan de leden van ons team die de machtiging hebben om publicaties te beoordelen; een debat waarvan de controle vaststelt dat het raakt aan „neigingen tot zelfdoding of het schaden van andere mensen”, wordt in plaats daarvan verwijderd, zoals de volgende alinea beschrijft. Als u op de pagina van het debat om onze goedkeuring vraagt, kan een lid van ons team dat een specifieke machtiging heeft om publicaties te beoordelen het debat lezen zoals het zou worden gepubliceerd, zonder uw pseudoniem. Keuren wij het goed, dan is de knop Publiceren weer voor u beschikbaar en blijft de controle die elke publicatie doorloopt van toepassing. Weigeren wij, dan blijft het debat privé en geven wij u een motivering (hoofdstuk 10). Na een weigering mag u nog één keer vragen, en een lid van ons team dat niet over het eerste verzoek heeft beslist, beslist; u kunt ook de klachtenprocedure in hoofdstuk 10 gebruiken. Na een tweede weigering kunt u niet opnieuw vragen, maar u kunt de beslissing nog steeds voorleggen aan een orgaan voor buitengerechtelijke geschillenbeslechting of aan de rechter (hoofdstuk 10). Een goedkeuring geldt voor de synthese die de beoordelaar heeft gelezen, met inbegrip van elke latere versie van het debat die haar woordelijk herhaalt; een herschreven synthese wordt bij het publiceren opnieuw gecontroleerd en heeft, als zij wordt gemarkeerd, een eigen goedkeuring nodig. Als u een gemarkeerd debat publiceert nadat wij het hebben goedgekeurd, kunt u het weer offline halen met de knop Offline halen op de kaart in Uw debatten.
 
@@ -250,6 +250,8 @@ Als u elders woont, vermeldt Bijlage A welk herroepingsrecht of welke bedenktijd
 Wij vertellen u vooraf, op een duurzame gegevensdrager, wat er verandert en wanneer. Als de wijziging meer dan een gering negatief effect heeft op uw toegang tot of gebruik van de dienst, kunt u binnen **30 dagen** nadat u hierover bent geïnformeerd of nadat de wijziging van kracht wordt, afhankelijk van welk moment later valt, de overeenkomst kosteloos beëindigen en betalen wij elk voorafbetaald bedrag voor de ongebruikte periode terug.
 
 **In deze Voorwaarden.** Wij kunnen deze Voorwaarden om dezelfde soorten redenen wijzigen. Voor wijzigingen die uw rechten niet verminderen, publiceren wij de nieuwe versie met een samenvatting van wat is gewijzigd en sturen wij u ten minste **30 dagen** vóór de ingangsdatum een e-mail; als u Dialectical Engine na die datum blijft gebruiken, betekent dit dat u de wijziging aanvaardt, en u kunt uw account voordien sluiten. Voor wijzigingen die uw rechten verminderen — waaronder prijsverhogingen voor een bestaand abonnement, lagere limieten, verwijderde functies, nieuw gebruik van uw inhoud of wijzigingen in aansprakelijkheid, toepasselijk recht of geschillenbeslechting — vragen wij u bij uw volgende aanmelding uitdrukkelijk de nieuwe versie te aanvaarden en geldt de wijziging uitsluitend voor de toekomst. Wij maken een wijziging nooit met terugwerkende kracht en gebruiken dit hoofdstuk nooit om de kern van hetgeen waarvoor u hebt betaald tijdens de looptijd te wijzigen zonder u een uitweg te bieden. Eerdere versies blijven beschikbaar op dezbatere.ro/terms/versions.
+
+Versie 2.11 verving versie 2.10: hoofdstuk 9 zegt dat wij een openbaar debat tijdelijk kunnen verbergen terwijl wij het beoordelen, en een deel ervan kunnen verwijderen of corrigeren.
 
 Versie 2.10 verving versie 2.9: hoofdstuk 9 zegt dat debatten op het gratis abonnement openbaar zijn, dat een openbaar debat niet kan worden teruggenomen en na sluiting van uw account openbaar blijft, dat iedereen met tegoed kan bijdragen aan een openbaar debat of er een rapport over kan schrijven, en dat een openbaar debat open blijft nadat de eerste auteur is vertrokken; hoofdstuk 11 zegt wat sluiting met uw openbare debatten doet.
 

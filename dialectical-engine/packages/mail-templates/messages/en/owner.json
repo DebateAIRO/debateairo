@@ -56,6 +56,8 @@
   "owner.teamLimit.open": "Open the private team page to see what changed.",
   "owner.teamAllowance.changedSubject": "A team allowance was changed",
   "owner.teamAllowance.changed": "An allowance on your team was given, taken back or ended. If you did not expect this, act at once.",
+  "owner.publicReview.subject": "A public debate review changed",
+  "owner.publicReview.changed": "Someone with access to the team page took a step on a public debate under review. Sign in to see the log.",
   "owner.teamAllowance.yoursSubject": "Your team allowance changed",
   "owner.teamAllowance.yours": "The allowance the Owner gave you for your debates has changed.",
   "owner.teamAllowance.yoursNext": "Sign in to see what you can use now. If you did not expect this, tell the Owner."

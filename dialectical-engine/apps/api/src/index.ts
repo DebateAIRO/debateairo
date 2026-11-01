@@ -3851,9 +3851,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         return reply.status(404).send({ error: "DEBATE_NOT_FOUND" });
       }
       const debate = await options.publications.readPublicDebate(publicationRef.data);
-      return debate === null
-        ? reply.status(404).send({ error: "DEBATE_NOT_FOUND" })
-        : reply.send(PublicDebateSchema.parse(debate));
+      if (debate !== null) return reply.send(PublicDebateSchema.parse(debate));
+      // Decision 33: hidden under review. Gone for now, no-store, and nothing of it: the page says one plain line.
+      if (await options.publications.isUnderReview?.(publicationRef.data).catch(() => false)) {
+        return reply.status(410).header("Cache-Control", "no-store").send({ error: "DEBATE_UNDER_REVIEW" });
+      }
+      return reply.status(404).send({ error: "DEBATE_NOT_FOUND" });
     }
   );
   // Decisions 13 and 16: a report on a public debate, by anyone with credit, while nothing is ongoing. The asks' budget: a stranger can press it. Their username is only a reference, and they pay.
@@ -4650,7 +4653,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const own = ownerRef === undefined || options.publicTree === undefined ? [] : await options.publicTree.contributions.readOwn(ownerRef, runId).catch((): readonly PublicContributionRead[] => []);
     const contribution = own.find((entry) => entry.dig_run_id.toLowerCase() === runId.toLowerCase());
     return reply.send(contribution === undefined ? answer : { ...answer, contribution: { public_ref: contribution.publication_ref,
-      state: contribution.outcome === null ? "CHECKING" : contribution.outcome === "ALLOWED" ? "ON_THE_PAGE" : "KEPT_PRIVATE" } });
+      state: contribution.removed_after_review === true ? "REMOVED_AFTER_REVIEW" : contribution.outcome === null ? "CHECKING" : contribution.outcome === "ALLOWED" && contribution.kept_private_after_review !== true ? "ON_THE_PAGE" : "KEPT_PRIVATE" } });
   });
   api.post<{ Params: { id: string } }>(
     "/v1/runs/:id/publish",

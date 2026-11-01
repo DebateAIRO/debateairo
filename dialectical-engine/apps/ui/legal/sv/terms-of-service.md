@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kort sagt
-eyebrow: ANVÄNDARVILLKOR · v2.10 · GÄLLER FRÅN 1 NOVEMBER 2026
+eyebrow: ANVÄNDARVILLKOR · v2.11 · GÄLLER FRÅN 1 NOVEMBER 2026
 title: Vad du godkänner
 lede: Avtalet mellan dig och DMS Merchandise Shop S.R.L., på ett lättbegripligt språk. Nitton avsnitt och bilaga A — rulla till slutet.
-endMarker: SLUT PÅ VILLKOREN · v2.10
+endMarker: SLUT PÅ VILLKOREN · v2.11
 bodyLabel: Användarvillkorens text
 annexTitle: Bilaga A — Regionala villkor
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TILLÄMPLIG LAG
 -->
 
-**Version 2.10 · Effective 1 november 2026 · Tidigare versioner finns på dezbatere.ro/terms/versions · Språk: svenska.**
+**Version 2.11 · Effective 1 november 2026 · Tidigare versioner finns på dezbatere.ro/terms/versions · Språk: svenska.**
 
 **In short.** Du måste ha fyllt 18 år. Dialectical Engine bygger argument med AI-modeller, och allt som tjänsten genererar kan vara felaktigt — det är inte rådgivning. På det kostnadsfria abonnemanget är dina debatter offentliga när de är klara, efter en AI-kontroll; på ett betalabonnemang är de privata om du inte publicerar dem. När en debatt är offentlig kan vem som helst läsa den, och den förblir offentlig. Text som du skickar in överförs till de AI-leverantörer som anges i vårt register över AI-leverantörer och används inte för att träna modeller. Rapportera olagligt innehåll till support@dezbatere.ro, oavsett om du har ett konto eller inte. Rumänsk lag är tillämplig, men du behåller ditt lokala konsumentskydd.
 
@@ -148,7 +148,7 @@ På ett betalabonnemang är debatter **privata som standard**: ingenting som du 
 
 **Debatter på det kostnadsfria abonnemanget är offentliga.** På det kostnadsfria abonnemanget är din fråga och dess debatt offentliga. Vi berättar det innan du ställer frågan. När debatten är klar kontrolleras den av en AI; om kontrollen tillåter det kan vem som helst läsa den och sökmotorer kan indexera den. Om kontrollen nekar den förblir den privat för dig. Ta inte med personliga uppgifter i en fråga på det kostnadsfria abonnemanget.
 
-**Det går inte att ta tillbaka.** När en debatt är offentlig förblir den offentlig. Du kan inte återkalla publiceringen eller radera den, och att radera ditt konto tar inte bort den. Kopior som andra gjort ligger utanför vår kontroll. Andra personer kan läsa, citera, skärmbilda, arkivera och cachelagra den. Publicera inget som du inte vill ska förknippas med din pseudonym för all framtid.
+**Det går inte att ta tillbaka.** När en debatt är offentlig förblir den offentlig. Du kan inte återkalla publiceringen eller radera den, och att radera ditt konto tar inte bort den. Vi kan dölja den medan vi granskar den, och ta bort eller rätta en del av den, i de fall som detta avsnitt tillåter. Kopior som andra gjort ligger utanför vår kontroll. Andra personer kan läsa, citera, skärmbilda, arkivera och cachelagra den. Publicera inget som du inte vill ska förknippas med din pseudonym för all framtid.
 
 **En markerad debatt behöver vårt godkännande.** När en debatt är avslutad läser en automatiserad kontroll dess syntes avseende de fyra kategorierna i avsnitt 8. En debatt som kontrollen markerar kan publiceras bara med vårt godkännande, och markeringen visas för ingen annan än dig och, om du ber om vårt godkännande, de medlemmar i vårt team som har behörighet att granska publiceringar; en debatt som kontrollen finner beröra ”tendenser till självmord eller till att skada andra människor” raderas i stället, som nästa stycke anger. Om du ber om vårt godkännande på debattens sida kan en medlem i vårt team som har en särskild behörighet att granska publiceringar läsa debatten såsom den skulle publiceras, utan ditt pseudonym. Om vi godkänner blir knappen Publicera tillgänglig för dig igen, och kontrollen som varje publicering går igenom gäller fortfarande. Om vi avslår förblir debatten privat och vi ger dig en motivering (avsnitt 10). Efter ett avslag får du be en gång till, och en medlem i vårt team som inte beslutade om den första begäran beslutar; du kan också använda klagomålsvägen i avsnitt 10. Efter ett andra avslag kan du inte be igen, men du kan fortfarande ta beslutet till ett organ för tvistlösning utanför domstol eller till domstol (avsnitt 10). Ett godkännande gäller den syntes som granskaren har läst, inklusive varje senare version av debatten som upprepar den ord för ord; en omskriven syntes kontrolleras på nytt när du publicerar och behöver, om den markeras, ett eget godkännande. Om du publicerar en markerad debatt efter vårt godkännande kan du ta ned den igen med knappen Ta ned på dess kort i Dina debatter.
 
@@ -250,6 +250,8 @@ Om du bor någon annanstans anger bilaga A den ånger- eller betänketid som gä
 Vi underrättar dig i förväg, på ett varaktigt medium, om vad som ändras och när. Om ändringen har mer än en mindre negativ inverkan på din åtkomst till eller användning av tjänsten får du säga upp avtalet utan kostnad inom **30 dagar** från det att du underrättades eller från det att ändringen trädde i kraft, beroende på vilket som inträffar senare, och vi återbetalar eventuellt förskottsbetalt belopp för den oanvända perioden.
 
 **Dessa villkor.** Vi får ändra dessa villkor av samma slags skäl. Vid ändringar som inte minskar dina rättigheter publicerar vi den nya versionen tillsammans med en sammanfattning av ändringarna och skickar e-post till dig minst **30 dagar** innan ändringen träder i kraft; om du fortsätter att använda Dialectical Engine efter det datumet innebär det att du godkänner ändringen, och du får avsluta ditt konto före dess. Vid ändringar som minskar dina rättigheter — däribland prishöjningar för ett befintligt abonnemang, lägre gränser, borttagna funktioner, ny användning av ditt innehåll eller ändringar av ansvar, tillämplig lag eller tvistlösning — ber vi dig uttryckligen godkänna den nya versionen nästa gång du loggar in, och ändringen gäller endast framåt i tiden. Vi gör aldrig en ändring retroaktiv och använder aldrig detta avsnitt för att ändra kärnan i det som du har betalat för under en pågående avtalsperiod utan att erbjuda dig en utväg. Tidigare versioner finns kvar på dezbatere.ro/terms/versions.
+
+Version 2.11 ersatte version 2.10: avsnitt 9 anger att vi kan dölja en offentlig debatt medan vi granskar den, och ta bort eller rätta en del av den.
 
 Version 2.10 ersatte version 2.9: avsnitt 9 anger att debatter på det kostnadsfria abonnemanget är offentliga, att publiceringen av en offentlig debatt inte kan återkallas och att den förblir offentlig efter att du har avslutat ditt konto, att var och en med kredit kan bidra till en offentlig debatt eller skriva en rapport om den, och att en offentlig debatt förblir öppen efter att dess första författare har lämnat; avsnitt 11 anger vad avslutandet innebär för dina offentliga debatter.
 

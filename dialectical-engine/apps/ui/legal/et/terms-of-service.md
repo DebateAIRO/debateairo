@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lühidalt
-eyebrow: TEENUSETINGIMUSED · v2.10 · KEHTIB ALATES 1. NOVEMBRIST 2026
+eyebrow: TEENUSETINGIMUSED · v2.11 · KEHTIB ALATES 1. NOVEMBRIST 2026
 title: Millega te nõustute
 lede: Teie ja DMS Merchandise Shop S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.
-endMarker: TINGIMUSTE LÕPP · v2.10
+endMarker: TINGIMUSTE LÕPP · v2.11
 bodyLabel: Teenusetingimuste tekst
 annexTitle: Lisa A — Piirkondlikud tingimused
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 KOHALDATAV ÕIGUS
 -->
 
-**Version 2.10 · Effective 1. november 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
+**Version 2.11 · Effective 1. november 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
 
 **In short.** Peate olema vähemalt 18-aastane. Dialectical Engine koostab tehisintellektimudelite abil argumente ja kõik selle loodud tulemused võivad olla valed — need ei ole nõuanded. Tasuta paketi korral on teie väitlused pärast lõppu avalikud, pärast tehisintellekti kontrolli; tasulise paketi korral on need privaatsed, kui te neid ei avalda. Kui väitlus on avalik, saab seda lugeda igaüks, ja see jääb avalikuks. Teie sisestatud tekst saadetakse meie tehisintellekti pakkujate registris loetletud pakkujatele ja seda ei kasutata mudelite treenimiseks. Teatage ebaseaduslikust sisust aadressil support@dezbatere.ro, olenemata sellest, kas teil on konto. Kohaldatakse Rumeenia õigust, kuid teile jääb teie kohaliku tarbijakaitse tagatud kaitse.
 
@@ -148,7 +148,7 @@ Tasulise paketi väitlused on **vaikimisi privaatsed**: miski, mida seal loote, 
 
 **Tasuta väitlused on avalikud.** Tasuta paketi korral on teie küsimus ja selle väitlus avalikud. Me ütleme seda teile enne, kui küsite. Kui väitlus on lõppenud, kontrollib seda tehisintellekt; kui kontroll lubab, saab seda igaüks lugeda ja otsingumootorid võivad seda indekseerida. Kui kontroll keeldub, jääb see teile privaatseks. Ärge lisage tasuta paketi küsimusse isikuandmeid.
 
-**Tagasipööramist ei ole.** Kui väitlus on avalik, jääb see avalikuks. Selle avaldamist ei saa tühistada ega seda kustutada ning konto kustutamine seda ei eemalda. Teiste tehtud koopiad ei ole meie kontrolli all. Teised inimesed saavad seda lugeda, tsiteerida, ekraanitõmmisele jäädvustada, arhiveerida ja vahemällu salvestada. Ärge avaldage midagi, mille püsivat seostamist oma pseudonüümiga te ei soovi.
+**Tagasipööramist ei ole.** Kui väitlus on avalik, jääb see avalikuks. Selle avaldamist ei saa tühistada ega seda kustutada ning konto kustutamine seda ei eemalda. Võime seda läbivaatamise ajaks peita ning eemaldada või parandada selle osa, kui see jaotis seda lubab. Teiste tehtud koopiad ei ole meie kontrolli all. Teised inimesed saavad seda lugeda, tsiteerida, ekraanitõmmisele jäädvustada, arhiveerida ja vahemällu salvestada. Ärge avaldage midagi, mille püsivat seostamist oma pseudonüümiga te ei soovi.
 
 **Märgistatud väitlus vajab meie heakskiitu.** Kui väitlus lõpeb, loeb automatiseeritud kontroll selle sünteesi jaotises 8 nimetatud nelja kategooria suhtes. Väitluse, mille kontroll märgistab, saab avaldada ainult meie heakskiidul ning märgistust ei näidata kellelegi peale teie ja, kui palute meie heakskiitu, nende meie meeskonna liikmete, kellel on luba avaldamisi läbi vaadata; väitlus, mille kontroll leiab puudutavat teemat „kalduvused enesetapule või teiste inimeste kahjustamisele“, kustutatakse selle asemel, nagu järgmine lõik ütleb. Kui palute meie heakskiitu väitluse lehel, saab meie meeskonna liige, kellel on konkreetne luba avaldamisi läbi vaadata, lugeda väitlust sellisel kujul, nagu see avaldataks, ilma teie pseudonüümita. Kui kiidame heaks, on nupp Avaldage teile jälle kättesaadav ning kontroll, mille iga avaldamine läbib, kehtib endiselt. Kui keeldume, jääb väitlus privaatseks ja esitame teile põhjenduse (jaotis 10). Pärast keeldumist võite paluda veel kord ning otsustab meie meeskonna liige, kes esimese taotluse üle ei otsustanud; võite kasutada ka jaotises 10 kirjeldatud kaebuste esitamise kanalit. Pärast teist keeldumist ei saa te enam paluda, kuid saate otsuse siiski viia vaidluste kohtuvälise lahendamise organi või kohtu ette (jaotis 10). Heakskiit hõlmab sünteesi, mille läbivaataja luges, sealhulgas väitluse hilisemat versiooni, mis seda sõna-sõnalt kordab; ümberkirjutatud süntees kontrollitakse avaldamisel uuesti ning kui see märgistatakse, vajab see oma heakskiitu. Kui avaldate märgistatud väitluse pärast meie heakskiitu, saate selle uuesti avalikust vaatest eemaldada nupuga Eemaldage avalikust vaatest selle kaardil jaotises Teie väitlused.
 
@@ -250,6 +250,8 @@ Kui elate mujal, on lisas A märgitud teie piirkonnas kohaldatav taganemis- või
 Teatame teile püsival andmekandjal ette, mis ja millal muutub. Kui muudatusel on teie juurdepääsule teenusele või selle kasutamisele enam kui vähene negatiivne mõju, võite lepingu tasuta lõpetada **30 päeva** jooksul pärast teate saamist või muudatuse jõustumist, olenevalt sellest, kumb on hilisem, ning tagastame kasutamata ajavahemiku eest ette makstud summa.
 
 **Nende Tingimuste muudatused.** Võime neid Tingimusi samalaadsetel põhjustel muuta. Muudatuste puhul, mis ei vähenda teie õigusi, avaldame uue versiooni koos muudatuste kokkuvõttega ja saadame teile e-kirja vähemalt **30 päeva** enne selle jõustumist; Dialectical Engine kasutamise jätkamine pärast seda kuupäeva tähendab, et nõustute muudatusega, ning võite oma konto enne seda sulgeda. Muudatuste puhul, mis vähendavad teie õigusi — sealhulgas olemasoleva paketi hinnatõus, madalamad kasutuslimiidid, eemaldatud funktsioonid, teie sisu uued kasutusviisid või vastutuse, kohaldatava õiguse või vaidluste lahendamise muudatused — palume teil järgmisel sisselogimisel uue versiooniga sõnaselgelt nõustuda ning muudatust kohaldatakse ainult edaspidi. Me ei kohalda muudatust kunagi tagasiulatuvalt ega kasuta seda jaotist selleks, et muuta tähtaja kestel tasulise teenuse põhiolemust ilma teile väljumisvõimalust pakkumata. Varasemad versioonid jäävad kättesaadavaks aadressil dezbatere.ro/terms/versions.
+
+Versioon 2.11 asendas versiooni 2.10: jaotis 9 ütleb, et võime avaliku väitluse läbivaatamise ajaks peita ning eemaldada või parandada selle osa.
 
 Versioon 2.10 asendas versiooni 2.9: jaotis 9 ütleb, et tasuta paketi väitlused on avalikud, et avaliku väitluse avaldamist ei saa tühistada ja see jääb pärast konto sulgemist avalikuks, et igaüks, kellel on krediiti, võib avalikule väitlusele panustada või selle kohta aruande kirjutada, ning et avalik väitlus jääb avatuks pärast selle esimese autori lahkumist; jaotis 11 ütleb, mida sulgemine teie avalikele väitlustele teeb.
 

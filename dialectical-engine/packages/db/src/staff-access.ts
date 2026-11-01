@@ -8,7 +8,7 @@ import { withMailLocale } from './mail-locale.js';
 export type StaffAlertIntent = Readonly<{
     schema: 'staff-alert-v1';
     event: 'INVITE' | 'ACCEPT' | 'GRANT' | 'DISABLE' | 'BOOTSTRAP' | 'RECOVER_OWNER' | 'KEY_CHANGE' | 'ALLOWANCE_CONFIGURED' | 'ALLOWANCE_REVOKED'
-      | 'TEAM_LIMIT_CHANGED' | 'TEAM_LIMIT_PARTNER_GRANTED' | 'TEAM_LIMIT_PARTNER_REVOKED' | 'TEAM_PRACTICE_RECORDED';
+      | 'TEAM_LIMIT_CHANGED' | 'TEAM_LIMIT_PARTNER_GRANTED' | 'TEAM_LIMIT_PARTNER_REVOKED' | 'TEAM_PRACTICE_RECORDED' | 'PUBLIC_REVIEW_CHANGED';
     operationId: string;
     envelope: CryptoEnvelope;
 }>;

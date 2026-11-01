@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import * as contract from "@debateai/contract";
 import type { ActionBinding, Reason } from "@debateai/kernel";
-import type { PostgresInternalAllowanceRepository, PostgresTeamLimitRepository, TeamLimitCommandState } from "@debateai/db";
+import type { PostgresInternalAllowanceRepository, PostgresPublicReviewRepository, PostgresTeamLimitRepository, TeamLimitCommandState } from "@debateai/db";
 import { parseCanonicalRegisterJson } from "@debateai/register";
 import type { StaffAccessApplication, StaffAuthentication } from "./access.js";
 import type { StaffAlertIntentProducer } from "./alerts.js";
@@ -126,9 +126,9 @@ export function registerTeamLimitRoutes(route: Route, service: () => TeamLimitSt
 }
 
 /** Decision 32 runs this same loop over its own notices (0146): the Owner's and the member's. Neither names an amount or a person. */
-const NOTICE_TEMPLATES = Object.freeze({ LIMIT_CHANGED: "TEAM_LIMIT_CHANGED", PARTNER_CHANGED: "TEAM_LIMIT_PARTNER_CHANGED", ALLOWANCE_CHANGED: "TEAM_ALLOWANCE_CHANGED", ALLOWANCE_YOURS: "TEAM_ALLOWANCE_YOURS" } as const);
+const NOTICE_TEMPLATES = Object.freeze({ LIMIT_CHANGED: "TEAM_LIMIT_CHANGED", PARTNER_CHANGED: "TEAM_LIMIT_PARTNER_CHANGED", ALLOWANCE_CHANGED: "TEAM_ALLOWANCE_CHANGED", ALLOWANCE_YOURS: "TEAM_ALLOWANCE_YOURS", PUBLIC_REVIEW: "PUBLIC_REVIEW_CHANGED" } as const);
 export type TeamLimitNoticeInputs = Readonly<{
-  repository: Pick<PostgresTeamLimitRepository, "completeNotice" | "noticeUser"> & Readonly<{ claimNotices(limit: number): ReturnType<PostgresTeamLimitRepository["claimNotices"]> | ReturnType<PostgresInternalAllowanceRepository["claimNotices"]> }>;
+  repository: Pick<PostgresTeamLimitRepository, "completeNotice" | "noticeUser"> & Readonly<{ claimNotices(limit: number): ReturnType<PostgresTeamLimitRepository["claimNotices"]> | ReturnType<PostgresInternalAllowanceRepository["claimNotices"]> | ReturnType<PostgresPublicReviewRepository["claimNotices"]> }>;
   mail: TemplatedMailChannel;
   /** Opens a live account's address; the same reader the threat reports use for a named account. */
   readEmail(userId: string): Promise<string | null>;
