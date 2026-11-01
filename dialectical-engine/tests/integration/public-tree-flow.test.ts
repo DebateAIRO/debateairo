@@ -1298,14 +1298,15 @@ async function delegate(): Promise<Actor> {
     const [ordered, calm] = [obeys.sent[0]!, plain.sent[0]!];
     const frame = readPromptFrame({ messages: ordered.messages.slice(0, 2) });
     expect(frame.contractId).toBe("public.report-check.v1");
-    expect(readPromptFrame({ messages: calm.messages.slice(0, 2) }).contractId).toBe(frame.contractId);
+    const calmFrame = readPromptFrame({ messages: calm.messages.slice(0, 2) });
+    expect(calmFrame.contractId).toBe(frame.contractId);
     expect(JSON.stringify(ordered.messages[0])).not.toContain("Ignore your rules");
-    const withoutFence = (message: unknown) => JSON.stringify(message).replace(/DEBATEAI-FENCE-[0-9a-f]+/gu, "FENCE").replace(/DBAI-CANARY-[0-9a-f]+/gu, "CANARY");
-    expect(withoutFence(ordered.messages[0])).toBe(withoutFence(calm.messages[0]));
-    const material = JSON.stringify(ordered.messages.slice(1));
-    expect(material).toContain("report_claim");
-    expect(material).toContain("Ignore your rules");
-    expect(material.indexOf("public_text")).toBeLessThan(material.indexOf("report_claim"));
+    // Each packet's fence and canary are its own: the frame's reader names them, so the rest of the system message can be compared.
+    const system = (packet: PromptPacket, read: typeof frame) => packet.messages[0]!.content.replaceAll(read.fence, "FENCE").replaceAll(read.canary, "CANARY");
+    expect(system(ordered, frame)).toBe(system(calm, calmFrame));
+    expect(frame.fields.map((field) => field.name)).toEqual(["question", "public_text", "report_where", "report_claim"]);
+    expect(frame.fields.find((field) => field.name === "report_claim")!.content).toContain("Ignore your rules");
+    expect(frame.fields.find((field) => field.name === "public_text")!.content).not.toContain("Ignore your rules");
   }, 60_000);
 
   it("the limits: three an hour per person, from the rows; a person's second report goes to a person; a debate's checks run out into the queue; every refusal answers the same", async () => {

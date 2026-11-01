@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { buildFramedPrompt, readPromptFrame } from "@debateai/providers";
-import { ASK_CLARIFY_INSTRUCTION, Judge, askComparingJudge, framedAskClarify, framedPublicContributionCheck } from "@debateai/judgement";
+import { ASK_CLARIFY_INSTRUCTION, Judge, askComparingJudge, framedAskClarify, framedPublicContributionCheck, framedPublicReportCheck } from "@debateai/judgement";
 import { buildSynthesisRolePrompt } from "@debateai/runner";
 import { LENGTH_GUIDANCE_START, argumentLanguageDirective } from "@debateai/kernel";
 import {
@@ -231,8 +231,8 @@ describe("V-BLIND-CONTEXT — the judgement prompt surface withholds authorship"
       .filter((entry) => entry.endsWith(".ts"))
       .map((entry) => readFileSync(`${JUDGEMENT_SRC}/${entry}`, "utf8"))
       .join("\n");
-    // Plus step 2's small call, framed before any debate exists, and the check on a contribution to a public debate: their own rows below.
-    expect(source.split(/\bbuildFramedPrompt\(\{/u).length - 1).toBe(BUILDERS.length + 2);
+    // Plus step 2's small call, framed before any debate exists, the check on a contribution to a public debate and the check on a report of one: their own rows below.
+    expect(source.split(/\bbuildFramedPrompt\(\{/u).length - 1).toBe(BUILDERS.length + 3);
     // ...and no builder may go back to assembling a packet by hand.
     expect(source.split(/\brole: "system"/u).length - 1).toBe(0);
     expect(source).toContain("argumentLanguageDirective");
@@ -267,6 +267,17 @@ describe("V-BLIND-CONTEXT — the judgement prompt surface withholds authorship"
     const contents = packet.messages.map((message) => message.content);
     for (const text of [QUESTION_LINE, STATEMENT, TARGET_STATEMENT, "A view the person wrote."]) expect(contents.some((content) => content.includes(text))).toBe(true);
     expect(Object.entries(WITHHELD).filter(([, sentinel]) => contents.some((content) => content.includes(sentinel)))).toEqual([]);
+  });
+
+  it("the check on a report of a public debate reads the text and the report inside the fence, and names no one (decision 35)", () => {
+    const { packet } = framedPublicReportCheck({ question: QUESTION_LINE, publicText: [STATEMENT, TARGET_STATEMENT], where: "The second paragraph.", claim: "This line gives a home address." });
+    expect(readPromptFrame(packet).contractId).toBe("public.report-check.v1");
+    expect(packet.messages.filter((message) => message.role === "system")).toHaveLength(1);
+    const contents = packet.messages.map((message) => message.content);
+    for (const text of [QUESTION_LINE, "The second paragraph.", "This line gives a home address."]) expect(contents.some((content) => content.includes(text))).toBe(true);
+    expect(Object.entries(WITHHELD).filter(([, sentinel]) => contents.some((content) => content.includes(sentinel)))).toEqual([]);
+    // The report's words stay in the material: the system message carries none of them.
+    expect(packet.messages.find((message) => message.role === "system")!.content).not.toContain("This line gives a home address.");
   });
 
   it("the panel's sources variant reads the cited extract as code built it, and names no author (decision 10)", async () => {

@@ -95,8 +95,9 @@ const R1D_ENGINE_CONTRACT_HASH = "b98a45d5933d82205d5c6514082d4151bfb8f3f45b3677
 // anything shipped: this order is engineSealedContracts()'s own
 // (60469207a7d5dfa9b690dbc2bffaa02b53f848f31b8db06c55e732f2e1a55e20, history). R22 clarify lane (decision 29): + dynamic step 2's small call.
 // R22 report 2 (decision 26): + the writer who may ask, its later version and the checker of "every path in the material"; then the
-// writer's v4 with the first sentence the owner put back. R22 public lane (decision 13): + the AI check on a contribution to a public debate.
-const ENGINE_CONTRACT_HASH_SEALED = "e1e6168de89965c88917259fab98914b372dac6a4fe16c907ad9d9797aad613c";
+// writer's v4 with the first sentence the owner put back. R22 public lane (decision 13): + the AI check on a contribution to a public debate
+// (e1e6168de89965c88917259fab98914b372dac6a4fe16c907ad9d9797aad613c, history). R22 decision 35: + the AI check on a report of a public debate (public.report-check.v1).
+const ENGINE_CONTRACT_HASH_SEALED = "24b33806d0e18b665bb530aa6a01e3e4c2af479b0004762cbdaefd237f70ada3";
 const SELECT = "SELECT value_json FROM register.register_row WHERE register_version=$1 AND row_key=$2";
 const runtime = { nodeVersion: "v26.8.2", pnpmVersion: "11.20.0", sourceRevision: "a".repeat(40), sourceTree: "b".repeat(40),
   operatorSha256: "c".repeat(64), observedAt: "2026-10-16T12:00:00.000Z" };

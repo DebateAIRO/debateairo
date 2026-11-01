@@ -454,7 +454,7 @@ await step("a debate paused at the month wall, then Continue", async () => {
 
 // Decision 13: the public-debates lane. It runs last among the asks: it adds two digs and one report to the mock.
 const PUBLIC = { debate: "f1000000-0000-4000-8000-000000000001", authorGone: "f1000000-0000-4000-8000-000000000002", update: "f2000000-0000-4000-8000-000000000001" };
-const CONTRIBUTION_DIGS = { CHECKING: "c1000000-0000-4000-8000-000000000001", ON_THE_PAGE: "c1000000-0000-4000-8000-000000000002", KEPT_PRIVATE: "c1000000-0000-4000-8000-000000000003" };
+const CONTRIBUTION_DIGS = { CHECKING: "c1000000-0000-4000-8000-000000000001", ON_THE_PAGE: "c1000000-0000-4000-8000-000000000002", KEPT_PRIVATE: "c1000000-0000-4000-8000-000000000003", REMOVED_AFTER_REVIEW: "c1000000-0000-4000-8000-000000000004" };
 const publicAsk = (publicParent: Loose | null, extra: Loose = {}): Loose => ({
   question_line: "Look deeper into this part of the answer: free fares.", plan_tier: "free", risk_tier: "standard", tier_source: "ASKER", tier_provenance_ref: "mock-check",
   composition_budget_tier: "low", depth_params: { depth: 1 }, decision_scope: "personal", as_of: new Date().toISOString(), steering_presets: [], steering_annotations: [],
@@ -471,12 +471,12 @@ await step("a public debate with one contribution, a changed main answer, one re
   return `${String(debate.contributions.length)} contribution(s), ${String(debate.reports.length)} report(s)`;
 }, (value: string) => value);
 await expectCode("a public debate nobody published", () => client.readPublicDebate("f1000000-0000-4000-8000-00000000ffff"), "NOT_FOUND");
-await step("the digger's three states", async () => {
+await step("the digger's four states", async () => {
   for (const [state, runId] of Object.entries(CONTRIBUTION_DIGS)) {
     const answer: Loose = await client.readRunAnswer(runId);
     must(answer.contribution.state === state && answer.contribution.public_ref === PUBLIC.debate, `${state}: ${JSON.stringify(answer.contribution)}`);
   }
-  return "CHECKING, ON_THE_PAGE, KEPT_PRIVATE";
+  return Object.keys(CONTRIBUTION_DIGS).join(", ");
 }, (value: string) => value);
 await step("a dig on a public page: its refusals, then it starts and checks", async () => {
   await expectCode("nobody's page", () => client.submitAsk(publicAsk({ public_ref: "f1000000-0000-4000-8000-00000000ffff", places: ["path:p-fares"], mode: "quick", picks: ownView("path:p-fares") })), "NOT_FOUND");
@@ -526,6 +526,28 @@ await step("Write a report: 202 and its refusals", async () => {
   const accepted: Loose = await client.writePublicReport(PUBLIC.debate);
   must(accepted.state === "WRITING" && accepted.report_version >= 2, `written: ${JSON.stringify(accepted)}`);
   return `version ${String(accepted.report_version)} writing`;
+}, (value: string) => value);
+// Decision 35: the Report button, through the website's own client, and the queue through the contract's schema. It hides the first public debate, so it reads the 410 and puts it back.
+await step("Report: not found, with a person, hidden (the page answers 410), and the queue holds them", async () => {
+  const report = (claim: string, ref: string = PUBLIC.debate) => client.flagPublicDebate(ref, { where: "The main answer.", claim });
+  const plain: Loose = await report("A plain claim about the answer.");
+  must(plain.state === "NOT_FOUND", `plain: ${JSON.stringify(plain)}`);
+  const person: Loose = await report("Someone should read this #person.");
+  must(person.state === "WITH_A_PERSON", `person: ${JSON.stringify(person)}`);
+  const nobody: Loose = await report("A claim about a page nobody published.", "f1000000-0000-4000-8000-00000000ffff");
+  must(nobody.state === "NOT_FOUND", `nobody's page: ${JSON.stringify(nobody)}`);
+  const hidden: Loose = await report("This text should hide at once.");
+  must(hidden.state === "HIDDEN", `hidden: ${JSON.stringify(hidden)}`);
+  try {
+    const page = await fetch(`${MOCK}/v1/public/debates/${PUBLIC.debate}`);
+    must(page.status === 410, `the page while hidden: ${String(page.status)}`);
+    const queue = contract.PublicFlagQueueSchema.parse(await (await fetch(`${MOCK}/v1/admin/public-reports`)).json());
+    must(queue.reports.filter((row: Loose) => row.publication_ref === PUBLIC.debate).map((row: Loose) => row.state).join() === "NOT_FOUND,QUEUED,HIDDEN", `queue: ${JSON.stringify(queue.reports.map((row: Loose) => row.state))}`);
+  } finally {
+    await mock(`/__mock/review?ref=${PUBLIC.debate}&step=REPUBLISH`);
+  }
+  await client.readPublicDebate(PUBLIC.debate);
+  return "three answers, 410 while hidden, the queue, and back";
 }, (value: string) => value);
 
 // The sign-in helper's cookies must survive the proxy's cookie rules.

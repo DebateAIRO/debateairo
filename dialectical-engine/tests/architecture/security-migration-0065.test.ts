@@ -113,7 +113,7 @@ const STAFF_OWNER = "debateai_staff_security_owner";
 const RECOVERY_READERS = ["debateai_password_recovery_owner", "debateai_password_reset_owner", "debateai_backup_email_owner", "debateai_mfa_recovery_owner"];
 const PRIVATE_READERS = [STAFF_OWNER, ...RECOVERY_READERS];
 const PRIVATE_TABLE_OWNERS: Readonly<Record<string, string>> = Object.fromEntries([
-  ...["action_proof", "alert_delivery_receipt", "alert_dispatch_state", "alert_operation_readiness", "alert_outbox", "audit_event", "bootstrap_marker", "funding_policy_selection", "grant_event", "independent_alert_readiness", "invitation", "invitation_proof", "owner_command", "owner_designation", "owner_lineage", "owner_possession_receipt", "owner_recovery_generation", "owner_recovery_operation", "password_totp_rotation_receipt", "prerequisite_receipt", "privilege_session", "public_review_notice", "publication_review_event", "subject", "team_limit_event", "team_limit_holder", "team_limit_notice", "internal_grant_holder", "internal_grant_end", "allowance_notice", "team_practice_spend", "team_public_report_spend", "threat_report", "threat_report_alert", "threat_report_event", "webauthn_challenge"].map((name) => [`staff.${name}`, STAFF_OWNER]),
+  ...["action_proof", "alert_delivery_receipt", "alert_dispatch_state", "alert_operation_readiness", "alert_outbox", "audit_event", "bootstrap_marker", "funding_policy_selection", "grant_event", "independent_alert_readiness", "invitation", "invitation_proof", "owner_command", "owner_designation", "owner_lineage", "owner_possession_receipt", "owner_recovery_generation", "owner_recovery_operation", "password_totp_rotation_receipt", "prerequisite_receipt", "privilege_session", "public_flag_notice", "public_review_notice", "publication_review_event", "subject", "team_limit_event", "team_limit_holder", "team_limit_notice", "internal_grant_holder", "internal_grant_end", "allowance_notice", "team_practice_spend", "team_public_report_spend", "threat_report", "threat_report_alert", "threat_report_event", "webauthn_challenge"].map((name) => [`staff.${name}`, STAFF_OWNER]),
   ...["internal_grant", "internal_grant_event", "internal_provider_admission"].map((name) => [`billing.${name}`, STAFF_OWNER]),
   ...["password_reset_control", "password_reset_notice_binding", "password_reset_notice", "password_reset_source_window"].map((name) => [`identity.${name}`, "debateai_password_reset_owner"]),
   ...["backup_email_control", "backup_email_notice_binding", "backup_email_notice", "backup_email_source_window", "backup_email_proof_window"].map((name) => [`identity.${name}`, "debateai_backup_email_owner"]),
@@ -345,12 +345,14 @@ describe("0065 TRUNCATE and mutation guards discovered from the catalog (DL5-F2)
 
     // 3. Definer path: no SECURITY DEFINER function an application role can call carries TRUNCATE or switches the
     //    guard off (DISABLE TRIGGER, session_replication_role) — the only way to act as a NOLOGIN owner.
+    //    The one named exception, decision 36 (0151): the six months' purge replaces a sealed original in place, so its two definers switch reject_mutation off and on again
+    //    inside the call's own transaction, and refuse anything not due. tests/architecture/public-flag-0151-contract.test.ts pins the four tables they touch. A third is a failure here.
     const definers = await database.pool.query<{ fn: string }>(`
       SELECT p.oid::regprocedure::text AS fn FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
       WHERE n.nspname=ANY($1::text[]) AND p.prosecdef
         AND p.prosrc ~* '(\\mtruncate\\M|disable\\s+trigger|session_replication_role)'
       ORDER BY 1`, [[...APPLICATION_SCHEMAS]]);
-    expect(definers.rows).toEqual([]);
+    expect(definers.rows).toEqual([{ fn: "core.public_review_replace_snapshot(uuid,jsonb)" }, { fn: "identity.public_review_purge(uuid,text,uuid,text,integer,jsonb,text)" }]);
 
     // 4. Behaviour: acting AS each owner (the strongest holder of the implicit grant), TRUNCATE is refused —
     //    55000 is the table's own guard; 42501 means the cascade reached a table that role may not truncate at all.
@@ -670,7 +672,7 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
       "0142_team_limit.sql",
       "0143_run_handover.sql",
       "0144_ask_clarify_charge.sql",
-      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql"
+      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql"
     ]);
     expect(plan.forwardChain[1]!.name).toBe(AUTH_DB_BATCH_MIGRATION);
   });
