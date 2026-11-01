@@ -230,8 +230,8 @@ async function rewriteChanged(settings: TreeUpdateSettings, entry: PathRewriteEn
   const front = pathLineFrontOf(line, entry.position_ref, (candidate) => candidate.source === "PATH_REWRITE"
     && candidate.run_id.toLowerCase() === entry.run_id.toLowerCase());
   if (front === null) return null;
-  const before = await lease(() => ports.parentPathOf({ parentRunId: entry.parent_run_id, positionRef: entry.position_ref,
-    baseRewriteId: front.base?.kind === "PATH_REWRITE" ? front.base.id : null, baseUpdateId: front.base?.kind === "PATH_UPDATE" ? front.base.id : null }));
+  const before = await ports.parentPathOf({ parentRunId: entry.parent_run_id, positionRef: entry.position_ref,
+    baseRewriteId: front.base?.kind === "PATH_REWRITE" ? front.base.id : null, baseUpdateId: front.base?.kind === "PATH_UPDATE" ? front.base.id : null });
   return pathReallyChanged(before, after);
 }
 
@@ -373,15 +373,15 @@ async function composeLevel(settings: TreeUpdateSettings, level: Level, updateId
   const runId = level.digRunId;
   let parent: PathRewriteParentPath;
   try {
-    parent = await level.lease(() => ports.parentPathOf({ parentRunId: level.parentRunId, positionRef: level.positionRef,
-      baseRewriteId: base?.kind === "PATH_REWRITE" ? base.id : null, baseUpdateId: base?.kind === "PATH_UPDATE" ? base.id : null }));
+    parent = await ports.parentPathOf({ parentRunId: level.parentRunId, positionRef: level.positionRef,
+      baseRewriteId: base?.kind === "PATH_REWRITE" ? base.id : null, baseUpdateId: base?.kind === "PATH_UPDATE" ? base.id : null });
   } catch (error) {
     log("PATH_CLIMB_PARENT_UNREAD", { runId, step: level.step, code: codeOf(error) });
     return failedLevel(updateId, base, "SET_ASIDE", "PATH_REWRITE_PARENT_UNREAD", null);
   }
   const failed = (code: string, written: PathRewriteWritten | null = null) => failedLevel(updateId, base, parent.fate, code, written);
   try {
-    const child = await level.lease(() => ports.childOf(level.below));
+    const child = await ports.childOf(level.below);
     if (child === null || child.digPaths.length === 0) return failed("PATH_REWRITE_INPUT_UNREAD");
     const built = await fitRewriteToTokenLine({ question: level.dig.question, parent, picks: child.picks, digPaths: child.digPaths }, settings.tokenCount, log);
     if (built.kind === "TOO_LARGE") {
@@ -494,7 +494,7 @@ async function composeAnswer(settings: TreeUpdateSettings, update: AnswerUpdate,
   try {
     const earlierSegments = newest === null ? null : await ports.openMainAnswer(root, newest);
     const earlier = newest === null || earlierSegments === null ? null : Object.freeze({ version: newest.answer_seq, segments: earlierSegments });
-    const read = await update.lease(() => ports.answerInputOf(root, earlier));
+    const read = await ports.answerInputOf(root, earlier);
     if (read === null) return await failed("MAIN_ANSWER_INPUT_UNREAD", 0, []);
     const dossier = await fitDossierToTokenLine(read.input, settings.tokenCount, log);
     if (dossier.kind === "TOO_LARGE") {
