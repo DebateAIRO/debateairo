@@ -9,6 +9,7 @@ import {
   type PostgresPublicDebateRepository, type PostgresPublicDebateRunnerRepository, type PostgresPublicPageRepository, type PostgresPublicTreeRepository, type PublicPageOwed, type PublicPageUpdateRead,
   type PublicReportCopyRead, type WebSealed
 } from "@debateai/db";
+import { exhaustive } from "@debateai/kernel";
 import { digAnchorOf, digPathIndexOf, digPicksOnOnePath, digPickAuthorOf, type DigPathIndex } from "./dig-admission.js";
 import type { PublicationCheckResult, PublicationContentCheck } from "./publication-check/check.js";
 
@@ -234,7 +235,7 @@ export async function pressPublicReport(input: Readonly<{ ownerRef: string; publ
       await input.tree.recordMaterial(opened.reportId!, opened.carrierRunId!, input.publicationRef, "REPORT", sealed);
       return Object.freeze({ kind: "WRITING", reportVersion: opened.reportVersion! });
     }
-    default: return Object.freeze({ kind: "NOT_FOUND" });
+    default: return exhaustive(opened.outcome);
   }
 }
 

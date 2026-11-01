@@ -1067,6 +1067,7 @@ END;
 $$;
 
 -- 13. One owner, then the grants ----------------------------------------------------------------------------------------------------------
+-- n1: reviewed gives only the new tables and new functions 0115's export owner, as 0135 does; touches no earlier object
 DO $public_tree_owner$
 DECLARE
   v_owner name;

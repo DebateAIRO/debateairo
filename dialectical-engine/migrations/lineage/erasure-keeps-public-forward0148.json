@@ -3,7 +3,7 @@
   "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
   "previous": {
     "name": "0147_public_tree.sql",
-    "manifestSha256": "5e94b876f1a00d1bef6386d256510f0d6566f679aa4383f7307ca76a3403fa0a",
+    "manifestSha256": "d7dbd660619ebcfaffed68313f0e48fa2ad80830a95c250f2a9d2ccbc14072ce",
     "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
   },
   "migration": {

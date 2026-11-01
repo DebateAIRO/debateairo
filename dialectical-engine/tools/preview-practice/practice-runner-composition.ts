@@ -270,7 +270,10 @@ export async function composePracticeRunner(input: Readonly<{
         buildInvestigationReportCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).investigationReportSeam({ runId, price, requireReportedUsage: true }),
         // R22 decisions 2 and 3: the climb's and the main-answer update's calls, each on its own never-walled seam, on the dig's run.
         buildPathClimbCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).pathClimbSeam({ runId, price, requireReportedUsage: true }),
-        buildAnswerUpdateCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).answerUpdateSeam({ runId, price, requireReportedUsage: true })
+        buildAnswerUpdateCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).answerUpdateSeam({ runId, price, requireReportedUsage: true }),
+        // Decision 13, as main.ts: the AI check on a contribution and a report on a public debate, each on its own never-walled seam.
+        buildContributionCheckCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).contributionCheckSeam({ runId, price, requireReportedUsage: true }),
+        buildPublicReportCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).publicReportSeam({ runId, price, requireReportedUsage: true })
       })
     });
     // Spec §3.4, as main.ts: the gate is marked unhealthy on its FIRST unsent refusal, before the resend wait.

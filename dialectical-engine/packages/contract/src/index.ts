@@ -1891,6 +1891,8 @@ export const contractInventory = Object.freeze({
     "GET /v1/public/debates/{id}",
     // Addition D24: the companies the declared provider targets reach, for the "AI providers" page.
     "GET /v1/public/ai-providers",
+    // Decision 13: a report on a public debate.
+    "POST /v1/public/debates/{id}/report",
     "GET /v1/geo/availability",
     "POST /v1/support/messages",
     "GET /v1/support/status",

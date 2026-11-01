@@ -618,7 +618,7 @@ const treeSweep = pathRewrite === undefined || retireRequestStanding ? null
 const publicReports = composePublicReport({ pool, targets: providerTargets, ...(writerTokenCount === undefined ? {} : { tokenCount: writerTokenCount }),
   members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
   priceOf: (providerRef) => closingPrices.get(providerRef) ?? null, log: storyLog });
-const publicTreeSweep = pathRewrite === undefined ? null
+const publicTreeSweep = pathRewrite === undefined || retireRequestStanding ? null
   : startPublicTreeSweep({ ...pathRewrite.publicTree, reports: publicReports, paused: () => retirementSignal.claimsStopped() });
 const investigationCloseSweep = investigationClose === undefined || retireRequestStanding ? null
   : startInvestigationCloseSweep({ ...investigationClose, paused: () => retirementSignal.claimsStopped() });
@@ -681,6 +681,7 @@ const retirement = startRunnerRetirement({
     lapsedResend.stop();
     pathRewriteSweep?.stop();
     treeSweep?.stop();
+    publicTreeSweep?.stop();
     investigationCloseSweep?.stop();
     passageSweep?.stop();
     webResearchedSweep?.stop();
@@ -696,6 +697,7 @@ await started;
 lapsedResend.stop();
 pathRewriteSweep?.stop();
 treeSweep?.stop();
+publicTreeSweep?.stop();
 investigationCloseSweep?.stop();
 passageSweep?.stop();
 webResearchedSweep?.stop();

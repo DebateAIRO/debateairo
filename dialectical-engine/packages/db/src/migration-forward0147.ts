@@ -4,7 +4,7 @@ import type { PoolClient } from "pg";
 import type { ForwardStepAnchor, ForwardStepPlan } from "./migration-forward-chain.js";
 
 /**
- * 0147, the public tree (R22, decisions 13 and 22): digs, checks, reports and the page on the publication, whoever is still here. Seven tables and their
+ * 0147, the public tree (R22, decisions 13 and 22): digs, checks, reports and the page on the publication, whoever is still here. Eight tables and their
  * definers; no earlier object changes; it keeps 0130's verifier.
  */
 const NAME = "0147_public_tree.sql";

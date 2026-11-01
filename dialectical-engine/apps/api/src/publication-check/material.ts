@@ -6,6 +6,8 @@ export const CHECKED_TEXT_PATHS: readonly { path: string; kind: PublicationPartK
     .map(path => ({ path: `answer.${path}`, kind: "SUMMARY" as const })),
   // Decision 13 of 31 Oct: the main answer a contribution updated, judged with the summary.
   { path: "main_answer_update.segments[].text", kind: "SUMMARY" },
+  // Decisions 13 and 16: a report on a public debate, judged part by part, each part beside its kind (one call per kind holds). Its writer's pseudonym and dates stay out, as the author's do.
+  { path: "reports[].answer.segments[]", kind: "SUMMARY" },
   ...["claim", "base_score.kind", "base_score.source", "base_score.producer", "base_score.replay_handle",
     "final_strength.kind", "final_strength.source", "final_strength.producer", "final_strength.replay_handle",
     "locator", "abstention.question_class", "abstention.register_row_key", "abstention.unlock_condition"]
@@ -20,14 +22,12 @@ export const CHECKED_TEXT_PATHS: readonly { path: string; kind: PublicationPartK
     .map(path => ({ path: `answer.nodes[].sources[].${path}`, kind: "ARGUMENTS" as const })),
   // Decision 13: a contribution's path text, judged with the arguments. Its contributor's pseudonym and date stay out, as the author's do.
   ...["line", "summary", "what_changed[]", "dig_paths[].line", "dig_paths[].points[]"].map(path => ({ path: `contributions[].${path}`, kind: "ARGUMENTS" as const })),
-  // Decisions 13 and 16: a report on a public debate, judged part by part. Its writer's pseudonym and dates stay out, as the author's do.
-  { path: "reports[].answer.segments[]", kind: "SUMMARY" },
-  ...["story.short_answer", "story.what_would_change", "story.how_it_went[].paragraph", "story.still_open[]"].map(path => ({ path: `reports[].${path}`, kind: "STORY" as const })),
   ...["sources[].site", "sources[].title", "sources[].quote", "sources[].line", "sources[].link", "paths[].line", "paths[].summary", "paths[].points[].text",
     "paths[].dig.picks[]", "paths[].dig.own_words[]", "paths[].dig.view.reason", "paths[].dig.changed[]"].map(path => ({ path: `reports[].${path}`, kind: "ARGUMENTS" as const })),
   { path: "answer.nodes[].review.reasons[]", kind: "REVIEWS" },
   ...["headline", "summary", "confidence", "paths[].line", "change.text", "reviewer_note.text"]
-    .map(path => ({ path: `story_short.${path}`, kind: "STORY" as const }))
+    .map(path => ({ path: `story_short.${path}`, kind: "STORY" as const })),
+  ...["story.short_answer", "story.what_would_change", "story.how_it_went[].paragraph", "story.still_open[]"].map(path => ({ path: `reports[].${path}`, kind: "STORY" as const }))
 ];
 
 export function isExcludedTextPath(path: string, schemaType: string): boolean {
