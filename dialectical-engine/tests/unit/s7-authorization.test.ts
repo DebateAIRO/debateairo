@@ -204,6 +204,11 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "POST /v1/admin/team-limit/partner/{staffId}", auth: "staff", resource: "staff-team", action: "partner-grant" },
   { route: "DELETE /v1/admin/team-limit/partner/{staffId}", auth: "staff", resource: "staff-team", action: "partner-revoke" },
   { route: "POST /v1/admin/team-limit/practice", auth: "staff", resource: "staff-team", action: "practice-record" },
+  // R22 decision 33 (0150): the same two accounts; each handler asks the database itself.
+  { route: "GET /v1/admin/public-review", auth: "staff", resource: "staff-team", action: "public-review-list" },
+  { route: "GET /v1/admin/public-review/{id}", auth: "staff", resource: "staff-team", action: "public-review-read" },
+  { route: "POST /v1/admin/public-review/{id}/hide", auth: "staff", resource: "staff-team", action: "public-review-hide" },
+  { route: "POST /v1/admin/public-review/{id}/step", auth: "staff", resource: "staff-team", action: "public-review-step" },
   // R22 decision 32 (0146): the Owner's allowance for a member.
   { route: "GET /v1/admin/team-allowances", auth: "staff", staffCapability: "ALLOWANCE_WRITE", resource: "staff-team", action: "allowance-read" },
   { route: "POST /v1/admin/team-allowances/{staffId}", auth: "staff", staffCapability: "ALLOWANCE_WRITE", resource: "staff-team", action: "allowance-give" },

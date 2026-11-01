@@ -300,7 +300,8 @@ export const staffContractInventory = Object.freeze({
         "GET /v1/admin/threat-reports", "GET /v1/admin/threat-reports/summary",
         "GET /v1/admin/threat-reports/{reportRef}", "POST /v1/admin/threat-reports/{reportRef}/decision",
         "GET /v1/admin/team-limit", "POST /v1/admin/team-limit", "POST /v1/admin/team-limit/partner/{staffId}",
-        "DELETE /v1/admin/team-limit/partner/{staffId}", "POST /v1/admin/team-limit/practice"
+        "DELETE /v1/admin/team-limit/partner/{staffId}", "POST /v1/admin/team-limit/practice",
+        "GET /v1/admin/public-review", "GET /v1/admin/public-review/{id}", "POST /v1/admin/public-review/{id}/hide", "POST /v1/admin/public-review/{id}/step"
     ]),
     resources: Object.freeze({
         StaffCapabilitySchema, DelegatedStaffCapabilitiesSchema, ActiveStaffCapabilitiesSchema, StaffActionSchema,
@@ -314,7 +315,8 @@ export const staffContractInventory = Object.freeze({
         StaffInvitationAcceptRequestSchema, StaffTargetParamsSchema, StaffGrantRequestSchema, StaffDisableModeSchema, StaffDisableRequestSchema,
         StaffPageQuerySchema, StaffTeamQuerySchema, StaffAuditQuerySchema, StaffTeamMemberSchema, StaffTeamPageSchema, StaffAuditEventSchema, ThreatReportAuditEventSchema, StaffAuditPageSchema,
         ThreatReportListSchema, ThreatReportSchema, ThreatReportSummarySchema, ThreatReportDecisionRequestSchema,
-        TeamLimitSetRequestSchema, TeamLimitPartnerRequestSchema, TeamPracticeRequestSchema, TeamLimitPageSchema
+        TeamLimitSetRequestSchema, TeamLimitPartnerRequestSchema, TeamPracticeRequestSchema, TeamLimitPageSchema,
+        PublicReviewHideRequestSchema, PublicReviewStepRequestSchema, PublicReviewPageSchema, PublicReviewListSchema
     })
 });
 

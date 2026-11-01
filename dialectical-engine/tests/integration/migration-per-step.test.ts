@@ -67,6 +67,7 @@ const PUBLIC_TREE = "0147_public_tree.sql";
 /** Erasing an account keeps a public debate (R22 decision 21): the chain's last step. */
 const ERASURE_KEEPS_PUBLIC = "0148_erasure_keeps_public.sql";
 const PUBLIC_REPORT_TEAM_MONTH = "0149_public_report_team_month.sql";
+const PUBLIC_REVIEW = "0150_public_review.sql";
 const EXPAND: N1Declaration = Object.freeze({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false, concurrentIndex: null });
 /** A later step with constant digests, as forward-chain-replay-verifiers.test.ts builds its probes, plus its n1 header. */
 function probe(previous: ChainStep, name: string, sql: string, n1: N1Declaration = EXPAND): ChainStep {
@@ -99,33 +100,34 @@ describe("Review Focus 1: a step that fails (or a kill) between steps", () => {
 
   it("a failing step leaves every earlier step committed", async () => {
     const real = (await loadMigrationPlan()).forwardChain.map((step) => step.name);
-    expect(real).toHaveLength(39);
-    expect(real.at(-20)).toBe(RLS);
-    expect(real.at(-19)).toBe(V4);
-    expect(real.at(-18)).toBe(WEB);
-    expect(real.at(-17)).toBe(INVESTIGATIONS);
-    expect(real.at(-16)).toBe(DIG_MODEL);
-    expect(real.at(-15)).toBe(DIG_PICKS);
-    expect(real.at(-14)).toBe(INVESTIGATION_REPORTS);
-    expect(real.at(-13)).toBe(PUBLIC_DEBATES);
-    expect(real.at(-12)).toBe(TREE_UPDATES);
-    expect(real.at(-11)).toBe(PASSAGE_RETENTION);
-    expect(real.at(-10)).toBe(SPEND_KINDS);
-    expect(real.at(-9)).toBe(PATH_SUGGESTIONS);
-    expect(real.at(-8)).toBe(TEAM_LIMIT);
-    expect(real.at(-7)).toBe(RUN_HANDOVER);
-    expect(real.at(-6)).toBe(ASK_CLARIFY_CHARGE);
-    expect(real.at(-5)).toBe(WEB_RESEARCHED_UNSETTLED);
-    expect(real.at(-4)).toBe(TEAM_ALLOWANCES);
-    expect(real.at(-3)).toBe(PUBLIC_TREE);
-    expect(real.at(-2)).toBe(ERASURE_KEEPS_PUBLIC);
-    expect(real.at(-1)).toBe(PUBLIC_REPORT_TEAM_MONTH);
+    expect(real).toHaveLength(40);
+    expect(real.at(-21)).toBe(RLS);
+    expect(real.at(-20)).toBe(V4);
+    expect(real.at(-19)).toBe(WEB);
+    expect(real.at(-18)).toBe(INVESTIGATIONS);
+    expect(real.at(-17)).toBe(DIG_MODEL);
+    expect(real.at(-16)).toBe(DIG_PICKS);
+    expect(real.at(-15)).toBe(INVESTIGATION_REPORTS);
+    expect(real.at(-14)).toBe(PUBLIC_DEBATES);
+    expect(real.at(-13)).toBe(TREE_UPDATES);
+    expect(real.at(-12)).toBe(PASSAGE_RETENTION);
+    expect(real.at(-11)).toBe(SPEND_KINDS);
+    expect(real.at(-10)).toBe(PATH_SUGGESTIONS);
+    expect(real.at(-9)).toBe(TEAM_LIMIT);
+    expect(real.at(-8)).toBe(RUN_HANDOVER);
+    expect(real.at(-7)).toBe(ASK_CLARIFY_CHARGE);
+    expect(real.at(-6)).toBe(WEB_RESEARCHED_UNSETTLED);
+    expect(real.at(-5)).toBe(TEAM_ALLOWANCES);
+    expect(real.at(-4)).toBe(PUBLIC_TREE);
+    expect(real.at(-3)).toBe(ERASURE_KEEPS_PUBLIC);
+    expect(real.at(-2)).toBe(PUBLIC_REPORT_TEAM_MONTH);
+    expect(real.at(-1)).toBe(PUBLIC_REVIEW);
     chain.shape = extendedBy((last) => probe(last, "0199_probe_fail.sql", "SELECT 1/0"));
     await expect(migrate(db.pool)).rejects.toMatchObject({ code: "22012" });
     chain.shape = undefined;
-    // All thirty-nine real steps were applied by that same run and stay committed; the probe left nothing.
+    // All forty real steps were applied by that same run and stay committed; the probe left nothing.
     expect(await receipts()).toEqual(real);
-    expect((await db.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration_step")).rows[0].n).toBe(39);
+    expect((await db.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration_step")).rows[0].n).toBe(40);
     expect(await ledger()).toEqual(expect.arrayContaining(real));
     expect(await ledger()).not.toContain("0199_probe_fail.sql");
     // The next run continues where the last one stopped: everything replays, nothing is left to apply.
@@ -164,6 +166,7 @@ describe("Review Focus 2: a page read holding a lock on core.run while 0123's AL
     expect(await ledger()).not.toContain(PUBLIC_TREE);
     expect(await ledger()).not.toContain(ERASURE_KEEPS_PUBLIC);
     expect(await ledger()).not.toContain(PUBLIC_REPORT_TEAM_MONTH);
+    expect(await ledger()).not.toContain(PUBLIC_REVIEW);
   }, 300_000);
   afterAll(async () => { await db?.stop(); });
 
