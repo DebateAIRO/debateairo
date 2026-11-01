@@ -26,7 +26,7 @@ import {
   DraftUsageBorrowsSchema, splitAsk, splitRoomQuery, stripAnswer, stripNode, stripRoom,
   stripRun, stripUsage, type DraftAskParent
 } from "./web-draft.js";
-import { borrowNotice, DEEPEST_DIG, DIG_ANSWERS, DIG_RUNS, monthPause, PATH_REWRITES, RUN_PAUSED, SEEDED_NEW_DIGS } from "./rewrite-seed.js";
+import { ARABIC_RUN, borrowNotice, DEEPEST_DIG, DIG_ANSWERS, DIG_RUNS, monthPause, PATH_REWRITES, reportVersionBody, RUN_PAUSED, SEEDED_NEW_DIGS } from "./rewrite-seed.js";
 import type { WebCase } from "./web-seed.js";
 import { contributionOf, PUBLIC_MODES, PUBLIC_REF, seedPublicDebates, writtenReport, type PublicMode } from "./public-seed.js";
 
@@ -173,6 +173,11 @@ const PUBLIC_REPORT_MS = 8_000;
 /** W4-4: how long the mock's readers take over a page added to researched. */
 const RESEARCHED_READ_MS = 6_000;
 let pauseMode: PauseMode = choice("MOCK_PAUSE", process.env.MOCK_PAUSE, PAUSE_MODES, "UNTIL_RESET");
+/** R22 W5-1: whether the next report written comes out finished (OK) or failed (FAIL), and how long the mock's writer takes. */
+const REPORT_MODES = ["OK", "FAIL"] as const;
+type ReportMode = (typeof REPORT_MODES)[number];
+let reportMode: ReportMode = choice("MOCK_REPORT", process.env.MOCK_REPORT, REPORT_MODES, "OK");
+const REPORT_WRITING_MS = seconds("MOCK_REPORT_SECONDS", 8) * 1000;
 
 // ---------------------------------------------------------------------------------------------------------------
 // The seeded world
@@ -221,6 +226,8 @@ type MockRun = {
   storyReadyAt?: number;
   /** The draft web case its answer carries (web-seed.ts). */
   web?: WebCase;
+  /** The question's language, when it is not English (the Arabic scene). */
+  language?: Readonly<{ tag: string; name: string }>;
   /** W2-7 (money rule): its planned calls and searches paused at the month wall, until Continue (POST /v1/runs/{id}/continue). */
   monthPaused?: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -316,6 +323,11 @@ settledRun({
   runRef: DEEPEST_DIG.runRef, answerId: DEEPEST_DIG.answerId, seq: DEEPEST_DIG.seq, web: "PAID", question: DEEPEST_DIG.question,
   askedAt: Date.parse(DEEPEST_DIG.askedAt), settleAt: Date.parse(DEEPEST_DIG.settledAt), storyReadyAt: 0, dig: DEEPEST_DIG.dig
 });
+// The click-test's Arabic debate: its question and its report are in Arabic, so the page offers Print in place of the PDF.
+settledRun({
+  runRef: ARABIC_RUN.runRef, answerId: ARABIC_RUN.answerId, seq: 40, web: "PAID", question: ARABIC_RUN.question,
+  askedAt: Date.parse("2026-10-30T09:00:00.000Z"), settleAt: Date.parse("2026-10-30T09:20:00.000Z"), storyReadyAt: 0
+}).language = Object.freeze({ tag: "ar", name: "Arabic" });
 
 // Decision 13: the public debates, and a digger's three digs on one, each in one state of its check (seeded under the first public debate's path).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -439,6 +451,7 @@ openInvestigation(RUN_SEARCH_FAILED);
 openInvestigation(RUN_RUNNING);
 openInvestigation(RUN_WAITING);
 openInvestigation(RUN_PAUSED);
+openInvestigation(ARABIC_RUN.runRef, [{ report_version: 1, closed_at: "2026-10-30T10:00:00.000Z", report: "READY", answer_id: ARABIC_RUN.answerId }], "CLOSED");
 // W2-7: the dig trail. Each dig joins the first debate's investigation (a dig of a dig too).
 for (const dig of SEEDED_NEW_DIGS) {
   const answer = DIG_ANSWERS[dig.runRef]!;
@@ -493,7 +506,7 @@ function runProjection(run: MockRun, now = Date.now()) {
     state,
     terminal_reason: state === "FAILED" ? run.failedReason ?? null : null,
     hold_until: null,
-    argument_language: ENGLISH,
+    argument_language: run.language ?? ENGLISH,
     waits_until: state === "WAITING" ? waitsUntil(now) : null,
     waits_for: null,
     // W2-7 (money rule, draft): paused at the month wall until the next month; Continue once it has started.
@@ -700,6 +713,19 @@ function investigationBody(investigation: Investigation) {
     digs: investigation.digs.map((record) => ({ ...record, places: [...record.places] })),
     closings: investigation.closings.map((closing) => ({ ...closing }))
   };
+}
+
+/** GET /v1/runs/{id}/investigation as the website reads it (R22 W5-1): each closing as a report version, the current one the newest finished. */
+function investigationReports(investigation: Investigation) {
+  const root = runs.get(investigation.root_run_id);
+  const versions = investigation.closings.map((closing) => {
+    const fields = { report_version: closing.report_version, closed_at: closing.closed_at };
+    if (closing.report === "WRITING") return { ...fields, state: "WRITING", waiting_for_digs: 0 };
+    if (closing.report === "FAILED") return { ...fields, state: "FAILED", written_at: closing.closed_at };
+    return reportVersionBody({ version: closing.report_version, closedAt: closing.closed_at, writtenAt: closing.closed_at, free: root?.web === "FREE", arabic: root?.language?.tag === "ar" });
+  });
+  const finished = investigation.closings.filter((closing) => closing.report === "READY").at(-1);
+  return { investigation_id: investigation.investigation_id, root_run_id: investigation.root_run_id, state: investigation.state, digs: investigation.digs.length, versions, current: finished?.report_version ?? null };
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -1109,6 +1135,7 @@ function mockState() {
     usage: usageMode,
     pause: pauseMode,
     public: publicMode,
+    report: reportMode,
     session: sessionOut ? "OUT" : "IN",
     free_notices: freeNotices,
     ask_effective: effectiveAskMode(),
@@ -1186,6 +1213,8 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
         const usage = url.searchParams.get("usage");
         const pause = url.searchParams.get("pause");
         const publicSetting = url.searchParams.get("public");
+        const reportSetting = url.searchParams.get("report");
+        if (reportSetting !== null) reportMode = choice("report", reportSetting, REPORT_MODES, reportMode);
         if (room !== null) roomMode = choice("room", room, ROOM_MODES, roomMode);
         if (ask !== null) askMode = choice("ask", ask, ASK_MODES, askMode);
         if (plan !== null) planMode = choice("plan", plan, PLAN_MODES, planMode);
@@ -1424,6 +1453,31 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       return sendJson(req, res, 200, { recorded: true }, C.DigLinkRecordedSchema);
     }
   }
+  // R22 W5-1: "Write my report": the new version reads WRITING, then finished (or failed, with the switch report=FAIL). Once a finished version stands: "Keep digging" first.
+  if (parts[1] === "runs" && parts.length === 4 && parts[3] === "report" && method === "POST") {
+    const investigation = investigationOf(parts[2]!);
+    if (investigation === undefined) return notFound(req, res, "RUN_NOT_FOUND", "No run with this id.");
+    const newest = investigation.closings.at(-1);
+    if (investigation.state === "CLOSED" && newest?.report !== "FAILED") return sendJson(req, res, 409, { error: "INVESTIGATION_CLOSED", message: "INVESTIGATION_CLOSED" });
+    investigation.state = "CLOSED";
+    const closing: Investigation["closings"][number] = { report_version: investigation.closings.length + 1, closed_at: iso(Date.now()), report: "WRITING", answer_id: null };
+    investigation.closings.push(closing);
+    const outcome = reportMode;
+    setTimeout(() => {
+      closing.report = outcome === "FAIL" ? "FAILED" : "READY";
+      closing.answer_id = outcome === "FAIL" ? null : runs.get(investigation.root_run_id)?.answerId ?? null;
+    }, REPORT_WRITING_MS);
+    return sendJson(req, res, 202, { state: "WRITING", report_version: closing.report_version, waiting_for_digs: 0 }, C.InvestigationReportAcceptedSchema);
+  }
+  // R22 W5-1: "Keep digging".
+  if (parts[1] === "runs" && parts.length === 4 && parts[3] === "reopen" && method === "POST") {
+    const investigation = investigationOf(parts[2]!);
+    if (investigation === undefined) return notFound(req, res, "RUN_NOT_FOUND", "No run with this id.");
+    const newest = investigation.closings.at(-1);
+    if (newest?.report === "WRITING") return sendJson(req, res, 409, { error: "INVESTIGATION_REPORT_WRITING", message: "INVESTIGATION_REPORT_WRITING", report_version: newest.report_version }, C.InvestigationReportWritingSchema);
+    investigation.state = "OPEN";
+    return sendJson(req, res, 200, { state: "OPEN" }, C.InvestigationReopenedSchema);
+  }
   if (parts[1] === "runs" && parts.length === 5 && parts[3] === "investigation" && parts[4] === "close" && method === "POST") {
     // Draft: "Write my report" closes the investigation and writes a new report version (earlier ones are kept).
     const investigation = investigationOf(parts[2]!);
@@ -1455,6 +1509,8 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       // Draft route (W1-6 / W3-2): the investigation this run belongs to.
       const investigation = investigationOf(run.runRef);
       if (investigation === undefined) return sendJson(req, res, 404, { error: "INVESTIGATION_NOT_FOUND" });
+      // The website reads report versions (R22 W5-1); the draft view keeps the older shape, with its dig links and closings.
+      if (!draftView) return sendJson(req, res, 200, investigationReports(investigation), C.InvestigationReportsSchema);
       return sendJson(req, res, 200, investigationBody(investigation), DraftInvestigationSchema);
     }
     if (sub === "events") return streamEvents(req, res, run);

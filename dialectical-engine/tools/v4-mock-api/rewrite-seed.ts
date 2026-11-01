@@ -284,3 +284,62 @@ export const DEEPEST_DIG = Object.freeze({
     parent_run_id: DIG_RUNS.levelThree, position_ref: "n-nuclear", places: ["path:n-nuclear"], level: 10, picks: [], rewrite: null
   } satisfies AnswerDig
 });
+
+/** The Arabic debate of the click-test (print, and the PDF's plain refusal): only its question and its report are in Arabic. */
+export const ARABIC_RUN = Object.freeze({
+  runRef: "a2000000-0000-4000-8000-000000000001",
+  answerId: "aaaaa200-0000-4000-8000-000000000001",
+  question: "هل ينبغي للدول بناء محطات نووية جديدة أم توجيه المال إلى الطاقة المتجددة والتخزين؟"
+});
+
+/**
+ * A finished report version, as `GET /v1/runs/{id}/investigation` serves it (R22 W5-1, decision 17): made-up words, with the tree of paths the PDF
+ * prints. Free has no sources, as it never searches.
+ */
+export function reportVersionBody(input: Readonly<{ version: number; closedAt: string; writtenAt: string; free?: boolean; arabic?: boolean }>): Record<string, unknown> {
+  const base = { report_version: input.version, closed_at: input.closedAt, state: "READY", written_at: input.writtenAt, shortened: false };
+  if (input.arabic === true) {
+    return {
+      ...base,
+      answer: { segments: [`الإصدار ${String(input.version)}: الأفضل في معظم البلدان هو الطاقة المتجددة أولًا، مع مصدر طاقة ثابت لأسابيع الشتاء الخالية من الرياح.`] },
+      story: {
+        short_answer: "الطاقة المتجددة أولًا، مع مصدر ثابت لأسابيع الشتاء.",
+        what_would_change: "تخزين طويل الأمد يغطي أسبوعًا كاملًا بلا رياح بكلفة مقبولة.",
+        how_it_went: [],
+        still_open: ["ما إذا كانت البطاريات ستغطي أيامًا عدة بلا رياح."]
+      },
+      sources: [],
+      paths: [{ line: "الطاقة المتجددة أولًا مع مصدر ثابت: صمد هذا الرأي.", summary: "تبقى الأرخص والأسرع، لكنها تحتاج إلى دعم في الشتاء.", fate: "HELD_UP", level: 0 }]
+    };
+  }
+  return {
+    ...base,
+    answer: { segments: [
+      `Version ${String(input.version)}: for most countries, mostly renewables with some firm power for windless winter weeks. Keeping some existing plants as a back-up looks cheaper than building new nuclear for that job.`,
+      "Long-lasting storage at an acceptable cost would change this."
+    ] },
+    story: {
+      short_answer: "Mostly renewables, with some firm power for windless winter weeks.",
+      what_would_change: "Storage that carries a whole windless week at an acceptable cost.",
+      how_it_went: [{ dig_run_id: DIG_RUNS.ownView, paragraph: "A dig looked at keeping old plants as a winter back-up. It found this can be cheaper than new nuclear, so the answer now needs less new nuclear." }],
+      still_open: ["Whether batteries and power lines can cover several windless days.", "How much this changes for a small, crowded country."]
+    },
+    sources: input.free === true ? [] : [{
+      site: "power-systems.example", title: "Firm power in grids with high shares of wind and sun", quote: "A made-up line this page was found to hold.",
+      line: "A made-up study of what firm power adds to a grid with much wind and sun.", link: "https://power-systems.example/firm-power"
+    }],
+    paths: [
+      { line: "Mostly renewables, plus some firm power: held up.", summary: "Keeping some existing plants as a winter back-up can be cheaper than building new nuclear.", fate: "HELD_UP", level: 0, points: [
+        { text: "Wind and sun are the cheapest new power in most places.", trust: "SURE", side: "for", sources: input.free === true ? [] : [0] },
+        { text: "Small towns and small countries were barely studied.", trust: "STILL_ARGUED", side: "against", sources: [] }
+      ] },
+      { line: "Nuclear first: did not hold.", summary: "It is clean and firm, but it takes too long and costs too much to lead.", fate: "FELL", level: 0 },
+      { line: "Keep some existing plants as a winter back-up while wind and sun grow.", summary: null, fate: "HELD_UP", level: 1, dig: {
+        picks: ["Keeping some old gas plants as a back-up for winter might be cheaper than building new nuclear."],
+        own_words: ["Keeping some old gas plants as a back-up for winter might be cheaper than building new nuclear."],
+        view: { outcome: "HELPED", reason: "The back-up you named turned out to be the cheaper way to cover winter." },
+        changed: ["The path now says a winter back-up can stand in for much of the new nuclear."]
+      } }
+    ]
+  };
+}
