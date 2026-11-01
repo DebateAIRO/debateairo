@@ -212,12 +212,12 @@ describe("an older release on a database a newer release moved forward (Review F
     expect(steps.slice(-18)).toEqual(plan.forwardChain.slice(-18).map((step) => ({ name: step.name, manifestSha256: step.manifestSha256,
       sourceSha256: step.sourceSha256, verifierSha256: IN_FORCE_VERIFIER, n1Expand: step.name !== SPEND_KINDS && step.name !== TEAM_LIMIT && step.name !== ASK_CLARIFY_CHARGE && step.name !== TEAM_ALLOWANCES && step.name !== HEAD_STEP, keepsVerifier: true, outsideTransaction: false })));
     expect(steps.slice(-18).map((step) => step.name)).toEqual([...AFTER_RLS]);
-    const tail = plan.forwardChain.slice(-DECLARED.length - 17, -17);
-    expect(steps.slice(-DECLARED.length - 17, -17)).toEqual(DECLARED.map(([name, n1Expand], index) => ({ name,
+    const tail = plan.forwardChain.slice(-DECLARED.length - 19, -19);
+    expect(steps.slice(-DECLARED.length - 19, -19)).toEqual(DECLARED.map(([name, n1Expand], index) => ({ name,
       manifestSha256: tail[index]!.manifestSha256, sourceSha256: tail[index]!.sourceSha256, verifierSha256: VERIFIER,
       n1Expand, keepsVerifier: true, outsideTransaction: false })));
     // 0122 and earlier declare nothing (all false).
-    expect(steps.slice(0, -DECLARED.length - 17).every((step) => !step.n1Expand && !step.keepsVerifier && !step.outsideTransaction)).toBe(true);
+    expect(steps.slice(0, -DECLARED.length - 19).every((step) => !step.n1Expand && !step.keepsVerifier && !step.outsideTransaction)).toBe(true);
   });
 
   it("half a newer release is accepted", async () => {
@@ -281,7 +281,7 @@ describe("an older release on a database a newer release moved forward (Review F
     const own = await describeForwardSteps();
     const newerChain = [...own, declaration(first()), declaration(second())];
     expect(await migrate(db.pool, { newerChain })).toEqual({ appliedSteps: [], extraSteps: [FIRST, SECOND] });
-    expect(await verifyDatabaseAhead(db.pool, { newerChain })).toEqual({ mode: "AHEAD", knownSteps: 37, extraSteps: [FIRST, SECOND] });
+    expect(await verifyDatabaseAhead(db.pool, { newerChain })).toEqual({ mode: "AHEAD", knownSteps: 38, extraSteps: [FIRST, SECOND] });
     await refused("MORE_THAN_ONE_RELEASE", SECOND);
     // Rule 7 still binds without rule 6: the fix release's step must be in its list as the database recorded it, and
     // the aborted release's own list (which ends at 0149) does not reach 0150.

@@ -83,7 +83,7 @@ describe("/new: the question's language (question-language spec 2026-10-13)", ()
     createDebate.mockResolvedValue({ id: "run-1" });
     const { host } = await renderNew("ro");
     await askWith(host, "Ar trebui România să adopte euro?");
-    expect(createDebate).toHaveBeenCalledWith("Ar trebui România să adopte euro?", expect.anything(), "test-token", undefined, { siteLanguage: "ro" });
+    expect(createDebate).toHaveBeenCalledWith("Ar trebui România să adopte euro?", expect.anything(), "test-token", undefined, { siteLanguage: "ro" }, undefined, undefined, undefined);
   });
 
   it("a real mix: the pop-up names the languages in the site language; 'Use this version' sends the server's rewrite and the reference", async () => {
@@ -98,7 +98,7 @@ describe("/new: the question's language (question-language spec 2026-10-13)", ()
     expect(dialog.textContent).not.toMatch(/eld|score|model|check_ref/iu);
     await act(async () => { button("Folosește varianta propusă").click(); });
     expect(createDebate).toHaveBeenLastCalledWith(OFFER.proposed_question, expect.anything(), "test-token", undefined,
-      { siteLanguage: "ro", choice: { check_ref: "ref.sig", choice: "USE_REWRITE", original_question_line: MIXED } });
+      { siteLanguage: "ro", choice: { check_ref: "ref.sig", choice: "USE_REWRITE", original_question_line: MIXED } }, undefined, undefined, undefined);
   });
 
   it("'Keep my wording' sends the person's own question with the reference", async () => {
@@ -109,7 +109,7 @@ describe("/new: the question's language (question-language spec 2026-10-13)", ()
     expect(document.querySelector('[data-dialog="question-language"]')!.textContent).toContain("Your question mixes Romanian and English.");
     await act(async () => { button("Keep my wording").click(); });
     expect(createDebate).toHaveBeenLastCalledWith(MIXED, expect.anything(), "test-token", undefined,
-      { siteLanguage: "en", choice: { check_ref: "ref.sig", choice: "KEEP_MINE" } });
+      { siteLanguage: "en", choice: { check_ref: "ref.sig", choice: "KEEP_MINE" } }, undefined, undefined, undefined);
   });
 
   it("CR-5: the pop-up shows at most once per submit; a second offer is answered with the person's own wording", async () => {
@@ -124,7 +124,7 @@ describe("/new: the question's language (question-language spec 2026-10-13)", ()
     await act(async () => { button("Use this version").click(); });
     expect(document.querySelectorAll('[data-dialog="question-language"]').length).toBe(0);
     expect(createDebate).toHaveBeenLastCalledWith(MIXED, expect.anything(), "test-token", undefined,
-      { siteLanguage: "en", choice: { check_ref: "ref2.sig", choice: "KEEP_MINE" } });
+      { siteLanguage: "en", choice: { check_ref: "ref2.sig", choice: "KEEP_MINE" } }, undefined, undefined, undefined);
   });
 
   it("'Edit' and Esc send nothing more and put the person back in the question box", async () => {
@@ -156,7 +156,7 @@ describe("/new: the question's language (question-language spec 2026-10-13)", ()
     expect(createDebate.mock.calls[1]![0]).toBe(OFFER.proposed_question);
     expect(createDebate.mock.calls[1]![4]).toEqual({ siteLanguage: "en",
       choice: { check_ref: "ref.sig", choice: "USE_REWRITE", original_question_line: MIXED } });
-    expect(createDebate.mock.calls[2]).toEqual([MIXED, expect.anything(), "test-token", undefined, { siteLanguage: "en" }]);
+    expect(createDebate.mock.calls[2]).toEqual([MIXED, expect.anything(), "test-token", undefined, { siteLanguage: "en" }, undefined, undefined, undefined]);
     expect(mocks.push).toHaveBeenCalledWith("/debate/run-1?starting=1");
   });
 
@@ -222,7 +222,7 @@ describe("/new: the question's language (question-language spec 2026-10-13)", ()
       createDebate.mockReset().mockResolvedValue({ id: "run-1" });
       const { host, root } = await renderNew(locale);
       await askWith(host, "Should the city fund the tram line?");
-      expect(createDebate).toHaveBeenCalledWith("Should the city fund the tram line?", expect.anything(), "test-token", undefined, { siteLanguage: "en" });
+      expect(createDebate).toHaveBeenCalledWith("Should the city fund the tram line?", expect.anything(), "test-token", undefined, { siteLanguage: "en" }, undefined, undefined, undefined);
       root.unmount();
     }
   });

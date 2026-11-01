@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { buildFramedPrompt, readPromptFrame } from "@debateai/providers";
-import { ASK_CLARIFY_INSTRUCTION, Judge, askComparingJudge, framedAskClarify } from "@debateai/judgement";
+import { ASK_CLARIFY_INSTRUCTION, Judge, askComparingJudge, framedAskClarify, framedPublicContributionCheck } from "@debateai/judgement";
 import { buildSynthesisRolePrompt } from "@debateai/runner";
 import { LENGTH_GUIDANCE_START, argumentLanguageDirective } from "@debateai/kernel";
 import {
@@ -231,8 +231,8 @@ describe("V-BLIND-CONTEXT — the judgement prompt surface withholds authorship"
       .filter((entry) => entry.endsWith(".ts"))
       .map((entry) => readFileSync(`${JUDGEMENT_SRC}/${entry}`, "utf8"))
       .join("\n");
-    // Plus step 2's small call, framed before any debate exists: its own row below.
-    expect(source.split(/\bbuildFramedPrompt\(\{/u).length - 1).toBe(BUILDERS.length + 1);
+    // Plus step 2's small call, framed before any debate exists, and the check on a contribution to a public debate: their own rows below.
+    expect(source.split(/\bbuildFramedPrompt\(\{/u).length - 1).toBe(BUILDERS.length + 2);
     // ...and no builder may go back to assembling a packet by hand.
     expect(source.split(/\brole: "system"/u).length - 1).toBe(0);
     expect(source).toContain("argumentLanguageDirective");
@@ -257,6 +257,16 @@ describe("V-BLIND-CONTEXT — the judgement prompt surface withholds authorship"
     expect(contents.some((content) => content.includes(QUESTION_LINE))).toBe(true);
     expect(Object.entries(WITHHELD).filter(([, sentinel]) => contents.some((content) => content.includes(sentinel)))).toEqual([]);
     expect(ASK_CLARIFY_INSTRUCTION).not.toMatch(/\bmaker\b|\bauthor\b|\bprovider\b/iu);
+  });
+
+  it("the check on a contribution to a public debate reads the text it judges and names no one (decision 13)", () => {
+    const { packet } = framedPublicContributionCheck({ question: QUESTION_LINE, pathBefore: STATEMENT, personWrote: ["A view the person wrote."],
+      line: TARGET_STATEMENT, summary: "A summary.", whatChanged: ["What changed."], digPaths: [] });
+    expect(readPromptFrame(packet).contractId).toBe("public.contribution-check.v1");
+    expect(packet.messages.filter((message) => message.role === "system")).toHaveLength(1);
+    const contents = packet.messages.map((message) => message.content);
+    for (const text of [QUESTION_LINE, STATEMENT, TARGET_STATEMENT, "A view the person wrote."]) expect(contents.some((content) => content.includes(text))).toBe(true);
+    expect(Object.entries(WITHHELD).filter(([, sentinel]) => contents.some((content) => content.includes(sentinel)))).toEqual([]);
   });
 
   it("the panel's sources variant reads the cited extract as code built it, and names no author (decision 10)", async () => {

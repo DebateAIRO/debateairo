@@ -342,6 +342,6 @@ describe("W2-7 old answers read unchanged; the inventory and the no-number rule"
     // R22 owner decision 13 removed the Unpublish route (POST /v1/runs/{id}/unpublish): 183.
     // W4-4: "Add to researched" (POST /v1/runs/{id}/researched): the count is the head's, with this one route.
     // Decision 13: a report on a public debate (POST /v1/public/debates/{id}/report).
-    expect(contractInventory.routes).toHaveLength(191);
+    expect(contractInventory.routes).toHaveLength(194);
   });
 });
