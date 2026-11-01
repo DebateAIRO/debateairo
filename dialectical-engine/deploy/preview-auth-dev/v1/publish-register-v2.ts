@@ -90,7 +90,7 @@ const FORBIDDEN_KEYS = Object.freeze(['modelScorecard','supportActivation']);
  * A new register row reaches the preview only by being added here.
  */
 export const PREVIEW_SOURCE_ROW_KEYS_V2 = Object.freeze([
-  'acceptanceOrganCostBounds','admissionPolicy','answerRoleRotationPolicy','auditSourceIpKdfPolicy','backupEmailVerificationPolicy','billingPlans','billingPolicy',
+  'abuseLimits','acceptanceOrganCostBounds','admissionPolicy','answerRoleRotationPolicy','auditSourceIpKdfPolicy','backupEmailVerificationPolicy','billingPlans','billingPolicy',
   'branchFreezeEpsilon','candidateConfidenceBand','channelPolicy','claimTypeCompositionMap','composerContractHash','compositionBundleBudget',
   'configuredProviderSet','conformanceContractHash','consumerRecoveryPolicy','costEnvelopePolicy','countryPolicy','disagreementQuantity',
   'disagreementThreshold','dispersionScale','downgradeBands','engineContractHash','envelopeFormulaInputs','evaluatorCallBound','evaluatorLoopMaxRounds',

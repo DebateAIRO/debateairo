@@ -12,10 +12,9 @@ import { correctedPiece, textPiecesOf } from "./public-tree.js";
 /**
  * THE REPORT BUTTON (plan 2026-10-31-r22-owner-changes decision 35; migration 0151). A signed-in person says what is wrong and where; an AI reads it beside the public text. The site pays, so the checks are bounded.
  * WHAT THE PERSON HEARS: one of three states, and refused things all read the same: `NOT_FOUND` for a check that did not agree, a guessed or private debate and a person over their limit alike.
- * THE LIMITS live here and nowhere else, for the Hide-limits lane to move to the server's settings. The database enforces them from its rows, so a restart forgets nothing.
+ * THE LIMITS are the register's abuseLimits row (R22 decision 18), and nothing in the code stands in for it. The database enforces them from its rows, so a restart forgets nothing.
  * WHY A QUOTE: the judge must copy the words that break the rules. Words that are not on the page are a judge that obeyed the claim, and they hide nothing: a person reads it.
  */
-export const PUBLIC_FLAG_LIMITS = Object.freeze({ personHour: 3, debateDay: 10, siteDay: 200 });
 /** The whole check, inside what the website's proxy waits. */
 const PUBLIC_FLAG_DEADLINE_MS = 20_000;
 /** How much of the page one check reads: it is the site's money. Longer pages are read from their start, and the person's own words point the way. */
@@ -28,7 +27,7 @@ export type PublicFlagPorts = Readonly<{
   /** Seals under the publication's key, public or hidden. */
   seal: (publicationRef: string, runId: string, value: unknown) => Promise<CryptoEnvelope>;
   readPublicDebate: (publicationRef: string) => Promise<PublicDebate | null>;
-  limits?: PublicFlagLimits;
+  limits: PublicFlagLimits;
   log?: (event: string, detail: Record<string, unknown>) => void;
 }>;
 const squeezed = (text: string): string => text.replace(/\s+/gu, " ").trim().toLowerCase();
@@ -64,7 +63,7 @@ export async function pressPublicFlag(input: Readonly<{ ownerRef: string; public
   const runId = await ports.repository.readTarget(input.publicationRef);
   if (runId === null) return "NOT_FOUND";
   const content = await ports.seal(input.publicationRef, runId, { where: input.where, claim: input.claim });
-  const opened = await ports.repository.open({ ownerRef: input.ownerRef, publicationRef: input.publicationRef, flagId: input.flagId, content, limits: ports.limits ?? PUBLIC_FLAG_LIMITS });
+  const opened = await ports.repository.open({ ownerRef: input.ownerRef, publicationRef: input.publicationRef, flagId: input.flagId, content, limits: ports.limits });
   if (opened === "LIMITED" || opened === "NOT_PUBLIC") return "NOT_FOUND";
   if (opened === "QUEUE") return "WITH_A_PERSON";
   const debate = await ports.readPublicDebate(input.publicationRef).catch(() => null);

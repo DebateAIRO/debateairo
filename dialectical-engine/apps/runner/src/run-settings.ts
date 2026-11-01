@@ -5,6 +5,7 @@ import {
   composeDebateCostEnvelope,
   costEnvelopeBand,
   costEnvelopeCeilings,
+  closingReservesOf,
   debateCallLaneLimits,
   readBillingPlans,
   readCallConcurrencyPolicy,
@@ -529,13 +530,15 @@ export async function loadRunnerVersionSettings(pool: Pool, version: number, sit
    * refusal refuses the boot, as before; another version's makes it unsupported).
    */
   const money = site.money;
+  const closingReserves = money === null ? null : closingReservesOf(await readBillingPlans(pool, version));
   const costEnvelope = money === null || debateEnvelope === null
     ? null
     : Object.freeze({
         policy: debateEnvelope,
         guard: new CostEnvelopeGuard({
           store: money.store,
-          policy: costEnvelopeGuardPolicy(debateEnvelope, storyPolicy),
+          // R22 decision 18: the closing's safety net is this version's plans' reserve, never a constant.
+          policy: costEnvelopeGuardPolicy(debateEnvelope, storyPolicy, closingReserves?.ceilingMicros),
           ...(money.sharedWall === undefined ? {} : { sharedWall: money.sharedWall }),
           ...(money.fundingAdmission === undefined ? {} : { fundingAdmission: money.fundingAdmission }),
           inFlight: money.inFlight

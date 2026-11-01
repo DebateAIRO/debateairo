@@ -43,7 +43,7 @@ import { replayingGateway, type ReplayBook } from "./run-replay.js";
  *     (0133's report_ref). No answer after every round: a FAILED row (no text); the person may write it again;
  *  5. `onReportSettled` runs: decision 7's wipe hooks here (RETENTION), never inside the closing.
  *
- * MONEY (the money rule, point 6): the reserve always kept, 20 cents inside a paid month and 5 on top of Free's 20, pays
+ * MONEY (the money rule, point 6): the reserve always kept, inside a paid month and on top of Free's credit, pays
  * the closing; it is never walled (no day, week or month stops it). Every call names the investigation's ROOT run on the
  * story lane at an `INVESTIGATION_REPORT:` site, so the gateway charges it as spend source INVESTIGATION_REPORT on the
  * never-walled seam (packages/budget `investigationReportSeam`, a 20-cent safety net per closing). Before each call the
@@ -150,8 +150,8 @@ export type InvestigationCloseSettings = Readonly<{
   writerRoleRef: string;
   checkerRoleRef: string;
   admission: InvestigationCloseAdmission;
-  /** The reserve per plan; absent: INVESTIGATION_REPORT_POLICY's (20 cents paid, 5 cents Free). */
-  reserveMicros?: Readonly<{ paid: number; free: number }>;
+  /** The reserve per plan, from the plans in force (`closingReservesOf`). No plans row: zero, which refuses every call. */
+  reserveMicros: Readonly<{ paid: number; free: number }>;
   replayBookOf?: (rootRunId: string, subjectItemId: string) => Promise<ReplayBook>;
   /** R22 decision 2: the tree's climbs still being written; a report waits for them too, within the same bound. Absent: none. */
   climbsOpen?: (rootRunId: string) => Promise<number>;
@@ -329,7 +329,7 @@ async function composeRecord(settings: InvestigationCloseSettings, closing: Unre
   if (writer === null || checker === null) return { record: failedRecord(closing, reportId, "INVESTIGATION_REPORT_ROLE_UNAVAILABLE", done, 0, null), payer };
   const subject = investigationReportSubjectOf(reportId);
   const book = settings.replayBookOf === undefined ? null : await settings.replayBookOf(root, subject).catch(() => null);
-  const reserve = (settings.reserveMicros ?? INVESTIGATION_REPORT_POLICY.reserveMicros)[payer.free ? "free" : "paid"];
+  const reserve = settings.reserveMicros[payer.free ? "free" : "paid"];
   const send = async (maker: StoryRoleMaker, request: ProviderCallRequest): Promise<ProviderCallResult> => {
     const spent = await spentOf(settings, root, log);
     const projected = settings.admission.projectedMicros(request);

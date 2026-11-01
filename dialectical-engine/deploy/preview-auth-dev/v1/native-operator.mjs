@@ -120,12 +120,12 @@ export const HOSTED_CEILING_BOUNDS=Object.freeze({perRunMaxMicros:50_000_000,dai
  */
 export function validateHostedBillingChoice(value) {
  const count=(number,max)=>Number.isSafeInteger(number)&&number>=1&&number<=max;
- exactKeys(value,['billing','perRunCeilingMicros','dailyCeilingMicros','askRoomReads'],'PREVIEW_NATIVE_PLAN_REFUSED');
+ exactKeys(value,['billing','perRunCeilingMicros','dailyCeilingMicros','askRoomReads','billingPlans','abuseLimits'],'PREVIEW_NATIVE_PLAN_REFUSED');
  exactKeys(value.askRoomReads,['limit','windowMs','capacity'],'PREVIEW_NATIVE_PLAN_REFUSED');
  const reads=value.askRoomReads;
  if(!['on','off'].includes(value.billing)||!count(value.perRunCeilingMicros,HOSTED_CEILING_BOUNDS.perRunMaxMicros)||!count(value.dailyCeilingMicros,HOSTED_CEILING_BOUNDS.dailyMaxMicros)
   ||value.perRunCeilingMicros>value.dailyCeilingMicros||!count(reads.limit,1_000_000)||!count(reads.windowMs,86_400_000)||!count(reads.capacity,1_048_576))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
- return {billing:value.billing,perRunCeilingMicros:value.perRunCeilingMicros,dailyCeilingMicros:value.dailyCeilingMicros,askRoomReads:{limit:reads.limit,windowMs:reads.windowMs,capacity:reads.capacity}};
+ return {billing:value.billing,perRunCeilingMicros:value.perRunCeilingMicros,dailyCeilingMicros:value.dailyCeilingMicros,askRoomReads:{limit:reads.limit,windowMs:reads.windowMs,capacity:reads.capacity},billingPlans:value.billingPlans,abuseLimits:value.abuseLimits};
 }
 /** The reviewed native-plan schema check; the release tool runs it before writing a plan. */
 export function validateNativePlan(plan) {

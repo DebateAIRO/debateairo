@@ -29,9 +29,9 @@ const MARK = "limits-check-ok";
 
 /** The marked made-up values: what an example file may hold. Plainly fake, multiples of eleven; they say nothing about the real ones. */
 export const MADE_UP_MEMBER_VALUES = Object.freeze({
-  monthly_credit_micros: [110_000, 3_300_000, 11_000_000, 99_000_000],
-  finish_overflow_micros: [66_000],
-  reserve_micros: [33_000, 77_000],
+  monthly_credit_micros: [330_000, 6_600_000, 33_000_000, 220_000_000],
+  finish_overflow_micros: [220_000],
+  reserve_micros: [88_000, 440_000],
   day_bp: [1_100],
   week_bp: [4_400],
   per_run_ceiling_micros: [440_000],
@@ -46,12 +46,10 @@ export const MADE_UP_MEMBER_VALUES = Object.freeze({
   flag_per_debate_day: [22],
   flag_per_site_day: [99],
   cancel_links_per_day: [11],
-  mail_domain_checks_per_minute: [110],
-  searches_quick: [11],
-  searches_thorough: [22]
+  mail_domain_checks_per_minute: [110]
 });
-const MADE_UP_DOLLARS = new Set([0.033, 0.066, 0.077, 0.11, 0.44, 3.3, 5.5, 11, 99]);
-const MADE_UP_CENTS = new Set([3.3, 6.6, 7.7, 11, 44]);
+const MADE_UP_DOLLARS = new Set([0.088, 0.22, 0.33, 0.44, 5.5, 6.6, 33, 220]);
+const MADE_UP_CENTS = new Set([8.8, 22, 33, 44]);
 
 const LIMIT_WORD = /\b(?:monthly credit|credit|reserve|overflow|allowance|monthly limit|month'?s limit|plan'?s (?:limit|cap)|team'?s? (?:limit|pot)|cost goal|margin|per user|run ceiling|daily ceiling)\b/iu;
 const TEXT_FILE = /\.(?:md|markdown|txt|ya?ml|json|html?|saved)$/iu;

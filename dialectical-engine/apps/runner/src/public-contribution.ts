@@ -11,7 +11,7 @@ import {
   buildFramedRepairPrompt, rememberingAcceptedReply, schemaFailureLocator, type ContentClassification, type ModelReplyFacts, type ProviderCallRequest, type ProviderCallResult,
   type ProviderGateway, type RejectedProviderContent, type TokenCounter
 } from "@debateai/providers";
-import { INVESTIGATION_REPORT_POLICY, PATH_REWRITE_POLICY } from "@debateai/register";
+import { PATH_REWRITE_POLICY } from "@debateai/register";
 import { publicReportCallSiteKey, type StoryRoleMaker, type StoryWriteInput } from "@debateai/story";
 import type { ProviderTargetPrice } from "@debateai/budget";
 import { engineContractHash } from "./engine-contracts.js";
@@ -238,6 +238,8 @@ export function composePublicReport(input: Readonly<{
   targets: readonly Readonly<{ providerRef: string; model: string }>[];
   members: readonly Readonly<{ provider: ProviderGateway; providerRef: string; maker: string }>[];
   priceOf: (providerRef: string) => ProviderTargetPrice | null;
+  /** The plans' reserves (`closingReservesOf`), read at the runner's boot. */
+  reserveMicros: Readonly<{ paid: number; free: number }>;
   tokenCount?: TokenCounter;
   log: (event: string, detail: Record<string, unknown>) => void;
 }>): Readonly<{ settings: InvestigationCloseSettings; list: () => Promise<readonly PublicReportUnwritten[]> }> | undefined {
@@ -299,7 +301,7 @@ export function composePublicReport(input: Readonly<{
       spentMicros: spent,
       projectedMicros: (request: ProviderCallRequest) => investigationReportProjectedMicros(request, input.priceOf(request.providerRef))
     }),
-    reserveMicros: INVESTIGATION_REPORT_POLICY.reserveMicros,
+    reserveMicros: input.reserveMicros,
     payerOf: async (closing: UnreportedClosing) => {
       const row = rows.get(closing.investigationId.toLowerCase());
       return Object.freeze({ ownerRef: row?.writer_ref ?? null, free: row?.free ?? true });

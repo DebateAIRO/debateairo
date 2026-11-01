@@ -107,12 +107,6 @@ export type ModelSpendSource =
    */
   | "PUBLIC_REPORT";
 
-/**
- * W5-1: the report seam's safety net per closing, the largest plan's reserve (20 cents; packages/register
- * INVESTIGATION_REPORT_POLICY.ceilingMicros, pinned equal by its unit test). The closing itself admits each call against
- * its own plan's reserve (5 cents on Free) before it is sent.
- */
-export const INVESTIGATION_REPORT_SEAM_CEILING_MICROS = 200_000 as const;
 /** R22 decision 2: a climb rewrites at most one path per level above, so its safety net is that many rewrites' ceilings. */
 export const PATH_CLIMB_SEAM_LEVELS = 10 as const;
 
@@ -426,6 +420,12 @@ export interface CostEnvelopeGuardInput {
      */
     perStoryOverrunBasisPoints?: number;
     /**
+     * W5-1, R22 decision 18: the report seam's safety net per closing, the largest plan's reserve (billingPlans,
+     * `closingReservesOf`). The closing itself admits each call against its own plan's reserve before it is sent.
+     * Absent means no closing's seam can be built: STORY_ENVELOPE_MISSING, as a story without its row.
+     */
+    closingCeilingMicros?: number;
+    /**
      * Engine money rule, Task M1: the `costEnvelopePolicy` row's reserve and
      * overrun (`serve_reserve_basis_points`, `serve_overrun_basis_points`).
      * Absent means 0: one ceiling for every call, exactly as before.
@@ -554,7 +554,8 @@ export function mostOneRunMaySpendMicros(policy: Readonly<{
 export function costEnvelopeGuardPolicy(
   run: Pick<CostEnvelopePolicy,
     "perRunCeilingMicros" | "dailyCeilingMicros" | "serveReserveBasisPoints" | "serveOverrunBasisPoints">,
-  story: Pick<StoryPolicy, "perStoryCeilingMicros" | "perStoryOverrunBasisPoints"> | null
+  story: Pick<StoryPolicy, "perStoryCeilingMicros" | "perStoryOverrunBasisPoints"> | null,
+  closingCeilingMicros?: number
 ): CostEnvelopeGuardInput["policy"] {
   const policy: CostEnvelopeGuardInput["policy"] = Object.freeze({
     perRunCeilingMicros: run.perRunCeilingMicros,
@@ -564,7 +565,8 @@ export function costEnvelopeGuardPolicy(
     ...(story === null || story.perStoryCeilingMicros === null ? {} : {
       perStoryCeilingMicros: story.perStoryCeilingMicros,
       perStoryOverrunBasisPoints: story.perStoryOverrunBasisPoints
-    })
+    }),
+    ...(closingCeilingMicros === undefined ? {} : { closingCeilingMicros })
   });
   if (policy.dailyCeilingMicros < mostOneRunMaySpendMicros(policy)) {
     throw new TypedDomainError(
@@ -663,6 +665,7 @@ export class CostEnvelopeGuard {
   readonly #ceilings: CostEnvelopeCeilings;
   /** Task M7: the story's ceiling with its overrun; null without a story ceiling (no story seam). */
   readonly #storyCeilingMicros: number | null;
+  readonly #closingCeilingMicros: number | null;
   readonly #clock: () => Date;
   readonly #reservationTtlMs: number;
   readonly #sharedWall: SharedWallInput | null;
@@ -692,6 +695,11 @@ export class CostEnvelopeGuard {
       ...(input.policy.perStoryOverrunBasisPoints === undefined
         ? {} : { perStoryOverrunBasisPoints: input.policy.perStoryOverrunBasisPoints })
     }).storyMicros;
+    const closingCeiling = input.policy.closingCeilingMicros;
+    if (closingCeiling !== undefined && (!Number.isSafeInteger(closingCeiling) || closingCeiling < 1)) {
+      throw new TypeError("STORY_ENVELOPE_POLICY_INVALID");
+    }
+    this.#closingCeilingMicros = closingCeiling ?? null;
     this.#clock = input.clock ?? (() => new Date());
     const ttl = input.reservationTtlMs ?? DEFAULT_RESERVATION_TTL_MS;
     if (!Number.isInteger(ttl) || ttl < 1) throw new TypeError("COST_ENVELOPE_RESERVATION_TTL_INVALID");
@@ -792,10 +800,18 @@ export class CostEnvelopeGuard {
     return this.#meteredSeam(input, "PATH_REWRITE", null, false);
   }
 
+  /** The safety net of the seams a closing pays through, or a plain refusal: nothing in the code stands in for the plans' reserve. */
+  #closingCeiling(): number {
+    if (this.#closingCeilingMicros === null) {
+      throw new TypedDomainError("STORY_ENVELOPE_MISSING", "A metered closing seam needs the plans' reserve");
+    }
+    return this.#closingCeilingMicros;
+  }
+
   /**
    * THE FINAL REPORT — its money seam (plan 2026-10-30 task W5-1; the money rule of 31 Oct, point 6). "Write my report"'s
    * calls name the investigation's root run and are paid from the reserve the money rule always keeps, so they are NEVER
-   * walled (no day, week or month stops them). Held to INVESTIGATION_REPORT_SEAM_CEILING_MICROS per closing (summed over
+   * walled (no day, week or month stops them). Held to `closingCeilingMicros` per closing (summed over
    * that closing's INVESTIGATION_REPORT charges only), refused with the story's own code (the step keeps its last
    * checked draft), and charged as INVESTIGATION_REPORT rows.
    */
@@ -1164,7 +1180,7 @@ export class CostEnvelopeGuard {
         }
         return Object.freeze({
           spendSource: "INVESTIGATION_REPORT",
-          ceilingMicros: INVESTIGATION_REPORT_SEAM_CEILING_MICROS,
+          ceilingMicros: this.#closingCeiling(),
           readSpentMicros: (runId: string) => read.call(this.#store, runId),
           refusal: storyCostEnvelopeReached
         });
@@ -1195,7 +1211,7 @@ export class CostEnvelopeGuard {
         }
         return Object.freeze({
           spendSource: "ANSWER_UPDATE",
-          ceilingMicros: INVESTIGATION_REPORT_SEAM_CEILING_MICROS,
+          ceilingMicros: this.#closingCeiling(),
           readSpentMicros: (runId: string) => read.call(this.#store, runId),
           refusal: storyCostEnvelopeReached
         });
@@ -1207,7 +1223,7 @@ export class CostEnvelopeGuard {
         }
         return Object.freeze({
           spendSource: "CONTRIBUTION_CHECK",
-          ceilingMicros: INVESTIGATION_REPORT_SEAM_CEILING_MICROS,
+          ceilingMicros: this.#closingCeiling(),
           readSpentMicros: (runId: string) => read.call(this.#store, runId),
           refusal: storyCostEnvelopeReached
         });
@@ -1219,7 +1235,7 @@ export class CostEnvelopeGuard {
         }
         return Object.freeze({
           spendSource: "PUBLIC_REPORT",
-          ceilingMicros: INVESTIGATION_REPORT_SEAM_CEILING_MICROS,
+          ceilingMicros: this.#closingCeiling(),
           readSpentMicros: (runId: string) => read.call(this.#store, runId),
           refusal: storyCostEnvelopeReached
         });

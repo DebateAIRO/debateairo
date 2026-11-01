@@ -45,7 +45,7 @@ const SITE_ROW_KEYS = Object.freeze([
   "passwordPolicy", "auditSourceIpKdfPolicy", "verificationPolicy", "rateLimitPolicy", "channelPolicy",
   "mfaPolicy", "sessionPolicy", "admissionPolicy", "passwordResetPolicy", "backupEmailVerificationPolicy",
   "mfaRecoveryPolicy", "recoveryPolicy", "consumerRecoveryPolicy", "productRolePolicy", "staffAccessPolicy",
-  "internalAllowancePolicy", "countryPolicy", "billingPolicy", "taxAuthorities", "publicationCheckPolicy",
+  "internalAllowancePolicy", "countryPolicy", "billingPolicy", "taxAuthorities", "publicationCheckPolicy", "abuseLimits",
   "configuredProviderSet", "panelDiscoveryPolicy", "costEstimateStartPolicy", "questionCheckPolicy",
   "supportNoSourceCheckPolicy",
   "support_enabled", "support_model_ref", "support_relay_concurrency", "support_daily_call_cap",

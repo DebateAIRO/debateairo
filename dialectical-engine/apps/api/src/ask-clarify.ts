@@ -26,7 +26,7 @@ import { anthropicFastCheckTransport, type FastCheckUsage } from "./question-lan
  * cache below lives in this process's memory for minutes and is keyed by a hash under a per-process key, so it can never answer one person with
  * another's words.
  *
- * The limits (LIMITS, below) live in this file: a guard against a stuck page, not a quota, and the Hide-limits lane may move them to the server.
+ * The limits are the register's abuseLimits row (R22 decision 18): a guard against a stuck page, not a quota. Per person, per process.
  */
 
 /** The server's bound on the whole step, retries included. The page gives up a little after it (V4 ASK_CLARIFY_PAGE_WAIT_MS). */
@@ -73,8 +73,7 @@ export function askClarifyTransportFor(route: QuestionLanguagePaidRoute): AskCla
   }
 }
 
-/** Per person, per process: enough for a person who edits their question, little for a page reloaded in a loop. */
-const LIMITS = Object.freeze({ perHour: 12, perDay: 30, hourMs: 3_600_000, dayMs: 86_400_000 });
+const WINDOWS = Object.freeze({ hourMs: 3_600_000, dayMs: 86_400_000 });
 /** A repeat of the same text within this time is answered from memory. */
 const CACHE = Object.freeze({ ttlMs: 10 * 60_000, entries: 2_000 });
 /** The tables' bound: past it the oldest person is forgotten, which can only give them a fresh limit. */
@@ -163,6 +162,8 @@ async function readWithRecovery(questionLine: string, transport: FastCheckTransp
 }
 
 export function createAskClarify(deps: Readonly<{
+  /** The register's abuseLimits row: enough for a person who edits their question, little for a page reloaded in a loop. */
+  limits: Readonly<{ perHour: number; perDay: number }>;
   /** Null: this deployment has no paid AI for it (local mode, no gate, no key, no writer). */
   transportFor: AskClarifyTransportFor | null;
   /** The one writer (0144). A failure stops the calls; it never fails the page. */
@@ -200,8 +201,8 @@ export function createAskClarify(deps: Readonly<{
   };
   /** Takes one call from the person's limits, or says none is left. */
   const admitted = (ownerRef: string, now: number): boolean => {
-    const recent = (calls.get(ownerRef) ?? []).filter((at) => now - at < LIMITS.dayMs);
-    if (recent.length >= LIMITS.perDay || recent.filter((at) => now - at < LIMITS.hourMs).length >= LIMITS.perHour) {
+    const recent = (calls.get(ownerRef) ?? []).filter((at) => now - at < WINDOWS.dayMs);
+    if (recent.length >= deps.limits.perDay || recent.filter((at) => now - at < WINDOWS.hourMs).length >= deps.limits.perHour) {
       calls.set(ownerRef, recent);
       return false;
     }

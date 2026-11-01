@@ -188,7 +188,7 @@ describe("the shape half: what is knowable without a list", () => {
 
   it("passes the marked made-up values in an example file", () => {
     const base = git("rev-parse", "HEAD");
-    put("deploy/register/site.example.json", `{ "plans": [{ "monthly_credit_micros": 110000, "reserve_micros": 33000, "day_bp": 1100 }] }\n`);
+    put("deploy/register/site.example.json", `{ "plans": [{ "monthly_credit_micros": 330000, "reserve_micros": 88000, "day_bp": 1100 }] }\n`);
     commit();
     expect(check(base).code).toBe(0);
   });
@@ -220,7 +220,7 @@ describe("the shape half: what is knowable without a list", () => {
 
   it("the marked made-up money figures may sit beside a limit word", () => {
     const base = git("rev-parse", "HEAD");
-    put("notes.md", "For example, a monthly credit of 0.11 USD.\n");
+    put("notes.md", "For example, a monthly credit of 0.33 USD.\n");
     commit();
     expect(check(base).code).toBe(0);
   });

@@ -105,7 +105,11 @@ import {
   ADMISSION_POLICY_ROW_KEY,
   ALGORITHM_REGISTER_ROW_KEYS,
   ANSWER_ROLE_ROTATION_POLICY_ROW_KEY,
+  ABUSE_LIMITS_ROW_KEY,
   BILLING_PLANS_ROW_KEY,
+  billingPlansAreMadeUp,
+  abuseLimitsFromValue,
+  readAbuseLimits,
   BILLING_POLICY_ROW_KEY,
   CALL_CONCURRENCY_POLICY_ROW_KEY,
   CONFIGURED_PROVIDER_SET_ROW_KEY,
@@ -244,9 +248,10 @@ const MAX_SOURCE_REF_LENGTH = 512;
 const TOP_LEVEL_KEYS = Object.freeze([
   "format", "sourceRef", "configuredProviderSet", "costEnvelopePolicy", "countryPolicy",
   "providerTargets", "synthesisRoles",
-  // Paid plans (spec 2026-09-29 §2.5.1): OPTIONAL. Left out, the engine's own
-  // rows are sealed (billing OFF); supplied, they supersede them.
-  "billingPlans", "billingPolicy",
+  // R22 decision 18: billingPlans and abuseLimits are REQUIRED (OPERATOR_ROW_KEYS): the code holds only made-up values.
+  "billingPlans", "abuseLimits",
+  // Paid plans (spec 2026-09-29 §2.5.1): OPTIONAL. Left out, the engine's own row is sealed (billing OFF).
+  "billingPolicy",
   // Paid plans P16a: OPTIONAL. Left out, the code-owned taxAuthorities row is sealed as it is.
   "taxAuthorities",
   // Paid plans P4-G (go-live row 31): OPTIONAL, the room read's admission budget. Left out, the
@@ -269,7 +274,7 @@ const TOP_LEVEL_KEYS = Object.freeze([
   "engineVersionPolicy",
   "supportNoSourceCheckPolicy"
 ] as const);
-const OPERATOR_ROW_KEYS = Object.freeze([CONFIGURED_PROVIDER_SET_ROW_KEY, COST_ENVELOPE_POLICY_ROW_KEY] as const);
+const OPERATOR_ROW_KEYS = Object.freeze([CONFIGURED_PROVIDER_SET_ROW_KEY, COST_ENVELOPE_POLICY_ROW_KEY, BILLING_PLANS_ROW_KEY, ABUSE_LIMITS_ROW_KEY] as const);
 
 /** A refusal this command owns. `code` is also the message, and it never carries a value from the file. */
 export class HostedRegisterPublicationError extends TypeError {
@@ -447,6 +452,8 @@ export type HostedRegisterFile = Readonly<{
   synthesisRoles: z.infer<typeof synthesisRolesSchema> | null;
   /** Paid plans: OPTIONAL operator rows, checked in the plan by the register's own parsers. */
   billingPlans: Readonly<{ value: unknown }> | null;
+  /** R22 decision 18: required; validated in the plan by the register's own parser (ABUSE_LIMITS_INVALID). */
+  abuseLimits: unknown;
   billingPolicy: Readonly<{ value: unknown }> | null;
   /** Optional (P16a): the operator's own where-and-when text; absent = the code-owned row. */
   taxAuthorities?: unknown;
@@ -528,7 +535,8 @@ export function parseHostedRegisterFile(bytes: Uint8Array): HostedRegisterFile {
     countryPolicy: Object.hasOwn(record, "countryPolicy") ? record.countryPolicy : null,
     providerTargets: record.providerTargets,
     synthesisRoles,
-    billingPlans: Object.hasOwn(record, BILLING_PLANS_ROW_KEY) ? Object.freeze({ value: record.billingPlans }) : null,
+    billingPlans: Object.freeze({ value: record.billingPlans }),
+    abuseLimits: record.abuseLimits,
     billingPolicy: Object.hasOwn(record, BILLING_POLICY_ROW_KEY) ? Object.freeze({ value: record.billingPolicy }) : null,
     ...(Object.hasOwn(record, "taxAuthorities") ? { taxAuthorities: record.taxAuthorities } : {}),
     ...(Object.hasOwn(record, "askRoomReads") ? { askRoomReads: record.askRoomReads } : {}),
@@ -1007,6 +1015,8 @@ export async function planHostedRegisterPublication(
   }
   // V-28: the register's own strict schema (integers, daily >= per-run).
   const costEnvelope = costEnvelopePolicyFromValue(file.costEnvelopePolicy, file.sourceRef);
+  // R22 decision 18: the operator's abuse limits, by the register's own parser (ABUSE_LIMITS_INVALID). No code-owned fallback.
+  abuseLimitsFromValue(file.abuseLimits, file.sourceRef);
   // Paid plans P16a: the operator's where-and-when text, by the register's own parser
   // (TAX_AUTHORITIES_INVALID). Absent member = the code-owned row, sealed as it is.
   if (file.taxAuthorities !== undefined) taxAuthoritiesFromValue(file.taxAuthorities, file.sourceRef);
@@ -1094,6 +1104,11 @@ export async function planHostedRegisterPublication(
       sourceRef: file.sourceRef
     })]
   ]);
+  operatorRows.set(ABUSE_LIMITS_ROW_KEY, Object.freeze({
+    rowKey: ABUSE_LIMITS_ROW_KEY,
+    valueJsonText: canonicalRowValue(file.abuseLimits),
+    sourceRef: file.sourceRef
+  }));
   if (file.countryPolicy !== null) {
     operatorRows.set(COUNTRY_POLICY_ROW_KEY, Object.freeze({
       rowKey: COUNTRY_POLICY_ROW_KEY,
@@ -1314,6 +1329,8 @@ export async function planHostedRegisterPublication(
   // R1 A22: billing may be switched on only with its plans and the three budget
   // members, asked here of the version about to be sealed, so a dry run says so.
   assertBillingReady({ policy: billingPolicy, plans: billingPlans, envelope: costEnvelope });
+  // R22 decision 18: a site that sells plans never runs on the example's made-up limits.
+  if (billingPolicy?.enabled === true && billingPlans !== null && billingPlansAreMadeUp(billingPlans)) refuse("HOSTED_REGISTER_BILLING_PLANS_MADE_UP");
   // Paid plans S2 (spec §2.6 item 6): a version that sells plans seals only a
   // scorecard that follows the owners' plan-cap rule — a sealed row is never edited.
   if (billingPolicy?.enabled === true && scorecard !== null && !planCapsFollowPaidSiteRule(scorecard.planStrengthCaps)) {
@@ -1597,6 +1614,8 @@ export async function verifyHostedRegisterBootReadiness(
   await readDeploymentRiskTier(pool, version);
   // hate-speech S02: main.ts's publication-check-policy stage (the pre-publish check's deadline).
   await readPublicationCheckPolicy(pool, version);
+  // R22 decision 18: main.ts's abuse-limits stage.
+  await readAbuseLimits(pool, version);
   // Role rotation (spec 2026-10-11): optional (ABSENT keeps the fixed roles), but a malformed row would refuse the API's boot.
   await readAnswerRoleRotationPolicy(pool, version);
   // Parallel calls (spec 2026-10-12): optional (ABSENT = one call at a time), but a malformed row would refuse the runner's boot.

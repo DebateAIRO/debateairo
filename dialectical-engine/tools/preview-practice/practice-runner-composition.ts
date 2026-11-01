@@ -46,6 +46,8 @@ import {
   readCallConcurrencyPolicy,
   type CallConcurrencyPolicy,
   type DeploymentMode
+  closingReservesOf,
+  readBillingPlans,
 } from "@debateai/register";
 import {
   type CostEnvelopePhase,
@@ -338,7 +340,8 @@ export async function composePracticeRunner(input: Readonly<{
     log: storyLog });
   // W5-1: the closing, composed as main.ts composes it (the practice writes a report only when its script presses it).
   const closingPrices = buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE);
-  const investigationClose = composeInvestigationClose({ pool, targets: providerTargets, ...(writerTokenCount === undefined ? {} : { tokenCount: writerTokenCount }),
+  const investigationClose = composeInvestigationClose({ pool, targets: providerTargets,
+    reserveMicros: closingReservesOf(await readBillingPlans(pool, environment.REGISTER_VERSION)) ?? { paid: 0, free: 0 }, ...(writerTokenCount === undefined ? {} : { tokenCount: writerTokenCount }),
     members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
     priceOf: (providerRef) => closingPrices.get(providerRef) ?? null,
     log: storyLog });

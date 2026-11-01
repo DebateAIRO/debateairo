@@ -32,7 +32,7 @@ export async function buildPreviewSourceRows(bootstrap:BootstrapRegister, runtim
     // P2b: the v1 kit predates the debate shape; its reviewed closure stays the 66 keys it was written for,
     // plus S04's questionCheckPolicy, which the API reads at start-up.
     // Engine redesign (R1d Task 4): so it predates engine 2's seal too.
-    .filter(row=>row.rowKey!==MAP_CONTRACT_HASH_ROW_KEY&&row.rowKey!==ENGINE_CONTRACT_HASH_ROW_KEY),
+    .filter(row=>row.rowKey!==MAP_CONTRACT_HASH_ROW_KEY&&row.rowKey!==ENGINE_CONTRACT_HASH_ROW_KEY&&row.rowKey!=='abuseLimits'),
     ...[PASSWORD_RESET_POLICY_REGISTER_ROW,BACKUP_EMAIL_POLICY_REGISTER_ROW,MFA_RECOVERY_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef}))];
   if(rows.length!==67)fail(); // START 66 + S04's questionCheckPolicy; allocator result is never assumed from this count.
   return Object.freeze(rows.map(row=>Object.freeze(row)));

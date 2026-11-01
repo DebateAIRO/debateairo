@@ -23,7 +23,9 @@ import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai
 import { releaseTaskName, TypedDomainError } from "@debateai/kernel";
 import {
   assertHostedCostEnvelopesSealed,
+  closingReservesOf,
   loadRunnerEnvironment,
+  readBillingPlans,
   effectiveCallConcurrency,
   readCallConcurrencyPolicy
 } from "@debateai/register";
@@ -375,7 +377,9 @@ const pathRewrite = composePathRewrite({ pool, targets: providerTargets, ...(wri
  * counts its free models at zero), and charged on the never-walled report seam above. Undefined without Haiku or GLM.
  */
 const closingPrices = buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE);
-const investigationClose = composeInvestigationClose({ pool, targets: providerTargets, ...(writerTokenCount === undefined ? {} : { tokenCount: writerTokenCount }),
+// R22 decision 18: the reserves are the plans row's, on the server. A version with none refuses every closing's call.
+const closingReserves = closingReservesOf(await readBillingPlans(pool, environment.REGISTER_VERSION)) ?? { paid: 0, free: 0 };
+const investigationClose = composeInvestigationClose({ pool, targets: providerTargets, reserveMicros: closingReserves, ...(writerTokenCount === undefined ? {} : { tokenCount: writerTokenCount }),
   members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
   priceOf: (providerRef) => closingPrices.get(providerRef) ?? null,
   // R22 decision 7: a written report takes its investigation's page texts and passages with it. A FAILED one may be written
@@ -615,7 +619,7 @@ const pathRewriteSweep = pathRewrite === undefined || retireRequestStanding ? nu
 const treeSweep = pathRewrite === undefined || retireRequestStanding ? null
   : startTreeSweep({ ...pathRewrite.treeSweep, paused: () => retirementSignal.claimsStopped() });
 // Decision 13: a contribution to a public debate that stopped goes on, an allowed one climbs, and a report on a public debate is written. None while retiring.
-const publicReports = composePublicReport({ pool, targets: providerTargets, ...(writerTokenCount === undefined ? {} : { tokenCount: writerTokenCount }),
+const publicReports = composePublicReport({ pool, targets: providerTargets, reserveMicros: closingReserves, ...(writerTokenCount === undefined ? {} : { tokenCount: writerTokenCount }),
   members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
   priceOf: (providerRef) => closingPrices.get(providerRef) ?? null, log: storyLog });
 const publicTreeSweep = pathRewrite === undefined || retireRequestStanding ? null

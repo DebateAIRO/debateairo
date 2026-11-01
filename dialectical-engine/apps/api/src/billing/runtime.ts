@@ -74,6 +74,8 @@ export type BillingRuntimeDeps = Readonly<{
    */
   ownerSpend?: Readonly<{ readOwnerSpentMicros(ownerRef: string, from: Date, to: Date): Promise<number> }>;
   blindIndexKey?: Uint8Array;
+  /** The register's abuseLimits row (R22 decision 18). */
+  cancelLinksPerDay?: number;
   identities?: Readonly<{ ownerRefByEmailBlindIndex(emailBlindIndex: Buffer): Promise<string | null> }>;
   /** P16a/P16c (R-35): where and when each tax is paid (the O1 text). Billing does not start without it. */
   taxAuthorities?: TaxAuthorities;
@@ -252,6 +254,7 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     identities: required(deps.identities, "identities"),
     blindIndexKey: required(deps.blindIndexKey, "blindIndexKey"),
     recordsKey: deps.connectors.recordsKey, recipients, mail: deps.mail?.sender,
+    linksPerDay: required(deps.cancelLinksPerDay, "cancelLinksPerDay"),
     // R-7/A22: the one origin, P6a's `BillingConnectors.publicAppUrl`.
     publicAppUrl: deps.connectors.publicAppUrl,
     audit: deps.audit, clock: deps.clock
