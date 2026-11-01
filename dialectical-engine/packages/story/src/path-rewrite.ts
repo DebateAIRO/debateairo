@@ -51,6 +51,7 @@ import type { StoryRoleMaker } from "./writer.js";
  *  - the fate is one of the story's four (the schema);
  *  - the verdict on the person's point of view is there exactly when a pick carries the person's own words (Q-D4);
  *  - the dig's own paths are each given once, in the material's order (Q-D2);
+ *  - no prose names a ref ("P1-P6"): the writer's sealed wording does not forbid it, so code refuses it and asks again;
  *  - no trust word: the rewritten path's word is set by code from the evidence (Q-D3), so a reply that names one (a
  *    `trust` member, a "Sure") is refused by the strict form.
  * Refs (P1…, D1…) are never shown: the runner maps them back before anything is stored.
@@ -282,12 +283,15 @@ export type PathRewriteIndex = Readonly<{
   digPathRefs: readonly string[];
   /** True when a pick is marked PERSON_EDITED or PERSON_OWN_VIEW (Q-D4: then, and only then, a verdict). */
   personWords: boolean;
+  /** Words shaped like a ref that the material's own text uses (a "D3" in "vitamin D3"): ordinary words, never a slip. */
+  ordinaryRefWords?: ReadonlySet<string>;
 }>;
 
 export const PATH_REWRITE_REPLY_ISSUES = Object.freeze({
   noSentenceLeft: "PATH_REWRITE_NO_SENTENCE_RESTS_ON_THE_MATERIAL",
   viewPresence: "PATH_REWRITE_VIEW_PRESENCE",
-  digPaths: "PATH_REWRITE_DIG_PATHS_INVALID"
+  digPaths: "PATH_REWRITE_DIG_PATHS_INVALID",
+  refInProse: "PATH_REWRITE_REF_IN_PROSE"
 } as const);
 
 type Issue = Readonly<{ code: "custom"; path: readonly (string | number)[]; message: string }>;
@@ -296,6 +300,27 @@ const issueAt = (message: string, path: readonly (string | number)[]): Issue => 
 /** The sentences code keeps: those whose every ref is one the material gives (salvage in code: the rest are dropped). */
 function keptSentences(reply: PathRewriteDraft, index: PathRewriteIndex): PathRewriteDraft["what_changed"] {
   return reply.what_changed.filter((sentence) => sentence.rests_on.every((name) => index.pointRefs.has(name)));
+}
+
+const REF_WORD = /(?<![\p{L}\p{N}])[PD]\d+(?![\p{L}\p{N}])/gu;
+
+/** The prose fields that name a ref of the material ("P1-P6", "D1 and D2"), which a reader must never meet. */
+function refsInProse(reply: PathRewriteDraft, index: PathRewriteIndex): readonly (readonly (string | number)[])[] {
+  const names = new Set([...index.pointRefs, ...index.digPathRefs]);
+  const named = (prose: string) => (prose.match(REF_WORD) ?? []).some((word) => names.has(word) && !index.ordinaryRefWords?.has(word));
+  return [
+    ...(named(reply.line) ? [["line"]] : []),
+    ...(named(reply.summary) ? [["summary"]] : []),
+    ...reply.what_changed.flatMap((sentence, at) => (named(sentence.text) ? [["what_changed", at, "text"]] : [])),
+    ...(reply.view !== null && named(reply.view.reason) ? [["view", "reason"]] : []),
+    ...reply.dig_paths.flatMap((path, at) => (named(path.line) ? [["dig_paths", at, "line"]] : []))
+  ];
+}
+
+/** The words shaped like a ref in a material's text, leaving out the refs it hands out itself. */
+export function ordinaryRefWordsOf(contents: readonly string[]): ReadonlySet<string> {
+  const own = /"(?:ref|on|point)":"[PD]\d+"/gu;
+  return new Set(contents.flatMap((content) => content.replace(own, "").match(REF_WORD) ?? []));
 }
 
 /** Code's checks of an accepted form (the reasons a reply is refused and asked again). */
@@ -307,6 +332,7 @@ export function pathRewriteReplyIssues(reply: PathRewriteDraft, index: PathRewri
   if (given.length !== index.digPathRefs.length || given.some((name, at) => name !== index.digPathRefs[at])) {
     issues.push(issueAt(PATH_REWRITE_REPLY_ISSUES.digPaths, ["dig_paths"]));
   }
+  for (const path of refsInProse(reply, index)) issues.push(issueAt(PATH_REWRITE_REPLY_ISSUES.refInProse, path));
   return Object.freeze(issues);
 }
 
