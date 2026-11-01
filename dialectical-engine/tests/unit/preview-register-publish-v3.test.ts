@@ -389,7 +389,7 @@ describe('the native operator chooses the kit by the plan', () => {
     expect(body).toContain("const hosted=Object.hasOwn(plan,'hostedBilling');");
     expect(body).toContain("tsImport(hosted?'./publish-register-v3.ts':'./publish-register-v2.ts',import.meta.url)");
     expect(body.split('publisher.buildPreviewSourceRowsV3(')).toHaveLength(2);
-    expect(body.split('publisher.buildPreviewSourceRowsV3(')[1]).toMatch(/^await register\.loadBootstrapRegister\(\),observation,plan\.hostedBilling,plan\.checkerChoice,plan\.roleRotation,plan\.callConcurrency\?\?null,plan\.debateShape\?\?null,plan\.questionLanguage\?\?null,plan\.lengthGuidance\?\?null,null,plan\.lineUp\?\?null,plan\.answerSeats\?\?null\)/);
+    expect(body.split('publisher.buildPreviewSourceRowsV3(')[1]).toMatch(/^await register\.loadBootstrapRegister\(\),observation,plan\.hostedBilling,plan\.checkerChoice,plan\.roleRotation,plan\.callConcurrency\?\?null,plan\.debateShape\?\?null,plan\.questionLanguage\?\?null,plan\.lengthGuidance\?\?null,plan\.engineVersion\?\?null,plan\.lineUp\?\?null,plan\.answerSeats\?\?null\)/);
     expect(body).toContain('const snapshot=hosted?publisher.composePreviewSnapshotV3(composition):publisher.composePreviewSnapshotV2(composition);');
   });
   it('publishes with kit v3 only after the pending-forward-step check, like kit v2', () => {

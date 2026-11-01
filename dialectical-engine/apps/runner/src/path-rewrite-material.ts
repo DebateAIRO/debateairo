@@ -2,7 +2,7 @@ import type { StoryFate } from "@debateai/contract";
 import { TypedDomainError, withQuestionLanguageField, withReaderField, type QuestionLanguage, type ReadingLevel } from "@debateai/kernel";
 import { buildFramedPrompt, type FramedMaterialField, type PromptPacket } from "@debateai/providers";
 import {
-  PATH_REWRITE_WRITER_V2_PROMPT_CONTRACT, withoutStoryNodeIds, type PathRewriteCallMaterial, type PathRewriteDraft,
+  PATH_REWRITE_WRITER_V2_PROMPT_CONTRACT, ordinaryRefWordsOf, withoutStoryNodeIds, type PathRewriteCallMaterial, type PathRewriteDraft,
   type PathRewritePickMark, type StoryNodeEnrichment, type StoryWriteInput
 } from "@debateai/story";
 
@@ -248,7 +248,8 @@ export function buildPathRewriteMaterial(input: PathRewriteMaterialInput, option
     const writer = closing(input, fields);
     bodyBytes = pathRewriteBodyBytes(buildFramedPrompt({ contract: PATH_REWRITE_WRITER_V2_PROMPT_CONTRACT, material: writer }).packet);
     if (!pathRewriteBodyFits(bodyBytes + PATH_REWRITE_ROUND_TWO_ROOM_BYTES)) continue;
-    const index = Object.freeze({ pointRefs: keptRefs, digPathRefs: Object.freeze([...refs.digRef.values()]), personWords });
+    const index = Object.freeze({ pointRefs: keptRefs, digPathRefs: Object.freeze([...refs.digRef.values()]), personWords,
+      ordinaryRefWords: ordinaryRefWordsOf(writer.map((one) => one.content)) });
     const checkerOf = (candidate: PathRewriteDraft): readonly FramedMaterialField[] =>
       closing(input, [...fields, field("rewrite", JSON.stringify(candidate))]);
     return Object.freeze({

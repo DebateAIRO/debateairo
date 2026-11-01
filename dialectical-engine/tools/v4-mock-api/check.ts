@@ -289,7 +289,7 @@ await step("dig links (0131)", async () => {
 }, (value: string) => value);
 
 await step("investigation of the first debate, reserve kept (draft)", async () => {
-  const investigation: Loose = await mock(`/v1/runs/${RUNS.settled}/investigation`);
+  const investigation: Loose = await mock(`/__mock/draft/v1/runs/${RUNS.settled}/investigation`);
   const room: Loose = await mock("/__mock/draft/v1/asks/room?plan_tier=premium&composition_budget_tier=medium&depth=2&answer_length=standard");
   must(investigation.state === "OPEN" && investigation.closings.length >= 1, "open again, with an earlier report");
   must(investigation.digs.some((link: Loose) => link.child_run_id === RUNS.dig), "the dig is in it");
@@ -328,7 +328,7 @@ await step("a dig sent with its parent (draft) joins the investigation", async (
     }
   });
   const links: Loose = await client.readDigLinks(RUNS.settled);
-  const investigation: Loose = await mock(`/v1/runs/${sent.run_ref}/investigation`);
+  const investigation: Loose = await mock(`/__mock/draft/v1/runs/${sent.run_ref}/investigation`);
   must(links.children.some((link: Loose) => link.child_run_id === sent.run_ref && link.mode === "thorough"), "the link was recorded");
   must(investigation.root_run_id === RUNS.settled, "it joined the first debate's investigation");
   return `${sent.run_ref} joined ${investigation.root_run_id}`;
@@ -336,7 +336,7 @@ await step("a dig sent with its parent (draft) joins the investigation", async (
 await step("a dig linked after start (the page's call today) joins too", async () => {
   const sent: Loose = await client.submitAsk({ ...ask, question_line: "How strong is this objection, and does it change the answer?" });
   await client.recordDigLink(RUNS.searchFailed, { child_run_id: sent.run_ref, places: ["o:0"], mode: "quick" });
-  const investigation: Loose = await mock(`/v1/runs/${sent.run_ref}/investigation`);
+  const investigation: Loose = await mock(`/__mock/draft/v1/runs/${sent.run_ref}/investigation`);
   must(investigation.root_run_id === RUNS.searchFailed, "it joined the parent's investigation");
   return `${sent.run_ref} joined ${investigation.root_run_id}`;
 }, (value: string) => value);
@@ -371,7 +371,7 @@ await step("the dig trail three levels down (draft)", async () => {
   must(own.picks.some((pick: Loose) => pick.by === "PERSON_OWN_VIEW") && own.rewrite.view !== null, "the own-view dig carries its verdict");
   const links: Loose = await client.readDigLinks(RUNS.digLevelTwo);
   must(links.parent?.parent_run_id === RUNS.dig && links.children.some((link: Loose) => link.child_run_id === RUNS.digLevelThree), "the dig links nest");
-  const investigation: Loose = await mock(`/v1/runs/${RUNS.digLevelThree}/investigation`);
+  const investigation: Loose = await mock(`/__mock/draft/v1/runs/${RUNS.digLevelThree}/investigation`);
   must(investigation.root_run_id === RUNS.settled, "a dig of a dig is in the first debate's investigation");
   return trail.join(" › ");
 }, (value: string) => value);
@@ -578,6 +578,36 @@ await step("sign-in cookies pass the proxy", async () => {
   if (response.status !== 200 || cookies.length !== 2) throw new Error(`status ${response.status}, cookies ${cookies.join(",")}`);
   return cookies;
 }, (cookies: string[]) => cookies.join(" + "));
+
+// R22 W5-1: the report's versions, as the website reads them; "Write my report", its failed case, "Keep digging", and the Arabic debate's language.
+await step("report versions: write, finish, keep digging, a failed one", async () => {
+  const seeded: Loose = await client.readInvestigation(RUNS.settled);
+  must(seeded.current === 1 && seeded.versions[0].paths.some((path: Loose) => path.dig !== undefined), "the first debate has report version 1, with its paths");
+  must((await client.writeReport(RUNS.free)).error === "INVESTIGATION_CLOSED", "a finished version stands: Keep digging first");
+  must((await client.reopenInvestigation(RUNS.free)).state === "OPEN", "Keep digging opens it");
+  const writing: Loose = await client.writeReport(RUNS.free);
+  must(writing.state === "WRITING" && writing.report_version === 2, "the next version is being written");
+  must((await client.readInvestigation(RUNS.free)).versions.at(-1).state === "WRITING", "it reads as being written");
+  must((await client.reopenInvestigation(RUNS.free)).error === "INVESTIGATION_REPORT_WRITING", "no Keep digging while it is written");
+  await new Promise((done) => setTimeout(done, 9_000));
+  const finished: Loose = await client.readInvestigation(RUNS.free);
+  must(finished.current === 2 && finished.versions[1].sources.length === 0, "version 2 is current, with no sources on Free");
+  await fetch(`${MOCK}/__mock/set?report=FAIL`);
+  await client.reopenInvestigation(RUNS.free);
+  await client.writeReport(RUNS.free);
+  await new Promise((done) => setTimeout(done, 9_000));
+  await fetch(`${MOCK}/__mock/set?report=OK`);
+  const failed: Loose = await client.readInvestigation(RUNS.free);
+  must(failed.versions[2].state === "FAILED" && failed.current === 2, "a failed version leaves the current one");
+  return `versions ${failed.versions.map((version: Loose) => version.state).join(" ")}`;
+}, (value: string) => value);
+await step("the Arabic debate says its language, and its report is in Arabic", async () => {
+  const ref = "a2000000-0000-4000-8000-000000000001";
+  must((await client.readRun(ref)).argument_language.tag === "ar", "the question's language");
+  const read: Loose = await client.readInvestigation(ref);
+  must(/[\u0600-\u06FF]/u.test(read.versions[0].story.short_answer), "the report's words");
+  return read.versions[0].story.short_answer;
+}, (value: string) => value);
 
 console.log(failures === 0 ? "\nALL CHECKS PASSED" : `\n${failures} CHECK(S) FAILED`);
 process.exit(failures === 0 ? 0 : 1);

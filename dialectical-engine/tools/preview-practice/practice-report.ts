@@ -408,6 +408,7 @@ export function debateReport(input: Readonly<{
     busyModels: busyDuringRun,
     shapeNotExercised: r.shape === undefined || r.shape.notExercised === null ? [] : [r.shape.notExercised],
     pinsNotHeld: r.writerPins === undefined ? [] : practicePinsNotHeld(r.writerPins),
+    unmappedCallSites: r.unmappedCallSites ?? [],
     unbilledRefusals: GATES.reduce((sum, gate) => sum + input.observer.summary(gate).unbilled, 0),
     p90ByModel: Object.fromEntries(Object.entries(r.byModelAndSite.reduce<Record<string, number>>((acc, row) => {
       if (row.latencyMs.p90 !== null) acc[row.model] = Math.max(acc[row.model] ?? 0, row.latencyMs.p90);

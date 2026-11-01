@@ -12,6 +12,8 @@ On 31 Oct 2026 (dig model revision, task W2-7) it gained the owner's new dig mod
 
 On 31 Oct 2026 (R22 decision 29) it gained dynamic step 2: `POST /v1/asks/clarify` writes made-up clarifying questions. The end of the question picks the scene: `#none` (the AI could not help: no questions, only the person's own-words boxes), `#fail` (the call fails: the same), `#slow` (no answer past the page's 10-second limit: the same), `#purposeonly` (only the question about what the answer is for), `#nopurpose` (without it). Any other question gets two questions and that one.
 
+On 1 Nov 2026 (R22, for the owner's click-test) it gained the final report as the website reads it: `GET /v1/runs/:id/investigation` serves report versions (the older shape stays at `/__mock/draft/v1/runs/:id/investigation`), `POST /v1/runs/:id/report` ("Write my report": about 8 seconds of "being written", then finished; `report=FAIL` makes it fail) and `POST /v1/runs/:id/reopen` ("Keep digging"). So the current version's PDF can be made against the mock, once the browser has the sign-in cookie. And a debate in Arabic, `a2000000-0000-4000-8000-000000000001`: its question and report are in Arabic (the rest of its map is the English seed), so the page offers Print in place of the PDF.
+
 ## Files
 
 | File | What it is |
@@ -169,6 +171,8 @@ Set these when starting the mock, or change them live by opening `http://127.0.0
 | `MOCK_USAGE` / `usage=` | `NORMAL` (default), `BORROWED` | The usage read: as today, or after running work borrowed from tomorrow (W2-7). |
 | `MOCK_PAUSE` / `pause=` | `UNTIL_RESET` (default), `CAN_CONTINUE` | Whether the paused debate `e100…` may continue yet (W2-7). Setting it pauses that debate again. |
 | `MOCK_ASK` / `ask=` | `AUTO` (default), `ACCEPT`, `WAITING`, `ALREADY_WAITING`, `LANGUAGE_CHOICE` | What a new ask gets. `AUTO` follows the room: FULL, BLOCKED or WAIT_RESET makes asks wait in line, ALREADY_WAITING refuses with 422, anything else accepts. |
+| `MOCK_REPORT` / `report=` | `OK` (default), `FAIL` | Whether the next report written comes out finished or failed. |
+| `MOCK_REPORT_SECONDS` | default `8` | How long "Write my report" reads as being written. |
 | `MOCK_PORT` | default `4011` | Port (always on 127.0.0.1). |
 | `MOCK_RUN_SECONDS` | default `25` | How long a new debate "runs". |
 | `MOCK_STORY_WRITING_SECONDS` | default `40` | How long run 5555's story says "still writing". |

@@ -374,7 +374,7 @@ describe('publish kit v2: the optional callConcurrencyPolicy row (absent by defa
     const text = readFileSync(resolve('deploy/preview-auth-dev/v1/native-operator.mjs'), 'utf8');
     const calls = text.split('publisher.buildPreviewSourceRowsV2(');
     expect(calls).toHaveLength(2); // the operator's one builder call
-    expect(calls[1]).toMatch(/^await register\.loadBootstrapRegister\(\),\{[^}]*\},plan\.checkerChoice,plan\.roleRotation,plan\.callConcurrency\?\?null,plan\.debateShape\?\?null,plan\.questionLanguage\?\?null,plan\.lengthGuidance\?\?null,null,plan\.lineUp\?\?null,plan\.answerSeats\?\?null\);/);
+    expect(calls[1]).toMatch(/^await register\.loadBootstrapRegister\(\),\{[^}]*\},plan\.checkerChoice,plan\.roleRotation,plan\.callConcurrency\?\?null,plan\.debateShape\?\?null,plan\.questionLanguage\?\?null,plan\.lengthGuidance\?\?null,plan\.engineVersion\?\?null,plan\.lineUp\?\?null,plan\.answerSeats\?\?null\);/);
     // What it hands over is the plan's value exactly as the plan check accepted it.
     const operator = await import('../../deploy/' + 'preview-auth-dev/v1/native-operator.mjs');
     const plan = operator.validateNativePlan({ schema: 'preview-auth-dev-native-plan-v1', operation: 'plan', sourceRoot: '/opt/debateai-v3-preview/releases/auth-dev-candidate-new-api',

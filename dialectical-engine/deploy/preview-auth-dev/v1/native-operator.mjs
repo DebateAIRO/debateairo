@@ -73,6 +73,17 @@ export function validateLengthGuidanceChoice(value) {
  return value;
 }
 /**
+ * The operator's optional engine row (engine redesign R1d; owner E5, 2026-10-29: engine 2 goes on with R22): kit v2's ninth
+ * argument and kit v3's tenth. The word off (the row published disabled: the rollback) or one plain JSON object (the policy,
+ * with its kind). Shape only: the register's own parser and the runner's own boot refusals check it before any row is built
+ * (the row needs the length row and this code's engine seal beside it). Like the checker choice, only plan and publish carry it.
+ */
+export function validateEngineVersionChoice(value) {
+ if(value===DEBATE_SHAPE_OFF)return value;
+ if(value===null||typeof value!=='object'||Array.isArray(value)||Object.getPrototypeOf(value)!==Object.prototype)refuse('PREVIEW_NATIVE_PLAN_REFUSED');
+ return value;
+}
+/**
  * The operator's optional line-up (side-by-side spec §13, addition D12, D23; owner 2026-10-22): kit v2's tenth argument and
  * kit v3's eleventh, sealed as the previewLineUpPolicy row. Exactly the three members the env carries today
  * (`free_model_ids`, `premium_model_ids`: lists of model-id texts; `thinking_levels`: the owner's table, or null for every AI
@@ -137,9 +148,10 @@ export function validateNativePlan(plan) {
  const language=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'questionLanguage');
  const lengthGuided=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'lengthGuidance');
  const hosted=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'hostedBilling');
+ const engined=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'engineVersion');
  const lineUp=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'lineUp');
  const seated=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'answerSeats');
- exactKeys(plan,[...NATIVE_PLAN_KEYS,...(chosen?['checkerChoice']:[]),...(rotation?['roleRotation']:[]),...(concurrency?['callConcurrency']:[]),...(shape?['debateShape']:[]),...(language?['questionLanguage']:[]),...(lengthGuided?['lengthGuidance']:[]),...(hosted?['hostedBilling']:[]),...(lineUp?['lineUp']:[]),...(seated?['answerSeats']:[])]);
+ exactKeys(plan,[...NATIVE_PLAN_KEYS,...(chosen?['checkerChoice']:[]),...(rotation?['roleRotation']:[]),...(concurrency?['callConcurrency']:[]),...(shape?['debateShape']:[]),...(language?['questionLanguage']:[]),...(lengthGuided?['lengthGuidance']:[]),...(engined?['engineVersion']:[]),...(hosted?['hostedBilling']:[]),...(lineUp?['lineUp']:[]),...(seated?['answerSeats']:[])]);
  if(plan.schema!=='preview-auth-dev-native-plan-v1'||!['apply-and-plan','plan','publish','verify'].includes(plan.operation)
   ||!/^\/opt\/debateai-v3-preview\/releases\/auth-dev-candidate-[a-z0-9-]+$/.test(plan.sourceRoot))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
  if(chosen){
@@ -161,6 +173,10 @@ export function validateNativePlan(plan) {
  }
  if(lengthGuided){
   validateLengthGuidanceChoice(plan.lengthGuidance);
+  if(!['plan','publish'].includes(plan.operation))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
+ }
+ if(engined){
+  validateEngineVersionChoice(plan.engineVersion);
   if(!['plan','publish'].includes(plan.operation))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
  }
  // Addition D23: the line-up and the seats, shape only (the kit's parsers run before any row is built).
@@ -260,8 +276,8 @@ export async function runNativeOperator(argv=process.argv.slice(2)) {
   else if(plan.operation==='plan'||plan.operation==='publish')await publisher.assertBaseIsCurrent(pool,base.registerVersion,plan.publicationId);
   const runtimeObservedAt=plan.approval?.runtimeObservedAt??new Date().toISOString();
   const observation={nodeVersion:process.version,pnpmVersion:source.pnpmVersion,sourceRevision:source.sourceRevision,sourceTree:source.sourceTree,operatorSha256:plan.operatorManifestSha256,observedAt:runtimeObservedAt};
-  const rows=hosted?await publisher.buildPreviewSourceRowsV3(await register.loadBootstrapRegister(),observation,plan.hostedBilling,plan.checkerChoice,plan.roleRotation,plan.callConcurrency??null,plan.debateShape??null,plan.questionLanguage??null,plan.lengthGuidance??null,null,plan.lineUp??null,plan.answerSeats??null)
-   :await publisher.buildPreviewSourceRowsV2(await register.loadBootstrapRegister(),{...observation},plan.checkerChoice,plan.roleRotation,plan.callConcurrency??null,plan.debateShape??null,plan.questionLanguage??null,plan.lengthGuidance??null,null,plan.lineUp??null,plan.answerSeats??null);
+  const rows=hosted?await publisher.buildPreviewSourceRowsV3(await register.loadBootstrapRegister(),observation,plan.hostedBilling,plan.checkerChoice,plan.roleRotation,plan.callConcurrency??null,plan.debateShape??null,plan.questionLanguage??null,plan.lengthGuidance??null,plan.engineVersion??null,plan.lineUp??null,plan.answerSeats??null)
+   :await publisher.buildPreviewSourceRowsV2(await register.loadBootstrapRegister(),{...observation},plan.checkerChoice,plan.roleRotation,plan.callConcurrency??null,plan.debateShape??null,plan.questionLanguage??null,plan.lengthGuidance??null,plan.engineVersion??null,plan.lineUp??null,plan.answerSeats??null);
   const composition={sourceRows:rows,baseRows:base.rows,baseRegisterVersion:base.registerVersion,baseSnapshotSha256:base.snapshotSha256};
   const snapshot=hosted?publisher.composePreviewSnapshotV3(composition):publisher.composePreviewSnapshotV2(composition);
   const metadata=snapshotProposal({runtimeObservedAt,source,plan,snapshot});

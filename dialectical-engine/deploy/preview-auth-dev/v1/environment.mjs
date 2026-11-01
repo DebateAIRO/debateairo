@@ -28,8 +28,8 @@ const LEGACY_CONFIG_KEYS='budget_socket,deployment,free_model_ids,requested_thin
 const ROSTER_CONFIG_KEYS='budget_socket,deployment,free_model_ids,premium_model_ids,requested_thinking_level,scope_id';
 // Addition D14 (owner 2026-10-22): the gate part alone, the line-up living in the settings version (previewLineUpPolicy).
 const SOCKETS_ONLY_CONFIG_KEYS='budget_socket,deployment,requested_thinking_level,scope_id';
-// PR B: the roster form may also name the Anthropic gate's socket (the API's parser checks its value).
-const OPTIONAL_SOCKET_KEYS=Object.freeze(['anthropic_budget_socket']);
+// PR B: the roster form may also name the Anthropic gate's socket (the API's parser checks its value); Perplexity plan W2-1: and the web search gate's.
+const OPTIONAL_SOCKET_KEYS=Object.freeze(['anthropic_budget_socket','perplexity_budget_socket']);
 // Spec 2026-10-12 §4.2: the owner's thinking-level table is optional on both forms (the API's parser checks its contents).
 const OPTIONAL_TABLE_KEYS=Object.freeze(['thinking_levels']);
 /**

@@ -949,6 +949,38 @@ describe('native-plan: publish kit v2 (plan -> owner review -> publish -> verify
     expect(existsSync(out)).toBe(false);
   });
 
+  /** The engine row (owner E5): the owners' start file, as the release guide hands it; the kit's parsers check the values. */
+  const ENGINE = JSON.parse(readFileSync(new URL('../../tools/preview-practice/engine-policy-start.json', import.meta.url), 'utf8'));
+
+  it('plan --engine-version: the plan carries the policy or the word off, publish carries it on, and none is the default', async () => {
+    const t = await staged();
+    const out = join(t.s.art, 'native-plan-engine.json');
+    const plan = read(await run(t.nativePlan('plan', ['--engine-version', JSON.stringify(ENGINE)]).with(-1, out), t.s.layout));
+    expect(plan).toEqual({ ...t.plan, engineVersion: ENGINE });
+    expect(operator.validateNativePlan(plan)).toEqual(plan);
+    const proposal = t.writeProposal(t.proposalOf());
+    const publish = read(await run(t.nativePlan('publish', ['--proposal', proposal.path, '--approved-delta-sha256', t.snapshot.deltaSha256], out), t.s.layout, deps));
+    expect(publish.engineVersion).toEqual(ENGINE);
+    const off = read(await run(t.nativePlan('plan', ['--engine-version', 'off']).with(-1, join(t.s.art, 'native-plan-engine-off.json')), t.s.layout));
+    expect(off).toEqual({ ...t.plan, engineVersion: 'off' });
+    expect(Object.hasOwn(t.plan, 'engineVersion')).toBe(false);
+    expect(() => operator.validateNativePlan({ ...plan, operation: 'verify' })).toThrow('PREVIEW_NATIVE_PLAN_REFUSED');
+  });
+
+  it.each([
+    ['text that is neither off nor JSON', 'plan', ['--engine-version', 'OFF']],
+    ['a JSON array', 'plan', ['--engine-version', '[1]']],
+    ['JSON null', 'plan', ['--engine-version', 'null']],
+    ['a JSON string other than off', 'plan', ['--engine-version', '"on"']],
+    ['the option on verify', 'verify', ['--engine-version', 'off']],
+    ['the option on apply-and-plan', 'apply-and-plan', ['--engine-version', 'off']]
+  ])('refuses --engine-version with %s and writes nothing', async (_name, operation, extra) => {
+    const t = await staged();
+    const out = join(t.s.art, 'native-plan-refused.json');
+    await expect(run(t.nativePlan(operation, extra).with(-1, out), t.s.layout)).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED', fields: ['--engine-version'] });
+    expect(existsSync(out)).toBe(false);
+  });
+
   /** Question language (P2L Task 12): the owners' start values, with their kind, as the operator would type them. */
   const LANGUAGE = JSON.parse(JSON.stringify(registerModule.questionLanguagePolicyStartValues()));
 

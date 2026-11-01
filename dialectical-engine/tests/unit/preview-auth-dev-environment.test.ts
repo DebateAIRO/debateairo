@@ -131,6 +131,7 @@ describe('the website\'s model list: one reviewed value per stage of the switch-
   ['the legacy array with the sockets-only config plus the Anthropic socket',LEGACY_FLAG,apiConfig({anthropic_budget_socket:ANTHROPIC_SOCKET}),true],
   ['the two-list value with the sockets-only config plus the Anthropic socket',MULTI_FLAG,apiConfig({anthropic_budget_socket:ANTHROPIC_SOCKET}),true],
   ['the all-models value with the sockets-only config plus the Anthropic socket',ALL_FLAG,apiConfig({anthropic_budget_socket:ANTHROPIC_SOCKET}),true],
+  ['the all-models value with the sockets-only config plus both optional sockets',ALL_FLAG,apiConfig({anthropic_budget_socket:ANTHROPIC_SOCKET,perplexity_budget_socket:'/run/debateai-v3-preview/perplexity-budget-v1.sock'}),true],
   ['an unreviewed website list with the sockets-only config',JSON.stringify([GLM,DEEPSEEK]),apiConfig({}),false],
   ['an unreviewed two-list value with the sockets-only config',JSON.stringify({free:ALL_FIVE.slice(0,4),premium:ALL_FIVE.slice(0,4)}),apiConfig({anthropic_budget_socket:ANTHROPIC_SOCKET}),false],
   ['the sockets-only config with a thinking_levels table (no line-up to apply it to)',LEGACY_FLAG,apiConfig({thinking_levels:{[GLM]:{level:'high'}}}),false],

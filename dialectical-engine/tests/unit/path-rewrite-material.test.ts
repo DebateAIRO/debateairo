@@ -6,7 +6,7 @@ import { purposeLinesMaterial } from "@debateai/contract";
 import { describe, expect, it } from "vitest";
 import { buildFramedPrompt, type PromptPacket } from "@debateai/providers";
 import { canonicalPromptFingerprint } from "@debateai/scorecard";
-import { PATH_REWRITE_WRITER_V2_PROMPT_CONTRACT } from "@debateai/story";
+import { PATH_REWRITE_REPLY_ISSUES, PATH_REWRITE_WRITER_V2_PROMPT_CONTRACT, pathRewriteReplyIssues, type PathRewriteDraft } from "@debateai/story";
 import {
   PATH_REWRITE_BODY_MAX_BYTES, PATH_REWRITE_BODY_OTHER_MEMBERS_BYTES, PATH_REWRITE_INPUT_OVER_LIMIT, buildPathRewriteMaterial,
   pathRewriteBodyBytes, pathRewriteBodyFits, pathRewriteDigPathsOf, pathRewriteGuard, type PathRewriteDigPath,
@@ -53,7 +53,7 @@ describe("W3-5 the rewrite's material", () => {
       ["D1", 1, "No: winter ridership falls by half."], ["D2", 2, "Yes: winter crowds fill both piers."]]);
     expect(digPaths[0]!.points).toEqual([{ ref: "P3", text: "Winter queues are short.", on: "D1", side: "for" },
       { ref: "P4", text: "The bridge takes winter traffic.", on: "D1", side: "for", disputed: true }]);
-    expect(material.material.index).toEqual({ pointRefs: new Set(["P1", "P2", "P3", "P4", "P5"]), digPathRefs: ["D1", "D2"], personWords: true });
+    expect(material.material.index).toEqual({ pointRefs: new Set(["P1", "P2", "P3", "P4", "P5"]), digPathRefs: ["D1", "D2"], personWords: true, ordinaryRefWords: new Set() });
     expect(material.digPathRefs.get("D1")).toBe(DIG_NODES.no);
     expect(material.pointIds.get("P4")).toBe(DIG_NODES.bridge);
   });
@@ -136,5 +136,32 @@ describe("decision 29: the person's step-2 answers reach the rewrite's AI", () =
     const fields = packetText({ ...dig().question, ...purposeLinesMaterial("Q?", { place: "In Harbour Town", time: "Next year", purpose: "To vote" }) });
     expect(fields).toEqual(expect.arrayContaining(["place=In Harbour Town", "time=Next year", "purpose=To vote"]));
   });
-});
 
+  describe("no prose names a point or a dig path by its ref (found on a saved Romanian debate: 'P1-P6', 'D1 and D2')", () => {
+    const index = { pointRefs: new Set(["P1", "P2"]), digPathRefs: ["D1"], personWords: false };
+    const reply = (over: Partial<PathRewriteDraft> = {}): PathRewriteDraft => ({ line: "A line.", summary: "A summary.", fate: "HELD_UP",
+      what_changed: [{ text: "A sentence.", rests_on: ["P1"] }], view: null, dig_paths: [{ position_ref: "D1", line: "A dig line.", fate: "HELD_UP" }], ...over }) as PathRewriteDraft;
+    const refused = (draft: PathRewriteDraft, words?: ReadonlySet<string>) => pathRewriteReplyIssues(draft, { ...index, ...(words === undefined ? {} : { ordinaryRefWords: words }) })
+      .filter((issue) => issue.message === PATH_REWRITE_REPLY_ISSUES.refInProse).map((issue) => issue.path);
+
+    it("refuses a ref in every field a reader meets, and says which", () => {
+      expect(refused(reply())).toEqual([]);
+      expect(refused(reply({ summary: "Points P1-P2 and D1 say so." }))).toEqual([["summary"]]);
+      expect(refused(reply({ line: "(P2) holds." }))).toEqual([["line"]]);
+      expect(refused(reply({ what_changed: [{ text: "D1 și mai mult.", rests_on: ["P1"] }] }))).toEqual([["what_changed", 0, "text"]]);
+      expect(refused(reply({ dig_paths: [{ position_ref: "D1", line: "As P1 said.", fate: "HELD_UP" }] }))).toEqual([["dig_paths", 0, "line"]]);
+    });
+
+    it("leaves a word alone that merely looks like one: not given by this material, or part of a longer word, or the material's own word", () => {
+      expect(refused(reply({ summary: "Route P9 and the P1X engine, and P2P." }))).toEqual([]);
+      expect(refused(reply({ summary: "Vitamin D1 helps." }), new Set(["D1"]))).toEqual([]);
+    });
+
+    it("the material tells the material's own words from the refs it hands out", () => {
+      const parent = storyParentPath();
+      const built = buildPathRewriteMaterial(input({ parent: { ...parent, line: "Does vitamin D2 help on the piers?" } }));
+      if (built.kind !== "BUILT") throw new Error(built.kind);
+      expect(built.material.index.ordinaryRefWords).toEqual(new Set(["D2"]));
+    });
+  });
+});

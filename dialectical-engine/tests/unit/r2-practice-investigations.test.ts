@@ -43,8 +43,9 @@ describe("R2 practice: the engine-2 call families", () => {
   });
 
   it("orders the per-AI table: reviews, investigations, the comparing judges, then the writers", () => {
-    expect(ROSTER_ORDER).toEqual(["MAP", "JUDGE", "PANEL", "REVIEW", "INVESTIGATOR", "VERDICT_JUDGE", "SYNTHESIZER", "EVALUATOR",
-      "STORYTELLER", "STORY_CHECKER", "STRUCTURE_REPAIR", "UNMAPPED"]);
+    expect(ROSTER_ORDER).toEqual(["MAP", "WEB", "JUDGE", "PANEL", "REVIEW", "INVESTIGATOR", "VERDICT_JUDGE", "SYNTHESIZER", "EVALUATOR",
+      "STORYTELLER", "STORY_CHECKER", "STORY_CHARTS", "SUGGESTIONS", "PATH_REWRITE", "PATH_CLIMB", "REPORT", "ANSWER_UPDATE", "PUBLIC_REPORT",
+      "CONTRIBUTION_CHECK", "WEB_RESEARCHED", "STRUCTURE_REPAIR", "UNMAPPED"]);
   });
 });
 

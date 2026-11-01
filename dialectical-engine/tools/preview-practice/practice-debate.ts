@@ -221,6 +221,8 @@ export type PracticeDebateResult = Readonly<{
   answersByModel: Readonly<Record<string, Readonly<{ answered: number; unanswered: number }>>>;
   /** Information only: each accepted reply that needed a tolerant repair, by model and code. */
   jsonRepairs: readonly Readonly<{ model: string; repair: string }>[];
+  /** Every call-site key the report has no name for, once each: a new call nobody told the practice about. Absent: none. */
+  unmappedCallSites?: readonly string[];
   /** LG-A (L34): each accepted reply's repairs, counted per AI, step and kind (from raw_artifact.reply_repairs). */
   repairsByKind?: readonly PracticeRepairRow[];
   /** LG-A (L34): each reply code could not repair, with its class, its follow-up, whether it recovered, and a sample. */
@@ -289,8 +291,9 @@ export type PracticeDebateResult = Readonly<{
 }>;
 
 /** The per-AI table's order: the steps in debate order (R2: the investigations after the reviews, then the comparing judges). */
-export const ROSTER_ORDER = Object.freeze(["MAP", "JUDGE", "PANEL", "REVIEW", "INVESTIGATOR", "VERDICT_JUDGE", "SYNTHESIZER", "EVALUATOR",
-  "STORYTELLER", "STORY_CHECKER", "STRUCTURE_REPAIR", "UNMAPPED"]);
+export const ROSTER_ORDER = Object.freeze(["MAP", "WEB", "JUDGE", "PANEL", "REVIEW", "INVESTIGATOR", "VERDICT_JUDGE", "SYNTHESIZER", "EVALUATOR",
+  "STORYTELLER", "STORY_CHECKER", "STORY_CHARTS", "SUGGESTIONS", "PATH_REWRITE", "PATH_CLIMB", "REPORT", "ANSWER_UPDATE", "PUBLIC_REPORT",
+  "CONTRIBUTION_CHECK", "WEB_RESEARCHED", "STRUCTURE_REPAIR", "UNMAPPED"]);
 
 /** LG-A (L34): one try as the report's two new tables read it (the ledger row with its artifact's 0120 columns). */
 export type PracticeTryRecord = Readonly<{
@@ -484,7 +487,7 @@ async function readRemaining(port: (signal?: AbortSignal) => Promise<PreviewGate
 
 /** What happened, read from the throwaway database after the debate. */
 async function collect(pool: Pool, runId: string, run: Readonly<{ structureRouted: boolean }>): Promise<Pick<PracticeDebateResult,
-  "byModelAndSite" | "failures" | "formatFailures" | "callsByModel" | "repairKindsByModel" | "answersByModel" | "jsonRepairs"
+  "byModelAndSite" | "failures" | "formatFailures" | "callsByModel" | "repairKindsByModel" | "answersByModel" | "jsonRepairs" | "unmappedCallSites"
   | "failedCalls" | "refusedCalls" | "repairsByKind" | "unrepaired" | "languageFollowUps" | "structureRescues" | "tokensByModelAndStep"
   | "lengthByModelAndStep">
   & Readonly<{ answerWritersServed: readonly string[] }>> {
@@ -675,6 +678,8 @@ async function collect(pool: Pool, runId: string, run: Readonly<{ structureRoute
     repairKindsByModel: practiceRepairKindsByModel(callList.map(([, call]) => call)),
     answersByModel: Object.freeze(Object.fromEntries(Object.entries(answersByModel).map(([model, mine]) => [model, Object.freeze(mine)]))),
     jsonRepairs: Object.freeze(jsonRepairs), failedCalls, refusedCalls,
+    unmappedCallSites: Object.freeze([...new Set(entries.map((entry) => entry.call_site_key)
+      .filter((key) => callFamilyOf(structureRepairOriginalKey(key)) === "UNMAPPED"))].sort()),
     repairsByKind: practiceRepairRows(records), unrepaired: practiceUnrepairedRows(records),
     languageFollowUps: practiceLanguageFollowUpRows(records),
     ...(practiceStructureRescuesShown(structureRescues) ? { structureRescues } : {}),

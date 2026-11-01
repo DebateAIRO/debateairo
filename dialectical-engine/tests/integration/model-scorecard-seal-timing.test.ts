@@ -17,6 +17,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { migrate } from "../../packages/db/src/index.js";
+import { TEST_OWNER_LIMIT_ROWS } from "../support/hostedRegisterRows.js";
 import {
   MODEL_SCORECARD_MAX_BYTES,
   readEngineVersion,
@@ -64,6 +65,7 @@ function hostedFile(): Record<string, unknown> {
   return {
     format: HOSTED_REGISTER_FILE_FORMAT,
     sourceRef: "a19 integration: hosted register with a model scorecard",
+    ...TEST_OWNER_LIMIT_ROWS,
     configuredProviderSet: {
       requiredDistinctMakers: 2,
       providers: [

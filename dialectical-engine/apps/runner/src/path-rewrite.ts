@@ -249,7 +249,9 @@ export async function runDigPathRewrite(settings: PathRewriteRunnerSettings | un
   if (settings.publicDig !== undefined && await settings.publicDig(input, lease)) return true;
   let dig: PathRewriteDig | null;
   try {
-    dig = await lease(() => settings.sources.digOf(input.runId));
+    // Outside the step's lease, as the sweep reads it: a dig also reads what its first debate keeps (decision 5's purpose lines), under that debate's own key,
+    // and a lease on this run may not widen to another run (CONTENT_LEASE_SCOPE_EXPANSION_FORBIDDEN).
+    dig = await settings.sources.digOf(input.runId);
   } catch (error) {
     log("PATH_REWRITE_DIG_UNREAD", { runId: input.runId, code: codeOf(error) });
     return false;
@@ -371,7 +373,7 @@ async function parentCodesFor(settings: PathRewriteRunnerSettings, job: PathRewr
   let codes: Readonly<{ answerVersion: number; fate: StoryFate }> = UNKNOWN_PARENT_CODES;
   if (tryText) {
     try {
-      const parent = await job.lease(() => settings.sources.parentPathOf({ parentRunId: job.parentRunId, positionRef: job.positionRef, baseRewriteId, baseUpdateId }));
+      const parent = await settings.sources.parentPathOf({ parentRunId: job.parentRunId, positionRef: job.positionRef, baseRewriteId, baseUpdateId });
       return Object.freeze({ ...parent, line: "", summary: null, points: [], extracts: [] });
     } catch (error) {
       log("PATH_REWRITE_PARENT_UNREAD", { runId: job.digRunId, code: codeOf(error) });
@@ -379,7 +381,7 @@ async function parentCodesFor(settings: PathRewriteRunnerSettings, job: PathRewr
   }
   if (settings.sources.parentCodesOf !== undefined) {
     try {
-      codes = await job.lease(() => settings.sources.parentCodesOf!({ parentRunId: job.parentRunId, positionRef: job.positionRef, baseRewriteId }));
+      codes = await settings.sources.parentCodesOf!({ parentRunId: job.parentRunId, positionRef: job.positionRef, baseRewriteId });
     } catch (error) {
       log("PATH_REWRITE_PARENT_CODES_UNREAD", { runId: job.digRunId, code: codeOf(error) });
     }
@@ -433,8 +435,9 @@ async function rewriteOnItsTurn(settings: PathRewriteRunnerSettings, job: PathRe
       const dig = job.dig;
       let parent: PathRewriteParentPath | null = null;
       try {
-        parent = await job.lease(() => settings.sources.parentPathOf({ parentRunId: dig.parentRunId, positionRef: dig.positionRef,
-          baseRewriteId: textRewriteId, baseUpdateId: textUpdateId }));
+        // Outside the step's lease: the parent is another run, under its own key, and each read takes its own lease (a lease may not widen).
+        parent = await settings.sources.parentPathOf({ parentRunId: dig.parentRunId, positionRef: dig.positionRef,
+          baseRewriteId: textRewriteId, baseUpdateId: textUpdateId });
       } catch (error) {
         // W3-7: the path keeps its text, and the turn still ends with its row.
         log("PATH_REWRITE_PARENT_UNREAD", { runId: digRunId, code: codeOf(error) });

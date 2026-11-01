@@ -5,7 +5,7 @@ import * as fixture from "../../apps/ui/lib/v3/storyFixture.js";
 import {
   AnswerDigSchema, AnswerPathRewritesSchema, AnswerSchema, AnswerWebSchema, AskParentSchema, AskRoomResponseSchema, AskRequestSchema,
   AskRoomQuerySchema, BillingUsageResponseSchema, cutQuoteAtWordEdge, DebateInvestigationSchema, DIG_LEVEL_MAX, DigSuggestionSchema,
-  MonthPauseSchema, NodeSchema, RunProjectionSchema, UsageBorrowSchema, WebOtherPageSchema, WebPathSchema, WebSourceSchema
+  InvestigationReportsSchema, MonthPauseSchema, NodeSchema, RunProjectionSchema, UsageBorrowSchema, WebOtherPageSchema, WebPathSchema, WebSourceSchema
 } from "../../packages/contract/src/index.js";
 import { createSeed, SEED_NODE_IDS } from "../../tools/v4-mock-api/seed.js";
 import {
@@ -15,7 +15,7 @@ import {
   SUGGESTION_KINDS, SUGGESTION_SIDES, DraftPathRewritesSchema, DraftAnswerDigSchema, DraftMonthPauseSchema, DraftUsageBorrowsSchema
 } from "../../tools/v4-mock-api/web-draft.js";
 import {
-  borrowNotice, DEEPEST_DIG, DIG_ANSWERS, DIG_FINISHED_AT, DIG_RUNS, monthPause, PATH_REWRITES, SEEDED_NEW_DIGS
+  borrowNotice, DEEPEST_DIG, DIG_ANSWERS, DIG_FINISHED_AT, DIG_RUNS, monthPause, PATH_REWRITES, reportVersionBody, SEEDED_NEW_DIGS
 } from "../../tools/v4-mock-api/rewrite-seed.js";
 import { WEB_CASES, type WebCase } from "../../tools/v4-mock-api/web-seed.js";
 
@@ -191,6 +191,18 @@ describe("V4 mock API: the draft web fields", () => {
     expect(DraftAskParentSchema.safeParse(split.parent).success).toBe(true);
     expect(DraftAskParentSchema.safeParse({ ...parent, picks: [{ ...parent.picks[1], suggestion_id: "x" }] }).success).toBe(false);
     expect(splitAsk(ask)).toEqual({ ask, parent: undefined });
+  });
+
+  it("a seeded report version is one the website can read, with the paths its PDF prints; Free has no sources", () => {
+    const read = (fields: Readonly<{ free?: boolean; arabic?: boolean }>) => InvestigationReportsSchema.parse({
+      investigation_id: "1a1a1a1a-1111-4111-8111-111111111111", root_run_id: "11111111-1111-4111-8111-111111111111", state: "CLOSED", digs: 1, current: 1,
+      versions: [reportVersionBody({ version: 1, closedAt: "2026-10-28T09:00:00.000Z", writtenAt: "2026-10-28T09:00:00.000Z", ...fields })]
+    }).versions[0] as Readonly<{ sources: readonly unknown[]; paths: readonly Readonly<{ dig?: unknown; level: number }>[]; story: Readonly<{ short_answer: string }> }>;
+    const paid = read({});
+    expect(paid.sources.length).toBeGreaterThan(0);
+    expect(paid.paths.some((path) => path.dig !== undefined && path.level === 1)).toBe(true);
+    expect(read({ free: true }).sources).toEqual([]);
+    expect(read({ arabic: true }).story.short_answer).toMatch(/[\u0600-\u06FF]/u);
   });
 
   it("an investigation is open or closed, keeps its earlier reports and numbers its closings", () => {
