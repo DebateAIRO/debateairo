@@ -28,7 +28,9 @@ jobs:
       # It runs tests/unit, tests/architecture and tests/render (V, 2026-09-28) under vitest but
       # fails only on failures that are not on the recorded list; a listed test that passes three
       # runs in a row fails the gate until its entry is deleted (V-4).
+      # Test files run side by side here only (2026-11-01): 31 minutes one at a time, 10 to 16 minutes side by side.
       - run: node tools/source-map-hotfix.mjs tests # pnpm run test:ci-gate
+        env: { CI_TEST_FILES_SIDE_BY_SIDE: "1" }
       - run: node tools/source-map-hotfix.mjs audit # pnpm audit --audit-level=moderate
   # 2026-10-09 (review of PR #82): `verify` never ran tests/integration, so the only real proof of the sign-in and
   # account-security rules (server-side resend limit, 30-day absolute session cut-off, phone masking, recovery-email
