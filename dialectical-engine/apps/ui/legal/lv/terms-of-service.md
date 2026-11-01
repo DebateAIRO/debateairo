@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Īsumā
-eyebrow: PAKALPOJUMA NOTEIKUMI · v2.9 · SPĒKĀ NO 2026. GADA 12. OKTOBRA
+eyebrow: PAKALPOJUMA NOTEIKUMI · v2.10 · SPĒKĀ NO 2026. GADA 1. NOVEMBRA
 title: Kam jūs piekrītat
 lede: Līgums starp jums un DMS Merchandise Shop S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.
-endMarker: NOTEIKUMU BEIGAS · v2.9
+endMarker: NOTEIKUMU BEIGAS · v2.10
 bodyLabel: Pakalpojuma noteikumu teksts
 annexTitle: A pielikums — Reģionālie noteikumi
 jumps:
@@ -21,9 +21,9 @@ jumps:
 18 PIEMĒROJAMIE TIESĪBU AKTI
 -->
 
-**Version 2.9 · Effective 2026. gada 12. oktobris · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
+**Version 2.10 · Effective 2026. gada 1. novembris · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
 
-**In short.** Jums jābūt vismaz 18 gadus vecam. Dialectical Engine veido argumentus ar MI modeļiem, un viss, ko tas ģenerē, var būt nepareizs — tā nav konsultācija. Jūsu debates ir privātas, ja vien tās nepublicējat; ja tās publicējat, ikviens tās var lasīt. Jūsu iesniegtais teksts tiek nosūtīts mūsu Pakalpojumu sniedzēju reģistrā norādītajiem MI pakalpojumu sniedzējiem un netiek izmantots modeļu apmācīšanai. Par nelikumīgu saturu ziņojiet uz support@dezbatere.ro neatkarīgi no tā, vai jums ir konts. Piemēro Rumānijas tiesību aktus, taču jums joprojām ir vietējā patērētāju aizsardzība.
+**In short.** Jums jābūt vismaz 18 gadus vecam. Dialectical Engine veido argumentus ar MI modeļiem, un viss, ko tas ģenerē, var būt nepareizs — tā nav konsultācija. Bezmaksas plānā jūsu debates kļūst publiskas, kad tās ir pabeigtas, pēc MI pārbaudes; maksas plānā tās ir privātas, ja vien tās nepublicējat. Kad debates ir publiskas, ikviens tās var lasīt, un tās paliek publiskas. Jūsu iesniegtais teksts tiek nosūtīts mūsu Pakalpojumu sniedzēju reģistrā norādītajiem MI pakalpojumu sniedzējiem un netiek izmantots modeļu apmācīšanai. Par nelikumīgu saturu ziņojiet uz support@dezbatere.ro neatkarīgi no tā, vai jums ir konts. Piemēro Rumānijas tiesību aktus, taču jums joprojām ir vietējā patērētāju aizsardzība.
 
 ## 1. Kas mēs esam un kā ar mums sazināties
 
@@ -142,17 +142,25 @@ Ja neesat pārliecināts, vai kaut kas ir atļauts, pirms publicēšanas jautāj
 
 ## 9. Debašu publicēšana
 
-Debates **pēc noklusējuma ir privātas**. Nekas no jūsu izveidotā nav redzams citām personām, ja vien to nepublicējat.
+Debates maksas plānā **pēc noklusējuma ir privātas**: nekas no tā, ko tur izveidojat, nav redzams citām personām, ja vien to nepublicējat. Debates bezmaksas plānā ir publiskas, kā norādīts šajā sadaļā.
 
 **Ko dara publicēšana.** Publicēšana ir apzināta darbība, ko apstiprina atsevišķi. Kad publicējat, mēs izveidojam fiksētu debašu momentuzņēmumu un ļaujam ikvienam to lasīt bez konta. Meklētājprogrammas to var indeksēt. Momentuzņēmumā redzams jūsu **pseidonīms**, jūsu jautājums tādā formā, kādā to uzrakstījāt, argumentu koks, vērtējumi, spriedums un ticamības pakāpe, kā arī redzams marķējums, ka saturu ģenerējis MI. Tajā nav redzama jūsu e-pasta adrese, sesiju ieraksti vai konta vēsture.
 
-**Praksē publicēšana faktiski ir neatgriezeniska.** Kad debates kļūst publiskas, citas personas tās var lasīt, citēt, uzņemt to ekrānuzņēmumus, arhivēt un saglabāt kešatmiņā. Publikācijas atcelšana noņem tās no Dialectical Engine un iznīcina mūsu kopijas atslēgu, taču nevar sasniegt kopijas, kas jau atrodas citviet. Nepublicējiet neko tādu, ko nevēlētos pastāvīgi saistīt ar savu pseidonīmu.
+**Bezmaksas debates ir publiskas.** Bezmaksas plānā jūsu jautājums un tā debates ir publiskas. Mēs to paziņojam jums, pirms jūs uzdodat jautājumu. Kad debates ir pabeigtas, MI tās pārbauda; ja pārbaude to atļauj, ikviens var tās lasīt, un meklētājprogrammas tās var indeksēt. Ja pārbaude to noraida, tās paliek privātas tikai jums. Bezmaksas plāna jautājumā neiekļaujiet personas datus.
+
+**Nav iespējams atsaukt.** Kad debate ir publiska, tā paliek publiska. Jūs nevarat atsaukt tās publikāciju vai to dzēst, un konta dzēšana to neaizvāc. Kopijas, ko izveidojuši citi, nav mūsu kontrolē. Citas personas var to lasīt, citēt, uzņemt ekrānuzņēmumus, arhivēt un saglabāt kešatmiņā. Nepublicējiet neko tādu, ko nevēlētos pastāvīgi saistīt ar savu pseidonīmu.
 
 **Atzīmētām debatēm nepieciešams mūsu apstiprinājums.** Kad debates noslēdzas, automatizēta pārbaude izlasa to sintēzi pēc četrām 8. sadaļā minētajām kategorijām. Debates, ko pārbaude atzīmē, drīkst publicēt tikai ar mūsu apstiprinājumu, un atzīme tiek parādīta tikai jums un, ja lūdzat mūsu apstiprinājumu, mūsu komandas dalībniekiem, kuriem ir atļauja pārskatīt publikācijas; debates, kuras pārbaude atzīst par attiecināmām uz kategoriju „tieksmes uz pašnāvību vai kaitējuma nodarīšanu citiem cilvēkiem”, tā vietā tiek izdzēstas, kā norāda nākamā rindkopa. Ja lūdzat mūsu apstiprinājumu debašu lapā, mūsu komandas dalībnieks, kuram ir īpaša atļauja pārskatīt publikācijas, var izlasīt debates tādā veidā, kādā tās tiktu publicētas, bez jūsu pseidonīma. Ja apstiprinām, poga „Publicēt” jums atkal ir pieejama, un pārbaude, ko iziet katra publicēšana, joprojām tiek piemērota. Ja atsakām, debates paliek privātas, un mēs jums sniedzam pamatojumu (10. sadaļa). Pēc atteikuma varat lūgt vēlreiz, un lēmumu pieņem mūsu komandas dalībnieks, kas nepieņēma lēmumu par pirmo lūgumu; varat izmantot arī 10. sadaļā minēto sūdzību kārtību. Pēc otrā atteikuma vairs lūgt nevarat, taču joprojām varat nodot lēmumu izskatīšanai ārpustiesas strīdu izšķiršanas iestādei vai tiesai (10. sadaļa). Apstiprinājums attiecas uz sintēzi, ko izlasīja recenzents, tostarp uz jebkuru vēlāku debašu versiju, kas to atkārto burtiski; pārrakstīta sintēze tiek pārbaudīta vēlreiz, kad publicējat, un, ja tā tiek atzīmēta, tai nepieciešams savs apstiprinājums. Ja atzīmētas debates publicējat pēc mūsu apstiprinājuma, varat tās atkal noņemt ar „Noņemt” to kartītē sadaļā „Jūsu debates”.
 
 **Debates, ko izdzēš mūsu pārbaude.** Ja mūsu automātiskā pārbaude konstatē, ka debašu sintēze attiecas uz kategoriju „tieksmes uz pašnāvību vai kaitējuma nodarīšanu citiem cilvēkiem”, mēs debates izdzēšam automātiski un neglabājam, pat ja tās jau bija publicētas. Sintēze tiek uzskatīta par kaitējuma nodarīšanu citiem cilvēkiem, ja tā mudina uz kaitējumu personai vai to plāno, vai ja tā secina, ka valstij, armijai, policijai vai kādam citam būtu jāizmanto spēks pret cilvēkiem; debates par vardarbību kā vēstures, tiesību, ētikas, politikas, aktuālo notikumu vai sabiedriskās politikas tēmu netiek uzskatītas par tādām vienīgi savas tēmas dēļ. Neviens cilvēks debates vispirms nelasa, un tās nevar atjaunot. Pēc debašu noslēguma jums netiek rādīta debašu atbilde, izņemot gadījumu, kad pārbaude nevarēja atbildēt laikus: katras noslēgtās debates tiek aizturētas, līdz pārbaude ir atbildējusi (8. sadaļa), bet notiekošu debašu lapā tiek rādīti argumenti un gala secinājums, tiklīdz tie tiek sagatavoti; ja pārbaude nevarēja atbildēt laikus, debates tiek pārbaudītas vēlreiz, kad nospiežat „Publicēt”. Mēs jums to paziņojam vienu reizi, uz ekrāna, ar pamatojumu un palīdzības tālruņu numuriem. Jūs joprojām varat sūdzēties, izmantojot 10. sadaļā norādīto sūdzību kārtību, taču sūdzība nevar atjaunot debates. Šādi izdzēstas premium debates netiek ieskaitītas jūsu plāna limitā.
 
-**Publicētās debates, kad slēdzat kontu.** Plānojot konta slēgšanu, jūs izvēlaties, kas notiks ar jūsu publicētajām debatēm. Ja atzīmēsiet **„Dzēst arī manas publiskās debates”**, slēgšanas laikā katras debates noņemsim no Dialectical Engine un iznīcināsim savas kopijas atslēgu, kā tas notiek, atsaucot publikāciju, ja vien likums neliek saglabāt konkrētu vienumu. Ja lodziņu neatzīmēsiet, debates paliks publiskas ar jūsu vairs neizmantoto pseidonīmu. Kopijas, ko citi izveidojuši pirms noņemšanas, nav mūsu kontrolē. Ja vēlaties noņemamās debates saglabāt sev, vispirms tās lejupielādējiet.
+**Jūsu vārds.** Jūsu pseidonīms parādās kā debates, ko esat publicējis, autors, katrā ceļā, kurā esat sniedzis ieguldījumu, ar datumu, kā arī kā atsauce jūsu uzrakstītajā pārskatā. Ja izdzēšat savu kontu, jūsu pseidonīms tiek noņemts visur, un lapā tā vietā tiek rādīts „līdzautors”.
+
+**Ieguldījumi.** Ikviens, kam ir kredīts, bezmaksas vai maksas plānā, var izpētīt publisku debati, izmantojot savu kvotu. Ko jūs tur rakstāt un ko no tā raksta MI, to pārbauda MI, pirms tas var mainīt publisko lapu. Ja tas tiek atļauts, tas maina lapu visiem ar jūsu pseidonīmu, un tas paliek publisks pēc tiem pašiem noteikumiem kā debate: to nevar atsaukt. Ja tas tiek noraidīts, tas paliek privāts tikai jums, un lapa nemainās. Jūs nedrīkstat rakstīt neko, ko jums nav tiesību publicēt, vai jebkādu personisku informāciju par kādu.
+
+**Pārskati no ikviena.** Ikviens, kam ir kredīts, var uzrakstīt pārskatu par publisku debati, kamēr tai vēl nekas netiek pievienots, izmantojot savu kvotu. Pārskats ir publisks. Autora pseidonīms ir tikai atsauce: pārskatu MI raksta pēc tā, ko rāda lapa, un tas nav autora paziņojums. Iepriekšējie pārskati paliek pieejami lasīšanai.
+
+**Pēc autora aiziešanas.** Publiska debate paliek atvērta ieguldījumiem pēc tam, kad tās pirmais autors ir izdzēsis savu kontu. Jauni ieguldījumi strādā no publiskās kopijas.
 
 **Mēs vienmēr varam noņemt publicētu saturu.** Mēs varam noņemt publicētas debates vai ierobežot piekļuvi tām, ja to prasa tiesību akti, ja to uzdod tiesa vai kompetenta iestāde vai ja tās pārkāpj šos Noteikumus vai ir nelikumīgas. Nekas šajā sadaļā neliedz mums rīkoties pēc derīga paziņojuma saskaņā ar 10. sadaļu, un nekas tajā nav solījums, ka publicētas debates paliks pieejamas.
 
@@ -197,7 +205,7 @@ Izņemot gadījumus, kad pārkāpums ir nopietns, tiesību akti prasa tūlītēj
 
 Ja pilnībā slēdzam pakalpojumu vai pārtraucam to sniegt jūsu valstī, mēs paziņojam vismaz **30 dienu iepriekš**, atmaksājam iepriekš samaksāto summu par laiku pēc slēgšanas un vispirms nodrošinām iespēju eksportēt debates.
 
-**Slēgšanas sekas.** Kad konts tiek slēgts, mēs iznīcinām jūsu konta datu un privāto debašu šifrēšanas atslēgas, tādējādi padarot tos neatgriezeniski nenolasāmus, dzēšam jūsu konta ierakstu un, ja esat to izvēlējies, noņemam publicētās debates no publiskas piekļuves, kā aprakstīts 9. sadaļā. Dažas lietas saglabājas, un jums jāzina, kuras: ieraksti mūsu audita un drošības žurnālos, kuriem datus var tikai pievienot un kurus glabājam savu juridisko un drošības pienākumu izpildei; ieraksti, kas mums jāglabā saskaņā ar tiesību aktiem, tostarp piekrišanas un akceptēšanas ieraksti; un neliels skaits vecāku debašu, kas ir senākas par mūsu šifrēšanas shēmu un kuru ierakstu dzēšanas iespējas ir ierobežotākas — mēs jums paziņosim, ja tas attiecas uz jūsu kontu. Privātuma politikā tas viss aprakstīts datu aizsardzības kontekstā un izskaidrotas jūsu tiesības uz dzēšanu.
+**Slēgšanas sekas.** Kad konts tiek slēgts, mēs iznīcinām jūsu konta datu un privāto debašu šifrēšanas atslēgas, tādējādi padarot tos neatgriezeniski nenolasāmus, dzēšam jūsu konta ierakstu un noņemam jūsu pseidonīmu no jūsu publiskajām debatēm, kā aprakstīts 9. sadaļā; šīs publiskās debates paliek publiskas. Dažas lietas saglabājas, un jums jāzina, kuras: ieraksti mūsu audita un drošības žurnālos, kuriem datus var tikai pievienot un kurus glabājam savu juridisko un drošības pienākumu izpildei; ieraksti, kas mums jāglabā saskaņā ar tiesību aktiem, tostarp piekrišanas un akceptēšanas ieraksti; un neliels skaits vecāku debašu, kas ir senākas par mūsu šifrēšanas shēmu un kuru ierakstu dzēšanas iespējas ir ierobežotākas — mēs jums paziņosim, ja tas attiecas uz jūsu kontu. Privātuma politikā tas viss aprakstīts datu aizsardzības kontekstā un izskaidrotas jūsu tiesības uz dzēšanu.
 
 8. sadaļa (attiecībā uz jau publicētu saturu), kā arī 15., 16. un 18. sadaļa paliek spēkā pēc līguma izbeigšanas.
 
@@ -242,6 +250,8 @@ Ja dzīvojat citviet, A pielikumā norādītas jūsu reģionā piemērojamās at
 Mēs pastāvīgā informācijas nesējā iepriekš paziņojam, kas un kad mainīsies. Ja izmaiņas vairāk nekā nebūtiski nelabvēlīgi ietekmē jūsu piekļuvi pakalpojumam vai tā lietošanu, varat bez maksas izbeigt līgumu **30 dienu laikā** pēc paziņojuma saņemšanas vai izmaiņu stāšanās spēkā atkarībā no tā, kurš datums ir vēlāks, un mēs atmaksājam iepriekš samaksāto summu par neizmantoto periodu.
 
 **Šo Noteikumu izmaiņas.** Mēs varam mainīt šos Noteikumus tādu pašu iemeslu dēļ. Attiecībā uz izmaiņām, kas nesamazina jūsu tiesības, mēs publicējam jauno versiju kopā ar izmaiņu kopsavilkumu un vismaz **30 dienu iepriekš** nosūtām jums e-pasta ziņojumu par tās stāšanos spēkā; turpinot lietot Dialectical Engine pēc šī datuma, jūs izmaiņām piekrītat, un pirms tam varat slēgt kontu. Attiecībā uz izmaiņām, kas samazina jūsu tiesības, — tostarp esoša plāna cenas paaugstinājumu, zemākiem ierobežojumiem, noņemtām funkcijām, jauniem jūsu satura lietošanas veidiem vai izmaiņām atbildībā, piemērojamajos tiesību aktos vai strīdu izšķiršanā — mēs lūdzam nākamajā pierakstīšanās reizē skaidri piekrist jaunajai versijai, un izmaiņas attiecas tikai uz turpmāko laiku. Mēs nekad neveicam izmaiņas ar atpakaļejošu spēku un nekad neizmantojam šo sadaļu, lai termiņa vidū mainītu jums apmaksātā pakalpojuma būtību, nepiedāvājot iespēju izstāties. Iepriekšējās versijas ir pieejamas vietnē dezbatere.ro/terms/versions.
+
+Versija 2.10 aizstāja versiju 2.9: 9. sadaļā teikts, ka bezmaksas plānā debates ir publiskas, ka publiskas debates publikāciju nevar atsaukt un tā paliek publiska pēc konta slēgšanas, ka ikviens, kam ir kredīts, var sniegt ieguldījumu publiskā debatē vai uzrakstīt tai pārskatu, un ka publiska debate paliek atvērta pēc tam, kad tās pirmais autors ir aizgājis; 11. sadaļā teikts, ko slēgšana nozīmē jūsu publiskajām debatēm.
 
 Versija 2.9 aizstāja versiju 2.8: 8. sadaļa tiek papildināta ar rindkopu „Mūsu ģenerētās diagrammas un statistika”, kas nosaka, kam pieder debašu pārskata diagrammas, un piešķir jums licenci tās izmantot.
 
