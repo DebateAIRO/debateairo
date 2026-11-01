@@ -216,7 +216,7 @@ export function useV4Ask(input: Readonly<{
       let offerShown = false;
       let rechecked = false;
       let settingsRetried = false;
-      let debate: { id: string } | null = null;
+      let debate: { id: string; public_dig_not_joined?: boolean } | null = null;
       while (debate === null) {
         // Rebuilt on every pass: the one retry after a 409 settings-changed (ASK-7) sends the adopted switches.
         const config = v4AskConfig(askMode, now.readingLevel, askSettings, new Date(), now.newDebateCatalog);

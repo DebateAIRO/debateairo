@@ -248,7 +248,7 @@ describe("0147: the public tree", () => {
 });
 
 describe("0148: an erased account keeps its public debates", () => {
-  it("is drained, keeps the verifier, follows 0147, is the chain's head for now, and pins its own bytes", async () => {
+  it("is drained, keeps the verifier, follows 0147, and pins its own bytes", async () => {
     expect(parseN1Header(NEXT, read(NEXT_SQL_PATH))).toEqual({
       expand: false, drained: true, keepsVerifier: true, outsideTransaction: false, concurrentIndex: null
     });
