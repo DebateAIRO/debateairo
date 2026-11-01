@@ -138,6 +138,8 @@ export function PublicDebatePageClient({
 
   return (
     <>
+      {debate.changed_after_review === true ? <p className="publicChangedAfterReview" role="status" data-public-changed>{t(v4Catalog, "v4.public.changedAfterReview")}</p> : null}
+      <p className="publicReportLink"><a data-public-report href={`mailto:support@dezbatere.ro?subject=${encodeURIComponent(`Report: public debate ${debate.public_ref}`)}`}>{t(v4Catalog, "v4.public.report")}</a></p>
       <DebatePageClient
       id={debate.public_ref}
       initialDebate={projection.detail}

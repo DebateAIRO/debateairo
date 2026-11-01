@@ -222,7 +222,8 @@ Made-up debates from `public-seed.ts`, read at `GET /v1/public/debates/:id`. The
 
 - **Dig into this** (a path, or the dig's own path): `POST /v1/asks` with `public_parent`. It goes to the dig's own page, which says "checking" and about 10 seconds after the run finishes either changes the public page, or, with `#refuse` in the view, stays private.
 - **Write a report**: `POST /v1/public/debates/:id/report` answers 202; the new version appears on the page about 8 seconds later.
-- **The digger's three states**, seeded: `c1000000-0000-4000-8000-000000000001` CHECKING, `…002` ON_THE_PAGE, `…003` KEPT_PRIVATE, at `/v4/debate/<id>`.
+- **The digger's states**, seeded: `c1000000-0000-4000-8000-000000000001` CHECKING, `…002` ON_THE_PAGE, `…003` KEPT_PRIVATE, `…004` REMOVED_AFTER_REVIEW, at `/v4/debate/<id>`.
+- **A debate under review (decision 33)**: the team page's panel reads from the mock, but a passkey cannot be pressed here, so `/__mock/review?ref=<public ref>&step=HIDE` does what Confirm does (then `step=REMOVE_DIG`, `step=CORRECT&pointer=/story_short/summary&text=New words`, `step=REPUBLISH`). `/public/debate/<ref>` shows the plain under-review line while hidden, then the page with its "changed after review" line and the Report link.
 - **Refusals**: `/__mock/set?public=ONGOING` (a report waits), `public=REPORT_WRITING` and `public=TOO_DEEP` (a dig is refused), `public=OPEN` (back to normal), `room=FULL` (a used-up limit), more than three views with `plan=FREE`.
 - **A stranger**: `/__mock/set?session=OUT` shows a sign-in link in place of each press; `session=IN` to go back. The V4 pages then send you to sign in, as they do for a stranger.
 

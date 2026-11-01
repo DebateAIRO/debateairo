@@ -700,16 +700,29 @@ describe("hate-speech S02 publish path", () => {
   describe("composition", () => {
     const main = readFileSync(join(REPOSITORY_ROOT, "apps/api/src/main.ts"), "utf8");
 
-    /** The object literal passed to the ONE `createPublicationContentCheck(` call of main.ts. */
-    function checkComposition(): string {
-      const calls = main.split("createPublicationContentCheck(").length - 1;
-      expect(calls).toBe(1);
-      const start = main.indexOf("createPublicationContentCheck(");
-      return main.slice(start, main.indexOf("});", start) + 3);
+    /**
+     * The object literals passed to main.ts's two `createPublicationContentCheck(` calls: the publish check, and the one a public debate's report goes through (R22 decision 13, 0149).
+     * The second is no second judge: the test below holds that the two differ only in where they record.
+     */
+    function checkCompositions(): readonly string[] {
+      const pieces = main.split("createPublicationContentCheck(").slice(1);
+      expect(pieces).toHaveLength(2);
+      return pieces.map((piece) => piece.slice(0, piece.indexOf("});")));
     }
-    // FIX-HS2-p1 ct-B4, and the owner's ruling of 2026-10-04: the RUNNING deployment's D is the register's
-    // publicationCheckPolicy row, read at start-up — a wired literal, or no deadline, is red. The judge transport's
-    // backstop is measured from the same D.
+    function checkComposition(): string {
+      return checkCompositions()[0]!;
+    }
+    it("the report's check shares the publish check's one judge switch and the register's D: only the recorder differs", () => {
+      for (const composition of checkCompositions()) {
+        expect(composition).toContain("judge: publicationJudgeSwitch.current");
+        expect(composition.match(/deadlineMs\s*:\s*([^,\n}]+)/gu)).toEqual(["deadlineMs: publicationCheckPolicy.deadlineMs"]);
+        expect(composition).toContain("clock: () => new Date()");
+      }
+      expect(main.split("createPublicationJudgeTransport(").length - 1).toBe(1);
+      expect(main.split("createPublicationJudgeSwitch(").length - 1).toBe(1);
+      const [publish, report] = checkCompositions() as [string, string];
+      expect(publish.replace(/recorder:[^\n]*\n/u, "")).toBe(report.replace(/recorder:[^\n]*\n/u, ""));
+    });
     it("main.ts wires D from the register's publicationCheckPolicy row into the check and the judge transport, and nothing else", () => {
       const composition = checkComposition();
       expect(composition.match(/deadlineMs\s*:\s*([^,\n}]+)/gu)).toEqual(["deadlineMs: publicationCheckPolicy.deadlineMs"]);
