@@ -347,7 +347,8 @@ for (const [at, seeded] of SEEDED_CONTRIBUTION_DIGS.entries()) {
       picks: [{ kind: "OWN_VIEW", place: "path:n-mix", text: "Small towns behave differently.", by: "PERSON_OWN_VIEW" }], rewrite: null }
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (run.answer as any).contribution = { public_ref: PUBLIC_REF, state: seeded.state };
+  (run.answer as any).contribution = { public_ref: PUBLIC_REF, state: seeded.state, rewrite: seeded.state === "CHECKING" || seeded.state === "REMOVED_AFTER_REVIEW" ? null
+    : { line: "Free fares for everyone: partly held, by this dig's own reading.", summary: "The dig looked at small towns, and the picture stayed the same.", fate: "PARTLY_HELD", what_changed: ["Small towns are now covered."] } };
 }
 
 type RunState = "QUEUED" | "WAITING" | "CLAIMED" | "RUNNING" | "HOLDING" | "SETTLED" | "FAILED";

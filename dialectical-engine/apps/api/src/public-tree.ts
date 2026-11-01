@@ -1,11 +1,11 @@
 import {
   DIG_LEVEL_MAX, FREE_DIG_PICKS_MAX, InvestigationReportAnswerSchema, InvestigationReportPathSchema, InvestigationReportSourceSchema, InvestigationReportStorySchema, PublicDebateSchema,
-  PublicMaterialSchema, PublicReportVersionSchema, StoryFateSchema, cutQuoteAtWordEdge, type AskParent, type PublicContribution, type PublicDebate, type PublicDigParent, type PublicMainAnswer, type PublicMaterial,
+  PublicMaterialSchema, PublicReportVersionSchema, type AnswerContribution, StoryFateSchema, cutQuoteAtWordEdge, type AskParent, type PublicContribution, type PublicDebate, type PublicDigParent, type PublicMainAnswer, type PublicMaterial,
   type PublicMaterialPath, type PublicMaterialPoint, type PublicReportVersion, type StoryFate
 } from "@debateai/contract";
 import type { CryptoEnvelope, PreparedPublicationCipher } from "@debateai/crypto";
 import {
-  DIG_PICK_CARRIER, PUBLIC_MATERIAL_CARRIER, PUBLIC_REPORT_CARRIER, decryptContentForRun, encryptAttestedContentForRun, withRunContentLease, type Pool,
+  DIG_PICK_CARRIER, PATH_UPDATE_CARRIER, PostgresPublicTreeRunnerRepository, PUBLIC_MATERIAL_CARRIER, PUBLIC_REPORT_CARRIER, decryptContentForRun, encryptAttestedContentForRun, withRunContentLease, type Pool,
   type PostgresPublicDebateRepository, type PostgresPublicDebateRunnerRepository, type PostgresPublicPageRepository, type PostgresPublicTreeRepository, type PublicPageOwed, type PublicPageUpdateRead,
   type PublicReportCopyRead, type WebSealed
 } from "@debateai/db";
@@ -270,6 +270,22 @@ export async function pressPublicReport(input: Readonly<{ ownerRef: string; publ
       return Object.freeze({ kind: "WRITING", reportVersion: opened.reportVersion! });
     }
     default: return exhaustive(opened.outcome);
+  }
+}
+
+/**
+ * The digger's own page (decision 13): their rewrite of the path, as they alone see it, whatever the check said. Read from the parent's line, and only the row of this dig's own turn is opened, under this dig's own key: the first author's
+ * private rewrites on the same line are never touched, and no run id leaves here. Null when it is not written, or when a review closed the row (hidden, or taken out): the reader of the line gives no text then. Never throws.
+ */
+export async function ownDigRewriteOf(pool: Pool, digRunId: string, parentRunId: string): Promise<NonNullable<AnswerContribution["rewrite"]> | null> {
+  try {
+    const line = await new PostgresPublicTreeRunnerRepository(pool).readLine(parentRunId);
+    const own = (line ?? []).find((entry) => entry.source === "PATH_UPDATE" && entry.kind === "PUBLIC_DIG" && entry.run_id.toLowerCase() === digRunId.toLowerCase());
+    if (own === undefined || own.entry_id === null || own.content === null || own.hidden === true || (own.state !== "READY" && own.state !== "READY_WITH_RESERVATION")) return null;
+    const copy = pathCopyOf(await openUnder(pool, digRunId, PATH_UPDATE_CARRIER, own.entry_id, own.content), { ownRewrite: false, writtenAt: new Date(0).toISOString(), onRef: null });
+    return copy === null ? null : Object.freeze({ line: copy.line, summary: copy.summary, fate: copy.fate, what_changed: [...copy.what_changed] });
+  } catch {
+    return null;
   }
 }
 

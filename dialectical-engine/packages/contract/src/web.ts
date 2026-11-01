@@ -885,7 +885,9 @@ export type PublicDigParent = z.infer<typeof PublicDigParentSchema>;
  */
 export const AnswerContributionSchema = z.object({
   public_ref: z.uuid(),
-  state: z.enum(["CHECKING", "ON_THE_PAGE", "KEPT_PRIVATE", "REMOVED_AFTER_REVIEW"])
+  state: z.enum(["CHECKING", "ON_THE_PAGE", "KEPT_PRIVATE", "REMOVED_AFTER_REVIEW"]),
+  /** The digger's own rewrite of the path, for the digger only. Null: not written (yet), or closed by a review. Never a run id, and nothing of the debate above it. */
+  rewrite: z.object({ line: z.string(), summary: z.string(), fate: StoryFateSchema, what_changed: z.array(z.string()) }).strict().nullable().optional()
 }).strict();
 export type AnswerContribution = z.infer<typeof AnswerContributionSchema>;
 

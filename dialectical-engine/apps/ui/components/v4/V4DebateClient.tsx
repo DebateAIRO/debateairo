@@ -364,7 +364,7 @@ function V4Debate({
   const answerId = served?.answer.answer_id ?? null;
   const answerVersion = served?.answer.answer_version ?? 1;
   /** W4-6 (Q-D13): this debate is a dig of the new model, so it has no story to read or wait for. */
-  const noStory = served?.answer.dig !== undefined && served !== null;
+  const noStory = served !== null && (served.answer.dig !== undefined || served.answer.contribution !== undefined);
   /** The whole text that was sent for this debate (the person's words plus any added lines). */
   const questionLine = served !== null ? served.answer.question_line : load?.kind === "RUN" ? load.run.question_line : null;
 

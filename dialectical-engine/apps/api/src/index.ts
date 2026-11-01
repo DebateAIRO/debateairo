@@ -34,7 +34,7 @@ import { runInRequestScope, setRequestCredential } from "@debateai/db";
 import { normalizeManualPhone } from "./phone-profile.js";
 import { answerForOutcome, type AskQuestionCheck } from "./question-check/ask-gate.js";
 import { questionWithPurposeLines, recordPurposeLinesAtAsk, type PurposeLinesPort } from "./purpose-lines.js";
-import { admitPublicDig, joinPublicDigAtStart, pressPublicReport, type PublicDigAdmission } from "./public-tree.js";
+import { admitPublicDig, joinPublicDigAtStart, pressPublicReport, type PublicDigAdmission, ownDigRewriteOf } from "./public-tree.js";
 import type { AskClarifyPort } from "./ask-clarify.js";
 import { resolveSourceMailLocale } from "./mail-locale.js";
 import { exhaustive, type FundingBasis } from "@debateai/kernel";
@@ -4670,7 +4670,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const ownerRef = request.authenticatedSession?.ownerRef;
     const own = ownerRef === undefined || options.publicTree === undefined ? [] : await options.publicTree.contributions.readOwn(ownerRef, runId).catch((): readonly PublicContributionRead[] => []);
     const contribution = own.find((entry) => entry.dig_run_id.toLowerCase() === runId.toLowerCase());
-    return reply.send(contribution === undefined ? answer : { ...answer, contribution: { public_ref: contribution.publication_ref,
+    if (contribution === undefined) return reply.send(answer);
+    const rewrite = await ownDigRewriteOf(options.publicTree!.pool, contribution.dig_run_id, contribution.parent_run_id);
+    return reply.send({ ...answer, contribution: { public_ref: contribution.publication_ref, rewrite,
       state: contribution.removed_after_review === true ? "REMOVED_AFTER_REVIEW" : contribution.outcome === null ? "CHECKING" : contribution.outcome === "ALLOWED" && contribution.kept_private_after_review !== true ? "ON_THE_PAGE" : "KEPT_PRIVATE" } });
   });
   api.post<{ Params: { id: string } }>(
