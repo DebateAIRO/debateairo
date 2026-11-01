@@ -1581,6 +1581,8 @@ export const PublicDebateSchema = z.object({
   main_answer_update: PublicMainAnswerSchema.optional(),
   // Decision 13: the first author's account is gone: `author_pseudonym` then reads "a contributor" and the page says it in its own language.
   author_name_gone: z.literal(true).optional(),
+  /** Decision 33: part of this debate was changed after a review. Plainly marked; no reason is ever given. */
+  changed_after_review: z.literal(true).optional(),
   // Decisions 13 and 16: every report anyone wrote on it, oldest first; the newest is current, the earlier ones stay readable.
   reports: z.array(PublicReportVersionSchema).max(WEB_CONTRACT_LIMITS.publicReportsMax).optional()
 }).strict();

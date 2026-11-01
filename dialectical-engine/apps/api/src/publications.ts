@@ -33,7 +33,7 @@ import { NO_MAP_VIEWS, answerNodeIds, type MapViewReader } from "./map-views.js"
 import { TypedDomainError } from "@debateai/kernel";
 import type { AuthenticatedSession } from "./sessions.js";
 import { MadeByNewerReleaseError, madeByNewerRelease } from "./made-by-newer-release.js";
-import { mergedPublicDebate } from "./public-tree.js";
+import { mergedPublicDebate, type PublicReviewOverlay } from "./public-tree.js";
 import { questionWithPurposeLines } from "./purpose-lines.js";
 import type { PublicationContentCheck } from "./publication-check/check.js";
 type LabeledNumber = Node["base_score"];
@@ -376,6 +376,9 @@ export type PublicPageReader = Readonly<{
   readUpdates(publicationRef: string): Promise<readonly PublicPageUpdateRead[]>;
   readReports(publicationRef: string): Promise<readonly PublicReportCopyRead[]>;
   authorNameGone(publicationRef: string): Promise<boolean>;
+  /** Decision 33: what the review changed. Null: not public now. */
+  readOverlay?(publicationRef: string): Promise<PublicReviewOverlay | null>;
+  isHeld?(publicationRef: string): Promise<boolean>;
 }>;
 
 /** Decision 13: what a Free debate's publishing needs without a session: the sweep's own, one per pass. */
@@ -419,6 +422,8 @@ export interface PublicationApplication {
     contentLease?: PublicationContentLease;
   }>): Promise<PublicationPublishResult | null>;
   readPublicDebate(publicationRef: string): Promise<PublicDebate | null>;
+  /** Decision 33: is this a public debate hidden under review? Only the plain line follows. */
+  isUnderReview?(publicationRef: string): Promise<boolean>;
   list(limit: number, offset: number): Promise<Readonly<{
     items: readonly Readonly<{
       public_ref: string;
@@ -511,6 +516,18 @@ export class PostgresPublicationApplication implements PublicationApplication {
   }
 
   /** The publication's key for a sweep's sealing, under its content lease, while it is public. Null: it is not. */
+  /** Decision 33: the key for the two accounts' review, of a debate that may be hidden. Their authority was proved by the caller; never a public path. */
+  async withReviewKey<T>(publicationRef: string, runId: string, use: (cipher: Awaited<ReturnType<PublicationCipher["open"]>>) => T): Promise<T> {
+    return this.repository.withContentLease(publicationRef, async () => {
+      const prepared = await this.cipher.open(publicationRef, runId);
+      try {
+        return use(prepared);
+      } finally {
+        prepared.close();
+      }
+    });
+  }
+
   async withPublicationKey<T>(publicationRef: string, use: (cipher: Awaited<ReturnType<PublicationCipher["open"]>>) => T): Promise<T | null> {
     return this.repository.withContentLease(publicationRef, async () => {
       const snapshot = await this.repository.readPublic(publicationRef);
@@ -525,16 +542,27 @@ export class PostgresPublicationApplication implements PublicationApplication {
   }
 
   /** The first snapshot with what contributions and reports added since. A failure to read them serves the snapshot alone. */
-  async #withPage(snapshot: PublicDebate, publicationRef: string, runId: string): Promise<PublicDebate> {
+  async #withPage(snapshot: PublicDebate, publicationRef: string, runId: string): Promise<PublicDebate | null> {
     if (this.publicPage === null) return snapshot;
+    // Decision 33, failing shut: a page whose review cannot be read is not served, because its first snapshot may hold what was corrected.
+    let overlay: PublicReviewOverlay | null = { changed: false, corrections: [] };
+    try {
+      if (this.publicPage.readOverlay !== undefined) overlay = await this.publicPage.readOverlay(publicationRef);
+    } catch (error) {
+      console.error(JSON.stringify({ event: "api.publication.review_unread", id: publicationRef, diagnostic: storyReadDiagnostic(error) }));
+      return null;
+    }
+    if (overlay === null) return null;
+    const reviewed = overlay.changed || overlay.corrections.length > 0;
     let prepared: Awaited<ReturnType<PublicationCipher["open"]>> | undefined;
     try {
       const [updates, reports, authorNameGone] = await Promise.all([this.publicPage.readUpdates(publicationRef), this.publicPage.readReports(publicationRef), this.publicPage.authorNameGone(publicationRef)]);
       prepared = await this.cipher.open(publicationRef, runId);
       const opener = prepared;
-      return mergedPublicDebate(snapshot, { updates, reports, authorNameGone, open: (envelope) => opener.decrypt(envelope) });
+      return mergedPublicDebate(snapshot, { updates, reports, authorNameGone, overlay, open: (envelope) => opener.decrypt(envelope) });
     } catch (error) {
       console.error(JSON.stringify({ event: "api.publication.page_copies_unread", id: publicationRef, diagnostic: storyReadDiagnostic(error) }));
+      if (reviewed) return null;
       return snapshot;
     } finally {
       prepared?.close();
@@ -792,6 +820,10 @@ export class PostgresPublicationApplication implements PublicationApplication {
    * old not found (null), with one content-free journal line (api.publication.snapshot_unreadable), since it is not a
    * newer release's data. The key is read only after the parse failed, inside the same content lease.
    */
+  async isUnderReview(publicationRef: string): Promise<boolean> {
+    return this.publicPage?.isHeld?.(publicationRef) ?? false;
+  }
+
   async readPublicDebate(publicationRef: string): Promise<PublicDebate | null> {
     return this.repository.withContentLease(publicationRef,async () => {
       const snapshot = await this.repository.readPublic(publicationRef);

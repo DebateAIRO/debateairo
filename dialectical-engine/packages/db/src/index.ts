@@ -17,6 +17,7 @@ import type {
 import { MODEL_STRENGTHS, TypedDomainError, parseReleaseKey, type ActivationState, type CompositionBudgetTier, type ModelStrength, type RiskTier, type TierSource } from "@debateai/kernel";
 
 export * from "./publication-check.js";
+export * from "./public-review.js";
 export * from "./synthesis-check-erasure.js";
 export { PostgresThreatReportRepository, type ThreatReportDecision, type ThreatReportListRow, type ThreatReportReadRow, type ThreatReportAlertClaim } from "./threat-reports.js";
 // Row-level security S01 (PLAN §0.3): the request scope and the cross-account routing createPool applies.

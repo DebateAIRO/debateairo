@@ -881,11 +881,11 @@ export type PublicDigParent = z.infer<typeof PublicDigParentSchema>;
 
 /**
  * `Answer.contribution`, on a dig made on a public debate, for the digger: CHECKING (the AI check on it is running), ON_THE_PAGE (it changed
- * the public page) or KEPT_PRIVATE (the check refused it or could not run: the dig stays theirs, and the page is unchanged).
+ * the public page) or KEPT_PRIVATE (the check refused it or could not run: the dig stays theirs, and the page is unchanged). REMOVED_AFTER_REVIEW: it was on the page and was taken off after a review (decision 33); no reason and no staff name.
  */
 export const AnswerContributionSchema = z.object({
   public_ref: z.uuid(),
-  state: z.enum(["CHECKING", "ON_THE_PAGE", "KEPT_PRIVATE"])
+  state: z.enum(["CHECKING", "ON_THE_PAGE", "KEPT_PRIVATE", "REMOVED_AFTER_REVIEW"])
 }).strict();
 export type AnswerContribution = z.infer<typeof AnswerContributionSchema>;
 

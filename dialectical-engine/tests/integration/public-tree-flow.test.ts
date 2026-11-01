@@ -2,7 +2,7 @@
 // R22 public lane (plan 2026-10-31-r22-owner-changes decisions 13, 16, 21, 22), on real PostgreSQL through the REAL gateway with scripted vendors on a fake fetch: strangers digging on a
 // public debate, each with their own account and run key, the AI check, the publication check, the page's copies under the publication's key, reports, and the first author leaving (their
 // run key destroyed, their account deleted). What matters here is what does NOT happen: what a stranger's prompts never hold, what never reaches the page, who never pays. Data is made up.
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -14,7 +14,7 @@ import {
 } from "../../packages/crypto/src/index.js";
 import {
   MAIN_ANSWER_UPDATE_CARRIER, PATH_REWRITE_CARRIER, PUBLIC_REPORT_CARRIER, PostgresTreeUpdateRunnerRepository, encryptAttestedContentForRun, PostgresPublicDebateRepository, PostgresPublicDebateRunnerRepository, PostgresPublicPageRepository, PostgresPublicTreeRepository,
-  PostgresInvestigationRepository, PostgresPublicTreeRunnerRepository, PostgresPublicationRepository, PostgresTreeUpdateRepository, configureContentEncryption, createPool,
+  PostgresInvestigationRepository, PostgresPublicReviewRepository, PostgresPublicTreeRunnerRepository, PostgresPublicationRepository, PostgresTreeUpdateRepository, configureContentEncryption, createPool,
   decryptContentForRun, migrate, withRunContentLease, type Pool
 } from "@debateai/db";
 import { createPostgresProviderGateway } from "@debateai/runner";
@@ -33,6 +33,9 @@ import { composePublicReport, sweepPublicTree } from "../../apps/runner/src/publ
 import { DIG_NODES, SATISFIED, digSnapshot, fieldsOf, fittingRewrite, isChecker } from "../support/path-rewrite-world.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
 import { provisionRlsLogins, type RlsLogins } from "../support/rls-logins.js";
+import { canonicalPublicReviewBinding } from "../../apps/api/src/staff/public-review.js";
+import { drainTeamLimitNotices } from "../../apps/api/src/staff/team-limit.js";
+import { authorizeStaffAlertFixture } from "../support/staffAlertReadiness.js";
 import { persistTerminalRun } from "../support/settledRun.js";
 import { createEncryptedStoryRun, type StoryEncryptedOwner } from "../support/storyEncryptedOwner.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
@@ -160,7 +163,9 @@ function application(): PostgresPublicationApplication {
   return new PostgresPublicationApplication(new PostgresPublicationRepository(api, hasher), publicationCipher, undefined, undefined, undefined, undefined, null, {
     readUpdates: (ref) => new PostgresPublicDebateRunnerRepository(api).readPageUpdates(ref),
     readReports: (ref) => new PostgresPublicPageRepository(api).readReports(ref),
-    authorNameGone: (ref) => new PostgresPublicDebateRunnerRepository(api).isAuthorNameGone(ref)
+    authorNameGone: (ref) => new PostgresPublicDebateRunnerRepository(api).isAuthorNameGone(ref),
+    readOverlay: (ref) => new PostgresPublicReviewRepository(api).readOverlay(ref),
+    isHeld: (ref) => new PostgresPublicReviewRepository(api).isHeld(ref)
   });
 }
 async function pageSweep(check: PublicationContentCheck = allowEverything, extra: Partial<Parameters<typeof sweepPublicPage>[0]> = {}) {
@@ -921,4 +926,301 @@ describe("the tables", () => {
     await expect(database.pool.query("DELETE FROM identity.public_debate_report WHERE report_id=$1", [reportId])).rejects.toBeDefined();
     await expect(database.pool.query("DELETE FROM identity.public_report WHERE report_id=$1", [reportId])).rejects.toMatchObject({ message: "PUBLIC_TREE_APPEND_ONLY" });
   });
+});
+
+describe("a debate under review (decision 33)", () => {
+  const hash = (value: string) => `sha256:${createHash("sha256").update(value).digest("hex")}`;
+  type Actor = Readonly<{ userId: string; sessionId: string; staffId: string; privilegeId: string; context: Record<string, unknown> }>;
+  const runtime = () => api;
+  const q = () => database.pool;
+  let owner: Actor;
+  async function contextOf(a: Omit<Actor, "context">): Promise<Record<string, unknown>> {
+  return (await runtime().query("SELECT staff.read_context($1,$2,$3) AS context", [a.userId, a.sessionId, hash(a.privilegeId)])).rows[0].context;
+}
+
+  /** A delegated staff member with every capability a delegate can hold, and a live elevated session. */
+async function delegate(): Promise<Actor> {
+  const userId = randomUUID(), sessionId = randomUUID(), staffId = randomUUID(), privilegeId = randomUUID();
+    await q().query(`INSERT INTO identity."user" (user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,password_hash,pseudonym,state,adult_affirmed_at)
+    VALUES($1,$2,'{}','{}','fixture-password',$3,'active',now())`, [userId, createHash("sha256").update(userId).digest(), userId]);
+  await q().query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at,last_accepted_step)
+    VALUES($1,$2,'totp','{}','active',now(),now(),1)`, [randomUUID(), userId]);
+  await q().query(`INSERT INTO identity.channel_binding(user_id,channel_type,address_ciphertext,state,created_at,verified_at) VALUES($1,'email','{}','verified',now(),now())`, [userId]);
+  await q().query(`INSERT INTO identity.session(session_id,user_id,token_hash,csrf_token_hash,binding_context,idle_expires_at,absolute_expires_at,last_mfa_at)
+    VALUES($1,$2,$3,$4,'{}',now()+interval '1 hour',now()+interval '2 hours',now())`, [sessionId, userId, hash(sessionId), hash("csrf" + sessionId)]);
+  await q().query("INSERT INTO staff.subject(staff_id,user_id,capabilities) VALUES($1,$2,$3)", [staffId, userId, ["TEAM_READ", "AUDIT_READ", "EMERGENCY_DISABLE", "PUBLICATION_REVIEW", "THREAT_REPORT"]]);
+  await q().query(`INSERT INTO staff.privilege_session(privilege_session_id,staff_id,user_id,ordinary_session_id,token_hash,csrf_token_hash,security_epoch,account_security_epoch,grant_revision,idle_expires_at,absolute_expires_at)
+    VALUES($1,$2,$3,$4,$5,$6,0,0,0,now()+interval '15 minutes',now()+interval '2 hours')`, [privilegeId, staffId, userId, sessionId, hash(privilegeId), hash("staff-csrf" + privilegeId)]);
+  const base = { userId, sessionId, staffId, privilegeId };
+  return { ...base, context: await contextOf(base) };
+}
+
+  async function storedProof(a: Actor, binding: Record<string, unknown>, event: string, ttl = "5 minutes"): Promise<Readonly<{ proofId: string; alert: Record<string, unknown> }>> {
+  const proofId = randomUUID(), c = a.context as { securityEpoch: number; grantRevision: number; accountSecurityEpoch: number };
+  const times = ttl === "expired" ? "now()-interval '2 minutes',now()-interval '1 minute'" : "now(),now()+interval '5 minutes'";
+  await q().query(`INSERT INTO staff.action_proof(proof_id,staff_id,user_id,ordinary_session_id,privilege_session_id,security_epoch,account_security_epoch,grant_revision,binding,credential_id,verified_at,expires_at)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'fixture-key',${times})`, [proofId, a.staffId, a.userId, a.sessionId, a.privilegeId, c.securityEpoch, c.accountSecurityEpoch, c.grantRevision, binding]);
+  await authorizeStaffAlertFixture(q(), binding.operationId as string);
+  return { proofId, alert: { schema: "staff-alert-v1", event, operationId: binding.operationId, envelope: { v: 1, keyId: "fixture-key", nonce: "AAAAAAAAAAAAAAAA", tag: "AAAAAAAAAAAAAAAAAAAAAA==", ct: "YQ==" } } };
+}
+
+  const reviewRevision = async (ref: string) => (await q().query<{ n: number }>("SELECT coalesce(max(revision),0)::int AS n FROM identity.public_review_event WHERE publication_ref=$1", [ref])).rows[0]!.n;
+  type Step = "HIDE" | "REPUBLISH" | "REMOVE_DIG" | "PUT_BACK" | "CORRECT" | "HIDE_REPORT";
+  type Piece = Readonly<{ kind?: "SNAPSHOT" | "UPDATE" | "REPORT" | "DIG"; id?: string; pointer?: string; text?: string }>;
+  function intentOf(ref: string, step: Step, piece: Piece, revision: number, operationId: string) {
+    return step === "HIDE" ? { action: "PUBLIC_REVIEW_HIDE" as const, publication_ref: ref, expected_revision: revision, operation_id: operationId }
+      : { action: "PUBLIC_REVIEW_STEP" as const, publication_ref: ref, step, piece_kind: piece.kind ?? null, piece_id: piece.id ?? null, pointer: piece.pointer ?? null,
+        text_sha256: piece.text === undefined ? null : createHash("sha256").update(piece.text).digest("hex"), expected_revision: revision, operation_id: operationId };
+  }
+  async function act(actor: Actor, debate: Readonly<{ ref: string; root: string }>, step: Step, piece: Piece = {}, change: Readonly<{ noAlert?: boolean; revision?: number; proofFor?: Parameters<typeof intentOf>; replay?: Readonly<{ proofId: string; binding: Record<string, unknown>; alert: Record<string, unknown>; operationId: string }> }> = {}) {
+    const revision = change.revision ?? await reviewRevision(debate.ref);
+    const operationId = change.replay?.operationId ?? randomUUID();
+    const intent = intentOf(debate.ref, step, piece, revision, operationId);
+    const binding = change.replay?.binding ?? canonicalPublicReviewBinding(change.proofFor === undefined ? intent : intentOf(...change.proofFor), { expectedRevision: change.proofFor?.[3] ?? revision, hidden: false }) as unknown as Record<string, unknown>;
+    const proof = change.replay ?? await storedProof(actor, binding, "PUBLIC_REVIEW_CHANGED");
+    const content = piece.text === undefined ? null : await application().withReviewKey(debate.ref, debate.root, (cipher) => cipher.encrypt({ text: piece.text }));
+    const receipt = await new PostgresPublicReviewRepository(runtime()).act({ actor: actor.context as never, proof: { proofId: proof.proofId, binding } as never, step, publicationRef: debate.ref, pieceKind: piece.kind ?? null, pieceId: piece.id ?? null,
+      pointer: piece.pointer ?? null, textSha256: piece.text === undefined ? null : createHash("sha256").update(piece.text).digest("hex"), content, expectedRevision: revision, operationId, alertIntent: change.noAlert === true ? null : proof.alert as never });
+    return { receipt, proofId: proof.proofId, binding, alert: proof.alert, operationId };
+  }
+  const updatesOf = async (ref: string) => (await q().query<{ update_id: string; dig_run_id: string; kind: string; update_seq: number }>("SELECT update_id,dig_run_id,kind,update_seq FROM identity.public_debate_update WHERE publication_ref=$1 ORDER BY update_seq", [ref])).rows;
+  const definerUpdates = async (ref: string) => (await api.query("SELECT identity.read_public_debate_updates($1) AS rows", [ref])).rows[0].rows as unknown[];
+
+  beforeAll(async () => {
+    // The partner of the two: 0142's authority, with no capability a delegate lacks. The Owner's half of the rule is held by team-limit-database.test.ts.
+    owner = await delegate();
+    await q().query("INSERT INTO staff.team_limit_holder(staff_id,granted_by_staff_id,granted_operation_id) VALUES($1,$1,$2)", [owner.staffId, randomUUID()]);
+  }, 120_000);
+
+  it("hidden means hidden on every public read, at once, while a report is writing and a sweep is due; it stays until someone acts; a running dig finishes privately", async () => {
+    const [ana, dan, eve, fay] = [await account(), await account(), await account(), await account()];
+    const debate = await publishedDebate(ana);
+    const world = vendors();
+    await dig(dan, debate, world);
+    await settleAll(world);
+    const before = await page(debate.ref);
+    expect(before.contributions).toHaveLength(1);
+    const tree = new PostgresPublicTreeRepository(api);
+    const readPublicDebate = (ref: string) => application().readPublicDebate(ref);
+    // A dig still running (joined, nothing settled), and a report being written.
+    const running = await createEncryptedStoryRun(database.pool, fay, "Still running?");
+    expect((await tree.join({ ownerRef: fay.ownerRef, publicationRef: debate.ref, parentRunId: debate.root, childRunId: running, positionRef: debate.position })).outcome).toBe("JOINED");
+    const reportId = randomUUID();
+    const opened = await tree.openReport(eve.ownerRef, debate.ref, reportId, false);
+    expect(["OPENED", "ONGOING"]).toContain(opened.outcome);
+    const listed = async () => (await application().list(100, 0)).items.map((item) => item.public_ref);
+    expect(await listed()).toContain(debate.ref);
+    await act(owner, debate, "HIDE");
+    // The page, its copies, its reports, the list.
+    expect(await application().readPublicDebate(debate.ref)).toBeNull();
+    expect(await definerUpdates(debate.ref)).toEqual([]);
+    expect((await api.query("SELECT identity.read_public_debate_reports($1) AS rows", [debate.ref])).rows[0].rows).toEqual([]);
+    expect((await api.query("SELECT identity.read_public_review_overlay($1) AS value", [debate.ref])).rows[0].value).toBeNull();
+    expect(await listed()).not.toContain(debate.ref);
+    // Over HTTP: the plain state, no text, no cache.
+    const base = testHttpIdentity(randomUUID());
+    const http = buildApi({ application: { withContentLease: <T>(_id: string, use: () => Promise<T>) => use() } as unknown as ApiOptions["application"], sessions: testSessionApplication([base]), allowedOrigin: TEST_APP_ORIGIN, publications: application() as never });
+    const served = await http.inject({ method: "GET", url: `/v1/public/debates/${debate.ref}`, headers: { origin: TEST_APP_ORIGIN } });
+    expect(served.statusCode).toBe(410);
+    expect(served.json()).toEqual({ error: "DEBATE_UNDER_REVIEW" });
+    expect(served.headers["cache-control"]).toBe("no-store");
+    expect(served.body).not.toContain(QUESTION);
+    const list = await http.inject({ method: "GET", url: "/v1/public/debates?limit=100&offset=0", headers: { origin: TEST_APP_ORIGIN } });
+    expect(list.body).not.toContain(debate.ref);
+    await http.close();
+    // Nothing new starts: no parent to dig, no join, no report.
+    expect(await tree.readDigParent(debate.ref, null)).toBeNull();
+    const late = await createEncryptedStoryRun(database.pool, eve, "Too late?");
+    expect((await tree.join({ ownerRef: eve.ownerRef, publicationRef: debate.ref, parentRunId: debate.root, childRunId: late, positionRef: debate.position })).outcome).toBe("NOT_PUBLIC");
+    expect(await pressPublicReport({ ownerRef: eve.ownerRef, publicationRef: debate.ref, reportId: randomUUID(), free: false, now: new Date(), pool: api, tree, readPublicDebate })).toEqual({ kind: "NOT_FOUND" });
+    // What was running: the dig is settled and stays its person's; its state says kept private; a report in hand ended; nothing is owed to this page.
+    const own = await new PostgresPublicDebateRepository(api).readOwn(fay.ownerRef, running);
+    expect(own.find((row) => row.dig_run_id === running)).toMatchObject({ outcome: "UNAVAILABLE", kept_private_after_review: true, removed_after_review: false });
+    expect((await q().query("SELECT outcome,failure_code FROM identity.public_report WHERE publication_ref=$1 AND outcome='FAILED'", [debate.ref])).rows.every((row) => row.failure_code === "PUBLIC_REVIEW_HOLD")).toBe(true);
+    await sweepPublicTree({ ...world.composed.publicTree, reports: world.reports, staleMs: 0 });
+    await pageSweep();
+    expect(await reviewRevision(debate.ref)).toBe(1);
+    // It stays hidden through any number of sweeps; a late report press cannot wake it.
+    expect(await application().readPublicDebate(debate.ref)).toBeNull();
+    // Put back with no correction: as it was, with no "changed" mark, and digs may start.
+    await act(owner, debate, "REPUBLISH");
+    const after = await page(debate.ref);
+    expect(after.contributions).toHaveLength(1);
+    expect(after.changed_after_review).toBeUndefined();
+    expect(await tree.readDigParent(debate.ref, null)).not.toBeNull();
+    expect(await pressPublicReport({ ownerRef: eve.ownerRef, publicationRef: debate.ref, reportId: randomUUID(), free: false, now: new Date(), pool: api, tree, readPublicDebate })).toEqual({ kind: "WRITING", reportVersion: expect.any(Number) });
+  }, 180_000);
+
+  it("taking a dig out: its text leaves the page; what came after it is shown as affected and off the page until put back; no later prompt, report or owner's read holds it; the digger's own view says so", async () => {
+    const [ana, xena, yan, zed, wes] = [await account(), await account(), await account(), await account(), await account()];
+    const debate = await publishedDebate(ana);
+    const REMOVED = "REMOVED-DIG-TEXT";
+    const worldX = vendors({ writeWith: REMOVED });
+    const xRun = await dig(xena, debate, worldX);
+    await settleAll(worldX);
+    const keptWorld = vendors({ writeWith: "LATER-DIG" });
+    const yRun = await dig(yan, debate, keptWorld);
+    await settleAll(keptWorld);
+    const tree = new PostgresPublicTreeRepository(api);
+    const readPublicDebate = (ref: string) => application().readPublicDebate(ref);
+    expect(await pressPublicReport({ ownerRef: wes.ownerRef, publicationRef: debate.ref, reportId: randomUUID(), free: false, now: new Date(), pool: api, tree, readPublicDebate })).toEqual({ kind: "WRITING", reportVersion: 1 });
+    await sweepPublicTree({ ...worldX.composed.publicTree, reports: worldX.reports, staleMs: 0 });
+    await pageSweep();
+    const full = await page(debate.ref);
+    expect(JSON.stringify(full)).toContain(REMOVED);
+    expect(full.reports).toHaveLength(1);
+    await act(owner, debate, "HIDE");
+    // Only while hidden: the order of things is the rule, and it holds in the database.
+    await act(owner, debate, "REMOVE_DIG", { kind: "DIG", id: xRun });
+    await act(owner, debate, "REPUBLISH");
+    const afterRemoval = await page(debate.ref);
+    expect(JSON.stringify(afterRemoval)).not.toContain(REMOVED);
+    expect(afterRemoval.changed_after_review).toBe(true);
+    // What came after it is off too: the page falls back to the last text before that dig; report written after it is off.
+    expect(afterRemoval.contributions ?? []).toHaveLength(0);
+    expect(afterRemoval.reports ?? []).toHaveLength(0);
+    expect(afterRemoval.main_answer_update).toBeUndefined();
+    // A step refused outside review.
+    await expect(act(owner, debate, "PUT_BACK", { kind: "UPDATE", id: (await updatesOf(debate.ref)).find((row) => row.dig_run_id === yRun)!.update_id })).rejects.toMatchObject({ message: "PUBLIC_REVIEW_NOT_HIDDEN" });
+    // The two see every piece, with its state.
+    const material = await new PostgresPublicReviewRepository(api).read(owner.context as never, hash(owner.sessionId), debate.ref);
+    expect(material!.updates.filter((row) => row.dig_run_id === xRun).every((row) => row.own_dig_removed && row.off)).toBe(true);
+    expect(material!.updates.filter((row) => row.dig_run_id === yRun).every((row) => !row.own_dig_removed && row.off)).toBe(true);
+    expect(material!.reports.every((row) => row.off && !row.hidden_by_hand)).toBe(true);
+    // Put one back after reading it. It returns; the taken-out dig's own row cannot.
+    await act(owner, debate, "HIDE");
+    const yRow = (await updatesOf(debate.ref)).find((row) => row.dig_run_id === yRun && row.kind === "PATH")!;
+    await act(owner, debate, "PUT_BACK", { kind: "UPDATE", id: yRow.update_id });
+    await expect(act(owner, debate, "PUT_BACK", { kind: "UPDATE", id: (await updatesOf(debate.ref)).find((row) => row.dig_run_id === xRun)!.update_id })).rejects.toMatchObject({ message: "PUBLIC_REVIEW_PIECE_UNKNOWN" });
+    await act(owner, debate, "REPUBLISH");
+    const back = await page(debate.ref);
+    expect(JSON.stringify(back)).toContain("LATER-DIG");
+    expect(JSON.stringify(back)).not.toContain(REMOVED);
+    // The digger's own view.
+    const own = await new PostgresPublicDebateRepository(api).readOwn(xena.ownerRef, xRun);
+    expect(own.find((row) => row.dig_run_id === xRun)?.removed_after_review).toBe(true);
+    // Nothing can hang from it now, and a parent that went is the plain refusal.
+    const under = await createEncryptedStoryRun(database.pool, zed, "Under the removed dig?");
+    expect((await tree.join({ ownerRef: zed.ownerRef, publicationRef: debate.ref, parentRunId: xRun, childRunId: under, positionRef: debate.position })).outcome).toBe("PARENT_PRIVATE");
+    expect((await api.query("SELECT identity.read_public_tree_of_run($1) AS value", [xRun])).rows[0].value).toBeNull();
+    // A later dig and its climb, main answer and report: the mark in no prompt, however they read the path. The first author's reads hold no closed row's text.
+    const laterWorld = vendors({ writeWith: "AFTER-REVIEW" });
+    await dig(zed, debate, laterWorld);
+    await settleAll(laterWorld);
+    expect(await pressPublicReport({ ownerRef: wes.ownerRef, publicationRef: debate.ref, reportId: randomUUID(), free: false, now: new Date(), pool: api, tree, readPublicDebate })).toMatchObject({ kind: "WRITING" });
+    await sweepPublicTree({ ...laterWorld.composed.publicTree, reports: laterWorld.reports, staleMs: 0 });
+    await pageSweep();
+    expect(laterWorld.sent.length).toBeGreaterThan(0);
+    expect(laterWorld.sent.some((packet) => contractOf(packet).startsWith("report."))).toBe(true);
+    expect(everyPromptText(laterWorld.sent)).not.toContain(REMOVED);
+    const ownerLine = (await api.query("SELECT identity.read_path_line($1,$2) AS line", [ana.ownerRef, debate.root])).rows[0].line as { run_id: string; content: unknown }[];
+    expect(ownerLine.some((entry) => entry.run_id === xRun)).toBe(false);
+    const ownerAnswers = (await api.query("SELECT identity.read_main_answer_updates($1,$2) AS rows", [ana.ownerRef, debate.root])).rows[0].rows as { trigger_run_id: string; content: unknown }[];
+    expect(ownerAnswers.filter((row) => row.trigger_run_id === xRun).every((row) => row.content === null)).toBe(true);
+    // The page after it all: the new text, still with no removed text.
+    const final = await page(debate.ref);
+    expect(JSON.stringify(final)).toContain("AFTER-REVIEW");
+    expect(JSON.stringify(final)).not.toContain(REMOVED);
+  }, 240_000);
+
+  it("a correction: the first snapshot, a dig's text and a report read corrected everywhere; a later climb rewrites from corrected text; the originals stay sealed, only for the two", async () => {
+    const [ana, dan, eve] = [await account(), await account(), await account()];
+    const debate = await publishedDebate(ana);
+    const SECRET = "Ileana Popescu of 5 Quay Street";
+    // The first snapshot's own path line carries what must go, and so does the dig's rewrite.
+    const world = vendors({ writeWith: `Partly ${SECRET}` });
+    await dig(dan, debate, world);
+    await settleAll(world);
+    const tree = new PostgresPublicTreeRepository(api);
+    const readPublicDebate = (ref: string) => application().readPublicDebate(ref);
+    expect(await pressPublicReport({ ownerRef: eve.ownerRef, publicationRef: debate.ref, reportId: randomUUID(), free: false, now: new Date(), pool: api, tree, readPublicDebate })).toMatchObject({ kind: "WRITING" });
+    await sweepPublicTree({ ...world.composed.publicTree, reports: world.reports, staleMs: 0 });
+    await pageSweep();
+    await act(owner, debate, "HIDE");
+    const repository = new PostgresPublicReviewRepository(api);
+    const material = (await repository.read(owner.context as never, hash(owner.sessionId), debate.ref))!;
+    // Correct the snapshot's path line, every copy's line, by hand.
+    await act(owner, debate, "CORRECT", { kind: "SNAPSHOT", id: debate.ref, pointer: "/story_short/paths/0/line", text: "Yes: CORRECTED-FIRST-LINE." });
+    for (const row of material.updates.filter((entry) => entry.kind === "PATH")) await act(owner, debate, "CORRECT", { kind: "UPDATE", id: row.update_id, pointer: "/line", text: "CORRECTED-DIG-LINE." });
+    for (const row of material.updates.filter((entry) => entry.kind === "PATH")) {
+      const opened = await application().withReviewKey(debate.ref, debate.root, (cipher) => cipher.decrypt(row.content)) as { what_changed: string[]; summary: string };
+      for (const [at, sentence] of opened.what_changed.entries()) if (sentence.includes(SECRET)) await act(owner, debate, "CORRECT", { kind: "UPDATE", id: row.update_id, pointer: `/what_changed/${String(at)}`, text: "CORRECTED." });
+      if (opened.summary.includes(SECRET)) await act(owner, debate, "CORRECT", { kind: "UPDATE", id: row.update_id, pointer: "/summary", text: "CORRECTED." });
+    }
+    // Hide the report that holds it, as one choice; correct-in-place is the other.
+    for (const report of material.reports) await act(owner, debate, "HIDE_REPORT", { kind: "REPORT", id: report.report_id });
+    // A pointer that is no text is no piece. Over the API this is refused before the database; in the database it is at least the log's shape.
+    await expect(act(owner, debate, "CORRECT", { kind: "SNAPSHOT", id: randomUUID(), pointer: "/question", text: "x" })).rejects.toMatchObject({ message: "PUBLIC_REVIEW_PIECE_UNKNOWN" });
+    await act(owner, debate, "REPUBLISH");
+    const shown = await page(debate.ref);
+    expect(shown.changed_after_review).toBe(true);
+    expect(shown.story_short?.paths[0]?.line).toBe("Yes: CORRECTED-FIRST-LINE.");
+    expect(shown.contributions![0]!.line).toBe("CORRECTED-DIG-LINE.");
+    expect(JSON.stringify(shown.contributions)).not.toContain(SECRET);
+    expect(shown.reports ?? []).toHaveLength(0);
+    // The original stays, sealed, for the two.
+    const stored = (await repository.read(owner.context as never, hash(owner.sessionId), debate.ref))!;
+    const originalFirst = await application().withReviewKey(debate.ref, debate.root, (cipher) => cipher.decrypt(stored.snapshot.content)) as PublicDebate;
+    expect(originalFirst.story_short?.paths[0]?.line).toBe(PATH_LINE);
+    expect((await q().query("SELECT count(*)::int AS n FROM identity.public_review_read WHERE publication_ref=$1", [debate.ref])).rows[0].n).toBe(2);
+    // A later dig: its copy holds the corrected text, its climb rewrites from it, and the mark and the first line are in no prompt.
+    const laterWorld = vendors({ writeWith: "AFTER-CORRECTION" });
+    const later = await dig(await account(), debate, laterWorld);
+    await settleAll(laterWorld);
+    const all = everyPromptText(laterWorld.sent);
+    expect(all).toContain("CORRECTED-DIG-LINE.");
+    expect(all).not.toContain(SECRET);
+    const material2 = await new PostgresPublicTreeRunnerRepository(runner).readMaterial(later);
+    expect(material2).not.toBeNull();
+    // Later main answers and page rows stack on the corrected ones and the correction still stands.
+    const afterClimb = await page(debate.ref);
+    expect(afterClimb.story_short?.paths[0]?.line).toBe("Yes: CORRECTED-FIRST-LINE.");
+    expect(JSON.stringify(afterClimb)).toContain("AFTER-CORRECTION");
+    expect(JSON.stringify(afterClimb)).not.toContain(SECRET);
+  }, 240_000);
+
+  it("exactly the two accounts: a delegate is refused by the database; a proof is bound to the debate, piece, action and revision; replay and stale refused; locked tools stop all but the hide; the log cannot be edited; notices name nothing", async () => {
+    const [ana] = [await account()];
+    const debate = await publishedDebate(ana);
+    const other = await publishedDebate(ana);
+    const person = await delegate();
+    const repository = new PostgresPublicReviewRepository(api);
+    await expect(repository.read(person.context as never, hash(person.sessionId), debate.ref)).rejects.toBeDefined();
+    await expect(repository.list(person.context as never, hash(person.sessionId))).rejects.toBeDefined();
+    await expect(act(person, debate, "HIDE")).rejects.toMatchObject({ message: "STAFF_AUTHORITY_INVALID" });
+    expect((await api.query("SELECT staff.authorize_action($1::jsonb,'TEAM_LIMIT_SET') AS ok", [person.context])).rows[0].ok).toBe(false);
+    await expect(application().readPublicDebate(debate.ref)).resolves.not.toBeNull();
+    // Bound to the debate.
+    await expect(act(owner, debate, "HIDE", {}, { proofFor: [other.ref, "HIDE", {}, 0, randomUUID()] })).rejects.toMatchObject({ message: "STAFF_PROOF_INVALID" });
+    // Stale: a proof for revision 5 of a log at 0.
+    await expect(act(owner, debate, "HIDE", {}, { revision: 5 })).rejects.toMatchObject({ message: "PUBLIC_REVIEW_STALE" });
+    const first = await act(owner, debate, "HIDE");
+    // The same operation answers the same receipt; a used proof with a new operation does not apply.
+    const replay = await act(owner, debate, "HIDE", {}, { revision: 0, replay: { proofId: first.proofId, binding: first.binding, alert: first.alert, operationId: first.operationId } });
+    expect(replay.receipt.operationId).toBe(first.operationId);
+    expect(await reviewRevision(debate.ref)).toBe(1);
+    await expect(new PostgresPublicReviewRepository(api).act({ actor: owner.context as never, proof: { proofId: first.proofId, binding: first.binding } as never, step: "REPUBLISH", publicationRef: debate.ref, pieceKind: null, pieceId: null, pointer: null, textSha256: null, content: null, expectedRevision: 1, operationId: randomUUID(), alertIntent: first.alert as never })).rejects.toMatchObject({ message: "STAFF_PROOF_INVALID" });
+    // Bound to the piece and to the text's digest: a proof for one piece opens no other.
+    const pieceA = randomUUID();
+    await expect(act(owner, debate, "CORRECT", { kind: "SNAPSHOT", id: debate.ref, pointer: "/question", text: "Other words." }, { proofFor: [debate.ref, "CORRECT", { kind: "SNAPSHOT", id: debate.ref, pointer: "/question", text: "Words." }, 1, pieceA] })).rejects.toMatchObject({ message: "STAFF_PROOF_INVALID" });
+    // Team tools locked: everything but the hide waits, at the database too.
+    await expect(act(owner, debate, "REPUBLISH", {}, { noAlert: true })).rejects.toMatchObject({ message: "STAFF_ALERT_UNAVAILABLE" });
+    const locked = await act(owner, other, "HIDE", {}, { noAlert: true });
+    expect(locked.receipt.outcome).toBe("COMPLETED");
+    expect(await application().readPublicDebate(other.ref)).toBeNull();
+    // The log cannot be edited, by anyone, and no request role reads it.
+    for (const table of ["identity.public_review_event", "identity.public_review_correction", "identity.public_review_detached", "identity.public_review_read"]) {
+      await expect(q().query(`DELETE FROM ${table}`), table).rejects.toBeDefined();
+      await expect(q().query(`UPDATE ${table} SET recorded_at=now()`), table).rejects.toBeDefined();
+      await expect(q().query(`TRUNCATE ${table}`), table).rejects.toBeDefined();
+      await expect(api.query(`SELECT * FROM ${table}`), table).rejects.toMatchObject({ code: "42501" });
+      await expect(runner.query(`SELECT * FROM ${table}`), table).rejects.toMatchObject({ code: "42501" });
+    }
+    await expect(api.query("SELECT * FROM staff.public_review_notice")).rejects.toMatchObject({ code: "42501" });
+    // Each step's mail is one template, to each of the two, with no parameter.
+    const sent: Record<string, unknown>[] = [];
+    await drainTeamLimitNotices({ repository, mail: { sendTemplated: async (mail: Record<string, unknown>) => { sent.push(mail); } } as never, readEmail: async () => "owner@example.test" });
+    expect(sent.length).toBeGreaterThanOrEqual(1);
+    expect(sent.every((mail) => mail.templateId === "PUBLIC_REVIEW_CHANGED" && Object.keys(mail.params as object).length === 0)).toBe(true);
+  }, 120_000);
 });

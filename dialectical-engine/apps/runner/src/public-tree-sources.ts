@@ -236,7 +236,8 @@ export function publicTreePortsOf(pool: Pool, digRunId: string): TreeUpdatePorts
     // Only a version a public contribution caused is ever opened here. A version from the author's private digs (0138 lists them too, for the bookkeeping of "based on") stays
     // shut: no prompt holds it, and the page's own main answer stands in for it.
     openMainAnswer: async (rootRunId, row) => {
-      if ((await contributions.readContribution(row.trigger_run_id))?.outcome !== "ALLOWED") return null;
+      // 0150: a row older than the debate's last review step has no content here: the page's copy stands for it, corrected.
+      if (row.content === null || (await contributions.readContribution(row.trigger_run_id))?.outcome !== "ALLOWED") return null;
       const lives = await rootLives(liveTree, rootRunId);
       const under = lives ? rootRunId : row.trigger_run_id;
       const opened = await withRunContentLease(pool, [under], () => decryptContentForRun<unknown>(pool, under, lives ? MAIN_ANSWER_UPDATE_CARRIER : PUBLIC_ANSWER_UPDATE_CARRIER,
