@@ -38,7 +38,7 @@ const refuse = () => { throw new Error("SOURCE_MAP_HOTFIX_REFUSED"); };
 
 // Early use is bound to the exact version and downloaded SRI, and to the floor that keeps it there.
 function requireEarlyUseBound({ name, version, sri, floor }, workspace, lock) {
-  const entry = new RegExp(`^  '?${name.replace(/[.]/g, "\\.")}@(\\d[^:\\s'(]*)(?:\\([^:\\s]*\\))?'?:(\\n    resolution: \\{integrity: ([^}]+)\\})?`, "gm");
+  const entry = new RegExp(`^  '?${name.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")}@(\\d[^:\\s'(]*)(?:\\([^:\\s]*\\))?'?:(\\n    resolution: \\{integrity: ([^}]+)\\})?`, "gm");
   const found = [...lock.matchAll(entry)];
   if (found.length !== 2 || found.some((match) => match[1] !== version) || !found.some((match) => match[3] === sri)) refuse();
   if (floor && (!workspace.split("\n").includes(`  '${floor}': '${version}'`) || !lock.split("\n").includes(`  ${floor}: ${version}`))) refuse();
