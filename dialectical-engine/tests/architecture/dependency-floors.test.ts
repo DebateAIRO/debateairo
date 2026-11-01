@@ -76,7 +76,14 @@ const VULNERABLE: Record<string, (version: string) => boolean> = {
   qs: (v) => compare(v, "6.16.1") < 0,
   // 2026-10-21: GHSA-8r9p-f939-6h3c and its sibling follow-redirects advisory (>=1.16.0 <1.16.1, array-form headers
   // and sensitiveHeaders regex escaping), reached through the Hatchet SDK's axios; 1.16.1 was published 2026-10-01.
-  "follow-redirects": (v) => v.startsWith("1.16.") && compare(v, "1.16.1") < 0,
+  // 2026-11-01: GHSA-mrwp-f3q8-3g9p (>=1.16.0 <=1.16.1, cross-realm sensitiveHeaders arrays); 1.16.2 was published
+  // 2026-10-25, young when this landed: early use approved by the owner, see tools/source-map-hotfix.mjs.
+  "follow-redirects": (v) => v.startsWith("1.16.") && compare(v, "1.16.2") < 0,
+  // 2026-11-01: GHSA-g3hv-75wg-m249 (minimatch <11.0.1, globparts amplification) and GHSA-3g3m-2fjr-6pw4 (glob
+  // >=9.0.0 <=14.0.1, AbortSignal bypass), test tooling only: testcontainers > archiver. Fixes published 2026-10-27,
+  // young when this landed: early use approved by the owner, see tools/source-map-hotfix.mjs.
+  minimatch: (v) => compare(v, "11.0.1") < 0,
+  glob: (v) => compare(v, "9.0.0") >= 0 && compare(v, "14.0.2") < 0,
   // 2026-10-22: GHSA-2464-fhr4-w9xw (critical: unauthenticated remote code execution in the Image Optimization API when
   // SVG files are used) and GHSA-p3m5-59mp-jv5r (high: App Router Server Actions denial of service), next <=15.5.27;
   // 15.5.28 was published 2026-10-14, so it clears the 7-day cooldown on its own.
