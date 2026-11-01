@@ -79,3 +79,5 @@ tests/integration/preview-auth-dev-fallback.test.ts
 
 # NOT listed: preview-auth-dev-startup.test.ts — red on dev at d1ac3641b (2 of 17: PREVIEW_STAGE_PROCESS_EXITED; it
 # starts the real API/UI stage processes, so it is a deployment rehearsal, not a self-contained suite).
+# The daily outbound mail limit (0153): the shared count, its atomicity and the API logins' rights on a real database.
+tests/integration/outbound-mail-limit.test.ts

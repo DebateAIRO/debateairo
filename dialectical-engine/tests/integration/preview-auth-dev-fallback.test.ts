@@ -83,7 +83,7 @@ describe('isolated PG18 native preview publication (source evidence, not Linux s
     const approval={baseRegisterVersion:snapshot.baseRegisterVersion,baseSnapshotSha256:snapshot.baseSnapshotSha256,snapshotSha256:snapshot.snapshotSha256,deltaSha256:snapshot.deltaSha256};
     const input={publicationId:randomUUID(),sourceRef:'isolated native preview operator fixture',snapshot,approval};
     const receipt=await publishPreviewRegister(pool,input);
-    expect(receipt.registerVersion).toBe('5');expect(receipt.rowCount).toBe(69);expect(receipt.publicationKind).toBe('GENERAL');expect(receipt.requestSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(receipt.registerVersion).toBe('5');expect(receipt.rowCount).toBe(70);expect(receipt.publicationKind).toBe('GENERAL');expect(receipt.requestSha256).toMatch(/^[a-f0-9]{64}$/);
     expect(await publishPreviewRegister(pool,input)).toEqual(receipt);
     const singleConnection=new pg.Pool({connectionString:db.connectionString,options:'-c role=debateai_prod_migrator',max:1,connectionTimeoutMillis:5000});
     await native.withGuardedPool(singleConnection,async(c:any)=>{acquisitions++;await native.assertNativeConnection(c,target,plan.manifest.cohorts.auth106);},async(verifierPool:any)=>{
