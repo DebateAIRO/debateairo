@@ -1357,6 +1357,61 @@ so a release does not touch them and needs no step for them. Setup, the test sit
 meaning of each email: `deploy/notify-alarm/README.md`. Each knock writes one harmless
 `billing.notice.unverified` line with `NOTICE_HEADER_MISSING` in the API's journal.
 
+## Before an upload: the Mac check (when the owner asks)
+
+**In plain words.** One command on the Mac tries three things the server does during an upload, on the exact commit
+about to be uploaded, the way the server does them. It was built after R22's upload (2 November 2026), which stopped
+six times on faults no test had seen. It runs only when the owner asks. It is never a required step: no step of any
+recipe below waits for it, and an upload may go without it. It never touches the server, reads no secret and spends
+no money.
+
+The command, run on the Mac from the `dialectical-engine/` folder of a checkout that holds the commit (here R22's
+commit; put the release's own `REV` in its place):
+
+```sh
+node tools/upload-check/run.mjs --rev af7e457b5
+```
+
+It needs Node v26.8.2 and pnpm 11.20.0 exactly (anything else is refused, `UPLOAD_CHECK_RUNTIME_REFUSED`), the
+internet for one package download, and port 5434 free. It first waits, up to an hour, until no other test run is going
+and at least 40% of the Mac's memory is free, because this Mac has frozen under parallel heavy work. Everything it
+makes goes into one temporary folder, which is deleted at the end however the run ends, Ctrl-C included.
+
+**What each check covers.** Each one does one thing the way the server does it:
+
+| Check | What it does | The 2 November fault it would have caught |
+|---|---|---|
+| 1. `tools-folder` | Builds the server's shared tools folder from the three `deploy/` folders alone, as they are at the commit (by `git archive`, so nothing else on the Mac can help), and loads every tool in it. Seven tools that always run from a release folder, where the packages are installed, are loaded in check 2 instead. | Fault 3: a tool that reached for a folder the shared tools folder does not have. |
+| 2. `website-build` | Installs a release the way step A3 does (one online package download, then installs that must download nothing), then builds the website with the settings the release tool itself gives the build, and loads the seven release-folder tools there. | Fault 2, but only while one of the owner's early allowances is in force (an early allowance lets a package version be used before it is 7 days old, which the package rule otherwise refuses). The report says how many are in force; with none, this check has nothing of that kind to catch. |
+| 3. `start-checks` | Starts a throwaway database (PostgreSQL) shaped like the server's to the start checks: the same name, port and cluster name. It applies every database step (migration) of the commit and makes the production logins (their names and roles) with the product's own tool. Then it runs the API's and the runner's own start checks as those logins, not as the database's all-powerful administrator. | Fault 5: the runner's start check expected one database role, and row security gives its login two. |
+
+- **A commit that is too old for a check** gets `not checked` for that check, with the reason. Check 2 says `not checked`
+  for any commit from before the release tool shared its build settings (`uiBuildEnvironment`), R22's included.
+- **`not checked` never counts as passed.**
+- **Check 3 gives the API's logins the three recovery roles** (password reset, backup email, two-step-login recovery),
+  as section 3 of the row-security release note (`docs/releases/2026-10-23-row-level-security.md`) says the server's
+  deployment does, and its report says so in a line.
+- **Its known gap:** on the server, step B4 made the logins by hand, as that guide said. So check 3 trusts the product's
+  list of production logins to match the server's, and its report says that too.
+
+**What none of the checks covers.** Faults 1, 4 and 6 of 2 November lived in the guide's own steps, on the server's own
+folders, and the checker does not run the guide's steps or copy the server. It also does not test the AIs' answers, and
+it leaves out the server-only checks that folders belong to root (the server's administrator account). The three
+house rules in "A normal release on a hosted base" ("How each step runs") are there for those faults.
+
+**How to read the result.** The report ends with `ALL PASSED` (exit code 0: the number a command hands back when it
+ends), or `NOT PASSED` (1). Exit code 2 means the run could not happen at all (a wrong version, a busy Mac, an unknown
+commit), with one line saying why. A `NOT PASSED` is a reason to bring the report to the owner before the upload.
+`tools/upload-check/README.md` explains each line.
+
+**The proof (2 November 2026).** The checker was run on three commits:
+
+| Commit | What it is | Result |
+|---|---|---|
+| `f8d39fc26` | the code on the morning of 2 November | `NOT PASSED`: check 1 names the four tools that failed that day (fault 3), and check 3 says `runner login: refused` (fault 5) |
+| `af7e457b5` | R22 as uploaded | `NOT PASSED` only because check 2 says `not checked` (too old); checks 1 and 3 pass |
+| the checker's own branch tip | the code with the R22 fixes and the checker | `ALL PASSED`: all three checks pass, the website build included, with the early allowances in force that day listed |
+
 ## A normal release on a hosted base (since R19, 21 October 2026)
 
 **Since the transition release T, this is the drained recipe of the old layout.** It ran on one fixed unit per
@@ -1393,6 +1448,28 @@ section is that recipe, written so that any later release can follow it.
 - Long steps (A3, A4, A6, A7) may run in the background, as R19 did: save the script in `$S/jobs` (made once with
   `install -d -o root -g root -m 0700 "$S/jobs"`), start it with `nohup bash "$S/jobs/<step>.sh" > "$S/jobs/<step>.log"
   2>&1 < /dev/null &`, and read the log with `tail`.
+
+**Three house rules (from R22's upload, 2 November 2026).** They hold for every recipe in this guide and for every new
+upload guide. Each one answers a fault the Mac check ("Before an upload: the Mac check" above) cannot see, because it
+lived in a guide's own step on the server's own folders. The blocks R22 stopped on already follow them; the rules are
+for every step written from now on.
+1. **An option's value goes on one line.** When a step hands a file's contents to a tool as an option's value, it takes
+   the line breaks and tabs out first (`tr -d '\n\r\t' < <file>`, or `jq -c` for JSON). The release tools refuse any
+   control character in a value. That was fault 1, which stopped R22 at its register plan (A8). The fixed form is in
+   the `native-plan --operation plan` row of "Commands" and in SV1's `LG` and `SHAPE` lines.
+2. **After starting a service, wait for its own sign that it is ready, with a time limit, before checking it; and read
+   a check file the way it is written.** `active` from systemd (the server's service manager) only says the process
+   started. Wait in a loop for the sign the service itself gives (its start line in the journal, its socket, its
+   answer on its address), give up after a stated time, and stop the step with `_NOT_DONE` then. When a tool writes
+   several lines, read the one that holds the answer, not the whole file. That was fault 6, which stopped R22 at its
+   Perplexity step. The fixed form is in steps 7 and 8 of `deploy/preview-gate/v3/README-perplexity.md` (a 30-second
+   wait for the socket, and the probe's last line read with `tail -n 1`). B6's wait of up to 4 minutes for the API's
+   start line follows the same rule.
+3. **In an upload with downtime, no step relies on a folder or file that only a release's first start creates.** A step
+   that runs before the first start (a check, a settings step) makes what it needs itself, the same way the start does
+   (same owner, same permissions), or it moves after the start. That was fault 4, the settings check; the fixed form is
+   item 4 of "The first upload with this change (T+1)", where the check now makes the release's
+   `lifecycle-current-<label>` folder itself.
 
 **The plan's inputs on this host never change** (the owner's, 14 and 19 October 2026). The hosted kit rebuilds
 billing, the ceilings and the answer checker from the plan every time, never from the base:
@@ -4043,7 +4120,8 @@ check says `DRAINED_PATH` (a migration that is not `n1: expand`) takes "Drained 
 **How each step runs.** As in the transition: one script per step, `set -euo pipefail`, the names file (SB1 makes it),
 `<STEP>_NOT_DONE` guards, `<STEP>_DONE` last, no env value printed except `REGISTER_VERSION`, `RELEASE_KEY`,
 `DEBATEAI_DEPLOYMENT_MODE`, `MAIL_SENDMAIL_PATH`, `PAYMENT_MARKS_AVAILABLE` (not secret) and ports. The traps of the
-transition hold. Two more:
+transition hold, and so do the three house rules of "A normal release on a hosted base" (one-line option values, a
+service's own ready sign, nothing that only a first start creates). Two more:
 - **One switch command at a time.** Each `release-switch.mjs` command takes
   `/etc/debateai-v3-preview/lifecycle/release-switch.lock`; another one meanwhile refuses `RELEASE_SWITCH_BUSY`. A lock
   left by an ssh drop names its path and how to clear it (WB4).
