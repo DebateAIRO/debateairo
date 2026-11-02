@@ -1,10 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { TEST_OWNER_LIMIT_ROWS } from '../support/hostedRegisterRows.js';
 const tool = await import('../../deploy/' + 'preview-release/v1/release-artifacts.mjs');
 const manifestModule = await import('../../deploy/' + 'preview-auth-dev/v1/source-manifest.mjs');
@@ -13,6 +12,7 @@ const environment = await import('../../deploy/' + 'preview-auth-dev/v1/environm
 const turnstile = await import('../../deploy/' + 'preview-auth-dev/v1/turnstile-custody.mjs');
 const operator = await import('../../deploy/' + 'preview-auth-dev/v1/native-operator.mjs');
 const prestart = await import('../../deploy/' + 'preview-lifecycle/v1/prestart.mjs');
+const toolsFolder = await import('../../tools/' + 'upload-check/tools-folder.mjs');
 
 const sha = (bytes: string | Buffer) => createHash('sha256').update(bytes).digest('hex');
 const me = { uid: process.getuid!(), gid: process.getgid!() };
@@ -1499,15 +1499,11 @@ describe('database-ahead', () => {
 // operator swap, the code guide's SB10). Every tool the guides run from it must load there: a top-level import of tools/
 // in release-artifacts.mjs (through caddy-slots.mjs) stopped release-switch.mjs during R22's downtime (2026-11-02).
 describe('the shared server-tools folder', () => {
-  it('every lifecycle tool the guides run loads from a copy of the three deploy folders alone', () => {
+  it('every server tool loads from a copy of the three deploy folders alone, except the release-folder ones', async () => {
     const base = realpathSync(mkdtempSync(join(tmpdir(), 'preview-operator-')));
     roots.push(base);
-    const engine = resolve(import.meta.dirname, '../..');
-    for (const dir of ['preview-lifecycle', 'preview-auth-dev', 'preview-release']) cpSync(join(engine, 'deploy', dir), join(base, 'dialectical-engine/deploy', dir), { recursive: true });
-    for (const tool of ['release-switch.mjs', 'release-check.mjs', 'release-env.mjs', 'release-retire.mjs', 'release-archive.mjs', 'settings-version.mjs', 'prestart.mjs']) {
-      const url = pathToFileURL(join(base, 'dialectical-engine/deploy/preview-lifecycle/v1', tool)).href;
-      const loaded = spawnSync(process.execPath, ['--input-type=module', '-e', `await import(${JSON.stringify(url)})`], { cwd: base, encoding: 'utf8', env: { PATH: process.env.PATH ?? '/usr/bin:/bin' } });
-      expect(loaded.status, `${tool}: ${loaded.stderr}`).toBe(0);
-    }
-  });
+    await toolsFolder.buildToolsFolder({ repo: resolve(import.meta.dirname, '../../..'), rev: 'HEAD', dest: base });
+    const results = await toolsFolder.loadEachTool({ folder: base, node: process.execPath, skip: toolsFolder.RELEASE_FOLDER_TOOLS });
+    expect(results.filter((result: { ok: boolean }) => !result.ok)).toEqual([]);
+  }, 300_000);
 });
