@@ -1349,6 +1349,14 @@ describe("P3-01 production database-principal manifest", () => {
   "grants": [
     "EXECUTE ON FUNCTION identity.read_data_export_public_flags(uuid,uuid)"
   ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0153_dig_tree_settled.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.mark_dig_tree_settled(uuid)",
+    "EXECUTE ON FUNCTION identity.dig_is_settled(uuid)"
+  ]
 }
 ]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))

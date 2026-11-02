@@ -191,6 +191,7 @@ export function publicTreePortsOf(pool: Pool, digRunId: string): TreeUpdatePorts
       record: (record) => publicTree.record(record),
       readLine: (runId) => publicTree.readLine(runId),
       readClimbNext: (runId) => publicTree.readClimbNext(runId),
+      markDigSettled: (runId) => liveTree.markDigSettled(runId),
       readMainAnswers: async (runId) => (await liveTree.readMainAnswers(runId)) ?? publicTree.readGoneAnswers(runId),
       recordMainAnswer: async (record) => {
         if (await rootLives(liveTree, record.rootRunId)) return liveTree.recordMainAnswer(record);

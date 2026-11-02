@@ -67,6 +67,8 @@ describe("S2 identity schema on real PostgreSQL", () => {
       "debate_last_visit", "dig_link",
       // 0135 a dig's picks: the set and each pick.
       "dig_pick", "dig_pick_set",
+      // 0153: the runner's mark that a dig has ended.
+      "dig_tree_settled",
       "email_change_request",
       // 0137 public debates: a free ask, a public dig's contribution, the debate's updates, the report's writer and charges.
       "free_public_ask",

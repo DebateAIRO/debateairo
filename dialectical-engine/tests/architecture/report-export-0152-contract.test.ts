@@ -41,10 +41,10 @@ const bodyOf = (sql: string, name: string): string => {
 const earlierSteps = (): string[] => readdirSync(new URL("migrations/", ROOT)).filter((entry) => /^\d{4}_.*\.sql$/u.test(entry) && entry < NAME).sort();
 
 describe("0152: a reporter's own reports in their export, and what the AI checks on public rows used", () => {
-  it("follows 0151 in the chain, last, with its own loader, and keeps 0130's verifier", async () => {
+  it("follows 0151 in the chain, with its own loader, and keeps 0130's verifier", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
     expect(chain).toContain("import { loadForward0152 } from './migration-forward0152.js';");
-    expect(chain).toContain("loadForward0150,loadForward0151,loadForward0152]");
+    expect(chain).toContain("loadForward0150,loadForward0151,loadForward0152,");
     const loader = read(LOADER_PATH);
     expect(loader).toContain(`const NAME = "${NAME}";`);
     expect(loader).toContain('const VERSION = "report-export-forward0152-v1";');
@@ -56,7 +56,7 @@ describe("0152: a reporter's own reports in their export, and what the AI checks
     expect(loader).toContain(`"${TABLE}"`);
     for (const signature of [RECORD, EXPORT_READER]) expect(loader, signature).toContain(`"${signature}"`);
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-1)!;
+    const step = plan.forwardChain.at(-2)!;
     expect(step.name).toBe(NAME);
     expect(step.previousName).toBe(PREVIOUS);
     expect(step.verifierSha256).toBe(VERIFIER_130);

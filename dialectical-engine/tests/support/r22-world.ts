@@ -177,7 +177,7 @@ export async function startR22World(options: Readonly<{ log?: (line: string) => 
   const PACK = loadStoryPack(resolveStoryPackDir({ env: {}, moduleUrl: import.meta.url }));
   let script: R22Script | null = null;
   const contractOf = (chat: string) => { try { return readFramedMaterial(wirePacket(chat)); } catch { return null; } };
-  const stubs = await startPreviewGateStubs({ storyDefaultShape: PACK.defaultShape, remainingToday: { usd: "9000.000000000", calls: 1_900_000 }, override: (request, chat) => {
+  const stubs = await startPreviewGateStubs({ storyDefaultShape: PACK.defaultShape, override: (request, chat) => {
     if (script === null) return null;
     const frame = contractOf(chat);
     return script(frame?.contractId ?? null, request, chat, (name) => frame?.fields.find((field) => field.name === name)?.content);

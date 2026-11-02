@@ -110,7 +110,7 @@ export type ClimbChild = Readonly<{ picks: readonly PathRewritePick[]; digPaths:
 export type MainAnswerContent = Readonly<{ v: 1; segments: readonly string[]; position_ref: string; trigger: "PATH_REWRITE" | "CHILD_PATH" }>;
 
 export type TreeUpdatePorts = Readonly<{
-  tree: Pick<PostgresTreeUpdateRunnerRepository, "takeTurn" | "readTurn" | "record" | "readLine" | "readClimbNext" | "recordMainAnswer" | "readMainAnswers">;
+  tree: Pick<PostgresTreeUpdateRunnerRepository, "takeTurn" | "readTurn" | "record" | "readLine" | "readClimbNext" | "recordMainAnswer" | "readMainAnswers" | "markDigSettled">;
   /** The dig as its rewrite reads it: the main question with its purpose lines, Free, the level. Null: no dig, nothing to climb. */
   digOf: (runId: string) => Promise<PathRewriteDig | null>;
   /** A dig's own first rewrite (0134), with its text when it is a finished one. */
@@ -203,22 +203,34 @@ export async function advanceTree(settings: TreeUpdateSettings, digRunId: string
   const log = safeLog(settings);
   try {
     const own = await settings.ports.ownRewriteOf(digRunId);
-    const rewriteId = own?.entry.rewrite_id ?? null;
-    if (own === null || !finishedState(own.entry.state) || own.text === null || rewriteId === null) return "NOTHING";
-    const entry = own.entry;
-    const start: ClimbStart = Object.freeze({ digRunId, debateRunId: entry.parent_run_id, positionRef: entry.position_ref,
-      cause: Object.freeze({ kind: "PATH_REWRITE" as const, id: rewriteId }), step: 1 });
-    const changed = await rewriteChanged(settings, entry, own.text, lease);
-    if (changed === null) return "LEFT";
-    if (!changed) {
-      log("PATH_CLIMB_NOT_CHANGED", { runId: digRunId, level: 0 });
-      return "STOPPED";
+    if (own === null) return "NOTHING";
+    if (!finishedState(own.entry.state)) {
+      // A failed rewrite leaves the path as it was and starts no climb: the dig has ended too.
+      if (own.entry.state === "FAILED") await settings.ports.tree.markDigSettled(digRunId);
+      return "NOTHING";
     }
-    return await climbFrom(settings, start, lease);
+    const rewriteId = own.entry.rewrite_id ?? null;
+    const outcome = own.text === null || rewriteId === null ? "NOTHING" : await advanceFrom(settings, digRunId, own.entry, own.text, rewriteId, lease);
+    // 0153: nothing more will be bought for this dig, so the test site's estimate stops holding it. An unwritten mark only keeps the hour's hold.
+    if (outcome !== "LEFT") await settings.ports.tree.markDigSettled(digRunId);
+    return outcome;
   } catch (error) {
     log("PATH_CLIMB_NOT_RECORDED", { runId: digRunId, code: codeOf(error) });
     return "LEFT";
   }
+}
+
+async function advanceFrom(settings: TreeUpdateSettings, digRunId: string, entry: PathRewriteEntry, text: Readonly<{ line: string; summary: string; fate: StoryFate }>,
+  rewriteId: string, lease: StepLease): Promise<TreeAdvance> {
+  const start: ClimbStart = Object.freeze({ digRunId, debateRunId: entry.parent_run_id, positionRef: entry.position_ref,
+    cause: Object.freeze({ kind: "PATH_REWRITE" as const, id: rewriteId }), step: 1 });
+  const changed = await rewriteChanged(settings, entry, text, lease);
+  if (changed === null) return "LEFT";
+  if (!changed) {
+    safeLog(settings)("PATH_CLIMB_NOT_CHANGED", { runId: digRunId, level: 0 });
+    return "STOPPED";
+  }
+  return climbFrom(settings, start, lease);
 }
 
 /** Whether the dig's own rewrite really changed its path: its text against the line's newest text before its turn. Null: unread. */

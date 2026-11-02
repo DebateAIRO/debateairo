@@ -2,6 +2,7 @@
 // Each path sends what the page sends (createDebate over v4AskConfig, the typed client, lib/v4/load.ts, lib/v4/publicPage.ts) over real HTTP, and feeds what comes back
 // through the page's own builders (buildV4Map, publicPathViews), so the mock in tools/v4-mock-api can hide no contract mismatch here. No vendor is contacted; all data is made up.
 // Integration suites are skipped by the CI gate: run this file by hand, alone.
+import { PREVIEW_UNFINISHED_RUNS_SQL } from "../../apps/api/src/preview-budget-estimate.js";
 import { createHash, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -104,6 +105,9 @@ const spendOf = async (runId: string): Promise<number> => Number((await world.da
 const listedRef = async (question: string): Promise<string | undefined> => (await world.stranger.readPublicDebates(50, 0) as unknown as { items: { public_ref: string; question: string }[] }).items.find((item) => item.question === question)?.public_ref;
 /** What each path saw, in plain words, in the run's log. */
 const saw = (path: string, what: string): void => { console.info(`SEEN ${path}: ${what}`); };
+
+/** What the start-of-debate estimate still holds right now: a finished dig must not be here, or a few digs refuse the next question. */
+const heldByEstimate = async (): Promise<number> => (await world.database.pool.query(PREVIEW_UNFINISHED_RUNS_SQL, [true, 3600])).rows.length;
 
 describe("R22 on the real API", () => {
   const QUESTION = "Should Harbour Town build a second ferry pier?";
@@ -387,6 +391,7 @@ describe("R22 on the real API", () => {
     expect(authorsOwn.answer.dig).toBeUndefined();
     expect(authorsOwn.map.storyState).toBe("NONE");
     expect(await spendOf(refused.id)).toBeGreaterThan(0);
+    expect(await heldByEstimate()).toBe(0);
     saw("8", `allowed: ${String(contributions)} contribution under ${dan.pseudonym}, line "${after[0]!.line}", the digger's run paid ${String(await spendOf(allowed.id))} micros; refused: page unchanged; the digger's own page has their rewrite and the kept-private line, no story; earlier no word of the refusal (no dig part, story WRITING)`);
   }, 300_000);
 
