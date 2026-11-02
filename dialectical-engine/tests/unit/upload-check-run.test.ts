@@ -211,7 +211,10 @@ function runFixtureUntil(signal: NodeJS.Signals) {
       clearInterval(watch);
       clearTimeout(giveUp);
       if (!existsSync(pidFile)) { rejectRun(new Error('the fixture never started its fake tree')); return; }
-      resolveRun({ code, folder: stdout.split('\n')[0], tmp, pids: JSON.parse(readFileSync(pidFile, 'utf8')) });
+      // An empty first line would make "the work folder is gone" pass without a folder, so it fails the run instead.
+      const folder = stdout.split('\n')[0];
+      if (!folder) { rejectRun(new Error('the fixture never named its work folder')); return; }
+      resolveRun({ code, folder, tmp, pids: JSON.parse(readFileSync(pidFile, 'utf8')) });
     });
   });
 }
