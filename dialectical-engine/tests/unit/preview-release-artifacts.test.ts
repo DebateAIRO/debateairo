@@ -317,6 +317,24 @@ describe('ui-build and verify', () => {
     expect(existsSync(join(s.art, 'd.json')) || existsSync(join(s.art, 'e.json'))).toBe(false);
   });
 
+  // The pre-upload checker (tools/upload-check/website-build.mjs) builds the website on the Mac with uiBuildEnvironment.
+  // ui-build must pass its build exactly that environment, so the checker sees what the release tool will use.
+  it('ui-build uses uiBuildEnvironment', async () => {
+    const s = server();
+    const source = s.write(join(s.art, 'candidate-ui-source.json'), sourceManifest('ui'));
+    const engine = resolve(import.meta.dirname, '../..');
+    const policy = { workspace: readFileSync(join(engine, 'pnpm-workspace.yaml'), 'utf8'), lock: readFileSync(join(engine, 'pnpm-lock.yaml'), 'utf8') };
+    const readPackagePolicy = async () => policy, now = Date.parse('2026-11-02T12:00:00.000Z');
+    let seen: any;
+    await run(['ui-build', '--source', source.path, '--release-key', NEW_KEY, '--out', join(s.art, 'candidate-ui-build.json')], s.layout, {
+      verifySourceManifest: async () => undefined, verifyUiBuildManifest: async () => undefined, execPath: '/opt/node/bin/node', readPackagePolicy, now,
+      buildUiArtifact: async (_m: unknown, env: any) => { seen = env; return { schema: 'preview-auth-dev-ui-build-v1' }; }
+    });
+    const shared = await tool.uiBuildEnvironment(NEW_ROOT.ui, NEW_KEY, '/opt/node/bin/node', { now, readPackagePolicy });
+    expect(seen).toEqual(shared);
+    expect(shared.PNPM_CONFIG_MINIMUM_RELEASE_AGE_EXCLUDE).toBe('["@isaacs/nonrecursive-glob-match@1.0.1","path-scurry@3.0.0","glob@14.0.2","minimatch@11.0.1"]');
+  });
+
   it('--models multi-model builds with the reviewed two-list value; an unknown name refuses before anything runs', async () => {
     const s = server();
     const source = s.write(join(s.art, 'candidate-ui-source.json'), sourceManifest('ui'));
