@@ -1,4 +1,5 @@
 import { askQuestionMaxBytes } from "@debateai/contract";
+import { PREVIEW_GATE_SLOT_WAIT_MS } from "@debateai/providers";
 import type { DeploymentMode, QuestionCheckPolicy } from "@debateai/register";
 import { hostedLanguageCheckPrice } from "../question-language/boot.js";
 import { createLocalOffFlagSwitch, localOffFlagPath } from "../publication-check/judge-transport.js";
@@ -31,15 +32,18 @@ export async function composeQuestionCheck(input: Readonly<{
    * Anthropic gate when both the guarded fetch and the gate's socket exist, and is off otherwise. It never takes the
    * support target there: the API holds no vendor key on the preview. Money there is the route table's: the gate
    * reserves, settles and caps each call in its own daily pot, so nothing is recorded here and the site's day pot is
-   * not asked (a record would count each check twice, and a send the gate refused as a cost never paid).
+   * not asked (a record would count each check twice, and a send the gate refused as a cost never paid). Time there is
+   * the gate's too: a Start must not be refused because running debates hold the gate's slots, so the check also waits
+   * out the gate's slot queue (PREVIEW_GATE_SLOT_WAIT_MS) on top of the policy's time limit.
    */
   preview: Readonly<{ fetch: typeof fetch | undefined; anthropicSocket: string | undefined }> | null;
 }>): Promise<AskQuestionCheck> {
   const preview = input.preview;
   const target = preview === null ? questionCheckTarget(input.target) : null;
   const gateFetch = preview?.anthropicSocket === undefined ? undefined : preview.fetch;
+  const deadlineMs = gateFetch === undefined ? input.policy.deadlineMs : input.policy.deadlineMs + PREVIEW_GATE_SLOT_WAIT_MS;
   const port: QuestionCheckPort | null = gateFetch !== undefined
-    ? createPreviewQuestionCheckTransport({ fetch: gateFetch, deadlineMs: input.policy.deadlineMs })
+    ? createPreviewQuestionCheckTransport({ fetch: gateFetch, deadlineMs })
     : target === null ? null : createQuestionCheckTransport(target, {
       readAuthorizationHeader: input.readAuthorizationHeader,
       reportDiagnostic: input.reportDiagnostic,
@@ -69,7 +73,7 @@ export async function composeQuestionCheck(input: Readonly<{
   const checker = createQuestionCheck({
     subjects: input.subjects,
     port: switcher.current,
-    deadlineMs: input.policy.deadlineMs,
+    deadlineMs,
     price: writerPresent ? price : null,
     spend: { record: onGate ? async () => undefined : input.spend.record },
     dayPot: onGate ? null : input.dayPot,
