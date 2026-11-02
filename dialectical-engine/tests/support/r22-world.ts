@@ -34,7 +34,7 @@ import {
 } from "@debateai/db";
 import { MapChoiceRepository } from "@debateai/map";
 import {
-  createPreviewBudgetRpcPort, createPreviewGuardedFetch, PREVIEW_GLM_DEADLINE_MS, PREVIEW_REVIEWED_PROVIDER_REFS, previewProbeControls, previewTargetJsonRow,
+  createPreviewBudgetRpcPort, createPreviewGuardedFetch, PREVIEW_GLM_DEADLINE_MS, PREVIEW_REVIEWED_PROVIDER_REFS, previewProbeControls, previewProviderSocket, previewTargetJsonRow,
   resolveProviderTargetCredentials
 } from "@debateai/providers";
 import {
@@ -67,8 +67,8 @@ import { questionLanguageSiteRoute } from "../../apps/api/src/question-language/
 import { newQuestionLanguageReferenceKey } from "../../apps/api/src/question-language/reference.js";
 import { PostgresAskAdmissionGate, settingsVersionPassed } from "../../apps/api/src/release-state.js";
 import { RepositoryAnswerStoryApplication, RepositoryPublicationStoryReader } from "../../apps/api/src/stories.js";
-import { recordAskClarifyCharge } from "@debateai/budget";
-import { closingReservesOf, readAbuseLimits } from "@debateai/register";
+import { questionCheckSpendWriterPresent, recordAskClarifyCharge, recordQuestionCheckSpend } from "@debateai/budget";
+import { closingReservesOf, readAbuseLimits, readQuestionCheckPolicy } from "@debateai/register";
 import { sweepInvestigationClosings } from "../../apps/runner/src/investigation-close.js";
 import { composeInvestigationClose } from "../../apps/runner/src/investigation-close-sources.js";
 import { sweepTreeUpdates } from "../../apps/runner/src/path-climb.js";
@@ -84,7 +84,8 @@ import { composePracticeRunner } from "../../tools/preview-practice/practice-run
 import { practiceMadeUpSearchReplies, practiceSearchStandIn, practiceWithSearchStandIn } from "../../tools/preview-practice/practice-search-stand-in.js";
 import { parsePracticeSettings, practiceReleaseKeyAt, practiceSettingsWithLineUp } from "../../tools/preview-practice/practice-settings.js";
 import { readFramedMaterial, wirePacket } from "./framed-packet.js";
-import { questionCheckPass } from "./questionCheckPass.js";
+import { composeQuestionCheck } from "../../apps/api/src/question-check/compose.js";
+import { readQuestionSubjects } from "../../apps/api/src/question-check/subjects.js";
 import { seedNetopiaSubscription } from "./billingSubscriptionFixtures.js";
 import { TEST_OWNER_LIMIT_ROWS } from "./hostedRegisterRows.js";
 import { TEST_APP_ORIGIN, persistLiveSession, testHttpIdentity, testSessionApplication, testSessionHeaders, type TestHttpIdentity } from "./httpSession.js";
@@ -256,8 +257,19 @@ export async function startR22World(options: Readonly<{ log?: (line: string) => 
       previewGate: gate, previewFetch, readCredential: () => { throw new TypeError("R22_NO_CREDENTIAL"); }, spend: { writerPresent: async () => true, record: async () => undefined },
       daySpentMicros: (day: string) => new PostgresModelSpendStore(apiPool).readDaySpentMicros(day), report: () => undefined } as never)),
     record: (entry) => recordAskClarifyCharge(apiPool, entry), clock: () => new Date(), report: () => undefined });
+  // 2026-11-02: the question check exactly as main.ts composes it on the preview, through the Anthropic gate's stand-in (it was a stub
+  // that always passed, and R22 reached the test site with a check that could never run). A world where it is off refuses to start.
+  const questionCheckOff: string[] = [];
+  const questionCheck = await composeQuestionCheck({ mode: "hosted", apiPort: 0, target: undefined,
+    readAuthorizationHeader: () => { throw new TypeError("R22_NO_CREDENTIAL"); }, reportDiagnostic: () => undefined,
+    policy: await readQuestionCheckPolicy(apiPool, nextVersion), subjects: readQuestionSubjects(),
+    spend: { writerPresent: () => questionCheckSpendWriterPresent(apiPool), record: (entry) => recordQuestionCheckSpend(apiPool, entry) },
+    dayPot: { ceilingMicros: money.siteCostEnvelopePolicy.dailyCeilingMicros, spentMicros: (day) => new PostgresModelSpendStore(apiPool).readDaySpentMicros(day) },
+    clock: () => new Date(), report: (line) => { if (line.event === "api.question_check.not_configured") questionCheckOff.push(line.code); },
+    preview: { fetch: previewFetch, anthropicSocket: previewProviderSocket(gate, "anthropic") } });
+  if (questionCheckOff.length > 0) throw new Error("R22_WORLD_QUESTION_CHECK_OFF");
   const api: FastifyInstance = buildApi({
-    questionCheck: questionCheckPass, previewProviderTestConfig: siteAdmission.previewConfig!, previewTeamUserIds, application, sessions, allowedOrigin: TEST_APP_ORIGIN,
+    questionCheck, previewProviderTestConfig: siteAdmission.previewConfig!, previewTeamUserIds, application, sessions, allowedOrigin: TEST_APP_ORIGIN,
     stories: new RepositoryAnswerStoryApplication(storyRepository), disclosures: new RepositoryAnswerDisclosureApplication(new ServeDisclosureRepository(apiPool)), mapViews, accountMemory,
     digModel: new PostgresDigModelRepository(apiPool), investigations,
     investigationReports: { reports: new PostgresInvestigationReportRepository(apiPool), investigations, owns: async (ownerRef: string, runId: string) => (await accountMemory.readLastVisit(ownerRef, runId)) !== null,
