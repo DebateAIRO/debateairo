@@ -13,7 +13,12 @@ import { ContractHttpError, QUESTION_NOT_STARTED, type AskParent, type QuestionN
  * A dig's text is AI-written around a question that already passed, so a dig gets a plain sentence instead of a pop-up (ASK-4, as the crisis gate).
  * The hook and the refusal screens are the real ones; only the server and the other pop-ups are stood in.
  */
-const server = vi.hoisted(() => ({ createDebate: vi.fn(async (..._args: unknown[]): Promise<{ id: string }> => ({ id: "unused" })) }));
+const server = vi.hoisted(() => ({
+  createDebate: vi.fn(async (..._args: unknown[]): Promise<{ id: string }> => ({ id: "unused" })),
+  room: null as null | Record<string, unknown>,
+  languageAnswer: "KEEP" as "KEEP" | "USE",
+  offers: 0
+}));
 const router = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 vi.mock("@/components/AuthGate", () => ({ AuthGate: ({ children }: { children: (token: string) => ReactNode }) => children("token") }));
@@ -23,13 +28,15 @@ vi.mock("@/components/SensitiveDataConsent", () => ({
   isSensitiveDataConsentRefusal: () => false,
   useSensitiveDataConsent: () => ({ ensureConsent: async () => true, declined: false, dialog: null })
 }));
-vi.mock("@/components/QuestionLanguageChoice", () => ({ useQuestionLanguageChoice: () => ({ ensureChoice: async () => "KEEP", dialog: null }) }));
+vi.mock("@/components/QuestionLanguageChoice", () => ({
+  useQuestionLanguageChoice: () => ({ ensureChoice: async () => { server.offers += 1; return server.languageAnswer; }, dialog: null })
+}));
 vi.mock("@/lib/api", () => ({
   COOKIE_SESSION_MARKER: "cookie",
   createDebate: (...args: unknown[]) => server.createDebate(...args),
   contractClient: {
     readAnswerIndex: async () => ({ items: [], open_runs: [] }),
-    getAskRoom: async () => null,
+    getAskRoom: async () => server.room,
     clarifyAsk: async () => ({ source: "NONE" }),
     readReadingLevel: async () => ({ reading_level: "plain" }),
     saveReadingLevel: async () => ({ reading_level: "plain" })
@@ -38,6 +45,7 @@ vi.mock("@/lib/api", () => ({
 
 import { V4AskClient } from "../../apps/ui/components/v4/V4AskClient.js";
 import { useV4Ask, type V4AskOutcome } from "../../apps/ui/lib/v4/useV4Ask.js";
+import { QuestionLanguageChoiceNeededError } from "../../apps/ui/lib/v3/requestFailure.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -53,7 +61,10 @@ const notStarted = (refusal: QuestionNotStarted) =>
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;
 
-beforeEach(() => { server.createDebate.mockReset(); router.push.mockReset(); });
+beforeEach(() => {
+  server.createDebate.mockReset(); router.push.mockReset();
+  server.room = null; server.languageAnswer = "KEEP"; server.offers = 0;
+});
 afterEach(async () => {
   await act(async () => root?.unmount());
   host?.remove();
@@ -112,6 +123,31 @@ describe("the V4 ask page shows the question check's own answers", () => {
   });
 });
 
+describe("a rewrite the person accepted survives the check's screen (ASK-5)", () => {
+  it("the language pop-up's rewrite, then the retry screen: the next Start sends the rewrite, with no second pop-up", async () => {
+    const REWRITE = "Should the city pay for the tram line?";
+    server.room = { room: "FITS", scope: null, resets_at: null, waiting_run_ref: null, plan_id: null, shape_settings: true };
+    server.languageAnswer = "USE";
+    server.createDebate
+      .mockRejectedValueOnce(new QuestionLanguageChoiceNeededError({ check_ref: "made-up-ref", main_language: { code: "en", name: "English" },
+        languages_seen: [{ code: "en", name: "English" }, { code: "ro", name: "Romanian" }], proposed_question: REWRITE }))
+      .mockRejectedValueOnce(unavailable())
+      .mockRejectedValueOnce(unavailable());
+    const page = await render(<V4AskClient catalog={CATALOG} homeCatalog={HOME} newDebateCatalog={NEW_DEBATE} billingCatalog={messages("billing")}
+      locale="en" crisisCountryHint={null} initialQuestion="Should the city fund the tram line?" initialLevel="plain" />);
+    await click(button(CATALOG["v4.ask.continue"]!));
+    await click(button(CATALOG["v4.read.start"]!));
+    expect(server.createDebate).toHaveBeenCalledTimes(2);
+    expect(server.createDebate.mock.calls[1]![0]).toBe(REWRITE);
+    expect(page.querySelector('[data-part="try-again"]')).not.toBeNull();
+    await click(page.querySelector<HTMLButtonElement>('[data-part="back"]')!);
+    await click(button(CATALOG["v4.read.start"]!));
+    expect(server.createDebate).toHaveBeenCalledTimes(3);
+    expect(server.createDebate.mock.calls[2]![0]).toBe(REWRITE);
+    expect(server.offers).toBe(1);
+  });
+});
+
 describe("a dig the question check refuses gets a plain sentence, no pop-up", () => {
   const PARENT: AskParent = { parent_run_id: "11111111-1111-4111-8111-111111111111", places: [], mode: "quick" };
 
@@ -139,5 +175,22 @@ describe("a dig the question check refuses gets a plain sentence, no pop-up", ()
 
   it("the check cannot run now: nothing started, try again", async () => {
     expect(await dig(unavailable())).toEqual({ kind: "REFUSED", message: CATALOG["v4.ask.failed"] });
+  });
+
+  it("but a dig carrying the person's own view is their words (the owner, 1 Nov): the subject's screen opens, help numbers and all", async () => {
+    server.createDebate.mockRejectedValue(notStarted({ kind: "SUICIDE_AND_ASSISTED_DYING", screen: "SENSITIVE", emergencyNumber: true }));
+    let submit: ReturnType<typeof useV4Ask>["submit"] | null = null;
+    function MapPage(): ReactNode {
+      const ask = useV4Ask({ catalog: CATALOG, homeCatalog: HOME, newDebateCatalog: NEW_DEBATE, locale: "en", crisisCountryHint: null,
+        mode: "quick", readingLevel: "plain", dig: { parentRunId: PARENT.parent_run_id, picks: 1 } });
+      submit = ask.submit;
+      return <>{ask.dialogs}</>;
+    }
+    await render(<MapPage />);
+    const own: AskParent = { ...PARENT, picks: [{ kind: "OWN_VIEW", suggestion_id: null, place: "made-up-place", text: "My own view on it, in my words" }] };
+    let outcome: V4AskOutcome | null = null;
+    await act(async () => { outcome = await submit!("What would the tram line cost each year to run?", "quick", "dig", own); });
+    expect(outcome).toEqual({ kind: "STOPPED" });
+    expect(host!.querySelector('[data-dialog="question-refusal"]')).not.toBeNull();
   });
 });
