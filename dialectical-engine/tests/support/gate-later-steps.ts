@@ -7,6 +7,7 @@
 // A contract with no row here (or in the stand-in's own classifier) is "UNKNOWN" at the gate: a billed vendor 500, recorded,
 // and every practice test refuses an UNKNOWN request. tests/unit/preview-gate-stand-in-coverage.test.ts reads the code's own
 // contract ids and call sites, so a new one that nobody told the stand-in fails there first, with its name.
+import { readPromptFrame, type PromptPacket } from "@debateai/providers";
 import { readFramedMaterial, wirePacket } from "./framed-packet.js";
 import type { StubLanguage } from "./preview-gate-stubs.js";
 
@@ -103,7 +104,8 @@ export function laterStepContent(kind: LaterGateKind, chat: string, language: St
     case "PUBLIC_REPORT_CHECK": return JSON.stringify({ verdict: "NOT_FOUND", reason: null, quote: null });
     case "ASK_CLARIFY": return JSON.stringify({ questions: [], purpose: { text: prose.clarifyPurpose, answers: prose.clarifyAnswers } });
     // The check's answer form (apps/api/src/question-check/verdict.ts): the call's own marker back, no subject, healthy.
-    case "QUESTION_CHECK": return JSON.stringify({ call: /DEBATEAI-FENCE-([0-9a-f]{32})/u.exec(chat)?.[1] ?? "", subject: "NONE", healthy: true });
+    case "QUESTION_CHECK": return JSON.stringify({ call: /[0-9a-f]{32}/u.exec(readPromptFrame(wirePacket(chat) as unknown as PromptPacket).fence)?.[0] ?? "",
+      subject: "NONE", healthy: true });
     case "WEB_PLAN": {
       const answers = list<{ answer_id: string }>("answers").map((answer) =>
         ({ answer_id: answer.answer_id, needs_search: false, reason: prose.noSearch, pace: null, searches: [] }));
