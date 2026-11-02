@@ -100,8 +100,9 @@ README.
 - `3 recovery roles granted …` (check 3): the check gives the API's logins the three recovery roles (password reset,
   backup email, two-step-login recovery), as section 3 of `docs/releases/2026-10-23-row-level-security.md` says the
   server's deployment does.
-- `known gap: …` (check 3): on the server, the guide's step B4 made the logins by hand. So this check trusts the
-  product's list of production logins to match the server's. It cannot see a difference between the two.
+- `known gap: …` (check 3): on the server, the logins were made by hand, in step B4 of R22's own upload guide (outside
+  this repository). So this check trusts the product's list of production logins to match the server's. It cannot see
+  a difference between the two.
 
 **The last line and the exit code:**
 

@@ -1391,8 +1391,9 @@ makes goes into one temporary folder, which is deleted at the end however the ru
 - **Check 3 gives the API's logins the three recovery roles** (password reset, backup email, two-step-login recovery),
   as section 3 of the row-security release note (`docs/releases/2026-10-23-row-level-security.md`) says the server's
   deployment does, and its report says so in a line.
-- **Its known gap:** on the server, step B4 made the logins by hand, as that guide said. So check 3 trusts the product's
-  list of production logins to match the server's, and its report says that too.
+- **Its known gap:** on the server, the logins were made by hand, in step B4 of R22's own upload guide (outside this
+  repository). So check 3 trusts the product's list of production logins to match the server's, and its report says
+  that too.
 
 **What none of the checks covers.** Faults 1, 4 and 6 of 2 November lived in the guide's own steps, on the server's own
 folders, and the checker does not run the guide's steps or copy the server. It also does not test the AIs' answers, and
