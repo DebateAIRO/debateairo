@@ -195,9 +195,19 @@ describe('check <label> <version>', () => {
       // The release guard first, for both folders, before any half or operator run (release-guard.mjs rule).
       `guard ${root(NEW, 'runner')} runner ${LOADER} dialectical-engine/apps/runner/src/settings-check-cli.ts`,
       `guard ${root(NEW, 'api')} api ${LOADER} dialectical-engine/apps/api/src/settings-check-cli.ts dialectical-engine/tools/settings-version/cli.ts dialectical-engine/tools/settings-version/settings-operator.ts`,
+      // A drained upload checks before the first start, when prestart has not made the folder yet (R22, 2026-11-02).
+      `folder ${CURRENT_NEW}`,
       `env /etc/debateai-v3-preview/auth-dev-v1/runner-${NEW}.env gid 1202`, 'half runner', `env /etc/debateai-v3-preview/auth-dev-v1/api-${NEW}.env gid 1302`, 'half api',
       `write ${r.receipt}`, `write ${CURRENT_NEW}/settings-check-21-${STAMP}-runner.txt`, `write ${CURRENT_NEW}/settings-check-21-${STAMP}-api.txt`, 'operator verdict'
     ]);
+  });
+
+  it('makes the release\'s current folder before any half runs; a folder it cannot make refuses CURRENT_DIRECTORY_REFUSED with nothing run or written', async () => {
+    const h = host();
+    h.deps.ensureCurrentDir = async () => { throw Object.assign(new Error('x'), { code: 'LIFECYCLE_DIRECTORY_REFUSED' }); };
+    expect((await refusal(checkSettingsVersion({ label: NEW, version: 21, layout: LAYOUT, deps: h.deps }))).code).toBe('CURRENT_DIRECTORY_REFUSED');
+    expect(h.log.filter(line => /^(half|write|operator)/.test(line))).toEqual([]);
+    expect(h.calls).toEqual([]);
   });
 
   it('a FAIL lists every code with one plain hint each', async () => {

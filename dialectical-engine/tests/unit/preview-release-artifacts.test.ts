@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { TEST_OWNER_LIMIT_ROWS } from '../support/hostedRegisterRows.js';
 const tool = await import('../../deploy/' + 'preview-release/v1/release-artifacts.mjs');
 const manifestModule = await import('../../deploy/' + 'preview-auth-dev/v1/source-manifest.mjs');
@@ -1491,5 +1492,22 @@ describe('database-ahead', () => {
     const t = staged();
     const argv = [...t.argv.slice(0, -1), join(t.s.art, 'database-ahead-new-v1.json')];
     await expect(run(argv, t.s.layout, t.deps)).rejects.toMatchObject({ code: 'OUTPUT_PATH_REFUSED' });
+  });
+});
+
+// The shared server-tools folder (operator/lifecycle-v1) is a git archive of these three deploy folders alone (the upload's
+// operator swap, the code guide's SB10). Every tool the guides run from it must load there: a top-level import of tools/
+// in release-artifacts.mjs (through caddy-slots.mjs) stopped release-switch.mjs during R22's downtime (2026-11-02).
+describe('the shared server-tools folder', () => {
+  it('every lifecycle tool the guides run loads from a copy of the three deploy folders alone', () => {
+    const base = realpathSync(mkdtempSync(join(tmpdir(), 'preview-operator-')));
+    roots.push(base);
+    const engine = resolve(import.meta.dirname, '../..');
+    for (const dir of ['preview-lifecycle', 'preview-auth-dev', 'preview-release']) cpSync(join(engine, 'deploy', dir), join(base, 'dialectical-engine/deploy', dir), { recursive: true });
+    for (const tool of ['release-switch.mjs', 'release-check.mjs', 'release-env.mjs', 'release-retire.mjs', 'release-archive.mjs', 'settings-version.mjs', 'prestart.mjs']) {
+      const url = pathToFileURL(join(base, 'dialectical-engine/deploy/preview-lifecycle/v1', tool)).href;
+      const loaded = spawnSync(process.execPath, ['--input-type=module', '-e', `await import(${JSON.stringify(url)})`], { cwd: base, encoding: 'utf8', env: { PATH: process.env.PATH ?? '/usr/bin:/bin' } });
+      expect(loaded.status, `${tool}: ${loaded.stderr}`).toBe(0);
+    }
   });
 });
