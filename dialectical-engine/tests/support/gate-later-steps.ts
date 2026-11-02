@@ -1,17 +1,19 @@
 // What the preview gate stand-in (tests/support/preview-gate-stubs.ts) knows of the calls beyond a debate's own arguing and
 // its story: the story's charts, the suggestions, the web step, a dig's rewrite and climb, the final report, the main-answer
-// update, the public debate's two checks, a public report and the ask page's clarify call. One row per contract id, and one
+// update, the public debate's two checks, a public report, the ask page's clarify call and the question check every ask passes
+// (on the preview it goes through the Anthropic gate since 2026-11-02; a healthy question by default). One row per contract id, and one
 // valid default reply per kind, written from the request's own material, in the language the request names.
 //
 // A contract with no row here (or in the stand-in's own classifier) is "UNKNOWN" at the gate: a billed vendor 500, recorded,
 // and every practice test refuses an UNKNOWN request. tests/unit/preview-gate-stand-in-coverage.test.ts reads the code's own
 // contract ids and call sites, so a new one that nobody told the stand-in fails there first, with its name.
+import { readPromptFrame, type PromptPacket } from "@debateai/providers";
 import { readFramedMaterial, wirePacket } from "./framed-packet.js";
 import type { StubLanguage } from "./preview-gate-stubs.js";
 
 export type LaterGateKind = "STORY_CHARTS" | "SUGGESTIONS" | "PATH_REWRITE_WRITER" | "PATH_REWRITE_CHECKER" | "REPORT_ANSWER" | "REPORT_ANSWER_CHECK"
   | "REPORT_STORY" | "REPORT_STORY_CHECK" | "CONTRIBUTION_CHECK" | "PUBLIC_REPORT_CHECK" | "ASK_CLARIFY" | "WEB_PLAN" | "WEB_DIG_PLAN" | "WEB_READ_ALL"
-  | "WEB_PICK" | "WEB_READ_TOP";
+  | "WEB_PICK" | "WEB_READ_TOP" | "QUESTION_CHECK";
 
 /** Every version is a row of its own: a new version may ask for a new form, so it is new to the stand-in until someone looks. */
 export const LATER_CONTRACT_KINDS: Readonly<Record<string, LaterGateKind>> = Object.freeze({
@@ -25,6 +27,7 @@ export const LATER_CONTRACT_KINDS: Readonly<Record<string, LaterGateKind>> = Obj
   "report.story.v1": "REPORT_STORY", "report.story-check.v1": "REPORT_STORY_CHECK",
   "public.contribution-check.v1": "CONTRIBUTION_CHECK", "public.report-check.v1": "PUBLIC_REPORT_CHECK",
   "ask.clarify.v1": "ASK_CLARIFY",
+  "question.start-check.v2": "QUESTION_CHECK",
   "web.plan.v1": "WEB_PLAN", "web.plan.v2": "WEB_PLAN",
   "web.plan-dig.v1": "WEB_DIG_PLAN", "web.plan-dig.v2": "WEB_DIG_PLAN", "web.plan-dig.v3": "WEB_DIG_PLAN",
   "web.read-all.v1": "WEB_READ_ALL", "web.read-all.v2": "WEB_READ_ALL",
@@ -100,6 +103,9 @@ export function laterStepContent(kind: LaterGateKind, chat: string, language: St
     case "CONTRIBUTION_CHECK": return JSON.stringify({ verdict: "ALLOW", reason: null });
     case "PUBLIC_REPORT_CHECK": return JSON.stringify({ verdict: "NOT_FOUND", reason: null, quote: null });
     case "ASK_CLARIFY": return JSON.stringify({ questions: [], purpose: { text: prose.clarifyPurpose, answers: prose.clarifyAnswers } });
+    // The check's answer form (apps/api/src/question-check/verdict.ts): the call's own marker back, no subject, healthy.
+    case "QUESTION_CHECK": return JSON.stringify({ call: /[0-9a-f]{32}/u.exec(readPromptFrame(wirePacket(chat) as unknown as PromptPacket).fence)?.[0] ?? "",
+      subject: "NONE", healthy: true });
     case "WEB_PLAN": {
       const answers = list<{ answer_id: string }>("answers").map((answer) =>
         ({ answer_id: answer.answer_id, needs_search: false, reason: prose.noSearch, pace: null, searches: [] }));

@@ -13,6 +13,8 @@ import {
   pathRewriteSuggestCallSiteKey, publicReportCallSiteKey
 } from "@debateai/story";
 import { readAskClarifyReply } from "../../apps/api/src/ask-clarify.js";
+import { readQuestionSubjects } from "../../apps/api/src/question-check/subjects.js";
+import { parseQuestionCheckAnswer } from "../../apps/api/src/question-check/verdict.js";
 import { engineSealedContracts } from "../../apps/runner/src/engine-contracts.js";
 import { classifyPickReply, classifyReadAllReply } from "../../apps/runner/src/web-reader-all.js";
 import { callFamilyOf, practiceStepOf, recheckReply } from "../../tools/preview-practice/practice-lanes.js";
@@ -49,7 +51,6 @@ const NOT_ANSWERED_BY_DEFAULT: Readonly<Record<string, string>> = Object.freeze(
   "story.pack-probe.v1": "a local check of the story pack; it never reaches a provider",
   "story.storyteller.v1": "retired: a run asks v3 or v4", "story.storyteller.v2": "retired: a run asks v3 or v4",
   "story.checker.v1": "retired: a run asks v3 or v4", "story.checker.v2": "retired: a run asks v3 or v4",
-  "question.start-check.v2": "the API's own check on its own configured judge; the practice's ask composition does not run it",
   "synthesis.content-check.v1": "the API's own check on its own configured judge; the practice does not run it",
   "publication.content-check.v1": "the API's own check on its own configured judge; the practice does not run it",
   "support.chat-answer.v1": "the support chat is not part of a debate", "support.chat-answer.v2": "the support chat is not part of a debate",
@@ -116,6 +117,12 @@ const ROWS: readonly Row[] = [
   { kind: "CONTRIBUTION_CHECK", id: "public.contribution-check.v1", material: [], accept: (content) => zodIssues(PublicContributionCheckReplySchema.safeParse(JSON.parse(content))) },
   { kind: "PUBLIC_REPORT_CHECK", id: "public.report-check.v1", material: [], accept: (content) => zodIssues(PublicReportCheckReplySchema.safeParse(JSON.parse(content))) },
   { kind: "ASK_CLARIFY", id: "ask.clarify.v1", material: [], accept: (content) => readAskClarifyReply(content)?.purpose === null ? ["NO_PURPOSE"] : [] },
+  // 2026-11-02: on the preview the question check goes through the gate (it was on the leave-alone list as "the API's own check on
+  // its own configured judge", which hid that the test site's check could never run). Read by the check's own strict parser.
+  { kind: "QUESTION_CHECK", id: "question.start-check.v2", material: [], accept: (content) => {
+    const read = parseQuestionCheckAnswer(content, String((JSON.parse(content) as { call?: unknown }).call), readQuestionSubjects().map((subject) => subject.id));
+    return read.ok && read.subject === "NONE" && read.healthy ? [] : [read.ok ? "NOT_HEALTHY" : read.code];
+  } },
   { kind: "WEB_PLAN", id: "web.plan.v2", material: [field("answers", [{ answer_id: "a1" }])], accept: (content) => {
     const read = webPlannerV2ReplySchema.safeParse(JSON.parse(content));
     return read.success ? webPlannerV2ReplyIssues(read.data, ["a1"], null).map((issue) => issue.message) : ["SCHEMA"];

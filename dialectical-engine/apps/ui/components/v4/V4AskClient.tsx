@@ -325,8 +325,12 @@ function V4AskForm({
           if (kept !== undefined && kept.trim().length > 0) setAccepted({ basis, text: kept });
           break;
         }
-        case "STOPPED":
+        case "STOPPED": {
+          // ASK-5: the same for a rewrite accepted before the question check's screen opened.
+          const kept = outcome.acceptedQuestion;
+          if (kept !== undefined && kept.trim().length > 0) setAccepted({ basis, text: kept });
           break;
+        }
       }
     } catch {
       setRefusal(t(catalog, "v4.ask.failed"));

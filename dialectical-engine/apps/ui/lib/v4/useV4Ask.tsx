@@ -16,6 +16,7 @@ import {
 } from "@/lib/v3/requestFailure";
 import { isSensitiveDataConsentRefusal, useSensitiveDataConsent } from "@/components/SensitiveDataConsent";
 import { isCrisisSupportRefusal, useCrisisSupport } from "@/components/CrisisSupport";
+import { questionRefusalOf, useQuestionRefusal } from "@/components/QuestionRefusal";
 import { useQuestionLanguageChoice } from "@/components/QuestionLanguageChoice";
 import { catalogLocale, isLocale, type LocaleCode } from "@/lib/i18n/locales";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
@@ -39,7 +40,8 @@ const QUESTION_MIN_LENGTH = 7;
 
 export type V4AskOutcome =
   | Readonly<{ kind: "STARTED"; runId: string; notJoined?: boolean }>
-  | Readonly<{ kind: "STOPPED" }>
+  /** A pop-up took over (or nothing was sent). `acceptedQuestion`: as on REFUSED, a rewrite accepted before the question check's screen. */
+  | Readonly<{ kind: "STOPPED"; acceptedQuestion?: string }>
   /** ASK-5 (V3 ruling L-USE-STICKS): `acceptedQuestion` is the rewrite the person chose ("Use this version") before the
    * refusal, so the next Start can send it again instead of asking a second time. */
   | Readonly<{ kind: "REFUSED"; message: string; acceptedQuestion?: string }>;
@@ -105,6 +107,7 @@ export function useV4Ask(input: Readonly<{
   const submitFlight = React.useRef(false);
   const consent = useSensitiveDataConsent({ catalog: homeCatalog, locale });
   const crisis = useCrisisSupport({ catalog: homeCatalog, locale, countryHint: crisisCountryHint });
+  const questionRefusal = useQuestionRefusal({ catalog: homeCatalog, locale, countryHint: crisisCountryHint });
   // Question language (spec 2026-10-13): the page's language goes with the question (PF-L56: `locale` is a string).
   const pageLocale: LocaleCode = isLocale(locale) ? locale : "en";
   const languageChoice = useQuestionLanguageChoice({ catalog: newDebateCatalog, locale: pageLocale });
@@ -178,10 +181,10 @@ export function useV4Ask(input: Readonly<{
 
   // The latest state, for a submit fired later (a dig sends after its 10-second Undo): never a stale closure.
   const live = React.useRef({ planTier, freePublicNotice, shapeSettings, lengthSettings, readingLevel, room, catalog, newDebateCatalog,
-    pageLocale, consent, crisis, languageChoice });
+    pageLocale, consent, crisis, questionRefusal, languageChoice });
   React.useEffect(() => {
     live.current = { planTier, freePublicNotice, shapeSettings, lengthSettings, readingLevel, room, catalog, newDebateCatalog,
-      pageLocale, consent, crisis, languageChoice };
+      pageLocale, consent, crisis, questionRefusal, languageChoice };
   });
 
   const submit = React.useCallback(async (questionLine: string, askMode: DigMode, origin: V4AskOrigin = "ask",
@@ -306,6 +309,18 @@ export function useV4Ask(input: Readonly<{
         now.crisis.offer();
         return STOPPED;
       }
+      // R22's first debate (2026-11-02): the question check's own answers, as /new shows them (its subject's screen, or the retry screen), never
+      // "could not be reached". A dig's text is AI-written around a question that already passed: a plain sentence instead (ASK-4, as above),
+      // unless it carries the person's own views, which are their words (the owner, 1 Nov): those get the screens, help numbers included.
+      const checkAnswer = questionRefusalOf(exc);
+      if (checkAnswer !== null) {
+        if (dig && crisisWordsOf(origin, question, parent).length === 0) {
+          return refused(t(now.catalog, checkAnswer === "UNAVAILABLE" ? "v4.ask.failed" : "v4.digError.cannotFollow"));
+        }
+        now.questionRefusal.offer(exc);
+        // ASK-5: a rewrite accepted before the screen opened sticks for the next Start, as after a refusal.
+        return acceptedRewrite === undefined ? STOPPED : { kind: "STOPPED", acceptedQuestion: acceptedRewrite };
+      }
       // A second 409 after the retry (ASK-7): nothing started; the room is read again and its version adopted (R50), so
       // the next press sends the new version's ask. V4 has no settings to check, so its own sentence is shown.
       if (isAskSettingsChanged(exc)) {
@@ -349,6 +364,7 @@ export function useV4Ask(input: Readonly<{
       ) : null}
       {consent.dialog}
       {crisis.dialog}
+      {questionRefusal.dialog}
       {languageChoice.dialog}
     </>
   );
