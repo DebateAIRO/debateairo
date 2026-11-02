@@ -51,9 +51,9 @@ const outcome = (promise: Promise<boolean>) => promise.then((go) => go ? "SEND" 
 const alerts = (events: readonly OutboundMailGateEvent[]) => events.flatMap((event) => event.kind === "alert" ? [event.alert] : []);
 
 describe("the outbound mail gate", () => {
-  it("classes every purpose: the reserve covers resets, recovery, security notices and alerts to staff", () => {
-    const security: MailPurpose[] = ["email-change-notice", "account-erasure-notice", "consumer-recovery", "consumer-security-notice", "password-reset", "email-recovery", "owner-notice", "threat-report-alert"];
-    const standard: MailPurpose[] = ["verification", "recovery-email-confirmation", "email-change-confirmation", "email-change-unavailable", "billing", "data-export"];
+  it("classes every purpose: the reserve covers resets, recovery, security notices, billing and alerts to staff", () => {
+    const security: MailPurpose[] = ["billing", "email-change-notice", "account-erasure-notice", "consumer-recovery", "consumer-security-notice", "password-reset", "email-recovery", "owner-notice", "threat-report-alert"];
+    const standard: MailPurpose[] = ["verification", "recovery-email-confirmation", "email-change-confirmation", "email-change-unavailable", "data-export"];
     for (const purpose of security) expect(mailPurposeClass(purpose)).toBe("security");
     for (const purpose of standard) expect(mailPurposeClass(purpose)).toBe("standard");
     expect(mailPurposeClass("owner-limit-alert")).toBe("unmetered");
@@ -94,9 +94,9 @@ describe("the outbound mail gate", () => {
     for (let i = 0; i < 8; i += 1) expect(await outcome(h.gate.authorize({ recipient: `p${i}@example.com`, purpose: "verification" }))).toBe("SEND");
     expect(await h.gate.hasStandardRoom()).toBe(false);
     expect(await outcome(h.gate.authorize({ recipient: "late@example.com", purpose: "verification" }))).toBe("MAIL_DAILY_LIMIT");
-    expect(await outcome(h.gate.authorize({ recipient: "late@example.com", purpose: "billing" }))).toBe("MAIL_DAILY_LIMIT");
+    expect(await outcome(h.gate.authorize({ recipient: "late@example.com", purpose: "data-export" }))).toBe("MAIL_DAILY_LIMIT");
     expect(await outcome(h.gate.authorize({ recipient: "reset1@example.com", purpose: "password-reset" }))).toBe("SEND");
-    expect(await outcome(h.gate.authorize({ recipient: "reset2@example.com", purpose: "consumer-security-notice" }))).toBe("SEND");
+    expect(await outcome(h.gate.authorize({ recipient: "receipt@example.com", purpose: "billing" }))).toBe("SEND");
     expect(await outcome(h.gate.authorize({ recipient: "reset3@example.com", purpose: "password-reset" }))).toBe("MAIL_DAILY_LIMIT");
     expect([h.store.standard.get(h.store.day), h.store.security.get(h.store.day)]).toEqual([8, 2]);
   });
