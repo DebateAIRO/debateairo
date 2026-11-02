@@ -54,7 +54,7 @@
 // and writes only new root-owned 0644 compact JSON files below the fixed artifacts folder.
 import { randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
-import { lstat, open, realpath, unlink } from 'node:fs/promises';
+import { lstat, open, readFile, realpath, unlink } from 'node:fs/promises';
 import { dirname, isAbsolute, join, normalize } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { protectedPath, sha256, strictJson, withPrivateBytes } from '../../preview-auth-dev/v1/custody.mjs';
@@ -67,6 +67,7 @@ import { PREVIEW_ORIGIN, PREVIEW_SITE_KEY } from '../../preview-auth-dev/v1/turn
 import { PREVIEW_MODEL_ROSTER_FLAGS, RELEASE_KEY_PATTERN } from '../../preview-auth-dev/v1/environment.mjs';
 import { runBounded } from '../../preview-lifecycle/v1/common.mjs';
 import { addedMigrations, n1Headers } from '../../preview-lifecycle/v1/migration-steps.mjs';
+import { childEnvironment } from '../../../tools/source-map-hotfix.mjs';
 import { DATABASE_AHEAD_MAX_BYTES, DATABASE_AHEAD_MAX_STEPS, DATABASE_AHEAD_SCHEMA, validateDatabaseAheadFile } from '../../preview-auth-dev/v1/database-ahead.mjs';
 
 /** The fixed server folders the reviewed launchers already require (launch-plan.mjs: ROOT, the artifact file pattern, prepareLaunch's plan path). */
@@ -114,6 +115,16 @@ export const UI_BUILD_ENVIRONMENT = Object.freeze({
  * (as prestart.mjs nativeVerifyArgv does), so the build runs on the Node the manifest records.
  */
 export const buildEnvironment = (releaseKey, execPath = process.execPath, models = DEFAULT_MODEL_ROSTER) => ({ ...UI_BUILD_ENVIRONMENT, ...uiPublicBuildValues(releaseKey, models), PATH: `${dirname(execPath)}:${UI_BUILD_ENVIRONMENT.PATH}` });
+/**
+ * The owner's early use (tools/source-map-hotfix.mjs, approved 2026-11-01): the release root was installed through that
+ * helper, so pnpm recorded its exemption; the build's own `pnpm` re-checks the install, and without the same exemption it
+ * recreates node_modules and refuses the young versions (R22 staging, 2026-11-02). The helper decides from the root's own
+ * workspace and lockfile: the same exact versions, each only until its seven days are up, and nothing once all are.
+ */
+async function readPackagePolicy(sourceRoot) {
+  const root = join(sourceRoot, 'dialectical-engine');
+  return { workspace: await readFile(join(root, 'pnpm-workspace.yaml'), 'utf8'), lock: await readFile(join(root, 'pnpm-lock.yaml'), 'utf8') };
+}
 
 const MAX_PUBLIC_ARTIFACT_BYTES = 16_777_216; // readPublicArtifact's bound
 const MAX_PLAN_BYTES = 32_768; // prepareLaunch, prestart and native-operator read plans up to this size
@@ -278,7 +289,11 @@ async function uiBuildCommand(options, { layout, deps }) {
   const verifySource = deps.verifySourceManifest ?? verifySourceManifest;
   // Before: the root is exactly what the manifest inventoried. After: the build changed none of it.
   await verifySource(source.value, sourceBinding(source));
-  const build = await (deps.buildUiArtifact ?? buildUiArtifact)(source.value, buildEnvironment(releaseKey, deps.execPath, models));
+  const policy = await (deps.readPackagePolicy ?? readPackagePolicy)(source.value.sourceRoot).catch(() => refuse('UI_BUILD_PACKAGE_POLICY_REFUSED'));
+  let environment;
+  try { environment = childEnvironment({ environment: buildEnvironment(releaseKey, deps.execPath, models), now: deps.now ?? Date.now(), workspace: policy.workspace, lock: policy.lock }); }
+  catch { refuse('UI_BUILD_PACKAGE_POLICY_REFUSED'); }
+  const build = await (deps.buildUiArtifact ?? buildUiArtifact)(source.value, environment);
   await verifySource(source.value, sourceBinding(source));
   await (deps.verifyUiBuildManifest ?? verifyUiBuildManifest)(JSON.parse(JSON.stringify(build)), source.value);
   return writeArtifact(options['--out'], build, { layout });
