@@ -209,6 +209,8 @@ export class AcceptanceUserDekStore implements ReadableUserDekStore {
 }
 
 const acceptanceContentStores = new WeakMap<Pool, AcceptanceUserDekStore>();
+/** The cipher each store's pool was given, so the runner's own pool can get the same one (createAcceptanceRuntime). */
+const acceptanceContentCiphers = new WeakMap<Pool, ContentCipher>();
 
 export function acceptanceContentStore(pool: Pool): AcceptanceUserDekStore {
   const existing = acceptanceContentStores.get(pool);
@@ -224,8 +226,10 @@ export function acceptanceContentStore(pool: Pool): AcceptanceUserDekStore {
     if (userId === undefined) throw new TypeError("ACCEPTANCE_OWNER_REF_UNRESOLVED");
     return userId;
   });
-  configureContentEncryption(pool, new ContentCipher(runs));
+  const cipher = new ContentCipher(runs);
+  configureContentEncryption(pool, cipher);
   acceptanceContentStores.set(pool, users);
+  acceptanceContentCiphers.set(pool, cipher);
   return users;
 }
 
@@ -412,6 +416,12 @@ export function resolveAcceptanceRisk(
 
 export async function createAcceptanceRuntime(input: {
   readonly pool: Pool;
+  /**
+   * Upload check Task 6: the runner's own pool, when a test gives it one (tests/support/rls-logins.ts, runnerTestPool:
+   * the production runner login in login mode). The runner, its model gateways, its hold and failure records and its
+   * closing evaluator use it, as on the server, where the runner has its own login. Absent: `pool`, as before.
+   */
+  readonly runnerPool?: Pool | undefined;
   readonly environment: AcceptanceEnvironment;
   readonly makerRelays: readonly AcceptanceMakerRelay[];
   readonly serviceCredential:string;
@@ -433,7 +443,13 @@ export async function createAcceptanceRuntime(input: {
   const policy = await readAcceptanceRuntimePolicy(input.pool);
   const modelScorecard = input.modelScorecard ?? await readBundledModelScorecard(await readEngineVersion());
   const scoringOperator = await readOptionalScoringOperator(input.pool);
-  const runRepository = new RunRepository(input.pool);
+  const runnerPool = input.runnerPool ?? input.pool;
+  if (runnerPool !== input.pool) {
+    // The runner reads and writes the same encrypted debates as the API side, so it gets the same cipher.
+    acceptanceContentStore(input.pool);
+    configureContentEncryption(runnerPool, acceptanceContentCiphers.get(input.pool)!);
+  }
+  const runRepository = new RunRepository(runnerPool);
   const relaysByProviderRef = new Map(input.makerRelays.map((relay) => [relay.providerRef, relay]));
   const discoveredProviders = policy.providers.flatMap((configured) => {
     const relay = relaysByProviderRef.get(configured.providerRef);
@@ -444,7 +460,7 @@ export async function createAcceptanceRuntime(input: {
   const primaryProviderPolicy = primary.configured;
   const additionalProviders = discoveredProviders.slice(1).map(({ configured, relay }) => {
     return Object.freeze({
-      gateway: createPostgresProviderGateway(input.pool, {
+      gateway: createPostgresProviderGateway(runnerPool, {
         endpoint: `${relay.baseUrl}/v1`,
         model: relay.model,
         maker: configured.maker,
@@ -458,7 +474,7 @@ export async function createAcceptanceRuntime(input: {
   // (codex) provider; FAIR-01 (DR-140(b)) adds the Anthropic relay as the
   // debate's SECOND maker — it runs the critic leg, so the counter-position
   // in the answer graph is genuinely independent of the position's maker.
-  const provider = createPostgresProviderGateway(input.pool, {
+  const provider = createPostgresProviderGateway(runnerPool, {
     endpoint: `${primary.relay.baseUrl}/v1`,
     model: primary.relay.model,
     maker: primaryProviderPolicy.maker,
@@ -472,7 +488,7 @@ export async function createAcceptanceRuntime(input: {
   const maximumRunAttempts = computeAcceptanceStructuralCeiling(policy, policy.providers.length, 5, 1)
     .max_model_attempts;
   const probes = new ProviderProbeRepository(input.pool);
-  const runner = new WalkingSkeletonRunner(input.pool, provider, {
+  const runner = new WalkingSkeletonRunner(runnerPool, provider, {
     workerId: ACCEPTANCE_WORKER_ID,
     // Side-by-side spec §3 (B16): it claims only runs stamped with the key the ask below stamps them with.
     releaseKey: ACCEPTANCE_RELEASE_KEY,
@@ -582,9 +598,9 @@ export async function createAcceptanceRuntime(input: {
     // TERM-01 (DR-139): the REAL recorded-facts terminal evaluator replaces
     // the DR-135 refusing evaluator on the live path. The refusing evaluator
     // (resolveAcceptanceTerminalActivations) remains the outermost fallback.
-    resolveTerminalActivations: input.testOnlyTerminalEvaluator ?? createTerminalActivationEvaluator(input.pool)
+    resolveTerminalActivations: input.testOnlyTerminalEvaluator ?? createTerminalActivationEvaluator(runnerPool)
   });
-  const dispatcher = new AcceptanceDispatcher(runner, acceptanceFailureRecorder(input.pool));
+  const dispatcher = new AcceptanceDispatcher(runner, acceptanceFailureRecorder(runnerPool));
   for (const { configured, relay } of discoveredProviders) {
     await probes.record({
       probeEvidenceRef: randomUUID(),

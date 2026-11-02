@@ -13,6 +13,9 @@
  *   DEBATEAI_TEST_API_LOGINS=1, the harness superuser pool in every field otherwise. In login mode it appends one
  *   report line per field to $DEBATEAI_TEST_API_LOGINS_REPORT and patches pg.Client.prototype.query once, so a query on
  *   a client connected as the harness superuser throws R21_SUPERUSER_POOL_IN_REQUEST inside a request scope.
+ * - `runnerTestPool(database, budget)` is the runner's side of the same switch: in login mode a pool on the production
+ *   runner login, debateai_prod_runner_runtime, the login the server's runner uses; otherwise nothing, and the caller
+ *   keeps the superuser pool it always used.
  */
 import { randomBytes, randomUUID } from "node:crypto";
 import { appendFileSync } from "node:fs";
@@ -29,7 +32,8 @@ import {
   hashToken
 } from "@debateai/crypto";
 import {
-  API_DATABASE_POOLS, createPool, migrate, requestScopeActive, runInRequestScope, setRequestCredential, type Pool
+  API_DATABASE_POOLS, createPool, migrate, requestScopeActive, RUNNER_DATABASE_POOLS, runInRequestScope,
+  setRequestCredential, type Pool
 } from "@debateai/db";
 import { provisionDevelopmentDatabasePrincipals } from "../../apps/runner/src/dev-database-principals.js";
 import {
@@ -61,8 +65,15 @@ const DEV_PRINCIPAL_KEYS: readonly DevPrincipalKey[] = Object.freeze([
   "API_AUTHORIZATION_SYSTEM_DATABASE_URL", "RUNNER_DATABASE_URL"
 ]);
 
-/** The production principals a test reaches: the two API T1 logins and their system twins (P3-01 ids). */
-export type RlsProductionPrincipalId = "api-runtime" | "api-authorization" | "api-system" | "api-authorization-system";
+/** The production principals a test reaches: the two API T1 logins, their system twins and the runner (P3-01 ids). */
+export type RlsProductionPrincipalId =
+  | "api-runtime" | "api-authorization" | "api-system" | "api-authorization-system" | "runner-runtime";
+
+/**
+ * What the logins need of a database: its superuser pool and its URL. A TestDatabase has both, and so does the
+ * acceptance harness's standing database (acceptance/standing-db.ts), whose runner the runner pool below also serves.
+ */
+type RlsDatabase = Pick<TestDatabase, "pool" | "connectionString">;
 
 /** The API's pools, field for field as apps/api/src/main.ts builds them (PLAN §0.3). */
 export type ApiTestPools = Readonly<{
@@ -138,7 +149,7 @@ type RlsLoginsState = {
   readonly track: (pool: Pool) => Pool;
 };
 
-const provisioned = new WeakMap<TestDatabase, Promise<RlsLoginsState>>();
+const provisioned = new WeakMap<RlsDatabase, Promise<RlsLoginsState>>();
 
 function poolOptions(field: ApiPoolField, target?: Pool): Parameters<typeof createPool>[1] {
   return target === undefined ? API_DATABASE_POOLS[field] : { ...API_DATABASE_POOLS[field], crossAccount: target };
@@ -157,7 +168,7 @@ function readEnvironmentFile(source: string): ReadonlyMap<string, string> {
   }));
 }
 
-async function provisionProduction(database: TestDatabase, track: (pool: Pool) => Pool,
+async function provisionProduction(database: RlsDatabase, track: (pool: Pool) => Pool,
   directories: string[]): Promise<RlsProductionLogins> {
   const harness = new URL(database.connectionString);
   const adminPassword = randomBytes(32).toString("base64url");
@@ -231,7 +242,7 @@ async function provisionProduction(database: TestDatabase, track: (pool: Pool) =
   }
 }
 
-async function provision(database: TestDatabase): Promise<RlsLoginsState> {
+async function provision(database: RlsDatabase): Promise<RlsLoginsState> {
   const pools: Pool[] = [];
   const directories: string[] = [];
   const track = (pool: Pool): Pool => { pools.push(pool); return pool; };
@@ -278,7 +289,7 @@ async function provision(database: TestDatabase): Promise<RlsLoginsState> {
   return { logins, track };
 }
 
-function provisionedState(database: TestDatabase): Promise<RlsLoginsState> {
+function provisionedState(database: RlsDatabase): Promise<RlsLoginsState> {
   let state = provisioned.get(database);
   if (state === undefined) {
     state = provision(database);
@@ -291,6 +302,40 @@ function provisionedState(database: TestDatabase): Promise<RlsLoginsState> {
 /** The dev logins of `database`, provisioned once per TestDatabase: the second call returns the first call's object. */
 export async function provisionRlsLogins(database: TestDatabase): Promise<RlsLogins> {
   return (await provisionedState(database)).logins;
+}
+
+/**
+ * Upload check Task 6 (2026-11-02): the runner's pool in login mode. The server's runner reaches the database on the
+ * production login debateai_prod_runner_runtime (P3-01's runner-runtime row: debateai_runtime and
+ * debateai_rls_all_accounts, no superuser, no row-security bypass), but the tests always ran it on the harness
+ * superuser, so a fault in the runner's roles (the start check of 2 Nov) never showed in a test.
+ *
+ * - DEBATEAI_TEST_API_LOGINS=1: a pool on that login, sized as apps/runner/src/main.ts sizes the `budget` pool
+ *   (RUNNER_DATABASE_POOLS), pointed at the harness database. The production logins are provisioned on the first call
+ *   for `database` (memoised, as `production()` above), and the pool is ended by `endProvisionedRlsLogins(database)`.
+ * - Otherwise (the default): `undefined`, and the caller uses the superuser pool it always used, unchanged.
+ *
+ * The runner runs outside any request scope, so the superuser guard of `apiTestPools` never fires on its work.
+ */
+export async function runnerTestPool(
+  database: RlsDatabase,
+  budget: keyof typeof RUNNER_DATABASE_POOLS = "runtime"
+): Promise<Pool | undefined> {
+  if (process.env.DEBATEAI_TEST_API_LOGINS !== "1") return undefined;
+  const state = await provisionedState(database);
+  const production = await state.logins.production();
+  return state.track(createPool(production.url("runner-runtime"), RUNNER_DATABASE_POOLS[budget]));
+}
+
+/**
+ * Ends the logins of `database` (their pools and their credential folders) if something above provisioned them, before
+ * the caller stops the database. Provisions nothing: with login mode off it does nothing.
+ */
+export async function endProvisionedRlsLogins(database: RlsDatabase): Promise<void> {
+  const state = provisioned.get(database);
+  if (state === undefined) return;
+  const settled = await state.catch(() => undefined);
+  await settled?.logins.end();
 }
 
 /** The login pools whatever DEBATEAI_TEST_API_LOGINS says (S4.1, S8.2). */

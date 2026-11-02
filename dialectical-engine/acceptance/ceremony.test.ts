@@ -11,6 +11,7 @@ import type { StandingDatabase } from "./standing-db.js";
 import { startStandingDatabase } from "./standing-db.js";
 import { assertFairDebate } from "./fair-debate.js";
 import { acceptanceServiceRequestHeaders, createAcceptanceRuntime } from "./main.js";
+import { endProvisionedRlsLogins, runnerTestPool } from "../tests/support/rls-logins.js";
 import { ACCEPTANCE_REGISTER_VERSION, seedAcceptanceRegister } from "./seed-register.js";
 import { withRequestDerivedBearings, type ReviewBearingPolicy } from "../tests/support/reviewBearings.js";
 import { evaluatorSatisfied, isEvaluatorPacket } from "./test-fixtures/evaluator-double.js";
@@ -277,6 +278,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await criticProvider?.stop();
   await provider?.stop();
+  if (database !== undefined) await endProvisionedRlsLogins(database);
   await database?.stop();
   await rm(dataDirectory, { recursive: true, force: true });
 });
@@ -413,6 +415,8 @@ describe("ACC-01 dry-run ceremony", () => {
       // Model scorecard A20.4: this suite stays on the plan rosters, whatever scorecards/current.json holds.
       modelScorecard: { state: "ABSENT" },
       pool: database.pool,
+      // The runner's own login in login mode (DEBATEAI_TEST_API_LOGINS=1); the superuser pool above otherwise.
+      runnerPool: await runnerTestPool(database),
       serviceCredential:"a".repeat(43),
       environment: {
         DATABASE_URL: database.connectionString,

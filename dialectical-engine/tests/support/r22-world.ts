@@ -89,6 +89,7 @@ import { seedNetopiaSubscription } from "./billingSubscriptionFixtures.js";
 import { TEST_OWNER_LIMIT_ROWS } from "./hostedRegisterRows.js";
 import { TEST_APP_ORIGIN, persistLiveSession, testHttpIdentity, testSessionApplication, testSessionHeaders, type TestHttpIdentity } from "./httpSession.js";
 import { startPreviewGateStubs, type GateOverride, type GateRequest } from "./preview-gate-stubs.js";
+import { endProvisionedRlsLogins, runnerTestPool } from "./rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "./testDatabase.js";
 
 const FIVE = ["zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash", "XiaomiMiMo/MiMo-V2.6-Pro", "Qwen/Qwen3.8-Flash", "claude-haiku-5-5"];
@@ -171,7 +172,15 @@ export async function startR22World(options: Readonly<{ log?: (line: string) => 
   const apiPool = encrypted();
   configureContentEncryption(pool, cipher);
   configureContentEncryption(database.pool, cipher);
-  const runnerPool = encrypted();
+  // The runner's pools: on the production runner login in login mode (DEBATEAI_TEST_API_LOGINS=1), on the superuser as
+  // before otherwise (tests/support/rls-logins.ts, runnerTestPool).
+  const runnerOwn = async (budget: "runtime" | "keepAlive"): Promise<Pool> => {
+    const login = await runnerTestPool(database, budget);
+    if (login === undefined) return encrypted();
+    configureContentEncryption(login, cipher);
+    return login;
+  };
+  const runnerPool = await runnerOwn("runtime");
 
   // The gates: AIs scripted, nothing leaves this computer.
   const PACK = loadStoryPack(resolveStoryPackDir({ env: {}, moduleUrl: import.meta.url }));
@@ -281,7 +290,7 @@ export async function startR22World(options: Readonly<{ log?: (line: string) => 
 
   // THE RUNNER, by the practice's composition (kept equal to the runner's main.ts by the drift test), with the stand-in in the search gate's place.
   const standIn = practiceWithSearchStandIn(environment, budgetPorts, search);
-  const composed = await composePracticeRunner({ pool: runnerPool, environment: standIn.environment, budgetPorts: standIn.budgetPorts, remaining, keepAlivePool: encrypted(),
+  const composed = await composePracticeRunner({ pool: runnerPool, environment: standIn.environment, budgetPorts: standIn.budgetPorts, remaining, keepAlivePool: await runnerOwn("keepAlive"),
     wait: async () => undefined, sleep: async () => undefined, storyLog: (event, detail) => { log(`story ${event} ${JSON.stringify(detail)}`); } });
   const members = [composed.providerTopology.primary, ...(composed.providerTopology.critique === undefined ? [] : [composed.providerTopology.critique]), ...composed.providerTopology.additionalMakers];
   const runnerLog = (event: string, detail: Record<string, unknown>): void => { log(`runner ${event} ${JSON.stringify(detail)}`); };
@@ -381,6 +390,7 @@ export async function startR22World(options: Readonly<{ log?: (line: string) => 
       await api.close();
       await stubs.close();
       await Promise.all(pools.map((each) => each.end().catch(() => undefined)));
+      await endProvisionedRlsLogins(database);
       await database.stop();
       await rm(secretRoot, { recursive: true, force: true });
     }

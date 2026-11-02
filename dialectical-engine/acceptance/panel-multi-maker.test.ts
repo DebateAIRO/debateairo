@@ -14,6 +14,7 @@ import {
 } from "@debateai/register";
 import type { RoleAssignment } from "@debateai/scorecard";
 import { acceptanceServiceRequestHeaders, createAcceptanceRuntime } from "./main.js";
+import { endProvisionedRlsLogins, runnerTestPool } from "../tests/support/rls-logins.js";
 import { computeAcceptanceStructuralCeiling, readAcceptanceRuntimePolicy } from "./runtime-policy.js";
 import { ACCEPTANCE_REGISTER_VERSION, seedAcceptanceRegister } from "./seed-register.js";
 import { bearingsForRequest } from "../tests/support/reviewBearings.js";
@@ -281,6 +282,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await secondProvider?.stop();
   await primaryProvider?.stop();
+  if (database !== undefined) await endProvisionedRlsLogins(database);
   await database?.stop();
   await rm(dataDirectory, { recursive: true, force: true });
 });
@@ -291,6 +293,8 @@ describe("T3 / S2-2 — the judge panel is live on the acceptance path (author !
       // Model scorecard A20.4: this suite stays on the plan rosters, whatever scorecards/current.json holds.
       modelScorecard: { state: "ABSENT" },
       pool: database.pool,
+      // The runner's own login in login mode (DEBATEAI_TEST_API_LOGINS=1); the superuser pool above otherwise.
+      runnerPool: await runnerTestPool(database),
       serviceCredential: "p".repeat(43),
       environment: {
         DATABASE_URL: database.connectionString,
@@ -432,6 +436,8 @@ describe("T3 / S2-2 — the judge panel is live on the acceptance path (author !
       // Model scorecard A20.4: this suite stays on the plan rosters, whatever scorecards/current.json holds.
       modelScorecard: { state: "ABSENT" },
       pool: database.pool,
+      // The runner's own login in login mode (DEBATEAI_TEST_API_LOGINS=1); the superuser pool above otherwise.
+      runnerPool: await runnerTestPool(database),
       serviceCredential: "d".repeat(43),
       environment: {
         DATABASE_URL: database.connectionString,
@@ -650,6 +656,8 @@ describe("A20 · a VALID scorecard drives the acceptance path: picked, pinned, p
     const runtime = await createAcceptanceRuntime({
       modelScorecard,
       pool: database.pool,
+      // The runner's own login in login mode (DEBATEAI_TEST_API_LOGINS=1); the superuser pool above otherwise.
+      runnerPool: await runnerTestPool(database),
       serviceCredential: "s".repeat(43),
       environment: {
         DATABASE_URL: database.connectionString,
