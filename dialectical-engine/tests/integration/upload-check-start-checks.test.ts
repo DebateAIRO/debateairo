@@ -47,6 +47,21 @@ describe('check 3: the API and runner start checks as the production logins', ()
     expect(processesNaming(workdir)).toEqual([]);
   }, 600_000);
 
+  it('a system login without a recovery role is refused on the system route', async () => {
+    // The API's start runs each recovery check on the runtime login and then on its system target (attestEveryRoute).
+    // Taking one recovery role from api-system alone must refuse there, while the runtime login's own check still passes.
+    const workdir = scratch();
+    const result = await startChecks.checkStartChecks({
+      root, workdir, node: process.execPath, extraEnv: { UPLOAD_CHECK_TEST_SYSTEM_REVOKE: 'debateai_password_reset_runtime' }
+    });
+    expect(result.status).toBe('refused');
+    expect(result.lines, result.lines.join('\n')).toContain('api system logins: refused');
+    expect(result.lines, result.lines.join('\n')).toContain('  PASSWORD_RESET_DATABASE_ROLE_INVALID on the system route (api-system)');
+    expect(result.lines, result.lines.join('\n')).toContain('api runtime login: passed');
+    expect(result.lines, result.lines.join('\n')).toContain('runner login: passed');
+    expect(processesNaming(workdir)).toEqual([]);
+  }, 600_000);
+
   it('port 5434 in use refuses before PostgreSQL starts', async () => {
     const workdir = scratch();
     const holder: Server = createServer((socket) => socket.end());

@@ -10,10 +10,11 @@
 // <root> is the release root from check 2 (the folder that holds dialectical-engine/), or null when check 2 installed
 // nothing. <workdir> is the run's work folder: the driver's cluster lives in <workdir>/start-checks, which is gone
 // afterwards, and its log stays at <workdir>/start-checks-driver.log. extraEnv is merged into the driver's environment
-// last, and limitMs replaces the driver's 10-minute limit; both are there for tests. extraEnv's
-// UPLOAD_CHECK_TEST_EXTRA_GRANT names one role the driver grants the runner login on the throwaway cluster, so a test can
-// watch the runner check refuse; it never reaches anything else. It goes to the driver as an argument, because the
-// source audit refuses a tools/ .ts file that reads the process environment.
+// last, and limitMs replaces the driver's 10-minute limit; both are there for tests. Two test hooks in extraEnv act on
+// the throwaway cluster only and never reach anything else: UPLOAD_CHECK_TEST_EXTRA_GRANT names one role the driver
+// grants the runner login, so a test can watch the runner check refuse, and UPLOAD_CHECK_TEST_SYSTEM_REVOKE names one
+// role the driver takes from the api-system login, so a test can watch a check on the system route refuse. They go to
+// the driver as arguments, because the source audit refuses a tools/ .ts file that reads the process environment.
 //
 // The driver prints exactly one line, {"ok":boolean,"lines":string[]}. Its lines read "<part>: passed",
 // "<part>: refused" or "<part>: not checked: …". Nothing here reads a server address, a key or a limit.
@@ -169,8 +170,10 @@ export async function checkStartChecks({ root, workdir, node, extraEnv = {}, lim
   let run;
   try {
     if (!existsSync(tsx)) return done("not-checked", [`start checks: not checked: the release root has no ${relative(root, tsx)}`]);
-    const grant = extraEnv.UPLOAD_CHECK_TEST_EXTRA_GRANT;
-    const args = [DRIVER, cluster, String(process.pid), ...(typeof grant === "string" && grant !== "" ? [grant] : [])];
+    // The two test hooks, as named arguments (see the top of this file).
+    const hooks = [["--test-extra-grant", extraEnv.UPLOAD_CHECK_TEST_EXTRA_GRANT], ["--test-system-revoke", extraEnv.UPLOAD_CHECK_TEST_SYSTEM_REVOKE]]
+      .filter(([, role]) => typeof role === "string" && role !== "").map(([flag, role]) => `${flag}=${role}`);
+    const args = [DRIVER, cluster, String(process.pid), ...hooks];
     // The driver's environment: this Mac's PATH is not handed on, only the given Node's folder and the system tools.
     const env = { PATH: `${dirname(node)}:/usr/bin:/bin`, HOME: process.env.HOME ?? "", TMPDIR: process.env.TMPDIR ?? "/tmp", TZ: "UTC", ...extraEnv };
     run = await runDriver(tsx, args, { cwd: engine, env, log, limitMs });

@@ -2,15 +2,16 @@
  * Check 3's driver (tools/upload-check/start-checks.mjs copies it into an installed release root and runs it there with
  * that root's tsx, so every import below is the target commit's own code and packages).
  *
- *   tsx tools/upload-check/start-checks-driver.ts <cluster folder> <checker pid> [<test role>]
+ *   tsx tools/upload-check/start-checks-driver.ts <cluster folder> <checker pid> [--test-extra-grant=<role>] [--test-system-revoke=<role>]
  *
  * It starts a throwaway PostgreSQL in <cluster folder> on port 5434 with the cluster name the start checks pin, makes
  * the `debateai` database, migrates it, provisions the production logins from the P3-01 principals list (plus the three
  * recovery roles the row-security release note's deployment rule grants the API logins by hand), seals a register
  * publication, and then runs the API's and the runner's start checks unchanged, each as its own production login. The
  * API's system logins get the role checks the API's start runs on them. PostgreSQL is stopped in a finally block, and
- * also when the checker (<checker pid>) is gone. <test role> is there for tests only: a role the driver grants the runner
- * login on the throwaway cluster, so a test can watch the runner check refuse.
+ * also when the checker (<checker pid>) is gone. The two --test- options are there for tests only, and act on the
+ * throwaway cluster alone: one more role for the runner login, so a test can watch the runner check refuse, and one role
+ * taken from the api-system login, so a test can watch a check on the system route refuse.
  *
  * Its stdout is exactly one line, {"ok":boolean,"lines":string[]}; everything else it or a library says goes to stderr.
  * A function this commit does not have makes that part "not checked", with the function's name. Every password here is
@@ -30,6 +31,8 @@ type PublishRegister = typeof import("../../deploy/preview-auth-dev/v1/publish-r
 type VerifyNative = typeof import("../../deploy/preview-auth-dev/v1/verify-native.js");
 type Principals = typeof import("../../apps/runner/src/production-database-principals.js");
 type AccountContext = typeof import("../../packages/db/src/account-context.js");
+type PasswordReset = typeof import("../../packages/db/src/password-reset.js");
+type EmailMfaRecovery = typeof import("../../packages/db/src/email-mfa-recovery.js");
 type Receipt = Awaited<ReturnType<PublishRegister["publishPreviewRegister"]>>;
 
 /** The port and database the start checks pin (verify-native.ts). */
@@ -138,7 +141,10 @@ async function stopCluster(): Promise<void> {
   clearTimeout(timer);
 }
 
-async function run(clusterFolder: string, extraGrant: string | undefined): Promise<{ ok: boolean; lines: string[] }> {
+type TestHooks = Readonly<{ extraGrant?: string; systemRevoke?: string }>;
+const PLAIN_ROLE = /^[a-z_][a-z0-9_]{0,62}$/;
+
+async function run(clusterFolder: string, hooks: TestHooks): Promise<{ ok: boolean; lines: string[] }> {
   const lines: string[] = [];
   const name = await clusterName();
   lines.push("start checks: cluster name read from verify-native.ts, the same in both checks");
@@ -254,12 +260,16 @@ async function run(clusterFolder: string, extraGrant: string | undefined): Promi
     }
     lines.push(recoveryGranted.length === 0 ? "start checks: this commit has no recovery roles to grant"
       : `start checks: ${recoveryGranted.length} recovery roles granted to the API runtime and system logins, by the row-security release note's deployment rule`);
-    if (extraGrant !== undefined) {
-      // Tests only: one more role for the runner login, on this throwaway cluster.
-      if (!/^[a-z_][a-z0-9_]{0,62}$/.test(extraGrant)) throw new Refused("UPLOAD_CHECK_TEST_GRANT_INVALID", "the test role is not a plain role name");
-      const grant = (await superuser.query<{ statement: string }>("SELECT format('GRANT %I TO %I',$1::text,$2::text) AS statement", [extraGrant, runnerRole])).rows[0]!.statement;
-      await superuser.query(grant);
-      lines.push(`test hook: granted ${extraGrant} to the runner login on the throwaway cluster`);
+    // Tests only, on this throwaway cluster: one more role for the runner login, one role fewer for api-system.
+    for (const [role, statement, login, words] of [
+      [hooks.extraGrant, "GRANT %I TO %I", runnerRole, "granted {role} to the runner login"],
+      [hooks.systemRevoke, "REVOKE %I FROM %I", roleOf.get("api-system") ?? "debateai_prod_api_system", "took {role} from the api-system login"]
+    ] as const) {
+      if (role === undefined) continue;
+      if (!PLAIN_ROLE.test(role)) throw new Refused("UPLOAD_CHECK_TEST_GRANT_INVALID", "the test role is not a plain role name");
+      const sql = (await superuser.query<{ statement: string }>(`SELECT format('${statement}',$1::text,$2::text) AS statement`, [role, login])).rows[0]!.statement;
+      await superuser.query(sql);
+      lines.push(`test hook: ${words.replace("{role}", role)} on the throwaway cluster`);
     }
     // 5. A sealed publication, as tests/integration/preview-auth-dev-native-verify.test.ts seals one.
     const observation = { nodeVersion: process.version, pnpmVersion: "11.20.0", sourceRevision: "a".repeat(40), sourceTree: "b".repeat(40),
@@ -286,10 +296,13 @@ async function run(clusterFolder: string, extraGrant: string | undefined): Promi
       const verify = await load<VerifyNative>("../../deploy/preview-auth-dev/v1/verify-native.js");
       await need(verify, "assertSelectedRunnerConnection", "verify-native.ts")({ DATABASE_URL: url("runner-runtime") }, receipt);
     }, async () => [await membershipsOf(superuser, runnerRole)]));
-    // 7. The system logins: the API's start (apps/api/src/main.ts, boot steps "database-roles" and
-    // "account-context-logins") wires each T1 pool to its system login and runs the role checks on both routes, then
-    // checks each login's account reach. The same here, on the production logins; the publication-cleanup and
-    // data-export checks depend on server settings and are left out.
+    // 7. The system logins: the API's start (apps/api/src/main.ts, boot steps "database-roles", "account-context-logins"
+    // and the three recovery roles) wires each T1 pool to its system login and runs the role checks on both routes: first
+    // the T1 login's own connections, then its system target (attestEveryRoute). Then it checks each login's account
+    // reach. The same here, on the production logins. The recovery checks run as on a host with the recovery policies on,
+    // which the grants above assume. Left out, because each depends on a server setting this check cannot know:
+    // assertPublicationCleanupDatabaseRole (only with PUBLICATION_ENABLED=true), assertDataExportDatabaseRoles (only with
+    // DATA_EXPORT_STORE_PATH set) and assertSupportDatabaseRole (the support console's own start, main.ts:2049).
     results.push(await part(lines, "api system logins", async () => {
       const context = await load<AccountContext>("../../packages/db/src/account-context.js");
       const attestEveryRoute = need(context, "attestEveryRoute", "account-context.ts");
@@ -302,13 +315,36 @@ async function run(clusterFolder: string, extraGrant: string | undefined): Promi
       const system = open("api-system"), authorizationSystem = open("api-authorization-system");
       const runtime = open("api-runtime"), authorization = open("api-authorization");
       const erasure = open("api-erasure"), contentProvision = open("api-content-provision");
+      const passwordReset = await load<PasswordReset>("../../packages/db/src/password-reset.js");
+      const emailMfa = await load<EmailMfaRecovery>("../../packages/db/src/email-mfa-recovery.js");
+      const PasswordResetRepository = need(passwordReset, "PostgresPasswordResetRepository", "password-reset.ts");
+      const BackupEmailRepository = need(emailMfa, "PostgresBackupEmailRepository", "email-mfa-recovery.ts");
+      const MfaRecoveryRepository = need(emailMfa, "PostgresMfaRecoveryRepository", "email-mfa-recovery.ts");
       setCrossAccountTarget(runtime, system);
       setCrossAccountTarget(authorization, authorizationSystem);
       await attestEveryRoute(() => Promise.all([
         erasureRole(runtime, erasure), publicationRole(runtime, authorization), provisionRole(runtime, contentProvision)
       ]));
+      // main.ts builds the three recovery repositories on the runtime pool, with the register version in force, and
+      // attests each on every route. assertRole never uses the audit hasher, as in verify-native.ts.
+      const version = Number(receipt.registerVersion);
+      for (const repository of [
+        new PasswordResetRepository(runtime, {} as never, version),
+        new BackupEmailRepository(runtime, {} as never, version),
+        new MfaRecoveryRepository(runtime, {} as never, version)
+      ]) {
+        try {
+          await attestEveryRoute(() => repository.assertRole());
+        } catch (error) {
+          // Which route refused: the runtime login's own connections, or its system target.
+          const own = (context as Partial<AccountContext>).onOwnConnections;
+          const ownPasses = own === undefined ? undefined : await own(() => repository.assertRole()).then(() => true, () => false);
+          throw new Error(`${codeOf(error)} on ${ownPasses === undefined ? "one of the two routes"
+            : ownPasses ? "the system route (api-system)" : "the API runtime login's own route"}`);
+        }
+      }
       await assertAccountContextLogins({ requestPools: [runtime, authorization], systemPools: [system, authorizationSystem] });
-    }));
+    }, async () => [await membershipsOf(superuser, roleOf.get("api-system") ?? "debateai_prod_api_system")]));
     lines.push(KNOWN_GAP);
     return { ok: results.every(Boolean), lines };
   } finally {
@@ -319,7 +355,10 @@ async function run(clusterFolder: string, extraGrant: string | undefined): Promi
 }
 
 async function main(): Promise<{ ok: boolean; lines: string[] }> {
-  const [clusterFolder, checkerPid, extraGrant] = process.argv.slice(2);
+  const [clusterFolder, checkerPid, ...options] = process.argv.slice(2);
+  const option = (name: string): string | undefined => options.find((given) => given.startsWith(`--${name}=`))?.slice(name.length + 3);
+  const extraGrant = option("test-extra-grant"), systemRevoke = option("test-system-revoke");
+  const hooks: TestHooks = { ...(extraGrant === undefined ? {} : { extraGrant }), ...(systemRevoke === undefined ? {} : { systemRevoke }) };
   const checker = Number(checkerPid);
   if (clusterFolder === undefined || !Number.isSafeInteger(checker) || checker <= 1) {
     return { ok: false, lines: ["start checks: not checked: the driver was not given a cluster folder and the checker's pid"] };
@@ -332,7 +371,7 @@ async function main(): Promise<{ ok: boolean; lines: string[] }> {
   }, 2000);
   watch.unref();
   try {
-    return await run(clusterFolder, extraGrant);
+    return await run(clusterFolder, hooks);
   } catch (error) {
     if (error instanceof Refused) return { ok: false, lines: [`start checks: refused (${error.message})`, error.code] };
     if (error instanceof NotChecked) return { ok: false, lines: [`start checks: not checked: ${error.message}`] };
