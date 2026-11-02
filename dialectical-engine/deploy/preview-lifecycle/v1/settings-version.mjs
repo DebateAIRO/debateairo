@@ -376,9 +376,12 @@ export async function checkSettingsVersion({ label, version, layout = LAYOUT, de
   // The guard for both folders before anything runs: the runner half's files, and the API folder's half and operator.
   await verified(io, release.pinned.runner, 'runner', [TSX_LOADER, HALF_ENTRIES.runner]);
   await verified(io, release.pinned.api, 'api', [TSX_LOADER, HALF_ENTRIES.api, ...OPERATOR_IMPORTS.slice(1)]);
+  const folder = currentDirFor(layout, label);
+  // A drained upload checks the new release before its first start, so prestart has not made this folder yet (R22,
+  // 2026-11-02: LIFECYCLE_WRITE_REFUSED): made here the same way (root, 0755), before any half runs.
+  await io.ensureCurrentDir(folder).catch(() => refuse('CURRENT_DIRECTORY_REFUSED'));
   const runner = await runHalf(io, layout, label, release, 'runner', v);
   const api = await runHalf(io, layout, label, release, 'api', v);
-  const folder = currentDirFor(layout, label);
   const stamp = utcStamp(io.now());
   const receipt = `${folder}/settings-check-${v}-${stamp}.json`;
   await io.writeFile(receipt, `${JSON.stringify({ schema: RECEIPT_SCHEMA, label, releaseKey: release.releaseKey, version: v, recordedAt: new Date(io.now()).toISOString(), runner, api })}\n`);

@@ -67,7 +67,6 @@ import { PREVIEW_ORIGIN, PREVIEW_SITE_KEY } from '../../preview-auth-dev/v1/turn
 import { PREVIEW_MODEL_ROSTER_FLAGS, RELEASE_KEY_PATTERN } from '../../preview-auth-dev/v1/environment.mjs';
 import { runBounded } from '../../preview-lifecycle/v1/common.mjs';
 import { addedMigrations, n1Headers } from '../../preview-lifecycle/v1/migration-steps.mjs';
-import { childEnvironment } from '../../../tools/source-map-hotfix.mjs';
 import { DATABASE_AHEAD_MAX_BYTES, DATABASE_AHEAD_MAX_STEPS, DATABASE_AHEAD_SCHEMA, validateDatabaseAheadFile } from '../../preview-auth-dev/v1/database-ahead.mjs';
 
 /** The fixed server folders the reviewed launchers already require (launch-plan.mjs: ROOT, the artifact file pattern, prepareLaunch's plan path). */
@@ -290,9 +289,13 @@ async function uiBuildCommand(options, { layout, deps }) {
   // Before: the root is exactly what the manifest inventoried. After: the build changed none of it.
   await verifySource(source.value, sourceBinding(source));
   const policy = await (deps.readPackagePolicy ?? readPackagePolicy)(source.value.sourceRoot).catch(() => refuse('UI_BUILD_PACKAGE_POLICY_REFUSED'));
+  // Loaded here only: the shared server-tools folder (operator/lifecycle-v1) holds deploy/ alone, and caddy-slots.mjs
+  // imports this file, so a top-level import of tools/ stopped release-switch.mjs there (R22 staging, 2026-11-02).
   let environment;
-  try { environment = childEnvironment({ environment: buildEnvironment(releaseKey, deps.execPath, models), now: deps.now ?? Date.now(), workspace: policy.workspace, lock: policy.lock }); }
-  catch { refuse('UI_BUILD_PACKAGE_POLICY_REFUSED'); }
+  try {
+    const { childEnvironment } = await import('../../../tools/source-map-hotfix.mjs');
+    environment = childEnvironment({ environment: buildEnvironment(releaseKey, deps.execPath, models), now: deps.now ?? Date.now(), workspace: policy.workspace, lock: policy.lock });
+  } catch { refuse('UI_BUILD_PACKAGE_POLICY_REFUSED'); }
   const build = await (deps.buildUiArtifact ?? buildUiArtifact)(source.value, environment);
   await verifySource(source.value, sourceBinding(source));
   await (deps.verifyUiBuildManifest ?? verifyUiBuildManifest)(JSON.parse(JSON.stringify(build)), source.value);
