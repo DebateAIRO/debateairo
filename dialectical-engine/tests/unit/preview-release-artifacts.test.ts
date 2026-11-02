@@ -266,6 +266,9 @@ describe('UI build values', () => {
 });
 
 describe('ui-build and verify', () => {
+  // A release root whose early-use versions are all seven days old: the build gets the fixed environment only.
+  const MATURE = { readPackagePolicy: async () => ({ workspace: 'minimumReleaseAge: 10080\n', lock: '' }), now: Date.parse('2026-11-04T00:00:00.000Z') };
+
   it('verifies the root, builds with the fixed environment, re-verifies that no source byte changed, then writes', async () => {
     const s = server();
     const source = s.write(join(s.art, 'candidate-ui-source.json'), sourceManifest('ui'));
@@ -273,6 +276,7 @@ describe('ui-build and verify', () => {
     const build = { schema: 'preview-auth-dev-ui-build-v1', buildId: 'x', files: [] };
     const out = join(s.art, 'candidate-ui-build.json');
     const result = await run(['ui-build', '--source', source.path, '--release-key', NEW_KEY, '--out', out], s.layout, {
+      ...MATURE,
       verifySourceManifest: async (_m: unknown, binding: any) => { events.push(`verify:${binding.manifestSha256}`); },
       buildUiArtifact: async (m: any, env: unknown) => { events.push('build'); expect(m.role).toBe('ui'); expect(env).toEqual({ ...tool.UI_BUILD_ENVIRONMENT, RELEASE_KEY: NEW_KEY, PATH: '/opt/node/bin:/usr/local/bin:/usr/bin:/bin' }); return build; },
       verifyUiBuildManifest: async () => { events.push('verify-build'); }, execPath: '/opt/node/bin/node'
@@ -282,12 +286,42 @@ describe('ui-build and verify', () => {
     expect(result.sha256).toBe(sha(JSON.stringify(build)));
   });
 
+  // The owner's early use (tools/source-map-hotfix.mjs, 2026-11-01): the root was installed with that exemption, so pnpm
+  // inside the build must see the same one or it recreates node_modules and refuses (R22 staging, 2026-11-02).
+  it("carries the owner's early-use exemption from the root's own package rules while a version is young, and refuses a tampered rule before building", async () => {
+    const s = server();
+    const source = s.write(join(s.art, 'candidate-ui-source.json'), sourceManifest('ui'));
+    const engine = resolve(import.meta.dirname, '../..');
+    const policy = { workspace: readFileSync(join(engine, 'pnpm-workspace.yaml'), 'utf8'), lock: readFileSync(join(engine, 'pnpm-lock.yaml'), 'utf8') };
+    const read: string[] = [], seen: any[] = [];
+    const build = (out: string, now: string, readPackagePolicy = async (root: string) => { read.push(root); return policy; }) =>
+      run(['ui-build', '--source', source.path, '--release-key', NEW_KEY, '--out', join(s.art, out)], s.layout, {
+        verifySourceManifest: async () => undefined, verifyUiBuildManifest: async () => undefined, execPath: '/opt/node/bin/node', readPackagePolicy, now: Date.parse(now),
+        buildUiArtifact: async (_m: unknown, env: any) => { seen.push(env); return { schema: 'preview-auth-dev-ui-build-v1' }; }
+      });
+    const fixed = { ...tool.UI_BUILD_ENVIRONMENT, RELEASE_KEY: NEW_KEY, PATH: '/opt/node/bin:/usr/local/bin:/usr/bin:/bin' };
+    await build('a.json', '2026-11-02T12:00:00.000Z');
+    await build('b.json', '2026-11-03T12:00:00.000Z');
+    await build('c.json', '2026-11-03T22:26:03.755Z');
+    expect(read).toEqual([NEW_ROOT.ui, NEW_ROOT.ui, NEW_ROOT.ui]);
+    expect(seen).toEqual([
+      { ...fixed, PNPM_CONFIG_MINIMUM_RELEASE_AGE_EXCLUDE: '["@isaacs/nonrecursive-glob-match@1.0.1","path-scurry@3.0.0","glob@14.0.2","minimatch@11.0.1"]' },
+      { ...fixed, PNPM_CONFIG_MINIMUM_RELEASE_AGE_EXCLUDE: '["path-scurry@3.0.0","glob@14.0.2","minimatch@11.0.1"]' },
+      fixed
+    ]);
+    const tampered = async () => ({ ...policy, workspace: `${policy.workspace}\nminimumReleaseAgeExclude: []\n` });
+    await expect(build('d.json', '2026-11-02T12:00:00.000Z', tampered)).rejects.toMatchObject({ code: 'UI_BUILD_PACKAGE_POLICY_REFUSED' });
+    await expect(build('e.json', '2026-11-02T12:00:00.000Z', async () => { throw new Error('ENOENT'); })).rejects.toMatchObject({ code: 'UI_BUILD_PACKAGE_POLICY_REFUSED' });
+    expect(seen).toHaveLength(3);
+    expect(existsSync(join(s.art, 'd.json')) || existsSync(join(s.art, 'e.json'))).toBe(false);
+  });
+
   it('--models multi-model builds with the reviewed two-list value; an unknown name refuses before anything runs', async () => {
     const s = server();
     const source = s.write(join(s.art, 'candidate-ui-source.json'), sourceManifest('ui'));
     let seen: any;
     await run(['ui-build', '--source', source.path, '--models', 'multi-model', '--release-key', NEW_KEY, '--out', join(s.art, 'candidate-ui-build.json')], s.layout, {
-      verifySourceManifest: async () => undefined, verifyUiBuildManifest: async () => undefined, execPath: '/opt/node/bin/node',
+      ...MATURE, verifySourceManifest: async () => undefined, verifyUiBuildManifest: async () => undefined, execPath: '/opt/node/bin/node',
       buildUiArtifact: async (_m: unknown, env: any) => { seen = env; return { schema: 'preview-auth-dev-ui-build-v1' }; }
     });
     expect(seen).toEqual({ ...tool.UI_BUILD_ENVIRONMENT, NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON: environment.PREVIEW_MODEL_ROSTER_FLAGS['multi-model'], RELEASE_KEY: NEW_KEY, PATH: '/opt/node/bin:/usr/local/bin:/usr/bin:/bin' });
@@ -308,7 +342,7 @@ describe('ui-build and verify', () => {
     // Any site version is admitted with this source's 12 hex (the number is checked when the release starts).
     let seen: any;
     await run(['ui-build', '--source', source.path, '--release-key', `r17-${newRevision.slice(0, 12)}`, '--out', join(s.art, 'candidate-ui-build.json')], s.layout, {
-      verifySourceManifest: async () => undefined, verifyUiBuildManifest: async () => undefined, execPath: '/opt/node/bin/node',
+      ...MATURE, verifySourceManifest: async () => undefined, verifyUiBuildManifest: async () => undefined, execPath: '/opt/node/bin/node',
       buildUiArtifact: async (_m: unknown, env: any) => { seen = env; return { schema: 'preview-auth-dev-ui-build-v1' }; }
     });
     expect(seen.RELEASE_KEY).toBe(`r17-${newRevision.slice(0, 12)}`);
@@ -319,7 +353,7 @@ describe('ui-build and verify', () => {
     const source = s.write(join(s.art, 'candidate-ui-source.json'), sourceManifest('ui'));
     let calls = 0;
     await expect(run(['ui-build', '--source', source.path, '--release-key', NEW_KEY, '--out', join(s.art, 'candidate-ui-build.json')], s.layout, {
-      verifySourceManifest: async () => { if (++calls === 2) throw new TypeError('PREVIEW_SOURCE_INVENTORY_REFUSED'); },
+      ...MATURE, verifySourceManifest: async () => { if (++calls === 2) throw new TypeError('PREVIEW_SOURCE_INVENTORY_REFUSED'); },
       buildUiArtifact: async () => ({ schema: 'preview-auth-dev-ui-build-v1' }), verifyUiBuildManifest: async () => undefined
     })).rejects.toThrow('PREVIEW_SOURCE_INVENTORY_REFUSED');
     expect(existsSync(join(s.art, 'candidate-ui-build.json'))).toBe(false);
