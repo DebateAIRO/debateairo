@@ -317,7 +317,7 @@ The body of these Terms is written for you. In addition: you may bring proceedin
 
 ### A.3 Canada and Quebec
 
-Our privacy officer, and in Quebec the person in charge of the protection of personal information, is our director, reachable at privacy@dezbatere.ro. Our Privacy Policy, Annex B.3, covers your data. **Quebec:** these Terms are available in French; choose French with the language switcher; the settings that keep your debates private are on by default; you may request de-indexing of personal information about you.
+Our privacy officer, and in Quebec the person in charge of the protection of personal information, is our director, reachable at privacy@dezbatere.ro. Our Privacy Policy, Annex B.3, covers your data. **Quebec:** these Terms are available in French; if you choose Canada when you sign up, you get them in French first and can choose English instead; the settings that keep your debates private are on by default; you may request de-indexing of personal information about you.
 
 ### A.4 Australia and New Zealand
 

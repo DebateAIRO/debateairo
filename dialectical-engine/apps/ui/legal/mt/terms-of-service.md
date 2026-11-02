@@ -317,7 +317,7 @@ Il-parti ewlenija ta’ dawn it-Termini nkitbet għalik. Barra minn hekk: tista�
 
 ### A.3 Il-Kanada u Quebec
 
-L-uffiċjal tal-privatezza tagħna, u fi Quebec il-persuna responsabbli għall-protezzjoni tal-informazzjoni personali, huwa d-direttur tagħna, li tista’ tilħqu fuq privacy@dezbatere.ro. Il-Politika dwar il-Privatezza tagħna, Anness B.3, tkopri d-data tiegħek. **Quebec:** dawn it-Termini huma disponibbli bil-Franċiż; agħżel il-Franċiż bis-selettur tal-lingwa; l-issettjar li jżomm id-dibattiti tiegħek privati huwa mixgħul b’mod awtomatiku; tista’ titlobna nneħħu mill-indiċi informazzjoni personali dwarek.
+L-uffiċjal tal-privatezza tagħna, u fi Quebec il-persuna responsabbli għall-protezzjoni tal-informazzjoni personali, huwa d-direttur tagħna, li tista’ tilħqu fuq privacy@dezbatere.ro. Il-Politika dwar il-Privatezza tagħna, Anness B.3, tkopri d-data tiegħek. **Quebec:** dawn it-Termini huma disponibbli bil-Franċiż; jekk tagħżel il-Kanada meta tirreġistra, tirċevihom l-ewwel bil-Franċiż u tista’ tagħżel l-Ingliż minflok; l-issettjar li jżomm id-dibattiti tiegħek privati huwa mixgħul b’mod awtomatiku; tista’ titlobna nneħħu mill-indiċi informazzjoni personali dwarek.
 
 ### A.4 L-Awstralja u ż-Żelanda l-Ġdida
 

@@ -328,7 +328,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Ceanada agus Québec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Is é ár stiúrthóir, ar féidir teagmháil a dhéanamh leis ag privacy@dezbatere.ro, ár n-oifigeach príobháideachais, agus i Québec an duine atá i gceannas ar chosaint faisnéise pearsanta. Pléann ár mBeartas Príobháideachais, Iarscríbhinn B.3, le do shonraí. Québec: tá na Téarmaí seo ar fáil i bhFraincis; roghnaigh an Fhraincis leis an roghnóir teanga; tá na socruithe a choinníonn do dhíospóireachtaí príobháideach curtha ar siúl mar réamhshocrú; féadfaidh tú dí-innéacsú faisnéise pearsanta fút a iarraidh." }
+      { kind: "p", text: "Is é ár stiúrthóir, ar féidir teagmháil a dhéanamh leis ag privacy@dezbatere.ro, ár n-oifigeach príobháideachais, agus i Québec an duine atá i gceannas ar chosaint faisnéise pearsanta. Pléann ár mBeartas Príobháideachais, Iarscríbhinn B.3, le do shonraí. Québec: tá na Téarmaí seo ar fáil i bhFraincis; má roghnaíonn tú Ceanada nuair a chláraíonn tú, gheobhaidh tú i bhFraincis ar dtús iad agus is féidir leat an Béarla a roghnú ina n-ionad; tá na socruithe a choinníonn do dhíospóireachtaí príobháideach curtha ar siúl mar réamhshocrú; féadfaidh tú dí-innéacsú faisnéise pearsanta fút a iarraidh." }
     ]
   },
   {
@@ -368,7 +368,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.9",
-  sha256: "203b624150c0832491351ba307085410caf5ebd094e8596b1bf91dbd05071b6b",
+  sha256: "16e8881dd74e97a15c1fb92ec55635dee37a245a54494d17dbb530bef51f0d5b",
   eyebrow: "TÉARMAÍ SEIRBHÍSE · v2.9 · I bhFEIDHM 12 DEIREADH FÓMHAIR 2026",
   title: "An méid lena n-aontaíonn tú",
   lede: "An conradh idir tú agus DMS Merchandise Shop S.R.L., i bhfriotal soiléir. Naoi rannán déag agus Iarscríbhinn A — scrollaigh go dtí an deireadh.",

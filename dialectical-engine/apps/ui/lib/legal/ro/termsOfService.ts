@@ -328,7 +328,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Canada și Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Responsabilul nostru cu protecția vieții private, iar în Quebec persoana responsabilă cu protecția informațiilor cu caracter personal, este administratorul nostru, care poate fi contactat la privacy@dezbatere.ro. Politica noastră de confidențialitate, Anexa B.3, se referă la datele dumneavoastră. Quebec: acești Termeni sunt disponibili în limba franceză; alegeți limba franceză din selectorul de limbă; setările care vă mențin dezbaterile private sunt activate în mod implicit; puteți solicita dezindexarea informațiilor cu caracter personal despre dumneavoastră." }
+      { kind: "p", text: "Responsabilul nostru cu protecția vieții private, iar în Quebec persoana responsabilă cu protecția informațiilor cu caracter personal, este administratorul nostru, care poate fi contactat la privacy@dezbatere.ro. Politica noastră de confidențialitate, Anexa B.3, se referă la datele dumneavoastră. Quebec: acești Termeni sunt disponibili în limba franceză; dacă alegeți Canada la înregistrare, îi primiți mai întâi în limba franceză și puteți alege în schimb limba engleză; setările care vă mențin dezbaterile private sunt activate în mod implicit; puteți solicita dezindexarea informațiilor cu caracter personal despre dumneavoastră." }
     ]
   },
   {
@@ -368,7 +368,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.9",
-  sha256: "2e01873a76d307e7c9234e12a1910b926423bb8d4e99957dec5488a760b6b6dc",
+  sha256: "fb88f7b1e958fc2ae14718839e0750474c21d914dce23ef0255da8b545d305e4",
   eyebrow: "TERMENII SERVICIULUI · v2.9 · ÎN VIGOARE DE LA 12 OCTOMBRIE 2026",
   title: "Ce acceptați",
   lede: "Contractul dintre dumneavoastră și DMS Merchandise Shop S.R.L., într-un limbaj clar. Nouăsprezece secțiuni și Anexa A — derulați până la final.",

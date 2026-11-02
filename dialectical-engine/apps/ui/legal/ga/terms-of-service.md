@@ -317,7 +317,7 @@ Scríobhadh príomhchorp na dTéarmaí seo duit. Ina theannta sin: féadfaidh t�
 
 ### A.3 Ceanada agus Québec
 
-Is é ár stiúrthóir, ar féidir teagmháil a dhéanamh leis ag privacy@dezbatere.ro, ár n-oifigeach príobháideachais, agus i Québec an duine atá i gceannas ar chosaint faisnéise pearsanta. Pléann ár mBeartas Príobháideachais, Iarscríbhinn B.3, le do shonraí. **Québec:** tá na Téarmaí seo ar fáil i bhFraincis; roghnaigh an Fhraincis leis an roghnóir teanga; tá na socruithe a choinníonn do dhíospóireachtaí príobháideach curtha ar siúl mar réamhshocrú; féadfaidh tú dí-innéacsú faisnéise pearsanta fút a iarraidh.
+Is é ár stiúrthóir, ar féidir teagmháil a dhéanamh leis ag privacy@dezbatere.ro, ár n-oifigeach príobháideachais, agus i Québec an duine atá i gceannas ar chosaint faisnéise pearsanta. Pléann ár mBeartas Príobháideachais, Iarscríbhinn B.3, le do shonraí. **Québec:** tá na Téarmaí seo ar fáil i bhFraincis; má roghnaíonn tú Ceanada nuair a chláraíonn tú, gheobhaidh tú i bhFraincis ar dtús iad agus is féidir leat an Béarla a roghnú ina n-ionad; tá na socruithe a choinníonn do dhíospóireachtaí príobháideach curtha ar siúl mar réamhshocrú; féadfaidh tú dí-innéacsú faisnéise pearsanta fút a iarraidh.
 
 ### A.4 An Astráil agus an Nua-Shéalainn
 

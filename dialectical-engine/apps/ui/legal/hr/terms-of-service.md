@@ -317,7 +317,7 @@ Opći dio ovih Uvjeta napisan je za vas. Dodatno: postupak možete pokrenuti pre
 
 ### A.3 Kanada i Quebec
 
-Naš službenik za privatnost, a u Quebecu osoba odgovorna za zaštitu osobnih podataka, jest naš direktor, dostupan na privacy@dezbatere.ro. Vaše podatke uređuje Prilog B.3 naših Pravila o privatnosti. **Quebec:** ovi su Uvjeti dostupni na francuskom jeziku; odaberite francuski u izborniku jezika; postavke kojima se vaše rasprave zadržavaju privatnima uključene su prema zadanom; možete zatražiti uklanjanje osobnih informacija o sebi iz rezultata pretraživanja.
+Naš službenik za privatnost, a u Quebecu osoba odgovorna za zaštitu osobnih podataka, jest naš direktor, dostupan na privacy@dezbatere.ro. Vaše podatke uređuje Prilog B.3 naših Pravila o privatnosti. **Quebec:** ovi su Uvjeti dostupni na francuskom jeziku; ako pri registraciji odaberete Kanadu, najprije ćete ih dobiti na francuskom, a umjesto toga možete odabrati engleski; postavke kojima se vaše rasprave zadržavaju privatnima uključene su prema zadanom; možete zatražiti uklanjanje osobnih informacija o sebi iz rezultata pretraživanja.
 
 ### A.4 Australija i Novi Zeland
 
