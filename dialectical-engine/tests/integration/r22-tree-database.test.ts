@@ -330,6 +330,7 @@ describe("decision 2: a rewrite that really changed a path rewrites the path abo
     const { afterStored: _unused, ...withoutClimb } = rewrite.settings;
     await runDigPathRewrite(withoutClimb, snapshotOf(settled.dig, settled.workItemId, team.members));
     expect(await advanceTree({ ...rewrite.treeSweep.tree, afterLevel: (level) => { levels.push(level); } }, settled.dig)).toBe("ANSWER_UPDATED");
+    expect((await database.pool.query<{ settled: boolean }>("SELECT identity.dig_is_settled($1) AS settled", [settled.dig])).rows[0]!.settled).toBe(true);
     expect(levels).toEqual([{ digRunId: settled.dig, parentRunId: root, positionRef: position, updateId: pathUpdateIdOf(settled.dig, 1), outcome: "CHANGED" }]);
   }, 120_000);
 

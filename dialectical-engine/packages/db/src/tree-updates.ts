@@ -75,6 +75,11 @@ const lineage = (value: Readonly<Record<string, unknown>> | null): string | null
 export class PostgresTreeUpdateRunnerRepository {
   constructor(private readonly pool: Executor) {}
 
+  /** 0153: this dig's rewrite, climb and any main-answer update have ended, so the test site's estimate stops holding it. */
+  async markDigSettled(runId: string): Promise<void> {
+    await this.pool.query("SELECT identity.mark_dig_tree_settled($1)", [runId]);
+  }
+
   async takeTurn(input: Readonly<{ updateId: string; runId: string; parentRunId: string; positionRef: string; kind: PathUpdateKind;
     climbStep: number; causeKind: PathUpdateCauseKind; causeId: string | null }>):
     Promise<"TAKEN" | "ALREADY" | "CONFLICT" | "NOT_LIVE" | "NOT_A_DIG" | "NO_CAUSE"> {

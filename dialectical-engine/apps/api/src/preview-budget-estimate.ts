@@ -208,6 +208,8 @@ const PREVIEW_UNFINISHED_RUNS_MAX = 64;
  * spending (the story runs after the work item is DONE). It is held while its latest model call
  * finished within this window: longer than any gap between two calls of a live story (one call's
  * deadline plus the unbilled retry's cooldown), so a story that died without a row stops holding.
+ * A dig writes no story: its rewrite, climb and any main-answer update take the story's place and its hold, until 0153's
+ * mark says they have ended (identity.dig_is_settled), so a finished dig stops holding at once.
  */
 const PREVIEW_STORY_HOLD_WINDOW_SECONDS = 3600;
 
@@ -1393,6 +1395,7 @@ export const PREVIEW_UNFINISHED_RUNS_SQL = `SELECT run.envelope_basis, run.disco
               OR ($1::boolean
                   AND EXISTS (SELECT 1 FROM serve.answer AS answer WHERE answer.run_id = run.run_id)
                   AND NOT EXISTS (SELECT 1 FROM serve.answer_story AS story WHERE story.run_id = run.run_id)
+                  AND NOT identity.dig_is_settled(run.run_id)
                   AND EXISTS (SELECT 1 FROM ledger.ledger_entry AS entry
                               WHERE entry.run_id = run.run_id AND entry.action_kind = 'MODEL_CALL'
                                 AND entry.finished_at > clock_timestamp() - make_interval(secs => $2::integer))))

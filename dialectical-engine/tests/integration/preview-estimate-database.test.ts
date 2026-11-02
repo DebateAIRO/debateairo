@@ -6,7 +6,7 @@
  *   story (answer served, no story row, a model call within the window), and nothing else;
  * - spec 2026-10-11 Part 5: it says whether each held debate has a role rotation pin (`rotated`).
  */
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { WorkItemRepository } from "@debateai/battery";
 import { RunRepository, insertRunRoleRotation, migrate } from "@debateai/db";
@@ -97,6 +97,28 @@ describe("the unfinished debates the estimate holds", () => {
        VALUES ($1,$2,$3,$4,'FAILED','STORY_FIXTURE_FAILED',0,'[]'::jsonb,'{}'::jsonb)`,
       [randomUUID(), runId, answer.rows[0]!.answer_id, answer.rows[0]!.answer_version]);
     expect((await unfinished(true)).has("story-written")).toBe(false);
+  });
+
+  it("a dig writes no story: held while its rewrite, climb or answer update is open, gone at once when the runner marks it ended (0153)", async () => {
+    const ownerRef = randomUUID();
+    await database.pool.query(
+      `INSERT INTO identity."user" (user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,phone_ciphertext,password_hash,pseudonym,audit_token,owner_ref,state,adult_affirmed_at,created_at)
+       VALUES ($1,$2,'{}'::jsonb,'{}'::jsonb,NULL,'test-password-hash',$3,$4,$5,'active',now(),now())`,
+      [randomUUID(), randomBytes(32), `dig-hold-${randomUUID()}`, randomUUID(), ownerRef]);
+    const dig = await servedRun("dig-open"), other = await servedRun("dig-other");
+    await database.pool.query("SELECT core.append_run_ownership_event($1,$2)", [dig, ownerRef]);
+    await modelCall(dig, new Date());
+    await modelCall(other, new Date());
+    expect((await unfinished(true)).get("dig-open")).toBe("STORY");
+    const mark = async (runId: string) => (await database.pool.query<{ outcome: string }>("SELECT identity.mark_dig_tree_settled($1) AS outcome", [runId])).rows[0]!.outcome;
+    expect(await mark(dig)).toBe("RECORDED");
+    expect(await mark(dig)).toBe("ALREADY");
+    const after = await unfinished(true);
+    expect(after.has("dig-open")).toBe(false);
+    expect(after.get("dig-other")).toBe("STORY");
+    // A run with a job still open stays held, marked or not.
+    await readyJob(dig);
+    expect((await unfinished(true)).get("dig-open")).toBe("DEBATE");
   });
 
   it("reports a run with a role rotation pin as rotated, and one without as not (spec 2026-10-11, Part 5)", async () => {
