@@ -194,7 +194,8 @@ async function publishThroughProduct(answer: Answer): Promise<PublicDebate> {
     readArgumentLanguageTag: async () => null,
     prepareKeyProvision: async () => true,
     publish: async () => true,
-    abandonKeyProvision: async () => true
+    abandonKeyProvision: async () => true,
+    readOwnedVisibility: async () => ({ state: "PRIVATE", publicRef: null })
   } as unknown as PostgresPublicationRepository;
   const cipher = {
     create: async () => ({

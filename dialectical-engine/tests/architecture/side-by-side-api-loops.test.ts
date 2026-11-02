@@ -100,6 +100,7 @@ describe("side-by-side C7 the API's background loops run only on the current rel
   it("gates every timer main.ts starts, on the watcher", () => {
     for (const loop of [
       "gatedInterval(releaseWatcher,triggerErasureReconciliation,30_000)",
+      "gatedInterval(releaseWatcher,triggerRestoreFenceAdvance,60_000)",
       "gatedInterval(releaseWatcher,triggerAuthenticationRiskCleanup,60_000)",
       "gatedInterval(releaseWatcher,triggerRetentionPurge,86_400_000)",
       "gatedInterval(releaseWatcher,triggerDataExportWork,DATA_EXPORT_TICK_MS)",

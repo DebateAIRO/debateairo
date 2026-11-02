@@ -10,13 +10,13 @@ base verifier).
 
 Every migration after 0110 is a forward step in an ordered chain anchored on 0110; 0111 (NETOPIA, PR-54, PR-58) is the
 first, the auth DB batch (0112, below) the second, Part C's prices (0113, below) the third, role rotation (0114,
-below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth, the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, the synthesis check (0126, below) the sixteenth, the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth, the support answer scope (0129, below) the nineteenth and row-level security (0130, below) the twentieth. A step is added with new files only; NNNN is its number, the step before's number plus one:
+below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth, the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, the synthesis check (0126, below) the sixteenth, the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth, the support answer scope (0129, below) the nineteenth, row-level security (0130, below) the twentieth, the security fixes of audit run 3 (0131, below) the twenty-first, the three recovery notice due indexes (0132, 0133 and 0134, below) the twenty-second to twenty-fourth, and the MFA recovery control user index (0135, below) the twenty-fifth. A step is added with new files only; NNNN is its number, the step before's number plus one:
 
 1. `migrations/NNNN_<name>.sql`: the SQL, forward-only and replayable.
 2. A manifest in `lineage/`, shaped like `billing-netopia-forward111.json`: its version, the recipe's SHA-256,
-   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0130: 0130,
-   `row-level-security-forward0130.json`, and `verify-effective-capabilities-130.sql`, which supersedes 0111's, which
-   0112 to 0129 keep),
+   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0135: 0135,
+   `mfa-recovery-control-user-started-forward0135.json`, and `verify-effective-capabilities-130.sql`, which supersedes
+   0111's, which 0112 to 0129 keep, and which 0131 to 0135 keep),
    and its own migration and verifier. (0111's own `previous` is 0110: `auth-dev-preview-20261006-forward110.json`
    and the sealed `verify-effective-capabilities.sql`.)
 3. A new verifier `lineage/verify-effective-capabilities-NNNN.sql` only when the step adds billing relations or
@@ -443,6 +443,286 @@ so it was renumbered again, to 0130, at its merge onto that dev (2026-10-28). Th
 `serve.synthesis_check_*` tables 0126 grants `debateai_runtime` SELECT on to the in-scope set (113 to 118 relations; each
 keyed on its run, K4) and V-18's guard on `serve.synthesis_check_attempt.request_id`.
 
+## The security fixes of audit run 3 (0131)
+
+The twenty-first chain step, after row-level security's 0130 (security audit run 3, the fix branch's one database
+step): `0131_security_fixes_run3.sql`, `security-fixes-run3-forward0131.json`,
+`packages/db/src/migration-forward0131.ts` (`loadForward0131`, appended last to `STEPS`, `MIGRATION_FORWARD0131_*`
+refusals). Every SQL change of the branch goes into this one file, in one section per issue, each opened by a line
+`-- ==== [<issue id>] <short title> ====` and holding only that issue's statements. Its header declares
+`-- n1: expand` and `-- n1: keeps-verifier`: every section only adds (new functions as `CREATE OR REPLACE FUNCTION` of
+names no earlier file defines, `REVOKE` only on objects this file creates, a reviewed `-- n1: reviewed <reason>` line
+above any of the four admitted exceptions), and no section adds a billing relation or function, so
+`verify-effective-capabilities-130.sql` stays the verifier in force. No supplemental verifier, so no
+`replayVerifierSql`: its postcondition is one group per section, in section order (the loader's `SECTIONS` list: the
+section's id, its functions whole and its tables whole, plus, only in a section that names them, its `tablePrivileges`
+answers of `has_table_privilege` for grants it adds on an earlier step's table, its `schemas`: owner and ACL of a
+schema it creates, its `triggers`: the enabled flag and definition of a trigger it re-creates on an earlier step's
+table, and its `constraints`: the name, type and definition, without a trailing `NOT VALID`, of a constraint it adds
+on an earlier step's table, never that table whole), and the loader refuses
+`MIGRATION_FORWARD0131_SECTIONS` when the file's section headers and that list disagree. The fix branch built this step
+and the four index steps after it as 0125 to 0129; `origin/dev` took 0125 to 0130 first, so they were renumbered to
+0131 to 0135 at the merge onto that dev (2026-10-29: every file and constant that carries the number, the manifests
+re-chained from 0130's, which also hands them 0130's verifier, and the chain lists re-pinned). The sections:
+
+- `[NV-16]` `identity.mfa_recovery_start_bounded(bytea,text,uuid,uuid[],text,text,jsonb,jsonb,bigint,uuid)`, owned by
+  `debateai_mfa_recovery_owner` (SECURITY DEFINER, `search_path=pg_catalog, pg_temp`, EXECUTE for
+  `debateai_mfa_recovery_runtime` only): under the account's security-subject lock it refuses silently once the
+  account has three control rows for the requested destination's channel type that started in the last hour, and
+  otherwise delegates to 0116's sealed `identity.mfa_recovery_start`, which keeps its grant for the release before.
+- `[NV-18]` `identity.expire_stale_account_recovery_bindings(integer)`, owned by the installer (as
+  `start_account_recovery` is; SECURITY DEFINER, `search_path=pg_catalog, pg_temp`, EXECUTE for `debateai_runtime`,
+  which its member roles inherit, and no PUBLIC row): closes up to `p_batch` (1 to 1000, else `22023`) open
+  `identity.account_recovery_binding` rows bound more than one hour ago, one subject lock at a time in `user_id`
+  order, and appends `EXPIRED` for each. The API's one-minute authentication-risk pass calls it in rounds of 100;
+  the new release's generic recovery start creates no binding, and `start_account_recovery` keeps its grant for the
+  release before.
+- `[NV-15]` `identity.mfa_recovery_record_failure(text,text,jsonb,jsonb)`, owned by `debateai_mfa_recovery_owner`
+  (SECURITY DEFINER, `search_path=pg_catalog, pg_temp`, EXECUTE for `debateai_mfa_recovery_runtime` only), plus
+  `GRANT INSERT ON identity.authentication_risk_signal TO debateai_mfa_recovery_owner` (recorded as a
+  `tablePrivileges` answer, not as that table's ACL): under the account's subject lock it delegates to the pinned
+  `identity.mfa_recovery_failure`, answers `REFUSED` while the sealed adverse rule holds, and for a link failure sums
+  the failures of the account's never-paired challenges whose link was valid after the later of its latest sign-in and
+  latest successful pairing; at the sealed `proof_failures_per_attempt` it writes one `RECOVERY_PROOF_FAILED` with the
+  caller's encrypted context. Finish failures keep their own five tries. The old `mfa_recovery_failure` keeps its
+  grant for the release before and for session failures.
+- `[NV-40]` `identity.password_reset_claim_pending_notice(integer)`, owned by `debateai_password_reset_owner` (SECURITY
+  DEFINER, `search_path=pg_catalog, pg_temp`, `plan_cache_mode=force_custom_plan`, EXECUTE for
+  `debateai_password_reset_runtime` only): the claim the new release's `PostgresPasswordResetRepository.claimNotice`
+  calls instead of 0116's sealed `identity.password_reset_claim_notice`, with the same argument, range check, error and
+  result object. One `a.notice_id=ANY(ARRAY(… FOR UPDATE OF s SKIP LOCKED))` sweep (a primary-key probe; keep that form)
+  first dead-letters every unleased PROOF whose control is no longer `EMAIL_REQUIRED` or has expired; a loop of at most
+  64 rows then dead-letters a PROOF found stale in the race window and takes the next due row, so a NULL answer means
+  nothing deliverable is due. A leased row is never touched, and the lease is taken after both. The old claim keeps its
+  grant for the release before.
+- `[NV-01]` `core.legacy_claim_lockout` (one counter row per account: `attempts`, `window_started_at`, `locked_until`;
+  its `user_id` references `identity."user"` `ON DELETE CASCADE`; a `reject_truncate` guard and no table grant), with
+  `core.legacy_claim_admit(uuid,bigint,integer,bigint)` and `core.legacy_claim_clear(uuid)`, owned by the installer (as
+  `core.claim_legacy_runs` is; SECURITY DEFINER, `search_path=pg_catalog, pg_temp`, EXECUTE for `debateai_runtime`, no
+  PUBLIC row): the new release's legacy-run claim admits each attempt first, in one upsert whose row lock serializes
+  one account's concurrent admits, so at most five attempts per account per hour reach `core.claim_legacy_runs`; the
+  attempt past the cap is refused and locks the account's claims for an hour, an elapsed window or an expired lock
+  starts afresh, and a `CLAIMED` outcome clears the row unless a lock is active. `core.claim_legacy_runs` is unchanged
+  and keeps its grant for the release before.
+- `[NV-12]` `identity.email_change_send_window` (one row per account: `sends`, `window_started_at`; installer-owned,
+  no grantee, a TRUNCATE guard, `ON DELETE CASCADE` from `identity."user"`) and
+  `identity.request_email_change_bounded(uuid,uuid,text,uuid,bytea,jsonb,text,text,timestamptz,jsonb,integer,bigint)`
+  and `identity.resend_email_change_bounded(uuid,uuid,text,timestamptz,bigint,jsonb,integer,bigint,bigint)`, owned by
+  the installer (SECURITY DEFINER, `search_path=pg_catalog, pg_temp`, EXECUTE for `debateai_authorization_runtime`
+  only): under the account lock both share one budget of at most `p_maximum_sends` (1 to 3) confirmation mails in a
+  fixed window of `p_window_ms` from its first counted send, refusing `LIMIT` with a `SEND_LIMIT` audit and counting
+  nothing when it is full. The request refuses before it delegates to 0079's `request_email_change_with_audit` (so
+  the step-up grant survives) and counts only `PENDING`; the resend is the live post-0099 resend body (the 720-hour
+  session ceiling) that also clamps `expires_at` to the change's `issued_at` plus `p_link_ttl_ms`, answering `NONE`
+  with `PENDING_CHANGE_LAPSED` once that has passed. Out-of-range thresholds answer `REQUEST_INVALID`. Both 0079
+  functions keep their grants for the release before.
+- `[NV-08]` `erasure_reconcile.claim_run_key_provision_cleanup(integer)` and the schema `erasure_reconcile` (owned by
+  the migration owner, like 0040's claim; the section's `schemas` entry digests its owner and ACL once, so it also
+  records the USAGE for `debateai_erasure_runtime` that the later K02 sections grant; USAGE for
+  `debateai_content_provision` here; SECURITY DEFINER, `search_path=pg_catalog, pg_temp`, EXECUTE for
+  `debateai_content_provision` only): the 0040 claim plus an owner-state filter and a locked re-check, so an owner the
+  intent trigger refuses is skipped instead of failing every owner's cleanup. The release before's exact-count
+  witnesses do not count the schema; the new one counts it by catalog OID. The 0040 claim keeps its grant for the
+  release before.
+- `[NV-04]` `identity.totp_login_lockout` (one row per account and TOTP factor: `level` 0 to 30, `level_at`,
+  `attempts`, `last_charged_at`, `last_failure_at`, `locked_until`; FK to `identity."user"` `ON DELETE CASCADE`, none on
+  the factor; no grantee but its owner; a `reject_truncate` guard) with
+  `identity.totp_login_admit(uuid,uuid,integer,bigint,bigint)` and `identity.totp_login_clear(uuid,uuid)`, all owned
+  by the installer (as the rest of the login family is; SECURITY DEFINER, `search_path=pg_catalog, pg_temp`, EXECUTE
+  for `debateai_authorization_runtime` only): the new release's `SessionService.completeLogin` charges every login
+  TOTP attempt before the code is checked, five per round; the next attempt closes the round, raises the level and
+  sets a cooldown of `p_base_lock_ms` doubled per level, at most `p_max_lock_ms` (24 h), from the round's last charge,
+  and a cooldown already over refuses nothing. A TOTP success clears only the round's count; the level falls one step
+  per full 24 h with no failure. Parameters outside fixed bounds raise `22023`; a row removed while the admit waits
+  for its lock raises `23503`. 0099's completion is unchanged, so the release before skips the budget.
+- `[NV-38]` `identity.backup_email_claim_pending_notice(integer)`, owned by `debateai_backup_email_owner`, and
+  `identity.mfa_recovery_claim_pending_notice(integer)`, owned by `debateai_mfa_recovery_owner`. Both are SECURITY
+  DEFINER with `search_path=pg_catalog, pg_temp` and `plan_cache_mode=force_custom_plan`, and each grants EXECUTE
+  only to its own runtime (`debateai_backup_email_runtime`, `debateai_mfa_recovery_runtime`). Each claim takes its
+  lease from the clock at the claim's end. It dead-letters stale notices with one `SKIP LOCKED` sweep, re-checks a
+  PROOF before claiming it, and returns `mail_locale`. The sealed `backup_email_claim_notice`,
+  `mfa_recovery_claim_notice` and `identity.mail_locale_of_mfa_claim` keep their grants for the release before.
+- `[NV-07]` the restore fence: the singleton table `identity.restore_fence` (the database half of the fence; no grant,
+  listed as a mutable exception) and `identity.restore_fence_begin_v1()`,
+  `identity.restore_fence_settle_v1(text,text)` (both SECURITY DEFINER, `search_path=pg_catalog, pg_temp`, EXECUTE
+  for `debateai_authorization_runtime` only) and `identity.restore_fence_release_public_hold_v1(text)` (SECURITY
+  INVOKER, no grant: the owner's call as postgres). All are owned by `identity.authenticate_session_t9`'s owner, which
+  must be a superuser (the DO block refuses otherwise). The settle compares the API host's fence file with the row
+  under the row lock. On a mismatch it revokes every long-lived bearer and sets the public read hold, and in every
+  case it advances the token.
+- `[NV-17]` `identity.password_reset_retry_lock` (one counter row per account: `attempts`, `locked_until`; its `user_id`
+  references `identity."user"` `ON DELETE CASCADE`; owned by `debateai_password_reset_owner`, a `reject_truncate`
+  guard and no grantee) with `identity.password_reset_start_guarded(bytea,uuid,uuid[],jsonb,text,text,jsonb,jsonb,bigint)`,
+  `identity.password_reset_proof_reserve(text,jsonb,bigint)`, `identity.password_reset_proof_refused(text,jsonb)` and
+  `identity.password_reset_complete_guarded(text,text,uuid,jsonb,bigint,bigint,jsonb)`, owned by
+  `debateai_password_reset_owner` (SECURITY DEFINER, `search_path=pg_catalog, pg_temp`, EXECUTE for
+  `debateai_password_reset_runtime` only): under the account's subject lock the reservation charges the counter
+  before the code is matched, across every attempt however it closes; each fifth reservation locks new starts and
+  further proofs for `p_lock_ms` (60 000 to 3 600 000, else `PASSWORD_RESET_LOCK_INVALID`) doubled per round, at most
+  24 hours. A refused reservation closes nothing; the settle of a mismatch closes the attempt `REFUSED` at the cap or
+  under the lock, and the guarded complete deletes the account's row on `COMPLETED`. The guarded start writes the
+  delegate's own `started` denial while the lock is live and otherwise delegates to 0108's sealed
+  `identity.password_reset_start`; 0104/0108's start, read, failure and complete keep their grants for the release
+  before.
+- `[NV-13]` three installer-owned SECURITY DEFINER functions with `search_path=pg_catalog, pg_temp`:
+  `identity.create_social_account_v2(jsonb,jsonb)` (EXECUTE for `debateai_billing_runtime` only),
+  `identity.finish_social_callback_v2(jsonb,jsonb)` (EXECUTE for `debateai_authorization_runtime` only) and
+  `identity.require_social_password_origin_v2()` (no EXECUTE grant), plus one reviewed swap of `social_password_origin`
+  and `social_password_origin_link` onto the new origin function, which also admits a NULL-password, link-less
+  `pending_verification` row (same names, tables, events and deferral; the section's `triggers` entry digests both
+  bindings): an untrusted typed-email sign-up links no provider, whether the typed address was registered or free, and
+  the callback answers a link to a `pending_verification` account like no link. The 0101, 0112 and 0116 functions keep
+  their grants for the release before.
+- `[NV-02]` `erasure_reconcile.fail_account_erasure_notification(uuid,uuid,text)` (owned by the migration owner, like
+  0040's fail and the trusted appender `identity.append_audit_event_internal` it calls; SECURITY DEFINER,
+  `search_path=pg_catalog`, EXECUTE for `debateai_erasure_runtime` only, plus that role's USAGE on the schema, which
+  NV-08's `schemas` entry digests): the erasure-notice fail with a terminal state. `MAIL_RECIPIENT_UNDELIVERABLE`,
+  which only the reconciler raises from its own pre-send check of the decrypted address, dead-letters at once; any
+  other code dead-letters only from the 10th attempt and only while the user's erasure is PREPARED; every other
+  failure re-queues 30 s doubling per attempt, at most 1 h. A dead letter keeps the claim token and sets
+  `acknowledged_at` with `last_error_code` `DEAD:<code>` (no column is added: 0116 digests this table), so 0040's
+  claim and readiness and 0110's FINALIZE read the row as settled, and appends an identifier-free
+  `identity.account.erasure_notice_dead_lettered` audit event (target the erasure, actor the user's audit token, as
+  FINALIZE's `identity.account.erased`) that survives FINALIZE. 0040's fail keeps its grant for the release before.
+- `[NV-14]` `identity.consume_verification_set_password(text,timestamptz,jsonb,text)`, owned by the installer (as
+  0096's `identity.consume_verification_with_audit` is; the section asserts that owner, and that it owns
+  `identity.social_identity`; SECURITY DEFINER, `search_path=pg_catalog`, STRICT, EXECUTE for `debateai_runtime`,
+  which its member roles inherit, and no PUBLIC row): the installed consume (0096's body with 0100's two `replace()`
+  rewrites) that, on every valid consume (the `pending_verification` verification and the `pending_mfa` mail resume),
+  also writes the password hash the new release's verify route checked against the registration policy, and on the
+  `pending_verification` transition only deletes every `identity.social_identity` row on the account and appends one
+  `identity.social.UNLINK` event when a row went. 0096's function is unchanged and keeps its grant for the release
+  before and for a request without a password.
+- `[NV-30]` `erasure_reconcile.prepare_private_run_erasure(uuid,uuid,uuid,uuid,text)` (owned by the migration owner,
+  like 0123's `core.prepare_private_run_erasure` and `core.private_erasure_run_chain` it calls; SECURITY DEFINER,
+  `search_path=pg_catalog, pg_temp`, EXECUTE for `debateai_erasure_runtime` only, plus that role's USAGE on the schema,
+  which NV-08's `schemas` entry digests): the private-debate delete's entry point. It repeats 0123's nonlocking
+  preauthorization and answers `NOT_FOUND` before taking any lock. It then tries the named run's content lease as a
+  transaction lock, answering `CONTENDED` when the lease is held, as 0123 does for the chain's other runs. Finally it
+  delegates to 0123's `core.prepare_private_run_erasure`, which keeps its grant for the release before.
+- `[NV-41]` `identity.prune_consumer_passkey_challenges_evicting(integer)` and `identity.prune_social_flows_evicting(integer)`,
+  each owned by the owner of the cleanup it supersedes (0098's `prune_consumer_passkey_challenges`, 0101's
+  `prune_social_flows`, read when the step applies; SECURITY DEFINER, `search_path=pg_catalog, pg_temp`, EXECUTE for
+  `debateai_authorization_runtime` only): the cleanups the new release's passkey and social begins run as a standalone
+  statement first. Under the same capacity lock each deletes what the old cleanup deletes, then, once the store holds
+  the high-water mark `capacity - GREATEST(1, capacity/256)` (8,160 at 8,192), gives up candidates down to the
+  low-water mark `capacity - GREATEST(1, capacity/64)` (8,064), heaviest source first, oldest first, locked in that
+  order with `SKIP LOCKED`. Candidates are anonymous pending rows only (passkey `user_id IS NULL AND consumed_at IS
+  NULL`; social `purpose='LOGIN' AND claimed_at IS NULL AND consumed_at IS NULL`), re-checked by the DELETE. The begins
+  and the old cleanups are unchanged and keep their grants for the release before, which behaves as today while only it
+  takes traffic.
+- `[NV-09]` `erasure_reconcile.account_erasure_preview(uuid)` and
+  `erasure_reconcile.prepare_account_erasure(uuid,uuid[],uuid[],uuid[])` (owned by the migration owner, like their
+  `identity.*` counterparts; SECURITY DEFINER, `search_path=pg_catalog`, EXECUTE for `debateai_erasure_runtime` only,
+  plus that role's USAGE on the schema, which NV-08's `schemas` entry digests): copies of 0040's preview and 0110's
+  PREPARE that also admit an owner the age gate froze after scheduling; PREPARE skips such an owner's expired orphan
+  run-key intents and its COMPLETION notices. The `identity.*` pair keeps its grant for the release before.
+- `[NV-39]` `identity.password_reset_admit_evicting(jsonb,bigint)` (owned by `debateai_password_reset_owner`),
+  `identity.mfa_recovery_admit_evicting(jsonb,bigint)` (owned by `debateai_mfa_recovery_owner`) and
+  `identity.backup_email_admit_evicting(uuid,text,jsonb,bigint)` (owned by `debateai_backup_email_owner`), each SECURITY
+  DEFINER with `search_path=pg_catalog, pg_temp` and EXECUTE only for the matching recovery runtime
+  (`debateai_password_reset_runtime`, `debateai_mfa_recovery_runtime`, `debateai_backup_email_runtime`): the three
+  recovery source-window admits the new release's repositories call, keyed by the caller's /64 for IPv6 (the address
+  digest stays the audit and risk evidence). Each is its 0104/0106/0105 admit, except that a new source at the 65,536-row
+  capacity no longer refuses: under the v1 capacity lock it ranks 64 candidates in a sub-select with no row marks (one
+  scan, a 64-row top-N sort; expired first, then budget left before spent, then the lowest count, then the oldest),
+  locks only those with `SKIP LOCKED` and deletes them, so the next 63 new sources find room without a scan; it refuses
+  only when all 64 are locked at that instant. The v1 admits keep their grants for the release before, which still
+  refuses a new digest at capacity.
+- `[NV-50]`, the LAST section: no function and no relation. On `ledger.model_spend` it replaces 0074's shared
+  `model_spend_spend_source_check` (last widened by 0128, which 0126 widened before it) in place, wider, by name: every
+  source 0126 and 0128 allow (`SYNTHESIS_CHECK`, `QUESTION_CHECK`) stays, and the two new sources `RUN_UNANSWERED` and
+  `STORY_UNANSWERED` are added after them; it also adds `model_spend_unanswered_names_its_attempt` (an unanswered row names
+  its run and its attempt and carries no phase). Each is a reviewed `DROP CONSTRAINT IF EXISTS` / `ADD … NOT VALID`
+  pair, and a `DO` block checks both constraints and 0066's two append-only guards. The new release's gateway charges
+  an attempt that was sent and never answered as one of these sources, at its reported usage or else its projected
+  maximum; the run's or story's envelope and the site's day count it, and no person reader does. The loader's
+  `constraints` entry digests the new restriction only: the shared list stays unpinned (W-0117), and a later
+  contract step validates both. It stays last because the pair takes ACCESS EXCLUSIVE on `ledger.model_spend` until
+  0131 commits, so every spend read and write of the release before waits for the rest of the step.
+
+While the branch is open, each issue inserts its section, its entry in `SECTIONS` (keeping every earlier entry) and
+its bullet above just before `[NV-50]`'s, which stays last, recomputes `migration.sha256` with the one-liner at the end of this file, and extends the
+chain's tests; once the step is applied anywhere, 0131 is never edited again. If `origin/dev` takes 0131 first,
+renumber this step (rename every file and constant that carries the number, recompute the manifest, re-pin the chain
+lists).
+
+## Recovery notice due indexes (0132-0134)
+
+The twenty-second, twenty-third and twenty-fourth chain steps, after the security fixes of audit run 3 (0131; security audit run
+3, NV-38): the pending-only due indexes of the three recovery mail outboxes, in the shape 0103 gives
+`identity.password_recovery_notice` (`(available_at, created_at, notice_id) WHERE sent_at IS NULL AND dead_at IS NULL`),
+so that every claim on them, the release before's and this release's alike, reads only pending rows instead of the
+whole retained history:
+
+- `0132_password_reset_notice_due.sql`, `password-reset-notice-due-forward0132.json`,
+  `packages/db/src/migration-forward0132.ts` (`loadForward0132`, `MIGRATION_FORWARD0132_*` refusals):
+  `identity.password_reset_notice_due`;
+- `0133_backup_email_notice_due.sql`, `backup-email-notice-due-forward0133.json`,
+  `packages/db/src/migration-forward0133.ts` (`loadForward0133`, `MIGRATION_FORWARD0133_*`):
+  `identity.backup_email_notice_due`;
+- `0134_mfa_recovery_notice_due.sql`, `mfa-recovery-notice-due-forward0134.json`,
+  `packages/db/src/migration-forward0134.ts` (`loadForward0134`, `MIGRATION_FORWARD0134_*`):
+  `identity.mfa_recovery_notice_due`.
+
+Each header declares `-- n1: expand`, `-- n1: keeps-verifier` and `-- n1: outside-transaction`, and each body is ONE
+`CREATE INDEX CONCURRENTLY IF NOT EXISTS <name> ON identity.<table> …`. They cannot be sections of 0131: `CREATE INDEX`
+without `CONCURRENTLY` on an existing table is refused in an expand step (step 7 above), and PostgreSQL refuses a
+concurrent build inside a transaction block, which every other step runs in. `CONCURRENTLY` takes SHARE UPDATE
+EXCLUSIVE only, so the release before keeps reading and writing the tables during a build. `migrate()` builds each
+index on its session first (One transaction per step, below), then records the step in a step transaction that refuses
+`MIGRATION_OUTSIDE_TRANSACTION_INDEX_INVALID` unless the index is valid and on its table; a build that ran out of its
+lock waits leaves an INVALID index, which the next run drops concurrently and builds again. The three steps share one
+loader, `packages/db/src/migration-forward-concurrent-index.ts` (`loadConcurrentIndexStep`): it checks the manifest as
+`loadForward0124` does, refuses `MIGRATION_FORWARD01NN_INDEX_DECLARATION` unless the header's index is the step's own,
+and has no `replayVerifierSql`: the postcondition is the index row whole (its definition, valid, ready, not unique, its
+owner). Each step keeps the verifier 0131 names (`verify-effective-capabilities-130.sql`), so its manifest names it as
+both `previous.verifierSha256` and its own. A later index step on an existing table is one more such file, manifest and
+three-line loader on the shared one (NV-15's `mfa_recovery_control_user_started`, 0135 below, is the next).
+
+A test seed that applies steps with `applyForwardStep` inside one transaction (`tests/support/devLineage108.ts`,
+`seedDevLineageThroughStep`) cannot seed through 0132 or later: nothing builds the index, so the step is refused
+`MIGRATION_OUTSIDE_TRANSACTION_INDEX_INVALID`. Such a seed stops at 0131, or runs `runOutsideTransactionStep` first.
+
+**Re-sealing after a 0131 change.** Each manifest's `previous.manifestSha256` is the SHA-256 of the manifest of the
+step before it, so any change to 0131 (a new section, then its `migration.sha256`) changes 0131's manifest and refuses
+0132 (`MIGRATION_FORWARD0132_MANIFEST`), and with it 0133, 0134 and 0135. After the last 0131 edit, recompute 0131's
+`migration.sha256`, then `previous.manifestSha256` of 0132, then of 0133, then of 0134, then of 0135 (NV-15's index
+step, below; and of any later step after it), in that order. From the project root, this one command does all of it and prints
+each manifest it re-chained:
+
+```
+node -e 'const fs=require("node:fs"),h=b=>require("node:crypto").createHash("sha256").update(b).digest("hex"),L="migrations/lineage/",all=fs.readdirSync(L).filter(f=>f.endsWith(".json")).map(f=>({f,m:JSON.parse(fs.readFileSync(L+f,"utf8"))})),put=e=>fs.writeFileSync(L+e.f,JSON.stringify(e.m,null,2)+"\n");let e=all.find(x=>x.m.migration?.name==="0131_security_fixes_run3.sql");e.m.migration.sha256=h(fs.readFileSync("migrations/"+e.m.migration.name));put(e);for(let n;(n=all.find(x=>x.m.previous?.name===e.m.migration.name));e=n){n.m.previous.manifestSha256=h(fs.readFileSync(L+e.f));put(n);console.log("re-chained",n.f);}'
+```
+
+If 0131 ever names a verifier of its own, set each later manifest's `previous.verifierSha256` and `verifier` to it too.
+If `origin/dev` takes 0132, 0133 or 0134 first, renumber these steps (rename every file and constant that carries the
+number, recompute the manifests, re-pin the chain lists).
+
+## The MFA recovery control user index (0135)
+
+The twenty-fifth chain step, after the recovery notice due indexes (0132-0134; security audit run 3, NV-15 and NV-16):
+`identity.mfa_recovery_control_user_started` on `identity.mfa_recovery_control (user_id, email_expires_at)`. NV-15's
+account-level count of unpaired link-password failures and its latest pairing (`identity.mfa_recovery_record_failure`)
+and NV-16's per-destination start count (`identity.mfa_recovery_start_bounded`) read the table by `user_id`, which no
+other index leads with (the only one is 0112's partial `mfa_recovery_control_one_waiting`), and the table only grows
+(rows go only with erasure and the FK cascade). The second column bounds both counts' `email_expires_at` test. Neither
+plan's SQL changes: the index only serves their reads.
+
+- `0135_mfa_recovery_control_user_started.sql`, `mfa-recovery-control-user-started-forward0135.json`,
+  `packages/db/src/migration-forward0135.ts` (`loadForward0135`, `MIGRATION_FORWARD0135_*` refusals):
+  `identity.mfa_recovery_control_user_started`.
+
+It is shaped like 0132-0134 (above): its header declares `-- n1: expand`, `-- n1: keeps-verifier` and
+`-- n1: outside-transaction`, its body is ONE `CREATE INDEX CONCURRENTLY IF NOT EXISTS …`, its three-line loader runs on
+the shared `packages/db/src/migration-forward-concurrent-index.ts` (the postcondition is the index row whole, and there
+is no `replayVerifierSql`), and its manifest names 0130's verifier (`verify-effective-capabilities-130.sql`) as both
+`previous.verifierSha256` and its own. Its `previous` is 0134, so its `previous.manifestSha256` is the SHA-256 of
+`mfa-recovery-notice-due-forward0134.json`: a change to 0131 re-chains it too, and the one-liner of "Re-sealing after a
+0131 change" (above) walks to it by `previous.name`. If `origin/dev` takes 0135 first, renumber this step (rename every
+file and constant that carries the number, recompute the manifest, re-pin the chain lists).
+
+
 ## Replay: every applied step keeps its own checks
 
 On a later `migrate()` EVERY applied step is checked by its receipt and by its postcondition digest (not only the
@@ -454,7 +734,7 @@ changes something an earlier step's verifier pins must change that verifier thro
 cannot silently pass. The effective-capability verifier of the last applied step (after 0129: 0111's, which the batch,
 Part C's step, role rotation, the data export, the mail locale, the debate shape map, the language check's site cost,
 the reclaim resume, the reply measures, the engine verdict, the engine's map answer step, the side-by-side releases,
-the settings activation, the Italy-specific approval, the synthesis check, the publication review, the threat reports and the support answer scope keep; after 0130: `verify-effective-capabilities-130.sql`) still
+the settings activation, the Italy-specific approval, the synthesis check, the publication review, the threat reports and the support answer scope keep; after 0130: `verify-effective-capabilities-130.sql`, which the security fixes of audit run 3, the three recovery notice due indexes and the MFA recovery control user index keep) still
 runs at the end of every `migrate()`. A step that changes by design a field an earlier step's postcondition digests
 declares it (`amendsPostconditionsOf`, 0130 below): the earlier step is then compared against its latest recorded
 amendment instead of its receipt.
@@ -463,7 +743,8 @@ amendment instead of its receipt.
 
 `migrate()` no longer applies every pending step in one transaction (side-by-side uploads, spec
 `docs/superpowers/specs/2026-10-21-side-by-side-uploads-design.md` §5, "Each step runs on its own"; plan A, task A6).
-It takes the `debateai:schema-migrations` advisory lock for its session (`pg_advisory_lock`, released in `finally`;
+It takes the `debateai:schema-migrations` advisory lock for its session (tried with `pg_try_advisory_lock` every 50 ms,
+holding no snapshot between tries, so a waiting migrator never deadlocks with a concurrent index step; released in `finally`;
 a connection that cannot send the unlock is destroyed, which ends the lock with the session), then:
 
 1. the prologue, one transaction: the ledger tables, the lineage and its receipts, the base recipe, the effective

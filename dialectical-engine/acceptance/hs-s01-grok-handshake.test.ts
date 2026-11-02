@@ -47,7 +47,7 @@ describe("S01 R6 unframed relay handshakes", () => {
       'const prompt = argumentList[argumentList.indexOf("--single") + 1];',
       `fs.appendFileSync(${JSON.stringify(invocationLog)}, JSON.stringify({ prompt, argumentList }) + "\\n");`,
       'console.log(JSON.stringify({',
-      '  text: JSON.stringify({ prompt, argumentList }), stopReason: "end_turn",',
+      '  text: JSON.stringify({ prompt, argumentList }), stopReason: "end_turn", num_turns: 1,',
       '  modelUsage: { "grok-4.6-build": { input_tokens: 1, output_tokens: 1 } }',
       '}));'
     ].join("\n");

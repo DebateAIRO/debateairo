@@ -6,7 +6,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({ assign: vi.fn(), authMethods: vi.fn() }));
 vi.mock('@/lib/i18n/I18nProvider', () => ({ useChromeI18n: () => ({ locale: 'en', catalog: {} }) }));
-vi.mock('@/lib/mfaEnrollment', () => ({ takeFragmentToken: () => 't'.repeat(43), verifyMfaEmail: async () => undefined, MfaEnrollmentHttpError: class extends Error {} }));
+vi.mock('@/lib/mfaEnrollment', () => ({ takeFragmentToken: () => 't'.repeat(43), verifyMfaEmail: async () => undefined, verifyMfaEmailWithPassword: async () => undefined, MfaEnrollmentHttpError: class extends Error {} }));
 vi.mock('@/components/auth/OnboardingEvidence', () => ({ OnboardingEvidence: ({ onReady }: { onReady: () => void }) => <button type="button" onClick={onReady}>evidence-ready</button> }));
 vi.mock('@/components/auth/SecurityEnrollment', () => ({ SecurityEnrollment: ({ onAuthenticated }: { onAuthenticated: (r: unknown) => void }) => <button type="button" onClick={() => onAuthenticated({ status: 'authenticated' })}>enrolled</button> }));
 vi.mock('@/lib/api', async (original) => ({ ...await original<typeof import('../../apps/ui/lib/api')>(), contractClient: { authMethods: state.authMethods } }));
@@ -34,6 +34,13 @@ afterEach(async () => { await act(async () => root.unmount()); vi.unstubAllGloba
 const click = async (text: string) => { const found = [...document.querySelectorAll<HTMLButtonElement>('button')].find(x => x.textContent?.trim() === text); expect(found, text).toBeDefined(); await act(async () => found!.click()); };
 async function enroll() {
   await act(async () => root.render(<EnrollMfaPage/>));
+  // NV-14: the mailed link first asks for the account's password.
+  const password = document.querySelector<HTMLInputElement>('#verify-password')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(password, 'Inbox owner pass 1');
+    password.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await click('Continue');
   await click('evidence-ready');
   await click('enrolled');
 }

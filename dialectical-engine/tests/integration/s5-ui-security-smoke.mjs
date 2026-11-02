@@ -13,7 +13,8 @@ const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..")
 // Exactly the policy the UI edge pre-sets on every response before Next runs
 // (apps/ui/content-security-policy.mjs). A matcher-excluded path must still
 // carry it: nothing is served without a policy.
-const FALLBACK_CONTENT_SECURITY_POLICY = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests";
+// (The Turnstile sources joined the policy at HEAD without this copy following; NV-03's run brought it up to date.)
+const FALLBACK_CONTENT_SECURITY_POLICY = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests";
 const API_CONTENT_SECURITY_POLICY = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'";
 const NONCE_SOURCE = /script-src 'self' 'nonce-([A-Za-z0-9+/=]{22,})' 'strict-dynamic'(?:;|$)/;
 const INJECTED_NONCE = "AAAAAAAAAAAAAAAAAAAAAA==";
@@ -69,7 +70,9 @@ async function startStubApi() {
   const server = createHttpServer((request, response) => {
     seen.push({
       forwardedFor: request.headers["x-forwarded-for"] ?? null,
-      edgeSecret: request.headers["x-debateai-edge-secret"] ?? null
+      edgeSecret: request.headers["x-debateai-edge-secret"] ?? null,
+      // NV-03: the UI-to-API proof the website sends with every forwarded address and on its readiness fetch.
+      uiApiProof: request.headers["x-debateai-ui-proof"] ?? null
     });
     response.writeHead(401, {
       "content-type": "application/json",
@@ -97,6 +100,7 @@ async function startStubApi() {
 function assertCommonHeaders(response, surface, path) {
   assert.equal(response.headers.get("strict-transport-security"), "max-age=31536000; includeSubDomains", `${surface} ${path}: HSTS`);
   assert.equal(response.headers.get("x-frame-options"), "DENY", `${surface} ${path}: framing denied`);
+  assert.equal(response.headers.get("cross-origin-opener-policy"), "same-origin", `${surface} ${path}: COOP same-origin (NV-05)`);
   assert.equal(response.headers.get("x-content-type-options"), "nosniff", `${surface} ${path}: nosniff`);
   assert.equal(response.headers.get("referrer-policy"), "no-referrer", `${surface} ${path}: no referrer`);
   assert.equal(response.headers.get("permissions-policy"), "camera=(), microphone=(), geolocation=(), payment=(), usb=()", `${surface} ${path}: permissions policy`);
@@ -215,6 +219,11 @@ async function smoke(surface) {
   const edgeSecret = randomBytes(32).toString("base64url");
   writeFileSync(secretPath, `${edgeSecret}\n`);
   chmodSync(secretPath, 0o600);
+  // NV-03: the UI-to-API proof, the website's copy (the stub API stands in for the API's).
+  const proofPath = join(secretDir, "ui-api-proof.secret");
+  const uiApiProof = randomBytes(32).toString("base64url");
+  writeFileSync(proofPath, `${uiApiProof}\n`);
+  chmodSync(proofPath, 0o600);
   const worldReadablePath = join(secretDir, "world.secret");
   writeFileSync(worldReadablePath, edgeSecret);
   chmodSync(worldReadablePath, 0o644);
@@ -232,6 +241,7 @@ async function smoke(surface) {
       // C2 / C2b: this loopback client plays the trusted reverse proxy.
       DIALECTICAL_UI_TRUSTED_PROXIES: "127.0.0.1, ::1",
       DIALECTICAL_UI_EDGE_SECRET_PATH: secretPath,
+      DIALECTICAL_UI_API_PROOF_PATH: proofPath,
       PORT: String(port)
     },
     stdio: ["ignore", "pipe", "pipe"]
@@ -295,7 +305,7 @@ async function smoke(surface) {
     // C12 review: a proxied answer carries only its API's own release header; this stub sends none.
     assert.equal(session.headers.get("x-debateai-release"), null, `${surface}: the edge lends no release header to /api`);
     assert.deepEqual(await session.json(), { error: "UNAUTHENTICATED" });
-    assert.deepEqual(stubApi.last(), { forwardedFor: "127.0.0.1", edgeSecret: null }, `${surface}: without x-forwarded-for the socket address is the client`);
+    assert.deepEqual(stubApi.last(), { forwardedFor: "127.0.0.1", edgeSecret: null, uiApiProof }, `${surface}: without x-forwarded-for the socket address is the client`);
 
     // C2 / C2b (R2, L3-F11): the trusted peer with the edge secret names the
     // client by the LAST hop; without the secret, or with a wrong one, the
@@ -310,7 +320,7 @@ async function smoke(surface) {
       const probe = await fetch(`${base}/api/v1/session`, { headers });
       assert.equal(probe.status, 401);
       await probe.arrayBuffer();
-      assert.deepEqual(stubApi.last(), { forwardedFor: expected, edgeSecret: null }, `${surface}: ${label}`);
+      assert.deepEqual(stubApi.last(), { forwardedFor: expected, edgeSecret: null, uiApiProof }, `${surface}: ${label}`);
     }
 
     await assertRefusesToStart(root, { DIALECTICAL_UI_TRUSTED_PROXIES: "10.0.0.0/8" }, "DIALECTICAL_UI_TRUSTED_PROXIES_INVALID");
@@ -318,6 +328,9 @@ async function smoke(surface) {
     // Side-by-side C12: no key, or a key the build was not stamped for, refuses to start.
     await assertRefusesToStart(root, { RELEASE_KEY: "" }, "RELEASE_KEY_REQUIRED");
     await assertRefusesToStart(root, { RELEASE_KEY: OTHER_RELEASE_KEY }, "RELEASE_KEY_BUILD_MISMATCH");
+    // NV-03: a website that trusts a proxy refuses to start without a proof, and with a proof equal to its edge secret.
+    await assertRefusesToStart(root, { DIALECTICAL_UI_TRUSTED_PROXIES: "127.0.0.1" }, "DIALECTICAL_UI_API_PROOF_REQUIRED");
+    await assertRefusesToStart(root, { DIALECTICAL_UI_EDGE_SECRET_PATH: secretPath, DIALECTICAL_UI_API_PROOF_PATH: secretPath }, "DIALECTICAL_UI_API_PROOF_REUSES_EDGE_SECRET");
 
     // Side-by-side C12 (spec §6): /readyz is answered by the edge from its own API's /readyz, for Caddy's probe with
     // the edge secret as for any caller. The stub API answers 401 to everything, which is not a readiness answer.
@@ -327,6 +340,10 @@ async function smoke(surface) {
       assert.equal(ready.headers.get("x-debateai-release"), TEST_RELEASE_KEY);
       assert.deepEqual(await ready.json(), { ready: false, releaseKey: TEST_RELEASE_KEY, reasons: ["BOOTING"] });
     }
+    // NV-03: the readiness fetch carries the proof (and no forwarded address).
+    assert.deepEqual(stubApi.last(), { forwardedFor: null, edgeSecret: null, uiApiProof }, `${surface}: the readiness fetch carries the UI-to-API proof`);
+    // NV-03: the bundled forwarders saw the value server.mjs installed (no "never installed" line).
+    assert(!log.join("").includes("ui.api_proof.not_installed"), `${surface}: the route code sees the installed UI-to-API proof`);
 
     // L3-F4: the image optimizer (sharp) is off the runtime path.
     const image = await fetch(`${base}/_next/image?url=%2Ficon.svg&w=64&q=75`);

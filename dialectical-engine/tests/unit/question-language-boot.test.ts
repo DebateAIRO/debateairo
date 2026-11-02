@@ -17,7 +17,7 @@ import { questionLanguagePolicyStartValues } from "@debateai/register";
 import { languageCheckChargeMicros, type LanguageCheckSpendEntry } from "@debateai/budget";
 import {
   assertQuestionLanguagePolicyBootable, composeQuestionLanguage, hostedLanguageCheckPrice, hostedQuestionLanguageRoute, questionLanguageRouteFor,
-  type QuestionLanguagePaidRoute
+  type QuestionLanguageOwnerBudget, type QuestionLanguagePaidRoute
 } from "../../apps/api/src/question-language/boot.js";
 import { newQuestionLanguageReferenceKey } from "../../apps/api/src/question-language/reference.js";
 
@@ -43,12 +43,18 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** The hosted route's seams, counted: the writer probe, the key read, the records written and the codes reported. */
+/**
+ * The hosted route's seams, counted: the writer probe, the key read, the records written and the codes reported.
+ * NV-47: `held` wires the default pot's `heldMicros` (an explicit `dayPot` may carry its own), and `ownerBudget` the
+ * person's count of paid checks.
+ */
 function hostedDeps(over: Readonly<{ mode?: "hosted" | "local"; fastCheck?: typeof start.fastCheck; writerPresent?: boolean;
   key?: string | undefined; recordFails?: Error; recordFailures?: (Error | undefined)[];
-  dayPot?: { ceilingMicros: number; spentMicros: (day: string) => Promise<number> } | null }>) {
+  dayPot?: { ceilingMicros: number; spentMicros: (day: string) => Promise<number>; heldMicros?: (day: string) => Promise<number> } | null;
+  held?: number; ownerBudget?: QuestionLanguageOwnerBudget }>) {
   const state = { probes: 0, keyReads: 0, records: [] as LanguageCheckSpendEntry[], reports: [] as unknown[], ids: [] as string[],
-    potReads: [] as string[] };
+    potReads: [] as string[], heldReads: [] as string[] };
+  const held = over.held;
   let n = 0;
   let call = 0;
   const input = {
@@ -63,7 +69,9 @@ function hostedDeps(over: Readonly<{ mode?: "hosted" | "local"; fastCheck?: type
         state.records.push(entry);
       }
     },
-    dayPot: "dayPot" in over ? over.dayPot! : { ceilingMicros: 5_000_000, spentMicros: async (day: string) => { state.potReads.push(day); return 0; } },
+    dayPot: "dayPot" in over ? over.dayPot! : { ceilingMicros: 5_000_000, spentMicros: async (day: string) => { state.potReads.push(day); return 0; },
+      ...(held === undefined ? {} : { heldMicros: async (day: string) => { state.heldReads.push(day); return held; } }) },
+    ...(over.ownerBudget === undefined ? {} : { ownerBudget: over.ownerBudget }),
     clock: () => new Date("2026-10-13T23:59:59.000Z"),
     newSpendId: () => { const id = `00000000-0000-4000-8000-${String(++n).padStart(12, "0")}`; state.ids.push(id); return id; },
     report: (line: unknown) => { state.reports.push(line); }
@@ -418,7 +426,9 @@ describe("I6: the question-language wiring in the API's main.ts and the practice
     // which main.ts calls with its guarded fetch and the env's gate part, and check-version with parts that cannot send.
     const siteRoute = balancedCallLines(main, "questionLanguageSiteRoute({");
     expect(siteRoute).toContain("previewGate,");
-    expect(siteRoute).toContain("previewFetch,");
+    // NV-58: the fast check's own guarded fetch, whose ports half-close on its abort; every other caller keeps previewFetch.
+    expect(siteRoute).toContain("previewFetch: previewLanguageCheckFetch,");
+    expect(countOf(main, 'createPreviewBudgetRpcPorts(previewGate, { onAbort: "HALF_CLOSE" })')).toBe(1);
     expect(siteRoute).toContain("readCredential: () => supportAnthropicMessagesKey(supportModelTarget, readSupportCredentialOnce),");
     expect(countOf(main, "questionLanguageRouteFor(")).toBe(0);
     const boot = await readFile(new URL("../../apps/api/src/question-language/boot.ts", import.meta.url), "utf8");
@@ -443,5 +453,94 @@ describe("I6: the question-language wiring in the API's main.ts and the practice
     expect(countOf(practice, "referenceKey: newQuestionLanguageReferenceKey(),")).toBe(1);
     expect(countOf(practice, QL_SPREAD)).toBe(0);
     expect(countOf(practice, "composeQuestionLanguage(")).toBe(0);
+  });
+});
+
+// Security audit run 3, NV-47: the hosted route's two bounds on a paid check, the person's own count (ownerBudget) and the
+// SITE_DAY room's measure (spend plus counted holds), and the code-only skip line. "red:" fails before NV-47.
+describe("NV-47: the hosted fast check's owner budget and holds-aware day pot", () => {
+  const SKIP_DAY_POT = "QUESTION_LANGUAGE_FAST_CHECK_SKIPPED_DAY_POT";
+  const billedFetch = () => vi.fn(async () => new Response(JSON.stringify({ id: "msg_1", type: "message", role: "assistant",
+    model: "claude-haiku-5-5", content: [{ type: "text", text: '{"main_language":"ro"}' }], stop_reason: "end_turn",
+    usage: { input_tokens: 1300, output_tokens: 20 } }), { status: 200 }));
+
+  it("red: the pot counts the site's holds, the room's own FULL test (spend + holds >= ceiling skips), reported once per minute", async () => {
+    for (const [held, skips] of [[1_000_000, true], [999_999, false]] as const) {
+      // An explicit dayPot override carries its own heldMicros.
+      const days: string[] = [];
+      const deps = hostedDeps({ dayPot: { ceilingMicros: 5_000_000, spentMicros: async (day) => { days.push(day); return 4_000_000; },
+        heldMicros: async (day) => { days.push(day); return held; } } });
+      const route = await hostedQuestionLanguageRoute(deps.input);
+      if (route.kind !== "HOSTED") throw new Error("unreachable");
+      expect(await route.beforeSend(), String(held)).toBe(skips ? SKIP_DAY_POT : null);
+      expect(await route.beforeSend(), String(held)).toBe(skips ? SKIP_DAY_POT : null);
+      // Both reads are of the same UTC day.
+      expect(days).toEqual(["2026-10-13", "2026-10-13", "2026-10-13", "2026-10-13"]);
+      // Two skips at the same clock: one code-only line (the throttle).
+      expect(deps.reports, String(held)).toEqual(skips ? [{ event: "api.question_language.fast_check_skipped", code: "DAY_POT" }] : []);
+    }
+    // The `held` option wires the default pot's heldMicros (spent 0 there): held alone at the ceiling skips.
+    const full = hostedDeps({ held: 5_000_000 });
+    const fullRoute = await hostedQuestionLanguageRoute(full.input);
+    if (fullRoute.kind !== "HOSTED") throw new Error("unreachable");
+    expect(await fullRoute.beforeSend()).toBe(SKIP_DAY_POT);
+    expect(full.heldReads).toEqual(["2026-10-13"]);
+    // A holds read that cannot be answered (async or sync throw, or not a number) counts as a full pot, logged apart.
+    const unreadable: Array<(day: string) => Promise<number>> = [
+      async () => { throw new Error("db down"); },
+      () => { throw new Error("sync"); },
+      async () => Number.NaN
+    ];
+    for (const heldMicros of unreadable) {
+      const deps = hostedDeps({ dayPot: { ceilingMicros: 5_000_000, spentMicros: async () => 0, heldMicros } });
+      const route = await hostedQuestionLanguageRoute(deps.input);
+      if (route.kind !== "HOSTED") throw new Error("unreachable");
+      expect(await route.beforeSend()).toBe(SKIP_DAY_POT);
+      expect(deps.reports).toEqual([{ event: "api.question_language.fast_check_skipped", code: "DAY_POT_UNREADABLE" }]);
+    }
+  });
+
+  it("red: a spent owner budget sends nothing and records nothing; one code-only line per code, never the owner or the question", async () => {
+    const fetchSpy = billedFetch();
+    vi.stubGlobal("fetch", fetchSpy);
+    const deps = hostedDeps({ ownerBudget: () => ({ allowed: false, reason: "LIMIT" }) });
+    const decider = await compose(null, await hostedQuestionLanguageRoute(deps.input));
+    for (const ownerScope of ["owner:a", "owner:a"]) {
+      const lock = await decider.decide({ ask: askOf(MIX_Q, "ro"), ownerScope, fastCheckAllowed: true });
+      expect(lock.recordCode).toBe(`${lock.source}:FAST_CHECK_SKIPPED_OWNER_BUDGET`);
+      expect(lock.trace.fast).toMatchObject({ outcome: "DOWN", reason: "SKIPPED_OWNER_BUDGET" });
+    }
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(deps.records).toEqual([]);
+    // Two skips at the same clock: one line.
+    expect(deps.reports).toEqual([{ event: "api.question_language.fast_check_skipped", code: "OWNER_BUDGET" }]);
+    // A full owner table (CAPACITY) is told apart from a spent count.
+    const capacity = hostedDeps({ ownerBudget: () => ({ allowed: false, reason: "CAPACITY" }) });
+    const full = await compose(null, await hostedQuestionLanguageRoute(capacity.input));
+    await full.decide({ ask: askOf(MIX_Q, "ro"), ownerScope: "owner:b", fastCheckAllowed: true });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(capacity.reports).toEqual([{ event: "api.question_language.fast_check_skipped", code: "OWNER_BUDGET_CAPACITY" }]);
+    expect(JSON.stringify([...deps.reports, ...capacity.reports])).not.toMatch(/owner:|România|wages/u);
+  });
+
+  it("red: an admitting owner budget is asked once per paid check, with the person's scope, and the check is sent", async () => {
+    const fetchSpy = billedFetch();
+    vi.stubGlobal("fetch", fetchSpy);
+    const ownerBudget = vi.fn((_ownerScope: string) => ({ allowed: true as const }));
+    const deps = hostedDeps({ ownerBudget });
+    const decider = await compose(null, await hostedQuestionLanguageRoute(deps.input));
+    await decider.decide({ ask: askOf(MIX_Q, "ro"), ownerScope: "owner:a", fastCheckAllowed: true });
+    expect(ownerBudget).toHaveBeenCalledTimes(1);
+    expect(ownerBudget).toHaveBeenCalledWith("owner:a");
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(deps.records).toHaveLength(1);
+    expect(deps.reports).toEqual([]);
+  });
+
+  it("red: the site's route hands the hosted side the owner budget and the site's counted holds", async () => {
+    const boot = await readFile(new URL("../../apps/api/src/question-language/boot.ts", import.meta.url), "utf8");
+    const decision = boot.slice(boot.indexOf("export async function questionLanguageSiteRoute("), boot.indexOf("export async function composeQuestionLanguage("));
+    expect(decision).toContain("ownerBudget: input.ownerBudget");
+    expect(decision).toContain("heldMicros: input.siteHeldMicros");
   });
 });

@@ -35,6 +35,8 @@ import {
   PUBLICATION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW,
   publicationCheckPolicyFromValue
 } from "../../packages/register/src/publication-check-policy.js";
+import { ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW, admissionPolicyFromValue } from "@debateai/register";
+import { AdmissionLimiter } from "../../apps/api/src/admission.js";
 import { STORY_TEST_BODY } from "../support/storyApiFixtures.js";
 import { bindJudgeAnswer, createJudgeStub, createPartJudgeStub, type JudgeStubStep } from "../support/hs-s02-judge-stub.js";
 import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
@@ -105,7 +107,10 @@ function publishedTexts(answer: Answer): string[] {
 }
 
 /** Memory fakes in the `publicationHarness` shape (s8-publication.test.ts), counting every side effect. */
-function publicationFakes(options: { preflight?: boolean; story?: PublicStoryShort; mapView?: DebateMapView; mapViews?: MapViewReader } = {}) {
+function publicationFakes(options: {
+  preflight?: boolean; story?: PublicStoryShort; mapView?: DebateMapView; mapViews?: MapViewReader;
+  visibility?: "PRIVATE" | "PUBLISHED";
+} = {}) {
   const counts = { prepareKeyProvision: 0, publish: 0, abandonKeyProvision: 0, cipherCreate: 0 };
   const stored: { publicationRef: string; runId: string; contentCiphertext: CryptoEnvelope }[] = [];
   const repository = {
@@ -120,7 +125,10 @@ function publicationFakes(options: { preflight?: boolean; story?: PublicStorySho
     abandonKeyProvision: async () => { counts.abandonKeyProvision += 1; return true; },
     claimKeyProvisionCleanup: async () => [],
     claimKeyCleanup: async () => [],
-    readOwnedVisibility: async () => ({ state: "PRIVATE", publicRef: null }),
+    readOwnedVisibility: async () => ({
+      state: options.visibility ?? "PRIVATE",
+      publicRef: options.visibility === "PUBLISHED" ? "77777777-7777-4777-8777-777777777777" : null
+    }),
     withContentLease: async <T>(_ref: string, use: () => Promise<T>) => use(),
     readPublic: async () => null
   } as unknown as PostgresPublicationRepository;
@@ -226,8 +234,14 @@ function routeApi(input: {
   synthesisPublishGate?: SynthesisPublishGate | null;
   preflight?: boolean;
   leases?: LeaseProbe;
+  visibility?: "PRIVATE" | "PUBLISHED";
+  admission?: AdmissionLimiter;
+  admissionClock?: () => Date;
 }) {
-  const fakes = publicationFakes(input.preflight === undefined ? {} : { preflight: input.preflight });
+  const fakes = publicationFakes({
+    ...(input.preflight === undefined ? {} : { preflight: input.preflight }),
+    ...(input.visibility === undefined ? {} : { visibility: input.visibility })
+  });
   const api = buildApi({
     application: askApplication(input.answer ?? servedAnswer(), input.leases),
     sessions: sessions(),
@@ -236,7 +250,9 @@ function routeApi(input: {
     ...(input.synthesisPublishGate === null ? {} : {
       synthesisPublishGate: input.synthesisPublishGate ?? { decide: async () => "PROCEED" as const }
     }),
-    ...(input.publicationContentCheck === undefined ? {} : { publicationContentCheck: input.publicationContentCheck })
+    ...(input.publicationContentCheck === undefined ? {} : { publicationContentCheck: input.publicationContentCheck }),
+    ...(input.admission === undefined ? {} : { admission: input.admission }),
+    ...(input.admissionClock === undefined ? {} : { admissionClock: input.admissionClock })
   });
   const publish = () => api.inject({
     method: "POST", url: `/v1/runs/${RUN_ID}/publish`, headers: mutationHeaders,
@@ -653,6 +669,134 @@ describe("hate-speech S02 publish path", () => {
       expect((await passing.publish()).statusCode).toBe(201);
       await passing.api.close();
       expect(calls).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  // Security audit run 3, NV-46: one owner's publish content checks are counted by the `publishChecks` admission
+  // scope (the parser's default: 10 per owner per fixed 24 h window) before any judge call, and a run whose latest
+  // visibility is PUBLISHED is never judged.
+  describe("NV-46 publish-check budget", () => {
+    const LIMIT = 10;
+    const WINDOW_MS = 24 * 60 * 60_000;
+    const NOW = new Date("2026-09-29T12:00:00.000Z");
+    const RATE_LIMITED = { error: "ADMISSION_RATE_LIMITED", message: "ADMISSION_RATE_LIMITED" };
+    const deploymentLimiter = () => new AdmissionLimiter(admissionPolicyFromValue(
+      ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW.value, ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef
+    ));
+    /** A judge that counts every call; BLOCK_ILLEGAL by default, so each admitted attempt is a 409. */
+    function countingJudge(steps: Record<string, JudgeStubStep> = BLOCK_ILLEGAL) {
+      const stub = createPartJudgeStub(steps);
+      const counter = { calls: 0 };
+      const judge: PublicationJudgePort = {
+        providerRef: stub.providerRef, modelId: stub.modelId,
+        complete: (input) => { counter.calls += 1; return stub.complete(input); }
+      };
+      return { judge, counter };
+    }
+    /** The refusal audit lines: one per route, reason and window. */
+    function spyErrors() {
+      const lines: string[] = [];
+      const spy = vi.spyOn(console, "error").mockImplementation((...values: unknown[]) => { lines.push(values.map(String).join(" ")); });
+      const admissionLines = () => lines.filter((line) => line.includes("api.admission.refused")).map((line) => JSON.parse(line));
+      return { spy, admissionLines };
+    }
+
+    it("red: the 11th sequential publish is 429 with retry-after, and only ten checks reached the judge", async () => {
+      const { judge, counter } = countingJudge();
+      const { check, records } = contentCheck(judge);
+      const errors = spyErrors();
+      try {
+        const { api, publish } = routeApi({ publicationContentCheck: check, admission: deploymentLimiter(), admissionClock: () => NOW });
+        for (let attempt = 1; attempt <= LIMIT; attempt += 1) {
+          const response = await publish();
+          expect(response.statusCode, `attempt ${attempt}`).toBe(409);
+          expect(response.json().error).toBe("PUBLICATION_CONTENT_REFUSED");
+        }
+        const eleventh = await publish();
+        await api.close();
+        expect(eleventh.statusCode).toBe(429);
+        expect(eleventh.json()).toStrictEqual(RATE_LIMITED);
+        expect(eleventh.headers["retry-after"]).toBe(String(WINDOW_MS / 1_000));
+        expect(errors.admissionLines()).toEqual([
+          { event: "api.admission.refused", route: "POST /v1/runs/{id}/publish", reason: "LIMIT", windowMs: WINDOW_MS }
+        ]);
+      } finally { errors.spy.mockRestore(); }
+      expect(counter.calls).toBe(LIMIT * FIXTURE_CALLS);
+      expect(records).toHaveLength(LIMIT);
+    });
+
+    it("red: 20 concurrent publishes of one owner admit exactly ten", async () => {
+      const { judge, counter } = countingJudge();
+      const { check, records } = contentCheck(judge);
+      const errors = spyErrors();
+      try {
+        const { api, publish } = routeApi({ publicationContentCheck: check, admission: deploymentLimiter(), admissionClock: () => NOW });
+        const responses = await Promise.all(Array.from({ length: 2 * LIMIT }, () => publish()));
+        await api.close();
+        expect(responses.filter((response) => response.statusCode === 409)).toHaveLength(LIMIT);
+        const limited = responses.filter((response) => response.statusCode === 429);
+        expect(limited).toHaveLength(LIMIT);
+        for (const response of limited) expect(response.json()).toStrictEqual(RATE_LIMITED);
+      } finally { errors.spy.mockRestore(); }
+      expect(counter.calls).toBe(LIMIT * FIXTURE_CALLS);
+      expect(records).toHaveLength(LIMIT);
+    });
+
+    it("red: the window is fixed from the first counted attempt; a publish after it is judged again", async () => {
+      const { judge, counter } = countingJudge();
+      const { check } = contentCheck(judge);
+      let now = NOW;
+      const errors = spyErrors();
+      try {
+        const { api, publish } = routeApi({ publicationContentCheck: check, admission: deploymentLimiter(), admissionClock: () => now });
+        for (let attempt = 1; attempt <= LIMIT; attempt += 1) expect((await publish()).statusCode, `attempt ${attempt}`).toBe(409);
+        expect((await publish()).statusCode).toBe(429);
+        now = new Date(NOW.getTime() + WINDOW_MS);
+        const twelfth = await publish();
+        await api.close();
+        expect(twelfth.statusCode).toBe(409);
+      } finally { errors.spy.mockRestore(); }
+      expect(counter.calls).toBe((LIMIT + 1) * FIXTURE_CALLS);
+    });
+
+    it("red: a run whose latest visibility is PUBLISHED is 404 RUN_NOT_FOUND and never judged", async () => {
+      const { judge, counter } = countingJudge({});
+      const { check, records } = contentCheck(judge);
+      const { api, publish, counts } = routeApi({ publicationContentCheck: check, visibility: "PUBLISHED" });
+      const response = await publish();
+      await api.close();
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toStrictEqual({ error: "RUN_NOT_FOUND" });
+      expect(counter.calls).toBe(0);
+      expect(records).toEqual([]);
+      expect(counts.prepareKeyProvision).toBe(0);
+    });
+
+    it("guard: a failed preflight is not counted", async () => {
+      const admission = deploymentLimiter();
+      const { judge, counter } = countingJudge();
+      const { check } = contentCheck(judge);
+      const refused = routeApi({ publicationContentCheck: check, preflight: false, admission });
+      for (let attempt = 1; attempt <= 2 * LIMIT; attempt += 1) {
+        const response = await refused.publish();
+        expect(response.statusCode, `attempt ${attempt}`).toBe(404);
+        expect(response.json()).toStrictEqual({ error: "RUN_NOT_FOUND" });
+      }
+      await refused.api.close();
+      const passing = routeApi({ publicationContentCheck: check, admission });
+      expect((await passing.publish()).statusCode).toBe(409);
+      await passing.api.close();
+      expect(counter.calls).toBe(FIXTURE_CALLS);
+    });
+
+    it("guard: a composition with no limiter admits every publish (ALLOW → 201)", async () => {
+      const { judge, counter } = countingJudge({});
+      const { check } = contentCheck(judge);
+      const { api, publish, counts } = routeApi({ publicationContentCheck: check });
+      for (let attempt = 1; attempt <= LIMIT + 1; attempt += 1) expect((await publish()).statusCode, `attempt ${attempt}`).toBe(201);
+      await api.close();
+      expect(counts.publish).toBe(LIMIT + 1);
+      expect(counter.calls).toBe((LIMIT + 1) * FIXTURE_CALLS);
     });
   });
 

@@ -157,6 +157,7 @@
   "billing.subscription.withdrawNothingDue": "Tamam. Planınız sona erdi. Önceden kullandığınız kısım fiyatın tamamını karşılıyor, bu nedenle geri ödenecek bir tutar yok.",
   "billing.subscription.withdrawOwnerReview": "Planınız sona erdi. Ödemelerinizden birine zaten iade yapılmış, bu yüzden hâlâ ne borçlu olduğumuzu kontrol edip 14 gün içinde size e-posta göndereceğiz.",
   "billing.subscription.withdrawWindowClosed": "14 günlük cayma süresi doldu veya yaşadığınız yerde geçerli değil. Yine de istediğiniz zaman iptal edebilirsiniz.",
+  "billing.subscription.withdrawDebateRunning": "Başlattığınız bir tartışma hâlâ kredi kullanıyor olabilir, bu yüzden ne kadar kullandığınızı henüz bilemiyoruz. Lütfen daha sonra tekrar deneyin. Cayma hakkınızı kullanmak için hâlâ bir günden fazla süreniz var.",
   "billing.subscription.stillConfirming": "Bunu hâlâ ödeme sağlayıcısıyla doğruluyoruz. Birkaç dakika sonra bu sayfaya yeniden bakın.",
   "billing.subscription.actionFailed": "Bu işe yaramadı. Lütfen yeniden deneyin.",
   "billing.subscription.invoices": "Faturalar",

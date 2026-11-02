@@ -1217,6 +1217,22 @@ class IpcTests(GateTest):
         entry = gate.day('2026-10-08')['entries']['preview-test:' + SCOPE + ':op-1']
         self.assertEqual((entry['state'], entry['held_usd']), ('settled', '0.01'))
 
+    def test_half_closed_caller_after_dispatch_gets_its_reply_and_the_gate_stays_active(self):
+        # NV-58: the app's fast-check port half-closes on its own abort; a call already dispatched is still delivered.
+        gate = self.gate().ready()
+
+        def half_close(client):
+            def dispatch(_body, _key):
+                client.shutdown(socket.SHUT_WR)
+                return 200, provider_response('0.01')
+            return dispatch
+        line, payload = self.exchange(gate, half_close)
+        self.assertIn(b' 200 ', line)
+        self.assertEqual(json.loads(payload)['status'], 200)
+        self.assertEqual(gate.status()['state'], 'active')
+        entry = gate.day('2026-10-08')['entries']['preview-test:' + SCOPE + ':op-1']
+        self.assertEqual((entry['state'], entry['held_usd']), ('settled', '0.01'))
+
     def test_any_failure_after_the_reservation_halts_even_when_a_refusal_is_delivered(self):
         gate = self.gate().ready()
 

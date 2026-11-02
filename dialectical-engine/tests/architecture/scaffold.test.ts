@@ -35,7 +35,8 @@ const MIGRATE_SIGNATURE = "export async function migrate(pool: Pool, options: Mi
 // dropping any one from the audit fails the case below that removes it from the text).
 const MIGRATE_CONTROL_FRAGMENTS = [
   "const plan = await loadMigrationPlan();", "const client = await pool.connect();",
-  "pg_advisory_lock(hashtextextended('debateai:schema-migrations', 0))", 'await withMigrationStepTransaction(client, "PROLOGUE"',
+  "SELECT pg_try_advisory_lock(hashtextextended('debateai:schema-migrations', 0)) AS acquired",
+  "if (lock.rows[0]?.acquired === true) break;", 'await withMigrationStepTransaction(client, "PROLOGUE"',
   "const { known: applied, extra } = splitLedger(plan, ledger);",
   "const lineage = identifyLineage(plan, applied, resolutions.map", "const appliedSet = new Set(applied);",
   "const resolvedSet = new Set(resolutions.map", "for (const name of plan.manifest.order)",
@@ -107,6 +108,19 @@ describe("P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law", () => {
     for (const fragment of TRANSACTION_CONTROL_FRAGMENTS) {
       expect(() => auditNativeMigratorControls(migrateSource, withoutFragment(transactionSource, fragment, 0)), fragment).toThrow("MIGRATION_NATIVE_AUDIT_BINDING_REFUSED");
     }
+    // Security fixes run 3 (NV-38): a blocking session lock cannot come back beside the poll.
+    const poll = "if (lock.rows[0]?.acquired === true) break;";
+    expect(migrateSource.split(poll)).toHaveLength(2);
+    expect(() => auditNativeMigratorControls(migrateSource.replace(poll,
+      `${poll}\n    await client.query("SELECT pg_advisory_lock(hashtextextended('debateai:schema-migrations', 0))");`), transactionSource))
+      .toThrow("MIGRATION_NATIVE_AUDIT_BINDING_REFUSED");
+  });
+
+  it("a concurrent index with IF NOT EXISTS is replay-safe; without it, it is still bare (NV-38)", () => {
+    expect(auditMigrationReplaySafety("migrations/9999_x.sql", "CREATE INDEX CONCURRENTLY IF NOT EXISTS i ON core.t (a);")).toEqual([]);
+    expect(auditMigrationReplaySafety("migrations/9999_x.sql", "CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS i ON core.t (a);")).toEqual([]);
+    expect(auditMigrationReplaySafety("migrations/9999_x.sql", "CREATE INDEX CONCURRENTLY i ON core.t (a);")).toEqual(["migrations/9999_x.sql:1 has bare CREATE INDEX without IF NOT EXISTS"]);
+    expect(auditMigrationReplaySafety("migrations/9999_x.sql", "CREATE INDEX i ON core.t (a);")).toEqual(["migrations/9999_x.sql:1 has bare CREATE INDEX without IF NOT EXISTS"]);
   });
 
   it.each(["comment", "string", "dead-code"])("cannot substitute a %s for the executable native ledger guard", async (kind) => {

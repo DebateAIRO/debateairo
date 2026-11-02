@@ -1,0 +1,17 @@
+{
+  "version": "mfa-recovery-control-user-started-forward0135-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0134_mfa_recovery_notice_due.sql",
+    "manifestSha256": "ef775fd6a17a16d8cedeadd8582b4a86238f681f8b89135a45da6a3be98068eb",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0135_mfa_recovery_control_user_started.sql",
+    "sha256": "0b80e0cca76843307b9f8a888cedbcedd2805c59ee8d3f292b2a6ddd8f092f0d"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  }
+}

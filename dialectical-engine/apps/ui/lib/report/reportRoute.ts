@@ -5,7 +5,7 @@ import { questionLocale } from "../i18n/questionLocale.js";
 import { loadNamespace } from "../i18n/server.js";
 import { t, type MessageCatalog } from "../i18n/translate.js";
 import { USER_TOKEN_COOKIE, sessionCookieValue } from "../serverApi.js";
-import { renderReportPdf } from "./renderReport.js";
+import { renderReportPdfOffThread } from "./reportRenderWorker.js";
 import { REPORT_RENDER_LIMITS, ReportRenderGate } from "./reportRenderGate.js";
 import {
   loadReportCatalogs,
@@ -22,7 +22,7 @@ import {
  * The answer's record (Task M6, GET /v1/answers/{id}/disclosure) is read beside
  * the story, for "About this report"; without one, About says nothing it holds.
  */
-export type ReportReader = Pick<ContractClient, "readAnswer" | "readRunAnswer" | "readRun" | "readAnswerStory" | "readAnswerDisclosure">;
+export type ReportReader = Pick<ContractClient, "readAnswer" | "readRunAnswer" | "readRun" | "readAnswerStory" | "readAnswerDisclosure" | "readSession">;
 
 export type ReportRenderer = (input: Readonly<{
   answer: Answer;
@@ -92,6 +92,21 @@ export function sessionFromCookieHeader(header: string | null): string | null {
 export function interfaceLocaleFromCookieHeader(header: string | null): LocaleCode {
   const value = cookieValues(header, LOCALE_COOKIE)?.at(-1);
   return isLocale(value) ? value : DEFAULT_LOCALE;
+}
+
+const REPORT_INITIATORS: ReadonlySet<string> = new Set(["same-origin", "none"]);
+
+/**
+ * NV-06: whether the browser's `Sec-Fetch-Site` lets this request reach the
+ * owner's reads. Allowed: `same-origin` (the debate page's own link), `none`
+ * (a typed, bookmarked or pasted address, or the browser's own UI) and an
+ * absent header (an old browser or a non-browser client, judged as before).
+ * Every other value, matched exactly, is refused: `cross-site`, an empty or
+ * combined value, and `same-site` too, since nothing on a sibling host links
+ * here and the preview and production hosts are same-site with each other.
+ */
+export function reportInitiatorAllowed(fetchSite: string | null | undefined): boolean {
+  return fetchSite === null || fetchSite === undefined || REPORT_INITIATORS.has(fetchSite);
 }
 
 const graphemes = new Intl.Segmenter("en", { granularity: "grapheme" });
@@ -211,7 +226,7 @@ function tryAgainLine(publicCatalog: MessageCatalog): string {
 /** A refusal: its status, the locale its line speaks, and how to word that line. */
 interface Refusal {
   readonly kind: "refused";
-  readonly status: 401 | 404 | 500 | 502;
+  readonly status: 401 | 403 | 404 | 500 | 502;
   readonly locale: LocaleCode;
   readonly line: (publicCatalog: MessageCatalog) => string;
 }
@@ -219,8 +234,8 @@ interface Refusal {
 /** Everything a report needs from the API, read and checked. */
 interface ReadyReport {
   readonly kind: "ready";
-  /** The owner's session the reads were made with; the render gate's key. */
-  readonly session: string;
+  /** The client the reads were made with (the owner's session); GET asks it for the owner, the render gate's key (NV-26). */
+  readonly client: ReportReader;
   readonly answer: Answer;
   readonly story: AnswerStory;
   /** The answer's record, or null: none, not read (HEAD), or a read that failed. */
@@ -262,6 +277,14 @@ async function readReportDisclosure(client: ReportReader, answerId: string): Pro
   }
 }
 
+/**
+ * NV-26: the render gate's key — the signed-in owner the API names for this session (Session.asker_id), so one
+ * account holds one place however many sessions it has. Never the cookie, and no fallback to it.
+ */
+async function readRenderOwner(client: ReportReader): Promise<string> {
+  return (await client.readSession()).asker_id;
+}
+
 export type ReportRequestInput = Readonly<{
   id: string;
   sessionCookie: string | null;
@@ -269,16 +292,22 @@ export type ReportRequestInput = Readonly<{
   client: () => ReportReader;
   now: Date;
   load?: ReportCatalogLoader;
+  /** The PDF maker: the report worker thread's unless a test brings its own (NV-27). */
   render?: ReportRenderer;
   supported?: (locale: string) => boolean;
   /** The render gate; the process's own unless a test brings a fresh one. */
   gate?: ReportRenderGate;
   /** The request's own signal: a download abandoned before its PDF is made is never made. */
   signal?: AbortSignal;
+  /** The request's Sec-Fetch-Site, raw (null when absent); any value but same-origin or none is refused before any read (NV-06). */
+  fetchSite?: string | null;
 }>;
 
 /**
  * What GET and HEAD share, read with the owner's session:
+ *  0. a request another site started (reportInitiatorAllowed, NV-06) gets one
+ *     fixed 403, before the session is looked at and before any read, so it
+ *     says nothing of sign-in, ownership or readiness;
  *  1. the answer (by answer id, then by run id) and its run, whose
  *     `argument_language` names the question's language;
  *  2. the question's locale (`und` or unknown falls back to the interface
@@ -290,6 +319,7 @@ export type ReportRequestInput = Readonly<{
  * interface locale before that.
  */
 async function prepareReport(input: ReportRequestInput, withDisclosure: boolean): Promise<Refusal | ReadyReport> {
+  if (!reportInitiatorAllowed(input.fetchSite)) return refuse(403, input.interfaceLocale, notAvailableLine);
   const session = input.sessionCookie;
   if (session === null) return refuse(401, input.interfaceLocale, signInLine);
 
@@ -320,17 +350,20 @@ async function prepareReport(input: ReportRequestInput, withDisclosure: boolean)
   if (story.story === null || (story.status !== "READY" && story.status !== "READY_WITH_RESERVATION")) {
     return refuse(404, locale, notAvailableLine);
   }
-  return { kind: "ready", session, answer, story, disclosure, questionTag, locale };
+  return { kind: "ready", client, answer, story, disclosure, questionTag, locale };
 }
 
 /**
- * GET: the report, rendered in memory in the question's locale and streamed as
- * an attachment. Nothing is stored; a refusal is one plain catalogue line.
+ * GET: the report, rendered in memory in the question's locale, in the report
+ * worker thread (reportRenderWorker.ts, NV-27), so the loop that answers /readyz
+ * and every page never lays it out, and streamed as an attachment. Nothing is stored; a refusal is one plain catalogue line.
  * Making the PDF waits for the render gate, entered only once the owner's
- * session has read a ready answer: a second download from a session whose first
+ * session has read a ready answer and the API has named that session's owner
+ * (NV-26): a second download from an owner (any of their sessions) whose first
  * is still being made is refused (429), and so is one that finds every place
  * taken (503), both with Retry-After and the plain "try again" line. The place
- * is freed in `finally`, whatever the render did.
+ * is freed in `finally`, whatever the render did. A request from another site
+ * gets the fixed 403 before the session or any read (NV-06).
  */
 export async function handleReportRequest(input: ReportRequestInput): Promise<Response> {
   const load = input.load ?? loadNamespace;
@@ -347,15 +380,23 @@ export async function handleReportRequest(input: ReportRequestInput): Promise<Re
     return textResponse(500, tryAgainLine(await refusalCatalog(load, prepared.locale)));
   }
 
+  let owner: string;
+  try {
+    owner = await readRenderOwner(prepared.client);
+  } catch (failure) {
+    const refusal = upstreamRefusal(failure, prepared.locale);
+    return textResponse(refusal.status, refusal.line(catalogs.publicCatalog));
+  }
+
   const gate = input.gate ?? processRenderGate;
-  const admission = await gate.admit(prepared.session, input.signal);
+  const admission = await gate.admit(owner, input.signal);
   if (admission.kind !== "admitted") return busyResponse(admission.kind === "busy" ? 429 : 503, gate, catalogs);
 
   let pdf: Buffer;
   try {
     // Abandoned while its reads ran or it waited: nobody will read the PDF, so it is not made.
     if (input.signal?.aborted === true) return busyResponse(503, gate, catalogs);
-    pdf = await (input.render ?? renderReportPdf)({
+    pdf = await (input.render ?? renderReportPdfOffThread)({
       answer: prepared.answer,
       story: prepared.story,
       disclosure: prepared.disclosure,
@@ -377,8 +418,10 @@ export async function handleReportRequest(input: ReportRequestInput): Promise<Re
  * HEAD: the same session check and the same three reads as GET, answered with
  * GET's status and headers and no body. The PDF is never made (Next would
  * otherwise answer HEAD by running GET and dropping the bytes), so a render
- * failure, which only making it can reveal, is GET's alone. The answer's record
- * is only for the PDF's About, so HEAD never reads it.
+ * failure, which only making it can reveal, is GET's alone, and so is a failed
+ * read of the owner, the render gate's key (NV-26). The answer's record is only
+ * for the PDF's About, so HEAD never reads it. A request from another site gets
+ * the same fixed 403 as GET, before the session or any read (NV-06).
  */
 export async function handleReportHeadRequest(input: ReportRequestInput): Promise<Response> {
   const prepared = await prepareReport(input, false);

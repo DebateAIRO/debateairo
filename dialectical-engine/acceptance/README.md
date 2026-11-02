@@ -44,7 +44,12 @@ read honestly reports 3 configured makers; `requiredDistinctMakers` stays 1 per
 DR-137. Seed freshness stays loud: a standing `.pgdata` seeded before FAIR-02
 stops with `ACCEPTANCE_REGISTER_CONFLICT:configuredProviderSet`. Sealed rows are
 never mutated — see **The ceremony register version** below for what to do
-instead.
+instead. A grok reply is accepted only when its JSON envelope reports
+`num_turns` 1 and `stopReason` `end_turn` (NV-53), at the handshake and on
+every call. Otherwise a served call gets a 502, `GROK_CLI_TOOL_TURNS` or
+`GROK_CLI_STOP_REASON_UNEXPECTED`, and no text is served; a handshake refusal
+stops the relay start. An envelope refusal never makes the sandbox probe drop
+`--sandbox read-only`.
 
 **Which CLI a maker relay runs (D10).** Nothing in this directory names a path
 to a binary; where a maker's CLI lives is a fact about THIS host and is deduced

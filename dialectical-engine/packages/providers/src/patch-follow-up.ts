@@ -19,6 +19,14 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> =>
 /** A schema code token, as `schemaFailureLocator` accepts one. */
 const REJECTION_CODE = /^[A-Z][A-Z0-9_]{0,63}$/u;
 
+/** Every proper dot-prefix of a patch path ("a.b.c" → "a", "a.b"): at most seven, as a patch path has at most eight
+ *  segments (`isPatchPath`). */
+function pathAncestors(path: string): string[] {
+  const ancestors: string[] = [];
+  for (let dot = path.indexOf("."); dot !== -1; dot = path.indexOf(".", dot + 1)) ancestors.push(path.slice(0, dot));
+  return ancestors;
+}
+
 /**
  * EVERY failing machine path of a refusal, or null when the refusal does not name each failure at a member the patch
  * could replace. Two refusal forms are read, the same two `schemaFailureLocator` reads (and nothing from either is
@@ -48,15 +56,17 @@ export function schemaFailurePaths(parseError: string): readonly string[] | null
       return path === "$" ? [] : path.split(".");
     });
   }
-  const paths: string[] = [];
+  const paths = new Set<string>();
   for (const segments of raw) {
     if (segments.length === 0) return null;
     const path = segments.map((segment) => String(segment)).join(".");
     if (!segments.every((segment) => typeof segment === "string" || (typeof segment === "number" && Number.isSafeInteger(segment) && segment >= 0))
       || !isPatchPath(path)) return null;
-    if (!paths.includes(path)) paths.push(path);
+    paths.add(path);
   }
-  const outermost = paths.filter((path) => !paths.some((other) => other !== path && path.startsWith(`${other}.`)));
+  // A path under another listed path is dropped (the outer member is replaced whole). Each path is checked against its
+  // own at most seven ancestors, never against every other path: linear in the issue list (NV-37).
+  const outermost = [...paths].filter((path) => !pathAncestors(path).some((ancestor) => paths.has(ancestor)));
   return isPatchPathList(outermost) ? Object.freeze(outermost) : null;
 }
 

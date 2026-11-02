@@ -448,6 +448,30 @@ export class PostgresIdentityRepository {
     });
   }
 
+  /**
+   * NV-14 (0131): the same consume, which on every valid consume also writes the token holder's password hash and, on
+   * the pending_verification transition, deletes the account's provider links, in this one transaction.
+   */
+  async consumeVerificationSetPassword(input: {
+    readonly tokenHash: string;
+    readonly occurredAt: Date;
+    readonly source: AuthSourceContext;
+    readonly newPasswordHash: string;
+  }): Promise<boolean> {
+    const prepared = await this.prepareAuditContext(input.source);
+    return this.transaction(async (client) => {
+      const result = await client.query<{ valid: boolean }>(`
+        SELECT identity.consume_verification_set_password($1,$2,$3::jsonb,$4) AS valid
+      `, [
+        input.tokenHash,input.occurredAt,JSON.stringify({
+          ipArgon2id: prepared.ipArgon2id,
+          userAgentArgon2id: prepared.userAgentArgon2id
+        }),input.newPasswordHash
+      ]);
+      return result.rows[0]?.valid === true;
+    });
+  }
+
   async prepareVerificationResend(input: {
     readonly emailBlindIndex: Buffer;
     readonly tokenHash: string;

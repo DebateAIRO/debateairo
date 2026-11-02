@@ -109,6 +109,15 @@ const outcome = (run: Promise<unknown>): Promise<Outcome> =>
   run.then(() => ({ ok: true as const }), (error: unknown) => ({ ok: false as const, message: error instanceof Error ? error.message : String(error) }));
 const lastApplied = async (db: TestDatabase): Promise<string | undefined> =>
   (await db.pool.query<{ name: string }>("SELECT name FROM public.debateai_schema_migration ORDER BY name DESC LIMIT 1")).rows[0]?.name;
+/**
+ * The chain's last step: the security fixes of audit run 3 (0131 to 0135) follow 0130 since the merge onto the fix
+ * branch (2026-10-29), so a migrate() that reaches 0130 goes on to them; 0130 itself is checked by its ledger row.
+ */
+const chainHead = async (): Promise<string> => (await loadMigrationPlan()).forwardChain.at(-1)!.name;
+const reached = async (db: TestDatabase): Promise<Readonly<{ rls: boolean; last: string | undefined }>> => ({
+  rls: (await db.pool.query<{ n: number }>("SELECT count(*)::int AS n FROM public.debateai_schema_migration WHERE name=$1", [HEAD])).rows[0]!.n === 1,
+  last: await lastApplied(db)
+});
 /** Runs `body` on one client inside a transaction that is always rolled back. */
 async function rolledBack<T>(db: TestDatabase, body: (client: PoolClient) => Promise<T>): Promise<T> {
   const client = await db.pool.connect();
@@ -152,7 +161,7 @@ describe("S1.2 migration 0130 on an empty database", () => {
 
   it("S1.2-T1 (R30) migrate() reaches 0130 on an empty database, and a second migrate() resolves", async () => {
     expect(first).toEqual({ ok: true });
-    expect(await lastApplied(db)).toBe(HEAD);
+    expect(await reached(db)).toEqual({ rls: true, last: await chainHead() });
     expect(await outcome(migrate(db.pool))).toEqual({ ok: true });
   }, 600_000);
 
@@ -525,7 +534,7 @@ describe("S1.2 migration 0130 on an empty database", () => {
       await db.pool.query("DELETE FROM public.debateai_schema_migration WHERE name=$1", [PROBE]);
     }
     expect(await outcome(migrate(db.pool))).toEqual({ ok: true });
-    expect(await lastApplied(db)).toBe(HEAD);
+    expect(await reached(db)).toEqual({ rls: true, last: await chainHead() });
   }, 600_000);
 });
 
@@ -562,7 +571,7 @@ describe("S1.2 migration 0130 on a database the release before migrated", () => 
 
   it("S1.2-T2 (R30) migrate() takes a database at 0129 to 0130", async () => {
     expect(head).toEqual({ ok: true });
-    expect(await lastApplied(db)).toBe(HEAD);
+    expect(await reached(db)).toEqual({ rls: true, last: await chainHead() });
   });
 
   it("S1.2-T13 (R28) on the twenty-three amended tables 0130 changes only the flag and adds the two policies", () => {

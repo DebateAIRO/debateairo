@@ -265,4 +265,38 @@ describe("Turn 14 change-email service", () => {
     await expectCode(service.confirm("short", source), "LINK_INVALID");
     await expectCode(service.cancelByLink("x".repeat(43) + "!", source), "LINK_INVALID");
   });
+
+  it("mails at most three confirmations an hour across request and resend, and a resend never extends the change", async () => {
+    // NV-12: the request's own mail counts, so request + two resends fill the hour; a fresh step-up does not refresh
+    // it, and every resend keeps the change's original issue time + 24 h.
+    const account = await fixtureAccount(`ivy.${randomUUID().slice(0, 8)}@unibuc.ro`);
+    const target = `ivy.${randomUUID().slice(0, 8)}@icub.ro`;
+    const { service, mail } = harness({ resendCooldownMs: 1_000 });
+    const bounded: boolean[] = [];
+    const withinTtl = async () => bounded.push((await database.pool.query<{ bounded: boolean }>(`
+      SELECT expires_at<=issued_at+interval '24 hours' AS bounded FROM identity.email_change_request
+      WHERE user_id=$1 AND closed_at IS NULL
+    `, [account.userId])).rows[0]?.bounded === true);
+    await service.request(session(account), { newEmail: target, grantToken: await grantFor(account) }, source);
+    await withinTtl();
+    for (let resend = 0; resend < 2; resend += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 1_100));
+      await service.resend(session(account), source);
+      await withinTtl();
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1_100));
+    await expectCode(service.resend(session(account), source), "SEND_LIMIT");
+    expect(mail.messages.filter((message) => message.kind === "confirmation" && message.recipient === target))
+      .toHaveLength(3);
+    const fresh = await grantFor(account);
+    await expectCode(service.request(session(account), { newEmail: target, grantToken: fresh }, source), "SEND_LIMIT");
+    const grant = await database.pool.query<{ unconsumed: boolean }>(
+      "SELECT consumed_at IS NULL AS unconsumed FROM identity.step_up_grant WHERE token_hash=$1",
+      [hashToken("step-up-grant", fresh)]
+    );
+    expect(grant.rows).toEqual([{ unconsumed: true }]);
+    await withinTtl();
+    expect(mail.messages.filter((message) => message.kind === "confirmation")).toHaveLength(3);
+    expect(bounded).toEqual([true, true, true, true]);
+  });
 });

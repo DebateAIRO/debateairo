@@ -83,7 +83,7 @@ describe("the public server's per-release overlays (side-by-side spec §10)", ()
     // The automatic reboot's pending flag, against the release check's NO_MAINTENANCE.
     expect(readme).toContain("`/run/reboot-required`");
     expect(readme).toContain("(`NO_MAINTENANCE: reboot required`)");
-    // §6: what only a running Caddy shows (the preview's TB7): the edge secret filled into health_headers, and /readyz refused.
+    // §6: what only a running Caddy shows (the preview's TB7): a slot healthy through the loopback site, and /readyz refused.
     const caddy = readme.slice(readme.indexOf("## 6. Caddy"), readme.indexOf("## 7. Mail"));
     expect(caddy).toContain("curl -s -m 15 -o /dev/null -D - http://127.0.0.1:3090/readyz | tr -d '\\r' | grep -i '^x-debateai-release:'");
     expect(caddy).toContain(`curl -s -o /dev/null -w '%{http_code}\\n' "https://$DEBATEAI_PUBLIC_HOSTNAME/readyz"`);
@@ -118,7 +118,7 @@ const FIRST_KEY = ["r18", "00aa11bb22cc"].join("-");
 const SECRET = ["edge", "v".repeat(48)].join("_");
 const START = Date.parse("2026-10-22T03:15:00.000Z");
 const DAY = 86_400_000;
-const PORTS = { A: { ui: "3001", api: "8790" }, B: { ui: "3002", api: "8791" } } as const;
+const PORTS = { A: { ui: "481", api: "491" }, B: { ui: "482", api: "492" } } as const;
 const U = (service: string, label: string) => `debateai-${service}@${label}.service`;
 const invocationId = (n: number) => n.toString(16).padStart(32, "b");
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -159,12 +159,14 @@ type Options = Partial<{
   ready: Record<string, string>;
   minutesSinceRequest: number;
   mainStatus: string;
+  // NV-55: the live net.ipv4.ip_unprivileged_port_start, as /proc prints it; null = the read fails.
+  portStart: string | null;
 }>;
 const result = (stdout = "", code: number | null = 0, stderr = "") => ({ code, signal: null, error: undefined, timedOut: false, overflow: false, stdout: Buffer.from(stdout), stderr: Buffer.from(stderr) });
 const site = (key: string, status = 200, reasons: string[] = []): Answer => ({ status, release: key, reasons, releaseKey: key });
 
 function host(releases: Release[], options: Options = {}) {
-  const o = { history: [] as [string, string, string?][], units: {} as Record<string, string>, ready: {} as Record<string, string>, minutesSinceRequest: 26, mainStatus: "0", ...options };
+  const o = { history: [] as [string, string, string?][], units: {} as Record<string, string>, ready: {} as Record<string, string>, minutesSinceRequest: 26, mainStatus: "0", portStart: "1024\n" as string | null, ...options };
   let clock = START, invocations = 0;
   const log: string[] = [], psql: string[][] = [], urls: string[] = [], unitFiles: Record<string, string> = {};
   const events: { key: string; kind: string; reason: string | null; at: number; ttf: number | null }[] = [];
@@ -306,7 +308,8 @@ function host(releases: Release[], options: Options = {}) {
       let answer: Answer;
       if (url === "http://127.0.0.1:3090/readyz") { expect(headers).toEqual({}); answer = edgeAnswer(); } else {
         const port = /^http:\/\/127\.0\.0\.1:(\d+)\/readyz$/.exec(url)![1]!;
-        expect(headers).toEqual({ "x-debateai-edge-secret": SECRET });
+        // NV-55: root's probe of a slot's website sends no secret.
+        expect(headers).toEqual({});
         const entry = releases.find((candidate) => PORTS[candidate.slot].ui === port);
         answer = entry ? websiteAnswer(entry.label) : "refused";
       }
@@ -320,6 +323,7 @@ function host(releases: Release[], options: Options = {}) {
     writeStateFile: async (path: string) => { throw new Error(`no state file on this server: ${path}`); },
     statfs: async () => ({ bavail: 40e9 / 4096, bsize: 4096 }),
     readMeminfo: async () => `MemTotal:       16000000 kB\nMemAvailable:    8000000 kB\n`,
+    readUnprivilegedPortStart: async () => { if (o.portStart === null) throw new Error("EACCES"); return o.portStart; },
     portRefuses: async () => true
   };
   return {
@@ -365,8 +369,8 @@ describe("release.mjs: the preview's release tools with the public server's layo
     expect(h.units[U("runner", "old-v1")]).toBe("active");
     // No target drop-in and no gate files: the only file root writes is the backstop's time.
     expect(Object.keys(h.unitFiles)).toEqual(["/etc/systemd/system/debateai-runner-retire@old-v1.timer.d/50-at.conf"]);
-    // This server's slots and edge: the new release's website in slot B (its overlay's API_PORT 8791), the edge on 3090.
-    expect(new Set(h.urls)).toEqual(new Set(["http://127.0.0.1:3002/readyz", "http://127.0.0.1:3090/readyz"]));
+    // This server's slots and edge: the new release's website in slot B (its overlay's API_PORT 492), the edge on 3090.
+    expect(new Set(h.urls)).toEqual(new Set(["http://127.0.0.1:482/readyz", "http://127.0.0.1:3090/readyz"]));
     // No gate was asked (an unknown command fails the fake run), and no preview unit was named.
     expect(h.log.join("\n")).not.toContain("debateai-preview-");
   });
@@ -442,11 +446,11 @@ describe("release.mjs: the preview's release tools with the public server's layo
       { label: "old-v1", releaseKey: OLD_KEY, slot: "A", state: "DRAINING", frontPairStopped: true, retireRequested: false, units: { api: "inactive", ui: "inactive", runner: "active" }, openWork: 0 }
     ], bad: [] });
     // An overlay that sets a value no release may change, or names no slot's API port, is refused, never guessed.
-    const extra = serverFiles([OLD], (entry) => `REGISTER_VERSION=19\nRELEASE_KEY=${entry.key}\nAPI_PORT=8790\nDATABASE_URL=elsewhere\n`);
+    const extra = serverFiles([OLD], (entry) => `REGISTER_VERSION=19\nRELEASE_KEY=${entry.key}\nAPI_PORT=491\nDATABASE_URL=elsewhere\n`);
     expect((await cli(["status"], extra.layout, host([OLD]).deps)).err).toMatchObject({ reason: "RELEASE_OVERLAY_REFUSED" });
     const port = serverFiles([OLD], (entry) => `REGISTER_VERSION=19\nRELEASE_KEY=${entry.key}\nAPI_PORT=3101\n`);
     expect((await cli(["status"], port.layout, host([OLD]).deps)).err).toMatchObject({ reason: "RELEASE_OVERLAY_REFUSED" });
-    const version = serverFiles([OLD], (entry) => `REGISTER_VERSION=20\nRELEASE_KEY=${entry.key}\nAPI_PORT=8790\n`);
+    const version = serverFiles([OLD], (entry) => `REGISTER_VERSION=20\nRELEASE_KEY=${entry.key}\nAPI_PORT=491\n`);
     expect((await cli(["status"], version.layout, host([OLD]).deps)).err).toMatchObject({ reason: "RELEASE_OVERLAY_REFUSED" });
   });
 
@@ -531,6 +535,14 @@ describe("release.mjs: the preview's release tools with the public server's layo
       // Side-by-side spec §13 (S15): this server has no settings operator until Phase 3 (plan D11).
       SETTINGS: "not planned on this server (the settings operator comes with Phase 3)"
     });
+    // NV-55: the slot ports are reserved only while the live sysctl stays above them; SLOT_FREE reads it at every check.
+    const unitsOff = { [U("runner", "new-v1")]: "inactive", [U("api", "new-v1")]: "inactive", [U("ui", "new-v1")]: "inactive" };
+    for (const [portStart, detail] of [["0\n", "slot ports not reserved (ip_unprivileged_port_start 0)"], [null, "slot ports not reserved (ip_unprivileged_port_start unreadable)"]] as const) {
+      const lowered = host([OLD, NEW], { history: [[OLD_KEY, "STAGED"], [OLD_KEY, "CURRENT"]], units: unitsOff, portStart });
+      const refused = await cli(["check", "--label", "new-v1"], layout, lowered.deps);
+      expect(refused.out.checks.find((entry: { name: string }) => entry.name === "SLOT_FREE")).toEqual({ name: "SLOT_FREE", ok: false, detail });
+      expect(refused.out.verdict).not.toBe("SIDE_BY_SIDE");
+    }
     // A new step without both n1 lines sends the upload the drained way.
     const drained = serverFiles([OLD, { ...NEW, migrations: { "0001_a.sql": `${N1}SELECT 1;\n`, "0002_b.sql": "SELECT 2;\n" } }]);
     const verdict = await cli(["check", "--label", "new-v1"], drained.layout, h.deps);
@@ -554,7 +566,7 @@ describe("release.mjs: the preview's release tools with the public server's layo
       "enable debateai-api@old-v1.service debateai-ui@old-v1.service debateai-runner@old-v1.service",
       "disable debateai-api@new-v1.service debateai-ui@new-v1.service"
     ]);
-    expect(h.urls).toContain("http://127.0.0.1:3001/readyz");
+    expect(h.urls).toContain("http://127.0.0.1:481/readyz");
   });
 
   it("a drained upgrade: the older pair and runner stopped with nothing open, the switch with --old-pair-stopped, then mark-retired (final fix wave S2)", async () => {

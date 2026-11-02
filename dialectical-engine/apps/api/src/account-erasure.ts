@@ -10,6 +10,7 @@ import {
   type AuthSourceContext
 } from "@debateai/db";
 import {
+  isSingleDeliverableRecipient,
   MailDeliveryError,
   type SecurityNotificationSender
 } from "./mail-channel.js";
@@ -128,7 +129,14 @@ export class PostgresAccountErasureApplication implements AccountErasureApplicat
 }
 
 export type AccountErasureNotificationOutcome =
-  | "ACKNOWLEDGED" | "CONTENDED" | "FAILED";
+  | "ACKNOWLEDGED" | "CONTENDED" | "FAILED" | "DEAD_LETTERED";
+/** NV-02 (0131): why a notice was dead-lettered: its stored address is undeliverable, or it hit the attempt cap after PREPARE. */
+export type AccountErasureNotificationDeadLetter = "recipient" | "attempt-cap";
+type AccountErasureNotificationResult = Readonly<{
+  outcome:AccountErasureNotificationOutcome;diagnosticStage?:AccountErasureNotificationDeadLetter;
+}>;
+/** NV-02: raised only by the reconciler's own pre-send address check; 0131's fail dead-letters it at once. */
+const RECIPIENT_UNDELIVERABLE = "MAIL_RECIPIENT_UNDELIVERABLE";
 
 export function createSingleFlightErasureReconciler(
   work:()=>Promise<void>,onFailure:()=>void
@@ -159,17 +167,23 @@ export class AccountErasureNotificationReconciler {
   ) {}
 
   private async process(claim:AccountErasureNotificationClaim):Promise<
-    AccountErasureNotificationOutcome
+    AccountErasureNotificationResult
   > {
-    return this.repository.withNotificationLease(claim.userId,async ()=>{
+    return this.repository.withNotificationLease(claim.userId,async ():Promise<AccountErasureNotificationResult>=>{
     let dek:Buffer|undefined;
     let plaintext:Buffer|undefined;
+    // NV-02: set only by the address check below, so a sender that threw the same code is retried, not dead-lettered.
+    let recipientUndeliverable=false;
     try {
       dek=await this.users.load(claim.userId);
       plaintext=decrypt(dek,claim.addressCiphertext,addressAad(claim));
       const recipient=plaintext.toString("utf8");
-      if (!/^[^\s@]+@[^\s@]+$/.test(recipient) || /[\r\n]/.test(recipient)) {
-        throw new MailDeliveryError("MAIL_INPUT_INVALID");
+      // NV-02 (0131): the stored address is fixed by its ciphertext, so one the shared rule refuses can never be sent;
+      // it is refused here, before any send, and the fail dead-letters it at once.
+      if (!/^[^\s@]+@[^\s@]+$/.test(recipient) || /[\r\n]/.test(recipient)
+        || !isSingleDeliverableRecipient(recipient)) {
+        recipientUndeliverable=true;
+        throw new MailDeliveryError(RECIPIENT_UNDELIVERABLE);
       }
       // C11.4 (R-13): the mail is written in the language stored on the claimed row, never a profile or cookie.
       await this.sender.sendSecurityNotification({
@@ -179,14 +193,17 @@ export class AccountErasureNotificationReconciler {
         executeAt:claim.executeAt,
         display:{ locale:claim.mailLocale, timeZone:null }
       });
-      return await this.repository.acknowledgeNotification(
+      return { outcome:await this.repository.acknowledgeNotification(
         claim.messageId,claim.claimToken
-      ) ? "ACKNOWLEDGED" : "CONTENDED";
+      ) ? "ACKNOWLEDGED" : "CONTENDED" };
     } catch (error) {
-      const code=error instanceof MailDeliveryError
-        ? error.operatorCode : "ERASURE_NOTIFICATION_SEND_FAILED";
-      return await this.repository.failNotification(claim.messageId,claim.claimToken,code)
-        ? "FAILED" : "CONTENDED";
+      const code=recipientUndeliverable ? RECIPIENT_UNDELIVERABLE
+        : error instanceof MailDeliveryError && error.operatorCode!==RECIPIENT_UNDELIVERABLE
+          ? error.operatorCode : "ERASURE_NOTIFICATION_SEND_FAILED";
+      const failed=await this.repository.failNotification(claim.messageId,claim.claimToken,code);
+      if (failed==="DEAD_LETTERED_RECIPIENT") return { outcome:"DEAD_LETTERED",diagnosticStage:"recipient" };
+      if (failed==="DEAD_LETTERED_ATTEMPT_CAP") return { outcome:"DEAD_LETTERED",diagnosticStage:"attempt-cap" };
+      return { outcome:failed };
     } finally {
       plaintext?.fill(0);
       dek?.fill(0);
@@ -197,11 +214,15 @@ export class AccountErasureNotificationReconciler {
   async reconcile(limit=100):Promise<readonly Readonly<{
     messageId:string;
     outcome:AccountErasureNotificationOutcome;
+    diagnosticStage?:AccountErasureNotificationDeadLetter;
   }>[]> {
-    const outcomes:{ messageId:string;outcome:AccountErasureNotificationOutcome }[]=[];
+    const outcomes:{
+      messageId:string;outcome:AccountErasureNotificationOutcome;diagnosticStage?:AccountErasureNotificationDeadLetter;
+    }[]=[];
     for (const claim of await this.repository.claimNotifications(limit)) {
       try {
-        outcomes.push({ messageId:claim.messageId,outcome:await this.process(claim) });
+        // diagnosticStage is present only on a dead letter.
+        outcomes.push({ messageId:claim.messageId,...await this.process(claim) });
       } catch {
         // A poisoned item remains claimable after its bounded lease; later
         // rows in this batch still receive an independent attempt.

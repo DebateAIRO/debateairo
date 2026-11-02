@@ -137,7 +137,7 @@ describe("the country gate (paid plans G3a, spec §2.3.3)", () => {
 });
 
 describe("the gate on the routes", () => {
-  function api(options: { countryGate?: CountryGate; admission?: AdmissionLimiter; sessions?: SessionApplication } = {}) {
+  function api(options: { countryGate?: CountryGate; admission?: AdmissionLimiter; sessions?: SessionApplication; uiApiProof?: Buffer } = {}) {
     const register = vi.fn(async (_input: unknown, _source: Readonly<{ countryCode?: string }>) => ({
       message: "If this address can be registered, verification instructions will arrive. Check your spam folder."
     }));
@@ -152,7 +152,8 @@ describe("the gate on the routes", () => {
         sessions: options.sessions ?? testSessionApplication([IDENTITY]),
         allowedOrigin: TEST_APP_ORIGIN,
         ...(options.countryGate === undefined ? {} : { countryGate: options.countryGate }),
-        ...(options.admission === undefined ? {} : { admission: options.admission })
+        ...(options.admission === undefined ? {} : { admission: options.admission }),
+        ...(options.uiApiProof === undefined ? {} : { uiApiProof: options.uiApiProof })
       })
     };
   }
@@ -200,12 +201,15 @@ describe("the gate on the routes", () => {
   });
 
   it("records the gate's country with the registration's age check when no Cloudflare edge reported one (R3-3)", async () => {
-    const { instance, register } = api({ countryGate: gate().gate });
+    const proof = "c".repeat(43);
+    const { instance, register } = api({ countryGate: gate().gate, uiApiProof: Buffer.from(proof) });
     await instance.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload: REGISTER_BODY, remoteAddress: "81.196.20.30" });
-    // A Cloudflare edge's own header still wins when there is one (the age gate's rule, kept).
+    // A Cloudflare edge's own header still wins when there is one (the age gate's rule, kept), from the proven UI only
+    // (NV-03). The edge country is gated on the proof alone, not on a loopback peer, which is why this direct peer keeps
+    // it; the API listens only on loopback (API_HOST_MUST_BE_LOOPBACK), so in production only a local peer can send one.
     await instance.inject({
       method: "POST", url: "/v1/auth/register", payload: REGISTER_BODY, remoteAddress: "81.196.20.30",
-      headers: { origin: TEST_APP_ORIGIN, "cf-ipcountry": "DE" }
+      headers: { origin: TEST_APP_ORIGIN, "cf-ipcountry": "DE", "x-debateai-ui-proof": proof }
     });
     expect(register.mock.calls.map(([, source]) => source.countryCode)).toEqual(["RO", "DE"]);
     await instance.close();

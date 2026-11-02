@@ -1521,6 +1521,37 @@ export class BillingRepository {
     [row.quarantineId, row.receivedAt, row.reason, row.orderId, row.rawCiphertext, row.headerCiphertext, row.keyId]);
   }
   /**
+   * NV-44: what the quarantine already holds for one message, read with no lock: whether its id (its content key) is
+   * kept, its order's rows since `orderSince`, the UTC day's rows and ciphertext bytes in [`dayStart`, `dayEnd`), and,
+   * for a charge, that day's rows of its owner's charges. Bounded above, so a row dated ahead never counts today.
+   */
+  async noticeQuarantineLoad(c: PoolClient, input: Readonly<{
+    quarantineId: string; orderId: string; orderSince: Date; dayStart: Date; dayEnd: Date; ownerRef: string | null;
+  }>): Promise<Readonly<{ duplicate: boolean; orderRows: number; dayRows: number; dayBytes: number; ownerDayRows: number }>> {
+    const row = (await c.query<{ duplicate: boolean; orderRows: number; dayRows: number; dayBytes: string; ownerDayRows: number }>(
+      `SELECT EXISTS (SELECT 1 FROM billing.notice_quarantine WHERE quarantine_id = $1::uuid) AS duplicate,
+        (SELECT count(*) FROM billing.notice_quarantine WHERE order_id = $2 AND received_at >= $3)::int AS "orderRows",
+        day.rows::int AS "dayRows", day.bytes::text AS "dayBytes",
+        (SELECT count(*) FROM billing.notice_quarantine AS held
+           JOIN billing.charge AS charge ON charge.charge_id = held.order_id
+          WHERE $6::uuid IS NOT NULL AND charge.owner_ref = $6::uuid
+            AND held.received_at >= $4 AND held.received_at < $5)::int AS "ownerDayRows"
+      FROM (SELECT count(*) AS rows,
+              coalesce(sum(octet_length(raw_ciphertext) + coalesce(octet_length(header_ciphertext), 0)), 0) AS bytes
+            FROM billing.notice_quarantine WHERE received_at >= $4 AND received_at < $5) AS day`,
+      [input.quarantineId, input.orderId, input.orderSince, input.dayStart, input.dayEnd, input.ownerRef])).rows[0]!;
+    return Object.freeze({
+      duplicate: row.duplicate, orderRows: row.orderRows, dayRows: row.dayRows, dayBytes: Number(row.dayBytes),
+      ownerDayRows: row.ownerDayRows
+    });
+  }
+  /** NV-44: the order's quarantine lock for this transaction, only if free; never waits (false: another holds it). */
+  async tryLockNoticeQuarantineOrder(c: PoolClient, orderId: string): Promise<boolean> {
+    const { rows } = await c.query<{ locked: boolean }>(
+      "SELECT pg_try_advisory_xact_lock(hashtextextended('debateai.billing.notice-quarantine:' || $1::text, 0)) AS locked", [orderId]);
+    return rows[0]?.locked === true;
+  }
+  /**
    * §2.7.4's re-check: the quarantine received at or after `since`, oldest first. With `page` (ruling PR-30), only the
    * rows after `page.after` in (received_at, quarantine_id) order, at most `page.limit` of them: the caller reads on
    * until a page comes back shorter than its limit.

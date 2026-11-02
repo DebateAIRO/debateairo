@@ -762,8 +762,27 @@ runuser -u postgres -- /usr/lib/postgresql/18/bin/pg_restore --host=/run/debatea
 ```
 
 Replacing the live `debateai` database is a separate, reviewed decision (roles are cluster-wide
-and not in the dump; encrypted rows need the existing key custody). After any restore, start
-the API and UI normally: prestart re-verifies the database before either starts.
+and not in the dump; encrypted rows need the existing key custody). After a restore into the live
+`debateai` database, and before the API starts: revoke the restored sessions and mark the restore
+fence, with the block below. It runs the same three lines as `deploy/preview-release/v1/README.md`
+rbD-B (H11), but outside a release there is no names file, so it sets its own archive folder `S`,
+stamp `TS` and `psqlq`. When the API carries NV-07, the public library then stays empty until the
+owner releases the hold: H11 step 4. A restore into a scratch database needs neither. Prestart
+re-verifies the schema, never the sessions.
+
+The block, as root, with every `debateai-preview-api@`, `-ui@` and `-runner@` instance stopped:
+
+```sh
+( set -euo pipefail
+  TS=$(date -u +%Y%m%dT%H%M%SZ); S=/root/preview-archive/restore-$TS
+  [ ! -e "$S" ] || { echo "RESTORE_NOT_DONE: $S exists (look first); nothing changed"; exit 1; }
+  install -d -o root -g root -m 0700 "$S"
+  psqlq() { runuser -u postgres -- /usr/lib/postgresql/18/bin/psql -h /run/debateai-v3-preview/postgresql -p 5434 -d debateai -XAt -c "$1"; }
+  psqlq "UPDATE identity.session SET revoked_at = GREATEST(clock_timestamp(), created_at) WHERE revoked_at IS NULL" >/dev/null && psqlq "UPDATE staff.privilege_session SET revoked_at = GREATEST(clock_timestamp(), created_at) WHERE revoked_at IS NULL" >/dev/null || { echo "RESTORE_NOT_DONE: the restored sessions were not revoked; the database is up, the app services are stopped"; exit 1; }
+  FENCE=/var/lib/debateai-v3-preview/api/restore-fence/fence; FH=$(psqlq "SELECT to_regclass('identity.restore_fence') IS NOT NULL") || { echo "RESTORE_NOT_DONE: the restored database did not answer the fence question; the sessions are revoked, the app services are stopped"; exit 1; }
+  if [ -d "${FENCE%/*}" ]; then case "$FH" in t) install -m 0600 -o "$(stat -c %U "${FENCE%/*}")" -g "$(stat -c %G "${FENCE%/*}")" /dev/null "$FENCE" || { echo "RESTORE_NOT_DONE: the restore fence was not marked; the app services are stopped"; exit 1; } ;; f) if [ -e "$FENCE" ]; then mv "$FENCE" "$S/restore-fence.before-$TS" || { echo "RESTORE_NOT_DONE: the restore fence did not move aside; the app services are stopped"; exit 1; }; fi ;; *) echo "RESTORE_NOT_DONE: the fence answer was '$FH'; the sessions are revoked, the app services are stopped"; exit 1 ;; esac; fi
+  echo "RESTORE_DONE (archive $S)" )
+```
 
 ## Cleanup checklist (after the tests above pass)
 

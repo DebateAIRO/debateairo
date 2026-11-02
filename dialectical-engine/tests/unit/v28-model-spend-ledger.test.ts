@@ -4,6 +4,7 @@ import {
   CostEnvelopeGuard,
   PostgresModelSpendStore,
   costEnvelopeDay,
+  projectedCallCeilingMicros,
   languageCheckChargeMicros,
   languageCheckSpendWriterPresent,
   costEnvelopeGuardPolicy,
@@ -70,11 +71,12 @@ function fakeStore(seed: readonly ModelSpendEntry[] = []) {
   const spentOn = (day: string) => rows
     .filter((row) => row.chargedOn === day)
     .reduce((total, row) => total + row.chargeMicros, 0);
+  // NV-50: the story's unanswered charges are the story's, as `readRunSpentMicros`/`readRunStorySpentMicros` read them.
   const spentByRun = (runId: string) => rows
-    .filter((row) => row.runId === runId && row.spendSource !== "STORY")
+    .filter((row) => row.runId === runId && row.spendSource !== "STORY" && row.spendSource !== "STORY_UNANSWERED")
     .reduce((total, row) => total + row.chargeMicros, 0);
   const storySpentByRun = (runId: string) => rows
-    .filter((row) => row.runId === runId && row.spendSource === "STORY")
+    .filter((row) => row.runId === runId && (row.spendSource === "STORY" || row.spendSource === "STORY_UNANSWERED"))
     .reduce((total, row) => total + row.chargeMicros, 0);
   const store: ModelSpendStore = {
     recordSpend: async (entry) => { rows.push(entry); },
@@ -236,6 +238,94 @@ describe("V-28 the per-run seam reads and writes the persisted spend", () => {
     await expect(seam.assertUsageReported({ providerRef: "provider-1", usage: null }))
       .resolves.toBeUndefined();
     expect(rows).toEqual([]);
+  });
+});
+
+/**
+ * NV-50 (security audit run 3) — AN ATTEMPT THE GATEWAY SENT AND NEVER GOT AN ANSWER FOR is charged by
+ * `recordUnanswered`, as its own source (`RUN_UNANSWERED`, `STORY_UNANSWERED`): its run's (or story's) envelope and the
+ * day count it, no person's window does, and it never settles an INTERNAL admission.
+ */
+describe("NV-50 the seam charges an unanswered attempt", () => {
+  const unanswered = (attemptId: string, usage: unknown = undefined) => ({
+    providerRef: "provider-1", usage, projection: PROJECTION, attemptId
+  });
+
+  it("writes one RUN_UNANSWERED row at the projection (no body) or the body's usage, with its attempt and no phase", async () => {
+    const { store, rows } = fakeStore();
+    const seam = guardWith(store).providerSeam({ runId: "run-1", price: PRICE, requireReportedUsage: true, phase: "BODY" });
+
+    await seam.recordUnanswered!(unanswered("a-1"));
+    await seam.recordUnanswered!(unanswered("a-2", { prompt_tokens: 10, completion_tokens: 5 }));
+
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({
+      spendSource: "RUN_UNANSWERED", runId: "run-1", providerRef: "provider-1", chargedOn: TODAY,
+      chargeMicros: projectedCallCeilingMicros(PRICE, PROJECTION), inputTokens: 400, outputTokens: 64, attemptId: "a-1"
+    });
+    expect(rows[1]).toMatchObject({ spendSource: "RUN_UNANSWERED", chargeMicros: 15, inputTokens: 10, outputTokens: 5, attemptId: "a-2" });
+    expect(rows.every((row) => row.spendPhase === undefined)).toBe(true);
+    expect(rows[0]!.spendId).not.toBe(rows[1]!.spendId);
+    expect(await store.readRunSpentMicros("run-1")).toBe(projectedCallCeilingMicros(PRICE, PROJECTION) + 15);
+    expect(await store.readDaySpentMicros(TODAY)).toBe(projectedCallCeilingMicros(PRICE, PROJECTION) + 15);
+  });
+
+  it("the next attempt's admission sees it: refused once spent plus its projection crosses the run's ceiling", async () => {
+    const projected = projectedCallCeilingMicros(PRICE, PROJECTION);
+    const { store } = fakeStore();
+    const seam = new CostEnvelopeGuard({
+      store, policy: { perRunCeilingMicros: 2 * projected - 1, dailyCeilingMicros: 1_000_000_000 },
+      clock: () => new Date("2026-09-22T11:00:00.000Z")
+    }).providerSeam({ runId: "run-1", price: PRICE, requireReportedUsage: true, phase: "BODY" });
+
+    await expect(seam.assertCallAllowed(PROJECTION)).resolves.toBeUndefined();
+    await seam.recordUnanswered!(unanswered("a-1"));
+    await expect(seam.assertCallAllowed(PROJECTION))
+      .rejects.toThrowError(expect.objectContaining({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" }));
+  });
+
+  it("a story's unanswered attempt is STORY_UNANSWERED: the story's envelope counts it, the debate's does not", async () => {
+    const { store, rows } = fakeStore();
+    const seam = new CostEnvelopeGuard({
+      store, policy: { perRunCeilingMicros: 250_000, dailyCeilingMicros: 2_000_000, perStoryCeilingMicros: 50_000 },
+      clock: () => new Date("2026-09-22T11:00:00.000Z")
+    }).storySeam({ runId: "run-1", price: PRICE, requireReportedUsage: true });
+
+    await seam.recordUnanswered!(unanswered("a-1"));
+
+    expect(rows.map((row) => row.spendSource)).toEqual(["STORY_UNANSWERED"]);
+    expect(await store.readRunStorySpentMicros("run-1")).toBe(projectedCallCeilingMicros(PRICE, PROJECTION));
+    expect(await store.readRunSpentMicros("run-1")).toBe(0);
+    expect(await store.readDaySpentMicros(TODAY)).toBe(projectedCallCeilingMicros(PRICE, PROJECTION));
+  });
+
+  it("refuses an attempt it cannot name, and writes nothing", async () => {
+    const { store, rows } = fakeStore();
+    const seam = guardWith(store).providerSeam({ runId: "run-1", price: PRICE, requireReportedUsage: true, phase: "BODY" });
+
+    const { attemptId: _none, ...withoutAttempt } = unanswered("a-1");
+    await expect(seam.recordUnanswered!(withoutAttempt as never)).rejects.toThrowError("MODEL_SPEND_ATTEMPT_REQUIRED");
+    expect(rows).toEqual([]);
+  });
+
+  it("never settles an INTERNAL admission: a fresh spend id, and settleInternalCall is not called", async () => {
+    const { store: base, rows } = fakeStore();
+    const settled: string[] = [];
+    const store: ModelSpendStore = {
+      ...base,
+      reserveInternalCall: async () => true,
+      settleInternalCall: async (callId) => { settled.push(callId); }
+    };
+    const seam = guardWith(store).providerSeam({ runId: "run-1", price: PRICE, requireReportedUsage: true, phase: "BODY" });
+
+    const admission = await seam.assertCallAllowed(PROJECTION);
+    expect(admission).toMatchObject({ kind: "INTERNAL" });
+    await seam.recordUnanswered!({ ...unanswered("a-1"), admission: admission! });
+
+    expect(settled).toEqual([]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ spendSource: "RUN_UNANSWERED", attemptId: "a-1" });
+    expect(rows[0]!.spendId).not.toBe((admission as { callId: string }).callId);
   });
 });
 

@@ -21,9 +21,11 @@ import { describe, expect, it } from "vitest";
 const PRODUCT_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const MAIN = "apps/api/src/main.ts";
 const PREVIEW_BUDGET = "apps/api/src/preview-budget-estimate.ts";
+const PUBLICATIONS = "apps/api/src/publications.ts";
 
 /** PLAN S4.5, verbatim as a map: reader id → the apps/api/src files where its sites are. */
 const EXPECTED_SITES: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  X10: [PUBLICATIONS],
   X11: [MAIN],
   X14: [MAIN],
   X18h: [MAIN],
@@ -36,10 +38,11 @@ const EXPECTED_SITES: Readonly<Record<string, readonly string[]>> = Object.freez
  * How many sites each id has (PLAN S4.3): X11 the NETOPIA intake's repository and jobs plus the billing runtime's pool;
  * X14 the three PostgresStaffRepository constructions; X18h the key store's owner lookup; X21 the gate's two reads; since
  * the merge onto synthesis-flag, X27 the staff threat report's recipient address reader and X28 the staff publication
- * review's repository and its two readers. The file-level map alone cannot see a site added under an id already mapped to
- * that file.
+ * review's repository and its two readers; since the merge with the security fixes of audit run 3, X10 the public read's
+ * run release key (readPublicDebate's #runReleaseKey: the author's run, read on the shared lease's connection, NV-31).
+ * The file-level map alone cannot see a site added under an id already mapped to that file.
  */
-const EXPECTED_SITE_COUNTS: Readonly<Record<string, number>> = Object.freeze({ X11: 3, X14: 3, X18h: 1, X21: 2, X27: 1, X28: 3 });
+const EXPECTED_SITE_COUNTS: Readonly<Record<string, number>> = Object.freeze({ X10: 1, X11: 3, X14: 3, X18h: 1, X21: 2, X27: 1, X28: 3 });
 
 /** PLAN S4.3: main.ts's three `setCrossAccountTarget(pool, target)` calls, in this order. */
 const EXPECTED_TARGETS = Object.freeze([
@@ -159,7 +162,7 @@ async function crossAccountSites(): Promise<Sites> {
 }
 
 describe("row-level security S01 C4: the apps/api cross-account sites and the T1 pools' targets", () => {
-  it("S4.5 every crossAccount(\"<id>\", …) and crossAccountPool(<pool>, \"<id>\") site in apps/api/src is exactly X11, X14, X18h, X27 and X28 in main.ts and X21 in preview-budget-estimate.ts, each id a literal, with 3, 3, 1, 1, 3 and 2 sites", async () => {
+  it("S4.5 every crossAccount(\"<id>\", …) and crossAccountPool(<pool>, \"<id>\") site in apps/api/src is exactly X11, X14, X18h, X27 and X28 in main.ts, X21 in preview-budget-estimate.ts and X10 in publications.ts, each id a literal, with 3, 3, 1, 1, 3, 2 and 1 sites", async () => {
     const { map, counts, unpinnable } = await crossAccountSites();
     expect(unpinnable).toEqual([]);
     expect(map).toEqual(EXPECTED_SITES);

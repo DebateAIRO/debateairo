@@ -35,7 +35,9 @@ export type QuestionLanguagePaidRoute =
   | Readonly<{ kind: "PREVIEW"; fetch: typeof fetch }>
   | Readonly<{ kind: "HOSTED"; credential: string; recordSpend: (usage: FastCheckUsage) => Promise<void>;
     /** Asked before each send: null = send; a skip code (breaker down, site pot full) = do not send (fix round 2). */
-    beforeSend: () => Promise<string | null> }>
+    beforeSend: () => Promise<string | null>;
+    /** NV-47: the person's count of paid checks; the decider asks it before each check (false = skipped, no call). */
+    ownerBudget?: (ownerScope: string) => boolean }>
   | Readonly<{ kind: "NONE"; reason: QuestionLanguageFastCheckOffReason }>;
 
 /** The message is the code (pre-flight PF-L13: a test's toThrow("…") reads the message); it carries no owner text. */
@@ -111,7 +113,23 @@ export function hostedLanguageCheckPrice(rowPrice: Readonly<{ input: number; out
  * (`spend_record_down`). The event and a code only, never question, reply or database text.
  */
 export type QuestionLanguageSpendReport = Readonly<{
-  event: "api.question_language.spend_unrecorded" | "api.question_language.spend_record_down"; code: string }>;
+  event: "api.question_language.spend_unrecorded" | "api.question_language.spend_record_down"
+    | "api.question_language.fast_check_skipped"; code: string }>;
+
+/**
+ * NV-47: the person's count of paid checks, as the admission limiter decides it (`AdmissionDecision` is assignable).
+ * CAPACITY (the owner table is full) is told apart from LIMIT (this owner's count is spent) in the skip line only.
+ */
+export type QuestionLanguageOwnerBudget = (ownerScope: string) => Readonly<{ allowed: true } | { allowed: false; reason: "LIMIT" | "CAPACITY" }>;
+
+/**
+ * NV-47: a skipped check is one code-only line, `api.question_language.fast_check_skipped`, at most once per code per
+ * this interval per hosted route (one route per loaded settings version). It never names the owner, the question or
+ * the scope. OWNER_BUDGET / OWNER_BUDGET_CAPACITY: the person's count is spent, or its table is full; DAY_POT: spend
+ * plus counted holds at or above the ceiling; DAY_POT_UNREADABLE: either read failed (treated as full).
+ */
+const FAST_CHECK_SKIP_LOG_INTERVAL_MS = 60_000;
+type FastCheckSkipLogCode = "OWNER_BUDGET" | "OWNER_BUDGET_CAPACITY" | "DAY_POT" | "DAY_POT_UNREADABLE";
 /**
  * The breaker (Task 19 fix round 2, "never spend unrecorded"): a refusal every later record would meet too — no right
  * (42501), no function (42883), a CHECK or the writer's own refusal (23514) — latches at once; any other failure after
@@ -141,6 +159,9 @@ function spendFailureCode(error: unknown): string {
  * happened (the support chat's rule for unreported cost). It counts in the provider's daily site pot, never a person's.
  * Fix round 2: `beforeSend` keeps the check from being sent when the spend record is down (the breaker above latched)
  * or today's site pot is at or above its day ceiling (ruling L-POT); either is the fallback lock, never a block.
+ * NV-47: ruling L-POT now counts the site's counted holds too, as the SITE_DAY room does (spend plus holds at or above
+ * the ceiling skips: the room's own FULL test), and `ownerBudget`, when given, is the person's count of paid checks,
+ * handed to the decider on the HOSTED route. Each kind of skip is one throttled code-only line through `report`.
  */
 export async function hostedQuestionLanguageRoute(input: Readonly<{
   mode: DeploymentMode;
@@ -150,8 +171,12 @@ export async function hostedQuestionLanguageRoute(input: Readonly<{
   /**
    * Ruling L-POT: today's site pot and the day ceiling the ask admission uses. At or above it, a check is skipped (no
    * call, no spend; the fallback lock). Hosted without it refuses the boot (QUESTION_LANGUAGE_DAY_POT_UNAVAILABLE).
+   * NV-47: `heldMicros`, the site's counted holds for the day (the room's reader), is added to the spend.
    */
-  dayPot: Readonly<{ ceilingMicros: number; spentMicros: (day: string) => Promise<number> }> | null;
+  dayPot: Readonly<{ ceilingMicros: number; spentMicros: (day: string) => Promise<number>;
+    heldMicros?: (day: string) => Promise<number> }> | null;
+  /** NV-47: the person's count of paid checks (the admission limiter's `languageChecks` decision). */
+  ownerBudget?: QuestionLanguageOwnerBudget;
   clock: () => Date;
   report: (line: QuestionLanguageSpendReport) => void;
   newSpendId?: () => string;
@@ -188,17 +213,44 @@ export async function hostedQuestionLanguageRoute(input: Readonly<{
       }
     }
   };
+  // NV-47: when each skip code was last reported (input.clock()), so each kind is at most one line per interval.
+  const skipReportedAt = new Map<FastCheckSkipLogCode, number>();
+  const skipped = (code: FastCheckSkipLogCode): void => {
+    const now = input.clock().getTime();
+    const last = skipReportedAt.get(code);
+    if (last !== undefined && now - last < FAST_CHECK_SKIP_LOG_INTERVAL_MS) return;
+    skipReportedAt.set(code, now);
+    input.report(Object.freeze({ event: "api.question_language.fast_check_skipped", code }));
+  };
+  const heldMicros = dayPot.heldMicros;
   const beforeSend = async (): Promise<string | null> => {
     if (recordDown) return QUESTION_LANGUAGE_FAST_CHECK_SKIP_CODES.spendRecordDown;
     try {
-      const spent = await dayPot.spentMicros(costEnvelopeDay(input.clock()));
-      return Number.isFinite(spent) && spent < dayPot.ceilingMicros ? null : QUESTION_LANGUAGE_FAST_CHECK_SKIP_CODES.dayPot;
+      // NV-47: the SITE_DAY room's own measure for the same day (spend plus counted holds) and its FULL test. Both reads
+      // start inside this try, so a reader that throws, even synchronously, is a full pot.
+      const day = costEnvelopeDay(input.clock());
+      const [spent, held] = await Promise.all([dayPot.spentMicros(day), heldMicros === undefined ? 0 : heldMicros(day)]);
+      if (!Number.isFinite(spent) || !Number.isFinite(held)) {
+        skipped("DAY_POT_UNREADABLE");
+        return QUESTION_LANGUAGE_FAST_CHECK_SKIP_CODES.dayPot;
+      }
+      if (spent + held < dayPot.ceilingMicros) return null;
+      skipped("DAY_POT");
+      return QUESTION_LANGUAGE_FAST_CHECK_SKIP_CODES.dayPot;
     } catch {
       // A pot that cannot be read is treated as full: never spend past what cannot be checked.
+      skipped("DAY_POT_UNREADABLE");
       return QUESTION_LANGUAGE_FAST_CHECK_SKIP_CODES.dayPot;
     }
   };
-  return Object.freeze({ kind: "HOSTED", credential, recordSpend, beforeSend });
+  const ownerBudget = input.ownerBudget;
+  return Object.freeze({ kind: "HOSTED", credential, recordSpend, beforeSend,
+    ...(ownerBudget === undefined ? {} : { ownerBudget: (ownerScope: string): boolean => {
+      const decision = ownerBudget(ownerScope);
+      if (decision.allowed) return true;
+      skipped(decision.reason === "CAPACITY" ? "OWNER_BUDGET_CAPACITY" : "OWNER_BUDGET");
+      return false;
+    } }) });
 }
 
 /**
@@ -219,6 +271,10 @@ export async function questionLanguageSiteRoute(input: Readonly<{
   readCredential: () => string | undefined;
   spend: Readonly<{ writerPresent: () => Promise<boolean>; record: (entry: LanguageCheckSpendEntry) => Promise<void> }>;
   daySpentMicros: (day: string) => Promise<number>;
+  /** NV-47: the site's counted holds for the day, the SITE_DAY room's own reader. */
+  siteHeldMicros: (day: string) => Promise<number>;
+  /** NV-47: the person's count of paid checks (main.ts: the process's one limiter, scope `languageChecks`). */
+  ownerBudget: QuestionLanguageOwnerBudget;
   report: (line: QuestionLanguageSpendReport) => void;
 }>): Promise<QuestionLanguagePaidRoute> {
   const { previewGate, previewFetch, policy, dayCeilingMicros } = input;
@@ -227,8 +283,11 @@ export async function questionLanguageSiteRoute(input: Readonly<{
     fastCheck: (policy ?? questionLanguagePolicyStartValues()).fastCheck,
     readCredential: input.readCredential,
     spend: input.spend,
-    // Ruling L-POT: the day ceiling the ask admission uses (costEnvelopeGuardPolicy), against the day's whole site pot.
-    dayPot: dayCeilingMicros === null ? null : { ceilingMicros: dayCeilingMicros, spentMicros: input.daySpentMicros },
+    // Ruling L-POT: the day ceiling the ask admission uses (costEnvelopeGuardPolicy), against the day's whole site pot
+    // plus its counted holds (NV-47: the SITE_DAY room's own measure).
+    dayPot: dayCeilingMicros === null ? null
+      : { ceilingMicros: dayCeilingMicros, spentMicros: input.daySpentMicros, heldMicros: input.siteHeldMicros },
+    ownerBudget: input.ownerBudget,
     clock: () => new Date(),
     report: input.report
   });
@@ -272,5 +331,7 @@ export async function composeQuestionLanguage(input: Readonly<{ policy: Question
   const eld = await loadEldReader(ELD_TUNING.database);
   return new QuestionLanguageDecider({ eld, fastCheck, key: input.referenceKey, clock: input.clock, maxQuestionBytes: input.maxQuestionBytes,
     ...(fastCheckOffReason === undefined ? {} : { fastCheckOffReason }),
+    // NV-47: the hosted route's per-person count of paid checks (the preview has none).
+    ...(route.kind === "HOSTED" && route.ownerBudget !== undefined ? { fastCheckBudget: route.ownerBudget } : {}),
     ...(input.onDecided === undefined ? {} : { onDecided: input.onDecided }) });
 }

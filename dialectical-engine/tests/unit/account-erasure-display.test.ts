@@ -55,7 +55,7 @@ describe("account erasure notices (email-locale C11)", () => {
       async claimNotifications() { return claims; },
       async withNotificationLease<T>(_userId: string, use: () => Promise<T>): Promise<T> { return use(); },
       async acknowledgeNotification() { return true; },
-      async failNotification() { return true; }
+      async failNotification() { return "FAILED" as const; }
     } as unknown as PostgresAccountErasureRepository;
     const sent: SecurityNotificationMail[] = [];
     const reconciler = new AccountErasureNotificationReconciler(repository, users, {

@@ -71,7 +71,9 @@ export const LAYOUT = Object.freeze({
 /**
  * Side-by-side spec §10, Phase 3 (plan D16b): the public server's layout, for deploy/vps/release.mjs. The same release
  * tools as the preview, with this server's units (`debateai-<service>@<label>`), PostgreSQL socket and port, slots,
- * edge listener and Caddy's copy of the edge secret (deploy/vps/Caddyfile). A release's key and slot come from its own
+ * edge listener and Caddy's copy of the edge secret (deploy/vps/Caddyfile). Its slots are below 1024 (website 481/482,
+ * API 491/492, NV-55): only root or a holder of CAP_NET_BIND_SERVICE may bind them, and of this kit's units only the
+ * website and API units hold it, each for its own two ports. A release's key and slot come from its own
  * overlay, /etc/debateai/releases/<label>/api.env (RELEASE_KEY, API_PORT: release-info.mjs); its code is
  * /opt/debateai/releases/<label>. No spending gates and no notice unit on this server. The switch enables the new
  * release's three instances and disables the old API and website; the old runner stays enabled until its stop
@@ -94,7 +96,7 @@ export const VPS_LAYOUT = Object.freeze({
   gates: Object.freeze([]),
   edge: 'http://127.0.0.1:3090',
   edgeSecretPath: '/etc/debateai/ui-edge.caddy.secret',
-  slots: Object.freeze({ A: Object.freeze({ uiPort: '3001', apiPort: '8790' }), B: Object.freeze({ uiPort: '3002', apiPort: '8791' }) }),
+  slots: Object.freeze({ A: Object.freeze({ uiPort: '481', apiPort: '491' }), B: Object.freeze({ uiPort: '482', apiPort: '492' }) }),
   retiredLines: Object.freeze(['DEBATEAI_RUNNER_RETIRED']),
   startedLines: Object.freeze({ runner: 'DEBATEAI_RUNNER_READY', api: 'DEBATEAI_API_READY' }),
   hatchetUnits: Object.freeze(['debateai-hatchet.service']),

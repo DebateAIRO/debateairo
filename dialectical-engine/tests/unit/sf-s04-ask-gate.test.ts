@@ -35,13 +35,15 @@ function harness(input: { consent?: "given" | "required"; preview?: boolean; rat
     ? { allowed: false, reason: "ASKS_EXHAUSTED", retryAfterMs: 60_000, windowMs: 60_000 }
     : { allowed: true } } as unknown as AdmissionLimiter;
   const countryGate = { recordedCountry: () => null, ask: () => input.country ? "COUNTRY_ASK_BLOCKED" : null } as unknown as CountryGate;
-  const api = buildApi({ application, sessions, admission, countryGate, allowedOrigin: TEST_APP_ORIGIN,
+  // NV-03: the edge country is honoured only from the proven UI, so the harness stands in for it.
+  const proof = "k".repeat(43);
+  const api = buildApi({ application, sessions, admission, countryGate, allowedOrigin: TEST_APP_ORIGIN, uiApiProof: Buffer.from(proof),
     ...(input.preview ? { previewProviderTestConfig: PREVIEW, previewTeamUserIds: [] } : {}),
     ...(input.check === false ? {} : { questionCheck: Object.assign({ check }, { keep }) })
   });
   const ask = (questionLine: string = ASK.question_line, countryHeader?: string) => api.inject({
     method: "POST", url: "/v1/asks", headers: { ...testSessionHeaders(identity, true),
-      ...(countryHeader === undefined ? {} : { "cf-ipcountry": countryHeader }) },
+      ...(countryHeader === undefined ? {} : { "cf-ipcountry": countryHeader, "x-debateai-ui-proof": proof }) },
     payload: { ...ASK, question_line: questionLine }
   });
   return { api, ask, check, keep, submitted, identity };

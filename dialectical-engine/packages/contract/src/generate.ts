@@ -60,6 +60,7 @@ const staffEndpointContracts: Record<string, Record<string, unknown>> = {
   "POST /v1/auth/recovery/start": request(reference("RecoveryStartRequestSchema")),
   "POST /v1/auth/register": { ...request(reference("RegisterRequestSchema")), ...response(reference("RegistrationVerificationAckSchema"), "202") },
   "POST /v1/auth/resend-verification": { ...request(reference("ResendVerificationRequestSchema")), ...response(reference("ResendVerificationAckSchema"), "202") },
+  "POST /v1/auth/verify-email/password": { ...request(reference("VerifyEmailRequestSchema")) },
   "GET /v1/account/profile": response(reference("AccountPhoneProfileSchema")),
   "POST /v1/account/profile/reveal": { ...request(reference("PhoneProfileRevealRequestSchema")), ...response(reference("PhoneProfileRevealSchema")) },
   "POST /v1/account/profile": { ...request(reference("PhoneProfileUpdateRequestSchema")), ...response(reference("AccountPhoneProfileSchema")) },

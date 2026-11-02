@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { setFlagsFromString } from "node:v8";
 import { runInNewContext } from "node:vm";
 import { readFile } from "node:fs/promises";
@@ -19,6 +19,8 @@ import {
   AUTH_POLICY_REGISTER_ROWS,
   authPolicyFromRegisterRows
 } from "../../packages/register/src/auth-policy.js";
+import { PostgresEmailChangeRepository } from "../../packages/db/src/email-change.js";
+import { PostgresSessionRepository } from "../../packages/db/src/sessions.js";
 
 const auditKdf = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS).auditSourceIpKdf;
 const SALT = Buffer.alloc(32, 0x6e);
@@ -2620,5 +2622,275 @@ describe("CI-1b — the salt binding is unpadded base64, stripped without backtr
     // `/=+$/` or `/=*$/`: a backtracking engine restarts at every "=" of a run
     // it cannot end — exactly the shape CodeQL reports.
     expect(source.slice(start, end)).not.toMatch(/\/[^/\n]*[+*]\$\/[a-z]*/u);
+  });
+});
+
+/**
+ * K09 NV-42: public link routes (email-change, recovery-email, password-reset
+ * and MFA-recovery links) derive audit digests before any per-source gate, so
+ * one client could hold the ordinary 96-job audit lane full and make login step
+ * 1 return 503 for everyone. Login success steps now submit `priority: "login"`
+ * audit jobs into a 32-job reserve OUTSIDE the 32/96/128 partition, queued ahead
+ * of every ordinary audit job. Ordinary admission is unchanged.
+ */
+describe("K09 NV-42 — reserved login audit capacity", () => {
+  const AUDIT_KDF = { memoryCostKiB: 19_456, iterations: 2, parallelism: 1, hashLength: 32 };
+
+  /** The real shipped bounds, with only the worker construction faked. */
+  function productionPool(): { pool: Argon2WorkerPool; workers: FakeWorker[] } {
+    const workers: FakeWorker[] = [];
+    const pool = new Argon2WorkerPool({
+      closeDrainMs: 50,
+      spawn: (index) => {
+        const worker = createFakeWorker(index, true);
+        workers.push(worker);
+        return worker;
+      }
+    });
+    return { pool, workers };
+  }
+
+  function ordinaryAudit(pool: Argon2WorkerPool, count: number): Promise<string>[] {
+    return Array.from({ length: count }, () => {
+      const promise = pool.hashAuditContext(bytes(8), bytes(32), AUDIT_KDF);
+      promise.catch(() => undefined);
+      return promise;
+    });
+  }
+
+  function loginAudit(pool: Argon2WorkerPool, count: number): Promise<string>[] {
+    return Array.from({ length: count }, () => {
+      const promise = pool.hashAuditContext(bytes(8), bytes(32), AUDIT_KDF, "login");
+      promise.catch(() => undefined);
+      return promise;
+    });
+  }
+
+  it("admits a login audit job beyond a saturated ordinary audit lane and a full ordinary total", async () => {
+    const bounds = ARGON2_PROVISIONAL_BOUNDS;
+    const { pool } = productionPool();
+    await pool.ready();
+    const ordinary = ordinaryAudit(pool, bounds.auditLaneCap);
+    const credential = Array.from({ length: bounds.credentialLaneCap }, () => {
+      const promise = pool.verifyPassword(bytes(8), ENCODED_HASH);
+      promise.catch(() => undefined);
+      return promise;
+    });
+    await flush();
+    expect(pool.stats().outstandingTotal).toBe(bounds.totalCap);
+    // Today's ordinary refusals are unchanged.
+    await expect(pool.hashAuditContext(bytes(8), bytes(32), AUDIT_KDF))
+      .rejects.toMatchObject({ code: "ARGON2_POOL_CAPACITY_EXHAUSTED" });
+    await expect(pool.verifyPassword(bytes(8), ENCODED_HASH))
+      .rejects.toMatchObject({ code: "ARGON2_POOL_CAPACITY_EXHAUSTED" });
+
+    const [login] = loginAudit(pool, 1);
+    expect(await settled(login!)).toBe("pending");
+    expect(pool.stats().outstandingAuditReserved).toBe(1);
+    expect(pool.stats().outstandingAudit).toBe(bounds.auditLaneCap + 1);
+
+    await pool.close();
+    await Promise.allSettled([...ordinary, ...credential, login!]);
+  });
+
+  it("bounds the reserve at 32 and then falls back to ordinary room", async () => {
+    expect(ARGON2_PROVISIONAL_BOUNDS.auditReservedCap).toBe(32);
+    const saturated = productionPool();
+    await saturated.pool.ready();
+    const ordinary = ordinaryAudit(saturated.pool, ARGON2_PROVISIONAL_BOUNDS.auditLaneCap);
+    const reserved = loginAudit(saturated.pool, 32);
+    await flush();
+    expect(await Promise.all(reserved.map((promise) => settled(promise))))
+      .toEqual(Array.from({ length: 32 }, () => "pending"));
+    // Reserve full AND no ordinary room: the 33rd login job is refused.
+    await expect(saturated.pool.hashAuditContext(bytes(8), bytes(32), AUDIT_KDF, "login"))
+      .rejects.toMatchObject({ code: "ARGON2_POOL_CAPACITY_EXHAUSTED" });
+    await saturated.pool.close();
+    await Promise.allSettled([...ordinary, ...reserved]);
+
+    // With ordinary room, the 33rd login job falls back to it.
+    const fresh = productionPool();
+    await fresh.pool.ready();
+    const logins = loginAudit(fresh.pool, 33);
+    await flush();
+    expect(await Promise.all(logins.map((promise) => settled(promise))))
+      .toEqual(Array.from({ length: 33 }, () => "pending"));
+    expect(fresh.pool.stats().outstandingAuditReserved).toBe(32);
+    expect(fresh.pool.stats().outstandingAudit).toBe(33);
+    // Two reserved jobs are on the two workers; 30 reserved + 1 fallback wait.
+    expect(fresh.pool.stats().queuedAuditReserved).toBe(30);
+    expect(fresh.pool.stats().queuedAudit).toBe(31);
+    await fresh.pool.close();
+    await Promise.allSettled(logins);
+  });
+
+  it("dispatches a queued login audit job before every queued ordinary audit job", async () => {
+    const { pool, workers } = makePool({ workers: 1 });
+    await pool.ready();
+    const ordinary = ordinaryAudit(pool, 6);
+    const [login] = loginAudit(pool, 1);
+    await flush();
+    expect(pool.stats().active).toBe(1);
+    expect(pool.stats().queuedAudit).toBe(6);
+
+    workers[0]!.settle(workers[0]!.received[0]!.id);
+    await flush();
+    const next = workers[0]!.received[1];
+    expect(next).toBeDefined();
+    workers[0]!.settle(next!.id);
+    await flush();
+    expect(await settled(login!)).toBe("resolved");
+    const states = await Promise.all(ordinary.map((promise) => settled(promise)));
+    expect(states.filter((state) => state === "pending").length).toBeGreaterThanOrEqual(4);
+
+    await pool.close();
+    await Promise.allSettled([...ordinary, login!]);
+  });
+
+  it("the hasher forwards the login priority, and a login caller never joins an ordinary in-flight IP derivation", async () => {
+    const calls: { argCount: number; priority: unknown; release: () => void }[] = [];
+    const executor: Argon2Executor = {
+      async hashPassword() { throw new Error("unused"); },
+      async verifyPassword() { throw new Error("unused"); },
+      async hashAuditContext(...args: unknown[]): Promise<string> {
+        const decoded = new TextDecoder().decode(args[0] as Uint8Array);
+        let release: () => void = () => undefined;
+        const gate = new Promise<void>((resolve) => { release = resolve; });
+        calls.push({ argCount: args.length, priority: args[3], release });
+        await gate;
+        // Deterministic per (domain+value), so equality proves identity.
+        return Buffer.from(decoded).toString("hex").padEnd(64, "0").slice(0, 64);
+      }
+    };
+    const hasher = new AuditContextHasher(executor, SALT, auditKdf);
+
+    const ordinary = hasher.hashSourceIp("203.0.113.9");
+    const login = hasher.hashSourceIp("203.0.113.9", "login");
+    await flush(1);
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).toMatchObject({ argCount: 3 });
+    expect(calls[1]).toMatchObject({ argCount: 4, priority: "login" });
+
+    // The login job bypassed the ordinary entry rather than replacing it: once
+    // the ordinary derivation settles, ITS digest is the cached one, while the
+    // login job is still in flight.
+    calls[0]!.release();
+    const ordinaryDigest = await ordinary;
+    const third = hasher.hashSourceIp("203.0.113.9");
+    expect(await settled(third)).toBe("resolved");
+    expect(await settled(login)).toBe("pending");
+    expect(calls).toHaveLength(2);
+
+    const loginUserAgent = hasher.hashUserAgent("ua", "login");
+    const ordinaryUserAgent = hasher.hashUserAgent("ua");
+    await flush(1);
+    expect(calls).toHaveLength(4);
+    expect(calls[2]).toMatchObject({ argCount: 4, priority: "login" });
+    expect(calls[3]).toMatchObject({ argCount: 3 });
+
+    for (const call of calls) call.release();
+    expect(await login).toBe(ordinaryDigest);
+    expect(await third).toBe(ordinaryDigest);
+    expect(await loginUserAgent).toBe(await ordinaryUserAgent);
+    expect(hasher.cacheSize()).toBe(1);
+    hasher.close();
+  });
+
+  it("a flood of public email-change confirms cannot refuse login step 1", async () => {
+    // Each job's value, read BEFORE the transfer detaches it, so a settled job
+    // can be attributed to the login or to the flood.
+    const valueById = new Map<string, string>();
+    const workers: FakeWorker[] = [];
+    const pool = new Argon2WorkerPool({
+      closeDrainMs: 50,
+      spawn: (index) => {
+        const worker = createFakeWorker(index, true);
+        const post = worker.postMessage.bind(worker);
+        worker.postMessage = (message: unknown, transfer?: readonly ArrayBuffer[]) => {
+          const request = message as { id: string; value?: Uint8Array };
+          if (request.value !== undefined) {
+            valueById.set(request.id, new TextDecoder().decode(request.value));
+          }
+          post(message, transfer);
+        };
+        workers.push(worker);
+        return worker;
+      }
+    });
+    await pool.ready();
+    const hasher = new AuditContextHasher(pool, SALT, auditKdf);
+    const stub = {
+      connect: async () => ({
+        query: async () => ({ rows: [{ outcome: "INVALID", valid: true }] }),
+        release() {}
+      }),
+      query: async () => ({ rows: [] })
+    };
+    const emailChange = new PostgresEmailChangeRepository(stub as never, hasher);
+    const sessions = new PostgresSessionRepository(stub as never, hasher);
+
+    // The flood: 150 anonymous confirms from one address, all at once.
+    const burst = Promise.allSettled(Array.from({ length: 150 }, (_unused, i) => emailChange.confirm({
+      confirmTokenHash: `sha256:${"a".repeat(64)}`,
+      source: { ip: "192.0.2.10", userAgent: `ua-${i}`, requestId: `r${i}` }
+    })));
+    await flush();
+    const settledIds = new Set<string>();
+    const ipJob = workers[0]!.received[0]!;
+    settledIds.add(ipJob.id);
+    workers[0]!.settle(ipJob.id);
+    await flush();
+    const afterBurst = pool.stats();
+    expect(afterBurst.outstandingAudit).toBe(96);
+    await expect(hasher.hashUserAgent("fresh"))
+      .rejects.toMatchObject({ code: "ARGON2_POOL_CAPACITY_EXHAUSTED" });
+
+    const login = sessions.createLoginChallenge({
+      identity: { userId: randomUUID(), ownerRef: "o", passwordHash: "x", factorId: randomUUID() } as never,
+      challengeId: randomUUID(),
+      challengeTokenHash: `sha256:${"0".repeat(64)}`,
+      bindingHash: `sha256:${"1".repeat(64)}`,
+      occurredAt: new Date(),
+      expiresAt: new Date(Date.now() + 60_000),
+      source: { ip: "198.51.100.7", userAgent: "login-ua", requestId: "login" }
+    });
+    login.catch(() => undefined);
+    const isLoginJob = (id: string): boolean => {
+      const value = valueById.get(id) ?? "";
+      return value.includes("198.51.100.7") || value.includes("login-ua");
+    };
+    let loginSettled = 0;
+    let ordinarySettled = 0;
+    for (let round = 0; round < 8 && (await settled(login)) === "pending"; round += 1) {
+      for (const worker of workers) {
+        const current = worker.received[worker.received.length - 1];
+        if (current === undefined || settledIds.has(current.id)) continue;
+        settledIds.add(current.id);
+        if (isLoginJob(current.id)) loginSettled += 1;
+        else ordinarySettled += 1;
+        worker.settle(current.id);
+      }
+      await flush();
+    }
+    const outstandingAtLogin = pool.stats().outstandingAudit;
+
+    await expect(login).resolves.toBe(true);
+    expect(loginSettled).toBe(2);
+    // The login did not wait for the flood to drain.
+    expect(ordinarySettled).toBeLessThanOrEqual(8);
+    expect(outstandingAtLogin).toBeGreaterThanOrEqual(88);
+    // The flood itself never touched the reserve.
+    expect(afterBurst.outstandingAuditReserved).toBe(0);
+
+    await pool.close();
+    const outcomes = await burst;
+    hasher.close();
+    for (const outcome of outcomes) {
+      if (outcome.status === "fulfilled") expect(outcome.value).toBe("INVALID");
+      else {
+        expect(["ARGON2_POOL_CAPACITY_EXHAUSTED", "ARGON2_POOL_UNAVAILABLE"])
+          .toContain((outcome.reason as { code?: string }).code);
+      }
+    }
   });
 });

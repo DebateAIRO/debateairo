@@ -1104,3 +1104,278 @@ describe('exact elapsed consumer lifetimes across DST',()=>{
     } finally {await client.query('RESET TimeZone');client.release();}
   });
 });
+
+// NV-04 (security audit run 3): every login-completion TOTP attempt is charged to its (account, factor) row before
+// the code is checked, five per round; a round closes at the next attempt with a cooldown of 300 s doubling to a
+// 24 h cap, anchored at the round's last failure; a TOTP success clears only the round's count, and the escalation
+// level falls one step per full 24 h with no failure. Elapsed time is simulated by moving the row's times back.
+describe("NV-04 login TOTP attempts per factor (identity.totp_login_admit, migrations/0131 [NV-04])", () => {
+  const LIMITS = [5, 300_000, 86_400_000] as const;
+  async function admit(userId: string, factorId: string, limits: readonly [number, number, number] = LIMITS) {
+    const client = await database.pool.connect();
+    try {
+      await client.query("SET ROLE debateai_authorization_runtime");
+      const rows = (await client.query<{ admitted: boolean; retry_after_ms: string }>(
+        "SELECT admitted,retry_after_ms::text AS retry_after_ms FROM identity.totp_login_admit($1,$2,$3,$4,$5)",
+        [userId, factorId, ...limits])).rows;
+      expect(rows).toHaveLength(1);
+      return Object.freeze({ admitted: rows[0]!.admitted, retry: Number(rows[0]!.retry_after_ms) });
+    } finally { await client.query("RESET ROLE").catch(() => undefined); client.release(); }
+  }
+  async function clear(userId: string, factorId: string): Promise<void> {
+    const client = await database.pool.connect();
+    try {
+      await client.query("SET ROLE debateai_authorization_runtime");
+      await client.query("SELECT identity.totp_login_clear($1,$2)", [userId, factorId]);
+    } finally { await client.query("RESET ROLE").catch(() => undefined); client.release(); }
+  }
+  /** Superuser only: the row's clock moves back by `interval`, as if that much time had passed. */
+  async function age(userId: string, factorId: string, interval: string): Promise<void> {
+    await database.pool.query(`
+      UPDATE identity.totp_login_lockout SET level_at=level_at-$3::interval,last_charged_at=last_charged_at-$3::interval,
+        last_failure_at=last_failure_at-$3::interval,locked_until=locked_until-$3::interval
+      WHERE user_id=$1 AND factor_id=$2`, [userId, factorId, interval]);
+  }
+  async function lockoutRow(userId: string, factorId: string) {
+    return (await database.pool.query<{ level: number; attempts: number; last_failure_at: Date | null; locked_until: Date | null }>(
+      "SELECT level,attempts,last_failure_at,locked_until FROM identity.totp_login_lockout WHERE user_id=$1 AND factor_id=$2",
+      [userId, factorId])).rows[0];
+  }
+  /** Five admitted attempts, then the sixth: refused, closing the round. Returns its retry_after_ms. */
+  async function round(userId: string, factorId: string): Promise<number> {
+    for (let attempt = 0; attempt < 5; attempt += 1) expect((await admit(userId, factorId)).admitted, `attempt ${attempt + 1}`).toBe(true);
+    const sixth = await admit(userId, factorId);
+    expect(sixth.admitted).toBe(false);
+    return sixth.retry;
+  }
+
+  it("admits five per round, refuses the sixth with a cooldown anchored at the round's last failure, and refuses nothing once it has run out", async () => {
+    const user = await fixtureUser("nv04-round");
+    const retry = await round(user.userId, user.factorId);
+    expect(retry).toBeGreaterThan(0);
+    expect(retry).toBeLessThanOrEqual(300_000);
+    expect(await lockoutRow(user.userId, user.factorId)).toMatchObject({ level: 1, attempts: 0 });
+    // While it runs, every attempt is refused and nothing changes.
+    const during = await admit(user.userId, user.factorId);
+    expect(during.admitted).toBe(false);
+    expect(during.retry).toBeLessThanOrEqual(retry);
+    expect(await lockoutRow(user.userId, user.factorId)).toMatchObject({ level: 1, attempts: 0 });
+
+    // A second factor: five attempts, then the next one arrives after the cooldown it would have had.
+    const secondFactor = randomUUID();
+    for (let attempt = 0; attempt < 5; attempt += 1) expect((await admit(user.userId, secondFactor)).admitted).toBe(true);
+    await age(user.userId, secondFactor, "10 minutes");
+    expect((await admit(user.userId, secondFactor)).admitted).toBe(true);
+    expect(await lockoutRow(user.userId, secondFactor)).toMatchObject({ level: 1, attempts: 1, locked_until: null });
+  });
+
+  it("keeps the level across a TOTP success, so the next round's cooldown doubles", async () => {
+    const user = await fixtureUser("nv04-success-keeps-level");
+    expect(await round(user.userId, user.factorId)).toBeLessThanOrEqual(300_000);
+    await age(user.userId, user.factorId, "10 minutes");
+    expect((await admit(user.userId, user.factorId)).admitted).toBe(true);
+    const before = await lockoutRow(user.userId, user.factorId);
+    await clear(user.userId, user.factorId);
+    const after = await lockoutRow(user.userId, user.factorId);
+    expect(after).toMatchObject({ level: 1, attempts: 0 });
+    expect(after!.last_failure_at).toEqual(before!.last_failure_at);
+    const retry = await round(user.userId, user.factorId);
+    expect(retry).toBeGreaterThan(300_000);
+    expect(retry).toBeLessThanOrEqual(600_000);
+  });
+
+  it("lowers the level one step per full quiet day", async () => {
+    const user = await fixtureUser("nv04-decay");
+    await round(user.userId, user.factorId);
+    await age(user.userId, user.factorId, "10 minutes");
+    expect(await round(user.userId, user.factorId)).toBeGreaterThan(300_000);
+    // 25 h of quiet: 2 -> 1, and the new round raises it to 2 again.
+    await age(user.userId, user.factorId, "25 hours");
+    const oneDay = await round(user.userId, user.factorId);
+    expect(oneDay).toBeGreaterThan(300_000);
+    expect(oneDay).toBeLessThanOrEqual(600_000);
+    // 49 h of quiet: 2 -> 0, and the new round raises it to 1.
+    await age(user.userId, user.factorId, "49 hours");
+    const twoDays = await round(user.userId, user.factorId);
+    expect(twoDays).toBeGreaterThan(0);
+    expect(twoDays).toBeLessThanOrEqual(300_000);
+  });
+
+  it("never counts a success's own charge as a failure for the decay", async () => {
+    const user = await fixtureUser("nv04-success-not-failure");
+    await round(user.userId, user.factorId);
+    await age(user.userId, user.factorId, "23 hours");
+    expect((await admit(user.userId, user.factorId)).admitted).toBe(true);
+    await clear(user.userId, user.factorId);
+    await age(user.userId, user.factorId, "2 hours");
+    // 25 h since the last failure: level 1 decays to 0, so the round ends at level 1 (300 s), not 2 (600 s).
+    const retry = await round(user.userId, user.factorId);
+    expect(retry).toBeGreaterThan(0);
+    expect(retry).toBeLessThanOrEqual(300_000);
+  });
+
+  it("caps the cooldown at 24 hours, and a clear never lifts a live cooldown or lowers the level", async () => {
+    // Review r3 M2: a fresh factor, so no earlier case's cooldown is still running on it.
+    const user = await fixtureUser("nv04-cap");
+    await database.pool.query(
+      "INSERT INTO identity.totp_login_lockout(user_id,factor_id,level,level_at,attempts) VALUES($1,$2,9,now(),0)",
+      [user.userId, user.factorId]);
+    const retry = await round(user.userId, user.factorId);
+    expect(retry).toBeGreaterThan(86_000_000);
+    expect(retry).toBeLessThanOrEqual(86_400_000);
+    const locked = await lockoutRow(user.userId, user.factorId);
+    expect(locked).toMatchObject({ level: 10, attempts: 0 });
+    await clear(user.userId, user.factorId);
+    expect(await lockoutRow(user.userId, user.factorId)).toEqual(locked);
+    expect((await admit(user.userId, user.factorId)).admitted).toBe(false);
+  });
+
+  it("refuses parameters outside the fixed bounds with 22023 before touching the table", async () => {
+    const user = await fixtureUser("nv04-bounds");
+    for (const limits of [[0, 300_000, 86_400_000], [5, 0, 86_400_000], [5, 300_000, 86_400_001], [11, 300_000, 86_400_000],
+      [5, 300_000, 299_999]] as const) {
+      await expect(admit(user.userId, user.factorId, limits), JSON.stringify(limits)).rejects.toMatchObject({ code: "22023" });
+    }
+    expect(await lockoutRow(user.userId, user.factorId)).toBeUndefined();
+  });
+
+  it("refuses with 23503 when the row is removed while the admit waits for it (review r3 M6, an erasure race)", async () => {
+    const user = await fixtureUser("nv04-row-gone");
+    expect((await admit(user.userId, user.factorId)).admitted).toBe(true);
+    const holder = await database.pool.connect();
+    try {
+      await holder.query("BEGIN");
+      await holder.query("SELECT 1 FROM identity.totp_login_lockout WHERE user_id=$1 AND factor_id=$2 FOR UPDATE",
+        [user.userId, user.factorId]);
+      const waiting = admit(user.userId, user.factorId);
+      waiting.catch(() => undefined);
+      // Its INSERT ... ON CONFLICT DO NOTHING met the live row (a lock-only holder does not make it wait); it now waits
+      // in the row lock. Only then is the row removed, so the admit wakes to find it gone.
+      for (let tries = 0; ; tries += 1) {
+        const blocked = await database.pool.query<{ n: string }>(
+          "SELECT count(*)::text AS n FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE '%identity.totp_login_admit(%'");
+        if (blocked.rows[0]!.n === "1") break;
+        if (tries > 200) throw new Error("NV04_ADMIT_NEVER_WAITED");
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+      await expectStillPending(waiting);
+      await holder.query("DELETE FROM identity.totp_login_lockout WHERE user_id=$1 AND factor_id=$2", [user.userId, user.factorId]);
+      await holder.query("COMMIT");
+      await expect(waiting).rejects.toMatchObject({ code: "23503" });
+    } finally {
+      await holder.query("ROLLBACK").catch(() => undefined);
+      holder.release();
+    }
+    expect(await lockoutRow(user.userId, user.factorId)).toBeUndefined();
+  });
+
+  it("grants EXECUTE to the authorization runtime only, keeps the table private to its owner and guards it against TRUNCATE", async () => {
+    const signatures = ["identity.totp_login_admit(uuid,uuid,integer,bigint,bigint)", "identity.totp_login_clear(uuid,uuid)"];
+    const roles = ["debateai_authorization_runtime", "public", "debateai_runtime", "debateai_billing_runtime",
+      "debateai_erasure_runtime", "debateai_mfa_recovery_runtime"];
+    const privileges = (await database.pool.query<{ role: string; signature: string; granted: boolean }>(`
+      SELECT r.role,s.signature,has_function_privilege(r.role,s.signature,'EXECUTE') AS granted
+      FROM unnest($1::text[]) AS r(role) CROSS JOIN unnest($2::text[]) AS s(signature) ORDER BY 1,2`, [roles, signatures])).rows;
+    expect(privileges.filter((row) => row.granted).map((row) => `${row.role}:${row.signature}`).sort())
+      .toEqual(signatures.map((signature) => `debateai_authorization_runtime:${signature}`).sort());
+    const definers = (await database.pool.query<{ secdef: boolean; config: string[] }>(
+      "SELECT prosecdef AS secdef,proconfig AS config FROM pg_proc WHERE oid=ANY($1::regprocedure[])", [signatures])).rows;
+    expect(definers).toEqual([
+      { secdef: true, config: ["search_path=pg_catalog, pg_temp"] },
+      { secdef: true, config: ["search_path=pg_catalog, pg_temp"] }
+    ]);
+    const table = (await database.pool.query<{ foreign_grantees: string; triggers: string[] }>(`
+      SELECT (SELECT count(*)::text FROM aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE a.grantee<>c.relowner) AS foreign_grantees,
+        ARRAY(SELECT t.tgname::text FROM pg_trigger t WHERE t.tgrelid=c.oid AND NOT t.tgisinternal ORDER BY 1) AS triggers
+      FROM pg_class c WHERE c.oid='identity.totp_login_lockout'::regclass`)).rows[0];
+    expect(table).toEqual({ foreign_grantees: "0", triggers: ["reject_truncate"] });
+  });
+
+  it("end to end: five wrong codes in one process, then a fresh process refuses the correct code until the cooldown has run out", async () => {
+    const databaseClock = await database.pool.query<{ epoch_ms: string }>(
+      `SELECT (extract(epoch FROM clock_timestamp())*1000)::bigint::text AS epoch_ms`
+    );
+    const now = new Date(Number(databaseClock.rows[0]!.epoch_ms));
+    const email = `nv04-login-${randomUUID()}@example.test`;
+    const password = "correct horse battery staple for NV-04";
+    const userId = randomUUID();
+    const factorId = randomUUID();
+    const blindIndexKey = Buffer.alloc(32, 0x53);
+    const bindingKey = Buffer.alloc(32, 0x54);
+    const dek = generateDek();
+    const secret = generateTotpSecret();
+    const argon2 = new Argon2WorkerPool({ workers: 1 });
+    await argon2.ready();
+    try {
+      const authPolicy = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS);
+      const passwordHash = await hashPassword(argon2, password, authPolicy.password.argon2id);
+      await database.pool.query(`
+        INSERT INTO identity."user" (
+          user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,
+          phone_ciphertext,password_hash,pseudonym,audit_token,owner_ref,state,adult_affirmed_at,created_at
+        ) VALUES ($1,$2,'{}'::jsonb,'{}'::jsonb,NULL,$3,$4,$5,$6,'active',$7,$7)
+      `, [userId, createEmailBlindIndex(blindIndexKey, email), passwordHash, "nv04-real-login", randomUUID(), randomUUID(), now]);
+      await database.pool.query(`
+        INSERT INTO identity.mfa_factor (
+          mfa_factor_id,user_id,factor_type,secret_ciphertext,credential_id,public_key,
+          state,created_at,verified_at,last_accepted_step
+        ) VALUES ($1,$2,'totp',$3::jsonb,NULL,NULL,'active',$4,$4,NULL)
+      `, [factorId, userId, JSON.stringify(encrypt(dek, secret, [
+        "identity", "mfa_factor.secret_ciphertext", factorId, "run:none", userId, `user-dek:${userId}`, "1"
+      ])), now]);
+      const repository = new PostgresSessionRepository(database.pool, fakeAuditHasher);
+      const dekStore: ReadableUserDekStore = {
+        store: async () => undefined,
+        destroy: async () => "ALREADY_ABSENT",
+        exists: async () => true,
+        load: async (requestedUserId) => {
+          if (requestedUserId !== userId) throw new Error("UNEXPECTED_USER_DEK_LOOKUP");
+          return Buffer.from(dek);
+        }
+      };
+      const service = () => SessionService.create({
+        repository,
+        riskSignals: { recordForSession: async () => "recorded" } as never,
+        onRiskSignalFailure: (error: unknown) => { throw error; },
+        dekStore,
+        argon2,
+        authPolicy,
+        mfaPolicy: mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value),
+        sessionPolicy: sessionPolicyFromValue(SESSION_POLICY_REGISTER_ROW.value, SESSION_POLICY_REGISTER_ROW.sourceRef),
+        blindIndexKey,
+        bindingKey,
+        dummyPasswordHash: passwordHash,
+        clock: () => now
+      });
+      const step = Math.floor(now.getTime() / 30_000);
+      const correct = totpCodeAtStep(secret, step);
+      let wrong = "";
+      for (let n = 0; wrong === ""; n += 1) {
+        const candidate = String(n).padStart(6, "0");
+        if (![step - 1, step, step + 1].some((s) => totpCodeAtStep(secret, s) === candidate)) wrong = candidate;
+      }
+      const first = await service();
+      const challenge = await first.beginLogin({ email, password }, source);
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        await expect(first.completeLogin({ challengeToken: challenge.challengeToken, code: wrong }, source))
+          .rejects.toMatchObject({ code: "AUTH_CREDENTIALS_INVALID" });
+      }
+      const restarted = await service();
+      const fresh = await restarted.beginLogin({ email, password }, source);
+      await expect(restarted.completeLogin({ challengeToken: fresh.challengeToken, code: correct }, source))
+        .rejects.toMatchObject({ code: "MFA_RATE_LIMITED" });
+      expect(Number((await database.pool.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM identity.session WHERE user_id=$1", [userId])).rows[0]!.count)).toBe(0);
+      await age(userId, factorId, "10 minutes");
+      await expect(restarted.completeLogin({ challengeToken: fresh.challengeToken, code: correct }, source))
+        .resolves.toMatchObject({ status: "authenticated" });
+      expect(await lockoutRow(userId, factorId)).toMatchObject({ level: 1, attempts: 0 });
+    } finally {
+      secret.fill(0);
+      dek.fill(0);
+      blindIndexKey.fill(0);
+      bindingKey.fill(0);
+      await argon2.close();
+    }
+  }, 30_000);
+});

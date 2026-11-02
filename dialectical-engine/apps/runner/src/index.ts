@@ -3659,6 +3659,11 @@ export function logBodyCostFallback(event: string, detail: Readonly<Record<strin
   console.warn(JSON.stringify({ ...detail, kind: "DEBATEAI_BODY_COST_FALLBACK", event }));
 }
 
+/** NV-50 (security audit run 3): the runner's content-free spend line (ids and codes only). The detail goes first. */
+export function logSpendJournal(event: string, detail: Readonly<Record<string, unknown>>): void {
+  console.warn(JSON.stringify({ ...detail, kind: "DEBATEAI_SPEND", event }));
+}
+
 /**
  * ENGINE MONEY RULE (spec §14.4.2), TASK M3 — A ROUND KEPT AFTER A SPEND STOP
  * SAYS SO ON THE ANSWER.
@@ -12248,6 +12253,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "PROVIDER_USAGE_CAP",
   "PROVIDER_USAGE_INVALID",
   "PROVIDER_USAGE_UNREPORTED",
+  "PUBLICATION_LEASE_CONTENDED",
   "PUBLICATION_LEASE_SCOPE_EXPANSION_FORBIDDEN",
   "QUERY_SET_REF_REQUIRED",
   "RAW_ARTIFACT_RUN_REQUIRED",
@@ -13201,6 +13207,41 @@ export function plansUnresolvedPersonAllowance(): PersonAllowanceSource {
  */
 type InFlightReleasingSeam = ProviderCostEnvelopeSeam & { readonly releaseInFlight?: () => void };
 
+/**
+ * NV-50 (security audit run 3): a call's money seam whose `recordUnanswered` leaves one `DEBATEAI_SPEND` /
+ * `UNANSWERED_CHARGE_WRITE_FAILED` line (its code, SQLSTATE and ids, never text) when the charge for an attempt that
+ * was sent and never answered could not be written, then rethrows, so the gateway stops the call. A log line never
+ * costs the call. A seam without the member, or no seam, comes back unchanged. The shipped seams are object literals
+ * of arrow members (`CostEnvelopeGuard`), so the copy keeps every member; the original is called as a method.
+ */
+export function withUnansweredWriteJournal<S extends ProviderCostEnvelopeSeam>(
+  seam: S | undefined, runId: string, callSiteKey: string
+): S | undefined {
+  if (seam?.recordUnanswered === undefined) return seam;
+  return Object.freeze({
+    ...seam,
+    recordUnanswered: async (observed: Parameters<NonNullable<ProviderCostEnvelopeSeam["recordUnanswered"]>>[0]) => {
+      try {
+        await seam.recordUnanswered!(observed);
+      } catch (error) {
+        try {
+          logSpendJournal("UNANSWERED_CHARGE_WRITE_FAILED", {
+            code: error instanceof TypedDomainError ? error.code
+              : error instanceof TypeError && /^[A-Z][A-Z0-9_]{2,95}$/u.test(error.message) ? error.message : "UNTYPED",
+            sqlState: databaseStateOf(error),
+            runId,
+            callSiteKey,
+            attemptId: observed.attemptId
+          });
+        } catch {
+          // A log line can never cost the call.
+        }
+        throw error;
+      }
+    }
+  });
+}
+
 export function createPostgresProviderGateway(
   pool: Pool,
   options: Omit<OpenAICompatibleGatewayOptions, "persistRawArtifact" | "appendLedgerEntry" | "assertNoOpenWriteTransaction" | "persistCallPrompt">
@@ -13389,6 +13430,8 @@ export function createPostgresProviderGateway(
       costEnvelope = storyScope
         ? buildStoryCostEnvelopeSeam?.(leasedRunId)
         : buildCostEnvelopeSeam?.(leasedRunId, costEnvelopePhase, providerCallSharedWall(request));
+      // NV-50: a sent attempt's charge that could not be written leaves a journal line before the call stops.
+      costEnvelope = withUnansweredWriteJournal(costEnvelope, leasedRunId, request.callSiteKey);
       try {
         return await http.call({
           // Preview retry fix, option B (spec 2026-10-11 §1.1): the spread forwards the preview's

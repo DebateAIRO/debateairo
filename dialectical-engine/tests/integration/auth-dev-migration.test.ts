@@ -21,7 +21,7 @@ describe('auth and Dev forward migration capabilities',()=>{
   }
  });
  it('keeps consent and social account creation on the API capability alone',async()=>{
-  for(const fn of [consent,'identity.create_social_account(jsonb,jsonb)','identity.record_registration_region(uuid,text,text)']){
+  for(const fn of [consent,'identity.create_social_account(jsonb,jsonb)','identity.create_social_account_v2(jsonb,jsonb)','identity.record_registration_region(uuid,text,text)']){
    expect((await database.pool.query("SELECT has_function_privilege('debateai_billing_runtime',$1,'EXECUTE') allowed",[fn])).rows[0].allowed,fn).toBe(true);
    for(const role of ['debateai_runtime','debateai_authorization_runtime','debateai_replay','debateai_erasure_runtime']) expect((await database.pool.query("SELECT has_function_privilege($1,$2,'EXECUTE') allowed",[role,fn])).rows[0].allowed,role+':'+fn).toBe(false);
   }

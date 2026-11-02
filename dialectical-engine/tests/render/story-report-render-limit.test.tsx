@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { ContractHttpError, type RunProjection } from "@debateai/contract";
+import { ContractHttpError, type Answer, type RunProjection, type Session } from "@debateai/contract";
 import { handleReportRequest, type ReportReader, type ReportRenderer } from "../../apps/ui/lib/report/reportRoute.js";
 import { REPORT_RENDER_LIMITS, ReportRenderGate, type ReportRenderLimits } from "../../apps/ui/lib/report/reportRenderGate.js";
 import {
@@ -13,7 +13,7 @@ import {
 
 /**
  * GET /debate/{id}/report makes a whole PDF in the one UI process. The render
- * gate bounds that: a few at once in the process, one per signed-in session,
+ * gate bounds that: a few at once in the process, one per signed-in owner,
  * a short bounded queue, and a quick plain refusal with Retry-After beyond it.
  */
 
@@ -21,9 +21,11 @@ const NOW = new Date("2026-09-26T12:00:00.000Z");
 const FAKE_PDF = Buffer.from("%PDF-1.3 fake");
 const session = (name: string): string => name.repeat(43).slice(0, 43);
 
-const tryAgain = (JSON.parse(readFileSync(
+const fixtureWords = JSON.parse(readFileSync(
   resolve(process.cwd(), "apps/ui/messages", STORY_FIXTURE_LANGUAGE.tag, "public.json"), "utf8"
-)) as Record<string, string>)["public.report.error.tryAgain"];
+)) as Record<string, string>;
+const tryAgain = fixtureWords["public.report.error.tryAgain"];
+const signIn = fixtureWords["public.report.error.signIn"];
 
 function runProjection(): RunProjection {
   return {
@@ -36,13 +38,28 @@ function runProjection(): RunProjection {
   };
 }
 
-const reader: ReportReader = {
-  readAnswer: async () => STORY_FIXTURE_ANSWER,
-  readRunAnswer: async () => { throw new ContractHttpError("NOT_FOUND", 404, "ANSWER_NOT_SERVED"); },
-  readRun: async () => runProjection(),
-  readAnswerStory: async () => storyFixture("READY"),
-  readAnswerDisclosure: async () => { throw new ContractHttpError("NOT_FOUND", 404, "DISCLOSURE_NOT_FOUND"); }
-};
+/** The session as GET /v1/session answers it: one `asker_id` per owner name, whichever session asks (NV-26). */
+function ownerSession(owner: string): Session {
+  return {
+    asker_id: `owner:00000000-0000-4000-8000-${Buffer.from(owner).toString("hex").padStart(12, "0").slice(-12)}`,
+    session_id: "00000000-0000-4000-8000-000000000001",
+    caller_scope: "ASKER",
+    ownership_provenance: "server_session",
+    provisional_identity_model: false
+  };
+}
+
+/** The reads of one owner's ready report; the API names `owner` as the session's owner. */
+function readerFor(owner: string): ReportReader {
+  return {
+    readAnswer: async () => STORY_FIXTURE_ANSWER,
+    readRunAnswer: async () => { throw new ContractHttpError("NOT_FOUND", 404, "ANSWER_NOT_SERVED"); },
+    readRun: async () => runProjection(),
+    readAnswerStory: async () => storyFixture("READY"),
+    readAnswerDisclosure: async () => { throw new ContractHttpError("NOT_FOUND", 404, "DISCLOSURE_NOT_FOUND"); },
+    readSession: async () => ownerSession(owner)
+  };
+}
 
 /** A render that only finishes when the test says so, counting how many run at once. */
 function heldRenders() {
@@ -72,13 +89,14 @@ function request(
   sessionCookie: string,
   render: ReportRenderer,
   gate?: ReportRenderGate,
-  extra: Readonly<{ signal?: AbortSignal; client?: ReportReader }> = {}
+  extra: Readonly<{ signal?: AbortSignal; client?: ReportReader; owner?: string }> = {}
 ): Promise<Response> {
   return handleReportRequest({
     id: STORY_FIXTURE_DEBATE_ID,
     sessionCookie,
     interfaceLocale: "en",
-    client: () => extra.client ?? reader,
+    // Unless a case names the owner, each session is its own owner.
+    client: () => extra.client ?? readerFor(extra.owner ?? sessionCookie),
     now: NOW,
     render,
     ...(gate === undefined ? {} : { gate }),
@@ -249,7 +267,7 @@ describe("the report render gate", () => {
     const browser = new AbortController();
     // The browser goes away while the story is being read.
     const client: ReportReader = {
-      ...reader,
+      ...readerFor("a"),
       readAnswerStory: async () => { browser.abort(); return storyFixture("READY"); }
     };
     const render = vi.fn<ReportRenderer>(async () => FAKE_PDF);
@@ -270,6 +288,102 @@ describe("the report render gate", () => {
     expect(response.headers.get("content-type")).toBe("application/pdf");
     expect(response.headers.get("retry-after")).toBeNull();
     expect(Buffer.from(await response.arrayBuffer())).toEqual(FAKE_PDF);
+  });
+});
+
+describe("the render gate counts owners, not sessions (NV-26)", () => {
+  it("refuses a second session of the same owner while the first is made, and still serves another owner", async () => {
+    const renders = heldRenders();
+    const fresh = gate({ concurrent: 2, retryAfterSeconds: 7 });
+    const first = request(session("a"), renders.render, fresh, { owner: "A" });
+    await renders.started(1);
+
+    await expectRefused(request(session("b"), renders.render, fresh, { owner: "A" }), 429, 7);
+
+    const other = request(session("c"), renders.render, fresh, { owner: "B" });
+    await renders.started(2);
+    renders.finishNext();
+    renders.finishNext();
+    expect((await first).status).toBe(200);
+    expect((await other).status).toBe(200);
+  });
+
+  it("lets ten sessions of one owner hold one place, so another owner is admitted, not refused", async () => {
+    const renders = heldRenders();
+    // The process's limits: 2 making, 8 waiting, 20 s, Retry-After 5.
+    const fresh = gate({});
+    const first = request(session("a"), renders.render, fresh, { owner: "A" });
+    await renders.started(1);
+
+    for (const name of ["b", "c", "d", "e", "f", "g", "h", "i", "j"]) {
+      await expectRefused(request(session(name), renders.render, fresh, { owner: "A" }), 429, 5);
+    }
+
+    const other = request(session("k"), renders.render, fresh, { owner: "B" });
+    await renders.started(2);
+    expect(renders.state.started).toBe(2);
+    renders.finishNext();
+    renders.finishNext();
+    expect((await first).status).toBe(200);
+    expect((await other).status).toBe(200);
+
+    // Once its report is made, the owner may download again, from any of its sessions.
+    const again = request(session("b"), renders.render, fresh, { owner: "A" });
+    await renders.started(3);
+    renders.finishNext();
+    expect((await again).status).toBe(200);
+  });
+
+  it("keys on the owner the API names, read once after the report is ready, with the request's own client", async () => {
+    const render = vi.fn<ReportRenderer>(async () => FAKE_PDF);
+    const readSession = vi.fn(async () => ownerSession("A"));
+    const served = await quickly(request(session("a"), render, gate({}), { client: { ...readerFor("A"), readSession } }));
+    expect(served.status).toBe(200);
+    expect(readSession).toHaveBeenCalledTimes(1);
+
+    // A debate that is not the caller's is refused before the owner is ever asked for.
+    const notFound = async (): Promise<Answer> => { throw new ContractHttpError("NOT_FOUND", 404, "ANSWER_NOT_FOUND"); };
+    const unread = vi.fn(async () => ownerSession("A"));
+    const foreign = await quickly(request(session("a"), render, gate({}), {
+      client: { ...readerFor("A"), readAnswer: notFound, readRunAnswer: notFound, readSession: unread }
+    }));
+    expect(foreign.status).toBe(404);
+    expect(unread).not.toHaveBeenCalled();
+  });
+
+  it("answers 401 when the API refuses to name the session's owner, and makes nothing", async () => {
+    const render = vi.fn<ReportRenderer>(async () => FAKE_PDF);
+    const client: ReportReader = {
+      ...readerFor("A"),
+      readSession: async () => { throw new ContractHttpError("SESSION_REQUIRED", 401, "SESSION_REQUIRED"); }
+    };
+    const response = await quickly(request(session("a"), render, gate({}), { client }));
+    expect(response.status).toBe(401);
+    expect(response.headers.get("content-type")).toBe("text/plain; charset=utf-8");
+    expect(await response.text()).toBe(signIn);
+    expect(render).not.toHaveBeenCalled();
+  });
+
+  it("answers 502 with the fixed tag for any other failure to read the owner, and makes nothing", async () => {
+    const render = vi.fn<ReportRenderer>(async () => FAKE_PDF);
+    const client: ReportReader = {
+      ...readerFor("A"),
+      readSession: async () => { throw new ContractHttpError("SERVER_FAILURE", 500, "secret upstream detail"); }
+    };
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    let response: Response;
+    let calls: unknown[][];
+    try {
+      response = await quickly(request(session("a"), render, gate({}), { client }));
+    } finally {
+      calls = [...logged.mock.calls];
+      logged.mockRestore();
+    }
+    expect(response.status).toBe(502);
+    expect(await response.text()).toBe(tryAgain);
+    expect(calls).toEqual([["[STORY_REPORT_UPSTREAM_FAILED]", "SERVER_FAILURE"]]);
+    expect(JSON.stringify(calls)).not.toContain("secret upstream detail");
+    expect(render).not.toHaveBeenCalled();
   });
 });
 

@@ -34,6 +34,7 @@ import {
   decryptContentForRun,
   migrate,
   PostgresAccountErasureRepository,
+  PostgresSupportShredRepository,
   prepareLeasedContentEncryptionForRuns,
   RunRepository,
   withOwnerAskAdmissionLease,
@@ -1912,7 +1913,9 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
         "core.claim_run_key_provision_cleanup(integer)",
         "core.complete_run_key_provision_cleanup(uuid,uuid)",
         // 0123 §4 (side-by-side spec §4): the readmitted run's provision is the content role's alone too.
-        "core.prepare_readmitted_run_key_provision(uuid,uuid)"
+        "core.prepare_readmitted_run_key_provision(uuid,uuid)",
+        // NV-08 (0131): an EXECUTE-only grant here, with no USAGE on the schema, is refused by OID too.
+        "erasure_reconcile.claim_run_key_provision_cleanup(integer)"
       ] as const;
       for (const signature of provisionSignatures) {
         await database.pool.query(`GRANT EXECUTE ON FUNCTION ${signature} TO ${runtimeLogin}`);
@@ -2424,7 +2427,9 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
     const reconciler = new AccountErasureCoordinator(
       erasureRepository,
       users,
-      keys
+      keys,
+      undefined,
+      new PostgresSupportShredRepository(database.pool)
     );
     expect(await reconciler.reconcileRunKeyProvisionIntents()).toContainEqual({
       runId: orphanRunId,
@@ -3182,7 +3187,7 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
          execute_at=clock_timestamp()-interval '1 day'
        WHERE erasure_id=$1`,[erasureId]
     );
-    const coordinator=new AccountErasureCoordinator(repository,users,keys);
+    const coordinator=new AccountErasureCoordinator(repository,users,keys,undefined,new PostgresSupportShredRepository(database.pool));
     let deletionSettled=false;
     const deleting=coordinator.reconcile({
       ip:"background",userAgent:"s10-notification-test",requestId:randomUUID()
@@ -3284,6 +3289,189 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
     });
     expect(await repository.claimNotifications(100)).toEqual([]);
   },120_000);
+
+  it("checks a delete's grant before the run's lease and never waits for it (NV-30)", async () => {
+    const runId = await createEncryptedRun(`NV-30 delete lease ${randomUUID()}`);
+    const grantTokenHash = await grantPrivateRunDeletion(runId);
+    const fake = `sha256:${"0".repeat(64)}`;
+    const leaseKey = `debateai:run-content-lease:v1:${runId}`;
+    const entry = "SELECT * FROM erasure_reconcile.prepare_private_run_erasure($1,$2,$3,$4,$5)";
+    const source = { ip:"192.0.2.71",userAgent:"nv30-delete-lease",requestId:randomUUID() };
+    const consumed = async (): Promise<boolean> => (await database.pool.query<{ consumed:boolean }>(
+      "SELECT consumed_at IS NOT NULL AS consumed FROM identity.step_up_grant WHERE token_hash=$1",
+      [grantTokenHash]
+    )).rows[0]!.consumed;
+    const within = <T>(promise: Promise<T>,ms: number,code: string): Promise<T> => Promise.race([
+      promise,
+      new Promise<never>((_resolve,reject) => setTimeout(() => reject(new Error(code)),ms))
+    ]);
+    const name = `nv30-${randomUUID().slice(0,8)}`;
+    const client = await database.pool.connect();
+    const probe = await database.pool.connect();
+    let readerPool: InstanceType<typeof PgPool> | undefined;
+    let erasurePool: Pool | undefined;
+    let lease: Awaited<ReturnType<typeof acquireRunContentLease>> | undefined;
+    try {
+      // Another backend's shared try on the run's lease key: false while anything holds it exclusively.
+      const probeShared = async (): Promise<boolean> => {
+        const acquired = (await probe.query<{ acquired:boolean }>(
+          "SELECT pg_try_advisory_lock_shared(hashtextextended($1,0)) AS acquired",[leaseKey]
+        )).rows[0]!.acquired;
+        if (acquired) await probe.query("SELECT pg_advisory_unlock_shared(hashtextextended($1,0))",[leaseKey]);
+        return acquired;
+      };
+      // Order of lock and grant, no lease held: a fake grant answers NOT_FOUND having taken no lock at all.
+      await client.query("BEGIN");
+      expect((await client.query(entry,[runId,userId,ownerRef,authSessionId,fake])).rows)
+        .toEqual([{ outcome:"NOT_FOUND",erasure_id:null }]);
+      expect(await probeShared()).toBe(true);
+      await client.query("ROLLBACK");
+      // The real grant prepares under the named run's transaction lock, which nothing else may share.
+      await client.query("BEGIN");
+      expect((await client.query(entry,[runId,userId,ownerRef,authSessionId,grantTokenHash])).rows)
+        .toMatchObject([{ outcome:"PREPARED" }]);
+      expect(await probeShared()).toBe(false);
+      await client.query("ROLLBACK");
+      expect(await consumed()).toBe(false);
+
+      // Contention: a live reader (the runner, a story step) holds the run's shared lease.
+      readerPool = new PgPool({ connectionString:database.connectionString,max:2 });
+      lease = await acquireRunContentLease(readerPool,[runId]);
+      erasurePool = createPool(database.connectionString,{ max:4,connectionTimeoutMillis:2_000,name });
+      const repository = new PostgresPrivateRunErasureRepository(erasurePool,{} as AuditContextHasher);
+      const fakes = Array.from({ length:4 },() => repository.prepare({
+        runId,userId,ownerRef,sessionId:authSessionId,grantTokenHash:fake
+      }));
+      await expect(within(Promise.all(fakes),1_000,"NV30_FAKE_GRANT_WAITED")).resolves.toEqual(
+        Array.from({ length:4 },() => ({ outcome:"NOT_FOUND",erasureId:null }))
+      );
+      expect((await database.pool.query<{ waiting:boolean }>(
+        `SELECT EXISTS(
+           SELECT 1 FROM pg_stat_activity WHERE application_name=$1 AND wait_event='advisory'
+         ) AS waiting`,[name]
+      )).rows[0]!.waiting).toBe(false);
+      const pinged = Date.now();
+      await erasurePool.query("SELECT 1");
+      expect(Date.now() - pinged).toBeLessThan(300);
+      // The owner's real grant: CONTENDED (the route's 202 PENDING) at once, and nothing spent.
+      await expect(within(repository.prepare({
+        runId,userId,ownerRef,sessionId:authSessionId,grantTokenHash
+      }),1_000,"NV30_AUTHORIZED_DELETE_WAITED")).resolves.toEqual({ outcome:"CONTENDED",erasureId:null });
+      const coordinator = new PrivateRunErasureCoordinator(repository,keys);
+      await expect(within(coordinator.execute({
+        runId,userId,ownerRef,sessionId:authSessionId,grantTokenHash,source
+      }),1_000,"NV30_AUTHORIZED_DELETE_WAITED")).resolves.toBe("CONTENDED");
+      expect(await consumed()).toBe(false);
+      const held = lease;
+      lease = undefined;
+      await held.release();
+      await expect(coordinator.execute({
+        runId,userId,ownerRef,sessionId:authSessionId,grantTokenHash,source
+      })).resolves.toBe("CLEANED");
+      expect(await consumed()).toBe(true);
+    } finally {
+      await client.query("ROLLBACK").catch(() => undefined);
+      client.release(true);
+      probe.release(true);
+      await lease?.release().catch(() => undefined);
+      await readerPool?.end();
+      await erasurePool?.end();
+    }
+  },30_000);
+
+  it("bounds account PREPARE's wait for a held run lease, then finishes (NV-30)", async () => {
+    const deletedUserId = randomUUID();
+    const deletedOwnerRef = randomUUID();
+    const deletedSessionId = randomUUID();
+    await database.pool.query(
+      `INSERT INTO identity."user"(
+        user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,
+        phone_ciphertext,password_hash,pseudonym,audit_token,owner_ref,state,
+        adult_affirmed_at,created_at
+      ) VALUES ($1,$2,'{}'::jsonb,'{}'::jsonb,NULL,'test-password-hash',$3,$4,$5,
+        'active',now(),now())`,
+      [deletedUserId,randomBytes(32),`nv30-account-lease-${randomUUID()}`,
+        randomUUID(),deletedOwnerRef]
+    );
+    await database.pool.query(
+      `INSERT INTO identity.session(
+        session_id,user_id,token_hash,csrf_token_hash,binding_context,
+        created_at,last_seen_at,idle_expires_at,absolute_expires_at,last_mfa_at
+      ) VALUES ($1,$2,$3,$4,'{}'::jsonb,now(),now(),now()+interval '1 hour',
+        now()+interval '2 hours',now())`,
+      [deletedSessionId,deletedUserId,`sha256:${randomBytes(32).toString("hex")}`,
+        `sha256:${randomBytes(32).toString("hex")}`]
+    );
+    await users.store(deletedUserId,generateDek());
+    const runId = await new RunRepository(database.pool).startRun({
+      ...serverRunInput(`NV-30 account lease bounded ${randomUUID()}`),
+      principal:{ kind:"server",userId:deletedUserId,ownerRef:deletedOwnerRef },
+      sessionId:deletedSessionId
+    });
+    const erasureId = (await database.pool.query<{ erasure_id:string }>(
+      `INSERT INTO identity.account_erasure_request(user_id,requested_at,execute_at)
+       VALUES ($1,clock_timestamp()-interval '2 seconds',
+         clock_timestamp()-interval '1 second') RETURNING erasure_id`,
+      [deletedUserId]
+    )).rows[0]!.erasure_id;
+    const applicationName = `nv30-account-content-lease-${randomUUID()}`;
+    const readerPool = new PgPool({ connectionString:database.connectionString,max:2 });
+    const erasurePool = new PgPool({
+      connectionString:database.connectionString,max:2,application_name:applicationName
+    });
+    const erasureRepository = new PostgresAccountErasureRepository(
+      erasurePool,{} as AuditContextHasher
+    );
+    const lease = await acquireRunContentLease(readerPool,[runId]);
+    let leaseReleased = false;
+    const releaseLease = async (): Promise<void> => {
+      if (leaseReleased) return;
+      leaseReleased = true;
+      await lease.release();
+    };
+    try {
+      const preview = (await erasureRepository.preview(erasureId))!;
+      expect(preview.runIds).toContain(runId);
+      const started = Date.now();
+      const preparing = erasureRepository.prepare(
+        erasureId,preview.runIds,preview.legacyRunIds,preview.publishedRunIds
+      ).then((outcome) => ({ outcome,elapsed:Date.now() - started }));
+      // It still queues for the lease (readers cannot starve it), but for LEASE_LOCK_WAITS.exclusiveMs only.
+      await waitForAdvisoryWait(applicationName);
+      const settled = await Promise.race([
+        preparing,
+        new Promise<never>((_resolve,reject) => setTimeout(
+          () => reject(new Error("NV30_ACCOUNT_PREPARE_UNBOUNDED")),6_000
+        ))
+      ]);
+      expect(settled.outcome).toBe("CONTENDED");
+      expect(settled.elapsed).toBeGreaterThanOrEqual(1_900);
+      expect(settled.elapsed).toBeLessThan(4_000);
+      expect((await database.pool.query<{ waiting:boolean }>(
+        `SELECT EXISTS(
+           SELECT 1 FROM pg_stat_activity
+           WHERE application_name=$1 AND wait_event_type='Lock' AND wait_event='advisory'
+         ) AS waiting`,[applicationName]
+      )).rows[0]!.waiting).toBe(false);
+      expect((await database.pool.query<{ prepared:boolean }>(
+        "SELECT prepared_at IS NOT NULL AS prepared FROM identity.account_erasure_request WHERE erasure_id=$1",
+        [erasureId]
+      )).rows[0]!.prepared).toBe(false);
+      await releaseLease();
+      await expect(erasureRepository.prepare(
+        erasureId,preview.runIds,preview.legacyRunIds,preview.publishedRunIds
+      )).resolves.toBe("PREPARED");
+      await expect(new AccountErasureCoordinator(
+        erasureRepository,users,keys,undefined,new PostgresSupportShredRepository(database.pool)
+      ).execute(erasureId,{
+        ip:"192.0.2.72",userAgent:"nv30-account-content-lease",requestId:randomUUID()
+      })).resolves.toBe("CLEANED");
+    } finally {
+      await releaseLease().catch(() => undefined);
+      await readerPool.end();
+      await erasurePool.end();
+    }
+  },30_000);
 
   it("releases the notification custody lease when its PostgreSQL backend crashes",async ()=>{
     const applicationName=`s10-notification-crash-${randomUUID()}`;
@@ -4042,7 +4230,7 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
     }
   }, 30_000);
 
-  it("holds the session content lease through key load, decrypt, plaintext use, and erasure PREPARE", async () => {
+  it("holds the session content lease through key load, decrypt, plaintext use, and erasure PREPARE, and makes a delete PREPARE wait for none of it (NV-30)", async () => {
     for (const pauseAt of ["LOAD","DECRYPT"] as const) {
       const question = `S10 ${pauseAt.toLowerCase()} lease ${randomUUID()}`;
       const runId = await createEncryptedRun(question);
@@ -4096,13 +4284,19 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
           return content.questionLine;
         });
         await paused;
-        const preparing = repository.prepare({
+        // NV-30: while the reader holds its lease, a delete PREPARE answers CONTENDED at once and spends nothing.
+        await expect(repository.prepare({
           runId,userId,ownerRef,sessionId: authSessionId,grantTokenHash
-        });
-        await waitForAdvisoryWait(applicationName);
+        })).resolves.toEqual({ outcome: "CONTENDED",erasureId: null });
+        expect((await database.pool.query<{ consumed: boolean }>(
+          "SELECT consumed_at IS NOT NULL AS consumed FROM identity.step_up_grant WHERE token_hash=$1",
+          [grantTokenHash]
+        )).rows[0]?.consumed).toBe(false);
         releasePause();
         await expect(reading).resolves.toBe(question);
-        await expect(preparing).resolves.toMatchObject({ outcome: "PREPARED" });
+        await expect(repository.prepare({
+          runId,userId,ownerRef,sessionId: authSessionId,grantTokenHash
+        })).resolves.toMatchObject({ outcome: "PREPARED" });
         const usedKeys = keys.loadedKeys.slice(loadedKeyOffset);
         expect(usedKeys.length).toBeGreaterThan(0);
         expect(usedKeys.every((key) => key.every((byte) => byte === 0))).toBe(true);
@@ -4369,7 +4563,7 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
     expect(await repository.prepare(
       erasureId,preview.runIds,preview.legacyRunIds,preview.publishedRunIds
     )).toBe("PREPARED");
-    expect(await new AccountErasureCoordinator(repository,users,keys).execute(erasureId,{
+    expect(await new AccountErasureCoordinator(repository,users,keys,undefined,new PostgresSupportShredRepository(database.pool)).execute(erasureId,{
       ip: "192.0.2.63",userAgent: "s10-account-child",requestId: randomUUID()
     })).toBe("CLEANED");
     const child = await runFreshProcessSecretProbe({
@@ -4460,7 +4654,7 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
       await expect(reading).resolves.toMatchObject({ runId });
       await expect(preparing).resolves.toBe("PREPARED");
       await expect(new AccountErasureCoordinator(
-        erasureRepository,users,keys
+        erasureRepository,users,keys,undefined,new PostgresSupportShredRepository(database.pool)
       ).execute(erasureId,{
         ip:"192.0.2.64",userAgent:"s10-account-content-lease",requestId:randomUUID()
       })).resolves.toBe("CLEANED");

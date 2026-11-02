@@ -157,6 +157,7 @@
   "billing.subscription.withdrawNothingDue": "Valmis. Teie pakett on lõppenud. Juba kasutatud osa katab kogu hinna, seega ei kuulu teile midagi tagastamisele.",
   "billing.subscription.withdrawOwnerReview": "Teie pakett on lõppenud. Ühele teie maksetest on juba tehtud tagasimakse, seega kontrollime, mis on veel tasumata, ja kirjutame teile 14 päeva jooksul.",
   "billing.subscription.withdrawWindowClosed": "14-päevane taganemistähtaeg on möödunud või see ei kehti seal, kus elate. Saate ikka igal ajal tühistada.",
+  "billing.subscription.withdrawDebateRunning": "Teie alustatud väitlus võib veel krediiti kasutada, seega ei saa me veel öelda, kui palju te kasutasite. Proovige hiljem uuesti. Teil on taganemiseks endiselt rohkem kui üks päev.",
   "billing.subscription.stillConfirming": "Kinnitame seda veel makseteenuse pakkujaga. Vaadake seda lehte mõne minuti pärast uuesti.",
   "billing.subscription.actionFailed": "See ei õnnestunud. Proovige uuesti.",
   "billing.subscription.invoices": "Arved",

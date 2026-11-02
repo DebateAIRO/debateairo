@@ -191,6 +191,18 @@ describe('sameChecks', () => {
     expect(bad(sameChecks([older, marks('visa, mastercard')]))).toEqual(['UI_PAYMENT_MARKS_AVAILABLE:new-v1']);
   });
 
+  it('NV-07: two releases on one host name one restore fence file, or the newer names one the older does not know', () => {
+    const older = release('old-v1', 'A', OLD_KEY), newer = release('new-v1', 'B', NEW_KEY);
+    const fence = (base: typeof older, path: string) => ({ ...base, api: { ...base.api, RESTORE_FENCE_PATH: path } });
+    const FENCE = '/var/lib/debateai-v3-preview/api/restore-fence/fence';
+    expect(sameChecks([older, newer]).map(result => result.check)).toContain('SAME_API_RESTORE_FENCE_PATH');
+    expect(bad(sameChecks([fence(older, FENCE), fence(newer, `${FENCE}-2`)]))).toEqual(['SAME_API_RESTORE_FENCE_PATH']);
+    expect(bad(sameChecks([older, fence(newer, FENCE)]))).toEqual([]);
+    expect(bad(sameChecks([fence(older, FENCE), fence(newer, FENCE)]))).toEqual([]);
+    // One release alone compares nothing across.
+    expect(sameChecks([fence(older, FENCE)]).map(result => result.check)).not.toContain('SAME_API_RESTORE_FENCE_PATH');
+  });
+
   it('a config it cannot read is never the same as anything', () => {
     const older = release('old-v1', 'A', OLD_KEY), newer = release('new-v1', 'B', NEW_KEY);
     const broken = { ...newer, api: { ...newer.api, PREVIEW_PROVIDER_TEST_CONFIG_JSON: '{' }, runner: { ...newer.runner, PREVIEW_PROVIDER_TEST_CONFIG_JSON: '{' } };

@@ -157,6 +157,7 @@
   "billing.subscription.withdrawNothingDue": "Færdig. Din plan er afsluttet. Den del, du allerede har brugt, dækker hele prisen, så du har intet til gode.",
   "billing.subscription.withdrawOwnerReview": "Din plan er afsluttet. Der er allerede foretaget en refusion på en af dine betalinger, så vi tjekker, hvad der stadig skal betales tilbage, og skriver til dig inden for 14 dage.",
   "billing.subscription.withdrawWindowClosed": "Fortrydelsesfristen på 14 dage er udløbet, eller den gælder ikke, hvor du bor. Du kan stadig opsige når som helst.",
+  "billing.subscription.withdrawDebateRunning": "En debat, du har startet, bruger muligvis stadig kredit, så vi kan endnu ikke se, hvor meget du har brugt. Prøv igen senere. Du har stadig mere end en dag til at fortryde.",
   "billing.subscription.stillConfirming": "Vi er stadig ved at bekræfte dette med betalingsudbyderen. Tjek denne side igen om et par minutter.",
   "billing.subscription.actionFailed": "Det virkede ikke. Prøv igen.",
   "billing.subscription.invoices": "Fakturaer",

@@ -77,7 +77,9 @@ describe("0128 threat reports contract", () => {
     // Property: the new loader records its own tables, functions, writer trigger and CHECK after 0127.
     const loader = await readFile(new URL("../../packages/db/src/migration-forward0128.ts", import.meta.url), "utf8").catch(() => "");
     const plan = await loadMigrationPlan();
-    expect(plan.forwardChain.slice(-4).map((step) => step.name))
+    // The security fixes of audit run 3 (0131 to 0135) follow 0130 since the merge onto the fix branch (2026-10-29).
+    const names = plan.forwardChain.map((step) => step.name);
+    expect(names.slice(names.indexOf("0127_publication_review.sql"), names.indexOf("0127_publication_review.sql") + 4))
       .toEqual(["0127_publication_review.sql", "0128_threat_reports.sql", "0129_support_answer_scope.sql",
         "0130_row_level_security.sql"]);
     for (const name of ["staff.threat_report", "staff.threat_report_event", "staff.threat_report_alert",

@@ -35,7 +35,7 @@ export const HI: CrisisLexicon = Object.freeze({
     { signal: "intent", pattern: String.raw`काश (?:मैं |मै )?(?:मर (?:जा(?:ऊँ|ऊं|उं|ता|ती)|गया होता|गई होती)|पैदा (?:ही )?(?:न|नहीं|ना) (?:हो(?:ता|ती)|हुआ|हुई))` },
     { signal: "intent", pattern: String.raw`(?<!(?:में|बिना|साथ|यहाँ|यहां|वहाँ|वहां|तरह|पर)\s)(?:जीना|जीने की इच्छा|जीने का मन|जीने को जी) (?:अब )?(?:नहीं|नही|ना) (?:चाह(?:ता|ती)|कर(?:ता|ती)|है|रही|रहा|होता|होती)` },
     { signal: "intent", pattern: String.raw`जीने (?:की|का|के) (?:अब )?(?:कोई )?(?:वजह|वज़ह|कारण|मतलब|मक़?सद|उम्मीद|इच्छा|लिए कुछ) (?:नहीं|नही|ना|बाक़?ी नहीं)` },
-    { signal: "intent", pattern: String.raw`(?:^|\s)(?:मैं|मै) (?:अब )?(?:और )?(?:नहीं|नही) (?:जी|सह|झेल) (?:सकता|सकती|पा रहा|पा रही)(?:\s(?:अब|और|${HOON}|ये|यह|इसे))*${END}` },
+    { signal: "intent", pattern: String.raw`(?:^|\s)(?:मैं|मै) (?:अब )?(?:और )?(?:नहीं|नही) (?:जी|सह|झेल) (?:सकता|सकती|पा रहा|पा रही)(?:\s(?:अब|और|${HOON}|ये|यह|इसे)){0,8}${END}` },
     { signal: "intent", pattern: String.raw`(?:मैं|मै|मैंने|मुझे)\s.{0,15}(?:सुसाइडल|सूसाइडल)|(?:सुसाइडल|सूसाइडल) (?:महसूस|फ़?ील)` },
     // intent — romanised
     { signal: "intent", pattern: String.raw`\b${SUI_R}\s(?:karna|krna|karne|krne|kar ?lena|kr ?lena|karni)\s(?:chah?t[ai]|chahata|chahati|ka (?:mann?|mn|soch|vichar|khayal|khyal|plan|irada)|ki soch|ke bare me(?:in)? soch|hai\b)` },
@@ -53,7 +53,7 @@ export const HI: CrisisLexicon = Object.freeze({
     { signal: "self-harm", pattern: String.raw`(?:ख़?ुद|अपने आप) को (?:नुक़?सान|चोट|कट|हर्ट|तकलीफ़?) (?:पहु[ँं]?चा|कर|लगा|दे)(?:ता|ती|ती रहती|ता रहता|ने लगा|ने लगी)? ${HOON}` },
     { signal: "self-harm", pattern: String.raw`ब्लेड से (?:अपना |अपने |अपनी )?(?:हाथ|कलाई|बाजू|बांह|बाँह|ख़?ुद को|शरीर|जांघ|जाँघ) (?:काट|कट|चीर)` },
     { signal: "self-harm", pattern: String.raw`(?:^|\s)(?:मैं|मै|मैंने)\s.{0,15}सेल्फ[ -]?हार्म|सेल्फ[ -]?हार्म कर(?:ता|ती) ${HOON}` },
-    { signal: "self-harm", pattern: String.raw`\b(?:mai|main|maine|me)\s(?:bhi |ab |fir se |phir se |roz )?khud ko (?:hurt|cut|nuksan|nuksaan|chot|kat)|\bkhud ko (?:hurt|cut|nuksan|nuksaan|chot|kaat|kat) (?:ka?r|pahu?n?cha)[a-z]* (?:hu|hoon|hun)\b|\bself[- ]?harm (?:karta|karti|krta|krti|kar raha|kar rahi) (?:hu|hoon|hun)\b` },
+    { signal: "self-harm", pattern: String.raw`\b(?:mai|main|maine|me)\s(?:bhi |ab |fir se |phir se |roz )?khud ko (?:hurt|cut|nuksan|nuksaan|chot|kat)|\bkhud ko (?:hurt|cut|nuksan|nuksaan|chot|kaat|kat) (?:ka?r|pahu?n?cha)[a-z]{0,32} (?:hu|hoon|hun)\b|\bself[- ]?harm (?:karta|karti|krta|krti|kar raha|kar rahi) (?:hu|hoon|hun)\b` },
     // decision
     { signal: "decision", pattern: String.raw`क्या (?:मुझे|मैं|मै) (?:बस |सच में |अब )?(?:${SUI} (?:कर ल(?:ूँ|ूं|ू|ुं|ुँ)|कर लेनी चाहिए|करनी चाहिए|करना चाहिए|कर लेना चाहिए)|मर जा(?:ऊँ|ऊं|उं|ना चाहिए)(?!ग)|मरना चाहिए|अपनी जान (?:ले ल(?:ूँ|ूं|ू)|लेनी चाहिए)|ख़?ुद को मार|अपनी ${LIFE} ख़?त्म|जीना चाहिए${END})` },
     { signal: "decision", pattern: String.raw`(?:जिऊँ|जियूँ|जीऊं|जिऊं|जियूं|जीऊँ|जीना) या (?:मर(?:ूँ|ूं|ुं|ना|ू)|मर जा(?:ऊँ|ऊं|उं|ना))|मर(?:ूँ|ूं|ुं|ना|ू) या (?:जिऊँ|जियूँ|जीऊं|जिऊं|जियूं|जीऊँ|जीना)` },

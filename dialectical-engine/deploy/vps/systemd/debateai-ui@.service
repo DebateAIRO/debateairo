@@ -1,11 +1,12 @@
 # deploy/vps/systemd/debateai-ui@.service
 # One website instance per release (side-by-side spec §6, §10): debateai-ui@<label>.service, %i = the release label.
 # It runs from the release's own root-owned folder, talks only to its own release's API (the overlay's
-# DIALECTICAL_API_BASE) and listens on its slot's port (the overlay's PORT): slot A 3001, slot B 3002, the two
-# upstreams of the Caddyfile. Only the current release's instance is enabled at boot.
+# DIALECTICAL_API_BASE) and listens on its slot's port (the overlay's PORT): slot A 481, slot B 482, the two
+# upstreams of the Caddyfile (below 1024, NV-55). Only the current release's instance is enabled at boot.
 #
 # The UI holds no key material and no database credential at all: it proxies to the API over
-# loopback. Its only secrets-adjacent input is the edge secret file, which it reads once at boot.
+# loopback. Its only secrets-adjacent inputs are the edge secret file and the UI-to-API proof file
+# (NV-03), each read once at boot.
 [Unit]
 Description=DebateAI UI (Next front door), release %i
 Documentation=file:///opt/debateai/dialectical-engine/deploy/vps/README.md
@@ -30,15 +31,22 @@ WorkingDirectory=/opt/debateai/releases/%i/dialectical-engine/apps/ui
 # and its own API's DIALECTICAL_API_BASE); the later file wins. No "-": a release without its own file does not start.
 EnvironmentFile=/etc/debateai/ui.env
 EnvironmentFile=/etc/debateai/releases/%i/ui.env
+# NV-52: the base file is root's (README §3), and these dynamic-loader, libc and Node start-up variables reach no
+# process of this unit, root's `+` hook included. ld.so and libc act on them for /usr/bin/env itself, before `env -i`
+# runs.
+UnsetEnvironment=LD_PRELOAD LD_LIBRARY_PATH LD_AUDIT LD_DEBUG_OUTPUT LD_PROFILE LD_PROFILE_OUTPUT LD_TRACE_LOADED_OBJECTS GLIBC_TUNABLES GCONV_PATH LOCPATH NODE_OPTIONS NODE_PATH
 Environment=NODE_ENV=production
 Environment=DIALECTICAL_UI_HOST=127.0.0.1
 # R2 / C2: only these exact peer addresses may name a client through x-forwarded-for. CIDRs and
 # hostnames are refused by parseTrustedProxies (apps/ui/trusted-client-ip.mjs).
 Environment=DIALECTICAL_UI_TRUSTED_PROXIES=127.0.0.1,::1
 # C2b: and only when they also present the shared edge secret, so that another local process
-# reaching 127.0.0.1:3001 or :3002 cannot forge a client address. File is 0400 debateai-ui, 0640 root:caddy
+# reaching 127.0.0.1:481 or :482 cannot forge a client address. File is 0400 debateai-ui, 0640 root:caddy
 # on the Caddy side (README §4).
 Environment=DIALECTICAL_UI_EDGE_SECRET_PATH=/etc/debateai/ui-edge.secret
+# NV-03: the UI-to-API proof it sends with every forwarded address; the API honours a forwarded address only
+# with it. File is 0400 debateai-ui; the API's copy of the same bytes is /etc/debateai/api/ui-api-proof.secret (README §3).
+Environment=DIALECTICAL_UI_API_PROOF_PATH=/etc/debateai/ui-api-proof.secret
 # Root's start check (side-by-side plan D16b): a draining or retired release's website is refused.
 ExecStartPre=+/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /usr/bin/node /opt/debateai/dialectical-engine/deploy/vps/release.mjs may-start --service ui --label %i
 ExecStart=/usr/bin/node /opt/debateai/releases/%i/dialectical-engine/apps/ui/server.mjs
@@ -71,12 +79,19 @@ RestrictNamespaces=true
 RestrictRealtime=true
 RestrictSUIDSGID=true
 LockPersonality=true
-CapabilityBoundingSet=
-AmbientCapabilities=
+# NV-55: the slot ports are below 1024, so this unit holds exactly CAP_NET_BIND_SERVICE (ambient, under
+# NoNewPrivileges) to bind its slot's port, and SocketBindAllow=/SocketBindDeny= below limit that grant to the two
+# website ports. systemd enforces that limit only through its BPF framework (README §2 checks it on the host).
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_BIND_SERVICE
 SystemCallArchitectures=native
 SystemCallFilter=@system-service
 SystemCallFilter=~@privileged @resources @obsolete
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+# NV-55: the capability above binds only the two website ports; every other port below 1024 is refused.
+SocketBindAllow=tcp:481-482
+SocketBindDeny=tcp:1-1023
+SocketBindDeny=udp:1-1023
 # MemoryDenyWriteExecute is NOT set: it breaks the V8 JIT.
 
 LimitNOFILE=65536

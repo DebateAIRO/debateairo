@@ -28,8 +28,8 @@ const shape = (value: unknown): unknown => typeof value === "object" && value !=
   : typeof value;
 
 describe("0123: the side-by-side releases step", () => {
-  it("is appended to the chain's STEPS after the engine's map answer step (the settings activation 0124, the Italy-specific approval 0125, synthesis-flag's 0126-0129 and row-level security 0130 follow it)", () => {
-    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130]");
+  it("is appended to the chain's STEPS after the engine's map answer step (the settings activation 0124, the Italy-specific approval 0125, synthesis-flag's 0126-0129, row-level security 0130 and the security fixes 0131 to 0135 follow it)", () => {
+    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130,loadForward0131,loadForward0132,loadForward0133,loadForward0134,loadForward0135]");
     const loader = read("packages/db/src/migration-forward0123.ts");
     expect(loader).toContain("const NAME='0123_side_by_side_releases.sql';");
     expect(loader).toContain("const VERSION='side-by-side-releases-forward0123-v1';");
@@ -294,7 +294,8 @@ describe("0123: the side-by-side releases step", () => {
     const store = read("packages/budget/src/model-spend.ts");
     const owner = store.slice(store.indexOf("async readOwnerSpentMicros("), store.indexOf("async readOwnerCountedHoldsMicros("));
     expect(owner).toContain("AND NOT EXISTS (SELECT 1 FROM ledger.model_spend_waiver AS waiver WHERE waiver.run_id = spend.run_id)");
-    expect(store.split("model_spend_waiver")).toHaveLength(2); // the subscription reader alone: no site-day reader names it
+    // the two subscription readers (readOwnerSpentMicros and NV-45's readWithdrawalSpend): no site-day reader names it
+    expect(store.split("model_spend_waiver")).toHaveLength(3);
     // The loader digests the table whole; the redefinition is checked by the closing block and these tests.
     const loader = read("packages/db/src/migration-forward0123.ts");
     expect(loader).toContain("const TABLES=['core.release_event','core.run_supersession','ledger.model_spend_waiver'] as const;");
@@ -404,9 +405,10 @@ describe("0123: the side-by-side releases step", () => {
       "the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth");
   });
 
-  it("is the plan's step after 0122 and before 0124 (the settings activation), with no supplemental verifier", async () => {
+  it("is the plan's step after 0122 and before 0124 (the settings activation, then the Italy-specific approval 0125, synthesis-flag's 0126-0129, row-level security 0130, the security fixes 0131, the due indexes 0132 to 0134 and the control user index 0135), with no supplemental verifier", async () => {
     const plan = await loadMigrationPlan();
     // The Italy-specific approval (0125) and synthesis-flag's 0126-0129 and row-level security's 0130 follow 0124 (merges of 2026-10-26 and 2026-10-28),
+    // then the security fixes of audit run 3 (0131), the due indexes (0132 to 0134) and the control user index (0135),
     // so the steps are found by name, not by the chain's end.
     const names = plan.forwardChain.map((step) => step.name);
     const at = names.indexOf("0123_side_by_side_releases.sql");
@@ -414,6 +416,7 @@ describe("0123: the side-by-side releases step", () => {
     expect(names[at - 1]).toBe("0122_engine_map_check.sql");
     expect(names[at + 1]).toBe("0124_settings_activation.sql");
     expect(names[at + 2]).toBe("0125_italy_specific_approval.sql");
+    expect(names.indexOf("0131_security_fixes_run3.sql")).toBeGreaterThan(names.indexOf("0130_row_level_security.sql"));
     expect(plan.forwardChain[at]?.replayVerifierSql).toBeUndefined();
     expect(plan.forwardChain[at]?.verifierPath).toBe("lineage/verify-effective-capabilities-111.sql");
   });

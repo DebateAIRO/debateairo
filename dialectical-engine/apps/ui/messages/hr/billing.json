@@ -157,6 +157,7 @@
   "billing.subscription.withdrawNothingDue": "Gotovo. Vaš je plan završio. Dio koji ste već iskoristili pokriva cijelu cijenu, pa vam ništa nije pripadalo natrag.",
   "billing.subscription.withdrawOwnerReview": "Vaš je plan završio. Na jednom od vaših plaćanja povrat je već izvršen, pa ćemo provjeriti što je još dospjelo i javiti vam se e-poštom u roku od 14 dana.",
   "billing.subscription.withdrawWindowClosed": "14-dnevni rok za raskid ugovora je istekao ili se ne primjenjuje ondje gdje živite. I dalje možete otkazati u bilo kojem trenutku.",
+  "billing.subscription.withdrawDebateRunning": "Rasprava koju ste pokrenuli možda još troši kredit, pa još ne možemo reći koliko ste iskoristili. Pokušajte ponovno kasnije. Za raskid ugovora imate još više od jednog dana.",
   "billing.subscription.stillConfirming": "Ovo još potvrđujemo s pružateljem usluge plaćanja. Provjerite ovu stranicu ponovno za nekoliko minuta.",
   "billing.subscription.actionFailed": "To nije uspjelo. Pokušajte ponovno.",
   "billing.subscription.invoices": "Računi",

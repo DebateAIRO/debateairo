@@ -3,6 +3,7 @@ import {
   decrypt,
   encrypt,
   type AeadAad,
+  type Argon2AuditPriority,
   type AuditContextHasher,
   type CryptoEnvelope,
   type ReadableUserDekStore
@@ -179,10 +180,12 @@ export class PostgresAuthenticationRiskSignalRepository{
     private readonly maxSignals:number
   ){}
 
-  private async context(source:AuthSourceContext):Promise<AuthenticationRiskSignalContext>{
+  private async context(
+    source:AuthSourceContext,priority:Argon2AuditPriority="ordinary"
+  ):Promise<AuthenticationRiskSignalContext>{
     const [networkRef,clientRef]=await Promise.all([
-      this.auditContext.hashSourceIp(normalized(source?.ip,64)).then(versioned),
-      this.auditContext.hashUserAgent(normalized(source?.userAgent,256)).then(versioned)
+      this.auditContext.hashSourceIp(normalized(source?.ip,64),priority).then(versioned),
+      this.auditContext.hashUserAgent(normalized(source?.userAgent,256),priority).then(versioned)
     ]);
     return Object.freeze({v:1,networkRef,clientRef});
   }
@@ -190,10 +193,11 @@ export class PostgresAuthenticationRiskSignalRepository{
   private async record(input:Readonly<{
     prepareSql:string;recordSql:string;scopeParameters:readonly string[];
     kind:AuthenticationRiskSignalKind;source:AuthSourceContext;
+    priority?:Argon2AuditPriority;
   }>):Promise<"recorded"|"scope_unresolved">{
     const [prepared,context]=await Promise.all([
       this.pool.query<{user_id:string}>(input.prepareSql,[...input.scopeParameters]),
-      this.context(input.source)
+      this.context(input.source,input.priority??"ordinary")
     ]);
     const userId=prepared.rows[0]?.user_id;
     if(userId===undefined) return "scope_unresolved";
@@ -229,7 +233,9 @@ export class PostgresAuthenticationRiskSignalRepository{
     return this.record({
       prepareSql:"SELECT * FROM identity.prepare_authentication_risk_signal_for_session($1,$2)",
       recordSql:"SELECT identity.record_authentication_risk_signal_for_session($1,$2,$3,$4::jsonb) AS recorded",
-      scopeParameters:[input.tokenHash,input.bindingHash],kind:input.kind,source:input.source
+      // K09/NV-42: reached only after a session is issued, so it may use the login reserve.
+      scopeParameters:[input.tokenHash,input.bindingHash],kind:input.kind,source:input.source,
+      priority:"login"
     });
   }
 

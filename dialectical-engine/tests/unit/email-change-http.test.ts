@@ -171,7 +171,7 @@ describe("Turn 14 change-email HTTP boundary", () => {
     expect(request.mock.calls[0]?.[0]).toEqual(owner);
     expect(request.mock.calls[0]?.[1]).toEqual({ newEmail: "ana.popescu@icub.ro", grantToken: GRANT_TOKEN });
     for (const [code, status] of [
-      ["EMAIL_INVALID", 422], ["EMAIL_UNCHANGED", 422], ["STEP_UP_REQUIRED", 403]
+      ["EMAIL_INVALID", 422], ["EMAIL_UNCHANGED", 422], ["STEP_UP_REQUIRED", 403], ["SEND_LIMIT", 429]
     ] as const) {
       request.mockRejectedValueOnce(new EmailChangeError(code));
       const refused = await api.inject({ method: "POST", url: "/v1/account/email/change", headers, payload });
@@ -196,6 +196,11 @@ describe("Turn 14 change-email HTTP boundary", () => {
     resend.mockRejectedValueOnce(new EmailChangeError("RESEND_COOLDOWN"));
     expect((await api.inject({ method: "POST", url: "/v1/account/email/change/resend", headers, payload: {} }))
       .statusCode).toBe(429);
+    // NV-12: the hour's three confirmation mails are spent.
+    resend.mockRejectedValueOnce(new EmailChangeError("SEND_LIMIT"));
+    const limited = await api.inject({ method: "POST", url: "/v1/account/email/change/resend", headers, payload: {} });
+    expect(limited.statusCode).toBe(429);
+    expect(limited.json()).toEqual({ error: "SEND_LIMIT" });
     resend.mockRejectedValueOnce(new EmailChangeError("NO_PENDING_CHANGE"));
     expect((await api.inject({ method: "POST", url: "/v1/account/email/change/resend", headers, payload: {} }))
       .statusCode).toBe(404);

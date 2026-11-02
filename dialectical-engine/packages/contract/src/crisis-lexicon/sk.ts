@@ -60,7 +60,7 @@ export const SK: CrisisLexicon = Object.freeze({
     { signal: "method", pattern: String.raw`\bbezbolestn(?:a|u|ej) samovrazd(?:a|u|y)\b` },
     { signal: "method", pattern: String.raw`\bsamovrazedn(?:y|u) (?:list|plan|pakt|metod(?:a|u))\b` },
     { signal: "method", pattern: String.raw`\bsmrteln(?:a|u|e) davk(?:a|u|y)\b` },
-    { signal: "method", pattern: String.raw`\bkolko (?:[a-z]+ )?(?:tabletiek|tabliet|liekov|praskov|paralenu|ibalginu|paracetamolu|ibuprofenu|miligramov|gramov|inzulinu|inzulinu|antidepresiv|alkoholu)\b.{0,40}\b(?:na (?:predavkovanie|smrt|umrtie)|k smrti|aby som (?:umrel|umrela|zomrel|zomrela|sa predavkoval|sa predavkovala|sa zabil|sa zabila)|zabije (?:cloveka|ma))\b` },
+    { signal: "method", pattern: String.raw`\bkolko (?:[a-z]{1,32} )?(?:tabletiek|tabliet|liekov|praskov|paralenu|ibalginu|paracetamolu|ibuprofenu|miligramov|gramov|inzulinu|inzulinu|antidepresiv|alkoholu)\b.{0,40}\b(?:na (?:predavkovanie|smrt|umrtie)|k smrti|aby som (?:umrel|umrela|zomrel|zomrela|sa predavkoval|sa predavkovala|sa zabil|sa zabila)|zabije (?:cloveka|ma))\b` },
     { signal: "method", pattern: String.raw`\b(?:z akej vysky|ako vysoko|ako vysok(?:y|a))\b.{0,40}\b(?:umriet|zomriet|aby som (?:umrel|umrela|zomrel|zomrela)|sa zabit|to zabije|je pad smrteln(?:y|a))\b` },
     { signal: "method", pattern: String.raw`\b(?:(?:obesim|predavkujem|zastrelim|otravim) sa|sa (?:obesim|predavkujem|zastrelim))\b` },
     { signal: "method", pattern: String.raw`\b${WANT} sa (?:obesit|predavkovat|otravit|utopit|zastrelit)\b` },

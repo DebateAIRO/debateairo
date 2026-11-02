@@ -86,6 +86,20 @@ describe("DL1-F2 stateless support admission", () => {
     } finally { await h.close(); }
   });
 
+  it("gives a new source the least-evidenced slot of a full key table instead of refusing it (NV-19)", async () => {
+    // Capacity 2: three addresses of one /64 take one slot, a one-shot /64 the other. The next new
+    // source evicts the least-evidenced entry (the one-shot `2001:db8:9:9::/64`) instead of a CAPACITY refusal.
+    const h = harness(policyWith({ support_reads: { key: "source", limit: 50, window_ms: QUARTER_MS, capacity: 2 } }));
+    try {
+      for (const address of ["2001:db8:1:2::1", "2001:db8:1:2::2", "2001:db8:1:2::3"]) {
+        expect((await h.status(address)).statusCode, address).toBe(200);
+      }
+      expect((await h.status("2001:db8:9:9::1")).statusCode).toBe(200);
+      expect((await h.status(SOURCE_A)).statusCode).toBe(200);
+      expect(h.admission.keys("supportReads")).toHaveLength(2);
+    } finally { await h.close(); }
+  });
+
   it("admits unlimited status reads when the optional budget is absent", async () => {
     const h = harness(SEALED);
     try {

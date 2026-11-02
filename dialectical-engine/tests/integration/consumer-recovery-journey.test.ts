@@ -14,6 +14,7 @@ import { RecoveryStartService, RECOVERY_START_PUBLIC_RESPONSE } from '../../apps
 import { SessionService } from '../../apps/api/src/sessions.js';
 import { consumerFixture, origin, rpId, b64 } from '../support/consumerWebAuthnFixtures.js';
 import { startTestDatabase, type TestDatabase } from '../support/testDatabase.js';
+import { withMailLocale } from '../../packages/db/src/mail-locale.js';
 import { createSystemTwin } from '../support/rls-logins.js';
 let db: TestDatabase, runtime: Pool, p2Runtime: Pool, argon2: Argon2WorkerPool, passwordHash: string;
 // Row-level security (0126; D28, D29): the authorization pool as main.ts wires it. Inside a request it runs on its own
@@ -105,15 +106,20 @@ describe('real consumer recovery crypto and replacement journeys', () => {
         expect(next).not.toHaveProperty('replacement_recovery_code');
         expect((await db.pool.query('SELECT count(*)::int n FROM identity.recovery_code WHERE user_id=$1 AND consumed_at IS NULL AND revoked_at IS NULL', [a.userId])).rows[0].n).toBe(0);
     });
-    it('composes actual P2 request persistence and independent consumer token delivery behind the same generic start', async () => {
-        const a = await account();
-        let risks = 0;
-        const composite = new RecoveryStartService({ repository: new PostgresRecoveryStartRepository(p2Runtime, audit, a.users as never), consumerPrepare: (input, source) => a.recovery.prepareStart(input, source), mailDispatch: { dispatchRecoveryMail: async (prepare) => { const work = await prepare(); await work?.(); } }, riskSignals: { recordForRecovery: async () => { risks++; return 'recorded'; } }, onRiskSignalFailure: () => { throw new Error('RISK_FAILURE'); }, blindIndexKey: blindKey, enumerationFloorMs: 1, publicResponsePolicy: 'ENUMERATION_RESISTANT_GENERIC' });
+    // NV-18 (security audit run 3): the generic start no longer creates a P2 recovery binding, which blocked password
+    // reset, backup-email setup and MFA-recovery exchange with nothing ever closing it.
+    it('the generic start delivers the consumer token and leaves no recovery binding, so password reset stays available', async () => {
+        const a = await account(), factorId = randomUUID();
+        await withMailLocale(db.pool, 'en', (c) => c.query("INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at) VALUES($1,$2,'totp',$3,'active',now(),now())", [factorId, a.userId, encrypt(randomBytes(32), generateTotpSecret(), ['identity', 'mfa_factor.secret_ciphertext', factorId, 'run:none', a.userId, `user-dek:${a.userId}`, '1'])]));
+        const started = async () => (await db.pool.query("SELECT count(*)::int n FROM identity.audit_event WHERE event_type='identity.recovery.started'")).rows[0].n;
+        const before = await started();
+        const composite = new RecoveryStartService({ consumerPrepare: (input, source) => a.recovery.prepareStart(input, source), mailDispatch: { dispatchRecoveryMail: async (prepare) => { const work = await prepare(); await work?.(); } }, enumerationFloorMs: 1, publicResponsePolicy: 'ENUMERATION_RESISTANT_GENERIC' });
         expect(await composite.start({ email: a.email }, a.source)).toEqual(RECOVERY_START_PUBLIC_RESPONSE);
-        expect(risks).toBe(1);
         expect(a.delivered).toHaveLength(1);
-        expect((await db.pool.query('SELECT count(*)::int n FROM identity.account_recovery_binding WHERE user_id=$1', [a.userId])).rows[0].n).toBe(1);
         expect((await db.pool.query('SELECT count(*)::int n FROM identity.consumer_recovery_token WHERE user_id=$1', [a.userId])).rows[0].n).toBe(1);
+        expect((await db.pool.query('SELECT count(*)::int n FROM identity.account_recovery_binding WHERE user_id=$1', [a.userId])).rows[0].n).toBe(0);
+        expect(await started()).toBe(before);
+        expect((await db.pool.query('SELECT identity.password_reset_prepare($1) AS value', [createEmailBlindIndex(blindKey, a.email)])).rows[0].value).not.toBeNull();
     });
     it('uses genuinely signed passkey ADD_TOTP and regeneration grants, preserving password plus saved-code consume-and-replace', async () => {
         const a = await account(), m = a.sessions.consumerProducer().prepare(a.source);

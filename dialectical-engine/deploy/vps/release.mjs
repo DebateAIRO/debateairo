@@ -1,10 +1,12 @@
 // Root's release tool on the public server (side-by-side spec §4, §6, §10, §11, §12; plan D16b). Linux, Node, run as
 // root: by the operator, by the units' ExecStartPre=+/ExecStopPost=+ hooks and by the two retirement timers, always
-// through `/usr/bin/env -i PATH=…` so nothing from a service's environment reaches it (deploy/vps/systemd/*@.service).
+// through `/usr/bin/env -i PATH=…` so nothing from a service's environment reaches it; the units' `UnsetEnvironment=`
+// keeps loader and libc start-up variables from `/usr/bin/env` itself, and the base env files are root's (NV-52)
+// (deploy/vps/systemd/*@.service).
 //
 // Plain words: the public server swaps releases exactly as the preview does. This file holds no release logic of its
 // own: every command is the preview's own function (deploy/preview-lifecycle/v1), called with common.mjs's VPS_LAYOUT:
-// this server's units (debateai-<service>@<label>), PostgreSQL socket, slots (website 3001/3002, API 8790/8791), edge
+// this server's units (debateai-<service>@<label>), PostgreSQL socket, slots (website 481/482, API 491/492, reserved ports, NV-55), edge
 // listener (127.0.0.1:3090) and Caddy's copy of the edge secret; no spending gates and no notice unit; each release's
 // key and slot from its own overlay /etc/debateai/releases/<label>/api.env (release-info.mjs); the current release's
 // instances enabled at boot (the switch enables the new three and disables the old pair; the stop recorder disables a

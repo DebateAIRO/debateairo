@@ -1,14 +1,14 @@
 import { TEST_APP_ORIGIN } from "../support/httpSession.js";
-import { createEmailBlindIndex, normalizeEmailForBlindIndex } from "@debateai/crypto";
-import { randomUUID } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { normalizeEmailForBlindIndex } from "@debateai/crypto";
+import { describe, expect, it, vi } from "vitest";
 import { buildApi, type AskApplication } from "../../apps/api/src/index.js";
 import {
   RECOVERY_START_PUBLIC_RESPONSE,
   RecoveryStartService,
-  type RecoveryApplication,
-  type RecoveryStartRepository
+  type RecoveryApplication
 } from "../../apps/api/src/recovery.js";
+import type { RecoveryMailDispatchPort } from "../../apps/api/src/registration.js";
+import { PostgresRecoveryStartRepository } from "../../packages/db/src/recovery.js";
 
 const source = Object.freeze({
   ip: "203.0.113.20",
@@ -16,34 +16,24 @@ const source = Object.freeze({
   requestId: "recovery-request"
 });
 
+// The production dispatch runs the prepare closure, then the mail work it returns.
+const mailDispatch: RecoveryMailDispatchPort = {
+  async dispatchRecoveryMail(prepare) { const work = await prepare(); await work?.(); }
+};
+
+// NV-18 (security audit run 3): the generic start creates no P2 recovery binding; its only work is the consumer
+// recovery preparation, behind the same enumeration floor and generic response.
 describe("P2-04 enumeration-resistant recovery start", () => {
   it("returns the same typed response at the same floor for present and absent identities", async () => {
-    const blindIndexKey = Buffer.alloc(32, 0x52);
-    const presentIndex = createEmailBlindIndex(
-      blindIndexKey,
-      normalizeEmailForBlindIndex("present@example.test")
-    );
     let now = 0;
-    const calls: Array<Readonly<Record<string, unknown>>> = [];
-    const riskCalls: Array<Readonly<Record<string, unknown>>> = [];
-    const publicHandle=randomUUID();
-    const repository: RecoveryStartRepository = {
-      async start(input) {
-        calls.push(input);
-        const present = input.emailBlindIndex.equals(presentIndex);
-        now += present ? 47 : 9;
-        return present
-          ? {status:"created" as const,publicHandle}
-          : {status:"not_created" as const};
-      }
-    };
+    const calls: Array<Readonly<{ input: Readonly<{ email: string }>; source: unknown }>> = [];
     const service = new RecoveryStartService({
-      repository,
-      riskSignals:{
-        async recordForRecovery(input){riskCalls.push(input);return "recorded" as const;}
+      async consumerPrepare(input, received) {
+        calls.push({ input, source: received });
+        now += input.email === "present@example.test" ? 47 : 9;
+        return null;
       },
-      onRiskSignalFailure:()=>{throw new Error("UNEXPECTED_RISK_SIGNAL_FAILURE");},
-      blindIndexKey,
+      mailDispatch,
       enumerationFloorMs: 600,
       publicResponsePolicy: "ENUMERATION_RESISTANT_GENERIC",
       monotonicNow: () => now,
@@ -61,29 +51,21 @@ describe("P2-04 enumeration-resistant recovery start", () => {
 
     expect(presentElapsed).toBe(600);
     expect(absentElapsed).toBe(600);
-    expect(calls).toHaveLength(2);
-    for (const call of calls) {
-      expect(Object.keys(call).sort()).toEqual(["emailBlindIndex", "source"]);
-      expect(call).not.toHaveProperty("email");
-      expect(call.source).toEqual(source);
-    }
-    expect(riskCalls).toEqual([{
-      publicHandle,kind:"RECOVERY_STARTED",source
-    }]);
+    expect(calls).toEqual([
+      { input: { email: normalizeEmailForBlindIndex(" Present@example.test ") }, source },
+      { input: { email: "absent@example.test" }, source }
+    ]);
+    for (const call of calls) expect(Object.keys(call.input)).toEqual(["email"]);
   });
 
   it("holds the same response floor before surfacing an infrastructure failure", async () => {
     let now = 0;
     const service = new RecoveryStartService({
-      repository: {
-        async start() {
-          now += 25;
-          throw new Error("DATABASE_UNAVAILABLE");
-        }
+      async consumerPrepare() {
+        now += 25;
+        throw new Error("DATABASE_UNAVAILABLE");
       },
-      riskSignals:{async recordForRecovery(){return "scope_unresolved";}},
-      onRiskSignalFailure:()=>undefined,
-      blindIndexKey: Buffer.alloc(32, 0x53),
+      mailDispatch,
       enumerationFloorMs: 600,
       publicResponsePolicy: "ENUMERATION_RESISTANT_GENERIC",
       monotonicNow: () => now,
@@ -95,67 +77,20 @@ describe("P2-04 enumeration-resistant recovery start", () => {
     expect(now).toBe(600);
   });
 
-  /**
-   * F-SESSIONS-BARE-CATCH's standing pin for recovery. The infrastructure-failure case
-   * above throws inside `repository.start()`, so the `if(outcome.status==="created")`
-   * block holding the risk-signal catch is never reached and its recorder stub is dead.
-   * These cases make `start()` return a created outcome first, so the catch is actually
-   * entered, and assert on WHAT THE OBSERVER RECEIVED.
-   */
-  function serviceRecording(
-    recordForRecovery: () => Promise<"recorded" | "scope_unresolved">,
-    received: unknown[],
-    clock: Readonly<{ read: () => number; advance: (ms: number) => void }>
-  ): RecoveryStartService {
-    return new RecoveryStartService({
-      repository: {
-        async start() {
-          clock.advance(31);
-          return { status: "created" as const, publicHandle: "recovery-public-handle" };
-        }
-      },
-      riskSignals: { recordForRecovery },
-      // Deliberately NON-THROWING, so the generic response and its floor stay observable.
-      onRiskSignalFailure: (error: unknown) => { received.push(error); },
-      blindIndexKey: Buffer.alloc(32, 0x54),
+  it("composed without consumer dispatch, start does no work and still answers the generic response at the floor", async () => {
+    let now = 0;
+    const service = new RecoveryStartService({
       enumerationFloorMs: 600,
       publicResponsePolicy: "ENUMERATION_RESISTANT_GENERIC",
-      monotonicNow: () => clock.read(),
-      sleep: async (milliseconds) => { clock.advance(milliseconds); }
+      monotonicNow: () => now,
+      sleep: async (milliseconds) => { now += milliseconds; }
     });
-  }
 
-  it("hands the observer a TypeError naming RECOVERY_RISK_SIGNAL_SCOPE_UNRESOLVED when the scope does not resolve", async () => {
-    let now = 0;
-    const received: unknown[] = [];
-    const clock = { read: () => now, advance: (ms: number) => { now += ms; } };
-    const service = serviceRecording(async () => "scope_unresolved", received, clock);
-
-    const startedAt = now;
     await expect(service.start({ email: "person@example.test" }, source))
       .resolves.toEqual(RECOVERY_START_PUBLIC_RESPONSE);
-
-    expect(received).toHaveLength(1);
-    expect(received[0]).toBeInstanceOf(TypeError);
-    expect((received[0] as Error).message).toBe("RECOVERY_RISK_SIGNAL_SCOPE_UNRESOLVED");
-    // A pending signal must not change the public response or shorten its floor.
-    expect(now - startedAt).toBe(600);
-  });
-
-  it("hands the observer the recorder's own rejection, unwrapped and unreplaced", async () => {
-    let now = 0;
-    const received: unknown[] = [];
-    const sentinel = new Error("RECORDER_REJECTED");
-    const clock = { read: () => now, advance: (ms: number) => { now += ms; } };
-    const service = serviceRecording(async () => { throw sentinel; }, received, clock);
-
-    const startedAt = now;
-    await expect(service.start({ email: "person@example.test" }, source))
-      .resolves.toEqual(RECOVERY_START_PUBLIC_RESPONSE);
-
-    expect(received).toHaveLength(1);
-    expect(received[0]).toBe(sentinel);
-    expect(now - startedAt).toBe(600);
+    expect(now).toBe(600);
+    await expect(service.start({ email: "not an address" }, source)).rejects.toThrow("AUTH_INPUT_INVALID");
+    expect(now).toBe(1200);
   });
 
   it("publishes only the exact 202 generic response at the public HTTP boundary", async () => {
@@ -179,5 +114,57 @@ describe("P2-04 enumeration-resistant recovery start", () => {
     } finally {
       await api.close();
     }
+  });
+});
+
+// NV-18: the maintenance pass closes recovery bindings left open past one hour, in rounds of at most `limit`, each round
+// its own short transaction with a bounded lock wait (identity.expire_stale_account_recovery_bindings, 0131).
+describe("PostgresRecoveryStartRepository.expireStaleBindings", () => {
+  const SWEEP = "SELECT identity.expire_stale_account_recovery_bindings($1) AS expired";
+  function pool(results: readonly unknown[]) {
+    const calls: { sql: string; args?: unknown[] }[] = [];
+    let round = 0, released = 0;
+    const client = {
+      query: vi.fn(async (sql: string, args?: unknown[]) => {
+        calls.push(args === undefined ? { sql } : { sql, args });
+        return sql === SWEEP ? { rows: [{ expired: results[Math.min(round++, results.length - 1)] }] } : { rows: [] };
+      }),
+      release: vi.fn(() => { released++; })
+    };
+    const connect = vi.fn(async () => client);
+    return { calls, connect, released: () => released,
+      repository: new PostgresRecoveryStartRepository({ connect } as never, {} as never, {} as never) };
+  }
+  const round = (limit: number) => [
+    { sql: "BEGIN" }, { sql: "SET LOCAL lock_timeout = '10s'" }, { sql: SWEEP, args: [limit] }, { sql: "COMMIT" }
+  ];
+
+  it("runs rounds until a short one and returns the total", async () => {
+    const p = pool([100, 100, 3]);
+    await expect(p.repository.expireStaleBindings(100, 10)).resolves.toBe(203);
+    expect(p.calls).toEqual([...round(100), ...round(100), ...round(100)]);
+    expect(p.connect).toHaveBeenCalledTimes(3);
+    expect(p.released()).toBe(3);
+  });
+
+  it("stops after the round cap", async () => {
+    const p = pool([100]);
+    await expect(p.repository.expireStaleBindings(100, 10)).resolves.toBe(1000);
+    expect(p.calls.filter((call) => call.sql === SWEEP)).toHaveLength(10);
+    expect(p.released()).toBe(10);
+  });
+
+  it.each([[0, 10], [1001, 10], [1.5, 10], [100, 0], [100, 11]])(
+    "refuses the batch (%s, %s) before any query", async (limit, rounds) => {
+      const p = pool([0]);
+      await expect(p.repository.expireStaleBindings(limit, rounds)).rejects.toThrow("RECOVERY_BINDING_BATCH_INVALID");
+      expect(p.connect).not.toHaveBeenCalled();
+    });
+
+  it.each([[-1], [null], ["3"], [101]])("refuses a round result of %j and rolls that round back", async (value) => {
+    const p = pool([value]);
+    await expect(p.repository.expireStaleBindings(100, 10)).rejects.toThrow("RECOVERY_BINDING_EXPIRY_OUTCOME_INVALID");
+    expect(p.calls).toEqual([...round(100).slice(0, 3), { sql: "ROLLBACK" }]);
+    expect(p.released()).toBe(1);
   });
 });

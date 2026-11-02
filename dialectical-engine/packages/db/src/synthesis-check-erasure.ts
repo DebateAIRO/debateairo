@@ -1,5 +1,5 @@
 import type { Pool } from "pg";
-import type { PublicationCipher, RunContentKeyStore } from "@debateai/crypto";
+import { isRunContentKeyRecordMissing, type PublicationCipher, type RunContentKeyStore } from "@debateai/crypto";
 import { withPublicationContentLease } from "./publication-lease.js";
 
 const SYNTHESIS_CHECK_ERASURE_WAITING_OUTCOMES = Object.freeze([
@@ -17,6 +17,12 @@ type CleanupManifest = Readonly<{
   ownerRef: string;
   cleanupPublicationRefs: readonly string[];
 }>;
+
+/** NV-10: the published owner of a run key, or null when its directory holds no published record (nothing usable). */
+async function recordedOwnerRef(runs: RunContentKeyStore, runId: string): Promise<string | null> {
+  try { return await runs.ownerRef(runId); }
+  catch (error) { if (isRunContentKeyRecordMissing(error)) return null; throw error; }
+}
 
 /** The SQL principal has only definer capabilities; it never reads check rows directly. */
 export class PostgresSynthesisCheckErasureRepository {
@@ -77,8 +83,10 @@ export class SynthesisCheckErasureCoordinator {
   ) {}
 
   private async completePrepared(erasureId: string, manifest: CleanupManifest): Promise<SynthesisCheckErasureOutcome> {
-    if (await this.runs.exists(manifest.runId)
-      && await this.runs.ownerRef(manifest.runId) !== manifest.ownerRef) return "INVALID_EVIDENCE";
+    // NV-10 (security fixes run 3): a record-less directory the manifest names is this run's half-destroyed key; it is
+    // destroyed below, as the account and private-run erasures do (account-erasure.ts, recordedOwnerRef).
+    const manifestOwner = await this.runs.exists(manifest.runId) ? await recordedOwnerRef(this.runs, manifest.runId) : null;
+    if (manifestOwner !== null && manifestOwner !== manifest.ownerRef) return "INVALID_EVIDENCE";
     if (manifest.cleanupPublicationRefs.length > 0 && this.publications === undefined) {
       return "INVALID_EVIDENCE";
     }

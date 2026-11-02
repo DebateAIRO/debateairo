@@ -1,0 +1,17 @@
+{
+  "version": "mfa-recovery-notice-due-forward0134-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0133_backup_email_notice_due.sql",
+    "manifestSha256": "a7b851f8d27ab3c67eac222ce4a3e1ea691bd5fbfd5b8816f9be028da22bcbe4",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0134_mfa_recovery_notice_due.sql",
+    "sha256": "127cb528436ad9d20740f2aa79a145b3a54863ca4a173e0e5e91aaf91a553604"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  }
+}

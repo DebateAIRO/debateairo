@@ -59,6 +59,20 @@ function sessionsWithConsent(
   };
 }
 
+// NV-28: Bulgarian negatives joined with ". ", in order and cycling, while `${padding}${suffix}` fits 8,192 bytes.
+function longBulgarianQuestion(suffix: string): string {
+  const { negative } = JSON.parse(readFileSync(new URL("./crisis-check-fixtures/bg.json", import.meta.url), "utf8")) as {
+    negative: readonly string[];
+  };
+  let padding = "";
+  for (let i = 0; ; i += 1) {
+    const next = negative[i % negative.length]!;
+    const candidate = padding === "" ? next : `${padding}. ${next}`;
+    if (Buffer.byteLength(`${candidate}${suffix}`, "utf8") > 8_192) return padding;
+    padding = candidate;
+  }
+}
+
 describe("crisis check before a debate starts", () => {
   it.each([
     ["English", "Should I kill myself?"],
@@ -106,11 +120,13 @@ describe("crisis check before a debate starts", () => {
   it("names the edge's country so the screen can show that country's helplines first", async () => {
     const identity = testHttpIdentity("crisis-country");
     const { sessions } = sessionsWithConsent(identity, "given");
-    const api = buildApi({ application: askSpy().app, sessions, allowedOrigin: TEST_APP_ORIGIN });
+    // NV-03: the edge country is honoured only from the proven UI.
+    const proof = "k".repeat(43);
+    const api = buildApi({ application: askSpy().app, sessions, allowedOrigin: TEST_APP_ORIGIN, uiApiProof: Buffer.from(proof) });
     try {
       const response = await api.inject({
         method: "POST", url: "/v1/asks",
-        headers: { ...testSessionHeaders(identity, true), "cf-ipcountry": "RO" },
+        headers: { ...testSessionHeaders(identity, true), "cf-ipcountry": "RO", "x-debateai-ui-proof": proof },
         payload: { ...ASK, question_line: "vreau să mă sinucid" }
       });
       expect(response.statusCode).toBe(422);
@@ -210,6 +226,71 @@ describe("crisis check before a debate starts", () => {
       const response = await api.inject({
         method: "POST", url: "/v1/asks", headers: testSessionHeaders(identity, true),
         payload: { ...ASK, question_line: `${padding}Should I kill myself?${padding}` }
+      });
+      expect(response.statusCode).toBe(422);
+      expect(response.json().error).toBe(CRISIS_SUPPORT_OFFERED);
+      expect(asks.submitted()).toBe(0);
+    } finally {
+      await api.close();
+    }
+  });
+
+  // NV-28: the lists run over at most crisisCheckMaxChars() of the spelled question. A question
+  // within the byte bound that passes it (compatibility forms such as ﷺ, 18 letters each) is
+  // never checked in part: it gets help numbers, never a debate.
+  it("a question within the byte bound whose crisis spelling passes the cap gets help, not a debate", async () => {
+    const identity = testHttpIdentity("crisis-overlong");
+    const { sessions } = sessionsWithConsent(identity, "given");
+    const asks = askSpy();
+    const api = buildApi({ application: asks.app, sessions, allowedOrigin: TEST_APP_ORIGIN });
+    try {
+      const question = "\u{FDFA}".repeat(2_730);
+      expect(Buffer.byteLength(question, "utf8")).toBe(8_190);
+      const response = await api.inject({
+        method: "POST", url: "/v1/asks", headers: testSessionHeaders(identity, true),
+        payload: { ...ASK, question_line: question }
+      });
+      expect(response.statusCode).toBe(422);
+      expect(response.json().error).toBe(CRISIS_SUPPORT_OFFERED);
+      expect(asks.submitted()).toBe(0);
+    } finally {
+      await api.close();
+    }
+  });
+
+  it("a long ordinary question near the byte bound still becomes a debate", async () => {
+    const identity = testHttpIdentity("long-ordinary");
+    const { sessions } = sessionsWithConsent(identity, "given");
+    const asks = askSpy();
+    // synthesis-flag S04: an ask that becomes a debate passes the question check first, as dev's own debate cases do.
+    const api = buildApi({ application: asks.app, questionCheck: questionCheckPass, sessions, allowedOrigin: TEST_APP_ORIGIN });
+    try {
+      const question = longBulgarianQuestion("");
+      expect(Buffer.byteLength(question, "utf8")).toBeGreaterThanOrEqual(8_000);
+      const response = await api.inject({
+        method: "POST", url: "/v1/asks", headers: testSessionHeaders(identity, true),
+        payload: { ...ASK, question_line: question }
+      });
+      expect(response.statusCode).toBe(202);
+      expect(asks.submitted()).toBe(1);
+    } finally {
+      await api.close();
+    }
+  });
+
+  it("a crisis question at the end of a long question near the byte bound still gets help", async () => {
+    const identity = testHttpIdentity("long-crisis");
+    const { sessions } = sessionsWithConsent(identity, "given");
+    const asks = askSpy();
+    const api = buildApi({ application: asks.app, sessions, allowedOrigin: TEST_APP_ORIGIN });
+    try {
+      const suffix = ". Кой е най-лесният начин да умра?";
+      const question = `${longBulgarianQuestion(suffix)}${suffix}`;
+      expect(Buffer.byteLength(question, "utf8")).toBeLessThanOrEqual(8_192);
+      expect(Buffer.byteLength(question, "utf8")).toBeGreaterThanOrEqual(8_000);
+      const response = await api.inject({
+        method: "POST", url: "/v1/asks", headers: testSessionHeaders(identity, true),
+        payload: { ...ASK, question_line: question }
       });
       expect(response.statusCode).toBe(422);
       expect(response.json().error).toBe(CRISIS_SUPPORT_OFFERED);

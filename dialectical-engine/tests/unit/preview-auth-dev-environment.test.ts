@@ -58,6 +58,15 @@ describe('the release key in the narrowed environment',()=>{
   expect(env.narrowEnvironment('ui',ui('Visa, amex'),built,pin,plan).environment.PAYMENT_MARKS_AVAILABLE).toBe('Visa, amex');
   expect(()=>env.narrowEnvironment('api',{...api(KEY),PAYMENT_MARKS_AVAILABLE:'visa,mastercard'},runtime,pin,plan)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
  });
+ // NV-03: the UI-to-API proof's two paths, each only on its own service (SB5c puts them in the new release's own files).
+ it('admits the UI-to-API proof path on the website and the API, and on no other service (NV-03)',()=>{
+  const ui={NODE_ENV:'production',PUBLIC_APP_URL:'https://v3-preview.dezbatere.ro',PORT:'3100',DIALECTICAL_UI_HOST:'127.0.0.1',DIALECTICAL_API_BASE:'http://127.0.0.1:3101',NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON:env.PREVIEW_FREE_MODEL_IDS_JSON,RELEASE_KEY:KEY};
+  const built={builtModelRosterFlag:env.PREVIEW_FREE_MODEL_IDS_JSON};
+  expect(env.narrowEnvironment('ui',{...ui,DIALECTICAL_UI_API_PROOF_PATH:'/etc/debateai-v3-preview/ui-api-proof/ui.secret'},built,pin,plan).environment.DIALECTICAL_UI_API_PROOF_PATH).toBe('/etc/debateai-v3-preview/ui-api-proof/ui.secret');
+  expect(env.narrowEnvironment('api',{...api(KEY),UI_API_PROOF_PATH:'/etc/debateai-v3-preview/ui-api-proof/api/proof.secret'},runtime,pin,plan).environment.UI_API_PROOF_PATH).toBe('/etc/debateai-v3-preview/ui-api-proof/api/proof.secret');
+  expect(()=>env.narrowEnvironment('runner',{...runner(),UI_API_PROOF_PATH:'/etc/debateai-v3-preview/ui-api-proof/api/proof.secret'},runtime,pin,plan)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
+  expect(()=>env.narrowEnvironment('api',{...api(KEY),DIALECTICAL_UI_API_PROOF_PATH:'/etc/debateai-v3-preview/ui-api-proof/ui.secret'},runtime,pin,plan)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
+ });
  it('isPaymentMarksList takes only the strict form',()=>{
   expect(env.PAYMENT_MARK_NAMES).toEqual(['netopia','visa','mastercard']);
   expect(Object.isFrozen(env.PAYMENT_MARK_NAMES)).toBe(true);
@@ -261,6 +270,42 @@ describe('the billing notice spool on the preview', () => {
    const at = guide.indexOf(step, from);
    expect(at, step).toBeGreaterThan(from);
    from = at;
+  }
+ });
+});
+
+// NV-07: the preview's restore fence folder, the API unit's write permission for it, and the launcher's one admitted path.
+describe('the restore fence on the preview', async () => {
+ const read = (path: string) => readFileSync(resolve(import.meta.dirname, '../..', path), 'utf8');
+ const FENCE = env.PREVIEW_HOSTED_FIXED_VALUES.RESTORE_FENCE_PATH;
+ const FOLDER = '/var/lib/debateai-v3-preview/api/restore-fence';
+ const DROPIN = 'deploy/preview-auth-dev/v1/debateai-preview-api-restore-fence.conf';
+ const INSTALLED = 'zzzzzzzzzz-fence-restore.conf';
+ const { RELEASE_DROPIN_NAME } = await import('../../deploy/' + 'preview-lifecycle/v1/prestart.mjs');
+ it('is an optional key of the API, at the preview\'s own state folder under the hosted kit\'s name', () => {
+  expect(runtime.API_ENVIRONMENT_KEYS.optional).toContain('RESTORE_FENCE_PATH');
+  expect(FENCE).toBe(`${FOLDER}/fence`);
+  const vps = /^RESTORE_FENCE_PATH=(.+)$/m.exec(read('deploy/vps/env/api.env.example'))?.[1];
+  expect(vps?.replace('/var/lib/debateai/', '/var/lib/debateai-v3-preview/')).toBe(FENCE);
+ });
+ it('the drop-in adds exactly that one folder, optional, and sorts after the older drop-ins and before the release one', () => {
+  const text = read(DROPIN);
+  expect(text.split('\n').filter(line => line !== '' && !line.startsWith('#'))).toEqual(['[Service]', `ReadWritePaths=-${FOLDER}`]);
+  expect(text).toContain(`# Install as /etc/systemd/system/debateai-preview-api@.service.d/${INSTALLED}\n`);
+  const order = ['50-lifecycle.conf', '60-hosted-egress.conf', 'zzzzzzzzz-auth-dev-task12-final.conf', 'zzzzzzzzzz-billing-notice-spool.conf', INSTALLED, RELEASE_DROPIN_NAME];
+  expect([...order].sort()).toEqual(order);
+ });
+ it('the hosted launcher admits the fence only at its fixed path', () => {
+  const hosted = (): Record<string, string> => ({ ...configured(), DEBATEAI_DEPLOYMENT_MODE: 'hosted',
+   PREVIEW_PROVIDER_TEST_CONFIG_JSON: JSON.stringify({ deployment: 'v3-preview', free_model_ids: ['zai-org/GLM-5.3-Flash'], requested_thinking_level: 'high', budget_socket: '/run/debateai-v3-preview/team-budget-v2.sock', scope_id: 'preview-team-v2-20261009' }),
+   PREVIEW_TEAM_USER_IDS_JSON: '["0b7c6f1e-2d3a-4b5c-8d9e-0f1a2b3c4d5e"]',
+   GEOIP_COUNTRY_DB_PATH: '/var/lib/debateai-geoip/dbip-country-lite.mmdb', TOR_EXIT_LIST_PATH: '/var/lib/debateai-geoip/tor-exit-list.txt',
+   TURNSTILE_SOCKET_PATH: '/run/debateai-preview-turnstile/siteverify.sock' });
+  const narrow = (input: Record<string, string>) => env.narrowEnvironment('api', input, runtime, native, approved);
+  expect(narrow({ ...hosted(), RESTORE_FENCE_PATH: FENCE }).environment.RESTORE_FENCE_PATH).toBe(FENCE);
+  expect(narrow(hosted()).environment.RESTORE_FENCE_PATH).toBeUndefined();
+  for (const other of ['/var/lib/debateai/api/restore-fence/fence', `${FOLDER}/other`, `${FOLDER}/../restore-fence/fence`]) {
+   expect(() => narrow({ ...hosted(), RESTORE_FENCE_PATH: other }), other).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
   }
  });
 });

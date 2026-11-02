@@ -353,3 +353,84 @@ describe("the question-language decider (question-language spec 2026-10-13)", ()
     expect(runLanguageOf(lock, "anything")).toEqual({ tag: "sr-Latn", nameEn: "Serbian (Latin script)" });
   });
 });
+
+// Security audit run 3, NV-47: the decider asks the person's own count of paid checks once, right before a paid check,
+// and only on the ASK_FAST branch. "red:" fails on the source before NV-47; "guard:" passes before and after.
+describe("NV-47 the owner's fast-check budget", () => {
+  const budgeted = (eld: EldReader, fastCheck: FastCheck, fastCheckBudget: (ownerScope: string) => boolean,
+    key = newQuestionLanguageReferenceKey()) =>
+    new QuestionLanguageDecider({ eld, fastCheck, key, clock: () => NOW, maxQuestionBytes: 8192, fastCheckBudget });
+  const RO_ONE: FastCheckReading = { kind: "ONE", main: { code: "ro", name: "Romanian" } };
+
+  it("red: a spent budget sends no paid check; the fallback lock carries the skip beside its own code", async () => {
+    const fast = fastSaying(RO_ONE);
+    const lock = await budgeted(eldSaying(UNSURE_RO), fast.check, () => false)
+      .decide({ ask: askOf(MIX_Q, { site_language: "ro" }), ownerScope: "owner:a", fastCheckAllowed: true });
+    expect(fast.read).not.toHaveBeenCalled();
+    expect(lock).toMatchObject({ language: { code: "ro" }, source: "FALLBACK_SITE", localReason: null });
+    expect(lock.recordCode).toBe(`${lock.source}:FAST_CHECK_SKIPPED_OWNER_BUDGET`);
+    expect(lock.trace.fast).toEqual({ outcome: "DOWN", reason: "SKIPPED_OWNER_BUDGET", main: null });
+    expect(questionLanguageAskContractMember(lock)).toMatchObject({ question_language: {
+      record_code: "FALLBACK_SITE:FAST_CHECK_SKIPPED_OWNER_BUDGET" } });
+  });
+
+  it("red: on the always-check sites (en and ro) a confident same-language ask IS a paid check, so the budget is asked once", async () => {
+    // The premise: eld never settles on these sites (CR-2), so every signed-in ask there reaches ASK_FAST.
+    expect(FAST_CHECK_ALWAYS_SITES).toEqual(expect.arrayContaining(["en", "ro"]));
+    const cases = [
+      ["ro", askOf("Ar trebui orașele să taxeze traficul?", { site_language: "ro" })],
+      ["en", askOf("Should cities price congestion?", { site_language: "en" })],
+      // No site_language: read as en.
+      ["en", askOf("Should cities price congestion?")]
+    ] as const;
+    for (const [code, ask] of cases) {
+      const fast = fastSaying({ kind: "ONE", main: { code, name: code === "ro" ? "Romanian" : "English" } });
+      const budget = vi.fn((_ownerScope: string) => true);
+      const lock = await budgeted(eldSaying(sure(code)), fast.check, budget).decide({ ask, ownerScope: "owner:nv47", fastCheckAllowed: true });
+      expect(budget, code).toHaveBeenCalledTimes(1);
+      expect(budget, code).toHaveBeenCalledWith("owner:nv47");
+      expect(fast.read, code).toHaveBeenCalledTimes(1);
+      expect(lock, code).toMatchObject({ language: { code }, source: "FAST", recordCode: "FAST" });
+    }
+  });
+
+  it("red: a budget that throws is a skip, never a block: no call, the same suffix, and decide resolves", async () => {
+    const fast = fastSaying(RO_ONE);
+    const decided = budgeted(eldSaying(UNSURE_RO), fast.check, () => { throw new TypeError("ADMISSION_SCOPE_UNKNOWN:languageChecks"); })
+      .decide({ ask: askOf(MIX_Q, { site_language: "ro" }), ownerScope: "owner:a", fastCheckAllowed: true });
+    await expect(decided).resolves.toMatchObject({ source: "FALLBACK_SITE" });
+    const lock = await decided;
+    expect(fast.read).not.toHaveBeenCalled();
+    expect(lock.recordCode).toBe(`${lock.source}:FAST_CHECK_SKIPPED_OWNER_BUDGET`);
+    expect(lock.trace.fast).toEqual({ outcome: "DOWN", reason: "SKIPPED_OWNER_BUDGET", main: null });
+  });
+
+  it("guard: the budget is never asked when no paid check is due (eld settles, a choice, a signed-out person)", async () => {
+    const budget = vi.fn((_ownerScope: string) => true);
+    // eld settles on a site outside the always-check list (PF-L20's SETTLING).
+    const settling = fastSaying({ kind: "ONE", main: { code: "en", name: "English" } });
+    expect(await budgeted(eldSaying(sure(SETTLING)), settling.check, budget).decide({ ask: askOf("A question in the site's language?",
+      { site_language: SETTLING as never }), ownerScope: "owner:a", fastCheckAllowed: true })).toMatchObject({ source: "ELD_SITE" });
+    expect(settling.read).not.toHaveBeenCalled();
+    // The choice path: an answer to a real offer (signed by the same key) locks CHOICE with no paid check.
+    const key = newQuestionLanguageReferenceKey();
+    const offered = await deciderWith(eldSaying(UNSURE_RO), fastSaying(RO_EN_MIX).check, key)
+      .decide({ ask: askOf(MIX_Q, { site_language: "ro" }), ownerScope: "owner:a", fastCheckAllowed: true }).catch((error: unknown) => error);
+    expect(offered).toBeInstanceOf(QuestionLanguageChoiceNeeded);
+    const choosing = fastSaying(RO_ONE);
+    const chooser = budgeted(eldSaying(UNSURE_RO), choosing.check, budget, key);
+    expect(await chooser.decide({ ask: askOf(MIX_Q, { site_language: "ro", question_language_choice: {
+      check_ref: (offered as QuestionLanguageChoiceNeeded).offer.check_ref, choice: "KEEP_MINE" } }), ownerScope: "owner:a", fastCheckAllowed: true }))
+      .toMatchObject({ source: "CHOICE" });
+    // An unsigned reference is the expected refusal, still with no paid check and no budget asked.
+    await expect(chooser.decide({ ask: askOf(MIX_Q, { site_language: "ro", question_language_choice: { check_ref: "aa.bb", choice: "KEEP_MINE" } }),
+      ownerScope: "owner:a", fastCheckAllowed: true })).rejects.toMatchObject({ code: "QUESTION_LANGUAGE_CHECK_INVALID" });
+    expect(choosing.read).not.toHaveBeenCalled();
+    // A signed-out person never reaches the fast AI (L-NOCONSENT).
+    const signedOut = fastSaying(RO_ONE);
+    expect(await budgeted(eldSaying(UNSURE_RO), signedOut.check, budget)
+      .decide({ ask: askOf(MIX_Q, { site_language: "ro" }), ownerScope: "legacy:x", fastCheckAllowed: false })).toMatchObject({ source: "LOCAL_SITE" });
+    expect(signedOut.read).not.toHaveBeenCalled();
+    expect(budget).not.toHaveBeenCalled();
+  });
+});

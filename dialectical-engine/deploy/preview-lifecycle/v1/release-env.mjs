@@ -110,7 +110,8 @@ const ACROSS_DIFFERENT = Object.freeze([['RELEASE_KEY', 'api'], ['RUNNER_WORKER_
  * API's release key; its ports and API address are its slot's; and its payment marks list, when it has one, is a list
  * of netopia, visa and mastercard (environment.mjs isPaymentMarksList; never compared across releases, since a release
  * may change it on purpose). Across releases (two only): every API and runner file names the same spending gates and
- * scope, deployment mode, workflow and team; the release keys, runner identities and ports all differ. Returns every
+ * scope, deployment mode, workflow and team, and every API file that names a restore fence names the same one
+ * (SAME_API_RESTORE_FENCE_PATH, NV-07); the release keys, runner identities and ports all differ. Returns every
  * check, OK or not, in a fixed order.
  */
 export function sameChecks(releases) {
@@ -130,6 +131,9 @@ export function sameChecks(releases) {
     const backends = releases.flatMap(release => [release.api, release.runner]);
     for (const field of ACROSS_CONFIG) out.push(result(`SAME_${field.toUpperCase()}`, allSame(backends.map(environment => configField(environment, field)), false)));
     for (const key of ACROSS_SAME) out.push(result(`SAME_${key}`, allSame(backends.map(environment => environment[key]), false)));
+    // NV-07: every release on one host must share ONE restore fence file, or each one's advance looks like a restore to
+    // the other. A release from before NV-07 names none (its shape refuses the key), so only named paths are compared.
+    out.push(result('SAME_API_RESTORE_FENCE_PATH', allSame(releases.map(release => release.api.RESTORE_FENCE_PATH).filter(value => value !== undefined), false)));
     for (const [key, service] of ACROSS_DIFFERENT) out.push(result(`DIFFERENT_${key}`, allDifferent(releases.map(release => release[service][key]))));
   }
   return Object.freeze(out);

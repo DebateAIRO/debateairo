@@ -45,5 +45,17 @@ describe.each(['password_reset','backup_email','mfa_recovery'] as const)('%s not
   const run=worker.reconcile(1);await tick();expect(f.stats().claims).toBe(0);expect(f.loaded).toHaveLength(0);blockers.resolve();f.transport.resolve();await run;await worker.close();await dispatcher.drainRegistrationAdmissions();await dispatcher.drainMailDispatches();dispatcher.drainMailCapacitySignals();await dispatcher.drainRateLimitAuditFlushes();blind.fill(0);
   expect(f.stats().claims).toBe(1);expect(f.finished).toEqual([false]);expect(f.loaded.every(key=>key.every(value=>value===0))).toBe(true);expect(f.plains.every(plain=>plain.every(value=>value===0))).toBe(true);
  },30000);
+ // K09/NV-24: the notice workers' own lane; 32 anonymous recovery starts holding every shared permit cannot delay them.
+ it('claims and sends on the notice lane while 32 anonymous recovery starts hold every shared permit',async()=>{
+  const f=fixture();const blind=Buffer.alloc(32,4);
+  const dispatcher=new RegistrationService({repository:{} as never,mail:{sendVerification:async()=>{}},dekStore:{store:async()=>{},destroy:async()=>'ALREADY_ABSENT'},blindIndexKey:blind,policy:authPolicy,limiter:new InProcessAuthRateLimiter(authPolicy.rateLimits,authPolicy.rateLimitBucketCapacity,authPolicy.rateLimitRefusalAuditIntervalMs),argon2:{} as never});
+  const blockers=defer();await Promise.all(Array.from({length:32},()=>dispatcher.dispatchRecoveryMail(async()=>async()=>{await blockers.promise;})));
+  const worker=flow==='password_reset'?new PasswordResetNotificationWorker({...f.common,repository:f.common.repository as never,passwordResetPolicy:resetPolicy,dispatch:prepare=>dispatcher.dispatchNoticeMail(prepare)}):new EmailRecoveryNotificationWorker({...f.common,flow,dispatch:prepare=>dispatcher.dispatchNoticeMail(prepare)});
+  const run=worker.reconcile(1);void run.catch(()=>{});
+  await vi.waitFor(()=>expect(f.stats().claims).toBe(1),{timeout:1000});await vi.waitFor(()=>expect(f.stats().sends).toBe(1),{timeout:2000});
+  expect(dispatcher.mailDispatchOccupancy()).toMatchObject({inFlight:32,queued:0});expect(dispatcher.noticeMailDispatchOccupancy().inFlight).toBe(1);
+  f.transport.resolve();await run;await worker.close();blockers.resolve();await dispatcher.drainRegistrationAdmissions();await dispatcher.drainMailDispatches();dispatcher.drainMailCapacitySignals();await dispatcher.drainRateLimitAuditFlushes();blind.fill(0);
+  expect(f.finished).toEqual([true]);expect(f.loaded.every(key=>key.every(value=>value===0))).toBe(true);
+ },30000);
 
 });

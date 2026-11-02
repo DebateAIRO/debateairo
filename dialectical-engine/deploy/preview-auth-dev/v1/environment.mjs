@@ -74,7 +74,10 @@ export const PREVIEW_HOSTED_FIXED_VALUES=Object.freeze({
  SMARTBILL_API_BASE_URL:'https://smartbill.invalid',
  // Optional (NETOPIA's answers 2026-10-21, B3a): the API-owned 0700 folder of NETOPIA messages the database could not
  // store; its unit's write permission is debateai-preview-api-notice-spool.conf (deploy/preview-release/v1/README.md H9).
- BILLING_NOTICE_SPOOL_PATH:'/var/lib/debateai-v3-preview/api/billing-notice-spool'
+ BILLING_NOTICE_SPOOL_PATH:'/var/lib/debateai-v3-preview/api/billing-notice-spool',
+ // NV-07: the restore fence file in the API-owned 0700 folder outside every backup; its unit's write permission is
+ // debateai-preview-api-restore-fence.conf (deploy/preview-release/v1/README.md H11). Every release names this one path.
+ RESTORE_FENCE_PATH:'/var/lib/debateai-v3-preview/api/restore-fence/fence'
 });
 /** NETOPIA's two sandbox bases, exactly (packages/payments-netopia/src/hosts.ts; a unit test pins the two lists equal). */
 export const PREVIEW_NETOPIA_SANDBOX_BASES=Object.freeze(['https://secure-sandbox.netopia-payments.com','https://secure.sandbox.netopia-payments.com']);
@@ -93,7 +96,8 @@ const REFUSED_ON_PREVIEW=['BILLING_STAGE_CLOCK_OFFSET_DAYS'];
  * start without them in hosted mode); NETOPIA's four settings all or none, and Quaderno's, SmartBill's and the owner's
  * six all or none and only beside NETOPIA's (none: hosted, billing off; NETOPIA alone: the provider-only mode; all
  * ten: billing on, once the register says so); and every value a sandbox form at its fixed path. The billing notice
- * spool is optional, only beside NETOPIA's four (it keeps NETOPIA's messages), and only at its fixed folder.
+ * spool is optional, only beside NETOPIA's four (it keeps NETOPIA's messages), and only at its fixed folder. The restore
+ * fence path (NV-07), when set, only at its fixed path.
  */
 function assertHostedApiValues(configured) {
  const fixed=PREVIEW_HOSTED_FIXED_VALUES;
@@ -107,6 +111,7 @@ function assertHostedApiValues(configured) {
  if(invoicing>0&&(!PREVIEW_QUADERNO_SANDBOX_BASE.test(configured.QUADERNO_API_BASE_URL)||configured.SMARTBILL_API_BASE_URL!==fixed.SMARTBILL_API_BASE_URL
   ||['QUADERNO_API_KEY_PATH','SMARTBILL_CREDENTIALS_PATH','OWNER_REPORT_EMAIL_PATH'].some(key=>configured[key]!==fixed[key])))refuse();
  if(configured[SPOOL_KEY]!==undefined&&(netopia===0||configured[SPOOL_KEY]!==fixed[SPOOL_KEY]))refuse();
+ if(configured.RESTORE_FENCE_PATH!==undefined&&configured.RESTORE_FENCE_PATH!==fixed.RESTORE_FENCE_PATH)refuse();
 }
 /** No billing setting in local mode: billing exists only in hosted mode (apps/api/src/billing/connectors.ts billingModeOf). */
 const BILLING_ONLY_KEYS=[...NETOPIA_KEYS,...INVOICING_KEYS,SPOOL_KEY];
@@ -143,7 +148,8 @@ export function isPaymentMarksList(value) {
 }
 // RELEASE_KEY: the website refuses to start without its release key (side-by-side spec §1, §7; apps/ui/release-edge.mjs).
 // PAYMENT_MARKS_AVAILABLE: the website's payment marks list (deploy/vps/README.md §14.7); a release before T+1 refuses it, so it goes only into the ui file of a release that lists it here.
-const UI=['NODE_ENV','PUBLIC_APP_URL','PORT','DIALECTICAL_UI_HOST','DIALECTICAL_API_BASE','DIALECTICAL_UI_TRUSTED_PROXIES','DIALECTICAL_UI_EDGE_SECRET_PATH','NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON','TURNSTILE_SITE_KEY','RELEASE_KEY','PAYMENT_MARKS_AVAILABLE'];
+// DIALECTICAL_UI_API_PROOF_PATH: the UI-to-API proof (NV-03); a release before NV-03 refuses it, so it goes only into the ui file of a release that lists it here (SB5c).
+const UI=['NODE_ENV','PUBLIC_APP_URL','PORT','DIALECTICAL_UI_HOST','DIALECTICAL_API_BASE','DIALECTICAL_UI_TRUSTED_PROXIES','DIALECTICAL_UI_EDGE_SECRET_PATH','NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON','TURNSTILE_SITE_KEY','RELEASE_KEY','PAYMENT_MARKS_AVAILABLE','DIALECTICAL_UI_API_PROOF_PATH'];
 /**
  * Side-by-side spec §1 (O1): a preview process starts only as its plan's release. Its RELEASE_KEY must be exactly
  * r<plan register pin>-<first 12 hex of the plan's source revision>, so an env file of another release (another

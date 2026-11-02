@@ -39,6 +39,12 @@ const THREAT_REPORT = "0128_threat_reports.sql";
 const SUPPORT_ANSWER_SCOPE = "0129_support_answer_scope.sql";
 /** Row-level security, chained after the support answer scope (mission row-level-security, SPEC-v4 R26). */
 const RLS = "0130_row_level_security.sql";
+/** The security fixes of audit run 3, chained after row-level security. */
+const SECURITY_FIXES = "0131_security_fixes_run3.sql";
+/** The three recovery notice due indexes (NV-38), outside-transaction steps chained after the security fixes. */
+const DUE_INDEXES = ["0132_password_reset_notice_due.sql", "0133_backup_email_notice_due.sql", "0134_mfa_recovery_notice_due.sql"] as const;
+/** The MFA recovery control user index (NV-15, NV-16), the outside-transaction step after the due indexes. */
+const CONTROL_INDEX = "0135_mfa_recovery_control_user_started.sql";
 const ROTATE = "identity.rotate_session_after_step_up(uuid,uuid,text,uuid,bigint,uuid,text,text,text,jsonb,timestamp with time zone,uuid,text,text,uuid,timestamp with time zone)";
 const rows = async (db: TestDatabase, table: string) => (await db.pool.query(`SELECT * FROM ${table} ORDER BY 1`)).rows;
 const ledger = (db: TestDatabase) => rows(db, "public.debateai_schema_migration");
@@ -50,13 +56,13 @@ describe("data export forward115", () => {
   beforeAll(async () => { db = await startTestDatabase(); await migrate(db.pool); }, 180_000);
   afterAll(async () => { await db?.stop(); });
 
-  it("G1 applies 0110, NETOPIA 0111, the auth batch 0112, Part C 0113, role rotation 0114, export 0115, the mail locale 0116, the map 0117, the language check 0118 and the reclaim resume 0119 and the reply measures 0120, the engine verdict 0121, the engine's map answer step 0122, the side-by-side releases 0123, the settings activation 0124, the Italy-specific approval 0125, the synthesis check 0126, the publication review 0127, the threat reports 0128 and the support answer scope 0129 with linked receipts", async () => {
+  it("G1 applies 0110, NETOPIA 0111, the auth batch 0112, Part C 0113, role rotation 0114, export 0115, the mail locale 0116, the map 0117, the language check 0118 and the reclaim resume 0119 and the reply measures 0120, the engine verdict 0121, the engine's map answer step 0122, the side-by-side releases 0123, the settings activation 0124, the Italy-specific approval 0125, the synthesis check 0126, the publication review 0127, the threat reports 0128, the support answer scope 0129, row-level security 0130, the security fixes 0131, the due indexes 0132 to 0134 and the control user index 0135 with linked receipts", async () => {
     const plan = await loadMigrationPlan();
-    expect(plan.forwardChain.map(step => step.name)).toEqual([NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAIL_LOCALE, MAP, LANGUAGE_CHECK, RECLAIM, REPLY_MEASURES, ENGINE_VERDICT, ENGINE_MAP_CHECK, SIDE_BY_SIDE, SETTINGS_ACTIVATION, ITALY_APPROVAL, SYNTHESIS_CHECK, PUBLICATION_REVIEW, THREAT_REPORT, SUPPORT_ANSWER_SCOPE, RLS]);
+    expect(plan.forwardChain.map(step => step.name)).toEqual([NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAIL_LOCALE, MAP, LANGUAGE_CHECK, RECLAIM, REPLY_MEASURES, ENGINE_VERDICT, ENGINE_MAP_CHECK, SIDE_BY_SIDE, SETTINGS_ACTIVATION, ITALY_APPROVAL, SYNTHESIS_CHECK, PUBLICATION_REVIEW, THREAT_REPORT, SUPPORT_ANSWER_SCOPE, RLS, SECURITY_FIXES, ...DUE_INDEXES, CONTROL_INDEX]);
     const names = (await ledger(db)).map(row => row.name).filter(name => /^01[123]/u.test(name));
-    expect(names).toEqual(["0110_account_erasure_public_debates.sql", NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAIL_LOCALE, MAP, LANGUAGE_CHECK, RECLAIM, REPLY_MEASURES, ENGINE_VERDICT, ENGINE_MAP_CHECK, SIDE_BY_SIDE, SETTINGS_ACTIVATION, ITALY_APPROVAL, SYNTHESIS_CHECK, PUBLICATION_REVIEW, THREAT_REPORT, SUPPORT_ANSWER_SCOPE, RLS]);
+    expect(names).toEqual(["0110_account_erasure_public_debates.sql", NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAIL_LOCALE, MAP, LANGUAGE_CHECK, RECLAIM, REPLY_MEASURES, ENGINE_VERDICT, ENGINE_MAP_CHECK, SIDE_BY_SIDE, SETTINGS_ACTIVATION, ITALY_APPROVAL, SYNTHESIS_CHECK, PUBLICATION_REVIEW, THREAT_REPORT, SUPPORT_ANSWER_SCOPE, RLS, SECURITY_FIXES, ...DUE_INDEXES, CONTROL_INDEX]);
     const steps = await receipts(db);
-    expect(steps.map(step => step.source_name)).toEqual([NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAIL_LOCALE, MAP, LANGUAGE_CHECK, RECLAIM, REPLY_MEASURES, ENGINE_VERDICT, ENGINE_MAP_CHECK, SIDE_BY_SIDE, SETTINGS_ACTIVATION, ITALY_APPROVAL, SYNTHESIS_CHECK, PUBLICATION_REVIEW, THREAT_REPORT, SUPPORT_ANSWER_SCOPE, RLS]);
+    expect(steps.map(step => step.source_name)).toEqual([NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAIL_LOCALE, MAP, LANGUAGE_CHECK, RECLAIM, REPLY_MEASURES, ENGINE_VERDICT, ENGINE_MAP_CHECK, SIDE_BY_SIDE, SETTINGS_ACTIVATION, ITALY_APPROVAL, SYNTHESIS_CHECK, PUBLICATION_REVIEW, THREAT_REPORT, SUPPORT_ANSWER_SCOPE, RLS, SECURITY_FIXES, ...DUE_INDEXES, CONTROL_INDEX]);
     expect(steps[4].previous_manifest_sha256).toBe(steps[3].forward_manifest_sha256);
     expect(steps[4].verifier_sha256).toBe(steps[3].verifier_sha256);
     expect(steps[5].previous_manifest_sha256).toBe(steps[4].forward_manifest_sha256);

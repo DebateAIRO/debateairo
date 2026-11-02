@@ -7,17 +7,27 @@
 # Hatchet is shared by every release, and updating code must never change what it runs. The project keeps its fixed
 # name (debateai-prod), so the same container and config volume carry on after the move.
 # The app units only Want= this one (spec §4): restarting Hatchet does not stop a release's API or runner.
+# Requires the ingress guard (NV-56): the 127.0.0.1 publish keeps other hosts out only while off-host packets for
+# 127.0.0.0/8 and for Hatchet's ports are dropped first.
 [Unit]
 Description=DebateAI Hatchet engine (hatchet-lite container)
 Documentation=file:///opt/debateai/dialectical-engine/deploy/vps/README.md
-After=network-online.target postgresql.service docker.service
+After=network-online.target postgresql.service docker.service debateai-ingress-guard.service
 Wants=network-online.target
-Requires=docker.service postgresql.service
+Requires=docker.service postgresql.service debateai-ingress-guard.service
 
 [Service]
 Type=oneshot
 RemainAfterExit=true
 WorkingDirectory=/etc/debateai/hatchet
+# NV-56: refuse to create the container while either ingress drop is missing (it may have been flushed since the
+# guard ran).
+ExecStartPre=/usr/sbin/iptables -w -t raw -C PREROUTING ! -i lo -d 127.0.0.0/8 -m comment --comment debateai-loopback-guard -j DROP
+ExecStartPre=/usr/sbin/iptables -w -t raw -C PREROUTING ! -i lo -p tcp -m multiport --dports 7077,8888 -m comment --comment debateai-hatchet-ports-guard -j DROP
+# NV-51 (L7-F3): no container is created from a hatchet.env without its own admin pair. A missing, duplicated, default
+# or short pair refuses here, before `compose up` reads the file. The check is installed beside the compose file
+# (README §5), never in a release.
+ExecStartPre=/usr/bin/node /etc/debateai/hatchet/check-env.mjs /etc/debateai/hatchet.env
 ExecStart=/usr/bin/docker compose -f /etc/debateai/hatchet/compose.prod.yaml up -d
 ExecStop=/usr/bin/docker compose -f /etc/debateai/hatchet/compose.prod.yaml down
 TimeoutStartSec=180

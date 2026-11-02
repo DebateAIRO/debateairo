@@ -109,6 +109,13 @@ if (process.env.FAKE_GROK_CAPTURED_ENVELOPE === "1") {
   process.stdout.write(`${envelope({ text: "model absent", modelUsage: {} })}\n`);
 } else if (prompt.includes("NON_JSON_CLI")) {
   process.stdout.write("not json\n");
+} else if (prompt.includes("TOOL_TURNS_CLI")) {
+  // NV-53: an answer grok produced after tool turns; its text stands in for what a tool read.
+  process.stdout.write(`${envelope({ text: "canary-v04", num_turns: 3 })}\n`);
+} else if (prompt.includes("TURNS_UNREPORTED_CLI")) {
+  process.stdout.write(`${envelope({ text: "canary-turns-unreported", num_turns: undefined })}\n`);
+} else if (prompt.includes("STOP_REASON_CLI")) {
+  process.stdout.write(`${envelope({ text: "canary-stop-reason", stopReason: "tool_use" })}\n`);
 } else {
   process.stdout.write(`${envelope()}\n`);
 }

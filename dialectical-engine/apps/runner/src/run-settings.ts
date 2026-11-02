@@ -24,6 +24,7 @@ import {
 } from "@debateai/register";
 import {
   CostEnvelopeGuard,
+  DAILY_COST_ENVELOPE_REACHED,
   PostgresModelSpendStore,
   assertRunCeilingCoversOneCall,
   costEnvelopeGuardPolicy,
@@ -788,6 +789,34 @@ export function runCostEnvelopeGuardOf(
       throw new TypedDomainError("RUN_SETTINGS_VERSION_UNKNOWN", `RUN_SETTINGS_VERSION_UNKNOWN:${String(version)}`);
     }
     return guard;
+  };
+}
+
+/**
+ * NV-25 (security audit run 3) — A RE-SENT DEBATE IS ADMITTED BY THE DAY AGAIN. The stale-READY re-send
+ * (runner-lapsed-resend.ts) hands Hatchet a debate whose daily reservation (30 minutes) has lapsed, and without the
+ * band nothing in the runner reads the day. So each re-send first asks the run's OWN version's daily guard, the
+ * API's rule, lock, reservation and amount (`assertDailyEnvelopeAdmitsNewRun`): true when the day admits it (a
+ * fresh reservation is written), false when the day is REACHED. A version this release cannot run is admitted
+ * (its task sets it aside before any call); local mode has no guard and admits; a hosted version without a guard
+ * is refused (never sent unmetered). A database failure propagates.
+ */
+export function staleReadyDayAdmission(input: Readonly<{
+  cache: Pick<RunnerSettingsCache, "settingsFor">;
+  hosted: boolean;
+}>): (item: Readonly<{ registerVersion: number }>) => Promise<boolean> {
+  return async ({ registerVersion }) => {
+    const resolution = await input.cache.settingsFor(registerVersion);
+    if (resolution.kind === "UNSUPPORTED") return true;
+    const guard = resolution.version.costEnvelope?.guard;
+    if (guard === undefined) return !input.hosted;
+    try {
+      await guard.assertDailyEnvelopeAdmitsNewRun();
+      return true;
+    } catch (error) {
+      if (error instanceof TypedDomainError && error.code === DAILY_COST_ENVELOPE_REACHED) return false;
+      throw error;
+    }
   };
 }
 

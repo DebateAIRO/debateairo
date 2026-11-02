@@ -19,7 +19,7 @@ import {
   readAnthropicMessagesReply
 } from "./anthropic-messages.js";
 import { previewModelRowForEndpoint, previewSamplingMembers } from "./preview-models.js";
-import { ProviderUnbilledRefusal } from "./unbilled-refusal.js";
+import { ProviderSentBilledFailure, ProviderUnbilledRefusal } from "./unbilled-refusal.js";
 import { contentRepairsOf, type ModelJsonRepair, type ModelReplyFacts } from "./model-json.js";
 import { replyWordCount } from "./reply-words.js";
 import { replyFailureClassOf, type ReplyFailureClass } from "./reply-fixer.js";
@@ -1363,7 +1363,8 @@ export interface ProviderCostEnvelopeSeam {
    * CHARGE what the vendor billed. Called for every attempt that produced a
    * response body, whatever the engine then decides about it, and it NEVER
    * refuses: it records money already taken, and a refusal here would be a
-   * reason not to record it (I4).
+   * reason not to record it (I4). An attempt that was sent and never got this
+   * far is charged by `recordUnanswered` instead (NV-50).
    */
   readonly recordCall: (observed: Readonly<{
     providerRef: string;
@@ -1383,6 +1384,23 @@ export interface ProviderCostEnvelopeSeam {
      * (`ledger.model_spend.attempt_id`). The gateway always passes it.
      */
     attemptId?: string;
+  }>) => void | Promise<void>;
+  /**
+   * NV-50 (security audit run 3): called once for an attempt that was SENT, may
+   * have been billed (`mayHaveBeenBilled`), and never reached `recordCall` — a
+   * deadline, a dropped connection, a reply that could not be read or stored.
+   * `usage` is the body's usage block when a body was read, else undefined; the
+   * policy charges it, or else `projection`'s maximum, before the next attempt is
+   * admitted. A throw means the charge could not be recorded, and the call then
+   * stops: no attempt is sent while an earlier one's money is unrecorded.
+   * Optional: a seam without it keeps the old behaviour.
+   */
+  readonly recordUnanswered?: (observed: Readonly<{
+    providerRef: string;
+    admission?: ProviderCallAdmission;
+    usage: unknown;
+    projection: Readonly<{ requestBytes: number; completionTokenCeiling: number }>;
+    attemptId: string;
   }>) => void | Promise<void>;
   /**
    * The HOSTED requirement, asked only of a SUCCESSFUL completion: a vendor that
@@ -1471,6 +1489,43 @@ export const PROVIDER_COST_ENVELOPE_REFUSAL_CODES = Object.freeze([
   // B9: and one of the run owner's windows, the same way.
   "PERSON_ALLOWANCE_REACHED"
 ] as const);
+
+/**
+ * NV-50: the causes Node's fetch gives a connection that was NEVER established (refused, no such host, a lookup that
+ * failed for now, no route, the connect deadline). Nothing reached the vendor, so nothing was billed.
+ */
+const NEVER_CONNECTED_CAUSES: ReadonlySet<string> = new Set([
+  "ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN", "EHOSTUNREACH", "ENETUNREACH", "UND_ERR_CONNECT_TIMEOUT"
+]);
+
+/** NV-50, rule 5's exception: a fetch failure whose cause says the connection was never made. */
+function neverConnected(error: unknown): boolean {
+  if (!(error instanceof TypeError)) return false;
+  const code = (error as { cause?: { code?: unknown } }).cause?.code;
+  return typeof code === "string" && NEVER_CONNECTED_CAUSES.has(code);
+}
+
+/**
+ * NV-50 — MAY THIS FAILED ATTEMPT HAVE BEEN BILLED? Asked only of an attempt that was sent (the line before the fetch
+ * ran) and never reached `recordCall`. The rules, in order:
+ *  1. a `ProviderUnbilledRefusal` provably cost nothing: no;
+ *  2. the fetch returned, so the vendor answered (a body-read, parse, artifact-store or any later failure): yes;
+ *  3. a `ProviderSentBilledFailure` (the preview gate sent the call and booked its maximum): yes;
+ *  4. any other typed error raised from inside the fetch: no. Node's fetch never throws one; only an in-process wrapper
+ *     does (the preview's guarded fetch and its gate RPC, which the hosted preview runner uses beside the money seam).
+ *     Its doubtful outcomes (STOPPED, a lost reply) are short-circuit codes, booked by the gate's own ledger;
+ *  5. a `TypeError`: only Node's own network failure, "fetch failed", and only when its cause is not a connection that
+ *     was never made. Any other TypeError is fetch's argument check or the preview wrapper's own refusal: nothing left;
+ *  6. anything else (a deadline's TimeoutError or AbortError, an unknown throw): yes, conservatively.
+ */
+function mayHaveBeenBilled(error: unknown, fetchReturned: boolean): boolean {
+  if (error instanceof ProviderUnbilledRefusal) return false;
+  if (fetchReturned) return true;
+  if (error instanceof ProviderSentBilledFailure) return true;
+  if (error instanceof TypedDomainError) return false;
+  if (error instanceof TypeError) return error.message === "fetch failed" && !neverConnected(error);
+  return true;
+}
 
 /** L4-F3: a provider body is streamed and abandoned past this many bytes; nothing of it is persisted. */
 const MAX_PROVIDER_RESPONSE_BYTES = 4 * 1024 * 1024;
@@ -2287,6 +2342,13 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       // Pre-flight fix F13: set when the prompt could not be recorded, so the
       // catch below lets that failure leave unsent, unledgered and unretried.
       let promptRecordFailed = false;
+      // NV-50: how far this attempt got, for the catch's unanswered charge: sent (the line before the fetch), a
+      // reply returned, the charge reached and the charge written; and the body's usage block once it was read.
+      let sent = false;
+      let fetchReturned = false;
+      let chargeReached = false;
+      let chargeWritten = false;
+      let bodyUsage: unknown = undefined;
       try {
         const headers: Record<string, string> = this.#anthropic
           ? anthropicMessagesRequestHeaders(this.#options.authorizationHeader)
@@ -2332,12 +2394,14 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             throw promptError;
           }
         }
+        sent = true;
         const response = await fetcher(`${this.#options.endpoint}${this.#anthropic ? ANTHROPIC_MESSAGES_PATH : "/chat/completions"}`, {
           method: "POST",
           headers,
           signal: AbortSignal.timeout(request.bound.deadlineMs),
           body
         });
+        fetchReturned = true;
         const rawText = await readBoundedResponseText(response);
         let decoded: unknown;
         try {
@@ -2382,6 +2446,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           && !Array.isArray(decoded)
           ? (decoded as Readonly<Record<string, unknown>>).usage
           : undefined;
+        bodyUsage = rawUsage;
         const strict = responseSchema.safeParse(decoded);
         // Model scorecard §2.2/§2.3: a relay says which level it RAN at; an API
         // vendor does not, and then the level sent is the level used. Thinking
@@ -2554,6 +2619,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
          * It sits after `persistRawArtifact` so a charge is never recorded
          * against a call the ledger cannot show.
          */
+        chargeReached = true;
         await request.costEnvelope?.recordCall({
           providerRef: request.providerRef,
           usage: rawUsage,
@@ -2567,6 +2633,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           },
           attemptId
         });
+        chargeWritten = true;
         /**
          * Model scorecard R4: a subscription tool at its usage cap answers 429
          * with the relay's typed marker. The cap is still there one backoff
@@ -2886,6 +2953,23 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
          * a seat never reads it as a reason to switch to its backup.
          */
         if (promptRecordFailed) throw error;
+        // NV-50: an attempt that left, may have been billed and was never charged is charged now (its usage, else its
+        // projected maximum), before the ledger row and before the next attempt's admission, which then sees it.
+        let unansweredUnrecorded = false;
+        if (sent && !chargeReached && request.costEnvelope?.recordUnanswered !== undefined
+          && mayHaveBeenBilled(error, fetchReturned)) {
+          try {
+            await request.costEnvelope.recordUnanswered({
+              providerRef: request.providerRef,
+              usage: bodyUsage,
+              ...(costAdmission === undefined ? {} : { admission: costAdmission }),
+              projection: { requestBytes: Buffer.byteLength(body, "utf8"), completionTokenCeiling: attemptTokenCeiling },
+              attemptId
+            });
+          } catch {
+            unansweredUnrecorded = true;
+          }
+        }
         /**
          * The refusals below are OURS, not the transport's, and none of them is
          * repaired by asking again — so each propagates untouched instead of
@@ -2953,6 +3037,9 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         // packet never reaches here at all, and one on a repair packet has
         // already been ledgered by the rejection branch above.
         if (shortCircuit) throw error;
+        // NV-50: never send another paid attempt while this one's money is unrecorded (the unanswered write failed, or
+        // recordCall's own store write did, whose commit outcome is unknown). Wrapped as PROVIDER_CALL_FAILED.
+        if (unansweredUnrecorded || (chargeReached && !chargeWritten)) break;
         /**
          * Model scorecard R4 + pre-flight ruling F11: a usage cap is still there
          * one backoff later, so the loop stops on the attempt that met it — after

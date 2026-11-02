@@ -27,8 +27,10 @@ export const ACCOUNT_CREDENTIAL_SETTING = "debateai.session_credential";
 /**
  * The readers a call site names (SPEC-v4 §6): X10, X18a-X18g, X18j, X20, X22, X23, X24 inside their reader methods in
  * packages/*; X21 in apps/api/src/preview-budget-estimate.ts; X11, X14, X18h, and since the merge onto synthesis-flag X27
- * (the staff threat report's recipient address) and X28 (the staff publication review), in apps/api/src/main.ts. Background readers
- * (X8, X12, X13) run outside every request scope and need no id; X19 and X25 connect as api-system directly.
+ * (the staff threat report's recipient address) and X28 (the staff publication review), in apps/api/src/main.ts; since the
+ * merge with the security fixes of audit run 3, X10 also in apps/api/src/publications.ts (the public read's run release
+ * key). Background readers (X8, X12, X13) run outside every request scope and need no id; X19 and X25 connect as
+ * api-system directly.
  */
 export type CrossAccountReader = "X10" | "X11" | "X14" | "X18a" | "X18b" | "X18c" | "X18d" | "X18e" | "X18f" | "X18g"
   | "X18h" | "X18j" | "X20" | "X21" | "X22" | "X23" | "X24" | "X27" | "X28";
@@ -121,6 +123,31 @@ export function accountContextRoute(pool: Pool): AccountContextRoute {
   const scope = state.scope.getStore();
   if (scope !== undefined && state.frame.getStore() === undefined) return { kind: "own", credential: scope.credential ?? "" };
   return { kind: "target", target };
+}
+
+/**
+ * The connections a statement issued now on `pool` runs on, read like `accountContextRoute`: the pool's own, with the
+ * credential each own checkout sends, or its target's own, with none (`onCrossAccountTarget` runs the target's own
+ * routing with no credential). Two statements with the same source run as the same login under the same account context.
+ */
+export type AccountContextSource = Readonly<{ pool: Pool; credential: string | null }>;
+
+/**
+ * Security fixes run 3 (NV-31) composed with row security: a lease records the source of the checkout that gave it its
+ * client, and the lease router (index.ts `routeLeaseBodyQueries`) sends a body statement to that client only while the
+ * statement's own source is the same. A `crossAccount(...)` frame entered inside a lease taken in a request therefore
+ * still reaches the target, and a request's statement never rides a lease taken on the target.
+ */
+export function accountContextSource(pool: Pool): AccountContextSource {
+  const route = accountContextRoute(pool);
+  return route.kind === "target"
+    ? Object.freeze({ pool: route.target, credential: null })
+    : Object.freeze({ pool, credential: route.credential });
+}
+
+/** True iff `recorded` (a lease's source, absent for a lease no router recorded) is `current`. */
+export function sameAccountContextSource(recorded: AccountContextSource | undefined, current: AccountContextSource): boolean {
+  return recorded !== undefined && recorded.pool === current.pool && recorded.credential === current.credential;
 }
 
 /**

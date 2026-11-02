@@ -476,7 +476,7 @@ describe("S3 ruled authentication policy", () => {
       "const counters={register:0,verify:0,resend:0};",
       "const now=new Date(0);",
       "const mib=(value)=>Number((value/1024/1024).toFixed(1));",
-      "const source=(route,n)=>{const r=routes.indexOf(route)+1;const h=n.toString(16).padStart(16,'0');return '2001:db8:5c3:'+r+':'+h.slice(0,4)+':'+h.slice(4,8)+':'+h.slice(8,12)+':'+h.slice(12,16);};",
+      "const source=(route,n)=>{const r=routes.indexOf(route)+1;return '2001:db8:'+(r*0x1000+Math.floor(n/65536)).toString(16)+':'+(n%65536).toString(16)+'::1';};",
       "const sample=(target)=>{global.gc();const memory=process.memoryUsage();const occupancy=limiter.memoryOccupancy();process.stdout.write(JSON.stringify({target,occupied:occupancy.occupiedSlots,capacity:occupancy.slotCapacity,rss_mib:mib(memory.rss),allocated_bytes:occupancy.allocatedBytes,sources:{...counters}})+'\\n');};",
       "sample(0);",
       "for(const target of [25,50,100]){for(const route of routes){const wanted=Math.ceil(policy.rateLimitBucketCapacity*target/100);while(limiter.memoryOccupancy().occupiedSlotsByRoute[route]<wanted){const n=++counters[route];limiter.consume({route,ip:source(route,n),addressKey:'ignored',now});if(n>12000000)throw new Error('S3C_OCCUPANCY_DID_NOT_CONVERGE:'+route);}}sample(target);}"
@@ -1493,6 +1493,12 @@ const AUTH_ROUTE_REQUESTS = Object.freeze([
     name: "resend" as const,
     url: "/v1/auth/resend-verification",
     payload: canonicalResend
+  }),
+  // NV-14 Revision 3: the route that hashes the token holder's password.
+  Object.freeze({
+    name: "verify-password" as const,
+    url: "/v1/auth/verify-email/password",
+    payload: { token: "A".repeat(43), password: "correct horse battery staple" }
   })
 ]);
 
@@ -2034,14 +2040,14 @@ function rework7Harness(options: {
       phone: "+40722123456", recoveryEmail: `rework7-${index}-recovery@example.test`,
       adultAffirmed: true
     }, {
-      ip: `2001:db8:7ea::${(index + 1).toString(16)}`,
+      ip: `2001:db8:7ea:${(index + 1).toString(16)}::1`,
       userAgent: "vitest-t1-rework7",
       requestId: `request:t1:rework7:${index}`
     }),
     resend: (index: number) => service.resendVerification({
       email: `rework7-resend-${index}@example.test`
     }, {
-      ip: `2001:db8:7eb::${(index + 1).toString(16)}`,
+      ip: `2001:db8:7eb:${(index + 1).toString(16)}::1`,
       userAgent: "vitest-t1-rework7",
       requestId: `request:t1:rework7:resend:${index}`
     }),
@@ -2421,7 +2427,7 @@ describe("T1 rework7 A1 — the admission token is released exactly once, and ne
             phone: "+40722123456", recoveryEmail: `rework7-limiter-${attempt}-recovery@example.test`,
             adultAffirmed: true
           }, {
-            ip: "2001:db8:7ea::1",
+            ip: "2001:db8:7ea:1::1",
             userAgent: "vitest-t1-rework7",
             requestId: `request:t1:rework7:limiter:${attempt}`
           }).catch(() => undefined);

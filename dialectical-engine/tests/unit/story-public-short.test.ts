@@ -93,6 +93,7 @@ async function publishWith(
       return true;
     },
     abandonKeyProvision: async () => true,
+    readOwnedVisibility: async () => ({ state: "PRIVATE", publicRef: null }),
     readPublic: async () => null
   } as unknown as PostgresPublicationRepository;
   const application = stories === undefined

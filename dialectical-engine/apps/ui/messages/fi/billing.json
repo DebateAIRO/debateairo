@@ -157,6 +157,7 @@
   "billing.subscription.withdrawNothingDue": "Valmista. Tilauksesi on päättynyt. Jo käyttämäsi osuus kattaa koko hinnan, joten sinulle ei kuulu palautusta.",
   "billing.subscription.withdrawOwnerReview": "Tilauksesi on päättynyt. Yhteen maksuistasi on jo tehty palautus, joten tarkistamme, mitä on vielä maksettava takaisin, ja lähetämme sinulle sähköpostia 14 päivän kuluessa.",
   "billing.subscription.withdrawWindowClosed": "14 päivän peruuttamisaika on päättynyt, tai se ei koske asuinmaatasi. Voit silti peruuttaa tilauksen milloin tahansa.",
+  "billing.subscription.withdrawDebateRunning": "Aloittamasi väittely saattaa vielä käyttää krediittiä, joten emme voi vielä sanoa, kuinka paljon olet käyttänyt. Yritä myöhemmin uudelleen. Sinulla on vielä yli päivä aikaa perua sopimus.",
   "billing.subscription.stillConfirming": "Vahvistamme tätä vielä maksupalvelun tarjoajan kanssa. Tarkista tämä sivu uudelleen muutaman minuutin kuluttua.",
   "billing.subscription.actionFailed": "Se ei onnistunut. Yritä uudelleen.",
   "billing.subscription.invoices": "Laskut",

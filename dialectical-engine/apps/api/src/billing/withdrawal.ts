@@ -72,6 +72,20 @@ export function withdrawalPayments(
 const REFUND_SAVEPOINT = "billing_withdrawal_refunds";
 
 /**
+ * NV-45: a withdrawal waits for a debate that may still be using credit only while the window closes more than this
+ * after it, so the person can always try again in time; inside the last day it is recorded at once.
+ */
+export const WITHDRAWAL_WAIT_MARGIN_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * NV-45: a statement older than this never waits: every call sent before it has been answered. This assumes every
+ * call deadline is under an hour: story bounds are capped at 900 s by their schema (`story-policy.ts`), but the
+ * synthesizer and evaluator bounds have only a floor (`algorithm-policy.ts`; the shipped debate rows are 60-180 s). A
+ * deadline sealed above an hour would under-deduct, in the person's favour.
+ */
+export const WITHDRAWAL_WAIT_STATEMENT_AGE_MS = 60 * 60 * 1000;
+
+/**
  * Spec §2.5.6 withdraw. The decision and every record commit together — WITHDRAWN, the FREE entitlement and the
  * refund intents (P9b's RefundDesk: REFUND_REQUESTED + one PAYMENT_REFUND job per payment, split newest first) —
  * and only then does money move, through the outbox this function kicks; M8 ("we refunded …") follows the last
@@ -79,9 +93,12 @@ const REFUND_SAVEPOINT = "billing_withdrawal_refunds";
  * queues the acknowledgement of receipt (Directive 2011/83/EU art. 11(3)) for every withdrawal it records: M8_RECEIVED
  * ("we received your withdrawal on …; we're refunding {amount}", or the owner's check), or, when nothing is due back,
  * M8 itself, which then says everything at once. The credit share uses the credit
- * in force at `withdrewAt` (A6's override after an upgrade) and the credit spent from the period start to it
- * ("withdrawal after an upgrade: the paid total is the sum of all successful charges since the first activation");
- * both are read before the lock, so a plan or period that changed meanwhile is refused and nothing is written.
+ * in force at `withdrewAt` (A6's override after an upgrade) and the credit spent by calls sent from the period start
+ * to it (NV-45) ("withdrawal after an upgrade: the paid total is the sum of all successful charges since the first
+ * activation"); both are read before the lock, so a plan or period that changed meanwhile is refused and nothing is
+ * written. NV-45: while more than a day of the window is left and the statement is under an hour old, it waits for
+ * the person's debates that may still be using credit (`WITHDRAWAL_DEBATE_RUNNING`, before the lock: nothing is
+ * written and the grant is not spent).
  * W6 (P2-I8): each of those payments gives back its own share, its days measured over the stretch it paid for
  * (`withdrawalPayments`: an UPGRADE's starts at its quote's creation), and the sum is floored once. C1 (P2-W6): a
  * payment whose SUCCEEDED is after `withdrewAt` (an upgrade paid after the emailed statement arrived, before the
@@ -108,12 +125,19 @@ export async function recordWithdrawal(deps: WithdrawalDeps, request: Withdrawal
     refuse(409, "NOT_SUBSCRIBED");
   }
   const taxCountry = await initialTaxCountry(deps.billing, before);
-  if (withdrawalOpenUntil({
+  const closesAt = withdrawalOpenUntil({
     state: before, taxCountry, policy: deps.policy, now: withdrewAt, paymentEnvironment: deps.paymentEnvironment
-  }) === null) {
+  });
+  if (closesAt === null) {
     refuse(409, "WITHDRAWAL_WINDOW_CLOSED");
   }
-  const spentMicros = await deps.ownerSpend.readOwnerSpentMicros(ownerRef, before.currentPeriodStart, withdrewAt);
+  // NV-45: the credit used is read by when each call was SENT. While the window has more than a day left and the
+  // statement is fresh, a debate that may still be using credit makes the person try again later; otherwise the
+  // withdrawal is recorded at once with what has been charged (never turned away for lack of time).
+  const { spentMicros, liveRuns } = await deps.ownerSpend.readWithdrawalSpend(ownerRef, before.currentPeriodStart, withdrewAt);
+  const mayWait = closesAt.getTime() - withdrewAt.getTime() > WITHDRAWAL_WAIT_MARGIN_MS
+    && now.getTime() - withdrewAt.getTime() < WITHDRAWAL_WAIT_STATEMENT_AGE_MS;
+  if (liveRuns > 0 && mayWait) refuse(409, "WITHDRAWAL_DEBATE_RUNNING");
   const entitlement = await deps.entitlements.current(ownerRef, withdrewAt);
   // The plan whose credit was in force when the person withdrew (an upgrade since then is not theirs to pay back).
   const creditPlanId = entitlement.planId === "FREE" ? before.planId : entitlement.planId;

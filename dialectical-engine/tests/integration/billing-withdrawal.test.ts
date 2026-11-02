@@ -41,7 +41,7 @@ async function start(label: string, input: Readonly<{ activatedDaysAgo: number; 
   const billing = new BillingRepository(database.pool);
   const deps = subscriptionDeps(database.pool, {
     billing, audit, kick,
-    ownerSpend: { readOwnerSpentMicros: async () => input.spentMicros ?? 1_000_000 },
+    ownerSpend: { readWithdrawalSpend: async () => ({ spentMicros: input.spentMicros ?? 1_000_000, liveRuns: 0 }) },
     clock: () => now
   });
   const api = await mountSubscriptionRoutes(deps, identity);
@@ -266,12 +266,12 @@ describe("P12d withdrawal on real PostgreSQL", () => {
     const raced = subscriptionDeps(database.pool, {
       billing: run.billing, clock: () => run.now,
       ownerSpend: {
-        readOwnerSpentMicros: async () => {
+        readWithdrawalSpend: async () => {
           await seedPaidUpgrade(database.pool, run.seeded, {
             at: new Date(run.now.getTime() - 60_000), netMicros: 15_000_000, taxMicros: 3_150_000,
             providerPaymentId: "7700456", monthCreditOverrideMicros: 12_500_000
           });
-          return 0;
+          return { spentMicros: 0, liveRuns: 0 };
         }
       }
     });
@@ -424,7 +424,7 @@ describe("P12d withdrawal on real PostgreSQL", () => {
     try {
       const run = await start("p12d-small-pool", { activatedDaysAgo: 1, taxCountry: "RO" });
       const deps = subscriptionDeps(small, {
-        ownerSpend: { readOwnerSpentMicros: async () => 1_000_000 }, clock: () => run.now
+        ownerSpend: { readWithdrawalSpend: async () => ({ spentMicros: 1_000_000, liveRuns: 0 }) }, clock: () => run.now
       });
       expect(await withdraw(deps, { authenticated: run.identity.authenticated, grantToken: run.grant }))
         .toMatchObject({ refundMicros: expect.any(Number) });

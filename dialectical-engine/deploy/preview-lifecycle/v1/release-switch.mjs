@@ -80,12 +80,17 @@ import { RELEASE_KEY_PATTERN, countOpenWork, readCurrentRelease, readReleaseEven
 import { checkSettingsGatesLive, planSettingsForSwitch } from './settings-version.mjs';
 
 /**
- * Caddy's health_interval, the switch's take-traffic delay, the edge budget and the backstop. TAKE_TRAFFIC_AFTER_S (final
- * fix wave P6): the old API may serve on a release read up to 5 s old (its watcher's stale bound, apps/api
- * release-state.ts) before it reads NOT_CURRENT, and Caddy then needs one health interval (2 s) to take the old pair out;
- * one more second of margin: 5 + 2 + 1 = 8 s, so the new pair never takes traffic while the old one still does.
+ * Caddy's health_interval and health_fails, and the take-out time they make, the switch's take-traffic delay, the edge
+ * budget and the backstop. TAKE_TRAFFIC_AFTER_S (final fix wave P6, NV-27): the old API may serve on a release read up
+ * to 5 s old (its watcher's stale bound, apps/api release-state.ts) before it reads NOT_CURRENT; a website that answers
+ * 503 at once is then out within CADDY_TAKE_OUT_S (health_fails 2 × health_interval 1 s = 2 s); one more second of
+ * margin: 5 + 2 + 1 = 8 s. A stalled old website may take up to 5 s to leave (1 + 1 + its 3 s probe timeout), but with
+ * lb_policy first Caddy sends new requests to one upstream at a time, so in either slot order the new pair never takes
+ * traffic while the old one still does. tests/architecture/slot-health-budget.test.ts pins these against both Caddy
+ * snippets.
  */
-export const HEALTH_INTERVAL_S = 2, TAKE_TRAFFIC_AFTER_S = 8, EDGE_WAIT_MS = 30_000, EDGE_CONFIRMATIONS = 3, BACKSTOP_S = 27_000;
+export const HEALTH_INTERVAL_S = 1, HEALTH_FAILS = 2, CADDY_TAKE_OUT_S = HEALTH_FAILS * HEALTH_INTERVAL_S, TAKE_TRAFFIC_AFTER_S = 8,
+  EDGE_WAIT_MS = 30_000, EDGE_CONFIRMATIONS = 3, BACKSTOP_S = 27_000;
 /**
  * One edge request every 500 ms (after the previous one answered), each allowed 15 s: longer than lb_try_duration 12 s
  * (integration M11: the no-slot window of a switch grew to about 10 s with the 8 s take-traffic delay), so a request
@@ -100,10 +105,10 @@ export const EDGE_URL = `http://${EDGE_LISTENER.bind}:${EDGE_LISTENER.port}/read
 /** The layout's edge readiness URL: its `edge` listener's /readyz, or the preview's (side-by-side plan D16b). */
 export const edgeUrlOf = layout => (layout.edge ? `${layout.edge}/readyz` : EDGE_URL);
 /**
- * Caddy's copy of the edge secret (its health_headers send it); the website's /readyz answers only a request carrying it.
- * That alone does not keep visitors out (every request the public route proxies carries it too): the public route
- * refuses /readyz itself (`respond /readyz 404`, final fix wave W2), and root reads it through the loopback listener or,
- * as here, straight at a slot's port.
+ * Caddy's copy of the edge secret, which Caddy adds to every request it proxies (header_up). Root only checks that it is
+ * there and well formed; no health check and no root probe sends it to a website port (NV-55). The public route refuses
+ * /readyz itself (`respond /readyz 404`, final fix wave W2), and root reads it through the loopback listener or, as
+ * here, straight at a slot's port.
  */
 export const EDGE_SECRET_PATH = '/etc/debateai-v3-preview/ui-edge.caddy.secret';
 const edgeSecretPathOf = layout => layout.edgeSecretPath ?? EDGE_SECRET_PATH;
@@ -347,10 +352,13 @@ async function readEdge(layout, io) {
   } catch { return { failed: true, status: null, release: null }; }
 }
 
-/** A slot's website /readyz, asked directly with the edge secret: { status, releaseKey, reasons } or null. */
-async function readWebsite(slot, secret, layout, io) {
+/**
+ * A slot's website /readyz, asked directly (no secret: the website answers its readiness to any peer, NV-55):
+ * { status, releaseKey, reasons } or null.
+ */
+async function readWebsite(slot, layout, io) {
   try {
-    const { status, body } = await io.httpGet(`http://127.0.0.1:${slotsOf(layout)[slot].uiPort}/readyz`, { headers: { 'x-debateai-edge-secret': secret }, timeoutMs: WEBSITE_TIMEOUT_MS });
+    const { status, body } = await io.httpGet(`http://127.0.0.1:${slotsOf(layout)[slot].uiPort}/readyz`, { headers: {}, timeoutMs: WEBSITE_TIMEOUT_MS });
     const parsed = JSON.parse(body);
     if (parsed === null || typeof parsed !== 'object' || typeof parsed.releaseKey !== 'string' || !Array.isArray(parsed.reasons) || !parsed.reasons.every(reason => typeof reason === 'string')) return null;
     return { status, releaseKey: parsed.releaseKey, reasons: parsed.reasons };
@@ -370,7 +378,7 @@ const definitiveRefusal = (answer, key) => answer !== null && answer.status !== 
 
 /**
  * Poll the edge until EDGE_CONFIRMATIONS answers in a row are 200 from `key`'s website; null after EDGE_WAIT_MS. Every
- * edge failure on the way is counted in `tally` (controller ruling Q1). `watch` (the switch only: `{ slot, secret }` of
+ * edge failure on the way is counted in `tally` (controller ruling Q1). `watch` (the switch only: `{ slot }` of
  * `key`'s release): while the edge does not show `key`, that website's own /readyz is read too, and a definitive refusal
  * ends the wait at once (null, its reasons in `tally.websiteReasons`) instead of after the whole EDGE_WAIT_MS.
  */
@@ -383,7 +391,7 @@ async function confirmEdge(key, tally, layout, io, watch = null) {
     inARow = confirmed ? inARow + 1 : 0;
     if (inARow >= EDGE_CONFIRMATIONS) return io.now() - startedAt;
     if (!confirmed && watch !== null) {
-      const website = await readWebsite(watch.slot, watch.secret, layout, io);
+      const website = await readWebsite(watch.slot, layout, io);
       if (definitiveRefusal(website, key)) {
         tally.websiteReasons = Object.freeze(website.releaseKey === key ? [...website.reasons] : ['RELEASE_KEY_MISMATCH']);
         return null;
@@ -566,9 +574,9 @@ async function preconditions({ to, from, oldPairStopped, rollback, layout, io })
     const dispatched = started?.startupDispatched;
     if (started?.releaseKey !== toKey || !Number.isSafeInteger(dispatched) || (rollback ? dispatched < 0 : dispatched !== 0)) fields.push('runnerStarted');
   }
-  let secret = null;
-  try { secret = await io.readEdgeSecret(); } catch { fields.push('edgeSecret'); }
-  if (secret !== null && !waitingWebsite(await readWebsite(toRelease.slot, secret, layout, io), toKey, WAITING_REASONS)) fields.push('website');
+  // Custody only (NV-55): Caddy's header_up needs its copy; the website check below sends no secret.
+  try { await io.readEdgeSecret(); } catch { fields.push('edgeSecret'); }
+  if (!waitingWebsite(await readWebsite(toRelease.slot, layout, io), toKey, WAITING_REASONS)) fields.push('website');
   if (!oldPairStopped) {
     const edge = await readEdge(layout, io);
     if (edge.failed || edge.status !== 200 || edge.release !== fromKey) fields.push('edge');
@@ -578,7 +586,7 @@ async function preconditions({ to, from, oldPairStopped, rollback, layout, io })
   if (!gatesActive) fields.push('gates');
   if (await io.pathExists(`${layout.lockRoot}/${MAINTENANCE_PENDING_NAME}`)) fields.push('maintenance');
   if (fields.length) refuse('SWITCH_PRECONDITION_FAILED', fields);
-  return { toKey, fromKey, watch: Object.freeze({ slot: toRelease.slot, secret }) };
+  return { toKey, fromKey, watch: Object.freeze({ slot: toRelease.slot }) };
 }
 
 /**
@@ -610,7 +618,7 @@ async function revert({ to, toKey, fromKey, recordedBy, settings, tally, layout,
 
 /**
  * Everything after the database write (the switch, and `switch --finish` again later), after the edge confirmations:
- * one more health interval (every Caddy proxy block has its own checker, so the public route may lag the listener by
+ * one more take-out time (every Caddy proxy block has its own checker, so the public route may lag the listener by
  * one); the old pair's stop and its record; the backstop (none for an old release that already RETIRED); the boot
  * target; the gate files (a finish keeps the ones the switch wrote); the final checks. Every step repeats safely, and
  * each one runs even when an earlier one failed: a failed step is named in `bad`, never a reason to leave the rest undone.
@@ -620,7 +628,7 @@ async function revert({ to, toKey, fromKey, recordedBy, settings, tally, layout,
  * else it must still run or its release must have RETIRED.
  */
 async function afterWrite({ to, from, toKey, fromKey, recordedBy, tally, keepGateFiles, oldPairStopped = false, layout, io }) {
-  await io.sleep(HEALTH_INTERVAL_S * 1000 + 500);
+  await io.sleep(CADDY_TAKE_OUT_S * 1000 + 500);
   const bad = [];
   const step = async (code, body) => { try { if (await body() === false) bad.push(code); } catch { bad.push(code); } };
   // The old website and API only; the old runner keeps finishing its debates and retires by itself (spec §4).
@@ -774,9 +782,9 @@ export async function firstSwitchRelease({ to, layout = LAYOUT, deps = {} }) {
     if (started?.releaseKey !== toKey || !Number.isSafeInteger(dispatched) || (again ? dispatched < 0 : dispatched !== 0)) fields.push('runnerStarted');
   }
   if (!again) {
-    let secret = null;
-    try { secret = await io.readEdgeSecret(); } catch { fields.push('edgeSecret'); }
-    if (secret !== null && !waitingWebsite(await readWebsite(toRelease.slot, secret, layout, io), toKey, WAITING_REASONS)) fields.push('website');
+    // Custody only (NV-55), as in the switch preconditions.
+    try { await io.readEdgeSecret(); } catch { fields.push('edgeSecret'); }
+    if (!waitingWebsite(await readWebsite(toRelease.slot, layout, io), toKey, WAITING_REASONS)) fields.push('website');
   }
   let gatesActive = true;
   for (const gate of layout.gates) if (await io.gateState(gate) !== 'active') gatesActive = false;
@@ -905,11 +913,8 @@ async function rollbackAfterSwitch({ to, from, layout, io }) {
   const announced = (service, kind) => async () => (await startedEvent(unit(service), kind, layout, io))?.releaseKey === toKey;
   await start('runner', announced('runner', startedLineOf(layout, 'runner')), RUNNER_START_WAIT_MS, 'ROLLBACK_RUNNER_NOT_STARTED');
   await start('api', announced('api', startedLineOf(layout, 'api')), FRONT_START_WAIT_MS, 'ROLLBACK_API_NOT_STARTED');
-  await start('ui', async () => {
-    let secret;
-    try { secret = await io.readEdgeSecret(); } catch { return false; }
-    return waitingWebsite(await readWebsite(toRelease.slot, secret, layout, io), toKey, ['NOT_CURRENT']);
-  }, FRONT_START_WAIT_MS, 'ROLLBACK_UI_NOT_READY');
+  await start('ui', async () => waitingWebsite(await readWebsite(toRelease.slot, layout, io), toKey, ['NOT_CURRENT']),
+    FRONT_START_WAIT_MS, 'ROLLBACK_UI_NOT_READY');
   const result = await runSwitch({ to, from, oldPairStopped: false, rollback: true, settings, layout, io });
   return Object.freeze({ ...result, event: 'PREVIEW_RELEASE_ROLLED_BACK', started: Object.freeze(started) });
 }

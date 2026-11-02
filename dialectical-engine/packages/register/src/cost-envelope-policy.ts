@@ -61,6 +61,9 @@ const microAmount = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
  */
 const BASIS_POINTS = Object.freeze({ whole: 10_000 });
 
+/** NV-43: one owner's share of the site's day when the row carries no `owner_day_share_basis_points` (half the day). */
+const OWNER_DAY_SHARE_DEFAULT_BASIS_POINTS = 5_000;
+
 /** A reserve is a share of the ceiling held back, so it can never be all of it. */
 const reserveBasisPoints = z.number().int().nonnegative().lt(BASIS_POINTS.whole);
 /** An overrun may double the ceiling for the answer, and no more. */
@@ -80,6 +83,8 @@ export const storyOverrunBasisPointsSchema = overrunBasisPoints;
 const closeEdgeBasisPoints = z.number().int().min(BASIS_POINTS.whole / 2).max(BASIS_POINTS.whole);
 const finishEdgeBasisPoints = z.number().int().min(BASIS_POINTS.whole).max(2 * BASIS_POINTS.whole);
 const waitingLinePerPerson = z.number().int().min(1).max(10);
+/** NV-43: one owner's share of the day, from one basis point to the whole day. */
+const ownerDayShareBasisPoints = z.number().int().min(1).max(BASIS_POINTS.whole);
 
 const costEnvelopePolicyValueSchema = z.object({
   kind: z.literal("COST_ENVELOPE_POLICY"),
@@ -122,7 +127,13 @@ const costEnvelopePolicyValueSchema = z.object({
    */
   admission_close_basis_points: closeEdgeBasisPoints.optional(),
   finish_up_to_basis_points: finishEdgeBasisPoints.optional(),
-  waiting_line_per_person: waitingLinePerPerson.optional()
+  waiting_line_per_person: waitingLinePerPerson.optional(),
+  /**
+   * NV-43 (security audit run 3): one owner's share of `daily_ceiling_micros` while the owner has no window of their
+   * own (billing off): their spend charged today plus their live debates' holds. Beyond it only their own question
+   * waits. OPTIONAL: absent means 5000, half the day. NOT part of the band's all-or-none refinement below.
+   */
+  owner_day_share_basis_points: ownerDayShareBasisPoints.optional()
 }).strict().superRefine((value, ctx) => {
   // A daily ceiling below what ONE run may spend is not a policy, it is a
   // deployment in which no run can ever complete: the first run's own envelope
@@ -183,6 +194,8 @@ export type CostEnvelopePolicy = Readonly<{
   finishBasisPoints: number | null;
   /** Budget spec §2.4: waiting questions per person; null when the row predates the band. */
   waitingLinePerPerson: number | null;
+  /** NV-43: the row's `owner_day_share_basis_points`, or 5,000 when absent. */
+  ownerDayShareBasisPoints: number;
   sourceRef: string;
 }>;
 
@@ -279,6 +292,32 @@ export function costEnvelopeCeilings(terms: CostEnvelopeCeilingTerms): CostEnvel
     serveMicros: narrowed(shareOfCeiling(perRun.data, BASIS_POINTS.whole + overrun.data, "DOWN")),
     runMaximumMicros: narrowed(shareOfCeiling(perRun.data, BASIS_POINTS.whole + overrun.data, "UP"))
   });
+}
+
+/**
+ * NV-43 (security audit run 3) — ONE OWNER'S SHARE OF THE SITE'S DAY, in micros, in this file for the reason
+ * `costEnvelopeCeilings` is: one denominator. `daily x share / 10000`, rounded DOWN (an owner waits earlier, never
+ * later), and at least one micro. The room applies it only to an owner with no window of their own (billing off).
+ */
+export function ownerDayShareMicrosOf(
+  policy: Pick<CostEnvelopePolicy, "dailyCeilingMicros" | "ownerDayShareBasisPoints">
+): number {
+  const daily = microAmount.safeParse(policy?.dailyCeilingMicros);
+  const share = ownerDayShareBasisPoints.safeParse(policy?.ownerDayShareBasisPoints);
+  if (!daily.success || !share.success) {
+    throw new TypedDomainError(
+      "COST_ENVELOPE_POLICY_INVALID",
+      "The daily ceiling or one owner's share of it is out of range"
+    );
+  }
+  const value = Number(shareOfCeiling(daily.data, share.data, "DOWN"));
+  if (!Number.isSafeInteger(value)) {
+    throw new TypedDomainError(
+      "COST_ENVELOPE_POLICY_INVALID",
+      "One owner's share of the daily ceiling cannot be represented exactly in micro-units"
+    );
+  }
+  return Math.max(1, value);
 }
 
 /** The terms the story's ceiling is computed from: the story row's members, camelCase. */
@@ -418,6 +457,8 @@ export function costEnvelopePolicyFromValue(value: unknown, sourceRef: string): 
     closeBasisPoints: parsed.data.admission_close_basis_points ?? null,
     finishBasisPoints: parsed.data.finish_up_to_basis_points ?? null,
     waitingLinePerPerson: parsed.data.waiting_line_per_person ?? null,
+    // NV-43: a row without the member means the default share, half the day.
+    ownerDayShareBasisPoints: parsed.data.owner_day_share_basis_points ?? OWNER_DAY_SHARE_DEFAULT_BASIS_POINTS,
     sourceRef
   });
 }

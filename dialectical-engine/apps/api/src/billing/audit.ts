@@ -212,6 +212,13 @@ export type BillingAuditEvent =
   /** N9 (§2.7.4 step 2): the start's re-check of the quarantine; the counts only, or the failure's code. */
   | "billing.notice.recheck"
   /**
+   * NV-44: a message that failed verification was NOT kept: its order is not ours (UNKNOWN_ORDER), its order already
+   * has 64 kept in 14 days (ORDER_FULL), its owner 64 today (OWNER_DAY_FULL), today's quarantine is full and it is
+   * neither its order's first nor carrying a saved card (DAY_FULL), or another copy for the same order was being kept
+   * at that moment (BUSY). The cause only.
+   */
+  | "billing.notice.quarantine_refused"
+  /**
    * B3a (NETOPIA answers 2026-10-21: the saved card comes only in the first message): a verified message the database
    * could not take was kept in the spool (BILLING_NOTICE_SPOOL_PATH) for the replay. No field.
    */

@@ -157,6 +157,7 @@
   "billing.subscription.withdrawNothingDue": "Listo. Su plan ha terminado. La parte que ya utilizó cubre el precio completo, por lo que no le corresponde ninguna devolución.",
   "billing.subscription.withdrawOwnerReview": "Su plan ha terminado. Ya se hizo un reembolso en uno de sus pagos, así que comprobaremos lo que aún se le debe y le escribiremos por correo en un plazo de 14 días.",
   "billing.subscription.withdrawWindowClosed": "El plazo de desistimiento de 14 días ha terminado, o no se aplica donde usted reside. Puede seguir cancelando en cualquier momento.",
+  "billing.subscription.withdrawDebateRunning": "Es posible que un debate que inició siga usando crédito, así que aún no podemos saber cuánto ha utilizado. Vuelva a intentarlo más tarde. Todavía le queda más de un día para desistir.",
   "billing.subscription.stillConfirming": "Todavía lo estamos confirmando con el proveedor de pagos. Vuelva a consultar esta página en unos minutos.",
   "billing.subscription.actionFailed": "No ha funcionado. Inténtelo de nuevo.",
   "billing.subscription.invoices": "Facturas",

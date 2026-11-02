@@ -8,7 +8,7 @@ import {
 import type { CallBound, ProviderCallRequest, ProviderDiscoveryTarget, ProviderGateway } from "./index.js";
 import { assertFramedPrompt } from "./prompt-frame.js";
 import type { StructureRepairRoute } from "./structure-repair.js";
-import { ProviderUnbilledRefusal } from "./unbilled-refusal.js";
+import { ProviderSentBilledFailure, ProviderUnbilledRefusal } from "./unbilled-refusal.js";
 import { createPreviewRemainingRpcPort, previewGateOffersFinalWriterTier, type PreviewGateRemaining, type PreviewRemainingPort } from "./preview-remaining.js";
 import { NO_BUSY_COORDINATION, type PreviewBusyCoordinator } from "./preview-busy.js";
 import {
@@ -1042,7 +1042,8 @@ function previewAuthorityRefusal(status: number | undefined, row: unknown): Type
  * Run resilience (spec docs/superpowers/specs/2026-10-12-preview-run-resilience-design.md, fix (c)) — A HALTED GATE
  * IS UNAVAILABLE, NOT MONEY. On 2026-10-11 the DeepInfra gate halted (its daily unbilled ceiling) and refused the next
  * call PREVIEW_TEST_AUTHORITY_STOPPED, which `previewAuthorityRefusal` reads as the run's money ceiling; the preview
- * has no run money seam (apps/runner/src/main.ts, costEnvelopePolicy is hosted only), so that was a misdiagnosis, and
+ * then had no run money seam, so that was a misdiagnosis (its runner has one since the preview runs in hosted mode,
+ * apps/runner/src/main.ts; a STOPPED refusal still never charges it, NV-50), and
  * the serve fallback then walked every maker behind the same halted gate. A STOPPED refusal now asks the gate's
  * read-only `/remaining` (preview-remaining.ts, on the same socket): a gate that is not active, or whose window is
  * shut, is UNAVAILABLE. The code is never a spend stop, the call is never resent (it is not an unbilled refusal),
@@ -1065,8 +1066,9 @@ export const PROVIDER_GATE_UNAVAILABLE = "PROVIDER_GATE_UNAVAILABLE" as const;
  * code, never gate-unavailable, and no `/remaining` is read for it.
  */
 export const PROVIDER_CHARGE_BOOKED_MAX = "PROVIDER_CHARGE_BOOKED_MAX" as const;
-export class PreviewChargeBookedMax extends TypedDomainError {
-  constructor() { super("PROVIDER_CALL_FAILED", "Private preview vendor call failed after it was sent; the gate booked its full reservation"); }
+// NV-50: a ProviderSentBilledFailure, so the gateway charges the attempt as unanswered at its projected maximum.
+export class PreviewChargeBookedMax extends ProviderSentBilledFailure {
+  constructor() { super("Private preview vendor call failed after it was sent; the gate booked its full reservation"); }
 }
 export class PreviewGateUnavailable extends TypedDomainError {
   constructor() { super(PROVIDER_GATE_UNAVAILABLE, "Private preview gate is halted or its window is shut"); }
@@ -1096,11 +1098,21 @@ export function previewRunResilience(config: PreviewGateSettings | undefined): R
     modelOf: (providerRef: string) => previewModelRowForRef(providerRef)?.model
   });
 }
+/**
+ * NV-58 (security audit run 3): what the port does when its caller gives up. "DESTROY" (the default, every caller
+ * today) tears the connection down, so a gate that already dispatched and settled the call meets a lost paid reply and
+ * halts. "HALF_CLOSE", once the whole request is written, rejects the caller and half-closes the socket instead: before
+ * dispatch the gate reads the EOF as a cancel and sends nothing; after it, the reply is read here and dropped. Only for
+ * a caller whose own limit is far inside the gate's call deadline (the API's fast language check), so the gate never
+ * meets a lost paid reply from it.
+ */
+export type PreviewBudgetRpcOptions = Readonly<{ onAbort?: "DESTROY" | "HALF_CLOSE" }>;
 /** Local IPC only: application principals never receive the provider credential or ledger write access. */
 export function createPreviewBudgetRpcPort(
   config: PreviewGateSettings, socketPath: string = config.budget_socket,
   // Fix (c): the same gate's read-only `/remaining`, asked only after a STOPPED refusal.
-  remaining: PreviewRemainingPort = createPreviewRemainingRpcPort({ budget_socket: socketPath, scope_id: config.scope_id })
+  remaining: PreviewRemainingPort = createPreviewRemainingRpcPort({ budget_socket: socketPath, scope_id: config.scope_id }),
+  options: PreviewBudgetRpcOptions = {}
 ): PreviewBudgetPort {
   return Object.freeze({ execute(input: PreviewBudgetExecution, signal?: AbortSignal) {
     return new Promise<Readonly<{ status: number; body: string }>>((resolve, reject) => {
@@ -1134,7 +1146,17 @@ export function createPreviewBudgetRpcPort(
           resolve({ status: Number(row.status), body: row.body });
         });
       });
-      const canceled = () => request.destroy(new Error("Private preview call canceled"));
+      const canceled = () => {
+        const socket = request.socket;
+        if (options.onAbort === "HALF_CLOSE" && request.writableFinished && socket !== null && !socket.destroyed) {
+          // NV-58: the whole request reached the gate. Half-close: before dispatch the gate reads the EOF as a cancel and
+          // sends nothing; after it, its reply is read here and dropped, so the gate never meets a lost paid reply.
+          reject(new TypedDomainError("PROVIDER_USAGE_UNREPORTED", "Private preview authority unavailable"));
+          socket.end();
+          return;
+        }
+        request.destroy(new Error("Private preview call canceled"));
+      };
       signal?.addEventListener("abort", canceled, { once: true });
       if (signal?.aborted) canceled();
       request.on("close", () => signal?.removeEventListener("abort", canceled));
@@ -1148,11 +1170,12 @@ export function createPreviewBudgetRpcPort(
  * PR B: one RPC port per gate this config names (DeepInfra on `budget_socket`, Anthropic on
  * `anthropic_budget_socket` when set). The guarded fetch routes each call to its own provider's port.
  */
-export function createPreviewBudgetRpcPorts(config: PreviewGateSettings): PreviewBudgetPorts {
+export function createPreviewBudgetRpcPorts(config: PreviewGateSettings, options: PreviewBudgetRpcOptions = {}): PreviewBudgetPorts {
   const ports: Partial<Record<PreviewProviderName, PreviewBudgetPort>> = {};
   for (const provider of ["deepinfra", ...Object.keys(PREVIEW_PROVIDER_SOCKET_KEYS)] as PreviewProviderName[]) {
     const socket = previewProviderSocket(config, provider);
-    if (socket !== undefined) ports[provider] = createPreviewBudgetRpcPort(config, socket);
+    // NV-58: `undefined` keeps the default `/remaining` port for that socket.
+    if (socket !== undefined) ports[provider] = createPreviewBudgetRpcPort(config, socket, undefined, options);
   }
   return Object.freeze(ports);
 }

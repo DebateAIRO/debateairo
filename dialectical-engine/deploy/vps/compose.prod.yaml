@@ -9,20 +9,39 @@ name: debateai-prod
 # model access on the VPS is through authenticated maker CLIs (DR-179). The architecture test
 # pins its absence as a plain substring, so its name may not appear here even in a comment.
 #
-# Note (L7): docker's published ports bypass ufw through the DOCKER iptables chain. Binding
-# every publish to 127.0.0.1 is the only reliable guard, and the architecture test pins it.
+# Note (L7, NV-56): docker's published ports bypass ufw through the DOCKER iptables chain. Every
+# publish is bound to 127.0.0.1 (the architecture test pins it). debateai-ingress-guard.service
+# drops, in the raw table before Docker sees them, off-host packets for 127.0.0.0/8 and off-host
+# TCP to the ports published here, so neither the 127.0.0.1 DNAT nor the container's own bridge
+# address is reachable from another host on any Docker version. Add a publish here only together
+# with its port in that unit's rule; debateai-hatchet.service will not start this container
+# without both drops.
 
 services:
   hatchet-lite:
     image: ghcr.io/hatchet-dev/hatchet/hatchet-lite:latest@sha256:7198bda4d73021a9759d90c57f11f1dd2b32599b81f4c08a5a97ea4cf047c41a
     restart: unless-stopped
+    # NV-57: no other host uid. Without SETUID/SETGID the container cannot become the host's
+    # postgres user (peer auth), and no-new-privileges ignores setuid bits and file capabilities at
+    # execve, the way round that. Never add privileged, cap_add, pid, userns_mode, ipc or another
+    # security_opt item: each would undo this.
+    cap_drop:
+      - SETUID
+      - SETGID
+    security_opt:
+      - no-new-privileges=true
     ports:
       - "127.0.0.1:8888:8888"
       - "127.0.0.1:7077:7077"
-    # Every secret — DATABASE_URL for the dedicated debateai_prod_hatchet role, ADMIN_EMAIL,
-    # ADMIN_PASSWORD, SERVER_ENCRYPTION_* — comes from this file (0600 root:root, never in the
-    # repo, written once by the operator per README §4). Nothing secret is inline here, so the
-    # compose file is safe to read on a public repository.
+    # Every secret (DATABASE_URL for the dedicated debateai_prod_hatchet role, ADMIN_EMAIL,
+    # ADMIN_PASSWORD, SERVER_ENCRYPTION_*) comes from this file: 0600 root:root, never in the
+    # repo, written once by the operator per README §4, whose step 1 generates DATABASE_URL and
+    # the admin pair. Nothing secret is inline here, so the compose file is safe to read on a
+    # public repository. NV-51 (L7-F3): debateai-hatchet.service runs hatchet-check-env.mjs
+    # before every start and refuses compose up when the admin pair is missing, duplicated, the
+    # image's documented seed or shorter than 20 characters. Never set either admin name under
+    # environment: here (it would override the checked file), and start this container only
+    # through that unit, never by hand.
     env_file:
       - /etc/debateai/hatchet.env
     environment:
@@ -43,15 +62,21 @@ services:
       SERVER_AUTH_SET_EMAIL_VERIFIED: "true"
       SERVER_AUTH_BASIC_AUTH_ENABLED: "true"
     volumes:
-      # The native cluster's socket directory. debateai_prod_hatchet authenticates with
-      # scram-sha-256 over it (pg_hba `local hatchet debateai_prod_hatchet`). The container's uid
-      # still matters: on this socket PostgreSQL's peer check sees the container process's host
-      # uid (no user namespace here), and production's pg_hba admits by peer only the host's
-      # `postgres` OS user (`local all postgres peer`), with pg_ident mapping no OS user to any
-      # role. So this container must never run as the host uid of `postgres`, and no peer line or
-      # ident map may ever name root (uid 0, which this image may well run as). No `user:` is set:
-      # nothing in this repository shows the pinned image runs correctly as non-root.
-      - /var/run/postgresql:/var/run/postgresql
+      # The native cluster's socket directory, read-only (NV-57). Hatchet connects to the existing
+      # socket (`connect` works through a read-only bind), but nothing in the container can create,
+      # rename or remove an entry there; every DebateAI principal, the just-in-time superuser among
+      # them, looks its socket up here. debateai_prod_hatchet authenticates with scram-sha-256 over
+      # it (pg_hba `local hatchet debateai_prod_hatchet`). Peer auth sees only the connecting
+      # process's host uid (no user namespace here), and production's pg_hba admits by peer the
+      # host's `postgres` OS user, a superuser.
+      # So this container must never run as the host uid of the `postgres` user: it must not start
+      # as that uid (the image's own user, and any `user:` set here later, must differ from the
+      # host's `id -u postgres`; the architecture test allows only a numeric `user:` of 10000 or
+      # more), and it cannot change to it (the cap_drop and security_opt at the top of this service
+      # remove SETUID and SETGID and ignore setuid bits at execve). No peer line or ident map may
+      # ever name root (uid 0, which this image may well run as). No `user:` is set: nothing in this
+      # repository shows the pinned image runs correctly as non-root (README §10).
+      - /var/run/postgresql:/var/run/postgresql:ro
       - /etc/debateai/hatchet-tls:/etc/hatchet-tls:ro
       - hatchet-config:/config
     # No healthcheck: this baseline has never been booted (README "What is deliberately absent"),

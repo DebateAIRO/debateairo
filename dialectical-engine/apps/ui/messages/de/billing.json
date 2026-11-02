@@ -157,6 +157,7 @@
   "billing.subscription.withdrawNothingDue": "Erledigt. Ihr Tarif ist beendet. Der bereits genutzte Teil deckt den gesamten Preis, daher steht Ihnen keine Rückzahlung zu.",
   "billing.subscription.withdrawOwnerReview": "Ihr Tarif ist beendet. Auf eine Ihrer Zahlungen wurde bereits eine Erstattung geleistet, daher prüfen wir, was noch offen ist, und schreiben Ihnen innerhalb von 14 Tagen per E-Mail.",
   "billing.subscription.withdrawWindowClosed": "Die 14-tägige Widerrufsfrist ist abgelaufen, oder sie gilt an Ihrem Wohnort nicht. Sie können trotzdem jederzeit kündigen.",
+  "billing.subscription.withdrawDebateRunning": "Eine Debatte, die Sie gestartet haben, nutzt möglicherweise noch Guthaben, daher können wir noch nicht sagen, wie viel Sie genutzt haben. Bitte versuchen Sie es später erneut. Sie haben noch mehr als einen Tag Zeit für den Widerruf.",
   "billing.subscription.stillConfirming": "Wir bestätigen dies noch mit dem Zahlungsdienstleister. Sehen Sie in ein paar Minuten erneut auf dieser Seite nach.",
   "billing.subscription.actionFailed": "Das hat nicht geklappt. Bitte versuchen Sie es erneut.",
   "billing.subscription.invoices": "Rechnungen",

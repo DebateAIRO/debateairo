@@ -2,7 +2,7 @@
 # One API instance per release (side-by-side spec §10): debateai-api@<label>.service, %i = the release label
 # (dashes kept). Each release runs from its own root-owned folder /opt/debateai/releases/<label>/, never from the
 # operator checkout, so updating code can never change it under a live older runner. Only the current release's
-# instance is enabled at boot (README §5 "Side-by-side upgrades"); the slot (port) comes from the release's overlay.
+# instance is enabled at boot (README §5 "Side-by-side upgrades"); the slot (port 491 or 492) comes from the release's overlay.
 #
 # One OS user per service (audit L7 "C2/C3 validation"): the UI must not be able to read
 # /etc/debateai/api.env, and the runner must not be able to read the blind-index key, the audit
@@ -37,12 +37,17 @@ WorkingDirectory=/opt/debateai/releases/%i/dialectical-engine
 # a release without its own file does not start.
 EnvironmentFile=/etc/debateai/api.env
 EnvironmentFile=/etc/debateai/releases/%i/api.env
+# NV-52: the base file is root's (README §3), and these dynamic-loader, libc and Node start-up variables reach no
+# process of this unit, root's `+` hooks included. ld.so and libc act on them for /usr/bin/env itself, before `env -i`
+# runs.
+UnsetEnvironment=LD_PRELOAD LD_LIBRARY_PATH LD_AUDIT LD_DEBUG_OUTPUT LD_PROFILE LD_PROFILE_OUTPUT LD_TRACE_LOADED_OBJECTS GLIBC_TUNABLES GCONV_PATH LOCPATH NODE_OPTIONS NODE_PATH
 Environment=NODE_ENV=production
 Environment=NODE_EXTRA_CA_CERTS=/etc/debateai/hatchet-tls/ca.crt
 # Root's start check (`+` = root, outside this unit's sandbox; side-by-side plan D16b): a release that is draining or
 # retired, or one the release table does not know, is refused before the API starts again. Root's node runs through
-# `env -i` with PATH only: `+` drops the sandbox but not this unit's environment, and the base env file is owned by
-# the service user, so a NODE_OPTIONS line written there must never reach a root process (same in every root hook).
+# `env -i` with PATH only, so nothing this unit's environment sets reaches node (same in every root hook). `+` drops
+# the sandbox but not that environment, and ld.so and libc read some variables for /usr/bin/env itself before `env -i`
+# acts: those are unset above, and the base env file is root's (README §3, NV-52).
 ExecStartPre=+/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /usr/bin/node /opt/debateai/dialectical-engine/deploy/vps/release.mjs may-start --service api --label %i
 ExecStart=/usr/bin/pnpm --dir /opt/debateai/releases/%i/dialectical-engine exec tsx apps/api/src/main.ts
 # After every stop root writes down what it saw (side-by-side spec §4): a draining release whose API is gone gets
@@ -67,7 +72,9 @@ UMask=0077
 # store and the publication key store are written by @debateai/crypto). Everything else on the
 # box — including /opt and /etc/debateai — stays read-only under ProtectSystem=strict.
 # The billing notice spool (README §14.5) is optional: its leading "-" lets the unit start while the folder does not exist.
-ReadWritePaths=/var/lib/debateai/api/user-deks /var/lib/debateai/api/publication-keys /var/lib/debateai/api/audit-keys /var/lib/debateai/data-exports -/var/lib/debateai/api/billing-notice-spool
+# The restore fence folder (NV-07) is the API's own and is never in a backup; '-' keeps older releases of this shared
+# template starting where it does not exist yet, and the API itself refuses without it in hosted mode.
+ReadWritePaths=/var/lib/debateai/api/user-deks /var/lib/debateai/api/publication-keys /var/lib/debateai/api/audit-keys -/var/lib/debateai/api/restore-fence /var/lib/debateai/data-exports -/var/lib/debateai/api/billing-notice-spool
 
 # --- process and kernel ---
 NoNewPrivileges=true
@@ -83,13 +90,20 @@ RestrictNamespaces=true
 RestrictRealtime=true
 RestrictSUIDSGID=true
 LockPersonality=true
-CapabilityBoundingSet=
-AmbientCapabilities=
+# NV-55: the slot ports are below 1024, so this unit holds exactly CAP_NET_BIND_SERVICE (ambient, under
+# NoNewPrivileges) to bind its slot's port, and SocketBindAllow=/SocketBindDeny= below limit that grant to the two
+# API ports. systemd enforces that limit only through its BPF framework (README §2 checks it on the host).
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_BIND_SERVICE
 SystemCallArchitectures=native
 SystemCallFilter=@system-service
 SystemCallFilter=~@privileged @resources @obsolete
-# Unix socket for PostgreSQL, INET/INET6 for the loopback listener and Hatchet gRPC.
+# Unix socket for PostgreSQL, INET/INET6 for the reserved loopback listener and Hatchet gRPC.
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+# NV-55: the capability above binds only the two API ports; every other port below 1024 is refused.
+SocketBindAllow=tcp:491-492
+SocketBindDeny=tcp:1-1023
+SocketBindDeny=udp:1-1023
 # MemoryDenyWriteExecute is NOT set: it breaks the V8 JIT.
 
 LimitNOFILE=65536

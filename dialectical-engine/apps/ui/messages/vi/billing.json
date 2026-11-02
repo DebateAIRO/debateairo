@@ -157,6 +157,7 @@
   "billing.subscription.withdrawNothingDue": "Xong. Gói của bạn đã kết thúc. Phần bạn đã dùng bao trọn toàn bộ giá, nên không có khoản nào phải hoàn lại.",
   "billing.subscription.withdrawOwnerReview": "Gói của bạn đã kết thúc. Một trong các khoản thanh toán của bạn đã được hoàn tiền trước đó, nên chúng tôi sẽ kiểm tra số tiền còn phải trả lại và gửi email cho bạn trong vòng 14 ngày.",
   "billing.subscription.withdrawWindowClosed": "Thời hạn rút lại 14 ngày đã kết thúc, hoặc không áp dụng tại nơi bạn sống. Bạn vẫn có thể hủy bất cứ lúc nào.",
+  "billing.subscription.withdrawDebateRunning": "Một cuộc tranh luận bạn đã bắt đầu có thể vẫn đang dùng tín dụng, nên chúng tôi chưa thể biết bạn đã dùng bao nhiêu. Vui lòng thử lại sau. Bạn vẫn còn hơn một ngày để rút lại.",
   "billing.subscription.stillConfirming": "Chúng tôi vẫn đang xác nhận việc này với nhà cung cấp thanh toán. Hãy xem lại trang này sau vài phút.",
   "billing.subscription.actionFailed": "Không thực hiện được. Vui lòng thử lại.",
   "billing.subscription.invoices": "Hóa đơn",

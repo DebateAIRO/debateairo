@@ -151,6 +151,8 @@ export const DEVELOPMENT_CLI_MODEL_PINS = Object.freeze({
   codexPremiumModel: rosterModel(PLAN_TIER_ROSTERS.premium, "gpt-"),
   claudeFreeAlias: claudeAlias(rosterModel(PLAN_TIER_ROSTERS.free, "claude-")),
   claudePremiumAlias: claudeAlias(rosterModel(PLAN_TIER_ROSTERS.premium, "claude-")),
+  // grok refuses `read-only` on Docker Desktop's symlinked docker.sock, so this panel runs it unsandboxed, tools off
+  // only by `--tools ""`; the relay refuses a reply without one turn ending `end_turn` (NV-53, parseGrokEnvelope).
   grokSandboxProfile: "none" as const
 });
 

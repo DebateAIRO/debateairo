@@ -157,6 +157,7 @@
   "billing.subscription.withdrawNothingDue": "완료되었습니다. 요금제가 종료되었습니다. 이미 사용한 부분이 전체 가격에 해당하므로 돌려드릴 금액이 없습니다.",
   "billing.subscription.withdrawOwnerReview": "요금제가 종료되었습니다. 결제 중 한 건에 대해 이미 환불이 이루어졌으므로, 아직 돌려드려야 할 금액을 확인한 뒤 14일 이내에 이메일로 알려 드리겠습니다.",
   "billing.subscription.withdrawWindowClosed": "14일 철회 기간이 끝났거나 거주 지역에는 적용되지 않습니다. 해지는 언제든지 할 수 있습니다.",
+  "billing.subscription.withdrawDebateRunning": "시작한 토론이 아직 크레딧을 사용하고 있을 수 있어 사용량을 아직 확인할 수 없습니다. 나중에 다시 시도해 주세요. 철회할 수 있는 기간이 아직 하루 이상 남아 있습니다.",
   "billing.subscription.stillConfirming": "결제 서비스 제공업체와 아직 확인 중입니다. 몇 분 후에 이 페이지를 다시 확인해 주세요.",
   "billing.subscription.actionFailed": "처리되지 않았습니다. 다시 시도해 주세요.",
   "billing.subscription.invoices": "송장",

@@ -157,6 +157,7 @@
   "billing.subscription.withdrawNothingDue": "Selesai. Paket Anda telah berakhir. Bagian yang sudah Anda gunakan menutupi seluruh harga, jadi tidak ada yang perlu dikembalikan.",
   "billing.subscription.withdrawOwnerReview": "Paket Anda telah berakhir. Pengembalian dana sudah dilakukan pada salah satu pembayaran Anda, jadi kami akan memeriksa apa yang masih terutang dan mengirim email kepada Anda dalam 14 hari.",
   "billing.subscription.withdrawWindowClosed": "Masa penarikan diri 14 hari telah berakhir, atau tidak berlaku di tempat Anda tinggal. Anda tetap dapat membatalkan kapan saja.",
+  "billing.subscription.withdrawDebateRunning": "Debat yang Anda mulai mungkin masih menggunakan kredit, jadi kami belum dapat mengetahui berapa banyak yang telah Anda gunakan. Silakan coba lagi nanti. Anda masih memiliki lebih dari satu hari untuk menarik diri.",
   "billing.subscription.stillConfirming": "Kami masih mengonfirmasi hal ini dengan penyedia pembayaran. Periksa halaman ini lagi dalam beberapa menit.",
   "billing.subscription.actionFailed": "Itu tidak berhasil. Silakan coba lagi.",
   "billing.subscription.invoices": "Faktur",

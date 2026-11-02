@@ -3,12 +3,9 @@
 	lb_try_duration 12s
 	lb_try_interval 250ms
 	health_uri /readyz
-	health_interval 2s
-	health_timeout 1s
+	health_interval 1s
+	health_timeout 3s
 	health_status 200
 	health_passes 1
-	health_fails 1
-	health_headers {
-		X-Debateai-Edge-Secret {file./etc/debateai-v3-preview/ui-edge.caddy.secret}
-	}
+	health_fails 2
 }

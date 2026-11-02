@@ -157,6 +157,7 @@
   "billing.subscription.withdrawNothingDue": "完成。您的方案已结束。您已使用的部分已覆盖全部价格，因此无需退还任何款项。",
   "billing.subscription.withdrawOwnerReview": "您的方案已结束。您的其中一笔付款已办理过退款，因此我们会核实仍需退还的金额，并在 14 天内发邮件给您。",
   "billing.subscription.withdrawWindowClosed": "14 天撤回期已结束，或不适用于您居住的地方。您仍可随时取消。",
+  "billing.subscription.withdrawDebateRunning": "您发起的辩论可能仍在使用额度，因此我们暂时无法确定您已使用了多少。请稍后再试。您仍有超过一天的时间可以撤回。",
   "billing.subscription.stillConfirming": "我们仍在与支付服务商确认此事。请几分钟后再查看此页面。",
   "billing.subscription.actionFailed": "操作未成功。请重试。",
   "billing.subscription.invoices": "发票",

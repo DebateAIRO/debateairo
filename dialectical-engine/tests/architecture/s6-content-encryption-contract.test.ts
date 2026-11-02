@@ -184,14 +184,58 @@ describe("S6 content-encryption architecture contract", () => {
 
   it("keeps account erasure the only EXCLUSIVE holder of the run content lease", async () => {
     const erasure = await read("packages/db/src/account-erasure.ts");
-    const leases = erasure.slice(
-      erasure.indexOf("async function withErasureContentLeases<T>("),
-      erasure.indexOf("async function withErasureContentLeases<T>(") + 1_600
-    );
+    const helperStart = erasure.indexOf("async function withErasureContentLeases<T>(");
+    const leases = erasure.slice(helperStart, erasure.indexOf("\n}\n", helperStart));
+    expect(helperStart).toBeGreaterThan(-1);
     expect(leases).toContain("SELECT pg_advisory_lock(hashtextextended($1,0))");
     expect(leases).toContain("SELECT pg_advisory_unlock(hashtextextended($1,0)) AS unlocked");
     expect(leases).not.toContain("_shared");
+    // NV-30: the timer's exclusive wait is bounded per run (lock_timeout), and its timeout answers CONTENDED.
+    expect(leases).toContain("set_config('lock_timeout'");
+    expect(leases).toContain('"55P03"');
     expect(erasure).toContain('const CONTENT_LEASE_NAMESPACE = "debateai:run-content-lease:v1:"');
+    // NV-30: a private-debate delete takes its run's lease in SQL, after its grant is checked; it never waits here.
+    const privateStart = erasure.indexOf("class PostgresPrivateRunErasureRepository");
+    const privatePrepare = erasure.slice(privateStart, erasure.indexOf("async resume(", privateStart));
+    expect(privateStart).toBeGreaterThan(-1);
+    expect(privatePrepare).toContain(
+      "\"SELECT * FROM erasure_reconcile.prepare_private_run_erasure($1,$2,$3,$4,$5)\""
+    );
+    expect(privatePrepare).not.toContain("withErasureContentLeases");
+    const accountStart = erasure.indexOf("async prepare(", erasure.indexOf("export class PostgresAccountErasureRepository"));
+    const accountPrepare = erasure.slice(accountStart, erasure.indexOf("async status(", accountStart));
+    expect(accountPrepare).toContain("withErasureContentLeases(");
+    expect(accountPrepare).toContain('contended: () => "CONTENDED"');
+  });
+
+  it("checks a private delete's grant before it tries the named run's lease, and never waits (NV-30)", async () => {
+    const migration = await read("migrations/0131_security_fixes_run3.sql");
+    const start = migration.indexOf("-- ==== [NV-30]");
+    expect(start).toBeGreaterThan(-1);
+    const next = migration.indexOf("\n-- ==== [", start + 1);
+    const section = migration.slice(start, next === -1 ? undefined : next);
+    const refused = section.indexOf("RETURN QUERY SELECT 'NOT_FOUND'::text,NULL::uuid");
+    const tried = section.indexOf(
+      "pg_try_advisory_xact_lock(hashtextextended('debateai:run-content-lease:v1:'||p_run_id::text,0))"
+    );
+    const delegated = section.indexOf("FROM core.prepare_private_run_erasure(");
+    expect(refused).toBeGreaterThan(-1);
+    expect(refused).toBeLessThan(tried);
+    expect(tried).toBeLessThan(delegated);
+    expect(section).not.toContain("pg_advisory_lock(");
+    expect(section).not.toContain("pg_advisory_xact_lock(");
+    // The preauthorization is 0123's, word for word (whitespace aside).
+    const predicate = (sql: string): string => {
+      const flat = sql.replace(/\s+/gu, " ");
+      const open = flat.indexOf("IF NOT EXISTS (");
+      return open === -1 ? "" : flat.slice(open, flat.indexOf(") THEN", open) + ") THEN".length);
+    };
+    const side = await read("migrations/0123_side_by_side_releases.sql");
+    const bodyStart = side.indexOf("CREATE OR REPLACE FUNCTION core.prepare_private_run_erasure(");
+    const original = predicate(side.slice(bodyStart, side.indexOf("\n$$;", bodyStart)));
+    expect(bodyStart).toBeGreaterThan(-1);
+    expect(original).toContain("step_grant.action='DELETE_PRIVATE_DEBATE'");
+    expect(predicate(section)).toBe(original);
   });
 
   it("keeps evaluator key preparation outside harvest transactions and add-on run locks", async () => {

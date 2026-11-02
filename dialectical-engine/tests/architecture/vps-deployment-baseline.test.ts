@@ -66,6 +66,28 @@ function publishedPorts(compose: string): string[] {
   return ports;
 }
 
+/** The items of a 4-space key's 6-space list under the one service (comment lines at 6 spaces are skipped). */
+function serviceList(compose: string, key: string): string[] {
+  const items: string[] = [];
+  let inList = false;
+  for (const line of compose.split("\n")) {
+    if (new RegExp(`^\\s{4}${key}:\\s*$`).test(line)) { inList = true; continue; }
+    if (inList && /^\s{6}-\s*/.test(line)) { items.push(line.replace(/^\s*-\s*"?/, "").replace(/"?\s*$/, "")); continue; }
+    if (inList && !/^\s{6}/.test(line)) inList = false;
+  }
+  return items;
+}
+
+/** The top-level `volumes:` block's lines (named-volume declarations), up to the next column-0 key. */
+function topLevelVolumeLines(compose: string): string[] {
+  const lines = compose.split("\n");
+  const start = lines.findIndex((line) => /^volumes:\s*$/.test(line));
+  if (start < 0) return [];
+  const rest = lines.slice(start + 1);
+  const end = rest.findIndex((line) => /^\S/.test(line));
+  return (end < 0 ? rest : rest.slice(0, end)).filter((line) => line.trim() !== "" && !line.trim().startsWith("#"));
+}
+
 function composeServices(compose: string): string[] {
   const names: string[] = [];
   let inServices = false;
@@ -106,9 +128,13 @@ const EDGE_FILES = [
   "deploy/vps/systemd/debateai-runner-retire-check@.timer",
   "deploy/vps/systemd/debateai-runner-retire-check@.service",
   "deploy/vps/systemd/debateai-hatchet.service",
+  // NV-56: the raw-table drops Docker requires, before it starts.
+  "deploy/vps/systemd/debateai-ingress-guard.service",
   "deploy/vps/systemd/debateai-observation-agent.service",
   "deploy/vps/systemd/debateai-geoip-refresh.service",
-  "deploy/vps/systemd/debateai-geoip-refresh.timer"
+  "deploy/vps/systemd/debateai-geoip-refresh.timer",
+  // NV-55: the pin that keeps the slot ports reserved.
+  "deploy/vps/sysctl.d/99-zz-debateai-reserved-ports.conf"
 ] as const;
 const BACKUP_FILES = [
   "deploy/vps/backup.sh",
@@ -361,7 +387,7 @@ describe("VPS baseline: Caddy edge, loopback-only compose, hardened systemd unit
   it("Caddyfile: TLS edge to the UI with the edge secret, no proxy trust, no API compression", () => {
     const caddy = read("deploy/vps/Caddyfile");
     for (const needle of [
-      "reverse_proxy 127.0.0.1:3001",
+      "reverse_proxy 127.0.0.1:481",
       "header_up X-Forwarded-For {remote_host}",
       "header_up X-Forwarded-Proto https",
       // Caddy's own 0640 root:caddy copy: the UI refuses a secret file with any group bit.
@@ -381,7 +407,7 @@ describe("VPS baseline: Caddy edge, loopback-only compose, hardened systemd unit
 
   /**
    * Side-by-side spec §6 and §10 (plan D area constants): one fixed config with both slots' websites as upstreams,
-   * an active health check on the website's /readyz that carries the edge secret, and a short hold while no slot is
+   * an active health check on the website's /readyz that carries no secret (NV-55), and a short hold while no slot is
    * ready. Caddy keeps `admin off`, so it is restarted, never reloaded (README §6). The loopback :3090 site is the
    * same front for root's switch checks; it answers on 127.0.0.1 only.
    */
@@ -391,15 +417,15 @@ describe("VPS baseline: Caddy edge, loopback-only compose, hardened systemd unit
     const snippet = /^\(debateai_slots\) \{\n([\s\S]*?)^\}$/m.exec(caddy)?.[1] ?? "";
     expect(snippet).not.toBe("");
     for (const needle of [
-      "reverse_proxy 127.0.0.1:3001 127.0.0.1:3002 {",
+      "reverse_proxy 127.0.0.1:481 127.0.0.1:482 {",
       "lb_policy first", "lb_try_duration 12s", "lb_try_interval 250ms",
-      "health_uri /readyz", "health_status 200", "health_interval 2s", "health_timeout 1s", "health_passes 1", "health_fails 1",
+      "health_uri /readyz", "health_status 200", "health_interval 1s", "health_timeout 3s", "health_passes 1", "health_fails 2",
       "header_up X-Forwarded-For {remote_host}",
       "header_up X-Forwarded-Proto https",
       "header_up X-Debateai-Edge-Secret {file./etc/debateai/ui-edge.caddy.secret}"
     ]) expect(snippet, needle).toContain(needle);
-    // The health check is an untrusted peer to server.mjs unless it carries the same secret (spec §6).
-    expect(snippet).toMatch(/health_headers \{\s*X-Debateai-Edge-Secret \{file\.\/etc\/debateai\/ui-edge\.caddy\.secret\}\s*\}/);
+    // NV-55: the health check carries no secret; server.mjs answers /readyz to any peer (slot-port-reservation.test.ts).
+    expect(snippet).not.toContain("health_headers");
     // Every proxy goes through the snippet: one reverse_proxy in the whole file, imported by exactly two sites.
     expect(caddy.match(/^\s*reverse_proxy\b/gm)).toHaveLength(1);
     expect(caddy.match(/^\s*import debateai_slots$/gm)).toHaveLength(2);
@@ -407,7 +433,7 @@ describe("VPS baseline: Caddy edge, loopback-only compose, hardened systemd unit
     expect(loopback).toMatch(/^\s*bind 127\.0\.0\.1$/m);
     expect(loopback).toMatch(/^\s*import debateai_slots$/m);
     expect(loopback).toMatch(/request_body\s*\{\s*max_size 1MB\s*\}/);
-    // The public site refuses /readyz itself (final fix wave W2: every request it proxies carries the edge secret);
+    // The public site refuses /readyz itself (final fix wave W2: visitors never read a slot's readiness);
     // the health checks ask the slots directly and root asks the loopback site, which still serves it.
     const site = /^\{\$DEBATEAI_PUBLIC_HOSTNAME\} \{\n([\s\S]*?)^\}$/m.exec(caddy)?.[1] ?? "";
     expect(site).toMatch(/^\s*respond \/readyz 404$/m);
@@ -468,17 +494,17 @@ describe("VPS baseline: Caddy edge, loopback-only compose, hardened systemd unit
   it("the Caddy upstreams are exactly the two slots' website ports, and each slot's website talks to its own API", () => {
     const caddy = read("deploy/vps/Caddyfile");
     const upstreams = /reverse_proxy ((?:127\.0\.0\.1:\d+ ?)+)\{/.exec(caddy)?.[1]?.trim().split(" ") ?? [];
-    expect(upstreams).toEqual(["127.0.0.1:3001", "127.0.0.1:3002"]);
-    // The per-release overlays carry the slot (plan D: public server A = 3001 / 8790, B = 3002 / 8791); the
+    expect(upstreams).toEqual(["127.0.0.1:481", "127.0.0.1:482"]);
+    // The per-release overlays carry the slot (NV-55: public server A = 481 / 491, B = 482 / 492); the
     // examples show slot A and say what slot B uses.
     const ui = envKeys(read("deploy/vps/env/releases/ui.env.example"));
     const api = envKeys(read("deploy/vps/env/releases/api.env.example"));
-    expect(ui.get("PORT")).toBe("3001");
-    expect(api.get("API_PORT")).toBe("8790");
+    expect(ui.get("PORT")).toBe("481");
+    expect(api.get("API_PORT")).toBe("491");
     expect(ui.get("DIALECTICAL_API_BASE")).toBe(`http://127.0.0.1:${api.get("API_PORT")}`);
     // The examples are comment-free (the overlay reader refuses comments, final fix wave S6): README §5 step 3 says
     // what slot B uses.
-    expect(read("deploy/vps/README.md")).toContain("The examples show slot A; slot B uses `API_PORT=8791`, `PORT=3002` and\n`DIALECTICAL_API_BASE=http://127.0.0.1:8791`.");
+    expect(read("deploy/vps/README.md")).toContain("The examples show slot A; slot B uses `API_PORT=492`, `PORT=482` and\n`DIALECTICAL_API_BASE=http://127.0.0.1:492`.");
     for (const file of ["ui", "api", "runner"]) expect(read(`deploy/vps/env/releases/${file}.env.example`), file).not.toMatch(/^\s*#/mu);
   });
 
@@ -507,6 +533,143 @@ describe("VPS baseline: Caddy edge, loopback-only compose, hardened systemd unit
     const digest = /hatchet-lite:latest@(sha256:[0-9a-f]{64})/.exec(pins)?.[1];
     expect(digest).toBeDefined();
     expect(compose).toContain(`hatchet-lite:latest@${digest}`);
+  });
+
+  /**
+   * NV-57: the host's only PostgreSQL socket directory is bind-mounted into a third-party container, and every
+   * DebateAI principal (the just-in-time superuser among them) looks its socket up there. Read-only, nothing in the
+   * container can plant a socket in its place. Peer auth admits the host `postgres` uid as a superuser, so the
+   * container can neither change to that uid (no SETUID/SETGID, no new privileges) nor start as it (any pinned `user:`
+   * is numeric and 10000 or more; the owner checks the running uids, README §4 bring-up step 1).
+   */
+  it("NV-57: the Hatchet container sees host paths read-only, the PostgreSQL socket directory above all, and can neither start as nor become the host postgres uid", () => {
+    const compose = read("deploy/vps/compose.prod.yaml");
+    const volumes = serviceList(compose, "volumes");
+    expect(volumes.length).toBeGreaterThanOrEqual(3);
+    const bind = /^\/[^:\s]+:\/[^:\s]+:ro$/u;
+    const named = /^[A-Za-z0-9][A-Za-z0-9_.-]*:\/[^:\s]+$/u;
+    expect(volumes.filter((entry) => !bind.test(entry) && !named.test(entry))).toEqual([]);
+    expect(volumes).toContain("/var/run/postgresql:/var/run/postgresql:ro");
+    // A named volume carries no options, so a driver_opts bind cannot hide behind a name.
+    const declared = topLevelVolumeLines(compose);
+    expect(declared.filter((line) => !/^ {2}[A-Za-z0-9][A-Za-z0-9_.-]*:\s*$/u.test(line))).toEqual([]);
+    const declaredNames = declared.map((line) => line.trim().replace(/:$/u, ""));
+    for (const entry of volumes.filter((item) => named.test(item))) expect(declaredNames).toContain(entry.split(":")[0]);
+    expect(serviceList(compose, "cap_drop")).toEqual(expect.arrayContaining(["SETUID", "SETGID"]));
+    expect(serviceList(compose, "security_opt")).toEqual(["no-new-privileges=true"]);
+    expect(compose).not.toMatch(/^\s{4}(privileged|cap_add|pid|userns_mode|ipc):/mu);
+    expect(compose).not.toContain("unconfined");
+    // A pinned user, if one is ever added: numeric, every number 10000 or more (outside the system range).
+    for (const match of compose.matchAll(/^\s{4}user:\s*"?([^"\s]+)"?\s*$/gmu)) {
+      const value = match[1] ?? "";
+      expect(value).toMatch(/^[0-9]+(:[0-9]+)?$/u);
+      for (const number of value.split(":")) expect(Number(number), value).toBeGreaterThanOrEqual(10000);
+    }
+    // The rule survives in the compose comment, whatever its wrapping.
+    const composeProse = compose.split("\n").map((line) => line.replace(/^\s*#\s?/u, "")).join(" ").replace(/\s+/gu, " ");
+    expect(composeProse).toContain("must never run as the host uid of the `postgres` user");
+    const flat = read("deploy/vps/README.md").replace(/\s+/gu, " ");
+    for (const needle of [
+      "read-only: it can connect, but cannot create, rename or remove anything in that directory",
+      "it must never start as that uid either",
+      "So the Hatchet container must never start as that uid",
+      "p=$(id -u postgres) && u=$(docker top debateai-prod-hatchet-lite-1 -eo pid,uid | awk 'NR > 1 { print $2 }') && test -n \"$u\" && ! printf '%s\\n' \"$u\" | grep -qx \"$p\" && echo 'postgres uid not used'"
+    ]) expect(flat, needle).toContain(needle);
+    expect(read("deploy/postgres/pg_hba.conf.template").replace(/\s+/gu, " ")).toContain("must never start as that uid");
+  });
+
+  /**
+   * NV-51 (L7-F3): every Hatchet container is created by the unit's `compose up`, so the unit checks hatchet.env's
+   * admin pair first (deploy/vps/hatchet-check-env.mjs, installed beside the compose file). Nothing in compose may set
+   * either admin key over the checked file, and the runbook generates the pair instead of asking for an editor.
+   */
+  it("debateai-hatchet.service refuses a hatchet.env without its own admin pair before compose up (NV-51, L7-F3)", () => {
+    const unit = configLines(read("deploy/vps/systemd/debateai-hatchet.service"));
+    const pre = unit.indexOf("ExecStartPre=/usr/bin/node /etc/debateai/hatchet/check-env.mjs /etc/debateai/hatchet.env");
+    expect(pre).toBeGreaterThanOrEqual(0);
+    expect(pre).toBeLessThan(unit.findIndex((line) => line.startsWith("ExecStart=")));
+    const lines = configLines(read("deploy/vps/compose.prod.yaml"));
+    expect(lines.filter((line) => /\bADMIN_(EMAIL|PASSWORD)\b/.test(line))).toEqual([]);
+    expect(lines.filter((line) => /^(env_file|extends|include)\s*:/.test(line))).toEqual(["env_file:"]);
+    const at = lines.indexOf("env_file:");
+    expect(lines.slice(at + 1, at + 3)).toEqual(["- /etc/debateai/hatchet.env", "environment:"]);
+    const readme = read("deploy/vps/README.md");
+    const compose = readme.slice(readme.indexOf("**Hatchet's compose file, once.**"), readme.indexOf("**1. The release folder.**"));
+    expect(compose).toContain(
+      "test ! -e /etc/debateai/hatchet/check-env.mjs && install -D -m 0644 deploy/vps/hatchet-check-env.mjs /etc/debateai/hatchet/check-env.mjs"
+    );
+    const bring = readme.slice(readme.indexOf("### Bring-up order"), readme.indexOf("## 5. Application units"));
+    const databaseUrl = bring.indexOf("> /etc/debateai/hatchet.env)");
+    expect(databaseUrl).toBeGreaterThanOrEqual(0);
+    expect(bring.indexOf(
+      "test -e /etc/debateai/hatchet.env && ! grep -Eq '^[[:space:]]*(export[[:space:]]+)?ADMIN_(EMAIL|PASSWORD)[[:space:]]*=' /etc/debateai/hatchet.env && printf 'ADMIN_EMAIL=debateai-hatchet-%s@localhost.invalid\\nADMIN_PASSWORD=%s\\n' \"$(openssl rand -hex 6)\" \"$(openssl rand -base64 24 | tr '+/' '-_')\" >> /etc/debateai/hatchet.env"
+    )).toBeGreaterThan(databaseUrl);
+    // The editor step for the pair is gone (compared with whitespace normalised, so a rewrap cannot hide it).
+    expect(bring.replace(/\s+/gu, " ")).not.toContain("`ADMIN_PASSWORD`, `SERVER_ENCRYPTION_*`) are Hatchet's own: add them with an");
+  });
+
+  /**
+   * NV-56: on engines where Docker does not filter by input interface, another host on the same network reaches a
+   * 127.0.0.1 publish (Docker's DNAT runs before routing) or the container's own bridge address. The raw table drops
+   * both before Docker sees them: rule L for 127.0.0.0/8, rule P for TCP to every port compose publishes, whatever the
+   * destination. Docker requires the guard, and the Hatchet unit checks both rules before it creates the container.
+   */
+  it("NV-56: off-host packets for 127.0.0.0/8 and for Hatchet's published ports are dropped before Docker, and Hatchet does not start without both drops", () => {
+    const published = publishedPorts(read("deploy/vps/compose.prod.yaml")).flatMap((port) => port.split(":").slice(1));
+    const ports = [...new Set(published)].map(Number).sort((a, b) => a - b).join(",");
+    expect(ports).toBe("7077,8888");
+    const LOOPBACK_RULE = "! -i lo -d 127.0.0.0/8 -m comment --comment debateai-loopback-guard -j DROP";
+    const PORTS_RULE = `! -i lo -p tcp -m multiport --dports ${ports} -m comment --comment debateai-hatchet-ports-guard -j DROP`;
+    const ensure = (rule: string): string =>
+      `/bin/sh -c '/usr/sbin/iptables -w -t raw -C PREROUTING ${rule} 2>/dev/null || /usr/sbin/iptables -w -t raw -I PREROUTING 1 ${rule}'`;
+    const sections = (text: string): Map<string, string[]> => {
+      const map = new Map<string, string[]>();
+      let current = "";
+      for (const line of configLines(text)) {
+        const header = /^\[([A-Za-z]+)\]$/u.exec(line)?.[1];
+        if (header !== undefined) { current = header; map.set(current, []); continue; }
+        map.get(current)?.push(line);
+      }
+      return map;
+    };
+    expect(exists("deploy/vps/systemd/debateai-ingress-guard.service")).toBe(true);
+    const guard = sections(read("deploy/vps/systemd/debateai-ingress-guard.service"));
+    const unitSection = guard.get("Unit") ?? [];
+    expect(unitSection).toContain("Before=docker.service");
+    expect(unitSection.filter((line) => line.startsWith("After=") && line.includes("nftables.service") && line.includes("ufw.service"))).toHaveLength(1);
+    const serviceSection = guard.get("Service") ?? [];
+    expect(serviceSection).toContain("Type=oneshot");
+    expect(serviceSection).toContain("RemainAfterExit=true");
+    expect(serviceSection.filter((line) => line.startsWith("ExecStart="))).toEqual([`ExecStart=${ensure(LOOPBACK_RULE)}`, `ExecStart=${ensure(PORTS_RULE)}`]);
+    expect(serviceSection.filter((line) => /^(User|ExecStop|ExecStopPost)=/u.test(line))).toEqual([]);
+    const installSection = guard.get("Install") ?? [];
+    expect(installSection).toContain("WantedBy=multi-user.target");
+    expect(installSection).toContain("RequiredBy=docker.service");
+    const hatchetText = read("deploy/vps/systemd/debateai-hatchet.service");
+    expect(hatchetText).toMatch(/^Requires=.*\bdebateai-ingress-guard\.service\b/mu);
+    expect(hatchetText).toMatch(/^After=.*\bdebateai-ingress-guard\.service\b/mu);
+    const hatchet = configLines(hatchetText);
+    const start = hatchet.findIndex((line) => line.startsWith("ExecStart="));
+    for (const rule of [LOOPBACK_RULE, PORTS_RULE]) {
+      const check = hatchet.indexOf(`ExecStartPre=/usr/sbin/iptables -w -t raw -C PREROUTING ${rule}`);
+      expect(check, rule).toBeGreaterThanOrEqual(0);
+      expect(check, rule).toBeLessThan(start);
+    }
+    const readme = read("deploy/vps/README.md");
+    const enable = /systemctl enable --now ([^\n\\]*(?:\\\n[^\n\\]*)*)/u.exec(readme)?.[1] ?? "";
+    expect(enable).toContain("debateai-ingress-guard.service");
+    const slice = (from: string, to: string): string => {
+      const at = readme.indexOf(from);
+      expect(at, from).toBeGreaterThanOrEqual(0);
+      return readme.slice(at, readme.indexOf(to, at + from.length));
+    };
+    expect(slice("## 1. Topology", "## 2. Host preparation")).toContain("debateai-ingress-guard.service");
+    const units = slice("## 5. Application units", "## 6. Caddy");
+    for (const rule of [LOOPBACK_RULE, PORTS_RULE]) {
+      expect(units, rule).toContain(`/usr/sbin/iptables -w -t raw -C PREROUTING ${rule} 2>/dev/null || /usr/sbin/iptables -w -t raw -I PREROUTING 1 ${rule}`);
+    }
+    expect(readme).not.toContain("closes that gap");
+    expect(read("deploy/vps/compose.prod.yaml")).toContain("debateai-ingress-guard");
   });
 
   const HARDENING = [
@@ -545,8 +708,8 @@ describe("VPS baseline: Caddy edge, loopback-only compose, hardened systemd unit
     // Nothing the service runs comes from the operator checkout except root's own release.mjs.
     expect(execs.filter((line) => line.includes("/opt/debateai/dialectical-engine/") && !line.includes("/opt/debateai/dialectical-engine/deploy/vps/release.mjs "))).toEqual([]);
     expect(unit).not.toContain("%I");
-    // Root's hooks get PATH only: `+` keeps the unit's environment, and the base env file is the service user's, so a
-    // NODE_OPTIONS line in it must never reach a root process.
+    // Root's hooks get PATH only; loader and libc start-up variables are unset by UnsetEnvironment= and the base env file
+    // is root's (NV-52).
     const root = "+/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /usr/bin/node /opt/debateai/dialectical-engine/deploy/vps/release.mjs";
     expect(lines.filter((line) => /^Exec[A-Za-z]*=\+/.test(line) && !line.includes(`=${root} `))).toEqual([]);
     expect(lines).toContain(`ExecStartPre=${root} may-start --service ${service} --label %i`);
@@ -560,6 +723,45 @@ describe("VPS baseline: Caddy edge, loopback-only compose, hardened systemd unit
     // Once the limit is hit systemd refuses even a start by hand until the interval passes: the runbook clears it first.
     expect(read("deploy/vps/README.md")).toContain("`systemctl reset-failed debateai-<service>@<label>`, then `systemctl start debateai-<service>@<label>`");
     expect(unit).toMatch(/^\[Install\]\nWantedBy=multi-user\.target$/m);
+  });
+
+  /**
+   * NV-52: a root (`+`) hook runs with the environment systemd builds for the unit, and ld.so and libc act on some of
+   * it for /usr/bin/env itself, before `env -i` runs. So every unit with such a hook unsets those variables, and the
+   * base env file it reads is root's, installed and migrated as a new root-owned file (never chowned in place).
+   */
+  it("NV-52: every unit with a root (+) hook unsets the loader and start-up variables, and its base env file is root's", () => {
+    const LOADER_VARIABLES = ["LD_PRELOAD", "LD_LIBRARY_PATH", "LD_AUDIT", "LD_DEBUG_OUTPUT", "LD_PROFILE", "LD_PROFILE_OUTPUT", "LD_TRACE_LOADED_OBJECTS", "GLIBC_TUNABLES", "GCONV_PATH", "LOCPATH", "NODE_OPTIONS", "NODE_PATH"];
+    const rooted = readdirSync(resolve(engineRoot, "deploy/vps/systemd")).filter((name) => name.endsWith(".service"))
+      .filter((name) => configLines(read(`deploy/vps/systemd/${name}`)).some((line) => /^Exec[A-Za-z]*=[-@:!]*\+/.test(line)));
+    for (const name of ["debateai-api@.service", "debateai-runner@.service", "debateai-ui@.service"]) expect(rooted).toContain(name);
+    for (const name of rooted) {
+      const unit = read(`deploy/vps/systemd/${name}`);
+      const serviceSection = unit.slice(unit.indexOf("\n[Service]\n"), unit.indexOf("\n[Install]\n"));
+      const unset = configLines(serviceSection).filter((line) => line.startsWith("UnsetEnvironment="));
+      expect(unset, name).toHaveLength(1);
+      const names = new Set((unset[0] ?? "").slice("UnsetEnvironment=".length).split(/\s+/u));
+      expect(LOADER_VARIABLES.filter((variable) => !names.has(variable)), name).toEqual([]);
+    }
+    const readme = read("deploy/vps/README.md");
+    const from = readme.indexOf("## 3. `/etc/debateai` layout");
+    expect(from).toBeGreaterThanOrEqual(0);
+    const layout = readme.slice(from, readme.indexOf("### The database principals each file names", from));
+    for (const service of ["api", "ui", "runner"]) {
+      expect(layout, service).toMatch(new RegExp(`^\\| \`/etc/debateai/${service}\\.env\` \\| \`0640\` \\| \`root:debateai-${service}\` \\| `, "mu"));
+      expect(read(`deploy/vps/env/${service}.env.example`).split("\n")[0])
+        .toBe(`# deploy/vps/env/${service}.env.example -> /etc/debateai/${service}.env (0640 root:debateai-${service})`);
+    }
+    expect(layout).not.toMatch(/^\| `\/etc\/debateai\/(api|ui|runner)\.env` \| `0600` /mu);
+    // Installed once by root, and an older host's files replaced by new root-owned copies, then checked.
+    expect(layout).toContain(
+      "for service in api ui runner; do test -e \"/etc/debateai/$service.env\" || install -m 0640 -o root -g \"debateai-$service\" \"deploy/vps/env/$service.env.example\" \"/etc/debateai/$service.env\"; done"
+    );
+    expect(layout).toContain(
+      "for service in api ui runner; do install -m 0640 -o root -g \"debateai-$service\" \"/etc/debateai/$service.env\" \"/etc/debateai/.$service.env.nv52\" && mv -f \"/etc/debateai/.$service.env.nv52\" \"/etc/debateai/$service.env\"; done && stat -c '%a %U:%G %n' /etc/debateai/api.env /etc/debateai/ui.env /etc/debateai/runner.env && test \"$(stat -c '%U:%a' /etc/debateai/api.env /etc/debateai/ui.env /etc/debateai/runner.env | sort -u)\" = root:640 && ! grep -nE '^[[:space:]]*(export[[:space:]]+)?(LD_[A-Z_]+|GLIBC_TUNABLES|GCONV_PATH|LOCPATH|NODE_OPTIONS|NODE_PATH)[[:space:]]*=' /etc/debateai/api.env /etc/debateai/ui.env /etc/debateai/runner.env"
+    );
+    // A chown in place would leave a write handle the service user already holds working.
+    expect(layout).not.toContain("chown \"root:debateai-$service\"");
   });
 
   /**
@@ -634,7 +836,7 @@ describe("VPS baseline: Caddy edge, loopback-only compose, hardened systemd unit
   it("ReadWritePaths are exactly the custody trees each service writes (L2 out-of-scope, C3 amendment)", () => {
     const api = read("deploy/vps/systemd/debateai-api@.service");
     // B3a: the optional billing notice spool, "-"-prefixed so the unit starts while that folder does not exist.
-    expect(api).toMatch(/^ReadWritePaths=\/var\/lib\/debateai\/api\/user-deks \/var\/lib\/debateai\/api\/publication-keys \/var\/lib\/debateai\/api\/audit-keys \/var\/lib\/debateai\/data-exports -\/var\/lib\/debateai\/api\/billing-notice-spool$/m);
+    expect(api).toMatch(/^ReadWritePaths=\/var\/lib\/debateai\/api\/user-deks \/var\/lib\/debateai\/api\/publication-keys \/var\/lib\/debateai\/api\/audit-keys -\/var\/lib\/debateai\/api\/restore-fence \/var\/lib\/debateai\/data-exports -\/var\/lib\/debateai\/api\/billing-notice-spool$/m);
     expect(api).toContain("ExecStart=/usr/bin/pnpm --dir /opt/debateai/releases/%i/dialectical-engine exec tsx apps/api/src/main.ts");
     const runner = read("deploy/vps/systemd/debateai-runner@.service");
     expect(runner).not.toMatch(/^ReadWritePaths=/m);
@@ -644,6 +846,8 @@ describe("VPS baseline: Caddy edge, loopback-only compose, hardened systemd unit
     expect(ui).not.toMatch(/^ReadWritePaths=/m);
     expect(ui).toContain("Environment=DIALECTICAL_UI_TRUSTED_PROXIES=127.0.0.1,::1");
     expect(ui).toContain("Environment=DIALECTICAL_UI_EDGE_SECRET_PATH=/etc/debateai/ui-edge.secret");
+    // NV-03: the UI-to-API proof the website sends with every forwarded address.
+    expect(ui).toContain("Environment=DIALECTICAL_UI_API_PROOF_PATH=/etc/debateai/ui-api-proof.secret");
     expect(ui).toContain("Environment=DIALECTICAL_UI_HOST=127.0.0.1");
     // The slot's port comes from the release's own overlay (side-by-side spec §6), never from the template.
     expect(ui).not.toMatch(/^Environment=PORT=/m);
@@ -785,7 +989,7 @@ describe("VPS baseline: runbook and environment templates", () => {
   it("README covers topology, firewall, custody contract, provisioning, backups, drill, absences", () => {
     const readme = read("deploy/vps/README.md");
     for (const needle of [
-      "127.0.0.1:3001", "127.0.0.1:8790", "ufw default deny incoming", "ufw allow 22,80,443/tcp",
+      "127.0.0.1:481", "127.0.0.1:491", "ufw default deny incoming", "ufw allow 22,80,443/tcp",
       "unattended-upgrades", "/etc/debateai", "head -c 32 /dev/urandom", "0600", "0700",
       "pnpm db:provision-principals", "log_statement", "sslmode=verify-full", "CONTENT_ENCRYPTION_ENABLED=true",
       "NODE_EXTRA_CA_CERTS", "X-Debateai-Edge-Secret", "backup.sh", "restore-drill.sh", "quarterly",
@@ -842,7 +1046,7 @@ describe("VPS baseline: runbook and environment templates", () => {
     for (const key of [
       "NODE_ENV", "KEK_PATH", "BLIND_INDEX_KEY_PATH", "AUDIT_KEY_STORE_PATH", "AUDIT_SOURCE_IP_SALT_PATH",
       "USER_DEK_STORE_PATH", "CONTENT_ENCRYPTION_ENABLED", "CONTENT_PROVISION_DATABASE_URL", "PUBLICATION_ENABLED",
-      "CORPUS_KEK_PATH", "PUBLICATION_KEY_STORE_PATH", "AUTHORIZATION_DATABASE_URL", "PUBLICATION_CLEANUP_DATABASE_URL",
+      "CORPUS_KEK_PATH", "PUBLICATION_KEY_STORE_PATH", "RESTORE_FENCE_PATH", "AUTHORIZATION_DATABASE_URL", "PUBLICATION_CLEANUP_DATABASE_URL",
       "ERASURE_DATABASE_URL", "DATA_EXPORT_DATABASE_URL", "ACCOUNT_ERASURE_GRACE_MS", "MAIL_SENDMAIL_PATH", "MAIL_FROM", "PUBLIC_APP_URL",
       "DATABASE_URL", "API_HOST", "API_PORT", "STRANGER_SAMPLE_RATE", "REGISTER_VERSION", "BATTERY_VERSION",
       "SETTLEMENT_WATCH_HANDLE", "PROVIDER_DISCOVERY_TARGETS_JSON", "HATCHET_CLIENT_TOKEN", "HATCHET_HOST_PORT",
@@ -854,7 +1058,9 @@ describe("VPS baseline: runbook and environment templates", () => {
       // (which loads this same file) refused before touching a record.
       "SUPPORT_KEK_PATH", "SUPPORT_DATABASE_URL",
       // Paid plans L1: required in every mode (apiEnvironmentShape).
-      "RECORDS_KEY_PATH"
+      "RECORDS_KEY_PATH",
+      // NV-03: required by the hosted API at its composition root (UI_API_PROOF_REQUIRED).
+      "UI_API_PROOF_PATH"
     ]) expect(env.has(key), key).toBe(true);
     expect(env.get("NODE_ENV")).toBe("production");
     // V-9(c): both services answer the same question with the same word, or the
@@ -863,7 +1069,7 @@ describe("VPS baseline: runbook and environment templates", () => {
     expect(envKeys(read("deploy/vps/env/runner.env.example")).get("DEBATEAI_DEPLOYMENT_MODE"))
       .toBe("hosted");
     expect(env.get("API_HOST")).toBe("127.0.0.1");
-    expect(env.get("API_PORT")).toBe("8790");
+    expect(env.get("API_PORT")).toBe("491");
     expect(env.get("CONTENT_ENCRYPTION_ENABLED")).toBe("true");
     expect(env.get("HATCHET_TLS_STRATEGY")).toBe("tls");
     expect(env.get("HATCHET_HOST_PORT")).toBe("127.0.0.1:7077");
@@ -1012,7 +1218,7 @@ describe("VPS baseline: runbook and environment templates", () => {
     expect(runner.get("KEK_PATH")).toBe("/etc/debateai/runner/kek.bin");
     expect(runner.has("BLIND_INDEX_KEY_PATH")).toBe(false);
     const ui = envKeys(read("deploy/vps/env/ui.env.example"));
-    expect(ui.get("DIALECTICAL_API_BASE")).toBe("http://127.0.0.1:8790");
+    expect(ui.get("DIALECTICAL_API_BASE")).toBe("http://127.0.0.1:491");
     expect(ui.get("NEXT_PUBLIC_API_BASE")).toBe("/api");
     for (const [key] of ui) expect(key).not.toMatch(/KEK|DATABASE_URL|HATCHET|SECRET$/);
     // The payment marks list is shown, commented out, until root has put each file in /etc/debateai/payment-marks/.
@@ -1041,6 +1247,61 @@ describe("VPS baseline: runbook and environment templates", () => {
     const layout = readme.slice(readme.indexOf("## 3. `/etc/debateai` layout"), readme.indexOf("### The key-file contract"));
     expect(layout).toMatch(/\| `\/etc\/debateai\/api\/` \|[^\n]*`support-kek\.bin`/u);
     expect(layout).toMatch(/SUPPORT_DATABASE_URL[^\n]*debateai_prod_api_support/u);
+  });
+
+  it("NV-07: §9 'After any restore' revokes the restored sessions before any API starts and marks the restore fence; §5 points to it", () => {
+    const readme = read("deploy/vps/README.md");
+    /** The blank-line-delimited paragraph around the first `needle`. */
+    const paragraph = (needle: string): string => {
+      const at = readme.indexOf(needle);
+      expect(at, needle).toBeGreaterThan(-1);
+      return readme.slice(readme.lastIndexOf("\n\n", at) + 2, readme.indexOf("\n\n", at));
+    };
+    const heading = "\n### After any restore — before any API starts\n";
+    const at = readme.indexOf(heading);
+    expect(at).toBeGreaterThan(readme.indexOf("\n#### The restore rehearsal — before go-live\n"));
+    expect(at).toBeLessThan(readme.indexOf("\n## 10. "));
+    expect(readme.indexOf(heading, at + 1)).toBe(-1);
+    const section = readme.slice(at, readme.indexOf("\n## 10. ", at));
+    const open = section.indexOf("```sh\n");
+    const lines = section.slice(open, section.indexOf("\n```", open + 1)).split("\n");
+    const block = lines.join("\n");
+    for (const needle of [
+      'UPDATE identity.session SET revoked_at = GREATEST(clock_timestamp(), created_at) WHERE revoked_at IS NULL',
+      'UPDATE staff.privilege_session SET revoked_at = GREATEST(clock_timestamp(), created_at) WHERE revoked_at IS NULL',
+      "RESTORE_SESSIONS_REVOKED", "HAS=$(", "to_regclass('identity.restore_fence')",
+      "install -m 0600 -o debateai-api -g debateai-api /dev/null", "RESTORE_FENCE_MARKED", "RESTORE_FENCE_CLEARED",
+      "RESTORE_FENCE_NOT_DONE", "RUNNING=$(systemctl list-units --plain --no-legend --state=active", '[ -z "$RUNNING" ] ||'
+    ]) expect(block, needle).toContain(needle);
+    // The revocation first, then the running-instance guard, then the api.env check, then the marker.
+    const first = (needle: string): number => lines.findIndex((line) => line.includes(needle));
+    const order = [first("UPDATE identity.session"), first("RUNNING=$("), first('grep -qx "RESTORE_FENCE_PATH='), first("install -m 0600")];
+    expect(order.every((index) => index > -1), JSON.stringify(order)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    const folder = lines.find((line) => line.includes('[ -d "${F%/*}" ] ||'));
+    expect(folder).toMatch(/RESTORE_FENCE_NOT_DONE[^\n]*exit 1/u);
+    for (const line of lines.filter((candidate) => candidate.includes("RESTORE_FENCE_NOT_DONE"))) expect(line, line).toMatch(/exit 1/u);
+    for (const needle of ["restore_fence_release_public_hold_v1", "before migration 0131", "a removed passkey", "an unlinked social sign-in"]) {
+      expect(section, needle).toContain(needle);
+    }
+    // §5: both ways back point to it.
+    expect(paragraph("**Going back.** Before the switch:")).toContain("After any restore");
+    expect(paragraph("Going back: before D3's migrations")).toContain("After any restore");
+    // §5: the upgrade note for a host installed before NV-07, in §14.5's order (sliced, since §2 and others repeat lines).
+    const upgrade = paragraph("Like the ingress guard's note above, for the restore fence:");
+    const steps = [
+      "install -d -m 0700 -o debateai-api -g debateai-api /var/lib/debateai/api/restore-fence",
+      "install -m 0644 deploy/vps/systemd/debateai-api@.service /etc/systemd/system/",
+      "systemctl daemon-reload",
+      "grep -q '^RESTORE_FENCE_PATH=' /etc/debateai/api.env || printf '\\nRESTORE_FENCE_PATH=%s\\n' /var/lib/debateai/api/restore-fence/fence >> /etc/debateai/api.env"
+    ].map((step) => upgrade.indexOf(step));
+    expect(steps.every((index) => index > -1), JSON.stringify(steps)).toBe(true);
+    expect([...steps].sort((a, b) => a - b)).toEqual(steps);
+    // §9: the online backup's globals are applied only where the roles do not exist yet.
+    const online = paragraph("`restore-drill.sh` does not take this layout");
+    expect(online).toContain("ON_ERROR_STOP=1");
+    expect(online).toContain("skip it");
+    expect(online).toContain('"After any restore"');
   });
 
   it("README: cost envelopes, register publication, rehearsals, V-9(a)(b), known limitations", () => {
@@ -1186,6 +1447,17 @@ describe("VPS baseline: runbook and environment templates", () => {
     expect(readme).toMatch(/umask 0277[^\n]*> \/etc\/debateai\/ui-edge\.secret/u);
     expect(readme).toMatch(/chown debateai-ui:debateai-ui \/etc\/debateai\/ui-edge\.secret/u);
     expect(readme).toMatch(/install -m 0640 -o root -g caddy \/etc\/debateai\/ui-edge\.secret/u);
+  });
+
+  it("README: the UI-to-API proof is written under temporary names with noclobber, moved in, compared and length-checked (NV-03)", () => {
+    const readme = read("deploy/vps/README.md").replace(/\\\n\s*/gu, " ");
+    expect(readme).toMatch(/\( set -C; umask 0277[^\n]*> \/etc\/debateai\/ui-api-proof\.secret\.new/u);
+    expect(readme).toContain("install -m 0600 -o debateai-api -g debateai-api /etc/debateai/ui-api-proof.secret.new /etc/debateai/api/ui-api-proof.secret.new");
+    expect(readme).toContain("mv /etc/debateai/api/ui-api-proof.secret.new /etc/debateai/api/ui-api-proof.secret");
+    expect(readme).toContain("mv /etc/debateai/ui-api-proof.secret.new /etc/debateai/ui-api-proof.secret");
+    expect(readme).toContain("cmp -s /etc/debateai/ui-api-proof.secret /etc/debateai/api/ui-api-proof.secret || echo UI_API_PROOF_COPIES_DIFFER");
+    expect(readme).toContain('test "$(wc -c < /etc/debateai/ui-api-proof.secret)" -ge 43 || echo UI_API_PROOF_TOO_SHORT');
+    expect(readme).toContain("sudoedit /etc/debateai/api.env");
   });
 
   /**

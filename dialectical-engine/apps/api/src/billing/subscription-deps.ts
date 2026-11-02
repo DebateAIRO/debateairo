@@ -52,8 +52,13 @@ export type SubscriptionRouteDeps = Readonly<{
   geo: GeoLookup;
   /** P7's outbox kick: a queued VERIFY_PAYMENT (or refund) runs now, not at the next 5-second tick. */
   kick: () => void;
-  /** B6a's model spend store: the owner's RUN + STORY spend between two instants (the credit-used share). */
-  ownerSpend: Readonly<{ readOwnerSpentMicros(ownerRef: string, from: Date, to: Date): Promise<number> }>;
+  /**
+   * B6a's model spend store. NV-45: the withdrawal's credit used, by send time, and the debates that may still be
+   * using it.
+   */
+  ownerSpend: Readonly<{
+    readWithdrawalSpend(ownerRef: string, from: Date, withdrewAt: Date): Promise<Readonly<{ spentMicros: number; liveRuns: number }>>;
+  }>;
   /** P9b's single refund executor (R-32). */
   refunds: Pick<RefundDesk, "requestAll">;
   /** P8c's account email reader: the address the card form is opened for, as at checkout. */

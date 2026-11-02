@@ -413,6 +413,7 @@ export class PostgresEvaluatorConsumerRepository implements EvaluatorConsumerRep
         "The public evaluator presentation reader is unavailable"
       );
     }
+    // NV-21: the evaluator is a reader, so it shares the lease; only key destruction (cleanup, erasure) excludes it.
     return withPublicationContentLease(this.pool,[sample.publicationRef],async (lease) => {
       const snapshot = await lease.client.query<{
         content_ciphertext: CryptoEnvelope;
@@ -457,7 +458,7 @@ export class PostgresEvaluatorConsumerRepository implements EvaluatorConsumerRep
         );
       }
       return result;
-    });
+    },"shared");
   }
 
   async persistOutput(input: Parameters<EvaluatorConsumerRepository["persistOutput"]>[0]): Promise<{

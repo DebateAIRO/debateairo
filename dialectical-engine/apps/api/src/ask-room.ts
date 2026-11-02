@@ -110,6 +110,9 @@ export interface AskRoomSpend {
   readSiteCountedHoldsMicros(day: string): Promise<number>;
   readOwnerSpentMicros(ownerRef: string, from: Date, to: Date, funding?: FundingBasis, scope?: SpendScope): Promise<number>;
   readOwnerCountedHoldsMicros(ownerRef: string, funding?: FundingBasis): Promise<number>;
+  /** NV-43: one owner's RUN+STORY spend charged on `day` and their live runs' unspent holds, billing on or off. */
+  readOwnerDaySpentMicros?(ownerRef: string, day: string): Promise<number>;
+  readOwnerLiveHoldsMicros?(ownerRef: string): Promise<number>;
   openHold(client: PoolClient, input: Readonly<{ runId: string; heldMicros: number }>): Promise<void>;
 }
 
@@ -184,6 +187,14 @@ export interface AskAdmissionGate {
    * version is compared, Phase 1's start.
    */
   readonly activeSettingsVersion?: (tx: Pick<PoolClient, "query">) => Promise<number>;
+  /**
+   * NV-48 (security audit run 3): the person's share of the site's places (`OWNER_CONCURRENT_DEBATES`), and their own
+   * runs with a READY or CLAIMED job across every release, read on the decision's own transaction. At the share the
+   * question waits as the person's own wait (PERSON_BUSY). Both or neither; absent (a gate a test builds without them):
+   * no person's share, as before.
+   */
+  readonly ownerConcurrentDebates?: number;
+  readonly ownerActiveDebates?: (tx: Pick<PoolClient, "query">, ownerRef: string) => Promise<number>;
 }
 
 export type AskRoomOptions = Readonly<{
@@ -218,6 +229,13 @@ export type AskRoomOptions = Readonly<{
   dailyCeilingMicros: number;
   closeBasisPoints: number;
   waitingLinePerPerson: number;
+  /**
+   * NV-43 (security audit run 3): one owner's share of the site's day, in micros (`ownerDayShareMicrosOf`), measured
+   * only for an owner with no window of their own (billing off) as one more room, PERSON_DAY. Needs both of the
+   * spend's NV-43 readers. Absent: no share (the room of every test that builds none); main.ts and the practice always
+   * pass it.
+   */
+  ownerDayShareMicros?: number;
   clock?: () => Date;
   /** Side-by-side C8: the site's cap and the release re-check, asked by `decide` and `startWaiting` only. */
   gate?: AskAdmissionGate;
@@ -339,6 +357,8 @@ type RoomMeasure = Readonly<{
   rooms: ReadonlyArray<ScopeRoom>;
   personUses: ReadonlyArray<RoomWindowUse>;
   waitReason: WaitReason;
+  /** NV-43: the owner's day share is FULL; only ever true for an owner with no window (billing off). */
+  ownerShareFull: boolean;
 }>;
 
 type RoomEvaluation = Readonly<{
@@ -366,6 +386,13 @@ class DecisionDayTurned extends Error {}
 export function nextWholeMinute(now: Date): Date {
   const minute = 60_000;
   return new Date(Math.floor(now.getTime() / minute) * minute + minute);
+}
+
+/** NV-48: what a hold records. PERSON_BUSY is the person's own wait, looked at again at the next tick. */
+function holdWaitReason(hold: AdmissionHold, now: Date): WaitReason {
+  return hold === "PERSON_BUSY"
+    ? Object.freeze({ waitsFor: "PERSON" as const, personRecheckAt: nextWholeMinute(now) })
+    : Object.freeze({ waitsFor: hold, personRecheckAt: null });
 }
 
 /** When the site's day resets: the next UTC midnight (V-28's day is a UTC day). */
@@ -465,6 +492,20 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
     }
     const cap = options.gate?.siteConcurrentDebates;
     if (cap !== undefined && (!Number.isSafeInteger(cap) || cap < 1)) throw new TypeError("ASK_ROOM_OPTIONS_INVALID");
+    // NV-48: the person's share and its count come together, and the share is one of the site's places at least.
+    const share = options.gate?.ownerConcurrentDebates;
+    const count = options.gate?.ownerActiveDebates;
+    if ((share === undefined) !== (count === undefined)
+      || (share !== undefined && (!Number.isSafeInteger(share) || share < 1 || share > (cap as number)))) {
+      throw new TypeError("ASK_ROOM_OPTIONS_INVALID");
+    }
+    // NV-43: the owner's day share is one micro at least, and the spend reads what it is measured from.
+    const dayShare = options.ownerDayShareMicros;
+    if (dayShare !== undefined && (!Number.isSafeInteger(dayShare) || dayShare < 1
+      || typeof options.spend.readOwnerDaySpentMicros !== "function"
+      || typeof options.spend.readOwnerLiveHoldsMicros !== "function")) {
+      throw new TypeError("ASK_ROOM_OPTIONS_INVALID");
+    }
     this.#options = options;
     this.#clock = options.clock ?? (() => new Date());
   }
@@ -494,9 +535,10 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
       const evaluation = await this.#evaluate(question, now, await this.#holdOf(tx, question));
       const admission = evaluation.admission;
       if (admission.kind === "REFUSE_ALREADY_WAITING") throw alreadyWaiting(evaluation);
-      // A wait the hold alone decides is recorded as the hold (SITE_BUSY or SWITCHING); any other as measured.
+      // A wait the hold alone decides is recorded as the hold (SITE_BUSY or SWITCHING), or (NV-48) for PERSON_BUSY as
+      // the person's own wait, PERSON at the next tick; any other as measured.
       this.#waitReasons.set(tx, admission.kind === "WAIT" && admission.cause !== undefined
-        ? Object.freeze({ waitsFor: admission.cause, personRecheckAt: null })
+        ? holdWaitReason(admission.cause, now)
         : evaluation.waitReason);
       const ownerRef = question.access.ownerRef;
       if (ownerRef !== null && this.#options.entitlements !== null) {
@@ -658,6 +700,12 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
    * Side-by-side C8 (with a gate): a release that is not current starts nothing and writes nothing (SWITCHING), asked
    * before anything else; a run the room would START while the site runs its cap of debates is held back (SITE_BUSY,
    * its reason appended only when it was not already SITE_BUSY).
+   * NV-48 (security audit run 3): before the site's count, a START for an owner who already has their share of the
+   * site's places live is held back (PERSON_FULL), and this run and every other of the owner's runs still in line are
+   * recorded PERSON afresh, looked at again at the next tick.
+   * NV-43 (security audit run 3): with billing off, an owner whose share of the site's day is FULL is left in line
+   * (PERSON_FULL), and this run and every other of the owner's runs still in line are recorded afresh with the same
+   * PERSON reason (`#recordOwnerLineAfresh`, the helper NV-48's block uses).
    * Side-by-side spec §13 "The API re-checks at admission" (Task S11): the same first question also needs this release
    * to have passed the version the start would run on (`startVersion`); not passed is SWITCHING too, and the waker's
    * tick stops there (ruling R11).
@@ -746,7 +794,7 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
       const estimateMicros = readmit === null
         ? await (await this.#estimatorFor(run.registerVersion)).estimateMicros(settingsClassOfWaitingRun(run))
         : readmit.holdMicros ?? await (await this.#estimatorFor(readmission?.registerVersion)).estimateMicros(readmit.settingsClass);
-      const { rooms, personUses, waitReason } = await this.#measure(access, estimateMicros, now, run.runId);
+      const { rooms, personUses, waitReason, ownerShareFull } = await this.#measure(access, estimateMicros, now, run.runId);
       const admission = decideAdmission({
         rooms,
         siteLineBlocking: false,
@@ -755,12 +803,29 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
         nextTickAt: nextWholeMinute(now)
       });
       if (admission.kind !== "START") {
-        // A still-SITE run writes nothing; any change, or a person's run measured again, is appended.
-        if (waitReason.waitsFor === "PERSON" || run.waitsFor !== "SITE") {
+        // NV-43: billing off, the owner's day share is FULL. Every run of the person measures the same PERSON reason
+        // (FULL does not depend on the estimate; the recheck only on the person's own spend), so all of them are recorded
+        // afresh, as NV-48 does for PERSON_BUSY. Billing-on PERSON waits stay per run (runs can be pinned to different
+        // funding).
+        if (ownerShareFull && run.ownerRef !== null) {
+          await this.#recordOwnerLineAfresh(tx, run.runId, run.ownerRef, Object.freeze({ ...waitReason, at: now }));
+        } else if (waitReason.waitsFor === "PERSON" || run.waitsFor !== "SITE") {
+          // A still-SITE run writes nothing; any change, or a person's run measured again, is appended.
           await this.#options.line.recordReason(tx, run.runId, Object.freeze({ ...waitReason, at: now }));
         }
         const siteFull = rooms.some((entry) => entry.scope === "SITE_DAY" && entry.room === "FULL");
         return Object.freeze({ kind: siteFull ? "SITE_FULL" as const : "PERSON_FULL" as const });
+      }
+      // NV-48: a person at their share of the site's places waits for their own debates. This run AND every other run
+      // of the person still in line are recorded afresh as PERSON on this transaction: the waker reaches one run per
+      // person per tick (index.ts `persons`), and a skipped run whose recheck instant has passed would hold the whole
+      // line (siteLineBlocking). Asked before the site count, as in `#holdOf`. (A START of one of the person's runs
+      // still skips the others that tick, so with `waiting_line_per_person` of 2 or more the line can be held for up
+      // to a minute.)
+      if (gate !== undefined && run.ownerRef !== null && await this.#personIsBusy(tx, gate, run.ownerRef)) {
+        const reason = Object.freeze({ ...holdWaitReason("PERSON_BUSY", now), at: now });
+        await this.#recordOwnerLineAfresh(tx, run.runId, run.ownerRef, reason);
+        return Object.freeze({ kind: "PERSON_FULL" as const });
       }
       if (gate !== undefined && await this.#siteIsBusy(tx, gate)) {
         if (run.waitsFor !== "SITE_BUSY") {
@@ -867,12 +932,16 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
    * The release check also asks, once and on this transaction, whether this release has passed the question's version
    * (`registerVersion`); not passed is SWITCHING: the ask waits in line, no charge, no hold, no error to the person. A
    * question whose version this API could not load (`settingsUnavailable`, ruling R47) is SWITCHING without a query.
+   * NV-48 (security audit run 3): after the release check and before the site's count, PERSON_BUSY when the asker
+   * already has their share of the site's places live (`#personIsBusy`), so a person at their share is never recorded
+   * SITE_BUSY, which would hold every later asker back.
    */
   async #holdOf(tx: PoolClient, question: RoomQuestion): Promise<AdmissionHold | null> {
     if (question.settingsUnavailable === true) return "SWITCHING";
     const gate = this.#options.gate;
     if (gate === undefined) return null;
     if (!(await gate.ownReleaseIsCurrent(tx, question.registerVersion))) return "SWITCHING";
+    if (await this.#personIsBusy(tx, gate, question.access.ownerRef)) return "PERSON_BUSY";
     return await this.#siteIsBusy(tx, gate) ? "SITE_BUSY" : null;
   }
 
@@ -880,6 +949,26 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
   async #siteIsBusy(tx: PoolClient, gate: AskAdmissionGate): Promise<boolean> {
     await tx.query(SITE_CONCURRENT_DEBATES_LOCK);
     return await gate.activeDebates(tx) >= gate.siteConcurrentDebates;
+  }
+
+  /** NV-48: the person already has their share of the site's places live, read on the decision's own transaction. */
+  async #personIsBusy(tx: PoolClient, gate: AskAdmissionGate, ownerRef: string | null): Promise<boolean> {
+    if (ownerRef === null || gate.ownerActiveDebates === undefined || gate.ownerConcurrentDebates === undefined) return false;
+    return await gate.ownerActiveDebates(tx, ownerRef) >= gate.ownerConcurrentDebates;
+  }
+
+  /**
+   * NV-48 + NV-43: records `reason` for `runId` and for every other run of the same person still in line, on `tx`.
+   * The waker reaches one run per person per tick; a skipped run whose recheck instant has passed would hold the
+   * whole line (siteLineBlocking).
+   */
+  async #recordOwnerLineAfresh(
+    tx: PoolClient, runId: string, ownerRef: string, reason: WaitReason & Readonly<{ at: Date }>
+  ): Promise<void> {
+    await this.#options.line.recordReason(tx, runId, reason);
+    for (const other of await this.#options.line.waitingForOwner(ownerRef)) {
+      if (other.runId !== runId) await this.#options.line.recordReason(tx, other.runId, reason);
+    }
   }
 
   /**
@@ -942,6 +1031,10 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
    * marked `fullOnOwnHolds` (Important 1): the expected start is then the next
    * tick, by the same rule, and the answers say the person's own debates are
    * what the question waits for.
+   * NV-43 (security audit run 3): an owner with NO window (billing off) is
+   * measured against their share of the site's day instead (`ownerDayShareMicros`),
+   * one more room, PERSON_DAY, resetting at the next UTC midnight, by the same
+   * rules (`ownerShareFull` says it is FULL). It is not one of `personUses`.
    */
   async #measure(access: RunOwnershipAccess, estimateMicros: number, now: Date, runId?: string): Promise<RoomMeasure> {
     const day = costEnvelopeDay(now);
@@ -961,6 +1054,7 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
     })];
     const personUses: RoomWindowUse[] = [];
     let personFull = false;
+    let ownerShareFull = false;
     let fullOnSpendUntil: Date | null = null;
     const ownerRef = access.ownerRef;
     const pinned = runId === undefined ? null : await this.#options.entitlements?.readRunFundingBasis?.(runId) ?? null;
@@ -1000,10 +1094,46 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
         }));
       }
     }
+    // NV-43 (security audit run 3): with no window of their own (billing off), the owner's RUN+STORY spend charged today
+    // plus their live runs' unspent holds, against their share of the site's day. FULL is their own wait (PERSON), as
+    // for a window: until UTC midnight when full on spend alone, else at the next tick (`fullOnOwnHolds`). Not pushed
+    // onto `personUses`: the picker keeps planning such asks for the site alone; the share is an admission gate.
+    const dayShare = this.#options.ownerDayShareMicros;
+    const spend = this.#options.spend;
+    if (ownerRef !== null && windows.length === 0 && dayShare !== undefined
+      && spend.readOwnerDaySpentMicros !== undefined && spend.readOwnerLiveHoldsMicros !== undefined) {
+      const [spentToday, liveHolds] = await Promise.all([
+        spend.readOwnerDaySpentMicros(ownerRef, day),
+        spend.readOwnerLiveHoldsMicros(ownerRef)
+      ]);
+      const room = decideRoom({
+        usedMicros: spentToday + liveHolds,
+        estimateMicros,
+        limitMicros: dayShare,
+        closeBasisPoints: this.#options.closeBasisPoints
+      });
+      const fullOnSpend = spentToday >= dayShare;
+      const resetsAt = nextUtcMidnight(now);
+      if (room === "FULL") {
+        personFull = true;
+        ownerShareFull = true;
+        if (fullOnSpend && (fullOnSpendUntil === null || resetsAt.getTime() > fullOnSpendUntil.getTime())) {
+          fullOnSpendUntil = resetsAt;
+        }
+      }
+      rooms.push(Object.freeze({
+        scope: "PERSON_DAY" as const,
+        room,
+        resetsAt,
+        ...(room === "FULL" && !fullOnSpend ? { fullOnOwnHolds: true } : {})
+      }));
+    }
     const waitReason: WaitReason = personFull
       ? Object.freeze({ waitsFor: "PERSON" as const, personRecheckAt: fullOnSpendUntil ?? nextWholeMinute(now) })
       : Object.freeze({ waitsFor: "SITE" as const, personRecheckAt: null });
-    return Object.freeze({ rooms: Object.freeze(rooms), personUses: Object.freeze(personUses), waitReason });
+    return Object.freeze({
+      rooms: Object.freeze(rooms), personUses: Object.freeze(personUses), waitReason, ownerShareFull
+    });
   }
 
   #waitingOf(access: RunOwnershipAccess): Promise<ReadonlyArray<WaitingRunRef>> {
