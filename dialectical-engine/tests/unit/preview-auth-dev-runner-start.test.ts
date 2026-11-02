@@ -621,3 +621,27 @@ describe('debateai-preview-runner@.service template', () => {
     expect(readable.filter(path => path.includes('.env'))).toEqual(['/etc/debateai-v3-preview/auth-dev-v1/runner-%i.env']);
   });
 });
+
+// R22, 2026-11-02: the runner's first start under 0130's row security refused, because this check still pinned the
+// membership set measured before 0130. The set it pins is the production principals manifest's runner-runtime row.
+describe('the runner connection check and the principals manifest', () => {
+  it("pins exactly the manifest's runner-runtime memberships, and the cross-account marker must be usable without SET ROLE", async () => {
+    const code = await readFile(resolve(OPERATOR, 'verify-native.ts'), 'utf8');
+    const body = code.slice(code.indexOf('export async function assertSelectedRunnerConnection'));
+    const pinned = /pg_has_role\(current_user,g\.oid,'MEMBER'\)\)=ARRAY\[([^\]]*)\]::text\[\]/.exec(body)?.[1];
+    const manifest: unknown = JSON.parse(await readFile(resolve(import.meta.dirname, '../../docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json'), 'utf8'));
+    const find = (node: unknown): { directMemberships: string[] } | undefined => {
+      if (Array.isArray(node)) { for (const item of node) { const hit = find(item); if (hit) return hit; } return undefined; }
+      if (node && typeof node === 'object') {
+        if ((node as { id?: unknown }).id === 'runner-runtime') return node as { directMemberships: string[] };
+        for (const value of Object.values(node)) { const hit = find(value); if (hit) return hit; }
+      }
+      return undefined;
+    };
+    const runner = find(manifest);
+    expect(runner?.directMemberships).toContain('debateai_rls_all_accounts');
+    // array_agg orders by name (C collation): the manifest's names sorted the same way.
+    expect(pinned?.split(',').map(name => name.trim().replace(/^'|'$/g, ''))).toEqual([...runner!.directMemberships].sort());
+    expect(body).toContain("AND pg_has_role(current_user,'debateai_rls_all_accounts','USAGE')");
+  });
+});
