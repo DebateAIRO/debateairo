@@ -328,7 +328,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kanada ja Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Meie privaatsusametnik, Quebecis ka isikuandmete kaitse eest vastutav isik, on meie juhatuse liige, kellega saab ühendust võtta aadressil privacy@dezbatere.ro. Teie andmeid käsitleb meie Privaatsuspoliitika lisa B.3. Quebec: need Tingimused on kättesaadavad prantsuse keeles; valige keelevalijast prantsuse keel; teie väitlusi privaatsena hoidvad seaded on vaikimisi sisse lülitatud; võite taotleda teid puudutavate isikuandmete otsingumootorite indeksist eemaldamist." }
+      { kind: "p", text: "Meie privaatsusametnik, Quebecis ka isikuandmete kaitse eest vastutav isik, on meie juhatuse liige, kellega saab ühendust võtta aadressil privacy@dezbatere.ro. Teie andmeid käsitleb meie Privaatsuspoliitika lisa B.3. Quebec: need Tingimused on kättesaadavad prantsuse keeles; kui valite registreerumisel Kanada, kuvatakse need teile kõigepealt prantsuse keeles ja võite selle asemel valida inglise keele; teie väitlusi privaatsena hoidvad seaded on vaikimisi sisse lülitatud; võite taotleda teid puudutavate isikuandmete otsingumootorite indeksist eemaldamist." }
     ]
   },
   {
@@ -368,7 +368,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.9",
-  sha256: "b7cc53be94b51ab272909db1d10b4749bd38ff53d2bbeaa75e4313e5aeb800c9",
+  sha256: "fbf0920290787fa6a993a7a8d60b975ed67c95c95106cd17ac64183d5612736a",
   eyebrow: "TEENUSETINGIMUSED · v2.9 · KEHTIB ALATES 12. OKTOOBRIST 2026",
   title: "Millega te nõustute",
   lede: "Teie ja DMS Merchandise Shop S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.",

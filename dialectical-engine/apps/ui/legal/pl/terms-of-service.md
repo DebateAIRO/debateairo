@@ -317,7 +317,7 @@ Część główna niniejszych Warunków została opracowana z myślą o Tobie. P
 
 ### A.3 Kanada i Quebec
 
-Naszym inspektorem ds. prywatności, a w Quebecu osobą odpowiedzialną za ochronę danych osobowych, jest nasz dyrektor, z którym można się skontaktować pod adresem privacy@dezbatere.ro. Twoje dane obejmuje Załącznik B.3 do naszej Polityki prywatności. **Quebec:** niniejsze Warunki są dostępne w języku francuskim; wybierz język francuski w przełączniku języka; ustawienia zachowujące prywatność debat są domyślnie włączone; możesz zażądać usunięcia z indeksów danych osobowych, które Cię dotyczą.
+Naszym inspektorem ds. prywatności, a w Quebecu osobą odpowiedzialną za ochronę danych osobowych, jest nasz dyrektor, z którym można się skontaktować pod adresem privacy@dezbatere.ro. Twoje dane obejmuje Załącznik B.3 do naszej Polityki prywatności. **Quebec:** niniejsze Warunki są dostępne w języku francuskim; jeśli przy rejestracji wybierzesz Kanadę, najpierw otrzymasz je w języku francuskim i możesz zamiast tego wybrać język angielski; ustawienia zachowujące prywatność debat są domyślnie włączone; możesz zażądać usunięcia z indeksów danych osobowych, które Cię dotyczą.
 
 ### A.4 Australia i Nowa Zelandia
 

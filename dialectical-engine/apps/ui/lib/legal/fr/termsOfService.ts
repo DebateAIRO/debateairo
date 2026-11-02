@@ -328,7 +328,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Canada et Québec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Notre responsable de la protection de la vie privée, qui est aussi, au Québec, la personne responsable de la protection des renseignements personnels, est notre administrateur, joignable à privacy@dezbatere.ro. L’annexe B.3 de notre Politique de confidentialité couvre vos données. Québec : les présentes Conditions sont disponibles en français ; choisissez le français dans le sélecteur de langue ; les paramètres qui gardent vos débats privés sont activés par défaut ; vous pouvez demander la désindexation des renseignements personnels vous concernant." }
+      { kind: "p", text: "Notre responsable de la protection de la vie privée, qui est aussi, au Québec, la personne responsable de la protection des renseignements personnels, est notre administrateur, joignable à privacy@dezbatere.ro. L’annexe B.3 de notre Politique de confidentialité couvre vos données. Québec : les présentes Conditions sont disponibles en français ; si vous choisissez le Canada lors de l’inscription, elles vous sont d’abord présentées en français et vous pouvez choisir l’anglais à la place ; les paramètres qui gardent vos débats privés sont activés par défaut ; vous pouvez demander la désindexation des renseignements personnels vous concernant." }
     ]
   },
   {
@@ -368,7 +368,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.9",
-  sha256: "c86525144e7c1699cafd2c241c207f7b8369ab9d9b55f66d6089ebdefc4cc887",
+  sha256: "8221c5e2fa9a51afcd6c11ae564c223a0847a0038d9dc2b77c3ad6244c2801a1",
   eyebrow: "CONDITIONS D’UTILISATION · v2.9 · PRISE D’EFFET 12 OCTOBRE 2026",
   title: "Ce que vous acceptez",
   lede: "Le contrat entre vous et DMS Merchandise Shop S.R.L., en termes clairs. Dix-neuf sections et l’annexe A — faites défiler jusqu’à la fin.",

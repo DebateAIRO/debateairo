@@ -317,7 +317,7 @@ Il corpo delle presenti Condizioni è redatto per te. Inoltre, puoi avviare un p
 
 ### A.3 Canada e Québec
 
-Il nostro responsabile della privacy, e in Québec la persona responsabile della protezione delle informazioni personali, è il nostro amministratore, raggiungibile all'indirizzo privacy@dezbatere.ro. La nostra Informativa sulla privacy, Allegato B.3, riguarda i tuoi dati. **Québec:** le presenti Condizioni sono disponibili in francese; scegli il francese con il selettore della lingua; le impostazioni che mantengono privati i tuoi dibattiti sono attive per impostazione predefinita; puoi chiedere la deindicizzazione delle informazioni personali che ti riguardano.
+Il nostro responsabile della privacy, e in Québec la persona responsabile della protezione delle informazioni personali, è il nostro amministratore, raggiungibile all'indirizzo privacy@dezbatere.ro. La nostra Informativa sulla privacy, Allegato B.3, riguarda i tuoi dati. **Québec:** le presenti Condizioni sono disponibili in francese; se scegli il Canada al momento della registrazione, le ricevi prima in francese e puoi scegliere invece l'inglese; le impostazioni che mantengono privati i tuoi dibattiti sono attive per impostazione predefinita; puoi chiedere la deindicizzazione delle informazioni personali che ti riguardano.
 
 ### A.4 Australia e Nuova Zelanda
 

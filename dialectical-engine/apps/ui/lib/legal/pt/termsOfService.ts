@@ -328,7 +328,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Canadá e Quebeque",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "O nosso responsável pela privacidade e, no Quebeque, a pessoa responsável pela proteção das informações pessoais é o nosso administrador, contactável em privacy@dezbatere.ro. O Anexo B.3 da nossa Política de Privacidade abrange os seus dados. Quebeque: estes Termos estão disponíveis em francês; escolha francês no seletor de idioma; as definições que mantêm os seus debates privados estão ativadas por predefinição; pode pedir a desindexação de informações pessoais a seu respeito." }
+      { kind: "p", text: "O nosso responsável pela privacidade e, no Quebeque, a pessoa responsável pela proteção das informações pessoais é o nosso administrador, contactável em privacy@dezbatere.ro. O Anexo B.3 da nossa Política de Privacidade abrange os seus dados. Quebeque: estes Termos estão disponíveis em francês; se escolher o Canadá ao registar-se, recebe-os primeiro em francês e pode escolher o inglês em alternativa; as definições que mantêm os seus debates privados estão ativadas por predefinição; pode pedir a desindexação de informações pessoais a seu respeito." }
     ]
   },
   {
@@ -368,7 +368,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.9",
-  sha256: "713fe3addd6864d097f01e1719342b5a76a71ed1a6f39e1cc88b16e511e0eb65",
+  sha256: "1de070c0c38bd46bb6367b5584b04acd819da719001d2bf0b124d371f178def0",
   eyebrow: "TERMOS DE SERVIÇO · v2.9 · EM VIGOR DESDE 12 DE OUTUBRO DE 2026",
   title: "Aquilo com que concorda",
   lede: "O contrato entre si e a DMS Merchandise Shop S.R.L., em linguagem clara. Dezanove secções e o Anexo A — desloque-se até ao fim.",
