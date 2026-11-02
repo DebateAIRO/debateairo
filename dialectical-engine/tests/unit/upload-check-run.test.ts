@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, realpathSync, rmSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 const run = await import('../../tools/' + 'upload-check/run.mjs');
-const startChecks = await import('../../tools/' + 'upload-check/start-checks.mjs');
 
 // The repository root is one level above dialectical-engine/, where git reads the commit from.
 const engine = resolve(import.meta.dirname, '../..');
@@ -19,7 +19,7 @@ const busy = async () => ({ processes: ['node node_modules/vitest/vitest.mjs run
 const passed = (name: string) => ({ name, status: 'passed', lines: [], seconds: 0 });
 const passingChecks = {
   toolsFolder: async () => passed('tools-folder'),
-  websiteBuild: async () => ({ result: passed('website-build'), root: null }),
+  websiteBuild: async () => ({ result: passed('website-build'), root: '/release-root' }),
   startChecks: async () => passed('start-checks')
 };
 // A stand-in for any check: the run must not call it.
@@ -115,14 +115,17 @@ describe('the run command', () => {
     expect(readdirSync(tmp)).toEqual([]);
   }, 60_000);
 
-  it('start-checks is not checked, with no installed release, when check 2 left no root', async () => {
+  it('start-checks is not checked, with no installed release, and check 3 is never called, when check 2 left no root', async () => {
     const tmp = scratch();
+    let startCalls = 0;
     const websiteRefused = async () => ({ result: { name: 'website-build', status: 'refused', lines: ['website build: the build failed'], seconds: 0 }, root: null });
+    const countingStart = async () => { startCalls += 1; return passed('start-checks'); };
     const result = await run.runUploadCheck({
       rev: 'HEAD', repo, tmp, host: free, log: quiet,
-      checks: { toolsFolder: async () => passed('tools-folder'), websiteBuild: websiteRefused, startChecks: startChecks.checkStartChecks }
+      checks: { toolsFolder: async () => passed('tools-folder'), websiteBuild: websiteRefused, startChecks: countingStart }
     });
-    expect(result.results[2]).toEqual({ name: 'start-checks', status: 'not-checked', lines: ['no installed release'], seconds: expect.any(Number) });
+    expect(startCalls).toBe(0);
+    expect(result.results[2]).toEqual({ name: 'start-checks', status: 'not-checked', lines: ['no installed release'], seconds: 0 });
     expect(result.exitCode).toBe(1);
     expect(result.output).toContain('start-checks: not checked (');
     expect(result.output).toContain('  no installed release');
@@ -159,4 +162,69 @@ describe('the run command', () => {
     expect(child.status).toBe(2);
     expect(child.stderr).toContain('UPLOAD_CHECK_USAGE');
   });
+});
+
+// A fake command for the signal tests: a child that starts a grandchild, both kept alive for a minute at most. Their pids go to UC_PIDFILE.
+const FAKE_TREE = "const { spawn } = require('node:child_process'); const { writeFileSync } = require('node:fs'); const grand = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { stdio: 'ignore' }); writeFileSync(process.env.UC_PIDFILE, JSON.stringify({ child: process.pid, grandchild: grand.pid })); setTimeout(() => {}, 60000);";
+const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+/** True once <pid> is gone; false if it is still there after <ms>. */
+async function stoppedWithin(pid: number, ms = 5_000) {
+  const until = Date.now() + ms;
+  while (alive(pid) && Date.now() < until) await new Promise((resolveWait) => setTimeout(resolveWait, 50));
+  return !alive(pid);
+}
+
+/** The script a signal test runs as a child: one run whose first check starts the fake tree and never finishes. */
+function fixtureSource(tmp: string): string {
+  return [
+    `import { runUploadCheck } from ${JSON.stringify(pathToFileURL(join(engine, 'tools/upload-check/run.mjs')).href)};`,
+    `import { runChild } from ${JSON.stringify(pathToFileURL(join(engine, 'tools/upload-check/website-build.mjs')).href)};`,
+    `const hangs = async ({ workdir }) => {`,
+    `  process.stdout.write(workdir + '\\n');`,
+    `  return runChild(process.execPath, ['-e', ${JSON.stringify(FAKE_TREE)}], { cwd: workdir, env: { PATH: '/usr/bin:/bin', UC_PIDFILE: process.env.UC_PIDFILE }, log: workdir + '/fake.log', limitMs: 600000 });`,
+    `};`,
+    `await runUploadCheck({ rev: 'HEAD', tmp: ${JSON.stringify(tmp)}, host: async () => ({ processes: [], freePercent: 80 }), log: () => {}, checks: { toolsFolder: hangs, websiteBuild: hangs, startChecks: hangs } });`,
+    ''
+  ].join('\n');
+}
+
+/** Runs the fixture as a child, sends <signal> once its work folder is named and its fake tree has written its pids, and reports how it ended. */
+function runFixtureUntil(signal: NodeJS.Signals) {
+  return new Promise<{ code: number | null; folder: string; tmp: string; pids: { child: number; grandchild: number } }>((resolveRun, rejectRun) => {
+    const dir = scratch();
+    const tmp = join(dir, 'tmp');
+    mkdirSync(tmp);
+    const pidFile = join(dir, 'pids.json');
+    const script = join(dir, 'fixture.mjs');
+    writeFileSync(script, fixtureSource(tmp));
+    const child = spawn(process.execPath, [script], { env: { ...process.env, UC_PIDFILE: pidFile }, stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = '';
+    let sent = false;
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (chunk: string) => { stdout += chunk; });
+    const watch = setInterval(() => {
+      if (!sent && stdout.includes('\n') && existsSync(pidFile)) { sent = true; child.kill(signal); }
+    }, 50);
+    const giveUp = setTimeout(() => { child.kill('SIGKILL'); }, 30_000);
+    child.on('error', rejectRun);
+    child.on('exit', (code) => {
+      clearInterval(watch);
+      clearTimeout(giveUp);
+      if (!existsSync(pidFile)) { rejectRun(new Error('the fixture never started its fake tree')); return; }
+      resolveRun({ code, folder: stdout.split('\n')[0], tmp, pids: JSON.parse(readFileSync(pidFile, 'utf8')) });
+    });
+  });
+}
+
+describe('a run stopped by a signal', () => {
+  for (const [signal, code] of [['SIGTERM', 143], ['SIGINT', 130]] as const) {
+    it(`exits ${code} on ${signal}, removes its work folder, and stops the processes its check started`, async () => {
+      const outcome = await runFixtureUntil(signal);
+      expect(outcome.code).toBe(code);
+      expect(existsSync(outcome.folder)).toBe(false);
+      expect(readdirSync(outcome.tmp)).toEqual([]);
+      expect(await stoppedWithin(outcome.pids.grandchild)).toBe(true);
+      expect(await stoppedWithin(outcome.pids.child)).toBe(true);
+    }, 60_000);
+  }
 });

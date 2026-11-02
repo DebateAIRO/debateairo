@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 const website = await import('../../tools/' + 'upload-check/website-build.mjs');
@@ -49,4 +49,27 @@ describe('check 2: the release install and the website build', () => {
     expect(result.lines).toContain('the online package fill failed');
     expect(root).toBeNull();
   }, 600_000);
+});
+
+// A fake command for the timeout test: a child that starts a grandchild, and both stay alive for a minute at most, so a
+// failing test cannot leave them running for long. Their pids go to UC_PIDFILE.
+const FAKE_TREE = "const { spawn } = require('node:child_process'); const { writeFileSync } = require('node:fs'); const grand = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { stdio: 'ignore' }); writeFileSync(process.env.UC_PIDFILE, JSON.stringify({ child: process.pid, grandchild: grand.pid })); setTimeout(() => {}, 60000);";
+const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+/** True once <pid> is gone; false if it is still there after <ms>. */
+async function stoppedWithin(pid: number, ms = 5_000) {
+  const until = Date.now() + ms;
+  while (alive(pid) && Date.now() < until) await new Promise((resolveWait) => setTimeout(resolveWait, 50));
+  return !alive(pid);
+}
+
+describe('a timed-out step takes its whole process group with it', () => {
+  it('no process the timed-out command started is left', async () => {
+    const dir = scratch();
+    const pidFile = join(dir, 'pids.json');
+    const code = await website.runChild(process.execPath, ['-e', FAKE_TREE], { cwd: dir, env: { PATH: '/usr/bin:/bin', UC_PIDFILE: pidFile }, log: join(dir, 'fake.log'), limitMs: 3_000 });
+    expect(code).toBeNull();
+    const pids = JSON.parse(readFileSync(pidFile, 'utf8')) as { child: number; grandchild: number };
+    expect(await stoppedWithin(pids.child)).toBe(true);
+    expect(await stoppedWithin(pids.grandchild)).toBe(true);
+  }, 60_000);
 });

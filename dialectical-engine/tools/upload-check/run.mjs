@@ -202,7 +202,12 @@ export async function runUploadCheck({
     const built = await checks.websiteBuild({ repo, rev: sha, workdir: workFolder, node, pnpmDir });
     results.push(built.result);
     log("check 3 of 3: start-checks");
-    results.push(await checks.startChecks({ root: built.root, workdir: workFolder, node }));
+    // Without an installed release there is nothing to start. The run says so itself, and check 3 is not called.
+    if (typeof built.root === "string") {
+      results.push(await checks.startChecks({ root: built.root, workdir: workFolder, node }));
+    } else {
+      results.push({ name: "start-checks", status: "not-checked", lines: ["no installed release"], seconds: 0 });
+    }
     outcome = { exitCode: exitCodeOf(results), output: formatReport({ rev: sha, results }), results };
   } catch (error) {
     outcome = { exitCode: 2, output: `UPLOAD_CHECK_RUN_FAILED: a check threw, so the run could not finish: ${firstLine(error)}`, results: [] };

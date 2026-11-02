@@ -11,6 +11,8 @@
 //   installRelease({ repo, rev, workdir, node, pnpmDir })      the A3 install under <workdir>; { root } or a refusal
 //   buildWebsiteIn({ root, node, pnpmDir })                    the build and the release-folder tools: a CheckResult
 //   checkWebsiteBuild({ repo, rev, workdir, node, pnpmDir })   the check: { result, root }, root null when not installed
+//   runChild(command, args, { cwd, env, log, limitMs? })       one child in its own process group; a timeout or this process
+//                                                              exiting stops the whole group, pnpm's children included
 //
 // <pnpmDir> is the folder that holds pnpm on this Mac. Each also takes extraEnv, merged into every child's environment
 // last; it is there for tests (an unreachable registry, say). A target too old for an export the check uses is
@@ -54,20 +56,35 @@ function installEnvironment({ node, pnpmDir, store, offline, extraEnv }) {
   };
 }
 
-/** One child process with exactly <env>, its output in <log>. Resolves to the exit code, or null if it did not run or ran too long. */
-function runChild(command, args, { cwd, env, log }) {
+/** Stops a process group with SIGKILL, so what a timed-out step started (pnpm's children, Next's workers) stops too. A group already gone is fine. */
+function killGroup(pid) {
+  if (pid === undefined) return;
+  try { process.kill(-pid, "SIGKILL"); } catch { /* already gone */ }
+}
+
+/**
+ * One child process in its own process group, with exactly <env>, its output in <log>. Resolves to the exit code, or null if
+ * it did not run or ran too long. A timeout stops the whole group. So does this process exiting while the child runs: run.mjs
+ * exits through process.exit on Ctrl-C and SIGTERM, and that runs the exit hook below, so pnpm does not outlive the run.
+ */
+export function runChild(command, args, { cwd, env, log, limitMs = STEP_LIMIT_MS }) {
   return new Promise((resolveCode) => {
     const fd = openSync(log, "w");
     let settled = false;
+    const child = spawn(command, args, { cwd, env, stdio: ["ignore", fd, fd], shell: false, detached: true });
+    const onExit = () => killGroup(child.pid);
     const settle = (code) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      process.removeListener("exit", onExit);
       closeSync(fd);
+      // Whatever the child left in its group goes with it, as on a timeout.
+      killGroup(child.pid);
       resolveCode(code);
     };
-    const child = spawn(command, args, { cwd, env, stdio: ["ignore", fd, fd], shell: false });
-    const timer = setTimeout(() => { child.kill("SIGKILL"); settle(null); }, STEP_LIMIT_MS);
+    process.on("exit", onExit);
+    const timer = setTimeout(() => { killGroup(child.pid); settle(null); }, limitMs);
     child.on("error", () => settle(null));
     child.on("close", (code) => settle(code));
   });
