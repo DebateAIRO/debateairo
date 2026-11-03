@@ -80,7 +80,7 @@
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} per bulan. Diperpanjang setiap tanggal {day} setiap bulan hingga Anda membatalkan.",
   "billing.consent.renewal": "Saya setuju bahwa NETOPIA Payments menyimpan kartu saya dan bahwa {total} ditagihkan ke kartu tersebut setiap bulan hingga saya membatalkan langganan. Saya dapat membatalkan kapan saja di Pengaturan atau di dezbatere.ro/cancel.",
   "billing.consent.immediateStart": "Mulai paket saya sekarang. Saya memahami bahwa jika saya menarik diri dalam 14 hari, saya membayar bagian yang sudah digunakan: yang lebih besar antara hari yang digunakan atau kredit yang digunakan.",
-  "billing.checkout.continueToCard": "Pesan dengan kewajiban membayar",
+  "billing.checkout.continueToCard": "Berlangganan dan bayar",
   "billing.checkout.cardTitle": "Pembayaran",
   "billing.checkout.cardNote": "Anda membayar di halaman aman NETOPIA Payments. Nomor kartu Anda tidak pernah sampai ke server kami.",
   "billing.checkout.subscribeAndPay": "Pesan dengan kewajiban membayar",

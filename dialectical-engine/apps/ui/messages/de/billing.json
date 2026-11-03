@@ -80,7 +80,7 @@
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} pro Monat. Verlängert sich jeden Monat am {day}., bis Sie kündigen.",
   "billing.consent.renewal": "Ich stimme zu, dass NETOPIA Payments meine Karte speichert und dass sie jeden Monat mit {total} belastet wird, bis ich kündige. Ich kann jederzeit in den Einstellungen oder unter dezbatere.ro/cancel kündigen.",
   "billing.consent.immediateStart": "Meinen Tarif jetzt starten. Mir ist bewusst, dass ich bei einem Widerruf innerhalb von 14 Tagen den bereits genutzten Teil bezahle: den größeren Anteil aus genutzten Tagen oder genutztem Guthaben.",
-  "billing.checkout.continueToCard": "Zahlungspflichtig bestellen",
+  "billing.checkout.continueToCard": "Kostenpflichtig abonnieren",
   "billing.checkout.cardTitle": "Zahlung",
   "billing.checkout.cardNote": "Sie bezahlen auf der sicheren Seite von NETOPIA Payments. Ihre Kartennummer erreicht niemals unsere Server.",
   "billing.checkout.subscribeAndPay": "Zahlungspflichtig bestellen",

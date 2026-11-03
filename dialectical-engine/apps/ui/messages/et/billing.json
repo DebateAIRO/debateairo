@@ -80,7 +80,7 @@
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} kuus. Uueneb iga kuu {day}. kuupäeval, kuni tühistate.",
   "billing.consent.renewal": "Nõustun, et NETOPIA Payments säilitab minu kaardi ja et sellelt võetakse igal kuul {total}, kuni ma tellimuse tühistan. Saan tühistada igal ajal seadetes või aadressil dezbatere.ro/cancel.",
   "billing.consent.immediateStart": "Alustage minu paketti kohe. Mõistan, et kui taganen 14 päeva jooksul, maksan juba kasutatud osa eest: suurema kasutatud päevadest või kasutatud krediidist.",
-  "billing.checkout.continueToCard": "Esita maksekohustusega tellimus",
+  "billing.checkout.continueToCard": "Tellige ja makske",
   "billing.checkout.cardTitle": "Makse",
   "billing.checkout.cardNote": "Maksate turvalisel NETOPIA Payments lehel. Teie kaardinumber ei jõua kunagi meie serveritesse.",
   "billing.checkout.subscribeAndPay": "Esita maksekohustusega tellimus",

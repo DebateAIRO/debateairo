@@ -80,7 +80,7 @@
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} sa mhí. Athnuaitear é ar lá {day} de gach mí go dtí go gcuireann tú ar ceal é.",
   "billing.consent.renewal": "Aontaím go gcoinneoidh NETOPIA Payments mo chárta agus go ngearrfar {total} air gach mí go dtí go gcuirim mo shíntiús ar ceal. Is féidir liom é a chur ar ceal am ar bith sna Socruithe nó ag dezbatere.ro/cancel.",
   "billing.consent.immediateStart": "Tosaigh mo phlean anois. Tuigim, má tharraingím siar laistigh de 14 lá, go n-íocaim as an gcuid a úsáideadh cheana: an ceann is mó de na laethanta a úsáideadh nó den chreidmheas a úsáideadh.",
-  "billing.checkout.continueToCard": "Ordú le hoibleagáid íocaíochta",
+  "billing.checkout.continueToCard": "Liostáil agus íoc",
   "billing.checkout.cardTitle": "Íocaíocht",
   "billing.checkout.cardNote": "Íocann tú ar leathanach slán NETOPIA Payments. Ní shroicheann uimhir do chárta ár bhfreastalaithe riamh.",
   "billing.checkout.subscribeAndPay": "Ordú le hoibleagáid íocaíochta",

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Na kratko
-eyebrow: POGOJI UPORABE · v2.12 · VELJAVNI OD 1. NOVEMBRA 2026
+eyebrow: POGOJI UPORABE · v2.13 · VELJAVNI OD 1. NOVEMBRA 2026
 title: S čim soglašate
 lede: Pogodba med vami in družbo DMS Merchandise Shop S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.
-endMarker: KONEC POGOJEV · v2.12
+endMarker: KONEC POGOJEV · v2.13
 bodyLabel: Besedilo Pogojev uporabe
 annexTitle: Priloga A — Regionalni pogoji
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PRAVO, KI SE UPORABLJA
 -->
 
-**Version 2.12 · Effective 1. novembra 2026 · Prejšnje različice so na dezbatere.ro/terms/versions · Jezik: slovenščina.**
+**Version 2.13 · Effective 1. novembra 2026 · Prejšnje različice so na dezbatere.ro/terms/versions · Jezik: slovenščina.**
 
 **In short.** Stari morate biti najmanj 18 let. Dialectical Engine z modeli umetne inteligence oblikuje argumente in vse, kar ustvari, je lahko napačno — to ni nasvet. Na brezplačnem paketu so vaše razprave po zaključku javne, po preverjanju z umetno inteligenco; na plačljivem paketu so zasebne, razen če jih objavite. Ko je razprava javna, jo lahko prebere vsakdo, in ostane javna. Besedilo, ki ga pošljete, se posreduje ponudnikom umetne inteligence, navedenim v našem Registru ponudnikov, in se ne uporablja za učenje modelov. Nezakonito vsebino prijavite na support@dezbatere.ro, ne glede na to, ali imate račun. Uporablja se romunsko pravo, vendar ohranite varstvo potrošnikov po svojem lokalnem pravu.
 
@@ -215,7 +215,7 @@ Razdelki 8 (glede že objavljene vsebine), 15, 16 in 18 ostanejo v veljavi tudi 
 
 Dialectical Engine ponuja brezplačen paket. Na voljo bo plačljivi paket **Premium**, ki bo odklenil celoten nabor modelov in vam omogočil, da sami nastavite parametre razprave.
 
-**Pred plačilom** vam neposredno nad gumbom za plačilo prikažemo: paket; skupno ceno z veljavnim davkom; obračunsko obdobje; dejstvo, da se paket samodejno obnavlja do preklica; datum, ko se konča morebitno brezplačno preskusno obdobje, in znesek, ki vam bo nato zaračunan; ter način preklica. Pogoje obnavljanja potrdite z označitvijo ločenega polja. Na gumbu piše **Naroči in plačaj** (v romunščini *Comandă cu obligație de plată*). Na trajnem nosilcu vam pošljemo potrdilo, ki vsebuje iste informacije, te Pogoje in obrazec za odstop.
+**Pred plačilom** vam neposredno nad gumbom za plačilo prikažemo: paket; skupno ceno z veljavnim davkom; obračunsko obdobje; dejstvo, da se paket samodejno obnavlja do preklica; datum, ko se konča morebitno brezplačno preskusno obdobje, in znesek, ki vam bo nato zaračunan; ter način preklica. Pogoje obnavljanja potrdite z označitvijo ločenega polja. Na gumbu piše **Naroči in plačaj** (v romunščini *Abonați-vă și plătiți*). Na trajnem nosilcu vam pošljemo potrdilo, ki vsebuje iste informacije, te Pogoje in obrazec za odstop.
 
 **Opomniki.** E-poštno sporočilo vam pošljemo najmanj 5 dni pred pretvorbo brezplačnega preskusnega obdobja v plačljivi paket; najmanj enkrat letno pri trajajočih paketih; ter od 30 do 45 dni pred vsakim podaljšanjem za obdobje dvanajstih mesecev ali več. Vsak opomnik vključuje ceno, datum in povezavo za preklic.
 
@@ -250,6 +250,8 @@ Dialectical Engine ponuja brezplačen paket. Na voljo bo plačljivi paket **Prem
 Na trajnem nosilcu vas vnaprej obvestimo, kaj se spreminja in kdaj. Če ima sprememba več kot zgolj manjši negativen vpliv na vaš dostop do storitve ali njeno uporabo, lahko brezplačno odpoveste pogodbo v **30 dneh** od obvestila ali začetka učinkovanja spremembe, kar je pozneje, mi pa vam vrnemo vse vnaprej plačane zneske za neizkoriščeno obdobje.
 
 **Spremembe teh Pogojev.** Te Pogoje lahko spremenimo iz enakih vrst razlogov. Pri spremembah, ki ne zmanjšujejo vaših pravic, objavimo novo različico s povzetkom sprememb in vam najmanj **30 dni** pred začetkom veljavnosti pošljemo e-poštno sporočilo; nadaljnja uporaba Dialectical Engine po tem datumu pomeni, da spremembo sprejemate, pred tem pa lahko zaprete račun. Pri spremembah, ki zmanjšujejo vaše pravice — vključno z zvišanjem cen obstoječega paketa, nižjimi omejitvami, odstranjenimi funkcijami, novimi načini uporabe vaše vsebine ali spremembami odgovornosti, prava, ki se uporablja, oziroma reševanja sporov — vas ob naslednji prijavi prosimo, da novo različico izrecno sprejmete, sprememba pa velja samo za naprej. Sprememb nikoli ne uveljavljamo za nazaj in tega razdelka nikoli ne uporabimo za spremembo bistva tega, kar ste plačali, med trajanjem pogodbe, ne da bi vam ponudili možnost odstopa. Prejšnje različice ostanejo dostopne na dezbatere.ro/terms/versions.
+
+Različica 2.13 je nadomestila različico 2.12: razdelek 12 navaja, da je v romunščini na gumbu za plačilo napis *Abonați-vă și plătiți*.
 
 Različica 2.12 je nadomestila različico 2.11: razdelek 10 navaja, da lahko prijavljena oseba tudi uporabi gumb Prijavi pri kateri koli javni razpravi, da umetna inteligenca prebere prijavo, oddano z njim, poleg javnega besedila, in kaj se nato zgodi.
 

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: W skrócie
-eyebrow: WARUNKI ŚWIADCZENIA USŁUG · v2.12 · OBOWIĄZUJĄ OD 1 LISTOPADA 2026
+eyebrow: WARUNKI ŚWIADCZENIA USŁUG · v2.13 · OBOWIĄZUJĄ OD 1 LISTOPADA 2026
 title: Na co wyrażasz zgodę
 lede: Umowa między Tobą a DMS Merchandise Shop S.R.L., napisana prostym językiem. Dziewiętnaście sekcji i załącznik A — przewiń do końca.
-endMarker: KONIEC WARUNKÓW · v2.12
+endMarker: KONIEC WARUNKÓW · v2.13
 bodyLabel: Treść Warunków świadczenia usług
 annexTitle: Załącznik A — Warunki regionalne
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PRAWO WŁAŚCIWE
 -->
 
-**Version 2.12 · Effective 1 listopada 2026 · Poprzednie wersje są dostępne pod adresem dezbatere.ro/terms/versions · Język: polski.**
+**Version 2.13 · Effective 1 listopada 2026 · Poprzednie wersje są dostępne pod adresem dezbatere.ro/terms/versions · Język: polski.**
 
 **In short.** Musisz mieć ukończone 18 lat. Dialectical Engine tworzy argumenty przy użyciu modeli sztucznej inteligencji, a wszystko, co generuje, może być błędne — nie jest to porada. W planie bezpłatnym Twoje debaty stają się publiczne po zakończeniu, po sprawdzeniu przez AI; w płatnym planie są prywatne, chyba że je opublikujesz. Po upublicznieniu każdy może przeczytać debatę, a ona pozostaje publiczna. Przesyłany przez Ciebie tekst jest przekazywany dostawcom AI wymienionym w naszym Rejestrze Dostawców i nie jest wykorzystywany do trenowania modeli. Nielegalne treści zgłaszaj pod adresem support@dezbatere.ro, niezależnie od tego, czy masz konto. Zastosowanie ma prawo rumuńskie, jednak zachowujesz ochronę konsumencką wynikającą z prawa miejscowego.
 
@@ -215,7 +215,7 @@ Sekcje 8 (w zakresie treści już opublikowanych), 15, 16 i 18 zachowują moc po
 
 Dialectical Engine oferuje plan bezpłatny. Dostępny będzie płatny plan **Premium**, który odblokowuje pełną listę modeli i umożliwia samodzielne ustawianie wskaźników debaty.
 
-**Przed dokonaniem płatności** bezpośrednio nad przyciskiem płatności wyświetlamy: plan; łączną cenę z uwzględnieniem należnego podatku; okres rozliczeniowy; informację, że plan odnawia się automatycznie do czasu anulowania; datę zakończenia ewentualnego bezpłatnego okresu próbnego i kwotę, która zostanie następnie pobrana; oraz sposób anulowania. Potwierdzasz warunki odnowienia, zaznaczając odrębne pole. Przycisk ma treść **Subskrybuj i zapłać** (po rumuńsku *Comandă cu obligație de plată*). Przekazujemy Ci na trwałym nośniku potwierdzenie zawierające te same informacje, niniejsze Warunki oraz formularz odstąpienia.
+**Przed dokonaniem płatności** bezpośrednio nad przyciskiem płatności wyświetlamy: plan; łączną cenę z uwzględnieniem należnego podatku; okres rozliczeniowy; informację, że plan odnawia się automatycznie do czasu anulowania; datę zakończenia ewentualnego bezpłatnego okresu próbnego i kwotę, która zostanie następnie pobrana; oraz sposób anulowania. Potwierdzasz warunki odnowienia, zaznaczając odrębne pole. Przycisk ma treść **Subskrybuj i zapłać** (po rumuńsku *Abonați-vă și plătiți*). Przekazujemy Ci na trwałym nośniku potwierdzenie zawierające te same informacje, niniejsze Warunki oraz formularz odstąpienia.
 
 **Przypomnienia.** Wysyłamy Ci wiadomość e-mail co najmniej 5 dni przed przekształceniem bezpłatnego okresu próbnego w plan płatny; co najmniej raz w roku w przypadku planów kontynuowanych; oraz od 30 do 45 dni przed każdym odnowieniem na okres co najmniej dwunastu miesięcy. Każde przypomnienie zawiera cenę, datę i link do anulowania.
 
@@ -250,6 +250,8 @@ Jeżeli mieszkasz w innym miejscu, załącznik A określa prawo odstąpienia lub
 Z wyprzedzeniem informujemy Cię na trwałym nośniku, co i kiedy ulegnie zmianie. Jeżeli zmiana ma więcej niż nieznaczny negatywny wpływ na Twój dostęp do usługi lub korzystanie z niej, możesz bezpłatnie rozwiązać umowę w terminie **30 dni** od otrzymania informacji lub wejścia zmiany w życie — w zależności od tego, która z tych dat jest późniejsza — a my zwrócimy wszelkie kwoty zapłacone z góry za niewykorzystany okres.
 
 **Zmiany niniejszych Warunków.** Możemy zmieniać niniejsze Warunki z tych samych rodzajów powodów. W przypadku zmian, które nie ograniczają Twoich praw, publikujemy nową wersję wraz z podsumowaniem zmian i wysyłamy Ci wiadomość e-mail co najmniej **30 dni** przed jej wejściem w życie; dalsze korzystanie z Dialectical Engine po tej dacie oznacza akceptację zmiany, a przed tą datą możesz zamknąć konto. W przypadku zmian ograniczających Twoje prawa — w tym podwyżek cen w istniejącym planie, obniżenia limitów, usunięcia funkcji, nowych sposobów wykorzystywania Twoich treści albo zmian odpowiedzialności, prawa właściwego lub rozstrzygania sporów — prosimy Cię o wyraźne zaakceptowanie nowej wersji przy kolejnym logowaniu, a zmiana obowiązuje wyłącznie na przyszłość. Nigdy nie wprowadzamy zmian z mocą wsteczną ani nie wykorzystujemy niniejszej sekcji do zmiany w trakcie okresu podstawowego zakresu opłaconej przez Ciebie usługi bez zapewnienia możliwości rezygnacji. Poprzednie wersje pozostają dostępne pod adresem dezbatere.ro/terms/versions.
+
+Wersja 2.13 zastąpiła wersję 2.12: sekcja 12 mówi, że po rumuńsku przycisk płatności ma napis *Abonați-vă și plătiți*.
 
 Wersja 2.12 zastąpiła wersję 2.11: sekcja 10 mówi, że zalogowana osoba może także użyć przycisku Zgłoś przy dowolnej publicznej debacie, że AI czyta zgłoszenie złożone tym przyciskiem obok publicznego tekstu oraz co wtedy się dzieje.
 

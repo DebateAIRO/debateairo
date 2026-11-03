@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ringkasnya
-eyebrow: KETENTUAN LAYANAN · v2.12 · BERLAKU 1 NOVEMBER 2026
+eyebrow: KETENTUAN LAYANAN · v2.13 · BERLAKU 1 NOVEMBER 2026
 title: Hal yang Anda setujui
 lede: Kontrak antara Anda dan DMS Merchandise Shop S.R.L., dalam bahasa yang mudah dipahami. Sembilan belas bagian dan Lampiran A — gulir hingga akhir.
-endMarker: AKHIR KETENTUAN · v2.12
+endMarker: AKHIR KETENTUAN · v2.13
 bodyLabel: Teks Ketentuan Layanan
 annexTitle: Lampiran A — Ketentuan regional
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 HUKUM YANG BERLAKU
 -->
 
-**Version 2.12 · Effective 1 November 2026 · Versi sebelumnya di dezbatere.ro/terms/versions · Bahasa: Indonesia.**
+**Version 2.13 · Effective 1 November 2026 · Versi sebelumnya di dezbatere.ro/terms/versions · Bahasa: Indonesia.**
 
 **In short.** Anda harus berusia 18 tahun atau lebih. Dialectical Engine menyusun argumen dengan model AI dan segala sesuatu yang dihasilkannya mungkin salah — ini bukan nasihat. Di paket gratis, debat Anda bersifat publik setelah selesai, setelah pemeriksaan AI; di paket berbayar, debat bersifat privat kecuali Anda memublikasikannya. Setelah publik, siapa pun dapat membaca debat itu, dan debat itu tetap publik. Teks yang Anda kirim diteruskan kepada penyedia AI yang tercantum dalam Daftar Penyedia kami, dan tidak digunakan untuk melatih model. Laporkan konten ilegal ke support@dezbatere.ro, baik Anda memiliki akun maupun tidak. Hukum Rumania berlaku, tetapi perlindungan konsumen setempat Anda tetap berlaku bagi Anda.
 
@@ -215,7 +215,7 @@ Bagian 8 (terkait konten yang telah dipublikasikan), 15, 16, dan 18 tetap berlak
 
 Dialectical Engine menawarkan paket gratis. Paket **Premium** berbayar akan tersedia, yang membuka seluruh daftar model dan memungkinkan Anda menetapkan sendiri indikator debat.
 
-**Sebelum Anda membayar**, tepat di atas tombol pembayaran kami menampilkan: paket; harga total termasuk pajak yang berlaku; periode penagihan; bahwa paket diperpanjang secara otomatis hingga dibatalkan; tanggal berakhirnya uji coba gratis dan jumlah yang selanjutnya akan ditagihkan kepada Anda; serta cara membatalkan. Anda mengonfirmasi ketentuan perpanjangan dengan mencentang kotak terpisah. Tombol tersebut bertuliskan **Berlangganan dan bayar** (dalam bahasa Rumania, *Comandă cu obligație de plată*). Kami mengirimkan kepada Anda konfirmasi pada media tahan lama yang memuat informasi yang sama, Ketentuan ini, dan formulir penarikan diri.
+**Sebelum Anda membayar**, tepat di atas tombol pembayaran kami menampilkan: paket; harga total termasuk pajak yang berlaku; periode penagihan; bahwa paket diperpanjang secara otomatis hingga dibatalkan; tanggal berakhirnya uji coba gratis dan jumlah yang selanjutnya akan ditagihkan kepada Anda; serta cara membatalkan. Anda mengonfirmasi ketentuan perpanjangan dengan mencentang kotak terpisah. Tombol tersebut bertuliskan **Berlangganan dan bayar** (dalam bahasa Rumania, *Abonați-vă și plătiți*). Kami mengirimkan kepada Anda konfirmasi pada media tahan lama yang memuat informasi yang sama, Ketentuan ini, dan formulir penarikan diri.
 
 **Pengingat.** Kami mengirim email kepada Anda sekurang-kurangnya 5 hari sebelum uji coba gratis berubah menjadi paket berbayar; setidaknya sekali setahun untuk paket berkelanjutan; dan antara 30 hingga 45 hari sebelum perpanjangan masa dua belas bulan atau lebih. Setiap pengingat mencantumkan harga, tanggal, dan tautan pembatalan.
 
@@ -250,6 +250,8 @@ Jika Anda tinggal di tempat lain, Lampiran A menyatakan hak penarikan diri atau 
 Kami memberi tahu Anda terlebih dahulu, pada media tahan lama, mengenai hal yang berubah dan waktu perubahan. Jika perubahan tersebut menimbulkan dampak negatif yang lebih dari kecil terhadap akses ke atau penggunaan layanan oleh Anda, Anda dapat mengakhiri layanan tanpa biaya dalam waktu **30 hari** sejak menerima pemberitahuan, atau sejak perubahan berlaku, mana yang lebih akhir, dan kami mengembalikan setiap jumlah yang telah dibayar di muka untuk periode yang tidak digunakan.
 
 **Pada Ketentuan ini.** Kami dapat mengubah Ketentuan ini untuk jenis alasan yang sama. Untuk perubahan yang tidak mengurangi hak Anda, kami memublikasikan versi baru beserta ringkasan perubahan dan mengirim email kepada Anda sekurang-kurangnya **30 hari** sebelum perubahan berlaku; jika Anda terus menggunakan Dialectical Engine setelah tanggal tersebut, berarti Anda menerimanya, dan Anda dapat menutup akun sebelumnya. Untuk perubahan yang mengurangi hak Anda — termasuk kenaikan harga pada paket yang sudah ada, batas yang lebih rendah, fitur yang dihapus, penggunaan baru atas konten Anda, atau perubahan pada tanggung jawab, hukum yang berlaku, maupun penyelesaian sengketa — kami meminta Anda menerima versi baru secara tegas saat masuk berikutnya, dan perubahan hanya berlaku untuk waktu mendatang. Kami tidak pernah memberlakukan perubahan secara surut, dan tidak pernah menggunakan bagian ini untuk mengubah inti dari hal yang telah Anda bayar di tengah masa berlaku tanpa menawarkan jalan keluar. Versi sebelumnya tetap tersedia di dezbatere.ro/terms/versions.
+
+Versi 2.13 menggantikan versi 2.12: bagian 12 menyatakan bahwa dalam bahasa Rumania tombol pembayaran bertuliskan *Abonați-vă și plătiți*.
 
 Versi 2.12 menggantikan versi 2.11: bagian 10 menyatakan bahwa orang yang sudah masuk juga dapat menggunakan tombol Laporkan pada debat publik mana pun, bahwa AI membaca laporan yang dibuat dengan tombol itu di samping teks publik, dan apa yang terjadi setelah itu.
 

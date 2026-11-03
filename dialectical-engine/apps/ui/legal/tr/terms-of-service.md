@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kısaca
-eyebrow: HİZMET KOŞULLARI · v2.12 · YÜRÜRLÜK TARİHİ 1 KASIM 2026
+eyebrow: HİZMET KOŞULLARI · v2.13 · YÜRÜRLÜK TARİHİ 1 KASIM 2026
 title: Kabul ettiğiniz hükümler
 lede: Sizinle DMS Merchandise Shop S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.
-endMarker: KOŞULLARIN SONU · v2.12
+endMarker: KOŞULLARIN SONU · v2.13
 bodyLabel: Hizmet Koşulları metni
 annexTitle: Ek A — Bölgesel koşullar
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 UYGULANACAK HUKUK
 -->
 
-**Version 2.12 · Effective 1 Kasım 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
+**Version 2.13 · Effective 1 Kasım 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
 
 **In short.** En az 18 yaşında olmalısınız. Dialectical Engine, yapay zekâ modelleriyle argümanlar oluşturur ve ürettiği her şey yanlış olabilir — bunlar tavsiye değildir. Ücretsiz plandaki tartışmalarınız, tamamlandığında ve bir yapay zekâ kontrolünden geçtikten sonra herkese açık olur; ücretli planda ise siz yayımlamadıkça özeldir. Herkese açık olduktan sonra herkes bir tartışmayı okuyabilir ve tartışma herkese açık kalır. Gönderdiğiniz metin, Sağlayıcı Sicilimizde belirtilen yapay zekâ sağlayıcılarına iletilir ve modelleri eğitmek için kullanılmaz. Hesabınız olsun veya olmasın, hukuka aykırı içerikleri support@dezbatere.ro adresine bildirin. Romanya hukuku uygulanır; ancak yerel tüketici korumalarınız saklıdır.
 
@@ -215,7 +215,7 @@ Hizmeti tamamen kapatırsak veya ülkenizden çekersek en az **30 gün önceden 
 
 Dialectical Engine ücretsiz bir plan sunar. Model listesinin tamamının kilidini açan ve tartışma göstergelerini kendiniz belirlemenize olanak tanıyan ücretli bir **Premium** plan sunulacaktır.
 
-**Ödeme yapmadan önce** size ödeme düğmesinin hemen üzerinde şunları gösteririz: planı; geçerli vergiler dahil toplam fiyatı; faturalandırma dönemini; planın iptal edilene kadar otomatik yenileneceğini; varsa ücretsiz denemenin sona ereceği tarihi ve sonrasında tahsil edilecek tutarı ve nasıl iptal edileceğini. Ayrı bir kutuyu işaretleyerek yenileme koşullarını teyit edersiniz. Düğmenin üzerinde **Abone ol ve öde** (Romence, *Comandă cu obligație de plată*) yazar. Aynı bilgileri, bu Koşulları ve cayma formunu içeren bir teyidi kalıcı veri saklayıcısıyla size göndeririz.
+**Ödeme yapmadan önce** size ödeme düğmesinin hemen üzerinde şunları gösteririz: planı; geçerli vergiler dahil toplam fiyatı; faturalandırma dönemini; planın iptal edilene kadar otomatik yenileneceğini; varsa ücretsiz denemenin sona ereceği tarihi ve sonrasında tahsil edilecek tutarı ve nasıl iptal edileceğini. Ayrı bir kutuyu işaretleyerek yenileme koşullarını teyit edersiniz. Düğmenin üzerinde **Abone ol ve öde** (Romence, *Abonați-vă și plătiți*) yazar. Aynı bilgileri, bu Koşulları ve cayma formunu içeren bir teyidi kalıcı veri saklayıcısıyla size göndeririz.
 
 **Hatırlatmalar.** Ücretsiz denemenin ücretli plana dönüşmesinden en az 5 gün önce; devam eden planlar için yılda en az bir kez ve on iki ay veya daha uzun süreli bir dönemin yenilenmesinden 30 ila 45 gün önce size e-posta göndeririz. Her hatırlatma fiyatı, tarihi ve iptal bağlantısını içerir.
 
@@ -250,6 +250,8 @@ Başka bir yerde yaşıyorsanız bölgenizde geçerli olan cayma veya vazgeçme 
 Neyin ne zaman değişeceğini kalıcı veri saklayıcısıyla önceden bildiririz. Değişiklik, hizmete erişiminiz veya hizmeti kullanımınız üzerinde önemsizden daha fazla olumsuz etkiye sahipse, bildirimin size iletilmesinden veya değişikliğin yürürlüğe girmesinden hangisi daha geç ise o tarihten itibaren **30 gün içinde** ücretsiz olarak sözleşmeyi sona erdirebilirsiniz; kullanılmayan dönem için önceden ödenmiş tutarları iade ederiz.
 
 **Bu Koşullarda.** Bu Koşulları aynı tür nedenlerle değiştirebiliriz. Haklarınızı azaltmayan değişiklikler için yeni sürümü, değişikliklerin özetiyle yayımlar ve yürürlüğe girmesinden en az **30 gün önce** size e-posta göndeririz; o tarihten sonra Dialectical Engine'i kullanmaya devam etmeniz değişikliği kabul ettiğiniz anlamına gelir ve hesabınızı o tarihten önce kapatabilirsiniz. Mevcut bir plandaki fiyat artışları, daha düşük sınırlar, kaldırılan özellikler, içeriğinizin yeni kullanım biçimleri veya sorumluluk, uygulanacak hukuk ya da uyuşmazlık çözümüne ilişkin değişiklikler dahil, haklarınızı azaltan değişiklikler için bir sonraki oturum açışınızda yeni sürümü açıkça kabul etmenizi isteriz ve değişiklik yalnızca ileriye dönük uygulanır. Hiçbir değişikliği geriye yürütmeyiz ve size bir çıkış yolu sunmadan, sürenin ortasında ücretini ödediğiniz hususun özünü değiştirmek için bu bölümü kullanmayız. Önceki sürümler dezbatere.ro/terms/versions adresinde erişilebilir kalır.
+
+Sürüm 2.13, sürüm 2.12'nin yerine geçmiştir: 12. bölüm, ödeme düğmesinde Romence *Abonați-vă și plătiți* yazdığını belirtir.
 
 Sürüm 2.12, sürüm 2.11'in yerine geçmiştir: 10. bölüm, oturum açmış bir kişinin herkese açık herhangi bir tartışmada Bildir düğmesini de kullanabileceğini, bir yapay zekânın düğmeyle yapılan bildirimi herkese açık metnin yanında okuduğunu ve sonrasında ne olacağını söyler.
 

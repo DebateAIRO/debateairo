@@ -80,7 +80,7 @@
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} на місяць. Подовжується {day}-го числа кожного місяця, доки ви не скасуєте.",
   "billing.consent.renewal": "Я погоджуюся, що NETOPIA Payments зберігає мою картку і що з неї щомісяця списується {total}, доки я не скасую підписку. Я можу скасувати її будь-коли в Налаштуваннях або на dezbatere.ro/cancel.",
   "billing.consent.immediateStart": "Запустити мій план зараз. Я розумію, що якщо відмовлюся від договору протягом 14 днів, то сплачу вже використану частину: більшу з використаних днів або використаного кредиту.",
-  "billing.checkout.continueToCard": "Замовлення з обов’язком оплати",
+  "billing.checkout.continueToCard": "Підписатися й оплатити",
   "billing.checkout.cardTitle": "Оплата",
   "billing.checkout.cardNote": "Ви оплачуєте на захищеній сторінці NETOPIA Payments. Номер вашої картки ніколи не потрапляє на наші сервери.",
   "billing.checkout.subscribeAndPay": "Замовлення з обов’язком оплати",

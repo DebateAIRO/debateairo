@@ -211,7 +211,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "[Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.]" },
       { kind: "p", text: "Dialectical Engine ponuja brezplačen paket. Na voljo bo plačljivi paket Premium, ki bo odklenil celoten nabor modelov in vam omogočil, da sami nastavite parametre razprave." },
-      { kind: "p", text: "Pred plačilom vam neposredno nad gumbom za plačilo prikažemo: paket; skupno ceno z veljavnim davkom; obračunsko obdobje; dejstvo, da se paket samodejno obnavlja do preklica; datum, ko se konča morebitno brezplačno preskusno obdobje, in znesek, ki vam bo nato zaračunan; ter način preklica. Pogoje obnavljanja potrdite z označitvijo ločenega polja. Na gumbu piše Naroči in plačaj (v romunščini Comandă cu obligație de plată). Na trajnem nosilcu vam pošljemo potrdilo, ki vsebuje iste informacije, te Pogoje in obrazec za odstop." },
+      { kind: "p", text: "Pred plačilom vam neposredno nad gumbom za plačilo prikažemo: paket; skupno ceno z veljavnim davkom; obračunsko obdobje; dejstvo, da se paket samodejno obnavlja do preklica; datum, ko se konča morebitno brezplačno preskusno obdobje, in znesek, ki vam bo nato zaračunan; ter način preklica. Pogoje obnavljanja potrdite z označitvijo ločenega polja. Na gumbu piše Naroči in plačaj (v romunščini Abonați-vă și plătiți). Na trajnem nosilcu vam pošljemo potrdilo, ki vsebuje iste informacije, te Pogoje in obrazec za odstop." },
       { kind: "p", text: "Opomniki. E-poštno sporočilo vam pošljemo najmanj 5 dni pred pretvorbo brezplačnega preskusnega obdobja v plačljivi paket; najmanj enkrat letno pri trajajočih paketih; ter od 30 do 45 dni pred vsakim podaljšanjem za obdobje dvanajstih mesecev ali več. Vsak opomnik vključuje ceno, datum in povezavo za preklic." },
       { kind: "p", text: "Preklic. Naročnino lahko kadar koli prekličete v meniju Nastavitve → Naročnina z enim potrditvenim klikom ali na strani za preklic na dezbatere.ro/cancel, za katero se vam ni treba prijaviti. Preklic začne učinkovati ob koncu tekočega obračunskega obdobja, dostop pa obdržite do takrat. Preklica ne bomo otežili bolj, kot je bila otežena sklenitev naročnine." },
       { kind: "p", text: "Spremembe cen začnejo učinkovati šele ob podaljšanju. Po e-pošti vas obvestimo najmanj 30 dni vnaprej ter vključimo novo ceno in povezavo za preklic. Kadar pravo vaše države zahteva izrecno soglasje k spremembi cene, ga zahtevamo; sicer se nova cena, če ne storite ničesar, uporablja od naslednjega podaljšanja. Regionalna pravila so navedena v Prilogi A." },
@@ -241,6 +241,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Spremembe storitve. Dialectical Engine nenehno razvijamo, zato običajne izboljšave, popravki in spremembe nabora modelov potekajo brez obvestila. Kadar uvedemo spremembo, ki presega ohranjanje delovanja storitve, kot je opisana, to storimo samo iz enega od naslednjih razlogov: zaradi skladnosti s pravno ali regulativno zahtevo; zaradi odziva na težavo z varnostjo ali zlorabo; ker ponudnik modela spremeni, omeji ali umakne model ali funkcijo, od katere smo odvisni; zaradi prilagoditve tehničnemu okolju, ki ga ne obvladujemo; ali zaradi dodajanja, izboljšanja ali ukinitve funkcije na način, ki vam ne povzroči stroškov." },
       { kind: "p", text: "Na trajnem nosilcu vas vnaprej obvestimo, kaj se spreminja in kdaj. Če ima sprememba več kot zgolj manjši negativen vpliv na vaš dostop do storitve ali njeno uporabo, lahko brezplačno odpoveste pogodbo v 30 dneh od obvestila ali začetka učinkovanja spremembe, kar je pozneje, mi pa vam vrnemo vse vnaprej plačane zneske za neizkoriščeno obdobje." },
       { kind: "p", text: "Spremembe teh Pogojev. Te Pogoje lahko spremenimo iz enakih vrst razlogov. Pri spremembah, ki ne zmanjšujejo vaših pravic, objavimo novo različico s povzetkom sprememb in vam najmanj 30 dni pred začetkom veljavnosti pošljemo e-poštno sporočilo; nadaljnja uporaba Dialectical Engine po tem datumu pomeni, da spremembo sprejemate, pred tem pa lahko zaprete račun. Pri spremembah, ki zmanjšujejo vaše pravice — vključno z zvišanjem cen obstoječega paketa, nižjimi omejitvami, odstranjenimi funkcijami, novimi načini uporabe vaše vsebine ali spremembami odgovornosti, prava, ki se uporablja, oziroma reševanja sporov — vas ob naslednji prijavi prosimo, da novo različico izrecno sprejmete, sprememba pa velja samo za naprej. Sprememb nikoli ne uveljavljamo za nazaj in tega razdelka nikoli ne uporabimo za spremembo bistva tega, kar ste plačali, med trajanjem pogodbe, ne da bi vam ponudili možnost odstopa. Prejšnje različice ostanejo dostopne na dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Različica 2.13 je nadomestila različico 2.12: razdelek 12 navaja, da je v romunščini na gumbu za plačilo napis Abonați-vă și plătiți." },
       { kind: "p", text: "Različica 2.12 je nadomestila različico 2.11: razdelek 10 navaja, da lahko prijavljena oseba tudi uporabi gumb Prijavi pri kateri koli javni razpravi, da umetna inteligenca prebere prijavo, oddano z njim, poleg javnega besedila, in kaj se nato zgodi." },
       { kind: "p", text: "Različica 2.11 je nadomestila različico 2.10: razdelek 9 navaja, da lahko začasno skrijemo javno razpravo, medtem ko jo pregledujemo, ter odstranimo ali popravimo del nje." },
       { kind: "p", text: "Različica 2.10 je nadomestila različico 2.9: razdelek 9 navaja, da so razprave na brezplačnem paketu javne, da javne razprave ni mogoče umakniti iz objave in ostanejo javne tudi po zaprtju vašega računa, da lahko vsak, ki ima dobroimetje, prispeva k javni razpravi ali napiše poročilo o njej, in da javna razprava ostane odprta tudi potem, ko je njen prvi avtor odšel; razdelek 11 navaja, kaj zaprtje naredi z vašimi javnimi razpravami." },
@@ -374,12 +375,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.12",
-  sha256: "ab822fef707b2f06100f8cc33536b8ec5f843f62bca73b03a60859df1610a6be",
-  eyebrow: "POGOJI UPORABE · v2.12 · VELJAVNI OD 1. NOVEMBRA 2026",
+  version: "2.13",
+  sha256: "bee9d91c928847a23ada6ad87ccf6ed7165cbba2454c756df081f7aaf4b5ac45",
+  eyebrow: "POGOJI UPORABE · v2.13 · VELJAVNI OD 1. NOVEMBRA 2026",
   title: "S čim soglašate",
   lede: "Pogodba med vami in družbo DMS Merchandise Shop S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.",
-  endMarker: "KONEC POGOJEV · v2.12",
+  endMarker: "KONEC POGOJEV · v2.13",
   contact: "support@dezbatere.ro",
   bodyLabel: "Besedilo Pogojev uporabe",
   sectionIdPrefix: "terms-section-",

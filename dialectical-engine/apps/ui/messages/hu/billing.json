@@ -80,7 +80,7 @@
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = havi {total}. Minden hónap {day}. napján megújul, amíg le nem mondja.",
   "billing.consent.renewal": "Elfogadom, hogy a NETOPIA Payments megőrzi a kártyámat, és arról minden hónapban {total} összeget terhelnek, amíg le nem mondom az előfizetést. Bármikor lemondhatom a Beállításokban vagy a dezbatere.ro/cancel oldalon.",
   "billing.consent.immediateStart": "Indítsák el most a csomagomat. Tudomásul veszem, hogy ha 14 napon belül elállok, a már felhasznált részt fizetem: a felhasznált napok és a felhasznált kredit közül a nagyobbat.",
-  "billing.checkout.continueToCard": "Fizetési kötelezettséggel járó megrendelés",
+  "billing.checkout.continueToCard": "Előfizetés és fizetés",
   "billing.checkout.cardTitle": "Fizetés",
   "billing.checkout.cardNote": "A NETOPIA Payments biztonságos oldalán fizet. A kártyaszáma soha nem jut el a szervereinkre.",
   "billing.checkout.subscribeAndPay": "Fizetési kötelezettséggel járó megrendelés",

@@ -80,7 +80,7 @@
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} per maand. Wordt elke maand op dag {day} verlengd tot u opzegt.",
   "billing.consent.renewal": "Ik ga ermee akkoord dat NETOPIA Payments mijn kaart bewaart en dat er elke maand {total} van wordt afgeschreven, totdat ik opzeg. Ik kan op elk moment opzeggen in Instellingen of op dezbatere.ro/cancel.",
   "billing.consent.immediateStart": "Start mijn abonnement nu. Ik begrijp dat als ik binnen 14 dagen herroep, ik betaal voor het deel dat al is gebruikt: het grootste van de gebruikte dagen of het gebruikte tegoed.",
-  "billing.checkout.continueToCard": "Bestelling met betalingsverplichting",
+  "billing.checkout.continueToCard": "Abonneren en betalen",
   "billing.checkout.cardTitle": "Betaling",
   "billing.checkout.cardNote": "U betaalt op de beveiligde pagina van NETOPIA Payments. Uw kaartnummer bereikt nooit onze servers.",
   "billing.checkout.subscribeAndPay": "Bestelling met betalingsverplichting",

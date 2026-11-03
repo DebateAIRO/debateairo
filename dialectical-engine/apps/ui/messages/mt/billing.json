@@ -80,7 +80,7 @@
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} fix-xahar. Jiġġedded fil-jum {day} ta’ kull xahar sakemm tikkanċella.",
   "billing.consent.renewal": "Naqbel li NETOPIA Payments iżżomm il-karta tiegħi u li {total} jiġi ddebitat minnha kull xahar, sakemm nikkanċella l-abbonament. Nista’ nikkanċella fi kwalunkwe ħin fl-Issettjar jew f’dezbatere.ro/cancel.",
   "billing.consent.immediateStart": "Ibda l-pjan tiegħi issa. Nifhem li jekk nirtira fi żmien 14-il jum, inħallas għall-parti diġà użata: l-akbar bejn il-jiem użati jew il-kreditu użat.",
-  "billing.checkout.continueToCard": "Ordna b’obbligu ta’ ħlas",
+  "billing.checkout.continueToCard": "Abbona u ħallas",
   "billing.checkout.cardTitle": "Ħlas",
   "billing.checkout.cardNote": "Tħallas fuq il-paġna sigura ta’ NETOPIA Payments. In-numru tal-karta tiegħek qatt ma jasal fis-servers tagħna.",
   "billing.checkout.subscribeAndPay": "Ordna b’obbligu ta’ ħlas",

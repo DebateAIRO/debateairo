@@ -80,7 +80,7 @@
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = 월 {total}. 해지할 때까지 매월 {day}일에 갱신됩니다.",
   "billing.consent.renewal": "NETOPIA Payments가 내 카드를 보관하고, 해지할 때까지 매월 {total}의 금액이 그 카드로 결제되는 데 동의합니다. 설정 또는 dezbatere.ro/cancel에서 언제든지 해지할 수 있습니다.",
   "billing.consent.immediateStart": "지금 요금제를 시작합니다. 14일 이내에 철회하면 이미 사용한 부분, 즉 사용한 일수와 사용한 크레딧 중 더 큰 쪽을 지불한다는 것을 이해합니다.",
-  "billing.checkout.continueToCard": "결제 의무가 있는 주문하기",
+  "billing.checkout.continueToCard": "구독 및 결제",
   "billing.checkout.cardTitle": "결제",
   "billing.checkout.cardNote": "NETOPIA Payments의 안전한 페이지에서 결제합니다. 카드 번호는 당사 서버에 절대 전달되지 않습니다.",
   "billing.checkout.subscribeAndPay": "결제 의무가 있는 주문하기",

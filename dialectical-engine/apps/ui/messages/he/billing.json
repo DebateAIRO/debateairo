@@ -80,7 +80,7 @@
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} לחודש. מתחדש ב-{day} בכל חודש עד שתבטלו.",
   "billing.consent.renewal": "אני מסכים/ה ש-NETOPIA Payments תשמור את הכרטיס שלי ושסכום של {total} יחויב ממנו בכל חודש, עד שאבטל את המינוי. אפשר לבטל בכל עת בהגדרות או ב-dezbatere.ro/cancel.",
   "billing.consent.immediateStart": "התחילו את התוכנית שלי עכשיו. ידוע לי שאם אבטל את ההתקשרות תוך 14 ימים, אשלם על החלק שכבר נוצל: הגדול מבין הימים שנוצלו והקרדיט שנוצל.",
-  "billing.checkout.continueToCard": "הזמנה עם חובת תשלום",
+  "billing.checkout.continueToCard": "הרשמה ותשלום",
   "billing.checkout.cardTitle": "תשלום",
   "billing.checkout.cardNote": "אתם משלמים בדף המאובטח של NETOPIA Payments. מספר הכרטיס שלכם לעולם אינו מגיע לשרתים שלנו.",
   "billing.checkout.subscribeAndPay": "הזמנה עם חובת תשלום",

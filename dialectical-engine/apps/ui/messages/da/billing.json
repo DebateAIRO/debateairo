@@ -80,7 +80,7 @@
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} om måneden. Fornyes den {day}. i hver måned, indtil du opsiger.",
   "billing.consent.renewal": "Jeg accepterer, at NETOPIA Payments gemmer mit kort, og at {total} trækkes på det hver måned, indtil jeg opsiger. Jeg kan opsige når som helst under Indstillinger eller på dezbatere.ro/cancel.",
   "billing.consent.immediateStart": "Start min plan nu. Jeg forstår, at hvis jeg fortryder inden for 14 dage, betaler jeg for den del, der allerede er brugt: den største af de brugte dage eller den brugte kredit.",
-  "billing.checkout.continueToCard": "Bestil med betalingspligt",
+  "billing.checkout.continueToCard": "Abonner og betal",
   "billing.checkout.cardTitle": "Betaling",
   "billing.checkout.cardNote": "Du betaler på NETOPIA Payments' sikre side. Dit kortnummer når aldrig vores servere.",
   "billing.checkout.subscribeAndPay": "Bestil med betalingspligt",

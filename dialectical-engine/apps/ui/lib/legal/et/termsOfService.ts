@@ -211,7 +211,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "[Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.]" },
       { kind: "p", text: "Dialectical Engine pakub tasuta paketti. Tulevikus on saadaval tasuline Premium-pakett, mis annab juurdepääsu mudelite täielikule valikule ja võimaldab teil väitluse seadeid ise määrata." },
-      { kind: "p", text: "Enne maksmist näitame otse maksenupu kohal: paketti; koguhinda koos kohalduvate maksudega; arveldusperioodi; asjaolu, et pakett uueneb automaatselt kuni tühistamiseni; tasuta prooviperioodi lõppkuupäeva ja pärast seda võetavat tasu; ning tühistamise viisi. Kinnitate uuendamistingimused eraldi ruudu märkimisega. Nupul on kiri Tellige ja makske (rumeenia keeles Comandă cu obligație de plată). Saadame teile püsival andmekandjal kinnituse, mis sisaldab sama teavet, neid Tingimusi ja taganemisvormi." },
+      { kind: "p", text: "Enne maksmist näitame otse maksenupu kohal: paketti; koguhinda koos kohalduvate maksudega; arveldusperioodi; asjaolu, et pakett uueneb automaatselt kuni tühistamiseni; tasuta prooviperioodi lõppkuupäeva ja pärast seda võetavat tasu; ning tühistamise viisi. Kinnitate uuendamistingimused eraldi ruudu märkimisega. Nupul on kiri Tellige ja makske (rumeenia keeles Abonați-vă și plătiți). Saadame teile püsival andmekandjal kinnituse, mis sisaldab sama teavet, neid Tingimusi ja taganemisvormi." },
       { kind: "p", text: "Meeldetuletused. Saadame teile e-kirja vähemalt 5 päeva enne tasuta prooviperioodi muutumist tasuliseks paketiks; jätkuvate pakettide puhul vähemalt kord aastas; ning 30–45 päeva enne vähemalt kaheteistkuulise tähtaja uuendamist. Igas meeldetuletuses on hind, kuupäev ja tühistamislink." },
       { kind: "p", text: "Tühistamine. Tühistage igal ajal menüüs Seaded → Tellimus ühe kinnitava klõpsuga või tühistamislehel aadressil dezbatere.ro/cancel, kuhu sisenemiseks ei ole vaja sisse logida. Tühistamine jõustub jooksva arveldusperioodi lõpus ja juurdepääs säilib selle ajani. Me ei muuda tühistamist keerulisemaks kui tellimist." },
       { kind: "p", text: "Hinnamuudatused jõustuvad ainult uuendamisel. Teatame uuest hinnast vähemalt 30 päeva ette e-posti teel ja lisame tühistamislingi. Kui teie riigi õigus nõuab hinnamuudatuseks teie sõnaselget nõusolekut, küsime seda; vastasel juhul kohaldatakse uuel uuendamisel uut hinda, kui te midagi ei tee. Lisas A on märgitud piirkondlikud reeglid." },
@@ -241,6 +241,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Teenuse muudatused. Arendame Dialectical Engine-d pidevalt ning tavapärased täiustused, parandused ja mudelivaliku muudatused toimuvad ette teatamata. Kui teeme muudatuse, mis läheb teenuse kirjeldatud viisil toimivana hoidmisest kaugemale, teeme seda ainult ühel järgmistest põhjustest: õigus- või regulatiivse nõude täitmiseks; turva- või kuritarvitamisprobleemile reageerimiseks; seetõttu, et mudelipakkuja muudab, piirab või kõrvaldab mudeli või funktsiooni, millest sõltume; kohanemiseks tehnilise keskkonnaga, mida me ei kontrolli; või funktsiooni lisamiseks, täiustamiseks või kasutuselt kõrvaldamiseks viisil, mis ei tekita teile lisakulu." },
       { kind: "p", text: "Teatame teile püsival andmekandjal ette, mis ja millal muutub. Kui muudatusel on teie juurdepääsule teenusele või selle kasutamisele enam kui vähene negatiivne mõju, võite lepingu tasuta lõpetada 30 päeva jooksul pärast teate saamist või muudatuse jõustumist, olenevalt sellest, kumb on hilisem, ning tagastame kasutamata ajavahemiku eest ette makstud summa." },
       { kind: "p", text: "Nende Tingimuste muudatused. Võime neid Tingimusi samalaadsetel põhjustel muuta. Muudatuste puhul, mis ei vähenda teie õigusi, avaldame uue versiooni koos muudatuste kokkuvõttega ja saadame teile e-kirja vähemalt 30 päeva enne selle jõustumist; Dialectical Engine kasutamise jätkamine pärast seda kuupäeva tähendab, et nõustute muudatusega, ning võite oma konto enne seda sulgeda. Muudatuste puhul, mis vähendavad teie õigusi — sealhulgas olemasoleva paketi hinnatõus, madalamad kasutuslimiidid, eemaldatud funktsioonid, teie sisu uued kasutusviisid või vastutuse, kohaldatava õiguse või vaidluste lahendamise muudatused — palume teil järgmisel sisselogimisel uue versiooniga sõnaselgelt nõustuda ning muudatust kohaldatakse ainult edaspidi. Me ei kohalda muudatust kunagi tagasiulatuvalt ega kasuta seda jaotist selleks, et muuta tähtaja kestel tasulise teenuse põhiolemust ilma teile väljumisvõimalust pakkumata. Varasemad versioonid jäävad kättesaadavaks aadressil dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Versioon 2.13 asendas versiooni 2.12: jaotis 12 ütleb, et rumeenia keeles on maksenupul tekst Abonați-vă și plătiți." },
       { kind: "p", text: "Versioon 2.12 asendas versiooni 2.11: jaotis 10 ütleb, et sisselogitud isik saab kasutada ka mis tahes avaliku väitluse juures nuppu Teatage, et tehisintellekt loeb nupuga tehtud teadet avaliku teksti kõrval ning mis siis juhtub." },
       { kind: "p", text: "Versioon 2.11 asendas versiooni 2.10: jaotis 9 ütleb, et võime avaliku väitluse läbivaatamise ajaks peita ning eemaldada või parandada selle osa." },
       { kind: "p", text: "Versioon 2.10 asendas versiooni 2.9: jaotis 9 ütleb, et tasuta paketi väitlused on avalikud, et avaliku väitluse avaldamist ei saa tühistada ja see jääb pärast konto sulgemist avalikuks, et igaüks, kellel on krediiti, võib avalikule väitlusele panustada või selle kohta aruande kirjutada, ning et avalik väitlus jääb avatuks pärast selle esimese autori lahkumist; jaotis 11 ütleb, mida sulgemine teie avalikele väitlustele teeb." },
@@ -374,12 +375,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.12",
-  sha256: "f5bfaee15c7297f6230f0c69e00bf172c19c7ee760d1efd80e37ca3818a8b01f",
-  eyebrow: "TEENUSETINGIMUSED · v2.12 · KEHTIB ALATES 1. NOVEMBRIST 2026",
+  version: "2.13",
+  sha256: "16110c6ad7e82d5e2ee086ab4354d1789a72e2d6c0f7ebb231f3c4fb9299184d",
+  eyebrow: "TEENUSETINGIMUSED · v2.13 · KEHTIB ALATES 1. NOVEMBRIST 2026",
   title: "Millega te nõustute",
   lede: "Teie ja DMS Merchandise Shop S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.",
-  endMarker: "TINGIMUSTE LÕPP · v2.12",
+  endMarker: "TINGIMUSTE LÕPP · v2.13",
   contact: "support@dezbatere.ro",
   bodyLabel: "Teenusetingimuste tekst",
   sectionIdPrefix: "terms-section-",

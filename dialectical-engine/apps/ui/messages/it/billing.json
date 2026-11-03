@@ -80,7 +80,7 @@
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} al mese. Si rinnova il giorno {day} di ogni mese finché non disdici.",
   "billing.consent.renewal": "Accetto che NETOPIA Payments conservi la mia carta e che ogni mese vi venga addebitato l’importo di {total}, finché non disdico l’abbonamento. Posso disdire in qualsiasi momento nelle Impostazioni o su dezbatere.ro/cancel.",
   "billing.consent.immediateStart": "Avvia subito il mio piano. Capisco che, se recedo entro 14 giorni, pago la parte già utilizzata: la maggiore tra i giorni utilizzati e il credito utilizzato.",
-  "billing.checkout.continueToCard": "Ordine con obbligo di pagamento",
+  "billing.checkout.continueToCard": "Abbonati e paga",
   "billing.checkout.cardTitle": "Pagamento",
   "billing.checkout.cardNote": "Paghi sulla pagina sicura di NETOPIA Payments. Il numero della tua carta non raggiunge mai i nostri server.",
   "billing.checkout.subscribeAndPay": "Ordine con obbligo di pagamento",
