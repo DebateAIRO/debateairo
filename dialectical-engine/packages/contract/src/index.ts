@@ -639,13 +639,37 @@ export const BillingPlansTaxSchema = z.object({
 export type BillingPlansTax = z.infer<typeof BillingPlansTaxSchema>;
 
 /**
- * GET /v1/billing/plans (public). Every plan's price in each currency, and `currency`, the one the caller's connection
- * pays in (spec 2026-10-05 §2.16.1). Credit is never shown in dollars: "4" reads "4× the Plus allowance".
- * `tax` is the connection country's tax and each plan's `total_price` its price in `currency` with that tax; both are
- * null together, when the country is unknown (an unknown place, a Tor exit) or the tax service has not answered.
+ * GET /v1/billing/plans' optional query: the place the visitor says they live, as the checkout's country (and, in the
+ * US and Canada, where the state's or province's tax comes from it, the postal code). Absent, the connection's country.
+ */
+export const BillingPlansQuerySchema = z.object({
+  country: z.string().trim().toUpperCase().pipe(BillingIso2Schema).optional(),
+  postal_code: z.string().trim().min(1).max(16).optional()
+}).strip();
+export type BillingPlansQuery = z.infer<typeof BillingPlansQuerySchema>;
+
+/**
+ * Where the list's prices are for, and whether they could be priced there. PRICED: `tax` and every `total_price` are
+ * that place's. COUNTRY_NEEDED: no country is known (no country chosen, and the connection's is unknown or a Tor
+ * exit). POSTAL_CODE_NEEDED / POSTAL_CODE_INVALID: a US or Canadian price needs a postal code that fits the country.
+ * TAX_UNAVAILABLE: the tax service has not answered for that place. Only PRICED shows a price.
+ */
+export const BillingPlansPlaceSchema = z.object({
+  country: BillingIso2Schema.nullable(),
+  postal_code: z.string().max(16).nullable(),
+  status: z.enum(["PRICED", "COUNTRY_NEEDED", "POSTAL_CODE_NEEDED", "POSTAL_CODE_INVALID", "TAX_UNAVAILABLE"])
+}).strict();
+export type BillingPlansPlace = z.infer<typeof BillingPlansPlaceSchema>;
+
+/**
+ * GET /v1/billing/plans (public). Every plan's net price in each currency, and `currency`, the one the place pays in
+ * (spec 2026-10-05 §2.16.1). Credit is never shown in dollars: "4" reads "4× the Plus allowance". Terms §12: `tax` is
+ * the place's tax and each plan's `total_price` its price in `currency` with that tax; both are present exactly when
+ * `place.status` is PRICED, so a net price is never offered as the price.
  */
 export const BillingPlansResponseSchema = z.object({
   currency: BillingCurrencySchema,
+  place: BillingPlansPlaceSchema,
   tax: BillingPlansTaxSchema.nullable(),
   plans: z.array(z.object({
     plan_id: PlanIdSchema,
@@ -654,7 +678,8 @@ export const BillingPlansResponseSchema = z.object({
     allowance_vs_plus: z.string().regex(/^\d+(?:\.\d+)?$/)
   }).strict()).min(1)
 }).strict().refine(
-  (answer) => answer.plans.every((plan) => (plan.total_price === null) === (answer.tax === null)),
+  (answer) => (answer.tax !== null) === (answer.place.status === "PRICED")
+    && answer.plans.every((plan) => (plan.total_price === null) === (answer.tax === null)),
   { message: "TOTAL_PRICE_WITHOUT_TAX" }
 );
 export type BillingPlansResponse = z.infer<typeof BillingPlansResponseSchema>;

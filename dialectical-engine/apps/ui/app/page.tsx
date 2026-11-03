@@ -30,8 +30,8 @@ type LandingPlans = Readonly<{ lowestPaidPrice: string | null; tax: PricedTax; f
 
 /**
  * The landing's one plans read: the lowest paid price for the price line (with the connection country's tax, Terms
- * §12, whenever the list knows it), and whether billing is on for the footer. Only the route's 404 means off (local
- * mode, or hosted before the switch), exactly as billingIsOn() decides.
+ * §12; with no priced place, no price at all), and whether billing is on for the footer. Only the route's 404 means
+ * off (local mode, or hosted before the switch), exactly as billingIsOn() decides.
  */
 async function landingPlans(locale: string, headerStore: Headers): Promise<LandingPlans> {
   const footer = (billingOn: boolean): SiteFooterBilling => Object.freeze({ billingOn, marks: availablePaymentMarks() });
@@ -40,20 +40,19 @@ async function landingPlans(locale: string, headerStore: Headers): Promise<Landi
       fetch, undefined, headerStore.get("user-agent") ?? undefined, readTrustedClientIp(headerStore)
     ).getBillingPlans();
     const paid = answer.plans.filter((plan) => plan.plan_id !== "FREE");
-    // `!= null`: an answer without the fields (only a hand-made one: the contract client requires them) is never read
-    // as tax included.
-    const tax = paid.every((plan) => plan.total_price != null) ? pricedTax(answer.tax) : "BEFORE";
-    const lowest = paid
+    // `!= null`: an answer without the fields (only a hand-made one: the contract client requires them) is UNPRICED.
+    const tax = paid.every((plan) => plan.total_price != null) ? pricedTax(answer) : "UNPRICED";
+    const lowest = tax === "UNPRICED" ? undefined : paid
       // Spec 2026-10-05 §2.16.1: in the currency the visitor's connection pays in.
-      .map((plan) => (tax === "BEFORE" ? null : plan.total_price) ?? plan.net_prices[answer.currency])
+      .flatMap((plan) => plan.total_price ?? [])
       .sort((left, right) => Number(left) - Number(right))[0];
     return Object.freeze({
-      lowestPaidPrice: lowest === undefined ? null : formatMoney(locale, lowest, answer.currency), tax,
-      footer: footer(true)
+      lowestPaidPrice: lowest === undefined ? null : formatMoney(locale, lowest, answer.currency),
+      tax: paid.length === 0 ? "UNPRICED" : tax, footer: footer(true)
     });
   } catch (failure) {
     return Object.freeze({
-      lowestPaidPrice: null, tax: "BEFORE",
+      lowestPaidPrice: null, tax: "UNPRICED",
       footer: footer(!(failure instanceof ContractHttpError && failure.status === 404))
     });
   }

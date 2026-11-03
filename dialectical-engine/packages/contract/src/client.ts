@@ -506,7 +506,8 @@ export interface ContractClient {
   /** Paid-plans spec §1.2 (U1): the person's windows as whole percentages; 404 when billing is off. */
   getBillingUsage(): Promise<BillingUsageResponse>;
   /** Paid-plans spec §2.5.3: the public plans list; 404 when billing is off. */
-  getBillingPlans(): Promise<BillingPlansResponse>;
+  /** With no place, the connection's country; `postalCode` counts only in the US and Canada. */
+  getBillingPlans(place?: Readonly<{ country?: string; postalCode?: string }>): Promise<BillingPlansResponse>;
   createBillingQuote(input: BillingQuoteRequest): Promise<BillingQuoteResponse>;
   /** A payment already on its way for the open checkout resolves as `{state: "PENDING", charge_ref}` (409 CHECKOUT_PENDING). */
   startBillingCheckout(input: BillingCheckoutRequest): Promise<BillingCheckoutResponse | BillingCheckoutPendingResponse>;
@@ -910,7 +911,13 @@ export function createContractClient(
       ...(input.dig_picks === undefined ? {} : { dig_picks: String(input.dig_picks) })
     }).toString()}`, AskRoomResponseSchema),
     getBillingUsage: () => request("/v1/billing/usage", BillingUsageResponseSchema),
-    getBillingPlans: () => request("/v1/billing/plans", BillingPlansResponseSchema),
+    getBillingPlans: (place?: Readonly<{ country?: string; postalCode?: string }>) => {
+      const query = new URLSearchParams();
+      if (place?.country !== undefined) query.set("country", place.country);
+      if (place?.postalCode !== undefined) query.set("postal_code", place.postalCode);
+      const search = query.toString();
+      return request(`/v1/billing/plans${search === "" ? "" : `?${search}`}`, BillingPlansResponseSchema);
+    },
     createBillingQuote: (input: BillingQuoteRequest) => request(
       "/v1/billing/quote", BillingQuoteResponseSchema,
       { method: "POST", body: JSON.stringify(BillingQuoteRequestSchema.parse(input)) }

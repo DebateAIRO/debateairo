@@ -4,17 +4,19 @@ import type { PricedTax } from "@/lib/billing/format";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
 /* The document's closing CTA: centred, with the pro/rule/con motif above it.
-   The pricing line carries the id the nav points at. Terms §12: it says whether
-   the price holds the visitor's country's tax, adds none, or is before tax. */
-const PRICING_COPY: Readonly<Record<PricedTax, string>> = Object.freeze({
-  INCLUDED: "home.pricingCopyTaxIncluded", NONE: "home.pricingCopyNoTax", BEFORE: "home.pricingCopy"
+   The pricing line carries the id the nav points at. Terms §12: it names a price
+   only with the visitor's country's tax in it (or none to add); with no priced
+   place it says the plans are priced with your tax, never a price before tax. */
+const PRICING_COPY: Readonly<Record<Exclude<PricedTax, "UNPRICED">, string>> = Object.freeze({
+  INCLUDED: "home.pricingCopyTaxIncluded", NONE: "home.pricingCopyNoTax"
 });
 
 export function LandingPricing({
   catalog,
   lowestPaidPrice,
-  tax = "BEFORE"
-}: { catalog: MessageCatalog; lowestPaidPrice: string | null; tax?: PricedTax }): JSX.Element {
+  tax = "UNPRICED",
+  billingOn = lowestPaidPrice !== null
+}: { catalog: MessageCatalog; lowestPaidPrice: string | null; tax?: PricedTax; billingOn?: boolean }): JSX.Element {
   return (
     <section
       id="start"
@@ -42,9 +44,11 @@ export function LandingPricing({
         </a>
       </div>
       <p id="pricing" className="lpPricing">
-        {lowestPaidPrice === null ? t(catalog, "home.pricingCopyFree") : (
+        {!billingOn ? t(catalog, "home.pricingCopyFree") : (
           <>
-            {t(catalog, PRICING_COPY[tax], { price: lowestPaidPrice })}{" "}
+            {lowestPaidPrice === null || tax === "UNPRICED"
+              ? t(catalog, "home.pricingCopyChoose")
+              : t(catalog, PRICING_COPY[tax], { price: lowestPaidPrice })}{" "}
             <a href="/pricing">{t(catalog, "home.pricingLink")}</a>
           </>
         )}
