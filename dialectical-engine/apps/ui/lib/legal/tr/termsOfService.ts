@@ -337,7 +337,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kanada ve Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Gizlilik görevlimiz ve Quebec'te kişisel bilgilerin korunmasından sorumlu kişi müdürümüzdür; kendisine privacy@dezbatere.ro adresinden ulaşılabilir. Verileriniz Gizlilik Politikamızın Ek B.3'ünde ele alınır. Quebec: bu Koşullar Fransızca olarak sunulur; dil seçiciden Fransızcayı seçin; tartışmalarınızı özel tutan ayarlar varsayılan olarak açıktır; hakkınızdaki kişisel bilgilerin arama sonuçlarından çıkarılmasını talep edebilirsiniz." }
+      { kind: "p", text: "Gizlilik görevlimiz ve Quebec'te kişisel bilgilerin korunmasından sorumlu kişi müdürümüzdür; kendisine privacy@dezbatere.ro adresinden ulaşılabilir. Verileriniz Gizlilik Politikamızın Ek B.3'ünde ele alınır. Quebec: bu Koşullar Fransızca olarak sunulur; kaydolurken Kanada'yı seçerseniz Koşullar size önce Fransızca gösterilir ve bunun yerine İngilizceyi seçebilirsiniz; tartışmalarınızı özel tutan ayarlar varsayılan olarak açıktır; hakkınızdaki kişisel bilgilerin arama sonuçlarından çıkarılmasını talep edebilirsiniz." }
     ]
   },
   {
@@ -377,7 +377,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.14",
-  sha256: "a5cab6bb4a762fe95ce6b50627fbffe9a7104dbbb2b156a22c096dc14bb0d4b6",
+  sha256: "bca91955c4ce20d6aa1b4dd53731666df2859a289ed08f3fd48139d55fe1235c",
   eyebrow: "HİZMET KOŞULLARI · v2.14 · YÜRÜRLÜK TARİHİ 1 KASIM 2026",
   title: "Kabul ettiğiniz hükümler",
   lede: "Sizinle DMS Merchandise Shop S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.",

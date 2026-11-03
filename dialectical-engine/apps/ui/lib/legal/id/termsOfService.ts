@@ -337,7 +337,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kanada dan Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Petugas privasi kami, dan di Quebec orang yang bertanggung jawab atas perlindungan informasi pribadi, adalah direktur kami, yang dapat dihubungi di privacy@dezbatere.ro. Kebijakan Privasi kami, Lampiran B.3, mencakup data Anda. Quebec: Ketentuan ini tersedia dalam bahasa Prancis; pilih bahasa Prancis melalui pengalih bahasa; pengaturan yang menjaga debat Anda tetap privat diaktifkan secara bawaan; Anda dapat meminta agar informasi pribadi tentang Anda tidak lagi diindeks." }
+      { kind: "p", text: "Petugas privasi kami, dan di Quebec orang yang bertanggung jawab atas perlindungan informasi pribadi, adalah direktur kami, yang dapat dihubungi di privacy@dezbatere.ro. Kebijakan Privasi kami, Lampiran B.3, mencakup data Anda. Quebec: Ketentuan ini tersedia dalam bahasa Prancis; jika Anda memilih Kanada saat mendaftar, Anda akan mendapatkannya dalam bahasa Prancis terlebih dahulu dan dapat memilih bahasa Inggris sebagai gantinya; pengaturan yang menjaga debat Anda tetap privat diaktifkan secara bawaan; Anda dapat meminta agar informasi pribadi tentang Anda tidak lagi diindeks." }
     ]
   },
   {
@@ -377,7 +377,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.14",
-  sha256: "798204d52c1194df314cae5c9e8f60b61a6dc981e521cec065ee119fa0a02c85",
+  sha256: "37f65f4f6475c7fa232edec3c2c3a2592e13d0d39f0d30605322344b96b1dc09",
   eyebrow: "KETENTUAN LAYANAN · v2.14 · BERLAKU 1 NOVEMBER 2026",
   title: "Hal yang Anda setujui",
   lede: "Kontrak antara Anda dan DMS Merchandise Shop S.R.L., dalam bahasa yang mudah dipahami. Sembilan belas bagian dan Lampiran A — gulir hingga akhir.",

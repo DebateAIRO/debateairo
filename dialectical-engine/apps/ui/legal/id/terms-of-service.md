@@ -335,7 +335,7 @@ Bagian utama Ketentuan ini ditulis untuk Anda. Selain itu: Anda dapat mengajukan
 
 ### A.3 Kanada dan Quebec
 
-Petugas privasi kami, dan di Quebec orang yang bertanggung jawab atas perlindungan informasi pribadi, adalah direktur kami, yang dapat dihubungi di privacy@dezbatere.ro. Kebijakan Privasi kami, Lampiran B.3, mencakup data Anda. **Quebec:** Ketentuan ini tersedia dalam bahasa Prancis; pilih bahasa Prancis melalui pengalih bahasa; pengaturan yang menjaga debat Anda tetap privat diaktifkan secara bawaan; Anda dapat meminta agar informasi pribadi tentang Anda tidak lagi diindeks.
+Petugas privasi kami, dan di Quebec orang yang bertanggung jawab atas perlindungan informasi pribadi, adalah direktur kami, yang dapat dihubungi di privacy@dezbatere.ro. Kebijakan Privasi kami, Lampiran B.3, mencakup data Anda. **Quebec:** Ketentuan ini tersedia dalam bahasa Prancis; jika Anda memilih Kanada saat mendaftar, Anda akan mendapatkannya dalam bahasa Prancis terlebih dahulu dan dapat memilih bahasa Inggris sebagai gantinya; pengaturan yang menjaga debat Anda tetap privat diaktifkan secara bawaan; Anda dapat meminta agar informasi pribadi tentang Anda tidak lagi diindeks.
 
 ### A.4 Australia dan Selandia Baru
 

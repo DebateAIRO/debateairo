@@ -337,7 +337,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "加拿大和魁北克",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "我们的隐私负责人（在魁北克亦为个人信息保护负责人）为我们的董事，联系方式为 privacy@dezbatere.ro。有关您的数据，见我们《隐私政策》的附件 B.3。魁北克：本条款提供法语版本；请通过语言切换器选择法语；使您的辩论保持私密的设置默认开启；您可以请求取消对与您有关的个人信息编制索引。" }
+      { kind: "p", text: "我们的隐私负责人（在魁北克亦为个人信息保护负责人）为我们的董事，联系方式为 privacy@dezbatere.ro。有关您的数据，见我们《隐私政策》的附件 B.3。魁北克：本条款提供法语版本；如您在注册时选择加拿大，本条款将首先以法语显示，您也可以改选英语；使您的辩论保持私密的设置默认开启；您可以请求取消对与您有关的个人信息编制索引。" }
     ]
   },
   {
@@ -377,7 +377,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.14",
-  sha256: "e74f0012efffbdf31117f37e01dcfb5e8a4206de83480442544927fd32ab5aaf",
+  sha256: "c17295835e4dd3af49c73954786ab065b5875949b7c78b9c84379fed2ce08bf3",
   eyebrow: "服务条款 · v2.14 · 生效日期 2026 年 11 月 1 日",
   title: "您同意的内容",
   lede: "以通俗语言说明您与 DMS Merchandise Shop S.R.L. 之间的合同。共十九节及附件 A — 请滚动至末尾。",

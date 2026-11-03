@@ -337,7 +337,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kanada ir Kvebekas",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Mūsų privatumo pareigūnas, o Kvebeke — už asmeninės informacijos apsaugą atsakingas asmuo, yra mūsų direktorius, su kuriuo galite susisiekti adresu privacy@dezbatere.ro. Jūsų duomenims taikomas mūsų Privatumo politikos B priedo B.3 skirsnis. Kvebekas: šios Sąlygos pateikiamos prancūzų kalba; prancūzų kalbą pasirinkite kalbos perjungikliu; nustatymai, pagal kuriuos jūsų debatai lieka privatūs, yra įjungti pagal numatytuosius nustatymus; galite prašyti pašalinti jūsų asmeninę informaciją iš indeksų." }
+      { kind: "p", text: "Mūsų privatumo pareigūnas, o Kvebeke — už asmeninės informacijos apsaugą atsakingas asmuo, yra mūsų direktorius, su kuriuo galite susisiekti adresu privacy@dezbatere.ro. Jūsų duomenims taikomas mūsų Privatumo politikos B priedo B.3 skirsnis. Kvebekas: šios Sąlygos pateikiamos prancūzų kalba; jei registruodamiesi pasirinksite Kanadą, pirmiausia jas gausite prancūzų kalba, o vietoj jos galėsite pasirinkti anglų kalbą; nustatymai, pagal kuriuos jūsų debatai lieka privatūs, yra įjungti pagal numatytuosius nustatymus; galite prašyti pašalinti jūsų asmeninę informaciją iš indeksų." }
     ]
   },
   {
@@ -377,7 +377,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.14",
-  sha256: "feee8ab3f97f750f608d29adeb062d8de11991a3c0c82b92d1d268b02d926860",
+  sha256: "c2060316a0d078f1219e7339b86923d54ba9873fb668df231907b48f519184cd",
   eyebrow: "PASLAUGŲ TEIKIMO SĄLYGOS · v2.14 · ĮSIGALIOJA 2026 M. LAPKRIČIO 1 D.",
   title: "Su kuo sutinkate",
   lede: "Jūsų ir DMS Merchandise Shop S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.",

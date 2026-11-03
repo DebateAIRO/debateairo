@@ -335,7 +335,7 @@ Pagrindinė šių Sąlygų dalis parengta jums. Be to: galite iškelti bylą ša
 
 ### A.3 Kanada ir Kvebekas
 
-Mūsų privatumo pareigūnas, o Kvebeke — už asmeninės informacijos apsaugą atsakingas asmuo, yra mūsų direktorius, su kuriuo galite susisiekti adresu privacy@dezbatere.ro. Jūsų duomenims taikomas mūsų Privatumo politikos B priedo B.3 skirsnis. **Kvebekas:** šios Sąlygos pateikiamos prancūzų kalba; prancūzų kalbą pasirinkite kalbos perjungikliu; nustatymai, pagal kuriuos jūsų debatai lieka privatūs, yra įjungti pagal numatytuosius nustatymus; galite prašyti pašalinti jūsų asmeninę informaciją iš indeksų.
+Mūsų privatumo pareigūnas, o Kvebeke — už asmeninės informacijos apsaugą atsakingas asmuo, yra mūsų direktorius, su kuriuo galite susisiekti adresu privacy@dezbatere.ro. Jūsų duomenims taikomas mūsų Privatumo politikos B priedo B.3 skirsnis. **Kvebekas:** šios Sąlygos pateikiamos prancūzų kalba; jei registruodamiesi pasirinksite Kanadą, pirmiausia jas gausite prancūzų kalba, o vietoj jos galėsite pasirinkti anglų kalbą; nustatymai, pagal kuriuos jūsų debatai lieka privatūs, yra įjungti pagal numatytuosius nustatymus; galite prašyti pašalinti jūsų asmeninę informaciją iš indeksų.
 
 ### A.4 Australija ir Naujoji Zelandija
 
