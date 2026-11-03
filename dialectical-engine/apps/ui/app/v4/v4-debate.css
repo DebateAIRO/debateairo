@@ -147,6 +147,11 @@
 }
 .v4DebPhoneMap { flex: 0 0 auto; }
 .v4DebPhoneDig { flex: 1 1 auto; min-width: 0; }
+/* map-f18: on a path or an open question the pinned bar carries the dig button, so the panel's own, identical one is
+   left out on the phone (its Quick look / Thorough, share line and notes stay). A dig's panel keeps its buttons: the
+   pinned bar has none there. */
+.v4DebLayout-phone .v4Panel-path .v4PanelDigBtn,
+.v4DebLayout-phone .v4Panel-open .v4PanelDigBtn { display: none; }
 
 /* ---------- the phone map sheet (D7) ---------- */
 .v4DebSheet {

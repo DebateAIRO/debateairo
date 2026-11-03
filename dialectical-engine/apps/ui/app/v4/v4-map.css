@@ -262,6 +262,11 @@
 .v4PanelModes .v4Chip { min-height: 44px; }
 .v4PanelDigBtn { width: 100%; }
 .v4Panel .v4MapPulse { margin-right: 6px; vertical-align: middle; }
+/* dig-f24: "Skip to the dig button" stays out of sight until it has the keyboard's focus. */
+.v4PanelSkip { align-self: flex-start; min-height: 44px; display: inline-flex; align-items: center; }
+.v4PanelSkip:not(:focus) { position: absolute; width: 1px; height: 1px; min-height: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* dig-f13: the way back to a dig's path names the path, so its label may wrap. */
+.v4PanelGoDig { padding-top: 8px; padding-bottom: 8px; }
 
 /* Perplexity plan W2-6: sources under a point, a path's search note and its other pages (V4Sources.tsx). Phone first:
    nothing here has a fixed width, long titles and addresses wrap, and buttons keep the 44px touch height. */
