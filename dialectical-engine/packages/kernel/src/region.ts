@@ -8,7 +8,7 @@ export interface DeclaredRegion { readonly country: string; readonly usState: st
 const countryRows: Readonly<Record<RegionContinent, string>> = {
   Africa: "DZ Algeria,EG Egypt,ET Ethiopia,GH Ghana,KE Kenya,MA Morocco,NG Nigeria,RW Rwanda,SN Senegal,ZA South Africa,TN Tunisia,UG Uganda",
   Asia: "CN China,IN India,ID Indonesia,JP Japan,MY Malaysia,PK Pakistan,PH Philippines,SG Singapore,KR South Korea,TW Taiwan,TH Thailand,VN Vietnam",
-  Europe: "AT Austria,BE Belgium,BG Bulgaria,HR Croatia,CY Cyprus,CZ Czechia,DK Denmark,EE Estonia,FI Finland,FR France,DE Germany,GR Greece,HU Hungary,IE Ireland,IT Italy,LV Latvia,LT Lithuania,LU Luxembourg,MT Malta,MD Moldova,NL Netherlands,NO Norway,PL Poland,PT Portugal,RO Romania,RS Serbia,SK Slovakia,SI Slovenia,ES Spain,SE Sweden,CH Switzerland,UA Ukraine,GB United Kingdom",
+  Europe: "AT Austria,BE Belgium,BG Bulgaria,HR Croatia,CY Cyprus,CZ Czechia,DK Denmark,EE Estonia,FI Finland,FR France,DE Germany,GR Greece,HU Hungary,IS Iceland,IE Ireland,IT Italy,LV Latvia,LI Liechtenstein,LT Lithuania,LU Luxembourg,MT Malta,MD Moldova,NL Netherlands,NO Norway,PL Poland,PT Portugal,RO Romania,RS Serbia,SK Slovakia,SI Slovenia,ES Spain,SE Sweden,CH Switzerland,UA Ukraine,GB United Kingdom",
   "Middle East": "BH Bahrain,IL Israel,JO Jordan,KW Kuwait,LB Lebanon,OM Oman,QA Qatar,SA Saudi Arabia,TR Türkiye,AE United Arab Emirates",
   "North America": "CA Canada,CR Costa Rica,MX Mexico,PA Panama,US United States",
   "South America": "AR Argentina,BR Brazil,CL Chile,CO Colombia,EC Ecuador,PE Peru,UY Uruguay",
