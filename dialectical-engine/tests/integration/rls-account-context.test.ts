@@ -598,7 +598,7 @@ describe("row-level security S01 C3: the verified account context on the product
     try {
       for (const mode of ["superuser", "login"] as const) {
         const pools = await withEnvironment({
-          DEBATEAI_TEST_API_LOGINS: mode === "login" ? "1" : undefined, DEBATEAI_TEST_API_LOGINS_REPORT: report
+          DEBATEAI_TEST_API_LOGINS: mode === "login" ? "1" : "0", DEBATEAI_TEST_API_LOGINS_REPORT: report
         }, () => apiTestPools(database, import.meta.url, { runtime: fixtureUrl.toString() }));
         expect({ mode, inside: await asA(() => sessionUser(pools.runtime)) }).toEqual({ mode, inside: fixtureName });
         expect({ mode, outside: await sessionUser(pools.runtime) }).toEqual({ mode, outside: "debateai_dev_api_system" });

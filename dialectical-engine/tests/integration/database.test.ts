@@ -28,6 +28,7 @@ import {
   RunCostSubstitutionRepository,
   RunRepository,
   ServeDisclosureRepository,
+  createPool,
   insertRunRoleRotation,
   migrate,
   readCallPrompt,
@@ -109,8 +110,7 @@ import {
   AnswerDisclosureSchema,
   AnswerSchema,
   PLAN_TIER_ROSTERS,
-  type AskRequest,
-  type Session
+  type AskRequest
 } from "@debateai/contract";
 import {
   argumentLanguageDirective,
@@ -146,13 +146,16 @@ import {
   registerFixtureRow
 } from "../support/registerFixtures.js";
 import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
-import { apiTestPools, provisionRlsLogins, runnerPoolOrSuperuser, type ApiTestPools } from "../support/rls-logins.js";
+import {
+  apiTestPools, provisionRlsLogins, runnerPoolOrSuperuser, shareContentCipher, type ApiTestPools
+} from "../support/rls-logins.js";
+import { provisionStoryEncryptedOwner, releaseStoryEncryptedOwner } from "../support/storyEncryptedOwner.js";
 
 let database: TestDatabase;
 /**
  * Row-level security S01 (PLAN S5.1, SPEC-v4 R21): every pool this file hands to buildApi or to an API repository,
- * field for field as apps/api/src/main.ts builds it — the product's own logins when DEBATEAI_TEST_API_LOGINS=1, the
- * harness superuser pool in every field otherwise. Seeding and read-back stay on database.pool.
+ * field for field as apps/api/src/main.ts builds it — the product's own logins in login mode (the default), the
+ * harness superuser pool in every field with DEBATEAI_TEST_API_LOGINS=0. Seeding and read-back stay on database.pool.
  */
 let apiPools: ApiTestPools;
 /** Upload check Task 7 (R21): the runner's own pool, its production login in login mode (rls-logins.ts). */
@@ -876,7 +879,24 @@ afterAll(async () => {
 
 describe("S-LANG argument language persistence", () => {
   it("stores Romanian detected from question_line through PostgresAskApplication.submit", async () => {
-    const askerId = `asker:slang:${randomUUID()}`;
+    // Upload check Task 7: a signed-in person's ask, the path the site serves. A legacy ask's admission inserts
+    // core.run on the API's runtime login, which migration 0040 no longer allows, so on the product's own logins it
+    // cannot admit. A person's run is encrypted, so the API's runtime pool carries the person's content cipher: a
+    // pool of this test's own (main.ts's wiring in login mode, a second superuser pool otherwise), so the file's
+    // shared pools stay as they are.
+    const seed = createPool(database.connectionString, { max: 4 });
+    const owner = await provisionStoryEncryptedOwner(seed);
+    const loginMode = apiPools.runtime !== database.pool;
+    const runtime = loginMode
+      ? shareContentCipher(seed, (await apiTestPools(database, import.meta.url, {
+        runtime: (await provisionRlsLogins(database)).url("DATABASE_URL")
+      })).runtime)
+      : seed;
+    const { userId, ownerRef } = owner;
+    const session = Object.freeze({
+      asker_id: `owner:${ownerRef}`, session_id: owner.sessionId, caller_scope: "ASKER" as const,
+      ownership_provenance: "server_session" as const, provisional_identity_model: false as const
+    });
     const panel = PLAN_TIER_ROSTERS.free.map((modelId, index) => Object.freeze({
       provider_ref: `provider:slang:${String(index + 1)}`,
       maker: `maker:slang:${String(index + 1)}`,
@@ -899,7 +919,7 @@ describe("S-LANG argument language persistence", () => {
       })
     };
     const application = new PostgresAskApplication(
-      apiPools.runtime,
+      runtime,
       { dispatch: async () => undefined },
       settings,
       undefined,
@@ -919,19 +939,10 @@ describe("S-LANG argument language persistence", () => {
       plan_tier: "free",
       steering_annotations: []
     };
-    const session = {
-      asker_id: askerId,
-      session_id: `session:slang:${randomUUID()}`,
-      caller_scope: "ASKER",
-      ownership_provenance: "user_dev_token",
-      provisional_identity_model: true
-    } as unknown as Session;
-
-    const accepted = await application.submit(ask, session, {
-      kind: "legacy",
-      legacyAskerId: askerId
-    });
+    let runId: string | undefined;
     try {
+      const accepted = await application.submit(ask, session, { kind: "server", userId, ownerRef });
+      runId = accepted.run_ref;
       const stored = await database.pool.query<{
         argument_language_tag: string;
         argument_language_name: string;
@@ -945,7 +956,9 @@ describe("S-LANG argument language persistence", () => {
         argument_language_name: "Romanian"
       });
     } finally {
-      await database.pool.query("DELETE FROM core.work_item WHERE run_id=$1", [accepted.run_ref]);
+      if (runId !== undefined) await database.pool.query("DELETE FROM core.work_item WHERE run_id=$1", [runId]);
+      await seed.end();
+      await releaseStoryEncryptedOwner(owner);
     }
   });
 });

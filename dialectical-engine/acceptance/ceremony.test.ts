@@ -415,7 +415,7 @@ describe("ACC-01 dry-run ceremony", () => {
       // Model scorecard A20.4: this suite stays on the plan rosters, whatever scorecards/current.json holds.
       modelScorecard: { state: "ABSENT" },
       pool: database.pool,
-      // The runner's own login in login mode (DEBATEAI_TEST_API_LOGINS=1); the superuser pool above otherwise.
+      // The runner's own login in login mode (the default); the superuser pool above with DEBATEAI_TEST_API_LOGINS=0.
       runnerPool: await runnerTestPool(database),
       serviceCredential:"a".repeat(43),
       environment: {

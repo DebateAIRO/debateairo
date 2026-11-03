@@ -172,8 +172,8 @@ export async function startR22World(options: Readonly<{ log?: (line: string) => 
   const apiPool = encrypted();
   configureContentEncryption(pool, cipher);
   configureContentEncryption(database.pool, cipher);
-  // The runner's pools: on the production runner login in login mode (DEBATEAI_TEST_API_LOGINS=1), on the superuser as
-  // before otherwise (tests/support/rls-logins.ts, runnerTestPool).
+  // The runner's pools: on the production runner login in login mode (the default), on the superuser as before with
+  // DEBATEAI_TEST_API_LOGINS=0 (tests/support/rls-logins.ts, runnerTestPool).
   const runnerOwn = async (budget: "runtime" | "keepAlive"): Promise<Pool> => {
     const login = await runnerTestPool(database, budget);
     if (login === undefined) return encrypted();

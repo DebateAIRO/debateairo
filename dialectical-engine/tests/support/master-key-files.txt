@@ -1,0 +1,5 @@
+# The master-key list (upload check Task 7): the test files whose API pools stay on the harness superuser, the
+# "master key", while every other end-to-end test logs in with the product's own database logins (the default; see
+# tests/support/rls-logins.ts). One entry per line: the file's path from dialectical-engine/, one or more spaces, then
+# a one-line reason. A file belongs here only for a named reason; a product fault is named as one.
+tests/integration/s7-authorization-database.test.ts  product fault: the investigation request locks core.run (SELECT ... FOR UPDATE, packages/serve/src/index.ts:3499), which the API's runtime login may not do, so a missing gap answers 500, not 404
