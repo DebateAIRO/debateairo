@@ -160,11 +160,11 @@ describe("review F2: the session check paints in the reader's language", () => {
     expect(html).not.toContain(englishChecking());
   });
 
-  it("the English pages still say Checking session…", async () => {
-    expect(renderToStaticMarkup(await SettingsPage() as ReactElement)).toContain("Checking session…");
+  it("the English pages say One moment… (wait-f20: no technical word)", async () => {
+    expect(renderToStaticMarkup(await SettingsPage() as ReactElement)).toContain("One moment…");
     expect(renderToStaticMarkup(
       await DebatePage({ params: Promise.resolve({ id: queuedRun.run_ref }) }) as ReactElement
-    )).toContain("Checking session…");
+    )).toContain("One moment…");
   });
 });
 

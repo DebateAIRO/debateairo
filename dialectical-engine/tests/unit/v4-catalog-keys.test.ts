@@ -311,3 +311,45 @@ describe("V4 catalogue keys", () => {
     expect(fresh.filter((line) => /\b(?:score|strength|threshold|READY|WRITING|FAILED|checker|GLM|Haiku)\b/u.test(line))).toEqual([]);
   });
 });
+
+/**
+ * The owner's V4 screen review (OWNER-PICKS-2026-11-03.md): the chat answers ("Next", "quota"), Round 2 r2-11, and the
+ * wording fixes dig-f15, wait-f20, wait-f21 and map-f16, word for word.
+ */
+const NO_WAIT = "You don't need to wait. You can dig or write your report now.";
+const REVIEW_LINES: Readonly<Record<string, string>> = Object.freeze({
+  "v4.ask.continue": "Next",
+  "v4.suggest.edit": "Change the wording",
+  "v4.dig.started": "Started. It's open now.",
+  "v4.debate.state.HOLDING": "Taking a short break · continues about {time}",
+  "v4.debate.state.HOLDING.noTime": "Taking a short break",
+  // map-f16: the approved N14 sentence (the report's own), then r2-11 A's line.
+  "v4.panel.storyMissing": `${APPROVED_REPORT_LINES["v4.investigation.noStory"]} ${NO_WAIT}`,
+  "v4.panel.fallbackMissing": `${APPROVED_REPORT_LINES["v4.investigation.noStory"]} ${NO_WAIT}`
+});
+
+describe("the owner's 3 Nov screen review", () => {
+  it("the first button reads Next, and the dig, wait and missing-answer lines are the review's words", () => {
+    expect(Object.fromEntries(Object.keys(REVIEW_LINES).map((key) => [key, catalog[key]]))).toEqual(REVIEW_LINES);
+  });
+
+  it("the share word is quota: no V4 line says allowance", () => {
+    expect(Object.entries(catalog).filter(([, value]) => /allowance/iu.test(value))).toEqual([]);
+    const shares = ["v4.header.allowance", "v4.panel.modeHint.thorough", "v4.money.borrowed.PERSON_DAY", "v4.money.borrowed.PERSON_WEEK",
+      "v4.money.startsWait.PERSON_MONTH", "v4.money.paused", "v4.money.pausedReady"];
+    for (const key of shares) expect(catalog[key], key).toMatch(/\bquota\b/u);
+  });
+
+  it("wait-f3 / map-f3: no wait names a figure before it is measured, and the question's wait says where to find it", () => {
+    for (const key of ["v4.debate.usually", "v4.investigation.writing"]) {
+      expect(catalog[key], key).not.toMatch(/\d|minute|hour|usually|few/iu);
+      expect(catalog[key], key).toMatch(/This takes a while\./u);
+    }
+    expect(catalog["v4.debate.usually"]).toContain(`“${catalog["v4.recent.title"]}”`);
+  });
+
+  it("wait-f20: 'Paused' is the month wall's word only", () => {
+    const paused = Object.entries(catalog).filter(([, value]) => /\bpaused\b/iu.test(value)).map(([key]) => key).sort();
+    expect(paused).toEqual(["v4.debate.state.PAUSED_MONTH", "v4.money.paused", "v4.money.pausedReady", "v4.rewrite.digCard.PAUSED"].sort());
+  });
+});

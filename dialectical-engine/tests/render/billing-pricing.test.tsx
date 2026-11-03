@@ -75,7 +75,7 @@ describe("P18 /pricing", () => {
     mocks.getBillingPlans.mockReset();
   });
 
-  it("shows the four plans in price order with prices, the allowance as a multiple, and the right next step", async () => {
+  it("shows the four plans in price order with prices, the quota as a multiple, and the right next step", async () => {
     mocks.getBillingPlans.mockResolvedValue(TEXAS);
     const document = await renderPricing();
     const cards = [...document.querySelectorAll("[data-plan]")];
@@ -83,13 +83,13 @@ describe("P18 /pricing", () => {
     const plus = document.querySelector('[data-plan="PLUS"]')!;
     expect(plus.textContent).toContain("$21.25 a month");
     expect(plus.textContent).toContain("Tax included (6.25%, United States)");
-    expect(plus.textContent).toContain("The Plus allowance");
+    expect(plus.textContent).toContain("The Plus quota");
     expect(plus.querySelector("a")?.getAttribute("href")).toBe("/checkout?plan=PLUS");
     expect(plus.querySelector("a")?.textContent).toBe("Choose Plus");
-    expect(document.querySelector('[data-plan="PRO"]')?.textContent).toContain("5× the Plus allowance");
-    expect(document.querySelector('[data-plan="MAX"]')?.textContent).toContain("33× the Plus allowance");
+    expect(document.querySelector('[data-plan="PRO"]')?.textContent).toContain("5× the Plus quota");
+    expect(document.querySelector('[data-plan="MAX"]')?.textContent).toContain("33× the Plus quota");
     const free = document.querySelector('[data-plan="FREE"]')!;
-    expect(free.textContent).toContain("A small monthly allowance");
+    expect(free.textContent).toContain("A small monthly quota");
     expect(free.querySelector("a")?.getAttribute("href")).toBe("/sign-up");
     expect(document.querySelector('a[href="/terms"]')).not.toBeNull();
     expect(document.querySelector('a[href="/privacy"]')).not.toBeNull();

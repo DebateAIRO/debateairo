@@ -100,7 +100,7 @@ describe("new starts wait for the reset (new_starts: BLOCKED_UNTIL_RESET)", () =
 });
 
 describe("the borrowed notice in the usage area", () => {
-  it("tells the person that running work used part of tomorrow's and next week's allowance", async () => {
+  it("tells the person that running work used part of tomorrow's and next week's quota", async () => {
     harness.borrowed = [
       { scope: "PERSON_WEEK", run_ref: "run-b", percent: 2, next_window_starts_at: "2026-11-02T00:00:00.000Z" },
       { scope: "PERSON_DAY", run_ref: "run-a", percent: 4, next_window_starts_at: RESET },
