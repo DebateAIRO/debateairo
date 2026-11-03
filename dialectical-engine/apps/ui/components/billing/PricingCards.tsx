@@ -1,6 +1,6 @@
 import type { JSX } from "react";
-import type { BillingCurrency, BillingPlansTax, BillingPrices } from "@debateai/contract";
-import { allowanceText, countryName, formatMoney, planName, pricedTax } from "@/lib/billing/format";
+import type { BillingCurrency, BillingPlansPlace, BillingPlansTax, BillingPrices } from "@debateai/contract";
+import { allowanceText, countryName, formatMoney, planName, pricedTax, unpricedReason } from "@/lib/billing/format";
 import type { BillingPlanId } from "@/lib/billing/plans";
 import { formatNumber, t, type MessageCatalog } from "@/lib/i18n/translate";
 import billingEnglish from "@/messages/en/billing.json";
@@ -9,12 +9,10 @@ export type PricingPlan = Readonly<{
   plan_id: BillingPlanId; net_prices: BillingPrices; total_price: string | null; allowance_vs_plus: string;
 }>;
 
-/** The line under a paid plan's price: the country's tax already in it, or, with no country's tax known, "plus tax". */
-function taxNote(catalog: MessageCatalog, locale: string, tax: BillingPlansTax | null): string {
-  const priced = pricedTax(tax);
-  if (tax == null || priced === "BEFORE") return t(catalog, "billing.pricing.plusTax");
+/** The line under a priced paid plan: the place's tax already in it, or no tax added there. */
+function taxNote(catalog: MessageCatalog, locale: string, tax: BillingPlansTax, included: boolean): string {
   const country = countryName(locale, tax.country);
-  if (priced === "NONE") return t(catalog, "billing.pricing.noTaxAdded", { country });
+  if (!included) return t(catalog, "billing.pricing.noTaxAdded", { country });
   // Basis points may carry a half (887.5 = 8.875 %), so three decimals are kept, as the checkout's tax label does.
   const rate = formatNumber(locale, tax.tax_rate_bp / 100, { maximumFractionDigits: 3 });
   return t(catalog, "billing.pricing.taxIncluded", { rate, country });
@@ -22,27 +20,28 @@ function taxNote(catalog: MessageCatalog, locale: string, tax: BillingPlansTax |
 
 /**
  * The plan cards (spec 2026-09-29 §2.10): the price, the allowance as a multiple, the next step. The prices are in
- * `currency`, the one the visitor's connection pays in (spec 2026-10-05 §2.16.1). Terms §12: "Prices include VAT, GST
- * or sales tax": with `tax`, the connection country's tax, each card shows its `total_price`; only when no country's
- * tax is known does it fall back to the net price "plus tax".
+ * `currency`, the one the place pays in (spec 2026-10-05 §2.16.1). Terms §12: "Prices include VAT, GST or sales tax,
+ * which depends on where you live": a paid card shows its `total_price` only for a PRICED place, and otherwise says
+ * what the price still needs (a country, a postal code, a moment), never a price before tax. Free costs nothing anywhere.
  */
 export function PricingCards({
   catalog = billingEnglish,
   locale,
   currency,
+  place,
   tax,
   plans
 }: Readonly<{
-  catalog?: MessageCatalog; locale: string; currency: BillingCurrency; tax: BillingPlansTax | null; plans: readonly PricingPlan[];
+  catalog?: MessageCatalog; locale: string; currency: BillingCurrency; place: BillingPlansPlace;
+  tax: BillingPlansTax | null; plans: readonly PricingPlan[];
 }>): JSX.Element {
+  const priced = pricedTax({ place, tax });
   return (
     <div className="pricingGrid" data-pricing-cards>
       {plans.map((plan) => {
         const name = planName(catalog, plan.plan_id);
         const free = plan.plan_id === "FREE";
-        // `!= null`: the contract requires both, so only a hand-made answer (a test's, a mock's) lacks them; it shows the
-        // net price "plus tax", never a net price as tax included.
-        const priced = tax != null && plan.total_price != null;
+        const total = priced === "UNPRICED" || tax == null ? null : plan.total_price ?? null;
         return (
           <article
             key={plan.plan_id}
@@ -51,12 +50,15 @@ export function PricingCards({
             aria-labelledby={`pricing-plan-${plan.plan_id}`}
           >
             <h2 id={`pricing-plan-${plan.plan_id}`}>{name}</h2>
-            <p className="pricingPrice">
-              {t(catalog, "billing.pricing.perMonth", {
-                price: formatMoney(locale, priced ? plan.total_price : plan.net_prices[currency], currency)
-              })}
-            </p>
-            {free ? null : <p className="pricingNote">{taxNote(catalog, locale, priced ? tax : null)}</p>}
+            {free || total !== null ? (
+              <p className="pricingPrice">
+                {t(catalog, "billing.pricing.perMonth", {
+                  price: formatMoney(locale, total ?? plan.net_prices[currency], currency)
+                })}
+              </p>
+            ) : <p className="pricingPrice pricingUnpriced">{t(catalog, unpricedReason(place.status))}</p>}
+            {free || total === null || tax == null ? null
+              : <p className="pricingNote">{taxNote(catalog, locale, tax, priced === "INCLUDED")}</p>}
             <p>{allowanceText(catalog, locale, plan.plan_id, plan.allowance_vs_plus)}</p>
             <p className="pricingNote">
               {t(catalog, free ? "billing.pricing.freeFeatures" : "billing.pricing.paidFeatures")}

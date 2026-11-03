@@ -639,6 +639,7 @@ apps/ui/components/billing/ChargeStatusPoller.tsx
 apps/ui/components/billing/CheckoutFlow.tsx
 apps/ui/components/billing/LegalAcceptGate.tsx
 apps/ui/components/billing/PricingCards.tsx
+apps/ui/components/billing/PricingPlaceForm.tsx
 apps/ui/components/billing/ResetSentence.tsx
 apps/ui/components/billing/RoomNotice.tsx
 apps/ui/components/billing/SubscriptionControls.tsx

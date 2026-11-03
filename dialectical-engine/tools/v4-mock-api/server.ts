@@ -614,9 +614,10 @@ function billingUsage(now = Date.now(), plan_id: PlanMode = planMode, usage: Usa
   };
 }
 
-/** The register's default plans (packages/register/src/billing-plans.ts), in US dollars, with no country's tax known. */
+/** The register's default plans (packages/register/src/billing-plans.ts), in US dollars, for no place yet. */
 const BILLING_PLANS = Object.freeze({
   currency: "USD",
+  place: { country: null, postal_code: null, status: "COUNTRY_NEEDED" },
   tax: null,
   plans: [
     { plan_id: "FREE", net_prices: { USD: "0.00", EUR: "0.00", RON: "0.00" }, total_price: null, allowance_vs_plus: "0.04" },
