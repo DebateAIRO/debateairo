@@ -324,7 +324,7 @@ const PREVIOUS_PROCESSOR = new RegExp(["x", "money"].join(""), "iu");
 test("every locale names NETOPIA Payments where it names the card processor, and never the previous one", () => {
   const english = catalogue("en");
   assert.equal(english["billing.checkout.cardNote"], "You pay on NETOPIA Payments' secure page. Your card number never reaches our servers.");
-  assert.equal(english["billing.checkout.continueToCard"], "Continue to payment");
+  assert.equal(english["billing.checkout.continueToCard"], "Subscribe and pay");
   assert.equal(english["billing.checkout.formUnavailable"], "The payment page could not be opened. Please try again in a minute.");
   assert.equal(catalogue("ro")["billing.checkout.continueToCard"], "Comandă cu obligație de plată");
   assert.equal(english["billing.card.countryRefused"], "We can't accept cards issued in that card's country. Nothing was charged, and your plan keeps the card it had.");

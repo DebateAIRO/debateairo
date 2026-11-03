@@ -80,7 +80,7 @@
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} per month. Renews on the {day} of each month until you cancel.",
   "billing.consent.renewal": "I agree that NETOPIA Payments keeps my card and that {total} is charged to it every month until I cancel. I can cancel at any time in Settings or at dezbatere.ro/cancel.",
   "billing.consent.immediateStart": "Start my plan now. I understand that if I withdraw within 14 days, I pay for the part already used: the larger of the days used or the credit used.",
-  "billing.checkout.continueToCard": "Continue to payment",
+  "billing.checkout.continueToCard": "Subscribe and pay",
   "billing.checkout.cardTitle": "Payment",
   "billing.checkout.cardNote": "You pay on NETOPIA Payments' secure page. Your card number never reaches our servers.",
   "billing.checkout.subscribeAndPay": "Subscribe and pay",

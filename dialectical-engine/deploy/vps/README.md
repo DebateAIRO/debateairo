@@ -4216,7 +4216,7 @@ server's register version (above). The Romanian path (SmartBill, the attached
 PDF) is proven only by the fake stack in step 6 and by the SmartBill contract tests, never in this run. For go-live row
 74, ask once for a quote as a Romanian buyer and do not pay: on a fresh test account choose Plus, pick Romania, confirm
 it, fill in a Romanian address, write down the total the page shows in lei (Quaderno's sandbox calculation in RON), and
-leave without pressing **Continue to payment**.
+leave without pressing **Subscribe and pay**.
 
 **The stage clock only ever goes up.** Step 2 sets `BILLING_STAGE_CLOCK_OFFSET_DAYS=31`, and it stays at 31 through
 steps 3, 4 and 5 (to see a second renewal, raise it to 62; never lower it or remove it during the run). While it is
@@ -4231,7 +4231,7 @@ it (step 8). A host must never go live holding rows written on a moved clock; a 
 dated ahead (`BILLING_RECORDS_DATED_AHEAD`, §14.8).
 
 1. **Pay.** Sign up from the pricing page, choose Plus, pick the United States as your country, confirm it, fill in the
-   billing details, and press **Continue to payment**. On NETOPIA's sandbox page pay with the test card
+   billing details, and press **Subscribe and pay**. On NETOPIA's sandbox page pay with the test card
    9900 0048 1022 5098 (any future expiry, CVV 111).
    - Expect: you come back to the site, the plan is active within seconds, and the confirmation (M1) and receipt (M2)
      emails arrive. Settings shows the saved card.
