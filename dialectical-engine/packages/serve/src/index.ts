@@ -3495,8 +3495,11 @@ export class ServeRepository {
       { userInput: input.userInput }
     );
     return withWriteTransaction(this.pool, async (client) => {
+      // The API's runtime login may not lock core.run itself (a row lock needs UPDATE on the table). The definer locks
+      // the run FOR UPDATE only when the caller owns it and its private content is live, as the memory writes do.
       const locked = await client.query<{ run_id: string }>(
-        `SELECT run_id FROM core.run WHERE run_id=$1 FOR UPDATE`, [candidate.run_id]
+        `SELECT run_id FROM core.lock_owned_live_runs(ARRAY[$1]::uuid[],$2::uuid,$3::text)`,
+        [candidate.run_id, access.ownerRef, access.legacyAskerId]
       );
       if (locked.rows[0] === undefined) return null;
       // Separate post-lock statement: a concurrent owner-event insert takes the
