@@ -65,4 +65,14 @@ describe("0155: the gap-investigation request and the memory-link unlink as the 
     }
     expect(bodyOf("memory.unlink_owned_memory_link")).toMatch(/ORDER BY link\.at_seq DESC LIMIT 1\n  FOR UPDATE;/u);
   });
+
+  it("the product calls the two definers and no longer locks or writes the two tables itself", () => {
+    const serve = read("packages/serve/src/index.ts");
+    expect(serve).toContain("SELECT core.record_owned_investigation_request($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10) AS request_ref");
+    expect(serve).not.toMatch(/INSERT INTO core\.investigation_request/u);
+    const memory = read("packages/memory/src/index.ts");
+    expect(memory).toContain("SELECT memory.unlink_owned_memory_link($1,$2,$3,$4) AS memory_link_id");
+    expect(memory).not.toMatch(/FROM memory\.memory_link AS link\s+WHERE link\.source_run_id=\$1\s+ORDER BY link\.at_seq DESC LIMIT 1\s+FOR UPDATE/u);
+    expect(memory).not.toContain("'UNLINKED',$2,'ASKER_UNLINK_CONTROL'");
+  });
 });
