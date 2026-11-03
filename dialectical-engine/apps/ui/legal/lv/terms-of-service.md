@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Īsumā
-eyebrow: PAKALPOJUMA NOTEIKUMI · v2.12 · SPĒKĀ NO 2026. GADA 1. NOVEMBRA
+eyebrow: PAKALPOJUMA NOTEIKUMI · v2.13 · SPĒKĀ NO 2026. GADA 1. NOVEMBRA
 title: Kam jūs piekrītat
 lede: Līgums starp jums un DMS Merchandise Shop S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.
-endMarker: NOTEIKUMU BEIGAS · v2.12
+endMarker: NOTEIKUMU BEIGAS · v2.13
 bodyLabel: Pakalpojuma noteikumu teksts
 annexTitle: A pielikums — Reģionālie noteikumi
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PIEMĒROJAMIE TIESĪBU AKTI
 -->
 
-**Version 2.12 · Effective 2026. gada 1. novembris · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
+**Version 2.13 · Effective 2026. gada 1. novembris · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
 
 **In short.** Jums jābūt vismaz 18 gadus vecam. Dialectical Engine veido argumentus ar MI modeļiem, un viss, ko tas ģenerē, var būt nepareizs — tā nav konsultācija. Bezmaksas plānā jūsu debates kļūst publiskas, kad tās ir pabeigtas, pēc MI pārbaudes; maksas plānā tās ir privātas, ja vien tās nepublicējat. Kad debates ir publiskas, ikviens tās var lasīt, un tās paliek publiskas. Jūsu iesniegtais teksts tiek nosūtīts mūsu Pakalpojumu sniedzēju reģistrā norādītajiem MI pakalpojumu sniedzējiem un netiek izmantots modeļu apmācīšanai. Par nelikumīgu saturu ziņojiet uz support@dezbatere.ro neatkarīgi no tā, vai jums ir konts. Piemēro Rumānijas tiesību aktus, taču jums joprojām ir vietējā patērētāju aizsardzība.
 
@@ -251,6 +251,8 @@ Mēs pastāvīgā informācijas nesējā iepriekš paziņojam, kas un kad mainī
 
 **Šo Noteikumu izmaiņas.** Mēs varam mainīt šos Noteikumus tādu pašu iemeslu dēļ. Attiecībā uz izmaiņām, kas nesamazina jūsu tiesības, mēs publicējam jauno versiju kopā ar izmaiņu kopsavilkumu un vismaz **30 dienu iepriekš** nosūtām jums e-pasta ziņojumu par tās stāšanos spēkā; turpinot lietot Dialectical Engine pēc šī datuma, jūs izmaiņām piekrītat, un pirms tam varat slēgt kontu. Attiecībā uz izmaiņām, kas samazina jūsu tiesības, — tostarp esoša plāna cenas paaugstinājumu, zemākiem ierobežojumiem, noņemtām funkcijām, jauniem jūsu satura lietošanas veidiem vai izmaiņām atbildībā, piemērojamajos tiesību aktos vai strīdu izšķiršanā — mēs lūdzam nākamajā pierakstīšanās reizē skaidri piekrist jaunajai versijai, un izmaiņas attiecas tikai uz turpmāko laiku. Mēs nekad neveicam izmaiņas ar atpakaļejošu spēku un nekad neizmantojam šo sadaļu, lai termiņa vidū mainītu jums apmaksātā pakalpojuma būtību, nepiedāvājot iespēju izstāties. Iepriekšējās versijas ir pieejamas vietnē dezbatere.ro/terms/versions.
 
+Versija 2.13 aizstāja versiju 2.12: 18. sadaļā un A pielikumā kā alternatīvas strīdu izšķiršanas ceļš norādīta ANPC (SAL).
+
 Versija 2.12 aizstāja versiju 2.11: 10. sadaļā teikts, ka pieteikusies persona var arī izmantot pogu „Ziņot” jebkurā publiskā debatē, ka MI lasa ar to iesniegtu ziņojumu līdzās publiskajam tekstam un kas pēc tam notiek.
 
 Versija 2.11 aizstāja versiju 2.10: 9. sadaļā teikts, ka mēs varam uz laiku paslēpt publisku debati, kamēr to pārskatām, un noņemt vai labot tās daļu.
@@ -297,7 +299,7 @@ Tas, kā mēs rīkojamies ar personas datiem, ir noteikts **Privātuma politikā
 
 **Patērētāji citviet.** Ja dzīvojat ārpus ES un EEZ, nekas šajos Noteikumos neierobežo jūsu tiesības saskaņā ar savas valsts tiesību aktiem celt prasību tās tiesās vai tādas tiesības saskaņā ar šiem tiesību aktiem, no kurām nevar atteikties, — tostarp, ja dzīvojat Austrālijā vai Jaunzēlandē, jūsu patērētāja garantiju tiesības; ja dzīvojat Brazīlijā, *Código de Defesa do Consumidor*; un, ja dzīvojat Amerikas Savienotajās Valstīs, jūsu štata patērētāju aizsardzības tiesību aktus.
 
-**Pirms vēršanās tiesā.** Sazinieties ar mums pa support@dezbatere.ro; lielāko daļu jautājumu var atrisināt, un mūsu mērķis ir atbildēt 5 darbdienu laikā. Ja esat patērētājs Rumānijā vai ES, varat izmantot alternatīvu strīdu izšķiršanu ar www.onoratainstanta.ro starpniecību; mēs neapņemamies piedalīties šajā procedūrā. Sūdzības par moderēšanas lēmumiem izskata saskaņā ar 10. sadaļu, kas ir atsevišķa kārtība.
+**Pirms vēršanās tiesā.** Sazinieties ar mums pa support@dezbatere.ro; lielāko daļu jautājumu var atrisināt, un mūsu mērķis ir atbildēt 5 darbdienu laikā. Ja esat patērētājs Rumānijā vai ES, varat izmantot alternatīvu strīdu izšķiršanu ar ANPC (SAL), reclamatiisal.anpc.ro starpniecību; mēs neapņemamies piedalīties šajā procedūrā. Sūdzības par moderēšanas lēmumiem izskata saskaņā ar 10. sadaļu, kas ir atsevišķa kārtība.
 
 ## 19. Citi noteikumi
 
@@ -319,7 +321,7 @@ Katrs ieraksts ir piemērojams personām, kuras dzīvo attiecīgajā reģionā, 
 
 ### A.1 Eiropas Savienība un Eiropas Ekonomikas zona
 
-Šo Noteikumu vispārīgā daļa ir sagatavota jums. Papildus: jūs varat celt prasību savas dzīvesvietas valsts tiesās; piemēro 13. sadaļā noteiktās atteikuma tiesības; alternatīva strīdu izšķiršana ir pieejama ar www.onoratainstanta.ro starpniecību. **Vācija:** atcelšanas poga vietnē dezbatere.ro/cancel ļauj izbeigt abonementu bez pierakstīšanās; abonementa noteikumi, atjaunošanas periodi un paziņošanas termiņi atbilst BGB §309(9): katrs plāns ir spēkā vienu mēnesi un tiek atjaunots katru mēnesi, kamēr to neatceļat; jūs varat to atcelt jebkurā laikā, un atcelšana stājas spēkā kārtējā mēneša beigās. **Francija:** abonementu varat izbeigt tiešsaistē trīs darbībās vietnē dezbatere.ro/cancel. **Itālija:** klauzulām par darbības apturēšanu un izbeigšanu (11), maksas plāniem un to atjaunošanu (12), izmaiņām (14), atbildību (15) un piemērojamajiem tiesību aktiem un strīdu izskatīšanas vietu (18) saskaņā ar Itālijas Civilkodeksa 1341. un 1342. pantu ir vajadzīgs jūsu īpašs apstiprinājums. Jūs to sniedzat, reģistrācijas laikā atzīmējot atsevišķu rūtiņu, kas tiek rādīta ikvienam, kurš laukā „Reģions” izvēlas Itāliju vai pieslēdzas no Itālijas. **Nīderlande:** pirms līguma noslēgšanas šie Noteikumi tiek sniegti saglabājamā formā. **Polija:** ir pieejama arī poļu valodas versija; valodas pārslēgā izvēlieties Polski.
+Šo Noteikumu vispārīgā daļa ir sagatavota jums. Papildus: jūs varat celt prasību savas dzīvesvietas valsts tiesās; piemēro 13. sadaļā noteiktās atteikuma tiesības; alternatīva strīdu izšķiršana ir pieejama ar ANPC (SAL), reclamatiisal.anpc.ro starpniecību. **Vācija:** atcelšanas poga vietnē dezbatere.ro/cancel ļauj izbeigt abonementu bez pierakstīšanās; abonementa noteikumi, atjaunošanas periodi un paziņošanas termiņi atbilst BGB §309(9): katrs plāns ir spēkā vienu mēnesi un tiek atjaunots katru mēnesi, kamēr to neatceļat; jūs varat to atcelt jebkurā laikā, un atcelšana stājas spēkā kārtējā mēneša beigās. **Francija:** abonementu varat izbeigt tiešsaistē trīs darbībās vietnē dezbatere.ro/cancel. **Itālija:** klauzulām par darbības apturēšanu un izbeigšanu (11), maksas plāniem un to atjaunošanu (12), izmaiņām (14), atbildību (15) un piemērojamajiem tiesību aktiem un strīdu izskatīšanas vietu (18) saskaņā ar Itālijas Civilkodeksa 1341. un 1342. pantu ir vajadzīgs jūsu īpašs apstiprinājums. Jūs to sniedzat, reģistrācijas laikā atzīmējot atsevišķu rūtiņu, kas tiek rādīta ikvienam, kurš laukā „Reģions” izvēlas Itāliju vai pieslēdzas no Itālijas. **Nīderlande:** pirms līguma noslēgšanas šie Noteikumi tiek sniegti saglabājamā formā. **Polija:** ir pieejama arī poļu valodas versija; valodas pārslēgā izvēlieties Polski.
 
 ### A.2 Amerikas Savienotās Valstis
 

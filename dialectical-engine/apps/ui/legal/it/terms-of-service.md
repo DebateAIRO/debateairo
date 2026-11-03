@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In breve
-eyebrow: CONDIZIONI DI SERVIZIO · v2.12 · IN VIGORE DAL 1 NOVEMBRE 2026
+eyebrow: CONDIZIONI DI SERVIZIO · v2.13 · IN VIGORE DAL 1 NOVEMBRE 2026
 title: Ciò che accetti
 lede: Il contratto tra te e DMS Merchandise Shop S.R.L., in un linguaggio chiaro. Diciannove sezioni e Allegato A — scorri fino alla fine.
-endMarker: FINE DELLE CONDIZIONI · v2.12
+endMarker: FINE DELLE CONDIZIONI · v2.13
 bodyLabel: Testo delle Condizioni di servizio
 annexTitle: Allegato A — Condizioni regionali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEGGE APPLICABILE
 -->
 
-**Version 2.12 · Effective 1 novembre 2026 · Versioni precedenti su dezbatere.ro/terms/versions · Lingua: italiano.**
+**Version 2.13 · Effective 1 novembre 2026 · Versioni precedenti su dezbatere.ro/terms/versions · Lingua: italiano.**
 
 **In short.** Devi avere almeno 18 anni. Dialectical Engine costruisce argomentazioni con modelli di IA e tutto ciò che genera può essere errato — non costituisce consulenza. Nel piano gratuito i tuoi dibattiti sono pubblici una volta conclusi, dopo la verifica dell’IA; nel piano a pagamento sono privati, salvo che tu non li pubblichi. Una volta pubblico, chiunque può leggere un dibattito, e questo resta pubblico. Il testo che invii viene trasmesso ai fornitori di IA elencati nel nostro Registro dei fornitori e non viene utilizzato per addestrare i modelli. Segnala i contenuti illegali a support@dezbatere.ro, indipendentemente dal fatto che tu abbia un account. Si applica la legge rumena, ma le tutele locali dei consumatori restano impregiudicate.
 
@@ -251,6 +251,8 @@ Ti comunichiamo anticipatamente, su un supporto durevole, cosa cambia e quando. 
 
 **Alle presenti Condizioni.** Possiamo modificare le presenti Condizioni per le medesime categorie di motivi. In caso di modifiche che non riducono i tuoi diritti, pubblichiamo la nuova versione con una sintesi delle modifiche e ti inviamo un'email almeno **30 giorni** prima della sua entrata in vigore; continuando a utilizzare Dialectical Engine dopo tale data accetti la modifica e puoi chiudere il tuo account prima di allora. In caso di modifiche che riducono i tuoi diritti — compresi aumenti di prezzo di un piano esistente, limiti inferiori, funzionalità eliminate, nuovi utilizzi dei tuoi contenuti o modifiche alla responsabilità, alla legge applicabile o alla risoluzione delle controversie — ti chiediamo di accettare espressamente la nuova versione al tuo accesso successivo e la modifica si applica soltanto per il futuro. Non apportiamo mai una modifica retroattiva e non utilizziamo mai la presente sezione per modificare, durante il relativo periodo, il nucleo di ciò per cui hai pagato senza offrirti una via d'uscita. Le versioni precedenti restano disponibili all'indirizzo dezbatere.ro/terms/versions.
 
+La versione 2.13 ha sostituito la versione 2.12: la sezione 18 e l'Allegato A indicano ANPC (SAL) come via per la risoluzione alternativa delle controversie.
+
 La versione 2.12 ha sostituito la versione 2.11: la sezione 10 afferma che una persona che ha effettuato l'accesso può usare anche il pulsante Segnala su qualsiasi dibattito pubblico, che un'IA legge una segnalazione fatta con il pulsante accanto al testo pubblico, e che cosa succede poi.
 
 La versione 2.11 ha sostituito la versione 2.10: la sezione 9 afferma che possiamo nascondere temporaneamente un dibattito pubblico mentre lo esaminiamo, e rimuoverne o correggerne una parte.
@@ -297,7 +299,7 @@ Il modo in cui trattiamo i dati personali è descritto nell'**Informativa sulla 
 
 **Consumatori in altri Paesi.** Se vivi al di fuori dell'UE e del SEE, nulla nelle presenti Condizioni limita qualsiasi diritto che ti spetta ai sensi della legge del tuo Paese di proporre una domanda dinanzi ai suoi tribunali, né qualsiasi diritto previsto da tale legge al quale non sia possibile rinunciare — compresi, se vivi in Australia o Nuova Zelanda, i diritti relativi alle garanzie dei consumatori; se vivi in Brasile, il Código de Defesa do Consumidor; e, se vivi negli Stati Uniti, le norme a tutela dei consumatori del tuo Stato.
 
-**Prima di adire un tribunale.** Contattaci all'indirizzo support@dezbatere.ro; la maggior parte dei problemi può essere risolta e ci proponiamo di rispondere entro 5 giorni lavorativi. Se sei un consumatore in Romania o nell'UE, puoi ricorrere alla risoluzione alternativa delle controversie tramite www.onoratainstanta.ro; non ci impegniamo a partecipare a tale procedura. I reclami relativi alle decisioni di moderazione seguono la sezione 10, che costituisce una procedura distinta.
+**Prima di adire un tribunale.** Contattaci all'indirizzo support@dezbatere.ro; la maggior parte dei problemi può essere risolta e ci proponiamo di rispondere entro 5 giorni lavorativi. Se sei un consumatore in Romania o nell'UE, puoi ricorrere alla risoluzione alternativa delle controversie tramite ANPC (SAL), reclamatiisal.anpc.ro; non ci impegniamo a partecipare a tale procedura. I reclami relativi alle decisioni di moderazione seguono la sezione 10, che costituisce una procedura distinta.
 
 ## 19. Altre disposizioni
 
@@ -319,7 +321,7 @@ Ciascuna voce si applica alle persone che vivono nella regione interessata e ind
 
 ### A.1 Unione europea e Spazio economico europeo
 
-Il corpo delle presenti Condizioni è redatto per te. Inoltre, puoi avviare un procedimento presso i tribunali del Paese in cui vivi; si applica il diritto di recesso di cui alla sezione 13; la risoluzione alternativa delle controversie è disponibile tramite www.onoratainstanta.ro. **Germania:** il pulsante di disdetta all'indirizzo dezbatere.ro/cancel ti consente di porre fine a un abbonamento senza effettuare l'accesso; le condizioni di abbonamento, i periodi di rinnovo e i termini di preavviso rispettano il §309(9) BGB: ogni piano ha durata di un mese e si rinnova mensilmente finché non lo disdici, e puoi disdire in qualsiasi momento con effetto dalla fine del mese in corso. **Francia:** puoi porre fine a un abbonamento online in tre passaggi all'indirizzo dezbatere.ro/cancel. **Italia:** le clausole sulla sospensione e cessazione (11), sui piani a pagamento e sul loro rinnovo (12), sulle modifiche (14), sulla responsabilità (15) e sulla legge applicabile e sul foro competente (18) richiedono la tua specifica approvazione ai sensi degli articoli 1341 e 1342 del Codice civile. La presti mediante una casella separata al momento della registrazione, mostrata a chiunque scelga l'Italia nel campo Regione o si connetta dall'Italia. **Paesi Bassi:** le presenti Condizioni ti vengono fornite in una forma memorizzabile prima della conclusione del contratto. **Polonia:** è disponibile una versione in polacco; scegli Polski nel selettore della lingua.
+Il corpo delle presenti Condizioni è redatto per te. Inoltre, puoi avviare un procedimento presso i tribunali del Paese in cui vivi; si applica il diritto di recesso di cui alla sezione 13; la risoluzione alternativa delle controversie è disponibile tramite ANPC (SAL), reclamatiisal.anpc.ro. **Germania:** il pulsante di disdetta all'indirizzo dezbatere.ro/cancel ti consente di porre fine a un abbonamento senza effettuare l'accesso; le condizioni di abbonamento, i periodi di rinnovo e i termini di preavviso rispettano il §309(9) BGB: ogni piano ha durata di un mese e si rinnova mensilmente finché non lo disdici, e puoi disdire in qualsiasi momento con effetto dalla fine del mese in corso. **Francia:** puoi porre fine a un abbonamento online in tre passaggi all'indirizzo dezbatere.ro/cancel. **Italia:** le clausole sulla sospensione e cessazione (11), sui piani a pagamento e sul loro rinnovo (12), sulle modifiche (14), sulla responsabilità (15) e sulla legge applicabile e sul foro competente (18) richiedono la tua specifica approvazione ai sensi degli articoli 1341 e 1342 del Codice civile. La presti mediante una casella separata al momento della registrazione, mostrata a chiunque scelga l'Italia nel campo Regione o si connetta dall'Italia. **Paesi Bassi:** le presenti Condizioni ti vengono fornite in una forma memorizzabile prima della conclusione del contratto. **Polonia:** è disponibile una versione in polacco; scegli Polski nel selettore della lingua.
 
 ### A.2 Stati Uniti
 

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kurz gesagt
-eyebrow: NUTZUNGSBEDINGUNGEN · v2.12 · GÜLTIG AB 1. NOVEMBER 2026
+eyebrow: NUTZUNGSBEDINGUNGEN · v2.13 · GÜLTIG AB 1. NOVEMBER 2026
 title: Womit Sie sich einverstanden erklären
 lede: Der Vertrag zwischen Ihnen und DMS Merchandise Shop S.R.L. in verständlicher Sprache. Neunzehn Abschnitte und Anhang A – scrollen Sie bis zum Ende.
-endMarker: ENDE DER NUTZUNGSBEDINGUNGEN · v2.12
+endMarker: ENDE DER NUTZUNGSBEDINGUNGEN · v2.13
 bodyLabel: Text der Nutzungsbedingungen
 annexTitle: Anhang A – Regionale Bestimmungen
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ANWENDBARES RECHT
 -->
 
-**Version 2.12 · Effective 1. November 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
+**Version 2.13 · Effective 1. November 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
 
 **In short.** Sie müssen mindestens 18 Jahre alt sein. Dialectical Engine erstellt Argumente mithilfe von KI-Modellen, und alles, was es erzeugt, kann falsch sein – es handelt sich nicht um Beratung. Im kostenlosen Tarif sind Ihre Debatten nach Abschluss öffentlich, nach einer KI-Prüfung; im kostenpflichtigen Tarif sind sie privat, sofern Sie sie nicht veröffentlichen. Sobald eine Debatte öffentlich ist, kann jede Person sie lesen, und sie bleibt öffentlich. Von Ihnen übermittelter Text wird an die in unserem Verzeichnis aufgeführten KI-Anbieter gesendet und nicht zum Trainieren von Modellen verwendet. Melden Sie rechtswidrige Inhalte unter support@dezbatere.ro, unabhängig davon, ob Sie ein Konto haben. Es gilt rumänisches Recht, Ihre örtlichen Verbraucherschutzrechte bleiben Ihnen jedoch erhalten.
 
@@ -251,6 +251,8 @@ Wir teilen Ihnen im Voraus auf einem dauerhaften Datenträger mit, was sich wann
 
 **Änderungen dieser Nutzungsbedingungen.** Wir können diese Nutzungsbedingungen aus denselben Arten von Gründen ändern. Bei Änderungen, die Ihre Rechte nicht einschränken, veröffentlichen wir die neue Fassung mit einer Zusammenfassung der Änderungen und senden Ihnen mindestens **30 Tage vor ihrem Inkrafttreten** eine E-Mail; wenn Sie Dialectical Engine nach diesem Datum weiterhin nutzen, stimmen Sie der Änderung zu, und Sie können Ihr Konto vorher schließen. Bei Änderungen, die Ihre Rechte einschränken – darunter Preiserhöhungen für einen bestehenden Tarif, niedrigere Limits, entfernte Funktionen, neue Nutzungen Ihrer Inhalte oder Änderungen der Haftung, des anwendbaren Rechts oder der Streitbeilegung – bitten wir Sie, der neuen Fassung bei Ihrer nächsten Anmeldung ausdrücklich zuzustimmen; die Änderung gilt nur für die Zukunft. Wir nehmen Änderungen niemals rückwirkend vor und verwenden diesen Abschnitt niemals dazu, den Kern Ihrer bereits bezahlten Leistung während der Laufzeit zu ändern, ohne Ihnen eine Beendigungsmöglichkeit einzuräumen. Frühere Fassungen bleiben unter dezbatere.ro/terms/versions verfügbar.
 
+Version 2.13 ersetzte Version 2.12: Abschnitt 18 und Anhang A nennen ANPC (SAL) als Weg zur alternativen Streitbeilegung.
+
 Version 2.12 ersetzte Version 2.11: Abschnitt 10 besagt, dass eine angemeldete Person auch die Schaltfläche Melden bei jeder öffentlichen Debatte verwenden kann, dass eine KI eine damit abgegebene Meldung neben dem öffentlichen Text liest und was dann geschieht.
 
 Version 2.11 ersetzte Version 2.10: Abschnitt 9 besagt, dass wir eine öffentliche Debatte während der Prüfung vorübergehend ausblenden und einen Teil davon entfernen oder korrigieren können.
@@ -297,7 +299,7 @@ Wie wir personenbezogene Daten verarbeiten, ist in der **Datenschutzerklärung**
 
 **Verbraucher in anderen Ländern.** Wenn Sie außerhalb der EU und des EWR leben, beschränkt nichts in diesen Nutzungsbedingungen Ihr nach dem Recht Ihres Landes bestehendes Recht, einen Anspruch vor dessen Gerichten geltend zu machen, oder ein Recht nach diesem Recht, auf das nicht verzichtet werden kann – einschließlich, wenn Sie in Australien oder Neuseeland leben, Ihrer Rechte aus Verbrauchergarantien; wenn Sie in Brasilien leben, des Código de Defesa do Consumidor; und wenn Sie in den Vereinigten Staaten leben, der Verbraucherschutzgesetze Ihres Bundesstaats.
 
-**Vor Anrufung eines Gerichts.** Kontaktieren Sie uns unter support@dezbatere.ro; die meisten Probleme lassen sich beheben, und wir bemühen uns um eine Antwort innerhalb von 5 Werktagen. Wenn Sie Verbraucher in Rumänien oder der EU sind, können Sie die alternative Streitbeilegung über www.onoratainstanta.ro nutzen; wir verpflichten uns nicht, an diesem Verfahren teilzunehmen. Für Beschwerden über Moderationsentscheidungen gilt der gesonderte Weg nach Abschnitt 10.
+**Vor Anrufung eines Gerichts.** Kontaktieren Sie uns unter support@dezbatere.ro; die meisten Probleme lassen sich beheben, und wir bemühen uns um eine Antwort innerhalb von 5 Werktagen. Wenn Sie Verbraucher in Rumänien oder der EU sind, können Sie die alternative Streitbeilegung über ANPC (SAL), reclamatiisal.anpc.ro nutzen; wir verpflichten uns nicht, an diesem Verfahren teilzunehmen. Für Beschwerden über Moderationsentscheidungen gilt der gesonderte Weg nach Abschnitt 10.
 
 ## 19. Sonstige Bestimmungen
 
@@ -319,7 +321,7 @@ Jeder Eintrag gilt für Personen, die in seiner Region leben, und nennt ausschli
 
 ### A.1 Europäische Union und Europäischer Wirtschaftsraum
 
-Der allgemeine Teil dieser Nutzungsbedingungen ist für Sie abgefasst. Zusätzlich gilt: Sie können vor den Gerichten des Landes klagen, in dem Sie leben; das Widerrufsrecht nach Abschnitt 13 findet Anwendung; alternative Streitbeilegung ist über www.onoratainstanta.ro möglich. **Deutschland:** Über die Kündigungsschaltfläche unter dezbatere.ro/cancel können Sie ein Abonnement ohne Anmeldung beenden; Vertragslaufzeiten, Verlängerungszeiträume und Kündigungsfristen entsprechen §309(9) BGB: Jeder Tarif läuft einen Monat und verlängert sich monatlich, bis Sie kündigen, und Sie können jederzeit mit Wirkung zum Ende des laufenden Monats kündigen. **Frankreich:** Sie können ein Abonnement online in drei Schritten unter dezbatere.ro/cancel beenden. **Italien:** Die Klauseln zu Sperrung und Kündigung (11), zu kostenpflichtigen Tarifen und ihrer Verlängerung (12), zu Änderungen (14), zur Haftung (15) sowie zu anwendbarem Recht und Gerichtsstand (18) bedürfen Ihrer gesonderten Zustimmung nach den Artikeln 1341 und 1342 des italienischen Zivilgesetzbuchs. Sie erteilen sie durch ein separates Kästchen bei der Registrierung, das jedem angezeigt wird, der im Feld Region Italien wählt oder dessen Verbindung aus Italien stammt. **Niederlande:** Diese Nutzungsbedingungen werden vor Vertragsschluss in speicherbarer Form bereitgestellt. **Polen:** Eine polnische Fassung ist verfügbar; wählen Sie im Sprachmenü Polski.
+Der allgemeine Teil dieser Nutzungsbedingungen ist für Sie abgefasst. Zusätzlich gilt: Sie können vor den Gerichten des Landes klagen, in dem Sie leben; das Widerrufsrecht nach Abschnitt 13 findet Anwendung; alternative Streitbeilegung ist über ANPC (SAL), reclamatiisal.anpc.ro möglich. **Deutschland:** Über die Kündigungsschaltfläche unter dezbatere.ro/cancel können Sie ein Abonnement ohne Anmeldung beenden; Vertragslaufzeiten, Verlängerungszeiträume und Kündigungsfristen entsprechen §309(9) BGB: Jeder Tarif läuft einen Monat und verlängert sich monatlich, bis Sie kündigen, und Sie können jederzeit mit Wirkung zum Ende des laufenden Monats kündigen. **Frankreich:** Sie können ein Abonnement online in drei Schritten unter dezbatere.ro/cancel beenden. **Italien:** Die Klauseln zu Sperrung und Kündigung (11), zu kostenpflichtigen Tarifen und ihrer Verlängerung (12), zu Änderungen (14), zur Haftung (15) sowie zu anwendbarem Recht und Gerichtsstand (18) bedürfen Ihrer gesonderten Zustimmung nach den Artikeln 1341 und 1342 des italienischen Zivilgesetzbuchs. Sie erteilen sie durch ein separates Kästchen bei der Registrierung, das jedem angezeigt wird, der im Feld Region Italien wählt oder dessen Verbindung aus Italien stammt. **Niederlande:** Diese Nutzungsbedingungen werden vor Vertragsschluss in speicherbarer Form bereitgestellt. **Polen:** Eine polnische Fassung ist verfügbar; wählen Sie im Sprachmenü Polski.
 
 ### A.2 Vereinigte Staaten
 

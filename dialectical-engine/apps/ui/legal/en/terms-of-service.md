@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In short
-eyebrow: TERMS OF SERVICE · v2.12 · EFFECTIVE 1 NOVEMBER 2026
+eyebrow: TERMS OF SERVICE · v2.13 · EFFECTIVE 1 NOVEMBER 2026
 title: What you agree to
 lede: The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.
-endMarker: END OF TERMS · v2.12
+endMarker: END OF TERMS · v2.13
 bodyLabel: Terms of Service text
 annexTitle: Annex A — Regional terms
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 GOVERNING LAW
 -->
 
-**Version 2.12 · Effective 1 November 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
+**Version 2.13 · Effective 1 November 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
 
 **In short.** You must be 18 or over. Dialectical Engine builds arguments with AI models and everything it generates may be wrong — it is not advice. On the Free plan your debates are public when finished, after an AI check; on a paid plan they are private unless you publish them. Once public, anyone can read a debate, and it stays public. Text you submit is sent to AI providers listed in our Provider Register, and is not used to train models. Report illegal content at support@dezbatere.ro whether or not you have an account. Romanian law governs, but your local consumer protections stay with you.
 
@@ -251,6 +251,8 @@ We tell you in advance, on a durable medium, what is changing and when. If the c
 
 **To these Terms.** We may change these Terms for the same kinds of reasons. For changes that do not reduce your rights, we post the new version with a summary of what changed and email you at least **30 days** before it takes effect; continuing to use Dialectical Engine after that date means you accept it, and you may close your account before then. For changes that reduce your rights — including price increases on an existing plan, lower limits, removed features, new uses of your content, or changes to liability, governing law or dispute resolution — we ask you to accept the new version expressly at your next sign-in, and the change applies only going forward. We never make a change retroactive, and we never use this section to change the core of what you have paid for mid-term without offering you a way out. Prior versions stay available at dezbatere.ro/terms/versions.
 
+Version 2.13 replaced version 2.12: section 18 and Annex A name ANPC (SAL) as the route for alternative dispute resolution.
+
 Version 2.12 replaced version 2.11: section 10 says that a signed-in person can also use the Report button on any public debate, that an AI reads a report made with it beside the public text, and what happens then.
 
 Version 2.11 replaced version 2.10: section 9 says that we can hide a public debate while we review it, and remove or correct part of it.
@@ -297,7 +299,7 @@ How we handle personal data is set out in the **Privacy Policy** at dezbatere.ro
 
 **Consumers elsewhere.** If you live outside the EU and the EEA, nothing in these Terms limits any right you have under the law of your country to bring a claim in its courts, or any right under that law that cannot be waived — including, if you live in Australia or New Zealand, your consumer-guarantee rights; if you live in Brazil, the Código de Defesa do Consumidor; and if you live in the United States, the consumer-protection laws of your state.
 
-**Before going to court.** Contact us at support@dezbatere.ro; most things are fixable, and we aim to reply within 5 working days. If you are a consumer in Romania or the EU, you may use alternative dispute resolution through www.onoratainstanta.ro; we do not commit to participate in that procedure. Complaints about moderation decisions follow section 10, which is a separate route.
+**Before going to court.** Contact us at support@dezbatere.ro; most things are fixable, and we aim to reply within 5 working days. If you are a consumer in Romania or the EU, you may use alternative dispute resolution through ANPC (SAL), reclamatiisal.anpc.ro; we do not commit to participate in that procedure. Complaints about moderation decisions follow section 10, which is a separate route.
 
 ## 19. Other terms
 
@@ -319,7 +321,7 @@ Each entry applies to people who live in its region and only states what differs
 
 ### A.1 European Union and European Economic Area
 
-The body of these Terms is written for you. In addition: you may bring proceedings in the courts of the country where you live; the withdrawal right in section 13 applies; alternative dispute resolution is available through www.onoratainstanta.ro. **Germany:** the cancellation button at dezbatere.ro/cancel lets you end a subscription without logging in; subscription terms, renewal periods and notice periods comply with §309(9) BGB: each plan runs for one month and renews monthly until you cancel, and you can cancel at any time with effect from the end of the current month. **France:** you may end a subscription online in three steps at dezbatere.ro/cancel. **Italy:** the clauses on suspension and termination (11), paid plans and their renewal (12), changes (14), liability (15) and governing law and jurisdiction (18) require your specific approval under articles 1341 and 1342 of the Italian Civil Code. You give it with a separate box at sign-up, shown to anyone who picks Italy in the Region field or whose connection comes from Italy. **Netherlands:** these Terms are provided in a storable form before conclusion. **Poland:** a Polish version is available; choose Polski in the language menu.
+The body of these Terms is written for you. In addition: you may bring proceedings in the courts of the country where you live; the withdrawal right in section 13 applies; alternative dispute resolution is available through ANPC (SAL), reclamatiisal.anpc.ro. **Germany:** the cancellation button at dezbatere.ro/cancel lets you end a subscription without logging in; subscription terms, renewal periods and notice periods comply with §309(9) BGB: each plan runs for one month and renews monthly until you cancel, and you can cancel at any time with effect from the end of the current month. **France:** you may end a subscription online in three steps at dezbatere.ro/cancel. **Italy:** the clauses on suspension and termination (11), paid plans and their renewal (12), changes (14), liability (15) and governing law and jurisdiction (18) require your specific approval under articles 1341 and 1342 of the Italian Civil Code. You give it with a separate box at sign-up, shown to anyone who picks Italy in the Region field or whose connection comes from Italy. **Netherlands:** these Terms are provided in a storable form before conclusion. **Poland:** a Polish version is available; choose Polski in the language menu.
 
 ### A.2 United States
 
