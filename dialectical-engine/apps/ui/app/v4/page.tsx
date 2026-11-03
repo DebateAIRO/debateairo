@@ -1,5 +1,6 @@
 import { cookies, headers } from "next/headers";
 import { V4AskClient } from "@/components/v4/V4AskClient";
+import { V4AllMaps } from "@/components/v4/V4AllMaps";
 import { readCrisisCountryHint } from "@/lib/crisisLines";
 import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
 import { loadNamespace } from "@/lib/i18n/server";
@@ -17,12 +18,13 @@ function firstParam(value: string | string[] | undefined): string | undefined {
 
 /*
  * V4 initial (spec "/v4 — D1 Ask + D2"): the ask page, beside V3's /new. Locale exactly as app/new/page.tsx. The
- * reading level comes from the address (`?level=`, FIXES Decision A: V4 stores nothing in the browser).
+ * reading level comes from the address (`?level=`, FIXES Decision A: V4 stores nothing in the browser). `?maps=all` is
+ * "All my maps" (owner pick ask-d5 B): a view of this page, so the site's list of pages is unchanged.
  */
 export default async function V4AskPage({
   searchParams = Promise.resolve({})
 }: {
-  searchParams?: Promise<{ topic?: string | string[]; level?: string | string[] }>;
+  searchParams?: Promise<{ topic?: string | string[]; level?: string | string[]; maps?: string | string[] }>;
 }) {
   const requestedLocale = (await cookies()).get(LOCALE_COOKIE)?.value;
   const locale = isLocale(requestedLocale) ? requestedLocale : "en";
@@ -33,6 +35,10 @@ export default async function V4AskPage({
     loadNamespace(locale, "billing")
   ]);
   const query = await searchParams;
+  // ask-d5 B: "All my maps" is a view of this page (`?maps=all`), signed-in only.
+  if (firstParam(query.maps) === "all") {
+    return <V4AllMaps catalog={catalog} newDebateCatalog={newDebateCatalog} locale={locale} initialLevel={parseReadingLevel(firstParam(query.level))} />;
+  }
   const topic = firstParam(query.topic);
   const initialQuestion = typeof topic === "string" ? topic.slice(0, TOPIC_MAX) : "";
   return (

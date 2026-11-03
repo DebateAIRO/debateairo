@@ -21,7 +21,8 @@ const server = vi.hoisted(() => ({
 }));
 const router = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
-vi.mock("@/components/AuthGate", () => ({ AuthGate: ({ children }: { children: (token: string) => ReactNode }) => children("token") }));
+// The ask page learns the session beside the page (ask-d1 D): a signed-in person here.
+vi.mock("@/components/v4/V4AskGate", () => ({ V4AskGate: ({ children }: { children: (session: "IN") => ReactNode }) => children("IN") }));
 vi.mock("@/components/billing/RoomNotice", () => ({ RoomNotice: () => null }));
 vi.mock("@/components/v4/V4Header", () => ({ V4Header: () => null }));
 vi.mock("@/components/SensitiveDataConsent", () => ({

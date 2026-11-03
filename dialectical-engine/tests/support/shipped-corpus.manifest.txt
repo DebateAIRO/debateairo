@@ -689,7 +689,9 @@ apps/ui/components/support/conversation.ts
 apps/ui/components/support/http.ts
 apps/ui/components/support/sessionChange.ts
 apps/ui/components/support/supportConversation.test.mjs
+apps/ui/components/v4/V4AllMaps.tsx
 apps/ui/components/v4/V4AskClient.tsx
+apps/ui/components/v4/V4AskGate.tsx
 apps/ui/components/v4/V4ChangesBar.tsx
 apps/ui/components/v4/V4ContributionNote.tsx
 apps/ui/components/v4/V4DebateClient.tsx
@@ -698,6 +700,8 @@ apps/ui/components/v4/V4DigToast.tsx
 apps/ui/components/v4/V4Header.tsx
 apps/ui/components/v4/V4LevelTrail.tsx
 apps/ui/components/v4/V4MainAnswer.tsx
+apps/ui/components/v4/V4MapSeed.tsx
+apps/ui/components/v4/V4MapShelf.tsx
 apps/ui/components/v4/V4MapTree.tsx
 apps/ui/components/v4/V4Outline.tsx
 apps/ui/components/v4/V4Panel.tsx
@@ -933,6 +937,7 @@ apps/ui/lib/v4/changes.ts
 apps/ui/lib/v4/digIndex.ts
 apps/ui/lib/v4/load.ts
 apps/ui/lib/v4/mapModel.ts
+apps/ui/lib/v4/mapShelf.ts
 apps/ui/lib/v4/money.ts
 apps/ui/lib/v4/publicPage.ts
 apps/ui/lib/v4/storage.ts

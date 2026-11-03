@@ -60,6 +60,22 @@ export function startsWaitLine(room: AskRoom | null, locale: string): MoneyLine 
   return Object.freeze({ key: `v4.money.startsWait.${scope}`, values: { time: resetText(room.resets_at, scope, locale) } });
 }
 
+/**
+ * The ask page's step 1 (ask-f18, ask-d4 C): when new questions wait for a reset, the ONE line above the question box,
+ * naming the window that binds — "You've used today's quota. New questions start after 08:00." (a clock time), or this
+ * week's or this month's quota (Free counts by the month) "… start on 1 December." (a date). null otherwise. The box keeps
+ * the person's words; holding Next and "Just answer it" until then is the step-1 buttons' own rule.
+ */
+export function usedUpLine(room: AskRoom | null, locale: string): MoneyLine | null {
+  if (room === null || room.new_starts !== "BLOCKED_UNTIL_RESET" || room.resets_at === null) return null;
+  const scope = personScope(room.scope);
+  if (scope === null) return null;
+  const values: MoneyLine["values"] = scope === "PERSON_DAY"
+    ? { time: formatDate(locale, room.resets_at, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }) }
+    : { date: formatDate(locale, room.resets_at, { day: "numeric", month: "long" }) };
+  return Object.freeze({ key: `v4.ask.usedUp.${scope}`, values });
+}
+
 /** The usage area's borrow notices: what running work used of tomorrow's or next week's allowance, day first. */
 export function borrowLines(borrowed: readonly UsageBorrow[] | undefined): readonly MoneyLine[] {
   const order: Readonly<Record<UsageBorrow["scope"], number>> = { PERSON_DAY: 0, PERSON_WEEK: 1 };
