@@ -69,7 +69,8 @@ describe('check 2: the release install and the website build', () => {
 
   it('a failed online fill is refused, not thrown', async () => {
     const { result, root } = await website.checkWebsiteBuild({
-      repo, rev: 'HEAD', workdir: scratch(), node: process.execPath, pnpmDir, extraEnv: { PNPM_CONFIG_REGISTRY: 'http://127.0.0.1:9' }
+      // No retries: each download fails at once, so the test does not wait out pnpm's retry pauses.
+      repo, rev: 'HEAD', workdir: scratch(), node: process.execPath, pnpmDir, extraEnv: { PNPM_CONFIG_REGISTRY: 'http://127.0.0.1:9', PNPM_CONFIG_FETCH_RETRIES: '0' }
     });
     expect(result.name).toBe('website-build');
     expect(result.status).toBe('refused');
