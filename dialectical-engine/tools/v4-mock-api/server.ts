@@ -21,10 +21,10 @@ import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createSeed, SEED_NODE_IDS, type StoryStatus } from "./seed.js";
 import {
-  answerDraftProblems, contractOrDraft, DraftAskParentSchema, DraftInvestigationSchema, DraftMonthPauseSchema, DraftNodeWebSchema,
+  answerDraftProblems, answerIndexDraftProblems, contractOrDraft, DraftAskParentSchema, DraftInvestigationSchema, DraftMonthPauseSchema, DraftNodeWebSchema,
   DraftRoomPartSchema, DraftRoomQueryPartSchema, DraftRunContinuedSchema, DraftRunContinueRefusedSchema, DraftRunContinueRequestSchema,
   DraftUsageBorrowsSchema, splitAsk, splitRoomQuery, stripAnswer, stripNode, stripRoom,
-  stripRun, stripUsage, type DraftAskParent
+  stripAnswerIndex, stripRun, stripUsage, type DraftAskParent
 } from "./web-draft.js";
 import { ARABIC_RUN, borrowNotice, DEEPEST_DIG, DIG_ANSWERS, DIG_RUNS, monthPause, PATH_REWRITES, reportVersionBody, RUN_PAUSED, SEEDED_NEW_DIGS } from "./rewrite-seed.js";
 import type { WebCase } from "./web-seed.js";
@@ -232,6 +232,8 @@ type MockRun = {
   language?: Readonly<{ tag: string; name: string }>;
   /** W2-7 (money rule): its planned calls and searches paused at the month wall, until Continue (POST /v1/runs/{id}/continue). */
   monthPaused?: boolean;
+  /** When it was asked (the shelf's draft `started_at`, owner's screen review 3 Nov); absent on a waiting one. */
+  askedAt?: number;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   answer?: any;
 };
@@ -262,6 +264,7 @@ function settledRun(input: Readonly<{
     answerId: input.answerId,
     storyReadyAt: input.storyReadyAt,
     web: input.web,
+    askedAt: input.askedAt,
     answer: {
       ...seed.answer({
         answerId: input.answerId,
@@ -283,7 +286,7 @@ settledRun({
   question: "Should countries build new nuclear power, or put the money into renewables and storage?",
   askedAt: Date.parse("2026-10-27T15:12:00.000Z"), settleAt: Date.parse("2026-10-27T15:40:00.000Z"), storyReadyAt: 0, web: "PAID"
 });
-addRun({ runRef: RUN_RUNNING, seq: 5, question: "Is a four-day work week good for productivity and for workers?" });
+addRun({ runRef: RUN_RUNNING, seq: 5, askedAt: T0, question: "Is a four-day work week good for productivity and for workers?" });
 addRun({ runRef: RUN_WAITING, seq: 3, waiting: true, question: "Should my town close the old centre to cars at weekends?" });
 addRun({
   runRef: RUN_FAILED, seq: 1, failedReason: FAILED_REASON,
@@ -319,7 +322,7 @@ for (const dig of SEEDED_NEW_DIGS) {
     askedAt: Date.parse(dig.askedAt), settleAt: Date.parse(dig.settledAt), storyReadyAt: 0
   });
 }
-addRun({ runRef: RUN_PAUSED, seq: 12, monthPaused: true, question: "Should my region build a hydrogen pipeline or more power lines?" });
+addRun({ runRef: RUN_PAUSED, seq: 12, monthPaused: true, askedAt: T0, question: "Should my region build a hydrogen pipeline or more power lines?" });
 // W3-4: a dig at the deepest level (10), whose map offers no dig anywhere (rewrite-seed.ts DEEPEST_DIG).
 settledRun({
   runRef: DEEPEST_DIG.runRef, answerId: DEEPEST_DIG.answerId, seq: DEEPEST_DIG.seq, web: "PAID", question: DEEPEST_DIG.question,
@@ -528,6 +531,19 @@ function storyRead(run: MockRun, now = Date.now()) {
   return seed.story(run.answerId!, status, writtenAt);
 }
 
+/**
+ * The shelf's draft parts of a row (web-draft.ts DraftShelfRowPartSchema, owner's screen review 3 Nov): the debate it was
+ * dug from (the account's dig link; null for a first question), and for an answer the seeded map's four-shade bar and
+ * whether its map changed since the person last opened it (here: no last visit recorded yet).
+ */
+const SEEDED_MAP_BAR = Object.freeze({ sure: 4, sure_for_case: 5, still_argued: 2, didnt_hold: 1 });
+function shelfPart(run: MockRun, served: boolean, now: number) {
+  const dugFrom = digLinks.find((record) => record.child_run_id === run.runRef)?.parent_run_id ?? null;
+  if (served) return { map_bar: { ...SEEDED_MAP_BAR }, changed_since_visit: !lastVisits.has(run.runRef), dug_from: dugFrom };
+  const working = !["WAITING", "FAILED"].includes(stateOf(run, now));
+  return { ...(working && run.askedAt !== undefined ? { started_at: iso(run.askedAt) } : {}), dug_from: dugFrom };
+}
+
 function answerIndex(limit: number, offset: number, now = Date.now()) {
   const all = [...runs.values()].sort((left, right) => right.seq - left.seq);
   const served = all.filter((run) => stateOf(run, now) === "SETTLED" && run.answer !== undefined);
@@ -544,7 +560,8 @@ function answerIndex(limit: number, offset: number, now = Date.now()) {
       staleness_state: "FRESH",
       builds_on_previous: false,
       created_at_sequence: run.seq,
-      models: [...MODELS]
+      models: [...MODELS],
+      ...shelfPart(run, true, now)
     })),
     open_runs: open.map((run) => {
       const projection = runProjection(run, now);
@@ -553,7 +570,8 @@ function answerIndex(limit: number, offset: number, now = Date.now()) {
         question_line: run.question,
         state: projection.state,
         terminal_reason: projection.terminal_reason,
-        created_at_sequence: run.seq
+        created_at_sequence: run.seq,
+        ...shelfPart(run, false, now)
       };
     }),
     limit,
@@ -836,7 +854,11 @@ function startupCheck(): number {
   for (const [country, postal] of [["DE", null], ["RO", null], ["US", "75201"], ["US", null], ["CA", "D1A 1A1"], ["JP", null]] as const) {
     check(`GET /v1/billing/plans?country=${country}`, C.BillingPlansResponseSchema, billingPlans(country, postal));
   }
-  check("GET /v1/answers", C.AnswerIndexSchema, answerIndex(50, 0));
+  // The shelf's draft parts (owner's screen review, 3 Nov) pass their draft schema, and today's contract once held back.
+  const index = answerIndex(50, 0);
+  const shelfProblems = answerIndexDraftProblems(index);
+  if (shelfProblems.length > 0) throw new Error(`MOCK_SEED_INVALID: GET /v1/answers draft fields:\n${shelfProblems.join("\n")}`);
+  check("GET /v1/answers", C.AnswerIndexSchema, contractOrDraft(C.AnswerIndexSchema, index, stripAnswerIndex).body);
   for (const run of runs.values()) {
     checkDraft(`GET /v1/runs/${run.runRef}`, C.RunProjectionSchema, runProjection(run), stripRun, runDraftSchema);
     check(`GET /v1/runs/${run.runRef}/visibility`, C.PublicationTransitionSchema, { state: "PRIVATE", public_ref: null });
@@ -1210,7 +1232,8 @@ function mockState() {
       answer: draftServed(C.AnswerSchema, runs.get(RUN_SETTLED)!.answer, stripAnswer),
       room: draftServed(C.AskRoomResponseSchema, roomRead(roomMode, now), stripRoom),
       run: draftServed(C.RunProjectionSchema, runProjection(runs.get(RUN_PAUSED)!, now), stripRun),
-      usage: draftServed(C.BillingUsageResponseSchema, billingUsage(now, planMode, "BORROWED"), stripUsage)
+      usage: draftServed(C.BillingUsageResponseSchema, billingUsage(now, planMode, "BORROWED"), stripUsage),
+      answer_index: draftServed(C.AnswerIndexSchema, answerIndex(50, 0, now), stripAnswerIndex)
     },
     investigations: [...investigations.values()].map(investigationBody),
     dig_links: digLinks.map((record) => ({ ...record })),
@@ -1439,7 +1462,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (limit === null || limit < 1 || offset === null) {
       return sendJson(req, res, 400, { error: "MALFORMED_REQUEST", message: "limit and offset must be whole numbers (limit at least 1)." });
     }
-    return sendJson(req, res, 200, answerIndex(limit, offset), C.AnswerIndexSchema);
+    return sendDraftable(answerIndex(limit, offset), C.AnswerIndexSchema, stripAnswerIndex, answerIndexDraftProblems);
   }
   if (parts[1] === "answers" && parts.length >= 3 && isGet) {
     const run = runsByAnswer.get(parts[2]!);
