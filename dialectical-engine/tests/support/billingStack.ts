@@ -1,6 +1,8 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { AsyncResource } from "node:async_hooks";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
+import { pathToFileURL } from "node:url";
 import type { FastifyInstance } from "fastify";
 import type { Pool } from "pg";
 import { BillingPersonAllowanceSource, foldSubscription } from "@debateai/billing-core";
@@ -17,8 +19,9 @@ import {
   type ReadableUserDekStore
 } from "@debateai/crypto";
 import {
-  AcceptanceRepository, BillingJobQueries, BillingRepository, EntitlementRepository, PostgresAccountErasureRepository,
-  PostgresEmailChangeRepository, RunRepository, migrate, type PrivateRunErasureCoordinator
+  AcceptanceRepository, BillingJobQueries, BillingRepository, crossAccountPool, EntitlementRepository,
+  PostgresAccountErasureRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, RunRepository, migrate,
+  type PrivateRunErasureCoordinator
 } from "@debateai/db";
 import { AGE_RULE_VERSION, MIN_AGE } from "@debateai/kernel";
 import { currentDocument } from "@debateai/legal-manifest";
@@ -47,6 +50,8 @@ import { FakeInvoiceIssuer } from "./fake-invoice-issuer.js";
 import { startFakeNetopia, type FakeNetopia, type FakeNetopiaDelivery, type FakeNetopiaOutcome } from "./fake-netopia.js";
 import { FakeTaxEngine } from "./fake-tax-engine.js";
 import { TEST_APP_ORIGIN, testSessionHeaders, type TestHttpIdentity } from "./httpSession.js";
+import { currentTestFile } from "./master-key-guard.js";
+import { apiTestPools } from "./rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "./testDatabase.js";
 
 /**
@@ -189,11 +194,15 @@ class MemoryUserDekStore implements ReadableUserDekStore {
 
 const opaqueHash = (): string => `sha256:${randomBytes(32).toString("hex")}`;
 
-function identityFor(userId: string, ownerRef: string, sessionId: string, label: string): TestHttpIdentity {
+/** The raw session and csrf tokens of the person `label`: the cookie the stack sends and the session row it seeds. */
+function stackTokens(label: string): Readonly<{ rawSessionToken: string; rawCsrfToken: string }> {
   const token = (purpose: string): string => createHash("sha256").update(`billing-stack:${label}:${purpose}`, "utf8").digest("base64url");
+  return Object.freeze({ rawSessionToken: token("session"), rawCsrfToken: token("csrf") });
+}
+
+function identityFor(userId: string, ownerRef: string, sessionId: string, label: string): TestHttpIdentity {
   const hash = (value: string): string => `sha256:${createHash("sha256").update(value, "utf8").digest("hex")}`;
-  const rawSessionToken = token("session");
-  const rawCsrfToken = token("csrf");
+  const { rawSessionToken, rawCsrfToken } = stackTokens(label);
   return Object.freeze({
     rawSessionToken,
     rawCsrfToken,
@@ -212,7 +221,9 @@ function identityFor(userId: string, ownerRef: string, sessionId: string, label:
  * apps/api/src/registration.ts:1271-1273; the blind index P13 looks up; the passed age record 0077's
  * identity.record_registration_age_check writes, with the connection's country, recorded and never decisive, R3-3),
  * plus one live session row, which P12a's `billing.consume_withdrawal_grant` requires. The same columns as P12a's own
- * grant test.
+ * grant test. Upload check Task 8: the row carries the hashes of the tokens the stack's requests present (`stackTokens`),
+ * as tests/support/httpSession.ts's persistLiveSession does, so on the product's own logins a request runs with this
+ * account's context.
  */
 async function createActiveAccount(
   pool: Pool, deks: MemoryUserDekStore, blindIndexKey: Buffer, email: string, countryCode: string, at: Date, age: AgeRecord
@@ -252,13 +263,31 @@ async function createActiveAccount(
     ) VALUES ($1,$2,$3,$4,jsonb_build_object('user_agent_hash',$5::text),clock_timestamp(),
       clock_timestamp(),clock_timestamp()+interval '1 hour',clock_timestamp()+interval '2 hours',
       clock_timestamp(),NULL)
-  `, [sessionId, userId, opaqueHash(), opaqueHash(), opaqueHash()]);
+  `, [sessionId, userId, hashToken("session", stackTokens(email).rawSessionToken),
+    hashToken("csrf", stackTokens(email).rawCsrfToken), opaqueHash()]);
   return Object.freeze({ userId, ownerRef, sessionId });
 }
 
+/**
+ * Runs `work` outside any request scope: the stack's own stand-ins for steps the real services do (minting the
+ * step-up grant the real rotation mints) are fixture writes, not the product's request path, so they stay on the
+ * harness superuser, which the R21 guard refuses only inside a request.
+ */
+const outsideRequest = AsyncResource.bind(<T,>(work: () => Promise<T>): Promise<T> => work());
+
 export async function startBillingStack(): Promise<BillingStack> {
+  // The test file that starts the stack: its API pools come from apiTestPools under that file's name (the master-key
+  // list is checked against it). Read before the first wait.
+  const testFile = currentTestFile();
+  if (testFile === undefined) throw new Error("BILLING_STACK_OUTSIDE_A_TEST_FILE");
   const database = await startTestDatabase();
   await migrate(database.pool);
+  // Upload check Task 8: the API's pools as apps/api/src/main.ts builds them, on the product's own logins in login
+  // mode (the default); every field is database.pool with DEBATEAI_TEST_API_LOGINS=0. Seeding, read-backs and the
+  // owner's jobs below stay on database.pool, outside any request.
+  const pools = await apiTestPools(database, pathToFileURL(testFile).href);
+  // The billing runtime's pool as main.ts builds it: `crossAccountPool(pool, "X11")`.
+  const billingPool = crossAccountPool(pools.runtime, "X11");
   const tax = new FakeTaxEngine();
   const invoices = new FakeInvoiceIssuer();
   const mail = new MemoryTemplatedMailSender();
@@ -289,7 +318,7 @@ export async function startBillingStack(): Promise<BillingStack> {
   // billing's, so a test reads the confirmation link from here.
   const emailChangeMail = new MemoryEmailChangeMailSender();
   const emailChanges = new EmailChangeService({
-    repository: new PostgresEmailChangeRepository(database.pool, Object.freeze({
+    repository: new PostgresEmailChangeRepository(pools.authorization, Object.freeze({
       hashSourceIp: async () => "33".repeat(32),
       hashUserAgent: async () => "44".repeat(32)
     }) as unknown as AuditContextHasher),
@@ -301,10 +330,10 @@ export async function startBillingStack(): Promise<BillingStack> {
   // repository), with billing's hook beside them (`billingErasure` below). Deleting a private debate is not a billing
   // journey: the stack never calls it, so its coordinator is left out.
   const accountErasure = new PostgresAccountErasureApplication(
-    new PostgresAccountErasureRepository(database.pool, Object.freeze({
+    new PostgresAccountErasureRepository(pools.erasure, Object.freeze({
       hashSourceIp: async () => "55".repeat(32),
       hashUserAgent: async () => "66".repeat(32)
-    }) as unknown as AuditContextHasher),
+    }) as unknown as AuditContextHasher, pools.contentProvision),
     Object.freeze({}) as unknown as PrivateRunErasureCoordinator
   );
 
@@ -323,9 +352,10 @@ export async function startBillingStack(): Promise<BillingStack> {
     revokeAllSessions: async () => identities.length,
     // The age gate's reader (0077), which P8c's checkout guard asks (R3-2) and which is optional on SessionApplication:
     // without it the checkout answers 503 AGE_CHECK_UNAVAILABLE. It reads the account's real record through 0077's
-    // own function and answers as SessionService.readAgeConfirmation does (apps/api/src/sessions.ts:549-552).
+    // own function and answers as SessionService.readAgeConfirmation does (apps/api/src/sessions.ts:549-552), on the
+    // login main.ts gives the session repository (`authorizationPool`).
     readAgeConfirmation: async (session) => {
-      const found = await database.pool.query<{ outcome: string }>(
+      const found = await pools.authorization.query<{ outcome: string }>(
         "SELECT identity.read_age_check_outcome($1) AS outcome", [session.userId]
       );
       return found.rows[0]?.outcome === "required" ? "required" : "confirmed";
@@ -339,7 +369,7 @@ export async function startBillingStack(): Promise<BillingStack> {
       const action = input.authorization?.action;
       // The account-scoped grants: P12d's withdrawal, and (P2-M39) the account deletion 0040's schedule consumes.
       if (action === "WITHDRAW_SUBSCRIPTION" || action === "DELETE_ACCOUNT") {
-        await database.pool.query(`
+        await outsideRequest(() => database.pool.query(`
           INSERT INTO identity.step_up_grant(
             step_up_grant_id,token_hash,session_id,user_id,action,target_run_id,target_account_id,issued_at,expires_at
           ) VALUES ($1,$2,$3,$4,$5,NULL,$4,clock_timestamp()-interval '1 second',
@@ -347,7 +377,7 @@ export async function startBillingStack(): Promise<BillingStack> {
         `, [
           randomUUID(), hashToken("step-up-grant", grantToken), identity.authenticated.session.session_id,
           identity.authenticated.userId, action
-        ]);
+        ]));
       }
       return {
         sessionToken: identity.rawSessionToken, csrfToken: identity.rawCsrfToken, grantToken,
@@ -370,9 +400,9 @@ export async function startBillingStack(): Promise<BillingStack> {
     lookup: (ip: string) => ({ country: COUNTRY_OF_IP[ip] ?? "XX", tor: false }),
     close: () => undefined
   });
-  const spendStore = new PostgresModelSpendStore(database.pool);
+  const spendStore = new PostgresModelSpendStore(pools.runtime);
   const billingRepository = new BillingRepository(database.pool);
-  const entitlements = new EntitlementRepository(database.pool);
+  const entitlements = new EntitlementRepository(pools.runtime);
   // runtime.ts's own `new BillingReconciler({...})`, over the stack's members.
   const reconcilerJobs = new BillingJobQueries(database.pool);
   const reconciler = new BillingReconciler({
@@ -386,7 +416,7 @@ export async function startBillingStack(): Promise<BillingStack> {
     billing: billingRepository, jobs: new BillingJobQueries(database.pool), taxAuthorities, audit: () => undefined, clock: now
   });
   const runtime = createBillingRuntime({
-    pool: database.pool,
+    pool: billingPool,
     connectors,
     policy: testBillingPolicy,
     plans: testBillingPlans,
@@ -407,16 +437,8 @@ export async function startBillingStack(): Promise<BillingStack> {
     reportPending: () => undefined,
     ownerSpend: spendStore,
     blindIndexKey,
-    identities: {
-      async ownerRefByEmailBlindIndex(emailBlindIndex: Buffer): Promise<string | null> {
-        // Only an active account: an `age_frozen` one (0077), like any other non-active state, gets no cancel link.
-        const found = await database.pool.query<{ owner_ref: string }>(
-          `SELECT owner_ref::text AS owner_ref FROM identity."user" WHERE email_blind_index = $1 AND state = 'active'`,
-          [emailBlindIndex]
-        );
-        return found.rows[0]?.owner_ref ?? null;
-      }
-    },
+    // main.ts's own identity repository on the runtime pool: only an active account gets a cancel link.
+    identities: new PostgresIdentityRepository(pools.runtime, Object.freeze({}) as unknown as AuditContextHasher),
     taxAuthorities
   });
   // B7a's usage read, composed as main.ts composes it beside the runtime's routes (R-3).
@@ -664,6 +686,9 @@ export async function startBillingStack(): Promise<BillingStack> {
         strangerSampleRate: 0, envelopeBasis: fixtureStructuralCeiling(4), registerVersion: 1,
         batteryVersion: "test", askContract: {}, batteryRows: []
       });
+      // The person's own run, as a real ask's is: on the product's own logins the usage and credit readers see only
+      // the spend of runs the request's account owns (0130's rls.owns_run).
+      await database.pool.query("SELECT core.append_run_ownership_event($1,$2)", [runId, person.ownerRef]);
       const entitlement = await entitlements.current(person.ownerRef, now());
       const client = await database.pool.connect();
       try {
