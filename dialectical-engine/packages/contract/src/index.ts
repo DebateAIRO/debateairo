@@ -623,21 +623,41 @@ export const BillingPricesSchema = z.object({
 }).strict();
 export type BillingPrices = z.infer<typeof BillingPricesSchema>;
 
+const BillingIso2Schema = z.string().regex(/^[A-Z]{2}$/);
+
+/**
+ * Terms §12: "Prices include VAT, GST or sales tax, which depends on where you live". The tax the connection's country
+ * adds to every plan, as the tax engine the quote asks answers it for that country alone (no address yet).
+ */
+export const BillingPlansTaxSchema = z.object({
+  country: BillingIso2Schema,
+  tax_name: z.string().min(1).max(64),
+  /** Basis points; a US rate may be fractional (8.875 % = 887.5). */
+  tax_rate_bp: z.number().min(0).max(10_000),
+  tax_status: z.enum(["TAXABLE", "NON_TAXABLE", "NOT_REGISTERED", "REVERSE_CHARGE"])
+}).strict();
+export type BillingPlansTax = z.infer<typeof BillingPlansTaxSchema>;
+
 /**
  * GET /v1/billing/plans (public). Every plan's price in each currency, and `currency`, the one the caller's connection
  * pays in (spec 2026-10-05 §2.16.1). Credit is never shown in dollars: "4" reads "4× the Plus allowance".
+ * `tax` is the connection country's tax and each plan's `total_price` its price in `currency` with that tax; both are
+ * null together, when the country is unknown (an unknown place, a Tor exit) or the tax service has not answered.
  */
 export const BillingPlansResponseSchema = z.object({
   currency: BillingCurrencySchema,
+  tax: BillingPlansTaxSchema.nullable(),
   plans: z.array(z.object({
     plan_id: PlanIdSchema,
     net_prices: BillingPricesSchema,
+    total_price: BillingDecimalMoneySchema.nullable(),
     allowance_vs_plus: z.string().regex(/^\d+(?:\.\d+)?$/)
   }).strict()).min(1)
-}).strict();
+}).strict().refine(
+  (answer) => answer.plans.every((plan) => (plan.total_price === null) === (answer.tax === null)),
+  { message: "TOTAL_PRICE_WITHOUT_TAX" }
+);
 export type BillingPlansResponse = z.infer<typeof BillingPlansResponseSchema>;
-
-const BillingIso2Schema = z.string().regex(/^[A-Z]{2}$/);
 
 /** POST /v1/billing/quote (paid-plans spec §2.5.3; P19's pre-fill makes `country` optional; R-15 adds `name`). */
 export const BillingQuoteRequestSchema = z.object({

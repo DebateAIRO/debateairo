@@ -4,21 +4,24 @@ import { authorizationPolicyInventory, buildApi } from "@debateai/api";
 import { BillingPlansResponseSchema, contractInventory } from "@debateai/contract";
 import { TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW, taxAuthoritiesFromValue } from "@debateai/register";
 import type { AdmissionLimiter } from "../../apps/api/src/admission.js";
+import type { BillingAudit } from "../../apps/api/src/billing/audit.js";
+import { DisplayedTaxReader } from "../../apps/api/src/billing/displayed-tax.js";
 import { BILLING_ROUTE_PATHS, type BillingRouteOptions } from "../../apps/api/src/billing/index.js";
 import { createBillingRuntime, type BillingRuntimeDeps } from "../../apps/api/src/billing/runtime.js";
 import type { GeoLookup } from "@debateai/geo";
 import {
   testBillingPlans, testBillingPolicy, testCountryPolicy, testRegionalPlans, unusedAskApplication
 } from "../support/billingFixtures.js";
+import { FakeTaxEngine } from "../support/fake-tax-engine.js";
 import { TEST_APP_ORIGIN } from "../support/httpSession.js";
 
 const NOW = new Date("2026-10-01T10:00:00.000Z");
-/** testBillingPlans' prices (the regional fixture shares them): every plan in every currency. */
+/** testBillingPlans' prices (the regional fixture shares them): every plan in every currency; no country's tax. */
 const PLANS_ANSWER = [
-  { plan_id: "FREE", net_prices: { USD: "0.00", EUR: "0.00", RON: "0.00" }, allowance_vs_plus: "0.05" },
-  { plan_id: "PLUS", net_prices: { USD: "20.00", EUR: "20.00", RON: "100.00" }, allowance_vs_plus: "1" },
-  { plan_id: "PRO", net_prices: { USD: "50.00", EUR: "50.00", RON: "250.00" }, allowance_vs_plus: "5" },
-  { plan_id: "MAX", net_prices: { USD: "200.00", EUR: "200.00", RON: "1000.00" }, allowance_vs_plus: "33.33" }
+  { plan_id: "FREE", net_prices: { USD: "0.00", EUR: "0.00", RON: "0.00" }, total_price: null, allowance_vs_plus: "0.05" },
+  { plan_id: "PLUS", net_prices: { USD: "20.00", EUR: "20.00", RON: "100.00" }, total_price: null, allowance_vs_plus: "1" },
+  { plan_id: "PRO", net_prices: { USD: "50.00", EUR: "50.00", RON: "250.00" }, total_price: null, allowance_vs_plus: "5" },
+  { plan_id: "MAX", net_prices: { USD: "200.00", EUR: "200.00", RON: "1000.00" }, total_price: null, allowance_vs_plus: "33.33" }
 ] as const;
 const billing = (): BillingRouteOptions => ({
   plans: testBillingPlans, legal: { requiresReacceptance: async () => false }, clock: () => NOW
@@ -41,15 +44,15 @@ describe("P8a GET /v1/billing/plans", () => {
     const api = buildApi({ application: unusedAskApplication(), billing: billing() });
     const response = await api.inject({ method: "GET", url: "/v1/billing/plans" });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ currency: "USD", plans: PLANS_ANSWER });
+    expect(response.json()).toEqual({ currency: "USD", tax: null, plans: PLANS_ANSWER });
     expect(response.body).not.toMatch(/credit|6\.60|220\.00|0\.33/);
     expect(BillingPlansResponseSchema.safeParse({
       ...response.json<Record<string, unknown>>(),
-      plans: [{ plan_id: "PLUS", net_prices: PLANS_ANSWER[1]!.net_prices, allowance_vs_plus: "1", credit: "6.60" }]
+      plans: [{ plan_id: "PLUS", net_prices: PLANS_ANSWER[1]!.net_prices, total_price: null, allowance_vs_plus: "1", credit: "6.60" }]
     }).success).toBe(false);
     // Part C: one price per plan is gone; every plan carries all three.
     expect(BillingPlansResponseSchema.safeParse({
-      currency: "USD", plans: [{ plan_id: "PLUS", net_price: "20.00", allowance_vs_plus: "1" }]
+      currency: "USD", tax: null, plans: [{ plan_id: "PLUS", net_price: "20.00", total_price: null, allowance_vs_plus: "1" }]
     }).success).toBe(false);
     await api.close();
   });
@@ -71,7 +74,7 @@ describe("P8a GET /v1/billing/plans", () => {
     for (const [remoteAddress, currency] of answers) {
       const response = await api.inject({ method: "GET", url: "/v1/billing/plans", remoteAddress });
       expect(response.statusCode, remoteAddress).toBe(200);
-      expect(response.json(), remoteAddress).toEqual({ currency, plans: PLANS_ANSWER });
+      expect(response.json(), remoteAddress).toEqual({ currency, tax: null, plans: PLANS_ANSWER });
       expect(response.body, remoteAddress).not.toMatch(/credit/u);
     }
     await api.close();
@@ -122,6 +125,186 @@ describe("P8a GET /v1/billing/plans", () => {
     expect(paths.indexOf("GET /v1/billing/plans")).toBe(paths.indexOf("GET /v1/billing/usage") + 1);
     const routes = contractInventory.routes as readonly string[];
     expect(routes.indexOf("GET /v1/billing/plans")).toBe(routes.indexOf("GET /v1/billing/usage") + 1);
+  });
+});
+
+/**
+ * Terms §12: "Prices include VAT, GST or sales tax, which depends on where you live". The list prices every plan with
+ * the connection country's tax, from the tax engine the quote asks (FakeTaxEngine's rates: RO 21 %, DE 19 %, FR 20 %;
+ * every other country adds none). The US and Canada price tax by the postal code's state or province, so the country
+ * alone cannot: there the list stays before tax.
+ */
+describe("Terms §12 GET /v1/billing/plans shows each country's price with its tax", () => {
+  const PLACES: Readonly<Record<string, Readonly<{ country: string; tor: boolean }>>> = {
+    "198.51.100.10": { country: "RO", tor: false },
+    "198.51.100.20": { country: "DE", tor: false },
+    "198.51.100.21": { country: "FR", tor: false },
+    "198.51.100.30": { country: "US", tor: false },
+    "198.51.100.31": { country: "CA", tor: false },
+    "198.51.100.40": { country: "RO", tor: true },
+    "198.51.100.50": { country: "CH", tor: false }
+  };
+  const geo: GeoLookup = { lookup: (ip) => PLACES[ip] ?? { country: "XX", tor: false }, close: () => undefined };
+
+  function taxed(tax = new FakeTaxEngine(), clock = () => NOW) {
+    const audit: Array<Readonly<Record<string, unknown>>> = [];
+    const record: BillingAudit = (event, fields) => { audit.push({ event, ...fields }); };
+    const displayedTax = new DisplayedTaxReader({
+      tax, plans: testRegionalPlans, policy: testBillingPolicy, audit: record, clock
+    });
+    const api = buildApi({
+      application: unusedAskApplication(),
+      billing: { ...billing(), plans: testRegionalPlans, geo, displayedTax, clock }
+    });
+    const read = async (remoteAddress: string) => {
+      const response = await api.inject({ method: "GET", url: "/v1/billing/plans", remoteAddress });
+      expect(response.statusCode, remoteAddress).toBe(200);
+      return response.json<{
+        currency: string; tax: Record<string, unknown> | null;
+        plans: ReadonlyArray<{ plan_id: string; total_price: string | null; net_prices: Record<string, string> }>;
+      }>();
+    };
+    const totals = (answer: Awaited<ReturnType<typeof read>>) =>
+      Object.fromEntries(answer.plans.map((plan) => [plan.plan_id, plan.total_price]));
+    return { api, tax, audit, read, totals };
+  }
+
+  it("prices each plan with its own country's tax, in that country's currency", async () => {
+    const { api, read, totals } = taxed();
+    const romania = await read("198.51.100.10");
+    expect(romania.currency).toBe("RON");
+    expect(romania.tax).toEqual({ country: "RO", tax_name: "VAT", tax_rate_bp: 2_100, tax_status: "TAXABLE" });
+    expect(totals(romania)).toEqual({ FREE: "0.00", PLUS: "121.00", PRO: "302.50", MAX: "1210.00" });
+    const germany = await read("198.51.100.20");
+    expect(germany.currency).toBe("EUR");
+    expect(germany.tax).toEqual({ country: "DE", tax_name: "MwSt.", tax_rate_bp: 1_900, tax_status: "TAXABLE" });
+    expect(totals(germany)).toEqual({ FREE: "0.00", PLUS: "23.80", PRO: "59.50", MAX: "238.00" });
+    // Two countries of one currency, two different totals: the price is the visitor's own country's.
+    const france = await read("198.51.100.21");
+    expect([france.currency, france.tax?.tax_rate_bp]).toEqual(["EUR", 2_000]);
+    expect(totals(france)).toEqual({ FREE: "0.00", PLUS: "24.00", PRO: "60.00", MAX: "240.00" });
+    // Where the tax engine adds nothing, the total is the net, and the answer says so.
+    const switzerland = await read("198.51.100.50");
+    expect(switzerland.tax).toEqual({ country: "CH", tax_name: "VAT", tax_rate_bp: 0, tax_status: "NOT_REGISTERED" });
+    expect(totals(switzerland)).toEqual({ FREE: "0.00", PLUS: "20.00", PRO: "50.00", MAX: "200.00" });
+    // The net prices in every currency are still listed beside the total, unchanged.
+    expect(germany.plans.map((plan) => plan.net_prices)).toEqual(PLANS_ANSWER.map((plan) => plan.net_prices));
+    await api.close();
+  });
+
+  it("names no country's tax for an unknown place, a Tor exit or an address that is not an IP", async () => {
+    const { api, tax, read } = taxed();
+    for (const remoteAddress of ["198.51.100.99", "198.51.100.40", "not-an-address"]) {
+      expect(await read(remoteAddress), remoteAddress).toEqual({ currency: "USD", tax: null, plans: PLANS_ANSWER });
+    }
+    expect(tax.quotedCurrencies).toEqual([]);
+    await api.close();
+  });
+
+  it("keeps the US and Canada before tax, never asking the country alone for a state's or province's tax", async () => {
+    // The fake prices Texas at 6.25 % by its postal code, and the country alone at nothing: a card built from that
+    // would say the price holds the tax while the checkout adds it.
+    const { api, tax, read } = taxed();
+    expect(await read("198.51.100.30")).toEqual({ currency: "USD", tax: null, plans: PLANS_ANSWER });
+    expect((await read("198.51.100.31")).tax).toBeNull();
+    expect(tax.quotedCurrencies).toEqual([]);
+    await api.close();
+  });
+
+  it("asks the tax engine once per country, for every paid plan, and keeps the answer for six hours", async () => {
+    let now = NOW.getTime();
+    const { api, tax, read } = taxed(new FakeTaxEngine(), () => new Date(now));
+    const quote = vi.spyOn(tax, "quote");
+    await Promise.all([read("198.51.100.20"), read("198.51.100.20"), read("198.51.100.21")]);
+    // The free plan costs nothing anywhere, so it is never quoted: three paid plans, two countries.
+    expect(quote).toHaveBeenCalledTimes(6);
+    expect(quote.mock.calls.map(([call]) => call.location)).toContainEqual(
+      { country: "DE", region: null, postalCode: null, city: null, street: null, ip: null }
+    );
+    expect(quote.mock.calls.every(([call]) => call.taxId === null && call.taxCode === "saas")).toBe(true);
+    now += 6 * 60 * 60 * 1_000 - 1;
+    await read("198.51.100.20");
+    expect(quote).toHaveBeenCalledTimes(6);
+    now += 1;
+    await read("198.51.100.20");
+    expect(quote).toHaveBeenCalledTimes(9);
+    await api.close();
+  });
+
+  it("falls back to the prices before tax while the tax service is down, and asks again only after a minute", async () => {
+    let now = NOW.getTime();
+    const { api, tax, audit, read } = taxed(new FakeTaxEngine(), () => new Date(now));
+    tax.failNext("TAX_SERVICE_UNAVAILABLE");
+    expect(await read("198.51.100.20")).toEqual({ currency: "EUR", tax: null, plans: PLANS_ANSWER });
+    expect(audit).toEqual([
+      { event: "billing.plans.tax_unavailable", country: "DE", code: "TAX_SERVICE_UNAVAILABLE", reason: "UNKNOWN" }
+    ]);
+    const quote = vi.spyOn(tax, "quote");
+    now += 59_999;
+    expect((await read("198.51.100.20")).tax).toBeNull();
+    expect(quote).not.toHaveBeenCalled();
+    now += 1;
+    expect((await read("198.51.100.20")).tax).toMatchObject({ country: "DE", tax_rate_bp: 1_900 });
+    expect(quote).toHaveBeenCalledTimes(3);
+    await api.close();
+  });
+
+  it("keeps the last answer when a refresh fails, so an outage never takes a country's tax off the cards", async () => {
+    let now = NOW.getTime();
+    const { api, tax, audit, read, totals } = taxed(new FakeTaxEngine(), () => new Date(now));
+    expect(totals(await read("198.51.100.10")).PLUS).toBe("121.00");
+    now += 6 * 60 * 60 * 1_000;
+    tax.failNext("TAX_SERVICE_REFUSED");
+    const kept = await read("198.51.100.10");
+    expect([kept.tax?.country, totals(kept).PLUS]).toEqual(["RO", "121.00"]);
+    expect(audit.map((line) => [line.event, line.code])).toEqual([["billing.plans.tax_unavailable", "TAX_SERVICE_REFUSED"]]);
+    await api.close();
+  });
+
+  it("never holds a page past its wait for a slow tax service, and keeps that answer for the visitors after", async () => {
+    const tax = new FakeTaxEngine();
+    const honest = tax.quote.bind(tax);
+    let release: () => void = () => undefined;
+    const slow = new Promise<void>((resolve) => { release = resolve; });
+    vi.spyOn(tax, "quote").mockImplementation(async (call) => { await slow; return honest(call); });
+    const audit: BillingAudit = () => undefined;
+    const reader = new DisplayedTaxReader({
+      tax, plans: testRegionalPlans, policy: testBillingPolicy, audit, clock: () => NOW, waitMs: 20
+    });
+    // The first visitor gets no tax (none is known yet) instead of waiting for the tax service.
+    expect(await reader.read("DE")).toBeNull();
+    release();
+    await vi.waitFor(async () => { expect((await reader.read("DE"))?.taxRateBasisPoints).toBe(1_900); });
+    expect(tax.quote).toHaveBeenCalledTimes(3);
+  });
+
+  it("never shows an answer that is not the plan's net in the country's currency", async () => {
+    const tax = new FakeTaxEngine();
+    const honest = tax.quote.bind(tax);
+    // A tax service that prices Germany as the United States (a USD country) is not Germany's price.
+    vi.spyOn(tax, "quote").mockImplementation(async (call) => ({ ...(await honest(call)), taxCountry: "US" }));
+    const { api, audit, read } = taxed(tax);
+    expect((await read("198.51.100.20")).tax).toBeNull();
+    expect(audit).toEqual([{ event: "billing.plans.tax_unavailable", country: "DE", code: "TAX_ANSWER_MISMATCH" }]);
+    await api.close();
+  });
+
+  it("answers the list even when the tax reader itself throws", async () => {
+    const displayedTax = { read: async () => { throw new Error("READER_BROKEN"); } };
+    const api = buildApi({
+      application: unusedAskApplication(), billing: { ...billing(), plans: testRegionalPlans, geo, displayedTax }
+    });
+    const response = await api.inject({ method: "GET", url: "/v1/billing/plans", remoteAddress: "198.51.100.20" });
+    expect([response.statusCode, response.json()]).toEqual([200, { currency: "EUR", tax: null, plans: PLANS_ANSWER }]);
+    await api.close();
+  });
+
+  it("refuses a list that names a total without a tax, or a tax without a total", () => {
+    const tax = { country: "DE", tax_name: "MwSt.", tax_rate_bp: 1_900, tax_status: "TAXABLE" };
+    const plus = { plan_id: "PLUS", net_prices: PLANS_ANSWER[1]!.net_prices, allowance_vs_plus: "1" };
+    expect(BillingPlansResponseSchema.safeParse({ currency: "EUR", tax, plans: [{ ...plus, total_price: "23.80" }] }).success).toBe(true);
+    expect(BillingPlansResponseSchema.safeParse({ currency: "EUR", tax: null, plans: [{ ...plus, total_price: "23.80" }] }).success).toBe(false);
+    expect(BillingPlansResponseSchema.safeParse({ currency: "EUR", tax, plans: [{ ...plus, total_price: null }] }).success).toBe(false);
   });
 });
 

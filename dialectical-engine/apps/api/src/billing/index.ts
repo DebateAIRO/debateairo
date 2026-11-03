@@ -6,14 +6,15 @@ import {
 } from "@debateai/contract";
 import { allowanceVsPlus, microsToDecimal } from "@debateai/billing-core";
 import type { GeoLookup } from "@debateai/geo";
-import { planNetPrice, type BillingPlans, type PlanId } from "@debateai/register";
+import { planNetPrice, priceCurrencyFor, type BillingPlans, type PlanId } from "@debateai/register";
 import { clientIpNetworkScope } from "../client-ip.js";
 import type { LegalAcceptanceApplication } from "../legal.js";
 import type { AuthenticatedSession } from "../sessions.js";
 import type { ChargeStatusPort } from "./charge-status.js";
 import type { CheckoutServicePort } from "./checkout.js";
+import type { DisplayedTaxPort } from "./displayed-tax.js";
 import type { NetopiaNoticeIntakePort } from "./netopia-intake.js";
-import { connectionCurrency } from "./place.js";
+import { connectionCountry } from "./place.js";
 import type { QuoteResult, QuoteServicePort } from "./quote.js";
 import { answerRefusal, BillingRefusal, billingNotFound } from "./refusal.js";
 import { installSubscriptionRoutes, SUBSCRIPTION_ROUTE_PATHS } from "./subscription-routes.js";
@@ -92,6 +93,8 @@ export type BillingRouteDeps = Readonly<{
   plans?: BillingPlans;
   /** Part C: the connection's country for the plans' currency; absent, the rule's default. */
   geo?: GeoLookup;
+  /** Terms §12: the connection country's tax on the plans list; absent, the list's prices are before tax. */
+  displayedTax?: DisplayedTaxPort;
   legal?: BillingLegalGate;
   /** P8b. */
   quotes?: QuoteServicePort;
@@ -140,8 +143,8 @@ async function refuseUnconfirmedAge(read: BillingAgeConfirmation | undefined, se
 }
 
 /**
- * Spec 2026-10-05 §2.16.5: the answer names the caller's currency, so only the browser may keep it for a minute; a
- * shared cache would hand one country's currency to everyone.
+ * Spec 2026-10-05 §2.16.5: the answer names the caller's currency and country's tax, so only the browser may keep it
+ * for a minute; a shared cache would hand one country's prices to everyone.
  */
 const PLANS_CACHE_CONTROL = "private, max-age=60";
 
@@ -215,8 +218,6 @@ export function installBillingRoutes(api: FastifyInstance, deps: BillingRouteDep
     }
   );
 
-  // The plans come from the register version read at boot, so one body per currency serves every caller until restart.
-  const plansBodies = new Map<BillingCurrency, Readonly<Record<string, unknown>>>();
   api.get("/v1/billing/plans", {
     ...deps.policy("GET /v1/billing/plans"),
     // Spec §2.5.3: "GET /v1/billing/plans (public; cached 60 s)". The house onSend hook of `buildApi`
@@ -233,21 +234,31 @@ export function installBillingRoutes(api: FastifyInstance, deps: BillingRouteDep
     // A source-keyed scope counts the caller's network (DL5-F3: an IPv6 address is its /64), as G3a's does.
     if (!admit.gate(reply, "publicReads", "GET /v1/billing/plans", clientIpNetworkScope(source(request).ip))) return reply;
     // Spec 2026-10-05 §2.16.1: every plan's price in each currency, and the one this caller's connection pays in.
-    const currency = connectionCurrency({ geo: deps.geo, plans, ip: source(request).ip });
-    let body = plansBodies.get(currency);
-    if (body === undefined) {
-      body = BillingPlansResponseSchema.parse({
-        currency,
-        plans: plans.plans.map((plan) => ({
+    const country = connectionCountry({ geo: deps.geo, ip: source(request).ip });
+    const currency: BillingCurrency = priceCurrencyFor(plans, country);
+    // Terms §12: prices include the tax of where the person lives; the connection's country is the page's best guess.
+    // The list never fails over its tax: a reader that throws leaves the prices before tax, as an unknown country does.
+    const read = country === null || deps.displayedTax === undefined ? null
+      : await deps.displayedTax.read(country).catch(() => null);
+    // A price is shown with tax only when every plan has one in this currency; never a net price called a total.
+    const tax = read !== null && read.currency === currency
+      && plans.plans.every((plan) => read.totalMicros.has(plan.planId)) ? read : null;
+    return reply.send(BillingPlansResponseSchema.parse({
+      currency,
+      tax: tax === null ? null : {
+        country: tax.country, tax_name: tax.taxName, tax_rate_bp: tax.taxRateBasisPoints, tax_status: tax.status
+      },
+      plans: plans.plans.map((plan) => {
+        const total = tax?.totalMicros.get(plan.planId);
+        return {
           plan_id: plan.planId,
           net_prices: Object.fromEntries(BillingCurrencySchema.options.map((priced) =>
             [priced, microsToDecimal(planNetPrice(plan, priced))])),
+          total_price: total === undefined ? null : microsToDecimal(total),
           allowance_vs_plus: allowanceVsPlus(plans, plan.planId)
-        }))
-      });
-      plansBodies.set(currency, body);
-    }
-    return reply.send(body);
+        };
+      })
+    }));
   });
 
   api.post("/v1/billing/quote", { ...deps.policy("POST /v1/billing/quote"), bodyLimit: BILLING_BODY_LIMIT_BYTES }, async (request, reply) => {

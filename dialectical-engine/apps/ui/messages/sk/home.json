@@ -77,6 +77,8 @@
   "home.closingTitle": "Váš argument je len taký silný ako jeho najslabší článok.",
   "home.closingLede": "Absolvujte jedno kolo. Štyri ťahy, približne deväť minút a prepis, ktorý vám presne ukáže, kde ste prestali odpovedať.",
   "home.pricingCopy": "Začnite zadarmo. Platené programy začínajú na {price} mesačne plus daň. Zrušiť môžete kedykoľvek.",
+  "home.pricingCopyTaxIncluded": "Začnite zadarmo. Platené programy začínajú na {price} mesačne vrátane dane. Zrušiť môžete kedykoľvek.",
+  "home.pricingCopyNoTax": "Začnite zadarmo. Platené programy začínajú na {price} mesačne bez pripočítanej dane. Zrušiť môžete kedykoľvek.",
   "home.pricingCopyFree": "Začnite zadarmo. Karta nie je potrebná.",
   "home.pricingLink": "Zobraziť programy",
   "home.card1Text": "Firmy fungujúce najmä na diaľku by mali vo všeobecnosti používať platové pásma nezávislé od miesta pre inžinierov vykonávajúcich rovnocennú prácu a zároveň umožniť transparentné úpravy podľa zákonom stanovených nákladov, vzácnych zručností a rozsahu roly.",

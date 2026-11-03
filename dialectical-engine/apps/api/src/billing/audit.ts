@@ -7,6 +7,11 @@ import { paymentErrorCode } from "@debateai/billing-core";
  */
 export type BillingAuditEvent =
   | "billing.quote.refused"
+  /**
+   * Terms §12: the plans list could not price a country's tax (the tax service down or refusing, or an answer that is
+   * not that country's), so its visitors see the prices before tax until it answers. The country and a code only.
+   */
+  | "billing.plans.tax_unavailable"
   | "billing.checkout.started"
   | "billing.payment.verified"
   | "billing.payment.failed"

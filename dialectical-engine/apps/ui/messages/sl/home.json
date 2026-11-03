@@ -77,6 +77,8 @@
   "home.closingTitle": "Vaš argument je močan le toliko kot njegov najšibkejši člen.",
   "home.closingLede": "Opravite en krog. Štiri poteze, približno devet minut in prepis, ki vam natančno pokaže, kje ste nehali odgovarjati.",
   "home.pricingCopy": "Začnite brezplačno. Plačljivi paketi se začnejo pri {price} na mesec plus davek. Kadar koli lahko prekličete.",
+  "home.pricingCopyTaxIncluded": "Začnite brezplačno. Plačljivi paketi se začnejo pri {price} na mesec z vključenim davkom. Kadar koli lahko prekličete.",
+  "home.pricingCopyNoTax": "Začnite brezplačno. Plačljivi paketi se začnejo pri {price} na mesec brez dodanega davka. Kadar koli lahko prekličete.",
   "home.pricingCopyFree": "Začnite brezplačno. Kartica ni potrebna.",
   "home.pricingLink": "Oglejte si pakete",
   "home.card1Text": "Podjetja, ki poslujejo predvsem na daljavo, bi morala za inženirje, ki opravljajo enakovredno delo, praviloma uporabljati plačne razrede, neodvisne od lokacije, pri tem pa dopuščati pregledne prilagoditve zaradi zakonsko predpisanih stroškov, redkih znanj in obsega vloge.",

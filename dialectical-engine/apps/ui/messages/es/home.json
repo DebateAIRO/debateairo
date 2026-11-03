@@ -76,6 +76,8 @@
   "home.closingTitle": "Su argumento es tan sólido como su eslabón más débil.",
   "home.closingLede": "Complete una ronda. Cuatro turnos, unos nueve minutos y una transcripción que le indica exactamente dónde dejó de responder.",
   "home.pricingCopy": "Empiece gratis. Los planes de pago empiezan en {price} al mes más impuestos. Cancele cuando quiera.",
+  "home.pricingCopyTaxIncluded": "Empiece gratis. Los planes de pago empiezan en {price} al mes, impuestos incluidos. Cancele cuando quiera.",
+  "home.pricingCopyNoTax": "Empiece gratis. Los planes de pago empiezan en {price} al mes, sin impuestos añadidos. Cancele cuando quiera.",
   "home.pricingCopyFree": "Empiece gratis. Sin tarjeta.",
   "home.pricingLink": "Ver los planes",
   "home.card1Text": "En general, las empresas que trabajan principalmente a distancia deberían aplicar bandas salariales independientes de la ubicación a los ingenieros que desempeñen un trabajo equivalente, aunque permitiendo ajustes transparentes por costes exigidos por ley, competencias escasas y alcance del puesto.",

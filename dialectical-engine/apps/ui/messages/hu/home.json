@@ -75,6 +75,8 @@
   "home.closingTitle": "Az érve csak annyira erős, mint a leggyengébb láncszeme.",
   "home.closingLede": "Tegyen meg egy fordulót. Négy megszólalás, körülbelül kilenc perc és egy átirat, amely pontosan megmutatja, hol hagyott fel a válaszadással.",
   "home.pricingCopy": "Kezdje ingyen. A fizetős csomagok havi {price} összegtől indulnak, plusz adó. Bármikor lemondható.",
+  "home.pricingCopyTaxIncluded": "Kezdje ingyen. A fizetős csomagok havi {price} összegtől indulnak, adóval együtt. Bármikor lemondható.",
+  "home.pricingCopyNoTax": "Kezdje ingyen. A fizetős csomagok havi {price} összegtől indulnak, adó felszámítása nélkül. Bármikor lemondható.",
   "home.pricingCopyFree": "Kezdje ingyen. Nem kell kártya.",
   "home.pricingLink": "Csomagok megtekintése",
   "home.card1Text": "Az elsősorban távmunkában működő vállalatoknak általában a helytől független fizetési sávokat kellene alkalmazniuk az egyenértékű munkát végző mérnökökre, miközben átlátható kiigazításokat engednek a jogszabályban előírt költségek, ritka készségek és a munkakör terjedelme alapján.",

@@ -75,6 +75,8 @@
   "home.closingTitle": "Argümanınız ancak en zayıf halkası kadar güçlüdür.",
   "home.closingLede": "Bir tura katılın. Dört söz sırası, yaklaşık dokuz dakika ve tam olarak nerede yanıt vermeyi bıraktığınızı gösteren bir tutanak.",
   "home.pricingCopy": "Ücretsiz başlayın. Ücretli planlar ayda {price} artı vergiden başlar. İstediğiniz zaman iptal edin.",
+  "home.pricingCopyTaxIncluded": "Ücretsiz başlayın. Ücretli planlar vergi dahil ayda {price} tutarından başlar. İstediğiniz zaman iptal edin.",
+  "home.pricingCopyNoTax": "Ücretsiz başlayın. Ücretli planlar ayda {price} tutarından başlar, vergi eklenmez. İstediğiniz zaman iptal edin.",
   "home.pricingCopyFree": "Ücretsiz başlayın. Kart gerekmez.",
   "home.pricingLink": "Planları görün",
   "home.card1Text": "Uzaktan çalışmayı önceleyen şirketler, eşdeğer iş yapan mühendisler için genel olarak konumdan bağımsız maaş aralıkları kullanmalı; yasal olarak zorunlu maliyetler, nadir beceriler ve rol kapsamı için şeffaf düzenlemelere izin vermelidir.",
