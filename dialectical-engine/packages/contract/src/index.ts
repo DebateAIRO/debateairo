@@ -19,6 +19,9 @@ export * from "./start-paths.js";
 import { StartCheckSchema, StartPathsSchema } from "./start-paths.js";
 // V4 start step, Task 15: a path debate's results per path.
 export * from "./path-outcome.js";
+// V4 start step, Task 16: Answer.branches, the run read's and the public snapshot's paths.
+export * from "./branches.js";
+import { AnswerBranchesSchema, PublicBranchesSchema } from "./branches.js";
 import { SessionSchema, LegalDocumentPairSchema } from "./auth-shared.js";
 export * from "./auth-shared.js";
 import { ConsumerAuthenticationCredentialSchema, consumerAuthContractSchemas } from "./consumer-auth.js";
@@ -948,7 +951,9 @@ export const RunProjectionSchema = z.object({
   // W2-7 (money rule): the month wall paused this debate's planned calls and searches (MonthPauseSchema, ./web.ts).
   month_pause: MonthPauseSchema.optional(),
   // Decision 12: only on a debate that an update set aside: what the AIs found stays readable.
-  found: z.array(RunFoundPageSchema).max(64).optional()
+  found: z.array(RunFoundPageSchema).max(64).optional(),
+  // V4 start step, Task 16: a path debate's paths as they stand while it runs; absent on every R22 run.
+  branches: AnswerBranchesSchema.optional()
 }).strict().superRefine((run, context) => {
   if (run.found !== undefined && run.state !== "FAILED") {
     context.addIssue({ code: "custom", message: "only a debate that stopped lists what was found so far" });
@@ -1608,7 +1613,9 @@ export const PublicDebateSchema = z.object({
   /** Decision 33: part of this debate was changed after a review. Plainly marked; no reason is ever given. */
   changed_after_review: z.literal(true).optional(),
   // Decisions 13 and 16: every report anyone wrote on it, oldest first; the newest is current, the earlier ones stay readable.
-  reports: z.array(PublicReportVersionSchema).max(WEB_CONTRACT_LIMITS.publicReportsMax).optional()
+  reports: z.array(PublicReportVersionSchema).max(WEB_CONTRACT_LIMITS.publicReportsMax).optional(),
+  // V4 start step, Task 16: a public path debate's paths (publicBranchesOf); absent on every R22 debate.
+  branches: PublicBranchesSchema.optional()
 }).strict();
 export type PublicDebate = z.infer<typeof PublicDebateSchema>;
 
@@ -1772,7 +1779,9 @@ export const AnswerSchema = z.object({
   // contribution to a public debate stands. Optional: older answers parse unchanged.
   main_answer: AnswerMainAnswerSchema.optional(),
   purpose_lines: PurposeLinesSchema.optional(),
-  contribution: AnswerContributionSchema.optional()
+  contribution: AnswerContributionSchema.optional(),
+  // V4 start step, Task 16: a path debate's paths (each its own branch); absent on every R22 answer.
+  branches: AnswerBranchesSchema.optional()
 }).strict().superRefine((answer, context) => {
   // W1-6: the server's checked flag stands only on a looked-up point whose locator is one of its own sources.
   for (const node of answer.nodes) {
