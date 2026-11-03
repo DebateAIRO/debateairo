@@ -29,6 +29,10 @@
 .publicFirstAnswer summary { cursor: pointer; color: var(--text-2); font-size: 13.5px; }
 .publicFirstAnswer[open] summary { margin-bottom: 8px; }
 
+/* public-f5: "Report a problem": the quiet line next to the link that says it was sent, then the check's answer; the short line under a box left too short. */
+.v4PubFlagLine { color: var(--text-2); font-size: 13px; }
+.v4PubFlagMore { margin: 0; color: var(--text-2); font-size: 12.5px; }
+
 /* public-f6: the grey outline shown at once while a public debate loads. Still: no shimmer, so reduced motion needs nothing more. */
 .v4PubSkel { display: flex; flex-direction: column; }
 .v4PubSkelHeader { display: flex; align-items: center; min-height: 64px; padding: 10px var(--v4-gutter); border-bottom: 1px solid var(--line-2); background: var(--surface); }

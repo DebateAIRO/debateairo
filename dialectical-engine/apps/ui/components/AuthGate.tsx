@@ -9,6 +9,15 @@ import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
 const SESSION_MARKER = COOKIE_SESSION_MARKER;
 
+/**
+ * public-f13 (owner screen review, 3 Nov): the sign-in page carries the way back to this page, from its path and query
+ * only (a fragment never travels to the server); lib/returnPath decides which addresses sign-in may return to (a V4
+ * debate, its report, /v4, settings…), and any other comes back to the default, as before.
+ */
+function signInHref(): string {
+  return `/login?next=${encodeURIComponent(`${window.location.pathname}${window.location.search}`)}`;
+}
+
 export function AuthGate({
   children,
   catalog,
@@ -25,6 +34,7 @@ export function AuthGate({
 }) {
   const [authenticated, setAuthenticated] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [signIn, setSignIn] = useState("/login");
   useEffect(() => {
     let active = true;
     void validateSession().then(
@@ -42,6 +52,7 @@ export function AuthGate({
       },
       () => {
         if (active) {
+          setSignIn(signInHref());
           setAuthenticated(false);
           setChecking(false);
         }
@@ -51,8 +62,8 @@ export function AuthGate({
   }, []);
 
   useEffect(() => {
-    if (!checking && !authenticated) window.location.replace("/login");
-  }, [authenticated, checking]);
+    if (!checking && !authenticated) window.location.replace(signIn);
+  }, [authenticated, checking, signIn]);
 
   if (checking) {
     return <div className="screen scroll"><div className="screenInner narrow"><p className="muted">{t(catalog, "newDebate.checkingSession")}</p></div></div>;
@@ -68,7 +79,7 @@ export function AuthGate({
     <div className="screen scroll">
       <div className="screenInner narrow">
         <p className="muted" role="status">{t(catalog, "newDebate.redirectingToSignIn")}</p>
-        <Link href="/login">{t(catalog, "newDebate.continueToSignIn")}</Link>
+        <Link href={signIn}>{t(catalog, "newDebate.continueToSignIn")}</Link>
       </div>
     </div>
   );
