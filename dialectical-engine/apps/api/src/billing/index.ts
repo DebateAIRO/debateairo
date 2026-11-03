@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
   BillingChargeStatusResponseSchema, BillingCheckoutRequestSchema, BillingCheckoutResponseSchema, BillingCurrencySchema,
-  BillingPlansResponseSchema, BillingQuoteRequestSchema, BillingQuoteResponseSchema, BillingUsageResponseSchema,
+  BillingPlansQuerySchema, BillingPlansResponseSchema, BillingQuoteRequestSchema, BillingQuoteResponseSchema, BillingUsageResponseSchema,
   type BillingCurrency
 } from "@debateai/contract";
 import { allowanceVsPlus, microsToDecimal } from "@debateai/billing-core";
@@ -14,7 +14,7 @@ import type { ChargeStatusPort } from "./charge-status.js";
 import type { CheckoutServicePort } from "./checkout.js";
 import type { DisplayedTaxPort } from "./displayed-tax.js";
 import type { NetopiaNoticeIntakePort } from "./netopia-intake.js";
-import { connectionCountry } from "./place.js";
+import { pricingPlace } from "./place.js";
 import type { QuoteResult, QuoteServicePort } from "./quote.js";
 import { answerRefusal, BillingRefusal, billingNotFound } from "./refusal.js";
 import { installSubscriptionRoutes, SUBSCRIPTION_ROUTE_PATHS } from "./subscription-routes.js";
@@ -233,18 +233,29 @@ export function installBillingRoutes(api: FastifyInstance, deps: BillingRouteDep
     if (plans === undefined) return billingNotFound(reply);
     // A source-keyed scope counts the caller's network (DL5-F3: an IPv6 address is its /64), as G3a's does.
     if (!admit.gate(reply, "publicReads", "GET /v1/billing/plans", clientIpNetworkScope(source(request).ip))) return reply;
-    // Spec 2026-10-05 §2.16.1: every plan's price in each currency, and the one this caller's connection pays in.
-    const country = connectionCountry({ geo: deps.geo, ip: source(request).ip });
-    const currency: BillingCurrency = priceCurrencyFor(plans, country);
-    // Terms §12: prices include the tax of where the person lives; the connection's country is the page's best guess.
-    // The list never fails over its tax: a reader that throws leaves the prices before tax, as an unknown country does.
-    const read = country === null || deps.displayedTax === undefined ? null
-      : await deps.displayedTax.read(country).catch(() => null);
+    // Terms §12: prices include the tax of where the person lives, so the list prices for a place: the country the
+    // visitor chose (and in the US and Canada the postal code), else the connection's. A query that does not parse is
+    // no choice at all.
+    const query = BillingPlansQuerySchema.safeParse(request.query);
+    const place = pricingPlace({
+      geo: deps.geo, ip: source(request).ip,
+      country: query.success ? query.data.country : undefined,
+      postalCode: query.success ? query.data.postal_code : undefined
+    });
+    // Spec 2026-10-05 §2.16.1: every plan's net price in each currency, and the one that place pays in.
+    const currency: BillingCurrency = priceCurrencyFor(plans, place.country);
+    // The list never fails over its tax: a reader that throws is TAX_UNAVAILABLE, and no price is offered.
+    const read = place.status !== "READY" || place.country === null || deps.displayedTax === undefined ? null
+      : await deps.displayedTax.read({ country: place.country, postalCode: place.postalCode }).catch(() => null);
     // A price is shown with tax only when every plan has one in this currency; never a net price called a total.
     const tax = read !== null && read.currency === currency
       && plans.plans.every((plan) => read.totalMicros.has(plan.planId)) ? read : null;
     return reply.send(BillingPlansResponseSchema.parse({
       currency,
+      place: {
+        country: place.country, postal_code: place.postalCode,
+        status: tax !== null ? "PRICED" : place.status === "READY" ? "TAX_UNAVAILABLE" : place.status
+      },
       tax: tax === null ? null : {
         country: tax.country, tax_name: tax.taxName, tax_rate_bp: tax.taxRateBasisPoints, tax_status: tax.status
       },

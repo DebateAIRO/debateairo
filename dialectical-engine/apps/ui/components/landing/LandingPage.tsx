@@ -12,7 +12,7 @@ import type { MessageCatalog } from "@/lib/i18n/translate";
 export function LandingPage({
   catalog,
   lowestPaidPrice,
-  tax = "BEFORE",
+  tax = "UNPRICED",
   footerBilling
 }: {
   catalog: MessageCatalog; lowestPaidPrice: string | null; tax?: PricedTax; footerBilling: SiteFooterBilling;
@@ -23,7 +23,9 @@ export function LandingPage({
       <LandingHero catalog={catalog} />
       <LandingSample catalog={catalog} />
       <LandingMethod catalog={catalog} />
-      <LandingPricing catalog={catalog} lowestPaidPrice={lowestPaidPrice} tax={tax} />
+      <LandingPricing
+        catalog={catalog} lowestPaidPrice={lowestPaidPrice} tax={tax} billingOn={footerBilling.billingOn}
+      />
       <SiteFooter variant="full" billing={footerBilling} />
     </div>
   );

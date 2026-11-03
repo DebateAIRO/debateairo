@@ -48,6 +48,37 @@ export function connectionCountry(input: Readonly<{ geo: GeoLookup | undefined; 
   return located.tor || located.country === UNKNOWN_COUNTRY ? null : located.country;
 }
 
+/** C-8: where Quaderno prices a sale by a region it reads from the postal code (P2-M29). */
+export const PRICED_REGION_COUNTRIES: ReadonlySet<string> = new Set(["US", "CA"]);
+
+export type PricingPlace = Readonly<{
+  country: string | null;
+  /** The postal code as the tax engine is sent it (US: the five-digit ZIP; Canada: "A1A 1A1"); null elsewhere. */
+  postalCode: string | null;
+  status: "READY" | "COUNTRY_NEEDED" | "POSTAL_CODE_NEEDED" | "POSTAL_CODE_INVALID";
+}>;
+
+/**
+ * Terms §12: the place the plans list prices for. The country the visitor chose, as the checkout's declared country,
+ * else the connection's; none known is COUNTRY_NEEDED. In the US and Canada the state's or province's tax comes from
+ * the postal code, so a price there waits for one that fits the country's format (the kernel's own check, as the
+ * checkout's); elsewhere a postal code is not used.
+ */
+export function pricingPlace(input: Readonly<{
+  geo: GeoLookup | undefined; ip: string; country: string | undefined; postalCode: string | undefined;
+}>): PricingPlace {
+  const country = input.country ?? connectionCountry({ geo: input.geo, ip: input.ip });
+  if (country === null) return Object.freeze({ country: null, postalCode: null, status: "COUNTRY_NEEDED" as const });
+  if (!PRICED_REGION_COUNTRIES.has(country)) return Object.freeze({ country, postalCode: null, status: "READY" as const });
+  if (input.postalCode === undefined) return Object.freeze({ country, postalCode: null, status: "POSTAL_CODE_NEEDED" as const });
+  const typed = input.postalCode.toUpperCase().replace(/[\s-]+/gu, "");
+  if (paymentRegionsOf({ country, postalCode: typed, region: null }).kind === "POSTCODE_INVALID") {
+    return Object.freeze({ country, postalCode: null, status: "POSTAL_CODE_INVALID" as const });
+  }
+  const postalCode = country === "US" ? typed.slice(0, 5) : `${typed.slice(0, 3)} ${typed.slice(3)}`;
+  return Object.freeze({ country, postalCode, status: "READY" as const });
+}
+
 /**
  * Spec 2026-10-05 §2.16.1: the currency a visitor's connection pays in; a connection in no known country pays in the
  * rule's default.
