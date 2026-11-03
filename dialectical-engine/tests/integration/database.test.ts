@@ -884,63 +884,65 @@ describe("S-LANG argument language persistence", () => {
     // cannot admit. A person's run is encrypted, so the API's runtime pool carries the person's content cipher: a
     // pool of this test's own (main.ts's wiring in login mode, a second superuser pool otherwise), so the file's
     // shared pools stay as they are.
+    // Everything after the seed pool is made sits inside the try, so a failing setup still ends it and releases the owner.
     const seed = createPool(database.connectionString, { max: 4 });
-    const owner = await provisionStoryEncryptedOwner(seed);
-    const loginMode = apiPools.runtime !== database.pool;
-    const runtime = loginMode
-      ? shareContentCipher(seed, (await apiTestPools(database, import.meta.url, {
-        runtime: (await provisionRlsLogins(database)).url("DATABASE_URL")
-      })).runtime)
-      : seed;
-    const { userId, ownerRef } = owner;
-    const session = Object.freeze({
-      asker_id: `owner:${ownerRef}`, session_id: owner.sessionId, caller_scope: "ASKER" as const,
-      ownership_provenance: "server_session" as const, provisional_identity_model: false as const
-    });
-    const panel = PLAN_TIER_ROSTERS.free.map((modelId, index) => Object.freeze({
-      provider_ref: `provider:slang:${String(index + 1)}`,
-      maker: `maker:slang:${String(index + 1)}`,
-      model_id: modelId,
-      probe_evidence_ref: randomUUID(),
-      probed_at: "2026-09-22T00:00:00.000Z"
-    }));
-    const settings: RunCreationSettings = {
-      strangerSampleRate: 0,
-      registerVersion: 1,
-      releaseKey: TEST_RELEASE_KEY,
-      batteryVersion: "slang-test",
-      settlementWatchHandle: "slang-test",
-      resolveDiscoveredPanel: async () => panel,
-      resolveEnvelopeBasis: async ({ panelSize }) => fixtureStructuralCeiling(12, panelSize, 1),
-      resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({
-        effectiveRiskTier,
-        tierSource: tierSource as "ASKER" | "MACHINE_DEFAULT" | "DEPLOYMENT_POLICY",
-        tierProvenanceRef
-      })
-    };
-    const application = new PostgresAskApplication(
-      runtime,
-      { dispatch: async () => undefined },
-      settings,
-      undefined,
-      apiPools.contentProvision,
-      askAdmissionPools(apiPools)
-    );
-    const ask: AskRequest = {
-      question_line: "Ar trebui ca România să investească mai mult în transportul public, deoarece orașele au nevoie de aer mai curat.",
-      risk_tier: "casual",
-      tier_source: "ASKER",
-      tier_provenance_ref: "asker-declaration:slang",
-      composition_budget_tier: "low",
-      depth_params: { depth: 1 },
-      decision_scope: "S-LANG integration test",
-      as_of: "2026-09-22T00:00:00.000Z",
-      steering_presets: [],
-      plan_tier: "free",
-      steering_annotations: []
-    };
+    let owner: Awaited<ReturnType<typeof provisionStoryEncryptedOwner>> | undefined;
     let runId: string | undefined;
     try {
+      owner = await provisionStoryEncryptedOwner(seed);
+      const loginMode = apiPools.runtime !== database.pool;
+      const runtime = loginMode
+        ? shareContentCipher(seed, (await apiTestPools(database, import.meta.url, {
+          runtime: (await provisionRlsLogins(database)).url("DATABASE_URL")
+        })).runtime)
+        : seed;
+      const { userId, ownerRef } = owner;
+      const session = Object.freeze({
+        asker_id: `owner:${ownerRef}`, session_id: owner.sessionId, caller_scope: "ASKER" as const,
+        ownership_provenance: "server_session" as const, provisional_identity_model: false as const
+      });
+      const panel = PLAN_TIER_ROSTERS.free.map((modelId, index) => Object.freeze({
+        provider_ref: `provider:slang:${String(index + 1)}`,
+        maker: `maker:slang:${String(index + 1)}`,
+        model_id: modelId,
+        probe_evidence_ref: randomUUID(),
+        probed_at: "2026-09-22T00:00:00.000Z"
+      }));
+      const settings: RunCreationSettings = {
+        strangerSampleRate: 0,
+        registerVersion: 1,
+        releaseKey: TEST_RELEASE_KEY,
+        batteryVersion: "slang-test",
+        settlementWatchHandle: "slang-test",
+        resolveDiscoveredPanel: async () => panel,
+        resolveEnvelopeBasis: async ({ panelSize }) => fixtureStructuralCeiling(12, panelSize, 1),
+        resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({
+          effectiveRiskTier,
+          tierSource: tierSource as "ASKER" | "MACHINE_DEFAULT" | "DEPLOYMENT_POLICY",
+          tierProvenanceRef
+        })
+      };
+      const application = new PostgresAskApplication(
+        runtime,
+        { dispatch: async () => undefined },
+        settings,
+        undefined,
+        apiPools.contentProvision,
+        askAdmissionPools(apiPools)
+      );
+      const ask: AskRequest = {
+        question_line: "Ar trebui ca România să investească mai mult în transportul public, deoarece orașele au nevoie de aer mai curat.",
+        risk_tier: "casual",
+        tier_source: "ASKER",
+        tier_provenance_ref: "asker-declaration:slang",
+        composition_budget_tier: "low",
+        depth_params: { depth: 1 },
+        decision_scope: "S-LANG integration test",
+        as_of: "2026-09-22T00:00:00.000Z",
+        steering_presets: [],
+        plan_tier: "free",
+        steering_annotations: []
+      };
       const accepted = await application.submit(ask, session, { kind: "server", userId, ownerRef });
       runId = accepted.run_ref;
       const stored = await database.pool.query<{
@@ -958,7 +960,7 @@ describe("S-LANG argument language persistence", () => {
     } finally {
       if (runId !== undefined) await database.pool.query("DELETE FROM core.work_item WHERE run_id=$1", [runId]);
       await seed.end();
-      await releaseStoryEncryptedOwner(owner);
+      if (owner !== undefined) await releaseStoryEncryptedOwner(owner);
     }
   });
 });
