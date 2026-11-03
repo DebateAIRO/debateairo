@@ -1,8 +1,8 @@
 import {
-  PublicMaterialSchema, StoryFateSchema, cutQuoteAtWordEdge, readingLevelOf, type PublicMaterial, type PublicMaterialPath, type StoryFate
+  StoryFateSchema, cutQuoteAtWordEdge, readingLevelOf, type PublicMaterial, type PublicMaterialPath, type StoryFate
 } from "@debateai/contract";
 import {
-  MAIN_ANSWER_UPDATE_CARRIER, PATH_UPDATE_CARRIER, PUBLIC_ANSWER_UPDATE_CARRIER, PUBLIC_DIG_INPUT_CARRIER, PUBLIC_MATERIAL_CARRIER, PostgresDigPicksRunnerRepository, PostgresPublicDebateRunnerRepository,
+  MAIN_ANSWER_UPDATE_CARRIER, PATH_UPDATE_CARRIER, PUBLIC_ANSWER_UPDATE_CARRIER, PUBLIC_DIG_INPUT_CARRIER, PostgresDigPicksRunnerRepository, PostgresPublicDebateRunnerRepository,
   PostgresPublicTreeRunnerRepository, PostgresTreeUpdateRunnerRepository, RunRepository, decryptContentForRun, encryptAttestedContentForRun, withRunContentLease,
   type PathLineEntry, type Pool, type PublicContributionRead, type WebSealed
 } from "@debateai/db";
@@ -12,7 +12,7 @@ import type { DossierDig, DossierInput, DossierPath, DossierText } from "./inves
 import type { MainAnswerContent, TreeUpdatePorts } from "./path-climb.js";
 import type { PathRewriteDigPath, PathRewriteExtract, PathRewriteParentPath, PathRewritePoint } from "./path-rewrite-material.js";
 import type { PathRewriteContent, PathRewriteDig, PathRewriteSources } from "./path-rewrite.js";
-import { postgresPathRewriteSources, storedDigPathsOf } from "./path-rewrite-sources.js";
+import { openPublicMaterial, postgresPathRewriteSources, storedDigPathsOf } from "./path-rewrite-sources.js";
 import { readReplayBook } from "./run-replay.js";
 
 /**
@@ -35,13 +35,8 @@ import { readReplayBook } from "./run-replay.js";
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> => typeof value === "object" && value !== null && !Array.isArray(value);
 const unread = (what: string): never => { throw new TypedDomainError("PUBLIC_TREE_SOURCE_UNREAD", what); };
 
-/** The copy sealed for this dig or this report's carrier. Null: there is none. */
-export async function openPublicMaterial(pool: Pool, materialId: string): Promise<PublicMaterial | null> {
-  const row = await new PostgresPublicTreeRunnerRepository(pool).readMaterial(materialId);
-  if (row === null) return null;
-  const opened = await withRunContentLease(pool, [row.run_id], () => decryptContentForRun<unknown>(pool, row.run_id, PUBLIC_MATERIAL_CARRIER, materialId, row.content, null));
-  return PublicMaterialSchema.parse(opened);
-}
+/** The copy sealed for this dig or this report's carrier. It lives with the private dig's sources, which stop at a person's own public dig and read its copy too. */
+export { openPublicMaterial };
 
 const pointsOfPath = (path: PublicMaterialPath): readonly PathRewritePoint[] => Object.freeze(path.points.map((point) => Object.freeze({
   id: point.id, text: point.text, onId: point.on_id, side: point.side, trust: null, disputed: point.disputed })));
