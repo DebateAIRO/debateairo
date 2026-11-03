@@ -26,6 +26,8 @@ vi.mock("@/lib/v4/money", async (original) => (await import("./v4-debate-harness
 const word = (key: string, values: Record<string, string | number> = {}): string =>
   Object.entries(values).reduce((line, [name, value]) => line.replaceAll(`{${name}}`, String(value)), CATALOG[key]!);
 const panelBoxes = (): HTMLInputElement[] => [...panel().querySelectorAll<HTMLInputElement>(".v4Sugs input[type=checkbox]")];
+/** journey-f23 (owner's screen review, 3 Nov): the tray shows the picks as chips, never as "N picked". */
+const trayChips = (): HTMLElement[] => [...(tray()?.querySelectorAll<HTMLElement>(".v4ChoiceChip") ?? [])];
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -114,7 +116,7 @@ describe("V4DebateClient's dig flow", () => {
     await advance(10_100);
     await settle();
     expect(text()).toContain(CATALOG["v4.nest.tooDeep"]);
-    expect(tray()?.textContent).toContain(word("v4.dig.trayPicked.one", { count: 1 }));
+    expect(trayChips()).toHaveLength(1);
   });
 
   // R22 W3-8: the two dig refusals with their own codes are said where DIG_TOO_DEEP is, and the picks stay too.
@@ -127,7 +129,7 @@ describe("V4DebateClient's dig flow", () => {
       await advance(10_100);
       await settle();
       expect(text()).toContain(word(key, values));
-      expect(tray()?.textContent).toContain(word("v4.dig.trayPicked.one", { count: 1 }));
+      expect(trayChips()).toHaveLength(1);
     });
 
   // Dig model revision W4-6 (owner Q-D13): a dig keeps its points and its answer text and writes no story, so its page never

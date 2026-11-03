@@ -14,6 +14,7 @@ import {
 import { AuthGate } from "@/components/AuthGate";
 import { RoomNotice } from "@/components/billing/RoomNotice";
 import { V4ChangesBar } from "@/components/v4/V4ChangesBar";
+import { V4PickChips } from "@/components/v4/V4ChoiceChips";
 import { V4MoneyLines, type V4DigChoice } from "@/components/v4/V4DigSuggest";
 import { V4DigToast, type V4DigNotice } from "@/components/v4/V4DigToast";
 import { V4Header } from "@/components/v4/V4Header";
@@ -1299,14 +1300,14 @@ function V4Debate({
   } as const;
 
   // W3-4: the tray names the path its picks are on (owner Q-D1: one path per dig), the money lines, and Free's cap.
+  // journey-f23 (owner's screen review): the picks show as chips, never as a count.
   const tray = hasTray && trayTarget !== null && trayTarget.kind === "picks" ? (
     <section className="v4DebTray" aria-label={t(catalog, "v4.dig.trayLabel")}>
+      <V4PickChips picks={trayTarget.picks} label={t(catalog, "v4.map.picked")} />
       <p className="v4DebTrayText">
-        <strong>{tPlural(catalog, "v4.dig.trayPicked", trayTarget.picks.length, locale)}</strong>
         {trayTarget.path !== null ? (
-          <>{" · "}<TitleText title={pathTitle(trayTarget.path, catalog, 40)} catalog={catalog} /></>
+          <><TitleText title={pathTitle(trayTarget.path, catalog, 40)} catalog={catalog} />{" · "}</>
         ) : null}
-        {" · "}
         {t(catalog, `v4.digMode.${sentDigMode}`)}
       </p>
       <p className="v4DebTrayHint v4Muted">
