@@ -36,7 +36,7 @@ export function LandingPricing({
         {t(catalog, "home.closingLede")}
       </p>
       <div style={{ display: "flex", justifyContent: "center", marginTop: "52px" }}>
-        <a className="lpCta lpCtaClosing" href="/login?next=%2Fnew">
+        <a className="lpCta lpCtaClosing" href="/login?next=%2Fv4">
           {t(catalog, "chrome.startRound")}
           <span className="lpArrow" aria-hidden="true">
             →

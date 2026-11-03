@@ -6,6 +6,7 @@ import { ageConfirmationHref, ageConfirmationRequired } from "@/lib/ageConfirmat
 import { LegalAcceptGate } from "@/components/billing/LegalAcceptGate";
 import { COOKIE_SESSION_MARKER, validateSession } from "@/lib/api";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import { signInHref } from "@/lib/returnPath";
 
 const SESSION_MARKER = COOKIE_SESSION_MARKER;
 
@@ -25,6 +26,9 @@ export function AuthGate({
 }) {
   const [authenticated, setAuthenticated] = useState(false);
   const [checking, setChecking] = useState(true);
+  // V4 review ask-f1: sign-in carries the way back to this page (its query too), so a stranger sent to sign in from
+  // the new ask page comes back to it, not to the old new-debate page. Read from the address once the session is known.
+  const [signIn, setSignIn] = useState("/login");
   useEffect(() => {
     let active = true;
     void validateSession().then(
@@ -42,6 +46,7 @@ export function AuthGate({
       },
       () => {
         if (active) {
+          setSignIn(signInHref(`${window.location.pathname}${window.location.search}`));
           setAuthenticated(false);
           setChecking(false);
         }
@@ -51,8 +56,8 @@ export function AuthGate({
   }, []);
 
   useEffect(() => {
-    if (!checking && !authenticated) window.location.replace("/login");
-  }, [authenticated, checking]);
+    if (!checking && !authenticated) window.location.replace(signIn);
+  }, [authenticated, checking, signIn]);
 
   if (checking) {
     return <div className="screen scroll"><div className="screenInner narrow"><p className="muted">{t(catalog, "newDebate.checkingSession")}</p></div></div>;
@@ -68,7 +73,7 @@ export function AuthGate({
     <div className="screen scroll">
       <div className="screenInner narrow">
         <p className="muted" role="status">{t(catalog, "newDebate.redirectingToSignIn")}</p>
-        <Link href="/login">{t(catalog, "newDebate.continueToSignIn")}</Link>
+        <Link href={signIn}>{t(catalog, "newDebate.continueToSignIn")}</Link>
       </div>
     </div>
   );

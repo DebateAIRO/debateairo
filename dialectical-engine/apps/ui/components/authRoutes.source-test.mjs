@@ -43,7 +43,10 @@ test("auth screens share the reference hierarchy and replace the inline gate", (
   assert.match(styles, /\.authHeadline\s*\{/);
   assert.match(styles, /\.authPrimary\s*\{/);
   assert.match(styles, /@media \(max-width: 640px\)[\s\S]*?\.authScreen/);
-  assert.match(gate, /window\.location\.replace\("\/login"\)/);
+  // V4 review ask-f1: the gate sends people to sign in with the way back to the page they were on (query kept).
+  assert.match(gate, /window\.location\.replace\(signIn\)/);
+  assert.match(gate, /setSignIn\(signInHref\(`\$\{window\.location\.pathname\}\$\{window\.location\.search\}`\)\)/);
+  assert.match(returnPath, /export function signInHref\(here: string\): string/);
   assert.doesNotMatch(gate, /beginLogin|completeLogin/);
   assert.match(topBar, /AUTH_PATHS/);
 });
@@ -71,7 +74,7 @@ test("every public and protected entry point reaches the dedicated auth routes",
   assert.match(signUp, /<a href=\{loginHref\}>/);
   assert.doesNotMatch(signUp, /<Link\b/);
   assert.doesNotMatch(signUp, /from "next\/link"/);
-  assert.match(gate, /window\.location\.replace\("\/login"\)/);
+  assert.match(gate, /window\.location\.replace\(signIn\)/);
 });
 
 test("the project home confirms a real session before exposing its debate composer", () => {

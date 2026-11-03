@@ -3,7 +3,8 @@ import { PublicDebateSummarySchema } from "@debateai/contract";
 import {
   DEFAULT_RETURN_PATH,
   RETURN_PATH_ALLOW_LIST,
-  safeReturnPath
+  safeReturnPath,
+  signInHref
 } from "../../apps/ui/lib/returnPath.js";
 
 const ACCEPTED_PUBLIC_REF = "3f2a1b4c-9d8e-4f70-b1c2-5a6d7e8f9012";
@@ -82,4 +83,35 @@ describe("T9 return-path validation", () => {
 });
 import {safeSocialReturnPath} from '../../apps/ui/lib/returnPath.js';
 import {BeginSocialLoginRequestSchema,BeginSocialStepUpRequestSchema} from '@debateai/contract';
-it('ordinary success defaults to /new and OAuth admits only exact closed routes including Security',()=>{expect(DEFAULT_RETURN_PATH).toBe('/new');for(const path of ['/new','/settings/security'] as const){expect(safeSocialReturnPath(path)).toBe(path);expect(BeginSocialLoginRequestSchema.safeParse({next:path}).success).toBe(true);expect(BeginSocialStepUpRequestSchema.safeParse({authorization:{action:'CHANGE_EMAIL'},next:path}).success).toBe(true);}for(const path of ['//evil.invalid','https://evil.invalid','/settings/security/../x','/new?next=//evil.invalid','/settings/security#token=secret']){expect(safeSocialReturnPath(path)).toBe('/new');expect(BeginSocialLoginRequestSchema.safeParse({next:path}).success).toBe(false);}});
+it('ordinary success defaults to /v4 (V4 review ask-f1) and OAuth admits only exact closed routes including Security',()=>{expect(DEFAULT_RETURN_PATH).toBe('/v4');for(const path of ['/new','/settings/security'] as const){expect(safeSocialReturnPath(path)).toBe(path);expect(BeginSocialLoginRequestSchema.safeParse({next:path}).success).toBe(true);expect(BeginSocialStepUpRequestSchema.safeParse({authorization:{action:'CHANGE_EMAIL'},next:path}).success).toBe(true);}for(const path of ['//evil.invalid','https://evil.invalid','/settings/security/../x','/new?next=//evil.invalid','/settings/security#token=secret']){expect(safeSocialReturnPath(path)).toBe('/new');expect(BeginSocialLoginRequestSchema.safeParse({next:path}).success).toBe(false);}});
+
+/*
+ * V4 review ask-f1: sign-in from a page carries the way back to that page, its query included (a question handed in by a
+ * link, the reading level), whenever sign-in may return there. Anywhere else it is the plain sign-in page, whose default
+ * is the new ask page. The outside sign-in list is the database's own and does not take /v4 yet (a migration's work), so
+ * it still falls back to /new.
+ */
+describe("V4 review ask-f1: the way back through sign-in", () => {
+  it.each([
+    ["/v4", "/login?next=%2Fv4"],
+    ["/v4?topic=Should%20Romania%20build%20nuclear%20plants%3F&level=plain", `/login?next=${encodeURIComponent("/v4?topic=Should%20Romania%20build%20nuclear%20plants%3F&level=plain")}`],
+    ["/settings/security", "/login?next=%2Fsettings%2Fsecurity"],
+    ["/v4#token=secret", "/login?next=%2Fv4"],
+    ["/v4/debate/11111111-1111-4111-8111-111111111111", "/login"],
+    ["/pricing", "/login"],
+    ["//evil.example/v4", "/login"],
+    ["", "/login"]
+  ])("from %s, sign-in is %s", (here, href) => {
+    expect(signInHref(here)).toBe(href);
+  });
+
+  it("keeps a question handed in by a link through the sign-in page's own return", () => {
+    const next = new URL(signInHref("/v4?topic=Why%20now%3F"), "https://example.invalid").searchParams.get("next");
+    expect(safeReturnPath(next)).toBe("/v4?topic=Why%20now%3F");
+  });
+
+  it("an outside sign-in from the new page still returns to /new until the database list takes /v4", () => {
+    expect(safeSocialReturnPath("/v4")).toBe("/new");
+    expect(BeginSocialLoginRequestSchema.safeParse({ next: "/v4" }).success).toBe(false);
+  });
+});

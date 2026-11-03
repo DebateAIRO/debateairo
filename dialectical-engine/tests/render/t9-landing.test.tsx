@@ -218,9 +218,9 @@ describe("T9-C2 chrome labels & CTAs", () => {
       .find((candidate) => (candidate.textContent ?? "").replace("→", "").trim() === "Start a round");
 
     expect(primary).toBeDefined();
-    expect(primary?.getAttribute("href")).toBe("/login?next=%2Fnew");
+    expect(primary?.getAttribute("href")).toBe("/login?next=%2Fv4");
     expect(primary?.getAttribute("href")).not.toBe("#");
-    expect(primary?.getAttribute("href")).not.toBe("/new");
+    expect(primary?.getAttribute("href")).not.toBe("/v4");
   });
 
   it("keeps every stub navigation link safe to click", async () => {
@@ -488,7 +488,7 @@ describe("T9-C4 landing content", () => {
 
   it("renders both hero CTAs and sends the primary through the safe auth entry", async () => {
     // PROPERTY: the hero owns both CTA labels and its primary enters auth with
-    // the exact encoded /new return path rather than a dead or unsafe target.
+    // the exact encoded /v4 return path (V4 review ask-f1) rather than a dead or unsafe target.
     const document = await renderRoute(null);
     const hero = document.querySelector('[data-landing-section="hero"]');
     const links = [...(hero?.querySelectorAll("a") ?? [])];
@@ -499,20 +499,20 @@ describe("T9-C4 landing content", () => {
     const secondary = links.find((link) => label(link) === "Read a scored transcript");
 
     expect(primary).toBeDefined();
-    expect(primary?.getAttribute("href")).toBe("/login?next=%2Fnew");
+    expect(primary?.getAttribute("href")).toBe("/login?next=%2Fv4");
     expect(secondary).toBeDefined();
   });
 
   it("renders the closing CTA with the safe auth entry", async () => {
     // PROPERTY: the tertiary Start action belongs to the closing subtree (the
     // document moved it out of the method split) and uses the same encoded
-    // /new auth-entry contract as the other primaries.
+    // /v4 auth-entry contract as the other primaries.
     const document = await renderRoute(null);
     const closing = document.querySelector('[data-landing-section="pricing"]');
     const primary = [...(closing?.querySelectorAll("a") ?? [])]
       .find((link) => (link.textContent ?? "").replace("→", "").trim() === "Start a round");
 
     expect(primary).toBeDefined();
-    expect(primary?.getAttribute("href")).toBe("/login?next=%2Fnew");
+    expect(primary?.getAttribute("href")).toBe("/login?next=%2Fv4");
   });
 });
