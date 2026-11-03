@@ -219,3 +219,56 @@
 .v4TrailParts .v4Link { min-height: 44px; display: inline-flex; align-items: center; }
 .v4TrailLevel { margin: 0; font-weight: 700; color: var(--text); }
 .v4DebChangesRewrites { flex: 1 1 100%; margin: 0; padding-left: 1.2em; min-width: 0; overflow-wrap: anywhere; }
+
+/* ---------- V4 screen review (owner picks 3 Nov 2026): the ready moment, "What your digs did", the tour bar ----------
+   journey-f17 / wait-f4: the small ready note (in the dock, so above the phone's pinned bar); journey-f10 / dig-f3: the
+   notice above the map; dig-f18: the pinned "Next change › · Done"; map-f19: "Since you last looked"; map-f21: the long
+   answer folded while the short one is written; dig-f19 / map-f17: "Your report is older than the map".
+   Motion (journey-d1): nothing here moves. What changes shows at once with a 1-second soft highlight (v4ReadyHighlight,
+   a local rule until the shared motion tokens land in v4-base.css); it is a colour, not a movement, so it stays under
+   reduced motion as the owner's rule asks. No fixed widths: everything wraps at 375px. */
+@keyframes v4ReadyHighlight {
+  from { box-shadow: 0 0 0 3px var(--accent); }
+  to { box-shadow: 0 0 0 3px transparent; }
+}
+.v4ReadyFlash { animation: v4ReadyHighlight 1s ease-out 1; }
+
+.v4ReadyNote {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; width: max-content; max-width: min(560px, 100%);
+  background: var(--ink); color: var(--surface); border-radius: var(--r-btn); padding: 6px 8px 6px 16px; box-shadow: var(--shadow-pop);
+}
+.v4DebDockPhone .v4ReadyNote { margin: 0 var(--v4-gutter) 8px; max-width: calc(100% - 2 * var(--v4-gutter)); }
+.v4DebSheetFoot .v4ReadyNote { margin: 8px var(--v4-gutter); }
+.v4ReadyNoteText { min-width: 0; flex: 1 1 200px; overflow-wrap: anywhere; }
+.v4ReadyNoteAct {
+  display: inline-flex; align-items: center; min-height: 44px; background: none; border: 0; padding: 0 4px; cursor: pointer;
+  color: var(--gold-bg); font-weight: 700; text-decoration: underline; text-underline-offset: 3px;
+}
+.v4ReadyNoteClose {
+  display: inline-flex; align-items: center; justify-content: center; width: 44px; min-height: 44px;
+  background: none; border: 0; color: var(--surface); cursor: pointer;
+}
+
+.v4DigsDid { flex-direction: column; align-items: stretch; gap: 8px; min-width: 0; }
+.v4DigsDidTitle { margin: 0; font-size: var(--t-ui); font-weight: 700; }
+.v4DigsDidNews { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; min-width: 0; }
+.v4DigsDidHolds { margin: 0; font-weight: 600; }
+.v4DigsDidList { margin: 0; padding-inline-start: 1.2em; min-width: 0; overflow-wrap: anywhere; font-size: var(--t-ui); }
+
+.v4TourBar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; min-width: 0;
+  padding: 8px 10px; border: 1px solid var(--con-border); border-radius: var(--r-card); background: var(--con-bg);
+}
+/* On a computer it sits under the where-you-are line and stays there while the panel scrolls. */
+.v4Panel .v4TourBar { position: sticky; top: 0; z-index: 2; margin: 6px 0; }
+.v4DebDockPhone .v4TourBar { width: 100%; border-radius: var(--r-card) var(--r-card) 0 0; border-bottom: 0; padding: 8px var(--v4-gutter); }
+
+.v4PanelSince { margin: 4px 0 6px; font-size: var(--t-ui); font-weight: 600; color: var(--text); }
+.v4PanelFullAnswer { margin-top: 8px; font-size: var(--t-ui); }
+.v4PanelFullAnswer summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--link); }
+.v4PanelFullAnswer .v4PanelFallback { font-size: var(--t-body); }
+
+.v4ChangedSincePaths { flex: 1 1 100%; min-width: 0; }
+.v4ChangedSinceLead, .v4ChangedSinceWait { margin: 0; font-size: var(--t-ui); }
+.v4ChangedSinceWait { flex: 1 1 100%; }
+.v4ChangedSinceList { margin: 4px 0 0; padding-inline-start: 1.2em; overflow-wrap: anywhere; font-size: var(--t-ui); }

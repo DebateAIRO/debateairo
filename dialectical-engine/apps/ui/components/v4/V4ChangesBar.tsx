@@ -1,69 +1,86 @@
 "use client";
 
-import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
-import type { RewriteNews } from "@/lib/v4/changes";
+import { useId, type MouseEvent } from "react";
+import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import { answerHolds, type NewsHeadline, type PathResult } from "@/lib/v4/readyMoment";
+import { readyText, ReadyWords, type ReadyNoteText } from "./V4ReadyNote";
 import { shortText } from "./V4MapTree";
-
-/** A sign no path line can hold, so the news sentence splits around the line and the line alone is marked AI text. */
-const LINE_SLOT = "\u2063\u2063";
 
 /*
  * V4 initial (2026-10-28), D4: one quiet bar when something changed, with a tour that walks the news one question at a
- * time. Fix wave 1 told only what changed "while you were here"; N7 (2026-10-29) adds "since your last visit", from the
- * last visit the account kept: the bar says so while any of that news is still in it.
- * RULES-11/FIT-7: the bar counts questions with news, the same unit the tour numbers ("Stop 1 of 3").
- * W4-6 (dig model revision, 5.5): a finished rewrite is told by name: "A dig changed the path “{line}”." or "A dig didn't
- * change the path “{line}”." (each path once).
+ * time. N7 (2026-10-29) adds "since your last visit", from the last visit the account kept.
+ * V4 screen review (owner picks 3 Nov 2026):
+ * - journey-f10: the notice above the map has one name, "What your digs did", and map-d5's "What this round did for you"
+ *   list folds into it: one plain line per path a dig settled, with the three result tags (Corrected, Added to,
+ *   Confirmed; journey-f11), and the win sentence "Confirmed: the answer holds." when every dig confirmed its path.
+ * - dig-f3: the news bar is the finished-dig notice and speaks as a result: "Done: “Mostly renewables” changed." with
+ *   [See it], or with several "Done: your digs finished." with [Show me]. No count of news.
+ * - wait-f15 / map-f21: the first arrival of the answer is never news (the page decides that, lib/v4/readyMoment.ts).
  */
+
+const SHORT_LINE = 80;
+
+/** The finished-dig notice's sentence, as the notice and the ready note both say it. */
+export function newsHeadlineText(catalog: MessageCatalog, headline: NewsHeadline): ReadyNoteText {
+  if (headline.kind === "CHANGED" || headline.kind === "HOLDS") {
+    return readyText(catalog, `v4.digsDid.news.${headline.kind}`, shortText(headline.path.line, SHORT_LINE));
+  }
+  if (headline.kind === "FAILED") {
+    return headline.path === null
+      ? readyText(catalog, "v4.digsDid.news.FAILED.noLine")
+      : readyText(catalog, "v4.digsDid.news.FAILED", shortText(headline.path.line, SHORT_LINE));
+  }
+  return readyText(catalog, `v4.digsDid.news.${headline.kind}`);
+}
+
 export function V4ChangesBar(props: Readonly<{
-  /** How many questions have news (changes that land on the same question are one stop). */
-  stops: number;
-  /** N7: some of the news is since the person's last visit (not only from this one). */
+  /** The news the notice shows (since the last "Hide this"); null when there is none. */
+  headline: NewsHeadline | null;
+  /** N7: some of that news is since the person's last visit (not only from this one). */
   sinceLastVisit: boolean;
-  /** null: the tour has not started; otherwise the stop now shown (0-based). */
-  tourIndex: number | null;
-  onTour: () => void;
+  /** How many places the news is at: one opens with "See it", several with the tour ("Show me"). */
+  stops: number;
+  onSee: (event: MouseEvent<HTMLButtonElement>) => void;
   onDismiss: () => void;
+  /** journey-f10: every path a dig settled on this map, with its result. */
+  results: readonly PathResult[];
   catalog: MessageCatalog;
-  locale: string;
-  /** W4-6: the finished rewrites among the news. */
-  rewrites?: readonly RewriteNews[];
 }>) {
-  const { stops, sinceLastVisit, tourIndex, onTour, onDismiss, catalog, locale } = props;
-  const rewrites = props.rewrites ?? [];
-  const atLast = tourIndex !== null && tourIndex >= stops - 1;
-  const tourLabel = tourIndex === null
-    ? t(catalog, "v4.changes.show")
-    : atLast ? t(catalog, "v4.changes.backToAnswer") : t(catalog, "v4.changes.next");
+  const { headline, sinceLastVisit, stops, onSee, onDismiss, results, catalog } = props;
+  const titleId = useId();
+  if (headline === null && results.length === 0) return null;
   return (
-    <section className="v4DebChanges" aria-label={t(catalog, sinceLastVisit ? "v4.changes.labelLastVisit" : "v4.changes.label")}>
-      <span className="v4DebChangesDot" aria-hidden="true" />
-      <p className="v4DebChangesText" role="status">
-        <strong>{t(catalog, sinceLastVisit ? "v4.changes.sinceLastVisit" : "v4.changes.since")}</strong>{" "}
-        {tPlural(catalog, "v4.changes.news", stops, locale)}
-      </p>
-      {rewrites.length > 0 ? (
-        <ul className="v4DebChangesRewrites">
-          {rewrites.map((news) => {
-            const [before = "", after = ""] = t(catalog, news.changed ? "v4.changes.digChanged" : "v4.changes.digNoChange", { line: LINE_SLOT })
-              .split(LINE_SLOT);
-            return (
-              <li key={news.path.id}>
-                {before}<span data-ai-generated="true">{shortText(news.path.line, 80)}</span>{after}
+    <section className="v4DebChanges v4DigsDid" aria-labelledby={titleId}>
+      <h2 id={titleId} className="v4DigsDidTitle">{t(catalog, "v4.digsDid.title")}</h2>
+      {headline === null ? null : (
+        <div className="v4DigsDidNews">
+          <span className="v4DebChangesDot" aria-hidden="true" />
+          <p className="v4DebChangesText">
+            {sinceLastVisit ? <><strong>{t(catalog, "v4.changes.sinceLastVisit")}</strong>{" "}</> : null}
+            <ReadyWords text={newsHeadlineText(catalog, headline)} />
+          </p>
+          <div className="v4DebChangesActions">
+            {stops > 0 ? (
+              <button type="button" className="v4Btn" onClick={onSee}>
+                {t(catalog, stops === 1 ? "v4.ready.seeIt" : "v4.ready.showMe")}
+              </button>
+            ) : null}
+            <button type="button" className="v4Link v4DebChangesDismiss" onClick={onDismiss}>{t(catalog, "v4.changes.dismiss")}</button>
+          </div>
+        </div>
+      )}
+      {results.length === 0 ? null : (
+        <>
+          {answerHolds(results) ? <p className="v4DigsDidHolds">{t(catalog, "v4.digsDid.holds")}</p> : null}
+          <ul className="v4DigsDidList">
+            {results.map((entry) => (
+              <li key={entry.path.id} className={`v4DigsDidLine v4DigsDid-${entry.result}`}>
+                <ReadyWords text={readyText(catalog, `v4.digsDid.line.${entry.result}`, shortText(entry.path.line, SHORT_LINE))} />
               </li>
-            );
-          })}
-        </ul>
-      ) : null}
-      {tourIndex !== null && stops > 0 ? (
-        <span className="v4DebChangesStep">
-          {t(catalog, "v4.changes.step", { index: Math.min(tourIndex + 1, stops), total: stops })}
-        </span>
-      ) : null}
-      <div className="v4DebChangesActions">
-        {stops > 0 ? <button type="button" className="v4Btn" onClick={onTour}>{tourLabel}</button> : null}
-        <button type="button" className="v4Link v4DebChangesDismiss" onClick={onDismiss}>{t(catalog, "v4.changes.dismiss")}</button>
-      </div>
+            ))}
+          </ul>
+        </>
+      )}
     </section>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { PathRewrite, PathsChangedSince, PointOfViewVerdict } from "@debateai/contract";
 import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { isFinishedRewrite, rewriteStateOf } from "@/lib/v4/mapModel";
@@ -252,24 +252,41 @@ export function V4PathRewrite(props: Readonly<{
 }
 
 /**
- * The top of the map (owner Q-D11): how many paths digs changed since the answer was written, or since the latest report
- * (version n), with "Write my report". Hidden when nothing changed since.
+ * The top of the map. Owner Q-D11 counted the paths digs changed since the answer (or the latest report) was written. V4
+ * screen review (owner picks 3 Nov 2026), dig-f19 / map-f17: since the 31 Oct ruling the main answer updates itself after
+ * each change, so a line shows only once a report exists and the map has moved on since it: "Your report is older than
+ * the map." with [Update my report], the changed paths named under it (never a count), and while a dig runs "It will
+ * wait for your running dig." (ruling F7). Hidden before any report, and when nothing changed since it.
  */
 export function V4ChangedSince(props: Readonly<{
   changedSince: PathsChangedSince | null | undefined;
   reportHref: string;
   catalog: MessageCatalog;
   locale: string;
+  /** dig-f19: the paths that changed since the report (lib/v4/readyMoment.ts pathsChangedSinceReport), in the map's order. */
+  changedPaths?: readonly V4Path[];
+  /** A dig is still running: the report it writes will wait for it. */
+  digRunning?: boolean;
 }>) {
   const { changedSince, catalog } = props;
-  if (changedSince === null || changedSince === undefined || changedSince.count === 0) return null;
-  const line = changedSince.since_report_version === null
-    ? tPlural(catalog, "v4.rewrite.changedSince", changedSince.count, props.locale)
-    : t(catalog, "v4.rewrite.changedSinceReport", { n: changedSince.since_report_version, count: changedSince.count });
+  const titleId = useId();
+  if (changedSince === null || changedSince === undefined || changedSince.since_report_version === null || changedSince.count === 0) {
+    return null;
+  }
+  const named = props.changedPaths ?? [];
   return (
-    <section className="v4ChangedSince" aria-label={line}>
-      <p className="v4ChangedSinceText">{line}</p>
-      <Link className="v4Btn v4BtnPrimary v4ChangedSinceReport" href={props.reportHref}>{t(catalog, "v4.rail.writeReport")}</Link>
+    <section className="v4ChangedSince" aria-labelledby={titleId}>
+      <p id={titleId} className="v4ChangedSinceText">{t(catalog, "v4.rewrite.reportOlder")}</p>
+      <Link className="v4Btn v4BtnPrimary v4ChangedSinceReport" href={props.reportHref}>{t(catalog, "v4.rewrite.updateReport")}</Link>
+      {named.length === 0 ? null : (
+        <div className="v4ChangedSincePaths">
+          <p className="v4ChangedSinceLead v4Muted">{t(catalog, "v4.rewrite.changedSinceYourReport")}</p>
+          <ul className="v4ChangedSinceList">
+            {named.map((path) => <li key={path.id} data-ai-generated="true">{path.line}</li>)}
+          </ul>
+        </div>
+      )}
+      {props.digRunning === true ? <p className="v4ChangedSinceWait v4Muted">{t(catalog, "v4.rewrite.waitsForDig")}</p> : null}
     </section>
   );
 }

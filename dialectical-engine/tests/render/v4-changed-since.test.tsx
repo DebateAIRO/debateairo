@@ -15,18 +15,19 @@ vi.mock("@/lib/v4/accountMemory", async (original) => (await import("./v4-debate
 vi.mock("@/lib/v4/money", async (original) => (await import("./v4-debate-harness.js")).moneyMock(await original()));
 
 /*
- * Dig model revision W4-6 (draft 5.5, "The top of the map"; owner Q-D11): the top of the map says how many paths digs changed since the answer was written, with "Write my report"; after a report, how
- * many changed since that report (its version), and nothing when none did. A later rewrite brings the line back, read
+ * Dig model revision W4-6 (draft 5.5, "The top of the map"; owner Q-D11) counted the paths digs changed since the answer
+ * was written. V4 screen review (owner picks 3 Nov 2026), dig-f19 / map-f17: since the 31 Oct ruling the main answer
+ * updates itself after each change, so the top of the map says something only once a report exists and the map has
+ * moved on since it: "Your report is older than the map." with [Update my report], the changed paths named under it and
+ * never a count, and "It will wait for your running dig." while one runs. A later rewrite brings the line back, read
  * while the page is open.
  */
-
-const word = (key: string, values: Record<string, string | number> = {}): string =>
-  Object.entries(values).reduce((line, [name, value]) => line.replaceAll(`{${name}}`, String(value)), CATALOG[key]!);
 
 const ROOT = PATH_REWRITES[DIG_RUNS.root]!;
 /** The first debate's rewritten paths but n-smr, which these tests rewrite themselves. */
 const OTHERS = ROOT.paths.filter((path) => path.position_ref !== "n-smr");
 const strip = (): HTMLElement | null => page().querySelector<HTMLElement>(".v4ChangedSince");
+const named = (): string[] => [...(strip()?.querySelectorAll(".v4ChangedSinceList li") ?? [])].map((item) => item.textContent ?? "");
 
 /** The seed also holds a page still being read (W4-4), which reads the answer every 5 s of its own; these debates have none, so only a rewrite reads it. */
 function answerWith(runId: string, rewrites: AnswerPathRewrites): Answer {
@@ -35,6 +36,11 @@ function answerWith(runId: string, rewrites: AnswerPathRewrites): Answer {
   return { ...answer, web: { ...answer.web, paths: answer.web.paths.map((path) => ({ ...path,
     other_pages: path.other_pages.filter((page) => page.researched?.state !== "READING") })) } };
 }
+
+const lineOf = (positionRef: string): string => {
+  const rewrite = ROOT.paths.find((path) => path.position_ref === positionRef)!.history[0]!;
+  return (rewrite as Extract<PathRewrite, { state: "READY" }>).text.line;
+};
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -46,22 +52,13 @@ afterEach(async () => {
   vi.useRealTimers();
 });
 
-describe("Paths changed since the answer was written", () => {
-  it("says the count and offers \"Write my report\"", async () => {
+describe("before any report", () => {
+  it("says nothing, however many paths changed: the main answer already took the changes in", async () => {
     const runId = crypto.randomUUID();
     harness.answer = answerWith(runId, { ...ROOT, changed_since: { count: 2, since_report_version: null } });
     await mountMap(1280, runId);
-    expect(strip()!.textContent).toContain(word("v4.rewrite.changedSince.other", { count: 2 }));
-    const report = strip()!.querySelector<HTMLAnchorElement>("a")!;
-    expect(report.textContent).toBe(CATALOG["v4.rail.writeReport"]);
-    expect(report.getAttribute("href")).toBe(`/v4/debate/${runId}/report?level=background`);
-  });
-
-  it("one path: its own sentence", async () => {
-    const runId = crypto.randomUUID();
-    harness.answer = answerWith(runId, { ...ROOT, changed_since: { count: 1, since_report_version: null } });
-    await mountMap(1280, runId);
-    expect(strip()!.textContent).toContain(word("v4.rewrite.changedSince.one", { count: 1 }));
+    expect(strip()).toBeNull();
+    expect(page().textContent).not.toContain(CATALOG["v4.rewrite.reportOlder"]);
   });
 
   it("an answer no dig changed says nothing", async () => {
@@ -71,12 +68,29 @@ describe("Paths changed since the answer was written", () => {
 });
 
 describe("after a report", () => {
-  it("counts since that report's version", async () => {
+  it("says the report is older than the map, names the changed paths without a count, and offers \"Update my report\"", async () => {
     const runId = crypto.randomUUID();
     harness.answer = answerWith(runId, ROOT);
     await mountMap(1280, runId);
-    expect(strip()!.textContent).toContain(word("v4.rewrite.changedSinceReport", { n: 1, count: 2 }));
-    expect(strip()!.querySelector("a")!.textContent).toBe(CATALOG["v4.rail.writeReport"]);
+    expect(strip()!.querySelector(".v4ChangedSinceText")!.textContent).toBe(CATALOG["v4.rewrite.reportOlder"]);
+    expect(strip()!.textContent).toContain(CATALOG["v4.rewrite.changedSinceYourReport"]);
+    // The two paths a dig changed (not the one it only confirmed, nor the one whose rewrite failed), in the map's order.
+    expect(named()).toEqual([lineOf("n-mix"), lineOf("n-renew")]);
+    expect(strip()!.querySelector(".v4ChangedSinceList li")!.getAttribute("data-ai-generated")).toBe("true");
+    expect(strip()!.textContent).not.toMatch(/\b2\b/u);
+    const report = strip()!.querySelector<HTMLAnchorElement>("a")!;
+    expect(report.textContent).toBe(CATALOG["v4.rewrite.updateReport"]);
+    expect(report.getAttribute("href")).toBe(`/v4/debate/${runId}/report?level=background`);
+    expect(strip()!.textContent).not.toContain(CATALOG["v4.rewrite.waitsForDig"]);
+  });
+
+  it("says the report will wait while a dig still runs (ruling F7)", async () => {
+    const runId = crypto.randomUUID();
+    harness.answer = answerWith(runId, ROOT);
+    harness.records = { parent: null, children: [{ parent_run_id: runId, child_run_id: "d9000000-0000-4000-8000-000000000031", places: ["path:n-smr"], mode: "quick", created_at: "2026-10-31T10:00:00.000Z" }] };
+    harness.digView = (link) => ({ link, state: "RUNNING", headline: null, counts: null });
+    await mountMap(1280, runId);
+    expect(strip()!.textContent).toContain(CATALOG["v4.rewrite.waitsForDig"]);
   });
 
   it("is gone when nothing changed since the report", async () => {
@@ -84,7 +98,7 @@ describe("after a report", () => {
     harness.answer = answerWith(runId, { ...ROOT, changed_since: { count: 0, since_report_version: 1 } });
     await mountMap(1280, runId);
     expect(strip()).toBeNull();
-    expect(page().textContent).not.toContain(word("v4.rewrite.changedSinceReport", { n: 1, count: 0 }));
+    expect(page().textContent).not.toContain(CATALOG["v4.rewrite.reportOlder"]);
   });
 
   it("comes back when a later rewrite finishes while the page is open", async () => {
@@ -113,7 +127,8 @@ describe("after a report", () => {
     expect(strip()).toBeNull();
     await advance(1_100);
     await settle();
-    expect(strip()!.textContent).toContain(word("v4.rewrite.changedSinceReport", { n: 2, count: 1 }));
+    expect(strip()!.querySelector(".v4ChangedSinceText")!.textContent).toBe(CATALOG["v4.rewrite.reportOlder"]);
+    expect(named()).toEqual(["Wait for small reactors: set aside, and the first ones are years late."]);
     // Nothing is being rewritten any more, so it stops reading.
     const reads = harness.loadAnswer.mock.calls.length;
     await advance(60_000);

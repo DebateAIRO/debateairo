@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode, RefObject } from "react";
+import { useEffect, useState, type ReactNode, type RefObject } from "react";
 import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { addedLines, ownWords, startsWithLabel } from "@/lib/v4/askText";
 import { findOpenQuestion, openQuestionsOf } from "@/lib/v4/mapModel";
@@ -96,6 +96,11 @@ type PanelProps = Readonly<{
    */
   reportAnswer?: Readonly<{ version: number; segments: readonly string[] }> | null;
   headingRef: RefObject<HTMLHeadingElement | null>;
+  /**
+   * V4 screen review (3 Nov 2026): what sits right under the where-you-are line — map-f19's "Since you last looked:
+   * Confirmed" and, on a computer, dig-f18's pinned "Next change › · Done" during the changes tour. Absent: nothing.
+   */
+  underCrumbs?: ReactNode;
   catalog: MessageCatalog;
   locale: string;
 }>;
@@ -382,6 +387,29 @@ function TrustSection(props: Readonly<{
   );
 }
 
+/**
+ * V4 screen review (3 Nov 2026), map-f21: the long answer under "Read the full answer" while the short one is written. It
+ * keeps what it was given, so when the short answer arrives (and the long one is no longer the fallback) a reader who
+ * opened it goes on reading in the same place; the short answer fills the empty place above it.
+ */
+function FullAnswerFold(props: Readonly<{ paragraphs: readonly string[]; catalog: MessageCatalog }>) {
+  const text = props.paragraphs.join("\n\n");
+  const [held, setHeld] = useState(text);
+  useEffect(() => {
+    if (text !== "") setHeld(text);
+  }, [text]);
+  const shown = text !== "" ? text : held;
+  if (shown === "") return null;
+  return (
+    <details className="v4PanelFullAnswer">
+      <summary>{t(props.catalog, "v4.panel.readFullAnswer")}</summary>
+      <div className="v4PanelFallback" data-ai-generated="true">
+        {shown.split("\n\n").map((paragraph, index) => <p key={index} className="v4PanelText">{paragraph}</p>)}
+      </div>
+    </details>
+  );
+}
+
 function RootBody(props: Readonly<{ panel: PanelProps }>) {
   const { panel } = props;
   const { map, catalog } = panel;
@@ -407,18 +435,21 @@ function RootBody(props: Readonly<{ panel: PanelProps }>) {
             {map.reservation ? <p className="v4PanelHint v4Muted">{t(catalog, "v4.story.reservation")}</p> : null}
           </>
         )
-        : fallback.length > 0
-          ? (
-            <>
-              <div className="v4PanelFallback" data-ai-generated="true">
-                {fallback.map((paragraph, index) => <p key={index} className="v4PanelText">{paragraph}</p>)}
-              </div>
-              {noStory ? null : (
-                <p className="v4PanelHint v4Muted">{t(catalog, writing ? "v4.panel.fallbackWriting" : "v4.panel.fallbackMissing")}</p>
-              )}
-            </>
-          )
-          : noStory ? null : <p className="v4Muted">{t(catalog, writing ? "v4.panel.storyWriting" : "v4.panel.storyMissing")}</p>}
+        : fallback.length > 0 && writing
+          // V4 screen review (3 Nov 2026), map-f21 / wait-f9: while the short answer is written, one line says so and the
+          // long answer waits under "Read the full answer" (below), so nothing swaps under the reader's eyes.
+          ? <p className="v4PanelHint v4Muted">{t(catalog, "v4.panel.fallbackWriting")}</p>
+          : fallback.length > 0
+            ? (
+              <>
+                <div className="v4PanelFallback" data-ai-generated="true">
+                  {fallback.map((paragraph, index) => <p key={index} className="v4PanelText">{paragraph}</p>)}
+                </div>
+                {noStory ? null : <p className="v4PanelHint v4Muted">{t(catalog, "v4.panel.fallbackMissing")}</p>}
+              </>
+            )
+            : noStory ? null : <p className="v4Muted">{t(catalog, writing ? "v4.panel.storyWriting" : "v4.panel.storyMissing")}</p>}
+      <FullAnswerFold paragraphs={writing ? fallback : []} catalog={catalog} />
     </>
   );
   return (
@@ -700,6 +731,7 @@ export function V4Panel(props: PanelProps) {
   return (
     <div className={`v4Panel v4Panel-${resolved.kind}`}>
       <Crumbs resolved={resolved} onSelect={props.onSelect} catalog={catalog} />
+      {props.underCrumbs ?? null}
       <span className="v4Eyebrow">{t(catalog, `v4.panel.kind.${resolved.kind}`)}</span>
       <h2 className="v4PanelH2" ref={props.headingRef} tabIndex={-1} data-ai-generated={heading.ai ? "true" : undefined}>
         {heading.text}

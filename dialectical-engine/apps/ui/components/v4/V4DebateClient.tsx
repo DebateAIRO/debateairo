@@ -12,6 +12,7 @@ import {
   type UsageBorrow
 } from "@debateai/contract";
 import { AuthGate } from "@/components/AuthGate";
+import { TAB_PREFIX_ATTRIBUTE } from "@/components/DocumentTitle";
 import { RoomNotice } from "@/components/billing/RoomNotice";
 import { V4ChangesBar } from "@/components/v4/V4ChangesBar";
 import { V4MoneyLines, type V4DigChoice } from "@/components/v4/V4DigSuggest";
@@ -26,16 +27,22 @@ import type { V4ResearchedPress } from "@/components/v4/V4Sources";
 import { V4ChangedSince } from "@/components/v4/V4PathRewrite";
 import { V4MainAnswer } from "@/components/v4/V4MainAnswer";
 import { V4Rail, type V4DigCounts } from "@/components/v4/V4Rail";
+import { useV4Ready } from "@/components/v4/useV4Ready";
 import { isNotFound } from "@/lib/api";
 import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { runFailureMessage } from "@/lib/v3/runFailure";
 import { digQuestion, digTargetQuestions, ownWords, parseDigQuestion } from "@/lib/v4/askText";
 import { mergeDigLinks, readDigRecords, readLastVisit, recordDig, recordLastVisit, storableItems } from "@/lib/v4/accountMemory";
-import { diffSnapshots, isRewriteWord, rewriteNewsOf, selectionForChange, snapshotItems } from "@/lib/v4/changes";
+import { diffSnapshots, isRewriteWord, selectionForChange, snapshotItems } from "@/lib/v4/changes";
+import {
+  firstAnswerArriving, laterNewsOnly, mainAnswerItems, mainAnswerWriting, pathResults, pathsChangedSinceReport, stopsOfChanges, unseenIdsOf,
+  visitItemsToKeep
+} from "@/lib/v4/readyMoment";
+import { useReportVersions } from "@/lib/v4/useReportVersions";
 import { effectiveDigMode } from "@/lib/v4/askConfig";
 import { digLinksFor, digParentOf, mergeIndex, readQuestionIndex, type IndexEntry } from "@/lib/v4/digIndex";
 import {
-  addToResearched, currentReportVersion, loadAnswer, loadDigTrail, loadDigView, loadInvestigation, loadStory, loadV4, storyReadFailed, type DigTrail, type V4Load
+  addToResearched, loadAnswer, loadDigTrail, loadDigView, loadStory, loadV4, storyReadFailed, type DigTrail, type V4Load
 } from "@/lib/v4/load";
 import { researchedWaiting } from "@/lib/v4/web";
 import { buildV4Map, rewriteByDig, rewriteWaiting, uniqueOpenQuestions } from "@/lib/v4/mapModel";
@@ -284,18 +291,15 @@ type LastVisitRead =
   | Readonly<{ status: "FAILED" }>;
 
 /**
- * N7: the news a last visit's snapshot gives on the first complete load. The story arriving since (the stand-in path,
- * fate "none", gave way to the story's paths) is one piece of news at the question, as R2TIME-1 tells it live.
+ * N7: the news a last visit's snapshot gives on the first complete load. V4 screen review (3 Nov 2026), wait-f15 /
+ * map-f21: the short answer arriving since (the stand-in path, fate "none", gave way to the story's paths) is the
+ * person's first sight of it, never news; only what digs did since is.
  */
-function visitNews(stored: Readonly<Record<string, string>>, now: Readonly<Record<string, string>>, map: V4Map,
+function visitNews(stored: Readonly<Record<string, string>>, now: Readonly<Record<string, string>>,
   startedHere: ReadonlySet<string>): readonly V4Change[] {
-  let fresh = diffSnapshots({ at: "", items: stored }, storableItems(now)).filter((change) => isNews(change, startedHere));
+  const fresh = diffSnapshots({ at: "", items: stored }, storableItems(now)).filter((change) => isNews(change, startedHere));
   const standIn = (items: Readonly<Record<string, string>>) => Object.entries(items).some(([id, word]) => id.startsWith("path:") && word === "none");
-  if (standIn(stored) && !standIn(now)) {
-    fresh = fresh.filter((change) => !change.id.startsWith("path:"));
-    if (map.storyState === "READY") fresh = [{ id: `story:${map.answerId}`, kind: "CHANGED", before: "WRITING", now: "READY" }, ...fresh];
-  }
-  return fresh;
+  return standIn(stored) && !standIn(now) ? laterNewsOnly(fresh) : fresh;
 }
 
 function V4Debate({
@@ -760,7 +764,8 @@ function V4Debate({
     const onMap = rewriteByDig(map, link.childRunId)?.rewrite ?? null;
     return onMap === null || onMap.rewrite_id !== own.rewrite_id || onMap.state !== own.state;
   });
-  const rewriteBehind = map !== null && (behind || rewriteWaiting(map));
+  // dig-f1 (V4 screen review, 3 Nov 2026): and while a change is being written into the main answer, so it shows without a reload.
+  const rewriteBehind = map !== null && (behind || rewriteWaiting(map) || mainAnswerWriting(served?.answer));
   const rewriteBehindRef = useRef(rewriteBehind);
   useEffect(() => {
     rewriteBehindRef.current = rewriteBehind;
@@ -848,23 +853,10 @@ function V4Debate({
     };
   }, [trailKey]);
 
-  // ── The report's answer (R22 W5-1, owner Q-D11) ──────────────────────────────────────────────────────────────────
-  // On the first debate's map, once its investigation has a finished report version, the panel's answer is that
-  // version's (the first debate's answer one click away). Read once per visit; a failed read leaves the first answer.
-  const [reportAnswer, setReportAnswer] = useState<Readonly<{ version: number; segments: readonly string[] }> | null>(null);
+  // ── The report's answer (R22 W5-1, owner Q-D11), and its ready moment (journey-f17) ─────────────────────────────
   const isDig = servedDig !== null;
-  useEffect(() => {
-    if (servedRunId === null || isDig) return;
-    let active = true;
-    void loadInvestigation(servedRunId).then((read) => {
-      const current = currentReportVersion(read);
-      if (!active || read === null || read.root_run_id.toLowerCase() !== servedRunId.toLowerCase()) return;
-      setReportAnswer(current === null ? null : { version: current.report_version, segments: current.answer.segments });
-    });
-    return () => {
-      active = false;
-    };
-  }, [servedRunId, isDig]);
+  const reportReady = useRef<() => void>(() => undefined);
+  const reportAnswer = useReportVersions(servedRunId, isDig, () => reportReady.current());
 
   // ── Selection ───────────────────────────────────────────────────────────────────────────────────────────────────
   // W4-6: a link back from a dig names the path it dug (`?path=`); the panel opens there (a path gone: the question).
@@ -1027,12 +1019,23 @@ function V4Debate({
   // visit"). Later live changes are news too ("while you were here"), each with a dot and a tour stop. The map as shown
   // is saved as the new last visit after the first complete load, then at most every 10 s while it changes; nothing is
   // kept in the browser (Decision A). A last visit that could not be read is never overwritten in this visit.
+  // V4 screen review (3 Nov 2026), journey-f17: whether a place with news was seen is kept with the account, in that same
+  // last visit: an item whose news the person has not opened yet keeps the word the account had, so the next visit (on
+  // any device) still tells it and still marks its place, until it is opened (lib/v4/readyMoment.ts visitItemsToKeep).
   const [lastVisit, setLastVisit] = useState<LastVisitRead>({ status: "PENDING" });
+  /** journey-f17: what the account holds as this debate's last visit (what was read, then what this page saved). */
+  const accountVisit = useRef<Readonly<Record<string, string>>>({});
+  /** journey-f17: the items whose news the person has not opened yet (their places still carry the "New" dot). */
+  const unseenIds = useRef<ReadonlySet<string>>(new Set());
   useEffect(() => {
     if (servedRunId === null) return;
     let active = true;
     readLastVisit(servedRunId).then(
-      (snapshot) => { if (active) setLastVisit({ status: "READ", snapshot }); },
+      (snapshot) => {
+        if (!active) return;
+        accountVisit.current = snapshot?.items ?? {};
+        setLastVisit({ status: "READ", snapshot });
+      },
       () => { if (active) setLastVisit({ status: "FAILED" }); }
     );
     return () => {
@@ -1043,13 +1046,28 @@ function V4Debate({
   const [visitNewsCount, setVisitNewsCount] = useState(0);
   const visitSave = useRef<{ timer: number | undefined; items: Readonly<Record<string, string>> | null; sent: string | null }>(
     { timer: undefined, items: null, sent: null });
-  /** Saves `items` as this debate's last visit unless they are what was saved last. Best-effort; never throws. */
-  const saveVisit = useCallback((runIdToSave: string, items: Readonly<Record<string, string>>): void => {
-    const key = JSON.stringify(storableItems(items));
+  /**
+   * Saves `items` as this debate's last visit unless they are what was saved last, the items with unseen news kept as the
+   * account had them (journey-f17). Best-effort; never throws.
+   */
+  const saveVisit = useCallback((runIdToSave: string, items: Readonly<Record<string, string>>,
+    unseen: ReadonlySet<string> = unseenIds.current): void => {
+    const kept = storableItems(visitItemsToKeep(items, accountVisit.current, unseen));
+    const key = JSON.stringify(kept);
     if (key === visitSave.current.sent) return;
     visitSave.current.sent = key;
-    void recordLastVisit(runIdToSave, items);
+    accountVisit.current = kept;
+    void recordLastVisit(runIdToSave, kept);
   }, []);
+  /** N7: a later save, gathered for VISIT_SAVE_MS (the newest map wins). */
+  const scheduleVisitSave = useCallback((runIdToSave: string, items: Readonly<Record<string, string>>): void => {
+    visitSave.current.items = items;
+    if (visitSave.current.timer !== undefined) return;
+    visitSave.current.timer = window.setTimeout(() => {
+      visitSave.current.timer = undefined;
+      if (visitSave.current.items !== null) saveVisit(runIdToSave, visitSave.current.items);
+    }, VISIT_SAVE_MS);
+  }, [saveVisit]);
   useEffect(() => {
     // Leaving the debate (or the page) saves a change still waiting for its timer.
     if (servedRunId === null) return;
@@ -1064,14 +1082,17 @@ function V4Debate({
   const [news, setNews] = useState<readonly V4Change[]>([]);
   /** R2TIME-6: how many news items "Hide this" put away; news that lands after it brings the bar back. */
   const [hiddenNews, setHiddenNews] = useState(0);
-  const [tourIndex, setTourIndex] = useState<number | null>(null);
-  /** The story state the baseline last saw (R2TIME-1: the story arriving is one piece of news, not one per question). */
+  /** The story state the baseline last saw (wait-f15 / map-f21: while the first answer arrives, nothing it changes is news). */
   const baselineStory = useRef<V4Map["storyState"] | null>(null);
   /** R2DIG-3: digs found by a first read that landed after the baseline; their first appearance is not news. */
   const foldIds = useRef<ReadonlySet<string>>(new Set());
   const selectedRef = useRef(selected);
+  const openedRef = useRef(opened);
+  /** journey-f17: the ready moment's handler for live news (set once the moment's hook has run, below). */
+  const onNewsRef = useRef<(fresh: readonly V4Change[]) => void>(() => undefined);
   useEffect(() => {
     selectedRef.current = selected;
+    openedRef.current = opened;
   });
   // Runs before the baseline effect below in the same commit, while the new links are not read yet.
   useEffect(() => {
@@ -1084,36 +1105,27 @@ function V4Debate({
   }, [links]);
   const digsSettled = indexSettled && recordsSettled && links.every((link) => isSettled(statuses.get(link.childRunId)));
   const liveReady = map !== null && digsSettled && lastVisit.status !== "PENDING";
+  // dig-f1: the main answer is an item of the page's snapshot too (news at the question, never kept by the account).
+  const mainItems = useMemo(() => mainAnswerItems(served?.answer), [served]);
   useEffect(() => {
     if (!liveReady || map === null || servedRunId === null) return;
-    const items = snapshotItems(map, digs);
+    const items = { ...snapshotItems(map, digs), ...mainItems };
     const before = baseline.current;
     const storyBefore = baselineStory.current;
     baseline.current = items;
     baselineStory.current = map.storyState;
     const startedHere = new Set(visitLinks.map((link) => link.childRunId));
-    if (lastVisit.status === "READ") {
-      // N7: the first save at once, later ones gathered for VISIT_SAVE_MS (the newest map wins).
-      if (before === null) saveVisit(servedRunId, items);
-      else {
-        visitSave.current.items = items;
-        if (visitSave.current.timer === undefined) {
-          visitSave.current.timer = window.setTimeout(() => {
-            visitSave.current.timer = undefined;
-            if (visitSave.current.items !== null) saveVisit(servedRunId, visitSave.current.items);
-          }, VISIT_SAVE_MS);
-        }
-      }
-    }
     if (before === null) {
       // N7: since the last visit the account kept (none on a first visit, or when it could not be read).
-      if (lastVisit.status !== "READ" || lastVisit.snapshot === null) return;
-      const fresh = visitNews(lastVisit.snapshot.items, items, map, startedHere);
+      const fresh = lastVisit.status === "READ" && lastVisit.snapshot !== null ? visitNews(lastVisit.snapshot.items, items, startedHere) : [];
+      // N7: the first save at once; journey-f17: the places of that news not opened yet stay unseen in it.
+      if (lastVisit.status === "READ") saveVisit(servedRunId, items, unseenIdsOf(map, fresh, openedRef.current));
       if (fresh.length === 0) return;
       setNews(fresh);
       setVisitNewsCount(fresh.length);
       return;
     }
+    if (lastVisit.status === "READ") scheduleVisitSave(servedRunId, items);
     let fresh = diffSnapshots({ at: "", items: before }, items).filter((change) => isNews(change, startedHere));
     // R2DIG-3: a dig that already existed but was missed by the failed first reads is folded into the baseline.
     if (foldIds.current.size > 0) {
@@ -1128,51 +1140,65 @@ function V4Debate({
       });
       foldIds.current = new Set([...folding].filter((childRunId) => !(`dig:${childRunId}` in items)));
     }
-    // R2TIME-1: the story arriving redraws every question under the answer; that is one piece of news at the question.
-    if (storyBefore !== null && storyBefore !== map.storyState) {
-      fresh = fresh.filter((change) => !change.id.startsWith("path:"));
-      if (map.storyState === "READY") {
-        fresh = [{ id: `story:${map.answerId}`, kind: "CHANGED", before: storyBefore, now: map.storyState }, ...fresh];
-      }
-    }
+    // wait-f15 / map-f21 (V4 screen review, 3 Nov 2026): the first answer arriving (its short answer written, its paths
+    // filling in) is the person's first sight of it, never news; only digs and the main answer's rewrite are.
+    if (firstAnswerArriving(storyBefore, map.storyState)) fresh = [...laterNewsOnly(fresh)];
     if (fresh.length === 0) return;
     setNews((previous) => [...previous, ...fresh]);
+    // journey-f17: a dig finishing (or the main answer rewritten) while the person is here is a ready moment.
+    onNewsRef.current(fresh);
     // A question opened earlier gets its "New" dot back when news lands on it (not the one on screen now).
     const landed = new Set<string>(fresh.map((change) => selectionForChange(map, change)));
     setOpened((previous) => new Set([...previous].filter((stop) => !landed.has(stop) || stop === selectedRef.current)));
-  }, [liveReady, map, digs, visitLinks, servedRunId, lastVisit, saveVisit]);
+  }, [liveReady, map, digs, mainItems, visitLinks, servedRunId, lastVisit, saveVisit, scheduleVisitSave]);
 
-  // RULES-11/FIT-7: the bar counts stops (questions), the same unit the tour numbers; news on the question itself is
-  // one stop too, so every change can be reached.
-  const stopsOf = useCallback((changes: readonly V4Change[]): readonly V4Selection[] => {
-    if (map === null) return [];
-    const stops: V4Selection[] = [];
-    for (const change of changes) {
-      const stop = selectionForChange(map, change);
-      if (!stops.includes(stop)) stops.push(stop);
-    }
-    return stops;
-  }, [map]);
-  // R2TIME-6: the bar and its tour cover the news since the last "Hide this"; the "New" dots cover all news.
-  const tourStops = useMemo<readonly V4Selection[]>(() => stopsOf(news.slice(hiddenNews)), [stopsOf, news, hiddenNews]);
-  // W4-6: the finished rewrites among the news the bar shows, told by name.
-  const rewriteNews = useMemo(() => (map === null ? [] : rewriteNewsOf(map, news.slice(hiddenNews))), [map, news, hiddenNews]);
+  // RULES-11/FIT-7: news is told by place (a stop); news on the question itself is one stop too, so every change can be
+  // reached. R2TIME-6: the notice and its tour cover the news since the last "Hide this"; the "New" dots cover all news.
   const changed = useMemo<ReadonlySet<string>>(
-    () => new Set(stopsOf(news).filter((stop) => stop !== "root" && !opened.has(stop))),
-    [stopsOf, news, opened]
+    () => new Set(map === null ? [] : stopsOfChanges(map, news).filter((stop) => stop !== "root" && !opened.has(stop))),
+    [map, news, opened]
   );
+  // journey-f17: the account keeps these items as unseen; a place opened (or new news) is saved like any change.
+  const unseen = useMemo(() => (map === null ? new Set<string>() : unseenIdsOf(map, news, opened)), [map, news, opened]);
+  const unseenKey = [...unseen].sort().join("|");
+  useEffect(() => {
+    unseenIds.current = unseen;
+  });
+  useEffect(() => {
+    if (lastVisit.status !== "READ" || servedRunId === null || baseline.current === null) return;
+    scheduleVisitSave(servedRunId, baseline.current);
+  }, [unseenKey, lastVisit.status, servedRunId, scheduleVisitSave]);
 
-  const onTour = useCallback((): void => {
-    if (tourStops.length === 0) return;
-    const next = tourIndex === null ? 0 : tourIndex + 1;
-    if (next >= tourStops.length) {
-      setTourIndex(null);
-      select("root", false);
-      return;
-    }
-    setTourIndex(next);
-    select(tourStops[next]!, false);
-  }, [tourStops, tourIndex, select]);
+  // ── The ready moments and the changes tour (V4 screen review, 3 Nov 2026: journey-f17, wait-f4, dig-f3, dig-f18) ──
+  const reportHref = levelHref(`/v4/debate/${encodeURIComponent(runId)}/report`, chosenLevel);
+  const ready = useV4Ready({
+    map,
+    waiting: map === null && load?.kind === "RUN" && load.run.state !== "FAILED",
+    isDigPage: isDigPage || recordParent !== null,
+    news,
+    hiddenNews,
+    visitNewsCount,
+    changed,
+    selected: shownSelection,
+    phone: layout === "phone",
+    select,
+    hideNews: () => setHiddenNews(news.length),
+    focusHeading: () => headingRef.current?.focus(),
+    reportHref,
+    catalog,
+    locale
+  });
+  useEffect(() => {
+    onNewsRef.current = ready.onNews;
+    reportReady.current = ready.onReportReady;
+  });
+  // The person opening any place on the map has seen the answer's ready moment.
+  const selectionSeen = useRef(selected);
+  useEffect(() => {
+    if (selectionSeen.current === selected) return;
+    selectionSeen.current = selected;
+    ready.acknowledge();
+  });
 
   // ── The back link of a dig, and when it started ─────────────────────────────────────────────────────────────────
   // A dig started in this visit knows both; else N11's record names the parent and the start, from any device; else the
@@ -1204,8 +1230,8 @@ function V4Debate({
 
   // ── Layout ──────────────────────────────────────────────────────────────────────────────────────────────────────
   const classicHref = `/debate/${encodeURIComponent(runId)}`;
-  // R2REG-5: links carry only a level the person chose (none chosen: /v4 still offers its one-time choice).
-  const reportHref = levelHref(`/v4/debate/${encodeURIComponent(runId)}/report`, chosenLevel);
+  // R2REG-5: links carry only a level the person chose (none chosen: /v4 still offers its one-time choice); the report
+  // link is made above, with the ready moments.
   const askHref = levelHref("/v4", chosenLevel);
   const header = (
     <V4Header
@@ -1222,9 +1248,12 @@ function V4Debate({
     </V4Header>
   );
 
+  // wait-f4: the tab title's state word ("Looking into it", "Ready", "(1) changed"), read by DocumentTitle.
+  const tabPrefix = ready.tabPrefix === "" ? {} : { [TAB_PREFIX_ATTRIBUTE]: ready.tabPrefix };
   if (map === null) {
     return (
-      <div className="v4DebPage">
+      <div className="v4DebPage" {...tabPrefix}>
+        {ready.announcer}
         {header}
         {/* UI-4: the layout already holds the page's one <main>. */}
         <div className="v4DebCentre">
@@ -1272,7 +1301,6 @@ function V4Debate({
     ? <RoomNotice room={room} catalog={{ ...newDebateCatalog, ...billingCatalog }} locale={locale} />
     : null;
   const phoneTarget = layout === "phone" && choice !== undefined ? targetOf(map, digs, shownSelection, choice) : null;
-  const showChanges = tourStops.length > 0;
 
   const rail = (variant: "column" | "strip") => (
     <V4Rail
@@ -1283,6 +1311,7 @@ function V4Debate({
       digs={dugCounts}
       variant={variant}
       usageNotes={borrowLines(borrowed)}
+      reportReady={ready.reportDot}
       catalog={catalog}
       locale={locale}
     />
@@ -1348,10 +1377,12 @@ function V4Debate({
 
   const pageClass = `v4DebPage v4DebLayout-${layout}${hasTray ? " v4DebHasTray" : ""}${sheetOpen ? " v4DebSheetOpen" : ""}`;
   return (
-    <div className={pageClass}>
+    <div className={pageClass} {...tabPrefix}>
       {/* The tab title follows this heading (DocumentTitle): the person's own words, not the added lines. R2TIME-9: it
-          sits outside the inert wrapper, so the title stays while the phone map is open. */}
+          sits outside the inert wrapper, so the title stays while the phone map is open. wait-f4: the state word above
+          (data-tab-prefix) and the one live region sit outside it too. */}
       <h1 className="v4SrOnly" data-ai-generated="true">{ownWords(map.question)}</h1>
+      {ready.announcer}
       {/* UI-6: while the phone map is open, everything behind it is inert (the sheet is a real modal). */}
       <div className="v4DebBehind" inert={sheetOpen}>
         {header}
@@ -1374,25 +1405,26 @@ function V4Debate({
           ) : null}
           <V4ContributionNote contribution={served?.answer.contribution} catalog={catalog} />
           <V4MainAnswer mainAnswer={served?.answer.main_answer} catalog={catalog} locale={locale} />
-          <V4ChangedSince changedSince={map.changedSince} reportHref={reportHref} catalog={catalog} locale={locale} />
-          {showChanges ? (
-            <V4ChangesBar
-              rewrites={rewriteNews}
-              stops={tourStops.length}
-              sinceLastVisit={hiddenNews < visitNewsCount}
-              tourIndex={tourIndex}
-              onTour={onTour}
-              onDismiss={() => {
-                setHiddenNews(news.length);
-                setTourIndex(null);
-              }}
-              catalog={catalog}
-              locale={locale}
-            />
-          ) : null}
-          {map.storyState === "WRITING" ? (
-            <p className="v4DebNote v4Muted" role="status">{t(catalog, "v4.debate.storyWriting")}</p>
-          ) : null}
+          {/* dig-f19 / map-f17: once a report exists and the map moved on, the paths it does not have yet, named. */}
+          <V4ChangedSince
+            changedSince={map.changedSince}
+            changedPaths={pathsChangedSinceReport(map, reportAnswer?.writtenAt ?? null)}
+            digRunning={dugCounts.running > 0}
+            reportHref={reportHref}
+            catalog={catalog}
+            locale={locale}
+          />
+          {/* journey-f10 / dig-f3: "What your digs did", which is also the finished-dig notice. wait-f9 / map-f21: the
+              short answer being written is said once, at the question (the panel), not here as well. */}
+          <V4ChangesBar
+            headline={ready.notice.headline}
+            stops={ready.notice.stops}
+            sinceLastVisit={hiddenNews < visitNewsCount}
+            onSee={ready.notice.onSee}
+            onDismiss={() => setHiddenNews(news.length)}
+            results={pathResults(map)}
+            catalog={catalog}
+          />
           {/* W3-4: the deepest level offers no dig anywhere on its map; this line says so once, at the top. */}
           {canDig ? null : <p className="v4DebNote v4DebDeepest" role="note">{t(catalog, "v4.nest.deepest")}</p>}
 
@@ -1427,6 +1459,7 @@ function V4Debate({
                 reportAnswer={reportAnswer}
                 {...(choice === undefined ? {} : { choice })}
                 headingRef={headingRef}
+                underCrumbs={ready.underCrumbs}
                 catalog={catalog}
                 locale={locale}
               />
@@ -1437,6 +1470,8 @@ function V4Debate({
 
       {sheetOpen ? null : (
         <div className={`v4DebDock${layout === "phone" ? " v4DebDockPhone" : ""}`}>
+          {ready.note}
+          {ready.phoneTourBar}
           {tray}
           {layout === "phone" ? (
             <PhoneBar
@@ -1454,7 +1489,7 @@ function V4Debate({
       {sheetOpen ? (
         <OutlineSheet
           onClose={() => setOutlineOpen(false)}
-          footer={<>{tray}{toast}</>}
+          footer={<>{ready.note}{tray}{toast}</>}
           catalog={catalog}
         >
           {rail("column")}

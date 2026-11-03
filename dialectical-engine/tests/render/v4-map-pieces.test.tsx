@@ -369,10 +369,13 @@ describe("V4 map pieces, fix wave 1", () => {
     expect(heading.hasAttribute("data-ai-generated")).toBe(false);
   });
 
-  it("shows the whole answer while the short one is missing, with a small note under it", () => {
+  it("keeps the whole answer under \"Read the full answer\" while the short one is written (map-f21), and shows it when the short one is missing", () => {
     const map: V4Map = { ...buildMap(), headline: null, summary: null, storyState: "WRITING", fallbackText: "First part.\n\nSecond part." };
     const root = panel(map, "root", "plain");
-    const fallback = root.querySelector('.v4PanelFallback[data-ai-generated="true"]')!;
+    const fold = root.querySelector<HTMLDetailsElement>("details.v4PanelFullAnswer")!;
+    expect(fold.open).toBe(false);
+    expect(fold.querySelector("summary")!.textContent).toBe(t(catalog, "v4.panel.readFullAnswer"));
+    const fallback = fold.querySelector('.v4PanelFallback[data-ai-generated="true"]')!;
     expect([...fallback.querySelectorAll("p")].map((p) => p.textContent)).toEqual(["First part.", "Second part."]);
     expect(root.textContent).toContain(t(catalog, "v4.panel.fallbackWriting"));
     expect(root.textContent).not.toContain(t(catalog, "v4.panel.storyWriting"));
