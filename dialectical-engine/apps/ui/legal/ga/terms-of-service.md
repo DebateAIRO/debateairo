@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Go hachomair
-eyebrow: TÉARMAÍ SEIRBHÍSE · v2.13 · I bhFEIDHM 1 SAMHAIN 2026
+eyebrow: TÉARMAÍ SEIRBHÍSE · v2.14 · I bhFEIDHM 1 SAMHAIN 2026
 title: An méid lena n-aontaíonn tú
 lede: An conradh idir tú agus DMS Merchandise Shop S.R.L., i bhfriotal soiléir. Naoi rannán déag agus Iarscríbhinn A — scrollaigh go dtí an deireadh.
-endMarker: DEIREADH NA dTÉARMAÍ · v2.13
+endMarker: DEIREADH NA dTÉARMAÍ · v2.14
 bodyLabel: Téacs na dTéarmaí Seirbhíse
 annexTitle: Iarscríbhinn A — Téarmaí réigiúnacha
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 AN DLÍ RIALAITHE
 -->
 
-**Version 2.13 · Effective 1 Samhain 2026 · Leaganacha roimhe seo ag dezbatere.ro/terms/versions · Teanga: Gaeilge.**
+**Version 2.14 · Effective 1 Samhain 2026 · Leaganacha roimhe seo ag dezbatere.ro/terms/versions · Teanga: Gaeilge.**
 
 **In short.** Ní mór duit a bheith 18 mbliana d'aois nó os a chionn. Tógann Dialectical Engine argóintí le samhlacha IS agus d'fhéadfadh gach rud a ghineann sé a bheith mícheart — ní comhairle é. Ar an bplean saor in aisce, bíonn do dhíospóireachtaí poiblí nuair a bhíonn siad críochnaithe, tar éis seiceála IS; ar phlean íoctha bíonn siad príobháideach mura bhfoilsíonn tú iad. Nuair a bhíonn díospóireacht phoiblí, is féidir le duine ar bith í a léamh, agus fanann sí poiblí. Seoltar téacs a chuireann tú isteach chuig soláthraithe IS atá liostaithe inár gClár Soláthraithe, agus ní úsáidtear é chun samhlacha a oiliúint. Tuairiscigh ábhar neamhdhleathach ag support@dezbatere.ro cibé acu atá cuntas agat nó nach bhfuil. Is é dlí na Rómáine an dlí rialaithe, ach coimeádann tú do chosaintí áitiúla tomhaltóra.
 
@@ -215,7 +215,7 @@ Maireann rannáin 8 (a mhéid a bhaineann le hábhar a foilsíodh cheana), 15, 1
 
 Cuireann Dialectical Engine plean saor in aisce ar fáil. Beidh plean íoctha **Préimh** ar fáil, a dhíghlasálann liosta iomlán na samhlacha agus a ligeann duit rialtáin na díospóireachta a shocrú tú féin.
 
-**Sula n-íocann tú** taispeánaimid duit, díreach os cionn an chnaipe íocaíochta: an plean; an praghas iomlán lena n-áirítear an cháin is infheidhme; an tréimhse bhilleála; go n-athnuaitear an plean go huathoibríoch go dtí go gcealaítear é; an dáta a chríochnaíonn aon triail saor in aisce agus an méid a ghearrfar ort ansin; agus conas cealú. Deimhníonn tú na téarmaí athnuachana trí bhosca ar leith a thiceáil. Léitear **Liostáil agus íoc** ar an gcnaipe (sa Rómáinis, *Comandă cu obligație de plată*). Seolaimid deimhniú chugat ar mheán marthanach ina bhfuil an fhaisnéis chéanna, na Téarmaí seo, agus an fhoirm um tharraingt siar.
+**Sula n-íocann tú** taispeánaimid duit, díreach os cionn an chnaipe íocaíochta: an plean; an praghas iomlán lena n-áirítear an cháin is infheidhme; an tréimhse bhilleála; go n-athnuaitear an plean go huathoibríoch go dtí go gcealaítear é; an dáta a chríochnaíonn aon triail saor in aisce agus an méid a ghearrfar ort ansin; agus conas cealú. Deimhníonn tú na téarmaí athnuachana trí bhosca ar leith a thiceáil. Léitear **Liostáil agus íoc** ar an gcnaipe (sa Rómáinis, *Abonați-vă și plătiți*). Seolaimid deimhniú chugat ar mheán marthanach ina bhfuil an fhaisnéis chéanna, na Téarmaí seo, agus an fhoirm um tharraingt siar.
 
 **Meabhrúcháin.** Seolaimid ríomhphost chugat 5 lá ar a laghad sula n-iompaíonn triail saor in aisce ina plean íoctha; uair sa bhliain ar a laghad le haghaidh pleananna leanúnacha; agus idir 30 agus 45 lá roimh aon athnuachan ar théarma dhá mhí dhéag nó níos faide. Bíonn an praghas, an dáta, agus nasc cealaithe i ngach meabhrúchán.
 
@@ -251,7 +251,9 @@ Insímid duit roimh ré, ar mheán marthanach, cad atá ag athrú agus cathain. 
 
 **Ar na Téarmaí seo.** Féadfaimid na Téarmaí seo a athrú ar na cineálacha céanna cúiseanna. I gcás athruithe nach laghdaíonn do chearta, foilsímid an leagan nua le hachoimre ar an méid a d'athraigh agus seolaimid ríomhphost chugat **30 lá ar a laghad** sula dtagann sé i bhfeidhm; má leanann tú d'úsáid Dialectical Engine tar éis an dáta sin, ciallaíonn sé go nglacann tú leis, agus féadfaidh tú do chuntas a dhúnadh roimhe sin. I gcás athruithe a laghdaíonn do chearta — lena n-áirítear méaduithe praghais ar phlean atá ann cheana, teorainneacha níos ísle, gnéithe a baineadh, úsáidí nua as d'ábhar, nó athruithe ar dhliteanas, ar an dlí rialaithe nó ar réiteach díospóidí — iarraimid ort glacadh go sainráite leis an leagan nua ag do chéad síniú isteach eile, agus ní bhíonn feidhm ag an athrú ach feasta. Ní dhéanaimid athrú aisghníomhach riamh, agus ní úsáidimid an rannán seo riamh chun croílár an mhéid ar íoc tú as a athrú i lár téarma gan bealach amach a thairiscint duit. Fanann leaganacha roimhe seo ar fáil ag dezbatere.ro/terms/versions.
 
-Tháinig leagan 2.13 in ionad leagan 2.12: ainmníonn rannán 18 agus Iarscríbhinn A ANPC (SAL) mar an bealach chun réiteach malartach díospóidí a fháil.
+Tháinig leagan 2.14 in ionad leagan 2.13: ainmníonn rannán 18 agus Iarscríbhinn A ANPC (SAL) mar an bealach chun réiteach malartach díospóidí a fháil.
+
+Tháinig leagan 2.13 in ionad leagan 2.12: deir rannán 12 go bhfuil *Abonați-vă și plătiți* ar an gcnaipe íocaíochta sa Rómáinis.
 
 Tháinig leagan 2.12 in ionad leagan 2.11: deir rannán 10 gur féidir le duine atá sínithe isteach an cnaipe Tuairiscigh a úsáid freisin ar aon díospóireacht phoiblí, go léann IS tuairisc a dhéantar leis taobh leis an téacs poiblí, agus cad a tharlaíonn ansin.
 

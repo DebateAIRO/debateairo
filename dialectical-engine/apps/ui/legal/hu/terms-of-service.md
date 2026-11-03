@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Röviden
-eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v2.13 · HATÁLYOS 2026. NOVEMBER 1.
+eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v2.14 · HATÁLYOS 2026. NOVEMBER 1.
 title: Amit Ön elfogad
 lede: Az Ön és a DMS Merchandise Shop S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.
-endMarker: A FELTÉTELEK VÉGE · v2.13
+endMarker: A FELTÉTELEK VÉGE · v2.14
 bodyLabel: A Szolgáltatási feltételek szövege
 annexTitle: A. melléklet — Regionális feltételek
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 IRÁNYADÓ JOG
 -->
 
-**Version 2.13 · Effective 2026. november 1. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
+**Version 2.14 · Effective 2026. november 1. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
 
 **In short.** Önnek legalább 18 évesnek kell lennie. A Dialectical Engine mesterségesintelligencia-modellekkel épít fel érveket, és minden általa létrehozott tartalom téves lehet — nem minősül tanácsadásnak. Az ingyenes csomagon az Ön vitái befejezésük után, MI-ellenőrzést követően nyilvánosak; fizetős csomagon bizalmasak, amíg közzé nem teszi őket. Nyilvánossá válva bárki elolvashatja a vitát, és az nyilvános marad. Az Ön által beküldött szöveget továbbítjuk a Szolgáltatói nyilvántartásunkban felsorolt MI-szolgáltatóknak, és azt nem használjuk modellek betanítására. Jogellenes tartalmat a support@dezbatere.ro címen jelenthet be, függetlenül attól, hogy rendelkezik-e fiókkal. A román jog az irányadó, de az Ön helyi fogyasztóvédelmi jogai változatlanul megilletik.
 
@@ -215,7 +215,7 @@ A 8. szakasz (a már közzétett tartalom tekintetében), valamint a 15., 16. é
 
 A Dialectical Engine ingyenes csomagot kínál. Egy fizetős **Prémium** csomag lesz elérhető, amely hozzáférést biztosít a modellek teljes választékához, és lehetővé teszi, hogy Ön állítsa be a vita mérőit.
 
-**Fizetés előtt** közvetlenül a fizetési gomb felett megjelenítjük Önnek: a csomagot; az alkalmazandó adóval növelt teljes árat; a számlázási időszakot; azt, hogy a csomag lemondásig automatikusan megújul; az esetleges ingyenes próbaidőszak végét és az azt követően felszámítandó összeget; valamint a lemondás módját. A megújítási feltételeket külön jelölőnégyzet bejelölésével erősíti meg. A gomb felirata **Előfizetés és fizetés** (románul *Comandă cu obligație de plată*). Ugyanezeket az információkat, e Feltételeket és az elállási nyomtatványt tartalmazó visszaigazolást tartós adathordozón küldjük meg Önnek.
+**Fizetés előtt** közvetlenül a fizetési gomb felett megjelenítjük Önnek: a csomagot; az alkalmazandó adóval növelt teljes árat; a számlázási időszakot; azt, hogy a csomag lemondásig automatikusan megújul; az esetleges ingyenes próbaidőszak végét és az azt követően felszámítandó összeget; valamint a lemondás módját. A megújítási feltételeket külön jelölőnégyzet bejelölésével erősíti meg. A gomb felirata **Előfizetés és fizetés** (románul *Abonați-vă și plătiți*). Ugyanezeket az információkat, e Feltételeket és az elállási nyomtatványt tartalmazó visszaigazolást tartós adathordozón küldjük meg Önnek.
 
 **Emlékeztetők.** E-mailben emlékeztetjük Önt legalább 5 nappal azelőtt, hogy egy ingyenes próbaidőszak fizetős csomaggá alakul; folyamatos csomagok esetén évente legalább egyszer; továbbá a legalább tizenkét hónapos időszak minden megújítása előtt 30–45 nappal. Minden emlékeztető tartalmazza az árat, a dátumot és a lemondási hivatkozást.
 
@@ -251,7 +251,9 @@ Tartós adathordozón előzetesen közöljük Önnel, mi és mikor változik. Ha
 
 **E Feltételek módosítása.** E Feltételeket ugyanezen típusú okokból módosíthatjuk. Az Ön jogait nem csökkentő módosítások esetén legalább **30 nappal** a hatálybalépés előtt közzétesszük az új változatot a módosítások összefoglalásával, és e-mailben értesítjük Önt; ha ezt az időpontot követően tovább használja a Dialectical Engine szolgáltatást, azzal elfogadja a módosítást, fiókját pedig ezt megelőzően megszüntetheti. Az Ön jogait csökkentő módosítások — ideértve egy meglévő csomag árának emelését, az alacsonyabb korlátokat, funkciók eltávolítását, tartalmának új felhasználási módjait, illetve a felelősség, az irányadó jog vagy a vitarendezés módosítását — esetén következő bejelentkezésekor kifejezett elfogadását kérjük, és a módosítás csak a jövőre nézve alkalmazandó. Módosítást soha nem alkalmazunk visszamenőleg, és e szakaszt soha nem használjuk arra, hogy a már kifizetett szolgáltatás lényegét a futamidő alatt megváltoztassuk anélkül, hogy kilépési lehetőséget biztosítanánk. A korábbi változatok továbbra is elérhetők itt: dezbatere.ro/terms/versions.
 
-A 2.13-as verzió a 2.12-es verzió helyébe lépett: a 18. szakasz és az A. melléklet az ANPC (SAL) szervet nevezi meg az alternatív vitarendezés útjaként.
+A 2.14-as verzió a 2.13-es verzió helyébe lépett: a 18. szakasz és az A. melléklet az ANPC (SAL) szervet nevezi meg az alternatív vitarendezés útjaként.
+
+A 2.13-as verzió a 2.12-es verzió helyébe lépett: a 12. szakasz kimondja, hogy románul a fizetési gomb felirata *Abonați-vă și plătiți*.
 
 A 2.12-es verzió a 2.11-es verzió helyébe lépett: a 10. szakasz kimondja, hogy egy bejelentkezett személy a nyilvános vitáknál a Bejelentés gombot is használhatja, hogy egy MI a gombbal tett bejelentést a nyilvános szöveg mellett olvassa, és hogy ezután mi történik.
 

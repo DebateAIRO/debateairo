@@ -86,7 +86,7 @@
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} mỗi tháng. Gia hạn vào ngày {day} hằng tháng cho đến khi bạn hủy.",
   "billing.consent.renewal": "Tôi đồng ý rằng NETOPIA Payments lưu giữ thẻ của tôi và {total} được trừ từ thẻ đó mỗi tháng cho đến khi tôi hủy gói đăng ký. Tôi có thể hủy bất cứ lúc nào trong Cài đặt hoặc tại dezbatere.ro/cancel.",
   "billing.consent.immediateStart": "Bắt đầu gói của tôi ngay. Tôi hiểu rằng nếu rút lại trong vòng 14 ngày, tôi trả cho phần đã dùng: phần lớn hơn giữa số ngày đã dùng hoặc tín dụng đã dùng.",
-  "billing.checkout.continueToCard": "Đặt hàng với nghĩa vụ thanh toán",
+  "billing.checkout.continueToCard": "Đăng ký và thanh toán",
   "billing.checkout.cardTitle": "Thanh toán",
   "billing.checkout.cardNote": "Bạn thanh toán trên trang bảo mật của NETOPIA Payments. Số thẻ của bạn không bao giờ đến máy chủ của chúng tôi.",
   "billing.checkout.subscribeAndPay": "Đặt hàng với nghĩa vụ thanh toán",

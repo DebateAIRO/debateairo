@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kurz gesagt
-eyebrow: NUTZUNGSBEDINGUNGEN · v2.13 · GÜLTIG AB 1. NOVEMBER 2026
+eyebrow: NUTZUNGSBEDINGUNGEN · v2.14 · GÜLTIG AB 1. NOVEMBER 2026
 title: Womit Sie sich einverstanden erklären
 lede: Der Vertrag zwischen Ihnen und DMS Merchandise Shop S.R.L. in verständlicher Sprache. Neunzehn Abschnitte und Anhang A – scrollen Sie bis zum Ende.
-endMarker: ENDE DER NUTZUNGSBEDINGUNGEN · v2.13
+endMarker: ENDE DER NUTZUNGSBEDINGUNGEN · v2.14
 bodyLabel: Text der Nutzungsbedingungen
 annexTitle: Anhang A – Regionale Bestimmungen
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ANWENDBARES RECHT
 -->
 
-**Version 2.13 · Effective 1. November 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
+**Version 2.14 · Effective 1. November 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
 
 **In short.** Sie müssen mindestens 18 Jahre alt sein. Dialectical Engine erstellt Argumente mithilfe von KI-Modellen, und alles, was es erzeugt, kann falsch sein – es handelt sich nicht um Beratung. Im kostenlosen Tarif sind Ihre Debatten nach Abschluss öffentlich, nach einer KI-Prüfung; im kostenpflichtigen Tarif sind sie privat, sofern Sie sie nicht veröffentlichen. Sobald eine Debatte öffentlich ist, kann jede Person sie lesen, und sie bleibt öffentlich. Von Ihnen übermittelter Text wird an die in unserem Verzeichnis aufgeführten KI-Anbieter gesendet und nicht zum Trainieren von Modellen verwendet. Melden Sie rechtswidrige Inhalte unter support@dezbatere.ro, unabhängig davon, ob Sie ein Konto haben. Es gilt rumänisches Recht, Ihre örtlichen Verbraucherschutzrechte bleiben Ihnen jedoch erhalten.
 
@@ -215,7 +215,7 @@ Die Abschnitte 8 (hinsichtlich bereits veröffentlichter Inhalte), 15, 16 und 18
 
 Dialectical Engine bietet einen kostenlosen Tarif an. Ein kostenpflichtiger **Premium**-Tarif wird verfügbar sein, der die vollständige Modellauswahl freischaltet und Ihnen erlaubt, die Regler der Debatte selbst einzustellen.
 
-**Bevor Sie bezahlen**, zeigen wir Ihnen unmittelbar über der Zahlungsschaltfläche Folgendes: den Tarif; den Gesamtpreis einschließlich der anwendbaren Steuern; den Abrechnungszeitraum; den Hinweis, dass der Tarif bis zur Kündigung automatisch verlängert wird; das Enddatum eines etwaigen kostenlosen Testzeitraums und den anschließend berechneten Betrag; sowie die Kündigungsmöglichkeiten. Sie bestätigen die Verlängerungsbedingungen durch Markieren eines gesonderten Kästchens. Die Schaltfläche trägt die Aufschrift **Kostenpflichtig abonnieren** (auf Rumänisch *Comandă cu obligație de plată*). Wir senden Ihnen eine Bestätigung auf einem dauerhaften Datenträger, die dieselben Informationen, diese Nutzungsbedingungen und das Widerrufsformular enthält.
+**Bevor Sie bezahlen**, zeigen wir Ihnen unmittelbar über der Zahlungsschaltfläche Folgendes: den Tarif; den Gesamtpreis einschließlich der anwendbaren Steuern; den Abrechnungszeitraum; den Hinweis, dass der Tarif bis zur Kündigung automatisch verlängert wird; das Enddatum eines etwaigen kostenlosen Testzeitraums und den anschließend berechneten Betrag; sowie die Kündigungsmöglichkeiten. Sie bestätigen die Verlängerungsbedingungen durch Markieren eines gesonderten Kästchens. Die Schaltfläche trägt die Aufschrift **Kostenpflichtig abonnieren** (auf Rumänisch *Abonați-vă și plătiți*). Wir senden Ihnen eine Bestätigung auf einem dauerhaften Datenträger, die dieselben Informationen, diese Nutzungsbedingungen und das Widerrufsformular enthält.
 
 **Erinnerungen.** Wir senden Ihnen mindestens 5 Tage vor der Umwandlung eines kostenlosen Testzeitraums in einen kostenpflichtigen Tarif eine E-Mail, bei fortlaufenden Tarifen mindestens einmal jährlich und zwischen 30 und 45 Tagen vor jeder Verlängerung einer Laufzeit von mindestens zwölf Monaten. Jede Erinnerung enthält den Preis, das Datum und einen Link zur Kündigung.
 
@@ -251,7 +251,9 @@ Wir teilen Ihnen im Voraus auf einem dauerhaften Datenträger mit, was sich wann
 
 **Änderungen dieser Nutzungsbedingungen.** Wir können diese Nutzungsbedingungen aus denselben Arten von Gründen ändern. Bei Änderungen, die Ihre Rechte nicht einschränken, veröffentlichen wir die neue Fassung mit einer Zusammenfassung der Änderungen und senden Ihnen mindestens **30 Tage vor ihrem Inkrafttreten** eine E-Mail; wenn Sie Dialectical Engine nach diesem Datum weiterhin nutzen, stimmen Sie der Änderung zu, und Sie können Ihr Konto vorher schließen. Bei Änderungen, die Ihre Rechte einschränken – darunter Preiserhöhungen für einen bestehenden Tarif, niedrigere Limits, entfernte Funktionen, neue Nutzungen Ihrer Inhalte oder Änderungen der Haftung, des anwendbaren Rechts oder der Streitbeilegung – bitten wir Sie, der neuen Fassung bei Ihrer nächsten Anmeldung ausdrücklich zuzustimmen; die Änderung gilt nur für die Zukunft. Wir nehmen Änderungen niemals rückwirkend vor und verwenden diesen Abschnitt niemals dazu, den Kern Ihrer bereits bezahlten Leistung während der Laufzeit zu ändern, ohne Ihnen eine Beendigungsmöglichkeit einzuräumen. Frühere Fassungen bleiben unter dezbatere.ro/terms/versions verfügbar.
 
-Version 2.13 ersetzte Version 2.12: Abschnitt 18 und Anhang A nennen ANPC (SAL) als Weg zur alternativen Streitbeilegung.
+Version 2.14 ersetzte Version 2.13: Abschnitt 18 und Anhang A nennen ANPC (SAL) als Weg zur alternativen Streitbeilegung.
+
+Version 2.13 ersetzte Version 2.12: Abschnitt 12 besagt, dass die Zahlungsschaltfläche auf Rumänisch *Abonați-vă și plătiți* lautet.
 
 Version 2.12 ersetzte Version 2.11: Abschnitt 10 besagt, dass eine angemeldete Person auch die Schaltfläche Melden bei jeder öffentlichen Debatte verwenden kann, dass eine KI eine damit abgegebene Meldung neben dem öffentlichen Text liest und was dann geschieht.
 
