@@ -24,6 +24,7 @@ const home = read("../app/page.tsx");
 const verifyEmail = read("../app/verify-email/page.tsx");
 const enrollMfa = read("../app/enroll-mfa/page.tsx");
 const returnPath = read("../lib/returnPath.ts");
+const signInWayBack = read("../lib/signInWayBack.ts");
 const packageJson = read("../package.json");
 const authMessages = JSON.parse(read("../messages/en/auth.json"));
 
@@ -43,7 +44,11 @@ test("auth screens share the reference hierarchy and replace the inline gate", (
   assert.match(styles, /\.authHeadline\s*\{/);
   assert.match(styles, /\.authPrimary\s*\{/);
   assert.match(styles, /@media \(max-width: 640px\)[\s\S]*?\.authScreen/);
-  assert.match(gate, /window\.location\.replace\("\/login"\)/);
+  // V4 screen review (map-f6, wait-f1): the gate still sends a signed-out person to the dedicated sign-in route, now
+  // with the way back to the page they opened (the sign-in page keeps only a path on this site, safeReturnPath).
+  assert.match(gate, /const href = signInHrefFor\(currentReturnPath\(\)\);[\s\S]*?window\.location\.replace\(href\)/);
+  assert.match(signInWayBack, /return `\/login\?next=\$\{encodeURIComponent\(returnPath\)\}`;/);
+  assert.match(loginPage, /redirect\(safeReturnPath\(/);
   assert.doesNotMatch(gate, /beginLogin|completeLogin/);
   assert.match(topBar, /AUTH_PATHS/);
 });
@@ -71,7 +76,10 @@ test("every public and protected entry point reaches the dedicated auth routes",
   assert.match(signUp, /<a href=\{loginHref\}>/);
   assert.doesNotMatch(signUp, /<Link\b/);
   assert.doesNotMatch(signUp, /from "next\/link"/);
-  assert.match(gate, /window\.location\.replace\("\/login"\)/);
+  // The same for the gate's own link to sign in, now that it carries ?next (V4 screen review): a plain <a>.
+  assert.match(gate, /window\.location\.replace\(href\)/);
+  assert.match(gate, /<a href=\{signIn\}>/);
+  assert.doesNotMatch(gate, /from "next\/link"/);
 });
 
 test("the project home confirms a real session before exposing its debate composer", () => {
