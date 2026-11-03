@@ -8,7 +8,7 @@ import { ProviderProbeRepository } from "@debateai/db";
 import type { StandingDatabase } from "./standing-db.js";
 import { startStandingDatabase } from "./standing-db.js";
 import { acceptanceServiceRequestHeaders, createAcceptanceRuntime } from "./main.js";
-import { endProvisionedRlsLogins, runnerTestPool } from "../tests/support/rls-logins.js";
+import { apiTestPools, endProvisionedRlsLogins, runnerTestPool } from "../tests/support/rls-logins.js";
 import { seedAcceptanceRegister } from "./seed-register.js";
 import { evaluatorSatisfied } from "./test-fixtures/evaluator-double.js";
 import {
@@ -230,6 +230,8 @@ describe("DR-182 live mono-panel composition", () => {
       pool: database.pool,
       // The runner's own login in login mode (the default); the superuser pool above with DEBATEAI_TEST_API_LOGINS=0.
       runnerPool: await runnerTestPool(database),
+      // The API's own logins, wired as apps/api/src/main.ts wires them; every field the superuser pool when they are off.
+      apiPools: await apiTestPools(database, import.meta.url),
       serviceCredential: "r".repeat(43),
       environment: monoEnvironment(),
       makerRelays: [
@@ -262,6 +264,8 @@ describe("DR-182 live mono-panel composition", () => {
       pool: database.pool,
       // The runner's own login in login mode (the default); the superuser pool above with DEBATEAI_TEST_API_LOGINS=0.
       runnerPool: await runnerTestPool(database),
+      // The API's own logins, wired as apps/api/src/main.ts wires them; every field the superuser pool when they are off.
+      apiPools: await apiTestPools(database, import.meta.url),
       serviceCredential:"m".repeat(43),
       environment: monoEnvironment(),
       makerRelays: [

@@ -11,7 +11,7 @@ import type { StandingDatabase } from "./standing-db.js";
 import { startStandingDatabase } from "./standing-db.js";
 import { assertFairDebate } from "./fair-debate.js";
 import { acceptanceServiceRequestHeaders, createAcceptanceRuntime } from "./main.js";
-import { endProvisionedRlsLogins, runnerTestPool } from "../tests/support/rls-logins.js";
+import { apiTestPools, endProvisionedRlsLogins, runnerTestPool } from "../tests/support/rls-logins.js";
 import { ACCEPTANCE_REGISTER_VERSION, seedAcceptanceRegister } from "./seed-register.js";
 import { withRequestDerivedBearings, type ReviewBearingPolicy } from "../tests/support/reviewBearings.js";
 import { evaluatorSatisfied, isEvaluatorPacket } from "./test-fixtures/evaluator-double.js";
@@ -417,6 +417,8 @@ describe("ACC-01 dry-run ceremony", () => {
       pool: database.pool,
       // The runner's own login in login mode (the default); the superuser pool above with DEBATEAI_TEST_API_LOGINS=0.
       runnerPool: await runnerTestPool(database),
+      // The API's own logins, wired as apps/api/src/main.ts wires them; every field the superuser pool when they are off.
+      apiPools: await apiTestPools(database, import.meta.url),
       serviceCredential:"a".repeat(43),
       environment: {
         DATABASE_URL: database.connectionString,

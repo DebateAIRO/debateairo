@@ -440,7 +440,7 @@ function reportRoutedCalls(pools: ApiTestPools, file: string, report: string): v
  * fields provision the dev logins in superuser mode too.
  */
 export async function apiTestPools(
-  database: TestDatabase,
+  database: RlsDatabase,
   testFile: string,
   overrides: Partial<Record<ApiPoolField, string>> = {}
 ): Promise<ApiTestPools> {

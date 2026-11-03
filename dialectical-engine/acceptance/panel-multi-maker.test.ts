@@ -14,7 +14,7 @@ import {
 } from "@debateai/register";
 import type { RoleAssignment } from "@debateai/scorecard";
 import { acceptanceServiceRequestHeaders, createAcceptanceRuntime } from "./main.js";
-import { endProvisionedRlsLogins, runnerTestPool } from "../tests/support/rls-logins.js";
+import { apiTestPools, endProvisionedRlsLogins, runnerTestPool } from "../tests/support/rls-logins.js";
 import { computeAcceptanceStructuralCeiling, readAcceptanceRuntimePolicy } from "./runtime-policy.js";
 import { ACCEPTANCE_REGISTER_VERSION, seedAcceptanceRegister } from "./seed-register.js";
 import { bearingsForRequest } from "../tests/support/reviewBearings.js";
@@ -295,6 +295,8 @@ describe("T3 / S2-2 — the judge panel is live on the acceptance path (author !
       pool: database.pool,
       // The runner's own login in login mode (the default); the superuser pool above with DEBATEAI_TEST_API_LOGINS=0.
       runnerPool: await runnerTestPool(database),
+      // The API's own logins, wired as apps/api/src/main.ts wires them; every field the superuser pool when they are off.
+      apiPools: await apiTestPools(database, import.meta.url),
       serviceCredential: "p".repeat(43),
       environment: {
         DATABASE_URL: database.connectionString,
@@ -438,6 +440,8 @@ describe("T3 / S2-2 — the judge panel is live on the acceptance path (author !
       pool: database.pool,
       // The runner's own login in login mode (the default); the superuser pool above with DEBATEAI_TEST_API_LOGINS=0.
       runnerPool: await runnerTestPool(database),
+      // The API's own logins, wired as apps/api/src/main.ts wires them; every field the superuser pool when they are off.
+      apiPools: await apiTestPools(database, import.meta.url),
       serviceCredential: "d".repeat(43),
       environment: {
         DATABASE_URL: database.connectionString,
@@ -658,6 +662,8 @@ describe("A20 · a VALID scorecard drives the acceptance path: picked, pinned, p
       pool: database.pool,
       // The runner's own login in login mode (the default); the superuser pool above with DEBATEAI_TEST_API_LOGINS=0.
       runnerPool: await runnerTestPool(database),
+      // The API's own logins, wired as apps/api/src/main.ts wires them; every field the superuser pool when they are off.
+      apiPools: await apiTestPools(database, import.meta.url),
       serviceCredential: "s".repeat(43),
       environment: {
         DATABASE_URL: database.connectionString,

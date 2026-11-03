@@ -12,8 +12,10 @@ import {
   type TerminalCompletionDeclaration
 } from "@debateai/battery";
 import {
+  contentCipherFor,
   createPool,
   configureContentEncryption,
+  crossAccount,
   PostgresSessionRepository,
   ProviderProbeRepository,
   RunRepository,
@@ -59,7 +61,8 @@ import {
 import {
   computeAcceptanceStructuralCeiling,
   readAcceptanceRuntimePolicy,
-  readOptionalScoringOperator
+  readOptionalScoringOperator,
+  type AcceptanceRuntimePolicy
 } from "./runtime-policy.js";
 
 const environmentSchema = z.object({
@@ -209,28 +212,64 @@ export class AcceptanceUserDekStore implements ReadableUserDekStore {
 }
 
 const acceptanceContentStores = new WeakMap<Pool, AcceptanceUserDekStore>();
-/** The cipher each store's pool was given, so the runner's own pool can get the same one (createAcceptanceRuntime). */
-const acceptanceContentCiphers = new WeakMap<Pool, ContentCipher>();
 
+/**
+ * The user key store behind `pool`'s content cipher, configured on the first call for `pool`. A debate's owner is
+ * resolved as apps/api/src/main.ts's run key store resolves it (X18h): on a pool with a cross-account target (the API's
+ * runtime login) through that target, the system login; on any other pool on the pool itself.
+ */
 export function acceptanceContentStore(pool: Pool): AcceptanceUserDekStore {
   const existing = acceptanceContentStores.get(pool);
   if (existing !== undefined) return existing;
   const users = new AcceptanceUserDekStore();
   const runs = new MemoryRunContentKeyStore(users, async (ownerRef) => {
-    const resolved = await pool.query<{ user_id: string }>(
+    const resolved = await crossAccount("X18h", () => pool.query<{ user_id: string }>(
       `SELECT user_id FROM identity."user"
        WHERE owner_ref=$1 AND state='active'`,
       [ownerRef]
-    );
+    ));
     const userId = resolved.rows[0]?.user_id;
     if (userId === undefined) throw new TypeError("ACCEPTANCE_OWNER_REF_UNRESOLVED");
     return userId;
   });
-  const cipher = new ContentCipher(runs);
-  configureContentEncryption(pool, cipher);
+  configureContentEncryption(pool, new ContentCipher(runs));
   acceptanceContentStores.set(pool, users);
-  acceptanceContentCiphers.set(pool, cipher);
   return users;
+}
+
+/** Gives `to` the content cipher `from` carries, unless `to` already has one, so both read the same encrypted debates. */
+function shareAcceptanceContentCipher(from: Pool, to: Pool): void {
+  const cipher = contentCipherFor(from);
+  if (cipher !== undefined && contentCipherFor(to) === undefined) configureContentEncryption(to, cipher);
+}
+
+/**
+ * Upload check Task 8: the API's own pools, the fields of apps/api/src/main.ts's pools that the acceptance API uses (a
+ * test hands them from tests/support/rls-logins.ts's apiTestPools, which builds them as main.ts does, with the T1 pools'
+ * cross-account targets).
+ */
+export interface AcceptanceApiPools {
+  /** main.ts:338 `pool`: the ask application, its probes, its content cipher (main.ts:536, :959, :1113). */
+  readonly runtime: Pool;
+  /** main.ts:339 `authorizationPool`: the session repository (main.ts:998). */
+  readonly authorization: Pool;
+  /** main.ts:345 `contentProvisionPool`: the ask application's run provision pool (main.ts:1139). */
+  readonly contentProvision: Pool;
+  /** main.ts:349-350: the two ask admission pools (main.ts:1139-1141). */
+  readonly serverAskAdmission: Pool;
+  readonly legacyAskAdmission: Pool;
+}
+
+/**
+ * The given ask admission pools when they are separate from each other and from the runtime and provision pools, as
+ * PostgresAskApplication requires (ASK_ADMISSION_DATABASE_POOLS_MUST_BE_SEPARATE); otherwise (no pools given, or a test
+ * with DEBATEAI_TEST_API_LOGINS=0, whose every field is the superuser pool) undefined, and the runtime makes its own.
+ */
+function separateAskAdmissionPools(pools: AcceptanceApiPools | undefined): Readonly<{ server: Pool; legacy: Pool }> | undefined {
+  if (pools === undefined) return undefined;
+  const { runtime, contentProvision, serverAskAdmission: server, legacyAskAdmission: legacy } = pools;
+  return [server, legacy].some((admission) => admission === runtime || admission === contentProvision) || server === legacy
+    ? undefined : Object.freeze({ server, legacy });
 }
 
 function acceptanceBindingHash(bindingKey: Uint8Array, source: AuthSourceContext): string {
@@ -254,10 +293,16 @@ function derivedServiceToken(serviceCredential: string, purpose: string): string
     .digest("base64url");
 }
 
+/**
+ * Seeds the service account and its session on `pool` (outside any request) and returns the session application the
+ * API authenticates with, whose repository reads on `sessionPool`: the API's authorization pool when a test hands one
+ * (apps/api/src/main.ts:998), `pool` otherwise.
+ */
 export async function createAcceptanceServiceSession(
   pool: Pool,
   serviceCredential: string,
-  userDeks: AcceptanceUserDekStore
+  userDeks: AcceptanceUserDekStore,
+  sessionPool: Pool = pool
 ): Promise<Readonly<{
   application: SessionApplication;
   credentials: AcceptanceServiceSession;
@@ -318,7 +363,7 @@ export async function createAcceptanceServiceSession(
     hashSourceIp: async () => { throw new Error("ACCEPTANCE_SERVICE_AUDIT_PATH_UNAVAILABLE"); },
     hashUserAgent: async () => { throw new Error("ACCEPTANCE_SERVICE_AUDIT_PATH_UNAVAILABLE"); }
   }) as unknown as AuditContextHasher;
-  const repository = new PostgresSessionRepository(pool, unavailableAuditContext);
+  const repository = new PostgresSessionRepository(sessionPool, unavailableAuditContext);
   const unsupported = (): never => { throw new Error("ACCEPTANCE_SERVICE_SESSION_OPERATION_UNSUPPORTED"); };
   const application: SessionApplication = Object.freeze({
     async authenticate(presented: string, source: AuthSourceContext): Promise<AuthenticatedSession | null> {
@@ -422,6 +467,13 @@ export async function createAcceptanceRuntime(input: {
    * closing evaluator use it, as on the server, where the runner has its own login. Absent: `pool`, as before.
    */
   readonly runnerPool?: Pool | undefined;
+  /**
+   * Upload check Task 8: the API's own pools, when a test gives them (tests/support/rls-logins.ts, apiTestPools: the
+   * product's API logins in login mode). Every piece the API's requests reach uses the pool apps/api/src/main.ts gives
+   * it (AcceptanceApiPools). `pool` keeps the boot reads, the seeding and the boot probe records, outside any request.
+   * Absent: every piece on `pool`, as before.
+   */
+  readonly apiPools?: AcceptanceApiPools | undefined;
   readonly environment: AcceptanceEnvironment;
   readonly makerRelays: readonly AcceptanceMakerRelay[];
   readonly serviceCredential:string;
@@ -444,11 +496,11 @@ export async function createAcceptanceRuntime(input: {
   const modelScorecard = input.modelScorecard ?? await readBundledModelScorecard(await readEngineVersion());
   const scoringOperator = await readOptionalScoringOperator(input.pool);
   const runnerPool = input.runnerPool ?? input.pool;
-  if (runnerPool !== input.pool) {
-    // The runner reads and writes the same encrypted debates as the API side, so it gets the same cipher.
-    acceptanceContentStore(input.pool);
-    configureContentEncryption(runnerPool, acceptanceContentCiphers.get(input.pool)!);
-  }
+  // The API's runtime pool (main.ts:338) carries the content cipher (main.ts:959); the runner and `pool`'s read-backs
+  // read and write the same encrypted debates, so they get the same cipher.
+  const apiPool = input.apiPools?.runtime ?? input.pool;
+  const userDeks = acceptanceContentStore(apiPool);
+  for (const other of [runnerPool, input.pool]) shareAcceptanceContentCipher(apiPool, other);
   const runRepository = new RunRepository(runnerPool);
   const relaysByProviderRef = new Map(input.makerRelays.map((relay) => [relay.providerRef, relay]));
   const discoveredProviders = policy.providers.flatMap((configured) => {
@@ -487,7 +539,8 @@ export async function createAcceptanceRuntime(input: {
   );
   const maximumRunAttempts = computeAcceptanceStructuralCeiling(policy, policy.providers.length, 5, 1)
     .max_model_attempts;
-  const probes = new ProviderProbeRepository(input.pool);
+  // The ask's discovery reads and records probes inside the request, on the API's runtime pool (main.ts:536).
+  const probes = new ProviderProbeRepository(apiPool);
   const runner = new WalkingSkeletonRunner(runnerPool, provider, {
     workerId: ACCEPTANCE_WORKER_ID,
     // Side-by-side spec §3 (B16): it claims only runs stamped with the key the ask below stamps them with.
@@ -601,8 +654,10 @@ export async function createAcceptanceRuntime(input: {
     resolveTerminalActivations: input.testOnlyTerminalEvaluator ?? createTerminalActivationEvaluator(runnerPool)
   });
   const dispatcher = new AcceptanceDispatcher(runner, acceptanceFailureRecorder(runnerPool));
+  // The boot's own probe records are seeding, outside any request, on `pool`.
+  const bootProbes = new ProviderProbeRepository(input.pool);
   for (const { configured, relay } of discoveredProviders) {
-    await probes.record({
+    await bootProbes.record({
       probeEvidenceRef: randomUUID(),
       providerRef: configured.providerRef,
       maker: configured.maker,
@@ -612,31 +667,90 @@ export async function createAcceptanceRuntime(input: {
       probedAt: new Date()
     });
   }
-  const serverAskAdmissionPool=createPool(input.environment.DATABASE_URL);
-  const legacyAskAdmissionPool=createPool(input.environment.DATABASE_URL);
-  try {
-    const principals=await Promise.all([
-      input.pool,serverAskAdmissionPool,legacyAskAdmissionPool
-    ].map(async (candidate) => (await candidate.query<{ principal:string }>(
-      "SELECT current_user AS principal"
-    )).rows[0]?.principal));
-    if (principals.some((principal)=>principal===undefined)
-      || new Set(principals).size!==1) {
-      throw new TypeError("ACCEPTANCE_ASK_ADMISSION_DATABASE_ROLE_MISMATCH");
+  // The ask admission pools a test hands are the test's to end (tests/support/rls-logins.ts, endProvisionedRlsLogins);
+  // the two made here, on `pool`'s own login, end with the API.
+  const givenAskAdmissionPools = separateAskAdmissionPools(input.apiPools);
+  const serverAskAdmissionPool=givenAskAdmissionPools?.server ?? createPool(input.environment.DATABASE_URL);
+  const legacyAskAdmissionPool=givenAskAdmissionPools?.legacy ?? createPool(input.environment.DATABASE_URL);
+  const endAskAdmissionPools = async (): Promise<void> => {
+    if (givenAskAdmissionPools !== undefined) return;
+    await Promise.allSettled([serverAskAdmissionPool.end(),legacyAskAdmissionPool.end()]);
+  };
+  if (givenAskAdmissionPools === undefined) {
+    try {
+      const principals=await Promise.all([
+        input.pool,serverAskAdmissionPool,legacyAskAdmissionPool
+      ].map(async (candidate) => (await candidate.query<{ principal:string }>(
+        "SELECT current_user AS principal"
+      )).rows[0]?.principal));
+      if (principals.some((principal)=>principal===undefined)
+        || new Set(principals).size!==1) {
+        throw new TypeError("ACCEPTANCE_ASK_ADMISSION_DATABASE_ROLE_MISMATCH");
+      }
+    } catch (error) {
+      await endAskAdmissionPools();
+      throw error;
     }
-  } catch (error) {
-    await Promise.allSettled([
-      serverAskAdmissionPool.end(),legacyAskAdmissionPool.end()
-    ]);
-    throw error;
   }
   let serviceSession: Awaited<ReturnType<typeof createAcceptanceServiceSession>> | null = null;
   try {
+  // Seeded on `pool`; the API authenticates on its authorization pool (main.ts:998).
   const initializedSession=await createAcceptanceServiceSession(
-    input.pool,input.serviceCredential,acceptanceContentStore(input.pool)
+    input.pool,input.serviceCredential,userDeks,input.apiPools?.authorization ?? input.pool
   );
   serviceSession=initializedSession;
-  const application = new PostgresAskApplication(input.pool, dispatcher, {
+  const application = acceptanceAskApplication({
+    // main.ts:1113-1141: the runtime pool, the content provision pool and the two ask admission pools.
+    pool: apiPool,
+    runProvisionPool: input.apiPools?.contentProvision ?? input.pool,
+    askAdmissionPools: Object.freeze({ server:serverAskAdmissionPool,legacy:legacyAskAdmissionPool }),
+    dispatcher,
+    environment: input.environment,
+    policy,
+    modelScorecard,
+    probes,
+    discoveredProviders
+  });
+  const api=buildApi({
+    application,
+    // A21 (owner decision O4): /new's yes/no, from the scorecard this runtime's picker runs on.
+    modelScorecardInForce:modelScorecard.state==="VALID",
+    sessions:initializedSession.application,
+    allowedOrigin:`http://${input.environment.API_HOST}:${input.environment.API_PORT}`
+  });
+  api.addHook("onClose",async () => {
+    await Promise.allSettled([endAskAdmissionPools(),initializedSession.close()]);
+  });
+  return Object.freeze({ api,runner,serviceSession:initializedSession.credentials });
+  } catch (error) {
+    await Promise.allSettled([
+      endAskAdmissionPools(),
+      ...(serviceSession === null ? [] : [serviceSession.close()])
+    ]);
+    throw error;
+  }
+}
+
+/**
+ * The ask application, wired as apps/api/src/main.ts:1113-1141 wires it: on `pool`, the API's runtime pool, with
+ * `runProvisionPool` (main.ts's content provision pool) and the two ask admission pools.
+ */
+function acceptanceAskApplication(input: Readonly<{
+  pool: Pool;
+  runProvisionPool: Pool;
+  askAdmissionPools: Readonly<{ server: Pool; legacy: Pool }>;
+  dispatcher: Dispatcher;
+  environment: AcceptanceEnvironment;
+  policy: AcceptanceRuntimePolicy;
+  modelScorecard: ModelScorecardReadResult;
+  probes: ProviderProbeRepository;
+  discoveredProviders: ReadonlyArray<Readonly<{
+    configured: AcceptanceRuntimePolicy["providers"][number];
+    relay: AcceptanceMakerRelay;
+  }>>;
+}>): PostgresAskApplication {
+  const { dispatcher, policy, modelScorecard, probes, discoveredProviders } = input;
+  return new PostgresAskApplication(input.pool, dispatcher, {
     strangerSampleRate: input.environment.STRANGER_SAMPLE_RATE,
     registerVersion: ACCEPTANCE_REGISTER_VERSION,
     // Side-by-side spec §1: every run is stamped, with the one acceptance key its runner above claims under (B16).
@@ -722,29 +836,7 @@ export async function createAcceptanceRuntime(input: {
       askerProvenanceRef,
       policy.riskTier
     )
-  },undefined,input.pool,Object.freeze({
-    server:serverAskAdmissionPool,legacy:legacyAskAdmissionPool
-  }));
-  const api=buildApi({
-    application,
-    // A21 (owner decision O4): /new's yes/no, from the scorecard this runtime's picker runs on.
-    modelScorecardInForce:modelScorecard.state==="VALID",
-    sessions:initializedSession.application,
-    allowedOrigin:`http://${input.environment.API_HOST}:${input.environment.API_PORT}`
-  });
-  api.addHook("onClose",async () => {
-    await Promise.allSettled([
-      serverAskAdmissionPool.end(),legacyAskAdmissionPool.end(),initializedSession.close()
-    ]);
-  });
-  return Object.freeze({ api,runner,serviceSession:initializedSession.credentials });
-  } catch (error) {
-    await Promise.allSettled([
-      serverAskAdmissionPool.end(),legacyAskAdmissionPool.end(),
-      ...(serviceSession === null ? [] : [serviceSession.close()])
-    ]);
-    throw error;
-  }
+  },undefined,input.runProvisionPool,input.askAdmissionPools);
 }
 
 export interface BootRelayOptions {
