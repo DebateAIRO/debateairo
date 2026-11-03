@@ -40,6 +40,33 @@ describe('check 2: the release install and the website build', () => {
     expect(typeof result.seconds).toBe('number');
   });
 
+  // A release root with a release tool whose build environment is plain, and a fake pnpm in its own folder that exits 0.
+  // With <writesBuildId>, the fake pnpm leaves Next's build id file where a real build leaves it.
+  function fakeBuild({ writesBuildId }: { writesBuildId: boolean }) {
+    const root = scratch();
+    const deploy = join(root, 'dialectical-engine/deploy');
+    for (const folder of ['preview-lifecycle', 'preview-auth-dev', 'preview-release/v1']) mkdirSync(join(deploy, folder), { recursive: true });
+    writeFileSync(join(deploy, 'preview-release/v1/release-artifacts.mjs'), "export async function uiBuildEnvironment() { return { PATH: '/usr/bin:/bin' }; }\n");
+    const fakePnpmDir = join(scratch(), 'bin');
+    mkdirSync(fakePnpmDir);
+    writeFileSync(join(fakePnpmDir, 'pnpm'), writesBuildId ? '#!/bin/sh\nmkdir -p apps/ui/.next && echo fake > apps/ui/.next/BUILD_ID\n' : '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+    return { root, fakePnpmDir };
+  }
+
+  it('a build that exits 0 but leaves no output is refused', async () => {
+    const { root, fakePnpmDir } = fakeBuild({ writesBuildId: false });
+    const result = await website.buildWebsiteIn({ root, node: process.execPath, pnpmDir: fakePnpmDir });
+    expect(result.status).toBe('refused');
+    expect(result.lines).toContain('UPLOAD_CHECK_WEBSITE_BUILD_NO_OUTPUT');
+  }, 60_000);
+
+  it('a build that exits 0 and leaves Next\'s build id file goes on to the release-folder tools', async () => {
+    const { root, fakePnpmDir } = fakeBuild({ writesBuildId: true });
+    const result = await website.buildWebsiteIn({ root, node: process.execPath, pnpmDir: fakePnpmDir });
+    expect(result.status, result.lines.join('\n')).toBe('passed');
+    expect(result.lines).toContain('website build: built with the release tool\'s own environment');
+  }, 60_000);
+
   it('a failed online fill is refused, not thrown', async () => {
     const { result, root } = await website.checkWebsiteBuild({
       repo, rev: 'HEAD', workdir: scratch(), node: process.execPath, pnpmDir, extraEnv: { PNPM_CONFIG_REGISTRY: 'http://127.0.0.1:9' }

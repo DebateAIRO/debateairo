@@ -28,6 +28,8 @@ import { RELEASE_FOLDER_TOOLS, loadEachTool } from "./tools-folder.mjs";
 const ENGINE = "dialectical-engine";
 const RELEASE_TOOL = `${ENGINE}/deploy/preview-release/v1/release-artifacts.mjs`;
 const HOTFIX = `${ENGINE}/tools/source-map-hotfix.mjs`;
+/** The file every Next build leaves, and the server's release tool reads (ui-build.mjs). Its absence means nothing was built. */
+const BUILD_ID = `${ENGINE}/apps/ui/.next/BUILD_ID`;
 /** A made-up release key. It only has to match RELEASE_KEY_PATTERN; the website bakes it in and nothing serves it. */
 const RELEASE_KEY = "r99-000000000000";
 /** One install or build gets this long. Past it, the child is stopped and counted as failed. */
@@ -196,6 +198,11 @@ export async function buildWebsiteIn({ root, node, pnpmDir, extraEnv = {} }) {
   const buildLog = join(root, "website-build.log");
   if (await runChild(join(pnpmDir, "pnpm"), ["--filter", "dialectical-engine-v2ui", "build"], { cwd: join(root, ENGINE), env, log: buildLog }) !== 0) {
     return done("refused", ["website build: the build failed", "UPLOAD_CHECK_WEBSITE_BUILD_FAILED", ...tailOf(buildLog), allowances]);
+  }
+  // pnpm exits 0 when --filter matches no package (a renamed website package, say), so exit 0 alone proves no build. A
+  // real build leaves Next's build id file, which the server's release tool reads; without it, nothing was built.
+  if (!existsSync(join(root, BUILD_ID))) {
+    return done("refused", [`website build: the build exited 0 but left no ${BUILD_ID}`, "UPLOAD_CHECK_WEBSITE_BUILD_NO_OUTPUT", ...tailOf(buildLog), allowances]);
   }
   // The tools that run from a release folder load there, with its packages, each on its own.
   const results = await loadEachTool({ folder: root, node, only: RELEASE_FOLDER_TOOLS });
