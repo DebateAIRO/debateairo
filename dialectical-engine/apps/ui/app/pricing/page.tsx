@@ -69,7 +69,9 @@ export default async function PricingPage({
   const requestedLocale = (await cookies()).get(LOCALE_COOKIE)?.value;
   const locale = isLocale(requestedLocale) ? requestedLocale : "en";
   const params = await searchParams;
-  const [billingCatalog, plans] = await Promise.all([loadNamespace(locale, "billing"), readPlans(params)]);
+  const [billingCatalog, authCatalog, plans] = await Promise.all([
+    loadNamespace(locale, "billing"), loadNamespace(locale, "auth"), readPlans(params)
+  ]);
   // Terms §12: the FAQ says what the cards say.
   const priced = pricedTax(plans);
   return (
@@ -83,7 +85,9 @@ export default async function PricingPage({
           : (
             <>
               <PricingPlaceForm
-                catalog={billingCatalog} locale={locale} place={plans.place}
+                // A new answer is a new place: the picker starts from it, never from the last page's pick.
+                key={`${plans.place.country ?? ""} ${plans.place.postal_code ?? ""} ${plans.place.status}`}
+                catalog={billingCatalog} regionCatalog={authCatalog} locale={locale} place={plans.place}
                 typedPostalCode={single(params.postal_code)}
               />
               <PricingCards
