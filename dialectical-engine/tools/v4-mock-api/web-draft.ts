@@ -112,6 +112,13 @@ export const DraftPathRewritesSchema = AnswerPathRewritesSchema;
 export const DraftAnswerDigSchema = AnswerDigSchema;
 export const DraftMonthPauseSchema = MonthPauseSchema;
 export const DraftUsageBorrowsSchema = UsageBorrowsSchema;
+/**
+ * Owner review 3 Nov 2026 (wait-f11, map-f30, wait-f18): a FAILED run's `quota_used` ("NONE": nothing was taken from the
+ * person's quota for it; "SOME": some was). NOT in the contract yet: the mock shows it only on its draft view, and the
+ * website says "Nothing was taken" only once the run read carries it (apps/ui/lib/v4/failedRun.ts).
+ */
+export const DraftRunQuotaUsedSchema = z.enum(["NONE", "SOME"]);
+export type DraftRunQuotaUsed = z.infer<typeof DraftRunQuotaUsedSchema>;
 /** W2-7: Continue on a month-paused debate (no route in the contract yet; the mock serves POST /v1/runs/{id}/continue). */
 export const DraftRunContinueRequestSchema = RunContinueRequestSchema;
 export const DraftRunContinuedSchema = RunContinuedSchema;
@@ -182,9 +189,9 @@ export function stripRoom<T extends Json>(room: T): T {
   return rest as unknown as T;
 }
 
-/** W2-7: without its month pause, a paused debate reads as today's RUNNING. */
+/** W2-7: without its month pause, a paused debate reads as today's RUNNING; without `quota_used`, a failed run says nothing of the quota. */
 export function stripRun<T extends Json>(run: T): T {
-  const { month_pause: _pause, ...rest } = run;
+  const { month_pause: _pause, quota_used: _quota, ...rest } = run;
   return rest as unknown as T;
 }
 

@@ -451,6 +451,16 @@ await step("a debate paused at the month wall, then Continue", async () => {
   await mock("/__mock/set?pause=UNTIL_RESET");
   return `paused until ${before.month_pause?.until ?? ready.month_pause.until}; Continue refused early, then resumed`;
 }, (value: string) => value);
+// Owner review 3 Nov (wait-f11, wait-f18): a failed run's `quota_used` (on the draft view until the contract carries it), and
+// the switch that makes new digs fail or pause, for the click-test of "Try this dig again" and the paused dig.
+await step("a failed debate's quota_used, and the dig= switch", async () => {
+  const today: Loose = await client.readRun(RUNS.failed);
+  must(today.state === "FAILED" && (today.quota_used === undefined || today.quota_used === "NONE"), "today's run read stays valid");
+  const draft: Loose = await mock(`/__mock/draft/v1/runs/${RUNS.failed}`);
+  must(draft.quota_used === "NONE", "the draft view says nothing was taken");
+  for (const dig of ["FAIL", "PAUSE", "SETTLE"]) must((await mock(`/__mock/set?dig=${dig}`)).dig === dig, `dig=${dig} is taken`);
+  return `draft quota_used ${String(draft.quota_used)}; dig= FAIL, PAUSE, SETTLE`;
+}, (value: string) => value);
 
 // Decision 13: the public-debates lane. It runs last among the asks: it adds two digs and one report to the mock.
 const PUBLIC = { debate: "f1000000-0000-4000-8000-000000000001", authorGone: "f1000000-0000-4000-8000-000000000002", update: "f2000000-0000-4000-8000-000000000001" };

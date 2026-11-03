@@ -12,7 +12,8 @@ import {
   answerDraftProblems, contractOrDraft, cutQuote, DraftAnswerWebSchema, DraftAskParentSchema, DraftDigSuggestionSchema,
   DraftInvestigationSchema, DraftOtherPageSchema, DraftRoomPartSchema, DraftSourceSchema, DraftWebPathSchema,
   DraftRoomQueryPartSchema, READ_DEPTHS, RESEARCHED_STATES, splitAsk, splitRoomQuery, stripAnswer, stripRoom, stripRun, stripUsage,
-  SUGGESTION_KINDS, SUGGESTION_SIDES, DraftPathRewritesSchema, DraftAnswerDigSchema, DraftMonthPauseSchema, DraftUsageBorrowsSchema
+  SUGGESTION_KINDS, SUGGESTION_SIDES, DraftPathRewritesSchema, DraftAnswerDigSchema, DraftMonthPauseSchema, DraftRunQuotaUsedSchema,
+  DraftUsageBorrowsSchema
 } from "../../tools/v4-mock-api/web-draft.js";
 import {
   borrowNotice, DEEPEST_DIG, DIG_ANSWERS, DIG_FINISHED_AT, DIG_RUNS, monthPause, PATH_REWRITES, reportVersionBody, SEEDED_NEW_DIGS
@@ -334,6 +335,22 @@ describe("V4 mock API: the new dig model and the money rule", () => {
     expect(DraftRoomPartSchema.safeParse({ ...wait, room: "FITS", scope: null, resets_at: null }).success).toBe(false);
     expect(AskRoomResponseSchema.safeParse(stripRoom(wait)).success).toBe(true);
     expect(Object.keys(stripRoom(wait))).not.toContain("new_starts");
+  });
+
+  it("a failed run's quota_used (owner review 3 Nov) passes its draft schema and falls back to today's run read", () => {
+    const run = {
+      run_ref: "44444444-4444-4444-8444-444444444444", question_line: "Will AI tutors replace homework help?", state: "FAILED",
+      terminal_reason: "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM", hold_until: null
+    };
+    for (const quota of ["NONE", "SOME"] as const) {
+      expect(DraftRunQuotaUsedSchema.safeParse(quota).success).toBe(true);
+      const full = { ...run, quota_used: quota };
+      expect(stripRun(full)).toEqual(run);
+      expect(RunProjectionSchema.safeParse(contractOrDraft(RunProjectionSchema, full, stripRun).body).success).toBe(true);
+    }
+    expect(DraftRunQuotaUsedSchema.safeParse("ALL").success).toBe(false);
+    expect(["v4.debate.failedNothingTaken", "v4.digFailed.nothingTaken", "v4.digFailed.retry", "v4.digFailed.keepsFailing",
+      "v4.pause.digCard", "v4.pause.digCardReady"].filter((key) => !(key in catalog))).toEqual([]);
   });
 
   it("every dig-model and money-rule word the mock plays has its English line in the V4 catalogue", () => {
