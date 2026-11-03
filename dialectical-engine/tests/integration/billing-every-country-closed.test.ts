@@ -93,6 +93,21 @@ describe("NETOPIA's check: billing on with every country closed for payment", ()
           { plan_id: "MAX", net_prices: { USD: "200.00", EUR: "200.00", RON: "1000.00" } }
         ]
       });
+      // Terms §12, through the runtime's own reader and the stack's tax engine: each country's price with its own tax
+      // (this stack prices every country in US dollars), even while no country may pay. The US, whose tax depends on
+      // the state, stays before tax.
+      if (country === "US") {
+        expect(plans.body.tax, country).toBeNull();
+        expect((plans.body.plans as Array<{ total_price: unknown }>).map((plan) => plan.total_price), country)
+          .toEqual([null, null, null, null]);
+        continue;
+      }
+      const rate = ({ RO: 2_100, DE: 1_900 } as Readonly<Record<string, number>>)[country];
+      const plus = ({ RO: "24.20", DE: "23.80" } as Readonly<Record<string, string>>)[country];
+      expect(plans.body, country).toMatchObject({
+        tax: { country, tax_rate_bp: rate },
+        plans: [{ total_price: "0.00" }, { total_price: plus }, {}, {}]
+      });
     }
   });
 

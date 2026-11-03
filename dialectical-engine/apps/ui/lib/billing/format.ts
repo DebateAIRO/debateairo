@@ -1,4 +1,4 @@
-import type { BillingCurrency } from "@debateai/contract";
+import type { BillingCurrency, BillingPlansTax } from "@debateai/contract";
 import { formatDate, formatNumber, t, type MessageCatalog } from "../i18n/translate.js";
 import type { BillingPlanId } from "./plans.js";
 
@@ -12,6 +12,19 @@ export function formatMoney(locale: string, decimal: string, currency: BillingCu
   return DECIMAL_PRICE.test(decimal)
     ? formatNumber(locale, Number(decimal), { style: "currency", currency })
     : decimal;
+}
+
+/**
+ * Terms §12: how a plans list's prices stand toward tax. INCLUDED: the visitor's country's tax is in them; NONE: that
+ * country adds none, so they are final; BEFORE: no country's tax is known (an unknown place, the US or Canada, whose
+ * tax depends on the state or province, or the tax service not answering), so they are before tax. `== null`: an answer
+ * without the field (an API from before the totals) is BEFORE, never read as tax included.
+ */
+export type PricedTax = "INCLUDED" | "NONE" | "BEFORE";
+
+export function pricedTax(tax: BillingPlansTax | null | undefined): PricedTax {
+  if (tax == null) return "BEFORE";
+  return tax.tax_status === "TAXABLE" && tax.tax_rate_bp > 0 ? "INCLUDED" : "NONE";
 }
 
 export function planName(catalog: MessageCatalog, planId: BillingPlanId): string {

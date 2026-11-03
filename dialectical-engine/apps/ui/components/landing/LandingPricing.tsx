@@ -1,13 +1,20 @@
 import type { JSX } from "react";
 import { AiNotice } from "../AiNotice";
+import type { PricedTax } from "@/lib/billing/format";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
 /* The document's closing CTA: centred, with the pro/rule/con motif above it.
-   The pricing line carries the id the nav points at. */
+   The pricing line carries the id the nav points at. Terms §12: it says whether
+   the price holds the visitor's country's tax, adds none, or is before tax. */
+const PRICING_COPY: Readonly<Record<PricedTax, string>> = Object.freeze({
+  INCLUDED: "home.pricingCopyTaxIncluded", NONE: "home.pricingCopyNoTax", BEFORE: "home.pricingCopy"
+});
+
 export function LandingPricing({
   catalog,
-  lowestPaidPrice
-}: { catalog: MessageCatalog; lowestPaidPrice: string | null }): JSX.Element {
+  lowestPaidPrice,
+  tax = "BEFORE"
+}: { catalog: MessageCatalog; lowestPaidPrice: string | null; tax?: PricedTax }): JSX.Element {
   return (
     <section
       id="start"
@@ -37,7 +44,7 @@ export function LandingPricing({
       <p id="pricing" className="lpPricing">
         {lowestPaidPrice === null ? t(catalog, "home.pricingCopyFree") : (
           <>
-            {t(catalog, "home.pricingCopy", { price: lowestPaidPrice })}{" "}
+            {t(catalog, PRICING_COPY[tax], { price: lowestPaidPrice })}{" "}
             <a href="/pricing">{t(catalog, "home.pricingLink")}</a>
           </>
         )}

@@ -1,17 +1,23 @@
 import { cookies, headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { ContractHttpError, type BillingCurrency } from "@debateai/contract";
+import { ContractHttpError, type BillingCurrency, type BillingPlansTax } from "@debateai/contract";
 import { PricingCards, type PricingPlan } from "@/components/billing/PricingCards";
 import { SiteFooter } from "@/components/SiteFooter";
 import { billingPageFooter } from "@/lib/billing/footerBilling";
+import { pricedTax } from "@/lib/billing/format";
 import { isBillingPlanId } from "@/lib/billing/plans";
 import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
 import { loadNamespace } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/translate";
 import { createServerContractClient, readTrustedClientIp } from "@/lib/serverApi";
 
-/** The plans, and the currency the visitor's connection pays in (spec 2026-10-05 §2.16.1). */
-async function readPlans(): Promise<Readonly<{ currency: BillingCurrency; plans: readonly PricingPlan[] }> | null> {
+/**
+ * The plans, the currency the visitor's connection pays in (spec 2026-10-05 §2.16.1), and its country's tax, which
+ * the prices include (Terms §12).
+ */
+async function readPlans(): Promise<Readonly<{
+  currency: BillingCurrency; tax: BillingPlansTax | null; plans: readonly PricingPlan[];
+}> | null> {
   const headerStore = await headers();
   try {
     const answer = await createServerContractClient(
@@ -19,6 +25,7 @@ async function readPlans(): Promise<Readonly<{ currency: BillingCurrency; plans:
     ).getBillingPlans();
     return {
       currency: answer.currency,
+      tax: answer.tax,
       plans: answer.plans.filter((plan): plan is PricingPlan => isBillingPlanId(plan.plan_id))
     };
   } catch (failure) {
@@ -32,6 +39,10 @@ export default async function PricingPage() {
   const requestedLocale = (await cookies()).get(LOCALE_COOKIE)?.value;
   const locale = isLocale(requestedLocale) ? requestedLocale : "en";
   const [billingCatalog, plans] = await Promise.all([loadNamespace(locale, "billing"), readPlans()]);
+  // Terms §12: the FAQ says what the cards say; with no plans shown, the general answer (prices before tax).
+  const priced = pricedTax(plans?.tax);
+  const faqTaxAnswer = priced === "INCLUDED" ? "billing.pricing.faqTaxAnswerIncluded"
+    : priced === "NONE" ? "billing.pricing.faqTaxAnswerNoTax" : "billing.pricing.faqTaxAnswer";
   return (
     <div className="screen scroll pricingPage">
       <div className="pricingInner">
@@ -42,7 +53,9 @@ export default async function PricingPage() {
           ? <p className="billingError" role="status">{t(billingCatalog, "billing.pricing.unavailable")}</p>
           : (
             <>
-              <PricingCards catalog={billingCatalog} locale={locale} currency={plans.currency} plans={plans.plans} />
+              <PricingCards
+                catalog={billingCatalog} locale={locale} currency={plans.currency} tax={plans.tax} plans={plans.plans}
+              />
               <p className="pricingNote">{t(billingCatalog, "billing.pricing.currencyNote")}</p>
             </>
           )}
@@ -52,8 +65,10 @@ export default async function PricingPage() {
           <p>{t(billingCatalog, "billing.pricing.faqLimitsAnswer")}</p>
           <h3>{t(billingCatalog, "billing.pricing.faqCancelQuestion")}</h3>
           <p>{t(billingCatalog, "billing.pricing.faqCancelAnswer")}</p>
-          <h3>{t(billingCatalog, "billing.pricing.faqTaxQuestion")}</h3>
-          <p>{t(billingCatalog, "billing.pricing.faqTaxAnswer")}</p>
+          <h3>
+            {t(billingCatalog, priced === "BEFORE" ? "billing.pricing.faqTaxQuestion" : "billing.pricing.faqTaxQuestionIncluded")}
+          </h3>
+          <p>{t(billingCatalog, faqTaxAnswer)}</p>
           <p className="billingActions">
             <a href="/terms">{t(billingCatalog, "billing.pricing.termsLink")}</a>
             <a href="/privacy">{t(billingCatalog, "billing.pricing.privacyLink")}</a>

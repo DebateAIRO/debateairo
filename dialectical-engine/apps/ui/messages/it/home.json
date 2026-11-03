@@ -76,6 +76,8 @@
   "home.closingTitle": "La tua argomentazione è forte quanto il suo anello più debole.",
   "home.closingLede": "Affronta un round. Quattro turni, circa nove minuti e una trascrizione che indica esattamente dove hai smesso di rispondere.",
   "home.pricingCopy": "Inizia gratis. I piani a pagamento partono da {price} al mese più imposte. Puoi disdire in qualsiasi momento.",
+  "home.pricingCopyTaxIncluded": "Inizia gratis. I piani a pagamento partono da {price} al mese, imposte incluse. Puoi disdire in qualsiasi momento.",
+  "home.pricingCopyNoTax": "Inizia gratis. I piani a pagamento partono da {price} al mese, senza imposte aggiunte. Puoi disdire in qualsiasi momento.",
   "home.pricingCopyFree": "Inizia gratis. Nessuna carta richiesta.",
   "home.pricingLink": "Vedi i piani",
   "home.card1Text": "In generale, le aziende che privilegiano il lavoro da remoto dovrebbero usare fasce salariali indipendenti dalla posizione geografica per gli ingegneri che svolgono un lavoro equivalente, consentendo adeguamenti trasparenti per costi imposti dalla legge, competenze rare e ambito del ruolo.",

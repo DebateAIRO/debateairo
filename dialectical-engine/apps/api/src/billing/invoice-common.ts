@@ -140,7 +140,7 @@ export function invoiceLine(
 }
 
 /** C-8: where Quaderno prices a sale by a region it reads from the postal code (P2-M29). */
-const PRICED_REGION_COUNTRIES: ReadonlySet<string> = new Set(["US", "CA"]);
+export const PRICED_REGION_COUNTRIES: ReadonlySet<string> = new Set(["US", "CA"]);
 
 /**
  * Spec §2.5.4 invoice jobs: the customer, one line with the tax rate, and the three pieces of location evidence.

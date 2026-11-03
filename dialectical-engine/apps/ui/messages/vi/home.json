@@ -74,6 +74,8 @@
   "home.closingTitle": "Lập luận của bạn chỉ mạnh bằng mắt xích yếu nhất của nó.",
   "home.closingLede": "Thực hiện một vòng. Bốn lượt, khoảng chín phút và một bản ghi chỉ rõ chính xác nơi bạn đã ngừng trả lời.",
   "home.pricingCopy": "Bắt đầu miễn phí. Gói trả phí chỉ từ {price} mỗi tháng cộng thuế. Hủy bất cứ lúc nào.",
+  "home.pricingCopyTaxIncluded": "Bắt đầu miễn phí. Gói trả phí chỉ từ {price} mỗi tháng, đã gồm thuế. Hủy bất cứ lúc nào.",
+  "home.pricingCopyNoTax": "Bắt đầu miễn phí. Gói trả phí chỉ từ {price} mỗi tháng, không cộng thêm thuế. Hủy bất cứ lúc nào.",
   "home.pricingCopyFree": "Bắt đầu miễn phí. Không cần thẻ.",
   "home.pricingLink": "Xem các gói",
   "home.card1Text": "Các công ty ưu tiên làm việc từ xa nhìn chung nên dùng khung lương không phụ thuộc vị trí cho những kỹ sư làm công việc tương đương, đồng thời cho phép điều chỉnh minh bạch theo chi phí bắt buộc về pháp lý, kỹ năng khan hiếm và phạm vi vai trò.",

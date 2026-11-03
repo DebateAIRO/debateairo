@@ -76,6 +76,8 @@
   "home.closingTitle": "Vaš je argument jak koliko i njegova najslabija karika.",
   "home.closingLede": "Odigrajte jednu rundu. Četiri poteza, oko devet minuta i prijepis koji točno pokazuje gdje ste prestali odgovarati.",
   "home.pricingCopy": "Počnite besplatno. Plaćeni planovi počinju od {price} mjesečno uz porez. Otkažite bilo kada.",
+  "home.pricingCopyTaxIncluded": "Počnite besplatno. Plaćeni planovi počinju od {price} mjesečno s uključenim porezom. Otkažite bilo kada.",
+  "home.pricingCopyNoTax": "Počnite besplatno. Plaćeni planovi počinju od {price} mjesečno, bez dodanog poreza. Otkažite bilo kada.",
   "home.pricingCopyFree": "Počnite besplatno. Kartica nije potrebna.",
   "home.pricingLink": "Pogledajte planove",
   "home.card1Text": "Tvrtke koje rade na daljinu općenito bi trebale upotrebljavati platne razrede neovisne o lokaciji za inženjere koji obavljaju ekvivalentan posao, a istodobno dopuštati transparentne prilagodbe za zakonski potrebne troškove, rijetke vještine i opseg uloga.",

@@ -39,14 +39,21 @@ export function decidePaymentPlace(input: Readonly<{
 }
 
 /**
- * Spec 2026-10-05 §2.16.1: the currency a visitor's connection pays in, from the same lookup the quote uses when no
- * country is declared. An address that is not an IP, the lookup's "XX" and a Tor exit say nothing about where the
- * person is billed: the rule's default.
+ * The country a visitor's connection is in, from the same lookup the quote uses when no country is declared. An
+ * address that is not an IP, the lookup's "XX" and a Tor exit say nothing about where the person is billed: null.
+ */
+export function connectionCountry(input: Readonly<{ geo: GeoLookup | undefined; ip: string }>): string | null {
+  if (input.geo === undefined || isIP(input.ip) === 0) return null;
+  const located = input.geo.lookup(input.ip);
+  return located.tor || located.country === UNKNOWN_COUNTRY ? null : located.country;
+}
+
+/**
+ * Spec 2026-10-05 §2.16.1: the currency a visitor's connection pays in; a connection in no known country pays in the
+ * rule's default.
  */
 export function connectionCurrency(input: Readonly<{ geo: GeoLookup | undefined; plans: BillingPlans; ip: string }>): BillingCurrency {
-  if (input.geo === undefined || isIP(input.ip) === 0) return priceCurrencyFor(input.plans, null);
-  const located = input.geo.lookup(input.ip);
-  return priceCurrencyFor(input.plans, located.tor || located.country === UNKNOWN_COUNTRY ? null : located.country);
+  return priceCurrencyFor(input.plans, connectionCountry(input));
 }
 
 function paymentRefusalCode(code: GeoRefusalCode): BillingRefusalCode {

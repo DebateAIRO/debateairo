@@ -77,6 +77,8 @@
   "home.closingTitle": "Váš argument je jen tak silný, jak silný je jeho nejslabší článek.",
   "home.closingLede": "Dejte si jedno kolo. Čtyři tahy, asi devět minut a přepis, který přesně ukáže, kde jste přestali odpovídat.",
   "home.pricingCopy": "Začněte zdarma. Placené plány začínají na {price} měsíčně plus daň. Kdykoli zrušit.",
+  "home.pricingCopyTaxIncluded": "Začněte zdarma. Placené plány začínají na {price} měsíčně včetně daně. Kdykoli zrušit.",
+  "home.pricingCopyNoTax": "Začněte zdarma. Placené plány začínají na {price} měsíčně bez připočtené daně. Kdykoli zrušit.",
   "home.pricingCopyFree": "Začněte zdarma. Karta není potřeba.",
   "home.pricingLink": "Zobrazit plány",
   "home.card1Text": "Vzdálené společnosti by obecně měly používat platová pásma nezávislá na místě pro inženýry vykonávající ekvivalentní práci a zároveň umožnit transparentní úpravy podle zákonem požadovaných nákladů, omezených dovedností a rozsahu rolí.",

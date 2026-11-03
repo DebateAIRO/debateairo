@@ -20,17 +20,18 @@ import { loadNamespace } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/translate";
 import { dailyLimitMessageCatalog, legalGateMessageCatalog } from "@/lib/v3/requestFailure";
 import { composerRoomCatalog } from "@/lib/billing/roomCatalog";
-import { formatMoney } from "@/lib/billing/format";
+import { formatMoney, pricedTax, type PricedTax } from "@/lib/billing/format";
 import { availablePaymentMarks } from "@/lib/billing/paymentMarks";
 import type { SiteFooterBilling } from "@/lib/billing/footerBilling";
 
 export const dynamic = "force-dynamic";
 
-type LandingPlans = Readonly<{ lowestPaidPrice: string | null; footer: SiteFooterBilling }>;
+type LandingPlans = Readonly<{ lowestPaidPrice: string | null; tax: PricedTax; footer: SiteFooterBilling }>;
 
 /**
- * The landing's one plans read: the lowest paid net price for the price line, and whether billing is on for the
- * footer. Only the route's 404 means off (local mode, or hosted before the switch), exactly as billingIsOn() decides.
+ * The landing's one plans read: the lowest paid price for the price line (with the connection country's tax, Terms
+ * §12, whenever the list knows it), and whether billing is on for the footer. Only the route's 404 means off (local
+ * mode, or hosted before the switch), exactly as billingIsOn() decides.
  */
 async function landingPlans(locale: string, headerStore: Headers): Promise<LandingPlans> {
   const footer = (billingOn: boolean): SiteFooterBilling => Object.freeze({ billingOn, marks: availablePaymentMarks() });
@@ -38,17 +39,20 @@ async function landingPlans(locale: string, headerStore: Headers): Promise<Landi
     const answer = await createServerContractClient(
       fetch, undefined, headerStore.get("user-agent") ?? undefined, readTrustedClientIp(headerStore)
     ).getBillingPlans();
-    const lowest = answer.plans
-      .filter((plan) => plan.plan_id !== "FREE")
+    const paid = answer.plans.filter((plan) => plan.plan_id !== "FREE");
+    // `!= null`: an answer without the fields (an API from before Terms §12's totals) is never read as tax included.
+    const tax = paid.every((plan) => plan.total_price != null) ? pricedTax(answer.tax) : "BEFORE";
+    const lowest = paid
       // Spec 2026-10-05 §2.16.1: in the currency the visitor's connection pays in.
-      .map((plan) => plan.net_prices[answer.currency])
+      .map((plan) => (tax === "BEFORE" ? null : plan.total_price) ?? plan.net_prices[answer.currency])
       .sort((left, right) => Number(left) - Number(right))[0];
     return Object.freeze({
-      lowestPaidPrice: lowest === undefined ? null : formatMoney(locale, lowest, answer.currency), footer: footer(true)
+      lowestPaidPrice: lowest === undefined ? null : formatMoney(locale, lowest, answer.currency), tax,
+      footer: footer(true)
     });
   } catch (failure) {
     return Object.freeze({
-      lowestPaidPrice: null,
+      lowestPaidPrice: null, tax: "BEFORE",
       footer: footer(!(failure instanceof ContractHttpError && failure.status === 404))
     });
   }
@@ -76,7 +80,9 @@ export default async function HomePage({
   const catalog = Object.freeze({ ...homeCatalog, ...chromeCatalog });
   if (token === null) {
     const plans = await landingPlans(locale, await headers());
-    return <><LandingPage catalog={catalog} lowestPaidPrice={plans.lowestPaidPrice} footerBilling={plans.footer} /><SupportWidget /></>;
+    return <><LandingPage
+      catalog={catalog} lowestPaidPrice={plans.lowestPaidPrice} tax={plans.tax} footerBilling={plans.footer}
+    /><SupportWidget /></>;
   }
   const requestedTab = (await searchParams).tab;
   const tab: "yours" | "public" =
