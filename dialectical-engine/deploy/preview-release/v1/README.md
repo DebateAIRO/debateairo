@@ -1465,7 +1465,8 @@ for every step written from now on.
 2. **After starting a service, wait for its own sign that it is ready, with a time limit, before checking it; and read
    a check file the way it is written.** `active` from systemd (the server's service manager) only says the process
    started. Wait in a loop for the sign the service itself gives (its start line in the journal, its socket, its
-   answer on its address), give up after a stated time, and stop the step with `_NOT_DONE` then. When a tool writes
+   answer on its address), give up after a stated time, and stop the step with `_NOT_DONE` then; a hand-run step
+   reads the check after the loop instead. When a tool writes
    several lines, read the one that holds the answer, not the whole file. That was fault 6, which stopped R22 at its
    Perplexity step. The fixed form is in steps 7 and 8 of `deploy/preview-gate/v3/README-perplexity.md` (a 30-second
    wait for the socket, and the probe's last line read with `tail -n 1`). B6's wait of up to 4 minutes for the API's
