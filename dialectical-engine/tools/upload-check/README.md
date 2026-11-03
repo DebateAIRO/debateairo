@@ -40,8 +40,7 @@ While it runs, it prints one progress line per check (`check 1 of 3: tools-folde
 (stderr), apart from the report. The report comes at the end, on the normal output.
 
 Everything it makes goes into one new folder under the Mac's temporary folder, named `upload-check-<commit>-<time>`.
-The one exception is a small connection file that tsx opens in the Mac's temporary folder while check 3 runs and
-removes itself when it ends; a path inside the work folder would be longer than a Mac allows for it. That folder is deleted when the run ends: when it finishes, on Ctrl-C, on a stop (`kill`) and when its terminal or
+This work folder is deleted when the run ends: when it finishes, on Ctrl-C, on a stop (`kill`) and when its terminal or
 app is closed. First everything the run started is stopped (the package installs, the website build, the throwaway
 database), then the folder is deleted. If the folder still cannot be deleted, the run says so in one line that starts
 `UPLOAD_CHECK_WORK_FOLDER_LEFT` and names the folder.
@@ -52,6 +51,14 @@ check is running, this one line finds every leftover folder, prints its name and
 ```sh
 find "${TMPDIR%/}" -maxdepth 1 -name 'upload-check-*' -print -exec rm -rf {} +
 ```
+
+Two small files are the exception: they go into the Mac's own temporary folder, not the work folder. Check 3 keeps the
+Mac's temporary folder because a path inside the work folder is longer than a Mac allows for tsx's connection file.
+- tsx's connection file, `tsx-<your user number>/<process number>.pipe`, lives there while check 3 runs.
+- The throwaway database writes a one-time password file, `pg-password-*`, there while it sets itself up.
+
+Both are removed when check 3 ends normally. A check 3 that is stopped, or that runs out of time, can leave them
+behind. They are a few bytes each and do no harm; the password belongs to a database that is already gone.
 
 ## The three checks
 

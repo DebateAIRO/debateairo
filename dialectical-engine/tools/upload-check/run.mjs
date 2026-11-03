@@ -233,12 +233,13 @@ export async function runUploadCheck({
   } catch (error) {
     outcome = { exitCode: 2, output: `UPLOAD_CHECK_RUN_FAILED: a check threw, so the run could not finish: ${firstLine(error)}`, results: [] };
   } finally {
-    for (const [signal, handler] of handlers) process.removeListener(signal, handler);
+    // The handlers stay until the folder is gone: a Ctrl-C during this long delete must not kill the run half-way.
     try {
       cleanUp();
     } catch (error) {
       cleanUpFailure = error;
     }
+    for (const [signal, handler] of handlers) process.removeListener(signal, handler);
   }
   if (cleanUpFailure !== null) {
     return stopped("UPLOAD_CHECK_CLEANUP_FAILED", `could not remove ${workFolder}: ${firstLine(cleanUpFailure)}`);
