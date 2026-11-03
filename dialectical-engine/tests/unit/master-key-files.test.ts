@@ -2,8 +2,8 @@
 // default, and only the files on tests/support/master-key-files.txt may use the harness superuser (the "master key")
 // inside a request. The guard arms where a test database starts (startTestDatabase, the acceptance tests'
 // startStandingDatabase) and in apiTestPools; the first case below starts a real database to show it. The other cases
-// need no database: the guard refuses the query before the client ever connects. The last case pins who may turn
-// login mode off (review M-10).
+// need no database: the guard refuses the query before the client ever connects. The last cases pin who may turn
+// login mode off (review M-10) and who may run a fixture step outside the request (Task 8 fix round 1).
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -197,3 +197,31 @@ describe("who may turn login mode off (review M-10)", () => {
   });
 });
 
+/**
+ * Task 8 fix round 1: the files that may run a fixture step outside the request with runFixtureStepOutsideRequest
+ * (tests/support/master-key-guard.ts), each a deliberate hole in the R21 guard, each with its reason.
+ */
+const FIXTURE_STEP_CALLERS: ReadonlyMap<string, string> = new Map([
+  ["tests/support/billingStack.ts",
+    "the session stand-in mints the step-up grant row the real rotation mints, on the superuser, during the request"],
+  ["tests/integration/sf-s04-ask-gate-database.test.ts",
+    "the stand-in ask application starts its run on the superuser; the gate in front of it is what is under test"],
+  ["tests/integration/team-allowance-http.test.ts",
+    "the staff alert readiness fixture (authorizeStaffAlertFixture) writes on the superuser during a staff request"],
+  ["tests/integration/staff-http-database.test.ts",
+    "the staff alert readiness fixture (authorizeStaffAlertFixture) writes on the superuser during a staff request"]
+]);
+
+describe("who may run a fixture step outside the request (Task 8 fix round 1)", () => {
+  it("only the files named in FIXTURE_STEP_CALLERS use runFixtureStepOutsideRequest, and nothing else binds its own", () => {
+    const own = new Set(["tests/support/master-key-guard.ts", "tests/unit/master-key-files.test.ts"]);
+    const files = SCANNED.flatMap((path) => scannedFiles(join(PRODUCT_ROOT, path)))
+      .map((file) => [relative(PRODUCT_ROOT, file), readFileSync(file, "utf8")] as const)
+      .filter(([file]) => !own.has(file));
+    expect(files.length).toBeGreaterThan(1000);
+    const callers = files.filter(([, source]) => source.includes("runFixtureStepOutsideRequest")).map(([file]) => file).sort();
+    expect(callers).toEqual([...FIXTURE_STEP_CALLERS.keys()].sort());
+    // A copy of the hole itself: AsyncResource.bind anywhere else under the scanned folders.
+    expect(files.filter(([, source]) => /AsyncResource\s*\.\s*bind\s*\(/u.test(source)).map(([file]) => file)).toEqual([]);
+  });
+});

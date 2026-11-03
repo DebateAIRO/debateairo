@@ -1,5 +1,4 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { AsyncResource } from "node:async_hooks";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { pathToFileURL } from "node:url";
@@ -50,7 +49,7 @@ import { FakeInvoiceIssuer } from "./fake-invoice-issuer.js";
 import { startFakeNetopia, type FakeNetopia, type FakeNetopiaDelivery, type FakeNetopiaOutcome } from "./fake-netopia.js";
 import { FakeTaxEngine } from "./fake-tax-engine.js";
 import { TEST_APP_ORIGIN, testSessionHeaders, type TestHttpIdentity } from "./httpSession.js";
-import { currentTestFile } from "./master-key-guard.js";
+import { currentTestFile, runFixtureStepOutsideRequest } from "./master-key-guard.js";
 import { apiTestPools } from "./rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "./testDatabase.js";
 
@@ -268,13 +267,6 @@ async function createActiveAccount(
   return Object.freeze({ userId, ownerRef, sessionId });
 }
 
-/**
- * Runs `work` outside any request scope: the stack's own stand-ins for steps the real services do (minting the
- * step-up grant the real rotation mints) are fixture writes, not the product's request path, so they stay on the
- * harness superuser, which the R21 guard refuses only inside a request.
- */
-const outsideRequest = AsyncResource.bind(<T,>(work: () => Promise<T>): Promise<T> => work());
-
 export async function startBillingStack(): Promise<BillingStack> {
   // The test file that starts the stack: its API pools come from apiTestPools under that file's name (the master-key
   // list is checked against it). Read before the first wait.
@@ -369,7 +361,8 @@ export async function startBillingStack(): Promise<BillingStack> {
       const action = input.authorization?.action;
       // The account-scoped grants: P12d's withdrawal, and (P2-M39) the account deletion 0040's schedule consumes.
       if (action === "WITHDRAW_SUBSCRIPTION" || action === "DELETE_ACCOUNT") {
-        await outsideRequest(() => database.pool.query(`
+        // The stand-in mints the grant row the real rotation mints: a fixture write on the superuser, outside the request.
+        await runFixtureStepOutsideRequest(() => database.pool.query(`
           INSERT INTO identity.step_up_grant(
             step_up_grant_id,token_hash,session_id,user_id,action,target_run_id,target_account_id,issued_at,expires_at
           ) VALUES ($1,$2,$3,$4,$5,NULL,$4,clock_timestamp()-interval '1 second',

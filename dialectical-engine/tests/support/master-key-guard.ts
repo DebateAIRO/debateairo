@@ -14,13 +14,15 @@
  * - What stays outside it: code that starts a database outside vitest (the acceptance and support-eval command-line
  *   tools, a child process a test spawns with a clean environment); logins other than the harness superuser; the work
  *   the runner does on the superuser, because the runner works outside any request (the five copy-database runner
- *   groups of ruling R26, named in the list's header).
+ *   groups of ruling R26, named in the list's header); and the fixture steps run through
+ *   `runFixtureStepOutsideRequest`, which only the files tests/unit/master-key-files.test.ts names may use.
  * - It never fails open inside vitest: a database started where neither vitest nor the stack names the test file
  *   refuses MASTER_KEY_GUARD_TEST_FILE_UNKNOWN in login mode, instead of quietly arming nothing.
  *
  * vitest runs each test file in a fresh worker process (`isolate`, the default), so the patch and its set of guarded
  * logins last for one test file.
  */
+import { AsyncResource } from "node:async_hooks";
 import { readFileSync } from "node:fs";
 import { isAbsolute, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -121,6 +123,15 @@ export function armSuperuserGuardForTestFile(
   if (loginModeOff()) return "off";
   throw new TypeError("MASTER_KEY_GUARD_TEST_FILE_UNKNOWN: a test database started where neither vitest nor the stack names the test file");
 }
+
+/**
+ * Runs `work` outside any request scope. It is for a fixture step that a test runs on the harness superuser while a
+ * request is in flight: a row the real service would have written, or a stand-in's own write. The R21 guard refuses the
+ * superuser only inside a request, so each use is a deliberate hole in it. Only the files listed in
+ * tests/unit/master-key-files.test.ts (`FIXTURE_STEP_CALLERS`, each with its reason) may use it; that test also fails
+ * on any other `AsyncResource.bind` under tests/ or acceptance/, so the hole cannot be copied elsewhere.
+ */
+export const runFixtureStepOutsideRequest = AsyncResource.bind(<T,>(work: () => Promise<T>): Promise<T> => work());
 
 const R21_GUARD = Symbol.for("debateai.rls.r21-superuser-guard.v1");
 type GuardedClientPrototype = { query: (...args: unknown[]) => unknown; [R21_GUARD]?: Set<string> };

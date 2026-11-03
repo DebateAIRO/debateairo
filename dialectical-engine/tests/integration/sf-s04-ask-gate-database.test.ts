@@ -1,4 +1,3 @@
-import { AsyncResource } from "node:async_hooks";
 import { createHash, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { buildApi, type AskApplication } from "@debateai/api";
@@ -12,20 +11,18 @@ import { readQuestionSubjects } from "../../apps/api/src/question-check/subjects
 import { SUPPORT_RELAY_PROVIDER_REF } from "../../apps/api/src/support/model.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
+import { runFixtureStepOutsideRequest } from "../support/master-key-guard.js";
 import { apiTestPools, type ApiTestPools } from "../support/rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 let database: TestDatabase;
 /** Upload check Task 8: the API's pools as main.ts builds them; every field database.pool with DEBATEAI_TEST_API_LOGINS=0. */
 let apiPools: ApiTestPools;
-/**
- * Runs `work` outside the request's scope. The ask application below is this test's stand-in for the real one (what is
- * under test is the gate in front of it): its run start is a fixture write, kept on the superuser as before. The
- * real server ask path cannot be used here: since migration 0040 the runtime login may not insert a legacy core.run,
- * and a signed-in owner's encrypted admission would add its own run-key and content rows to the table delta this file
- * pins as the gate's contract. That path runs on the logins in database.test.ts's S-LANG case.
- */
-const outsideRequest = AsyncResource.bind(<T,>(work: () => Promise<T>): Promise<T> => work());
+// The ask application below is this test's stand-in for the real one (what is under test is the gate in front of it):
+// its run start is a fixture write, kept on the superuser and run outside the request (runFixtureStepOutsideRequest).
+// The real server ask path cannot be used here: since migration 0040 the runtime login may not insert a legacy
+// core.run, and a signed-in owner's encrypted admission would add its own run-key and content rows to the table delta
+// this file pins as the gate's contract. That path runs on the logins in database.test.ts's S-LANG case.
 const identity = testHttpIdentity("s04-database-gate");
 const question = "Should a private sentinel question lead to a debate?";
 // V, 2026-10-28: the model answers the subject (or NONE) and whether the question is healthy; nothing is kept.
@@ -85,7 +82,7 @@ function serverFor(label: typeof labels[number], reports: { event: string; code:
     // As main.ts:1458 records it: on the API's runtime pool.
     spend: { record: entry => recordQuestionCheckSpend(apiPools.runtime, entry) }, report: line => { reports.push(line); } });
   const application = new Proxy({}, { get: (_target, key) => key === "submit"
-    ? async () => outsideRequest(async () => {
+    ? async () => runFixtureStepOutsideRequest(async () => {
       const runId = await new RunRepository(database.pool).startRun({
         questionLine: question, principal: { kind: "legacy", legacyAskerId: `gate:${randomUUID()}` },
         sessionId: randomUUID(), callerScope: "ASKER", asOf: new Date(),
