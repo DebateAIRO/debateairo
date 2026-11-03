@@ -77,6 +77,8 @@
   "home.closingTitle": "Twój argument jest tylko tak mocny, jak jego najsłabsze ogniwo.",
   "home.closingLede": "Rozegraj jedną rundę. Cztery tury, około dziewięciu minut i transkrypcja, która dokładnie wskaże, gdzie przestałeś odpowiadać.",
   "home.pricingCopy": "Zacznij bezpłatnie. Płatne plany od {price} miesięcznie plus podatek. Możesz zrezygnować w dowolnej chwili.",
+  "home.pricingCopyTaxIncluded": "Zacznij bezpłatnie. Płatne plany od {price} miesięcznie z podatkiem. Możesz zrezygnować w dowolnej chwili.",
+  "home.pricingCopyNoTax": "Zacznij bezpłatnie. Płatne plany od {price} miesięcznie, bez doliczonego podatku. Możesz zrezygnować w dowolnej chwili.",
   "home.pricingCopyFree": "Zacznij bezpłatnie. Bez karty.",
   "home.pricingLink": "Zobacz plany",
   "home.card1Text": "Firmy działające głównie zdalnie powinny zasadniczo stosować niezależne od lokalizacji widełki płacowe dla inżynierów wykonujących równoważną pracę, dopuszczając przejrzyste korekty ze względu na koszty wymagane prawem, rzadkie umiejętności i zakres roli.",

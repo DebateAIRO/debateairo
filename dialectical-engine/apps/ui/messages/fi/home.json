@@ -75,6 +75,8 @@
   "home.closingTitle": "Argumenttisi on vain heikoimman lenkkinsä vahvuinen.",
   "home.closingLede": "Käy yksi kierros. Neljä vuoroa, noin yhdeksän minuuttia ja litterointi, joka kertoo tarkalleen, missä lakkasit vastaamasta.",
   "home.pricingCopy": "Aloita maksutta. Maksulliset tilaukset alkaen {price} kuukaudessa ja vero päälle. Voit peruuttaa milloin tahansa.",
+  "home.pricingCopyTaxIncluded": "Aloita maksutta. Maksulliset tilaukset alkaen {price} kuukaudessa, sisältää veron. Voit peruuttaa milloin tahansa.",
+  "home.pricingCopyNoTax": "Aloita maksutta. Maksulliset tilaukset alkaen {price} kuukaudessa, ei lisättyä veroa. Voit peruuttaa milloin tahansa.",
   "home.pricingCopyFree": "Aloita maksutta. Korttia ei tarvita.",
   "home.pricingLink": "Katso tilaukset",
   "home.card1Text": "Ensisijaisesti etätyötä tekevien yritysten tulisi yleensä käyttää sijainnista riippumattomia palkkahaarukoita samanarvoista työtä tekeville insinööreille, mutta sallia läpinäkyvät mukautukset lakisääteisiin kustannuksiin, harvinaisiin taitoihin ja tehtävän laajuuteen.",

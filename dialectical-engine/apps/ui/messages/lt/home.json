@@ -77,6 +77,8 @@
   "home.closingTitle": "Jūsų argumentas stiprus tik tiek, kiek jo silpniausia grandis.",
   "home.closingLede": "Sužaiskite vieną raundą. Keturi ėjimai, maždaug devynios minutės ir stenograma, tiksliai parodanti, kur nustojote atsakyti.",
   "home.pricingCopy": "Pradėkite nemokamai. Mokami planai prasideda nuo {price} per mėnesį plius mokestis. Atšaukti galite bet kada.",
+  "home.pricingCopyTaxIncluded": "Pradėkite nemokamai. Mokami planai prasideda nuo {price} per mėnesį su mokesčiu. Atšaukti galite bet kada.",
+  "home.pricingCopyNoTax": "Pradėkite nemokamai. Mokami planai prasideda nuo {price} per mėnesį, mokestis nepridedamas. Atšaukti galite bet kada.",
   "home.pricingCopyFree": "Pradėkite nemokamai. Kortelės nereikia.",
   "home.pricingLink": "Žiūrėti planus",
   "home.card1Text": "Nuotoliniam darbui pirmenybę teikiančios įmonės lygiavertį darbą atliekantiems inžinieriams paprastai turėtų taikyti nuo vietos nepriklausomus atlyginimų intervalus, leidžiant skaidriai koreguoti dėl teisės aktuose numatytų išlaidų, retų įgūdžių ir pareigų apimties.",
