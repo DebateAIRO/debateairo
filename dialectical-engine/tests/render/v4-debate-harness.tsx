@@ -7,7 +7,7 @@ import * as fixture from "../../apps/ui/lib/v3/storyFixture.js";
 import type { AskRoom } from "../../apps/ui/lib/billing/room.js";
 import type { ContinueOutcome } from "../../apps/ui/lib/v4/money.js";
 import type { DigTrail } from "../../apps/ui/lib/v4/load.js";
-import type { DigLink, DigView, SeenSnapshot } from "../../apps/ui/lib/v4/types.js";
+import type { DigLink, DigView, ReadingLevel, SeenSnapshot } from "../../apps/ui/lib/v4/types.js";
 import type { V4AskOutcome } from "../../apps/ui/lib/v4/useV4Ask.js";
 import type { Answer, AnswerStory, AskParent, DigLinks, InvestigationReports, RunProjection, UsageBorrow } from "../../packages/contract/src/index.js";
 import { createSeed } from "../../tools/v4-mock-api/seed.js";
@@ -76,7 +76,15 @@ export const harness = {
   loadStory: vi.fn(),
   loadAnswer: vi.fn(),
   /** W4-4: "Add to researched"'s press. */
-  addToResearched: vi.fn<(runId: string, pathId: string, pageRef: string) => Promise<"READING" | "WAITS_FOR_RESET" | "TRY_AGAIN">>()
+  addToResearched: vi.fn<(runId: string, pathId: string, pageRef: string) => Promise<"READING" | "WAITS_FOR_RESET" | "TRY_AGAIN">>(),
+  /** V4 screen review: the page's address after `/v4/debate/<id>` when it is mounted ("?path=…&pick=…"; "" none). */
+  search: "",
+  /** wait-f1: what reading the debate throws (null: it reads as above). */
+  loadError: null as unknown,
+  /** map-f6: the debate's read never answers (the page shows its outline). */
+  loadPending: false,
+  /** map-f6: the account's reading level (null: none kept); a promise that never settles keeps it unknown. */
+  accountLevel: null as Promise<ReadingLevel | null> | null
 };
 
 export function resetHarness(): void {
@@ -98,6 +106,10 @@ export function resetHarness(): void {
   harness.loadStory = vi.fn(async () => harness.story);
   harness.loadAnswer = vi.fn(async (runId: string) => harness.fresh ?? harness.answer ?? seededAnswer(runId));
   harness.addToResearched = vi.fn(async () => "READING" as const);
+  harness.search = "";
+  harness.loadError = null;
+  harness.loadPending = false;
+  harness.accountLevel = null;
 }
 resetHarness();
 
@@ -125,9 +137,13 @@ export const useV4AskMock = {
 export function loadMock(original: Record<string, unknown>) {
   return {
     ...original,
-    loadV4: async (id: string) => harness.run !== null
-      ? { kind: "RUN", runId: id, run: harness.run }
-      : { kind: "SERVED", runId: id, answer: harness.answer ?? seededAnswer(id), story: harness.story },
+    loadV4: async (id: string) => {
+      if (harness.loadPending) return new Promise(() => undefined);
+      if (harness.loadError !== null) throw harness.loadError;
+      return harness.run !== null
+        ? { kind: "RUN", runId: id, run: harness.run }
+        : { kind: "SERVED", runId: id, answer: harness.answer ?? seededAnswer(id), story: harness.story };
+    },
     loadStory: (...args: unknown[]) => harness.loadStory(...args),
     loadAnswer: (runId: string) => harness.loadAnswer(runId),
     addToResearched: (runId: string, pathId: string, pageRef: string) => harness.addToResearched(runId, pathId, pageRef),
@@ -152,6 +168,8 @@ export function accountMemoryMock(original: Record<string, unknown>) {
   return {
     ...original,
     readDigRecords: async () => harness.records,
+    readAccountLevel: () => harness.accountLevel ?? Promise.resolve(null),
+    saveAccountLevel: async () => true,
     readLastVisit: async () => harness.lastVisit,
     recordLastVisit: async () => true,
     recordDig: async () => true
@@ -195,14 +213,18 @@ export async function advance(ms: number): Promise<void> {
 }
 
 /** Mounts the map page of a fresh run id at `width`; returns the run id. W4-6: `initialPath` as `?path=` names it. */
-export async function mountMap(width: 375 | 1280 = 1280, runId: string = crypto.randomUUID(), initialPath: string | null = null): Promise<string> {
+export async function mountMap(width: 375 | 1280 = 1280, runId: string = crypto.randomUUID(), initialPath: string | null = null,
+  initialLevel: ReadingLevel | null = "background"): Promise<string> {
   stubWidth(width);
+  // The page reads (and writes) its question and picks in the address: each test starts from its own page address.
+  const query = harness.search !== "" ? harness.search : initialPath === null ? "" : `?path=${encodeURIComponent(initialPath)}`;
+  window.history.replaceState(null, "", `/v4/debate/${runId}${query}`);
   const { V4DebateClient } = await import("../../apps/ui/components/v4/V4DebateClient.js");
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
   await act(async () => root?.render(
-    <V4DebateClient id={runId} initialPath={initialPath} initialLevel="background" catalog={CATALOG} homeCatalog={{}} newDebateCatalog={{}}
+    <V4DebateClient id={runId} initialPath={initialPath} initialLevel={initialLevel} catalog={CATALOG} homeCatalog={{}} newDebateCatalog={{}}
       billingCatalog={{}} locale="en" crisisCountryHint={null} />
   ));
   await settle();

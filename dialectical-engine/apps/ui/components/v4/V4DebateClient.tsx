@@ -19,6 +19,9 @@ import { V4DigToast, type V4DigNotice } from "@/components/v4/V4DigToast";
 import { V4Header } from "@/components/v4/V4Header";
 import { V4ContributionNote } from "@/components/v4/V4ContributionNote";
 import { V4LevelTrail } from "@/components/v4/V4LevelTrail";
+import { V4LeaveQuestion } from "@/components/v4/V4LeaveQuestion";
+import { V4LoadingOutline, V4LoadingPage, V4SignInAgain } from "@/components/v4/V4LoadingOutline";
+import { V4PicksClearedNote } from "@/components/v4/V4PicksClearedNote";
 import { digFor, digsUnder, openCount, pathTitle, resolveSelection, selectionIdOf, TitleText, V4MapTree } from "@/components/v4/V4MapTree";
 import { V4Outline } from "@/components/v4/V4Outline";
 import { V4Panel } from "@/components/v4/V4Panel";
@@ -27,6 +30,7 @@ import { V4ChangedSince } from "@/components/v4/V4PathRewrite";
 import { V4MainAnswer } from "@/components/v4/V4MainAnswer";
 import { V4Rail, type V4DigCounts } from "@/components/v4/V4Rail";
 import { isNotFound } from "@/lib/api";
+import { isSignedOut, signInHrefHere } from "@/lib/signInWayBack";
 import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { runFailureMessage } from "@/lib/v3/runFailure";
 import { digQuestion, digTargetQuestions, ownWords, parseDigQuestion } from "@/lib/v4/askText";
@@ -55,6 +59,7 @@ import {
   draftTarget,
   editPick,
   EMPTY_DRAFT,
+  isEdited,
   openPick,
   ownViewPick,
   pickedOpenIds,
@@ -80,6 +85,10 @@ import type {
   V4Selection
 } from "@/lib/v4/types";
 import { useV4Ask, type V4AskOutcome } from "@/lib/v4/useV4Ask";
+import { useLeaveLinkGuard, useTypedWords } from "@/lib/v4/useLeaveGuard";
+import { useLevelSettled } from "@/lib/v4/useLevelSettled";
+import { usePicksUndo } from "@/lib/v4/usePicksUndo";
+import { useAddressPicks, useQuestionAddress } from "@/lib/v4/useQuestionAddress";
 
 /*
  * V4 initial (2026-10-28), the map page shell (D3 map, D4 what changed, D6/D7 phone). It loads the debate over
@@ -136,7 +145,8 @@ const MID_QUERY = "(max-width: 1099px)";
 const FOCUSABLE = "a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex='-1'])";
 
 type Layout = "desktop" | "mid" | "phone";
-type LoadProblem = "NOT_FOUND" | "UNREACHABLE";
+/** wait-f1: SIGNED_OUT, the server said the sign-in has ended (never shown as a lost connection). */
+type LoadProblem = "NOT_FOUND" | "UNREACHABLE" | "SIGNED_OUT";
 
 /** What the page last read of one dig, and how its reads went. */
 type DigStatus = Readonly<{
@@ -175,7 +185,8 @@ export type V4DebateClientProps = Readonly<{
 /** Every V3 read is asker-scoped, so the page waits for a session first (the classic page does the same). */
 export function V4DebateClient(props: V4DebateClientProps) {
   return (
-    <AuthGate catalog={props.newDebateCatalog}>
+    // map-f6: one look while the page loads, from the session check on: a grey outline of the page.
+    <AuthGate catalog={props.newDebateCatalog} checkingView={<V4LoadingPage catalog={props.catalog} />}>
       {() => (
         // Keyed by id: moving between two debates (a dig's back link) starts fresh, never with the last one's state.
         <V4Debate key={props.id} {...props} />
@@ -310,7 +321,7 @@ function V4Debate({
   crisisCountryHint
 }: V4DebateClientProps) {
   const layout = useLayout();
-  const [chosenLevel, chooseLevel] = useReadingLevel(initialLevel);
+  const [chosenLevel, chooseLevel, levelKnown] = useReadingLevel(initialLevel);
   const readingLevel: ReadingLevel = chosenLevel ?? DEFAULT_LEVEL;
   const [digMode, setDigMode] = useState<DigMode>("quick");
 
@@ -340,6 +351,11 @@ function V4Debate({
         if (!active) return;
         if (isNotFound(failure)) {
           setLoadProblem("NOT_FOUND");
+          return;
+        }
+        // wait-f1: the sign-in has ended; asking again cannot help, so the card asks the person to sign in.
+        if (isSignedOut(failure)) {
+          setLoadProblem("SIGNED_OUT");
           return;
         }
         // Spec: back off to 30 s after an error; the page keeps what it last showed.
@@ -626,6 +642,15 @@ function V4Debate({
     setDraft(next);
   }, []);
   const ownViewSerial = useRef(0);
+  // dig-f23: typed words kept in the page; the ticks kept in the address (ids only); "Clear" with a 10-second Undo; and a
+  // question before a link loses typed words (the browser's own one before a reload or a closed tab).
+  const typed = useTypedWords();
+  const addressPicks = useAddressPicks({ map, canDig, draft, commit: commitDraft });
+  const picksUndo = usePicksUndo({ draft, current: draftRef, commit: commitDraft });
+  const { clear: clearPicks, dismiss: dismissPicksUndo } = picksUndo;
+  const leaveGuard = useLeaveLinkGuard(
+    () => typed.any() || draftRef.current.picks.some((pick) => pick.kind === "OWN_VIEW" || isEdited(pick))
+  );
   // W3-4 (owner Q14): the room read is for the dig the page would send now, so it says the dig's share of today.
   const ask = useV4Ask({
     catalog, homeCatalog, newDebateCatalog, locale, crisisCountryHint, mode: digMode, readingLevel,
@@ -868,23 +893,32 @@ function V4Debate({
 
   // ── Selection ───────────────────────────────────────────────────────────────────────────────────────────────────
   // W4-6: a link back from a dig names the path it dug (`?path=`); the panel opens there (a path gone: the question).
-  const [selected, setSelected] = useState<V4Selection>(() => (initialPath === null ? "root" : `path:${initialPath}`));
-  const [opened, setOpened] = useState<ReadonlySet<string>>(() => new Set(["root", ...(initialPath === null ? [] : [`path:${initialPath}`])]));
+  // journey-d4 A / map-f24: the open question lives in the address (`?path=`, `?open=`, `?dig=`), so opening one adds one
+  // step to the history, Back and Forward open the one before or after, and a reload or a shared link opens it again.
+  // The phone's Map sheet leaves no step behind, and Back with it open closes it (lib/v4/useQuestionAddress.ts).
+  const address = useQuestionAddress({
+    initial: initialPath === null ? "root" : `path:${initialPath}`,
+    picks: addressPicks,
+    onTraverse: (selection) => {
+      setOpened((previous) => (previous.has(selection) ? previous : new Set([...previous, selection])));
+      if (layout === "phone") setFocusRequest((count) => count + 1);
+    }
+  });
+  const { selected, openQuestion, openSheet, closeSheet } = address;
+  const [opened, setOpened] = useState<ReadonlySet<string>>(() => new Set(["root", selected]));
   const [focusRequest, setFocusRequest] = useState(0);
-  const [outlineOpen, setOutlineOpen] = useState(false);
   const headingRef = useRef<HTMLHeadingElement | null>(null);
   const panelColRef = useRef<HTMLElement | null>(null);
   const shownSelection: V4Selection = map === null ? "root" : selectionIdOf(resolveSelection(map, digs, selected));
-  const sheetOpen = layout === "phone" && outlineOpen;
+  const sheetOpen = layout === "phone" && address.sheetOpen;
 
   const select = useCallback((selection: V4Selection, viaKeyboard: boolean): void => {
-    setSelected(selection);
+    // Phone: tapping a row of the outline opens it in the panel, so the sheet closes (openQuestion closes it).
+    openQuestion(selection);
     setOpened((previous) => (previous.has(selection) ? previous : new Set([...previous, selection])));
-    // Phone: tapping a row of the outline opens it in the panel, so the sheet closes.
-    if (layout === "phone" && outlineOpen) setOutlineOpen(false);
     // UI-5: on the phone the new question always opens at its heading (focus scrolls it into view).
     if (viaKeyboard || layout === "phone") setFocusRequest((count) => count + 1);
-  }, [layout, outlineOpen]);
+  }, [layout, openQuestion]);
 
   useEffect(() => {
     if (focusRequest > 0) headingRef.current?.focus();
@@ -938,9 +972,10 @@ function V4Debate({
         return keep(addPick(draftRef.current, ownViewPick(pathId, text, ownViewSerial.current), planTier));
       },
       onRemovePick: (key: string) => commitDraft(removePick(draftRef.current, key)),
-      onClear: () => commitDraft(EMPTY_DRAFT)
+      onClear: clearPicks,
+      typed
     };
-  }, [map, draft, planTier, canDig, isDigMap, digs, commitDraft]);
+  }, [map, draft, planTier, canDig, isDigMap, digs, commitDraft, clearPicks, typed]);
   const trayTarget = map === null || !canDig ? null : draftTarget(draft, map.paths);
   const hasTray = trayTarget !== null;
 
@@ -960,6 +995,10 @@ function V4Debate({
   }, [digBusy, map, canDig, sentDigMode]);
 
   const undoDig = useCallback((): void => setPending(null), []);
+  // dig-f23: a dig being started ends the "Picks cleared" offer (its note would sit under the dig's own note).
+  useEffect(() => {
+    if (pending !== null) dismissPicksUndo();
+  }, [pending, dismissPicksUndo]);
 
   const send = async (dig: PendingDig, parentRunId: string, parentQuestionLine: string): Promise<void> => {
     setPending(null);
@@ -997,7 +1036,7 @@ function V4Debate({
         commitDraft([...sentKeys].reduce((left, key) => removePick(left, key), draftRef.current));
       }
       const selection: V4Selection = `dig:${link.childRunId}`;
-      setSelected(selection);
+      openQuestion(selection);
       setOpened((previous) => new Set([...previous, selection]));
       setNotice({ kind: "STARTED" });
     } else if (outcome.kind === "REFUSED") {
@@ -1207,10 +1246,12 @@ function V4Debate({
   // R2REG-5: links carry only a level the person chose (none chosen: /v4 still offers its one-time choice).
   const reportHref = levelHref(`/v4/debate/${encodeURIComponent(runId)}/report`, chosenLevel);
   const askHref = levelHref("/v4", chosenLevel);
+  // map-f6: no reading level shows until the saved one is known; the map waits for it behind its outline (not forever).
+  const levelSettled = useLevelSettled(levelKnown, map !== null);
   const header = (
     <V4Header
       catalog={catalog}
-      readingLevel={readingLevel}
+      readingLevel={levelSettled ? readingLevel : null}
       linkLevel={chosenLevel}
       onReadingLevel={chooseLevel}
       classicHref={classicHref}
@@ -1222,6 +1263,30 @@ function V4Debate({
     </V4Header>
   );
 
+  if (loadProblem === "SIGNED_OUT" && map === null) {
+    // wait-f1: the sign-in ended (on the waiting card, or before the first read): sign in again, and come back here.
+    return (
+      <div className="v4DebPage">
+        {header}
+        <div className="v4DebCentre">
+          <V4SignInAgain
+            questionLine={load?.kind === "RUN" ? load.run.question_line : null}
+            signInHref={signInHrefHere()}
+            catalog={catalog}
+          />
+        </div>
+      </div>
+    );
+  }
+  if ((map === null && load === null && loadProblem === null) || (map !== null && !levelSettled)) {
+    // map-f6: the page's grey outline until there is something to show (and, on the map, until the level is known).
+    return (
+      <div className="v4DebPage">
+        {header}
+        <div className="v4DebMain"><V4LoadingOutline catalog={catalog} /></div>
+      </div>
+    );
+  }
   if (map === null) {
     return (
       <div className="v4DebPage">
@@ -1327,12 +1392,15 @@ function V4Debate({
             ? tPlural(catalog, "v4.dig.trayDig", trayTarget.picks.length, locale)
             : t(catalog, "v4.panel.dig")}
         </button>
-        <button type="button" className="v4Link v4DebTrayClear" onClick={() => commitDraft(EMPTY_DRAFT)}>
+        <button type="button" className="v4Link v4DebTrayClear" onClick={clearPicks}>
           {t(catalog, "v4.dig.trayClear")}
         </button>
       </div>
     </section>
   ) : null;
+
+  // dig-f23: where the tray was, "Picks cleared [Undo]" for 10 seconds.
+  const picksClearedNote = picksUndo.offered ? <V4PicksClearedNote onUndo={picksUndo.undo} catalog={catalog} /> : null;
 
   const toast = (
     <V4DigToast
@@ -1438,10 +1506,11 @@ function V4Debate({
       {sheetOpen ? null : (
         <div className={`v4DebDock${layout === "phone" ? " v4DebDockPhone" : ""}`}>
           {tray}
+          {picksClearedNote}
           {layout === "phone" ? (
             <PhoneBar
               mapButtonRef={mapButtonRef}
-              onMap={() => setOutlineOpen(true)}
+              onMap={openSheet}
               target={phoneTarget}
               onDig={startDig}
               digBusy={digBusy}
@@ -1453,8 +1522,8 @@ function V4Debate({
 
       {sheetOpen ? (
         <OutlineSheet
-          onClose={() => setOutlineOpen(false)}
-          footer={<>{tray}{toast}</>}
+          onClose={closeSheet}
+          footer={<>{tray}{picksClearedNote}{toast}</>}
           catalog={catalog}
         >
           {rail("column")}
@@ -1462,6 +1531,7 @@ function V4Debate({
         </OutlineSheet>
       ) : toast}
       {ask.dialogs}
+      {leaveGuard.asking ? <V4LeaveQuestion onStay={leaveGuard.stay} onLeave={leaveGuard.leave} catalog={catalog} /> : null}
     </div>
   );
 }
@@ -1492,7 +1562,8 @@ function StatusScreen({ problem, onRetry, askHref, catalog }: Readonly<{
       </section>
     );
   }
-  return <p className="v4DebLoading v4Muted" role="status">{t(catalog, "v4.common.loading")}</p>;
+  // map-f6: the page's grey outline, never a bare "Loading…" line.
+  return <V4LoadingOutline catalog={catalog} />;
 }
 
 function FailedScreen({ run, classicHref, askHref, catalog, homeCatalog }: Readonly<{
