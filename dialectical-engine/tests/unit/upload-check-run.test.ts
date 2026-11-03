@@ -78,6 +78,15 @@ describe('formatReport: the plain report', () => {
     expect(run.formatReport({ rev, results }).split('\n').at(-1)).toBe('ALL PASSED');
     expect(run.formatReport({ rev, results: [...results.slice(0, 2), { ...passed('start-checks'), status: 'not-checked' }] }).split('\n').at(-1)).toBe('NOT PASSED');
   });
+
+  it('an empty list, or fewer than three checks, is NOT PASSED with exit 1, never ALL PASSED', () => {
+    const all = [passed('tools-folder'), passed('website-build'), passed('start-checks')];
+    for (const results of [[], all.slice(0, 1), all.slice(0, 2), [...all, passed('start-checks')]]) {
+      expect(run.formatReport({ rev, results }).split('\n').at(-1), `${results.length} results`).toBe('NOT PASSED');
+      expect(run.exitCodeOf(results), `${results.length} results`).toBe(1);
+    }
+    expect(run.exitCodeOf(all)).toBe(0);
+  });
 });
 
 describe('versionProblem: the checker needs Node v26.8.2 and pnpm 11.20.0', () => {

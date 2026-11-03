@@ -8,7 +8,8 @@
 //   node tools/upload-check/run.mjs --rev <commit>   the command: exit 0 all passed, 1 a check refused or not checked, 2 could not run
 //   runUploadCheck({ rev, ... })                     the run itself: { exitCode, output, results }
 //   hostIsFree({ processes, freePercent })           true when no heavy run is going and at least 40% of memory is free
-//   formatReport({ rev, results })                   the plain report, as one string
+//   formatReport({ rev, results })                   the plain report, as one string; ALL PASSED only for three passed checks
+//   exitCodeOf(results)                              0 only for three passed checks, else 1
 //   versionProblem({ nodeVersion, pnpmVersion })     the first version the checker refuses, in words, or null
 //
 // The three checks come in as a parameter, so the tests can inject one that throws. A refusal of the run itself carries
@@ -140,9 +141,17 @@ function stopped(code, words) {
   return { exitCode: 2, output: `${code}: ${words}`, results: [] };
 }
 
-/** Exit 0 only when every check passed. A check that was not checked never counts as passed. */
-function exitCodeOf(results) {
-  return results.every((result) => result.status === "passed") ? 0 : 1;
+/** How many checks a whole run has. A list with any other count is never all passed: an empty list included. */
+const CHECK_COUNT = 3;
+
+/** True only for exactly three results, every one passed. A check that was not checked never counts as passed. */
+function allPassed(results) {
+  return results.length === CHECK_COUNT && results.every((result) => result.status === "passed");
+}
+
+/** Exit 0 only when all three checks passed; 1 otherwise. */
+export function exitCodeOf(results) {
+  return allPassed(results) ? 0 : 1;
 }
 
 /**
@@ -155,7 +164,7 @@ export function formatReport({ rev, results }) {
     lines.push(`${result.name}: ${STATUS_WORDS[result.status] ?? "not checked"} (${result.seconds} s)`);
     for (const line of result.lines) lines.push(`  ${line}`);
   }
-  lines.push(results.every((result) => result.status === "passed") ? "ALL PASSED" : "NOT PASSED");
+  lines.push(allPassed(results) ? "ALL PASSED" : "NOT PASSED");
   return lines.join("\n");
 }
 
