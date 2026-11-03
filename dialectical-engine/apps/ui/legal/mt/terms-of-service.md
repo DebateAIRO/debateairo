@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Fil-qosor
-eyebrow: TERMINI TAS-SERVIZZ · v2.12 · EFFETTIVI 1 TA’ NOVEMBRU 2026
+eyebrow: TERMINI TAS-SERVIZZ · v2.13 · EFFETTIVI 1 TA’ NOVEMBRU 2026
 title: Dak li taqbel miegħu
 lede: Il-kuntratt bejnek u DMS Merchandise Shop S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.
-endMarker: TMIEM IT-TERMINI · v2.12
+endMarker: TMIEM IT-TERMINI · v2.13
 bodyLabel: Test tat-Termini tas-Servizz
 annexTitle: Anness A — Termini reġjonali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LIĠI APPLIKABBLI
 -->
 
-**Version 2.12 · Effective 1 ta’ Novembru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
+**Version 2.13 · Effective 1 ta’ Novembru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
 
 **In short.** Irid ikollok 18-il sena jew aktar. Dialectical Engine tibni argumenti b’mudelli tal-IA u dak kollu li tiġġenera jista’ jkun żbaljat — mhuwiex parir. Fuq il-pjan bla ħlas, id-dibattiti tiegħek huma pubbliċi meta jintemmu, wara verifika bl-IA; fuq pjan bi ħlas, huma privati sakemm ma tippubblikahomx. Ladarba jkunu pubbliċi, kulħadd jista’ jaqra dibattitu, u jibqa’ pubbliku. It-test li tissottometti jintbagħat lill-fornituri tal-IA elenkati fir-Reġistru tal-Fornituri tagħna, u ma jintużax għat-taħriġ tal-mudelli. Irrapporta kontenut illegali fuq support@dezbatere.ro kemm jekk għandek kont kif ukoll jekk le. Tapplika l-liġi Rumena, iżda l-protezzjonijiet lokali tiegħek bħala konsumatur jibqgħu japplikaw għalik.
 
@@ -251,6 +251,8 @@ Ngħidulek minn qabel, fuq mezz durabbli, x’inhu jinbidel u meta. Jekk il-bidl
 
 **F’dawn it-Termini.** Nistgħu nibdlu dawn it-Termini għall-istess tipi ta’ raġunijiet. Għal bidliet li ma jnaqqsux id-drittijiet tiegħek, nippubblikaw il-verżjoni l-ġdida b’sommarju ta’ dak li nbidel u nibagħtulek messaġġ elettroniku mill-inqas **30 jum** qabel ma tidħol fis-seħħ; jekk tkompli tuża Dialectical Engine wara dik id-data, dan ifisser li taċċettaha, u tista’ tagħlaq il-kont tiegħek qabel dak iż-żmien. Għal bidliet li jnaqqsu d-drittijiet tiegħek — inkluż żidiet fil-prezz fuq pjan eżistenti, limiti aktar baxxi, funzjonalitajiet imneħħija, użi ġodda tal-kontenut tiegħek, jew bidliet fir-responsabbiltà, fil-liġi applikabbli jew fis-soluzzjoni tat-tilwim — nitolbuk taċċetta l-verżjoni l-ġdida b’mod espliċitu meta terġa’ tidħol fil-kont, u l-bidla tapplika biss għall-futur. Qatt ma nagħmlu bidla retroattiva, u qatt ma nużaw din it-taqsima biex nibdlu l-qalba ta’ dak li ħallast għalih f’nofs it-terminu mingħajr ma noffrulek mod kif toħroġ. Il-verżjonijiet preċedenti jibqgħu disponibbli fuq dezbatere.ro/terms/versions.
 
+Il-Verżjoni 2.13 issostitwiet il-Verżjoni 2.12: it-taqsima 18 u l-Anness A jsemmu lill-ANPC (SAL) bħala r-rotta għas-soluzzjoni alternattiva tat-tilwim.
+
 Il-Verżjoni 2.12 issostitwiet il-Verżjoni 2.11: it-taqsima 10 tgħid li persuna mdaħħla fil-kont tagħha tista’ wkoll tuża l-buttuna Irrapporta fuq kwalunkwe dibattitu pubbliku, li IA taqra rapport magħmul biha ħdejn it-test pubbliku, u x’jiġri wara.
 
 Il-Verżjoni 2.11 issostitwiet il-Verżjoni 2.10: it-taqsima 9 tgħid li nistgħu naħbu dibattitu pubbliku temporanjament waqt li nirrieżaminawh, u nneħħu jew nikkoreġu parti minnu.
@@ -297,7 +299,7 @@ Il-mod kif nittrattaw id-data personali huwa stabbilit fil-**Politika dwar il-Pr
 
 **Konsumaturi band’oħra.** Jekk tgħix barra l-UE u ż-ŻEE, xejn f’dawn it-Termini ma jillimita xi dritt li għandek skont il-liġi ta’ pajjiżek li tressaq pretensjoni fil-qrati tiegħu, jew xi dritt skont dik il-liġi li ma jistax jiġi rrinunzjat — inkluż, jekk tgħix fl-Awstralja jew fiż-Żelanda l-Ġdida, id-drittijiet tiegħek għall-garanziji tal-konsumatur; jekk tgħix fil-Brażil, il-Código de Defesa do Consumidor; u jekk tgħix fl-Istati Uniti, il-liġijiet tal-istat tiegħek dwar il-protezzjoni tal-konsumatur.
 
-**Qabel tmur il-qorti.** Ikkuntattjana fuq support@dezbatere.ro; il-biċċa l-kbira tal-affarijiet jistgħu jiġu solvuti, u nimmiraw li nwieġbu fi żmien 5 ijiem tax-xogħol. Jekk int konsumatur fir-Rumanija jew fl-UE, tista’ tuża s-soluzzjoni alternattiva għat-tilwim permezz ta’ www.onoratainstanta.ro; aħna ma nintrabtux li nipparteċipaw f’dik il-proċedura. Ilmenti dwar deċiżjonijiet ta’ moderazzjoni jsegwu t-taqsima 10, li hija rotta separata.
+**Qabel tmur il-qorti.** Ikkuntattjana fuq support@dezbatere.ro; il-biċċa l-kbira tal-affarijiet jistgħu jiġu solvuti, u nimmiraw li nwieġbu fi żmien 5 ijiem tax-xogħol. Jekk int konsumatur fir-Rumanija jew fl-UE, tista’ tuża s-soluzzjoni alternattiva għat-tilwim permezz ta’ ANPC (SAL), reclamatiisal.anpc.ro; aħna ma nintrabtux li nipparteċipaw f’dik il-proċedura. Ilmenti dwar deċiżjonijiet ta’ moderazzjoni jsegwu t-taqsima 10, li hija rotta separata.
 
 ## 19. Termini oħra
 
@@ -319,7 +321,7 @@ Kull entrata tapplika għall-persuni li jgħixu fir-reġjun tagħha, u tiddikjar
 
 ### A.1 L-Unjoni Ewropea u ż-Żona Ekonomika Ewropea
 
-Il-parti ewlenija ta’ dawn it-Termini nkitbet għalik. Barra minn hekk: tista’ tibda proċedimenti fil-qrati tal-pajjiż fejn tgħix; japplika d-dritt tal-irtirar fit-taqsima 13; soluzzjoni alternattiva għat-tilwim hija disponibbli permezz ta’ www.onoratainstanta.ro. **Il-Ġermanja:** il-buttuna tal-kanċellazzjoni fuq dezbatere.ro/cancel tħallik ittemm abbonament mingħajr ma tidħol fil-kont; it-termini tal-abbonament, il-perjodi tat-tiġdid u l-perjodi tal-avviż jikkonformaw mal-§309(9) BGB: kull pjan jgħaddi għal xahar u jitġedded kull xahar sakemm tikkanċella, u tista’ tikkanċella fi kwalunkwe ħin b’effett minn tmiem ix-xahar kurrenti. **Franza:** tista’ ttemm abbonament fuq l-internet fi tliet passi fuq dezbatere.ro/cancel. **L-Italja:** il-klawżoli dwar is-sospensjoni u t-terminazzjoni (11), il-pjanijiet bi ħlas u t-tiġdid tagħhom (12), il-bidliet (14), ir-responsabbiltà (15) u l-liġi applikabbli u fejn jinstema’ t-tilwim (18) jeħtieġu l-approvazzjoni speċifika tiegħek skont l-artikoli 1341 u 1342 tal-Kodiċi Ċivili Taljan. Tagħtiha b’kaxxa separata waqt ir-reġistrazzjoni, murija lil kull min jagħżel l-Italja fil-qasam “Reġjun” jew li l-konnessjoni tiegħu tiġi mill-Italja. **Il-Pajjiżi l-Baxxi:** dawn it-Termini jiġu pprovduti f’forma li tista’ tinħażen qabel il-konklużjoni. **Il-Polonja:** verżjoni bil-Pollakk hija disponibbli; agħżel Polski bis-selettur tal-lingwa.
+Il-parti ewlenija ta’ dawn it-Termini nkitbet għalik. Barra minn hekk: tista’ tibda proċedimenti fil-qrati tal-pajjiż fejn tgħix; japplika d-dritt tal-irtirar fit-taqsima 13; soluzzjoni alternattiva għat-tilwim hija disponibbli permezz ta’ ANPC (SAL), reclamatiisal.anpc.ro. **Il-Ġermanja:** il-buttuna tal-kanċellazzjoni fuq dezbatere.ro/cancel tħallik ittemm abbonament mingħajr ma tidħol fil-kont; it-termini tal-abbonament, il-perjodi tat-tiġdid u l-perjodi tal-avviż jikkonformaw mal-§309(9) BGB: kull pjan jgħaddi għal xahar u jitġedded kull xahar sakemm tikkanċella, u tista’ tikkanċella fi kwalunkwe ħin b’effett minn tmiem ix-xahar kurrenti. **Franza:** tista’ ttemm abbonament fuq l-internet fi tliet passi fuq dezbatere.ro/cancel. **L-Italja:** il-klawżoli dwar is-sospensjoni u t-terminazzjoni (11), il-pjanijiet bi ħlas u t-tiġdid tagħhom (12), il-bidliet (14), ir-responsabbiltà (15) u l-liġi applikabbli u fejn jinstema’ t-tilwim (18) jeħtieġu l-approvazzjoni speċifika tiegħek skont l-artikoli 1341 u 1342 tal-Kodiċi Ċivili Taljan. Tagħtiha b’kaxxa separata waqt ir-reġistrazzjoni, murija lil kull min jagħżel l-Italja fil-qasam “Reġjun” jew li l-konnessjoni tiegħu tiġi mill-Italja. **Il-Pajjiżi l-Baxxi:** dawn it-Termini jiġu pprovduti f’forma li tista’ tinħażen qabel il-konklużjoni. **Il-Polonja:** verżjoni bil-Pollakk hija disponibbli; agħżel Polski bis-selettur tal-lingwa.
 
 ### A.2 L-Istati Uniti
 

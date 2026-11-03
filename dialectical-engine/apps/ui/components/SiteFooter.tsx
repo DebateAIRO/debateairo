@@ -6,7 +6,7 @@ import type { SiteFooterBilling } from "@/lib/billing/footerBilling";
 import type { PaymentMarks } from "@/lib/billing/paymentMarks";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
 import { t } from "@/lib/i18n/translate";
-import { COMPANY, LEGAL_PAGES } from "@/lib/legal/pages";
+import { ADR_URL, COMPANY, LEGAL_PAGES } from "@/lib/legal/pages";
 import { useSupportOffered } from "@/components/support/availability";
 
 const PRODUCT_NAME = "Dialectical Engine";
@@ -34,9 +34,9 @@ const DBIP_URL = "https://db-ip.com";
 /**
  * ANPC's pictogram for alternative dispute resolution (SAL), the consumer-protection link Romanian law asks a shop to show
  * (design 15a/15b/15c). The EU's ODR platform (SOL) closed on 20 July 2025, so it has no badge. The artwork and its words
- * are ANPC's own, in Romanian, so the alt text and the title stay Romanian in every locale, marked `lang="ro"`.
+ * are ANPC's own, in Romanian, so the alt text and the title stay Romanian in every locale, marked `lang="ro"`. The link
+ * is `ADR_URL`, the route the Terms name.
  */
-const ANPC_SAL_URL = "https://reclamatiisal.anpc.ro/";
 const ANPC_SAL_TITLE = "ANPC – Soluționarea alternativă a litigiilor";
 const ANPC_SAL_ALT = `${ANPC_SAL_TITLE}. Detalii`;
 const ANPC_SAL_SRC = "/consumer-protection/anpc-sal.png";
@@ -44,7 +44,7 @@ const ANPC_SAL_SRC = "/consumer-protection/anpc-sal.png";
 /** Both footer shapes show it, billing on or off; legal.css sizes it per shape (44px full, 22px one line, 40px phone). */
 function AnpcSalBadge() {
   return (
-    <a className="siteFooterAnpc" href={ANPC_SAL_URL} target="_blank" rel="noopener noreferrer" title={ANPC_SAL_TITLE} lang="ro">
+    <a className="siteFooterAnpc" href={ADR_URL} target="_blank" rel="noopener noreferrer" title={ANPC_SAL_TITLE} lang="ro">
       <img src={ANPC_SAL_SRC} alt={ANPC_SAL_ALT} width={337} height={88} />
     </a>
   );

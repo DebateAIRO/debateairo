@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Stručne
-eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v2.12 · ÚČINNÉ OD 1. NOVEMBRA 2026
+eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v2.13 · ÚČINNÉ OD 1. NOVEMBRA 2026
 title: S čím súhlasíte
 lede: Zmluva medzi vami a DMS Merchandise Shop S.R.L. zrozumiteľným jazykom. Devätnásť častí a príloha A — prejdite až na koniec.
-endMarker: KONIEC PODMIENOK · v2.12
+endMarker: KONIEC PODMIENOK · v2.13
 bodyLabel: Text Podmienok poskytovania služby
 annexTitle: Príloha A — Regionálne podmienky
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ROZHODNÉ PRÁVO
 -->
 
-**Version 2.12 · Effective 1. novembra 2026 · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
+**Version 2.13 · Effective 1. novembra 2026 · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
 
 **In short.** Musíte mať aspoň 18 rokov. Dialectical Engine vytvára argumenty pomocou modelov umelej inteligencie a všetko, čo vygeneruje, môže byť nesprávne — nejde o poradenstvo. V bezplatnom programe sú vaše debaty po dokončení verejné, po kontrole umelou inteligenciou; v platenom programe sú súkromné, pokiaľ ich nezverejníte. Keď je debata verejná, môže ju čítať ktokoľvek a zostáva verejná. Text, ktorý zadáte, sa odosiela poskytovateľom umelej inteligencie uvedeným v našom Registri poskytovateľov a nepoužíva sa na trénovanie modelov. Nezákonný obsah nahláste na support@dezbatere.ro bez ohľadu na to, či máte účet. Rozhodným právom je rumunské právo, vaše miestne práva na ochranu spotrebiteľa vám však zostávajú zachované.
 
@@ -251,6 +251,8 @@ O tom, čo a kedy sa mení, vás vopred informujeme na trvanlivom médiu. Ak má
 
 **Zmeny týchto Podmienok.** Tieto Podmienky môžeme meniť z rovnakých druhov dôvodov. Pri zmenách, ktoré neobmedzujú vaše práva, zverejníme novú verziu so zhrnutím zmien a najmenej **30 dní** pred nadobudnutím účinnosti vám zašleme e-mail; pokračovaním v používaní Dialectical Engine po tomto dátume zmenu prijímate a pred týmto dátumom môžete svoj účet odstrániť. Pri zmenách, ktoré obmedzujú vaše práva — vrátane zvýšenia ceny existujúceho programu, zníženia limitov, odstránenia funkcií, nového spôsobu použitia vášho obsahu alebo zmien zodpovednosti, rozhodného práva či riešenia sporov — vás pri nasledujúcom prihlásení požiadame, aby ste novú verziu výslovne prijali, a zmena platí iba do budúcnosti. Žiadnu zmenu nikdy neuplatníme spätne a túto časť nikdy nepoužijeme na zmenu podstaty toho, za čo ste počas obdobia zaplatili, bez toho, aby sme vám ponúkli možnosť zmluvu ukončiť. Predchádzajúce verzie zostávajú dostupné na adrese dezbatere.ro/terms/versions.
 
+Verzia 2.13 nahradila verziu 2.12: časť 18 a príloha A uvádzajú ANPC (SAL) ako cestu k alternatívnemu riešeniu sporov.
+
 Verzia 2.12 nahradila verziu 2.11: časť 10 uvádza, že prihlásená osoba môže tiež použiť tlačidlo Nahlásiť pri ktorejkoľvek verejnej debate, že umelá inteligencia číta hlásenie podané týmto tlačidlom vedľa verejného textu a čo sa potom stane.
 
 Verzia 2.11 nahradila verziu 2.10: časť 9 uvádza, že môžeme dočasne skryť verejnú debatu, kým ju posudzujeme, a odstrániť alebo opraviť jej časť.
@@ -296,7 +298,7 @@ Spôsob, akým nakladáme s osobnými údajmi, stanovujú **Zásady ochrany osob
 
 **Spotrebitelia inde.** Ak žijete mimo EÚ a EHP, nič v týchto Podmienkach neobmedzuje vaše právo podľa práva vašej krajiny podať žalobu na jej súdoch ani žiadne právo podľa tohto práva, ktorého sa nemožno vzdať — vrátane práv zo spotrebiteľských záruk, ak žijete v Austrálii alebo na Novom Zélande; práv podľa Código de Defesa do Consumidor, ak žijete v Brazílii; a práv podľa zákonov vášho štátu na ochranu spotrebiteľa, ak žijete v Spojených štátoch.
 
-**Pred podaním žaloby.** Kontaktujte nás na support@dezbatere.ro; väčšinu vecí možno napraviť a snažíme sa odpovedať do 5 pracovných dní. Ak ste spotrebiteľom v Rumunsku alebo EÚ, môžete využiť alternatívne riešenie sporov prostredníctvom www.onoratainstanta.ro; k účasti na tomto postupe sa nezaväzujeme. Sťažnosti na moderátorské rozhodnutia sa riadia časťou 10, čo je samostatný postup.
+**Pred podaním žaloby.** Kontaktujte nás na support@dezbatere.ro; väčšinu vecí možno napraviť a snažíme sa odpovedať do 5 pracovných dní. Ak ste spotrebiteľom v Rumunsku alebo EÚ, môžete využiť alternatívne riešenie sporov prostredníctvom ANPC (SAL), reclamatiisal.anpc.ro; k účasti na tomto postupe sa nezaväzujeme. Sťažnosti na moderátorské rozhodnutia sa riadia časťou 10, čo je samostatný postup.
 
 ## 19. Ostatné ustanovenia
 
@@ -318,7 +320,7 @@ Každá položka sa uplatňuje na osoby, ktoré žijú v jej regióne, a stanovu
 
 ### A.1 Európska únia a Európsky hospodársky priestor
 
-Hlavná časť týchto Podmienok je určená pre vás. Ďalej platí: konanie môžete začať na súdoch krajiny, v ktorej žijete; uplatní sa právo na odstúpenie podľa časti 13; alternatívne riešenie sporov je dostupné prostredníctvom www.onoratainstanta.ro. **Nemecko:** tlačidlo na zrušenie na adrese dezbatere.ro/cancel vám umožňuje ukončiť predplatné bez prihlásenia; podmienky predplatného, obdobia obnovenia a výpovedné lehoty sú v súlade s § 309 bod 9 BGB: každý program platí jeden mesiac a obnovuje sa mesačne, kým ho nezrušíte, pričom ho môžete zrušiť kedykoľvek s účinnosťou od konca prebiehajúceho mesiaca. **Francúzsko:** predplatné môžete ukončiť online v troch krokoch na adrese dezbatere.ro/cancel. **Taliansko:** ustanovenia o pozastavení a ukončení (11), platených programoch a ich obnovení (12), zmenách (14), zodpovednosti (15) a rozhodnom práve a príslušnosti súdov (18) vyžadujú váš osobitný súhlas podľa článkov 1341 a 1342 talianskeho Občianskeho zákonníka. Udeľujete ho prostredníctvom samostatného políčka pri registrácii, ktoré sa zobrazí každému, kto v poli Región zvolí Taliansko alebo sa pripája z Talianska. **Holandsko:** tieto Podmienky sa pred uzavretím poskytujú v podobe, ktorú možno uložiť. **Poľsko:** poľská verzia je dostupná; zvoľte Polski v prepínači jazykov.
+Hlavná časť týchto Podmienok je určená pre vás. Ďalej platí: konanie môžete začať na súdoch krajiny, v ktorej žijete; uplatní sa právo na odstúpenie podľa časti 13; alternatívne riešenie sporov je dostupné prostredníctvom ANPC (SAL), reclamatiisal.anpc.ro. **Nemecko:** tlačidlo na zrušenie na adrese dezbatere.ro/cancel vám umožňuje ukončiť predplatné bez prihlásenia; podmienky predplatného, obdobia obnovenia a výpovedné lehoty sú v súlade s § 309 bod 9 BGB: každý program platí jeden mesiac a obnovuje sa mesačne, kým ho nezrušíte, pričom ho môžete zrušiť kedykoľvek s účinnosťou od konca prebiehajúceho mesiaca. **Francúzsko:** predplatné môžete ukončiť online v troch krokoch na adrese dezbatere.ro/cancel. **Taliansko:** ustanovenia o pozastavení a ukončení (11), platených programoch a ich obnovení (12), zmenách (14), zodpovednosti (15) a rozhodnom práve a príslušnosti súdov (18) vyžadujú váš osobitný súhlas podľa článkov 1341 a 1342 talianskeho Občianskeho zákonníka. Udeľujete ho prostredníctvom samostatného políčka pri registrácii, ktoré sa zobrazí každému, kto v poli Región zvolí Taliansko alebo sa pripája z Talianska. **Holandsko:** tieto Podmienky sa pred uzavretím poskytujú v podobe, ktorú možno uložiť. **Poľsko:** poľská verzia je dostupná; zvoľte Polski v prepínači jazykov.
 
 ### A.2 Spojené štáty
 

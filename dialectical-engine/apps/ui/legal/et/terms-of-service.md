@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lühidalt
-eyebrow: TEENUSETINGIMUSED · v2.12 · KEHTIB ALATES 1. NOVEMBRIST 2026
+eyebrow: TEENUSETINGIMUSED · v2.13 · KEHTIB ALATES 1. NOVEMBRIST 2026
 title: Millega te nõustute
 lede: Teie ja DMS Merchandise Shop S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.
-endMarker: TINGIMUSTE LÕPP · v2.12
+endMarker: TINGIMUSTE LÕPP · v2.13
 bodyLabel: Teenusetingimuste tekst
 annexTitle: Lisa A — Piirkondlikud tingimused
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 KOHALDATAV ÕIGUS
 -->
 
-**Version 2.12 · Effective 1. november 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
+**Version 2.13 · Effective 1. november 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
 
 **In short.** Peate olema vähemalt 18-aastane. Dialectical Engine koostab tehisintellektimudelite abil argumente ja kõik selle loodud tulemused võivad olla valed — need ei ole nõuanded. Tasuta paketi korral on teie väitlused pärast lõppu avalikud, pärast tehisintellekti kontrolli; tasulise paketi korral on need privaatsed, kui te neid ei avalda. Kui väitlus on avalik, saab seda lugeda igaüks, ja see jääb avalikuks. Teie sisestatud tekst saadetakse meie tehisintellekti pakkujate registris loetletud pakkujatele ja seda ei kasutata mudelite treenimiseks. Teatage ebaseaduslikust sisust aadressil support@dezbatere.ro, olenemata sellest, kas teil on konto. Kohaldatakse Rumeenia õigust, kuid teile jääb teie kohaliku tarbijakaitse tagatud kaitse.
 
@@ -251,6 +251,8 @@ Teatame teile püsival andmekandjal ette, mis ja millal muutub. Kui muudatusel o
 
 **Nende Tingimuste muudatused.** Võime neid Tingimusi samalaadsetel põhjustel muuta. Muudatuste puhul, mis ei vähenda teie õigusi, avaldame uue versiooni koos muudatuste kokkuvõttega ja saadame teile e-kirja vähemalt **30 päeva** enne selle jõustumist; Dialectical Engine kasutamise jätkamine pärast seda kuupäeva tähendab, et nõustute muudatusega, ning võite oma konto enne seda sulgeda. Muudatuste puhul, mis vähendavad teie õigusi — sealhulgas olemasoleva paketi hinnatõus, madalamad kasutuslimiidid, eemaldatud funktsioonid, teie sisu uued kasutusviisid või vastutuse, kohaldatava õiguse või vaidluste lahendamise muudatused — palume teil järgmisel sisselogimisel uue versiooniga sõnaselgelt nõustuda ning muudatust kohaldatakse ainult edaspidi. Me ei kohalda muudatust kunagi tagasiulatuvalt ega kasuta seda jaotist selleks, et muuta tähtaja kestel tasulise teenuse põhiolemust ilma teile väljumisvõimalust pakkumata. Varasemad versioonid jäävad kättesaadavaks aadressil dezbatere.ro/terms/versions.
 
+Versioon 2.13 asendas versiooni 2.12: jaotis 18 ja lisa A nimetavad vaidluste kohtuvälise lahendamise teeks ANPC (SAL).
+
 Versioon 2.12 asendas versiooni 2.11: jaotis 10 ütleb, et sisselogitud isik saab kasutada ka mis tahes avaliku väitluse juures nuppu Teatage, et tehisintellekt loeb nupuga tehtud teadet avaliku teksti kõrval ning mis siis juhtub.
 
 Versioon 2.11 asendas versiooni 2.10: jaotis 9 ütleb, et võime avaliku väitluse läbivaatamise ajaks peita ning eemaldada või parandada selle osa.
@@ -297,7 +299,7 @@ Isikuandmete töötlemist kirjeldatakse **Privaatsuspoliitikas** aadressil dezba
 
 **Mujal elavad tarbijad.** Kui elate väljaspool ELi ja EMPd, ei piira miski neis Tingimustes teie riigi õigusest tulenevat õigust esitada nõue selle riigi kohtule ega õigust, millest selle õiguse alusel ei saa loobuda — sealhulgas Austraalias või Uus-Meremaal elades teie tarbijagarantii õigusi; Brasiilias elades *Código de Defesa do Consumidori* kohaseid õigusi; ja Ameerika Ühendriikides elades teie osariigi tarbijakaitseõiguse kohaseid õigusi.
 
-**Enne kohtusse pöördumist.** Võtke meiega ühendust aadressil support@dezbatere.ro; enamik probleeme on lahendatavad ja meie eesmärk on vastata 5 tööpäeva jooksul. Kui olete tarbija Rumeenias või ELis, võite kasutada alternatiivset vaidluste lahendamist veebisaidi www.onoratainstanta.ro kaudu; me ei kohustu selles menetluses osalema. Modereerimisotsuste kohta esitatavaid kaebusi käsitletakse eraldi kanalis jaotise 10 kohaselt.
+**Enne kohtusse pöördumist.** Võtke meiega ühendust aadressil support@dezbatere.ro; enamik probleeme on lahendatavad ja meie eesmärk on vastata 5 tööpäeva jooksul. Kui olete tarbija Rumeenias või ELis, võite kasutada alternatiivset vaidluste lahendamist veebisaidi ANPC (SAL), reclamatiisal.anpc.ro kaudu; me ei kohustu selles menetluses osalema. Modereerimisotsuste kohta esitatavaid kaebusi käsitletakse eraldi kanalis jaotise 10 kohaselt.
 
 ## 19. Muud tingimused
 
@@ -319,7 +321,7 @@ Iga kirjet kohaldatakse inimestele, kes elavad vastavas piirkonnas, ning selles 
 
 ### A.1 Euroopa Liit ja Euroopa Majanduspiirkond
 
-Nende Tingimuste põhiosa on kirjutatud teile. Lisaks: võite esitada hagi oma elukohariigi kohtule; kohaldatakse jaotises 13 sätestatud taganemisõigust; alternatiivne vaidluste lahendamine on kättesaadav veebisaidi www.onoratainstanta.ro kaudu. **Saksamaa:** tühistamisnupp aadressil dezbatere.ro/cancel võimaldab teil tellimuse sisse logimata lõpetada; tellimistingimused, uuendamisperioodid ja etteteatamistähtajad vastavad BGB § 309 lõikele 9: iga pakett kestab ühe kuu ja uueneb igakuiselt, kuni selle tühistate, ning tühistada saab igal ajal, kusjuures tühistamine jõustub jooksva kuu lõpus. **Prantsusmaa:** saate tellimuse veebis kolme sammuga lõpetada aadressil dezbatere.ro/cancel. **Itaalia:** peatamise ja lõpetamise (11), tasuliste pakettide ja nende uuendamise (12), muudatuste (14), vastutuse (15) ning kohaldatava õiguse ja vaidluste lahendamise koha (18) klauslid nõuavad teie eraldi heakskiitu Itaalia tsiviilkoodeksi artiklite 1341 ja 1342 alusel. Annate selle registreerumisel eraldi ruuduga, mis kuvatakse igaühele, kes valib väljal Piirkond Itaalia või kelle ühendus pärineb Itaaliast. **Madalmaad:** need Tingimused esitatakse enne lepingu sõlmimist salvestatavas vormis. **Poola:** poolakeelne versioon on saadaval; valige keelemenüüst Polski.
+Nende Tingimuste põhiosa on kirjutatud teile. Lisaks: võite esitada hagi oma elukohariigi kohtule; kohaldatakse jaotises 13 sätestatud taganemisõigust; alternatiivne vaidluste lahendamine on kättesaadav veebisaidi ANPC (SAL), reclamatiisal.anpc.ro kaudu. **Saksamaa:** tühistamisnupp aadressil dezbatere.ro/cancel võimaldab teil tellimuse sisse logimata lõpetada; tellimistingimused, uuendamisperioodid ja etteteatamistähtajad vastavad BGB § 309 lõikele 9: iga pakett kestab ühe kuu ja uueneb igakuiselt, kuni selle tühistate, ning tühistada saab igal ajal, kusjuures tühistamine jõustub jooksva kuu lõpus. **Prantsusmaa:** saate tellimuse veebis kolme sammuga lõpetada aadressil dezbatere.ro/cancel. **Itaalia:** peatamise ja lõpetamise (11), tasuliste pakettide ja nende uuendamise (12), muudatuste (14), vastutuse (15) ning kohaldatava õiguse ja vaidluste lahendamise koha (18) klauslid nõuavad teie eraldi heakskiitu Itaalia tsiviilkoodeksi artiklite 1341 ja 1342 alusel. Annate selle registreerumisel eraldi ruuduga, mis kuvatakse igaühele, kes valib väljal Piirkond Itaalia või kelle ühendus pärineb Itaaliast. **Madalmaad:** need Tingimused esitatakse enne lepingu sõlmimist salvestatavas vormis. **Poola:** poolakeelne versioon on saadaval; valige keelemenüüst Polski.
 
 ### A.2 Ameerika Ühendriigid
 
