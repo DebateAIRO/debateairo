@@ -242,7 +242,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Ngħidulek minn qabel, fuq mezz durabbli, x’inhu jinbidel u meta. Jekk il-bidla jkollha effett negattiv aktar minn minuri fuq l-aċċess tiegħek għas-servizz jew l-użu tiegħu, tista’ tittermina mingħajr ħlas fi żmien 30 jum minn meta tiġi avżat, jew minn meta tidħol fis-seħħ il-bidla, skont liema jiġi l-aħħar, u nagħtuk lura kwalunkwe ammont imħallas bil-quddiem għall-perjodu mhux użat." },
       { kind: "p", text: "F’dawn it-Termini. Nistgħu nibdlu dawn it-Termini għall-istess tipi ta’ raġunijiet. Għal bidliet li ma jnaqqsux id-drittijiet tiegħek, nippubblikaw il-verżjoni l-ġdida b’sommarju ta’ dak li nbidel u nibagħtulek messaġġ elettroniku mill-inqas 30 jum qabel ma tidħol fis-seħħ; jekk tkompli tuża Dialectical Engine wara dik id-data, dan ifisser li taċċettaha, u tista’ tagħlaq il-kont tiegħek qabel dak iż-żmien. Għal bidliet li jnaqqsu d-drittijiet tiegħek — inkluż żidiet fil-prezz fuq pjan eżistenti, limiti aktar baxxi, funzjonalitajiet imneħħija, użi ġodda tal-kontenut tiegħek, jew bidliet fir-responsabbiltà, fil-liġi applikabbli jew fis-soluzzjoni tat-tilwim — nitolbuk taċċetta l-verżjoni l-ġdida b’mod espliċitu meta terġa’ tidħol fil-kont, u l-bidla tapplika biss għall-futur. Qatt ma nagħmlu bidla retroattiva, u qatt ma nużaw din it-taqsima biex nibdlu l-qalba ta’ dak li ħallast għalih f’nofs it-terminu mingħajr ma noffrulek mod kif toħroġ. Il-verżjonijiet preċedenti jibqgħu disponibbli fuq dezbatere.ro/terms/versions." },
       { kind: "p", text: "Il-Verżjoni 2.14 issostitwiet il-Verżjoni 2.13: it-taqsima 18 u l-Anness A jsemmu lill-ANPC (SAL) bħala r-rotta għas-soluzzjoni alternattiva tat-tilwim." },
-      { kind: "p", text: "Il-Verżjoni 2.13 issostitwiet il-Verżjoni 2.12: it-taqsima 12 tgħid li bir-Rumen il-buttuna tal-ħlas tgħid Abonați-vă și plătiți." },
+      { kind: "p", text: "Il-Verżjoni 2.13 issostitwiet il-Verżjoni 2.12: it-taqsima 12 tagħti l-kliem bir-Rumen tal-buttuna tal-ħlas." },
       { kind: "p", text: "Il-Verżjoni 2.12 issostitwiet il-Verżjoni 2.11: it-taqsima 10 tgħid li persuna mdaħħla fil-kont tagħha tista’ wkoll tuża l-buttuna Irrapporta fuq kwalunkwe dibattitu pubbliku, li IA taqra rapport magħmul biha ħdejn it-test pubbliku, u x’jiġri wara." },
       { kind: "p", text: "Il-Verżjoni 2.11 issostitwiet il-Verżjoni 2.10: it-taqsima 9 tgħid li nistgħu naħbu dibattitu pubbliku temporanjament waqt li nirrieżaminawh, u nneħħu jew nikkoreġu parti minnu." },
       { kind: "p", text: "Il-Verżjoni 2.10 issostitwiet il-Verżjoni 2.9: it-taqsima 9 tgħid li d-dibattiti fuq il-pjan bla ħlas huma pubbliċi, li dibattitu pubbliku ma jistax jitneħħa mill-pubbliku u jibqa’ pubbliku wara li tagħlaq il-kont tiegħek, li kull min għandu kreditu jista’ jikkontribwixxi għal dibattitu pubbliku jew jikteb rapport dwaru, u li dibattitu pubbliku jibqa’ miftuħ wara li l-ewwel awtur tiegħu jitlaq; it-taqsima 11 tgħid x’jagħmel l-għeluq għad-dibattiti pubbliċi tiegħek." },
@@ -377,7 +377,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.14",
-  sha256: "38fe036b5e9050e24d7358753390029fbc82ffca72f0ac80aff13a79b5e3d953",
+  sha256: "7887130478f17e68d74bff4cb1b1308537b219904927fa71da4fecd21e176c7b",
   eyebrow: "TERMINI TAS-SERVIZZ · v2.14 · EFFETTIVI 1 TA’ NOVEMBRU 2026",
   title: "Dak li taqbel miegħu",
   lede: "Il-kuntratt bejnek u DMS Merchandise Shop S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.",

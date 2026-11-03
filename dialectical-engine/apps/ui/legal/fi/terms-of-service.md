@@ -253,7 +253,7 @@ Ilmoitamme sinulle etukäteen pysyvällä välineellä, mikä muuttuu ja milloin
 
 Versio 2.14 korvasi version 2.13: kohdassa 18 ja liitteessä A vaihtoehtoisen riidanratkaisun reitiksi nimetään ANPC (SAL).
 
-Versio 2.13 korvasi version 2.12: kohdassa 12 kerrotaan, että romaniaksi maksupainikkeen teksti on *Abonați-vă și plătiți*.
+Versio 2.13 korvasi version 2.12: kohdassa 12 kerrotaan maksupainikkeen romaniankielinen teksti.
 
 Versio 2.12 korvasi version 2.11: kohdassa 10 kerrotaan, että kirjautunut henkilö voi myös käyttää Ilmoita-painiketta minkä tahansa julkisen väittelyn kohdalla, että tekoäly lukee sillä tehdyn ilmoituksen julkisen tekstin rinnalla ja mitä sen jälkeen tapahtuu.
 

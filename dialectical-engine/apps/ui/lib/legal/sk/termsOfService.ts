@@ -242,7 +242,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "O tom, čo a kedy sa mení, vás vopred informujeme na trvanlivom médiu. Ak má zmena viac než nepodstatný nepriaznivý vplyv na váš prístup k službe alebo jej používanie, môžete zmluvu bezplatne ukončiť do 30 dní odo dňa, keď ste boli informovaní, alebo odo dňa nadobudnutia účinnosti zmeny, podľa toho, ktorý deň nastane neskôr, a vrátime vám prípadnú predplatenú sumu za nevyužité obdobie." },
       { kind: "p", text: "Zmeny týchto Podmienok. Tieto Podmienky môžeme meniť z rovnakých druhov dôvodov. Pri zmenách, ktoré neobmedzujú vaše práva, zverejníme novú verziu so zhrnutím zmien a najmenej 30 dní pred nadobudnutím účinnosti vám zašleme e-mail; pokračovaním v používaní Dialectical Engine po tomto dátume zmenu prijímate a pred týmto dátumom môžete svoj účet odstrániť. Pri zmenách, ktoré obmedzujú vaše práva — vrátane zvýšenia ceny existujúceho programu, zníženia limitov, odstránenia funkcií, nového spôsobu použitia vášho obsahu alebo zmien zodpovednosti, rozhodného práva či riešenia sporov — vás pri nasledujúcom prihlásení požiadame, aby ste novú verziu výslovne prijali, a zmena platí iba do budúcnosti. Žiadnu zmenu nikdy neuplatníme spätne a túto časť nikdy nepoužijeme na zmenu podstaty toho, za čo ste počas obdobia zaplatili, bez toho, aby sme vám ponúkli možnosť zmluvu ukončiť. Predchádzajúce verzie zostávajú dostupné na adrese dezbatere.ro/terms/versions." },
       { kind: "p", text: "Verzia 2.14 nahradila verziu 2.13: časť 18 a príloha A uvádzajú ANPC (SAL) ako cestu k alternatívnemu riešeniu sporov." },
-      { kind: "p", text: "Verzia 2.13 nahradila verziu 2.12: časť 12 uvádza, že v rumunčine je na platobnom tlačidle text Abonați-vă și plătiți." },
+      { kind: "p", text: "Verzia 2.13 nahradila verziu 2.12: časť 12 uvádza rumunský text platobného tlačidla." },
       { kind: "p", text: "Verzia 2.12 nahradila verziu 2.11: časť 10 uvádza, že prihlásená osoba môže tiež použiť tlačidlo Nahlásiť pri ktorejkoľvek verejnej debate, že umelá inteligencia číta hlásenie podané týmto tlačidlom vedľa verejného textu a čo sa potom stane." },
       { kind: "p", text: "Verzia 2.11 nahradila verziu 2.10: časť 9 uvádza, že môžeme dočasne skryť verejnú debatu, kým ju posudzujeme, a odstrániť alebo opraviť jej časť." },
       { kind: "p", text: "Verzia 2.10 nahradila verziu 2.9: časť 9 uvádza, že debaty v bezplatnom programe sú verejné, že verejnú debatu nemožno zrušiť zverejnenie a zostáva verejná aj po zrušení vášho účtu, že ktokoľvek s kreditom môže prispievať do verejnej debaty alebo o nej napísať správu a že verejná debata zostáva otvorená aj po odchode jej prvého autora; časť 11 uvádza, čo zrušenie účtu znamená pre vaše verejné debaty." },
@@ -377,7 +377,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.14",
-  sha256: "30ee6cd31d3ed37201ab888a6bd181073a8bd0d52bfc3b69f31b67c473d30d40",
+  sha256: "2436ea1c2b6bff2030749a5ddc3a38cf9ae6a18c204aad0e64345d6300d38816",
   eyebrow: "PODMIENKY POSKYTOVANIA SLUŽBY · v2.14 · ÚČINNÉ OD 1. NOVEMBRA 2026",
   title: "S čím súhlasíte",
   lede: "Zmluva medzi vami a DMS Merchandise Shop S.R.L. zrozumiteľným jazykom. Devätnásť častí a príloha A — prejdite až na koniec.",

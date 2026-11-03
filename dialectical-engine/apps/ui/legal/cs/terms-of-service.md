@@ -253,7 +253,7 @@ O tom, co a kdy se mění, vás předem informujeme na trvalém nosiči. Má-li 
 
 Verze 2.14 nahradila verzi 2.13: oddíl 18 a příloha A uvádějí jako cestu k alternativnímu řešení sporů ANPC (SAL).
 
-Verze 2.13 nahradila verzi 2.12: oddíl 12 uvádí, že v rumunštině nese platební tlačítko text *Abonați-vă și plătiți*.
+Verze 2.13 nahradila verzi 2.12: oddíl 12 uvádí rumunské znění platebního tlačítka.
 
 Verze 2.12 nahradila verzi 2.11: oddíl 10 uvádí, že přihlášená osoba může také použít tlačítko Nahlásit u kterékoli veřejné debaty, že AI čte hlášení podané tímto tlačítkem vedle veřejného textu a co se pak stane.
 

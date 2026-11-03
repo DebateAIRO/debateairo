@@ -253,7 +253,7 @@ Ngħidulek minn qabel, fuq mezz durabbli, x’inhu jinbidel u meta. Jekk il-bidl
 
 Il-Verżjoni 2.14 issostitwiet il-Verżjoni 2.13: it-taqsima 18 u l-Anness A jsemmu lill-ANPC (SAL) bħala r-rotta għas-soluzzjoni alternattiva tat-tilwim.
 
-Il-Verżjoni 2.13 issostitwiet il-Verżjoni 2.12: it-taqsima 12 tgħid li bir-Rumen il-buttuna tal-ħlas tgħid *Abonați-vă și plătiți*.
+Il-Verżjoni 2.13 issostitwiet il-Verżjoni 2.12: it-taqsima 12 tagħti l-kliem bir-Rumen tal-buttuna tal-ħlas.
 
 Il-Verżjoni 2.12 issostitwiet il-Verżjoni 2.11: it-taqsima 10 tgħid li persuna mdaħħla fil-kont tagħha tista’ wkoll tuża l-buttuna Irrapporta fuq kwalunkwe dibattitu pubbliku, li IA taqra rapport magħmul biha ħdejn it-test pubbliku, u x’jiġri wara.
 

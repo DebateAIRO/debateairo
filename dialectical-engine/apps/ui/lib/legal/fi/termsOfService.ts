@@ -242,7 +242,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Ilmoitamme sinulle etukäteen pysyvällä välineellä, mikä muuttuu ja milloin. Jos muutoksella on vähäistä suurempi kielteinen vaikutus mahdollisuuteesi käyttää palvelua tai palvelun käyttöösi, voit päättää sopimuksen maksutta 30 päivän kuluessa ilmoituksesta tai muutoksen voimaantulosta sen mukaan, kumpi ajankohta on myöhäisempi, ja palautamme käyttämättömään aikaan kohdistuvat ennakkomaksut." },
       { kind: "p", text: "Näiden käyttöehtojen muutokset. Voimme muuttaa näitä käyttöehtoja samanlaisista syistä. Jos muutos ei vähennä oikeuksiasi, julkaisemme uuden version ja yhteenvedon muutoksista sekä lähetämme sinulle sähköpostia vähintään 30 päivää ennen sen voimaantuloa; Dialectical Engine -palvelun käytön jatkaminen kyseisen ajankohdan jälkeen merkitsee hyväksyntääsi, ja voit sulkea tilisi ennen sitä. Jos muutos vähentää oikeuksiasi — mukaan lukien olemassa olevan tilauksen hinnankorotukset, alhaisemmat rajat, poistetut ominaisuudet, sisältösi uudet käyttötavat tai vastuuta, sovellettavaa lakia tai riidanratkaisua koskevat muutokset — pyydämme sinua hyväksymään uuden version nimenomaisesti seuraavan kirjautumisesi yhteydessä, ja muutosta sovelletaan vain jatkossa. Emme koskaan muuta ehtoja taannehtivasti emmekä käytä tätä kohtaa muuttaaksemme kesken sopimuskauden maksamasi palvelun ydintä tarjoamatta sinulle mahdollisuutta irtautua. Aiemmat versiot säilyvät saatavilla osoitteessa dezbatere.ro/terms/versions." },
       { kind: "p", text: "Versio 2.14 korvasi version 2.13: kohdassa 18 ja liitteessä A vaihtoehtoisen riidanratkaisun reitiksi nimetään ANPC (SAL)." },
-      { kind: "p", text: "Versio 2.13 korvasi version 2.12: kohdassa 12 kerrotaan, että romaniaksi maksupainikkeen teksti on Abonați-vă și plătiți." },
+      { kind: "p", text: "Versio 2.13 korvasi version 2.12: kohdassa 12 kerrotaan maksupainikkeen romaniankielinen teksti." },
       { kind: "p", text: "Versio 2.12 korvasi version 2.11: kohdassa 10 kerrotaan, että kirjautunut henkilö voi myös käyttää Ilmoita-painiketta minkä tahansa julkisen väittelyn kohdalla, että tekoäly lukee sillä tehdyn ilmoituksen julkisen tekstin rinnalla ja mitä sen jälkeen tapahtuu." },
       { kind: "p", text: "Versio 2.11 korvasi version 2.10: kohdan 9 mukaan voimme piilottaa julkisen väittelyn sen tarkistamisen ajaksi sekä poistaa tai korjata osan siitä." },
       { kind: "p", text: "Versio 2.10 korvasi version 2.9: kohdan 9 mukaan maksuttomassa tilauksessa väittelyt ovat julkisia, julkista väittelyä ei voi perua ja se pysyy julkisena tilin sulkemisen jälkeen, kuka tahansa, jolla on krediittiä, voi osallistua julkiseen väittelyyn tai kirjoittaa siitä raportin, ja julkinen väittely pysyy avoimena ensimmäisen kirjoittajan poistuttua; kohta 11 kertoo, mitä sulkeminen tekee julkisille väittelyillesi." },
@@ -377,7 +377,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.14",
-  sha256: "01092e1739374c6b0a7a3a51d3a7497c1226e544876ed355efb54742fa48d8b5",
+  sha256: "99dd6e909fedaebc4eded7ce83fd99d1abcc64b762758465b372ee719d9e887e",
   eyebrow: "KÄYTTÖEHDOT · v2.14 · VOIMASSA 1. MARRASKUUTA 2026 ALKAEN",
   title: "Mihin sitoudut",
   lede: "Sinun ja DMS Merchandise Shop S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.",

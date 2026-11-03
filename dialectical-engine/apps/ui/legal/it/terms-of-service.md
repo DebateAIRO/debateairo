@@ -253,7 +253,7 @@ Ti comunichiamo anticipatamente, su un supporto durevole, cosa cambia e quando. 
 
 La versione 2.14 ha sostituito la versione 2.13: la sezione 18 e l'Allegato A indicano ANPC (SAL) come via per la risoluzione alternativa delle controversie.
 
-La versione 2.13 ha sostituito la versione 2.12: la sezione 12 afferma che in rumeno il pulsante di pagamento riporta *Abonați-vă și plătiți*.
+La versione 2.13 ha sostituito la versione 2.12: la sezione 12 indica la dicitura in rumeno del pulsante di pagamento.
 
 La versione 2.12 ha sostituito la versione 2.11: la sezione 10 afferma che una persona che ha effettuato l'accesso può usare anche il pulsante Segnala su qualsiasi dibattito pubblico, che un'IA legge una segnalazione fatta con il pulsante accanto al testo pubblico, e che cosa succede poi.
 

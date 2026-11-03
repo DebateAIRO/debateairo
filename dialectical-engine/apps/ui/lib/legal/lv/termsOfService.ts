@@ -242,7 +242,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Mēs pastāvīgā informācijas nesējā iepriekš paziņojam, kas un kad mainīsies. Ja izmaiņas vairāk nekā nebūtiski nelabvēlīgi ietekmē jūsu piekļuvi pakalpojumam vai tā lietošanu, varat bez maksas izbeigt līgumu 30 dienu laikā pēc paziņojuma saņemšanas vai izmaiņu stāšanās spēkā atkarībā no tā, kurš datums ir vēlāks, un mēs atmaksājam iepriekš samaksāto summu par neizmantoto periodu." },
       { kind: "p", text: "Šo Noteikumu izmaiņas. Mēs varam mainīt šos Noteikumus tādu pašu iemeslu dēļ. Attiecībā uz izmaiņām, kas nesamazina jūsu tiesības, mēs publicējam jauno versiju kopā ar izmaiņu kopsavilkumu un vismaz 30 dienu iepriekš nosūtām jums e-pasta ziņojumu par tās stāšanos spēkā; turpinot lietot Dialectical Engine pēc šī datuma, jūs izmaiņām piekrītat, un pirms tam varat slēgt kontu. Attiecībā uz izmaiņām, kas samazina jūsu tiesības, — tostarp esoša plāna cenas paaugstinājumu, zemākiem ierobežojumiem, noņemtām funkcijām, jauniem jūsu satura lietošanas veidiem vai izmaiņām atbildībā, piemērojamajos tiesību aktos vai strīdu izšķiršanā — mēs lūdzam nākamajā pierakstīšanās reizē skaidri piekrist jaunajai versijai, un izmaiņas attiecas tikai uz turpmāko laiku. Mēs nekad neveicam izmaiņas ar atpakaļejošu spēku un nekad neizmantojam šo sadaļu, lai termiņa vidū mainītu jums apmaksātā pakalpojuma būtību, nepiedāvājot iespēju izstāties. Iepriekšējās versijas ir pieejamas vietnē dezbatere.ro/terms/versions." },
       { kind: "p", text: "Versija 2.14 aizstāja versiju 2.13: 18. sadaļā un A pielikumā kā alternatīvas strīdu izšķiršanas ceļš norādīta ANPC (SAL)." },
-      { kind: "p", text: "Versija 2.13 aizstāja versiju 2.12: 12. sadaļā teikts, ka rumāņu valodā uz maksājuma pogas rakstīts Abonați-vă și plătiți." },
+      { kind: "p", text: "Versija 2.13 aizstāja versiju 2.12: 12. sadaļā norādīts maksājuma pogas uzraksts rumāņu valodā." },
       { kind: "p", text: "Versija 2.12 aizstāja versiju 2.11: 10. sadaļā teikts, ka pieteikusies persona var arī izmantot pogu „Ziņot” jebkurā publiskā debatē, ka MI lasa ar to iesniegtu ziņojumu līdzās publiskajam tekstam un kas pēc tam notiek." },
       { kind: "p", text: "Versija 2.11 aizstāja versiju 2.10: 9. sadaļā teikts, ka mēs varam uz laiku paslēpt publisku debati, kamēr to pārskatām, un noņemt vai labot tās daļu." },
       { kind: "p", text: "Versija 2.10 aizstāja versiju 2.9: 9. sadaļā teikts, ka bezmaksas plānā debates ir publiskas, ka publiskas debates publikāciju nevar atsaukt un tā paliek publiska pēc konta slēgšanas, ka ikviens, kam ir kredīts, var sniegt ieguldījumu publiskā debatē vai uzrakstīt tai pārskatu, un ka publiska debate paliek atvērta pēc tam, kad tās pirmais autors ir aizgājis; 11. sadaļā teikts, ko slēgšana nozīmē jūsu publiskajām debatēm." },
@@ -377,7 +377,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.14",
-  sha256: "09aa6ff05784fc4b036133c0fdc68fcaddd376af884bf5dce91bc9afd2fbe40d",
+  sha256: "3d7cfaeab5fbefd4fd317ac7beab053968d4997c0b2af536e9b47255484ab534",
   eyebrow: "PAKALPOJUMA NOTEIKUMI · v2.14 · SPĒKĀ NO 2026. GADA 1. NOVEMBRA",
   title: "Kam jūs piekrītat",
   lede: "Līgums starp jums un DMS Merchandise Shop S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.",

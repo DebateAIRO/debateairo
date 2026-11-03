@@ -242,7 +242,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Chúng tôi thông báo trước cho bạn trên một phương tiện bền vững về nội dung và thời điểm thay đổi. Nếu thay đổi có tác động tiêu cực lớn hơn mức không đáng kể đối với khả năng truy cập hoặc sử dụng dịch vụ của bạn, bạn có thể chấm dứt miễn phí trong vòng 30 ngày kể từ khi được thông báo hoặc kể từ khi thay đổi có hiệu lực, tùy thời điểm nào muộn hơn, và chúng tôi hoàn trả mọi khoản đã trả trước cho thời gian chưa sử dụng." },
       { kind: "p", text: "Đối với các Điều khoản này. Chúng tôi có thể thay đổi các Điều khoản này vì các loại lý do tương tự. Đối với thay đổi không làm giảm quyền của bạn, chúng tôi đăng phiên bản mới kèm bản tóm tắt nội dung thay đổi và gửi email cho bạn ít nhất 30 ngày trước khi phiên bản có hiệu lực; tiếp tục sử dụng Dialectical Engine sau ngày đó có nghĩa là bạn chấp nhận phiên bản mới, và bạn có thể đóng tài khoản trước ngày đó. Đối với thay đổi làm giảm quyền của bạn — bao gồm tăng giá đối với gói hiện có, hạ thấp giới hạn, loại bỏ tính năng, cách sử dụng mới đối với nội dung của bạn, hoặc thay đổi về trách nhiệm, luật điều chỉnh hay giải quyết tranh chấp — chúng tôi yêu cầu bạn chấp nhận rõ ràng phiên bản mới vào lần đăng nhập tiếp theo, và thay đổi chỉ áp dụng về sau. Chúng tôi không bao giờ áp dụng thay đổi hồi tố và không bao giờ dùng mục này để thay đổi nội dung cốt lõi mà bạn đã thanh toán giữa kỳ mà không cho bạn một lối thoát. Các phiên bản trước vẫn được cung cấp tại dezbatere.ro/terms/versions." },
       { kind: "p", text: "Phiên bản 2.14 thay thế phiên bản 2.13: mục 18 và Phụ lục A nêu ANPC (SAL) là kênh giải quyết tranh chấp thay thế." },
-      { kind: "p", text: "Phiên bản 2.13 thay thế phiên bản 2.12: mục 12 nêu rằng bằng tiếng Romania, nút thanh toán ghi Abonați-vă și plătiți." },
+      { kind: "p", text: "Phiên bản 2.13 thay thế phiên bản 2.12: mục 12 nêu dòng chữ tiếng Romania trên nút thanh toán." },
       { kind: "p", text: "Phiên bản 2.12 thay thế phiên bản 2.11: mục 10 nêu rằng người đã đăng nhập cũng có thể sử dụng nút Báo cáo trên bất kỳ cuộc tranh luận công khai nào, rằng AI đọc báo cáo được gửi bằng nút đó bên cạnh văn bản công khai, và điều gì xảy ra sau đó." },
       { kind: "p", text: "Phiên bản 2.11 thay thế phiên bản 2.10: mục 9 nêu rằng chúng tôi có thể tạm ẩn một cuộc tranh luận công khai trong khi rà soát, đồng thời gỡ bỏ hoặc sửa một phần của nó." },
       { kind: "p", text: "Phiên bản 2.10 thay thế phiên bản 2.9: mục 9 nêu rằng các cuộc tranh luận trên gói miễn phí là công khai, rằng một cuộc tranh luận công khai không thể hủy công khai và vẫn công khai sau khi bạn đóng tài khoản, rằng bất kỳ ai có tín dụng đều có thể đóng góp vào một cuộc tranh luận công khai hoặc viết báo cáo về nó, và rằng một cuộc tranh luận công khai vẫn mở sau khi tác giả đầu tiên của nó đã rời đi; mục 11 nêu việc đóng tài khoản tác động thế nào đến các cuộc tranh luận công khai của bạn." },
@@ -377,7 +377,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.14",
-  sha256: "26496ede634a5b9bf4a625e66d92a78f9756910f760f75ee2573a6c67ded42e1",
+  sha256: "56a5fe03dee2ccbf98c9c2f2594cff4bf3df28f84b0d9839234c353e0fd947cd",
   eyebrow: "ĐIỀU KHOẢN DỊCH VỤ · v2.14 · CÓ HIỆU LỰC 1 THÁNG 11 NĂM 2026",
   title: "Những điều bạn đồng ý",
   lede: "Hợp đồng giữa bạn và DMS Merchandise Shop S.R.L., được trình bày bằng ngôn ngữ dễ hiểu. Mười chín mục và Phụ lục A — cuộn đến cuối.",

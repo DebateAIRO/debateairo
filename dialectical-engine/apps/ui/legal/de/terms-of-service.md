@@ -253,7 +253,7 @@ Wir teilen Ihnen im Voraus auf einem dauerhaften Datenträger mit, was sich wann
 
 Version 2.14 ersetzte Version 2.13: Abschnitt 18 und Anhang A nennen ANPC (SAL) als Weg zur alternativen Streitbeilegung.
 
-Version 2.13 ersetzte Version 2.12: Abschnitt 12 besagt, dass die Zahlungsschaltfläche auf Rumänisch *Abonați-vă și plătiți* lautet.
+Version 2.13 ersetzte Version 2.12: Abschnitt 12 nennt den rumänischen Wortlaut der Zahlungsschaltfläche.
 
 Version 2.12 ersetzte Version 2.11: Abschnitt 10 besagt, dass eine angemeldete Person auch die Schaltfläche Melden bei jeder öffentlichen Debatte verwenden kann, dass eine KI eine damit abgegebene Meldung neben dem öffentlichen Text liest und was dann geschieht.
 

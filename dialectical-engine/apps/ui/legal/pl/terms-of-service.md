@@ -253,7 +253,7 @@ Z wyprzedzeniem informujemy Cię na trwałym nośniku, co i kiedy ulegnie zmiani
 
 Wersja 2.14 zastąpiła wersję 2.13: sekcja 18 i załącznik A wskazują ANPC (SAL) jako drogę alternatywnego rozstrzygania sporów.
 
-Wersja 2.13 zastąpiła wersję 2.12: sekcja 12 mówi, że po rumuńsku przycisk płatności ma napis *Abonați-vă și plătiți*.
+Wersja 2.13 zastąpiła wersję 2.12: sekcja 12 podaje rumuński napis na przycisku płatności.
 
 Wersja 2.12 zastąpiła wersję 2.11: sekcja 10 mówi, że zalogowana osoba może także użyć przycisku Zgłoś przy dowolnej publicznej debacie, że AI czyta zgłoszenie złożone tym przyciskiem obok publicznego tekstu oraz co wtedy się dzieje.
 

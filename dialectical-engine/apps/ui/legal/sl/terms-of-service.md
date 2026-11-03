@@ -253,7 +253,7 @@ Na trajnem nosilcu vas vnaprej obvestimo, kaj se spreminja in kdaj. Če ima spre
 
 Različica 2.14 je nadomestila različico 2.13: razdelek 18 in Priloga A navajata ANPC (SAL) kot pot za alternativno reševanje sporov.
 
-Različica 2.13 je nadomestila različico 2.12: razdelek 12 navaja, da je v romunščini na gumbu za plačilo napis *Abonați-vă și plătiți*.
+Različica 2.13 je nadomestila različico 2.12: razdelek 12 navaja romunski napis na gumbu za plačilo.
 
 Različica 2.12 je nadomestila različico 2.11: razdelek 10 navaja, da lahko prijavljena oseba tudi uporabi gumb Prijavi pri kateri koli javni razpravi, da umetna inteligenca prebere prijavo, oddano z njim, poleg javnega besedila, in kaj se nato zgodi.
 

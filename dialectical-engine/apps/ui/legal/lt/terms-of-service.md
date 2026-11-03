@@ -253,7 +253,7 @@ Patvariojoje laikmenoje iš anksto pranešame, kas ir kada keisis. Jei pakeitima
 
 2.14 versija pakeitė 2.13 versiją: 18 skyriuje ir A priede alternatyvaus ginčų sprendimo keliu nurodyta ANPC (SAL).
 
-2.13 versija pakeitė 2.12 versiją: 12 skyriuje nurodyta, kad rumunų kalba mokėjimo mygtuke parašyta *Abonați-vă și plătiți*.
+2.13 versija pakeitė 2.12 versiją: 12 skyriuje nurodytas mokėjimo mygtuko užrašas rumunų kalba.
 
 2.12 versija pakeitė 2.11 versiją: 10 skyriuje nurodyta, kad prisijungęs asmuo taip pat gali naudoti mygtuką Pranešti bet kuriame viešame debate, kad DI perskaito pranešimą, pateiktą jį naudojant, šalia viešo teksto, ir kas tada įvyksta.
 

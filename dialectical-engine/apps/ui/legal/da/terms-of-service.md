@@ -253,7 +253,7 @@ Vi oplyser dig på forhånd på et varigt medium om, hvad der ændres og hvornå
 
 Version 2.14 erstattede version 2.13: afsnit 18 og bilag A angiver ANPC (SAL) som vejen til alternativ tvistbilæggelse.
 
-Version 2.13 erstattede version 2.12: afsnit 12 oplyser, at betalingsknappen på rumænsk lyder *Abonați-vă și plătiți*.
+Version 2.13 erstattede version 2.12: afsnit 12 oplyser betalingsknappens rumænske ordlyd.
 
 Version 2.12 erstattede version 2.11: afsnit 10 oplyser, at en person, der er logget ind, også kan bruge knappen Anmeld på enhver offentlig debat, at en AI læser en anmeldelse, der er indsendt med den, ved siden af den offentlige tekst, og hvad der så sker.
 

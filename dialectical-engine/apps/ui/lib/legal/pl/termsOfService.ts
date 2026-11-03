@@ -242,7 +242,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Z wyprzedzeniem informujemy Cię na trwałym nośniku, co i kiedy ulegnie zmianie. Jeżeli zmiana ma więcej niż nieznaczny negatywny wpływ na Twój dostęp do usługi lub korzystanie z niej, możesz bezpłatnie rozwiązać umowę w terminie 30 dni od otrzymania informacji lub wejścia zmiany w życie — w zależności od tego, która z tych dat jest późniejsza — a my zwrócimy wszelkie kwoty zapłacone z góry za niewykorzystany okres." },
       { kind: "p", text: "Zmiany niniejszych Warunków. Możemy zmieniać niniejsze Warunki z tych samych rodzajów powodów. W przypadku zmian, które nie ograniczają Twoich praw, publikujemy nową wersję wraz z podsumowaniem zmian i wysyłamy Ci wiadomość e-mail co najmniej 30 dni przed jej wejściem w życie; dalsze korzystanie z Dialectical Engine po tej dacie oznacza akceptację zmiany, a przed tą datą możesz zamknąć konto. W przypadku zmian ograniczających Twoje prawa — w tym podwyżek cen w istniejącym planie, obniżenia limitów, usunięcia funkcji, nowych sposobów wykorzystywania Twoich treści albo zmian odpowiedzialności, prawa właściwego lub rozstrzygania sporów — prosimy Cię o wyraźne zaakceptowanie nowej wersji przy kolejnym logowaniu, a zmiana obowiązuje wyłącznie na przyszłość. Nigdy nie wprowadzamy zmian z mocą wsteczną ani nie wykorzystujemy niniejszej sekcji do zmiany w trakcie okresu podstawowego zakresu opłaconej przez Ciebie usługi bez zapewnienia możliwości rezygnacji. Poprzednie wersje pozostają dostępne pod adresem dezbatere.ro/terms/versions." },
       { kind: "p", text: "Wersja 2.14 zastąpiła wersję 2.13: sekcja 18 i załącznik A wskazują ANPC (SAL) jako drogę alternatywnego rozstrzygania sporów." },
-      { kind: "p", text: "Wersja 2.13 zastąpiła wersję 2.12: sekcja 12 mówi, że po rumuńsku przycisk płatności ma napis Abonați-vă și plătiți." },
+      { kind: "p", text: "Wersja 2.13 zastąpiła wersję 2.12: sekcja 12 podaje rumuński napis na przycisku płatności." },
       { kind: "p", text: "Wersja 2.12 zastąpiła wersję 2.11: sekcja 10 mówi, że zalogowana osoba może także użyć przycisku Zgłoś przy dowolnej publicznej debacie, że AI czyta zgłoszenie złożone tym przyciskiem obok publicznego tekstu oraz co wtedy się dzieje." },
       { kind: "p", text: "Wersja 2.11 zastąpiła wersję 2.10: sekcja 9 mówi, że możemy tymczasowo ukryć publiczną debatę podczas jej przeglądu oraz usunąć lub poprawić jej część." },
       { kind: "p", text: "Wersja 2.10 zastąpiła wersję 2.9: sekcja 9 mówi, że debaty w planie bezpłatnym są publiczne, że publicznej debaty nie można wycofać z publikacji i że pozostaje ona publiczna po zamknięciu konta, że każdy, kto ma kredyt, może wnosić wkład do publicznej debaty lub napisać jej raport, oraz że publiczna debata pozostaje otwarta po odejściu jej pierwszego autora; sekcja 11 mówi, co zamknięcie konta oznacza dla Twoich publicznych debat." },
@@ -377,7 +377,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.14",
-  sha256: "33e9ae7f287b9efc922ea6e78d64feda4e4d173f0c3c56b0170d61fa9fd0db36",
+  sha256: "94e3c30247710249f12d654fbc68822d6a4f67cb7b349976af408cf4e52015f7",
   eyebrow: "WARUNKI ŚWIADCZENIA USŁUG · v2.14 · OBOWIĄZUJĄ OD 1 LISTOPADA 2026",
   title: "Na co wyrażasz zgodę",
   lede: "Umowa między Tobą a DMS Merchandise Shop S.R.L., napisana prostym językiem. Dziewiętnaście sekcji i załącznik A — przewiń do końca.",

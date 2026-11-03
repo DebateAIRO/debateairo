@@ -253,7 +253,7 @@ Le informaremos de antemano, en un soporte duradero, de qué va a cambiar y cuá
 
 La versión 2.14 sustituyó a la versión 2.13: la sección 18 y el anexo A indican ANPC (SAL) como vía para la resolución alternativa de litigios.
 
-La versión 2.13 sustituyó a la versión 2.12: la sección 12 indica que, en rumano, el botón de pago dice *Abonați-vă și plătiți*.
+La versión 2.13 sustituyó a la versión 2.12: la sección 12 indica el texto en rumano del botón de pago.
 
 La versión 2.12 sustituyó a la versión 2.11: la sección 10 indica que una persona que ha iniciado sesión también puede usar el botón Denunciar de cualquier debate público, que una IA lee una denuncia hecha con él junto al texto público, y qué ocurre entonces.
 

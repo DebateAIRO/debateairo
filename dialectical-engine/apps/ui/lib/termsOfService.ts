@@ -242,7 +242,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "We tell you in advance, on a durable medium, what is changing and when. If the change has more than a minor negative effect on your access to or use of the service, you may terminate free of charge within 30 days of being told, or of the change taking effect, whichever is later, and we refund any prepaid amount for the unused period." },
       { kind: "p", text: "To these Terms. We may change these Terms for the same kinds of reasons. For changes that do not reduce your rights, we post the new version with a summary of what changed and email you at least 30 days before it takes effect; continuing to use Dialectical Engine after that date means you accept it, and you may close your account before then. For changes that reduce your rights — including price increases on an existing plan, lower limits, removed features, new uses of your content, or changes to liability, governing law or dispute resolution — we ask you to accept the new version expressly at your next sign-in, and the change applies only going forward. We never make a change retroactive, and we never use this section to change the core of what you have paid for mid-term without offering you a way out. Prior versions stay available at dezbatere.ro/terms/versions." },
       { kind: "p", text: "Version 2.14 replaced version 2.13: section 18 and Annex A name ANPC (SAL) as the route for alternative dispute resolution." },
-      { kind: "p", text: "Version 2.13 replaced version 2.12: section 12 says that in Romanian the payment button reads Abonați-vă și plătiți." },
+      { kind: "p", text: "Version 2.13 replaced version 2.12: section 12 gives the payment button's Romanian wording." },
       { kind: "p", text: "Version 2.12 replaced version 2.11: section 10 says that a signed-in person can also use the Report button on any public debate, that an AI reads a report made with it beside the public text, and what happens then." },
       { kind: "p", text: "Version 2.11 replaced version 2.10: section 9 says that we can hide a public debate while we review it, and remove or correct part of it." },
       { kind: "p", text: "Version 2.10 replaced version 2.9: section 9 says that debates on the Free plan are public, that a public debate cannot be unpublished and stays public after you close your account, that anyone with credit can contribute to a public debate or write a report on it, and that a public debate stays open after its first author has left; section 11 says what closure does to your public debates." },
@@ -377,7 +377,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.14",
-  sha256: "644c0b29286ac29adcee83560395916cfd0dfae0f73367ccc2c7905561b39253",
+  sha256: "9d8d0f5c42dd344919f9e8afb1237e69ed4016fa8447457661e5241141462163",
   eyebrow: "TERMS OF SERVICE · v2.14 · EFFECTIVE 1 NOVEMBER 2026",
   title: "What you agree to",
   lede: "The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.",

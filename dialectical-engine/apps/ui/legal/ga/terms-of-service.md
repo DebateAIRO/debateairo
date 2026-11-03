@@ -253,7 +253,7 @@ Insímid duit roimh ré, ar mheán marthanach, cad atá ag athrú agus cathain. 
 
 Tháinig leagan 2.14 in ionad leagan 2.13: ainmníonn rannán 18 agus Iarscríbhinn A ANPC (SAL) mar an bealach chun réiteach malartach díospóidí a fháil.
 
-Tháinig leagan 2.13 in ionad leagan 2.12: deir rannán 12 go bhfuil *Abonați-vă și plătiți* ar an gcnaipe íocaíochta sa Rómáinis.
+Tháinig leagan 2.13 in ionad leagan 2.12: tugann rannán 12 an fhoclaíocht Rómáinise atá ar an gcnaipe íocaíochta.
 
 Tháinig leagan 2.12 in ionad leagan 2.11: deir rannán 10 gur féidir le duine atá sínithe isteach an cnaipe Tuairiscigh a úsáid freisin ar aon díospóireacht phoiblí, go léann IS tuairisc a dhéantar leis taobh leis an téacs poiblí, agus cad a tharlaíonn ansin.
 
