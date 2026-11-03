@@ -65,7 +65,7 @@ export default async function PricingPage({
   searchParams = Promise.resolve({})
 }: {
   searchParams?: Promise<PlaceParams>;
-} = {}) {
+}) {
   const requestedLocale = (await cookies()).get(LOCALE_COOKIE)?.value;
   const locale = isLocale(requestedLocale) ? requestedLocale : "en";
   const params = await searchParams;
