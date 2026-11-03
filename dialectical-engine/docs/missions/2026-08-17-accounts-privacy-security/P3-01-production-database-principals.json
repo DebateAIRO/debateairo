@@ -408,6 +408,8 @@
         "ledger.record_question_check_spend",
         "identity.record_ask_clarify_charge",
         "identity.read_ask_clarify_spent",
+        "identity.record_pre_start_charge",
+        "identity.read_pre_start_spent",
         "staff.keep_threat_report",
         "staff.list_threat_reports",
         "staff.count_unread_threat_reports",
@@ -3225,6 +3227,28 @@
       "grants": [
         "EXECUTE ON FUNCTION identity.mark_dig_tree_settled(uuid)",
         "EXECUTE ON FUNCTION identity.dig_is_settled(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_staff_security_owner",
+      "source": "migrations/0154_pre_start_charge.sql",
+      "grants": [
+        "SELECT, INSERT ON identity.pre_start_charge"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0154_pre_start_charge.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.record_pre_start_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint)",
+        "EXECUTE ON FUNCTION identity.read_pre_start_spent(uuid,timestamptz,timestamptz)"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0154_pre_start_charge.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_pre_start(uuid,uuid)"
       ]
     }
   ],

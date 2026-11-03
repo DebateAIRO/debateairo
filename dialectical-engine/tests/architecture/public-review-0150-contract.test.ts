@@ -82,7 +82,7 @@ describe("0150: a public debate under review", () => {
   it("follows 0149 as the chain's head, with its own loader, and keeps 0130's verifier", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
     expect(chain).toContain("import { loadForward0150 } from './migration-forward0150.js';");
-    expect(chain).toContain("loadForward0148,loadForward0149,loadForward0150,loadForward0151,loadForward0152,loadForward0153]");
+    expect(chain).toContain("loadForward0148,loadForward0149,loadForward0150,loadForward0151,loadForward0152,loadForward0153,loadForward0154]");
     const loader = read(LOADER_PATH);
     expect(loader).toContain(`const NAME = "${NAME}";`);
     expect(loader).toContain('const VERSION = "public-review-forward0150-v1";');
@@ -95,7 +95,7 @@ describe("0150: a public debate under review", () => {
     // The loader's postcondition digests every new function, and 0039's, which no earlier receipt in the chain holds.
     for (const signature of [...GRANTED, ...PRIVATE, RECIPE_FUNCTION]) expect(loader, signature).toContain(`"${signature}"`);
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-4)!;
+    const step = plan.forwardChain.at(-5)!;
     expect(step.name).toBe(NAME);
     expect(step.previousName).toBe(PREVIOUS);
     expect(step.verifierSha256).toBe(VERIFIER_130);
@@ -115,7 +115,7 @@ describe("0150: a public debate under review", () => {
     });
     // The loader refuses a manifest whose list differs from its own, and the plan hands the chain the list.
     const plan = await loadMigrationPlan();
-    expect(plan.forwardChain.at(-4)!.amendsPostconditionsOf).toEqual(AMENDS);
+    expect(plan.forwardChain.at(-5)!.amendsPostconditionsOf).toEqual(AMENDS);
   });
 
   it("declares `-- n1: drained` and `-- n1: keeps-verifier`", () => {
