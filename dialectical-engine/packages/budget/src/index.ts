@@ -12,9 +12,15 @@ import {
   engineSettingsOfReceipt,
   lengthGuidanceOfReceipt,
   lengthGuidanceReceiptSchema,
-  webReceiptSchema,
   webSitesOfReceipt,
+  // V4 start step, Task 13: shape receipt v2 and web receipt v2 beside v1.
+  DEBATE_SHAPE_V2_FORMULA_VERSION,
+  debateShapeReceiptV2Schema,
+  debateShapeSiteCountsV2,
+  debateShapeV2OfReceipt,
+  webReceiptAnySchema,
   type DebateShapeCeilingInput,
+  type DebateShapeV2Input,
   type EngineSettings,
   type LengthGuidance,
   type WebSites
@@ -264,8 +270,11 @@ const costEnvelopeBasisSchema = z.object({
   final_retry_attempts: z.number().int().positive(),
   formula_version: z.string().trim().min(1),
   bounds_source_ref: z.string().trim().min(1),
-  /** Debate shape (spec 2026-10-12 §3.6): the run's frozen sizes; present exactly on a DR-185-shape-v1 receipt. */
-  shape: debateShapeReceiptSchema.optional(),
+  /**
+   * Debate shape (spec 2026-10-12 §3.6): the run's frozen sizes; present exactly on a DR-185-shape-v1 receipt (version 1)
+   * or a DR-185-shape-v2 one (version 2, V4 start step Task 13: a path debate's sizes).
+   */
+  shape: z.discriminatedUnion("version", [debateShapeReceiptSchema, debateShapeReceiptV2Schema]).optional(),
   /** Length guidance (spec 2026-10-15 §3.1): the run's frozen numbers; present exactly when the row was in force at admission. */
   length: lengthGuidanceReceiptSchema.optional(),
   /**
@@ -277,7 +286,7 @@ const costEnvelopeBasisSchema = z.object({
    * Web search (plan 2026-10-30, W2-2): the run's web part (searches, reader calls, pick calls, readers 2-3 calls);
    * present exactly when the run was admitted with web search on. Absent: no web part, today's receipt.
    */
-  web: webReceiptSchema.optional()
+  web: webReceiptAnySchema.optional()
 }).strict().superRefine((basis, ctx) => {
   /**
    * S09B: the serve leg is disclosed TWICE — once as the billed site count
@@ -358,10 +367,56 @@ const costEnvelopeBasisSchema = z.object({
    * its own sizes give (`debateShapeSiteCounts`, the constructor's rule, READ here, never restated), so a receipt can
    * never bill a shape its own numbers do not support, nor carry sizes the debaters cannot fill.
    */
-  const shape = basis.shape;
-  if ((basis.formula_version === DEBATE_SHAPE_FORMULA_VERSION) !== (shape !== undefined)) {
+  const anyShape = basis.shape;
+  const shapeFormula = anyShape === undefined ? null : anyShape.version === 1 ? DEBATE_SHAPE_FORMULA_VERSION : DEBATE_SHAPE_V2_FORMULA_VERSION;
+  if (shapeFormula !== null ? basis.formula_version !== shapeFormula
+    : basis.formula_version === DEBATE_SHAPE_FORMULA_VERSION || basis.formula_version === DEBATE_SHAPE_V2_FORMULA_VERSION) {
     ctx.addIssue({ code: "custom", path: ["shape"], message: `formula ${basis.formula_version} and its shape member disagree` });
   }
+  /**
+   * V4 start step, Task 13: a path debate's legs are the ones its own sizes give (`debateShapeSiteCountsV2`, the
+   * constructor's rule, READ here): author sites = map + nodes + every path's answer so far; no cross exchange (so no
+   * backup); graders and reviewers on every node.
+   */
+  if (anyShape !== undefined && anyShape.version === 2) {
+    const shape = anyShape;
+    let counts: ReturnType<typeof debateShapeSiteCountsV2> | null = null;
+    try {
+      counts = debateShapeSiteCountsV2(debateShapeV2OfReceipt(shape), basis.depth);
+    } catch (error) {
+      ctx.addIssue({ code: "custom", path: ["shape", "nodes"],
+        message: `shape sites cannot be counted at ${basis.depth} rounds (${error instanceof Error ? error.message : String(error)})` });
+    }
+    if (counts !== null && (counts.mapSites !== shape.map_sites || counts.nodes !== shape.nodes
+      || counts.pathOutcomeSites !== shape.path_outcome_sites)) {
+      ctx.addIssue({ code: "custom", path: ["shape", "nodes"],
+        message: `shape sites ${shape.map_sites}/${shape.nodes}/${shape.path_outcome_sites} disagree with its sizes` });
+    }
+    const noScrutiny = shape.scrutiny === "standard";
+    if (noScrutiny !== (shape.scrutiny_rounds_per_point === 0) || noScrutiny !== (shape.scrutiny_points_per_debate === 0)) {
+      ctx.addIssue({ code: "custom", path: ["shape", "scrutiny"],
+        message: `scrutiny ${shape.scrutiny} with ${shape.scrutiny_rounds_per_point} rounds and ${shape.scrutiny_points_per_debate} points`
+          + " disagrees: standard scrutiny means 0 rounds and 0 points" });
+    }
+    if (basis.call_sites.author !== shape.map_sites + shape.nodes + shape.path_outcome_sites) {
+      ctx.addIssue({ code: "custom", path: ["call_sites", "author"],
+        message: `author sites ${basis.call_sites.author} are not map plus nodes plus path outcomes` });
+    }
+    if (basis.call_sites.panel !== (shape.graders + shape.close_call_extra_graders) * shape.nodes) {
+      ctx.addIssue({ code: "custom", path: ["call_sites", "panel"], message: `panel sites ${basis.call_sites.panel} are not graders per node` });
+    }
+    if (basis.call_sites.reviewer < shape.nodes || basis.call_sites.reviewer % shape.nodes !== 0) {
+      ctx.addIssue({ code: "custom", path: ["call_sites", "reviewer"],
+        message: `reviewer sites ${basis.call_sites.reviewer} are not whole reviews per node (${shape.nodes} nodes)` });
+    }
+    if (shape.graders + shape.close_call_extra_graders > basis.panel_size - 1) {
+      ctx.addIssue({ code: "custom", path: ["shape", "graders"], message: `the shape's graders exceed ${basis.panel_size} debaters` });
+    }
+    if (basis.per_site_attempts.cross_exchange_site !== undefined) {
+      ctx.addIssue({ code: "custom", path: ["shape", "backup_sequences"], message: "a path debate provisions no backup sequence" });
+    }
+  }
+  const shape = anyShape !== undefined && anyShape.version === 1 ? anyShape : undefined;
   if (shape !== undefined) {
     /**
      * T4-ABSORB (c): this refinement also runs on a receipt that already failed a non-aborting check (a depth of 0),
@@ -445,6 +500,8 @@ export interface CostEnvelopeBasis {
    * reader of a shaped receipt (PF7): later readers take the sizes from here, never from `wire.shape`.
    */
   readonly shape?: DebateShapeCeilingInput;
+  /** V4 start step, Task 13: a path debate's sizes (shape receipt v2); absent on every other receipt, never with `shape`. */
+  readonly shapeV2?: DebateShapeV2Input;
   /** Length guidance: the numbers the run was admitted with; absent on every run admitted without the row. */
   readonly length?: LengthGuidance;
   /**
@@ -502,7 +559,8 @@ export function parseCostEnvelopeBasis(value: unknown): CostEnvelopeBasis {
       selected: parsed.data.serve_leg.selected
     }),
     serveReserveAttempts: parsed.data.serve_reserve_attempts ?? 0,
-    ...(parsed.data.shape === undefined ? {} : { shape: debateShapeOfReceipt(parsed.data.shape) }),
+    ...(parsed.data.shape === undefined ? {}
+      : parsed.data.shape.version === 1 ? { shape: debateShapeOfReceipt(parsed.data.shape) } : { shapeV2: debateShapeV2OfReceipt(parsed.data.shape) }),
     ...(parsed.data.length === undefined ? {} : { length: lengthGuidanceOfReceipt(parsed.data.length) }),
     ...(parsed.data.engine === undefined ? {} : { engine: engineSettingsOfReceipt(parsed.data.engine) }),
     ...(parsed.data.web === undefined ? {} : { web: webSitesOfReceipt(parsed.data.web) }),

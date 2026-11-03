@@ -320,7 +320,7 @@ export const webReceiptV2Schema = z.object({
 });
 export type WebReceiptV2 = z.infer<typeof webReceiptV2Schema>;
 /** Either version, by its own strict schema. */
-export const webReceiptAnySchema = z.union([webReceiptSchema, webReceiptV2Schema]);
+export const webReceiptAnySchema = z.discriminatedUnion("version", [webReceiptSchema, webReceiptV2Schema]);
 
 /**
  * The member, parsed with its own schema before it is handed back: a receipt the parser would refuse is never minted.
