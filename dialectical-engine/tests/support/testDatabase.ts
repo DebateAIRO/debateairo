@@ -19,6 +19,23 @@ export interface TestDatabase {
   stop(): Promise<void>;
 }
 
+const beforeStopHooks = new WeakMap<object, (() => Promise<void>)[]>();
+
+/**
+ * Upload check Task 7: `hook` runs when `database.stop()` is called, before its pool ends and the cluster stops. The
+ * logins of tests/support/rls-logins.ts use it to end their own pools, so a file that never ends them itself (a file
+ * whose runner the preview harness builds on the runner login) does not leave connections open on a stopping cluster.
+ */
+export function beforeTestDatabaseStops(database: Pick<TestDatabase, "pool">, hook: () => Promise<void>): void {
+  const hooks = beforeStopHooks.get(database) ?? [];
+  hooks.push(hook);
+  beforeStopHooks.set(database, hooks);
+}
+
+async function runBeforeStopHooks(database: TestDatabase): Promise<void> {
+  for (const hook of (beforeStopHooks.get(database) ?? []).splice(0)) await hook();
+}
+
 export function createTestAskAdmissionPoolFacades(pool:Pool):Readonly<{
   server:Pool;legacy:Pool;
 }> {
@@ -71,17 +88,19 @@ async function startWithTestcontainers(postgresMajor: string): Promise<TestDatab
   const pool = createPool(connectionString);
   await pool.query("SELECT 1");
   console.info("[S00 DB] Testcontainers ACTIVE: real PostgreSQL container started");
-  return {
+  const database: TestDatabase = {
     pool,
     connectionString,
     mechanism: "testcontainers",
     testcontainersStatus: "ACTIVE",
     expectedPostgresMajor: postgresMajor,
     async stop() {
+      await runBeforeStopHooks(database);
       await pool.end();
       await container.stop();
     }
   };
+  return database;
 }
 
 /**
@@ -169,18 +188,20 @@ async function startWithEmbedded(postgresMajor: string): Promise<TestDatabase> {
     await applyTestSchemaFrom(connectionString);
     const pool = createPool(connectionString);
     await pool.query("SELECT 1");
-    return {
+    const database: TestDatabase = {
       pool,
       connectionString,
       mechanism: "embedded-postgres",
       testcontainersStatus: policy.testcontainersStatus,
       expectedPostgresMajor: postgresMajor,
       async stop() {
+        await runBeforeStopHooks(database);
         await pool.end();
         await embedded.stop();
         await rm(directory, { recursive: true, force: true });
       }
     };
+    return database;
   } catch (error) {
     await embedded.stop().catch(() => undefined);
     await rm(directory, { recursive: true, force: true });

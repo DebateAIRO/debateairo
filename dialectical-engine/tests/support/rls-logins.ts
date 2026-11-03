@@ -32,8 +32,8 @@ import {
   hashToken
 } from "@debateai/crypto";
 import {
-  API_DATABASE_POOLS, createPool, migrate, requestScopeActive, RUNNER_DATABASE_POOLS, runInRequestScope,
-  setRequestCredential, type Pool
+  API_DATABASE_POOLS, configureContentEncryption, contentCipherFor, createPool, migrate, requestScopeActive,
+  RUNNER_DATABASE_POOLS, runInRequestScope, setRequestCredential, type Pool
 } from "@debateai/db";
 import { provisionDevelopmentDatabasePrincipals } from "../../apps/runner/src/dev-database-principals.js";
 import {
@@ -41,7 +41,7 @@ import {
   provisionProductionDatabasePrincipals
 } from "../../apps/runner/src/production-database-principals.js";
 import type { TestHttpIdentity } from "./httpSession.js";
-import type { TestDatabase } from "./testDatabase.js";
+import { beforeTestDatabaseStops, type TestDatabase } from "./testDatabase.js";
 
 const PRODUCT_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const PRODUCTION_MANIFEST_PATH = join(PRODUCT_ROOT,
@@ -295,6 +295,8 @@ function provisionedState(database: RlsDatabase): Promise<RlsLoginsState> {
     state = provision(database);
     provisioned.set(database, state);
     state.catch(() => { if (provisioned.get(database) === state) provisioned.delete(database); });
+    // The logins end before the cluster stops, also in a file that never ends them itself (testDatabase.ts).
+    beforeTestDatabaseStops(database, () => endProvisionedRlsLogins(database));
   }
   return state;
 }
@@ -322,9 +324,38 @@ export async function runnerTestPool(
   budget: keyof typeof RUNNER_DATABASE_POOLS = "runtime"
 ): Promise<Pool | undefined> {
   if (process.env.DEBATEAI_TEST_API_LOGINS !== "1") return undefined;
+  // Read before the first wait, while the calling test file is still on the stack.
+  const file = callingTestFile();
   const state = await provisionedState(database);
   const production = await state.logins.production();
-  return state.track(createPool(production.url("runner-runtime"), RUNNER_DATABASE_POOLS[budget]));
+  const url = production.url("runner-runtime");
+  const report = process.env.DEBATEAI_TEST_API_LOGINS_REPORT;
+  if (report !== undefined && report !== "") await appendFile(report, `${file}\trunner:${budget}\t${loginOf(url)}\n`);
+  return state.track(createPool(url, RUNNER_DATABASE_POOLS[budget]));
+}
+
+/**
+ * Upload check Task 7 (R21): the pool a test hands to the runner it builds itself, and to the runner's gateways and
+ * story writer. In login mode the runner login's pool from `runnerTestPool`, carrying `superuser`'s content cipher if
+ * that pool has one; otherwise `superuser` itself (by default the harness superuser pool), exactly as before.
+ */
+export async function runnerPoolOrSuperuser(
+  database: RlsDatabase,
+  superuser: Pool = database.pool,
+  budget: keyof typeof RUNNER_DATABASE_POOLS = "runtime"
+): Promise<Pool> {
+  const login = await runnerTestPool(database, budget);
+  return login === undefined ? superuser : shareContentCipher(superuser, login);
+}
+
+/**
+ * Gives `login` the content cipher `superuser` carries, if it carries one and `login` has none yet, so the runner on
+ * its own login reads and writes the same encrypted rows. Returns `login`.
+ */
+export function shareContentCipher(superuser: Pool, login: Pool): Pool {
+  const cipher = contentCipherFor(superuser);
+  if (cipher !== undefined && contentCipherFor(login) === undefined) configureContentEncryption(login, cipher);
+  return login;
 }
 
 /**
@@ -392,6 +423,11 @@ const ROUTED_OBSERVED = Symbol.for("debateai.rls.routed-call-report.v1");
 /** The T1 fields of ApiTestPools: the pools main.ts gives a system target (runtime, legacyAskAdmission, authorization). */
 const T1_FIELDS: readonly ApiPoolField[] = Object.freeze(API_POOL_WIRING.filter(({ target }) => target !== undefined)
   .map(({ field }) => field));
+
+/** The test file of `callingTestLine()`, without its line. */
+function callingTestFile(): string {
+  return callingTestLine().replace(/:\d+$/u, "");
+}
 
 /** The first stack frame in a test file (not tests/support), as `<path from the product root>:<line>`. */
 function callingTestLine(): string {

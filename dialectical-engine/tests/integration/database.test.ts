@@ -146,7 +146,7 @@ import {
   registerFixtureRow
 } from "../support/registerFixtures.js";
 import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
-import { apiTestPools, provisionRlsLogins, type ApiTestPools } from "../support/rls-logins.js";
+import { apiTestPools, provisionRlsLogins, runnerPoolOrSuperuser, type ApiTestPools } from "../support/rls-logins.js";
 
 let database: TestDatabase;
 /**
@@ -155,6 +155,8 @@ let database: TestDatabase;
  * harness superuser pool in every field otherwise. Seeding and read-back stay on database.pool.
  */
 let apiPools: ApiTestPools;
+/** Upload check Task 7 (R21): the runner's own pool, its production login in login mode (rls-logins.ts). */
+let runnerPool: Pool;
 const batteryRows = createInitialBatteryRows({ settlementWatchHandle: "settlement-watch:test-layer" });
 
 async function persistHttpIdentity(identity:TestHttpIdentity,label:string):Promise<void> {
@@ -720,7 +722,7 @@ async function executeResil01Scenario(input: {
     });
     await input.beforeExecute?.({ runId, workItemId });
     const runRepository = new RunRepository(database.pool);
-    const runner = new WalkingSkeletonRunner(database.pool, observed("primary", createPostgresProviderGateway(database.pool, {
+    const runner = new WalkingSkeletonRunner(runnerPool, observed("primary", createPostgresProviderGateway(runnerPool, {
       endpoint: primary.endpoint, model: "test-layer/primary-model", maker: "Primary test maker",
       ...(input.primaryCostEnvelope === undefined ? {} : { buildCostEnvelopeSeam: input.primaryCostEnvelope })
     })), {
@@ -742,7 +744,7 @@ async function executeResil01Scenario(input: {
         wait: async () => undefined
       },
       critique: {
-        provider: observed("secondary", createPostgresProviderGateway(database.pool, {
+        provider: observed("secondary", createPostgresProviderGateway(runnerPool, {
           endpoint: secondary.endpoint, model: "test-layer/secondary-model", maker: "Secondary test maker",
           ...(input.secondaryCostEnvelope === undefined ? {} : { buildCostEnvelopeSeam: input.secondaryCostEnvelope })
         })),
@@ -815,7 +817,7 @@ function recordingRunner(endpoint: string, settings = runnerSettings()): {
   const evaluatorCalls: ProviderCallRequest[] = [];
   const synthesizerCalls: ProviderCallRequest[] = [];
   const evaluatorRepairBuilds: Readonly<{ parseStatus: string; parseError: string }>[] = [];
-  const inner = createPostgresProviderGateway(database.pool, {
+  const inner = createPostgresProviderGateway(runnerPool, {
     endpoint, model: "test-layer/model", maker: "test-layer"
   });
   const gateway: ProviderGateway = {
@@ -833,7 +835,7 @@ function recordingRunner(endpoint: string, settings = runnerSettings()): {
     }
   };
   return {
-    runner: new WalkingSkeletonRunner(database.pool, gateway, settings),
+    runner: new WalkingSkeletonRunner(runnerPool, gateway, settings),
     evaluatorCalls,
     synthesizerCalls,
     evaluatorRepairBuilds
@@ -841,7 +843,7 @@ function recordingRunner(endpoint: string, settings = runnerSettings()): {
 }
 
 function runnerWithEndpoint(endpoint: string, settings = runnerSettings()): WalkingSkeletonRunner {
-  return new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+  return new WalkingSkeletonRunner(runnerPool, createPostgresProviderGateway(runnerPool, {
     endpoint, model: "test-layer/model", maker: "test-layer"
   }), settings);
 }
@@ -861,6 +863,7 @@ beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
   apiPools = await apiTestPools(database, import.meta.url);
+  runnerPool = await runnerPoolOrSuperuser(database);
 });
 
 afterAll(async () => {
@@ -961,7 +964,7 @@ describe("BUG-01 content-rejection retry accounting", () => {
       reviewDouble("agree", "The catch-up crossed the real relay boundary.")
     ]);
     try {
-      const gateway = createPostgresProviderGateway(database.pool, {
+      const gateway = createPostgresProviderGateway(runnerPool, {
         endpoint: provider.endpoint, model: "test-layer/model", maker: "test-layer:reviewer"
       });
       const request = {
@@ -1007,7 +1010,7 @@ describe("BUG-01 content-rejection retry accounting", () => {
     });
     const ceilingProvider = await startProviderDouble([{ status: 503 }, { status: 503 }]);
     try {
-      const ceilingGateway = createPostgresProviderGateway(database.pool, {
+      const ceilingGateway = createPostgresProviderGateway(runnerPool, {
         endpoint: ceilingProvider.endpoint, model: "test-layer/model", maker: "test-layer:reviewer"
       });
       const ceilingRequest = {
@@ -1044,7 +1047,7 @@ describe("BUG-01 content-rejection retry accounting", () => {
     });
     const provider = await startProviderDouble([{ status: 503 }, { status: 503 }, { status: 503 }]);
     try {
-      const gateway = createPostgresProviderGateway(database.pool, {
+      const gateway = createPostgresProviderGateway(runnerPool, {
         endpoint: provider.endpoint, model: "test-layer/model", maker: "test-layer:reviewer",
         sleepImplementation: async () => undefined
       });
@@ -1070,7 +1073,7 @@ describe("BUG-01 content-rejection retry accounting", () => {
     const { runId, workItemId } = await createRunnerWork(question);
     const provider = await startProviderDouble(["rejected-one", "rejected-two", "accepted-three"]);
     try {
-      const gateway = createPostgresProviderGateway(database.pool, {
+      const gateway = createPostgresProviderGateway(runnerPool, {
         endpoint: provider.endpoint, model: "test-layer/model", maker: "test-layer"
       });
       const result = await gateway.call({
@@ -1116,7 +1119,7 @@ describe("BUG-01 content-rejection retry accounting", () => {
     const provider = await startProviderDouble(["rejected-one", "rejected-two", "rejected-three"]);
     const ledger = new LedgerRepository(database.pool);
     try {
-      const gateway = createPostgresProviderGateway(database.pool, {
+      const gateway = createPostgresProviderGateway(runnerPool, {
         endpoint: provider.endpoint, model: "test-layer/model", maker: "test-layer"
       });
       await expect(gateway.call({
@@ -1924,7 +1927,7 @@ describe("L4-F9 / ADR-0017 §3(c) — a running debate keeps its claim", () => {
 
   /** A gateway whose FIRST call waits until the test releases it: a long model call. */
   function heldFirstCall(endpoint: string) {
-    const inner = createPostgresProviderGateway(database.pool, { endpoint, model: "test-layer/model", maker: "test-layer" });
+    const inner = createPostgresProviderGateway(runnerPool, { endpoint, model: "test-layer/model", maker: "test-layer" });
     let release!: () => void;
     const released = new Promise<void>((resolve) => { release = resolve; });
     let entered!: () => void;
@@ -1987,14 +1990,14 @@ describe("L4-F9 / ADR-0017 §3(c) — a running debate keeps its claim", () => {
     const held = heldFirstCall(provider.endpoint);
     const settings = { ...runnerSettings(), claimMs: SHORT_CLAIM_MS };
     const secondCopyCalls: ProviderCallRequest[] = [];
-    const secondCopy = new WalkingSkeletonRunner(database.pool, {
+    const secondCopy = new WalkingSkeletonRunner(runnerPool, {
       call: async (request) => {
         secondCopyCalls.push(request);
         return held.inner.call(request);
       }
     }, settings);
     try {
-      const first = settled(new WalkingSkeletonRunner(database.pool, held.gateway, settings).executeWorkItem(workItemId));
+      const first = settled(new WalkingSkeletonRunner(runnerPool, held.gateway, settings).executeWorkItem(workItemId));
       await held.firstCallSent;
       // Well past the first claim's whole length: before the repair it had lapsed here.
       await new Promise((resolve) => setTimeout(resolve, SHORT_CLAIM_MS + 1_200));
@@ -2013,7 +2016,7 @@ describe("L4-F9 / ADR-0017 §3(c) — a running debate keeps its claim", () => {
     const provider = await startProviderDouble(servedAnswer());
     const held = heldFirstCall(provider.endpoint);
     try {
-      const first = settled(new WalkingSkeletonRunner(database.pool, held.gateway, {
+      const first = settled(new WalkingSkeletonRunner(runnerPool, held.gateway, {
         ...runnerSettings(), claimMs: SHORT_CLAIM_MS
       }).executeWorkItem(workItemId));
       await held.firstCallSent;
@@ -2363,7 +2366,7 @@ describe("apps/runner — legal command lifecycle", () => {
         nodeSet: [],
         commandKey: `runner-test:${question}`
       });
-      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+      const runner = new WalkingSkeletonRunner(runnerPool, createPostgresProviderGateway(runnerPool, {
         endpoint: absentPrimary.endpoint,
         model: "test-layer/primary-model",
         maker: "Primary test maker"
@@ -2371,7 +2374,7 @@ describe("apps/runner — legal command lifecycle", () => {
         ...runnerSettings(),
         maker: "Primary test maker",
         critique: {
-          provider: createPostgresProviderGateway(database.pool, {
+          provider: createPostgresProviderGateway(runnerPool, {
             endpoint: healthySecondary.endpoint,
             model: "test-layer/secondary-model",
             maker: "Secondary test maker"
@@ -2486,7 +2489,7 @@ describe("apps/runner — legal command lifecycle", () => {
         nodeSet: [],
         commandKey: "runner-test:xrev-01-depth-6-envelope-refusal"
       });
-      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+      const runner = new WalkingSkeletonRunner(runnerPool, createPostgresProviderGateway(runnerPool, {
         endpoint: primary.endpoint,
         model: "test-layer/primary-model",
         maker: "Primary test maker"
@@ -2494,7 +2497,7 @@ describe("apps/runner — legal command lifecycle", () => {
         ...runnerSettings(),
         maker: "Primary test maker",
         critique: {
-          provider: createPostgresProviderGateway(database.pool, {
+          provider: createPostgresProviderGateway(runnerPool, {
             endpoint: secondary.endpoint,
             model: "test-layer/secondary-model",
             maker: "Secondary test maker"
@@ -2586,17 +2589,17 @@ describe("apps/runner — legal command lifecycle", () => {
         nodeSet: [],
         commandKey: "runner-test:hyg-01-depth-2-two-maker"
       });
-      const primaryGateway = createPostgresProviderGateway(database.pool, {
+      const primaryGateway = createPostgresProviderGateway(runnerPool, {
         endpoint: primary.endpoint,
         model: "test-layer/primary-model",
         maker: "Primary test maker"
       });
-      const secondaryGateway = createPostgresProviderGateway(database.pool, {
+      const secondaryGateway = createPostgresProviderGateway(runnerPool, {
         endpoint: secondary.endpoint,
         model: "test-layer/secondary-model",
         maker: "Secondary test maker"
       });
-      const runner = new WalkingSkeletonRunner(database.pool, primaryGateway, {
+      const runner = new WalkingSkeletonRunner(runnerPool, primaryGateway, {
         ...runnerSettings(),
         critique: {
           provider: secondaryGateway,
@@ -2791,16 +2794,16 @@ describe("apps/runner — legal command lifecycle", () => {
         nodeSet: [],
         commandKey: "runner-test:grok-01-three-maker-review-rotation"
       });
-      const gatewayA = createPostgresProviderGateway(database.pool, {
+      const gatewayA = createPostgresProviderGateway(runnerPool, {
         endpoint: makerA.endpoint, model: "test-layer/rotation-a", maker: "Rotation maker A"
       });
-      const gatewayB = createPostgresProviderGateway(database.pool, {
+      const gatewayB = createPostgresProviderGateway(runnerPool, {
         endpoint: makerB.endpoint, model: "test-layer/rotation-b", maker: "Rotation maker B"
       });
-      const gatewayC = createPostgresProviderGateway(database.pool, {
+      const gatewayC = createPostgresProviderGateway(runnerPool, {
         endpoint: makerC.endpoint, model: "test-layer/rotation-c", maker: "Rotation maker C"
       });
-      const runner = new WalkingSkeletonRunner(database.pool, gatewayA, {
+      const runner = new WalkingSkeletonRunner(runnerPool, gatewayA, {
         ...runnerSettings(),
           providerRef: "provider:test-layer",
         maker: "Rotation maker A",
@@ -2870,14 +2873,14 @@ describe("apps/runner — legal command lifecycle", () => {
         nodeSet: [],
         commandKey: "runner-test:xrev-01-failed-review-absence"
       });
-      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+      const runner = new WalkingSkeletonRunner(runnerPool, createPostgresProviderGateway(runnerPool, {
         endpoint: primary.endpoint,
         model: "test-layer/primary-model",
         maker: "Primary test maker"
       }), {
         ...runnerSettings(),
         critique: {
-          provider: createPostgresProviderGateway(database.pool, {
+          provider: createPostgresProviderGateway(runnerPool, {
             endpoint: secondary.endpoint,
             model: "test-layer/secondary-model",
             maker: "Secondary test maker"
@@ -2952,7 +2955,7 @@ describe("apps/runner — legal command lifecycle", () => {
           transport_outcome: event.transportOutcome, planned_leg_count: event.plannedLegCount
         }
       });
-      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+      const runner = new WalkingSkeletonRunner(runnerPool, createPostgresProviderGateway(runnerPool, {
         endpoint: primary.endpoint, model: "test-layer/primary-model", maker: "Primary test maker"
       }), {
         ...runnerSettings(),
@@ -2965,7 +2968,7 @@ describe("apps/runner — legal command lifecycle", () => {
           wait: async () => undefined
         },
         critique: {
-          provider: createPostgresProviderGateway(database.pool, {
+          provider: createPostgresProviderGateway(runnerPool, {
             endpoint: secondary.endpoint, model: "test-layer/secondary-model", maker: "Secondary test maker"
           }),
           providerRef: "provider:test-layer:secondary",
@@ -3199,7 +3202,7 @@ describe("apps/runner — legal command lifecycle", () => {
       const runRepository = new RunRepository(database.pool);
       const scoringOperator = { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" } as const;
       const settings = runnerSettings();
-      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+      const runner = new WalkingSkeletonRunner(runnerPool, createPostgresProviderGateway(runnerPool, {
         endpoint: primary.endpoint, model: "test-layer/primary-model", maker: "Primary test maker"
       }), {
         ...settings,
@@ -3220,7 +3223,7 @@ describe("apps/runner — legal command lifecycle", () => {
           wait: async () => undefined
         },
         critique: {
-          provider: createPostgresProviderGateway(database.pool, {
+          provider: createPostgresProviderGateway(runnerPool, {
             endpoint: secondary.endpoint, model: "test-layer/secondary-model", maker: "Secondary test maker"
           }),
           providerRef: "provider:test-layer:secondary",
@@ -4072,7 +4075,7 @@ describe("apps/runner — legal command lifecycle", () => {
         nodeSet: [],
         commandKey: "runner-test:xrev-01-producer-grading-preserved"
       });
-      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+      const runner = new WalkingSkeletonRunner(runnerPool, createPostgresProviderGateway(runnerPool, {
         endpoint: primary.endpoint,
         model: "test-layer/primary-model",
         maker: "Recorded shared maker"
@@ -4080,7 +4083,7 @@ describe("apps/runner — legal command lifecycle", () => {
         ...runnerSettings(),
         maker: "Declared primary maker",
         critique: {
-          provider: createPostgresProviderGateway(database.pool, {
+          provider: createPostgresProviderGateway(runnerPool, {
             endpoint: secondary.endpoint,
             model: "test-layer/secondary-model",
             maker: "Recorded shared maker"
@@ -4110,7 +4113,7 @@ describe("apps/runner — legal command lifecycle", () => {
     try {
       const work = await createRunnerWork("policy-before-claim");
       const { judgementPolicy: _omitted, ...settingsWithoutPolicy } = runnerSettings();
-      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+      const runner = new WalkingSkeletonRunner(runnerPool, createPostgresProviderGateway(runnerPool, {
         endpoint: provider.endpoint, model: "model:test-layer", maker: "maker:test-layer"
       }), settingsWithoutPolicy);
 
@@ -4136,12 +4139,12 @@ describe("apps/runner — legal command lifecycle", () => {
     try {
       const work = await createRunnerWork("panel-policy-before-claim");
       const { panelPolicy: _omitted, ...settingsWithoutPanelPolicy } = runnerSettings();
-      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+      const runner = new WalkingSkeletonRunner(runnerPool, createPostgresProviderGateway(runnerPool, {
         endpoint: primary.endpoint, model: "model:test-layer", maker: "maker:test-layer"
       }), {
         ...settingsWithoutPanelPolicy,
         critique: {
-          provider: createPostgresProviderGateway(database.pool, {
+          provider: createPostgresProviderGateway(runnerPool, {
             endpoint: secondary.endpoint, model: "model:test-layer:secondary", maker: "maker:test-layer:secondary"
           }),
           providerRef: "provider:test-layer:secondary",
@@ -4180,12 +4183,12 @@ describe("apps/runner — legal command lifecycle", () => {
     try {
       const work = await createRunnerWork("stopping-policy-before-claim");
       const { stoppingPolicy: _omitted, ...settingsWithoutStoppingPolicy } = runnerSettings();
-      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+      const runner = new WalkingSkeletonRunner(runnerPool, createPostgresProviderGateway(runnerPool, {
         endpoint: primary.endpoint, model: "model:test-layer", maker: "maker:test-layer"
       }), {
         ...settingsWithoutStoppingPolicy,
         critique: {
-          provider: createPostgresProviderGateway(database.pool, {
+          provider: createPostgresProviderGateway(runnerPool, {
             endpoint: secondary.endpoint, model: "model:test-layer:secondary", maker: "maker:test-layer:secondary"
           }),
           providerRef: "provider:test-layer:secondary",
@@ -4265,21 +4268,21 @@ describe("apps/runner — legal command lifecycle", () => {
         commandKey: "runner-test:t3-repeated-family-and-partial"
       });
       const settings = runnerSettings();
-      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+      const runner = new WalkingSkeletonRunner(runnerPool, createPostgresProviderGateway(runnerPool, {
         endpoint: makerA.endpoint, model: "test-layer/family-a", maker: "Family maker A"
       }), {
         ...settings,
         providerRef: "provider:test-layer",
         maker: "Family maker A",
         critique: {
-          provider: createPostgresProviderGateway(database.pool, {
+          provider: createPostgresProviderGateway(runnerPool, {
             endpoint: makerB.endpoint, model: "test-layer/family-b", maker: "Family maker B"
           }),
           providerRef: "provider:test-layer:secondary",
           maker: "Family maker B"
         },
         additionalMakers: [{
-          provider: createPostgresProviderGateway(database.pool, {
+          provider: createPostgresProviderGateway(runnerPool, {
             endpoint: makerC.endpoint, model: "test-layer/family-c", maker: "Family maker C"
           }),
           providerRef: "provider:test-layer:third",
@@ -4386,7 +4389,7 @@ describe("apps/runner — legal command lifecycle", () => {
     try {
       const work = await createRunnerWork("panel-policy-mono-exempt");
       const { panelPolicy: _omitted, ...settingsWithoutPanelPolicy } = runnerSettings();
-      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+      const runner = new WalkingSkeletonRunner(runnerPool, createPostgresProviderGateway(runnerPool, {
         endpoint: provider.endpoint, model: "model:test-layer", maker: "maker:test-layer"
       }), settingsWithoutPanelPolicy);
 
@@ -5782,7 +5785,7 @@ describe("Engine money rule M2 — a stop while arguing never skips the answer (
         runId, batteryRowId: "Q1", nodeSet: [], commandKey: `runner-test:${question}`
       });
       const settings = runnerSettings();
-      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+      const runner = new WalkingSkeletonRunner(runnerPool, createPostgresProviderGateway(runnerPool, {
         endpoint: makerA.endpoint, model: "test-layer/maker-a", maker: "Maker A",
         buildCostEnvelopeSeam: seamA.build
       }), {
@@ -5790,7 +5793,7 @@ describe("Engine money rule M2 — a stop while arguing never skips the answer (
         providerRef: "provider:test-layer",
         maker: "Maker A",
         critique: {
-          provider: createPostgresProviderGateway(database.pool, {
+          provider: createPostgresProviderGateway(runnerPool, {
             endpoint: makerB.endpoint, model: "test-layer/maker-b", maker: "Maker B",
             buildCostEnvelopeSeam: seamB.build
           }),
@@ -5798,7 +5801,7 @@ describe("Engine money rule M2 — a stop while arguing never skips the answer (
           maker: "Maker B"
         },
         additionalMakers: [{
-          provider: createPostgresProviderGateway(database.pool, {
+          provider: createPostgresProviderGateway(runnerPool, {
             endpoint: makerC.endpoint, model: "test-layer/maker-c", maker: "Maker C",
             buildCostEnvelopeSeam: seamC.build
           }),
@@ -6139,21 +6142,21 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
         runId, batteryRowId: "Q1", nodeSet: [], commandKey: `runner-test:${question}`
       });
       const settings = runnerSettings();
-      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+      const runner = new WalkingSkeletonRunner(runnerPool, createPostgresProviderGateway(runnerPool, {
         endpoint: makerA.endpoint, model: "test-layer/maker-a", maker: "Maker A", buildCostEnvelopeSeam: seamA.build
       }), {
         ...settings,
         providerRef: PRIMARY_REF,
         maker: "Maker A",
         critique: {
-          provider: createPostgresProviderGateway(database.pool, {
+          provider: createPostgresProviderGateway(runnerPool, {
             endpoint: makerB.endpoint, model: "test-layer/maker-b", maker: "Maker B", buildCostEnvelopeSeam: seamB.build
           }),
           providerRef: SECONDARY_REF,
           maker: "Maker B"
         },
         additionalMakers: [{
-          provider: createPostgresProviderGateway(database.pool, {
+          provider: createPostgresProviderGateway(runnerPool, {
             endpoint: makerC.endpoint, model: "test-layer/maker-c", maker: "Maker C", buildCostEnvelopeSeam: seamC.build
           }),
           providerRef: THIRD_REF,
@@ -6223,21 +6226,21 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
         runId, batteryRowId: "Q1", nodeSet: [], commandKey: `runner-test:${question}`
       });
       const settings = runnerSettings();
-      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+      const runner = new WalkingSkeletonRunner(runnerPool, createPostgresProviderGateway(runnerPool, {
         endpoint: makerA.endpoint, model: "test-layer/maker-a", maker: "Maker A", buildCostEnvelopeSeam: seamA.build
       }), {
         ...settings,
         providerRef: PRIMARY_REF,
         maker: "Maker A",
         critique: {
-          provider: createPostgresProviderGateway(database.pool, {
+          provider: createPostgresProviderGateway(runnerPool, {
             endpoint: makerB.endpoint, model: "test-layer/maker-b", maker: "Maker B", buildCostEnvelopeSeam: seamB.build
           }),
           providerRef: SECONDARY_REF,
           maker: "Maker B"
         },
         additionalMakers: [{
-          provider: createPostgresProviderGateway(database.pool, {
+          provider: createPostgresProviderGateway(runnerPool, {
             endpoint: makerC.endpoint, model: "test-layer/maker-c", maker: "Maker C", buildCostEnvelopeSeam: seamC.build
           }),
           providerRef: THIRD_REF,
@@ -7842,13 +7845,13 @@ describe("T10/T11 · the served root and its label, through the production runne
         runId, batteryRowId: "Q1", nodeSet: [], commandKey: `runner-test:${question}`
       });
       const settings = runnerSettings();
-      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+      const runner = new WalkingSkeletonRunner(runnerPool, createPostgresProviderGateway(runnerPool, {
         endpoint: absentRolePrimary.endpoint, model: "test-layer/primary-model", maker: "Primary test maker"
       }), {
         ...settings,
         maker: "Primary test maker",
         critique: {
-          provider: createPostgresProviderGateway(database.pool, {
+          provider: createPostgresProviderGateway(runnerPool, {
             endpoint: healthySecondary.endpoint,
             model: "test-layer/secondary-model",
             maker: "Secondary test maker"
@@ -7942,7 +7945,7 @@ describe("T10/T11 · the served root and its label, through the production runne
           ...settings,
           scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" },
           additionalMakers: [{
-            provider: createPostgresProviderGateway(database.pool, {
+            provider: createPostgresProviderGateway(runnerPool, {
               endpoint: synthesis.endpoint, model: "test-layer/synthesis-model", maker: "synthesis-only"
             }),
             providerRef: roleRef, maker: "synthesis-only"
@@ -8309,13 +8312,13 @@ describe("T10/T11 · the served root and its label, through the production runne
         runId, batteryRowId: "Q1", nodeSet: [], commandKey: `runner-test:${question}`
       });
       const settings = runnerSettings();
-      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+      const runner = new WalkingSkeletonRunner(runnerPool, createPostgresProviderGateway(runnerPool, {
         endpoint: absentPrimary.endpoint, model: "test-layer/primary-model", maker: "Primary test maker"
       }), {
         ...settings,
         maker: "Primary test maker",
         critique: {
-          provider: createPostgresProviderGateway(database.pool, {
+          provider: createPostgresProviderGateway(runnerPool, {
             endpoint: absentSecondary.endpoint,
             model: "test-layer/secondary-model",
             maker: "Secondary test maker"
@@ -9518,7 +9521,7 @@ async function runB9ThreeMakers(input: Readonly<{
     c: refuseBodyCallSites(input.refuse.c)
   };
   const gateway = (maker: "a" | "b" | "c", model: string, makerName: string): ProviderGateway => {
-    const inner = createPostgresProviderGateway(database.pool, {
+    const inner = createPostgresProviderGateway(runnerPool, {
       endpoint: doubles[maker].endpoint, model, maker: makerName, buildCostEnvelopeSeam: seams[maker].build
     });
     return { call: (request) => { input.onCall?.(maker, request); seams[maker].observe(request); return inner.call(request); } };
@@ -9529,7 +9532,7 @@ async function runB9ThreeMakers(input: Readonly<{
     const workItemId = await new WorkItemRepository(database.pool).enqueue({
       runId, batteryRowId: "Q1", nodeSet: [], commandKey: `runner-test:${question}`
     });
-    const runner = new WalkingSkeletonRunner(database.pool, gateway("a", "test-layer/maker-a", "Maker A"), {
+    const runner = new WalkingSkeletonRunner(runnerPool, gateway("a", "test-layer/maker-a", "Maker A"), {
       ...runnerSettings(),
       providerRef: PRIMARY_REF,
       maker: "Maker A",
@@ -10191,7 +10194,7 @@ async function executeSeatScenario(input: {
       ...(story === undefined ? {} : { buildStoryCostEnvelopeSeam: story })
     };
   };
-  const gatewayFor = (route: SeatRoute) => observed(route, createPostgresProviderGateway(database.pool, {
+  const gatewayFor = (route: SeatRoute) => observed(route, createPostgresProviderGateway(runnerPool, {
     endpoint: doubles[route].endpoint, model: SEAT_ROUTES[route].model, maker: SEAT_ROUTES[route].maker, ...seamOf(route)
   }));
   try {
@@ -10205,7 +10208,7 @@ async function executeSeatScenario(input: {
     await input.beforeExecute?.({ runId, workItemId });
     const runRepository = new RunRepository(database.pool);
     const baseSettings = runnerSettings();
-    const runner = new WalkingSkeletonRunner(database.pool, gatewayFor("primary"), {
+    const runner = new WalkingSkeletonRunner(runnerPool, gatewayFor("primary"), {
       ...baseSettings,
       ...(input.judgeMaxAttempts === undefined ? {} : {
         judgeBound: { ...baseSettings.judgeBound, maxAttempts: input.judgeMaxAttempts }
@@ -10234,13 +10237,13 @@ async function executeSeatScenario(input: {
       additionalMakers: [{
         provider: gatewayFor("third"), providerRef: SEAT_ROUTES.third.providerRef, maker: SEAT_ROUTES.third.maker
       }, ...(input.twin === true ? [{
-        provider: createPostgresProviderGateway(database.pool, {
+        provider: createPostgresProviderGateway(runnerPool, {
           endpoint: doubles.primary.endpoint, model: SEAT_TWIN.model, maker: SEAT_TWIN.maker
         }),
         providerRef: SEAT_TWIN.providerRef,
         maker: SEAT_TWIN.maker
       }] : []), ...(input.judgeOnlyRoutes === true ? (Object.keys(SEAT_JUDGE_ONLY) as JudgeOnlyRoute[]).map((name) => ({
-        provider: observed(name, createPostgresProviderGateway(database.pool, {
+        provider: observed(name, createPostgresProviderGateway(runnerPool, {
           endpoint: doubles.third.endpoint, model: SEAT_JUDGE_ONLY[name].model, maker: SEAT_JUDGE_ONLY[name].maker, ...seamOf(name)
         })),
         providerRef: SEAT_JUDGE_ONLY[name].providerRef,
@@ -11950,7 +11953,7 @@ function seatStoryWriter(sealedRef: string = SEAT_STORY_SEALED_REF) {
   });
   // The boot resolver knows nobody: only what the runner hands the story can answer it.
   const writer = new StoryWriter({
-    pool: database.pool, pack: SEAT_STORY_PACK, policy, hosted: false, resolveProvider: () => null, log: () => undefined,
+    pool: runnerPool, pack: SEAT_STORY_PACK, policy, hosted: false, resolveProvider: () => null, log: () => undefined,
     repository: {
       insert: async (record) => {
         records.push(record);
