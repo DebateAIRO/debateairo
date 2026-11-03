@@ -17,6 +17,8 @@
  * new starts waiting for the reset, the borrow notice and the debate paused at the month wall with Continue.
  * Task W4-6: it draws the first debate's map with its four rewrite states, and a dig's map from its rewrite's own paths
  * with no story, through the website's own map builder.
+ *
+ * Owner's screen review (3 Nov 2026, journey-d2): it reads the draft start time of a running question (`started_at`).
  */
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -450,6 +452,18 @@ await step("a debate paused at the month wall, then Continue", async () => {
   must(after.month_pause === undefined, "no pause after Continue");
   await mock("/__mock/set?pause=UNTIL_RESET");
   return `paused until ${before.month_pause?.until ?? ready.month_pause.until}; Continue refused early, then resumed`;
+}, (value: string) => value);
+
+// Owner's screen review, 3 Nov 2026 (journey-d2, journey-f16, wait-f7): when a question started, for "Started 14:31" on any
+// device. A DRAFT field: on the draft view now; the website gets it only once the contract's run read knows `started_at`.
+await step("when a question started (draft started_at)", async () => {
+  const draft: Loose = await mock(`/__mock/draft/v1/runs/${RUNS.running}`);
+  must(typeof draft.started_at === "string" && !Number.isNaN(Date.parse(draft.started_at)), "the draft view says when it started");
+  const waiting: Loose = await mock(`/__mock/draft/v1/runs/${RUNS.waiting}`);
+  must(waiting.state === "WAITING" && waiting.started_at === undefined, "a question waiting to start has no start time");
+  const today: Loose = await client.readRun(RUNS.running);
+  must(today.started_at === undefined || today.started_at === draft.started_at, "the website gets the same time, once the contract knows it");
+  return `started ${draft.started_at}${today.started_at === undefined ? " (held back from the website until the contract knows it)" : ""}`;
 }, (value: string) => value);
 
 // Decision 13: the public-debates lane. It runs last among the asks: it adds two digs and one report to the mock.

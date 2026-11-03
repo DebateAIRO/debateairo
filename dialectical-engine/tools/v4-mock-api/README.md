@@ -146,6 +146,8 @@ The shapes are the contract's (`packages/contract/src/web.ts`, merged in W2-7), 
 | `GET /v1/runs/:id` | `month_pause` | on run `e100…`: `until` (the next month) and `can_continue` |
 | `POST /v1/runs/:id/continue` | (draft route) | 409 `RUN_PAUSED_UNTIL_RESET` before the month reset, 200 `{"state":"CONTINUING"}` after it (switch `pause=CAN_CONTINUE`); setting `pause=` again pauses the run again |
 
+**The waiting card's start time (owner's screen review, 3 Nov 2026, journey-d2):** `GET /v1/runs/:id` may carry `started_at`, when the question started (ISO), so the card says "Started 14:31" on any device and after a reload. It is NOT in the contract yet (the run read's schema is strict), so today it is sent only on the draft view (`/__mock/draft/v1/runs/:id`), and on the normal view only once the contract's own schema accepts it. Seeded: the running run `2222…` (started 4 minutes before the mock), the paused run `e100…`, every settled run and every new ask that runs; a run waiting to start (`3333…`) has none.
+
 Every dig keeps its points and its answer text (owner Q-D13). The mock's digs still have a story, but since task W4-6 the website never reads a dig's story: a dig's map is drawn from its rewrite's own paths (each with its line and fate), or from the positions it argued while its rewrite is still being written.
 
 Since task W4-6 the first debate's map shows all four rewrite states: n-mix and n-renew **rewritten**, n-nuclear **failed** (dig d400), n-smr **no change** (dig d500); and **rewriting** one level down, on d200's n-nuclear (dig d300). "Paths changed since your report (version 1): 2." stays: a failed rewrite and one that changed nothing are not counted.

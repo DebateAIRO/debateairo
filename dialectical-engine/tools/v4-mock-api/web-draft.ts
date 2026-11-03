@@ -112,6 +112,13 @@ export const DraftPathRewritesSchema = AnswerPathRewritesSchema;
 export const DraftAnswerDigSchema = AnswerDigSchema;
 export const DraftMonthPauseSchema = MonthPauseSchema;
 export const DraftUsageBorrowsSchema = UsageBorrowsSchema;
+/**
+ * Owner's screen review, 3 Nov 2026 (journey-d2, journey-f16, wait-f7): when a question started, so the waiting card says
+ * "Started 14:31" on every device and after a reload. DRAFT: the contract's RunProjection has no `started_at` yet (its
+ * schema is strict), so the mock sends it only on the draft view, or once the contract's own schema accepts it. Absent
+ * while the question waits to start.
+ */
+export const DraftRunStartedAtSchema = z.iso.datetime();
 /** W2-7: Continue on a month-paused debate (no route in the contract yet; the mock serves POST /v1/runs/{id}/continue). */
 export const DraftRunContinueRequestSchema = RunContinueRequestSchema;
 export const DraftRunContinuedSchema = RunContinuedSchema;
@@ -182,9 +189,9 @@ export function stripRoom<T extends Json>(room: T): T {
   return rest as unknown as T;
 }
 
-/** W2-7: without its month pause, a paused debate reads as today's RUNNING. */
+/** W2-7: without its month pause, a paused debate reads as today's RUNNING; the draft start time (journey-d2) goes too. */
 export function stripRun<T extends Json>(run: T): T {
-  const { month_pause: _pause, ...rest } = run;
+  const { month_pause: _pause, started_at: _started, ...rest } = run;
   return rest as unknown as T;
 }
 
