@@ -37,7 +37,11 @@ describe("the ask's question-language fields (question-language spec 2026-10-13)
       // The owner's changes of 31 Oct: a dig on a public debate, the purpose lines and the Free notice, later optional keys.
       "public_parent",
       "purpose_lines",
-      "free_public_notice"
+      "free_public_notice",
+      // V4 start step, Task 14: the checked question, the chosen paths and the carry-on box, later optional keys.
+      "start_check",
+      "start_paths",
+      "carry_on_to_report"
     ]);
     expect(AskRequestSchema.shape.site_language.safeParse(undefined).success).toBe(true);
     expect(AskRequestSchema.shape.question_language_choice.safeParse(undefined).success).toBe(true);

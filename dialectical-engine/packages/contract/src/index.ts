@@ -16,6 +16,7 @@ import { QuestionLanguageChoiceSchema, QuestionLanguageOfferSchema, SiteLanguage
 export * from "./question-language.js";
 // V4 start step, Task 9: the step before Start's ids, limits and wire shapes.
 export * from "./start-paths.js";
+import { StartCheckSchema, StartPathsSchema } from "./start-paths.js";
 import { SessionSchema, LegalDocumentPairSchema } from "./auth-shared.js";
 export * from "./auth-shared.js";
 import { ConsumerAuthenticationCredentialSchema, consumerAuthContractSchemas } from "./consumer-auth.js";
@@ -296,7 +297,12 @@ export const AskRequestSchema = z.object({
   // Decision 5: the debate's place, time and purpose lines, structured (PurposeLinesSchema, ./web.ts); absent, the debate keeps none.
   purpose_lines: PurposeLinesSchema.optional(),
   // Decision 13: this Free ask showed the notice that its question and debate are public. Only such a debate ever goes public.
-  free_public_notice: z.literal(true).optional()
+  free_public_notice: z.literal(true).optional(),
+  // V4 start step, Task 14 (spec 2026-11-03 §4.2), last: the proof that this line is the one checked at Next, the chosen
+  // paths, and the carry-on box ("Let the AIs carry on to the report", owner answer 9; only ever true). Absent: R22's ask.
+  start_check: StartCheckSchema.optional(),
+  start_paths: StartPathsSchema.optional(),
+  carry_on_to_report: z.literal(true).optional()
 }).strict();
 export type AskRequest = z.infer<typeof AskRequestSchema>;
 
@@ -484,14 +490,47 @@ function roomReserveIssues(answer: Readonly<{ room: string; scope: string | null
  * question's estimate or a dig's, never both.
  */
 function roomMoneyIssues(answer: Readonly<{ room: string; scope: string | null; new_starts?: string | undefined;
-  start_share_percent?: number | undefined; dig_share_percent?: number | undefined }>, context: z.RefinementCtx): void {
+  start_share_percent?: number | undefined; dig_share_percent?: number | undefined; start_step?: unknown }>, context: z.RefinementCtx): void {
   if (answer.new_starts !== undefined && (answer.room !== "FULL" || !PERSON_SCOPES.has(answer.scope ?? ""))) {
     context.addIssue({ code: "custom", message: "new starts wait only for the reset of a full person window" });
   }
   if (answer.start_share_percent !== undefined && answer.dig_share_percent !== undefined) {
     context.addIssue({ code: "custom", message: "a room read estimates a new question or a dig, not both" });
   }
+  // V4 start step, Task 14: the start step belongs to a new question's read, never a dig's.
+  if (answer.start_step !== undefined && answer.dig_share_percent !== undefined) {
+    context.addIssue({ code: "custom", message: "the start step comes with a new question's read, not a dig's" });
+  }
 }
+
+/**
+ * V4 start step, Task 14 (spec 2026-11-03 §2.6): How wide's choices (1 to 3 path counts, whole numbers 1 to 7, rising)
+ * and the one it starts on.
+ */
+export const StartStepWidthsSchema = z.object({
+  options: z.array(z.number().int().min(1).max(7)).min(1).max(3),
+  default: z.number().int().min(1).max(7)
+}).strict().superRefine((widths, context) => {
+  if (!widths.options.every((value, index) => index === 0 || value > widths.options[index - 1]!)) {
+    context.addIssue({ code: "custom", path: ["options"], message: "the widths rise" });
+  }
+  if (!widths.options.includes(widths.default)) context.addIssue({ code: "custom", path: ["default"], message: "the default is one of the widths" });
+});
+/**
+ * V4 start step, Task 14: the room read's start step: whether the lists run before Start, How wide's widths, and the
+ * share of today a debate of 1, 2, … paths takes (one entry per path count up to the widest), absent when the read has
+ * no money-rule window (internal funding, billing off).
+ */
+export const StartStepRoomSchema = z.object({
+  lists: z.enum(["ON", "OFF"]),
+  widths: StartStepWidthsSchema,
+  share_by_paths: z.array(z.number().int().min(0).max(100)).optional()
+}).strict().superRefine((room, context) => {
+  if (room.share_by_paths !== undefined && room.share_by_paths.length !== Math.max(...room.widths.options)) {
+    context.addIssue({ code: "custom", path: ["share_by_paths"], message: "one share per path count, up to the widest" });
+  }
+});
+export type StartStepRoom = z.infer<typeof StartStepRoomSchema>;
 
 const CustomerAskRoomResponseSchema = z.object({
   room: z.enum(["FITS", "CLOSE", "FULL", "ALREADY_WAITING"]),
@@ -523,7 +562,9 @@ const CustomerAskRoomResponseSchema = z.object({
   // W2-7 (money rule): a new question's estimate, as a share of today in the same steps; absent on a read for a dig.
   start_share_percent: DigSharePercentSchema.optional(),
   // W2-7 (money rule): new questions and digs wait for `resets_at` (RoomNewStartsSchema, ./web.ts); running work goes on.
-  new_starts: RoomNewStartsSchema.optional()
+  new_starts: RoomNewStartsSchema.optional(),
+  // V4 start step, Task 14: the step before Start, present only when its switch is on for the read's plan.
+  start_step: StartStepRoomSchema.optional()
 }).strict().superRefine((answer, context) => {
   roomReserveIssues(answer, context);
   roomMoneyIssues(answer, context);
@@ -555,7 +596,9 @@ const InternalAskRoomResponseSchema = z.object({
   dig_share_percent:DigSharePercentSchema.optional(),
   // W2-7: as the customer answer's `start_share_percent` and `new_starts`.
   start_share_percent:DigSharePercentSchema.optional(),
-  new_starts:RoomNewStartsSchema.optional()
+  new_starts:RoomNewStartsSchema.optional(),
+  // V4 start step, Task 14: as the customer answer's `start_step`.
+  start_step:StartStepRoomSchema.optional()
 }).strict().superRefine((answer,context)=>{
   roomReserveIssues(answer,context);
   roomMoneyIssues(answer,context);
