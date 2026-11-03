@@ -1378,6 +1378,13 @@ export {
   webReceiptSchema,
   webSitesOf,
   webSitesOfReceipt,
+  // V4 start step, Task 8: web receipt v2 (a path debate's paths).
+  WEB_PATHS_KIND_MAX,
+  webReceiptAnySchema,
+  webReceiptV2Schema,
+  webSearchCapForPaths,
+  type WebOrigin,
+  type WebReceiptV2,
   type WebDepth,
   type WebKind,
   type WebReceipt,
