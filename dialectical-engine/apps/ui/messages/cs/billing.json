@@ -76,6 +76,7 @@
   "billing.checkout.priceCleared": "Změnili jste své údaje, proto byla cena odebrána. Pro pokračování znovu zobrazte celkovou cenu.",
   "billing.checkout.countryUnavailable": "Placené plány zatím ve vaší zemi nejsou k dispozici. Můžete dál používat plán Zdarma.",
   "billing.checkout.regionUnavailable": "Placené plány zatím ve vašem regionu nejsou k dispozici. Můžete dál používat plán Zdarma.",
+  "billing.checkout.regionTermsExcluded": "Dialectical Engine ve státě Tennessee nenabízíme, proto nemůžeme přijmout platbu s touto adresou.",
   "billing.checkout.confirmCountry": "Vaše připojení vypadá, že pochází ze země {ipCountry}. Žijete v zemi {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Ano, žiji tam",
   "billing.checkout.confirmCountryRequired": "Potvrďte prosím zemi, ve které žijete, a pokračujte.",

@@ -81,13 +81,13 @@ switch later is a new version, never an edit of a sealed one.
 
 ## Closing payment in a region
 
-Some places inside an open country need their own tax registration before the site may sell there. The
-`regions` member of `countryPolicy` closes payment in them. People there can still sign up and use the
-Free plan; only paying is refused. The site finds the region from the billing address the buyer types (the
-postal code, or the state or province), not from the internet address.
+Some places inside an open country need their own tax registration before the site may sell there, and the Terms
+exclude one, Tennessee. The `regions` member of `countryPolicy` closes payment in them. People in a tax region can
+still sign up and use the Free plan; only paying is refused. The site finds the region from the billing address the
+buyer types (the postal code, or the state or province), not from the internet address.
 
 `country-policy.example.json` carries the owner's launch list of 20 October 2026 (the research is in the payment
-region blocks spec, `docs/superpowers/specs/2026-10-20-payment-region-blocks-design.md`):
+region blocks spec, `docs/superpowers/specs/2026-10-20-payment-region-blocks-design.md`), and Tennessee:
 
 - Canada: Saskatchewan (`CA-SK`), Manitoba (`CA-MB`);
 - United States: `US-DC`, `US-HI`, `US-MD`, `US-RI`, `US-VT`, `US-WV`, `US-NJ`, and Ohio (`US-OH`) for
@@ -95,12 +95,20 @@ region blocks spec, `docs/superpowers/specs/2026-10-20-payment-region-blocks-des
 - the EU places outside the EU VAT area: `ES-CN` (Canary Islands), `ES-CE` (Ceuta), `ES-ML` (Melilla),
   `FR-971` (Guadeloupe, with Saint-Martin and Saint-Barthélemy), `FR-972` (Martinique), `FR-973` (French
   Guiana), `FR-974` (Réunion), `FR-976` (Mayotte), `FI-01` (Åland), `GR-69` (Mount Athos), `IT-LIVIGNO`,
-  `IT-CAMPIONE` (Campione d'Italia), `DE-HELGOLAND` (Heligoland), `DE-BUESINGEN` (Büsingen).
+  `IT-CAMPIONE` (Campione d'Italia), `DE-HELGOLAND` (Heligoland), `DE-BUESINGEN` (Büsingen);
+- Tennessee (`US-TN`), for every buyer, because the Terms exclude it (section 2 and Annex A.2, the owner's
+  amendment of 8 October 2026). Sign-up already refuses a person who declares Tennessee (`us_states`); this entry
+  refuses a Tennessee billing address too, so someone who declared another state still cannot pay from there.
+  Its refusal has its own code, `REGION_TERMS_EXCLUDED`, read from the reason, and its own sentence ("We don't
+  offer Dialectical Engine in Tennessee, so we can't take payment for this address."); a region closed for tax
+  answers `REGION_PAYMENT_UNAVAILABLE`.
 
-Each entry reads `{ "pay": false, "reason": "TAX_NOT_READY" }`; Ohio's adds `"buyers": "business"`. To open a
+Each tax entry reads `{ "pay": false, "reason": "TAX_NOT_READY" }`; Ohio's adds `"buyers": "business"`. To open a
 region once the company is registered there, delete its entry from the hosted file and publish: that new
-version supersedes the old one, which is never edited (`deploy/vps/README.md` §14.6). A file whose
-`countryPolicy` has no `regions` member closes no region.
+version supersedes the old one, which is never edited (`deploy/vps/README.md` §14.6). Tennessee's entry reads
+`{ "pay": false, "reason": "TERMS_EXCLUDED" }`. Keep it while the Terms exclude Tennessee, and delete it only
+together with the `us_states` entry, once the Terms serve Tennessee again. A file whose `countryPolicy` has no
+`regions` member closes no region.
 
 ## The room read's budget
 

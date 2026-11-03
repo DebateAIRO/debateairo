@@ -76,6 +76,7 @@
   "billing.checkout.priceCleared": "Bilgilerinizi değiştirdiğiniz için fiyat kaldırıldı. Devam etmek için tam fiyatı yeniden gösterin.",
   "billing.checkout.countryUnavailable": "Ücretli planlar ülkenizde henüz kullanılamıyor. Ücretsiz planı kullanmaya devam edebilirsiniz.",
   "billing.checkout.regionUnavailable": "Ücretli planlar bölgenizde henüz kullanılamıyor. Ücretsiz planı kullanmaya devam edebilirsiniz.",
+  "billing.checkout.regionTermsExcluded": "Dialectical Engine'ı Tennessee'de sunmuyoruz, bu nedenle bu adres için ödeme kabul edemiyoruz.",
   "billing.checkout.confirmCountry": "Bağlantınız şu ülkeden geliyor gibi görünüyor: {ipCountry}. Şu ülkede mi yaşıyorsunuz: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Evet, orada yaşıyorum",
   "billing.checkout.confirmCountryRequired": "Lütfen yaşadığınız ülkeyi onaylayın, ardından devam edin.",

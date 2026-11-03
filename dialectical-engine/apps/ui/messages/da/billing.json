@@ -76,6 +76,7 @@
   "billing.checkout.priceCleared": "Du har ændret dine oplysninger, så prisen er fjernet. Vis den fulde pris igen for at fortsætte.",
   "billing.checkout.countryUnavailable": "Betalte planer er endnu ikke tilgængelige i dit land. Du kan fortsat bruge Gratis-planen.",
   "billing.checkout.regionUnavailable": "Betalte planer er endnu ikke tilgængelige i din region. Du kan fortsat bruge Gratis-planen.",
+  "billing.checkout.regionTermsExcluded": "Vi tilbyder ikke Dialectical Engine i Tennessee, så vi kan ikke modtage betaling med denne adresse.",
   "billing.checkout.confirmCountry": "Din forbindelse ser ud til at komme fra {ipCountry}. Bor du i {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Ja, jeg bor der",
   "billing.checkout.confirmCountryRequired": "Bekræft det land, du bor i, og fortsæt derefter.",
