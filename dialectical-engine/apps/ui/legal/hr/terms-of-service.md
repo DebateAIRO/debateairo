@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ukratko
-eyebrow: UVJETI KORIŠTENJA · v2.13 · NA SNAZI OD 1. STUDENOGA 2026.
+eyebrow: UVJETI KORIŠTENJA · v2.14 · NA SNAZI OD 1. STUDENOGA 2026.
 title: Na što pristajete
 lede: Ugovor između vas i društva DMS Merchandise Shop S.R.L., jednostavnim jezikom. Devetnaest odjeljaka i Prilog A — pomaknite se do kraja.
-endMarker: KRAJ UVJETA · v2.13
+endMarker: KRAJ UVJETA · v2.14
 bodyLabel: Tekst Uvjeta korištenja
 annexTitle: Prilog A — Regionalni uvjeti
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 MJERODAVNO PRAVO
 -->
 
-**Version 2.13 · Effective 1. studenoga 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
+**Version 2.14 · Effective 1. studenoga 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
 
 **In short.** Morate imati najmanje 18 godina. Dialectical Engine izrađuje argumente pomoću modela umjetne inteligencije i sve što generira može biti pogrešno — to nije savjet. Na besplatnom planu vaše su rasprave javne kada završe, nakon provjere umjetnom inteligencijom; na plaćenom planu privatne su osim ako ih objavite. Kada je rasprava javna, svatko je može pročitati i ona ostaje javna. Tekst koji pošaljete prosljeđuje se pružateljima usluga umjetne inteligencije navedenima u našem Registru pružatelja i ne upotrebljava se za treniranje modela. Nezakonit sadržaj prijavite na support@dezbatere.ro, bez obzira na to imate li račun. Primjenjuje se rumunjsko pravo, ali zadržavate zaštitu potrošača prema svojem lokalnom pravu.
 
@@ -215,7 +215,7 @@ Odjeljci 8. (u odnosu na već objavljeni sadržaj), 15., 16. i 18. nastavljaju s
 
 Dialectical Engine nudi besplatni plan. Bit će dostupan plaćeni plan **Premium**, koji će otključati cijeli popis modela i omogućiti vam da sami postavite mjerače rasprave.
 
-**Prije plaćanja** neposredno iznad gumba za plaćanje prikazujemo vam: plan; ukupnu cijenu s primjenjivim porezom; obračunsko razdoblje; činjenicu da se plan automatski obnavlja do otkazivanja; datum završetka eventualnog besplatnog probnog razdoblja i iznos koji će vam se tada naplatiti; te način otkazivanja. Uvjete obnavljanja potvrđujete označavanjem zasebnog polja. Na gumbu piše **Pretplatite se i platite** (na rumunjskom *Comandă cu obligație de plată*). Na trajnom mediju šaljemo vam potvrdu koja sadržava iste informacije, ove Uvjete i obrazac za odustanak.
+**Prije plaćanja** neposredno iznad gumba za plaćanje prikazujemo vam: plan; ukupnu cijenu s primjenjivim porezom; obračunsko razdoblje; činjenicu da se plan automatski obnavlja do otkazivanja; datum završetka eventualnog besplatnog probnog razdoblja i iznos koji će vam se tada naplatiti; te način otkazivanja. Uvjete obnavljanja potvrđujete označavanjem zasebnog polja. Na gumbu piše **Pretplatite se i platite** (na rumunjskom *Abonați-vă și plătiți*). Na trajnom mediju šaljemo vam potvrdu koja sadržava iste informacije, ove Uvjete i obrazac za odustanak.
 
 **Podsjetnici.** Šaljemo vam e-poruku najmanje 5 dana prije nego što se besplatno probno razdoblje pretvori u plaćeni plan; najmanje jednom godišnje za trajne planove; i između 30 i 45 dana prije svakog obnavljanja razdoblja od dvanaest mjeseci ili duljeg. Svaki podsjetnik sadržava cijenu, datum i poveznicu za otkazivanje.
 
@@ -251,7 +251,9 @@ Na trajnom mediju unaprijed vas obavještavamo što se mijenja i kada. Ako promj
 
 **Promjene ovih Uvjeta.** Ove Uvjete možemo mijenjati zbog istih vrsta razloga. Za promjene koje ne umanjuju vaša prava objavljujemo novu verziju sa sažetkom promjena i šaljemo vam e-poruku najmanje **30 dana** prije njezina stupanja na snagu; nastavak uporabe Dialectical Engine-a nakon tog datuma znači da je prihvaćate, a prije toga možete zatvoriti račun. Za promjene koje umanjuju vaša prava — uključujući povećanja cijena postojećeg plana, niža ograničenja, uklonjene značajke, nove načine uporabe vašeg sadržaja ili promjene odgovornosti, mjerodavnog prava ili rješavanja sporova — tražimo da izričito prihvatite novu verziju pri sljedećoj prijavi, a promjena se primjenjuje samo ubuduće. Promjenu nikada ne primjenjujemo retroaktivno i ovaj odjeljak nikada ne upotrebljavamo za izmjenu bitnog sadržaja onoga što ste platili usred razdoblja bez omogućavanja izlaska iz ugovora. Prethodne verzije ostaju dostupne na dezbatere.ro/terms/versions.
 
-Verzija 2.13 zamijenila je verziju 2.12: odjeljak 18. i Prilog A navode ANPC (SAL) kao put za alternativno rješavanje sporova.
+Verzija 2.14 zamijenila je verziju 2.13: odjeljak 18. i Prilog A navode ANPC (SAL) kao put za alternativno rješavanje sporova.
+
+Verzija 2.13 zamijenila je verziju 2.12: odjeljak 12. navodi da na rumunjskom gumb za plaćanje glasi *Abonați-vă și plătiți*.
 
 Verzija 2.12 zamijenila je verziju 2.11: odjeljak 10. navodi da prijavljena osoba može upotrijebiti i gumb Prijavite na bilo kojoj javnoj raspravi, da umjetna inteligencija čita prijavu podnesenu tim gumbom uz javni tekst i što se tada događa.
 

@@ -68,7 +68,8 @@ export default async function PricingPage({
 } = {}) {
   const requestedLocale = (await cookies()).get(LOCALE_COOKIE)?.value;
   const locale = isLocale(requestedLocale) ? requestedLocale : "en";
-  const [billingCatalog, plans] = await Promise.all([loadNamespace(locale, "billing"), readPlans(await searchParams)]);
+  const params = await searchParams;
+  const [billingCatalog, plans] = await Promise.all([loadNamespace(locale, "billing"), readPlans(params)]);
   // Terms §12: the FAQ says what the cards say.
   const priced = pricedTax(plans);
   return (
@@ -81,7 +82,10 @@ export default async function PricingPage({
           ? <p className="billingError" role="status">{t(billingCatalog, "billing.pricing.unavailable")}</p>
           : (
             <>
-              <PricingPlaceForm catalog={billingCatalog} locale={locale} place={plans.place} />
+              <PricingPlaceForm
+                catalog={billingCatalog} locale={locale} place={plans.place}
+                typedPostalCode={single(params.postal_code)}
+              />
               <PricingCards
                 catalog={billingCatalog} locale={locale} currency={plans.currency} place={plans.place} tax={plans.tax}
                 plans={plans.plans}

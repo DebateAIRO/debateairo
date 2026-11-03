@@ -86,7 +86,7 @@
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = ayda {total}. İptal edene kadar her ayın {day}. günü yenilenir.",
   "billing.consent.renewal": "NETOPIA Payments’in kartımı saklamasını ve ben iptal edene kadar her ay bu karttan {total} tahsil edilmesini kabul ediyorum. İstediğim zaman Ayarlar’dan veya dezbatere.ro/cancel adresinden iptal edebilirim.",
   "billing.consent.immediateStart": "Planımı şimdi başlatın. 14 gün içinde cayma hakkımı kullanırsam, kullanılmış kısmı ödeyeceğimi anlıyorum: kullanılan günler ile kullanılan krediden büyük olanı.",
-  "billing.checkout.continueToCard": "Ödeme yükümlülüğüyle sipariş ver",
+  "billing.checkout.continueToCard": "Abone ol ve öde",
   "billing.checkout.cardTitle": "Ödeme",
   "billing.checkout.cardNote": "Ödemeyi NETOPIA Payments’in güvenli sayfasında yaparsınız. Kart numaranız hiçbir zaman sunucularımıza ulaşmaz.",
   "billing.checkout.subscribeAndPay": "Ödeme yükümlülüğüyle sipariş ver",

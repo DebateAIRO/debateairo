@@ -12,6 +12,7 @@ import type { GeoLookup } from "@debateai/geo";
 import {
   testBillingPlans, testBillingPolicy, testCountryPolicy, testRegionalPlans, unusedAskApplication
 } from "../support/billingFixtures.js";
+import { COUNTRY_CODES } from "../../apps/ui/lib/billing/countries.js";
 import { FakeTaxEngine } from "../support/fake-tax-engine.js";
 import { TEST_APP_ORIGIN } from "../support/httpSession.js";
 
@@ -247,6 +248,25 @@ describe("Terms §12 GET /v1/billing/plans prices each place with its own tax", 
     expect(unpriced(await read("198.51.100.30", "?postal_code=ABCDE")).status).toBe("POSTAL_CODE_INVALID");
     // Elsewhere a postal code changes nothing.
     expect((await read("198.51.100.20", "?postal_code=10115")).place).toEqual({ country: "DE", postal_code: null, status: "PRICED" });
+    await api.close();
+  });
+
+  it("prices every country the pricing page offers with that country's own tax, and leaves no plan without its total", async () => {
+    const { api, read } = taxed();
+    // The US and Canada are priced by a postal code the visitor gives (New York; Toronto).
+    const POSTAL_CODES: Readonly<Record<string, string>> = { US: "10001", CA: "M5V 3L9" };
+    expect(COUNTRY_CODES).toHaveLength(249);
+    for (const country of COUNTRY_CODES) {
+      const postal = POSTAL_CODES[country];
+      const answer = await read("198.51.100.99", `?country=${country}${postal === undefined ? "" : `&postal_code=${encodeURIComponent(postal)}`}`);
+      expect(answer.place.status, country).toBe("PRICED");
+      expect(answer.tax?.country, country).toBe(country);
+      const rate = answer.tax!.tax_rate_bp as number;
+      for (const plan of answer.plans) {
+        const netCents = Math.round(Number(plan.net_prices[answer.currency]) * 100);
+        expect(plan.total_price, `${country} ${plan.plan_id}`).toBe((Math.round(netCents * (10_000 + rate) / 10_000) / 100).toFixed(2));
+      }
+    }
     await api.close();
   });
 

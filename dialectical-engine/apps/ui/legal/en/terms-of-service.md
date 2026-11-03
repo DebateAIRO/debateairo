@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In short
-eyebrow: TERMS OF SERVICE · v2.13 · EFFECTIVE 1 NOVEMBER 2026
+eyebrow: TERMS OF SERVICE · v2.14 · EFFECTIVE 1 NOVEMBER 2026
 title: What you agree to
 lede: The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.
-endMarker: END OF TERMS · v2.13
+endMarker: END OF TERMS · v2.14
 bodyLabel: Terms of Service text
 annexTitle: Annex A — Regional terms
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 GOVERNING LAW
 -->
 
-**Version 2.13 · Effective 1 November 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
+**Version 2.14 · Effective 1 November 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
 
 **In short.** You must be 18 or over. Dialectical Engine builds arguments with AI models and everything it generates may be wrong — it is not advice. On the Free plan your debates are public when finished, after an AI check; on a paid plan they are private unless you publish them. Once public, anyone can read a debate, and it stays public. Text you submit is sent to AI providers listed in our Provider Register, and is not used to train models. Report illegal content at support@dezbatere.ro whether or not you have an account. Romanian law governs, but your local consumer protections stay with you.
 
@@ -215,7 +215,7 @@ Sections 8 (as to content already published), 15, 16 and 18 survive termination.
 
 Dialectical Engine offers a free plan. A paid **Premium** plan will be available, which unlocks the full model roster and lets you set the debate gauges yourself.
 
-**Before you pay** we show you, directly above the payment button: the plan; the total price including applicable tax; the billing period; that the plan renews automatically until cancelled; the date any free trial ends and what you will then be charged; and how to cancel. You confirm the renewal terms by ticking a separate box. The button reads **Subscribe and pay** (in Romanian, *Comandă cu obligație de plată*). We send you a confirmation on a durable medium containing the same information, these Terms, and the withdrawal form.
+**Before you pay** we show you, directly above the payment button: the plan; the total price including applicable tax; the billing period; that the plan renews automatically until cancelled; the date any free trial ends and what you will then be charged; and how to cancel. You confirm the renewal terms by ticking a separate box. The button reads **Subscribe and pay** (in Romanian, *Abonați-vă și plătiți*). We send you a confirmation on a durable medium containing the same information, these Terms, and the withdrawal form.
 
 **Reminders.** We email you at least 5 days before a free trial converts to a paid plan; at least once a year for continuing plans; and between 30 and 45 days before any renewal of a term of twelve months or more. Every reminder includes the price, the date, and a cancellation link.
 
@@ -251,7 +251,9 @@ We tell you in advance, on a durable medium, what is changing and when. If the c
 
 **To these Terms.** We may change these Terms for the same kinds of reasons. For changes that do not reduce your rights, we post the new version with a summary of what changed and email you at least **30 days** before it takes effect; continuing to use Dialectical Engine after that date means you accept it, and you may close your account before then. For changes that reduce your rights — including price increases on an existing plan, lower limits, removed features, new uses of your content, or changes to liability, governing law or dispute resolution — we ask you to accept the new version expressly at your next sign-in, and the change applies only going forward. We never make a change retroactive, and we never use this section to change the core of what you have paid for mid-term without offering you a way out. Prior versions stay available at dezbatere.ro/terms/versions.
 
-Version 2.13 replaced version 2.12: section 18 and Annex A name ANPC (SAL) as the route for alternative dispute resolution.
+Version 2.14 replaced version 2.13: section 18 and Annex A name ANPC (SAL) as the route for alternative dispute resolution.
+
+Version 2.13 replaced version 2.12: section 12 says that in Romanian the payment button reads *Abonați-vă și plătiți*.
 
 Version 2.12 replaced version 2.11: section 10 says that a signed-in person can also use the Report button on any public debate, that an AI reads a report made with it beside the public text, and what happens then.
 

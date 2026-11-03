@@ -86,7 +86,7 @@
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} شهريًا. تتجدد في اليوم {day} من كل شهر إلى أن تلغي.",
   "billing.consent.renewal": "أوافق على أن تحتفظ NETOPIA Payments ببطاقتي وأن يُخصم منها {total} كل شهر إلى أن ألغي الاشتراك. يمكنني الإلغاء في أي وقت من الإعدادات أو عبر dezbatere.ro/cancel.",
   "billing.consent.immediateStart": "ابدأ خطتي الآن. أفهم أنني إذا انسحبت خلال 14 يومًا، أدفع مقابل الجزء المستخدم بالفعل: الأكبر بين الأيام المستخدمة والرصيد المستخدم.",
-  "billing.checkout.continueToCard": "طلب مع التزام بالدفع",
+  "billing.checkout.continueToCard": "الاشتراك والدفع",
   "billing.checkout.cardTitle": "الدفع",
   "billing.checkout.cardNote": "تدفع على الصفحة الآمنة لـ NETOPIA Payments. لا يصل رقم بطاقتك إلى خوادمنا أبدًا.",
   "billing.checkout.subscribeAndPay": "طلب مع التزام بالدفع",

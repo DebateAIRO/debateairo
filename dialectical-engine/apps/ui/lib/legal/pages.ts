@@ -98,7 +98,7 @@ export const isUnverified = (value: string): boolean => value.includes("[");
 
 /**
  * The alternative dispute resolution route Terms section 18 and Annex A.1 name: ANPC's SAL, the
- * consumer-protection body (Terms 2.13), the same link as the footer's SAL badge. The EU online
+ * consumer-protection body (Terms 2.14), the same link as the footer's SAL badge. The EU online
  * dispute resolution platform closed on 20 July 2025 and is deliberately not linked.
  */
 export const ADR_URL = "https://reclamatiisal.anpc.ro/";
@@ -480,7 +480,9 @@ export type TermsVersion = Readonly<{
  * that was current before the next revision.
  */
 export const TERMS_VERSIONS: readonly TermsVersion[] = Object.freeze([
-  { version: "2.13", dateKey: "legal.versions.v2.date", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
+  { version: "2.14", dateKey: "legal.versions.v2.date", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
+  { version: "2.13", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+    href: "/terms/versions/9cad1a62f77eee42c46facba8a3c2e04c44afba940688ae5e06d3bf586808cfc" },
   { version: "2.12", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/95dd058c6751ae2a8a65f32144fb51a4baab91568d8970423efa32e8f867564b" },
   { version: "2.11", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,

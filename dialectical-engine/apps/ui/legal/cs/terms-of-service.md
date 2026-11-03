@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Stručně
-eyebrow: PODMÍNKY POSKYTOVÁNÍ SLUŽBY · v2.13 · ÚČINNÉ OD 1. LISTOPADU 2026
+eyebrow: PODMÍNKY POSKYTOVÁNÍ SLUŽBY · v2.14 · ÚČINNÉ OD 1. LISTOPADU 2026
 title: S čím souhlasíte
 lede: Smlouva mezi vámi a DMS Merchandise Shop S.R.L. srozumitelným jazykem. Devatenáct oddílů a příloha A — přejděte až na konec.
-endMarker: KONEC PODMÍNEK · v2.13
+endMarker: KONEC PODMÍNEK · v2.14
 bodyLabel: Text Podmínek poskytování služby
 annexTitle: Příloha A — Regionální podmínky
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ROZHODNÉ PRÁVO
 -->
 
-**Version 2.13 · Effective 1. listopadu 2026 · Předchozí verze na dezbatere.ro/terms/versions · Jazyk: čeština.**
+**Version 2.14 · Effective 1. listopadu 2026 · Předchozí verze na dezbatere.ro/terms/versions · Jazyk: čeština.**
 
 **In short.** Musí vám být alespoň 18 let. Dialectical Engine vytváří argumenty pomocí modelů AI a vše, co vygeneruje, může být nesprávné — nejde o poradenství. V bezplatném tarifu jsou vaše debaty po dokončení veřejné, po kontrole AI; v placeném tarifu jsou soukromé, dokud je nezveřejníte. Jakmile je debata veřejná, může ji číst kdokoli a zůstává veřejná. Text, který zadáte, je odesílán poskytovatelům AI uvedeným v našem Registru poskytovatelů a nepoužívá se k trénování modelů. Nezákonný obsah hlaste na support@dezbatere.ro bez ohledu na to, zda máte účet. Rozhodným právem je rumunské právo, vaše místní spotřebitelská ochrana vám však zůstává zachována.
 
@@ -215,7 +215,7 @@ Oddíly 8 (pokud jde o již zveřejněný obsah), 15, 16 a 18 zůstávají v pla
 
 Dialectical Engine nabízí bezplatný tarif. Bude k dispozici placený tarif **Premium**, který zpřístupní úplný výběr modelů a umožní vám samostatně nastavovat parametry debaty.
 
-**Před zaplacením** vám přímo nad platebním tlačítkem zobrazíme: tarif; celkovou cenu včetně příslušné daně; fakturační období; skutečnost, že se tarif automaticky obnovuje až do zrušení; datum skončení případného bezplatného zkušebního období a částku, která vám poté bude účtována; a způsob zrušení. Podmínky obnovení potvrdíte zaškrtnutím samostatného políčka. Tlačítko zní **Předplatit a zaplatit** (v rumunštině *Comandă cu obligație de plată*). Na trvalém nosiči vám zašleme potvrzení obsahující stejné informace, tyto Podmínky a formulář pro odstoupení.
+**Před zaplacením** vám přímo nad platebním tlačítkem zobrazíme: tarif; celkovou cenu včetně příslušné daně; fakturační období; skutečnost, že se tarif automaticky obnovuje až do zrušení; datum skončení případného bezplatného zkušebního období a částku, která vám poté bude účtována; a způsob zrušení. Podmínky obnovení potvrdíte zaškrtnutím samostatného políčka. Tlačítko zní **Předplatit a zaplatit** (v rumunštině *Abonați-vă și plătiți*). Na trvalém nosiči vám zašleme potvrzení obsahující stejné informace, tyto Podmínky a formulář pro odstoupení.
 
 **Připomenutí.** E-mail vám zašleme nejméně 5 dnů před přechodem bezplatného zkušebního období na placený tarif; nejméně jednou ročně u pokračujících tarifů; a 30 až 45 dnů před obnovením jakéhokoli období v délce dvanácti měsíců nebo delšího. Každé připomenutí obsahuje cenu, datum a odkaz ke zrušení.
 
@@ -251,7 +251,9 @@ O tom, co a kdy se mění, vás předem informujeme na trvalém nosiči. Má-li 
 
 **Změny těchto Podmínek.** Tyto Podmínky můžeme měnit ze stejných druhů důvodů. U změn, které neomezují vaše práva, zveřejníme novou verzi se shrnutím změn a nejméně **30 dnů** před nabytím účinku vám zašleme e-mail; pokračováním v používání Dialectical Engine po tomto datu změnu přijímáte a před tímto datem můžete svůj účet uzavřít. U změn, které omezují vaše práva — včetně zvýšení ceny stávajícího tarifu, snížení limitů, odstranění funkcí, nového způsobu použití vašeho obsahu nebo změn odpovědnosti, rozhodného práva či řešení sporů — vás při příštím přihlášení požádáme, abyste novou verzi výslovně přijali, a změna platí pouze do budoucna. Žádnou změnu nikdy neuplatníme zpětně a tento oddíl nikdy nepoužijeme ke změně podstaty toho, za co jste v průběhu období zaplatili, aniž bychom vám nabídli možnost smlouvu ukončit. Předchozí verze zůstávají dostupné na adrese dezbatere.ro/terms/versions.
 
-Verze 2.13 nahradila verzi 2.12: oddíl 18 a příloha A uvádějí jako cestu k alternativnímu řešení sporů ANPC (SAL).
+Verze 2.14 nahradila verzi 2.13: oddíl 18 a příloha A uvádějí jako cestu k alternativnímu řešení sporů ANPC (SAL).
+
+Verze 2.13 nahradila verzi 2.12: oddíl 12 uvádí, že v rumunštině nese platební tlačítko text *Abonați-vă și plătiți*.
 
 Verze 2.12 nahradila verzi 2.11: oddíl 10 uvádí, že přihlášená osoba může také použít tlačítko Nahlásit u kterékoli veřejné debaty, že AI čte hlášení podané tímto tlačítkem vedle veřejného textu a co se pak stane.
 

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kort sagt
-eyebrow: ANVÄNDARVILLKOR · v2.13 · GÄLLER FRÅN 1 NOVEMBER 2026
+eyebrow: ANVÄNDARVILLKOR · v2.14 · GÄLLER FRÅN 1 NOVEMBER 2026
 title: Vad du godkänner
 lede: Avtalet mellan dig och DMS Merchandise Shop S.R.L., på ett lättbegripligt språk. Nitton avsnitt och bilaga A — rulla till slutet.
-endMarker: SLUT PÅ VILLKOREN · v2.13
+endMarker: SLUT PÅ VILLKOREN · v2.14
 bodyLabel: Användarvillkorens text
 annexTitle: Bilaga A — Regionala villkor
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TILLÄMPLIG LAG
 -->
 
-**Version 2.13 · Effective 1 november 2026 · Tidigare versioner finns på dezbatere.ro/terms/versions · Språk: svenska.**
+**Version 2.14 · Effective 1 november 2026 · Tidigare versioner finns på dezbatere.ro/terms/versions · Språk: svenska.**
 
 **In short.** Du måste ha fyllt 18 år. Dialectical Engine bygger argument med AI-modeller, och allt som tjänsten genererar kan vara felaktigt — det är inte rådgivning. På det kostnadsfria abonnemanget är dina debatter offentliga när de är klara, efter en AI-kontroll; på ett betalabonnemang är de privata om du inte publicerar dem. När en debatt är offentlig kan vem som helst läsa den, och den förblir offentlig. Text som du skickar in överförs till de AI-leverantörer som anges i vårt register över AI-leverantörer och används inte för att träna modeller. Rapportera olagligt innehåll till support@dezbatere.ro, oavsett om du har ett konto eller inte. Rumänsk lag är tillämplig, men du behåller ditt lokala konsumentskydd.
 
@@ -215,7 +215,7 @@ Avsnitten 8 (i fråga om innehåll som redan har publicerats), 15, 16 och 18 for
 
 Dialectical Engine erbjuder ett kostnadsfritt abonnemang. Ett avgiftsbelagt **Premium**-abonnemang kommer att bli tillgängligt, vilket ger tillgång till hela modellutbudet och låter dig själv ställa in debattens parametrar.
 
-**Innan du betalar** visar vi, direkt ovanför betalningsknappen: abonnemanget; totalpriset inklusive tillämplig skatt; faktureringsperioden; att abonnemanget förnyas automatiskt tills det sägs upp; vilket datum en eventuell kostnadsfri provperiod upphör och vilket belopp du därefter debiteras; samt hur du säger upp abonnemanget. Du bekräftar förnyelsevillkoren genom att markera en separat ruta. På knappen står **Teckna abonnemang och betala** (på rumänska *Comandă cu obligație de plată*). Vi skickar dig en bekräftelse på ett varaktigt medium med samma information, dessa villkor och ångerblanketten.
+**Innan du betalar** visar vi, direkt ovanför betalningsknappen: abonnemanget; totalpriset inklusive tillämplig skatt; faktureringsperioden; att abonnemanget förnyas automatiskt tills det sägs upp; vilket datum en eventuell kostnadsfri provperiod upphör och vilket belopp du därefter debiteras; samt hur du säger upp abonnemanget. Du bekräftar förnyelsevillkoren genom att markera en separat ruta. På knappen står **Teckna abonnemang och betala** (på rumänska *Abonați-vă și plătiți*). Vi skickar dig en bekräftelse på ett varaktigt medium med samma information, dessa villkor och ångerblanketten.
 
 **Påminnelser.** Vi skickar e-post till dig minst 5 dagar innan en kostnadsfri provperiod övergår till ett betalabonnemang; minst en gång om året för löpande abonnemang; och mellan 30 och 45 dagar före varje förnyelse av en avtalstid på tolv månader eller mer. Varje påminnelse innehåller priset, datumet och en länk för uppsägning.
 
@@ -251,7 +251,9 @@ Vi underrättar dig i förväg, på ett varaktigt medium, om vad som ändras och
 
 **Dessa villkor.** Vi får ändra dessa villkor av samma slags skäl. Vid ändringar som inte minskar dina rättigheter publicerar vi den nya versionen tillsammans med en sammanfattning av ändringarna och skickar e-post till dig minst **30 dagar** innan ändringen träder i kraft; om du fortsätter att använda Dialectical Engine efter det datumet innebär det att du godkänner ändringen, och du får avsluta ditt konto före dess. Vid ändringar som minskar dina rättigheter — däribland prishöjningar för ett befintligt abonnemang, lägre gränser, borttagna funktioner, ny användning av ditt innehåll eller ändringar av ansvar, tillämplig lag eller tvistlösning — ber vi dig uttryckligen godkänna den nya versionen nästa gång du loggar in, och ändringen gäller endast framåt i tiden. Vi gör aldrig en ändring retroaktiv och använder aldrig detta avsnitt för att ändra kärnan i det som du har betalat för under en pågående avtalsperiod utan att erbjuda dig en utväg. Tidigare versioner finns kvar på dezbatere.ro/terms/versions.
 
-Version 2.13 ersatte version 2.12: avsnitt 18 och bilaga A anger ANPC (SAL) som vägen för alternativ tvistlösning.
+Version 2.14 ersatte version 2.13: avsnitt 18 och bilaga A anger ANPC (SAL) som vägen för alternativ tvistlösning.
+
+Version 2.13 ersatte version 2.12: avsnitt 12 anger att betalningsknappen på rumänska har texten *Abonați-vă și plătiți*.
 
 Version 2.12 ersatte version 2.11: avsnitt 10 anger att en inloggad person också kan använda knappen Rapportera i en offentlig debatt, att en AI läser en rapport som gjorts med den bredvid den offentliga texten, och vad som sedan händer.
 

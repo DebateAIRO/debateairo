@@ -14,7 +14,7 @@
   "home.pricingCopyChoose": "The landing's price line when the visitor's place cannot be priced yet (unknown country, the US or Canada before a postal code, the tax service not answering). Names no price; the 'See the plans' link follows it.",
   "billing.consent.renewal": "Keep the address dezbatere.ro/cancel as written. NETOPIA Payments is a brand name; keep it. {total} is the monthly price with tax; keep it in the sentence. This sentence is a legal agreement (the card kept for monthly payments): translate it faithfully, add nothing.",
   "billing.checkout.cardNote": "NETOPIA Payments is a brand name; keep it. The sentence says the card is typed on NETOPIA's own page, not ours.",
-  "billing.checkout.continueToCard": "This button places the paid order before NETOPIA's payment page opens. English reads 'Subscribe and pay' and Romanian exactly 'Comandă cu obligație de plată' (Terms §12); elsewhere use the local legal wording for an order with an obligation to pay.",
+  "billing.checkout.continueToCard": "This button places the paid order before NETOPIA's payment page opens. It reads 'Subscribe and pay' in every language (Terms §12): Romanian exactly 'Abonați-vă și plătiți'; every other language uses the button text its own Terms §12 gives.",
   "billing.checkout.total": "{day} is a day of the month; English shows it as an ordinal (29th), other languages as a number: word the sentence so a plain number reads naturally.",
   "billing.checkout.county": "The Romanian judet (or Bucharest); in Romanian use 'Județ'.",
   "billing.subscription.upgradeQuote": "{recurringTotal} is the new plan's full monthly price with tax; keep it in the sentence.",

@@ -86,7 +86,7 @@
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} प्रति माह। रद्द करने तक हर महीने की {day} तारीख को नवीनीकृत होती है।",
   "billing.consent.renewal": "मैं सहमत हूँ कि NETOPIA Payments मेरा कार्ड सुरक्षित रखेगा और जब तक मैं रद्द नहीं करता/करती, हर महीने उससे {total} लिया जाएगा। मैं सेटिंग्स में या dezbatere.ro/cancel पर किसी भी समय रद्द कर सकता/सकती हूँ।",
   "billing.consent.immediateStart": "मेरी योजना अभी शुरू करें। मैं समझता/समझती हूँ कि यदि मैं 14 दिनों के भीतर अनुबंध वापस लेता/लेती हूँ, तो मैं पहले से उपयोग किए गए हिस्से का भुगतान करूँगा/करूँगी: उपयोग किए गए दिनों या उपयोग किए गए क्रेडिट में से जो अधिक हो।",
-  "billing.checkout.continueToCard": "भुगतान दायित्व के साथ ऑर्डर करें",
+  "billing.checkout.continueToCard": "सदस्यता लें और भुगतान करें",
   "billing.checkout.cardTitle": "भुगतान",
   "billing.checkout.cardNote": "आप NETOPIA Payments के सुरक्षित पेज पर भुगतान करते हैं। आपका कार्ड नंबर कभी हमारे सर्वर तक नहीं पहुँचता।",
   "billing.checkout.subscribeAndPay": "भुगतान दायित्व के साथ ऑर्डर करें",

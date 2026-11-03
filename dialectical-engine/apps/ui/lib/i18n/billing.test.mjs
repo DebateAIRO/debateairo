@@ -330,7 +330,7 @@ test("every locale names NETOPIA Payments where it names the card processor, and
   assert.equal(english["billing.checkout.cardNote"], "You pay on NETOPIA Payments' secure page. Your card number never reaches our servers.");
   assert.equal(english["billing.checkout.continueToCard"], "Subscribe and pay");
   assert.equal(english["billing.checkout.formUnavailable"], "The payment page could not be opened. Please try again in a minute.");
-  assert.equal(catalogue("ro")["billing.checkout.continueToCard"], "Comandă cu obligație de plată");
+  assert.equal(catalogue("ro")["billing.checkout.continueToCard"], "Abonați-vă și plătiți");
   assert.equal(english["billing.card.countryRefused"], "We can't accept cards issued in that card's country. Nothing was charged, and your plan keeps the card it had.");
   assert.equal(JSON.parse(source("messages/en/legal.json"))["legal.notice.s04.payments"],
     "We accept Visa and Mastercard; we do not accept American Express. Card payments are processed by NETOPIA Payments. We never see or store your full card number.");

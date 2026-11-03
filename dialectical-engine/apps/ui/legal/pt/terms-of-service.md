@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Em resumo
-eyebrow: TERMOS DE SERVIÇO · v2.13 · EM VIGOR DESDE 1 DE NOVEMBRO DE 2026
+eyebrow: TERMOS DE SERVIÇO · v2.14 · EM VIGOR DESDE 1 DE NOVEMBRO DE 2026
 title: Aquilo com que concorda
 lede: O contrato entre si e a DMS Merchandise Shop S.R.L., em linguagem clara. Dezanove secções e o Anexo A — desloque-se até ao fim.
-endMarker: FIM DOS TERMOS · v2.13
+endMarker: FIM DOS TERMOS · v2.14
 bodyLabel: Texto dos Termos de Serviço
 annexTitle: Anexo A — Termos regionais
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEI APLICÁVEL
 -->
 
-**Version 2.13 · Effective 1 de novembro de 2026 · Versões anteriores em dezbatere.ro/terms/versions · Idioma: português.**
+**Version 2.14 · Effective 1 de novembro de 2026 · Versões anteriores em dezbatere.ro/terms/versions · Idioma: português.**
 
 **In short.** Tem de ter pelo menos 18 anos. A Dialectical Engine constrói argumentos com modelos de IA e tudo o que gera pode estar errado — não constitui aconselhamento. No plano gratuito, os seus debates são públicos quando terminam, após uma verificação por IA; num plano pago, são privados, a menos que os publique. Uma vez públicos, qualquer pessoa pode ler um debate, e este mantém-se público. O texto que envia é transmitido aos fornecedores de IA indicados no nosso Registo de Fornecedores e não é utilizado para treinar modelos. Denuncie conteúdos ilegais através de support@dezbatere.ro, tenha ou não uma conta. É aplicável a lei romena, mas as proteções locais de que beneficia enquanto consumidor mantêm-se.
 
@@ -215,7 +215,7 @@ As secções 8 (relativamente a conteúdo já publicado), 15, 16 e 18 mantêm-se
 
 A Dialectical Engine oferece um plano gratuito. Estará disponível um plano **Premium** pago, que desbloqueia o conjunto completo de modelos e lhe permite definir diretamente os parâmetros do debate.
 
-**Antes do pagamento**, mostramos-lhe, imediatamente acima do botão de pagamento: o plano; o preço total, incluindo os impostos aplicáveis; o período de faturação; o facto de o plano se renovar automaticamente até ser cancelado; a data em que termina qualquer período experimental gratuito e o montante que lhe será então cobrado; e como cancelar. Confirma as condições de renovação assinalando uma caixa separada. O botão contém a indicação **Subscrever e pagar** (em romeno, *Comandă cu obligație de plată*). Enviamos-lhe uma confirmação num suporte duradouro que contém as mesmas informações, estes Termos e o formulário de retratação.
+**Antes do pagamento**, mostramos-lhe, imediatamente acima do botão de pagamento: o plano; o preço total, incluindo os impostos aplicáveis; o período de faturação; o facto de o plano se renovar automaticamente até ser cancelado; a data em que termina qualquer período experimental gratuito e o montante que lhe será então cobrado; e como cancelar. Confirma as condições de renovação assinalando uma caixa separada. O botão contém a indicação **Subscrever e pagar** (em romeno, *Abonați-vă și plătiți*). Enviamos-lhe uma confirmação num suporte duradouro que contém as mesmas informações, estes Termos e o formulário de retratação.
 
 **Lembretes.** Enviamos-lhe uma mensagem de correio eletrónico pelo menos 5 dias antes de um período experimental gratuito se converter num plano pago; pelo menos uma vez por ano para planos contínuos; e entre 30 e 45 dias antes de qualquer renovação de um prazo igual ou superior a doze meses. Cada lembrete inclui o preço, a data e uma ligação de cancelamento.
 
@@ -251,7 +251,9 @@ Informá-lo-emos previamente, num suporte duradouro, sobre o que será alterado 
 
 **A estes Termos.** Podemos alterar estes Termos pelos mesmos tipos de motivos. No caso de alterações que não reduzam os seus direitos, publicamos a nova versão com um resumo das alterações e enviamos-lhe uma mensagem de correio eletrónico pelo menos **30 dias** antes de produzir efeitos; a utilização continuada da Dialectical Engine depois dessa data significa que a aceita; pode encerrar a sua conta antes dessa data. No caso de alterações que reduzam os seus direitos — incluindo aumentos de preço de um plano existente, redução de limites, remoção de funcionalidades, novas utilizações do seu conteúdo ou alterações relativas à responsabilidade, à lei aplicável ou à resolução de litígios — pedimos-lhe que aceite expressamente a nova versão quando voltar a iniciar sessão, e a alteração só se aplica daí em diante. Nunca aplicamos uma alteração retroativamente e nunca utilizamos esta secção para alterar, durante o respetivo prazo, o essencial daquilo por que pagou sem lhe oferecer uma forma de sair. As versões anteriores permanecem disponíveis em dezbatere.ro/terms/versions.
 
-A versão 2.13 substituiu a versão 2.12: a secção 18 e o Anexo A indicam a ANPC (SAL) como via para a resolução alternativa de litígios.
+A versão 2.14 substituiu a versão 2.13: a secção 18 e o Anexo A indicam a ANPC (SAL) como via para a resolução alternativa de litígios.
+
+A versão 2.13 substituiu a versão 2.12: a secção 12 indica que, em romeno, o botão de pagamento apresenta *Abonați-vă și plătiți*.
 
 A versão 2.12 substituiu a versão 2.11: a secção 10 indica que uma pessoa com sessão iniciada também pode utilizar o botão Denunciar em qualquer debate público, que uma IA lê uma denúncia feita com ele junto ao texto público, e o que acontece depois.
 
