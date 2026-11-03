@@ -22,7 +22,7 @@
  * The money rule: a paused debate (the month wall; Continue once the month resets) and a usage read that says running work
  * borrowed from tomorrow's allowance (switch usage=BORROWED).
  */
-import type { AnswerDig, AnswerPathRewrites, DugPick, PathRewrite, UsageBorrow } from "../../packages/contract/src/web.js";
+import type { AnswerDig, AnswerMainAnswer, AnswerPathRewrites, DugPick, MainAnswerVersion, PathRewrite, UsageBorrow } from "../../packages/contract/src/web.js";
 
 /** A finished rewrite (the checker passed it): it carries the path's new text. */
 type ReadyRewrite = Extract<PathRewrite, { state: "READY" }>;
@@ -256,6 +256,28 @@ export const SEEDED_NEW_DIGS = Object.freeze([
     askedAt: "2026-10-30T12:10:00.000Z", settledAt: DIG_FINISHED_AT.noChange
   }
 ]);
+
+/**
+ * V4 screen review (owner picks 3 Nov 2026), dig-f1: the first debate's main answer, rewritten after its digs changed its
+ * paths (decision 3 of 31 Oct). For the click-test the mock plays one more rewrite: for the first `writingSeconds` after
+ * it starts (switch MOCK_MAIN_ANSWER_SECONDS, 45 by default) the newest change is still being written into it (version 1
+ * stands, `writing`), then version 2 is the current one. The map shows it without a reload, as news at the question.
+ */
+const MAIN_ANSWER_ONE: MainAnswerVersion = {
+  version: 1, updated_at: "2026-10-29T08:20:00.000Z", trigger: "PATH_REWRITE", position_ref: "n-renew",
+  segments: [{ text: "Mostly renewables, with some firm power kept for long windless spells; storage covers hours, not weeks." }]
+};
+const MAIN_ANSWER_TWO: MainAnswerVersion = {
+  version: 2, updated_at: "2026-10-29T10:30:00.000Z", trigger: "PATH_REWRITE", position_ref: "n-mix",
+  segments: [{ text: "Mostly renewables, with some existing plants kept as a winter back-up while wind and sun grow; storage covers hours, not weeks." }]
+};
+
+/** The first debate's main answer at `nowMs`: still being rewritten until `readyAtMs`, then with its newest version. */
+export function mainAnswerAt(nowMs: number, readyAtMs: number): AnswerMainAnswer {
+  return nowMs < readyAtMs
+    ? { current: MAIN_ANSWER_ONE, history: [MAIN_ANSWER_ONE], writing: true }
+    : { current: MAIN_ANSWER_TWO, history: [MAIN_ANSWER_ONE, MAIN_ANSWER_TWO] };
+}
 
 /** The month pause of RUN_PAUSED: until the next month starts; `canContinue` once the mock plays the new month. */
 export function monthPause(nextMonthStartsAt: string, canContinue: boolean): { until: string; can_continue: boolean } {

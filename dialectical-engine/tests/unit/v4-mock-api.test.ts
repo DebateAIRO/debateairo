@@ -15,7 +15,7 @@ import {
   SUGGESTION_KINDS, SUGGESTION_SIDES, DraftPathRewritesSchema, DraftAnswerDigSchema, DraftMonthPauseSchema, DraftUsageBorrowsSchema
 } from "../../tools/v4-mock-api/web-draft.js";
 import {
-  borrowNotice, DEEPEST_DIG, DIG_ANSWERS, DIG_FINISHED_AT, DIG_RUNS, monthPause, PATH_REWRITES, reportVersionBody, SEEDED_NEW_DIGS
+  borrowNotice, DEEPEST_DIG, DIG_ANSWERS, DIG_FINISHED_AT, DIG_RUNS, mainAnswerAt, monthPause, PATH_REWRITES, reportVersionBody, SEEDED_NEW_DIGS
 } from "../../tools/v4-mock-api/rewrite-seed.js";
 import { WEB_CASES, type WebCase } from "../../tools/v4-mock-api/web-seed.js";
 
@@ -313,6 +313,28 @@ describe("V4 mock API: the new dig model and the money rule", () => {
     expect(Date.parse(DEEPEST_DIG.settledAt)).toBeGreaterThan(Date.parse(DEEPEST_DIG.askedAt));
   });
 
+  it("dig-f1: the first debate's main answer is still being rewritten, then has its newest version; both pass the contract", () => {
+    const readyAt = Date.parse("2026-11-04T10:00:00.000Z");
+    const writing = mainAnswerAt(readyAt - 1, readyAt);
+    const done = mainAnswerAt(readyAt, readyAt);
+    expect(writing.writing).toBe(true);
+    expect(writing.current!.version).toBe(1);
+    expect(done.writing).toBeUndefined();
+    expect(done.current!.version).toBe(2);
+    expect(done.history.map((version) => version.version)).toEqual([1, 2]);
+    // Each version names a path a seeded dig rewrote, and came after that dig finished.
+    for (const version of done.history) {
+      const path = PATH_REWRITES[DIG_RUNS.root]!.paths.find((candidate) => candidate.position_ref === version.position_ref)!;
+      expect(Date.parse(version.updated_at)).toBeGreaterThan(Date.parse(path.history[0]!.dig_finished_at));
+    }
+    for (const main of [writing, done]) {
+      const answer = { ...answerOf("PAID"), path_rewrites: PATH_REWRITES[DIG_RUNS.root], main_answer: main };
+      expect(AnswerSchema.safeParse(answer).success).toBe(true);
+      // An older contract gets the answer without it.
+      expect(Object.keys(stripAnswer(answer))).not.toContain("main_answer");
+    }
+  });
+
   it("a paused debate, the borrow notice and a room whose new starts wait fall back to today's reads", () => {
     const run = { run_ref: DIG_RUNS.root, question_line: "Should I move?", state: "RUNNING", terminal_reason: null, hold_until: null };
     const paused = { ...run, month_pause: monthPause("2026-11-01T00:00:00.000Z", false) };
@@ -340,6 +362,8 @@ describe("V4 mock API: the new dig model and the money rule", () => {
     const words = [
       "v4.view.heading", "v4.view.HELPED.MAIN_QUESTION", "v4.view.DID_NOT_HELP.PATH", "v4.view.asYours", "v4.view.why",
       "v4.rewrite.whatChanged", "v4.rewrite.changedSince.other", "v4.rewrite.changedSinceReport", "v4.rewrite.changedBelow",
+      // V4 screen review (3 Nov 2026): the first debate's report is older than its map (dig-f19), and its main answer is rewritten (dig-f1).
+      "v4.rewrite.reportOlder", "v4.rewrite.updateReport", "v4.rewrite.changedSinceYourReport", "v4.mainAnswer.writing", "v4.digsDid.news.ANSWER",
       "v4.rewrite.state.WRITING", "v4.nest.level", "v4.nest.digHereToo", "v4.room.startShare", "v4.money.startsWait.PERSON_DAY",
       "v4.money.borrowed.PERSON_DAY", "v4.money.paused", "v4.money.pausedReady", "v4.money.continue", "v4.debate.state.PAUSED_MONTH"
     ];
