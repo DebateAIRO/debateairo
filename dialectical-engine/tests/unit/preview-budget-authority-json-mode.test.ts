@@ -65,7 +65,7 @@ describe('production preview spending guard optional JSON mode', () => {
   it('checks the Anthropic gate systemd files and its address check offline', () => {
     const result = runPython('tests/unit/preview_gate_v3_anthropic_unit_test.py', 10000);
     expect(result.status, result.stderr).toBe(0);
-    expect(result.stderr).toContain('Ran 19 tests');
+    expect(result.stderr).toContain('Ran 20 tests');
     expect(summaryLine(result.stderr)).toBe('OK');
   });
   it('checks the guided key command shared by all provider gates offline (fake terminal, no real key)', () => {

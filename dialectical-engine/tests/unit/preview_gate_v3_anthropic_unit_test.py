@@ -242,6 +242,21 @@ class GateUnitTests(unittest.TestCase):
         self.assertNotIn('max_paid_posts_per_day:400', readme)
         self.assertIn('TEAM_TOTAL_BUDGET_EXCEEDED', readme)
 
+    # V4 start step, Task 7 (owner answer 6, 3 Nov): at the upload sitting, with the owner's yes, this release's gate
+    # code in all three gates and four Anthropic calls at once, by named fields only; the pot figure is never written.
+    def test_the_v4_start_step_section_gives_four_slots_by_named_fields_with_the_owners_yes(self):
+        readme = README.read_text()
+        start = readme.index("## V4 start step (2026-11): four calls at once and this release's gate code")
+        end = readme.index('## Daily operations')
+        self.assertLess(start, end)
+        block = readme[start:end]
+        for text in ("""jq -e '.provider=="anthropic"' "$GO" """, '.max_concurrent_calls=4 | .bridge_sha256=$b | .helper_sha256=$h',
+                     'del(.max_concurrent_calls,.bridge_sha256,.helper_sha256)', 'ONLY_NAMED_FIELDS_CHANGED',
+                     'systemctl restart debateai-preview-anthropic-budget.service', '1.71776', 'max_final_writer_calls',
+                     'SETTINGS_GATE_HELPER_DIFFERS', 'daily_pot', "the owner's yes", 'jq \'.max_concurrent_calls=2\' "$GO"'):
+            self.assertIn(text, block)
+        self.assertNotIn('daily_budget_usd=', block)
+
     def test_install_order_reinstalls_the_deepinfra_units_before_the_key_and_checks_them_live(self):
         readme = README.read_text()
         step3a, step4 = readme.index('**3a. Re-install the two DeepInfra units'), readme.index('**4. The Anthropic key.')
