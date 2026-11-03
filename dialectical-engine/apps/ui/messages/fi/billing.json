@@ -76,6 +76,7 @@
   "billing.checkout.priceCleared": "Muutit tietojasi, joten hinta poistettiin. Näytä koko hinta uudelleen jatkaaksesi.",
   "billing.checkout.countryUnavailable": "Maksulliset tilaukset eivät ole vielä saatavilla maassasi. Voit jatkaa maksuttoman tilauksen käyttöä.",
   "billing.checkout.regionUnavailable": "Maksulliset tilaukset eivät ole vielä saatavilla alueellasi. Voit jatkaa maksuttoman tilauksen käyttöä.",
+  "billing.checkout.regionTermsExcluded": "Dialectical Engine ei ole tarjolla Tennesseen osavaltiossa, joten emme voi ottaa vastaan maksua tällä osoitteella.",
   "billing.checkout.confirmCountry": "Yhteytesi näyttää tulevan maasta {ipCountry}. Asutko maassa {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Kyllä, asun siellä",
   "billing.checkout.confirmCountryRequired": "Vahvista asuinmaasi ja jatka sitten.",

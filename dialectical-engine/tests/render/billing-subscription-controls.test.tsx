@@ -534,7 +534,9 @@ describe("P20 SubscriptionControls (S1)", () => {
   it("words a refused upgrade quote and a refused downgrade by what the server said, before any money moves", async () => {
     for (const [failure, sentence] of [
       [new ContractHttpError("SERVER_FAILURE", 409, "x", "UPGRADE_NOT_AVAILABLE_NOW"), "Your plan is about to renew, so an upgrade can't start right now."],
-      [new ContractHttpError("SERVER_FAILURE", 409, "x", "ACCOUNT_ERASURE_PENDING"), "Your account is scheduled for deletion."]
+      [new ContractHttpError("SERVER_FAILURE", 409, "x", "ACCOUNT_ERASURE_PENDING"), "Your account is scheduled for deletion."],
+      // A subscriber whose stored billing address is in a region the Terms exclude (Tennessee).
+      [new ContractHttpError("FORBIDDEN", 403, "x", "REGION_TERMS_EXCLUDED"), "We don't offer Dialectical Engine in Tennessee, so we can't take payment for this address."]
     ] as const) {
       act(() => root.unmount());
       root = createRoot(container);

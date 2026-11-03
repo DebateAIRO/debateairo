@@ -33,7 +33,7 @@ const at = (country: string, postalCode: string | null, region: string | null, c
   ({ country, postalCode, region, company });
 const decide = (location: ReturnType<typeof at>, postcodeMustFit = true, policy: CountryPolicy = testClosedRegionsPolicy) =>
   decidePaymentRegion({ policy, location, postcodeMustFit });
-const refuse = (region: string) => ({ kind: "REFUSE", code: "REGION_PAYMENT_UNAVAILABLE", region });
+const refuse = (region: string, code = "REGION_PAYMENT_UNAVAILABLE") => ({ kind: "REFUSE", code, region });
 
 describe("decidePaymentRegion (ruling R1: a refusing region first, then a postcode that doesn't fit, then allow)", () => {
   it("refuses Saskatchewan by its postal code, however it is typed", () => {
@@ -233,46 +233,129 @@ describe("the upgrade quote's payment gate (gateCardAction) refuses a subscriber
   });
 });
 
+/** A subscriber whose INITIAL quote stored `location`, asking quoteUpgrade for PRO under the launch regions. */
+function upgradeQuoteHarness(location: QuoteLocation, currency: "EUR" | "USD") {
+  const quoteId = "5f0c2a8e-8a61-4d1f-9a55-0d6f3a1b2d22";
+  const subscriptionId = "7b2c3d4e-5f60-4a71-8b92-000000000d22";
+  const sealed = sealQuoteLocation(TEST_RECORDS_KEY, quoteId, location);
+  const initialQuote = {
+    quoteId, ownerRef: OWNER, planId: "PLUS", kind: "SUBSCRIBE", currency,
+    locationCiphertext: sealed.ciphertext, keyId: sealed.keyId
+  } as unknown as QuoteRow;
+  const state = {
+    subscriptionId, ownerRef: OWNER, planId: "PLUS", status: "ACTIVE", currency,
+    currentPeriodStart: new Date(NOW.getTime() - 10 * 86_400_000), currentPeriodEnd: new Date(NOW.getTime() + 20 * 86_400_000),
+    renewalPostponedUntil: null
+  };
+  const insertQuote = vi.fn(async () => {});
+  const taxQuote = vi.fn(async () => { throw new Error("NOT_REACHED"); });
+  const audit: Audited[] = [];
+  const geo = new StubGeo();
+  geo.country = location.country;
+  const deps = {
+    billing: {
+      subscriptionForOwner: async (owner: string) => (owner === OWNER ? state : null),
+      ownerErasurePending: async () => false,
+      chargesForSubscription: async () => [{ kind: "INITIAL", quoteId, periodStart: state.currentPeriodStart }],
+      subscriptionEvents: async () => [{ kind: "ACTIVATED", data: { recurring_net_micros: 20_000_000 } }],
+      quote: async (ref: string, owner: string) => (ref === quoteId && owner === OWNER ? initialQuote : null),
+      customerByOwner: async () => ({ customerId: "c" }),
+      latestProfile: async () => null,
+      withTransaction: async <T>(fn: (client: PoolClient) => Promise<T>): Promise<T> => fn({} as PoolClient),
+      insertQuote
+    },
+    plans: testBillingPlans, policy: testBillingPolicy, tax: { quote: taxQuote }, recordsKey: TEST_RECORDS_KEY,
+    legal: { requiresReacceptance: async () => false }, countryPolicy: testClosedRegionsPolicy, geo,
+    audit: (event: string, fields: Record<string, BillingAuditField>) => { audit.push({ event, ...fields }); }
+  } as unknown as SubscriptionRouteDeps;
+  const upgrade = () => quoteUpgrade(deps, { ownerRef: OWNER, planId: "PRO", ip: "198.51.100.7", now: NOW });
+  return { upgrade, insertQuote, taxQuote, audit };
+}
+
 describe("quoteUpgrade refuses a subscriber whose stored INITIAL quote is in a closed region", () => {
   it("a Canary Islands subscriber: 403 REGION_PAYMENT_UNAVAILABLE, no tax asked, no quote stored", async () => {
-    const quoteId = "5f0c2a8e-8a61-4d1f-9a55-0d6f3a1b2d22";
-    const subscriptionId = "7b2c3d4e-5f60-4a71-8b92-000000000d22";
     const location = storedLocation({ country: "ES", region: null, postalCode: "35001", city: "Las Palmas", ipCountry: "ES" });
-    const sealed = sealQuoteLocation(TEST_RECORDS_KEY, quoteId, location);
-    const initialQuote = {
-      quoteId, ownerRef: OWNER, planId: "PLUS", kind: "SUBSCRIBE", currency: "EUR",
-      locationCiphertext: sealed.ciphertext, keyId: sealed.keyId
-    } as unknown as QuoteRow;
-    const state = {
-      subscriptionId, ownerRef: OWNER, planId: "PLUS", status: "ACTIVE", currency: "EUR",
-      currentPeriodStart: new Date(NOW.getTime() - 10 * 86_400_000), currentPeriodEnd: new Date(NOW.getTime() + 20 * 86_400_000),
-      renewalPostponedUntil: null
-    };
-    const insertQuote = vi.fn(async () => {});
-    const taxQuote = vi.fn(async () => { throw new Error("NOT_REACHED"); });
-    const audit: Audited[] = [];
-    const geo = new StubGeo();
-    geo.country = "ES";
-    const deps = {
-      billing: {
-        subscriptionForOwner: async (owner: string) => (owner === OWNER ? state : null),
-        ownerErasurePending: async () => false,
-        chargesForSubscription: async () => [{ kind: "INITIAL", quoteId, periodStart: state.currentPeriodStart }],
-        subscriptionEvents: async () => [{ kind: "ACTIVATED", data: { recurring_net_micros: 20_000_000 } }],
-        quote: async (ref: string, owner: string) => (ref === quoteId && owner === OWNER ? initialQuote : null),
-        customerByOwner: async () => ({ customerId: "c" }),
-        latestProfile: async () => null,
-        withTransaction: async <T>(fn: (client: PoolClient) => Promise<T>): Promise<T> => fn({} as PoolClient),
-        insertQuote
-      },
-      plans: testBillingPlans, policy: testBillingPolicy, tax: { quote: taxQuote }, recordsKey: TEST_RECORDS_KEY,
-      legal: { requiresReacceptance: async () => false }, countryPolicy: testClosedRegionsPolicy, geo,
-      audit: (event: string, fields: Record<string, BillingAuditField>) => { audit.push({ event, ...fields }); }
-    } as unknown as SubscriptionRouteDeps;
-    await expect(quoteUpgrade(deps, { ownerRef: OWNER, planId: "PRO", ip: "198.51.100.7", now: NOW }))
-      .rejects.toMatchObject({ status: 403, code: "REGION_PAYMENT_UNAVAILABLE" });
+    const { upgrade, insertQuote, taxQuote, audit } = upgradeQuoteHarness(location, "EUR");
+    await expect(upgrade()).rejects.toMatchObject({ status: 403, code: "REGION_PAYMENT_UNAVAILABLE" });
     expect(insertQuote).not.toHaveBeenCalled();
     expect(taxQuote).not.toHaveBeenCalled();
     expect(audit).toEqual([{ event: "billing.region.refused", code: "REGION_PAYMENT_UNAVAILABLE", country: "ES", region: "ES-CN" }]);
+  });
+});
+
+/**
+ * Tennessee (Terms §2 and Annex A.2, the owner's amendment of 8 October 2026: "We do not offer Dialectical Engine to
+ * people who live in Tennessee"). Sign-up closes it by the declared state; payment must close it by the billing
+ * address too, for every buyer, at the quote, at checkout start and at the upgrade. A region the Terms exclude has its
+ * own code, REGION_TERMS_EXCLUDED (the owner's choice of 3 November 2026), read from the rule's reason, so the register
+ * opens it again by dropping the entry; a region closed for tax keeps REGION_PAYMENT_UNAVAILABLE.
+ */
+describe("a Tennessee billing address is refused payment, consumer or company, wherever money is taken", () => {
+  const nashville = storedLocation({ region: "TN", postalCode: "37203", city: "Nashville" });
+  const tennesseeRefused = { event: "billing.region.refused", code: "REGION_TERMS_EXCLUDED", country: "US", region: "US-TN" };
+  const excluded = refuse("US-TN", "REGION_TERMS_EXCLUDED");
+
+  it("decidePaymentRegion refuses US-TN by ZIP (370-385) or by typed state, consumer and company alike", () => {
+    for (const location of [
+      at("US", "37203", null), at("US", "38103", null), at("US", "37010", null), at("US", "38589", null),
+      at("US", "37203-1234", null), at("US", null, "TN"), at("US", null, "Tennessee"), at("US", "75201", "tennessee"),
+      at("US", "37203", "TX"), at("US", "37203", null, COMPANY)
+    ]) {
+      for (const mustFit of [true, false]) expect(decide(location, mustFit), JSON.stringify(location)).toEqual(excluded);
+    }
+    // Its neighbours either side of the ZIP range stay open: 369 is Alabama, 386 Mississippi.
+    expect(decide(at("US", "36925", null))).toEqual({ kind: "ALLOW" });
+    expect(decide(at("US", "38601", null))).toEqual({ kind: "ALLOW" });
+  });
+
+  it("names the Terms exclusion first when the address also names a region closed for tax", () => {
+    // US-MD sorts before US-TN; the Terms exclusion still wins, so the buyer is told the true reason.
+    expect(decide(at("US", "37203", "MD"))).toEqual(excluded);
+    expect(decide(at("US", "21201", "Tennessee"))).toEqual(excluded);
+    // A region closed for tax alone keeps its own code.
+    expect(decide(at("US", "21201", "MD"))).toEqual(refuse("US-MD"));
+  });
+
+  it("lets Tennessee pay again under a register version without the US-TN entry", () => {
+    const { "US-TN": _tennessee, ...withoutTennessee } = testClosedRegionsPolicy.regions;
+    const reopened: CountryPolicy = Object.freeze({ ...testClosedRegionsPolicy, regions: Object.freeze(withoutTennessee) });
+    expect(decide(at("US", "37203", "TN"), true, reopened)).toEqual({ kind: "ALLOW" });
+  });
+
+  it("the SUBSCRIBE quote: 403, no tax asked, no quote stored, one region audit line", async () => {
+    for (const fields of [{ postalCode: "37203", region: "TN" }, { postalCode: "38103", region: null }, { postalCode: null, region: "Tennessee" }]) {
+      const { service, input, taxCalls, inserted, audit } = quoteHarness("US");
+      await expect(service.create(input(fields)), JSON.stringify(fields))
+        .rejects.toMatchObject({ status: 403, code: "REGION_TERMS_EXCLUDED" });
+      expect(taxCalls).toEqual([]);
+      expect(inserted).toEqual([]);
+      expect(audit).toEqual([tennesseeRefused, { event: "billing.quote.refused", code: "REGION_TERMS_EXCLUDED" }]);
+    }
+  });
+
+  it("checkout start re-checks a stored Tennessee quote: 403, nothing written", async () => {
+    const { start, written, audit } = checkoutHarness(nashville);
+    await expect(start()).rejects.toMatchObject({ status: 403, code: "REGION_TERMS_EXCLUDED" });
+    expect(written).not.toHaveBeenCalled();
+    expect(audit).toEqual([tennesseeRefused]);
+  });
+
+  it("the card-action gate (upgrade, card change) refuses a subscriber stored in Tennessee", async () => {
+    const audit: Audited[] = [];
+    const geo = new StubGeo();
+    geo.country = "US";
+    await expect(gateCardAction({
+      legal: { requiresReacceptance: async () => false } as never, geo, countryPolicy: testClosedRegionsPolicy,
+      audit: (event, fields) => { audit.push({ event, ...fields }); }
+    }, OWNER, "198.51.100.7", upgradeContext(nashville))).rejects.toMatchObject({ status: 403, code: "REGION_TERMS_EXCLUDED" });
+    expect(audit).toEqual([tennesseeRefused]);
+  });
+
+  it("quoteUpgrade: 403, no tax asked, no quote stored", async () => {
+    const { upgrade, insertQuote, taxQuote, audit } = upgradeQuoteHarness(nashville, "USD");
+    await expect(upgrade()).rejects.toMatchObject({ status: 403, code: "REGION_TERMS_EXCLUDED" });
+    expect(insertQuote).not.toHaveBeenCalled();
+    expect(taxQuote).not.toHaveBeenCalled();
+    expect(audit).toEqual([tennesseeRefused]);
   });
 });

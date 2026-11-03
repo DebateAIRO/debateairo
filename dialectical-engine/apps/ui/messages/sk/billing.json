@@ -76,6 +76,7 @@
   "billing.checkout.priceCleared": "Zmenili ste svoje údaje, preto bola cena odstránená. Ak chcete pokračovať, znova zobrazte celú cenu.",
   "billing.checkout.countryUnavailable": "Platené programy zatiaľ vo vašej krajine nie sú dostupné. Môžete ďalej používať bezplatný program.",
   "billing.checkout.regionUnavailable": "Platené programy zatiaľ vo vašom regióne nie sú dostupné. Môžete ďalej používať bezplatný program.",
+  "billing.checkout.regionTermsExcluded": "Dialectical Engine v štáte Tennessee neponúkame, preto nemôžeme prijať platbu s touto adresou.",
   "billing.checkout.confirmCountry": "Vaše pripojenie vyzerá, že pochádza z tejto krajiny: {ipCountry}. Žijete v tejto krajine: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Áno, žijem tam",
   "billing.checkout.confirmCountryRequired": "Potvrďte krajinu, v ktorej žijete, a pokračujte.",

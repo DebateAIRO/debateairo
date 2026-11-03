@@ -14,6 +14,11 @@ export type BillingRefusalCode =
   | "COUNTRY_BLOCKED"
   /** Payment region blocks (spec 2026-10-20 §8): the billing address is in a region closed for payment (403). */
   | "REGION_PAYMENT_UNAVAILABLE"
+  /**
+   * The billing address is in a region the Terms exclude (403): Tennessee (Terms §2, Annex A.2), read from the region
+   * rule's reason TERMS_EXCLUDED (the owner's choice of 3 November 2026).
+   */
+  | "REGION_TERMS_EXCLUDED"
   /** Payment region blocks (spec 2026-10-20 §6): the postal code doesn't fit its country's format (422). */
   | "BILLING_POSTCODE_INVALID"
   | "COUNTRY_CONFIRMATION_REQUIRED"

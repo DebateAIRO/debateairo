@@ -98,6 +98,7 @@ const PROVIDERS_REFUSE: RuleValue = Object.freeze({ signup: false, pay: false, r
 type RegionRuleValue = z.infer<typeof regionRuleSchema>;
 const REGION_TAX_NOT_READY: RegionRuleValue = Object.freeze({ pay: false, reason: "TAX_NOT_READY" });
 const REGION_TAX_NOT_READY_FOR_BUSINESS: RegionRuleValue = Object.freeze({ pay: false, reason: "TAX_NOT_READY", buyers: "business" });
+const REGION_EXCLUDED: RegionRuleValue = Object.freeze({ pay: false, reason: "TERMS_EXCLUDED" });
 
 /**
  * The §1.5 table, every code spelled out. EU 27 + Norway and Iceland (Terms Annex A.1; one EU
@@ -142,12 +143,16 @@ const COUNTRY_GROUPS: ReadonlyArray<readonly [readonly string[], RuleValue]> = O
  * SaaS only when it is bought for business use); and in the EU territories outside the EU VAT area: the Canary
  * Islands, Ceuta, Melilla, the five French overseas departments, Åland, Mount Athos, Livigno, Campione d'Italia,
  * Heligoland and Büsingen. Sign-up is open in all of them. Opening one is publishing a version without its entry.
+ * Tennessee is closed for payment too, for every buyer, because the Terms exclude it (section 2, Annex A.2; the
+ * owner's amendment of 8 October 2026, see US_STATE_GROUPS): sign-up refuses a person who declares Tennessee, and this
+ * entry refuses a Tennessee billing address, so a person who declared another state still cannot pay from there.
  */
 const REGION_GROUPS: ReadonlyArray<readonly [readonly PaymentRegionId[], RegionRuleValue]> = Object.freeze([
   [["CA-SK", "CA-MB", "US-DC", "US-HI", "US-MD", "US-RI", "US-VT", "US-WV", "US-NJ",
     "ES-CN", "ES-CE", "ES-ML", "FR-971", "FR-972", "FR-973", "FR-974", "FR-976", "FI-01", "GR-69",
     "IT-LIVIGNO", "IT-CAMPIONE", "DE-HELGOLAND", "DE-BUESINGEN"], REGION_TAX_NOT_READY],
-  [["US-OH"], REGION_TAX_NOT_READY_FOR_BUSINESS]
+  [["US-OH"], REGION_TAX_NOT_READY_FOR_BUSINESS],
+  [["US-TN"], REGION_EXCLUDED]
 ]);
 
 export const COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
