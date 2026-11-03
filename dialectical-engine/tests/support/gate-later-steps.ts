@@ -13,7 +13,7 @@ import type { StubLanguage } from "./preview-gate-stubs.js";
 
 export type LaterGateKind = "STORY_CHARTS" | "SUGGESTIONS" | "PATH_REWRITE_WRITER" | "PATH_REWRITE_CHECKER" | "REPORT_ANSWER" | "REPORT_ANSWER_CHECK"
   | "REPORT_STORY" | "REPORT_STORY_CHECK" | "CONTRIBUTION_CHECK" | "PUBLIC_REPORT_CHECK" | "ASK_CLARIFY" | "WEB_PLAN" | "WEB_DIG_PLAN" | "WEB_READ_ALL"
-  | "WEB_PICK" | "WEB_READ_TOP" | "QUESTION_CHECK";
+  | "WEB_PICK" | "WEB_READ_TOP" | "QUESTION_CHECK" | "START_LIST" | "START_MERGE" | "START_MERGE_LATE" | "START_COMBINE" | "START_FIT";
 
 /** Every version is a row of its own: a new version may ask for a new form, so it is new to the stand-in until someone looks. */
 export const LATER_CONTRACT_KINDS: Readonly<Record<string, LaterGateKind>> = Object.freeze({
@@ -32,7 +32,10 @@ export const LATER_CONTRACT_KINDS: Readonly<Record<string, LaterGateKind>> = Obj
   "web.plan-dig.v1": "WEB_DIG_PLAN", "web.plan-dig.v2": "WEB_DIG_PLAN", "web.plan-dig.v3": "WEB_DIG_PLAN",
   "web.read-all.v1": "WEB_READ_ALL", "web.read-all.v2": "WEB_READ_ALL",
   "web.pick.v1": "WEB_PICK", "web.pick.v2": "WEB_PICK",
-  "web.read-top.v1": "WEB_READ_TOP", "web.read-top.v2": "WEB_READ_TOP"
+  "web.read-top.v1": "WEB_READ_TOP", "web.read-top.v2": "WEB_READ_TOP",
+  // V4 start step (Task 22): the step before Start's list writers, merge, late merge, combine and fit.
+  "start.list.v1": "START_LIST", "start.merge.v1": "START_MERGE", "start.merge-late.v1": "START_MERGE_LATE", "start.combine.v1": "START_COMBINE",
+  "start.fit.v1": "START_FIT"
 });
 
 const LATER_PROSE = Object.freeze({
@@ -49,7 +52,8 @@ const LATER_PROSE = Object.freeze({
     clarifyAnswers: ["To decide something", "To understand it better"],
     noSearch: "This answer rests on reasoning that needs no outside source.",
     adds: "It adds a figure.",
-    note: "The page reports one figure."
+    note: "The page reports one figure.",
+    pathTitle: "Winter supply"
   }),
   ro: Object.freeze({
     question: "Rezistă dovezile și iarna?",
@@ -64,7 +68,8 @@ const LATER_PROSE = Object.freeze({
     clarifyAnswers: ["Ca să iau o decizie", "Ca să înțeleg mai bine"],
     noSearch: "Acest răspuns se sprijină pe un raționament care nu cere o sursă din afară.",
     adds: "Adaugă o cifră.",
-    note: "Pagina prezintă o cifră."
+    note: "Pagina prezintă o cifră.",
+    pathTitle: "Aprovizionarea iarna"
   })
 });
 
@@ -119,5 +124,15 @@ export function laterStepContent(kind: LaterGateKind, chat: string, language: St
     case "WEB_PICK": return JSON.stringify({ top: list<{ page_id: string }>("pages").map((page) => page.page_id).slice(0, Number(text("top_count") ?? "3")) });
     case "WEB_READ_TOP": return JSON.stringify({ pages: list<{ page_id: string }>("pages").map((page) => ({ page_id: page.page_id, grade: 3, extracts: [] })),
       worth_looking_into: [] });
+    // The step before Start: one path from each angle given; every suggestion a path of its own, nothing marked a repeat, no card, no
+    // suggestion; the combine's one path; the person's own view fits no chosen path.
+    case "START_LIST": return JSON.stringify({ paths: list<{ angle_id: string }>("angles").map((angle, at) =>
+      ({ angle_id: angle.angle_id, title: `${prose.pathTitle} ${String(at + 1)}`, question: prose.question, why: prose.why })) });
+    case "START_MERGE": return JSON.stringify({ repeats: [], paths: list<{ id: string }>("suggestions").map((one) => ({ ids: [one.id], title: null, question: null })),
+      cards: [], suggestions: [] });
+    case "START_MERGE_LATE": return JSON.stringify({ repeats: [],
+      paths: list<{ id: string }>("new_suggestions").map((one) => ({ ids: [one.id], title: null, question: null })), fits: [] });
+    case "START_COMBINE": return JSON.stringify({ title: prose.pathTitle, question: prose.question });
+    case "START_FIT": return JSON.stringify({ fits: null });
   }
 }

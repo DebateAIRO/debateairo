@@ -14,3 +14,6 @@ export * from "./roles.js";
 export * from "./orchestrator.js";
 export * from "./opposite-templates.js";
 export * from "./repository.js";
+// V4 start step (spec 2026-11-03 §2, §4): the step before Start's drafted contracts and their reply readers.
+export * from "./start-prompts.js";
+export * from "./start-replies.js";

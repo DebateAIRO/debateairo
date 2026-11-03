@@ -1254,6 +1254,8 @@ packages/map/src/repository.ts
 packages/map/src/roles.ts
 packages/map/src/salvage.ts
 packages/map/src/specs.ts
+packages/map/src/start-prompts.ts
+packages/map/src/start-replies.ts
 packages/map/src/text.ts
 packages/map/src/types.ts
 packages/memory/src/index.ts

@@ -18,7 +18,8 @@ describe("engine 2: the map's vocabulary", () => {
     expect(MAP_ANSWER_CHECK_OUTCOMES).not.toContain("BOTH");
     expect(MAP_ENGINE_LIMITS).toEqual({ assumptionsMax: 3, reservesMax: 2, checkIdsMax: 8, candidatesMax: 4 });
     expect(MAP_ENGINE_LIMITS.candidatesMax).toBe(ENGINE_VERSION_LIMITS.answerCheckMax); // the row's range and the map's c1..c4 agree
-    expect(MAP_STEPS.at(-1)).toBe("CHECK");
+    // CHECK stays the debate map's last step; the V4 start step's START_* steps follow it.
+    expect(MAP_STEPS.indexOf("CHECK")).toBe(6);
     for (const list of [MAP_RESTS_ON, MAP_ANSWER_CHECK_OUTCOMES, MAP_ENGINE_LIMITS, MAP_STEPS]) expect(Object.isFrozen(list)).toBe(true);
   });
 

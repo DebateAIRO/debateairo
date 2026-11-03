@@ -96,6 +96,8 @@ export const MAP_DEFAULT_INSTRUCTIONS: MapInstructionTexts = Object.freeze({
 
 const L = MAP_LIMITS;
 const STRICT = "Return only one JSON object with exactly this schema and no additional keys:";
+/** Every map answer form starts with it (the start step's forms too, start-prompts.ts). */
+export const MAP_STRICT_SENTENCE = STRICT;
 const ID_FORM = `short id of lowercase letters, digits and hyphens, at most ${String(L.idMaxChars)} characters`;
 const POINT_FORM = `{ "claim": non-empty string of at most ${String(L.claimMaxChars)} characters, "why_it_matters": non-empty string of at most ${String(L.whyMaxChars)} characters, "leans": "for_some_answer" | "against_some_answer" | "context" }`;
 const LIST_FORM = `${STRICT}\n{ "points": [${POINT_FORM}, ...], "candidate_answers": [non-empty string of at most ${String(L.candidateAnswerMaxChars)} characters, ...] }\npoints has ${String(L.listPointsMin)} to ${String(L.listPointsMax)} entries; candidate_answers has ${String(L.listAnswersMin)} to ${String(L.listAnswersMax)} entries.`;
