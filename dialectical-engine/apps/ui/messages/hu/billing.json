@@ -76,6 +76,7 @@
   "billing.checkout.priceCleared": "Módosította az adatait, ezért az árat eltávolítottuk. A folytatáshoz jelenítse meg újra a teljes árat.",
   "billing.checkout.countryUnavailable": "A fizetős csomagok az Ön országában még nem érhetők el. Továbbra is használhatja az Ingyenes csomagot.",
   "billing.checkout.regionUnavailable": "A fizetős csomagok az Ön régiójában még nem érhetők el. Továbbra is használhatja az Ingyenes csomagot.",
+  "billing.checkout.regionTermsExcluded": "A Dialectical Engine szolgáltatást Tennessee államban nem kínáljuk, ezért ezzel a címmel nem tudunk fizetést elfogadni.",
   "billing.checkout.confirmCountry": "A kapcsolata úgy tűnik, innen érkezik: {ipCountry}. Ebben az országban él: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Igen, ott élek",
   "billing.checkout.confirmCountryRequired": "Kérjük, erősítse meg, melyik országban él, majd folytassa.",

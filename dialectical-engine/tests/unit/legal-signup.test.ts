@@ -72,6 +72,18 @@ describe("sign-up records the Terms and Privacy pairs (paid plans L3b)", () => {
     expect(resolveSignUpDocuments(undefined)).toBeNull();
   });
 
+  it("accepts Canada's French pair under locale fr and its English pair under locale en, whatever the page language", () => {
+    // Canada at sign-up (owner ruling 2026-11-02): the request's locale names the pair's language, not the page's.
+    expect(resolveSignUpDocuments({ terms: terms("fr"), privacy: privacy("fr"), locale: "fr" })).toEqual({
+      terms: { ...terms("fr"), locale: "fr" }, privacy: { ...privacy("fr"), locale: "fr" }
+    });
+    expect(resolveSignUpDocuments({ terms: terms("en"), privacy: privacy("en"), locale: "en" })).toEqual({
+      terms: { ...terms("en"), locale: "en" }, privacy: { ...privacy("en"), locale: "en" }
+    });
+    // The trap the UI avoids: the French pair under the English page's locale is stale.
+    expect(resolveSignUpDocuments({ terms: terms("fr"), privacy: privacy("fr"), locale: "en" })).toBeNull();
+  });
+
   it("seals one evidence per row under the records key, bound to that row", () => {
     const recordsKey = randomBytes(32);
     const documents = resolveSignUpDocuments({ terms: terms("de"), privacy: privacy("de"), locale: "de" })!;

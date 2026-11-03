@@ -76,6 +76,7 @@
   "billing.checkout.priceCleared": "Twoje dane się zmieniły, więc cena została usunięta. Pokaż pełną cenę ponownie, aby kontynuować.",
   "billing.checkout.countryUnavailable": "Płatne plany nie są jeszcze dostępne w Twoim kraju. Możesz dalej korzystać z planu Bezpłatny.",
   "billing.checkout.regionUnavailable": "Płatne plany nie są jeszcze dostępne w Twoim regionie. Możesz dalej korzystać z planu Bezpłatny.",
+  "billing.checkout.regionTermsExcluded": "Nie oferujemy Dialectical Engine w stanie Tennessee, dlatego nie możemy przyjąć płatności dla tego adresu.",
   "billing.checkout.confirmCountry": "Wygląda na to, że Twoje połączenie pochodzi z tego kraju: {ipCountry}. Czy mieszkasz w tym kraju: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Tak, mieszkam tam",
   "billing.checkout.confirmCountryRequired": "Potwierdź kraj zamieszkania, a potem kontynuuj.",

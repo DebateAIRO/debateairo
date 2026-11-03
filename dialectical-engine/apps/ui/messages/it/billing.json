@@ -76,6 +76,7 @@
   "billing.checkout.priceCleared": "Hai modificato i tuoi dati, quindi il prezzo è stato rimosso. Mostra di nuovo il prezzo completo per continuare.",
   "billing.checkout.countryUnavailable": "I piani a pagamento non sono ancora disponibili nel tuo paese. Puoi continuare a usare il piano Gratuito.",
   "billing.checkout.regionUnavailable": "I piani a pagamento non sono ancora disponibili nella tua regione. Puoi continuare a usare il piano Gratuito.",
+  "billing.checkout.regionTermsExcluded": "Non offriamo Dialectical Engine nel Tennessee, quindi non possiamo accettare pagamenti per questo indirizzo.",
   "billing.checkout.confirmCountry": "La tua connessione sembra provenire da questo paese: {ipCountry}. Vivi in questo paese: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Sì, vivo lì",
   "billing.checkout.confirmCountryRequired": "Conferma il paese in cui vivi, poi continua.",

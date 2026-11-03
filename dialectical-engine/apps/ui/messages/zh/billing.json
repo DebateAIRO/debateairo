@@ -76,6 +76,7 @@
   "billing.checkout.priceCleared": "您更改了信息，因此价格已被移除。请重新显示完整价格以继续。",
   "billing.checkout.countryUnavailable": "您所在的国家/地区尚未提供付费方案。您可以继续使用免费方案。",
   "billing.checkout.regionUnavailable": "您所在的地区尚未提供付费方案。您可以继续使用免费方案。",
+  "billing.checkout.regionTermsExcluded": "我们不在田纳西州提供 Dialectical Engine，因此无法接受此地址的付款。",
   "billing.checkout.confirmCountry": "您的连接似乎来自 {ipCountry}。您是否居住在 {declaredCountry}？",
   "billing.checkout.confirmCountryYes": "是的，我住在那里",
   "billing.checkout.confirmCountryRequired": "请确认您居住的国家/地区，然后继续。",

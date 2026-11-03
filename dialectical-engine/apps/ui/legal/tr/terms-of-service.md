@@ -335,7 +335,7 @@ Bu Koşulların ana metni sizin için kaleme alınmıştır. Buna ek olarak: ya�
 
 ### A.3 Kanada ve Quebec
 
-Gizlilik görevlimiz ve Quebec'te kişisel bilgilerin korunmasından sorumlu kişi müdürümüzdür; kendisine privacy@dezbatere.ro adresinden ulaşılabilir. Verileriniz Gizlilik Politikamızın Ek B.3'ünde ele alınır. **Quebec:** bu Koşullar Fransızca olarak sunulur; dil seçiciden Fransızcayı seçin; tartışmalarınızı özel tutan ayarlar varsayılan olarak açıktır; hakkınızdaki kişisel bilgilerin arama sonuçlarından çıkarılmasını talep edebilirsiniz.
+Gizlilik görevlimiz ve Quebec'te kişisel bilgilerin korunmasından sorumlu kişi müdürümüzdür; kendisine privacy@dezbatere.ro adresinden ulaşılabilir. Verileriniz Gizlilik Politikamızın Ek B.3'ünde ele alınır. **Quebec:** bu Koşullar Fransızca olarak sunulur; kaydolurken Kanada'yı seçerseniz Koşullar size önce Fransızca gösterilir ve bunun yerine İngilizceyi seçebilirsiniz; tartışmalarınızı özel tutan ayarlar varsayılan olarak açıktır; hakkınızdaki kişisel bilgilerin arama sonuçlarından çıkarılmasını talep edebilirsiniz.
 
 ### A.4 Avustralya ve Yeni Zelanda
 

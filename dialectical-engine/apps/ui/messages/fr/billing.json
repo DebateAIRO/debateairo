@@ -76,6 +76,7 @@
   "billing.checkout.priceCleared": "Vous avez modifié vos informations, le prix a donc été retiré. Affichez à nouveau le prix total pour continuer.",
   "billing.checkout.countryUnavailable": "Les formules payantes ne sont pas encore disponibles dans votre pays. Vous pouvez continuer à utiliser la formule Gratuite.",
   "billing.checkout.regionUnavailable": "Les formules payantes ne sont pas encore disponibles dans votre région. Vous pouvez continuer à utiliser la formule Gratuite.",
+  "billing.checkout.regionTermsExcluded": "Nous ne proposons pas Dialectical Engine au Tennessee, nous ne pouvons donc pas accepter de paiement pour cette adresse.",
   "billing.checkout.confirmCountry": "Votre connexion semble provenir de ce pays : {ipCountry}. Résidez-vous dans ce pays : {declaredCountry} ?",
   "billing.checkout.confirmCountryYes": "Oui, j’y réside",
   "billing.checkout.confirmCountryRequired": "Veuillez confirmer votre pays de résidence, puis continuer.",

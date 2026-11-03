@@ -335,7 +335,7 @@ Hovedteksten i disse vilkår er skrevet til dig. Derudover gælder følgende: Du
 
 ### A.3 Canada og Quebec
 
-Vores privatlivsansvarlige, og i Quebec den person, der er ansvarlig for beskyttelsen af personoplysninger, er vores direktør, som kan kontaktes på privacy@dezbatere.ro. Vores privatlivspolitik, bilag B.3, dækker dine data. **Quebec:** Disse vilkår findes på fransk; vælg fransk med sprogvælgeren; de indstillinger, der holder dine debatter private, er slået til som standard; du kan anmode om afindeksering af personoplysninger om dig.
+Vores privatlivsansvarlige, og i Quebec den person, der er ansvarlig for beskyttelsen af personoplysninger, er vores direktør, som kan kontaktes på privacy@dezbatere.ro. Vores privatlivspolitik, bilag B.3, dækker dine data. **Quebec:** Disse vilkår findes på fransk; hvis du vælger Canada ved tilmelding, får du dem først på fransk og kan i stedet vælge engelsk; de indstillinger, der holder dine debatter private, er slået til som standard; du kan anmode om afindeksering af personoplysninger om dig.
 
 ### A.4 Australien og New Zealand
 

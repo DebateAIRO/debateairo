@@ -76,6 +76,7 @@
   "billing.checkout.priceCleared": "Du ändrade dina uppgifter, så priset togs bort. Visa hela priset igen för att fortsätta.",
   "billing.checkout.countryUnavailable": "Betalabonnemang är ännu inte tillgängliga i ditt land. Du kan fortsätta använda det kostnadsfria abonnemanget.",
   "billing.checkout.regionUnavailable": "Betalabonnemang är ännu inte tillgängliga i din region. Du kan fortsätta använda det kostnadsfria abonnemanget.",
+  "billing.checkout.regionTermsExcluded": "Vi erbjuder inte Dialectical Engine i Tennessee, så vi kan inte ta emot betalning för den här adressen.",
   "billing.checkout.confirmCountry": "Din anslutning verkar komma från det här landet: {ipCountry}. Bor du i det här landet: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Ja, jag bor där",
   "billing.checkout.confirmCountryRequired": "Bekräfta landet där du bor och fortsätt sedan.",

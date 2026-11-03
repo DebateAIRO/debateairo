@@ -13,11 +13,14 @@ const locales = readdirSync(MESSAGES, { withFileTypes: true })
 
 const REGION_KEY = "billing.checkout.regionUnavailable";
 const POSTCODE_KEY = "billing.checkout.postalCodeInvalid";
+/** A region the Terms exclude (Tennessee, the owner's choice of 3 November 2026): its own code and sentence. */
+const TERMS_EXCLUDED_KEY = "billing.checkout.regionTermsExcluded";
 
 describe("the closed-region and postal-code refusals have their own plain sentences", () => {
   it("maps REGION_PAYMENT_UNAVAILABLE (403) and BILLING_POSTCODE_INVALID (422) to their sentences", () => {
     expect(checkoutFailureKey(new ContractHttpError("FORBIDDEN", 403, "x", "REGION_PAYMENT_UNAVAILABLE"))).toBe(REGION_KEY);
     expect(checkoutFailureKey(new ContractHttpError("UNPROCESSABLE", 422, "x", "BILLING_POSTCODE_INVALID"))).toBe(POSTCODE_KEY);
+    expect(checkoutFailureKey(new ContractHttpError("FORBIDDEN", 403, "x", "REGION_TERMS_EXCLUDED"))).toBe(TERMS_EXCLUDED_KEY);
     // The country refusal keeps its own sentence: a region is not a country.
     expect(checkoutFailureKey(new ContractHttpError("FORBIDDEN", 403, "x", "COUNTRY_PAYMENT_UNAVAILABLE")))
       .toBe("billing.checkout.countryUnavailable");
@@ -27,6 +30,7 @@ describe("the closed-region and postal-code refusals have their own plain senten
     const english = catalogue("en");
     expect(english[REGION_KEY]).toBe("Paid plans aren't available in your region yet. You can keep using the Free plan.");
     expect(english[POSTCODE_KEY]).toBe("Please check your postal code.");
+    expect(english[TERMS_EXCLUDED_KEY]).toBe("We don't offer Dialectical Engine in Tennessee, so we can't take payment for this address.");
   });
 
   it("is present, non-empty and translated in all 35 locales", () => {
@@ -34,7 +38,7 @@ describe("the closed-region and postal-code refusals have their own plain senten
     const english = catalogue("en");
     for (const locale of locales) {
       const billing = catalogue(locale);
-      for (const key of [REGION_KEY, POSTCODE_KEY]) {
+      for (const key of [REGION_KEY, POSTCODE_KEY, TERMS_EXCLUDED_KEY]) {
         const value = billing[key];
         expect(typeof value, `${locale}: ${key}`).toBe("string");
         expect((value as string).trim(), `${locale}: ${key}`).not.toBe("");

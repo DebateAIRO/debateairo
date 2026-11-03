@@ -76,6 +76,7 @@
   "billing.checkout.priceCleared": "Jūs mainījāt savus datus, tāpēc cena tika noņemta. Lai turpinātu, vēlreiz parādiet pilnu cenu.",
   "billing.checkout.countryUnavailable": "Maksas plāni jūsu valstī vēl nav pieejami. Jūs varat turpināt lietot bezmaksas plānu.",
   "billing.checkout.regionUnavailable": "Maksas plāni jūsu reģionā vēl nav pieejami. Jūs varat turpināt lietot bezmaksas plānu.",
+  "billing.checkout.regionTermsExcluded": "Mēs nepiedāvājam Dialectical Engine Tenesī štatā, tāpēc nevaram pieņemt maksājumu ar šo adresi.",
   "billing.checkout.confirmCountry": "Šķiet, ka jūsu savienojums ir no šīs valsts: {ipCountry}. Vai dzīvojat šajā valstī: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Jā, es tur dzīvoju",
   "billing.checkout.confirmCountryRequired": "Lūdzu, apstipriniet valsti, kurā dzīvojat, un pēc tam turpiniet.",
