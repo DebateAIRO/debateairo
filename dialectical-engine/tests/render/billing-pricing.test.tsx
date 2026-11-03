@@ -121,8 +121,10 @@ describe("P18 /pricing", () => {
     expect(document.querySelector('[data-plan="FREE"]')?.textContent).not.toMatch(/Tax included|No tax added/u);
     expect(document.body.textContent).toContain(billingEnglish["billing.pricing.faqTaxQuestionIncluded"]);
     expect(document.body.textContent).toContain(billingEnglish["billing.pricing.faqTaxAnswerIncluded"]);
-    // The place form shows the country the cards are priced for, and asks no postal code outside the US and Canada.
-    expect((document.querySelector("#pricing-country") as HTMLSelectElement).value).toBe("DE");
+    // The place form (sign-up's region picker) shows the country the cards are priced for, and asks no postal code
+    // outside the US and Canada.
+    expect(document.querySelector("#pricing-region-value")?.textContent).toBe("Germany");
+    expect((document.querySelector('input[type="hidden"][name="country"]') as HTMLInputElement).value).toBe("DE");
     expect(document.querySelector("#pricing-postal-code")).toBeNull();
     expect(document.querySelector("[data-pricing-place]")?.getAttribute("action")).toBe("/pricing");
     // A fractional rate keeps its decimals, as the checkout's tax label does.
@@ -194,11 +196,12 @@ describe("P18 /pricing", () => {
     // A repeated or empty parameter is no choice.
     await renderPricing({ country: ["US", "DE"], postal_code: " " });
     expect(mocks.getBillingPlans).toHaveBeenLastCalledWith({});
-    // Every country can be chosen, named in the reader's language.
+    // With no place yet, the picker is empty and there is nothing to send.
     mocks.getBillingPlans.mockResolvedValue(NO_COUNTRY);
-    const options = [...(await renderPricing()).querySelectorAll("#pricing-country option")];
-    expect(options.length).toBe(250);
-    expect(options.find((option) => option.getAttribute("value") === "RO")?.textContent).toBe("Romania");
+    const empty = await renderPricing();
+    expect(empty.querySelector("#pricing-region-value")?.textContent).toBe(billingEnglish["billing.checkout.country"]);
+    expect(empty.querySelector('input[name="country"]')).toBeNull();
+    expect((empty.querySelector('[data-pricing-place] button[type="submit"]') as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("never shows a dollar amount of AI credit", async () => {
@@ -229,6 +232,6 @@ describe("P18 /pricing", () => {
     expect(plus.textContent).toContain(formatMoney("ro", "121.00", "RON"));
     expect(plus.textContent).toContain("Taxe incluse (21%, România)");
     expect(document.body.textContent).toContain(billingRomanian["billing.pricing.faqTaxAnswerIncluded"]);
-    expect(document.querySelector('label[for="pricing-country"]')?.textContent).toBe(billingRomanian["billing.checkout.country"]);
+    expect(document.querySelector('label[for="pricing-region-trigger"]')?.textContent).toBe(billingRomanian["billing.checkout.country"]);
   });
 });
