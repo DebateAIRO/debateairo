@@ -9,11 +9,13 @@ import { DisplayedTaxReader } from "../../apps/api/src/billing/displayed-tax.js"
 import { BILLING_ROUTE_PATHS, type BillingRouteOptions } from "../../apps/api/src/billing/index.js";
 import { createBillingRuntime, type BillingRuntimeDeps } from "../../apps/api/src/billing/runtime.js";
 import type { GeoLookup } from "@debateai/geo";
+import { QuadernoTaxEngine } from "@debateai/tax-quaderno";
 import {
   testBillingPlans, testBillingPolicy, testCountryPolicy, testRegionalPlans, unusedAskApplication
 } from "../support/billingFixtures.js";
 import { COUNTRY_CODES } from "../../apps/ui/lib/billing/countries.js";
 import { FakeTaxEngine } from "../support/fake-tax-engine.js";
+import { startFakeQuaderno } from "../support/fake-quaderno.js";
 import { TEST_APP_ORIGIN } from "../support/httpSession.js";
 
 const NOW = new Date("2026-10-01T10:00:00.000Z");
@@ -251,13 +253,13 @@ describe("Terms §12 GET /v1/billing/plans prices each place with its own tax", 
     await api.close();
   });
 
-  it("prices every country the pricing page offers with that country's own tax, and leaves no plan without its total", async () => {
-    const { api, read } = taxed();
-    // The US and Canada are priced by a postal code the visitor gives (New York; Toronto).
-    const POSTAL_CODES: Readonly<Record<string, string>> = { US: "10001", CA: "M5V 3L9" };
+  /** The US and Canada are priced by a postal code the visitor gives (New York; Toronto). */
+  const EVERY_COUNTRY_POSTAL_CODES: Readonly<Record<string, string>> = { US: "10001", CA: "M5V 3L9" };
+  /** Each country the page offers comes back PRICED with its own tax, every plan's total its net plus that tax. */
+  async function expectEveryCountryPriced(read: (remoteAddress: string, query?: string) => Promise<Answer>) {
     expect(COUNTRY_CODES).toHaveLength(249);
     for (const country of COUNTRY_CODES) {
-      const postal = POSTAL_CODES[country];
+      const postal = EVERY_COUNTRY_POSTAL_CODES[country];
       const answer = await read("198.51.100.99", `?country=${country}${postal === undefined ? "" : `&postal_code=${encodeURIComponent(postal)}`}`);
       expect(answer.place.status, country).toBe("PRICED");
       expect(answer.tax?.country, country).toBe(country);
@@ -267,7 +269,43 @@ describe("Terms §12 GET /v1/billing/plans prices each place with its own tax", 
         expect(plan.total_price, `${country} ${plan.plan_id}`).toBe((Math.round(netCents * (10_000 + rate) / 10_000) / 100).toFixed(2));
       }
     }
+  }
+
+  it("prices every country the pricing page offers with that country's own tax, and leaves no plan without its total", async () => {
+    const { api, read } = taxed();
+    await expectEveryCountryPriced(read);
     await api.close();
+  });
+
+  it("prices every country through the real Quaderno client, asking Quaderno for that country in its own currency", async () => {
+    // The production adapter over HTTP, against the acceptance fake of Quaderno's /tax_rates/calculate (same rates).
+    const quaderno = await startFakeQuaderno();
+    const tax = new QuadernoTaxEngine({ baseUrl: quaderno.baseUrl, apiKey: quaderno.apiKey, timeoutMs: 2_000 });
+    const displayedTax = new DisplayedTaxReader({
+      tax, plans: testRegionalPlans, policy: testBillingPolicy, audit: () => undefined, clock: () => NOW
+    });
+    const api = buildApi({
+      application: unusedAskApplication(),
+      billing: { ...billing(), plans: testRegionalPlans, geo, displayedTax, clock: () => NOW }
+    });
+    const answers = new Map<string, Answer>();
+    await expectEveryCountryPriced(async (remoteAddress, query = "") => {
+      const response = await api.inject({ method: "GET", url: `/v1/billing/plans${query}`, remoteAddress });
+      expect(response.statusCode, query).toBe(200);
+      const answer = response.json<Answer>();
+      answers.set(String(answer.place.country), answer);
+      return answer;
+    });
+    // Three paid plans per country, each asked once, for that country (and the US/Canadian postal code), in its currency.
+    const calculations = quaderno.requests.filter((request) => request.path === "/api/tax_rates/calculate");
+    expect(calculations).toHaveLength(COUNTRY_CODES.length * 3);
+    for (const request of calculations) {
+      const country = request.query.to_country!;
+      expect(request.query, country).toMatchObject({ currency: answers.get(country)!.currency, tax_behavior: "exclusive" });
+      expect(request.query.to_postal_code, country).toBe(EVERY_COUNTRY_POSTAL_CODES[country]);
+    }
+    await api.close();
+    await quaderno.stop();
   });
 
   it("asks the tax engine once per place, for every paid plan, and keeps the answer for six hours", async () => {
