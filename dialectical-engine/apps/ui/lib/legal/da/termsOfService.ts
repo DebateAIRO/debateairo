@@ -242,7 +242,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Vi oplyser dig på forhånd på et varigt medium om, hvad der ændres og hvornår. Hvis ændringen har mere end en mindre negativ indvirkning på din adgang til eller brug af tjenesten, kan du uden omkostninger opsige inden for 30 dage efter, at du blev underrettet, eller efter at ændringen fik virkning, alt efter hvilken dato der ligger senest, og vi tilbagebetaler eventuelle forudbetalte beløb for den uudnyttede periode." },
       { kind: "p", text: "Disse vilkår. Vi kan ændre disse vilkår af samme type grunde. Ved ændringer, der ikke begrænser dine rettigheder, offentliggør vi den nye version med et resumé af ændringerne og sender dig en e-mail mindst 30 dage, før den får virkning; hvis du fortsætter med at bruge Dialectical Engine efter denne dato, betyder det, at du accepterer den, og du kan lukke din konto inden da. Ved ændringer, der begrænser dine rettigheder — herunder prisstigninger på et eksisterende abonnement, lavere grænser, fjernede funktioner, nye anvendelser af dit indhold eller ændringer af ansvar, lovvalg eller tvistbilæggelse — beder vi dig udtrykkeligt acceptere den nye version ved dit næste login, og ændringen gælder kun fremadrettet. Vi foretager aldrig ændringer med tilbagevirkende kraft, og vi bruger aldrig dette afsnit til at ændre kernen i det, du har betalt for, midt i en periode uden at tilbyde dig en udvej. Tidligere versioner forbliver tilgængelige på dezbatere.ro/terms/versions." },
       { kind: "p", text: "Version 2.14 erstattede version 2.13: afsnit 18 og bilag A angiver ANPC (SAL) som vejen til alternativ tvistbilæggelse." },
-      { kind: "p", text: "Version 2.13 erstattede version 2.12: afsnit 12 oplyser, at betalingsknappen på rumænsk lyder Abonați-vă și plătiți." },
+      { kind: "p", text: "Version 2.13 erstattede version 2.12: afsnit 12 oplyser betalingsknappens rumænske ordlyd." },
       { kind: "p", text: "Version 2.12 erstattede version 2.11: afsnit 10 oplyser, at en person, der er logget ind, også kan bruge knappen Anmeld på enhver offentlig debat, at en AI læser en anmeldelse, der er indsendt med den, ved siden af den offentlige tekst, og hvad der så sker." },
       { kind: "p", text: "Version 2.11 erstattede version 2.10: afsnit 9 oplyser, at vi kan midlertidigt skjule en offentlig debat, mens vi gennemgår den, og fjerne eller rette en del af den." },
       { kind: "p", text: "Version 2.10 erstattede version 2.9: afsnit 9 oplyser, at debatter på det gratis abonnement er offentlige, at en offentlig debat ikke kan få ophævet offentliggørelsen og forbliver offentlig, efter at du har lukket din konto, at alle med kredit kan bidrage til en offentlig debat eller skrive en rapport om den, og at en offentlig debat forbliver åben, efter at dens første forfatter er gået; afsnit 11 oplyser, hvad lukning gør ved dine offentlige debatter." },
@@ -377,7 +377,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.14",
-  sha256: "e167fc908c736d0dba87d793d6a44e7b1ec8c985544edad6b653ec40d8388cf6",
+  sha256: "41732261f757c10ffb388ebb8e9eaff0cc67642d788d15192c36f1b68bebb164",
   eyebrow: "TJENESTEVILKÅR · v2.14 · GÆLDENDE FRA 1. NOVEMBER 2026",
   title: "Det, du accepterer",
   lede: "Aftalen mellem dig og DMS Merchandise Shop S.R.L. i et klart sprog. Nitten afsnit og bilag A — rul ned til slutningen.",

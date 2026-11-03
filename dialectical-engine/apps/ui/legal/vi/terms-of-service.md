@@ -253,7 +253,7 @@ Chúng tôi thông báo trước cho bạn trên một phương tiện bền v�
 
 Phiên bản 2.14 thay thế phiên bản 2.13: mục 18 và Phụ lục A nêu ANPC (SAL) là kênh giải quyết tranh chấp thay thế.
 
-Phiên bản 2.13 thay thế phiên bản 2.12: mục 12 nêu rằng bằng tiếng Romania, nút thanh toán ghi *Abonați-vă și plătiți*.
+Phiên bản 2.13 thay thế phiên bản 2.12: mục 12 nêu dòng chữ tiếng Romania trên nút thanh toán.
 
 Phiên bản 2.12 thay thế phiên bản 2.11: mục 10 nêu rằng người đã đăng nhập cũng có thể sử dụng nút Báo cáo trên bất kỳ cuộc tranh luận công khai nào, rằng AI đọc báo cáo được gửi bằng nút đó bên cạnh văn bản công khai, và điều gì xảy ra sau đó.
 

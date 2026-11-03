@@ -253,7 +253,7 @@ Mēs pastāvīgā informācijas nesējā iepriekš paziņojam, kas un kad mainī
 
 Versija 2.14 aizstāja versiju 2.13: 18. sadaļā un A pielikumā kā alternatīvas strīdu izšķiršanas ceļš norādīta ANPC (SAL).
 
-Versija 2.13 aizstāja versiju 2.12: 12. sadaļā teikts, ka rumāņu valodā uz maksājuma pogas rakstīts *Abonați-vă și plătiți*.
+Versija 2.13 aizstāja versiju 2.12: 12. sadaļā norādīts maksājuma pogas uzraksts rumāņu valodā.
 
 Versija 2.12 aizstāja versiju 2.11: 10. sadaļā teikts, ka pieteikusies persona var arī izmantot pogu „Ziņot” jebkurā publiskā debatē, ka MI lasa ar to iesniegtu ziņojumu līdzās publiskajam tekstam un kas pēc tam notiek.
 

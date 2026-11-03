@@ -253,7 +253,7 @@ Kami memberi tahu Anda terlebih dahulu, pada media tahan lama, mengenai hal yang
 
 Versi 2.14 menggantikan versi 2.13: bagian 18 dan Lampiran A menyebut ANPC (SAL) sebagai jalur penyelesaian sengketa alternatif.
 
-Versi 2.13 menggantikan versi 2.12: bagian 12 menyatakan bahwa dalam bahasa Rumania tombol pembayaran bertuliskan *Abonați-vă și plătiți*.
+Versi 2.13 menggantikan versi 2.12: bagian 12 menyebutkan tulisan tombol pembayaran dalam bahasa Rumania.
 
 Versi 2.12 menggantikan versi 2.11: bagian 10 menyatakan bahwa orang yang sudah masuk juga dapat menggunakan tombol Laporkan pada debat publik mana pun, bahwa AI membaca laporan yang dibuat dengan tombol itu di samping teks publik, dan apa yang terjadi setelah itu.
 

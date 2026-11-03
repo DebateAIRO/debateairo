@@ -253,7 +253,7 @@ Teatame teile püsival andmekandjal ette, mis ja millal muutub. Kui muudatusel o
 
 Versioon 2.14 asendas versiooni 2.13: jaotis 18 ja lisa A nimetavad vaidluste kohtuvälise lahendamise teeks ANPC (SAL).
 
-Versioon 2.13 asendas versiooni 2.12: jaotis 12 ütleb, et rumeenia keeles on maksenupul tekst *Abonați-vă și plătiți*.
+Versioon 2.13 asendas versiooni 2.12: jaotis 12 esitab maksenupu rumeeniakeelse teksti.
 
 Versioon 2.12 asendas versiooni 2.11: jaotis 10 ütleb, et sisselogitud isik saab kasutada ka mis tahes avaliku väitluse juures nuppu Teatage, et tehisintellekt loeb nupuga tehtud teadet avaliku teksti kõrval ning mis siis juhtub.
 

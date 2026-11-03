@@ -242,7 +242,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Patvariojoje laikmenoje iš anksto pranešame, kas ir kada keisis. Jei pakeitimas turi didesnį nei nedidelį neigiamą poveikį jūsų prieigai prie paslaugos ar naudojimuisi ja, galite nemokamai nutraukti sutartį per 30 dienų nuo pranešimo gavimo arba pakeitimo įsigaliojimo dienos, atsižvelgiant į tai, kuri data vėlesnė, o mes grąžinsime visas iš anksto už nepanaudotą laikotarpį sumokėtas sumas." },
       { kind: "p", text: "Šių Sąlygų pakeitimai. Šias Sąlygas galime keisti dėl tokių pačių priežasčių. Jei pakeitimai nesumažina jūsų teisių, paskelbiame naują versiją su pakeitimų santrauka ir išsiunčiame jums el. laišką bent prieš 30 dienų iki jos įsigaliojimo; jei po tos dienos toliau naudositės Dialectical Engine, tai reikš, kad su pakeitimais sutinkate, o iki tol galite uždaryti paskyrą. Jei pakeitimais sumažinamos jūsų teisės — įskaitant esamo plano kainos padidinimą, mažesnes ribas, pašalintas funkcijas, naujus jūsų turinio naudojimo būdus arba atsakomybės, taikytinos teisės ar ginčų sprendimo pakeitimus — kitą kartą prisijungus prašome aiškiai sutikti su nauja versija, o pakeitimas taikomas tik ateityje. Niekada netaikome pakeitimo atgaline data ir niekada nesinaudojame šiuo skyriumi tam, kad sutarties laikotarpio viduryje pakeistume esminius dalykus, už kuriuos sumokėjote, nepasiūlydami galimybės atsisakyti sutarties. Ankstesnes versijas galima rasti adresu dezbatere.ro/terms/versions." },
       { kind: "p", text: "2.14 versija pakeitė 2.13 versiją: 18 skyriuje ir A priede alternatyvaus ginčų sprendimo keliu nurodyta ANPC (SAL)." },
-      { kind: "p", text: "2.13 versija pakeitė 2.12 versiją: 12 skyriuje nurodyta, kad rumunų kalba mokėjimo mygtuke parašyta Abonați-vă și plătiți." },
+      { kind: "p", text: "2.13 versija pakeitė 2.12 versiją: 12 skyriuje nurodytas mokėjimo mygtuko užrašas rumunų kalba." },
       { kind: "p", text: "2.12 versija pakeitė 2.11 versiją: 10 skyriuje nurodyta, kad prisijungęs asmuo taip pat gali naudoti mygtuką Pranešti bet kuriame viešame debate, kad DI perskaito pranešimą, pateiktą jį naudojant, šalia viešo teksto, ir kas tada įvyksta." },
       { kind: "p", text: "2.11 versija pakeitė 2.10 versiją: 9 skyriuje nurodyta, kad mes galime laikinai paslėpti viešą debatą, kol jį peržiūrime, ir pašalinti arba ištaisyti jo dalį." },
       { kind: "p", text: "2.10 versija pakeitė 2.9 versiją: 9 skyriuje nurodyta, kad nemokamame plane debatai yra vieši, kad viešo debato paskelbimo negalima atšaukti ir jis lieka viešas jums uždarius paskyrą, kad kiekvienas, turintis kredito, gali prisidėti prie viešo debato arba parašyti jo ataskaitą, ir kad viešas debatas lieka atviras po to, kai jo pirmasis autorius pasitraukė; 11 skyriuje nurodyta, ką uždarymas reiškia jūsų viešiems debatams." },
@@ -377,7 +377,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.14",
-  sha256: "05e25b126b91ab743669aaff80f724f220b69bab334ec148dbec6c8780d75a4b",
+  sha256: "feee8ab3f97f750f608d29adeb062d8de11991a3c0c82b92d1d268b02d926860",
   eyebrow: "PASLAUGŲ TEIKIMO SĄLYGOS · v2.14 · ĮSIGALIOJA 2026 M. LAPKRIČIO 1 D.",
   title: "Su kuo sutinkate",
   lede: "Jūsų ir DMS Merchandise Shop S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.",

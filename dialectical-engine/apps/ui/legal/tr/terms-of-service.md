@@ -253,7 +253,7 @@ Neyin ne zaman değişeceğini kalıcı veri saklayıcısıyla önceden bildirir
 
 Sürüm 2.14, sürüm 2.13'ün yerine geçmiştir: 18. bölüm ve Ek A, alternatif uyuşmazlık çözümü yolu olarak ANPC (SAL)'ı belirtir.
 
-Sürüm 2.13, sürüm 2.12'nin yerine geçmiştir: 12. bölüm, ödeme düğmesinde Romence *Abonați-vă și plătiți* yazdığını belirtir.
+Sürüm 2.13, sürüm 2.12'nin yerine geçmiştir: 12. bölüm, ödeme düğmesinin Romence metnini belirtir.
 
 Sürüm 2.12, sürüm 2.11'in yerine geçmiştir: 10. bölüm, oturum açmış bir kişinin herkese açık herhangi bir tartışmada Bildir düğmesini de kullanabileceğini, bir yapay zekânın düğmeyle yapılan bildirimi herkese açık metnin yanında okuduğunu ve sonrasında ne olacağını söyler.
 

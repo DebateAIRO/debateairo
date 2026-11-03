@@ -242,7 +242,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Teatame teile püsival andmekandjal ette, mis ja millal muutub. Kui muudatusel on teie juurdepääsule teenusele või selle kasutamisele enam kui vähene negatiivne mõju, võite lepingu tasuta lõpetada 30 päeva jooksul pärast teate saamist või muudatuse jõustumist, olenevalt sellest, kumb on hilisem, ning tagastame kasutamata ajavahemiku eest ette makstud summa." },
       { kind: "p", text: "Nende Tingimuste muudatused. Võime neid Tingimusi samalaadsetel põhjustel muuta. Muudatuste puhul, mis ei vähenda teie õigusi, avaldame uue versiooni koos muudatuste kokkuvõttega ja saadame teile e-kirja vähemalt 30 päeva enne selle jõustumist; Dialectical Engine kasutamise jätkamine pärast seda kuupäeva tähendab, et nõustute muudatusega, ning võite oma konto enne seda sulgeda. Muudatuste puhul, mis vähendavad teie õigusi — sealhulgas olemasoleva paketi hinnatõus, madalamad kasutuslimiidid, eemaldatud funktsioonid, teie sisu uued kasutusviisid või vastutuse, kohaldatava õiguse või vaidluste lahendamise muudatused — palume teil järgmisel sisselogimisel uue versiooniga sõnaselgelt nõustuda ning muudatust kohaldatakse ainult edaspidi. Me ei kohalda muudatust kunagi tagasiulatuvalt ega kasuta seda jaotist selleks, et muuta tähtaja kestel tasulise teenuse põhiolemust ilma teile väljumisvõimalust pakkumata. Varasemad versioonid jäävad kättesaadavaks aadressil dezbatere.ro/terms/versions." },
       { kind: "p", text: "Versioon 2.14 asendas versiooni 2.13: jaotis 18 ja lisa A nimetavad vaidluste kohtuvälise lahendamise teeks ANPC (SAL)." },
-      { kind: "p", text: "Versioon 2.13 asendas versiooni 2.12: jaotis 12 ütleb, et rumeenia keeles on maksenupul tekst Abonați-vă și plătiți." },
+      { kind: "p", text: "Versioon 2.13 asendas versiooni 2.12: jaotis 12 esitab maksenupu rumeeniakeelse teksti." },
       { kind: "p", text: "Versioon 2.12 asendas versiooni 2.11: jaotis 10 ütleb, et sisselogitud isik saab kasutada ka mis tahes avaliku väitluse juures nuppu Teatage, et tehisintellekt loeb nupuga tehtud teadet avaliku teksti kõrval ning mis siis juhtub." },
       { kind: "p", text: "Versioon 2.11 asendas versiooni 2.10: jaotis 9 ütleb, et võime avaliku väitluse läbivaatamise ajaks peita ning eemaldada või parandada selle osa." },
       { kind: "p", text: "Versioon 2.10 asendas versiooni 2.9: jaotis 9 ütleb, et tasuta paketi väitlused on avalikud, et avaliku väitluse avaldamist ei saa tühistada ja see jääb pärast konto sulgemist avalikuks, et igaüks, kellel on krediiti, võib avalikule väitlusele panustada või selle kohta aruande kirjutada, ning et avalik väitlus jääb avatuks pärast selle esimese autori lahkumist; jaotis 11 ütleb, mida sulgemine teie avalikele väitlustele teeb." },
@@ -377,7 +377,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.14",
-  sha256: "0d889567b7aefc483e9978abfc5c300bc8c4ee2fb7c701b472dbcc9c73b209a6",
+  sha256: "58967ca5c2c79d8a3859a537eccbe91d3257312b5062722943876a65df01402f",
   eyebrow: "TEENUSETINGIMUSED · v2.14 · KEHTIB ALATES 1. NOVEMBRIST 2026",
   title: "Millega te nõustute",
   lede: "Teie ja DMS Merchandise Shop S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.",

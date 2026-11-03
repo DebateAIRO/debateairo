@@ -242,7 +242,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Vi underrättar dig i förväg, på ett varaktigt medium, om vad som ändras och när. Om ändringen har mer än en mindre negativ inverkan på din åtkomst till eller användning av tjänsten får du säga upp avtalet utan kostnad inom 30 dagar från det att du underrättades eller från det att ändringen trädde i kraft, beroende på vilket som inträffar senare, och vi återbetalar eventuellt förskottsbetalt belopp för den oanvända perioden." },
       { kind: "p", text: "Dessa villkor. Vi får ändra dessa villkor av samma slags skäl. Vid ändringar som inte minskar dina rättigheter publicerar vi den nya versionen tillsammans med en sammanfattning av ändringarna och skickar e-post till dig minst 30 dagar innan ändringen träder i kraft; om du fortsätter att använda Dialectical Engine efter det datumet innebär det att du godkänner ändringen, och du får avsluta ditt konto före dess. Vid ändringar som minskar dina rättigheter — däribland prishöjningar för ett befintligt abonnemang, lägre gränser, borttagna funktioner, ny användning av ditt innehåll eller ändringar av ansvar, tillämplig lag eller tvistlösning — ber vi dig uttryckligen godkänna den nya versionen nästa gång du loggar in, och ändringen gäller endast framåt i tiden. Vi gör aldrig en ändring retroaktiv och använder aldrig detta avsnitt för att ändra kärnan i det som du har betalat för under en pågående avtalsperiod utan att erbjuda dig en utväg. Tidigare versioner finns kvar på dezbatere.ro/terms/versions." },
       { kind: "p", text: "Version 2.14 ersatte version 2.13: avsnitt 18 och bilaga A anger ANPC (SAL) som vägen för alternativ tvistlösning." },
-      { kind: "p", text: "Version 2.13 ersatte version 2.12: avsnitt 12 anger att betalningsknappen på rumänska har texten Abonați-vă și plătiți." },
+      { kind: "p", text: "Version 2.13 ersatte version 2.12: avsnitt 12 anger betalningsknappens rumänska text." },
       { kind: "p", text: "Version 2.12 ersatte version 2.11: avsnitt 10 anger att en inloggad person också kan använda knappen Rapportera i en offentlig debatt, att en AI läser en rapport som gjorts med den bredvid den offentliga texten, och vad som sedan händer." },
       { kind: "p", text: "Version 2.11 ersatte version 2.10: avsnitt 9 anger att vi kan dölja en offentlig debatt medan vi granskar den, och ta bort eller rätta en del av den." },
       { kind: "p", text: "Version 2.10 ersatte version 2.9: avsnitt 9 anger att debatter på det kostnadsfria abonnemanget är offentliga, att publiceringen av en offentlig debatt inte kan återkallas och att den förblir offentlig efter att du har avslutat ditt konto, att var och en med kredit kan bidra till en offentlig debatt eller skriva en rapport om den, och att en offentlig debatt förblir öppen efter att dess första författare har lämnat; avsnitt 11 anger vad avslutandet innebär för dina offentliga debatter." },
@@ -377,7 +377,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.14",
-  sha256: "7867110ce8f2df94ae691ed57d59bfe14c77abf41e7299fe1d1c2e679291fc6f",
+  sha256: "451e923119c4a649b0717d64b70bdf6112080679237ba9a7dfa98fd4b509a822",
   eyebrow: "ANVÄNDARVILLKOR · v2.14 · GÄLLER FRÅN 1 NOVEMBER 2026",
   title: "Vad du godkänner",
   lede: "Avtalet mellan dig och DMS Merchandise Shop S.R.L., på ett lättbegripligt språk. Nitton avsnitt och bilaga A — rulla till slutet.",

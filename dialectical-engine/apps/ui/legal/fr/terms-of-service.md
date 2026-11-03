@@ -253,7 +253,7 @@ Nous vous informons à l’avance, sur un support durable, de la modification et
 
 La version 2.14 a remplacé la version 2.13 : la section 18 et l’annexe A désignent ANPC (SAL) comme voie de règlement extrajudiciaire des litiges.
 
-La version 2.13 a remplacé la version 2.12 : la section 12 indique qu'en roumain, le bouton de paiement porte la mention *Abonați-vă și plătiți*.
+La version 2.13 a remplacé la version 2.12 : la section 12 indique le libellé roumain du bouton de paiement.
 
 La version 2.12 a remplacé la version 2.11 : la section 10 indique qu'une personne connectée peut aussi utiliser le bouton Signaler sur tout débat public, qu'une IA lit un signalement fait avec lui à côté du texte public, et ce qui se passe alors.
 

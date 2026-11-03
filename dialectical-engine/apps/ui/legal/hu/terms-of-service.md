@@ -253,7 +253,7 @@ Tartós adathordozón előzetesen közöljük Önnel, mi és mikor változik. Ha
 
 A 2.14-es verzió a 2.13-as verzió helyébe lépett: a 18. szakasz és az A. melléklet az ANPC (SAL) szervet nevezi meg az alternatív vitarendezés útjaként.
 
-A 2.13-as verzió a 2.12-es verzió helyébe lépett: a 12. szakasz kimondja, hogy románul a fizetési gomb felirata *Abonați-vă și plătiți*.
+A 2.13-as verzió a 2.12-es verzió helyébe lépett: a 12. szakasz megadja a fizetési gomb román nyelvű feliratát.
 
 A 2.12-es verzió a 2.11-es verzió helyébe lépett: a 10. szakasz kimondja, hogy egy bejelentkezett személy a nyilvános vitáknál a Bejelentés gombot is használhatja, hogy egy MI a gombbal tett bejelentést a nyilvános szöveg mellett olvassa, és hogy ezután mi történik.
 

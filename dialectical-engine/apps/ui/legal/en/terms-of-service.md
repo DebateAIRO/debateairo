@@ -253,7 +253,7 @@ We tell you in advance, on a durable medium, what is changing and when. If the c
 
 Version 2.14 replaced version 2.13: section 18 and Annex A name ANPC (SAL) as the route for alternative dispute resolution.
 
-Version 2.13 replaced version 2.12: section 12 says that in Romanian the payment button reads *Abonați-vă și plătiți*.
+Version 2.13 replaced version 2.12: section 12 gives the payment button's Romanian wording.
 
 Version 2.12 replaced version 2.11: section 10 says that a signed-in person can also use the Report button on any public debate, that an AI reads a report made with it beside the public text, and what happens then.
 

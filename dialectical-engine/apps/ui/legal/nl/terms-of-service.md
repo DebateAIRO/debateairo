@@ -253,7 +253,7 @@ Wij vertellen u vooraf, op een duurzame gegevensdrager, wat er verandert en wann
 
 Versie 2.14 verving versie 2.13: hoofdstuk 18 en bijlage A noemen ANPC (SAL) als de weg voor alternatieve geschillenbeslechting.
 
-Versie 2.13 verving versie 2.12: hoofdstuk 12 zegt dat de betaalknop in het Roemeens *Abonați-vă și plătiți* vermeldt.
+Versie 2.13 verving versie 2.12: hoofdstuk 12 noemt de Roemeense tekst van de betaalknop.
 
 Versie 2.12 verving versie 2.11: hoofdstuk 10 zegt dat een ingelogde persoon ook de knop Melden kan gebruiken bij elk openbaar debat, dat een AI een melding die ermee is gedaan naast de openbare tekst leest, en wat er dan gebeurt.
 

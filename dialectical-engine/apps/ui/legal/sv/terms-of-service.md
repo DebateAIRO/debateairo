@@ -253,7 +253,7 @@ Vi underrättar dig i förväg, på ett varaktigt medium, om vad som ändras och
 
 Version 2.14 ersatte version 2.13: avsnitt 18 och bilaga A anger ANPC (SAL) som vägen för alternativ tvistlösning.
 
-Version 2.13 ersatte version 2.12: avsnitt 12 anger att betalningsknappen på rumänska har texten *Abonați-vă și plătiți*.
+Version 2.13 ersatte version 2.12: avsnitt 12 anger betalningsknappens rumänska text.
 
 Version 2.12 ersatte version 2.11: avsnitt 10 anger att en inloggad person också kan använda knappen Rapportera i en offentlig debatt, att en AI läser en rapport som gjorts med den bredvid den offentliga texten, och vad som sedan händer.
 

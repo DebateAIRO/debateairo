@@ -242,7 +242,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Na trajnom mediju unaprijed vas obavještavamo što se mijenja i kada. Ako promjena ima više nego neznatan negativan učinak na vaš pristup usluzi ili njezinu uporabu, možete bez naknade raskinuti ugovor u roku od 30 dana od obavijesti ili od stupanja promjene na snagu, ovisno o tome što je kasnije, a mi ćemo vratiti svaki unaprijed plaćeni iznos za neiskorišteno razdoblje." },
       { kind: "p", text: "Promjene ovih Uvjeta. Ove Uvjete možemo mijenjati zbog istih vrsta razloga. Za promjene koje ne umanjuju vaša prava objavljujemo novu verziju sa sažetkom promjena i šaljemo vam e-poruku najmanje 30 dana prije njezina stupanja na snagu; nastavak uporabe Dialectical Engine-a nakon tog datuma znači da je prihvaćate, a prije toga možete zatvoriti račun. Za promjene koje umanjuju vaša prava — uključujući povećanja cijena postojećeg plana, niža ograničenja, uklonjene značajke, nove načine uporabe vašeg sadržaja ili promjene odgovornosti, mjerodavnog prava ili rješavanja sporova — tražimo da izričito prihvatite novu verziju pri sljedećoj prijavi, a promjena se primjenjuje samo ubuduće. Promjenu nikada ne primjenjujemo retroaktivno i ovaj odjeljak nikada ne upotrebljavamo za izmjenu bitnog sadržaja onoga što ste platili usred razdoblja bez omogućavanja izlaska iz ugovora. Prethodne verzije ostaju dostupne na dezbatere.ro/terms/versions." },
       { kind: "p", text: "Verzija 2.14 zamijenila je verziju 2.13: odjeljak 18. i Prilog A navode ANPC (SAL) kao put za alternativno rješavanje sporova." },
-      { kind: "p", text: "Verzija 2.13 zamijenila je verziju 2.12: odjeljak 12. navodi da na rumunjskom gumb za plaćanje glasi Abonați-vă și plătiți." },
+      { kind: "p", text: "Verzija 2.13 zamijenila je verziju 2.12: odjeljak 12. navodi rumunjski tekst gumba za plaćanje." },
       { kind: "p", text: "Verzija 2.12 zamijenila je verziju 2.11: odjeljak 10. navodi da prijavljena osoba može upotrijebiti i gumb Prijavite na bilo kojoj javnoj raspravi, da umjetna inteligencija čita prijavu podnesenu tim gumbom uz javni tekst i što se tada događa." },
       { kind: "p", text: "Verzija 2.11 zamijenila je verziju 2.10: odjeljak 9. navodi da javnu raspravu možemo sakriti dok je pregledavamo, a dio nje ukloniti ili ispraviti." },
       { kind: "p", text: "Verzija 2.10 zamijenila je verziju 2.9: odjeljak 9. navodi da su rasprave na besplatnom planu javne, da se javna rasprava ne može povući iz objave ni izbrisati i da ostaje javna nakon što zatvorite račun, da svatko s kreditom može doprinijeti javnoj raspravi ili o njoj napisati izvješće te da javna rasprava ostaje otvorena nakon što je njezin prvi autor otišao; odjeljak 11. navodi što zatvaranje čini s vašim javnim raspravama." },
@@ -377,7 +377,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.14",
-  sha256: "a4fd5bd151741f0434893299443723de1d1af9bf1f2bb4736d35eec1074415f1",
+  sha256: "741b19ab2de9d502721298284079c162c3ca3594da481fb0aeb8429f428a29b2",
   eyebrow: "UVJETI KORIŠTENJA · v2.14 · NA SNAZI OD 1. STUDENOGA 2026.",
   title: "Na što pristajete",
   lede: "Ugovor između vas i društva DMS Merchandise Shop S.R.L., jednostavnim jezikom. Devetnaest odjeljaka i Prilog A — pomaknite se do kraja.",
