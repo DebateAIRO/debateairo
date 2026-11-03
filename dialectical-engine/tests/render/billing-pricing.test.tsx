@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { JSDOM } from "jsdom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ContractHttpError } from "@debateai/contract";
+import { REGION_COUNTRIES } from "@debateai/kernel";
 
 const mocks = vi.hoisted(() => ({
   locale: "en",
@@ -122,9 +123,10 @@ describe("P18 /pricing", () => {
     expect(document.body.textContent).toContain(billingEnglish["billing.pricing.faqTaxQuestionIncluded"]);
     expect(document.body.textContent).toContain(billingEnglish["billing.pricing.faqTaxAnswerIncluded"]);
     // The place form (sign-up's region picker) shows the country the cards are priced for, and asks no postal code
-    // outside the US and Canada.
+    // outside the US and Canada. As served (before scripts run), the plain select is what sends the country.
     expect(document.querySelector("#pricing-region-value")?.textContent).toBe("Germany");
-    expect((document.querySelector('input[type="hidden"][name="country"]') as HTMLInputElement).value).toBe("DE");
+    expect((document.querySelector("#pricing-country") as HTMLSelectElement).value).toBe("DE");
+    expect(document.querySelectorAll('[data-pricing-place] [name="country"]')).toHaveLength(1);
     expect(document.querySelector("#pricing-postal-code")).toBeNull();
     expect(document.querySelector("[data-pricing-place]")?.getAttribute("action")).toBe("/pricing");
     // A fractional rate keeps its decimals, as the checkout's tax label does.
@@ -196,12 +198,17 @@ describe("P18 /pricing", () => {
     // A repeated or empty parameter is no choice.
     await renderPricing({ country: ["US", "DE"], postal_code: " " });
     expect(mocks.getBillingPlans).toHaveBeenLastCalledWith({});
-    // With no place yet, the picker is empty and there is nothing to send.
+    // With no place yet, the picker is empty. Without scripts (a Tor exit's country is never known, and Tor often runs
+    // without them) the plain select of the countries we serve still lets the visitor choose one and send it.
     mocks.getBillingPlans.mockResolvedValue(NO_COUNTRY);
     const empty = await renderPricing();
     expect(empty.querySelector("#pricing-region-value")?.textContent).toBe(billingEnglish["billing.checkout.country"]);
-    expect(empty.querySelector('input[name="country"]')).toBeNull();
-    expect((empty.querySelector('[data-pricing-place] button[type="submit"]') as HTMLButtonElement).disabled).toBe(true);
+    expect(empty.querySelector('input[type="hidden"][name="country"]')).toBeNull();
+    const select = empty.querySelector("#pricing-country") as HTMLSelectElement;
+    expect([select.name, select.required, select.value]).toEqual(["country", true, ""]);
+    expect(select.options).toHaveLength(REGION_COUNTRIES.length + 1);
+    expect([...select.options].find((option) => option.value === "RO")?.textContent).toBe("Romania");
+    expect((empty.querySelector('[data-pricing-place] button[type="submit"]') as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("never shows a dollar amount of AI credit", async () => {

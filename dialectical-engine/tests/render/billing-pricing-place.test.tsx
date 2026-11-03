@@ -99,10 +99,19 @@ describe("Terms §12 the pricing page's place picker", () => {
     expect(query("#pricing-postal-code-error")).toBeNull();
   });
 
-  it("starts from the priced place, and leaves the picker empty for a country it does not list", async () => {
+  it("starts from the priced place, even a country its grid does not list, and sends it again", async () => {
     await mount({ country: "US", postal_code: "75201", status: "PRICED" });
     expect([sentCountry(), query<HTMLInputElement>("#pricing-postal-code")?.value]).toEqual(["US", "75201"]);
-    await mount({ country: "AQ", postal_code: null, status: "PRICED" });
-    expect(sentCountry()).toBeNull();
+    // A connection's country outside the countries we serve: the picker names it, as the cards do.
+    await mount({ country: "PR", postal_code: null, status: "PRICED" });
+    expect([query("#pricing-region-value")?.textContent, sentCountry(), submit().disabled]).toEqual(["Puerto Rico", "PR", false]);
+  });
+
+  it("sends the country once: with scripts, the picker's field only", async () => {
+    await mount({ country: "DE", postal_code: null, status: "PRICED" });
+    const form = query<HTMLFormElement>("[data-pricing-place]")!;
+    expect([...new FormData(form).getAll("country")]).toEqual(["DE"]);
+    await pick("Europe", "RO");
+    expect([...new FormData(form).getAll("country")]).toEqual(["RO"]);
   });
 });

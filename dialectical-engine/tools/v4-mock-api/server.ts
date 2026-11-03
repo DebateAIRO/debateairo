@@ -28,6 +28,8 @@ import {
 } from "./web-draft.js";
 import { ARABIC_RUN, borrowNotice, DEEPEST_DIG, DIG_ANSWERS, DIG_RUNS, monthPause, PATH_REWRITES, reportVersionBody, RUN_PAUSED, SEEDED_NEW_DIGS } from "./rewrite-seed.js";
 import type { WebCase } from "./web-seed.js";
+import { paymentRegionsOf } from "../../packages/kernel/src/payment-regions.js";
+import { BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, priceCurrencyFor } from "../../packages/register/src/billing-plans.js";
 import { contributionOf, PUBLIC_MODES, PUBLIC_REF, seedPublicDebates, writtenReport, type PublicMode } from "./public-seed.js";
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -632,22 +634,25 @@ const MOCK_TAX_RATES: Readonly<Record<string, Readonly<{ name: string; basisPoin
   RO: { name: "VAT", basisPoints: 2_100 }, DE: { name: "MwSt.", basisPoints: 1_900 }, FR: { name: "TVA", basisPoints: 2_000 }
 };
 
+/** The register's own plans row, for the currency each country pays in (RO: lei; the euro countries: euro; else dollars). */
+const REGISTER_PLANS = billingPlansFromValue(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value, BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.sourceRef);
+
 /**
  * Terms §12, as GET /v1/billing/plans answers: the plans priced for the place asked (?country=, and in the US and
- * Canada ?postal_code=), each with its total including that place's tax, and no price at all until the place is known.
+ * Canada ?postal_code=, checked by the kernel's own format as the API does), in that place's currency, each with its
+ * total including that place's tax, and no price at all until the place is known.
  */
 function billingPlans(countryParam: string | null, postalParam: string | null) {
   const country = (countryParam ?? "").trim().toUpperCase();
   if (!/^[A-Z]{2}$/u.test(country)) return BILLING_PLANS;
+  const currency = priceCurrencyFor(REGISTER_PLANS, country);
   const unpriced = (status: "POSTAL_CODE_NEEDED" | "POSTAL_CODE_INVALID") =>
-    ({ ...BILLING_PLANS, place: { country, postal_code: null, status } });
+    ({ ...BILLING_PLANS, currency, place: { country, postal_code: null, status } });
   let postalCode: string | null = null;
   if (country === "US" || country === "CA") {
     const typed = (postalParam ?? "").toUpperCase().replace(/[\s-]+/gu, "");
     if (typed === "") return unpriced("POSTAL_CODE_NEEDED");
-    if (country === "US" ? !/^[0-9]{5}([0-9]{4})?$/u.test(typed) : !/^[A-Z][0-9][A-Z][0-9][A-Z][0-9]$/u.test(typed)) {
-      return unpriced("POSTAL_CODE_INVALID");
-    }
+    if (paymentRegionsOf({ country, postalCode: typed, region: null }).kind === "POSTCODE_INVALID") return unpriced("POSTAL_CODE_INVALID");
     postalCode = country === "US" ? typed.slice(0, 5) : `${typed.slice(0, 3)} ${typed.slice(3)}`;
   }
   const rate = country === "US"
@@ -659,13 +664,13 @@ function billingPlans(countryParam: string | null, postalParam: string | null) {
     return ((cents + Math.floor((cents * basisPoints + 5_000) / 10_000)) / 100).toFixed(2);
   };
   return {
-    currency: "USD",
+    currency,
     place: { country, postal_code: postalCode, status: "PRICED" },
     tax: {
       country, tax_name: rate?.name ?? (country === "US" ? "Sales tax" : "VAT"), tax_rate_bp: basisPoints,
       tax_status: rate === undefined ? "NOT_REGISTERED" : "TAXABLE"
     },
-    plans: BILLING_PLANS.plans.map((plan) => ({ ...plan, total_price: withTax(plan.net_prices.USD) }))
+    plans: BILLING_PLANS.plans.map((plan) => ({ ...plan, total_price: withTax(plan.net_prices[currency]) }))
   };
 }
 
@@ -817,7 +822,7 @@ function startupCheck(): number {
     }
   }
   check("GET /v1/billing/plans", C.BillingPlansResponseSchema, BILLING_PLANS);
-  for (const [country, postal] of [["DE", null], ["US", "75201"], ["US", null], ["CA", "ABC"], ["JP", null]] as const) {
+  for (const [country, postal] of [["DE", null], ["RO", null], ["US", "75201"], ["US", null], ["CA", "D1A 1A1"], ["JP", null]] as const) {
     check(`GET /v1/billing/plans?country=${country}`, C.BillingPlansResponseSchema, billingPlans(country, postal));
   }
   check("GET /v1/answers", C.AnswerIndexSchema, answerIndex(50, 0));
