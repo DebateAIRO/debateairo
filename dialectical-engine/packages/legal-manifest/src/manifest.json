@@ -292,143 +292,143 @@
     "PRIVACY": {
       "ar": {
         "version": "3.11",
-        "sha256": "fe64298f53095fa6ba8fbe813cc27ac333e54ebe7de2068c837eb95a4e021c37"
+        "sha256": "55e255f34ef47ed4df60f7a697780bdd8244b2cbd53ca28fc511ce36741b1726"
       },
       "bg": {
         "version": "3.11",
-        "sha256": "7024785804254e90fdbec4d7acb0282972849ca6d84dc2844f78938606363919"
+        "sha256": "049ef7254a789601d3f6c232c7723886d20f7ac6cf68cfcaa6a064b02d078883"
       },
       "cs": {
         "version": "3.11",
-        "sha256": "00d399df5d8e44bac4576cb241d8d477fa988b4a3295999f5ab7ef63676c7d89"
+        "sha256": "a423b633c08e342c0661611ee3a48e6ea21532d6673d66bbda67361acaf71bf6"
       },
       "da": {
         "version": "3.11",
-        "sha256": "2f884c80f4dce78ed0905f2921738087b5246dcbc52da44e9767869399f6cbad"
+        "sha256": "a2696348b253292309891f4763201f54561470357a0145ab8e103741ca52c723"
       },
       "de": {
         "version": "3.11",
-        "sha256": "083e496b7019bcf4ee7723979e11eb165dbeb58e38b6ad518fbc0eddf9426e40"
+        "sha256": "147c3ab0b9fa5ab7af64e7951e7125c9436b880f386fc028694e37c592583ddd"
       },
       "el": {
         "version": "3.11",
-        "sha256": "a3d2a4bd23c2d3ac06d116aed90910b42e9d270b5d480a84d3ee837402aff47f"
+        "sha256": "df69b511b781b9b0b850b2832312f374731cb568e7e863ef556ceab01344ac2a"
       },
       "en": {
         "version": "3.11",
-        "sha256": "e2d04fb3828cbc603499d4a46f75f5a8625cea09e4d1a376e10cef7a1f58112c"
+        "sha256": "7252fafd0b72f3a23a822668170bc76b93297e067dd5f12324a900dd43167a53"
       },
       "es": {
         "version": "3.11",
-        "sha256": "8bf03961497d65e0989dc6c9103ab0106922a0103f57d0b0d0c5d6725e37aa8c"
+        "sha256": "e2af98103eede479613bc92943a3166e0980dbc7e496243742ddf5e6b03e166b"
       },
       "et": {
         "version": "3.11",
-        "sha256": "1b5d9835df89f3894e44c76b5b65bef4c7dcca2ba4407878700c480e0833b04b"
+        "sha256": "808986df541038f9751485cbb0787fffd9a2281d358ee945e19c778483a9bb2c"
       },
       "fi": {
         "version": "3.11",
-        "sha256": "5b71c7e81ebf9097b47d99e246f032e11523fdad66b2829d335c229f60ac4787"
+        "sha256": "8d123be9cbed68e93341e52050ade21b63725394b18069ed46ffe47b603c35bf"
       },
       "fr": {
         "version": "3.11",
-        "sha256": "ec78e95f9e8474c6de8b57436cf579d743adb5c00b2b8efc0d59df33b27c6992"
+        "sha256": "cd19a3a39f727e49b53a436fb4792e822f4b6016bf4cc9c929bc56eced0bd7a3"
       },
       "ga": {
         "version": "3.11",
-        "sha256": "36dd54625c80cfeaad4dcf3f8d1b2945bf300fc120a5d91d4afaa6d3cb0eca27"
+        "sha256": "f748cbc8525f8da09eea4c271cb7aea339af9533c46a4e5a0389fc81a77e649f"
       },
       "he": {
         "version": "3.11",
-        "sha256": "135df174173507156909d9895fb353e0437d50e7da620f9eeb33d5055948a018"
+        "sha256": "866c7322c7ed68ef74f2d9f1712ac9ec672e8717074610f44c489e2a56de512b"
       },
       "hi": {
         "version": "3.11",
-        "sha256": "bce4141d92dfcc30bbe72b931556183bd25f75afaa32810deb178f602b079b23"
+        "sha256": "87b4a05ab7c17cb13e72e23ae79ee8a876ab215b596ed7cf4bb0ef7fb503aed9"
       },
       "hr": {
         "version": "3.11",
-        "sha256": "c717aef546c4ddbc47c85ae43ae20e268a2c77e1ddbb9c86d861213ddf98efdf"
+        "sha256": "5f9be5a72049a4f3b268483cd1014bec9525521addbbf94399aaa2817819f2f4"
       },
       "hu": {
         "version": "3.11",
-        "sha256": "7ebe092dbadd65fe5af31183692a86a78b053c6669d41c27673baaf31afac5ed"
+        "sha256": "5e07c727acc4cd6dc312f9bc8b01d1710d2dd2c67213d83b8369248cbf72995e"
       },
       "id": {
         "version": "3.11",
-        "sha256": "9a671fa4e005f9cd609687b59ec69bcf8952387e783625f0e8ebfbde09860775"
+        "sha256": "2c43c29d715154df598a25e41eefe56bec4f8bc81a6394631efdda5157ae9d24"
       },
       "it": {
         "version": "3.11",
-        "sha256": "542c88cfba2229fc1ec13c4e65875359d0e1b3bf273a788f2610ef6030bc093b"
+        "sha256": "5163148781cbb2a1898ee955a53b53232c376671faae663d09b4b41f602b29f2"
       },
       "ja": {
         "version": "3.11",
-        "sha256": "b7b372560b4efd466dd32772f18c33710f71c5d6e781221cda2bd50ebb39cecf"
+        "sha256": "d4270d811eff235939ebe281f5582d6a144c65eb7f1536a11ffe4420b08a53d2"
       },
       "ko": {
         "version": "3.11",
-        "sha256": "b50604b63650e0e0056bc4d4d073f6a8f3d68a311bc708705009357c58a8fc9f"
+        "sha256": "77b4b99213b9d2d97fd8c5682caaa51591b6aa803326a94f6a4b26fb24daa799"
       },
       "lt": {
         "version": "3.11",
-        "sha256": "fd45d2c242da6509544453c5d3a00a1617d8bea1c1ab75830b869ea50bd01114"
+        "sha256": "dd31acce76be672dd590297f673ba66151143c99c3e0b96bc7948953a4016420"
       },
       "lv": {
         "version": "3.11",
-        "sha256": "b9f50178f0395e5553a3887df094f7c6f291ee3a48e8ca28250c2971237beee5"
+        "sha256": "527ece34a3c8700840fde85e051c24613322b44e286f4b6579955d6d174e7b6f"
       },
       "mt": {
         "version": "3.11",
-        "sha256": "ce37bbce99ccc0a9bc53b3cb91650b0c9b84574d562e8ec550ac4135f67c4ff6"
+        "sha256": "8ce4002927548f43e523be4f193b5c06556f63c21c08245f1f1061cecda11be0"
       },
       "nl": {
         "version": "3.11",
-        "sha256": "6c7d7775d2b02d62ce99cf98d73d27a2ef01e7e570fb969a28ab7992b1fd0a94"
+        "sha256": "c3d6d45fdc0d1e9796b6f3eef35bf2eef3b3fcfc362a8913b7aa40588db44862"
       },
       "pl": {
         "version": "3.11",
-        "sha256": "749330a8455dd6a6b979cb5a0c84cc59c5d4b70e66067f1f5deda3e21d7b2933"
+        "sha256": "7c04e12e57acc8d5f247dc746cf38a8a1a6ae5a2e4e8bb4b7df68f98048d336c"
       },
       "pt": {
         "version": "3.11",
-        "sha256": "15e4ff2d85e4f3e03452a59a201a8373fae4d154987204c8d68d0706c902d256"
+        "sha256": "c481f355704c67d82a811fb650bd211248d35d4796e9927b6be15f488e1ab4dc"
       },
       "ro": {
         "version": "3.11",
-        "sha256": "bc92ccdb129ee713b8c038f2d90ecbf89a2a904e435dcd513072c8a3c82fd752"
+        "sha256": "fc400136334354f3658928d2ea9d0f23b693a883a63c13e3919134a34ed5423c"
       },
       "ru": {
         "version": "3.11",
-        "sha256": "f4c572dcfa1b483e6f27bc9b79bd62e7d07df5aa17f4248355eafbac87db6551"
+        "sha256": "746d01e372296d5a1305f35c6856bffe0f5ac28fc6695e9e5e22acaf1cb6842a"
       },
       "sk": {
         "version": "3.11",
-        "sha256": "3e5b00c6654884aab9a1693f16ff089f8d3699db2751f74b6bdb0d82c4b06af3"
+        "sha256": "fc02b3072c1c6d8d037e2363398841e4caa15b6fbf9726fcbc9f28d575dad035"
       },
       "sl": {
         "version": "3.11",
-        "sha256": "5fd2bdaefe449026beee02545b1be6b61f1d414a970590449e12454d58d9ae18"
+        "sha256": "6d1931f30ddcce72b357ab255bedd53b92626b146d6219e3a2f20bb799db3cec"
       },
       "sv": {
         "version": "3.11",
-        "sha256": "7f0625210614be9df13b1d23492ff9541ea4796b8819491e1bdbf1a4e96adfdd"
+        "sha256": "266aa35ec19e21290c28619ed57d9db54c01057ee565b7d93176319e186ffa82"
       },
       "tr": {
         "version": "3.11",
-        "sha256": "9a765081bb655e655b222caf70b216fce833883a415b684660eafe6c6eec9c10"
+        "sha256": "5685b3cac61196cb9bb6cc77be42af8e9eb1409e82daea686152848b8a9a2716"
       },
       "uk": {
         "version": "3.11",
-        "sha256": "3c33d4b7bddf63e45b78681c7adb680b839418c0a570eb192b375a921fe98b0a"
+        "sha256": "85b307bb12e3501c6fb099baab43f0550dc3bb85bd0f6dac61b5624f3473b466"
       },
       "vi": {
         "version": "3.11",
-        "sha256": "cca1624eb4886040d42681f140f1cd3c0a813fb241e0500df6e82f7bcedc4a9d"
+        "sha256": "8762fb92aacea0f4e0847c1a8b2d729ed89fa1d8c383578ddc3b53557d00e8d0"
       },
       "zh": {
         "version": "3.11",
-        "sha256": "2b9a9983a9368e014a16746e49df1126aab547810f2e3081a76264601691701b"
+        "sha256": "b130c700a5821fc7ccead39f8a5a5bd32249c5964382cfd50599f2cb75b46210"
       }
     },
     "TERMS": {
@@ -625,6 +625,10 @@
           "version": "3.2",
           "path": "apps/ui/legal/archive/ar/5277c84174e481c59055bb7511c9e57025a7819ed0ef9634d82d0c859ae829ac.md"
         },
+        "55e255f34ef47ed4df60f7a697780bdd8244b2cbd53ca28fc511ce36741b1726": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/ar/55e255f34ef47ed4df60f7a697780bdd8244b2cbd53ca28fc511ce36741b1726.md"
+        },
         "6b0bdb3d95b9b27236a47aeccc6cad81e696d4695e070f70a22f4d8f30f533cd": {
           "version": "3.1",
           "path": "apps/ui/legal/archive/ar/6b0bdb3d95b9b27236a47aeccc6cad81e696d4695e070f70a22f4d8f30f533cd.md"
@@ -688,16 +692,16 @@
         "fd67be5d737d36fcd0a9edefb5c3d3d173c1a06c44403f6f5e67d00dd034ae35": {
           "version": "3.0",
           "path": "apps/ui/legal/archive/ar/fd67be5d737d36fcd0a9edefb5c3d3d173c1a06c44403f6f5e67d00dd034ae35.md"
-        },
-        "fe64298f53095fa6ba8fbe813cc27ac333e54ebe7de2068c837eb95a4e021c37": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/ar/fe64298f53095fa6ba8fbe813cc27ac333e54ebe7de2068c837eb95a4e021c37.md"
         }
       },
       "bg": {
         "007b8f77ab4d4b32be527e05d5653a1e9783821d45648f77e5dfde3ba1d78916": {
           "version": "3.2",
           "path": "apps/ui/legal/archive/bg/007b8f77ab4d4b32be527e05d5653a1e9783821d45648f77e5dfde3ba1d78916.md"
+        },
+        "049ef7254a789601d3f6c232c7723886d20f7ac6cf68cfcaa6a064b02d078883": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/bg/049ef7254a789601d3f6c232c7723886d20f7ac6cf68cfcaa6a064b02d078883.md"
         },
         "0aed2bf64c984be2e465374c783666b92de691dc5fbee95e2c2d76aead2539cd": {
           "version": "3.3",
@@ -738,10 +742,6 @@
         "6cdd6719b00449a79839793fddd4d87183118ba7f37db744e42344ec9762f208": {
           "version": "3.2",
           "path": "apps/ui/legal/archive/bg/6cdd6719b00449a79839793fddd4d87183118ba7f37db744e42344ec9762f208.md"
-        },
-        "7024785804254e90fdbec4d7acb0282972849ca6d84dc2844f78938606363919": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/bg/7024785804254e90fdbec4d7acb0282972849ca6d84dc2844f78938606363919.md"
         },
         "70a86858d44dbc4c638a322ce5bedb73db6cd88854f8342abd3e6bd6c31c50d2": {
           "version": "3.0",
@@ -813,10 +813,6 @@
         }
       },
       "cs": {
-        "00d399df5d8e44bac4576cb241d8d477fa988b4a3295999f5ab7ef63676c7d89": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/cs/00d399df5d8e44bac4576cb241d8d477fa988b4a3295999f5ab7ef63676c7d89.md"
-        },
         "0375d39b015e50103c736801838fca885fb7df67505b59c3005972ef276090eb": {
           "version": "3.3",
           "path": "apps/ui/legal/archive/cs/0375d39b015e50103c736801838fca885fb7df67505b59c3005972ef276090eb.md"
@@ -885,6 +881,10 @@
           "version": "3.2",
           "path": "apps/ui/legal/archive/cs/a134896b16fc16ac2a7259394458d9788a4cfbd4eafbcb13e6f2b2215034c2ef.md"
         },
+        "a423b633c08e342c0661611ee3a48e6ea21532d6673d66bbda67361acaf71bf6": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/cs/a423b633c08e342c0661611ee3a48e6ea21532d6673d66bbda67361acaf71bf6.md"
+        },
         "b70789d6353fbebb6c8186ea64bd2cb1ea01d26c816fc956372aaa1e98b6e297": {
           "version": "3.0",
           "path": "apps/ui/legal/archive/cs/b70789d6353fbebb6c8186ea64bd2cb1ea01d26c816fc956372aaa1e98b6e297.md"
@@ -950,10 +950,6 @@
         "29bbe4df1a6dd56c2785b794cb44f5b951b43f14ea6db22bda5ccb265f337d5e": {
           "version": "3.3",
           "path": "apps/ui/legal/archive/da/29bbe4df1a6dd56c2785b794cb44f5b951b43f14ea6db22bda5ccb265f337d5e.md"
-        },
-        "2f884c80f4dce78ed0905f2921738087b5246dcbc52da44e9767869399f6cbad": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/da/2f884c80f4dce78ed0905f2921738087b5246dcbc52da44e9767869399f6cbad.md"
         },
         "34606e34683d4c273a3a1eb45f3ec79a4254f9d38276af760781a117ec5d4d4f": {
           "version": "3.7",
@@ -1031,6 +1027,10 @@
           "version": "3.3",
           "path": "apps/ui/legal/archive/da/9f0f94467fa01dc6fb0ade8fc5d67eeb510ddcb32305f76d8ae8f86966b321b2.md"
         },
+        "a2696348b253292309891f4763201f54561470357a0145ab8e103741ca52c723": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/da/a2696348b253292309891f4763201f54561470357a0145ab8e103741ca52c723.md"
+        },
         "b2b22ebc3a30b73b4b13ef97800b90f5d78a1999280e408d14f1e853f16a47ea": {
           "version": "3.8",
           "path": "apps/ui/legal/archive/da/b2b22ebc3a30b73b4b13ef97800b90f5d78a1999280e408d14f1e853f16a47ea.md"
@@ -1061,9 +1061,9 @@
         }
       },
       "de": {
-        "083e496b7019bcf4ee7723979e11eb165dbeb58e38b6ad518fbc0eddf9426e40": {
+        "147c3ab0b9fa5ab7af64e7951e7125c9436b880f386fc028694e37c592583ddd": {
           "version": "3.11",
-          "path": "apps/ui/legal/archive/de/083e496b7019bcf4ee7723979e11eb165dbeb58e38b6ad518fbc0eddf9426e40.md"
+          "path": "apps/ui/legal/archive/de/147c3ab0b9fa5ab7af64e7951e7125c9436b880f386fc028694e37c592583ddd.md"
         },
         "20abc973bee3bf847e4f9dcb0e031af81ffe298782368ff744546b554b8e19a7": {
           "version": "3.3",
@@ -1255,10 +1255,6 @@
           "version": "3.0",
           "path": "apps/ui/legal/archive/el/9b8c38ab2008ba642c6f7b9c787e12a3fd4786aec58a66cbc0a7a62cbabbbbec.md"
         },
-        "a3d2a4bd23c2d3ac06d116aed90910b42e9d270b5d480a84d3ee837402aff47f": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/el/a3d2a4bd23c2d3ac06d116aed90910b42e9d270b5d480a84d3ee837402aff47f.md"
-        },
         "a571a454e6f3210b86013653eff944b9690537d6def9f0acc58ea413d5873544": {
           "version": "3.3",
           "path": "apps/ui/legal/archive/el/a571a454e6f3210b86013653eff944b9690537d6def9f0acc58ea413d5873544.md"
@@ -1286,6 +1282,10 @@
         "cb3e034b84a62ebf71fe7842e8a240b47607121a26505a21de0015da8a71ae67": {
           "version": "3.3",
           "path": "apps/ui/legal/archive/el/cb3e034b84a62ebf71fe7842e8a240b47607121a26505a21de0015da8a71ae67.md"
+        },
+        "df69b511b781b9b0b850b2832312f374731cb568e7e863ef556ceab01344ac2a": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/el/df69b511b781b9b0b850b2832312f374731cb568e7e863ef556ceab01344ac2a.md"
         },
         "e5fc4ab4ea3aa68ce87091846e5aabed78642d161c3edbf967b4ea11dbe75e24": {
           "version": "3.0",
@@ -1349,6 +1349,10 @@
           "version": "3.7",
           "path": "apps/ui/legal/archive/en/669b974666656486f65fc84a21433728dee6f8ca57630cf941c10a1093dc761b.md"
         },
+        "7252fafd0b72f3a23a822668170bc76b93297e067dd5f12324a900dd43167a53": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/en/7252fafd0b72f3a23a822668170bc76b93297e067dd5f12324a900dd43167a53.md"
+        },
         "74a59e8f30ac5fbedbc54c62d26686c7d87a7ebded155762e520ffd70e534b3d": {
           "version": "3.0",
           "path": "apps/ui/legal/archive/en/74a59e8f30ac5fbedbc54c62d26686c7d87a7ebded155762e520ffd70e534b3d.md"
@@ -1388,10 +1392,6 @@
         "e20adfede07688bbbc37252fdc65adc19c237f25c5179ae1ed583e2b20a3c5e6": {
           "version": "3.0",
           "path": "apps/ui/legal/archive/en/e20adfede07688bbbc37252fdc65adc19c237f25c5179ae1ed583e2b20a3c5e6.md"
-        },
-        "e2d04fb3828cbc603499d4a46f75f5a8625cea09e4d1a376e10cef7a1f58112c": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/en/e2d04fb3828cbc603499d4a46f75f5a8625cea09e4d1a376e10cef7a1f58112c.md"
         },
         "e32b3a90e411c6eb6f0d35462555e0750c56b4665097cc7725fe01b532e5d554": {
           "version": "3.0",
@@ -1475,10 +1475,6 @@
           "version": "3.1",
           "path": "apps/ui/legal/archive/es/6f5c7b9b4a2d45f8cbc29b1907f5481393c7ea483600ac33f751954f85f9ef86.md"
         },
-        "8bf03961497d65e0989dc6c9103ab0106922a0103f57d0b0d0c5d6725e37aa8c": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/es/8bf03961497d65e0989dc6c9103ab0106922a0103f57d0b0d0c5d6725e37aa8c.md"
-        },
         "8e16c27a450885892b0d154b6e964a7196ae45a67078b61ca3638008878cc265": {
           "version": "3.6",
           "path": "apps/ui/legal/archive/es/8e16c27a450885892b0d154b6e964a7196ae45a67078b61ca3638008878cc265.md"
@@ -1527,6 +1523,10 @@
           "version": "3.0",
           "path": "apps/ui/legal/archive/es/e243c9af2422da0ef684455eeb77e3144c002f1ceb3f739a130e854ed0423cc1.md"
         },
+        "e2af98103eede479613bc92943a3166e0980dbc7e496243742ddf5e6b03e166b": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/es/e2af98103eede479613bc92943a3166e0980dbc7e496243742ddf5e6b03e166b.md"
+        },
         "f5000aa450b03c91795e304f3eb7ed5cd11ff06e210a4814ddade4d18cd63b1b": {
           "version": "3.3",
           "path": "apps/ui/legal/archive/es/f5000aa450b03c91795e304f3eb7ed5cd11ff06e210a4814ddade4d18cd63b1b.md"
@@ -1552,10 +1552,6 @@
         "0e3bb33066aacfb8370542a63ddf69e878b176c00b178f33e6152813b73f589c": {
           "version": "3.0",
           "path": "apps/ui/legal/archive/et/0e3bb33066aacfb8370542a63ddf69e878b176c00b178f33e6152813b73f589c.md"
-        },
-        "1b5d9835df89f3894e44c76b5b65bef4c7dcca2ba4407878700c480e0833b04b": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/et/1b5d9835df89f3894e44c76b5b65bef4c7dcca2ba4407878700c480e0833b04b.md"
         },
         "21dd4d70ce50a9425c61d3baa444f29f670c20da1fd026ae665fc193d9c202ba": {
           "version": "3.1",
@@ -1592,6 +1588,10 @@
         "7d816a63eface898805f3d61a7f17affe90442bb219242eedb5a0111c307b0be": {
           "version": "3.2",
           "path": "apps/ui/legal/archive/et/7d816a63eface898805f3d61a7f17affe90442bb219242eedb5a0111c307b0be.md"
+        },
+        "808986df541038f9751485cbb0787fffd9a2281d358ee945e19c778483a9bb2c": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/et/808986df541038f9751485cbb0787fffd9a2281d358ee945e19c778483a9bb2c.md"
         },
         "830543c708e925f788ac8d4a5da0618eb902816d8c49fa3de8763846eaa1f943": {
           "version": "3.10",
@@ -1715,10 +1715,6 @@
           "version": "3.2",
           "path": "apps/ui/legal/archive/fi/5782a8be731aef2277b11188e5da2fd0d4b36b4521c7074d45c8d6c9c8598439.md"
         },
-        "5b71c7e81ebf9097b47d99e246f032e11523fdad66b2829d335c229f60ac4787": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/fi/5b71c7e81ebf9097b47d99e246f032e11523fdad66b2829d335c229f60ac4787.md"
-        },
         "5dcda2043a002837daca22cfc5ecdb8f457b6c2354854da378990770a50ec6d2": {
           "version": "3.0",
           "path": "apps/ui/legal/archive/fi/5dcda2043a002837daca22cfc5ecdb8f457b6c2354854da378990770a50ec6d2.md"
@@ -1730,6 +1726,10 @@
         "893d40e7790595aa5e67a7f6836b3d69d746565b9aede5a586018a6bdf4f9fe0": {
           "version": "3.8",
           "path": "apps/ui/legal/archive/fi/893d40e7790595aa5e67a7f6836b3d69d746565b9aede5a586018a6bdf4f9fe0.md"
+        },
+        "8d123be9cbed68e93341e52050ade21b63725394b18069ed46ffe47b603c35bf": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/fi/8d123be9cbed68e93341e52050ade21b63725394b18069ed46ffe47b603c35bf.md"
         },
         "947c6da3560bd1514861857207cb28aa5a9a636259d5b483fc55ec96e6fbbb27": {
           "version": "3.3",
@@ -1869,6 +1869,10 @@
           "version": "3.2",
           "path": "apps/ui/legal/archive/fr/c2d69e2b0f8c190638fa20354590033319f0f5d68e2a28b2d05a38ee56fa9c47.md"
         },
+        "cd19a3a39f727e49b53a436fb4792e822f4b6016bf4cc9c929bc56eced0bd7a3": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/fr/cd19a3a39f727e49b53a436fb4792e822f4b6016bf4cc9c929bc56eced0bd7a3.md"
+        },
         "cd219ad2f5328d0192b8d0c08c9bd6ea3ef628625f612e706fc6d273994c9bd4": {
           "version": "3.3",
           "path": "apps/ui/legal/archive/fr/cd219ad2f5328d0192b8d0c08c9bd6ea3ef628625f612e706fc6d273994c9bd4.md"
@@ -1880,10 +1884,6 @@
         "e0c75bc836f4072b3d3be345f48d5e44bb6bcb3dfeb1b4e6bb66c3a4829967eb": {
           "version": "3.3",
           "path": "apps/ui/legal/archive/fr/e0c75bc836f4072b3d3be345f48d5e44bb6bcb3dfeb1b4e6bb66c3a4829967eb.md"
-        },
-        "ec78e95f9e8474c6de8b57436cf579d743adb5c00b2b8efc0d59df33b27c6992": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/fr/ec78e95f9e8474c6de8b57436cf579d743adb5c00b2b8efc0d59df33b27c6992.md"
         },
         "f49e446873b4739d697fe0047c08075f3e6dc32ae0f52c8e7c02666c1dbbdfd1": {
           "version": "3.10",
@@ -1930,10 +1930,6 @@
         "302ef54089eba43a559c76bad36ac30568c15cb3835971f49f642afde0d82c1d": {
           "version": "3.8",
           "path": "apps/ui/legal/archive/ga/302ef54089eba43a559c76bad36ac30568c15cb3835971f49f642afde0d82c1d.md"
-        },
-        "36dd54625c80cfeaad4dcf3f8d1b2945bf300fc120a5d91d4afaa6d3cb0eca27": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/ga/36dd54625c80cfeaad4dcf3f8d1b2945bf300fc120a5d91d4afaa6d3cb0eca27.md"
         },
         "378c14876bb1ec5313fae4190e90571fddd89c54b25929fc1aa8368d6b9bbdbe": {
           "version": "3.3",
@@ -2019,6 +2015,10 @@
           "version": "3.4",
           "path": "apps/ui/legal/archive/ga/eef4f7f442c4558a24b3cbf7b2fefa0abe3c3ced2711b9e2bb1146dff511d18e.md"
         },
+        "f748cbc8525f8da09eea4c271cb7aea339af9533c46a4e5a0389fc81a77e649f": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/ga/f748cbc8525f8da09eea4c271cb7aea339af9533c46a4e5a0389fc81a77e649f.md"
+        },
         "f7d6ae1718530afbbed224ece8e9c9250ba5ebc4bfaf6e1eb64a0bc1fb24418a": {
           "version": "3.2",
           "path": "apps/ui/legal/archive/ga/f7d6ae1718530afbbed224ece8e9c9250ba5ebc4bfaf6e1eb64a0bc1fb24418a.md"
@@ -2036,10 +2036,6 @@
         "0d81fb2430a764648fd1a3b7489158f4b61609189afda2adcd37e5a7d9307bc4": {
           "version": "3.2",
           "path": "apps/ui/legal/archive/he/0d81fb2430a764648fd1a3b7489158f4b61609189afda2adcd37e5a7d9307bc4.md"
-        },
-        "135df174173507156909d9895fb353e0437d50e7da620f9eeb33d5055948a018": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/he/135df174173507156909d9895fb353e0437d50e7da620f9eeb33d5055948a018.md"
         },
         "1cb7e4db83c28810789f189428e89bea71f76b8af744685846b96d1237f3e912": {
           "version": "3.0",
@@ -2104,6 +2100,10 @@
         "7f17bf8579c2f1271ddd63c1d96e43f0523c0df45a5a90401b4bc3fc7b55c88f": {
           "version": "3.3",
           "path": "apps/ui/legal/archive/he/7f17bf8579c2f1271ddd63c1d96e43f0523c0df45a5a90401b4bc3fc7b55c88f.md"
+        },
+        "866c7322c7ed68ef74f2d9f1712ac9ec672e8717074610f44c489e2a56de512b": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/he/866c7322c7ed68ef74f2d9f1712ac9ec672e8717074610f44c489e2a56de512b.md"
         },
         "a3c423f6066a6ba9921d8e52134fec2352c4f98d7534c2209dc6bdf4c9099fe5": {
           "version": "3.2",
@@ -2203,6 +2203,10 @@
           "version": "3.3",
           "path": "apps/ui/legal/archive/hi/67cd2ea1eb4fe9ff6436a0dccd556b7111b28fe2f82f05f940f67837332842db.md"
         },
+        "87b4a05ab7c17cb13e72e23ae79ee8a876ab215b596ed7cf4bb0ef7fb503aed9": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/hi/87b4a05ab7c17cb13e72e23ae79ee8a876ab215b596ed7cf4bb0ef7fb503aed9.md"
+        },
         "88efeee77face9150563d2ccc80eaa09e71456b3307c20c8967324f365e701f8": {
           "version": "3.2",
           "path": "apps/ui/legal/archive/hi/88efeee77face9150563d2ccc80eaa09e71456b3307c20c8967324f365e701f8.md"
@@ -2230,10 +2234,6 @@
         "affd6e596a7ea7b0bfc27fd97c32b62688ec0903f00cbdc808088bb18316b389": {
           "version": "3.5",
           "path": "apps/ui/legal/archive/hi/affd6e596a7ea7b0bfc27fd97c32b62688ec0903f00cbdc808088bb18316b389.md"
-        },
-        "bce4141d92dfcc30bbe72b931556183bd25f75afaa32810deb178f602b079b23": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/hi/bce4141d92dfcc30bbe72b931556183bd25f75afaa32810deb178f602b079b23.md"
         },
         "bdb8abb1eaa5070c01869968405c6b7c389acdf1b2bb0619765731142049c2b2": {
           "version": "3.0",
@@ -2325,6 +2325,10 @@
           "version": "3.0",
           "path": "apps/ui/legal/archive/hr/562be4bf078003c3c72db2165b71001a999296caa6adac610618fc757b6f551a.md"
         },
+        "5f9be5a72049a4f3b268483cd1014bec9525521addbbf94399aaa2817819f2f4": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/hr/5f9be5a72049a4f3b268483cd1014bec9525521addbbf94399aaa2817819f2f4.md"
+        },
         "613ce9388f037c955244aa78c6aeaa80a7ef18651848823d7c469af1f978b049": {
           "version": "3.5",
           "path": "apps/ui/legal/archive/hr/613ce9388f037c955244aa78c6aeaa80a7ef18651848823d7c469af1f978b049.md"
@@ -2360,10 +2364,6 @@
         "c14f8e28211705a165a425550ebd29a554b973435c051c7fd0d012416fea4999": {
           "version": "3.2",
           "path": "apps/ui/legal/archive/hr/c14f8e28211705a165a425550ebd29a554b973435c051c7fd0d012416fea4999.md"
-        },
-        "c717aef546c4ddbc47c85ae43ae20e268a2c77e1ddbb9c86d861213ddf98efdf": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/hr/c717aef546c4ddbc47c85ae43ae20e268a2c77e1ddbb9c86d861213ddf98efdf.md"
         },
         "cae795f8dfc3d48ca28d0fad99aed376cc18067c653a62f60890c27fe00d481f": {
           "version": "3.3",
@@ -2459,13 +2459,13 @@
           "version": "3.2",
           "path": "apps/ui/legal/archive/hu/463fac11a8c0232654ef08b4fcaf67b87a377822a98deb42c81537b3a893d653.md"
         },
+        "5e07c727acc4cd6dc312f9bc8b01d1710d2dd2c67213d83b8369248cbf72995e": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/hu/5e07c727acc4cd6dc312f9bc8b01d1710d2dd2c67213d83b8369248cbf72995e.md"
+        },
         "7918495f9fe1dc532958a3604a7db0d4b4f57e7ff61c0bdf0ae3b7f8a4765450": {
           "version": "3.3",
           "path": "apps/ui/legal/archive/hu/7918495f9fe1dc532958a3604a7db0d4b4f57e7ff61c0bdf0ae3b7f8a4765450.md"
-        },
-        "7ebe092dbadd65fe5af31183692a86a78b053c6669d41c27673baaf31afac5ed": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/hu/7ebe092dbadd65fe5af31183692a86a78b053c6669d41c27673baaf31afac5ed.md"
         },
         "80d4c7c6421f2aa5024f8b8846c30139798a3f8c9ee580a4c32fe460cef58e81": {
           "version": "3.0",
@@ -2537,6 +2537,10 @@
           "version": "3.2",
           "path": "apps/ui/legal/archive/id/2784aa304292ae4c0a8b94e502c37fc292313ede2e3f4959b9de90d86e21e7fa.md"
         },
+        "2c43c29d715154df598a25e41eefe56bec4f8bc81a6394631efdda5157ae9d24": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/id/2c43c29d715154df598a25e41eefe56bec4f8bc81a6394631efdda5157ae9d24.md"
+        },
         "3334d7b38c8be9e57c097c025e8c8f7f7b6c9a66943c890568f68fd98cdb4e94": {
           "version": "3.0",
           "path": "apps/ui/legal/archive/id/3334d7b38c8be9e57c097c025e8c8f7f7b6c9a66943c890568f68fd98cdb4e94.md"
@@ -2592,10 +2596,6 @@
         "96b18190dafd46904131bea9834240e53a96a9e64b11389374014a7342f5c9b6": {
           "version": "3.1",
           "path": "apps/ui/legal/archive/id/96b18190dafd46904131bea9834240e53a96a9e64b11389374014a7342f5c9b6.md"
-        },
-        "9a671fa4e005f9cd609687b59ec69bcf8952387e783625f0e8ebfbde09860775": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/id/9a671fa4e005f9cd609687b59ec69bcf8952387e783625f0e8ebfbde09860775.md"
         },
         "9a9d1c31ef1885710b849b30a32ecc3f8f774ce59447543c526026c787ab386c": {
           "version": "3.3",
@@ -2679,13 +2679,13 @@
           "version": "3.9",
           "path": "apps/ui/legal/archive/it/38e99ef4eebb07511753b7b375a675a32abd258737d82e367acb283bcb909319.md"
         },
+        "5163148781cbb2a1898ee955a53b53232c376671faae663d09b4b41f602b29f2": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/it/5163148781cbb2a1898ee955a53b53232c376671faae663d09b4b41f602b29f2.md"
+        },
         "5348b782b95e670e96d94116df87b7c15bf32865a6d3617ae09e74fb363bed3d": {
           "version": "3.0",
           "path": "apps/ui/legal/archive/it/5348b782b95e670e96d94116df87b7c15bf32865a6d3617ae09e74fb363bed3d.md"
-        },
-        "542c88cfba2229fc1ec13c4e65875359d0e1b3bf273a788f2610ef6030bc093b": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/it/542c88cfba2229fc1ec13c4e65875359d0e1b3bf273a788f2610ef6030bc093b.md"
         },
         "59a16f2a3658d5808d004dfbac0dc1cba50cc7a3d0da6e8b7dc1296ac62c0e92": {
           "version": "3.3",
@@ -2857,10 +2857,6 @@
           "version": "3.3",
           "path": "apps/ui/legal/archive/ja/a6d235df6d1b40eed543c706191f581b70995f6e8d23a91af5d9b6515b1e7b53.md"
         },
-        "b7b372560b4efd466dd32772f18c33710f71c5d6e781221cda2bd50ebb39cecf": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/ja/b7b372560b4efd466dd32772f18c33710f71c5d6e781221cda2bd50ebb39cecf.md"
-        },
         "b856c1e063851888bbd4352378b98e7dcdb099943f23a3054a255fae5ed89aa1": {
           "version": "3.2",
           "path": "apps/ui/legal/archive/ja/b856c1e063851888bbd4352378b98e7dcdb099943f23a3054a255fae5ed89aa1.md"
@@ -2880,6 +2876,10 @@
         "d189dbd0ac233e03d681eda2febd0abc5fe125c9ce70ac4cf7e0cfb58ca7cae7": {
           "version": "3.0",
           "path": "apps/ui/legal/archive/ja/d189dbd0ac233e03d681eda2febd0abc5fe125c9ce70ac4cf7e0cfb58ca7cae7.md"
+        },
+        "d4270d811eff235939ebe281f5582d6a144c65eb7f1536a11ffe4420b08a53d2": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/ja/d4270d811eff235939ebe281f5582d6a144c65eb7f1536a11ffe4420b08a53d2.md"
         },
         "fb6ddebc2e7938fbe4d6e7dfd273a4beb78de40b58e387b877ddbdffdccc782e": {
           "version": "3.1",
@@ -2947,6 +2947,10 @@
           "version": "3.5",
           "path": "apps/ui/legal/archive/ko/727e81b671b40ca0da2411dc7664df1a8c313685da90bb8991dd2df3553d3dcc.md"
         },
+        "77b4b99213b9d2d97fd8c5682caaa51591b6aa803326a94f6a4b26fb24daa799": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/ko/77b4b99213b9d2d97fd8c5682caaa51591b6aa803326a94f6a4b26fb24daa799.md"
+        },
         "79be7c38294dab1b266e94c1963e00b9d3f1178122783be4779cb2d248b3ca32": {
           "version": "3.3",
           "path": "apps/ui/legal/archive/ko/79be7c38294dab1b266e94c1963e00b9d3f1178122783be4779cb2d248b3ca32.md"
@@ -2966,10 +2970,6 @@
         "ac52e8562b6dec16ad341139535b68a3b77a89cf9c06f0085088383d3c55059c": {
           "version": "3.7",
           "path": "apps/ui/legal/archive/ko/ac52e8562b6dec16ad341139535b68a3b77a89cf9c06f0085088383d3c55059c.md"
-        },
-        "b50604b63650e0e0056bc4d4d073f6a8f3d68a311bc708705009357c58a8fc9f": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/ko/b50604b63650e0e0056bc4d4d073f6a8f3d68a311bc708705009357c58a8fc9f.md"
         },
         "b7e05fd6dc1b0fa1071105aeaaad302641e61d62007ad24ba73fc1e7d6282cf2": {
           "version": "3.2",
@@ -3113,6 +3113,10 @@
           "version": "3.6",
           "path": "apps/ui/legal/archive/lt/dc6de5249f1f004cc08dccc9a93553d5326f4b66fdd9bb914125b0e32d70aa43.md"
         },
+        "dd31acce76be672dd590297f673ba66151143c99c3e0b96bc7948953a4016420": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/lt/dd31acce76be672dd590297f673ba66151143c99c3e0b96bc7948953a4016420.md"
+        },
         "f39f05d3ad50b1170136d753a2a3e11880ac087f1bbcaea95b74d772072803ff": {
           "version": "3.2",
           "path": "apps/ui/legal/archive/lt/f39f05d3ad50b1170136d753a2a3e11880ac087f1bbcaea95b74d772072803ff.md"
@@ -3128,10 +3132,6 @@
         "fbe92278b01e5af0d0a4bee5c7a13440398989bfe987f073dadba0dc9378220f": {
           "version": "3.3",
           "path": "apps/ui/legal/archive/lt/fbe92278b01e5af0d0a4bee5c7a13440398989bfe987f073dadba0dc9378220f.md"
-        },
-        "fd45d2c242da6509544453c5d3a00a1617d8bea1c1ab75830b869ea50bd01114": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/lt/fd45d2c242da6509544453c5d3a00a1617d8bea1c1ab75830b869ea50bd01114.md"
         }
       },
       "lv": {
@@ -3174,6 +3174,10 @@
         "4d2169e7b672ce938af8dcf6dd5dfd0c1ad4c3d5d00565e7f80b5862d975fa76": {
           "version": "3.0",
           "path": "apps/ui/legal/archive/lv/4d2169e7b672ce938af8dcf6dd5dfd0c1ad4c3d5d00565e7f80b5862d975fa76.md"
+        },
+        "527ece34a3c8700840fde85e051c24613322b44e286f4b6579955d6d174e7b6f": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/lv/527ece34a3c8700840fde85e051c24613322b44e286f4b6579955d6d174e7b6f.md"
         },
         "5debd4f87830db1cafa83541849ca7f95709ba49bef68e04a866125041e44a79": {
           "version": "3.8",
@@ -3222,10 +3226,6 @@
         "a7d6ef32678ff82c6c2a69bf254ab69ec5f2f4aab3d71a78d54bd322fd08810e": {
           "version": "3.0",
           "path": "apps/ui/legal/archive/lv/a7d6ef32678ff82c6c2a69bf254ab69ec5f2f4aab3d71a78d54bd322fd08810e.md"
-        },
-        "b9f50178f0395e5553a3887df094f7c6f291ee3a48e8ca28250c2971237beee5": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/lv/b9f50178f0395e5553a3887df094f7c6f291ee3a48e8ca28250c2971237beee5.md"
         },
         "c016c7ad6771377a52df3da6207fde2682a441b8139eacab04d8c2dceb64f407": {
           "version": "3.3",
@@ -3325,6 +3325,10 @@
           "version": "3.0",
           "path": "apps/ui/legal/archive/mt/85d4ca04c35be559a12005650c44c1c78cca3fb7cec627c7b77414683541dc53.md"
         },
+        "8ce4002927548f43e523be4f193b5c06556f63c21c08245f1f1061cecda11be0": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/mt/8ce4002927548f43e523be4f193b5c06556f63c21c08245f1f1061cecda11be0.md"
+        },
         "8f4e82a7bac66be089483edb480badcd365a00767d7b4fa964a1c65302cd0c81": {
           "version": "3.3",
           "path": "apps/ui/legal/archive/mt/8f4e82a7bac66be089483edb480badcd365a00767d7b4fa964a1c65302cd0c81.md"
@@ -3340,10 +3344,6 @@
         "c5daf566b44043e42752c0e9b58c3eecc5b9c5affe0e7c8d7346113bd07b8e1f": {
           "version": "3.2",
           "path": "apps/ui/legal/archive/mt/c5daf566b44043e42752c0e9b58c3eecc5b9c5affe0e7c8d7346113bd07b8e1f.md"
-        },
-        "ce37bbce99ccc0a9bc53b3cb91650b0c9b84574d562e8ec550ac4135f67c4ff6": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/mt/ce37bbce99ccc0a9bc53b3cb91650b0c9b84574d562e8ec550ac4135f67c4ff6.md"
         },
         "d50b2050a308126b229ffa64744b3f05cbf03429cc3a390d45f32db3963daecb": {
           "version": "3.3",
@@ -3411,10 +3411,6 @@
           "version": "3.5",
           "path": "apps/ui/legal/archive/nl/630acd3d7c646fb2f4fab5ce0be2087d821d6247532d79b5c7f8e61fd3ada11c.md"
         },
-        "6c7d7775d2b02d62ce99cf98d73d27a2ef01e7e570fb969a28ab7992b1fd0a94": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/nl/6c7d7775d2b02d62ce99cf98d73d27a2ef01e7e570fb969a28ab7992b1fd0a94.md"
-        },
         "6f267c574a66cf9d24685590409e77e8c0a0ff8f55d5f64b959f430b41ad5b10": {
           "version": "3.10",
           "path": "apps/ui/legal/archive/nl/6f267c574a66cf9d24685590409e77e8c0a0ff8f55d5f64b959f430b41ad5b10.md"
@@ -3466,6 +3462,10 @@
         "bde7acdbd243c9bc7b83317dcc7c163cee1da5abee11239e9a01a178f3b41e99": {
           "version": "3.2",
           "path": "apps/ui/legal/archive/nl/bde7acdbd243c9bc7b83317dcc7c163cee1da5abee11239e9a01a178f3b41e99.md"
+        },
+        "c3d6d45fdc0d1e9796b6f3eef35bf2eef3b3fcfc362a8913b7aa40588db44862": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/nl/c3d6d45fdc0d1e9796b6f3eef35bf2eef3b3fcfc362a8913b7aa40588db44862.md"
         },
         "c977964efd1b151b72036e3112f1f59089136c12833a20149c6d6d69c4802716": {
           "version": "3.3",
@@ -3553,9 +3553,9 @@
           "version": "3.3",
           "path": "apps/ui/legal/archive/pl/712161691212f1c918ff18ac6f55249f3913dfe28895652feaa3629b2f54fab5.md"
         },
-        "749330a8455dd6a6b979cb5a0c84cc59c5d4b70e66067f1f5deda3e21d7b2933": {
+        "7c04e12e57acc8d5f247dc746cf38a8a1a6ae5a2e4e8bb4b7df68f98048d336c": {
           "version": "3.11",
-          "path": "apps/ui/legal/archive/pl/749330a8455dd6a6b979cb5a0c84cc59c5d4b70e66067f1f5deda3e21d7b2933.md"
+          "path": "apps/ui/legal/archive/pl/7c04e12e57acc8d5f247dc746cf38a8a1a6ae5a2e4e8bb4b7df68f98048d336c.md"
         },
         "7d042f3fee515429993c9831cd6ed8a9965fec36144dd29191a4bb61cd451b7a": {
           "version": "3.7",
@@ -3626,10 +3626,6 @@
         "0a6fb0e789ec0b77a06d00f028343fcd902c7f34bfdb26fda12067e57900c363": {
           "version": "3.5",
           "path": "apps/ui/legal/archive/pt/0a6fb0e789ec0b77a06d00f028343fcd902c7f34bfdb26fda12067e57900c363.md"
-        },
-        "15e4ff2d85e4f3e03452a59a201a8373fae4d154987204c8d68d0706c902d256": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/pt/15e4ff2d85e4f3e03452a59a201a8373fae4d154987204c8d68d0706c902d256.md"
         },
         "1aa6b6ef0e2b6ae6e3ea6b1f646e6bbab0b742c3d2299f7919900ba073b3ab03": {
           "version": "3.3",
@@ -3706,6 +3702,10 @@
         "ba4fe29132539b23a274435b66543c540b2ab11f245a066d8452d9065092f79d": {
           "version": "3.7",
           "path": "apps/ui/legal/archive/pt/ba4fe29132539b23a274435b66543c540b2ab11f245a066d8452d9065092f79d.md"
+        },
+        "c481f355704c67d82a811fb650bd211248d35d4796e9927b6be15f488e1ab4dc": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/pt/c481f355704c67d82a811fb650bd211248d35d4796e9927b6be15f488e1ab4dc.md"
         },
         "d4551f04a56815461ecb89d1b5d43d726f79ec85879a62240a4f28377933188d": {
           "version": "3.6",
@@ -3849,10 +3849,6 @@
           "version": "3.0",
           "path": "apps/ui/legal/archive/ro/b743c59bbb41b123f112699ddd75cf117d3177a4bd98abdfe31708065eb3b543.md"
         },
-        "bc92ccdb129ee713b8c038f2d90ecbf89a2a904e435dcd513072c8a3c82fd752": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/ro/bc92ccdb129ee713b8c038f2d90ecbf89a2a904e435dcd513072c8a3c82fd752.md"
-        },
         "c77b1c4bda5f9365e8b0ecf5ad068e10a65b5a41463045153927bcddae3eb66a": {
           "version": "3.0",
           "path": "apps/ui/legal/archive/ro/c77b1c4bda5f9365e8b0ecf5ad068e10a65b5a41463045153927bcddae3eb66a.md"
@@ -3868,6 +3864,10 @@
         "e92a1b4b2f298982be73dec882089a60af28159aca22ec748939d8a03881abf5": {
           "version": "3.1",
           "path": "apps/ui/legal/archive/ro/e92a1b4b2f298982be73dec882089a60af28159aca22ec748939d8a03881abf5.md"
+        },
+        "fc400136334354f3658928d2ea9d0f23b693a883a63c13e3919134a34ed5423c": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/ro/fc400136334354f3658928d2ea9d0f23b693a883a63c13e3919134a34ed5423c.md"
         }
       },
       "ru": {
@@ -3923,6 +3923,10 @@
           "version": "3.7",
           "path": "apps/ui/legal/archive/ru/6a912c40f4b5002c4f71a229b5c8337f3f312cc0eb56a65039869bea68c5b9c5.md"
         },
+        "746d01e372296d5a1305f35c6856bffe0f5ac28fc6695e9e5e22acaf1cb6842a": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/ru/746d01e372296d5a1305f35c6856bffe0f5ac28fc6695e9e5e22acaf1cb6842a.md"
+        },
         "763e80793cfd9c5161c9a9649ca14d0548cbb88d95e86005ed07e3fe977ec958": {
           "version": "3.1",
           "path": "apps/ui/legal/archive/ru/763e80793cfd9c5161c9a9649ca14d0548cbb88d95e86005ed07e3fe977ec958.md"
@@ -3974,10 +3978,6 @@
         "eba067cec66a991529e6881be21bbe5ea5a6706c8a696cc5c3a3d13f48b7c10b": {
           "version": "3.2",
           "path": "apps/ui/legal/archive/ru/eba067cec66a991529e6881be21bbe5ea5a6706c8a696cc5c3a3d13f48b7c10b.md"
-        },
-        "f4c572dcfa1b483e6f27bc9b79bd62e7d07df5aa17f4248355eafbac87db6551": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/ru/f4c572dcfa1b483e6f27bc9b79bd62e7d07df5aa17f4248355eafbac87db6551.md"
         },
         "f871475c95400665d20a39d491e60cd3613ddf865ef122cd77af638a8748aa5b": {
           "version": "3.3",
@@ -4032,10 +4032,6 @@
         "3778f9cb8fd546c150a76d240c4c000b22817188914894b7e8f527025d21fdc9": {
           "version": "3.7",
           "path": "apps/ui/legal/archive/sk/3778f9cb8fd546c150a76d240c4c000b22817188914894b7e8f527025d21fdc9.md"
-        },
-        "3e5b00c6654884aab9a1693f16ff089f8d3699db2751f74b6bdb0d82c4b06af3": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/sk/3e5b00c6654884aab9a1693f16ff089f8d3699db2751f74b6bdb0d82c4b06af3.md"
         },
         "4846d524d98b6ebb8bdbc0c97328139e17c667ad8ac7ed9c013e9948fa5d5b39": {
           "version": "3.9",
@@ -4112,6 +4108,10 @@
         "f84bfbe402f4d51c8757fd08830080eb42e4f76ba58a875a6809b6aec4115d95": {
           "version": "3.2",
           "path": "apps/ui/legal/archive/sk/f84bfbe402f4d51c8757fd08830080eb42e4f76ba58a875a6809b6aec4115d95.md"
+        },
+        "fc02b3072c1c6d8d037e2363398841e4caa15b6fbf9726fcbc9f28d575dad035": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/sk/fc02b3072c1c6d8d037e2363398841e4caa15b6fbf9726fcbc9f28d575dad035.md"
         }
       },
       "sl": {
@@ -4171,10 +4171,6 @@
           "version": "3.0",
           "path": "apps/ui/legal/archive/sl/59d2d992ce4fff4ab732ec29926e14d5355d13399613408a3939ee52b9ed6656.md"
         },
-        "5fd2bdaefe449026beee02545b1be6b61f1d414a970590449e12454d58d9ae18": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/sl/5fd2bdaefe449026beee02545b1be6b61f1d414a970590449e12454d58d9ae18.md"
-        },
         "653477ad2221456e71f2245e19caaeabff601b91c9ebd6cdb642fb4b9e493fa8": {
           "version": "3.2",
           "path": "apps/ui/legal/archive/sl/653477ad2221456e71f2245e19caaeabff601b91c9ebd6cdb642fb4b9e493fa8.md"
@@ -4182,6 +4178,10 @@
         "6aed4c4dfc6982f87ef0bb4aa02770f7c0b10921b54b7bb392922e5f23ef7b9b": {
           "version": "3.3",
           "path": "apps/ui/legal/archive/sl/6aed4c4dfc6982f87ef0bb4aa02770f7c0b10921b54b7bb392922e5f23ef7b9b.md"
+        },
+        "6d1931f30ddcce72b357ab255bedd53b92626b146d6219e3a2f20bb799db3cec": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/sl/6d1931f30ddcce72b357ab255bedd53b92626b146d6219e3a2f20bb799db3cec.md"
         },
         "777a7607c93e86c1c135fa1d68bf13aa18158c4e3259f2ea26f12fe301b792b9": {
           "version": "3.2",
@@ -4257,6 +4257,10 @@
           "version": "3.2",
           "path": "apps/ui/legal/archive/sv/260138998911c8e66f0f5b8e225715f6d4d62862b65b06775bff9909ee207376.md"
         },
+        "266aa35ec19e21290c28619ed57d9db54c01057ee565b7d93176319e186ffa82": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/sv/266aa35ec19e21290c28619ed57d9db54c01057ee565b7d93176319e186ffa82.md"
+        },
         "277f99e537160badb54c9562780cd3c727e59567d489c43136ea381975a3873b": {
           "version": "3.1",
           "path": "apps/ui/legal/archive/sv/277f99e537160badb54c9562780cd3c727e59567d489c43136ea381975a3873b.md"
@@ -4292,10 +4296,6 @@
         "6caca921c51e7307cb40f95b2f5a3a5abcaa4094c5cbfd9eac3590da2c21981e": {
           "version": "3.3",
           "path": "apps/ui/legal/archive/sv/6caca921c51e7307cb40f95b2f5a3a5abcaa4094c5cbfd9eac3590da2c21981e.md"
-        },
-        "7f0625210614be9df13b1d23492ff9541ea4796b8819491e1bdbf1a4e96adfdd": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/sv/7f0625210614be9df13b1d23492ff9541ea4796b8819491e1bdbf1a4e96adfdd.md"
         },
         "7fb10f5e5a43591d39ba9d095082bd414baeeee4d96af9618632d24bdd0b2eb0": {
           "version": "3.2",
@@ -4415,6 +4415,10 @@
           "version": "3.1",
           "path": "apps/ui/legal/archive/tr/52a584ce05ba2cf32569ad2cc1a059027dbea736e9e87bba8596b3f379786e6f.md"
         },
+        "5685b3cac61196cb9bb6cc77be42af8e9eb1409e82daea686152848b8a9a2716": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/tr/5685b3cac61196cb9bb6cc77be42af8e9eb1409e82daea686152848b8a9a2716.md"
+        },
         "66f4061ded6718d32be4a2375ef81b8e2742d799b4c17cccb5612b223da46eca": {
           "version": "3.0",
           "path": "apps/ui/legal/archive/tr/66f4061ded6718d32be4a2375ef81b8e2742d799b4c17cccb5612b223da46eca.md"
@@ -4450,10 +4454,6 @@
         "95ae318b3f73a0827c97a15eed19c5cfbeb09bd1377dd8b76fba3a2cdeb7bfba": {
           "version": "3.2",
           "path": "apps/ui/legal/archive/tr/95ae318b3f73a0827c97a15eed19c5cfbeb09bd1377dd8b76fba3a2cdeb7bfba.md"
-        },
-        "9a765081bb655e655b222caf70b216fce833883a415b684660eafe6c6eec9c10": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/tr/9a765081bb655e655b222caf70b216fce833883a415b684660eafe6c6eec9c10.md"
         },
         "9dbe8497f8d70633f964a13bc92c5625cd0c346f47f786714b0c396baa9d0fb8": {
           "version": "3.3",
@@ -4509,10 +4509,6 @@
           "version": "3.2",
           "path": "apps/ui/legal/archive/uk/30524aa6f3150d7a9e03bb3a974b68a5efced4be56d4bbd2db2ff7c6dfdd51e4.md"
         },
-        "3c33d4b7bddf63e45b78681c7adb680b839418c0a570eb192b375a921fe98b0a": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/uk/3c33d4b7bddf63e45b78681c7adb680b839418c0a570eb192b375a921fe98b0a.md"
-        },
         "4274e0f187acbef737776ef1a95c10009da8c10c49860c8765a1c912352e4c14": {
           "version": "3.6",
           "path": "apps/ui/legal/archive/uk/4274e0f187acbef737776ef1a95c10009da8c10c49860c8765a1c912352e4c14.md"
@@ -4556,6 +4552,10 @@
         "8510c160bf7fb0fc346f6d740d84986329ecbd6a78d09d696f2b6f7b946389d2": {
           "version": "3.0",
           "path": "apps/ui/legal/archive/uk/8510c160bf7fb0fc346f6d740d84986329ecbd6a78d09d696f2b6f7b946389d2.md"
+        },
+        "85b307bb12e3501c6fb099baab43f0550dc3bb85bd0f6dac61b5624f3473b466": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/uk/85b307bb12e3501c6fb099baab43f0550dc3bb85bd0f6dac61b5624f3473b466.md"
         },
         "85d0e132608c19eb4593cf26a64e0772ab0713d011b8cf60baac7ae10fcb035d": {
           "version": "3.3",
@@ -4695,6 +4695,10 @@
           "version": "3.0",
           "path": "apps/ui/legal/archive/vi/73942931cebb6415d642282ca8e88d8aa06c4b7d7a120095180e2b0f3a1f5fd5.md"
         },
+        "8762fb92aacea0f4e0847c1a8b2d729ed89fa1d8c383578ddc3b53557d00e8d0": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/vi/8762fb92aacea0f4e0847c1a8b2d729ed89fa1d8c383578ddc3b53557d00e8d0.md"
+        },
         "8999f23a08d69181e0c4ae98a3f8718488f3128dbf70c1a754e71ac9f34d9871": {
           "version": "3.0",
           "path": "apps/ui/legal/archive/vi/8999f23a08d69181e0c4ae98a3f8718488f3128dbf70c1a754e71ac9f34d9871.md"
@@ -4706,10 +4710,6 @@
         "b880c715a9fdfcf8710254a8eaf7dc13147b2cb74fd3db648a92b9d67c8c4c63": {
           "version": "3.3",
           "path": "apps/ui/legal/archive/vi/b880c715a9fdfcf8710254a8eaf7dc13147b2cb74fd3db648a92b9d67c8c4c63.md"
-        },
-        "cca1624eb4886040d42681f140f1cd3c0a813fb241e0500df6e82f7bcedc4a9d": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/vi/cca1624eb4886040d42681f140f1cd3c0a813fb241e0500df6e82f7bcedc4a9d.md"
         },
         "d618c57a4e7392f65a5db2c2e954dc4512229a635ebdc73fa7418bb36e7c0848": {
           "version": "3.3",
@@ -4760,10 +4760,6 @@
         "28bb2ec5f2ebb9be6f45d347fe1d2a63aa18bc2b61c9d1abf8d412c54c5dff0a": {
           "version": "3.6",
           "path": "apps/ui/legal/archive/zh/28bb2ec5f2ebb9be6f45d347fe1d2a63aa18bc2b61c9d1abf8d412c54c5dff0a.md"
-        },
-        "2b9a9983a9368e014a16746e49df1126aab547810f2e3081a76264601691701b": {
-          "version": "3.11",
-          "path": "apps/ui/legal/archive/zh/2b9a9983a9368e014a16746e49df1126aab547810f2e3081a76264601691701b.md"
         },
         "3db013e579210a73b4f89f3963d7236c933ff2481a34ca77cbffa3df11281ceb": {
           "version": "3.2",
@@ -4816,6 +4812,10 @@
         "af3f72b4a42289993b2690e71a15ae351dd9a40fcad998288acd83b4616e0e2e": {
           "version": "3.2",
           "path": "apps/ui/legal/archive/zh/af3f72b4a42289993b2690e71a15ae351dd9a40fcad998288acd83b4616e0e2e.md"
+        },
+        "b130c700a5821fc7ccead39f8a5a5bd32249c5964382cfd50599f2cb75b46210": {
+          "version": "3.11",
+          "path": "apps/ui/legal/archive/zh/b130c700a5821fc7ccead39f8a5a5bd32249c5964382cfd50599f2cb75b46210.md"
         },
         "b674d7a1914d5dcefa5bdbc47edf9e70b24ce3c2e9853a8ef15ed50bcc3e84cf": {
           "version": "3.5",
