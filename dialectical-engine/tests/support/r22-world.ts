@@ -173,7 +173,8 @@ export async function startR22World(options: Readonly<{ log?: (line: string) => 
   });
   const cipher = new ContentCipher(runKeys);
   const encrypted = (): Pool => { const each = open(); configureContentEncryption(each, cipher); return each; };
-  // The test's own pool, on the harness superuser: fixtures and read-backs outside any request (exported as `apiPool`).
+  // The test's own pool, on the harness superuser: fixtures and read-backs outside any request (exported as
+  // `fixtureSuperuserPool`; the API's real runtime pool goes out as `runtimePool`).
   const fixturePool = encrypted();
   configureContentEncryption(database.pool, cipher);
   // THE API's pools, field for field as apps/api/src/main.ts builds them (tests/support/rls-logins.ts, apiTestPools): the
@@ -401,7 +402,7 @@ export async function startR22World(options: Readonly<{ log?: (line: string) => 
   /** The public page as the review read sees it, for the staff seam (tests/integration/public-tree-flow.test.ts's). */
   const withReviewKey = publications.withReviewKey.bind(publications);
   return {
-    base, database, apiPool: fixturePool, runtimePool: apiPool, runnerPool, stubs, search, queue, content, flag, account, signedIn, stranger, settle, composed, askRoom, publications, nextVersion, environment, withReviewKey, api, identities,
+    base, database, fixtureSuperuserPool: fixturePool, runtimePool: apiPool, runnerPool, stubs, search, queue, content, flag, account, signedIn, stranger, settle, composed, askRoom, publications, nextVersion, environment, withReviewKey, api, identities,
     setScript: (next: R22Script | null) => { script = next; },
     async stop(): Promise<void> {
       await api.close();
