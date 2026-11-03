@@ -9,6 +9,7 @@ import { GenericContainer, Wait, type StartedTestContainer } from "testcontainer
 import { createPool, type Pool } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import { loadBootstrapRegister } from "@debateai/register";
+import { armSuperuserGuardForTestFile, currentTestFile } from "./master-key-guard.js";
 
 export interface TestDatabase {
   readonly pool: Pool;
@@ -236,9 +237,19 @@ async function startWithEmbedded(postgresMajor: string): Promise<TestDatabase> {
   }
 }
 
+/**
+ * Starts a fresh embedded PostgreSQL cluster for one test file. Upload check Task 8: it also arms the R21 master-key
+ * guard (tests/support/master-key-guard.ts) for the test file that started it, so in login mode (the default) a query
+ * on this database's superuser inside a request is refused, unless that file is on tests/support/master-key-files.txt.
+ * Seeding, read-backs and the runner run outside any request and are not touched.
+ */
 export async function startTestDatabase(): Promise<TestDatabase> {
+  // Read before the first wait, while the calling test file is still on the stack (the stack is only the fallback).
+  const testFile = currentTestFile();
   // A10: a bad ★DEBATEAI_TEST_SCHEMA_FROM refuses before a cluster is spent on it.
   resolveTestSchemaFrom();
   const bootstrap = await loadBootstrapRegister();
-  return startWithEmbedded(bootstrap.values.postgresMajorVersion);
+  const database = await startWithEmbedded(bootstrap.values.postgresMajorVersion);
+  armSuperuserGuardForTestFile(database.connectionString, testFile);
+  return database;
 }

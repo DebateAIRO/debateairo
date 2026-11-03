@@ -13,23 +13,22 @@
  * - `apiTestPools(database, testFile, overrides)` is the R21 mode switch: the login pools in login mode, the harness
  *   superuser pool in every field when it is off or the file is on tests/support/master-key-files.txt (the master-key
  *   list, `DEBATEAI_TEST_MASTER_KEY_FILES`). In login mode it appends one report line per field to
- *   $DEBATEAI_TEST_API_LOGINS_REPORT and patches pg.Client.prototype.query once, so a query on a client connected as
- *   the harness superuser throws R21_SUPERUSER_POOL_IN_REQUEST inside a request scope.
- * - What is guarded: the files that take their API pools from `apiTestPools`, plus the runners that `runnerTestPool`,
- *   `runnerPoolOrSuperuser` and the preview harness build. A file that never calls `apiTestPools` never arms the guard;
- *   if it builds API pieces on the superuser pool by hand, it is neither guarded nor listed. The known ones are named
- *   in the header of tests/support/master-key-files.txt.
+ *   $DEBATEAI_TEST_API_LOGINS_REPORT and arms the R21 guard (tests/support/master-key-guard.ts), so a query on a client
+ *   connected as the harness superuser throws R21_SUPERUSER_POOL_IN_REQUEST inside a request scope.
+ * - What is guarded (upload check Task 8): every test file that uses a database. The guard arms where the test
+ *   database starts (`startTestDatabase`, and the acceptance tests' `startStandingDatabase`), keyed on the test file,
+ *   so a file that builds API pieces on the superuser pool by hand is guarded too, unless it is on the master-key list.
+ *   What stays outside it is named in tests/support/master-key-guard.ts and in the list's header.
  * - `runnerTestPool(database, budget)` is the runner's side of the same switch: in login mode a pool on the production
  *   runner login, debateai_prod_runner_runtime, the login the server's runner uses; otherwise nothing, and the caller
  *   keeps the superuser pool it always used.
  */
 import { randomBytes, randomUUID } from "node:crypto";
-import { appendFileSync, readFileSync } from "node:fs";
+import { appendFileSync } from "node:fs";
 import { appendFile, chmod, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import pg from "pg";
 import {
   createEmailBlindIndex,
   encrypt,
@@ -47,13 +46,19 @@ import {
   provisionProductionDatabasePrincipals
 } from "../../apps/runner/src/production-database-principals.js";
 import type { TestHttpIdentity } from "./httpSession.js";
+import {
+  callingTestFile, callingTestLine, DEBATEAI_TEST_MASTER_KEY_FILES, enterApiPoolMode, loginModeOff, loginOf,
+  readMasterKeyFiles
+} from "./master-key-guard.js";
 import { beforeTestDatabaseStops, type TestDatabase } from "./testDatabase.js";
+
+// The master-key list and the guard live in master-key-guard.ts (Task 8); these stay importable from here.
+export { DEBATEAI_TEST_MASTER_KEY_FILES, enterApiPoolMode, readMasterKeyFiles };
 
 const PRODUCT_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const PRODUCTION_MANIFEST_PATH = join(PRODUCT_ROOT,
   "docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json");
 const PRODUCTION_ADMIN_ROLE = "debateai_prod_migrator";
-const MASTER_KEY_LIST = join(PRODUCT_ROOT, "tests/support/master-key-files.txt");
 const PRODUCTION_DATABASE = "debateai";
 
 /** The keys of the dev credential file, in apps/runner/src/dev-database-principals.ts order. */
@@ -324,7 +329,7 @@ export async function provisionRlsLogins(database: TestDatabase): Promise<RlsLog
  *   call for `database` (memoised, as `production()` above), and `endProvisionedRlsLogins(database)` ends the pool.
  * - DEBATEAI_TEST_API_LOGINS=0: `undefined`, and the caller uses the superuser pool it always used, unchanged.
  *
- * The runner runs outside any request scope, so the superuser guard of `apiTestPools` never fires on its work.
+ * The runner runs outside any request scope, so the R21 superuser guard never fires on its work.
  */
 export async function runnerTestPool(
   database: RlsDatabase,
@@ -382,84 +387,6 @@ export async function loginApiPools(database: TestDatabase): Promise<ApiTestPool
 }
 
 /**
- * Upload check Task 7: reads the master-key list, one entry per line: a test file's path from dialectical-engine/, one
- * or more spaces, then the one-line reason it may use the superuser pool inside a request. Lines starting with `#` and
- * blank lines are skipped. An entry without a reason, or a file named twice, refuses MASTER_KEY_FILES_ENTRY_INVALID.
- */
-export function readMasterKeyFiles(source: string): ReadonlyMap<string, string> {
-  const entries = new Map<string, string>();
-  for (const line of source.split("\n")) {
-    if (line.trim() === "" || line.startsWith("#")) continue;
-    const found = /^(\S+)\s+(\S.*)$/u.exec(line.trim());
-    if (found === null || entries.has(found[1]!)) throw new TypeError(`MASTER_KEY_FILES_ENTRY_INVALID: ${line}`);
-    entries.set(found[1]!, found[2]!);
-  }
-  return entries;
-}
-
-/**
- * The master-key list, tests/support/master-key-files.txt: the files whose API pools stay on the superuser although
- * they take them from `apiTestPools`. Files that never call `apiTestPools` are not on it and not guarded.
- */
-export const DEBATEAI_TEST_MASTER_KEY_FILES: ReadonlyMap<string, string> =
-  readMasterKeyFiles(readFileSync(MASTER_KEY_LIST, "utf8"));
-
-/**
- * The mode `testFile`'s API pools run in, decided once per call of apiTestPools:
- * - "off" when DEBATEAI_TEST_API_LOGINS=0: the superuser pool, as before Task 7;
- * - "master-key" when the file is on the master-key list: the superuser pool, with no guard;
- * - "logins" otherwise (the default): the product's own logins, and from now on in this process a query on a client
- *   connected as `superuserUrl`'s login throws R21_SUPERUSER_POOL_IN_REQUEST inside a request scope.
- *
- * Only `apiTestPools` calls this, so only a file that takes its API pools from it arms the guard. A file that builds
- * API pieces on the superuser pool by hand and never calls `apiTestPools` is not guarded (the known gap named in
- * tests/support/master-key-files.txt).
- */
-export function enterApiPoolMode(testFile: string, superuserUrl: string): "logins" | "master-key" | "off" {
-  if (loginModeOff()) return "off";
-  if (DEBATEAI_TEST_MASTER_KEY_FILES.has(relative(PRODUCT_ROOT, fileURLToPath(testFile)))) return "master-key";
-  guardSuperuserInRequests(loginOf(superuserUrl));
-  return "logins";
-}
-
-/** Login mode is on unless DEBATEAI_TEST_API_LOGINS=0 asks for the old superuser runs (upload check Task 7). */
-function loginModeOff(): boolean {
-  return process.env.DEBATEAI_TEST_API_LOGINS === "0";
-}
-
-const R21_GUARD = Symbol.for("debateai.rls.r21-superuser-guard.v1");
-type GuardedClientPrototype = { query: (...args: unknown[]) => unknown; [R21_GUARD]?: Set<string> };
-
-/**
- * Login mode (D55): a query on a client whose `user` (pg/lib/client.js:55) is a guarded superuser fails while a request
- * scope is active — `database.pool` and every pool a file builds from the harness URL — instead of passing silently.
- */
-function guardSuperuserInRequests(superuser: string): void {
-  const prototype = pg.Client.prototype as unknown as GuardedClientPrototype;
-  const guarded = prototype[R21_GUARD];
-  if (guarded !== undefined) { guarded.add(superuser); return; }
-  const users = new Set([superuser]);
-  const original = prototype.query;
-  prototype.query = function guardedQuery(this: pg.Client, ...args: unknown[]): unknown {
-    if (users.has(this.user ?? "") && requestScopeActive()) {
-      const failure = new TypeError("R21_SUPERUSER_POOL_IN_REQUEST");
-      const callback = args.at(-1);
-      if (typeof callback === "function") {
-        process.nextTick(() => (callback as (error: Error) => void)(failure));
-        return undefined;
-      }
-      return Promise.reject(failure);
-    }
-    return original.apply(this, args);
-  };
-  Object.defineProperty(prototype, R21_GUARD, { value: users });
-}
-
-function loginOf(url: string): string {
-  return decodeURIComponent(new URL(url).username);
-}
-
-/**
  * PRD-N2 (t_283643c4): runs `fn` as the product runs a repository call inside a request — in a request scope carrying
  * the account's raw session token (`null`: an anonymous request) — so in login mode a T1 pool sends the call's
  * statements on its own login with that account's context instead of routing them to its system target, as it does for
@@ -476,24 +403,6 @@ const ROUTED_OBSERVED = Symbol.for("debateai.rls.routed-call-report.v1");
 /** The T1 fields of ApiTestPools: the pools main.ts gives a system target (runtime, legacyAskAdmission, authorization). */
 const T1_FIELDS: readonly ApiPoolField[] = Object.freeze(API_POOL_WIRING.filter(({ target }) => target !== undefined)
   .map(({ field }) => field));
-
-/** The test file of `callingTestLine()`, without its line. */
-function callingTestFile(): string {
-  return callingTestLine().replace(/:\d+$/u, "");
-}
-
-/** The first stack frame in a test file (not tests/support), as `<path from the product root>:<line>`. */
-function callingTestLine(): string {
-  const limit = Error.stackTraceLimit;
-  Error.stackTraceLimit = 60;
-  const stack = new Error().stack ?? "";
-  Error.stackTraceLimit = limit;
-  for (const frame of stack.split("\n").slice(1)) {
-    const found = /(\/[^\s():]+\.test\.tsx?):(\d+):\d+/u.exec(frame);
-    if (found !== null && !found[1]!.includes("/tests/support/")) return `${relative(PRODUCT_ROOT, found[1]!)}:${found[2]}`;
-  }
-  return "no-test-frame";
-}
 
 /**
  * PRD-N2 (t_283643c4), login mode with $DEBATEAI_TEST_API_LOGINS_ROUTED_REPORT set: a query or checkout on a T1 pool

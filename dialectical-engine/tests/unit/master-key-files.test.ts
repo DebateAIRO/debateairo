@@ -6,19 +6,58 @@ import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import pg from "pg";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { runInRequestScope } from "@debateai/db";
 import {
   DEBATEAI_TEST_MASTER_KEY_FILES,
   enterApiPoolMode,
   readMasterKeyFiles
 } from "../support/rls-logins.js";
+import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 const PRODUCT_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 /** A made-up superuser login and address: the guard refuses before any connection is tried. */
 const superuserUrl = (user: string) => `postgresql://${user}:made-up-password@127.0.0.1:9/made_up_database`;
 
 afterEach(() => { vi.unstubAllEnvs(); });
+
+/** The logins the R21 guard refuses inside a request, as the guard keeps them on pg.Client.prototype. */
+function guardedLogins(): readonly string[] {
+  const prototype = pg.Client.prototype as unknown as Record<symbol, Set<string> | undefined>;
+  return [...(prototype[Symbol.for("debateai.rls.r21-superuser-guard.v1")] ?? [])];
+}
+
+// Upload check Task 8: no apiTestPools and no enterApiPoolMode here. This file is not on the list, and starting its
+// test database the normal way is all it does, so the guard below comes from startTestDatabase itself.
+describe("a test database started the normal way", () => {
+  const off = process.env.DEBATEAI_TEST_API_LOGINS === "0";
+  let guardedBeforeStart: readonly string[] = [];
+  let database: TestDatabase | undefined;
+  beforeAll(async () => {
+    guardedBeforeStart = guardedLogins();
+    database = await startTestDatabase();
+  });
+  afterAll(async () => { await database?.stop(); });
+
+  it("guards an ordinary unlisted file: its superuser pool is refused inside a request, and works outside one", async () => {
+    const pool = database!.pool;
+    const superuser = decodeURIComponent(new URL(database!.connectionString).username);
+    expect(guardedBeforeStart).not.toContain(superuser);
+    expect(DEBATEAI_TEST_MASTER_KEY_FILES.has("tests/unit/master-key-files.test.ts")).toBe(false);
+    expect((await pool.query<{ one: number }>("SELECT 1 AS one")).rows[0]!.one).toBe(1);
+    const inRequest = runInRequestScope(() => pool.query("SELECT 1"));
+    if (off) {
+      // DEBATEAI_TEST_API_LOGINS=0: nothing is armed, the superuser works inside a request as before Task 7.
+      await expect(inRequest).resolves.toBeDefined();
+      expect(guardedLogins()).not.toContain(superuser);
+    } else {
+      await expect(inRequest).rejects.toThrow("R21_SUPERUSER_POOL_IN_REQUEST");
+      expect(guardedLogins()).toContain(superuser);
+    }
+    // Outside a request (seeding, read-backs, the runner) the guard never fires.
+    expect((await pool.query<{ one: number }>("SELECT 1 AS one")).rows[0]!.one).toBe(1);
+  });
+});
 
 describe("the master-key list", () => {
   it("a test file not on the list, once it arms the guard as apiTestPools does, cannot use the superuser pool in a request", async () => {
