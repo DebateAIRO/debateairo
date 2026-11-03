@@ -12,7 +12,10 @@ import { z } from "zod";
 export const ThreatReportSchema = StaffThreatReportSchema.extend({
   account: StaffThreatReportSchema.shape.account.nullable()
 }).strict();
-import { CatalogLocaleCodeSchema } from "./locale.js";
+import { QuestionLanguageChoiceSchema, QuestionLanguageOfferSchema, SiteLanguageSchema, type QuestionLanguageOffer } from "./question-language.js";
+export * from "./question-language.js";
+// V4 start step, Task 9: the step before Start's ids, limits and wire shapes.
+export * from "./start-paths.js";
 import { SessionSchema, LegalDocumentPairSchema } from "./auth-shared.js";
 export * from "./auth-shared.js";
 import { ConsumerAuthenticationCredentialSchema, consumerAuthContractSchemas } from "./consumer-auth.js";
@@ -260,17 +263,8 @@ export function readingLevelOf(depthParams: Readonly<Record<string, unknown>>): 
   return parsed.data;
 }
 
-/** The 35 site locales (apps/ui/messages/<locale>): the language the person's page is in (question-language spec 2026-10-13, L1). */
-export const SiteLanguageSchema = CatalogLocaleCodeSchema;
-export const SITE_LANGUAGE_CODES = CatalogLocaleCodeSchema.options;
-export type SiteLanguage = z.infer<typeof SiteLanguageSchema>;
-/** The person's answer to a real-mix offer: a reference the server signed and a choice; never a language or text of its own. */
-export const QuestionLanguageChoiceSchema = z.object({
-  check_ref: z.string().min(3).max(4096).regex(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/u),
-  choice: z.enum(["USE_REWRITE", "KEEP_MINE"]),
-  original_question_line: z.string().trim().min(1).max(8192).optional()
-}).strict();
-export type QuestionLanguageChoice = z.infer<typeof QuestionLanguageChoiceSchema>;
+// V4 start step, Task 9: the site language and the question-language choice moved to ./question-language.js, unchanged,
+// so the start step's contract can use them without importing this file; re-exported below.
 
 /** Side-by-side spec §13 (Task S12): a sealed settings version's number, as the room read names it and an ask echoes it. */
 const SettingsVersionSchema = z.number().int().positive();
@@ -413,21 +407,6 @@ export type MadeByNewerRelease = z.infer<typeof MadeByNewerReleaseSchema>;
  * bytes — the decider safeParses its offer with this schema and locks instead, so the 409 never becomes a 500.
  */
 export const QUESTION_LANGUAGE_CHOICE_NEEDED = "QUESTION_LANGUAGE_CHOICE_NEEDED" as const;
-const LANGUAGE_NAME_BYTES = Object.freeze({ max: 64 });
-const NamedLanguageSchema = z.object({
-  code: z.string().regex(/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/u),
-  name: z.string().min(1).max(LANGUAGE_NAME_BYTES.max)
-    .refine((name) => new TextEncoder().encode(name).length <= LANGUAGE_NAME_BYTES.max, "a language name is at most 64 bytes")
-}).strict();
-export const QuestionLanguageOfferSchema = z.object({
-  check_ref: z.string().min(3).max(4096),
-  main_language: NamedLanguageSchema,
-  languages_seen: z.array(NamedLanguageSchema).min(2).max(6)
-    .refine((seen) => new Set(seen.map((language) => language.code.split("-")[0])).size === seen.length,
-      "each language is named once"),
-  proposed_question: z.string().min(1)
-}).strict();
-export type QuestionLanguageOffer = z.infer<typeof QuestionLanguageOfferSchema>;
 export const QuestionLanguageChoiceNeededSchema = z.object({
   error: z.literal(QUESTION_LANGUAGE_CHOICE_NEEDED),
   message: z.literal(QUESTION_LANGUAGE_CHOICE_NEEDED),

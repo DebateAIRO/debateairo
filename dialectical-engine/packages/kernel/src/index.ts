@@ -14,6 +14,8 @@ export * from "./payment-regions.js";
 export * from "./engine.js";
 export * from "./engine-material.js";
 export * from "./release-key.js";
+// V4 start step, Task 9: the step before Start's plain limits and ids (the contract re-exports them).
+export * from "./start-step-limits.js";
 
 export type Brand<T, Name extends string> = T & { readonly __brand: Name };
 

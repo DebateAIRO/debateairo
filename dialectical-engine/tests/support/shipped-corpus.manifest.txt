@@ -1043,9 +1043,11 @@ packages/contract/src/password-reset.ts
 packages/contract/src/plan-tiers.ts
 packages/contract/src/publication-review.ts
 packages/contract/src/question-check.ts
+packages/contract/src/question-language.ts
 packages/contract/src/romania-address.ts
 packages/contract/src/social-auth.ts
 packages/contract/src/staff-access.ts
+packages/contract/src/start-paths.ts
 packages/contract/src/story.ts
 packages/contract/src/synthesis-check.ts
 packages/contract/src/verdict-state.ts
@@ -1218,6 +1220,7 @@ packages/kernel/src/region.ts
 packages/kernel/src/release-key.ts
 packages/kernel/src/reply-language.ts
 packages/kernel/src/staff-access.ts
+packages/kernel/src/start-step-limits.ts
 packages/kernel/src/support-credentials.ts
 packages/kernel/src/support-text-views.ts
 packages/kernel/src/web-sentences.ts
