@@ -15,6 +15,10 @@
  *   list, `DEBATEAI_TEST_MASTER_KEY_FILES`). In login mode it appends one report line per field to
  *   $DEBATEAI_TEST_API_LOGINS_REPORT and patches pg.Client.prototype.query once, so a query on a client connected as
  *   the harness superuser throws R21_SUPERUSER_POOL_IN_REQUEST inside a request scope.
+ * - What is guarded: the files that take their API pools from `apiTestPools`, plus the runners that `runnerTestPool`,
+ *   `runnerPoolOrSuperuser` and the preview harness build. A file that never calls `apiTestPools` never arms the guard;
+ *   if it builds API pieces on the superuser pool by hand, it is neither guarded nor listed. The known ones are named
+ *   in the header of tests/support/master-key-files.txt.
  * - `runnerTestPool(database, budget)` is the runner's side of the same switch: in login mode a pool on the production
  *   runner login, debateai_prod_runner_runtime, the login the server's runner uses; otherwise nothing, and the caller
  *   keeps the superuser pool it always used.
@@ -393,7 +397,10 @@ export function readMasterKeyFiles(source: string): ReadonlyMap<string, string> 
   return entries;
 }
 
-/** The master-key list, tests/support/master-key-files.txt: the files whose API pools stay on the superuser. */
+/**
+ * The master-key list, tests/support/master-key-files.txt: the files whose API pools stay on the superuser although
+ * they take them from `apiTestPools`. Files that never call `apiTestPools` are not on it and not guarded.
+ */
 export const DEBATEAI_TEST_MASTER_KEY_FILES: ReadonlyMap<string, string> =
   readMasterKeyFiles(readFileSync(MASTER_KEY_LIST, "utf8"));
 
@@ -403,6 +410,10 @@ export const DEBATEAI_TEST_MASTER_KEY_FILES: ReadonlyMap<string, string> =
  * - "master-key" when the file is on the master-key list: the superuser pool, with no guard;
  * - "logins" otherwise (the default): the product's own logins, and from now on in this process a query on a client
  *   connected as `superuserUrl`'s login throws R21_SUPERUSER_POOL_IN_REQUEST inside a request scope.
+ *
+ * Only `apiTestPools` calls this, so only a file that takes its API pools from it arms the guard. A file that builds
+ * API pieces on the superuser pool by hand and never calls `apiTestPools` is not guarded (the known gap named in
+ * tests/support/master-key-files.txt).
  */
 export function enterApiPoolMode(testFile: string, superuserUrl: string): "logins" | "master-key" | "off" {
   if (loginModeOff()) return "off";

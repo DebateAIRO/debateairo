@@ -1,5 +1,22 @@
 # The master-key list (upload check Task 7): the test files whose API pools stay on the harness superuser, the
-# "master key", while every other end-to-end test logs in with the product's own database logins (the default; see
-# tests/support/rls-logins.ts). One entry per line: the file's path from dialectical-engine/, one or more spaces, then
-# a one-line reason. A file belongs here only for a named reason; a product fault is named as one.
+# "master key". One entry per line: the file's path from dialectical-engine/, one or more spaces, then a one-line
+# reason. A file belongs here only for a named reason; a product fault is named as one.
+#
+# What the guard covers (tests/support/rls-logins.ts): a file that takes its API pools from apiTestPools gets the
+# product's own logins (the default), and from then on a query on the superuser inside a request fails
+# (R21_SUPERUSER_POOL_IN_REQUEST), unless the file is listed here. The runners that runnerTestPool,
+# runnerPoolOrSuperuser and the preview harness build run on the runner's own login.
+#
+# Known gap: a file that never calls apiTestPools never arms the guard. When such a file builds API pieces on the
+# superuser pool by hand, its superuser queries inside requests pass silently, and it is neither guarded nor listed
+# here. Found on 3 Nov 2026:
+# - tests/support/billingStack.ts, used by billing-whole-flow, billing-email-change, billing-dispute-fake-stack,
+#   billing-every-country-closed and billing-retired-payment-jobs (the billing runtime on database.pool);
+# - tests/integration/registration-database.test.ts (sessions and the consumer repositories on database.pool);
+# - tests/integration/sf-s04-ask-gate-database.test.ts (RunRepository on database.pool inside the ask);
+# - tests/support/r22-world.ts, used by r22-end-to-end (its API pool is built from the superuser address);
+# - not reached today: tests/support/staffSecurityJourney.ts's fallback alert readiness on database.pool.
+# The five copy-database runner groups also stay on the superuser (ruling R26): debate-shape-row-absent,
+# r2-engine-row-absent, reclaim-resume, and the variant parts of debate-shape-run and parallel-calls-debate.
+# Arming the guard for every database test file is an open question for the owner.
 tests/integration/s7-authorization-database.test.ts  product fault: the investigation request locks core.run (SELECT ... FOR UPDATE, packages/serve/src/index.ts:3499), which the API's runtime login may not do, so a missing gap answers 500, not 404

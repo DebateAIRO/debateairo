@@ -1,6 +1,7 @@
-// Upload check Task 7: the end-to-end tests log in with the product's own database logins by default, and only the
-// files on tests/support/master-key-files.txt may use the harness superuser (the "master key") inside a request.
-// No database is needed: the guard refuses the query before the client ever connects.
+// Upload check Task 7: the test files that take their API pools from apiTestPools log in with the product's own
+// database logins by default, and of those only the files on tests/support/master-key-files.txt may use the harness
+// superuser (the "master key") inside a request. Files that never call apiTestPools are not guarded (the known gap in
+// that list's header). No database is needed: the guard refuses the query before the client ever connects.
 import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -20,7 +21,7 @@ const superuserUrl = (user: string) => `postgresql://${user}:made-up-password@12
 afterEach(() => { vi.unstubAllEnvs(); });
 
 describe("the master-key list", () => {
-  it("a test file not on the list cannot use the superuser pool in a request", async () => {
+  it("a test file not on the list, once it arms the guard as apiTestPools does, cannot use the superuser pool in a request", async () => {
     vi.stubEnv("DEBATEAI_TEST_API_LOGINS", undefined);
     expect(DEBATEAI_TEST_MASTER_KEY_FILES.has("tests/unit/master-key-files.test.ts")).toBe(false);
     expect(enterApiPoolMode(import.meta.url, superuserUrl("t7_unlisted_superuser"))).toBe("logins");
