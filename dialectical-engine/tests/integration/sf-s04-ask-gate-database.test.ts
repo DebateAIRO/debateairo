@@ -1,3 +1,4 @@
+import { AsyncResource } from "node:async_hooks";
 import { createHash, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { buildApi, type AskApplication } from "@debateai/api";
@@ -11,9 +12,20 @@ import { readQuestionSubjects } from "../../apps/api/src/question-check/subjects
 import { SUPPORT_RELAY_PROVIDER_REF } from "../../apps/api/src/support/model.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
+import { apiTestPools, type ApiTestPools } from "../support/rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 let database: TestDatabase;
+/** Upload check Task 8: the API's pools as main.ts builds them; every field database.pool with DEBATEAI_TEST_API_LOGINS=0. */
+let apiPools: ApiTestPools;
+/**
+ * Runs `work` outside the request's scope. The ask application below is this test's stand-in for the real one (what is
+ * under test is the gate in front of it): its run start is a fixture write, kept on the superuser as before. The
+ * real server ask path cannot be used here: since migration 0040 the runtime login may not insert a legacy core.run,
+ * and a signed-in owner's encrypted admission would add its own run-key and content rows to the table delta this file
+ * pins as the gate's contract. That path runs on the logins in database.test.ts's S-LANG case.
+ */
+const outsideRequest = AsyncResource.bind(<T,>(work: () => Promise<T>): Promise<T> => work());
 const identity = testHttpIdentity("s04-database-gate");
 const question = "Should a private sentinel question lead to a debate?";
 // V, 2026-10-28: the model answers the subject (or NONE) and whether the question is healthy; nothing is kept.
@@ -21,22 +33,6 @@ const labels = ["NONE healthy", "DRUGS healthy", "HARM_TO_OTHERS not", "WEAPONS_
   "HATE_SPEECH not", "RELIGIOUS_INSULT not", "SUICIDE_AND_ASSISTED_DYING not", "OWN_CRISIS not", "SUICIDE_METHODS healthy",
   "QUESTION_CHECK_HTTP_STATUS"] as const;
 const starts = (label: string) => label.endsWith(" healthy") && !label.startsWith("SUICIDE_METHODS");
-
-async function asRuntime<T extends Record<string, unknown> = Record<string, unknown>>(
-  statement: string, values: unknown[] = []
-): Promise<T[]> {
-  const client = await database.pool.connect();
-  try {
-    await client.query("BEGIN");
-    await client.query("SET LOCAL ROLE debateai_runtime");
-    const rows = (await client.query<T>(statement, values)).rows;
-    await client.query("COMMIT");
-    return rows;
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally { client.release(); }
-}
 
 async function staffHolder(owner: boolean): Promise<void> {
   const userId = randomUUID(), staffId = randomUUID();
@@ -86,10 +82,10 @@ function serverFor(label: typeof labels[number], reports: { event: string; code:
   };
   const check = createQuestionCheck({ subjects: readQuestionSubjects(), port: () => port, deadlineMs: 1_000,
     price: { input: 1, output: 2 }, dayPot: null, clock: () => new Date(),
-    spend: { record: entry => recordQuestionCheckSpend({ query: async (sql: string, values?: unknown[]) =>
-      ({ rows: await asRuntime(sql, values) }) } as never, entry) }, report: line => { reports.push(line); } });
+    // As main.ts:1458 records it: on the API's runtime pool.
+    spend: { record: entry => recordQuestionCheckSpend(apiPools.runtime, entry) }, report: line => { reports.push(line); } });
   const application = new Proxy({}, { get: (_target, key) => key === "submit"
-    ? async () => {
+    ? async () => outsideRequest(async () => {
       const runId = await new RunRepository(database.pool).startRun({
         questionLine: question, principal: { kind: "legacy", legacyAskerId: `gate:${randomUUID()}` },
         sessionId: randomUUID(), callerScope: "ASKER", asOf: new Date(),
@@ -101,7 +97,7 @@ function serverFor(label: typeof labels[number], reports: { event: string; code:
       });
       await database.pool.query("SELECT core.append_run_ownership_event($1,$2)", [runId, identity.authenticated.ownerRef]);
       return { run_ref: runId, status: "QUEUED" };
-    } : async () => null }) as AskApplication;
+    }) : async () => null }) as AskApplication;
   const api = buildApi({ application, sessions: testSessionApplication([identity]), allowedOrigin: TEST_APP_ORIGIN,
     questionCheck: { check: line => check.check(line) } });
   return api;
@@ -111,6 +107,7 @@ describe("S04 ask gate over the database", () => {
   beforeAll(async () => {
     database = await startTestDatabase();
     await migrate(database.pool);
+    apiPools = await apiTestPools(database, import.meta.url);
     await database.pool.query(`INSERT INTO identity."user"
       (user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,password_hash,pseudonym,owner_ref,state,adult_affirmed_at)
       VALUES ($1,$2,'{}','{}','fixture-password',$3,$4,'active',now())`,
