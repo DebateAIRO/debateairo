@@ -10,13 +10,20 @@ const POSTAL_CODE_COUNTRIES: ReadonlySet<string> = new Set(["US", "CA"]);
 /**
  * Terms §12: the place the cards are priced for, as the checkout asks it: the country where the visitor lives (the
  * connection's, until they choose), and in the US and Canada the postal code. A plain GET form back to /pricing, so it
- * works without scripts; the place is used for this page only and stored nowhere.
+ * works without scripts; the place is used for this page only and stored nowhere. The postal code is not `required`:
+ * a visitor priced for the US or Canada who picks another country must not be stopped by it, and one sent empty is
+ * asked for again by the cards.
  */
 export function PricingPlaceForm({
   catalog,
   locale,
-  place
-}: Readonly<{ catalog: MessageCatalog; locale: string; place: BillingPlansPlace }>): JSX.Element {
+  place,
+  typedPostalCode
+}: Readonly<{
+  catalog: MessageCatalog; locale: string; place: BillingPlansPlace;
+  /** The postal code as the visitor typed it, given back when it did not fit so they can correct it. */
+  typedPostalCode?: string;
+}>): JSX.Element {
   const countries = COUNTRY_CODES.map((code) => ({ code, label: countryName(locale, code) }))
     .sort((left, right) => left.label.localeCompare(right.label, locale));
   const asksPostalCode = place.country !== null && POSTAL_CODE_COUNTRIES.has(place.country);
@@ -34,8 +41,8 @@ export function PricingPlaceForm({
         <div className="billingField">
           <label htmlFor="pricing-postal-code">{t(catalog, "billing.checkout.postalCode")}</label>
           <input
-            id="pricing-postal-code" name="postal_code" defaultValue={place.postal_code ?? ""} autoComplete="postal-code"
-            maxLength={16} required aria-invalid={postalInvalid}
+            id="pricing-postal-code" name="postal_code" defaultValue={place.postal_code ?? (postalInvalid ? typedPostalCode ?? "" : "")}
+            autoComplete="postal-code" maxLength={16} aria-invalid={postalInvalid}
             aria-describedby={postalInvalid ? "pricing-postal-code-error" : undefined}
           />
           {postalInvalid

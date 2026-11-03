@@ -171,12 +171,15 @@ describe("P18 /pricing", () => {
     mocks.getBillingPlans.mockResolvedValue(answer("USD", { country: "US", postal_code: null, status: "POSTAL_CODE_NEEDED" }, null));
     const needed = await renderPricing();
     const postal = needed.querySelector("#pricing-postal-code") as HTMLInputElement;
-    expect([postal.name, postal.required, postal.getAttribute("aria-invalid")]).toEqual(["postal_code", true, "false"]);
+    // Not required: a visitor priced for the US who picks another country is not held back by it.
+    expect([postal.name, postal.required, postal.getAttribute("aria-invalid")]).toEqual(["postal_code", false, "false"]);
     expect(needed.querySelector('label[for="pricing-postal-code"]')?.textContent).toBe(billingEnglish["billing.checkout.postalCode"]);
     mocks.getBillingPlans.mockResolvedValue(answer("USD", { country: "US", postal_code: null, status: "POSTAL_CODE_INVALID" }, null));
     const invalid = await renderPricing({ country: "US", postal_code: "ABCDE" });
     expect(invalid.querySelector("#pricing-postal-code")?.getAttribute("aria-invalid")).toBe("true");
     expect(invalid.querySelector("#pricing-postal-code-error")?.textContent).toBe(billingEnglish["billing.checkout.postalCodeInvalid"]);
+    // The code that did not fit is given back to correct, not cleared.
+    expect((invalid.querySelector("#pricing-postal-code") as HTMLInputElement).value).toBe("ABCDE");
     mocks.getBillingPlans.mockResolvedValue(TEXAS);
     expect(((await renderPricing({ country: "US", postal_code: "75201" })).querySelector("#pricing-postal-code") as HTMLInputElement).value)
       .toBe("75201");
