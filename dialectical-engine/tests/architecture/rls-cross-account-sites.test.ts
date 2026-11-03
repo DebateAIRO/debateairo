@@ -199,9 +199,10 @@ describe("row-level security S01 C4: the apps/api cross-account sites and the T1
     let clause: ts.Node | undefined = frame.parent;
     while (clause !== undefined && !ts.isCaseClause(clause)) clause = clause.parent;
     expect(clause !== undefined && ts.isCaseClause(clause) ? clause.expression.getText() : null).toBe('"OPENED"');
-    // The frame's whole body is the one seal, under the carrier and bound to the report's id.
+    // The frame's whole body is the one seal, under the carrier and bound to the report's id: anchored at both ends, so
+    // anything chained after the seal (a `.then(...)`, a second call) fails here.
     expect(frame.arguments[1]?.getText()).toMatch(
-      /^\(\) => sealFor\(input\.pool, opened\.carrierRunId!, PUBLIC_MATERIAL_CARRIER, opened\.reportId!, publicMaterialOf\(/u);
+      /^\(\) => sealFor\(input\.pool, opened\.carrierRunId!, PUBLIC_MATERIAL_CARRIER, opened\.reportId!, publicMaterialOf\(debate, \{ now: input\.now \}\)\)$/u);
     const press = descendants(tree).find((node): node is ts.FunctionDeclaration =>
       ts.isFunctionDeclaration(node) && node.name?.text === "pressPublicReport")!;
     const calls = (name: string) => descendants(press).filter((node): node is ts.CallExpression => ts.isCallExpression(node)
