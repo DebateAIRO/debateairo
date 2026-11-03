@@ -10,10 +10,13 @@ import { ContractHttpError } from "../../packages/contract/src/client.js";
 
 /*
  * Decisions 13, 16 and 22 on the public page: a path's newest text and who added to it, the main answer's update with the first still reachable, the author whose
- * name went, the Reports section, and the two presses, signed in and signed out.
+ * name went, the Reports section, and the two presses, signed in and signed out. Owner screen review (3 Nov): the credit line is a sentence (r2-17); signed
+ * out offers "Create a free account · Sign in", each back to the same place (r2-21, public-f13); the places are held while the session is read (public-f13);
+ * the dig's rules are two lines with the rest under "How this works" (r2-16); a dig that runs privately is a calm note with "Open it" (public-f10); extra
+ * views are numbered and can be removed (public-f12); a dig on a dig's path is tagged with whose dig it came from, at the same indent (public-f23).
  */
 const lane = vi.hoisted(() => ({
-  session: true,
+  session: true as boolean | "pending",
   push: vi.fn(),
   refresh: vi.fn(),
   submit: vi.fn(),
@@ -23,7 +26,10 @@ const lane = vi.hoisted(() => ({
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: lane.push, refresh: lane.refresh }) }));
 vi.mock("@/lib/api", async (original) => ({
   ...await original<Record<string, unknown>>(),
-  validateSession: async () => { if (!lane.session) throw new Error("no session"); },
+  validateSession: async () => {
+    if (lane.session === "pending") await new Promise(() => undefined);
+    if (!lane.session) throw new Error("no session");
+  },
   contractClient: {
     writePublicReport: (...args: unknown[]) => lane.writePublicReport(...args),
     readReadingLevel: async () => ({ reading_level: "plain" }),
@@ -35,7 +41,7 @@ vi.mock("@/lib/v4/useV4Ask", () => ({
 }));
 
 import { PublicDebateOverview } from "../../apps/ui/components/PublicDebateOverview.js";
-import { seedPublicDebates, PUBLIC_REF, PUBLIC_REF_AUTHOR_GONE, PUBLIC_UPDATE_REF } from "../../tools/v4-mock-api/public-seed.js";
+import { contributionOf, seedPublicDebates, PUBLIC_REF, PUBLIC_REF_AUTHOR_GONE, PUBLIC_UPDATE_REF } from "../../tools/v4-mock-api/public-seed.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -81,6 +87,7 @@ afterEach(async () => {
   host?.remove();
   root = null;
   vi.useRealTimers();
+  window.history.replaceState(null, "", "/");
 });
 
 describe("what the public page shows", () => {
@@ -88,14 +95,14 @@ describe("what the public page shows", () => {
     await mount(debate());
     const paths = [...host!.querySelectorAll(".publicVerdictText > .publicStory .storyPath")];
     expect(paths[0]!.querySelector(".storyPathLine")!.textContent).toContain("also in small towns");
-    expect(paths[0]!.textContent).toContain("Added to by Quiet Heron on October 28, 2026");
+    expect(paths[0]!.textContent).toContain("Quiet Heron added to this on October 28, 2026");
     expect(paths[0]!.textContent).toContain("A dig looked at small towns");
-    expect(paths[1]!.textContent).not.toContain("Added to by");
+    expect(paths[1]!.textContent).not.toContain("added to this");
     const first = host!.querySelector<HTMLDetailsElement>(".publicFirstAnswer")!;
     expect(first.querySelector("summary")!.textContent).toBe(V4["v4.public.firstAnswer"]);
     expect(first.textContent).toContain("Free fares for everyone: partly held. They help people with little money");
     expect(first.textContent).toContain("Our answer: cheaper fares");
-    expect(first.textContent).not.toContain("Added to by");
+    expect(first.textContent).not.toContain("added to this");
   });
 
   it("the main answer shows its update, and the date it changed", async () => {
@@ -113,13 +120,13 @@ describe("what the public page shows", () => {
     expect(host!.querySelector(".publicMainUpdate")).toBeNull();
     expect(host!.querySelector(".publicFirstAnswer")).toBeNull();
     expect(text()).toContain("Our answer: cheaper fares");
-    expect(text()).not.toContain("Added to by");
+    expect(text()).not.toContain("added to this");
   });
 
   it("a name that went reads \"a contributor\", on a path and on a report", async () => {
     const page = debate();
     await mount({ ...page, contributions: [{ ...page.contributions![0]!, contributor: null }], reports: [{ ...page.reports![0]!, writer: null }] });
-    expect(text()).toContain("Added to by a contributor on October 28, 2026");
+    expect(text()).toContain("A contributor added to this on October 28, 2026");
     expect(text()).toContain("Report written by a contributor");
     expect(text()).not.toContain("Quiet Heron");
   });
@@ -149,37 +156,86 @@ describe("what the public page shows", () => {
 
   it("a publication review (no lane) shows the text, and offers no press", async () => {
     await mount(debate(), false);
-    expect(text()).toContain("Added to by Quiet Heron");
+    expect(text()).toContain("Quiet Heron added to this");
     expect(text()).toContain("Report written by Quiet Heron");
     expect(buttons(V4["v4.public.dig.open"]!)).toEqual([]);
     expect(buttons(V4["v4.public.report.write"]!)).toEqual([]);
-    expect(text()).not.toContain(V4["v4.public.dig.signIn"]);
+    expect(host!.querySelector("[data-public-sign-in]")).toBeNull();
+  });
+
+  it("a dig on a dig's path sits at the same indent, tagged with whose dig it came from; long words can wrap", async () => {
+    const page = debate();
+    const deeper = "77777777-7777-4777-8777-777777777777";
+    await mount(PublicDebateSchema.parse({ ...page, contributions: [...page.contributions!, contributionOf("p-towns", PUBLIC_UPDATE_REF, deeper, "2026-10-30", "Rural lines differ.")] }));
+    const boxes = [...host!.querySelectorAll(".v4PubDigPaths")];
+    expect(boxes).toHaveLength(2);
+    // The first level is indented once; the deeper one carries no indent of its own, only its tag.
+    expect(boxes[0]!.classList.contains("v4PubDigPathsDeeper")).toBe(false);
+    expect(boxes[1]!.classList.contains("v4PubDigPathsDeeper")).toBe(true);
+    expect(boxes[0]!.contains(boxes[1]!)).toBe(true);
+    expect(boxes[1]!.querySelector(".v4PubDigFrom")!.textContent).toBe("From Mock Tester's dig");
+    expect(boxes[0]!.querySelector(":scope > .v4PubLabel")!.textContent).toBe(V4["v4.public.digPaths"]);
+    const css = readFileSync(resolve(import.meta.dirname, "../../apps/ui/app/public/debate/[id]/public-lane.css"), "utf8");
+    expect(css).toMatch(/\.v4PubDigPathsDeeper \{ padding-inline-start: 0; border-inline-start: 0; \}/u);
+    expect(css).toMatch(/\.v4PubPathNote \{[^}]*overflow-wrap: anywhere;/u);
+    // No side line in the lane is fixed to the left: in Arabic it sits on the right.
+    expect(css).not.toMatch(/(?:border|padding|margin)-(?:left|right)\b/u);
   });
 });
 
 describe("not signed in", () => {
-  it("each press is a sign-in link back to this page, and nothing is offered to press", async () => {
+  it("each press offers \"Create a free account · Sign in\", both back to the same place, and nothing is offered to press", async () => {
     lane.session = false;
     await mount(debate());
-    const links = [...host!.querySelectorAll("a")].filter((link) => link.textContent === V4["v4.public.dig.signIn"]);
-    // Three paths and the dig's own path.
-    expect(links).toHaveLength(4);
-    expect(links[0]!.getAttribute("href")).toBe(`/login?next=${encodeURIComponent(`/public/debate/${PUBLIC_REF}`)}`);
-    expect([...host!.querySelectorAll("a")].some((link) => link.textContent === V4["v4.public.report.signIn"])).toBe(true);
+    const choices = [...host!.querySelectorAll("[data-public-sign-in]")];
+    // Three paths, the dig's own path, and the report.
+    expect(choices).toHaveLength(5);
+    for (const choice of choices) {
+      expect([...choice.querySelectorAll("a")].map((link) => link.textContent)).toEqual(["Create a free account", "Sign in"]);
+      expect(choice.textContent).toContain("Create a free account · Sign in");
+    }
+    expect(choices[0]!.textContent).toMatch(/^To dig into this:/u);
+    const hrefs = (at: number): string[] => [...choices[at]!.querySelectorAll("a")].map((link) => link.getAttribute("href")!);
+    const back = (path: string): string[] => [`/sign-up?next=${encodeURIComponent(path)}`, `/login?next=${encodeURIComponent(path)}`];
+    expect(hrefs(0)).toEqual(back(`/public/debate/${PUBLIC_REF}?dig=p-fares`));
+    // The dig's own path names the dig it hangs under, so the way back opens that box and no other.
+    expect(choices.map((_, at) => hrefs(at)[1]!)).toContain(`/login?next=${encodeURIComponent(`/public/debate/${PUBLIC_REF}?dig=p-towns&under=${PUBLIC_UPDATE_REF}`)}`);
+    const report = choices.find((choice) => choice.textContent!.startsWith("To write a report:"))!;
+    expect([...report.querySelectorAll("a")].map((link) => link.getAttribute("href"))).toEqual(back(`/public/debate/${PUBLIC_REF}#public-reports`));
+    expect(host!.querySelector("#public-reports")).not.toBeNull();
     expect(buttons(V4["v4.public.dig.open"]!)).toEqual([]);
     expect(buttons(V4["v4.public.report.write"]!)).toEqual([]);
+  });
+
+  it("while the session is read, the places are held: nothing pops in, and nothing can be pressed", async () => {
+    lane.session = "pending";
+    await mount(debate());
+    const held = [...host!.querySelectorAll("[data-public-held]")];
+    expect(held).toHaveLength(5);
+    for (const place of held) expect(place.getAttribute("aria-hidden")).toBe("true");
+    expect(host!.querySelector("[data-public-sign-in]")).toBeNull();
+    expect(buttons(V4["v4.public.dig.open"]!)).toEqual([]);
   });
 });
 
 describe("Dig into this", () => {
   const firstOpen = (): HTMLButtonElement => buttons(V4["v4.public.dig.open"]!)[0]!;
 
-  it("says what it costs and what the check does; nothing starts with an empty box", async () => {
+  it("says what it costs and what the check does in two lines, the rest under \"How this works\"; nothing starts with an empty box", async () => {
     await mount(debate());
     await click(firstOpen());
-    expect(text()).toContain("This dig uses your own quota. An AI checks its result before it can change this public page. If it doesn't pass, it stays private to you and the page is unchanged. If a later part of the update doesn't pass, the page keeps its older text and that part still counts in your quota.");
+    const box = host!.querySelector(".v4PubDig")!;
+    expect(box.querySelector(":scope > .v4PubHint")!.textContent).toBe("This uses your own quota. An AI checks it before it can change this public page.");
+    const how = box.querySelector<HTMLDetailsElement>("details.v4PubHow")!;
+    expect(how.open).toBe(false);
+    expect(how.querySelector("summary")!.textContent).toBe("How this works");
+    expect(how.textContent).toContain("it stays private to you and the page is unchanged. If a later part of the update doesn't pass, the page keeps its older text and that part still counts in your quota.");
     expect(buttons(V4["v4.public.dig.start"]!)[0]!.disabled).toBe(true);
     expect(lane.submit).not.toHaveBeenCalled();
+    // Opening the box puts focus in it; Cancel gives it back to "Dig into this".
+    expect(document.activeElement).toBe(box.querySelector(".v4PubText"));
+    await click(buttons(V4["v4.public.dig.cancel"]!)[0]!);
+    expect(document.activeElement).toBe(firstOpen());
   });
 
   it("a path of the debate: a quick dig named by the page, then the dig's own page; no run id goes out, no AI suggestion is offered", async () => {
@@ -239,14 +295,63 @@ describe("Dig into this", () => {
     expect(lane.push).not.toHaveBeenCalled();
   });
 
-  it("a dig that could not join says it runs as the person's own private debate, and goes nowhere", async () => {
+  it("a dig that could not join is a calm note, not a refusal: it runs as the person's own private debate, with \"Open it\"", async () => {
     lane.submit = vi.fn(async () => ({ kind: "STARTED", runId: "99999999-9999-4999-8999-999999999999", notJoined: true }));
     await mount(debate());
     await click(firstOpen());
     await write(host!.querySelector<HTMLTextAreaElement>(".v4PubText")!, "Mine.");
     await click(buttons(V4["v4.public.dig.start"]!)[0]!);
-    expect(host!.querySelector("[role=alert]")!.textContent).toBe(V4["v4.public.dig.notJoined"]);
+    expect(host!.querySelector("[role=alert]")).toBeNull();
+    const note = host!.querySelector("[data-public-dig-private]")!;
+    expect(note.getAttribute("role")).toBe("status");
+    expect(note.className).toBe("v4PubNote");
+    expect(note.textContent).toBe(`${V4["v4.public.dig.notJoined"]} Open it`);
+    expect(note.querySelector("a")!.getAttribute("href")).toBe("/v4/debate/99999999-9999-4999-8999-999999999999?level=plain");
+    // It started: the box is gone, so it cannot be started twice.
+    expect(buttons(V4["v4.public.dig.start"]!)).toEqual([]);
     expect(lane.push).not.toHaveBeenCalled();
+  });
+
+  it("extra views are \"Your view 2\" and \"Your view 3\", each with Remove; removing one keeps the others' words", async () => {
+    await mount(debate());
+    await click(firstOpen());
+    const addView = (): HTMLButtonElement => [...host!.querySelectorAll("button")].find((one) => one.textContent === V4["v4.public.dig.addView"])!;
+    await click(addView());
+    await click(addView());
+    const labels = (): string[] => [...host!.querySelectorAll(".v4PubDig label")].map((label) => label.textContent!);
+    expect(labels()).toEqual(["Your own view", "Your view 2", "Your view 3"]);
+    const fields = (): HTMLTextAreaElement[] => [...host!.querySelectorAll<HTMLTextAreaElement>(".v4PubText")];
+    // A new box takes focus.
+    expect(document.activeElement).toBe(fields()[2]);
+    await write(fields()[0]!, "First.");
+    await write(fields()[1]!, "Second.");
+    await write(fields()[2]!, "Third.");
+    const removes = buttons(V4["v4.public.dig.removeView"]!);
+    expect(removes).toHaveLength(2);
+    // Each Remove names its box for a screen reader.
+    expect(document.getElementById(removes[0]!.getAttribute("aria-describedby")!)!.textContent).toBe("Your view 2");
+    await click(removes[0]!);
+    expect(labels()).toEqual(["Your own view", "Your view 2"]);
+    expect(fields().map((field) => field.value)).toEqual(["First.", "Third."]);
+    expect(document.activeElement).toBe(fields()[0]);
+  });
+
+  it("back from signing in, the page opens the same path's dig box from its address alone, and puts focus in it", async () => {
+    window.history.replaceState(null, "", `/public/debate/${PUBLIC_REF}?dig=p-service`);
+    await mount(debate());
+    const boxes = [...host!.querySelectorAll(".v4PubDig")];
+    expect(boxes).toHaveLength(1);
+    const path = boxes[0]!.closest(".storyPath")!;
+    expect(path.querySelector(".storyPathLine")!.textContent).toContain("Better service first");
+    expect(document.activeElement).toBe(boxes[0]!.querySelector(".v4PubText"));
+    // The dig's own path is opened only when the address names the dig it hangs under.
+    await act(async () => root?.unmount());
+    host?.remove();
+    window.history.replaceState(null, "", `/public/debate/${PUBLIC_REF}?dig=p-towns&under=${PUBLIC_UPDATE_REF}`);
+    await mount(debate());
+    const under = host!.querySelector(".v4PubDigPaths")!;
+    expect(under.querySelector(".v4PubDig")).not.toBeNull();
+    expect(host!.querySelectorAll(".v4PubDig")).toHaveLength(1);
   });
 });
 

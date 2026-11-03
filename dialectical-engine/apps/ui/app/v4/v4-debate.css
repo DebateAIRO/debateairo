@@ -189,7 +189,8 @@
 .v4DebPaused { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
 .v4DebPaused p { margin: 0; }
 .v4DebPaused .v4Btn { min-height: 44px; }
-.v4DebRailUsage { border-left: 3px solid var(--gold); padding-left: 10px; }
+/* public-f23: the side line follows the reading direction (it sits on the right in Arabic and Hebrew). */
+.v4DebRailUsage { border-inline-start: 3px solid var(--gold); padding-inline-start: 10px; }
 .v4DebRailUsageNote { margin: 0; font-size: var(--t-ui); overflow-wrap: anywhere; }
 
 /* Dig model revision W4-6: the top of the map (paths changed since the answer), a dig's trail, and rewrites in the news. */

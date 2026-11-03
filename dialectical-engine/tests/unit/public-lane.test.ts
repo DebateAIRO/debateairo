@@ -59,7 +59,16 @@ describe("the public page's words", () => {
     "v4.public.report.noCarrier": "This debate's first author has left and no dig is on it yet, so a report can't be written. Dig into a path first.",
     "v4.public.report.write": "Write a report",
     "v4.public.dig.open": "Dig into this",
-    "v4.public.addedBy": "Added to by {name} on {date}",
+    // Round 2, r2-17 (owner, 3 Nov): a whole sentence, "Quiet Heron added to this on 2 November".
+    "v4.public.addedBy": "{name} added to this on {date}",
+    "v4.public.addedByGone": "A contributor added to this on {date}",
+    // r2-14, r2-15, r2-16 and r2-21 (owner, 3 Nov), word for word.
+    "v4.public.report": "Report a problem",
+    "v4.public.flag.NOT_FOUND": "An automatic check didn't find this. You can report again with more details, and a person will read it. You can also write to support@dezbatere.ro.",
+    "v4.public.dig.terms": "This uses your own quota. An AI checks it before it can change this public page.",
+    "v4.public.dig.howItWorks": "How this works",
+    "v4.public.signedOut.createAccount": "Create a free account",
+    "v4.public.signedOut.signIn": "Sign in",
     "v4.public.report.writtenBy": "Report written by {name}",
     "v4.public.aContributor": "a contributor"
   };
