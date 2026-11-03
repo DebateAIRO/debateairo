@@ -15,6 +15,7 @@ import {
   enterApiPoolMode,
   readMasterKeyFiles
 } from "../support/rls-logins.js";
+import { armSuperuserGuardForTestFile, currentTestFile } from "../support/master-key-guard.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 const PRODUCT_ROOT = fileURLToPath(new URL("../../", import.meta.url));
@@ -58,6 +59,27 @@ describe("a test database started the normal way", () => {
     }
     // Outside a request (seeding, read-backs, the runner) the guard never fires.
     expect((await pool.query<{ one: number }>("SELECT 1 AS one")).rows[0]!.one).toBe(1);
+  });
+});
+
+describe("the test file the guard is keyed on", () => {
+  it("without vitest's worker state the stack still names the test file", () => {
+    // A future vitest that renamed `__vitest_worker__`: the lookup falls back to the first test file on the stack.
+    expect(currentTestFile(undefined)).toBe(join(PRODUCT_ROOT, "tests/unit/master-key-files.test.ts"));
+    expect(currentTestFile({})).toBe(join(PRODUCT_ROOT, "tests/unit/master-key-files.test.ts"));
+    expect(currentTestFile()).toBe(join(PRODUCT_ROOT, "tests/unit/master-key-files.test.ts"));
+  });
+
+  it("with no test file named it refuses loudly inside vitest in login mode, and arms nothing elsewhere", () => {
+    vi.stubEnv("DEBATEAI_TEST_API_LOGINS", undefined);
+    expect(() => armSuperuserGuardForTestFile(superuserUrl("t8_unknown_superuser"), undefined))
+      .toThrow("MASTER_KEY_GUARD_TEST_FILE_UNKNOWN");
+    vi.stubEnv("DEBATEAI_TEST_API_LOGINS", "0");
+    expect(armSuperuserGuardForTestFile(superuserUrl("t8_unknown_superuser"), undefined)).toBe("off");
+    // Outside vitest (a command-line tool, a child spawned with a clean environment) nothing is armed.
+    vi.stubEnv("DEBATEAI_TEST_API_LOGINS", undefined);
+    vi.stubEnv("VITEST", undefined);
+    expect(armSuperuserGuardForTestFile(superuserUrl("t8_unknown_superuser"), undefined)).toBe("outside-tests");
   });
 });
 
@@ -174,3 +196,4 @@ describe("who may turn login mode off (review M-10)", () => {
     expect(writers).toEqual([...LOGIN_MODE_WRITERS.keys()].sort());
   });
 });
+

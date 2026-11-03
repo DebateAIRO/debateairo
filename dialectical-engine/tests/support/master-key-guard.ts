@@ -11,10 +11,12 @@
  *   `startTestDatabase` (tests/support/testDatabase.ts) and the acceptance tests' `startStandingDatabase`
  *   (acceptance/standing-db.ts), and, as before, every call of `apiTestPools`. So every test file that uses a database
  *   is guarded unless it is on tests/support/master-key-files.txt (the master-key list) or login mode is off.
- * - What stays outside it: code that starts a database outside a vitest test file (the acceptance and support-eval
- *   command-line tools, a child process a test spawns); logins other than the harness superuser; and the work the
- *   runner does on the superuser, because the runner works outside any request (the five copy-database runner groups
- *   of ruling R26, named in the list's header).
+ * - What stays outside it: code that starts a database outside vitest (the acceptance and support-eval command-line
+ *   tools, a child process a test spawns with a clean environment); logins other than the harness superuser; the work
+ *   the runner does on the superuser, because the runner works outside any request (the five copy-database runner
+ *   groups of ruling R26, named in the list's header).
+ * - It never fails open inside vitest: a database started where neither vitest nor the stack names the test file
+ *   refuses MASTER_KEY_GUARD_TEST_FILE_UNKNOWN in login mode, instead of quietly arming nothing.
  *
  * vitest runs each test file in a fresh worker process (`isolate`, the default), so the patch and its set of guarded
  * logins last for one test file.
@@ -81,32 +83,43 @@ export function enterApiPoolMode(testFile: string, superuserUrl: string): "login
 }
 
 /** The vitest worker's state: the test file this process runs (vitest sets `filepath` before each file). */
-type VitestWorkerState = { filepath?: string };
+export type VitestWorkerState = { filepath?: string };
+
+/** vitest's own state for this process; `undefined` outside a vitest worker (or if a future vitest renames it). */
+function vitestWorkerState(): VitestWorkerState | undefined {
+  return (globalThis as { __vitest_worker__?: VitestWorkerState }).__vitest_worker__;
+}
 
 /**
  * The test file running in this process, as an absolute path: vitest's own record of it, else the first test file on
- * the stack (read it before the caller's first wait). `undefined` outside a vitest test file: a command-line tool, or
- * a child process a test spawned.
+ * the stack (so read it before the caller's first wait). `undefined` only when neither names one: a command-line tool,
+ * or a child process a test spawned. `worker` is vitest's state; a test passes its own to try the stack path.
  */
-export function currentTestFile(): string | undefined {
-  const worker = (globalThis as { __vitest_worker__?: VitestWorkerState }).__vitest_worker__;
-  if (worker === undefined) return undefined;
-  if (typeof worker.filepath === "string" && isAbsolute(worker.filepath)) return worker.filepath;
+export function currentTestFile(worker: VitestWorkerState | undefined = vitestWorkerState()): string | undefined {
+  if (typeof worker?.filepath === "string" && isAbsolute(worker.filepath)) return worker.filepath;
   const line = callingTestLine();
   return line === "no-test-frame" ? undefined : join(PRODUCT_ROOT, line.replace(/:\d+$/u, ""));
 }
 
 /**
- * Upload check Task 8: arms the guard for the test database at `superuserUrl`, keyed on the test file that started it,
- * in the three modes of `enterApiPoolMode`. Outside a vitest test file it arms nothing ("outside-tests").
+ * Upload check Task 8: arms the guard for the test database at `superuserUrl`, keyed on `testFile`, the test file that
+ * started it (`currentTestFile()`, read by the caller before its first wait), in the three modes of `enterApiPoolMode`.
  * testDatabase.ts's `startTestDatabase` and acceptance/standing-db.ts's `startStandingDatabase` call it.
+ *
+ * With no test file it never quietly arms nothing inside vitest: outside vitest (no VITEST in the environment: the
+ * acceptance and support-eval command lines, a child spawned with a clean environment) it arms nothing
+ * ("outside-tests"); with login mode off nothing is armed anyway ("off"); otherwise it refuses
+ * MASTER_KEY_GUARD_TEST_FILE_UNKNOWN, so a vitest that renamed its worker state, or a database started where the stack
+ * names no test file, is seen at once instead of running the file unguarded.
  */
 export function armSuperuserGuardForTestFile(
   superuserUrl: string,
-  testFile: string | undefined = currentTestFile()
+  testFile: string | undefined
 ): "logins" | "master-key" | "off" | "outside-tests" {
-  if (testFile === undefined) return "outside-tests";
-  return enterApiPoolMode(testFile, superuserUrl);
+  if (testFile !== undefined) return enterApiPoolMode(testFile, superuserUrl);
+  if (process.env.VITEST === undefined) return "outside-tests";
+  if (loginModeOff()) return "off";
+  throw new TypeError("MASTER_KEY_GUARD_TEST_FILE_UNKNOWN: a test database started where neither vitest nor the stack names the test file");
 }
 
 const R21_GUARD = Symbol.for("debateai.rls.r21-superuser-guard.v1");

@@ -244,7 +244,7 @@ async function startWithEmbedded(postgresMajor: string): Promise<TestDatabase> {
  * Seeding, read-backs and the runner run outside any request and are not touched.
  */
 export async function startTestDatabase(): Promise<TestDatabase> {
-  // Read before the first wait, while the calling test file is still on the stack (the stack is only the fallback).
+  // Read before the first wait, while the calling test file is still on the stack (vitest's own record comes first).
   const testFile = currentTestFile();
   // A10: a bad ★DEBATEAI_TEST_SCHEMA_FROM refuses before a cluster is spent on it.
   resolveTestSchemaFrom();
