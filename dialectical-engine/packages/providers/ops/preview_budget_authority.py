@@ -1756,7 +1756,10 @@ def nano_text(amount, rounding):
 
 
 def remaining_input_valid(input):
-    return isinstance(input, dict) and set(input) == {'scope_id'} and isinstance(input['scope_id'], str)
+    """Exactly {"scope_id": s}, or (V4 start step, Task 6) {"scope_id": s, "daily_pot": true} with true itself."""
+    if not isinstance(input, dict) or not isinstance(input.get('scope_id'), str):
+        return False
+    return set(input) == {'scope_id'} or (set(input) == {'scope_id', 'daily_pot'} and input['daily_pot'] is True)
 
 
 def remaining_snapshot(private, go_path, slots=None, now=None):
@@ -1803,6 +1806,9 @@ def remaining_snapshot(private, go_path, slots=None, now=None):
         reply['largest_final_writer_reservation_usd'] = nano_text(
             largest_final_writer_reservation(profile, control['enabled_models']), ROUND_CEILING)
         reply['final_writer_max_in_flight'] = limits['max_final_writer_calls']
+    # V4 start step, Task 6: the day's pot, kept in the one read and answered only to a request that asks for it
+    # (remaining_answer); rounded DOWN like what is left, never in the app's favour.
+    reply['daily_pot_usd'] = nano_text(budget, ROUND_FLOOR)
     return control['scope_id'], allowed, reply
 
 
@@ -1812,12 +1818,15 @@ def remaining_answer(snapshot, input, uid):
         raise SafetyError('IPC_REQUEST_REFUSED')
     if input['scope_id'] != scope_id:
         raise SafetyError('REMAINING_REQUEST_INVALID')
-    return reply
+    # V4 start step, Task 6: a plain request gets today's reply, without the pot.
+    if input.get('daily_pot') is True:
+        return dict(reply)
+    return {key: value for key, value in reply.items() if key != 'daily_pot_usd'}
 
 
 def remaining_report(private, go_path, input, slots=None, now=None, uid=None):
-    """One /remaining answer for exactly {"scope_id": <this state's scope>} (and, with uid, a peer
-    the GO on disk allows); anything else refuses."""
+    """One /remaining answer for exactly {"scope_id": <this state's scope>}, or that plus
+    "daily_pot": true (and, with uid, a peer the GO on disk allows); anything else refuses."""
     if not remaining_input_valid(input):
         raise SafetyError('REMAINING_REQUEST_INVALID')
     return remaining_answer(remaining_snapshot(private, go_path, slots, now), input, uid)
