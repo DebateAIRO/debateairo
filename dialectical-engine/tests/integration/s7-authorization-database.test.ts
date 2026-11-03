@@ -856,11 +856,14 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
     const refused = [
       await record(theirs.runId, theirs.answerId, "gap:0155-foreign", owner.ownerRef), // another account's run
       await record(randomUUID(), randomUUID(), "gap:0155-a", owner.ownerRef), // an absent run
-      await record(a.runId, b.answerId, "gap:0155-a", owner.ownerRef), // own run, another run's answer
+      // Own run, another run's answer with the gap really open on that answer's run: only the answer-run check refuses.
+      await record(a.runId, b.answerId, "gap:0155-b", owner.ownerRef),
+      // Own run, the foreign account's answer with its own open gap: the same check, across accounts.
+      await record(a.runId, theirs.answerId, "gap:0155-foreign", owner.ownerRef),
       await record(a.runId, a.answerId, "gap:0155-b", owner.ownerRef), // own run, a gap opened only on another run
       await record(a.runId, a.answerId, "gap:0155-absent", owner.ownerRef) // own run, no such gap
     ];
-    expect(refused.map(({ id }) => id)).toEqual([null, null, null, null, null]);
+    expect(refused.map(({ id }) => id)).toEqual([null, null, null, null, null, null]);
     expect(Number((await database.pool.query<{ count: string }>("SELECT count(*) FROM core.investigation_request")).rows[0]!.count)).toBe(before);
     expect(await requestsOf(theirs.runId)).toEqual([]);
     expect(await requestsOf(b.runId)).toEqual([]);
