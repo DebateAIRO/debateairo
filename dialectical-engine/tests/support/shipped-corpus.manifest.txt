@@ -708,6 +708,7 @@ apps/ui/components/v4/V4Rail.tsx
 apps/ui/components/v4/V4ReportClient.tsx
 apps/ui/components/v4/V4Sources.tsx
 apps/ui/components/v4/V4TrustBar.tsx
+apps/ui/components/v4/V4UndoNote.tsx
 apps/ui/content-security-policy.d.mts
 apps/ui/content-security-policy.mjs
 apps/ui/edge-upgrade.mjs
@@ -931,6 +932,7 @@ apps/ui/lib/v4/askConfig.ts
 apps/ui/lib/v4/askText.ts
 apps/ui/lib/v4/changes.ts
 apps/ui/lib/v4/digIndex.ts
+apps/ui/lib/v4/digUndo.ts
 apps/ui/lib/v4/load.ts
 apps/ui/lib/v4/mapModel.ts
 apps/ui/lib/v4/money.ts
