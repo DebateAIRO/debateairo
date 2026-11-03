@@ -1516,6 +1516,8 @@ describe('database-ahead', () => {
 // The shared server-tools folder (operator/lifecycle-v1) is a git archive of these three deploy folders alone (the upload's
 // operator swap, the code guide's SB10). Every tool the guides run from it must load there: a top-level import of tools/
 // in release-artifacts.mjs (through caddy-slots.mjs) stopped release-switch.mjs during R22's downtime (2026-11-02).
+// The copy is made with git archive from the committed HEAD, not from the working tree: an edit that is not committed yet
+// is not in it, so this test can pass on this Mac while a broken edit sits uncommitted. Commit, then run it.
 describe('the shared server-tools folder', () => {
   it('every server tool loads from a copy of the three deploy folders alone, except the release-folder ones', async () => {
     const base = realpathSync(mkdtempSync(join(tmpdir(), 'preview-operator-')));
