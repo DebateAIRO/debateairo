@@ -691,6 +691,7 @@ apps/ui/components/support/sessionChange.ts
 apps/ui/components/support/supportConversation.test.mjs
 apps/ui/components/v4/V4AskClient.tsx
 apps/ui/components/v4/V4ChangesBar.tsx
+apps/ui/components/v4/V4ChoiceChips.tsx
 apps/ui/components/v4/V4ContributionNote.tsx
 apps/ui/components/v4/V4DebateClient.tsx
 apps/ui/components/v4/V4DigSuggest.tsx
@@ -708,6 +709,7 @@ apps/ui/components/v4/V4Rail.tsx
 apps/ui/components/v4/V4ReportClient.tsx
 apps/ui/components/v4/V4Sources.tsx
 apps/ui/components/v4/V4TrustBar.tsx
+apps/ui/components/v4/V4WaitCard.tsx
 apps/ui/content-security-policy.d.mts
 apps/ui/content-security-policy.mjs
 apps/ui/edge-upgrade.mjs
@@ -935,6 +937,7 @@ apps/ui/lib/v4/load.ts
 apps/ui/lib/v4/mapModel.ts
 apps/ui/lib/v4/money.ts
 apps/ui/lib/v4/publicPage.ts
+apps/ui/lib/v4/stateWords.ts
 apps/ui/lib/v4/storage.ts
 apps/ui/lib/v4/suggestions.ts
 apps/ui/lib/v4/trust.ts
@@ -942,6 +945,7 @@ apps/ui/lib/v4/types.ts
 apps/ui/lib/v4/useAskClarify.ts
 apps/ui/lib/v4/useReadingLevel.ts
 apps/ui/lib/v4/useV4Ask.tsx
+apps/ui/lib/v4/useWaitPolling.ts
 apps/ui/lib/v4/web.ts
 apps/ui/middleware.ts
 apps/ui/next-env.d.ts

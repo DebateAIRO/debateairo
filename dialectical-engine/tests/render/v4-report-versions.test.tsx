@@ -152,7 +152,7 @@ describe("the report page's versions", () => {
     const load = vi.fn(async () => before);
     reports.load = load;
     const node = versionSection(await mountReport(runId))!;
-    expect(node.textContent).toContain("Your report is being written. This takes about 5 to 10 minutes.");
+    expect(node.textContent).toContain("Your report is being written. This takes a while. You can leave this page.");
     expect(node.textContent).toContain("Your report starts when the 2 digs in progress finish.");
     expect(buttonOf(node, "Write my report")).toBeNull();
     expect(buttonOf(node, "Keep digging")).toBeNull();
@@ -184,7 +184,7 @@ describe("the report page's versions", () => {
     load.mockImplementation(async () => investigation(runId, "CLOSED", [failed(1), writing(2, 0)]));
     await press(buttonOf(node, "Write my report")!);
     expect(write).toHaveBeenCalledWith(runId);
-    expect(node.textContent).toContain("Your report is being written. This takes about 5 to 10 minutes.");
+    expect(node.textContent).toContain("Your report is being written. This takes a while. You can leave this page.");
     expect(node.textContent).not.toContain("Your report starts when");
   });
 
