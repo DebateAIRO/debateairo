@@ -56,7 +56,9 @@ describe("no browser storage (Decision A, S01-R17)", () => {
   it("the V4 map pieces that hold the dig choice and the rewrites never write browser storage or cookies (W3-4, W4-6)", () => {
     for (const file of ["V4DigSuggest.tsx", "V4DebateClient.tsx", "V4MapTree.tsx", "V4Outline.tsx", "V4Panel.tsx", "V4Rail.tsx", "V4AskClient.tsx",
       // W4-6: a path's rewrites, the top of the map, a dig's trail and the news bar.
-      "V4PathRewrite.tsx", "V4LevelTrail.tsx", "V4ChangesBar.tsx", "V4Header.tsx"]) {
+      "V4PathRewrite.tsx", "V4LevelTrail.tsx", "V4ChangesBar.tsx", "V4Header.tsx",
+      // The owner's screen review (3 Nov): the report page, its own header and Share keep nothing in the browser either.
+      "V4ReportClient.tsx", "V4ReportHeader.tsx"]) {
       const source = readFileSync(resolve(here, "../../apps/ui/components/v4", file), "utf8");
       expect(source, file).not.toMatch(/\.setItem\(|localStorage|sessionStorage|indexedDB|document\.cookie/);
     }

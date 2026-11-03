@@ -97,6 +97,15 @@ describe("loadV4", () => {
     expect(client.calls).toEqual([`readRun:${RUN_ID}`, `readRunAnswer:${RUN_ID}`, `readAnswerStory:${ANSWER.answer_id}`]);
   });
 
+  it("report-f14: carries the question's language from the run, and leaves out an unsure \"und\"", async () => {
+    const story = storyFixture("READY");
+    const tagged = (tag: string): RunProjection => ({ ...run("SETTLED"), argument_language: { tag, name: "Arabic" } });
+    expect(await loadV4(RUN_ID, fakeClient({ run: tagged("ar"), runAnswer: ANSWER, story })))
+      .toEqual({ kind: "SERVED", runId: RUN_ID, answer: ANSWER, story, language: "ar" });
+    expect(await loadV4(RUN_ID, fakeClient({ run: tagged("und"), runAnswer: ANSWER, story })))
+      .not.toHaveProperty("language");
+  });
+
   it("serves with V3's UNAVAILABLE record when the story read is 404, labelled with the answer's version", async () => {
     const answer: Answer = { ...ANSWER, answer_version: 2 };
     const loaded = await loadV4(RUN_ID, fakeClient({ run: run("SETTLED"), runAnswer: answer, story: notFound() }));
