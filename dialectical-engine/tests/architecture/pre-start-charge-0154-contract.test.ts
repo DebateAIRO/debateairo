@@ -23,17 +23,18 @@ const TABLE = "identity.pre_start_charge";
 const READERS = ["billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean)", "staff.read_team_internal_spent(timestamptz,timestamptz)"];
 
 describe("0154: the small AIs before Start in the person's quota", () => {
-  it("C-T is the chain's last step, after 0153, with its own loader", async () => {
+  it("C-T is a step of the chain, after 0153, with its own loader", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
     expect(chain).toContain("import { loadForward0154 } from './migration-forward0154.js';");
-    expect(chain).toContain("loadForward0153,loadForward0154]");
+    expect(chain).toContain("loadForward0153,loadForward0154,");
     const plan = await loadMigrationPlan();
-    expect(plan.forwardChain.slice(-2).map((step) => step.name)).toEqual([PREVIOUS, NAME]);
+    const names = plan.forwardChain.map((step) => step.name);
+    expect(names.slice(names.indexOf(NAME) - 1, names.indexOf(NAME) + 1)).toEqual([PREVIOUS, NAME]);
     // Its later-drift check covers what it adds to ledger.model_spend as well as its own objects, as 0128's does: the writer-only trigger
     // (the only barrier for a login whose row security admits a run-less row) and the run-less CHECK.
     const loader = read("packages/db/src/migration-forward0154.ts");
     for (const name of ["identity.pre_start_charge", "pre_start_spend_writer_only", "model_spend_pre_start_is_runless"]) expect(loader, name).toContain(name);
-    expect(plan.forwardChain.at(-1)!.amendsPostconditionsOf).toEqual([
+    expect(plan.forwardChain.find((step) => step.name === NAME)!.amendsPostconditionsOf).toEqual([
       { step: "0140_internal_spend_kinds.sql", functions: READERS, field: "function_definition" },
       { step: "0144_ask_clarify_charge.sql", functions: READERS, field: "function_definition" }
     ]);

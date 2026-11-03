@@ -2452,7 +2452,11 @@ export const CONTENT_CARRIERS = Object.freeze([
   "identity.public_material",
   "identity.public_dig_input",
   "identity.public_answer_update",
-  "identity.public_report"
+  "identity.public_report",
+  // 0155 (V4 start step): the menu a person chose from at Start and each chosen path's words, sealed under the debate's own key; the set bound to
+  // its run, a path to its path id. The carry-on marks are ids and codes only, no carrier.
+  "core.start_path_set",
+  "core.start_path"
 ] as const);
 
 export type ContentCarrier = typeof CONTENT_CARRIERS[number];
