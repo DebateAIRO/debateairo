@@ -40,8 +40,17 @@ While it runs, it prints one progress line per check (`check 1 of 3: tools-folde
 (stderr), apart from the report. The report comes at the end, on the normal output.
 
 Everything it makes goes into one new folder under the Mac's temporary folder, named `upload-check-<commit>-<time>`.
-That folder is deleted when the run ends, however it ends, Ctrl-C included, and any database the run started is
-stopped with it.
+That folder is deleted when the run ends: when it finishes, on Ctrl-C, on a stop (`kill`) and when its terminal or
+app is closed. First everything the run started is stopped (the package installs, the website build, the throwaway
+database), then the folder is deleted. If the folder still cannot be deleted, the run says so in one line that starts
+`UPLOAD_CHECK_WORK_FOLDER_LEFT` and names the folder.
+
+A forced kill (`kill -9`, or the Mac losing power) cannot be caught, so it leaves the folder behind. When no upload
+check is running, this one line finds every leftover folder, prints its name and deletes it:
+
+```sh
+find "${TMPDIR%/}" -maxdepth 1 -name 'upload-check-*' -print -exec rm -rf {} +
+```
 
 ## The three checks
 

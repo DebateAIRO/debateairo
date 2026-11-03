@@ -11,8 +11,9 @@
 //   installRelease({ repo, rev, workdir, node, pnpmDir })      the A3 install under <workdir>; { root } or a refusal
 //   buildWebsiteIn({ root, node, pnpmDir })                    the build and the release-folder tools: a CheckResult
 //   checkWebsiteBuild({ repo, rev, workdir, node, pnpmDir })   the check: { result, root }, root null when not installed
-//   runChild(command, args, { cwd, env, log, limitMs? })       one child in its own process group; a timeout or this process
-//                                                              exiting stops the whole group, pnpm's children included
+//   runChild(command, args, { cwd, env, log, limitMs? })       one child in its own process group; a timeout, stopRunning()
+//                                                              or this process exiting stops the whole group, pnpm's children included
+//   stopRunning()                                              stops every group runChild started that is still running
 //
 // <pnpmDir> is the folder that holds pnpm on this Mac. Each also takes extraEnv, merged into every child's environment
 // last; it is there for tests (an unreachable registry, say). A target too old for an export the check uses is
@@ -62,21 +63,34 @@ function killGroup(pid) {
   try { process.kill(-pid, "SIGKILL"); } catch { /* already gone */ }
 }
 
+/** The process groups runChild started that have not ended yet. */
+const running = new Set();
+
+/**
+ * Stops every process group runChild started that is still running (pnpm, Next and their children). run.mjs calls it
+ * first on a stop signal, before it removes the work folder, so nothing is still writing there while the folder goes.
+ */
+export function stopRunning() {
+  for (const pid of running) killGroup(pid);
+}
+
 /**
  * One child process in its own process group, with exactly <env>, its output in <log>. Resolves to the exit code, or null if
- * it did not run or ran too long. A timeout stops the whole group. So does this process exiting while the child runs: run.mjs
- * exits through process.exit on Ctrl-C and SIGTERM, and that runs the exit hook below, so pnpm does not outlive the run.
+ * it did not run or ran too long. A timeout stops the whole group. So does stopRunning(), and so does this process exiting
+ * while the child runs (the exit hook below), so pnpm does not outlive the run.
  */
 export function runChild(command, args, { cwd, env, log, limitMs = STEP_LIMIT_MS }) {
   return new Promise((resolveCode) => {
     const fd = openSync(log, "w");
     let settled = false;
     const child = spawn(command, args, { cwd, env, stdio: ["ignore", fd, fd], shell: false, detached: true });
+    if (child.pid !== undefined) running.add(child.pid);
     const onExit = () => killGroup(child.pid);
     const settle = (code) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      running.delete(child.pid);
       process.removeListener("exit", onExit);
       closeSync(fd);
       // Whatever the child left in its group goes with it, as on a timeout.

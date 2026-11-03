@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -164,8 +164,12 @@ describe('the run command', () => {
   });
 });
 
-// A fake command for the signal tests: a child that starts a grandchild, both kept alive for a minute at most. Their pids go to UC_PIDFILE.
-const FAKE_TREE = "const { spawn } = require('node:child_process'); const { writeFileSync } = require('node:fs'); const grand = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { stdio: 'ignore' }); writeFileSync(process.env.UC_PIDFILE, JSON.stringify({ child: process.pid, grandchild: grand.pid })); setTimeout(() => {}, 60000);";
+// A busy writer, as pnpm is during an install: for a minute at most, it makes its own folder in the work folder again and
+// again (mkdir -p, so a removed work folder comes back) and writes files into it, never resting.
+const WRITER = "const { mkdirSync, writeFileSync } = require('node:fs'); const dir = require('node:path').join(process.env.UC_WORKDIR, 'busy-' + process.pid); const until = Date.now() + 60000; let i = 0; while (Date.now() < until) { try { mkdirSync(dir, { recursive: true }); writeFileSync(dir + '/f' + (i++ % 200), 'x'); } catch {} }";
+// A fake command for the signal tests: a child that starts a grandchild, and both write into the work folder as above.
+// Their pids go to UC_PIDFILE before the child starts writing.
+const FAKE_TREE = `const WRITER = ${JSON.stringify(WRITER)}; const { spawn } = require('node:child_process'); const { writeFileSync } = require('node:fs'); const grand = spawn(process.execPath, ['-e', WRITER], { stdio: 'ignore', env: process.env }); writeFileSync(process.env.UC_PIDFILE, JSON.stringify({ child: process.pid, grandchild: grand.pid })); eval(WRITER);`;
 const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catch { return false; } };
 /** True once <pid> is gone; false if it is still there after <ms>. */
 async function stoppedWithin(pid: number, ms = 5_000) {
@@ -174,60 +178,98 @@ async function stoppedWithin(pid: number, ms = 5_000) {
   return !alive(pid);
 }
 
-/** The script a signal test runs as a child: one run whose first check starts the fake tree and never finishes. */
-function fixtureSource(tmp: string): string {
+/**
+ * The script a signal test runs as a child: one run whose first check starts the fake tree and never finishes. With
+ * <locked>, the check first makes a folder in the work folder that cannot be emptied (no write permission), so the
+ * work folder cannot be removed.
+ */
+function fixtureSource(tmp: string, locked = false): string {
   return [
+    `import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';`,
     `import { runUploadCheck } from ${JSON.stringify(pathToFileURL(join(engine, 'tools/upload-check/run.mjs')).href)};`,
     `import { runChild } from ${JSON.stringify(pathToFileURL(join(engine, 'tools/upload-check/website-build.mjs')).href)};`,
     `const hangs = async ({ workdir }) => {`,
+    ...(locked ? [`  mkdirSync(workdir + '/locked'); writeFileSync(workdir + '/locked/file', 'x'); chmodSync(workdir + '/locked', 0o555);`] : []),
     `  process.stdout.write(workdir + '\\n');`,
-    `  return runChild(process.execPath, ['-e', ${JSON.stringify(FAKE_TREE)}], { cwd: workdir, env: { PATH: '/usr/bin:/bin', UC_PIDFILE: process.env.UC_PIDFILE }, log: workdir + '/fake.log', limitMs: 600000 });`,
+    `  return runChild(process.execPath, ['-e', ${JSON.stringify(FAKE_TREE)}], { cwd: workdir, env: { PATH: '/usr/bin:/bin', UC_PIDFILE: process.env.UC_PIDFILE, UC_WORKDIR: workdir }, log: workdir + '/fake.log', limitMs: 600000 });`,
     `};`,
     `await runUploadCheck({ rev: 'HEAD', tmp: ${JSON.stringify(tmp)}, host: async () => ({ processes: [], freePercent: 80 }), log: () => {}, checks: { toolsFolder: hangs, websiteBuild: hangs, startChecks: hangs } });`,
     ''
   ].join('\n');
 }
 
-/** Runs the fixture as a child, sends <signal> once its work folder is named and its fake tree has written its pids, and reports how it ended. */
-function runFixtureUntil(signal: NodeJS.Signals) {
-  return new Promise<{ code: number | null; folder: string; tmp: string; pids: { child: number; grandchild: number } }>((resolveRun, rejectRun) => {
+/** True once the fixture has named its work folder and both fake writers are writing into it. */
+function writersBusy(stdout: string, pidFile: string): boolean {
+  const folder = stdout.split('\n')[0];
+  if (!stdout.includes('\n') || !folder || !existsSync(pidFile)) return false;
+  let pids: { child: number; grandchild: number };
+  try { pids = JSON.parse(readFileSync(pidFile, 'utf8')); } catch { return false; }
+  return existsSync(join(folder, `busy-${pids.child}`)) && existsSync(join(folder, `busy-${pids.grandchild}`));
+}
+
+/** Runs the fixture as a child, sends <signal> once both fake writers are writing into its work folder, and reports how it ended. */
+function runFixtureUntil(signal: NodeJS.Signals, { locked = false } = {}) {
+  return new Promise<{ code: number | null; exitSignal: NodeJS.Signals | null; stderr: string; folder: string; tmp: string; pids: { child: number; grandchild: number } }>((resolveRun, rejectRun) => {
     const dir = scratch();
     const tmp = join(dir, 'tmp');
     mkdirSync(tmp);
     const pidFile = join(dir, 'pids.json');
     const script = join(dir, 'fixture.mjs');
-    writeFileSync(script, fixtureSource(tmp));
+    writeFileSync(script, fixtureSource(tmp, locked));
     const child = spawn(process.execPath, [script], { env: { ...process.env, UC_PIDFILE: pidFile }, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '';
+    let stderr = '';
     let sent = false;
     child.stdout.setEncoding('utf8');
     child.stdout.on('data', (chunk: string) => { stdout += chunk; });
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', (chunk: string) => { stderr += chunk; });
     const watch = setInterval(() => {
-      if (!sent && stdout.includes('\n') && existsSync(pidFile)) { sent = true; child.kill(signal); }
+      if (!sent && writersBusy(stdout, pidFile)) { sent = true; child.kill(signal); }
     }, 50);
     const giveUp = setTimeout(() => { child.kill('SIGKILL'); }, 30_000);
     child.on('error', rejectRun);
-    child.on('exit', (code) => {
+    // 'close', not 'exit': the fixture's stderr must be read to its end before the run is judged.
+    child.on('close', (code, exitSignal) => {
       clearInterval(watch);
       clearTimeout(giveUp);
       if (!existsSync(pidFile)) { rejectRun(new Error('the fixture never started its fake tree')); return; }
       // An empty first line would make "the work folder is gone" pass without a folder, so it fails the run instead.
       const folder = stdout.split('\n')[0];
       if (!folder) { rejectRun(new Error('the fixture never named its work folder')); return; }
-      resolveRun({ code, folder, tmp, pids: JSON.parse(readFileSync(pidFile, 'utf8')) });
+      if (!sent) { rejectRun(new Error('the fixture ended before the signal was sent')); return; }
+      resolveRun({ code, exitSignal, stderr, folder, tmp, pids: JSON.parse(readFileSync(pidFile, 'utf8')) });
     });
   });
 }
 
 describe('a run stopped by a signal', () => {
-  for (const [signal, code] of [['SIGTERM', 143], ['SIGINT', 130]] as const) {
-    it(`exits ${code} on ${signal}, removes its work folder, and stops the processes its check started`, async () => {
+  for (const [signal, code] of [['SIGTERM', 143], ['SIGINT', 130], ['SIGHUP', 129]] as const) {
+    it(`exits ${code} on ${signal}, stops the processes its check started, then removes its work folder while they were writing into it`, async () => {
       const outcome = await runFixtureUntil(signal);
-      expect(outcome.code).toBe(code);
-      expect(existsSync(outcome.folder)).toBe(false);
-      expect(readdirSync(outcome.tmp)).toEqual([]);
+      // Both writers are gone first, so a leftover folder below is the run's fault, not a writer still at work.
       expect(await stoppedWithin(outcome.pids.grandchild)).toBe(true);
       expect(await stoppedWithin(outcome.pids.child)).toBe(true);
+      expect({ code: outcome.code, signal: outcome.exitSignal, stderr: outcome.stderr }).toEqual({ code, signal: null, stderr: '' });
+      expect(existsSync(outcome.folder)).toBe(false);
+      expect(readdirSync(outcome.tmp)).toEqual([]);
     }, 60_000);
   }
+
+  it('names a work folder it could not remove in one stderr line, and keeps the exit code', async () => {
+    const outcome = await runFixtureUntil('SIGTERM', { locked: true });
+    try {
+      expect(await stoppedWithin(outcome.pids.grandchild)).toBe(true);
+      expect(await stoppedWithin(outcome.pids.child)).toBe(true);
+      expect(outcome.code).toBe(143);
+      const lines = outcome.stderr.split('\n').filter((line) => line !== '');
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toMatch(/^UPLOAD_CHECK_WORK_FOLDER_LEFT: /u);
+      expect(lines[0]).toContain(outcome.folder);
+      expect(existsSync(outcome.folder)).toBe(true);
+    } finally {
+      // The locked folder must be writable again, or the scratch folder could not be removed after the test.
+      if (existsSync(join(outcome.folder, 'locked'))) chmodSync(join(outcome.folder, 'locked'), 0o755);
+    }
+  }, 60_000);
 });

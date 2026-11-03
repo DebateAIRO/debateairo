@@ -6,6 +6,7 @@
 // with that root's own tsx, so every import the driver makes resolves to the root's packages, not this checkout's.
 //
 //   checkStartChecks({ root, workdir, node, extraEnv, limitMs })   the check: a CheckResult
+//   stopRunning()                                                  stops a driver still running, its PostgreSQL with it
 //
 // <root> is the release root from check 2 (the folder that holds dialectical-engine/), or null when check 2 installed
 // nothing. <workdir> is the run's work folder: the driver's cluster lives in <workdir>/start-checks, which is gone
@@ -103,9 +104,20 @@ function killGroup(pid) {
   try { process.kill(-pid, "SIGKILL"); } catch { /* already gone */ }
 }
 
+/** The driver groups runDriver started that have not ended yet. */
+const running = new Set();
+
 /**
- * Runs the driver in its own process group, so a timeout, a failure or this process's own exit can stop the driver and
- * the PostgreSQL it started together. Resolves to { code, stdout, timedOut }.
+ * Stops every driver group that is still running, the driver's PostgreSQL with it. run.mjs calls it first on a stop
+ * signal, before it removes the work folder, so the cluster is not still writing there while the folder goes.
+ */
+export function stopRunning() {
+  for (const pid of running) killGroup(pid);
+}
+
+/**
+ * Runs the driver in its own process group, so a timeout, a failure, stopRunning() or this process's own exit can stop
+ * the driver and the PostgreSQL it started together. Resolves to { code, stdout, timedOut }.
  */
 function runDriver(tsx, args, { cwd, env, log, limitMs }) {
   return new Promise((resolveRun) => {
@@ -113,11 +125,13 @@ function runDriver(tsx, args, { cwd, env, log, limitMs }) {
     const chunks = [];
     let settled = false, timedOut = false;
     const child = spawn(tsx, args, { cwd, env, stdio: ["ignore", "pipe", fd], shell: false, detached: true });
+    if (child.pid !== undefined) running.add(child.pid);
     const onExit = () => killGroup(child.pid);
     const settle = (code) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      running.delete(child.pid);
       process.removeListener("exit", onExit);
       closeSync(fd);
       // Whatever the driver left in its group (a PostgreSQL its finally could not stop) goes with it.

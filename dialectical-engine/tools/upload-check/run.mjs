@@ -2,7 +2,8 @@
 //
 // It runs the three checks in order on one commit: check 1 the shared tools folder, check 2 the release install and the
 // website build, check 3 the API and runner start checks. Before any of them it waits its turn on a busy Mac, the way
-// run-clean.sh does. It makes one fresh work folder for the run and removes it however the run ends, including Ctrl-C.
+// run-clean.sh does. It makes one fresh work folder for the run and removes it when the run ends, on Ctrl-C, a stop
+// (SIGTERM) and a closed terminal (SIGHUP) included. A forced kill (kill -9) cannot be caught, and leaves the folder.
 //
 //   node tools/upload-check/run.mjs --rev <commit>   the command: exit 0 all passed, 1 a check refused or not checked, 2 could not run
 //   runUploadCheck({ rev, ... })                     the run itself: { exitCode, output, results }
@@ -19,8 +20,8 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { checkToolsFolder } from "./tools-folder.mjs";
-import { checkWebsiteBuild } from "./website-build.mjs";
-import { checkStartChecks } from "./start-checks.mjs";
+import { checkWebsiteBuild, stopRunning as stopBuildGroups } from "./website-build.mjs";
+import { checkStartChecks, stopRunning as stopStartCheckGroups } from "./start-checks.mjs";
 
 /** The checkout root: the folder that holds dialectical-engine/. This file sits at dialectical-engine/tools/upload-check/. */
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -185,12 +186,23 @@ export async function runUploadCheck({
     return stopped("UPLOAD_CHECK_WORK_FOLDER_EXISTS", `${workFolder} already exists; each run starts from a new folder`);
   }
   mkdirSync(workFolder);
-  const cleanUp = () => rmSync(workFolder, { recursive: true, force: true });
-  // Ctrl-C and SIGTERM remove the folder, then exit. The exit runs the checks' own exit hooks, which stop what they started.
-  const onInterrupt = () => { try { cleanUp(); } finally { process.exit(130); } };
-  const onTerminate = () => { try { cleanUp(); } finally { process.exit(143); } };
-  process.on("SIGINT", onInterrupt);
-  process.on("SIGTERM", onTerminate);
+  // A few tries, a tenth of a second apart: a process that was just stopped may still be letting go of a file.
+  const cleanUp = () => rmSync(workFolder, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  // Ctrl-C, a stop and a closed terminal first stop every process group the checks started (pnpm, Next, the start-checks
+  // driver and its PostgreSQL), so nothing is still writing into the folder; then the folder goes; then the run exits with
+  // the signal's usual code. A folder that still could not be removed is named on stderr, so the owner can delete it.
+  const onSignal = (exitCode) => () => {
+    try {
+      stopBuildGroups();
+      stopStartCheckGroups();
+      try { cleanUp(); } catch { /* named just below */ }
+      if (existsSync(workFolder)) process.stderr.write(`UPLOAD_CHECK_WORK_FOLDER_LEFT: could not remove ${workFolder}; delete it by hand\n`);
+    } finally {
+      process.exit(exitCode);
+    }
+  };
+  const handlers = [["SIGINT", onSignal(130)], ["SIGTERM", onSignal(143)], ["SIGHUP", onSignal(129)]];
+  for (const [signal, handler] of handlers) process.on(signal, handler);
   const pnpmDir = dirname(pnpm);
   let outcome;
   let cleanUpFailure = null;
@@ -212,8 +224,7 @@ export async function runUploadCheck({
   } catch (error) {
     outcome = { exitCode: 2, output: `UPLOAD_CHECK_RUN_FAILED: a check threw, so the run could not finish: ${firstLine(error)}`, results: [] };
   } finally {
-    process.removeListener("SIGINT", onInterrupt);
-    process.removeListener("SIGTERM", onTerminate);
+    for (const [signal, handler] of handlers) process.removeListener(signal, handler);
     try {
       cleanUp();
     } catch (error) {

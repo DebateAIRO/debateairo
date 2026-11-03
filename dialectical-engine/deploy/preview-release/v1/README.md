@@ -1375,7 +1375,11 @@ node tools/upload-check/run.mjs --rev af7e457b5
 It needs Node v26.8.2 and pnpm 11.20.0 exactly (anything else is refused, `UPLOAD_CHECK_RUNTIME_REFUSED`), the
 internet for one package download, and port 5434 free. It first waits, up to an hour, until no other test run is going
 and at least 40% of the Mac's memory is free, because this Mac has frozen under parallel heavy work. Everything it
-makes goes into one temporary folder, which is deleted at the end however the run ends, Ctrl-C included.
+makes goes into one temporary folder. That folder is deleted at the end: when the run finishes, on Ctrl-C, on a stop
+(`kill`) and when its terminal is closed. A folder that still cannot be deleted is named in one line that starts
+`UPLOAD_CHECK_WORK_FOLDER_LEFT`. A forced kill (`kill -9`) cannot be caught and leaves the folder behind; when no upload
+check is running, `find "${TMPDIR%/}" -maxdepth 1 -name 'upload-check-*' -print -exec rm -rf {} +` prints and deletes
+every leftover.
 
 **What each check covers.** Each one does one thing the way the server does it:
 
