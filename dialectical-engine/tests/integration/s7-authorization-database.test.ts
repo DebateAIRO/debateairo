@@ -752,11 +752,11 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
     expect(noServedAnswer.json()).toEqual({ error: "ANSWER_NOT_SERVED" });
   }, 60_000);
 
-  // Row-level security S01, PRD-N1 (t_f667b6ff): under the real logins the ten-route test above stops at its owner gap
-  // write (V-13: no API login holds INSERT on core.investigation_request nor UPDATE on memory.memory_link, so the
-  // owner's writes answer 500), and the routes after it went unmeasured there. V-13 keeps that test as it is; this one
-  // pins those routes again, foreign-valid against absent plus the owner's reads, with none of the owner writes, so it
-  // runs in both modes.
+  // Row-level security S01, PRD-N1 (t_f667b6ff): under the real logins the ten-route test above once stopped at its
+  // owner gap write (no API login holds INSERT on core.investigation_request nor UPDATE on memory.memory_link, the gap
+  // that work labelled V-13), and the routes after it went unmeasured there. Since upload check Task 9 both owner writes
+  // go through 0155's definers and the ten-route test runs in full on the logins. This one still pins those routes
+  // without the owner writes, foreign-valid against absent plus the owner's reads, in both modes.
   it("keeps memory-link unlink and the run, events and answer routes indistinguishable for foreign-valid and absent resources, without the owner writes V-13 lists", async () => {
     const absentRunId = randomUUID();
     const absentAnswerId = randomUUID();

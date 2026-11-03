@@ -24,10 +24,12 @@
 # tests/support/billingStack.ts (the five billing files), registration-database, sf-s04-ask-gate-database,
 # tests/support/r22-world.ts and acceptance/main.ts. tests/support/staffSecurityJourney.ts's fallback alert readiness on
 # database.pool is not reached in a request today; if it were, the guard would now refuse it.
-tests/integration/s7-authorization-database.test.ts  product fault, owner decision open (Task 9): the owner's gap request and memory-link unlink write core.investigation_request (INSERT) and memory.memory_link (UPDATE), which no API login holds (V-13), so both answer 500; Task 9 fixed the earlier lock fault (core.lock_owned_live_runs, packages/serve/src/index.ts)
 tests/integration/rls-boot-attestation.test.ts  a real need of the test: it proves that main.ts's boot checks refuse a superuser login (B1-c, B1-g), and those checks run inside a request scope
 #
-# Task 9 fixed a product fault that kept a file here, and took the file off:
+# Task 9 fixed the product faults that kept files here, and took the files off:
+# - tests/integration/s7-authorization-database.test.ts: the gap-investigation request and the memory-link unlink locked
+#   and wrote tables the runtime login may not touch; they now lock through core.lock_owned_live_runs and write through
+#   0155's two definers (packages/serve/src/index.ts, packages/memory/src/index.ts).
 # - tests/integration/r22-public-report.test.ts: a stranger's report on a public debate was sealed under the author's run
 #   on the runtime login, which row security does not let see that run; the seal now runs as cross-account reader X29
 #   (apps/api/src/public-tree.ts, pinned by tests/architecture/rls-cross-account-sites.test.ts).
