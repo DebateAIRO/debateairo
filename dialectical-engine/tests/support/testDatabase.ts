@@ -32,8 +32,22 @@ export function beforeTestDatabaseStops(database: Pick<TestDatabase, "pool">, ho
   beforeStopHooks.set(database, hooks);
 }
 
-async function runBeforeStopHooks(database: TestDatabase): Promise<void> {
-  for (const hook of (beforeStopHooks.get(database) ?? []).splice(0)) await hook();
+/**
+ * Runs every hook in turn, the later ones too when one rejects, and never rejects itself: it returns what failed (one
+ * error, or an AggregateError for several), or undefined. stop() ends the pool, stops the cluster and removes its
+ * folder whatever this returns, and throws the failure only after that.
+ */
+async function runBeforeStopHooks(database: TestDatabase): Promise<unknown> {
+  const failures: unknown[] = [];
+  for (const hook of (beforeStopHooks.get(database) ?? []).splice(0)) {
+    try {
+      await hook();
+    } catch (error) {
+      failures.push(error);
+    }
+  }
+  if (failures.length === 0) return undefined;
+  return failures.length === 1 ? failures[0] : new AggregateError(failures, "TEST_DATABASE_STOP_HOOKS_FAILED");
 }
 
 export function createTestAskAdmissionPoolFacades(pool:Pool):Readonly<{
@@ -95,9 +109,13 @@ async function startWithTestcontainers(postgresMajor: string): Promise<TestDatab
     testcontainersStatus: "ACTIVE",
     expectedPostgresMajor: postgresMajor,
     async stop() {
-      await runBeforeStopHooks(database);
-      await pool.end();
-      await container.stop();
+      const hookFailure = await runBeforeStopHooks(database);
+      try {
+        await pool.end();
+      } finally {
+        await container.stop();
+      }
+      if (hookFailure !== undefined) throw hookFailure;
     }
   };
   return database;
@@ -195,10 +213,18 @@ async function startWithEmbedded(postgresMajor: string): Promise<TestDatabase> {
       testcontainersStatus: policy.testcontainersStatus,
       expectedPostgresMajor: postgresMajor,
       async stop() {
-        await runBeforeStopHooks(database);
-        await pool.end();
-        await embedded.stop();
-        await rm(directory, { recursive: true, force: true });
+        // A rejecting hook must not leave the pool, the cluster or its folder behind: they go first, then it is thrown.
+        const hookFailure = await runBeforeStopHooks(database);
+        try {
+          await pool.end();
+        } finally {
+          try {
+            await embedded.stop();
+          } finally {
+            await rm(directory, { recursive: true, force: true });
+          }
+        }
+        if (hookFailure !== undefined) throw hookFailure;
       }
     };
     return database;
