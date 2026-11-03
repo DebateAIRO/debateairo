@@ -9,8 +9,10 @@ import "@/app/v4/v4-base.css";
 import "@/app/v4/v4-ask.css";
 import "@/app/v4/v4-report.css";
 import "./public-lane.css";
+import { CouldNotLoadRetry } from "./CouldNotLoad";
 import { MadeByNewerRelease } from "./MadeByNewerRelease";
 import { PublicDebatePageClient } from "./PublicDebatePageClient";
+import { PublicPageNote } from "./PublicPageNote";
 import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
 import { questionLocale } from "@/lib/i18n/questionLocale";
 import { loadNamespace } from "@/lib/i18n/server";
@@ -41,19 +43,24 @@ export default async function PublicDebatePage({ params }: { params: Promise<{ i
     debate = await createServerContractClient(fetch, undefined, undefined, readTrustedClientIp(await headers())).readPublicDebate(id);
   } catch (failure) {
     // Side-by-side spec §7 (plan C13): a debate a newer version made (the server says so, or its answer does not
-    // parse here) is told so plainly; every other refusal stays "not found".
+    // parse here) is told so plainly.
     // Decision 33: hidden while it is reviewed. One plain line, nothing of the debate, and no search engine keeps it.
+    // public-f8: both inside the normal header, with the ways on.
     if (failure instanceof ContractHttpError && failure.serverCode === "DEBATE_UNDER_REVIEW") {
-      return <div className="newVersionNote newVersionNotePage" role="status" data-public-under-review>
-        <meta name="robots" content="noindex" />
-        <span>{t(v4Catalog, "v4.public.underReview")}</span>
-      </div>;
+      return <PublicPageNote kind="under-review" v4Catalog={v4Catalog} line={t(v4Catalog, "v4.public.underReview")} />;
     }
     if (failure instanceof ContractHttpError
       && (failure.serverCode === MADE_BY_NEWER_RELEASE || failure.code === "INVALID_RESPONSE")) {
-      return <MadeByNewerRelease catalog={await loadNamespace(locale, "chrome")} />;
+      return <MadeByNewerRelease catalog={await loadNamespace(locale, "chrome")} v4Catalog={v4Catalog} />;
     }
-    notFound();
+    // public-f7: "not found" only for a debate that does not exist. A passing fault, the read limit or a lost connection
+    // says so, with Try again.
+    if (failure instanceof ContractHttpError && failure.status === 404) notFound();
+    return (
+      <PublicPageNote kind="could-not-load" v4Catalog={v4Catalog} line={t(v4Catalog, "v4.public.couldNotLoad")} waysOn={false}>
+        <CouldNotLoadRetry catalog={v4Catalog} />
+      </PublicPageNote>
+    );
   }
   // The language the debate was argued in, as the snapshot recorded it (spec
   // 2026-09-26 §14.3); an older snapshot without one keeps the reader's.
