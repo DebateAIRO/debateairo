@@ -1,7 +1,8 @@
 // R22 path 9, split out of tests/integration/r22-end-to-end.test.ts (owner, 3 Nov 2026): a stranger's report on a public
 // debate, against the REAL API of tests/support/r22-world.ts, sending what the page sends (lib/v4/publicPage.ts's
-// pressPublicReport) over real HTTP. On the product's own logins this step meets a product fault, so this file alone is
-// on tests/support/master-key-files.txt (the reason is named there) and the other eleven paths run on the logins.
+// pressPublicReport) over real HTTP, on the product's own logins like the other eleven paths. Until upload check Task 9 this
+// step met a product fault there (the seal under the author's run answered 500 PRIVATE_CONTENT_ERASED), so this file sat
+// alone on tests/support/master-key-files.txt; the seal now runs as cross-account reader X29 (apps/api/src/public-tree.ts).
 // No vendor is contacted; all data is made up. Integration suites are skipped by the CI gate: run this file by hand, alone.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { pressPublicReport } from "../../apps/ui/lib/v4/publicPage.js";

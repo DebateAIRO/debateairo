@@ -373,8 +373,8 @@ describe("R22 on the real API", () => {
     saw("8", `allowed: ${String(contributions)} contribution under ${dan.pseudonym}, line "${after[0]!.line}", the digger's run paid ${String(await spendOf(allowed.id))} micros; refused: page unchanged; the digger's own page has their rewrite and the kept-private line, no story; earlier no word of the refusal (no dig part, story WRITING)`);
   }, 300_000);
 
-  // Path 9, a stranger's report on a public debate, is tests/integration/r22-public-report.test.ts (owner, 3 Nov): it meets a
-  // product fault on the product's own logins, so that file alone is on tests/support/master-key-files.txt.
+  // Path 9, a stranger's report on a public debate, is tests/integration/r22-public-report.test.ts (owner, 3 Nov), on the
+  // product's own logins since upload check Task 9 fixed the fault it met there.
   const publicRunIds = new Map<string, string>();
 
   // Paths 10 and 11: the team's side, with tests/integration/public-tree-flow.test.ts's seam: a real elevated staff row and a stored action proof, no passkey and no staff HTTP route.
