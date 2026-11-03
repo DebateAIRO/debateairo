@@ -1310,7 +1310,12 @@ export {
   type DebateShapePlan,
   type DebateShapePlanKey,
   type DebateShapePolicy,
-  type DebateShapeScrutinyBudget
+  type DebateShapeScrutinyBudget,
+  // V4 start step, Task 11: the start step's switch and widths.
+  debateShapeStartStepOf,
+  debateShapeStartStepStartValues,
+  type DebateShapeStartStep,
+  type DebateShapeWidths
 } from "./debate-shape-policy.js";
 export {
   LENGTH_GUIDANCE_POLICY_ROW_KEY,
