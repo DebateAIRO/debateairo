@@ -26,7 +26,7 @@ describe('check 3: the API and runner start checks as the production logins', ()
     expect(result.lines, result.lines.join('\n')).toContain('api runtime login: passed');
     expect(result.lines, result.lines.join('\n')).toContain('runner login: passed');
     expect(result.lines, result.lines.join('\n')).toContain('api system logins: passed');
-    expect(result.lines, result.lines.join('\n')).toContain("known gap: the server's logins were made by guide step B4 by hand; this checks the production list");
+    expect(result.lines, result.lines.join('\n')).toContain("known gap: the server's logins were made by hand in step B4 of R22's own upload guide; this checks the production list");
     expect(result.status).toBe('passed');
     expect(typeof result.seconds).toBe('number');
     // The repository already holds the same driver, so nothing was copied over it and it is still there, unchanged.

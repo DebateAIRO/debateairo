@@ -44,7 +44,7 @@ const PRINCIPALS_MANIFEST = "docs/missions/2026-08-17-accounts-privacy-security/
 const VERIFY_NATIVE = "deploy/preview-auth-dev/v1/verify-native.ts";
 /** The three recovery groups a host with the recovery policies on grants by hand (see the deployment rule below). */
 const RECOVERY_ROLES = ["debateai_password_reset_runtime", "debateai_backup_email_runtime", "debateai_mfa_recovery_runtime"] as const;
-const KNOWN_GAP = "known gap: the server's logins were made by guide step B4 by hand; this checks the production list";
+const KNOWN_GAP = "known gap: the server's logins were made by hand in step B4 of R22's own upload guide; this checks the production list";
 /** The engine folder of the release root this driver was copied into. */
 const ENGINE = fileURLToPath(new URL("../../", import.meta.url));
 
