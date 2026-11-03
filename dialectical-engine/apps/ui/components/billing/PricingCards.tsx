@@ -40,7 +40,8 @@ export function PricingCards({
       {plans.map((plan) => {
         const name = planName(catalog, plan.plan_id);
         const free = plan.plan_id === "FREE";
-        // `!= null`: a plan without both (an API from before Terms §12's totals) shows its net price "plus tax".
+        // `!= null`: the contract requires both, so only a hand-made answer (a test's, a mock's) lacks them; it shows the
+        // net price "plus tax", never a net price as tax included.
         const priced = tax != null && plan.total_price != null;
         return (
           <article

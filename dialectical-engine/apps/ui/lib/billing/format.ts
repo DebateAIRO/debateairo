@@ -18,7 +18,7 @@ export function formatMoney(locale: string, decimal: string, currency: BillingCu
  * Terms §12: how a plans list's prices stand toward tax. INCLUDED: the visitor's country's tax is in them; NONE: that
  * country adds none, so they are final; BEFORE: no country's tax is known (an unknown place, the US or Canada, whose
  * tax depends on the state or province, or the tax service not answering), so they are before tax. `== null`: an answer
- * without the field (an API from before the totals) is BEFORE, never read as tax included.
+ * without the field (only a hand-made one: the contract client requires it) is BEFORE, never read as tax included.
  */
 export type PricedTax = "INCLUDED" | "NONE" | "BEFORE";
 

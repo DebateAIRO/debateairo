@@ -40,7 +40,8 @@ async function landingPlans(locale: string, headerStore: Headers): Promise<Landi
       fetch, undefined, headerStore.get("user-agent") ?? undefined, readTrustedClientIp(headerStore)
     ).getBillingPlans();
     const paid = answer.plans.filter((plan) => plan.plan_id !== "FREE");
-    // `!= null`: an answer without the fields (an API from before Terms §12's totals) is never read as tax included.
+    // `!= null`: an answer without the fields (only a hand-made one: the contract client requires them) is never read
+    // as tax included.
     const tax = paid.every((plan) => plan.total_price != null) ? pricedTax(answer.tax) : "BEFORE";
     const lowest = paid
       // Spec 2026-10-05 §2.16.1: in the currency the visitor's connection pays in.

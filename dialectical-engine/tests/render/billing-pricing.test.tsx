@@ -130,7 +130,7 @@ describe("P18 /pricing", () => {
     expect(unknown.querySelector('[data-plan="PLUS"]')?.textContent).toContain("plus tax where it applies");
     expect(unknown.body.textContent).toContain(billingEnglish["billing.pricing.faqTaxQuestion"]);
     expect(unknown.body.textContent).toContain(billingEnglish["billing.pricing.faqTaxAnswer"]);
-    // An answer from before the totals existed (no `tax`, no `total_price`) is never read as tax included.
+    // A hand-made answer without the fields (no `tax`, no `total_price`) is never read as tax included.
     mocks.getBillingPlans.mockResolvedValue({ currency: "USD", plans: PLANS.plans.map(({ total_price: _, ...plan }) => plan) });
     const older = (await renderPricing()).querySelector('[data-plan="PLUS"]')!;
     expect(older.textContent).toContain("$20.00 a month");
