@@ -141,12 +141,33 @@ describe("loadDigView", () => {
     const expected = { QUEUED: "RUNNING", WAITING: "WAITING", CLAIMED: "RUNNING", RUNNING: "RUNNING", HOLDING: "RUNNING", FAILED: "FAILED" } as const;
     for (const [state, digState] of Object.entries(expected)) {
       const view = await loadDigView(link, fakeClient({ run: run(state as RunProjection["state"]) }));
-      expect(view).toEqual({ link, state: digState, headline: null, counts: null });
+      // Owner review 3 Nov (wait-f18, dig-f12): a dig that did not finish keeps its run's reason, for its plain sentence,
+      // and the question its run was asked with, so a retry rebuilt from its link is checked to ask the same.
+      expect(view).toEqual({
+        link, state: digState, headline: null, counts: null,
+        ...(digState === "FAILED" ? { terminalReason: "RUNNER_FAILED", questionLine: ANSWER.question_line } : {})
+      });
     }
   });
 
-  it("is FAILED when the follow-up run is gone", async () => {
-    expect((await loadDigView(link, fakeClient({ run: notFound() }))).state).toBe("FAILED");
+  it("is FAILED when the follow-up run is gone (with no reason of its own)", async () => {
+    expect(await loadDigView(link, fakeClient({ run: notFound() }))).toEqual({ link, state: "FAILED", headline: null, counts: null });
+  });
+
+  it("says nothing was taken from the quota only when the run read says quota_used NONE (owner review 3 Nov, wait-f18)", async () => {
+    const said = (quota: string) => ({ ...run("FAILED"), quota_used: quota }) as unknown as RunProjection;
+    expect(await loadDigView(link, fakeClient({ run: said("NONE") }))).toMatchObject({ state: "FAILED", quotaUntouched: true });
+    expect(await loadDigView(link, fakeClient({ run: said("SOME") }))).not.toHaveProperty("quotaUntouched");
+    expect(await loadDigView(link, fakeClient({ run: run("FAILED") }))).not.toHaveProperty("quotaUntouched");
+  });
+
+  it("keeps a month pause's date and whether it may continue now (owner review 3 Nov, wait-f2, public-f16)", async () => {
+    for (const canContinue of [false, true]) {
+      const paused: RunProjection = { ...run("RUNNING"), month_pause: { until: "2026-12-01T00:00:00.000Z", can_continue: canContinue } };
+      expect(await loadDigView(link, fakeClient({ run: paused }))).toEqual({
+        link, state: "RUNNING", headline: null, counts: null, pausedUntil: "2026-12-01T00:00:00.000Z", canContinue
+      });
+    }
   });
 
   it("is still RUNNING when a settled follow-up has no readable answer yet", async () => {

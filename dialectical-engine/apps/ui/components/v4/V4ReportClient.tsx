@@ -248,13 +248,17 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
   // R22 decision 17: once a report version stands, its own PDF (InvestigationReport below) takes the place of the debate's.
   const [hasReportVersion, setHasReportVersion] = useState(false);
   const pdfReady = map !== null && map.storyState === "READY" && !hasReportVersion;
+  // Owner review 3 Nov (map-f30): a debate that did not finish has no map; the way back is to its page, which offers
+  // "Ask this again".
+  const failed = load.kind === "NOT_READY" && load.failed;
+  const backKey = failed ? "v4.report.backToQuestion" : "v4.report.backToMap";
 
   const header = (
     <div className="v4RepChrome">
       {/* R2REG-5: the menu shows the level in use, but links carry only a level the person chose. */}
       <V4Header catalog={catalog} readingLevel={level} linkLevel={chosenLevel} onReadingLevel={chooseLevel} classicHref={classicHref}>
         <div className="v4RepActions">
-          <Link className="v4Btn" href={mapHref}>{t(catalog, "v4.report.backToMap")}</Link>
+          <Link className="v4Btn" href={mapHref}>{t(catalog, backKey)}</Link>
           {pdfReady ? <a className="v4Btn" href={`${classicHref}/report`}>{t(catalog, "v4.report.downloadPdf")}</a> : null}
           {map !== null ? (
             <button type="button" className="v4Btn v4BtnPrimary" onClick={() => window.print()}>{t(catalog, "v4.report.print")}</button>
@@ -279,9 +283,7 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
           {load.kind === "NOT_READY" ? (
             <>
               <p className="v4RepProse">{load.failed ? t(catalog, "v4.report.failed") : t(catalog, "v4.report.notReady")}</p>
-              <Link className="v4Btn" href={load.failed ? classicHref : mapHref}>
-                {load.failed ? t(catalog, "v4.common.classicView") : t(catalog, "v4.report.backToMap")}
-              </Link>
+              <Link className={load.failed ? "v4Btn v4BtnPrimary" : "v4Btn"} href={mapHref}>{t(catalog, backKey)}</Link>
             </>
           ) : null}
         </div>

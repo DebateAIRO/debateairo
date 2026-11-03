@@ -24,6 +24,7 @@ import {
   type V4Goal,
   type V4GoalAnswer
 } from "@/lib/v4/types";
+import { useAskAgain } from "@/lib/v4/useAskAgain";
 import { useAskClarify } from "@/lib/v4/useAskClarify";
 import { useV4Ask } from "@/lib/v4/useV4Ask";
 
@@ -157,7 +158,8 @@ export function V4AskClient({
   locale,
   crisisCountryHint,
   initialQuestion,
-  initialLevel
+  initialLevel,
+  againRunId = null
 }: Readonly<{
   catalog: MessageCatalog;
   homeCatalog: MessageCatalog;
@@ -168,6 +170,8 @@ export function V4AskClient({
   initialQuestion: string;
   /** The level the address carried (`?level=`), or null: then D1 offers the chips. */
   initialLevel: ReadingLevel | null;
+  /** Owner review 3 Nov (wait-f11): "Ask this again" names the debate (`?again=`) whose question fills the box; null: none. */
+  againRunId?: string | null;
 }>) {
   // AuthGate reads newDebate.* keys (checking session / redirecting), as on /new.
   return (
@@ -181,6 +185,7 @@ export function V4AskClient({
         crisisCountryHint={crisisCountryHint}
         initialQuestion={initialQuestion}
         initialLevel={initialLevel}
+        againRunId={againRunId}
       />
     )}</AuthGate>
   );
@@ -194,7 +199,8 @@ function V4AskForm({
   locale,
   crisisCountryHint,
   initialQuestion,
-  initialLevel
+  initialLevel,
+  againRunId
 }: Readonly<{
   catalog: MessageCatalog;
   homeCatalog: MessageCatalog;
@@ -205,6 +211,7 @@ function V4AskForm({
   initialQuestion: string;
   /** The level the address carried (`?level=`), or null: then D1 offers the chips. */
   initialLevel: ReadingLevel | null;
+  againRunId: string | null;
 }>) {
   const router = useRouter();
   // N7: a level the person chose before (on any device) comes back from the account; until that read has answered the
@@ -228,6 +235,13 @@ function V4AskForm({
   const questionField = useRef<HTMLTextAreaElement>(null);
   const shownStep = useRef<Step>(step);
   const ids = useId();
+  // Owner review 3 Nov (wait-f11): "Ask this again" fills the box with the earlier question, read back from the server, as
+  // long as the person has not started typing; nothing starts by itself.
+  const againQuestion = useAskAgain(againRunId, catalog);
+  useEffect(() => {
+    if (againQuestion === null) return;
+    setQuestion((current) => (current === initialQuestion ? againQuestion : current));
+  }, [againQuestion, initialQuestion]);
   const recent = useRecentQuestions();
 
   const ask = useV4Ask({

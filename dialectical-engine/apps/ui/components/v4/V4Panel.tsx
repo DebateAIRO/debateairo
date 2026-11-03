@@ -6,6 +6,7 @@ import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translat
 import { addedLines, ownWords, startsWithLabel } from "@/lib/v4/askText";
 import { findOpenQuestion, openQuestionsOf } from "@/lib/v4/mapModel";
 import type { MoneyLine } from "@/lib/v4/money";
+import { pauseOfDig } from "@/lib/v4/monthPause";
 import { draftTarget } from "@/lib/v4/suggestions";
 import { levelHref } from "@/lib/v4/storage";
 import { countTrust } from "@/lib/v4/trust";
@@ -26,6 +27,7 @@ import {
 } from "@/lib/v4/types";
 import {
   digFor,
+  DigPauseDot,
   digNote,
   digsUnder,
   digTitle,
@@ -41,7 +43,9 @@ import {
   type ResolvedSelection,
   type Title
 } from "./V4MapTree";
+import { V4DigFailed, type V4FailedDigs } from "./V4DigFailed";
 import { V4DigCompose, V4MoneyLines, type V4DigChoice } from "./V4DigSuggest";
+import { V4MonthPause } from "./V4MonthPause";
 import { V4DigPageIntro, V4PathRewrite, V4WhatChanged } from "./V4PathRewrite";
 import { V4OtherPages, V4SearchNote, V4SourceList, V4WebNoteLine, type V4ResearchedPress } from "./V4Sources";
 import { V4TrustBar } from "./V4TrustBar";
@@ -57,6 +61,8 @@ import { V4TrustBar } from "./V4TrustBar";
  * Dig model revision W4-6: a path a dig rewrote shows its rewrite under its new text (V4PathRewrite.tsx); a dig's own page
  * says what it looked into and the path it rewrote in place of a short answer (a dig writes no story, owner Q-D13), then its
  * answer text and its points as usual; a dig's panel says what became of its rewrite, or that it is paused at the month wall.
+ * Owner review 3 Nov (wait-f2, public-f16, wait-f18, dig-f12): a paused dig's panel shows the one pause block (with
+ * Continue once the server says its month has reset), and a dig that did not finish its reason and "Try this dig again".
  */
 
 type PanelProps = Readonly<{
@@ -95,6 +101,11 @@ type PanelProps = Readonly<{
    * debate's answer, which stays one click away. Absent or null: no finished report yet.
    */
   reportAnswer?: Readonly<{ version: number; segments: readonly string[] }> | null;
+  /**
+   * Owner review 3 Nov (wait-f18, dig-f12): what a dig that did not finish says and offers (its reason, "Try this dig
+   * again", "This keeps failing…"). Absent: its panel says only that it did not finish, as before.
+   */
+  failedDigs?: V4FailedDigs;
   headingRef: RefObject<HTMLHeadingElement | null>;
   catalog: MessageCatalog;
   locale: string;
@@ -229,7 +240,7 @@ function Section(props: Readonly<{ title: string; children: ReactNode; className
   );
 }
 
-function DigLinkRow(props: Readonly<{ dig: DigView; onSelect: PanelProps["onSelect"]; catalog: MessageCatalog }>) {
+function DigLinkRow(props: Readonly<{ dig: DigView; onSelect: PanelProps["onSelect"]; catalog: MessageCatalog; locale: string }>) {
   const { dig } = props;
   const working = digWorking(dig) && dig.pausedUntil === undefined;
   return (
@@ -242,7 +253,8 @@ function DigLinkRow(props: Readonly<{ dig: DigView; onSelect: PanelProps["onSele
         <TitleText className="v4PanelRowTitle" title={digTitle(dig, props.catalog)} catalog={props.catalog} />
         <span className="v4MapNote">
           {working ? <span className="v4MapPulse" aria-hidden="true" /> : null}
-          {digNote(dig, props.catalog)}
+          <DigPauseDot dig={dig} />
+          {digNote(dig, props.catalog, props.locale)}
         </span>
       </button>
     </li>
@@ -300,7 +312,7 @@ function WhereToDig(props: Readonly<{
             <h4 className="v4PanelSmallHead">{t(panel.catalog, "v4.panel.digsHere")}</h4>
             <ul className="v4PanelRows">
               {props.digs.map((dig) => (
-                <DigLinkRow key={dig.link.childRunId} dig={dig} onSelect={panel.onSelect} catalog={panel.catalog} />
+                <DigLinkRow key={dig.link.childRunId} dig={dig} onSelect={panel.onSelect} catalog={panel.catalog} locale={panel.locale} />
               ))}
             </ul>
           </>
@@ -623,7 +635,8 @@ function DigBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolved
   const finished = rewrite !== undefined && rewrite !== null && (rewrite.state === "READY" || rewrite.state === "READY_WITH_RESERVATION")
     ? rewrite
     : null;
-  const paused = dig.pausedUntil;
+  // Owner review 3 Nov (wait-f2): one pause block, the same as the waiting card's, with Continue once the month has reset.
+  const pause = pauseOfDig(dig);
   return (
     <>
       {more.length > 0
@@ -636,17 +649,25 @@ function DigBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolved
         )
         : null}
       <Section title={t(panel.catalog, "v4.panel.answerHere")}>
-        <p className="v4PanelText">
-          {digWorking(dig) && paused === undefined ? <span className="v4MapPulse" aria-hidden="true" /> : null}
-          {paused !== undefined
-            ? t(panel.catalog, "v4.money.paused", { date: formatDate(panel.locale, paused, { dateStyle: "medium" }) })
-            : rewrite !== undefined && dig.state === "DONE"
-              ? digNote(dig, panel.catalog)
+        {pause !== null ? (
+          <>
+            <V4MonthPause runId={dig.link.childRunId} pause={pause} catalog={panel.catalog} locale={panel.locale} className="v4PanelPause" />
+            {dig.link.mode !== null ? <p className="v4PanelText"><span className="v4PanelModeTag">{t(panel.catalog, `v4.digMode.${dig.link.mode}`)}</span></p> : null}
+          </>
+        ) : (
+          <p className="v4PanelText">
+            {digWorking(dig) ? <span className="v4MapPulse" aria-hidden="true" /> : null}
+            {rewrite !== undefined && dig.state === "DONE"
+              ? digNote(dig, panel.catalog, panel.locale)
               : t(panel.catalog, `v4.panel.digState.${dig.state}`)}
-          {dig.link.mode !== null
-            ? <> <span className="v4PanelModeTag">{t(panel.catalog, `v4.digMode.${dig.link.mode}`)}</span></>
-            : null}
-        </p>
+            {dig.link.mode !== null
+              ? <> <span className="v4PanelModeTag">{t(panel.catalog, `v4.digMode.${dig.link.mode}`)}</span></>
+              : null}
+          </p>
+        )}
+        {panel.failedDigs !== undefined
+          ? <V4DigFailed dig={dig} failed={panel.failedDigs} digBusy={panel.digBusy} catalog={panel.catalog} />
+          : null}
         {dig.state === "DONE" && rewrite === undefined
           ? (headline.length > 0
             ? <p className="v4PanelHeadline v4Serif" data-ai-generated="true">{headline}</p>

@@ -6,8 +6,8 @@ import type { AskRoom } from "../../apps/ui/lib/billing/room.js";
 import type * as Money from "../../apps/ui/lib/v4/money.js";
 import { DIG_LEVEL_MAX, type RunProjection } from "../../packages/contract/src/index.js";
 import {
-  branch, buttonNamed, CATALOG, click, digPart, harness, mountMap, openPath, page, panel, PATHS, resetHarness, seededAnswer,
-  text, tray, unmountMap
+  advance, branch, buttonNamed, buttonsNamed, CATALOG, click, digPart, harness, mountMap, openPath, page, panel, PATHS, resetHarness,
+  seededAnswer, text, tray, unmountMap
 } from "./v4-debate-harness.js";
 
 vi.mock("@/components/AuthGate", async () => (await import("./v4-debate-harness.js")).authGateMock);
@@ -121,19 +121,22 @@ describe("the borrowed notice in the usage area", () => {
 });
 
 describe("a debate paused at the month wall", () => {
-  it("says 'paused until {date}', and Continue before the reset is refused with nothing changed", async () => {
+  // Owner review 3 Nov (wait-f5, map-f31, public-f17): the pause is said once, with a still mark; before the reset nothing
+  // looks pressable ("Continues on …" is a plain label); after it, Continue.
+  it("says it once, with a still mark and no Continue button before the reset", async () => {
     const runId = crypto.randomUUID();
     harness.run = paused(runId, false);
-    harness.continueRun = vi.fn(async () => ({ kind: "TOO_EARLY" as const, until: NEXT_MONTH }));
     await mountMap(1280, runId);
     const date = formatDate("en", NEXT_MONTH, { dateStyle: "medium" });
-    expect(text()).toContain(word("v4.debate.state.PAUSED_MONTH", { date }));
+    const day = formatDate("en", NEXT_MONTH, { day: "numeric", month: "short" });
     expect(text()).toContain(word("v4.money.paused", { date }));
+    expect(text()).not.toContain(word("v4.debate.state.PAUSED_MONTH", { date }));
+    expect(text()).toContain(word("v4.pause.continuesOn", { date: day }));
     expect(text()).toContain(CATALOG["v4.money.continueNote"]);
-    await click(buttonNamed(CATALOG["v4.money.continue"]!));
-    expect(harness.continueRun).toHaveBeenCalledWith(runId);
-    expect(text()).toContain(word("v4.money.continueTooEarly", { date }));
-    expect(buttonNamed(CATALOG["v4.money.continue"]!).disabled).toBe(false);
+    expect(text()).not.toContain(CATALOG["v4.debate.usually"]);
+    expect(buttonsNamed(CATALOG["v4.money.continue"]!)).toEqual([]);
+    expect(page().querySelector(".v4DebPulse")).toBeNull();
+    expect(page().querySelector(".v4PauseDot")).not.toBeNull();
   });
 
   it("once the month has reset, Continue resumes it", async () => {
@@ -142,7 +145,18 @@ describe("a debate paused at the month wall", () => {
     await mountMap(1280, runId);
     expect(text()).toContain(CATALOG["v4.money.pausedReady"]);
     await click(buttonNamed(CATALOG["v4.money.continue"]!));
+    expect(harness.continueRun).toHaveBeenCalledWith(runId);
     expect(buttonNamed(CATALOG["v4.money.continuing"]!).disabled).toBe(true);
+  });
+
+  it("a Continue the server still refuses as too early says from when, and nothing changed", async () => {
+    const runId = crypto.randomUUID();
+    harness.run = paused(runId, true);
+    harness.continueRun = vi.fn(async () => ({ kind: "TOO_EARLY" as const, until: NEXT_MONTH }));
+    await mountMap(1280, runId);
+    await click(buttonNamed(CATALOG["v4.money.continue"]!));
+    expect(text()).toContain(word("v4.money.continueTooEarly", { date: formatDate("en", NEXT_MONTH, { dateStyle: "medium" }) }));
+    expect(buttonNamed(CATALOG["v4.money.continue"]!).disabled).toBe(false);
   });
 
   it("a failed Continue says so plainly", async () => {
@@ -152,6 +166,19 @@ describe("a debate paused at the month wall", () => {
     await mountMap(1280, runId);
     await click(buttonNamed(CATALOG["v4.money.continue"]!));
     expect(text()).toContain(CATALOG["v4.money.continueFailed"]);
+  });
+
+  it("when the new month starts while the page is open, the block changes at once with the 1-second highlight", async () => {
+    const runId = crypto.randomUUID();
+    harness.run = paused(runId, false);
+    await mountMap(1280, runId);
+    expect(page().querySelector(".v4PauseChanged")).toBeNull();
+    harness.run = paused(runId, true);
+    await advance(5_000);
+    expect(text()).toContain(CATALOG["v4.money.pausedReady"]);
+    expect(page().querySelector(".v4PauseChanged")).not.toBeNull();
+    await advance(1_000);
+    expect(page().querySelector(".v4PauseChanged")).toBeNull();
   });
 });
 
