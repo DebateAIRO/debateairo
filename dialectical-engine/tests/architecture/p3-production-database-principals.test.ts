@@ -1392,6 +1392,18 @@ describe("P3-01 production database-principal manifest", () => {
     "EXECUTE ON FUNCTION core.read_carry_on_begun(integer)",
     "EXECUTE ON FUNCTION core.record_carry_on_done(uuid)"
   ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0156_path_results.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION core.write_path_root(uuid,text,integer,uuid,text)",
+    "EXECUTE ON FUNCTION core.record_path_outcome(uuid,text,text,jsonb,bytea)",
+    "EXECUTE ON FUNCTION core.record_path_gap_round(uuid,integer,jsonb,bytea)",
+    "EXECUTE ON FUNCTION core.read_path_roots(uuid)",
+    "EXECUTE ON FUNCTION core.read_path_outcomes(uuid)",
+    "EXECUTE ON FUNCTION core.read_path_gap_round(uuid)"
+  ]
 }
 ]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))

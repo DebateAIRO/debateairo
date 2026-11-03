@@ -45,6 +45,8 @@ export * from "./investigations.js";
 export * from "./dig-model.js";
 // The paths a person chose at Start and the carry-on marks (migration 0155, V4 start step Task 20).
 export * from "./start-paths.js";
+// A path debate's results per path (migration 0156, V4 start step Task 21).
+export * from "./path-results.js";
 export * from "./pool-budget.js";
 export * from "./release-state.js";
 export { recordRunSupersession, resolveRunRef } from "./run-supersession.js";

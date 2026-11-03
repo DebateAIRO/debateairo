@@ -620,7 +620,8 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // migrate() is byte-identical.
 // V4 start step Task 20 (2026-11-03): one comment and one export line for the start paths store (0155). migrate() is
 // byte-identical (its slice, sha256 d1495dbe4bbf…, as before).
-const NATIVE_MIGRATE_MODULE_SHA256 = "bf37b5b9fe082dba5d1c7cfb0186e686be3d3a639455956054283268a111bb5f";
+// V4 start step Task 21 (2026-11-03): one comment and one export line for the path results repository (0156). migrate() is byte-identical.
+const NATIVE_MIGRATE_MODULE_SHA256 = "3eca52aafca33bd516dba70a9caf7cb26fe2264688fe8d16651096119ef98265";
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
 // ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK and the rethrow after it, then the one retried
 // SQLSTATE). A6 review (2026-10-22): its doc gained one sentence (a step holds its locks until COMMIT; 2 s bounds each
