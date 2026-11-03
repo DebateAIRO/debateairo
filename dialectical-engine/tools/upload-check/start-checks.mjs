@@ -188,8 +188,11 @@ export async function checkStartChecks({ root, workdir, node, extraEnv = {}, lim
     const hooks = [["--test-extra-grant", extraEnv.UPLOAD_CHECK_TEST_EXTRA_GRANT], ["--test-system-revoke", extraEnv.UPLOAD_CHECK_TEST_SYSTEM_REVOKE]]
       .filter(([, role]) => typeof role === "string" && role !== "").map(([flag, role]) => `${flag}=${role}`);
     const args = [DRIVER, cluster, String(process.pid), ...hooks];
-    // The driver's environment: this Mac's PATH is not handed on, only the given Node's folder and the system tools.
-    const env = { PATH: `${dirname(node)}:/usr/bin:/bin`, HOME: process.env.HOME ?? "", TMPDIR: process.env.TMPDIR ?? "/tmp", TZ: "UTC", ...extraEnv };
+    // The driver's environment: this Mac's PATH is not handed on, only the given Node's folder and the system tools. tsx
+    // keeps no compile cache, as on the server (source-manifest.mjs), so none lands in the Mac's temporary folder. TMPDIR
+    // stays the Mac's own: tsx's wrapper makes its socket there, and under the work folder that path is longer than the
+    // 104 characters a Mac socket path may have, so the driver would not start.
+    const env = { PATH: `${dirname(node)}:/usr/bin:/bin`, HOME: process.env.HOME ?? "", TMPDIR: process.env.TMPDIR ?? "/tmp", TSX_DISABLE_CACHE: "1", TZ: "UTC", ...extraEnv };
     run = await runDriver(tsx, args, { cwd: engine, env, log, limitMs });
   } finally {
     undo();
