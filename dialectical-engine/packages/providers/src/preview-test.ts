@@ -17,6 +17,7 @@ import {
   previewRefsAreReviewedSet, previewReservationNanoUsd, previewRostersHonourMakerRule, previewStorytellerOutputCap,
   previewTierOutputBound, type PreviewCallTier, type PreviewEffort, type PreviewModelRow, type PreviewProviderName
 } from "./preview-models.js";
+import { previewFinalWriterRoleOf } from "./preview-final-writer.js";
 import {
   parsePreviewThinkingLevels, previewSlipFixLevel, previewThinkingLevelBelow, previewThinkingLevelFor, previewThinkingLevelOnRequest,
   previewThinkingStepOf, type PreviewThinkingLevels
@@ -369,13 +370,8 @@ export function previewFinalWriterTierUnreadLine(event: PreviewFinalWriterTierUn
  * else, LG-A's structure-repair calls included.
  */
 export function previewCallTierOf(request: Readonly<{ callSiteKey: string; lane: string; role: string }>): PreviewCallTier {
-  const step = lengthCallStepOf(request.callSiteKey, request.lane);
-  const served = request.lane === "served";
-  const story = request.lane === "story";
-  return (step === "answer_writer" && served && request.role === "SYNTHESIZER")
-    || (step === "answer_checker" && served && request.role === "EVALUATOR")
-    || (step === "story_writer" && story && request.role === "SYNTHESIZER")
-    || (step === "story_checker" && story && request.role === "EVALUATOR") ? "FINAL_WRITER" : "STANDARD";
+  // V4 start step, Task 2: the four roles are read in one place, the shared final-writer rule's.
+  return previewFinalWriterRoleOf(request) === null ? "STANDARD" : "FINAL_WRITER";
 }
 /**
  * Story v4 (engine redesign R1d, absorbing LG-D; spec 2026-10-15 §7.4): the story contracts whose native requests keep

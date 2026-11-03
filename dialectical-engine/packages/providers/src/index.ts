@@ -3282,6 +3282,8 @@ export {
 } from "./structure-repair.js";
 export * from "./anthropic-token-count.js";
 export * from "./preview-test.js";
+// V4 start step, Task 2: the one final-writer rule for v2 runs.
+export * from "./preview-final-writer.js";
 // Perplexity plan 2026-10-30, task W2-1: the web search adapter (a search provider kind, never a model).
 export * from "./perplexity-search.js";
 // Side-by-side spec §13, addition D12-D20 (owner 2026-10-22): the preview line-up as a settings value, the env's gate part.

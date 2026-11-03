@@ -1288,6 +1288,7 @@ packages/providers/src/model-json.ts
 packages/providers/src/patch-follow-up.ts
 packages/providers/src/perplexity-search.ts
 packages/providers/src/preview-busy.ts
+packages/providers/src/preview-final-writer.ts
 packages/providers/src/preview-line-up.ts
 packages/providers/src/preview-models.ts
 packages/providers/src/preview-remaining.ts
