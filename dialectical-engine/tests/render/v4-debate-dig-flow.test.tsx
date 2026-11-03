@@ -2,6 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AskParentSchema, DIG_LEVEL_MAX, FREE_DIG_PICKS_MAX } from "../../packages/contract/src/index.js";
+import { readDigUndo, undoDig } from "../../apps/ui/lib/v4/digUndo.js";
 import {
   advance, branch, buttonNamed, buttonsNamed, CATALOG, click, digPart, harness, mountMap, openPath, page, panel, PATHS, resetHarness,
   seededAnswer, seededStory, settle, text, tray, typeInto, unmountMap
@@ -82,7 +83,10 @@ describe("V4DebateClient's dig flow", () => {
 
     await settle();
     expect(tray()).toBeNull();
-    expect(text()).toContain(CATALOG["v4.dig.started"]);
+    // dig-f10: the note says it started, with its clock time; the person stays on the path they were reading.
+    expect(text()).toMatch(/Started \d{2}:\d{2}/u);
+    expect(text()).toContain(CATALOG["v4.dig.started"]!.split("{time}")[1]);
+    expect(panel().classList.contains("v4Panel-path")).toBe(true);
     expect(branch(PATHS.renew).querySelector(".v4MapDig")).not.toBeNull();
     // A path that now has a dig offers "Dig here too".
     expect(buttonsNamed(CATALOG["v4.nest.digHereToo"]!, branch(PATHS.renew))).toHaveLength(1);
@@ -97,11 +101,28 @@ describe("V4DebateClient's dig flow", () => {
     expect(harness.submit.mock.calls[0]![3]).toEqual({ parent_run_id: runId, places: ["path:n-smr"], mode: "quick" });
   });
 
-  it("leaving the page during the Undo time sends nothing", async () => {
+  // dig-d3 (owner pick B, 3 Nov): leaving the map no longer cancels the dig in silence. It keeps its 10 seconds and its
+  // Undo on the next page (the site-wide note), and is sent only when they are over.
+  it("leaving the map during the Undo time keeps the dig: it is sent once its 10 seconds are over, not before", async () => {
+    const runId = await mountMap();
+    await openPath(PATHS.smr);
+    await click(buttonNamed(CATALOG["v4.panel.dig"]!, panel()));
+    await advance(3_000);
+    await unmountMap();
+    await advance(6_800);
+    expect(harness.submit).not.toHaveBeenCalled();
+    await advance(400);
+    expect(harness.submit).toHaveBeenCalledTimes(1);
+    expect(harness.submit.mock.calls[0]![3]).toEqual({ parent_run_id: runId, places: ["path:n-smr"], mode: "quick" });
+    expect(readDigUndo().map((entry) => entry.phase)).toEqual(["STARTED"]);
+  });
+
+  it("Undo pressed on the next page still means nothing is sent", async () => {
     await mountMap();
     await openPath(PATHS.smr);
     await click(buttonNamed(CATALOG["v4.panel.dig"]!, panel()));
     await unmountMap();
+    expect(undoDig(readDigUndo()[0]!.id)).toBe(true);
     await advance(30_000);
     expect(harness.submit).not.toHaveBeenCalled();
   });

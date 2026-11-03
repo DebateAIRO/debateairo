@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   addDig,
   DIG_CANCELLED_SHOWN_MS,
+  DIG_SEND_GIVE_UP_MS,
   DIG_STARTED_SHOWN_MS,
   DIG_UNDO_MS,
   digGroupOf,
@@ -40,7 +41,8 @@ function add(id: string, send: Sender, runIds: readonly string[] = []): number {
     dig: { target: target(id), mode: "quick", sendsAt: Date.now() + DIG_UNDO_MS },
     sharePercent: 4,
     showMode: true,
-    send
+    send,
+    failedLine: "We couldn't start this dig."
   });
 }
 
@@ -138,6 +140,20 @@ describe("the site-wide waiting digs (dig-d3)", () => {
     });
     await vi.advanceTimersByTimeAsync(DIG_UNDO_MS + 10);
     expect(readDigUndo()).toEqual([]);
+  });
+
+  it("a send that never answers stops holding up the next dig after a minute, and its note says it could not start", async () => {
+    const send = vi.fn<Sender>(async (pending) => (pathIdOf(pending) === "a" ? new Promise<DigUndoResult>(() => undefined) : started("b")));
+    add("a", send);
+    add("b", send);
+    await vi.advanceTimersByTimeAsync(DIG_UNDO_MS + 30_000);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(phases()).toEqual(["SENDING", "SENDING"]);
+    // The minute runs from the first send (10 s in); the second dig goes out just after it.
+    await vi.advanceTimersByTimeAsync(DIG_SEND_GIVE_UP_MS - 30_000 + 10);
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(phases()).toEqual(["REFUSED", "STARTED"]);
+    expect(readDigUndo()[0]!.result).toEqual({ kind: "REFUSED", message: "We couldn't start this dig." });
   });
 
   it("knows one waiting dig per place, and which debates (the one dug and those above it) wait for it", () => {

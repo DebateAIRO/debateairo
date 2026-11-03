@@ -82,7 +82,8 @@ export function V4UndoNote(props: V4UndoNoteProps) {
     const now = latest.current;
     if (state !== "counting" || !takeFocus) return;
     const before = document.activeElement;
-    backTo.current = focusable(before) ? before : null;
+    // A second run of this effect (React's development check) finds focus already on Undo: keep the first answer.
+    if (focusable(before) && !(rootRef.current?.contains(before) ?? false)) backTo.current = before;
     undoRef.current?.focus();
     setSpoken(now.announce);
     now.onFocusTaken?.();

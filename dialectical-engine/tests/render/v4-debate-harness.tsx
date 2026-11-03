@@ -6,6 +6,7 @@ import { vi } from "vitest";
 import * as fixture from "../../apps/ui/lib/v3/storyFixture.js";
 import type { AskRoom } from "../../apps/ui/lib/billing/room.js";
 import type { ContinueOutcome } from "../../apps/ui/lib/v4/money.js";
+import { resetDigUndo } from "../../apps/ui/lib/v4/digUndo.js";
 import type { DigTrail } from "../../apps/ui/lib/v4/load.js";
 import type { DigLink, DigView, SeenSnapshot } from "../../apps/ui/lib/v4/types.js";
 import type { V4AskOutcome } from "../../apps/ui/lib/v4/useV4Ask.js";
@@ -80,6 +81,8 @@ export const harness = {
 };
 
 export function resetHarness(): void {
+  // dig-d3: the waiting digs live in the page's memory across pages; each test starts with none.
+  resetDigUndo();
   harness.planTier = "premium";
   harness.room = null;
   harness.submit = vi.fn<Submit>(async () => ({ kind: "STARTED", runId: crypto.randomUUID() }));

@@ -20,6 +20,12 @@ export const DIG_UNDO_MS = 10_000;
 export const DIG_CANCELLED_SHOWN_MS = 4_000;
 /** How long the "started" note stays (as the old note did). A refused dig's reason stays until it is closed. */
 export const DIG_STARTED_SHOWN_MS = 6_000;
+/**
+ * A send that has not answered after this long stops holding up the digs behind it, and its note says it could not start.
+ * It can hang only when the page that pressed it is gone and its send waits for a screen that page would have shown (the
+ * one-time data consent after a failed read): without this, every later dig of the visit would wait behind it.
+ */
+export const DIG_SEND_GIVE_UP_MS = 60_000;
 
 export type DigUndoResult =
   | Readonly<{ kind: "STARTED"; childRunId: string; startedAt: string }>
@@ -55,9 +61,16 @@ export type AddDigInput = Readonly<{
   sharePercent: number | null;
   showMode: boolean;
   send: (dig: PendingDig) => Promise<DigUndoResult>;
+  /** The plain line for a send that never answered ("We couldn't start this dig. Please try again."). */
+  failedLine: string;
 }>;
 
-type Slot = { entry: DigUndoEntry; send: AddDigInput["send"]; timer: ReturnType<typeof setTimeout> | undefined };
+type Slot = {
+  entry: DigUndoEntry;
+  send: AddDigInput["send"];
+  failedLine: string;
+  timer: ReturnType<typeof setTimeout> | undefined;
+};
 
 const EMPTY: readonly DigUndoEntry[] = Object.freeze([]);
 let slots: Slot[] = [];
@@ -129,20 +142,35 @@ function fire(id: number): void {
   update(id, { phase: "SENDING" });
   chain = chain.then(async () => {
     if (slotOf(id) === undefined) return;
-    let result: DigUndoResult;
-    try {
-      result = await slot.send(slot.entry.dig);
-    } catch {
-      result = { kind: "STOPPED" };
-    }
-    if (slotOf(id) === undefined) return;
-    if (result.kind === "STOPPED") {
-      drop(id);
+    const sent = Promise.resolve()
+      .then(() => slot.send(slot.entry.dig))
+      .catch((): DigUndoResult => ({ kind: "STOPPED" }));
+    let watchdog: ReturnType<typeof setTimeout> | undefined;
+    const gaveUp = new Promise<"GAVE_UP">((resolve) => {
+      watchdog = setTimeout(() => resolve("GAVE_UP"), DIG_SEND_GIVE_UP_MS);
+    });
+    const first = await Promise.race([sent, gaveUp]);
+    clearTimeout(watchdog);
+    if (first !== "GAVE_UP") {
+      settle(id, first);
       return;
     }
-    update(id, { phase: result.kind, result });
-    if (result.kind === "STARTED") dropLater(id, DIG_STARTED_SHOWN_MS);
+    if (slotOf(id) !== undefined) update(id, { phase: "REFUSED", result: { kind: "REFUSED", message: slot.failedLine } });
+    // A late answer still counts when it did start the dig (the map finds it in any case, from the account's records).
+    void sent.then((late) => {
+      if (late.kind === "STARTED" && slotOf(id) !== undefined) settle(id, late);
+    });
   });
+}
+
+function settle(id: number, result: DigUndoResult): void {
+  if (slotOf(id) === undefined) return;
+  if (result.kind === "STOPPED") {
+    drop(id);
+    return;
+  }
+  update(id, { phase: result.kind, result });
+  if (result.kind === "STARTED") dropLater(id, DIG_STARTED_SHOWN_MS);
 }
 
 /** Which place a dig waits on: a path, open questions, or a group's picks (one dig of picks per path, owner Q-D1). */
@@ -175,7 +203,7 @@ export function addDig(input: AddDigInput): number {
     focused: false,
     result: null
   });
-  const slot: Slot = { entry, send: input.send, timer: undefined };
+  const slot: Slot = { entry, send: input.send, failedLine: input.failedLine, timer: undefined };
   slots = [...slots, slot];
   slot.timer = setTimeout(() => fire(id), Math.max(0, input.dig.sendsAt - Date.now()));
   emit();

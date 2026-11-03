@@ -690,11 +690,13 @@ apps/ui/components/support/http.ts
 apps/ui/components/support/sessionChange.ts
 apps/ui/components/support/supportConversation.test.mjs
 apps/ui/components/v4/V4AskClient.tsx
+apps/ui/components/v4/V4BottomStack.tsx
 apps/ui/components/v4/V4ChangesBar.tsx
 apps/ui/components/v4/V4ContributionNote.tsx
 apps/ui/components/v4/V4DebateClient.tsx
+apps/ui/components/v4/V4DigSeed.tsx
 apps/ui/components/v4/V4DigSuggest.tsx
-apps/ui/components/v4/V4DigToast.tsx
+apps/ui/components/v4/V4DigUndo.tsx
 apps/ui/components/v4/V4Header.tsx
 apps/ui/components/v4/V4LevelTrail.tsx
 apps/ui/components/v4/V4MainAnswer.tsx

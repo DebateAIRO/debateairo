@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Answer, AnswerStory, DigLinks, InvestigationReports, InvestigationReportVersion } from "@debateai/contract";
 import { AuthGate } from "@/components/AuthGate";
+import { V4ReportDigWait } from "@/components/v4/V4DigUndo";
 import { V4Header } from "@/components/v4/V4Header";
 import { V4OtherPages, V4SearchNote, V4SourceList, V4WebNoteLine } from "@/components/v4/V4Sources";
 import { V4TrustBar } from "@/components/v4/V4TrustBar";
@@ -16,6 +17,7 @@ import {
 } from "@/lib/v4/load";
 import { buildV4Map } from "@/lib/v4/mapModel";
 import { mergeDigLinks, readDigRecords } from "@/lib/v4/accountMemory";
+import { waitForDigs } from "@/lib/v4/digUndo";
 import { levelHref, useReadingLevel } from "@/lib/v4/storage";
 import { basisKey, TRUST_WORDS, type DigLink, type DigView, type ReadingLevel, type V4Map, type V4Path } from "@/lib/v4/types";
 
@@ -320,6 +322,8 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
           </h1>
         </header>
 
+        {/* dig-d3 A, ruling F7: a dig still in its 10 seconds (pressed on the map just before) is waited for. */}
+        <V4ReportDigWait runId={load.runId} catalog={catalog} />
         <InvestigationReport runId={load.runId} locale={locale} catalog={catalog} onCurrent={setHasReportVersion} />
 
         {sent ? (
@@ -579,6 +583,10 @@ function InvestigationReport({ runId, locale, catalog, onCurrent }: Readonly<{
   if (read === undefined || read === null) return null;
   const act = (post: (id: string) => Promise<unknown>) => async () => {
     setBusy(true);
+    // dig-d3 A, ruling F7: "Your report will wait for it." A dig still in its 10 seconds is not on the server yet, so the
+    // report is asked for only once it has been sent (or undone).
+    if (post === writeReport) await waitForDigs(runId);
+    if (!alive.current) return;
     await post(runId);
     if (!alive.current) return;
     setBusy(false);
