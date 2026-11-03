@@ -31,6 +31,23 @@ const labels = ["NONE healthy", "DRUGS healthy", "HARM_TO_OTHERS not", "WEAPONS_
   "QUESTION_CHECK_HTTP_STATUS"] as const;
 const starts = (label: string) => label.endsWith(" healthy") && !label.startsWith("SUICIDE_METHODS");
 
+/** With login mode off: a statement on a superuser client narrowed to the runtime role, as the gate's spend ran before Task 8. */
+async function asRuntime<T extends Record<string, unknown> = Record<string, unknown>>(
+  statement: string, values: unknown[] = []
+): Promise<T[]> {
+  const client = await database.pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SET LOCAL ROLE debateai_runtime");
+    const rows = (await client.query<T>(statement, values)).rows;
+    await client.query("COMMIT");
+    return rows;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally { client.release(); }
+}
+
 async function staffHolder(owner: boolean): Promise<void> {
   const userId = randomUUID(), staffId = randomUUID();
   await database.pool.query(`INSERT INTO identity."user"
@@ -79,8 +96,11 @@ function serverFor(label: typeof labels[number], reports: { event: string; code:
   };
   const check = createQuestionCheck({ subjects: readQuestionSubjects(), port: () => port, deadlineMs: 1_000,
     price: { input: 1, output: 2 }, dayPot: null, clock: () => new Date(),
-    // As main.ts:1458 records it: on the API's runtime pool.
-    spend: { record: entry => recordQuestionCheckSpend(apiPools.runtime, entry) }, report: line => { reports.push(line); } });
+    // As main.ts:1458 records it: on the API's runtime pool. With login mode off that pool is the superuser, so the write
+    // is narrowed to the runtime role as before Task 8 (asRuntime).
+    spend: { record: entry => recordQuestionCheckSpend(apiPools.runtime !== database.pool ? apiPools.runtime
+      : { query: async (sql: string, values?: unknown[]) => ({ rows: await asRuntime(sql, values) }) } as never, entry) },
+    report: line => { reports.push(line); } });
   const application = new Proxy({}, { get: (_target, key) => key === "submit"
     ? async () => runFixtureStepOutsideRequest(async () => {
       const runId = await new RunRepository(database.pool).startRun({
