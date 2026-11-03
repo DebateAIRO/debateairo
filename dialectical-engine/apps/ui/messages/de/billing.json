@@ -152,7 +152,7 @@
   "billing.subscription.cancelYes": "Ja, kündigen",
   "billing.subscription.keep": "Tarif behalten",
   "billing.subscription.revoke": "Kündigung zurücknehmen",
-  "billing.subscription.withdraw": "Vertrag hier widerrufen",
+  "billing.subscription.withdraw": "Vertrag widerrufen",
   "billing.subscription.withdrawSocialOnly": "Konten, die mit Google, Apple, Facebook oder X erstellt wurden, können hier nicht widerrufen, weil der Widerruf ein Passwort und einen Authentifizierungscode erfordert. Für den Widerruf senden Sie das Muster-Widerrufsformular aus Ihrer Bestätigungs-E-Mail oder eine eindeutige Erklärung, dass Sie widerrufen, an {email}. Wir führen ihn aus und bestätigen ihn per E-Mail.",
   "billing.subscription.withdrawHint": "Sie können bis zum {date} widerrufen. Sie erhalten den Preis abzüglich des bereits genutzten Teils zurück: des größeren Anteils aus genutzten Tagen oder genutztem Guthaben.",
   "billing.subscription.stepUpHint": "Für den Widerruf geben Sie Ihr Passwort und den Code aus Ihrer Authentifizierungs-App ein.",
@@ -200,7 +200,7 @@
   "billing.withdrawPage.title": "Vom Vertrag zurücktreten",
   "billing.withdrawPage.who": "Wenn Sie in der EU, im EWR oder im Vereinigten Königreich wohnen, können Sie einen kostenpflichtigen Tarif innerhalb von 14 Tagen nach Abschluss ohne Angabe von Gründen widerrufen.",
   "billing.withdrawPage.refund": "Sie erhalten den Preis abzüglich des bereits genutzten Teils zurück: des größeren Anteils aus genutzten Tagen oder genutztem Guthaben. Das Geld geht auf Ihre Karte zurück, und der Tarif endet sofort.",
-  "billing.withdrawPage.how": "Melden Sie sich an und öffnen Sie Einstellungen, dann Abonnement, dann „Vertrag hier widerrufen“. Sie brauchen Ihr Passwort und den Code aus Ihrer Authentifizierungs-App. Konten, die mit Google, Apple, Facebook oder X erstellt wurden, widerrufen stattdessen per E-Mail, wie unten beschrieben.",
+  "billing.withdrawPage.how": "Melden Sie sich an und öffnen Sie Einstellungen, dann Abonnement, dann „Vertrag widerrufen“. Sie brauchen Ihr Passwort und den Code aus Ihrer Authentifizierungs-App. Konten, die mit Google, Apple, Facebook oder X erstellt wurden, widerrufen stattdessen per E-Mail, wie unten beschrieben.",
   "billing.withdrawPage.byEmail": "Sie können auch das Muster-Widerrufsformular aus Ihrer Bestätigungs-E-Mail oder eine andere eindeutige Erklärung Ihres Widerrufs an {email} senden. Wir führen ihn aus und bestätigen ihn per E-Mail.",
   "billing.withdrawPage.signIn": "Anmelden",
   "billing.withdrawPage.settings": "Einstellungen öffnen"

@@ -152,7 +152,7 @@
   "billing.subscription.cancelYes": "Igen, lemondom",
   "billing.subscription.keep": "Megtartom a csomagomat",
   "billing.subscription.revoke": "Lemondás visszavonása",
-  "billing.subscription.withdraw": "Elállás a szerződéstől itt",
+  "billing.subscription.withdraw": "Elállás a szerződéstől",
   "billing.subscription.withdrawSocialOnly": "A Google-, Apple-, Facebook- vagy X-fiókkal létrehozott fiókok itt nem állhatnak el, mert az elálláshoz jelszó és hitelesítési kód kell. Az elálláshoz küldje el a visszaigazoló e-mailben található minta elállási nyilatkozatot, vagy bármely egyértelmű nyilatkozatot arról, hogy eláll, a(z) {email} címre. Végrehajtjuk, és e-mailben megerősítjük.",
   "billing.subscription.withdrawHint": "Eddig állhat el: {date}. Visszakapja az árat a már felhasznált rész levonásával: a felhasznált napok és a felhasznált kredit közül a nagyobbat vonjuk le.",
   "billing.subscription.stepUpHint": "Az elálláshoz adja meg jelszavát és a hitelesítő alkalmazás kódját.",
@@ -200,7 +200,7 @@
   "billing.withdrawPage.title": "Elállás a szerződéstől",
   "billing.withdrawPage.who": "Ha az EU-ban, az EGT-ben vagy az Egyesült Királyságban él, az előfizetéstől számított 14 napon belül indoklás nélkül elállhat a fizetős csomagtól.",
   "billing.withdrawPage.refund": "Visszakapja az árat a már felhasznált rész levonásával: a felhasznált napok és a felhasznált kredit közül a nagyobbat vonjuk le. A pénz visszakerül a kártyájára, és a csomag azonnal véget ér.",
-  "billing.withdrawPage.how": "Jelentkezzen be, és nyissa meg a Beállításokat, majd az Előfizetést, majd az „Elállás a szerződéstől itt” gombot. Szüksége lesz a jelszavára és a hitelesítő alkalmazás kódjára. A Google-, Apple-, Facebook- vagy X-fiókkal létrehozott fiókok e-mailben állnak el, az alább leírtak szerint.",
+  "billing.withdrawPage.how": "Jelentkezzen be, és nyissa meg a Beállításokat, majd az Előfizetést, majd az „Elállás a szerződéstől” gombot. Szüksége lesz a jelszavára és a hitelesítő alkalmazás kódjára. A Google-, Apple-, Facebook- vagy X-fiókkal létrehozott fiókok e-mailben állnak el, az alább leírtak szerint.",
   "billing.withdrawPage.byEmail": "A visszaigazoló e-mailben található elállási nyilatkozatmintát vagy bármilyen egyértelmű nyilatkozatot az elállásról elküldheti a(z) {email} címre is. Végrehajtjuk, és e-mailben visszaigazoljuk.",
   "billing.withdrawPage.signIn": "Bejelentkezés",
   "billing.withdrawPage.settings": "Beállítások megnyitása"

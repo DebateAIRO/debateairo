@@ -159,7 +159,7 @@
   "billing.subscription.password": "Hasło",
   "billing.subscription.code": "Kod uwierzytelniający",
   "billing.subscription.stepUpExpired": "Potwierdź ponownie, że to Ty: to potwierdzenie wygasło lub zostało już użyte.",
-  "billing.subscription.withdrawConfirm": "Potwierdź odstąpienie",
+  "billing.subscription.withdrawConfirm": "Potwierdź odstąpienie od umowy",
   "billing.subscription.withdrawDone": "Otrzymaliśmy Twoje odstąpienie od umowy. Zwracamy {amount} na Twoją kartę i napiszemy do Ciebie, gdy zwrot zostanie zrealizowany.",
   "billing.subscription.withdrawRefused": "Nie udało się dokończyć odstąpienia od umowy. Sprawdź hasło i kod, a potem spróbuj ponownie.",
   "billing.subscription.withdrawNothingDue": "Gotowe. Twój plan się zakończył. Już wykorzystana część pokrywa całą cenę, więc nie przysługuje Ci żaden zwrot.",
