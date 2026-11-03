@@ -212,6 +212,7 @@
   "public.report.investigation.stillOpen": "仍未解决的问题",
   "public.report.investigation.sources": "来源",
   "public.report.investigation.shortened": "这次调查规模很大，因此报告是根据其缩略版本撰写的。",
+  "public.report.investigation.notOnWeb": "未在网络上核查。",
   "public.report.investigation.followUp": "后续辩论",
   "public.report.investigation.ownView": "提问者自己的观点",
   "public.report.investigation.viewHelped": "有帮助。",

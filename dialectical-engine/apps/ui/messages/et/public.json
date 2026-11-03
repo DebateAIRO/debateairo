@@ -212,6 +212,7 @@
   "public.report.investigation.stillOpen": "Mis on veel lahtine",
   "public.report.investigation.sources": "Allikad",
   "public.report.investigation.shortened": "Uurimine oli väga mahukas, seega kirjutati aruanne selle lühendatud versiooni põhjal.",
+  "public.report.investigation.notOnWeb": "Ei ole veebist kontrollitud.",
   "public.report.investigation.followUp": "Järgnev arutelu",
   "public.report.investigation.ownView": "Küsija enda arvamus",
   "public.report.investigation.viewHelped": "Aitas.",

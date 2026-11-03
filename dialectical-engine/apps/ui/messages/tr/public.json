@@ -212,6 +212,7 @@
   "public.report.investigation.stillOpen": "Hâlâ açık olanlar",
   "public.report.investigation.sources": "Kaynaklar",
   "public.report.investigation.shortened": "İnceleme çok büyüktü, bu yüzden rapor onun kısaltılmış bir sürümünden yazıldı.",
+  "public.report.investigation.notOnWeb": "Web'de kontrol edilmedi.",
   "public.report.investigation.followUp": "Sonraki tartışma",
   "public.report.investigation.ownView": "Soranın kendi görüşü",
   "public.report.investigation.viewHelped": "Yardımcı oldu.",

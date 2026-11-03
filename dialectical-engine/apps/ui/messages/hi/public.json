@@ -212,6 +212,7 @@
   "public.report.investigation.stillOpen": "क्या अब भी खुला है",
   "public.report.investigation.sources": "स्रोत",
   "public.report.investigation.shortened": "जाँच बहुत बड़ी थी, इसलिए रिपोर्ट उसके छोटे रूप से लिखी गई।",
+  "public.report.investigation.notOnWeb": "वेब पर जाँचा नहीं गया।",
   "public.report.investigation.followUp": "आगे की बहस",
   "public.report.investigation.ownView": "पूछने वाले की अपनी राय",
   "public.report.investigation.viewHelped": "इससे मदद मिली।",

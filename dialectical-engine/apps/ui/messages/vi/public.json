@@ -212,6 +212,7 @@
   "public.report.investigation.stillOpen": "Điều gì vẫn còn bỏ ngỏ",
   "public.report.investigation.sources": "Nguồn",
   "public.report.investigation.shortened": "Cuộc tìm hiểu rất lớn, nên báo cáo được viết từ một bản rút gọn.",
+  "public.report.investigation.notOnWeb": "Chưa được kiểm tra trên web.",
   "public.report.investigation.followUp": "Tranh luận tiếp theo",
   "public.report.investigation.ownView": "Quan điểm riêng của người hỏi",
   "public.report.investigation.viewHelped": "Đã giúp ích.",

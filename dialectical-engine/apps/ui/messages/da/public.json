@@ -212,6 +212,7 @@
   "public.report.investigation.stillOpen": "Hvad der stadig står åbent",
   "public.report.investigation.sources": "Kilder",
   "public.report.investigation.shortened": "Undersøgelsen var meget stor, så rapporten blev skrevet ud fra en forkortet udgave af den.",
+  "public.report.investigation.notOnWeb": "Ikke tjekket på nettet.",
   "public.report.investigation.followUp": "Opfølgende debat",
   "public.report.investigation.ownView": "Den spørgendes egen holdning",
   "public.report.investigation.viewHelped": "Den hjalp.",

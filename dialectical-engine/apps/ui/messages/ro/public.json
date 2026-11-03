@@ -212,6 +212,7 @@
   "public.report.investigation.stillOpen": "Ce rămâne deschis",
   "public.report.investigation.sources": "Surse",
   "public.report.investigation.shortened": "Investigația a fost foarte mare, așa că raportul a fost scris dintr-o versiune scurtată a ei.",
+  "public.report.investigation.notOnWeb": "Nu a fost verificat pe web.",
   "public.report.investigation.followUp": "Dezbatere ulterioară",
   "public.report.investigation.ownView": "Opinia proprie a persoanei care a întrebat",
   "public.report.investigation.viewHelped": "A ajutat.",

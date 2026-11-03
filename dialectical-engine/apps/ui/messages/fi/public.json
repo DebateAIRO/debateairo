@@ -212,6 +212,7 @@
   "public.report.investigation.stillOpen": "Mikä on yhä avoinna",
   "public.report.investigation.sources": "Lähteet",
   "public.report.investigation.shortened": "Selvitys oli hyvin laaja, joten raportti kirjoitettiin sen lyhennetystä versiosta.",
+  "public.report.investigation.notOnWeb": "Ei tarkistettu verkosta.",
   "public.report.investigation.followUp": "Jatkoväittely",
   "public.report.investigation.ownView": "Kysyjän oma näkemys",
   "public.report.investigation.viewHelped": "Se auttoi.",

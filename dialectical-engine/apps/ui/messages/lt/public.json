@@ -212,6 +212,7 @@
   "public.report.investigation.stillOpen": "Kas dar neišspręsta",
   "public.report.investigation.sources": "Šaltiniai",
   "public.report.investigation.shortened": "Tyrimas buvo labai didelis, todėl ataskaita parašyta pagal sutrumpintą jo versiją.",
+  "public.report.investigation.notOnWeb": "Nepatikrinta internete.",
   "public.report.investigation.followUp": "Tęstinė diskusija",
   "public.report.investigation.ownView": "Klausiančiojo paties nuomonė",
   "public.report.investigation.viewHelped": "Padėjo.",

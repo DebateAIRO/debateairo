@@ -212,6 +212,7 @@
   "public.report.investigation.stillOpen": "מה עדיין פתוח",
   "public.report.investigation.sources": "מקורות",
   "public.report.investigation.shortened": "הבדיקה הייתה גדולה מאוד, ולכן הדוח נכתב מגרסה מקוצרת שלה.",
+  "public.report.investigation.notOnWeb": "לא נבדק ברשת.",
   "public.report.investigation.followUp": "דיון המשך",
   "public.report.investigation.ownView": "הדעה האישית של השואל",
   "public.report.investigation.viewHelped": "זה עזר.",

@@ -212,6 +212,7 @@
   "public.report.investigation.stillOpen": "Što je još otvoreno",
   "public.report.investigation.sources": "Izvori",
   "public.report.investigation.shortened": "Istraga je bila vrlo opsežna pa je izvješće napisano iz njezine skraćene verzije.",
+  "public.report.investigation.notOnWeb": "Nije provjereno na webu.",
   "public.report.investigation.followUp": "Nastavna rasprava",
   "public.report.investigation.ownView": "Vlastito mišljenje osobe koja je postavila pitanje",
   "public.report.investigation.viewHelped": "Pomoglo je.",
