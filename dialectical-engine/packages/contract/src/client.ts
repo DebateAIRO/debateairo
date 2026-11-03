@@ -161,6 +161,38 @@ import {
   type SessionList
 } from "./index.js";
 import type { DeclaredRegion } from "@debateai/kernel";
+import {
+  StartCombineRequestSchema, StartCombineResponseSchema, StartFitRequestSchema, StartFitResponseSchema, StartListsEventSchema,
+  StartListsRequestSchema, StartMergeEventSchema, StartMergeRequestSchema, type StartCombineRequest, type StartCombineResponse,
+  type StartFitRequest, type StartFitResponse, type StartListsEvent, type StartListsRequest, type StartMergeRequest,
+  type StartMergeResponse
+} from "./start-paths.js";
+
+/**
+ * V4 start step, Task 10: the step before Start's live-event frames, read as `streamEvents` reads a run's: frames end at
+ * a blank line (LF or CRLF), comment lines (":") are ignored, a frame without data is dropped, and the text after the
+ * last blank line is handed back as `rest` (a frame cut across chunks). A frame's name is its `event:` line
+ * ("message" without one); its data is the `data:` lines joined, read as JSON (anything else is an invalid response).
+ */
+export function parseStartStepFrames(text: string): Readonly<{ events: readonly Readonly<{ event: string; data: unknown }>[]; rest: string }> {
+  const frames = text.split(/\r?\n\r?\n/u);
+  const rest = frames.pop() ?? "";
+  const events: Readonly<{ event: string; data: unknown }>[] = [];
+  for (const frame of frames) {
+    const lines = frame.split(/\r?\n/u).filter((line) => !line.startsWith(":"));
+    const data = lines.filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trimStart()).join("\n");
+    if (data.length === 0) continue;
+    const named = lines.find((line) => line.startsWith("event:"));
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(data);
+    } catch (error) {
+      throw new ContractHttpError("INVALID_RESPONSE", 200, error instanceof Error ? error.message : "Invalid event response");
+    }
+    events.push(Object.freeze({ event: named === undefined ? "message" : named.slice(6).trim(), data: parsed }));
+  }
+  return Object.freeze({ events: Object.freeze(events), rest });
+}
 
 export { ContractHttpError, type ContractErrorCode, type ContractWaitingRefusal } from "./http-error.js";
 
@@ -582,6 +614,14 @@ export interface ContractClient {
   unlinkMemory(answerId: string): Promise<{ memory_link_id: string; state: "UNLINKED" }>;
   readEvents(runId: string): Promise<readonly RunEvent[]>;
   streamEvents(runId: string, consume: (event: RunEvent) => void, signal?: AbortSignal): Promise<void>;
+  /** V4 start step, Task 10: the lists before Start, as a stream of events (POST /v1/asks/paths/lists). */
+  startPathLists(input: StartListsRequest, onEvent: (event: StartListsEvent) => void, signal: AbortSignal): Promise<void>;
+  /** The merge of the lists into a menu (POST /v1/asks/paths/merge): its menu, or why there is none. */
+  startPathMerge(input: StartMergeRequest, signal?: AbortSignal): Promise<StartMergeResponse>;
+  /** One question for several points (POST /v1/asks/paths/combine). */
+  startPathCombine(input: StartCombineRequest, signal?: AbortSignal): Promise<StartCombineResponse>;
+  /** Which chosen path the person's own point of view fits inside (POST /v1/asks/paths/fit). */
+  startPathFit(input: StartFitRequest, signal?: AbortSignal): Promise<StartFitResponse>;
 }
 
 const UnlinkSchema = { parse(value: unknown) {
@@ -632,6 +672,52 @@ export function createContractClient(
     if (!response.ok) throw await contractErrorForResponse(response);
     return response;
   };
+  /**
+   * V4 start step, Task 10: POST `body` to `path` as an event stream (with the CSRF pair, as every POST), reading each
+   * frame as it arrives and handing its parsed event to `consume`; a refusal is the contract's error for its status.
+   */
+  const startStepStream = async <E>(path: string, body: unknown, schema: { parse(value: unknown): E }, consume: (event: E) => void,
+    signal?: AbortSignal): Promise<void> => {
+    let response: Response;
+    try {
+      const headers = new Headers({ accept: "text/event-stream", "content-type": "application/json" });
+      if (auth.cookieHeader !== undefined) headers.set("cookie", auth.cookieHeader);
+      if (auth.userAgent !== undefined) headers.set("user-agent", auth.userAgent);
+      if (auth.forwardedFor !== undefined) headers.set("x-forwarded-for", auth.forwardedFor);
+      const csrf = auth.csrfToken?.() ?? browserCsrfToken();
+      if (csrf !== null) headers.set("x-csrf-token", csrf);
+      response = await fetchImplementation(new URL(path, root), { method: "POST", body: JSON.stringify(body), headers,
+        cache: "no-store", credentials: "same-origin" as const, ...(signal === undefined ? {} : { signal }) });
+    } catch (error) {
+      if (signal?.aborted === true) throw error;
+      throw new ContractHttpError("NETWORK_FAILURE", 0, error instanceof Error ? error.message : "Network failure");
+    }
+    if (!response.ok) throw await contractErrorForResponse(response);
+    if (response.body === null) throw new ContractHttpError("INVALID_RESPONSE", response.status, "Event stream has no body");
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    const hand = (events: readonly Readonly<{ event: string; data: unknown }>[]) => {
+      for (const one of events) {
+        let parsed: E;
+        try {
+          parsed = schema.parse(one);
+        } catch (error) {
+          throw new ContractHttpError("INVALID_RESPONSE", 200, error instanceof Error ? error.message : "Invalid event response");
+        }
+        consume(parsed);
+      }
+    };
+    while (true) {
+      const chunk = await reader.read();
+      buffer += decoder.decode(chunk.value, { stream: !chunk.done });
+      const read = parseStartStepFrames(buffer);
+      buffer = read.rest;
+      hand(read.events);
+      if (chunk.done) break;
+    }
+    hand(parseStartStepFrames(`${buffer}\n\n`).events);
+  };
   const parseFrame = (frame: string): RunEvent | null => {
     const data = frame.split(/\r?\n/)
       .filter((line) => line.startsWith("data:"))
@@ -645,6 +731,22 @@ export function createContractClient(
     }
   };
   return Object.freeze({
+    startPathLists: (input: StartListsRequest, onEvent: (event: StartListsEvent) => void, signal: AbortSignal) =>
+      startStepStream("/v1/asks/paths/lists", StartListsRequestSchema.parse(input), StartListsEventSchema, onEvent, signal),
+    async startPathMerge(input: StartMergeRequest, signal?: AbortSignal): Promise<StartMergeResponse> {
+      let answer: StartMergeResponse | null = null;
+      await startStepStream("/v1/asks/paths/merge", StartMergeRequestSchema.parse(input), StartMergeEventSchema, (event) => {
+        if (answer !== null) return;
+        if (event.event === "menu") answer = { source: event.data.source, menu: event.data.menu };
+        else if (event.event === "none") answer = { source: "NONE", reason: event.data.reason };
+      }, signal);
+      if (answer === null) throw new ContractHttpError("INVALID_RESPONSE", 200, "The merge stream ended without a menu or a reason");
+      return answer;
+    },
+    startPathCombine: (input: StartCombineRequest, signal?: AbortSignal) => request("/v1/asks/paths/combine", StartCombineResponseSchema,
+      { method: "POST", body: JSON.stringify(StartCombineRequestSchema.parse(input)), ...(signal === undefined ? {} : { signal }) }),
+    startPathFit: (input: StartFitRequest, signal?: AbortSignal) => request("/v1/asks/paths/fit", StartFitResponseSchema,
+      { method: "POST", body: JSON.stringify(StartFitRequestSchema.parse(input)), ...(signal === undefined ? {} : { signal }) }),
     checkAge: (dateOfBirth: string) => request(
       "/v1/auth/age-check",
       AgeCheckResultSchema,
