@@ -57,8 +57,11 @@ export const WEB_SITES_START = Object.freeze({
   pickCallsPerPack: 1
 });
 
-/** The largest debate the receipt accepts (five paths today; ten gives room) and the most paths one dig may choose (the contract's). */
-export const WEB_SITES_LIMITS = Object.freeze({ webPathsMax: 10, digPicksMax: 16 });
+/**
+ * The largest debate the receipt accepts (five paths today; ten gives room) and the most paths one dig may choose (the contract's).
+ * V4 start step, Task 8: a path debate has at most 8 paths (b1..b8), every one of which may search.
+ */
+export const WEB_SITES_LIMITS = Object.freeze({ webPathsMax: 10, digPicksMax: 16, pathsKindMax: 8 });
 
 export type WebDepth = "QUICK" | "THOROUGH";
 /**
@@ -67,8 +70,8 @@ export type WebDepth = "QUICK" | "THOROUGH";
  */
 export type WebKind = "START" | "DIG" | "PATHS";
 export type WebOrigin = "START" | "DIG";
-/** V4 start step, Task 8: a path debate has at most 8 paths (b1..b8), every one of which may search. */
-export const WEB_PATHS_KIND_MAX = 8;
+/** The most paths of a path debate (WEB_SITES_LIMITS.pathsKindMax), by the name the path debate's callers use. */
+export const WEB_PATHS_KIND_MAX = WEB_SITES_LIMITS.pathsKindMax;
 
 /** What admission knows about the web part: a debate's start or a dig, one pack per path or per chosen path. */
 export type WebSiteInput = Readonly<{

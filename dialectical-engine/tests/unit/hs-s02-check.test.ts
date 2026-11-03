@@ -15,6 +15,8 @@ const D = PUBLICATION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW.value.deadline_ms;
 
 const paths = [
   ["question", "QUESTION"],
+  // V4 start step (Task 16): a path debate's paths, the person's own words among them, judged with the question.
+  ...["title", "question", "viewpoints[].title", "viewpoints[].question"].map(p => [`branches.paths[].${p}`, "QUESTION"]),
   ["answer.confidence_band", "SUMMARY"], ["answer.summary_segments[].text", "SUMMARY"],
   ["answer.badges[]", "SUMMARY"], ["answer.residual_objections[]", "SUMMARY"], ["answer.reversal_point", "SUMMARY"],
   // Decision 13 of 31 Oct: the main answer a contribution updated, judged with the summary.
@@ -27,6 +29,8 @@ const paths = [
     .map(p => [`answer.nodes[].${p}`, "ARGUMENTS"]),
   // Debate shape P2c: the map view's public text, judged with the arguments.
   ["map_view.positions[].answer", "ARGUMENTS"], ["map_view.also_raised[]", "ARGUMENTS"],
+  // V4 start step: the gap round's points no path took, judged with the arguments.
+  ["branches.also_raised[]", "ARGUMENTS"],
   // Plan 2026-10-30 W1-6: a point's web sources, judged with the arguments.
   ...["quote", "title", "site", "link", "explanation.text"].map(p => [`answer.nodes[].sources[].${p}`, "ARGUMENTS"]),
   // Decision 13: a contribution's path text, judged with the arguments.
@@ -36,6 +40,8 @@ const paths = [
   ["answer.nodes[].review.reasons[]", "REVIEWS"],
   ...["headline", "summary", "confidence", "paths[].line", "change.text", "reviewer_note.text"]
     .map(p => [`story_short.${p}`, "STORY"]),
+  // V4 start step: each path's answer so far, judged with the story.
+  ...["outcome.text.line", "outcome.text.summary", "outcome.what_changed[]"].map(p => [`branches.paths[].${p}`, "STORY"]),
   ...["story.short_answer", "story.what_would_change", "story.how_it_went[].paragraph", "story.still_open[]"].map(p => [`reports[].${p}`, "STORY"])
 ] as const;
 const kinds = ["QUESTION", "SUMMARY", "ARGUMENTS", "REVIEWS", "STORY"];
@@ -68,7 +74,7 @@ function snapshot(markers = false): PublicDebate {
   }
   for (const path of ["public_ref", "author_pseudonym", "answer.nodes[].node_id", "answer.nodes[].provenance_ref",
     "answer.edges[].strength.number.source", "answer.nodes[].maker_lineage.model_id", "story_short.paths[].position_ref",
-    "map_view.positions[].node_id"])
+    "map_view.positions[].node_id", "branches.paths[].path_id"])
     setPath(root, path, `EXCLUDED-${path}`);
   return root as PublicDebate;
 }
@@ -117,12 +123,14 @@ describe("R2", () => {
   // positions[].node_id excluded: 58 → 61, 32 → 33, 26 → 28 checked paths.
   // Plan 2026-10-30 W1-6: a point's web sources add 7 string leaves — quote, title, site, link and explanation.text
   // checked, extract_id and published_on excluded: 61 → 68, 33 → 35, 28 → 33 checked paths.
-  it("covers the schema with 56 checked paths and 45 excluded strings", async () => {
+  // V4 start step (Task 16, wired here so the public schema and the check agree at every commit; plan Task 63): a path debate's
+  // paths add 9 string leaves — 8 checked, branches.paths[].path_id excluded by its _id name: 101 → 110, 45 → 46, 56 → 64.
+  it("covers the schema with 64 checked paths and 46 excluded strings", async () => {
     const m = await import("../../apps/api/src/publication-check/material.js");
     expect(m.CHECKED_TEXT_PATHS).toEqual(paths.map(([path, kind]) => ({ path, kind })));
     const leaves = walk(PublicDebateSchema).filter(l => l.type === "string");
-    expect(leaves).toHaveLength(101);
-    expect(leaves.filter(l => m.isExcludedTextPath(l.path, l.type))).toHaveLength(45);
+    expect(leaves).toHaveLength(110);
+    expect(leaves.filter(l => m.isExcludedTextPath(l.path, l.type))).toHaveLength(46);
     for (const leaf of walk(PublicDebateSchema)) {
       const checked = m.CHECKED_TEXT_PATHS.some(p => p.path === leaf.path);
       expect(Number(checked) + Number(m.isExcludedTextPath(leaf.path, leaf.type)), leaf.path).toBe(1);
@@ -135,8 +143,8 @@ describe("R2", () => {
     const m = await import("../../apps/api/src/publication-check/material.js");
     const leaves = m.extractCheckedText(snapshot(true));
     const expected = paths.flatMap(([path, kind]) => tuples(path, 2).map(t => ({ kind, text: markerOf(path, t) })));
-    // 56 paths: 8 without an array, 24 with one array (2 members each), 19 with two nested arrays (4 members), 5 with three (8 members).
-    expect(expected).toHaveLength(8 + 24 * 2 + 19 * 4 + 5 * 8);
+    // 64 paths: 8 without an array, 29 with one array (2 members each), 22 with two nested arrays (4 members), 5 with three (8 members).
+    expect(expected).toHaveLength(8 + 29 * 2 + 22 * 4 + 5 * 8);
     expect(leaves).toEqual(expected);
     const calls = m.packJudgeCalls(leaves);
     // FIX-HS2-t: one part kind per call — five kinds, five calls, one field each.

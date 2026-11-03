@@ -1,4 +1,4 @@
-import { lengthCallStepOf } from "@debateai/kernel";
+import { exhaustive, lengthCallStepOf } from "@debateai/kernel";
 import type { PreviewCallTier, PreviewModelRow } from "./preview-models.js";
 
 /**
@@ -49,6 +49,7 @@ function f3CapOf(role: PreviewFinalWriterRole, plan: PreviewFinalWriterPlan): nu
     case "ANSWER_WRITER": return PREVIEW_FINAL_WRITER_F3_CAPS.answer;
     case "ANSWER_CHECKER": case "STORY_CHECKER": return PREVIEW_FINAL_WRITER_F3_CAPS.checker;
     case "STORYTELLER": return plan === "free" ? PREVIEW_FINAL_WRITER_F3_CAPS.freeStory : PREVIEW_FINAL_WRITER_F3_CAPS.story;
+    default: return exhaustive(role);
   }
 }
 
