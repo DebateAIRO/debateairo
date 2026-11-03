@@ -1,9 +1,11 @@
-// Upload check Task 7: the test files that take their API pools from apiTestPools log in with the product's own
-// database logins by default, and of those only the files on tests/support/master-key-files.txt may use the harness
-// superuser (the "master key") inside a request. Files that never call apiTestPools are not guarded (the known gap in
-// that list's header). No database is needed: the guard refuses the query before the client ever connects.
-import { existsSync, statSync } from "node:fs";
-import { join } from "node:path";
+// Upload check Tasks 7 and 8: every test file that uses a database logs in with the product's own database logins by
+// default, and only the files on tests/support/master-key-files.txt may use the harness superuser (the "master key")
+// inside a request. The guard arms where a test database starts (startTestDatabase, the acceptance tests'
+// startStandingDatabase) and in apiTestPools; the first case below starts a real database to show it. The other cases
+// need no database: the guard refuses the query before the client ever connects. The last case pins who may turn
+// login mode off (review M-10).
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import pg from "pg";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -98,5 +100,77 @@ describe("the master-key list", () => {
     expect(() => readMasterKeyFiles("tests/a.test.ts\n")).toThrow("MASTER_KEY_FILES_ENTRY_INVALID");
     expect(() => readMasterKeyFiles("tests/a.test.ts  one\ntests/a.test.ts  two\n"))
       .toThrow("MASTER_KEY_FILES_ENTRY_INVALID");
+  });
+});
+
+/** The variable that turns login mode off for a run (DEBATEAI_TEST_API_LOGINS=0). */
+const LOGIN_MODE_VARIABLE = "DEBATEAI_TEST_API_LOGINS";
+
+/**
+ * Review M-10: the files that may write DEBATEAI_TEST_API_LOGINS, each with its reason. Any other test or support file
+ * that sets, stubs, deletes or passes it on could quietly run a file on the superuser, so it must be named here first.
+ */
+const LOGIN_MODE_WRITERS: ReadonlyMap<string, string> = new Map([
+  ["tests/integration/rls-account-context.test.ts",
+    "turns login mode on and off around single cases to prove both modes of apiTestPools and runnerTestPool"],
+  ["tests/unit/master-key-files.test.ts",
+    "stubs it to prove the three modes, and names it here to find its writers"]
+]);
+
+/** Where a writer could hide: every test and support folder, the tools, and the CI workflows that run the tests. */
+const SCANNED = ["tests", "acceptance", "tools", "package.json", "vitest.config.ts", "../.github/workflows"];
+const SCANNED_EXTENSIONS = /\.(?:[cm]?[jt]sx?|sh|json|ya?ml)$/u;
+
+/**
+ * True when `source` writes the variable: a quoted name (stubEnv, process.env[...], a name kept in a constant), an
+ * object or YAML key (an env passed to a child), an assignment or delete on process.env, or a shell form (NAME=...,
+ * env -u NAME). Comment lines do not count; reads such as `process.env.NAME === "0"` do not either.
+ */
+function writesLoginMode(source: string): boolean {
+  const name = LOGIN_MODE_VARIABLE;
+  const forms = [
+    new RegExp(`(["'\`])${name}\\1`, "u"),
+    new RegExp(`(?:^|[\\s{,])${name}\\s*:(?!:)`, "u"),
+    new RegExp(`process\\.env\\.${name}\\s*(?:\\?\\?|\\|\\||&&)?=(?!=)`, "u"),
+    new RegExp(`delete\\s+process\\.env\\.${name}\\b`, "u"),
+    new RegExp(`(?:^|[\\s"'\`;(])${name}=`, "u"),
+    new RegExp(`-u\\s+${name}\\b`, "u")
+  ];
+  return source.split("\n").some((line) => {
+    const code = line.trim();
+    if (code.startsWith("//") || code.startsWith("*") || code.startsWith("/*") || code.startsWith("#")) return false;
+    return forms.some((form) => form.test(code));
+  });
+}
+
+function scannedFiles(path: string): string[] {
+  if (!existsSync(path)) return [];
+  if (statSync(path).isFile()) return SCANNED_EXTENSIONS.test(path) ? [path] : [];
+  return readdirSync(path, { withFileTypes: true })
+    .filter((entry) => entry.name !== "node_modules" && !entry.name.startsWith("."))
+    .flatMap((entry) => scannedFiles(join(path, entry.name)));
+}
+
+describe("who may turn login mode off (review M-10)", () => {
+  it("the scanner sees every way of writing the variable, and not a read, a comment or another variable", () => {
+    const name = LOGIN_MODE_VARIABLE;
+    for (const written of [
+      `vi.stubEnv("${name}", "0");`, `process.env.${name} = "0";`, `process.env["${name}"] = "0";`,
+      `delete process.env.${name};`, `spawn(cmd, { env: { ...process.env, ${name}: "0" } });`,
+      `const key = "${name}";`, `env ${name}=0 pnpm test`, `export ${name}=0`, `env -u ${name} vitest`,
+      `      ${name}: "0"`, `process.env.${name} ??= "0";`
+    ]) expect({ written, found: writesLoginMode(written) }).toEqual({ written, found: true });
+    for (const read of [
+      `return process.env.${name} === "0";`, `// ${name}=0 turns it off`, ` * ${name}=0: superuser pools`,
+      `# ${name}=0`, `process.env.${name}_REPORT = report;`, `{ ${name}_REPORT: report }`
+    ]) expect({ read, found: writesLoginMode(read) }).toEqual({ read, found: false });
+  });
+
+  it("only the files named in LOGIN_MODE_WRITERS write DEBATEAI_TEST_API_LOGINS", () => {
+    const files = SCANNED.flatMap((path) => scannedFiles(join(PRODUCT_ROOT, path)));
+    expect(files.length).toBeGreaterThan(1000);
+    const writers = files.filter((file) => writesLoginMode(readFileSync(file, "utf8")))
+      .map((file) => relative(PRODUCT_ROOT, file)).sort();
+    expect(writers).toEqual([...LOGIN_MODE_WRITERS.keys()].sort());
   });
 });
