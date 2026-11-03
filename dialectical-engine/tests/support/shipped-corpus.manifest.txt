@@ -1322,6 +1322,7 @@ packages/register/src/cost-estimate-start-policy.ts
 packages/register/src/country-policy.ts
 packages/register/src/debate-shape-ceiling.ts
 packages/register/src/debate-shape-policy.ts
+packages/register/src/debate-shape-v2.ts
 packages/register/src/email-mfa-policy.ts
 packages/register/src/engine-contract-hash.ts
 packages/register/src/engine-shape.ts

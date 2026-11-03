@@ -1317,6 +1317,20 @@ export {
   type DebateShapeStartStep,
   type DebateShapeWidths
 } from "./debate-shape-policy.js";
+// V4 start step, Task 12: shape receipt v2 (a path debate's frozen sizes).
+export {
+  DEBATE_SHAPE_V2_FORMULA_VERSION,
+  assertDebateShapeV2Input,
+  debateShapeReceiptV2,
+  debateShapeReceiptV2Schema,
+  debateShapeSiteCountsV2,
+  debateShapeV2OfReceipt,
+  isShapeReceiptV2,
+  resolveDebateShapeV2,
+  type DebateShapeReceiptV2,
+  type DebateShapeV2Input,
+  type DebateShapeV2SiteCounts
+} from "./debate-shape-v2.js";
 export {
   LENGTH_GUIDANCE_POLICY_ROW_KEY,
   answerJobTokenCeilings,

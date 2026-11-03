@@ -333,7 +333,8 @@ export function debateShapePlanKeyOf(planId: PlanId | null, planTier: PlanTier):
   }
 }
 
-function scrutinyBudgetOf(plan: DebateShapePlan, scrutiny: Scrutiny): DebateShapeScrutinyBudget | null {
+/** A plan's budget for an asked scrutiny (null: the plan has none); shared with shape v2 (debate-shape-v2.ts). */
+export function scrutinyBudgetOf(plan: DebateShapePlan, scrutiny: Scrutiny): DebateShapeScrutinyBudget | null {
   switch (scrutiny) {
     case "standard": return Object.freeze({ roundsPerPoint: 0, pointsPerDebate: 0 });
     case "deep": return plan.scrutiny.deep;
@@ -374,7 +375,8 @@ export function normaliseDepthParamsForShape(depthParams: DepthParams, policy: D
   return Object.freeze({ depth, depthMode, scrutiny, answerLength: asked.answerLength, ...level });
 }
 
-const notNormalised = (key: string): never => { throw new TypeError(`DEBATE_SHAPE_SETTINGS_NOT_NORMALISED:${key}`); };
+/** An un-normalised setting is an engine fault, never a silent fix; shared with shape v2. */
+export const notNormalised = (key: string): never => { throw new TypeError(`DEBATE_SHAPE_SETTINGS_NOT_NORMALISED:${key}`); };
 
 /**
  * The sizes for `makers` distinct makers (INTERFACE §1): answers <= makers, map AIs <= makers, graders <= makers - 1 and
