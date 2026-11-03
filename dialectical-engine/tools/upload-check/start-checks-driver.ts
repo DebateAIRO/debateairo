@@ -163,6 +163,7 @@ async function run(clusterFolder: string, hooks: TestHooks): Promise<{ ok: boole
   const canonicalRegisterJson = need(register, "canonicalRegisterJson", "@debateai/register");
   const snapshotSha256 = need(register, "computeRegisterSnapshotSha256", "@debateai/register");
   const parseVersion = need(register, "parseRegisterVersionText", "@debateai/register");
+  const safeVersionNumber = need(register, "registerVersionToSafeLegacyNumber", "@debateai/register");
   const staffRow = need(staffPolicy, "STAFF_ACCESS_POLICY_REGISTER_ROW", "staff-access-policy.ts");
   const allowanceRow = need(staffPolicy, "INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW", "staff-access-policy.ts");
   const buildPreviewSourceRows = need(publish, "buildPreviewSourceRows", "publish-register.ts");
@@ -327,7 +328,7 @@ async function run(clusterFolder: string, hooks: TestHooks): Promise<{ ok: boole
       ]));
       // main.ts builds the three recovery repositories on the runtime pool, with the register version in force, and
       // attests each on every route. assertRole never uses the audit hasher, as in verify-native.ts.
-      const version = Number(receipt.registerVersion);
+      const version = safeVersionNumber(receipt.registerVersion);
       for (const repository of [
         new PasswordResetRepository(runtime, {} as never, version),
         new BackupEmailRepository(runtime, {} as never, version),
