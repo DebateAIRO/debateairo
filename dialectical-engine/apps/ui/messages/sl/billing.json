@@ -76,6 +76,7 @@
   "billing.checkout.priceCleared": "Spremenili ste svoje podatke, zato je bila cena odstranjena. Za nadaljevanje znova prikažite polno ceno.",
   "billing.checkout.countryUnavailable": "Plačljivi paketi v vaši državi še niso na voljo. Še naprej lahko uporabljate brezplačni paket.",
   "billing.checkout.regionUnavailable": "Plačljivi paketi v vaši regiji še niso na voljo. Še naprej lahko uporabljate brezplačni paket.",
+  "billing.checkout.regionTermsExcluded": "Dialectical Engine v zvezni državi Tennessee ne ponujamo, zato plačila za ta naslov ne moremo sprejeti.",
   "billing.checkout.confirmCountry": "Vaša povezava je videti, kot da prihaja iz te države: {ipCountry}. Ali živite v tej državi: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Da, tam živim",
   "billing.checkout.confirmCountryRequired": "Potrdite državo, v kateri živite, in nato nadaljujte.",

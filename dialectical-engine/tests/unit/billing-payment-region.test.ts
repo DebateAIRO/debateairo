@@ -33,7 +33,7 @@ const at = (country: string, postalCode: string | null, region: string | null, c
   ({ country, postalCode, region, company });
 const decide = (location: ReturnType<typeof at>, postcodeMustFit = true, policy: CountryPolicy = testClosedRegionsPolicy) =>
   decidePaymentRegion({ policy, location, postcodeMustFit });
-const refuse = (region: string) => ({ kind: "REFUSE", code: "REGION_PAYMENT_UNAVAILABLE", region });
+const refuse = (region: string, code = "REGION_PAYMENT_UNAVAILABLE") => ({ kind: "REFUSE", code, region });
 
 describe("decidePaymentRegion (ruling R1: a refusing region first, then a postcode that doesn't fit, then allow)", () => {
   it("refuses Saskatchewan by its postal code, however it is typed", () => {
@@ -286,11 +286,14 @@ describe("quoteUpgrade refuses a subscriber whose stored INITIAL quote is in a c
 /**
  * Tennessee (Terms §2 and Annex A.2, the owner's amendment of 8 October 2026: "We do not offer Dialectical Engine to
  * people who live in Tennessee"). Sign-up closes it by the declared state; payment must close it by the billing
- * address too, for every buyer, at the quote, at checkout start and at the upgrade.
+ * address too, for every buyer, at the quote, at checkout start and at the upgrade. A region the Terms exclude has its
+ * own code, REGION_TERMS_EXCLUDED (the owner's choice of 3 November 2026), read from the rule's reason, so the register
+ * opens it again by dropping the entry; a region closed for tax keeps REGION_PAYMENT_UNAVAILABLE.
  */
 describe("a Tennessee billing address is refused payment, consumer or company, wherever money is taken", () => {
   const nashville = storedLocation({ region: "TN", postalCode: "37203", city: "Nashville" });
-  const tennesseeRefused = { event: "billing.region.refused", code: "REGION_PAYMENT_UNAVAILABLE", country: "US", region: "US-TN" };
+  const tennesseeRefused = { event: "billing.region.refused", code: "REGION_TERMS_EXCLUDED", country: "US", region: "US-TN" };
+  const excluded = refuse("US-TN", "REGION_TERMS_EXCLUDED");
 
   it("decidePaymentRegion refuses US-TN by ZIP (370-385) or by typed state, consumer and company alike", () => {
     for (const location of [
@@ -298,27 +301,41 @@ describe("a Tennessee billing address is refused payment, consumer or company, w
       at("US", "37203-1234", null), at("US", null, "TN"), at("US", null, "Tennessee"), at("US", "75201", "tennessee"),
       at("US", "37203", "TX"), at("US", "37203", null, COMPANY)
     ]) {
-      for (const mustFit of [true, false]) expect(decide(location, mustFit), JSON.stringify(location)).toEqual(refuse("US-TN"));
+      for (const mustFit of [true, false]) expect(decide(location, mustFit), JSON.stringify(location)).toEqual(excluded);
     }
     // Its neighbours either side of the ZIP range stay open: 369 is Alabama, 386 Mississippi.
     expect(decide(at("US", "36925", null))).toEqual({ kind: "ALLOW" });
     expect(decide(at("US", "38601", null))).toEqual({ kind: "ALLOW" });
   });
 
+  it("names the Terms exclusion first when the address also names a region closed for tax", () => {
+    // US-MD sorts before US-TN; the Terms exclusion still wins, so the buyer is told the true reason.
+    expect(decide(at("US", "37203", "MD"))).toEqual(excluded);
+    expect(decide(at("US", "21201", "Tennessee"))).toEqual(excluded);
+    // A region closed for tax alone keeps its own code.
+    expect(decide(at("US", "21201", "MD"))).toEqual(refuse("US-MD"));
+  });
+
+  it("lets Tennessee pay again under a register version without the US-TN entry", () => {
+    const { "US-TN": _tennessee, ...withoutTennessee } = testClosedRegionsPolicy.regions;
+    const reopened: CountryPolicy = Object.freeze({ ...testClosedRegionsPolicy, regions: Object.freeze(withoutTennessee) });
+    expect(decide(at("US", "37203", "TN"), true, reopened)).toEqual({ kind: "ALLOW" });
+  });
+
   it("the SUBSCRIBE quote: 403, no tax asked, no quote stored, one region audit line", async () => {
     for (const fields of [{ postalCode: "37203", region: "TN" }, { postalCode: "38103", region: null }, { postalCode: null, region: "Tennessee" }]) {
       const { service, input, taxCalls, inserted, audit } = quoteHarness("US");
       await expect(service.create(input(fields)), JSON.stringify(fields))
-        .rejects.toMatchObject({ status: 403, code: "REGION_PAYMENT_UNAVAILABLE" });
+        .rejects.toMatchObject({ status: 403, code: "REGION_TERMS_EXCLUDED" });
       expect(taxCalls).toEqual([]);
       expect(inserted).toEqual([]);
-      expect(audit).toEqual([tennesseeRefused, { event: "billing.quote.refused", code: "REGION_PAYMENT_UNAVAILABLE" }]);
+      expect(audit).toEqual([tennesseeRefused, { event: "billing.quote.refused", code: "REGION_TERMS_EXCLUDED" }]);
     }
   });
 
   it("checkout start re-checks a stored Tennessee quote: 403, nothing written", async () => {
     const { start, written, audit } = checkoutHarness(nashville);
-    await expect(start()).rejects.toMatchObject({ status: 403, code: "REGION_PAYMENT_UNAVAILABLE" });
+    await expect(start()).rejects.toMatchObject({ status: 403, code: "REGION_TERMS_EXCLUDED" });
     expect(written).not.toHaveBeenCalled();
     expect(audit).toEqual([tennesseeRefused]);
   });
@@ -330,13 +347,13 @@ describe("a Tennessee billing address is refused payment, consumer or company, w
     await expect(gateCardAction({
       legal: { requiresReacceptance: async () => false } as never, geo, countryPolicy: testClosedRegionsPolicy,
       audit: (event, fields) => { audit.push({ event, ...fields }); }
-    }, OWNER, "198.51.100.7", upgradeContext(nashville))).rejects.toMatchObject({ status: 403, code: "REGION_PAYMENT_UNAVAILABLE" });
+    }, OWNER, "198.51.100.7", upgradeContext(nashville))).rejects.toMatchObject({ status: 403, code: "REGION_TERMS_EXCLUDED" });
     expect(audit).toEqual([tennesseeRefused]);
   });
 
   it("quoteUpgrade: 403, no tax asked, no quote stored", async () => {
     const { upgrade, insertQuote, taxQuote, audit } = upgradeQuoteHarness(nashville, "USD");
-    await expect(upgrade()).rejects.toMatchObject({ status: 403, code: "REGION_PAYMENT_UNAVAILABLE" });
+    await expect(upgrade()).rejects.toMatchObject({ status: 403, code: "REGION_TERMS_EXCLUDED" });
     expect(insertQuote).not.toHaveBeenCalled();
     expect(taxQuote).not.toHaveBeenCalled();
     expect(audit).toEqual([tennesseeRefused]);

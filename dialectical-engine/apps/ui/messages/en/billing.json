@@ -76,6 +76,7 @@
   "billing.checkout.priceCleared": "You changed your details, so the price was removed. Show the full price again to continue.",
   "billing.checkout.countryUnavailable": "Paid plans aren't available in your country yet. You can keep using the Free plan.",
   "billing.checkout.regionUnavailable": "Paid plans aren't available in your region yet. You can keep using the Free plan.",
+  "billing.checkout.regionTermsExcluded": "We don't offer Dialectical Engine in Tennessee, so we can't take payment for this address.",
   "billing.checkout.confirmCountry": "Your connection looks like it's from {ipCountry}. Do you live in {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Yes, I live there",
   "billing.checkout.confirmCountryRequired": "Please confirm the country where you live, then continue.",

@@ -76,6 +76,7 @@
   "billing.checkout.priceCleared": "Biddilt id-dettalji tiegħek, għalhekk il-prezz tneħħa. Uri l-prezz sħiħ mill-ġdid biex tkompli.",
   "billing.checkout.countryUnavailable": "Il-pjanijiet bi ħlas għadhom mhumiex disponibbli f’pajjiżek. Tista’ tkompli tuża l-pjan B’xejn.",
   "billing.checkout.regionUnavailable": "Il-pjanijiet bi ħlas għadhom mhumiex disponibbli f’reġjunek. Tista’ tkompli tuża l-pjan B’xejn.",
+  "billing.checkout.regionTermsExcluded": "Ma noffrux Dialectical Engine f’Tennessee, għalhekk ma nistgħux naċċettaw ħlas għal dan l-indirizz.",
   "billing.checkout.confirmCountry": "Il-konnessjoni tiegħek tidher li ġejja minn dan il-pajjiż: {ipCountry}. Tgħix f’dan il-pajjiż: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Iva, ngħix hemm",
   "billing.checkout.confirmCountryRequired": "Jekk jogħġbok ikkonferma l-pajjiż fejn tgħix, imbagħad kompli.",

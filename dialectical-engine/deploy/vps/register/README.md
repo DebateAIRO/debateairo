@@ -99,6 +99,9 @@ region blocks spec, `docs/superpowers/specs/2026-10-20-payment-region-blocks-des
 - Tennessee (`US-TN`), for every buyer, because the Terms exclude it (section 2 and Annex A.2, the owner's
   amendment of 8 October 2026). Sign-up already refuses a person who declares Tennessee (`us_states`); this entry
   refuses a Tennessee billing address too, so someone who declared another state still cannot pay from there.
+  Its refusal has its own code, `REGION_TERMS_EXCLUDED`, read from the reason, and its own sentence ("We don't
+  offer Dialectical Engine in Tennessee, so we can't take payment for this address."); a region closed for tax
+  answers `REGION_PAYMENT_UNAVAILABLE`.
 
 Each tax entry reads `{ "pay": false, "reason": "TAX_NOT_READY" }`; Ohio's adds `"buyers": "business"`. To open a
 region once the company is registered there, delete its entry from the hosted file and publish: that new
