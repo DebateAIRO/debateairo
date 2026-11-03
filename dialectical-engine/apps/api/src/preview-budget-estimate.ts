@@ -39,6 +39,7 @@ import {
   createPreviewRemainingRpcPort,
   lengthRetryTokenCeiling,
   PREVIEW_CALL_TIER_LIMITS,
+  PREVIEW_FINAL_WRITER_LIMITS,
   PREVIEW_MODEL_ROWS_BY_PROVIDER,
   PREVIEW_PROVIDER_NAMES,
   PREVIEW_GLM_GENERATION_TOKEN_FLOOR,
@@ -47,6 +48,7 @@ import {
   PREVIEW_STRUCTURE_REPAIR_MODEL,
   previewCallBound,
   previewChargedInputTokens,
+  previewFinalWriterAsk,
   previewModelRow,
   previewModelRowForRef,
   previewProviderSocket,
@@ -55,6 +57,8 @@ import {
   previewTierOutputBound,
   previewVendorPrices,
   type PreviewCallTier,
+  type PreviewFinalWriterPlan,
+  type PreviewFinalWriterRole,
   type PreviewGateRemaining,
   type PreviewGateSettings,
   type PreviewModelRow,
@@ -169,6 +173,24 @@ const PREVIEW_ESTIMATE_BYTES_PER_TOKEN = 3;
 export function previewEstimateInputTokens(requestBytes: number): bigint {
   const perToken = BigInt(PREVIEW_ESTIMATE_BYTES_PER_TOKEN);
   return (previewChargedInputTokens(requestBytes) + perToken - 1n) / perToken;
+}
+/**
+ * V4 start step, Task 4 (spec 2026-11-03 §5): a v2 run's final writer's body is at most the end-of-debate line
+ * (PREVIEW_FINAL_WRITER_LIMITS.inputBodyMaxBytes, 195,904 bytes), so (195,904 + 2,048) / 3 = 65,984 tokens.
+ */
+export const PREVIEW_V2_FINAL_WRITER_INPUT_TOKENS = previewEstimateInputTokens(PREVIEW_FINAL_WRITER_LIMITS.inputBodyMaxBytes);
+/** V4 start step, Task 4: a v2 run's final-writer terms (its plan); absent or null = a v1 run, priced on R22.1's own terms. */
+export type PreviewFinalWriterPricing = Readonly<{ plan: PreviewFinalWriterPlan }>;
+/** The final writers' call types, each with its role and its attempt (a `*_RETRY` type is attempt 2). */
+type PreviewFinalWriterCallType = "ANSWER_WRITER" | "ANSWER_CHECKER" | "STORYTELLER" | "STORYTELLER_RETRY" | "STORY_CHECKER" | "STORY_CHECKER_RETRY";
+const FINAL_WRITER_CALLS: Readonly<Record<PreviewFinalWriterCallType, readonly [PreviewFinalWriterRole, 1 | 2]>> = Object.freeze({
+  ANSWER_WRITER: ["ANSWER_WRITER", 1], ANSWER_CHECKER: ["ANSWER_CHECKER", 1], STORYTELLER: ["STORYTELLER", 1],
+  STORYTELLER_RETRY: ["STORYTELLER", 2], STORY_CHECKER: ["STORY_CHECKER", 1], STORY_CHECKER_RETRY: ["STORY_CHECKER", 2]
+});
+/** V4 start step, Task 4: the max_tokens a v2 final writer asks: the same function the call policy sends (Task 3). */
+export function previewFinalWriterOutputTokens(row: PreviewModelRow, type: PreviewFinalWriterCallType, finalWriters: PreviewFinalWriterPricing): number {
+  const [role, attempt] = FINAL_WRITER_CALLS[type];
+  return previewFinalWriterAsk(row, role, attempt, finalWriters.plan).maxTokens;
 }
 /**
  * The realistic worst case's ordinary prompt (owner ruling, 2026-10-10): 64 KiB, so (65,536 + 2,048) / 3
@@ -432,13 +454,11 @@ export function calibratedEstimatePricer(measured: PreviewMeasuredCallUsage): Pr
  * the storyteller its row's allowance (a fast row's own maximum, a slow row's 16,384) and its length retry twice that,
  * held to previewStorytellerOutputCap. A register without a story prices no story output, as before. LG-A's
  * structure-repair call keeps its own ceiling (structureRepairNanoUsd, STANDARD tier: controller ruling PF-B4.15).
- * Final review (2026-10-16, Important 3): on a slow row (GLM, MiMo, Qwen) the call policy now has the answer writer,
- * answer checker and story checker ask 16,384 with their retry held to `outputBound`, as the slow storyteller; this
- * estimate keeps pricing them at the row's own maximum on purpose, a safe over-count (it never prices a call below what
- * it may send).
+ * V4 start step, Task 4: a v1 run is priced on R22.1's own terms, as above; a v2 run's six final-writer types
+ * (`finalWriters` given) by the one function the call policy sends (previewFinalWriterAsk), at that ask's tier.
  */
 function sentOutputPricer(inputTokens: Readonly<Record<Exclude<PreviewBilledCallType, "PROBE">, bigint>>,
-  output: PreviewCallOutputTokens): PreviewCallPricer {
+  output: PreviewCallOutputTokens, finalWriters: PreviewFinalWriterPricing | null = null): PreviewCallPricer {
   const outputOf = (row: PreviewModelRow, type: Exclude<PreviewBilledCallType, "PROBE" | "STRUCTURE_REPAIR">): number => {
     switch (type) {
       case "DEBATE": return output.debate;
@@ -452,40 +472,52 @@ function sentOutputPricer(inputTokens: Readonly<Record<Exclude<PreviewBilledCall
       default: return exhaustive(type);
     }
   };
+  // V4 start step, Task 4: a v2 final writer at the rule's ask and tier; a register without a story still prices none.
+  const v2FinalWriter = (row: PreviewModelRow, type: PreviewFinalWriterCallType, terms: PreviewFinalWriterPricing): bigint => {
+    const [role, attempt] = FINAL_WRITER_CALLS[type];
+    const ask = previewFinalWriterAsk(row, role, attempt, terms.plan);
+    const noStory = (role === "STORYTELLER" && output.storyteller === 0) || (role === "STORY_CHECKER" && output.storyChecker === 0);
+    return previewCallNanoUsd(row, inputTokens[type], noStory ? 0 : ask.maxTokens, ask.tier);
+  };
   return (row, type) => type === "PROBE"
     ? previewCallNanoUsd(row, PREVIEW_STRICT_PROBE_INPUT_TOKENS, PREVIEW_GLM_GENERATION_TOKEN_FLOOR)
     : type === "STRUCTURE_REPAIR" ? structureRepairNanoUsd(row, inputTokens.STRUCTURE_REPAIR)
-    : previewCallNanoUsd(row, inputTokens[type], outputOf(row, type), previewCallTypeTier(type));
+    : finalWriters !== null && Object.hasOwn(FINAL_WRITER_CALLS, type)
+      ? v2FinalWriter(row, type as PreviewFinalWriterCallType, finalWriters)
+      : previewCallNanoUsd(row, inputTokens[type], outputOf(row, type), previewCallTypeTier(type));
 }
 const everyCallAt = (tokens: bigint) => ({ DEBATE: tokens, ANSWER_WRITER: tokens, ANSWER_CHECKER: tokens, MAP_MERGE: tokens, MAP_CHOOSE: tokens,
   STORYTELLER: tokens, STORYTELLER_RETRY: tokens, STORY_CHECKER: tokens, STORY_CHECKER_RETRY: tokens, STRUCTURE_REPAIR: tokens });
 /**
  * STRICT_BOUND (6f62b6ba3): every call at its most, input at the largest body the gate accepts,
  * output at the max_tokens that call sends, clamped to the row; a health check at its fixed body and
- * the generation floor. LG-B: a final writer's input at the final-writer request cap (1 MiB).
+ * the generation floor. LG-B: a final writer's input at the final-writer request cap (1 MiB). V4 start step, Task 4: a v2
+ * run's final writers' output by the shared rule (`finalWriters`), their input still at that cap.
  */
-export function strictUpperBoundPricer(output: PreviewCallOutputTokens): PreviewCallPricer {
+export function strictUpperBoundPricer(output: PreviewCallOutputTokens, finalWriters: PreviewFinalWriterPricing | null = null): PreviewCallPricer {
   // LG-B (L29): a final writer's body may be up to the final-writer request cap.
   const finalWriter = previewChargedInputTokens(PREVIEW_CALL_TIER_LIMITS.FINAL_WRITER.requestBodyMaxBytes);
   return sentOutputPricer({ ...everyCallAt(PREVIEW_STRICT_INPUT_TOKENS_PER_CALL), ANSWER_WRITER: finalWriter, ANSWER_CHECKER: finalWriter,
-    STORYTELLER: finalWriter, STORYTELLER_RETRY: finalWriter, STORY_CHECKER: finalWriter, STORY_CHECKER_RETRY: finalWriter }, output);
+    STORYTELLER: finalWriter, STORYTELLER_RETRY: finalWriter, STORY_CHECKER: finalWriter, STORY_CHECKER_RETRY: finalWriter }, output, finalWriters);
 }
 /**
  * REALISTIC_WORST_CASE (owner rulings, 2026-10-10): a debate call's input at a realistic 64 KiB, a
  * story call's (the storyteller, its repair, the story check) at the largest measured request of the
  * ask's story size (PREVIEW_STORY_REQUEST_BYTES), both at 3 bytes per token; its output at the
  * max_tokens that call asks for (clamped to the row); a health check at its fixed body and the
- * generation floor, as in the strict bound.
+ * generation floor, as in the strict bound. V4 start step, Task 4: a v2 run's final writers (`finalWriters` given) at
+ * the end-of-debate line in (PREVIEW_V2_FINAL_WRITER_INPUT_TOKENS) and the shared rule's ask out.
  */
-export function realisticWorstCasePricer(output: PreviewCallOutputTokens, storyTier: PreviewStoryTier = PREVIEW_STORY_TIER_FALLBACK): PreviewCallPricer {
+export function realisticWorstCasePricer(output: PreviewCallOutputTokens, storyTier: PreviewStoryTier = PREVIEW_STORY_TIER_FALLBACK,
+  finalWriters: PreviewFinalWriterPricing | null = null): PreviewCallPricer {
   const story = PREVIEW_STORY_REQUEST_BYTES[previewStoryTierOf(storyTier)];
-  const storyteller = previewEstimateInputTokens(story.storyteller);
-  const storyChecker = previewEstimateInputTokens(story.storyChecker);
-  return sentOutputPricer({ DEBATE: PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL, ANSWER_WRITER: PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL,
-    ANSWER_CHECKER: PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL,
+  const storyteller = finalWriters === null ? previewEstimateInputTokens(story.storyteller) : PREVIEW_V2_FINAL_WRITER_INPUT_TOKENS;
+  const storyChecker = finalWriters === null ? previewEstimateInputTokens(story.storyChecker) : PREVIEW_V2_FINAL_WRITER_INPUT_TOKENS;
+  const answer = finalWriters === null ? PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL : PREVIEW_V2_FINAL_WRITER_INPUT_TOKENS;
+  return sentOutputPricer({ DEBATE: PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL, ANSWER_WRITER: answer, ANSWER_CHECKER: answer,
     MAP_MERGE: PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL, MAP_CHOOSE: PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL,
     STORYTELLER: storyteller, STORYTELLER_RETRY: storyteller,
-    STORY_CHECKER: storyChecker, STORY_CHECKER_RETRY: storyChecker, STRUCTURE_REPAIR: PREVIEW_REALISTIC_REPAIR_INPUT_TOKENS }, output);
+    STORY_CHECKER: storyChecker, STORY_CHECKER_RETRY: storyChecker, STRUCTURE_REPAIR: PREVIEW_REALISTIC_REPAIR_INPUT_TOKENS }, output, finalWriters);
 }
 
 export type PreviewPricingMode = "REALISTIC_WORST_CASE" | "CALIBRATED_ESTIMATE" | "STRICT_BOUND";
@@ -502,11 +534,14 @@ export type PreviewPricingMode = "REALISTIC_WORST_CASE" | "CALIBRATED_ESTIMATE" 
 export const PREVIEW_ESTIMATE_PRICING_MODE: PreviewPricingMode = "REALISTIC_WORST_CASE";
 /** THE ONE PRICING SWITCH: the pricer for `mode` (default: the active mode above). */
 export function previewEstimatePricer(context: Readonly<{ measured: PreviewMeasuredCallUsage; callOutputTokens: PreviewCallOutputTokens;
-  storyTier?: PreviewStoryTier }>, mode: PreviewPricingMode = PREVIEW_ESTIMATE_PRICING_MODE): PreviewCallPricer {
+  storyTier?: PreviewStoryTier;
+  /** V4 start step, Task 4: a v2 run's final-writer terms; absent or null = a v1 run (R22.1's own terms). */
+  finalWriters?: PreviewFinalWriterPricing | null }>, mode: PreviewPricingMode = PREVIEW_ESTIMATE_PRICING_MODE): PreviewCallPricer {
+  const finalWriters = context.finalWriters ?? null;
   switch (mode) {
-    case "REALISTIC_WORST_CASE": return realisticWorstCasePricer(context.callOutputTokens, context.storyTier);
+    case "REALISTIC_WORST_CASE": return realisticWorstCasePricer(context.callOutputTokens, context.storyTier, finalWriters);
     case "CALIBRATED_ESTIMATE": return calibratedEstimatePricer(context.measured);
-    case "STRICT_BOUND": return strictUpperBoundPricer(context.callOutputTokens);
+    case "STRICT_BOUND": return strictUpperBoundPricer(context.callOutputTokens, finalWriters);
     default: return exhaustive(mode);
   }
 }
@@ -732,6 +767,9 @@ export function previewCallShares(input: Readonly<{
    */
   dearestFor?: (models: readonly string[], role: PreviewRotatedRoleKind) => string;
 }>): PreviewCallShares {
+  // V4 start step, Task 4 (bridge, removed in Task 40): a v2 receipt's paths are not priced yet, so its calls are never
+  // shared out on a v1 reading; admission answers "unavailable" rather than under-count.
+  if (input.basis.formula_version === "DR-185-shape-v2") throw new TypeError("PREVIEW_SHAPE_V2_UNPRICED");
   const rotated = input.rotated === true;
   // Debate shape: the writer's sites are priced at the run's writer bound, and the map's merge and choose (one site
   // each, X1) at its map step bounds; today's receipt keeps them all as DEBATE and has no map.
