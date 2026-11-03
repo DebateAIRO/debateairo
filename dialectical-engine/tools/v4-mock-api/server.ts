@@ -28,6 +28,8 @@ import {
 } from "./web-draft.js";
 import { ARABIC_RUN, borrowNotice, DEEPEST_DIG, DIG_ANSWERS, DIG_RUNS, monthPause, PATH_REWRITES, reportVersionBody, RUN_PAUSED, SEEDED_NEW_DIGS } from "./rewrite-seed.js";
 import type { WebCase } from "./web-seed.js";
+import { paymentRegionsOf } from "../../packages/kernel/src/payment-regions.js";
+import { BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, priceCurrencyFor } from "../../packages/register/src/billing-plans.js";
 import { contributionOf, PUBLIC_MODES, PUBLIC_REF, seedPublicDebates, writtenReport, type PublicMode } from "./public-seed.js";
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -614,16 +616,74 @@ function billingUsage(now = Date.now(), plan_id: PlanMode = planMode, usage: Usa
   };
 }
 
-/** The register's default plans (packages/register/src/billing-plans.ts), in US dollars. */
+/** The register's default plans (packages/register/src/billing-plans.ts), in US dollars, for no place yet. */
 const BILLING_PLANS = Object.freeze({
   currency: "USD",
+  place: { country: null, postal_code: null, status: "COUNTRY_NEEDED" },
+  tax: null,
   plans: [
-    { plan_id: "FREE", net_prices: { USD: "0.00", EUR: "0.00", RON: "0.00" }, allowance_vs_plus: "0.04" },
-    { plan_id: "PLUS", net_prices: { USD: "20.00", EUR: "20.00", RON: "100.00" }, allowance_vs_plus: "1" },
-    { plan_id: "PRO", net_prices: { USD: "50.00", EUR: "50.00", RON: "250.00" }, allowance_vs_plus: "4" },
-    { plan_id: "MAX", net_prices: { USD: "200.00", EUR: "200.00", RON: "1000.00" }, allowance_vs_plus: "30" }
+    { plan_id: "FREE", net_prices: { USD: "0.00", EUR: "0.00", RON: "0.00" }, total_price: null, allowance_vs_plus: "0.04" },
+    { plan_id: "PLUS", net_prices: { USD: "20.00", EUR: "20.00", RON: "100.00" }, total_price: null, allowance_vs_plus: "1" },
+    { plan_id: "PRO", net_prices: { USD: "50.00", EUR: "50.00", RON: "250.00" }, total_price: null, allowance_vs_plus: "4" },
+    { plan_id: "MAX", net_prices: { USD: "200.00", EUR: "200.00", RON: "1000.00" }, total_price: null, allowance_vs_plus: "30" }
   ]
 });
+
+/**
+ * The mock's tax table: each EU country's standard VAT rate (2026), which a Romanian seller charges every EU consumer
+ * through the OSS, and Texas's sales tax by ZIP; none elsewhere, where the seller is not registered.
+ */
+const MOCK_TAX_RATES: Readonly<Record<string, Readonly<{ name: string; basisPoints: number }>>> = {
+  AT: { name: "USt.", basisPoints: 2_000 }, BE: { name: "VAT", basisPoints: 2_100 }, BG: { name: "VAT", basisPoints: 2_000 },
+  CY: { name: "VAT", basisPoints: 1_900 }, CZ: { name: "DPH", basisPoints: 2_100 }, DE: { name: "MwSt.", basisPoints: 1_900 },
+  DK: { name: "moms", basisPoints: 2_500 }, EE: { name: "VAT", basisPoints: 2_400 }, ES: { name: "IVA", basisPoints: 2_100 },
+  FI: { name: "ALV", basisPoints: 2_550 }, FR: { name: "TVA", basisPoints: 2_000 }, GR: { name: "ΦΠΑ", basisPoints: 2_400 },
+  HR: { name: "PDV", basisPoints: 2_500 }, HU: { name: "ÁFA", basisPoints: 2_700 }, IE: { name: "VAT", basisPoints: 2_300 },
+  IT: { name: "IVA", basisPoints: 2_200 }, LT: { name: "PVM", basisPoints: 2_100 }, LU: { name: "TVA", basisPoints: 1_700 },
+  LV: { name: "PVN", basisPoints: 2_100 }, MT: { name: "VAT", basisPoints: 1_800 }, NL: { name: "btw", basisPoints: 2_100 },
+  PL: { name: "VAT", basisPoints: 2_300 }, PT: { name: "IVA", basisPoints: 2_300 }, RO: { name: "VAT", basisPoints: 2_100 },
+  SE: { name: "moms", basisPoints: 2_500 }, SI: { name: "DDV", basisPoints: 2_200 }, SK: { name: "DPH", basisPoints: 2_300 }
+};
+
+/** The register's own plans row, for the currency each country pays in (RO: lei; the euro countries: euro; else dollars). */
+const REGISTER_PLANS = billingPlansFromValue(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value, BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.sourceRef);
+
+/**
+ * Terms §12, as GET /v1/billing/plans answers: the plans priced for the place asked (?country=, and in the US and
+ * Canada ?postal_code=, checked by the kernel's own format as the API does), in that place's currency, each with its
+ * total including that place's tax, and no price at all until the place is known.
+ */
+function billingPlans(countryParam: string | null, postalParam: string | null) {
+  const country = (countryParam ?? "").trim().toUpperCase();
+  if (!/^[A-Z]{2}$/u.test(country)) return BILLING_PLANS;
+  const currency = priceCurrencyFor(REGISTER_PLANS, country);
+  const unpriced = (status: "POSTAL_CODE_NEEDED" | "POSTAL_CODE_INVALID") =>
+    ({ ...BILLING_PLANS, currency, place: { country, postal_code: null, status } });
+  let postalCode: string | null = null;
+  if (country === "US" || country === "CA") {
+    const typed = (postalParam ?? "").toUpperCase().replace(/[\s-]+/gu, "");
+    if (typed === "") return unpriced("POSTAL_CODE_NEEDED");
+    if (paymentRegionsOf({ country, postalCode: typed, region: null }).kind === "POSTCODE_INVALID") return unpriced("POSTAL_CODE_INVALID");
+    postalCode = country === "US" ? typed.slice(0, 5) : `${typed.slice(0, 3)} ${typed.slice(3)}`;
+  }
+  const rate = country === "US"
+    ? (postalCode !== null && /^7[5-9]/u.test(postalCode) ? { name: "Sales tax", basisPoints: 625 } : undefined)
+    : MOCK_TAX_RATES[country];
+  const basisPoints = rate?.basisPoints ?? 0;
+  const withTax = (net: string) => {
+    const cents = Math.round(Number(net) * 100);
+    return ((cents + Math.floor((cents * basisPoints + 5_000) / 10_000)) / 100).toFixed(2);
+  };
+  return {
+    currency,
+    place: { country, postal_code: postalCode, status: "PRICED" },
+    tax: {
+      country, tax_name: rate?.name ?? (country === "US" ? "Sales tax" : "VAT"), tax_rate_bp: basisPoints,
+      tax_status: rate === undefined ? "NOT_REGISTERED" : "TAXABLE"
+    },
+    plans: BILLING_PLANS.plans.map((plan) => ({ ...plan, total_price: withTax(plan.net_prices[currency]) }))
+  };
+}
 
 const DEPLOYMENT = Object.freeze({
   register: { register_version: 20, rows: [] },
@@ -773,6 +833,9 @@ function startupCheck(): number {
     }
   }
   check("GET /v1/billing/plans", C.BillingPlansResponseSchema, BILLING_PLANS);
+  for (const [country, postal] of [["DE", null], ["RO", null], ["US", "75201"], ["US", null], ["CA", "D1A 1A1"], ["JP", null]] as const) {
+    check(`GET /v1/billing/plans?country=${country}`, C.BillingPlansResponseSchema, billingPlans(country, postal));
+  }
   check("GET /v1/answers", C.AnswerIndexSchema, answerIndex(50, 0));
   for (const run of runs.values()) {
     checkDraft(`GET /v1/runs/${run.runRef}`, C.RunProjectionSchema, runProjection(run), stripRun, runDraftSchema);
@@ -1365,7 +1428,9 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     // W2-7 (draft): the borrow notices ride the usage read once the contract knows them.
     return sendDraftable(billingUsage(), C.BillingUsageResponseSchema, stripUsage, issuesOf(usageDraftSchema));
   }
-  if (path === "/v1/billing/plans" && isGet) return sendJson(req, res, 200, BILLING_PLANS, C.BillingPlansResponseSchema);
+  if (path === "/v1/billing/plans" && isGet) {
+    return sendJson(req, res, 200, billingPlans(url.searchParams.get("country"), url.searchParams.get("postal_code")), C.BillingPlansResponseSchema);
+  }
 
   // ---- answers ----
   if (path === "/v1/answers" && isGet) {

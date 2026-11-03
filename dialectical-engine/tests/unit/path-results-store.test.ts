@@ -1,5 +1,5 @@
 // tests/unit/path-results-store.test.ts
-// V4 start step, Task 21: a path's root saved while its debate is being erased. 0156's writer checks the debate is live, then inserts; an
+// V4 start step, Task 21: a path's root saved while its debate is being erased. 0157's writer checks the debate is live, then inserts; an
 // erasure that commits in between is refused by 0040's barrier on the insert (55000 PRIVATE_CONTENT_ERASED). The store answers RUN_ERASED
 // for it, as for the writer's own answer, so the runner stops the debate the typed way; any other failure is passed on.
 import { describe, expect, it } from "vitest";

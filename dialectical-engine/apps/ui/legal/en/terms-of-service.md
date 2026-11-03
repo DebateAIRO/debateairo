@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In short
-eyebrow: TERMS OF SERVICE · v2.12 · EFFECTIVE 1 NOVEMBER 2026
+eyebrow: TERMS OF SERVICE · v2.14 · EFFECTIVE 1 NOVEMBER 2026
 title: What you agree to
 lede: The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.
-endMarker: END OF TERMS · v2.12
+endMarker: END OF TERMS · v2.14
 bodyLabel: Terms of Service text
 annexTitle: Annex A — Regional terms
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 GOVERNING LAW
 -->
 
-**Version 2.12 · Effective 1 November 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
+**Version 2.14 · Effective 1 November 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
 
 **In short.** You must be 18 or over. Dialectical Engine builds arguments with AI models and everything it generates may be wrong — it is not advice. On the Free plan your debates are public when finished, after an AI check; on a paid plan they are private unless you publish them. Once public, anyone can read a debate, and it stays public. Text you submit is sent to AI providers listed in our Provider Register, and is not used to train models. Report illegal content at support@dezbatere.ro whether or not you have an account. Romanian law governs, but your local consumer protections stay with you.
 
@@ -215,7 +215,7 @@ Sections 8 (as to content already published), 15, 16 and 18 survive termination.
 
 Dialectical Engine offers a free plan. A paid **Premium** plan will be available, which unlocks the full model roster and lets you set the debate gauges yourself.
 
-**Before you pay** we show you, directly above the payment button: the plan; the total price including applicable tax; the billing period; that the plan renews automatically until cancelled; the date any free trial ends and what you will then be charged; and how to cancel. You confirm the renewal terms by ticking a separate box. The button reads **Subscribe and pay** (in Romanian, *Comandă cu obligație de plată*). We send you a confirmation on a durable medium containing the same information, these Terms, and the withdrawal form.
+**Before you pay** we show you, directly above the payment button: the plan; the total price including applicable tax; the billing period; that the plan renews automatically until cancelled; the date any free trial ends and what you will then be charged; and how to cancel. You confirm the renewal terms by ticking a separate box. The button reads **Subscribe and pay** (in Romanian, *Abonați-vă și plătiți*). We send you a confirmation on a durable medium containing the same information, these Terms, and the withdrawal form.
 
 **Reminders.** We email you at least 5 days before a free trial converts to a paid plan; at least once a year for continuing plans; and between 30 and 45 days before any renewal of a term of twelve months or more. Every reminder includes the price, the date, and a cancellation link.
 
@@ -250,6 +250,10 @@ If you live elsewhere, Annex A states the withdrawal or cooling-off right that a
 We tell you in advance, on a durable medium, what is changing and when. If the change has more than a minor negative effect on your access to or use of the service, you may terminate free of charge within **30 days** of being told, or of the change taking effect, whichever is later, and we refund any prepaid amount for the unused period.
 
 **To these Terms.** We may change these Terms for the same kinds of reasons. For changes that do not reduce your rights, we post the new version with a summary of what changed and email you at least **30 days** before it takes effect; continuing to use Dialectical Engine after that date means you accept it, and you may close your account before then. For changes that reduce your rights — including price increases on an existing plan, lower limits, removed features, new uses of your content, or changes to liability, governing law or dispute resolution — we ask you to accept the new version expressly at your next sign-in, and the change applies only going forward. We never make a change retroactive, and we never use this section to change the core of what you have paid for mid-term without offering you a way out. Prior versions stay available at dezbatere.ro/terms/versions.
+
+Version 2.14 replaced version 2.13: section 18 and Annex A name ANPC (SAL) as the route for alternative dispute resolution.
+
+Version 2.13 replaced version 2.12: section 12 gives the payment button's Romanian wording.
 
 Version 2.12 replaced version 2.11: section 10 says that a signed-in person can also use the Report button on any public debate, that an AI reads a report made with it beside the public text, and what happens then.
 
@@ -297,7 +301,7 @@ How we handle personal data is set out in the **Privacy Policy** at dezbatere.ro
 
 **Consumers elsewhere.** If you live outside the EU and the EEA, nothing in these Terms limits any right you have under the law of your country to bring a claim in its courts, or any right under that law that cannot be waived — including, if you live in Australia or New Zealand, your consumer-guarantee rights; if you live in Brazil, the Código de Defesa do Consumidor; and if you live in the United States, the consumer-protection laws of your state.
 
-**Before going to court.** Contact us at support@dezbatere.ro; most things are fixable, and we aim to reply within 5 working days. If you are a consumer in Romania or the EU, you may use alternative dispute resolution through www.onoratainstanta.ro; we do not commit to participate in that procedure. Complaints about moderation decisions follow section 10, which is a separate route.
+**Before going to court.** Contact us at support@dezbatere.ro; most things are fixable, and we aim to reply within 5 working days. If you are a consumer in Romania or the EU, you may use alternative dispute resolution through ANPC (SAL), reclamatiisal.anpc.ro; we do not commit to participate in that procedure. Complaints about moderation decisions follow section 10, which is a separate route.
 
 ## 19. Other terms
 
@@ -319,7 +323,7 @@ Each entry applies to people who live in its region and only states what differs
 
 ### A.1 European Union and European Economic Area
 
-The body of these Terms is written for you. In addition: you may bring proceedings in the courts of the country where you live; the withdrawal right in section 13 applies; alternative dispute resolution is available through www.onoratainstanta.ro. **Germany:** the cancellation button at dezbatere.ro/cancel lets you end a subscription without logging in; subscription terms, renewal periods and notice periods comply with §309(9) BGB: each plan runs for one month and renews monthly until you cancel, and you can cancel at any time with effect from the end of the current month. **France:** you may end a subscription online in three steps at dezbatere.ro/cancel. **Italy:** the clauses on suspension and termination (11), paid plans and their renewal (12), changes (14), liability (15) and governing law and jurisdiction (18) require your specific approval under articles 1341 and 1342 of the Italian Civil Code. You give it with a separate box at sign-up, shown to anyone who picks Italy in the Region field or whose connection comes from Italy. **Netherlands:** these Terms are provided in a storable form before conclusion. **Poland:** a Polish version is available; choose Polski in the language menu.
+The body of these Terms is written for you. In addition: you may bring proceedings in the courts of the country where you live; the withdrawal right in section 13 applies; alternative dispute resolution is available through ANPC (SAL), reclamatiisal.anpc.ro. **Germany:** the cancellation button at dezbatere.ro/cancel lets you end a subscription without logging in; subscription terms, renewal periods and notice periods comply with §309(9) BGB: each plan runs for one month and renews monthly until you cancel, and you can cancel at any time with effect from the end of the current month. **France:** you may end a subscription online in three steps at dezbatere.ro/cancel. **Italy:** the clauses on suspension and termination (11), paid plans and their renewal (12), changes (14), liability (15) and governing law and jurisdiction (18) require your specific approval under articles 1341 and 1342 of the Italian Civil Code. You give it with a separate box at sign-up, shown to anyone who picks Italy in the Region field or whose connection comes from Italy. **Netherlands:** these Terms are provided in a storable form before conclusion. **Poland:** a Polish version is available; choose Polski in the language menu.
 
 ### A.2 United States
 
@@ -331,7 +335,7 @@ The body of these Terms is written for you. In addition: you may bring proceedin
 
 ### A.3 Canada and Quebec
 
-Our privacy officer, and in Quebec the person in charge of the protection of personal information, is our director, reachable at privacy@dezbatere.ro. Our Privacy Policy, Annex B.3, covers your data. **Quebec:** these Terms are available in French; choose French with the language switcher; the settings that keep your debates private are on by default; you may request de-indexing of personal information about you.
+Our privacy officer, and in Quebec the person in charge of the protection of personal information, is our director, reachable at privacy@dezbatere.ro. Our Privacy Policy, Annex B.3, covers your data. **Quebec:** these Terms are available in French; if you choose Canada when you sign up, you get them in French first and can choose English instead; the settings that keep your debates private are on by default; you may request de-indexing of personal information about you.
 
 ### A.4 Australia and New Zealand
 

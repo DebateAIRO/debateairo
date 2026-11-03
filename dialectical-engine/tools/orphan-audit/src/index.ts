@@ -618,10 +618,12 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // Perplexity plan W1-3 (2026-10-30): two export lines for the web evidence and investigation repositories (0132, 0133).
 // Dig-model revision W2-8 (2026-10-31): one comment and one export line for the dig model repositories (0134).
 // migrate() is byte-identical.
-// V4 start step Task 20 (2026-11-03): one comment and one export line for the start paths store (0155). migrate() is
+// V4 start step Task 20 (2026-11-03): one comment and one export line for the start paths store (0156). migrate() is
 // byte-identical (its slice, sha256 d1495dbe4bbf…, as before).
-// V4 start step Task 21 (2026-11-03): one comment and one export line for the path results repository (0156). migrate() is byte-identical.
-const NATIVE_MIGRATE_MODULE_SHA256 = "3eca52aafca33bd516dba70a9caf7cb26fe2264688fe8d16651096119ef98265";
+// V4 start step Task 21 (2026-11-03): one comment and one export line for the path results repository (0157). migrate() is byte-identical.
+// Merge of origin V4 bbd16f888 (2026-11-04): V4 took 0154, so the two comments above name 0156 and 0157 (the start step's three
+// migrations moved up one). Comments only; migrate() is byte-identical.
+const NATIVE_MIGRATE_MODULE_SHA256 = "cd15d5983a857b49df2ab3447340524c7f22812e145472d2dd62fcaeb6d1a23c";
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
 // ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK and the rethrow after it, then the one retried
 // SQLSTATE). A6 review (2026-10-22): its doc gained one sentence (a step holds its locks until COMMIT; 2 s bounds each

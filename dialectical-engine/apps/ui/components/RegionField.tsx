@@ -35,7 +35,9 @@ function onActionKey(event: ReactKeyboardEvent<HTMLButtonElement>, action: () =>
   }
 }
 
-export function RegionField({ catalog, locale, value, onChange, disabled, errorId }: Readonly<{
+export function RegionField({
+  catalog, locale, value, onChange, disabled, errorId, idPrefix = "signup-region", label, placeholder, askUsState = true
+}: Readonly<{
   catalog: MessageCatalog;
   locale: string;
   value: RegionPick;
@@ -43,7 +45,18 @@ export function RegionField({ catalog, locale, value, onChange, disabled, errorI
   disabled: boolean;
   /** The id of the error shown under the picker, while one is shown. */
   errorId?: string;
+  /** The ids' prefix, so a page other than sign-up (the pricing page) can hold its own picker. */
+  idPrefix?: string;
+  /** The visible label and the empty trigger's text; sign-up's "Region" and "Select your region" by default. */
+  label?: string;
+  placeholder?: string;
+  /** Sign-up asks a US resident's state; the pricing page asks the postal code instead, as the checkout does. */
+  askUsState?: boolean;
 }>): JSX.Element {
+  const triggerId = `${idPrefix}-trigger`;
+  const popoverId = `${idPrefix}-popover`;
+  const valueId = `${idPrefix}-value`;
+  const stateId = `${idPrefix}-state`;
   const [open, setOpen] = useState(false);
   const [continent, setContinent] = useState<RegionContinent | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
@@ -110,28 +123,28 @@ export function RegionField({ catalog, locale, value, onChange, disabled, errorI
       const last = wrapperRef.current?.querySelector(".regionContinent:last-of-type, .regionCountry:last-of-type");
       if ((!event.shiftKey && event.target === last) || (event.shiftKey && event.target === triggerRef.current)) setOpen(false);
     }}>
-      <label htmlFor="signup-region-trigger">{t(catalog, "auth.region.label")}</label>
+      <label htmlFor={triggerId}>{label ?? t(catalog, "auth.region.label")}</label>
       <div className="regionPicker">
       <button
         type="button"
-        id="signup-region-trigger"
+        id={triggerId}
         className="regionTrigger"
         ref={triggerRef}
         aria-expanded={open}
-        aria-controls={open ? "signup-region-popover" : undefined}
+        aria-controls={open ? popoverId : undefined}
         // The label names the button "Region"; the chosen country (or the placeholder) and any error
         // are its description, so a screen reader says what is picked.
-        aria-describedby={errorId ? `signup-region-value ${errorId}` : "signup-region-value"}
+        aria-describedby={errorId ? `${valueId} ${errorId}` : valueId}
         disabled={disabled}
         onClick={toggle}
       >
         {value.country === null ? null : <span className="regionFlag">{regionFlag(value.country)}</span>}
-        <span className="regionName" id="signup-region-value">{value.country === null ? t(catalog, "auth.region.placeholder") : regionCountryName(value.country, locale)}</span>
+        <span className="regionName" id={valueId}>{value.country === null ? placeholder ?? t(catalog, "auth.region.placeholder") : regionCountryName(value.country, locale)}</span>
         {value.country === null || pickedContinent === null ? null : <span className="regionPath">{continentName(catalog, pickedContinent)} · {value.country}</span>}
         <span className="regionChevron" aria-hidden="true">▾</span>
       </button>
       {open ? (
-        <div className="regionPopover" id="signup-region-popover">
+        <div className="regionPopover" id={popoverId}>
           {continent === null ? (
             <>
               <div className="regionHeader">{t(catalog, "auth.region.continentHeader")}</div>
@@ -173,10 +186,10 @@ export function RegionField({ catalog, locale, value, onChange, disabled, errorI
         </div>
       ) : null}
       </div>
-      {value.country === "US" ? (
+      {askUsState && value.country === "US" ? (
         <div className="regionState">
-          <label htmlFor="signup-region-state">{t(catalog, "auth.region.stateLabel")}</label>
-          <select id="signup-region-state" name="us-state" className="regionStateSelect" data-state={value.usState === "" ? "bad" : "ok"} value={value.usState} disabled={disabled} onChange={(event) => onChange({ country: "US", usState: event.target.value })}>
+          <label htmlFor={stateId}>{t(catalog, "auth.region.stateLabel")}</label>
+          <select id={stateId} name="us-state" className="regionStateSelect" data-state={value.usState === "" ? "bad" : "ok"} value={value.usState} disabled={disabled} onChange={(event) => onChange({ country: "US", usState: event.target.value })}>
             <option value="">{t(catalog, "auth.region.statePlaceholder")}</option>
             {US_STATES.map(({ code, name }) => <option value={code} key={code}>{name}</option>)}
           </select>

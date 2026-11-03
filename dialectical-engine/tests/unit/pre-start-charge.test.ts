@@ -1,7 +1,7 @@
 /**
  * V4 start step, Task 17 (spec 2026-11-03 §5.2): the small AIs before Start (the angle planner, the list writers, the
  * merges, the combine and the fit check) are charged as PRE_START: run-less, written only by
- * identity.record_pre_start_charge (0154), in the person's windows through their own reader, and in the person's export
+ * identity.record_pre_start_charge (0155), in the person's windows through their own reader, and in the person's export
  * as the time and the kind only, never the cost or the person's key.
  */
 import { describe, expect, it } from "vitest";

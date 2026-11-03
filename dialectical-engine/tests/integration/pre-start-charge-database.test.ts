@@ -8,7 +8,7 @@ import { ASK_CLARIFY_SPEND_REF } from "../../apps/api/src/ask-clarify.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
- * 0154 on real PostgreSQL (V4 start step, plan 2026-11-03 Task 18; spec §5.2): the small AIs before Start count in the person's day, week and month,
+ * 0155 on real PostgreSQL (V4 start step, plan 2026-11-03 Task 18; spec §5.2): the small AIs before Start count in the person's day, week and month,
  * in a team member's grant and in the team's one limit, and in the site's day; the row holds the person, the kind, the cost and the time; an erased
  * account takes its rows; the export gets the times and the kinds only; no request role reads the table. Data is made up.
  */
@@ -70,7 +70,7 @@ afterAll(async () => {
   await database?.stop();
 });
 
-describe("0154: the charge reaches every reader", () => {
+describe("0155: the charge reaches every reader", () => {
   it("the API's login finds the writer; another role does not", async () => {
     expect(await preStartChargeWriterPresent(runner)).toBe(true);
     expect(await preStartChargeWriterPresent(erasure)).toBe(false);
@@ -120,7 +120,7 @@ describe("0154: the charge reaches every reader", () => {
   });
 });
 
-describe("0154: the writer's refusals", () => {
+describe("0155: the writer's refusals", () => {
   it("a kind its reference does not name, free text, a far day: refused, nothing written", async () => {
     const ana = await account();
     expect((await sqlError(() => recordPreStartCharge(runner, { ...entry(ana.ownerRef, 1, "LIST"), kind: "FIT" }))).code).toBe("23514");
@@ -157,7 +157,7 @@ describe("0154: the writer's refusals", () => {
   });
 });
 
-describe("0154: erasure, export and the roles", () => {
+describe("0155: erasure, export and the roles", () => {
   it("an erased account takes its rows; the ledger's row, naming nobody, stays in the site's day", async () => {
     const ana = await account();
     const made = entry(ana.ownerRef, 5);

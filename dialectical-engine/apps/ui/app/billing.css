@@ -24,3 +24,7 @@
 .billingStatus { margin-top: 18px; }
 .billingCardFrame { min-height: 180px; margin-top: 12px; }
 .billingActions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+/* Terms §12: the place the cards are priced for (the country, and the US or Canadian postal code). */
+.pricingPlace { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-top: 24px; }
+.pricingPlace .billingField { margin-top: 0; min-width: min(100%, 220px); }
+.pricingUnpriced { font-size: 15px; font-weight: 500; color: var(--muted); }

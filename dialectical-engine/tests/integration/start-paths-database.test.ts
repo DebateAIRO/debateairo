@@ -1,5 +1,5 @@
 // tests/integration/start-paths-database.test.ts
-// V4 start step, Task 20 (spec 2026-11-03 §4): the paths a person chose at Start, on real PostgreSQL through 0155's definers, sealed under the
+// V4 start step, Task 20 (spec 2026-11-03 §4): the paths a person chose at Start, on real PostgreSQL through 0156's definers, sealed under the
 // debate's own key by PostgresStartPathsStore on the runner's login; the carry-on marks; the definers' refusals; and no role reading a table.
 // Data is made up.
 import { randomUUID } from "node:crypto";

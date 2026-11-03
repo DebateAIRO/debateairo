@@ -93,6 +93,26 @@ describe("NETOPIA's check: billing on with every country closed for payment", ()
           { plan_id: "MAX", net_prices: { USD: "200.00", EUR: "200.00", RON: "1000.00" } }
         ]
       });
+      // Terms §12, through the runtime's own reader and the stack's tax engine: each country's price with its own tax
+      // (this stack prices every country in US dollars), even while no country may pay. The US, whose tax depends on
+      // the state or province, is priced once the visitor gives a postal code (Texas: 6.25 %), and asks for one until then.
+      if (country === "US") {
+        expect(plans.body.place, country).toEqual({ country: "US", postal_code: null, status: "POSTAL_CODE_NEEDED" });
+        expect(plans.body.tax, country).toBeNull();
+        const texas = await stack.get(null, "/v1/billing/plans?postal_code=75201", TEST_IPS[country]);
+        expect(texas.body.place).toEqual({ country: "US", postal_code: "75201", status: "PRICED" });
+        expect((texas.body.plans as Array<{ total_price: unknown }>).map((plan) => plan.total_price))
+          .toEqual(["0.00", "21.25", "53.13", "212.50"]);
+        expect((plans.body.plans as Array<{ total_price: unknown }>).map((plan) => plan.total_price), country)
+          .toEqual([null, null, null, null]);
+        continue;
+      }
+      const rate = ({ RO: 2_100, DE: 1_900 } as Readonly<Record<string, number>>)[country];
+      const plus = ({ RO: "24.20", DE: "23.80" } as Readonly<Record<string, string>>)[country];
+      expect(plans.body, country).toMatchObject({
+        tax: { country, tax_rate_bp: rate },
+        plans: [{ total_price: "0.00" }, { total_price: plus }, {}, {}]
+      });
     }
   });
 

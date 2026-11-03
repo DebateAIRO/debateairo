@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Pe scurt
-eyebrow: TERMENII SERVICIULUI · v2.12 · ÎN VIGOARE DE LA 1 NOIEMBRIE 2026
+eyebrow: TERMENII SERVICIULUI · v2.14 · ÎN VIGOARE DE LA 1 NOIEMBRIE 2026
 title: Ce acceptați
 lede: Contractul dintre dumneavoastră și DMS Merchandise Shop S.R.L., într-un limbaj clar. Nouăsprezece secțiuni și Anexa A — derulați până la final.
-endMarker: SFÂRȘITUL TERMENILOR · v2.12
+endMarker: SFÂRȘITUL TERMENILOR · v2.14
 bodyLabel: Textul Termenilor serviciului
 annexTitle: Anexa A — Termeni regionali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEGEA APLICABILĂ
 -->
 
-**Version 2.12 · Effective 1 noiembrie 2026 · Versiunile anterioare la dezbatere.ro/terms/versions · Limba: română.**
+**Version 2.14 · Effective 1 noiembrie 2026 · Versiunile anterioare la dezbatere.ro/terms/versions · Limba: română.**
 
 **In short.** Trebuie să aveți cel puțin 18 ani. Dialectical Engine construiește argumente cu modele de inteligență artificială, iar tot ceea ce generează poate fi greșit — nu constituie consultanță. Pe planul gratuit, dezbaterile dumneavoastră sunt publice după ce se încheie, în urma unei verificări cu IA; pe un plan cu plată, sunt private dacă nu le publicați. Odată publică, o dezbatere poate fi citită de oricine și rămâne publică. Textul pe care îl transmiteți este trimis furnizorilor de IA enumerați în Registrul furnizorilor de IA și nu este folosit pentru antrenarea modelelor. Raportați conținutul ilegal la support@dezbatere.ro, indiferent dacă aveți sau nu un cont. Se aplică legea română, însă protecția locală a consumatorilor de care beneficiați se menține.
 
@@ -215,7 +215,7 @@ Secțiunile 8 (în ceea ce privește conținutul deja publicat), 15, 16 și 18 c
 
 Dialectical Engine oferă un plan gratuit. Un plan cu plată **Premium** va fi disponibil, care deblochează întreaga gamă de modele și vă permite să configurați personal indicatorii dezbaterii.
 
-**Înainte de a plăti**, vă afișăm, direct deasupra butonului de plată: planul; prețul total, inclusiv taxele aplicabile; perioada de facturare; faptul că planul se reînnoiește automat până la anulare; data la care se încheie orice perioadă de încercare gratuită și suma care vă va fi percepută ulterior; precum și modalitatea de anulare. Confirmați condițiile de reînnoire bifând o casetă separată. Butonul are textul **Comandă cu obligație de plată**. Vă trimitem, pe un suport durabil, o confirmare care conține aceleași informații, acești Termeni și formularul de retragere.
+**Înainte de a plăti**, vă afișăm, direct deasupra butonului de plată: planul; prețul total, inclusiv taxele aplicabile; perioada de facturare; faptul că planul se reînnoiește automat până la anulare; data la care se încheie orice perioadă de încercare gratuită și suma care vă va fi percepută ulterior; precum și modalitatea de anulare. Confirmați condițiile de reînnoire bifând o casetă separată. Butonul are textul **Abonați-vă și plătiți**. Vă trimitem, pe un suport durabil, o confirmare care conține aceleași informații, acești Termeni și formularul de retragere.
 
 **Mementouri.** Vă trimitem un e-mail cu cel puțin 5 zile înainte ca o perioadă de încercare gratuită să se transforme într-un plan cu plată; cel puțin o dată pe an pentru planurile care continuă; și cu 30 până la 45 de zile înainte de orice reînnoire a unui termen de douăsprezece luni sau mai mult. Fiecare memento include prețul, data și un link de anulare.
 
@@ -250,6 +250,10 @@ Dacă locuiți în altă parte, Anexa A precizează dreptul de retragere sau per
 Vă informăm în avans, pe un suport durabil, ce se modifică și când. Dacă modificarea are un efect negativ mai mult decât minor asupra accesului la serviciu sau a utilizării acestuia, puteți înceta contractul fără costuri în termen de **30 de zile** de la informare sau de la data la care modificarea produce efecte, luându-se în considerare data mai recentă, iar noi rambursăm orice sumă plătită în avans pentru perioada neutilizată.
 
 **Cu privire la acești Termeni.** Putem modifica acești Termeni pentru aceleași tipuri de motive. Pentru modificările care nu vă reduc drepturile, publicăm noua versiune însoțită de un rezumat al modificărilor și vă trimitem un e-mail cu cel puțin **30 de zile** înainte ca aceasta să producă efecte; continuarea utilizării Dialectical Engine după data respectivă înseamnă că o acceptați și vă puteți închide contul înainte de acea dată. Pentru modificările care vă reduc drepturile — inclusiv majorarea prețurilor unui plan existent, reducerea limitelor, eliminarea unor funcții, noi utilizări ale conținutului dumneavoastră sau modificări privind răspunderea, legea aplicabilă ori soluționarea litigiilor — vă solicităm să acceptați în mod expres noua versiune la următoarea autentificare, iar modificarea se aplică numai pentru viitor. Nu aplicăm niciodată retroactiv o modificare și nu folosim niciodată această secțiune pentru a modifica, pe parcursul termenului, esența serviciului pentru care ați plătit fără să vă oferim o posibilitate de încetare. Versiunile anterioare rămân disponibile la dezbatere.ro/terms/versions.
+
+Versiunea 2.14 a înlocuit versiunea 2.13: secțiunea 18 și Anexa A indică ANPC (SAL) drept cale pentru soluționarea alternativă a litigiilor.
+
+Versiunea 2.13 a înlocuit versiunea 2.12: secțiunea 12 arată că butonul de plată are textul *Abonați-vă și plătiți*.
 
 Versiunea 2.12 a înlocuit versiunea 2.11: secțiunea 10 arată că o persoană autentificată poate folosi și butonul Raportare de pe orice dezbatere publică, că o IA citește o raportare făcută cu acesta alături de textul public și ce se întâmplă atunci.
 
@@ -297,7 +301,7 @@ Modul în care prelucrăm datele cu caracter personal este descris în **Politic
 
 **Consumatorii din alte regiuni.** Dacă locuiți în afara UE și a SEE, nicio dispoziție din acești Termeni nu limitează vreun drept conferit de legislația țării dumneavoastră de a formula o pretenție în fața instanțelor acesteia ori vreun drept prevăzut de legislația respectivă la care nu se poate renunța — inclusiv, dacă locuiți în Australia sau Noua Zeelandă, drepturile dumneavoastră privind garanțiile pentru consumatori; dacă locuiți în Brazilia, *Código de Defesa do Consumidor*; iar dacă locuiți în Statele Unite, legislația statului dumneavoastră privind protecția consumatorilor.
 
-**Înainte de a vă adresa instanței.** Contactați-ne la support@dezbatere.ro; majoritatea problemelor pot fi remediate, iar obiectivul nostru este să răspundem în termen de 5 zile lucrătoare. Dacă sunteți consumator în România sau în UE, puteți recurge la soluționarea alternativă a litigiilor prin www.onoratainstanta.ro; nu ne angajăm să participăm la procedura respectivă. Reclamațiile referitoare la deciziile de moderare urmează procedura din secțiunea 10, care este o cale separată.
+**Înainte de a vă adresa instanței.** Contactați-ne la support@dezbatere.ro; majoritatea problemelor pot fi remediate, iar obiectivul nostru este să răspundem în termen de 5 zile lucrătoare. Dacă sunteți consumator în România sau în UE, puteți recurge la soluționarea alternativă a litigiilor prin ANPC (SAL), reclamatiisal.anpc.ro; nu ne angajăm să participăm la procedura respectivă. Reclamațiile referitoare la deciziile de moderare urmează procedura din secțiunea 10, care este o cale separată.
 
 ## 19. Alte clauze
 
@@ -319,7 +323,7 @@ Fiecare intrare se aplică persoanelor care locuiesc în regiunea respectivă ș
 
 ### A.1 Uniunea Europeană și Spațiul Economic European
 
-Corpul acestor Termeni este redactat pentru dumneavoastră. În plus: puteți introduce acțiuni în fața instanțelor din țara în care locuiți; se aplică dreptul de retragere din secțiunea 13; soluționarea alternativă a litigiilor este disponibilă prin www.onoratainstanta.ro. **Germania:** butonul de anulare de la dezbatere.ro/cancel vă permite să încetați un abonament fără autentificare; durata abonamentelor, perioadele de reînnoire și termenele de notificare respectă §309(9) BGB: fiecare plan se derulează pe o durată de o lună și se reînnoiește lunar până la anulare, și îl puteți anula oricând, cu efect de la sfârșitul lunii în curs. **Franța:** puteți înceta online un abonament în trei pași la dezbatere.ro/cancel. **Italia:** clauzele privind suspendarea și încetarea (11), planurile cu plată și reînnoirea lor (12), modificările (14), răspunderea (15) și legea aplicabilă și instanțele competente pentru soluționarea litigiilor (18) necesită aprobarea dumneavoastră specifică, în temeiul articolelor 1341 și 1342 din Codul civil italian. O acordați printr-o căsuță separată la înregistrare, afișată oricui alege Italia în câmpul „Regiune” sau a cărui conexiune provine din Italia. **Țările de Jos:** acești Termeni vă sunt furnizați într-o formă care poate fi stocată înainte de încheiere. **Polonia:** o versiune în limba polonă este disponibilă; alegeți Polski în selectorul de limbă.
+Corpul acestor Termeni este redactat pentru dumneavoastră. În plus: puteți introduce acțiuni în fața instanțelor din țara în care locuiți; se aplică dreptul de retragere din secțiunea 13; soluționarea alternativă a litigiilor este disponibilă prin ANPC (SAL), reclamatiisal.anpc.ro. **Germania:** butonul de anulare de la dezbatere.ro/cancel vă permite să încetați un abonament fără autentificare; durata abonamentelor, perioadele de reînnoire și termenele de notificare respectă §309(9) BGB: fiecare plan se derulează pe o durată de o lună și se reînnoiește lunar până la anulare, și îl puteți anula oricând, cu efect de la sfârșitul lunii în curs. **Franța:** puteți înceta online un abonament în trei pași la dezbatere.ro/cancel. **Italia:** clauzele privind suspendarea și încetarea (11), planurile cu plată și reînnoirea lor (12), modificările (14), răspunderea (15) și legea aplicabilă și instanțele competente pentru soluționarea litigiilor (18) necesită aprobarea dumneavoastră specifică, în temeiul articolelor 1341 și 1342 din Codul civil italian. O acordați printr-o căsuță separată la înregistrare, afișată oricui alege Italia în câmpul „Regiune” sau a cărui conexiune provine din Italia. **Țările de Jos:** acești Termeni vă sunt furnizați într-o formă care poate fi stocată înainte de încheiere. **Polonia:** o versiune în limba polonă este disponibilă; alegeți Polski în selectorul de limbă.
 
 ### A.2 Statele Unite
 
@@ -331,7 +335,7 @@ Corpul acestor Termeni este redactat pentru dumneavoastră. În plus: puteți in
 
 ### A.3 Canada și Quebec
 
-Responsabilul nostru cu protecția vieții private, iar în Quebec persoana responsabilă cu protecția informațiilor cu caracter personal, este administratorul nostru, care poate fi contactat la privacy@dezbatere.ro. Politica noastră de confidențialitate, Anexa B.3, se referă la datele dumneavoastră. **Quebec:** acești Termeni sunt disponibili în limba franceză; alegeți limba franceză din selectorul de limbă; setările care vă mențin dezbaterile private sunt activate în mod implicit; puteți solicita dezindexarea informațiilor cu caracter personal despre dumneavoastră.
+Responsabilul nostru cu protecția vieții private, iar în Quebec persoana responsabilă cu protecția informațiilor cu caracter personal, este administratorul nostru, care poate fi contactat la privacy@dezbatere.ro. Politica noastră de confidențialitate, Anexa B.3, se referă la datele dumneavoastră. **Quebec:** acești Termeni sunt disponibili în limba franceză; dacă alegeți Canada la înregistrare, îi primiți mai întâi în limba franceză și puteți alege în schimb limba engleză; setările care vă mențin dezbaterile private sunt activate în mod implicit; puteți solicita dezindexarea informațiilor cu caracter personal despre dumneavoastră.
 
 ### A.4 Australia și Noua Zeelandă
 

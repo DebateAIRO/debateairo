@@ -225,7 +225,7 @@ describe("the legal notice states the company and seller details from one consta
     const view = renderNotice("en");
     const hrefs = [...view.querySelectorAll("a")].map((link) => link.getAttribute("href") ?? "");
     expect(hrefs).toContain(ADR_URL);
-    expect(ADR_URL).toBe("https://www.onoratainstanta.ro");
+    expect(ADR_URL).toBe("https://reclamatiisal.anpc.ro/");
     expect(hrefs).toEqual(
       expect.arrayContaining(["/ai-transparency", "/terms#legal-section-13", "/terms#legal-section-18", "/terms", "/privacy", "/cookies", "/providers"])
     );
@@ -320,11 +320,11 @@ describe("the text pages render the same documents as the sign-up modals", () =>
 
 describe("the terms versions page lists only versions that exist", () => {
   it("names the current and previous versions, linking each to its text", () => {
-    expect(TERMS_VERSIONS).toHaveLength(12);
+    expect(TERMS_VERSIONS).toHaveLength(14);
     expect(TERMS_OF_SERVICE.eyebrow).toContain(`v${TERMS_VERSIONS[0]?.version}`);
     const view = render(<LegalVersionsBody legalCatalog={legalEnglish} />);
     const rows = view.querySelectorAll(".legalVersionRow");
-    expect(rows).toHaveLength(12);
+    expect(rows).toHaveLength(14);
     expect(rows[0]?.querySelector("a")?.getAttribute("href")).toBe("/terms");
     expect(rows[1]?.querySelector("a")?.getAttribute("href")).toBe(TERMS_VERSIONS[1]?.href);
     expect(view.querySelector(".legalVersionsNone")).toBeNull();

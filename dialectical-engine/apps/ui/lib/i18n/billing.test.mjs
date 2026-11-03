@@ -11,7 +11,8 @@ import { assertLocalizedCatalog, assertTranslationSample } from "./catalogContra
 // with the usage bars; P18 adds its pages' keys and its files to `ownedFiles`.
 const root = process.cwd();
 const ownedFiles = [
-  "components/billing/UsageBars.tsx", "components/billing/PricingCards.tsx", "app/pricing/page.tsx",
+  "components/billing/UsageBars.tsx", "components/billing/PricingCards.tsx", "components/billing/PricingPlaceForm.tsx",
+  "app/pricing/page.tsx", "lib/billing/format.ts",
   "components/billing/ChargeStatusPoller.tsx",
   "components/billing/CheckoutFlow.tsx", "app/checkout/page.tsx", "app/checkout/return/page.tsx",
   "components/billing/SubscriptionControls.tsx", "components/billing/CardChangeFlow.tsx", "app/settings/card/page.tsx",
@@ -87,11 +88,13 @@ const catalogue = (locale) => JSON.parse(source(`messages/${locale}/billing.json
 const REQUIRED = [
   "billing.plans.FREE.name", "billing.plans.PLUS.name", "billing.plans.PRO.name", "billing.plans.MAX.name",
   "billing.pricing.eyebrow", "billing.pricing.title", "billing.pricing.lede", "billing.pricing.perMonth",
-  "billing.pricing.plusTax", "billing.pricing.currencyNote", "billing.pricing.allowanceFree", "billing.pricing.allowancePlus", "billing.pricing.allowance",
+  "billing.pricing.taxIncluded", "billing.pricing.noTaxAdded", "billing.pricing.chooseCountry", "billing.pricing.enterPostalCode",
+  "billing.pricing.showPrices", "billing.pricing.currencyNote", "billing.pricing.allowanceFree", "billing.pricing.allowancePlus", "billing.pricing.allowance",
   "billing.pricing.freeFeatures", "billing.pricing.paidFeatures", "billing.pricing.startFree", "billing.pricing.choose",
   "billing.pricing.unavailable", "billing.pricing.faqTitle", "billing.pricing.faqLimitsQuestion",
   "billing.pricing.faqLimitsAnswer", "billing.pricing.faqCancelQuestion", "billing.pricing.faqCancelAnswer",
-  "billing.pricing.faqTaxQuestion", "billing.pricing.faqTaxAnswer", "billing.pricing.termsLink", "billing.pricing.privacyLink",
+  "billing.pricing.faqTaxQuestionIncluded", "billing.pricing.faqTaxAnswerIncluded", "billing.pricing.faqTaxAnswerNoTax",
+  "billing.pricing.faqTaxAnswerChoose", "billing.pricing.termsLink", "billing.pricing.privacyLink",
   "billing.checkout.eyebrow", "billing.checkout.title", "billing.checkout.country", "billing.checkout.region",
   "billing.checkout.postalCode", "billing.checkout.city", "billing.checkout.county",
   "billing.checkout.billingTitle", "billing.checkout.billingNote", "billing.checkout.firstName", "billing.checkout.lastName",
@@ -101,7 +104,7 @@ const REQUIRED = [
   "billing.checkout.companyToggle", "billing.checkout.companyName",
   "billing.checkout.companyVatId", "billing.checkout.companyAddress", "billing.checkout.companyIncomplete",
   "billing.checkout.showPrice", "billing.checkout.quoting",
-  "billing.checkout.countryUnavailable", "billing.checkout.regionUnavailable", "billing.checkout.confirmCountry", "billing.checkout.confirmCountryYes",
+  "billing.checkout.countryUnavailable", "billing.checkout.regionUnavailable", "billing.checkout.regionTermsExcluded", "billing.checkout.confirmCountry", "billing.checkout.confirmCountryYes",
   "billing.checkout.confirmCountryRequired",
   "billing.checkout.taxLabel", "billing.checkout.taxReverseCharge", "billing.checkout.noTax", "billing.checkout.total",
   "billing.consent.renewal", "billing.consent.immediateStart", "billing.checkout.continueToCard",
@@ -128,7 +131,8 @@ const REQUIRED = [
   "billing.subscription.cancel", "billing.subscription.cancelConfirm", "billing.subscription.cancelConfirmPastDue",
   "billing.subscription.cancelConfirmSuspended", "billing.subscription.wontRenew",
   "billing.subscription.cancelYes", "billing.subscription.keep",
-  "billing.subscription.revoke", "billing.subscription.withdraw", "billing.subscription.withdrawHint",
+  "billing.subscription.revoke", "billing.subscription.withdraw", "billing.subscription.withdrawSocialOnly",
+  "billing.subscription.withdrawHint",
   "billing.subscription.stepUpHint", "billing.subscription.password", "billing.subscription.code",
   "billing.subscription.stepUpExpired",
   "billing.subscription.withdrawConfirm", "billing.subscription.withdrawDone", "billing.subscription.withdrawRefused",
@@ -174,6 +178,8 @@ test("the closed-region and postal-code refusals read exactly as the owner appro
   assert.equal(english["billing.checkout.regionUnavailable"], "Paid plans aren't available in your region yet. You can keep using the Free plan.");
   // BILLING_POSTCODE_INVALID (422): the postal code does not fit its country's format.
   assert.equal(english["billing.checkout.postalCodeInvalid"], "Please check your postal code.");
+  // REGION_TERMS_EXCLUDED (403): the billing address is in a region the Terms exclude (the owner's choice of 3 Nov 2026).
+  assert.equal(english["billing.checkout.regionTermsExcluded"], "We don't offer Dialectical Engine in Tennessee, so we can't take payment for this address.");
 });
 
 test("Romanian names the order button as Terms §12 requires", () => {
@@ -324,9 +330,9 @@ const PREVIOUS_PROCESSOR = new RegExp(["x", "money"].join(""), "iu");
 test("every locale names NETOPIA Payments where it names the card processor, and never the previous one", () => {
   const english = catalogue("en");
   assert.equal(english["billing.checkout.cardNote"], "You pay on NETOPIA Payments' secure page. Your card number never reaches our servers.");
-  assert.equal(english["billing.checkout.continueToCard"], "Continue to payment");
+  assert.equal(english["billing.checkout.continueToCard"], "Subscribe and pay");
   assert.equal(english["billing.checkout.formUnavailable"], "The payment page could not be opened. Please try again in a minute.");
-  assert.equal(catalogue("ro")["billing.checkout.continueToCard"], "Comandă cu obligație de plată");
+  assert.equal(catalogue("ro")["billing.checkout.continueToCard"], "Abonați-vă și plătiți");
   assert.equal(english["billing.card.countryRefused"], "We can't accept cards issued in that card's country. Nothing was charged, and your plan keeps the card it had.");
   assert.equal(JSON.parse(source("messages/en/legal.json"))["legal.notice.s04.payments"],
     "We accept Visa and Mastercard; we do not accept American Express. Card payments are processed by NETOPIA Payments. We never see or store your full card number.");

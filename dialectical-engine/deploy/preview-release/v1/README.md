@@ -1187,7 +1187,7 @@ Start a short debate as usual: it must finish as it did in local mode.
 
 As in `deploy/vps/README.md` §14.9 step 1, without the clock move. On an account whose address is
 allow-listed: open the pricing page, choose Plus, pick the United States as the country, answer the
-"Do you live in …" question with yes, give a state, press **Continue to payment**, and on NETOPIA's
+"Do you live in …" question with yes, give a state, press **Subscribe and pay**, and on NETOPIA's
 sandbox page pay with the test card 9900 0048 1022 5098 (any future expiry, CVV 111). Expect: back on
 the site, the plan active within seconds; the confirmation (M1, with the Terms attached) and the
 receipt (M2) at that allow-listed inbox; Settings shows the saved card; the invoice in Quaderno's

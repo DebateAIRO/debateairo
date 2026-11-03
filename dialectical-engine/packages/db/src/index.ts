@@ -43,9 +43,9 @@ export * from "./web-evidence.js";
 export * from "./investigations.js";
 // The new dig model and the month pause (migration 0134, dig-model revision task W2-8).
 export * from "./dig-model.js";
-// The paths a person chose at Start and the carry-on marks (migration 0155, V4 start step Task 20).
+// The paths a person chose at Start and the carry-on marks (migration 0156, V4 start step Task 20).
 export * from "./start-paths.js";
-// A path debate's results per path (migration 0156, V4 start step Task 21).
+// A path debate's results per path (migration 0157, V4 start step Task 21).
 export * from "./path-results.js";
 export * from "./pool-budget.js";
 export * from "./release-state.js";

@@ -98,7 +98,7 @@ tests/integration/team-limit-http.test.ts
 tests/integration/team-limit-admission.test.ts
 # Step 2's small AI in the person's quota (0144): both rows, every spending reader, erasure, export, no request role reads them.
 tests/integration/ask-clarify-charge-database.test.ts
-# The small AIs before Start in the person's quota (0154): both rows, the kind check, every spending reader, erasure, export, no request role reads them.
+# The small AIs before Start in the person's quota (0155): both rows, the kind check, every spending reader, erasure, export, no request role reads them.
 tests/integration/pre-start-charge-database.test.ts
 # "Add to researched" (0145): the page read and charged once, its note and quote kept through the wipe, a stranger refused, 30 days later.
 tests/integration/web-researched-database.test.ts

@@ -36,6 +36,7 @@ apps/api/src/billing/checkout.ts
 apps/api/src/billing/codes.ts
 apps/api/src/billing/connectors.ts
 apps/api/src/billing/dead-jobs.ts
+apps/api/src/billing/displayed-tax.ts
 apps/api/src/billing/dispute-cli.ts
 apps/api/src/billing/efactura-status-cli.ts
 apps/api/src/billing/email-job.ts
@@ -638,6 +639,7 @@ apps/ui/components/billing/ChargeStatusPoller.tsx
 apps/ui/components/billing/CheckoutFlow.tsx
 apps/ui/components/billing/LegalAcceptGate.tsx
 apps/ui/components/billing/PricingCards.tsx
+apps/ui/components/billing/PricingPlaceForm.tsx
 apps/ui/components/billing/ResetSentence.tsx
 apps/ui/components/billing/RoomNotice.tsx
 apps/ui/components/billing/SubscriptionControls.tsx
@@ -650,6 +652,7 @@ apps/ui/components/consent/LegalDocumentModal.tsx
 apps/ui/components/consent/LegalDocumentsProvider.tsx
 apps/ui/components/consent/PrivacyPolicyModal.tsx
 apps/ui/components/consent/TermsOfServiceModal.tsx
+apps/ui/components/consent/canadaLegalLanguage.ts
 apps/ui/components/consent/modalSemantics.ts
 apps/ui/components/consent/useConsentCatalog.ts
 apps/ui/components/consent/useLegalDocument.ts
@@ -1132,6 +1135,7 @@ packages/db/src/migration-forward0153.ts
 packages/db/src/migration-forward0154.ts
 packages/db/src/migration-forward0155.ts
 packages/db/src/migration-forward0156.ts
+packages/db/src/migration-forward0157.ts
 packages/db/src/migration-forward108.ts
 packages/db/src/migration-forward110.ts
 packages/db/src/migration-forward111.ts

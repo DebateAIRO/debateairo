@@ -39,6 +39,11 @@ const PLANS = {
   ]
 };
 
+/** GET /v1/account/auth-methods: the withdrawal button needs the password and authenticator pair ("password_totp"). */
+function authMethods(available: ReadonlyArray<"passkey" | "password_totp" | "provider">) {
+  return { methods: [], recovery_codes_remaining: 10, available_step_up_methods: [...available], step_up_providers: [] };
+}
+
 let container: HTMLDivElement;
 let root: Root;
 let client: { [K in keyof SubscriptionClient]: ReturnType<typeof vi.fn> };
@@ -54,7 +59,8 @@ beforeEach(() => {
     quoteSubscriptionUpgrade: vi.fn(), upgradeSubscription: vi.fn(), downgradeSubscription: vi.fn(async () => undefined),
     cancelSubscription: vi.fn(async () => undefined), revokeSubscriptionCancel: vi.fn(async () => undefined),
     withdrawSubscription: vi.fn(), stepUp: vi.fn(), getBillingCharge: vi.fn(),
-    getBillingPlans: vi.fn(async () => PLANS)
+    getBillingPlans: vi.fn(async () => PLANS),
+    authMethods: vi.fn(async () => authMethods(["password_totp"]))
   };
 });
 afterEach(() => {
@@ -117,7 +123,7 @@ describe("P20 SubscriptionControls (S1)", () => {
     await render();
     expect(text()).toContain("Plan: Plus");
     expect(text()).toContain("Renews on October 29, 2026 for $24.20");
-    for (const label of ["Change plan", "Cancel", "Withdraw"]) expect(button(label), label).toBeDefined();
+    for (const label of ["Change plan", "Cancel", "Withdraw from contract here"]) expect(button(label), label).toBeDefined();
     expect(container.querySelector('a[href="/settings/card"]')?.textContent).toBe("Update card");
     expect(text()).toContain("DBAI 0042 · October 1, 2026 · $24.20");
     expect(container.querySelector('a[href="https://quadernoapp.com/i/abc"]')?.textContent).toBe("Open");
@@ -151,11 +157,11 @@ describe("P20 SubscriptionControls (S1)", () => {
     });
     client.withdrawSubscription.mockResolvedValue({ refund: "18.00", currency: "USD" });
     await render();
-    await click("Withdraw");
+    await click("Withdraw from contract here");
     expect(text()).toContain("You can withdraw until October 13, 2026.");
     await fill("#billing-withdraw-password", "correct horse");
     await fill("#billing-withdraw-code", "123456");
-    await click("Withdraw and refund");
+    await click("Confirm withdrawal");
     expect(client.stepUp).toHaveBeenCalledWith("correct horse", "123456", { action: "WITHDRAW_SUBSCRIPTION" });
     expect(client.withdrawSubscription).toHaveBeenCalledWith("G".repeat(43));
     // W9 (P2-I11): only what has happened; the refund is on its way, and M8 says when it is done.
@@ -176,10 +182,10 @@ describe("P20 SubscriptionControls (S1)", () => {
       root = createRoot(container);
       client.withdrawSubscription.mockResolvedValueOnce({ refund, currency: "USD" });
       await render();
-      await click("Withdraw");
+      await click("Withdraw from contract here");
       await fill("#billing-withdraw-password", "correct horse");
       await fill("#billing-withdraw-code", "123456");
-      await click("Withdraw and refund");
+      await click("Confirm withdrawal");
       expect(text(), String(refund)).toContain(sentence);
       expect(text(), String(refund)).not.toContain("$0.00");
       expect(text(), String(refund)).not.toContain("We refunded");
@@ -189,10 +195,10 @@ describe("P20 SubscriptionControls (S1)", () => {
   it("refuses to withdraw without the right grant, and hides Withdraw once the window closed", async () => {
     client.stepUp.mockResolvedValue({ status: "step_up_complete", csrf_token: "c".repeat(43) });
     await render();
-    await click("Withdraw");
+    await click("Withdraw from contract here");
     await fill("#billing-withdraw-password", "x");
     await fill("#billing-withdraw-code", "123456");
-    await click("Withdraw and refund");
+    await click("Confirm withdrawal");
     expect(client.withdrawSubscription).not.toHaveBeenCalled();
     expect(text()).toContain("The withdrawal couldn't be completed.");
     act(() => root.unmount());
@@ -201,7 +207,42 @@ describe("P20 SubscriptionControls (S1)", () => {
       subscription: subscription({ withdrawal_open_until: "2026-10-01T00:00:00.000Z", withdrawal_last_day: "2026-09-30" })
     });
     await render();
-    expect(button("Withdraw")).toBeUndefined();
+    expect(button("Withdraw from contract here")).toBeUndefined();
+  });
+
+  it("words the button and its confirmation as Romania's withdrawal rules require, and asks for the password and code", async () => {
+    await render();
+    await click("Withdraw from contract here");
+    expect(text()).toContain("To withdraw, enter your password and the code from your authenticator app.");
+    expect(container.querySelector<HTMLInputElement>("#billing-withdraw-password")?.required).toBe(true);
+    expect(container.querySelector<HTMLInputElement>("#billing-withdraw-code")?.required).toBe(true);
+    expect(button("Confirm withdrawal")).toBeDefined();
+  });
+
+  it("gives an account created through social sign-in no withdrawal button, only the email route", async () => {
+    client.authMethods.mockResolvedValue(authMethods(["passkey", "provider"]));
+    await render();
+    expect(button("Withdraw from contract here")).toBeUndefined();
+    expect(container.querySelector("#billing-withdraw-password")).toBeNull();
+    const note = container.querySelector("[data-withdraw-social-only]");
+    expect(note?.textContent).toContain("Accounts created with Google, Apple, Facebook or X can't withdraw here");
+    expect(note?.textContent).toMatch(/to \S+@\S+\. We carry it out/u);
+    expect(client.stepUp).not.toHaveBeenCalled();
+  });
+
+  it("keeps the button when the sign-in methods can't be read (the server still demands the password and code)", async () => {
+    client.authMethods.mockRejectedValue(new ContractHttpError("UNAVAILABLE", 503, "x"));
+    await render();
+    expect(button("Withdraw from contract here")).toBeDefined();
+    expect(container.querySelector("[data-withdraw-social-only]")).toBeNull();
+  });
+
+  it("asks for the sign-in methods only while a withdrawal is still possible", async () => {
+    client.getBillingSubscription.mockResolvedValue({
+      subscription: subscription({ withdrawal_open_until: null, withdrawal_last_day: null })
+    });
+    await render();
+    expect(client.authMethods).not.toHaveBeenCalled();
   });
 
   it("names the window's last day in the person's calendar, not the UTC day of its closing instant", async () => {
@@ -210,7 +251,7 @@ describe("P20 SubscriptionControls (S1)", () => {
       subscription: subscription({ withdrawal_open_until: "2026-11-16T00:00:00.000Z", withdrawal_last_day: "2026-11-15" })
     });
     await render();
-    await click("Withdraw");
+    await click("Withdraw from contract here");
     expect(text()).toContain("You can withdraw until November 15, 2026.");
     expect(text()).not.toContain("November 16, 2026");
   });
@@ -493,7 +534,9 @@ describe("P20 SubscriptionControls (S1)", () => {
   it("words a refused upgrade quote and a refused downgrade by what the server said, before any money moves", async () => {
     for (const [failure, sentence] of [
       [new ContractHttpError("SERVER_FAILURE", 409, "x", "UPGRADE_NOT_AVAILABLE_NOW"), "Your plan is about to renew, so an upgrade can't start right now."],
-      [new ContractHttpError("SERVER_FAILURE", 409, "x", "ACCOUNT_ERASURE_PENDING"), "Your account is scheduled for deletion."]
+      [new ContractHttpError("SERVER_FAILURE", 409, "x", "ACCOUNT_ERASURE_PENDING"), "Your account is scheduled for deletion."],
+      // A subscriber whose stored billing address is in a region the Terms exclude (Tennessee).
+      [new ContractHttpError("FORBIDDEN", 403, "x", "REGION_TERMS_EXCLUDED"), "We don't offer Dialectical Engine in Tennessee, so we can't take payment for this address."]
     ] as const) {
       act(() => root.unmount());
       root = createRoot(container);
@@ -650,10 +693,10 @@ describe("P20 SubscriptionControls (S1)", () => {
       root = createRoot(container);
       client.withdrawSubscription.mockRejectedValueOnce(failure);
       await render();
-      await click("Withdraw");
+      await click("Withdraw from contract here");
       await fill("#billing-withdraw-password", "correct horse");
       await fill("#billing-withdraw-code", "123456");
-      await click("Withdraw and refund");
+      await click("Confirm withdrawal");
       expect(text(), String(failure.serverCode ?? failure.status)).toContain(sentence);
       expect(text(), String(failure.serverCode ?? failure.status)).not.toContain("Check your password");
     }
@@ -662,10 +705,10 @@ describe("P20 SubscriptionControls (S1)", () => {
     root = createRoot(container);
     client.stepUp.mockRejectedValueOnce(new ContractHttpError("SESSION_REQUIRED", 401, "x"));
     await render();
-    await click("Withdraw");
+    await click("Withdraw from contract here");
     await fill("#billing-withdraw-password", "wrong");
     await fill("#billing-withdraw-code", "000000");
-    await click("Withdraw and refund");
+    await click("Confirm withdrawal");
     expect(text()).toContain("Check your password and code, then try again.");
   });
 
@@ -709,7 +752,7 @@ describe("P20 SubscriptionControls (S1)", () => {
     await render();
     expect(text()).toContain("Plan: Plus");
     expect(text()).toContain("That didn't work. Please try again.");
-    for (const label of ["Change plan", "Cancel", "Withdraw"]) expect(button(label), label).toBeDefined();
+    for (const label of ["Change plan", "Cancel", "Withdraw from contract here"]) expect(button(label), label).toBeDefined();
     expect(text()).not.toContain("You're on the Free plan.");
     expect(text()).not.toContain("No invoices yet.");
     expect(container.querySelector('a[href="/pricing"]')).toBeNull();

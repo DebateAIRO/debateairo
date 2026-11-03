@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ukratko
-eyebrow: UVJETI KORIŠTENJA · v2.12 · NA SNAZI OD 1. STUDENOGA 2026.
+eyebrow: UVJETI KORIŠTENJA · v2.14 · NA SNAZI OD 1. STUDENOGA 2026.
 title: Na što pristajete
 lede: Ugovor između vas i društva DMS Merchandise Shop S.R.L., jednostavnim jezikom. Devetnaest odjeljaka i Prilog A — pomaknite se do kraja.
-endMarker: KRAJ UVJETA · v2.12
+endMarker: KRAJ UVJETA · v2.14
 bodyLabel: Tekst Uvjeta korištenja
 annexTitle: Prilog A — Regionalni uvjeti
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 MJERODAVNO PRAVO
 -->
 
-**Version 2.12 · Effective 1. studenoga 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
+**Version 2.14 · Effective 1. studenoga 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
 
 **In short.** Morate imati najmanje 18 godina. Dialectical Engine izrađuje argumente pomoću modela umjetne inteligencije i sve što generira može biti pogrešno — to nije savjet. Na besplatnom planu vaše su rasprave javne kada završe, nakon provjere umjetnom inteligencijom; na plaćenom planu privatne su osim ako ih objavite. Kada je rasprava javna, svatko je može pročitati i ona ostaje javna. Tekst koji pošaljete prosljeđuje se pružateljima usluga umjetne inteligencije navedenima u našem Registru pružatelja i ne upotrebljava se za treniranje modela. Nezakonit sadržaj prijavite na support@dezbatere.ro, bez obzira na to imate li račun. Primjenjuje se rumunjsko pravo, ali zadržavate zaštitu potrošača prema svojem lokalnom pravu.
 
@@ -215,7 +215,7 @@ Odjeljci 8. (u odnosu na već objavljeni sadržaj), 15., 16. i 18. nastavljaju s
 
 Dialectical Engine nudi besplatni plan. Bit će dostupan plaćeni plan **Premium**, koji će otključati cijeli popis modela i omogućiti vam da sami postavite mjerače rasprave.
 
-**Prije plaćanja** neposredno iznad gumba za plaćanje prikazujemo vam: plan; ukupnu cijenu s primjenjivim porezom; obračunsko razdoblje; činjenicu da se plan automatski obnavlja do otkazivanja; datum završetka eventualnog besplatnog probnog razdoblja i iznos koji će vam se tada naplatiti; te način otkazivanja. Uvjete obnavljanja potvrđujete označavanjem zasebnog polja. Na gumbu piše **Pretplatite se i platite** (na rumunjskom *Comandă cu obligație de plată*). Na trajnom mediju šaljemo vam potvrdu koja sadržava iste informacije, ove Uvjete i obrazac za odustanak.
+**Prije plaćanja** neposredno iznad gumba za plaćanje prikazujemo vam: plan; ukupnu cijenu s primjenjivim porezom; obračunsko razdoblje; činjenicu da se plan automatski obnavlja do otkazivanja; datum završetka eventualnog besplatnog probnog razdoblja i iznos koji će vam se tada naplatiti; te način otkazivanja. Uvjete obnavljanja potvrđujete označavanjem zasebnog polja. Na gumbu piše **Pretplatite se i platite** (na rumunjskom *Abonați-vă și plătiți*). Na trajnom mediju šaljemo vam potvrdu koja sadržava iste informacije, ove Uvjete i obrazac za odustanak.
 
 **Podsjetnici.** Šaljemo vam e-poruku najmanje 5 dana prije nego što se besplatno probno razdoblje pretvori u plaćeni plan; najmanje jednom godišnje za trajne planove; i između 30 i 45 dana prije svakog obnavljanja razdoblja od dvanaest mjeseci ili duljeg. Svaki podsjetnik sadržava cijenu, datum i poveznicu za otkazivanje.
 
@@ -250,6 +250,10 @@ Ako živite drugdje, Prilog A navodi pravo na odustanak ili razdoblje za odustan
 Na trajnom mediju unaprijed vas obavještavamo što se mijenja i kada. Ako promjena ima više nego neznatan negativan učinak na vaš pristup usluzi ili njezinu uporabu, možete bez naknade raskinuti ugovor u roku od **30 dana** od obavijesti ili od stupanja promjene na snagu, ovisno o tome što je kasnije, a mi ćemo vratiti svaki unaprijed plaćeni iznos za neiskorišteno razdoblje.
 
 **Promjene ovih Uvjeta.** Ove Uvjete možemo mijenjati zbog istih vrsta razloga. Za promjene koje ne umanjuju vaša prava objavljujemo novu verziju sa sažetkom promjena i šaljemo vam e-poruku najmanje **30 dana** prije njezina stupanja na snagu; nastavak uporabe Dialectical Engine-a nakon tog datuma znači da je prihvaćate, a prije toga možete zatvoriti račun. Za promjene koje umanjuju vaša prava — uključujući povećanja cijena postojećeg plana, niža ograničenja, uklonjene značajke, nove načine uporabe vašeg sadržaja ili promjene odgovornosti, mjerodavnog prava ili rješavanja sporova — tražimo da izričito prihvatite novu verziju pri sljedećoj prijavi, a promjena se primjenjuje samo ubuduće. Promjenu nikada ne primjenjujemo retroaktivno i ovaj odjeljak nikada ne upotrebljavamo za izmjenu bitnog sadržaja onoga što ste platili usred razdoblja bez omogućavanja izlaska iz ugovora. Prethodne verzije ostaju dostupne na dezbatere.ro/terms/versions.
+
+Verzija 2.14 zamijenila je verziju 2.13: odjeljak 18. i Prilog A navode ANPC (SAL) kao put za alternativno rješavanje sporova.
+
+Verzija 2.13 zamijenila je verziju 2.12: odjeljak 12. navodi rumunjski tekst gumba za plaćanje.
 
 Verzija 2.12 zamijenila je verziju 2.11: odjeljak 10. navodi da prijavljena osoba može upotrijebiti i gumb Prijavite na bilo kojoj javnoj raspravi, da umjetna inteligencija čita prijavu podnesenu tim gumbom uz javni tekst i što se tada događa.
 
@@ -297,7 +301,7 @@ Način na koji postupamo s osobnim podacima utvrđen je u **Pravilima o privatno
 
 **Potrošači drugdje.** Ako živite izvan EU-a i EGP-a, ništa u ovim Uvjetima ne ograničava bilo koje pravo koje imate prema pravu svoje države da podnesete zahtjev njezinim sudovima niti bilo koje pravo kojeg se prema tom pravu ne možete odreći — uključujući, ako živite u Australiji ili Novom Zelandu, prava iz jamstava za potrošače; ako živite u Brazilu, prava iz zakona Código de Defesa do Consumidor; i ako živite u Sjedinjenim Američkim Državama, prava iz zakona vaše savezne države o zaštiti potrošača.
 
-**Prije obraćanja sudu.** Obratite nam se na support@dezbatere.ro; većina se stvari može riješiti, a cilj nam je odgovoriti u roku od 5 radnih dana. Ako ste potrošač u Rumunjskoj ili EU-u, možete se koristiti alternativnim rješavanjem sporova putem www.onoratainstanta.ro; ne obvezujemo se sudjelovati u tom postupku. Pritužbe na odluke o moderiranju podnose se prema odjeljku 10., što je zaseban postupak.
+**Prije obraćanja sudu.** Obratite nam se na support@dezbatere.ro; većina se stvari može riješiti, a cilj nam je odgovoriti u roku od 5 radnih dana. Ako ste potrošač u Rumunjskoj ili EU-u, možete se koristiti alternativnim rješavanjem sporova putem ANPC (SAL), reclamatiisal.anpc.ro; ne obvezujemo se sudjelovati u tom postupku. Pritužbe na odluke o moderiranju podnose se prema odjeljku 10., što je zaseban postupak.
 
 ## 19. Ostali uvjeti
 
@@ -319,7 +323,7 @@ Svaka se stavka primjenjuje na osobe koje žive u njezinoj regiji i navodi samo 
 
 ### A.1 Europska unija i Europski gospodarski prostor
 
-Opći dio ovih Uvjeta napisan je za vas. Dodatno: postupak možete pokrenuti pred sudovima države u kojoj živite; primjenjuje se pravo na odustanak iz odjeljka 13.; alternativno rješavanje sporova dostupno je putem www.onoratainstanta.ro. **Njemačka:** gumb za otkazivanje na dezbatere.ro/cancel omogućuje vam raskid pretplate bez prijave; trajanje pretplate, razdoblja obnavljanja i otkazni rokovi u skladu su s §309(9) BGB-a: svaki plan traje jedan mjesec i obnavlja se svaki mjesec dok ga ne otkažete, a možete ga otkazati u bilo kojem trenutku s učinkom od kraja tekućeg mjeseca. **Francuska:** pretplatu možete raskinuti putem interneta u tri koraka na dezbatere.ro/cancel. **Italija:** odredbe o suspenziji i prestanku (11.), plaćenim planovima i njihovu obnavljanju (12.), promjenama (14.), odgovornosti (15.) te mjerodavnom pravu i mjestu rješavanja sporova (18.) zahtijevaju vaše posebno odobrenje na temelju članaka 1341. i 1342. talijanskog Građanskog zakonika. Dajete ga zasebnim poljem pri registraciji, koje se prikazuje svakome tko u polju Regija odabere Italiju ili čija veza dolazi iz Italije. **Nizozemska:** ovi Uvjeti dostavljaju se prije sklapanja u obliku koji se može pohraniti. **Poljska:** dostupna je poljska verzija; odaberite Polski u izborniku jezika.
+Opći dio ovih Uvjeta napisan je za vas. Dodatno: postupak možete pokrenuti pred sudovima države u kojoj živite; primjenjuje se pravo na odustanak iz odjeljka 13.; alternativno rješavanje sporova dostupno je putem ANPC (SAL), reclamatiisal.anpc.ro. **Njemačka:** gumb za otkazivanje na dezbatere.ro/cancel omogućuje vam raskid pretplate bez prijave; trajanje pretplate, razdoblja obnavljanja i otkazni rokovi u skladu su s §309(9) BGB-a: svaki plan traje jedan mjesec i obnavlja se svaki mjesec dok ga ne otkažete, a možete ga otkazati u bilo kojem trenutku s učinkom od kraja tekućeg mjeseca. **Francuska:** pretplatu možete raskinuti putem interneta u tri koraka na dezbatere.ro/cancel. **Italija:** odredbe o suspenziji i prestanku (11.), plaćenim planovima i njihovu obnavljanju (12.), promjenama (14.), odgovornosti (15.) te mjerodavnom pravu i mjestu rješavanja sporova (18.) zahtijevaju vaše posebno odobrenje na temelju članaka 1341. i 1342. talijanskog Građanskog zakonika. Dajete ga zasebnim poljem pri registraciji, koje se prikazuje svakome tko u polju Regija odabere Italiju ili čija veza dolazi iz Italije. **Nizozemska:** ovi Uvjeti dostavljaju se prije sklapanja u obliku koji se može pohraniti. **Poljska:** dostupna je poljska verzija; odaberite Polski u izborniku jezika.
 
 ### A.2 Sjedinjene Američke Države
 
@@ -331,7 +335,7 @@ Opći dio ovih Uvjeta napisan je za vas. Dodatno: postupak možete pokrenuti pre
 
 ### A.3 Kanada i Quebec
 
-Naš službenik za privatnost, a u Quebecu osoba odgovorna za zaštitu osobnih podataka, jest naš direktor, dostupan na privacy@dezbatere.ro. Vaše podatke uređuje Prilog B.3 naših Pravila o privatnosti. **Quebec:** ovi su Uvjeti dostupni na francuskom jeziku; odaberite francuski u izborniku jezika; postavke kojima se vaše rasprave zadržavaju privatnima uključene su prema zadanom; možete zatražiti uklanjanje osobnih informacija o sebi iz rezultata pretraživanja.
+Naš službenik za privatnost, a u Quebecu osoba odgovorna za zaštitu osobnih podataka, jest naš direktor, dostupan na privacy@dezbatere.ro. Vaše podatke uređuje Prilog B.3 naših Pravila o privatnosti. **Quebec:** ovi su Uvjeti dostupni na francuskom jeziku; ako pri registraciji odaberete Kanadu, najprije ćete ih dobiti na francuskom, a umjesto toga možete odabrati engleski; postavke kojima se vaše rasprave zadržavaju privatnima uključene su prema zadanom; možete zatražiti uklanjanje osobnih informacija o sebi iz rezultata pretraživanja.
 
 ### A.4 Australija i Novi Zeland
 

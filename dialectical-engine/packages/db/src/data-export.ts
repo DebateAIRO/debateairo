@@ -147,7 +147,7 @@ const WORKER_FUNCTIONS = [
   "identity.read_data_export_path_suggestions(uuid,uuid)",
   // When step 2's small AI read the person's question (0144): wired, into account.json.
   "identity.read_data_export_ask_clarify(uuid,uuid)",
-  // When the small AIs before Start ran for the person (0154): wired, into account.json, the time and the kind only.
+  // When the small AIs before Start ran for the person (0155): wired, into account.json, the time and the kind only.
   "identity.read_data_export_pre_start(uuid,uuid)",
   // The reports the person made with the Report button (0152): wired, into account.json. The words stay under the debate's publication key.
   "identity.read_data_export_public_flags(uuid,uuid)",

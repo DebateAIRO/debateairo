@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Trumpai
-eyebrow: PASLAUGŲ TEIKIMO SĄLYGOS · v2.12 · ĮSIGALIOJA 2026 M. LAPKRIČIO 1 D.
+eyebrow: PASLAUGŲ TEIKIMO SĄLYGOS · v2.14 · ĮSIGALIOJA 2026 M. LAPKRIČIO 1 D.
 title: Su kuo sutinkate
 lede: Jūsų ir DMS Merchandise Shop S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.
-endMarker: SĄLYGŲ PABAIGA · v2.12
+endMarker: SĄLYGŲ PABAIGA · v2.14
 bodyLabel: Paslaugų teikimo sąlygų tekstas
 annexTitle: A priedas — Regioninės sąlygos
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TAIKYTINA TEISĖ
 -->
 
-**Version 2.12 · Effective 2026 m. lapkričio 1 d. · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
+**Version 2.14 · Effective 2026 m. lapkričio 1 d. · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
 
 **In short.** Turite būti ne jaunesni kaip 18 metų. Dialectical Engine kuria argumentus naudodama DI modelius, todėl viskas, ką ji sugeneruoja, gali būti klaidinga — tai nėra konsultacija. Nemokamame plane jūsų debatai tampa vieši, kai jie baigiami, po DI patikros; mokamame plane jie yra privatūs, nebent juos paskelbiate. Viešus tapusius debatus gali skaityti bet kas, ir jie lieka vieši. Jūsų pateiktas tekstas siunčiamas mūsų Paslaugų teikėjų registre nurodytiems DI paslaugų teikėjams ir nenaudojamas modeliams mokyti. Apie neteisėtą turinį praneškite adresu support@dezbatere.ro, nesvarbu, ar turite paskyrą. Taikoma Rumunijos teisė, tačiau jums ir toliau taikoma vietos vartotojų apsauga.
 
@@ -215,7 +215,7 @@ Nutraukus sutartį toliau taikomi 8 skyrius (jau paskelbtam turiniui), 15, 16 ir
 
 Dialectical Engine siūlo nemokamą planą. Mokamas planas **Premium** bus prieinamas; jis suteikia prieigą prie viso modelių sąrašo ir leidžia patiems nustatyti debatų parametrus.
 
-**Prieš jums mokant** tiesiai virš mokėjimo mygtuko parodome: planą; bendrą kainą su taikomais mokesčiais; atsiskaitymo laikotarpį; tai, kad planas automatiškai atnaujinamas, kol jo neatšaukiate; nemokamo bandomojo laikotarpio pabaigos datą ir po jos mokėtiną sumą; ir kaip atšaukti planą. Atnaujinimo sąlygas patvirtinate pažymėdami atskirą langelį. Ant mygtuko parašyta **Prenumeruoti ir mokėti** (rumunų kalba — *Comandă cu obligație de plată*). Patvariojoje laikmenoje atsiunčiame patvirtinimą su ta pačia informacija, šiomis Sąlygomis ir sutarties atsisakymo forma.
+**Prieš jums mokant** tiesiai virš mokėjimo mygtuko parodome: planą; bendrą kainą su taikomais mokesčiais; atsiskaitymo laikotarpį; tai, kad planas automatiškai atnaujinamas, kol jo neatšaukiate; nemokamo bandomojo laikotarpio pabaigos datą ir po jos mokėtiną sumą; ir kaip atšaukti planą. Atnaujinimo sąlygas patvirtinate pažymėdami atskirą langelį. Ant mygtuko parašyta **Prenumeruoti ir mokėti** (rumunų kalba — *Abonați-vă și plătiți*). Patvariojoje laikmenoje atsiunčiame patvirtinimą su ta pačia informacija, šiomis Sąlygomis ir sutarties atsisakymo forma.
 
 **Priminimai.** El. paštu jums primename bent prieš 5 dienas iki nemokamo bandomojo laikotarpio pakeitimo mokamu planu; bent kartą per metus, jei planas tęstinis; ir likus 30–45 dienoms iki dvylikos mėnesių ar ilgesnio laikotarpio atnaujinimo. Kiekviename priminime nurodoma kaina, data ir pateikiama atšaukimo nuoroda.
 
@@ -250,6 +250,10 @@ Jei gyvenate kitur, A priede nurodyta jūsų regione taikoma teisė atsisakyti s
 Patvariojoje laikmenoje iš anksto pranešame, kas ir kada keisis. Jei pakeitimas turi didesnį nei nedidelį neigiamą poveikį jūsų prieigai prie paslaugos ar naudojimuisi ja, galite nemokamai nutraukti sutartį per **30 dienų** nuo pranešimo gavimo arba pakeitimo įsigaliojimo dienos, atsižvelgiant į tai, kuri data vėlesnė, o mes grąžinsime visas iš anksto už nepanaudotą laikotarpį sumokėtas sumas.
 
 **Šių Sąlygų pakeitimai.** Šias Sąlygas galime keisti dėl tokių pačių priežasčių. Jei pakeitimai nesumažina jūsų teisių, paskelbiame naują versiją su pakeitimų santrauka ir išsiunčiame jums el. laišką bent prieš **30 dienų** iki jos įsigaliojimo; jei po tos dienos toliau naudositės Dialectical Engine, tai reikš, kad su pakeitimais sutinkate, o iki tol galite uždaryti paskyrą. Jei pakeitimais sumažinamos jūsų teisės — įskaitant esamo plano kainos padidinimą, mažesnes ribas, pašalintas funkcijas, naujus jūsų turinio naudojimo būdus arba atsakomybės, taikytinos teisės ar ginčų sprendimo pakeitimus — kitą kartą prisijungus prašome aiškiai sutikti su nauja versija, o pakeitimas taikomas tik ateityje. Niekada netaikome pakeitimo atgaline data ir niekada nesinaudojame šiuo skyriumi tam, kad sutarties laikotarpio viduryje pakeistume esminius dalykus, už kuriuos sumokėjote, nepasiūlydami galimybės atsisakyti sutarties. Ankstesnes versijas galima rasti adresu dezbatere.ro/terms/versions.
+
+2.14 versija pakeitė 2.13 versiją: 18 skyriuje ir A priede alternatyvaus ginčų sprendimo keliu nurodyta ANPC (SAL).
+
+2.13 versija pakeitė 2.12 versiją: 12 skyriuje nurodytas mokėjimo mygtuko užrašas rumunų kalba.
 
 2.12 versija pakeitė 2.11 versiją: 10 skyriuje nurodyta, kad prisijungęs asmuo taip pat gali naudoti mygtuką Pranešti bet kuriame viešame debate, kad DI perskaito pranešimą, pateiktą jį naudojant, šalia viešo teksto, ir kas tada įvyksta.
 
@@ -297,7 +301,7 @@ Kaip tvarkome asmens duomenis, nustatyta **Privatumo politikoje** adresu dezbate
 
 **Kitur gyvenantys vartotojai.** Jei gyvenate ne ES ar EEE, jokia šių Sąlygų nuostata neriboja pagal jūsų šalies teisę turimos teisės pareikšti ieškinį jos teismuose ar teisės, kurios pagal tos šalies teisę negalima atsisakyti — įskaitant Australijoje ar Naujojoje Zelandijoje gyvenančių asmenų teises pagal vartotojų garantijas, Brazilijoje gyvenančių asmenų teises pagal *Código de Defesa do Consumidor* ir Jungtinėse Amerikos Valstijose gyvenančių asmenų teises pagal jų valstijos vartotojų apsaugos įstatymus.
 
-**Prieš kreipiantis į teismą.** Susisiekite su mumis adresu support@dezbatere.ro; daugumą dalykų galima išspręsti ir siekiame atsakyti per 5 darbo dienas. Jei esate vartotojas Rumunijoje arba ES, galite naudotis alternatyviu ginčų sprendimu per www.onoratainstanta.ro; mes neįsipareigojame dalyvauti šioje procedūroje. Skundams dėl moderavimo sprendimų taikoma 10 skyriuje nustatyta atskira tvarka.
+**Prieš kreipiantis į teismą.** Susisiekite su mumis adresu support@dezbatere.ro; daugumą dalykų galima išspręsti ir siekiame atsakyti per 5 darbo dienas. Jei esate vartotojas Rumunijoje arba ES, galite naudotis alternatyviu ginčų sprendimu per ANPC (SAL), reclamatiisal.anpc.ro; mes neįsipareigojame dalyvauti šioje procedūroje. Skundams dėl moderavimo sprendimų taikoma 10 skyriuje nustatyta atskira tvarka.
 
 ## 19. Kitos sąlygos
 
@@ -319,7 +323,7 @@ Kiekvienas įrašas taikomas žmonėms, gyvenantiems jo regione, ir jame nurodom
 
 ### A.1 Europos Sąjunga ir Europos ekonominė erdvė
 
-Pagrindinė šių Sąlygų dalis parengta jums. Be to: galite iškelti bylą šalies, kurioje gyvenate, teismuose; taikoma 13 skyriuje nustatyta teisė atsisakyti sutarties; alternatyviu ginčų sprendimu galima pasinaudoti per www.onoratainstanta.ro. **Vokietija:** naudodamiesi atšaukimo mygtuku adresu dezbatere.ro/cancel galite nutraukti prenumeratą neprisijungę; prenumeratos sąlygos, atnaujinimo laikotarpiai ir įspėjimo terminai atitinka BGB §309(9): kiekvienas planas galioja vieną mėnesį ir kas mėnesį atnaujinamas, kol jo neatšauksite; atšaukti galite bet kada, o atšaukimas įsigalioja einamojo mėnesio pabaigoje. **Prancūzija:** galite internetu trimis veiksmais nutraukti prenumeratą adresu dezbatere.ro/cancel. **Italija:** sustabdymo ir nutraukimo (11), mokamų planų ir jų atnaujinimo (12), pakeitimų (14), atsakomybės (15) bei taikytinos teisės ir ginčų nagrinėjimo vietos (18) nuostatoms pagal Italijos civilinio kodekso 1341 ir 1342 straipsnius būtinas konkretus jūsų pritarimas. Jį duodate registruodamiesi pažymėdami atskirą langelį; jis rodomas kiekvienam, kuris lauke „Regionas“ pasirenka Italiją arba jungiasi iš Italijos. **Nyderlandai:** prieš sudarant sutartį šios Sąlygos pateikiamos forma, kurią galima išsaugoti. **Lenkija:** pateikiama ir versija lenkų kalba; kalbos perjungikliu pasirinkite Polski.
+Pagrindinė šių Sąlygų dalis parengta jums. Be to: galite iškelti bylą šalies, kurioje gyvenate, teismuose; taikoma 13 skyriuje nustatyta teisė atsisakyti sutarties; alternatyviu ginčų sprendimu galima pasinaudoti per ANPC (SAL), reclamatiisal.anpc.ro. **Vokietija:** naudodamiesi atšaukimo mygtuku adresu dezbatere.ro/cancel galite nutraukti prenumeratą neprisijungę; prenumeratos sąlygos, atnaujinimo laikotarpiai ir įspėjimo terminai atitinka BGB §309(9): kiekvienas planas galioja vieną mėnesį ir kas mėnesį atnaujinamas, kol jo neatšauksite; atšaukti galite bet kada, o atšaukimas įsigalioja einamojo mėnesio pabaigoje. **Prancūzija:** galite internetu trimis veiksmais nutraukti prenumeratą adresu dezbatere.ro/cancel. **Italija:** sustabdymo ir nutraukimo (11), mokamų planų ir jų atnaujinimo (12), pakeitimų (14), atsakomybės (15) bei taikytinos teisės ir ginčų nagrinėjimo vietos (18) nuostatoms pagal Italijos civilinio kodekso 1341 ir 1342 straipsnius būtinas konkretus jūsų pritarimas. Jį duodate registruodamiesi pažymėdami atskirą langelį; jis rodomas kiekvienam, kuris lauke „Regionas“ pasirenka Italiją arba jungiasi iš Italijos. **Nyderlandai:** prieš sudarant sutartį šios Sąlygos pateikiamos forma, kurią galima išsaugoti. **Lenkija:** pateikiama ir versija lenkų kalba; kalbos perjungikliu pasirinkite Polski.
 
 ### A.2 Jungtinės Amerikos Valstijos
 
@@ -331,7 +335,7 @@ Pagrindinė šių Sąlygų dalis parengta jums. Be to: galite iškelti bylą ša
 
 ### A.3 Kanada ir Kvebekas
 
-Mūsų privatumo pareigūnas, o Kvebeke — už asmeninės informacijos apsaugą atsakingas asmuo, yra mūsų direktorius, su kuriuo galite susisiekti adresu privacy@dezbatere.ro. Jūsų duomenims taikomas mūsų Privatumo politikos B priedo B.3 skirsnis. **Kvebekas:** šios Sąlygos pateikiamos prancūzų kalba; prancūzų kalbą pasirinkite kalbos perjungikliu; nustatymai, pagal kuriuos jūsų debatai lieka privatūs, yra įjungti pagal numatytuosius nustatymus; galite prašyti pašalinti jūsų asmeninę informaciją iš indeksų.
+Mūsų privatumo pareigūnas, o Kvebeke — už asmeninės informacijos apsaugą atsakingas asmuo, yra mūsų direktorius, su kuriuo galite susisiekti adresu privacy@dezbatere.ro. Jūsų duomenims taikomas mūsų Privatumo politikos B priedo B.3 skirsnis. **Kvebekas:** šios Sąlygos pateikiamos prancūzų kalba; jei registruodamiesi pasirinksite Kanadą, pirmiausia jas gausite prancūzų kalba, o vietoj jos galėsite pasirinkti anglų kalbą; nustatymai, pagal kuriuos jūsų debatai lieka privatūs, yra įjungti pagal numatytuosius nustatymus; galite prašyti pašalinti jūsų asmeninę informaciją iš indeksų.
 
 ### A.4 Australija ir Naujoji Zelandija
 

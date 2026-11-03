@@ -1,32 +1,20 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import type { PoolClient } from "pg";
-import type { ForwardStepAnchor, ForwardStepPlan, PostconditionAmendment } from "./migration-forward-chain.js";
+import type { ForwardStepAnchor, ForwardStepPlan } from "./migration-forward-chain.js";
 
 /**
- * 0154, the small AIs before Start count in the person's quota (V4 start step; plan 2026-11-03 Task 18; drained): one row per call naming the
- * person, the kind, the cost and the time, its writer and readers, and 0144's two readers taught to count it. It pins the objects it creates and
- * the two it redefines; it keeps 0130's verifier.
+ * 0154, Iceland and Liechtenstein in the sign-up's Region list (expand): 0095's country CHECK on
+ * identity.registration_region widened by IS and LI, NOT VALID. No table, function or grant is added.
  */
-const NAME = "0154_pre_start_charge.sql";
-const VERSION = "pre-start-charge-forward0154-v1";
-const MANIFEST_PATH = "lineage/pre-start-charge-forward0154.json";
+const NAME = "0154_region_iceland_liechtenstein.sql";
+const VERSION = "region-iceland-liechtenstein-forward0154-v1";
+const MANIFEST_PATH = "lineage/region-iceland-liechtenstein-forward0154.json";
 const VERIFIER_PATH = "lineage/verify-effective-capabilities-130.sql";
 const PREVIOUS = "0153_dig_tree_settled.sql";
-const TABLES = ["identity.pre_start_charge"] as const;
-const FUNCTIONS = [
-  "identity.guard_pre_start_charge()",
-  "identity.record_pre_start_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint)",
-  "ledger.refuse_pre_start_spend_outside_writer()",
-  "identity.read_pre_start_spent(uuid,timestamptz,timestamptz)",
-  "billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean)",
-  "staff.read_team_internal_spent(timestamptz,timestamptz)",
-  "identity.read_data_export_pre_start(uuid,uuid)"
-] as const;
-/** 0140's and 0144's digests both pin the two readers this step teaches the new kind, so it declares both (0130's route). The manifest carries the same list. */
-const READERS = Object.freeze(["billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean)", "staff.read_team_internal_spent(timestamptz,timestamptz)"]);
-const AMENDS: readonly PostconditionAmendment[] = Object.freeze(["0140_internal_spend_kinds.sql", "0144_ask_clarify_charge.sql"].map((step) =>
-  Object.freeze({ step, functions: READERS, field: "function_definition" as const })));
+const TABLE = "identity.registration_region";
+const CONSTRAINT = "registration_region_country_code_check";
+const AMENDS: readonly never[] = [];
 const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0154_${detail}`); };
 const sha = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
 const exactKeys = (value: unknown, keys: readonly string[]): value is Record<string, unknown> =>
@@ -35,36 +23,15 @@ const exactKeys = (value: unknown, keys: readonly string[]): value is Record<str
 const digest = (value: unknown): value is string => typeof value === "string" && /^[0-9a-f]{64}$/u.test(value);
 
 /**
- * The 1 table (owner, ACL, columns, constraints, indexes, triggers), the 7 functions (owner, definer, body, ACL), and what it adds to
- * ledger.model_spend, as 0128's: the writer-only trigger (the only barrier for a login whose row security admits a run-less row) and the
- * run-less CHECK. Not the shared source CHECK, which later steps widen.
+ * The CHECK's name, table and kind. Its code list is pinned by tests (registration-region-database B2), not digested,
+ * as 0125 leaves its own CHECKs, so a later step may widen the list again without a postcondition drift on 0154.
  */
 async function postconditionEvidence(client: PoolClient): Promise<string> {
-  const tables = (await client.query(`
-    SELECT relation,pg_get_userbyid(c.relowner) owner,c.relkind,c.relpersistence,c.relrowsecurity rls,c.relforcerowsecurity force_rls,
-      (SELECT jsonb_agg(g.item ORDER BY g.item) FROM (SELECT pg_get_userbyid(a.grantee)||':'||a.privilege_type||':'||a.is_grantable::text item FROM aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a) g) acl,
-      (SELECT jsonb_agg(jsonb_build_object('name',a.attname,'type',format_type(a.atttypid,a.atttypmod),'required',a.attnotnull,'acl',a.attacl::text,'default',pg_get_expr(d.adbin,d.adrelid)) ORDER BY a.attnum) FROM pg_attribute a LEFT JOIN pg_attrdef d ON d.adrelid=a.attrelid AND d.adnum=a.attnum WHERE a.attrelid=c.oid AND a.attnum>0 AND NOT a.attisdropped) columns,
-      (SELECT jsonb_agg(k.conname||':'||pg_get_constraintdef(k.oid) ORDER BY k.conname) FROM pg_constraint k WHERE k.conrelid=c.oid) constraints,
-      (SELECT jsonb_agg(pg_get_indexdef(i.indexrelid) ORDER BY pg_get_indexdef(i.indexrelid)) FROM pg_index i WHERE i.indrelid=c.oid) indexes,
-      (SELECT jsonb_agg(t.tgname||':'||t.tgenabled::text||':'||pg_get_triggerdef(t.oid) ORDER BY t.tgname) FROM pg_trigger t WHERE t.tgrelid=c.oid AND NOT t.tgisinternal) triggers
-    FROM unnest($1::text[]) relation JOIN pg_class c ON c.oid=to_regclass(relation) ORDER BY relation`, [TABLES])).rows;
-  if (tables.length !== TABLES.length) return fail("POSTCONDITION_OBJECTS");
-  const functions = (await client.query(`
-    SELECT signature,pg_get_userbyid(p.proowner) owner,p.prosecdef definer,p.proconfig config,p.provolatile volatility,
-      encode(sha256(convert_to(pg_get_functiondef(p.oid),'UTF8')),'hex') definition,
-      (SELECT jsonb_agg(g.item ORDER BY g.item) FROM (SELECT coalesce(pg_get_userbyid(nullif(a.grantee,0)),'PUBLIC')||':'||a.privilege_type||':'||a.is_grantable::text item FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a) g) acl
-    FROM unnest($1::text[]) signature JOIN pg_proc p ON p.oid=to_regprocedure(signature) ORDER BY signature`, [FUNCTIONS])).rows;
-  if (functions.length !== FUNCTIONS.length) return fail("POSTCONDITION_OBJECTS");
-  const trigger = (await client.query(`
-    SELECT t.tgname,t.tgenabled,pg_get_triggerdef(t.oid) definition
-    FROM pg_trigger t WHERE t.tgrelid='ledger.model_spend'::regclass
-      AND t.tgname='pre_start_spend_writer_only'`)).rows;
-  const check = (await client.query(`
-    SELECT k.conname,pg_get_constraintdef(k.oid) definition
-    FROM pg_constraint k WHERE k.conrelid='ledger.model_spend'::regclass
-      AND k.conname='model_spend_pre_start_is_runless'`)).rows;
-  if (trigger.length !== 1 || check.length !== 1) return fail("POSTCONDITION_OBJECTS");
-  return sha(JSON.stringify({ tables, functions, trigger, check }));
+  const rows = (await client.query(`
+    SELECT k.conname,k.contype,c.oid::regclass::text relation FROM pg_constraint k JOIN pg_class c ON c.oid=k.conrelid
+    WHERE k.conrelid=to_regclass($1) AND k.conname=$2`, [TABLE, CONSTRAINT])).rows;
+  if (rows.length !== 1) return fail("POSTCONDITION_OBJECTS");
+  return sha(JSON.stringify(rows));
 }
 
 export async function loadForward0154(anchor: ForwardStepAnchor): Promise<ForwardStepPlan> {

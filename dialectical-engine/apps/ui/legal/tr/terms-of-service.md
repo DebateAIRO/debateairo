@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kısaca
-eyebrow: HİZMET KOŞULLARI · v2.12 · YÜRÜRLÜK TARİHİ 1 KASIM 2026
+eyebrow: HİZMET KOŞULLARI · v2.14 · YÜRÜRLÜK TARİHİ 1 KASIM 2026
 title: Kabul ettiğiniz hükümler
 lede: Sizinle DMS Merchandise Shop S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.
-endMarker: KOŞULLARIN SONU · v2.12
+endMarker: KOŞULLARIN SONU · v2.14
 bodyLabel: Hizmet Koşulları metni
 annexTitle: Ek A — Bölgesel koşullar
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 UYGULANACAK HUKUK
 -->
 
-**Version 2.12 · Effective 1 Kasım 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
+**Version 2.14 · Effective 1 Kasım 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
 
 **In short.** En az 18 yaşında olmalısınız. Dialectical Engine, yapay zekâ modelleriyle argümanlar oluşturur ve ürettiği her şey yanlış olabilir — bunlar tavsiye değildir. Ücretsiz plandaki tartışmalarınız, tamamlandığında ve bir yapay zekâ kontrolünden geçtikten sonra herkese açık olur; ücretli planda ise siz yayımlamadıkça özeldir. Herkese açık olduktan sonra herkes bir tartışmayı okuyabilir ve tartışma herkese açık kalır. Gönderdiğiniz metin, Sağlayıcı Sicilimizde belirtilen yapay zekâ sağlayıcılarına iletilir ve modelleri eğitmek için kullanılmaz. Hesabınız olsun veya olmasın, hukuka aykırı içerikleri support@dezbatere.ro adresine bildirin. Romanya hukuku uygulanır; ancak yerel tüketici korumalarınız saklıdır.
 
@@ -215,7 +215,7 @@ Hizmeti tamamen kapatırsak veya ülkenizden çekersek en az **30 gün önceden 
 
 Dialectical Engine ücretsiz bir plan sunar. Model listesinin tamamının kilidini açan ve tartışma göstergelerini kendiniz belirlemenize olanak tanıyan ücretli bir **Premium** plan sunulacaktır.
 
-**Ödeme yapmadan önce** size ödeme düğmesinin hemen üzerinde şunları gösteririz: planı; geçerli vergiler dahil toplam fiyatı; faturalandırma dönemini; planın iptal edilene kadar otomatik yenileneceğini; varsa ücretsiz denemenin sona ereceği tarihi ve sonrasında tahsil edilecek tutarı ve nasıl iptal edileceğini. Ayrı bir kutuyu işaretleyerek yenileme koşullarını teyit edersiniz. Düğmenin üzerinde **Abone ol ve öde** (Romence, *Comandă cu obligație de plată*) yazar. Aynı bilgileri, bu Koşulları ve cayma formunu içeren bir teyidi kalıcı veri saklayıcısıyla size göndeririz.
+**Ödeme yapmadan önce** size ödeme düğmesinin hemen üzerinde şunları gösteririz: planı; geçerli vergiler dahil toplam fiyatı; faturalandırma dönemini; planın iptal edilene kadar otomatik yenileneceğini; varsa ücretsiz denemenin sona ereceği tarihi ve sonrasında tahsil edilecek tutarı ve nasıl iptal edileceğini. Ayrı bir kutuyu işaretleyerek yenileme koşullarını teyit edersiniz. Düğmenin üzerinde **Abone ol ve öde** (Romence, *Abonați-vă și plătiți*) yazar. Aynı bilgileri, bu Koşulları ve cayma formunu içeren bir teyidi kalıcı veri saklayıcısıyla size göndeririz.
 
 **Hatırlatmalar.** Ücretsiz denemenin ücretli plana dönüşmesinden en az 5 gün önce; devam eden planlar için yılda en az bir kez ve on iki ay veya daha uzun süreli bir dönemin yenilenmesinden 30 ila 45 gün önce size e-posta göndeririz. Her hatırlatma fiyatı, tarihi ve iptal bağlantısını içerir.
 
@@ -250,6 +250,10 @@ Başka bir yerde yaşıyorsanız bölgenizde geçerli olan cayma veya vazgeçme 
 Neyin ne zaman değişeceğini kalıcı veri saklayıcısıyla önceden bildiririz. Değişiklik, hizmete erişiminiz veya hizmeti kullanımınız üzerinde önemsizden daha fazla olumsuz etkiye sahipse, bildirimin size iletilmesinden veya değişikliğin yürürlüğe girmesinden hangisi daha geç ise o tarihten itibaren **30 gün içinde** ücretsiz olarak sözleşmeyi sona erdirebilirsiniz; kullanılmayan dönem için önceden ödenmiş tutarları iade ederiz.
 
 **Bu Koşullarda.** Bu Koşulları aynı tür nedenlerle değiştirebiliriz. Haklarınızı azaltmayan değişiklikler için yeni sürümü, değişikliklerin özetiyle yayımlar ve yürürlüğe girmesinden en az **30 gün önce** size e-posta göndeririz; o tarihten sonra Dialectical Engine'i kullanmaya devam etmeniz değişikliği kabul ettiğiniz anlamına gelir ve hesabınızı o tarihten önce kapatabilirsiniz. Mevcut bir plandaki fiyat artışları, daha düşük sınırlar, kaldırılan özellikler, içeriğinizin yeni kullanım biçimleri veya sorumluluk, uygulanacak hukuk ya da uyuşmazlık çözümüne ilişkin değişiklikler dahil, haklarınızı azaltan değişiklikler için bir sonraki oturum açışınızda yeni sürümü açıkça kabul etmenizi isteriz ve değişiklik yalnızca ileriye dönük uygulanır. Hiçbir değişikliği geriye yürütmeyiz ve size bir çıkış yolu sunmadan, sürenin ortasında ücretini ödediğiniz hususun özünü değiştirmek için bu bölümü kullanmayız. Önceki sürümler dezbatere.ro/terms/versions adresinde erişilebilir kalır.
+
+Sürüm 2.14, sürüm 2.13'ün yerine geçmiştir: 18. bölüm ve Ek A, alternatif uyuşmazlık çözümü yolu olarak ANPC (SAL)'ı belirtir.
+
+Sürüm 2.13, sürüm 2.12'nin yerine geçmiştir: 12. bölüm, ödeme düğmesinin Romence metnini belirtir.
 
 Sürüm 2.12, sürüm 2.11'in yerine geçmiştir: 10. bölüm, oturum açmış bir kişinin herkese açık herhangi bir tartışmada Bildir düğmesini de kullanabileceğini, bir yapay zekânın düğmeyle yapılan bildirimi herkese açık metnin yanında okuduğunu ve sonrasında ne olacağını söyler.
 
@@ -297,7 +301,7 @@ Kişisel verileri nasıl işlediğimiz dezbatere.ro/privacy adresindeki **Gizlil
 
 **Başka yerlerdeki tüketiciler.** AB ve AEA dışında yaşıyorsanız bu Koşullardaki hiçbir hüküm, ülkenizin hukuku uyarınca o ülkenin mahkemelerinde talepte bulunma hakkınızı veya o hukuk uyarınca vazgeçilemeyecek herhangi bir hakkınızı sınırlandırmaz — Avustralya veya Yeni Zelanda'da yaşıyorsanız tüketici güvencesi haklarınız; Brezilya'da yaşıyorsanız Código de Defesa do Consumidor ve Amerika Birleşik Devletleri'nde yaşıyorsanız eyaletinizin tüketiciyi koruma kanunları buna dahildir.
 
-**Mahkemeye gitmeden önce.** support@dezbatere.ro adresinden bizimle iletişime geçin; çoğu sorun çözülebilir ve 5 iş günü içinde yanıt vermeyi hedefleriz. Romanya'da veya AB'de bir tüketiciyseniz www.onoratainstanta.ro üzerinden alternatif uyuşmazlık çözümünden yararlanabilirsiniz; bu usule katılmayı taahhüt etmiyoruz. Moderasyon kararlarına ilişkin şikâyetler ayrı bir yol olan 10. bölüme tabidir.
+**Mahkemeye gitmeden önce.** support@dezbatere.ro adresinden bizimle iletişime geçin; çoğu sorun çözülebilir ve 5 iş günü içinde yanıt vermeyi hedefleriz. Romanya'da veya AB'de bir tüketiciyseniz ANPC (SAL), reclamatiisal.anpc.ro üzerinden alternatif uyuşmazlık çözümünden yararlanabilirsiniz; bu usule katılmayı taahhüt etmiyoruz. Moderasyon kararlarına ilişkin şikâyetler ayrı bir yol olan 10. bölüme tabidir.
 
 ## 19. Diğer hükümler
 
@@ -319,7 +323,7 @@ Her bir madde, bölgesinde yaşayan kişilere uygulanır ve yalnızca ana metind
 
 ### A.1 Avrupa Birliği ve Avrupa Ekonomik Alanı
 
-Bu Koşulların ana metni sizin için kaleme alınmıştır. Buna ek olarak: yaşadığınız ülkenin mahkemelerinde dava açabilirsiniz; 13. bölümdeki cayma hakkı uygulanır; www.onoratainstanta.ro üzerinden alternatif uyuşmazlık çözümü kullanılabilir. **Almanya:** dezbatere.ro/cancel adresindeki iptal düğmesi, oturum açmadan aboneliği sona erdirmenize olanak tanır; abonelik süreleri, yenileme dönemleri ve bildirim süreleri §309(9) BGB'ye uygundur: her plan bir ay sürer, siz iptal edene kadar aylık olarak yenilenir ve istediğiniz zaman, içinde bulunulan ayın sonunda geçerli olacak şekilde iptal edebilirsiniz. **Fransa:** dezbatere.ro/cancel adresinden üç adımda çevrim içi abonelik iptali yapabilirsiniz. **İtalya:** askıya alma ve sona erdirme (11), ücretli planlar ve yenilenmeleri (12), değişiklikler (14), sorumluluk (15) ile uygulanacak hukuk ve uyuşmazlıkların görüleceği yer (18) hakkındaki hükümler, İtalyan Medeni Kanunu'nun 1341 ve 1342. maddeleri uyarınca özel onayınızı gerektirir. Bu onayı kayıt sırasında ayrı bir kutuyla verirsiniz; kutu, Bölge alanında İtalya'yı seçen veya bağlantısı İtalya'dan gelen herkese gösterilir. **Hollanda:** bu Koşullar sözleşme kurulmadan önce saklanabilir bir biçimde sunulur. **Polonya:** Lehçe sürüm mevcuttur; dil menüsünden Polski'yi seçin.
+Bu Koşulların ana metni sizin için kaleme alınmıştır. Buna ek olarak: yaşadığınız ülkenin mahkemelerinde dava açabilirsiniz; 13. bölümdeki cayma hakkı uygulanır; ANPC (SAL), reclamatiisal.anpc.ro üzerinden alternatif uyuşmazlık çözümü kullanılabilir. **Almanya:** dezbatere.ro/cancel adresindeki iptal düğmesi, oturum açmadan aboneliği sona erdirmenize olanak tanır; abonelik süreleri, yenileme dönemleri ve bildirim süreleri §309(9) BGB'ye uygundur: her plan bir ay sürer, siz iptal edene kadar aylık olarak yenilenir ve istediğiniz zaman, içinde bulunulan ayın sonunda geçerli olacak şekilde iptal edebilirsiniz. **Fransa:** dezbatere.ro/cancel adresinden üç adımda çevrim içi abonelik iptali yapabilirsiniz. **İtalya:** askıya alma ve sona erdirme (11), ücretli planlar ve yenilenmeleri (12), değişiklikler (14), sorumluluk (15) ile uygulanacak hukuk ve uyuşmazlıkların görüleceği yer (18) hakkındaki hükümler, İtalyan Medeni Kanunu'nun 1341 ve 1342. maddeleri uyarınca özel onayınızı gerektirir. Bu onayı kayıt sırasında ayrı bir kutuyla verirsiniz; kutu, Bölge alanında İtalya'yı seçen veya bağlantısı İtalya'dan gelen herkese gösterilir. **Hollanda:** bu Koşullar sözleşme kurulmadan önce saklanabilir bir biçimde sunulur. **Polonya:** Lehçe sürüm mevcuttur; dil menüsünden Polski'yi seçin.
 
 ### A.2 Amerika Birleşik Devletleri
 
@@ -331,7 +335,7 @@ Bu Koşulların ana metni sizin için kaleme alınmıştır. Buna ek olarak: ya�
 
 ### A.3 Kanada ve Quebec
 
-Gizlilik görevlimiz ve Quebec'te kişisel bilgilerin korunmasından sorumlu kişi müdürümüzdür; kendisine privacy@dezbatere.ro adresinden ulaşılabilir. Verileriniz Gizlilik Politikamızın Ek B.3'ünde ele alınır. **Quebec:** bu Koşullar Fransızca olarak sunulur; dil seçiciden Fransızcayı seçin; tartışmalarınızı özel tutan ayarlar varsayılan olarak açıktır; hakkınızdaki kişisel bilgilerin arama sonuçlarından çıkarılmasını talep edebilirsiniz.
+Gizlilik görevlimiz ve Quebec'te kişisel bilgilerin korunmasından sorumlu kişi müdürümüzdür; kendisine privacy@dezbatere.ro adresinden ulaşılabilir. Verileriniz Gizlilik Politikamızın Ek B.3'ünde ele alınır. **Quebec:** bu Koşullar Fransızca olarak sunulur; kaydolurken Kanada'yı seçerseniz Koşullar size önce Fransızca gösterilir ve bunun yerine İngilizceyi seçebilirsiniz; tartışmalarınızı özel tutan ayarlar varsayılan olarak açıktır; hakkınızdaki kişisel bilgilerin arama sonuçlarından çıkarılmasını talep edebilirsiniz.
 
 ### A.4 Avustralya ve Yeni Zelanda
 

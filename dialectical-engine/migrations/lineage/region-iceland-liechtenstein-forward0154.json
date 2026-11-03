@@ -1,0 +1,18 @@
+{
+  "version": "region-iceland-liechtenstein-forward0154-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0153_dig_tree_settled.sql",
+    "manifestSha256": "18acdf49bf4b4b8586f29af9be719d7eefe4771afd57e271aa2a996b9b2f5050",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0154_region_iceland_liechtenstein.sql",
+    "sha256": "aaac94ab48020b5dfe07ace75432fa6f002f9d752a0cbed2564fab8851802b39"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "amendsPostconditionsOf": []
+}
