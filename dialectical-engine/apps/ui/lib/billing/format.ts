@@ -1,4 +1,4 @@
-import type { BillingCurrency } from "@debateai/contract";
+import type { BillingCurrency, BillingPlansPlace, BillingPlansTax } from "@debateai/contract";
 import { formatDate, formatNumber, t, type MessageCatalog } from "../i18n/translate.js";
 import type { BillingPlanId } from "./plans.js";
 
@@ -12,6 +12,32 @@ export function formatMoney(locale: string, decimal: string, currency: BillingCu
   return DECIMAL_PRICE.test(decimal)
     ? formatNumber(locale, Number(decimal), { style: "currency", currency })
     : decimal;
+}
+
+/**
+ * Terms §12: how a plans list's prices stand toward tax. INCLUDED: the place's tax is in them; NONE: that place adds
+ * none, so they are final; UNPRICED: no place's tax is known yet (no country, a US or Canadian postal code still
+ * needed, or the tax service not answering), so no price is shown at all, never one before tax. `== null`: an answer
+ * without the fields (only a hand-made one: the contract client requires them) is UNPRICED.
+ */
+export type PricedTax = "INCLUDED" | "NONE" | "UNPRICED";
+
+export function pricedTax(
+  answer: Readonly<{ place?: BillingPlansPlace | null; tax?: BillingPlansTax | null }> | null | undefined
+): PricedTax {
+  const tax = answer?.tax;
+  if (answer?.place?.status !== "PRICED" || tax == null) return "UNPRICED";
+  return tax.tax_status === "TAXABLE" && tax.tax_rate_bp > 0 ? "INCLUDED" : "NONE";
+}
+
+/** The sentence a card shows in place of a price its place cannot be given yet (Terms §12: never a price before tax). */
+export function unpricedReason(status: BillingPlansPlace["status"] | undefined): string {
+  switch (status) {
+    case "COUNTRY_NEEDED": return "billing.pricing.chooseCountry";
+    case "POSTAL_CODE_NEEDED": return "billing.pricing.enterPostalCode";
+    case "POSTAL_CODE_INVALID": return "billing.checkout.postalCodeInvalid";
+    default: return "billing.pricing.unavailable";
+  }
 }
 
 export function planName(catalog: MessageCatalog, planId: BillingPlanId): string {

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Tóm tắt
-eyebrow: ĐIỀU KHOẢN DỊCH VỤ · v2.12 · CÓ HIỆU LỰC 1 THÁNG 11 NĂM 2026
+eyebrow: ĐIỀU KHOẢN DỊCH VỤ · v2.14 · CÓ HIỆU LỰC 1 THÁNG 11 NĂM 2026
 title: Những điều bạn đồng ý
 lede: Hợp đồng giữa bạn và DMS Merchandise Shop S.R.L., được trình bày bằng ngôn ngữ dễ hiểu. Mười chín mục và Phụ lục A — cuộn đến cuối.
-endMarker: HẾT ĐIỀU KHOẢN · v2.12
+endMarker: HẾT ĐIỀU KHOẢN · v2.14
 bodyLabel: Nội dung Điều khoản dịch vụ
 annexTitle: Phụ lục A — Điều khoản theo khu vực
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LUẬT ĐIỀU CHỈNH
 -->
 
-**Version 2.12 · Effective 1 tháng 11 năm 2026 · Các phiên bản trước tại dezbatere.ro/terms/versions · Ngôn ngữ: tiếng Việt.**
+**Version 2.14 · Effective 1 tháng 11 năm 2026 · Các phiên bản trước tại dezbatere.ro/terms/versions · Ngôn ngữ: tiếng Việt.**
 
 **In short.** Bạn phải từ 18 tuổi trở lên. Dialectical Engine xây dựng các lập luận bằng mô hình AI và mọi nội dung do dịch vụ tạo ra đều có thể sai — đó không phải là lời tư vấn. Trên gói miễn phí, các cuộc tranh luận của bạn trở thành công khai khi kết thúc, sau khi AI kiểm tra; trên gói trả phí, chúng là riêng tư trừ khi bạn công khai chúng. Khi đã công khai, bất kỳ ai cũng có thể đọc một cuộc tranh luận, và nó vẫn công khai. Văn bản bạn gửi được chuyển đến các nhà cung cấp AI nêu trong Sổ đăng ký nhà cung cấp của chúng tôi và không được dùng để huấn luyện mô hình. Hãy báo cáo nội dung bất hợp pháp tại support@dezbatere.ro dù bạn có tài khoản hay không. Luật Romania điều chỉnh, nhưng các biện pháp bảo vệ người tiêu dùng tại nơi bạn sinh sống vẫn được bảo đảm.
 
@@ -215,7 +215,7 @@ Các mục 8 (đối với nội dung đã được công khai), 15, 16 và 18 t
 
 Dialectical Engine cung cấp một gói miễn phí. Gói **Premium** trả phí sẽ được cung cấp, mở khóa toàn bộ danh sách mô hình và cho phép bạn tự thiết lập các thước đo tranh luận.
 
-**Trước khi bạn thanh toán**, ngay phía trên nút thanh toán, chúng tôi hiển thị: gói dịch vụ; tổng giá gồm thuế áp dụng; kỳ thanh toán; thông tin rằng gói dịch vụ tự động gia hạn cho đến khi bị hủy; ngày kết thúc mọi thời gian dùng thử miễn phí và khoản tiền bạn sẽ phải trả sau đó; cùng cách hủy. Bạn xác nhận điều khoản gia hạn bằng cách đánh dấu vào một ô riêng. Nút này ghi **Đăng ký và thanh toán** (bằng tiếng Romania, *Comandă cu obligație de plată*). Chúng tôi gửi cho bạn xác nhận trên một phương tiện bền vững có cùng thông tin, các Điều khoản này và biểu mẫu rút lui.
+**Trước khi bạn thanh toán**, ngay phía trên nút thanh toán, chúng tôi hiển thị: gói dịch vụ; tổng giá gồm thuế áp dụng; kỳ thanh toán; thông tin rằng gói dịch vụ tự động gia hạn cho đến khi bị hủy; ngày kết thúc mọi thời gian dùng thử miễn phí và khoản tiền bạn sẽ phải trả sau đó; cùng cách hủy. Bạn xác nhận điều khoản gia hạn bằng cách đánh dấu vào một ô riêng. Nút này ghi **Đăng ký và thanh toán** (bằng tiếng Romania, *Abonați-vă și plătiți*). Chúng tôi gửi cho bạn xác nhận trên một phương tiện bền vững có cùng thông tin, các Điều khoản này và biểu mẫu rút lui.
 
 **Nhắc nhở.** Chúng tôi gửi email cho bạn ít nhất 5 ngày trước khi gói dùng thử miễn phí chuyển thành gói trả phí; ít nhất mỗi năm một lần đối với gói đang tiếp tục; và trong khoảng từ 30 đến 45 ngày trước mỗi lần gia hạn kỳ hạn từ mười hai tháng trở lên. Mỗi thông báo nhắc nhở đều gồm giá, ngày và liên kết hủy.
 
@@ -250,6 +250,10 @@ Nếu sống tại nơi khác, Phụ lục A quy định quyền rút lui hoặc
 Chúng tôi thông báo trước cho bạn trên một phương tiện bền vững về nội dung và thời điểm thay đổi. Nếu thay đổi có tác động tiêu cực lớn hơn mức không đáng kể đối với khả năng truy cập hoặc sử dụng dịch vụ của bạn, bạn có thể chấm dứt miễn phí trong vòng **30 ngày** kể từ khi được thông báo hoặc kể từ khi thay đổi có hiệu lực, tùy thời điểm nào muộn hơn, và chúng tôi hoàn trả mọi khoản đã trả trước cho thời gian chưa sử dụng.
 
 **Đối với các Điều khoản này.** Chúng tôi có thể thay đổi các Điều khoản này vì các loại lý do tương tự. Đối với thay đổi không làm giảm quyền của bạn, chúng tôi đăng phiên bản mới kèm bản tóm tắt nội dung thay đổi và gửi email cho bạn ít nhất **30 ngày** trước khi phiên bản có hiệu lực; tiếp tục sử dụng Dialectical Engine sau ngày đó có nghĩa là bạn chấp nhận phiên bản mới, và bạn có thể đóng tài khoản trước ngày đó. Đối với thay đổi làm giảm quyền của bạn — bao gồm tăng giá đối với gói hiện có, hạ thấp giới hạn, loại bỏ tính năng, cách sử dụng mới đối với nội dung của bạn, hoặc thay đổi về trách nhiệm, luật điều chỉnh hay giải quyết tranh chấp — chúng tôi yêu cầu bạn chấp nhận rõ ràng phiên bản mới vào lần đăng nhập tiếp theo, và thay đổi chỉ áp dụng về sau. Chúng tôi không bao giờ áp dụng thay đổi hồi tố và không bao giờ dùng mục này để thay đổi nội dung cốt lõi mà bạn đã thanh toán giữa kỳ mà không cho bạn một lối thoát. Các phiên bản trước vẫn được cung cấp tại dezbatere.ro/terms/versions.
+
+Phiên bản 2.14 thay thế phiên bản 2.13: mục 18 và Phụ lục A nêu ANPC (SAL) là kênh giải quyết tranh chấp thay thế.
+
+Phiên bản 2.13 thay thế phiên bản 2.12: mục 12 nêu dòng chữ tiếng Romania trên nút thanh toán.
 
 Phiên bản 2.12 thay thế phiên bản 2.11: mục 10 nêu rằng người đã đăng nhập cũng có thể sử dụng nút Báo cáo trên bất kỳ cuộc tranh luận công khai nào, rằng AI đọc báo cáo được gửi bằng nút đó bên cạnh văn bản công khai, và điều gì xảy ra sau đó.
 
@@ -297,7 +301,7 @@ Cách chúng tôi xử lý dữ liệu cá nhân được quy định trong **Ch
 
 **Người tiêu dùng tại nơi khác.** Nếu sống ngoài EU và EEA, không nội dung nào trong các Điều khoản này hạn chế bất kỳ quyền nào bạn có theo pháp luật quốc gia của mình để khởi kiện tại tòa án của quốc gia đó, hoặc bất kỳ quyền nào theo pháp luật đó mà không thể từ bỏ — bao gồm quyền bảo đảm của người tiêu dùng nếu bạn sống tại Australia hoặc New Zealand; Código de Defesa do Consumidor nếu bạn sống tại Brazil; và luật bảo vệ người tiêu dùng của tiểu bang nếu bạn sống tại Hoa Kỳ.
 
-**Trước khi khởi kiện ra tòa.** Hãy liên hệ với chúng tôi tại support@dezbatere.ro; hầu hết vấn đề đều có thể khắc phục, và chúng tôi đặt mục tiêu trả lời trong vòng 5 ngày làm việc. Nếu là người tiêu dùng tại Romania hoặc EU, bạn có thể sử dụng phương thức giải quyết tranh chấp thay thế thông qua www.onoratainstanta.ro; chúng tôi không cam kết tham gia thủ tục đó. Khiếu nại về quyết định kiểm duyệt tuân theo mục 10, là một kênh riêng biệt.
+**Trước khi khởi kiện ra tòa.** Hãy liên hệ với chúng tôi tại support@dezbatere.ro; hầu hết vấn đề đều có thể khắc phục, và chúng tôi đặt mục tiêu trả lời trong vòng 5 ngày làm việc. Nếu là người tiêu dùng tại Romania hoặc EU, bạn có thể sử dụng phương thức giải quyết tranh chấp thay thế thông qua ANPC (SAL), reclamatiisal.anpc.ro; chúng tôi không cam kết tham gia thủ tục đó. Khiếu nại về quyết định kiểm duyệt tuân theo mục 10, là một kênh riêng biệt.
 
 ## 19. Các điều khoản khác
 
@@ -319,7 +323,7 @@ Mỗi mục áp dụng cho người sống tại khu vực tương ứng và ch�
 
 ### A.1 Liên minh Châu Âu và Khu vực Kinh tế Châu Âu
 
-Phần nội dung chung của các Điều khoản này được soạn cho bạn. Ngoài ra: bạn có thể khởi kiện tại tòa án của quốc gia nơi bạn sống; quyền rút lui tại mục 13 được áp dụng; phương thức giải quyết tranh chấp thay thế được cung cấp thông qua www.onoratainstanta.ro. **Đức:** nút hủy tại dezbatere.ro/cancel cho phép bạn chấm dứt gói đăng ký mà không cần đăng nhập; thời hạn đăng ký, kỳ gia hạn và thời hạn thông báo tuân thủ §309(9) BGB: mỗi gói kéo dài một tháng và tự động gia hạn hằng tháng cho đến khi bạn hủy, và bạn có thể hủy bất cứ lúc nào, có hiệu lực từ cuối tháng hiện tại. **Pháp:** bạn có thể chấm dứt gói đăng ký trực tuyến trong ba bước tại dezbatere.ro/cancel. **Ý:** các điều khoản về đình chỉ và chấm dứt (11), gói trả phí và việc gia hạn (12), thay đổi (14), trách nhiệm (15) cũng như luật điều chỉnh và nơi giải quyết tranh chấp (18) cần sự chấp thuận cụ thể của bạn theo Điều 1341 và Điều 1342 của Bộ luật Dân sự Ý. Bạn đưa ra chấp thuận này bằng một ô riêng khi đăng ký, ô này được hiển thị cho bất kỳ ai chọn Ý trong trường Khu vực hoặc có kết nối đến từ Ý. **Hà Lan:** các Điều khoản này được cung cấp dưới hình thức có thể lưu trữ trước khi giao kết. **Ba Lan:** có phiên bản tiếng Ba Lan; hãy chọn Polski trong menu ngôn ngữ.
+Phần nội dung chung của các Điều khoản này được soạn cho bạn. Ngoài ra: bạn có thể khởi kiện tại tòa án của quốc gia nơi bạn sống; quyền rút lui tại mục 13 được áp dụng; phương thức giải quyết tranh chấp thay thế được cung cấp thông qua ANPC (SAL), reclamatiisal.anpc.ro. **Đức:** nút hủy tại dezbatere.ro/cancel cho phép bạn chấm dứt gói đăng ký mà không cần đăng nhập; thời hạn đăng ký, kỳ gia hạn và thời hạn thông báo tuân thủ §309(9) BGB: mỗi gói kéo dài một tháng và tự động gia hạn hằng tháng cho đến khi bạn hủy, và bạn có thể hủy bất cứ lúc nào, có hiệu lực từ cuối tháng hiện tại. **Pháp:** bạn có thể chấm dứt gói đăng ký trực tuyến trong ba bước tại dezbatere.ro/cancel. **Ý:** các điều khoản về đình chỉ và chấm dứt (11), gói trả phí và việc gia hạn (12), thay đổi (14), trách nhiệm (15) cũng như luật điều chỉnh và nơi giải quyết tranh chấp (18) cần sự chấp thuận cụ thể của bạn theo Điều 1341 và Điều 1342 của Bộ luật Dân sự Ý. Bạn đưa ra chấp thuận này bằng một ô riêng khi đăng ký, ô này được hiển thị cho bất kỳ ai chọn Ý trong trường Khu vực hoặc có kết nối đến từ Ý. **Hà Lan:** các Điều khoản này được cung cấp dưới hình thức có thể lưu trữ trước khi giao kết. **Ba Lan:** có phiên bản tiếng Ba Lan; hãy chọn Polski trong menu ngôn ngữ.
 
 ### A.2 Hoa Kỳ
 

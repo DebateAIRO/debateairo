@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lyhyesti
-eyebrow: KÄYTTÖEHDOT · v2.12 · VOIMASSA 1. MARRASKUUTA 2026 ALKAEN
+eyebrow: KÄYTTÖEHDOT · v2.14 · VOIMASSA 1. MARRASKUUTA 2026 ALKAEN
 title: Mihin sitoudut
 lede: Sinun ja DMS Merchandise Shop S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.
-endMarker: KÄYTTÖEHTOJEN LOPPU · v2.12
+endMarker: KÄYTTÖEHTOJEN LOPPU · v2.14
 bodyLabel: Käyttöehtojen teksti
 annexTitle: Liite A — Alueelliset ehdot
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 SOVELLETTAVA LAKI
 -->
 
-**Version 2.12 · Effective 1. marraskuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
+**Version 2.14 · Effective 1. marraskuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
 
 **In short.** Sinun on oltava vähintään 18-vuotias. Dialectical Engine muodostaa argumentteja tekoälymalleilla, ja kaikki sen tuottama voi olla virheellistä — se ei ole neuvontaa. Maksuttomassa tilauksessa väittelysi ovat valmistuttuaan julkisia tekoälytarkistuksen jälkeen; maksullisessa tilauksessa ne ovat yksityisiä, ellet julkaise niitä. Kun väittely on julkinen, kuka tahansa voi lukea sen, ja se pysyy julkisena. Lähettämäsi teksti toimitetaan palveluntarjoajarekisterissämme luetelluille tekoälypalveluntarjoajille, eikä sitä käytetä mallien kouluttamiseen. Ilmoita lainvastaisesta sisällöstä osoitteeseen support@dezbatere.ro riippumatta siitä, onko sinulla tiliä. Sopimukseen sovelletaan Romanian lakia, mutta paikallinen kuluttajansuojasi säilyy.
 
@@ -215,7 +215,7 @@ Kohdat 8 (jo julkaistun sisällön osalta), 15, 16 ja 18 jäävät voimaan sopim
 
 Dialectical Engine tarjoaa maksuttoman tilauksen. Tarjolle tulee maksullinen **Premium**-tilaus, joka avaa koko mallivalikoiman ja antaa sinun asettaa väittelyn mittarit itse.
 
-**Ennen maksamista** näytämme suoraan maksupainikkeen yläpuolella: tilauksen; kokonaishinnan sovellettavine veroineen; laskutuskauden; tiedon siitä, että tilaus uusiutuu automaattisesti peruuttamiseen asti; maksuttoman kokeilujakson päättymispäivän ja sen jälkeen veloitettavan määrän; sekä peruutustavan. Vahvistat uusimisehdot valitsemalla erillisen valintaruudun. Painikkeessa lukee **Tilaa ja maksa** (romaniaksi *Comandă cu obligație de plată*). Lähetämme sinulle pysyvällä välineellä vahvistuksen, joka sisältää samat tiedot, nämä käyttöehdot ja peruuttamislomakkeen.
+**Ennen maksamista** näytämme suoraan maksupainikkeen yläpuolella: tilauksen; kokonaishinnan sovellettavine veroineen; laskutuskauden; tiedon siitä, että tilaus uusiutuu automaattisesti peruuttamiseen asti; maksuttoman kokeilujakson päättymispäivän ja sen jälkeen veloitettavan määrän; sekä peruutustavan. Vahvistat uusimisehdot valitsemalla erillisen valintaruudun. Painikkeessa lukee **Tilaa ja maksa** (romaniaksi *Abonați-vă și plătiți*). Lähetämme sinulle pysyvällä välineellä vahvistuksen, joka sisältää samat tiedot, nämä käyttöehdot ja peruuttamislomakkeen.
 
 **Muistutukset.** Lähetämme sinulle sähköpostia vähintään 5 päivää ennen kuin maksuton kokeilujakso muuttuu maksulliseksi tilaukseksi; vähintään kerran vuodessa jatkuvien tilausten osalta; ja 30–45 päivää ennen vähintään 12 kuukauden pituisen kauden uusimista. Jokainen muistutus sisältää hinnan, päivämäärän ja peruutuslinkin.
 
@@ -250,6 +250,10 @@ Jos asut muualla, liitteessä A ilmoitetaan alueellasi mahdollisesti sovellettav
 Ilmoitamme sinulle etukäteen pysyvällä välineellä, mikä muuttuu ja milloin. Jos muutoksella on vähäistä suurempi kielteinen vaikutus mahdollisuuteesi käyttää palvelua tai palvelun käyttöösi, voit päättää sopimuksen maksutta **30 päivän** kuluessa ilmoituksesta tai muutoksen voimaantulosta sen mukaan, kumpi ajankohta on myöhäisempi, ja palautamme käyttämättömään aikaan kohdistuvat ennakkomaksut.
 
 **Näiden käyttöehtojen muutokset.** Voimme muuttaa näitä käyttöehtoja samanlaisista syistä. Jos muutos ei vähennä oikeuksiasi, julkaisemme uuden version ja yhteenvedon muutoksista sekä lähetämme sinulle sähköpostia vähintään **30 päivää ennen** sen voimaantuloa; Dialectical Engine -palvelun käytön jatkaminen kyseisen ajankohdan jälkeen merkitsee hyväksyntääsi, ja voit sulkea tilisi ennen sitä. Jos muutos vähentää oikeuksiasi — mukaan lukien olemassa olevan tilauksen hinnankorotukset, alhaisemmat rajat, poistetut ominaisuudet, sisältösi uudet käyttötavat tai vastuuta, sovellettavaa lakia tai riidanratkaisua koskevat muutokset — pyydämme sinua hyväksymään uuden version nimenomaisesti seuraavan kirjautumisesi yhteydessä, ja muutosta sovelletaan vain jatkossa. Emme koskaan muuta ehtoja taannehtivasti emmekä käytä tätä kohtaa muuttaaksemme kesken sopimuskauden maksamasi palvelun ydintä tarjoamatta sinulle mahdollisuutta irtautua. Aiemmat versiot säilyvät saatavilla osoitteessa dezbatere.ro/terms/versions.
+
+Versio 2.14 korvasi version 2.13: kohdassa 18 ja liitteessä A vaihtoehtoisen riidanratkaisun reitiksi nimetään ANPC (SAL).
+
+Versio 2.13 korvasi version 2.12: kohdassa 12 kerrotaan maksupainikkeen romaniankielinen teksti.
 
 Versio 2.12 korvasi version 2.11: kohdassa 10 kerrotaan, että kirjautunut henkilö voi myös käyttää Ilmoita-painiketta minkä tahansa julkisen väittelyn kohdalla, että tekoäly lukee sillä tehdyn ilmoituksen julkisen tekstin rinnalla ja mitä sen jälkeen tapahtuu.
 
@@ -297,7 +301,7 @@ Henkilötietojen käsittelymme kuvataan osoitteessa dezbatere.ro/privacy olevass
 
 **Muualla asuvat kuluttajat.** Jos asut EU:n ja ETA:n ulkopuolella, mikään näissä käyttöehdoissa ei rajoita maasi lainsäädäntöön perustuvaa oikeuttasi nostaa kanne sen tuomioistuimissa tai mitään kyseiseen lainsäädäntöön perustuvaa oikeutta, josta ei voida luopua — mukaan lukien Australiassa tai Uudessa-Seelannissa asuvien kuluttajantakuuoikeudet, Brasiliassa asuvien Código de Defesa do Consumidor -lain mukaiset oikeudet ja Yhdysvalloissa asuvien oman osavaltion kuluttajansuojalainsäädäntöön perustuvat oikeudet.
 
-**Ennen asian viemistä tuomioistuimeen.** Ota meihin yhteyttä osoitteessa support@dezbatere.ro; useimmat asiat voidaan korjata, ja pyrimme vastaamaan 5 työpäivän kuluessa. Jos olet kuluttaja Romaniassa tai EU:ssa, voit käyttää vaihtoehtoista riidanratkaisua sivuston www.onoratainstanta.ro kautta; emme sitoudu osallistumaan kyseiseen menettelyyn. Moderointipäätöksiä koskeviin valituksiin sovelletaan kohdan 10 erillistä reittiä.
+**Ennen asian viemistä tuomioistuimeen.** Ota meihin yhteyttä osoitteessa support@dezbatere.ro; useimmat asiat voidaan korjata, ja pyrimme vastaamaan 5 työpäivän kuluessa. Jos olet kuluttaja Romaniassa tai EU:ssa, voit käyttää vaihtoehtoista riidanratkaisua sivuston ANPC (SAL), reclamatiisal.anpc.ro kautta; emme sitoudu osallistumaan kyseiseen menettelyyn. Moderointipäätöksiä koskeviin valituksiin sovelletaan kohdan 10 erillistä reittiä.
 
 ## 19. Muut ehdot
 
@@ -319,7 +323,7 @@ Kutakin kohtaa sovelletaan henkilöihin, jotka asuvat sen alueella, ja siinä to
 
 ### A.1 Euroopan unioni ja Euroopan talousalue
 
-Näiden käyttöehtojen yleinen osa on laadittu sinua varten. Lisäksi: voit nostaa kanteen asuinmaasi tuomioistuimissa; kohdan 13 peruuttamisoikeutta sovelletaan; vaihtoehtoinen riidanratkaisu on saatavilla sivuston www.onoratainstanta.ro kautta. **Saksa:** osoitteessa dezbatere.ro/cancel olevalla peruutuspainikkeella voit päättää tilauksen kirjautumatta; tilauskaudet, uusimisjaksot ja irtisanomisajat ovat BGB:n §309(9):n mukaisia: kukin tilaus kestää yhden kuukauden ja uusiutuu kuukausittain, kunnes peruutat sen, ja voit peruuttaa milloin tahansa niin, että peruutus tulee voimaan kuluvan kuukauden lopussa. **Ranska:** voit päättää tilauksen verkossa kolmessa vaiheessa osoitteessa dezbatere.ro/cancel. **Italia:** keskeyttämistä ja päättämistä (11), maksullisia tilauksia ja niiden uusimista (12), muutoksia (14), vastuuta (15) sekä sovellettavaa lakia ja riitojen käsittelypaikkaa (18) koskevat ehdot edellyttävät erityistä hyväksyntääsi Italian siviililain 1341 ja 1342 artiklan nojalla. Annat sen erillisellä ruudulla rekisteröitymisen yhteydessä; ruutu näytetään jokaiselle, joka valitsee Alue-kentässä Italian tai jonka yhteys tulee Italiasta. **Alankomaat:** nämä käyttöehdot toimitetaan ennen sopimuksen tekemistä tallennettavassa muodossa. **Puola:** puolankielinen versio on saatavilla; valitse kielivalikosta Polski.
+Näiden käyttöehtojen yleinen osa on laadittu sinua varten. Lisäksi: voit nostaa kanteen asuinmaasi tuomioistuimissa; kohdan 13 peruuttamisoikeutta sovelletaan; vaihtoehtoinen riidanratkaisu on saatavilla sivuston ANPC (SAL), reclamatiisal.anpc.ro kautta. **Saksa:** osoitteessa dezbatere.ro/cancel olevalla peruutuspainikkeella voit päättää tilauksen kirjautumatta; tilauskaudet, uusimisjaksot ja irtisanomisajat ovat BGB:n §309(9):n mukaisia: kukin tilaus kestää yhden kuukauden ja uusiutuu kuukausittain, kunnes peruutat sen, ja voit peruuttaa milloin tahansa niin, että peruutus tulee voimaan kuluvan kuukauden lopussa. **Ranska:** voit päättää tilauksen verkossa kolmessa vaiheessa osoitteessa dezbatere.ro/cancel. **Italia:** keskeyttämistä ja päättämistä (11), maksullisia tilauksia ja niiden uusimista (12), muutoksia (14), vastuuta (15) sekä sovellettavaa lakia ja riitojen käsittelypaikkaa (18) koskevat ehdot edellyttävät erityistä hyväksyntääsi Italian siviililain 1341 ja 1342 artiklan nojalla. Annat sen erillisellä ruudulla rekisteröitymisen yhteydessä; ruutu näytetään jokaiselle, joka valitsee Alue-kentässä Italian tai jonka yhteys tulee Italiasta. **Alankomaat:** nämä käyttöehdot toimitetaan ennen sopimuksen tekemistä tallennettavassa muodossa. **Puola:** puolankielinen versio on saatavilla; valitse kielivalikosta Polski.
 
 ### A.2 Yhdysvallat
 

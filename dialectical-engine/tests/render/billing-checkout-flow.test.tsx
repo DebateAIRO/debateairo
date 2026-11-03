@@ -226,7 +226,7 @@ describe("N19 CheckoutFlow on NETOPIA's page", () => {
     expect(client.startBillingCheckout).toHaveBeenCalledWith(expect.objectContaining({ country_confirmed: true }));
   });
 
-  it("keeps Continue to payment focusable while locked, says why, and takes focus to what is missing (a11y 2026-10-17)", async () => {
+  it("keeps Subscribe and pay focusable while locked, says why, and takes focus to what is missing (a11y 2026-10-17)", async () => {
     client.createBillingQuote.mockResolvedValue(quote());
     await render();
     await fillDetails();

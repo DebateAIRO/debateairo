@@ -49,6 +49,18 @@ async function readBoundedReply(response: Response): Promise<string> {
   }
 }
 
+/** The call's answer, or a rejection the moment `signal` aborts; the call itself goes on, and a late answer or failure is dropped. */
+function letGoOnAbort<T>(call: Promise<T>, signal: AbortSignal): Promise<T> {
+  call.catch(() => undefined);
+  if (signal.aborted) return Promise.reject(signal.reason);
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = (): void => reject(signal.reason);
+    signal.addEventListener("abort", onAbort, { once: true });
+    call.then((value) => { signal.removeEventListener("abort", onAbort); resolve(value); },
+      (error: unknown) => { signal.removeEventListener("abort", onAbort); reject(error); });
+  });
+}
+
 /**
  * One Anthropic Messages POST for the fast language check (ruling CR-6: the only two ways in).
  *  · Preview: `fetch` is the guarded fetch (`createPreviewGuardedFetch`) and `url` its Anthropic Messages URL. The
@@ -125,7 +137,12 @@ export function anthropicFastCheckTransport(deps: Readonly<{
     if (signal.aborted) throw failure("QUESTION_LANGUAGE_FAST_CHECK_ABORTED");
     let response: Response;
     try {
-      response = await deps.fetch(deps.url, { method: "POST", headers: anthropicMessagesRequestHeaders(deps.credential), body, signal });
+      // 2026-11-02 review: on the preview the signal never reaches the guarded fetch, which would close the gate's socket,
+      // and a reply the gate cannot deliver halts it (preview_budget_authority.py: ipc_or_delivery_failure). The time limit
+      // is raced here instead: the call is let go, the gate delivers and settles it, and its late answer is dropped.
+      response = deps.credential === undefined
+        ? await letGoOnAbort(deps.fetch(deps.url, { method: "POST", headers: anthropicMessagesRequestHeaders(undefined), body }), signal)
+        : await deps.fetch(deps.url, { method: "POST", headers: anthropicMessagesRequestHeaders(deps.credential), body, signal });
     } catch {
       // The send began and may have been billed (an abort after sending, a connection lost mid-call): never under-count.
       await record(projectedMaximum);

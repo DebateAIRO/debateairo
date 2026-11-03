@@ -23,6 +23,15 @@ export function parseConsumerSecurityInput<T>(schema: {
         throw new AuthFlowError('AUTH_INPUT_INVALID');
     return result.data;
 }
+/**
+ * Romania's withdrawal rules (owner ruling 2026-11-03): the withdrawal button needs the password and the
+ * authenticator code, so its grant comes only from POST /v1/auth/step-up. A passkey or a provider step-up never
+ * mints one; an account created through social sign-in has no password and withdraws by email instead.
+ */
+export function refuseWithdrawalWithoutPassword(authorization: Readonly<{ action: string }>): void {
+    if (authorization.action === 'WITHDRAW_SUBSCRIPTION')
+        throw new AuthFlowError('AUTH_INPUT_INVALID');
+}
 const random = () => randomBytes(32).toString('base64url');
 const digest = (value: string) => 'sha256:' + createHash('sha256').update(value).digest('hex');
 const handleHash = (value: string) => digest('consumer-passkey:STEP_UP\0' + value);
@@ -62,7 +71,9 @@ export class ConsumerSecurityService implements ConsumerSecurityApplication {
     async pendingMfaRecovery(session: AuthenticatedSession): Promise<MfaRecoveryPendingResponse> { const record = await this.repository.pendingMfaRecovery(consumerSecuritySession(session)); return MfaRecoveryPendingResponseSchema.parse({ pending: record === null ? null : { not_before: new Date(record.notBefore).toISOString(), started_at: new Date(record.waitingAt).toISOString() } }); }
     async cancelPendingMfaRecovery(input: unknown, session: AuthenticatedSession, source: AuthSourceContext): Promise<{ status: 'cancelled' }> { parseConsumerSecurityInput(MfaRecoveryPendingCancelRequestSchema, input); if (await this.repository.cancelPendingMfaRecovery(consumerSecuritySession(session), source) !== 'CANCELLED') throw new AuthFlowError('MFA_ENROLLMENT_STATE_INVALID'); return { status: 'cancelled' }; }
     async beginPasskeyStepUp(input: unknown, session: AuthenticatedSession, source: AuthSourceContext): Promise<PasskeyAuthenticationOptionsResponse> {
-        const parsed = parseConsumerSecurityInput(BeginPasskeyStepUpRequestSchema, input), admission = await this.sessions.admit('STEP_UP_BEGIN', session.userId, source), handle = random(), challenge = random();
+        const parsed = parseConsumerSecurityInput(BeginPasskeyStepUpRequestSchema, input);
+        refuseWithdrawalWithoutPassword(parsed.authorization);
+        const admission = await this.sessions.admit('STEP_UP_BEGIN', session.userId, source), handle = random(), challenge = random();
         const result = await this.repository.beginStepUp({ ...admission, ...consumerSecuritySession(session), handleHash: handleHash(handle), challengeHash: digest(challenge), bindingHash: this.sessions.bindingHash(source), rpId: this.rpId, origin: this.origin, authorization: parsed.authorization });
         const { extensions: _extensions, ...options } = await generateAuthenticationOptions({ rpID: this.rpId, challenge: new Uint8Array(Buffer.from(challenge, 'base64url')), timeout: 300000, userVerification: 'required' });
         return PasskeyAuthenticationOptionsResponseSchema.parse({ challenge_handle: handle, expires_at: new Date(result.expiresAt).toISOString(), options });

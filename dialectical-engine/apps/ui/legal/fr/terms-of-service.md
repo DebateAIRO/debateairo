@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: En bref
-eyebrow: CONDITIONS D’UTILISATION · v2.12 · PRISE D’EFFET 1ER NOVEMBRE 2026
+eyebrow: CONDITIONS D’UTILISATION · v2.14 · PRISE D’EFFET 1ER NOVEMBRE 2026
 title: Ce que vous acceptez
 lede: Le contrat entre vous et DMS Merchandise Shop S.R.L., en termes clairs. Dix-neuf sections et l’annexe A — faites défiler jusqu’à la fin.
-endMarker: FIN DES CONDITIONS · v2.12
+endMarker: FIN DES CONDITIONS · v2.14
 bodyLabel: Texte des Conditions d’utilisation
 annexTitle: Annexe A — Conditions régionales
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 DROIT APPLICABLE
 -->
 
-**Version 2.12 · Effective 1er novembre 2026 · Versions précédentes sur dezbatere.ro/terms/versions · Langue : français.**
+**Version 2.14 · Effective 1er novembre 2026 · Versions précédentes sur dezbatere.ro/terms/versions · Langue : français.**
 
 **In short.** Vous devez avoir au moins 18 ans. Dialectical Engine construit des arguments à l’aide de modèles d’IA et tout ce qu’il génère peut être erroné — il ne s’agit pas d’un conseil. Sur la formule gratuite, vos débats deviennent publics une fois terminés, après une vérification par IA ; sur une formule payante, ils restent privés, sauf si vous les publiez. Un débat public peut être lu par tous, et il reste public. Le texte que vous soumettez est transmis aux fournisseurs d’IA inscrits dans notre Registre des fournisseurs et n’est pas utilisé pour entraîner des modèles. Signalez tout contenu illicite à support@dezbatere.ro, que vous ayez ou non un compte. Le droit roumain s’applique, mais les protections locales dont vous bénéficiez en tant que consommateur demeurent acquises.
 
@@ -215,7 +215,7 @@ Les sections 8 (en ce qui concerne le contenu déjà publié), 15, 16 et 18 rest
 
 Dialectical Engine propose une formule gratuite. Une formule **Premium** payante sera disponible, qui donne accès à l’ensemble des modèles et vous permet de régler vous-même les paramètres du débat.
 
-**Avant votre paiement**, nous affichons, directement au-dessus du bouton de paiement : la formule ; le prix total, taxes applicables comprises ; la période de facturation ; le fait que la formule se renouvelle automatiquement jusqu’à sa résiliation ; la date de fin de tout essai gratuit et le montant qui vous sera alors facturé ; et la manière de résilier. Vous confirmez les conditions de renouvellement en cochant une case distincte. Le bouton porte la mention **S’abonner et payer** (en roumain, *Comandă cu obligație de plată*). Nous vous envoyons sur un support durable une confirmation contenant les mêmes informations, les présentes Conditions et le formulaire de rétractation.
+**Avant votre paiement**, nous affichons, directement au-dessus du bouton de paiement : la formule ; le prix total, taxes applicables comprises ; la période de facturation ; le fait que la formule se renouvelle automatiquement jusqu’à sa résiliation ; la date de fin de tout essai gratuit et le montant qui vous sera alors facturé ; et la manière de résilier. Vous confirmez les conditions de renouvellement en cochant une case distincte. Le bouton porte la mention **S’abonner et payer** (en roumain, *Abonați-vă și plătiți*). Nous vous envoyons sur un support durable une confirmation contenant les mêmes informations, les présentes Conditions et le formulaire de rétractation.
 
 **Rappels.** Nous vous envoyons un e-mail au moins 5 jours avant la conversion d’un essai gratuit en formule payante ; au moins une fois par an pour les formules continues ; et entre 30 et 45 jours avant tout renouvellement d’une durée de douze mois ou plus. Chaque rappel indique le prix, la date et un lien de résiliation.
 
@@ -250,6 +250,10 @@ Si vous résidez ailleurs, l’annexe A précise le droit de rétractation ou le
 Nous vous informons à l’avance, sur un support durable, de la modification et de sa date. Si celle-ci a une incidence négative plus que mineure sur votre accès au service ou son utilisation, vous pouvez résilier sans frais dans un délai de **30 jours** à compter du jour où vous en avez été informé ou de son entrée en vigueur, la date la plus tardive étant retenue, et nous remboursons tout montant payé d’avance pour la période non utilisée.
 
 **Modifications des présentes Conditions.** Nous pouvons modifier les présentes Conditions pour les mêmes types de motifs. Pour les modifications qui ne réduisent pas vos droits, nous publions la nouvelle version avec un résumé des changements et vous envoyons un e-mail au moins **30 jours** avant son entrée en vigueur ; la poursuite de l’utilisation de Dialectical Engine après cette date vaut acceptation et vous pouvez clôturer votre compte avant celle-ci. Pour les modifications qui réduisent vos droits — notamment les hausses de prix d’une formule existante, les diminutions de limites, la suppression de fonctionnalités, les nouvelles utilisations de votre contenu ou les modifications relatives à la responsabilité, au droit applicable ou au règlement des litiges —, nous vous demandons d’accepter expressément la nouvelle version lors de votre prochaine connexion et la modification ne s’applique que pour l’avenir. Nous n’appliquons jamais une modification rétroactivement et n’utilisons jamais la présente section pour modifier, pendant sa durée, l’essence de ce pour quoi vous avez payé sans vous offrir une possibilité de résiliation. Les versions antérieures restent disponibles à l’adresse dezbatere.ro/terms/versions.
+
+La version 2.14 a remplacé la version 2.13 : la section 18 et l’annexe A désignent ANPC (SAL) comme voie de règlement extrajudiciaire des litiges.
+
+La version 2.13 a remplacé la version 2.12 : la section 12 indique le libellé roumain du bouton de paiement.
 
 La version 2.12 a remplacé la version 2.11 : la section 10 indique qu'une personne connectée peut aussi utiliser le bouton Signaler sur tout débat public, qu'une IA lit un signalement fait avec lui à côté du texte public, et ce qui se passe alors.
 
@@ -297,7 +301,7 @@ La manière dont nous traitons les données à caractère personnel est décrite
 
 **Consommateurs résidant ailleurs.** Si vous résidez en dehors de l’Union européenne et de l’EEE, rien dans les présentes Conditions ne limite les droits que le droit de votre pays vous confère pour saisir ses juridictions, ni tout droit prévu par ce droit auquel il ne peut être renoncé — notamment, si vous résidez en Australie ou en Nouvelle-Zélande, vos droits au titre des garanties offertes aux consommateurs ; si vous résidez au Brésil, le *Código de Defesa do Consumidor* ; et si vous résidez aux États-Unis, les lois de votre État relatives à la protection des consommateurs.
 
-**Avant de saisir une juridiction.** Contactez-nous à l’adresse support@dezbatere.ro ; la plupart des problèmes peuvent être résolus et nous nous efforçons de répondre dans un délai de 5 jours ouvrables. Si vous êtes un consommateur en Roumanie ou dans l’Union européenne, vous pouvez recourir au règlement extrajudiciaire des litiges par l’intermédiaire du site www.onoratainstanta.ro ; nous ne nous engageons pas à participer à cette procédure. Les réclamations relatives aux décisions de modération relèvent de la section 10, qui constitue une voie distincte.
+**Avant de saisir une juridiction.** Contactez-nous à l’adresse support@dezbatere.ro ; la plupart des problèmes peuvent être résolus et nous nous efforçons de répondre dans un délai de 5 jours ouvrables. Si vous êtes un consommateur en Roumanie ou dans l’Union européenne, vous pouvez recourir au règlement extrajudiciaire des litiges par l’intermédiaire du site ANPC (SAL), reclamatiisal.anpc.ro ; nous ne nous engageons pas à participer à cette procédure. Les réclamations relatives aux décisions de modération relèvent de la section 10, qui constitue une voie distincte.
 
 ## 19. Autres dispositions
 
@@ -319,7 +323,7 @@ Chaque entrée s’applique aux personnes qui résident dans sa région et n’i
 
 ### A.1 Union européenne et Espace économique européen
 
-Le corps des présentes Conditions est rédigé pour vous. En outre : vous pouvez saisir les juridictions du pays dans lequel vous résidez ; le droit de rétractation prévu à la section 13 s’applique ; un règlement extrajudiciaire des litiges est disponible par l’intermédiaire du site www.onoratainstanta.ro. **Allemagne :** le bouton de résiliation disponible à l’adresse dezbatere.ro/cancel vous permet de mettre fin à un abonnement sans vous connecter ; les durées d’abonnement et de renouvellement ainsi que les délais de préavis sont conformes au §309(9) BGB : chaque formule dure un mois et se renouvelle chaque mois jusqu’à ce que vous la résiliiez, et vous pouvez la résilier à tout moment avec effet à la fin du mois en cours. **France :** vous pouvez résilier un abonnement en ligne en trois étapes à l’adresse dezbatere.ro/cancel. **Italie :** les clauses relatives à la suspension et à la résiliation (11), aux formules payantes et à leur renouvellement (12), aux modifications (14), à la responsabilité (15) et au droit applicable et aux juridictions compétentes (18) nécessitent votre approbation expresse au titre des articles 1341 et 1342 du Code civil italien. Vous la donnez au moyen d’une case distincte lors de l’inscription, affichée à toute personne qui choisit l’Italie dans le champ Région ou dont la connexion provient d’Italie. **Pays-Bas :** les présentes Conditions sont fournies sous une forme permettant leur conservation avant la conclusion du contrat. **Pologne :** une version polonaise est disponible ; choisissez Polski dans le menu des langues.
+Le corps des présentes Conditions est rédigé pour vous. En outre : vous pouvez saisir les juridictions du pays dans lequel vous résidez ; le droit de rétractation prévu à la section 13 s’applique ; un règlement extrajudiciaire des litiges est disponible par l’intermédiaire du site ANPC (SAL), reclamatiisal.anpc.ro. **Allemagne :** le bouton de résiliation disponible à l’adresse dezbatere.ro/cancel vous permet de mettre fin à un abonnement sans vous connecter ; les durées d’abonnement et de renouvellement ainsi que les délais de préavis sont conformes au §309(9) BGB : chaque formule dure un mois et se renouvelle chaque mois jusqu’à ce que vous la résiliiez, et vous pouvez la résilier à tout moment avec effet à la fin du mois en cours. **France :** vous pouvez résilier un abonnement en ligne en trois étapes à l’adresse dezbatere.ro/cancel. **Italie :** les clauses relatives à la suspension et à la résiliation (11), aux formules payantes et à leur renouvellement (12), aux modifications (14), à la responsabilité (15) et au droit applicable et aux juridictions compétentes (18) nécessitent votre approbation expresse au titre des articles 1341 et 1342 du Code civil italien. Vous la donnez au moyen d’une case distincte lors de l’inscription, affichée à toute personne qui choisit l’Italie dans le champ Région ou dont la connexion provient d’Italie. **Pays-Bas :** les présentes Conditions sont fournies sous une forme permettant leur conservation avant la conclusion du contrat. **Pologne :** une version polonaise est disponible ; choisissez Polski dans le menu des langues.
 
 ### A.2 États-Unis
 

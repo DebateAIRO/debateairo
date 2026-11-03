@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ringkasnya
-eyebrow: KETENTUAN LAYANAN · v2.12 · BERLAKU 1 NOVEMBER 2026
+eyebrow: KETENTUAN LAYANAN · v2.14 · BERLAKU 1 NOVEMBER 2026
 title: Hal yang Anda setujui
 lede: Kontrak antara Anda dan DMS Merchandise Shop S.R.L., dalam bahasa yang mudah dipahami. Sembilan belas bagian dan Lampiran A — gulir hingga akhir.
-endMarker: AKHIR KETENTUAN · v2.12
+endMarker: AKHIR KETENTUAN · v2.14
 bodyLabel: Teks Ketentuan Layanan
 annexTitle: Lampiran A — Ketentuan regional
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 HUKUM YANG BERLAKU
 -->
 
-**Version 2.12 · Effective 1 November 2026 · Versi sebelumnya di dezbatere.ro/terms/versions · Bahasa: Indonesia.**
+**Version 2.14 · Effective 1 November 2026 · Versi sebelumnya di dezbatere.ro/terms/versions · Bahasa: Indonesia.**
 
 **In short.** Anda harus berusia 18 tahun atau lebih. Dialectical Engine menyusun argumen dengan model AI dan segala sesuatu yang dihasilkannya mungkin salah — ini bukan nasihat. Di paket gratis, debat Anda bersifat publik setelah selesai, setelah pemeriksaan AI; di paket berbayar, debat bersifat privat kecuali Anda memublikasikannya. Setelah publik, siapa pun dapat membaca debat itu, dan debat itu tetap publik. Teks yang Anda kirim diteruskan kepada penyedia AI yang tercantum dalam Daftar Penyedia kami, dan tidak digunakan untuk melatih model. Laporkan konten ilegal ke support@dezbatere.ro, baik Anda memiliki akun maupun tidak. Hukum Rumania berlaku, tetapi perlindungan konsumen setempat Anda tetap berlaku bagi Anda.
 
@@ -215,7 +215,7 @@ Bagian 8 (terkait konten yang telah dipublikasikan), 15, 16, dan 18 tetap berlak
 
 Dialectical Engine menawarkan paket gratis. Paket **Premium** berbayar akan tersedia, yang membuka seluruh daftar model dan memungkinkan Anda menetapkan sendiri indikator debat.
 
-**Sebelum Anda membayar**, tepat di atas tombol pembayaran kami menampilkan: paket; harga total termasuk pajak yang berlaku; periode penagihan; bahwa paket diperpanjang secara otomatis hingga dibatalkan; tanggal berakhirnya uji coba gratis dan jumlah yang selanjutnya akan ditagihkan kepada Anda; serta cara membatalkan. Anda mengonfirmasi ketentuan perpanjangan dengan mencentang kotak terpisah. Tombol tersebut bertuliskan **Berlangganan dan bayar** (dalam bahasa Rumania, *Comandă cu obligație de plată*). Kami mengirimkan kepada Anda konfirmasi pada media tahan lama yang memuat informasi yang sama, Ketentuan ini, dan formulir penarikan diri.
+**Sebelum Anda membayar**, tepat di atas tombol pembayaran kami menampilkan: paket; harga total termasuk pajak yang berlaku; periode penagihan; bahwa paket diperpanjang secara otomatis hingga dibatalkan; tanggal berakhirnya uji coba gratis dan jumlah yang selanjutnya akan ditagihkan kepada Anda; serta cara membatalkan. Anda mengonfirmasi ketentuan perpanjangan dengan mencentang kotak terpisah. Tombol tersebut bertuliskan **Berlangganan dan bayar** (dalam bahasa Rumania, *Abonați-vă și plătiți*). Kami mengirimkan kepada Anda konfirmasi pada media tahan lama yang memuat informasi yang sama, Ketentuan ini, dan formulir penarikan diri.
 
 **Pengingat.** Kami mengirim email kepada Anda sekurang-kurangnya 5 hari sebelum uji coba gratis berubah menjadi paket berbayar; setidaknya sekali setahun untuk paket berkelanjutan; dan antara 30 hingga 45 hari sebelum perpanjangan masa dua belas bulan atau lebih. Setiap pengingat mencantumkan harga, tanggal, dan tautan pembatalan.
 
@@ -250,6 +250,10 @@ Jika Anda tinggal di tempat lain, Lampiran A menyatakan hak penarikan diri atau 
 Kami memberi tahu Anda terlebih dahulu, pada media tahan lama, mengenai hal yang berubah dan waktu perubahan. Jika perubahan tersebut menimbulkan dampak negatif yang lebih dari kecil terhadap akses ke atau penggunaan layanan oleh Anda, Anda dapat mengakhiri layanan tanpa biaya dalam waktu **30 hari** sejak menerima pemberitahuan, atau sejak perubahan berlaku, mana yang lebih akhir, dan kami mengembalikan setiap jumlah yang telah dibayar di muka untuk periode yang tidak digunakan.
 
 **Pada Ketentuan ini.** Kami dapat mengubah Ketentuan ini untuk jenis alasan yang sama. Untuk perubahan yang tidak mengurangi hak Anda, kami memublikasikan versi baru beserta ringkasan perubahan dan mengirim email kepada Anda sekurang-kurangnya **30 hari** sebelum perubahan berlaku; jika Anda terus menggunakan Dialectical Engine setelah tanggal tersebut, berarti Anda menerimanya, dan Anda dapat menutup akun sebelumnya. Untuk perubahan yang mengurangi hak Anda — termasuk kenaikan harga pada paket yang sudah ada, batas yang lebih rendah, fitur yang dihapus, penggunaan baru atas konten Anda, atau perubahan pada tanggung jawab, hukum yang berlaku, maupun penyelesaian sengketa — kami meminta Anda menerima versi baru secara tegas saat masuk berikutnya, dan perubahan hanya berlaku untuk waktu mendatang. Kami tidak pernah memberlakukan perubahan secara surut, dan tidak pernah menggunakan bagian ini untuk mengubah inti dari hal yang telah Anda bayar di tengah masa berlaku tanpa menawarkan jalan keluar. Versi sebelumnya tetap tersedia di dezbatere.ro/terms/versions.
+
+Versi 2.14 menggantikan versi 2.13: bagian 18 dan Lampiran A menyebut ANPC (SAL) sebagai jalur penyelesaian sengketa alternatif.
+
+Versi 2.13 menggantikan versi 2.12: bagian 12 menyebutkan tulisan tombol pembayaran dalam bahasa Rumania.
 
 Versi 2.12 menggantikan versi 2.11: bagian 10 menyatakan bahwa orang yang sudah masuk juga dapat menggunakan tombol Laporkan pada debat publik mana pun, bahwa AI membaca laporan yang dibuat dengan tombol itu di samping teks publik, dan apa yang terjadi setelah itu.
 
@@ -297,7 +301,7 @@ Cara kami menangani data pribadi ditetapkan dalam **Kebijakan Privasi** di dezba
 
 **Konsumen di tempat lain.** Jika Anda tinggal di luar Uni Eropa dan EEA, tidak ada hal dalam Ketentuan ini yang membatasi hak Anda berdasarkan hukum negara Anda untuk mengajukan klaim di pengadilannya, atau hak apa pun berdasarkan hukum tersebut yang tidak dapat dikesampingkan — termasuk hak jaminan konsumen jika Anda tinggal di Australia atau Selandia Baru; Código de Defesa do Consumidor jika Anda tinggal di Brasil; dan hukum perlindungan konsumen negara bagian Anda jika Anda tinggal di Amerika Serikat.
 
-**Sebelum mengajukan perkara ke pengadilan.** Hubungi kami di support@dezbatere.ro; sebagian besar masalah dapat diperbaiki, dan kami berupaya menjawab dalam waktu 5 hari kerja. Jika Anda seorang konsumen di Rumania atau Uni Eropa, Anda dapat menggunakan penyelesaian sengketa alternatif melalui www.onoratainstanta.ro; kami tidak berkomitmen untuk berpartisipasi dalam prosedur tersebut. Pengaduan mengenai keputusan moderasi mengikuti bagian 10, yang merupakan jalur terpisah.
+**Sebelum mengajukan perkara ke pengadilan.** Hubungi kami di support@dezbatere.ro; sebagian besar masalah dapat diperbaiki, dan kami berupaya menjawab dalam waktu 5 hari kerja. Jika Anda seorang konsumen di Rumania atau Uni Eropa, Anda dapat menggunakan penyelesaian sengketa alternatif melalui ANPC (SAL), reclamatiisal.anpc.ro; kami tidak berkomitmen untuk berpartisipasi dalam prosedur tersebut. Pengaduan mengenai keputusan moderasi mengikuti bagian 10, yang merupakan jalur terpisah.
 
 ## 19. Ketentuan lain
 
@@ -319,7 +323,7 @@ Setiap entri berlaku bagi orang yang tinggal di wilayahnya, dan hanya menyatakan
 
 ### A.1 Uni Eropa dan Wilayah Ekonomi Eropa
 
-Bagian utama Ketentuan ini ditulis untuk Anda. Selain itu: Anda dapat mengajukan perkara di pengadilan negara tempat Anda tinggal; hak penarikan diri dalam bagian 13 berlaku; penyelesaian sengketa alternatif tersedia melalui www.onoratainstanta.ro. **Jerman:** tombol pembatalan di dezbatere.ro/cancel memungkinkan Anda mengakhiri langganan tanpa masuk; jangka waktu langganan, periode perpanjangan, dan periode pemberitahuan mematuhi §309(9) BGB: setiap paket berjalan selama satu bulan dan diperpanjang setiap bulan hingga Anda membatalkan, dan Anda dapat membatalkan kapan saja, dengan pembatalan berlaku efektif pada akhir bulan berjalan. **Prancis:** Anda dapat mengakhiri langganan secara daring dalam tiga langkah di dezbatere.ro/cancel. **Italia:** klausul mengenai penangguhan dan pengakhiran (11), paket berbayar dan perpanjangannya (12), perubahan (14), tanggung jawab (15), dan hukum yang berlaku serta tempat sengketa diperiksa (18) memerlukan persetujuan khusus Anda berdasarkan pasal 1341 dan 1342 Kitab Undang-Undang Hukum Perdata Italia. Anda memberikannya melalui kotak terpisah saat pendaftaran, yang ditampilkan kepada siapa pun yang memilih Italia di kolom Wilayah atau yang koneksinya berasal dari Italia. **Belanda:** Ketentuan ini diberikan dalam bentuk yang dapat disimpan sebelum kontrak dibuat. **Polandia:** versi bahasa Polandia tersedia; pilih Polski di menu bahasa.
+Bagian utama Ketentuan ini ditulis untuk Anda. Selain itu: Anda dapat mengajukan perkara di pengadilan negara tempat Anda tinggal; hak penarikan diri dalam bagian 13 berlaku; penyelesaian sengketa alternatif tersedia melalui ANPC (SAL), reclamatiisal.anpc.ro. **Jerman:** tombol pembatalan di dezbatere.ro/cancel memungkinkan Anda mengakhiri langganan tanpa masuk; jangka waktu langganan, periode perpanjangan, dan periode pemberitahuan mematuhi §309(9) BGB: setiap paket berjalan selama satu bulan dan diperpanjang setiap bulan hingga Anda membatalkan, dan Anda dapat membatalkan kapan saja, dengan pembatalan berlaku efektif pada akhir bulan berjalan. **Prancis:** Anda dapat mengakhiri langganan secara daring dalam tiga langkah di dezbatere.ro/cancel. **Italia:** klausul mengenai penangguhan dan pengakhiran (11), paket berbayar dan perpanjangannya (12), perubahan (14), tanggung jawab (15), dan hukum yang berlaku serta tempat sengketa diperiksa (18) memerlukan persetujuan khusus Anda berdasarkan pasal 1341 dan 1342 Kitab Undang-Undang Hukum Perdata Italia. Anda memberikannya melalui kotak terpisah saat pendaftaran, yang ditampilkan kepada siapa pun yang memilih Italia di kolom Wilayah atau yang koneksinya berasal dari Italia. **Belanda:** Ketentuan ini diberikan dalam bentuk yang dapat disimpan sebelum kontrak dibuat. **Polandia:** versi bahasa Polandia tersedia; pilih Polski di menu bahasa.
 
 ### A.2 Amerika Serikat
 

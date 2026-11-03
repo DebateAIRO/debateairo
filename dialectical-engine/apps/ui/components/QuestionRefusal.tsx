@@ -10,7 +10,14 @@ import { resolveCrisisCountry } from "@/lib/crisisLines";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
 /** V, 2026-10-28: a refusal carries its subject, its screen and whether to show the emergency number; nothing is kept. */
-type RefusalScreen = QuestionNotStarted | "UNAVAILABLE";
+export type RefusalScreen = QuestionNotStarted | "UNAVAILABLE";
+
+/** The question check's answer a failed ask carries: its subject's screen, "UNAVAILABLE" (503), or null when it is not the check's. */
+export function questionRefusalOf(failure: unknown): RefusalScreen | null {
+  if (!(failure instanceof ContractHttpError)) return null;
+  if (failure.status === 422 && failure.questionNotStarted !== null) return failure.questionNotStarted;
+  return failure.serverCode === "QUESTION_CHECK_UNAVAILABLE" ? "UNAVAILABLE" : null;
+}
 
 export function useQuestionRefusal({ catalog, locale, countryHint = null }: Readonly<{
   catalog: MessageCatalog;
@@ -20,18 +27,11 @@ export function useQuestionRefusal({ catalog, locale, countryHint = null }: Read
   const [screen, setScreen] = React.useState<RefusalScreen | null>(null);
   const [helpOpen, setHelpOpen] = React.useState(false);
   const offer = (failure: unknown): boolean => {
-    if (!(failure instanceof ContractHttpError)) return false;
-    if (failure.status === 422 && failure.questionNotStarted !== null) {
-      setHelpOpen(false);
-      setScreen(failure.questionNotStarted);
-      return true;
-    }
-    if (failure.serverCode === "QUESTION_CHECK_UNAVAILABLE") {
-      setHelpOpen(false);
-      setScreen("UNAVAILABLE");
-      return true;
-    }
-    return false;
+    const refusal = questionRefusalOf(failure);
+    if (refusal === null) return false;
+    setHelpOpen(false);
+    setScreen(refusal);
+    return true;
   };
   const dialog = helpOpen ? <CrisisSupportDialog catalog={catalog} locale={locale} countryHint={countryHint} onBack={() => setHelpOpen(false)} />
     : screen !== null ? <QuestionRefusalDialog

@@ -1048,7 +1048,7 @@ describe("P22 the Billing runbook", () => {
       // C5a fix round 1 (go-live row 74): Quaderno's RON calculation is one unpaid Romanian quote on this server, and
       // the server is kept, or built again, for step 7's RON and EUR payments.
       "ask once for a quote as a Romanian buyer and do not pay",
-      "leave without pressing **Continue to payment**",
+      "leave without pressing **Subscribe and pay**",
       "Keep the server until step 7's RON and EUR runs (`start --currency RON` and `start --currency EUR`) are done",
       "build a sandbox server again as above for those runs (go-live row 74)",
       "pay for Plus first: a cancel link is sent only for a plan that is paid",

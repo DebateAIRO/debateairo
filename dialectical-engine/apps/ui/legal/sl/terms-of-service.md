@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Na kratko
-eyebrow: POGOJI UPORABE · v2.12 · VELJAVNI OD 1. NOVEMBRA 2026
+eyebrow: POGOJI UPORABE · v2.14 · VELJAVNI OD 1. NOVEMBRA 2026
 title: S čim soglašate
 lede: Pogodba med vami in družbo DMS Merchandise Shop S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.
-endMarker: KONEC POGOJEV · v2.12
+endMarker: KONEC POGOJEV · v2.14
 bodyLabel: Besedilo Pogojev uporabe
 annexTitle: Priloga A — Regionalni pogoji
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PRAVO, KI SE UPORABLJA
 -->
 
-**Version 2.12 · Effective 1. novembra 2026 · Prejšnje različice so na dezbatere.ro/terms/versions · Jezik: slovenščina.**
+**Version 2.14 · Effective 1. novembra 2026 · Prejšnje različice so na dezbatere.ro/terms/versions · Jezik: slovenščina.**
 
 **In short.** Stari morate biti najmanj 18 let. Dialectical Engine z modeli umetne inteligence oblikuje argumente in vse, kar ustvari, je lahko napačno — to ni nasvet. Na brezplačnem paketu so vaše razprave po zaključku javne, po preverjanju z umetno inteligenco; na plačljivem paketu so zasebne, razen če jih objavite. Ko je razprava javna, jo lahko prebere vsakdo, in ostane javna. Besedilo, ki ga pošljete, se posreduje ponudnikom umetne inteligence, navedenim v našem Registru ponudnikov, in se ne uporablja za učenje modelov. Nezakonito vsebino prijavite na support@dezbatere.ro, ne glede na to, ali imate račun. Uporablja se romunsko pravo, vendar ohranite varstvo potrošnikov po svojem lokalnem pravu.
 
@@ -215,7 +215,7 @@ Razdelki 8 (glede že objavljene vsebine), 15, 16 in 18 ostanejo v veljavi tudi 
 
 Dialectical Engine ponuja brezplačen paket. Na voljo bo plačljivi paket **Premium**, ki bo odklenil celoten nabor modelov in vam omogočil, da sami nastavite parametre razprave.
 
-**Pred plačilom** vam neposredno nad gumbom za plačilo prikažemo: paket; skupno ceno z veljavnim davkom; obračunsko obdobje; dejstvo, da se paket samodejno obnavlja do preklica; datum, ko se konča morebitno brezplačno preskusno obdobje, in znesek, ki vam bo nato zaračunan; ter način preklica. Pogoje obnavljanja potrdite z označitvijo ločenega polja. Na gumbu piše **Naroči in plačaj** (v romunščini *Comandă cu obligație de plată*). Na trajnem nosilcu vam pošljemo potrdilo, ki vsebuje iste informacije, te Pogoje in obrazec za odstop.
+**Pred plačilom** vam neposredno nad gumbom za plačilo prikažemo: paket; skupno ceno z veljavnim davkom; obračunsko obdobje; dejstvo, da se paket samodejno obnavlja do preklica; datum, ko se konča morebitno brezplačno preskusno obdobje, in znesek, ki vam bo nato zaračunan; ter način preklica. Pogoje obnavljanja potrdite z označitvijo ločenega polja. Na gumbu piše **Naroči in plačaj** (v romunščini *Abonați-vă și plătiți*). Na trajnem nosilcu vam pošljemo potrdilo, ki vsebuje iste informacije, te Pogoje in obrazec za odstop.
 
 **Opomniki.** E-poštno sporočilo vam pošljemo najmanj 5 dni pred pretvorbo brezplačnega preskusnega obdobja v plačljivi paket; najmanj enkrat letno pri trajajočih paketih; ter od 30 do 45 dni pred vsakim podaljšanjem za obdobje dvanajstih mesecev ali več. Vsak opomnik vključuje ceno, datum in povezavo za preklic.
 
@@ -250,6 +250,10 @@ Dialectical Engine ponuja brezplačen paket. Na voljo bo plačljivi paket **Prem
 Na trajnem nosilcu vas vnaprej obvestimo, kaj se spreminja in kdaj. Če ima sprememba več kot zgolj manjši negativen vpliv na vaš dostop do storitve ali njeno uporabo, lahko brezplačno odpoveste pogodbo v **30 dneh** od obvestila ali začetka učinkovanja spremembe, kar je pozneje, mi pa vam vrnemo vse vnaprej plačane zneske za neizkoriščeno obdobje.
 
 **Spremembe teh Pogojev.** Te Pogoje lahko spremenimo iz enakih vrst razlogov. Pri spremembah, ki ne zmanjšujejo vaših pravic, objavimo novo različico s povzetkom sprememb in vam najmanj **30 dni** pred začetkom veljavnosti pošljemo e-poštno sporočilo; nadaljnja uporaba Dialectical Engine po tem datumu pomeni, da spremembo sprejemate, pred tem pa lahko zaprete račun. Pri spremembah, ki zmanjšujejo vaše pravice — vključno z zvišanjem cen obstoječega paketa, nižjimi omejitvami, odstranjenimi funkcijami, novimi načini uporabe vaše vsebine ali spremembami odgovornosti, prava, ki se uporablja, oziroma reševanja sporov — vas ob naslednji prijavi prosimo, da novo različico izrecno sprejmete, sprememba pa velja samo za naprej. Sprememb nikoli ne uveljavljamo za nazaj in tega razdelka nikoli ne uporabimo za spremembo bistva tega, kar ste plačali, med trajanjem pogodbe, ne da bi vam ponudili možnost odstopa. Prejšnje različice ostanejo dostopne na dezbatere.ro/terms/versions.
+
+Različica 2.14 je nadomestila različico 2.13: razdelek 18 in Priloga A navajata ANPC (SAL) kot pot za alternativno reševanje sporov.
+
+Različica 2.13 je nadomestila različico 2.12: razdelek 12 navaja romunski napis na gumbu za plačilo.
 
 Različica 2.12 je nadomestila različico 2.11: razdelek 10 navaja, da lahko prijavljena oseba tudi uporabi gumb Prijavi pri kateri koli javni razpravi, da umetna inteligenca prebere prijavo, oddano z njim, poleg javnega besedila, in kaj se nato zgodi.
 
@@ -297,7 +301,7 @@ Način ravnanja z osebnimi podatki je opisan v **Pravilniku o zasebnosti** na de
 
 **Potrošniki drugje.** Če živite zunaj EU in EGP, nič v teh Pogojih ne omejuje pravice, ki jo imate po pravu svoje države, da vložite zahtevek pri njenih sodiščih, ali katere koli pravice po tem pravu, ki se ji ni mogoče odpovedati — vključno s pravicami iz jamstev za potrošnike, če živite v Avstraliji ali Novi Zelandiji; zakonikom Código de Defesa do Consumidor, če živite v Braziliji; in zakoni o varstvu potrošnikov vaše zvezne države, če živite v Združenih državah Amerike.
 
-**Pred sodnim postopkom.** Obrnite se na nas na support@dezbatere.ro; večino težav je mogoče odpraviti, odgovoriti pa si prizadevamo v 5 delovnih dneh. Če ste potrošnik v Romuniji ali EU, lahko uporabite alternativno reševanje sporov prek www.onoratainstanta.ro; k sodelovanju v tem postopku se ne zavezujemo. Pritožbe zoper odločitve o moderiranju sledijo razdelku 10, ki je ločen postopek.
+**Pred sodnim postopkom.** Obrnite se na nas na support@dezbatere.ro; večino težav je mogoče odpraviti, odgovoriti pa si prizadevamo v 5 delovnih dneh. Če ste potrošnik v Romuniji ali EU, lahko uporabite alternativno reševanje sporov prek ANPC (SAL), reclamatiisal.anpc.ro; k sodelovanju v tem postopku se ne zavezujemo. Pritožbe zoper odločitve o moderiranju sledijo razdelku 10, ki je ločen postopek.
 
 ## 19. Drugi pogoji
 
@@ -319,7 +323,7 @@ Vsak vnos velja za osebe, ki živijo v njegovi regiji, in navaja samo razlike od
 
 ### A.1 Evropska unija in Evropski gospodarski prostor
 
-Splošni del teh Pogojev je napisan za vas. Poleg tega velja: postopek lahko začnete na sodiščih države, v kateri živite; velja pravica do odstopa iz razdelka 13; alternativno reševanje sporov je na voljo prek www.onoratainstanta.ro. **Nemčija:** gumb za preklic na dezbatere.ro/cancel vam omogoča, da naročnino prekinete brez prijave; trajanje naročnine, obdobja podaljšanja in odpovedni roki so skladni s členom 309(9) BGB: vsak paket traja en mesec in se vsak mesec podaljša, dokler ga ne odpoveste, odpoveste pa ga lahko kadar koli z učinkom ob koncu tekočega meseca. **Francija:** naročnino lahko v treh korakih prek spleta prekinete na dezbatere.ro/cancel. **Italija:** določbe o začasni onemogočitvi in prenehanju (11), plačljivih paketih in njihovem podaljšanju (12), spremembah (14), odgovornosti (15) in pravu, ki se uporablja, ter pristojnosti za spore (18) zahtevajo vašo posebno odobritev na podlagi 1341. in 1342. člena italijanskega civilnega zakonika. Podate jo z ločenim poljem ob registraciji, ki se prikaže vsakomur, ki v polju Regija izbere Italijo ali se povezuje iz Italije. **Nizozemska:** ti Pogoji so vam pred sklenitvijo zagotovljeni v obliki, ki jo je mogoče shraniti. **Poljska:** poljska različica je na voljo; v izbirniku jezikov izberite Polski.
+Splošni del teh Pogojev je napisan za vas. Poleg tega velja: postopek lahko začnete na sodiščih države, v kateri živite; velja pravica do odstopa iz razdelka 13; alternativno reševanje sporov je na voljo prek ANPC (SAL), reclamatiisal.anpc.ro. **Nemčija:** gumb za preklic na dezbatere.ro/cancel vam omogoča, da naročnino prekinete brez prijave; trajanje naročnine, obdobja podaljšanja in odpovedni roki so skladni s členom 309(9) BGB: vsak paket traja en mesec in se vsak mesec podaljša, dokler ga ne odpoveste, odpoveste pa ga lahko kadar koli z učinkom ob koncu tekočega meseca. **Francija:** naročnino lahko v treh korakih prek spleta prekinete na dezbatere.ro/cancel. **Italija:** določbe o začasni onemogočitvi in prenehanju (11), plačljivih paketih in njihovem podaljšanju (12), spremembah (14), odgovornosti (15) in pravu, ki se uporablja, ter pristojnosti za spore (18) zahtevajo vašo posebno odobritev na podlagi 1341. in 1342. člena italijanskega civilnega zakonika. Podate jo z ločenim poljem ob registraciji, ki se prikaže vsakomur, ki v polju Regija izbere Italijo ali se povezuje iz Italije. **Nizozemska:** ti Pogoji so vam pred sklenitvijo zagotovljeni v obliki, ki jo je mogoče shraniti. **Poljska:** poljska različica je na voljo; v izbirniku jezikov izberite Polski.
 
 ### A.2 Združene države Amerike
 

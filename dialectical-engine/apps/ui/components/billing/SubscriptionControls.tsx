@@ -7,14 +7,21 @@ import { formatLongDate, formatMoney, planName } from "@/lib/billing/format";
 import type { PaidPlanId } from "@/lib/billing/plans";
 import { catalogLocale, type LocaleCode } from "@/lib/i18n/locales";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import { COMPANY } from "@/lib/legal/pages";
 import billingEnglish from "@/messages/en/billing.json";
 import { ChargeStatusPoller } from "./ChargeStatusPoller";
 
 export type SubscriptionClient = Pick<ContractClient,
   | "getBillingSubscription" | "getBillingInvoices" | "quoteSubscriptionUpgrade" | "upgradeSubscription"
   | "downgradeSubscription" | "cancelSubscription" | "revokeSubscriptionCancel" | "withdrawSubscription"
-  | "stepUp" | "getBillingCharge" | "getBillingPlans"
+  | "stepUp" | "getBillingCharge" | "getBillingPlans" | "authMethods"
 >;
+/**
+ * Romania's withdrawal rules (owner ruling 2026-11-03): the button needs the password and the authenticator code. An
+ * account without that pair (created through social sign-in) is shown the email route instead; UNKNOWN (the methods
+ * could not be read) keeps the button, and the server refuses a withdrawal grant from any other step-up.
+ */
+type WithdrawPath = "LOADING" | "PASSWORD_TOTP" | "SOCIAL_ONLY" | "UNKNOWN";
 type Subscription = NonNullable<Awaited<ReturnType<ContractClient["getBillingSubscription"]>>["subscription"]>;
 type Invoice = Awaited<ReturnType<ContractClient["getBillingInvoices"]>>["invoices"][number];
 type UpgradeQuote = Awaited<ReturnType<ContractClient["quoteSubscriptionUpgrade"]>>;
@@ -225,6 +232,21 @@ export function SubscriptionControls({
 
   useEffect(() => { void reload(); }, [reload]);
 
+  // Only a subscription that can still be withdrawn from asks which step-up the account has.
+  const [withdrawPath, setWithdrawPath] = useState<WithdrawPath>("LOADING");
+  const withdrawable = subscription !== null && subscription.status === "ACTIVE" && subscription.withdrawal_open_until !== null;
+  useEffect(() => {
+    if (!withdrawable) return;
+    let current = true;
+    client.authMethods().then(
+      (methods) => {
+        if (current) setWithdrawPath(methods.available_step_up_methods.includes("password_totp") ? "PASSWORD_TOTP" : "SOCIAL_ONLY");
+      },
+      () => { if (current) setWithdrawPath("UNKNOWN"); }
+    );
+    return () => { current = false; };
+  }, [client, withdrawable]);
+
   async function run(
     action: () => Promise<void>,
     words: (failure: unknown) => FailureWords = () => ACTION_FAILED
@@ -378,12 +400,17 @@ export function SubscriptionControls({
                 {t(catalog, "billing.subscription.cancel")}
               </button>
             )}
-            {withdrawOpen ? (
+            {withdrawOpen && (withdrawPath === "PASSWORD_TOTP" || withdrawPath === "UNKNOWN") ? (
               <button type="button" className="setBtn" disabled={busy} onClick={() => setPanel("WITHDRAW")}>
                 {t(catalog, "billing.subscription.withdraw")}
               </button>
             ) : null}
           </div>
+          {withdrawOpen && withdrawPath === "SOCIAL_ONLY" ? (
+            <p className="setCardNote" data-withdraw-social-only>
+              {t(catalog, "billing.subscription.withdrawSocialOnly", { email: COMPANY.emails.general })}
+            </p>
+          ) : null}
           {panel === "CHANGE" ? (
             <div className="setCardRow">
               {live.can_upgrade ? UPGRADE_TARGETS.filter((planId) => rankOf(planId) > currentRank).map((planId) => (
@@ -495,7 +522,7 @@ export function SubscriptionControls({
               </div>
             </div>
           ) : null}
-          {panel === "WITHDRAW" ? (
+          {panel === "WITHDRAW" && withdrawPath !== "SOCIAL_ONLY" ? (
             <form onSubmit={withdraw}>
               <p className="setCardNote">{t(catalog, "billing.subscription.withdrawHint", { date: date(live.withdrawal_last_day) })}</p>
               <p className="setCardNote">{t(catalog, "billing.subscription.stepUpHint")}</p>

@@ -30,14 +30,19 @@ import PricingPage from "../../apps/ui/app/pricing/page.js";
 import TermsPage from "../../apps/ui/app/terms/page.js";
 import WithdrawPage from "../../apps/ui/app/withdraw/page.js";
 
-/** GET /v1/billing/plans as the API answers it with every country closed (the integration suite's answer). */
+/**
+ * GET /v1/billing/plans as the API answers it with every country closed (the integration suite's answer for a German
+ * connection: that stack prices every country in US dollars, with Germany's 19 % in each paid price, Terms §12).
+ */
 const PLANS = Object.freeze({
   currency: "USD" as const,
+  place: { country: "DE", postal_code: null, status: "PRICED" as const },
+  tax: { country: "DE", tax_name: "MwSt.", tax_rate_bp: 1_900, tax_status: "TAXABLE" as const },
   plans: [
-    { plan_id: "FREE" as const, net_prices: { USD: "0.00", EUR: "0.00", RON: "0.00" }, allowance_vs_plus: "0.04" },
-    { plan_id: "PLUS" as const, net_prices: { USD: "20.00", EUR: "20.00", RON: "100.00" }, allowance_vs_plus: "1" },
-    { plan_id: "PRO" as const, net_prices: { USD: "50.00", EUR: "50.00", RON: "250.00" }, allowance_vs_plus: "4" },
-    { plan_id: "MAX" as const, net_prices: { USD: "200.00", EUR: "200.00", RON: "1000.00" }, allowance_vs_plus: "30" }
+    { plan_id: "FREE" as const, net_prices: { USD: "0.00", EUR: "0.00", RON: "0.00" }, total_price: "0.00", allowance_vs_plus: "0.04" },
+    { plan_id: "PLUS" as const, net_prices: { USD: "20.00", EUR: "20.00", RON: "100.00" }, total_price: "23.80", allowance_vs_plus: "1" },
+    { plan_id: "PRO" as const, net_prices: { USD: "50.00", EUR: "50.00", RON: "250.00" }, total_price: "59.50", allowance_vs_plus: "4" },
+    { plan_id: "MAX" as const, net_prices: { USD: "200.00", EUR: "200.00", RON: "1000.00" }, total_price: "238.00", allowance_vs_plus: "30" }
   ]
 });
 const BILLING_LINKS = ["/pricing", "/cancel", "/withdraw"];
@@ -77,10 +82,11 @@ describe("NETOPIA's check: billing on with every country closed for payment, on 
     const document = await page(PricingPage);
     expect([...document.querySelectorAll("[data-plan]")].map((card) => card.getAttribute("data-plan"))).toEqual(["FREE", "PLUS", "PRO", "MAX"]);
     const plus = document.querySelector('[data-plan="PLUS"]')!;
-    expect(plus.textContent).toContain("$20.00 a month");
+    expect(plus.textContent).toContain("$23.80 a month");
+    expect(plus.textContent).toContain("Tax included (19%, Germany)");
     expect(plus.querySelector("a")?.getAttribute("href")).toBe("/checkout?plan=PLUS");
-    expect(document.querySelector('[data-plan="PRO"]')?.textContent).toContain("$50.00 a month");
-    expect(document.querySelector('[data-plan="MAX"]')?.textContent).toContain("$200.00 a month");
+    expect(document.querySelector('[data-plan="PRO"]')?.textContent).toContain("$59.50 a month");
+    expect(document.querySelector('[data-plan="MAX"]')?.textContent).toContain("$238.00 a month");
     expect(document.body.textContent).not.toContain("The plans can't be shown right now.");
   });
 

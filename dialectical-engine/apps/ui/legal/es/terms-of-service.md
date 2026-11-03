@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: En resumen
-eyebrow: TÉRMINOS DE SERVICIO · v2.12 · EN VIGOR DESDE 1 DE NOVIEMBRE DE 2026
+eyebrow: TÉRMINOS DE SERVICIO · v2.14 · EN VIGOR DESDE 1 DE NOVIEMBRE DE 2026
 title: Lo que usted acepta
 lede: El contrato entre usted y DMS Merchandise Shop S.R.L., en lenguaje claro. Diecinueve secciones y el anexo A — desplácese hasta el final.
-endMarker: FIN DE LOS TÉRMINOS · v2.12
+endMarker: FIN DE LOS TÉRMINOS · v2.14
 bodyLabel: Texto de los Términos de servicio
 annexTitle: Anexo A — Términos regionales
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEY APLICABLE
 -->
 
-**Version 2.12 · Effective 1 de noviembre de 2026 · Versiones anteriores en dezbatere.ro/terms/versions · Idioma: español.**
+**Version 2.14 · Effective 1 de noviembre de 2026 · Versiones anteriores en dezbatere.ro/terms/versions · Idioma: español.**
 
 **In short.** Debe tener al menos 18 años. Dialectical Engine elabora argumentos mediante modelos de IA y todo lo que genera puede ser erróneo; no constituye asesoramiento. En el plan gratuito, sus debates son públicos cuando terminan, tras una comprobación de IA; en un plan de pago son privados salvo que los publique. Una vez públicos, cualquiera puede leer un debate, y sigue siendo público. El texto que envía se remite a los proveedores de IA incluidos en nuestro Registro de proveedores y no se utiliza para entrenar modelos. Denuncie contenido ilícito en support@dezbatere.ro, tenga o no una cuenta. Se aplica la legislación rumana, pero usted conserva la protección local que le corresponda como consumidor.
 
@@ -215,7 +215,7 @@ Las secciones 8 (respecto del contenido ya publicado), 15, 16 y 18 seguirán vig
 
 Dialectical Engine ofrece un plan gratuito. Un plan de pago **Premium** estará disponible, que desbloquea toda la selección de modelos y le permite configurar usted mismo los parámetros del debate.
 
-**Antes de que pague**, le mostramos, justo encima del botón de pago: el plan; el precio total con los impuestos aplicables; el período de facturación; que el plan se renueva automáticamente hasta que se cancele; la fecha en que finaliza cualquier prueba gratuita y el importe que se le cobrará entonces; y cómo cancelar. Usted confirma las condiciones de renovación marcando una casilla aparte. El botón indica **Suscribirse y pagar** (en rumano, *Comandă cu obligație de plată*). Le enviamos una confirmación en un soporte duradero que contiene la misma información, estos Términos y el formulario de desistimiento.
+**Antes de que pague**, le mostramos, justo encima del botón de pago: el plan; el precio total con los impuestos aplicables; el período de facturación; que el plan se renueva automáticamente hasta que se cancele; la fecha en que finaliza cualquier prueba gratuita y el importe que se le cobrará entonces; y cómo cancelar. Usted confirma las condiciones de renovación marcando una casilla aparte. El botón indica **Suscribirse y pagar** (en rumano, *Abonați-vă și plătiți*). Le enviamos una confirmación en un soporte duradero que contiene la misma información, estos Términos y el formulario de desistimiento.
 
 **Recordatorios.** Le enviamos un correo electrónico al menos 5 días antes de que una prueba gratuita se convierta en un plan de pago; al menos una vez al año en el caso de planes continuados; y entre 30 y 45 días antes de cualquier renovación de un plazo de doce meses o más. Cada recordatorio incluye el precio, la fecha y un enlace de cancelación.
 
@@ -250,6 +250,10 @@ Si vive en otro lugar, el anexo A indica el derecho de desistimiento o período 
 Le informaremos de antemano, en un soporte duradero, de qué va a cambiar y cuándo. Si el cambio tiene un efecto negativo que no sea menor sobre su acceso al servicio o su uso, podrá resolver el contrato sin coste alguno en un plazo de **30 días** desde que se le informe o desde que el cambio surta efecto, si esta fecha es posterior, y le reembolsaremos cualquier importe pagado por adelantado correspondiente al período no utilizado.
 
 **En estos Términos.** Podemos modificar estos Términos por los mismos tipos de motivos. Para los cambios que no reduzcan sus derechos, publicaremos la nueva versión con un resumen de las modificaciones y le enviaremos un correo electrónico al menos **30 días** antes de que entre en vigor; si continúa utilizando Dialectical Engine después de esa fecha, se entenderá que la acepta, y puede cerrar su cuenta antes de entonces. Para los cambios que reduzcan sus derechos —incluidos aumentos de precio de un plan existente, límites inferiores, funciones retiradas, nuevos usos de su contenido o cambios en la responsabilidad, la ley aplicable o la resolución de controversias—, le pediremos que acepte expresamente la nueva versión la próxima vez que inicie sesión, y el cambio solo se aplicará en lo sucesivo. Nunca aplicamos cambios con carácter retroactivo ni utilizamos esta sección para modificar, durante la vigencia del contrato, la esencia de aquello por lo que ha pagado sin ofrecerle una vía de salida. Las versiones anteriores seguirán disponibles en dezbatere.ro/terms/versions.
+
+La versión 2.14 sustituyó a la versión 2.13: la sección 18 y el anexo A indican ANPC (SAL) como vía para la resolución alternativa de litigios.
+
+La versión 2.13 sustituyó a la versión 2.12: la sección 12 indica el texto en rumano del botón de pago.
 
 La versión 2.12 sustituyó a la versión 2.11: la sección 10 indica que una persona que ha iniciado sesión también puede usar el botón Denunciar de cualquier debate público, que una IA lee una denuncia hecha con él junto al texto público, y qué ocurre entonces.
 
@@ -297,7 +301,7 @@ La forma en que tratamos los datos personales se expone en la **Política de pri
 
 **Consumidores de otros lugares.** Si vive fuera de la UE y el EEE, nada de lo dispuesto en estos Términos limita ningún derecho que tenga, conforme a la legislación de su país, a presentar una reclamación ante sus tribunales, ni ningún derecho que no pueda ser objeto de renuncia conforme a dicha legislación; incluidos, si vive en Australia o Nueva Zelanda, sus derechos de garantía como consumidor; si vive en Brasil, los derechos derivados del Código de Defesa do Consumidor; y, si vive en Estados Unidos, las normas de protección de los consumidores de su estado.
 
-**Antes de acudir a los tribunales.** Póngase en contacto con nosotros en support@dezbatere.ro; la mayoría de las cuestiones pueden resolverse y nuestro objetivo es responder en un plazo de 5 días laborables. Si es un consumidor de Rumanía o de la UE, puede utilizar la resolución alternativa de litigios a través de www.onoratainstanta.ro; no nos comprometemos a participar en dicho procedimiento. Las reclamaciones relativas a decisiones de moderación siguen la sección 10, que constituye una vía separada.
+**Antes de acudir a los tribunales.** Póngase en contacto con nosotros en support@dezbatere.ro; la mayoría de las cuestiones pueden resolverse y nuestro objetivo es responder en un plazo de 5 días laborables. Si es un consumidor de Rumanía o de la UE, puede utilizar la resolución alternativa de litigios a través de ANPC (SAL), reclamatiisal.anpc.ro; no nos comprometemos a participar en dicho procedimiento. Las reclamaciones relativas a decisiones de moderación siguen la sección 10, que constituye una vía separada.
 
 ## 19. Otras disposiciones
 
@@ -319,7 +323,7 @@ Cada apartado se aplica a las personas que viven en su región y solo establece 
 
 ### A.1 Unión Europea y Espacio Económico Europeo
 
-El cuerpo de estos Términos está redactado para usted. Además: puede iniciar un procedimiento ante los tribunales del país donde vive; se aplica el derecho de desistimiento de la sección 13; puede recurrir a la resolución alternativa de litigios a través de www.onoratainstanta.ro. **Alemania:** el botón de cancelación disponible en dezbatere.ro/cancel le permite finalizar una suscripción sin iniciar sesión; las condiciones de suscripción, los períodos de renovación y los plazos de preaviso cumplen lo dispuesto en el §309(9) BGB: cada plan tiene una duración de un mes y se renueva mensualmente hasta que lo cancele, y puede cancelarlo en cualquier momento con efecto al final del mes en curso. **Francia:** puede finalizar una suscripción en línea en tres pasos en dezbatere.ro/cancel. **Italia:** las cláusulas sobre suspensión y terminación (11), planes de pago y su renovación (12), cambios (14), responsabilidad (15) y ley aplicable y órganos competentes para conocer de las controversias (18) requieren su aprobación específica conforme a los artículos 1341 y 1342 del Código Civil italiano. Usted la presta mediante una casilla separada al registrarse, que se muestra a quien elija Italia en el campo Región o cuya conexión proceda de Italia. **Países Bajos:** estos Términos se facilitan en un formato almacenable antes de su celebración. **Polonia:** hay una versión en polaco disponible; elija Polski en el selector de idioma.
+El cuerpo de estos Términos está redactado para usted. Además: puede iniciar un procedimiento ante los tribunales del país donde vive; se aplica el derecho de desistimiento de la sección 13; puede recurrir a la resolución alternativa de litigios a través de ANPC (SAL), reclamatiisal.anpc.ro. **Alemania:** el botón de cancelación disponible en dezbatere.ro/cancel le permite finalizar una suscripción sin iniciar sesión; las condiciones de suscripción, los períodos de renovación y los plazos de preaviso cumplen lo dispuesto en el §309(9) BGB: cada plan tiene una duración de un mes y se renueva mensualmente hasta que lo cancele, y puede cancelarlo en cualquier momento con efecto al final del mes en curso. **Francia:** puede finalizar una suscripción en línea en tres pasos en dezbatere.ro/cancel. **Italia:** las cláusulas sobre suspensión y terminación (11), planes de pago y su renovación (12), cambios (14), responsabilidad (15) y ley aplicable y órganos competentes para conocer de las controversias (18) requieren su aprobación específica conforme a los artículos 1341 y 1342 del Código Civil italiano. Usted la presta mediante una casilla separada al registrarse, que se muestra a quien elija Italia en el campo Región o cuya conexión proceda de Italia. **Países Bajos:** estos Términos se facilitan en un formato almacenable antes de su celebración. **Polonia:** hay una versión en polaco disponible; elija Polski en el selector de idioma.
 
 ### A.2 Estados Unidos
 

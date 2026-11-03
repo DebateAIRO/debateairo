@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kort fortalt
-eyebrow: TJENESTEVILKÅR · v2.12 · GÆLDENDE FRA 1. NOVEMBER 2026
+eyebrow: TJENESTEVILKÅR · v2.14 · GÆLDENDE FRA 1. NOVEMBER 2026
 title: Det, du accepterer
 lede: Aftalen mellem dig og DMS Merchandise Shop S.R.L. i et klart sprog. Nitten afsnit og bilag A — rul ned til slutningen.
-endMarker: SLUT PÅ VILKÅRENE · v2.12
+endMarker: SLUT PÅ VILKÅRENE · v2.14
 bodyLabel: Tjenestevilkårenes tekst
 annexTitle: Bilag A — Regionale vilkår
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LOVVALG
 -->
 
-**Version 2.12 · Effective 1. november 2026 · Tidligere versioner på dezbatere.ro/terms/versions · Sprog: Dansk.**
+**Version 2.14 · Effective 1. november 2026 · Tidligere versioner på dezbatere.ro/terms/versions · Sprog: Dansk.**
 
 **In short.** Du skal være fyldt 18 år. Dialectical Engine opbygger argumenter ved hjælp af AI-modeller, og alt, hvad tjenesten genererer, kan være forkert — det er ikke rådgivning. På det gratis abonnement er dine debatter offentlige, når de er afsluttet, efter en AI-kontrol; på et betalt abonnement er de private, medmindre du offentliggør dem. Når en debat er offentlig, kan alle læse den, og den forbliver offentlig. Tekst, du indsender, sendes til de AI-udbydere, der er anført i vores udbyderregister, og bruges ikke til at træne modeller. Anmeld ulovligt indhold på support@dezbatere.ro, uanset om du har en konto eller ej. Rumænsk ret finder anvendelse, men du bevarer din lokale forbrugerbeskyttelse.
 
@@ -215,7 +215,7 @@ Afsnit 8 (for så vidt angår allerede offentliggjort indhold), 15, 16 og 18 bes
 
 Dialectical Engine tilbyder et gratis abonnement. Et betalt **Premium**-abonnement bliver tilgængeligt og giver adgang til hele modeludvalget samt mulighed for selv at indstille debattens målere.
 
-**Før du betaler**, viser vi dig direkte over betalingsknappen: abonnementet; den samlede pris inklusive gældende afgifter; faktureringsperioden; at abonnementet fornys automatisk, indtil det opsiges; datoen, hvor en eventuel gratis prøveperiode udløber, og det beløb, du derefter skal betale; samt hvordan du opsiger. Du bekræfter vilkårene om fornyelse ved at markere et særskilt felt. På knappen står der **Abonner og betal** (på rumænsk *Comandă cu obligație de plată*). Vi sender dig en bekræftelse på et varigt medium med de samme oplysninger, disse vilkår og fortrydelsesformularen.
+**Før du betaler**, viser vi dig direkte over betalingsknappen: abonnementet; den samlede pris inklusive gældende afgifter; faktureringsperioden; at abonnementet fornys automatisk, indtil det opsiges; datoen, hvor en eventuel gratis prøveperiode udløber, og det beløb, du derefter skal betale; samt hvordan du opsiger. Du bekræfter vilkårene om fornyelse ved at markere et særskilt felt. På knappen står der **Abonner og betal** (på rumænsk *Abonați-vă și plătiți*). Vi sender dig en bekræftelse på et varigt medium med de samme oplysninger, disse vilkår og fortrydelsesformularen.
 
 **Påmindelser.** Vi sender dig en e-mail mindst 5 dage før en gratis prøveperiode overgår til et betalt abonnement; mindst én gang om året for løbende abonnementer; og mellem 30 og 45 dage før enhver fornyelse af en periode på tolv måneder eller mere. Hver påmindelse indeholder prisen, datoen og et link til opsigelse.
 
@@ -250,6 +250,10 @@ Hvis du bor et andet sted, angiver bilag A den fortrydelsesret eller betænkning
 Vi oplyser dig på forhånd på et varigt medium om, hvad der ændres og hvornår. Hvis ændringen har mere end en mindre negativ indvirkning på din adgang til eller brug af tjenesten, kan du uden omkostninger opsige inden for **30 dage** efter, at du blev underrettet, eller efter at ændringen fik virkning, alt efter hvilken dato der ligger senest, og vi tilbagebetaler eventuelle forudbetalte beløb for den uudnyttede periode.
 
 **Disse vilkår.** Vi kan ændre disse vilkår af samme type grunde. Ved ændringer, der ikke begrænser dine rettigheder, offentliggør vi den nye version med et resumé af ændringerne og sender dig en e-mail mindst **30 dage**, før den får virkning; hvis du fortsætter med at bruge Dialectical Engine efter denne dato, betyder det, at du accepterer den, og du kan lukke din konto inden da. Ved ændringer, der begrænser dine rettigheder — herunder prisstigninger på et eksisterende abonnement, lavere grænser, fjernede funktioner, nye anvendelser af dit indhold eller ændringer af ansvar, lovvalg eller tvistbilæggelse — beder vi dig udtrykkeligt acceptere den nye version ved dit næste login, og ændringen gælder kun fremadrettet. Vi foretager aldrig ændringer med tilbagevirkende kraft, og vi bruger aldrig dette afsnit til at ændre kernen i det, du har betalt for, midt i en periode uden at tilbyde dig en udvej. Tidligere versioner forbliver tilgængelige på dezbatere.ro/terms/versions.
+
+Version 2.14 erstattede version 2.13: afsnit 18 og bilag A angiver ANPC (SAL) som vejen til alternativ tvistbilæggelse.
+
+Version 2.13 erstattede version 2.12: afsnit 12 oplyser betalingsknappens rumænske ordlyd.
 
 Version 2.12 erstattede version 2.11: afsnit 10 oplyser, at en person, der er logget ind, også kan bruge knappen Anmeld på enhver offentlig debat, at en AI læser en anmeldelse, der er indsendt med den, ved siden af den offentlige tekst, og hvad der så sker.
 
@@ -297,7 +301,7 @@ Det fremgår af **privatlivspolitikken** på dezbatere.ro/privacy, hvordan vi be
 
 **Forbrugere andre steder.** Hvis du bor uden for EU og EØS, begrænser intet i disse vilkår din ret efter lovgivningen i dit land til at anlægge sag ved landets domstole eller nogen rettighed efter denne lovgivning, der ikke kan fraviges — herunder, hvis du bor i Australien eller New Zealand, dine rettigheder i henhold til forbrugergarantier; hvis du bor i Brasilien, Código de Defesa do Consumidor; og hvis du bor i USA, forbrugerbeskyttelseslovgivningen i din delstat.
 
-**Før du går rettens vej.** Kontakt os på support@dezbatere.ro; de fleste forhold kan løses, og vi bestræber os på at svare inden for 5 arbejdsdage. Hvis du er forbruger i Rumænien eller EU, kan du benytte alternativ tvistbilæggelse gennem www.onoratainstanta.ro; vi forpligter os ikke til at deltage i denne procedure. Klager over moderationsafgørelser følger afsnit 10, som er en særskilt fremgangsmåde.
+**Før du går rettens vej.** Kontakt os på support@dezbatere.ro; de fleste forhold kan løses, og vi bestræber os på at svare inden for 5 arbejdsdage. Hvis du er forbruger i Rumænien eller EU, kan du benytte alternativ tvistbilæggelse gennem ANPC (SAL), reclamatiisal.anpc.ro; vi forpligter os ikke til at deltage i denne procedure. Klager over moderationsafgørelser følger afsnit 10, som er en særskilt fremgangsmåde.
 
 ## 19. Andre vilkår
 
@@ -319,7 +323,7 @@ Hvert punkt gælder for personer, der bor i den pågældende region, og angiver 
 
 ### A.1 Den Europæiske Union og Det Europæiske Økonomiske Samarbejdsområde
 
-Hovedteksten i disse vilkår er skrevet til dig. Derudover gælder følgende: Du kan anlægge sag ved domstolene i det land, hvor du bor; fortrydelsesretten i afsnit 13 gælder; alternativ tvistbilæggelse er tilgængelig gennem www.onoratainstanta.ro. **Tyskland:** Opsigelsesknappen på dezbatere.ro/cancel giver dig mulighed for at opsige et abonnement uden at logge ind; abonnementsperioder, fornyelsesperioder og opsigelsesvarsler overholder §309(9) BGB: hvert abonnement løber i én måned og fornyes månedligt, indtil du opsiger det, og du kan til enhver tid opsige det med virkning fra udgangen af den igangværende måned. **Frankrig:** Du kan opsige et abonnement online i tre trin på dezbatere.ro/cancel. **Italien:** Bestemmelserne om suspension og ophør (11), betalingsabonnementer og deres fornyelse (12), ændringer (14), ansvar (15) og lovvalg og værneting (18) kræver din specifikke godkendelse i henhold til artikel 1341 og 1342 i den italienske civillov. Du giver den ved hjælp af et særskilt felt ved tilmelding, som vises for alle, der vælger Italien i feltet Region, eller hvis forbindelse kommer fra Italien. **Nederlandene:** Disse vilkår stilles til rådighed i en form, der kan lagres, inden aftalen indgås. **Polen:** En polsk version er tilgængelig; vælg Polski i sprogvælgeren.
+Hovedteksten i disse vilkår er skrevet til dig. Derudover gælder følgende: Du kan anlægge sag ved domstolene i det land, hvor du bor; fortrydelsesretten i afsnit 13 gælder; alternativ tvistbilæggelse er tilgængelig gennem ANPC (SAL), reclamatiisal.anpc.ro. **Tyskland:** Opsigelsesknappen på dezbatere.ro/cancel giver dig mulighed for at opsige et abonnement uden at logge ind; abonnementsperioder, fornyelsesperioder og opsigelsesvarsler overholder §309(9) BGB: hvert abonnement løber i én måned og fornyes månedligt, indtil du opsiger det, og du kan til enhver tid opsige det med virkning fra udgangen af den igangværende måned. **Frankrig:** Du kan opsige et abonnement online i tre trin på dezbatere.ro/cancel. **Italien:** Bestemmelserne om suspension og ophør (11), betalingsabonnementer og deres fornyelse (12), ændringer (14), ansvar (15) og lovvalg og værneting (18) kræver din specifikke godkendelse i henhold til artikel 1341 og 1342 i den italienske civillov. Du giver den ved hjælp af et særskilt felt ved tilmelding, som vises for alle, der vælger Italien i feltet Region, eller hvis forbindelse kommer fra Italien. **Nederlandene:** Disse vilkår stilles til rådighed i en form, der kan lagres, inden aftalen indgås. **Polen:** En polsk version er tilgængelig; vælg Polski i sprogvælgeren.
 
 ### A.2 USA
 

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Röviden
-eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v2.12 · HATÁLYOS 2026. NOVEMBER 1.
+eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v2.14 · HATÁLYOS 2026. NOVEMBER 1.
 title: Amit Ön elfogad
 lede: Az Ön és a DMS Merchandise Shop S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.
-endMarker: A FELTÉTELEK VÉGE · v2.12
+endMarker: A FELTÉTELEK VÉGE · v2.14
 bodyLabel: A Szolgáltatási feltételek szövege
 annexTitle: A. melléklet — Regionális feltételek
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 IRÁNYADÓ JOG
 -->
 
-**Version 2.12 · Effective 2026. november 1. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
+**Version 2.14 · Effective 2026. november 1. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
 
 **In short.** Önnek legalább 18 évesnek kell lennie. A Dialectical Engine mesterségesintelligencia-modellekkel épít fel érveket, és minden általa létrehozott tartalom téves lehet — nem minősül tanácsadásnak. Az ingyenes csomagon az Ön vitái befejezésük után, MI-ellenőrzést követően nyilvánosak; fizetős csomagon bizalmasak, amíg közzé nem teszi őket. Nyilvánossá válva bárki elolvashatja a vitát, és az nyilvános marad. Az Ön által beküldött szöveget továbbítjuk a Szolgáltatói nyilvántartásunkban felsorolt MI-szolgáltatóknak, és azt nem használjuk modellek betanítására. Jogellenes tartalmat a support@dezbatere.ro címen jelenthet be, függetlenül attól, hogy rendelkezik-e fiókkal. A román jog az irányadó, de az Ön helyi fogyasztóvédelmi jogai változatlanul megilletik.
 
@@ -215,7 +215,7 @@ A 8. szakasz (a már közzétett tartalom tekintetében), valamint a 15., 16. é
 
 A Dialectical Engine ingyenes csomagot kínál. Egy fizetős **Prémium** csomag lesz elérhető, amely hozzáférést biztosít a modellek teljes választékához, és lehetővé teszi, hogy Ön állítsa be a vita mérőit.
 
-**Fizetés előtt** közvetlenül a fizetési gomb felett megjelenítjük Önnek: a csomagot; az alkalmazandó adóval növelt teljes árat; a számlázási időszakot; azt, hogy a csomag lemondásig automatikusan megújul; az esetleges ingyenes próbaidőszak végét és az azt követően felszámítandó összeget; valamint a lemondás módját. A megújítási feltételeket külön jelölőnégyzet bejelölésével erősíti meg. A gomb felirata **Előfizetés és fizetés** (románul *Comandă cu obligație de plată*). Ugyanezeket az információkat, e Feltételeket és az elállási nyomtatványt tartalmazó visszaigazolást tartós adathordozón küldjük meg Önnek.
+**Fizetés előtt** közvetlenül a fizetési gomb felett megjelenítjük Önnek: a csomagot; az alkalmazandó adóval növelt teljes árat; a számlázási időszakot; azt, hogy a csomag lemondásig automatikusan megújul; az esetleges ingyenes próbaidőszak végét és az azt követően felszámítandó összeget; valamint a lemondás módját. A megújítási feltételeket külön jelölőnégyzet bejelölésével erősíti meg. A gomb felirata **Előfizetés és fizetés** (románul *Abonați-vă și plătiți*). Ugyanezeket az információkat, e Feltételeket és az elállási nyomtatványt tartalmazó visszaigazolást tartós adathordozón küldjük meg Önnek.
 
 **Emlékeztetők.** E-mailben emlékeztetjük Önt legalább 5 nappal azelőtt, hogy egy ingyenes próbaidőszak fizetős csomaggá alakul; folyamatos csomagok esetén évente legalább egyszer; továbbá a legalább tizenkét hónapos időszak minden megújítása előtt 30–45 nappal. Minden emlékeztető tartalmazza az árat, a dátumot és a lemondási hivatkozást.
 
@@ -250,6 +250,10 @@ Ha Ön máshol él, az A. melléklet határozza meg a régiójában esetlegesen 
 Tartós adathordozón előzetesen közöljük Önnel, mi és mikor változik. Ha a módosítás az Ön szolgáltatáshoz való hozzáférésére vagy annak használatára kisebbnél nagyobb hátrányos hatást gyakorol, Ön az értesítéstől vagy a módosítás hatálybalépésétől számított **30 napon** belül — a kettő közül a későbbi időpontig — díjmentesen megszüntetheti a szerződést, mi pedig visszatérítjük a fel nem használt időszakra előre kifizetett összeget.
 
 **E Feltételek módosítása.** E Feltételeket ugyanezen típusú okokból módosíthatjuk. Az Ön jogait nem csökkentő módosítások esetén legalább **30 nappal** a hatálybalépés előtt közzétesszük az új változatot a módosítások összefoglalásával, és e-mailben értesítjük Önt; ha ezt az időpontot követően tovább használja a Dialectical Engine szolgáltatást, azzal elfogadja a módosítást, fiókját pedig ezt megelőzően megszüntetheti. Az Ön jogait csökkentő módosítások — ideértve egy meglévő csomag árának emelését, az alacsonyabb korlátokat, funkciók eltávolítását, tartalmának új felhasználási módjait, illetve a felelősség, az irányadó jog vagy a vitarendezés módosítását — esetén következő bejelentkezésekor kifejezett elfogadását kérjük, és a módosítás csak a jövőre nézve alkalmazandó. Módosítást soha nem alkalmazunk visszamenőleg, és e szakaszt soha nem használjuk arra, hogy a már kifizetett szolgáltatás lényegét a futamidő alatt megváltoztassuk anélkül, hogy kilépési lehetőséget biztosítanánk. A korábbi változatok továbbra is elérhetők itt: dezbatere.ro/terms/versions.
+
+A 2.14-es verzió a 2.13-as verzió helyébe lépett: a 18. szakasz és az A. melléklet az ANPC (SAL) szervet nevezi meg az alternatív vitarendezés útjaként.
+
+A 2.13-as verzió a 2.12-es verzió helyébe lépett: a 12. szakasz megadja a fizetési gomb román nyelvű feliratát.
 
 A 2.12-es verzió a 2.11-es verzió helyébe lépett: a 10. szakasz kimondja, hogy egy bejelentkezett személy a nyilvános vitáknál a Bejelentés gombot is használhatja, hogy egy MI a gombbal tett bejelentést a nyilvános szöveg mellett olvassa, és hogy ezután mi történik.
 
@@ -297,7 +301,7 @@ A személyes adatok kezelésének módját a dezbatere.ro/privacy címen elérhe
 
 **Máshol élő fogyasztók.** Ha Ön az EU-n és az EGT-n kívül él, e Feltételek egyetlen rendelkezése sem korlátozza az Ön országának joga alapján fennálló jogát arra, hogy annak bíróságai előtt igényt érvényesítsen, sem bármely, e jog alapján le nem mondható jogát — ideértve, ha Ön Ausztráliában vagy Új-Zélandon él, a fogyasztói garanciákhoz fűződő jogait; ha Brazíliában él, a Código de Defesa do Consumidor rendelkezéseit; ha pedig az Egyesült Államokban él, az állama fogyasztóvédelmi jogszabályait.
 
-**Bírósághoz fordulás előtt.** Lépjen velünk kapcsolatba a support@dezbatere.ro címen; a legtöbb probléma orvosolható, és célunk, hogy 5 munkanapon belül válaszoljunk. Ha Ön romániai vagy uniós fogyasztó, igénybe veheti a www.onoratainstanta.ro útján elérhető alternatív vitarendezést; nem vállaljuk az eljárásban való részvételt. A moderálási döntésekre vonatkozó panaszokra a 10. szakasz szerinti külön eljárás alkalmazandó.
+**Bírósághoz fordulás előtt.** Lépjen velünk kapcsolatba a support@dezbatere.ro címen; a legtöbb probléma orvosolható, és célunk, hogy 5 munkanapon belül válaszoljunk. Ha Ön romániai vagy uniós fogyasztó, igénybe veheti a ANPC (SAL), reclamatiisal.anpc.ro útján elérhető alternatív vitarendezést; nem vállaljuk az eljárásban való részvételt. A moderálási döntésekre vonatkozó panaszokra a 10. szakasz szerinti külön eljárás alkalmazandó.
 
 ## 19. Egyéb feltételek
 
@@ -319,7 +323,7 @@ Minden bejegyzés az adott régióban élő személyekre alkalmazandó, és csak
 
 ### A.1 Európai Unió és Európai Gazdasági Térség
 
-E Feltételek törzsszövege Önnek szól. Ezen túlmenően: Ön a lakóhelye szerinti ország bíróságai előtt indíthat eljárást; a 13. szakasz szerinti elállási jog alkalmazandó; alternatív vitarendezés a www.onoratainstanta.ro útján érhető el. **Németország:** a dezbatere.ro/cancel címen található lemondási gombbal bejelentkezés nélkül megszüntetheti előfizetését; az előfizetési feltételek, a megújítási időszakok és a felmondási idők megfelelnek a BGB 309. § (9) bekezdésének: minden csomag egy hónapra szól, és havonta megújul, amíg Ön le nem mondja; bármikor lemondhatja, a lemondás az aktuális hónap végével lép hatályba. **Franciaország:** előfizetését három lépésben, online megszüntetheti a dezbatere.ro/cancel címen. **Olaszország:** a felfüggesztésre és megszüntetésre (11), a fizetős csomagokra és azok megújítására (12), a módosításokra (14), a felelősségre (15), valamint az irányadó jogra és a jogviták elbírálásának helyére (18) vonatkozó rendelkezésekhez az Ön külön jóváhagyása szükséges az olasz Polgári Törvénykönyv 1341. és 1342. cikke alapján. Ezt a regisztrációkor megjelenő külön négyzettel adja meg, amely mindenkinek megjelenik, aki a Régió mezőben Olaszországot választja, vagy akinek a kapcsolata Olaszországból érkezik. **Hollandia:** e Feltételeket a szerződéskötés előtt tárolható formában bocsátjuk rendelkezésre. **Lengyelország:** lengyel nyelvű változat is elérhető; válassza a Polski nyelvet a nyelvválasztóban.
+E Feltételek törzsszövege Önnek szól. Ezen túlmenően: Ön a lakóhelye szerinti ország bíróságai előtt indíthat eljárást; a 13. szakasz szerinti elállási jog alkalmazandó; alternatív vitarendezés a ANPC (SAL), reclamatiisal.anpc.ro útján érhető el. **Németország:** a dezbatere.ro/cancel címen található lemondási gombbal bejelentkezés nélkül megszüntetheti előfizetését; az előfizetési feltételek, a megújítási időszakok és a felmondási idők megfelelnek a BGB 309. § (9) bekezdésének: minden csomag egy hónapra szól, és havonta megújul, amíg Ön le nem mondja; bármikor lemondhatja, a lemondás az aktuális hónap végével lép hatályba. **Franciaország:** előfizetését három lépésben, online megszüntetheti a dezbatere.ro/cancel címen. **Olaszország:** a felfüggesztésre és megszüntetésre (11), a fizetős csomagokra és azok megújítására (12), a módosításokra (14), a felelősségre (15), valamint az irányadó jogra és a jogviták elbírálásának helyére (18) vonatkozó rendelkezésekhez az Ön külön jóváhagyása szükséges az olasz Polgári Törvénykönyv 1341. és 1342. cikke alapján. Ezt a regisztrációkor megjelenő külön négyzettel adja meg, amely mindenkinek megjelenik, aki a Régió mezőben Olaszországot választja, vagy akinek a kapcsolata Olaszországból érkezik. **Hollandia:** e Feltételeket a szerződéskötés előtt tárolható formában bocsátjuk rendelkezésre. **Lengyelország:** lengyel nyelvű változat is elérhető; válassza a Polski nyelvet a nyelvválasztóban.
 
 ### A.2 Egyesült Államok
 
