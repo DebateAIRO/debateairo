@@ -17,7 +17,7 @@ import {
   previewRefsAreReviewedSet, previewReservationNanoUsd, previewRostersHonourMakerRule, previewStorytellerOutputCap,
   previewTierOutputBound, type PreviewCallTier, type PreviewEffort, type PreviewModelRow, type PreviewProviderName
 } from "./preview-models.js";
-import { previewFinalWriterRoleOf } from "./preview-final-writer.js";
+import { previewFinalWriterAsk, previewFinalWriterRoleOf, type PreviewFinalWriterPlan } from "./preview-final-writer.js";
 import {
   parsePreviewThinkingLevels, previewSlipFixLevel, previewThinkingLevelBelow, previewThinkingLevelFor, previewThinkingLevelOnRequest,
   previewThinkingStepOf, type PreviewThinkingLevels
@@ -657,6 +657,13 @@ export function withPreviewProviderCallPolicy(
      * AsyncLocalStorage: the scheduler's pump starts one debate's call inside another's context).
      */
     thinkingLevelsOf?: (runId: string | null) => PreviewThinkingLevels | undefined;
+    /**
+     * V4 start step, Task 3 (spec 2026-11-03 §5): the final-writer terms of the call's run, by `request.runId`: a v2
+     * run's plan, so its four final writers ask the shared rule (previewFinalWriterAsk) on every attempt; undefined =
+     * R22's asks, byte for byte. Asked once per final-writer call, never for another call; a resolver that throws ends
+     * the call before anything is sent. Synchronous and closure-captured, as `thinkingLevelsOf`.
+     */
+    finalWriterTermsOf?: (runId: string | null) => Readonly<{ plan: PreviewFinalWriterPlan }> | undefined;
   }> = {}
 ): ProviderGateway {
   const reviewed = previewModelRow(target.model) ?? refused();
@@ -719,7 +726,23 @@ export function withPreviewProviderCallPolicy(
     // bound) and their length retry is held to `outputBound` (previewStorytellerOutputCap), exactly as the slow
     // storyteller; a fast row (DeepSeek, Claude Haiku) asks its own maximum. The 1 MiB body room stays for all four.
     const slowRow = reviewed.storytellerTokenCeiling <= reviewed.outputBound;
-    const finalWriter = previewCallTierOf(request) === "FINAL_WRITER" ? Object.freeze({
+    // V4 start step, Task 3: a v2 run's final writer asks the shared rule instead: the F3 cap of its role and plan as a
+    // ceiling (never the request's guided bound above it), the length retry held to the same cap, and the 1 MiB body
+    // room only for a FINAL_WRITER ask the gate offers; otherwise a STANDARD call at the row's own bound, told once as
+    // today. A STANDARD ask never reads the gate.
+    const role = previewFinalWriterRoleOf(request);
+    const terms = role === null || options.finalWriterTermsOf === undefined ? undefined : options.finalWriterTermsOf(request.runId);
+    const v2Ask = role === null || terms === undefined ? undefined : previewFinalWriterAsk(reviewed, role, 1, terms.plan);
+    const v2Sized = (tokens: number, caps: Readonly<{ packetByteCap?: number }> = {}) =>
+      Object.freeze({ bound: Object.freeze({ ...preview, tokenCeiling: tokens }), caps: Object.freeze({ ...caps, outputTokenCap: tokens }) });
+    const standard = v2Ask === undefined
+      ? Object.freeze({ bound: standardBound, caps: Object.freeze({}) })
+      : v2Sized(v2Ask.tier === "FINAL_WRITER" ? reviewed.outputBound : v2Ask.maxTokens);
+    const finalWriter = v2Ask !== undefined
+      ? v2Ask.tier === "FINAL_WRITER"
+        ? v2Sized(v2Ask.maxTokens, { packetByteCap: PREVIEW_CALL_TIER_LIMITS.FINAL_WRITER.requestBodyMaxBytes })
+        : undefined
+      : previewCallTierOf(request) === "FINAL_WRITER" ? Object.freeze({
       bound: storyteller
         ? Object.freeze({ ...preview, tokenCeiling: previewStorytellerTokenCeiling(reviewed) })
         : Object.freeze({ ...preview, tokenCeiling: Math.max(preview.tokenCeiling,
@@ -754,12 +777,12 @@ export function withPreviewProviderCallPolicy(
     const slipFix = previewSlipFixLevel(levels, reviewed);
     const repairLevel = slipFix === undefined || (!storyRepair && !formatRepair) ? undefined : previewThinkingLevelOnRequest(slipFix);
     const send = async () => {
-      const tier = await finalWriterCall();
+      const tier = (await finalWriterCall()) ?? standard;
       return gateway.call({ ...request, thinkingLevel: level,
         ...(repairLevel === undefined ? {} : { repairThinkingLevel: repairLevel }),
         ...(lengthRetry === undefined ? {} : { lengthRetry }),
-        ...(tier === undefined ? {} : tier.caps),
-        bound: tier === undefined ? standardBound : tier.bound, maxAttemptsThisCall: storyRepair || formatRepair ? 2 : 1,
+        ...tier.caps,
+        bound: tier.bound, maxAttemptsThisCall: storyRepair || formatRepair ? 2 : 1,
         attemptScope: "actor", ...(formatRepair ? { retryOnlyAfterContentRejection: true } : {}),
         ...(judgeReAsk ? { fullReAskAfterPatch: true } : {}) });
     };
