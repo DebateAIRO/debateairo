@@ -82,6 +82,12 @@ export type ModelSpendSource =
   /** step 2's small AI before a debate: run-less, in the site's day and in the person's windows through its own row (0144), written only by identity.record_ask_clarify_charge */
   | "ASK_CLARIFY"
   /**
+   * V4 start step (0154; spec 2026-11-03 §5.2): the small AIs before Start (the angle planner, the list writers, the merges,
+   * the combine and the fit check). Run-less like ASK_CLARIFY, in the site's day and in the person's windows through its own
+   * row, written only by identity.record_pre_start_charge.
+   */
+  | "PRE_START"
+  /**
    * A dig's path rewrite (0134; plan 2026-10-30 dig-model revision W3-2/W3-5): written after the dig settled, in the
    * story's place (a dig has no story). It names the DIG's run, is inside the dig's estimate, counts in the person's
    * windows like RUN and STORY, and is never walled: a dig that started always gets its rewrite.
@@ -185,6 +191,34 @@ export async function askClarifyChargeWriterPresent(pool: Pick<Pool, "query">): 
 export async function recordAskClarifyCharge(pool: Pick<Pool, "query">, entry: AskClarifyChargeEntry): Promise<void> {
   await pool.query("SELECT identity.record_ask_clarify_charge($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,$6::date,$7::bigint,$8::bigint,$9::bigint)",
     [entry.spendId, entry.ownerRef, entry.grant?.grantId ?? null, entry.grant?.grantEventId ?? null, entry.providerRef, entry.chargedOn,
+      entry.chargeMicros, entry.inputTokens, entry.outputTokens]);
+}
+
+/** V4 start step (0154): which small AI before Start a charge paid for. */
+export const PRE_START_CHARGE_KINDS = Object.freeze(["ANGLES", "LIST", "MERGE", "MERGE_LATE", "COMBINE", "FIT"] as const);
+export type PreStartChargeKind = typeof PRE_START_CHARGE_KINDS[number];
+
+/** The writer of the small AIs before Start: the ledger's row and the person's, in one transaction, as ASK_CLARIFY's. */
+export const PRE_START_CHARGE_WRITER = "identity.record_pre_start_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint)" as const;
+
+export type PreStartChargeEntry = AskClarifyChargeEntry & Readonly<{ kind: PreStartChargeKind }>;
+
+/** A pre-Start call's provider reference: pre-start:<kind, lower case, _ as ->:<provider>:<model>. 0154's writer checks the kind matches. */
+export function preStartSpendRef(kind: PreStartChargeKind, provider: string, model: string): string {
+  return `pre-start:${kind.toLowerCase().replaceAll("_", "-")}:${provider}:${model}`;
+}
+
+export async function preStartChargeWriterPresent(pool: Pick<Pool, "query">): Promise<boolean> {
+  const result = await pool.query<{ present: unknown }>(
+    `SELECT CASE WHEN NOT has_schema_privilege(current_user, 'identity', 'USAGE') THEN false
+       ELSE coalesce(to_regprocedure($1) IS NOT NULL AND has_function_privilege(current_user, to_regprocedure($1), 'EXECUTE'), false) END AS present`,
+    [PRE_START_CHARGE_WRITER]);
+  return result.rows[0]?.present === true;
+}
+
+export async function recordPreStartCharge(pool: Pick<Pool, "query">, entry: PreStartChargeEntry): Promise<void> {
+  await pool.query("SELECT identity.record_pre_start_charge($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,$6::text,$7::date,$8::bigint,$9::bigint,$10::bigint)",
+    [entry.spendId, entry.ownerRef, entry.grant?.grantId ?? null, entry.grant?.grantEventId ?? null, entry.kind, entry.providerRef, entry.chargedOn,
       entry.chargeMicros, entry.inputTokens, entry.outputTokens]);
 }
 
@@ -1391,6 +1425,9 @@ export class PostgresModelSpendStore implements ModelSpendStore {
     if (entry.spendSource === "ASK_CLARIFY") {
       throw new TypedDomainError("MODEL_SPEND_ASK_CLARIFY_FUNCTION_ONLY", "Step 2's small AI is written only by identity.record_ask_clarify_charge");
     }
+    if (entry.spendSource === "PRE_START") {
+      throw new TypedDomainError("MODEL_SPEND_PRE_START_FUNCTION_ONLY", "The small AIs before Start are written only by identity.record_pre_start_charge");
+    }
     if ((entry.spendSource === "RUN" || entry.spendSource === "STORY" || entry.spendSource === "SYNTHESIS_CHECK") && entry.runId === null) {
       throw new TypedDomainError("MODEL_SPEND_RUN_REQUIRED", "A run, story or synthesis check charge must name its run");
     }
@@ -1566,10 +1603,11 @@ export class PostgresModelSpendStore implements ModelSpendStore {
       return this.#total(result.rows[0]?.total);
     }
     // Most runs have no synthesis check. CASE keeps the definer lookup off their spend path.
-    // Decisions 29 and 31: plus step 2's small AI, which has no run (0144).
+    // Decisions 29 and 31: plus step 2's small AI, which has no run (0144); the V4 start step: plus the small AIs before Start (0154).
     const result = await this.pool.query<{ total: string }>(
       `SELECT ((SELECT coalesce(sum(spend.charge_micros),0) ${PostgresModelSpendStore.#ownerSpendFrom})
          + identity.read_ask_clarify_spent($1::uuid, $2::timestamptz, $3::timestamptz)
+         + identity.read_pre_start_spent($1::uuid, $2::timestamptz, $3::timestamptz)
          + identity.read_public_report_spent_by_funding($1::uuid, $2::timestamptz, $3::timestamptz, false))::text AS total`,
       [ownerRef, from, to]
     );
@@ -1617,6 +1655,7 @@ export class PostgresModelSpendStore implements ModelSpendStore {
          SELECT coalesce(sum(spend.charge_micros),0)
          ${PostgresModelSpendStore.#ownerSpendFrom.replaceAll("$2", "window_range.from_at").replaceAll("$3", "window_range.to_at")}
        ) + identity.read_ask_clarify_spent($1::uuid, window_range.from_at, window_range.to_at)
+         + identity.read_pre_start_spent($1::uuid, window_range.from_at, window_range.to_at)
          + identity.read_public_report_spent_by_funding($1::uuid, window_range.from_at, window_range.to_at, false))::text AS total
        FROM unnest($2::timestamptz[], $3::timestamptz[]) WITH ORDINALITY AS window_range(from_at, to_at, ordinal)
        ORDER BY window_range.ordinal`,

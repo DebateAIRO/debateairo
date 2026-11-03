@@ -430,6 +430,7 @@
   "investigations": [],
   "reserve_events": [],
   "ask_clarify_calls": [],
+  "pre_start_calls": [],
   "public_flags": [
     {
       "publication_ref": "publication-1",

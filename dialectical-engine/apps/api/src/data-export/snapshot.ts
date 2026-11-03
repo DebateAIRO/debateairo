@@ -21,6 +21,8 @@ export const RAW_SECTIONS = [
   "web_evidence", "investigations", "reserve_events",
   // When step 2's small AI read the person's question (0144, identity.read_data_export_ask_clarify): the time only (README C5).
   "ask_clarify_calls",
+  // When the small AIs before Start ran for the person (0154, identity.read_data_export_pre_start): the time and the kind only.
+  "pre_start_calls",
   // The reports the person made with the Report button (0152, identity.read_data_export_public_flags). Not what the AI answered.
   "public_flags",
 ] as const;
@@ -134,6 +136,7 @@ export const KEEP_COLUMNS = {
   },
   // 0133's investigation_json, and its reserve events.
   ask_clarify_calls: ["recorded_at"],
+  pre_start_calls: ["recorded_at", "kind"],
   investigations: {
     investigation: ["investigation_id", "root_run_id", "state", "opened_at", "last_activity_at", "closed_at", "report_version", "members", "closings"],
     members: ["run_id", "parent_run_id", "places", "mode", "joined_at"],
@@ -545,6 +548,7 @@ export async function collectSnapshot(input: {
         investigations: collectInvestigations(raw),
         reserve_events: simple("reserve_events"),
         question_readings: simple("ask_clarify_calls"),
+        before_start_readings: simple("pre_start_calls"),
         reports_you_made: reportsYouMade,
       },
       security: {
