@@ -629,9 +629,20 @@ const BILLING_PLANS = Object.freeze({
   ]
 });
 
-/** The mock's tax table (the test fakes' rates): VAT in Romania, Germany and France, Texas's sales tax by ZIP; none elsewhere. */
+/**
+ * The mock's tax table: each EU country's standard VAT rate (2026), which a Romanian seller charges every EU consumer
+ * through the OSS, and Texas's sales tax by ZIP; none elsewhere, where the seller is not registered.
+ */
 const MOCK_TAX_RATES: Readonly<Record<string, Readonly<{ name: string; basisPoints: number }>>> = {
-  RO: { name: "VAT", basisPoints: 2_100 }, DE: { name: "MwSt.", basisPoints: 1_900 }, FR: { name: "TVA", basisPoints: 2_000 }
+  AT: { name: "USt.", basisPoints: 2_000 }, BE: { name: "VAT", basisPoints: 2_100 }, BG: { name: "VAT", basisPoints: 2_000 },
+  CY: { name: "VAT", basisPoints: 1_900 }, CZ: { name: "DPH", basisPoints: 2_100 }, DE: { name: "MwSt.", basisPoints: 1_900 },
+  DK: { name: "moms", basisPoints: 2_500 }, EE: { name: "VAT", basisPoints: 2_400 }, ES: { name: "IVA", basisPoints: 2_100 },
+  FI: { name: "ALV", basisPoints: 2_550 }, FR: { name: "TVA", basisPoints: 2_000 }, GR: { name: "ΦΠΑ", basisPoints: 2_400 },
+  HR: { name: "PDV", basisPoints: 2_500 }, HU: { name: "ÁFA", basisPoints: 2_700 }, IE: { name: "VAT", basisPoints: 2_300 },
+  IT: { name: "IVA", basisPoints: 2_200 }, LT: { name: "PVM", basisPoints: 2_100 }, LU: { name: "TVA", basisPoints: 1_700 },
+  LV: { name: "PVN", basisPoints: 2_100 }, MT: { name: "VAT", basisPoints: 1_800 }, NL: { name: "btw", basisPoints: 2_100 },
+  PL: { name: "VAT", basisPoints: 2_300 }, PT: { name: "IVA", basisPoints: 2_300 }, RO: { name: "VAT", basisPoints: 2_100 },
+  SE: { name: "moms", basisPoints: 2_500 }, SI: { name: "DDV", basisPoints: 2_200 }, SK: { name: "DPH", basisPoints: 2_300 }
 };
 
 /** The register's own plans row, for the currency each country pays in (RO: lei; the euro countries: euro; else dollars). */
