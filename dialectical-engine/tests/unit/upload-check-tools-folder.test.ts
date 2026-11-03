@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, onTestFinished } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { cpSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 const tools = await import('../../tools/' + 'upload-check/tools-folder.mjs');
@@ -48,6 +48,32 @@ describe('check 1: the shared tools folder', () => {
     await expect(tools.buildToolsFolder({ repo: repository({ folders: [], extra: NO_FOLDERS_EXTRA }), rev: 'HEAD', dest })).rejects.toMatchObject({ code: 'UPLOAD_CHECK_TOOLS_FOLDER_EMPTY' });
     expect(readdirSync(dest)).toEqual([]);
   }, 120_000);
+
+  it('a tool that runs too long is TIMEOUT on time, even when a process it started holds its error output open', async () => {
+    // The tool starts a grandchild that inherits its error output and outlives it, then never ends itself. Killing the
+    // tool cannot close that output, so the result must not wait for it to close.
+    const dest = scratch();
+    for (const folder of FOLDERS) mkdirSync(join(dest, 'dialectical-engine/deploy', folder), { recursive: true });
+    const tool = 'preview-lifecycle/hold.mjs';
+    // The grandchild's pid goes to a folder of its own: afterEach removes the scratch folders before onTestFinished runs.
+    const pidDir = realpathSync(mkdtempSync(join(tmpdir(), 'upload-check-hold-')));
+    const pidFile = join(pidDir, 'pid.json');
+    writeFileSync(join(dest, 'dialectical-engine/deploy', tool), [
+      "import { spawn } from 'node:child_process';",
+      "import { writeFileSync } from 'node:fs';",
+      "const grand = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { stdio: ['ignore', 'ignore', 'inherit'] });",
+      `writeFileSync(${JSON.stringify(pidFile)}, JSON.stringify({ grandchild: grand.pid }));`,
+      'setInterval(() => {}, 1000);',
+      ''
+    ].join('\n'));
+    onTestFinished(() => {
+      try { process.kill(JSON.parse(readFileSync(pidFile, 'utf8')).grandchild, 'SIGKILL'); } catch { /* not started, or gone */ }
+      rmSync(pidDir, { recursive: true, force: true });
+    });
+    const started = Date.now();
+    expect(await tools.loadEachTool({ folder: dest, node: process.execPath, only: [tool], limitMs: 1_000 })).toEqual([{ tool, ok: false, code: 'TIMEOUT' }]);
+    expect(Date.now() - started).toBeLessThan(10_000);
+  }, 20_000);
 
   it('the release-folder list is exactly the seven', () => {
     expect(tools.RELEASE_FOLDER_TOOLS).toEqual([

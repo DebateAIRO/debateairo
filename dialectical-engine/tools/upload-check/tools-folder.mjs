@@ -9,7 +9,7 @@
 // in RELEASE_FOLDER_TOOLS. That list is fixed in one place, and a test pins its exact contents, so a change shows in review.
 //
 //   buildToolsFolder({ repo, rev, dest })          copies the three folders as they are at <rev> into <dest>
-//   loadEachTool({ folder, node, only?, skip? })   loads each tool alone; one result per tool, sorted by name
+//   loadEachTool({ folder, node, only?, skip?, limitMs? })   loads each tool alone; one result per tool, sorted by name
 //   checkToolsFolder({ repo, rev, workdir, node }) the check: a CheckResult, refused if any tool fails
 //
 // A refusal carries a code that starts UPLOAD_CHECK_. A check that cannot finish is not-checked, never passed.
@@ -70,7 +70,7 @@ function toolsIn(folder) {
 }
 
 /** One child process: the tool is imported with an emptied environment and no stdin. ok means it exited 0 in time. */
-function loadOne(folder, node, tool) {
+function loadOne(folder, node, tool, limitMs) {
   return new Promise((resolveResult) => {
     const child = spawn("env", ["-i", "PATH=/usr/bin:/bin", node, "--input-type=module", "-e", `await import('./${DEPLOY}/${tool}')`], { cwd: folder, stdio: ["ignore", "ignore", "pipe"] });
     let stderr = "";
@@ -78,7 +78,9 @@ function loadOne(folder, node, tool) {
     let settled = false;
     child.stderr.setEncoding("utf8");
     child.stderr.on("data", (chunk) => { stderr += chunk; });
-    const timer = setTimeout(() => { timedOut = true; child.kill("SIGKILL"); }, LOAD_LIMIT_MS);
+    // The timer settles the result itself: a process the tool started may hold its error output open after the kill, and
+    // then 'close' never comes. The error output is let go, so it cannot hold this process open either.
+    const timer = setTimeout(() => { timedOut = true; child.kill("SIGKILL"); settle(false); child.stderr.destroy(); }, limitMs);
     const settle = (exitedCleanly) => {
       if (settled) return;
       settled = true;
@@ -92,11 +94,14 @@ function loadOne(folder, node, tool) {
   });
 }
 
-/** Loads each server tool under <folder> on its own, one after another, and reports whether it loaded. */
-export async function loadEachTool({ folder, node, only, skip = [] }) {
+/**
+ * Loads each server tool under <folder> on its own, one after another, and reports whether it loaded. limitMs replaces the
+ * 30-second limit per tool; it is there for tests.
+ */
+export async function loadEachTool({ folder, node, only, skip = [], limitMs = LOAD_LIMIT_MS }) {
   const chosen = toolsIn(folder).filter((tool) => (only === undefined || only.includes(tool)) && !skip.includes(tool));
   const results = [];
-  for (const tool of chosen) results.push(await loadOne(folder, node, tool));
+  for (const tool of chosen) results.push(await loadOne(folder, node, tool, limitMs));
   return results;
 }
 
