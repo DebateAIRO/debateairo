@@ -76,6 +76,7 @@
   "billing.checkout.priceCleared": "Bạn đã thay đổi thông tin, nên giá đã bị gỡ. Hiển thị lại giá đầy đủ để tiếp tục.",
   "billing.checkout.countryUnavailable": "Các gói trả phí chưa có ở quốc gia của bạn. Bạn vẫn có thể tiếp tục dùng gói Miễn phí.",
   "billing.checkout.regionUnavailable": "Các gói trả phí chưa có ở khu vực của bạn. Bạn vẫn có thể tiếp tục dùng gói Miễn phí.",
+  "billing.checkout.regionTermsExcluded": "Chúng tôi không cung cấp Dialectical Engine tại tiểu bang Tennessee, vì vậy chúng tôi không thể nhận thanh toán cho địa chỉ này.",
   "billing.checkout.confirmCountry": "Kết nối của bạn có vẻ đến từ {ipCountry}. Bạn có sống ở {declaredCountry} không?",
   "billing.checkout.confirmCountryYes": "Có, tôi sống ở đó",
   "billing.checkout.confirmCountryRequired": "Vui lòng xác nhận quốc gia bạn sinh sống, rồi tiếp tục.",

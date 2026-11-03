@@ -335,7 +335,7 @@ Phần nội dung chung của các Điều khoản này được soạn cho bạ
 
 ### A.3 Canada và Quebec
 
-Cán bộ phụ trách quyền riêng tư của chúng tôi, đồng thời tại Quebec là người phụ trách bảo vệ thông tin cá nhân, là giám đốc của chúng tôi, có thể liên hệ tại privacy@dezbatere.ro. Phụ lục B.3 trong Chính sách quyền riêng tư của chúng tôi quy định về dữ liệu của bạn. **Quebec:** các Điều khoản này được cung cấp bằng tiếng Pháp; hãy chọn tiếng Pháp bằng bộ chuyển đổi ngôn ngữ; các cài đặt giữ cuộc tranh luận của bạn ở chế độ riêng tư được bật theo mặc định; bạn có thể yêu cầu hủy lập chỉ mục thông tin cá nhân về mình.
+Cán bộ phụ trách quyền riêng tư của chúng tôi, đồng thời tại Quebec là người phụ trách bảo vệ thông tin cá nhân, là giám đốc của chúng tôi, có thể liên hệ tại privacy@dezbatere.ro. Phụ lục B.3 trong Chính sách quyền riêng tư của chúng tôi quy định về dữ liệu của bạn. **Quebec:** các Điều khoản này được cung cấp bằng tiếng Pháp; nếu bạn chọn Canada khi đăng ký, bạn sẽ nhận được các Điều khoản này bằng tiếng Pháp trước và có thể chọn tiếng Anh thay thế; các cài đặt giữ cuộc tranh luận của bạn ở chế độ riêng tư được bật theo mặc định; bạn có thể yêu cầu hủy lập chỉ mục thông tin cá nhân về mình.
 
 ### A.4 Australia và New Zealand
 

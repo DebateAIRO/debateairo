@@ -335,7 +335,7 @@ Huvuddelen av dessa villkor är skriven för dig. Därutöver gäller följande:
 
 ### A.3 Kanada och Quebec
 
-Vår integritetsansvariga, och i Quebec den person som ansvarar för skyddet av personuppgifter, är vår verkställande direktör, nåbar på privacy@dezbatere.ro. Vår integritetspolicy, bilaga B.3, beskriver hur vi behandlar dina uppgifter. **Quebec:** dessa villkor finns på franska; välj franska i språkväljaren; inställningarna som håller dina debatter privata är aktiverade som standard; du får begära att personuppgifter om dig avindexeras.
+Vår integritetsansvariga, och i Quebec den person som ansvarar för skyddet av personuppgifter, är vår verkställande direktör, nåbar på privacy@dezbatere.ro. Vår integritetspolicy, bilaga B.3, beskriver hur vi behandlar dina uppgifter. **Quebec:** dessa villkor finns på franska; om du väljer Kanada när du registrerar dig får du dem först på franska och kan välja engelska i stället; inställningarna som håller dina debatter privata är aktiverade som standard; du får begära att personuppgifter om dig avindexeras.
 
 ### A.4 Australien och Nya Zeeland
 

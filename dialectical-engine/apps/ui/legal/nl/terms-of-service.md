@@ -335,7 +335,7 @@ De hoofdtekst van deze Voorwaarden is voor u geschreven. Daarnaast geldt: u kunt
 
 ### A.3 Canada en Quebec
 
-Onze privacyfunctionaris, en in Quebec de persoon die verantwoordelijk is voor de bescherming van persoonsgegevens, is onze bestuurder, bereikbaar op privacy@dezbatere.ro. Bijlage B.3 van ons Privacybeleid heeft betrekking op uw gegevens. **Quebec:** deze Voorwaarden zijn in het Frans beschikbaar; kies Frans met de taalkeuzeschakelaar; de instellingen die uw debatten privé houden, zijn standaard ingeschakeld; u kunt verzoeken om persoonsgegevens over u uit zoekresultaten te verwijderen.
+Onze privacyfunctionaris, en in Quebec de persoon die verantwoordelijk is voor de bescherming van persoonsgegevens, is onze bestuurder, bereikbaar op privacy@dezbatere.ro. Bijlage B.3 van ons Privacybeleid heeft betrekking op uw gegevens. **Quebec:** deze Voorwaarden zijn in het Frans beschikbaar; als u bij het aanmelden Canada kiest, krijgt u ze eerst in het Frans en kunt u in plaats daarvan Engels kiezen; de instellingen die uw debatten privé houden, zijn standaard ingeschakeld; u kunt verzoeken om persoonsgegevens over u uit zoekresultaten te verwijderen.
 
 ### A.4 Australië en Nieuw-Zeeland
 

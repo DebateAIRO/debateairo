@@ -3,7 +3,9 @@
 import * as React from "react";
 
 import type { LegalDocument } from "../../lib/legalDocument";
+import type { CatalogLocaleCode } from "@/lib/i18n/locales";
 import { withNames } from "../legal/LegalBodies";
+import type { LegalLanguageSwitch } from "./canadaLegalLanguage";
 import { backdropCloseHandler, prefersReducedMotion, useModalSurface } from "./modalSemantics";
 import { useHideOutside } from "@/components/dialogSurface";
 import { t } from "@/lib/i18n/translate";
@@ -26,6 +28,10 @@ export type LegalModalProps = {
   mode: "read" | "consent";
   onClose: () => void;
   onAcknowledge?: () => void;
+  /** Sign-up in Canada: the document's own language, which the page's may not be. */
+  locale?: CatalogLocaleCode;
+  /** Sign-up in Canada: the French/English switch, shown at the top of the text in `mode="consent"` only. */
+  languageSwitch?: LegalLanguageSwitch;
 };
 
 export type LegalDocumentModalProps = LegalModalProps & { document: LegalDocument };
@@ -51,7 +57,9 @@ export function LegalDocumentModal({
   open,
   mode,
   onClose,
-  onAcknowledge
+  onAcknowledge,
+  locale,
+  languageSwitch
 }: LegalDocumentModalProps): React.ReactElement | null {
   const scrimRef = React.useRef<HTMLDivElement | null>(null);
   const dialogRef = React.useRef<HTMLElement | null>(null);
@@ -59,6 +67,13 @@ export function LegalDocumentModal({
   const bodyRef = React.useRef<HTMLDivElement | null>(null);
   const endRef = React.useRef<HTMLDivElement | null>(null);
   const [reachedEnd, setReachedEnd] = React.useState(false);
+  // A different document (the Canadian French/English switch swaps it in place) has not been read
+  // to its end yet, so the latch starts over for it.
+  const [gatedDocument, setGatedDocument] = React.useState(document.sha256);
+  if (gatedDocument !== document.sha256) {
+    setGatedDocument(document.sha256);
+    setReachedEnd(false);
+  }
   // Counts presses of the still-locked button; each one re-says the hint (focus stays put: this
   // directory's only focus handling is the shared helper's).
   const [lockedPresses, setLockedPresses] = React.useState(0);
@@ -109,7 +124,7 @@ export function LegalDocumentModal({
       region.removeEventListener("scroll", evaluate);
       window.removeEventListener("resize", evaluate);
     };
-  }, [open, mode]);
+  }, [open, mode, document.sha256]);
 
   if (!open) return null;
 
@@ -155,7 +170,7 @@ export function LegalDocumentModal({
         <div className="policyCore">
           <span className="policyTab" aria-hidden="true" />
           <div className="policyHead">
-            <div className="policyHeadText">
+            <div className="policyHeadText" lang={locale}>
               <div className="policyEyebrow">{document.eyebrow}</div>
               <div id={document.titleId} className="policyTitle">
                 {document.title}
@@ -177,7 +192,16 @@ export function LegalDocumentModal({
           {/* `tabindex="0"` plus a name of its own: paging this region is the ONLY way a
               keyboard-only reader can satisfy the scroll gate, and the name says what is inside
               it rather than repeating the dialog's title. */}
-          <div className="policyBody" role="region" tabIndex={0} aria-label={document.bodyLabel} ref={bodyRef}>
+          <div className="policyBody" role="region" tabIndex={0} aria-label={document.bodyLabel} lang={locale} ref={bodyRef}>
+            {/* The one switch, above the text. Its name is in the language it leads to, and it stays
+                the same button across the swap, so focus stays on it. */}
+            {languageSwitch !== undefined && mode === "consent" ? (
+              <div className="policyLanguage">
+                <button type="button" className="consentPolicyLink" lang={languageSwitch.lang} onClick={languageSwitch.onSwitch}>
+                  {languageSwitch.name}
+                </button>
+              </div>
+            ) : null}
             <div className="policyJumps">
               {document.jumps.map((jump) => (
                 <button

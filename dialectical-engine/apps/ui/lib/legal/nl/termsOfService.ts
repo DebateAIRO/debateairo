@@ -337,7 +337,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Canada en Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Onze privacyfunctionaris, en in Quebec de persoon die verantwoordelijk is voor de bescherming van persoonsgegevens, is onze bestuurder, bereikbaar op privacy@dezbatere.ro. Bijlage B.3 van ons Privacybeleid heeft betrekking op uw gegevens. Quebec: deze Voorwaarden zijn in het Frans beschikbaar; kies Frans met de taalkeuzeschakelaar; de instellingen die uw debatten privé houden, zijn standaard ingeschakeld; u kunt verzoeken om persoonsgegevens over u uit zoekresultaten te verwijderen." }
+      { kind: "p", text: "Onze privacyfunctionaris, en in Quebec de persoon die verantwoordelijk is voor de bescherming van persoonsgegevens, is onze bestuurder, bereikbaar op privacy@dezbatere.ro. Bijlage B.3 van ons Privacybeleid heeft betrekking op uw gegevens. Quebec: deze Voorwaarden zijn in het Frans beschikbaar; als u bij het aanmelden Canada kiest, krijgt u ze eerst in het Frans en kunt u in plaats daarvan Engels kiezen; de instellingen die uw debatten privé houden, zijn standaard ingeschakeld; u kunt verzoeken om persoonsgegevens over u uit zoekresultaten te verwijderen." }
     ]
   },
   {
@@ -377,7 +377,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.14",
-  sha256: "685f07b7f1683ec9330094e597930a01bfe10d3ffbe92f6db758e2dbff23d881",
+  sha256: "20fe2593a8b61b656bcae69dadf715e4de8ae40e301d0a8fb83fcca720f6b047",
   eyebrow: "SERVICEVOORWAARDEN · v2.14 · VAN KRACHT OP 1 NOVEMBER 2026",
   title: "Waarmee u instemt",
   lede: "De overeenkomst tussen u en DMS Merchandise Shop S.R.L., in begrijpelijke taal. Negentien hoofdstukken en Bijlage A — scrol tot het einde.",

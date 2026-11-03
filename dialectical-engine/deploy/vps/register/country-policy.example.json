@@ -84,6 +84,7 @@
       "US-WV": { "pay": false, "reason": "TAX_NOT_READY" },
       "US-NJ": { "pay": false, "reason": "TAX_NOT_READY" },
       "US-OH": { "pay": false, "reason": "TAX_NOT_READY", "buyers": "business" },
+      "US-TN": { "pay": false, "reason": "TERMS_EXCLUDED" },
       "ES-CN": { "pay": false, "reason": "TAX_NOT_READY" },
       "ES-CE": { "pay": false, "reason": "TAX_NOT_READY" },
       "ES-ML": { "pay": false, "reason": "TAX_NOT_READY" },

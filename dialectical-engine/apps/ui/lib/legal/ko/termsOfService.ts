@@ -337,7 +337,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "캐나다 및 퀘벡",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "당사의 개인정보 보호책임자(퀘벡에서는 개인정보 보호 담당자)는 당사의 이사이며, privacy@dezbatere.ro로 연락하실 수 있습니다. 귀하의 데이터에 관하여는 당사 개인정보 처리방침 부속서 B.3가 적용됩니다. 퀘벡: 본 약관은 프랑스어로 제공되며, 언어 전환 메뉴에서 프랑스어를 선택할 수 있습니다. 토론을 비공개로 유지하는 설정은 기본적으로 활성화되어 있으며, 귀하는 자신에 관한 개인정보의 검색 제외를 요청할 수 있습니다." }
+      { kind: "p", text: "당사의 개인정보 보호책임자(퀘벡에서는 개인정보 보호 담당자)는 당사의 이사이며, privacy@dezbatere.ro로 연락하실 수 있습니다. 귀하의 데이터에 관하여는 당사 개인정보 처리방침 부속서 B.3가 적용됩니다. 퀘벡: 본 약관은 프랑스어로 제공되며, 가입 시 캐나다를 선택하면 먼저 프랑스어로 표시되고 대신 영어를 선택할 수도 있습니다. 토론을 비공개로 유지하는 설정은 기본적으로 활성화되어 있으며, 귀하는 자신에 관한 개인정보의 검색 제외를 요청할 수 있습니다." }
     ]
   },
   {
@@ -377,7 +377,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.14",
-  sha256: "94446f0af079b62b5b4892c23b207f2b44a7907fc49d7e0e38c0e7a51bee923d",
+  sha256: "44934c974f29a70b5e2228504e652850bf4ee1bb1590a70a275b8d6184450728",
   eyebrow: "서비스 이용약관 · v2.14 · 시행일 2026년 11월 1일",
   title: "귀하가 동의하는 사항",
   lede: "귀하와 DMS Merchandise Shop S.R.L. 간의 계약을 알기 쉬운 말로 설명합니다. 19개 조항과 부속서 A가 있으며, 끝까지 스크롤하여 확인하십시오.",

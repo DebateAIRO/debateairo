@@ -9,6 +9,8 @@ const KEY_BY_SERVER_CODE: Readonly<Record<string, string>> = Object.freeze({
   // Payment region blocks (2026-10-20): the billing address is in a region where payment is closed (403); sign-up
   // never is. A postal code that does not fit its country's format is sent back to be fixed (422), never let through.
   REGION_PAYMENT_UNAVAILABLE: "billing.checkout.regionUnavailable",
+  // The billing address is in a region the Terms exclude (Tennessee, 403): it says so, never "not yet".
+  REGION_TERMS_EXCLUDED: "billing.checkout.regionTermsExcluded",
   BILLING_POSTCODE_INVALID: "billing.checkout.postalCodeInvalid",
   TAX_ID_INVALID: "billing.checkout.taxIdInvalid",
   TAX_SERVICE_UNAVAILABLE: "billing.checkout.serviceUnavailable",

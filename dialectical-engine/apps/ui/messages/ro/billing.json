@@ -76,6 +76,7 @@
   "billing.checkout.priceCleared": "Ați modificat datele, așa că prețul a fost eliminat. Afișați din nou prețul complet ca să continuați.",
   "billing.checkout.countryUnavailable": "Abonamentele plătite nu sunt încă disponibile în țara dvs. Puteți folosi în continuare abonamentul Gratuit.",
   "billing.checkout.regionUnavailable": "Abonamentele plătite nu sunt încă disponibile în regiunea dvs. Puteți folosi în continuare abonamentul Gratuit.",
+  "billing.checkout.regionTermsExcluded": "Nu oferim Dialectical Engine în statul Tennessee, așa că nu putem accepta plata pentru această adresă.",
   "billing.checkout.confirmCountry": "Conexiunea dvs. pare să fie din această țară: {ipCountry}. Locuiți în această țară: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Da, locuiesc acolo",
   "billing.checkout.confirmCountryRequired": "Vă rugăm să confirmați țara în care locuiți, apoi să continuați.",

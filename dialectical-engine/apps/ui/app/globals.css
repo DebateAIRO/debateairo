@@ -10979,6 +10979,12 @@ a:focus-visible {
   outline-offset: -2px;
 }
 
+/* Canada at sign-up (owner ruling, 2 November 2026): the row of the French/English switch, above the
+   jumps. Layout only: the button inside is a `.consentPolicyLink`, ring and all. */
+.policyLanguage {
+  margin-bottom: 12px;
+}
+
 .policyJumps {
   display: flex;
   flex-wrap: wrap;

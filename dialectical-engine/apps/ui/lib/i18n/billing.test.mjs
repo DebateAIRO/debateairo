@@ -104,7 +104,7 @@ const REQUIRED = [
   "billing.checkout.companyToggle", "billing.checkout.companyName",
   "billing.checkout.companyVatId", "billing.checkout.companyAddress", "billing.checkout.companyIncomplete",
   "billing.checkout.showPrice", "billing.checkout.quoting",
-  "billing.checkout.countryUnavailable", "billing.checkout.regionUnavailable", "billing.checkout.confirmCountry", "billing.checkout.confirmCountryYes",
+  "billing.checkout.countryUnavailable", "billing.checkout.regionUnavailable", "billing.checkout.regionTermsExcluded", "billing.checkout.confirmCountry", "billing.checkout.confirmCountryYes",
   "billing.checkout.confirmCountryRequired",
   "billing.checkout.taxLabel", "billing.checkout.taxReverseCharge", "billing.checkout.noTax", "billing.checkout.total",
   "billing.consent.renewal", "billing.consent.immediateStart", "billing.checkout.continueToCard",
@@ -178,6 +178,8 @@ test("the closed-region and postal-code refusals read exactly as the owner appro
   assert.equal(english["billing.checkout.regionUnavailable"], "Paid plans aren't available in your region yet. You can keep using the Free plan.");
   // BILLING_POSTCODE_INVALID (422): the postal code does not fit its country's format.
   assert.equal(english["billing.checkout.postalCodeInvalid"], "Please check your postal code.");
+  // REGION_TERMS_EXCLUDED (403): the billing address is in a region the Terms exclude (the owner's choice of 3 Nov 2026).
+  assert.equal(english["billing.checkout.regionTermsExcluded"], "We don't offer Dialectical Engine in Tennessee, so we can't take payment for this address.");
 });
 
 test("Romanian names the order button as Terms §12 requires", () => {

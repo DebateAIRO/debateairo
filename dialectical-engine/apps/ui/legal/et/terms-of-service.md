@@ -335,7 +335,7 @@ Nende Tingimuste põhiosa on kirjutatud teile. Lisaks: võite esitada hagi oma e
 
 ### A.3 Kanada ja Quebec
 
-Meie privaatsusametnik, Quebecis ka isikuandmete kaitse eest vastutav isik, on meie juhatuse liige, kellega saab ühendust võtta aadressil privacy@dezbatere.ro. Teie andmeid käsitleb meie Privaatsuspoliitika lisa B.3. **Quebec:** need Tingimused on kättesaadavad prantsuse keeles; valige keelevalijast prantsuse keel; teie väitlusi privaatsena hoidvad seaded on vaikimisi sisse lülitatud; võite taotleda teid puudutavate isikuandmete otsingumootorite indeksist eemaldamist.
+Meie privaatsusametnik, Quebecis ka isikuandmete kaitse eest vastutav isik, on meie juhatuse liige, kellega saab ühendust võtta aadressil privacy@dezbatere.ro. Teie andmeid käsitleb meie Privaatsuspoliitika lisa B.3. **Quebec:** need Tingimused on kättesaadavad prantsuse keeles; kui valite registreerumisel Kanada, kuvatakse need teile kõigepealt prantsuse keeles ja võite selle asemel valida inglise keele; teie väitlusi privaatsena hoidvad seaded on vaikimisi sisse lülitatud; võite taotleda teid puudutavate isikuandmete otsingumootorite indeksist eemaldamist.
 
 ### A.4 Austraalia ja Uus-Meremaa
 
