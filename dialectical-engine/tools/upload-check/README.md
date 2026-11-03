@@ -100,7 +100,9 @@ README.
   refused and the reason the product's own check gave.
 - **`not checked`**: the check could not do its work, and one line says why. The usual reason is a commit older than
   something the check uses: check 2 needs the release tool's shared build settings (`uiBuildEnvironment`), so it says
-  `not checked` for R22 and older. **`not checked` never counts as passed.**
+  `not checked` for R22 and older. **`not checked` never counts as passed.** A `not checked` that does not name a
+  missing export is a fault in the commit's own setup (for example a database step, or migration, that fails on an
+  empty database). Bring it to the owner.
 
 **The lines worth knowing:**
 
