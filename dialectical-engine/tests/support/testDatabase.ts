@@ -250,6 +250,12 @@ export async function startTestDatabase(): Promise<TestDatabase> {
   resolveTestSchemaFrom();
   const bootstrap = await loadBootstrapRegister();
   const database = await startWithEmbedded(bootstrap.values.postgresMajorVersion);
-  armSuperuserGuardForTestFile(database.connectionString, testFile);
+  try {
+    armSuperuserGuardForTestFile(database.connectionString, testFile);
+  } catch (error) {
+    // A guard that refuses (MASTER_KEY_GUARD_TEST_FILE_UNKNOWN) must not leave the cluster and its folder behind.
+    await database.stop();
+    throw error;
+  }
   return database;
 }

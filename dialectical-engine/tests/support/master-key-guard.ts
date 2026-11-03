@@ -129,7 +129,7 @@ export function armSuperuserGuardForTestFile(
  * request is in flight: a row the real service would have written, or a stand-in's own write. The R21 guard refuses the
  * superuser only inside a request, so each use is a deliberate hole in it. Only the files listed in
  * tests/unit/master-key-files.test.ts (`FIXTURE_STEP_CALLERS`, each with its reason) may use it; that test also fails
- * on any other `AsyncResource.bind` under tests/ or acceptance/, so the hole cannot be copied elsewhere.
+ * on any other `AsyncResource.bind` under tests/, acceptance/ or tools/, so the hole cannot be copied elsewhere.
  */
 export const runFixtureStepOutsideRequest = AsyncResource.bind(<T,>(work: () => Promise<T>): Promise<T> => work());
 
