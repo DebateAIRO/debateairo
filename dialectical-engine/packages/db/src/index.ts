@@ -43,6 +43,8 @@ export * from "./web-evidence.js";
 export * from "./investigations.js";
 // The new dig model and the month pause (migration 0134, dig-model revision task W2-8).
 export * from "./dig-model.js";
+// The paths a person chose at Start and the carry-on marks (migration 0155, V4 start step Task 20).
+export * from "./start-paths.js";
 export * from "./pool-budget.js";
 export * from "./release-state.js";
 export { recordRunSupersession, resolveRunRef } from "./run-supersession.js";
