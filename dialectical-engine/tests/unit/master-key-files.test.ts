@@ -31,12 +31,14 @@ describe("the master-key list", () => {
     await expect(runInRequestScope(() => client.query("SELECT 1"))).rejects.toThrow("R21_SUPERUSER_POOL_IN_REQUEST");
   });
 
-  it("a listed file keeps the superuser pool; DEBATEAI_TEST_API_LOGINS=0 turns login mode off for every file", () => {
-    const [listed] = [...DEBATEAI_TEST_MASTER_KEY_FILES.keys()];
-    if (listed === undefined) throw new Error("the list is empty: this case needs one entry");
+  it("every listed file keeps the superuser pool; DEBATEAI_TEST_API_LOGINS=0 turns login mode off for every file", () => {
+    const listed = [...DEBATEAI_TEST_MASTER_KEY_FILES.keys()];
+    if (listed.length === 0) throw new Error("the list is empty: this case needs at least one entry");
     vi.stubEnv("DEBATEAI_TEST_API_LOGINS", undefined);
-    expect(enterApiPoolMode(pathToFileURL(join(PRODUCT_ROOT, listed)).href, superuserUrl("t7_listed_superuser")))
-      .toBe("master-key");
+    for (const file of listed) {
+      expect({ file, mode: enterApiPoolMode(pathToFileURL(join(PRODUCT_ROOT, file)).href, superuserUrl("t7_listed_superuser")) })
+        .toEqual({ file, mode: "master-key" });
+    }
     vi.stubEnv("DEBATEAI_TEST_API_LOGINS", "0");
     expect(enterApiPoolMode(import.meta.url, superuserUrl("t7_off_superuser"))).toBe("off");
   });
