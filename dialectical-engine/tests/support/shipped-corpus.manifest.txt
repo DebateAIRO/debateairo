@@ -1040,6 +1040,7 @@ packages/contract/src/locale.ts
 packages/contract/src/map-view.ts
 packages/contract/src/mfa-recovery.ts
 packages/contract/src/password-reset.ts
+packages/contract/src/path-outcome.ts
 packages/contract/src/plan-tiers.ts
 packages/contract/src/publication-review.ts
 packages/contract/src/question-check.ts

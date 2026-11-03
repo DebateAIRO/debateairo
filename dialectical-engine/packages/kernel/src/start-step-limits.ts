@@ -50,3 +50,9 @@ export const START_PATHS_SOURCES = Object.freeze(["MENU", "RUN_BUILT", "DIG_PICK
 export const START_PATH_AUTHORS = Object.freeze(["AI_SUGGESTION", "AI_COMBINED", "PERSON_EDITED", "PERSON_OWN_VIEW"] as const);
 /** The four kinds of "Another way to see it" card. */
 export const START_CARD_KINDS = Object.freeze(["CHOICE_NOT_WEIGHED", "EITHER_OR", "WHAT_WOULD_CHANGE_IT", "OTHER_READING"] as const);
+
+/**
+ * V4 start step, Task 15 (spec 2026-11-03 §2.7, §4.3): a path's results: at most 3 "what changed" lines, 120 pieces of
+ * evidence it rests on, a gap round's 40 points of at most 400 characters, and "+ N more to explore" at most 54.
+ */
+export const PATH_RESULT_LIMITS = Object.freeze({ whatChangedMax: 3, restsOnMax: 120, gapPointsMax: 40, gapPointMaxChars: 400, moreMax: 54 });

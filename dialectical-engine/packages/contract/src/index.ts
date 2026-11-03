@@ -17,6 +17,8 @@ export * from "./question-language.js";
 // V4 start step, Task 9: the step before Start's ids, limits and wire shapes.
 export * from "./start-paths.js";
 import { StartCheckSchema, StartPathsSchema } from "./start-paths.js";
+// V4 start step, Task 15: a path debate's results per path.
+export * from "./path-outcome.js";
 import { SessionSchema, LegalDocumentPairSchema } from "./auth-shared.js";
 export * from "./auth-shared.js";
 import { ConsumerAuthenticationCredentialSchema, consumerAuthContractSchemas } from "./consumer-auth.js";
