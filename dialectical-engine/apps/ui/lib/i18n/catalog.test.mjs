@@ -90,11 +90,7 @@ const SAME_AS_ENGLISH = {
   "public.badges.heading": ["fr"],
   "public.export.filename": ["ar", "bg", "cs", "da", "el", "et", "fi", "fr", "ga", "he", "hi", "hr", "hu", "id", "it", "ja", "ko", "lt", "mt", "nl", "pl", "pt", "sk", "sl", "sv", "tr", "vi", "zh"],
   "public.honesty.verdict": ["fr", "ro"],
-  "public.overview.baseAndFinalAria": ["pt"],
-  "public.overview.convergence": ["fr"],
   "public.overview.details": ["de", "nl"],
-  "public.overview.proLabel": ["cs", "de", "hu", "id", "ro"],
-  "public.overview.proSideName": ["cs", "hu", "id", "ro"],
   "public.report.point.position": ["da", "de", "fr"]
 };
 

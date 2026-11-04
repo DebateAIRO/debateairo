@@ -14,11 +14,18 @@ import v4English from "../../apps/ui/messages/en/v4.json" with { type: "json" };
  * - public-f7: "not found" only for a debate that does not exist; a passing fault, the read limit or a lost connection says "We couldn't load this
  *   debate just now." with Try again, which asks the server again in place.
  * - public-f8: "under review" and "made by a newer version" sit inside the normal header, with "See other public debates" and "Ask your own question".
+ * - Wave 2: the server's read of the debate gives up after a while (an AbortSignal.timeout on its fetch), so a hung API ends in "We couldn't load this
+ *   debate just now." with Try again, instead of the grey outline staying (the Phase A click-through saw it stay over 60 s).
  */
-const mocks = vi.hoisted(() => ({ readPublicDebate: vi.fn(), readBillingUsage: vi.fn(async () => null as unknown) }));
+const mocks = vi.hoisted(() => ({
+  readPublicDebate: vi.fn(), readBillingUsage: vi.fn(async () => null as unknown), fetchImpl: null as typeof fetch | null
+}));
 vi.mock("@/lib/serverApi", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../apps/ui/lib/serverApi.js")>()),
-  createServerContractClient: () => ({ readPublicDebate: mocks.readPublicDebate })
+  createServerContractClient: (fetchImpl: typeof fetch) => {
+    mocks.fetchImpl = fetchImpl;
+    return { readPublicDebate: mocks.readPublicDebate };
+  }
 }));
 // journey-f19 (review F8): a signed-in visitor has a quota to show, but a public page's note never shows it nor reads it.
 vi.mock("@/lib/billing/usage", () => ({ readBillingUsage: mocks.readBillingUsage }));
@@ -36,6 +43,8 @@ afterEach(async () => {
   host?.remove();
   root = null;
   host = null;
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 type Navigation = typeof import("./stubs/next-navigation.js");
@@ -103,6 +112,38 @@ describe("a debate that cannot be shown", () => {
     expect(page.querySelector('meta[name="robots"]')!.getAttribute("content")).toBe("noindex");
     // Nothing of the debate is shown.
     expect(html).not.toContain(REF);
+  });
+});
+
+describe("a read that hangs", () => {
+  it("gives up with a timeout on the server's fetch, and then says it couldn't load just now, with Try again", async () => {
+    // A fetch that answers only when its signal aborts, as a hung API does.
+    const hung = vi.fn((_input: unknown, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      const signal = init?.signal;
+      if (signal === undefined || signal === null) return;
+      if (signal.aborted) reject(signal.reason);
+      signal.addEventListener("abort", () => reject(signal.reason));
+    }));
+    vi.stubGlobal("fetch", hung);
+    // The timeout, already spent (the real one is 15 s): what matters is that the read carries it, and what the page does when it fires.
+    const timeout = vi.spyOn(AbortSignal, "timeout").mockImplementation(() => AbortSignal.abort(new DOMException("timed out", "TimeoutError")));
+    const { element } = await pageFor(() => new Error("unused"));
+    expect(element).toBeDefined();
+    // pageFor's read rejects at once; read again through the page's own fetch so the hung API is what it meets.
+    mocks.readPublicDebate.mockReset();
+    mocks.readPublicDebate.mockImplementation(async () => {
+      await mocks.fetchImpl!(`https://api.test/v1/public/debates/${REF}`);
+      throw new Error("a hung read never answers");
+    });
+    const { default: PublicDebatePage } = await import("../../apps/ui/app/public/debate/[id]/page.js");
+    const page = await mount(await PublicDebatePage({ params: Promise.resolve({ id: REF }) }) as ReactElement);
+    expect(timeout).toHaveBeenCalled();
+    expect(timeout.mock.calls.at(-1)![0]).toBeGreaterThan(0);
+    expect(hung).toHaveBeenCalledTimes(1);
+    expect(hung.mock.calls[0]![1]!.signal!.aborted).toBe(true);
+    const note = page.querySelector("[data-public-note=could-not-load]")!;
+    expect(note.querySelector("[role=status]")!.textContent).toBe("We couldn't load this debate just now.");
+    expect([...note.querySelectorAll("button")].map((button) => button.textContent)).toEqual([V4["v4.common.retry"]]);
   });
 });
 

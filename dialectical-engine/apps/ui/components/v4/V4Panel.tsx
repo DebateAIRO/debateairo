@@ -214,8 +214,9 @@ function PointItem(props: Readonly<{ point: V4Point; word: TrustWord; level: Rea
  * The points in the four trust words, as folded groups; only groups with points. map-f1: the first group that has points
  * is open at first, in the words' order (Sure, then Sure for the case named, then Still argued), so a debate with no
  * "Sure" (every Free one, older ones) never opens on folded headings only; "Didn't hold" always starts folded.
+ * Exported for the public page (public-d1 A, owner review 3 Nov), which reads a path's findings the same way.
  */
-function PointGroups(props: Readonly<{ points: readonly V4Point[]; level: ReadingLevel; catalog: MessageCatalog; locale: string }>) {
+export function PointGroups(props: Readonly<{ points: readonly V4Point[]; level: ReadingLevel; catalog: MessageCatalog; locale: string }>) {
   const groups = TRUST_WORDS.map((word) => ({ word, points: props.points.filter((point) => point.trust === word) }))
     .filter((group) => group.points.length > 0);
   if (groups.length === 0) return null;

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { WEB_CONTRACT_LIMITS, type PublicDebate, type PublicReportVersion } from "@debateai/contract";
 import { FinishedReportBody } from "@/components/v4/V4ReportClient";
+import { V4WaitCard } from "@/components/v4/V4WaitCard";
 import {
   DIG_RETURN_PARAM, DIG_RETURN_UNDER_PARAM, publicDigReturnPath, signInHrefs, usePublicSignedIn
 } from "@/components/v4/V4PublicSession";
@@ -12,6 +13,9 @@ import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
 import {
   contributorName, pressPublicReport, publicDigAsk, reportsNewestFirst, type PublicAddition, type PublicPathView, type PublicReportPress
 } from "@/lib/v4/publicPage";
+import { publicReportWriting, reportShown } from "@/lib/v4/publicReport";
+import { useWaitPolling } from "@/lib/v4/useWaitPolling";
+import { contractClient } from "@/lib/api";
 import { levelHref, useReadingLevel } from "@/lib/v4/storage";
 import { picksMax } from "@/lib/v4/suggestions";
 import { useV4Ask } from "@/lib/v4/useV4Ask";
@@ -22,9 +26,25 @@ import { useV4Ask } from "@/lib/v4/useV4Ask";
  * dig goes through the one ask hook (consent, room, refusals), so the page starts nothing another way. English for R22 (owner N10), like V4's other labels.
  */
 
-/** "Write a report": how often the page reads itself again while the report is written, and how long before it stops asking. */
-const REPORT_REFRESH_MS = 15_000;
-const REPORT_REFRESHES_MAX = 40;
+/**
+ * public-f9 (owner review, 3 Nov): while a report is written the page checks for it often at first, then less often, and not
+ * at all while the tab is hidden (one check at once when it is shown again). Each step: until this long after the press,
+ * check this often.
+ */
+const REPORT_CHECK_STEPS: ReadonlyArray<Readonly<{ untilMs: number; everyMs: number }>> = Object.freeze([
+  { untilMs: 2 * 60_000, everyMs: 15_000 },
+  { untilMs: 5 * 60_000, everyMs: 30_000 },
+  { untilMs: Number.POSITIVE_INFINITY, everyMs: 60_000 }
+]);
+/** public-f9 (the record's own number): after 10 minutes the checks stop, and the card says it is taking longer than usual, with "Check again". */
+const REPORT_CHECKS_STOP_MINUTES = 10;
+/** While the tab is hidden the checks pause: the next one comes when the tab is shown again (useWaitPolling checks at once then). */
+const REPORT_HIDDEN_PAUSE_MS = 24 * 60 * 60_000;
+/**
+ * A check this soon after the last read reads nothing: when the checks slow down, useWaitPolling starts afresh with a check at once, which would read the
+ * debate twice in a row.
+ */
+const REPORT_READ_GAP_MS = 1_000;
 /** The Reports section's place on the page: where "Write a report" brings a visitor back to after signing in. */
 const REPORTS_ANCHOR = "public-reports";
 
@@ -361,72 +381,185 @@ function PublicReport({ report, catalog, locale }: Readonly<{ report: PublicRepo
   );
 }
 
-/** Refreshes the page from the server until it shows the version being written; the press's own line stays meanwhile. */
-function ReportButton({ debate, catalog }: Readonly<{ debate: PublicDebate; catalog: MessageCatalog }>) {
+/**
+ * public-f9: what "Write a report" came to on this page. PRESSING: the button says it is starting. WRITING: the card at the top of Reports, from this tab's
+ * press (`mine`) or, after a reload or on another device, from the server's optional `report_writing` (lib/v4/publicReport.ts). READY: the new version
+ * arrived (the "ready" line, once). FAILED: the server said the version could not be written.
+ */
+type ReportPressState =
+  | Readonly<{ kind: "IDLE" }>
+  | Readonly<{ kind: "PRESSING" }>
+  | Readonly<{ kind: "REFUSED"; message: string }>
+  | Readonly<{ kind: "WRITING"; version: number; startedAt: string; mine: boolean }>
+  | Readonly<{ kind: "READY"; version: number; mine: boolean }>
+  | Readonly<{ kind: "FAILED"; version: number }>;
+
+/** How often to check, this long after the start (REPORT_CHECK_STEPS). */
+function reportCheckEvery(elapsedMs: number): number {
+  return (REPORT_CHECK_STEPS.find((step) => elapsedMs < step.untilMs) ?? REPORT_CHECK_STEPS[REPORT_CHECK_STEPS.length - 1]!).everyMs;
+}
+
+/**
+ * The card at the top of Reports while a report is written (journey-d2's one waiting card): "Being written", "Started 14:02", "You can leave this page. It
+ * keeps going.". The checks slow down and pause in a hidden tab; once the new version is there the page reads itself again. After 10 minutes they stop:
+ * "taking longer than usual" with "Check again". Nothing is kept in the browser: a reload knows of the report only from the server.
+ */
+function ReportWriting({ debate, version, startedAt, catalog, locale, onSettled }: Readonly<{
+  debate: PublicDebate; version: number; startedAt: string; catalog: MessageCatalog; locale: string; onSettled: (state: "READY" | "FAILED") => void;
+}>) {
+  const router = useRouter();
+  const startedMs = Date.parse(startedAt);
+  const stopAt = startedMs + REPORT_CHECKS_STOP_MINUTES * 60_000;
+  // When the checks stopped: always past the ten minutes, so the card's "taking longer than usual" shows from then on.
+  const stopNow = useCallback((): number => Math.max(Date.now(), stopAt + 1), [stopAt]);
+  const [stoppedAt, setStoppedAt] = useState<number | null>(() => (Date.now() >= stopAt ? Math.max(Date.now(), stopAt + 1) : null));
+  const [step, setStep] = useState(() => reportCheckEvery(Date.now() - startedMs));
+  const settled = useRef(false);
+  const lastRead = useRef(Number.NEGATIVE_INFINITY);
+  const settle = useCallback((state: "READY" | "FAILED") => {
+    if (settled.current) return;
+    settled.current = true;
+    if (state === "READY") router.refresh();
+    onSettled(state);
+  }, [router, onSettled]);
+  // The page's own read already shows it (a refresh that came first): ready.
+  useEffect(() => {
+    if (reportShown(debate, version)) settle("READY");
+  }, [debate, version, settle]);
+  const check = useCallback(async (stillWanted: () => boolean): Promise<"AGAIN" | "DONE"> => {
+    if (Date.now() - lastRead.current < REPORT_READ_GAP_MS) return "AGAIN";
+    lastRead.current = Date.now();
+    const fresh = await contractClient.readPublicDebate(debate.public_ref);
+    if (!stillWanted()) return "DONE";
+    if (reportShown(fresh, version)) { settle("READY"); return "DONE"; }
+    const writing = publicReportWriting(fresh);
+    // Only this version's failure counts: an earlier one that failed says nothing about it.
+    if (writing?.state === "FAILED" && writing.report_version === version) { settle("FAILED"); return "DONE"; }
+    if (Date.now() >= stopAt) { setStoppedAt(stopNow()); return "DONE"; }
+    setStep(reportCheckEvery(Date.now() - startedMs));
+    return "AGAIN";
+  }, [debate.public_ref, version, settle, startedMs, stopAt, stopNow]);
+  const polling = useWaitPolling(check, { everyMs: step, hiddenEveryMs: REPORT_HIDDEN_PAUSE_MS, enabled: stoppedAt === null });
+  useEffect(() => {
+    // The checks stop at 10 minutes even when none answers just then.
+    if (stoppedAt !== null) return;
+    const timer = window.setTimeout(() => setStoppedAt(stopNow()), Math.max(0, stopAt - Date.now()));
+    return () => window.clearTimeout(timer);
+  }, [stoppedAt, stopAt, stopNow]);
+  const [checking, setChecking] = useState(false);
+  const checkAgain = async (): Promise<void> => {
+    setChecking(true);
+    try {
+      if (await check(() => true) === "AGAIN") setStoppedAt(stopNow());
+    } catch {
+      setStoppedAt(stopNow());
+    } finally {
+      setChecking(false);
+    }
+  };
+  return (
+    <div className="v4PubReportCard" data-public-report-writing>
+      <V4WaitCard
+        state={{ kind: "BEING_WRITTEN" }}
+        variant="inline"
+        headingLevel={3}
+        startedAt={startedAt}
+        checkedAt={stoppedAt ?? polling.checkedAt}
+        reconnecting={stoppedAt === null && polling.reconnecting}
+        onTryNow={polling.tryNow}
+        // The record's own number (public-f9: "After 10 minutes the card says it is taking longer than usual"), not a guessed time.
+        usualTopMinutes={REPORT_CHECKS_STOP_MINUTES}
+        longerAction={stoppedAt === null ? null : (
+          <button type="button" className="v4Btn" disabled={checking} aria-busy={checking} onClick={() => void checkAgain()} data-public-report-check>
+            {t(catalog, "v4.investigation.checkAgain")}
+          </button>
+        )}
+        catalog={catalog}
+        locale={locale}
+      />
+    </div>
+  );
+}
+
+/** Where "Write a report" stands on this page, and the press: the card's state (top of Reports) and the button's (bottom). */
+function useReportPress(debate: PublicDebate): Readonly<{ state: ReportPressState; press: () => Promise<void>; settle: (state: "READY" | "FAILED") => void }> {
   const actions = useContext(LaneContext);
-  const [state, setState] = useState<Readonly<{ kind: "IDLE" | "PRESSING" }> | PublicReportPress>({ kind: "IDLE" });
+  const [state, setState] = useState<ReportPressState>(() => {
+    // After a reload or on another device: only the server can say a report is being written (its optional `report_writing`).
+    const writing = publicReportWriting(debate);
+    if (writing === null || reportShown(debate, writing.report_version)) return { kind: "IDLE" };
+    if (writing.state === "FAILED") return { kind: "FAILED", version: writing.report_version };
+    return { kind: "WRITING", version: writing.report_version, startedAt: writing.started_at, mine: false };
+  });
+  const press = useCallback(async (): Promise<void> => {
+    if (actions === null) return;
+    setState({ kind: "PRESSING" });
+    const answer: PublicReportPress = await actions.writeReport();
+    setState(answer.kind === "WRITING" ? { kind: "WRITING", version: answer.version, startedAt: new Date().toISOString(), mine: true } : answer);
+  }, [actions]);
+  const settle = useCallback((next: "READY" | "FAILED") => {
+    setState((before) => {
+      if (before.kind !== "WRITING") return before;
+      return next === "READY" ? { kind: "READY", version: before.version, mine: before.mine } : { kind: "FAILED", version: before.version };
+    });
+  }, []);
+  return { state, press, settle };
+}
+
+/**
+ * The press itself: the terms and "Write a report" (it says it is starting while the press is sent; after a failed report it offers to write it again),
+ * or the signed-out choice. While a report is written the card at the top says so, and the button waits for it.
+ */
+function ReportButton({ state, press, catalog }: Readonly<{ state: ReportPressState; press: () => Promise<void>; catalog: MessageCatalog }>) {
+  const actions = useContext(LaneContext);
   if (actions === null) return null;
   if (actions.signedIn === null) return <HeldPlace label={t(catalog, "v4.public.report.write")} />;
   if (!actions.signedIn) {
     return <SignInChoice lead="v4.public.signedOut.report" returnPath={`${actions.returnPath(null)}#${REPORTS_ANCHOR}`} catalog={catalog} />;
   }
-  const press = async (): Promise<void> => {
-    setState({ kind: "PRESSING" });
-    setState(await actions.writeReport());
-  };
-  const writingVersion = state.kind === "WRITING" ? state.version : null;
-  const shown = writingVersion !== null && (debate.reports ?? []).some((report) => report.report_version >= writingVersion);
+  if (state.kind === "WRITING") return null;
+  const pressing = state.kind === "PRESSING";
+  const label = pressing ? "v4.ask.starting" : state.kind === "FAILED" ? "v4.investigation.writeAgain" : "v4.public.report.write";
   return (
     <div className="v4PubReportPress">
-      {writingVersion === null || shown ? (
-        <>
-          <p className="v4PubHint">{t(catalog, "v4.public.report.terms")}</p>
-          <button type="button" className="v4Btn" disabled={state.kind === "PRESSING"} aria-busy={state.kind === "PRESSING"} onClick={() => void press()}>
-            {t(catalog, "v4.public.report.write")}
-          </button>
-        </>
-      ) : (
-        <>
-          <p className="v4PubHint" role="status">{t(catalog, "v4.public.report.writing")}</p>
-          <ReportRefresher />
-        </>
-      )}
+      <p className="v4PubHint">{t(catalog, "v4.public.report.terms")}</p>
+      <button type="button" className="v4Btn" disabled={pressing} aria-busy={pressing} onClick={() => void press()} data-public-report-press>
+        {t(catalog, label)}
+      </button>
       {state.kind === "REFUSED" ? <p className="v4AskRefusal" role="alert">{state.message}</p> : null}
     </div>
   );
 }
 
-function ReportRefresher() {
-  const router = useRouter();
-  useEffect(() => {
-    let reads = 0;
-    const timer = window.setInterval(() => {
-      reads += 1;
-      if (reads > REPORT_REFRESHES_MAX) window.clearInterval(timer);
-      else router.refresh();
-    }, REPORT_REFRESH_MS);
-    return () => window.clearInterval(timer);
-  }, [router]);
-  return null;
-}
-
 /** Reports: every version anyone wrote, newest first; the earlier ones stay readable, one click away. */
 export function V4PublicReports({ debate, catalog, locale }: Readonly<{ debate: PublicDebate; catalog: MessageCatalog; locale: string }>) {
   const actions = useContext(LaneContext);
+  const press = useReportPress(debate);
   const [current, ...earlier] = reportsNewestFirst(debate.reports);
   // A page with no way to press (a publication review) and nothing written has no section.
   if (current === undefined && actions === null) return null;
+  const { state } = press;
+  // public-f9: the "ready" line. Its status region is always there, so the line is read out once when it appears; it shows at once with the shared
+  // 1-second soft highlight. Someone else's report (known only from the server) is not called "yours".
+  const ready = state.kind === "READY" ? t(catalog, state.mine ? "v4.ready.report" : "v4.public.report.ready") : "";
   return (
     <section id={REPORTS_ANCHOR} className="v4Root v4PublicLane v4PubReports" aria-labelledby="public-reports-title">
       <h2 id="public-reports-title" className="v4PubHeading">{t(catalog, "v4.public.reports")}</h2>
+      {state.kind === "WRITING" ? (
+        <ReportWriting debate={debate} version={state.version} startedAt={state.startedAt} catalog={catalog} locale={locale} onSettled={press.settle} />
+      ) : null}
+      <p className={`v4PubReady${ready === "" ? "" : " v4Highlight"}`} role="status" data-public-report-ready>{ready}</p>
+      {state.kind === "FAILED" ? (
+        <p className="v4PubReportFailed" role="alert" data-public-report-failed>{t(catalog, "v4.investigation.failed")}</p>
+      ) : null}
       {current === undefined ? null : <PublicReport report={current} catalog={catalog} locale={locale} />}
-      {earlier.map((report) => (
-        <details key={report.report_version} className="v4PubEarlier">
-          <summary>{t(catalog, "v4.public.report.earlier", { version: report.report_version })}</summary>
-          <PublicReport report={report} catalog={catalog} locale={locale} />
+      {earlier.map((version) => (
+        <details key={version.report_version} className="v4PubEarlier">
+          <summary>{t(catalog, "v4.public.report.earlier", { version: version.report_version })}</summary>
+          <PublicReport report={version} catalog={catalog} locale={locale} />
         </details>
       ))}
-      <ReportButton debate={debate} catalog={catalog} />
+      <ReportButton state={state} press={press.press} catalog={catalog} />
     </section>
   );
 }

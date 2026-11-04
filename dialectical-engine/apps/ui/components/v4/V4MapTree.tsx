@@ -181,6 +181,11 @@ export type MapPiecesProps = Readonly<{
   reveal?: ReadonlySet<string>;
   /** map-d3 (laptops, 1100-1439 px): only the opened path unfolds its leaves; absent or false: every path shows them. */
   fold?: boolean;
+  /**
+   * public-d1 A (owner review, 3 Nov): the same map in read-only form, for a public debate's "Explore the map": no pick
+   * boxes (nothing can be ticked or dug from the map itself); the cards still open. Absent or false: the own map.
+   */
+  readOnly?: boolean;
 }>;
 
 /**
@@ -429,13 +434,15 @@ function OpenCard(props: Readonly<{
           <LevelWords level={props.level} catalog={pieces.catalog} />
         </span>
       </button>
-      <PickBox
-        question={question}
-        picked={picked}
-        onTogglePick={pieces.onTogglePick}
-        catalog={pieces.catalog}
-        {...(pieces.choice === undefined ? {} : { choice: pieces.choice })}
-      />
+      {pieces.readOnly === true ? null : (
+        <PickBox
+          question={question}
+          picked={picked}
+          onTogglePick={pieces.onTogglePick}
+          catalog={pieces.catalog}
+          {...(pieces.choice === undefined ? {} : { choice: pieces.choice })}
+        />
+      )}
     </div>
   );
 }

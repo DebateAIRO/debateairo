@@ -1646,6 +1646,8 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (debate.author_name_gone === true && (debate.contributions ?? []).length === 0) return refuse("PUBLIC_DEBATE_NO_CARRIER");
     const version = (debate.reports ?? []).length + 1 + (publicReportsWriting.get(parts[3]!) ?? 0);
     publicReportsWriting.set(parts[3]!, (publicReportsWriting.get(parts[3]!) ?? 0) + 1);
+    // public-f9: with `public=REPORT_STUCK` the version is accepted and never arrives (the page's "taking longer" and "Check again").
+    if (publicMode === "REPORT_STUCK") return sendJson(req, res, 202, { state: "WRITING", report_version: version }, C.PublicReportAcceptedSchema);
     const written = setTimeout(() => {
       publicReportsWriting.set(debate.public_ref, (publicReportsWriting.get(debate.public_ref) ?? 1) - 1);
       debate.reports = [...(debate.reports ?? []), writtenReport(version, iso(Date.now()))];

@@ -272,7 +272,13 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.reportStrip.coversNoDigs",
   "v4.reportStrip.share",
   "v4.reportStrip.digsWait",
-  "v4.report.checkedWordsIntroFree"
+  "v4.report.checkedWordsIntroFree",
+  // The owner's screen review of 3 Nov, public-d1 / public-f4 / public-f9 (wave 2): the lines the record does not word. The way back from the public
+  // page's read-only map, the phone menu that holds "Report a problem", and the ready line for a report someone else started (the page knows of it
+  // only from the server). "For", "Against", "Explore the map" and "Check again" are the record's own words.
+  "v4.public.mapBack",
+  "v4.public.menu",
+  "v4.public.report.ready"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {
