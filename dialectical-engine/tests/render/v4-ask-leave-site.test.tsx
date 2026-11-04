@@ -13,6 +13,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  */
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/components/AuthGate", () => ({ AuthGate: ({ children }: { children: (token: string) => React.ReactNode }) => children("token") }));
+// A signed-in person (a signed-out visitor's Next goes to sign in instead: tests/render/v4-ask-step-one.test.tsx).
+vi.mock("@/components/v4/V4AskGate", () => ({ V4AskGate: ({ children }: { children: (session: string) => React.ReactNode }) => children("IN") }));
 vi.mock("@/components/billing/RoomNotice", () => ({ RoomNotice: () => null }));
 vi.mock("@/components/v4/V4Header", () => ({ V4Header: () => null }));
 vi.mock("@/lib/api", () => ({ contractClient: { readAnswerIndex: async () => ({ items: [], open_runs: [] }), clarifyAsk: async () => ({ source: "NONE" }) } }));

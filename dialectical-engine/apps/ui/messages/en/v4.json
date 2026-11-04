@@ -66,6 +66,7 @@
   "v4.ask.questionPlaceholder": "For example: should my city build a new metro line, or spend the money on buses?",
   "v4.ask.promise": "Several AIs from different companies argue it from all sides. You choose what they look into. You get a plain answer and see what holds up and what doesn't.",
   "v4.ask.signIn": "Sign in",
+  "v4.ask.signInFirst": "You'll sign in first, then come back to this page.",
   "v4.ask.typeFirst": "Type your question first.",
   "v4.ask.tooLong": "This is too long to send. Please shorten it a little.",
   "v4.ask.usedUp.PERSON_DAY": "You've used today's quota. New questions start after {time}.",

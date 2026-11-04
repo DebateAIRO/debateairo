@@ -27,7 +27,8 @@ function AllMapsView({ catalog, locale, initialLevel }: Readonly<{ catalog: Mess
   return (
     <>
       <V4Header catalog={catalog} readingLevel={level} onReadingLevel={chooseLevel} />
-      <main className="v4AskMain v4MapsMain">
+      {/* UI-4: the site layout already holds the page's one <main>. */}
+      <div className="v4AskMain v4MapsMain">
         <h1 className="v4AskTitle v4Serif">{t(catalog, "v4.maps.title")}</h1>
         {load.status === "LOADING" ? <p className="v4AskHint v4Muted" role="status">{t(catalog, "v4.common.loading")}</p> : null}
         {load.status === "FAILED" ? (
@@ -52,7 +53,7 @@ function AllMapsView({ catalog, locale, initialLevel }: Readonly<{ catalog: Mess
             </button>
           </div>
         ) : null}
-      </main>
+      </div>
     </>
   );
 }

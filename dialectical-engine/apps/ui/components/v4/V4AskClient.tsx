@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { askQuestionMaxBytes, type ClarifyQuestion } from "@debateai/contract";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { askQuestionMaxBytes, detectCrisis, type ClarifyQuestion } from "@debateai/contract";
 import { RoomNotice } from "@/components/billing/RoomNotice";
 import { V4AskGate, type V4Session } from "@/components/v4/V4AskGate";
 import { V4MoneyLines } from "@/components/v4/V4DigSuggest";
@@ -11,6 +10,7 @@ import { V4Header } from "@/components/v4/V4Header";
 import { V4MapSeed } from "@/components/v4/V4MapSeed";
 import { SHELF_MAX, useMapShelf, V4MapShelf } from "@/components/v4/V4MapShelf";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import { currentReturnPath, signInHrefFor } from "@/lib/signInWayBack";
 import {
   answersStillAsked, clarifyingQuestions, composeQuestion, FREE_GOAL_CHOICES_MAX, goalChoiceCount, goalWithinPlan, purposeLinesOfGoal
 } from "@/lib/v4/askText";
@@ -225,9 +225,6 @@ function V4AskForm({
   const ids = useId();
   // ask-d5 B: "Your maps", read once the person is known to be signed in.
   const shelf = useMapShelf({ enabled: session === "IN", want: SHELF_MAX, catalog });
-  // journey-d4 A: before Next, the browser's own "Leave site?" protects typed words (a reload or a closed tab); words a
-  // reload brings back from the address are not at risk.
-  useLeaveSiteGuard(() => step === "ask" && question.trim().length > 0 && question.trim() !== initialQuestion.trim());
   // Owner review 3 Nov (wait-f11): "Ask this again" fills the box with the earlier question, read back from the server, as
   // long as the person has not started typing; nothing starts by itself. Read once the person is known to be signed in.
   const againQuestion = useAskAgain(session === "IN" ? againRunId : null, catalog);
@@ -235,6 +232,11 @@ function V4AskForm({
     if (againQuestion === null) return;
     setQuestion((current) => (current === initialQuestion ? againQuestion : current));
   }, [againQuestion, initialQuestion]);
+  // journey-d4 A: before Next, the browser's own "Leave site?" protects typed words (a reload or a closed tab); words a
+  // reload brings back by themselves (from the address, or "Ask this again" from the server) are not at risk.
+  const filledByItself = againQuestion ?? initialQuestion;
+  useLeaveSiteGuard(() => step === "ask" && question.trim().length > 0 && question.trim() !== filledByItself.trim()
+    && question.trim() !== initialQuestion.trim());
 
   const ask = useV4Ask({
     catalog,
@@ -311,7 +313,28 @@ function V4AskForm({
   );
   // ask-d1 D: the seed of the map, for a first visit only (signed out, or an account with no debate yet).
   const firstVisit = session === "OUT" || (session === "IN" && shelf.load.status === "READ" && !shelf.load.read.anyRows);
-  const signInHref = `/login?next=${encodeURIComponent(levelHref("/v4", savedLevel))}`;
+  // ask-d1 A (in D): the promise line too is for first visits only; returning people never see it. Until the account
+  // says which (ask-f16), its place is held, then closed at once for a returning person.
+  const promise: "SHOW" | "HOLD" | "NONE" = firstVisit ? "SHOW"
+    : session === "CHECKING" || (session === "IN" && shelf.load.status === "LOADING") ? "HOLD" : "NONE";
+  // ask-d1: sign-in sends the person back to this page, its address as it is (the one rule of lib/signInWayBack.ts, which
+  // keeps only an allowed way back), with the level they chose. Worked out once mounted: the server has no window.
+  const [signInHref, setSignInHref] = useState("/login");
+  useEffect(() => {
+    setSignInHref(signInHrefFor(levelHref(currentReturnPath(), savedLevel)));
+  }, [savedLevel]);
+  // ask-d1 A: the sign-in panel at Next is the start-step session's. Until it lands, a signed-out visitor's Next and "Just
+  // answer it" go to sign in (with the way back), and a grey line under Next says so; nothing reaches the consent screen or
+  // step 2 without a session. While the session is unknown both wait.
+  const signedOut = session === "OUT";
+  const sessionUnknown = session === "CHECKING";
+  // V, 2026-09-30 (ask-f3: "even signed out"): words of a person in crisis get the help numbers before any sign-in step.
+  // The page stays and nothing is sent: useV4Ask's own first check opens the help screen and stops there.
+  const helpBeforeSignIn = (event: MouseEvent<HTMLAnchorElement>): void => {
+    if (trimmed.length === 0 || !detectCrisis(trimmed).crisis) return;
+    event.preventDefault();
+    void ask.submit(trimmed, "quick", "ask");
+  };
 
   // Changing step moves focus to the new step's heading or the question, and back to the top.
   useEffect(() => {
@@ -415,10 +438,11 @@ function V4AskForm({
     addAngle();
   }
 
-  // ask-d1: a signed-out visitor reads "Sign in" at the end of the header (the way back is this page).
+  // ask-d1: a signed-out visitor reads "Sign in" at the end of the header (the way back is this page). A plain link (W11):
+  // /login may send a signed-in visitor on as a full page load, and the browser's own "Leave site?" guards typed words.
   const header = (
     <V4Header catalog={catalog} readingLevel={savedLevel} onReadingLevel={chooseLevelNow} classicHref="/new">
-      {session === "OUT" ? <Link className="v4Link v4HdrSignIn" href={signInHref}>{t(catalog, "v4.ask.signIn")}</Link> : null}
+      {signedOut ? <a className="v4Link v4HdrSignIn" href={signInHref}>{t(catalog, "v4.ask.signIn")}</a> : null}
     </V4Header>
   );
   const refusalAlert = refusal === null ? null : <p className="v4AskRefusal" role="alert">{refusal}</p>;
@@ -433,8 +457,15 @@ function V4AskForm({
             <h1 id={`${ids}-title`} className="v4AskTitle v4Serif">
               <label htmlFor={`${ids}-q`}>{t(catalog, "v4.ask.title")}</label>
             </h1>
-            {/* ask-d1: the one grey promise line under the title. */}
-            <p className="v4AskPromise v4Muted">{t(catalog, "v4.ask.promise")}</p>
+            {/* ask-d1: the one grey promise line under the title, for first visits only (its place held until known). */}
+            {promise === "NONE" ? null : (
+              <p
+                className="v4AskPromise v4Muted"
+                {...(promise === "HOLD" ? { "aria-hidden": "true" as const, style: { visibility: "hidden" as const } } : {})}
+              >
+                {t(catalog, "v4.ask.promise")}
+              </p>
+            )}
             {usedUp === null ? null : (
               <p id={`${ids}-usedup`} className="v4AskUsedUp" role="status">{t(catalog, usedUp.key, usedUp.values)}</p>
             )}
@@ -492,19 +523,40 @@ function V4AskForm({
 
           {publicNotice}
           <div className="v4AskActions">
-            <button type="button" className="v4Btn v4BtnPrimary" onClick={() => void goOn()} disabled={!canGoOn || busy} aria-describedby={stepOneWhy}>
-              {t(catalog, "v4.ask.continue")}
-            </button>
-            <button
-              type="button"
-              className="v4Link v4AskJust"
-              onClick={() => void start(quickLine, "quick", "quick", plain)}
-              disabled={!canGoOn || busy || quickTooLong}
-              aria-busy={pressed === "quick"}
-              aria-describedby={stepOneWhy}
-            >
-              {pressed === "quick" ? t(catalog, "v4.ask.starting") : t(catalog, "v4.ask.justAnswer")}
-            </button>
+            {signedOut ? (
+              // ask-d1 A, until the start-step's sign-in panel: both go to sign in, with the way back to this page.
+              <>
+                <a className="v4Btn v4BtnPrimary" href={signInHref} aria-describedby={`${ids}-signin`} onClick={helpBeforeSignIn}>
+                  {t(catalog, "v4.ask.continue")}
+                </a>
+                <p id={`${ids}-signin`} className="v4AskHint v4Muted v4AskSignInFirst">{t(catalog, "v4.ask.signInFirst")}</p>
+                <a className="v4Link v4AskJust" href={signInHref} aria-describedby={`${ids}-signin`} onClick={helpBeforeSignIn}>
+                  {t(catalog, "v4.ask.justAnswer")}
+                </a>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="v4Btn v4BtnPrimary"
+                  onClick={() => void goOn()}
+                  disabled={!canGoOn || busy || sessionUnknown}
+                  aria-describedby={stepOneWhy}
+                >
+                  {t(catalog, "v4.ask.continue")}
+                </button>
+                <button
+                  type="button"
+                  className="v4Link v4AskJust"
+                  onClick={() => void start(quickLine, "quick", "quick", plain)}
+                  disabled={!canGoOn || busy || quickTooLong || sessionUnknown}
+                  aria-busy={pressed === "quick"}
+                  aria-describedby={stepOneWhy}
+                >
+                  {pressed === "quick" ? t(catalog, "v4.ask.starting") : t(catalog, "v4.ask.justAnswer")}
+                </button>
+              </>
+            )}
           </div>
           {stepOneRoomLines}
           {refusalAlert}

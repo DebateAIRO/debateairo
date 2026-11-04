@@ -83,6 +83,25 @@ async function type(text: string): Promise<void> {
   });
 }
 
+/**
+ * Presses a link and answers whether the page's own handler stopped it; the link is then stopped anyway (jsdom has no
+ * navigation).
+ */
+async function pressLink(link: HTMLAnchorElement): Promise<boolean> {
+  let stopped = false;
+  const after = (event: Event): void => {
+    stopped = event.defaultPrevented;
+    event.preventDefault();
+  };
+  document.addEventListener("click", after);
+  try {
+    await act(async () => { link.click(); });
+  } finally {
+    document.removeEventListener("click", after);
+  }
+  return stopped;
+}
+
 /** The text of the elements an element's aria-describedby names. */
 function describedBy(element: Element): string {
   return (element.getAttribute("aria-describedby") ?? "").split(" ").filter(Boolean)
@@ -91,6 +110,8 @@ function describedBy(element: Element): string {
 
 beforeEach(() => {
   gate.session = "IN";
+  // The page's own address (the way back after signing in is read from it).
+  window.history.replaceState(null, "", "/v4");
   ask.room = null;
   ask.submit.mockReset();
   ask.submit.mockImplementation(async () => ({ kind: "STOPPED" }));
@@ -141,6 +162,54 @@ describe("a signed-out visitor (ask-d1 D)", () => {
     expect(host!.querySelector(".v4Hdr a")).toBeNull();
     expect(host!.querySelector(".v4Seed")).toBeNull();
     expect(field()).not.toBeNull();
+    // Nothing can start before the session is known: both step-1 buttons wait (no consent screen for a stranger).
+    expect(nextButton().disabled).toBe(true);
+    expect(justButton().disabled).toBe(true);
+    // The promise line's place is held (ask-f16) until it is known whether this is a first visit.
+    const promise = host!.querySelector<HTMLElement>(".v4AskPromise");
+    expect(promise?.getAttribute("aria-hidden")).toBe("true");
+    expect(promise?.style.visibility).toBe("hidden");
+  });
+
+  it("Next and 'Just answer it' go to sign in with the way back here, and say so under Next; nothing is asked or sent", async () => {
+    gate.session = "OUT";
+    window.history.replaceState(null, "", "/v4?level=plain&topic=trams");
+    await mount();
+    const wayBack = `/login?next=${encodeURIComponent("/v4?level=plain&topic=trams")}`;
+    const links = [...host!.querySelectorAll<HTMLAnchorElement>(".v4AskActions a")];
+    expect(links.map((link) => link.textContent)).toEqual([CATALOG["v4.ask.continue"], CATALOG["v4.ask.justAnswer"]]);
+    expect(links.every((link) => link.getAttribute("href") === wayBack)).toBe(true);
+    // No button that would run the ask (the consent screen, step 2) is on the page for a stranger.
+    expect([...host!.querySelectorAll(".v4AskActions button")]).toHaveLength(0);
+    const line = host!.querySelector(".v4AskSignInFirst");
+    expect(line?.textContent).toBe("You'll sign in first, then come back to this page.");
+    expect(links.every((link) => describedBy(link) === line?.textContent)).toBe(true);
+    // The header's Sign in is the same plain link (W11: a full page load).
+    expect(host!.querySelector(".v4HdrSignIn")?.getAttribute("href")).toBe(wayBack);
+    // A plain question: the press goes on to sign in (nothing stops the link).
+    expect(await pressLink(links[0]!)).toBe(false);
+    expect(ask.submit).not.toHaveBeenCalled();
+  });
+
+  it("words of a person in crisis get the help screen before any sign-in step; the page stays (V, 2026-09-30)", async () => {
+    gate.session = "OUT";
+    await mount({ question: "I want to kill myself" });
+    for (const link of [...host!.querySelectorAll<HTMLAnchorElement>(".v4AskActions a")]) {
+      ask.submit.mockClear();
+      // The page does not go to sign in; useV4Ask's own first check opens the help screen and sends nothing.
+      expect(await pressLink(link)).toBe(true);
+      expect(ask.submit).toHaveBeenCalledTimes(1);
+      expect(ask.submit.mock.calls[0]![0]).toBe("I want to kill myself");
+    }
+  });
+
+  it("the promise line is for first visits only: a returning person never sees it", async () => {
+    server.readAnswerIndex.mockImplementation(async () => ({
+      items: [{ run_ref: "11111111-1111-4111-8111-111111111111", question_line: QUESTION, created_at_sequence: 1 }],
+      open_runs: [], limit: 32, offset: 0, total: 1
+    }));
+    await mount();
+    expect(host!.querySelector(".v4AskPromise")).toBeNull();
   });
 });
 
