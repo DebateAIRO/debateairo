@@ -3,7 +3,8 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import * as fixture from "../../apps/ui/lib/v3/storyFixture.js";
 import { digTargetQuestions } from "../../apps/ui/lib/v4/askText.js";
-import { digRetryOf, linkOfSent, rebuildDigTarget, retryPending, sameDig } from "../../apps/ui/lib/v4/digRetry.js";
+import { digRetryOf, rebuildDigTarget, retryPending, sameDig } from "../../apps/ui/lib/v4/digRetry.js";
+import { rememberSentDig, sentDigOf } from "../../apps/ui/lib/v4/useSentDigs.js";
 import {
   askAgainHref, askAgainQuestion, askAgainRunId, quotaUntouched, reasonSaysNothingUsed, sayNothingTaken
 } from "../../apps/ui/lib/v4/failedRun.js";
@@ -129,11 +130,12 @@ describe("a dig that did not finish (wait-f18, dig-f12)", () => {
     expect(rebuilt === null ? null : digTargetQuestions(rebuilt)).toEqual(["Small towns behave differently."]);
   });
 
-  it("a sent dig is matched to the link it made, places, texts and mode", () => {
-    const target: DigTarget = { kind: "path", path: mix };
-    expect(linkOfSent(linkOf(target, "c-7", "quick"), { target, mode: "quick" })).toBe(true);
-    expect(linkOfSent(linkOf(target, "c-7", "quick"), { target, mode: "thorough" })).toBe(false);
-    expect(linkOfSent(linkOf({ kind: "picks", path: renew, picks: [openPick(renew.open[0]!)] }, "c-8", "quick"), { target, mode: "quick" })).toBe(false);
+  it("a dig this visit sent is remembered exactly as sent, under its new run (the send records it, integration)", () => {
+    const target: DigTarget = { kind: "picks", path: renew, picks: [openPick(renew.open[0]!)] };
+    expect(sentDigOf("c-7")).toBeNull();
+    rememberSentDig("c-7", { target, mode: "thorough" });
+    expect(sentDigOf("c-7")).toEqual({ target, mode: "thorough" });
+    expect(sentDigOf("c-8")).toBeNull();
   });
 });
 

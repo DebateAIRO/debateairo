@@ -1,6 +1,6 @@
-import { digTargetQuestions, sameItemText } from "./askText.js";
+import { sameItemText } from "./askText.js";
 import { findOpenQuestion } from "./mapModel.js";
-import { openPick, placesOf, suggestionPick } from "./suggestions.js";
+import { openPick, suggestionPick } from "./suggestions.js";
 import type { DigLink, DigMode, DigTarget, DigView, PendingDig, V4DigPick, V4Map } from "./types.js";
 
 /*
@@ -46,15 +46,6 @@ export function sameDig(a: DigLink, b: DigLink): boolean {
   const left = texts(a);
   const right = texts(b);
   return places(a) === places(b) && left.length === right.length && left.every((text, index) => text === right[index]);
-}
-
-/** Whether `link` is the link a send of `sent` made (its places and its texts, as the page records them). */
-export function linkOfSent(link: DigLink, sent: SentDig): boolean {
-  const places = placesOf(sent.target);
-  const texts = digTargetQuestions(sent.target).map(oneLine);
-  return link.openQuestionIds.length === places.length && link.openQuestionIds.every((place, index) => place === places[index])
-    && link.questions.length === texts.length && link.questions.every((text, index) => oneLine(text) === texts[index])
-    && (link.mode === null || link.mode === sent.mode);
 }
 
 /**
