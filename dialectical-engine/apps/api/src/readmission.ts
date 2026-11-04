@@ -1,5 +1,5 @@
 import { isDeepStrictEqual } from "node:util";
-import { AskRequestSchema, START_STEP_LIMITS, type AskRequest } from "@debateai/contract";
+import { AskRequestSchema, type AskRequest } from "@debateai/contract";
 import type { RunSettingsClass } from "@debateai/budget";
 import type { StartPathsStore, StoredAsk, StoredStartPathSet } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
@@ -13,6 +13,7 @@ import { askStartShapeOf, normaliseAskForDebateShape, type AskStartShape } from 
 import { AskRefusal, type PlannedAskAdmission, type RunCreationSettings } from "./index.js";
 import { readPurposeLinesOf, recordPurposeLinesAtAsk, type PurposeLinesPort } from "./purpose-lines.js";
 import { runLanguageOf } from "./question-language/decider.js";
+import { startPathsFit } from "./start-paths-at-ask.js";
 
 /**
  * Side-by-side uploads spec 2026-10-21 §4, O3 (Q1 → a; plan C task C10) — THE RE-ADMISSION PLAN. A debate that waited
@@ -80,16 +81,14 @@ const ASK_AGAIN: ReadmissionPlan = Object.freeze({ kind: "ASK_AGAIN" });
 
 /**
  * V4 start step, Task 39: the start a waiting run's sealed set keeps under this version, or null when this version no
- * longer offers it: the start step off for the person (no widths), a menu's How wide not among the widths, a dig's picks
- * (or any other set) more than How wide's widest (START_PATHS_TOO_MANY at submit), or more than 3 paths on Free whatever
- * the widths say.
+ * longer offers it: the start step off for the person (no widths), or more paths than this version allows for the plan
+ * (`startPathsFit`: more than How wide's widest, START_PATHS_TOO_MANY at submit, or more than 3 on Free whatever the
+ * widths say). Task 39b (owner answer Q8, 4 Nov): Start's rule, for a menu and a dig's picks alike, so a menu whose How
+ * wide this version no longer offers is kept as chosen when its paths fit; the copy keeps the set's width.
  */
 function keptStartOf(set: StoredStartPathSet, widths: DebateShapeWidths | null, plan: DebateShapePlanKey): AskStartShape | null {
-  if (widths === null) return null;
-  const paths = set.paths.length;
-  if (plan === "free" && paths > START_STEP_LIMITS.freePathsMax) return null;
-  if (set.source === "MENU" ? !widths.options.includes(set.width) : paths > Math.max(...widths.options)) return null;
-  return Object.freeze({ paths, pathsSource: set.source });
+  if (widths === null || !startPathsFit(widths, plan, set.paths.length)) return null;
+  return Object.freeze({ paths: set.paths.length, pathsSource: set.source });
 }
 
 /**

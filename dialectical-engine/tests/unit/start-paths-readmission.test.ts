@@ -4,8 +4,9 @@
  *
  *  - The plan (`planReadmission`) reads the waiting run's sealed set: its count and source are the start the new release
  *    prices (receipt v2). A set this version no longer offers is ASK_AGAIN, before any probe: the start step off for the
- *    person (no widths), a MENU width How wide no longer offers, a dig's picks wider than its widest, or more than 3 paths
- *    on Free. A set whose new evaluation is not receipt v2 (one maker on the panel) is ASK_AGAIN too.
+ *    person (no widths), more paths than How wide's widest (a menu's or a dig's picks alike), or more than 3 paths on Free.
+ *    Task 39b (owner answer Q8, 4 Nov): Start's rule, so a menu whose width How wide no longer offers is kept as chosen
+ *    when its paths fit. A set whose new evaluation is not receipt v2 (one maker on the panel) is ASK_AGAIN too.
  *  - Without a set, the run builds its own list at the default width where the step runs (RUN_BUILT), and no start where
  *    it does not (today's re-admission: `evaluate` is called exactly as C10 calls it, with no start argument).
  *  - The carry-on box (`carry_on_to_report`) stays on the new run only on receipt v2.
@@ -157,13 +158,39 @@ describe("planReadmission keeps the chosen paths (Task 39)", () => {
     expect(evaluate).not.toHaveBeenCalled();
   });
 
-  it("ASK_AGAIN, before any probe, when How wide no longer offers the MENU set's width; the control is re-admitted", async () => {
+  // Task 39b (owner answer Q8, 4 Nov): Start's rule (`startPathsFit`): chosen paths that fit the version's widest are kept
+  // as chosen, whatever How wide now offers; the set keeps its width.
+  it("a MENU set whose width the version no longer offers is re-admitted when its paths fit the widest", async () => {
+    const without5: DebateShapeWidths = Object.freeze({ options: Object.freeze([3, 7]), default: 3 });
+    const set = setOf({ width: 5, count: 4 });
+    const { result, evaluate } = plan({ stored: stored({ planTier: "premium" }), planId: "PLUS", widths: without5, set });
+    const value = readmitted(await result);
+    expect(value.start).toEqual({ paths: 4, pathsSource: "MENU" });
+    expect(evaluate).toHaveBeenCalledWith(value.ask, "plus", { paths: 4, pathsSource: "MENU" });
+    expect(value.startPaths).toBe(set);
+    expect(value.evaluation.envelopeBasis).toMatchObject({ shape: { paths: 4, paths_source: "MENU" } });
+  });
+
+  // Review of Task 39b: the paths chosen decide, not the How wide they were chosen at. Four paths chosen at How wide 7
+  // (the AIs found fewer) fit a version whose widest is 5, as at Start.
+  it("a MENU set chosen at a How wide above the widest is re-admitted when its paths fit: the count decides", async () => {
+    const narrower: DebateShapeWidths = Object.freeze({ options: Object.freeze([3, 5]), default: 5 });
+    const set = setOf({ width: 7, count: 4 });
+    const { result, evaluate } = plan({ stored: stored({ planTier: "premium" }), planId: "PLUS", widths: narrower, set });
+    const value = readmitted(await result);
+    expect(value.start).toEqual({ paths: 4, pathsSource: "MENU" });
+    expect(evaluate).toHaveBeenCalledWith(value.ask, "plus", { paths: 4, pathsSource: "MENU" });
+    expect(value.startPaths).toBe(set);
+  });
+
+  it("ASK_AGAIN, before any probe, when its paths are more than the widest; the control is re-admitted", async () => {
     const narrower: DebateShapeWidths = Object.freeze({ options: Object.freeze([3, 5]), default: 5 });
     const paid = { stored: stored({ planTier: "premium" }), planId: "PLUS" } as const;
-    const { result, evaluate } = plan({ ...paid, widths: narrower, set: setOf({ width: 7 }) });
+    const { result, evaluate } = plan({ ...paid, widths: narrower, set: setOf({ width: 7, count: 7 }) });
     expect(await result).toEqual({ kind: "ASK_AGAIN" });
     expect(evaluate).not.toHaveBeenCalled();
-    expect(readmitted(await plan({ ...paid, widths: PAID, set: setOf({ width: 7 }) }).result).start).toEqual({ paths: 2, pathsSource: "MENU" });
+    expect(readmitted(await plan({ ...paid, widths: PAID, set: setOf({ width: 7, count: 7 }) }).result).start)
+      .toEqual({ paths: 7, pathsSource: "MENU" });
   });
 
   it("ASK_AGAIN, before any probe, when a dig's picks are wider than How wide's widest", async () => {
