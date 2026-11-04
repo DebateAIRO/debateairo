@@ -43,6 +43,8 @@ function gateway(tries: readonly string[]) {
   return { caller, requests, repairs };
 }
 const combined = (title: string, question: string): string => JSON.stringify({ title, question });
+/** A combined question that does not restate the main question. */
+const FAIR = "Do fuel imports and weapons spread make it unsafe?";
 const COMBINE_RUN = { mainQuestion: MAIN, languageName: "English", languageTag: "en", readingLevel: "plain" as const, members: MEMBERS, seat: HAIKU };
 const FIT_RUN = { questionLine: MAIN, languageName: "English", languageTag: "en", ownText: OWN, paths: PATHS, seat: HAIKU };
 
@@ -117,6 +119,38 @@ describe("the combine", () => {
     const script = gateway([combined("Fuel and weapons", "Do fuel imports and weapons spread make it unsafe?")]);
     expect(await mapCombineStart({ ...COMBINE_RUN, seat: null, caller: script.caller })).toBeNull();
     expect(script.requests).toEqual([]);
+  });
+
+  it("screens the title and the question as list texts are: a sentence naming a step id or an engine field is left out", async () => {
+    const ids = gateway([combined("Fuel and weapons. It joins kp01 and kp02.", `${FAIR} It puts pt11 and pt12 together.`)]);
+    expect(await mapCombineStart({ ...COMBINE_RUN, caller: ids.caller })).toEqual({ title: "Fuel and weapons.", question: FAIR });
+    expect(ids.repairs).toEqual([]);
+    const field = gateway([combined("Fuel and weapons", `${FAIR} The main_question asks about plants.`)]);
+    expect(await mapCombineStart({ ...COMBINE_RUN, caller: field.caller })).toEqual({ title: "Fuel and weapons", question: FAIR });
+    expect(field.repairs).toEqual([]);
+  });
+
+  it("a title or question with no sentence a person may read is refused for the one repair; still so, there is none", async () => {
+    const placeholder = gateway([combined("<short title>", FAIR), combined("<short title>", FAIR)]);
+    expect(await mapCombineStart({ ...COMBINE_RUN, caller: placeholder.caller })).toBeNull();
+    expect(placeholder.repairs).toEqual([{ code: "START_COMBINE_TEXT_UNUSABLE", path: ["title"] }]);
+    const field = gateway([combined("Fuel and weapons", "What does the main_question leave out about the fuel?"), combined("Fuel and weapons", FAIR)]);
+    expect(await mapCombineStart({ ...COMBINE_RUN, caller: field.caller })).toEqual({ title: "Fuel and weapons", question: FAIR });
+    expect(field.repairs).toEqual([{ code: "START_COMBINE_TEXT_UNUSABLE", path: ["question"] }]);
+  });
+
+  it("a title that restates the main question is refused as a question that does is", async () => {
+    const script = gateway([combined("Should Romania build new nuclear plants?", FAIR), combined("Fuel and weapons", FAIR)]);
+    expect(await mapCombineStart({ ...COMBINE_RUN, caller: script.caller })).toEqual({ title: "Fuel and weapons", question: FAIR });
+    expect(script.repairs).toEqual([{ code: "START_COMBINE_RESTATES_MAIN_QUESTION", path: ["title"] }]);
+  });
+
+  it("a reply in another language than the question's is refused for the one repair; still in it, there is none", async () => {
+    const ro = combined("Combustibil și arme",
+      "Ar face importurile de combustibil și răspândirea armelor ca aceste centrale să fie nesigure pentru țară și pentru vecini?");
+    const script = gateway([ro, ro]);
+    expect(await mapCombineStart({ ...COMBINE_RUN, caller: script.caller })).toBeNull();
+    expect(script.repairs).toEqual([{ code: "MAP_WRONG_LANGUAGE", path: ["question"] }]);
   });
 });
 

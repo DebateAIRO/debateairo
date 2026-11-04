@@ -129,13 +129,14 @@ async function startAsk<T>(caller: MapCaller, step: MapStep, callSiteKey: string
 /**
  * The angle planner: the debate map's map.angles.v2, byte for byte (engine 2, the start lengths, no language lock: it runs at Next, before
  * the language is settled, under today's directive in the language the kernel reads the question in), raced with `plannerDeadlineMs`.
- * No seat, a failed call or the deadline: the fixed angles (MAP_FALLBACK_ANGLES). A call past the deadline is not stopped: it runs on and
- * is charged by the caller, and its record is not in `calls`.
+ * No seat, an aborted signal (nothing new starts after an abort, Calls item 8: no call is asked), a failed call or the deadline: the fixed
+ * angles (MAP_FALLBACK_ANGLES). A call past the deadline is not stopped: it runs on and is charged by the caller, and its record is not in
+ * `calls`.
  */
 export async function mapPlanStartAngles(run: Readonly<{ questionLine: string; planner: MapSeat | null; caller: MapCaller; clock?: StartClock;
   signal: AbortSignal }>): Promise<StartPlanned> {
   const fallback: StartPlanned = Object.freeze({ angles: MAP_FALLBACK_ANGLES, fallback: true, calls: Object.freeze([]) });
-  if (run.planner === null) return fallback;
+  if (run.planner === null || run.signal.aborted) return fallback;
   const clock = run.clock ?? START_SYSTEM_CLOCK;
   const planner = run.planner;
   const ctx: MapSpecContext = Object.freeze({ questionLine: run.questionLine, languageName: detectArgumentLanguage(run.questionLine).nameEn,
@@ -168,7 +169,10 @@ export type StartListsResult = Readonly<{
   lists: readonly StartList[];
   /** The lists that arrived after the cut (STREAM only), in list order. */
   late: readonly StartList[];
-  /** Every call that ended by the return, in plan order (the planner 0, list n at n). */
+  /**
+   * The planner's call when it ended in time, and every list call the run took in by its return (its seat told, its list in `lists` or
+   * `late`, or its LIST_DROPPED note), in plan order (the planner 0, list n at n).
+   */
   calls: readonly MapCallRecord[];
   notes: readonly MapNoteRecord[];
   marks: readonly MapMarkRecord[];
@@ -178,13 +182,15 @@ export type StartListsResult = Readonly<{
  * The lists run. The angles are planned here (or come from `planned`, started at Next); then every list starts at once. STREAM: the cut
  * comes when every seat has ended, or at `cutAtMs` once one list is in, else with the first list after it (or at the return when none
  * comes); a list after the cut is late. WAIT_ALL: no list is late, and the cut comes once, at the end. The run returns when every seat has
- * ended or at `listsHardCapMs`, both counted from this call. An aborted signal returns at once with what is in, and nothing more is asked
- * or told (`onSeatDone`, `onList`, `onCut`); it is never passed to the calls already asked.
+ * ended or at `listsHardCapMs`, both counted from this call; a seat that ended in the cap's own tick is taken in at the return. An aborted
+ * signal returns at once with what is in, and nothing more is asked or told (`onSeatDone`, `onList`, `onCut`); it is never passed to the
+ * calls already asked. More than nine seats is refused (START_SEATS_INVALID) before any call, the planner's included.
  */
 export async function mapRunStartLists(run: Readonly<{ questionLine: string; languageName: string; languageTag: string; readingLevel: ReadingLevel | null;
   seats: readonly MapSeat[]; planner: MapSeat; caller: MapCaller; clock?: StartClock; signal: AbortSignal; cut: "STREAM" | "WAIT_ALL";
   planned?: Promise<StartPlanned>; onSeatDone(answered: number, of: number): void; onList(list: StartList, late: boolean): void;
   onCut(listsIn: number): void }>): Promise<StartListsResult> {
+  if (run.seats.length > L.listsMax) throw new TypedDomainError("START_SEATS_INVALID", "START_SEATS_INVALID: at most nine list writers");
   const clock = run.clock ?? START_SYSTEM_CLOCK;
   const startedAt = clock.now();
   // Ended at the return: the run's own timers stop, and a call that ends later is no longer recorded here.
@@ -221,17 +227,17 @@ export async function mapRunStartLists(run: Readonly<{ questionLine: string; lan
   const deal = startDealAngles(angles, run.seats);
   for (const angle of deal.dropped) notes.push(Object.freeze({ note: "LIST_DROPPED" as const, step: "START_LIST" as const, detail: `angle:${angle.angleId}` }));
 
-  type Ended = Readonly<{ assignment: StartListAssignment; list: StartList | null }>;
+  type Ended = Readonly<{ assignment: StartListAssignment; record: MapCallRecord; list: StartList | null }>;
   const ended: Ended[] = [];
   let wake: (() => void) | null = null;
-  // Every list starts now, together; each call's record is kept when it ends, whether or not the run still waits for it.
+  // Every list starts now, together; a call that ends while the run still waits joins `ended`, and is recorded when it is taken in.
   for (const assignment of deal.lists) {
     const callSiteKey = startListCallSiteKey(assignment.listNo);
     void startAsk(run.caller, "START_LIST", callSiteKey, assignment.seat, assignment.listNo, startListSpec(ctx, assignment.angles, assignment.listNo))
       .then((outcome) => {
         if (waits.signal.aborted) return;
-        calls.push(startCallRecord("START_LIST", callSiteKey, assignment.seat, assignment.listNo, outcome));
-        ended.push(Object.freeze({ assignment, list: outcome.kind === "OK" ? startListOf(assignment, outcome.value) : null }));
+        ended.push(Object.freeze({ assignment, record: startCallRecord("START_LIST", callSiteKey, assignment.seat, assignment.listNo, outcome),
+          list: outcome.kind === "OK" ? startListOf(assignment, outcome.value) : null }));
         const woken = wake;
         wake = null;
         woken?.();
@@ -251,21 +257,26 @@ export async function mapRunStartLists(run: Readonly<{ questionLine: string; lan
     run.onCut(lists.length);
   };
   let seen = 0;
+  // One ended seat taken in: its call recorded, its seat told, its list shown, late or dropped. A call is recorded only here, so every
+  // call in `calls` has its list in `lists` or `late` (or its LIST_DROPPED note) and its seat told; none is charged and lost.
+  const takeIn = (one: Ended): void => {
+    seen += 1;
+    calls.push(one.record);
+    run.onSeatDone(seen, of);
+    if (one.list === null) {
+      notes.push(Object.freeze({ note: "LIST_DROPPED" as const, step: "START_LIST" as const, detail: `list:${String(one.assignment.listNo)}` }));
+    } else if (run.cut === "STREAM" && cut) {
+      late.push(one.list);
+      run.onList(one.list, true);
+    } else {
+      lists.push(one.list);
+      run.onList(one.list, false);
+      if (run.cut === "STREAM" && cutTimePassed) cutNow();
+    }
+  };
   while (seen < of) {
     if (seen < ended.length) {
-      const one = ended[seen]!;
-      seen += 1;
-      run.onSeatDone(seen, of);
-      if (one.list === null) {
-        notes.push(Object.freeze({ note: "LIST_DROPPED" as const, step: "START_LIST" as const, detail: `list:${String(one.assignment.listNo)}` }));
-      } else if (run.cut === "STREAM" && cut) {
-        late.push(one.list);
-        run.onList(one.list, true);
-      } else {
-        lists.push(one.list);
-        run.onList(one.list, false);
-        if (run.cut === "STREAM" && cutTimePassed) cutNow();
-      }
+      takeIn(ended[seen]!);
       continue;
     }
     const next = new Promise<"ENDED">((resolve) => { wake = () => { resolve("ENDED"); }; });
@@ -278,6 +289,9 @@ export async function mapRunStartLists(run: Readonly<{ questionLine: string; lan
       if (lists.length > 0) cutNow();
     }
   }
+  // At the cap: a seat that ended in the cap's own tick, before the run stopped its waits, is taken in too (its call is charged, so its
+  // list is shown late, or in by the cut when none came before). Nothing joins `ended` after this: the return stops the waits at once.
+  while (seen < ended.length) takeIn(ended[seen]!);
   cutNow();
   return result();
 }

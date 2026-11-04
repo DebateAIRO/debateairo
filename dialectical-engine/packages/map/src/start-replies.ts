@@ -98,12 +98,16 @@ const MergeLateShape = z.object({ repeats: z.array(RepeatShape), paths: z.array(
 /** The step's own opaque ids as words (kernel start-step-limits.ts): an angle, a menu path, a card, a suggestion, a chosen path. */
 const START_ID_WORD = /(?<![\p{L}\p{N}_])(?:g[1-7]|kp[0-5][0-9]|cd[1-3]|sg[1-9]|b[1-8])(?![\p{L}\p{N}_])/u;
 
-/** A text a person may read: within its limit, naming no engine field, item id or step id, copying no form placeholder. */
+/** Whatever its length, a text a person may read: naming no engine field, item id or step id, copying no form placeholder. */
+function readable(text: string): boolean {
+  return !/<[^<>]*>/u.test(text) && !START_ID_WORD.test(text.normalize("NFKC")) && !mapNamesInternalWord(text, START_INTERNAL_FIELD_NAMES);
+}
+
+/** A text a person may read, within its limit. */
 function clean(value: string | null, max: number): value is string {
   if (value === null) return false;
   const trimmed = value.trim();
-  return trimmed.length >= 1 && trimmed.length <= max && !/<[^<>]*>/u.test(trimmed) && !START_ID_WORD.test(trimmed.normalize("NFKC"))
-    && !mapNamesInternalWord(trimmed, START_INTERNAL_FIELD_NAMES);
+  return trimmed.length >= 1 && trimmed.length <= max && readable(trimmed);
 }
 
 /** One salvage, run before the schema on a well-formed reply and again after it (on what the reply fixer repaired): idempotent. */
@@ -399,26 +403,33 @@ export function startRestatesMainQuestion(question: string, mainQuestion: string
 
 const CombineShape = z.object({ title: z.string(), question: z.string() }).strict();
 
-/** Before the schema: the sentences that restate the main question left out (when one does not), and an over-long text cut at a word edge. */
+/**
+ * Before the schema, in the title and in the question alike (both reach the person): a text that restates the main question, copies a
+ * form's placeholder, or names a step id, an item id or an engine field keeps only its sentences that do none of these, left out whole
+ * (when one or more are left; with none, it stays as written and the check refuses it); then an over-long text is cut at a word edge.
+ */
 function combineSalvage(mainQuestion: string, languageTag: string): MapReplySalvage<StartCombineReply> {
+  const fine = (text: string): boolean => readable(text) && !startRestatesMainQuestion(text, mainQuestion, languageTag);
+  const kept = (text: string): string => {
+    if (fine(text)) return text;
+    const sentences = [...segmenterFor(languageTag, "sentence").segment(text)].filter((sentence) => sentence.segment.trim() !== "" && fine(sentence.segment));
+    return sentences.length > 0 ? sentences.map((sentence) => sentence.segment).join("").trim() : text;
+  };
   return bothWays((value) => {
     const shape = CombineShape.safeParse(value);
     if (!shape.success) return { value, repairs: [] };
     const title = shape.data.title.trim();
-    let question = shape.data.question.trim();
-    if (startRestatesMainQuestion(question, mainQuestion, languageTag)) {
-      const kept = [...segmenterFor(languageTag, "sentence").segment(question)].filter((sentence) => sentence.segment.trim() !== ""
-        && !startRestatesMainQuestion(sentence.segment, mainQuestion, languageTag));
-      if (kept.length > 0) question = kept.map((sentence) => sentence.segment).join("").trim();
-    }
-    const salvaged = { title: startCutAtWordEdge(title, L.pathTitleMaxChars), question: startCutAtWordEdge(question, L.pathQuestionMaxChars) };
-    return salvaged.title === title && salvaged.question === shape.data.question.trim() ? { value, repairs: [] }
+    const question = shape.data.question.trim();
+    const salvaged = { title: startCutAtWordEdge(kept(title), L.pathTitleMaxChars), question: startCutAtWordEdge(kept(question), L.pathQuestionMaxChars) };
+    return salvaged.title === title && salvaged.question === question ? { value, repairs: [] }
       : { value: salvaged, repairs: ["MAP_TEXT_TRIMMED"] };
   });
 }
 
+/** Each of the title and the question: refused at its own place when the salvage left it unreadable, or restating the main question. */
 const combineCheck = (mainQuestion: string, languageTag: string, expected: ReplyLanguageExpectation): MapReplyCheck<StartCombineReply> => (reply) => [
-  ...(startRestatesMainQuestion(reply.question, mainQuestion, languageTag) ? [issue(["question"], "START_COMBINE_RESTATES_MAIN_QUESTION")] : []),
+  ...(["title", "question"] as const).flatMap((name) => !readable(reply[name]) ? [issue([name], "START_COMBINE_TEXT_UNUSABLE")]
+    : startRestatesMainQuestion(reply[name], mainQuestion, languageTag) ? [issue([name], "START_COMBINE_RESTATES_MAIN_QUESTION")] : []),
   ...languageIssues([reply.title, reply.question], expected, ["question"])
 ];
 

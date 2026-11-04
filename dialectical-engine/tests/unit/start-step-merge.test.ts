@@ -173,30 +173,65 @@ describe("the first menu", () => {
     expect(script.requests).toEqual([]);
     expect(done.source).toBe("CODE");
   });
+
+  it("a first merge with no list is refused START_MERGE_INVALID and asks nothing", async () => {
+    const script = scripted({ [START_CALL_SITES.merge]: merge({ paths: [one("pt11")] }) });
+    await expect(mapMergeStartLists({ ...BASE, lists: [], prior: null, seat: HAIKU, caller: script.caller, signal: new AbortController().signal }))
+      .rejects.toMatchObject({ code: "START_MERGE_INVALID" });
+    expect(script.requests).toEqual([]);
+  });
 });
 
 describe("the late merge", () => {
-  const PRIOR = startMenuFromMerge({ repeats: [], paths: [one("pt11"), one("pt12"), one("pt13")], cards: [{ ...CARD, fits_path: 1 }],
-    suggestions: [{ kind: "COMBINE", paths: [1, 2], reason: "Both ask about the pier in the quiet months." }] }, [L1], { menuId: MENU_ID, language: LANGUAGE });
-  const LATE = listOf(2, ["Queues again at the old pier", "Dredging the harbour"]);
+  // The menu so far holds a repeat (list 2's only viewpoint, of pt11), so the late merge has prior repeats to keep in place.
+  const L2R = listOf(2, ["Queues again at the old pier"]);
+  const PRIOR = startMenuFromMerge({ repeats: [{ id: "pt21", same_as: "pt11" }], paths: [one("pt11"), one("pt12"), one("pt13")],
+    cards: [{ ...CARD, fits_path: 1 }], suggestions: [{ kind: "COMBINE", paths: [1, 2], reason: "Both ask about the pier in the quiet months." }] },
+  [L1, L2R], { menuId: MENU_ID, language: LANGUAGE });
+  const LATE = listOf(3, ["Queues once more at the old pier", "Dredging the harbour"]);
 
-  it("only appends: the prior paths, repeats, cards and suggestions in place, a new path marked new, its fit a suggestion", async () => {
-    const script = scripted({ [START_CALL_SITES.mergeLate]: JSON.stringify({ repeats: [{ id: "pt21", same_as: "pt11" }], paths: [one("pt22")],
+  it("only appends: the prior paths, repeats, shown viewpoints, cards and suggestions as they were, a new path marked new, its fit a suggestion", async () => {
+    const priorBytes = JSON.stringify(PRIOR);
+    expect(PRIOR.repeats.map((one) => one.viewpoint_id)).toEqual(["pt21"]);
+    const script = scripted({ [START_CALL_SITES.mergeLate]: JSON.stringify({ repeats: [{ id: "pt31", same_as: "pt11" }], paths: [one("pt32")],
       fits: [{ path: 1, into: "kp02" }] }) });
     const done = await mapMergeStartLists({ ...BASE, lists: [LATE], prior: PRIOR, seat: HAIKU, caller: script.caller, signal: new AbortController().signal });
     expect(script.requests.map((request) => request.callSiteKey)).toEqual(["START:merge-late"]);
     expect(done.source).toBe("AI");
     expect(done.menu.revision).toBe(2);
     expect(done.menu.paths.slice(0, 3)).toEqual(PRIOR.paths);
-    expect(done.menu.repeats.slice(0, PRIOR.repeats.length)).toEqual(PRIOR.repeats);
+    // The prior repeats first, byte for byte, then the late one.
+    expect(JSON.stringify(done.menu.repeats.slice(0, PRIOR.repeats.length))).toBe(JSON.stringify(PRIOR.repeats));
+    expect(done.menu.repeats).toEqual([L2R.viewpoints[0], LATE.viewpoints[0]]);
+    // The shown viewpoints so far, in place and byte for byte; the late repeat only joins the end of its viewpoint's repeat_ids.
+    expect(JSON.stringify(done.menu.viewpoints.slice(0, PRIOR.viewpoints.length))).toBe(JSON.stringify(PRIOR.viewpoints.map((one) =>
+      one.viewpoint_id === "pt11" ? { ...one, repeat_ids: [...one.repeat_ids, "pt31"] } : one)));
+    expect(done.menu.viewpoints.find((one) => one.viewpoint_id === "pt11")!.repeat_ids).toEqual(["pt21", "pt31"]);
     expect(done.menu.cards).toEqual(PRIOR.cards);
     expect(done.menu.suggestions.slice(0, 1)).toEqual(PRIOR.suggestions);
-    expect(done.menu.paths[3]).toEqual({ path_ref: "kp04", title: "Dredging the harbour", question: LATE.viewpoints[1]!.question, viewpoint_ids: ["pt22"],
+    expect(done.menu.paths[3]).toEqual({ path_ref: "kp04", title: "Dredging the harbour", question: LATE.viewpoints[1]!.question, viewpoint_ids: ["pt32"],
       put_together: false, is_new: true });
     expect(done.menu.suggestions[1]).toEqual({ suggestion_id: "sg2", kind: "FITS", path_ref: "kp04", into_path_ref: "kp02" });
-    expect(done.menu.viewpoints.find((one) => one.viewpoint_id === "pt11")!.repeat_ids).toEqual(["pt21"]);
-    expect(done.menu.repeats).toEqual([LATE.viewpoints[0]]);
-    everyOnce(done.menu, [L1, LATE]);
+    // The menu it was given is not changed.
+    expect(JSON.stringify(PRIOR)).toBe(priorBytes);
+    everyOnce(done.menu, [L1, L2R, LATE]);
+  });
+
+  it("a menu at its ninth revision takes no late merge: no call, the menu so far", async () => {
+    const ninth: StartMenu = { ...PRIOR, revision: 9 };
+    const script = scripted({ [START_CALL_SITES.mergeLate]: JSON.stringify({ repeats: [], paths: [one("pt32")], fits: [] }) });
+    const done = await mapMergeStartLists({ ...BASE, lists: [LATE], prior: ninth, seat: HAIKU, caller: script.caller, signal: new AbortController().signal });
+    expect(script.requests).toEqual([]);
+    expect(done).toEqual({ menu: ninth, source: "CODE", calls: [] });
+    expect(done.menu).toBe(ninth);
+  });
+
+  it("startLateMenu makes revisions up to the ninth and refuses a menu already at it", () => {
+    const reply: StartMergeLateReply = { repeats: [], paths: [{ ids: ["pt32"], title: null, question: null }], fits: [] };
+    expect(startLateMenu({ ...PRIOR, revision: 8 }, reply, [LATE]).revision).toBe(9);
+    let refused: unknown = null;
+    try { startLateMenu({ ...PRIOR, revision: 9 }, reply, [LATE]); } catch (error) { refused = error; }
+    expect(refused).toMatchObject({ code: "START_MENU_REVISIONS_SPENT" });
   });
 
   it("a late repeat beyond the eighth becomes a new path", () => {

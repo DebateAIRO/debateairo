@@ -46,6 +46,20 @@ describe("labels cut at a word edge", () => {
     expect(startCutAtWordEdge("Short label", 80)).toBe("Short label");
     expect(startCutAtWordEdge("𝔸".repeat(50), 9)).toBe("𝔸".repeat(4));
   });
+
+  it("in Chinese and Japanese, written without spaces, the cut lands on a word edge of that language, never inside a word", () => {
+    // Plain cuts at 18 and 13 would end inside 第二个 ("the second") and フェリー ("ferry"); the edges are Intl.Segmenter's in each locale.
+    for (const [locale, text, max, cut] of [
+      ["zh", "我们的城市应该在明年夏天之前建造第二个渡轮码头吗", 18, "我们的城市应该在明年夏天之前建造"],
+      ["ja", "冬の静かな数か月間はフェリーがほとんど運航されず古い桟橋は何週間も空のままです", 13, "冬の静かな数か月間は"]
+    ] as const) {
+      const edges = new Set([...new Intl.Segmenter(locale, { granularity: "word" }).segment(text)].map((segment) => segment.index + segment.segment.length));
+      expect(edges.has(max), `${locale}: a plain cut at ${String(max)} splits a word`).toBe(false);
+      const done = startCutAtWordEdge(text, max);
+      expect(done).toBe(cut);
+      expect(text.startsWith(done) && edges.has(done.length), `${locale}: the cut ends on a word edge`).toBe(true);
+    }
+  });
 });
 
 describe("the start step's names and start values", () => {
@@ -106,6 +120,14 @@ function recorded() {
   return { events, lists, onSeatDone: (answered: number, of: number) => { events.push(`progress ${String(answered)}/${String(of)}`); },
     onList: (list: StartList, late: boolean) => { lists.push(list); events.push(`${late ? "late" : "list"} ${String(list.list_no)}`); },
     onCut: (listsIn: number) => { events.push(`cut ${String(listsIn)}`); } };
+}
+
+/** Every list call the run recorded was told to its seat, and every one recorded OK has its list shown or late: none charged and lost. */
+function everyCallKept(result: Awaited<ReturnType<typeof mapRunStartLists>>, events: readonly string[]): void {
+  const listCalls = result.calls.filter((call) => call.step === "START_LIST");
+  expect(events.filter((event) => event.startsWith("progress "))).toHaveLength(listCalls.length);
+  const kept = new Set([...result.lists, ...result.late].map((list) => startListCallSiteKey(list.list_no)));
+  expect(listCalls.filter((call) => call.outcome === "OK" && !kept.has(call.callSiteKey)).map((call) => call.callSiteKey)).toEqual([]);
 }
 
 const BASE = { questionLine: Q, languageName: "English", languageTag: "en", readingLevel: null as ReadingLevel | null, planner: PLANNER };
@@ -189,11 +211,67 @@ describe("the lists run", () => {
     await vi.advanceTimersByTimeAsync(START_STEP_TIMING.plannerDeadlineMs + 1_000);
     const result = await run;
     expect(result.angles.map((angle) => angle.kind)).toEqual(["OPPOSITE_CASE", "ASKER_WORRY", "PRACTICAL", "GENERAL"]);
-    expect(result.marks.map((mark) => [mark.mark, mark.step])).toEqual([["MAP_ANGLES_FALLBACK", "ANGLES"]]);
+    expect(result.marks).toEqual([{ mark: "MAP_ANGLES_FALLBACK", step: "ANGLES", detail: "no planner reply in time" }]);
     expect(result.lists).toHaveLength(4);
     expect(script.ended).not.toContain("START:angles");
     await vi.advanceTimersByTimeAsync(5_000);
     expect(script.ended).toContain("START:angles");
+  });
+
+  it("a planner that answers in time but fails: the fixed angles, its failed call kept, the mark says the reply was missing", async () => {
+    const alone = scripted({}, "FAIL");
+    const planned = mapPlanStartAngles({ questionLine: Q, planner: PLANNER, caller: alone.caller, signal: new AbortController().signal });
+    await vi.advanceTimersByTimeAsync(1_000);
+    const failed = await planned;
+    expect(failed.fallback).toBe(true);
+    expect(failed.angles.map((angle) => angle.kind)).toEqual(["OPPOSITE_CASE", "ASKER_WORRY", "PRACTICAL", "GENERAL"]);
+    expect(failed.calls.map((call) => [call.callSiteKey, call.order, call.outcome, call.code])).toEqual([["START:angles", 0, "FAILED", "TEST_FAILED"]]);
+    const script = scripted({ a: 1_000 }, "FAIL");
+    const run = mapRunStartLists({ ...BASE, seats: FOUR.slice(0, 1), caller: script.caller, signal: new AbortController().signal, cut: "STREAM",
+      onSeatDone: () => {}, onList: () => {}, onCut: () => {} });
+    await vi.advanceTimersByTimeAsync(2_000);
+    const result = await run;
+    expect(result.marks).toEqual([{ mark: "MAP_ANGLES_FALLBACK", step: "ANGLES", detail: "angles reply missing" }]);
+    expect(result.calls.map((call) => [call.callSiteKey, call.outcome])).toEqual([["START:angles", "FAILED"], ["START:list:1", "OK"]]);
+    expect(result.lists[0]!.angles.map((angle) => angle.kind)).toEqual(["OPPOSITE_CASE", "ASKER_WORRY", "PRACTICAL", "GENERAL"]);
+  });
+
+  it("an aborted signal asks no planner: the fixed angles and no call, since nothing new starts after an abort", async () => {
+    const script = scripted({}, 1_000);
+    const controller = new AbortController();
+    controller.abort();
+    const planned = await mapPlanStartAngles({ questionLine: Q, planner: PLANNER, caller: script.caller, signal: controller.signal });
+    expect(script.requests).toEqual([]);
+    expect(planned.fallback).toBe(true);
+    expect(planned.calls).toEqual([]);
+    expect(planned.angles.map((angle) => angle.kind)).toEqual(["OPPOSITE_CASE", "ASKER_WORRY", "PRACTICAL", "GENERAL"]);
+  });
+
+  it("more than nine seats is refused START_SEATS_INVALID before any call, the planner's included", async () => {
+    const script = scripted({});
+    const ten = Array.from({ length: 10 }, (_unused, at) => S(`s${String(at)}`, `M${String(at)}`));
+    const refused = mapRunStartLists({ ...BASE, seats: ten, caller: script.caller, signal: new AbortController().signal, cut: "STREAM",
+      onSeatDone: () => {}, onList: () => {}, onCut: () => {} }).then(() => null, (error: unknown) => error);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(await refused).toMatchObject({ code: "START_SEATS_INVALID" });
+    expect(script.requests).toEqual([]);
+  });
+
+  it("a list that ends in the same tick as the hard cap is taken in: late, its seat told, its call recorded", async () => {
+    const script = scripted({ a: 1_000, b: START_STEP_TIMING.listsHardCapMs });
+    const seen = recorded();
+    const run = mapRunStartLists({ ...BASE, seats: FOUR.slice(0, 2), caller: script.caller, signal: new AbortController().signal, cut: "STREAM", ...seen });
+    await vi.advanceTimersByTimeAsync(START_STEP_TIMING.listsHardCapMs - 1);
+    // The seat's timer and the cap's fire in one synchronous step (the seat's first), so their promise chains interleave, as two ends in
+    // one tick do: the seat's call ends before the run stops its waits, while the cap wins the run's race.
+    vi.advanceTimersByTime(1);
+    const result = await run;
+    expect(script.ended).toContain("START:list:2");
+    expect(seen.events).toEqual(["progress 1/2", "list 1", "cut 1", "progress 2/2", "late 2"]);
+    expect(result.lists.map((list) => list.list_no)).toEqual([1]);
+    expect(result.late.map((list) => list.list_no)).toEqual([2]);
+    expect(result.calls.map((call) => [call.callSiteKey, call.outcome])).toEqual([["START:angles", "OK"], ["START:list:1", "OK"], ["START:list:2", "OK"]]);
+    everyCallKept(result, seen.events);
   });
 
   it("the planner alone: on time it plans, with no seat or past the deadline the fixed angles", async () => {
@@ -261,6 +339,7 @@ describe("the lists run", () => {
     expect(seen.events).toEqual(["progress 1/4", "list 1"]);
     expect(script.ended).toEqual(["START:angles", "START:list:1", "START:list:2", "START:list:3", "START:list:4"]);
     expect(script.requests).toHaveLength(5);
+    everyCallKept(result, seen.events);
   });
 
   it("an abort before the angles are planned asks no list", async () => {
