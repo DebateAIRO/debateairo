@@ -20,6 +20,7 @@ import { join } from "node:path";
 import { argumentLanguageDirective, detectArgumentLanguage, questionLanguageSentence } from "@debateai/kernel";
 import { mapContractNameOf, mapEngineContractNameOf } from "@debateai/map";
 import { COMPARING_JUDGE_CONTRACT_ID, COMPARING_JUDGE_SOURCES_CONTRACT_ID, POINT_INVESTIGATION_CONTRACT_ID } from "@debateai/judgement";
+import { previewModelRow, previewNanoUsdText, previewUsdTextToNano } from "@debateai/providers";
 import { STORY_CHECKER_CONTRACT_ID, STORY_CHECKER_V4_CONTRACT_ID, STORYTELLER_CONTRACT_ID, STORYTELLER_V4_CONTRACT_ID } from "@debateai/story";
 import { engineMapScriptedContent } from "./engine-map-script.js";
 import { LATER_CONTRACT_KINDS, laterStepContent, type LaterGateKind } from "./gate-later-steps.js";
@@ -55,6 +56,28 @@ export const STUB_COOL_OFF_RETRY_AFTER_SECONDS = 60;
 export type GateRecord = GateRequest & Readonly<{ answer: GateAnswer }>;
 /** One read of a gate's `POST /remaining` (contract A §5), with the state it was answered. */
 export type GateRemainingRead = Readonly<{ provider: GateProvider; state: "active" | "halted" }>;
+/**
+ * V4 start step, Task 85: what one gate's `/remaining` answers, as the real gate's figures (made up in a test, or the owner's
+ * private file). `usd` (what is left today) and the reservations are the gate's decimal texts. The final-writer room is given
+ * as a pair or not at all (the real gate answers it only for a GO that names final-writer calls); `dailyPotUsd` is answered
+ * only to a request that asks for the pot (`"daily_pot": true`), as the real gate does; `enabledModels` absent: the doubles'
+ * own list for that gate.
+ */
+export type StubRemainingFigures = Readonly<{
+  usd: string;
+  calls: number;
+  maxConcurrentCalls: number;
+  largestReservationUsd: string;
+  finalWriterMaxInFlight?: number;
+  largestFinalWriterReservationUsd?: string;
+  dailyPotUsd?: string;
+  enabledModels?: readonly string[];
+}>;
+/**
+ * Task 85: the answers the real gate's ledger counts as a call of the day (every entry but an unbilled release): a request
+ * that reached the vendor and was not released unbilled.
+ */
+const BILLED_ANSWERS: ReadonlySet<GateAnswer> = new Set<GateAnswer>(["OK", "BILLED_500", "VENDOR_ERROR", "BOOKED_MAX", "UNEXPECTED"]);
 /**
  * The run-resilience scripts (spec 2026-10-12 "Tests", T1/T2 setup).
  *  - `unbilled`: models that passed their claim probe and then refuse every other request: a gate-proven unbilled
@@ -493,9 +516,12 @@ export type PreviewGateStubs = Readonly<{
  *  - `remainingState`: what /remaining says while the gate has not halted (default "active"); a halted DeepInfra gate
  *    always answers "halted".
  *  - `usage`: the tokens an answered request's reply reports (default 100 in, 50 out).
- * The order of answers: a halted DeepInfra gate (STOPPED or HALTED), a model cooling off (COOLING), a refused model
- * (BILLED_500), an unbilled step (the probe's script, or `debate.unbilled` for any other request), the override, the
- * contract.
+ *  - V4 start step, Task 85 (each absent: the doubles as before, byte for byte): `remaining`, each gate's /remaining
+ *    figures (StubRemainingFigures); `spendLowersRemaining`, what is left today falls as the gate's ledger counts it;
+ *    `refuseOverConcurrency`, a call over the gate's calls in flight is refused CONCURRENCY_LIMIT_REACHED.
+ * The order of answers: a halted DeepInfra gate (STOPPED or HALTED), a model cooling off (COOLING), a call over the gate's
+ * slots (GATE_REFUSED, with `refuseOverConcurrency`), a refused model (BILLED_500), an unbilled step (the probe's script,
+ * or `debate.unbilled` for any other request), the override, the contract.
  */
 export async function startPreviewGateStubs(input: Readonly<{
   storyDefaultShape: string;
@@ -514,9 +540,69 @@ export async function startPreviewGateStubs(input: Readonly<{
    * debates spend; null or absent: the default 100 in, 50 out.
    */
   usage?: (request: GateRequest, chat: string) => StubUsage | null;
+  /** V4 start step, Task 85: each gate's /remaining figures; a gate left out answers as before. */
+  remaining?: Readonly<Partial<Record<GateProvider, StubRemainingFigures>>>;
+  /**
+   * Task 85: what is left today falls as the real gate's ledger counts it: each billed answer (BILLED_ANSWERS) takes one of
+   * the day's calls, and a reply's usage (its tokens at the model's reviewed list prices) comes off the money, which is then
+   * answered as the gate's nine-decimal text. An unbilled release, and a refusal of the gate's own, takes nothing. (A billed
+   * vendor error reports no usage, so it takes no money; a booked-max call's reservation is not modelled.)
+   */
+  spendLowersRemaining?: boolean;
+  /**
+   * Task 85: the gate's slots. A call that arrives while the gate holds `maxConcurrentCalls` calls (default 2 on Anthropic,
+   * 10 on DeepInfra), or a final writer (callTier FINAL_WRITER) while it holds `finalWriterMaxInFlight` final writers, is
+   * refused 409 CONCURRENCY_LIMIT_REACHED before the vendor is asked and recorded GATE_REFUSED. The real gate first waits up
+   * to 60 s for a slot; the doubles refuse at once, so a test sees any call the app sends over the gate's slots. Only
+   * held calls (`delayMs`) are in flight.
+   */
+  refuseOverConcurrency?: boolean;
 }>): Promise<PreviewGateStubs> {
+  // Task 85: the final-writer room is a pair, as the real gate answers it.
+  for (const [provider, figures] of Object.entries(input.remaining ?? {})) {
+    if ((figures?.finalWriterMaxInFlight === undefined) !== (figures?.largestFinalWriterReservationUsd === undefined)) {
+      throw new TypeError(`STUB_REMAINING_FINAL_WRITER_PAIR: ${provider}'s final-writer room is given as a pair or not at all`);
+    }
+  }
   const concurrency: GateConcurrency = { now: 0, most: 0, mostByProvider: { deepinfra: 0, anthropic: 0 }, mostByModel: {} };
   const holding = { deepinfra: 0, anthropic: 0 } as Record<GateProvider, number>;
+  // Task 85: the final writers each gate holds, and what its billed calls have spent today.
+  const holdingFinalWriters = { deepinfra: 0, anthropic: 0 } as Record<GateProvider, number>;
+  const spent = { deepinfra: { nanoUsd: 0n, calls: 0 }, anthropic: { nanoUsd: 0n, calls: 0 } } as Record<GateProvider, { nanoUsd: bigint; calls: number }>;
+  const maxCallsOf = (provider: GateProvider): number => input.remaining?.[provider]?.maxConcurrentCalls ?? (provider === "anthropic" ? 2 : 10);
+  const overSlots = (provider: GateProvider, finalWriter: boolean): boolean => {
+    const slots = input.remaining?.[provider]?.finalWriterMaxInFlight;
+    return holding[provider] >= maxCallsOf(provider) || finalWriter && slots !== undefined && holdingFinalWriters[provider] >= slots;
+  };
+  /** One billed answer's spend (`spendLowersRemaining`): one call, and the reply's usage at the model's list prices. */
+  const spend = (provider: GateProvider, model: string, answer: GateAnswer, usage: StubUsage | null): void => {
+    if (input.spendLowersRemaining !== true || !BILLED_ANSWERS.has(answer)) return;
+    spent[provider].calls += 1;
+    const row = previewModelRow(model);
+    if (usage === null || row === undefined) return;
+    const perMillion = BigInt(usage.input) * previewUsdTextToNano(row.inputUsdPerM)! + BigInt(usage.output) * previewUsdTextToNano(row.outputUsdPerM)!;
+    spent[provider].nanoUsd += (perMillion + 999_999n) / 1_000_000n;
+  };
+  /**
+   * One /remaining answer: today's seven members in today's order, then the final-writer room (a pair) and the pot (only
+   * when given and asked for), as the real gate's remaining_snapshot and remaining_answer build it.
+   */
+  const remainingAnswer = (provider: GateProvider, state: "active" | "halted", askedPot: boolean): Readonly<Record<string, unknown>> => {
+    const figures = input.remaining?.[provider];
+    const usd = figures?.usd ?? input.remainingToday?.usd ?? "9.500000000";
+    const calls = figures?.calls ?? input.remainingToday?.calls ?? 1900;
+    const leftNano = (previewUsdTextToNano(usd) ?? 0n) - spent[provider].nanoUsd;
+    return {
+      state, window_open: true,
+      remaining_usd: input.spendLowersRemaining === true ? previewNanoUsdText(leftNano > 0n ? leftNano : 0n) : usd,
+      remaining_calls: Math.max(0, calls - spent[provider].calls),
+      max_concurrent_calls: maxCallsOf(provider), largest_reservation_usd: figures?.largestReservationUsd ?? "0.214016000",
+      enabled_models: figures?.enabledModels ?? enabled[provider],
+      ...(figures?.finalWriterMaxInFlight === undefined ? {} : {
+        largest_final_writer_reservation_usd: figures.largestFinalWriterReservationUsd, final_writer_max_in_flight: figures.finalWriterMaxInFlight }),
+      ...(askedPot && figures?.dailyPotUsd !== undefined ? { daily_pot_usd: figures.dailyPotUsd } : {})
+    };
+  };
   const holdingByModel = new Map<string, number>();
   const requests: GateRecord[] = [];
   const arrivals: GateArrival[] = [];
@@ -565,15 +651,15 @@ export async function startPreviewGateStubs(input: Readonly<{
         if (request.url === "/remaining") {
           const state = provider === "deepinfra" && halt.haltedAt !== null ? "halted" : input.remainingState ?? "active";
           remainingReads.push(Object.freeze({ provider, state }));
-          json(200, JSON.stringify({
-            state, window_open: true, remaining_usd: input.remainingToday?.usd ?? "9.500000000", remaining_calls: input.remainingToday?.calls ?? 1900,
-            max_concurrent_calls: provider === "anthropic" ? 2 : 10, largest_reservation_usd: "0.214016000",
-            enabled_models: enabled[provider]
-          }));
+          // Task 85: the pot is answered only to a request that asks for it ({"scope_id": …, "daily_pot": true}).
+          let askedPot = false;
+          try { askedPot = (JSON.parse(Buffer.concat(chunks).toString("utf8")) as { daily_pot?: unknown }).daily_pot === true; } catch { askedPot = false; }
+          json(200, JSON.stringify(remainingAnswer(provider, state, askedPot)));
           return;
         }
         if (request.url !== "/complete") { json(404, JSON.stringify({ error: "NOT_FOUND" })); return; }
-        const execution = JSON.parse(Buffer.concat(chunks).toString("utf8")) as { requestBody: string };
+        const execution = JSON.parse(Buffer.concat(chunks).toString("utf8")) as { requestBody: string; callTier?: unknown };
+        const finalWriter = execution.callTier === "FINAL_WRITER";
         const body = JSON.parse(execution.requestBody) as Record<string, unknown>;
         const model = String(body.model);
         const chat = stubChatBody(provider, body);
@@ -582,10 +668,13 @@ export async function startPreviewGateStubs(input: Readonly<{
         const seen: GateRequest = Object.freeze({ provider, model, kind, body });
         const arrival: GateArrival = { provider, model, kind, at: performance.now(), answeredAt: null };
         arrivals.push(arrival);
+        // Task 85: a call over the gate's slots is never held; it is answered at once, after the gate's earlier refusals.
+        if (input.refuseOverConcurrency === true && overSlots(provider, finalWriter)) { answer(seen, chat, arrival, true); return; }
         const delay = input.delayMs?.(seen) ?? 0;
-        if (delay <= 0) { answer(seen, chat, arrival); return; }
+        if (delay <= 0) { answer(seen, chat, arrival, false); return; }
         concurrency.now += 1;
         holding[provider] += 1;
+        if (finalWriter) holdingFinalWriters[provider] += 1;
         holdingByModel.set(model, (holdingByModel.get(model) ?? 0) + 1);
         concurrency.most = Math.max(concurrency.most, concurrency.now);
         concurrency.mostByProvider[provider] = Math.max(concurrency.mostByProvider[provider], holding[provider]);
@@ -593,18 +682,20 @@ export async function startPreviewGateStubs(input: Readonly<{
         setTimeout(() => {
           concurrency.now -= 1;
           holding[provider] -= 1;
+          if (finalWriter) holdingFinalWriters[provider] -= 1;
           holdingByModel.set(model, holdingByModel.get(model)! - 1);
-          answer(seen, chat, arrival);
+          answer(seen, chat, arrival, false);
         }, delay);
       });
-      const answer = (seen: GateRequest, chat: string, arrival: GateArrival): void => {
+      const answer = (seen: GateRequest, chat: string, arrival: GateArrival, overGateSlots: boolean): void => {
         // Answered now (at once, or after the scenario's delay); `provider` is this socket's.
         arrival.answeredAt = performance.now();
         const { model, kind } = seen;
         const json = (status: number, payload: string) => response.writeHead(status, { "content-type": "application/json" }).end(payload);
-        const record = (answer: GateAnswer): number => {
+        const record = (answer: GateAnswer, usage: StubUsage | null = null): number => {
           // A settled reply of a model ends its run of unbilled refusals (the real gate's clear_cooling).
           if (answer === "OK") unbilledRun.delete(model);
+          spend(provider, model, answer, usage);
           return requests.push(Object.freeze({ ...seen, answer })) - 1;
         };
         const reply = (status: number, vendorBody: string) => json(200, JSON.stringify({ status, body: vendorBody }));
@@ -634,6 +725,8 @@ export async function startPreviewGateStubs(input: Readonly<{
           return;
         }
         if (cooling.has(model)) { coolingRefusal(); return; }
+        // Task 85: the real gate's own refusal over its slots: 409 {"error": "CONCURRENCY_LIMIT_REACHED"}, nothing reserved.
+        if (overGateSlots) { record("GATE_REFUSED"); refuse("CONCURRENCY_LIMIT_REACHED"); return; }
         if (input.refuseModels?.includes(model) === true) {
           record("BILLED_500");
           reply(500, JSON.stringify({ error: { message: "this model must never be called in this test" } }));
@@ -660,14 +753,16 @@ export async function startPreviewGateStubs(input: Readonly<{
             return;
           }
           served += 1;
-          record("OK");
-          reply(200, stubVendorReply(provider, model, override.content, `practice-stub-${String(served)}`, input.usage?.(seen, chat) ?? undefined));
+          const usage = input.usage?.(seen, chat) ?? null;
+          record("OK", usage ?? STUB_DEFAULT_USAGE);
+          reply(200, stubVendorReply(provider, model, override.content, `practice-stub-${String(served)}`, usage ?? undefined));
           return;
         }
         const content = answerFor(kind, chat);
         if (content === null) { record("UNEXPECTED"); reply(500, JSON.stringify({ error: { message: "unexpected test request" } })); return; }
-        record("OK");
-        reply(200, stubVendorReply(provider, model, content, `practice-stub-${String(served)}`, input.usage?.(seen, chat) ?? undefined));
+        const usage = input.usage?.(seen, chat) ?? null;
+        record("OK", usage ?? STUB_DEFAULT_USAGE);
+        reply(200, stubVendorReply(provider, model, content, `practice-stub-${String(served)}`, usage ?? undefined));
       };
     });
     servers.push(server);
