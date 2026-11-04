@@ -15,7 +15,8 @@
  *  - NOT_PROVEN (exit 30): it worked, but a model sat out as busy (its vendor refused it, or it was cooling off) before
  *    it gave a single accepted answer, or the practice paused a gate itself after four connection failures in a row, or
  *    the operator interrupted it once (the calls in flight finished, the rest were skipped), so some model was not
- *    tested to the end.
+ *    tested to the end; or (openings arm S) a card of the step before Start got no list by the cut, so its wait was not
+ *    measured (START_NO_CARD:<plan>:<question>).
  *  - HARNESS_ERROR (exit 40): the practice itself could not run (a start check refused, or the tool broke). No verdict
  *    about the release.
  *  - ABORTED (exit 50): the practice started but did not get to its end (a second interrupt, or the tool broke midway).
@@ -224,6 +225,12 @@ export type PracticeVerdictInput = Readonly<{
    * Optional: none when absent.
    */
   armsRefused?: readonly string[];
+  /**
+   * Openings arm S (V4 start step, Task 91): each card of the step before Start that had no list in by the cut, as
+   * `<plan>:<question>` in run order. No card was shown, so its wait was not measured: NOT_PROVEN (a list that failed is
+   * already a failed call). Optional: none when absent.
+   */
+  startNoCard?: readonly string[];
   /** Refusals the gate proved unbilled (vendor busy, model cooling off, not reached) during a practice that went through. */
   unbilledRefusals: number;
   /** Each model's 90th-percentile latency in ms. */
@@ -264,6 +271,7 @@ export function practiceVerdict(input: PracticeVerdictInput): PracticeVerdictRes
   const partlyBusy = busy.filter((model) => answeredOf(model) >= 1);
   const notProven = [
     ...(input.armsRefused ?? []).map((refused) => `ARM_REFUSED:${refused}`),
+    ...(input.startNoCard ?? []).map((card) => `START_NO_CARD:${card}`),
     ...busy.filter((model) => answeredOf(model) < 1).map((model) => `MODEL_BUSY:${model}`),
     ...[...new Set(input.notExercisedModels)].filter((model) => !busy.includes(model)).sort().map((model) => `MODEL_NOT_EXERCISED:${model}`),
     ...[...(input.gatePauses ?? [])].sort().map((pause) => `GATE_PAUSED:${pause}`),

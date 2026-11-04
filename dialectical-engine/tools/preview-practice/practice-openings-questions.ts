@@ -43,10 +43,18 @@ export const OPENINGS_ARMS = Object.freeze(["T", "A", "B", "C"] as const);
 /** Task 17a (D5): the engine-2 angle map in the sealed wording (C2) and in wording N (C2N); asked only when named. */
 export const OPENINGS_ENGINE_ARMS = Object.freeze(["C2", "C2N"] as const);
 /**
- * T: today's opening. A: snowball. B: blind lists. C: the angle map. C2: the angle map on engine 2. C2N: C2 in wording N
- * (practice only).
+ * V4 start step, Task 91 (spec 2026-11-03 §4.1): the step before Start, timed per plan (S); asked only when named. It runs
+ * with --dry too: its dry gates answer the planner, the lists and the merges.
  */
-export type OpeningsArm = typeof OPENINGS_ARMS[number] | typeof OPENINGS_ENGINE_ARMS[number];
+export const OPENINGS_START_ARMS = Object.freeze(["S"] as const);
+/** Arm S's plans, in the order each question runs them. */
+export const OPENINGS_START_PLANS = Object.freeze(["FREE", "PLUS", "PRO", "MAX"] as const);
+export type OpeningsStartPlan = typeof OPENINGS_START_PLANS[number];
+/**
+ * T: today's opening. A: snowball. B: blind lists. C: the angle map. C2: the angle map on engine 2. C2N: C2 in wording N
+ * (practice only). S: the step before Start, the card's wait on each plan.
+ */
+export type OpeningsArm = typeof OPENINGS_ARMS[number] | typeof OPENINGS_ENGINE_ARMS[number] | typeof OPENINGS_START_ARMS[number];
 
 /** A question as the log pins it: its id and the first 12 hex characters of the SHA-256 of its question line. */
 export type OpeningsQuestionDigest = Readonly<{ id: string; sha256: string }>;
@@ -78,15 +86,15 @@ export function openingsQuestionsFromFlag(value: string | undefined): readonly O
 }
 
 /**
- * The arms a run uses: the four of OPENINGS_ARMS, or the arms named (in the order T, A, B, C, C2, C2N). The engine-2
- * arms (C2, C2N) run only when named, so a plain openings run never spends on engine 2.
+ * The arms a run uses: the four of OPENINGS_ARMS, or the arms named (in the order T, A, B, C, C2, C2N, S). The engine-2
+ * arms (C2, C2N) and the start step's (S) run only when named, so a plain openings run never spends on them.
  */
 export function openingsArmsFromFlag(value: string | undefined): readonly OpeningsArm[] {
   if (value === undefined) return OPENINGS_ARMS;
   const ids = openingsIds(value);
-  const known: readonly OpeningsArm[] = [...OPENINGS_ARMS, ...OPENINGS_ENGINE_ARMS];
+  const known: readonly OpeningsArm[] = [...OPENINGS_ARMS, ...OPENINGS_ENGINE_ARMS, ...OPENINGS_START_ARMS];
   if (ids === null || ids.some((id) => !(known as readonly string[]).includes(id))) {
-    throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--arms (only T, A, B, C, C2, C2N, comma-separated, each once)");
+    throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--arms (only T, A, B, C, C2, C2N, S, comma-separated, each once)");
   }
   return Object.freeze(known.filter((arm) => ids.includes(arm)));
 }

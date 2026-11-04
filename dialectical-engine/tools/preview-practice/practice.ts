@@ -86,7 +86,7 @@ import {
   type OpeningsArm,
   type OpeningsQuestion
 } from "./practice-openings-questions.js";
-import { openingsQuestionRotations, runPracticeOpenings } from "./practice-openings.js";
+import { openingsMaxInFlightDefault, openingsQuestionRotations, runPracticeOpenings } from "./practice-openings.js";
 import { practiceJudgeOrderDryPorts, runPracticeJudgeOrderMode } from "./practice-judge-order.js";
 import { practiceDebateLanguageFromArgs, practiceLanguageDryPorts, practiceLanguagePolicy, runPracticeLanguageMode } from "./practice-language.js";
 import { parsePracticeCallConcurrency } from "./practice-parallel.js";
@@ -403,7 +403,9 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       onCall: (call) => opened.append({ kind: "call", call }),
       onArm: (arm) => opened.append({ kind: "arm", arm }),
       onBusy: (model) => opened.append({ kind: "busy", model }),
-      onBusyWait: (wait) => opened.append({ kind: "busy-wait", ...wait })
+      onBusyWait: (wait) => opened.append({ kind: "busy-wait", ...wait }),
+      // Task 91 (arm S): each card of the step before Start, once its calls have ended.
+      onStartCard: (card) => opened.append(card)
     });
     if (settled !== null) return settled;
     const after = setup.remainingPorts === null ? { deepinfra: null, anthropic: null } : {
@@ -576,7 +578,7 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
         before: { deepinfra: null, anthropic: null }, remainingPorts: null, questions: openingsQuestions, arms: openingsArms,
         // A busy model sits out at once unless asked otherwise; the script's waits take no time either way.
         busyWaitMs: wholeNumber(args, "--busy-wait-minutes", 0, 0, 240) * 60_000,
-        maxInFlight: wholeNumber(args, "--max-in-flight", PRACTICE_FORMATS_DEFAULTS.maxInFlight, 1, 20), sleep: dry.sleep });
+        maxInFlight: wholeNumber(args, "--max-in-flight", openingsMaxInFlightDefault(openingsArms), 1, 20), sleep: dry.sleep });
     }
     if (args.mode === "language" && args.switches.has("--dry")) {
       // --dry: the two gate ports come ONLY from the script (practice-language.ts practiceLanguageDryPorts). No
@@ -745,7 +747,7 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
         ports: budgetPorts, dry: false, folder: directory, unsentStreakAtStart, gateLimits, before, remainingPorts,
         questions: openingsQuestions, arms: openingsArms,
         busyWaitMs: wholeNumber(args, "--busy-wait-minutes", 30, 0, 240) * 60_000,
-        maxInFlight: wholeNumber(args, "--max-in-flight", PRACTICE_FORMATS_DEFAULTS.maxInFlight, 1, 20), sleep: options.sleep });
+        maxInFlight: wholeNumber(args, "--max-in-flight", openingsMaxInFlightDefault(openingsArms), 1, 20), sleep: options.sleep });
     }
     if (mode === "formats") {
       const lanes = lanesOf(args) ?? [...PRACTICE_LANES];

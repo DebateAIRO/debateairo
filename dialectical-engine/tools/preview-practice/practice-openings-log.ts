@@ -7,15 +7,18 @@
  * blanked, at most 64 KiB). After each arm of each question one line holds the map that came out (or the positions
  * count for today's opening). The gates' watch adds one line per gate call. report.json and report.md are built from
  * these lines at the end and on every other way out. They hold counts, cost, time, slips, fallbacks and notes only:
- * the comparison of the openings is the owners' own method, outside this repository.
+ * the comparison of the openings is the owners' own method, outside this repository. Arm S (V4 start step, Task 91) adds
+ * one START_CARD line per question and plan (the card's wait, never a cost), and report.json its `startStep` block.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { MapMarkRecord, MapNoteRecord, MapResult, MapStep } from "@debateai/map";
+import { previewModelRow } from "@debateai/providers";
+import { START_SEAT_SPEED_ORDER, startModelOfSeat } from "../../apps/api/src/start-step/seats.js";
 import type { PracticeAttempt } from "./practice-formats.js";
 import type { PracticeGateName } from "./practice-gate-observer.js";
 import { practiceWordingRows, practiceWordingTotals } from "./practice-map-wording.js";
-import type { OpeningsArm, OpeningsQuestionDigest } from "./practice-openings-questions.js";
+import { OPENINGS_START_PLANS, type OpeningsArm, type OpeningsQuestionDigest, type OpeningsStartPlan } from "./practice-openings-questions.js";
 import {
   GATES,
   gateHalted,
@@ -36,11 +39,18 @@ import {
   type PracticeLogCommonLine,
   type PracticeRemainingLine
 } from "./practice-samples-log.js";
-import { practiceModelCalls, practiceRepairKindsByModel, practiceVerdict, type PracticeReplyForm } from "./practice-verdict.js";
+import {
+  latencySummary,
+  percentile,
+  practiceModelCalls,
+  practiceRepairKindsByModel,
+  practiceVerdict,
+  type PracticeReplyForm
+} from "./practice-verdict.js";
 
 export const OPENINGS_SCHEMA = "preview-practice-openings-v1" as const;
 export const OPENINGS_FILE = "openings.jsonl" as const;
-const OPENINGS_LINE_KINDS: readonly string[] = ["start", "wire", "stop", "call", "arm", "busy", "busy-wait", "end", "abort"];
+const OPENINGS_LINE_KINDS: readonly string[] = ["start", "wire", "stop", "call", "arm", "busy", "busy-wait", "end", "abort", "START_CARD"];
 
 /** A map step, or POSITION: today's opening (arm T), one full position per AI. */
 export type OpeningsStep = MapStep | "POSITION";
@@ -83,6 +93,27 @@ export type OpeningsCall = Readonly<{
    * fragment). Otherwise the last reply's text. Key-shaped strings blanked, at most 64 KiB; null when none came.
    */
   replyText: string | null;
+  /** Arm S only (Task 91): the plan whose card the call was made for. Absent on every other arm's call, as before. */
+  plan?: OpeningsStartPlan;
+}>;
+
+/**
+ * V4 start step, Task 91 (arm S): one card of the step before Start, written once every call it asked has ended.
+ *  - cardMs: from the planner's start to the end of the first merge (the moment the card shows); with no list by the
+ *    cut, to the moment the step ended without one;
+ *  - listsIn: the lists in by the cut (0: no card was shown); late: the lists after it;
+ *  - seatMs: each list seat in seat order, by its seat ref (the model, with "#2" on a company's second seat), with its
+ *    list's time from asked to answered (null: it gave no list).
+ * It never holds a cost: the card's calls carry it (`OpeningsCall.plan`), and report.json sums it per plan.
+ */
+export type OpeningsStartCardLine = Readonly<{
+  kind: "START_CARD";
+  plan: OpeningsStartPlan;
+  questionId: string;
+  cardMs: number;
+  listsIn: number;
+  late: number;
+  seatMs: readonly Readonly<{ model: string; ms: number | null }>[];
 }>;
 
 /**
@@ -134,7 +165,8 @@ export type OpeningsLogLine =
   | PracticeLogCommonLine
   | Readonly<{ kind: "call"; call: OpeningsCall }>
   | Readonly<{ kind: "arm"; arm: OpeningsArmLine }>
-  | (Readonly<{ kind: "busy-wait" }> & OpeningsBusyWait);
+  | (Readonly<{ kind: "busy-wait" }> & OpeningsBusyWait)
+  | OpeningsStartCardLine;
 
 /**
  * Every string value inside a model-written structure, key-shape redacted (no cap: a map is short, and every field the
@@ -211,6 +243,105 @@ const openingsWrongFormat = (call: OpeningsCall): boolean => call.status === "FO
   || call.attempts.some((attempt) => attempt.parseStatus !== null && attempt.parseStatus !== "PARSED");
 
 /**
+ * One plan's cards (Task 91, arm S), over the cards that were shown (a list in by the cut): the card's wait at the
+ * typical card (p50), the slow end (p90, max), the model whose seats were slowest there (the highest p50 list time; a
+ * tie goes to the later model in today's speed order) and the lists in by the cut (p50). All null with no card shown.
+ */
+export type OpeningsStartPlanSummary = Readonly<{ p50Ms: number | null; p90Ms: number | null; maxMs: number | null;
+  slowestSeatModel: string | null; listsInP50: number | null }>;
+/** Per plan, and each model's p50 list time over every card (a "#2" seat's time counts for its model). */
+export type OpeningsStartSummary = Readonly<Record<OpeningsStartPlan, OpeningsStartPlanSummary>>
+  & Readonly<{ seatP50Ms: Readonly<Record<string, number>> }>;
+
+/** Each model's list times in these cards, a "#2" seat's under its model; a seat with no list has none. */
+function startSeatTimes(lines: readonly OpeningsStartCardLine[]): ReadonlyMap<string, readonly number[]> {
+  const times = new Map<string, number[]>();
+  for (const seat of lines.flatMap((line) => line.seatMs)) {
+    if (seat.ms === null) continue;
+    const model = startModelOfSeat(seat.model);
+    times.set(model, [...(times.get(model) ?? []), seat.ms]);
+  }
+  return times;
+}
+
+/** A model's place in today's speed order; a model it does not name comes after every one it names. */
+const startSpeedRank = (model: string): number => {
+  const at = START_SEAT_SPEED_ORDER.indexOf(model);
+  return at < 0 ? START_SEAT_SPEED_ORDER.length : at;
+};
+
+/** The start step's figures from its START_CARD lines (nearest-rank percentiles, as every practice report's). */
+export function startStepSummary(lines: readonly OpeningsStartCardLine[]): OpeningsStartSummary {
+  const ofPlan = (plan: OpeningsStartPlan): OpeningsStartPlanSummary => {
+    const shown = lines.filter((line) => line.plan === plan && line.listsIn > 0);
+    const wait = latencySummary(shown.map((line) => line.cardMs));
+    const slowest = [...startSeatTimes(shown)].map(([model, times]) => [model, percentile(times, 50)!] as const)
+      .reduce<readonly [string, number] | null>((worst, one) => (worst === null || one[1] > worst[1]
+        || (one[1] === worst[1] && startSpeedRank(one[0]) > startSpeedRank(worst[0])) ? one : worst), null);
+    return Object.freeze({ p50Ms: wait.p50, p90Ms: wait.p90, maxMs: wait.max, slowestSeatModel: slowest?.[0] ?? null,
+      listsInP50: percentile(shown.map((line) => line.listsIn), 50) });
+  };
+  const plans = Object.fromEntries(OPENINGS_START_PLANS.map((plan) => [plan, ofPlan(plan)])) as Record<OpeningsStartPlan, OpeningsStartPlanSummary>;
+  return Object.freeze({ ...plans,
+    seatP50Ms: Object.freeze(Object.fromEntries([...startSeatTimes(lines)].map(([model, times]) => [model, percentile(times, 50)!]))) });
+}
+
+/**
+ * The list seats' order the times suggest (a proposed START_SEAT_SPEED_ORDER, plan Task 91 Step 4; never applied by
+ * code): the timed models by p50 list time, fastest first, a tie in today's order; then every model of today's order
+ * that has no time, in that order.
+ */
+export function startSeatOrderOf(summary: Pick<OpeningsStartSummary, "seatP50Ms">): readonly string[] {
+  const timed = Object.keys(summary.seatP50Ms).sort((a, b) => summary.seatP50Ms[a]! - summary.seatP50Ms[b]!
+    || startSpeedRank(a) - startSpeedRank(b) || (a < b ? -1 : a > b ? 1 : 0));
+  return Object.freeze([...timed, ...START_SEAT_SPEED_ORDER.filter((model) => !timed.includes(model))]);
+}
+
+/** Arm S's wall time: each card's calls from the first one's start to the last one's end, added up. */
+function openingsStartWallSeconds(calls: readonly OpeningsCall[]): number {
+  const spans = new Map<string, { from: number; to: number }>();
+  for (const call of calls) {
+    const key = `${call.questionId}|${call.plan ?? ""}`;
+    const span = spans.get(key) ?? { from: Date.parse(call.startedAt), to: Date.parse(call.finishedAt) };
+    spans.set(key, { from: Math.min(span.from, Date.parse(call.startedAt)), to: Math.max(span.to, Date.parse(call.finishedAt)) });
+  }
+  return Math.round([...spans.values()].reduce((sum, span) => sum + (span.to - span.from), 0) / 1_000);
+}
+
+/**
+ * Review (Task 91 Step 4; decision record: "only one or two companies' lists may be in" at the first card): the companies
+ * whose lists were in by the cut on one card, sorted. Every list is asked at the same moment and taken in as it arrives,
+ * so the `listsIn` seats with the shortest list times are the ones in by the cut (a tie in seat order; a seat with no
+ * list has no time). A "#2" seat is its company's, so a company counts once.
+ */
+function startCompaniesInByCut(card: OpeningsStartCardLine, makerOf: (model: string) => string): readonly string[] {
+  const timed = card.seatMs.flatMap((seat, at) => (seat.ms === null ? [] : [{ model: startModelOfSeat(seat.model), ms: seat.ms, at }]));
+  const inByCut = timed.sort((a, b) => a.ms - b.ms || a.at - b.at).slice(0, card.listsIn);
+  return [...new Set(inByCut.map((seat) => makerOf(seat.model)))].sort();
+}
+
+/** report.json's `startStep` (arm S): the summary, the seat order it suggests, the card lines and the cost of each plan. */
+function openingsStartStepBlock(cards: readonly OpeningsStartCardLine[], calls: readonly OpeningsCall[],
+  nano: (rows: readonly OpeningsCall[]) => bigint) {
+  const summary = startStepSummary(cards);
+  const perPlan = <T>(pick: (plan: OpeningsStartPlan) => T): Readonly<Record<OpeningsStartPlan, T>> =>
+    Object.freeze(Object.fromEntries(OPENINGS_START_PLANS.map((plan) => [plan, pick(plan)])) as Record<OpeningsStartPlan, T>);
+  // A model's company as its calls name it, else as the reviewed preview rows do, else the model itself.
+  const makers = new Map(calls.map((call) => [call.model, call.maker] as const));
+  const makerOf = (model: string): string => makers.get(model) ?? previewModelRow(model)?.maker ?? model;
+  return Object.freeze({ summary, seatOrder: startSeatOrderOf(summary),
+    cardsByPlan: perPlan((plan) => cards.filter((card) => card.plan === plan).length),
+    // Per plan, over the shown cards: how many companies had a list in by the cut (p50), and on how many cards each did.
+    companiesInByPlan: perPlan((plan) => {
+      const each = cards.filter((card) => card.plan === plan && card.listsIn > 0).map((card) => startCompaniesInByCut(card, makerOf));
+      const cardsOf = openingsCount(each.flat());
+      return Object.freeze({ p50: percentile(each.map((companies) => companies.length), 50),
+        cards: Object.freeze(Object.fromEntries(Object.keys(cardsOf).sort().map((maker) => [maker, cardsOf[maker]!]))) });
+    }),
+    costUsdByPlan: perPlan((plan) => usd(nano(calls.filter((call) => call.plan === plan)))) });
+}
+
+/**
  * The report from the log alone, with the tool's own verdict (practice-verdict.ts): a log with an end line gives the
  * run's own verdict; one with an abort line, or neither, gives ABORTED with every other rule listed after it.
  */
@@ -221,6 +352,8 @@ export function openingsReportFromLog(lines: readonly OpeningsLogLine[], abort: 
   const after = ending.after;
   const calls = lines.flatMap((line) => (line.kind === "call" ? [line.call] : []));
   const armLines = lines.flatMap((line) => (line.kind === "arm" ? [line.arm] : []));
+  // Task 91 (arm S): the start step's cards; one with no list by the cut was not shown (NOT_PROVEN, START_NO_CARD).
+  const cards = lines.flatMap((line) => (line.kind === "START_CARD" ? [line] : []));
   const busy = ending.busy;
   const tries = calls.filter((call) => call.attempts.length > 0).map((call) => Object.freeze({ model: call.model, tries: call.attempts }));
   const callsByModel = practiceModelCalls(tries);
@@ -252,6 +385,7 @@ export function openingsReportFromLog(lines: readonly OpeningsLogLine[], abort: 
     notExercisedModels: start.models.filter((model) => !answeredModels.has(model) && !busy.includes(model)),
     busyModels: busy,
     armsRefused: armsRefused.map((refused) => `${refused.arm}:${refused.questionId}:${refused.code}`),
+    startNoCard: cards.filter((card) => card.listsIn === 0).map((card) => `${card.plan}:${card.questionId}`),
     unbilledRefusals: GATES.reduce((sum, gate) => sum + ending.observer.summary(gate).unbilled, 0),
     p90ByModel: p90ByModel(calls.map((call) => ({ model: call.model, latencies: call.attempts.map((attempt) => attempt.latencyMs) })))
   });
@@ -263,9 +397,11 @@ export function openingsReportFromLog(lines: readonly OpeningsLogLine[], abort: 
   const byArm = start.arms.map((arm) => {
     const mine = calls.filter((call) => call.arm === arm);
     const ownLines = armLines.filter((line) => line.arm === arm);
+    // Arm S writes card lines, not arm lines: its questions are its cards' questions, its time its cards' calls'.
+    const startArm = arm === "S";
     return Object.freeze({
       arm,
-      questions: ownLines.length,
+      questions: startArm ? new Set(cards.map((card) => card.questionId)).size : ownLines.length,
       calls: mine.length,
       statuses: openingsCount(mine.map((call) => call.status)),
       byStep: openingsCount(mine.map((call) => call.step)),
@@ -273,7 +409,8 @@ export function openingsReportFromLog(lines: readonly OpeningsLogLine[], abort: 
       outputTokens: tokens(mine, (call) => call.outputTokens),
       reasoningTokens: tokens(mine, (call) => call.reasoningTokens),
       costUsd: usd(nano(mine)),
-      wallSeconds: Math.round(ownLines.reduce((sum, line) => sum + (Date.parse(line.finishedAt) - Date.parse(line.startedAt)), 0) / 1_000),
+      wallSeconds: startArm ? openingsStartWallSeconds(mine)
+        : Math.round(ownLines.reduce((sum, line) => sum + (Date.parse(line.finishedAt) - Date.parse(line.startedAt)), 0) / 1_000),
       unavailable: ownLines.filter((line) => line.outcome === "UNAVAILABLE").length,
       marks: openingsCount(ownLines.flatMap((line) => line.marks.map((mark) => mark.mark))),
       notes: openingsCount(ownLines.flatMap((line) => line.notes.map((note) => note.note)))
@@ -292,6 +429,9 @@ export function openingsReportFromLog(lines: readonly OpeningsLogLine[], abort: 
     // Task 17a (D5): wording N's comparison, only when an engine-2 arm ran (the debated answers word for word are for the
     // owner's reading; report.md prints counts only).
     ...(wording.length === 0 ? {} : { wording, wordingTotals: practiceWordingTotals(wording) }),
+    // Task 91 (arm S), only when it ran: the waits per plan, each model's list time, the seat order they suggest, and the
+    // cost per plan (here and in the call lines only; a card line never holds one).
+    ...(cards.length === 0 ? {} : { startStep: openingsStartStepBlock(cards, calls.filter((call) => call.arm === "S"), nano) }),
     gates: Object.fromEntries(GATES.map((gate) => [gate, Object.freeze({ observed: ending.observer.summary(gate),
       remainingBefore: start.remainingBefore[gate], remainingAfter: after?.[gate] ?? null,
       // The formats report's own check (report.md prints it per gate): the gate's count before less after.

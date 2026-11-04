@@ -228,6 +228,41 @@ ids, a later task). An arm that hits a practice refusal (the engine seal missing
 shipped text) ends at once with no map; report.md lists it under "Refused arms" with its code, its Wording N row counts it
 as refused, and the run reads NOT_PROVEN (exit 30, `ARM_REFUSED:<arm>:<question>:<code>`), never PASS.
 
+Arm `S` (V4 start step, plan Task 91; named only with `--arms`, and it runs with `--dry` too): the step before Start,
+timed per plan. For each question it runs the step four times, on Free, Plus, Pro and Max in turn, as the site runs it:
+the plan's list writers (Free 2, Plus 4, Pro 5, Max 7: one seat per company in the code's speed order,
+`START_SEAT_SPEED_ORDER`, then a company's second seat, marked `#2`; Free from the settings' Free line-up, the others
+from the full one), the angle planner on the first seat, every list started at the same moment, the cut (at
+`START_STEP_TIMING.cutAtMs` once a list is in, or as soon as every list is in), the first merge on Haiku over the lists
+in by the cut, and one small late merge for the lists after it. Each call goes through the same gates, relay, call
+policy and watch as every other arm's, with the site's own token room for its kind. One difference: a vendor's busy
+refusal gets the practice's waits here (the policy's one resend, then the model's `--busy-wait-minutes`), while the site
+ends such a call at once, so a card it touched reads slower than the site's (the report's busy lines show it). With arm
+S, `--max-in-flight` starts at 8 (Max's seven lists and the merge), so every list of a card starts together, within
+each gate's own limit of calls at once (from its status file), as on the site. The card's wait is counted from the
+planner's start, as the code's own cut is: the question check and the language decision that run beside the planner
+at Next are not part of it.
+
+After each card, once all its calls have ended, one `START_CARD` line holds the card's wait (`cardMs`: from the
+planner's start to the end of the first merge), how many lists were in by the cut (`listsIn`), how many came late, and
+each seat's list time (`seatMs`, by seat; null for a seat that gave no list). It holds no cost: each call line does, with
+its `plan`. `report.json` `startStep` gives, per plan, the typical wait (p50), the slow end (p90 and the longest), the
+model whose seats were slowest and the lists in by the cut (p50); each model's p50 list time (`#2` seats under their
+model); the seat order those times suggest (`seatOrder`: fastest first, a tie in today's order, a model without a time
+last); the companies whose lists were in by the cut (`companiesInByPlan`: per plan, how many companies at the typical
+card, p50, and on how many cards each company's list was in; a company's `#2` list counts once, and the lists in by the
+cut are the `listsIn` fastest seats, since every list starts at the same moment); the cards and the cost of each plan.
+report.md lists arm S in its per-arm table only. A card with no list by the
+cut was not shown: it is left out of the waits, and the run reads NOT_PROVEN (`START_NO_CARD:<plan>:<question>`).
+Nothing here changes the code's timing values or seat order: the owner decides from the report (plan Task 91 Step 4).
+Its dry run, from a fresh folder outside the repository:
+
+```sh
+O=$(mktemp -d /tmp/openings-dry.XXXXXX)
+node_modules/.bin/tsx tools/preview-practice/practice.ts openings --dry --arms S --out "$O/start-step"
+echo "exit: $?"
+```
+
 The owner's thinking levels (the settings' `thinking_levels` table, deploy/preview-auth-dev/v1/README.md) apply to
 openings as to every other call: arm T's positions run at the `opening` step's level, and so do all the map's calls
 (angles, lists, merge, gap, choose), since the map builds the opening; a repair inside a call runs at `slip_fix` when
@@ -496,7 +531,7 @@ block holds:
   points per answer, deeper points, gap rounds, the three settings, the opening);
 - `opening`: the opening the debate used. It is `TODAYS_OPENING` when the map was unavailable, or gave fewer than two
   answers to argue, and each AI argued its own position, as today;
-- `mapCallsByStep`: the map's calls by step (angles, list, merge, gap, choose, check), every try as the ledger recorded it;
+- `mapCallsByStep`: the map's calls by step (angles, list, merge, gap, gap-paths, choose, check; gap-paths is the gap round after Start on a path debate), every try as the ledger recorded it;
 - `chosenAnswers` and `alsoRaised`: how many different answers the map chose to argue, and how many points came up but
   were not debated. When fewer than two answers were chosen, the points are still counted here, but the story and the
   debate page show none of them (today's opening was argued instead);
@@ -1033,6 +1068,17 @@ PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRA
 echo "exit: $?"
 ```
 
+The start step's waits (arm S, plan Task 91 Step 4; it spends real money from the test budget, so only within the
+sitting the owner said yes to): run it dry first (see "The openings record"), then, after S-3 again, the 12 questions on
+the four plans. Its figures stay in `$P`: the waits and the cost per plan are reported to the owner in the chat, never
+written into the repository.
+
+```sh
+scp "$PREVIEW_SSH:/home/ubuntu/practice/*-status.json" "$P/"
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts openings --settings "$P/settings.env" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --arms S --out "$P/start-step-timing"
+echo "exit: $?"
+```
+
 Optional flags:
 
 - formats: `--samples N` (1 to 10, default 2), `--gap-ms MS` (between one model's calls, default 1000; with
@@ -1045,9 +1091,10 @@ Optional flags:
 - openings: `--dry` (scripted answers, nothing spent), `--questions ro-euro,en-rent-caps,...` (only the fixed ids:
   ro-euro, ro-autobuze, ro-final-viata, ro-ciuperci, ro-strainatate, ro-hpv, en-nuclear, en-four-day-week,
   en-phones-school, en-retirement-age, en-social-media-age, en-rent-caps; default all twelve), `--arms T,A,B,C`
-  (default all four; they always run in the order T, A, B, C, C2, C2N; C2 and C2N run only when named, never with
-  `--dry`, see "The openings record"), `--busy-wait-minutes N` and `--max-in-flight N` as in
-  formats (with `--dry` a busy AI sits out at once unless `--busy-wait-minutes` is given). The questions themselves
+  (default all four; they always run in the order T, A, B, C, C2, C2N, S; C2, C2N and S run only when named, C2 and
+  C2N never with `--dry`, see "The openings record"), `--busy-wait-minutes N` and `--max-in-flight N` as in
+  formats (with `--dry` a busy AI sits out at once unless `--busy-wait-minutes` is given; with arm S `--max-in-flight`
+  starts at 8). The questions themselves
   are fixed in the code and never read from the command line; a refused value is never repeated in the output.
   Any other flag is refused in openings (for example `--question`, `--models` or `--samples`), and `--settings` and
   the two `--gate-status-*` flags are refused with `--dry`, so a mistyped flag can never start the paid run.
