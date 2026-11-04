@@ -27,7 +27,7 @@ const L = START_STEP_LIMITS;
 /** Start values; changed only after the Mac measurement (Task 91). */
 export const START_STEP_TIMING = Object.freeze({ plannerDeadlineMs: 15_000, cutAtMs: 30_000, listsHardCapMs: 150_000, mergeDeadlineMs: 45_000,
   lateMergeDeadlineMs: 30_000, combineDeadlineMs: 15_000, fitDeadlineMs: 10_000, heartbeatMs: 10_000, streamMaxLifeMs: 210_000,
-  serverCacheTtlMs: 600_000, signedLifetimeMs: 7_200_000 });
+  serverCacheTtlMs: 600_000 });
 export type StartStepTiming = typeof START_STEP_TIMING;
 
 /** The merge, the late merge, the combine and the fit run on Haiku, fixed in code, as the clarifying call does (spec §9). */

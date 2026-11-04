@@ -66,7 +66,8 @@ describe("the start step's names and start values", () => {
   it("are the plan's", () => {
     expect(START_STEP_TIMING).toEqual({ plannerDeadlineMs: 15_000, cutAtMs: 30_000, listsHardCapMs: 150_000, mergeDeadlineMs: 45_000,
       lateMergeDeadlineMs: 30_000, combineDeadlineMs: 15_000, fitDeadlineMs: 10_000, heartbeatMs: 10_000, streamMaxLifeMs: 210_000,
-      serverCacheTtlMs: 600_000, signedLifetimeMs: 7_200_000 });
+      serverCacheTtlMs: 600_000 });
+    expect(Object.keys(START_STEP_TIMING).filter((name) => /lifetime|expir/iu.test(name))).toEqual([]);
     expect(Object.isFrozen(START_STEP_TIMING)).toBe(true);
     expect(START_CALL_SITES).toEqual({ angles: "START:angles", merge: "START:merge", mergeLate: "START:merge-late", combine: "START:combine", fit: "START:fit" });
     expect(startListCallSiteKey(3)).toBe("START:list:3");
