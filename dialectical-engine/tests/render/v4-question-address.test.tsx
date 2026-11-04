@@ -213,7 +213,9 @@ describe("picks and typed words are not lost (dig-f23)", () => {
     expect(tray()).toBeNull();
     expect(text()).toContain(CATALOG["v4.dig.picksCleared"]);
     expect(params().getAll("pick")).toEqual([]);
-    await click(page().querySelector<HTMLButtonElement>(".v4PicksClearedUndo")!);
+    // journey-f21: the shared Undo note (V4UndoNote), with its shrinking line.
+    expect(page().querySelector(".v4PicksCleared .v4Undo-counting .v4UndoLine")).not.toBeNull();
+    await click(page().querySelector<HTMLButtonElement>(".v4PicksCleared .v4UndoBtn")!);
     expect(trayChips()).toHaveLength(2);
     expect(params().getAll("pick")).toHaveLength(2);
     expect(text()).not.toContain(CATALOG["v4.dig.picksCleared"]);

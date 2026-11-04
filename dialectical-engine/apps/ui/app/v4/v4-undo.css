@@ -48,6 +48,9 @@
   .v4UndoLineFill { animation: none; }
   .v4UndoStill { display: inline; }
 }
+/* dig-f23: "Picks cleared [Undo]" is this same note (V4PicksClearedNote), sized like the dig notes beside it. */
+.v4PicksCleared { width: max-content; max-width: min(560px, calc(100vw - 32px)); min-width: 0; }
+.v4StackPhone .v4PicksCleared, .v4DebSheetFoot .v4PicksCleared { width: 100%; max-width: none; }
 /* An older note on a phone: one line, its words and its Undo. */
 .v4UndoFolded .v4UndoText {
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; line-clamp: 1; overflow: hidden;

@@ -1,21 +1,25 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { DIG_UNDO_MS } from "./digUndo.js";
 import { EMPTY_DRAFT } from "./suggestions.js";
 import type { V4DigDraft } from "./types.js";
 
 /*
  * V4 screen review, 3 Nov (dig-f23): "Clear" no longer wipes the picks for good. After it, "Picks cleared [Undo]" shows
  * for 10 seconds, and Undo brings every pick back as it was (edited wordings and own views included: the words were only
- * ever in the page's memory). A new pick, or a dig being started, ends the offer. Memory only; nothing is stored.
+ * ever in the page's memory). A new pick, or a dig being started, ends the offer. Memory only; nothing is stored. The note
+ * itself is the shared Undo note (V4PicksClearedNote → V4UndoNote, journey-f21): same look, same 10 seconds.
  */
 
-/** How long "Picks cleared" offers Undo (the site's Undo time). */
-export const PICKS_UNDO_MS = 10_000;
+/** How long "Picks cleared" offers Undo: the site's one Undo time (row D decision 1, as a dig's). */
+export const PICKS_UNDO_MS = DIG_UNDO_MS;
 
 export type PicksUndo = Readonly<{
   /** True while "Picks cleared [Undo]" shows. */
   offered: boolean;
+  /** When the offer ends (ms since the epoch), for the note's shrinking line; null when nothing is offered. */
+  endsAt: number | null;
   /** Clears every pick and offers Undo (nothing to clear: nothing happens). */
   clear: () => void;
   undo: () => void;
@@ -31,6 +35,7 @@ export function usePicksUndo(input: Readonly<{
 }>): PicksUndo {
   const { draft, current, commit } = input;
   const [before, setBefore] = useState<V4DigDraft | null>(null);
+  const [endsAt, setEndsAt] = useState<number | null>(null);
   const beforeRef = useRef(before);
   useEffect(() => {
     beforeRef.current = before;
@@ -41,6 +46,7 @@ export function usePicksUndo(input: Readonly<{
     if (now.picks.length === 0) return;
     commit(EMPTY_DRAFT);
     setBefore(now);
+    setEndsAt(Date.now() + PICKS_UNDO_MS);
   }, [current, commit]);
 
   const undo = useCallback((): void => {
@@ -63,5 +69,5 @@ export function usePicksUndo(input: Readonly<{
     if (draft.picks.length > 0 && beforeRef.current !== null && draft !== beforeRef.current) setBefore(null);
   }, [draft]);
 
-  return { offered: before !== null, clear, undo, dismiss };
+  return { offered: before !== null, endsAt: before === null ? null : endsAt, clear, undo, dismiss };
 }

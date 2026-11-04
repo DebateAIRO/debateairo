@@ -258,6 +258,8 @@
   "v4.dig.trayClear": "Clear",
   "v4.dig.picksCleared": "Picks cleared",
   "v4.dig.picksClearedUndoLabel": "Bring back the picks you cleared",
+  "v4.dig.picksClearedStill": "You can undo this for a few seconds",
+  "v4.dig.picksClearedAnnounce": "Picks cleared. Undo is selected.",
   "v4.bar.label": "How solid this is: {counts}",
   "v4.bar.unchecked": "Some points were not checked by a second AI",
   "v4.map.new": "New",

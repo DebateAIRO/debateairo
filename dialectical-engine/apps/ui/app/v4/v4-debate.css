@@ -231,29 +231,6 @@
 .v4DebOutlineCards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 12px; }
 .v4DebOutlineCard { display: block; height: 88px; border: 1px solid var(--line-2); border-radius: var(--r-card); background: var(--surface-2); }
 
-/* dig-f23: "Picks cleared [Undo]" where the tray was, for 10 seconds. A local note until the shared Undo note (journey-f21)
-   lands: it appears at once with the 1-second soft highlight, and its quiet line shrinks over the 10 seconds (owner r2-22).
-   Integration can point these two at the shared motion tokens of v4-base.css. */
-.v4PicksCleared {
-  position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px;
-  width: 100%; max-width: 640px; padding: 8px 16px 10px; overflow: hidden;
-  border-radius: var(--r-btn); background: var(--ink); color: var(--surface); box-shadow: var(--shadow-pop);
-  animation: v4PicksClearedHighlight 1s ease-out;
-}
-.v4DebDockPhone .v4PicksCleared { max-width: none; border-radius: 0; box-shadow: none; }
-.v4DebSheetFoot .v4PicksCleared { max-width: none; border-radius: 0; box-shadow: none; }
-.v4PicksClearedText { min-width: 0; overflow-wrap: anywhere; }
-.v4PicksClearedUndo { background: none; border: 0; color: var(--gold-bg); font-weight: 700; cursor: pointer; min-height: 44px; }
-.v4PicksClearedLine {
-  position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--gold-bg);
-  transform-origin: left center; animation: v4PicksClearedShrink 10s linear forwards;
-}
-[dir="rtl"] .v4PicksClearedLine { transform-origin: right center; }
-@keyframes v4PicksClearedShrink { from { transform: scaleX(1); } to { transform: scaleX(0); } }
-@keyframes v4PicksClearedHighlight { from { box-shadow: 0 0 0 3px var(--accent); } to { box-shadow: 0 0 0 3px transparent; } }
-/* Reduced motion: the line stands still; the highlight and the written line stay. */
-@media (prefers-reduced-motion: reduce) { .v4PicksClearedLine { animation: none; } }
-
 /* dig-f23: the page's own question before a link would lose typed words. It appears at once, above everything. */
 .v4LeaveBackdrop {
   position: fixed; inset: 0; z-index: 70; display: flex; align-items: center; justify-content: center;

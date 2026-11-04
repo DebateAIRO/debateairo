@@ -1618,9 +1618,9 @@ function V4Debate({
   ) : null);
   const tray = trayOf(true);
 
-  // dig-f23: where the tray was, "Picks cleared [Undo]" for 10 seconds.
+  // dig-f23: where the tray was, "Picks cleared [Undo]" for 10 seconds, in the shared Undo note (journey-f21).
   const picksClearedNote = picksUndo.offered
-    ? <V4PicksClearedNote onUndo={picksUndo.undo} catalog={catalog} />
+    ? <V4PicksClearedNote onUndo={picksUndo.undo} endsAt={picksUndo.endsAt ?? undefined} catalog={catalog} />
     : null;
 
   // dig-d3 / dig-f10: every waiting dig of the site, in this page's bottom stack (the site-wide holder steps back). [See it]
