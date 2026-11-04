@@ -47,6 +47,8 @@ export * from "./dig-model.js";
 export * from "./start-paths.js";
 // A path debate's results per path (migration 0158, V4 start step Task 21).
 export * from "./path-results.js";
+// Each path's step and points, the carry-on mark and a public debate's report counts (migration 0159, V4 start step Task 53a).
+export * from "./path-progress.js";
 export * from "./pool-budget.js";
 export * from "./release-state.js";
 export { recordRunSupersession, resolveRunRef } from "./run-supersession.js";

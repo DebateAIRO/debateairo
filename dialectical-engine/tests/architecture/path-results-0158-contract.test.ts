@@ -45,13 +45,14 @@ const bodyOf = (sql: string, name: string): string => {
 };
 
 describe("0158: a path debate's results per path", () => {
-  it("C-T is the chain's last step, after 0157, with its own loader and no amendment", async () => {
+  it("C-T is a step of the chain, after 0157, with its own loader and no amendment", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
     expect(chain).toContain("import { loadForward0158 } from './migration-forward0158.js';");
-    expect(chain).toContain("loadForward0157,loadForward0158]");
+    expect(chain).toContain("loadForward0157,loadForward0158,");
     const plan = await loadMigrationPlan();
-    expect(plan.forwardChain.slice(-2).map((step) => step.name)).toEqual([PREVIOUS, NAME]);
-    expect(plan.forwardChain.at(-1)!.amendsPostconditionsOf).toEqual([]);
+    const names = plan.forwardChain.map((step) => step.name);
+    expect(names.slice(names.indexOf(NAME) - 1, names.indexOf(NAME) + 1)).toEqual([PREVIOUS, NAME]);
+    expect(plan.forwardChain.find((step) => step.name === NAME)!.amendsPostconditionsOf).toEqual([]);
     const loader = read("packages/db/src/migration-forward0158.ts");
     for (const name of [...TABLES, ...DEFINERS]) expect(loader, name).toContain(`"${name}"`);
     expect(loader).toContain("MIGRATION_FORWARD0158_");

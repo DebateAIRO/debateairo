@@ -626,7 +626,8 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // Merge of origin V4 5cef1764d (2026-11-04): V4 took 0155 (the owner's two writes on their own answer), so the Task 20 and
 // Task 21 comments above now name 0157 and 0158 (the start step's three migrations moved up one again). Comments only;
 // migrate() is byte-identical.
-const NATIVE_MIGRATE_MODULE_SHA256 = "e8137913aa99efb992988ade6a8a4fed180b1f0750cf1b85d3b831e1f6b95c20";
+// V4 start step Task 53a (2026-11-04): one comment and one export line for the path progress repository (0159). migrate() is byte-identical.
+const NATIVE_MIGRATE_MODULE_SHA256 = "c6acf77300574c43a4d4e0c53633aa6c63350b49d2f56ecf0b6b58ca43504ea3";
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
 // ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK and the rethrow after it, then the one retried
 // SQLSTATE). A6 review (2026-10-22): its doc gained one sentence (a step holds its locks until COMMIT; 2 s bounds each
