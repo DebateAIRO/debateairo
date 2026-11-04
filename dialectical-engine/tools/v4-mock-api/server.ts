@@ -35,7 +35,8 @@ import {
 } from "./rewrite-seed.js";
 import type { WebCase } from "./web-seed.js";
 import { paymentRegionsOf } from "../../packages/kernel/src/payment-regions.js";
-import { BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, priceCurrencyFor } from "../../packages/register/src/billing-plans.js";
+import { BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, priceCurrencyFor, type PlanId } from "../../packages/register/src/billing-plans.js";
+import { quadernoPricingFromKeyFile, type QuadernoPriced } from "./quaderno-tax.js";
 import {
   contributionOf, contributionRewriteOf, PUBLIC_DIG_SUGGESTIONS, PUBLIC_MODES, PUBLIC_REF, PUBLIC_STATES, seedPublicDebates, visibilityOf, writtenReport,
   type PublicMode, type PublicState
@@ -141,6 +142,8 @@ let roomMode: RoomMode = choice("MOCK_ROOM", process.env.MOCK_ROOM, ROOM_MODES, 
 let askMode: AskMode = choice("MOCK_ASK", process.env.MOCK_ASK, ASK_MODES, "AUTO");
 let planMode: PlanMode = choice("MOCK_PLAN", process.env.MOCK_PLAN, PLAN_MODES, "PLUS");
 let usageMode: UsageMode = choice("MOCK_USAGE", process.env.MOCK_USAGE, USAGE_MODES, "NORMAL");
+/** When Settings withdrew the Plus subscription (OUG 34/2014 art. 11^1); null while it is inside its 14 days. */
+let withdrawnAt: number | null = null;
 /** Decision 33: the mock's review of a public debate, in memory. One dig to take out and any first-snapshot text to replace. */
 type MockReview = { hidden: boolean; removed: boolean; corrected: Map<string, string>; log: { revision: number; action: string; piece_kind: null; actor_staff_id: string; at: string }[] };
 const mockReview = new Map<string, MockReview>();
@@ -729,6 +732,25 @@ function roomRead(
   return rooms[mode]();
 }
 
+/** GET /v1/billing/subscription: Plus, subscribed four days ago, inside its 14 days until withdrawn; none on Free. */
+function billingSubscription(now = Date.now()) {
+  if (planMode === "FREE") return { subscription: null };
+  const day = 86_400_000;
+  const started = now - 4 * day;
+  const open = withdrawnAt === null;
+  return {
+    subscription: {
+      plan_id: "PLUS", status: open ? "ACTIVE" : "WITHDRAWN", cancel_requested: false,
+      current_period_end: open ? iso(started + 30 * day) : null, renews_on: open ? iso(started + 30 * day) : null,
+      renewal_total: open ? "24.20" : null, currency: "EUR", scheduled_downgrade_plan_id: null,
+      withdrawal_open_until: open ? iso(started + 14 * day) : null,
+      withdrawal_last_day: open ? iso(started + 13 * day).slice(0, 10) : null,
+      can_upgrade: open, can_change_card: open, can_revoke_cancel: false
+    }
+  };
+}
+
+
 function billingUsage(now = Date.now(), plan_id: PlanMode = planMode, usage: UsageMode = usageMode) {
   const date = new Date(now);
   const daysToMonday = ((8 - date.getUTCDay()) % 7) || 7;
@@ -777,12 +799,18 @@ const MOCK_TAX_RATES: Readonly<Record<string, Readonly<{ name: string; basisPoin
 /** The register's own plans row, for the currency each country pays in (RO: lei; the euro countries: euro; else dollars). */
 const REGISTER_PLANS = billingPlansFromValue(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value, BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.sourceRef);
 
+/** With MOCK_QUADERNO_API_KEY_PATH, every country's tax comes from Quaderno (the sandbox by default); else the table. */
+const QUADERNO = quadernoPricingFromKeyFile({
+  plans: REGISTER_PLANS, keyPath: process.env.MOCK_QUADERNO_API_KEY_PATH, baseUrl: process.env.MOCK_QUADERNO_BASE_URL,
+  log: (line) => process.stderr.write(line)
+});
+
 /**
  * Terms §12, as GET /v1/billing/plans answers: the plans priced for the place asked (?country=, and in the US and
  * Canada ?postal_code=, checked by the kernel's own format as the API does), in that place's currency, each with its
  * total including that place's tax, and no price at all until the place is known.
  */
-function billingPlans(countryParam: string | null, postalParam: string | null) {
+function billingPlans(countryParam: string | null, postalParam: string | null, quaderno?: QuadernoPriced | null) {
   const country = (countryParam ?? "").trim().toUpperCase();
   if (!/^[A-Z]{2}$/u.test(country)) return BILLING_PLANS;
   const currency = priceCurrencyFor(REGISTER_PLANS, country);
@@ -794,6 +822,14 @@ function billingPlans(countryParam: string | null, postalParam: string | null) {
     if (typed === "") return unpriced("POSTAL_CODE_NEEDED");
     if (paymentRegionsOf({ country, postalCode: typed, region: null }).kind === "POSTCODE_INVALID") return unpriced("POSTAL_CODE_INVALID");
     postalCode = country === "US" ? typed.slice(0, 5) : `${typed.slice(0, 3)} ${typed.slice(3)}`;
+  }
+  if (quaderno !== undefined) {
+    // Quaderno's own answer for the place; none yet is no price, as the API's TAX_UNAVAILABLE.
+    if (quaderno === null) return { ...BILLING_PLANS, currency, place: { country, postal_code: postalCode, status: "TAX_UNAVAILABLE" } };
+    return {
+      currency, place: { country, postal_code: postalCode, status: "PRICED" }, tax: quaderno.tax,
+      plans: BILLING_PLANS.plans.map((plan) => ({ ...plan, total_price: quaderno.totals[plan.plan_id as PlanId] }))
+    };
   }
   const rate = country === "US"
     ? (postalCode !== null && /^7[5-9]/u.test(postalCode) ? { name: "Sales tax", basisPoints: 625 } : undefined)
@@ -1013,6 +1049,9 @@ function startupCheck(): number {
     }
   }
   check("GET /v1/billing/plans", C.BillingPlansResponseSchema, BILLING_PLANS);
+  check("GET /v1/billing/subscription", C.BillingSubscriptionResponseSchema, billingSubscription());
+  check("GET /v1/billing/invoices", C.BillingInvoicesResponseSchema, { invoices: [] });
+  check("POST /v1/billing/subscription/withdraw", C.BillingWithdrawResponseSchema, { refund: "18.00", currency: "EUR" });
   for (const [country, postal] of [["DE", null], ["RO", null], ["US", "75201"], ["US", null], ["CA", "D1A 1A1"], ["JP", null]] as const) {
     check(`GET /v1/billing/plans?country=${country}`, C.BillingPlansResponseSchema, billingPlans(country, postal));
   }
@@ -1468,6 +1507,7 @@ function mockState() {
     ask: askMode,
     plan: planMode,
     usage: usageMode,
+    withdrawn_at: withdrawnAt === null ? null : iso(withdrawnAt),
     pause: pauseMode,
     dig: digEndMode,
     live: liveMode,
@@ -1568,6 +1608,8 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
         if (ask !== null) askMode = choice("ask", ask, ASK_MODES, askMode);
         if (plan !== null) planMode = choice("plan", plan, PLAN_MODES, planMode);
         if (usage !== null) usageMode = choice("usage", usage, USAGE_MODES, usageMode);
+        // The withdrawal can be clicked again: subscription=RESET puts the Plus subscription back inside its 14 days.
+        if (url.searchParams.get("subscription") === "RESET") withdrawnAt = null;
         if (publicSetting !== null) publicMode = choice("public", publicSetting, PUBLIC_MODES, publicMode);
         if (publicStateSetting !== null) publicState = choice("publicstate", publicStateSetting, PUBLIC_STATES, publicState);
         const sessionSetting = url.searchParams.get("session");
@@ -1590,7 +1632,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (parts[1] === "sign-out" && isGet) {
       return sendJson(req, res, 200, { signed_in: false }, undefined, { "set-cookie": clearedSessionCookies() });
     }
-    return notFound(req, res, "MOCK_CONTROL_NOT_FOUND", "Known: /__mock/state, /__mock/set?room=&ask=&plan=&usage=&pause=&public=&publicstate=&live=&climb=, /__mock/draft/v1/..., /__mock/sign-in, /__mock/sign-out");
+    return notFound(req, res, "MOCK_CONTROL_NOT_FOUND", "Known: /__mock/state, /__mock/set?room=&ask=&plan=&usage=&pause=&public=&publicstate=&live=&climb=&subscription=RESET, /__mock/draft/v1/..., /__mock/sign-in, /__mock/sign-out");
   }
 
   // ---- the website edge's readiness probe (server.mjs /readyz forwards to <API>/readyz) ----
@@ -1607,6 +1649,11 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   // A stranger has no quota and no account: the room and usage reads and the account reads are signed-in only in the
   // real API (auth "user"), so the ask page shows no "% of your quota used" and no share line to someone signed out.
   if (sessionOut && isGet && (path === "/v1/asks/room" || path === "/v1/billing/usage" || parts[1] === "account")) {
+    return sendJson(req, res, 401, { error: "SESSION_REQUIRED" });
+  }
+  // The same for Settings' subscription and invoice reads and the withdrawal (auth "user" in the real API too): a stranger
+  // has no subscription to read or withdraw.
+  if (sessionOut && (path === "/v1/billing/invoices" || path === "/v1/billing/subscription" || path === "/v1/billing/subscription/withdraw")) {
     return sendJson(req, res, 401, { error: "SESSION_REQUIRED" });
   }
   if (path === "/v1/session" && isGet) return sendJson(req, res, 200, SESSION, C.SessionSchema);
@@ -1732,8 +1779,28 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     return sendDraftable(billingUsage(), C.BillingUsageResponseSchema, stripUsage, issuesOf(usageDraftSchema));
   }
   if (path === "/v1/billing/plans" && isGet) {
-    return sendJson(req, res, 200, billingPlans(url.searchParams.get("country"), url.searchParams.get("postal_code")), C.BillingPlansResponseSchema);
+    const countryParam = url.searchParams.get("country");
+    const postalParam = url.searchParams.get("postal_code");
+    const table = billingPlans(countryParam, postalParam);
+    // With a Quaderno key, a place the table would price is priced by Quaderno instead (MOCK_QUADERNO_API_KEY_PATH).
+    if (QUADERNO === null || table.place.status !== "PRICED") return sendJson(req, res, 200, table, C.BillingPlansResponseSchema);
+    const place = { country: table.place.country!, postalCode: table.place.postal_code };
+    const priced = await QUADERNO(place).catch(() => null);
+    return sendJson(req, res, 200, billingPlans(countryParam, postalParam, priced), C.BillingPlansResponseSchema);
   }
+  if (path === "/v1/billing/subscription" && isGet) return sendJson(req, res, 200, billingSubscription(), C.BillingSubscriptionResponseSchema);
+  if (path === "/v1/billing/invoices" && isGet) return sendJson(req, res, 200, { invoices: [] }, C.BillingInvoicesResponseSchema);
+  if (path === "/v1/billing/subscription/withdraw" && method === "POST") {
+    // As the API (owner ruling 2026-11-04): the signed-in session withdraws with an empty body, no step-up.
+    const body = await readJsonBody(req).catch(() => null);
+    if (body !== null && (typeof body !== "object" || Object.keys(body).length > 0)) {
+      return sendJson(req, res, 400, { error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    }
+    if (planMode === "FREE" || withdrawnAt !== null) return sendJson(req, res, 409, { error: "NOT_SUBSCRIBED", message: "NOT_SUBSCRIBED" });
+    withdrawnAt = Date.now();
+    return sendJson(req, res, 200, { refund: "18.00", currency: "EUR" }, C.BillingWithdrawResponseSchema);
+  }
+
 
   // ---- answers ----
   if (path === "/v1/answers" && isGet) {
@@ -1939,6 +2006,7 @@ server.listen(PORT, HOST, () => {
     room: roomMode,
     ask: askMode,
     plan: planMode,
+    plans_tax: QUADERNO === null ? "TABLE" : "QUADERNO",
     draft_fields_sent: draftServed(C.AnswerSchema, runs.get(RUN_SETTLED)!.answer, stripAnswer),
     seed_runs: {
       settled: RUN_SETTLED, running: RUN_RUNNING, waiting: RUN_WAITING, failed: RUN_FAILED, story_writing: RUN_STORY_WRITING,

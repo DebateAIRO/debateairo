@@ -1,0 +1,35 @@
+# The master-key list (upload check Tasks 7 and 8): the test files that may use the harness superuser, the "master
+# key", inside a request. One entry per line: the file's path from dialectical-engine/, one or more spaces, then a
+# one-line reason. A file belongs here only for a named reason: a product fault, named with its statement and file:line,
+# or a real need of the test itself.
+#
+# What the guard covers (tests/support/master-key-guard.ts): every test file that uses a database. The guard arms where
+# a test database starts (startTestDatabase in tests/support/testDatabase.ts, and startStandingDatabase in
+# acceptance/standing-db.ts), keyed on the test file that started it, and again in apiTestPools. From then on, in login
+# mode (the default), a query on the superuser inside a request fails (R21_SUPERUSER_POOL_IN_REQUEST), unless the file
+# is listed here. A listed file's apiTestPools hands out the superuser pool in every field. DEBATEAI_TEST_API_LOGINS=0
+# turns login mode off for a run (only the files the M-10 test in tests/unit/master-key-files.test.ts names may set it).
+# Seeding, read-backs, migrations and the runner work outside any request and are never refused. The runners that
+# runnerTestPool, runnerPoolOrSuperuser and the preview harness build run on the runner's own login.
+#
+# What stays outside it:
+# - code that starts a database outside a vitest test file: the acceptance and support-eval command-line tools, and
+#   the child processes a test spawns (tools/rls/proof.ts, the practice and upload-check tools, the obs-agent fixtures);
+# - superuser logins other than the harness's own (none found);
+# - the five copy-database runner groups, which stay on the superuser (ruling R26): debate-shape-row-absent,
+#   r2-engine-row-absent, reclaim-resume, and the variant parts of debate-shape-run and parallel-calls-debate. They
+#   are runners, not requests, so the guard does not touch them.
+#
+# Task 8 moved the setups that built API pieces on the superuser by hand onto the product's own logins:
+# tests/support/billingStack.ts (the five billing files), registration-database, sf-s04-ask-gate-database,
+# tests/support/r22-world.ts and acceptance/main.ts. tests/support/staffSecurityJourney.ts's fallback alert readiness on
+# database.pool is not reached in a request today; if it were, the guard would now refuse it.
+tests/integration/rls-boot-attestation.test.ts  a real need of the test: it proves that main.ts's boot checks refuse a superuser login (B1-c, B1-g), and those checks run inside a request scope
+#
+# Task 9 fixed the product faults that kept files here, and took the files off:
+# - tests/integration/s7-authorization-database.test.ts: the gap-investigation request and the memory-link unlink locked
+#   and wrote tables the runtime login may not touch; they now lock through core.lock_owned_live_runs and write through
+#   0155's two definers (packages/serve/src/index.ts, packages/memory/src/index.ts).
+# - tests/integration/r22-public-report.test.ts: a stranger's report on a public debate was sealed under the author's run
+#   on the runtime login, which row security does not let see that run; the seal now runs as cross-account reader X29
+#   (apps/api/src/public-tree.ts, pinned by tests/architecture/rls-cross-account-sites.test.ts).

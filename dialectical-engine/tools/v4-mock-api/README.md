@@ -27,9 +27,10 @@ On 4 Nov 2026 (V4 screen review, dig-f1) the first debate gained its main answer
 | `rewrite-seed.ts` | The new dig model's seeded rewrites, digs and dig trail, and the money rule's paused debate and borrow notice (task W2-7). |
 | `live-seed.ts` | Draft (owner review 3 Nov, dig-d1 B): a running dig's steps and checked findings, for `GET /v1/runs/:id/progress` (switch `live=ON`). |
 | `climb-seed.ts` | Draft (owner review 3 Nov, dig-f2): the played climb of the seeded level-3 dig up to the first debate (switch `climb=PLAY`). |
+| `quaderno-tax.ts` | Prices `GET /v1/billing/plans` through Quaderno itself when `MOCK_QUADERNO_API_KEY_PATH` is set: the API's own tax reader (`DisplayedTaxReader`) over the production Quaderno client. See "Tax from Quaderno" below. |
 | `check.ts` | Self-check. It reads every endpoint through the website's own code: the `/api` proxy, the typed client, and the V4 map builder. |
 
-The unit test `tests/unit/v4-mock-api.test.ts` checks the seed and the draft shapes without starting anything.
+The unit test `tests/unit/v4-mock-api.test.ts` checks the seed and the draft shapes without starting anything. `tests/unit/v4-mock-quaderno.test.ts` checks the Quaderno pricing against the acceptance fake of Quaderno.
 
 ## 1. Start the mock
 
@@ -191,16 +192,40 @@ Set these when starting the mock, or change them live by opening `http://127.0.0
 | `MOCK_DIG` / `dig=` | `SETTLE` (default), `FAIL`, `PAUSE` | How a NEW dig ends (owner review 3 Nov): it finishes; it runs its time and then fails "stopped partway" (its draft view says `quota_used: "SOME"`), so "Try this dig again" and, after a second failure, "This keeps failing" can be seen; or it pauses at the month wall at once (its card reads "Dig · paused until …", and once `pause=CAN_CONTINUE` its panel's Continue lets it finish). |
 | `MOCK_LIVE` / `live=` | `OFF` (default), `ON` | Draft (owner review 3 Nov, dig-d1 B): `ON` serves a running dig's steps and checked findings at `GET /v1/runs/:id/progress` (`live-seed.ts`), so a dig's panel shows "Finding sources › Reading › Checking › Writing what changed" and each finding as it passes; `OFF` answers 404 there, as today's API does, and the panel shows the one calm line. |
 | `MOCK_CLIMB` / `climb=` | `SEED` (default), `PLAY` | Draft (owner review 3 Nov, dig-f2; `climb-seed.ts`): `PLAY` plays, from that moment, the rest of the climb of the seeded level-3 dig `d300…` up to the first debate (each level 10 s: d300's own rewrite, then 8888's path, then 1111's `n-renew`). The first debate's map shows the change without a reload, and stops reading again once it has landed. Setting `PLAY` again plays it again from now. |
+| `subscription=RESET` | | Puts the Plus subscription back inside its 14 days after a withdrawal, so the withdrawal can be clicked again. |
 | `MOCK_REPORT_SECONDS` | default `8` | How long "Write my report" reads as being written. |
 | `MOCK_PORT` | default `4011` | Port (always on 127.0.0.1). |
 | `MOCK_RUN_SECONDS` | default `25` | How long a new debate "runs". |
 | `MOCK_STORY_WRITING_SECONDS` | default `40` | How long run 5555's story says "still writing". |
 | `MOCK_POSTED_STORY_SECONDS` | default `10` | How long a new debate's story says "still writing" after it finishes. |
 | `MOCK_MAIN_ANSWER_SECONDS` | default `45` | How long run 1111's main answer says a change is still being written into it, before version 2 shows. |
+| `MOCK_QUADERNO_API_KEY_PATH` | path | A file holding a Quaderno API key: every country's tax on the pricing page then comes from Quaderno. See "Tax from Quaderno" below. Unset: the mock's own table. |
+| `MOCK_QUADERNO_BASE_URL` | default `https://sandbox-quadernoapp.com/api` | Which Quaderno it asks. |
 | `MOCK_QUIET=1` | | Hides the per-request lines. |
 | `MOCK_ENGINE_DIR` | path | Where `dialectical-engine` is. Not needed when the mock runs from this folder. |
 
 A wrong value stops the start with a clear message, for example `MOCK_ROOM_INVALID: bogus (allowed: FITS, CLOSE, FULL, ALREADY_WAITING, BLOCKED)`.
+
+## Tax from Quaderno
+
+Without a key, the pricing page's tax comes from the mock's own table: each EU country's standard VAT and Texas's sales tax, and "No tax added" everywhere else. With a Quaderno key, every country the page asks for is priced by Quaderno itself, exactly as the real API does it: the API's own tax reader (`apps/api/src/billing/displayed-tax.ts`) over the production Quaderno client (`packages/tax-quaderno`), once per paid plan, in that country's currency, with the postal code in the US and Canada. An answer is kept for six hours; a place Quaderno cannot price shows no price ("The plans can't be shown right now") and is asked again after a minute.
+
+1. In your Quaderno **sandbox** account, copy the private API key (Settings, API keys).
+2. Put it in a file of its own, kept as the API keeps its keys (one line, the file `0600`, its folder `0700`, both yours):
+
+   ```sh
+   mkdir -m 700 ~/.quaderno-sandbox && (umask 077 && pbpaste > ~/.quaderno-sandbox/api-key)
+   ```
+
+3. Start the mock with it:
+
+   ```sh
+   cd dialectical-engine && MOCK_QUADERNO_API_KEY_PATH=~/.quaderno-sandbox/api-key node_modules/.bin/tsx tools/v4-mock-api/server.ts
+   ```
+
+   The ready line then says `"plans_tax":"QUADERNO"` (else `"TABLE"`). A key file it cannot read stops the start with `MOCK_QUADERNO_API_KEY_PATH_INVALID`.
+
+Quaderno adds a country's tax only where the account has a tax registration there (Settings, Tax jurisdictions); everywhere else it answers "not registered" and the card says "No tax added". So the page shows what that account would charge, not every country's rate. A failed answer is logged on the mock's error output as `billing.plans.tax_unavailable` with Quaderno's code.
 
 ## Endpoints it serves
 
@@ -215,7 +240,9 @@ A wrong value stops the start with a clear message, for example `MOCK_ROOM_INVAL
 | `GET /v1/asks/room?…` | The plan (`PLUS` or `FREE`), settings version 20, answer length offered, word targets 300/700/1500. The debate-shape switch is left out (the contract allows only "on" or absent). The query is checked like the real API checks it. Draft: `reserve`, `dig_share_percent`. |
 | `POST /v1/asks` | See above. |
 | `GET /v1/billing/usage` | Day 14%, week 31%, month 9%; with `usage=BORROWED`, day 104% with a borrow notice. |
-| `GET /v1/billing/plans` | The register's default plans (Free, Plus $20, Pro $50, Max $200). With no `?country=` there is no place yet, so no paid price is shown (the page asks for the country). With `?country=` the plans come in that country's currency (lei in Romania, euro in the euro countries, dollars elsewhere, as the register says) and each total includes its tax: each EU country's standard VAT (21% in Romania, 19% in Germany, 21% in the Czech Republic, 25% in Croatia, and so on), none added outside the EU. The US and Canada also need `?postal_code=` (a Texas ZIP such as 75201 adds 6.25%); a missing one, or one that does not fit the country's format (the kernel's own check), is asked for again. |
+| `GET /v1/billing/plans` | The register's default plans (Free, Plus $20, Pro $50, Max $200). With no `?country=` there is no place yet, so no paid price is shown (the page asks for the country). With `?country=` the plans come in that country's currency (lei in Romania, euro in the euro countries, dollars elsewhere, as the register says) and each total includes its tax: each EU country's standard VAT (21% in Romania, 19% in Germany, 21% in the Czech Republic, 25% in Croatia, and so on), none added outside the EU (with `MOCK_QUADERNO_API_KEY_PATH`, whatever Quaderno answers instead). The US and Canada also need `?postal_code=` (a Texas ZIP such as 75201 adds 6.25%); a missing one, or one that does not fit the country's format (the kernel's own check), is asked for again. |
+| `GET /v1/billing/subscription`, `GET /v1/billing/invoices` | Plus in euro, subscribed four days ago, inside its 14-day withdrawal window (none on `plan=FREE`); no invoices. After a withdrawal it reads WITHDRAWN. |
+| `POST /v1/billing/subscription/withdraw` | The signed-in session withdraws with an empty body, no step-up (OUG 34/2014 art. 11^1, owner ruling 2026-11-04): a €18.00 refund, once; again, 409 `NOT_SUBSCRIBED`. A body with anything in it gets 400 `MALFORMED_REQUEST`. |
 | `GET /v1/answers?limit=&offset=` | Finished debates, plus the open runs (running, waiting, failed). Draft: the shelf's row parts (see "Draft fields"). |
 | `GET /v1/answers/:id[?version=1]` | The answer (version 1 only). Draft: sources and path research. |
 | `GET /v1/answers/:id/story` | WRITING or READY, as described above. |
@@ -256,14 +283,14 @@ Made-up debates from `public-seed.ts`, read at `GET /v1/public/debates/:id`. The
 - **Refusals**: `/__mock/set?public=ONGOING` (a report waits), `public=REPORT_WRITING` and `public=TOO_DEEP` (a dig is refused), `public=OPEN` (back to normal), `room=FULL` (a used-up limit), more than three views with `plan=FREE`.
 - **A report that never arrives** (public-f9): `/__mock/set?public=REPORT_STUCK`, then "Write a report": the press is accepted, the "Being written" card stays, its checks slow down and pause in a hidden tab, and after 10 minutes it says it is taking longer than usual, with "Check again". A report that could not be written cannot be shown yet: the public debate's contract is strict and has no field for it (server need, `report_writing`).
 - **The answer-first page** (public-d1): the first debate's tree is published, so each path shows its trust word and bar, a row unfolds its findings (one with a checked page and its source), "For" and "Against" show the strongest point on each side, the still-argued point is the star, and "Explore the map" opens the own map read-only.
-- **A stranger**: `/__mock/set?session=OUT` shows a sign-in link in place of each press; `session=IN` to go back. The V4 pages then send you to sign in, as they do for a stranger, with the way back to the same page (`/login?next=…`). The room read, the usage read and the account reads are refused (401) as the real API refuses them, so the ask page shows a stranger no quota share and no "% of your quota used".
+- **A stranger**: `/__mock/set?session=OUT` shows a sign-in link in place of each press; `session=IN` to go back. The V4 pages then send you to sign in, as they do for a stranger, with the way back to the same page (`/login?next=…`). The room read, the usage read, the account reads, the subscription and invoice reads and the withdrawal are refused (401) as the real API refuses them, so the ask page shows a stranger no quota share and no "% of your quota used".
 - **A sign-in that ended during a wait** (wait-f1): open a debate that is still running while signed in, then `/__mock/set?session=OUT`. Its reads are now refused (401), and the waiting card says "Please sign in again to see your question." with a Sign in button that comes back to the same question.
 
 **The Free notice**: `/__mock/set?plan=FREE`, then open `/v4` or `/new`: the notice shows before each Start press, and an ask that showed it sends `free_public_notice` (`/__mock/state` counts them as `free_notices`). Any paid plan shows no notice.
 
 ## Not mocked (the website may call these)
 
-- **Billing pages**: subscription, invoices, charge status, card details and card change, checkout, quote, upgrade, downgrade, cancel, withdraw (`/settings`, `/pricing` buying, `/checkout`, `/settings/card`, `/cancel`, `/withdraw`).
+- **Billing pages**: charge status, card details and card change, checkout, quote, upgrade, downgrade, cancel (`/pricing` buying, `/checkout`, `/settings/card`, `/cancel`). The subscription, invoices and the withdrawal in Settings are mocked.
 - **Account and security settings**: sessions list, sign-in methods, social links, email change, recovery email, phone, data export, account erasure (`/settings`, `/settings/security`, `/export`).
 - **Signing in and up for real**: login, register, password reset, MFA, social sign-in, age check (`/login`, `/sign-up`, `/recover`, …). The mock just says "signed in"; use `/api/__mock/sign-in` for the cookie.
 - **Publishing**: publish, the list of public debates, deleting a private debate. The public debate page itself is mocked (see "Public debates").

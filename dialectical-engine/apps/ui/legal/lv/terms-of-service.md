@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Īsumā
-eyebrow: PAKALPOJUMA NOTEIKUMI · v2.14 · SPĒKĀ NO 2026. GADA 1. NOVEMBRA
+eyebrow: PAKALPOJUMA NOTEIKUMI · v2.15 · SPĒKĀ NO 2026. GADA 1. NOVEMBRA
 title: Kam jūs piekrītat
 lede: Līgums starp jums un DMS Merchandise Shop S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.
-endMarker: NOTEIKUMU BEIGAS · v2.14
+endMarker: NOTEIKUMU BEIGAS · v2.15
 bodyLabel: Pakalpojuma noteikumu teksts
 annexTitle: A pielikums — Reģionālie noteikumi
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PIEMĒROJAMIE TIESĪBU AKTI
 -->
 
-**Version 2.14 · Effective 2026. gada 1. novembris · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
+**Version 2.15 · Effective 2026. gada 1. novembris · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
 
 **In short.** Jums jābūt vismaz 18 gadus vecam. Dialectical Engine veido argumentus ar MI modeļiem, un viss, ko tas ģenerē, var būt nepareizs — tā nav konsultācija. Bezmaksas plānā jūsu debates kļūst publiskas, kad tās ir pabeigtas, pēc MI pārbaudes; maksas plānā tās ir privātas, ja vien tās nepublicējat. Kad debates ir publiskas, ikviens tās var lasīt, un tās paliek publiskas. Jūsu iesniegtais teksts tiek nosūtīts mūsu Pakalpojumu sniedzēju reģistrā norādītajiem MI pakalpojumu sniedzējiem un netiek izmantots modeļu apmācīšanai. Par nelikumīgu saturu ziņojiet uz support@dezbatere.ro neatkarīgi no tā, vai jums ir konts. Piemēro Rumānijas tiesību aktus, taču jums joprojām ir vietējā patērētāju aizsardzība.
 
@@ -225,7 +225,7 @@ Dialectical Engine piedāvā bezmaksas plānu. Būs pieejams maksas **Premium** 
 
 **Neizdevušies maksājumi.** Ja maksājums neizdodas, mēs atkārtojam mēģinājumus 7 dienas un pirms jūsu konta pazemināšanas uz bezmaksas plānu brīdinām jūs pa e-pastu. Mēs nedzēšam jūsu debates neizdevušās apmaksas dēļ.
 
-**Nodokļi un maksājuma saņēmējs.** Cenās ir iekļauts PVN, GST vai tirdzniecības nodoklis atkarībā no jūsu dzīvesvietas, un tas tiek parādīts pirms maksājuma veikšanas. Pārdevējs ir DMS Merchandise Shop S.R.L., kas izsniedz jūsu rēķinu un paliek atbildīgs par pašu pakalpojumu un šiem Noteikumiem.
+**Nodokļi un maksājuma saņēmējs.** Mūsu cenas tiek parādītas bez nodokļiem, kā cena + PVN (vai GST vai tirdzniecības nodoklis atkarībā no jūsu dzīvesvietas). Jūsu norēķinu adresei piemērojamais nodoklis tiek pievienots norēķinu laikā, un pirms maksājuma veikšanas norēķinu lapā tiek parādīta jūsu maksājamā kopsumma, ieskaitot nodokļus. Pārdevējs ir DMS Merchandise Shop S.R.L., kas izsniedz jūsu rēķinu un paliek atbildīgs par pašu pakalpojumu un šiem Noteikumiem.
 
 **Maksājumu veidi.** Jūs maksājat ar karti. Mēs pieņemam Visa un Mastercard kartes; American Express kartes mēs nepieņemam. Kartes maksājumus apstrādā NETOPIA Payments (netopia-payments.com), un pilns jūsu kartes numurs nekad nenonāk pie mums.
 
@@ -250,6 +250,8 @@ Ja dzīvojat citviet, A pielikumā norādītas jūsu reģionā piemērojamās at
 Mēs pastāvīgā informācijas nesējā iepriekš paziņojam, kas un kad mainīsies. Ja izmaiņas vairāk nekā nebūtiski nelabvēlīgi ietekmē jūsu piekļuvi pakalpojumam vai tā lietošanu, varat bez maksas izbeigt līgumu **30 dienu laikā** pēc paziņojuma saņemšanas vai izmaiņu stāšanās spēkā atkarībā no tā, kurš datums ir vēlāks, un mēs atmaksājam iepriekš samaksāto summu par neizmantoto periodu.
 
 **Šo Noteikumu izmaiņas.** Mēs varam mainīt šos Noteikumus tādu pašu iemeslu dēļ. Attiecībā uz izmaiņām, kas nesamazina jūsu tiesības, mēs publicējam jauno versiju kopā ar izmaiņu kopsavilkumu un vismaz **30 dienu iepriekš** nosūtām jums e-pasta ziņojumu par tās stāšanos spēkā; turpinot lietot Dialectical Engine pēc šī datuma, jūs izmaiņām piekrītat, un pirms tam varat slēgt kontu. Attiecībā uz izmaiņām, kas samazina jūsu tiesības, — tostarp esoša plāna cenas paaugstinājumu, zemākiem ierobežojumiem, noņemtām funkcijām, jauniem jūsu satura lietošanas veidiem vai izmaiņām atbildībā, piemērojamajos tiesību aktos vai strīdu izšķiršanā — mēs lūdzam nākamajā pierakstīšanās reizē skaidri piekrist jaunajai versijai, un izmaiņas attiecas tikai uz turpmāko laiku. Mēs nekad neveicam izmaiņas ar atpakaļejošu spēku un nekad neizmantojam šo sadaļu, lai termiņa vidū mainītu jums apmaksātā pakalpojuma būtību, nepiedāvājot iespēju izstāties. Iepriekšējās versijas ir pieejamas vietnē dezbatere.ro/terms/versions.
+
+Versija 2.15 aizstāja versiju 2.14: 12. sadaļā teikts, ka mūsu cenas tiek parādītas bez nodokļiem, kā cena + PVN, un ka nodoklis tiek pievienots norēķinu laikā.
 
 Versija 2.14 aizstāja versiju 2.13: 18. sadaļā un A pielikumā kā alternatīvas strīdu izšķiršanas ceļš norādīta ANPC (SAL).
 

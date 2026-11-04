@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In het kort
-eyebrow: SERVICEVOORWAARDEN · v2.14 · VAN KRACHT OP 1 NOVEMBER 2026
+eyebrow: SERVICEVOORWAARDEN · v2.15 · VAN KRACHT OP 1 NOVEMBER 2026
 title: Waarmee u instemt
 lede: De overeenkomst tussen u en DMS Merchandise Shop S.R.L., in begrijpelijke taal. Negentien hoofdstukken en Bijlage A — scrol tot het einde.
-endMarker: EINDE VAN DE VOORWAARDEN · v2.14
+endMarker: EINDE VAN DE VOORWAARDEN · v2.15
 bodyLabel: Tekst van de Servicevoorwaarden
 annexTitle: Bijlage A — Regionale voorwaarden
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TOEPASSELIJK RECHT
 -->
 
-**Version 2.14 · Effective 1 november 2026 · Eerdere versies op dezbatere.ro/terms/versions · Taal: Nederlands.**
+**Version 2.15 · Effective 1 november 2026 · Eerdere versies op dezbatere.ro/terms/versions · Taal: Nederlands.**
 
 **In short.** U moet 18 jaar of ouder zijn. Dialectical Engine stelt met AI-modellen argumenten op en alles wat het genereert kan onjuist zijn — het is geen advies. Op het gratis abonnement worden uw debatten openbaar wanneer ze zijn afgerond, na een AI-controle; op een betaald abonnement zijn ze privé, tenzij u ze publiceert. Eenmaal openbaar kan iedereen een debat lezen, en het blijft openbaar. Tekst die u indient, wordt verzonden naar de AI-aanbieders in ons Register van aanbieders en wordt niet gebruikt om modellen te trainen. Meld illegale inhoud via support@dezbatere.ro, ongeacht of u een account hebt. Het Roemeense recht is van toepassing, maar uw lokale consumentenbescherming blijft voor u gelden.
 
@@ -225,7 +225,7 @@ Dialectical Engine biedt een gratis abonnement. Een betaald **Premium**-abonneme
 
 **Mislukte betalingen.** Als een betaling mislukt, proberen wij deze gedurende 7 dagen opnieuw uit te voeren en waarschuwen wij u per e-mail voordat wij uw account naar het gratis abonnement terugzetten. Wij verwijderen uw debatten niet omdat een betaling is mislukt.
 
-**Belastingen en aan wie u betaalt.** Prijzen zijn inclusief BTW, GST of omzetbelasting, afhankelijk van waar u woont; dit wordt getoond voordat u betaalt. De verkoper is DMS Merchandise Shop S.R.L., die uw factuur uitreikt en verantwoordelijk blijft voor de dienst zelf en voor deze Voorwaarden.
+**Belastingen en aan wie u betaalt.** Onze prijzen worden getoond zonder belasting, als prijs + btw (of GST of omzetbelasting, afhankelijk van waar u woont). De belasting voor uw factuuradres wordt bij het afrekenen toegevoegd, en de afrekenpagina toont het totaal dat u betaalt, inclusief belasting, voordat u betaalt. De verkoper is DMS Merchandise Shop S.R.L., die uw factuur uitreikt en verantwoordelijk blijft voor de dienst zelf en voor deze Voorwaarden.
 
 **Betaalmethoden.** U betaalt met een kaart. Wij accepteren Visa en Mastercard; American Express accepteren wij niet. Kaartbetalingen worden verwerkt door NETOPIA Payments (netopia-payments.com), en uw volledige kaartnummer bereikt ons nooit.
 
@@ -250,6 +250,8 @@ Als u elders woont, vermeldt Bijlage A welk herroepingsrecht of welke bedenktijd
 Wij vertellen u vooraf, op een duurzame gegevensdrager, wat er verandert en wanneer. Als de wijziging meer dan een gering negatief effect heeft op uw toegang tot of gebruik van de dienst, kunt u binnen **30 dagen** nadat u hierover bent geïnformeerd of nadat de wijziging van kracht wordt, afhankelijk van welk moment later valt, de overeenkomst kosteloos beëindigen en betalen wij elk voorafbetaald bedrag voor de ongebruikte periode terug.
 
 **In deze Voorwaarden.** Wij kunnen deze Voorwaarden om dezelfde soorten redenen wijzigen. Voor wijzigingen die uw rechten niet verminderen, publiceren wij de nieuwe versie met een samenvatting van wat is gewijzigd en sturen wij u ten minste **30 dagen** vóór de ingangsdatum een e-mail; als u Dialectical Engine na die datum blijft gebruiken, betekent dit dat u de wijziging aanvaardt, en u kunt uw account voordien sluiten. Voor wijzigingen die uw rechten verminderen — waaronder prijsverhogingen voor een bestaand abonnement, lagere limieten, verwijderde functies, nieuw gebruik van uw inhoud of wijzigingen in aansprakelijkheid, toepasselijk recht of geschillenbeslechting — vragen wij u bij uw volgende aanmelding uitdrukkelijk de nieuwe versie te aanvaarden en geldt de wijziging uitsluitend voor de toekomst. Wij maken een wijziging nooit met terugwerkende kracht en gebruiken dit hoofdstuk nooit om de kern van hetgeen waarvoor u hebt betaald tijdens de looptijd te wijzigen zonder u een uitweg te bieden. Eerdere versies blijven beschikbaar op dezbatere.ro/terms/versions.
+
+Versie 2.15 verving versie 2.14: hoofdstuk 12 zegt dat onze prijzen worden getoond zonder belasting, als prijs + btw, en dat de belasting bij het afrekenen wordt toegevoegd.
 
 Versie 2.14 verving versie 2.13: hoofdstuk 18 en bijlage A noemen ANPC (SAL) als de weg voor alternatieve geschillenbeslechting.
 

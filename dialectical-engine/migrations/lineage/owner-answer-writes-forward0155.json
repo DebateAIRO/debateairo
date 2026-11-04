@@ -1,0 +1,18 @@
+{
+  "version": "owner-answer-writes-forward0155-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0154_region_iceland_liechtenstein.sql",
+    "manifestSha256": "20d6fa209223ce805fe73fe30079a7647093f36908e0ee09b5f308bb6a7c3def",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0155_owner_answer_writes.sql",
+    "sha256": "e17ed7c55679ea7f2b0bafb9ddb7169091047372999f0d419f28588fba996615"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "amendsPostconditionsOf": []
+}

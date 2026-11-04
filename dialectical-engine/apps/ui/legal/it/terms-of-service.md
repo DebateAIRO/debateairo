@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In breve
-eyebrow: CONDIZIONI DI SERVIZIO · v2.14 · IN VIGORE DAL 1 NOVEMBRE 2026
+eyebrow: CONDIZIONI DI SERVIZIO · v2.15 · IN VIGORE DAL 1 NOVEMBRE 2026
 title: Ciò che accetti
 lede: Il contratto tra te e DMS Merchandise Shop S.R.L., in un linguaggio chiaro. Diciannove sezioni e Allegato A — scorri fino alla fine.
-endMarker: FINE DELLE CONDIZIONI · v2.14
+endMarker: FINE DELLE CONDIZIONI · v2.15
 bodyLabel: Testo delle Condizioni di servizio
 annexTitle: Allegato A — Condizioni regionali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEGGE APPLICABILE
 -->
 
-**Version 2.14 · Effective 1 novembre 2026 · Versioni precedenti su dezbatere.ro/terms/versions · Lingua: italiano.**
+**Version 2.15 · Effective 1 novembre 2026 · Versioni precedenti su dezbatere.ro/terms/versions · Lingua: italiano.**
 
 **In short.** Devi avere almeno 18 anni. Dialectical Engine costruisce argomentazioni con modelli di IA e tutto ciò che genera può essere errato — non costituisce consulenza. Nel piano gratuito i tuoi dibattiti sono pubblici una volta conclusi, dopo la verifica dell’IA; nel piano a pagamento sono privati, salvo che tu non li pubblichi. Una volta pubblico, chiunque può leggere un dibattito, e questo resta pubblico. Il testo che invii viene trasmesso ai fornitori di IA elencati nel nostro Registro dei fornitori e non viene utilizzato per addestrare i modelli. Segnala i contenuti illegali a support@dezbatere.ro, indipendentemente dal fatto che tu abbia un account. Si applica la legge rumena, ma le tutele locali dei consumatori restano impregiudicate.
 
@@ -225,7 +225,7 @@ Dialectical Engine offre un piano gratuito. Sarà disponibile un piano **Premium
 
 **Pagamenti non riusciti.** Se un pagamento non va a buon fine, riproviamo per 7 giorni e ti avvertiamo tramite email prima di riportare il tuo account al piano gratuito. Non cancelliamo i tuoi dibattiti a causa di un pagamento non riuscito.
 
-**Imposte e soggetto a cui effettui il pagamento.** I prezzi includono IVA, GST o imposta sulle vendite, a seconda del luogo in cui vivi, e ciò viene indicato prima del pagamento. Il venditore è DMS Merchandise Shop S.R.L., che emette la tua fattura e resta responsabile del servizio stesso e delle presenti Condizioni.
+**Imposte e soggetto a cui effettui il pagamento.** I nostri prezzi sono indicati al netto delle imposte, come prezzo + IVA (o GST o imposta sulle vendite, a seconda del luogo in cui vivi). L'imposta per il tuo indirizzo di fatturazione viene aggiunta al momento del pagamento, e la pagina di pagamento ti mostra il totale da pagare, imposte incluse, prima che tu paghi. Il venditore è DMS Merchandise Shop S.R.L., che emette la tua fattura e resta responsabile del servizio stesso e delle presenti Condizioni.
 
 **Metodi di pagamento.** Paghi con carta. Accettiamo Visa e Mastercard; non accettiamo American Express. I pagamenti con carta sono elaborati da NETOPIA Payments (netopia-payments.com) e il numero completo della tua carta non arriva mai a noi.
 
@@ -250,6 +250,8 @@ Se vivi altrove, l'Allegato A indica il diritto di recesso o il periodo di ripen
 Ti comunichiamo anticipatamente, su un supporto durevole, cosa cambia e quando. Se la modifica produce un effetto negativo più che minimo sul tuo accesso al servizio o sul suo utilizzo, puoi recedere gratuitamente entro **30 giorni** dalla comunicazione o dall'entrata in vigore della modifica, se successiva, e rimborsiamo qualsiasi importo prepagato per il periodo non utilizzato.
 
 **Alle presenti Condizioni.** Possiamo modificare le presenti Condizioni per le medesime categorie di motivi. In caso di modifiche che non riducono i tuoi diritti, pubblichiamo la nuova versione con una sintesi delle modifiche e ti inviamo un'email almeno **30 giorni** prima della sua entrata in vigore; continuando a utilizzare Dialectical Engine dopo tale data accetti la modifica e puoi chiudere il tuo account prima di allora. In caso di modifiche che riducono i tuoi diritti — compresi aumenti di prezzo di un piano esistente, limiti inferiori, funzionalità eliminate, nuovi utilizzi dei tuoi contenuti o modifiche alla responsabilità, alla legge applicabile o alla risoluzione delle controversie — ti chiediamo di accettare espressamente la nuova versione al tuo accesso successivo e la modifica si applica soltanto per il futuro. Non apportiamo mai una modifica retroattiva e non utilizziamo mai la presente sezione per modificare, durante il relativo periodo, il nucleo di ciò per cui hai pagato senza offrirti una via d'uscita. Le versioni precedenti restano disponibili all'indirizzo dezbatere.ro/terms/versions.
+
+La versione 2.15 ha sostituito la versione 2.14: la sezione 12 afferma che i nostri prezzi sono indicati al netto delle imposte, come prezzo + IVA, e che l'imposta viene aggiunta al momento del pagamento.
 
 La versione 2.14 ha sostituito la versione 2.13: la sezione 18 e l'Allegato A indicano ANPC (SAL) come via per la risoluzione alternativa delle controversie.
 

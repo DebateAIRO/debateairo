@@ -524,8 +524,8 @@ export interface ContractClient {
     planId: "PRO" | "MAX", quoteRef: string,
     agreement: Readonly<{ locale: string; renewal_terms: Readonly<{ version: string; sha256: string }> }>
   ): Promise<BillingUpgradeResponse | BillingUpgradePendingResponse>;
-  /** P12d: withdraw within the 14 days with a WITHDRAW_SUBSCRIPTION step-up grant; `refund` null = the owner settles it. */
-  withdrawSubscription(stepUpGrant: string): Promise<BillingWithdrawResponse>;
+  /** P12d: withdraw within the 14 days, as the signed-in session (no step-up); `refund` null = the owner settles it. */
+  withdrawSubscription(): Promise<BillingWithdrawResponse>;
   /** N13 (spec §2.11): the stored billing details the card page pre-fills (country and region read-only). */
   getBillingCardDetails(): Promise<BillingCardDetailsResponse>;
   /** N13: NETOPIA's 0 check for the corrected details and the agreement; the browser goes to `redirect_url`. */
@@ -968,9 +968,9 @@ export function createContractClient(
         return pending.success ? Object.freeze({ state: "PENDING" as const, charge_ref: pending.data.charge_ref }) : null;
       }
     ),
-    withdrawSubscription: (stepUpGrant: string) => request(
+    withdrawSubscription: () => request(
       "/v1/billing/subscription/withdraw", BillingWithdrawResponseSchema,
-      { method: "POST", body: JSON.stringify({ step_up_grant: stepUpGrant }) }
+      { method: "POST", body: JSON.stringify({}) }
     ),
     getBillingCardDetails: () => request("/v1/billing/subscription/card", BillingCardDetailsResponseSchema),
     startCardChange: (input: BillingCardChangeRequest) => request(

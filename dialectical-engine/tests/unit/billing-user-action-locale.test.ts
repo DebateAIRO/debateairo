@@ -324,7 +324,7 @@ describe("S01-C13 the subscriber's routes read the dropdown cookie (R-09, R-06)"
     const response = await api.inject({
       method: "POST", url: "/v1/billing/subscription/withdraw",
       headers: { ...SESSION_HEADER, cookie: "debateai.locale=ja" },
-      payload: { step_up_grant: "A".repeat(43) }
+      payload: {}
     });
     expect(response.statusCode).toBe(200);
     expect(jobs.find((job) => job.payload.template === "M8")?.payload.locale).toBe("ja");

@@ -140,6 +140,8 @@ try {
   // A stranger has no quota: the room and usage reads are signed-in only, as in the real API.
   await expectCode("the room read of a stranger", () => client.getAskRoom({ plan_tier: "premium", composition_budget_tier: "medium", depth: 2, answer_length: "standard" }), "SESSION_REQUIRED");
   await expectCode("the usage read of a stranger", () => client.getBillingUsage(), "SESSION_REQUIRED");
+  await expectCode("the subscription read of a stranger", () => client.getBillingSubscription(), "SESSION_REQUIRED");
+  await expectCode("the withdrawal of a stranger", () => client.withdrawSubscription(), "SESSION_REQUIRED");
 } finally {
   await fetch(`${MOCK}/__mock/set?session=IN`);
 }

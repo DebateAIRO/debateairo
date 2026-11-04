@@ -39,11 +39,6 @@ const PLANS = {
   ]
 };
 
-/** GET /v1/account/auth-methods: the withdrawal button needs the password and authenticator pair ("password_totp"). */
-function authMethods(available: ReadonlyArray<"passkey" | "password_totp" | "provider">) {
-  return { methods: [], recovery_codes_remaining: 10, available_step_up_methods: [...available], step_up_providers: [] };
-}
-
 let container: HTMLDivElement;
 let root: Root;
 let client: { [K in keyof SubscriptionClient]: ReturnType<typeof vi.fn> };
@@ -58,9 +53,8 @@ beforeEach(() => {
     getBillingInvoices: vi.fn(async () => INVOICES),
     quoteSubscriptionUpgrade: vi.fn(), upgradeSubscription: vi.fn(), downgradeSubscription: vi.fn(async () => undefined),
     cancelSubscription: vi.fn(async () => undefined), revokeSubscriptionCancel: vi.fn(async () => undefined),
-    withdrawSubscription: vi.fn(), stepUp: vi.fn(), getBillingCharge: vi.fn(),
-    getBillingPlans: vi.fn(async () => PLANS),
-    authMethods: vi.fn(async () => authMethods(["password_totp"]))
+    withdrawSubscription: vi.fn(), getBillingCharge: vi.fn(),
+    getBillingPlans: vi.fn(async () => PLANS)
   };
 });
 afterEach(() => {
@@ -93,14 +87,6 @@ async function upgradeAndPay(): Promise<void> {
   await act(async () => { upgradeButton()!.click(); });
   await settle();
 }
-async function fill(selector: string, value: string): Promise<void> {
-  const input = container.querySelector<HTMLInputElement>(selector)!;
-  await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, value);
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-}
-
 describe("P20 SubscriptionControls (S1)", () => {
   it("renders nothing while it asks, and nothing at all when billing is off, after ONE request", async () => {
     client.getBillingSubscription.mockReturnValue(new Promise(() => undefined));
@@ -150,30 +136,31 @@ describe("P20 SubscriptionControls (S1)", () => {
     expect(client.revokeSubscriptionCancel).toHaveBeenCalledTimes(1);
   });
 
-  it("withdraws through a fresh step-up, like account deletion", async () => {
-    client.stepUp.mockResolvedValue({
-      status: "step_up_complete", csrf_token: "c".repeat(43),
-      step_up_grant: { token: "G".repeat(43), action: "WITHDRAW_SUBSCRIPTION", expires_at: "2026-10-03T12:05:00.000Z" }
-    });
+  it("withdraws with the button and its confirmation alone: no password, no code, no step-up (OUG 34/2014 art. 11^1)", async () => {
     client.withdrawSubscription.mockResolvedValue({ refund: "18.00", currency: "USD" });
     await render();
     await click("Withdraw from contract here");
     expect(text()).toContain("You can withdraw until October 13, 2026.");
-    await fill("#billing-withdraw-password", "correct horse");
-    await fill("#billing-withdraw-code", "123456");
+    // Recital 37: a person already signed in is not asked to identify again.
+    expect(container.querySelector('input[type="password"]')).toBeNull();
+    expect(container.querySelector('input[autocomplete="one-time-code"]')).toBeNull();
+    expect(text()).not.toContain("password");
     await click("Confirm withdrawal");
-    expect(client.stepUp).toHaveBeenCalledWith("correct horse", "123456", { action: "WITHDRAW_SUBSCRIPTION" });
-    expect(client.withdrawSubscription).toHaveBeenCalledWith("G".repeat(43));
+    expect(client.withdrawSubscription).toHaveBeenCalledTimes(1);
+    expect(client.withdrawSubscription).toHaveBeenCalledWith();
     // W9 (P2-I11): only what has happened; the refund is on its way, and M8 says when it is done.
     expect(text()).toContain("We've received your withdrawal. We're refunding $18.00 to your card and will email you when it's done.");
     expect(text()).not.toContain("We refunded");
   });
 
+  it("sends nothing until the confirmation is pressed", async () => {
+    await render();
+    await click("Withdraw from contract here");
+    expect(client.withdrawSubscription).not.toHaveBeenCalled();
+    expect(button("Confirm withdrawal")).toBeDefined();
+  });
+
   it("words P12d's two other withdrawal answers: nothing due back, and a refund the owner settles (refund: null)", async () => {
-    client.stepUp.mockResolvedValue({
-      status: "step_up_complete", csrf_token: "c".repeat(43),
-      step_up_grant: { token: "G".repeat(43), action: "WITHDRAW_SUBSCRIPTION", expires_at: "2026-10-03T12:05:00.000Z" }
-    });
     for (const [refund, sentence] of [
       ["0.00", "Done. Your plan has ended. The part you already used covers the whole price, so nothing was due back."],
       [null, "Your plan has ended. A refund was already made on one of your payments, so we'll check what is still due and email you within 14 days."]
@@ -183,8 +170,6 @@ describe("P20 SubscriptionControls (S1)", () => {
       client.withdrawSubscription.mockResolvedValueOnce({ refund, currency: "USD" });
       await render();
       await click("Withdraw from contract here");
-      await fill("#billing-withdraw-password", "correct horse");
-      await fill("#billing-withdraw-code", "123456");
       await click("Confirm withdrawal");
       expect(text(), String(refund)).toContain(sentence);
       expect(text(), String(refund)).not.toContain("$0.00");
@@ -192,57 +177,12 @@ describe("P20 SubscriptionControls (S1)", () => {
     }
   });
 
-  it("refuses to withdraw without the right grant, and hides Withdraw once the window closed", async () => {
-    client.stepUp.mockResolvedValue({ status: "step_up_complete", csrf_token: "c".repeat(43) });
-    await render();
-    await click("Withdraw from contract here");
-    await fill("#billing-withdraw-password", "x");
-    await fill("#billing-withdraw-code", "123456");
-    await click("Confirm withdrawal");
-    expect(client.withdrawSubscription).not.toHaveBeenCalled();
-    expect(text()).toContain("The withdrawal couldn't be completed.");
-    act(() => root.unmount());
-    root = createRoot(container);
+  it("hides the withdrawal button once the window closed", async () => {
     client.getBillingSubscription.mockResolvedValue({
       subscription: subscription({ withdrawal_open_until: "2026-10-01T00:00:00.000Z", withdrawal_last_day: "2026-09-30" })
     });
     await render();
     expect(button("Withdraw from contract here")).toBeUndefined();
-  });
-
-  it("words the button and its confirmation as Romania's withdrawal rules require, and asks for the password and code", async () => {
-    await render();
-    await click("Withdraw from contract here");
-    expect(text()).toContain("To withdraw, enter your password and the code from your authenticator app.");
-    expect(container.querySelector<HTMLInputElement>("#billing-withdraw-password")?.required).toBe(true);
-    expect(container.querySelector<HTMLInputElement>("#billing-withdraw-code")?.required).toBe(true);
-    expect(button("Confirm withdrawal")).toBeDefined();
-  });
-
-  it("gives an account created through social sign-in no withdrawal button, only the email route", async () => {
-    client.authMethods.mockResolvedValue(authMethods(["passkey", "provider"]));
-    await render();
-    expect(button("Withdraw from contract here")).toBeUndefined();
-    expect(container.querySelector("#billing-withdraw-password")).toBeNull();
-    const note = container.querySelector("[data-withdraw-social-only]");
-    expect(note?.textContent).toContain("Accounts created with Google, Apple, Facebook or X can't withdraw here");
-    expect(note?.textContent).toMatch(/to \S+@\S+\. We carry it out/u);
-    expect(client.stepUp).not.toHaveBeenCalled();
-  });
-
-  it("keeps the button when the sign-in methods can't be read (the server still demands the password and code)", async () => {
-    client.authMethods.mockRejectedValue(new ContractHttpError("UNAVAILABLE", 503, "x"));
-    await render();
-    expect(button("Withdraw from contract here")).toBeDefined();
-    expect(container.querySelector("[data-withdraw-social-only]")).toBeNull();
-  });
-
-  it("asks for the sign-in methods only while a withdrawal is still possible", async () => {
-    client.getBillingSubscription.mockResolvedValue({
-      subscription: subscription({ withdrawal_open_until: null, withdrawal_last_day: null })
-    });
-    await render();
-    expect(client.authMethods).not.toHaveBeenCalled();
   });
 
   it("names the window's last day in the person's calendar, not the UTC day of its closing instant", async () => {
@@ -678,38 +618,20 @@ describe("P20 SubscriptionControls (S1)", () => {
     expect(text()).not.toContain("That didn't work.");
   });
 
-  it("words a closed window, a spent confirmation and an unknown refund outcome, instead of blaming the password", async () => {
-    client.stepUp.mockResolvedValue({
-      status: "step_up_complete", csrf_token: "c".repeat(43),
-      step_up_grant: { token: "G".repeat(43), action: "WITHDRAW_SUBSCRIPTION", expires_at: "2026-10-03T12:05:00.000Z" }
-    });
+  it("words a closed window and an unknown refund outcome, and never asks to check a password", async () => {
     for (const [failure, sentence] of [
       [new ContractHttpError("SERVER_FAILURE", 409, "x", "WITHDRAWAL_WINDOW_CLOSED"), "The 14-day withdrawal period has ended, or it doesn't apply where you live. You can still cancel at any time."],
-      [new ContractHttpError("NETWORK_FAILURE", 0, "x"), "We're still confirming this with the payment provider."],
-      // The password and code were right (the step-up succeeded); only the grant expired or was already used.
-      [new ContractHttpError("FORBIDDEN", 403, "x", "STEP_UP_REQUIRED"), "Please confirm it's you again: that confirmation expired or was already used."]
+      [new ContractHttpError("NETWORK_FAILURE", 0, "x"), "We're still confirming this with the payment provider."]
     ] as const) {
       act(() => root.unmount());
       root = createRoot(container);
       client.withdrawSubscription.mockRejectedValueOnce(failure);
       await render();
       await click("Withdraw from contract here");
-      await fill("#billing-withdraw-password", "correct horse");
-      await fill("#billing-withdraw-code", "123456");
       await click("Confirm withdrawal");
       expect(text(), String(failure.serverCode ?? failure.status)).toContain(sentence);
-      expect(text(), String(failure.serverCode ?? failure.status)).not.toContain("Check your password");
+      expect(text(), String(failure.serverCode ?? failure.status)).not.toContain("password");
     }
-    // A refused step-up (wrong password or code) is the one case that asks to check them.
-    act(() => root.unmount());
-    root = createRoot(container);
-    client.stepUp.mockRejectedValueOnce(new ContractHttpError("SESSION_REQUIRED", 401, "x"));
-    await render();
-    await click("Withdraw from contract here");
-    await fill("#billing-withdraw-password", "wrong");
-    await fill("#billing-withdraw-code", "000000");
-    await click("Confirm withdrawal");
-    expect(text()).toContain("Check your password and code, then try again.");
   });
 
   it("tells a person with a failed payment, and one without a plan, what is true", async () => {
