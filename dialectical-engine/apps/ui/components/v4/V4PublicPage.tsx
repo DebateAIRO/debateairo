@@ -9,6 +9,7 @@ import { floorAnswerView, publicFloorHost, resolveFloor } from "@/lib/v3/floorAn
 import { cardLabel } from "@/lib/v4/mapLooks";
 import { publicHasWords, publicMapOf, publicSidesOf, type PublicSide } from "@/lib/v4/publicMap";
 import type { PublicPathView } from "@/lib/v4/publicPage";
+import { useOpenSide } from "@/lib/v4/useOpenSide";
 import type { V4Map, V4OpenQuestion, V4Path, V4Selection } from "@/lib/v4/types";
 import { DIG_RETURN_PARAM } from "./V4PublicSession";
 import { V4PublicPathNote, V4PublicReports } from "./V4PublicLane";
@@ -456,6 +457,9 @@ export function V4PublicTopMenu({ catalog, children }: Readonly<{ catalog: Messa
   const itemsId = useId();
   const button = useRef<HTMLButtonElement>(null);
   const root = useRef<HTMLDivElement>(null);
+  // RC-1 (the checks of the last fixes, 4 Nov): the open box opens toward the room from wherever the header put the Menu
+  // button (the start of its second row, or beside the brand near the end side), so it stays on screen at every phone width.
+  const side = useOpenSide(button, open);
   // ACCESS-12 (the wave-2 checks, 4 Nov): like any menu (the header's level menu), it also closes on a click outside it
   // and when keyboard focus moves out of it. A blur with no new target is left to the click (Safari blurs without
   // focusing what is clicked).
@@ -481,7 +485,8 @@ export function V4PublicTopMenu({ catalog, children }: Readonly<{ catalog: Messa
     button.current?.focus();
   };
   return (
-    <div ref={root} className="v4PubTopMenu" data-open={open ? "true" : "false"} onKeyDown={onKeyDown} onBlur={onBlur} data-public-top-menu>
+    <div ref={root} className="v4PubTopMenu" data-open={open ? "true" : "false"} data-side={side} onKeyDown={onKeyDown} onBlur={onBlur}
+      data-public-top-menu>
       <button
         type="button"
         ref={button}

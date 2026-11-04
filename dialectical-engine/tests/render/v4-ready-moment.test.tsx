@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { shortText } from "../../apps/ui/components/v4/V4MapTree.js";
 import * as fixture from "../../apps/ui/lib/v3/storyFixture.js";
@@ -386,5 +388,16 @@ describe("the report's ready moment (journey-f17)", () => {
     expect(page().querySelector(".v4DebRail .v4MapNew")).not.toBeNull();
     // The answer above the map is the report's now (map-d1, map-f2: the newest version is the current one).
     expect(card().textContent).toContain("The report's answer.");
+  });
+});
+
+describe("the phone's ready note (the second browser check; RC-3, the checks of the last fixes)", () => {
+  it("keeps its words, 'See it' and ✕ on one row in the phone's bottom stack, the words wrapping within it", () => {
+    const css = readFileSync(resolve(import.meta.dirname, "../../apps/ui/app/v4/v4-debate.css"), "utf8").replace(/\/\*[\s\S]*?\*\//gu, "");
+    // The note's own rule lets its parts wrap (a computer's note); in the phone's stack they share one row, so ✕ never sits
+    // alone on a second row of a mostly empty box that the stack's short top could cut.
+    expect(css).toMatch(/\.v4ReadyNote \{[^}]*flex-wrap: wrap;/u);
+    expect(css).toMatch(/\.v4StackPhone \.v4ReadyNote \{[^}]*flex-wrap: nowrap;[^}]*\}/u);
+    expect(css).toMatch(/\.v4StackPhone \.v4ReadyNoteText \{ flex: 1 1 0; \}/u);
   });
 });

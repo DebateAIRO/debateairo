@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { act, type ReactElement } from "react";
+import { act, Suspense, use, useState, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -144,6 +144,46 @@ describe("a read that hangs", () => {
     const note = page.querySelector("[data-public-note=could-not-load]")!;
     expect(note.querySelector("[role=status]")!.textContent).toBe("We couldn't load this debate just now.");
     expect([...note.querySelectorAll("button")].map((button) => button.textContent)).toEqual([V4["v4.common.retry"]]);
+  });
+});
+
+describe("W2L-4 (RC-3, the checks of the last fixes): Try again while the page asks the server again", () => {
+  it("keeps its focus (never natively disabled, but aria-disabled and aria-busy); a press meanwhile asks nothing more", async () => {
+    vi.resetModules();
+    const { CouldNotLoadRetry } = await import("../../apps/ui/app/public/debate/[id]/CouldNotLoad.js");
+    const nav = await import("./stubs/next-navigation.js");
+    nav.resetRefreshes();
+    // The page's new read takes a while: the refresh's update waits on it, as a server read in a transition does.
+    let answer: () => void = () => undefined;
+    const read = new Promise<void>((resolve) => { answer = resolve; });
+    function Read() {
+      use(read);
+      return <p data-read-again="">read</p>;
+    }
+    function Page() {
+      const [asked, setAsked] = useState(false);
+      nav.setRefreshEffect(() => setAsked(true));
+      return <><CouldNotLoadRetry catalog={V4} /><Suspense fallback={<p data-fallback="">…</p>}>{asked ? <Read /> : null}</Suspense></>;
+    }
+    const page = await mount(<Page />);
+    const retry = page.querySelector<HTMLButtonElement>(".v4PubRetry")!;
+    expect(retry.textContent).toBe(V4["v4.common.retry"]);
+    retry.focus();
+    await act(async () => { retry.click(); });
+    expect(nav.readRefreshes()).toHaveLength(1);
+    expect(retry.isConnected).toBe(true);
+    expect(retry.disabled).toBe(false);
+    expect(retry.getAttribute("aria-disabled")).toBe("true");
+    expect(retry.getAttribute("aria-busy")).toBe("true");
+    expect(document.activeElement).toBe(retry);
+    await act(async () => { retry.click(); });
+    expect(nav.readRefreshes()).toHaveLength(1);
+    // The read answers: the page shows it, and the button is pressable again with focus still on it.
+    await act(async () => { answer(); await read; });
+    expect(page.querySelector("[data-read-again]")).not.toBeNull();
+    expect(retry.hasAttribute("aria-busy")).toBe(false);
+    expect(document.activeElement).toBe(retry);
+    nav.resetRefreshes();
   });
 });
 

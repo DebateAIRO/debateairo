@@ -128,6 +128,29 @@ describe("pick, combine, edit and add your own view", () => {
     expect(buttonsNamed(CATALOG["v4.dig.yourPicks.one"]!, panel())).toHaveLength(1);
   });
 
+  it("the second browser check (RC-3, the checks of the last fixes): a box that opens is brought into view whole, its buttons too", async () => {
+    // jsdom draws nothing, so it has no scrollIntoView of its own: the page's call is recorded on the element it scrolls.
+    const scrolled: Array<Readonly<{ element: Element; options: unknown }>> = [];
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true, value(this: HTMLElement, options: unknown) { scrolled.push({ element: this, options }); }
+    });
+    try {
+      await mountMap();
+      await openPath(PATHS.renew);
+      await click(buttonNamed(CATALOG["v4.suggest.ownView"]!, panel()));
+      const editor = panel().querySelector<HTMLElement>(".v4SugEditor")!;
+      expect(document.activeElement).toBe(editor.querySelector("textarea"));
+      expect(scrolled).toContainEqual({ element: editor, options: { block: "nearest" } });
+      // The same for a suggestion's own wording.
+      await click(buttonNamed(CATALOG["v4.suggest.cancel"]!, panel()));
+      scrolled.length = 0;
+      await click(buttonsNamed(CATALOG["v4.suggest.edit"]!, panel())[0]!);
+      expect(scrolled).toContainEqual({ element: panel().querySelector(".v4SugEditor"), options: { block: "nearest" } });
+    } finally {
+      Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
+    }
+  });
+
   it("dig-f20: the tray's chips mark only the AIs' words as AI text, never the person's own view or their own wording", async () => {
     await mountMap();
     await openPath(PATHS.renew);

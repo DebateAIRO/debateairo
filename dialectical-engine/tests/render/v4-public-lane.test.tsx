@@ -985,6 +985,37 @@ describe("Write a report", () => {
     expect(press()).toBeTruthy();
   });
 
+  it("W2L-4 (RC-3, the checks of the last fixes): Check again keeps its focus while it checks; a second press asks nothing more", async () => {
+    vi.useFakeTimers();
+    const page = debate();
+    // A report the server says is being written, started eleven minutes ago: the card already says it is taking longer.
+    const startedAt = new Date(Date.now() - 11 * 60_000).toISOString();
+    await mount({ ...page, report_writing: { report_version: 2, state: "WRITING", started_at: startedAt } } as PublicDebate);
+    await advance(5_000);
+    const again = buttons(V4["v4.investigation.checkAgain"]!)[0]!;
+    expect(again).toBeTruthy();
+    const reads = (): number => lane.readPublicDebate.mock.calls.length;
+    let answer: (value: PublicDebate) => void = () => undefined;
+    lane.readPublicDebate = vi.fn(() => new Promise<PublicDebate>((resolve) => { answer = resolve; }));
+    again.focus();
+    await click(again);
+    expect(reads()).toBe(1);
+    // It keeps its focus while it checks: never natively disabled, but aria-disabled and aria-busy.
+    expect(again.isConnected).toBe(true);
+    expect(again.disabled).toBe(false);
+    expect(again.getAttribute("aria-disabled")).toBe("true");
+    expect(again.getAttribute("aria-busy")).toBe("true");
+    expect(document.activeElement).toBe(again);
+    await click(again);
+    expect(reads()).toBe(1);
+    // Not there yet: the card stays as it is, the button can be pressed again, and focus is still on it.
+    await act(async () => { answer(page); });
+    await flush();
+    expect(again.hasAttribute("aria-busy")).toBe(false);
+    expect(again.hasAttribute("aria-disabled")).toBe(false);
+    expect(document.activeElement).toBe(again);
+  });
+
   it("the ten minutes and the slow-down are the record's own numbers, and no line promises a time", () => {
     const source = readFileSync(resolve(import.meta.dirname, "../../apps/ui/components/v4/V4PublicLane.tsx"), "utf8");
     expect(source).toMatch(/REPORT_LONGER_AFTER_MINUTES = 10;/u);

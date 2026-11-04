@@ -14,7 +14,7 @@ import type { DigLink, DigView } from "../../apps/ui/lib/v4/types.js";
 import { InvestigationReportsSchema, type RunProjection } from "../../packages/contract/src/index.js";
 import {
   advance, branch, buttonNamed, buttonsNamed, CATALOG, click, harness, mountMap, page, panel, PATHS, resetHarness, seededAnswer,
-  seededStory, text, unmountMap
+  seededStory, settle, text, unmountMap
 } from "./v4-debate-harness.js";
 
 vi.mock("@/components/AuthGate", async () => (await import("./v4-debate-harness.js")).authGateMock);
@@ -302,5 +302,70 @@ describe("a dig paused at the month wall (wait-f2, public-f16, public-f17)", () 
     expect(continuing.disabled).toBe(false);
     expect(continuing.getAttribute("aria-disabled")).toBe("true");
     expect(continuing.getAttribute("aria-busy")).toBe("true");
+  });
+
+  // RC-3 (the checks of the last fixes, 4 Nov): the month pause's hand-offs on the map, pinned so a revert goes red.
+  const running = (link: DigLink): DigView => ({ link, state: "RUNNING", headline: null, counts: null });
+
+  it("W2L-4: the panel's Continue keeps its focus while the dig continues, and when the block goes focus goes to the panel's heading, without scrolling", async () => {
+    const runId = crypto.randomUUID();
+    const child = crypto.randomUUID();
+    recordDig(runId, child, ["path:n-mix"]);
+    harness.digView = pausedDig(true);
+    await mountMap(1600, runId);
+    await openDig(PATHS.mix);
+    const press = buttonNamed(CATALOG["v4.money.continue"]!, panel());
+    press.focus();
+    await click(press);
+    const continuing = buttonNamed(CATALOG["v4.money.continuing"]!, panel());
+    expect(document.activeElement).toBe(continuing);
+    // A press while it continues sends nothing more.
+    await click(continuing);
+    expect(harness.continueRun).toHaveBeenCalledTimes(1);
+    // The dig reads as running again (its next read): the pause block goes, and focus goes on to the panel's heading.
+    const focus = vi.spyOn(HTMLElement.prototype, "focus");
+    harness.digView = running;
+    await advance(15_000);
+    await settle(10);
+    expect(panel().querySelector(".v4Pause")).toBeNull();
+    expect(document.activeElement).toBe(panel().querySelector(".v4PanelH2"));
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+    focus.mockRestore();
+  });
+
+  it("W2L-4 on a phone: the pinned bar's Continue keeps its focus while the dig continues; then focus goes to the bar's next job or the Map button, without scrolling", async () => {
+    const runId = crypto.randomUUID();
+    const child = crypto.randomUUID();
+    recordDig(runId, child, ["path:n-mix"]);
+    harness.digView = pausedDig(true);
+    harness.search = `?dig=${child}`;
+    await mountMap(375, runId);
+    const bar = (): HTMLElement => page().querySelector<HTMLElement>(".v4DebPhoneBar")!;
+    const paused = bar().querySelector<HTMLElement>(".v4DebPhonePaused")!;
+    expect(paused.textContent).toContain(CATALOG["v4.money.continue"]);
+    const press = paused.querySelector<HTMLButtonElement>(".v4DebPhoneDig")!;
+    press.focus();
+    await click(press);
+    expect(harness.continueRun).toHaveBeenCalledWith(child);
+    // It keeps its focus while the press is on its way: never natively disabled, but aria-disabled and aria-busy.
+    const busy = bar().querySelector<HTMLButtonElement>(".v4DebPhonePaused .v4DebPhoneDig")!;
+    expect(busy.disabled).toBe(false);
+    expect(busy.getAttribute("aria-disabled")).toBe("true");
+    expect(busy.getAttribute("aria-busy")).toBe("true");
+    expect(document.activeElement).toBe(busy);
+    // A press meanwhile sends nothing more.
+    await click(busy);
+    expect(harness.continueRun).toHaveBeenCalledTimes(1);
+    // The dig reads as running again: "Paused · Continue" goes, and focus goes on within the bar, never to the page's body.
+    const focus = vi.spyOn(HTMLElement.prototype, "focus");
+    harness.digView = running;
+    await advance(15_000);
+    await settle(10);
+    expect(bar().querySelector(".v4DebPhonePaused")).toBeNull();
+    expect(document.activeElement).not.toBe(document.body);
+    expect(bar().contains(document.activeElement)).toBe(true);
+    expect(document.activeElement!.matches(".v4DebPhoneDig, .v4DebPhoneMap")).toBe(true);
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+    focus.mockRestore();
   });
 });

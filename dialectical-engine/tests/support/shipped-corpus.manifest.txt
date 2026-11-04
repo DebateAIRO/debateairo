@@ -1016,6 +1016,7 @@ apps/ui/lib/v4/useFocusHandOff.ts
 apps/ui/lib/v4/useLeaveGuard.ts
 apps/ui/lib/v4/useLevelSettled.ts
 apps/ui/lib/v4/useMapKeys.ts
+apps/ui/lib/v4/useOpenSide.ts
 apps/ui/lib/v4/usePausedBarJob.ts
 apps/ui/lib/v4/usePicksUndo.ts
 apps/ui/lib/v4/useQuestionAddress.ts

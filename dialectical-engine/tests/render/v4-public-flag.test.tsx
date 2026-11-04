@@ -7,6 +7,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { V4PublicFlag } from "../../apps/ui/components/v4/V4PublicFlag.js";
 import { V4PublicSessionProvider } from "../../apps/ui/components/v4/V4PublicSession.js";
 import { V4PublicTopMenu } from "../../apps/ui/components/v4/V4PublicPage.js";
+import { V4CopyLink } from "../../apps/ui/components/v4/V4PublicMark.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 vi.mock("next/link", () => ({ default: ({ href, children, className }: { href: string; children: unknown; className?: string }) => <a href={href} className={className}>{children as never}</a> }));
@@ -303,5 +304,112 @@ describe("Report a problem: where it sits and how its form opens (public-f4)", (
     } finally {
       outside.remove();
     }
+  });
+});
+
+/*
+ * RC-1 and RC-2 (the checks of the last fixes, 4 Nov): a small box that opens from a control in the public page's top bar
+ * stays on screen wherever the header has put that control. The phone's menu: the Menu button sits at the start of the
+ * bar's second row at about 467 px and below, but beside the brand, near the end side, from about 468 to 767 px (landscape
+ * phones, small tablets), where a box held to its start edge ran about 60 px off the screen. The computer bar's "Link
+ * copied." line also says "We couldn't copy the link…" (57 characters), which ran past the window's edge on one line.
+ * The page measures which half of the window the control sits in and holds the box to the edge that opens it toward
+ * the room (lib/v4/useOpenSide.ts), in both reading directions.
+ */
+describe("RC-1 / RC-2: the top bar's menu and Copy link's line open toward the room, at every width and in both directions", () => {
+  const css = readFileSync(resolve(process.cwd(), "apps/ui/app/public/debate/[id]/public-lane.css"), "utf8");
+  const phone = css.slice(css.indexOf("@media (max-width: 767px)"));
+  const innerWidth = Object.getOwnPropertyDescriptor(window, "innerWidth")!;
+  afterEach(() => { Object.defineProperty(window, "innerWidth", innerWidth); });
+  const rect = (left: number, width: number): DOMRect =>
+    ({ left, right: left + width, width, top: 70, bottom: 114, height: 44, x: left, y: 70, toJSON: () => ({}) }) as DOMRect;
+  /** A window `width` wide, laid out in `dir`. */
+  function windowOf(width: number, dir: "ltr" | "rtl"): HTMLDivElement {
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
+    host = document.body.appendChild(document.createElement("div"));
+    host.setAttribute("dir", dir);
+    root = createRoot(host);
+    return host;
+  }
+
+  it.each([
+    // [window width, the Menu button's left edge, direction, the edge the open box is held to]
+    // Two rows (about 467 px and below): Menu starts the second row, so the box opens toward the end side.
+    [375, 16, "ltr", "start"],
+    [430, 16, "ltr", "start"],
+    [375, 275, "rtl", "start"],
+    // One row (about 468 to 767 px): Menu sits near the end side, so the box opens toward the start side (it ran ~60 px off).
+    [600, 440, "ltr", "end"],
+    [767, 607, "ltr", "end"],
+    [600, 76, "rtl", "end"],
+    [767, 76, "rtl", "end"]
+  ] as const)("%i px, Menu at x %i (%s): the box is held to the button's %s edge", async (width, left, dir, side) => {
+    windowOf(width, dir);
+    await act(async () => { root!.render(<V4PublicTopMenu catalog={V4}><span>Copy link</span></V4PublicTopMenu>); });
+    const menu = host!.querySelector<HTMLElement>("[data-public-top-menu]")!;
+    const button = menu.querySelector<HTMLButtonElement>(".v4PubTopMenuButton")!;
+    button.getBoundingClientRect = () => rect(left, 84);
+    await act(async () => { button.click(); });
+    expect(menu.getAttribute("data-open")).toBe("true");
+    expect(menu.getAttribute("data-side")).toBe(side);
+  });
+
+  it("a window that changes size while the menu is open (a phone turned) is measured again", async () => {
+    windowOf(375, "ltr");
+    await act(async () => { root!.render(<V4PublicTopMenu catalog={V4}><span>Copy link</span></V4PublicTopMenu>); });
+    const menu = host!.querySelector<HTMLElement>("[data-public-top-menu]")!;
+    const button = menu.querySelector<HTMLButtonElement>(".v4PubTopMenuButton")!;
+    button.getBoundingClientRect = () => rect(16, 84);
+    await act(async () => { button.click(); });
+    expect(menu.getAttribute("data-side")).toBe("start");
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 667 });
+    button.getBoundingClientRect = () => rect(507, 84);
+    await act(async () => { window.dispatchEvent(new Event("resize")); });
+    expect(menu.getAttribute("data-side")).toBe("end");
+  });
+
+  it("the phone's open box has no fixed side of its own: it takes the measured one, within the window's gutters", () => {
+    const open = /\.v4PubTopMenu\[data-open="true"\] \.v4PubTopMenuItems \{([^}]*)\}/u.exec(phone)![1]!;
+    expect(open).toMatch(/position: absolute;/u);
+    expect(open).not.toMatch(/inset-inline-(?:start|end)/u);
+    expect(open).toMatch(/max-width: calc\(100vw - 2 \* var\(--v4-gutter\)\);/u);
+    expect(phone).toMatch(/\.v4PubTopMenu\[data-side="start"\] \.v4PubTopMenuItems \{ inset-inline-start: 0; \}/u);
+    expect(phone).toMatch(/\.v4PubTopMenu\[data-side="end"\] \.v4PubTopMenuItems \{ inset-inline-end: 0; \}/u);
+  });
+
+  it.each([
+    // [window width, Copy link's left edge, direction, the edge its line is held to]
+    [1280, 982, "ltr", "end"],
+    [768, 460, "ltr", "end"],
+    [1280, 228, "rtl", "end"],
+    // The header wrapped (the flag's thank-you line beside its link on a narrow computer): Copy link starts the second row.
+    [800, 32, "ltr", "start"],
+    [800, 698, "rtl", "start"]
+  ] as const)("Copy link's line at %i px, the link at x %i (%s): held to the link's %s edge", async (width, left, dir, side) => {
+    windowOf(width, dir);
+    const writeText = vi.fn(async () => { throw new Error("denied"); });
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    await act(async () => { root!.render(<span className="v4PubCopyLink"><V4CopyLink href={`/public/debate/${REF}`} catalog={V4} /></span>); });
+    const link = host!.querySelector<HTMLButtonElement>("[data-public-copy-link]")!;
+    link.getBoundingClientRect = () => rect(left, 70);
+    await act(async () => { link.click(); });
+    await act(async () => { for (let turn = 0; turn < 4; turn += 1) await Promise.resolve(); });
+    const said = host!.querySelector<HTMLElement>(".v4PublicMarkCopied")!;
+    expect(said.textContent).toBe(V4["v4.publicMark.copyFailed"]);
+    expect(said.getAttribute("data-side")).toBe(side);
+    Reflect.deleteProperty(navigator, "clipboard");
+  });
+
+  it("on a computer the line sits under the link and wraps within the window: never one long line past its edge", () => {
+    const wide = css.slice(css.indexOf("@media (min-width: 768px)"), css.indexOf("@media (max-width: 767px)"));
+    const said = /\.v4PubCopyLink > \.v4PublicMarkCopied \{([^}]*)\}/u.exec(wide)![1]!;
+    expect(said).toMatch(/position: absolute;/u);
+    expect(said).not.toMatch(/nowrap|inset-inline-(?:start|end)/u);
+    expect(said).toMatch(/width: max-content;/u);
+    expect(said).toMatch(/max-width: min\(26rem, calc\(100vw - 2 \* var\(--v4-gutter\)\)\);/u);
+    // It lies over the header's foot only: a click there still reaches what is under it.
+    expect(said).toMatch(/pointer-events: none;/u);
+    expect(wide).toMatch(/\.v4PubCopyLink > \.v4PublicMarkCopied\[data-side="start"\] \{ inset-inline-start: 0; \}/u);
+    expect(wide).toMatch(/\.v4PubCopyLink > \.v4PublicMarkCopied\[data-side="end"\] \{ inset-inline-end: 0; \}/u);
   });
 });

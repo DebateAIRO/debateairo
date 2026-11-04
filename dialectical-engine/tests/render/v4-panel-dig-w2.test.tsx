@@ -105,6 +105,30 @@ describe("map-f14 / dig-f4: one pick reads \"Dig into your pick\"; the tray come
     measured.mockRestore();
   });
 
+  it("the second browser check (RC-3, the checks of the last fixes): the docked tray and the pinned dig block are measured by their border box", async () => {
+    // A change of their padding alone (the cookie bar going puts the block back with its foot padding) must be measured too.
+    const observed: Array<Readonly<{ element: Element; options: unknown }>> = [];
+    class Recording {
+      constructor(_changed: () => void) {}
+      observe(element: Element, options?: unknown): void { observed.push({ element, options }); }
+      unobserve(): void {}
+      disconnect(): void {}
+    }
+    vi.stubGlobal("ResizeObserver", Recording);
+    try {
+      await mountMap();
+      await openPath(PATHS.renew);
+      await click(panelBoxes()[0]!);
+      await click(panelBoxes()[1]!);
+      const dock = page().querySelector(".v4DebTrayDock")!;
+      const block = panel().querySelector(".v4PanelDig")!;
+      expect(observed).toContainEqual({ element: dock, options: { box: "border-box" } });
+      expect(observed).toContainEqual({ element: block, options: { box: "border-box" } });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("a pick on 'Your question' is dug by that panel's own pinned button; a pick it does not list is not", async () => {
     await mountMap();
     const rootBox = panel().querySelector<HTMLInputElement>(".v4PanelOpenRow input[type=checkbox]")!;

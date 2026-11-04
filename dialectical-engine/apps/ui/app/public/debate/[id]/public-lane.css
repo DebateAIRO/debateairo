@@ -149,12 +149,18 @@
 .v4PubCopyLink > .v4Link { display: inline-flex; align-items: center; min-height: 44px; font-size: var(--t-ui); }
 /* The second browser check (4 Nov): in the computer's top bar, "Link copied." sits just under the link instead of beside
    it, so the bar's items do not move when it shows (it pushed Copy link about 100 px toward the brand). In the phone's
-   menu it stays in the list's flow. */
+   menu it stays in the list's flow. RC-2 (the checks of the last fixes, 4 Nov): the same place also says "We couldn't copy
+   the link…" (57 characters), which ran past the window's edge on one line. The line opens toward the room from the link
+   (V4CopyLink measures which side, `data-side`), wraps within the window, and lies over the header's foot without taking
+   the clicks there. */
 @media (min-width: 768px) {
   .v4PubCopyLink { position: relative; }
   .v4PubCopyLink > .v4PublicMarkCopied {
-    position: absolute; top: calc(100% - 8px); inset-inline-start: 0; margin: 0; white-space: nowrap; font-size: 13px;
+    position: absolute; top: calc(100% - 8px); margin: 0; width: max-content; max-width: min(26rem, calc(100vw - 2 * var(--v4-gutter)));
+    font-size: 13px; pointer-events: none;
   }
+  .v4PubCopyLink > .v4PublicMarkCopied[data-side="start"] { inset-inline-start: 0; }
+  .v4PubCopyLink > .v4PublicMarkCopied[data-side="end"] { inset-inline-end: 0; }
 }
 .v4PubFlag { position: relative; display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; min-width: 0; }
 .v4PubFlagToggle { display: inline-flex; align-items: center; min-height: 44px; font-size: var(--t-ui); }
@@ -177,13 +183,17 @@
   .v4PubTitle { font-size: 24px; }
   .v4PubTopMenuButton { display: inline-flex; padding: 0 14px; }
   .v4PubTopMenuItems { display: none; }
-  /* The second browser check (4 Nov): the Menu button sits at the start of the bar's second row, so the box opens from its
-     start edge toward the end side (it went off the screen's start edge, out of reach, in either direction). */
+  /* The second browser check and RC-1 (the checks of the last fixes, 4 Nov): the Menu button starts the bar's second row at
+     about 467 px and below, but sits beside the brand, near the end side, from about 468 to 767 px. The box opens toward the
+     room from wherever it is (V4PublicTopMenu measures which side, `data-side`): from its start edge toward the end side on
+     two rows, from its end edge toward the start side on one, so it stays on screen in either reading direction. */
   .v4PubTopMenu[data-open="true"] .v4PubTopMenuItems {
-    position: absolute; z-index: 50; top: calc(100% + 6px); inset-inline-start: 0; display: flex; flex-direction: column; align-items: stretch;
-    min-width: 220px; max-width: calc(100vw - 32px); padding: 6px 12px;
+    position: absolute; z-index: 50; top: calc(100% + 6px); display: flex; flex-direction: column; align-items: stretch;
+    min-width: 220px; max-width: calc(100vw - 2 * var(--v4-gutter)); padding: 6px 12px;
     background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-btn); box-shadow: var(--shadow-pop);
   }
+  .v4PubTopMenu[data-side="start"] .v4PubTopMenuItems { inset-inline-start: 0; }
+  .v4PubTopMenu[data-side="end"] .v4PubTopMenuItems { inset-inline-end: 0; }
   .v4PubFlagScrim { background: var(--scrim); }
   /* The form: a sheet from the bottom on a phone. */
   .v4PubFlagPanel, .v4PubFlag-foot .v4PubFlagPanel {

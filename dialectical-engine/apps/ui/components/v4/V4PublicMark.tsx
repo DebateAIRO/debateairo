@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { publicPageHref, usePublicStage, type PublicStage } from "@/lib/v4/publicState";
+import { useOpenSide } from "@/lib/v4/useOpenSide";
 
 /*
  * V4 screen review (owner picks 3 Nov 2026): one small grey line with a globe mark, in the same spot under the question
@@ -57,6 +58,10 @@ async function shareOrCopy(url: string): Promise<CopyState | "SHARED"> {
  */
 export function V4CopyLink({ href, catalog, className = "v4Link" }: Readonly<{ href: string; catalog: MessageCatalog; className?: string }>) {
   const [copy, setCopy] = useState<CopyState>("IDLE");
+  // RC-2 (the checks of the last fixes, 4 Nov): in the public page's computer bar the line sits under the link (public-lane.css),
+  // opening toward the room from it, so the longer "We couldn't copy the link…" stays inside the window too.
+  const button = useRef<HTMLButtonElement>(null);
+  const side = useOpenSide(button, copy !== "IDLE");
   const press = async (): Promise<void> => {
     const url = new URL(href, window.location.origin).toString();
     const outcome = await shareOrCopy(url);
@@ -64,8 +69,8 @@ export function V4CopyLink({ href, catalog, className = "v4Link" }: Readonly<{ h
   };
   return (
     <>
-      <button type="button" className={className} data-public-copy-link="" onClick={() => void press()}>{t(catalog, "v4.publicMark.copyLink")}</button>
-      <span className="v4PublicMarkCopied" role="status">
+      <button ref={button} type="button" className={className} data-public-copy-link="" onClick={() => void press()}>{t(catalog, "v4.publicMark.copyLink")}</button>
+      <span className="v4PublicMarkCopied" role="status" data-side={side}>
         {copy === "COPIED" ? t(catalog, "v4.publicMark.linkCopied") : copy === "FAILED" ? t(catalog, "v4.publicMark.copyFailed") : ""}
       </span>
     </>

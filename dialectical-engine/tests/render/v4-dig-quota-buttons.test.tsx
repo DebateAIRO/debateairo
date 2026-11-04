@@ -3,10 +3,14 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { V4BottomStack } from "../../apps/ui/components/v4/V4BottomStack.js";
 import { V4ShareChange } from "../../apps/ui/components/v4/V4ShareChange.js";
+import { phoneBarJob } from "../../apps/ui/components/v4/mapDigHelpers.js";
 import type { AskRoom } from "../../apps/ui/lib/billing/room.js";
 import { formatDate } from "../../apps/ui/lib/i18n/translate.js";
 import { quotaChanged } from "../../apps/ui/lib/v4/quotaPulse.js";
+import type { V4DigQuota } from "../../apps/ui/lib/v4/digQuota.js";
+import type { DigTarget } from "../../apps/ui/lib/v4/types.js";
 import { digRoomQuery } from "../../apps/ui/lib/v4/useDigQuota.js";
 import {
   advance, branch, buttonNamed, buttonsNamed, CATALOG, click, expandBranch, harness, mountMap, openPath, page, panel, PATHS,
@@ -146,6 +150,31 @@ describe("journey-f8: a changed share in grey for 2 seconds", () => {
     // On the same place a change shows again.
     await act(async () => root.render(<V4ShareChange share={9} subject="path:b" />));
     expect(host.querySelector(".v4ShareChange")?.textContent).toBe("+5%");
+    await act(async () => root.unmount());
+    host.remove();
+  });
+
+  it("CODE-4 on the phone (RC-3): the pinned bar's mark is of its own place: one place's 6%, then another's 4%, shows no '−2%'", async () => {
+    // The bar's job names the place it digs (mapDigHelpers.ts phoneBarJob), an open question's or a path's picks.
+    const quota = { label: () => "Dig", share: () => 6, periodLine: null, waitLine: null } as unknown as V4DigQuota;
+    const open = { kind: "open", questions: [{ id: "o:1" }, { id: "o:2" }] } as unknown as DigTarget;
+    const picks = { kind: "picks", path: { id: "n-mix" }, picks: [] } as unknown as DigTarget;
+    const jobOf = (target: DigTarget) => phoneBarJob({ target, again: false }, quota, CATALOG, () => undefined, () => undefined, null);
+    expect(jobOf(open)).toMatchObject({ kind: "dig", share: 6, place: "open:o:1,o:2" });
+    expect(jobOf(picks)).toMatchObject({ kind: "dig", share: 6, place: "path:n-mix" });
+    // The bar passes that place on to its mark, so a share of another place is never shown as a change.
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const bar = (share: number, place: string) => (
+      <V4BottomStack phone notes={null} tray={null} goodTime={false} reportHref="/v4/report" catalog={CATALOG}
+        job={{ kind: "dig", label: `Dig · ${share}%`, onDig: () => undefined, share, place }} />
+    );
+    await act(async () => root.render(bar(6, "path:n-mix")));
+    await act(async () => root.render(bar(4, "path:n-smr")));
+    expect(host.querySelector(".v4ShareChange")).toBeNull();
+    await act(async () => root.render(bar(9, "path:n-smr")));
+    expect(host.querySelector(".v4DebPhoneBar .v4ShareChange")?.textContent).toBe("+5%");
     await act(async () => root.unmount());
     host.remove();
   });
