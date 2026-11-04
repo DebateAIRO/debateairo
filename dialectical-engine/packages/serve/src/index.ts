@@ -1380,13 +1380,17 @@ export type VerdictLabelTrigger =
   | "DISAGREEMENT_AT_THRESHOLD"
   | "AT_OR_ABOVE_HIGH_CUT"
   | "MID_BAND"
-  // Engine 2 (R2b): the comparing judges decided (rung 5).
+  // Engine 2 (R2b): the comparing judges decided (rung 5); on a path run (V4 start step, Task 44), the main answer's
+  // trust word decided (rung 5 too).
   | EngineVerdictTrigger;
 
 export interface VerdictLabelDerivation {
   /** SPLIT ("Contested", owner ruling E8) only from the comparing judges; the ladder never gives it. */
   readonly label: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED" | "SPLIT";
-  /** The ladder rung that decided, 0-4 as goal lines 199-207 number them; 5: the comparing judges (engine 2). */
+  /**
+   * The ladder rung that decided, 0-4 as goal lines 199-207 number them; 5: the comparing judges (engine 2), or on a
+   * path run the main answer's trust word (V4 start step, Task 44).
+   */
   readonly rung: 0 | 1 | 2 | 3 | 4 | 5;
   readonly trigger: VerdictLabelTrigger;
   /** Which basis limbs were ABSENT; empty unless rung 0 fired. */

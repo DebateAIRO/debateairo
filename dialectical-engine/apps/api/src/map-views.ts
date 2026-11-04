@@ -20,8 +20,8 @@ import { mapAnswersArgued, mapMergeAlsoRaised, mapNamesInternalWord } from "@deb
  * one primary-key lookup of the map choice's opening) and answers 404 before any full answer
  * read or content lease when there is no map.
  *
- * V4 start step, Task 59 (spec 2026-11-03 §7): a debate with chosen paths (0156's
- * `core.start_path_set`) has no classic map view; its page reads the paths from
+ * V4 start step, Task 59 (spec 2026-11-03 §4.5 "The classic view"): a debate with chosen
+ * paths (0156's `core.start_path_set`) has no classic map view; its page reads the paths from
  * `Answer.branches`. After the owner query, and only for the caller's own run, one code-only
  * question (`core.read_start_path_ids`, no lease, no decryption) says whether the run has paths;
  * if it has, the map choice is never read.

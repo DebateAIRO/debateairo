@@ -252,6 +252,21 @@ describe("the Register names the two jobs before a debate starts", () => {
     expect(providerRegister(["anthropic", "deepinfra"]).at(-1)).toBe(SUPPORT_PROVIDER);
   });
 
+  // Whichever companies the API's targets reach, the clarifying questions stand on exactly one row (Anthropic's, else
+  // the support chat's) and what to look into on DeepInfra's and Anthropic's rows, else the support chat's.
+  it.each([
+    ["no answer from the API (the whole reviewed catalogue)", null, ["claude"], ["claude", "deepinfra"]],
+    ["targets on DeepInfra only", ["deepinfra"], ["support"], ["deepinfra", "support"]],
+    ["targets on Anthropic and DeepInfra", ["anthropic", "deepinfra"], ["claude"], ["claude", "deepinfra"]],
+    ["a target on a host no catalogue row knows", ["host:api.acme.example"], ["support"], ["support"]]
+  ] as const)("names the rows that do each job before a debate starts: %s", (_build, companies, clarifying, suggesting) => {
+    const register = providerRegister(companies);
+    const rowsWith = (purpose: "clarifyQuestions" | "suggestPaths") =>
+      register.filter((entry) => entry.purposes.includes(purpose)).map((entry) => entry.key);
+    expect(rowsWith("clarifyQuestions")).toEqual(clarifying);
+    expect(rowsWith("suggestPaths")).toEqual(suggesting);
+  });
+
   it("English labels read exactly as the owner approved", () => {
     const en = legalCatalog("en");
     expect(en["legal.providers.purpose.suggestPaths"]).toBe(LABELS.suggestPaths);

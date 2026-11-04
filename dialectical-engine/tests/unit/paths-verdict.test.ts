@@ -1,8 +1,9 @@
 /**
- * V4 start step, Task 44 (spec 2026-11-03 §6 "The main answer"): the label of a path run. No judge picks a winner on a
- * debate with chosen paths; its label comes from the main answer's trust word, which code sets from the evidence (Task
- * 15's `mainAnswerTrustWordOf`). The record has the judges' shape (rung 5, no basis absence, no marks) with one of five
- * path triggers of its own; the judges' verdict keeps its six. No new served-root rule: 0121 is untouched.
+ * V4 start step, Task 44 (spec 2026-11-03 §4.3 "After Start", the main answer): the label of a path run. No judge picks a
+ * winner on a debate with chosen paths; its label comes from the main answer's trust word, which code sets from the
+ * evidence (Task 15's `mainAnswerTrustWordOf`). The record has the judges' shape (rung 5, no basis absence, no marks)
+ * with one of five path triggers of its own; the judges' verdict keeps its six. No new served-root rule: 0121 is
+ * untouched.
  */
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { TRUST_WORDS, type TrustWord } from "@debateai/contract";

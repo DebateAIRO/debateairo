@@ -5,12 +5,12 @@
 import { describe, expect, it } from "vitest";
 import type { PathGapRound } from "@debateai/contract";
 import type { StoredStartPathSet } from "@debateai/db";
-import type { DebateShapeV2Input } from "@debateai/register";
+import { debateShapeSiteCountsV2, type DebateShapeV2Input } from "@debateai/register";
 import {
   PATH_ROOT_LIMITS, pathConsiderationsOf, pathPlanFitsReceipt, pathRootLegMaterial, pathRootSeats, pathRoundOnePoints, pathsRunPathsOf,
   shapePositionsFromPaths, shapeViewOfV2, type PathsRunPath
 } from "../../apps/runner/src/path-plan.js";
-import { buildShapePlan, shapePositionsForTodaysOpening } from "../../apps/runner/src/shape-plan.js";
+import { buildShapePlan, shapePositionsForTodaysOpening, shapeRunnableNodeCount } from "../../apps/runner/src/shape-plan.js";
 import { pathsSelectChains } from "../../apps/runner/src/shape-select.js";
 import { pathsRootHandOver } from "../../apps/runner/src/shape-seats.js";
 
@@ -56,6 +56,12 @@ describe("the paths a run argues", () => {
     expect(pathConsiderationsOf(b1!)).toEqual(["Costs: What would it cost to build?", "Crews: Who would crew the second ferry?",
       "What about winter storms?", "What about dredging?"]);
     expect(pathConsiderationsOf(b2!)).toEqual(["The old pier is enough if it is repaired.", "Would tourists use it?"]);
+  });
+
+  it("the person's own viewpoint is its text alone even when it carries a title", () => {
+    const own = path(1, { viewpoints: [viewpoint("My own view", "The old pier is enough if it is repaired.", true), viewpoint("Costs", "What would it cost?")] });
+    expect(pathConsiderationsOf(own)).toEqual(["The old pier is enough if it is repaired.", "Costs: What would it cost?"]);
+    expect(pathRootLegMaterial(own).viewpoints).toBe("The old pier is enough if it is repaired.\nCosts: What would it cost?");
   });
 
   it("round 1: against first, then alternating, one consideration each, none past the last", () => {
@@ -107,6 +113,15 @@ describe("the plan: one branch per path, no cross", () => {
     expect(pathRootSeats(["A", "B", "C", "D"], 2)).toEqual(["A", "B"]);
     expect(() => pathRootSeats([], 2)).toThrowError("PATH_ROOT_SEATS_INVALID");
   });
+
+  it("the root seats of one to eight paths; no seats, or paths outside 1..8, are refused", () => {
+    expect(pathRootSeats(["A"], 1)).toEqual(["A"]);
+    expect(pathRootSeats(["A", "B", "C"], 8)).toEqual(["A", "B", "C", "A", "B", "C", "A", "B"]);
+    expect(() => pathRootSeats([], 1)).toThrowError("PATH_ROOT_SEATS_INVALID");
+    for (const paths of [0, -1, 9, 1.5, Number.NaN]) {
+      expect(() => pathRootSeats(["A", "B"], paths), String(paths)).toThrowError("PATH_ROOT_SEATS_INVALID");
+    }
+  });
 });
 
 describe("a chain kept on every path", () => {
@@ -156,6 +171,11 @@ describe("the root writer's material", () => {
       viewpoint(null, "The old pier is enough.", true)], gapPoints: ["G1.", "G2.", "G3."] });
     expect(material).toEqual({ pathTitle: "T1", pathQuestion: "Q1?", viewpoints: "Costs: What would it cost?\nThe old pier is enough.",
       pointsRaised: "G1.\nG2.\nG3." });
+  });
+
+  it("a path with no viewpoints and no gap points: its title and question, and nothing else", () => {
+    expect(pathRootLegMaterial({ ...path(1), viewpoints: [], gapPoints: [] }))
+      .toEqual({ pathTitle: "T1", pathQuestion: "Q1?", viewpoints: "", pointsRaised: "" });
   });
 
   it("keeps at most the limit's gap points", () => {
@@ -215,5 +235,28 @@ describe("the receipt's view and the fit", () => {
     expect(pathPlanFitsReceipt(planOf(2, 2), { ...V2, scrutinyRoundsPerPoint: 0, scrutinyPointsPerDebate: 0, scrutiny: "standard" }, 2)).toBe(false);
     const crossed = buildShapePlan({ positions: shapePositionsForTodaysOpening({ answers: 7, pointsPerAnswer: 2 }), depth: 2, scrutiny: SCRUTINY });
     expect(pathPlanFitsReceipt(crossed, V2, 2)).toBe(false);
+  });
+
+  // Each priced count is checked on its own: in both cases below the node total still fits (25 of 30), so only that
+  // count can refuse the plan. Seven paths, 2 points each, depth 1: 7 roots, 14 POINT legs and 4 scrutiny slots.
+  const sevenPathsDepthOne = () => buildShapePlan({
+    positions: shapePositionsFromPaths(Array.from({ length: 7 }, (_unused, at) => path(at + 1)), 2), depth: 1, scrutiny: SCRUTINY, cross: false });
+
+  it("more points than priced is refused even when the node total fits", () => {
+    const plan = sevenPathsDepthOne();
+    const fewerPoints: DebateShapeV2Input = { ...V2, pointsPerPath: 1, scrutinyRoundsPerPoint: 2, scrutinyPointsPerDebate: 4 };
+    expect(shapeRunnableNodeCount(plan, 1, "fixed", V2.deeperTopPoints)).toBe(25);
+    expect(debateShapeSiteCountsV2(fewerPoints, 1)).toMatchObject({ pointNodes: 7, scrutinyNodes: 16, nodes: 30 });
+    expect(pathPlanFitsReceipt(plan, { ...fewerPoints, pointsPerPath: 2 }, 1)).toBe(true);
+    expect(pathPlanFitsReceipt(plan, fewerPoints, 1)).toBe(false);
+  });
+
+  it("more scrutiny slots than priced is refused even when the node total fits", () => {
+    const plan = sevenPathsDepthOne();
+    const fewerScrutiny: DebateShapeV2Input = { ...V2, pointsPerPath: 3, scrutinyRoundsPerPoint: 1, scrutinyPointsPerDebate: 1 };
+    expect(plan.scrutiny.count).toBe(4);
+    expect(debateShapeSiteCountsV2(fewerScrutiny, 1)).toMatchObject({ pointNodes: 21, scrutinyNodes: 2, nodes: 30 });
+    expect(pathPlanFitsReceipt(plan, { ...fewerScrutiny, scrutinyPointsPerDebate: 2 }, 1)).toBe(true);
+    expect(pathPlanFitsReceipt(plan, fewerScrutiny, 1)).toBe(false);
   });
 });

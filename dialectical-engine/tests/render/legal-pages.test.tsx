@@ -592,7 +592,9 @@ describe("the model providers page lists the companies the API's targets reach (
   });
 
   // FIX-SF-S03-p1 (t_566873aa): both checks always call Claude Haiku 5.5 on Anthropic (S01-R9, S04-R5), so every
-  // Register names that recipient for both purposes, whichever companies the API's targets reach.
+  // Register names that recipient for both purposes, whichever companies the API's targets reach. Privacy 3.12 (V4
+  // start step, Task 83): the clarifying questions before a debate starts run on the same model, so they too stand on
+  // exactly one row.
   it.each([
     ["no answer from the API (the whole reviewed catalogue)", null],
     ["targets on DeepInfra only", ["deepinfra"]],
@@ -600,7 +602,7 @@ describe("the model providers page lists the companies the API's targets reach (
     ["a target on a host no catalogue row knows", ["host:api.acme.example"]]
   ] as const)("names Anthropic's Claude Haiku 5.5 for both checks on exactly one row: %s", (_build, companies) => {
     const register = providerRegister(companies);
-    for (const purpose of ["synthesisCheck", "questionCheck", "reportCheck"] as const) {
+    for (const purpose of ["synthesisCheck", "questionCheck", "reportCheck", "clarifyQuestions"] as const) {
       const rows = register.filter((entry) => entry.purposes.includes(purpose));
       expect(rows.map((entry) => entry.key), purpose).toHaveLength(1);
       expect(rows[0]).toMatchObject({ models: "Claude Haiku 5.5", entity: "Anthropic Ireland, Limited" });

@@ -24,8 +24,9 @@ export const ENGINE_VERDICT_TRIGGERS = Object.freeze([
 ] as const);
 export type JudgesVerdictTrigger = typeof ENGINE_VERDICT_TRIGGERS[number];
 /**
- * V4 start step, Task 44 (spec 2026-11-03 §6): a debate with chosen paths has no judge picking a winner; its label comes
- * from the main answer's trust word (`verdictDerivationOfPaths`), one trigger per word and one for no word.
+ * V4 start step, Task 44 (spec 2026-11-03 §4.3 "After Start", the main answer): a debate with chosen paths has no judge
+ * picking a winner; its label comes from the main answer's trust word (`verdictDerivationOfPaths`), one trigger per word
+ * and one for no word.
  */
 export const PATHS_VERDICT_TRIGGERS = Object.freeze([
   "PATHS_MAIN_SURE", "PATHS_MAIN_SURE_FOR_CASE", "PATHS_MAIN_STILL_ARGUED", "PATHS_MAIN_DIDNT_HOLD", "PATHS_MAIN_UNSETTLED"
@@ -270,11 +271,11 @@ export function verdictDerivationOfJudges(verdict: JudgesVerdict): VerdictLabelD
 }
 
 /**
- * V4 start step, Task 44 (spec 2026-11-03 §6): the label record of a debate with chosen paths, from its main answer's
- * trust word (code sets it from the evidence: `mainAnswerTrustWordOf`). Sure, or sure for the case: "Clear answer"
- * (SUPPORTED); still argued: "Close call" (CONTESTED); didn't hold: UNSUPPORTED; no word could be set: "Close call"
- * (PATHS_MAIN_UNSETTLED). Never SPLIT: no judge counted anything. Rung 5 like the judges' record, with no basis absence
- * and no mark. No new served-root rule (0121 untouched).
+ * V4 start step, Task 44 (spec 2026-11-03 §4.3 "After Start", the main answer): the label record of a debate with
+ * chosen paths, from its main answer's trust word (code sets it from the evidence: `mainAnswerTrustWordOf`). Sure, or
+ * sure for the case: "Clear answer" (SUPPORTED); still argued: "Close call" (CONTESTED); didn't hold: UNSUPPORTED; no
+ * word could be set: "Close call" (PATHS_MAIN_UNSETTLED). Never SPLIT: no judge counted anything. Rung 5 like the
+ * judges' record, with no basis absence and no mark. No new served-root rule (0121 untouched).
  */
 export function verdictDerivationOfPaths(mainTrust: TrustWord | null): VerdictLabelDerivation {
   const derived = (label: VerdictLabelDerivation["label"], trigger: PathsVerdictTrigger): VerdictLabelDerivation => Object.freeze({
