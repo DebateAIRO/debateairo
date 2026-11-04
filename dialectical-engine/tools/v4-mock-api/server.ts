@@ -11,6 +11,9 @@
  * person's point of view, a dig trail three levels down; rewrite-seed.ts) and the money rule (a debate paused at the month
  * wall with Continue, a usage read that borrowed from tomorrow, a room where new starts wait for the reset).
  *
+ * Owner's screen review (3 Nov 2026): a running dig's steps and checked findings (draft GET /v1/runs/{id}/progress, switch
+ * live=ON; live-seed.ts) and the played climb of the seeded level-3 dig up to the first debate (switch climb=PLAY; climb-seed.ts).
+ *
  * stdout: one JSON line at start ({"mock":"ready",...}) and one JSON line per posted ask ({"mock":"ask",...}).
  * stderr: one line per request ("[mock] GET /v1/session 200"); MOCK_QUIET=1 hides them.
  */
@@ -34,6 +37,8 @@ import type { WebCase } from "./web-seed.js";
 import { paymentRegionsOf } from "../../packages/kernel/src/payment-regions.js";
 import { BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, priceCurrencyFor } from "../../packages/register/src/billing-plans.js";
 import { contributionOf, PUBLIC_MODES, PUBLIC_REF, seedPublicDebates, writtenReport, type PublicMode } from "./public-seed.js";
+import { digProgressAt, DraftDigProgressSchema, LIVE_MODES, type LiveMode } from "./live-seed.js";
+import { climbAt, CLIMB_MODES, CLIMB_STEP_MS, type ClimbParts } from "./climb-seed.js";
 
 // ---------------------------------------------------------------------------------------------------------------
 // Find the repository (no machine path is written here): MOCK_ENGINE_DIR, else the dialectical-engine folder this file
@@ -184,6 +189,16 @@ const PUBLIC_REPORT_MS = 8_000;
 const RESEARCHED_READ_MS = 6_000;
 let pauseMode: PauseMode = choice("MOCK_PAUSE", process.env.MOCK_PAUSE, PAUSE_MODES, "UNTIL_RESET");
 let digEndMode: DigEndMode = choice("MOCK_DIG", process.env.MOCK_DIG, DIG_END_MODES, "SETTLE");
+/**
+ * DRAFT (dig-d1 B, owner's screen review 3 Nov; live-seed.ts): ON serves a running dig's steps and checked findings at
+ * GET /v1/runs/{id}/progress; OFF answers 404 there, as today's API does (the website then shows the one calm line).
+ */
+let liveMode: LiveMode = choice("MOCK_LIVE", process.env.MOCK_LIVE, LIVE_MODES, "OFF");
+/**
+ * DRAFT play (dig-f2; climb-seed.ts): climb=PLAY plays, from that moment, the rest of the climb of the seeded level-3 dig
+ * d300 up to the first debate (each level 10 s); climb=SEED (the default) keeps d300's rewrite still writing.
+ */
+let climbPlayedAt: number | null = choice("MOCK_CLIMB", process.env.MOCK_CLIMB, CLIMB_MODES, "SEED") === "PLAY" ? Date.now() : null;
 /** Owner review 3 Nov: what a dig that fails under `dig=FAIL` stored ("stopped partway", one of the website's fixed sentences). */
 const DIG_FAILED_REASON = "RUNNER_EXECUTION_FAILED:CALL_BUDGET_EXHAUSTED";
 /** R22 W5-1: whether the next report written comes out finished (OK) or failed (FAIL), and how long the mock's writer takes. */
@@ -273,8 +288,19 @@ function addRun(run: MockRun): MockRun {
 
 /** A run's answer as it stands now: dig-f1, the first debate's main answer is rewritten a little after the mock starts. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function answerNow(run: MockRun, now = Date.now()): any {
-  return run.mainAnswerReadyAt === undefined ? run.answer : { ...run.answer, main_answer: mainAnswerAt(now, run.mainAnswerReadyAt) };
+function answerNow(run: MockRun, now = Date.now(), playedAt: number | null = climbPlayedAt): any {
+  const answer = run.mainAnswerReadyAt === undefined ? run.answer : { ...run.answer, main_answer: mainAnswerAt(now, run.mainAnswerReadyAt) };
+  return playedAt === null ? answer : withClimb(answer, run.runRef, climbAt(now, playedAt));
+}
+
+/** dig-f2 (climb=PLAY): the seeded trail's answers as the played climb has left them (climb-seed.ts). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function withClimb(answer: any, runRef: string, parts: ClimbParts): any {
+  if (runRef === DIG_RUNS.root) return { ...answer, path_rewrites: parts.rootPaths };
+  if (runRef === DIG_RUNS.levelOne) return { ...answer, path_rewrites: parts.levelOnePaths };
+  if (runRef === DIG_RUNS.levelTwo) return { ...answer, path_rewrites: parts.levelTwoPaths };
+  if (runRef === DIG_RUNS.levelThree) return { ...answer, dig: { ...answer.dig, rewrite: parts.levelThreeRewrite } };
+  return answer;
 }
 
 function settledRun(input: Readonly<{
@@ -924,6 +950,15 @@ function startupCheck(): number {
     const problems = checkAnswerDraft(run.answer);
     if (problems.length > 0) throw new Error(`MOCK_SEED_INVALID: GET /v1/answers/${run.answerId} draft fields:\n${problems.join("\n")}`);
     check(`GET /v1/answers/${run.answerId}`, C.AnswerSchema, contractOrDraft(C.AnswerSchema, run.answer, stripAnswer).body);
+    // dig-f2 (climb=PLAY): every step of the played climb is a whole answer the contract takes, draft fields and all, so the
+    // website gets the rewrites (a body the contract refused would be sent without them).
+    const climbs = [DIG_RUNS.root, DIG_RUNS.levelOne, DIG_RUNS.levelTwo, DIG_RUNS.levelThree] as string[];
+    for (let step = 0; climbs.includes(run.runRef) && step <= 3; step += 1) {
+      const full = answerNow(run, T0 + step * CLIMB_STEP_MS, T0);
+      const climbProblems = checkAnswerDraft(full);
+      if (climbProblems.length > 0) throw new Error(`MOCK_SEED_INVALID: GET /v1/answers/${run.answerId} (climb step ${String(step)}):\n${climbProblems.join("\n")}`);
+      check(`GET /v1/answers/${run.answerId} (climb step ${String(step)})`, C.AnswerSchema, full);
+    }
     if (run.mainAnswerReadyAt !== undefined) {
       for (const at of [run.mainAnswerReadyAt - 1, run.mainAnswerReadyAt]) {
         check(`GET /v1/answers/${run.answerId} (main answer at ${iso(at)})`, C.AnswerSchema, contractOrDraft(C.AnswerSchema, answerNow(run, at), stripAnswer).body);
@@ -1284,6 +1319,25 @@ async function postAsk(req: IncomingMessage, res: ServerResponse): Promise<void>
   sendJson(req, res, 202, askAccepted(run, false), C.AskAcceptedSchema);
 }
 
+/**
+ * DRAFT (dig-d1 B; live-seed.ts): GET /v1/runs/{id}/progress, a dig's steps and the findings that passed their checks.
+ * Only for a dig (a run with a dig link), only while live=ON, never for a dig that failed; else 404, as today's API.
+ */
+function sendProgress(req: IncomingMessage, res: ServerResponse, run: MockRun, now = Date.now()): void {
+  const state = stateOf(run, now);
+  const dig = digLinks.some((record) => record.child_run_id === run.runRef);
+  // Its run time ends when it settles (or, under dig=FAIL, when it fails); a dig with neither only waits.
+  const endsAt = run.settleAt ?? run.failsAt;
+  const waiting = state === "WAITING";
+  if (liveMode !== "ON" || !dig || state === "FAILED" || (endsAt === undefined && !waiting)) {
+    return notFound(req, res, "NOT_FOUND", "No progress read for this run.");
+  }
+  const settleAt = endsAt ?? now;
+  const startedAt = Math.min(run.startedAt ?? settleAt - RUN_SECONDS * 1000, settleAt);
+  const body = digProgressAt({ runRef: run.runRef, startedAt, settleAt, web: run.web === "PAID", free: run.web === "FREE", waiting }, now);
+  return sendJson(req, res, 200, body, DraftDigProgressSchema);
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------------------------------------------
@@ -1297,6 +1351,9 @@ function mockState() {
     usage: usageMode,
     pause: pauseMode,
     dig: digEndMode,
+    live: liveMode,
+    climb: climbPlayedAt === null ? "SEED" : "PLAY",
+    climb_played_at: climbPlayedAt === null ? null : iso(climbPlayedAt),
     public: publicMode,
     report: reportMode,
     session: sessionOut ? "OUT" : "IN",
@@ -1379,6 +1436,11 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
         const publicSetting = url.searchParams.get("public");
         const reportSetting = url.searchParams.get("report");
         const digSetting = url.searchParams.get("dig");
+        const liveSetting = url.searchParams.get("live");
+        if (liveSetting !== null) liveMode = choice("live", liveSetting, LIVE_MODES, liveMode);
+        // Setting climb=PLAY again plays the climb again from now, so a click-test can be repeated.
+        const climbSetting = url.searchParams.get("climb");
+        if (climbSetting !== null) climbPlayedAt = choice("climb", climbSetting, CLIMB_MODES, "SEED") === "PLAY" ? Date.now() : null;
         if (reportSetting !== null) reportMode = choice("report", reportSetting, REPORT_MODES, reportMode);
         if (digSetting !== null) digEndMode = choice("dig", digSetting, DIG_END_MODES, digEndMode);
         if (room !== null) roomMode = choice("room", room, ROOM_MODES, roomMode);
@@ -1396,7 +1458,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       } catch (failure) {
         // The detail goes to the mock's log, never into the reply (CodeQL js/stack-trace-exposure, PR #224).
         process.stderr.write(`[mock] setting refused: ${failure instanceof Error ? failure.message : String(failure)}\n`);
-        return sendJson(req, res, 400, { error: "MOCK_SETTING_INVALID", message: "Unknown value for room, ask, plan, usage, pause, dig or public; see the mock's log." });
+        return sendJson(req, res, 400, { error: "MOCK_SETTING_INVALID", message: "Unknown value for room, ask, plan, usage, pause, dig, live, climb or public; see the mock's log." });
       }
       return sendJson(req, res, 200, mockState());
     }
@@ -1406,7 +1468,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (parts[1] === "sign-out" && isGet) {
       return sendJson(req, res, 200, { signed_in: false }, undefined, { "set-cookie": clearedSessionCookies() });
     }
-    return notFound(req, res, "MOCK_CONTROL_NOT_FOUND", "Known: /__mock/state, /__mock/set?room=&ask=&plan=&usage=&pause=&public=, /__mock/draft/v1/..., /__mock/sign-in, /__mock/sign-out");
+    return notFound(req, res, "MOCK_CONTROL_NOT_FOUND", "Known: /__mock/state, /__mock/set?room=&ask=&plan=&usage=&pause=&public=&live=&climb=, /__mock/draft/v1/..., /__mock/sign-in, /__mock/sign-out");
   }
 
   // ---- the website edge's readiness probe (server.mjs /readyz forwards to <API>/readyz) ----
@@ -1684,6 +1746,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       if (stateOf(run) !== "SETTLED" || run.answer === undefined) return notFound(req, res, "ANSWER_NOT_FOUND", "This run has no answer yet.");
       return sendDraftable(answerNow(run), C.AnswerSchema, stripAnswer, checkAnswerDraft);
     }
+    if (sub === "progress") return sendProgress(req, res, run);
     if (sub === "last-visit") return sendJson(req, res, 200, lastVisits.get(run.runRef) ?? { seen_at: null, items: null }, C.LastVisitSchema);
     if (sub === "dig-links") return sendJson(req, res, 200, digLinksOf(run.runRef), C.DigLinksSchema);
     if (sub === "investigation") {
