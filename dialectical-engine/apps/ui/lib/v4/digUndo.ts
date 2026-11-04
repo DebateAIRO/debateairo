@@ -58,6 +58,11 @@ export type DigUndoEntry = Readonly<{
   sharePeriod?: DigSharePeriod;
   /** Owner N13: false on Free, which has no Quick look / Thorough choice, so no mode word is shown. */
   showMode: boolean;
+  /**
+   * public-f11 / dig-f25: a dig pressed on a public page names that page's reference instead of a debate (`parentRunId`
+   * is then the page's place in this list, never a run id); once started, [See it] opens the dig's own page.
+   */
+  publicRef?: string;
   phase: DigUndoPhase;
   /** journey-f8: the period its share is of ("today", or "this month" on Free). */
   period: "today" | "month";
@@ -75,6 +80,8 @@ export type AddDigInput = Readonly<{
   sharePercent: number | null;
   sharePeriod?: DigSharePeriod;
   showMode: boolean;
+  /** A dig pressed on a public page: its reference (see DigUndoEntry.publicRef). */
+  publicRef?: string;
   send: (dig: PendingDig) => Promise<DigUndoResult>;
   /** The plain line for a send that never answered ("We couldn't start this dig. Please try again."). */
   failedLine: string;
@@ -232,6 +239,7 @@ export function addDig(input: AddDigInput): number {
     sharePercent: input.sharePercent,
     ...(input.sharePeriod === undefined ? {} : { sharePeriod: input.sharePeriod }),
     showMode: input.showMode,
+    ...(input.publicRef === undefined ? {} : { publicRef: input.publicRef }),
     phase: "COUNTING",
     period: input.period ?? "today",
     slow: false,

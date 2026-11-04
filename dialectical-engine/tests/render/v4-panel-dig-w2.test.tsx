@@ -382,7 +382,9 @@ describe("dig-f22: a greyed pick box always has a reason the person can see", ()
 });
 
 describe("dig-f26 / dig-f34: the own view on Free, and what each picked item is", () => {
-  it("on a public Free debate a line under the own-view box says the view may be shown, and the box points to it", async () => {
+  // dig-f26 / journey-f20: the one grey line where typed words will be public, "This will be public." (dig-f26's longer
+  // sentence is an owner question).
+  it("on a public Free debate a line under the own-view box says the view will be public, and the box points to it", async () => {
     harness.planTier = "free";
     harness.freePublicNotice = true;
     await mountMap();
@@ -390,7 +392,7 @@ describe("dig-f26 / dig-f34: the own view on Free, and what each picked item is"
     await click(buttonNamed(CATALOG["v4.suggest.ownView"]!, panel()));
     const box = panel().querySelector<HTMLTextAreaElement>(".v4SugEditor textarea")!;
     const line = panel().querySelector<HTMLElement>(".v4SugPublic")!;
-    expect(line.textContent).toBe(CATALOG["v4.suggest.ownViewPublic"]);
+    expect(line.textContent).toBe(CATALOG["v4.publicMark.willBePublic"]);
     expect(box.getAttribute("aria-describedby")).toBe(line.id);
     expect(before(box, line)).toBe(true);
   });
@@ -400,7 +402,7 @@ describe("dig-f26 / dig-f34: the own view on Free, and what each picked item is"
     await openPath(PATHS.renew);
     await click(buttonNamed(CATALOG["v4.suggest.ownView"]!, panel()));
     expect(panel().querySelector(".v4SugPublic")).toBeNull();
-    expect(panel().textContent).not.toContain(CATALOG["v4.suggest.ownViewPublic"]);
+    expect(panel().textContent).not.toContain(CATALOG["v4.publicMark.willBePublic"]);
   });
 
   it("labels a picked open question 'Open question' and the person's text 'Your view'", async () => {

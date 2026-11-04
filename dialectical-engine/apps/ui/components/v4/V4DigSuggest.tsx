@@ -58,10 +58,11 @@ export type V4DigChoice = Readonly<{
    */
   picksPlace?: Readonly<{ title: Readonly<{ text: string; ai: boolean }>; onGo: () => void }>;
   /**
-   * dig-f26: true when this is a Free debate the server named as public (useV4Ask's freePublicNotice), so a line under
-   * the own-view box says the view may be shown on the public page. Absent or false: no such line.
+   * journey-f20 / dig-f26 / public-f26: what the person types here goes on the debate's public page: one grey line under
+   * the own-view box ("This will be public."), which the box points to. Left out: a private debate (or one whose state the
+   * page does not know).
    */
-  publicDebate?: boolean;
+  publicLine?: string;
 }>;
 
 /** On the tree and the outline, at most this many suggestions per path; the panel lists them all. */
@@ -401,8 +402,8 @@ function OwnView(props: Readonly<{ path: V4Path; choice: V4DigChoice; catalog: M
     setProblem(refused);
     if (refused === null) setText(null);
   };
-  // dig-f26: Free debates are public, so on Free one line under the box says the view may be shown there.
-  const shownPublicly = choice.publicDebate === true;
+  // journey-f20 / dig-f26: one line under the box when what is typed here will be public.
+  const shownPublicly = choice.publicLine !== undefined;
   return (
     <div className="v4SugEditor">
       <label className="v4SugLabel" htmlFor={`${id}-own`}>{t(catalog, "v4.suggest.ownViewLabel")}</label>
@@ -416,7 +417,7 @@ function OwnView(props: Readonly<{ path: V4Path; choice: V4DigChoice; catalog: M
         onChange={(event) => setText(event.target.value)}
         {...(shownPublicly ? { "aria-describedby": `${id}-public` } : {})}
       />
-      {shownPublicly ? <p id={`${id}-public`} className="v4PanelHint v4Muted v4SugPublic">{t(catalog, "v4.suggest.ownViewPublic")}</p> : null}
+      {shownPublicly ? <p id={`${id}-public`} className="v4PanelHint v4Muted v4SugPublic" data-public-will-be>{choice.publicLine}</p> : null}
       {problem !== null ? <p className="v4SugProblem" role="alert">{refusalLine(problem, choice.planTier, catalog)}</p> : null}
       <div className="v4SugEditorActions">
         <button type="button" className="v4Btn" onClick={add}>{t(catalog, "v4.suggest.ownViewAdd")}</button>

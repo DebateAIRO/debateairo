@@ -12,6 +12,9 @@ import "@/app/v4/v4-report.css";
 import "@/app/v4/v4-map.css";
 import "@/app/v4/v4-map-looks.css";
 import "@/app/v4/v4-wait.css";
+// Owner screen review (public-f11, public-d2): the public dig flow uses the site's one Undo note and the map's looks.
+import "@/app/v4/v4-undo.css";
+import "@/app/v4/v4-public.css";
 import "./public-lane.css";
 import { CouldNotLoadRetry } from "./CouldNotLoad";
 import { MadeByNewerRelease } from "./MadeByNewerRelease";

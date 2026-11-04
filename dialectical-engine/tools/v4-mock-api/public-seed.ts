@@ -120,6 +120,37 @@ export function seedPublicDebates(): readonly Record<string, unknown>[] {
 }
 
 /**
+ * Owner screen review (3 Nov, public-d2 A), DRAFT field `dig_suggestions` of the public read: each path's own suggestions, as the page's dig box shows
+ * them as chips; one has been dug near since (`dug_on`, `dug_ref`: that dig's contribution), so its chip opens that result instead. The contract's
+ * PublicDebate is strict and does not name the field yet, so the website does not receive it: it is on the draft view only
+ * (`/__mock/draft/v1/public/debates/<ref>`).
+ */
+export const PUBLIC_DIG_SUGGESTIONS: readonly Record<string, unknown>[] = [
+  { position_ref: "p-fares", suggestions: [
+    { suggestion_id: "pub-fares-towns", kind: "UNDOCUMENTED", side: null, text: "Do free fares work the same way in small towns?", places: ["path:p-fares"],
+      dug_on: "2026-10-28", dug_ref: PUBLIC_UPDATE_REF },
+    { suggestion_id: "pub-fares-drivers", kind: "CONTRADICTING", side: null, text: "Did any city see many drivers switch for good after fares went free?", places: ["path:p-fares"] }
+  ] },
+  { position_ref: "p-service", suggestions: [
+    { suggestion_id: "pub-service-cost", kind: "HELPS_MAIN_QUESTION", side: "FOR", text: "What does running buses more often cost compared with free fares?", places: ["path:p-service"] }
+  ] }
+];
+
+/**
+ * Owner screen review (public-f26): where a debate is on its way to a public page, for the click-test: `/__mock/set?publicstate=…`. The visibility read
+ * says PUBLISHED (with the first public debate's reference) for PUBLISHED and PRIVATE for every other one; the draft view adds the DRAFT field
+ * `public_stage` (WILL_BE_PUBLIC, BEING_CHECKED, KEPT_PRIVATE), which the contract does not name yet.
+ */
+export const PUBLIC_STATES = ["PRIVATE", "WILL_BE_PUBLIC", "BEING_CHECKED", "PUBLISHED", "KEPT_PRIVATE"] as const;
+export type PublicState = (typeof PUBLIC_STATES)[number];
+
+/** The visibility read for a debate of the asker's, in the click-test's public state; `draft` adds the stage field. */
+export function visibilityOf(state: PublicState, draft: boolean): Record<string, unknown> {
+  const body = state === "PUBLISHED" ? { state: "PUBLISHED", public_ref: PUBLIC_REF } : { state: "PRIVATE", public_ref: null };
+  return draft && state !== "PRIVATE" && state !== "PUBLISHED" ? { ...body, public_stage: state } : body;
+}
+
+/**
  * What a dig or a report waits on, for the click-test: `/__mock/set?public=…`. REPORT_STUCK (public-f9): "Write a report" is accepted but its version
  * never arrives, so the page keeps its "Being written" card, its checks slow down, and after 10 minutes it says it is taking longer, with "Check again".
  */
@@ -132,11 +163,20 @@ export function writtenReport(version: number, writtenAt: string): Record<string
     answer: { segments: [`Version ${String(version)}: service first, and free fares for those who need them.`] } };
 }
 
+/**
+ * The digger's own rewrite of the path, as the dig's answer carries it once it is on the page (`contribution.rewrite`): the new text of a
+ * contribution, or, with "#confirm" in the view, the path's text as it was and nothing changed ("Confirmed: the answer holds.").
+ */
+export function contributionRewriteOf(contribution: Record<string, unknown> | null, sameLine: string | null): Record<string, unknown> {
+  if (contribution === null) return { line: sameLine ?? "", summary: "The dig looked again and the path holds as it was.", fate: "PARTLY_HELD", what_changed: [] };
+  return { line: contribution.line, summary: contribution.summary, fate: contribution.fate, what_changed: contribution.what_changed };
+}
+
 /** A dig that passed the check, as its page shows it. */
 export function contributionOf(positionRef: string, onRef: string | null, updateRef: string, on: string, view: string): Record<string, unknown> {
   return {
     position_ref: positionRef, contributor: "Mock Tester", contributed_on: on,
-    line: "This path, after a dig from the click-test: partly held.",
+    line: "This path, after a dig from the click-test: partly held, with one more point in it.",
     summary: `A dig weighed this view and kept what held: ${view.slice(0, 200)}`,
     fate: "PARTLY_HELD", what_changed: ["The dig added one point to this path."], update_ref: updateRef, own_rewrite: true, on_ref: onRef,
     dig_paths: [{ position_ref: `p-${updateRef.slice(0, 8)}`, line: "A path of this dig's own.", fate: "HELD_UP", points: ["A made-up point this dig argued."] }]

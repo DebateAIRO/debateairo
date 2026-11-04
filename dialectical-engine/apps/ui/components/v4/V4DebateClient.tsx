@@ -32,6 +32,8 @@ import {
 import { V4Outline } from "@/components/v4/V4Outline";
 import { V4Panel } from "@/components/v4/V4Panel";
 import { useQuestionShare, V4QuestionShareLine, V4TopLine } from "@/components/v4/V4QuestionShare";
+import { V4PublicMark } from "@/components/v4/V4PublicMark";
+import { typedGoesPublic, usePublicStage } from "@/lib/v4/publicState";
 import type { V4ResearchedPress } from "@/components/v4/V4Sources";
 import { V4ChangedSince } from "@/components/v4/V4PathRewrite";
 import { V4AnswerCard, type V4ReportAnswer } from "@/components/v4/V4AnswerCard";
@@ -966,6 +968,16 @@ function V4Debate({
     };
   }, [trailKey]);
 
+  // public-f26 / journey-f20 (lib/v4/publicState.ts): the public state of the debate this map belongs to (the top one, under
+  // a dig), for the globe line under the question and "This will be public." where the person types. Not on a dig made from
+  // someone else's public page (its own note says what became of it).
+  const publicStage = usePublicStage(served === null || served.answer.contribution !== undefined ? null
+    : isDigMap ? (trail?.complete === true ? trail.steps[0]?.runId ?? null : null) : servedRunId, answerVersion);
+  // One line wherever the person types something that will be public (journey-f20): when the debate's public state says
+  // so, or, while the server does not say that yet, on a Free debate the server named as public (dig-f26: useV4Ask's
+  // freePublicNotice).
+  const publicLine = typedGoesPublic(publicStage) || ask.freePublicNotice ? t(catalog, "v4.publicMark.willBePublic") : null;
+
   // ── The report's answer (R22 W5-1, owner Q-D11), and its ready moment (journey-f17) ─────────────────────────────
   // V4 screen review (3 Nov 2026), report-d1 / report-d2 / report-f15: the report is asked for and waited for on the map,
   // the first question's report on a dig's map too (components/v4/useMapReport.tsx).
@@ -1071,10 +1083,10 @@ function V4Debate({
       typed,
       // dig-f5: where the picks wait, by name, with [Go to them] (the path, or the main question for its own open questions).
       ...(picksPlaceOf(map, draft, catalog, select) ?? {}),
-      // dig-f26: on a Free debate the server named as public, the own-view box says the view may be shown there.
-      publicDebate: ask.freePublicNotice
+      // journey-f20 / dig-f26 / public-f26: the own-view box's one grey line when what is typed there will be public.
+      ...(publicLine === null ? {} : { publicLine })
     };
-  }, [map, draft, planTier, canDig, isDigMap, digs, commitDraft, clearPicks, typed, catalog, select, ask.freePublicNotice]);
+  }, [map, draft, planTier, canDig, isDigMap, digs, commitDraft, clearPicks, typed, catalog, select, publicLine]);
   // ── The dig flow (dig-d3 B, owner pick 3 Nov): lib/v4/useDigQueue.tsx ──────────────────────────────────────────
   // A dig waiting out its 10 seconds belongs to the whole V4 site, not to this page (lib/v4/digUndo.ts, memory only): it
   // keeps its own Undo when the person digs again or opens another page, and the other dig buttons stay active. Its
@@ -1486,6 +1498,7 @@ function V4Debate({
       money={money}
       quota={digQuota.quota}
       rest={report.digsRest ? report.restReason : null}
+      publicNote={publicLine === null ? null : t(catalog, "v4.publicMark.addsToPublic")}
       withDig={!panelDigsPicks(shownSelection, draft, rootPanelOpen(view, digs), view.paths)}
       onDig={() => startDig(picksTarget)}
       onClear={clearPicks}
@@ -1495,7 +1508,16 @@ function V4Debate({
     />
   ) : null;
   const picksList = layout === "phone" && picksTarget !== null
-    ? <V4PicksList target={picksTarget} planTier={planTier} onClear={clearPicks} clearRef={trayClearRef} catalog={catalog} />
+    ? (
+      <V4PicksList
+        target={picksTarget}
+        planTier={planTier}
+        onClear={clearPicks}
+        clearRef={trayClearRef}
+        publicNote={publicLine === null ? null : t(catalog, "v4.publicMark.addsToPublic")}
+        catalog={catalog}
+      />
+    )
     : null;
   // dig-f7: where focus goes when a note's button is gone (the pressed button hidden, a note that went): the tray's Clear
   // button, the phone's bar job or Map button, else the panel's heading, the first that is on the page.
@@ -1575,6 +1597,7 @@ function V4Debate({
           {map.dig !== null && map.dig !== undefined ? (
             <V4LevelTrail level={map.dig.level} trail={trail} linkLevel={chosenLevel} catalog={catalog} />
           ) : null}
+          <V4PublicMark stage={publicStage} catalog={catalog} />
           <V4ContributionNote contribution={served?.answer.contribution} catalog={catalog} />
           {answerCard}
           {/* report-d2: the report waiting for digs, being written or not written, in the shared waiting card. */}

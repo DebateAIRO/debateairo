@@ -724,8 +724,10 @@ apps/ui/components/v4/V4Panel.tsx
 apps/ui/components/v4/V4PathRewrite.tsx
 apps/ui/components/v4/V4PausedScreen.tsx
 apps/ui/components/v4/V4PicksClearedNote.tsx
+apps/ui/components/v4/V4PublicDig.tsx
 apps/ui/components/v4/V4PublicFlag.tsx
 apps/ui/components/v4/V4PublicLane.tsx
+apps/ui/components/v4/V4PublicMark.tsx
 apps/ui/components/v4/V4PublicPage.tsx
 apps/ui/components/v4/V4PublicSession.tsx
 apps/ui/components/v4/V4QuestionShare.tsx
@@ -984,9 +986,11 @@ apps/ui/lib/v4/mapModel.ts
 apps/ui/lib/v4/mapShelf.ts
 apps/ui/lib/v4/money.ts
 apps/ui/lib/v4/monthPause.ts
+apps/ui/lib/v4/publicDig.ts
 apps/ui/lib/v4/publicMap.ts
 apps/ui/lib/v4/publicPage.ts
 apps/ui/lib/v4/publicReport.ts
+apps/ui/lib/v4/publicState.ts
 apps/ui/lib/v4/questionAddress.ts
 apps/ui/lib/v4/quotaPulse.ts
 apps/ui/lib/v4/readyMoment.ts

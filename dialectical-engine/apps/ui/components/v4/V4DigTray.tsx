@@ -77,6 +77,8 @@ export function V4DigTray(props: Readonly<{
    * ("Digging opens again when your report is written."). Absent or null: digging can start.
    */
   rest?: string | null;
+  /** public-f26: on a debate whose page is public, "This adds to your public debate." (null or absent: nothing). */
+  publicNote?: string | null;
   /** False when the panel's own pinned dig block already digs these picks: the tray then offers no second button. */
   withDig: boolean;
   onDig: () => void;
@@ -106,6 +108,7 @@ export function V4DigTray(props: Readonly<{
           ? <p className="v4PanelHint v4DigWaitLine" role="note">{quota.waitLine}</p>
           : <V4MoneyLines lines={props.money} catalog={catalog} />
         : null}
+      {props.publicNote === null || props.publicNote === undefined ? null : <p className="v4DebTrayPublic">{props.publicNote}</p>}
       <div className="v4DebTrayActions">
         {props.withDig ? (
           <span className="v4DigBtnRow">
@@ -142,6 +145,8 @@ export function V4PicksList(props: Readonly<{
   onClear: () => void;
   /** The Clear button (dig-f23: focus comes back to it after "Picks cleared" is undone). */
   clearRef?: Ref<HTMLButtonElement>;
+  /** public-f26: on a debate whose page is public, "This adds to your public debate." (null or absent: nothing). */
+  publicNote?: string | null;
   catalog: MessageCatalog;
 }>) {
   const { target, catalog } = props;
@@ -149,6 +154,7 @@ export function V4PicksList(props: Readonly<{
     <section className="v4DebTray v4DebTrayList" aria-label={t(catalog, "v4.dig.trayLabel")}>
       <V4PickChips picks={target.picks} label={t(catalog, "v4.map.picked")} />
       <TrayText target={target} planTier={props.planTier} mode={null} catalog={catalog} />
+      {props.publicNote === null || props.publicNote === undefined ? null : <p className="v4DebTrayPublic">{props.publicNote}</p>}
       <div className="v4DebTrayActions">
         <button ref={props.clearRef} type="button" className="v4Link v4DebTrayClear" onClick={props.onClear}>
           {t(catalog, "v4.dig.trayClear")}

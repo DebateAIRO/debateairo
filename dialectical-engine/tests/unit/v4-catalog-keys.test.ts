@@ -278,7 +278,26 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   // only from the server). "For", "Against", "Explore the map" and "Check again" are the record's own words.
   "v4.public.mapBack",
   "v4.public.menu",
-  "v4.public.report.ready"
+  "v4.public.report.ready",
+  // The owner's screen review of 3 Nov, wave 2 (public-f11, public-d2 A, public-f26, journey-f20): the public dig flow's and the public marks' lines the
+  // record does not word ("the exact sentences go into the wording card"). The record's own words (Dig done, Checked, On the public page, See it on the
+  // page, Kept with you…, Confirmed…, Or write your own, Someone dug near here on…, Public, See its page, Copy link, This will be public.) are pinned in
+  // tests/unit/public-lane.test.ts.
+  "v4.public.dig.chipsLabel",
+  "v4.public.dig.shareToday",
+  "v4.public.dig.shareMonth",
+  "v4.public.digCard.running",
+  "v4.public.digCard.stopReached",
+  "v4.public.digCard.stopOpen",
+  "v4.public.digCard.before",
+  "v4.public.digCard.after",
+  "v4.public.digCard.removed",
+  "v4.publicMark.linkCopied",
+  "v4.publicMark.copyFailed",
+  "v4.publicMark.WILL_BE_PUBLIC",
+  "v4.publicMark.BEING_CHECKED",
+  "v4.publicMark.KEPT_PRIVATE",
+  "v4.publicMark.addsToPublic"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {
@@ -451,15 +470,15 @@ const REVIEW_LINES: Readonly<Record<string, string>> = Object.freeze({
   "v4.panel.storyMissing": `${APPROVED_REPORT_LINES["v4.investigation.noStory"]} ${NO_WAIT}`,
   "v4.panel.fallbackMissing": `${APPROVED_REPORT_LINES["v4.investigation.noStory"]} ${NO_WAIT}`,
   // Wave 2, the panel and choosing what to dig: dig-f9 (the question check names the dig), dig-f22 (the visible reason
-  // over greyed boxes), dig-f26 (Free's line under the own-view box), dig-f34 (the two labels). One pick's button reads
-  // dig-f5 / dig-f31's "Dig into your pick" (QUOTA_RECORD_LINES below), the one dig-button helper of lib/v4/digQuota.ts;
-  // map-f14's "Dig into this" is an owner question.
+  // over greyed boxes), dig-f34 (the two labels). dig-f26's line under the own-view box is journey-f20's one line, "This
+  // will be public." (v4.publicMark.willBePublic, pinned in tests/unit/public-lane.test.ts); dig-f26's own sentence is an
+  // owner question. One pick's button reads dig-f5 / dig-f31's "Dig into your pick" (QUOTA_RECORD_LINES below), the one
+  // dig-button helper of lib/v4/digQuota.ts; map-f14's "Dig into this" is an owner question.
   // map-d4 A, as drawn on the page the owner picked from: the findings' heading.
   "v4.panel.found": "What we found",
   "v4.dig.checkAbout": "About your dig on “{path}”:",
   "v4.suggest.picksOn": "Your picks are on “{path}”.",
   "v4.suggest.freeCap": "On the Free plan a dig combines up to {count} picks.",
-  "v4.suggest.ownViewPublic": "Free debates are public, so your view may be shown on this public page.",
   "v4.suggest.openTag": "Open question",
   "v4.suggest.ownViewTag": "Your view"
 });

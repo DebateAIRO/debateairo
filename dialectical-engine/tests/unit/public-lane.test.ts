@@ -70,7 +70,20 @@ describe("the public page's words", () => {
     "v4.public.signedOut.createAccount": "Create a free account",
     "v4.public.signedOut.signIn": "Sign in",
     "v4.public.report.writtenBy": "Report written by {name}",
-    "v4.public.aContributor": "a contributor"
+    "v4.public.aContributor": "a contributor",
+    // The owner's screen review of 3 Nov (public-d2 A, journey-f20, public-f26): the record's own words, word for word.
+    "v4.public.dig.writeOwn": "Or write your own",
+    "v4.public.dig.dugNear": "Someone dug near here on {date}",
+    "v4.public.digCard.stopDone": "Dig done",
+    "v4.public.digCard.stopChecked": "Checked",
+    "v4.public.digCard.onPage": "On the public page",
+    "v4.public.digCard.seeOnPage": "See it on the page",
+    "v4.public.digCard.keptPrivate": "Kept with you: the public page is unchanged.",
+    "v4.public.digCard.confirmed": "Confirmed: the answer holds.",
+    "v4.publicMark.public": "Public",
+    "v4.publicMark.seePage": "See its page",
+    "v4.publicMark.copyLink": "Copy link",
+    "v4.publicMark.willBePublic": "This will be public."
   };
   it("the briefed sentences, word for word", () => {
     for (const [key, words] of Object.entries(OWNER_WORDS)) expect(CATALOG[key], key).toBe(words);
@@ -160,6 +173,19 @@ describe("what a dig on a public page sends", () => {
   });
   it("an empty box sends nothing", () => {
     expect(publicDigAsk({ publicRef: PUBLIC_REF, question: "Q?", path, views: ["  "], catalog: CATALOG, locale: "en" })).toBeNull();
+  });
+  it("owner screen review (public-f11, public-d2 A): Thorough when chosen, and the path's own suggestions the person tapped, first", () => {
+    const chip = { suggestion_id: "pub-fares-drivers", kind: "CONTRADICTING" as const, side: null, text: "Did any city see many drivers switch?", places: ["path:p-fares"] };
+    const sent = publicDigAsk({ publicRef: PUBLIC_REF, question: "Q?", path, views: ["Mine."], chips: [chip], mode: "thorough", catalog: CATALOG, locale: "en" })!;
+    expect(sent.parent).toEqual({ public_ref: PUBLIC_REF, places: ["path:p-fares"], mode: "thorough", picks: [
+      { kind: "CONTRADICTING", suggestion_id: "pub-fares-drivers", place: "path:p-fares", text: "Did any city see many drivers switch?" },
+      { kind: "OWN_VIEW", suggestion_id: null, place: "path:p-fares", text: "Mine." }
+    ] });
+    // The dig as the site's one Undo list keeps it: the path's picks, under the path.
+    expect(sent.target).toMatchObject({ kind: "picks", path: { id: "p-fares", line: path.line } });
+    expect(sent.questionLine).toContain("Did any city see many drivers switch?");
+    // Tapped chips alone are a dig too; with no mode named it is a quick look.
+    expect(publicDigAsk({ publicRef: PUBLIC_REF, question: "Q?", path, views: [], chips: [chip], catalog: CATALOG, locale: "en" })!.parent.mode).toBe("quick");
   });
 });
 

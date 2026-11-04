@@ -17,6 +17,9 @@ import { ContractHttpError } from "../../packages/contract/src/client.js";
  * Wave 2 (public-d1 A): the paths are rows that unfold, so each test opens the rows it reads; "Write a report" (public-f9) says it is starting, then a
  * card at the top of Reports says the report is being written and the person can leave, the checks slow down and pause in a hidden tab, and after ten
  * minutes the card says it is taking longer, with "Check again"; the ready line is read out once; a report that could not be written says so.
+ * Wave 2: the map's dig flow (public-f11, dig-f25): nothing is sent before the site's 10-second Undo, Quick look with Thorough on paid plans, the share when
+ * the room read says one; after it the person stays, with a card under the path that reads the dig's own run (public-d2 A); the path's own suggestions as
+ * chips when the public read carries them; "This will be public." under the person's own words (journey-f20).
  */
 const lane = vi.hoisted(() => ({
   session: true as boolean | "pending",
@@ -25,7 +28,10 @@ const lane = vi.hoisted(() => ({
   submit: vi.fn(),
   writePublicReport: vi.fn(),
   readPublicDebate: vi.fn(),
-  planTier: "free" as "free" | "premium"
+  readRun: vi.fn(),
+  readRunAnswer: vi.fn(),
+  planTier: "free" as "free" | "premium",
+  room: null as Record<string, unknown> | null
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: lane.push, refresh: lane.refresh }) }));
 vi.mock("@/lib/api", async (original) => ({
@@ -37,16 +43,20 @@ vi.mock("@/lib/api", async (original) => ({
   contractClient: {
     writePublicReport: (...args: unknown[]) => lane.writePublicReport(...args),
     readPublicDebate: (...args: unknown[]) => lane.readPublicDebate(...args),
+    readRun: (...args: unknown[]) => lane.readRun(...args),
+    readRunAnswer: (...args: unknown[]) => lane.readRunAnswer(...args),
     readReadingLevel: async () => ({ reading_level: "plain" }),
     saveReadingLevel: async () => ({ reading_level: "plain" })
   }
 }));
 vi.mock("@/lib/v4/useV4Ask", () => ({
-  useV4Ask: () => ({ planTier: lane.planTier, room: null, submit: (...args: unknown[]) => lane.submit(...args), submitting: false, dialogs: null, flagsCrisis: () => false })
+  useV4Ask: () => ({ planTier: lane.planTier, room: lane.room, submit: (...args: unknown[]) => lane.submit(...args), submitting: false, dialogs: null, flagsCrisis: () => false })
 }));
 
 import { PublicDebateOverview } from "../../apps/ui/components/PublicDebateOverview.js";
-import { contributionOf, seedPublicDebates, PUBLIC_REF, PUBLIC_REF_AUTHOR_GONE, PUBLIC_UPDATE_REF } from "../../tools/v4-mock-api/public-seed.js";
+import { resetDigUndo } from "../../apps/ui/lib/v4/digUndo.js";
+import { resetPublicDigs } from "../../apps/ui/lib/v4/publicDig.js";
+import { contributionOf, seedPublicDebates, PUBLIC_DIG_SUGGESTIONS, PUBLIC_REF, PUBLIC_REF_AUTHOR_GONE, PUBLIC_UPDATE_REF } from "../../tools/v4-mock-api/public-seed.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -83,10 +93,18 @@ const rows = (): HTMLElement[] => [...host!.querySelectorAll<HTMLElement>("[data
 async function openRows(): Promise<void> {
   for (const head of [...host!.querySelectorAll<HTMLButtonElement>(".v4PubRowHead")]) if (head.getAttribute("aria-expanded") === "false") await click(head);
 }
+/** The site's 10-second Undo runs out (fake timers): the dig is sent, and its answer is read. */
+const undoRunsOut = async (): Promise<void> => { await act(async () => { vi.advanceTimersByTime(10_000); }); await flush(); };
+const notes = (): Element | null => host!.querySelector(".v4PubNotes .v4UndoHost");
 
 beforeEach(() => {
+  resetDigUndo();
+  resetPublicDigs();
   lane.session = true;
   lane.planTier = "free";
+  lane.room = null;
+  lane.readRun = vi.fn(async () => ({ state: "RUNNING", hold_until: null }));
+  lane.readRunAnswer = vi.fn(async () => { throw new Error("not settled"); });
   lane.push = vi.fn();
   lane.refresh = vi.fn();
   lane.submit = vi.fn(async () => ({ kind: "STARTED", runId: "99999999-9999-4999-8999-999999999999" }));
@@ -97,6 +115,8 @@ afterEach(async () => {
   await act(async () => root?.unmount());
   host?.remove();
   root = null;
+  resetDigUndo();
+  resetPublicDigs();
   vi.useRealTimers();
   window.history.replaceState(null, "", "/");
 });
@@ -263,12 +283,22 @@ describe("Dig into this", () => {
     expect(document.activeElement).toBe(firstOpen());
   });
 
-  it("a path of the debate: a quick dig named by the page, then the dig's own page; no run id goes out, no AI suggestion is offered", async () => {
+  it("a path of the debate: nothing is sent before the 10-second Undo; then a quick dig named by the page, and the person stays", async () => {
+    vi.useFakeTimers();
     await mount(debate());
     await openRows();
     await click(firstOpen());
     await write(host!.querySelector<HTMLTextAreaElement>(".v4PubText")!, "Rural towns differ.");
     await click(buttons(V4["v4.public.dig.start"]!)[0]!);
+    // journey-f21 / dig-f25: the site's one Undo note, with focus on Undo; the box says it is starting, with the same Undo.
+    expect(lane.submit).not.toHaveBeenCalled();
+    expect(notes()!.textContent).toContain("Digging into “Rural towns differ.”");
+    expect(notes()!.textContent).not.toContain(V4["v4.digMode.quick"]);
+    expect(document.activeElement!.textContent).toBe(V4["v4.dig.undo"]);
+    expect(host!.querySelector(".v4PubDig")!.textContent).toContain(V4["v4.panel.digStarting"]);
+    await act(async () => { vi.advanceTimersByTime(9_000); });
+    expect(lane.submit).not.toHaveBeenCalled();
+    await undoRunsOut();
     expect(lane.submit).toHaveBeenCalledTimes(1);
     const [line, mode, origin, parent] = lane.submit.mock.calls[0]!;
     expect(mode).toBe("quick");
@@ -279,16 +309,54 @@ describe("Dig into this", () => {
     // The path's newest line is what is dug, as on the map.
     expect(line).toContain("also in small towns");
     expect(parent).not.toHaveProperty("parent_run_id");
-    expect(lane.push).toHaveBeenCalledWith("/v4/debate/99999999-9999-4999-8999-999999999999?level=plain");
+    // public-d2 A: the person stays on the page; a card under the path says the dig is running, with "Open it" to its own page.
+    expect(lane.push).not.toHaveBeenCalled();
+    expect(buttons(V4["v4.public.dig.start"]!)).toEqual([]);
+    const card = host!.querySelector("[data-public-dig-card]")!;
+    expect(card.textContent).toContain(`${V4["v4.seed.yourDig"]} Rural towns differ.`);
+    expect(card.textContent).toContain(V4["v4.public.digCard.running"]);
+    expect(card.classList.contains("v4GroundLOOKING")).toBe(true);
+    expect([...card.querySelectorAll(".v4PubDigStop")].map((stop) => stop.getAttribute("data-reached"))).toEqual(["false", "false"]);
+    expect(card.querySelector("a")!.getAttribute("href")).toBe("/v4/debate/99999999-9999-4999-8999-999999999999?level=plain");
+    expect(lane.readRun).toHaveBeenCalledWith("99999999-9999-4999-8999-999999999999");
+    // The note says it started; its [See it] opens the dig's own page (a public page has no map of the person's).
+    expect(notes()!.textContent).toContain("You can leave this page.");
+    expect(notes()!.querySelector("a")!.getAttribute("href")).toBe("/v4/debate/99999999-9999-4999-8999-999999999999");
+    // Focus that was in the box goes to "Dig into this"; the box can be opened again, empty.
+    expect(document.activeElement).toBe(firstOpen());
+    await click(firstOpen());
+    expect(host!.querySelector<HTMLTextAreaElement>(".v4PubText")!.value).toBe("");
+  });
+
+  it("Undo: nothing is sent, the box keeps the words, and the note says \"Cancelled. Nothing was used.\"", async () => {
+    vi.useFakeTimers();
+    await mount(debate());
+    await openRows();
+    await click(firstOpen());
+    const field = host!.querySelector<HTMLTextAreaElement>(".v4PubText")!;
+    await write(field, "Mine.");
+    await click(buttons(V4["v4.public.dig.start"]!)[0]!);
+    // While it waits the words cannot change under it.
+    expect(field.readOnly).toBe(true);
+    await click(buttons(V4["v4.dig.undo"]!)[0]!);
+    expect(notes()!.textContent).toContain(V4["v4.undo.cancelled"]);
+    await undoRunsOut();
+    expect(lane.submit).not.toHaveBeenCalled();
+    expect(field.value).toBe("Mine.");
+    expect(field.readOnly).toBe(false);
+    expect(buttons(V4["v4.public.dig.start"]!)[0]!.getAttribute("aria-disabled")).toBeNull();
+    expect(host!.querySelector("[data-public-dig-card]")).toBeNull();
   });
 
   it("a dig's own path names the contribution it hangs under", async () => {
+    vi.useFakeTimers();
     await mount(debate());
     await openRows();
     const under = host!.querySelector(".v4PubDigPaths")!;
     await click(under.querySelector<HTMLButtonElement>("button")!);
     await write(under.querySelector<HTMLTextAreaElement>(".v4PubText")!, "Mine.");
     await click([...under.querySelectorAll("button")].find((one) => one.textContent === V4["v4.public.dig.start"])!);
+    await undoRunsOut();
     expect(lane.submit.mock.calls[0]![3]).toMatchObject({ dig_ref: PUBLIC_UPDATE_REF, places: ["path:p-towns"], picks: [{ place: "path:p-towns" }] });
   });
 
@@ -312,7 +380,8 @@ describe("Dig into this", () => {
     expect(host!.querySelectorAll(".v4PubText")).toHaveLength(4);
   });
 
-  it("a refusal reads as the hook said it; the box stays, with the person's words", async () => {
+  it("a refusal reads as the hook said it, in the box, after the 10 seconds; the box stays, with the person's words", async () => {
+    vi.useFakeTimers();
     lane.submit = vi.fn(async () => ({ kind: "REFUSED", message: "Plain words." }));
     await mount(debate());
     await openRows();
@@ -320,27 +389,33 @@ describe("Dig into this", () => {
     const field = host!.querySelector<HTMLTextAreaElement>(".v4PubText")!;
     await write(field, "Mine.");
     await click(buttons(V4["v4.public.dig.start"]!)[0]!);
+    await undoRunsOut();
     expect(host!.querySelector("[role=alert]")!.textContent).toBe("Plain words.");
     expect(field.value).toBe("Mine.");
     expect(lane.push).not.toHaveBeenCalled();
+    // Said once, in the box: the site's note steps back.
+    expect(notes()).toBeNull();
   });
 
   it("a dig that could not join is a calm note, not a refusal: it runs as the person's own private debate, with \"Open it\"", async () => {
+    vi.useFakeTimers();
     lane.submit = vi.fn(async () => ({ kind: "STARTED", runId: "99999999-9999-4999-8999-999999999999", notJoined: true }));
     await mount(debate());
     await openRows();
     await click(firstOpen());
     await write(host!.querySelector<HTMLTextAreaElement>(".v4PubText")!, "Mine.");
     await click(buttons(V4["v4.public.dig.start"]!)[0]!);
-    expect(host!.querySelector("[role=alert]")).toBeNull();
+    await undoRunsOut();
+    expect(host!.querySelector(".v4PubDig [role=alert]")).toBeNull();
     const note = host!.querySelector("[data-public-dig-private]")!;
     expect(note.getAttribute("role")).toBe("status");
     expect(note.className).toBe("v4PubNote");
     expect(note.textContent).toBe(`${V4["v4.public.dig.notJoined"]} Open it`);
     expect(note.querySelector("a")!.getAttribute("href")).toBe("/v4/debate/99999999-9999-4999-8999-999999999999?level=plain");
-    // It started: the box is gone, so it cannot be started twice.
+    // It started: the box is gone, so it cannot be started twice; its own run is not read for a page it never joined.
     expect(buttons(V4["v4.public.dig.start"]!)).toEqual([]);
     expect(lane.push).not.toHaveBeenCalled();
+    expect(lane.readRun).not.toHaveBeenCalled();
   });
 
   it("extra views are \"Your view 2\" and \"Your view 3\", each with Remove; removing one keeps the others' words", async () => {
@@ -389,6 +464,177 @@ describe("Dig into this", () => {
     const under = host!.querySelector(".v4PubDigPaths")!;
     expect(under.querySelector(".v4PubDig")).not.toBeNull();
     expect(host!.querySelectorAll(".v4PubDig")).toHaveLength(1);
+  });
+});
+
+describe("the map's dig flow on a public page (owner screen review, 3 Nov)", () => {
+  const firstOpen = (): HTMLButtonElement => buttons(V4["v4.public.dig.open"]!)[0]!;
+  const withChips = (): PublicDebate => ({ ...debate(), dig_suggestions: PUBLIC_DIG_SUGGESTIONS } as unknown as PublicDebate);
+
+  it("public-f11: Free has no Thorough and no mode word; a paid plan starts on Quick look and sends Thorough when chosen", async () => {
+    vi.useFakeTimers();
+    await mount(debate());
+    await openRows();
+    await click(firstOpen());
+    expect(buttons(V4["v4.digMode.thorough"]!)).toEqual([]);
+    await act(async () => root?.unmount());
+    host?.remove();
+    lane.planTier = "premium";
+    await mount(debate());
+    await openRows();
+    await click(firstOpen());
+    const quick = buttons(V4["v4.digMode.quick"]!)[0]!;
+    expect(quick.getAttribute("aria-pressed")).toBe("true");
+    expect(text()).toContain(V4["v4.panel.modeHint.quick"]);
+    await click(buttons(V4["v4.digMode.thorough"]!)[0]!);
+    expect(text()).toContain(V4["v4.panel.modeHint.thorough"]);
+    await write(host!.querySelector<HTMLTextAreaElement>(".v4PubText")!, "Mine.");
+    await click(buttons(V4["v4.public.dig.start"]!)[0]!);
+    expect(notes()!.textContent).toContain(V4["v4.digMode.thorough"]);
+    await undoRunsOut();
+    expect(lane.submit.mock.calls[0]![1]).toBe("thorough");
+    expect(lane.submit.mock.calls[0]![3]).toMatchObject({ mode: "thorough" });
+  });
+
+  it("public-f11: no share is shown while the room read has none for this dig, never a new question's; with one, the box says it, Free by the month", async () => {
+    lane.planTier = "premium";
+    lane.room = { room: "FITS", scope: null, resets_at: null, waiting_run_ref: null, plan_id: "PLUS", start_share_percent: 10 };
+    await mount(debate());
+    await openRows();
+    await click(firstOpen());
+    expect(host!.querySelector("[data-public-dig-share]")).toBeNull();
+    expect(text()).not.toContain("10%");
+    await act(async () => root?.unmount());
+    host?.remove();
+    lane.room = { room: "FITS", scope: null, resets_at: null, waiting_run_ref: null, plan_id: "PLUS", dig_share_percent: 5 };
+    await mount(debate());
+    await openRows();
+    await click(firstOpen());
+    expect(host!.querySelector("[data-public-dig-share]")!.textContent).toBe("This dig uses up to 5% of today.");
+    await write(host!.querySelector<HTMLTextAreaElement>(".v4PubText")!, "Mine.");
+    await click(buttons(V4["v4.public.dig.start"]!)[0]!);
+    expect(notes()!.textContent).toContain("up to 5% of today");
+    await click(buttons(V4["v4.dig.undo"]!)[0]!);
+    await act(async () => root?.unmount());
+    host?.remove();
+    lane.planTier = "free";
+    lane.room = { room: "FITS", scope: null, resets_at: null, waiting_run_ref: null, plan_id: "FREE", dig_share_percent: 5 };
+    await mount(debate());
+    await openRows();
+    await click(firstOpen());
+    expect(host!.querySelector("[data-public-dig-share]")!.textContent).toBe("This dig uses up to 5% of this month.");
+    // public-f14: the site's one note names the share's own window, so on Free it says the month too, never "of today".
+    await write(host!.querySelector<HTMLTextAreaElement>(".v4PubText")!, "Mine.");
+    await click(buttons(V4["v4.public.dig.start"]!)[0]!);
+    expect(notes()!.textContent).toContain("up to 5% of this month");
+    expect(notes()!.textContent).not.toContain("of today");
+  });
+
+  it("journey-f20: before the person's own words go on the public page, one grey line says so", async () => {
+    await mount(debate());
+    await openRows();
+    await click(firstOpen());
+    const line = host!.querySelector("[data-public-will-be]")!;
+    expect(line.textContent).toBe("This will be public.");
+    expect(host!.querySelector<HTMLTextAreaElement>(".v4PubText")!.getAttribute("aria-describedby")).toBe(line.id);
+  });
+
+  it("public-d2 A: the path's own suggestions as chips, \"Or write your own\" folded; a tapped chip goes first into the dig", async () => {
+    vi.useFakeTimers();
+    await mount(withChips());
+    await openRows();
+    await click(firstOpen());
+    const box = host!.querySelector(".v4PubDig")!;
+    const chips = [...box.querySelectorAll<HTMLButtonElement>(".v4PubChip")];
+    expect(chips.map((chip) => chip.querySelector("span")!.textContent)).toEqual([
+      "Do free fares work the same way in small towns?", "Did any city see many drivers switch for good after fares went free?"
+    ]);
+    for (const chip of chips) expect(chip.querySelector("[data-ai-generated=true]")).not.toBeNull();
+    // Focus goes to the first chip; the person's own box is folded until tapped.
+    expect(document.activeElement).toBe(chips[0]);
+    expect(box.querySelector(".v4PubText")).toBeNull();
+    expect(buttons(V4["v4.public.dig.start"]!)[0]!.disabled).toBe(true);
+    await click(chips[1]!);
+    expect(chips[1]!.getAttribute("aria-pressed")).toBe("true");
+    await click(buttons(V4["v4.public.dig.writeOwn"]!)[0]!);
+    const field = box.querySelector<HTMLTextAreaElement>(".v4PubText")!;
+    expect(document.activeElement).toBe(field);
+    await write(field, "Mine.");
+    await click(buttons(V4["v4.public.dig.start"]!)[0]!);
+    await undoRunsOut();
+    expect(lane.submit.mock.calls[0]![3]).toEqual({ public_ref: PUBLIC_REF, places: ["path:p-fares"], mode: "quick", picks: [
+      { kind: "CONTRADICTING", suggestion_id: "pub-fares-drivers", place: "path:p-fares", text: "Did any city see many drivers switch for good after fares went free?" },
+      { kind: "OWN_VIEW", suggestion_id: null, place: "path:p-fares", text: "Mine." }
+    ] });
+    // The card's title is the first pick, the AIs' words marked as theirs.
+    const title = host!.querySelector("[data-public-dig-card] .v4PubDigCardTitle")!;
+    expect(title.textContent).toContain("Did any city see many drivers switch");
+    expect(title.querySelector("[data-ai-generated=true]")).not.toBeNull();
+  });
+
+  it("public-d2 A: a chip someone has dug near says so, with its day, and opens that dig's result on the page instead", async () => {
+    await mount(withChips());
+    await openRows();
+    await click(firstOpen());
+    const dug = host!.querySelector<HTMLButtonElement>("[data-public-chip-dug]")!;
+    expect(dug.textContent).toContain("Someone dug near here on Oct 28");
+    expect(dug.hasAttribute("aria-pressed")).toBe(false);
+    await click(dug);
+    const result = document.getElementById(`public-dig-${PUBLIC_UPDATE_REF}`)!;
+    expect(result.classList.contains("v4Highlight")).toBe(true);
+    expect(document.activeElement).toBe(result);
+    expect(lane.submit).not.toHaveBeenCalled();
+  });
+
+  it("public-d2 A: the card reads the dig again when the person comes back, then shows both stops and the page's change, new words underlined", async () => {
+    vi.useFakeTimers();
+    await mount(debate());
+    await openRows();
+    await click(firstOpen());
+    await write(host!.querySelector<HTMLTextAreaElement>(".v4PubText")!, "Mine.");
+    await click(buttons(V4["v4.public.dig.start"]!)[0]!);
+    await undoRunsOut();
+    expect(host!.querySelector("[data-public-dig-card]")!.getAttribute("data-public-dig-card")).toBe("RUNNING");
+    // Nothing moves while the person stays: the card is read again only when they come back to the page.
+    lane.readRun = vi.fn(async () => ({ state: "SETTLED", hold_until: null }));
+    const before = debate().contributions![0]!.line;
+    const after = `${before} Rural lines too.`;
+    lane.readRunAnswer = vi.fn(async () => ({ contribution: { public_ref: PUBLIC_REF, state: "ON_THE_PAGE", rewrite: { line: after, summary: "s", fate: "PARTLY_HELD", what_changed: ["x"] } } }));
+    await act(async () => { vi.advanceTimersByTime(60_000); });
+    await flush();
+    expect(lane.readRun).not.toHaveBeenCalled();
+    await act(async () => { document.dispatchEvent(new Event("visibilitychange")); });
+    await flush();
+    const card = host!.querySelector("[data-public-dig-card]")!;
+    expect(card.getAttribute("data-public-dig-card")).toBe("ON_THE_PAGE");
+    expect(card.classList.contains("v4GroundLOOKING")).toBe(false);
+    expect([...card.querySelectorAll(".v4PubDigStop")].map((stop) => stop.getAttribute("data-reached"))).toEqual(["true", "true"]);
+    expect(card.textContent).toContain(V4["v4.public.digCard.onPage"]);
+    expect([...card.querySelectorAll("ins")].map((mark) => mark.textContent)).toEqual(["Rural lines too."]);
+    await click([...card.querySelectorAll("button")].find((one) => one.textContent === V4["v4.public.digCard.seeOnPage"])!);
+    expect(lane.refresh).toHaveBeenCalled();
+    expect(document.getElementById("public-path-root-p-fares")!.classList.contains("v4Highlight")).toBe(true);
+  });
+
+  it.each([
+    [{ state: "ON_THE_PAGE", rewrite: { line: "SAME", summary: "s", fate: "PARTLY_HELD", what_changed: [] } }, "CONFIRMED", "Confirmed: the answer holds."],
+    [{ state: "KEPT_PRIVATE" }, "KEPT_PRIVATE", "Kept with you: the public page is unchanged."],
+    [{ state: "CHECKING" }, "CHECKING", "An AI is checking this before it can change the public page."]
+  ])("public-d2 A: %o reads as %s", async (contribution, kind, words) => {
+    vi.useFakeTimers();
+    const line = debate().contributions![0]!.line;
+    lane.readRun = vi.fn(async () => ({ state: "SETTLED", hold_until: null }));
+    lane.readRunAnswer = vi.fn(async () => ({ contribution: { public_ref: PUBLIC_REF, ...contribution, ...("rewrite" in contribution ? { rewrite: { ...contribution.rewrite, line } } : {}) } }));
+    await mount(debate());
+    await openRows();
+    await click(firstOpen());
+    await write(host!.querySelector<HTMLTextAreaElement>(".v4PubText")!, "Mine.");
+    await click(buttons(V4["v4.public.dig.start"]!)[0]!);
+    await undoRunsOut();
+    const card = host!.querySelector("[data-public-dig-card]")!;
+    expect(card.getAttribute("data-public-dig-card")).toBe(kind);
+    expect(card.textContent).toContain(words);
+    expect(card.querySelector("[role=alert]")).toBeNull();
   });
 });
 
