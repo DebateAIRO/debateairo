@@ -23,7 +23,7 @@ import { V4LevelTrail } from "./V4LevelTrail";
  *
  * Motion (journey-d1 A and the owner's chat answer): the working dot has one slow pulse; a new state line shows at once
  * with a 1-second soft highlight; with reduced motion the dot is still, and the highlight and the written line stay.
- * The motion rules are local to this card (app/v4/v4-wait.css) until v4-base.css carries the shared ones.
+ * The highlight is the shared one (.v4Highlight, app/v4/v4-base.css); the pulse is the map's working dot's (v4MapPulse).
  */
 
 /** The 1-second soft highlight of a changed line (the owner's motion rule). */
@@ -169,7 +169,7 @@ export function V4WaitCard(props: V4WaitCardProps) {
             <Heading className="v4Serif v4WaitQuestion" data-ai-generated="true">{question}</Heading>
           </>
         )}
-        <p className={`v4WaitState${highlighted ? " v4WaitHighlight" : ""}`} role="status" data-wait-word="">
+        <p className={`v4WaitState${highlighted ? " v4Highlight" : ""}`} role="status" data-wait-word="">
           {dot === "NONE" ? null : (
             <span
               className={`v4WaitDot v4WaitDot-${dot}${reducedMotion ? " v4WaitDotStill" : ""}`}

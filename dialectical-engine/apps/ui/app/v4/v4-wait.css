@@ -1,9 +1,8 @@
 /* Owner's screen review, 3 Nov 2026 (journey-d2 A): the one waiting card (components/v4/V4WaitCard.tsx) and the
    choice chips (components/v4/V4ChoiceChips.tsx). Site tokens and the V4 tokens from v4-base.css only.
    Motion (journey-d1 A and the owner's chat answer): the working dot has one slow pulse; a changed state line shows at
-   once with a 1-second soft highlight; with reduced motion the dot is still and the highlight stays. These motion rules
-   are LOCAL (v4Wait…) until v4-base.css carries the shared motion tokens: point .v4WaitHighlight and the pulse at them
-   then. */
+   once with the shared 1-second highlight (.v4Highlight, v4-base.css); with reduced motion the dot is still and the
+   highlight stays. The pulse is the map's working dot's own (v4MapPulse, v4-map.css), not a second one. */
 
 .v4WaitBlock { width: 100%; max-width: 640px; align-self: flex-start; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .v4WaitCard { display: flex; flex-direction: column; gap: 12px; padding: 28px; min-width: 0; }
@@ -21,15 +20,10 @@
   border-radius: var(--r-btn); margin: 0 -6px; padding: 2px 6px;
 }
 .v4WaitDot { flex: none; width: 10px; height: 10px; border-radius: var(--r-dot); }
-.v4WaitDot-PULSE { background: var(--accent); animation: v4WaitPulse 1.6s ease-in-out infinite; }
+.v4WaitDot-PULSE { background: var(--accent); animation: v4MapPulse 1.6s ease-in-out infinite; }
 .v4WaitDot-SOLID { background: var(--accent); }
 .v4WaitDot-HOLLOW { background: transparent; border: 2px solid var(--accent); }
 .v4WaitDotStill { animation: none; }
-@keyframes v4WaitPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.7); } }
-
-/* A changed line: at once, with a 1-second soft terracotta highlight (kept with reduced motion). */
-.v4WaitHighlight { animation: v4WaitHighlight 1s ease-out; }
-@keyframes v4WaitHighlight { from { background-color: var(--con-bg); } to { background-color: transparent; } }
 
 @media (prefers-reduced-motion: reduce) {
   .v4WaitDot-PULSE { animation: none; }

@@ -167,12 +167,12 @@
   line-height: 1.4; max-height: 2.8em; font-weight: 600; overflow-wrap: anywhere;
 }
 .v4ShelfMeta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: var(--t-meta); color: var(--text-2); }
-/* The one slow pulse of a place being worked on (the approved "working places" pulse); none with reduced motion. */
+/* The one slow pulse of a place being worked on: the same working dot as the map and the waiting card (v4MapPulse,
+   v4-map.css), not a second one; none with reduced motion. */
 .v4ShelfPulse {
   display: inline-block; flex: none; width: 8px; height: 8px; border-radius: var(--r-dot); background: var(--accent);
-  animation: v4ShelfPulse 2.4s ease-in-out infinite;
+  animation: v4MapPulse 1.6s ease-in-out infinite;
 }
-@keyframes v4ShelfPulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) { .v4ShelfPulse { animation: none; } }
 .v4ShelfNew { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; color: var(--con-text); }
 .v4ShelfNewDot { width: 8px; height: 8px; border-radius: var(--r-dot); background: var(--accent); }

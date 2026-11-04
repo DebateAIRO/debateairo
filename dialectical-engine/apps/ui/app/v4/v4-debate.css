@@ -169,8 +169,8 @@
 .v4DebPaused .v4Btn { min-height: 44px; }
 /* Owner review 3 Nov (wait-f2, wait-f5, map-f31): the one pause block. Its dot and sentence on one line; before the month
    resets a plain grey label where Continue will be (not a button); after it, Continue. Motion (journey-d1 A): nothing
-   moves; a block that changes on screen gets the 1-second soft highlight (local rule until v4-base.css has the shared
-   highlight token), kept as is with reduced motion. */
+   moves; a block that changes on screen gets the shared 1-second highlight (.v4Highlight, v4-base.css), kept as is with
+   reduced motion. */
 .v4Pause { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; border-radius: var(--r-card); min-width: 0; }
 .v4Pause p { margin: 0; }
 .v4PauseLine { display: flex; align-items: baseline; gap: 10px; font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
@@ -180,7 +180,6 @@
   border: 1px dashed var(--line-strong); color: var(--text-2); font-weight: 600; font-size: var(--t-ui);
 }
 .v4PauseContinue { min-height: 44px; }
-.v4PauseChanged { background: var(--con-bg); box-shadow: 0 0 0 6px var(--con-bg); }
 /* Owner review 3 Nov (wait-f11, map-f30): the failed page's way on: "Ask this again" with its grey line, then small links. */
 .v4DebFailedAgain { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 4px; }
 .v4DebFailedNote { font-size: var(--t-meta); max-width: 52ch; }
@@ -241,17 +240,12 @@
 .v4LeaveActions { display: flex; flex-wrap: wrap; gap: 10px; }
 
 /* ---------- V4 screen review (owner picks 3 Nov 2026): the ready moment, "What your digs did", the tour bar ----------
-   journey-f17 / wait-f4: the small ready note (in the dock, so above the phone's pinned bar); journey-f10 / dig-f3: the
+   journey-f17 / wait-f4: the small ready note (in the bottom stack, above the phone's pinned bar); journey-f10 / dig-f3: the
    notice above the map; dig-f18: the pinned "Next change › · Done"; map-f19: "Since you last looked"; map-f21: the long
    answer folded while the short one is written; dig-f19 / map-f17: "Your report is older than the map".
-   Motion (journey-d1): nothing here moves. What changes shows at once with a 1-second soft highlight (v4ReadyHighlight,
-   a local rule until the shared motion tokens land in v4-base.css); it is a colour, not a movement, so it stays under
-   reduced motion as the owner's rule asks. No fixed widths: everything wraps at 375px. */
-@keyframes v4ReadyHighlight {
-  from { box-shadow: 0 0 0 3px var(--accent); }
-  to { box-shadow: 0 0 0 3px transparent; }
-}
-.v4ReadyFlash { animation: v4ReadyHighlight 1s ease-out 1; }
+   Motion (journey-d1): nothing here moves. What changes shows at once with the shared 1-second highlight (.v4Highlight,
+   v4-base.css); it is a colour, not a movement, so it stays under reduced motion as the owner's rule asks. No fixed
+   widths: everything wraps at 375px. */
 
 .v4ReadyNote {
   display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; width: max-content; max-width: min(560px, 100%);

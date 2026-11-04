@@ -3,17 +3,13 @@
    v4-debate.css, so it overrides the older looks where they differ. Site tokens and the V4 tokens only.
    Motion (chat answer of 3 Nov): only the six approved moves, each under 0.5 s and silent: fold, clear, snap, fly-in,
    number roll, card turn-over. Everything else changes at once, with a 1-second soft highlight. Under reduced motion every
-   move is instant; the highlight and a written line stay. The --v4-look-* names below are this file's own stand-ins: the
-   shared motion tokens being added to v4-base.css can replace them at integration. */
+   move is instant; the highlight and a written line stay. Every move takes the shared motion tokens of v4-base.css
+   (--v4-move-*, --v4-ease-move) and the highlight is the shared one (v4Highlight, --v4-highlight-time); the two
+   --v4-look-* names below are looks (the hatching, the glow), not moves. */
 
 .v4Root {
   --v4-look-hatch: repeating-linear-gradient(135deg, color-mix(in srgb, var(--gold-border) 55%, transparent) 0 1px, transparent 1px 7px);
   --v4-look-glow: color-mix(in srgb, var(--accent) 32%, transparent);
-  --v4-look-fold: 0.3s;
-  --v4-look-turn: 0.45s;
-  --v4-look-fly: 0.4s;
-  --v4-look-clear: 0.45s;
-  --v4-look-highlight: 1s;
 }
 
 /* ---------- journey-f2: one look per state ---------- */
@@ -54,7 +50,7 @@
 .v4BarSlot { flex-basis: 0; min-width: 0; margin-inline-start: -2px; }
 /* dig-d4 B: on a map card the bar slides to its new shares (one of the card turn-over's parts). */
 .v4MapPath .v4BarSeg, .v4MapPath .v4BarSlot, .v4OutPath .v4BarSeg, .v4OutPath .v4BarSlot,
-.v4MiniBar .v4BarSeg, .v4MiniBar .v4BarSlot { transition: flex-grow var(--v4-look-turn) ease-out; }
+.v4MiniBar .v4BarSeg, .v4MiniBar .v4BarSlot { transition: flex-grow var(--v4-move-turn) var(--v4-ease-move); }
 
 /* ---------- r2-20 A / journey-f11: one trust word per path, three result tags, the "Holds" seal ---------- */
 .v4MapPathMeta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
@@ -79,7 +75,7 @@
 .v4RewriteAsked { margin: 0; color: var(--text-2); }
 
 /* ---------- the moves: card turn-over (with the clear), fly-in, fold; the highlight ---------- */
-.v4Reveal { animation: v4TurnOver var(--v4-look-turn) ease-out 1; transform-origin: center; }
+.v4Reveal { animation: v4TurnOver var(--v4-move-turn) var(--v4-ease-move) 1; transform-origin: center; }
 @keyframes v4TurnOver {
   0% { transform: perspective(700px) rotateY(-86deg); opacity: .35; }
   100% { transform: none; opacity: 1; }
@@ -87,16 +83,16 @@
 /* map-d5: the ground clears where a dig settled it: the hatching fades as the card lands. */
 .v4MapDig.v4Reveal::before, .v4OutMain.v4Reveal::before {
   content: ""; position: absolute; inset: 0; border-radius: inherit; background-image: var(--v4-look-hatch);
-  pointer-events: none; animation: v4Clear var(--v4-look-clear) ease-out forwards;
+  pointer-events: none; animation: v4Clear var(--v4-move-clear) var(--v4-ease-move) forwards;
 }
 @keyframes v4Clear { from { opacity: 1; } to { opacity: 0; } }
-.v4MapSprout.v4GroundNEW { animation: v4FlyIn var(--v4-look-fly) ease-out 1; }
+.v4MapSprout.v4GroundNEW { animation: v4FlyIn var(--v4-move-fly) var(--v4-ease-move) 1; }
 @keyframes v4FlyIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-@keyframes v4Highlight { from { box-shadow: 0 0 0 6px var(--v4-look-glow); } to { box-shadow: 0 0 0 0 transparent; } }
 
 @media (prefers-reduced-motion: reduce) {
   .v4GroundLOOKING::after { animation: none; opacity: .6; }
-  .v4Reveal { animation: v4Highlight var(--v4-look-highlight) ease-out 1; }
+  /* The shared 1-second highlight (v4-base.css) in place of the turn-over. */
+  .v4Reveal { animation: v4Highlight var(--v4-highlight-time) ease-out 1; }
   .v4MapDig.v4Reveal::before, .v4OutMain.v4Reveal::before { animation: none; opacity: 0; }
   .v4MapSprout.v4GroundNEW { animation: none; }
   .v4MapPath .v4BarSeg, .v4MapPath .v4BarSlot, .v4OutPath .v4BarSeg, .v4OutPath .v4BarSlot,
@@ -192,8 +188,8 @@
 .v4AnswerFoldLine[hidden] { display: none; }
 .v4AnswerFoldLabel { font-weight: 700; flex: none; }
 .v4AnswerFoldWords { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* The fold: one of the six moves, 0.3 s. */
-.v4AnswerFold { display: grid; grid-template-rows: 1fr; transition: grid-template-rows var(--v4-look-fold) ease; }
+/* The fold: one of the six moves (the shared fold token). */
+.v4AnswerFold { display: grid; grid-template-rows: 1fr; transition: grid-template-rows var(--v4-move-fold) var(--v4-ease-move); }
 .v4AnswerCardFolded .v4AnswerFold { grid-template-rows: 0fr; }
 .v4AnswerInner { min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 10px; padding: 0 16px; }
 .v4AnswerInner > :first-child { margin-top: 14px; }

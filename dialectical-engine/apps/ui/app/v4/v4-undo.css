@@ -1,16 +1,9 @@
 /* V4 UX fixes (owner picks 3 Nov 2026): the shared Undo note (V4UndoNote.tsx, journey-f21, r2-22 A), the map page's
    self-measuring bottom stack (V4BottomStack.tsx, journey-d3 A, dig-f16, dig-f17), the site-wide dig note holder
    (V4DigUndo.tsx) and the dashed seed card on the map (V4DigSeed.tsx, dig-d3 B). Site tokens and the V4 tokens only.
-   Motion: the countdown line (r2-22 A) and the seed's grow and shrink (under 0.5 s). The moves are named locally
-   (--v4-undo-*) so the shared motion tokens in v4-base.css can take their place; with reduced motion every move is
-   instant and words say what the line said. No fixed widths: everything wraps at 375 px. */
-
-.v4Root {
-  --v4-undo-line: var(--accent);
-  --v4-undo-seed-in: 0.4s;
-  --v4-undo-seed-out: 0.3s;
-  --v4-undo-fold: 0.2s;
-}
+   Motion: the countdown line (r2-22 A, the Undo's own 10 seconds), the seed's fly-in and its way back out, and the picks
+   arrow's fold, each on the shared motion tokens of v4-base.css (--v4-move-fly, --v4-move-fold, --v4-ease-move); with
+   reduced motion every move is instant and words say what the line said. No fixed widths: everything wraps at 375 px. */
 
 /* ---------- the note ---------- */
 .v4UndoNotes {
@@ -37,7 +30,7 @@
 /* r2-22 A: a thin line under the words shrinks over the 10 seconds; no number. */
 .v4UndoLine { position: absolute; inset-inline: 0; bottom: 0; height: 3px; background: color-mix(in srgb, var(--surface) 18%, transparent); }
 .v4UndoLineFill {
-  display: block; height: 100%; background: var(--v4-undo-line); transform-origin: left center;
+  display: block; height: 100%; background: var(--accent); transform-origin: left center;
   animation-name: v4UndoShrink; animation-timing-function: linear; animation-fill-mode: forwards;
 }
 [dir="rtl"] .v4UndoLineFill { transform-origin: right center; }
@@ -105,7 +98,7 @@
   display: flex; align-items: center; gap: 8px; min-height: 44px; min-width: 0; width: 100%;
   background: none; border: 0; padding: 0; cursor: pointer; font-weight: 700; text-align: start;
 }
-.v4StackPicksArrow { display: inline-block; transition: transform var(--v4-undo-fold) ease; }
+.v4StackPicksArrow { display: inline-block; transition: transform var(--v4-move-fold) var(--v4-ease-move); }
 .v4StackPicksOpen .v4StackPicksArrow { transform: rotate(90deg); }
 [dir="rtl"] .v4StackPicksArrow { transform: scaleX(-1); }
 [dir="rtl"] .v4StackPicksOpen .v4StackPicksArrow { transform: rotate(90deg); }
@@ -128,10 +121,10 @@
 .v4DigSeed {
   display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 8px 12px; border-radius: 12px;
   background: var(--con-bg); border: 1.5px dashed var(--accent); color: var(--text); font-size: var(--t-ui); line-height: 1.35;
-  transform-origin: left top; animation: v4SeedIn var(--v4-undo-seed-in) ease-out;
+  transform-origin: left top; animation: v4SeedIn var(--v4-move-fly) var(--v4-ease-move);
 }
 .v4DigSeedTitle { min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
-.v4DigSeedLeaving { animation: v4SeedOut var(--v4-undo-seed-out) ease-in forwards; }
+.v4DigSeedLeaving { animation: v4SeedOut var(--v4-move-fly) var(--v4-ease-move) forwards; }
 @keyframes v4SeedIn { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: scale(1); } }
 @keyframes v4SeedOut { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(0.6); } }
 @media (prefers-reduced-motion: reduce) {

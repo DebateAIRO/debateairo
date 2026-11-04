@@ -150,18 +150,18 @@ describe("the one waiting card", () => {
     expect(host!.querySelector(".v4WaitDot")).toBeNull();
   });
 
-  it("a changed state line gets the 1-second soft highlight, and the first one does not", async () => {
+  it("a changed state line gets the shared 1-second highlight (v4-base.css .v4Highlight), and the first one does not", async () => {
     await mount({ state: { kind: "WAITING", startsAfter: null } });
-    expect(stateLine().classList.contains("v4WaitHighlight")).toBe(false);
+    expect(stateLine().classList.contains("v4Highlight")).toBe(false);
     await mount({ state: LOOKING });
-    expect(stateLine().classList.contains("v4WaitHighlight")).toBe(true);
+    expect(stateLine().classList.contains("v4Highlight")).toBe(true);
     await act(async () => { vi.advanceTimersByTime(999); });
-    expect(stateLine().classList.contains("v4WaitHighlight")).toBe(true);
+    expect(stateLine().classList.contains("v4Highlight")).toBe(true);
     await act(async () => { vi.advanceTimersByTime(1); });
-    expect(stateLine().classList.contains("v4WaitHighlight")).toBe(false);
+    expect(stateLine().classList.contains("v4Highlight")).toBe(false);
     // The same words again: no highlight.
     await mount({ state: LOOKING, checkedAt: Date.now() });
-    expect(stateLine().classList.contains("v4WaitHighlight")).toBe(false);
+    expect(stateLine().classList.contains("v4Highlight")).toBe(false);
   });
 });
 

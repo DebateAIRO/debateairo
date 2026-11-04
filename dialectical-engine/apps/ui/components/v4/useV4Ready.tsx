@@ -119,15 +119,15 @@ export function useV4Ready(input: V4ReadyInput): V4Ready {
     for (const target of [main, card, heading]) {
       if (target === null) continue;
       targets.push(target);
-      target.classList.add("v4ReadyFlash");
+      target.classList.add("v4Highlight");
     }
     (main ?? card)?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
     const timer = window.setTimeout(() => {
-      for (const target of targets) target.classList.remove("v4ReadyFlash");
+      for (const target of targets) target.classList.remove("v4Highlight");
     }, FLASH_MS);
     return () => {
       window.clearTimeout(timer);
-      for (const target of targets) target.classList.remove("v4ReadyFlash");
+      for (const target of targets) target.classList.remove("v4Highlight");
     };
   }, [flash]);
 

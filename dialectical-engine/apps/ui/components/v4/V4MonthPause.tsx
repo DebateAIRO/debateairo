@@ -58,7 +58,7 @@ export function V4MonthPause({ runId, pause, catalog, locale, className }: Reado
   };
   const continuing = pressing || outcome?.kind === "CONTINUING";
   return (
-    <div className={`v4Pause${highlight ? " v4PauseChanged" : ""}${className === undefined ? "" : ` ${className}`}`}>
+    <div className={`v4Pause${highlight ? " v4Highlight" : ""}${className === undefined ? "" : ` ${className}`}`}>
       <p className="v4PauseLine" role="status">
         <span className="v4PauseDot" aria-hidden="true" />
         <span>{pauseSentence(pause, catalog, locale)}</span>

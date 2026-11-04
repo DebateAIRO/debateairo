@@ -148,8 +148,12 @@ describe("the shared Undo note", () => {
     expect(reduced).toMatch(/\.v4UndoLineFill \{ animation: none; \}/u);
     expect(reduced).toMatch(/\.v4UndoStill \{ display: inline; \}/u);
     expect(css).toMatch(/\.v4UndoStill \{ display: none; \}/u);
-    // Every move is under half a second, apart from the 10-second countdown line itself (r2-22 A).
-    for (const match of css.matchAll(/--v4-undo-[a-z-]+: ([0-9.]+)s;/gu)) expect(Number(match[1])).toBeLessThan(0.5);
+    // Every move takes the shared motion tokens of v4-base.css (each under half a second, instant with reduced motion);
+    // only the 10-second countdown line has its own time (r2-22 A, set on the element). No second set of motion names.
+    expect(css).not.toMatch(/--v4-undo-[a-z-]+:/u);
+    const moves = [...css.matchAll(/(?:animation|transition):[^;]*;/gu)].map((match) => match[0]).filter((rule) => !/: none;/u.test(rule));
+    expect(moves.length).toBeGreaterThan(0);
+    for (const rule of moves) expect(rule, rule).toMatch(/var\(--v4-move-(?:fold|clear|snap|fly|roll|turn)\)/u);
   });
 });
 

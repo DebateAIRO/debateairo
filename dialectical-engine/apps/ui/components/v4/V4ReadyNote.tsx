@@ -49,7 +49,7 @@ export function V4ReadyNote(props: Readonly<{
 }>) {
   const { text, action, onClose, catalog } = props;
   return (
-    <div className="v4ReadyNote v4ReadyFlash">
+    <div className="v4ReadyNote v4Highlight">
       <span className="v4ReadyNoteText"><ReadyWords text={text} /></span>
       {action.href === undefined ? (
         <button type="button" className="v4ReadyNoteAct" onClick={action.onAct}>{action.label}</button>

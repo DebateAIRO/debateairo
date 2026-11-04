@@ -174,13 +174,13 @@ describe("a debate paused at the month wall", () => {
     const runId = crypto.randomUUID();
     harness.run = paused(runId, false);
     await mountMap(1600, runId);
-    expect(page().querySelector(".v4PauseChanged")).toBeNull();
+    expect(page().querySelector(".v4Pause.v4Highlight")).toBeNull();
     harness.run = paused(runId, true);
     await advance(5_000);
     expect(text()).toContain(CATALOG["v4.money.pausedReady"]);
-    expect(page().querySelector(".v4PauseChanged")).not.toBeNull();
+    expect(page().querySelector(".v4Pause.v4Highlight")).not.toBeNull();
     await advance(1_000);
-    expect(page().querySelector(".v4PauseChanged")).toBeNull();
+    expect(page().querySelector(".v4Pause.v4Highlight")).toBeNull();
   });
 });
 
