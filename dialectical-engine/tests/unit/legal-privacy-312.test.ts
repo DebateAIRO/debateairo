@@ -22,6 +22,12 @@ import {
  * and only the eyebrow, the end marker, the version line, the Next sentence and the change log's first sentence and
  * new entry differ. The rest of the change log stays byte for byte, so `legal-report-button`'s pin still finds 3.11,
  * 3.10 and 3.9 on that line. English is pinned word for word; the 34 translations are drafts for native readers.
+ *
+ * Plan Task 83b (the owner, 4 Nov 2026: card "Privacy 3.12", "Add one sentence"; card "3.12 words", "The draft as
+ * shown"): 3.12 is still unpublished, so it takes one more sentence in place — the question's words and, after a site
+ * update, the chosen paths are also kept in the browser tab (owner answers Q3 A and Q8, Tasks 76c and 76e). In every
+ * locale the Next paragraph is Task 83's (by its sha256) and one sentence more, and so is the change log's 3.12 entry,
+ * whose added sentence says what 3.12 also says, as the 3.8 and 3.11 entries do.
  */
 
 /**
@@ -37,6 +43,56 @@ const NEXT_SENTENCE =
 /** Answer 13, verbatim: section 14's new entry. */
 const CHANGE_ENTRY =
   "Version 3.12 replaced version 3.11: when you press Next, several AIs from several companies read your question to suggest what to look into, even if you never start, and these calls count in your allowance (sections 2 and 5).";
+
+/** Task 83b, verbatim as the owner approved it (card "3.12 words"): the sentence the Next paragraph gains, last. */
+const TAB_SENTENCE =
+  "Your question's words, and after a site update your chosen paths, are also kept in this browser tab until you close it; we cannot read them there.";
+
+/** Task 83b: the sentence the 3.12 entry gains, in the approved sentence's words, as "Version 3.8 also says …" does. */
+const CHANGE_ENTRY_TAB =
+  "Version 3.12 also says that your question's words, and after a site update your chosen paths, are kept in this browser tab until you close it (section 2).";
+
+/**
+ * Task 83's 3.12 texts of each locale, by sha256: section 2's Next paragraph (index 53) and section 14's 3.12 entry, as
+ * they stood at 54d431e14. Task 83b keeps both and adds one sentence after each.
+ */
+const AS_83: Readonly<Record<string, Readonly<{ next: string; entry: string }>>> = {
+  ar: { next: "f5edfd7e2a9c00d3cba140719aa211d45b7fe1e546e9eeb9a7ea42bf0bf09190", entry: "75e64b19e6d93b422dfa2162372956d08f976f079166d99750d43e3a5739c04f" },
+  bg: { next: "3b8362d4b761d0fbb7916373a37d7f06f2a1239eecc02e2ed54812773160b379", entry: "965b139d2f0e6226858815578c9d11b209d42f091254b6691a7043708e63ad83" },
+  cs: { next: "5823074e12fe6acd55fbc9ae6e5f1f244b733966bcd70143555fb175918a7d66", entry: "a03fd4cbf313824012b2a05c41be8ac7e1fdffb67ec13ba35dda60d0f148a78f" },
+  da: { next: "981d34ab2ad961072094c689a6b5fce588884c138f7da7d47b46c1dad0608289", entry: "32d589e50700c0a4015b789a7bf5c7b22afaa75d242541bb7cd9f18f044bc079" },
+  de: { next: "daaf0aa289d64925cb5da9bd5a9e9593de1cff27f1d8922d6e4cc5676c4e4ffe", entry: "62f1dd700d04e1c3a86e79a73cdcf0502a68a354a71f6db99c4396caa1056a70" },
+  el: { next: "cba0298fcce3ed50fd26d5df20bae3ead26c7a37f7803512fbcbab9c4d7e6d2c", entry: "f8a34339ab8f021537635d1c15d4cc82ea58bae16944cf176ee96ff4cbb2b246" },
+  en: { next: "761a66bf96c92f88cbfe9e3a13e84bdf21f01b567fb2177dad7315d887bbfa38", entry: "6d84ad2dc4d3ab57e641e0d9dfe8453a4f1e8b87202d383f0e07eaf0ab605dd4" },
+  es: { next: "40ab47fed80d3020f8f0a638e30163b15d4d0e26742025479be54f0e48b987b5", entry: "dba270c238e53a396080c6bd0d21e5b0dee685c2275a716272a1ed0768a3e076" },
+  et: { next: "ffedc4496f1fade8dc213504a9e6d291f74a798bbac275bafe5babfeb44c2fd1", entry: "f99eac716ee8a0fffe9109f311de0aabc1c57bcd823486ad964855faaa28ee81" },
+  fi: { next: "1bf44ea68e8c0056118442defb66b9e364f687f493ba9d4db292d89cf4101fee", entry: "d8d4b1c0f89a60be5653ebed888f90047ee9fc34a2e6a78243acf730cd1a5c29" },
+  fr: { next: "17693aa2cdd71ee58bd5e57d7da000f2039bd26763a45552bb518c5fa3fe33e4", entry: "aabfe3f6924f139b80d9d54081158b09f75568f108d6331de53226d59f17c763" },
+  ga: { next: "33a7668b82b1df92f673a5e2bf63f85d430d334f60e624dd5da1ef0372f7d58c", entry: "31f5b246bf3c2bc13e7197e3e70fb387e576f1b7deed8b2a03344d3554c4de13" },
+  he: { next: "386159a79a3e40e38fd3690dfc23b6c5f5dd9ac95f3556587c5a27073957a50a", entry: "effea96b3cb4e119a628facaf692c88cb91f3035ab88f1737f013e21505bca4f" },
+  hi: { next: "4f6f3b06ef4652a8cc13a81518aadad910188167f11df29728bc8ff677244275", entry: "0bb12b99572b90db86f95507851e92a5ed25f18dc931fce3b80f03e087afe7ad" },
+  hr: { next: "7cf6495980f03644bb6e1bb7a2007d5eb8cf424be06280475e53c69c54f032ac", entry: "43d400d0c93bfc8cb023057dcd0766dde97dc62d097869788465646c0bc38b12" },
+  hu: { next: "6aca26995ab6800196b055f101483ceefa9f64ea4133534192d465228c8b71aa", entry: "b717b75ed5733555bb36b07343cf25ba9cc6a522214aa3722388b7ba2cd9454b" },
+  id: { next: "c87e385fb0b517e51b921c423e59d5b0a777286a5e4a4763c4bde8d027eb584f", entry: "cdffd76ca8d9fa3177305134a79886b1dc59addbe6e47d4dfaa816ec5c1b98b5" },
+  it: { next: "0cef4e516c9dd6c900b0fad4985c01af52fa24ba0446b67978171b3fe303ec40", entry: "c891bb80d191565f35cd87a37a9265edbd4ab339c2160aedfbdf9b8128664d37" },
+  ja: { next: "ff89f2586b929d83a4e825a6858b9e32518a9bef1cf9fb6d8baa8ab71d5e7240", entry: "a21aae12f016e596fcba6798f754689c262d3aba1c5dab1bd55d43950fbf6e7e" },
+  ko: { next: "b2ef1c54b934a68fcc4274d9e047161a740db9f5195ae6292542b2dc792c7f01", entry: "cf8a1fad36f9c6b3e8625b1c767e0d6c2ca09e18362c1c588b69d73b9bd5b3ce" },
+  lt: { next: "55e68ca08e5c8eb23003515de9fa299f2e71e3005bfa4b73fcd357a791c2af4d", entry: "22de0e294fefb56ad5fe9ec512837967ce5915a4f76c1269f8aa7572ff5c4601" },
+  lv: { next: "d5046a01ebf31a8d265b8c94425ce86ad23111ee44f6e956ad094f498b22f51c", entry: "223f67b893a16fe0a1cf35a480b4747961e29fbc0655331e09e5a04f09f24eae" },
+  mt: { next: "7dc9195e79d1dddb66172f8d23f3ee04780025e3e675cbd54a4df6ea50e53598", entry: "2ca95d6a0822541afce6ab090b4a5129d1f25bd50d7df415ddd1f9c6cb541758" },
+  nl: { next: "6938318d65b360c4db0bfc7d6190c6efe83b8f169f486c92c75c4e617464ea91", entry: "87c45524a9226b41e2053f2e11d9a71ea778a6549e93f66ce777550e8e801c43" },
+  pl: { next: "95c2bff06d2bd405fa5dc531f88a8106f3bde28cdef0dc57bdfb1f269377c766", entry: "6de15add656e97fdb7e18740a8788f66471bfe559f659aa1ca0c43cd585a0d03" },
+  pt: { next: "d4912a4b8b606502ef06f8123058afb80c8d51dc9110a414a247557ee050d5bc", entry: "710ef92612a272d304738789943ac555b287b49bb43387a88dca8fbede0ae969" },
+  ro: { next: "d18bf5ed2cf5adf5a653f871d4980ccb0dcff81629232f29a81eecd33e21c9d8", entry: "42de10019464cd10ed45780d39269287cd71442047fb3be2f72c1b3a8b51e14e" },
+  ru: { next: "785825ffbcf3dbb8dd62428ef72fa80ce561b4947fb76843b11879f98d1f8c7e", entry: "56dcc66790ea41f8052e6f51076870be2aed6db44827bb05dff2a30ab86a98e2" },
+  sk: { next: "ab8b0f9b2b4517f83cf0e0cc489ea113b4f7b7c8a2d48b5ec6f17ed129bae4f6", entry: "f90975b6cbf133b845f459a5734e63b42e04723219b8535c5a2eaf6aa767e564" },
+  sl: { next: "8e37791e2bde13250b53497cd73f9abc6708b59f51c93f4217c6e82a48293cb5", entry: "887be41fa85e3a364b5bf2fc1da77006cd7555d3df09af82e87980a2f80ff3a9" },
+  sv: { next: "e98bb8f6a5269c5b38267a9403270e60e4d0a6e2f50e3abe3a2faef8d54c1b9a", entry: "992347e86b014232fd9ef39d1c90ebc3a7d670819a21be690eb2e08eed680b3a" },
+  tr: { next: "27dc968ee5492e96de34fae9ed1b0f8c43d4f68006362f7d97ff2e85040b46ef", entry: "547025da12928bfbb7f5f10c3f5486f8576230599b40403c071a86317a2e2d45" },
+  uk: { next: "81d03cfd6fdb92f0d25c85cb0d3db8ee55a87f3a29a2a9bd8d7826783086fd19", entry: "25200b4c4ebf35b59c2a5efb994cccfdd5b4d49d7e184229123dfbbad711d8b9" },
+  vi: { next: "52d8f3d185d226fd9b2e0d197e8318a406c05b3c60180b0522210212f132f9b0", entry: "e30204ebcf4883d7c18fb05427d7f554f65dcc339b50e0b78fb4214e4b3cdda6" },
+  zh: { next: "7aade62038475e3fa68bf99f132023d98401fce9af4ee7fb613d166f3a3c0d07", entry: "fcf4776b78de38a1cf89e5daef9869dc416878f1d9be58a265dc6500720a48f0" }
+};
 
 /** Answer 13, verbatim: the two purpose labels of the Register. */
 const LABELS = {
@@ -170,11 +226,37 @@ const onlyDateChanged = (next: string, prior: string, date: string, label: strin
   expect(priorDate, `${label}: the date moved`).not.toBe(date);
 };
 
+const sha256Of = (text: string): string => createHash("sha256").update(text, "utf8").digest("hex");
+/** What stands between two sentences: nothing after the CJK full stop, else one space. */
+const sentenceGap = (code: string): string => (code === "ja" || code === "zh" ? "" : " ");
+
+/**
+ * Where the last sentence of `text` begins: just after the last sentence end before its own (". " after a non-digit,
+ * so the "2. " of "2. szakasz" ends nothing; the CJK full stop; or the Devanagari danda and a space).
+ */
+const lastSentenceStart = (text: string): number => {
+  const last = [...text.slice(0, -1).matchAll(/(?<!\d)\. |。|। /gu)].at(-1);
+  return last === undefined ? 0 : last.index! + last[0].length;
+};
+
+/** `text` is Task 83's text (by its sha256), the locale's gap and exactly one sentence more; returns that sentence. */
+const oneSentenceAfter = (text: string, sha256: string, code: string, label: string): string => {
+  const at = lastSentenceStart(text);
+  const gap = sentenceGap(code);
+  const head = text.slice(0, at);
+  expect(head.endsWith(gap), `${label}: the locale's gap before the added sentence`).toBe(true);
+  expect(sha256Of(head.slice(0, head.length - gap.length)), `${label}: Task 83's text, unchanged, then one sentence`).toBe(sha256);
+  const added = text.slice(at);
+  expect(added, `${label}: the added sentence ends as a sentence`).toMatch(/[.。।]$/u);
+  return added;
+};
+
 describe("Privacy Policy 3.12: what happens when you press Next", () => {
   it("covers the 35 languages, each with a prior 3.11 text and the effective date in its own words", () => {
     expect(LOCALES).toHaveLength(35);
     expect(Object.keys(PRIOR).sort()).toEqual(LOCALES.map(({ code }) => code).sort());
     expect(Object.keys(DATES).sort()).toEqual(LOCALES.map(({ code }) => code).sort());
+    expect(Object.keys(AS_83).sort()).toEqual(LOCALES.map(({ code }) => code).sort());
     const [year, month, day] = EFFECTIVE.split("-").map(Number) as [number, number, number];
     for (const [code, dates] of Object.entries(DATES)) {
       for (const date of [dates.eyebrow, dates.line, dates.updated]) {
@@ -226,15 +308,50 @@ describe("Privacy Policy 3.12: what happens when you press Next", () => {
     expect(next[EYEBROW]).toBe("eyebrow: PRIVACY POLICY · v3.12 · EFFECTIVE 4 NOVEMBER 2026");
     expect(next[END_MARKER]).toBe("endMarker: END OF POLICY · GDPR (EU) 2016/679 · v3.12");
     expect(next[VERSION_LINE]).toBe("**Version 3.12 · Effective 4 November 2026 · Previous versions at dezbatere.ro/privacy/versions · Controller: DMS Merchandise Shop S.R.L., Piatra Neamț**");
-    expect(next[NEXT_LINE]).toBe(NEXT_SENTENCE);
+    expect(next[NEXT_LINE]).toBe(`${NEXT_SENTENCE} ${TAB_SENTENCE}`);
     const prior = lines(readFileSync(resolve(root, "apps/ui/legal/archive/en", `${PRIOR.en}.md`), "utf8"));
     const tail = prior[CHANGE_LOG]!.slice(prior[CHANGE_LOG]!.indexOf("Version 3.11 replaced version 3.10:"));
-    expect(next[CHANGE_LOG]).toBe(`This policy was last updated on 4 November 2026. ${CHANGE_ENTRY} ${tail}`);
+    expect(next[CHANGE_LOG]).toBe(`This policy was last updated on 4 November 2026. ${CHANGE_ENTRY} ${CHANGE_ENTRY_TAB} ${tail}`);
+  });
+
+  // Task 83b: the Next paragraph and the 3.12 entry are Task 83's, each followed by one sentence on the browser tab.
+  it.each(LOCALES.map(({ code }) => [code]))("%s: the Next paragraph and the 3.12 entry each gain one sentence on the browser tab", (code) => {
+    const pins = AS_83[code]!;
+    const next = lines(draftBytes(code).toString("utf8"));
+    const tab = oneSentenceAfter(next[NEXT_LINE]!, pins.next, code, `${code}: the Next paragraph`);
+
+    const priorLog = lines(readFileSync(resolve(root, "apps/ui/legal/archive", code, `${PRIOR[code]!}.md`), "utf8"))[CHANGE_LOG]!;
+    const tail = priorLog.slice(entryStart(priorLog, "3.11"));
+    const log = next[CHANGE_LOG]!;
+    expect(log.endsWith(tail), `${code}: from the 3.11 entry to the end, the log is unchanged`).toBe(true);
+    const entry = log.slice(entryStart(log, "3.12"), log.length - tail.length);
+    const gap = sentenceGap(code);
+    expect(entry.endsWith(gap), `${code}: the locale's gap before the 3.11 entry`).toBe(true);
+    const also = oneSentenceAfter(entry.slice(0, entry.length - gap.length), pins.entry, code, `${code}: the 3.12 entry`);
+    expect(also, `${code}: the added log sentence names 3.12`).toMatch(/3\.12/u);
+    expect(also, `${code}: the added log sentence names no older version`).not.toMatch(/3\.11|3\.10|3\.9/u);
+    expect(also, `${code}: the added log sentence names section 2`).toMatch(/(^|\D)2(\D|$)/u);
+
+    if (code === "en") {
+      expect(tab).toBe(TAB_SENTENCE);
+      expect(also).toBe(CHANGE_ENTRY_TAB);
+    } else {
+      expect(tab, `${code}: the Next sentence is translated`).not.toBe(TAB_SENTENCE);
+      expect(also, `${code}: the log sentence is translated`).not.toBe(CHANGE_ENTRY_TAB);
+    }
   });
 
   it.each(LOCALES.map(({ code }) => [code]))("%s: the manifest carries 3.12 for the draft's exact bytes", (code) => {
     const current = manifest().documents.PRIVACY?.[code];
     expect(current).toEqual({ version: "3.12", sha256: createHash("sha256").update(draftBytes(code)).digest("hex") });
+  });
+
+  // Task 83b: 3.12 was never published, so its Task 83 draft leaves the archive, as the never-published 3.11 drafts
+  // did in 0bbaecc47 and d3bf346e5; the versions page lists one 3.12 text per language, the one that goes up.
+  it.each(LOCALES.map(({ code }) => [code]))("%s: the archive holds one 3.12 text, the draft's", (code) => {
+    const draft = createHash("sha256").update(draftBytes(code)).digest("hex");
+    const archived = Object.entries(manifest().archive.PRIVACY?.[code] ?? {}).filter(([, entry]) => entry.version === "3.12");
+    expect(archived).toEqual([[draft, { version: "3.12", path: `apps/ui/legal/archive/${code}/${draft}.md` }]]);
   });
 });
 
