@@ -11,6 +11,7 @@ import "./v4-wait.css";
 import "./v4-report.css";
 import "./v4-map-looks.css";
 import "./v4-undo.css";
+import "./v4-public.css";
 
 /* V4 initial (2026-10-28): the V4 pages live beside V3 under /v4 and share only the site's tokens (globals.css). */
 

@@ -93,8 +93,12 @@ function noteState(entry: DigUndoEntry): V4UndoNoteState {
   return "done";
 }
 
-/** Where a started dig can be seen: on its debate's map, at the path it digs (when it digs one). */
-function mapHrefOf(entry: DigUndoEntry): string {
+/**
+ * Where a started dig can be seen: on its debate's map, at the path it digs (when it digs one). A dig pressed on a public
+ * page has no debate of the person's above it: its own page (public-d2's "Open it").
+ */
+function mapHrefOf(entry: DigUndoEntry, childRunId: string): string {
+  if (entry.publicRef !== undefined) return `/v4/debate/${encodeURIComponent(childRunId)}`;
   const base = `/v4/debate/${encodeURIComponent(entry.parentRunId)}`;
   const group = digGroupOf(entry.dig.target);
   return group === "root" ? base : `${base}?path=${encodeURIComponent(group)}`;
@@ -137,7 +141,7 @@ export function V4DigNotes(props: V4DigNotesProps) {
               {t(catalog, "v4.dig.seeIt")}
             </button>
           )
-          : <Link className="v4UndoLink" href={mapHrefOf(entry)}>{t(catalog, "v4.dig.seeIt")}</Link>;
+          : <Link className="v4UndoLink" href={mapHrefOf(entry, started.childRunId)}>{t(catalog, "v4.dig.seeIt")}</Link>;
       const doneWords = started !== null
         ? t(catalog, "v4.dig.started", { time: clock(started.startedAt, locale) })
         : result?.kind === "REFUSED" ? result.message : "";
