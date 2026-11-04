@@ -177,6 +177,31 @@ describe("map-f29 / dig-f20: dig titles", () => {
   });
 });
 
+describe("dig-d4 A: the path's result box", () => {
+  const pathPanel = (digs: readonly DigView[]) => dom(renderToStaticMarkup(
+    <V4Panel map={buildMap()} digs={digs} selected="path:a" readingLevel="plain" picked={new Set()} onTogglePick={noop} onSelect={noop}
+      digMode="quick" onDigMode={noop} onDig={noop} digBusy={false} headingRef={createRef<HTMLHeadingElement>()} catalog={catalog} locale="en" />
+  ));
+  it("says the result first, then what was asked, in the dig's own words", () => {
+    const asked: DigView = { ...doneDig, picks: [{ text: "Twice the cost of wind?", by: "AI_SUGGESTION" }] };
+    const panel = pathPanel([asked]);
+    expect(panel.querySelector(".v4RewriteResult")!.textContent).toContain(t(catalog, "v4.result.box.CONFIRMED_HOLDS"));
+    const line = panel.querySelector(".v4RewriteAsked")!;
+    expect(line.textContent).toBe(t(catalog, "v4.rewrite.youAsked", { question: "Twice the cost of wind?" }));
+    expect(line.querySelector("[data-ai-generated='true']")!.textContent).toBe("Twice the cost of wind?");
+    expect(panel.querySelector(".v4RewriteResult")!.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The person's own view is theirs, not AI text.
+    const own = pathPanel([{ ...doneDig, picks: [{ text: "Pumped hydro could carry it.", by: "PERSON_OWN_VIEW" }] }]);
+    expect(own.querySelector(".v4RewriteAsked [data-ai-generated]")).toBeNull();
+    expect(own.querySelector(".v4RewriteAsked")!.textContent).toContain("Pumped hydro could carry it.");
+  });
+
+  it("leaves the line out when only the site's words could say what was asked", () => {
+    expect(pathPanel([doneDig]).querySelector(".v4RewriteAsked")).toBeNull();
+    expect(pathPanel([]).querySelector(".v4RewriteAsked")).toBeNull();
+  });
+});
+
 describe("map-d3: laptops fold every path but the opened one", () => {
   it("unfolds the opened path, gives the others the \"Open ground\" mark, and keeps the star in view", () => {
     const root = dom(renderToStaticMarkup(<V4MapTree {...props({ fold: true, selected: "path:a" })} />));

@@ -370,6 +370,7 @@
   "v4.rewrite.changedSince.other": "Paths changed since the answer was written: {count}.",
   "v4.rewrite.changedSinceReport": "Paths changed since your report (version {n}): {count}.",
   "v4.rewrite.whatChanged": "What the dig changed",
+  "v4.rewrite.youAsked": "You asked: {question}",
   "v4.rewrite.whatChangedBelow": "A dig further down changed part of this path. What changed:",
   "v4.mainAnswer.title": "The answer as it stands now",
   "v4.mainAnswer.updated": "Updated on {date}.",

@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { ReactNode, RefObject } from "react";
 import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { addedLines, ownWords } from "@/lib/v4/askText";
-import { findOpenQuestion, openQuestionsOf } from "@/lib/v4/mapModel";
+import { findOpenQuestion, isFinishedRewrite, openQuestionsOf } from "@/lib/v4/mapModel";
 import type { MoneyLine } from "@/lib/v4/money";
 import { draftTarget } from "@/lib/v4/suggestions";
 import { levelHref } from "@/lib/v4/storage";
@@ -21,6 +21,7 @@ import {
   type TrustWord,
   type V4Map,
   type V4OpenQuestion,
+  type V4Path,
   type V4Point,
   type V4Selection
 } from "@/lib/v4/types";
@@ -492,6 +493,20 @@ function AnswerSoFar(props: Readonly<{ line: string | null; catalog: MessageCata
     : <p className="v4PanelText" data-ai-generated="true">{props.line}</p>;
 }
 
+/**
+ * dig-d4 A: what the dig behind the path's newest finished rewrite looked into, in its own words ("You asked: …"); null
+ * when that dig is not on this map, or when only the site's own words could title it (a whole-path dig).
+ */
+function askedTitle(path: V4Path, panel: PanelProps): ReactNode {
+  const latest = (path.rewrites?.history ?? []).filter(isFinishedRewrite).at(-1);
+  const dig = latest === undefined ? undefined : panel.digs.find((candidate) => candidate.link.childRunId === latest.dig_run_id);
+  if (dig === undefined) return null;
+  const title = digTitle(dig, panel.catalog, HEADING_MAX, panel.map);
+  const siteWords = [t(panel.catalog, "v4.map.digWholePath"), t(panel.catalog, "v4.map.digUntitled")];
+  if (!title.ai && siteWords.includes(title.text)) return null;
+  return <TitleText title={title} catalog={panel.catalog} />;
+}
+
 function PathBody(props: Readonly<{ panel: PanelProps; resolved: Extract<ResolvedSelection, { kind: "path" }> }>) {
   const { panel } = props;
   const { path } = props.resolved;
@@ -510,6 +525,7 @@ function PathBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolve
         linkLevel={panel.linkLevel === undefined ? panel.readingLevel : panel.linkLevel}
         catalog={panel.catalog}
         locale={panel.locale}
+        asked={askedTitle(path, panel)}
       />
       {path.web !== undefined
         ? <V4SearchNote search={path.web.search} catalog={panel.catalog} />

@@ -76,6 +76,7 @@
 }
 .v4RewriteResult { margin: 0; display: flex; gap: 6px; align-items: baseline; font-weight: 700; color: var(--text); }
 .v4RewriteResultShape { color: var(--accent); }
+.v4RewriteAsked { margin: 0; color: var(--text-2); }
 
 /* ---------- the moves: card turn-over (with the clear), fly-in, fold; the highlight ---------- */
 .v4Reveal { animation: v4TurnOver var(--v4-look-turn) ease-out 1; transform-origin: center; }

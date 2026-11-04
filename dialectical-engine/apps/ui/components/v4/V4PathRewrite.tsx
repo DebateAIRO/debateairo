@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { PathRewrite, PathsChangedSince, PointOfViewVerdict } from "@debateai/contract";
 import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { pathHolds, pathOutcome, type DigOutcome } from "@/lib/v4/mapLooks";
@@ -226,6 +226,11 @@ export function V4PathRewrite(props: Readonly<{
   linkLevel: ReadingLevel | null;
   catalog: MessageCatalog;
   locale: string;
+  /**
+   * dig-d4 A (3 Nov): what the newest finished dig looked into, in its own words (the panel renders the title, AI text
+   * marked only when an AI wrote it); shown as "You asked: …" under the result. Absent or null: no line.
+   */
+  asked?: ReactNode;
 }>) {
   const { path, catalog, locale } = props;
   const state = pathRewriteState(path);
@@ -245,9 +250,13 @@ export function V4PathRewrite(props: Readonly<{
   const stateKey = state === null || (state === "NO_CHANGE" && result !== null) ? undefined : STATE_KEYS[state];
   const rewritten = rewrittenLine(path, catalog, locale);
   const summary = state === "REWRITTEN" && latest !== null ? latest.text.summary.trim() : "";
+  const asked = around(catalog, "v4.rewrite.youAsked", "question");
   return (
     <section className={`v4Rewrite${state === null ? "" : ` v4Rewrite${state}`}`} aria-label={t(catalog, "v4.rewrite.whatChanged")}>
       {result === null ? null : <V4RewriteResult path={path} digs={props.digs} catalog={catalog} />}
+      {props.asked === undefined || props.asked === null || latest === null ? null : (
+        <p className="v4RewriteAsked">{asked.before}{props.asked}{asked.after}</p>
+      )}
       {stateKey === undefined ? null : <p className="v4RewriteState" role="status">{t(catalog, stateKey)}</p>}
       {rewritten === null ? null : <p className="v4RewriteWhen v4Muted">{rewritten}</p>}
       {summary.length > 0 ? <p className="v4PanelText" data-ai-generated="true">{summary}</p> : null}
