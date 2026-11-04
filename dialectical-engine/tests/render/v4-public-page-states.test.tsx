@@ -15,12 +15,13 @@ import v4English from "../../apps/ui/messages/en/v4.json" with { type: "json" };
  *   debate just now." with Try again, which asks the server again in place.
  * - public-f8: "under review" and "made by a newer version" sit inside the normal header, with "See other public debates" and "Ask your own question".
  */
-const mocks = vi.hoisted(() => ({ readPublicDebate: vi.fn() }));
+const mocks = vi.hoisted(() => ({ readPublicDebate: vi.fn(), readBillingUsage: vi.fn(async () => null as unknown) }));
 vi.mock("@/lib/serverApi", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../apps/ui/lib/serverApi.js")>()),
   createServerContractClient: () => ({ readPublicDebate: mocks.readPublicDebate })
 }));
-vi.mock("@/lib/billing/usage", () => ({ readBillingUsage: async () => null }));
+// journey-f19 (review F8): a signed-in visitor has a quota to show, but a public page's note never shows it nor reads it.
+vi.mock("@/lib/billing/usage", () => ({ readBillingUsage: mocks.readBillingUsage }));
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const V4 = v4English as Record<string, string>;
@@ -71,10 +72,14 @@ describe("a debate that cannot be shown", () => {
     ["a failed fetch", () => new TypeError("fetch failed")]
   ])("%s says it couldn't load just now, inside the header, with Try again that asks the server again", async (_case, failure) => {
     const { element, nav } = await pageFor(failure);
+    mocks.readBillingUsage.mockReset();
+    mocks.readBillingUsage.mockResolvedValue({ plan_id: "PLUS", windows: [{ scope: "PERSON_DAY", percent: 15, resets_at: "2026-12-01T00:00:00.000Z" }] });
     const page = await mount(element);
     const note = page.querySelector("[data-public-note=could-not-load]")!;
     expect(note.querySelector("[role=status]")!.textContent).toBe("We couldn't load this debate just now.");
     expect(page.querySelector(".v4Hdr")).not.toBeNull();
+    expect(page.querySelector(".v4HdrAllowance")).toBeNull();
+    expect(mocks.readBillingUsage).not.toHaveBeenCalled();
     const retry = [...note.querySelectorAll("button")].find((button) => button.textContent === V4["v4.common.retry"])!;
     await act(async () => { retry.click(); });
     expect(nav.readRefreshes()).toHaveLength(1);

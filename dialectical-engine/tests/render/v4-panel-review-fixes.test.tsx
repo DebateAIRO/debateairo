@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { V4DigChoice } from "../../apps/ui/components/v4/V4DigSuggest.js";
 import { V4Panel } from "../../apps/ui/components/v4/V4Panel.js";
 import { t } from "../../apps/ui/lib/i18n/translate.js";
+import type { MoneyLine } from "../../apps/ui/lib/v4/money.js";
 import { EMPTY_DRAFT } from "../../apps/ui/lib/v4/suggestions.js";
 import type { DigState, DigView, TrustCounts, V4Map, V4OpenQuestion, V4Path, V4Point, V4Selection } from "../../apps/ui/lib/v4/types.js";
 import type { DigSuggestion, PathRewrite } from "../../packages/contract/src/index.js";
@@ -63,7 +64,9 @@ function choiceOf(extra: Partial<V4DigChoice> = {}): V4DigChoice {
   };
 }
 
-type Extra = Partial<{ digs: readonly DigView[]; choice: V4DigChoice | null; digBusy: boolean; onSelect: (selection: V4Selection) => void }>;
+type Extra = Partial<{
+  digs: readonly DigView[]; choice: V4DigChoice | null; digBusy: boolean; onSelect: (selection: V4Selection) => void; money: readonly MoneyLine[];
+}>;
 
 function element(map: V4Map, selected: V4Selection, extra: Extra = {}) {
   const choice = extra.choice === undefined ? choiceOf() : extra.choice;
@@ -81,6 +84,7 @@ function element(map: V4Map, selected: V4Selection, extra: Extra = {}) {
       onDig={noop}
       digBusy={extra.digBusy ?? false}
       {...(choice === null ? {} : { choice })}
+      {...(extra.money === undefined ? {} : { money: extra.money })}
       headingRef={createRef<HTMLHeadingElement>()}
       catalog={catalog}
       locale="en"
@@ -302,6 +306,29 @@ describe("dig-f33: no \"Nothing is open here\" above the path's suggestions", ()
     const deepest = render(mapWith([], [path("a", { suggestions: [suggestion("s1")] })]), "path:a", { choice: choiceOf({ canDig: false }) });
     expect(deepest.textContent).not.toContain(nothingOpen);
     expect(deepest.textContent).toContain(t(catalog, "v4.panel.noOpenRoot"));
+  });
+});
+
+describe("map-f16 + r2-11: the missing short answer's line says only what is true (review F10)", () => {
+  const CAN_DIG = "You can dig or write your report now.";
+  const noShort = (fallbackText: string | null): V4Map =>
+    ({ ...mapWith([point("p1", "SURE")]), headline: null, summary: null, storyState: "UNAVAILABLE", fallbackText });
+  const monthUsed: MoneyLine = { key: "v4.money.startsWait.PERSON_MONTH", values: { time: "1 December" } };
+
+  it("where a dig can start, the whole approved line, with or without the composed answer above it", () => {
+    expect(render(noShort(null), "root").textContent).toContain(t(catalog, "v4.panel.storyMissing"));
+    expect(render(noShort("First part.\n\nSecond part."), "root").textContent).toContain(t(catalog, "v4.panel.fallbackMissing"));
+    expect(t(catalog, "v4.panel.storyMissing")).toContain(CAN_DIG);
+  });
+
+  it("at the deepest level, or while new questions and digs wait for the quota's reset, it stops after \"You don't need to wait.\"", () => {
+    for (const [name, extra] of [["deepest", { choice: choiceOf({ canDig: false }) }], ["quota", { money: [monthUsed] }]] as const) {
+      for (const fallback of [null, "First part."]) {
+        const text = render(noShort(fallback), "root", extra).textContent ?? "";
+        expect(text, `${name} ${fallback}`).toContain(t(catalog, "v4.panel.noShortAnswerNoDig"));
+        expect(text, `${name} ${fallback}`).not.toContain(CAN_DIG);
+      }
+    }
   });
 });
 

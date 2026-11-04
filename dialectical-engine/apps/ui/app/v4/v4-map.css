@@ -141,6 +141,29 @@
 .v4MapRootLeaves .v4MapLeaf::before, .v4MapRootLeaves .v4MapLeaf::after { inset-inline-start: -12px; }
 .v4MapRootLeaves .v4MapLeaf::after { width: 12px; }
 
+/* V4 review map-f13 (review F2): the three columns stay straight when one grows. The headings, the question's column and
+   every path's row share one grid's columns (subgrid): each column is as wide as its widest card needs for a word that
+   cannot break, between its drawn width and its cap, and every card in it takes that width. So the headings sit over
+   their columns and every row's open questions start at the same place. The 32px gap between columns is the space the
+   trunk, branches and stubs are drawn in, as before. Browsers without subgrid keep the per-row widths above. */
+@supports (grid-template-columns: subgrid) {
+  .v4MapCanvas {
+    display: grid; grid-template-columns: minmax(196px, min-content) minmax(228px, min-content) minmax(236px, min-content);
+    column-gap: 32px; row-gap: 10px;
+  }
+  .v4MapHeads, .v4MapBody { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; column-gap: normal; }
+  .v4MapBody { align-items: start; }
+  .v4MapRootCol { width: auto; }
+  .v4MapEmpty { grid-column: 2 / -1; }
+  .v4MapBranches {
+    grid-column: 2 / -1; display: grid; grid-template-columns: subgrid; column-gap: normal; row-gap: 14px;
+    margin-inline-start: 0;
+  }
+  .v4MapBranch { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; column-gap: normal; align-items: start; }
+  .v4MapBranch > .v4MapPath { grid-column: 1; width: 100%; }
+  .v4MapBranch > .v4MapLeaves { grid-column: 2; width: auto; }
+}
+
 .v4MapOpen {
   display: flex; align-items: stretch; background: var(--gold-bg); border: 1.5px dashed var(--gold-border);
   border-radius: 12px;

@@ -60,4 +60,30 @@ describe("the V4 map's styles follow the reading direction (map-f13)", () => {
       expect(declarations, selector).not.toMatch(/(?:^|[\s;{])width: \d+px/u);
     }
   });
+
+  it("keep the columns straight when one grows: the headings and every row share one grid's columns (review F2)", () => {
+    const start = rules.indexOf("@supports (grid-template-columns: subgrid) {");
+    expect(start).toBeGreaterThan(-1);
+    const block = rules.slice(start, rules.indexOf("\n}", start));
+    const inBlock = (selector: string): string => {
+      const escaped = selector.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+      const found = new RegExp(`\\n[ \\t]*${escaped} \\{([^}]*)\\}`, "u").exec(block);
+      expect(found, selector).not.toBeNull();
+      return found![1]!;
+    };
+    // One grid: each column is its drawn width at least, and grows only as far as its widest card needs (within the caps).
+    expect(inBlock(".v4MapCanvas")).toMatch(
+      /grid-template-columns: minmax\(196px, min-content\) minmax\(228px, min-content\) minmax\(236px, min-content\);[\s\S]*column-gap: 32px;/u);
+    // The headings, the body, the paths and every path's row use those same columns, with the same gap (no gap of their own).
+    for (const selector of [".v4MapHeads, .v4MapBody", ".v4MapBranches", ".v4MapBranch"]) {
+      expect(inBlock(selector), selector).toMatch(/grid-template-columns: subgrid;[\s\S]*column-gap: normal;/u);
+    }
+    expect(inBlock(".v4MapBranches")).toMatch(/grid-column: 2 \/ -1;[\s\S]*margin-inline-start: 0;/u);
+    // Every card fills its column, so each row's open questions start at the same place.
+    expect(inBlock(".v4MapBranch > .v4MapPath")).toMatch(/grid-column: 1; width: 100%;/u);
+    expect(inBlock(".v4MapBranch > .v4MapLeaves")).toMatch(/grid-column: 2; width: auto;/u);
+    expect(inBlock(".v4MapRootCol")).toMatch(/width: auto;/u);
+    // The fixed heading widths are gone from the grid (the per-row floors above stay for browsers without subgrid).
+    expect(block).not.toMatch(/196px 228px 236px/u);
+  });
 });

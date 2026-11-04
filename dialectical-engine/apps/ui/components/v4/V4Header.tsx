@@ -38,17 +38,21 @@ export function tightestWindow(usage: BillingUsage | null): Readonly<{ scope: Qu
   return tightest;
 }
 
-/** The binding window of the person's quota, or null (billing off, local site, read failed, no window). */
-function useTightestWindow(): ReturnType<typeof tightestWindow> {
+/**
+ * The binding window of the person's quota, or null (billing off, local site, read failed, no window). `wanted` false: the
+ * page shows no quota, so nothing is read.
+ */
+function useTightestWindow(wanted: boolean): ReturnType<typeof tightestWindow> {
   const [quota, setQuota] = useState<ReturnType<typeof tightestWindow>>(null);
   useEffect(() => {
+    if (!wanted) return;
     let active = true;
     void readBillingUsage(contractClient).then((usage) => {
       if (active) setQuota(tightestWindow(usage));
     });
     return () => { active = false; };
-  }, []);
-  return quota;
+  }, [wanted]);
+  return wanted ? quota : null;
 }
 
 function ReadingLevelMenu({ catalog, level, onLevel }: Readonly<{
@@ -130,7 +134,7 @@ function ReadingLevelMenu({ catalog, level, onLevel }: Readonly<{
   );
 }
 
-export function V4Header({ catalog, readingLevel, linkLevel, onReadingLevel, classicHref = null, children }: Readonly<{
+export function V4Header({ catalog, readingLevel, linkLevel, onReadingLevel, classicHref = null, showQuota = true, children }: Readonly<{
   catalog: MessageCatalog;
   /** The level the menu shows (a page may show its default when none was chosen). */
   readingLevel: ReadingLevel | null;
@@ -141,10 +145,15 @@ export function V4Header({ catalog, readingLevel, linkLevel, onReadingLevel, cla
   linkLevel?: ReadingLevel | null;
   onReadingLevel?: (level: ReadingLevel) => void;
   classicHref?: string | null;
+  /**
+   * journey-f19: the quota share shows only on the ask, choosing and map pages. False on any other page (a public page's
+   * note, for one): no share is shown and the usage is not read.
+   */
+  showQuota?: boolean;
   /** Right-side extras (e.g. the Report button). */
   children?: ReactNode;
 }>) {
-  const quota = useTightestWindow();
+  const quota = useTightestWindow(showQuota);
   return (
     <header className="v4Hdr">
       <Link href={levelHref("/v4", linkLevel === undefined ? readingLevel : linkLevel)} className="v4HdrBrand">

@@ -75,6 +75,11 @@ type ReportLoad =
 /** A dig as the report lists it; `view` is undefined while it loads and null when it could not be read just now. */
 type ReportDig = Readonly<{ link: DigLink; view: DigView | null | undefined }>;
 
+/** report-f7: a dig the report may still wait for: running, waiting for a spot, or done but still rewriting its path. */
+function mayBeWaitedFor(view: DigView): boolean {
+  return view.state === "RUNNING" || view.state === "WAITING" || (view.state === "DONE" && view.rewrite?.state === "WRITING");
+}
+
 /*
  * R2TIME-3 / R2TIME-7: the same rule as the map page's story poll. While the story is being written it is read again
  * on a chained timer (never two reads in flight), backing off 10 s → 20 s → 40 s → 60 s; there is no try cap while it
@@ -85,6 +90,11 @@ const STORY_POLL_MAX_MS = 60_000;
 const STORY_WAIT_MAX_MS = 15 * 60_000;
 /** report-f8: once a report has been written for 15 minutes the page says so and keeps checking, slowly. */
 const REPORT_SLOW_POLL_MS = 120_000;
+/**
+ * report-f7 (review F1): a version this page's own "Write my report" press began closes within this of the press (the
+ * server's clock against this computer's). Beyond it the page cannot tell that its press began the writing.
+ */
+const PRESS_MATCH_MS = 5 * 60_000;
 /** report-f12: how long "Link copied." stays. */
 const COPIED_NOTE_MS = 4_000;
 /** A dig's path sits one step in per level, up to four steps (as in the PDF). */
@@ -170,9 +180,15 @@ type Investigation = Readonly<{
   retry: () => void;
   /** report-f8's Check again while a version is being written. */
   checkNow: () => void;
-  /** When the newest version's writing started as far as the page knows (ms); null while it is not being written or waits for digs. */
+  /** report-f7: this page is about to send its own "Write my report" (the version it begins started writing then). */
+  notePress: () => void;
+  /**
+   * When the newest version's writing started (ms), only when this visit knows it (review F1): it saw the digs it waited for
+   * finish, its own press began it, or the investigation has no digs to wait for. Null otherwise, and while it is not being
+   * written or waits for digs.
+   */
   writingSince: number | null;
-  /** report-f8: the newest version has been written for 15 minutes or more. */
+  /** report-f8: the newest version has been written for 15 minutes or more, as far as this visit can tell. */
   slow: boolean;
 }>;
 
@@ -187,16 +203,32 @@ function useInvestigation(runId: string | null): Investigation {
   const [attempt, setAttempt] = useState(0);
   const forRun = useRef(runId);
   forRun.current = runId;
-  // Which versions this visit saw waiting for digs, and when it saw them stop waiting: writing started then.
+  // Review F1: a version may wait 20 to 40 minutes for a dig, and its `closed_at` is when "Write my report" was pressed, so
+  // the page says when writing started only when this visit saw it start. By version: whether this visit saw it wait for
+  // digs, when writing is known to have started, and when this visit first saw it being written (the 15 minutes count
+  // from there when the start is not known, so "taking longer" never comes early).
   const sawWaiting = useRef(new Set<number>());
-  const clearedAt = useRef(new Map<number, number>());
+  const startedAt = useRef(new Map<number, number>());
+  const firstSeenWriting = useRef(new Map<number, number>());
+  const pressedAt = useRef<number | null>(null);
 
   const apply = useCallback((read: InvestigationReports) => {
     const newest = read.versions.at(-1);
     if (newest?.state === "WRITING") {
-      if (newest.waiting_for_digs > 0) sawWaiting.current.add(newest.report_version);
-      else if (sawWaiting.current.has(newest.report_version) && !clearedAt.current.has(newest.report_version)) {
-        clearedAt.current.set(newest.report_version, Date.now());
+      const version = newest.report_version;
+      if (newest.waiting_for_digs > 0) sawWaiting.current.add(version);
+      else {
+        const now = Date.now();
+        if (!firstSeenWriting.current.has(version)) firstSeenWriting.current.set(version, now);
+        if (!startedAt.current.has(version)) {
+          const closed = Date.parse(newest.closed_at);
+          const pressed = pressedAt.current;
+          // Seen waiting, now not: writing started about now. No digs: it started when the version closed. This page's press
+          // began it: the version closed with that press, and no dig was waited for since (it would read as waiting first).
+          if (sawWaiting.current.has(version)) startedAt.current.set(version, now);
+          else if (read.digs === 0) startedAt.current.set(version, closed);
+          else if (pressed !== null && Math.abs(closed - pressed) <= PRESS_MATCH_MS) startedAt.current.set(version, closed);
+        }
       }
     }
     setState({ kind: "READ", read });
@@ -263,28 +295,30 @@ function useInvestigation(runId: string | null): Investigation {
     };
   }, [runId, writingVersion, apply]);
 
-  // While digs still run, writing has not started; once they are done (seen on this visit) it started then, else when asked.
-  const writingSince = writing === null || writing.waiting_for_digs > 0
-    ? null
-    : clearedAt.current.get(writing.report_version) ?? Date.parse(writing.closed_at);
+  // While digs still run, writing has not started; after that, it started when this visit knows (else no time is said).
+  const writingNow = writing === null || writing.waiting_for_digs > 0 ? null : writing.report_version;
+  const writingSince = writingNow === null ? null : startedAt.current.get(writingNow) ?? null;
+  // The 15 minutes count from the known start, else from when this visit first saw the version being written.
+  const slowFrom = writingNow === null ? null : writingSince ?? firstSeenWriting.current.get(writingNow) ?? null;
   const [slow, setSlow] = useState(false);
   useEffect(() => {
     setSlow(false);
-    if (writingSince === null) return;
-    const left = writingSince + STORY_WAIT_MAX_MS - Date.now();
+    if (slowFrom === null) return;
+    const left = slowFrom + STORY_WAIT_MAX_MS - Date.now();
     if (left <= 0) {
       setSlow(true);
       return;
     }
     const timer = window.setTimeout(() => setSlow(true), left);
     return () => window.clearTimeout(timer);
-  }, [writingSince]);
+  }, [slowFrom]);
 
   return {
     state,
     reread,
     retry: () => setAttempt((value) => value + 1),
     checkNow: () => check.current(),
+    notePress: () => { pressedAt.current = Date.now(); },
     writingSince,
     slow
   };
@@ -335,6 +369,30 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
     );
     return () => { active = false; };
   }, [target, attempt]);
+
+  // report-f9 (review F5): a dig whose own answer cannot be read (still running, or failed) is in an investigation too, which
+  // names the first question: its report address moves there as well. Its own line shows only once that read has answered.
+  const notReady = load.kind === "NOT_READY";
+  const [rootChecked, setRootChecked] = useState<string | null>(null);
+  const levelForMove = useRef(chosenLevel);
+  levelForMove.current = chosenLevel;
+  useEffect(() => {
+    if (!notReady) return;
+    let active = true;
+    setRootChecked(null);
+    void Promise.resolve().then(() => loadInvestigation(target)).catch(() => null).then((read) => {
+      if (!active) return;
+      const root = read?.root_run_id ?? null;
+      if (root !== null && root.toLowerCase() !== target.toLowerCase()) {
+        window.history.replaceState(null, "", levelHref(`/v4/debate/${encodeURIComponent(root)}/report`, levelForMove.current));
+        setTarget(root);
+        return;
+      }
+      setRootChecked(target);
+    });
+    return () => { active = false; };
+  }, [notReady, target]);
+  const notReadyShown = notReady && rootChecked === target;
 
   // DATA-3: the fourth failed story read in a row ends the wait too (buildV4Map reads a failed read as "still being
   // written" until the page gives up).
@@ -468,10 +526,34 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
     }
   }, [digLinks]);
   const digs: readonly ReportDig[] = digLinks.map((link) => ({ link, view: views.get(link.childRunId) }));
-  // report-f16: the digs are listed together once every one is read, never filling in one by one.
+  // report-f16: the digs are listed together once every one is read, never filling in one by one (and the page waits for
+  // them, review F6, so the section is there from the first draw).
   const digsReady = index !== null && records !== undefined && digs.every((dig) => dig.view !== undefined);
-  // report-f7: the one dig still running, by its question, for "Your report starts when your dig on … finishes."
-  const running = digs.filter((dig) => dig.view?.state === "RUNNING" || dig.view?.state === "WAITING");
+
+  // report-f7 (review F7): while the report waits for digs, every dig it may be waiting for (running, waiting for a spot, or
+  // finished but still rewriting its path, or not readable) is read again each time the versions are, so the line names
+  // the dig that is really still going. One read per dig at a time.
+  const linksNow = useRef(digLinks);
+  linksNow.current = digLinks;
+  const viewsNow = useRef(views);
+  viewsNow.current = views;
+  const rereading = useRef(new Set<string>());
+  useEffect(() => {
+    const newest = read?.versions.at(-1);
+    if (newest?.state !== "WRITING" || newest.waiting_for_digs === 0) return;
+    for (const link of linksNow.current) {
+      const view = viewsNow.current.get(link.childRunId);
+      if (view === undefined || (view !== null && !mayBeWaitedFor(view)) || rereading.current.has(link.childRunId)) continue;
+      rereading.current.add(link.childRunId);
+      const done = (next: DigView | null) => {
+        rereading.current.delete(link.childRunId);
+        if (alive.current && next !== null) setViews((current) => new Map(current).set(link.childRunId, next));
+      };
+      loadDigView(link).then(done, () => done(null));
+    }
+  }, [read]);
+  // The one dig the report still waits for, by its question, for "Your report starts when your dig on … finishes."
+  const running = digs.filter((dig) => dig.view !== undefined && dig.view !== null && mayBeWaitedFor(dig.view));
   const runningDig = running.length === 1 ? running[0]!.link.questions[0] ?? null : null;
 
   // The person's own words, not the added lines. R2TIME-8: the site's DocumentTitle names the tab (and a printed file)
@@ -522,8 +604,12 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
     }
   };
 
-  // The page is drawn once the debate and its report versions are read (report-f16: one placeholder until then).
-  const ready = load.kind === "SERVED" && map !== null && ownQuestion !== null && investigation.state.kind !== "LOADING" && !elsewhere;
+  // The page is drawn once the debate, its report versions and its digs are read (report-f16: one placeholder until then).
+  // A dig found only later (by its text, once the story lands) shows "Loading…" in its own section; the page stays drawn.
+  const readable = load.kind === "SERVED" && map !== null && ownQuestion !== null && investigation.state.kind !== "LOADING" && !elsewhere;
+  const drawnFor = useRef<string | null>(null);
+  if (readable && digsReady) drawnFor.current = target;
+  const ready = readable && (digsReady || drawnFor.current === target);
   const share: ReportShareItem[] = [];
   if (ready && current !== null && pdfCheck === "OFFERED") {
     share.push({ id: "pdf", label: t(catalog, "v4.investigation.downloadVersion", { n: current }), onSelect: () => void savePdfNow() });
@@ -565,7 +651,9 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
       <div className="v4RepPage">
         {header}
         <div className="v4RepState">
-          {load.kind === "LOADING" ? <p role="status" className="v4Muted">{t(catalog, "v4.common.loading")}</p> : null}
+          {load.kind === "LOADING" || (load.kind === "NOT_READY" && !notReadyShown)
+            ? <p role="status" className="v4Muted">{t(catalog, "v4.common.loading")}</p>
+            : null}
           {load.kind === "ERROR" ? (
             <>
               <p role="alert">{t(catalog, "v4.report.loadFailed")}</p>
@@ -578,21 +666,21 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
               <Link className="v4Btn v4BtnPrimary" href={askHref}>{t(catalog, "v4.debate.askNew")}</Link>
             </>
           ) : null}
-          {load.kind === "NOT_READY" && load.failed ? (
+          {notReadyShown && load.kind === "NOT_READY" && load.failed ? (
             <>
               <p className="v4RepProse">{t(catalog, "v4.report.failed")}</p>
               <Link className="v4Btn v4BtnPrimary" href={askHref}>{t(catalog, "v4.debate.askNew")}</Link>
               <Link className="v4Link v4RepSmallLink" href={classicHref}>{t(catalog, "v4.common.classicView")}</Link>
             </>
           ) : null}
-          {load.kind === "NOT_READY" && !load.failed ? (
+          {notReadyShown && load.kind === "NOT_READY" && !load.failed ? (
             <>
               <p className="v4RepProse">{t(catalog, "v4.report.notReady")}</p>
               <Link className="v4Btn" href={mapHref}>{t(catalog, "v4.report.backToMap")}</Link>
             </>
           ) : null}
         </div>
-        {load.kind === "ERROR" || (load.kind === "NOT_READY" && !load.failed) ? foot : null}
+        {load.kind === "ERROR" || (notReadyShown && load.kind === "NOT_READY" && !load.failed) ? foot : null}
       </div>
     );
   }
@@ -956,6 +1044,7 @@ function ReportArea({ runId, investigation, runningDig, webNote, pdfRefused, map
   const press = async (kind: PressKind): Promise<void> => {
     setBusy(true);
     setNote(null);
+    if (kind === "write") investigation.notePress();
     const result = kind === "write" ? await writeReport(runId) : await reopenInvestigation(runId);
     if (!alive.current) return;
     if (result.kind === "FAILED") {
@@ -1117,8 +1206,15 @@ function VersionStatus({ version, investigation, runningDig, locale, language, c
       </div>
     );
   }
-  const since = investigation.writingSince ?? Date.parse(version.closed_at);
-  return <p className="v4RepNote" role="status">{t(catalog, "v4.investigation.writingSince", { time: clockTime(locale, since) })}</p>;
+  // Review F1: the time only when this visit knows when writing started (`closed_at` is when the button was pressed).
+  const since = investigation.writingSince;
+  return (
+    <p className="v4RepNote" role="status">
+      {since === null
+        ? t(catalog, "v4.investigation.writing")
+        : t(catalog, "v4.investigation.writingSince", { time: clockTime(locale, since) })}
+    </p>
+  );
 }
 
 /** The pieces a stored version's path keeps (an earlier version keeps only its line, summary, fate and level). */

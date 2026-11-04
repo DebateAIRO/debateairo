@@ -203,7 +203,21 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.investigation.checkAgain",
   "v4.investigation.writeAgain",
   "v4.investigation.digMore",
-  "v4.web.freeOnPaper"
+  "v4.web.freeOnPaper",
+  // The review of the fix branch (4 Nov): lines the builders wrote beyond the record's approved fix texts, shown to the owner
+  // at the click-test. The report's line when this visit cannot know when writing started (review F1); the missing-answer
+  // line without "You can dig or write your report now." where no dig can start (review F10); the team grant's header word;
+  // the public page's dig credit, which the record words "A dig by Quiet Heron changed …" (dig-f25); the problem
+  // report's thank-you and its two "say more" lines (public-f5 gives no words).
+  "v4.investigation.writing",
+  "v4.panel.noShortAnswerNoDig",
+  "v4.header.used.PERSON_GRANT",
+  "v4.public.digFrom",
+  "v4.public.digFromGone",
+  "v4.public.digFromAnother",
+  "v4.public.flag.thanks",
+  "v4.public.flag.whereMore",
+  "v4.public.flag.claimMore"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {
@@ -370,6 +384,11 @@ const REVIEW_LINES: Readonly<Record<string, string>> = Object.freeze({
 describe("the owner's 3 Nov screen review", () => {
   it("the first button reads Next, and the dig, wait and missing-answer lines are the review's words", () => {
     expect(Object.fromEntries(Object.keys(REVIEW_LINES).map((key) => [key, catalog[key]]))).toEqual(REVIEW_LINES);
+    // Review F10: where no dig can start, the same approved words stop after "You don't need to wait."
+    expect(catalog["v4.panel.noShortAnswerNoDig"]).toBe(`${APPROVED_REPORT_LINES["v4.investigation.noStory"]} You don't need to wait.`);
+    expect(`${catalog["v4.panel.noShortAnswerNoDig"]} You can dig or write your report now.`).toBe(catalog["v4.panel.storyMissing"]);
+    // Review F1: the report's line when the start of writing is not known is the timed line without its time.
+    expect(catalog["v4.investigation.writing"]).toBe(catalog["v4.investigation.writingSince"]!.replace(" Started {time}.", ""));
   });
 
   it("the share word is quota: no V4 line says allowance", () => {
@@ -381,7 +400,7 @@ describe("the owner's 3 Nov screen review", () => {
   });
 
   it("wait-f3 / map-f3: no wait names a figure before it is measured, and the question's wait says where to find it", () => {
-    for (const key of ["v4.debate.usually", "v4.investigation.writingSince"]) {
+    for (const key of ["v4.debate.usually", "v4.investigation.writingSince", "v4.investigation.writing"]) {
       expect(catalog[key], key).not.toMatch(/\d|minute|hour|usually|few/iu);
       expect(catalog[key], key).toMatch(/This takes a while\./u);
     }

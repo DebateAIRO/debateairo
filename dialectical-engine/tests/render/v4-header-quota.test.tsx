@@ -11,10 +11,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * word. A Free person whose month is used up reads "This month: 100%", never today's share; a paid person mid-day reads
  * today's. A tie goes to the longest window, the way the server's room sentence names one. Nothing shows without a read.
  */
-const server = vi.hoisted(() => ({ usage: null as unknown }));
+const server = vi.hoisted(() => ({ usage: null as unknown, reads: 0 }));
 vi.mock("@/lib/api", () => ({
   contractClient: {
     getBillingUsage: async () => {
+      server.reads += 1;
       if (server.usage === null) throw new Error("404: billing off");
       return server.usage;
     },
@@ -35,19 +36,21 @@ const free = (percent: number) => ({ plan_id: "FREE", windows: [window_("PERSON_
 const team = (...windows: ReturnType<typeof window_>[]) => ({ plan_id: null, funding: { kind: "INTERNAL", expires_at: RESET }, windows });
 
 let root: Root | null = null;
-beforeEach(() => { server.usage = null; });
+beforeEach(() => { server.usage = null; server.reads = 0; });
 afterEach(async () => {
   if (root !== null) await act(async () => root!.unmount());
   root = null;
   document.body.replaceChildren();
 });
 
-async function headerQuota(): Promise<string | null> {
+async function headerQuota(showQuota?: boolean): Promise<string | null> {
   const host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
   await act(async () => {
-    root!.render(<V4Header catalog={CATALOG} readingLevel={null} />);
+    root!.render(showQuota === undefined
+      ? <V4Header catalog={CATALOG} readingLevel={null} />
+      : <V4Header catalog={CATALOG} readingLevel={null} showQuota={showQuota} />);
     for (let turn = 0; turn < 4; turn += 1) await Promise.resolve();
   });
   return host.querySelector(".v4HdrAllowance")?.textContent ?? null;
@@ -66,6 +69,12 @@ describe("the V4 header's quota line", () => {
   ])("%s", async (_name, usage, line) => {
     server.usage = usage;
     expect(await headerQuota()).toBe(line);
+  });
+
+  it("journey-f19: a page that shows no quota (a public page's note) reads no usage and shows no share (review F8)", async () => {
+    server.usage = paid(window_("PERSON_DAY", 15));
+    expect(await headerQuota(false)).toBeNull();
+    expect(server.reads).toBe(0);
   });
 
   it("shows nothing when the usage read fails (billing off, a local site)", async () => {

@@ -432,6 +432,11 @@ function RootBody(props: Readonly<{ panel: PanelProps }>) {
   const writing = map.storyState === "WRITING";
   // W4-6 (Q-D13): a dig has no short answer by design: its answer text is the answer, with nothing said to be missing.
   const noStory = map.storyState === "NONE";
+  // map-f16 + r2-11 (review F10): "You can dig or write your report now." only where a dig can start now: not at the deepest
+  // level, and not while new questions and digs wait for the quota's reset. Elsewhere the approved line stops after "You
+  // don't need to wait."
+  const canDigNow = panel.choice?.canDig !== false && !(panel.money ?? []).some((line) => /^v4\.money\.startsWait\./u.test(line.key));
+  const missingKey = canDigNow ? (fallback.length > 0 ? "v4.panel.fallbackMissing" : "v4.panel.storyMissing") : "v4.panel.noShortAnswerNoDig";
   const firstAnswer = (
     <>
       {headline.length > 0 || summary.length > 0
@@ -451,11 +456,11 @@ function RootBody(props: Readonly<{ panel: PanelProps }>) {
                 {fallback.map((paragraph, index) => <p key={index} className="v4PanelText">{paragraph}</p>)}
               </div>
               {noStory ? null : (
-                <p className="v4PanelHint v4Muted">{t(catalog, writing ? "v4.panel.fallbackWriting" : "v4.panel.fallbackMissing")}</p>
+                <p className="v4PanelHint v4Muted">{t(catalog, writing ? "v4.panel.fallbackWriting" : missingKey)}</p>
               )}
             </>
           )
-          : noStory ? null : <p className="v4Muted">{t(catalog, writing ? "v4.panel.storyWriting" : "v4.panel.storyMissing")}</p>}
+          : noStory ? null : <p className="v4Muted">{t(catalog, writing ? "v4.panel.storyWriting" : missingKey)}</p>}
     </>
   );
   return (

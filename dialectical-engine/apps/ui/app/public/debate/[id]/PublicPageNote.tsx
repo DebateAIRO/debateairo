@@ -19,7 +19,8 @@ export function PublicPageNote({ kind, v4Catalog, line, waysOn = true, children 
   return (
     <div className="v4Root v4PubNotePage">
       <meta name="robots" content="noindex" />
-      <V4Header catalog={v4Catalog} readingLevel={null} />
+      {/* journey-f19: the quota share is for the ask, choosing and map pages, never a public page's note. */}
+      <V4Header catalog={v4Catalog} readingLevel={null} showQuota={false} />
       {/* The layout already holds the page's one <main>. */}
       <div className="v4PubNoteMain" data-public-note={kind}>
         <p className="v4PubNoteLine" role="status">{line}</p>

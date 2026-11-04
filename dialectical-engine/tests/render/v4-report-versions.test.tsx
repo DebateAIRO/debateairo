@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ContractHttpError } from "@debateai/contract";
 import { InvestigationReportsSchema, type InvestigationReports, type InvestigationReportVersion, type RunProjection } from "../../packages/contract/src/index.js";
 import type { ReopenResult, WriteReportResult } from "../../apps/ui/lib/v4/load.js";
+import type { DigLink, DigView } from "../../apps/ui/lib/v4/types.js";
 import { buildV4Map } from "../../apps/ui/lib/v4/mapModel.js";
 import { CATALOG, harness, mountMap, page, resetHarness, seededAnswer, seededStory, settle, unmountMap } from "./v4-debate-harness.js";
 
@@ -19,6 +20,10 @@ const reports = vi.hoisted(() => ({
   language: undefined as string | undefined,
   /** report-f10: a read of the debate that fails, in place of the harness's. */
   fail: null as Error | null,
+  /** Review F5: debates whose own answer is not served yet (still running, or failed), whatever the harness serves. */
+  notServed: new Map<string, "RUNNING" | "FAILED">(),
+  /** Review F6: each dig's read, in place of the harness's (null: the harness's). */
+  digView: null as ((link: DigLink) => Promise<DigView>) | null,
   /** Every id the page read the debate by. */
   reads: [] as string[]
 }));
@@ -33,10 +38,16 @@ vi.mock("@/lib/v4/load", async (original) => {
     loadV4: async (id: string) => {
       reports.reads.push(id);
       if (reports.fail !== null) throw reports.fail;
+      const notServed = reports.notServed.get(id);
+      if (notServed !== undefined) {
+        return { kind: "RUN", runId: id, run: { run_ref: id, question_line: "Q?", state: notServed,
+          terminal_reason: notServed === "FAILED" ? "RUNNER_FAILED" : null, hold_until: null } as RunProjection };
+      }
       const served = await base.loadV4(id);
       return reports.language === undefined || served.kind !== "SERVED" ? served : { ...served, language: reports.language };
     },
     loadInvestigation: (runId: string) => reports.load(runId),
+    loadDigView: (link: DigLink) => reports.digView === null ? base.loadDigView(link) : reports.digView(link),
     writeReport: (runId: string) => reports.write(runId),
     reopenInvestigation: (runId: string) => reports.reopen(runId)
   };
@@ -95,9 +106,10 @@ const writing = (version: number, waiting: number): InvestigationReportVersion =
 const failed = (version: number): InvestigationReportVersion =>
   ({ report_version: version, closed_at: "2026-10-31T09:00:00.000Z", state: "FAILED", written_at: "2026-10-31T09:20:00.000Z" });
 
-function investigation(runId: string, state: "OPEN" | "CLOSED", versions: InvestigationReportVersion[]): InvestigationReports {
+/** `digs`: how many digs the investigation holds (review F1: with none, writing starts when the version closes). */
+function investigation(runId: string, state: "OPEN" | "CLOSED", versions: InvestigationReportVersion[], digs = 1): InvestigationReports {
   const current = versions.filter((version) => version.state === "READY" || version.state === "READY_WITH_RESERVATION").at(-1)?.report_version ?? null;
-  return InvestigationReportsSchema.parse({ investigation_id: "55555555-5555-4555-8555-555555555555", root_run_id: runId, state, digs: 1, versions, current });
+  return InvestigationReportsSchema.parse({ investigation_id: "55555555-5555-4555-8555-555555555555", root_run_id: runId, state, digs, versions, current });
 }
 const noInvestigation = (runId: string): InvestigationReports =>
   InvestigationReportsSchema.parse({ investigation_id: null, root_run_id: runId, state: "OPEN", digs: 0, versions: [], current: null });
@@ -134,6 +146,11 @@ beforeEach(() => {
   reports.language = undefined;
   reports.fail = null;
   reports.reads = [];
+  reports.notServed = new Map();
+  reports.digView = null;
+  reports.load = async () => null;
+  reports.write = async () => ({ kind: "FAILED" });
+  reports.reopen = async () => ({ kind: "FAILED" });
   window.history.replaceState(null, "", "/");
 });
 afterEach(async () => {
@@ -261,8 +278,9 @@ describe("the report page's versions", () => {
   it("f7: while the newest is being written: 'Version 2 · being written', when it started (no minutes), read again until it is written", async () => {
     vi.setSystemTime(new Date("2026-10-31T09:04:00.000Z"));
     const runId = crypto.randomUUID();
-    const before = investigation(runId, "CLOSED", [finished(1, "2026-10-29T10:00:00.000Z"), writing(2, 0)]);
-    const after = investigation(runId, "CLOSED", [finished(1, "2026-10-29T10:00:00.000Z"), finished(2, "2026-10-31T10:05:00.000Z")]);
+    // No digs to wait for: writing started when the version closed.
+    const before = investigation(runId, "CLOSED", [finished(1, "2026-10-29T10:00:00.000Z"), writing(2, 0)], 0);
+    const after = investigation(runId, "CLOSED", [finished(1, "2026-10-29T10:00:00.000Z"), finished(2, "2026-10-31T10:05:00.000Z")], 0);
     const load = vi.fn(async () => before);
     reports.load = load;
     const node = versionSection(await mountReport(runId))!;
@@ -304,7 +322,8 @@ describe("the report page's versions", () => {
   it("f8: after 15 minutes it says it is taking longer and keeps checking; Check again, the tab coming back and the network returning read at once", async () => {
     vi.setSystemTime(new Date("2026-10-31T09:16:00.000Z"));
     const runId = crypto.randomUUID();
-    const load = vi.fn(async () => investigation(runId, "CLOSED", [writing(1, 0)]));
+    // No digs to wait for, so writing started when the version closed, 16 minutes ago.
+    const load = vi.fn(async () => investigation(runId, "CLOSED", [writing(1, 0)], 0));
     reports.load = load;
     const node = versionSection(await mountReport(runId))!;
     expect(text(node.querySelector(".v4RepStatusBox"))).toContain(word("v4.investigation.slow"));
@@ -323,10 +342,56 @@ describe("the report page's versions", () => {
     await settle(3 * 60 * 60_000);
     expect(load.mock.calls.length).toBeGreaterThan(reads + 3);
     // The server says the report failed: the failure, with "Write it again".
-    load.mockImplementation(async () => investigation(runId, "CLOSED", [failed(1)]));
+    load.mockImplementation(async () => investigation(runId, "CLOSED", [failed(1)], 0));
     await press(buttonOf(node, "Check again")!);
     expect(node.textContent).toContain(word("v4.investigation.failed"));
     expect(buttonOf(node, "Write it again")).not.toBeNull();
+  });
+
+  it("review F1: a version that waited for a dig, opened later, says it is being written with no time, and 'taking longer' only 15 minutes into this visit", async () => {
+    // The button was pressed at 08:20; a dig ran until about 09:10; this visit begins at 09:16, after the dig finished.
+    vi.setSystemTime(new Date("2026-10-31T09:16:00.000Z"));
+    const runId = crypto.randomUUID();
+    const pressedEarly = { ...writing(1, 0), closed_at: "2026-10-31T08:20:00.000Z" } as InvestigationReportVersion;
+    const load = vi.fn(async () => investigation(runId, "CLOSED", [pressedEarly]));
+    reports.load = load;
+    const node = versionSection(await mountReport(runId))!;
+    const status = () => text(node.querySelector(".v4RepStatusBox"));
+    expect(status()).toBe(word("v4.investigation.writing"));
+    expect(status()).not.toContain("Started");
+    expect(status()).not.toContain(word("v4.investigation.slow"));
+    await settle(14 * 60_000);
+    expect(status()).toBe(word("v4.investigation.writing"));
+    await settle(60_000);
+    expect(status()).toContain(word("v4.investigation.slow"));
+  });
+
+  it("review F1: a version this visit saw waiting for a dig started when the dig finished, not when the button was pressed", async () => {
+    vi.setSystemTime(new Date("2026-10-31T09:30:00.000Z"));
+    const runId = crypto.randomUUID();
+    const waitingEarly = (left: number) => ({ ...writing(1, left), closed_at: "2026-10-31T08:20:00.000Z" }) as InvestigationReportVersion;
+    const load = vi.fn(async () => investigation(runId, "CLOSED", [waitingEarly(1)]));
+    reports.load = load;
+    const node = versionSection(await mountReport(runId))!;
+    expect(text(node.querySelector(".v4RepStatusBox"))).toBe("Your report starts when the dig in progress finishes.");
+    // The dig finishes; the next check (10 s later) sees no dig left to wait for.
+    load.mockImplementation(async () => investigation(runId, "CLOSED", [waitingEarly(0)]));
+    await settle(10_000);
+    const seen = new Date(Date.now()).toISOString();
+    expect(text(node.querySelector(".v4RepStatusBox"))).toBe(word("v4.investigation.writingSince", { time: clock(seen) }));
+    expect(text(node.querySelector(".v4RepStatusBox"))).not.toContain(clock("2026-10-31T08:20:00.000Z"));
+  });
+
+  it("review F1: this page's own press, with digs in the investigation: started when the version closed", async () => {
+    vi.setSystemTime(new Date("2026-10-31T09:01:00.000Z"));
+    const runId = crypto.randomUUID();
+    const load = vi.fn(async () => noInvestigation(runId));
+    reports.load = load;
+    reports.write = vi.fn(async (): Promise<WriteReportResult> => ({ kind: "WRITING", reportVersion: 1, waitingForDigs: 0 }));
+    const node = await mountReport(runId);
+    load.mockImplementation(async () => investigation(runId, "CLOSED", [writing(1, 0)]));
+    await press(buttonOf(node, "Write my report")!);
+    expect(text(node.querySelector(".v4RepStatusBox"))).toBe(word("v4.investigation.writingSince", { time: clock(WRITING_AT) }));
   });
 
   it("a FAILED version says so and offers \"Write it again\", which posts and reads the versions again", async () => {
@@ -446,6 +511,43 @@ describe("the report page's address and states", () => {
     expect(window.location.pathname).toBe(`/v4/debate/${rootRun}/report`);
     expect(node.querySelector(".v4RepHdrBack")!.getAttribute("href")).toMatch(new RegExp(`^/v4/debate/${rootRun}(?:\\?|$)`, "u"));
     expect(versionSection(node)).not.toBeNull();
+  });
+
+  it("review F5: a dig still running, or one that failed, moves to the first question's report too", async () => {
+    for (const state of ["RUNNING", "FAILED"] as const) {
+      if (state === "FAILED") {
+        await act(async () => root?.unmount());
+        host?.remove();
+      }
+      window.history.replaceState(null, "", "/");
+      const rootRun = crypto.randomUUID();
+      const dig = crypto.randomUUID();
+      reports.reads = [];
+      reports.notServed = new Map([[dig, state]]);
+      reports.load = vi.fn(async () => investigation(rootRun, "CLOSED", [finished(1, "2026-10-29T10:00:00.000Z")]));
+      const node = await mountReport(dig);
+      await settle();
+      expect(reports.reads, state).toEqual([dig, rootRun]);
+      expect(window.location.pathname, state).toBe(`/v4/debate/${rootRun}/report`);
+      expect(node.textContent, state).not.toContain(word("v4.report.notReady"));
+      expect(node.textContent, state).not.toContain(word("v4.report.failed"));
+      expect(versionSection(node), state).not.toBeNull();
+    }
+  });
+
+  it("review F5: a first question still running keeps its own line, shown once the check has answered", async () => {
+    const runId = crypto.randomUUID();
+    reports.notServed = new Map([[runId, "RUNNING"]]);
+    let answer: (read: InvestigationReports | null) => void = () => undefined;
+    reports.load = vi.fn(() => new Promise<InvestigationReports | null>((resolveRead) => { answer = resolveRead; }));
+    const node = await mountReport(runId);
+    expect(node.textContent).not.toContain(word("v4.report.notReady"));
+    expect(node.querySelector(".v4RepState [role=status]")!.textContent).toBe(CATALOG["v4.common.loading"]);
+    await act(async () => answer(noInvestigation(runId)));
+    await settle();
+    expect(node.textContent).toContain(word("v4.report.notReady"));
+    expect(reports.reads).toEqual([runId]);
+    expect(window.location.pathname).toBe("/");
   });
 
   it("f10: a report that does not exist, or is someone else's, says so with Ask a new question", async () => {
@@ -665,6 +767,62 @@ describe("the first debate's answer on the report", () => {
     const digs = node.querySelector(".v4RepDigs")!;
     expect(digs.querySelectorAll(".v4RepDig")).toHaveLength(2);
     expect(digs.textContent).not.toContain(CATALOG["v4.common.loading"]);
+  });
+});
+
+describe("the report's digs (review F6, F7)", () => {
+  const link = (runId: string, child: string, path: string, minute: number) =>
+    ({ parent_run_id: runId, child_run_id: child, places: [`path:${path}`], mode: "quick", created_at: `2026-10-30T10:0${minute}:00.000Z` });
+
+  it("F6: the page is drawn once the digs are read, so 'Your digs' is there from the first draw, never popping in", async () => {
+    const runId = crypto.randomUUID();
+    harness.records = { parent: null, children: [link(runId, crypto.randomUUID(), "n-mix", 0)] };
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolveHeld) => { release = resolveHeld; });
+    reports.digView = async (dig) => {
+      await held;
+      return { link: dig, state: "DONE", headline: "The dig's short answer.", counts: { SURE: 1, SURE_FOR_CASE: 0, STILL_ARGUED: 0, DIDNT_HOLD: 0 } };
+    };
+    reports.load = vi.fn(async () => noInvestigation(runId));
+    const node = await mountReport(runId);
+    expect(node.querySelector(".v4RepLoading")!.textContent).toBe(word("v4.report.loadingReport"));
+    expect(node.querySelector(".v4RepDoc h1")).toBeNull();
+    await act(async () => release());
+    await settle();
+    expect(node.querySelector(".v4RepLoading")).toBeNull();
+    const digs = node.querySelector(".v4RepDigs")!;
+    expect(digs.querySelectorAll(".v4RepDig")).toHaveLength(1);
+    expect(node.textContent).not.toContain(CATALOG["v4.common.loading"]);
+  });
+
+  it("F7: while the report waits, each dig is read again with the versions, so the line names the dig really still going", async () => {
+    const runId = crypto.randomUUID();
+    const first = crypto.randomUUID();
+    const second = crypto.randomUUID();
+    harness.records = { parent: null, children: [link(runId, first, "n-mix", 0), link(runId, second, "n-renew", 1)] };
+    // The first dig runs; the second has finished but still rewrites its path.
+    const now = new Map<string, Pick<DigView, "state" | "rewrite">>([
+      [first, { state: "RUNNING" }],
+      [second, { state: "DONE", rewrite: { state: "WRITING" } as DigView["rewrite"] }]
+    ]);
+    const reads: string[] = [];
+    reports.digView = async (dig) => {
+      reads.push(dig.childRunId);
+      return { link: dig, headline: null, counts: null, ...now.get(dig.childRunId)! };
+    };
+    const load = vi.fn(async () => investigation(runId, "CLOSED", [writing(1, 2)]));
+    reports.load = load;
+    const node = versionSection(await mountReport(runId))!;
+    expect(text(node.querySelector(".v4RepStatusBox"))).toBe("Your report starts when the 2 digs in progress finish.");
+    // The first dig finishes; the report now waits only for the second one's rewrite.
+    now.set(first, { state: "DONE", rewrite: null });
+    load.mockImplementation(async () => investigation(runId, "CLOSED", [writing(1, 1)]));
+    await settle(10_000);
+    await settle();
+    const lines = buildV4Map({ runId, answer: seededAnswer(runId), story: seededStory() }).paths;
+    const renew = lines.find((path) => path.id === "n-renew")!.line;
+    expect(text(node.querySelector(".v4RepStatusBox"))).toBe(`Your report starts when your dig on “${renew}” finishes.`);
+    expect(reads.filter((id) => id === first).length).toBeGreaterThan(1);
   });
 });
 

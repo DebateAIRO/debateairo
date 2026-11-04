@@ -193,7 +193,7 @@ describe("a dig's own page (in place of its short answer)", () => {
       .toBe(`/v4/debate/${DIG_RUNS.root}?path=n-renew&level=background`);
     // Its own answer text, as usual; nothing says a short answer is missing or still being written.
     expect(panel().textContent).toContain(harness.answer.composed_text[0]!.text);
-    for (const key of ["v4.panel.fallbackMissing", "v4.panel.fallbackWriting", "v4.panel.storyMissing", "v4.panel.storyWriting"]) {
+    for (const key of ["v4.panel.fallbackMissing", "v4.panel.fallbackWriting", "v4.panel.storyMissing", "v4.panel.storyWriting", "v4.panel.noShortAnswerNoDig"]) {
       expect(panel().textContent, key).not.toContain(CATALOG[key]);
     }
   });

@@ -26,11 +26,12 @@ import "./data-export.css";
 import { DocumentTitle } from "@/components/DocumentTitle";
 
 /*
- * V4 review ask-f21: only the faces a first screen paints with are preloaded (the upright display and body faces), so
- * the browser stops warning "preloaded but not used" on every load. The italic faces and the mono face still load,
- * when a page first uses them (display: swap). Each italic is its own loader so it can skip the preload: next/font
- * keeps the family's real name in its @font-face rules (it hashes only class names), so the italic rules join the same
- * "Fraunces" and "Plus Jakarta Sans" families the variables name, and italic text keeps its true italic.
+ * V4 review ask-f21: only the faces a first screen paints with are preloaded, so the browser stops warning "preloaded but
+ * not used" on every load: the upright display and body faces, and the mono face (every first screen shows it: the classic
+ * top bar's site name and eyebrows, the V4 header's badge and eyebrows). The italic faces still load when a page first
+ * uses them (display: swap). Each italic is its own loader so it can skip the preload: next/font keeps the family's real
+ * name in its @font-face rules (it hashes only class names), so the italic rules join the same "Fraunces" and "Plus
+ * Jakarta Sans" families the variables name, and italic text keeps its true italic.
  */
 const display = Fraunces({
   subsets: ["latin"],
@@ -68,8 +69,7 @@ const mono = JetBrains_Mono({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-mono-src",
-  display: "swap",
-  preload: false
+  display: "swap"
 });
 
 async function requestLocale(): Promise<LocaleCode> {
