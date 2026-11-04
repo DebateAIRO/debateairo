@@ -230,6 +230,30 @@ export const DraftShelfRowPartSchema = z.object({
   dug_from: z.uuid().nullable().optional()
 });
 
+/**
+ * The owner's screen review (3 Nov 2026, report-d1 A): before "Write it", the strip on the map says roughly what share of
+ * today's quota writing the report uses ("Your report uses about 5% of today."), the way a dig's share comes from the room
+ * read. The investigation read (GET /v1/runs/{id}/investigation) carries it as `report_share_percent` while a report can
+ * be asked for on a paid plan (never on Free: its report comes from the small reserve). The contract's read is strict and
+ * does not name it yet, so the website never receives it (the strip leaves the line out); the mock shows it at
+ * /__mock/draft/v1/runs/<id>/investigation?shape=reports.
+ */
+export const REPORT_SHARE_KEY = "report_share_percent" as const;
+export const DraftReportSharePartSchema = z.object({ report_share_percent: DigSharePercentSchema.min(5).optional() }).strict();
+
+/** The report share's draft part of an investigation read, for checking against DraftReportSharePartSchema. */
+export function reportShareProblems(reports: Json): string[] {
+  const part = REPORT_SHARE_KEY in reports ? { [REPORT_SHARE_KEY]: reports[REPORT_SHARE_KEY] } : {};
+  const result = DraftReportSharePartSchema.safeParse(part);
+  return result.success ? [] : [JSON.stringify(result.error.issues)];
+}
+
+/** Without the report's share, an investigation read is today's. */
+export function stripReportShare<T extends Json>(reports: T): T {
+  const { [REPORT_SHARE_KEY]: _share, ...rest } = reports;
+  return rest as unknown as T;
+}
+
 /** The shelf's draft parts of an answer list (each row's), for checking against DraftShelfRowPartSchema. */
 export function answerIndexDraftProblems(index: Json): string[] {
   const rows = [...((index.items as Json[] | undefined) ?? []), ...((index.open_runs as Json[] | undefined) ?? [])];

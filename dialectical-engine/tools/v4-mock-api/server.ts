@@ -24,8 +24,8 @@ import {
   answerDraftProblems, answerIndexDraftProblems, contractOrDraft, DraftAskParentSchema, DraftInvestigationSchema, DraftMonthPauseSchema, DraftNodeWebSchema,
   DraftRunQuotaUsedSchema,
   DraftRoomPartSchema, DraftRoomQueryPartSchema, DraftRunContinuedSchema, DraftRunContinueRefusedSchema, DraftRunContinueRequestSchema,
-  DraftRunStartedAtSchema, DraftUsageBorrowsSchema, splitAsk, splitRoomQuery, stripAnswer, stripNode, stripRoom,
-  stripAnswerIndex, stripRun, stripUsage, type DraftAskParent
+  DraftRunStartedAtSchema, DraftUsageBorrowsSchema, reportShareProblems, REPORT_SHARE_KEY, splitAsk, splitRoomQuery, stripAnswer, stripNode, stripRoom,
+  stripAnswerIndex, stripReportShare, stripRun, stripUsage, type DraftAskParent
 } from "./web-draft.js";
 import {
   ARABIC_RUN, borrowNotice, DEEPEST_DIG, DIG_ANSWERS, DIG_RUNS, mainAnswerAt, monthPause, PATH_REWRITES, reportVersionBody, RUN_PAUSED, SEEDED_NEW_DIGS
@@ -848,6 +848,27 @@ function investigationBody(investigation: Investigation) {
   };
 }
 
+/**
+ * The owner's screen review (3 Nov 2026, report-d1 A, draft field): the report's share of today on a paid plan while a
+ * report can be asked for (no version being written, and none finished since the investigation was last reopened).
+ */
+const REPORT_SHARE_PERCENT = 5;
+function reportSharePart(investigation: Investigation, plan: PlanMode = planMode): Record<string, number> {
+  const newest = investigation.closings.at(-1);
+  const askable = newest === undefined ? true : newest.report !== "WRITING" && (investigation.state === "OPEN" || newest.report === "FAILED");
+  return plan === "FREE" || !askable ? {} : { [REPORT_SHARE_KEY]: REPORT_SHARE_PERCENT };
+}
+
+/**
+ * The owner's screen review (3 Nov 2026, report-f15): a Free question goes public once it is finished and its check
+ * passed, so its own visibility read says PUBLISHED; "#private" in a Free question plays a question its check kept
+ * private. Every other question is private, as before.
+ */
+function visibilityOf(run: MockRun) {
+  if (run.web !== "FREE" || /#private/iu.test(run.question) || stateOf(run) !== "SETTLED") return { state: "PRIVATE", public_ref: null };
+  return { state: "PUBLISHED", public_ref: `f3${run.runRef.slice(2)}` };
+}
+
 /** GET /v1/runs/{id}/investigation as the website reads it (R22 W5-1): each closing as a report version, the current one the newest finished. */
 function investigationReports(investigation: Investigation) {
   const root = runs.get(investigation.root_run_id);
@@ -858,7 +879,10 @@ function investigationReports(investigation: Investigation) {
     return reportVersionBody({ version: closing.report_version, closedAt: closing.closed_at, writtenAt: closing.closed_at, free: root?.web === "FREE", arabic: root?.language?.tag === "ar" });
   });
   const finished = investigation.closings.filter((closing) => closing.report === "READY").at(-1);
-  return { investigation_id: investigation.investigation_id, root_run_id: investigation.root_run_id, state: investigation.state, digs: investigation.digs.length, versions, current: finished?.report_version ?? null };
+  return {
+    investigation_id: investigation.investigation_id, root_run_id: investigation.root_run_id, state: investigation.state, digs: investigation.digs.length,
+    versions, current: finished?.report_version ?? null, ...reportSharePart(investigation)
+  };
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -915,11 +939,18 @@ function startupCheck(): number {
   check("GET /v1/answers", C.AnswerIndexSchema, contractOrDraft(C.AnswerIndexSchema, index, stripAnswerIndex).body);
   for (const run of runs.values()) {
     checkDraft(`GET /v1/runs/${run.runRef}`, C.RunProjectionSchema, runProjection(run), stripRun, runDraftSchema);
-    check(`GET /v1/runs/${run.runRef}/visibility`, C.PublicationTransitionSchema, { state: "PRIVATE", public_ref: null });
+    check(`GET /v1/runs/${run.runRef}/visibility`, C.PublicationTransitionSchema, visibilityOf(run));
     check(`GET /v1/runs/${run.runRef}/last-visit`, C.LastVisitSchema, { seen_at: null, items: null });
     check(`GET /v1/runs/${run.runRef}/dig-links`, C.DigLinksSchema, digLinksOf(run.runRef));
     const investigation = investigationOf(run.runRef);
-    if (investigation !== undefined) check(`GET /v1/runs/${run.runRef}/investigation (draft)`, DraftInvestigationSchema, investigationBody(investigation));
+    if (investigation !== undefined) {
+      check(`GET /v1/runs/${run.runRef}/investigation (draft)`, DraftInvestigationSchema, investigationBody(investigation));
+      // report-d1: the report's share passes its draft part, and today's contract once it is held back.
+      const reports = investigationReports(investigation);
+      const shareProblems = reportShareProblems(reports);
+      if (shareProblems.length > 0) throw new Error(`MOCK_SEED_INVALID: GET /v1/runs/${run.runRef}/investigation draft fields:\n${shareProblems.join("\n")}`);
+      check(`GET /v1/runs/${run.runRef}/investigation`, C.InvestigationReportsSchema, contractOrDraft(C.InvestigationReportsSchema, reports, stripReportShare).body);
+    }
     if (run.answer === undefined) continue;
     const problems = checkAnswerDraft(run.answer);
     if (problems.length > 0) throw new Error(`MOCK_SEED_INVALID: GET /v1/answers/${run.answerId} draft fields:\n${problems.join("\n")}`);
@@ -1691,11 +1722,19 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       const investigation = investigationOf(run.runRef);
       if (investigation === undefined) return sendJson(req, res, 404, { error: "INVESTIGATION_NOT_FOUND" });
       // The website reads report versions (R22 W5-1); the draft view keeps the older shape, with its dig links and closings.
-      if (!draftView) return sendJson(req, res, 200, investigationReports(investigation), C.InvestigationReportsSchema);
+      // report-d1: the website's shape with its draft field (the report's share of today) is at ?shape=reports on the draft view.
+      const reports = investigationReports(investigation);
+      if (!draftView) return sendJson(req, res, 200, contractOrDraft(C.InvestigationReportsSchema, reports, stripReportShare).body, C.InvestigationReportsSchema);
+      if (url.searchParams.get("shape") === "reports") {
+        const problems = reportShareProblems(reports);
+        if (problems.length === 0) return sendJson(req, res, 200, reports);
+        process.stderr.write(`[mock] DRAFT BODY FAILED ITS DRAFT SCHEMA for ${method} ${path}: ${problems.join("; ")}\n`);
+        return sendJson(req, res, 500, { error: "MOCK_RESPONSE_INVALID", message: "The mock built a draft body that fails its draft schema; see the mock's log." });
+      }
       return sendJson(req, res, 200, investigationBody(investigation), DraftInvestigationSchema);
     }
     if (sub === "events") return streamEvents(req, res, run);
-    if (sub === "visibility") return sendJson(req, res, 200, { state: "PRIVATE", public_ref: null }, C.PublicationTransitionSchema);
+    if (sub === "visibility") return sendJson(req, res, 200, visibilityOf(run), C.PublicationTransitionSchema);
   }
 
   logRequest(method, req.url ?? "", 404, "<- NOT MOCKED");

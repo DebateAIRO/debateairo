@@ -121,6 +121,7 @@ The shapes are task W1-6's (`packages/contract/src/web.ts`). W1-6 merged (`76e93
 | `GET /v1/runs/:id/investigation` | (new route; W1-6 names no route yet) | the investigation the run belongs to: state `OPEN`/`CLOSED`, its digs (the 0131 link records), and every closing with its report version |
 | `POST /v1/runs/:id/investigation/close` | (new route) | "Write my report": closes it and adds a report version |
 | `GET /v1/answers` (each row) | `started_at`, `map_bar`, `changed_since_visit`, `dug_from` | the ask page's "Your maps" (owner's screen review, 3 Nov 2026): when an open question started ("Being looked into, started 14:00"), an answer's four-shade bar (`sure`, `sure_for_case`, `still_argued`, `didnt_hold`), whether its map changed since the person last opened it (here: no last visit recorded yet; the "New" dot), and the debate a dig was dug from (null for a first question). **The contract's rows are strict and do not name these yet, so the website never receives them**: the page shows the calm fallback (no time, no bar, no dot, and it reads each row's dig links). See them at `/__mock/draft/v1/answers?limit=50&offset=0`. |
+| `GET /v1/runs/:id/investigation` | `report_share_percent` | the owner's screen review (3 Nov 2026, report-d1 A): roughly what share of today's quota writing the report uses, a whole percent in the dig share's steps of 5 (here always 5%), while a report can be asked for on a paid plan (nothing being written, and no finished version since the investigation was last reopened); never on Free, whose report comes from the small reserve. **The contract's read is strict and does not name it yet, so the website never receives it**: the strip "Write my report" turns into leaves the share line out. See it at `/__mock/draft/v1/runs/<id>/investigation?shape=reports` (the draft address without `?shape=reports` keeps the older shape). |
 
 How they are sent:
 
@@ -209,7 +210,7 @@ A wrong value stops the start with a clear message, for example `MOCK_ROOM_INVAL
 | `GET /v1/answers/:id/map` | 404, as for a debate made without the debate-shape setting. The website treats this as "no map view". |
 | `GET /v1/answers/:id/disclosure` | A normal record (the planned AIs wrote and checked it, nothing was cut short). |
 | `GET /v1/answers/:id/inspection`, `/ledger-digest`, `/nodes/:nodeId` | Simple valid replies (the classic debate page reads them). |
-| `GET /v1/runs/:id`, `/answer`, `/visibility` | The run. Its answer appears once it is finished (404 before). It is private. |
+| `GET /v1/runs/:id`, `/answer`, `/visibility` | The run. Its answer appears once it is finished (404 before). It is private, except a finished Free question (6666, and new asks with `plan_tier: "free"`), which is public (`PUBLISHED`, as a Free debate is once its check passed), so the report's "This question is public, so your report will be public too." can be seen (report-f15); `#private` in a Free question plays one its check kept private. |
 | `GET`/`POST /v1/runs/:id/last-visit` | The last visit (0131): both null before a first visit. |
 | `GET`/`POST /v1/runs/:id/dig-links` | The dig links (0131): the parent this debate was dug from, and the digs made from it. A child already dug from another debate gets 409 `DIG_LINK_CONFLICT`. |
 | `GET /v1/runs/:id/investigation`, `POST …/investigation/close` | Draft routes, see "Draft fields". |

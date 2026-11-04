@@ -659,5 +659,26 @@ await step("Your maps: digs left out by their dig links and hung under their que
   return shelf.maps.map((map: Loose) => `${map.state}${map.digs.length > 0 ? ` (+digs)` : ""}`).join(", ");
 }, (value: string) => value);
 
+// ---- The owner's screen review (3 Nov): the report from the map (report-d1 A, report-f15) ----
+await step("the report's share of today is held back from the website; a Free question reads public", async () => {
+  // An open paid investigation (5555) says the report's share on the draft view only; the website's read has no share.
+  const draft: Loose = await mock(`/__mock/draft/v1/runs/${RUNS.storyWriting}/investigation?shape=reports`);
+  const read: Loose = await client.readInvestigation(RUNS.storyWriting);
+  must(draft.report_share_percent === 5, "the draft view says the report's share");
+  must(!("report_share_percent" in read), "the strict contract's read carries no share");
+  // On Free, no share (its report comes from the reserve); a finished Free question (6666) is public.
+  await mock("/__mock/set?plan=FREE");
+  try {
+    const free: Loose = await mock(`/__mock/draft/v1/runs/${RUNS.storyWriting}/investigation?shape=reports`);
+    must(!("report_share_percent" in free), "no share on Free");
+  } finally {
+    await mock("/__mock/set?plan=PLUS");
+  }
+  const visibility: Loose = await client.readRunVisibility(RUNS.free);
+  must(visibility.state === "PUBLISHED" && typeof visibility.public_ref === "string", "the Free question is public");
+  must((await client.readRunVisibility(RUNS.settled)).state === "PRIVATE", "a paid question stays private");
+  return `share ${draft.report_share_percent}% (draft only), Free question ${visibility.state}`;
+}, (value: string) => value);
+
 console.log(failures === 0 ? "\nALL CHECKS PASSED" : `\n${failures} CHECK(S) FAILED`);
 process.exit(failures === 0 ? 0 : 1);
