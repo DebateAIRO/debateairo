@@ -93,6 +93,7 @@ const digParent = Object.freeze({ parent_run_id: PARENT_RUN_ID, places: [], mode
 const MENU = Object.freeze({ menu: Object.freeze({ menu_id: "madeUpNuclearMenu00001" }) as unknown as StartMenu, lateLists: Object.freeze([]) });
 const VERIFIED_MENU: VerifiedStartPaths = Object.freeze({
   source: "MENU", width: 3, chosenBy: "PERSON", carryOnToReport: false, questionSwap: null, menu: MENU, ownWords: Object.freeze([OWN]),
+  questionEdited: false,
   paths: Object.freeze([
     Object.freeze({ pathId: "b1", pathNo: 1, author: "AI_SUGGESTION", title: "Whole-system costs", question: "What does it cost with the grid counted?",
       viewpoints: Object.freeze([{ viewpointId: "pt11", pickNo: null, title: "Whole-system costs", question: "What does it cost with the grid counted?", own: false }]),
@@ -107,6 +108,7 @@ const VERIFIED_MENU: VerifiedStartPaths = Object.freeze({
 } as const);
 const VERIFIED_DIG: VerifiedStartPaths = Object.freeze({
   source: "DIG_PICKS", width: 2, chosenBy: "PERSON", carryOnToReport: false, questionSwap: null, menu: null, ownWords: Object.freeze([]),
+  questionEdited: false,
   paths: Object.freeze([1, 2].map((no) => Object.freeze({ pathId: `b${no}` as PathId, pathNo: no, author: "PERSON_OWN_VIEW" as const,
     title: PICK.text, question: PICK.text, ownWords: Object.freeze([PICK.text]),
     viewpoints: Object.freeze([{ viewpointId: null, pickNo: no, title: null, question: PICK.text, own: true }]) })))

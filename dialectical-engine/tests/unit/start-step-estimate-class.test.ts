@@ -192,7 +192,7 @@ const path = (no: 1 | 2, title: string) => Object.freeze({ pathId: `b${no}` as c
   viewpoints: Object.freeze([{ viewpointId: `pt${no}1`, pickNo: null, title, question: `${title}?`, own: false }]), ownWords: Object.freeze([]) });
 /** Two chosen paths, so the class's count is the person's, not the default width. */
 const VERIFIED_TWO: VerifiedStartPaths = Object.freeze({
-  source: "MENU", width: 3, chosenBy: "PERSON", carryOnToReport: false, questionSwap: null, ownWords: Object.freeze([]),
+  source: "MENU", width: 3, chosenBy: "PERSON", carryOnToReport: false, questionSwap: null, ownWords: Object.freeze([]), questionEdited: false,
   menu: Object.freeze({ menu: Object.freeze({ menu_id: "madeUpTreesMenu0000001" }) as unknown as StartMenu, lateLists: Object.freeze([]) }),
   paths: Object.freeze([path(1, "Shade in summer"), path(2, "Upkeep costs")])
 } as const);
