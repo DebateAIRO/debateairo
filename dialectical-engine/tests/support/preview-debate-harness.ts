@@ -102,6 +102,8 @@ import {
   type StubUsage
 } from "./preview-gate-stubs.js";
 import { clearPendingRunId, fixedRunIdTaken, nextRandomUUIDIs } from "./fixed-run-id.js";
+import { runnerPoolOrSuperuser, shareContentCipher } from "./rls-logins.js";
+import type { TestDatabase } from "./testDatabase.js";
 
 export const GLM = "zai-org/GLM-5.3-Flash";
 export const DEEPSEEK = "deepseek-ai/DeepSeek-V4.1-Flash";
@@ -226,8 +228,24 @@ export const olderReleaseWording = (request: ProviderCallRequest): ProviderCallR
 export function previewDebateHarness(input: Readonly<{
   pool: () => Pool;
   stubClosers: (() => Promise<void>)[];
+  /**
+   * Upload check Task 7 (R21): the database `pool` belongs to. With it, the runner, its gateways and its story writer
+   * run on the production runner login in login mode (tests/support/rls-logins.ts, runnerPoolOrSuperuser), with the
+   * content cipher `pool` carries; admission, seeding and the read-backs stay on `pool`. Without it (a per-variant
+   * copy of the database), everything runs on `pool`, as before.
+   */
+  database?: () => TestDatabase;
 }>) {
   const pool = input.pool;
+  let runnerLogin: Promise<Pool> | undefined;
+  /** The runner's pool: one per harness, made on the first runner (so a `beforeAll` may start the database first). */
+  async function runnerPool(): Promise<Pool> {
+    if (input.database === undefined) return pool();
+    runnerLogin ??= runnerPoolOrSuperuser(input.database(), pool());
+    const own = await runnerLogin;
+    // A cipher `pool` was given after the first runner still reaches the runner's login.
+    return own === pool() ? own : shareContentCipher(pool(), own);
+  }
 
   /**
    * Both preview gates over real unix sockets, speaking the gate's RPC protocol (startPreviewGateStubs). Without
@@ -385,6 +403,7 @@ export function previewDebateHarness(input: Readonly<{
       perVersion?: Readonly<{ cache: RunnerSettingsCache; versions: RunSettingsVersions; site: RunnerSiteContext }>;
     }> = {}
   ) {
+    const own = await runnerPool();
     const perVersion = options.perVersion;
     const siteVersionSettings = perVersion === undefined ? undefined : perVersion.cache.loaded(perVersion.site.siteVersion);
     if (perVersion !== undefined && siteVersionSettings === undefined) {
@@ -460,7 +479,7 @@ export function previewDebateHarness(input: Readonly<{
     const reworded = (gateway: ProviderGateway): ProviderGateway => options.reword === undefined ? gateway
       : Object.freeze({ call: (request: ProviderCallRequest) => gateway.call(options.reword!(request)) });
     const targetGateway = (target: ProviderDiscoveryTarget) => reworded(withPreviewProviderCallPolicy(
-      createPostgresProviderGateway(pool(), {
+      createPostgresProviderGateway(own, {
         fetchImplementation: gates.guardedFetch, endpoint: target.baseUrl, model: target.model, maker: target.maker,
         ...providerTargetGatewayControls(target), ...previewTargetGatewayControls(PREVIEW, target), inFlight: gatewayInFlight,
         ...(options.money === undefined ? {} : {
@@ -485,7 +504,7 @@ export function previewDebateHarness(input: Readonly<{
     const topology = createRunnerProviderTopology(TARGETS, (target) => targetGateways === null ? targetGateway(target)
       : withStructureRepair(targetGateways.get(target.providerRef)!, structureRepairRoute));
     const story = new StoryWriter({
-      pool: pool(), pack: PACK,
+      pool: own, pack: PACK,
       // Ruling R36 (per version): no boot policy; every write carries its own debate's version's story policy.
       ...(perVersion === undefined ? { policy: STORY_POLICY } : {}),
       hosted: perVersion?.site.deploymentMode === "hosted", log: () => undefined,
@@ -524,7 +543,7 @@ export function previewDebateHarness(input: Readonly<{
       assertPreviewRoleTargets(PREVIEW, TARGETS, [SEALED_WRITER_REF, SEALED_CHECKER_REF, STORY_POLICY.storytellerRoleRef, STORY_POLICY.storyCheckerRoleRef]);
     }
     const fixture = fixtureSettings();
-    const runner = new WalkingSkeletonRunner(pool(), topology.primary.provider, {
+    const runner = new WalkingSkeletonRunner(own, topology.primary.provider, {
       ...fixture,
       ...(options.stoppingPolicy === undefined ? {} : {
         stoppingPolicy: { ...fixture.stoppingPolicy!, delta: options.stoppingPolicy.delta, epsilon: options.stoppingPolicy.epsilon }

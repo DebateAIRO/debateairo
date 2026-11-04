@@ -1,4 +1,3 @@
-import { AsyncResource } from "node:async_hooks";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApi } from "@debateai/api";
@@ -18,12 +17,12 @@ import { staffHttpAskApplication } from "../support/staffHttpApplication.js";
 import { b64, digest, fixture, key, origin, rpId } from "../support/staffWebAuthnFixtures.js";
 import { createSystemTwin } from "../support/rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { runFixtureStepOutsideRequest } from "../support/master-key-guard.js";
 
 /**
  * Decision 32 over HTTP on real Postgres: the real routes, access service, passkey ceremony, alert producer and repositories, through the
  * runtime role. Only the ordinary session is a test one (and the funding readiness's static facts, which main.ts's boot checks). Amounts are made up.
  */
-const outsideRequest = AsyncResource.bind(<T,>(work: () => Promise<T>): Promise<T> => work());
 const hash = (value: string) => `sha256:${createHash("sha256").update(value).digest("hex")}`;
 let database: TestDatabase, runtime: Pool, api: ReturnType<typeof buildApi>, allowances: PostgresInternalAllowanceRepository, teamLimit: PostgresTeamLimitRepository;
 const identities: TestHttpIdentity[] = [], deks = new Map<string, Buffer>();
@@ -117,7 +116,7 @@ beforeAll(async () => {
   teamLimit = new PostgresTeamLimitRepository(runtime);
   const repository = new PostgresStaffRepository(crossAccountPool(runtime, "X14")), sessions = testSessionApplication(identities);
   const access = new StaffAccessService(repository, sessions);
-  const intents = new StaffAlertIntentProducer({ keys, mappings: new PostgresStaffAlertRepository(runtime), readiness: { require: (operationId: string) => outsideRequest(() => authorizeStaffAlertFixture(database.pool, operationId)) } });
+  const intents = new StaffAlertIntentProducer({ keys, mappings: new PostgresStaffAlertRepository(runtime), readiness: { require: (operationId: string) => runFixtureStepOutsideRequest(() => authorizeStaffAlertFixture(database.pool, operationId)) } });
   const staff = { access, sessions, repository, intents, webauthn: new StaffWebAuthnService(repository, { publicAppUrl: origin }),
     funding: { allowances, requireReady: async () => {}, requireNewGrantPolicy: async () => {} }, teamLimit: { repository: teamLimit } } as unknown as StaffHttpApplication;
   api = buildApi({ application: staffHttpAskApplication(), allowedOrigin: origin, sessions, staffAccess: access, staffPolicyVersion: 2, staff });

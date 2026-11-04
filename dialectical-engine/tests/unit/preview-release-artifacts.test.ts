@@ -1,10 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { TEST_OWNER_LIMIT_ROWS } from '../support/hostedRegisterRows.js';
 const tool = await import('../../deploy/' + 'preview-release/v1/release-artifacts.mjs');
 const manifestModule = await import('../../deploy/' + 'preview-auth-dev/v1/source-manifest.mjs');
@@ -13,6 +12,7 @@ const environment = await import('../../deploy/' + 'preview-auth-dev/v1/environm
 const turnstile = await import('../../deploy/' + 'preview-auth-dev/v1/turnstile-custody.mjs');
 const operator = await import('../../deploy/' + 'preview-auth-dev/v1/native-operator.mjs');
 const prestart = await import('../../deploy/' + 'preview-lifecycle/v1/prestart.mjs');
+const toolsFolder = await import('../../tools/' + 'upload-check/tools-folder.mjs');
 
 const sha = (bytes: string | Buffer) => createHash('sha256').update(bytes).digest('hex');
 const me = { uid: process.getuid!(), gid: process.getgid!() };
@@ -315,6 +315,24 @@ describe('ui-build and verify', () => {
     await expect(build('e.json', '2026-11-02T12:00:00.000Z', async () => { throw new Error('ENOENT'); })).rejects.toMatchObject({ code: 'UI_BUILD_PACKAGE_POLICY_REFUSED' });
     expect(seen).toHaveLength(3);
     expect(existsSync(join(s.art, 'd.json')) || existsSync(join(s.art, 'e.json'))).toBe(false);
+  });
+
+  // The pre-upload checker (tools/upload-check/website-build.mjs) builds the website on the Mac with uiBuildEnvironment.
+  // ui-build must pass its build exactly that environment, so the checker sees what the release tool will use.
+  it('ui-build uses uiBuildEnvironment', async () => {
+    const s = server();
+    const source = s.write(join(s.art, 'candidate-ui-source.json'), sourceManifest('ui'));
+    const engine = resolve(import.meta.dirname, '../..');
+    const policy = { workspace: readFileSync(join(engine, 'pnpm-workspace.yaml'), 'utf8'), lock: readFileSync(join(engine, 'pnpm-lock.yaml'), 'utf8') };
+    const readPackagePolicy = async () => policy, now = Date.parse('2026-11-02T12:00:00.000Z');
+    let seen: any;
+    await run(['ui-build', '--source', source.path, '--release-key', NEW_KEY, '--out', join(s.art, 'candidate-ui-build.json')], s.layout, {
+      verifySourceManifest: async () => undefined, verifyUiBuildManifest: async () => undefined, execPath: '/opt/node/bin/node', readPackagePolicy, now,
+      buildUiArtifact: async (_m: unknown, env: any) => { seen = env; return { schema: 'preview-auth-dev-ui-build-v1' }; }
+    });
+    const shared = await tool.uiBuildEnvironment(NEW_ROOT.ui, NEW_KEY, '/opt/node/bin/node', { now, readPackagePolicy });
+    expect(seen).toEqual(shared);
+    expect(shared.PNPM_CONFIG_MINIMUM_RELEASE_AGE_EXCLUDE).toBe('["@isaacs/nonrecursive-glob-match@1.0.1","path-scurry@3.0.0","glob@14.0.2","minimatch@11.0.1"]');
   });
 
   it('--models multi-model builds with the reviewed two-list value; an unknown name refuses before anything runs', async () => {
@@ -1498,16 +1516,14 @@ describe('database-ahead', () => {
 // The shared server-tools folder (operator/lifecycle-v1) is a git archive of these three deploy folders alone (the upload's
 // operator swap, the code guide's SB10). Every tool the guides run from it must load there: a top-level import of tools/
 // in release-artifacts.mjs (through caddy-slots.mjs) stopped release-switch.mjs during R22's downtime (2026-11-02).
+// The copy is made with git archive from the committed HEAD, not from the working tree: an edit that is not committed yet
+// is not in it, so this test can pass on this Mac while a broken edit sits uncommitted. Commit, then run it.
 describe('the shared server-tools folder', () => {
-  it('every lifecycle tool the guides run loads from a copy of the three deploy folders alone', () => {
+  it('every server tool loads from a copy of the three deploy folders alone, except the release-folder ones', async () => {
     const base = realpathSync(mkdtempSync(join(tmpdir(), 'preview-operator-')));
     roots.push(base);
-    const engine = resolve(import.meta.dirname, '../..');
-    for (const dir of ['preview-lifecycle', 'preview-auth-dev', 'preview-release']) cpSync(join(engine, 'deploy', dir), join(base, 'dialectical-engine/deploy', dir), { recursive: true });
-    for (const tool of ['release-switch.mjs', 'release-check.mjs', 'release-env.mjs', 'release-retire.mjs', 'release-archive.mjs', 'settings-version.mjs', 'prestart.mjs']) {
-      const url = pathToFileURL(join(base, 'dialectical-engine/deploy/preview-lifecycle/v1', tool)).href;
-      const loaded = spawnSync(process.execPath, ['--input-type=module', '-e', `await import(${JSON.stringify(url)})`], { cwd: base, encoding: 'utf8', env: { PATH: process.env.PATH ?? '/usr/bin:/bin' } });
-      expect(loaded.status, `${tool}: ${loaded.stderr}`).toBe(0);
-    }
-  });
+    await toolsFolder.buildToolsFolder({ repo: resolve(import.meta.dirname, '../../..'), rev: 'HEAD', dest: base });
+    const results = await toolsFolder.loadEachTool({ folder: base, node: process.execPath, skip: toolsFolder.RELEASE_FOLDER_TOOLS });
+    expect(results.filter((result: { ok: boolean }) => !result.ok)).toEqual([]);
+  }, 300_000);
 });

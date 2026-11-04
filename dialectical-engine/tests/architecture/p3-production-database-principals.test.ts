@@ -1359,15 +1359,23 @@ describe("P3-01 production database-principal manifest", () => {
   ]
 },
 {
+  "roleName": "debateai_runtime",
+  "source": "migrations/0155_owner_answer_writes.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION core.record_owned_investigation_request(uuid,uuid,uuid,text,uuid,text,text,text,jsonb,bytea)",
+    "EXECUTE ON FUNCTION memory.unlink_owned_memory_link(uuid,uuid,text,text)"
+  ]
+},
+{
   "roleName": "debateai_staff_security_owner",
-  "source": "migrations/0155_pre_start_charge.sql",
+  "source": "migrations/0156_pre_start_charge.sql",
   "grants": [
     "SELECT, INSERT ON identity.pre_start_charge"
   ]
 },
 {
   "roleName": "debateai_runtime",
-  "source": "migrations/0155_pre_start_charge.sql",
+  "source": "migrations/0156_pre_start_charge.sql",
   "grants": [
     "EXECUTE ON FUNCTION identity.record_pre_start_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint)",
     "EXECUTE ON FUNCTION identity.read_pre_start_spent(uuid,timestamptz,timestamptz)"
@@ -1375,14 +1383,14 @@ describe("P3-01 production database-principal manifest", () => {
 },
 {
   "roleName": "debateai_data_export_worker",
-  "source": "migrations/0155_pre_start_charge.sql",
+  "source": "migrations/0156_pre_start_charge.sql",
   "grants": [
     "EXECUTE ON FUNCTION identity.read_data_export_pre_start(uuid,uuid)"
   ]
 },
 {
   "roleName": "debateai_runtime",
-  "source": "migrations/0156_start_paths.sql",
+  "source": "migrations/0157_start_paths.sql",
   "grants": [
     "EXECUTE ON FUNCTION core.record_start_paths(uuid,jsonb,jsonb)",
     "EXECUTE ON FUNCTION core.read_start_paths(uuid)",
@@ -1395,7 +1403,7 @@ describe("P3-01 production database-principal manifest", () => {
 },
 {
   "roleName": "debateai_runtime",
-  "source": "migrations/0157_path_results.sql",
+  "source": "migrations/0158_path_results.sql",
   "grants": [
     "EXECUTE ON FUNCTION core.write_path_root(uuid,text,integer,uuid,text)",
     "EXECUTE ON FUNCTION core.record_path_outcome(uuid,text,text,jsonb,bytea)",

@@ -27,7 +27,7 @@ afterEach(async () => {
 });
 afterAll(async () => database?.stop());
 
-const { startGates, previewRunner, admittedRun } = previewDebateHarness({ pool: () => database.pool, stubClosers });
+const { startGates, previewRunner, admittedRun } = previewDebateHarness({ pool: () => database.pool, database: () => database, stubClosers });
 
 /** Every non-probe call is held `ms(request)` before its gate answers it; probes are answered at once. */
 const heldCalls = (ms: (request: GateRequest) => number) => (request: GateRequest): number => request.kind === "PROBE" ? 0 : ms(request);

@@ -241,10 +241,10 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // withRunContentLease and opened through prepareLeasedContentEncryptionForRun, both under the dig's own run key.
       "packages/db/src/dig-picks.ts",
       "packages/db/src/index.ts",
-      // V4 start step (0157, Task 21): each path's answer so far and the gap round are sealed inside withRunContentLease and opened through
+      // V4 start step (0158, Task 21): each path's answer so far and the gap round are sealed inside withRunContentLease and opened through
       // prepareLeasedContentEncryptionForRun, both under the debate's own run key.
       "packages/db/src/path-results.ts",
-      // V4 start step (0156, Task 20): the chosen paths and their menu are sealed inside withRunContentLease and opened through
+      // V4 start step (0157, Task 20): the chosen paths and their menu are sealed inside withRunContentLease and opened through
       // prepareLeasedContentEncryptionForRun, both under the debate's own run key.
       "packages/db/src/start-paths.ts",
       "packages/evaluator/src/index.ts",

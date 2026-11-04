@@ -15,7 +15,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 
 let database: TestDatabase;
 const stubClosers: (() => Promise<void>)[] = [];
-const harness = previewDebateHarness({ pool: () => database.pool, stubClosers });
+const harness = previewDebateHarness({ pool: () => database.pool, database: () => database, stubClosers });
 const GUIDANCE = resolveLengthGuidance({ policy: lengthGuidancePolicyStartValues(), plan: "free", answerLength: "standard" });
 
 beforeAll(async () => { database = await startTestDatabase(); await migrate(database.pool); }, 600_000);

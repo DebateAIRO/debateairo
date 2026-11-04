@@ -77,11 +77,11 @@ describe("0128 threat reports contract", () => {
     // Property: the new loader records its own tables, functions, writer trigger and CHECK after 0127.
     const loader = await readFile(new URL("../../packages/db/src/migration-forward0128.ts", import.meta.url), "utf8").catch(() => "");
     const plan = await loadMigrationPlan();
-    expect(plan.forwardChain.slice(-31).map((step) => step.name))
+    expect(plan.forwardChain.slice(-32).map((step) => step.name))
       .toEqual(["0127_publication_review.sql", "0128_threat_reports.sql", "0129_support_answer_scope.sql",
         "0130_row_level_security.sql", "0131_v4_account_memory.sql",
         "0132_web_evidence.sql", "0133_investigations.sql", "0134_dig_model_and_month_pause.sql", "0135_dig_picks.sql",
-        "0136_investigation_reports.sql", "0137_public_debates.sql", "0138_tree_updates.sql", "0139_passage_retention.sql", "0140_internal_spend_kinds.sql", "0141_path_suggestions.sql", "0142_team_limit.sql", "0143_run_handover.sql", "0144_ask_clarify_charge.sql", "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_pre_start_charge.sql", "0156_start_paths.sql", "0157_path_results.sql"]);
+        "0136_investigation_reports.sql", "0137_public_debates.sql", "0138_tree_updates.sql", "0139_passage_retention.sql", "0140_internal_spend_kinds.sql", "0141_path_suggestions.sql", "0142_team_limit.sql", "0143_run_handover.sql", "0144_ask_clarify_charge.sql", "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_pre_start_charge.sql", "0157_start_paths.sql", "0158_path_results.sql"]);
     for (const name of ["staff.threat_report", "staff.threat_report_event", "staff.threat_report_alert",
       "question_check_spend_writer_only", "model_spend_question_check_is_runless"]) expect(loader).toContain(name);
     expect(loader).not.toContain("staff.commit_owner_command");

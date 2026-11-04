@@ -1,4 +1,4 @@
--- 0157 · A path debate's results per path (V4 start step; plan docs/superpowers/plans/2026-11-03-v4-start-step.md Task 21, spec 2026-11-03
+-- 0158 · A path debate's results per path (V4 start step; plan docs/superpowers/plans/2026-11-03-v4-start-step.md Task 21, spec 2026-11-03
 -- §2.7, §4.3).
 --
 -- Plain words. Each path the person chose at Start is argued as its own branch. The debate keeps, per path: which root argued it (and, after a
@@ -24,7 +24,7 @@
 --   row security    outside 0130's scope rule: no request role can SELECT these tables.
 --
 -- THE RULE 0063 WROTE DOWN, obeyed here: never CREATE OR REPLACE a function another migration defines. Replay-safe in the repository's form,
--- as 0117 and 0156.
+-- as 0117 and 0157.
 
 -- 1. Which root argued each path -----------------------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS core.path_root (
@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS core.path_root_repoint (
 SELECT core.install_truncate_guard('core.path_root_repoint');
 
 -- 3. Each path's answer so far ---------------------------------------------------------------------------------------------------
--- No foreign key to core.run, as 0132 to 0156: the content guards read the run, and erasure shreds its key. The size bound holds the largest
+-- No foreign key to core.run, as 0132 to 0157: the content guards read the run, and erasure shreds its key. The size bound holds the largest
 -- answer the contract accepts (about 61,000 characters) in a three-byte script, sealed.
 CREATE TABLE IF NOT EXISTS core.path_outcome (
   run_id uuid NOT NULL,
@@ -419,7 +419,7 @@ END;
 $$;
 
 -- 7. The grants ---------------------------------------------------------------------------------------------------------------------
--- The tables and the functions keep the migrator, as 0156's. No role reads a table. Every function leaves PUBLIC first: a new core function
+-- The tables and the functions keep the migrator, as 0157's. No role reads a table. Every function leaves PUBLIC first: a new core function
 -- PUBLIC could run would change the content-provision login's core function count, which the API checks at boot. The four guards are run by
 -- their triggers inside the definers, so no role is granted them.
 REVOKE ALL ON core.path_root FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
@@ -459,12 +459,12 @@ BEGIN
       OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger AS t WHERE t.tgrelid = pg_catalog.to_regclass(v_table)
         AND t.tgname = 'enforce_erasure_barrier' AND NOT t.tgisinternal AND t.tgenabled = 'O'
         AND t.tgfoid = 'core.enforce_erasure_barrier()'::regprocedure) THEN
-      RAISE EXCEPTION 'PATH_RESULTS_0157_CONTRACT table %', v_table;
+      RAISE EXCEPTION 'PATH_RESULTS_0158_CONTRACT table %', v_table;
     END IF;
     FOREACH v_role IN ARRAY ARRAY['debateai_runtime', 'debateai_billing_runtime', 'debateai_authorization_runtime',
       'debateai_erasure_runtime', 'debateai_replay', 'debateai_data_export_worker', 'debateai_content_provision'] LOOP
       IF pg_catalog.has_table_privilege(v_role, v_table, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') THEN
-        RAISE EXCEPTION 'PATH_RESULTS_0157_CONTRACT table privilege % %', v_table, v_role;
+        RAISE EXCEPTION 'PATH_RESULTS_0158_CONTRACT table privilege % %', v_table, v_role;
       END IF;
     END LOOP;
   END LOOP;
@@ -475,14 +475,14 @@ BEGIN
       OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger AS t WHERE t.tgrelid = pg_catalog.to_regclass('core.' || v_table)
         AND t.tgname = 'enforce_content_ciphertext' AND NOT t.tgisinternal AND t.tgenabled = 'O'
         AND t.tgfoid = pg_catalog.to_regprocedure('core.enforce_content_ciphertext_' || v_table || '()')) THEN
-      RAISE EXCEPTION 'PATH_RESULTS_0157_CONTRACT content guards %', v_table;
+      RAISE EXCEPTION 'PATH_RESULTS_0158_CONTRACT content guards %', v_table;
     END IF;
   END LOOP;
   FOREACH v_name IN ARRAY ARRAY['core.enforce_content_ciphertext_path_outcome()', 'core.enforce_content_attestation_v2_path_outcome()',
     'core.enforce_content_ciphertext_path_gap_round()', 'core.enforce_content_attestation_v2_path_gap_round()'] LOOP
     IF pg_catalog.has_function_privilege('debateai_runtime', v_name, 'EXECUTE')
       OR pg_catalog.has_function_privilege('debateai_content_provision', v_name, 'EXECUTE') THEN
-      RAISE EXCEPTION 'PATH_RESULTS_0157_CONTRACT guard %', v_name;
+      RAISE EXCEPTION 'PATH_RESULTS_0158_CONTRACT guard %', v_name;
     END IF;
   END LOOP;
   FOREACH v_name IN ARRAY ARRAY['core.write_path_root(uuid,text,integer,uuid,text)', 'core.record_path_outcome(uuid,text,text,jsonb,bytea)',
@@ -494,7 +494,7 @@ BEGIN
       OR pg_catalog.has_function_privilege('debateai_content_provision', v_name, 'EXECUTE')
       OR pg_catalog.has_function_privilege('debateai_erasure_runtime', v_name, 'EXECUTE')
       OR pg_catalog.has_function_privilege('debateai_data_export_worker', v_name, 'EXECUTE') THEN
-      RAISE EXCEPTION 'PATH_RESULTS_0157_CONTRACT %', v_name;
+      RAISE EXCEPTION 'PATH_RESULTS_0158_CONTRACT %', v_name;
     END IF;
   END LOOP;
 END

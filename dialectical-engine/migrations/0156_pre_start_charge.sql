@@ -1,4 +1,4 @@
--- 0155 · The small AIs before Start count in the person's quota (V4 start step; plan docs/superpowers/plans/2026-11-03-v4-start-step.md Task 18,
+-- 0156 · The small AIs before Start count in the person's quota (V4 start step; plan docs/superpowers/plans/2026-11-03-v4-start-step.md Task 18,
 -- spec 2026-11-03 §5.2).
 --
 -- Plain words. Before a debate starts, small AIs plan the angles, write the lists of viewpoints, merge them, combine two paths and check that a
@@ -225,12 +225,12 @@ BEGIN
       AND t.tgname = 'guard_pre_start_charge' AND NOT t.tgisinternal AND t.tgenabled = 'O')
     OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger AS t WHERE t.tgrelid = pg_catalog.to_regclass('ledger.model_spend')
       AND t.tgname = 'pre_start_spend_writer_only' AND NOT t.tgisinternal AND t.tgenabled = 'O') THEN
-    RAISE EXCEPTION 'PRE_START_0155_CONTRACT table';
+    RAISE EXCEPTION 'PRE_START_0156_CONTRACT table';
   END IF;
   FOREACH v_role IN ARRAY ARRAY['debateai_runtime', 'debateai_billing_runtime', 'debateai_authorization_runtime',
     'debateai_erasure_runtime', 'debateai_replay', 'debateai_data_export_worker'] LOOP
     IF pg_catalog.has_table_privilege(v_role, 'identity.pre_start_charge', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') THEN
-      RAISE EXCEPTION 'PRE_START_0155_CONTRACT table privilege %', v_role;
+      RAISE EXCEPTION 'PRE_START_0156_CONTRACT table privilege %', v_role;
     END IF;
   END LOOP;
   FOREACH v_name IN ARRAY ARRAY['billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean)',
@@ -240,7 +240,7 @@ BEGIN
         AND p.proconfig = '{search_path=pg_catalog}'::text[]
         AND pg_catalog.pg_get_functiondef(p.oid) LIKE '%ask_clarify_charge%'
         AND pg_catalog.pg_get_functiondef(p.oid) LIKE '%pre_start_charge%') THEN
-      RAISE EXCEPTION 'PRE_START_0155_CONTRACT %', v_name;
+      RAISE EXCEPTION 'PRE_START_0156_CONTRACT %', v_name;
     END IF;
   END LOOP;
 END

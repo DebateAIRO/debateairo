@@ -82,7 +82,7 @@ export type ModelSpendSource =
   /** step 2's small AI before a debate: run-less, in the site's day and in the person's windows through its own row (0144), written only by identity.record_ask_clarify_charge */
   | "ASK_CLARIFY"
   /**
-   * V4 start step (0155; spec 2026-11-03 §5.2): the small AIs before Start (the angle planner, the list writers, the merges,
+   * V4 start step (0156; spec 2026-11-03 §5.2): the small AIs before Start (the angle planner, the list writers, the merges,
    * the combine and the fit check). Run-less like ASK_CLARIFY, in the site's day and in the person's windows through its own
    * row, written only by identity.record_pre_start_charge.
    */
@@ -194,7 +194,7 @@ export async function recordAskClarifyCharge(pool: Pick<Pool, "query">, entry: A
       entry.chargeMicros, entry.inputTokens, entry.outputTokens]);
 }
 
-/** V4 start step (0155): which small AI before Start a charge paid for. */
+/** V4 start step (0156): which small AI before Start a charge paid for. */
 export const PRE_START_CHARGE_KINDS = Object.freeze(["ANGLES", "LIST", "MERGE", "MERGE_LATE", "COMBINE", "FIT"] as const);
 export type PreStartChargeKind = typeof PRE_START_CHARGE_KINDS[number];
 
@@ -203,7 +203,7 @@ export const PRE_START_CHARGE_WRITER = "identity.record_pre_start_charge(uuid,uu
 
 export type PreStartChargeEntry = AskClarifyChargeEntry & Readonly<{ kind: PreStartChargeKind }>;
 
-/** A pre-Start call's provider reference: pre-start:<kind, lower case, _ as ->:<provider>:<model>. 0155's writer checks the kind matches. */
+/** A pre-Start call's provider reference: pre-start:<kind, lower case, _ as ->:<provider>:<model>. 0156's writer checks the kind matches. */
 export function preStartSpendRef(kind: PreStartChargeKind, provider: string, model: string): string {
   return `pre-start:${kind.toLowerCase().replaceAll("_", "-")}:${provider}:${model}`;
 }
@@ -1603,7 +1603,7 @@ export class PostgresModelSpendStore implements ModelSpendStore {
       return this.#total(result.rows[0]?.total);
     }
     // Most runs have no synthesis check. CASE keeps the definer lookup off their spend path.
-    // Decisions 29 and 31: plus step 2's small AI, which has no run (0144); the V4 start step: plus the small AIs before Start (0155).
+    // Decisions 29 and 31: plus step 2's small AI, which has no run (0144); the V4 start step: plus the small AIs before Start (0156).
     const result = await this.pool.query<{ total: string }>(
       `SELECT ((SELECT coalesce(sum(spend.charge_micros),0) ${PostgresModelSpendStore.#ownerSpendFrom})
          + identity.read_ask_clarify_spent($1::uuid, $2::timestamptz, $3::timestamptz)

@@ -6,7 +6,7 @@ import { createInitialBatteryRows, WorkItemRepository } from "@debateai/battery"
 import { BudgetRepository, CostEnvelopeGuard, PostgresModelSpendStore, type ProviderTargetPrice } from "@debateai/budget";
 import { SESSION_COOKIE_NAME, PostgresAskApplication, buildApi } from "@debateai/api";
 import { AnswerDisclosureSchema, AnswerStorySchema, StoryBodySchema, type Session } from "@debateai/contract";
-import { RunRepository, ServeDisclosureRepository, migrate } from "@debateai/db";
+import { RunRepository, ServeDisclosureRepository, migrate, type Pool } from "@debateai/db";
 import { argumentLanguageDirective } from "@debateai/kernel";
 import type { ProviderCallRequest, ProviderGateway } from "@debateai/providers";
 import { CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY, type StoryPolicy } from "@debateai/register";
@@ -26,7 +26,7 @@ import {
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { readFramedMaterial, wirePacket } from "../support/framed-packet.js";
 import { createTestAskAdmissionPoolFacades, startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
-import { apiTestPools, inAccountRequest, provisionRlsLogins, type RlsLogins } from "../support/rls-logins.js";
+import { apiTestPools, inAccountRequest, provisionRlsLogins, runnerPoolOrSuperuser, type RlsLogins } from "../support/rls-logins.js";
 import { persistLiveSession } from "../support/httpSession.js";
 import { persistCatchUpVersion } from "../support/catchUpVersion.js";
 import { RepositoryAnswerStoryApplication, RepositoryPublicationStoryReader } from "../../apps/api/src/stories.js";
@@ -43,6 +43,8 @@ import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
  */
 
 let database: TestDatabase;
+/** Upload check Task 7 (R21): the runner's own pool, its production login in login mode (rls-logins.ts). */
+let runnerPool: Pool;
 /** The dev logins apiTestPools provisioned for the API root (login mode only), ended after the suite. */
 let apiLogins: RlsLogins | undefined;
 const batteryRows = createInitialBatteryRows({ settlementWatchHandle: "settlement-watch:story-e2e" });
@@ -367,12 +369,12 @@ function storyWriter(policy: StoryPolicy | null): StoryWriter {
   // The boot resolver knows nobody: the runner's per-run resolver (its
   // claim-eligible synthesis makers) must be what reaches the provider.
   return new StoryWriter({
-    pool: database.pool, pack: PACK, policy, hosted: false, resolveProvider: () => null, log: () => undefined
+    pool: runnerPool, pack: PACK, policy, hosted: false, resolveProvider: () => null, log: () => undefined
   });
 }
 
 function runnerWith(endpoint: string, writer: StoryWriter): WalkingSkeletonRunner {
-  return new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+  return new WalkingSkeletonRunner(runnerPool, createPostgresProviderGateway(runnerPool, {
     endpoint, model: "test-layer/model", maker: "test-layer"
   }), { ...runnerSettings(), story: writer });
 }
@@ -562,6 +564,8 @@ async function nonStoryAttempts(runId: string): Promise<number> {
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
+  // Upload check Task 7 (R21): the runner, its gateways and its story writer on the runner's production login in login mode.
+  runnerPool = await runnerPoolOrSuperuser(database);
 }, 240_000);
 
 afterAll(async () => {
@@ -713,7 +717,7 @@ describe("verdict story — end to end, after the debate is settled", () => {
         store: new PostgresModelSpendStore(database.pool),
         policy: { perRunCeilingMicros: 1_000_000, dailyCeilingMicros: 1_000_000_000, perStoryCeilingMicros: 1 }
       });
-      const gateway = createPostgresProviderGateway(database.pool, {
+      const gateway = createPostgresProviderGateway(runnerPool, {
         endpoint: provider.endpoint, model: "test-layer/model", maker: "test-layer",
         buildStoryCostEnvelopeSeam: (runId: string) => guard.storySeam({
           runId,
@@ -722,10 +726,10 @@ describe("verdict story — end to end, after the debate is settled", () => {
         })
       });
       const writer = new StoryWriter({
-        pool: database.pool, pack: PACK, policy: { ...LOCAL_STORY_POLICY, perStoryCeilingMicros: 1 },
+        pool: runnerPool, pack: PACK, policy: { ...LOCAL_STORY_POLICY, perStoryCeilingMicros: 1 },
         hosted: true, resolveProvider: () => null, log: () => undefined
       });
-      const result = await new WalkingSkeletonRunner(database.pool, gateway, { ...runnerSettings(), story: writer })
+      const result = await new WalkingSkeletonRunner(runnerPool, gateway, { ...runnerSettings(), story: writer })
         .executeWorkItem(debate.workItemId);
       if (result.kind !== "COMPLETED") throw new Error(`STORY_E2E_EXPECTED_COMPLETION:${result.kind}`);
       await expect(new StoryRepository(database.pool).readForAnswer({
@@ -777,7 +781,7 @@ describe("verdict story — end to end, after the debate is settled", () => {
       maker: "planned" | "cheaper", endpoint: string, model: string, makerName: string,
       price: ProviderTargetPrice
     ): ProviderGateway => {
-      const inner = createPostgresProviderGateway(database.pool, {
+      const inner = createPostgresProviderGateway(runnerPool, {
         endpoint, model, maker: makerName,
         buildStoryCostEnvelopeSeam: (runId: string) => guard.storySeam({ runId, price, requireReportedUsage: true })
       });
@@ -786,12 +790,12 @@ describe("verdict story — end to end, after the debate is settled", () => {
     try {
       const settings = runnerSettings();
       const writer = new StoryWriter({
-        pool: database.pool, pack: PACK,
+        pool: runnerPool, pack: PACK,
         policy: { ...LOCAL_STORY_POLICY, perStoryCeilingMicros: 50_000, perStoryOverrunBasisPoints: 2_000 },
         hosted: true, resolveProvider: () => null, log: () => undefined
       });
       const runner = new WalkingSkeletonRunner(
-        database.pool,
+        runnerPool,
         gatewayFor("planned", planned.endpoint, "test-layer/model", "test-layer", dear),
         twoMakerSettings({
           secondRef: CHEAPER_REF,
@@ -866,19 +870,19 @@ describe("verdict story — end to end, after the debate is settled", () => {
       }
     });
     const gatewayFor = (endpoint: string, model: string, makerName: string): ProviderGateway =>
-      createPostgresProviderGateway(database.pool, {
+      createPostgresProviderGateway(runnerPool, {
         endpoint, model, maker: makerName,
         buildStoryCostEnvelopeSeam: (runId: string) => guard.storySeam({ runId, price: dear, requireReportedUsage: true })
       });
     try {
       const settings = runnerSettings();
       const writer = new StoryWriter({
-        pool: database.pool, pack: PACK,
+        pool: runnerPool, pack: PACK,
         policy: { ...LOCAL_STORY_POLICY, perStoryCeilingMicros: 50_000, perStoryOverrunBasisPoints: 2_000 },
         hosted: true, resolveProvider: () => null, log: () => undefined
       });
       const result = await new WalkingSkeletonRunner(
-        database.pool,
+        runnerPool,
         gatewayFor(planned.endpoint, "test-layer/model", "test-layer"),
         twoMakerSettings({
           secondRef: OTHER_REF,
@@ -951,7 +955,7 @@ describe("verdict story — end to end, after the debate is settled", () => {
       const settings = runnerSettings();
       const policy = settings.servePolicy!;
       const tiny = (tier: "low" | "medium" | "high") => ({ ...policy.compositionBudgets[tier], bound: 1 });
-      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+      const runner = new WalkingSkeletonRunner(runnerPool, createPostgresProviderGateway(runnerPool, {
         endpoint: provider.endpoint, model: "test-layer/model", maker: "test-layer"
       }), {
         ...settings,
@@ -1042,7 +1046,7 @@ describe("verdict story — a review catch-up version keeps the story (M5 review
       const settings = runnerSettings();
       const policy = settings.servePolicy!;
       const tiny = (tier: "low" | "medium" | "high") => ({ ...policy.compositionBudgets[tier], bound: 1 });
-      const result = await new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+      const result = await new WalkingSkeletonRunner(runnerPool, createPostgresProviderGateway(runnerPool, {
         endpoint: provider.endpoint, model: "test-layer/model", maker: "test-layer"
       }), {
         ...settings,

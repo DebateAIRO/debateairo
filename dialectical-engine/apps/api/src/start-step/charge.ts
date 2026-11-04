@@ -8,7 +8,7 @@ import { previewModelRow, type ProviderCostEnvelopeSeam, type ProviderDiscoveryT
 
 /**
  * V4 start step, Task 27 (spec 2026-11-03 §4.1 "Allowance"): THE PER-PERSON CHARGE of every call before Start. No run
- * exists yet, so each call has its own record (0155): one row naming the person, the kind of call, the cost and the
+ * exists yet, so each call has its own record (0156): one row naming the person, the kind of call, the cost and the
  * time, beside a run-less ledger row that keeps it in the site's day; the windows, a team member's grant and the team's
  * one limit read it, as they read step 2's clarifying call (ask-clarify.ts, 0144), whose rules this follows.
  *
@@ -39,7 +39,7 @@ function realUsage(usage: unknown, projection: Readonly<{ requestBytes: number; 
 }
 
 export function createStartCharges(deps: Readonly<{
-  /** The one writer (0155): identity.record_pre_start_charge. */
+  /** The one writer (0156): identity.record_pre_start_charge. */
   record(entry: PreStartChargeEntry): Promise<void>;
   /** The target's price (main: previewTargetChargePrice over providerTargetPrice), or null: none. */
   priceOf(providerRef: string): ProviderTargetPrice | null;

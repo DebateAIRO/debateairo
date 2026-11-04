@@ -27,11 +27,12 @@ export const ACCOUNT_CREDENTIAL_SETTING = "debateai.session_credential";
 /**
  * The readers a call site names (SPEC-v4 §6): X10, X18a-X18g, X18j, X20, X22, X23, X24 inside their reader methods in
  * packages/*; X21 in apps/api/src/preview-budget-estimate.ts; X11, X14, X18h, and since the merge onto synthesis-flag X27
- * (the staff threat report's recipient address) and X28 (the staff publication review), in apps/api/src/main.ts. Background readers
+ * (the staff threat report's recipient address) and X28 (the staff publication review), in apps/api/src/main.ts; X29 (a report
+ * press's seal under the public debate's own run, upload check Task 9) in apps/api/src/public-tree.ts. Background readers
  * (X8, X12, X13) run outside every request scope and need no id; X19 and X25 connect as api-system directly.
  */
 export type CrossAccountReader = "X10" | "X11" | "X14" | "X18a" | "X18b" | "X18c" | "X18d" | "X18e" | "X18f" | "X18g"
-  | "X18h" | "X18j" | "X20" | "X21" | "X22" | "X23" | "X24" | "X27" | "X28";
+  | "X18h" | "X18j" | "X20" | "X21" | "X22" | "X23" | "X24" | "X27" | "X28" | "X29";
 
 type RequestScope = { credential: string | null };
 

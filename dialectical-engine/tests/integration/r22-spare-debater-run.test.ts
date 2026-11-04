@@ -29,7 +29,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  */
 let database: TestDatabase;
 const stubClosers: (() => Promise<void>)[] = [];
-const harness = previewDebateHarness({ pool: () => database.pool, stubClosers });
+const harness = previewDebateHarness({ pool: () => database.pool, database: () => database, stubClosers });
 const SHAPE_SETTINGS = { debateShape: { mapContractHash: mapPromptContractHash() } } as const;
 const STANDARD = { depthMode: "adaptive", scrutiny: "standard", answerLength: "standard" } as const;
 const MODEL_REFS: Readonly<Record<string, string>> = Object.freeze({

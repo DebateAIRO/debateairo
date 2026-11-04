@@ -5397,7 +5397,7 @@ export interface RunCreationSettings {
    */
   readonly activeVersionAlarm?: ActiveVersionAlarm;
   /**
-   * V4 start step, Task 35 (spec 2026-11-03 §4.2): the chosen paths' store (0156), where a debate admitted with shape
+   * V4 start step, Task 35 (spec 2026-11-03 §4.2): the chosen paths' store (0157), where a debate admitted with shape
    * receipt v2 seals the paths the person chose before its first job (RUN_SETUP_FAILED:START_PATHS). Absent: such a debate
    * is refused at that step (START_PATHS_STORE_UNAVAILABLE). A process member, never a version's.
    */

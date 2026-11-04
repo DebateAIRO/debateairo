@@ -1,4 +1,4 @@
--- 0156 · The paths a person chose at Start, sealed under the debate's own key (V4 start step; plan docs/superpowers/plans/2026-11-03-v4-start-step.md
+-- 0157 · The paths a person chose at Start, sealed under the debate's own key (V4 start step; plan docs/superpowers/plans/2026-11-03-v4-start-step.md
 -- Task 19, spec 2026-11-03 §4).
 --
 -- Plain words. When the person presses Start, the debate keeps what they chose: how many paths and from where, and each path's words. The words
@@ -329,12 +329,12 @@ BEGIN
         AND t.tgname = 'reject_truncate' AND NOT t.tgisinternal)
       OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger AS t WHERE t.tgrelid = pg_catalog.to_regclass(v_table)
         AND t.tgname = 'reject_mutation' AND NOT t.tgisinternal AND t.tgenabled = 'O') THEN
-      RAISE EXCEPTION 'START_PATHS_0156_CONTRACT table %', v_table;
+      RAISE EXCEPTION 'START_PATHS_0157_CONTRACT table %', v_table;
     END IF;
     FOREACH v_role IN ARRAY ARRAY['debateai_runtime', 'debateai_billing_runtime', 'debateai_authorization_runtime',
       'debateai_erasure_runtime', 'debateai_replay', 'debateai_data_export_worker', 'debateai_content_provision'] LOOP
       IF pg_catalog.has_table_privilege(v_role, v_table, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') THEN
-        RAISE EXCEPTION 'START_PATHS_0156_CONTRACT table privilege % %', v_table, v_role;
+        RAISE EXCEPTION 'START_PATHS_0157_CONTRACT table privilege % %', v_table, v_role;
       END IF;
     END LOOP;
   END LOOP;
@@ -342,7 +342,7 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger AS t WHERE t.tgrelid = pg_catalog.to_regclass(v_table)
         AND t.tgname = 'aaa_enforce_web_evidence_content' AND NOT t.tgisinternal AND t.tgenabled = 'O'
         AND t.tgfoid = 'identity.enforce_web_evidence_content()'::regprocedure) THEN
-      RAISE EXCEPTION 'START_PATHS_0156_CONTRACT content check %', v_table;
+      RAISE EXCEPTION 'START_PATHS_0157_CONTRACT content check %', v_table;
     END IF;
   END LOOP;
   FOREACH v_name IN ARRAY ARRAY['core.record_start_paths(uuid,jsonb,jsonb)', 'core.read_start_paths(uuid)', 'core.read_start_path_ids(uuid)',
@@ -353,7 +353,7 @@ BEGIN
       OR pg_catalog.has_function_privilege('debateai_content_provision', v_name, 'EXECUTE')
       OR pg_catalog.has_function_privilege('debateai_erasure_runtime', v_name, 'EXECUTE')
       OR pg_catalog.has_function_privilege('debateai_data_export_worker', v_name, 'EXECUTE') THEN
-      RAISE EXCEPTION 'START_PATHS_0156_CONTRACT %', v_name;
+      RAISE EXCEPTION 'START_PATHS_0157_CONTRACT %', v_name;
     END IF;
   END LOOP;
 END

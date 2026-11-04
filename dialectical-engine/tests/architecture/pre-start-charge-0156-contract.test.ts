@@ -6,14 +6,14 @@ import { parseN1Header } from "../../packages/db/src/migration-n1.js";
 import { auditMigrationReplaySafety, definedRelationNames } from "../../tools/orphan-audit/src/index.js";
 
 /**
- * 0155 (V4 start step, plan 2026-11-03 Task 18; spec §5.2): the small AIs before Start count in the person's quota. One row per call naming the
+ * 0156 (V4 start step, plan 2026-11-03 Task 18; spec §5.2): the small AIs before Start count in the person's quota. One row per call naming the
  * person, the kind of call, the cost and the time, never the question, the lists or the paths; drained, because it redefines 0144's two readers.
  */
-const NAME = "0155_pre_start_charge.sql";
+const NAME = "0156_pre_start_charge.sql";
 const SQL_PATH = `migrations/${NAME}`;
-const MANIFEST_PATH = "migrations/lineage/pre-start-charge-forward0155.json";
-const PREVIOUS = "0154_region_iceland_liechtenstein.sql";
-const PREVIOUS_MANIFEST_PATH = "migrations/lineage/region-iceland-liechtenstein-forward0154.json";
+const MANIFEST_PATH = "migrations/lineage/pre-start-charge-forward0156.json";
+const PREVIOUS = "0155_owner_answer_writes.sql";
+const PREVIOUS_MANIFEST_PATH = "migrations/lineage/owner-answer-writes-forward0155.json";
 const VERIFIER_130 = "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57";
 const ROOT = new URL("../../", import.meta.url);
 const read = (path: string): string => readFileSync(new URL(path, ROOT), "utf8");
@@ -22,17 +22,17 @@ const code = (sql: string): string => sql.split("\n").map((line) => line.replace
 const TABLE = "identity.pre_start_charge";
 const READERS = ["billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean)", "staff.read_team_internal_spent(timestamptz,timestamptz)"];
 
-describe("0155: the small AIs before Start in the person's quota", () => {
-  it("C-T is a step of the chain, after 0154, with its own loader", async () => {
+describe("0156: the small AIs before Start in the person's quota", () => {
+  it("C-T is a step of the chain, after 0155, with its own loader", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
-    expect(chain).toContain("import { loadForward0155 } from './migration-forward0155.js';");
-    expect(chain).toContain("loadForward0154,loadForward0155,");
+    expect(chain).toContain("import { loadForward0156 } from './migration-forward0156.js';");
+    expect(chain).toContain("loadForward0155,loadForward0156,");
     const plan = await loadMigrationPlan();
     const names = plan.forwardChain.map((step) => step.name);
     expect(names.slice(names.indexOf(NAME) - 1, names.indexOf(NAME) + 1)).toEqual([PREVIOUS, NAME]);
     // Its later-drift check covers what it adds to ledger.model_spend as well as its own objects, as 0128's does: the writer-only trigger
     // (the only barrier for a login whose row security admits a run-less row) and the run-less CHECK.
-    const loader = read("packages/db/src/migration-forward0155.ts");
+    const loader = read("packages/db/src/migration-forward0156.ts");
     for (const name of ["identity.pre_start_charge", "pre_start_spend_writer_only", "model_spend_pre_start_is_runless"]) expect(loader, name).toContain(name);
     expect(plan.forwardChain.find((step) => step.name === NAME)!.amendsPostconditionsOf).toEqual([
       { step: "0140_internal_spend_kinds.sql", functions: READERS, field: "function_definition" },
@@ -40,11 +40,11 @@ describe("0155: the small AIs before Start in the person's quota", () => {
     ]);
   });
 
-  it("C-M is bound to 0154's manifest and to the verifier in force, and declares what it changes of 0140's and 0144's digests", () => {
+  it("C-M is bound to 0155's manifest and to the verifier in force, and declares what it changes of 0140's and 0144's digests", () => {
     const manifest = JSON.parse(read(MANIFEST_PATH)) as Record<string, unknown>;
     const previous = JSON.parse(read(PREVIOUS_MANIFEST_PATH)) as { baseRecipeSha256: string };
     expect(manifest).toEqual({
-      version: "pre-start-charge-forward0155-v1",
+      version: "pre-start-charge-forward0156-v1",
       baseRecipeSha256: previous.baseRecipeSha256,
       previous: { name: PREVIOUS, manifestSha256: sha256(read(PREVIOUS_MANIFEST_PATH)), verifierSha256: VERIFIER_130 },
       migration: { name: NAME, sha256: sha256(read(SQL_PATH)) },
@@ -99,7 +99,7 @@ describe("0155: the small AIs before Start in the person's quota", () => {
     const declared = manifest.privilegeDisclosures.filter((entry) => entry.source === SQL_PATH)
       .flatMap(({ roleName, grants }) => grants.map((grant) => `${roleName}: ${grant}`)).sort();
     expect(actual).toEqual(declared);
-    expect(read("tests/support/shipped-corpus.manifest.txt").split("\n")).toContain("packages/db/src/migration-forward0155.ts");
+    expect(read("tests/support/shipped-corpus.manifest.txt").split("\n")).toContain("packages/db/src/migration-forward0156.ts");
     expect(read("tests/ci-integration-auth.txt").split("\n")).toContain("tests/integration/pre-start-charge-database.test.ts");
     expect(read("packages/budget/src/model-spend.ts").match(/identity\.read_pre_start_spent/gu)).toHaveLength(2);
     expect(read("packages/db/src/data-export.ts")).toContain("identity.read_data_export_pre_start($1,$2) pre_start_calls");
@@ -107,9 +107,9 @@ describe("0155: the small AIs before Start in the person's quota", () => {
 
   it("C-R is documented", () => {
     const readme = read("migrations/lineage/README.md").replace(/\s+/gu, " ");
-    for (const needle of ["(0155, below) the forty-fifth", "## The small AIs before Start in the quota (0155)", "`loadForward0155`", "MIGRATION_FORWARD0155_", "-- n1: drained", "-- n1: keeps-verifier"]) {
+    for (const needle of ["(0156, below) the forty-sixth", "## The small AIs before Start in the quota (0156)", "`loadForward0156`", "MIGRATION_FORWARD0156_", "-- n1: drained", "-- n1: keeps-verifier"]) {
       expect(readme, needle).toContain(needle);
     }
-    expect(read("deploy/preview-auth-dev/v1/README.md")).toContain("`migrations/0155_pre_start_charge.sql` (after `0154_region_iceland_liechtenstein.sql`, `n1: drained`)");
+    expect(read("deploy/preview-auth-dev/v1/README.md")).toContain("`migrations/0156_pre_start_charge.sql` (after `0155_owner_answer_writes.sql`, `n1: drained`)");
   });
 });

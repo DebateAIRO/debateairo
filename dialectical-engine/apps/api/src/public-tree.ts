@@ -5,7 +5,7 @@ import {
 } from "@debateai/contract";
 import type { CryptoEnvelope, PreparedPublicationCipher } from "@debateai/crypto";
 import {
-  DIG_PICK_CARRIER, PATH_UPDATE_CARRIER, PostgresPublicTreeRunnerRepository, PUBLIC_MATERIAL_CARRIER, PUBLIC_REPORT_CARRIER, decryptContentForRun, encryptAttestedContentForRun, withRunContentLease, type Pool,
+  DIG_PICK_CARRIER, PATH_UPDATE_CARRIER, PostgresPublicTreeRunnerRepository, PUBLIC_MATERIAL_CARRIER, PUBLIC_REPORT_CARRIER, crossAccount, decryptContentForRun, encryptAttestedContentForRun, withRunContentLease, type Pool,
   type PostgresPublicDebateRepository, type PostgresPublicDebateRunnerRepository, type PostgresPublicPageRepository, type PostgresPublicTreeRepository, type PublicPageOwed, type PublicPageUpdateRead,
   type PublicReportCopyRead, type WebSealed
 } from "@debateai/db";
@@ -264,7 +264,9 @@ export async function pressPublicReport(input: Readonly<{ ownerRef: string; publ
     case "NO_CARRIER": return Object.freeze({ kind: "NO_CARRIER" });
     case "WRITING": return Object.freeze({ kind: "WRITING", reportVersion: opened.reportVersion! });
     case "OPENED": {
-      const sealed = await sealFor(input.pool, opened.carrierRunId!, PUBLIC_MATERIAL_CARRIER, opened.reportId!, publicMaterialOf(debate, { now: input.now }));
+      // Row-level security X29: a stranger's report of a public debate is sealed under the debate's own run key so the runner can read it, and that run is the
+      // author's, which the runtime login does not see inside the stranger's request. The public check is open_public_report, above; only this seal crosses.
+      const sealed = await crossAccount("X29", () => sealFor(input.pool, opened.carrierRunId!, PUBLIC_MATERIAL_CARRIER, opened.reportId!, publicMaterialOf(debate, { now: input.now })));
       if (sealed === null) return Object.freeze({ kind: "NO_CARRIER" });
       await input.tree.recordMaterial(opened.reportId!, opened.carrierRunId!, input.publicationRef, "REPORT", sealed);
       return Object.freeze({ kind: "WRITING", reportVersion: opened.reportVersion! });
