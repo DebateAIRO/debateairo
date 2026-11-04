@@ -133,6 +133,9 @@ await expectCode("run answer of the running run", () => client.readRunAnswer(RUN
 await fetch(`${MOCK}/__mock/set?session=OUT`);
 try {
   await expectCode("a debate read after the sign-in ended", () => client.readRun(RUNS.running), "SESSION_REQUIRED");
+  // A stranger has no quota: the room and usage reads are signed-in only, as in the real API.
+  await expectCode("the room read of a stranger", () => client.getAskRoom({ plan_tier: "premium", composition_budget_tier: "medium", depth: 2, answer_length: "standard" }), "SESSION_REQUIRED");
+  await expectCode("the usage read of a stranger", () => client.getBillingUsage(), "SESSION_REQUIRED");
 } finally {
   await fetch(`${MOCK}/__mock/set?session=IN`);
 }

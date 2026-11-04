@@ -1420,6 +1420,11 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   // V4 screen review (wait-f1): with `session=OUT` the asker's own debates are refused as an ended sign-in is (401
   // SESSION_REQUIRED), so a page opened while signed in shows "Please sign in again to see your question." on its next read.
   if (sessionOut && isGet && (parts[1] === "runs" || parts[1] === "answers")) return sendJson(req, res, 401, { error: "SESSION_REQUIRED" });
+  // A stranger has no quota and no account: the room and usage reads and the account reads are signed-in only in the
+  // real API (auth "user"), so the ask page shows no "% of your quota used" and no share line to someone signed out.
+  if (sessionOut && isGet && (path === "/v1/asks/room" || path === "/v1/billing/usage" || parts[1] === "account")) {
+    return sendJson(req, res, 401, { error: "SESSION_REQUIRED" });
+  }
   if (path === "/v1/session" && isGet) return sendJson(req, res, 200, SESSION, C.SessionSchema);
   if (path === "/v1/auth/age-confirmation" && isGet) return sendJson(req, res, 200, { status: "confirmed" }, C.AgeConfirmationStatusSchema);
   if (path === "/v1/account/sensitive-data-consent" && (isGet || method === "POST")) {
