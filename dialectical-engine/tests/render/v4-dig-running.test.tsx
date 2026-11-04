@@ -294,6 +294,15 @@ describe("the running dig's styles (journey-d1: the six moves only)", () => {
     expect(block).toMatch(/\.v4DigSteps \{[^}]*flex-wrap: wrap;/u);
     // ACCESS-8 (the wave-2 review): "›" is mirrored by the browser on a right-to-left page, so no rule turns it a second time.
     expect(block).toMatch(/\.v4DigStep \+ \.v4DigStep::before \{[^}]*content: "›"/u);
-    expect(block).not.toMatch(/:dir\(rtl\)/u);
+    expect(block).not.toMatch(/\.v4DigStep[^{]*:dir\(rtl\)/u);
+  });
+
+  it("dig-d1 B: \"This path says now\" shows that it folds, with the panel's own fold arrows, turned by hand on a right-to-left page", () => {
+    // The browser check (4 Nov): a flex summary draws no marker of its own. "▸" is not a mirrored character (unlike "›"),
+    // so a right-to-left page gets "◂" from its own rule, as the panel's other folds do (v4-map.css .v4PanelGroup).
+    expect(block).toMatch(/\.v4DigPathNow > summary::-webkit-details-marker \{ display: none; \}/u);
+    expect(block).toMatch(/\.v4DigPathNow > summary::before \{[^}]*content: "▸"/u);
+    expect(block).toMatch(/\.v4DigPathNow > summary:dir\(rtl\)::before \{[^}]*content: "◂"/u);
+    expect(block).toMatch(/\.v4DigPathNow\[open\] > summary::before \{[^}]*content: "▾"/u);
   });
 });
