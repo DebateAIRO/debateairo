@@ -33,6 +33,26 @@ describe("T9 return-path validation", () => {
   });
 
   it.each([
+    ["/v4/debate/a1b2c3d4-e5f6-4789-abcd-0123456789ef", "/v4/debate/a1b2c3d4-e5f6-4789-abcd-0123456789ef"],
+    ["/v4/debate/a1b2c3d4-e5f6-4789-abcd-0123456789ef?level=plain&path=p-1", "/v4/debate/a1b2c3d4-e5f6-4789-abcd-0123456789ef?level=plain&path=p-1"],
+    ["/v4/debate/a1b2c3d4-e5f6-4789-abcd-0123456789ef/report", "/v4/debate/a1b2c3d4-e5f6-4789-abcd-0123456789ef/report"],
+    ["/public/debate/a1b2c3d4-e5f6-4789-abcd-0123456789ef?dig=p-fares&under=b1b2c3d4-e5f6-4789-abcd-0123456789ef", "/public/debate/a1b2c3d4-e5f6-4789-abcd-0123456789ef?dig=p-fares&under=b1b2c3d4-e5f6-4789-abcd-0123456789ef"]
+  ])("public-f13: a signed-out link to a V4 debate, its report or a public dig box comes back to it (%s)", (raw, expected) => {
+    expect(safeReturnPath(raw)).toBe(expected);
+  });
+
+  it.each([
+    ["v4 debate without an id", "/v4/debate/"],
+    ["v4 debate non-uuid id", "/v4/debate/not-a-run"],
+    ["v4 debate traversal", "/v4/debate/a1b2c3d4-e5f6-4789-abcd-0123456789ef/../../settings"],
+    ["v4 debate other sub-path", "/v4/debate/a1b2c3d4-e5f6-4789-abcd-0123456789ef/report/pdf"],
+    ["v4 debate prefix", "/v4/debatex/a1b2c3d4-e5f6-4789-abcd-0123456789ef"],
+    ["scheme-relative v4 debate", "//evil.example/v4/debate/a1b2c3d4-e5f6-4789-abcd-0123456789ef"]
+  ])("rejects the V4 debate shape %s", (_case, raw) => {
+    expect(safeReturnPath(raw)).toBe(DEFAULT_RETURN_PATH);
+  });
+
+  it.each([
     ["/new?x=1", "/new?x=1"],
     [
       "/public/debate/a1b2c3d4-e5f6-4789-abcd-0123456789ef?from=share",
@@ -97,7 +117,9 @@ describe("V4 review ask-f1: the way back through sign-in", () => {
     ["/v4?topic=Should%20Romania%20build%20nuclear%20plants%3F&level=plain", `/login?next=${encodeURIComponent("/v4?topic=Should%20Romania%20build%20nuclear%20plants%3F&level=plain")}`],
     ["/settings/security", "/login?next=%2Fsettings%2Fsecurity"],
     ["/v4#token=secret", "/login?next=%2Fv4"],
-    ["/v4/debate/11111111-1111-4111-8111-111111111111", "/login"],
+    // public-f13: a V4 debate's map is now on the return list, so its way back travels too.
+    ["/v4/debate/11111111-1111-4111-8111-111111111111", "/login?next=%2Fv4%2Fdebate%2F11111111-1111-4111-8111-111111111111"],
+    ["/debate/11111111-1111-4111-8111-111111111111", "/login"],
     ["/pricing", "/login"],
     ["//evil.example/v4", "/login"],
     ["", "/login"]

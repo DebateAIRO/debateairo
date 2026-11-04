@@ -64,7 +64,9 @@ describe("AuthGate sends a signed-out visitor to sign in with the way back", () 
     ["/v4", "/login?next=%2Fv4"],
     ["/v4?topic=Why%20now%3F&level=plain", `/login?next=${encodeURIComponent("/v4?topic=Why%20now%3F&level=plain")}`],
     ["/settings", "/login?next=%2Fsettings"],
-    ["/v4/debate/11111111-1111-4111-8111-111111111111", "/login"]
+    // public-f13: a V4 debate's map is on the return list too; the classic debate page is not, so it gets the plain page.
+    ["/v4/debate/11111111-1111-4111-8111-111111111111", "/login?next=%2Fv4%2Fdebate%2F11111111-1111-4111-8111-111111111111"],
+    ["/debate/11111111-1111-4111-8111-111111111111", "/login"]
   ])("from %s to %s, by the redirect and by the link shown meanwhile", async (address, href) => {
     const host = await signedOutAt(address);
     expect(state.replace.mock.calls).toEqual([[href]]);

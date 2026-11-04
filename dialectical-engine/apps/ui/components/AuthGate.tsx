@@ -26,8 +26,10 @@ export function AuthGate({
 }) {
   const [authenticated, setAuthenticated] = useState(false);
   const [checking, setChecking] = useState(true);
-  // V4 review ask-f1: sign-in carries the way back to this page (its query too), so a stranger sent to sign in from
-  // the new ask page comes back to it, not to the old new-debate page. Read from the address once the session is known.
+  // V4 review ask-f1 and public-f13: sign-in carries the way back to this page (its path and query, never the
+  // fragment), so a stranger sent to sign in from the new ask page, a V4 debate or its report comes back to it.
+  // lib/returnPath decides which addresses sign-in may return to; any other gets the bare sign-in page, as before.
+  // Read from the address once the session is known.
   const [signIn, setSignIn] = useState("/login");
   useEffect(() => {
     let active = true;

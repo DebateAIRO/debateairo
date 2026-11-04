@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import type { PublicDebate } from "@debateai/contract";
 import DebatePageClient from "@/app/debate/[id]/DebatePageClient";
 import { V4PublicFlag } from "@/components/v4/V4PublicFlag";
+import { V4PublicSessionProvider } from "@/components/v4/V4PublicSession";
 import { PublicAnswerDisclosure } from "@/components/PublicAnswerDisclosure";
 import { PublicDebateOverview } from "@/components/PublicDebateOverview";
 import { PublicHonestyDrawer } from "@/components/PublicHonestyDrawer";
@@ -137,8 +138,9 @@ export function PublicDebatePageClient({
     </details>
   );
 
+  // public-f13: one sign-in read for the whole page; the report link, the dig boxes and the report press all read it.
   return (
-    <>
+    <V4PublicSessionProvider>
       {debate.changed_after_review === true ? <p className="publicChangedAfterReview" role="status" data-public-changed>{t(v4Catalog, "v4.public.changedAfterReview")}</p> : null}
       <V4PublicFlag publicRef={debate.public_ref} catalog={v4Catalog} />
       <DebatePageClient
@@ -186,6 +188,6 @@ export function PublicDebatePageClient({
       )}
       />
       <SupportWidget />
-    </>
+    </V4PublicSessionProvider>
   );
 }

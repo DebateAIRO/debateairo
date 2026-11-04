@@ -1,7 +1,8 @@
 /* Decisions 13, 16 and 22: the public page's contributions and reports, in V4's look. It sits inside a page of the classic layout, so .v4Root gives only its tokens here. */
 .v4Root.v4PublicLane { min-height: 0; background: none; font-size: inherit; }
 
-.v4PubPathNote { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+/* public-f23: long words and addresses wrap anywhere in the lane, and every side line follows the reading direction. */
+.v4PubPathNote { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; margin-top: 4px; min-width: 0; overflow-wrap: anywhere; }
 .v4PubSummary { margin: 0; color: var(--text); font-size: 13.5px; line-height: 1.5; }
 .v4PubChanged { margin: 0; padding-inline-start: 18px; color: var(--text-2); font-size: 13px; }
 .v4PubAddedBy { margin: 0; color: var(--text-3); font-size: 12px; }
@@ -12,13 +13,28 @@
 .v4PubDigActions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .v4PubHint { margin: 0; color: var(--text-2); font-size: 13px; }
 .v4PubLabel { margin: 0; color: var(--text-2); font-size: 12px; font-weight: 700; }
+.v4PubDigFieldHead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.v4PubRemove { font-size: 12.5px; }
+.v4PubHow summary { cursor: pointer; color: var(--text-2); font-size: 13px; }
+.v4PubHow[open] summary { margin-bottom: 4px; }
+/* public-f10: a dig that runs privately is a calm grey note, never the red refusal box. */
+.v4PubNote { margin: 0; padding: 8px 12px; border-inline-start: 3px solid var(--line-strong); background: var(--surface-2); color: var(--text-2); font-size: 13.5px; line-height: 1.5; }
+/* public-f13: a held place is as tall as the button it waits for; the signed-out choice keeps that height, so nothing jumps. */
+.v4PubHold { visibility: hidden; }
+.v4PubSignIn { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-height: 44px; margin: 0; color: var(--text-2); font-size: 13.5px; }
 .v4PubText { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--r-btn); background: var(--bg); color: var(--text); font: inherit; font-size: 14px; resize: vertical; }
 
 .v4PubDigPaths { display: flex; flex-direction: column; gap: 6px; padding-inline-start: 12px; border-inline-start: 2px solid var(--line-2); }
+/* public-f23: indented once only. A dig on a dig's path sits at the same indent, with a small tag saying whose dig it came from. */
+.v4PubDigPathsDeeper { padding-inline-start: 0; border-inline-start: 0; }
+.v4PubDigFrom {
+  align-self: flex-start; padding: 1px 8px; border: 1px solid var(--line-2); border-radius: var(--r-pill);
+  background: var(--surface-2); font-weight: 600;
+}
 .v4PubDigPathList { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
 .v4PubDigPathLine { margin: 0; color: var(--text); font-size: 13.5px; }
 
-.v4PubReports { display: flex; flex-direction: column; gap: 12px; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line-2); }
+.v4PubReports { display: flex; flex-direction: column; gap: 12px; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line-2); min-width: 0; overflow-wrap: anywhere; }
 .v4PubHeading { margin: 0; font-size: 18px; font-weight: 700; color: var(--text); }
 .v4PubEarlier summary { cursor: pointer; color: var(--text-2); font-size: 13.5px; }
 .v4PubEarlier[open] { display: flex; flex-direction: column; gap: 10px; }
@@ -28,3 +44,24 @@
 .publicMainUpdateNote { margin: 0; color: var(--muted); font-size: 12px; }
 .publicFirstAnswer summary { cursor: pointer; color: var(--text-2); font-size: 13.5px; }
 .publicFirstAnswer[open] summary { margin-bottom: 8px; }
+
+/* public-f5: "Report a problem": the quiet line next to the link that says it was sent, then the check's answer; the short line under a box left too short. */
+.v4PubFlagLine { color: var(--text-2); font-size: 13px; }
+.v4PubFlagMore { margin: 0; color: var(--text-2); font-size: 12.5px; }
+
+/* public-f6: the grey outline shown at once while a public debate loads. Still: no shimmer, so reduced motion needs nothing more. */
+.v4PubSkel { display: flex; flex-direction: column; }
+.v4PubSkelHeader { display: flex; align-items: center; min-height: 64px; padding: 10px var(--v4-gutter); border-bottom: 1px solid var(--line-2); background: var(--surface); }
+.v4PubSkelMain { display: flex; flex-direction: column; gap: 14px; width: 100%; max-width: 820px; margin: 0 auto; padding: 32px var(--v4-gutter) 56px; }
+.v4PubSkelBar { display: block; height: 12px; width: 100%; border-radius: var(--r-pill); background: var(--line-2); }
+.v4PubSkelBrand { width: 180px; height: 18px; }
+.v4PubSkelTitle { height: 26px; width: 92%; }
+.v4PubSkelShort { width: 55%; }
+.v4PubSkelTag { width: 96px; flex: none; }
+.v4PubSkelCard { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; padding: 18px; border: 1px solid var(--line-2); border-radius: var(--r-card); background: var(--surface); }
+.v4PubSkelRow { display: flex; align-items: center; gap: 16px; min-height: 56px; padding: 0 16px; border: 1px solid var(--line-2); border-radius: var(--r-card); background: var(--surface); }
+
+/* public-f7 / public-f8: a public debate that cannot be shown, inside the normal header. */
+.v4PubNoteMain { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; width: 100%; max-width: 640px; margin: 0 auto; padding: 48px var(--v4-gutter) 56px; overflow-wrap: anywhere; }
+.v4PubNoteLine { margin: 0; color: var(--text); font-size: var(--t-body); line-height: 1.5; }
+.v4PubNoteWays { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: var(--t-ui); }

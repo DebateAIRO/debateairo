@@ -43,9 +43,11 @@ test("auth screens share the reference hierarchy and replace the inline gate", (
   assert.match(styles, /\.authHeadline\s*\{/);
   assert.match(styles, /\.authPrimary\s*\{/);
   assert.match(styles, /@media \(max-width: 640px\)[\s\S]*?\.authScreen/);
-  // V4 review ask-f1: the gate sends people to sign in with the way back to the page they were on (query kept).
+  // V4 review ask-f1 and public-f13: the gate sends people to sign in with the way back to the page they were on, from
+  // its path and query only (the fragment never travels).
   assert.match(gate, /window\.location\.replace\(signIn\)/);
   assert.match(gate, /setSignIn\(signInHref\(`\$\{window\.location\.pathname\}\$\{window\.location\.search\}`\)\)/);
+  assert.doesNotMatch(gate, /window\.location\.hash/);
   assert.match(returnPath, /export function signInHref\(here: string\): string/);
   assert.doesNotMatch(gate, /beginLogin|completeLogin/);
   assert.match(topBar, /AUTH_PATHS/);
