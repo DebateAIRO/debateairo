@@ -1,11 +1,15 @@
 import type { Pool } from "pg";
 import { TypedDomainError } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
-import type { PreviewGateSettings, PreviewLineUp } from "@debateai/providers";
 import {
+  PERPLEXITY_SEARCH_VENDOR, type PreviewGateName, type PreviewGateRemaining, type PreviewGateSettings, type PreviewLineUp
+} from "@debateai/providers";
+import {
+  DEBATE_SHAPE_PLAN_KEYS,
   assertHostedCostEnvelopesSealed,
   assertHostedSupportAdmissionSealed,
   compareSiteSettings,
+  debateShapeStartStepOf,
   readAdmissionPolicy,
   readBillingPlans,
   readBillingPolicy,
@@ -21,6 +25,8 @@ import {
   settingsSeatableModels,
   settingsVersionKindRefusal,
   settingsVersionLineUp,
+  type DebateShapePlanKey,
+  type DebateShapePolicy,
   type DeploymentMode,
   type SealedPreviewLineUp,
   type QuestionLanguagePolicy,
@@ -32,6 +38,7 @@ import {
 import {
   buildAdmissionSiteContext, decideAskRoomReadiness, loadAdmissionSettings, type AdmissionSiteContext
 } from "./admission-settings.js";
+import { previewGateEstimateNanoUsd, type PreviewGateNeed } from "./preview-budget-estimate.js";
 import { parseDeclaredProviderTargets } from "./provider-discovery.js";
 import { questionLanguageSiteRoute, type QuestionLanguagePaidRoute } from "./question-language/boot.js";
 import { newQuestionLanguageReferenceKey } from "./question-language/reference.js";
@@ -283,4 +290,81 @@ export async function checkAdmissionSettingsVersion(input: Readonly<{
   return settingsCheckReport({
     half: "api", releaseKey: input.environment.RELEASE_KEY, version: input.version, codes, snapshotSha256
   });
+}
+
+/**
+ * V4 start step, Task 41 (spec 2026-11-03 §8 "Before upload"): one debate must fit each spending gate's daily pot. The
+ * pure half of the guard; Task 42 builds each case's needs from the checked version and asks each gate's `/remaining`
+ * once with its pot. Refusals are report codes; a SPENT_TODAY finding is a note only (the pot resets at midnight).
+ */
+export const GATE_POT_CODES = Object.freeze({
+  BELOW: "GATE_POT_BELOW_ONE_DEBATE",
+  SPENT_TODAY: "GATE_POT_SPENT_TODAY",
+  UNREPORTED: "GATE_POT_UNREPORTED",
+  UNANSWERED: "GATE_POT_UNANSWERED"
+} as const);
+
+/** One choice a person can make at Start: a plan, a question or a dig, its depth, How wide's path count, web search. */
+export type GatePotCase = Readonly<{ plan: DebateShapePlanKey; kind: "QUESTION" | "DIG"; depth: 1 | 2; paths: number; web: boolean }>;
+/** A case's needs on the model gates (the ask's own estimate) and its searches' money on the search gate (null: none). */
+export type GatePotCaseNeeds = Readonly<{ choice: GatePotCase; needs: readonly PreviewGateNeed[]; searchNanoUsd: bigint | null }>;
+export type GatePotFindings = Readonly<{ refusals: readonly string[]; warnings: readonly string[] }>;
+
+/** The case as lowercase parts, e.g. "plus:question:d2:p7:web" (no ":web" without web search). */
+export function gatePotChoice(c: GatePotCase): string {
+  return [c.plan, c.kind.toLowerCase(), `d${String(c.depth)}`, `p${String(c.paths)}`, ...(c.web ? ["web"] : [])].join(":");
+}
+
+/**
+ * The choices checked: every plan whose start step is switched on (`debateShapeStartStepOf`; none without the switch),
+ * at the widest How wide (Free capped at 3 there), a question at depth 1 and 2, and one dig (Free at depth 1, a paid
+ * plan at 2); web search on a paid plan when the site has the search gate.
+ */
+export function gatePotCases(policy: DebateShapePolicy, site: Readonly<{ searchGate: boolean }>): readonly GatePotCase[] {
+  const cases: GatePotCase[] = [];
+  for (const plan of DEBATE_SHAPE_PLAN_KEYS) {
+    const widths = debateShapeStartStepOf(policy, plan);
+    if (widths === null) continue;
+    const paths = Math.max(...widths.options);
+    const web = plan !== "free" && site.searchGate;
+    const at = (kind: GatePotCase["kind"], depth: GatePotCase["depth"]): GatePotCase => Object.freeze({ plan, kind, depth, paths, web });
+    cases.push(at("QUESTION", 1), at("QUESTION", 2), at("DIG", plan === "free" ? 1 : 2));
+  }
+  return Object.freeze(cases);
+}
+
+/**
+ * Weighs one debate of each case on every gate it needs (its model gates, and the search gate when it searches) as the
+ * ask's own estimate (`previewGateEstimateNanoUsd`: the calls plus the gate's holds for calls in flight). Above the
+ * pot: BELOW:<gate>:<choice>; within the pot but above today's money left: SPENT_TODAY:<gate> (a note, once per gate);
+ * a gate that answers without its pot: UNREPORTED:<gate>; one that did not answer (null) or was never asked:
+ * UNANSWERED:<gate>. A gate no case needs is never named. Both lists sorted, each code once.
+ */
+export function checkGatePotsFitOneDebate(input: Readonly<{
+  cases: readonly GatePotCaseNeeds[];
+  remaining: Readonly<Partial<Record<PreviewGateName, PreviewGateRemaining | null>>>;
+}>): GatePotFindings {
+  const refusals = new Set<string>();
+  const warnings = new Set<string>();
+  const weigh = (gate: PreviewGateName, need: PreviewGateNeed, choice: GatePotCase): void => {
+    const remaining = input.remaining[gate];
+    if (remaining === undefined || remaining === null) {
+      refusals.add(`${GATE_POT_CODES.UNANSWERED}:${gate}`);
+      return;
+    }
+    const pot = remaining.dailyPotNanoUsd;
+    if (pot === undefined) {
+      refusals.add(`${GATE_POT_CODES.UNREPORTED}:${gate}`);
+      return;
+    }
+    const one = previewGateEstimateNanoUsd(need, remaining);
+    if (one > pot) refusals.add(`${GATE_POT_CODES.BELOW}:${gate}:${gatePotChoice(choice)}`);
+    else if (one > remaining.remainingNanoUsd) warnings.add(`${GATE_POT_CODES.SPENT_TODAY}:${gate}`);
+  };
+  for (const { choice, needs, searchNanoUsd } of input.cases) {
+    for (const need of needs) weigh(need.gate, need, choice);
+    // The estimate reads only a need's money: the search gate's need is its searches' money (`previewWebSearchNeed`).
+    if (searchNanoUsd !== null) weigh(PERPLEXITY_SEARCH_VENDOR, { callsNanoUsd: searchNanoUsd } as PreviewGateNeed, choice);
+  }
+  return Object.freeze({ refusals: Object.freeze([...refusals].sort()), warnings: Object.freeze([...warnings].sort()) });
 }
