@@ -936,6 +936,7 @@ apps/ui/lib/v3/useStoryLocaleReady.ts
 apps/ui/lib/v4/accountMemory.ts
 apps/ui/lib/v4/askConfig.ts
 apps/ui/lib/v4/askText.ts
+apps/ui/lib/v4/carryOn.ts
 apps/ui/lib/v4/changes.ts
 apps/ui/lib/v4/digIndex.ts
 apps/ui/lib/v4/load.ts
