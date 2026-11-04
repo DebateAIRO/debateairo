@@ -208,8 +208,9 @@ describe("a signed-out visitor (ask-d1 D)", () => {
     const line = host!.querySelector(".v4AskSignInFirst");
     expect(line?.textContent).toBe("You'll sign in first, then come back to this page.");
     expect(links.every((link) => describedBy(link) === line?.textContent)).toBe(true);
-    // The header's Sign in is the same plain link (W11: a full page load).
-    expect(host!.querySelector(".v4HdrSignIn")?.getAttribute("href")).toBe(wayBack);
+    // ask-d6 A: the page tells the header the visitor is signed out; the header then draws its own Sign in, a plain link
+    // with the same way back (lib/signInWayBack, tests/render/v4-header-account.test.tsx).
+    expect(host!.querySelector(".v4Hdr")?.getAttribute("data-session")).toBe("OUT");
     // A plain question: the press goes on to sign in (nothing stops the link).
     expect(await pressLink(links[0]!)).toBe(false);
     expect(ask.submit).not.toHaveBeenCalled();

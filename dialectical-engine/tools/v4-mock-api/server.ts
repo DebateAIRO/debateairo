@@ -932,7 +932,7 @@ function reportSharePart(investigation: Investigation, plan: PlanMode = planMode
 }
 
 /**
- * A question's visibility read. public-f26: the click-test's switch (`/__mock/set?publicstate=…`) wins for every question
+ * A question's visibility read. public-f26: the click-test's setting `/__mock/set?publicstate=…` wins for every question
  * of the asker's when it is set to anything but PRIVATE (the draft view then adds the stage, public-seed.ts visibilityOf).
  * Otherwise (report-f15) a Free question goes public once it is finished and its check passed, so its own read says
  * PUBLISHED; "#private" in a Free question plays a question its check kept private. Every other question is private.

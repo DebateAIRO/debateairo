@@ -62,6 +62,9 @@ vi.mock("@/components/AuthGate", () => ({
   AuthGate: ({ children }: { children: (token: string) => ReactNode }) => children("t".repeat(43))
 }));
 vi.mock("@/components/support/SupportWidget", () => ({ SupportWidget: () => null }));
+// ask-d6 A: the public page's V4 header ends in the account button, which reads the session and the account's address; its
+// own test is v4-header-account, so here it stands in (as in the other suites that render the real V4 header).
+vi.mock("@/components/v4/V4AccountMenu", () => ({ V4AccountMenu: () => null }));
 vi.mock("next/link", () => ({
   default: ({ children, ...props }: { children: ReactNode; href: string }) => <a {...props}>{children}</a>
 }));

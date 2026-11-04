@@ -231,7 +231,9 @@ describe("picks and typed words are not lost (dig-f23)", () => {
   it("dig-f7: Undo has focus once; after Undo focus goes to the tray's Clear, and after the 10 seconds it never drops to the page", async () => {
     await mountMap();
     await openPath(PATHS.renew);
+    // dig-f4: the tray shows from the second pick.
     await click(panelBoxes()[0]!);
+    await click(panelBoxes()[1]!);
     const clear = buttonNamed(CATALOG["v4.dig.trayClear"]!, tray()!);
     await act(async () => { clear.focus(); clear.click(); });
     await settle();

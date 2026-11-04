@@ -18,7 +18,7 @@ import { DIG_FINISHED_AT, DIG_RUNS, PATH_REWRITES } from "./rewrite-seed.js";
 export const CLIMB_MODES = ["SEED", "PLAY"] as const;
 export type ClimbMode = (typeof CLIMB_MODES)[number];
 /** Each level of the played climb takes this long. */
-export const CLIMB_STEP_MS = 10_000;
+export const CLIMB_STEP_MS = 10 * 1_000;
 
 type ReadyRewrite = Extract<PathRewrite, { state: "READY" }>;
 
