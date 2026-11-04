@@ -167,8 +167,13 @@ export function moneyMock(original: Record<string, unknown>) {
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;
 
-/** The page's layout queries: phone (< 768 px) or desktop. */
-function stubWidth(width: 375 | 1280): void {
+/**
+ * The page's layout queries: phone (< 768 px), tablet (768-1099 px), laptop (1100-1439 px, map-d3: only the opened path
+ * unfolds) or the wide desktop (the whole tree, as before map-d3).
+ */
+export type MapWidth = 375 | 800 | 1280 | 1600;
+
+function stubWidth(width: MapWidth): void {
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
     value: (query: string) => {
@@ -194,8 +199,11 @@ export async function advance(ms: number): Promise<void> {
   });
 }
 
-/** Mounts the map page of a fresh run id at `width`; returns the run id. W4-6: `initialPath` as `?path=` names it. */
-export async function mountMap(width: 375 | 1280 = 1280, runId: string = crypto.randomUUID(), initialPath: string | null = null): Promise<string> {
+/**
+ * Mounts the map page of a fresh run id at `width` (the wide desktop by default); returns the run id. W4-6: `initialPath`
+ * as `?path=` names it.
+ */
+export async function mountMap(width: MapWidth = 1600, runId: string = crypto.randomUUID(), initialPath: string | null = null): Promise<string> {
   stubWidth(width);
   const { V4DebateClient } = await import("../../apps/ui/components/v4/V4DebateClient.js");
   host = document.createElement("div");
@@ -255,6 +263,15 @@ export function branch(index: number): HTMLElement {
   const found = page().querySelectorAll<HTMLElement>(".v4MapBranch")[index];
   if (found === undefined) throw new Error(`no branch ${index}`);
   return found;
+}
+
+/**
+ * map-f22: the tree shows about 12 cards at once and folds the rest behind "+N more" (a visible sign); this unfolds one
+ * path's leaves (its open questions, digs and suggestions), as the person would. Nothing happens when nothing is folded.
+ */
+export async function expandBranch(index: number): Promise<void> {
+  const more = branch(index).querySelector<HTMLButtonElement>(":scope > .v4MapLeaves > .v4MapLeafMore > .v4MapMore[aria-expanded=\"false\"]");
+  if (more !== null) await click(more);
 }
 
 /** Opens a path in the panel by its tree card. */

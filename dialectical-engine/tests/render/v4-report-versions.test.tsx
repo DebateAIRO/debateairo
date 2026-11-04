@@ -221,26 +221,30 @@ describe("the report page's versions", () => {
   });
 });
 
-describe("the map's answer (owner Q-D11)", () => {
+describe("the map's answer (owner Q-D11; map-d1 and map-f2 of 3 Nov: one answer card, the newest answer current)", () => {
   it("shows the current version's answer, labelled with its version, and the first debate's answer one click away", async () => {
     const runId = crypto.randomUUID();
     reports.load = vi.fn(async () => investigation(runId, "OPEN", [finished(1, "2026-10-29T10:00:00.000Z"), finished(2, "2026-10-31T10:00:00.000Z")]));
-    await mountMap(1280, runId);
-    const section = page().querySelector<HTMLElement>(".v4PanelReportAnswer")!;
-    expect(section.querySelector("h3")!.textContent).toBe("From your report, version 2");
-    expect(section.textContent).toContain("The made-up answer of version 2.");
-    const first = section.querySelector<HTMLDetailsElement>("details.v4PanelFirstAnswer")!;
-    expect(first.open).toBe(false);
-    expect(first.querySelector("summary")!.textContent).toBe("See the first debate's answer");
-    expect(first.textContent).toContain("Our answer: put most new money into renewables and storage");
+    await mountMap(1600, runId);
+    const card = page().querySelector<HTMLElement>(".v4AnswerCard")!;
+    expect(card.querySelector(".v4Eyebrow")!.textContent).toBe("From your report, version 2");
+    expect(card.textContent).toContain("The made-up answer of version 2.");
+    const earlier = card.querySelector<HTMLDetailsElement>("details.v4AnswerEarlier")!;
+    expect(earlier.open).toBe(false);
+    expect(earlier.querySelector("summary")!.textContent).toBe(CATALOG["v4.mainAnswer.earlier"]);
+    expect(earlier.textContent).toContain("Our answer: put most new money into renewables and storage");
+    // The panel shows the evidence, not a second copy of either answer.
+    expect(page().querySelector(".v4PanelReportAnswer")).toBeNull();
   });
 
   it("before any finished version the map shows the first debate's answer as before", async () => {
     const runId = crypto.randomUUID();
     reports.load = vi.fn(async () => investigation(runId, "CLOSED", [writing(1, 0)]));
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     expect(page().querySelector(".v4PanelReportAnswer")).toBeNull();
-    expect(page().textContent).toContain(CATALOG["v4.panel.answerRoot"]);
+    const card = page().querySelector<HTMLElement>(".v4AnswerCard")!;
+    expect(card.querySelector(".v4Eyebrow")!.textContent).toBe(CATALOG["v4.panel.answerRoot"]);
+    expect(card.querySelector("details.v4AnswerEarlier")).toBeNull();
   });
 });
 

@@ -24,7 +24,8 @@ import { V4Outline } from "@/components/v4/V4Outline";
 import { V4Panel } from "@/components/v4/V4Panel";
 import type { V4ResearchedPress } from "@/components/v4/V4Sources";
 import { V4ChangedSince } from "@/components/v4/V4PathRewrite";
-import { V4MainAnswer } from "@/components/v4/V4MainAnswer";
+import { V4AnswerCard, type V4ReportAnswer } from "@/components/v4/V4AnswerCard";
+import { swipeTarget, usePositionFlash, useShortWindow, useSideSwipe, V4PathList, V4WhereBar } from "@/components/v4/V4MapPlace";
 import { V4Rail, type V4DigCounts } from "@/components/v4/V4Rail";
 import { isNotFound } from "@/lib/api";
 import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
@@ -38,7 +39,9 @@ import {
   addToResearched, currentReportVersion, loadAnswer, loadDigTrail, loadDigView, loadInvestigation, loadStory, loadV4, storyReadFailed, type DigTrail, type V4Load
 } from "@/lib/v4/load";
 import { researchedWaiting } from "@/lib/v4/web";
-import { buildV4Map, rewriteByDig, rewriteWaiting, uniqueOpenQuestions } from "@/lib/v4/mapModel";
+import { buildV4Map, restarMap, rewriteByDig, rewriteWaiting, uniqueOpenQuestions } from "@/lib/v4/mapModel";
+import { dugIds, firstByOf, reportMoment, starOf } from "@/lib/v4/mapLooks";
+import { useRevealOnce } from "@/lib/v4/useReveal";
 import {
   borrowLines,
   continueRun,
@@ -130,12 +133,17 @@ const VISIT_SAVE_MS = 10_000;
 const CLOCK_TICK_MS = 15_000;
 /** The reading level a page uses when the address names none (Decision A). */
 const DEFAULT_LEVEL: ReadingLevel = "background";
-/** Spec: desktop ≥ 1100 px, 768–1099 px a top strip, < 768 px the phone layout. */
+/**
+ * Spec: desktop ≥ 1100 px, 768–1099 px a top strip, < 768 px the phone layout. map-d3 (3 Nov): from 1440 px the three
+ * columns; 1100–1439 px ("laptop") a 56 px strip of steps, the map in two columns with only the opened path unfolded;
+ * 768–1099 px the steps across the top and the map as an indented list beside the panel.
+ */
 const PHONE_QUERY = "(max-width: 767px)";
 const MID_QUERY = "(max-width: 1099px)";
+const LAPTOP_QUERY = "(max-width: 1439px)";
 const FOCUSABLE = "a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex='-1'])";
 
-type Layout = "desktop" | "mid" | "phone";
+type Layout = "desktop" | "laptop" | "mid" | "phone";
 type LoadProblem = "NOT_FOUND" | "UNREACHABLE";
 
 /** What the page last read of one dig, and how its reads went. */
@@ -190,13 +198,12 @@ function useLayout(): Layout {
   useEffect(() => {
     const phone = window.matchMedia(PHONE_QUERY);
     const mid = window.matchMedia(MID_QUERY);
-    const update = (): void => setLayout(phone.matches ? "phone" : mid.matches ? "mid" : "desktop");
+    const laptop = window.matchMedia(LAPTOP_QUERY);
+    const update = (): void => setLayout(phone.matches ? "phone" : mid.matches ? "mid" : laptop.matches ? "laptop" : "desktop");
     update();
-    phone.addEventListener("change", update);
-    mid.addEventListener("change", update);
+    for (const query of [phone, mid, laptop]) query.addEventListener("change", update);
     return () => {
-      phone.removeEventListener("change", update);
-      mid.removeEventListener("change", update);
+      for (const query of [phone, mid, laptop]) query.removeEventListener("change", update);
     };
   }, []);
   return layout;
@@ -851,7 +858,7 @@ function V4Debate({
   // ── The report's answer (R22 W5-1, owner Q-D11) ──────────────────────────────────────────────────────────────────
   // On the first debate's map, once its investigation has a finished report version, the panel's answer is that
   // version's (the first debate's answer one click away). Read once per visit; a failed read leaves the first answer.
-  const [reportAnswer, setReportAnswer] = useState<Readonly<{ version: number; segments: readonly string[] }> | null>(null);
+  const [reportAnswer, setReportAnswer] = useState<V4ReportAnswer | null>(null);
   const isDig = servedDig !== null;
   useEffect(() => {
     if (servedRunId === null || isDig) return;
@@ -859,7 +866,7 @@ function V4Debate({
     void loadInvestigation(servedRunId).then((read) => {
       const current = currentReportVersion(read);
       if (!active || read === null || read.root_run_id.toLowerCase() !== servedRunId.toLowerCase()) return;
-      setReportAnswer(current === null ? null : { version: current.report_version, segments: current.answer.segments });
+      setReportAnswer(current === null ? null : { version: current.report_version, segments: current.answer.segments, writtenAt: current.written_at });
     });
     return () => {
       active = false;
@@ -980,7 +987,9 @@ function V4Debate({
         openQuestionIds: placesOf(dig.target),
         questions: digTargetQuestions(dig.target),
         mode: dig.mode,
-        startedAt: new Date().toISOString()
+        startedAt: new Date().toISOString(),
+        // dig-f20: the person's own words are never marked as AI text (kept for this visit; the dig's answer tells later).
+        firstBy: firstByOf(dig.target)
       };
       // Kept for this visit even when the page has gone meanwhile (Decision A: memory only), and in the account (N11:
       // which debate it came from, where on the map, its mode). Best-effort: without the record it is found by text.
@@ -1202,6 +1211,32 @@ function V4Debate({
     return () => window.clearInterval(timer);
   }, [waiting]);
 
+  // ── The map as shown (V4 screen review, 3 Nov) ──────────────────────────────────────────────────────────────────
+  // map-f5 / journey-f12: the star sits on one open question no dig covers yet, and moves on when that one is dug.
+  const dugKey = [...dugIds(digs)].sort().join("|");
+  const shownMap = useMemo(() => (map === null ? null : restarMap(map, new Set(dugKey.length === 0 ? [] : dugKey.split("|")))), [map, dugKey]);
+  // dig-f29: "the starred question" is the one the map starred first, before any dig moved the star.
+  const firstStarId = useMemo(() => (map === null ? null : starOf(map)?.id ?? null), [map]);
+  // dig-d4 B / map-d5: each card with unopened news turns over once in this visit.
+  const reveal = useRevealOnce(changed);
+  // map-d1: the answer card folds when another question is open or the window is short; a tap unfolds it until the
+  // person opens another question.
+  const shortWindow = useShortWindow();
+  const [answerUnfolded, setAnswerUnfolded] = useState(false);
+  useEffect(() => {
+    setAnswerUnfolded(false);
+  }, [shownSelection]);
+  // map-d3 B: on the phone, a sideways swipe moves to the next or the previous path, and says where it landed.
+  const [position, flashPosition] = usePositionFlash();
+  const swipe = useSideSwipe(useCallback((step: 1 | -1) => {
+    if (shownMap === null) return;
+    const next = swipeTarget(shownMap, digs, shownSelection, step);
+    if (next === null) return;
+    select(next.selection, false);
+    if (next.n > 0) flashPosition({ n: next.n, total: next.total });
+  }, [shownMap, digs, shownSelection, select, flashPosition]));
+  const moment = map === null ? null : reportMoment(map, digs, firstStarId);
+
   // ── Layout ──────────────────────────────────────────────────────────────────────────────────────────────────────
   const classicHref = `/debate/${encodeURIComponent(runId)}`;
   // R2REG-5: links carry only a level the person chose (none chosen: /v4 still offers its one-time choice).
@@ -1217,7 +1252,12 @@ function V4Debate({
     >
       {served !== null ? (
         // W3-4: "Write my report" is always there once the answer is served (the owner's money rule keeps it possible).
-        <Link className="v4Btn v4BtnPrimary v4DebReportLink" href={reportHref}>{t(catalog, "v4.rail.writeReport")}</Link>
+        // map-f15: it is the page's one report button; dig-f29's "Good time" is a small mark on it, with the words.
+        <Link className={`v4Btn v4BtnPrimary v4DebReportLink${moment === "GOOD" ? " v4DebReportGood" : ""}`} href={reportHref}>
+          {moment === "GOOD" ? <span className="v4DebReportMark" aria-hidden="true" /> : null}
+          {t(catalog, "v4.rail.writeReport")}
+          {moment === "GOOD" ? <span className="v4SrOnly">{` · ${t(catalog, "v4.rail.goodTimeTitle")}`}</span> : null}
+        </Link>
       ) : null}
     </V4Header>
   );
@@ -1262,7 +1302,9 @@ function V4Debate({
     done: digs.filter((dig) => dig.state === "DONE").length,
     failed: digs.filter((dig) => dig.state === "FAILED").length
   };
-  const openLeft = openCount(map, digs);
+  // The map as shown: its star moved off what is dug (map-f5). Everything else reads the same map.
+  const view = shownMap ?? map;
+  const openLeft = openCount(view, digs);
   const room = ask.room;
   // The money rule: new starts waiting for the reset get their own line (with the time) in place of today's notice.
   const startsWait = startsWaitLine(room, locale);
@@ -1271,10 +1313,10 @@ function V4Debate({
     && (room.room === "CLOSE" || room.room === "FULL" || room.room === "ALREADY_WAITING")
     ? <RoomNotice room={room} catalog={{ ...newDebateCatalog, ...billingCatalog }} locale={locale} />
     : null;
-  const phoneTarget = layout === "phone" && choice !== undefined ? targetOf(map, digs, shownSelection, choice) : null;
+  const phoneTarget = layout === "phone" && choice !== undefined ? targetOf(view, digs, shownSelection, choice) : null;
   const showChanges = tourStops.length > 0;
 
-  const rail = (variant: "column" | "strip") => (
+  const rail = (variant: "column" | "strip" | "marks" | "notes" | "steps") => (
     <V4Rail
       runId={runId}
       level={chosenLevel}
@@ -1283,12 +1325,13 @@ function V4Debate({
       digs={dugCounts}
       variant={variant}
       usageNotes={borrowLines(borrowed)}
+      moment={moment}
       catalog={catalog}
       locale={locale}
     />
   );
   const pieces = {
-    map,
+    map: view,
     digs,
     selected: shownSelection,
     changed,
@@ -1297,8 +1340,39 @@ function V4Debate({
     onTogglePick: togglePick,
     catalog,
     locale,
+    reveal,
     ...(choice === undefined ? {} : { choice })
   } as const;
+  // map-d1: the answer card folds into its line when another question is open or the window is short. On a phone its
+  // line goes back to "Your question"; elsewhere it unfolds in place.
+  const rootShown = shownSelection === "root";
+  const answerFolded = !answerUnfolded && (!rootShown || shortWindow);
+  const answerCard = (
+    <V4AnswerCard
+      map={view}
+      mainAnswer={served?.answer.main_answer}
+      reportAnswer={reportAnswer}
+      answeredAt={served?.answer.as_of ?? null}
+      folded={answerFolded}
+      onUnfold={() => (layout === "phone" && !rootShown ? select("root", false) : setAnswerUnfolded(true))}
+      {...(answerUnfolded ? { onFold: () => setAnswerUnfolded(false) } : {})}
+      catalog={catalog}
+      locale={locale}
+    />
+  );
+  // map-f10: past the map in one step, to the answer of the question open in the panel.
+  const skipLink = (
+    <a
+      className="v4SkipLink"
+      href="#v4-deb-panel"
+      onClick={(event) => {
+        event.preventDefault();
+        headingRef.current?.focus();
+      }}
+    >
+      {t(catalog, "v4.map.skipToAnswer")}
+    </a>
+  );
 
   // W3-4: the tray names the path its picks are on (owner Q-D1: one path per dig), the money lines, and Free's cap.
   const tray = hasTray && trayTarget !== null && trayTarget.kind === "picks" ? (
@@ -1356,6 +1430,18 @@ function V4Debate({
       <div className="v4DebBehind" inert={sheetOpen}>
         {header}
         {layout === "mid" ? rail("strip") : null}
+        {/* map-f7 / map-d3 B: on the phone, where you are stays pinned under the header, with the live minimap. */}
+        {layout === "phone" ? (
+          <V4WhereBar
+            map={view}
+            digs={digs}
+            selected={shownSelection}
+            onSelect={select}
+            onOpenMap={() => setOutlineOpen(true)}
+            position={position}
+            catalog={catalog}
+          />
+        ) : null}
         <div className="v4DebMain">
           {parent !== null ? (
             <Link className="v4DebBack" href={levelHref(`/v4/debate/${encodeURIComponent(parent.runId)}`, chosenLevel)}>
@@ -1373,7 +1459,7 @@ function V4Debate({
             <V4LevelTrail level={map.dig.level} trail={trail} linkLevel={chosenLevel} catalog={catalog} />
           ) : null}
           <V4ContributionNote contribution={served?.answer.contribution} catalog={catalog} />
-          <V4MainAnswer mainAnswer={served?.answer.main_answer} catalog={catalog} locale={locale} />
+          {answerCard}
           <V4ChangedSince changedSince={map.changedSince} reportHref={reportHref} catalog={catalog} locale={locale} />
           {showChanges ? (
             <V4ChangesBar
@@ -1396,16 +1482,33 @@ function V4Debate({
           {/* W3-4: the deepest level offers no dig anywhere on its map; this line says so once, at the top. */}
           {canDig ? null : <p className="v4DebNote v4DebDeepest" role="note">{t(catalog, "v4.nest.deepest")}</p>}
 
+          {/* map-f23: on the phone's "Your question", the paths looked into come right under the answer. */}
+          {layout === "phone" && rootShown ? (
+            <>
+              <V4PathList map={view} onSelect={select} catalog={catalog} />
+              {rail("notes")}
+            </>
+          ) : null}
+
           <div className="v4DebGrid">
             {layout === "desktop" ? <div className="v4DebRailCol">{rail("column")}</div> : null}
+            {layout === "laptop" ? <div className="v4DebRailCol v4DebRailMarksCol">{rail("marks")}</div> : null}
             {layout !== "phone" ? (
               <section className="v4DebMapCol" aria-label={t(catalog, "v4.debate.mapRegion")}>
-                <V4MapTree {...pieces} />
+                {layout === "laptop" ? rail("notes") : null}
+                {skipLink}
+                {layout === "mid" ? <V4Outline {...pieces} /> : <V4MapTree {...pieces} fold={layout === "laptop"} />}
               </section>
             ) : null}
-            <section ref={panelColRef} className="v4DebPanelCol" aria-label={t(catalog, "v4.debate.panelRegion")}>
+            <section
+              ref={panelColRef}
+              id="v4-deb-panel"
+              className="v4DebPanelCol"
+              aria-label={t(catalog, "v4.debate.panelRegion")}
+              {...(layout === "phone" ? swipe : {})}
+            >
               <V4Panel
-                map={map}
+                map={view}
                 digs={digs}
                 selected={shownSelection}
                 readingLevel={readingLevel}
@@ -1425,6 +1528,7 @@ function V4Debate({
                 money={money}
                 digPathLine={trail?.steps.at(-1)?.line ?? null}
                 reportAnswer={reportAnswer}
+                answerOnTop
                 {...(choice === undefined ? {} : { choice })}
                 headingRef={headingRef}
                 catalog={catalog}
@@ -1457,8 +1561,9 @@ function V4Debate({
           footer={<>{tray}{toast}</>}
           catalog={catalog}
         >
-          {rail("column")}
+          {/* map-f23: the sheet opens straight at the outline; the steps are one line at its foot. */}
           <V4Outline {...pieces} />
+          {rail("steps")}
         </OutlineSheet>
       ) : toast}
       {ask.dialogs}

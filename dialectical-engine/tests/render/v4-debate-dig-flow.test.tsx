@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AskParentSchema, DIG_LEVEL_MAX, FREE_DIG_PICKS_MAX } from "../../packages/contract/src/index.js";
 import {
-  advance, branch, buttonNamed, buttonsNamed, CATALOG, click, digPart, harness, mountMap, openPath, page, panel, PATHS, resetHarness,
+  advance, branch, buttonNamed, buttonsNamed, CATALOG, click, digPart, expandBranch, harness, mountMap, openPath, page, panel, PATHS, resetHarness,
   seededAnswer, seededStory, settle, text, tray, typeInto, unmountMap
 } from "./v4-debate-harness.js";
 
@@ -109,6 +109,8 @@ describe("V4DebateClient's dig flow", () => {
   it("a refused dig (two quick clicks past level 10) says so, and the picks stay", async () => {
     harness.submit = vi.fn(async () => ({ kind: "REFUSED" as const, message: CATALOG["v4.nest.tooDeep"]! }));
     await mountMap();
+    // map-f22: the path's suggestions show once its leaves are unfolded (about 12 cards at once).
+    await expandBranch(PATHS.renew);
     await click(branch(PATHS.renew).querySelector<HTMLInputElement>(".v4MapLeafSuggestion input[type=checkbox]")!);
     await click(buttonNamed(CATALOG["v4.panel.dig"]!, tray()!));
     await advance(10_100);
@@ -122,6 +124,8 @@ describe("V4DebateClient's dig flow", () => {
     "a dig refused with its own code (%s) says so, and the picks stay", async (key, values) => {
       harness.submit = vi.fn(async () => ({ kind: "REFUSED" as const, message: word(key, values) }));
       await mountMap();
+      // map-f22: the path's suggestions show once its leaves are unfolded (about 12 cards at once).
+      await expandBranch(PATHS.renew);
       await click(branch(PATHS.renew).querySelector<HTMLInputElement>(".v4MapLeafSuggestion input[type=checkbox]")!);
       await click(buttonNamed(CATALOG["v4.panel.dig"]!, tray()!));
       await advance(10_100);
@@ -146,7 +150,7 @@ describe("V4DebateClient's dig flow", () => {
       dig: { parent_run_id: parentRunId, position_ref: "n-smr", places: ["path:n-smr"], level: 1, picks: [], rewrite: null }
     });
     harness.loadStory.mockClear();
-    await mountMap(1280, childRunId);
+    await mountMap(1600, childRunId);
     await advance(60_000);
     expect(harness.loadStory).not.toHaveBeenCalled();
     expect(text()).not.toContain(CATALOG["v4.debate.storyWriting"]);
@@ -159,7 +163,7 @@ describe("V4DebateClient's dig flow", () => {
     harness.answer = null;
     harness.story = seededStory();
     harness.digView = (link) => ({ link, state: "DONE", headline: null, counts: null, rewrite: null, points: [] });
-    await mountMap(1280, parentRunId);
+    await mountMap(1600, parentRunId);
     expect(branch(PATHS.smr).querySelector(".v4MapDig")!.textContent).toContain(CATALOG["v4.rewrite.digCard.DONE"]);
     await click(branch(PATHS.smr).querySelector<HTMLButtonElement>(".v4MapDig")!);
     expect(panel().textContent).not.toContain(CATALOG["v4.panel.digNoHeadline"]);
@@ -168,7 +172,7 @@ describe("V4DebateClient's dig flow", () => {
   it("the deepest level reads no dig room and offers no dig at all", async () => {
     const runId = crypto.randomUUID();
     harness.answer = seededAnswer(runId, { dig: digPart(crypto.randomUUID(), DIG_LEVEL_MAX) });
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     expect(harness.digRooms.at(-1)).toBeNull();
     await openPath(PATHS.smr);
     expect(buttonsNamed(CATALOG["v4.panel.dig"]!)).toHaveLength(0);
