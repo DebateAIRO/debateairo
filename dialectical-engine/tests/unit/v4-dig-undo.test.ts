@@ -203,3 +203,53 @@ describe("the site-wide waiting digs (dig-d3)", () => {
     expect(digGroupOf({ kind: "picks", path: null, picks: [] })).toBe("root");
   });
 });
+
+/*
+ * The rule the start step builds on (its Start Undo imports DIG_UNDO_MS, and its dig paths plan rides on the waiting
+ * dig): nothing is sent before a dig's sendsAt, an Undo means that dig is never sent, and the dig reaches its send exactly
+ * as it was handed in.
+ */
+describe("nothing is sent before sendsAt; Undo means nothing is sent", () => {
+  it("one dig", async () => {
+    const send = vi.fn<Sender>(async () => started("child-1"));
+    add("a", send);
+    await vi.advanceTimersByTimeAsync(DIG_UNDO_MS - 1);
+    expect(send).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(send).toHaveBeenCalledTimes(1);
+
+    const undone = add("b", send);
+    await vi.advanceTimersByTimeAsync(DIG_UNDO_MS - 1);
+    expect(undoDig(undone)).toBe(true);
+    await vi.advanceTimersByTimeAsync(DIG_UNDO_MS * 3);
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it("two digs waiting at once: neither goes before its own sendsAt, and the one undone never goes", async () => {
+    const send = vi.fn<Sender>(async (pending) => started(pathIdOf(pending)));
+    const first = add("a", send);
+    await vi.advanceTimersByTimeAsync(4_000);
+    add("b", send);
+    expect(phases()).toEqual(["COUNTING", "COUNTING"]);
+    await vi.advanceTimersByTimeAsync(DIG_UNDO_MS - 4_000 - 1);
+    expect(send).not.toHaveBeenCalled();
+    expect(undoDig(first)).toBe(true);
+    await vi.advanceTimersByTimeAsync(4_000);
+    expect(send).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(send.mock.calls.map(([pending]) => pathIdOf(pending))).toEqual(["b"]);
+    await vi.advanceTimersByTimeAsync(DIG_UNDO_MS * 3);
+    expect(send.mock.calls.map(([pending]) => pathIdOf(pending))).toEqual(["b"]);
+  });
+
+  it("hands the dig to its send exactly as given, so an extra field rides along unchanged", async () => {
+    const send = vi.fn<Sender>(async () => started("child-1"));
+    const paths = { source: "DIG_PICKS", ids: ["p1"] };
+    const dig = { target: target("a"), mode: "quick", sendsAt: Date.now() + DIG_UNDO_MS, paths } as unknown as PendingDig;
+    addDig({ parentRunId: "run-1", runIds: [], dig, sharePercent: null, showMode: true, send, failedLine: "x" });
+    await vi.advanceTimersByTimeAsync(DIG_UNDO_MS + 10);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0]![0]).toBe(dig);
+    expect((send.mock.calls[0]![0] as unknown as { paths: unknown }).paths).toBe(paths);
+  });
+});
