@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import type { DigSuggestion } from "@debateai/contract";
-import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
+import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import type { MoneyLine } from "@/lib/v4/money";
 import {
   isEdited,
@@ -335,9 +335,7 @@ export function V4DigCompose(props: Readonly<{ path: V4Path; choice: V4DigChoice
       <OtherPicks picks={mine} choice={choice} catalog={catalog} />
       {elsewhere ? null : <OwnView key={`own/${path.id}`} path={path} choice={choice} catalog={catalog} />}
       {full && choice.planTier !== "free" ? <p className="v4PanelHint v4Muted">{t(catalog, "v4.suggest.full")}</p> : null}
-      {mine.length > 0 ? (
-        <p className="v4PanelHint">{tPlural(catalog, "v4.dig.trayPicked", mine.length, props.locale)}</p>
-      ) : null}
+      {/* journey-f23 (owner's screen review): no "N picked" count; the picks are marked above and shown as chips in the tray. */}
     </section>
   );
 }

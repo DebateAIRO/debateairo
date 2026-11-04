@@ -1,0 +1,53 @@
+/* Owner's screen review, 3 Nov 2026 (journey-d2 A): the one waiting card (components/v4/V4WaitCard.tsx) and the
+   choice chips (components/v4/V4ChoiceChips.tsx). Site tokens and the V4 tokens from v4-base.css only.
+   Motion (journey-d1 A and the owner's chat answer): the working dot has one slow pulse; a changed state line shows at
+   once with a 1-second soft highlight; with reduced motion the dot is still and the highlight stays. These motion rules
+   are LOCAL (v4Wait…) until v4-base.css carries the shared motion tokens: point .v4WaitHighlight and the pulse at them
+   then. */
+
+.v4WaitBlock { width: 100%; max-width: 640px; align-self: flex-start; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.v4WaitCard { display: flex; flex-direction: column; gap: 12px; padding: 28px; min-width: 0; }
+.v4WaitCardInline { padding: 0; }
+.v4WaitCard p { margin: 0; }
+.v4WaitQuestion {
+  margin: 0; font-size: var(--t-title); line-height: 1.25; color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+.v4WaitCardInline .v4WaitQuestion { font-size: var(--t-body); }
+
+/* The state line: the dot and the one true word. */
+.v4WaitState {
+  display: flex; align-items: center; gap: 10px; font-weight: 600; color: var(--text);
+  border-radius: var(--r-btn); margin: 0 -6px; padding: 2px 6px;
+}
+.v4WaitDot { flex: none; width: 10px; height: 10px; border-radius: var(--r-dot); }
+.v4WaitDot-PULSE { background: var(--accent); animation: v4WaitPulse 1.6s ease-in-out infinite; }
+.v4WaitDot-SOLID { background: var(--accent); }
+.v4WaitDot-HOLLOW { background: transparent; border: 2px solid var(--accent); }
+.v4WaitDotStill { animation: none; }
+@keyframes v4WaitPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.7); } }
+
+/* A changed line: at once, with a 1-second soft terracotta highlight (kept with reduced motion). */
+.v4WaitHighlight { animation: v4WaitHighlight 1s ease-out; }
+@keyframes v4WaitHighlight { from { background-color: var(--con-bg); } to { background-color: transparent; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .v4WaitDot-PULSE { animation: none; }
+}
+
+.v4WaitChecked, .v4WaitStarted { font-size: var(--t-ui); }
+.v4WaitLeave, .v4WaitLonger { display: flex; flex-direction: column; gap: 8px; }
+.v4WaitReconnect { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.v4WaitTryNow { min-height: 44px; font-size: var(--t-ui); font-weight: 600; }
+/* "Open in the classic view": once, small, at the bottom (wait-f23). */
+.v4WaitClassic { font-size: var(--t-meta); }
+.v4WaitClassic .v4Link { min-height: 44px; display: inline-flex; align-items: center; }
+.v4WaitBack { align-self: flex-start; }
+
+/* The person's choices: chips that show, never a count (journey-f23). */
+.v4ChoiceChips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.v4ChoiceChip {
+  display: inline-flex; align-items: center; min-height: 28px; max-width: 100%; padding: 4px 10px;
+  border-radius: var(--r-pill); border: 1px solid var(--line-strong); background: var(--surface-2);
+  font-size: var(--t-ui); overflow-wrap: anywhere;
+}

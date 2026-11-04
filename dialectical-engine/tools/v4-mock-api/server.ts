@@ -23,7 +23,7 @@ import { createSeed, SEED_NODE_IDS, type StoryStatus } from "./seed.js";
 import {
   answerDraftProblems, contractOrDraft, DraftAskParentSchema, DraftInvestigationSchema, DraftMonthPauseSchema, DraftNodeWebSchema,
   DraftRoomPartSchema, DraftRoomQueryPartSchema, DraftRunContinuedSchema, DraftRunContinueRefusedSchema, DraftRunContinueRequestSchema,
-  DraftUsageBorrowsSchema, splitAsk, splitRoomQuery, stripAnswer, stripNode, stripRoom,
+  DraftRunStartedAtSchema, DraftUsageBorrowsSchema, splitAsk, splitRoomQuery, stripAnswer, stripNode, stripRoom,
   stripRun, stripUsage, type DraftAskParent
 } from "./web-draft.js";
 import { ARABIC_RUN, borrowNotice, DEEPEST_DIG, DIG_ANSWERS, DIG_RUNS, monthPause, PATH_REWRITES, reportVersionBody, RUN_PAUSED, SEEDED_NEW_DIGS } from "./rewrite-seed.js";
@@ -232,6 +232,8 @@ type MockRun = {
   language?: Readonly<{ tag: string; name: string }>;
   /** W2-7 (money rule): its planned calls and searches paused at the month wall, until Continue (POST /v1/runs/{id}/continue). */
   monthPaused?: boolean;
+  /** Draft (journey-d2): when it started; absent while it waits to start (run read `started_at`, DraftRunStartedAtSchema). */
+  startedAt?: number;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   answer?: any;
 };
@@ -259,6 +261,7 @@ function settledRun(input: Readonly<{
     question: input.question,
     seq: input.seq,
     settleAt: input.settleAt,
+    startedAt: input.askedAt,
     answerId: input.answerId,
     storyReadyAt: input.storyReadyAt,
     web: input.web,
@@ -283,7 +286,7 @@ settledRun({
   question: "Should countries build new nuclear power, or put the money into renewables and storage?",
   askedAt: Date.parse("2026-10-27T15:12:00.000Z"), settleAt: Date.parse("2026-10-27T15:40:00.000Z"), storyReadyAt: 0, web: "PAID"
 });
-addRun({ runRef: RUN_RUNNING, seq: 5, question: "Is a four-day work week good for productivity and for workers?" });
+addRun({ runRef: RUN_RUNNING, seq: 5, startedAt: T0 - 4 * 60_000, question: "Is a four-day work week good for productivity and for workers?" });
 addRun({ runRef: RUN_WAITING, seq: 3, waiting: true, question: "Should my town close the old centre to cars at weekends?" });
 addRun({
   runRef: RUN_FAILED, seq: 1, failedReason: FAILED_REASON,
@@ -319,7 +322,7 @@ for (const dig of SEEDED_NEW_DIGS) {
     askedAt: Date.parse(dig.askedAt), settleAt: Date.parse(dig.settledAt), storyReadyAt: 0
   });
 }
-addRun({ runRef: RUN_PAUSED, seq: 12, monthPaused: true, question: "Should my region build a hydrogen pipeline or more power lines?" });
+addRun({ runRef: RUN_PAUSED, seq: 12, monthPaused: true, startedAt: T0 - 40 * 60_000, question: "Should my region build a hydrogen pipeline or more power lines?" });
 // W3-4: a dig at the deepest level (10), whose map offers no dig anywhere (rewrite-seed.ts DEEPEST_DIG).
 settledRun({
   runRef: DEEPEST_DIG.runRef, answerId: DEEPEST_DIG.answerId, seq: DEEPEST_DIG.seq, web: "PAID", question: DEEPEST_DIG.question,
@@ -515,6 +518,18 @@ function runProjection(run: MockRun, now = Date.now()) {
     // W2-7 (money rule, draft): paused at the month wall until the next month; Continue once it has started.
     ...(run.monthPaused === true && state === "RUNNING" ? { month_pause: monthPause(nextUtcMonth(now), pauseMode === "CAN_CONTINUE") } : {})
   };
+}
+
+/**
+ * Draft (owner's screen review, journey-d2 / journey-f16 / wait-f7): the run read with when the question started, so the
+ * waiting card can say "Started 14:31" on any device. Sent on the draft view, and on the normal view only once the
+ * contract's own (strict) RunProjection schema accepts it; never while the question waits to start.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function withStartedAt(body: any, run: MockRun, draftView: boolean, now = Date.now()) {
+  if (run.startedAt === undefined || stateOf(run, now) === "WAITING") return body;
+  const full = { ...body, started_at: iso(run.startedAt) };
+  return draftView || C.RunProjectionSchema.safeParse(full).success ? full : body;
 }
 
 function nextUtcMonth(now = Date.now()): string {
@@ -764,6 +779,7 @@ const draftPart = (key: string, schema: { safeParse: (body: unknown) => { succes
   }
 });
 const runDraftSchema = draftPart("month_pause", DraftMonthPauseSchema);
+const runStartDraftSchema = draftPart("started_at", DraftRunStartedAtSchema);
 const usageDraftSchema = draftPart("borrowed", DraftUsageBorrowsSchema);
 
 function investigationBody(investigation: Investigation) {
@@ -1564,7 +1580,11 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (run === undefined) return notFound(req, res, "RUN_NOT_FOUND", "No run with this id.");
     const sub = parts.slice(3).join("/");
     // W2-7 (draft): a debate paused at the month wall says so once the contract knows `month_pause`.
-    if (sub === "") return sendDraftable(runProjection(run), C.RunProjectionSchema, stripRun, issuesOf(runDraftSchema));
+    // Draft (journey-d2): the start time rides along on the draft view, and on the normal view once the contract knows it.
+    if (sub === "") {
+      return sendDraftable(withStartedAt(runProjection(run), run, draftView), C.RunProjectionSchema, stripRun,
+        (body: unknown) => [...issuesOf(runDraftSchema)(body), ...issuesOf(runStartDraftSchema)(body)]);
+    }
     if (sub === "answer") {
       if (stateOf(run) !== "SETTLED" || run.answer === undefined) return notFound(req, res, "ANSWER_NOT_FOUND", "This run has no answer yet.");
       return sendDraftable(run.answer, C.AnswerSchema, stripAnswer, checkAnswerDraft);

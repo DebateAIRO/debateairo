@@ -14,6 +14,7 @@ import {
 import { AuthGate } from "@/components/AuthGate";
 import { RoomNotice } from "@/components/billing/RoomNotice";
 import { V4ChangesBar } from "@/components/v4/V4ChangesBar";
+import { V4PickChips } from "@/components/v4/V4ChoiceChips";
 import { V4MoneyLines, type V4DigChoice } from "@/components/v4/V4DigSuggest";
 import { V4DigToast, type V4DigNotice } from "@/components/v4/V4DigToast";
 import { V4Header } from "@/components/v4/V4Header";
@@ -80,6 +81,7 @@ import type {
   V4Selection
 } from "@/lib/v4/types";
 import { useV4Ask, type V4AskOutcome } from "@/lib/v4/useV4Ask";
+import { useWaitPolling } from "@/lib/v4/useWaitPolling";
 
 /*
  * V4 initial (2026-10-28), the map page shell (D3 map, D4 what changed, D6/D7 phone). It loads the debate over
@@ -323,36 +325,30 @@ function V4Debate({
   }, []);
 
   // ── The debate: poll the run until it is served or failed ─────────────────────────────────────────────────────────
+  // wait-f19 (owner's screen review): rarely while the tab is hidden, at once when it is shown again or the connection
+  // returns (useWaitPolling); a retry from the status screen starts afresh. `runChecks` (when a check last answered, lost
+  // touch, Try now) is what the waiting card (V4WaitCard) shows.
   const [load, setLoad] = useState<V4Load | null>(null);
   const [loadProblem, setLoadProblem] = useState<LoadProblem | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
-  useEffect(() => {
-    let active = true;
-    let timer: number | undefined;
-    const tick = async (): Promise<void> => {
-      try {
-        const next = await loadV4(id);
-        if (!active) return;
+  const runChecks = useWaitPolling(async (stillWanted) => {
+    try {
+      const next = await loadV4(id);
+      if (stillWanted()) {
         setLoad(next);
         setLoadProblem(null);
-        if (next.kind === "RUN" && next.run.state !== "FAILED") timer = window.setTimeout(() => void tick(), RUN_POLL_MS);
-      } catch (failure) {
-        if (!active) return;
-        if (isNotFound(failure)) {
-          setLoadProblem("NOT_FOUND");
-          return;
-        }
-        // Spec: back off to 30 s after an error; the page keeps what it last showed.
-        setLoadProblem("UNREACHABLE");
-        timer = window.setTimeout(() => void tick(), RUN_POLL_AFTER_ERROR_MS);
       }
-    };
-    void tick();
-    return () => {
-      active = false;
-      window.clearTimeout(timer);
-    };
-  }, [id, loadAttempt]);
+      return next.kind === "RUN" && next.run.state !== "FAILED" ? "AGAIN" : "DONE";
+    } catch (failure) {
+      if (isNotFound(failure)) {
+        if (stillWanted()) setLoadProblem("NOT_FOUND");
+        return "DONE";
+      }
+      // Spec: back off to 30 s after an error; the page keeps what it last showed.
+      if (stillWanted()) setLoadProblem("UNREACHABLE");
+      throw failure;
+    }
+  }, { everyMs: RUN_POLL_MS, afterFailureMs: RUN_POLL_AFTER_ERROR_MS, restartKey: `${id}/${String(loadAttempt)}` });
 
   const servedLoad = load?.kind === "SERVED" ? load : null;
   // W4-6: the answer as read again since (paths a dig rewrote), when it is still this debate's.
@@ -1207,13 +1203,16 @@ function V4Debate({
   // R2REG-5: links carry only a level the person chose (none chosen: /v4 still offers its one-time choice).
   const reportHref = levelHref(`/v4/debate/${encodeURIComponent(runId)}/report`, chosenLevel);
   const askHref = levelHref("/v4", chosenLevel);
+  // wait-f23 (owner's screen review): while the question waits, "Open in the classic view" shows once, at the bottom of
+  // the waiting card, and not in the header too.
+  const waitingCard = map === null && load?.kind === "RUN" && load.run.state !== "FAILED";
   const header = (
     <V4Header
       catalog={catalog}
       readingLevel={readingLevel}
       linkLevel={chosenLevel}
       onReadingLevel={chooseLevel}
-      classicHref={classicHref}
+      classicHref={waitingCard ? null : classicHref}
     >
       {served !== null ? (
         // W3-4: "Write my report" is always there once the answer is served (the owner's money rule keeps it possible).
@@ -1301,14 +1300,14 @@ function V4Debate({
   } as const;
 
   // W3-4: the tray names the path its picks are on (owner Q-D1: one path per dig), the money lines, and Free's cap.
+  // journey-f23 (owner's screen review): the picks show as chips, never as a count.
   const tray = hasTray && trayTarget !== null && trayTarget.kind === "picks" ? (
     <section className="v4DebTray" aria-label={t(catalog, "v4.dig.trayLabel")}>
+      <V4PickChips picks={trayTarget.picks} label={t(catalog, "v4.map.picked")} />
       <p className="v4DebTrayText">
-        <strong>{tPlural(catalog, "v4.dig.trayPicked", trayTarget.picks.length, locale)}</strong>
         {trayTarget.path !== null ? (
-          <>{" · "}<TitleText title={pathTitle(trayTarget.path, catalog, 40)} catalog={catalog} /></>
+          <><TitleText title={pathTitle(trayTarget.path, catalog, 40)} catalog={catalog} />{" · "}</>
         ) : null}
-        {" · "}
         {t(catalog, `v4.digMode.${sentDigMode}`)}
       </p>
       <p className="v4DebTrayHint v4Muted">

@@ -12,7 +12,8 @@ import {
   answerDraftProblems, contractOrDraft, cutQuote, DraftAnswerWebSchema, DraftAskParentSchema, DraftDigSuggestionSchema,
   DraftInvestigationSchema, DraftOtherPageSchema, DraftRoomPartSchema, DraftSourceSchema, DraftWebPathSchema,
   DraftRoomQueryPartSchema, READ_DEPTHS, RESEARCHED_STATES, splitAsk, splitRoomQuery, stripAnswer, stripRoom, stripRun, stripUsage,
-  SUGGESTION_KINDS, SUGGESTION_SIDES, DraftPathRewritesSchema, DraftAnswerDigSchema, DraftMonthPauseSchema, DraftUsageBorrowsSchema
+  SUGGESTION_KINDS, SUGGESTION_SIDES, DraftPathRewritesSchema, DraftAnswerDigSchema, DraftMonthPauseSchema, DraftUsageBorrowsSchema,
+  DraftRunStartedAtSchema
 } from "../../tools/v4-mock-api/web-draft.js";
 import {
   borrowNotice, DEEPEST_DIG, DIG_ANSWERS, DIG_FINISHED_AT, DIG_RUNS, monthPause, PATH_REWRITES, reportVersionBody, SEEDED_NEW_DIGS
@@ -334,6 +335,17 @@ describe("V4 mock API: the new dig model and the money rule", () => {
     expect(DraftRoomPartSchema.safeParse({ ...wait, room: "FITS", scope: null, resets_at: null }).success).toBe(false);
     expect(AskRoomResponseSchema.safeParse(stripRoom(wait)).success).toBe(true);
     expect(Object.keys(stripRoom(wait))).not.toContain("new_starts");
+  });
+
+  it("the waiting card's draft start time (journey-d2) is an ISO time, held back with the pause from a contract that lacks it", () => {
+    expect(DraftRunStartedAtSchema.safeParse("2026-11-04T09:31:00.000Z").success).toBe(true);
+    expect(DraftRunStartedAtSchema.safeParse("14:31").success).toBe(false);
+    const run = { run_ref: DIG_RUNS.root, question_line: "Should I move?", state: "RUNNING", terminal_reason: null, hold_until: null };
+    const started = { ...run, started_at: "2026-11-04T09:31:00.000Z" };
+    // Today's run read has no `started_at`: the website never receives it until the contract knows it.
+    expect(stripRun(started)).toEqual(run);
+    expect(stripRun({ ...started, month_pause: monthPause("2026-12-01T00:00:00.000Z", false) })).toEqual(run);
+    expect(RunProjectionSchema.safeParse(stripRun(started)).success).toBe(true);
   });
 
   it("every dig-model and money-rule word the mock plays has its English line in the V4 catalogue", () => {
