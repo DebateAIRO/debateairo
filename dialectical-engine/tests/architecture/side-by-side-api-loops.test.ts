@@ -184,7 +184,12 @@ describe("side-by-side C7 the API's background loops run only on the current rel
     expect(exportService).toContain("const timer = setInterval(renew, DATA_EXPORT_RENEW_MS);");
     // The support relay's durable drain serves this process's own waiters.
     expect(read("support/queue.ts")).toContain("#scheduleDurableDrain(");
-    for (const file of ["data-export/service.ts", "support/queue.ts"]) {
+    // V4 start step, Task 30: the pre-Start stream's heartbeat and drain poll belong to one open answer, and stop with it.
+    const startStream = read("start-step/stream.ts");
+    for (const timer of ["heartbeat = setInterval(", "drainPoll = setInterval(", "clearInterval(heartbeat);", "clearInterval(drainPoll);"]) {
+      expect(startStream, timer).toContain(timer);
+    }
+    for (const file of ["data-export/service.ts", "support/queue.ts", "start-step/stream.ts"]) {
       expect(read(file), file).not.toMatch(/ownIsCurrent\(\)|release-loops|gatedInterval|gatedTrigger/u);
     }
     // The watcher's own poll chain is never gated: it is the gate.
@@ -201,7 +206,8 @@ describe("side-by-side C7 the API's background loops run only on the current rel
       "billing/runtime.ts",
       "data-export/service.ts",
       "release-loops.ts",
-      "staff/runtime.ts"
+      "staff/runtime.ts",
+      "start-step/stream.ts"
     ]);
   });
 });

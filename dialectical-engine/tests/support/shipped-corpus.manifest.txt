@@ -211,6 +211,8 @@ apps/api/src/start-paths-at-ask.ts
 apps/api/src/start-step/charge.ts
 apps/api/src/start-step/seats.ts
 apps/api/src/start-step/signing.ts
+apps/api/src/start-step/step.ts
+apps/api/src/start-step/stream.ts
 apps/api/src/start-step/transport.ts
 apps/api/src/startup-resource-owner.ts
 apps/api/src/stories.ts

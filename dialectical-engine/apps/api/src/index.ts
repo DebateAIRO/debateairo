@@ -162,7 +162,11 @@ import {
   INVESTIGATION_REPORT_WRITING,
   RunContinueRefusedSchema,
   RUN_PAUSED_UNTIL_RESET,
-  type AskParent
+  type AskParent,
+  // V4 start step, Task 30: the four calls before Start.
+  START_PATHS_EXPIRED, START_PATHS_INVALID, START_PATHS_STALE, StartCombineRequestSchema, StartCombineResponseSchema, StartFitRequestSchema,
+  StartFitResponseSchema, StartListsEventSchema, StartListsRequestSchema, StartMergeEventSchema, StartMergeRequestSchema,
+  type StartCombineResponse, type StartFitResponse, type StartListsEvent, type StartMergeResponse, type StartStepNoneReason
 } from "@debateai/contract";
 import type { Pool, PoolClient, QueryResultRow, QueryResult } from "pg";
 import { assertPreviewBudgetAdmits, PreviewGateUnavailableRefusal, type PreviewAdmissionLock, type PreviewBudgetGateSettings } from "./preview-budget-estimate.js";
@@ -338,6 +342,12 @@ import {
 import {
   sealStartPathsAtSetup, startAskContractMember, startOfAsk, type AskStart, type AskStartHandOver
 } from "./start-paths-at-ask.js";
+// V4 start step, Task 30: the step behind the four calls before Start, its key and its stream writer.
+import { START_STEP_TIMING, type StartStepTiming } from "@debateai/map";
+import { detectArgumentLanguage } from "@debateai/kernel";
+import { verifyStartMergeRequest, type StartStepKey } from "./start-step/signing.js";
+import { startStepBindingOf, type StartCombineInput, type StartStepContext, type StartStepPort } from "./start-step/step.js";
+import { openStartStream, startClientGoneOf, type StartStream, type StartStreamStop } from "./start-step/stream.js";
 import { engineForAsk, webSitesForAsk } from "./engine-ask.js";
 import type { WebSites } from "@debateai/register";
 import { lengthAnswerWordsFor, lengthGuidanceForAsk } from "./length-guidance-ask.js";
@@ -1542,6 +1552,12 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/asks", auth: "user", resource: "run-owner", action: "create" },
   { route: "GET /v1/asks/room", auth: "user", resource: "run-owner", action: "read-room" },
   { route: "POST /v1/asks/clarify", auth: "user", resource: "run-owner", action: "read-clarifying-questions" },
+  // V4 start step
+  // Task 30 (spec 2026-11-03 §4.1): the four calls before Start, each a signed-in person's read of their own question, as the clarify call.
+  { route: "POST /v1/asks/paths/lists", auth: "user", resource: "run-owner", action: "read-start-lists" },
+  { route: "POST /v1/asks/paths/merge", auth: "user", resource: "run-owner", action: "read-start-menu" },
+  { route: "POST /v1/asks/paths/combine", auth: "user", resource: "run-owner", action: "read-start-combine" },
+  { route: "POST /v1/asks/paths/fit", auth: "user", resource: "run-owner", action: "read-start-fit" },
   { route: "GET /v1/session", auth: "user", resource: "session-self", action: "read" },
   { route: "GET /v1/deployment", auth: "operator", resource: "deployment", action: "read" },
   // Side-by-side spec §6 (plan C5): the process probes. Public and session-free (the website's /readyz and Caddy poll
@@ -2061,8 +2077,20 @@ export interface ApiOptions {
   /**
    * V4 start step, Task 38 (the member Task 30 composes as its `StartStepPort`): the pre-Start step's route. GET
    * /v1/asks/room says the lists run before Start (`start_step.lists` ON) only on "PREVIEW"; "NONE" or absent: OFF.
+   * Task 30: the step itself (./start-step/step.ts; main.ts composes it, Task 31), behind POST /v1/asks/paths/lists, …/merge,
+   * …/combine and …/fit. Absent, or on "NONE": each of the four answers none OFF.
    */
-  readonly startStep?: Readonly<{ route: "PREVIEW" | "NONE" }>;
+  readonly startStep?: StartStepPort;
+  /**
+   * V4 start step, Task 30: the key the step signs its references with (the same one main.ts gives the step), with which the
+   * merge's references are verified before its stream opens. Absent: the four calls answer none OFF.
+   */
+  readonly startStepKey?: StartStepKey;
+  /**
+   * V4 start step, Task 30: the two streams' heartbeat and longest life (START_STEP_TIMING's two members, as numbers: tests shorten
+   * them). Absent in production: START_STEP_TIMING's.
+   */
+  readonly startStepTiming?: Readonly<Partial<Record<keyof Pick<StartStepTiming, "heartbeatMs" | "streamMaxLifeMs">, number>>>;
 }
 
 /**
@@ -4287,6 +4315,191 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       : await options.askRoom.readPersonPool(asker.ownerRef, new Date()).catch(() => ({ empty: true, funding: null }));
     if (pool.empty) return reply.send(none);
     return reply.send(AskClarifyResponseSchema.parse(await options.askClarify!.read(asker.ownerRef, question, pool.funding)));
+  });
+
+  // V4 start step
+  /**
+   * V4 start step, Task 30 (spec 2026-11-03 §4.1; owner answers Q2 and Q8 of 4 Nov): THE FOUR CALLS BEFORE START, built like the
+   * clarifying questions above. A signed-in person only. The person's words reach the step only when the ask itself could send them
+   * to an AI: no crisis in the line or in any of their own words (their words go to no model), never before the sensitive-data
+   * consent, never off the preview's team, never from a blocked country (each: none NOT_ASKED); only where the step runs, with its
+   * key, on an active settings version (else none OFF); and never on an empty pool, for every call counts in the person's quota
+   * (none POOL_EMPTY). These are answered before the step is asked, so none of them is ever kept as a reading (Task 28). The lists
+   * and the merge answer as an event stream (./start-step/stream.ts), the combine and the fit once, as JSON. A reference that does
+   * not verify is refused before a byte of a stream: 400 START_PATHS_INVALID, 409 START_PATHS_STALE (and 409 START_PATHS_EXPIRED,
+   * which nothing answers since references lost their lifetime, Task 26b). A reference signed under an older settings version is not
+   * refused (answer Q8): the step verifies with the version not compared and runs on the active one. A step that fails: none TRANSPORT.
+   */
+  type StartFront = Readonly<{ none: StartStepNoneReason }> | Readonly<{ port: StartStepPort; key: StartStepKey; context: StartStepContext }>;
+  const startFront = async (request: FastifyRequest, asker: AuthenticatedSession, ownWords: readonly string[]): Promise<StartFront> => {
+    const mayAsk = !ownWords.some((words) => detectCrisis(words).crisis)
+      && previewTeamAdmits(previewConfig, options.previewTeamUserIds, asker.userId)
+      && (options.countryGate?.ask(sourceFor(request)) ?? null) === null
+      && options.sessions?.readSensitiveDataConsent !== undefined
+      && await options.sessions.readSensitiveDataConsent(asker) === "given";
+    if (!mayAsk) return { none: "NOT_ASKED" };
+    const port = options.startStep;
+    const key = options.startStepKey;
+    if (port === undefined || key === undefined || port.route === "NONE") return { none: "OFF" };
+    // The one binding (startStepBindingOf): the person's plan as their room is read, under the active version (none: the step is off).
+    const binding = await startStepBindingOf({ ownerRef: asker.ownerRef, askBilling: options.askBilling,
+      registerVersion: (await admissionView()).registerVersion });
+    if (binding === null) return { none: "OFF" };
+    // A pool that cannot be read is treated as empty, as the clarify call's: nothing is spent that cannot be counted.
+    const pool = options.askRoom?.readPersonPool === undefined ? { empty: false, funding: null }
+      : await options.askRoom.readPersonPool(asker.ownerRef, new Date()).catch(() => ({ empty: true, funding: null }));
+    if (pool.empty) return { none: "POOL_EMPTY" };
+    return { port, key, context: Object.freeze({ ownerRef: asker.ownerRef, ...binding, funding: pool.funding }) };
+  };
+  const startRefusalOf = (error: unknown): Readonly<{ status: 400 | 409; code: string }> | null => {
+    if (!(error instanceof TypedDomainError)) return null;
+    if (error.code === START_PATHS_INVALID) return { status: 400, code: error.code };
+    return error.code === START_PATHS_STALE || error.code === START_PATHS_EXPIRED ? { status: 409, code: error.code } : null;
+  };
+  const startMalformed = (reply: FastifyReply) => reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+  const startLineTooLong = (line: string): boolean => Buffer.byteLength(line, "utf8") > ASK_QUESTION_MAX_BYTES;
+  /** A step that threw: one content-free line; the person is answered none TRANSPORT. */
+  const startStepFailed = (route: AuthorizationRoute): void => {
+    console.error(JSON.stringify(Object.freeze({ event: "api.start_step.failed", route })));
+  };
+  const startStreamOf = (request: FastifyRequest, reply: FastifyReply, clientGone: AbortSignal,
+    onStop: (cause: StartStreamStop, stream: StartStream) => void): StartStream => openStartStream(reply, {
+    // writeHead bypasses onSend: the security set, the release and a refreshed cookie are named here, as on the run-event stream.
+    headers: { ...SECURITY_HEADERS, ...(options.releaseKey === undefined ? {} : { "x-debateai-release": options.releaseKey }),
+      ...(request.cookieRefresh === undefined ? {} : { "set-cookie": [...refreshedCookies(request.cookieRefresh)] }) },
+    heartbeatMs: options.startStepTiming?.heartbeatMs ?? START_STEP_TIMING.heartbeatMs,
+    maxLifeMs: options.startStepTiming?.streamMaxLifeMs ?? START_STEP_TIMING.streamMaxLifeMs,
+    draining: () => options.readiness?.draining() ?? false, onStop, clientGone });
+  const streamNone = (stream: StartStream, reason: StartStepNoneReason): void => {
+    stream.write("none", { reason });
+    stream.end("end", { reason: "NONE" });
+  };
+
+  api.post("/v1/asks/paths/lists", routePolicy("POST /v1/asks/paths/lists"), async (request, reply) => {
+    const asker = request.authenticatedSession;
+    if (asker === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    const clientGone = startClientGoneOf(reply);
+    const body = StartListsRequestSchema.safeParse(request.body);
+    if (!body.success || startLineTooLong(body.data.question_line)) return startMalformed(reply);
+    const asked = body.data;
+    const original = asked.question_language_choice?.original_question_line;
+    const front = await startFront(request, asker, original === undefined ? [asked.question_line] : [asked.question_line, original]);
+    // Draining: the lists end DRAINING (the page reads again from the next process); past the stream's longest life: none DEADLINE.
+    const stream = startStreamOf(request, reply, clientGone, (cause, open) => {
+      if (cause === "DRAINING") open.end("end", { reason: "DRAINING" });
+      else streamNone(open, "DEADLINE");
+    });
+    if ("none" in front) return streamNone(stream, front.none);
+    // Every event, a kept reading's replayed ones too, is read by the contract before it is written; one it refuses: none TRANSPORT.
+    const send = (event: StartListsEvent): void => {
+      const read = StartListsEventSchema.safeParse(event);
+      if (!read.success) streamNone(stream, "TRANSPORT");
+      else if (read.data.event === "end") stream.end(read.data.event, read.data.data);
+      else stream.write(read.data.event, read.data.data);
+    };
+    try {
+      await front.port.lists({ ...asked, ...front.context, country: edgeCountry(request.headers) }, send, stream.signal);
+    } catch {
+      startStepFailed("POST /v1/asks/paths/lists");
+    }
+    if (!stream.ended()) streamNone(stream, "TRANSPORT");
+  });
+
+  api.post("/v1/asks/paths/merge", routePolicy("POST /v1/asks/paths/merge"), async (request, reply) => {
+    const asker = request.authenticatedSession;
+    if (asker === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    const clientGone = startClientGoneOf(reply);
+    const body = StartMergeRequestSchema.safeParse(request.body);
+    if (!body.success || startLineTooLong(body.data.question_line)) return startMalformed(reply);
+    const asked = body.data;
+    // The person's own words: the line, their answers to the clarifying questions and what matters to them (the lists are the AIs').
+    const front = await startFront(request, asker, [asked.question_line, ...(asked.clarify?.answers ?? []).map((one) => one.answer),
+      ...(asked.clarify?.matters === undefined ? [] : [asked.clarify.matters])]);
+    // Verified before the stream opens, as the step will verify them: the line read at Next compared, the version not (answer Q8).
+    if (!("none" in front)) {
+      try {
+        verifyStartMergeRequest(front.key, { ownerScope: front.context.ownerScope, questionLine: asked.question_line,
+          planKey: front.context.planKey, request: asked });
+      } catch (error) {
+        const refused = startRefusalOf(error);
+        if (refused === null) throw error;
+        return reply.status(refused.status).send({ error: refused.code, message: refused.code });
+      }
+    }
+    const stream = startStreamOf(request, reply, clientGone, (cause, open) => {
+      streamNone(open, cause === "DRAINING" ? "DRAINING" : "DEADLINE");
+    });
+    if ("none" in front) return streamNone(stream, front.none);
+    let answer: StartMergeResponse;
+    try {
+      answer = await front.port.merge({ ...asked, ...front.context }, stream.signal);
+    } catch {
+      startStepFailed("POST /v1/asks/paths/merge");
+      answer = { source: "NONE", reason: "TRANSPORT" };
+    }
+    // A stream already ended (drained, too old, the page gone) writes nothing more; a menu the contract refuses: none TRANSPORT.
+    const read = StartMergeEventSchema.safeParse(answer.source === "NONE" ? { event: "none", data: { reason: answer.reason } }
+      : { event: "menu", data: { source: answer.source, menu: answer.menu } });
+    if (!read.success || read.data.event === "end") return streamNone(stream, "TRANSPORT");
+    stream.write(read.data.event, read.data.data);
+    stream.end("end", { reason: read.data.event === "menu" ? "DONE" : "NONE" });
+  });
+
+  api.post("/v1/asks/paths/combine", routePolicy("POST /v1/asks/paths/combine"), async (request, reply) => {
+    const asker = request.authenticatedSession;
+    if (asker === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    const clientGone = startClientGoneOf(reply);
+    const body = StartCombineRequestSchema.safeParse(request.body);
+    const menuLine = body.success && body.data.context.kind === "MENU" ? body.data.context.question_line : null;
+    if (!body.success || (menuLine !== null && startLineTooLong(menuLine))) return startMalformed(reply);
+    const asked = body.data;
+    const front = await startFront(request, asker, [...(menuLine === null ? [] : [menuLine]),
+      ...asked.members.flatMap((member) => member.title === null ? [member.question] : [member.title, member.question])]);
+    if ("none" in front) return reply.send(StartCombineResponseSchema.parse({ source: "NONE", reason: front.none }));
+    // A dig's points are put together under its parent debate, the person's own: its question, in its language.
+    let digParent: StartCombineInput["digParent"] = null;
+    if (asked.context.kind === "DIG") {
+      const run = await readOwnerRun(options, asked.context.parent_run_id, request.session, ownershipFor(request));
+      if (run === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      const named = run.argument_language ?? null;
+      const detected = named === null ? detectArgumentLanguage(run.question_line) : null;
+      digParent = Object.freeze({ questionLine: run.question_line, language: detected === null ? { code: named!.tag, name: named!.name }
+        : { code: detected.tag, name: detected.nameEn } });
+    }
+    let answer: StartCombineResponse;
+    try {
+      answer = await front.port.combine({ ...asked, ...front.context, digParent }, clientGone);
+    } catch (error) {
+      const refused = startRefusalOf(error);
+      if (refused !== null) return reply.status(refused.status).send({ error: refused.code, message: refused.code });
+      startStepFailed("POST /v1/asks/paths/combine");
+      answer = { source: "NONE", reason: "TRANSPORT" };
+    }
+    const read = StartCombineResponseSchema.safeParse(answer);
+    return reply.send(read.success ? read.data : { source: "NONE", reason: "TRANSPORT" });
+  });
+
+  api.post("/v1/asks/paths/fit", routePolicy("POST /v1/asks/paths/fit"), async (request, reply) => {
+    const asker = request.authenticatedSession;
+    if (asker === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    const clientGone = startClientGoneOf(reply);
+    const body = StartFitRequestSchema.safeParse(request.body);
+    if (!body.success || startLineTooLong(body.data.question_line)) return startMalformed(reply);
+    const asked = body.data;
+    const front = await startFront(request, asker, [asked.question_line, asked.own_text,
+      ...asked.paths.flatMap((path) => [path.title, path.question])]);
+    if ("none" in front) return reply.send(StartFitResponseSchema.parse({ source: "NONE", reason: front.none }));
+    let answer: StartFitResponse;
+    try {
+      answer = await front.port.fit({ ...asked, ...front.context }, clientGone);
+    } catch (error) {
+      const refused = startRefusalOf(error);
+      if (refused !== null) return reply.status(refused.status).send({ error: refused.code, message: refused.code });
+      startStepFailed("POST /v1/asks/paths/fit");
+      answer = { source: "NONE", reason: "TRANSPORT" };
+    }
+    const read = StartFitResponseSchema.safeParse(answer);
+    return reply.send(read.success ? read.data : { source: "NONE", reason: "TRANSPORT" });
   });
 
   api.get<{ Querystring: Record<string, unknown> }>("/v1/asks/room", routePolicy("GET /v1/asks/room"), async (request, reply) => {

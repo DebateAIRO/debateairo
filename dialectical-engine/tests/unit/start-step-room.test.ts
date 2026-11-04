@@ -16,6 +16,7 @@ import {
   debateShapePolicyStartValues, debateShapeStartStepStartValues, engineVersionPolicyStartValues, type DebateShapePolicy
 } from "@debateai/register";
 import { AskRoom, wholeSharePercent, type AskRoomAnswer, type AskRoomReader, type RoomQuestion } from "../../apps/api/src/ask-room.js";
+import type { StartStepPort } from "../../apps/api/src/start-step/step.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
 
 const NOW = new Date("2026-11-04T12:00:00.000Z");
@@ -190,6 +191,9 @@ function fixtureApplication(): AskApplication {
 }
 
 type RouteRead = Readonly<{ status: number; body: string; questions: RoomQuestion[] }>;
+/** Task 30 made ApiOptions.startStep the step's port; the room reads only its route, so its calls are never reached here. */
+const unreached = async (): Promise<never> => { throw new Error("not reached: the room reads the route only"); };
+const stepOn = (route: "PREVIEW" | "NONE"): StartStepPort => Object.freeze({ route, lists: unreached, merge: unreached, combine: unreached, fit: unreached });
 async function readRoute(input: Readonly<{
   url: string; route?: "PREVIEW" | "NONE"; signedIn?: boolean; reader?: boolean; noEngine?: boolean;
   view?: Readonly<{ debateShapePolicy?: DebateShapePolicy; modelScorecardInForce?: boolean; previewProviderTestConfig?: PreviewProviderTestConfig }>;
@@ -210,7 +214,7 @@ async function readRoute(input: Readonly<{
     application: fixtureApplication(), sessions: testSessionApplication([identity]), allowedOrigin: TEST_APP_ORIGIN,
     ...(input.reader === false ? {} : { askRoom }),
     admissionView: async () => view,
-    ...(input.route === undefined ? {} : { startStep: { route: input.route } })
+    ...(input.route === undefined ? {} : { startStep: stepOn(input.route) })
   });
   try {
     const response = await api.inject({ method: "GET", url: input.url, ...(input.signedIn === false ? {} : { headers: testSessionHeaders(identity) }) });

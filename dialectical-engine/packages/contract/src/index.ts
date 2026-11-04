@@ -16,7 +16,10 @@ import { QuestionLanguageChoiceSchema, QuestionLanguageOfferSchema, SiteLanguage
 export * from "./question-language.js";
 // V4 start step, Task 9: the step before Start's ids, limits and wire shapes.
 export * from "./start-paths.js";
-import { StartCheckSchema, StartPathsSchema } from "./start-paths.js";
+import {
+  StartCheckSchema, StartCombineRequestSchema, StartCombineResponseSchema, StartFitRequestSchema, StartFitResponseSchema, StartListsEventSchema,
+  StartListsRequestSchema, StartMergeEventSchema, StartMergeRequestSchema, StartPathsSchema
+} from "./start-paths.js";
 // V4 start step, Task 15: a path debate's results per path.
 export * from "./path-outcome.js";
 // V4 start step, Task 16: Answer.branches, the run read's and the public snapshot's paths.
@@ -2014,6 +2017,11 @@ export const contractInventory = Object.freeze({
     "GET /v1/asks/room",
     // Decision 29: dynamic step 2.
     "POST /v1/asks/clarify",
+    // V4 start step, Task 30: the four calls before Start (./start-paths.ts); the lists and the merge answer as an event stream.
+    "POST /v1/asks/paths/lists",
+    "POST /v1/asks/paths/merge",
+    "POST /v1/asks/paths/combine",
+    "POST /v1/asks/paths/fit",
     "GET /v1/session",
     "GET /v1/deployment",
     // Side-by-side spec §6 (plan C5): the API's liveness and readiness probes.
@@ -2121,6 +2129,9 @@ export const contractInventory = Object.freeze({
     PublicContributionSchema, PublicMainAnswerSchema, PublicReportVersionSchema, PublicReportRequestSchema, PublicReportAcceptedSchema, PublicDebateRefusedSchema,
     // Decision 29: dynamic step 2.
     AskClarifyRequestSchema, AskClarifyResponseSchema,
+    // V4 start step, Task 30: the four calls before Start, their requests and what each answers (an event of a stream, or JSON).
+    StartListsRequestSchema, StartListsEventSchema, StartMergeRequestSchema, StartMergeEventSchema, StartCombineRequestSchema,
+    StartCombineResponseSchema, StartFitRequestSchema, StartFitResponseSchema,
     BillingQuoteRequestSchema, BillingQuoteResponseSchema, BillingCheckoutRequestSchema, BillingCheckoutResponseSchema,
     BillingCheckoutPendingErrorSchema, BillingChargeStatusResponseSchema,
     BillingSubscriptionResponseSchema, BillingDowngradeRequestSchema, BillingInvoicesResponseSchema,

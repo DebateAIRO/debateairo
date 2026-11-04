@@ -149,6 +149,11 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "POST /v1/runs/{id}/reopen", auth: "user", resource: "run-owner", action: "reopen-investigation" },
   { route: "POST /v1/runs/{id}/researched", auth: "user", resource: "run-owner", action: "add-researched" },
   { route: "POST /v1/asks/clarify", auth: "user", resource: "run-owner", action: "read-clarifying-questions" },
+  // V4 start step, Task 30: the four calls before Start.
+  { route: "POST /v1/asks/paths/lists", auth: "user", resource: "run-owner", action: "read-start-lists" },
+  { route: "POST /v1/asks/paths/merge", auth: "user", resource: "run-owner", action: "read-start-menu" },
+  { route: "POST /v1/asks/paths/combine", auth: "user", resource: "run-owner", action: "read-start-combine" },
+  { route: "POST /v1/asks/paths/fit", auth: "user", resource: "run-owner", action: "read-start-fit" },
   { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" },
   { route: "GET /v1/billing/plans", auth: "public", resource: "billing", action: "read-plans" },
   { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" },
@@ -381,7 +386,8 @@ describe("S7 deny-by-default authorization", () => {
     // R22 decision 32 adds the three of the Owner's allowance for a member: 193.
     // Decision 13: a report on a public debate (POST /v1/public/debates/{id}/report).
     // Decision 33 adds the four staff routes of a public debate under review. Decision 35 adds the Report button's three.
-    expect(contractInventory.routes).toHaveLength(201);
+    // V4 start step, Task 30 adds the four calls before Start (POST /v1/asks/paths/lists, …/merge, …/combine and …/fit): 205.
+    expect(contractInventory.routes).toHaveLength(205);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 

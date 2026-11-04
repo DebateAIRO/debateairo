@@ -10,7 +10,9 @@ import { contractInventory, staffContractInventory, fundedStaffContractInventory
   StaffElevationResponseSchema, FundedStaffElevationResponseSchema, StaffTeamPageSchema, FundedStaffTeamPageSchema,
   StaffActionOptionsRequestSchema, FundedStaffActionOptionsRequestSchema, StaffActionVerifyRequestSchema, FundedStaffActionVerifyRequestSchema,
   StaffAuthenticationOptionsResponseSchema, StaffActionProofResponseSchema,
-  InternalAllowanceConfigureRequestSchema, InternalAllowanceRevokeRequestSchema, SecurityReceiptSchema } from "./index.js";
+  InternalAllowanceConfigureRequestSchema, InternalAllowanceRevokeRequestSchema, SecurityReceiptSchema,
+  StartListsRequestSchema, StartListsEventSchema, StartMergeRequestSchema, StartMergeEventSchema, StartCombineRequestSchema,
+  StartCombineResponseSchema, StartFitRequestSchema, StartFitResponseSchema } from "./index.js";
 
 const endpointSchemas = {
   ...passwordResetContractSchemas,
@@ -24,13 +26,18 @@ const endpointSchemas = {
   StaffElevationResponseSchema, FundedStaffElevationResponseSchema, StaffTeamPageSchema, FundedStaffTeamPageSchema,
   StaffActionOptionsRequestSchema, FundedStaffActionOptionsRequestSchema, StaffActionVerifyRequestSchema, FundedStaffActionVerifyRequestSchema,
   StaffAuthenticationOptionsResponseSchema, StaffActionProofResponseSchema,
-  InternalAllowanceConfigureRequestSchema, InternalAllowanceRevokeRequestSchema, SecurityReceiptSchema
+  InternalAllowanceConfigureRequestSchema, InternalAllowanceRevokeRequestSchema, SecurityReceiptSchema,
+  // V4 start step, Task 30: the four calls before Start.
+  StartListsRequestSchema, StartListsEventSchema, StartMergeRequestSchema, StartMergeEventSchema, StartCombineRequestSchema,
+  StartCombineResponseSchema, StartFitRequestSchema, StartFitResponseSchema
 };
 type EndpointSchemaName = keyof typeof endpointSchemas;
 const reference = (name: EndpointSchemaName) => ({ $ref: `#/components/schemas/${name}` });
 const variants = (...names: EndpointSchemaName[]) => ({ anyOf: names.map(reference) });
 const request = (schema: unknown) => ({ requestBody: { required: true, content: { "application/json": { schema } } } });
 const response = (schema: unknown, status = "200") => ({ responses: { [status]: { description: status === "202" ? "Generic verification acknowledgement" : "Current selected policy response", content: { "application/json": { schema } } } } });
+/** V4 start step, Task 30: an answer as an event stream, each frame one event of `schema` (its name as the frame's event, its data as the data). */
+const eventStream = (schema: unknown) => ({ responses: { "200": { description: "An event stream: one frame per event, a keep-alive comment while it runs, exactly one end, last", content: { "text/event-stream": { schema } } } } });
 const staffEndpointContracts: Record<string, Record<string, unknown>> = {
   // Decision 33: a public debate hidden under review answers 410, with no text of it.
   "GET /v1/public/debates/{id}": { responses: { "200": { description: "The public debate" }, "404": { description: "No public debate here" }, "410": { description: "Hidden under review: error DEBATE_UNDER_REVIEW, no-store" } } },
@@ -72,6 +79,11 @@ const staffEndpointContracts: Record<string, Record<string, unknown>> = {
   "GET /v1/billing/usage": response(reference("BillingUsageResponseSchema")),
   "GET /v1/asks/room": response(reference("AskRoomResponseSchema")),
   "POST /v1/asks/clarify": { ...request(reference("AskClarifyRequestSchema")), ...response(reference("AskClarifyResponseSchema")) },
+  // V4 start step, Task 30: the four calls before Start; a reference that does not verify is 400 START_PATHS_INVALID or 409 START_PATHS_STALE.
+  "POST /v1/asks/paths/lists": { ...request(reference("StartListsRequestSchema")), ...eventStream(reference("StartListsEventSchema")) },
+  "POST /v1/asks/paths/merge": { ...request(reference("StartMergeRequestSchema")), ...eventStream(reference("StartMergeEventSchema")) },
+  "POST /v1/asks/paths/combine": { ...request(reference("StartCombineRequestSchema")), ...response(reference("StartCombineResponseSchema")) },
+  "POST /v1/asks/paths/fit": { ...request(reference("StartFitRequestSchema")), ...response(reference("StartFitResponseSchema")) },
   "GET /v1/admin/enrollment": response(variants("StaffEnrollmentResponseSchema","FundedStaffEnrollmentResponseSchema")),
   "POST /v1/admin/webauthn/elevation/verify": response(variants("StaffElevationResponseSchema", "FundedStaffElevationResponseSchema")),
   "GET /v1/admin/team": response(variants("StaffTeamPageSchema", "FundedStaffTeamPageSchema")),

@@ -343,7 +343,8 @@ describe("W1-6 inventory and the no-grade rule over every new shape", () => {
     // R22 owner decision 13 removed the Unpublish route (POST /v1/runs/{id}/unpublish): 183.
     // W4-4: "Add to researched" (POST /v1/runs/{id}/researched): the count is the head's, with this one route.
     // Decision 13: a report on a public debate (POST /v1/public/debates/{id}/report). Decision 33: the four staff routes of a public debate under review. Decision 35: the Report button's three.
-    expect(contractInventory.routes).toHaveLength(201);
+    // V4 start step, Task 30: the four calls before Start (POST /v1/asks/paths/{lists,merge,combine,fit}).
+    expect(contractInventory.routes).toHaveLength(205);
   });
 });
 

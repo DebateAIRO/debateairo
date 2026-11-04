@@ -176,6 +176,11 @@ export function createAskClarify(deps: Readonly<{
   const deadlineMs = deps.deadlineMs ?? ASK_CLARIFY_DEADLINE_MS;
   const cacheKey = randomBytes(32);
   const cache = new Map<string, Readonly<{ at: number; answer: AskClarifyResponse }>>();
+  /**
+   * V4 start step, Task 28 (ask-f9, read-f13): the reads still waiting on their AI, under the cache's key. A second read of the same line
+   * by the same person while the first runs gets the first's answer: one AI call, counted once, and no call taken from the limits.
+   */
+  const running = new Map<string, Promise<AskClarifyResponse>>();
   const calls = new Map<string, number[]>();
   const newId = deps.newId ?? randomUUID;
   let recordDown = false;
@@ -212,6 +217,30 @@ export function createAskClarify(deps: Readonly<{
     if (calls.size > PEOPLE_MAX) calls.delete(calls.keys().next().value!);
     return true;
   };
+  /** One read's AI call and answer (the cache keeps an AI answer for CACHE.ttlMs). */
+  const readOnce = async (transportFor: AskClarifyTransportFor, key: string, now: number, ownerRef: string, questionLine: string,
+    funding: FundingBasis | null): Promise<AskClarifyResponse> => {
+    if (recordDown) return fallback("RECORD_DOWN");
+    if (!admitted(ownerRef, now)) return fallback("RATE_LIMITED");
+    const transport = transportFor((usage) => charge(ownerRef, funding, usage));
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), deadlineMs);
+    const abandoned = new Promise<never>((_resolve, reject) => {
+      controller.signal.addEventListener("abort", () => reject(new Error("ASK_CLARIFY_DEADLINE")), { once: true });
+    });
+    try {
+      const reading = await Promise.race([readWithRecovery(questionLine, transport, controller.signal), abandoned]);
+      if (reading === null || (reading.purpose === null && reading.questions.length === 0)) return fallback("UNREADABLE");
+      const answer = AskClarifyResponseSchema.parse({ source: "AI", questions: reading.questions, ...(reading.purpose === null ? {} : { purpose: reading.purpose }) });
+      cache.set(key, Object.freeze({ at: now, answer }));
+      if (cache.size > CACHE.entries) cache.delete(cache.keys().next().value!);
+      return answer;
+    } catch {
+      return fallback(controller.signal.aborted ? "DEADLINE" : "TRANSPORT");
+    } finally {
+      clearTimeout(timer);
+    }
+  };
   return Object.freeze({
     async read(ownerRef: string, questionLine: string, funding: FundingBasis | null): Promise<AskClarifyResponse> {
       const transportFor = deps.transportFor;
@@ -221,26 +250,15 @@ export function createAskClarify(deps: Readonly<{
       const known = cache.get(key);
       if (known !== undefined && now - known.at < CACHE.ttlMs) return known.answer;
       cache.delete(key);
-      if (recordDown) return fallback("RECORD_DOWN");
-      if (!admitted(ownerRef, now)) return fallback("RATE_LIMITED");
-      const transport = transportFor((usage) => charge(ownerRef, funding, usage));
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), deadlineMs);
-      const abandoned = new Promise<never>((_resolve, reject) => {
-        controller.signal.addEventListener("abort", () => reject(new Error("ASK_CLARIFY_DEADLINE")), { once: true });
-      });
-      try {
-        const reading = await Promise.race([readWithRecovery(questionLine, transport, controller.signal), abandoned]);
-        if (reading === null || (reading.purpose === null && reading.questions.length === 0)) return fallback("UNREADABLE");
-        const answer = AskClarifyResponseSchema.parse({ source: "AI", questions: reading.questions, ...(reading.purpose === null ? {} : { purpose: reading.purpose }) });
-        cache.set(key, Object.freeze({ at: now, answer }));
-        if (cache.size > CACHE.entries) cache.delete(cache.keys().next().value!);
-        return answer;
-      } catch {
-        return fallback(controller.signal.aborted ? "DEADLINE" : "TRANSPORT");
-      } finally {
-        clearTimeout(timer);
-      }
+      // Task 28: the same person's same line, still being read, is joined (nothing is awaited before it is registered, so two reads
+      // made at once meet here); once it has ended, answered or not, it is joined no more.
+      const joined = running.get(key);
+      if (joined !== undefined) return joined;
+      const reading = readOnce(transportFor, key, now, ownerRef, questionLine, funding);
+      running.set(key, reading);
+      const over = (): void => { if (running.get(key) === reading) running.delete(key); };
+      void reading.then(over, over);
+      return reading;
     }
   });
 }

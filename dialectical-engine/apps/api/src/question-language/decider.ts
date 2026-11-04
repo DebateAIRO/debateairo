@@ -84,8 +84,11 @@ export class QuestionLanguageChoiceNeeded extends Error {
 /**
  * `fastCheckAllowed` (ruling L-NOCONSENT): the route records sensitive-data consent only for signed-in people, so a
  * signed-out (legacy) person's question never reaches the fast AI: eld and the site language decide, no offer.
+ * V4 start step, Task 28: the decision reads only the ask's three language members, so the step before Start (which
+ * moved the decision to Next and has no whole ask yet) asks it with exactly those.
  */
-export type QuestionLanguagePort = Readonly<{ decide(input: Readonly<{ ask: AskRequest; ownerScope: string; fastCheckAllowed: boolean }>): Promise<QuestionLanguageLock> }>;
+export type QuestionLanguageAsk = Pick<AskRequest, "question_line" | "site_language" | "question_language_choice">;
+export type QuestionLanguagePort = Readonly<{ decide(input: Readonly<{ ask: QuestionLanguageAsk; ownerScope: string; fastCheckAllowed: boolean }>): Promise<QuestionLanguageLock> }>;
 
 /**
  * The owner scope the check reference binds (Task 8) and the repeat-offer memory keys on. For a signed-in person it is
@@ -143,7 +146,7 @@ export class QuestionLanguageDecider implements QuestionLanguagePort {
     this.#memoryEntries = entries;
   }
 
-  async decide(input: Readonly<{ ask: AskRequest; ownerScope: string; fastCheckAllowed: boolean }>): Promise<QuestionLanguageLock> {
+  async decide(input: Readonly<{ ask: QuestionLanguageAsk; ownerScope: string; fastCheckAllowed: boolean }>): Promise<QuestionLanguageLock> {
     const questionLine = input.ask.question_line;
     const choice = input.ask.question_language_choice;
     if (choice !== undefined) return this.#chosen(input.ownerScope, questionLine, choice);
