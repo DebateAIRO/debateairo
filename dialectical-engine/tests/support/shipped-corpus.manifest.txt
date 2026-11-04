@@ -1212,6 +1212,7 @@ packages/judgement/src/engine-repository.ts
 packages/judgement/src/honest-score.ts
 packages/judgement/src/index.ts
 packages/judgement/src/investigation.ts
+packages/judgement/src/path-root-prompts.ts
 packages/judgement/src/prompts.ts
 packages/judgement/src/public-contribution-prompt.ts
 packages/judgement/src/public-report-check-prompt.ts
