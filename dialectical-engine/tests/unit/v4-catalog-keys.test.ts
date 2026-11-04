@@ -229,7 +229,10 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.dig.unconfirmed",
   "v4.outline.fold",
   "v4.outline.unfold",
-  "v4.map.scrollHint"
+  "v4.map.scrollHint",
+  // The browser check of the fix branch (4 Nov): the report header's short "Map" on phones, where the record's
+  // "← Back to the map" (report-f12) was cut off; the record gives no short form.
+  "v4.report.backToMapShort"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {
