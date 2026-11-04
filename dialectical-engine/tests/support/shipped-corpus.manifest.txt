@@ -436,6 +436,7 @@ apps/runner/src/path-rewrite-scope.ts
 apps/runner/src/path-rewrite-sources.ts
 apps/runner/src/path-rewrite-sweep.ts
 apps/runner/src/path-rewrite.ts
+apps/runner/src/paths-main-answer.ts
 apps/runner/src/production-database-principals-cli.ts
 apps/runner/src/production-database-principals.ts
 apps/runner/src/production-database-url.ts

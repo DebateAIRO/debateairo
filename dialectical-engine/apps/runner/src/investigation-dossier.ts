@@ -31,7 +31,8 @@ import {
  *    the fates before and after, and the dig's own paths with their lines, fates and every point argued on them (decision
  *    4: "every path of the debate and every point argued on it"). A FAILED rewrite (or none) brings in the dig's own
  *    material instead: its answer text and its paths' points (Q-D13: a dig keeps both);
- *  - the person's own views, each word for word beside its verdict;
+ *  - the person's own views, each word for word beside its verdict (on a path run's main answer, V4 start step Task 50, first the
+ *    person's own words on each path, by the path);
  *  - the sources: each checked extract a point cites, as the quote people see (at most 120 characters, owner F9) and
  *    reader 1's line;
  *  - from version 2 on, the earlier report's answer (owner F8 A);
@@ -86,6 +87,13 @@ export function investigationReportAnswerLength(paths: number): string {
   const steps = Math.floor(Math.max(0, paths - 1) / pathsPerStep);
   return `about ${String(Math.min(most, base + step * steps))} words`;
 }
+/** V4 start step, Task 50: the length line of a receipt's words (a whole number above 0, as the receipt holds it). */
+function receiptAnswerLength(words: number): string {
+  if (!Number.isSafeInteger(words) || words < 1) {
+    throw new TypedDomainError("INVESTIGATION_REPORT_ANSWER_WORDS_INVALID", "The answer's words are a whole number above 0");
+  }
+  return `about ${String(words)} words`;
+}
 
 /** Every packet a report call sends passes here before it goes: one over the 100K line is refused, nothing sent. */
 export function investigationReportGuard(packet: PromptPacket): PromptPacket {
@@ -138,6 +146,11 @@ export type DossierPath = Readonly<{
   sources: readonly DossierSource[];
   /** The path's newest text when a later update wrote it (a climb, a public dig; 0138); absent: its newest rewrite's, else the story's. */
   current?: DossierText | null;
+  /**
+   * V4 start step, Task 50: the person's own words on this path (a path run's own path or rewrite), word for word. They go in
+   * `views`, marked as theirs, by the path's ref, never beside the path; absent or none: no entry (R22's bytes).
+   */
+  ownWords?: readonly string[];
 }>;
 
 /** W4-4 (owner Q-D9): a page the person added to researched that added to the argument: reader 1's note and its shown quotes. */
@@ -160,6 +173,12 @@ export type DossierInput = Readonly<{
    * change with time (a point grows dated), and a closing run again must send the same bytes.
    */
   trustWords?: ReadonlyMap<string, TrustWord>;
+  /**
+   * V4 start step, Task 50: the words the answer is asked for, from the run's receipt (a path run's main answer): the length line is
+   * "about <answerWords> words". Absent: `investigationReportAnswerLength` over the paths the material holds (R22's bytes). On the
+   * input, not a build option, so `fitDossierToTokenLine` carries it to every ladder place it builds.
+   */
+  answerWords?: number;
 }>;
 
 /* ----------------------------------------------------------------- the output */
@@ -249,8 +268,11 @@ type Refs = Readonly<{
 /** A page's quote is one source, however many points cite it. */
 const sourceKey = (source: DossierSource): string => `${source.site}\u0000${source.link ?? ""}\u0000${source.quote}`;
 
-/** Refs over the WHOLE input, before any step: a point, card or source keeps its ref on every step of the ladder. */
-function refsOf(input: DossierInput, cards: readonly DossierDig[]): Refs {
+/**
+ * Refs over the WHOLE input, before any step: a point, card or source keeps its ref on every step of the ladder. Exported (V4 start
+ * step, Task 50) so a path run's main answer turns the refs its segments rest on back into the run's nodes.
+ */
+export function dossierRefsOf(input: DossierInput, cards: readonly DossierDig[]): Refs {
   const pathRef = new Map<string, string>();
   for (const path of input.first.paths) {
     if (pathRef.has(path.ref)) throw new TypedDomainError("INVESTIGATION_REPORT_PATHS_INVALID", "A path is given once");
@@ -448,14 +470,17 @@ function fieldsAt(input: DossierInput, cards: readonly DossierDig[], refs: Refs,
     }
     followUps.push(cardJson(dig, form, step, input, refs, digPathRefOf));
   }
-  const views = cards.flatMap((dig) => {
+  // V4 start step, Task 50: a path's own words first, by its ref, in map order (none on any path: R22's bytes), then the cards'.
+  const pathViews = input.first.paths.flatMap((path) => ((path.ownWords ?? []).length === 0 ? []
+    : [{ path: refs.pathRef.get(path.ref)!, words: [...path.ownWords!], marked: "PERSON" }]));
+  const views = [...pathViews, ...cards.flatMap((dig) => {
     const words = dig.picks.filter((pick) => pick.by !== "AI_SUGGESTION").map((pick) => pick.text);
     const form = step.forms.get(lower(dig.runId)) ?? "WHOLE";
     if (words.length === 0 || form === "LEFT_OUT" || step.offTheList.has(lower(dig.runId))) return [];
     const view = dig.rewrite?.view ?? null;
     return [{ card: refs.cardRef.get(lower(dig.runId))!, words, marked: "PERSON",
       ...(view === null ? {} : { verdict: { outcome: view.outcome, scope: view.scope, reason: view.reason } }) }];
-  });
+  })];
   const cited = new Set<string>();
   for (const path of paths) for (const source of path.sources) cited.add(source);
   for (const card of followUps as { own_material?: { paths: { sources?: string[] }[] }; rewrite?: { dig_paths?: { sources?: string[] }[] } }[]) {
@@ -722,8 +747,8 @@ export type DossierBuildOptions = Readonly<{
  */
 export function buildInvestigationDossier(input: DossierInput, options: DossierBuildOptions = {}): DossierBuilt {
   const cards = digsInTreeOrder(input);
-  const refs = refsOf(input, cards);
-  const answerLength = investigationReportAnswerLength(pathsInMaterial(input, cards));
+  const refs = dossierRefsOf(input, cards);
+  const answerLength = input.answerWords === undefined ? investigationReportAnswerLength(pathsInMaterial(input, cards)) : receiptAnswerLength(input.answerWords);
   let bodyBytes = 0;
   let at = -1;
   for (const { number, step } of ladder(input, cards)) {

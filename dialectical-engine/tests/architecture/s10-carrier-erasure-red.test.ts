@@ -314,6 +314,10 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // of its own; the outcome is stored through the path results store (0158).
       "apps/runner/src/path-outcomes.ts",
       "apps/runner/src/path-rewrite.ts",
+      // V4 start step, Task 50: the main answer of a path run sends its writer and checker calls through the gateway its
+      // job hands it (Task 54: the run's leased gateway) on the served lane, naming the run. It opens no lease and reads no
+      // content of its own; its dossier is built by code from the paths' stored outcomes.
+      "apps/runner/src/paths-main-answer.ts",
       // The public tree (0147): the AI check on a contribution goes through the gateway the settled dig's snapshot hands it, naming the dig's run.
       "apps/runner/src/public-contribution.ts",
       // L4-F9 repair: the keep-alive hands each runner call, unchanged, to the
