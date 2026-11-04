@@ -130,6 +130,8 @@
   "legal.providers.purpose.synthesisCheck": "הסינתזה של דיון שהסתיים — לבדיקתה בארבע קטגוריות",
   "legal.providers.purpose.reportCheck": "דיווח שהוגש בלחצן דיווח והטקסט הציבורי של הדיון — לבדיקת הדיווח",
   "legal.providers.purpose.questionCheck": "שאלה לפני שדיון מתחיל — לבדיקה אם הדיון רשאי להתחיל",
+  "legal.providers.purpose.clarifyQuestions": "לפני שדיון מתחיל: הצעת שאלות הבהרה",
+  "legal.providers.purpose.suggestPaths": "לפני שדיון מתחיל: הצעה מה כדאי לבדוק",
   "legal.providers.purpose.search": "שאילתות חיפוש שהמודלים כותבים מתוך הדיון — למציאת ראיות ברשת",
   "legal.providers.purpose.support": "מה שאתם מקלידים בשיחת התמיכה — כדי לענות לכם",
   "legal.providers.purposesUnconfirmed": "[טעון אישור: אילו מהמשימות האלה מוטלות עליו]",

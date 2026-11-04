@@ -130,6 +130,8 @@
   "legal.providers.purpose.synthesisCheck": "Sinteza završene rasprave — za provjeru s obzirom na četiri kategorije",
   "legal.providers.purpose.reportCheck": "Prijava podnesena gumbom Prijavite i javni tekst rasprave — za provjeru prijave",
   "legal.providers.purpose.questionCheck": "Pitanje prije nego što rasprava započne — za provjeru smije li rasprava započeti",
+  "legal.providers.purpose.clarifyQuestions": "Prije nego što rasprava započne: prijedlozi pojašnjavajućih pitanja",
+  "legal.providers.purpose.suggestPaths": "Prije nego što rasprava započne: prijedlozi što vrijedi istražiti",
   "legal.providers.purpose.search": "Upiti za pretraživanje koje modeli sastavljaju iz rasprave — za pronalaženje dokaza na internetu",
   "legal.providers.purpose.support": "Ono što upišete u razgovor s podrškom — kako bi vam odgovorio",
   "legal.providers.purposesUnconfirmed": "[potvrditi: koje od ovih zadaća obavlja]",

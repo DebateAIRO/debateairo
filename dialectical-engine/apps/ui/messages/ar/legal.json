@@ -130,6 +130,8 @@
   "legal.providers.purpose.synthesisCheck": "تركيب المناظرة المنتهية — لفحصه بحثًا عن أربع فئات",
   "legal.providers.purpose.reportCheck": "البلاغ المقدَّم بزر الإبلاغ، ونص المناظرة العام — للتحقق من البلاغ",
   "legal.providers.purpose.questionCheck": "السؤال قبل بدء المناظرة — لفحص ما إذا كان يجوز للمناظرة أن تبدأ",
+  "legal.providers.purpose.clarifyQuestions": "قبل بدء المناظرة: اقتراح أسئلة توضيحية",
+  "legal.providers.purpose.suggestPaths": "قبل بدء المناظرة: اقتراح ما يستحق البحث فيه",
   "legal.providers.purpose.search": "استعلامات البحث التي تكتبها النماذج انطلاقًا من المناظرة — للعثور على أدلة على الويب",
   "legal.providers.purpose.support": "ما تكتبه في محادثة الدعم — للرد عليك",
   "legal.providers.purposesUnconfirmed": "[قيد التأكيد: أيّ هذه المهام تُسند إليه]",

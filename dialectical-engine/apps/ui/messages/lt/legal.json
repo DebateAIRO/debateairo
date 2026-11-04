@@ -130,6 +130,8 @@
   "legal.providers.purpose.synthesisCheck": "Užbaigtų debatų apibendrinimas — kad jį patikrintume pagal keturias kategorijas",
   "legal.providers.purpose.reportCheck": "Pranešimas, pateiktas mygtuku Pranešti, ir viešas debato tekstas — pranešimui patikrinti",
   "legal.providers.purpose.questionCheck": "Klausimas prieš debatų pradžią — kad patikrintume, ar debatai gali prasidėti",
+  "legal.providers.purpose.clarifyQuestions": "Prieš debatų pradžią: patikslinančių klausimų siūlymas",
+  "legal.providers.purpose.suggestPaths": "Prieš debatų pradžią: pasiūlymai, ką verta išnagrinėti",
   "legal.providers.purpose.search": "Modelių pagal debatus parašytos paieškos užklausos — įrodymams internete rasti",
   "legal.providers.purpose.support": "Pagalbos pokalbyje įvestas tekstas — kad galėtume jums atsakyti",
   "legal.providers.purposesUnconfirmed": "[patvirtinti: kurios iš šių užduočių jam pavedamos]",

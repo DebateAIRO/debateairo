@@ -130,6 +130,8 @@
   "legal.providers.purpose.synthesisCheck": "Biten bir tartışmanın sentezi — dört kategori bakımından kontrol etmek için",
   "legal.providers.purpose.reportCheck": "Bildir düğmesiyle yapılan bir bildirim ve tartışmanın herkese açık metni — bildirimi kontrol etmek için",
   "legal.providers.purpose.questionCheck": "Bir tartışma başlamadan önceki soru — tartışmanın başlayıp başlayamayacağını kontrol etmek için",
+  "legal.providers.purpose.clarifyQuestions": "Bir tartışma başlamadan önce: açıklayıcı sorular önermek",
+  "legal.providers.purpose.suggestPaths": "Bir tartışma başlamadan önce: neyin incelenmeye değer olduğunu önermek",
   "legal.providers.purpose.search": "Modellerin tartışmadan yola çıkarak yazdığı arama sorguları — internette kanıt bulmak için",
   "legal.providers.purpose.support": "Destek sohbetine yazdıklarınız — size yanıt vermek için",
   "legal.providers.purposesUnconfirmed": "[teyit edilecek: bu görevlerden hangilerinin kendisine verildiği]",

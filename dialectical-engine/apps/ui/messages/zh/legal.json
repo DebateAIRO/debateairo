@@ -130,6 +130,8 @@
   "legal.providers.purpose.synthesisCheck": "已完成辩论的综合结论 — 用于检查四类内容",
   "legal.providers.purpose.reportCheck": "通过举报按钮提交的举报和该辩论的公开文本 — 用于检查该举报",
   "legal.providers.purpose.questionCheck": "辩论开始前的问题 — 用于检查该辩论是否可以开始",
+  "legal.providers.purpose.clarifyQuestions": "辩论开始前：提出澄清性问题",
+  "legal.providers.purpose.suggestPaths": "辩论开始前：建议值得深入了解的方向",
   "legal.providers.purpose.search": "模型根据辩论撰写的搜索查询 — 用于在网络上查找证据",
   "legal.providers.purpose.support": "您在支持聊天中输入的内容 — 用于回复您",
   "legal.providers.purposesUnconfirmed": "[待确认：承担上述哪些工作]",

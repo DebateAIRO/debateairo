@@ -130,6 +130,8 @@
   "legal.providers.purpose.synthesisCheck": "Päättyneen väittelyn synteesi — sen tarkistamiseen neljän luokan osalta",
   "legal.providers.purpose.reportCheck": "Ilmoita-painikkeella tehty ilmoitus ja väittelyn julkinen teksti — ilmoituksen tarkistamiseen",
   "legal.providers.purpose.questionCheck": "Kysymys ennen väittelyn alkua — sen tarkistamiseen, saako väittely alkaa",
+  "legal.providers.purpose.clarifyQuestions": "Ennen väittelyn alkua: tarkentavien kysymysten ehdottaminen",
+  "legal.providers.purpose.suggestPaths": "Ennen väittelyn alkua: ehdotukset siitä, mitä kannattaa selvittää",
   "legal.providers.purpose.search": "Hakukyselyt, jotka mallit kirjoittavat väittelyn pohjalta — näytön hakemiseen verkosta",
   "legal.providers.purpose.support": "Tukikeskusteluun kirjoittamasi teksti — sinulle vastaamiseen",
   "legal.providers.purposesUnconfirmed": "[vahvistetaan: mitkä näistä tehtävistä sille annetaan]",

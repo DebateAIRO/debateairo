@@ -130,6 +130,8 @@
   "legal.providers.purpose.synthesisCheck": "Синтезът на приключил дебат — за проверка за четири категории",
   "legal.providers.purpose.reportCheck": "Сигналът, подаден с бутона Сигнализиране, и публичният текст на дебата — за проверка на сигнала",
   "legal.providers.purpose.questionCheck": "Въпросът преди началото на дебат — за проверка дали дебатът може да започне",
+  "legal.providers.purpose.clarifyQuestions": "Преди началото на дебат: предлагане на уточняващи въпроси",
+  "legal.providers.purpose.suggestPaths": "Преди началото на дебат: предлагане на това какво си струва да се проучи",
   "legal.providers.purpose.search": "Заявките за търсене, които моделите съставят въз основа на дебата — за намиране на доказателства в интернет",
   "legal.providers.purpose.support": "Написаното от Вас в чата за поддръжка — за да Ви се отговори",
   "legal.providers.purposesUnconfirmed": "[да се потвърди: кои от тези задачи изпълнява]",

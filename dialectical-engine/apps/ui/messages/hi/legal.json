@@ -130,6 +130,8 @@
   "legal.providers.purpose.synthesisCheck": "समाप्त वाद-विवाद का संश्लेषण — उसे चार श्रेणियों के लिए जाँचने के लिए",
   "legal.providers.purpose.reportCheck": "रिपोर्ट करें बटन से की गई रिपोर्ट, और वाद-विवाद का सार्वजनिक पाठ — रिपोर्ट की जाँच के लिए",
   "legal.providers.purpose.questionCheck": "वाद-विवाद शुरू होने से पहले का प्रश्न — यह जाँचने के लिए कि वाद-विवाद शुरू हो सकता है या नहीं",
+  "legal.providers.purpose.clarifyQuestions": "वाद-विवाद शुरू होने से पहले: स्पष्टीकरण वाले प्रश्न सुझाना",
+  "legal.providers.purpose.suggestPaths": "वाद-विवाद शुरू होने से पहले: यह सुझाना कि किन बातों की पड़ताल की जाए",
   "legal.providers.purpose.search": "मॉडल द्वारा वाद-विवाद से लिखे गए खोज-प्रश्न — वेब पर साक्ष्य खोजने के लिए",
   "legal.providers.purpose.support": "आप सहायता चैट में जो लिखते हैं — आपको उत्तर देने के लिए",
   "legal.providers.purposesUnconfirmed": "[पुष्टि की जानी है: इनमें से कौन-से कार्य उसे सौंपे जाते हैं]",

@@ -130,6 +130,8 @@
   "legal.providers.purpose.synthesisCheck": "完了したディベートの総合評価 — 四つのカテゴリーについてチェックするため",
   "legal.providers.purpose.reportCheck": "通報ボタンで行った報告、および公開ディベートのテキスト — 報告を確認するため",
   "legal.providers.purpose.questionCheck": "ディベートが始まる前の質問 — ディベートを開始してよいかどうかをチェックするため",
+  "legal.providers.purpose.clarifyQuestions": "ディベートが始まる前：明確化のための質問の提案",
+  "legal.providers.purpose.suggestPaths": "ディベートが始まる前：調べるべき点の提案",
   "legal.providers.purpose.search": "モデルがディベートから作成する検索クエリ — ウェブで証拠を探すため",
   "legal.providers.purpose.support": "サポートチャットで入力された内容 — お客様に回答するため",
   "legal.providers.purposesUnconfirmed": "[要確認：上記のうちどの業務を担うか]",

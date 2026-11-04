@@ -130,6 +130,8 @@
   "legal.providers.purpose.synthesisCheck": "The synthesis of a finished debate — to check it for four categories",
   "legal.providers.purpose.reportCheck": "A report made with the Report button, and the debate's public text — to check the report",
   "legal.providers.purpose.questionCheck": "A question before a debate starts — to check whether the debate may start",
+  "legal.providers.purpose.clarifyQuestions": "Before a debate starts: suggesting clarifying questions",
+  "legal.providers.purpose.suggestPaths": "Before a debate starts: suggesting what to look into",
   "legal.providers.purpose.search": "Search questions the models write from the debate — to find evidence on the web",
   "legal.providers.purpose.support": "What you type in the support chat — to answer you",
   "legal.providers.purposesUnconfirmed": "[to confirm: which of these jobs it is given]",

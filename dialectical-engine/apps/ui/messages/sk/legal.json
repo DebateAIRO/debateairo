@@ -130,6 +130,8 @@
   "legal.providers.purpose.synthesisCheck": "Syntéza dokončenej debaty — na jej kontrolu z hľadiska štyroch kategórií",
   "legal.providers.purpose.reportCheck": "Hlásenie podané tlačidlom Nahlásiť a verejný text debaty — na kontrolu hlásenia",
   "legal.providers.purpose.questionCheck": "Otázka pred začatím debaty — na kontrolu, či debata môže začať",
+  "legal.providers.purpose.clarifyQuestions": "Pred začatím debaty: návrhy spresňujúcich otázok",
+  "legal.providers.purpose.suggestPaths": "Pred začatím debaty: návrhy, čomu sa oplatí venovať",
   "legal.providers.purpose.search": "Vyhľadávacie dopyty, ktoré modely zostavia z debaty — na vyhľadanie dôkazov na webe",
   "legal.providers.purpose.support": "Čo napíšete do chatu podpory — aby vám mohol odpovedať",
   "legal.providers.purposesUnconfirmed": "[na overenie: ktoré z týchto úloh plní]",

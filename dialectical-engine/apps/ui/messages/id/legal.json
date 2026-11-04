@@ -130,6 +130,8 @@
   "legal.providers.purpose.synthesisCheck": "Sintesis debat yang telah selesai — untuk memeriksanya terhadap empat kategori",
   "legal.providers.purpose.reportCheck": "Laporan yang dibuat dengan tombol Laporkan, dan teks publik debat — untuk memeriksa laporan",
   "legal.providers.purpose.questionCheck": "Pertanyaan sebelum debat dimulai — untuk memeriksa apakah debat boleh dimulai",
+  "legal.providers.purpose.clarifyQuestions": "Sebelum debat dimulai: menyarankan pertanyaan klarifikasi",
+  "legal.providers.purpose.suggestPaths": "Sebelum debat dimulai: menyarankan hal yang perlu ditelusuri",
   "legal.providers.purpose.search": "Pertanyaan pencarian yang ditulis model dari debat — untuk menemukan bukti di web",
   "legal.providers.purpose.support": "Apa yang Anda ketik dalam obrolan dukungan — untuk menjawab Anda",
   "legal.providers.purposesUnconfirmed": "[perlu dikonfirmasi: tugas mana saja yang diberikan kepadanya]",

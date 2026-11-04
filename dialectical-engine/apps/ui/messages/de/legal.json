@@ -130,6 +130,8 @@
   "legal.providers.purpose.synthesisCheck": "Die Synthese einer abgeschlossenen Debatte – zur Prüfung auf vier Kategorien",
   "legal.providers.purpose.reportCheck": "Eine mit der Schaltfläche Melden abgegebene Meldung und der öffentliche Text der Debatte – zur Prüfung der Meldung",
   "legal.providers.purpose.questionCheck": "Eine Frage, bevor eine Debatte beginnt – zur Prüfung, ob die Debatte beginnen darf",
+  "legal.providers.purpose.clarifyQuestions": "Bevor eine Debatte beginnt: Vorschläge für klärende Fragen",
+  "legal.providers.purpose.suggestPaths": "Bevor eine Debatte beginnt: Vorschläge, was es zu untersuchen lohnt",
   "legal.providers.purpose.search": "Suchanfragen, die die Modelle aus der Debatte formulieren – um Belege im Web zu finden",
   "legal.providers.purpose.support": "Was Sie in den Support-Chat eingeben – um Ihnen zu antworten",
   "legal.providers.purposesUnconfirmed": "[zu bestätigen: welche dieser Aufgaben er übernimmt]",

@@ -130,6 +130,8 @@
   "legal.providers.purpose.synthesisCheck": "Синтез завершённых дебатов — для проверки по четырём категориям",
   "legal.providers.purpose.reportCheck": "Сообщение, отправленное с помощью кнопки «Сообщить», и публичный текст дебатов — для проверки сообщения",
   "legal.providers.purpose.questionCheck": "Вопрос до начала дебатов — для проверки, могут ли дебаты начаться",
+  "legal.providers.purpose.clarifyQuestions": "До начала дебатов: предложение уточняющих вопросов",
+  "legal.providers.purpose.suggestPaths": "До начала дебатов: предложение того, что стоит изучить",
   "legal.providers.purpose.search": "Поисковые запросы, которые модели составляют на основе дебатов, — для поиска доказательств в интернете",
   "legal.providers.purpose.support": "То, что вы пишете в чате поддержки, — чтобы ответить вам",
   "legal.providers.purposesUnconfirmed": "[уточнить: какие из этих задач ему поручены]",

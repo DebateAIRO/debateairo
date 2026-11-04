@@ -130,6 +130,8 @@
   "legal.providers.purpose.synthesisCheck": "Pabeigto debašu sintēze — lai to pārbaudītu pēc četrām kategorijām",
   "legal.providers.purpose.reportCheck": "Ziņojums, kas iesniegts ar pogu „Ziņot”, un debates publiskais teksts — lai pārbaudītu ziņojumu",
   "legal.providers.purpose.questionCheck": "Jautājums pirms debašu sākuma — lai pārbaudītu, vai debates drīkst sākties",
+  "legal.providers.purpose.clarifyQuestions": "Pirms debašu sākuma: precizējošu jautājumu ieteikšana",
+  "legal.providers.purpose.suggestPaths": "Pirms debašu sākuma: ieteikumi, ko vērts izpētīt",
   "legal.providers.purpose.search": "Modeļu no debatēm izveidotie meklēšanas vaicājumi — lai atrastu pierādījumus tīmeklī",
   "legal.providers.purpose.support": "Atbalsta sarunā ievadītais teksts — lai jums atbildētu",
   "legal.providers.purposesUnconfirmed": "[jāapstiprina: kuri no šiem uzdevumiem tam tiek uzticēti]",

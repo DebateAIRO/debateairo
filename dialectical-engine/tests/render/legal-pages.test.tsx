@@ -550,7 +550,8 @@ describe("the model providers page lists the companies the API's targets reach (
     }
   });
 
-  it("names the eight jobs a provider can be given, and brackets every job nobody has confirmed", () => {
+  // Privacy 3.12 (V4 start step): two jobs before a debate starts join the eight.
+  it("names the ten jobs a provider can be given, and brackets every job nobody has confirmed", () => {
     const view = render(<LegalProvidersBody legalCatalog={legalEnglish} entries={WITH_UNCHECKED} />);
     const jobs = new Set(texts(view.querySelectorAll(".legalProviderPurposes li")));
     expect([...jobs].sort()).toEqual(
@@ -562,6 +563,8 @@ describe("the model providers page lists the companies the API's targets reach (
         "The synthesis of a finished debate — to check it for four categories",
         "A question before a debate starts — to check whether the debate may start",
         REPORT_CHECK_LINE,
+        "Before a debate starts: suggesting clarifying questions",
+        "Before a debate starts: suggesting what to look into",
         "What you type in the support chat — to answer you"
       ].sort()
     );

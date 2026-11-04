@@ -130,6 +130,8 @@
   "legal.providers.purpose.synthesisCheck": "Lõppenud väitluse süntees — selle kontrollimiseks nelja kategooria suhtes",
   "legal.providers.purpose.reportCheck": "Teatage-nupuga tehtud teade ja väitluse avalik tekst — teate kontrollimiseks",
   "legal.providers.purpose.questionCheck": "Küsimus enne väitluse algust — kontrollimiseks, kas väitlus võib alata",
+  "legal.providers.purpose.clarifyQuestions": "Enne väitluse algust: täpsustavate küsimuste pakkumine",
+  "legal.providers.purpose.suggestPaths": "Enne väitluse algust: soovitused, mida uurida",
   "legal.providers.purpose.search": "Otsingupäringud, mille mudelid väitluse põhjal koostavad — tõendite leidmiseks veebist",
   "legal.providers.purpose.support": "Kasutajatoe vestluses sisestatu — teile vastamiseks",
   "legal.providers.purposesUnconfirmed": "[kinnitada: milliseid neist ülesannetest talle antakse]",
