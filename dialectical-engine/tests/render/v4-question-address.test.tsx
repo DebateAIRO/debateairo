@@ -236,7 +236,7 @@ describe("loading and an ended sign-in (map-f6, wait-f1)", () => {
   it("keeps the outline until the saved reading level is known, then draws the map", async () => {
     let answer: (level: "plain" | null) => void = () => undefined;
     harness.accountLevel = new Promise((done) => { answer = done; });
-    await mountMap(1280, crypto.randomUUID(), null, null);
+    await mountMap(1600, crypto.randomUUID(), null, null);
     expect(page().querySelector(".v4DebOutline")).not.toBeNull();
     expect(page().querySelector(".v4MapBranch")).toBeNull();
     await act(async () => answer("plain"));
@@ -247,7 +247,7 @@ describe("loading and an ended sign-in (map-f6, wait-f1)", () => {
 
   it("does not wait for a level that never comes", async () => {
     harness.accountLevel = new Promise(() => undefined);
-    await mountMap(1280, crypto.randomUUID(), null, null);
+    await mountMap(1600, crypto.randomUUID(), null, null);
     expect(page().querySelector(".v4MapBranch")).toBeNull();
     await advance(4_000);
     await settle();
@@ -269,7 +269,7 @@ describe("loading and an ended sign-in (map-f6, wait-f1)", () => {
     harness.run = {
       run_ref: runId, question_line: "Should my town build a heat pump network?", state: "RUNNING", terminal_reason: null, hold_until: null
     } as RunProjection;
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     expect(text()).toContain(CATALOG["v4.debate.state.RUNNING"]);
     harness.loadError = new ContractHttpError("SESSION_REQUIRED", 401, "sign in");
     await advance(5_000);

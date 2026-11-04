@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DIG_LEVEL_MAX } from "../../packages/contract/src/index.js";
 import {
-  advance, branch, buttonNamed, buttonsNamed, CATALOG, click, digPart, harness, mountMap, openPath, panel, PATHS, resetHarness,
+  advance, branch, buttonNamed, buttonsNamed, CATALOG, click, digPart, expandBranch, harness, mountMap, openPath, panel, PATHS, resetHarness,
   seededAnswer, text, tray, typeInto, unmountMap, page
 } from "./v4-debate-harness.js";
 
@@ -48,11 +48,16 @@ afterEach(async () => {
 describe("a path's dig suggestions, by kind", () => {
   it("the tree shows each path's first suggestions with their kind and a pick box; the panel lists them all by kind", async () => {
     await mountMap();
+    // map-f22: about 12 cards at once; a path's suggestions wait behind its "+N more" until it is opened or unfolded.
+    expect(treeBoxes(PATHS.renew)).toHaveLength(0);
+    expect(branch(PATHS.renew).querySelector(".v4MapMore[aria-expanded=\"false\"]")).not.toBeNull();
+    await expandBranch(PATHS.mix);
     expect(treeBoxes(PATHS.mix)).toHaveLength(2);
-    expect(treeBoxes(PATHS.renew)).toHaveLength(2);
-    expect(branch(PATHS.renew).textContent).toContain(word("v4.suggest.more", { count: 1 }));
     expect(branch(PATHS.mix).textContent).toContain(CATALOG["v4.suggest.kind.HELPS_MAIN_QUESTION.FOR"]);
     await openPath(PATHS.renew);
+    // The opened path shows its own leaves in full.
+    expect(treeBoxes(PATHS.renew)).toHaveLength(2);
+    expect(branch(PATHS.renew).textContent).toContain(word("v4.suggest.more", { count: 1 }));
     expect(panel().textContent).toContain(CATALOG["v4.suggest.heading"]);
     expect(panel().textContent).toContain(CATALOG["v4.suggest.onePath"]);
     const heads = [...panel().querySelectorAll(".v4SugGroup .v4PanelSmallHead")].map((node) => node.textContent);
@@ -121,7 +126,10 @@ describe("pick, combine, edit and add your own view", () => {
 describe("picks stay on one path (owner Q-D1)", () => {
   it("refuses a pick from a second path, says so plainly, and lets the person clear and start again", async () => {
     await mountMap();
+    await expandBranch(PATHS.renew);
     await click(treeBoxes(PATHS.renew)[0]!);
+    await expandBranch(PATHS.mix);
+    await expandBranch(PATHS.smr);
     // Every pick box of another path is closed (suggestions and open questions alike), and says why to a screen reader.
     for (const box of treeBoxes(PATHS.mix)) expect(box.disabled).toBe(true);
     const smrOpen = branch(PATHS.smr).querySelector<HTMLInputElement>(".v4MapLeafOpen input[type=checkbox]")!;
@@ -147,6 +155,7 @@ describe("picks stay on one path (owner Q-D1)", () => {
 describe("Undo sends nothing", () => {
   it("a dig undone within 10 seconds is never sent, and the picks wait in the tray", async () => {
     await mountMap();
+    await expandBranch(PATHS.renew);
     await click(treeBoxes(PATHS.renew)[0]!);
     await click(treeBoxes(PATHS.renew)[1]!);
     await click(buttonNamed(word("v4.dig.trayDig.other", { count: 2 }), tray()!));
@@ -191,7 +200,9 @@ describe("\"Dig here too\" (nesting) and the deepest level", () => {
       parent: null,
       children: [{ parent_run_id: runId, child_run_id: crypto.randomUUID(), places: ["path:n-mix"], mode: "quick", created_at: "2026-10-30T10:00:00.000Z" }]
     };
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
+    await expandBranch(PATHS.mix);
+    await expandBranch(PATHS.renew);
     expect(buttonsNamed(CATALOG["v4.nest.digHereToo"]!, branch(PATHS.mix))).toHaveLength(1);
     expect(buttonsNamed(CATALOG["v4.nest.digHereToo"]!, branch(PATHS.renew))).toHaveLength(0);
     await click(buttonNamed(CATALOG["v4.nest.digHereToo"]!, branch(PATHS.mix)));
@@ -204,8 +215,9 @@ describe("\"Dig here too\" (nesting) and the deepest level", () => {
   it("is offered on every path of a dig's own map", async () => {
     const runId = crypto.randomUUID();
     harness.answer = seededAnswer(runId, { dig: digPart(crypto.randomUUID(), 3) });
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     for (const index of Object.values(PATHS)) {
+      await expandBranch(index);
       expect(buttonsNamed(CATALOG["v4.nest.digHereToo"]!, branch(index)), `path ${index}`).toHaveLength(1);
     }
   });
@@ -213,7 +225,7 @@ describe("\"Dig here too\" (nesting) and the deepest level", () => {
   it("at level 10 it is replaced by the deepest-level line: nothing can be picked or dug", async () => {
     const runId = crypto.randomUUID();
     harness.answer = seededAnswer(runId, { dig: digPart(crypto.randomUUID(), DIG_LEVEL_MAX) });
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     expect(text()).toContain(CATALOG["v4.nest.deepest"]);
     expect(buttonsNamed(CATALOG["v4.nest.digHereToo"]!)).toHaveLength(0);
     expect(page().querySelectorAll(".v4MapLeafSuggestion")).toHaveLength(0);

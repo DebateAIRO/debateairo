@@ -183,7 +183,9 @@ export async function loadDigView(link: DigLink, client: DigClient = contractCli
   // W4-6 (Q-D13): a dig of the new model writes no story: it rewrites the path it came from, and keeps its points.
   if (answer.dig !== undefined) {
     const own = buildV4Map({ runId: link.childRunId, answer, story: null });
-    return { link, state: "DONE", headline: null, counts: own.counts, rewrite: answer.dig.rewrite, points: own.points };
+    // map-f29 / dig-f20: what it looked into, in its own words and by whom, titles the dig on the map above.
+    const picks = answer.dig.picks.map((pick) => ({ text: pick.text, by: pick.by }));
+    return { link, state: "DONE", headline: null, counts: own.counts, rewrite: answer.dig.rewrite, points: own.points, picks };
   }
   // A failed story read leaves the dig DONE without a headline; the page reads it again later (TIME-5, TIME-8).
   const story = await loadStory(answer.answer_id, client, answer.answer_version);

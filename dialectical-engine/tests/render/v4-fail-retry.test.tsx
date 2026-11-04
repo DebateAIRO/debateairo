@@ -84,7 +84,7 @@ describe("a debate that did not finish (wait-f11, map-f30)", () => {
   it("offers 'Ask this again' (by its id only), the grey line, and 'Ask a new question' as a small link", async () => {
     const runId = crypto.randomUUID();
     harness.run = failedRun(runId);
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     expect(text()).toContain(HOME["runFailure.MODELS_UNAVAILABLE"]);
     // The ask step is filled from this debate: only its id travels in the address, never the words.
     expect(linkHref(CATALOG["v4.debate.askAgain"]!)).toBe(`/v4?again=${runId}&level=background`);
@@ -99,13 +99,13 @@ describe("a debate that did not finish (wait-f11, map-f30)", () => {
   it("says 'Nothing was taken for the failed try.' only when the server confirms it, and never twice", async () => {
     const runId = crypto.randomUUID();
     harness.run = failedRun(runId, { quota_used: "NONE" });
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     expect(text()).toContain(CATALOG["v4.debate.failedNothingTaken"]);
     await unmountMap();
     // An upload set it aside: its own sentence already says it used none.
     const other = crypto.randomUUID();
     harness.run = failedRun(other, { quota_used: "NONE" }, "RUN_SET_ASIDE:BACKSTOP");
-    await mountMap(1280, other);
+    await mountMap(1600, other);
     expect(text()).toContain(HOME["runFailure.SET_ASIDE"]);
     expect(text()).not.toContain(CATALOG["v4.debate.failedNothingTaken"]);
   });
@@ -115,7 +115,7 @@ describe("a debate that did not finish (wait-f11, map-f30)", () => {
     const runId = crypto.randomUUID();
     harness.run = failedRun(runId);
     harness.records = { parent: { parent_run_id: parent, child_run_id: runId, places: ["path:n-mix"], mode: "quick", created_at: "2026-10-29T10:05:00.000Z" }, children: [] };
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     expect(linkHref(CATALOG["v4.debate.askAgain"]!)).toBeNull();
     expect(linkHref(CATALOG["v4.report.backToMap"]!)).toBe(`/v4/debate/${parent}?level=background`);
     expect(text()).toContain(CATALOG["v4.debate.digFailedBackNote"]);
@@ -128,7 +128,7 @@ describe("a dig that did not finish (wait-f18, dig-f12)", () => {
     const child = crypto.randomUUID();
     recordDig(runId, child, ["path:n-mix"], "thorough");
     harness.digView = (link) => failedDig(link, { questionLine: pathDigQuestion(runId, "n-mix") });
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     expect(branch(PATHS.mix).querySelector(".v4MapDig")!.textContent).toContain(CATALOG["v4.rewrite.digCard.FAILED"]);
     await openDig(PATHS.mix);
     expect(panel().textContent).toContain(CATALOG["v4.panel.digState.FAILED"]);
@@ -150,7 +150,7 @@ describe("a dig that did not finish (wait-f18, dig-f12)", () => {
     const runId = crypto.randomUUID();
     recordDig(runId, crypto.randomUUID(), ["path:n-mix"]);
     harness.digView = (link) => failedDig(link, { questionLine: pathDigQuestion(runId, "n-mix"), quotaUntouched: true });
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     await openDig(PATHS.mix);
     expect(panel().textContent).toContain(CATALOG["v4.digFailed.nothingTaken"]);
     await click(buttonNamed(CATALOG["v4.digFailed.retry"]!, panel()));
@@ -162,7 +162,7 @@ describe("a dig that did not finish (wait-f18, dig-f12)", () => {
     const other = crypto.randomUUID();
     recordDig(other, crypto.randomUUID(), ["path:n-mix"]);
     harness.digView = (link) => failedDig(link, { questionLine: "Something the page would not send for this path." });
-    await mountMap(1280, other);
+    await mountMap(1600, other);
     await openDig(PATHS.mix);
     expect(buttonsNamed(CATALOG["v4.digFailed.retry"]!, panel())).toEqual([]);
   });
@@ -172,7 +172,7 @@ describe("a dig that did not finish (wait-f18, dig-f12)", () => {
     recordDig(runId, crypto.randomUUID(), ["path:n-mix"]);
     recordDig(runId, crypto.randomUUID(), ["path:n-mix"]);
     harness.digView = (link) => failedDig(link, { questionLine: pathDigQuestion(runId, "n-mix") });
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     await openDig(PATHS.mix);
     expect(panel().textContent).toContain(CATALOG["v4.digFailed.keepsFailing"]);
     expect(buttonsNamed(CATALOG["v4.digFailed.retry"]!, panel())).toEqual([]);
@@ -189,7 +189,7 @@ describe("a dig paused at the month wall (wait-f2, public-f16, public-f17)", () 
     const runId = crypto.randomUUID();
     recordDig(runId, crypto.randomUUID(), ["path:n-mix"]);
     harness.digView = pausedDig(false);
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     const card = branch(PATHS.mix).querySelector(".v4MapDig")!;
     expect(card.textContent).toContain(word("v4.pause.digCard", { date: day }));
     expect(card.querySelector(".v4MapPulse")).toBeNull();
@@ -208,7 +208,7 @@ describe("a dig paused at the month wall (wait-f2, public-f16, public-f17)", () 
     const child = crypto.randomUUID();
     recordDig(runId, child, ["path:n-mix"]);
     harness.digView = pausedDig(true);
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     expect(branch(PATHS.mix).querySelector(".v4MapDig")!.textContent).toContain(CATALOG["v4.pause.digCardReady"]);
     await openDig(PATHS.mix);
     expect(panel().textContent).toContain(CATALOG["v4.money.pausedReady"]);

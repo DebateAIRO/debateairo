@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { digTargetQuestions } from "@/lib/v4/askText";
+import { firstByOf } from "@/lib/v4/mapLooks";
 import type { PendingDig } from "@/lib/v4/types";
 
 /*
@@ -71,7 +72,8 @@ export function V4DigToast(props: Readonly<{
       <div className={className}>
         <span className="v4DebToastText" role="status">
           {before}
-          <span data-ai-generated="true">{first}</span>
+          {/* dig-f20: the person's own view (or their wording of a suggestion) is theirs, not AI text. */}
+          <span data-ai-generated={firstByOf(pending.target) === "AI" ? "true" : undefined}>{first}</span>
           {after}
           {questions.length > 1 ? <>{" "}{tPlural(catalog, "v4.dig.andMore", questions.length - 1, locale)}</> : null}
           <span className="v4DebToastMode">{" · "}{t(catalog, `v4.digMode.${pending.mode}`)}</span>

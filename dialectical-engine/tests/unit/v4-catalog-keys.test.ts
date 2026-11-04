@@ -344,7 +344,10 @@ describe("V4 catalogue keys", () => {
     const cards = ["WAITING", "RUNNING", "PAUSED", "FAILED", "DONE", "REWRITING", "CHANGED", "NO_CHANGE", "REWRITE_FAILED"]
       .map((state) => `v4.rewrite.digCard.${state}`);
     expect(cards.filter((key) => !(key in catalog))).toEqual([]);
-    for (const key of cards) expect(catalog[key], key).toMatch(/^Dig · /u);
+    // V4 screen review (3 Nov), journey-f2 / journey-f22: a dig at work says the one state word "Looking into it" (its card
+    // already carries what is being dug); the other card lines keep their "Dig · " start.
+    expect(catalog["v4.rewrite.digCard.RUNNING"]).toBe("Looking into it");
+    for (const key of cards.filter((card) => card !== "v4.rewrite.digCard.RUNNING")) expect(catalog[key], key).toMatch(/^Dig · /u);
     // The new lines say what happened in plain words: no score, no state code, no reviewer or checker name.
     const fresh = DRAFTED_UNTIL_CLICK_TEST.filter((key) => key.startsWith("v4.rewrite.") || key.startsWith("v4.nest.")).map((key) => catalog[key]!);
     expect(fresh.filter((line) => /\b(?:score|strength|threshold|READY|WRITING|FAILED|checker|GLM|Haiku)\b/u.test(line))).toEqual([]);

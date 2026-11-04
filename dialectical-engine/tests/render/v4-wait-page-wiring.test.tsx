@@ -54,7 +54,7 @@ describe("the debate page's checks while the question runs (wait-f19)", () => {
   it("reads every 5 seconds while shown, rarely while hidden, and at once when shown again or back online", async () => {
     const runId = crypto.randomUUID();
     harness.run = running(runId);
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     expect(seen.reads).toBe(1);
     await advance(5_000);
     await settle();
@@ -76,7 +76,7 @@ describe("the debate page's checks while the question runs (wait-f19)", () => {
   it("stops reading once the answer is served", async () => {
     const runId = crypto.randomUUID();
     harness.run = running(runId);
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     harness.run = null;
     await advance(5_000);
     await settle();
@@ -92,7 +92,7 @@ describe("Open in the classic view while the question waits (wait-f23)", () => {
   it("the header leaves it out on the waiting card, so it shows once; the map's header has it again", async () => {
     const runId = crypto.randomUUID();
     harness.run = running(runId);
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     expect(seen.headerLinks.at(-1)).toBeNull();
     expect(classicLinks()).toHaveLength(1);
     harness.run = null;

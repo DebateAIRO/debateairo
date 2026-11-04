@@ -111,12 +111,14 @@ describe("a rewritten path (desktop)", () => {
   it("shows its new text on the map, and in the panel what the dig changed and the verdict on the person's point of view", async () => {
     const runId = crypto.randomUUID();
     harness.answer = answerWith(runId, ROOT);
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     const card = branch(PATHS.mix).querySelector<HTMLElement>(".v4MapPath")!;
     // The card's title is the new text; its one line says when the dig rewrote it.
     expect(card.querySelector(".v4MapPathTitle")!.textContent).toContain("Mostly renewables, plus some firm power");
     expect(card.querySelector(".v4RewriteNote")!.textContent).toBe(word("v4.rewrite.rewrittenOnce", { date: day(OWN_VIEW.rewritten_at) }));
-    expect(card.querySelector(".v4MapFate")!.textContent).toBe(CATALOG["v4.fate.HELD_UP"]);
+    // r2-20 A / map-f25: no outcome tag on the card; the path's own trust word and its bar say how it stands.
+    expect(card.querySelector(".v4MapFate")).toBeNull();
+    expect(card.querySelector(".v4MapPathTitle")!.textContent).not.toMatch(/held up/iu);
 
     await openPath(PATHS.mix);
     const rewrite = panel().querySelector<HTMLElement>(".v4Rewrite")!;
@@ -141,7 +143,7 @@ describe("a rewritten path (desktop)", () => {
   it("a rewrite made of an AI suggestion chosen as it was carries no verdict", async () => {
     const runId = crypto.randomUUID();
     harness.answer = answerWith(runId, ROOT);
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     await openPath(PATHS.renew);
     expect(panel().querySelector(".v4RewriteChanged")).not.toBeNull();
     expect(panel().querySelector(".v4RewriteView")).toBeNull();
@@ -154,7 +156,7 @@ describe("a rewritten path (desktop)", () => {
       paths: [{ position_ref: "n-mix", current: SECOND.state === "READY" ? SECOND.text : null, history: [OWN_VIEW, SECOND] }],
       changed_since: { count: 1, since_report_version: null }
     });
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     expect(branch(PATHS.mix).querySelector(".v4RewriteNote")!.textContent)
       .toBe(word("v4.rewrite.rewrittenMany", { count: 2, date: day("2026-10-31T09:03:00.000Z") }));
     await openPath(PATHS.mix);
@@ -176,9 +178,10 @@ describe("a rewritten path (desktop)", () => {
     harness.answer = answerWith(runId, ROOT);
     recordDig(runId, DIG_RUNS.ownView, ["path:n-mix", "p:n-mix-land"]);
     harness.digView = (link) => doneDig(link, OWN_VIEW);
-    await mountMap(1280, runId);
-    // The dig's card says it changed this path.
-    expect(branch(PATHS.mix).querySelector(".v4MapDig")!.textContent).toContain(CATALOG["v4.rewrite.digCard.CHANGED"]);
+    await mountMap(1600, runId);
+    // The dig's card says what it did to this path (journey-f11: "Corrected" when its outcome moved, else "Added to").
+    const result = OWN_VIEW.fate_before === OWN_VIEW.text.fate ? "v4.result.card.ADDED_TO" : "v4.result.card.CORRECTED";
+    expect(branch(PATHS.mix).querySelector(".v4MapDig")!.textContent).toContain(CATALOG[result]);
     await openPath(PATHS.mix);
     expect(panel().querySelector(".v4RewriteDigPoints")).toBeNull();
     await click(buttonNamed(CATALOG["v4.rewrite.seeDigPoints"]!, panel()));
@@ -207,11 +210,13 @@ describe("a rewritten path's trust words (W4-8, owner Q-D3)", () => {
     harness.answer = answerWith(runId, { ...ROOT, paths: ROOT.paths.map((path) => (path.position_ref === "n-mix" ? { ...path, history: [served] } : path)) });
     recordDig(runId, DIG_RUNS.ownView, ["path:n-mix"]);
     harness.digView = (link) => doneDig(link, served);
-    await mountMap(1280, runId);
-    // The path's bar counts one more still-argued point than the path's own points give.
+    await mountMap(1600, runId);
+    // The path's bar counts one more still-argued point than the path's own points give (map-f28: shown as its share of
+    // the bar, never as a number).
     const argued = plain.counts.STILL_ARGUED + 1;
     const bar = branch(PATHS.mix).querySelector<HTMLElement>(".v4MapPath .v4BarTrack")!;
-    expect(bar.getAttribute("aria-label")).toContain(word("v4.trustCount.STILL_ARGUED", { count: argued }));
+    expect(bar.querySelector<HTMLElement>(".v4BarArgued")!.style.flexGrow).toBe(String(argued));
+    expect(bar.getAttribute("aria-label")).not.toMatch(/\d/u);
     await openPath(PATHS.mix);
     await click(buttonNamed(CATALOG["v4.rewrite.seeDigPoints"]!, panel()));
     const item = [...panel().querySelectorAll<HTMLElement>(".v4RewriteDigPoints li")].find((entry) => entry.textContent!.includes(digPoint.text))!;
@@ -224,11 +229,13 @@ describe("a rewritten path's trust words (W4-8, owner Q-D3)", () => {
   it("an unrewritten path keeps the words of its own points", async () => {
     const runId = crypto.randomUUID();
     harness.answer = answerWith(runId, ROOT);
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     const plain = buildV4Map({ runId, answer: answerWith(runId, ROOT), story: seededStory() }).paths.find((path) => path.id === "n-nuclear")!;
     const bar = branch(PATHS.nuclear).querySelector<HTMLElement>(".v4MapPath .v4BarTrack")!;
+    const shares = { SURE: "v4BarSure", SURE_FOR_CASE: "v4BarCase", STILL_ARGUED: "v4BarArgued", DIDNT_HOLD: "v4BarFell" } as const;
     const words = (["SURE", "SURE_FOR_CASE", "STILL_ARGUED", "DIDNT_HOLD"] as const).filter((name) => plain.counts[name] > 0);
-    for (const name of words) expect(bar.getAttribute("aria-label")).toContain(word(`v4.trustCount.${name}`, { count: plain.counts[name] }));
+    expect(words.length).toBeGreaterThan(0);
+    for (const name of words) expect(bar.querySelector<HTMLElement>(`.${shares[name]}`)!.style.flexGrow).toBe(String(plain.counts[name]));
   });
 });
 
@@ -238,15 +245,16 @@ describe("the four states (draft 5.5)", () => {
     harness.answer = answerWith(runId, FOUR_STATES);
     recordDig(runId, DIG_FAILED, ["path:n-nuclear"]);
     harness.digView = (link) => doneDig(link, FOUR_STATES.paths[2]!.history[0]!);
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     const note = (index: number) => branch(index).querySelector(".v4RewriteNote")?.textContent;
     expect(note(PATHS.mix)).toBe(word("v4.rewrite.rewrittenOnce", { date: day(OWN_VIEW.rewritten_at) }));
     expect(note(PATHS.renew)).toBe(CATALOG["v4.rewrite.state.WRITING"]);
     expect(note(PATHS.nuclear)).toBe(CATALOG["v4.rewrite.card.FAILED"]);
     expect(note(PATHS.smr)).toBe(CATALOG["v4.rewrite.state.NO_CHANGE"]);
     // A rewrite still being written or a failed one leaves the path's text as it was.
-    expect(branch(PATHS.renew).querySelector(".v4MapPathTitle")!.textContent).toContain("Only renewables and storage: partly held.");
-    expect(branch(PATHS.nuclear).querySelector(".v4MapFate")!.textContent).toBe(CATALOG["v4.fate.FELL"]);
+    expect(branch(PATHS.renew).querySelector(".v4MapPathTitle")!.textContent).toBe("Only renewables and storage");
+    // map-f25: "Didn't hold" stays only where a path fell, as its one trust word (r2-20 A).
+    expect(branch(PATHS.nuclear).querySelector(".v4MapTrust")!.textContent).toBe(CATALOG["v4.trust.DIDNT_HOLD"]);
     // The failed rewrite's dig card says so.
     expect(branch(PATHS.nuclear).querySelector(".v4MapDig")!.textContent).toContain(CATALOG["v4.rewrite.digCard.REWRITE_FAILED"]);
 
@@ -270,7 +278,7 @@ describe("the four states (draft 5.5)", () => {
   it("a failed rewrite whose dig this page has not read points to the dig's map", async () => {
     const runId = crypto.randomUUID();
     harness.answer = answerWith(runId, FOUR_STATES);
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     await openPath(PATHS.nuclear);
     expect(panel().textContent).toContain(CATALOG["v4.rewrite.digPointsElsewhere"]);
     const map = [...panel().querySelectorAll<HTMLAnchorElement>("a")].find((link) => link.textContent === CATALOG["v4.rewrite.openDigMap"])!;
@@ -307,7 +315,7 @@ describe("news (draft 5.5)", () => {
     harness.answer = answerWith(runId, writing);
     recordDig(runId, DIG_WRITING, ["path:n-renew"]);
     harness.digView = (link) => doneDig(link, writing.paths[0]!.history[0]!);
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     expect(page().querySelector(".v4DebChanges")).toBeNull();
     const ready: PathRewrite = {
       ...OWN_VIEW, rewrite_id: "rw-writing", dig_run_id: DIG_WRITING, dig_finished_at: LATER, rewritten_at: "2026-10-31T09:06:00.000Z",
@@ -334,7 +342,7 @@ describe("news (draft 5.5)", () => {
     const before = buildV4Map({ runId, answer: answerWith(runId, writing), story: seededStory() });
     harness.lastVisit = { at: "2026-10-30T12:00:00.000Z", items: snapshotItems(before, []) };
     harness.answer = answerWith(runId, done);
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     const bar = page().querySelector<HTMLElement>(".v4DebChanges")!;
     expect(bar.getAttribute("aria-label")).toBe(CATALOG["v4.changes.labelLastVisit"]);
     expect(bar.querySelector(".v4DebChangesRewrites")!.textContent).toBe(word("v4.changes.digNoChange", { line: shortText(STORY_LINES["n-smr"]!, 80) }));

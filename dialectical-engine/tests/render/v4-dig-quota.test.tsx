@@ -6,8 +6,8 @@ import type { AskRoom } from "../../apps/ui/lib/billing/room.js";
 import type * as Money from "../../apps/ui/lib/v4/money.js";
 import { DIG_LEVEL_MAX, type RunProjection } from "../../packages/contract/src/index.js";
 import {
-  advance, branch, buttonNamed, buttonsNamed, CATALOG, click, digPart, harness, mountMap, openPath, page, panel, PATHS, resetHarness,
-  seededAnswer, text, tray, unmountMap
+  advance, branch, buttonNamed, buttonsNamed, CATALOG, click, digPart, expandBranch, harness, mountMap, openPath, page, panel, PATHS,
+  resetHarness, seededAnswer, text, tray, unmountMap
 } from "./v4-debate-harness.js";
 
 vi.mock("@/components/AuthGate", async () => (await import("./v4-debate-harness.js")).authGateMock);
@@ -62,6 +62,8 @@ describe("before a dig: its share of today", () => {
     await mountMap();
     const line = word("v4.dig.quotaShare", { percent: 20 });
     expect(line).toBe("This dig uses about 20% of today. After it you can still finish your report.");
+    // map-f22: the path's suggestions show once its leaves are unfolded (about 12 cards at once).
+    await expandBranch(PATHS.renew);
     await click(branch(PATHS.renew).querySelector<HTMLInputElement>(".v4MapLeafSuggestion input[type=checkbox]")!);
     expect(tray()?.textContent).toContain(line);
     await openPath(PATHS.renew);
@@ -126,7 +128,7 @@ describe("a debate paused at the month wall", () => {
   it("says it once, with a still mark and no Continue button before the reset", async () => {
     const runId = crypto.randomUUID();
     harness.run = paused(runId, false);
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     const date = formatDate("en", NEXT_MONTH, { dateStyle: "medium" });
     const day = formatDate("en", NEXT_MONTH, { day: "numeric", month: "short" });
     expect(text()).toContain(word("v4.money.paused", { date }));
@@ -142,7 +144,7 @@ describe("a debate paused at the month wall", () => {
   it("once the month has reset, Continue resumes it", async () => {
     const runId = crypto.randomUUID();
     harness.run = paused(runId, true);
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     expect(text()).toContain(CATALOG["v4.money.pausedReady"]);
     await click(buttonNamed(CATALOG["v4.money.continue"]!));
     expect(harness.continueRun).toHaveBeenCalledWith(runId);
@@ -153,7 +155,7 @@ describe("a debate paused at the month wall", () => {
     const runId = crypto.randomUUID();
     harness.run = paused(runId, true);
     harness.continueRun = vi.fn(async () => ({ kind: "TOO_EARLY" as const, until: NEXT_MONTH }));
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     await click(buttonNamed(CATALOG["v4.money.continue"]!));
     expect(text()).toContain(word("v4.money.continueTooEarly", { date: formatDate("en", NEXT_MONTH, { dateStyle: "medium" }) }));
     expect(buttonNamed(CATALOG["v4.money.continue"]!).disabled).toBe(false);
@@ -163,7 +165,7 @@ describe("a debate paused at the month wall", () => {
     const runId = crypto.randomUUID();
     harness.run = paused(runId, true);
     harness.continueRun = vi.fn(async () => ({ kind: "FAILED" as const }));
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     await click(buttonNamed(CATALOG["v4.money.continue"]!));
     expect(text()).toContain(CATALOG["v4.money.continueFailed"]);
   });
@@ -171,7 +173,7 @@ describe("a debate paused at the month wall", () => {
   it("when the new month starts while the page is open, the block changes at once with the 1-second highlight", async () => {
     const runId = crypto.randomUUID();
     harness.run = paused(runId, false);
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     expect(page().querySelector(".v4PauseChanged")).toBeNull();
     harness.run = paused(runId, true);
     await advance(5_000);
@@ -203,7 +205,7 @@ describe("\"Write my report\" is always there", () => {
   it("at the deepest level too (where nothing more can be dug)", async () => {
     const runId = crypto.randomUUID();
     harness.answer = seededAnswer(runId, { dig: digPart(crypto.randomUUID(), DIG_LEVEL_MAX) });
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     expect(reportLinks().length).toBeGreaterThan(0);
   });
 });

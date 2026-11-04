@@ -32,7 +32,7 @@ afterEach(async () => { await unmountMap(); vi.useRealTimers(); });
 
 describe("Add to researched on the debate page", () => {
   it("a press names the path and the page, says READING, and the answer read again shows the outcome", async () => {
-    const runId = await mountMap(1280, crypto.randomUUID(), PATH);
+    const runId = await mountMap(1600, crypto.randomUUID(), PATH);
     expect(panelText()).toContain(CATALOG["v4.web.addResearchedHint"]);
     const pageRef = seededAnswer(runId).web!.paths.find((path) => path.position_ref === PATH)!.other_pages[0]!.page_ref;
     await click(addButton()!);
@@ -54,7 +54,7 @@ describe("Add to researched on the debate page", () => {
 
   it("a press that does not take says so and offers the button again; a full quota says when", async () => {
     harness.addToResearched = vi.fn(async () => "TRY_AGAIN" as const);
-    await mountMap(1280, crypto.randomUUID(), PATH);
+    await mountMap(1600, crypto.randomUUID(), PATH);
     await click(addButton()!);
     expect(panelText()).toContain(CATALOG["v4.web.researched.tryAgain"]);
     expect(addButton()!.disabled).toBe(false);
@@ -66,14 +66,14 @@ describe("Add to researched on the debate page", () => {
 
   it("Free offers no button, and neither does a quota waiting for its reset; the pages still show", async () => {
     harness.planTier = "free";
-    await mountMap(1280, crypto.randomUUID(), PATH);
+    await mountMap(1600, crypto.randomUUID(), PATH);
     expect(panelText()).toContain(CATALOG["v4.web.otherPages"]);
     expect(addButton()).toBeNull();
     expect(panelText()).not.toContain(CATALOG["v4.web.addResearchedHint"]);
     await unmountMap();
     harness.planTier = "premium";
     harness.room = { room: "FULL", scope: "PERSON_DAY", resets_at: "2026-11-01T00:00:00.000Z", waiting_run_ref: null, plan_id: "PLUS", new_starts: "BLOCKED_UNTIL_RESET" } as never;
-    await mountMap(1280, crypto.randomUUID(), PATH);
+    await mountMap(1600, crypto.randomUUID(), PATH);
     expect(panelText()).toContain(CATALOG["v4.web.otherPages"]);
     expect(addButton()).toBeNull();
   });

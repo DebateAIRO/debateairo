@@ -50,7 +50,7 @@ describe("Paths changed since the answer was written", () => {
   it("says the count and offers \"Write my report\"", async () => {
     const runId = crypto.randomUUID();
     harness.answer = answerWith(runId, { ...ROOT, changed_since: { count: 2, since_report_version: null } });
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     expect(strip()!.textContent).toContain(word("v4.rewrite.changedSince.other", { count: 2 }));
     const report = strip()!.querySelector<HTMLAnchorElement>("a")!;
     expect(report.textContent).toBe(CATALOG["v4.rail.writeReport"]);
@@ -60,7 +60,7 @@ describe("Paths changed since the answer was written", () => {
   it("one path: its own sentence", async () => {
     const runId = crypto.randomUUID();
     harness.answer = answerWith(runId, { ...ROOT, changed_since: { count: 1, since_report_version: null } });
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     expect(strip()!.textContent).toContain(word("v4.rewrite.changedSince.one", { count: 1 }));
   });
 
@@ -74,7 +74,7 @@ describe("after a report", () => {
   it("counts since that report's version", async () => {
     const runId = crypto.randomUUID();
     harness.answer = answerWith(runId, ROOT);
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     expect(strip()!.textContent).toContain(word("v4.rewrite.changedSinceReport", { n: 1, count: 2 }));
     expect(strip()!.querySelector("a")!.textContent).toBe(CATALOG["v4.rail.writeReport"]);
   });
@@ -82,7 +82,7 @@ describe("after a report", () => {
   it("is gone when nothing changed since the report", async () => {
     const runId = crypto.randomUUID();
     harness.answer = answerWith(runId, { ...ROOT, changed_since: { count: 0, since_report_version: 1 } });
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     expect(strip()).toBeNull();
     expect(page().textContent).not.toContain(word("v4.rewrite.changedSinceReport", { n: 1, count: 0 }));
   });
@@ -97,7 +97,7 @@ describe("after a report", () => {
       paths: [...OTHERS, { position_ref: "n-smr", current: null, history: [writing] }],
       changed_since: { count: 0, since_report_version: 2 }
     });
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     expect(strip()).toBeNull();
     const done: PathRewrite = {
       ...writing, state: "READY", rewritten_at: "2026-10-31T10:02:00.000Z", changed: true,
