@@ -130,9 +130,11 @@ function Rounds(props: Readonly<{ rail: RailProps }>) {
               <span className="v4DebRailNote">
                 {digs.running > 0
                   ? tPlural(catalog, "v4.rail.digsRunning", digs.running, locale)
-                  : paused > 0 ? tPlural(catalog, "v4.rail.digsPaused", paused, locale) : tPlural(catalog, "v4.rail.digsDone", digs.done, locale)}
+                  : paused > 0 ? tPlural(catalog, "v4.rail.digsPaused", paused, locale)
+                  : digs.done > 0 ? tPlural(catalog, "v4.rail.digsDone", digs.done, locale) : null}
                 {digs.running > 0 && paused > 0 ? <>{" · "}{tPlural(catalog, "v4.rail.digsPaused", paused, locale)}</> : null}
-                {digs.failed > 0 ? <>{" · "}{tPlural(catalog, "v4.rail.digsFailed", digs.failed, locale)}</> : null}
+                {/* When every dig failed, the round says only that: never "Ready" before it. */}
+                {digs.failed > 0 ? <>{roundOpen || digs.done > 0 ? " · " : null}{tPlural(catalog, "v4.rail.digsFailed", digs.failed, locale)}</> : null}
               </span>
             </span>
           </li>

@@ -84,7 +84,6 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.suggest.kind.HELPS_MAIN_QUESTION.FOR",
   "v4.suggest.kind.HELPS_MAIN_QUESTION.AGAINST",
   "v4.suggest.ownView",
-  "v4.suggest.edit",
   // Dig model revision (W2-7): the page labels of section 5.5 (no search-words box: the owner corrected that on 30 Oct).
   "v4.view.heading",
   "v4.rewrite.changedSince.one",
@@ -177,7 +176,6 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.suggest.heading",
   "v4.suggest.onePath",
   "v4.suggest.otherPath",
-  "v4.suggest.freeCap",
   "v4.suggest.full",
   "v4.suggest.empty",
   "v4.suggest.tooLong",
@@ -190,7 +188,6 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.suggest.cancel",
   "v4.suggest.ownViewLabel",
   "v4.suggest.ownViewAdd",
-  "v4.suggest.ownViewTag",
   "v4.suggest.remove",
   "v4.money.continueFailed",
   // R22 W5-1 (31 Oct): the final report's versions, its waits, a failed version, "Keep digging", and the map's answer from
@@ -396,7 +393,21 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.rail.digsFailed.other",
   "v4.panel.unchecked.one",
   "v4.public.signedOut.dig",
-  "v4.public.signedOut.report"
+  "v4.public.signedOut.report",
+  // The final check of that list (5 Nov): two more of the build's own words (ask-f4 words only the day and month pills;
+  // no record words a pause whose date is unknown), and lines whose words are only in the drawings the owner picked from
+  // or join two record phrases. REVIEW_LINES below keeps their drawn words; the owner confirms them at the click-test.
+  "v4.header.used.PERSON_WEEK",
+  "v4.state.PAUSED.noDate",
+  "v4.report.digWait",
+  "v4.digsDid.line.CORRECTED",
+  "v4.digsDid.line.ADDED_TO",
+  "v4.digsDid.line.CONFIRMED",
+  "v4.dig.started",
+  "v4.debate.state.HOLDING.noTime",
+  "v4.panel.found",
+  "v4.digLive.found",
+  "v4.digLive.pathNow"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {
