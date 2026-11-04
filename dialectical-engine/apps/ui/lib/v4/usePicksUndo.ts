@@ -25,6 +25,12 @@ export type PicksUndo = Readonly<{
   undo: () => void;
   /** Ends the offer without bringing the picks back. */
   dismiss: () => void;
+  /**
+   * dig-f7: whether the note already took focus for this offer. The note is drawn again when the phone's Map sheet opens
+   * or closes (it moves to the sheet's foot); only its first showing moves focus to Undo.
+   */
+  focusTaken: boolean;
+  markFocusTaken: () => void;
 }>;
 
 export function usePicksUndo(input: Readonly<{
@@ -36,6 +42,7 @@ export function usePicksUndo(input: Readonly<{
   const { draft, current, commit } = input;
   const [before, setBefore] = useState<V4DigDraft | null>(null);
   const [endsAt, setEndsAt] = useState<number | null>(null);
+  const [focusTaken, setFocusTaken] = useState(false);
   const beforeRef = useRef(before);
   useEffect(() => {
     beforeRef.current = before;
@@ -47,7 +54,9 @@ export function usePicksUndo(input: Readonly<{
     commit(EMPTY_DRAFT);
     setBefore(now);
     setEndsAt(Date.now() + PICKS_UNDO_MS);
+    setFocusTaken(false);
   }, [current, commit]);
+  const markFocusTaken = useCallback((): void => setFocusTaken(true), []);
 
   const undo = useCallback((): void => {
     const kept = beforeRef.current;
@@ -69,5 +78,5 @@ export function usePicksUndo(input: Readonly<{
     if (draft.picks.length > 0 && beforeRef.current !== null && draft !== beforeRef.current) setBefore(null);
   }, [draft]);
 
-  return { offered: before !== null, endsAt: before === null ? null : endsAt, clear, undo, dismiss };
+  return { offered: before !== null, endsAt: before === null ? null : endsAt, clear, undo, dismiss, focusTaken, markFocusTaken };
 }

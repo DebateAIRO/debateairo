@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { AnswerMainAnswer } from "@debateai/contract";
 import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
 import { cardLabel } from "@/lib/v4/mapLooks";
@@ -197,6 +197,19 @@ export function V4AnswerCard(props: Readonly<{
 }>) {
   const { map, catalog, locale } = props;
   const bodyId = useId();
+  // dig-f7 / map-d1: the control pressed hides itself (the folded line) or goes inert (Fold): focus moves on to the
+  // card's eyebrow after unfolding, and back to the folded line after folding, never to the page's top. Only a press of
+  // the card's own controls moves focus: a fold the page makes by itself (another question opened) leaves focus alone.
+  const lineRef = useRef<HTMLButtonElement | null>(null);
+  const eyebrowRef = useRef<HTMLParagraphElement | null>(null);
+  const focusAfter = useRef<"line" | "eyebrow" | null>(null);
+  useEffect(() => {
+    const to = focusAfter.current;
+    // Once the change the press asked for is drawn.
+    if (to === null || (to === "line") !== props.folded) return;
+    focusAfter.current = null;
+    (to === "line" ? lineRef.current : eyebrowRef.current)?.focus();
+  }, [props.folded]);
   const versions = answerVersions({ mainAnswer: props.mainAnswer, reportAnswer: props.reportAnswer, answeredAt: props.answeredAt });
   const current = versions[0]!;
   const earlier = versions.slice(1);
@@ -215,12 +228,16 @@ export function V4AnswerCard(props: Readonly<{
       aria-label={t(catalog, "v4.answerCard.region")}
     >
       <button
+        ref={lineRef}
         type="button"
         className="v4AnswerFoldLine"
         aria-expanded={!props.folded}
         aria-controls={bodyId}
         hidden={!props.folded}
-        onClick={props.onUnfold}
+        onClick={() => {
+          focusAfter.current = "eyebrow";
+          props.onUnfold();
+        }}
       >
         <span className="v4AnswerFoldLabel">{t(catalog, "v4.answerCard.folded")}</span>{" "}
         <span className="v4AnswerFoldWords" data-ai-generated={lineWords.length > 0 ? "true" : undefined}>{lineWords}</span>
@@ -229,9 +246,12 @@ export function V4AnswerCard(props: Readonly<{
       <div className="v4AnswerFold" id={bodyId} inert={props.folded} aria-hidden={props.folded ? "true" : undefined}>
         <div className="v4AnswerInner">
           <div className="v4AnswerHead">
-            <p className="v4Eyebrow">{label}</p>
+            <p ref={eyebrowRef} className="v4Eyebrow" tabIndex={-1}>{label}</p>
             {props.onFold !== undefined ? (
-              <button type="button" className="v4Link v4AnswerFoldBtn" aria-expanded="true" aria-controls={bodyId} onClick={props.onFold}>
+              <button type="button" className="v4Link v4AnswerFoldBtn" aria-expanded="true" aria-controls={bodyId} onClick={() => {
+                focusAfter.current = "line";
+                props.onFold?.();
+              }}>
                 {t(catalog, "v4.answerCard.fold")}
               </button>
             ) : null}

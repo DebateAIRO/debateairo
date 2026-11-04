@@ -19,6 +19,8 @@ import { t, type MessageCatalog } from "@/lib/i18n/translate";
 export type V4BarJob =
   | Readonly<{ kind: "dig"; label: string; onDig: () => void }>
   | Readonly<{ kind: "report"; href: string }>
+  /** wait-f2: "Paused · Continue" (after the reset) or "Paused · Continues on 1 Dec" (before it; nothing to press). */
+  | Readonly<{ kind: "paused"; label: string; continueLabel: string | null; untilLabel: string | null; busy: boolean; onContinue: () => void }>
   | Readonly<{ kind: "none" }>;
 
 /** The stack's real height, as the page's bottom room (a CSS variable on the page root), while it is on screen. */
@@ -163,6 +165,26 @@ export function V4BottomStack(props: Readonly<{
           >
             {job.label}
           </button>
+        ) : null}
+        {job.kind === "paused" ? (
+          <p className="v4DebPhonePaused" role="status">
+            <span className="v4DebPhonePausedWord">{job.label}</span>
+            {job.continueLabel !== null ? (
+              <>
+                {" · "}
+                <button
+                  ref={props.jobRef as RefObject<HTMLButtonElement | null> | undefined}
+                  type="button"
+                  className="v4Btn v4BtnPrimary v4DebPhoneDig"
+                  disabled={job.busy}
+                  aria-busy={job.busy}
+                  onClick={job.onContinue}
+                >
+                  {job.continueLabel}
+                </button>
+              </>
+            ) : job.untilLabel !== null ? <span className="v4Muted">{` · ${job.untilLabel}`}</span> : null}
+          </p>
         ) : null}
         {job.kind === "report" ? (
           <Link

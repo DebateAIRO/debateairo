@@ -388,13 +388,13 @@ function SkipToDig(props: Readonly<{ targetId: string; catalog: MessageCatalog }
 
 /**
  * Quick look / Thorough, then "Dig deeper here" (row D decisions 1 and 5). W3-4: "Dig here too" where a dig already
- * exists (and on every path of a dig's own map); the person's picks name how many they are; the money lines before the
+ * exists (and on every path of a dig's own map); several picks read "Dig into these" (no count); the money lines before the
  * dig; at the deepest level the "deepest level" line instead of all of it.
  */
 function DigBlock(props: Readonly<{ target: DigTarget; panel: PanelProps; again?: boolean; id?: string; startingAbove?: boolean }>) {
   const { panel } = props;
   if (panel.choice !== undefined && !panel.choice.canDig) return <DeepestLine catalog={panel.catalog} />;
-  // Several picks: "Dig into {count} together" (today's tray words); one, or a whole path: as before, or "Dig here too".
+  // Several picks: "Dig into these" (the tray's words; journey-f23: no count); one, or a whole path: as before, or "Dig here too".
   const label = props.target.kind === "picks" && props.target.picks.length >= 2
     ? tPlural(panel.catalog, "v4.dig.trayDig", props.target.picks.length, panel.locale)
     : t(panel.catalog, props.again === true ? "v4.nest.digHereToo" : "v4.panel.dig");

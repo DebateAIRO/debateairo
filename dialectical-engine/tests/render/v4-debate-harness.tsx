@@ -56,6 +56,8 @@ export const harness = {
   planTier: "premium" as "free" | "premium",
   room: null as AskRoom | null,
   submit: vi.fn<Submit>(),
+  /** The one-time data consent's answer at a dig's press. */
+  ensureConsent: vi.fn<() => Promise<boolean>>(),
   /** Every `dig` the page handed useV4Ask (its room read), newest last. */
   digRooms: [] as unknown[],
   answer: null as Answer | null,
@@ -94,6 +96,7 @@ export function resetHarness(): void {
   harness.planTier = "premium";
   harness.room = null;
   harness.submit = vi.fn<Submit>(async () => ({ kind: "STARTED", runId: crypto.randomUUID() }));
+  harness.ensureConsent = vi.fn(async () => true);
   harness.digRooms = [];
   harness.answer = null;
   harness.story = seededStory();
@@ -130,6 +133,8 @@ export const useV4AskMock = {
     return {
       planTier: harness.planTier,
       submit: (...args: Parameters<Submit>) => harness.submit(...args),
+      // The one-time data consent, asked at a dig's press (lib/v4/useDigQueue.tsx): given, unless a test says otherwise.
+      ensureConsent: () => harness.ensureConsent(),
       flagsCrisis: () => false,
       room: harness.room,
       submitting: false,

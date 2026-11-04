@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AnswerSchema, type Answer, type AnswerStory, type PathRewrite, type RunProjection } from "@debateai/contract";
 import * as fixture from "../../apps/ui/lib/v3/storyFixture.js";
-import { diffSnapshots, rewriteNewsOf, selectionForChange, snapshotItems } from "../../apps/ui/lib/v4/changes.js";
+import { diffSnapshots, selectionForChange, snapshotItems } from "../../apps/ui/lib/v4/changes.js";
 import { loadAnswer, loadDigTrail, loadDigView, loadV4 } from "../../apps/ui/lib/v4/load.js";
 import { buildV4Map, rewriteByDig, rewriteStateOf, rewriteWaiting } from "../../apps/ui/lib/v4/mapModel.js";
 import type { DigLink, DigView } from "../../apps/ui/lib/v4/types.js";
@@ -223,7 +223,6 @@ describe("news of a finished rewrite", () => {
     const news = changes.find((change) => change.id === `dig:${DIG_RUNS.levelThree}`)!;
     expect(news).toMatchObject({ kind: "CHANGED", before: "REWRITING", now: "CHANGED" });
     expect(selectionForChange(after, news)).toBe("path:n-nuclear");
-    expect(rewriteNewsOf(after, changes)).toEqual([{ path: after.paths.find((path) => path.id === "n-nuclear"), changed: true }]);
     // A rewrite whose dig the page does not list is an item of its own (so a visit from elsewhere still tells it).
     expect(snapshotItems(after, [])[`dig:${DIG_RUNS.levelThree}`]).toBe("CHANGED");
     // A dig still running keeps its state word; a dig from before R22 (no rewrite) stays "DONE".

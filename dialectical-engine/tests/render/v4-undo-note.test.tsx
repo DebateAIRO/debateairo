@@ -153,7 +153,8 @@ describe("the shared Undo note", () => {
     expect(css).not.toMatch(/--v4-undo-[a-z-]+:/u);
     const moves = [...css.matchAll(/(?:animation|transition):[^;]*;/gu)].map((match) => match[0]).filter((rule) => !/: none;/u.test(rule));
     expect(moves.length).toBeGreaterThan(0);
-    for (const rule of moves) expect(rule, rule).toMatch(/var\(--v4-move-(?:fold|clear|snap|fly|roll|turn)\)/u);
+    // Under reduced motion a move becomes the shared 1-second highlight of v4-base.css (the chat answer on movement).
+    for (const rule of moves) expect(rule, rule).toMatch(/var\(--v4-move-(?:fold|clear|snap|fly|roll|turn)\)|^animation: v4Highlight var\(--v4-highlight-time\)/u);
   });
 });
 

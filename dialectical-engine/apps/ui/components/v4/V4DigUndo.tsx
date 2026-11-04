@@ -77,7 +77,7 @@ function digLabel(entry: DigUndoEntry, catalog: MessageCatalog, locale: string):
       {more > 0 ? <>{" "}{tPlural(catalog, "v4.dig.andMore", more, locale)}</> : null}
       {entry.showMode ? <span className="v4UndoMode">{" · "}{t(catalog, `v4.digMode.${mode}`)}</span> : null}
       {entry.sharePercent !== null && entry.sharePercent > 0
-        ? <>{" · "}{t(catalog, "v4.undo.digShare", { percent: entry.sharePercent })}</>
+        ? <>{" · "}{t(catalog, entry.period === "month" ? "v4.undo.digShareMonth" : "v4.undo.digShare", { percent: entry.sharePercent })}</>
         : null}
     </>
   );
@@ -148,7 +148,7 @@ export function V4DigNotes(props: V4DigNotesProps) {
           undoName={t(catalog, "v4.dig.undoLabel")}
           stillLine={t(catalog, "v4.undo.still")}
           announce={t(catalog, "v4.undo.announceDig")}
-          sendingLine={t(catalog, "v4.undo.sendingDig")}
+          sendingLine={t(catalog, entry.slow ? "v4.undo.sendingSlow" : "v4.undo.sendingDig")}
           confirmedLine={t(catalog, "v4.undo.cancelled")}
           doneLine={<>{doneWords}{seeIt === null ? null : <>{" "}{seeIt}</>}</>}
           doneAnnounce={doneWords}
@@ -175,7 +175,9 @@ export function V4DigNotes(props: V4DigNotesProps) {
 /** dig-f8 / dig-d3 B: the line where the dig was pressed, while it waits. Its Undo is the same as the note's. */
 export function V4DigStartingLine(props: Readonly<{ entry: DigUndoEntry; onUndo: (id: number) => void; catalog: MessageCatalog }>) {
   const { entry, catalog } = props;
-  if (entry.phase === "SENDING") return <p className="v4PanelHint v4DigStarting" role="status">{t(catalog, "v4.undo.sendingDig")}</p>;
+  if (entry.phase === "SENDING") {
+    return <p className="v4PanelHint v4DigStarting" role="status">{t(catalog, entry.slow ? "v4.undo.sendingSlow" : "v4.undo.sendingDig")}</p>;
+  }
   return (
     <p className="v4PanelHint v4DigStarting">
       {t(catalog, "v4.panel.digStarting")}{" "}

@@ -226,6 +226,29 @@ describe("picks and typed words are not lost (dig-f23)", () => {
     expect(page().querySelector(".v4PicksCleared")).toBeNull();
     expect(tray()).toBeNull();
   });
+
+  it("dig-f7: Undo has focus once; after Undo focus goes to the tray's Clear, and after the 10 seconds it never drops to the page", async () => {
+    await mountMap();
+    await openPath(PATHS.renew);
+    await click(panelBoxes()[0]!);
+    const clear = buttonNamed(CATALOG["v4.dig.trayClear"]!, tray()!);
+    await act(async () => { clear.focus(); clear.click(); });
+    await settle();
+    const undo = page().querySelector<HTMLButtonElement>(".v4PicksCleared .v4UndoBtn")!;
+    expect(document.activeElement).toBe(undo);
+    await act(async () => { undo.click(); });
+    await settle();
+    expect(document.activeElement).toBe(buttonNamed(CATALOG["v4.dig.trayClear"]!, tray()!));
+    // Cleared again and left alone: when the note goes, focus moves on to the page's next place, not to its top.
+    const again = buttonNamed(CATALOG["v4.dig.trayClear"]!, tray()!);
+    await act(async () => { again.focus(); again.click(); });
+    await settle();
+    expect(document.activeElement).toBe(page().querySelector(".v4PicksCleared .v4UndoBtn"));
+    await advance(10_000);
+    await settle();
+    expect(page().querySelector(".v4PicksCleared")).toBeNull();
+    expect(document.activeElement).not.toBe(document.body);
+  });
 });
 
 describe("loading and an ended sign-in (map-f6, wait-f1)", () => {

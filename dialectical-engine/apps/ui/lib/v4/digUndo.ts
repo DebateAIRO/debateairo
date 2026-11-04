@@ -21,9 +21,11 @@ export const DIG_CANCELLED_SHOWN_MS = 4_000;
 /** How long the "started" note stays (as the old note did). A refused dig's reason stays until it is closed. */
 export const DIG_STARTED_SHOWN_MS = 6_000;
 /**
- * A send that has not answered after this long stops holding up the digs behind it, and its note says it could not start.
- * It can hang only when the page that pressed it is gone and its send waits for a screen that page would have shown (the
- * one-time data consent after a failed read): without this, every later dig of the visit would wait behind it.
+ * After this long without an answer a send's note says it is still starting. While the page that pressed it is still on
+ * screen the send keeps the digs behind it waiting (its pop-ups can still be answered there, and a second send of the same
+ * page would only meet the first one in flight). Once that page is gone a send that has not answered stops holding up the
+ * digs behind it, and its note says the start could not be confirmed: it can hang only when its send waits for a screen
+ * the gone page would have shown (the one-time data consent), and without this every later dig of the visit would wait.
  */
 export const DIG_SEND_GIVE_UP_MS = 60_000;
 
@@ -49,6 +51,10 @@ export type DigUndoEntry = Readonly<{
   /** Owner N13: false on Free, which has no Quick look / Thorough choice, so no mode word is shown. */
   showMode: boolean;
   phase: DigUndoPhase;
+  /** journey-f8: the period its share is of ("today", or "this month" on Free). */
+  period: "today" | "month";
+  /** Being sent for longer than DIG_SEND_GIVE_UP_MS: the note says it is still starting. */
+  slow: boolean;
   /** dig-f7: focus moved to its Undo once (a page it travels to does not take focus again). */
   focused: boolean;
   result: DigUndoResult | null;
@@ -63,12 +69,23 @@ export type AddDigInput = Readonly<{
   send: (dig: PendingDig) => Promise<DigUndoResult>;
   /** The plain line for a send that never answered ("We couldn't start this dig. Please try again."). */
   failedLine: string;
+  /**
+   * The line for a send given up on after its page had gone ("We couldn't confirm this dig started. …"); absent: failedLine.
+   * A late answer that did start the dig still turns the note into "Started".
+   */
+  unconfirmedLine?: string;
+  /** Whether the page that pressed the dig is still on screen (absent: treated as gone once the send hangs). */
+  alive?: () => boolean;
+  /** journey-f8: the period the share is of (absent: today). */
+  period?: "today" | "month";
 }>;
 
 type Slot = {
   entry: DigUndoEntry;
   send: AddDigInput["send"];
   failedLine: string;
+  unconfirmedLine: string;
+  alive: () => boolean;
   timer: ReturnType<typeof setTimeout> | undefined;
 };
 
@@ -145,17 +162,23 @@ function fire(id: number): void {
     const sent = Promise.resolve()
       .then(() => slot.send(slot.entry.dig))
       .catch((): DigUndoResult => ({ kind: "STOPPED" }));
-    let watchdog: ReturnType<typeof setTimeout> | undefined;
-    const gaveUp = new Promise<"GAVE_UP">((resolve) => {
-      watchdog = setTimeout(() => resolve("GAVE_UP"), DIG_SEND_GIVE_UP_MS);
-    });
-    const first = await Promise.race([sent, gaveUp]);
-    clearTimeout(watchdog);
-    if (first !== "GAVE_UP") {
-      settle(id, first);
-      return;
+    for (;;) {
+      let watchdog: ReturnType<typeof setTimeout> | undefined;
+      const slowNow = new Promise<"SLOW">((resolve) => {
+        watchdog = setTimeout(() => resolve("SLOW"), DIG_SEND_GIVE_UP_MS);
+      });
+      const first = await Promise.race([sent, slowNow]);
+      clearTimeout(watchdog);
+      if (first !== "SLOW") {
+        settle(id, first);
+        return;
+      }
+      // Still on its page: the send keeps its place in the line (nothing is called "couldn't start" while it may still
+      // answer, and the next dig never meets this one in flight); the note says it is still starting.
+      if (!slot.alive()) break;
+      if (slotOf(id) !== undefined && !slot.entry.slow) update(id, { slow: true });
     }
-    if (slotOf(id) !== undefined) update(id, { phase: "REFUSED", result: { kind: "REFUSED", message: slot.failedLine } });
+    if (slotOf(id) !== undefined) update(id, { phase: "REFUSED", result: { kind: "REFUSED", message: slot.unconfirmedLine } });
     // A late answer still counts when it did start the dig (the map finds it in any case, from the account's records).
     void sent.then((late) => {
       if (late.kind === "STARTED" && slotOf(id) !== undefined) settle(id, late);
@@ -200,10 +223,19 @@ export function addDig(input: AddDigInput): number {
     sharePercent: input.sharePercent,
     showMode: input.showMode,
     phase: "COUNTING",
+    period: input.period ?? "today",
+    slow: false,
     focused: false,
     result: null
   });
-  const slot: Slot = { entry, send: input.send, failedLine: input.failedLine, timer: undefined };
+  const slot: Slot = {
+    entry,
+    send: input.send,
+    failedLine: input.failedLine,
+    unconfirmedLine: input.unconfirmedLine ?? input.failedLine,
+    alive: input.alive ?? (() => false),
+    timer: undefined
+  };
   slots = [...slots, slot];
   slot.timer = setTimeout(() => fire(id), Math.max(0, input.dig.sendsAt - Date.now()));
   emit();

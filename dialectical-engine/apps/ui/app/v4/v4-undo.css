@@ -83,6 +83,9 @@
 .v4StackPhone .v4UndoNotes { width: 100%; max-width: none; }
 .v4StackPhone .v4Undo { box-shadow: none; }
 .v4StackPhone .v4DebPhoneBar { flex: none; border-top: 0; box-shadow: none; }
+/* wait-f2: the bar's "Paused · Continue" job: still words, no pulse. */
+.v4DebPhonePaused { flex: 1 1 auto; min-width: 0; margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: var(--t-ui); }
+.v4DebPhonePausedWord { font-weight: 700; }
 .v4StackPhone .v4DebTray { max-width: none; box-shadow: none; padding: 8px 0; border: 0; border-radius: 0; }
 /* dig-f17: the slim report line just above the bar. */
 .v4StackGoodTime {
@@ -127,8 +130,10 @@
 .v4DigSeedLeaving { animation: v4SeedOut var(--v4-move-fly) var(--v4-ease-move) forwards; }
 @keyframes v4SeedIn { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: scale(1); } }
 @keyframes v4SeedOut { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(0.6); } }
+[dir="rtl"] .v4DigSeed { transform-origin: right top; }
 @media (prefers-reduced-motion: reduce) {
-  .v4DigSeed { animation: none; }
+  /* Instant, with the shared 1-second highlight (v4-base.css) and its written "starting" line. */
+  .v4DigSeed { animation: v4Highlight var(--v4-highlight-time) ease-out 1; }
   .v4MapLeafSeedLeaving { display: none; }
 }
 

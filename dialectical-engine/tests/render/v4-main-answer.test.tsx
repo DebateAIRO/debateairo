@@ -90,8 +90,12 @@ describe("the answer card on the debate page", () => {
     expect(line.getAttribute("aria-expanded")).toBe("false");
     expect(line.textContent).toContain(CATALOG["v4.answerCard.folded"]);
     expect(card().querySelector(".v4AnswerFold")!.hasAttribute("inert")).toBe(true);
+    // A fold the page made by itself (another question opened) leaves focus where it was.
+    expect(document.activeElement).not.toBe(line);
     await click(line);
     expect(card().classList.contains("v4AnswerCardFolded")).toBe(false);
+    // dig-f7: the pressed line hides itself, so focus moves on to the card's eyebrow, never to the page's top.
+    expect(document.activeElement).toBe(card().querySelector(".v4Eyebrow"));
     // The path stays open in the panel.
     expect(page().querySelector(".v4Panel-path")).not.toBeNull();
   });

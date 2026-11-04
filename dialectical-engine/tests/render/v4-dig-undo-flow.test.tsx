@@ -104,6 +104,45 @@ describe("several digs, each with its own Undo (dig-d3 A)", () => {
   });
 });
 
+describe("the screens a dig may need are asked at the press (the review of 4 Nov)", () => {
+  it("an own view in a person's crisis words gets the help numbers at the press; nothing waits or is sent (V, 2026-09-30)", async () => {
+    await mountMap();
+    await openPath(PATHS.renew);
+    await click(buttonNamed(CATALOG["v4.suggest.ownView"]!, panel()));
+    await typeInto(panel().querySelector<HTMLTextAreaElement>(".v4SugEditor textarea")!, "Should I kill myself?");
+    await click(buttonNamed(CATALOG["v4.suggest.ownViewAdd"]!, panel()));
+    const trayDig = page().querySelector<HTMLButtonElement>(".v4DebTray .v4BtnPrimary")!;
+    await press(trayDig);
+    expect(document.querySelector(".crisisSupport[role=dialog]")).not.toBeNull();
+    expect(readDigUndo()).toEqual([]);
+    expect(harness.ensureConsent).not.toHaveBeenCalled();
+    await advance(20_000);
+    expect(harness.submit).not.toHaveBeenCalled();
+  });
+
+  it("the one-time consent is asked at the press; No cancels the dig in its note, and nothing is sent (V, 2026-09-29)", async () => {
+    harness.ensureConsent = vi.fn(async () => false);
+    await mountMap();
+    await openPath(PATHS.smr);
+    await press(buttonNamed(CATALOG["v4.panel.dig"]!, panel()));
+    expect(harness.ensureConsent).toHaveBeenCalledTimes(1);
+    expect(notes()[0]!.textContent).toContain(CATALOG["v4.undo.cancelled"]);
+    await advance(20_000);
+    expect(harness.submit).not.toHaveBeenCalled();
+  });
+
+  it("a dig sent after its map has gone that meets a screen nobody saw says it did not start, never vanishes", async () => {
+    harness.submit = vi.fn(async () => ({ kind: "STOPPED" }) as V4AskOutcome);
+    await mountMap();
+    await openPath(PATHS.smr);
+    await press(buttonNamed(CATALOG["v4.panel.dig"]!, panel()));
+    await unmountMap();
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_100); });
+    expect(harness.submit).toHaveBeenCalledTimes(1);
+    expect(readDigUndo()[0]?.result).toEqual({ kind: "REFUSED", message: CATALOG["v4.dig.notStartedAway"] });
+  });
+});
+
 describe("the note's words and keys (dig-f7, dig-f8, journey-f21)", () => {
   it("moves focus to Undo, says one line, and Esc undoes with 'Cancelled. Nothing was used.'; focus goes back", async () => {
     await mountMap();
@@ -121,14 +160,15 @@ describe("the note's words and keys (dig-f7, dig-f8, journey-f21)", () => {
     expect(harness.submit).not.toHaveBeenCalled();
   });
 
-  it("names the share of today, and on Free leaves the mode word out of the note and the tray", async () => {
+  it("names the share of this month on Free (journey-f8), and leaves the mode word out of the note and the tray", async () => {
     harness.planTier = "free";
     harness.room = room({ dig_share_percent: 4 });
     await mountMap();
     await openPath(PATHS.smr);
     await press(buttonNamed(CATALOG["v4.panel.dig"]!, panel()));
     const note = notes()[0]!.textContent ?? "";
-    expect(note).toContain(word("v4.undo.digShare", { percent: 4 }));
+    expect(note).toContain(word("v4.undo.digShareMonth", { percent: 4 }));
+    expect(note).toContain("up to 4% of this month");
     expect(note).not.toContain(CATALOG["v4.digMode.quick"]);
     // No ticking number: the countdown is the line.
     expect(note).not.toMatch(/\(\d+\)/u);
@@ -245,7 +285,9 @@ describe("a phone's one bottom stack (journey-d3, dig-f16, dig-f17)", () => {
     await mountMap(375, crypto.randomUUID(), "n-smr");
     const bar = page().querySelector<HTMLElement>(".v4StackPhone .v4DebPhoneBar")!;
     const job = bar.querySelector<HTMLButtonElement>(".v4DebPhoneDig")!;
-    expect(job.textContent).toBe(`${CATALOG["v4.debate.digHere"]} · ${word("v4.undo.barShare", { percent: 3 })}`);
+    // journey-d3 / journey-f13: "Dig here · about 3%" (never "Dig deeper here", "Dig here too" or "up to" on a button).
+    expect(job.textContent).toBe(`${CATALOG["v4.bar.dig"]} · ${word("v4.bar.digAbout", { percent: 3 })}`);
+    expect(job.textContent).toBe("Dig here · about 3%");
     await press(job);
     // The note sits inside the stack, above the bar; the bar's dig button steps back for the note's Undo.
     const note = stack()!.querySelector(".v4StackTop .v4Undo");
@@ -277,7 +319,8 @@ describe("a phone's one bottom stack (journey-d3, dig-f16, dig-f17)", () => {
     expect(tray.querySelectorAll(".v4ChoiceChip")).toHaveLength(1);
     expect(buttonsNamed(CATALOG["v4.panel.dig"]!, tray)).toHaveLength(0);
     expect(buttonsNamed(CATALOG["v4.dig.trayClear"]!, tray)).toHaveLength(1);
-    expect(stack()!.querySelector(".v4DebPhoneDig")?.textContent).toBe(CATALOG["v4.debate.digHere"]);
+    // journey-d3 / journey-f13: the bar's job reads "Dig here" (with its share when the room read names one).
+    expect(stack()!.querySelector(".v4DebPhoneDig")?.textContent).toBe(CATALOG["v4.bar.dig"]);
   });
 
   it("after a single dig of a path the slim line does not claim a good time (dig-f29, the map track's report rule)", async () => {

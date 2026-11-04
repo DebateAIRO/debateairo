@@ -156,6 +156,48 @@ describe("the site-wide waiting digs (dig-d3)", () => {
     expect(readDigUndo()[0]!.result).toEqual({ kind: "REFUSED", message: "We couldn't start this dig." });
   });
 
+  it("while the page that pressed it is on screen, a slow send keeps its place and says it is still starting; nothing is called failed", async () => {
+    let answer: (result: DigUndoResult) => void = () => undefined;
+    const send = vi.fn<Sender>(async (pending) => (pathIdOf(pending) === "a"
+      ? new Promise<DigUndoResult>((resolve) => { answer = resolve; })
+      : started("b")));
+    const alive = { now: true };
+    const addAlive = (id: string): number => addDig({
+      parentRunId: "run-1", runIds: [], dig: { target: target(id), mode: "quick", sendsAt: Date.now() + DIG_UNDO_MS },
+      sharePercent: 4, showMode: true, send, failedLine: "We couldn't start this dig.", unconfirmedLine: "Not confirmed.",
+      alive: () => alive.now
+    });
+    addAlive("a");
+    addAlive("b");
+    await vi.advanceTimersByTimeAsync(DIG_UNDO_MS + DIG_SEND_GIVE_UP_MS * 3);
+    // Still on its page: the second dig never meets the first one in flight, and the first is never called failed.
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(phases()).toEqual(["SENDING", "SENDING"]);
+    expect(readDigUndo()[0]!.slow).toBe(true);
+    answer(started("a"));
+    await vi.advanceTimersByTimeAsync(1);
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(phases()).toEqual(["STARTED", "STARTED"]);
+  });
+
+  it("once its page has gone, a send that never answers stops holding up the next dig and says the start is not confirmed", async () => {
+    const send = vi.fn<Sender>(async (pending) => (pathIdOf(pending) === "a" ? new Promise<DigUndoResult>(() => undefined) : started("b")));
+    const alive = { now: true };
+    for (const id of ["a", "b"]) {
+      addDig({
+        parentRunId: "run-1", runIds: [], dig: { target: target(id), mode: "quick", sendsAt: Date.now() + DIG_UNDO_MS },
+        sharePercent: null, showMode: false, period: "month", send, failedLine: "x", unconfirmedLine: "Not confirmed.", alive: () => alive.now
+      });
+    }
+    expect(readDigUndo()[0]!.period).toBe("month");
+    await vi.advanceTimersByTimeAsync(DIG_UNDO_MS + DIG_SEND_GIVE_UP_MS + 10);
+    expect(phases()).toEqual(["SENDING", "SENDING"]);
+    alive.now = false;
+    await vi.advanceTimersByTimeAsync(DIG_SEND_GIVE_UP_MS);
+    expect(phases()).toEqual(["REFUSED", "STARTED"]);
+    expect(readDigUndo()[0]!.result).toEqual({ kind: "REFUSED", message: "Not confirmed." });
+  });
+
   it("knows one waiting dig per place, and which debates (the one dug and those above it) wait for it", () => {
     add("a", async () => ({ kind: "STOPPED" }), ["root-run"]);
     expect(waitingDigFor(readDigUndo(), "run-1", target("a"))?.targetKey).toBe("path:a");

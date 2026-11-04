@@ -121,6 +121,29 @@ describe("pick, combine, edit and add your own view", () => {
     await click(buttonNamed(CATALOG["v4.suggest.remove"]!, panel()));
     expect(trayChips()).toHaveLength(1);
   });
+
+  it("dig-f20: the tray's chips mark only the AIs' words as AI text, never the person's own view or their own wording", async () => {
+    await mountMap();
+    await openPath(PATHS.renew);
+    // An unedited suggestion, then the first one in the person's own wording, then their own view.
+    await click(panelBoxes()[1]!);
+    await click(buttonsNamed(CATALOG["v4.suggest.edit"]!, panel())[0]!);
+    await typeInto(panel().querySelector<HTMLTextAreaElement>(".v4SugEditor textarea")!, "My own wording of the battery point.");
+    await click(buttonNamed(CATALOG["v4.suggest.editDone"]!, panel()));
+    await click(buttonNamed(CATALOG["v4.suggest.ownView"]!, panel()));
+    await typeInto(panel().querySelector<HTMLTextAreaElement>(".v4SugEditor textarea")!, "Pumped hydro could carry a windless week.");
+    await click(buttonNamed(CATALOG["v4.suggest.ownViewAdd"]!, panel()));
+    const chips = trayChips();
+    expect(chips).toHaveLength(3);
+    const marked = (words: string): string | null => chips.find((chip) => chip.textContent?.includes(words))!.getAttribute("data-ai-generated");
+    expect(marked("My own wording")).toBeNull();
+    expect(marked("Pumped hydro")).toBeNull();
+    expect(chips.filter((chip) => chip.getAttribute("data-ai-generated") === "true")).toHaveLength(1);
+    expect(chips.every((chip) => chip.getAttribute("dir") === "auto")).toBe(true);
+    // journey-f13 / journey-f23: the tray's button counts nothing.
+    expect(buttonsNamed(CATALOG["v4.dig.trayDig.other"]!, tray()!)).toHaveLength(1);
+    expect(tray()!.textContent).not.toMatch(/\b3\b/u);
+  });
 });
 
 describe("picks stay on one path (owner Q-D1)", () => {
