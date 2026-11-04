@@ -149,6 +149,26 @@ describe("what the public page shows", () => {
     expect(paths[0]!.textContent).not.toContain("They help people with little money");
   });
 
+  it("an open row shows its trust bar once: the head's small bar steps aside, as its star does, for the large one in the body", async () => {
+    await mount(debate());
+    const row = rows().find((one) => one.querySelector(".v4PubRowHead .v4Bar") !== null)!;
+    expect(row).toBeDefined();
+    const head = (): HTMLButtonElement => row.querySelector<HTMLButtonElement>(".v4PubRowHead")!;
+    // Folded: the head's small bar, and nothing in the body.
+    expect(row.querySelectorAll(".v4Bar")).toHaveLength(1);
+    expect(head().querySelector(".v4BarSmall")).not.toBeNull();
+    // Open: only the body's large bar.
+    await click(head());
+    expect(head().getAttribute("aria-expanded")).toBe("true");
+    expect(row.querySelectorAll(".v4Bar")).toHaveLength(1);
+    expect(head().querySelector(".v4Bar")).toBeNull();
+    expect(row.querySelector(".v4PubFound .v4BarLarge")).not.toBeNull();
+    // Folded again, the head's bar is back.
+    await click(head());
+    expect(row.querySelectorAll(".v4Bar")).toHaveLength(1);
+    expect(head().querySelector(".v4BarSmall")).not.toBeNull();
+  });
+
   it("the main answer shows its update, and the date it changed", async () => {
     await mount(debate());
     const update = host!.querySelector(".publicMainUpdate")!.textContent!;

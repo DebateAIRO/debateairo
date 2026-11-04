@@ -1023,7 +1023,13 @@ function startupCheck(): number {
   check("GET /v1/answers", C.AnswerIndexSchema, contractOrDraft(C.AnswerIndexSchema, index, stripAnswerIndex).body);
   for (const run of runs.values()) {
     checkDraft(`GET /v1/runs/${run.runRef}`, C.RunProjectionSchema, withQuestionShare(runProjection(run), run, true), stripRun, runDraftSchema);
-    check(`GET /v1/runs/${run.runRef} (normal view)`, C.RunProjectionSchema, withQuestionShare(runProjection(run), run, false));
+    // The normal view as its route sends it: a draft-only part (a failed run's quota_used) is held back there, and the
+    // question's share never makes the read fall back and lose its month pause.
+    const normalRun = contractOrDraft(C.RunProjectionSchema, withQuestionShare(withStartedAt(runProjection(run), run, false), run, false), stripRun).body;
+    check(`GET /v1/runs/${run.runRef} (normal view)`, C.RunProjectionSchema, normalRun);
+    if (run.monthPaused === true && stateOf(run) === "RUNNING" && !("month_pause" in normalRun)) {
+      throw new Error(`MOCK_SEED_INVALID: GET /v1/runs/${run.runRef} (normal view) lost its month pause`);
+    }
     check(`GET /v1/runs/${run.runRef}/visibility`, C.PublicationTransitionSchema, runVisibility(run, false));
     for (const state of PUBLIC_STATES) check(`GET /v1/runs/${run.runRef}/visibility (${state})`, C.PublicationTransitionSchema, visibilityOf(state, false));
     check(`GET /v1/runs/${run.runRef}/last-visit`, C.LastVisitSchema, { seen_at: null, items: null });

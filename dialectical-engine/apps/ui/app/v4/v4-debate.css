@@ -150,6 +150,13 @@
 .v4DebPanelCol > .v4DebTrayDock {
   position: sticky; bottom: 0; z-index: 1; max-width: none; margin-top: 12px; box-shadow: none;
 }
+/* The browser check (4 Nov): with the tray docked, the pinned block reaches down behind the tray's rounded top edge (the
+   tray comes later, so it paints over it), so no line of the panel shows through the seam or the tray's corners. */
+.v4DebLayout-desktop .v4DebPanelCol:has(> .v4DebTrayDock) .v4PanelDig,
+.v4DebLayout-laptop .v4DebPanelCol:has(> .v4DebTrayDock) .v4PanelDig,
+.v4DebLayout-mid .v4DebPanelCol:has(> .v4DebTrayDock) .v4PanelDig {
+  bottom: calc(var(--v4-dock-room, 0px) - var(--r-card)); padding-bottom: calc(12px + var(--r-card));
+}
 /* ACCESS-2 (the wave-2 review, 4 Nov): a control the keyboard reaches is scrolled clear of the pinned dig block and the
    docked tray (--v4-pin-room is the block's measured height, V4Panel.tsx), never left behind them. */
 .v4DebLayout-desktop .v4DebPanelCol,

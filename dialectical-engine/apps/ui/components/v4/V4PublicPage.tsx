@@ -251,7 +251,8 @@ function PathRow({ path, view, open, onToggle, words, props }: Readonly<{
             <TrustWordTag path={path} catalog={catalog} />
             {star && !open ? <span className="v4PubStar"><span aria-hidden="true">★</span> {t(catalog, "v4.map.starHint")}</span> : null}
           </span>
-          {words && checked ? <V4TrustBar counts={path.counts} unchecked={path.unchecked} catalog={catalog} /> : null}
+          {/* The browser check (4 Nov): an open row shows its bar once, the large one in its body; the head's small bar steps aside, as the star does. */}
+          {words && checked && !open ? <V4TrustBar counts={path.counts} unchecked={path.unchecked} catalog={catalog} /> : null}
           <span className="v4PubRowChevron" aria-hidden="true">▾</span>
         </button>
       </h3>
