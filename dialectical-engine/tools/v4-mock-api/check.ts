@@ -129,6 +129,13 @@ for (const [name, id] of Object.entries(RUNS)) {
       `${r.state}${r.terminal_reason ? ` (${r.terminal_reason})` : ""}${r.waits_until ? ` waits until ${r.waits_until}` : ""}`);
 }
 await expectCode("run answer of the running run", () => client.readRunAnswer(RUNS.running), "NOT_FOUND");
+// V4 screen review (wait-f1): a sign-in that ended reads as SESSION_REQUIRED (the page then asks to sign in again).
+await fetch(`${MOCK}/__mock/set?session=OUT`);
+try {
+  await expectCode("a debate read after the sign-in ended", () => client.readRun(RUNS.running), "SESSION_REQUIRED");
+} finally {
+  await fetch(`${MOCK}/__mock/set?session=IN`);
+}
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const answer: any = await step("run answer (settled)", () => client.readRunAnswer(RUNS.settled), (a: { answer_id: string; nodes: unknown[] }) => `${a.answer_id}, ${a.nodes.length} points`);
 if (answer !== undefined) {

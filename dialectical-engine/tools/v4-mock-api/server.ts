@@ -1355,6 +1355,9 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   // ---- session, gates, public reads ----
   // Decision 13: `session=OUT` shows a public page as a stranger sees it (a sign-in link in place of each press).
   if (path === "/v1/session" && isGet && sessionOut) return sendJson(req, res, 401, { error: "SESSION_REQUIRED" });
+  // V4 screen review (wait-f1): with `session=OUT` the asker's own debates are refused as an ended sign-in is (401
+  // SESSION_REQUIRED), so a page opened while signed in shows "Please sign in again to see your question." on its next read.
+  if (sessionOut && isGet && (parts[1] === "runs" || parts[1] === "answers")) return sendJson(req, res, 401, { error: "SESSION_REQUIRED" });
   if (path === "/v1/session" && isGet) return sendJson(req, res, 200, SESSION, C.SessionSchema);
   if (path === "/v1/auth/age-confirmation" && isGet) return sendJson(req, res, 200, { status: "confirmed" }, C.AgeConfirmationStatusSchema);
   if (path === "/v1/account/sensitive-data-consent" && (isGet || method === "POST")) {

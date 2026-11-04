@@ -26,6 +26,7 @@ import {
   type V4GoalAnswer
 } from "@/lib/v4/types";
 import { useAskClarify } from "@/lib/v4/useAskClarify";
+import { useLeaveSiteGuard } from "@/lib/v4/useLeaveGuard";
 import { useV4Ask } from "@/lib/v4/useV4Ask";
 
 /*
@@ -216,6 +217,9 @@ function V4AskForm({
   const ids = useId();
   // ask-d5 B: "Your maps", read once the person is known to be signed in.
   const shelf = useMapShelf({ enabled: session === "IN", want: SHELF_MAX, catalog });
+  // journey-d4 A: before Next, the browser's own "Leave site?" protects typed words (a reload or a closed tab); words a
+  // reload brings back from the address are not at risk.
+  useLeaveSiteGuard(() => step === "ask" && question.trim().length > 0 && question.trim() !== initialQuestion.trim());
 
   const ask = useV4Ask({
     catalog,
