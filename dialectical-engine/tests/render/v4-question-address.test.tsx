@@ -145,7 +145,8 @@ describe("picks and typed words are not lost (dig-f23)", () => {
     await unmountMap();
     harness.search = search;
     await mountMap();
-    expect(trayChips()).toHaveLength(1);
+    // dig-f4: one pick shows no tray; it is ticked where it is, and the panel's own button digs it.
+    expect(tray()).toBeNull();
     expect(panelBoxes().filter((box) => box.checked)).toHaveLength(1);
   });
 

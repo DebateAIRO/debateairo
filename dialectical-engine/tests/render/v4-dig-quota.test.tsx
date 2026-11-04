@@ -64,7 +64,8 @@ describe("before a dig: its share of today", () => {
     expect(line).toBe("This dig uses about 20% of today. After it you can still finish your report.");
     // map-f22: the path's suggestions show once its leaves are unfolded (about 12 cards at once).
     await expandBranch(PATHS.renew);
-    await click(branch(PATHS.renew).querySelector<HTMLInputElement>(".v4MapLeafSuggestion input[type=checkbox]")!);
+    // dig-f4: the tray shows from the second pick.
+    for (const box of branch(PATHS.renew).querySelectorAll<HTMLInputElement>(".v4MapLeafSuggestion input[type=checkbox]")) await click(box);
     expect(tray()?.textContent).toContain(line);
     await openPath(PATHS.renew);
     expect(panel().querySelector(".v4PanelDig")?.textContent).toContain(line);

@@ -9,7 +9,7 @@ import { isFinishedRewrite, rewriteStateOf } from "@/lib/v4/mapModel";
 import { servedRewriteWords } from "@/lib/v4/trust";
 import { levelHref } from "@/lib/v4/storage";
 import type { DigView, ReadingLevel, RewriteState, TrustWord, V4Map, V4Path, V4Point } from "@/lib/v4/types";
-import { V4SourceList } from "./V4Sources";
+import { V4SourcesFold } from "./V4Sources";
 
 /*
  * Dig model revision W4-6 (plan 2026-10-30-dig-model-revision.md; owner answers of 30-31 Oct): what a dig did to a path.
@@ -172,7 +172,8 @@ function DigPoints(props: Readonly<{ points: readonly V4Point[]; served: Readonl
             <div className="v4PanelPointBody">
               <span className="v4RewritePointWord">{t(catalog, `v4.trust.${point.trust}`)}</span>
               <p className="v4PanelPointText" data-ai-generated="true">{point.text}</p>
-              <V4SourceList sources={point.sources} catalog={catalog} locale={props.locale} />
+              {/* map-d4 A: a finding's sources folded into one line, as in the panel's own findings. */}
+              <V4SourcesFold sources={point.sources} catalog={catalog} locale={props.locale} />
             </div>
           </li>
         ))}

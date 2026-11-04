@@ -10,7 +10,8 @@ import { t, type MessageCatalog } from "@/lib/i18n/translate";
  *  - Phone: one pinned bar whose job changes ("Dig here · up to 3%", or "Write my report" when that is the next step),
  *    with the Map button. Above it, inside the same surface: the slim "Good time to write your report" line when the rule
  *    fires (dig-f17, with a small × to close it), the Undo and ready notes for their few seconds (never floating over
- *    anything), and the picks folded to one line ("Your picks ▸", which opens them); a tour's pinned bar sits right
+ *    anything), and the picks folded to one line ("Your picks ▸", which opens them: dig-f4, in the Map sheet, since a
+ *    phone has no tray); a tour's pinned bar sits right
  *    above the bar (dig-f18). It never takes more than about a
  *    quarter of the screen, steps aside while the keyboard is open, and sits in the page while the cookie bar shows.
  *  - Computer: the Undo and ready notes bottom-left, then the tray, in one column.
@@ -81,6 +82,12 @@ export function V4BottomStack(props: Readonly<{
   pinned?: ReactNode;
   /** Phone: the path the picks are on, shown on the folded line. */
   trayTitle?: ReactNode;
+  /**
+   * Phone (dig-f4, 3 Nov): there are picks, and a phone has no tray, so "Your picks ▸" opens the Map sheet, which lists
+   * them with Clear (the outline is also the tray), while the pinned bar carries their dig. Absent: the folded line opens
+   * `tray` inside the stack, as before.
+   */
+  onOpenPicks?: () => void;
   /** Phone: the pinned bar. */
   mapButtonRef?: RefObject<HTMLButtonElement | null>;
   jobRef?: RefObject<HTMLElement | null>;
@@ -133,7 +140,15 @@ export function V4BottomStack(props: Readonly<{
           </div>
         ) : null}
         {props.notes}
-        {hasTray ? (
+        {props.onOpenPicks !== undefined ? (
+          <div className="v4StackPicks">
+            <button type="button" className="v4StackPicksToggle" aria-haspopup="dialog" onClick={props.onOpenPicks}>
+              <span>{t(catalog, "v4.bar.yourPicks")}</span>
+              <span className="v4StackPicksArrow" aria-hidden="true">▸</span>
+              {props.trayTitle === undefined ? null : <span className="v4StackPicksPath">{props.trayTitle}</span>}
+            </button>
+          </div>
+        ) : hasTray ? (
           <div className={`v4StackPicks${picksOpen ? " v4StackPicksOpen" : ""}`}>
             <button
               type="button"

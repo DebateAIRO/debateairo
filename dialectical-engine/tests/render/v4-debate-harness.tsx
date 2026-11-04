@@ -50,7 +50,8 @@ export function digPart(parentRunId: string, level: number): Answer["dig"] {
   return { parent_run_id: parentRunId, position_ref: "n-mix", places: ["path:n-mix"], level, picks: [], rewrite: null };
 }
 
-type Submit = (questionLine: string, mode: string, origin?: string, parent?: AskParent | null) => Promise<V4AskOutcome>;
+type Submit = (questionLine: string, mode: string, origin?: string, parent?: AskParent | null, purposeLines?: unknown,
+  about?: ReactNode) => Promise<V4AskOutcome>;
 
 export const harness = {
   planTier: "premium" as "free" | "premium",
@@ -85,7 +86,13 @@ export const harness = {
   /** map-f6: the debate's read never answers (the page shows its outline). */
   loadPending: false,
   /** map-f6: the account's reading level (null: none kept); a promise that never settles keeps it unknown. */
-  accountLevel: null as Promise<ReadingLevel | null> | null
+  accountLevel: null as Promise<ReadingLevel | null> | null,
+  /** dig-f9: the one-time consent asked at a dig's click (resolves true: given). */
+  ensureConsent: vi.fn<() => Promise<boolean>>(),
+  /** dig-f9: the crisis check run at a dig's click on its own views (true: the help screen opened). */
+  offerCrisisHelp: vi.fn<(words: readonly string[]) => boolean>(),
+  /** dig-f26: the server named the plan Free, so the debate is public (useV4Ask's freePublicNotice). */
+  freePublicNotice: false
 };
 
 export function resetHarness(): void {
@@ -113,6 +120,9 @@ export function resetHarness(): void {
   harness.loadError = null;
   harness.loadPending = false;
   harness.accountLevel = null;
+  harness.ensureConsent = vi.fn(async () => true);
+  harness.offerCrisisHelp = vi.fn(() => false);
+  harness.freePublicNotice = false;
 }
 resetHarness();
 
@@ -130,6 +140,9 @@ export const useV4AskMock = {
     return {
       planTier: harness.planTier,
       submit: (...args: Parameters<Submit>) => harness.submit(...args),
+      ensureConsent: () => harness.ensureConsent(),
+      offerCrisisHelp: (words: readonly string[]) => harness.offerCrisisHelp(words),
+      freePublicNotice: harness.freePublicNotice,
       flagsCrisis: () => false,
       room: harness.room,
       submitting: false,

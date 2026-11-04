@@ -49,7 +49,9 @@ describe("no browser storage (Decision A, S01-R17)", () => {
       // Dig model revision W4-6: the rewrites, the dig trail and the news of a finished rewrite keep nothing in the browser.
       "mapModel.ts", "changes.ts", "load.ts", "types.ts",
       // The owner's screen review (3 Nov): the "Your maps" shelf keeps its dig links in memory only.
-      "mapShelf.ts"]) {
+      "mapShelf.ts",
+      // Wave 2 (dig-f4, dig-f9): where picks are dug, and the checks at a dig's click, keep nothing in the browser.
+      "digDock.ts", "useDigClickCheck.ts"]) {
       const source = readFileSync(resolve(here, "../../apps/ui/lib/v4", file), "utf8");
       expect(source, file).not.toMatch(/\.setItem\(|localStorage|sessionStorage|document\.cookie/);
     }
@@ -62,7 +64,9 @@ describe("no browser storage (Decision A, S01-R17)", () => {
       // The owner's screen review (3 Nov): the report page, its own header and Share keep nothing in the browser either.
       "V4ReportClient.tsx", "V4ReportHeader.tsx",
       // The owner's screen review (3 Nov): the ask page's session, the seed of the map, "Your maps" and "All my maps".
-      "V4AskGate.tsx", "V4MapSeed.tsx", "V4MapShelf.tsx", "V4AllMaps.tsx"]) {
+      "V4AskGate.tsx", "V4MapSeed.tsx", "V4MapShelf.tsx", "V4AllMaps.tsx",
+      // Wave 2 (dig-f4): the docked tray and the phone's list of picks.
+      "V4DigTray.tsx"]) {
       const source = readFileSync(resolve(here, "../../apps/ui/components/v4", file), "utf8");
       expect(source, file).not.toMatch(/\.setItem\(|localStorage|sessionStorage|indexedDB|document\.cookie/);
     }

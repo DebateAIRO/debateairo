@@ -27,8 +27,9 @@ vi.mock("@/lib/v4/money", async (original) => (await import("./v4-debate-harness
 const word = (key: string, values: Record<string, string | number> = {}): string =>
   Object.entries(values).reduce((line, [name, value]) => line.replaceAll(`{${name}}`, String(value)), CATALOG[key]!);
 const panelBoxes = (): HTMLInputElement[] => [...panel().querySelectorAll<HTMLInputElement>(".v4Sugs input[type=checkbox]")];
-/** journey-f23 (owner's screen review, 3 Nov): the tray shows the picks as chips, never as "N picked". */
-const trayChips = (): HTMLElement[] => [...(tray()?.querySelectorAll<HTMLElement>(".v4ChoiceChip") ?? [])];
+/** The picks still ticked on the tree's renewables path (one pick shows no tray, dig-f4). */
+const pickedOnTree = (): HTMLInputElement[] =>
+  [...branch(PATHS.renew).querySelectorAll<HTMLInputElement>(".v4MapLeafSuggestion input[type=checkbox]")].filter((box) => box.checked);
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -55,7 +56,9 @@ describe("V4DebateClient's dig flow", () => {
     // The room read is for this dig, so it can say the dig's share of today.
     expect(harness.digRooms.at(-1)).toEqual({ parentRunId: runId, picks: 3 });
 
-    await click(buttonNamed(word("v4.dig.trayDig.other", { count: 3 }), tray()!));
+    // dig-f4 / map-d4 A: on the picks' own path the panel's pinned button digs them, so the docked tray offers no second one.
+    expect(buttonsNamed(word("v4.dig.trayDig.other", { count: 3 }), tray()!)).toHaveLength(0);
+    await click(buttonNamed(word("v4.dig.trayDig.other", { count: 3 }), panel()));
     await advance(9_500);
     expect(harness.submit).not.toHaveBeenCalled();
     await advance(600);
@@ -135,11 +138,13 @@ describe("V4DebateClient's dig flow", () => {
     // map-f22: the path's suggestions show once its leaves are unfolded (about 12 cards at once).
     await expandBranch(PATHS.renew);
     await click(branch(PATHS.renew).querySelector<HTMLInputElement>(".v4MapLeafSuggestion input[type=checkbox]")!);
-    await click(buttonNamed(CATALOG["v4.panel.dig"]!, tray()!));
+    // map-f14 / dig-f4: one pick has no tray; its path's panel digs it, "Dig into this".
+    await openPath(PATHS.renew);
+    await click(buttonNamed(CATALOG["v4.dig.intoThis"]!, panel()));
     await advance(10_100);
     await settle();
     expect(text()).toContain(CATALOG["v4.nest.tooDeep"]);
-    expect(trayChips()).toHaveLength(1);
+    expect(pickedOnTree()).toHaveLength(1);
   });
 
   // R22 W3-8: the two dig refusals with their own codes are said where DIG_TOO_DEEP is, and the picks stay too.
@@ -150,11 +155,12 @@ describe("V4DebateClient's dig flow", () => {
       // map-f22: the path's suggestions show once its leaves are unfolded (about 12 cards at once).
       await expandBranch(PATHS.renew);
       await click(branch(PATHS.renew).querySelector<HTMLInputElement>(".v4MapLeafSuggestion input[type=checkbox]")!);
-      await click(buttonNamed(CATALOG["v4.panel.dig"]!, tray()!));
+      await openPath(PATHS.renew);
+      await click(buttonNamed(CATALOG["v4.dig.intoThis"]!, panel()));
       await advance(10_100);
       await settle();
       expect(text()).toContain(word(key, values));
-      expect(trayChips()).toHaveLength(1);
+      expect(pickedOnTree()).toHaveLength(1);
     });
 
   // Dig model revision W4-6 (owner Q-D13): a dig keeps its points and its answer text and writes no story, so its page never

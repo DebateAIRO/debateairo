@@ -16,8 +16,8 @@ import { TAB_PREFIX_ATTRIBUTE } from "@/components/DocumentTitle";
 import { RoomNotice } from "@/components/billing/RoomNotice";
 import { V4BottomStack, type V4BarJob } from "@/components/v4/V4BottomStack";
 import { V4ChangesBar } from "@/components/v4/V4ChangesBar";
-import { V4PickChips } from "@/components/v4/V4ChoiceChips";
-import { V4MoneyLines, type V4DigChoice } from "@/components/v4/V4DigSuggest";
+import type { V4DigChoice } from "@/components/v4/V4DigSuggest";
+import { V4DigTray, V4PicksList } from "@/components/v4/V4DigTray";
 import { V4DigNotes, V4DigStartingLine } from "@/components/v4/V4DigUndo";
 import type { V4FailedDigs } from "@/components/v4/V4DigFailed";
 import { V4FailedScreen } from "@/components/v4/V4FailedScreen";
@@ -27,7 +27,9 @@ import { V4LevelTrail } from "@/components/v4/V4LevelTrail";
 import { V4LeaveQuestion } from "@/components/v4/V4LeaveQuestion";
 import { V4LoadingOutline, V4LoadingPage, V4SignInAgain } from "@/components/v4/V4LoadingOutline";
 import { V4PicksClearedNote } from "@/components/v4/V4PicksClearedNote";
-import { digFor, digsUnder, openCount, pathTitle, resolveSelection, selectionIdOf, TitleText, V4MapTree } from "@/components/v4/V4MapTree";
+import {
+  digFor, digsUnder, openCount, pathTitle, resolveSelection, rootPanelOpen, selectionIdOf, shortText, TitleText, V4MapTree
+} from "@/components/v4/V4MapTree";
 import { V4Outline } from "@/components/v4/V4Outline";
 import { V4Panel } from "@/components/v4/V4Panel";
 import type { V4ResearchedPress } from "@/components/v4/V4Sources";
@@ -52,6 +54,7 @@ import {
 } from "@/lib/v4/readyMoment";
 import { useReportVersions } from "@/lib/v4/useReportVersions";
 import { effectiveDigMode } from "@/lib/v4/askConfig";
+import { digButtonLabel, panelDigsPicks, trayShows } from "@/lib/v4/digDock";
 import { digRetryOf, retryPending } from "@/lib/v4/digRetry";
 import { askAgainHref } from "@/lib/v4/failedRun";
 import { digLinksFor, digParentOf, mergeIndex, readQuestionIndex, type IndexEntry } from "@/lib/v4/digIndex";
@@ -85,7 +88,6 @@ import {
   ownViewPick,
   pickedOpenIds,
   pickRefusal,
-  picksMax,
   placesOf,
   removePick,
   suggestionPick,
@@ -112,6 +114,7 @@ import { useLeaveLinkGuard, useTypedWords } from "@/lib/v4/useLeaveGuard";
 import { useLevelSettled } from "@/lib/v4/useLevelSettled";
 import { usePicksUndo } from "@/lib/v4/usePicksUndo";
 import { useAddressPicks, useQuestionAddress } from "@/lib/v4/useQuestionAddress";
+import { useDigClickCheck } from "@/lib/v4/useDigClickCheck";
 
 /*
  * V4 initial (2026-10-28), the map page shell (D3 map, D4 what changed, D6/D7 phone). It loads the debate over
@@ -281,17 +284,18 @@ function linkKeyOf(links: readonly DigLink[]): string {
 type PhoneTarget = Readonly<{ target: DigTarget; again: boolean }>;
 
 /**
- * What the phone's pinned "Dig deeper here" digs into: a path (the person's picks on it, when there are some) or one
- * open question (never the root or a dig). W3-4: an open question that already has a dig, and a path that has one (or
- * any path of a dig's own map), offer "Dig here too"; at the deepest level nothing is offered.
+ * What the phone's pinned "Dig deeper here" digs into: the person's picks when there are some (dig-f4, 3 Nov: a phone has
+ * no tray, so the pinned button carries them on whichever screen is open), else a path or one open question (never the
+ * root or a dig). W3-4: an open question that already has a dig, and a path that has one (or any path of a dig's own
+ * map), offer "Dig here too"; at the deepest level nothing is offered.
  */
 function targetOf(map: V4Map, digs: readonly DigView[], selection: V4Selection, choice: V4DigChoice): PhoneTarget | null {
   if (!choice.canDig) return null;
+  const picks = draftTarget(choice.draft, map.paths);
+  if (picks !== null) return { target: picks, again: false };
   if (selection.startsWith("path:")) {
     const path = map.paths.find((candidate) => `path:${candidate.id}` === selection);
-    if (path === undefined) return null;
-    const mine = choice.draft.group === path.id ? draftTarget(choice.draft, map.paths) : null;
-    return { target: mine ?? { kind: "path", path }, again: choice.digHereToo(path.id) };
+    return path === undefined ? null : { target: { kind: "path", path }, again: choice.digHereToo(path.id) };
   }
   if (selection.startsWith("open:")) {
     const question = uniqueOpenQuestions(map).find((candidate) => `open:${candidate.id}` === selection);
@@ -310,10 +314,31 @@ function shareFor(target: DigTarget, draft: V4DigDraft, room: AskRoom | null): n
   return (draft.picks.length > 0) === (target.kind === "picks") ? percent : null;
 }
 
-/** journey-d3: the pinned bar's dig job, "Dig here · up to 3%" (the share only when the room read is for this dig). */
-function barDigLabel(phone: PhoneTarget, percent: number | null, catalog: MessageCatalog): string {
-  const label = t(catalog, phone.again ? "v4.nest.digHereToo" : "v4.debate.digHere");
+/**
+ * journey-d3: the pinned bar's dig job, "Dig here · up to 3%" (the share only when the room read is for this dig).
+ * map-f14: one pick reads "Dig into this", several the tray's words (lib/v4/digDock.ts).
+ */
+function barDigLabel(phone: PhoneTarget, percent: number | null, catalog: MessageCatalog, locale: string): string {
+  const label = digButtonLabel(phone.target, phone.again, "v4.debate.digHere", catalog, locale);
   return percent === null ? label : `${label} · ${t(catalog, "v4.undo.barShare", { percent })}`;
+}
+
+/** Stands in for the dug place's words while the sentence around them is read from the catalogue (they are AI text). */
+const PLACE_SLOT = "\u0000place\u0000";
+
+/**
+ * dig-f9: "About your dig on “Mostly renewables”:", said first on the question check's screen when it answers a sent dig.
+ * The place is the dig's path (its label), or its first open question; only those words are marked as AI text.
+ */
+function digAboutLine(target: DigTarget, catalog: MessageCatalog): ReactNode {
+  const path = target.kind === "open" ? null : target.path;
+  const place = path !== null
+    ? pathTitle(path, catalog, 70)
+    : target.kind === "open" && target.questions[0] !== undefined
+      ? { text: shortText(target.questions[0].text), ai: true, more: 0 }
+      : { text: t(catalog, "v4.panel.crumbRoot"), ai: false, more: 0 };
+  const [before = "", after = ""] = t(catalog, "v4.dig.checkAbout", { path: PLACE_SLOT }).split(PLACE_SLOT);
+  return <>{before}<span data-ai-generated={place.ai ? "true" : undefined}>{place.text}</span>{after}</>;
 }
 
 /**
@@ -963,7 +988,7 @@ function V4Debate({
     if (panelColRef.current !== null) panelColRef.current.scrollTop = 0;
   }, [shownSelection]);
 
-  // ── Picks for the tray (row D decision 1; W3-4: any pick shows the tray, which digs them together) ─────────────
+  // ── Picks (row D decision 1; W3-4: the picks are dug together; dig-f4: the tray shows from the second) ───────────
   // Owner Q-D1: picks stay on one path; a pick box of another path is closed while picks wait (lib/v4/suggestions.ts
   // refuses it too). FIT-1: a point still argued under two paths is one pick, sent once.
   const picked = useMemo<ReadonlySet<string>>(() => pickedOpenIds(draft), [draft]);
@@ -995,14 +1020,18 @@ function V4Debate({
       },
       onRemovePick: (key: string) => commitDraft(removePick(draftRef.current, key)),
       onClear: clearPicks,
-      typed
+      typed,
+      // dig-f26: on a Free debate the server named as public, the own-view box says the view may be shown there.
+      publicDebate: ask.freePublicNotice
     };
-  }, [map, draft, planTier, canDig, isDigMap, digs, commitDraft, clearPicks, typed]);
+  }, [map, draft, planTier, canDig, isDigMap, digs, commitDraft, clearPicks, typed, ask.freePublicNotice]);
   // dig-d3: the digs still in their 10 seconds, on any V4 page (lib/v4/digUndo.ts, memory only).
   const waitingDigs = useDigUndo();
   const trayTarget = map === null || !canDig ? null : draftTarget(draft, map.paths);
-  // While the picks' own dig waits, they are on their way: the tray steps back (Undo brings them back).
-  const hasTray = trayTarget !== null && waitingDigFor(waitingDigs, servedRunId, trayTarget) === null;
+  // While the picks' own dig waits, they are on their way: the tray steps back (Undo brings them back). dig-f4 / map-f14:
+  // the tray shows on a computer only, from the second pick (lib/v4/digDock.ts).
+  const picksOnTheirWay = trayTarget !== null && waitingDigFor(waitingDigs, servedRunId, trayTarget) !== null;
+  const hasTray = !picksOnTheirWay && trayShows(trayTarget, layout === "phone");
 
   // ── The dig flow ────────────────────────────────────────────────────────────────────────────────────────────────
   // dig-d3 (owner pick B, 3 Nov): a dig waiting out its 10 seconds belongs to the whole V4 site, not to this page: it
@@ -1034,9 +1063,13 @@ function V4Debate({
     });
   }, [map, canDig, servedRunId, servedQuestionLine, aboveRunIds, ask.room, planTier, catalog]);
 
+  // dig-f9 (3 Nov): the crisis help and the one-time consent run at the click, before the 10 seconds start (useV4Ask's own
+  // pieces); only then does the dig wait out its Undo. Nothing is sent here.
+  const checkDig = useDigClickCheck({ ensureConsent: ask.ensureConsent, offerCrisisHelp: ask.offerCrisisHelp });
   const startDig = useCallback((target: DigTarget): void => {
-    queueDig({ target, mode: sentDigMode, sendsAt: Date.now() + UNDO_MS });
-  }, [queueDig, sentDigMode]);
+    if (servedRunId === null) return;
+    void checkDig(target, sentDigMode, servedRunId, () => queueDig({ target, mode: sentDigMode, sendsAt: Date.now() + UNDO_MS }));
+  }, [checkDig, queueDig, sentDigMode, servedRunId]);
 
   const undoDig = useCallback((id: number): void => {
     undoWaitingDig(id);
@@ -1053,8 +1086,10 @@ function V4Debate({
     try {
       // ASK-4: a dig carries AI-written text, so it is sent as a dig (no client crisis pop-up on AI words). W3-4: with its
       // parent (the debate it digs, the places, the mode and the picks as sent).
+      // dig-f9: the question check's screen can only come with the server's answer, 10 seconds after the click, so it
+      // names the dig it is about.
       outcome = await ask.submit(digQuestion(dig.target, parentQuestionLine, catalog, locale), dig.mode, "dig",
-        askParentOf(parentRunId, dig.target, dig.mode));
+        askParentOf(parentRunId, dig.target, dig.mode), undefined, digAboutLine(dig.target, catalog));
     } catch {
       outcome = { kind: "REFUSED", message: t(catalog, "v4.dig.failed") };
     }
@@ -1132,13 +1167,15 @@ function V4Debate({
       retryOf,
       onRetry: (dig: DigView) => {
         const retry = retryOf(dig);
-        if (retry.kind !== "OFFER" || !canDig) return;
-        // The shared dig Undo (lib/v4/digUndo.ts): the same note, 10 seconds and one-at-a-time send as any dig.
-        queueDig(retryPending(retry, effectiveDigMode(retry.mode ?? digMode, planTier), Date.now(), UNDO_MS));
+        if (retry.kind !== "OFFER" || !canDig || servedRunId === null) return;
+        // The shared dig Undo (lib/v4/digUndo.ts): the same note, 10 seconds and one-at-a-time send as any dig, after the
+        // same checks at the click (dig-f9).
+        const mode = effectiveDigMode(retry.mode ?? digMode, planTier);
+        void checkDig(retry.target, mode, servedRunId, () => queueDig(retryPending(retry, mode, Date.now(), UNDO_MS)));
       },
       reasonText: (reason) => runFailureMessage(reason, homeCatalog)
     };
-  }, [map, digs, canDig, digMode, planTier, homeCatalog, servedQuestionLine, catalog, locale, queueDig]);
+  }, [map, digs, canDig, digMode, planTier, homeCatalog, servedQuestionLine, servedRunId, catalog, locale, queueDig, checkDig]);
 
   // ── What changed since your last visit and while you were here (D4, fix wave 1, N7) ─────────────────────────────
   // The first complete load (map + every dig read once + the question list and dig records read once + the last visit
@@ -1518,7 +1555,7 @@ function V4Debate({
   // journey-d3: the pinned bar's one job. A place whose dig waits has its Undo in the note above the bar instead.
   const phoneJob: V4BarJob = phoneTarget !== null
     ? waitingDigFor(waitingDigs, servedRunId, phoneTarget.target) === null
-      ? { kind: "dig", label: barDigLabel(phoneTarget, shareFor(phoneTarget.target, draft, room), catalog), onDig: () => startDig(phoneTarget.target) }
+      ? { kind: "dig", label: barDigLabel(phoneTarget, shareFor(phoneTarget.target, draft, room), catalog, locale), onDig: () => startDig(phoneTarget.target) }
       : { kind: "none" }
     : goodTime ? { kind: "report", href: reportHref } : { kind: "none" };
 
@@ -1583,40 +1620,26 @@ function V4Debate({
 
   // W3-4: the tray names the path its picks are on (owner Q-D1: one path per dig), the money lines, and Free's cap.
   // journey-f23 (owner's screen review): the picks show as chips, never as a count. dig-f8: no mode word on Free.
-  // journey-d3: inside the phone's bar the bar's own button digs the picks when the person is on their path, so the
-  // folded tray does not offer a second one.
-  const trayOf = (withDig: boolean): ReactNode => (hasTray && trayTarget !== null && trayTarget.kind === "picks" ? (
-    <section className="v4DebTray" aria-label={t(catalog, "v4.dig.trayLabel")}>
-      <V4PickChips picks={trayTarget.picks} label={t(catalog, "v4.map.picked")} />
-      <p className="v4DebTrayText">
-        {trayTarget.path !== null ? <TitleText title={pathTitle(trayTarget.path, catalog, 40)} catalog={catalog} /> : null}
-        {trayTarget.path !== null && planTier !== "free" ? " · " : null}
-        {planTier === "free" ? null : t(catalog, `v4.digMode.${sentDigMode}`)}
-      </p>
-      <p className="v4DebTrayHint v4Muted">
-        {t(catalog, "v4.suggest.onePath")}
-        {planTier === "free" ? <>{" "}{t(catalog, "v4.suggest.freeCap", { count: picksMax("free") })}</> : null}
-      </p>
-      <V4MoneyLines lines={money} catalog={catalog} />
-      <div className="v4DebTrayActions">
-        {withDig ? (
-          <button
-            type="button"
-            className="v4Btn v4BtnPrimary"
-            onClick={() => startDig(trayTarget)}
-          >
-            {trayTarget.picks.length >= 2
-              ? tPlural(catalog, "v4.dig.trayDig", trayTarget.picks.length, locale)
-              : t(catalog, "v4.panel.dig")}
-          </button>
-        ) : null}
-        <button type="button" className="v4Link v4DebTrayClear" onClick={clearPicks}>
-          {t(catalog, "v4.dig.trayClear")}
-        </button>
-      </div>
-    </section>
-  ) : null);
-  const tray = trayOf(true);
+  // dig-f4 / map-f14 (3 Nov): on a computer the tray shows from the second pick, docked at the foot of the panel column,
+  // with no dig button of its own when the panel's pinned button already digs the picks; a phone has no tray (its pinned
+  // bar carries the picks, and the Map sheet lists them with Clear).
+  const picksTarget = trayTarget !== null && trayTarget.kind === "picks" && !picksOnTheirWay ? trayTarget : null;
+  const tray = hasTray && picksTarget !== null ? (
+    <V4DigTray
+      target={picksTarget}
+      planTier={planTier}
+      mode={sentDigMode}
+      money={money}
+      withDig={!panelDigsPicks(shownSelection, draft, rootPanelOpen(view, digs), view.paths)}
+      onDig={() => startDig(picksTarget)}
+      onClear={clearPicks}
+      catalog={catalog}
+      locale={locale}
+    />
+  ) : null;
+  const picksList = layout === "phone" && picksTarget !== null
+    ? <V4PicksList target={picksTarget} planTier={planTier} onClear={clearPicks} catalog={catalog} />
+    : null;
 
   // dig-f23: where the tray was, "Picks cleared [Undo]" for 10 seconds, in the shared Undo note (journey-f21).
   const picksClearedNote = picksUndo.offered
@@ -1763,6 +1786,8 @@ function V4Debate({
                 catalog={catalog}
                 locale={locale}
               />
+              {/* dig-f4: from the second pick, the tray docked at the foot of the panel column (never on a phone). */}
+              {tray}
             </section>
           </div>
         </div>
@@ -1776,9 +1801,11 @@ function V4Debate({
           notes={<>{ready.note}{digNotes}{picksClearedNote}</>}
           // dig-f18: the tour's pinned "Next change › · Done" sits right above the phone's bar.
           pinned={ready.phoneTourBar}
-          tray={layout === "phone" ? trayOf(phoneTarget?.target.kind !== "picks") : tray}
-          trayTitle={trayTarget !== null && trayTarget.kind === "picks" && trayTarget.path !== null
-            ? <TitleText title={pathTitle(trayTarget.path, catalog, 40)} catalog={catalog} />
+          // dig-f4: the tray is docked in the panel column on a computer; a phone's "Your picks ▸" opens the Map sheet.
+          tray={null}
+          {...(picksList === null ? {} : { onOpenPicks: openSheet })}
+          trayTitle={picksTarget !== null && picksTarget.path !== null
+            ? <TitleText title={pathTitle(picksTarget.path, catalog, 40)} catalog={catalog} />
             : undefined}
           mapButtonRef={mapButtonRef}
           jobRef={barJobRef}
@@ -1793,7 +1820,7 @@ function V4Debate({
       {sheetOpen ? (
         <OutlineSheet
           onClose={closeSheet}
-          footer={<>{ready.note}{digNotes}{picksClearedNote}{tray}</>}
+          footer={<>{ready.note}{digNotes}{picksClearedNote}{picksList}</>}
           catalog={catalog}
         >
           {/* map-f23: the sheet opens straight at the outline; the steps are one line at its foot. */}
@@ -1913,7 +1940,7 @@ function ProgressScreen({ run, runId, startedAt, now, reconnecting, classicHref,
 
 /**
  * D7: the phone map, full screen. UI-6: a real modal — the page behind is inert, Tab stays inside, Escape closes, and
- * the tray (and the dig note with its Undo) live inside it while it is open.
+ * the picks with Clear (dig-f4: the outline is also the tray) and the dig note with its Undo live inside it while it is open.
  */
 function OutlineSheet({ onClose, footer, catalog, children }: Readonly<{
   onClose: () => void;

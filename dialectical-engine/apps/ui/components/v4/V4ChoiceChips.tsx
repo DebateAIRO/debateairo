@@ -23,7 +23,8 @@ export function V4ChoiceChips(props: Readonly<{
   return (
     <ul className="v4ChoiceChips" aria-label={props.label}>
       {shown.map((choice, at) => (
-        <li key={`${String(at)}:${choice}`} className="v4ChoiceChip" data-ai-generated="true">{choice}</li>
+        // dig-f21: a chip's words keep the direction they were written in (a person's own view may be right-to-left).
+        <li key={`${String(at)}:${choice}`} className="v4ChoiceChip" data-ai-generated="true" dir="auto">{choice}</li>
       ))}
     </ul>
   );

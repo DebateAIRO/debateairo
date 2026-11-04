@@ -3,6 +3,7 @@
 import { useId, useState } from "react";
 import type { DigSuggestion } from "@debateai/contract";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import { cardLabel } from "@/lib/v4/mapLooks";
 import type { MoneyLine } from "@/lib/v4/money";
 import {
   isEdited,
@@ -13,7 +14,7 @@ import {
   type PickRefusal,
   type V4PlanTier
 } from "@/lib/v4/suggestions";
-import type { V4DigDraft, V4DigPick, V4Path } from "@/lib/v4/types";
+import type { V4DigDraft, V4DigPick, V4OpenQuestion, V4Path } from "@/lib/v4/types";
 import type { TypedWords } from "@/lib/v4/useLeaveGuard";
 
 /*
@@ -24,6 +25,10 @@ import type { TypedWords } from "@/lib/v4/useLeaveGuard";
  * Owner Q19: on Free a dig combines at most 3. There is no search-words box (the owner's correction of 31 Oct): what is
  * sent to the web search stays the planner's decision. Users see shares of their quota, never prices. Nothing here
  * fetches or stores anything; the page owns the draft.
+ * V4 screen review (owner picks, 3 Nov): a greyed pick box always has a reason the person can see, one line above the
+ * first box greyed for it (dig-f22); Cancel on a wording puts the tick back as it was (dig-f14); the boxes and the
+ * person's own words follow the direction of what is typed (dig-f21); on Free a line under the own-view box says the
+ * view may be shown publicly (dig-f26); a picked open question and the person's own view are labelled (dig-f34).
  */
 
 /** What the page lends the map pieces and the panel for choosing what to dig. */
@@ -47,6 +52,11 @@ export type V4DigChoice = Readonly<{
    * page while the person moves between questions. Left out: they last only while this part is on screen, as before.
    */
   typed?: TypedWords;
+  /**
+   * dig-f26: true when this is a Free debate the server named as public (useV4Ask's freePublicNotice), so a line under
+   * the own-view box says the view may be shown on the public page. Absent or false: no such line.
+   */
+  publicDebate?: boolean;
 }>;
 
 /** On the tree and the outline, at most this many suggestions per path; the panel lists them all. */
@@ -74,6 +84,84 @@ export function refusalLine(refusal: PickRefusal, planTier: V4PlanTier, catalog:
     TOO_LONG: () => t(catalog, "v4.suggest.tooLong", { count: PICK_TEXT_MAX })
   };
   return lines[refusal]();
+}
+
+/** Stands in for the path's label while the sentence around it is read from the catalogue (the label is AI text). */
+const PATH_SLOT = "\u0000path\u0000";
+
+/**
+ * dig-f22: the one visible line above the first pick box greyed for `reason`, on the map and in the phone outline:
+ * "Your picks are on “Mostly renewables”." (picks of another path wait), or the plan's cap ("On the Free plan a dig
+ * combines up to 3 picks."). Only the path's own label is marked as AI text. It appears at once with the soft highlight.
+ */
+export function V4PickReason(props: Readonly<{ reason: PickRefusal; choice: V4DigChoice; paths: readonly V4Path[]; catalog: MessageCatalog }>) {
+  const { reason, choice, catalog } = props;
+  if (reason !== "OTHER_PATH") {
+    return <p className="v4PickReason v4Highlight" role="note">{refusalLine(reason, choice.planTier, catalog)}</p>;
+  }
+  const path = choice.draft.group === null ? undefined : props.paths.find((candidate) => candidate.id === choice.draft.group);
+  const label = path === undefined ? "" : shortLine(cardLabel(path.line), 40);
+  const [before = "", after = ""] = t(catalog, "v4.suggest.picksOn", { path: PATH_SLOT }).split(PATH_SLOT);
+  return (
+    <p className="v4PickReason v4Highlight" role="note">
+      {before}
+      {label.length > 0
+        ? <span data-ai-generated="true">{label}</span>
+        : t(catalog, path === undefined ? "v4.panel.crumbRoot" : "v4.map.pathUntitled")}
+      {after}
+    </p>
+  );
+}
+
+/** One group of pick boxes as it is drawn: its open questions in order, and whether its suggestion leaves are drawn. */
+export type PickGroup = Readonly<{ key: string; path: V4Path | null; open: readonly V4OpenQuestion[]; suggestions: boolean }>;
+
+/** Where a reason line goes: before this open question's row (its id), or before the group's suggestions ("suggestions"). */
+export type PickReasonPlace = Readonly<{ reason: PickRefusal; before: string }>;
+
+/**
+ * dig-f22: for each reason a box can be greyed for, the group (in the order drawn) that shows the first box greyed for it,
+ * and where in that group the line goes. A picked box is never greyed; nothing is placed at the deepest level (no box can
+ * be picked there, and the page says so once at the top).
+ */
+export function pickReasonPlaces(groups: readonly PickGroup[], picked: ReadonlySet<string>, choice: V4DigChoice | undefined):
+  ReadonlyMap<string, PickReasonPlace> {
+  const places = new Map<string, PickReasonPlace>();
+  if (choice === undefined || !choice.canDig || choice.draft.picks.length === 0) return places;
+  const placed = new Set<PickRefusal>();
+  for (const group of groups) {
+    let found: PickReasonPlace | null = null;
+    for (const question of group.open) {
+      const reason = picked.has(question.id) ? null : choice.refusalFor(question.pathId);
+      if (reason !== null) {
+        found = { reason, before: question.id };
+        break;
+      }
+    }
+    if (found === null && group.suggestions && group.path !== null && shownSuggestions(group.path, choice).closed > 0) {
+      const reason = choice.refusalFor(group.path.id);
+      if (reason !== null) found = { reason, before: "suggestions" };
+    }
+    if (found !== null && !placed.has(found.reason)) {
+      placed.add(found.reason);
+      places.set(group.key, found);
+    }
+  }
+  return places;
+}
+
+/**
+ * The suggestions a path shows on the tree and the outline: the picked ones always, then the first ones in the answer's
+ * order, at most two unless more are picked; the rest are in the panel ("{count} more"). `closed`: how many of those
+ * shown have a box that cannot join the picks now.
+ */
+export function shownSuggestions(path: V4Path, choice: V4DigChoice): Readonly<{ shown: readonly DigSuggestion[]; more: number; closed: number }> {
+  const all = choice.canDig ? path.suggestions ?? [] : [];
+  const picked = pickedSuggestionIds(choice.draft);
+  const mine = all.filter((item) => picked.has(item.suggestion_id));
+  const shown = [...mine, ...all.filter((item) => !picked.has(item.suggestion_id))].slice(0, Math.max(SHOWN_ON_MAP, mine.length));
+  const closed = choice.refusalFor(path.id) === null ? 0 : shown.filter((item) => !picked.has(item.suggestion_id)).length;
+  return { shown, more: all.length - shown.length, closed };
 }
 
 /** A pick box for one suggestion. Closed (with its reason read aloud) when it cannot join the draft. */
@@ -117,13 +205,10 @@ export function SuggestionLeaves(props: Readonly<{
   catalog: MessageCatalog;
 }>) {
   const { path, choice, catalog } = props;
-  const all = choice.canDig ? path.suggestions ?? [] : [];
-  if (all.length === 0) return null;
-  const picked = pickedSuggestionIds(choice.draft);
   // The picked ones always show, then the first ones in the answer's order.
-  const shown = [...all.filter((item) => picked.has(item.suggestion_id)), ...all.filter((item) => !picked.has(item.suggestion_id))]
-    .slice(0, Math.max(SHOWN_ON_MAP, all.filter((item) => picked.has(item.suggestion_id)).length));
-  const more = all.length - shown.length;
+  const { shown, more } = shownSuggestions(path, choice);
+  if (shown.length === 0) return null;
+  const picked = pickedSuggestionIds(choice.draft);
   const tree = props.variant === "tree";
   return (
     <>
@@ -181,9 +266,19 @@ function PanelSuggestion(props: Readonly<{ path: V4Path; suggestion: DigSuggesti
     setEditingNow(text);
     choice.typed?.set(typedKey, text, startText);
   };
+  // dig-f14: whether starting the edit ticked the box, so Cancel can put the tick back as it was. Kept beside the typed
+  // wording in the page's memory (its text equals its start, so it never counts as typed words), never in the browser.
+  const tickedKey = `edit-ticked:${suggestion.suggestion_id}`;
+  const setTickedByEdit = (ticked: boolean): void => {
+    choice.typed?.set(tickedKey, ticked ? "yes" : null, "yes");
+  };
+  const [tickedByEdit, setTickedByEditNow] = useState(() => choice.typed?.get(tickedKey) === "yes");
   const startEdit = (): void => {
     // Editing a suggestion picks it, so the wording the person writes is what is sent.
-    if (pick === undefined) choice.onToggleSuggestion(path.id, suggestion);
+    const ticks = pick === undefined;
+    if (ticks) choice.onToggleSuggestion(path.id, suggestion);
+    setTickedByEditNow(ticks);
+    setTickedByEdit(ticks);
     setProblem(null);
     setEditing(startText);
   };
@@ -193,15 +288,28 @@ function PanelSuggestion(props: Readonly<{ path: V4Path; suggestion: DigSuggesti
     if (pick === undefined) choice.onToggleSuggestion(path.id, suggestion);
     const refused = choice.onEditPick(key, editing);
     setProblem(refused);
-    if (refused === null) setEditing(null);
+    if (refused === null) {
+      setEditing(null);
+      setTickedByEditNow(false);
+      setTickedByEdit(false);
+    }
+  };
+  const cancelEdit = (): void => {
+    // dig-f14: an edit that ticked the box gives the tick back on Cancel; a box ticked before the edit stays ticked.
+    if (tickedByEdit && pick !== undefined) choice.onToggleSuggestion(path.id, suggestion);
+    setTickedByEditNow(false);
+    setTickedByEdit(false);
+    setProblem(null);
+    setEditing(null);
   };
   return (
     <li className={`v4SugRow${pick !== undefined ? " v4SugPicked" : ""}`}>
       <div className="v4SugRowHead">
         <SuggestionBox path={path} suggestion={suggestion} choice={choice} catalog={catalog} className="v4PanelPick" />
         <p className="v4SugRowText">
+          {/* dig-f21: the person's wording follows the direction it was typed in. */}
           {editedText !== null
-            ? <span>{editedText}</span>
+            ? <span dir="auto">{editedText}</span>
             : <span data-ai-generated="true">{suggestion.text}</span>}
           {editedText !== null ? <> <span className="v4SugTag">{t(catalog, "v4.suggest.edited")}</span></> : null}
         </p>
@@ -216,6 +324,7 @@ function PanelSuggestion(props: Readonly<{ path: V4Path; suggestion: DigSuggesti
           <textarea
             id={`${id}-edit`}
             className="v4SugInput"
+            dir="auto"
             value={editing}
             maxLength={PICK_TEXT_MAX}
             rows={3}
@@ -224,7 +333,7 @@ function PanelSuggestion(props: Readonly<{ path: V4Path; suggestion: DigSuggesti
           {problem !== null ? <p className="v4SugProblem" role="alert">{refusalLine(problem, choice.planTier, catalog)}</p> : null}
           <div className="v4SugEditorActions">
             <button type="button" className="v4Btn" onClick={saveEdit}>{t(catalog, "v4.suggest.editDone")}</button>
-            <button type="button" className="v4Link" onClick={() => setEditing(null)}>{t(catalog, "v4.suggest.cancel")}</button>
+            <button type="button" className="v4Link" onClick={cancelEdit}>{t(catalog, "v4.suggest.cancel")}</button>
           </div>
         </div>
       )}
@@ -257,17 +366,22 @@ function OwnView(props: Readonly<{ path: V4Path; choice: V4DigChoice; catalog: M
     setProblem(refused);
     if (refused === null) setText(null);
   };
+  // dig-f26: Free debates are public, so on Free one line under the box says the view may be shown there.
+  const shownPublicly = choice.publicDebate === true;
   return (
     <div className="v4SugEditor">
       <label className="v4SugLabel" htmlFor={`${id}-own`}>{t(catalog, "v4.suggest.ownViewLabel")}</label>
       <textarea
         id={`${id}-own`}
         className="v4SugInput"
+        dir="auto"
         value={text}
         maxLength={PICK_TEXT_MAX}
         rows={3}
         onChange={(event) => setText(event.target.value)}
+        {...(shownPublicly ? { "aria-describedby": `${id}-public` } : {})}
       />
+      {shownPublicly ? <p id={`${id}-public`} className="v4PanelHint v4Muted v4SugPublic">{t(catalog, "v4.suggest.ownViewPublic")}</p> : null}
       {problem !== null ? <p className="v4SugProblem" role="alert">{refusalLine(problem, choice.planTier, catalog)}</p> : null}
       <div className="v4SugEditorActions">
         <button type="button" className="v4Btn" onClick={add}>{t(catalog, "v4.suggest.ownViewAdd")}</button>
@@ -277,7 +391,10 @@ function OwnView(props: Readonly<{ path: V4Path; choice: V4DigChoice; catalog: M
   );
 }
 
-/** The person's own views and the open questions picked on this path (the suggestions show their own boxes). */
+/**
+ * The person's own views and the open questions picked on this path (the suggestions show their own boxes). dig-f34:
+ * each says what it is, "Open question" or "Your view", so a picked open question never looks like the person's view.
+ */
 function OtherPicks(props: Readonly<{ picks: readonly V4DigPick[]; choice: V4DigChoice; catalog: MessageCatalog }>) {
   const { catalog } = props;
   const shown = props.picks.filter((pick) => pick.kind !== "SUGGESTION");
@@ -288,8 +405,11 @@ function OtherPicks(props: Readonly<{ picks: readonly V4DigPick[]; choice: V4Dig
         <li key={pick.key} className="v4SugRow v4SugRowPlain v4SugPicked">
           <p className="v4SugRowText">
             {pick.kind === "OWN_VIEW"
-              ? <><span className="v4SugTag">{t(catalog, "v4.suggest.ownViewTag")}</span> <span>{pick.text}</span></>
-              : pick.kind === "OPEN" ? <span data-ai-generated="true">{shortLine(pick.question.text, 120)}</span> : null}
+              // dig-f21: the person's own words follow the direction they were typed in.
+              ? <><span className="v4SugTag">{t(catalog, "v4.suggest.ownViewTag")}</span> <span dir="auto">{pick.text}</span></>
+              : pick.kind === "OPEN"
+                ? <><span className="v4SugTag">{t(catalog, "v4.suggest.openTag")}</span> <span data-ai-generated="true">{shortLine(pick.question.text, 120)}</span></>
+                : null}
           </p>
           <button type="button" className="v4Link" onClick={() => props.choice.onRemovePick(pick.key)}>
             {t(catalog, "v4.suggest.remove")}
@@ -336,6 +456,8 @@ export function V4DigCompose(props: Readonly<{ path: V4Path; choice: V4DigChoice
           <button type="button" className="v4Btn" onClick={choice.onClear}>{t(catalog, "v4.dig.trayClear")}</button>
         </div>
       ) : null}
+      {/* dig-f22: the reason sits right above the boxes it greys (Free's cap is said above already). */}
+      {full && choice.planTier !== "free" ? <p className="v4PanelHint v4Muted">{t(catalog, "v4.suggest.full")}</p> : null}
       {suggestions.length === 0
         ? <p className="v4Muted">{t(catalog, "v4.suggest.none")}</p>
         : suggestionsByKind(suggestions).map((group) => (
@@ -356,7 +478,6 @@ export function V4DigCompose(props: Readonly<{ path: V4Path; choice: V4DigChoice
         ))}
       <OtherPicks picks={mine} choice={choice} catalog={catalog} />
       {elsewhere ? null : <OwnView key={`own/${path.id}`} path={path} choice={choice} catalog={catalog} />}
-      {full && choice.planTier !== "free" ? <p className="v4PanelHint v4Muted">{t(catalog, "v4.suggest.full")}</p> : null}
       {/* journey-f23 (owner's screen review): no "N picked" count; the picks are marked above and shown as chips in the tray. */}
     </section>
   );

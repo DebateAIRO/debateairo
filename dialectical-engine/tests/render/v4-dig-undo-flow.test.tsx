@@ -136,7 +136,9 @@ describe("the note's words and keys (dig-f7, dig-f8, journey-f21)", () => {
     await click(noteUndos()[0]!);
     // map-f22 (the map track): a path that is not open keeps its suggestions behind "+N more".
     await expandBranch(PATHS.renew);
-    await click(branch(PATHS.renew).querySelector<HTMLInputElement>(".v4MapLeafSuggestion input[type=checkbox]")!);
+    // dig-f4: the tray shows from the second pick.
+    for (const box of branch(PATHS.renew).querySelectorAll<HTMLInputElement>(".v4MapLeafSuggestion input[type=checkbox]")) await click(box);
+    expect(page().querySelector(".v4DebTray")).not.toBeNull();
     expect(page().querySelector(".v4DebTray")?.textContent).not.toContain(CATALOG["v4.digMode.quick"]);
   });
 
@@ -263,21 +265,35 @@ describe("a phone's one bottom stack (journey-d3, dig-f16, dig-f17)", () => {
     expect(document.activeElement).toBe(back);
   });
 
-  it("picks fold into 'Your picks ▸', which opens them; the bar digs them, so the folded tray has no second button", async () => {
+  it("picks fold into 'Your picks ▸', which opens the Map sheet listing them with Clear; the bar digs them (dig-f4)", async () => {
     await mountMap(375, crypto.randomUUID(), "n-renew");
     await click(panel().querySelector<HTMLInputElement>(".v4Sugs input[type=checkbox]")!);
     const toggle = stack()!.querySelector<HTMLButtonElement>(".v4StackPicksToggle")!;
     expect(toggle.textContent).toContain(CATALOG["v4.bar.yourPicks"]);
-    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(toggle.getAttribute("aria-haspopup")).toBe("dialog");
+    // A phone has no tray: nothing of the kind in the stack, and the pinned bar carries the pick (map-f14's words).
     expect(stack()!.querySelector(".v4DebTray")).toBeNull();
+    expect(stack()!.querySelector(".v4DebPhoneDig")?.textContent).toBe(CATALOG["v4.dig.intoThis"]);
     await click(toggle);
-    expect(toggle.getAttribute("aria-expanded")).toBe("true");
-    const tray = stack()!.querySelector<HTMLElement>(".v4DebTray")!;
+    const list = page().querySelector<HTMLElement>(".v4DebSheet .v4DebSheetFoot .v4DebTray")!;
     // journey-f23 (the wait-card track): the picks show as chips, never as "1 picked".
-    expect(tray.querySelectorAll(".v4ChoiceChip")).toHaveLength(1);
-    expect(buttonsNamed(CATALOG["v4.panel.dig"]!, tray)).toHaveLength(0);
-    expect(buttonsNamed(CATALOG["v4.dig.trayClear"]!, tray)).toHaveLength(1);
-    expect(stack()!.querySelector(".v4DebPhoneDig")?.textContent).toBe(CATALOG["v4.debate.digHere"]);
+    expect(list.querySelectorAll(".v4ChoiceChip")).toHaveLength(1);
+    expect([...list.querySelectorAll("button")].map((button) => button.textContent)).toEqual([CATALOG["v4.dig.trayClear"]]);
+  });
+
+  it("the pinned bar carries the picks on any screen, the main question's too (dig-f4)", async () => {
+    await mountMap(375, crypto.randomUUID(), "n-renew");
+    const boxes = [...panel().querySelectorAll<HTMLInputElement>(".v4Sugs input[type=checkbox]")];
+    await click(boxes[0]!);
+    await click(boxes[1]!);
+    await click(buttonNamed(CATALOG["v4.panel.crumbRoot"]!, panel()));
+    expect(panel().classList.contains("v4Panel-root")).toBe(true);
+    const job = stack()!.querySelector<HTMLButtonElement>(".v4DebPhoneDig")!;
+    expect(job.textContent).toBe(word("v4.dig.trayDig.other", { count: 2 }));
+    await press(job);
+    await advance(10_100);
+    expect(harness.submit).toHaveBeenCalledTimes(1);
+    expect((harness.submit.mock.calls[0]![3] as { picks?: unknown[] }).picks).toHaveLength(2);
   });
 
   it("after a single dig of a path the slim line does not claim a good time (dig-f29, the map track's report rule)", async () => {

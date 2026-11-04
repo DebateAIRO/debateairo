@@ -22,6 +22,7 @@ import {
   pathMarks,
   pathTitle,
   PickBox,
+  PickReasonRow,
   resolveSelection,
   ResultTag,
   selectionIdOf,
@@ -32,6 +33,7 @@ import {
   viaKeyboard,
   type MapPiecesProps
 } from "./V4MapTree";
+import { pickReasonPlaces, type PickGroup, type PickReasonPlace } from "./V4DigSuggest";
 import { V4RewriteCardNote } from "./V4PathRewrite";
 import { V4TrustBar } from "./V4TrustBar";
 
@@ -153,12 +155,18 @@ function Children(props: Readonly<{
   level: number;
   /** W3-4: the path's suggestions and "Dig here too" (null: none). */
   extra?: ReactNode;
+  /** dig-f22: where this group's visible reason line goes (absent: it has none). */
+  reason?: PickReasonPlace;
 }>) {
   const extra = props.extra ?? null;
   if (props.open.length === 0 && props.digs.length === 0 && extra === null) return null;
+  const reasonRow = (before: string): ReactNode => (props.reason?.before === before
+    ? <PickReasonRow key={`reason/${props.groupKey}`} place={props.reason} pieces={props.pieces} className="v4OutRow v4OutReason" />
+    : null);
   return (
     <ul className="v4OutGroup v4OutLeaves" data-group={props.group}>
-      {props.open.map((question) => (
+      {props.open.flatMap((question) => [
+        reasonRow(question.id),
         <OpenRow
           key={`${props.groupKey}/${question.id}`}
           question={question}
@@ -167,10 +175,11 @@ function Children(props: Readonly<{
           group={props.group}
           level={props.level}
         />
-      ))}
+      ])}
       {props.digs.map((dig) => (
         <DigRow key={dig.link.childRunId} dig={dig} pieces={props.pieces} selectedId={props.selectedId} group={props.group} level={props.level} />
       ))}
+      {extra === null ? null : reasonRow("suggestions")}
       {extra}
     </ul>
   );
@@ -191,6 +200,19 @@ export function V4Outline(props: MapPiecesProps) {
     return true;
   };
   const keys = useMapKeys(treeRef, { onExpand: (row) => setFold(row, false), onCollapse: (row) => setFold(row, true) });
+  // dig-f22: a visible line above the first box greyed for each reason, in the order the rows are drawn (a folded path
+  // draws none of its boxes).
+  const rootOpen = undugOpen(map.open, digs);
+  const reasons = pickReasonPlaces([
+    { key: "root", path: null, open: rootOpen, suggestions: false },
+    ...map.paths.map((path): PickGroup => (folded.has(path.id)
+      ? { key: path.id, path, open: [], suggestions: false }
+      : { key: path.id, path, open: undugOpen(path.open, digs), suggestions: pathExtras(path, props, "outline") !== null }))
+  ], props.picked, props.choice);
+  const reasonOf = (key: string) => {
+    const place = reasons.get(key);
+    return place === undefined ? {} : { reason: place };
+  };
   return (
     <nav className="v4Out" aria-label={t(catalog, "v4.outline.label")}>
       <details className="v4OutShades">
@@ -218,10 +240,11 @@ export function V4Outline(props: MapPiecesProps) {
             groupKey="root"
             group="root"
             level={2}
-            open={undugOpen(map.open, digs)}
+            open={rootOpen}
             digs={digsUnder(map, digs, null)}
             pieces={props}
             selectedId={selectedId}
+            {...reasonOf("root")}
           />
           {map.paths.length === 0
             ? <p className="v4MapEmpty v4Muted">{t(catalog, "v4.map.noPaths")}</p>
@@ -277,6 +300,7 @@ export function V4Outline(props: MapPiecesProps) {
                           pieces={props}
                           selectedId={selectedId}
                           extra={extra}
+                          {...reasonOf(path.id)}
                         />
                       )}
                     </li>
