@@ -10,6 +10,8 @@
 .pricingCard { display: flex; flex-direction: column; gap: 10px; padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--core); }
 .pricingCard h2 { margin: 0; font-family: var(--font-display); font-size: 24px; }
 .pricingPrice { margin: 0; font-size: 20px; font-weight: 600; }
+/* Terms §12: the total stays as plain to read as the price and its tax above it. */
+.pricingTotal { margin: -4px 0 0; font-size: 16px; font-weight: 600; }
 .pricingNote,
 .billingNote { margin: 0; color: var(--muted); font-size: 13px; }
 .pricingCard .btn { margin-top: auto; text-align: center; }

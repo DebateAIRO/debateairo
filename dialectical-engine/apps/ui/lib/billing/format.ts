@@ -15,6 +15,17 @@ export function formatMoney(locale: string, decimal: string, currency: BillingCu
 }
 
 /**
+ * The tax inside a price the API sent with its net ("24.20" and "20.00" give "4.20"), counted in whole cents so no
+ * float rounding can show; null when either is not a plain decimal price or the total is below the net.
+ */
+export function taxInPrice(total: string, net: string): string | null {
+  if (!DECIMAL_PRICE.test(total) || !DECIMAL_PRICE.test(net)) return null;
+  const cents = (decimal: string): number => Number(decimal.replace(".", ""));
+  const tax = cents(total) - cents(net);
+  return tax < 0 ? null : `${Math.trunc(tax / 100)}.${String(tax % 100).padStart(2, "0")}`;
+}
+
+/**
  * Terms §12: how a plans list's prices stand toward tax. INCLUDED: the place's tax is in them; NONE: that place adds
  * none, so they are final; UNPRICED: no place's tax is known yet (no country, a US or Canadian postal code still
  * needed, or the tax service not answering), so no price is shown at all, never one before tax. `== null`: an answer
