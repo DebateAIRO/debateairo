@@ -428,3 +428,44 @@ describe("V4 mock API: the shelf's draft parts of the answer list (owner's scree
     expect(answerIndexDraftProblems({ ...full, items: [{ ...item, changed_since_visit: "yes" }] })).toHaveLength(1);
   });
 });
+
+describe("the public dig flow and the public state (owner screen review, 3 Nov: public-d2 A, public-f26)", () => {
+  it("each chip of the public read's draft field is a contract suggestion of a path the page shows; one was dug near, with its day and dig", async () => {
+    const { PUBLIC_DIG_SUGGESTIONS, PUBLIC_UPDATE_REF, seedPublicDebates } = await import("../../tools/v4-mock-api/public-seed.js");
+    const { PublicDebateSchema } = await import("../../packages/contract/src/index.js");
+    const debate = PublicDebateSchema.parse(seedPublicDebates()[0]);
+    const shown = new Set((debate.story_short?.paths ?? []).map((path) => path.position_ref));
+    const chips: Loose[] = PUBLIC_DIG_SUGGESTIONS.flatMap((entry: Loose) => {
+      expect(shown.has(entry.position_ref), entry.position_ref).toBe(true);
+      return entry.suggestions;
+    });
+    for (const { dug_on: _on, dug_ref: _ref, ...suggestion } of chips) expect(DigSuggestionSchema.safeParse(suggestion).success, suggestion.suggestion_id).toBe(true);
+    expect(chips.filter((chip) => chip.dug_on !== undefined)).toEqual([expect.objectContaining({ dug_on: "2026-10-28", dug_ref: PUBLIC_UPDATE_REF })]);
+    // The field is a draft: today's strict public read does not take it, so the website's view never carries it.
+    expect(PublicDebateSchema.safeParse({ ...debate, dig_suggestions: PUBLIC_DIG_SUGGESTIONS }).success).toBe(false);
+  });
+
+  it("the visibility read: PUBLISHED with the page's reference, PRIVATE for every other state; the draft view adds only the stages before or after the check", async () => {
+    const { PUBLIC_REF, PUBLIC_STATES, visibilityOf } = await import("../../tools/v4-mock-api/public-seed.js");
+    const { PublicationTransitionSchema } = await import("../../packages/contract/src/index.js");
+    for (const state of PUBLIC_STATES) expect(PublicationTransitionSchema.safeParse(visibilityOf(state, false)).success, state).toBe(true);
+    expect(visibilityOf("PUBLISHED", false)).toEqual({ state: "PUBLISHED", public_ref: PUBLIC_REF });
+    expect(visibilityOf("BEING_CHECKED", false)).toEqual({ state: "PRIVATE", public_ref: null });
+    expect(visibilityOf("BEING_CHECKED", true)).toEqual({ state: "PRIVATE", public_ref: null, public_stage: "BEING_CHECKED" });
+    expect(visibilityOf("PRIVATE", true)).toEqual({ state: "PRIVATE", public_ref: null });
+    expect(visibilityOf("PUBLISHED", true)).toEqual({ state: "PUBLISHED", public_ref: PUBLIC_REF });
+  });
+
+  it("a public dig on the page gives the digger its new text as `rewrite`; \"#confirm\" gives the path's text as it was, with nothing changed", async () => {
+    const { contributionOf, contributionRewriteOf } = await import("../../tools/v4-mock-api/public-seed.js");
+    const { AnswerContributionSchema } = await import("../../packages/contract/src/web.js");
+    const added = contributionOf("p-fares", null, "f3000000-0000-4000-8000-000000000001", "2026-11-04", "Mine.");
+    const rewrite = contributionRewriteOf(added, null);
+    expect(rewrite).toEqual({ line: added.line, summary: added.summary, fate: added.fate, what_changed: added.what_changed });
+    const same = contributionRewriteOf(null, "Free fares for everyone.");
+    expect(same).toMatchObject({ line: "Free fares for everyone.", what_changed: [] });
+    for (const body of [rewrite, same]) {
+      expect(AnswerContributionSchema.safeParse({ public_ref: "f1000000-0000-4000-8000-000000000001", state: "ON_THE_PAGE", rewrite: body }).success).toBe(true);
+    }
+  });
+});

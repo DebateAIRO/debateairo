@@ -537,6 +537,24 @@ await step("the Free notice: a Free room says so, and an ask that showed it is c
   }
   return "counted";
 }, (value: string) => value);
+// Owner screen review (public-f26, public-d2 A): the public state of the asker's own debate, and the chips' draft field.
+await step("the public state of your debate: PUBLISHED with its page; the stages before it on the draft view only", async () => {
+  try {
+    await mock("/__mock/set?publicstate=PUBLISHED");
+    const published: Loose = await client.readRunVisibility(RUNS.settled);
+    must(published.state === "PUBLISHED" && published.public_ref === PUBLIC.debate, `published: ${JSON.stringify(published)}`);
+    await mock("/__mock/set?publicstate=BEING_CHECKED");
+    const checking: Loose = await client.readRunVisibility(RUNS.settled);
+    must(checking.state === "PRIVATE" && checking.public_ref === null, `the website's read: ${JSON.stringify(checking)}`);
+    const draft: Loose = await mock(`/__mock/draft/v1/runs/${RUNS.settled}/visibility`);
+    must(draft.public_stage === "BEING_CHECKED", `draft: ${JSON.stringify(draft)}`);
+  } finally {
+    await mock("/__mock/set?publicstate=PRIVATE");
+  }
+  const page: Loose = await mock(`/__mock/draft/v1/public/debates/${PUBLIC.debate}`);
+  must(Array.isArray(page.dig_suggestions) && page.dig_suggestions.length === 2, `draft chips: ${JSON.stringify(page.dig_suggestions)}`);
+  return "PUBLISHED, BEING_CHECKED (draft), chips (draft)";
+}, (value: string) => value);
 await step("Write a report: 202 and its refusals", async () => {
   const noCarrier: Loose = await client.writePublicReport(PUBLIC.authorGone);
   must(noCarrier.error === "PUBLIC_DEBATE_NO_CARRIER", `author gone: ${JSON.stringify(noCarrier)}`);

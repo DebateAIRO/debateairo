@@ -21,7 +21,7 @@ import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createSeed, SEED_NODE_IDS, type StoryStatus } from "./seed.js";
 import {
-  answerDraftProblems, answerIndexDraftProblems, contractOrDraft, DraftAskParentSchema, DraftInvestigationSchema, DraftMonthPauseSchema, DraftNodeWebSchema,
+  answerDraftProblems, answerIndexDraftProblems, contractOrDraft, DraftAskParentSchema, DraftDigSuggestionSchema, DraftInvestigationSchema, DraftMonthPauseSchema, DraftNodeWebSchema,
   DraftRunQuotaUsedSchema,
   DraftRoomPartSchema, DraftRoomQueryPartSchema, DraftRunContinuedSchema, DraftRunContinueRefusedSchema, DraftRunContinueRequestSchema,
   DraftRunStartedAtSchema, DraftUsageBorrowsSchema, splitAsk, splitRoomQuery, stripAnswer, stripNode, stripRoom,
@@ -33,7 +33,10 @@ import {
 import type { WebCase } from "./web-seed.js";
 import { paymentRegionsOf } from "../../packages/kernel/src/payment-regions.js";
 import { BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, priceCurrencyFor } from "../../packages/register/src/billing-plans.js";
-import { contributionOf, PUBLIC_MODES, PUBLIC_REF, seedPublicDebates, writtenReport, type PublicMode } from "./public-seed.js";
+import {
+  contributionOf, contributionRewriteOf, PUBLIC_DIG_SUGGESTIONS, PUBLIC_MODES, PUBLIC_REF, PUBLIC_STATES, seedPublicDebates, visibilityOf, writtenReport,
+  type PublicMode, type PublicState
+} from "./public-seed.js";
 
 // ---------------------------------------------------------------------------------------------------------------
 // Find the repository (no machine path is written here): MOCK_ENGINE_DIR, else the dialectical-engine folder this file
@@ -177,6 +180,8 @@ function mockReviewPage(ref: string, debate: any, row: MockReview) {
 
 /** Decision 13: what a public page's dig or report waits on (the click-test's switch), and how long the mock's check and report writer take. */
 let publicMode: PublicMode = choice("MOCK_PUBLIC", process.env.MOCK_PUBLIC, PUBLIC_MODES, "OPEN");
+/** Owner screen review (public-f26): where the asker's debates are on their way to a public page (the click-test's switch). */
+let publicState: PublicState = choice("MOCK_PUBLIC_STATE", process.env.MOCK_PUBLIC_STATE, PUBLIC_STATES, "PRIVATE");
 let sessionOut = false;
 const PUBLIC_CHECK_MS = 10_000;
 const PUBLIC_REPORT_MS = 8_000;
@@ -883,6 +888,13 @@ function startupCheck(): number {
   check("GET /v1/public/ai-providers", C.PublicAiProvidersResponseSchema, { companies: ["anthropic", "openai", "xai"] });
   check("GET /v1/public/debates", C.PublicDebateListSchema, { items: [], total: 0 });
   for (const debate of publicDebates.values()) check(`GET /v1/public/debates/${String(debate.public_ref)}`, C.PublicDebateSchema, debate);
+  // public-d2 A (draft): every chip of the public read's draft field is a contract suggestion, with or without its "dug near" day.
+  for (const entry of PUBLIC_DIG_SUGGESTIONS) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const { dug_on: _on, dug_ref: _ref, ...suggestion } of entry.suggestions as readonly any[]) {
+      check(`GET /v1/public/debates/${PUBLIC_REF} (draft dig_suggestions ${String(suggestion.suggestion_id)})`, DraftDigSuggestionSchema, suggestion);
+    }
+  }
   check("GET /v1/deployment", C.DeploymentSchema, DEPLOYMENT);
   // A draft body must pass the draft schema whole, and today's contract once its draft fields are held back.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -915,7 +927,7 @@ function startupCheck(): number {
   check("GET /v1/answers", C.AnswerIndexSchema, contractOrDraft(C.AnswerIndexSchema, index, stripAnswerIndex).body);
   for (const run of runs.values()) {
     checkDraft(`GET /v1/runs/${run.runRef}`, C.RunProjectionSchema, runProjection(run), stripRun, runDraftSchema);
-    check(`GET /v1/runs/${run.runRef}/visibility`, C.PublicationTransitionSchema, { state: "PRIVATE", public_ref: null });
+    for (const state of PUBLIC_STATES) check(`GET /v1/runs/${run.runRef}/visibility (${state})`, C.PublicationTransitionSchema, visibilityOf(state, false));
     check(`GET /v1/runs/${run.runRef}/last-visit`, C.LastVisitSchema, { seen_at: null, items: null });
     check(`GET /v1/runs/${run.runRef}/dig-links`, C.DigLinksSchema, digLinksOf(run.runRef));
     const investigation = investigationOf(run.runRef);
@@ -1144,7 +1156,24 @@ function publicDigRefusal(parent: any, planTier: string): Readonly<{ status: num
   return null;
 }
 
-/** CHECKING while the dig runs and for a few seconds after; then ON_THE_PAGE and the page changes, or, with "#refuse" in the view, KEPT_PRIVATE and it does not. */
+/** A path's text on a public page now: its newest contribution's, else the story's (or its dig's own) first text. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function currentPublicLine(debate: any, place: string, digRef: string | null): string | null {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rows: readonly any[] = debate.contributions ?? [];
+  const last = rows.filter((row) => row.position_ref === place).at(-1);
+  if (last !== undefined) return String(last.line);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if (digRef === null) return debate.story_short?.paths?.find((path: any) => path.position_ref === place)?.line ?? null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return rows.find((row) => row.update_ref === digRef)?.dig_paths?.find((path: any) => path.position_ref === place)?.line ?? null;
+}
+
+/**
+ * CHECKING while the dig runs and for a few seconds after; then ON_THE_PAGE and the page changes (the digger's answer carries the new text as its
+ * `rewrite`, so the page's card shows before and after), or, with "#refuse" in the view, KEPT_PRIVATE and it does not; with "#confirm", ON_THE_PAGE with
+ * the path's text as it was and nothing changed (the card says "Confirmed: the answer holds.").
+ */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function startPublicCheck(run: MockRun, parent: any, question: string, settleAt: number): void {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1155,10 +1184,15 @@ function startPublicCheck(run: MockRun, parent: any, question: string, settleAt:
       answer.contribution = { public_ref: parent.public_ref, state: "KEPT_PRIVATE" };
       return;
     }
-    answer.contribution = { public_ref: parent.public_ref, state: "ON_THE_PAGE" };
     const place = (parent.places as readonly string[]).find((candidate) => candidate.startsWith("path:"))!.slice("path:".length);
     const debate = publicDebates.get(parent.public_ref);
-    debate.contributions = [...(debate.contributions ?? []), contributionOf(place, parent.dig_ref ?? null, randomUUID(), iso(Date.now()).slice(0, 10), parent.picks?.[0]?.text ?? "")];
+    if (/#confirm/iu.test(question)) {
+      answer.contribution = { public_ref: parent.public_ref, state: "ON_THE_PAGE", rewrite: contributionRewriteOf(null, currentPublicLine(debate, place, parent.dig_ref ?? null)) };
+      return;
+    }
+    const added = contributionOf(place, parent.dig_ref ?? null, randomUUID(), iso(Date.now()).slice(0, 10), parent.picks?.[0]?.text ?? "");
+    answer.contribution = { public_ref: parent.public_ref, state: "ON_THE_PAGE", rewrite: contributionRewriteOf(added, null) };
+    debate.contributions = [...(debate.contributions ?? []), added];
   }, Math.max(0, settleAt - Date.now()) + PUBLIC_CHECK_MS);
   settle.unref();
 }
@@ -1298,6 +1332,7 @@ function mockState() {
     pause: pauseMode,
     dig: digEndMode,
     public: publicMode,
+    public_state: publicState,
     report: reportMode,
     session: sessionOut ? "OUT" : "IN",
     free_notices: freeNotices,
@@ -1377,6 +1412,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
         const usage = url.searchParams.get("usage");
         const pause = url.searchParams.get("pause");
         const publicSetting = url.searchParams.get("public");
+        const publicStateSetting = url.searchParams.get("publicstate");
         const reportSetting = url.searchParams.get("report");
         const digSetting = url.searchParams.get("dig");
         if (reportSetting !== null) reportMode = choice("report", reportSetting, REPORT_MODES, reportMode);
@@ -1386,6 +1422,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
         if (plan !== null) planMode = choice("plan", plan, PLAN_MODES, planMode);
         if (usage !== null) usageMode = choice("usage", usage, USAGE_MODES, usageMode);
         if (publicSetting !== null) publicMode = choice("public", publicSetting, PUBLIC_MODES, publicMode);
+        if (publicStateSetting !== null) publicState = choice("publicstate", publicStateSetting, PUBLIC_STATES, publicState);
         const sessionSetting = url.searchParams.get("session");
         if (sessionSetting !== null) sessionOut = choice("session", sessionSetting, ["IN", "OUT"] as const, sessionOut ? "OUT" : "IN") === "OUT";
         if (pause !== null) {
@@ -1396,7 +1433,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       } catch (failure) {
         // The detail goes to the mock's log, never into the reply (CodeQL js/stack-trace-exposure, PR #224).
         process.stderr.write(`[mock] setting refused: ${failure instanceof Error ? failure.message : String(failure)}\n`);
-        return sendJson(req, res, 400, { error: "MOCK_SETTING_INVALID", message: "Unknown value for room, ask, plan, usage, pause, dig or public; see the mock's log." });
+        return sendJson(req, res, 400, { error: "MOCK_SETTING_INVALID", message: "Unknown value for room, ask, plan, usage, pause, dig, public or publicstate; see the mock's log." });
       }
       return sendJson(req, res, 200, mockState());
     }
@@ -1406,7 +1443,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (parts[1] === "sign-out" && isGet) {
       return sendJson(req, res, 200, { signed_in: false }, undefined, { "set-cookie": clearedSessionCookies() });
     }
-    return notFound(req, res, "MOCK_CONTROL_NOT_FOUND", "Known: /__mock/state, /__mock/set?room=&ask=&plan=&usage=&pause=&public=, /__mock/draft/v1/..., /__mock/sign-in, /__mock/sign-out");
+    return notFound(req, res, "MOCK_CONTROL_NOT_FOUND", "Known: /__mock/state, /__mock/set?room=&ask=&plan=&usage=&pause=&public=&publicstate=, /__mock/draft/v1/..., /__mock/sign-in, /__mock/sign-out");
   }
 
   // ---- the website edge's readiness probe (server.mjs /readyz forwards to <API>/readyz) ----
@@ -1488,6 +1525,8 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (debate === undefined) return sendJson(req, res, 404, { error: "DEBATE_NOT_FOUND", message: "DEBATE_NOT_FOUND" });
     // Decision 33: hidden under review, the plain line. The mock's own switch below hides, corrects and puts back.
     if (mockReview.get(parts[3]!)?.hidden === true) return sendJson(req, res, 410, { error: "DEBATE_UNDER_REVIEW" });
+    // Owner screen review (public-d2 A): the draft view adds each path's own suggestions (DRAFT field `dig_suggestions`, not in the contract yet).
+    if (draftView && debate.public_ref === PUBLIC_REF) return sendJson(req, res, 200, { ...mockReviewed(debate), dig_suggestions: PUBLIC_DIG_SUGGESTIONS });
     return sendJson(req, res, 200, mockReviewed(debate), C.PublicDebateSchema);
   }
   if (parts[1] === "public" && parts[2] === "debates" && parts.length === 5 && parts[4] === "report" && method === "POST") {
@@ -1695,7 +1734,10 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       return sendJson(req, res, 200, investigationBody(investigation), DraftInvestigationSchema);
     }
     if (sub === "events") return streamEvents(req, res, run);
-    if (sub === "visibility") return sendJson(req, res, 200, { state: "PRIVATE", public_ref: null }, C.PublicationTransitionSchema);
+    // Owner screen review (public-f26): PUBLISHED or PRIVATE as the contract says it; the draft view adds the stage before or after the check.
+    if (sub === "visibility") {
+      return draftView ? sendJson(req, res, 200, visibilityOf(publicState, true)) : sendJson(req, res, 200, visibilityOf(publicState, false), C.PublicationTransitionSchema);
+    }
   }
 
   logRequest(method, req.url ?? "", 404, "<- NOT MOCKED");
