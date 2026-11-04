@@ -73,9 +73,19 @@ type RailProps = Readonly<{
    * step carries the "New" dot until it is.
    */
   reportReady?: boolean;
+  /**
+   * V4 screen review (3 Nov 2026), report-d2: the report waits for digs, is being written ("Being written · Started 14:02",
+   * with the working dot) or could not be written; its step says so. Absent: nothing waits.
+   */
+  report?: V4RailReport;
+  /** report-f9: the first question's report page (a dig's map links there too). Absent: this debate's own, as before. */
+  reportHref?: string;
   catalog: MessageCatalog;
   locale: string;
 }>;
+
+/** report-d2: the "Your report" step's state line, in the shared state words (lib/v4/stateWords.ts), and whether it works. */
+export type V4RailReport = Readonly<{ text: string; working: boolean }>;
 
 function Steps(props: Readonly<{ rail: RailProps; reportHref: string; marksOnly: boolean }>) {
   const { catalog } = props.rail;
@@ -86,6 +96,7 @@ function Steps(props: Readonly<{ rail: RailProps; reportHref: string; marksOnly:
       shape={props.marksOnly ? "marks" : "list"}
       hrefs={{ report: props.reportHref }}
       reportMark={props.rail.reportReady === true ? <NewDot catalog={catalog} /> : null}
+      {...(props.rail.report === undefined ? {} : { reportState: props.rail.report })}
       catalog={catalog}
     />
   );
@@ -174,7 +185,7 @@ function ReportNote(props: Readonly<{ rail: RailProps }>) {
 
 export function V4Rail(props: RailProps) {
   const { runId, level, variant, catalog } = props;
-  const reportHref = levelHref(`/v4/debate/${encodeURIComponent(runId)}/report`, level);
+  const reportHref = props.reportHref ?? levelHref(`/v4/debate/${encodeURIComponent(runId)}/report`, level);
   if (variant === "marks" || variant === "steps") {
     return (
       <nav className={`v4DebRail v4DebRail-${variant}`} aria-label={t(catalog, "v4.rail.label")}>

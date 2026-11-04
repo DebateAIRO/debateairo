@@ -38,6 +38,11 @@ export type V4StepsProps = Readonly<{
    * not opened ("list" and "line"; the marks strip and the dots have no room for it).
    */
   reportMark?: ReactNode;
+  /**
+   * report-d2: the report's state on the map's rail ("Being written · Started 14:02", with the working dot): after the
+   * report's name in "list", and in "marks" as its mark (the dot) and its screen-reader words. Absent: nothing.
+   */
+  reportState?: Readonly<{ text: string; working: boolean }>;
   shape: V4StepsShape;
   catalog: MessageCatalog;
 }>;
@@ -56,6 +61,7 @@ function RailStep(props: Readonly<{ step: V4StepId; number: number; place: Place
   const words = t(rail.catalog, STEP_KEYS[step]);
   const className = `v4DebRailStep${place === "done" ? " v4DebRailDone" : place === "here" ? " v4DebRailHere" : ""}`;
   const mark = place === "done" ? "✓" : marks ? (place === "here" ? "●" : "○") : String(number);
+  const state = step === "report" ? rail.reportState : undefined;
   if (place === "here") {
     return (
       <li className={className} aria-current="step">
@@ -68,18 +74,21 @@ function RailStep(props: Readonly<{ step: V4StepId; number: number; place: Place
     );
   }
   if (marks) {
-    // The marks strip names only the step the person is on; a step it can go to is a link around its mark.
+    // The marks strip names only the step the person is on; a step it can go to is a link around its mark. report-d2: the
+    // report's mark is the working dot while it is written, and its state is said to screen readers.
+    const shownMark = state?.working === true ? <span className="v4WaitDot v4WaitDot-PULSE" /> : mark;
+    const spoken = state === undefined ? words : `${words} · ${state.text}`;
     return (
       <li className={className}>
         {href === undefined ? (
           <>
-            <span className="v4DebRailMark" aria-hidden="true">{mark}</span>
-            <span className="v4SrOnly">{words}</span>
+            <span className="v4DebRailMark" aria-hidden="true">{shownMark}</span>
+            <span className="v4SrOnly">{spoken}</span>
           </>
         ) : (
           <Link className="v4DebRailMarkLink" href={href}>
-            <span className="v4DebRailMark" aria-hidden="true">{mark}</span>
-            <span className="v4SrOnly">{words}</span>
+            <span className="v4DebRailMark" aria-hidden="true">{shownMark}</span>
+            <span className="v4SrOnly">{spoken}</span>
           </Link>
         )}
       </li>
@@ -90,6 +99,12 @@ function RailStep(props: Readonly<{ step: V4StepId; number: number; place: Place
       <span className="v4DebRailMark" aria-hidden="true">{mark}</span>
       {href === undefined ? <span className="v4DebRailStepName">{words}</span> : <Link className="v4Link" href={href}>{words}</Link>}
       {step === "report" ? rail.reportMark : null}
+      {state === undefined ? null : (
+        <span className="v4DebRailNote v4DebRailReportState" data-report-state="">
+          {state.working ? <span className="v4WaitDot v4WaitDot-PULSE" aria-hidden="true" /> : null}
+          {state.text}
+        </span>
+      )}
     </li>
   );
 }

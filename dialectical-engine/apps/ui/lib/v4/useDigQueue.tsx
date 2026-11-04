@@ -80,13 +80,19 @@ export function useDigQueue(input: Readonly<{
   onCounting: () => void;
   /** dig-f9: the line the question check's screen opens with when it answers this dig ("About your dig on “…”:"). */
   aboutOf: (target: DigTarget) => ReactNode;
+  /** report-d2: the report waits for digs or is written, so digging rests (its buttons say why); nothing starts. */
+  digsRest: boolean;
   catalog: MessageCatalog;
   locale: string;
 }>): DigQueue {
   const {
     map, canDig, servedRunId, servedQuestionLine, aboveRunIds, digQuotaRef, planTier, sentDigMode, draftRef, commitDraft,
-    setVisitLinks, ask, onCounting, aboutOf, catalog, locale
+    setVisitLinks, ask, onCounting, aboutOf, digsRest, catalog, locale
   } = input;
+  const restRef = useRef(digsRest);
+  useEffect(() => {
+    restRef.current = digsRest;
+  });
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -171,8 +177,9 @@ export function useDigQueue(input: Readonly<{
   const checking = useRef(new Set<string>());
 
   const queueDig = useCallback((dig: PendingDig): void => {
-    // W3-4: nothing is dug from the deepest level (the page offers no button there; this holds it).
-    if (map === null || !canDig || servedRunId === null || servedQuestionLine === null) return;
+    // W3-4: nothing is dug from the deepest level (the page offers no button there; this holds it). report-d2: nor while
+    // the report waits for digs or is written (its buttons rest).
+    if (map === null || !canDig || servedRunId === null || servedQuestionLine === null || digsRest) return;
     // One waiting dig per place: its buttons say it is starting, with its Undo, instead of starting a second one. The live
     // list is read (not this render's copy), so a quick second press never starts a second dig.
     if (waitingDigFor(readDigUndo(), servedRunId, dig.target) !== null) return;
@@ -191,8 +198,8 @@ export function useDigQueue(input: Readonly<{
     void askConsent().then((agreed) => {
       checking.current.delete(key);
       if (!agreed) return;
-      // The same holds after the answer: one waiting dig per place, nothing while new digs wait.
-      if (waitingDigFor(readDigUndo(), parentRunId, dig.target) !== null) return;
+      // The same holds after the answer: one waiting dig per place, nothing while new digs wait or the report is written.
+      if (restRef.current || waitingDigFor(readDigUndo(), parentRunId, dig.target) !== null) return;
       const quota = digQuotaRef.current;
       if (quota.quota.waitLine !== null) return;
       const sharePeriod = sharePeriodOf(quota.room);
@@ -214,7 +221,7 @@ export function useDigQueue(input: Readonly<{
         alive: () => mounted.current
       });
     });
-  }, [map, canDig, servedRunId, servedQuestionLine, aboveRunIds, digQuotaRef, planTier, catalog, askConsent]);
+  }, [map, canDig, servedRunId, servedQuestionLine, aboveRunIds, digQuotaRef, planTier, catalog, askConsent, digsRest]);
 
   const startDig = useCallback((target: DigTarget): void => {
     queueDig({ target, mode: sentDigMode, sendsAt: Date.now() + DIG_UNDO_MS });

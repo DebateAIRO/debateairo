@@ -15,7 +15,7 @@ import {
   DraftRoomQueryPartSchema, READ_DEPTHS, RESEARCHED_STATES, splitAsk, splitRoomQuery, stripAnswer, stripRoom, stripRun, stripUsage,
   SUGGESTION_KINDS, SUGGESTION_SIDES, DraftPathRewritesSchema, DraftAnswerDigSchema, DraftMonthPauseSchema, DraftRunQuotaUsedSchema,
   DraftUsageBorrowsSchema, DraftRunStartedAtSchema, answerIndexDraftProblems, DraftShelfRowPartSchema, stripAnswerIndex,
-  DraftQuestionShareSchema, DraftShareScopeSchema
+  DraftQuestionShareSchema, DraftShareScopeSchema, DraftReportSharePartSchema, reportShareProblems, stripReportShare
 } from "../../tools/v4-mock-api/web-draft.js";
 import {
   borrowNotice, DEEPEST_DIG, DIG_ANSWERS, DIG_FINISHED_AT, DIG_RUNS, mainAnswerAt, monthPause, PATH_REWRITES, reportVersionBody, SEEDED_NEW_DIGS
@@ -553,5 +553,28 @@ describe("V4 mock API: the played climb three levels up (draft, switch climb=PLA
   it("the website's own rule sees it climbing at every step until it reaches the first debate, then quiet", () => {
     expect([0, 1, 2, 3].map(stateAt)).toEqual(["CLIMBING", "CLIMBING", "CLIMBING", "QUIET"]);
     expect(CLIMB_MODES).toEqual(["SEED", "PLAY"]);
+  });
+});
+
+describe("V4 mock API: the report's share of today on the investigation read (owner's screen review, 3 Nov, report-d1)", () => {
+  const reports = {
+    investigation_id: "1a1a1a1a-5555-4555-8555-555555555555", root_run_id: "55555555-5555-4555-8555-555555555555",
+    state: "OPEN", digs: 0, versions: [], current: null
+  };
+
+  it("passes its draft part, and today's contract once it is held back", () => {
+    const full = { ...reports, report_share_percent: 5 };
+    expect(reportShareProblems(full)).toEqual([]);
+    expect(reportShareProblems(reports)).toEqual([]);
+    expect(stripReportShare(full)).toEqual(reports);
+    expect(InvestigationReportsSchema.safeParse(stripReportShare(full)).success).toBe(true);
+    expect(InvestigationReportsSchema.safeParse(contractOrDraft(InvestigationReportsSchema, full, stripReportShare).body).success).toBe(true);
+  });
+
+  it("is a whole percent in the dig share's steps of 5, never 0 and never a price", () => {
+    for (const share of [0, 3, 12.5, "5%", 105]) expect(DraftReportSharePartSchema.safeParse({ report_share_percent: share }).success, String(share)).toBe(false);
+    expect(DraftReportSharePartSchema.safeParse({ report_share_percent: 5 }).success).toBe(true);
+    expect(reportShareProblems({ ...reports, report_share_percent: 7 })).toHaveLength(1);
+    expect(["v4.reportStrip.share", "v4.report.publicToo"].filter((key) => !(key in catalog))).toEqual([]);
   });
 });

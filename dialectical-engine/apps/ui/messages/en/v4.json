@@ -56,6 +56,7 @@
   "v4.report.checkedSecondAi": "A second AI checked each point. Points it did not check are shown in grey.",
   "v4.report.checkedNoWeb": "This first version does not search the web for sources yet.",
   "v4.report.checkedWordsIntro": "What the four words mean:",
+  "v4.report.checkedWordsIntroFree": "What these words mean:",
   "v4.report.word.SURE": "A second AI agreed, and the point names where it comes from or how it was worked out, not only an argument.",
   "v4.report.word.SURE_FOR_CASE": "A second AI agreed, but the point holds only as argued here, or may be out of date.",
   "v4.report.word.STILL_ARGUED": "A second AI disagreed or could not check it, so it is still open.",
@@ -726,6 +727,14 @@
   "v4.investigation.slow": "This is taking longer than usual. We keep checking.",
   "v4.investigation.checkAgain": "Check again",
   "v4.investigation.writeAgain": "Write it again",
+  "v4.reportStrip.covers": "Your report brings your first answer and what your digs found together in one document.",
+  "v4.reportStrip.coversNoDigs": "You haven't dug into anything yet, so your report will mostly restate your first answer.",
+  "v4.reportStrip.share": "Your report uses about {percent}% of today.",
+  "v4.reportStrip.digsWait": "While your report is written, you can't start a dig.",
+  "v4.reportStrip.write": "Write it",
+  "v4.reportStrip.notYet": "Not yet",
+  "v4.report.publicToo": "This question is public, so your report will be public too.",
+  "v4.reportWait.digsRest": "Digging opens again when your report is written.",
   "v4.investigation.digMore": "You can dig more from the map. This report stays as it is, and your next one becomes version {n}.",
   "v4.web.freeOnPaper": "Not checked on the web."
 }

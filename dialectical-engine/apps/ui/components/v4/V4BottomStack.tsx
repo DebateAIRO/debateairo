@@ -29,6 +29,11 @@ export type V4BarJob =
   | Readonly<{ kind: "report"; href: string }>
   /** wait-f2: "Paused · Continue" (after the reset) or "Paused · Continues on 1 Dec" (before it; nothing to press). */
   | Readonly<{ kind: "paused"; label: string; continueLabel: string | null; untilLabel: string | null; busy: boolean; onContinue: () => void }>
+  /**
+   * V4 screen review (3 Nov 2026), report-d2: while the report waits or is written, the bar says so where the dig button
+   * lives ("Your report · Being written", with the working dot); digging rests meanwhile.
+   */
+  | Readonly<{ kind: "status"; text: string; working: boolean }>
   | Readonly<{ kind: "none" }>;
 
 /** The stack's real height, as the page's bottom room (a CSS variable on the page root), while it is on screen. */
@@ -107,6 +112,13 @@ export function V4BottomStack(props: Readonly<{
   /** Phone (map-f9): one quiet line in the bar, "This question: 11% of today", on the screens other than the question's. */
   status?: ReactNode;
   reportHref: string;
+  /**
+   * report-d1 (V4 screen review, 3 Nov 2026): "Write my report" here opens the report's strip in the pinned bar instead of
+   * leading to the report page. Absent: the link, as before.
+   */
+  onWriteReport?: () => void;
+  /** report-d1: the report's strip, grown up from the bar while it is open (the bar's report button steps back). */
+  strip?: ReactNode;
   catalog: MessageCatalog;
 }>) {
   const { phone, catalog } = props;
@@ -130,16 +142,24 @@ export function V4BottomStack(props: Readonly<{
     );
   }
 
-  const showGoodTime = props.goodTime && !goodTimeClosed;
+  const hasStrip = props.strip !== null && props.strip !== undefined && props.strip !== false;
+  const showGoodTime = props.goodTime && !goodTimeClosed && !hasStrip;
+  const writeReport = (className: string, ref?: RefObject<HTMLElement | null>): ReactNode => (props.onWriteReport === undefined ? (
+    <Link ref={ref as RefObject<HTMLAnchorElement | null> | undefined} className={className} href={job.kind === "report" ? job.href : props.reportHref}>
+      {t(catalog, "v4.rail.writeReport")}
+    </Link>
+  ) : (
+    <button ref={ref as RefObject<HTMLButtonElement | null> | undefined} type="button" className={className} onClick={props.onWriteReport}>
+      {t(catalog, "v4.rail.writeReport")}
+    </button>
+  ));
   return (
     <div ref={ref} className={`v4Stack v4StackPhone${aside ? " v4StackAside" : ""}`} data-keyboard={aside ? "open" : undefined}>
       <div className="v4StackTop">
         {showGoodTime ? (
           <div className="v4StackGoodTime" role="note">
             <p className="v4StackGoodText">{t(catalog, "v4.bar.goodTime")}</p>
-            {job.kind === "report" ? null : (
-              <Link className="v4Btn v4BtnPrimary v4StackGoodReport" href={props.reportHref}>{t(catalog, "v4.rail.writeReport")}</Link>
-            )}
+            {job.kind === "report" ? null : writeReport("v4Btn v4BtnPrimary v4StackGoodReport")}
             <button
               type="button"
               className="v4StackGoodClose"
@@ -150,6 +170,7 @@ export function V4BottomStack(props: Readonly<{
             </button>
           </div>
         ) : null}
+        {props.strip}
         {props.notes}
         {props.onOpenPicks !== undefined ? (
           <div className="v4StackPicks">
@@ -222,14 +243,12 @@ export function V4BottomStack(props: Readonly<{
             {job.label}
           </button>
         ) : null}
-        {job.kind === "report" ? (
-          <Link
-            ref={props.jobRef as RefObject<HTMLAnchorElement | null> | undefined}
-            className="v4Btn v4BtnPrimary v4DebPhoneDig v4DebPhoneReport"
-            href={job.href}
-          >
-            {t(catalog, "v4.rail.writeReport")}
-          </Link>
+        {job.kind === "report" && !hasStrip ? writeReport("v4Btn v4BtnPrimary v4DebPhoneDig v4DebPhoneReport", props.jobRef) : null}
+        {job.kind === "status" ? (
+          <p className="v4DebPhoneStatus" data-bar-status="">
+            {job.working ? <span className="v4WaitDot v4WaitDot-PULSE" aria-hidden="true" /> : null}
+            <span>{job.text}</span>
+          </p>
         ) : null}
       </div>
     </div>

@@ -1,0 +1,51 @@
+/* V4 screen review (owner picks 3 Nov 2026), the report from the map (report-d1 A, report-d2 A, report-f15): the strip
+   "Write my report" turns into (components/v4/V4ReportStrip.tsx), the report's waiting card on the map, the rail step's
+   line and the phone bar's line while it is written. Site tokens and the V4 tokens from v4-base.css only.
+   Motion: none of the six moves; the strip shows at once with the shared 1-second highlight (.v4Highlight), which stays
+   (colour only) under reduced motion. The working dot is the waiting card's own (.v4WaitDot-PULSE, v4-wait.css). */
+
+/* ---------- the strip, in the button's place ---------- */
+.v4RepStrip {
+  display: flex; flex-direction: column; gap: 8px; min-width: 0;
+  padding: 12px 14px; border-radius: var(--r-card); background: var(--surface);
+  border: 1px solid var(--line-strong); border-inline-start: 3px solid var(--accent);
+  font-size: var(--t-ui); color: var(--text);
+}
+.v4RepStripLine { margin: 0; overflow-wrap: anywhere; }
+.v4RepStripPublic { font-weight: 600; }
+.v4RepStripNote { color: var(--con-text); font-weight: 600; }
+.v4RepStripActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: 2px; }
+.v4RepStripNotYet { min-height: 44px; font-size: var(--t-ui); font-weight: 600; }
+.v4RepStrip .v4RepDigWait { margin: 0; }
+/* In the top bar: its own row at the end side, as wide as a short paragraph. */
+.v4RepStrip-top { flex: 1 1 100%; width: min(30rem, 100%); max-width: 30rem; margin-inline-start: auto; }
+/* In the phone's pinned bar: full width, "Write it" 48 px tall across it, "Not yet" under it. */
+.v4RepStrip-bottom { width: 100%; }
+.v4RepStrip-bottom .v4RepStripActions { flex-direction: column; align-items: stretch; gap: 4px; }
+.v4RepStrip-bottom .v4RepStripWrite { min-height: 48px; width: 100%; }
+.v4RepStrip-bottom .v4RepStripNotYet { align-self: center; }
+
+/* ---------- the report's waiting card on the map ---------- */
+.v4DebReportWait {
+  display: flex; flex-direction: column; gap: 8px; min-width: 0; max-width: 640px;
+  padding: 12px 14px; border-radius: var(--r-card); background: var(--surface); border: 1px solid var(--line-strong);
+}
+.v4DebReportWait > .v4Eyebrow { margin: 0; }
+.v4DebReportWait .v4WaitBlock { max-width: none; }
+.v4DebReportWaitLine { margin: 0; font-size: var(--t-ui); overflow-wrap: anywhere; }
+.v4DebReportWaitSlow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.v4DebReportWaitCheck { min-height: 44px; font-size: var(--t-ui); font-weight: 600; }
+
+/* ---------- the rail's "Your report" step, and the phone bar's line ---------- */
+.v4DebRailReportState { display: flex; align-items: center; gap: 6px; }
+.v4DebRail-strip .v4DebRailReportState { display: inline-flex; }
+.v4DebRailMark .v4WaitDot { display: inline-block; vertical-align: middle; }
+.v4DebPhoneStatus {
+  flex: 1 1 auto; min-width: 0; min-height: 44px; margin: 0; display: flex; align-items: center; gap: 8px;
+  font-size: var(--t-ui); font-weight: 600; color: var(--text); overflow-wrap: anywhere;
+}
+
+/* Paper never shows the strip or the wait. */
+@media print {
+  .v4RepStrip, .v4DebReportWait { display: none; }
+}

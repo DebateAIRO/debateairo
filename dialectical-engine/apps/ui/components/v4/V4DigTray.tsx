@@ -72,6 +72,11 @@ export function V4DigTray(props: Readonly<{
   money: readonly MoneyLine[];
   /** The dig buttons' quota words (lib/v4/useDigQuota.ts): the label, the share and the waiting line. */
   quota: V4DigQuota;
+  /**
+   * report-d2: while the report waits for digs or is written, digging rests: the button is disabled and this line says why
+   * ("Digging opens again when your report is written."). Absent or null: digging can start.
+   */
+  rest?: string | null;
   /** False when the panel's own pinned dig block already digs these picks: the tray then offers no second button. */
   withDig: boolean;
   onDig: () => void;
@@ -85,6 +90,7 @@ export function V4DigTray(props: Readonly<{
   const ref = useRef<HTMLElement | null>(null);
   useDockRoom(ref);
   const waiting = quota.waitLine !== null;
+  const rest = props.rest ?? null;
   return (
     <section ref={ref} className="v4DebTray v4DebTrayDock v4Highlight" aria-label={t(catalog, "v4.dig.trayLabel")}>
       <V4PickChips picks={target.picks} label={t(catalog, "v4.map.picked")} />
@@ -106,6 +112,7 @@ export function V4DigTray(props: Readonly<{
             <button
               type="button"
               className={`v4Btn v4BtnPrimary${waiting ? " v4DigWaiting" : ""}`}
+              disabled={rest !== null}
               aria-disabled={waiting ? "true" : undefined}
               onClick={() => {
                 if (!waiting) props.onDig();
@@ -120,6 +127,7 @@ export function V4DigTray(props: Readonly<{
           {t(catalog, "v4.dig.trayClear")}
         </button>
       </div>
+      {props.withDig && rest !== null ? <p className="v4DebTrayHint v4Muted" data-dig-rest="">{rest}</p> : null}
     </section>
   );
 }

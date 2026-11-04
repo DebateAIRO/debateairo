@@ -263,7 +263,16 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   // The owner's screen review of 3 Nov (dig-d1 B): the two words a running dig's steps need that the record does not give,
   // the list's name for screen readers and the hidden word after a step that is done.
   "v4.digLive.stepsLabel",
-  "v4.digLive.stepDone"
+  "v4.digLive.stepDone",
+  // The owner's screen review of 3 Nov, report-d1 A (the strip "Write my report" turns into on the map) and report-f15 (on
+  // Free, only the trust words that can appear there): the record describes these lines but gives no words for them.
+  // "Write it", "Not yet", "This question is public, so your report will be public too." and "Digging opens again when
+  // your report is written." are the record's own words and are not drafts.
+  "v4.reportStrip.covers",
+  "v4.reportStrip.coversNoDigs",
+  "v4.reportStrip.share",
+  "v4.reportStrip.digsWait",
+  "v4.report.checkedWordsIntroFree"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {
@@ -424,6 +433,12 @@ const REVIEW_LINES: Readonly<Record<string, string>> = Object.freeze({
   "v4.suggest.edit": "Change the wording",
   // dig-f10 (the undo-bottom track): the person stays where they are; the note says when it started, with its own [See it].
   "v4.dig.started": "Started {time} · You can leave this page.",
+  // report-d1 / report-d2 / report-f15 (the report from the map): the strip's two buttons, Free's line before writing,
+  // and the quiet reason dig buttons rest with while the report is written.
+  "v4.reportStrip.write": "Write it",
+  "v4.reportStrip.notYet": "Not yet",
+  "v4.report.publicToo": "This question is public, so your report will be public too.",
+  "v4.reportWait.digsRest": "Digging opens again when your report is written.",
   "v4.debate.state.HOLDING": "Taking a short break · continues about {time}",
   "v4.debate.state.HOLDING.noTime": "Taking a short break",
   // map-f16: the approved N14 sentence (the report's own), then r2-11 A's line.

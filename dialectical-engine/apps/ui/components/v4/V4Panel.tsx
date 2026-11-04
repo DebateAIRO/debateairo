@@ -105,6 +105,11 @@ type PanelProps = Readonly<{
   onDig: (target: DigTarget) => void;
   digBusy: boolean;
   /**
+   * V4 screen review (3 Nov 2026), report-d2: while the report waits for digs or is written, every dig button here rests
+   * with this quiet reason ("Digging opens again when your report is written."). Absent or null: as before.
+   */
+  digRest?: string | null;
+  /**
    * dig-d3 / dig-f8: the line for a dig of this place still in its 10 seconds ("Your dig starts in a few seconds. You can
    * still undo it. [Undo]"), or null when none waits there. While it shows, this place's dig button does nothing more.
    * Absent: as before.
@@ -452,6 +457,7 @@ function DigBlock(props: Readonly<{ target: DigTarget; panel: PanelProps; again?
   const starting = panel.digStarting?.(props.target) ?? null;
   // public-d3 A: the period by the switch, only where this button names a share.
   const period = quota === undefined || quota.share(props.target) === null ? null : quota.periodLine;
+  const resting = panel.digRest !== null && panel.digRest !== undefined;
   return (
     // dig-f24: `id` is where "Skip to the dig button" lands (the block itself takes focus only when its button cannot).
     <section className="v4PanelDig" {...(props.id === undefined ? {} : { id: props.id, tabIndex: -1 })}>
@@ -478,7 +484,8 @@ function DigBlock(props: Readonly<{ target: DigTarget; panel: PanelProps; again?
         <button
           type="button"
           className={`v4Btn v4BtnPrimary v4PanelDigBtn${waiting ? " v4DigWaiting" : ""}`}
-          disabled={panel.digBusy}
+          // report-d2: while the report waits for digs or is written, digging rests, with its reason below.
+          disabled={panel.digBusy || resting}
           aria-disabled={starting !== null || waiting ? "true" : undefined}
           aria-describedby={waiting ? waitId : undefined}
           onClick={() => {
@@ -501,7 +508,8 @@ function DigBlock(props: Readonly<{ target: DigTarget; panel: PanelProps; again?
       )}
       {starting !== null
         ? (props.startingAbove === true ? null : starting)
-        : panel.digBusy ? <p className="v4PanelHint v4Muted">{t(panel.catalog, "v4.panel.digBusy")}</p> : null}
+        : resting ? <p className="v4PanelHint v4Muted" data-dig-rest="">{panel.digRest}</p>
+          : panel.digBusy ? <p className="v4PanelHint v4Muted">{t(panel.catalog, "v4.panel.digBusy")}</p> : null}
       <V4MoneyLines lines={money} catalog={panel.catalog} />
       {panel.roomNotice ?? null}
     </section>
@@ -913,7 +921,7 @@ function DigBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolved
           </p>
         )}
         {panel.failedDigs !== undefined
-          ? <V4DigFailed dig={dig} failed={panel.failedDigs} digBusy={panel.digBusy} catalog={panel.catalog} />
+          ? <V4DigFailed dig={dig} failed={panel.failedDigs} digBusy={panel.digBusy || (panel.digRest ?? null) !== null} catalog={panel.catalog} />
           : null}
         {dig.state === "DONE" && rewrite === undefined
           ? (headline.length > 0
