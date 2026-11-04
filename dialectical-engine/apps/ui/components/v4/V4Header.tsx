@@ -2,33 +2,44 @@
 
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode } from "react";
-import { contractClient } from "@/lib/api";
-import { readBillingUsage } from "@/lib/billing/usage";
+import type { BillingUsage } from "@/lib/billing/usage";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { levelHref } from "@/lib/v4/storage";
 import { READING_LEVELS, type ReadingLevel } from "@/lib/v4/types";
+import { V4QuotaPill } from "./V4QuotaPill";
+import { V4AccountMenu, type V4HeaderSession } from "./V4AccountMenu";
 
 /*
  * V4 initial (spec "/v4", header everywhere): brand + badge to /v4, the reading level as a small menu (changing it
- * saves it, through the page's onReadingLevel; the level lives in the address, FIXES Decision A), the classic-view
- * link and the page's own extras. Today's allowance is
- * shown only as "N% used" (no prices, no other numbers) and only when the usage read succeeds.
+ * saves it, through the page's onReadingLevel; the level lives in the address, FIXES Decision A) and the page's own
+ * extras. The quota is shown only as "N% used" of one window (no prices, no other numbers) and only when the usage read
+ * succeeds: the steady pill of V4QuotaPill.tsx (public-d3 A, owner's screen review 3 Nov).
+ * V4 screen review (3 Nov 2026), ask-d6 A / ask-f5 / journey-f19: this is the V4 pages' one header row (the site's old top
+ * bar steps back on them). It ends in the round account button (V4AccountMenu), whose menu also holds the classic-view
+ * link, once; the header itself shows no classic link any more.
  */
 
-/** The person's day window, in percent, or null (billing off, local site, read failed). */
-function useDayPercent(): number | null {
-  const [percent, setPercent] = useState<number | null>(null);
-  useEffect(() => {
-    let active = true;
-    void readBillingUsage(contractClient).then((usage) => {
-      if (!active || usage === null) return;
-      const day = usage.windows.find((window) => window.scope === "PERSON_DAY");
-      // Past 100% is a running debate's finish leeway (UsageBars); the person reads "100% used".
-      setPercent(day === undefined ? null : Math.min(100, Math.max(0, Math.round(day.percent))));
-    });
-    return () => { active = false; };
-  }, []);
-  return percent;
+type QuotaScope = BillingUsage["windows"][number]["scope"];
+
+/**
+ * V4 review ask-f4: the window that binds first, named by its own word ("Today", "This week", "This month", or "In
+ * total" for a team grant). That is the fullest one; a tie goes to the longest window, as the server's room sentence
+ * names a tie (packages/budget room.ts SCOPE_PRECEDENCE), so a Free person whose month is used up reads "This month"
+ * here too, never today's share.
+ */
+const LONGEST_FIRST: readonly QuotaScope[] = Object.freeze(["PERSON_GRANT", "PERSON_MONTH", "PERSON_WEEK", "PERSON_DAY"]);
+
+export function tightestWindow(usage: BillingUsage | null): Readonly<{ scope: QuotaScope; percent: number }> | null {
+  if (usage === null) return null;
+  let tightest: Readonly<{ scope: QuotaScope; percent: number }> | null = null;
+  for (const scope of LONGEST_FIRST) {
+    const window = usage.windows.find((candidate) => candidate.scope === scope);
+    if (window === undefined) continue;
+    // Past 100% is a running debate's finish leeway (UsageBars); the person reads "100% used".
+    const percent = Math.min(100, Math.max(0, Math.round(window.percent)));
+    if (tightest === null || percent > tightest.percent) tightest = Object.freeze({ scope, percent });
+  }
+  return tightest;
 }
 
 function ReadingLevelMenu({ catalog, level, onLevel }: Readonly<{
@@ -110,7 +121,9 @@ function ReadingLevelMenu({ catalog, level, onLevel }: Readonly<{
   );
 }
 
-export function V4Header({ catalog, readingLevel, linkLevel, onReadingLevel, classicHref = null, children }: Readonly<{
+export function V4Header({
+  catalog, readingLevel, linkLevel, onReadingLevel, classicHref = null, showQuota = true, session, children, after
+}: Readonly<{
   catalog: MessageCatalog;
   /** The level the menu shows (a page may show its default when none was chosen). */
   readingLevel: ReadingLevel | null;
@@ -120,11 +133,31 @@ export function V4Header({ catalog, readingLevel, linkLevel, onReadingLevel, cla
    */
   linkLevel?: ReadingLevel | null;
   onReadingLevel?: (level: ReadingLevel) => void;
+  /** journey-f19 / ask-f6: this page's classic view, offered once, in the account menu (null: none, or the page shows it). */
   classicHref?: string | null;
-  /** Right-side extras (e.g. the Report button). */
+  /**
+   * journey-f19: the quota share shows only on the ask, choosing and map pages. False on any other page (a public page's
+   * note, for one): no share is shown and the usage is not read.
+   */
+  showQuota?: boolean;
+  /** The page's own knowledge of the session (the ask page learns it beside the page); absent: the menu reads it. */
+  session?: V4HeaderSession;
+  /** Extras before the account button (e.g. the Report button). */
   children?: ReactNode;
+  /**
+   * What comes after the account button, on its own row at the end side (the map's report strip, report-d1 A). It is
+   * after the button in the page too, so the keyboard meets it in the order it is seen (WCAG 2.4.3; the wave-2 checks).
+   * It is a row of the header itself, not of the controls beside the brand, so opening it moves none of them (the browser
+   * check, 4 Nov: on a phone they jumped from the start side to the end side).
+   */
+  after?: ReactNode;
 }>) {
-  const dayPercent = useDayPercent();
+  // ask-f16 with the wave-2 checks (4 Nov): the usage is read only for a signed-in person, and a page that knows the person
+  // is signed out reads nothing and holds nothing (they never get a pill). While the page is still checking, the pill's
+  // place is held from the first frame without reading, so a person who turns out signed in sees nothing jump; it closes
+  // at once if they are signed out (ask-f16: "close it quickly if that part does not come").
+  const quotaWanted = showQuota && (session === undefined || session === "IN");
+  const quotaHeld = showQuota && session === "CHECKING";
   return (
     <header className="v4Hdr">
       <Link href={levelHref("/v4", linkLevel === undefined ? readingLevel : linkLevel)} className="v4HdrBrand">
@@ -138,14 +171,17 @@ export function V4Header({ catalog, readingLevel, linkLevel, onReadingLevel, cla
         ) : (
           <ReadingLevelMenu catalog={catalog} level={readingLevel} onLevel={onReadingLevel} />
         )}
-        {dayPercent === null ? null : (
-          <span className="v4HdrAllowance">{t(catalog, "v4.header.allowance", { percent: dayPercent })}</span>
-        )}
-        {classicHref === null ? null : (
-          <Link href={classicHref} className="v4Link v4HdrClassic">{t(catalog, "v4.common.classicView")}</Link>
-        )}
+        <V4QuotaPill catalog={catalog} wanted={quotaWanted} hold={quotaHeld} />
         {children}
+        {/* ask-d6 A: the round account button ends the row; its links carry the level the brand link carries. */}
+        <V4AccountMenu
+          catalog={catalog}
+          level={linkLevel === undefined ? readingLevel : linkLevel}
+          classicHref={classicHref}
+          {...(session === undefined ? {} : { session })}
+        />
       </div>
+      {after}
     </header>
   );
 }

@@ -1,0 +1,79 @@
+/* Owner's screen review, 3 Nov 2026 (journey-d2 A): the one waiting card (components/v4/V4WaitCard.tsx) and the
+   choice chips (components/v4/V4ChoiceChips.tsx). Site tokens and the V4 tokens from v4-base.css only.
+   Motion (journey-d1 A and the owner's chat answer): the working dot has one slow pulse; a changed state line shows at
+   once with the shared 1-second highlight (.v4Highlight, v4-base.css); with reduced motion the dot is still and the
+   highlight stays. The pulse is the map's working dot's own (v4MapPulse, v4-map.css), not a second one. */
+
+.v4WaitBlock { width: 100%; max-width: 640px; align-self: flex-start; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.v4WaitCard { display: flex; flex-direction: column; gap: 12px; padding: 28px; min-width: 0; }
+.v4WaitCardInline { padding: 0; }
+.v4WaitCard p { margin: 0; }
+.v4WaitQuestion {
+  margin: 0; font-size: var(--t-title); line-height: 1.25; color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+.v4WaitCardInline .v4WaitQuestion { font-size: var(--t-body); }
+
+/* The state line: the dot and the one true word. */
+.v4WaitState {
+  display: flex; align-items: center; gap: 10px; font-weight: 600; color: var(--text);
+  border-radius: var(--r-btn); margin: 0 -6px; padding: 2px 6px;
+}
+.v4WaitDot { flex: none; width: 10px; height: 10px; border-radius: var(--r-dot); }
+.v4WaitDot-PULSE { background: var(--accent); animation: v4MapPulse 1.6s ease-in-out infinite; }
+.v4WaitDot-SOLID { background: var(--accent); }
+.v4WaitDot-HOLLOW { background: transparent; border: 2px solid var(--accent); }
+.v4WaitDotStill { animation: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .v4WaitDot-PULSE { animation: none; }
+}
+
+.v4WaitChecked, .v4WaitStarted { font-size: var(--t-ui); }
+.v4WaitLeave, .v4WaitLonger { display: flex; flex-direction: column; gap: 8px; }
+.v4WaitReconnect { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.v4WaitTryNow { min-height: 44px; font-size: var(--t-ui); font-weight: 600; }
+/* "Open in the classic view": once, small, at the bottom (wait-f23). */
+.v4WaitClassic { font-size: var(--t-meta); }
+.v4WaitClassic .v4Link { min-height: 44px; display: inline-flex; align-items: center; }
+.v4WaitBack { align-self: flex-start; }
+
+/* The person's choices: chips that show, never a count (journey-f23). */
+.v4ChoiceChips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.v4ChoiceChip {
+  display: inline-flex; align-items: center; min-height: 28px; max-width: 100%; padding: 4px 10px;
+  border-radius: var(--r-pill); border: 1px solid var(--line-strong); background: var(--surface-2);
+  font-size: var(--t-ui); overflow-wrap: anywhere;
+}
+
+/* Owner's screen review, 3 Nov 2026 (dig-d1 B, dig-f32): a running dig's own panel (components/v4/V4DigRunning.tsx): the
+   waiting card inline, the steps the server reports, "Checked so far" and "This path says now". Logical properties only, so
+   the steps run right to left in Arabic and wrap into two rows on a phone. Motion: a finding that arrives while the panel is
+   open flies in (the shared v4FlyIn and --v4-move-fly, v4-map-looks.css and v4-base.css) with the 1-second highlight; under
+   reduced motion the fly is instant (the token is 0.01ms) and the highlight stays. No other move. */
+.v4DigLive { display: flex; flex-direction: column; gap: 14px; min-width: 0; margin-block-end: 8px; }
+.v4DigSteps { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; font-size: var(--t-ui); }
+.v4DigStep { display: inline-flex; align-items: center; gap: 4px; color: var(--text-2); border-radius: var(--r-btn); padding-inline: 4px; }
+.v4DigStep + .v4DigStep::before { content: "›"; content: "›" / ""; color: var(--text-3); padding-inline: 2px 6px; }
+.v4DigStep-DONE { color: var(--text); }
+.v4DigStep-NOW { color: var(--text-strong); font-weight: 700; }
+.v4DigStepTick { color: var(--accent); font-weight: 700; }
+.v4DigFound { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.v4DigFound .v4PanelH3 { margin: 0; }
+.v4DigFindings { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.v4DigFinding {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 10px 12px; min-width: 0;
+  border: 1px solid var(--line-2); border-radius: var(--r-card); background: var(--surface);
+}
+.v4DigFindingText { margin: 0; overflow-wrap: anywhere; unicode-bidi: plaintext; }
+.v4DigFindingNew {
+  animation: v4FlyIn var(--v4-move-fly) var(--v4-ease-move) 1, v4Highlight var(--v4-highlight-time) ease-out 1;
+}
+.v4DigPathNow > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 600; }
+/* dig-d1 B: "This path says now ▾" shows that it folds (a flex summary draws no marker of its own); the same arrow as
+   the panel's other folds (v4-map.css .v4PanelGroup). */
+.v4DigPathNow > summary::-webkit-details-marker { display: none; }
+.v4DigPathNow > summary::before { content: "▸"; content: "▸" / ""; margin-inline-end: 8px; color: var(--text-3); }
+.v4DigPathNow > summary:dir(rtl)::before { content: "◂"; content: "◂" / ""; }
+.v4DigPathNow[open] > summary::before { content: "▾"; content: "▾" / ""; }
+.v4DigPathNow > p { margin: 0; overflow-wrap: anywhere; }

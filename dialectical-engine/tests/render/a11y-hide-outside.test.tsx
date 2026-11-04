@@ -124,4 +124,29 @@ describe("the tab title under an open dialog (2026-10-18)", () => {
     await settle();
     expect(document.title).toBe("Brand");
   });
+
+  it("puts a page's state word first (V4 wait-f4: \"Ready · …\") and follows it as it changes, also behind a dialog", async () => {
+    const Stated = ({ prefix, open }: { prefix: string | null; open: boolean }) => (
+      <div>
+        <DocumentTitle brand="Brand" />
+        <main id="main-content">
+          <div {...(prefix === null ? {} : { "data-tab-prefix": prefix })}>
+            <h1>Question of the page</h1>
+            {open ? <Surface label="drawer" /> : null}
+          </div>
+        </main>
+      </div>
+    );
+    mounted = await mount(<Stated prefix="Looking into it" open={false} />);
+    await settle();
+    expect(document.title).toBe("Looking into it · Question of the page — Brand");
+
+    await act(async () => mounted!.root.render(<Stated prefix="Ready" open />));
+    await settle();
+    expect(document.title).toBe("Ready · Question of the page — Brand");
+
+    await act(async () => mounted!.root.render(<Stated prefix={null} open={false} />));
+    await settle();
+    expect(document.title).toBe("Question of the page — Brand");
+  });
 });

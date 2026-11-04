@@ -139,6 +139,8 @@ export async function renderInvestigationReportPdf(input: Readonly<{
   question: string;
   version: FinishedInvestigationReport;
   catalogs: ReportCatalogs;
+  /** r2-13: the debate ran on Free (the PDF then says it was not checked on the web). */
+  free?: boolean;
   fontDirectory?: string;
 }>): Promise<Buffer> {
   if (!reportSupportedForLocale(input.catalogs.locale)) throw new RangeError(`REPORT_LOCALE_UNSUPPORTED: ${input.catalogs.locale}`);

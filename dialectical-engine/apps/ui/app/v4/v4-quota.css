@@ -1,0 +1,53 @@
+/* The owner's screen review (3 Nov 2026), the quota words on the V4 pages: the header's steady pill and its detail list
+   (public-d3 A), the map's top line with "This question: N% of today" (map-f9), every dig button's share and its grey
+   change mark (journey-f8, journey-f13), the period by the Quick look / Thorough switch with one hint under each choice
+   (public-d3 A, read-f20), and greyed dig buttons with their reset time and reason (dig-f11, journey-f14). Tokens only;
+   nothing here moves but the shared 1-second highlight of v4-base.css. */
+
+/* ---- The header's pill (V4QuotaPill) ---- */
+.v4HdrQuota { position: relative; }
+/* ask-f16 (the wave-2 review, 4 Nov): the pill's place, held empty until the first usage read answers, about one pill wide. */
+.v4HdrQuotaHold { display: inline-block; inline-size: 13em; max-inline-size: 100%; block-size: 1.5em; visibility: hidden; }
+.v4HdrQuotaButton {
+  display: inline-flex; align-items: center; min-height: 44px; cursor: pointer; font: inherit; font-size: var(--t-meta);
+}
+.v4HdrQuotaButton:hover { background: var(--surface-sunken); }
+.v4HdrQuotaList {
+  position: absolute; z-index: 50; top: calc(100% + 6px); inset-inline-end: 0; min-width: 240px; max-width: calc(100vw - 32px);
+  margin: 0; padding: 10px 14px; list-style: none; display: flex; flex-direction: column; gap: 6px;
+  background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-btn); box-shadow: var(--shadow-pop);
+  font-size: var(--t-meta); color: var(--text-2);
+}
+.v4HdrQuotaList[hidden] { display: none; }
+
+/* ---- The map's top line (V4TopLine) and "This question: …" ---- */
+.v4TopLine {
+  display: flex; align-items: baseline; gap: 6px 16px; flex-wrap: wrap;
+  padding: 6px var(--v4-gutter); border-bottom: 1px solid var(--line-2); background: var(--surface);
+}
+.v4TopLineQuestion {
+  flex: 1 1 260px; min-width: 0; margin: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  font-family: var(--font-display); font-size: var(--t-ui); color: var(--ink);
+}
+.v4QuestionShare { margin: 0; font-size: var(--t-meta); }
+.v4StackPhone .v4QuestionShare { padding: 2px var(--v4-gutter) 0; }
+.v4DebPhoneUsage { margin: 8px 0; }
+
+/* ---- Dig buttons: their share, its change, the period and the hints ---- */
+.v4DigBtnRow { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.v4DigBtnRow .v4PanelDigBtn { flex: 1 1 auto; }
+.v4ShareChange { font-size: var(--t-meta); color: var(--text-3); font-variant-numeric: tabular-nums; border-radius: var(--r-pill); padding: 0 4px; }
+.v4DigPeriod { margin: 0; }
+.v4PanelMode { display: flex; flex-direction: column; gap: 4px; flex: 1 1 180px; min-width: 0; }
+.v4PanelModeHint { margin: 0; }
+
+/* ---- Can't start right now (dig-f11, journey-f14): greyed, never without the visible line beside it ---- */
+.v4Btn.v4DigWaiting, .v4Btn.v4DigWaiting:hover {
+  background: var(--surface-2); color: var(--text-2); border-color: var(--line-strong); cursor: not-allowed;
+}
+.v4DigWaitLine { margin: 6px 0 0; color: var(--text); }
+.v4DigAddTray { margin-top: 8px; min-height: 44px; }
+.v4SugElsewhereActions { display: flex; flex-wrap: wrap; gap: 8px; }
+/* The phone's pinned bar carries a path's or an open question's dig button (v4-debate.css), so its change mark goes too. */
+.v4DebLayout-phone .v4Panel-path .v4DigBtnRow .v4ShareChange,
+.v4DebLayout-phone .v4Panel-open .v4DigBtnRow .v4ShareChange { display: none; }

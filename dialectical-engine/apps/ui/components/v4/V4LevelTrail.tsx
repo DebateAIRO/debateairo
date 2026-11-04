@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import type { DigTrail } from "@/lib/v4/load";
+import { cardLabel } from "@/lib/v4/mapLooks";
 import { levelHref } from "@/lib/v4/storage";
 import type { ReadingLevel } from "@/lib/v4/types";
 import { shortText } from "./V4MapTree";
@@ -43,7 +44,8 @@ export function V4LevelTrail(props: Readonly<{
               <Link className="v4Link" href={mapHref(step.runId, step.pathRef, props.linkLevel)}>
                 {step.line === null || step.line.trim().length === 0
                   ? t(catalog, "v4.map.pathUntitled")
-                  : <span data-ai-generated="true">{shortText(step.line, 40)}</span>}
+                  // map-f25 / r2-20 A: a path in the trail is named by its short label, never with its outcome words.
+                  : <span data-ai-generated="true" dir="auto">{shortText(cardLabel(step.line), 40)}</span>}
               </Link>
             </li>
           ))}

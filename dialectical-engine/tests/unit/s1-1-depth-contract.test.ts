@@ -340,7 +340,8 @@ function shippedSourceFiles(): string[] {
   const found: string[] = [];
   const walk = (directory: string): void => {
     for (const entry of readdirSync(directory)) {
-      if (SKIPPED_DIRECTORIES.has(entry)) continue;
+      // Any Next.js build folder (".next", or a dev server's NEXT_DIST_DIR such as ".next-v4mock") is generated, not shipped source.
+      if (SKIPPED_DIRECTORIES.has(entry) || entry.startsWith(".next")) continue;
       const absolute = join(directory, entry);
       if (statSync(absolute).isDirectory()) { walk(absolute); continue; }
       if (SHIPPED_EXTENSIONS.some((extension) => entry.endsWith(extension))) found.push(absolute);

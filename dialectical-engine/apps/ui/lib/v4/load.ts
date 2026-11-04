@@ -9,7 +9,9 @@ import {
   type InvestigationReportVersion,
   type RunProjection
 } from "@debateai/contract";
-import { contractClient, isNotFound } from "../api.js";
+import { API_BASE, contractClient, createSameOriginFetch, isNotFound } from "../api.js";
+import { DIG_PROGRESS_ABSENT, digProgressPath, parseDigProgress, type DigProgressRead } from "./digProgress.js";
+import { quotaUntouched } from "./failedRun.js";
 import { buildV4Map, isFinishedRewrite } from "./mapModel.js";
 import type { DigLink, DigView } from "./types.js";
 
@@ -28,7 +30,14 @@ export type V4Load =
    * `story` is never null from loadV4 for a first debate (fix wave 1: a failed read is an UNAVAILABLE record); it is null
    * for a dig's answer, which has no story (W4-6, Q-D13).
    */
-  | Readonly<{ kind: "SERVED"; runId: string; answer: Answer; story: AnswerStory | null }>;
+  | Readonly<{
+    kind: "SERVED"; runId: string; answer: Answer; story: AnswerStory | null;
+    /**
+     * report-f14: the language the question was argued in (the run's BCP-47 tag), so AI text can be marked with it. Absent
+     * when unknown: an answer id opened directly, a database without the tag, or "und".
+     */
+    language?: string;
+  }>;
 
 type StoryClient = Pick<ContractClient, "readAnswerStory">;
 type LoadClient = Pick<ContractClient, "readRun" | "readRunAnswer" | "readAnswer" | "readAnswerStory">;
@@ -104,7 +113,14 @@ export async function loadV4(id: string, client: LoadClient = contractClient): P
     if (isNotFound(failure)) return { kind: "RUN", runId: id, run };
     throw failure;
   }
-  return { kind: "SERVED", runId: id, answer, story: await storyFor(answer, client) };
+  const language = argumentLanguage(run);
+  return { kind: "SERVED", runId: id, answer, story: await storyFor(answer, client), ...(language === null ? {} : { language }) };
+}
+
+/** The run's question language as a usable tag: "und" (detection not confident) and a missing tag are unknown. */
+function argumentLanguage(run: RunProjection): string | null {
+  const tag = run.argument_language?.tag ?? null;
+  return tag === null || tag === "und" ? null : tag;
 }
 
 /**
@@ -120,9 +136,19 @@ export async function loadAnswer(runId: string, client: AnswerClient = contractC
 }
 
 function digView(link: DigLink, state: DigView["state"], run?: RunProjection): DigView {
-  // W4-6 (the money rule): a dig whose own run reached the month wall says it is paused, on its card.
-  const pausedUntil = run?.month_pause?.until;
-  return { link, state, headline: null, counts: null, ...(pausedUntil === undefined ? {} : { pausedUntil }) };
+  // W4-6 (the money rule): a dig whose own run reached the month wall says it is paused, on its card. Owner review 3 Nov
+  // (wait-f2, public-f16): with the server's answer whether it may continue now, so its panel can offer Continue.
+  const pause = run?.month_pause;
+  // wait-f18: a dig that did not finish keeps its run's reason (the panel shows only its plain sentence) and, when the
+  // server confirmed it, that nothing was taken from the quota for it.
+  const failed = state === "FAILED" && run !== undefined
+    ? { terminalReason: run.terminal_reason, questionLine: run.question_line, ...(quotaUntouched(run) ? { quotaUntouched: true as const } : {}) }
+    : {};
+  return {
+    link, state, headline: null, counts: null,
+    ...(pause === undefined ? {} : { pausedUntil: pause.until, canContinue: pause.can_continue }),
+    ...failed
+  };
 }
 
 /** What a dig's follow-up debate has become (row D decision 1: digs show on the map while they run). */
@@ -144,7 +170,7 @@ export async function loadDigView(link: DigLink, client: DigClient = contractCli
     case "HOLDING":
       return digView(link, "RUNNING", run);
     case "FAILED":
-      return digView(link, "FAILED");
+      return digView(link, "FAILED", run);
     case "SETTLED":
       break;
   }
@@ -158,12 +184,36 @@ export async function loadDigView(link: DigLink, client: DigClient = contractCli
   // W4-6 (Q-D13): a dig of the new model writes no story: it rewrites the path it came from, and keeps its points.
   if (answer.dig !== undefined) {
     const own = buildV4Map({ runId: link.childRunId, answer, story: null });
-    return { link, state: "DONE", headline: null, counts: own.counts, rewrite: answer.dig.rewrite, points: own.points };
+    // map-f29 / dig-f20: what it looked into, in its own words and by whom, titles the dig on the map above.
+    const picks = answer.dig.picks.map((pick) => ({ text: pick.text, by: pick.by }));
+    return { link, state: "DONE", headline: null, counts: own.counts, rewrite: answer.dig.rewrite, points: own.points, picks };
   }
   // A failed story read leaves the dig DONE without a headline; the page reads it again later (TIME-5, TIME-8).
   const story = await loadStory(answer.answer_id, client, answer.answer_version);
   const map = buildV4Map({ runId: link.childRunId, answer, story });
   return { link, state: "DONE", headline: map.headline, counts: map.counts };
+}
+
+/**
+ * dig-d1 B (owner's screen review, 3 Nov): a running dig's steps and the findings that passed their checks, from the
+ * optional read GET /v1/runs/{id}/progress (lib/v4/digProgress.ts says why it is a read of its own). ABSENT when there is
+ * none: the route is unknown (today's API answers 404), the run is not this person's, or the body makes no sense; the
+ * page then shows the one calm line. Throws only on a failed read (no answer, or the server failed), which is tried again.
+ */
+export async function loadDigProgress(runId: string, fetchImpl?: typeof fetch): Promise<DigProgressRead> {
+  const read = fetchImpl ?? createSameOriginFetch(API_BASE);
+  const origin = typeof window === "undefined" ? "http://localhost" : window.location.origin;
+  const response = await read(`${origin}${digProgressPath(runId)}`, { headers: { accept: "application/json" }, credentials: "same-origin" });
+  if (response.status >= 500 || response.status === 429 || response.status === 408) throw new Error(`DIG_PROGRESS_READ_${String(response.status)}`);
+  if (!response.ok) return DIG_PROGRESS_ABSENT;
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    return DIG_PROGRESS_ABSENT;
+  }
+  const progress = parseDigProgress(body, runId);
+  return progress === null ? DIG_PROGRESS_ABSENT : { kind: "SHOWN", progress };
 }
 
 /** W4-6: one step of a dig's trail: a debate above it, and the path of it that the dig below dug (null: an open question). */

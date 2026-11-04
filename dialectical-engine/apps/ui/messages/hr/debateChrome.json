@@ -303,7 +303,7 @@
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinator je odbio zahtjev: model potreban za ovaj plan trenutačno nije dostupan. Pokušajte ponovno kasnije ili odaberite drugi plan.",
   "requestFailure.kind.ALREADY_WAITING": "Samo jedno pitanje može čekati u isto vrijeme. Ovo postavite nakon što započne vaša rasprava na čekanju.",
   "requestFailure.kind.UNCLASSIFIED": "Došlo je do pogreške prije nego što je stigao odgovor, pa je ishod nepoznat. To nije odluka koordinatora.",
-  "debateChrome.error.fundingEnded": "Interno financiranje ove rasprave na čekanju završilo je. Ponovno postavite pitanje kako biste koristili trenutačnu kvotu.",
+  "debateChrome.error.fundingEnded": "Kvota koju vam je dao tim za ovu raspravu na čekanju je istekla. Ponovno postavite pitanje kako biste koristili trenutačnu kvotu.",
   "runFailure.NOT_STARTED": "Nešto je pošlo po zlu na našoj strani prije nego što je ova rasprava počela. Molimo, pitajte ponovno.",
   "runFailure.MODELS_UNAVAILABLE": "Ova rasprava nije mogla započeti jer modeli umjetne inteligencije koji su joj potrebni nisu bili dostupni. Molimo, pokušajte ponovno malo kasnije.",
   "runFailure.RUN_LIMIT_REACHED": "Ova je rasprava dosegnula svoje ograničenje prije nego što je mogla dati odgovor.",

@@ -218,6 +218,29 @@ describe("RoomNotice picks exactly one sentence", () => {
     expect(container.querySelector('a[href="/debate/run%3Awaiting"]')?.textContent).toBe(en["newDebate.room.openWaiting"]);
   });
 
+  // V4 review ask-f11, read-f4, public-f21: on a V4 page the link opens the waiting debate's V4 map, at the reading level
+  // the address carries; the classic pages keep the classic debate page.
+  it.each([
+    ["/v4?level=expert", "/v4/debate/run%3Awaiting?level=expert"],
+    ["/v4", "/v4/debate/run%3Awaiting"],
+    ["/v4/debate/run-1?path=p1&level=background", "/v4/debate/run%3Awaiting?level=background"],
+    ["/v4/debate/run-1?level=nonsense", "/v4/debate/run%3Awaiting"],
+    ["/v4x?level=plain", "/debate/run%3Awaiting"],
+    ["/new?level=plain", "/debate/run%3Awaiting"]
+  ])("on %s, links the waiting debate to %s", async (address, href) => {
+    window.history.replaceState(null, "", address);
+    try {
+      const container = await mount(<RoomNotice
+        room={room({ room: "ALREADY_WAITING", resets_at: RESET, waiting_run_ref: "run:waiting" }) as never}
+        catalog={en} locale="en" />);
+      const links = [...container.querySelectorAll<HTMLAnchorElement>(".roomNoticeLink")];
+      expect(links.map((link) => link.getAttribute("href"))).toEqual([href]);
+      expect(links[0]?.textContent).toBe(en["newDebate.room.openWaiting"]);
+    } finally {
+      window.history.replaceState(null, "", "/");
+    }
+  });
+
   it("speaks the interface's language", async () => {
     const ro = catalogue("ro", "newDebate");
     const container = await mount(<RoomNotice room={room({ room: "CLOSE", scope: "SITE_DAY" }) as never} catalog={ro} locale="ro" />);

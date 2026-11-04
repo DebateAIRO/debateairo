@@ -39,7 +39,12 @@ const sourcePaths = [
   // Debate shape P2c: "Also raised, not debated" and the position titles, `public.alsoRaised.*` and
   // `public.positionTitle`, in the QUESTION's `public` catalogue.
   "components/AlsoRaisedList.tsx",
-  "lib/v3/mapView.ts"
+  "lib/v3/mapView.ts",
+  // The owner's screen review of 3 Nov 2026 (public-d1 A): the public page's V4 body reads the story's fixed words (its reservation line, "Worth
+  // knowing") from the question's `public` catalogue, and a publication review's "Details" and "Read" from the interface's; the review panel names its
+  // own panels with the same two words.
+  "components/v4/V4PublicPage.tsx",
+  "components/PublicationReviewsPanel.tsx"
 ];
 const sources = new Map(sourcePaths.map((path) => [path, readFileSync(join(root, path), "utf8")]));
 const catalogPath = join(root, "messages/en/public.json");
@@ -187,28 +192,31 @@ test("S2-public sources contain no hard-coded user-visible English", () => {
   assert.doesNotMatch(overview, /["'](?:PRO|CON)["']/);
 });
 
-test("the public overview keeps the guarded verdict-first structure and owner return path", () => {
+// The owner's screen review of 3 Nov 2026 (public-d1 A): the public page leads with the answer and opens the person's own map, read-only, one click
+// away. The classic overview (its verdict shell, support meter and argument grid) and the classic workspace behind it are gone from the public route.
+test("the public overview leads with the answer, in V4's page, with the map one click away", () => {
   const overview = sources.get("components/PublicDebateOverview.tsx");
   const page = sources.get("app/public/debate/[id]/PublicDebatePageClient.tsx");
   const serverPage = sources.get("app/public/debate/[id]/page.tsx");
+  const body = sources.get("components/v4/V4PublicPage.tsx");
   assert.match(serverPage, /loadNamespace\(locale, "public"\)/);
   assert.match(serverPage, /publicCatalog=\{publicCatalog\}/);
   assert.match(page, /<PublicDebateOverview/);
-  assert.match(overview, /data-design-turn="3b"/);
-  assert.match(overview, /className="publicVerdictShell"/);
-  assert.match(overview, /className="publicSupportRow"/);
-  assert.match(overview, /className="publicArgumentGrid"/);
-  assert.match(overview, /next=\$\{encodeURIComponent\(returnPath\)\}/);
+  assert.match(overview, /<V4PublicAnswerFirst/);
+  assert.match(body, /data-public-answer-first/);
+  assert.match(body, /"v4\.public\.exploreMap"/);
+  assert.match(body, /readOnly: true/);
+  for (const gone of ["publicVerdictShell", "publicSupportRow", "publicArgumentGrid", "publicUnlockNote", "publicLockedAction"]) {
+    assert.doesNotMatch(overview + body + page, new RegExp(gone));
+  }
 });
 
-test("the public route threads debateChrome through the server-client boundary", () => {
+test("the public route reads only what the V4 page needs, and no classic workspace", () => {
   const serverPage = sources.get("app/public/debate/[id]/page.tsx");
   const clientPage = sources.get("app/public/debate/[id]/PublicDebatePageClient.tsx");
-  assert.match(serverPage, /loadNamespace\(locale, "debateChrome"\)/);
-  assert.match(serverPage, /debateChromeCatalog=\{debateChromeCatalog\}/);
-  assert.match(clientPage, /debateChromeCatalog: MessageCatalog/);
-  assert.match(
-    clientPage,
-    /<DebatePageClient[\s\S]*?debateChromeCatalog=\{debateChromeCatalog\}/
-  );
+  for (const namespace of ["public", "home", "chrome", "v4", "newDebate"]) assert.match(serverPage, new RegExp(`loadNamespace\\(locale, "${namespace}"\\)`));
+  for (const namespace of ["debateChrome", "debateDrawers", "compose", "misc", "time"]) assert.doesNotMatch(serverPage, new RegExp(`loadNamespace\\(locale, "${namespace}"\\)`));
+  assert.match(serverPage, /chromeCatalog=\{chromeCatalog\}/);
+  assert.match(clientPage, /<AiNotice catalog=\{\{ \.\.\.homeCatalog, \.\.\.chromeCatalog \}\} \/>/);
+  assert.doesNotMatch(clientPage, /<DebatePageClient/);
 });

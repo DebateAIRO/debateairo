@@ -235,10 +235,13 @@ describe("the debate pages mount the offer", () => {
     const element = await PublicDebatePage({ params: Promise.resolve({ id: "22222222-2222-4222-8222-222222222222" }) }) as ReactElement<{ storyLocale: string }>;
     expect(element.props.storyLocale).toBe("ro");
     const html = renderToStaticMarkup(element);
-    // The page loads the `public` catalogue of the snapshot's language for the short story (R2 §14.3).
-    expect(html).toContain('<div class="publicStory" lang="ro" dir="ltr" data-ai-generated="true">');
-    expect(html).toContain(">A rezistat parțial<");
-    expect(html).toContain(">Ce ar schimba răspunsul<");
-    expect(html).toContain('lang="ro">Decizie strânsă</span>');
+    // The page loads the `public` catalogue of the snapshot's language for the short story (R2 §14.3): the story leads the answer card in it.
+    expect(html).toContain('<div data-ai-generated="true" lang="ro" dir="auto" data-public-story="true">');
+    expect(html).toContain("Răspunsul nostru: mutați-vă treptat.");
+    // Owner's screen review, 3 Nov 2026 (public-f1, r2-20 A): no outcome tag on the path and no label pill, in any language.
+    expect(html).not.toContain(">A rezistat parțial<");
+    expect(html).not.toContain("Decizie strânsă");
+    // What would change the answer is still there, in the question's words.
+    expect(html).toContain("Dacă angajatorul refuză.");
   });
 });

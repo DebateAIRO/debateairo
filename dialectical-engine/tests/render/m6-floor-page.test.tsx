@@ -13,6 +13,7 @@ import { LOCALE_COOKIE, type LocaleCode } from "../../apps/ui/lib/i18n/locales.j
 import composeEnglish from "../../apps/ui/messages/en/compose.json" with { type: "json" };
 import publicEnglish from "../../apps/ui/messages/en/public.json" with { type: "json" };
 import publicRomanian from "../../apps/ui/messages/ro/public.json" with { type: "json" };
+import V4_ENGLISH from "../../apps/ui/messages/en/v4.json" with { type: "json" };
 
 /**
  * Task M6 (spec 2026-09-26 §14.4.4): a components-only answer whose label the
@@ -294,8 +295,9 @@ describe("the owner's page shows a floor answer as an answer (§14.4.4)", () => 
   it("tells both drawers when the page shows a floor (fix round 1)", () => {
     const owner = readFileSync(resolve(process.cwd(), "apps/ui/app/debate/[id]/DebatePageClient.tsx"), "utf8");
     expect(owner).toMatch(/<AnswerHonestyDrawer[\s\S]*?floorShown=\{floorView !== null\}/u);
+    // Owner's screen review, 3 Nov 2026 (public-f1): the public page has no honesty drawer any more, so there is none to tell.
     const publicPage = readFileSync(resolve(process.cwd(), "apps/ui/app/public/debate/[id]/PublicDebatePageClient.tsx"), "utf8");
-    expect(publicPage).toMatch(/<PublicHonestyDrawer[\s\S]*?floorShown=\{publicFloor !== null\}/u);
+    expect(publicPage).not.toContain("PublicHonestyDrawer");
   });
 
   it("hands the server's floor to the page (page.tsx)", async () => {
@@ -355,23 +357,26 @@ describe("the public page shows the same floor answer, in the question's languag
     );
   }
 
-  it("shows the label, 'Our best answer:' and the statement in Romanian, with the thin-basis line", async () => {
+  // Owner's screen review, 3 Nov 2026 (public-f1): the verdict's label pill is gone from the public page; the floor answer itself stays.
+  it("shows 'Our best answer:' and the statement in Romanian, with the thin-basis line, and no label pill", async () => {
     const container = await overview(THIN_FLOOR);
-    const pill = container.querySelector("#public-verdict-label");
-    expect(pill?.textContent).toBe("Decizie strânsă");
-    expect(pill?.getAttribute("lang")).toBe("ro");
-    const text = container.querySelector(".publicVerdictText")!;
+    expect(container.querySelector("#public-verdict-label")).toBeNull();
+    expect(container.textContent).not.toContain("Decizie strânsă");
+    const text = container.querySelector(".v4PubAnswer")!;
+    expect(text.querySelector(".floorAnswer")?.getAttribute("lang")).toBe("ro");
     expect(text.querySelector(".floorAnswerLead")?.textContent).toBe(words(publicRomanian, "public.story.floorLead"));
     expect(text.querySelector(".floorAnswerStatement")?.textContent).toBe(LEADING.claim);
     expect(text.querySelector(".floorAnswerNote")?.textContent).toBe(words(publicRomanian, "public.story.floorThinBasis"));
-    expect(container.textContent).not.toContain(words(publicEnglish, "public.overview.composedVerdictUnavailable"));
+    expect(container.textContent).not.toContain("Composed verdict prose was not included");
   });
 
-  it("renders a snapshot without a floor as today", async () => {
+  it("renders a snapshot without a floor or any answer text with the plain no-short-answer line, and no engine words", async () => {
     const container = await overview(undefined);
-    expect(container.querySelector("#public-verdict-label")?.textContent).toBe(words(publicEnglish, "public.overview.verdictUnavailable"));
+    expect(container.querySelector("#public-verdict-label")).toBeNull();
     expect(container.querySelector(".floorAnswer")).toBeNull();
-    expect(container.querySelector(".publicVerdictText")?.textContent).toBe(words(publicEnglish, "public.overview.composedVerdictUnavailable"));
+    expect(container.querySelector("[data-public-no-answer]")?.textContent).toBe(V4_ENGLISH["v4.report.storyUnavailable"]);
+    expect(container.textContent).not.toContain(words(publicEnglish, "public.overview.verdictUnavailable"));
+    expect(container.textContent).not.toContain("Composed verdict prose was not included");
   });
 
   it("shows the floor in the public workspace's verdict area with the question's words", async () => {
@@ -399,10 +404,10 @@ describe("the public page shows the same floor answer, in the question's languag
     expect(mocks.readAnswerDisclosure).not.toHaveBeenCalled();
   });
 
-  it("wires the snapshot's floor into the public workspace (PublicDebatePageClient)", () => {
-    const source = readFileSync(resolve(process.cwd(), "apps/ui/app/public/debate/[id]/PublicDebatePageClient.tsx"), "utf8");
-    expect(source).toMatch(/publicFloor=\{publicFloor\}/);
+  it("wires the snapshot's floor into the public page's answer (components/v4/V4PublicPage.tsx, public-d1 A)", () => {
+    const source = readFileSync(resolve(process.cwd(), "apps/ui/components/v4/V4PublicPage.tsx"), "utf8");
     expect(source).toMatch(/resolveFloor\(publicFloorHost\(debate\.answer\), debate\.floor\)/);
+    expect(source).toMatch(/<FloorAnswer view=\{floorView\} showLabel=\{false\} \/>/);
   });
 });
 

@@ -44,7 +44,8 @@ function publicNode(nodeId: string, claim: string, value: number) {
     final_strength: labeledNumber(value),
     provenance_ref: "REDACTED_OWNER_ONLY",
     maker_lineage: null,
-    review: null,
+    // Wave 2 (public-d1 A): each published point carries a second AI's review, so the public page words it as the own map does.
+    review: { outcome: "agree" as const, reasons: ["The second AI agreed."], provenance_ref: "REDACTED_OWNER_ONLY", reviewer_lineage: { maker: "published maker", model_id: "published-model" } },
     locator: null,
     stranger_restatement: { check_status: "NOT_SAMPLED" as const },
     defeater_refs: [],
@@ -292,66 +293,49 @@ describe("S02 shared tree leaves in public read-only mode", () => {
   });
 });
 
+/*
+ * V's ruling of 2026-09-20 (a public visitor lands on the conclusion and the argument tree is one click away), as the owner's screen review of 3 Nov
+ * 2026 rebuilt it (public-d1 A): the page leads with the answer; the published points are read under their path, each in its trust word; and "Explore
+ * the map" opens the same map as the person's own, read-only. Nothing on it can be ticked, challenged or dug from the map itself, and no score, model or
+ * count reaches the page (public-f1).
+ */
 describe("S02 public argument-tree projection", () => {
-  it("renders every reading mode, real projected claims, and a read-only node drawer", async () => {
+  it("lands on the answer; the published points are one click away under their path, and the map opens read-only", async () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     const container = await render(
-      <PublicDebatePageClient debate={publicTreeDebate} {...PUBLIC_PAGE_I18N} />
+      <PublicDebatePageClient debate={publicTreeDebate} {...PUBLIC_PAGE_I18N} storyLocale="en" storyCatalog={publicEnglish} homeCatalog={{}} />
     );
-    const viewButtons = [...container.querySelectorAll<HTMLButtonElement>(
-      `[role="group"][aria-label="${chromeEnglish["chrome.view"]}"] > button`
-    )];
-    expect(viewButtons.map((button) => button.textContent)).toEqual([
-      chromeEnglish["chrome.overview"],
-      chromeEnglish["chrome.thread"],
-      chromeEnglish["chrome.split"],
-      chromeEnglish["chrome.tree"],
-      chromeEnglish["chrome.map"]
-    ]);
-    expect(viewButtons.map((button) => button.textContent)).toEqual(["Overview", "Thread", "Split", "Tree", "Map"]);
-    expect(container.querySelectorAll('[role="group"][aria-label="View"] > button')).toHaveLength(5);
-
-    const clickView = async (label: string) => {
-      const button = viewButtons.find((candidate) => candidate.textContent === label);
-      expect(button).not.toBeUndefined();
-      await act(async () => button!.click());
-    };
-
-    // V's ruling of 2026-09-20: a public visitor lands on the conclusion and
-    // the argument tree is ONE CLICK AWAY. Until that ruling this row encoded
-    // the older binary — public "Tree" both WAS the canvas and WAS the landing
-    // view — and there was no way to have the summary and the tree at once.
-    // What the row protects is unchanged and is all still asserted below: the
-    // tree is genuinely reachable, it carries the real projected claims, and it
-    // is read-only. Only the landing view moved, and that move is now pinned
-    // rather than assumed — the overview must be what a stranger sees first.
-    expect(container.querySelector('[data-design-turn="3b"]')).not.toBeNull();
-    expect(container.querySelector(".canvasViewport")).toBeNull();
-
-    await clickView("Tree");
-    const reachableCanvas = container.querySelector<HTMLElement>(".canvasViewport");
-    expect(reachableCanvas).not.toBeNull();
-    expect(reachableCanvas!.textContent).not.toContain("⚐ Challenge");
-    expect(container.textContent).toContain("A public supporting claim.");
-
-    await clickView("Thread");
-    expect(container.querySelector(".thread")).not.toBeNull();
-    const supportCard = [...container.querySelectorAll<HTMLElement>(".threadCard")]
-      .find((card) => card.textContent?.includes("A public supporting claim."));
-    expect(supportCard).not.toBeUndefined();
-    await act(async () => supportCard!.click());
-    expect(container.querySelector('[role="dialog"]')).not.toBeNull();
-    expect(container.textContent).toContain("Unlock actions to view generation history.");
+    // The answer first, with no classic view switch and no canvas.
+    expect(container.querySelector("[data-public-answer-first] .v4PubAnswer")!.textContent).toContain("The public graph remains readable.");
+    expect(container.querySelectorAll(`[role="group"][aria-label="${chromeEnglish["chrome.view"]}"] > button`)).toHaveLength(0);
+    expect(container.querySelector(".canvasViewport, .thread, .split")).toBeNull();
+    // For and Against: the strongest published point on each side, in one sentence, with no score or model.
+    expect(container.querySelector('[data-public-side="for"]')!.textContent).toContain("A public supporting claim.");
+    expect(container.querySelector('[data-public-side="against"]')!.textContent).toContain("A public counterclaim.");
+    expect(container.textContent).not.toMatch(/80%|70%|40%|published-model|published maker|→/u);
+    // A snapshot without a story reads as the own map does: one path holding every point. Opening it shows the real projected claims.
+    const head = container.querySelector<HTMLButtonElement>(".v4PubRowHead")!;
+    expect(head.getAttribute("aria-expanded")).toBe("false");
+    await act(async () => head.click());
+    const row = container.querySelector("[data-public-path]")!;
+    for (const claim of ["The public parent claim.", "A public supporting claim.", "A public counterclaim."]) expect(row.textContent).toContain(claim);
+    expect(row.textContent).toContain("Sure, for the case named");
     expect(container.textContent).not.toContain("⚐ Challenge");
-    const close = container.querySelector<HTMLButtonElement>('button[aria-label="Close"]');
-    await act(async () => close!.click());
-
-    await clickView("Split");
-    expect(container.querySelector(".split")).not.toBeNull();
-    await clickView("Map");
-    expect(container.querySelector(".map")).not.toBeNull();
-    await clickView("Tree");
-    expect(container.querySelector(".canvasViewport")).not.toBeNull();
+    // "Explore the map": the same map, read-only, in the page address.
+    await act(async () => container.querySelector<HTMLButtonElement>("[data-public-explore]")!.click());
+    expect(window.location.search).toContain("view=map");
+    const map = container.querySelector("[data-public-map]")!;
+    expect(map.querySelector(".v4Map")).not.toBeNull();
+    expect(map.querySelector(".v4MapPick, .v4OutPick, input[type=checkbox]")).toBeNull();
+    expect(map.textContent).not.toContain("⚐ Challenge");
+    expect(document.activeElement).toBe(map.querySelector("[data-public-map-back]"));
+    // Picking the path's card comes back to its row, opened and focused.
+    await act(async () => map.querySelector<HTMLButtonElement>(".v4MapPath")!.click());
+    expect(container.querySelector("[data-public-map]")).toBeNull();
+    expect(window.location.search).not.toContain("view=map");
+    expect(document.activeElement).toBe(container.querySelector(".v4PubRowHead"));
+    expect(container.querySelector(".v4PubRowHead")!.getAttribute("aria-expanded")).toBe("true");
+    window.history.replaceState(null, "", "/");
   });
 
   it("renders no tree controls for a legacy answer-only publication", async () => {
@@ -371,13 +355,15 @@ describe("S02 public argument-tree projection", () => {
       }
     });
     const container = await render(
-      <PublicDebatePageClient debate={legacyDebate} {...PUBLIC_PAGE_I18N} />
+      <PublicDebatePageClient debate={legacyDebate} {...PUBLIC_PAGE_I18N} storyLocale="en" storyCatalog={publicEnglish} homeCatalog={{}} />
     );
     expect(container.querySelectorAll(
       `[role="group"][aria-label="${chromeEnglish["chrome.view"]}"] > button`
     )).toHaveLength(0);
     expect(container.querySelector(".canvasViewport, .thread, .split, .map")).toBeNull();
-    expect(container.textContent).toContain(publicEnglish["public.disclosure.legacySummaryOnly"]);
-    expect(container.textContent).toContain("predates argument-tree publishing");
+    expect(container.querySelector("[data-public-explore], [data-public-path], [data-public-side]")).toBeNull();
+    expect(container.textContent).toContain("The public graph remains readable.");
+    // public-f1: the engine's own words for the snapshot's kind are not shown to a stranger.
+    expect(container.textContent).not.toContain("predates argument-tree publishing");
   });
 });

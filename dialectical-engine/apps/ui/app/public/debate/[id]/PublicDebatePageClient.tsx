@@ -1,31 +1,32 @@
 "use client";
 
-import { useMemo } from "react";
 import type { PublicDebate } from "@debateai/contract";
-import DebatePageClient from "@/app/debate/[id]/DebatePageClient";
-import { V4PublicFlag } from "@/components/v4/V4PublicFlag";
+import { AiNotice } from "@/components/AiNotice";
 import { PublicAnswerDisclosure } from "@/components/PublicAnswerDisclosure";
+import { V4PublicFlag } from "@/components/v4/V4PublicFlag";
+import { V4CopyLink } from "@/components/v4/V4PublicMark";
+import { V4PublicTopMenu } from "@/components/v4/V4PublicPage";
+import { V4PublicHeader, V4PublicSessionProvider } from "@/components/v4/V4PublicSession";
 import { PublicDebateOverview } from "@/components/PublicDebateOverview";
-import { PublicHonestyDrawer } from "@/components/PublicHonestyDrawer";
 import { SupportWidget } from "@/components/support/SupportWidget";
-import {
-  contractNodesById,
-  debateDetailFromAnswer,
-  type TreeProjectableAnswer
-} from "@/lib/v3/adapter";
-import type { AnswerExport } from "@/lib/v3/answerExport";
-import { publicFloorHost, resolveFloor } from "@/lib/v3/floorAnswer";
-import { buildPublicAnswerExport } from "@/lib/v3/publicAnswerExport";
 import type { LocaleCode } from "@/lib/i18n/locales";
 import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
+import { publicPageHref } from "@/lib/v4/publicState";
+import chromeEnglish from "@/messages/en/chrome.json";
 import v4English from "@/messages/en/v4.json";
 
-/**
- * A published debate is the private workspace seen by a stranger. This is a
- * projection, not a second implementation: the public envelope is adapted into
- * the shapes DebatePageClient already consumes, and that component renders in
- * `publicMode`. Anything the workspace gains — views, panels, chrome — a public
- * reader gains with it, and the two can never drift apart.
+/*
+ * A published debate, as a stranger reads it. Owner's screen review, 3 Nov 2026:
+ *   - public-d1 A: a V4 page that leads with the answer (the body is PublicDebateOverview → components/v4/V4PublicPage.tsx), in place of the classic
+ *     workspace. That workspace's extra doors are gone with it (public-f1): the folded "Published by" header with its badges and disclosure, the
+ *     "Details" drawer with its measures, and the snapshot download whose file carried the scores. The published line stays, as one quiet line.
+ *   - public-f4: "Report a problem" (r2-14 A) sits in the page's top bar (on a phone, in the bar's menu) and at the foot of each path; "Part of this
+ *     debate was changed after review." is a quiet grey line under the question; the question's title is at the top on every screen.
+ *   - public-f13: one sign-in read for the whole page; the report link, the dig boxes and the report press all read it.
+ *   - Kept from the old page, in the reader's language: the site's AI notice (its strip, with the AI transparency link: published debates are labelled
+ *     for readers), now in the wording that names no scores and no verdict (public-f1: the old notice named "scores and the verdict"), and, at the foot,
+ *     that published debates may be indexed and when the evidence dates from (PublicAnswerDisclosure without its engine lines).
+ * The props of the old workspace's catalogues stay, so the server page and its callers need no change; they are no longer read.
  */
 export function PublicDebatePageClient({
   debate,
@@ -33,12 +34,8 @@ export function PublicDebatePageClient({
   storyLocale,
   storyCatalog,
   publicCatalog,
-  timeCatalog,
-  debateChromeCatalog,
-  debateDrawersCatalog,
-  miscCatalog,
-  composeCatalog,
   homeCatalog,
+  chromeCatalog = chromeEnglish,
   v4Catalog = v4English,
   newDebateCatalog,
   crisisCountryHint = null
@@ -50,142 +47,58 @@ export function PublicDebatePageClient({
   /** The `public` catalogue of `storyLocale`: the short story's fixed words. */
   storyCatalog: MessageCatalog;
   publicCatalog: MessageCatalog;
-  timeCatalog: MessageCatalog;
-  debateChromeCatalog: MessageCatalog;
-  debateDrawersCatalog: MessageCatalog;
-  miscCatalog: MessageCatalog;
-  composeCatalog: MessageCatalog;
+  /** The old workspace's catalogues: no longer read. */
+  timeCatalog?: MessageCatalog;
+  debateChromeCatalog?: MessageCatalog;
+  debateDrawersCatalog?: MessageCatalog;
+  miscCatalog?: MessageCatalog;
+  composeCatalog?: MessageCatalog;
   homeCatalog: MessageCatalog;
+  /** The reader's `chrome` catalogue: with `home`, the words of the site's AI notice (AiNotice reads both). */
+  chromeCatalog?: MessageCatalog;
   /** Decision 13: the contributions, reports and dig box, and what a dig's ask reads. */
   v4Catalog?: MessageCatalog;
   newDebateCatalog?: MessageCatalog;
   crisisCountryHint?: string | null;
 }) {
-  // Publications made before trees were carried have no nodes. That is not an
-  // error: the verdict, the summary and the honesty surface are still the
-  // debate, so they project the same way and the canvas renders its own empty
-  // state rather than a failure screen.
-  const projection = useMemo(() => {
-    const projectable: TreeProjectableAnswer = {
-      nodes: debate.answer.nodes ?? [],
-      edges: debate.answer.edges ?? [],
-      condition_mark_records: [],
-      answer_id: debate.public_ref,
-      answer_version: 1,
-      question_line: debate.question,
-      terminal: debate.answer.terminal,
-      composed_text: debate.answer.summary_segments,
-      serve_state: debate.answer.terminal === "COMPONENTS_ONLY" ? "COMPONENTS_ONLY" : "COMPOSED"
-    };
-    const detail = debateDetailFromAnswer(projectable, composeCatalog);
-    return {
-      // An answer-only publication carries no argument graph. The adapter would
-      // still synthesise a root from the question line, which would light up the
-      // reading-mode controls over a tree that was never published — so the tree
-      // is dropped and the workspace shows its own empty state instead.
-      detail: debate.answer.tree_included === true ? detail : { ...detail, tree: null },
-      nodesById: contractNodesById({ nodes: debate.answer.nodes ?? [] })
-    };
-  }, [composeCatalog, debate]);
-
-  // A components-only snapshot whose label the engine kept (spec 2026-09-26
-  // §14.4.4): its verdict area shows the floor answer, in the question's words.
-  const publicFloor = useMemo(() => resolveFloor(publicFloorHost(debate.answer), debate.floor), [debate]);
-
-  // S14's dual gate, public edition: the label must never outrun the bytes.
-  // buildPublicAnswerExport ships exactly what the public envelope carries, so
-  // the label says that and nothing more.
-  const publicExport = useMemo<AnswerExport>(() => {
-    const built = buildPublicAnswerExport(debate, publicCatalog);
-    return {
-      available: true,
-      href: built.href,
-      filename: built.filename,
-      label: t(publicCatalog, "public.export.publishedSnapshotLabel"),
-      toast: t(publicCatalog, "public.export.publishedSnapshotToast")
-    };
-  }, [debate, publicCatalog]);
-
-  // The Turn-3b overview re-emits verdict, confidence and summary, but the
-  // rest of the published envelope — pseudonym, published date, badges,
-  // residual objections, the reversal point and the indexing disclosure — has
-  // no other public home. It collapses behind one summary line rather than
-  // being dropped. A closed <details> keeps its children in the DOM, so
-  // nothing stops being reachable or assertable.
-  const publicHeader = (
-    <details className="publicationDetails">
-      <summary>
-        {t(publicCatalog, "public.header.summary", {
-          // Decision 13: the first author's account is gone: the name went, and the page says so in its own words.
-          author: debate.author_name_gone === true ? t(v4Catalog, "v4.public.aContributor") : debate.author_pseudonym,
-          date: formatDate(locale, debate.published_at)
-        })}
-      </summary>
-      <section className="card">
-        <PublicAnswerDisclosure answer={debate.answer} catalog={publicCatalog} locale={locale} />
-      </section>
-      {debate.answer.badges.length > 0 ? (
-        <section className="card"><h2>{t(publicCatalog, "public.badges.heading")}</h2><p>{debate.answer.badges.join(" · ")}</p></section>
-      ) : null}
-      {debate.answer.residual_objections.length > 0 ? (
-        <section className="card">
-          <h2>{t(publicCatalog, "public.residualObjections.heading")}</h2>
-          {debate.answer.residual_objections.map((objection, index) => <p key={index}>{objection}</p>)}
-        </section>
-      ) : null}
-      <section className="card"><h2>{t(publicCatalog, "public.reversalPoint.questionHeading")}</h2><p>{debate.answer.reversal_point}</p></section>
-    </details>
-  );
-
+  // Decision 13: the first author's account is gone: the name went, and the page says so in its own words.
+  const author = debate.author_name_gone === true ? t(v4Catalog, "v4.public.aContributor") : debate.author_pseudonym;
+  const published = t(publicCatalog, "public.header.summary", { author, date: formatDate(locale, debate.published_at) });
   return (
-    <>
-      {debate.changed_after_review === true ? <p className="publicChangedAfterReview" role="status" data-public-changed>{t(v4Catalog, "v4.public.changedAfterReview")}</p> : null}
-      <V4PublicFlag publicRef={debate.public_ref} catalog={v4Catalog} />
-      <DebatePageClient
-      id={debate.public_ref}
-      initialDebate={projection.detail}
-      initialAnswer={null}
-      initialError={null}
-      timeCatalog={timeCatalog}
-      debateChromeCatalog={debateChromeCatalog}
-      debateDrawersCatalog={debateDrawersCatalog}
-      miscCatalog={miscCatalog}
-      publicCatalog={publicCatalog}
-      composeCatalog={composeCatalog}
-      homeCatalog={homeCatalog}
-      publicMode
-      questionLocale={storyLocale}
-      storyLocale={storyLocale}
-      storyCatalog={storyCatalog}
-      publicFloor={publicFloor}
-      publicMapView={debate.map_view ?? null}
-      publicNodesById={projection.nodesById}
-      publicExport={publicExport}
-      publicHeader={publicHeader}
-      publicOverview={({ onDetails, onRead }) => (
-        <PublicDebateOverview
-          debate={debate}
-          catalog={publicCatalog}
-          storyCatalog={storyCatalog}
-          storyLocale={storyLocale}
-          composeCatalog={composeCatalog}
-          locale={locale}
-          lane={{ catalog: v4Catalog, homeCatalog, newDebateCatalog, locale, crisisCountryHint }}
-          onDetails={onDetails}
-          onRead={onRead}
-        />
-      )}
-      renderPublicHonesty={(close) => (
-        <PublicHonestyDrawer
-          answer={debate.answer}
-          catalog={publicCatalog}
-          locale={locale}
-          onClose={close}
-          floorShown={publicFloor !== null}
-        />
-      )}
-      />
-      <SupportWidget />
-    </>
+    <V4PublicSessionProvider>
+      <div className="v4Root v4PubPage" data-public-page>
+        {/* journey-f19 (review F8): the quota shows only on the ask, choosing and map pages; a public page shows none and reads none. */}
+        <V4PublicHeader catalog={v4Catalog}>
+          <V4PublicTopMenu catalog={v4Catalog}>
+            {/* public-f26 (owner's screen review): "Copy link" at the top of the public page too (the phone's share sheet there). */}
+            <span className="v4PubCopyLink"><V4CopyLink href={publicPageHref(debate.public_ref)} catalog={v4Catalog} /></span>
+            <V4PublicFlag publicRef={debate.public_ref} catalog={v4Catalog} placement="top" />
+          </V4PublicTopMenu>
+        </V4PublicHeader>
+        {/* The layout already holds the page's one <main>. */}
+        <div className="v4PubMain">
+          <h1 className="v4Serif v4PubTitle" data-ai-generated="true" lang={storyLocale} dir="auto">{debate.question}</h1>
+          <p className="v4PubPublished v4Muted">{published}</p>
+          {debate.changed_after_review === true
+            ? <p className="v4PubChangedLine v4Muted" data-public-changed>{t(v4Catalog, "v4.public.changedAfterReview")}</p>
+            : null}
+          <div className="v4PubAiNotice"><AiNotice catalog={{ ...homeCatalog, ...chromeCatalog }} /></div>
+          <PublicDebateOverview
+            debate={debate}
+            catalog={publicCatalog}
+            storyCatalog={storyCatalog}
+            storyLocale={storyLocale}
+            locale={locale}
+            lane={{ catalog: v4Catalog, homeCatalog, newDebateCatalog, locale, crisisCountryHint }}
+            onDetails={() => undefined}
+            onRead={() => undefined}
+          />
+          <div className="v4PubFoot v4Muted" data-public-foot>
+            <PublicAnswerDisclosure answer={debate.answer} catalog={publicCatalog} locale={locale} engineLines={false} />
+          </div>
+        </div>
+        <SupportWidget />
+      </div>
+    </V4PublicSessionProvider>
   );
 }

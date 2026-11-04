@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useSyncExternalStore } from "react";
 import { PlanIdSchema } from "@debateai/contract";
 import { exhaustive } from "@debateai/kernel";
 import type { AskRoom } from "@/lib/billing/room";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import { READING_LEVELS } from "@/lib/v4/types";
 import { RESET_TIME_MARK, ResetSentence } from "./ResetSentence";
 
 type RoomSentence = Readonly<{
@@ -99,6 +101,36 @@ export function roomSentence(room: AskRoom | null): RoomSentence | null {
   }
 }
 
+/**
+ * Where "Open the waiting debate" leads (V4 review ask-f11, read-f4, public-f21). The notice is shared by the classic
+ * pages (/new, the home composer) and the V4 pages, so it reads the address it sits on: on a V4 page (/v4 and below) the
+ * link opens the waiting debate's V4 map, at the reading level the address carries (`?level=`, the parameter every V4
+ * link carries, lib/v4/storage.ts); anywhere else, the classic debate page as before. `address` is the path with its
+ * query ("" while it is unknown, e.g. on the server).
+ */
+export function waitingDebateHref(runRef: string, address: string): string {
+  const run = encodeURIComponent(runRef);
+  const queryAt = address.indexOf("?");
+  const path = queryAt === -1 ? address : address.slice(0, queryAt);
+  if (path !== "/v4" && !path.startsWith("/v4/")) return `/debate/${run}`;
+  const level = new URLSearchParams(queryAt === -1 ? "" : address.slice(queryAt + 1)).get("level");
+  const known = READING_LEVELS.find((option) => option === level);
+  return known === undefined ? `/v4/debate/${run}` : `/v4/debate/${run}?level=${known}`;
+}
+
+/** The address, read from window.location (as lib/v4/useReadingLevel.ts does) and re-read on Back/Forward. */
+function onTraversal(changed: () => void): () => void {
+  window.addEventListener("popstate", changed);
+  return () => window.removeEventListener("popstate", changed);
+}
+const readAddress = (): string => `${window.location.pathname}${window.location.search}`;
+const noAddress = (): string => "";
+
+function WaitingDebateLink({ runRef, label }: Readonly<{ runRef: string; label: string }>) {
+  const address = useSyncExternalStore(onTraversal, readAddress, noAddress);
+  return <Link className="roomNoticeLink" href={waitingDebateHref(runRef, address)}>{label}</Link>;
+}
+
 export function RoomNotice({ room, catalog, locale }: { room: AskRoom | null; catalog: MessageCatalog; locale: string }) {
   const sentence = roomSentence(room);
   if (sentence === null) return null;
@@ -118,9 +150,7 @@ export function RoomNotice({ room, catalog, locale }: { room: AskRoom | null; ca
         <Link className="roomNoticeLink" href="/pricing">{t(catalog, "newDebate.room.upgradeLink")}</Link>
       ) : null}
       {sentence.waitingRunRef === null ? null : (
-        <Link className="roomNoticeLink" href={`/debate/${encodeURIComponent(sentence.waitingRunRef)}`}>
-          {t(catalog, "newDebate.room.openWaiting")}
-        </Link>
+        <WaitingDebateLink runRef={sentence.waitingRunRef} label={t(catalog, "newDebate.room.openWaiting")} />
       )}
     </div>
   );
