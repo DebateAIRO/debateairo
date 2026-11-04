@@ -97,6 +97,16 @@ describe("the start step's signed references (spec 2026-11-03 §4.1)", () => {
     expect(codeOf(run)).toBe(code);
   });
 
+  it("refuses a reference of another kind even when it signs the very same content (the kind check alone)", () => {
+    // Wave 2 review fix (Task 26): in every cross-kind case above the content hash differs too, so only this one shows the kind
+    // check. A menu reference sealed over the list's own words matches the list's reference in all but its kind.
+    const sameContentMenuRef = signStartMenu(key, { ...BINDING, menu: LIST1 as unknown as StartMenu, now: NOW });
+    expect({ ...payloadOf(sameContentMenuRef), t: "LIST" }).toEqual(payloadOf(listRef));
+    expect(codeOf(() => verifyList({ signed: { list: LIST1, ref: sameContentMenuRef } }))).toBe("START_PATHS_INVALID");
+    const sameContentListRef = signStartList(key, { ...BINDING, list: MENU as unknown as StartList, now: NOW });
+    expect(codeOf(() => verifyStartMenu(key, { ...BINDING, signed: { menu: MENU, ref: sameContentListRef }, now: NOW }))).toBe("START_PATHS_INVALID");
+  });
+
   it("the question binds trimmed, so the page's spacing never makes a list stale", () => {
     expect(verifyList({ questionLine: `  ${QUESTION}\n` })).toEqual(LIST1);
   });

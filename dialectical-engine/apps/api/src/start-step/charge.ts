@@ -18,9 +18,9 @@ import { previewModelRow, type ProviderCostEnvelopeSeam, type ProviderDiscoveryT
  *  · after it: the vendor's REAL counts only. On the preview the gate settles the money, and a send it refused, or a
  *    reply whose counts cannot be read, settles there at its projection; charging the person that projection would book
  *    spend the vendor may never have billed. A usage-less call charges nothing.
- *  · It never throws after a call: a record that fails is one code line, and the breaker latches until a restart on a
- *    refusal every later record would meet too (42501, 42883, 23514) or on the third failure in a row (a success resets
- *    that count). Nothing here logs the person, the question or the reply.
+ *  · It never throws after a call: a record that fails is one code line (a report that throws is dropped), and the
+ *    breaker latches until a restart on a refusal every later record would meet too (42501, 42883, 23514) or on the third
+ *    failure in a row (a success resets that count). Nothing here logs the person, the question or the reply.
  */
 export type StartCharges = Readonly<{
   recordDown(): boolean;
@@ -53,7 +53,13 @@ export function createStartCharges(deps: Readonly<{
   const unrecorded = (code: string): void => {
     failuresInARow += 1;
     if (RECORD_LATCHING_CODES.has(code) || failuresInARow >= RECORD_FAILURES_IN_A_ROW) down = true;
-    deps.report({ event: "api.start_step.charge_unrecorded", code: "RECORD_DOWN" });
+    // Wave 2 review fix (Task 27): the report is this seam's one log line, so a report that throws has nowhere else to go;
+    // it is dropped, after the count and the latch above, and recordCall still never throws.
+    try {
+      deps.report({ event: "api.start_step.charge_unrecorded", code: "RECORD_DOWN" });
+    } catch {
+      // the report never changes the record
+    }
   };
   const charges: StartCharges = {
     recordDown: () => down,

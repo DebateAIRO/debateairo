@@ -14,19 +14,31 @@ import { startModelOfSeat, type StartBusyBook } from "./seats.js";
 /**
  * V4 start step, Task 27 (spec 2026-11-03 §4.1): THE PREVIEW TRANSPORT of the calls before Start. Each call goes through
  * one fresh gateway built for it alone, exactly as a debate's call goes on the preview (the guarded fetch, so the gates
- * reserve and settle it; the target's reviewed controls; `withPreviewProviderCallPolicy`, so the owner's thinking table
- * and the one format repair apply), with no debate (`runId: null`) and nothing persisted: the gateway's artifacts and
- * ledger entries are dropped, and the only record is the person's charge (charge.ts) through the call's money seam.
+ * reserve and settle it; the target's reviewed controls; `withPreviewProviderCallPolicy`, so the owner's thinking table,
+ * the one format repair and the preview's call bound apply: see START_STEP_CALL_BOUNDS for what that bound does to each
+ * kind's own), with no debate (`runId: null`) and nothing persisted: the gateway's artifacts and ledger entries are
+ * dropped, and the only record is the person's charge (charge.ts) through the call's money seam.
  * Role JUDGE on the served lane, as the map's calls; the seat's "#2" mark is stripped before anything is sent.
  *
  * A model the vendor refused as busy (an unbilled refusal, proved by the gate) ends its call at once, BUSY, with no
  * 60-second resend (the step lasts about a minute), and sits out the busy book's two minutes. A refusal of the money seam
  * (the record down, an unpriced target) is STOPPED: nothing was sent. Any other failure is FAILED with its code. Every
- * call's end is told to `onCallEnd` (the model, the outcome, the time; never the question or the reply).
+ * call's end is told to `onCallEnd` exactly once, after its outcome is settled (the model, the outcome, the time; never
+ * the question or the reply); a hook that throws changes nothing.
  */
 const callBound = (tokenCeiling: number, deadlineMs: number): CallBound => Object.freeze({ maxAttempts: 2, tokenCeiling, deadlineMs });
 
-/** Each kind's bound: two attempts (the one format repair), its reply's room, its deadline from START_STEP_TIMING. */
+/**
+ * Each kind's bound as this transport hands it to the gateway: two attempts (the one format repair), its reply's room,
+ * its deadline from START_STEP_TIMING. What a call actually gets on the preview (the only transport today) is the preview
+ * call policy's (`previewCallBound` in @debateai/providers, run by `withPreviewProviderCallPolicy`): the two attempts
+ * kept; `max_tokens` raised to at least PREVIEW_GLM_GENERATION_TOKEN_FLOOR (8,192: the merge keeps its own 16,384, the
+ * combine's and the fit's 4,096 go out as 8,192); and the deadline replaced by the gate's, PREVIEW_GLM_DEADLINE_MS
+ * (1,260 s), so no START_STEP_TIMING deadline here ever ends a call on the preview. Kept so (wave 2 review ruling): a
+ * call already started finishes and counts in the allowance (the owner's 31 Oct rule, settled for the step on 3 Nov),
+ * and the step's own clocks in @debateai/map (the planner's race, the lists' 150 s cap) stop the waiting, never the
+ * call. A gateway without the preview policy (none today) would get these bounds exactly as written.
+ */
 export const START_STEP_CALL_BOUNDS: Readonly<Record<PreStartChargeKind, CallBound>> = Object.freeze({
   ANGLES: callBound(8_192, START_STEP_TIMING.plannerDeadlineMs),
   LIST: callBound(8_192, START_STEP_TIMING.listsHardCapMs),
@@ -92,14 +104,23 @@ export function createStartTransport(deps: Readonly<{ fetch: typeof fetch; targe
       async call<T>(request: MapCallRequest<T>): Promise<MapCallOutcome<T>> {
         const started = now();
         const model = startModelOfSeat(request.seat.aiRef);
+        // Wave 2 review fix (Task 27): told once, after the outcome is settled and outside the call's try, so a hook that
+        // throws is never caught as the call's own failure (which told it a second time, FAILED). The hook is this
+        // transport's only telling, so its own failure has nowhere else to go: it changes neither the outcome nor how often
+        // the end is told.
         const ended = (outcome: MapCallOutcome<T>): MapCallOutcome<T> => {
-          input.onCallEnd(Object.freeze({ callSiteKey: request.callSiteKey, model, outcome: outcome.kind, ms: Math.max(0, now() - started) }));
+          try {
+            input.onCallEnd(Object.freeze({ callSiteKey: request.callSiteKey, model, outcome: outcome.kind, ms: Math.max(0, now() - started) }));
+          } catch {
+            // the hook never changes the call
+          }
           return outcome;
         };
         const kind = preStartKindOfCallSite(request.callSiteKey);
         if (kind === null) return ended({ kind: "FAILED", code: "START_STEP_CALL_SITE_UNKNOWN" });
         const target = targetOf(model);
         if (target === null) return ended({ kind: "FAILED", code: "START_STEP_SEAT_UNKNOWN" });
+        let outcome: MapCallOutcome<T>;
         try {
           const pieces = mapProviderPieces(request.spec);
           const response = await gatewayFor(input.config, target).call({
@@ -110,15 +131,17 @@ export function createStartTransport(deps: Readonly<{ fetch: typeof fetch; targe
             ...(request.spec.guidedWords === null ? {} : { guidedWords: request.spec.guidedWords }),
             ...(request.spec.replyWordsCeiling === null ? {} : { replyWordsCeiling: request.spec.replyWordsCeiling })
           });
-          return ended({ kind: "OK", value: pieces.readAccepted(response.content) });
+          outcome = { kind: "OK", value: pieces.readAccepted(response.content) };
         } catch (error) {
           const code = mapErrorCodeOf(error);
           if (providerCallEndedVendorRefusedUnbilled(error)) {
             input.busy.mark(model);
-            return ended({ kind: "BUSY", code });
+            outcome = { kind: "BUSY", code };
+          } else {
+            outcome = START_STEP_STOP_CODES.has(code) ? { kind: "STOPPED", code } : { kind: "FAILED", code };
           }
-          return ended(START_STEP_STOP_CODES.has(code) ? { kind: "STOPPED", code } : { kind: "FAILED", code });
         }
+        return ended(outcome);
       }
     })
   });

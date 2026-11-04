@@ -54,6 +54,19 @@ describe("the list seats (spec 2026-11-03 §4.1, S5)", () => {
     expect(refs(seats([HAIKU, GLM, QWEN, DEEPSEEK, MIMO], 7, new Set([QWEN])))).toEqual([HAIKU, GLM, DEEPSEEK, MIMO, `${HAIKU}#2`, `${GLM}#2`, `${DEEPSEEK}#2`]);
   });
 
+  it("a company's second seat is its other model when the roster has one, and only then the same model marked #2", () => {
+    // Wave 2 review fix (Task 27): no line-up above has two models of one company. A made-up second Anthropic model,
+    // declared for this test only (Haiku's target under another model id).
+    const OTHER = "claude-fixture-second-model";
+    const haikuTarget = targetOf(HAIKU)!;
+    const withOther = (model: string) => model === OTHER ? Object.freeze({ ...haikuTarget, model: OTHER }) : targetOf(model);
+    const three = startSeatsFor({ roster: [HAIKU, OTHER, GLM], targetOf: withOther, count: 3, busy: new Set() });
+    expect(refs(three)).toEqual([HAIKU, GLM, OTHER]);
+    expect(three.seats.map((seat) => seat.maker)).toEqual(["Anthropic", "Z.AI", "Anthropic"]);
+    expect(refs(startSeatsFor({ roster: [HAIKU, OTHER, GLM], targetOf: withOther, count: 9, busy: new Set() })))
+      .toEqual([HAIKU, GLM, OTHER, `${GLM}#2`]);
+  });
+
   it("9 asked of two companies: at most two seats a company, so 4", () => {
     expect(refs(seats([GLM, HAIKU], 9))).toEqual([HAIKU, GLM, `${HAIKU}#2`, `${GLM}#2`]);
   });
