@@ -499,7 +499,10 @@ await step("a public debate with one contribution, a changed main answer, one re
   must(debate.reports.length >= 1 && debate.reports[0].writer !== null, "one report, with its writer as a reference");
   const gone: Loose = await client.readPublicDebate(PUBLIC.authorGone);
   must(gone.author_name_gone === true, "the author's name went");
-  return `${String(debate.contributions.length)} contribution(s), ${String(debate.reports.length)} report(s)`;
+  // public-d1 A: the tree is published, so the page has each path's trust word and bar; every point carries a review, one rests on a checked page.
+  must(debate.answer.tree_included === true && debate.answer.nodes.every((node: Loose) => node.review !== null), "a published tree, every point reviewed");
+  must(debate.answer.nodes.some((node: Loose) => node.looked_up_checked === true), "one point on a checked page");
+  return `${String(debate.contributions.length)} contribution(s), ${String(debate.reports.length)} report(s), ${String(debate.answer.nodes.length)} points`;
 }, (value: string) => value);
 await expectCode("a public debate nobody published", () => client.readPublicDebate("f1000000-0000-4000-8000-00000000ffff"), "NOT_FOUND");
 await step("the digger's four states", async () => {
@@ -557,6 +560,19 @@ await step("Write a report: 202 and its refusals", async () => {
   const accepted: Loose = await client.writePublicReport(PUBLIC.debate);
   must(accepted.state === "WRITING" && accepted.report_version >= 2, `written: ${JSON.stringify(accepted)}`);
   return `version ${String(accepted.report_version)} writing`;
+}, (value: string) => value);
+// public-f9: a report the click-test can watch wait: accepted, and its version never arrives.
+await step("Write a report that never arrives (public=REPORT_STUCK)", async () => {
+  await mock("/__mock/set?public=REPORT_STUCK");
+  try {
+    const stuck: Loose = await client.writePublicReport(PUBLIC.debate);
+    must(stuck.state === "WRITING", `accepted: ${JSON.stringify(stuck)}`);
+    const page: Loose = await client.readPublicDebate(PUBLIC.debate);
+    must(!(page.reports ?? []).some((report: Loose) => report.report_version >= stuck.report_version), "its version is not on the page");
+    return `version ${String(stuck.report_version)} stays being written`;
+  } finally {
+    await mock("/__mock/set?public=OPEN");
+  }
 }, (value: string) => value);
 // Decision 35: the Report button, through the website's own client, and the queue through the contract's schema. It hides the first public debate, so it reads the 410 and puts it back.
 await step("Report: not found, with a person, hidden (the page answers 410), and the queue holds them", async () => {
