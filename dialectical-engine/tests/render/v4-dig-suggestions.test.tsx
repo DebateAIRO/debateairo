@@ -88,7 +88,8 @@ describe("pick, combine, edit and add your own view", () => {
     expect(tray()!.textContent).not.toMatch(/\bpicked\b/iu);
     // The panel names no count either: the picks are marked where they are.
     expect(panel().textContent).not.toMatch(/\d+ picked/iu);
-    expect(buttonsNamed(word("v4.dig.trayDig.other", { count: 3 }), tray()!)).toHaveLength(1);
+    // journey-f13 (owner's screen review): the tray's one button, "Dig into these" (no count; its share when known).
+    expect(buttonsNamed(CATALOG["v4.dig.trayDigThese"]!, tray()!)).toHaveLength(1);
     // Picks shown on the tree too.
     expect(treeBoxes(PATHS.renew).filter((box) => box.checked)).toHaveLength(2);
   });
@@ -141,7 +142,7 @@ describe("pick, combine, edit and add your own view", () => {
     expect(chips.filter((chip) => chip.getAttribute("data-ai-generated") === "true")).toHaveLength(1);
     expect(chips.every((chip) => chip.getAttribute("dir") === "auto")).toBe(true);
     // journey-f13 / journey-f23: the tray's button counts nothing.
-    expect(buttonsNamed(CATALOG["v4.dig.trayDig.other"]!, tray()!)).toHaveLength(1);
+    expect(buttonsNamed(CATALOG["v4.dig.trayDigThese"]!, tray()!)).toHaveLength(1);
     expect(tray()!.textContent).not.toMatch(/\b3\b/u);
   });
 });
@@ -162,12 +163,14 @@ describe("picks stay on one path (owner Q-D1)", () => {
     await click(smrOpen);
     expect(trayChips()).toHaveLength(1);
     expect(treeBoxes(PATHS.mix).some((box) => box.checked)).toBe(false);
-    // The other path's panel says it in words and offers Clear, and no own view or edit there.
+    // The other path's panel says it in words (dig-f5: where the picks wait, with [Go to them] [Clear them]), and no own
+    // view or edit there.
     await openPath(PATHS.mix);
-    expect(panel().textContent).toContain(CATALOG["v4.suggest.otherPath"]);
+    expect(panel().textContent).toContain(CATALOG["v4.suggest.waitingOn"]!.split("“")[0]!);
+    expect(buttonsNamed(CATALOG["v4.suggest.goToPicks"]!, panel())).toHaveLength(1);
     expect(buttonsNamed(CATALOG["v4.suggest.ownView"]!, panel())).toHaveLength(0);
     expect(buttonsNamed(CATALOG["v4.suggest.edit"]!, panel())).toHaveLength(0);
-    await click(buttonNamed(CATALOG["v4.dig.trayClear"]!, panel()));
+    await click(buttonNamed(CATALOG["v4.suggest.clearPicks"]!, panel()));
     expect(tray()).toBeNull();
     for (const box of treeBoxes(PATHS.mix)) expect(box.disabled).toBe(false);
     await click(treeBoxes(PATHS.mix)[0]!);
@@ -181,7 +184,7 @@ describe("Undo sends nothing", () => {
     await expandBranch(PATHS.renew);
     await click(treeBoxes(PATHS.renew)[0]!);
     await click(treeBoxes(PATHS.renew)[1]!);
-    await click(buttonNamed(word("v4.dig.trayDig.other", { count: 2 }), tray()!));
+    await click(buttonNamed(CATALOG["v4.dig.trayDigThese"]!, tray()!));
     expect(text()).toContain(CATALOG["v4.dig.undo"]);
     await advance(4_000);
     await click(page().querySelector<HTMLButtonElement>(`button[aria-label="${CATALOG["v4.dig.undoLabel"]}"]`)!);
@@ -216,7 +219,7 @@ describe("Free combines at most 3 picks (owner Q19)", () => {
   });
 });
 
-describe("\"Dig here too\" (nesting) and the deepest level", () => {
+describe("digging again where a dig is (nesting) and the deepest level", () => {
   it("is offered on a path that already has a dig, and only there on a first debate", async () => {
     const runId = crypto.randomUUID();
     harness.records = {
@@ -226,11 +229,13 @@ describe("\"Dig here too\" (nesting) and the deepest level", () => {
     await mountMap(1600, runId);
     await expandBranch(PATHS.mix);
     await expandBranch(PATHS.renew);
-    expect(buttonsNamed(CATALOG["v4.nest.digHereToo"]!, branch(PATHS.mix))).toHaveLength(1);
-    expect(buttonsNamed(CATALOG["v4.nest.digHereToo"]!, branch(PATHS.renew))).toHaveLength(0);
-    await click(buttonNamed(CATALOG["v4.nest.digHereToo"]!, branch(PATHS.mix)));
+    // journey-f13 (owner's screen review): the tree's way in says where it goes, never "Dig here too".
+    expect(buttonsNamed(CATALOG["v4.dig.chooseWhat"]!, branch(PATHS.mix))).toHaveLength(1);
+    expect(buttonsNamed(CATALOG["v4.dig.chooseWhat"]!, branch(PATHS.renew))).toHaveLength(0);
+    await click(buttonNamed(CATALOG["v4.dig.chooseWhat"]!, branch(PATHS.mix)));
     expect(panel().textContent).toContain(CATALOG["v4.suggest.heading"]);
-    expect(buttonsNamed(CATALOG["v4.nest.digHereToo"]!, panel()).length).toBeGreaterThan(0);
+    expect(buttonsNamed(CATALOG["v4.panel.dig"]!, panel()).length).toBeGreaterThan(0);
+    expect(text()).not.toContain("Dig here too");
     await openPath(PATHS.renew);
     expect(buttonsNamed(CATALOG["v4.panel.dig"]!, panel())).toHaveLength(1);
   });
@@ -241,7 +246,7 @@ describe("\"Dig here too\" (nesting) and the deepest level", () => {
     await mountMap(1600, runId);
     for (const index of Object.values(PATHS)) {
       await expandBranch(index);
-      expect(buttonsNamed(CATALOG["v4.nest.digHereToo"]!, branch(index)), `path ${index}`).toHaveLength(1);
+      expect(buttonsNamed(CATALOG["v4.dig.chooseWhat"]!, branch(index)), `path ${index}`).toHaveLength(1);
     }
   });
 
@@ -250,7 +255,7 @@ describe("\"Dig here too\" (nesting) and the deepest level", () => {
     harness.answer = seededAnswer(runId, { dig: digPart(crypto.randomUUID(), DIG_LEVEL_MAX) });
     await mountMap(1600, runId);
     expect(text()).toContain(CATALOG["v4.nest.deepest"]);
-    expect(buttonsNamed(CATALOG["v4.nest.digHereToo"]!)).toHaveLength(0);
+    expect(buttonsNamed(CATALOG["v4.dig.chooseWhat"]!)).toHaveLength(0);
     expect(page().querySelectorAll(".v4MapLeafSuggestion")).toHaveLength(0);
     for (const box of page().querySelectorAll<HTMLInputElement>(".v4MapLeafOpen input[type=checkbox]")) expect(box.disabled).toBe(true);
     await openPath(PATHS.renew);

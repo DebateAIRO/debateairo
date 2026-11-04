@@ -26,6 +26,7 @@ import type { AskRoom } from "../../apps/ui/lib/billing/room.js";
  */
 const CATALOG = JSON.parse(readFileSync(resolve(import.meta.dirname, "../../apps/ui/messages/en/v4.json"), "utf8")) as Record<string, string>;
 const NOW = Date.parse("2026-11-04T10:00:00.000Z");
+// journey-f15 (owner's screen review): one 24-hour clock on every V4 page ("14:31", never "02:31 PM").
 const clock = (iso: string): string => new Intl.DateTimeFormat("en", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(iso));
 const run = (fields: Partial<RunProjection>): RunProjection => RunProjectionSchema.parse({
   run_ref: "r-1", question_line: "Should my town close the old centre to cars?", state: "RUNNING", terminal_reason: null, hold_until: null, ...fields
@@ -118,6 +119,7 @@ describe("the shared state words (journey-f22)", () => {
 
   it("clock and day texts are the page's language, and unreadable times give null", () => {
     expect(clockText("2026-11-04T14:31:00.000Z", "en")).toBe(clock("2026-11-04T14:31:00.000Z"));
+    expect(clockText("2026-11-04T14:31:00.000Z", "en")).toMatch(/^\d{2}:\d{2}$/u);
     expect(clockText("nope", "en")).toBeNull();
     expect(whenText("nope", "en", NOW)).toBeNull();
     expect(dayText("nope", "en")).toBeNull();

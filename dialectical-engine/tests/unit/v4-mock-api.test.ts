@@ -13,7 +13,8 @@ import {
   DraftInvestigationSchema, DraftOtherPageSchema, DraftRoomPartSchema, DraftSourceSchema, DraftWebPathSchema,
   DraftRoomQueryPartSchema, READ_DEPTHS, RESEARCHED_STATES, splitAsk, splitRoomQuery, stripAnswer, stripRoom, stripRun, stripUsage,
   SUGGESTION_KINDS, SUGGESTION_SIDES, DraftPathRewritesSchema, DraftAnswerDigSchema, DraftMonthPauseSchema, DraftRunQuotaUsedSchema,
-  DraftUsageBorrowsSchema, DraftRunStartedAtSchema, answerIndexDraftProblems, DraftShelfRowPartSchema, stripAnswerIndex
+  DraftUsageBorrowsSchema, DraftRunStartedAtSchema, answerIndexDraftProblems, DraftShelfRowPartSchema, stripAnswerIndex,
+  DraftQuestionShareSchema, DraftShareScopeSchema
 } from "../../tools/v4-mock-api/web-draft.js";
 import {
   borrowNotice, DEEPEST_DIG, DIG_ANSWERS, DIG_FINISHED_AT, DIG_RUNS, mainAnswerAt, monthPause, PATH_REWRITES, reportVersionBody, SEEDED_NEW_DIGS
@@ -386,13 +387,38 @@ describe("V4 mock API: the new dig model and the money rule", () => {
       "v4.pause.digCard", "v4.pause.digCardReady"].filter((key) => !(key in catalog))).toEqual([]);
   });
 
+  it("the quota's windows (owner's screen review, 3 Nov): share_scope and question_share pass their draft schemas and fall back", () => {
+    // read-f19 / public-f14 / map-f33: the window a room read's share is of, only beside a share.
+    for (const scope of ["PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]) expect(DraftShareScopeSchema.safeParse(scope).success).toBe(true);
+    expect(DraftShareScopeSchema.safeParse("SITE_DAY").success).toBe(false);
+    const fits = { room: "FITS", scope: null, resets_at: null, waiting_run_ref: null, plan_id: "FREE", dig_share_percent: 20 };
+    expect(DraftRoomPartSchema.safeParse({ ...fits, share_scope: "PERSON_MONTH" }).success).toBe(true);
+    const { dig_share_percent: _share, ...noShare } = fits;
+    expect(DraftRoomPartSchema.safeParse({ ...noShare, share_scope: "PERSON_MONTH" }).success).toBe(false);
+    // Today's contract never sees it: held back, the room read keeps its share.
+    const held = stripRoom({ ...fits, share_scope: "PERSON_MONTH" });
+    expect(Object.keys(held)).not.toContain("share_scope");
+    expect(AskRoomResponseSchema.safeParse({ ...fits }).success).toBe(true);
+    // map-f9: what a question has used of that window.
+    expect(DraftQuestionShareSchema.safeParse({ scope: "PERSON_DAY", percent: 11 }).success).toBe(true);
+    expect(DraftQuestionShareSchema.safeParse({ scope: "PERSON_DAY", percent: 11.5 }).success).toBe(false);
+    expect(DraftQuestionShareSchema.safeParse({ scope: "PERSON_GRANT", percent: 11 }).success).toBe(false);
+    const run = { run_ref: DIG_RUNS.root, question_line: "Should I move?", state: "SETTLED", terminal_reason: null, hold_until: null };
+    expect(stripRun({ ...run, question_share: { scope: "PERSON_MONTH", percent: 11 } })).toEqual(run);
+    expect(RunProjectionSchema.safeParse(contractOrDraft(RunProjectionSchema, { ...run, question_share: { scope: "PERSON_DAY", percent: 11 } }, stripRun).body).success)
+      .toBe(true);
+    for (const key of ["v4.debate.questionShare.PERSON_DAY", "v4.debate.questionShare.PERSON_MONTH", "v4.room.startShare.PERSON_MONTH", "v4.dig.period.PERSON_MONTH"]) {
+      expect(catalog[key], key).toBeDefined();
+    }
+  });
+
   it("every dig-model and money-rule word the mock plays has its English line in the V4 catalogue", () => {
     const words = [
       "v4.view.heading", "v4.view.HELPED.MAIN_QUESTION", "v4.view.DID_NOT_HELP.PATH", "v4.view.asYours", "v4.view.why",
       "v4.rewrite.whatChanged", "v4.rewrite.changedSince.other", "v4.rewrite.changedSinceReport", "v4.rewrite.changedBelow",
       // V4 screen review (3 Nov 2026): the first debate's report is older than its map (dig-f19), and its main answer is rewritten (dig-f1).
       "v4.rewrite.reportOlder", "v4.rewrite.updateReport", "v4.rewrite.changedSinceYourReport", "v4.mainAnswer.writing", "v4.digsDid.news.ANSWER",
-      "v4.rewrite.state.WRITING", "v4.nest.level", "v4.nest.digHereToo", "v4.room.startShare", "v4.money.startsWait.PERSON_DAY",
+      "v4.rewrite.state.WRITING", "v4.nest.level", "v4.dig.chooseWhat", "v4.room.startShare", "v4.money.startsWait.PERSON_DAY",
       "v4.money.borrowed.PERSON_DAY", "v4.money.paused", "v4.money.pausedReady", "v4.money.continue", "v4.debate.state.PAUSED_MONTH"
     ];
     expect(words.filter((key) => !(key in catalog))).toEqual([]);

@@ -37,6 +37,9 @@ export type DigUndoResult =
 
 export type DigUndoPhase = "COUNTING" | "SENDING" | "STARTED" | "REFUSED" | "CANCELLED";
 
+/** The quota window a dig's share is of (lib/v4/money.ts SharePeriod). */
+export type DigSharePeriod = "PERSON_DAY" | "PERSON_WEEK" | "PERSON_MONTH";
+
 export type DigUndoEntry = Readonly<{
   id: number;
   /** The debate the dig digs into. */
@@ -48,6 +51,11 @@ export type DigUndoEntry = Readonly<{
   targetKey: string;
   /** The share of today the room read said for this dig when it was pressed (null: none said). Never worked out here. */
   sharePercent: number | null;
+  /**
+   * public-f14 / map-f33 (owner's screen review, 3 Nov): the window that share is of, when it is not today ("of this
+   * month" on Free). Absent: today, as before.
+   */
+  sharePeriod?: DigSharePeriod;
   /** Owner N13: false on Free, which has no Quick look / Thorough choice, so no mode word is shown. */
   showMode: boolean;
   phase: DigUndoPhase;
@@ -65,6 +73,7 @@ export type AddDigInput = Readonly<{
   runIds: readonly string[];
   dig: PendingDig;
   sharePercent: number | null;
+  sharePeriod?: DigSharePeriod;
   showMode: boolean;
   send: (dig: PendingDig) => Promise<DigUndoResult>;
   /** The plain line for a send that never answered ("We couldn't start this dig. Please try again."). */
@@ -221,6 +230,7 @@ export function addDig(input: AddDigInput): number {
     dig: input.dig,
     targetKey: digTargetKey(input.dig.target),
     sharePercent: input.sharePercent,
+    ...(input.sharePeriod === undefined ? {} : { sharePeriod: input.sharePeriod }),
     showMode: input.showMode,
     phase: "COUNTING",
     period: input.period ?? "today",

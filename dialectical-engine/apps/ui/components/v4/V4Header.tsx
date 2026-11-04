@@ -2,17 +2,17 @@
 
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode } from "react";
-import { contractClient } from "@/lib/api";
-import { readBillingUsage, type BillingUsage } from "@/lib/billing/usage";
+import type { BillingUsage } from "@/lib/billing/usage";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { levelHref } from "@/lib/v4/storage";
 import { READING_LEVELS, type ReadingLevel } from "@/lib/v4/types";
+import { V4QuotaPill } from "./V4QuotaPill";
 
 /*
  * V4 initial (spec "/v4", header everywhere): brand + badge to /v4, the reading level as a small menu (changing it
  * saves it, through the page's onReadingLevel; the level lives in the address, FIXES Decision A), the classic-view
  * link and the page's own extras. The quota is shown only as "N% used" of one window (no prices, no other numbers) and
- * only when the usage read succeeds.
+ * only when the usage read succeeds: the steady pill of V4QuotaPill.tsx (public-d3 A, owner's screen review 3 Nov).
  */
 
 type QuotaScope = BillingUsage["windows"][number]["scope"];
@@ -36,23 +36,6 @@ export function tightestWindow(usage: BillingUsage | null): Readonly<{ scope: Qu
     if (tightest === null || percent > tightest.percent) tightest = Object.freeze({ scope, percent });
   }
   return tightest;
-}
-
-/**
- * The binding window of the person's quota, or null (billing off, local site, read failed, no window). `wanted` false: the
- * page shows no quota, so nothing is read.
- */
-function useTightestWindow(wanted: boolean): ReturnType<typeof tightestWindow> {
-  const [quota, setQuota] = useState<ReturnType<typeof tightestWindow>>(null);
-  useEffect(() => {
-    if (!wanted) return;
-    let active = true;
-    void readBillingUsage(contractClient).then((usage) => {
-      if (active) setQuota(tightestWindow(usage));
-    });
-    return () => { active = false; };
-  }, [wanted]);
-  return wanted ? quota : null;
 }
 
 function ReadingLevelMenu({ catalog, level, onLevel }: Readonly<{
@@ -153,7 +136,6 @@ export function V4Header({ catalog, readingLevel, linkLevel, onReadingLevel, cla
   /** Right-side extras (e.g. the Report button). */
   children?: ReactNode;
 }>) {
-  const quota = useTightestWindow(showQuota);
   return (
     <header className="v4Hdr">
       <Link href={levelHref("/v4", linkLevel === undefined ? readingLevel : linkLevel)} className="v4HdrBrand">
@@ -167,9 +149,7 @@ export function V4Header({ catalog, readingLevel, linkLevel, onReadingLevel, cla
         ) : (
           <ReadingLevelMenu catalog={catalog} level={readingLevel} onLevel={onReadingLevel} />
         )}
-        {quota === null ? null : (
-          <span className="v4HdrAllowance">{t(catalog, `v4.header.used.${quota.scope}`, { percent: quota.percent })}</span>
-        )}
+        <V4QuotaPill catalog={catalog} wanted={showQuota} />
         {classicHref === null ? null : (
           <Link href={classicHref} className="v4Link v4HdrClassic">{t(catalog, "v4.common.classicView")}</Link>
         )}

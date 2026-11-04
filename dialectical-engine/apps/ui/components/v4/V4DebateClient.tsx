@@ -17,7 +17,7 @@ import { RoomNotice } from "@/components/billing/RoomNotice";
 import { V4BottomStack, type V4BarJob } from "@/components/v4/V4BottomStack";
 import { V4ChangesBar } from "@/components/v4/V4ChangesBar";
 import type { V4DigChoice } from "@/components/v4/V4DigSuggest";
-import { digHereLabel, V4DigTray } from "@/components/v4/V4DigTray";
+import { V4DigTray } from "@/components/v4/V4DigTray";
 import { V4DigNotes, V4DigStartingLine } from "@/components/v4/V4DigUndo";
 import { V4FailedScreen } from "@/components/v4/V4FailedScreen";
 import { V4Header } from "@/components/v4/V4Header";
@@ -29,6 +29,7 @@ import { V4PicksClearedNote } from "@/components/v4/V4PicksClearedNote";
 import { digFor, digsUnder, openCount, pathTitle, resolveSelection, selectionIdOf, TitleText, V4MapTree } from "@/components/v4/V4MapTree";
 import { V4Outline } from "@/components/v4/V4Outline";
 import { V4Panel } from "@/components/v4/V4Panel";
+import { useQuestionShare, V4QuestionShareLine, V4TopLine } from "@/components/v4/V4QuestionShare";
 import type { V4ResearchedPress } from "@/components/v4/V4Sources";
 import { V4ChangedSince } from "@/components/v4/V4PathRewrite";
 import { V4AnswerCard, type V4ReportAnswer } from "@/components/v4/V4AnswerCard";
@@ -51,11 +52,10 @@ import { effectiveDigMode } from "@/lib/v4/askConfig";
 import { askAgainHref } from "@/lib/v4/failedRun";
 import { digLinksFor, digParentOf, mergeIndex, readQuestionIndex, type IndexEntry } from "@/lib/v4/digIndex";
 import { useClaimDigNotes, waitingDigFor } from "@/lib/v4/digUndo";
-import { shareFor, startedThisVisit, useDigQueue } from "@/lib/v4/useDigQueue";
+import { startedThisVisit, useDigQueue } from "@/lib/v4/useDigQueue";
 import { useFailedDigs } from "@/lib/v4/useFailedDigs";
 import { useUnseenSaving, useVisitMemory } from "@/lib/v4/useVisitMemory";
 import { selectedDigOf, usePausedBarJob } from "@/lib/v4/usePausedBarJob";
-import { clockText } from "@/lib/v4/stateWords";
 import {
   addToResearched, loadAnswer, loadDigTrail, loadDigView, loadStory, loadV4, storyReadFailed, type DigTrail, type V4Load
 } from "@/lib/v4/load";
@@ -64,13 +64,17 @@ import { buildV4Map, rewriteByDig, rewriteWaiting, uniqueOpenQuestions } from "@
 import {
   borrowLines,
   continueRun,
-  digShareLine,
+  limitLine,
   monthPauseOf,
   readBorrowed,
-  startsWaitLine,
   type ContinueOutcome,
   type MoneyLine
 } from "@/lib/v4/money";
+import { clock24 } from "@/lib/v4/clock";
+import type { V4DigQuota } from "@/lib/v4/digQuota";
+import { useQuotaRefresh } from "@/lib/v4/quotaPulse";
+import { useDigQuota } from "@/lib/v4/useDigQuota";
+import { useQuotaMoments } from "@/lib/v4/useQuotaMoments";
 import { pausedDigCount, pauseOfDig, pauseOfRun } from "@/lib/v4/monthPause";
 import {
   addPick,
@@ -222,9 +226,9 @@ function useLayout(): Layout {
   return layout;
 }
 
-/** "14:31" in the page's language (journey-f15/f16: the one V4 clock form), or null when the time cannot be read. */
+/** "HH:MM" in the page's language on the 24-hour clock (journey-f15, lib/v4/clock.ts), or null when unreadable. */
 function clockTime(iso: string | null | undefined, locale: string): string | null {
-  return typeof iso === "string" ? clockText(iso, locale) : null;
+  return typeof iso === "string" ? clock24(iso, locale) : null;
 }
 
 function isRunning(dig: DigView): boolean {
@@ -279,6 +283,49 @@ function targetOf(map: V4Map, digs: readonly DigView[], selection: V4Selection, 
     return mine === null ? null : { target: mine, again: false };
   }
   return null;
+}
+
+/**
+ * journey-d3 / dig-f31 (owner's screen review, 3 Nov): the phone's pinned bar. On a path with nothing picked on it,
+ * "Choose what to dig ›" takes the person to the path's choices first, so a whole path is never dug before they have
+ * seen them and the share; once shown (`choicesSeen`), the bar digs the whole path ("Dig here · up to 4%"). With picks
+ * there, it digs them ("Dig into your pick · up to 3%"); an open question's own screen digs that one question. While new
+ * digs wait for a reset the button stays, greyed with the reset time, and pressing it shows the line that says why.
+ */
+function phoneBarJob(phone: PhoneTarget, quota: V4DigQuota, catalog: MessageCatalog, onDig: () => void,
+  show: (place: "choices" | "dig") => void, choicesSeen: boolean): V4BarJob {
+  if (phone.target.kind === "path" && !choicesSeen) {
+    return { kind: "choose", label: t(catalog, "v4.dig.chooseWhat"), onChoose: () => show("choices") };
+  }
+  return quota.waitLine === null
+    ? { kind: "dig", label: quota.label(phone.target), onDig }
+    : { kind: "dig", label: quota.label(phone.target), onDig: () => show("dig"), waiting: true };
+}
+
+/** dig-f5: the place the person's picks wait on, named, and the way to it; null while nothing is picked. */
+function picksPlaceOf(map: V4Map, draft: V4DigDraft, catalog: MessageCatalog,
+  select: (selection: V4Selection, viaKeyboard: boolean) => void): Pick<V4DigChoice, "picksPlace"> | null {
+  if (draft.picks.length === 0) return null;
+  const path = draft.group === null ? null : map.paths.find((candidate) => candidate.id === draft.group) ?? null;
+  if (draft.group !== null && path === null) return null;
+  const title = path === null ? { text: t(catalog, "v4.nest.trailRoot"), ai: false } : pathTitle(path, catalog, 40);
+  return { picksPlace: { title, onGo: () => select(path === null ? "root" : `path:${path.id}`, false) } };
+}
+
+/**
+ * dig-f31: brings the place's choices (a path's "Choose what to dig") or its dig block into view at once, moves focus there
+ * and gives it the shared 1-second highlight (app/v4/v4-base.css). Nothing is dug.
+ */
+function showChoices(column: HTMLElement | null, place: "choices" | "dig"): void {
+  const choices = place === "choices" ? column?.querySelector<HTMLElement>(".v4Sugs") ?? null : null;
+  const target = choices ?? column?.querySelector<HTMLElement>(".v4PanelDig") ?? null;
+  if (target === null) return;
+  if (typeof target.scrollIntoView === "function") target.scrollIntoView({ block: "start" });
+  if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
+  target.focus({ preventScroll: true });
+  target.classList.remove("v4Highlight");
+  void target.offsetWidth;
+  target.classList.add("v4Highlight");
 }
 
 /**
@@ -643,19 +690,40 @@ function V4Debate({
     dig: servedRunId === null || !canDig ? null : { parentRunId: servedRunId, picks: draft.picks.length }
   });
   const planTier = ask.planTier;
-
-  // ── The money rule (owner, 31 Oct): what running work borrowed from tomorrow or next week, read once ────────────
-  const [borrowed, setBorrowed] = useState<readonly UsageBorrow[]>([]);
+  // Owner's screen review (3 Nov): every dig button's quota words, from its own check with the server (dig-f5), read
+  // again after each quota moment (dig-f11); lib/v4/useDigQuota.ts.
+  const digQuota = useDigQuota({
+    room: ask.room, parentRunId: servedRunId === null || !canDig ? null : servedRunId, picks: draft.picks.length,
+    mode: digMode, readingLevel, catalog, locale
+  });
+  const digQuotaRef = useRef(digQuota);
   useEffect(() => {
-    if (!hasLoad) return;
-    let active = true;
+    digQuotaRef.current = digQuota;
+  });
+  // map-f9: "This question: 11% of today", when the run read says it (an optional server field), read again on each moment.
+  const questionShare = useQuestionShare(servedRunId);
+  // dig-f31: the phone place whose choices "Choose what to dig ›" has shown (its bar then digs the whole path).
+  const [choicesShownFor, setChoicesShownFor] = useState<V4Selection | null>(null);
+
+  // ── The money rule (owner, 31 Oct): what running work borrowed from tomorrow or next week; map-f9: read again ─────
+  // after each quota moment and when the person comes back to the tab.
+  const [borrowed, setBorrowed] = useState<readonly UsageBorrow[]>([]);
+  const borrowReads = useRef(0);
+  const readBorrowedNow = useCallback(() => {
+    borrowReads.current += 1;
+    const mine = borrowReads.current;
     void readBorrowed().then((next) => {
-      if (active) setBorrowed(next);
+      if (mine === borrowReads.current) setBorrowed(next);
     });
+  }, []);
+  useEffect(() => {
+    if (!hasLoad) return undefined;
+    readBorrowedNow();
     return () => {
-      active = false;
+      borrowReads.current += 1;
     };
-  }, [hasLoad]);
+  }, [hasLoad, readBorrowedNow]);
+  useQuotaRefresh(readBorrowedNow, hasLoad);
 
   // ── Digs: the ones started in this visit (memory) merged with the recorded ones and the ones found by text ──────
   const [visitLinks, setVisitLinks] = useState<readonly DigLink[]>(() => [...startedThisVisit.values()].map((entry) => entry.link));
@@ -692,6 +760,8 @@ function V4Debate({
   useEffect(() => {
     digsLiveRef.current = links.some((link) => !isFinal(statuses.get(link.childRunId)));
   }, [links, statuses]);
+  // wait-f22 / map-f9: the answer arriving, a dig starting and a dig finishing are quota moments: the figures read again.
+  useQuotaMoments({ running: load?.kind === "RUN" && served === null, served: served !== null, digs });
 
   // One loop per debate, one round of reads in flight; a new link "kicks" it instead of starting a second loop.
   const digLoop = useRef<Readonly<{ kick: () => void; seenKey: () => string }> | null>(null);
@@ -947,9 +1017,11 @@ function V4Debate({
       },
       onRemovePick: (key: string) => commitDraft(removePick(draftRef.current, key)),
       onClear: clearPicks,
-      typed
+      typed,
+      // dig-f5: where the picks wait, by name, with [Go to them] (the path, or the main question for its own open questions).
+      ...(picksPlaceOf(map, draft, catalog, select) ?? {})
     };
-  }, [map, draft, planTier, canDig, isDigMap, digs, commitDraft, clearPicks, typed]);
+  }, [map, draft, planTier, canDig, isDigMap, digs, commitDraft, clearPicks, typed, catalog, select]);
   // ── The dig flow (dig-d3 B, owner pick 3 Nov): lib/v4/useDigQueue.tsx ──────────────────────────────────────────
   // A dig waiting out its 10 seconds belongs to the whole V4 site, not to this page (lib/v4/digUndo.ts, memory only): it
   // keeps its own Undo when the person digs again or opens another page, and the other dig buttons stay active. Its
@@ -959,7 +1031,7 @@ function V4Debate({
   // The debates above this one (top first): their report pages wait for a dig sent from here too (ruling F7).
   const aboveRunIds = useMemo(() => trail?.steps.map((step) => step.runId) ?? [], [trail]);
   const digQueue = useDigQueue({
-    map, canDig, servedRunId, servedQuestionLine, aboveRunIds, room: ask.room, planTier, sentDigMode, draftRef, commitDraft,
+    map, canDig, servedRunId, servedQuestionLine, aboveRunIds, digQuotaRef, planTier, sentDigMode, draftRef, commitDraft,
     setVisitLinks, ask, onCounting: dismissPicksUndo, catalog, homeCatalog, locale, crisisCountryHint
   });
   const { waitingDigs, queueDig, startDig, undoDig } = digQueue;
@@ -1265,10 +1337,13 @@ function V4Debate({
   // The map as shown: its star moved off what is dug (map-f5). Everything else reads the same map.
   const view = shownMap ?? map;
   const openLeft = openCount(view, digs);
-  const room = ask.room;
+  // The room read the dig buttons work from: the page's own, or the newer one read after a quota moment (useDigQuota).
+  const room = digQuota.room;
   // The money rule: new starts waiting for the reset get their own line (with the time) in place of today's notice.
-  const startsWait = startsWaitLine(room, locale);
-  const money: readonly MoneyLine[] = [digShareLine(room), startsWait].filter((line): line is MoneyLine => line !== null);
+  // public-f24: the one V4 line whichever server switch is in force. dig-f5 / public-d3 A: a dig's share is on its own
+  // button (digQuota), in no other line.
+  const startsWait = limitLine(room, locale);
+  const money: readonly MoneyLine[] = startsWait === null ? [] : [startsWait];
   const roomNotice = startsWait === null && room !== null
     && (room.room === "CLOSE" || room.room === "FULL" || room.room === "ALREADY_WAITING")
     ? <RoomNotice room={room} catalog={{ ...newDebateCatalog, ...billingCatalog }} locale={locale} />
@@ -1277,12 +1352,17 @@ function V4Debate({
   // dig-f17 / dig-f29 (the map track): the slim report line follows the page's report moment, the corrected rule.
   const goodTime = moment === "GOOD";
   // journey-d3: the pinned bar's one job. A place whose dig waits has its Undo in the note above the bar instead.
-  // journey-d3 / journey-f13: "Dig here · about 3%" (the share only when the room read is for this dig).
+  // journey-d3 / dig-f31: the bar's dig job ("Choose what to dig ›" first on a whole path, then "Dig here · up to 4%"; with
+  // picks "Dig into your pick · up to 3%"), greyed with the reset time while new digs wait (dig-f11). A paused dig open in
+  // the panel gives the bar its Continue instead.
   const phoneJob: V4BarJob = pausedBar !== null
     ? pausedBar
     : phoneTarget !== null
       ? waitingDigFor(waitingDigs, servedRunId, phoneTarget.target) === null
-        ? { kind: "dig", label: digHereLabel(shareFor(phoneTarget.target, draft, room), catalog), onDig: () => startDig(phoneTarget.target) }
+        ? phoneBarJob(phoneTarget, digQuota.quota, catalog, () => startDig(phoneTarget.target), (place) => {
+          showChoices(panelColRef.current, place);
+          if (place === "choices") setChoicesShownFor(shownSelection);
+        }, choicesShownFor === shownSelection)
         : { kind: "none" }
       : goodTime ? { kind: "report", href: reportHref } : { kind: "none" };
 
@@ -1341,7 +1421,7 @@ function V4Debate({
       planTier={planTier}
       sentDigMode={sentDigMode}
       money={money}
-      sharePercent={shareFor(trayTarget, draft, room)}
+      quota={digQuota.quota}
       onDig={() => startDig(trayTarget)}
       onClear={clearPicks}
       clearRef={trayClearRef}
@@ -1395,6 +1475,8 @@ function V4Debate({
       {/* UI-6: while the phone map is open, everything behind it is inert (the sheet is a real modal). */}
       <div className="v4DebBehind" inert={sheetOpen}>
         {header}
+        {/* map-f9: the top bar's question on one line and what this question has used (the phone: below and in its bar). */}
+        {layout === "phone" ? null : <V4TopLine question={ownWords(map.question)} share={questionShare} catalog={catalog} />}
         {layout === "mid" ? rail("strip") : null}
         {/* map-f7 / map-d3 B: on the phone, where you are stays pinned under the header, with the live minimap. */}
         {layout === "phone" ? (
@@ -1448,6 +1530,14 @@ function V4Debate({
           />
           {/* W3-4: the deepest level offers no dig anywhere on its map; this line says so once, at the top. */}
           {canDig ? null : <p className="v4DebNote v4DebDeepest" role="note">{t(catalog, "v4.nest.deepest")}</p>}
+          {/* map-f9: on the phone, "This question: …" on the question's own screen, and the borrow notices on every other
+              screen too (the question's screen has them in its notes). */}
+          {layout === "phone" && rootShown ? <V4QuestionShareLine share={questionShare} catalog={catalog} /> : null}
+          {layout === "phone" && !rootShown && borrowed.length > 0 ? (
+            <div className="v4DebRailUsage v4DebPhoneUsage" role="status">
+              {borrowLines(borrowed).map((note) => <p key={note.key} className="v4DebRailUsageNote">{t(catalog, note.key, note.values)}</p>)}
+            </div>
+          ) : null}
 
           {/* map-f23: on the phone's "Your question", the paths looked into come right under the answer. */}
           {layout === "phone" && rootShown ? (
@@ -1500,6 +1590,7 @@ function V4Debate({
                 researchedPresses={researchedPresses}
                 roomNotice={roomNotice}
                 money={money}
+                digQuota={digQuota.quota}
                 digPathLine={trail?.steps.at(-1)?.line ?? null}
                 reportAnswer={reportAnswer}
                 answerOnTop
@@ -1533,6 +1624,8 @@ function V4Debate({
           job={phoneJob}
           goodTime={goodTime}
           reportHref={reportHref}
+          {...(layout === "phone" && !rootShown && questionShare !== null
+            ? { status: <V4QuestionShareLine share={questionShare} catalog={catalog} /> } : {})}
           catalog={catalog}
         />
       )}

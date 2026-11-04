@@ -7,7 +7,8 @@ import { t, type MessageCatalog } from "@/lib/i18n/translate";
 /*
  * V4 UX fixes (owner picks 3 Nov: journey-d3 A, dig-f16, dig-f17): the bottom of the map page is ONE stack that measures
  * itself, so nothing overlaps and the page's bottom room is the stack's real height (never a guessed 150 px).
- *  - Phone: one pinned bar whose job changes ("Dig here · up to 3%", or "Write my report" when that is the next step),
+ *  - Phone: one pinned bar whose job changes ("Dig into your pick · up to 3%"; dig-f31: with nothing picked, "Choose what
+ *    to dig ›", which goes to the choices; or "Write my report" when that is the next step),
  *    with the Map button. Above it, inside the same surface: the slim "Good time to write your report" line when the rule
  *    fires (dig-f17, with a small × to close it), the Undo and ready notes for their few seconds (never floating over
  *    anything), and the picks folded to one line ("Your picks ▸", which opens them); a tour's pinned bar sits right
@@ -17,7 +18,13 @@ import { t, type MessageCatalog } from "@/lib/i18n/translate";
  */
 
 export type V4BarJob =
-  | Readonly<{ kind: "dig"; label: string; onDig: () => void }>
+  /**
+   * `waiting` (dig-f11, owner's screen review 3 Nov): new digs wait for a reset, so the button stays where it is, greyed,
+   * its label carrying the reset time; pressing it shows why (the panel's line above).
+   */
+  | Readonly<{ kind: "dig"; label: string; onDig: () => void; waiting?: boolean }>
+  /** dig-f31: with nothing picked, "Choose what to dig ›" takes the person to the choices instead of digging at once. */
+  | Readonly<{ kind: "choose"; label: string; onChoose: () => void }>
   | Readonly<{ kind: "report"; href: string }>
   /** wait-f2: "Paused · Continue" (after the reset) or "Paused · Continues on 1 Dec" (before it; nothing to press). */
   | Readonly<{ kind: "paused"; label: string; continueLabel: string | null; untilLabel: string | null; busy: boolean; onContinue: () => void }>
@@ -90,6 +97,8 @@ export function V4BottomStack(props: Readonly<{
   job?: V4BarJob;
   /** dig-f17: the report rule fired (the page's report moment, dig-f29: lib/v4/mapLooks.ts reportMoment). */
   goodTime: boolean;
+  /** Phone (map-f9): one quiet line in the bar, "This question: 11% of today", on the screens other than the question's. */
+  status?: ReactNode;
   reportHref: string;
   catalog: MessageCatalog;
 }>) {
@@ -152,6 +161,7 @@ export function V4BottomStack(props: Readonly<{
         ) : null}
       </div>
       {props.pinned ?? null}
+      {props.status ?? null}
       <div className="v4DebPhoneBar">
         <button ref={props.mapButtonRef} type="button" className="v4Btn v4DebPhoneMap" onClick={props.onMap} aria-haspopup="dialog">
           {t(catalog, "v4.debate.mapButton")}
@@ -160,7 +170,8 @@ export function V4BottomStack(props: Readonly<{
           <button
             ref={props.jobRef as RefObject<HTMLButtonElement | null> | undefined}
             type="button"
-            className="v4Btn v4BtnPrimary v4DebPhoneDig"
+            className={`v4Btn v4BtnPrimary v4DebPhoneDig${job.waiting === true ? " v4DigWaiting" : ""}`}
+            aria-disabled={job.waiting === true ? "true" : undefined}
             onClick={job.onDig}
           >
             {job.label}
@@ -185,6 +196,16 @@ export function V4BottomStack(props: Readonly<{
               </>
             ) : job.untilLabel !== null ? <span className="v4Muted">{` · ${job.untilLabel}`}</span> : null}
           </p>
+        ) : null}
+        {job.kind === "choose" ? (
+          <button
+            ref={props.jobRef as RefObject<HTMLButtonElement | null> | undefined}
+            type="button"
+            className="v4Btn v4BtnPrimary v4DebPhoneDig v4DebPhoneChoose"
+            onClick={job.onChoose}
+          >
+            {job.label}
+          </button>
         ) : null}
         {job.kind === "report" ? (
           <Link

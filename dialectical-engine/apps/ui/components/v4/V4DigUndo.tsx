@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { digTargetQuestions } from "@/lib/v4/askText";
+import { clock24 } from "@/lib/v4/clock";
 import {
   digGroupOf,
   dismissDig,
@@ -15,7 +16,6 @@ import {
   type DigUndoEntry
 } from "@/lib/v4/digUndo";
 import { cardLabel, firstByOf } from "@/lib/v4/mapLooks";
-import { clockText } from "@/lib/v4/stateWords";
 import type { DigTarget } from "@/lib/v4/types";
 import { V4UndoNote, V4UndoNotes, type V4UndoNoteState } from "./V4UndoNote";
 
@@ -67,7 +67,16 @@ function withQuestion(sentence: string, target: DigTarget): ReactNode {
 
 /** journey-f15 / f16: one way to write a time on every V4 page ("Started 14:31"). */
 function clock(iso: string, locale: string): string {
-  return clockText(iso, locale) ?? "";
+  return clock24(iso, locale) ?? "";
+}
+
+/**
+ * The window the note's share is of (public-f14, map-f33): the one the server named for the pressed button when it named
+ * one, else the page's own rule (Free's month, every other plan's day).
+ */
+function digShareKey(entry: DigUndoEntry): string {
+  const window = entry.sharePeriod ?? (entry.period === "month" ? "PERSON_MONTH" : "PERSON_DAY");
+  return window === "PERSON_DAY" ? "v4.undo.digShare" : `v4.undo.digShare.${window}`;
 }
 
 /** "Digging into “…” and 1 more · Thorough · up to 4% of today" (journey-f8: "of this month" on Free). */
@@ -80,7 +89,7 @@ function digLabel(entry: DigUndoEntry, catalog: MessageCatalog, locale: string):
       {more > 0 ? <>{" "}{tPlural(catalog, "v4.dig.andMore", more, locale)}</> : null}
       {entry.showMode ? <span className="v4UndoMode">{" · "}{t(catalog, `v4.digMode.${mode}`)}</span> : null}
       {entry.sharePercent !== null && entry.sharePercent > 0
-        ? <>{" · "}{t(catalog, entry.period === "month" ? "v4.undo.digShareMonth" : "v4.undo.digShare", { percent: entry.sharePercent })}</>
+        ? <>{" · "}{t(catalog, digShareKey(entry), { percent: entry.sharePercent })}</>
         : null}
     </>
   );

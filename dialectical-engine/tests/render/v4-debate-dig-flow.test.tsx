@@ -55,7 +55,7 @@ describe("V4DebateClient's dig flow", () => {
     // The room read is for this dig, so it can say the dig's share of today.
     expect(harness.digRooms.at(-1)).toEqual({ parentRunId: runId, picks: 3 });
 
-    await click(buttonNamed(word("v4.dig.trayDig.other", { count: 3 }), tray()!));
+    await click(buttonNamed(CATALOG["v4.dig.trayDigThese"]!, tray()!));
     await advance(9_500);
     expect(harness.submit).not.toHaveBeenCalled();
     await advance(600);
@@ -90,8 +90,8 @@ describe("V4DebateClient's dig flow", () => {
     expect(text()).toContain(CATALOG["v4.dig.started"]!.split("{time}")[1]);
     expect(panel().classList.contains("v4Panel-path")).toBe(true);
     expect(branch(PATHS.renew).querySelector(".v4MapDig")).not.toBeNull();
-    // A path that now has a dig offers "Dig here too".
-    expect(buttonsNamed(CATALOG["v4.nest.digHereToo"]!, branch(PATHS.renew))).toHaveLength(1);
+    // A path that now has a dig offers a way to dig there again (journey-f13: "Choose what to dig ›", not "Dig here too").
+    expect(buttonsNamed(CATALOG["v4.dig.chooseWhat"]!, branch(PATHS.renew))).toHaveLength(1);
   });
 
   it("a whole path dug as before sends its place and no picks", async () => {
@@ -135,7 +135,8 @@ describe("V4DebateClient's dig flow", () => {
     // map-f22: the path's suggestions show once its leaves are unfolded (about 12 cards at once).
     await expandBranch(PATHS.renew);
     await click(branch(PATHS.renew).querySelector<HTMLInputElement>(".v4MapLeafSuggestion input[type=checkbox]")!);
-    await click(buttonNamed(CATALOG["v4.panel.dig"]!, tray()!));
+    // journey-f13 / dig-f5: the tray's one pick reads "Dig into your pick".
+    await click(buttonNamed(CATALOG["v4.dig.yourPicks.one"]!, tray()!));
     await advance(10_100);
     await settle();
     expect(text()).toContain(CATALOG["v4.nest.tooDeep"]);
@@ -150,7 +151,7 @@ describe("V4DebateClient's dig flow", () => {
       // map-f22: the path's suggestions show once its leaves are unfolded (about 12 cards at once).
       await expandBranch(PATHS.renew);
       await click(branch(PATHS.renew).querySelector<HTMLInputElement>(".v4MapLeafSuggestion input[type=checkbox]")!);
-      await click(buttonNamed(CATALOG["v4.panel.dig"]!, tray()!));
+      await click(buttonNamed(CATALOG["v4.dig.yourPicks.one"]!, tray()!));
       await advance(10_100);
       await settle();
       expect(text()).toContain(word(key, values));

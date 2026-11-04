@@ -10,7 +10,9 @@ import { crisisWordsOf, digQuestion, digTargetQuestions, ownWords } from "./askT
 import {
   addDig, DIG_UNDO_MS, readDigUndo, undoDig as undoWaitingDig, useDigUndo, waitingDigFor, type DigUndoEntry, type DigUndoResult
 } from "./digUndo.js";
+import type { V4DigQuota } from "./digQuota.js";
 import { firstByOf } from "./mapLooks.js";
+import { sharePeriodOf } from "./money.js";
 import { askParentOf, placesOf, removePick } from "./suggestions.js";
 import type { DigLink, DigMode, DigTarget, PendingDig, V4DigDraft, V4Map } from "./types.js";
 import { rememberSentDig } from "./useSentDigs.js";
@@ -39,16 +41,6 @@ export type VisitDig = Readonly<{ link: DigLink; parentQuestion: string }>;
  */
 export const startedThisVisit = new Map<string, VisitDig>();
 
-/**
- * dig-f8: the share the room read said for this dig. The read is for the person's picks when there are some, else for
- * one whole path or open question (W3-4), so a dig of anything else gets no share rather than another dig's.
- */
-export function shareFor(target: DigTarget, draft: V4DigDraft, room: AskRoom | null): number | null {
-  const percent = room?.dig_share_percent;
-  if (percent === undefined || percent === null || percent <= 0) return null;
-  return (draft.picks.length > 0) === (target.kind === "picks") ? percent : null;
-}
-
 type DigAsk = Pick<ReturnType<typeof useV4Ask>, "submit" | "ensureConsent">;
 
 const STOPPED: DigUndoResult = Object.freeze({ kind: "STOPPED" });
@@ -72,7 +64,11 @@ export function useDigQueue(input: Readonly<{
   servedQuestionLine: string | null;
   /** The debates above this one (top first): their report pages wait for a dig sent from here too (ruling F7). */
   aboveRunIds: readonly string[];
-  room: AskRoom | null;
+  /**
+   * The dig buttons' quota (lib/v4/useDigQuota.ts), read at the press: the pressed button's own share (dig-f5), the window
+   * it is of (public-f14), and whether new digs wait for a reset (dig-f11: then nothing starts).
+   */
+  digQuotaRef: Readonly<{ current: Readonly<{ quota: V4DigQuota; room: AskRoom | null }> }>;
   planTier: "free" | "premium";
   /** The Quick look / Thorough choice a new dig is sent with (owner N13: always quick on Free). */
   sentDigMode: DigMode;
@@ -88,7 +84,7 @@ export function useDigQueue(input: Readonly<{
   crisisCountryHint: string | null;
 }>): DigQueue {
   const {
-    map, canDig, servedRunId, servedQuestionLine, aboveRunIds, room, planTier, sentDigMode, draftRef, commitDraft,
+    map, canDig, servedRunId, servedQuestionLine, aboveRunIds, digQuotaRef, planTier, sentDigMode, draftRef, commitDraft,
     setVisitLinks, ask, onCounting, catalog, homeCatalog, locale, crisisCountryHint
   } = input;
   const mounted = useRef(true);
@@ -176,6 +172,9 @@ export function useDigQueue(input: Readonly<{
     // One waiting dig per place: its buttons say it is starting, with its Undo, instead of starting a second one. The live
     // list is read (not this render's copy), so a quick second press never starts a second dig.
     if (waitingDigFor(readDigUndo(), servedRunId, dig.target) !== null) return;
+    // dig-f11: while new digs wait for a reset, nothing starts (the buttons say so, greyed, with the reset time).
+    const quota = digQuotaRef.current;
+    if (quota.quota.waitLine !== null) return;
     const parentRunId = servedRunId;
     const parentQuestionLine = servedQuestionLine;
     // V, 2026-09-30: the person's own views read as a person in crisis: the help numbers now, and no dig.
@@ -186,14 +185,18 @@ export function useDigQueue(input: Readonly<{
     }
     // V, 2026-09-29: the one-time consent, asked while this page can show it; the send waits for the answer.
     const consent = askConsent();
+    const sharePeriod = sharePeriodOf(quota.room);
     const id = addDig({
       parentRunId,
       runIds: aboveRunIds,
       dig,
-      sharePercent: shareFor(dig.target, draftRef.current, room),
+      // dig-f5 / dig-f8: the note repeats the share of the button that was pressed, of its own window (public-f14:
+      // Free's is of this month; the server may name another, map-f33).
+      sharePercent: quota.quota.share(dig.target),
+      ...(sharePeriod === "PERSON_DAY" ? {} : { sharePeriod }),
       showMode: planTier !== "free",
       // journey-f8: Free's share is of this month.
-      period: planTier === "free" ? "month" : "today",
+      period: sharePeriod === "PERSON_MONTH" ? "month" : "today",
       // The page may be gone by then: the send works from its last state (useV4Ask reads through refs).
       send: async (waiting) => ((await consent) ? sendRef.current(waiting, parentRunId, parentQuestionLine) : STOPPED),
       failedLine: t(catalog, "v4.dig.failed"),
@@ -203,7 +206,7 @@ export function useDigQueue(input: Readonly<{
     void consent.then((agreed) => {
       if (!agreed) undoWaitingDig(id);
     });
-  }, [map, canDig, servedRunId, servedQuestionLine, aboveRunIds, room, planTier, catalog, draftRef, askConsent]);
+  }, [map, canDig, servedRunId, servedQuestionLine, aboveRunIds, digQuotaRef, planTier, catalog, askConsent]);
 
   const startDig = useCallback((target: DigTarget): void => {
     queueDig({ target, mode: sentDigMode, sendsAt: Date.now() + DIG_UNDO_MS });

@@ -150,6 +150,13 @@ The shapes are the contract's (`packages/contract/src/web.ts`, merged in W2-7), 
 | `GET /v1/runs/:id` | `quota_used` (owner review 3 Nov; NOT in the contract yet) | on a failed run: `NONE` (nothing was taken from the person's quota) or `SOME`. Only the draft view shows it; the website says "Nothing was taken" once the contract carries it |
 | `POST /v1/runs/:id/continue` | (draft route) | 409 `RUN_PAUSED_UNTIL_RESET` before the month reset, 200 `{"state":"CONTINUING"}` after it (switch `pause=CAN_CONTINUE`); setting `pause=` again pauses the run again |
 
+**The quota's windows (owner's screen review, 3 Nov 2026: read-f19, public-f14, map-f33, map-f9):** two more fields that are NOT in the contract yet, so, like `started_at`, they are sent on the draft view (`/__mock/draft/v1/…`) and on the normal view only once the contract's own (strict) schema accepts them (they never make a read fall back and lose its shares or its month pause):
+
+| Where | Field | What it holds |
+|---|---|---|
+| `GET /v1/asks/room` | `share_scope` | the window the read's share (`start_share_percent` or `dig_share_percent`) is measured against, the one that will actually stop the person: `PERSON_MONTH` on Free (`plan=FREE`), `PERSON_DAY` otherwise. The website then says "of this month" / "of this week"; without it, it says what the server measures today (Free: the month, else today) |
+| `GET /v1/runs/:id` | `question_share` | on a running or settled run: `{ scope, percent }`, what this question (with its digs) has used of that window (11% in the mock), for the map's "This question: 11% of today" |
+
 **The waiting card's start time (owner's screen review, 3 Nov 2026, journey-d2):** `GET /v1/runs/:id` may carry `started_at`, when the question started (ISO), so the card says "Started 14:31" on any device and after a reload. It is NOT in the contract yet (the run read's schema is strict), so today it is sent only on the draft view (`/__mock/draft/v1/runs/:id`), and on the normal view only once the contract's own schema accepts it. Seeded: the running run `2222…` (started 4 minutes before the mock), the paused run `e100…`, every settled run and every new ask that runs; a run waiting to start (`3333…`) has none.
 
 Every dig keeps its points and its answer text (owner Q-D13). The mock's digs still have a story, but since task W4-6 the website never reads a dig's story: a dig's map is drawn from its rewrite's own paths (each with its line and fate), or from the positions it argued while its rewrite is still being written.

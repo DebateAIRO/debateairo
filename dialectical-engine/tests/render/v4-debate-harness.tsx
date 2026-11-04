@@ -5,7 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { vi } from "vitest";
 import * as fixture from "../../apps/ui/lib/v3/storyFixture.js";
 import type { AskRoom } from "../../apps/ui/lib/billing/room.js";
-import type { ContinueOutcome } from "../../apps/ui/lib/v4/money.js";
+import type { ContinueOutcome, QuestionShare } from "../../apps/ui/lib/v4/money.js";
 import { resetDigUndo } from "../../apps/ui/lib/v4/digUndo.js";
 import type { DigTrail } from "../../apps/ui/lib/v4/load.js";
 import type { DigLink, DigView, ReadingLevel, SeenSnapshot } from "../../apps/ui/lib/v4/types.js";
@@ -87,7 +87,19 @@ export const harness = {
   /** map-f6: the debate's read never answers (the page shows its outline). */
   loadPending: false,
   /** map-f6: the account's reading level (null: none kept); a promise that never settles keeps it unknown. */
-  accountLevel: null as Promise<ReadingLevel | null> | null
+  accountLevel: null as Promise<ReadingLevel | null> | null,
+  /**
+   * Owner's screen review (3 Nov, dig-f5): the share the second room read says for a whole dig while picks wait (null:
+   * none); every query it was asked with, newest last.
+   */
+  wholeShare: null as number | null,
+  digShareReads: [] as unknown[],
+  /** dig-f11 / map-f9: what the dig's room read says when it is read again after a quota moment (null: the read fails). */
+  roomAgain: null as AskRoom | null,
+  /** How many times the dig's room read was asked again (each quota moment, each return to the tab). */
+  roomAgainReads: 0,
+  /** map-f9: the run read's "This question" share (null: the server does not say it). */
+  questionShare: null as QuestionShare | null
 };
 
 export function resetHarness(): void {
@@ -116,6 +128,11 @@ export function resetHarness(): void {
   harness.loadError = null;
   harness.loadPending = false;
   harness.accountLevel = null;
+  harness.wholeShare = null;
+  harness.digShareReads = [];
+  harness.roomAgain = null;
+  harness.roomAgainReads = 0;
+  harness.questionShare = null;
 }
 resetHarness();
 
@@ -184,7 +201,20 @@ export function accountMemoryMock(original: Record<string, unknown>) {
   };
 }
 export function moneyMock(original: Record<string, unknown>) {
-  return { ...original, readBorrowed: async () => harness.borrowed, continueRun: (runId: string) => harness.continueRun(runId) };
+  return {
+    ...original,
+    readBorrowed: async () => harness.borrowed,
+    continueRun: (runId: string) => harness.continueRun(runId),
+    readDigShare: async (query: unknown) => {
+      harness.digShareReads.push(query);
+      return harness.wholeShare;
+    },
+    readDigRoom: async () => {
+      harness.roomAgainReads += 1;
+      return harness.roomAgain;
+    },
+    readQuestionShare: async () => harness.questionShare
+  };
 }
 
 // ── Mounting ──────────────────────────────────────────────────────────────────────────────────────────────────────

@@ -101,7 +101,7 @@ describe("the breadcrumb on a dig's map", () => {
 });
 
 describe("a dig's own map", () => {
-  it("shows every path of the dig with its label and no outcome tag, and offers \"Dig here too\" on each", async () => {
+  it("shows every path of the dig with its label and no outcome tag, and offers a way to dig again on each", async () => {
     seedTrail();
     harness.answer = trailAnswer(DIG_RUNS.levelOne);
     await mountMap(1600, DIG_RUNS.levelOne);
@@ -116,7 +116,7 @@ describe("a dig's own map", () => {
       expect(card.querySelector(".v4MapFate"), `path ${index}`).toBeNull();
       // map-f22: a path's leaves past the first 12 or so cards wait behind its "+N more".
       await expandBranch(index);
-      expect(buttonsNamed(CATALOG["v4.nest.digHereToo"]!, branch(index)), `path ${index}`).toHaveLength(1);
+      expect(buttonsNamed(CATALOG["v4.dig.chooseWhat"]!, branch(index)), `path ${index}`).toHaveLength(1);
     }
     expect(page().querySelectorAll(".v4MapBranch")).toHaveLength(own.length);
     // The deeper rewrite's whole text (the card cuts it), and its line on the card.
@@ -136,20 +136,20 @@ describe("a dig's own map", () => {
     expect(page().querySelectorAll(".v4MapBranch .v4MapFate")).toHaveLength(0);
     for (const index of Object.values(PATHS)) {
       await expandBranch(index);
-      expect(buttonsNamed(CATALOG["v4.nest.digHereToo"]!, branch(index))).toHaveLength(1);
+      expect(buttonsNamed(CATALOG["v4.dig.chooseWhat"]!, branch(index))).toHaveLength(1);
     }
   });
 
-  it("at level 10 says so, and offers no \"Dig here too\" and no dig anywhere", async () => {
+  it("at level 10 says so, and offers no way to dig again and no dig anywhere", async () => {
     seedTrail();
     const runId = DEEPEST_DIG.runRef;
     harness.answer = AnswerSchema.parse(seededAnswer(runId, { dig: DEEPEST_DIG.dig }));
     await mountMap(1600, runId);
     expect(page().querySelector(".v4TrailLevel")!.textContent).toBe(word("v4.nest.level", { n: DIG_LEVEL_MAX }));
     expect(page().textContent).toContain(CATALOG["v4.nest.deepest"]);
-    expect(buttonsNamed(CATALOG["v4.nest.digHereToo"]!)).toHaveLength(0);
+    expect(buttonsNamed(CATALOG["v4.dig.chooseWhat"]!)).toHaveLength(0);
     await openPath(PATHS.renew);
-    expect(buttonsNamed(CATALOG["v4.nest.digHereToo"]!)).toHaveLength(0);
+    expect(buttonsNamed(CATALOG["v4.dig.chooseWhat"]!)).toHaveLength(0);
     expect(buttonsNamed(CATALOG["v4.panel.dig"]!)).toHaveLength(0);
     expect(panel().textContent).toContain(CATALOG["v4.nest.deepest"]);
   });

@@ -136,6 +136,13 @@ export const DraftRunContinueRefusedSchema = RunContinueRefusedSchema;
  * names a full person window and its reset); the rest of the room read is the contract's AskRoomResponseSchema.
  */
 const PERSON_SCOPES = new Set(["PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]);
+/**
+ * The owner's screen review (3 Nov 2026: read-f19, public-f14, map-f33, map-f9): the person window a share is measured
+ * against, the one that will actually stop this person ("of this month" on Free, "of this week" when the week binds).
+ */
+export const DraftShareScopeSchema = z.enum(["PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]);
+/** map-f9: what this question (the debate with its digs) has used of that window, for "This question: 11% of today". */
+export const DraftQuestionShareSchema = z.object({ scope: DraftShareScopeSchema, percent: z.number().int().min(0).max(110) }).strict();
 export const DraftRoomPartSchema = z.looseObject({
   room: z.enum(["FITS", "CLOSE", "FULL", "ALREADY_WAITING"]),
   scope: z.string().nullable(),
@@ -143,7 +150,9 @@ export const DraftRoomPartSchema = z.looseObject({
   dig_share_percent: DigSharePercentSchema.optional(),
   // W2-7 (money rule): a new question's share of today, and new starts waiting for the reset.
   start_share_percent: DigSharePercentSchema.optional(),
-  new_starts: RoomNewStartsSchema.optional()
+  new_starts: RoomNewStartsSchema.optional(),
+  // Owner's screen review (3 Nov): the window the share above is of (DraftShareScopeSchema).
+  share_scope: DraftShareScopeSchema.optional()
 }).superRefine((room, context) => {
   if (room.reserve === "BLOCKED" && (room.room !== "FULL" || !PERSON_SCOPES.has(room.scope ?? ""))) {
     context.addIssue({ code: "custom", message: "BLOCKED names a full person window and its reset" });
@@ -153,6 +162,9 @@ export const DraftRoomPartSchema = z.looseObject({
   }
   if (room.start_share_percent !== undefined && room.dig_share_percent !== undefined) {
     context.addIssue({ code: "custom", message: "a room read estimates a new question or a dig, not both" });
+  }
+  if (room.share_scope !== undefined && room.start_share_percent === undefined && room.dig_share_percent === undefined) {
+    context.addIssue({ code: "custom", message: "share_scope names the window of a share the read carries" });
   }
 });
 
@@ -193,16 +205,16 @@ export function stripAnswer<T extends Json>(answer: T): T {
  * "new starts wait" room is today's FULL (a question waits for that reset).
  */
 export function stripRoom<T extends Json>(room: T): T {
-  const { reserve: _reserve, dig_share_percent: _share, start_share_percent: _start, new_starts: _starts, ...rest } = room;
+  const { reserve: _reserve, dig_share_percent: _share, start_share_percent: _start, new_starts: _starts, share_scope: _scope, ...rest } = room;
   return rest as unknown as T;
 }
 
 /**
  * W2-7: without its month pause, a paused debate reads as today's RUNNING; the draft start time (journey-d2) goes too; without
- * `quota_used`, a failed run says nothing of the quota.
+ * `quota_used`, a failed run says nothing of the quota; without `question_share` (map-f9), the map shows no "This question".
  */
 export function stripRun<T extends Json>(run: T): T {
-  const { month_pause: _pause, started_at: _started, quota_used: _quota, ...rest } = run;
+  const { month_pause: _pause, started_at: _started, quota_used: _quota, question_share: _share, ...rest } = run;
   return rest as unknown as T;
 }
 

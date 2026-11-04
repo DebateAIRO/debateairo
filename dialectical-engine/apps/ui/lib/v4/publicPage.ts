@@ -5,7 +5,7 @@ import {
 import { contractClient } from "../api.js";
 import { t, type MessageCatalog } from "../i18n/translate.js";
 import { digQuestion } from "./askText.js";
-import { startsWaitLine } from "./money.js";
+import { limitLine } from "./money.js";
 import { ownViewPick, publicParentOf } from "./suggestions.js";
 import { TRUST_WORDS, type DigTarget, type TrustCounts, type V4Path } from "./types.js";
 import type { AskRoom } from "../billing/room.js";
@@ -106,9 +106,12 @@ export function publicDigRefusalWords(failure: unknown, catalog: MessageCatalog,
   return null;
 }
 
-/** The site's plain line for a used-up limit, with its time when the room read knows it. */
+/**
+ * The site's plain line for a used-up limit, with its time when the room read knows it. public-f24 (owner's screen review,
+ * 3 Nov): the same V4 line as every other V4 page, whichever server switch is in force (lib/v4/money.ts limitLine).
+ */
 export function usedUpWords(catalog: MessageCatalog, room: AskRoom | null, locale: string): string {
-  const line = startsWaitLine(room, locale);
+  const line = limitLine(room, locale);
   return line === null ? t(catalog, "v4.public.refusal.waitsForReset") : t(catalog, line.key, line.values);
 }
 
