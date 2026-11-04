@@ -1,10 +1,14 @@
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import { howSureKeys } from "@/lib/v4/mapLooks";
 import { TRUST_WORDS, type TrustCounts, type TrustWord } from "@/lib/v4/types";
 
 /*
  * V4 initial (2026-10-28): the four-shade bar (row D decision 2). Sure = solid ink, Sure for the case named = a softer
  * ink, Still argued = gold hatching, Didn't hold = an outline only. Points no second AI checked stay out of the bar
  * (decision 6); they are only named in words.
+ * V4 screen review (3 Nov): map-f28 drops the number captions ("3 sure · 6 sure for the case named · …"): the bar's words
+ * are map-f8's "How sure" sentence, built only from the trust words. dig-d4 B: every word keeps its slot (an empty one
+ * has no width), so when a dig moves the shares the bar on a map card slides to the new ones (v4-map-looks.css).
  */
 
 const SEGMENT_CLASS: Readonly<Record<TrustWord, string>> = {
@@ -22,29 +26,38 @@ export function trustCountWords(counts: TrustCounts, catalog: MessageCatalog): r
   return words.length > 0 ? words : [t(catalog, "v4.trustCount.none")];
 }
 
+/** map-f8: the "How sure" sentence for these counts (no numbers), with the unchecked line when some were not checked. */
+export function howSureSentence(counts: TrustCounts, catalog: MessageCatalog, unchecked = 0): string {
+  return howSureKeys(counts, unchecked).map((key) => t(catalog, key)).join(" ");
+}
+
 export function V4TrustBar(props: Readonly<{
   counts: TrustCounts;
   unchecked?: number;
   catalog: MessageCatalog;
   size?: "small" | "large";
+  /** Shows the bar's words under it: "How sure: …" (map-f8; never a count, map-f28). */
   showCounts?: boolean;
 }>) {
   const { counts, catalog } = props;
   const unchecked = props.unchecked ?? 0;
   const size = props.size ?? "small";
   const total = TRUST_WORDS.reduce((sum, word) => sum + counts[word], 0);
-  const words = [...trustCountWords(counts, catalog)];
-  if (unchecked > 0) words.push(t(catalog, "v4.bar.unchecked", { count: unchecked }));
-  const label = t(catalog, "v4.bar.label", { counts: words.join(", ") });
+  const sentence = howSureSentence(counts, catalog, unchecked);
+  const label = t(catalog, "v4.bar.label", { counts: sentence });
   return (
     <span className={`v4Bar ${size === "large" ? "v4BarLarge" : "v4BarSmall"}`}>
       <span className={total === 0 ? "v4BarTrack v4BarEmpty" : "v4BarTrack"} role="img" aria-label={label}>
-        {TRUST_WORDS.filter((word) => counts[word] > 0).map((word) => (
-          <span key={word} className={`v4BarSeg ${SEGMENT_CLASS[word]}`} style={{ flexGrow: counts[word] }} />
+        {TRUST_WORDS.map((word) => (
+          <span
+            key={word}
+            className={counts[word] > 0 ? `v4BarSeg ${SEGMENT_CLASS[word]}` : "v4BarSlot"}
+            style={{ flexGrow: counts[word] }}
+          />
         ))}
       </span>
       {props.showCounts === true
-        ? <span className="v4BarCounts" aria-hidden="true">{words.join(" · ")}</span>
+        ? <span className="v4BarCounts" aria-hidden="true">{t(catalog, "v4.panel.confidence")} {sentence}</span>
         : null}
     </span>
   );

@@ -170,30 +170,37 @@ function panel(map: V4Map, selected: V4Selection, level: ReadingLevel, extra: Pa
 }
 
 describe("V4 trust bar", () => {
-  it("draws one segment per word that has points and names the counts in words", () => {
-    // The label wraps the count words; "{counts}" alone lets the check read them whatever the merged wording is.
+  // V4 screen review (3 Nov): map-f28 drops the number captions; map-f8's "How sure" sentence, built from the trust words
+  // only, is the bar's words. Every word keeps a slot (an empty one has no width), so the bar can slide (dig-d4 B).
+  it("draws one segment per word that has points and says how sure in words, never a number", () => {
+    // The label wraps the sentence; "{counts}" alone lets the check read it whatever the merged wording is.
     const labelled = { ...catalog, "v4.bar.label": "{counts}" };
     const root = dom(renderToStaticMarkup(<V4TrustBar counts={counts(2, 4, 2, 0)} catalog={labelled} showCounts />));
     expect(root.querySelectorAll(".v4BarSeg")).toHaveLength(3);
+    expect(root.querySelectorAll(".v4BarSlot")).toHaveLength(1);
+    const sentence = `${t(catalog, "v4.sure.SURE_FOR_CASE.most")} ${t(catalog, "v4.sure.argued.some")}`;
     const label = root.querySelector('[role="img"]')?.getAttribute("aria-label") ?? "";
-    expect(label).toContain(t(catalog, "v4.trustCount.SURE", { count: 2 }));
-    expect(label).not.toContain(t(catalog, "v4.trustCount.DIDNT_HOLD", { count: 0 }));
-    expect(root.querySelector(".v4BarCounts")?.textContent).toContain(t(catalog, "v4.trustCount.SURE_FOR_CASE", { count: 4 }));
+    expect(label).toBe(sentence);
+    expect(root.querySelector(".v4BarCounts")?.textContent).toBe(`${t(catalog, "v4.panel.confidence")} ${sentence}`);
+    expect(`${label} ${root.textContent}`).not.toMatch(/\d/u);
   });
 
-  it("shows an empty track and the nothing-checked words when every count is zero", () => {
+  it("shows an empty track and says nothing was checked when every count is zero", () => {
     const root = dom(renderToStaticMarkup(<V4TrustBar counts={none} unchecked={3} catalog={catalog} showCounts />));
     expect(root.querySelectorAll(".v4BarSeg")).toHaveLength(0);
     expect(root.querySelector(".v4BarEmpty")).not.toBeNull();
-    expect(root.querySelector(".v4BarCounts")?.textContent).toContain(t(catalog, "v4.trustCount.none"));
+    expect(root.querySelector(".v4BarCounts")?.textContent).toBe(`${t(catalog, "v4.panel.confidence")} ${t(catalog, "v4.sure.none")}`);
+    expect(root.textContent).not.toMatch(/\d/u);
   });
 });
 
 describe("V4 map tree", () => {
-  it("draws the question, all 8 paths, at most two open questions per path and every dig state", () => {
-    const root = tree(buildMap(), "root");
+  it("draws the question, its paths, at most two open questions per path and every dig state", () => {
+    // Two paths, so the 12-card limit (map-f22) leaves room for every leaf; the 8-path map is checked below.
+    const base = buildMap();
+    const root = tree({ ...base, paths: base.paths.slice(0, 2) }, "root");
     expect(root.querySelectorAll(".v4MapRoot")).toHaveLength(1);
-    expect(root.querySelectorAll(".v4MapPath")).toHaveLength(8);
+    expect(root.querySelectorAll(".v4MapPath")).toHaveLength(2);
     // Path a: p:n3 (star) and p:x3 (its dig did not finish) are open; p:x1 and p:x2 are covered by their digs.
     const branchA = root.querySelectorAll(".v4MapBranch")[0]!;
     expect(branchA.querySelectorAll(".v4MapOpen")).toHaveLength(2);
@@ -206,6 +213,24 @@ describe("V4 map tree", () => {
     expect(root.querySelectorAll(".v4MapStar[aria-hidden]").length).toBeGreaterThan(0);
   });
 
+  it("shows at most about 12 cards: the star and the digs at work first, the rest behind \"+N more\" (map-f22)", () => {
+    const root = tree(buildMap(), "root");
+    expect(root.querySelectorAll(".v4MapPath")).toHaveLength(8);
+    const leaves = root.querySelectorAll(".v4MapOpen, .v4MapDig").length;
+    expect(1 + 8 + leaves).toBeLessThanOrEqual(12);
+    // Always shown: the star, and the digs still at work (waiting, running).
+    expect(root.querySelector(".v4MapOpen .v4MapStar")).not.toBeNull();
+    expect(root.querySelector(".v4MapDigWAITING")).not.toBeNull();
+    expect(root.querySelector(".v4MapDigRUNNING")).not.toBeNull();
+    // Nothing is hidden without a visible sign.
+    const more = [...root.querySelectorAll(".v4MapMore")];
+    expect(more.length).toBeGreaterThan(0);
+    for (const button of more) {
+      expect(button.getAttribute("aria-expanded")).toBe("false");
+      expect(button.textContent).toMatch(/^\+\d+/u);
+    }
+  });
+
   it("cuts long titles at a word boundary and keeps AI text marked", () => {
     const root = tree(buildMap(), "root");
     const title = root.querySelector(".v4MapPathTitle [data-ai-generated]")!;
@@ -215,14 +240,15 @@ describe("V4 map tree", () => {
     expect(longLine.startsWith(title.textContent!.slice(0, -1))).toBe(true);
   });
 
-  it("shows +N open when a path has more than two open questions and no fate word for the stand-in path", () => {
+  it("shows +N more when a path has more than two open questions, and no outcome tags at all (r2-20 A)", () => {
     const map = buildMap();
     const root = tree(map, "root", { digs: [] });
     const branchA = root.querySelectorAll(".v4MapBranch")[0]!;
     expect(branchA.querySelectorAll(".v4MapOpen")).toHaveLength(2);
     expect(branchA.querySelector(".v4MapMore")?.textContent).toBe(t(catalog, "v4.map.moreOpen", { count: 2 }));
-    const branchB = root.querySelectorAll(".v4MapBranch")[1]!;
-    expect(branchB.querySelector(".v4MapFate")).toBeNull();
+    // map-f25 / journey-f11: "Held up", "Partly held" and "Set aside" are gone from the cards (the panel says it in a sentence).
+    expect(root.querySelector(".v4MapFate")).toBeNull();
+    for (const word of ["HELD_UP", "PARTLY_HELD", "SET_ASIDE"]) expect(root.textContent).not.toContain(t(catalog, `v4.fate.${word}`));
     // Path c has one unchecked point and nothing checked: an empty track.
     expect(root.querySelectorAll(".v4MapBranch")[2]!.querySelector(".v4BarEmpty")).not.toBeNull();
   });
@@ -244,6 +270,13 @@ describe("V4 map tree", () => {
     expect(root.querySelectorAll(".v4MapPath")).toHaveLength(0);
     expect(root.querySelector(".v4MapEmpty")?.textContent).toBe(t(catalog, "v4.map.noPaths"));
     expect(root.querySelector(".v4MapRootChip")).toBeNull();
+  });
+
+  it("counts nothing on the cards: no open-questions chip and no number captions (map-f28)", () => {
+    const root = tree(buildMap(), "root", { digs: [] });
+    expect(root.querySelector(".v4MapRootChip")).toBeNull();
+    expect(root.querySelector(".v4BarCounts")).toBeNull();
+    expect(root.textContent).not.toContain(t(catalog, "v4.map.openCount", { count: 4 }).replace("4", ""));
   });
 });
 
@@ -280,15 +313,27 @@ describe("V4 panel", () => {
     expect(root.textContent).not.toContain("First reason");
   });
 
-  it("adds the second AI's reasons, who answered it, why and how sure at the expert level; text only in plain words", () => {
+  it("adds the second AI's reasons, who answered it and why at the expert level; text only in plain words", () => {
     const expert = panel(buildMap(), "root", "expert");
     expect(expert.textContent).toContain("Reason for n1");
     expect(expert.textContent).toContain("Answer to n4");
     expect(expert.textContent).toContain("First reason");
-    expect(expert.textContent).toContain("Fairly sure about the first part.");
     const plain = panel(buildMap(), "root", "plain");
     expect(plain.querySelectorAll(".v4PanelBasis")).toHaveLength(0);
     expect(plain.textContent).toContain("Claim n1");
+  });
+
+  it("says how sure in one plain sentence at every reading level, from the trust words only (map-f8)", () => {
+    // The map's counts are one of each word: no word carries more than half, so the findings are mixed. The points no second
+    // AI checked are said once, in the panel's own line under the groups, not again in the sentence.
+    const sentence = [t(catalog, "v4.sure.mixed"), t(catalog, "v4.sure.argued.one"), t(catalog, "v4.sure.fell.one")].join(" ");
+    for (const level of ["plain", "background", "expert"] as const) {
+      const root = panel(buildMap(), "root", level);
+      expect(root.querySelector(".v4PanelBar .v4BarCounts")?.textContent, level).toBe(`${t(catalog, "v4.panel.confidence")} ${sentence}`);
+      expect(root.querySelectorAll(".v4PanelUnchecked"), level).toHaveLength(1);
+      // The AI writer's own "How sure" sentence is no longer shown, at any level.
+      expect(root.textContent, level).not.toContain("Fairly sure about the first part.");
+    }
   });
 
   it("gives a path its breadcrumb, full line, open questions and a dig button that waits while a dig is busy", () => {
@@ -343,7 +388,12 @@ describe("V4 map pieces, fix wave 1", () => {
     const map = sharedMap();
     expect(openCount(map, [])).toBe(2);
     const shownDigs = [dig("c-s1", "RUNNING", ["p:s1"])];
-    expect(openCount(map, shownDigs)).toBe(1);
+    // map-f26: a dig that only started does not lower the count; one that came back Confirmed (or Corrected) does.
+    expect(openCount(map, shownDigs)).toBe(2);
+    const confirmed: DigView = { ...dig("c-s1", "DONE", ["p:s1"]), rewrite: null, points: [point("d1", "SURE")] };
+    expect(openCount(map, [confirmed])).toBe(1);
+    const nothing: DigView = { ...confirmed, points: [point("d2", "STILL_ARGUED")] };
+    expect(openCount(map, [nothing])).toBe(2);
     const root = tree(map, "root", { digs: shownDigs });
     const branches = root.querySelectorAll(".v4MapBranch");
     expect(branches[0]!.querySelectorAll(".v4MapDig")).toHaveLength(1);
@@ -455,8 +505,11 @@ describe("W4-6: dig cards and rewritten paths", () => {
       [dig("c-fail", "FAILED", ["p:x1"]), "v4.rewrite.digCard.FAILED"],
       [dig("c-done", "DONE", ["p:x1"]), "v4.rewrite.digCard.DONE"],
       [{ ...dig("c-done", "DONE", ["p:x1"]), rewrite: writing }, "v4.rewrite.digCard.REWRITING"],
-      [{ ...dig("c-done", "DONE", ["p:x1"]), rewrite: rewritten(true) }, "v4.rewrite.digCard.CHANGED"],
-      [{ ...dig("c-done", "DONE", ["p:x1"]), rewrite: rewritten(false) }, "v4.rewrite.digCard.NO_CHANGE"],
+      // journey-f11: a finished dig says what it found, in the three result words (or that nothing new was found).
+      [{ ...dig("c-done", "DONE", ["p:x1"]), rewrite: rewritten(true) }, "v4.result.card.ADDED_TO"],
+      [{ ...dig("c-done", "DONE", ["p:x1"]), rewrite: { ...rewritten(true), fate_before: "PARTLY_HELD" } as PathRewrite }, "v4.result.card.CORRECTED"],
+      [{ ...dig("c-done", "DONE", ["p:x1"]), rewrite: rewritten(false) }, "v4.result.card.CONFIRMED"],
+      [{ ...dig("c-done", "DONE", ["p:x1"]), counts: counts(0, 0, 1, 0), rewrite: rewritten(false) }, "v4.result.card.NOTHING_NEW"],
       [{ ...dig("c-done", "DONE", ["p:x1"]), rewrite: { ...writing, state: "FAILED", failed_at: "2026-10-30T09:20:00.000Z" } }, "v4.rewrite.digCard.REWRITE_FAILED"]
     ];
     for (const [view, key] of cases) {
@@ -477,7 +530,7 @@ describe("W4-6: dig cards and rewritten paths", () => {
     const done: DigView = { ...dig("c-new", "DONE", ["w"]), headline: null, rewrite: rewritten(true) };
     const root = panel(buildMap(), "dig:c-new", "plain", { digs: [done] });
     expect(root.textContent).not.toContain(t(catalog, "v4.panel.digNoHeadline"));
-    expect(root.textContent).toContain(t(catalog, "v4.rewrite.digCard.CHANGED"));
+    expect(root.textContent).toContain(t(catalog, "v4.result.card.ADDED_TO"));
     expect(root.querySelector(".v4RewriteChanged")?.textContent).toContain("What the dig changed, in one sentence.");
   });
 
