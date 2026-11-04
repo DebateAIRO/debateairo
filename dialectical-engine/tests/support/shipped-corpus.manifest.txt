@@ -508,8 +508,11 @@ apps/ui/app/privacy/us-health-data/page.tsx
 apps/ui/app/privacy/versions/[sha256]/page.tsx
 apps/ui/app/privacy/versions/page.tsx
 apps/ui/app/providers/page.tsx
+apps/ui/app/public/debate/[id]/CouldNotLoad.tsx
 apps/ui/app/public/debate/[id]/MadeByNewerRelease.tsx
 apps/ui/app/public/debate/[id]/PublicDebatePageClient.tsx
+apps/ui/app/public/debate/[id]/PublicPageNote.tsx
+apps/ui/app/public/debate/[id]/loading.tsx
 apps/ui/app/public/debate/[id]/page.tsx
 apps/ui/app/recover-authenticator/page.tsx
 apps/ui/app/recover/layout.tsx
@@ -704,6 +707,7 @@ apps/ui/components/v4/V4Panel.tsx
 apps/ui/components/v4/V4PathRewrite.tsx
 apps/ui/components/v4/V4PublicFlag.tsx
 apps/ui/components/v4/V4PublicLane.tsx
+apps/ui/components/v4/V4PublicSession.tsx
 apps/ui/components/v4/V4Rail.tsx
 apps/ui/components/v4/V4ReportClient.tsx
 apps/ui/components/v4/V4ReportHeader.tsx
