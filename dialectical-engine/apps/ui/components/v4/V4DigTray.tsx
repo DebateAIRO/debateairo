@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type Ref, type RefObject } from "react";
+import { useEffect, useId, useRef, useState, type Ref, type RefObject } from "react";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import type { V4DigQuota } from "@/lib/v4/digQuota";
 import type { MoneyLine } from "@/lib/v4/money";
@@ -93,6 +93,11 @@ export function V4DigTray(props: Readonly<{
   useDockRoom(ref);
   const waiting = quota.waitLine !== null;
   const rest = props.rest ?? null;
+  // journey-f14 / dig-f11 (the wave-2 review, 4 Nov): one pattern with the panel's button: greyed but focusable, pointing at
+  // the visible line that says why, and a press gives that line the highlight again.
+  const reasonId = useId();
+  const [replay, setReplay] = useState(0);
+  const greyed = waiting || rest !== null;
   return (
     <section ref={ref} className="v4DebTray v4DebTrayDock v4Highlight" aria-label={t(catalog, "v4.dig.trayLabel")}>
       <V4PickChips picks={target.picks} label={t(catalog, "v4.map.picked")} />
@@ -104,9 +109,9 @@ export function V4DigTray(props: Readonly<{
       {/* The share is said once, beside the button that spends it. dig-f11 / journey-f14: while new digs wait, the greyed
           button carries the reset time and this line says why. */}
       {props.withDig
-        ? waiting
-          ? <p className="v4PanelHint v4DigWaitLine" role="note">{quota.waitLine}</p>
-          : <V4MoneyLines lines={props.money} catalog={catalog} />
+        ? waiting && rest === null
+          ? <p key={replay} id={reasonId} className={`v4PanelHint v4DigWaitLine${replay > 0 ? " v4Highlight" : ""}`} role="note">{quota.waitLine}</p>
+          : waiting ? null : <V4MoneyLines lines={props.money} catalog={catalog} />
         : null}
       {props.publicNote === null || props.publicNote === undefined ? null : <p className="v4DebTrayPublic">{props.publicNote}</p>}
       <div className="v4DebTrayActions">
@@ -114,23 +119,26 @@ export function V4DigTray(props: Readonly<{
           <span className="v4DigBtnRow">
             <button
               type="button"
-              className={`v4Btn v4BtnPrimary${waiting ? " v4DigWaiting" : ""}`}
-              disabled={rest !== null}
-              aria-disabled={waiting ? "true" : undefined}
+              className={`v4Btn v4BtnPrimary${greyed ? " v4DigWaiting" : ""}`}
+              aria-disabled={greyed ? "true" : undefined}
+              aria-describedby={greyed ? reasonId : undefined}
               onClick={() => {
-                if (!waiting) props.onDig();
+                if (greyed) setReplay((count) => count + 1);
+                else props.onDig();
               }}
             >
               {quota.label(target, true)}
             </button>
-            <V4ShareChange share={quota.share(target)} />
+            <V4ShareChange share={quota.share(target)} subject={`path:${target.path?.id ?? "root"}`} />
           </span>
         ) : null}
         <button ref={props.clearRef} type="button" className="v4Link v4DebTrayClear" onClick={props.onClear}>
           {t(catalog, "v4.dig.trayClear")}
         </button>
       </div>
-      {props.withDig && rest !== null ? <p className="v4DebTrayHint v4Muted" data-dig-rest="">{rest}</p> : null}
+      {props.withDig && rest !== null ? (
+        <p key={replay} id={reasonId} className={`v4DebTrayHint v4Muted${replay > 0 ? " v4Highlight" : ""}`} data-dig-rest="">{rest}</p>
+      ) : null}
     </section>
   );
 }

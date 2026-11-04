@@ -63,7 +63,20 @@ export function digButtonLabel(input: Readonly<{
   const { target, share, wait, catalog, locale } = input;
   const words = digWords(target, catalog, locale, input.tray === true);
   if (wait !== null) return `${words} · ${waitWords(wait, catalog, locale)}`;
+  return withShare(words, share, catalog);
+}
+
+/** A dig button's words with its share: "Dig here · up to 3%"; without a known share, the words alone. */
+function withShare(words: string, share: number | null, catalog: MessageCatalog): string {
   return share === null ? words : `${words} · ${t(catalog, "v4.undo.barShare", { percent: share })}`;
+}
+
+/**
+ * journey-f13 / dig-f5 on a public page's dig box (the wave-2 review, 4 Nov): the box digs the person's picks (its chips
+ * and own views), so its button reads as the map's picks button, "Dig into your pick · up to 3%" ("your picks" for more).
+ */
+export function picksButtonLabel(count: number, share: number | null, catalog: MessageCatalog, locale: string): string {
+  return withShare(tPlural(catalog, "v4.dig.yourPicks", count, locale), share, catalog);
 }
 
 /** public-d3 A: the period, once, by the Quick look / Thorough switch: "of today · you can still finish your report". */

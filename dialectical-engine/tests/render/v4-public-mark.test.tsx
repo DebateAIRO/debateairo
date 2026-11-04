@@ -4,7 +4,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  buttonNamed, CATALOG, click, harness, mountMap, openPath, page, panel, PATHS, resetHarness, settle, tray, typeInto, unmountMap
+  buttonNamed, CATALOG, click, harness, mountMap, openPath, page, panel, PATHS, resetHarness, seededAnswer, settle, tray, typeInto, unmountMap
 } from "./v4-debate-harness.js";
 
 /*
@@ -103,11 +103,17 @@ describe("the globe line", () => {
   it("the stages before and after the check, once the server says them; a change shows at once with the 1-second highlight", async () => {
     await show({ kind: "WILL_BE_PUBLIC" });
     expect(line()!.textContent).toBe(CATALOG["v4.publicMark.WILL_BE_PUBLIC"]);
-    expect(line()!.getAttribute("role")).toBe("status");
+    // ACCESS-16: one region that stays on the page says a later stage out loud; the first is read with the page.
+    const said = (): Element => host!.querySelector("[data-public-stage-said]")!;
+    expect(said().getAttribute("role")).toBe("status");
+    expect(said().textContent).toBe("");
     expect(line()!.classList.contains("v4Highlight")).toBe(false);
     await show({ kind: "BEING_CHECKED" });
     expect(line()!.textContent).toBe(CATALOG["v4.publicMark.BEING_CHECKED"]);
     expect(line()!.classList.contains("v4Highlight")).toBe(true);
+    expect(said().textContent).toBe(CATALOG["v4.publicMark.BEING_CHECKED"]);
+    await show({ kind: "PUBLIC", publicRef: REF });
+    expect(said().textContent).toBe(CATALOG["v4.publicMark.public"]);
     await show({ kind: "KEPT_PRIVATE" });
     expect(line()!.textContent).toBe(CATALOG["v4.publicMark.KEPT_PRIVATE"]);
   });
@@ -151,6 +157,43 @@ describe("on the map", () => {
     // dig-f4: the tray shows from the second pick; with two it says the dig adds to the public debate (public-f26).
     await click(panel().querySelector<HTMLInputElement>(".v4Sugs input[type=checkbox]")!);
     expect(tray()!.textContent).toContain("This adds to your public debate.");
+  });
+
+  // The wave-2 review (4 Nov, lib/v4/publicNotes.ts): the notes follow the debate's own state, never the person's plan today.
+  it("a Free person's private debate (a paid one from before, or one the check kept private) never says it will be public", async () => {
+    harness.planTier = "free";
+    harness.freePublicNotice = true;
+    visibility.read = vi.fn(async () => ({ state: "PRIVATE" }));
+    await mountMap();
+    await settle();
+    await openPath(PATHS.renew);
+    await click(buttonNamed(CATALOG["v4.suggest.ownView"]!, panel()));
+    expect(panel().querySelector("[data-public-will-be]")).toBeNull();
+    await unmountMap();
+    // A debate that ran on Free, which the check kept private (the server's optional stage): nothing either.
+    const runId = crypto.randomUUID();
+    harness.answer = seededAnswer(runId, {}, "FREE");
+    visibility.read = vi.fn(async () => ({ state: "PRIVATE", public_stage: "KEPT_PRIVATE" }));
+    await mountMap(1600, runId);
+    await settle();
+    await openPath(PATHS.renew);
+    await click(buttonNamed(CATALOG["v4.suggest.ownView"]!, panel()));
+    expect(panel().querySelector("[data-public-will-be]")).toBeNull();
+    expect(page().textContent).not.toContain(CATALOG["v4.publicMark.addsToPublic"]);
+  });
+
+  it("a debate that ran on Free whose state says only private: dig-f26's own 'may' line under the box, and nothing in the tray", async () => {
+    harness.planTier = "free";
+    const runId = crypto.randomUUID();
+    harness.answer = seededAnswer(runId, {}, "FREE");
+    visibility.read = vi.fn(async () => ({ state: "PRIVATE" }));
+    await mountMap(1600, runId);
+    await settle();
+    await openPath(PATHS.renew);
+    await click(buttonNamed(CATALOG["v4.suggest.ownView"]!, panel()));
+    expect(panel().querySelector("[data-public-will-be]")!.textContent).toBe(CATALOG["v4.suggest.ownViewPublic"]);
+    expect(page().textContent).not.toContain(CATALOG["v4.publicMark.willBePublic"]);
+    expect(page().textContent).not.toContain(CATALOG["v4.publicMark.addsToPublic"]);
   });
 
   it("a private debate, or a read that fails: no line, nothing said about going public", async () => {

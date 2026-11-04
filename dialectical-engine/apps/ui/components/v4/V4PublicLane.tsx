@@ -12,13 +12,15 @@ import {
   DIG_RETURN_PARAM, DIG_RETURN_UNDER_PARAM, publicDigReturnPath, signInHrefs, usePublicSignedIn
 } from "@/components/v4/V4PublicSession";
 import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
-import { digTargetQuestions } from "@/lib/v4/askText";
+import { crisisWordsOf, digTargetQuestions } from "@/lib/v4/askText";
 import { effectiveDigMode } from "@/lib/v4/askConfig";
-import { addDig, DIG_UNDO_MS, dismissDig, readDigUndo, undoDig, useDigUndo, type DigUndoResult } from "@/lib/v4/digUndo";
-import { firstByOf } from "@/lib/v4/mapLooks";
-import { sharePeriodOf, type MoneyLine } from "@/lib/v4/money";
+import { addDig, DIG_UNDO_MS, digTargetKey, dismissDig, readDigUndo, undoDig, useDigUndo, type DigUndoResult } from "@/lib/v4/digUndo";
+import { digPeriodLine, picksButtonLabel } from "@/lib/v4/digQuota";
+import { placeAboutLine } from "@/components/v4/digAbout";
+import { cardLabel, firstByOf } from "@/lib/v4/mapLooks";
+import { sharePeriodOf } from "@/lib/v4/money";
 import {
-  publicDigAnchor, publicDigParentKey, publicDigShareLine, publicPathAnchor, publicSuggestionsFor, rememberPublicDig, usePublicDigsStarted,
+  publicDigAnchor, publicDigParentKey, publicDigShare, publicPathAnchor, publicSuggestionsFor, rememberPublicDig, usePublicDigsStarted,
   waitingPublicDig, type PublicDigSuggestion
 } from "@/lib/v4/publicDig";
 import {
@@ -30,6 +32,7 @@ import { contractClient } from "@/lib/api";
 import { levelHref, useReadingLevel } from "@/lib/v4/storage";
 import { picksMax } from "@/lib/v4/suggestions";
 import type { DigMode, PendingDig, ReadingLevel } from "@/lib/v4/types";
+import { useDigClickCheck } from "@/lib/v4/useDigClickCheck";
 import { useV4Ask, type V4AskOutcome } from "@/lib/v4/useV4Ask";
 
 /*
@@ -40,6 +43,10 @@ import { useV4Ask, type V4AskOutcome } from "@/lib/v4/useV4Ask";
  * says one; the site's one 10-second Undo, during which nothing is sent or used (lib/v4/digUndo.ts). After it the person stays on the page, with a card under
  * the path (public-d2 A, V4PublicDig.tsx); the box starts with the path's own suggestions as chips when the public read carries them; "This will be public."
  * under the person's own words (journey-f20).
+ * The wave-2 review (4 Nov): the press runs the map's own click checks (dig-f9, lib/v4/useDigClickCheck.ts): the crisis help on the person's own views and the
+ * one-time consent come at the click, and the 10 seconds start from the yes. A send still waiting while this page is open keeps its place (it is never called
+ * failed while it may still start); one that met a screen after the page had gone says so in its note. The question check's screen names the path the dig is
+ * about. journey-f13 / dig-f5: the box's buttons say "Dig here" and "Dig into your pick(s) · up to 3%", as on the map, with the period named once by the switch.
  */
 
 /**
@@ -52,8 +59,12 @@ const REPORT_CHECK_STEPS: ReadonlyArray<Readonly<{ untilMs: number; everyMs: num
   { untilMs: 5 * 60_000, everyMs: 30_000 },
   { untilMs: Number.POSITIVE_INFINITY, everyMs: 60_000 }
 ]);
-/** public-f9 (the record's own number): after 10 minutes the checks stop, and the card says it is taking longer than usual, with "Check again". */
-const REPORT_CHECKS_STOP_MINUTES = 10;
+/**
+ * public-f9 (the record's own number): after 10 minutes the card says it is taking longer than usual, with "Check again". report-f8's rule (the wave-2
+ * review, 4 Nov): the page keeps checking slowly and says so, "This is taking longer than usual. We keep checking.", never that the report is still being
+ * written, which the page cannot know.
+ */
+const REPORT_LONGER_AFTER_MINUTES = 10;
 /** While the tab is hidden the checks pause: the next one comes when the tab is shown again (useWaitPolling checks at once then). */
 const REPORT_HIDDEN_PAUSE_MS = 24 * 60 * 60_000;
 /**
@@ -88,12 +99,17 @@ type LaneActions = Readonly<{
   publicRef: string;
   /** The reading level the person chose, for the links to a dig's own page. */
   level: ReadingLevel | null;
-  /** public-f11: the share line before the press, when the room read says one for a dig (not yet on a public page). */
-  share: MoneyLine | null;
+  /** public-f11: the dig's share before the press, when the room read says one for a dig (not yet on a public page). */
+  share: number | null;
+  /** public-d3 A: the period that share is of, named once by the switch (null: no share known). */
+  periodLine: string | null;
   /** public-d2: the path's own suggestions, when the public read carries them. */
   suggestionsFor(path: PublicPathView): readonly PublicDigSuggestion[];
-  /** Puts the dig in its 10-second Undo (the site's one list): its id there, or why nothing could be sent. */
-  startDig(path: PublicPathView, press: DigPress): number | DigRefused;
+  /**
+   * Runs the click checks (crisis help, consent), then puts the dig in its 10-second Undo (the site's one list): its id there, why nothing could be sent,
+   * or null when a screen took over (the help screen, a "No" to the consent) and nothing waits.
+   */
+  startDig(path: PublicPathView, press: DigPress): Promise<number | DigRefused | null>;
   writeReport(): Promise<PublicReportPress>;
 }>;
 
@@ -123,10 +139,22 @@ function SignedInActions({ debate, lane, returnPath, children }: Readonly<{
   useEffect(() => {
     submitRef.current = submit;
   });
-  const share = useMemo(() => publicDigShareLine(room, planTier), [room, planTier]);
+  // Whether this page is still on screen: a send still waiting then keeps its place, and one that meets a screen after it
+  // has gone says so in its note (as the map's digs do, lib/v4/useDigQueue.tsx).
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  // dig-f9: the crisis help and the one-time consent at the click, with the map's own piece (no second copy).
+  const clickCheck = useDigClickCheck({ ensureConsent: ask.ensureConsent, offerCrisisHelp: ask.offerCrisisHelp });
+  const share = useMemo(() => publicDigShare(room), [room]);
+  const periodLine = share === null ? null : digPeriodLine(room, catalog);
   const publicRef = debate.public_ref;
   const question = debate.question;
-  const startDig = useCallback((path: PublicPathView, press: DigPress): number | DigRefused => {
+  const startDig = useCallback(async (path: PublicPathView, press: DigPress): Promise<number | DigRefused | null> => {
     const failed: DigRefused = { kind: "REFUSED", message: t(catalog, "v4.dig.failed") };
     // One waiting dig per box: a second press while it waits is the same dig.
     const waiting = waitingPublicDig(readDigUndo(), publicRef, path);
@@ -138,16 +166,29 @@ function SignedInActions({ debate, lane, returnPath, children }: Readonly<{
     const before = path.line;
     const first = digTargetQuestions(sent.target)[0] ?? "";
     const firstIsAi = firstByOf(sent.target) === "AI";
+    // V, 2026-09-30 / V, 2026-09-29 (dig-f9): the person's own views read for crisis words, then the one-time consent, both
+    // now, while this page can show them; the words are exactly the ones the send reads. Nothing waits until both pass.
+    const place = `${publicDigParentKey(publicRef, path.digRef)}|${digTargetKey(sent.target)}`;
+    if (!await clickCheck(place, crisisWordsOf("dig", "", sent.parent))) return null;
+    if (!mounted.current) return null;
+    // A dig of this box that started counting meanwhile is the same dig.
+    const counting = waitingPublicDig(readDigUndo(), publicRef, path);
+    if (counting !== null) return counting.id;
+    // dig-f9: the question check's screen can only come with the server's answer, 10 seconds after the click, so it names
+    // the path the dig is about ("About your dig on “…”:"; the path's words are AI text).
+    const about = placeAboutLine({ text: cardLabel(path.line), ai: true }, catalog);
     const send = async (dig: PendingDig): Promise<DigUndoResult> => {
       let outcome: V4AskOutcome;
       try {
         // ASK-4: a dig carries AI-written text around the person's views; the hook reads the views for crisis words itself.
-        outcome = await submitRef.current(sent.questionLine, dig.mode, "dig", sent.parent);
+        outcome = await submitRef.current(sent.questionLine, dig.mode, "dig", sent.parent, undefined, about);
       } catch {
         return { kind: "REFUSED", message: t(catalog, "v4.dig.failed") };
       }
       if (outcome.kind === "REFUSED") return { kind: "REFUSED", message: outcome.message };
-      if (outcome.kind !== "STARTED") return { kind: "STOPPED" };
+      // A screen took over: on this page it is on screen, so the note goes quietly. With the page gone nobody saw it, so
+      // the note says the dig did not start and how to start it again (never a silent loss).
+      if (outcome.kind !== "STARTED") return mounted.current ? { kind: "STOPPED" } : { kind: "REFUSED", message: t(catalog, "v4.public.dig.notStartedAway") };
       const startedAt = new Date().toISOString();
       // public-d2 A: the person stays on the page; the card under the path is kept for this visit (memory only).
       rememberPublicDig({ childRunId: outcome.runId, publicRef, pathRef: path.ref, digRef: path.digRef, startedAt,
@@ -161,20 +202,23 @@ function SignedInActions({ debate, lane, returnPath, children }: Readonly<{
       dig: { target: sent.target, mode, sendsAt: Date.now() + DIG_UNDO_MS },
       // dig-f8 / public-f14: the site's one note repeats the share, of its own window (Free's month, lib/v4/money.ts
       // sharePeriodOf), as the map's digs do.
-      sharePercent: share === null ? null : Number(share.values.percent),
+      sharePercent: share,
       ...(sharePeriod === "PERSON_DAY" ? {} : { sharePeriod }),
       period: sharePeriod === "PERSON_MONTH" ? "month" : "today",
       showMode: planTier !== "free",
       publicRef,
       send,
-      failedLine: t(catalog, "v4.dig.failed")
+      failedLine: t(catalog, "v4.dig.failed"),
+      // Given up on only once this page has gone (a send that may still start is never called failed while it is open).
+      unconfirmedLine: t(catalog, "v4.public.dig.unconfirmed"),
+      alive: () => mounted.current
     });
-  }, [publicRef, question, catalog, locale, planTier, share, room]);
+  }, [publicRef, question, catalog, locale, planTier, share, room, clickCheck]);
   const writeReport = useCallback(() => pressPublicReport(debate.public_ref, { catalog, room, locale }), [debate.public_ref, catalog, room, locale]);
   const suggestionsFor = useCallback((path: PublicPathView) => publicSuggestionsFor(debate, path), [debate]);
   const actions = useMemo<LaneActions>(() => ({
-    signedIn: true, returnPath, planTier, busy: submitting, publicRef, level: savedLevel, share, suggestionsFor, startDig, writeReport
-  }), [returnPath, planTier, submitting, publicRef, savedLevel, share, suggestionsFor, startDig, writeReport]);
+    signedIn: true, returnPath, planTier, busy: submitting, publicRef, level: savedLevel, share, periodLine, suggestionsFor, startDig, writeReport
+  }), [returnPath, planTier, submitting, publicRef, savedLevel, share, periodLine, suggestionsFor, startDig, writeReport]);
   return (
     <LaneContext.Provider value={actions}>
       {children}
@@ -195,8 +239,8 @@ export function V4PublicLaneProvider({ debate, lane, children }: Readonly<{ deba
     return byDig;
   }, [debate.contributions]);
   const quiet = useMemo<LaneActions>(() => ({
-    signedIn, returnPath, planTier: "free", busy: false, publicRef: debate.public_ref, level: null, share: null, suggestionsFor: () => [],
-    startDig: () => ({ kind: "REFUSED", message: "" }), writeReport: async () => ({ kind: "REFUSED", message: "" })
+    signedIn, returnPath, planTier: "free", busy: false, publicRef: debate.public_ref, level: null, share: null, periodLine: null, suggestionsFor: () => [],
+    startDig: async () => ({ kind: "REFUSED", message: "" }), writeReport: async () => ({ kind: "REFUSED", message: "" })
   }), [signedIn, returnPath, debate.public_ref]);
   return (
     <DigMakersContext.Provider value={makers}>
@@ -273,6 +317,8 @@ function DigBox({ path, catalog, locale }: Readonly<{ path: PublicPathView; cata
   const [refusal, setRefusal] = useState<string | null>(null);
   // The dig this box put in its 10 seconds, until it started, was refused or was undone.
   const [pendingId, setPendingId] = useState<number | null>(null);
+  // dig-f9: the click's checks (the crisis help, the one-time consent) are open: Start waits for them.
+  const [checking, setChecking] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const openButton = useRef<HTMLButtonElement>(null);
   const firstChip = useRef<HTMLButtonElement | null>(null);
@@ -359,11 +405,18 @@ function DigBox({ path, catalog, locale }: Readonly<{ path: PublicPathView; cata
   const max = picksMax(actions.planTier);
   const full = chosen.length + (showViews ? views.length : 0) >= max;
   const start = (): void => {
-    if (locked) return;
+    // ACCESS-17 (journey-f14): with nothing picked the button stays focusable, and its line says why.
+    if (locked || checking || picked === 0) return;
     setRefusal(null);
-    const outcome = actions.startDig(path, { chips: chosen, views: showViews ? views.map((view) => view.text) : [], mode });
-    if (typeof outcome === "number") setPendingId(outcome);
-    else setRefusal(outcome.message);
+    setChecking(true);
+    void actions.startDig(path, { chips: chosen, views: showViews ? views.map((view) => view.text) : [], mode })
+      .catch((): DigRefused => ({ kind: "REFUSED", message: t(catalog, "v4.dig.failed") }))
+      .then((outcome) => {
+        setChecking(false);
+        if (outcome === null) return;
+        if (typeof outcome === "number") setPendingId(outcome);
+        else setRefusal(outcome.message);
+      });
   };
   const toggleChip = (suggestion: DigSuggestion): void => {
     setRefusal(null);
@@ -398,7 +451,8 @@ function DigBox({ path, catalog, locale }: Readonly<{ path: PublicPathView; cata
         </details>
         {chips.length === 0 ? null : (
           <PublicDigChips chips={chips} chosen={new Set(chosen.map((one) => one.suggestion_id))} full={full} onToggle={toggleChip} locked={locked}
-            pathAnchor={publicPathAnchor(path)} catalog={catalog} locale={locale} firstRef={(element) => { firstChip.current = element; }} />
+            pathAnchor={publicPathAnchor(path)} catalog={catalog} locale={locale} firstRef={(element) => { firstChip.current = element; }}
+            fullLineId={`${ids}-full`} />
         )}
         {chips.length > 0 && !writing ? (
           <button type="button" className="v4Link v4PubWriteOwn" disabled={locked}
@@ -439,17 +493,23 @@ function DigBox({ path, catalog, locale }: Readonly<{ path: PublicPathView; cata
         {showViews ? <p className="v4PubHint" id={`${ids}-public`} data-public-will-be>{t(catalog, "v4.publicMark.willBePublic")}</p> : null}
         {showViews && !full && !locked ? (
           <button type="button" className="v4Link v4PubAddView" onClick={add}>{t(catalog, "v4.public.dig.addView")}</button>
-        ) : full ? <p className="v4PubHint">{t(catalog, "v4.public.dig.viewsFull")}</p> : null}
+        ) : full ? <p className="v4PubHint" id={`${ids}-full`}>{t(catalog, "v4.public.dig.viewsFull")}</p> : null}
         {/* public-f11: Quick look by default, Thorough beside it on paid plans; Free's digs are quick looks with no mode word. */}
         {actions.planTier === "premium" ? <PublicDigModes mode={mode} onMode={(next) => { if (!locked) setMode(next); }} catalog={catalog} /> : null}
-        {actions.share === null ? null : <p className="v4PubHint" data-public-dig-share>{t(catalog, actions.share.key, actions.share.values)}</p>}
+        {/* public-d3 A / journey-f8: the period, once, by the switch, only where the button names a share. */}
+        {actions.periodLine === null ? null : <p className="v4PubHint" data-public-dig-share>{actions.periodLine}</p>}
         <div className="v4PubDigActions">
-          <button type="button" className="v4Btn v4BtnPrimary" disabled={picked === 0 || (actions.busy && !locked)}
-            aria-disabled={locked ? "true" : undefined} onClick={start}>
-            {t(catalog, "v4.public.dig.start")}
+          {/* journey-f13 / dig-f5: the map's words, "Dig into your pick(s) · up to 3%". */}
+          <button type="button" className="v4Btn v4BtnPrimary" disabled={actions.busy && !locked}
+            aria-disabled={locked || checking || picked === 0 ? "true" : undefined}
+            aria-describedby={picked === 0 ? `${ids}-why` : undefined} onClick={start} data-public-dig-start>
+            {picksButtonLabel(Math.max(1, picked), actions.share, catalog, locale)}
           </button>
           <button type="button" className="v4Link" disabled={actions.busy || locked} onClick={close}>{t(catalog, "v4.public.dig.cancel")}</button>
         </div>
+        {picked === 0 && !locked ? (
+          <p className="v4PubHint" id={`${ids}-why`} data-public-dig-why>{t(catalog, chips.length > 0 ? "v4.public.dig.pickFirst" : "v4.public.dig.writeFirst")}</p>
+        ) : null}
         {/* dig-f8: while it waits, the box says so, with the same Undo as the note. */}
         {waiting === null ? null : <V4DigStartingLine entry={waiting} onUndo={(id) => void undoDig(id)} catalog={catalog} />}
         {refusal === null ? null : <p className="v4AskRefusal" role="alert">{refusal}</p>}
@@ -540,18 +600,17 @@ function reportCheckEvery(elapsedMs: number): number {
 
 /**
  * The card at the top of Reports while a report is written (journey-d2's one waiting card): "Being written", "Started 14:02", "You can leave this page. It
- * keeps going.". The checks slow down and pause in a hidden tab; once the new version is there the page reads itself again. After 10 minutes they stop:
- * "taking longer than usual" with "Check again". Nothing is kept in the browser: a reload knows of the report only from the server.
+ * keeps going.". The checks slow down and pause in a hidden tab; once the new version is there the page reads itself again. After 10 minutes: "This is
+ * taking longer than usual. We keep checking." with "Check again", and the slow checks go on. Nothing is kept in the browser: a reload knows of the
+ * report only from the server.
  */
 function ReportWriting({ debate, version, startedAt, catalog, locale, onSettled }: Readonly<{
   debate: PublicDebate; version: number; startedAt: string; catalog: MessageCatalog; locale: string; onSettled: (state: "READY" | "FAILED") => void;
 }>) {
   const router = useRouter();
   const startedMs = Date.parse(startedAt);
-  const stopAt = startedMs + REPORT_CHECKS_STOP_MINUTES * 60_000;
-  // When the checks stopped: always past the ten minutes, so the card's "taking longer than usual" shows from then on.
-  const stopNow = useCallback((): number => Math.max(Date.now(), stopAt + 1), [stopAt]);
-  const [stoppedAt, setStoppedAt] = useState<number | null>(() => (Date.now() >= stopAt ? Math.max(Date.now(), stopAt + 1) : null));
+  const longerAt = startedMs + REPORT_LONGER_AFTER_MINUTES * 60_000;
+  const [longer, setLonger] = useState(() => Date.now() >= longerAt);
   const [step, setStep] = useState(() => reportCheckEvery(Date.now() - startedMs));
   const settled = useRef(false);
   const lastRead = useRef(Number.NEGATIVE_INFINITY);
@@ -574,48 +633,50 @@ function ReportWriting({ debate, version, startedAt, catalog, locale, onSettled 
     const writing = publicReportWriting(fresh);
     // Only this version's failure counts: an earlier one that failed says nothing about it.
     if (writing?.state === "FAILED" && writing.report_version === version) { settle("FAILED"); return "DONE"; }
-    if (Date.now() >= stopAt) { setStoppedAt(stopNow()); return "DONE"; }
+    if (Date.now() >= longerAt) setLonger(true);
     setStep(reportCheckEvery(Date.now() - startedMs));
     return "AGAIN";
-  }, [debate.public_ref, version, settle, startedMs, stopAt, stopNow]);
-  const polling = useWaitPolling(check, { everyMs: step, hiddenEveryMs: REPORT_HIDDEN_PAUSE_MS, enabled: stoppedAt === null });
+  }, [debate.public_ref, version, settle, startedMs, longerAt]);
+  const polling = useWaitPolling(check, { everyMs: step, hiddenEveryMs: REPORT_HIDDEN_PAUSE_MS });
   useEffect(() => {
-    // The checks stop at 10 minutes even when none answers just then.
-    if (stoppedAt !== null) return;
-    const timer = window.setTimeout(() => setStoppedAt(stopNow()), Math.max(0, stopAt - Date.now()));
+    // The line comes at 10 minutes even when no check answers just then.
+    if (longer) return;
+    const timer = window.setTimeout(() => setLonger(true), Math.max(0, longerAt - Date.now()));
     return () => window.clearTimeout(timer);
-  }, [stoppedAt, stopAt, stopNow]);
+  }, [longer, longerAt]);
   const [checking, setChecking] = useState(false);
   const checkAgain = async (): Promise<void> => {
     setChecking(true);
     try {
-      if (await check(() => true) === "AGAIN") setStoppedAt(stopNow());
+      await check(() => true);
     } catch {
-      setStoppedAt(stopNow());
+      // The slow checks go on; the card stays as it is.
     } finally {
       setChecking(false);
     }
   };
   return (
-    <div className="v4PubReportCard" data-public-report-writing>
+    <div className="v4PubReportCard" data-public-report-writing tabIndex={-1}>
       <V4WaitCard
         state={{ kind: "BEING_WRITTEN" }}
         variant="inline"
         headingLevel={3}
         startedAt={startedAt}
-        checkedAt={stoppedAt ?? polling.checkedAt}
-        reconnecting={stoppedAt === null && polling.reconnecting}
+        checkedAt={polling.checkedAt}
+        reconnecting={polling.reconnecting}
         onTryNow={polling.tryNow}
-        // The record's own number (public-f9: "After 10 minutes the card says it is taking longer than usual"), not a guessed time.
-        usualTopMinutes={REPORT_CHECKS_STOP_MINUTES}
-        longerAction={stoppedAt === null ? null : (
-          <button type="button" className="v4Btn" disabled={checking} aria-busy={checking} onClick={() => void checkAgain()} data-public-report-check>
-            {t(catalog, "v4.investigation.checkAgain")}
-          </button>
-        )}
         catalog={catalog}
         locale={locale}
-      />
+      >
+        {longer ? (
+          <div className="v4WaitLonger" data-public-report-slow>
+            <p>{t(catalog, "v4.investigation.slow")}</p>
+            <button type="button" className="v4Btn" disabled={checking} aria-busy={checking} onClick={() => void checkAgain()} data-public-report-check>
+              {t(catalog, "v4.investigation.checkAgain")}
+            </button>
+          </div>
+        ) : null}
+      </V4WaitCard>
     </div>
   );
 }
@@ -662,7 +723,9 @@ function ReportButton({ state, press, catalog }: Readonly<{ state: ReportPressSt
   return (
     <div className="v4PubReportPress">
       <p className="v4PubHint">{t(catalog, "v4.public.report.terms")}</p>
-      <button type="button" className="v4Btn" disabled={pressing} aria-busy={pressing} onClick={() => void press()} data-public-report-press>
+      {/* ACCESS-3: it stays focusable while it says it is starting (a second press does nothing), so focus is not lost. */}
+      <button type="button" className="v4Btn" aria-disabled={pressing ? "true" : undefined} aria-busy={pressing}
+        onClick={() => { if (!pressing) void press(); }} data-public-report-press>
         {t(catalog, label)}
       </button>
       {state.kind === "REFUSED" ? <p className="v4AskRefusal" role="alert">{state.message}</p> : null}
@@ -675,14 +738,22 @@ export function V4PublicReports({ debate, catalog, locale }: Readonly<{ debate: 
   const actions = useContext(LaneContext);
   const press = useReportPress(debate);
   const [current, ...earlier] = reportsNewestFirst(debate.reports);
+  const { state } = press;
+  // ACCESS-3 (report-f16's rule, as on the map): once the press says the report is being written, the button goes and focus moves to the card at the
+  // top of Reports, so it is not lost and the card is read out.
+  const section = useRef<HTMLElement | null>(null);
+  const writingMine = state.kind === "WRITING" && state.mine;
+  useEffect(() => {
+    if (!writingMine) return;
+    section.current?.querySelector<HTMLElement>("[data-public-report-writing]")?.focus();
+  }, [writingMine]);
   // A page with no way to press (a publication review) and nothing written has no section.
   if (current === undefined && actions === null) return null;
-  const { state } = press;
   // public-f9: the "ready" line. Its status region is always there, so the line is read out once when it appears; it shows at once with the shared
   // 1-second soft highlight. Someone else's report (known only from the server) is not called "yours".
   const ready = state.kind === "READY" ? t(catalog, state.mine ? "v4.ready.report" : "v4.public.report.ready") : "";
   return (
-    <section id={REPORTS_ANCHOR} className="v4Root v4PublicLane v4PubReports" aria-labelledby="public-reports-title">
+    <section ref={section} id={REPORTS_ANCHOR} className="v4Root v4PublicLane v4PubReports" aria-labelledby="public-reports-title">
       <h2 id="public-reports-title" className="v4PubHeading">{t(catalog, "v4.public.reports")}</h2>
       {state.kind === "WRITING" ? (
         <ReportWriting debate={debate} version={state.version} startedAt={state.startedAt} catalog={catalog} locale={locale} onSettled={press.settle} />

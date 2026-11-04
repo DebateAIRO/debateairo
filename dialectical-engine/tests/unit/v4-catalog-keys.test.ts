@@ -257,9 +257,9 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   // own words ("My maps", "Language", "Light or dark", "Settings", "Sign out") are the record's; this one is not.
   "v4.header.account",
   // V4 screen review (3 Nov), map-d4 A: a point's sources folded into one line. The drawn option said "From 3 pages: …";
-  // journey-f23 says nothing counts sources, so the line names the sites only (an owner question until the click-test).
+  // journey-f23 says nothing counts sources, so the line names every site and counts nothing ("From iea.org and
+  // oecd-nea.org"; an owner question until the click-test).
   "v4.web.sourcesFrom",
-  "v4.web.sourcesFromMore",
   // The owner's screen review of 3 Nov (dig-d1 B): the two words a running dig's steps need that the record does not give,
   // the list's name for screen readers and the hidden word after a step that is done.
   "v4.digLive.stepsLabel",
@@ -284,8 +284,15 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   // page, Kept with you…, Confirmed…, Or write your own, Someone dug near here on…, Public, See its page, Copy link, This will be public.) are pinned in
   // tests/unit/public-lane.test.ts.
   "v4.public.dig.chipsLabel",
-  "v4.public.dig.shareToday",
-  "v4.public.dig.shareMonth",
+  // The wave-2 review fixes (4 Nov 2026), drafted where the record has no words: the visible reason under a public dig box's
+  // Start while nothing is picked (journey-f14), a public dig sent after its page was closed that met a screen nobody saw,
+  // and one whose start could not be confirmed (the map's own lines name the map), and the running dig's empty findings
+  // list (the drawn line comes from a path card of the wait, not from dig-d1).
+  "v4.public.dig.pickFirst",
+  "v4.public.dig.writeFirst",
+  "v4.public.dig.notStartedAway",
+  "v4.public.dig.unconfirmed",
+  "v4.digLive.foundNone",
   "v4.public.digCard.running",
   "v4.public.digCard.stopReached",
   "v4.public.digCard.stopOpen",
@@ -470,12 +477,18 @@ const REVIEW_LINES: Readonly<Record<string, string>> = Object.freeze({
   "v4.panel.storyMissing": `${APPROVED_REPORT_LINES["v4.investigation.noStory"]} ${NO_WAIT}`,
   "v4.panel.fallbackMissing": `${APPROVED_REPORT_LINES["v4.investigation.noStory"]} ${NO_WAIT}`,
   // Wave 2, the panel and choosing what to dig: dig-f9 (the question check names the dig), dig-f22 (the visible reason
-  // over greyed boxes), dig-f34 (the two labels). dig-f26's line under the own-view box is journey-f20's one line, "This
-  // will be public." (v4.publicMark.willBePublic, pinned in tests/unit/public-lane.test.ts); dig-f26's own sentence is an
-  // owner question. One pick's button reads dig-f5 / dig-f31's "Dig into your pick" (QUOTA_RECORD_LINES below), the one
-  // dig-button helper of lib/v4/digQuota.ts; map-f14's "Dig into this" is an owner question.
+  // over greyed boxes), dig-f34 (the two labels). Under the own-view box, journey-f20's "This will be public." where the
+  // debate's own public state says so (v4.publicMark.willBePublic, pinned in tests/unit/public-lane.test.ts), and on a
+  // Free debate whose state says no more than private, dig-f26's own sentence (the wave-2 review, lib/v4/publicNotes.ts).
+  // One pick's button reads dig-f5 / dig-f31's "Dig into your pick" (QUOTA_RECORD_LINES below), the one dig-button helper
+  // of lib/v4/digQuota.ts; map-f14's "Dig into this" is an owner question.
+  "v4.suggest.ownViewPublic": "Free debates are public, so your view may be shown on this public page.",
   // map-d4 A, as drawn on the page the owner picked from: the findings' heading.
   "v4.panel.found": "What we found",
+  // dig-d1 B (it includes all of A), as drawn on the page the owner picked from: the running dig's checked findings and
+  // the folded current text of the path.
+  "v4.digLive.found": "Checked so far",
+  "v4.digLive.pathNow": "This path says now",
   "v4.dig.checkAbout": "About your dig on “{path}”:",
   "v4.suggest.picksOn": "Your picks are on “{path}”.",
   "v4.suggest.freeCap": "On the Free plan a dig combines up to {count} picks.",

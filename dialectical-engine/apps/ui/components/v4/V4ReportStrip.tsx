@@ -5,6 +5,7 @@ import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { waitForDigs } from "@/lib/v4/digUndo";
 import { writeReport } from "@/lib/v4/load";
 import { loadRunPublished, REPORT_SLOW_MS, type ReportStage } from "@/lib/v4/reportWriting";
+import { quotaChanged } from "@/lib/v4/quotaPulse";
 import type { WaitState } from "@/lib/v4/stateWords";
 import type { ReportWatch } from "@/lib/v4/useReportVersions";
 import { V4ReportDigWait } from "./V4DigUndo";
@@ -91,24 +92,29 @@ export function V4ReportStrip(props: V4ReportStripProps) {
         </p>
       )}
       <p id={`${id}-rest`} className="v4RepStripLine v4Muted">{t(catalog, "v4.reportStrip.digsWait")}</p>
-      {props.publicLine ? (
-        <p id={`${id}-public`} className="v4RepStripLine v4RepStripPublic" data-report-public="">{t(catalog, "v4.report.publicToo")}</p>
-      ) : null}
       <V4ReportDigWait runId={props.rootRunId} catalog={catalog} />
       {props.note === null ? null : (
         <p className="v4RepStripLine v4RepStripNote" role="alert">{t(catalog, "v4.investigation.startUnconfirmed")}</p>
       )}
+      {/* report-f15 / ACCESS-1: right above Write it, so it is in view where focus lands (the phone's stack is short). */}
+      {props.publicLine ? (
+        <p id={`${id}-public`} className="v4RepStripLine v4RepStripPublic" data-report-public="">{t(catalog, "v4.report.publicToo")}</p>
+      ) : null}
       <div className="v4RepStripActions">
+        {/* ACCESS-6: both stay focusable while the press is on its way (up to a dig's 10 seconds), so Esc still reaches the
+            strip and focus is never lost; a press meanwhile does nothing. */}
         <button
           ref={writeRef}
           type="button"
           className="v4Btn v4BtnPrimary v4RepStripWrite"
-          disabled={props.busy}
-          onClick={props.onWrite}
+          aria-disabled={props.busy ? "true" : undefined}
+          aria-busy={props.busy}
+          onClick={() => { if (!props.busy) props.onWrite(); }}
         >
           {t(catalog, props.note === "TRY_AGAIN" ? "v4.common.retry" : "v4.reportStrip.write")}
         </button>
-        <button type="button" className="v4Link v4RepStripNotYet" disabled={props.busy} onClick={props.onNotYet}>
+        <button type="button" className="v4Link v4RepStripNotYet" aria-disabled={props.busy ? "true" : undefined}
+          onClick={() => { if (!props.busy) props.onNotYet(); }}>
           {t(catalog, "v4.reportStrip.notYet")}
         </button>
       </div>
@@ -201,9 +207,13 @@ export function useReportStart(input: Readonly<{
       flight.current = false;
       setBusy(false);
       if (!asked) return;
+      // WHOLE-11 (public-d3 A, public-f15): the report uses quota, so the figures read again ("updates quietly after each start").
+      quotaChanged();
       setAt(null);
-      // The waiting card takes focus once it shows (a press answered CLOSED found a finished report instead: no card).
+      // The waiting card takes focus once it shows (a press answered CLOSED found a finished report instead: no card, so
+      // focus goes back to the button that opened the strip, ACCESS-6).
       if (writing) setFocusCard(true);
+      else setBack((before) => ({ at: place, serial: (before?.serial ?? 0) + 1 }));
     })();
   }, []);
 

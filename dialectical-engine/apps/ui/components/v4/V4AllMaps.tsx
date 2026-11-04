@@ -26,7 +26,8 @@ function AllMapsView({ catalog, locale, initialLevel }: Readonly<{ catalog: Mess
   const { load, busy, retry } = useMapShelf({ enabled: true, want, catalog });
   return (
     <>
-      <V4Header catalog={catalog} readingLevel={level} onReadingLevel={chooseLevel} />
+      {/* journey-f19: the quota share shows only on the ask, choosing and map pages; All my maps is none of them. */}
+      <V4Header catalog={catalog} readingLevel={level} onReadingLevel={chooseLevel} showQuota={false} />
       {/* UI-4: the site layout already holds the page's one <main>. */}
       <div className="v4AskMain v4MapsMain">
         <h1 className="v4AskTitle v4Serif">{t(catalog, "v4.maps.title")}</h1>

@@ -24,7 +24,7 @@ import { V4TrustBar } from "./V4TrustBar";
  *     four-shade bar and the "How sure" sentence, never a number), then "For" and "Against": the strongest published point on each side, one sentence
  *     each, with no score, model code or count; then what is still open under the question itself;
  *   - the paths (r2-1 A: "path") as rows, each with its one trust word and its bar (r2-20 A: no outcome tags). A row unfolds what was found (with its
- *     sources), who added to it, the deeper questions, "Dig into this" and, at its foot, "Report a problem" (public-f4) already naming the path;
+ *     sources), who added to it, the deeper questions, "Dig here" and, at its foot, "Report a problem" (public-f4) already naming the path;
  *   - the one star, "★ A good place to start" (journey-f12: one label on both pages, in place of public-d1's "Biggest open question · Dig here"), on an
  *     open question a public page can dig into;
  *   - "Explore the map": the same map as the person's own (V4MapTree, or V4Outline below 1100 px, as the own page chooses), with the read-only switch

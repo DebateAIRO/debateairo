@@ -15,7 +15,7 @@ import { currentReturnPath, signInHrefFor } from "@/lib/signInWayBack";
 import {
   answersStillAsked, clarifyingQuestions, composeQuestion, FREE_GOAL_CHOICES_MAX, goalChoiceCount, goalWithinPlan, purposeLinesOfGoal
 } from "@/lib/v4/askText";
-import { limitLine, startShareLine, usedUpLine, type MoneyLine } from "@/lib/v4/money";
+import { limitLine, startShareLine, startsWaitLine, usedUpLine, type MoneyLine } from "@/lib/v4/money";
 import { levelHref, useReadingLevel } from "@/lib/v4/storage";
 import {
   DIG_MODES,
@@ -281,14 +281,17 @@ function V4AskForm({
   const busy = ask.submitting || pressed !== null;
   // W3-4 (the money rule, owner 31 Oct): before a new question, its share of today; when new starts wait for the day,
   // week or month reset, that line with the time takes the place of today's room notice. Shares only, never a price.
-  // public-f24 (owner's screen review, 3 Nov): the one V4 line whichever server switch is in force, never the older
+  // public-f24 (owner's screen review, 3 Nov): step 1's one V4 line whichever server switch is in force, never the older
   // "will start by itself … Or upgrade" sentences; read-f19 / public-f14: the share names its own window (lib/v4/money.ts).
   const startsWait = limitLine(ask.room, locale);
-  const startLines: readonly MoneyLine[] = [startShareLine(ask.room), startsWait].filter((line): line is MoneyLine => line !== null);
+  // Step 2 (under Start) belongs to the start-step session (everything from the Next press onward): its room lines stay as
+  // they were before the screen review's step-1 work (the wave-2 review, 4 Nov).
+  const stepTwoWait = startsWaitLine(ask.room, locale);
+  const startLines: readonly MoneyLine[] = [startShareLine(ask.room), stepTwoWait].filter((line): line is MoneyLine => line !== null);
   const roomLines = (
     <>
       <V4MoneyLines lines={startLines} catalog={catalog} />
-      {startsWait === null ? <RoomNotice room={ask.room} catalog={{ ...newDebateCatalog, ...billingCatalog }} locale={locale} /> : null}
+      {stepTwoWait === null ? <RoomNotice room={ask.room} catalog={{ ...newDebateCatalog, ...billingCatalog }} locale={locale} /> : null}
     </>
   );
   const shortHint = trimmed.length > 0 && !longEnough && !crisisText;

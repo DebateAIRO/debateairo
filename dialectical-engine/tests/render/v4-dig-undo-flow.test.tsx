@@ -307,17 +307,20 @@ describe("a phone's one bottom stack (journey-d3, dig-f16, dig-f17)", () => {
     harness.room = room({ dig_share_percent: 3 });
     await mountMap(375, crypto.randomUUID(), "n-smr");
     const bar = page().querySelector<HTMLElement>(".v4StackPhone .v4DebPhoneBar")!;
-    // dig-f31 (owner's screen review): on a path with nothing picked, the bar first shows the choices; nothing is dug.
+    // dig-f31 (owner's screen review), the record's two states: on a path with nothing picked, the bar shows the choices;
+    // nothing is dug, and it keeps saying so (whether it may then dig the whole path is an owner question).
     const choose = bar.querySelector<HTMLButtonElement>(".v4DebPhoneDig")!;
     expect(choose.textContent).toBe(CATALOG["v4.dig.chooseWhat"]);
     await press(choose);
     expect(harness.submit).not.toHaveBeenCalled();
     expect(page().querySelectorAll(".v4Undo")).toHaveLength(0);
+    expect(bar.querySelector(".v4DebPhoneDig")!.textContent).toBe(CATALOG["v4.dig.chooseWhat"]);
+    // Once something is picked, the bar digs it: "Dig into your pick · up to 3%" (journey-f13 / dig-f5: "up to" while the
+    // server's deep-dig estimate still counts every rewrite above).
+    await click(panel().querySelector<HTMLInputElement>(".v4Sugs input[type=checkbox]")!);
     const job = bar.querySelector<HTMLButtonElement>(".v4DebPhoneDig")!;
-    // journey-f13 / dig-f5: "Dig here · up to 3%" (never "Dig deeper here" or "Dig here too"; "up to" while the server's
-    // deep-dig estimate still counts every rewrite above, dig-f5).
-    expect(job.textContent).toBe(`${CATALOG["v4.panel.dig"]} · ${word("v4.undo.barShare", { percent: 3 })}`);
-    expect(job.textContent).toBe("Dig here · up to 3%");
+    expect(job.textContent).toBe(`${CATALOG["v4.dig.yourPicks.one"]} · ${word("v4.undo.barShare", { percent: 3 })}`);
+    expect(job.textContent).toBe("Dig into your pick · up to 3%");
     await press(job);
     // The note sits inside the stack, above the bar; the bar's dig button steps back for the note's Undo.
     const note = stack()!.querySelector(".v4StackTop .v4Undo");
@@ -370,8 +373,9 @@ describe("a phone's one bottom stack (journey-d3, dig-f16, dig-f17)", () => {
   it("after a single dig of a path the slim line does not claim a good time (dig-f29, the map track's report rule)", async () => {
     await mountMap(375, crypto.randomUUID(), "n-smr");
     expect(stack()!.querySelector(".v4StackGoodTime")).toBeNull();
-    // dig-f31: the first press shows the path's choices, the second digs the whole path.
+    // dig-f31 (the record's two states): the first press shows the path's choices; with one picked, the bar digs it.
     await press(stack()!.querySelector<HTMLButtonElement>(".v4DebPhoneDig")!);
+    await click(panel().querySelector<HTMLInputElement>(".v4Sugs input[type=checkbox]")!);
     await press(stack()!.querySelector<HTMLButtonElement>(".v4DebPhoneDig")!);
     await advance(10_100);
     await settle(16_000);

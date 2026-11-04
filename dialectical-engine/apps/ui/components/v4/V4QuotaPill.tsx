@@ -69,9 +69,13 @@ export function pillDetails(usage: BillingUsage | null): readonly PillWindow[] {
     .filter((window): window is PillWindow => window !== null);
 }
 
-/** The person's usage, read once and again on every quota moment and tab return; null when there is none to show. */
-function useQuotaUsage(wanted: boolean): BillingUsage | null {
+/**
+ * The person's usage, read once and again on every quota moment and tab return; null when there is none to show.
+ * `answered`: the first read has answered (with usage or with none), so the pill's held place can go (ask-f16).
+ */
+function useQuotaUsage(wanted: boolean): Readonly<{ usage: BillingUsage | null; answered: boolean }> {
   const [usage, setUsage] = useState<BillingUsage | null>(null);
+  const [answered, setAnswered] = useState(false);
   const reads = useRef(0);
   const read = useCallback(() => {
     reads.current += 1;
@@ -79,7 +83,8 @@ function useQuotaUsage(wanted: boolean): BillingUsage | null {
     void readBillingUsage(contractClient).then((next) => {
       // The latest read wins; a failed read keeps what was shown (the pill never blinks out on a passing fault).
       if (mine === reads.current && next !== null) setUsage(next);
-    });
+      setAnswered(true);
+    }, () => setAnswered(true));
   }, []);
   useEffect(() => {
     if (!wanted) return undefined;
@@ -89,7 +94,7 @@ function useQuotaUsage(wanted: boolean): BillingUsage | null {
     };
   }, [wanted, read]);
   useQuotaRefresh(read, wanted);
-  return wanted ? usage : null;
+  return { usage: wanted ? usage : null, answered };
 }
 
 /**
@@ -97,7 +102,7 @@ function useQuotaUsage(wanted: boolean): BillingUsage | null {
  * quota and nothing is read (journey-f19: the report page and public pages).
  */
 export function V4QuotaPill({ catalog, wanted = true }: Readonly<{ catalog: MessageCatalog; wanted?: boolean }>) {
-  const usage = useQuotaUsage(wanted);
+  const { usage, answered } = useQuotaUsage(wanted);
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const listId = useId();
@@ -110,7 +115,9 @@ export function V4QuotaPill({ catalog, wanted = true }: Readonly<{ catalog: Mess
     return () => document.removeEventListener("mousedown", onDown);
   }, [open]);
   const shown = pillWindow(usage);
-  if (shown === null) return null;
+  // ask-f16 (first frame = the real page, nothing moves): until the first read answers, the pill's place is held, empty and
+  // hidden, so the header row does not shift when it comes.
+  if (shown === null) return wanted && !answered ? <span className="v4HdrQuotaHold" aria-hidden="true" data-quota-hold="" /> : null;
   const text = pillText(shown, catalog);
   const details = pillDetails(usage);
   // One window only (a Free read names just its month): nothing more to show, so the pill is plain text.

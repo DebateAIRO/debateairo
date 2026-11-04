@@ -3,10 +3,9 @@
 import type { PublicDebate } from "@debateai/contract";
 import { AiNotice } from "@/components/AiNotice";
 import { PublicAnswerDisclosure } from "@/components/PublicAnswerDisclosure";
-import { V4Header } from "@/components/v4/V4Header";
 import { V4PublicFlag } from "@/components/v4/V4PublicFlag";
 import { V4PublicTopMenu } from "@/components/v4/V4PublicPage";
-import { V4PublicSessionProvider } from "@/components/v4/V4PublicSession";
+import { V4PublicHeader, V4PublicSessionProvider } from "@/components/v4/V4PublicSession";
 import { PublicDebateOverview } from "@/components/PublicDebateOverview";
 import { SupportWidget } from "@/components/support/SupportWidget";
 import type { LocaleCode } from "@/lib/i18n/locales";
@@ -67,11 +66,11 @@ export function PublicDebatePageClient({
     <V4PublicSessionProvider>
       <div className="v4Root v4PubPage" data-public-page>
         {/* journey-f19 (review F8): the quota shows only on the ask, choosing and map pages; a public page shows none and reads none. */}
-        <V4Header catalog={v4Catalog} readingLevel={null} showQuota={false}>
+        <V4PublicHeader catalog={v4Catalog}>
           <V4PublicTopMenu catalog={v4Catalog}>
             <V4PublicFlag publicRef={debate.public_ref} catalog={v4Catalog} placement="top" />
           </V4PublicTopMenu>
-        </V4Header>
+        </V4PublicHeader>
         {/* The layout already holds the page's one <main>. */}
         <div className="v4PubMain">
           <h1 className="v4Serif v4PubTitle" data-ai-generated="true" lang={storyLocale} dir="auto">{debate.question}</h1>

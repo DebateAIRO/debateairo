@@ -90,6 +90,10 @@ describe("dig-f5: each dig button carries its own share", () => {
     await click(buttonNamed(CATALOG["v4.suggest.goToPicks"]!, waiting));
     expect(panel().querySelector(".v4SugElsewhere")).toBeNull();
     expect(panel().querySelector(".v4SugPicked")).not.toBeNull();
+    // ACCESS-4: the pressed button went with the other path, so focus moves to the new place's heading, never the body.
+    expect(document.activeElement).not.toBe(document.body);
+    expect(panel().contains(document.activeElement)).toBe(true);
+    expect(document.activeElement!.tagName).toMatch(/^H[1-6]$/u);
     await openPath(PATHS.smr);
     await click(buttonNamed(CATALOG["v4.suggest.clearPicks"]!, panel()));
     expect(tray()).toBeNull();
@@ -234,5 +238,39 @@ describe("map-f9: 'This question: N% of today'", () => {
     expect(page().querySelector(".v4DebMain .v4QuestionShare")).toBeNull();
     expect(stack()!.querySelector(".v4QuestionShare")?.textContent).toBe(words);
     expect(page().querySelector(".v4DebPhoneUsage")?.textContent).toBe(word("v4.money.borrowed.PERSON_DAY", { percent: 4 }));
+  });
+});
+
+describe("wait-f22 / map-f9: the first digs the page reads are its starting point (the wave-2 review, CODE-3)", () => {
+  it("an old dig found while the page still reads its digs is no quota moment; a dig started after is one", async () => {
+    const { createRoot } = await import("react-dom/client");
+    const { useQuotaMoments } = await import("../../apps/ui/lib/v4/useQuotaMoments.js");
+    const { useQuotaBeat } = await import("../../apps/ui/lib/v4/quotaPulse.js");
+    type View = import("../../apps/ui/lib/v4/types.js").DigView;
+    const view = (id: string, state: View["state"]): View => ({ link: { childRunId: id }, state }) as unknown as View;
+    function Probe({ digs, settled }: Readonly<{ digs: readonly View[]; settled: boolean }>) {
+      useQuotaMoments({ running: false, served: true, digs, settled });
+      return <span data-beat={useQuotaBeat()} />;
+    }
+    const host = document.createElement("div");
+    document.body.append(host);
+    const probe = createRoot(host);
+    const beat = (): number => Number(host.querySelector("span")!.getAttribute("data-beat"));
+    try {
+      await act(async () => probe.render(<Probe digs={[]} settled={false} />));
+      const start = beat();
+      // The old dig shows as working until its own read answers, then as done: the page was still reading its digs.
+      await act(async () => probe.render(<Probe digs={[view("old", "RUNNING")]} settled={false} />));
+      await act(async () => probe.render(<Probe digs={[view("old", "DONE")]} settled />));
+      expect(beat()).toBe(start);
+      // A dig started now is a moment, once.
+      await act(async () => probe.render(<Probe digs={[view("old", "DONE"), view("new", "RUNNING")]} settled={false} />));
+      expect(beat()).toBe(start + 1);
+      await act(async () => probe.render(<Probe digs={[view("old", "DONE"), view("new", "RUNNING")]} settled />));
+      expect(beat()).toBe(start + 1);
+    } finally {
+      await act(async () => probe.unmount());
+      host.remove();
+    }
   });
 });

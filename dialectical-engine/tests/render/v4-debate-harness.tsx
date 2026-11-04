@@ -33,12 +33,13 @@ export const CATALOG = JSON.parse(readFileSync(resolve(import.meta.dirname, "../
 const seed = createSeed(fixture);
 const ANSWER_ID = "aaaa1111-1111-4111-8111-111111111111";
 
-export function seededAnswer(runId: string, extra: Partial<Answer> = {}): Answer {
+/** `web`: the answer's web part as the stand-in seeds it ("FREE": a debate that ran on Free, which searches nothing). */
+export function seededAnswer(runId: string, extra: Partial<Answer> = {}, web: "PAID" | "FREE" = "PAID"): Answer {
   return {
     ...(seed.answer({
       answerId: ANSWER_ID, runRef: runId,
       question: "Should countries build new nuclear power, or put the money into renewables and storage?",
-      askedAt: "2026-10-27T15:12:00.000Z", servedAt: "2026-10-27T15:40:00.000Z", web: "PAID"
+      askedAt: "2026-10-27T15:12:00.000Z", servedAt: "2026-10-27T15:40:00.000Z", web
     }) as Answer),
     ...extra
   };

@@ -134,10 +134,19 @@ describe("new starts wait for the reset (new_starts: BLOCKED_UNTIL_RESET)", () =
     await click(add);
     expect(tray()).not.toBeNull();
     expect(buttonsNamed(CATALOG["v4.dig.addToTray"]!, panel())).toHaveLength(0);
+    // ACCESS-5: the pressed button went, so focus stays at the dig button in the same place, never on the page's body.
+    expect(document.activeElement).toBe(panel().querySelector(".v4PanelDigBtn"));
     // The tray's one button waits too, with the reset time on it.
     const time = formatDate("en", RESET, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
-    expect(buttonsNamed(`${CATALOG["v4.dig.yourPicks.one"]} · ${word("v4.dig.after", { time })}`, tray()!)).toHaveLength(1);
+    const trayDig = buttonNamed(`${CATALOG["v4.dig.yourPicks.one"]} · ${word("v4.dig.after", { time })}`, tray()!);
     expect(tray()!.textContent).toContain(word("v4.dig.quotaDayUsed", { time }));
+    // dig-f11 / journey-f14 (CODE-5): greyed but focusable, pointing at the visible reason; a press gives it the highlight again.
+    expect(trayDig.getAttribute("aria-disabled")).toBe("true");
+    const reason = document.getElementById(trayDig.getAttribute("aria-describedby")!)!;
+    expect(reason.textContent).toBe(word("v4.dig.quotaDayUsed", { time }));
+    await click(trayDig);
+    expect(document.getElementById(trayDig.getAttribute("aria-describedby")!)!.classList.contains("v4Highlight")).toBe(true);
+    expect(harness.submit).not.toHaveBeenCalled();
   });
 
   it("the month: its own line, which says the report can still be written, and 'on {date}' on the button", async () => {

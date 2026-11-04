@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from "react";
+import { V4ShareChange } from "@/components/v4/V4ShareChange";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
 /*
@@ -20,10 +21,11 @@ import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
 export type V4BarJob =
   /**
-   * `waiting` (dig-f11, owner's screen review 3 Nov): new digs wait for a reset, so the button stays where it is, greyed,
-   * its label carrying the reset time; pressing it shows why (the panel's line above).
+   * `waiting` (dig-f11, owner's screen review 3 Nov): new digs wait for a reset (or rest while the report is written,
+   * journey-f14), so the button stays where it is, greyed; `reason` is the line that says why, for screen readers, and
+   * pressing it shows that line in the panel. `share` (journey-f8): the button's share, for its grey change mark.
    */
-  | Readonly<{ kind: "dig"; label: string; onDig: () => void; waiting?: boolean }>
+  | Readonly<{ kind: "dig"; label: string; onDig: () => void; waiting?: boolean; reason?: string; share?: number | null; place?: string }>
   /** dig-f31: with nothing picked, "Choose what to dig ›" takes the person to the choices instead of digging at once. */
   | Readonly<{ kind: "choose"; label: string; onChoose: () => void }>
   | Readonly<{ kind: "report"; href: string }>
@@ -87,7 +89,7 @@ export function V4BottomStack(props: Readonly<{
   phone: boolean;
   /** The Undo and ready notes (V4DigNotes); null when there are none. */
   notes: ReactNode;
-  /** The tray of picks; null when nothing is picked (or the picks' dig is waiting). */
+  /** Computer: the tray of picks; null when nothing is picked (or the picks' dig is waiting). A phone has no tray (dig-f4). */
   tray: ReactNode;
   /**
    * Phone: what stays pinned right above the bar, outside the part that scrolls (dig-f18, the ready-digs track: the
@@ -98,8 +100,7 @@ export function V4BottomStack(props: Readonly<{
   trayTitle?: ReactNode;
   /**
    * Phone (dig-f4, 3 Nov): there are picks, and a phone has no tray, so "Your picks ▸" opens the Map sheet, which lists
-   * them with Clear (the outline is also the tray), while the pinned bar carries their dig. Absent: the folded line opens
-   * `tray` inside the stack, as before.
+   * them with Clear (the outline is also the tray), while the pinned bar carries their dig. Absent: no picks line.
    */
   onOpenPicks?: () => void;
   /** Phone: the pinned bar. */
@@ -125,13 +126,9 @@ export function V4BottomStack(props: Readonly<{
   const ref = useRef<HTMLDivElement | null>(null);
   useStackRoom(ref, phone);
   const aside = useKeyboardOpen(phone);
-  const [picksOpen, setPicksOpen] = useState(false);
   const [goodTimeClosed, setGoodTimeClosed] = useState(false);
+  const reasonId = useId();
   const job = props.job ?? { kind: "none" };
-  const hasTray = props.tray !== null && props.tray !== undefined && props.tray !== false;
-  useEffect(() => {
-    if (!hasTray) setPicksOpen(false);
-  }, [hasTray]);
 
   if (!phone) {
     return (
@@ -180,20 +177,6 @@ export function V4BottomStack(props: Readonly<{
               {props.trayTitle === undefined ? null : <span className="v4StackPicksPath">{props.trayTitle}</span>}
             </button>
           </div>
-        ) : hasTray ? (
-          <div className={`v4StackPicks${picksOpen ? " v4StackPicksOpen" : ""}`}>
-            <button
-              type="button"
-              className="v4StackPicksToggle"
-              aria-expanded={picksOpen}
-              onClick={() => setPicksOpen((open) => !open)}
-            >
-              <span>{t(catalog, "v4.bar.yourPicks")}</span>
-              <span className="v4StackPicksArrow" aria-hidden="true">▸</span>
-              {props.trayTitle === undefined ? null : <span className="v4StackPicksPath">{props.trayTitle}</span>}
-            </button>
-            {picksOpen ? props.tray : null}
-          </div>
         ) : null}
       </div>
       {props.pinned ?? null}
@@ -203,15 +186,21 @@ export function V4BottomStack(props: Readonly<{
           {t(catalog, "v4.debate.mapButton")}
         </button>
         {job.kind === "dig" ? (
-          <button
-            ref={props.jobRef as RefObject<HTMLButtonElement | null> | undefined}
-            type="button"
-            className={`v4Btn v4BtnPrimary v4DebPhoneDig${job.waiting === true ? " v4DigWaiting" : ""}`}
-            aria-disabled={job.waiting === true ? "true" : undefined}
-            onClick={job.onDig}
-          >
-            {job.label}
-          </button>
+          <>
+            <button
+              ref={props.jobRef as RefObject<HTMLButtonElement | null> | undefined}
+              type="button"
+              className={`v4Btn v4BtnPrimary v4DebPhoneDig${job.waiting === true ? " v4DigWaiting" : ""}`}
+              aria-disabled={job.waiting === true ? "true" : undefined}
+              aria-describedby={job.waiting === true && job.reason !== undefined ? reasonId : undefined}
+              onClick={job.onDig}
+            >
+              {job.label}
+            </button>
+            {/* journey-f8: a changed share in grey for 2 seconds, here too (the panel's own mark is hidden on a phone). */}
+            {job.waiting === true ? null : <V4ShareChange share={job.share ?? null} subject={job.place ?? null} />}
+            {job.waiting === true && job.reason !== undefined ? <span id={reasonId} className="v4SrOnly">{job.reason}</span> : null}
+          </>
         ) : null}
         {job.kind === "paused" ? (
           <p className="v4DebPhonePaused" role="status">

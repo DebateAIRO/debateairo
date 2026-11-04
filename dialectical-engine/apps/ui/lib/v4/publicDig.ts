@@ -6,7 +6,6 @@ import {
 import { contractClient } from "../api.js";
 import type { AskRoom } from "../billing/room.js";
 import type { DigUndoEntry } from "./digUndo.js";
-import type { MoneyLine } from "./money.js";
 import { waitStateOfRun, type WaitState } from "./stateWords.js";
 
 /*
@@ -38,15 +37,15 @@ export function waitingPublicDig(entries: readonly DigUndoEntry[], publicRef: st
 }
 
 /**
- * public-f11: the share a public dig takes, shown before the press, when the room read says one for this dig. The read a
- * public page makes today is a new question's (the server works a dig's share out only for the person's own debate), so
- * `dig_share_percent` is absent and nothing is shown: never a new question's share in its place, never worked out here.
- * Free counts by the month, so its line says "of this month".
+ * public-f11: the share a public dig takes, shown on its button before the press, when the room read says one for this
+ * dig. The read a public page makes today is a new question's (the server works a dig's share out only for the person's
+ * own debate), so `dig_share_percent` is absent and nothing is shown: never a new question's share in its place, never
+ * worked out here. The period it is of is named once by the switch, from the server's window (read-f19 / public-f14:
+ * lib/v4/digQuota.ts digPeriodLine, "of this month" on Free), as on the map.
  */
-export function publicDigShareLine(room: AskRoom | null, planTier: "free" | "premium"): MoneyLine | null {
+export function publicDigShare(room: AskRoom | null): number | null {
   const percent = room?.dig_share_percent;
-  if (percent === undefined || percent <= 0) return null;
-  return Object.freeze({ key: planTier === "free" ? "v4.public.dig.shareMonth" : "v4.public.dig.shareToday", values: { percent } });
+  return percent === undefined || percent <= 0 ? null : percent;
 }
 
 // ---------------------------------------------------------------------------------------------------------------

@@ -104,15 +104,12 @@ export function V4SourceList(props: Readonly<{ sources: readonly WebSource[] | u
   );
 }
 
-/** map-d4 A: at most this many sites are named on a point's folded source line; the rest are "and N more". */
-const SITES_NAMED = 2;
-
-/** The folded line's words: "From iea.org and oecd-nea.org", or "From iea.org, oecd-nea.org and 1 more" (no count of pages). */
+/**
+ * map-d4 A: a point's folded source line, "From iea.org and oecd-nea.org". journey-f23 (the wave-2 review, 4 Nov):
+ * nothing counts sources, so every site is named, never "and N more".
+ */
 function sourcesLine(sources: readonly WebSource[], catalog: MessageCatalog, locale: string): string {
   const sites = [...new Set(sources.map((source) => source.site.trim()).filter((site) => site.length > 0))];
-  if (sites.length > SITES_NAMED) {
-    return t(catalog, "v4.web.sourcesFromMore", { sites: sites.slice(0, SITES_NAMED).join(", "), count: sites.length - SITES_NAMED });
-  }
   let named: string;
   try {
     named = new Intl.ListFormat(locale, { style: "long", type: "conjunction" }).format(sites);

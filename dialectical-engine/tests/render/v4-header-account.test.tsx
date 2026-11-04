@@ -19,9 +19,15 @@ const server = vi.hoisted(() => ({
   session: "IN" as "IN" | "OUT",
   email: "maria@example.com" as string | null,
   sessionReads: 0,
-  emailReads: 0
+  emailReads: 0,
+  pageReads: 0
 }));
 vi.mock("@/lib/api", () => ({
+  // public-f13: the public page's one session read (V4PublicSessionProvider).
+  validateSession: async () => {
+    server.pageReads += 1;
+    if (server.session === "OUT") throw new Error("SESSION_REQUIRED");
+  },
   contractClient: {
     readSession: async () => {
       server.sessionReads += 1;
@@ -42,6 +48,7 @@ vi.mock("@/lib/api", () => ({
 import { V4Header } from "../../apps/ui/components/v4/V4Header.js";
 import { initialOf } from "../../apps/ui/components/v4/V4AccountMenu.js";
 import { TopBar } from "../../apps/ui/components/TopBar.js";
+import { V4PublicHeader, V4PublicSessionProvider } from "../../apps/ui/components/v4/V4PublicSession.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const CATALOG = JSON.parse(readFileSync(resolve(import.meta.dirname, "../../apps/ui/messages/en/v4.json"), "utf8")) as Record<string, string>;
@@ -53,6 +60,7 @@ beforeEach(() => {
   server.email = "maria@example.com";
   server.sessionReads = 0;
   server.emailReads = 0;
+  server.pageReads = 0;
   window.history.replaceState(null, "", "/v4/debate/11111111-1111-4111-8111-111111111111?level=plain");
   delete document.documentElement.dataset.mode;
 });
@@ -183,6 +191,20 @@ describe("ask-d6 A: the round account button", () => {
   });
 });
 
+describe("public-f13 with ask-d6 A: a public page reads the session once", () => {
+  it.each([["IN"], ["OUT"]] as const)("signed %s, the header's account button takes the page's one answer and reads no session of its own", async (session) => {
+    server.session = session;
+    window.history.replaceState(null, "", "/public/debate/22222222-2222-4222-8222-222222222222");
+    await mount(<V4PublicSessionProvider><V4PublicHeader catalog={CATALOG} /></V4PublicSessionProvider>);
+    expect(server.pageReads).toBe(1);
+    expect(server.sessionReads).toBe(0);
+    if (session === "IN") expect(accountButton()).not.toBeNull();
+    else expect(document.querySelector<HTMLAnchorElement>(".v4HdrAccount a")!.textContent).toBe(CATALOG["v4.ask.signIn"]);
+    // journey-f19: no quota on a public page.
+    expect(document.querySelector(".v4HdrAllowance")).toBeNull();
+  });
+});
+
 describe("ask-d6 A: signed out, and while the page still checks", () => {
   it("a page that knows the visitor is signed out shows Sign in in the button's place, with the way back to this page and its level", async () => {
     window.history.replaceState(null, "", "/v4?topic=nuclear");
@@ -195,6 +217,19 @@ describe("ask-d6 A: signed out, and while the page still checks", () => {
     // Nothing of the account is read for a stranger, and the page's own session answer is used.
     expect(server.sessionReads).toBe(0);
     expect(server.emailReads).toBe(0);
+  });
+
+  it("WHOLE-14: on the ask page's address its Sign in carries exactly the way back the step-1 buttons carry", async () => {
+    // tests/render/v4-ask-step-one.test.tsx pins the step-1 buttons' `wayBack` for this very address; the page builds both
+    // links with the same expression (signInHrefFor(levelHref(currentReturnPath(), level))).
+    window.history.replaceState(null, "", "/v4?level=plain&topic=trams");
+    await mount(header({ session: "OUT" }));
+    const wayBack = `/login?next=${encodeURIComponent("/v4?level=plain&topic=trams")}`;
+    expect(document.querySelector<HTMLAnchorElement>(".v4HdrAccount a")!.getAttribute("href")).toBe(wayBack);
+    const askPage = readFileSync(resolve(import.meta.dirname, "../../apps/ui/components/v4/V4AskClient.tsx"), "utf8");
+    expect(askPage).toContain("signInHrefFor(levelHref(currentReturnPath(), savedLevel))");
+    const menu = readFileSync(resolve(import.meta.dirname, "../../apps/ui/components/v4/V4AccountMenu.tsx"), "utf8");
+    expect(menu).toContain("signInHrefFor(levelHref(currentReturnPath(), level))");
   });
 
   it("a page with no session answer of its own reads it: signed out, Sign in", async () => {

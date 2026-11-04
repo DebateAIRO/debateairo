@@ -8,6 +8,7 @@ import {
   canAskForReport, carryOnOf, digsRestFor, reportMomentAllowed, reportSharePercentOf, type ReportStage
 } from "@/lib/v4/reportWriting";
 import { stateWordText, whenText } from "@/lib/v4/stateWords";
+import { quotaChanged } from "@/lib/v4/quotaPulse";
 import { levelHref } from "@/lib/v4/storage";
 import type { ReadingLevel } from "@/lib/v4/types";
 import { useReportWatch, type ReportAnswer } from "@/lib/v4/useReportVersions";
@@ -95,7 +96,16 @@ export function useMapReport(input: MapReportInput): MapReport {
   const watch = useReportWatch(input.servedRunId, input.isDig, input.onReady, carryOn);
   const { stage } = watch;
   const canAsk = canAskForReport(stage);
-  const headerRef = useRef<HTMLButtonElement | null>(null);
+  // WHOLE-11 (public-d3 A, public-f15): a report that was being written and is now written (or did not finish) is a quota
+  // moment: the figures read again. A report already done when the page opened is not.
+  const stageKindBefore = useRef(stage.kind);
+  useEffect(() => {
+    const before = stageKindBefore.current;
+    stageKindBefore.current = stage.kind;
+    if ((before === "WRITING" || before === "WAITING_DIGS") && (stage.kind === "DONE" || stage.kind === "FAILED")) quotaChanged();
+  }, [stage.kind]);
+  // The header's report button, or its link once the report waits, is written or stands (ACCESS-6: focus can go back to it).
+  const headerRef = useRef<HTMLElement | null>(null);
   const start = useReportStart({
     watch,
     runId: input.servedRunId ?? input.runId,
@@ -146,7 +156,7 @@ export function useMapReport(input: MapReportInput): MapReport {
     if (canAsk) {
       return (
         <button
-          ref={headerRef}
+          ref={headerRef as RefObject<HTMLButtonElement | null>}
           type="button"
           className={className}
           disabled={start.busy}
@@ -160,7 +170,7 @@ export function useMapReport(input: MapReportInput): MapReport {
     }
     // W3-4: always there once the answer is served; while the report waits, is written or stands, it leads to its page.
     return (
-      <Link className={className} href={href}>
+      <Link ref={headerRef as RefObject<HTMLAnchorElement | null>} className={className} href={href}>
         {mark}
         {t(catalog, "v4.rail.writeReport")}
         {goodWords}

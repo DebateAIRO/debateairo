@@ -109,7 +109,7 @@
 .v4DebRail-strip .v4DebRailSteps, .v4DebRail-strip .v4DebRailRounds { flex-direction: row; flex-wrap: wrap; gap: 6px 16px; }
 .v4DebRail-strip .v4DebRailBlock { flex-direction: row; align-items: center; gap: 10px; }
 .v4DebRail-strip .v4DebRailBlock > .v4Eyebrow { display: none; }
-.v4DebRail-strip .v4DebRailNote { display: inline; margin-left: 6px; }
+.v4DebRail-strip .v4DebRailNote { display: inline; margin-inline-start: 6px; }
 .v4DebRail-strip .v4DebRailOpen { border-top: 0; padding-top: 0; }
 .v4DebRail-strip .v4DebRailOpenCount { font-size: 20px; }
 .v4DebRail-strip .v4DebRailGoodTime { flex-direction: row; flex-wrap: wrap; align-items: center; padding: 6px 10px; }
@@ -149,6 +149,13 @@
 }
 .v4DebPanelCol > .v4DebTrayDock {
   position: sticky; bottom: 0; z-index: 1; max-width: none; margin-top: 12px; box-shadow: none;
+}
+/* ACCESS-2 (the wave-2 review, 4 Nov): a control the keyboard reaches is scrolled clear of the pinned dig block and the
+   docked tray (--v4-pin-room is the block's measured height, V4Panel.tsx), never left behind them. */
+.v4DebLayout-desktop .v4DebPanelCol,
+.v4DebLayout-laptop .v4DebPanelCol,
+.v4DebLayout-mid .v4DebPanelCol {
+  scroll-padding-block-end: calc(var(--v4-pin-room, 0px) + var(--v4-dock-room, 0px) + 8px);
 }
 
 /* ---------- the phone map sheet (D7) ---------- */
@@ -228,10 +235,10 @@
 .v4Trail { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; min-width: 0; font-size: var(--t-ui); }
 .v4TrailParts { display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; margin: 0; padding: 0; list-style: none; min-width: 0; }
 .v4TrailParts li { display: inline-flex; align-items: center; min-width: 0; overflow-wrap: anywhere; }
-.v4TrailParts li + li::before { content: "›"; margin-right: 6px; color: var(--text-2); }
+.v4TrailParts li + li::before { content: "›"; margin-inline-end: 6px; color: var(--text-2); }
 .v4TrailParts .v4Link { min-height: 44px; display: inline-flex; align-items: center; }
 .v4TrailLevel { margin: 0; font-weight: 700; color: var(--text); }
-.v4DebChangesRewrites { flex: 1 1 100%; margin: 0; padding-left: 1.2em; min-width: 0; overflow-wrap: anywhere; }
+.v4DebChangesRewrites { flex: 1 1 100%; margin: 0; padding-inline-start: 1.2em; min-width: 0; overflow-wrap: anywhere; }
 
 /* V4 screen review, 3 Nov (map-f6): the page's grey outline while it loads: an empty header bar, an empty answer card and
    a few empty question cards. It stands still (no shimmer) and is replaced at once when the page is there. */
@@ -328,6 +335,9 @@
 .v4StepsDone .v4StepsDot { background: var(--ink); border-color: var(--ink); }
 .v4StepsHere { color: var(--text-strong); font-weight: 700; }
 .v4StepsHere .v4StepsDot { background: var(--accent); border-color: var(--accent); }
+/* ACCESS-7 (the wave-2 review, 4 Nov): "you are here" is told apart from "done" by more than its colour: the current dot is
+   larger and ringed (the names are hidden on a phone and in the dots shape). */
+.v4StepsHere .v4StepsDot { width: 10px; height: 10px; box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--accent); }
 /* The dots shape, and the line on a phone: the names stay for screen readers only. */
 .v4Steps-dots .v4StepsName { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .v4Steps-dots .v4StepsStep + .v4StepsStep::before { width: 6px; margin-inline: 2px; }

@@ -109,3 +109,34 @@ describe("the V4 map's styles follow the reading direction (map-f13)", () => {
     expect(inBlock(".v4MapFold .v4MapBranch")).toMatch(/display: flex;/u);
   });
 });
+
+describe("the wave-2 stylesheets follow the reading direction too (the wave-2 review, 4 Nov: ACCESS-15)", () => {
+  // The quota marks, the report on the map, the public page and the dig box, the debate page's own rules and the wait card.
+  const files = ["app/v4/v4-quota.css", "app/v4/v4-report-map.css", "app/v4/v4-public.css", "app/v4/v4-debate.css", "app/v4/v4-wait.css",
+    "app/public/debate/[id]/public-lane.css"];
+  it.each(files)("%s places nothing by left or right", (file) => {
+    const text = readFileSync(resolve(import.meta.dirname, "../../apps/ui", file), "utf8").replace(/\/\*[\s\S]*?\*\//gu, "");
+    const physical = [...text.matchAll(/(?:^|[\s;{])((?:margin|padding|border)-(?:left|right)(?:-[a-z]+)?|left|right|text-align:\s*(?:left|right))\s*:?/gmu)]
+      .map((match) => match[1]);
+    expect(physical).toEqual([]);
+  });
+
+  it("ACCESS-8: the running dig's step arrow is not turned a second time on a right-to-left page (the browser mirrors › there itself)", () => {
+    const wait = readFileSync(resolve(import.meta.dirname, "../../apps/ui/app/v4/v4-wait.css"), "utf8").replace(/\/\*[\s\S]*?\*\//gu, "");
+    expect(wait).toMatch(/\.v4DigStep \+ \.v4DigStep::before \{[^}]*content: "›"/u);
+    expect(wait).not.toMatch(/\.v4DigStep:dir\(rtl\)/u);
+  });
+});
+
+describe("the wave-2 review's layout rules (4 Nov)", () => {
+  const read = (file: string): string => readFileSync(resolve(import.meta.dirname, "../../apps/ui/app/v4", file), "utf8").replace(/\/\*[\s\S]*?\*\//gu, "");
+  it("ACCESS-7: the current step is told apart from a done one by more than colour (larger, ringed)", () => {
+    expect(read("v4-debate.css")).toMatch(/\.v4StepsHere \.v4StepsDot \{ width: 10px; height: 10px; box-shadow: 0 0 0 2px var\(--surface\), 0 0 0 3\.5px var\(--accent\); \}/u);
+  });
+  it("ACCESS-2: a control the keyboard reaches in the panel column scrolls clear of the pinned dig block and the docked tray", () => {
+    expect(read("v4-debate.css")).toMatch(/\.v4DebLayout-mid \.v4DebPanelCol \{\s*scroll-padding-block-end: calc\(var\(--v4-pin-room, 0px\) \+ var\(--v4-dock-room, 0px\) \+ 8px\);/u);
+  });
+  it("ACCESS-1: the phone's stack grows while the report's strip is open in it, so its lines show before Write it", () => {
+    expect(read("v4-undo.css")).toMatch(/\.v4StackPhone:has\(\.v4RepStrip-bottom\) \{ max-height: 85vh; max-height: 85dvh; \}/u);
+  });
+});

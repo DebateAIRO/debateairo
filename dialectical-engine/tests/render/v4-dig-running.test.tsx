@@ -292,6 +292,8 @@ describe("the running dig's styles (journey-d1: the six moves only)", () => {
   it("lays the steps out with start and end only, so they run right to left in Arabic and wrap on a phone", () => {
     expect(block).not.toMatch(/\b(?:margin|padding)-(?:left|right)\b|\b(?:left|right):/u);
     expect(block).toMatch(/\.v4DigSteps \{[^}]*flex-wrap: wrap;/u);
-    expect(block).toMatch(/:dir\(rtl\)/u);
+    // ACCESS-8 (the wave-2 review): "›" is mirrored by the browser on a right-to-left page, so no rule turns it a second time.
+    expect(block).toMatch(/\.v4DigStep \+ \.v4DigStep::before \{[^}]*content: "›"/u);
+    expect(block).not.toMatch(/:dir\(rtl\)/u);
   });
 });

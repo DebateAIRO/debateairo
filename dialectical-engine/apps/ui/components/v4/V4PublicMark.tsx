@@ -56,20 +56,30 @@ export function V4PublicMark({ stage, catalog }: Readonly<{ stage: PublicStage |
   // its stage, so each change plays it once.
   const shown = useRef<string | null>(null);
   const [glow, setGlow] = useState(false);
+  // ACCESS-16 (the wave-2 review, 4 Nov): one region that stays on the page says a stage that follows another one out loud
+  // (a region drawn with its words already in it is often not read); the first stage is read with the page.
+  const [said, setSaid] = useState("");
   const kind = stage?.kind ?? null;
   useEffect(() => {
     if (kind === null) return;
-    if (shown.current !== null && shown.current !== kind) setGlow(true);
+    if (shown.current !== null && shown.current !== kind) {
+      setGlow(true);
+      setSaid(t(catalog, kind === "PUBLIC" ? "v4.publicMark.public" : `v4.publicMark.${kind}`));
+    }
     shown.current = kind;
-  }, [kind]);
-  if (stage === null) return null;
+  }, [kind, catalog]);
+  const live = <span className="v4SrOnly" role="status" data-public-stage-said="">{said}</span>;
+  if (stage === null) return live;
   const className = `v4PublicMark${glow ? " v4Highlight" : ""}`;
   if (stage.kind !== "PUBLIC") {
     return (
-      <p key={stage.kind} className={className} role="status" data-public-stage={stage.kind}>
-        <Globe />
-        <span>{t(catalog, `v4.publicMark.${stage.kind}`)}</span>
-      </p>
+      <>
+        <p key={stage.kind} className={className} data-public-stage={stage.kind}>
+          <Globe />
+          <span>{t(catalog, `v4.publicMark.${stage.kind}`)}</span>
+        </p>
+        {live}
+      </>
     );
   }
   const href = publicPageHref(stage.publicRef);
@@ -79,6 +89,7 @@ export function V4PublicMark({ stage, catalog }: Readonly<{ stage: PublicStage |
     setCopy(outcome === "SHARED" ? "IDLE" : outcome);
   };
   return (
+    <>
     <p key={stage.kind} className={className} data-public-stage="PUBLIC">
       <Globe />
       <span className="v4PublicMarkWord">{t(catalog, "v4.publicMark.public")}</span>
@@ -90,6 +101,8 @@ export function V4PublicMark({ stage, catalog }: Readonly<{ stage: PublicStage |
         {copy === "COPIED" ? t(catalog, "v4.publicMark.linkCopied") : copy === "FAILED" ? t(catalog, "v4.publicMark.copyFailed") : ""}
       </span>
     </p>
+    {live}
+    </>
   );
 }
 

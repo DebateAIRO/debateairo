@@ -9,7 +9,7 @@ import type { WebSource } from "../../packages/contract/src/index.js";
 import { V4SourcesFold } from "../../apps/ui/components/v4/V4Sources.js";
 import {
   advance, branch, buttonNamed, buttonsNamed, CATALOG, click, expandBranch, harness, mountMap, openPath, page, panel, PATHS, resetHarness,
-  settle, tray, typeInto, unmountMap
+  seededAnswer, settle, tray, typeInto, unmountMap
 } from "./v4-debate-harness.js";
 
 vi.mock("@/components/AuthGate", async () => (await import("./v4-debate-harness.js")).authGateMock);
@@ -141,7 +141,7 @@ describe("map-d4 A: evidence first, sources folded, Skip to the dig button, the 
     explanation: null, published_on: null
   });
 
-  it("folds a point's sources into one closed line naming the sites, never a count of pages", () => {
+  it("folds a point's sources into one closed line naming the sites, never a count of pages or of sites (journey-f23)", () => {
     const fold = (sources: WebSource[]) => {
       const host = document.createElement("div");
       host.innerHTML = renderToStaticMarkup(<V4SourcesFold sources={sources} catalog={CATALOG} locale="en" />);
@@ -153,8 +153,8 @@ describe("map-d4 A: evidence first, sources folded, Skip to the dig button, the 
     // Every page is inside the fold, in full.
     expect(two.querySelectorAll(".v4Sources blockquote")).toHaveLength(3);
     const many = fold([source("a", "iea.org"), source("b", "oecd-nea.org"), source("c", "ember.org"), source("d", "ipcc.ch")]);
-    expect(many.querySelector("summary")!.textContent).toBe("From iea.org, oecd-nea.org and 2 more");
-    expect(many.querySelector("summary")!.textContent).not.toMatch(/\bpages?\b/u);
+    expect(many.querySelector("summary")!.textContent).toBe("From iea.org, oecd-nea.org, ember.org, and ipcc.ch");
+    expect(many.querySelector("summary")!.textContent).not.toMatch(/\bpages?\b|\d|\bmore\b/u);
     expect(renderToStaticMarkup(<V4SourcesFold sources={[]} catalog={CATALOG} locale="en" />)).toBe("");
   });
 
@@ -382,27 +382,33 @@ describe("dig-f22: a greyed pick box always has a reason the person can see", ()
 });
 
 describe("dig-f26 / dig-f34: the own view on Free, and what each picked item is", () => {
-  // dig-f26 / journey-f20: the one grey line where typed words will be public, "This will be public." (dig-f26's longer
-  // sentence is an owner question).
-  it("on a public Free debate a line under the own-view box says the view will be public, and the box points to it", async () => {
+  // dig-f26 / journey-f20 (the wave-2 review, 4 Nov: lib/v4/publicNotes.ts): the line follows the DEBATE, never the person's
+  // plan today. A debate that ran on Free, whose public state says no more than private (today's server), gets dig-f26's own
+  // sentence, which says "may"; "This will be public." needs the debate's public state (tests/render/v4-public-mark.test.tsx).
+  it("on a debate that ran on Free a line under the own-view box says the view may be shown, and the box points to it", async () => {
+    harness.planTier = "free";
+    const runId = crypto.randomUUID();
+    harness.answer = seededAnswer(runId, {}, "FREE");
+    await mountMap(1600, runId);
+    await openPath(PATHS.renew);
+    await click(buttonNamed(CATALOG["v4.suggest.ownView"]!, panel()));
+    const box = panel().querySelector<HTMLTextAreaElement>(".v4SugEditor textarea")!;
+    const line = panel().querySelector<HTMLElement>(".v4SugPublic")!;
+    expect(line.textContent).toBe(CATALOG["v4.suggest.ownViewPublic"]);
+    expect(line.textContent).toBe("Free debates are public, so your view may be shown on this public page.");
+    expect(box.getAttribute("aria-describedby")).toBe(line.id);
+    expect(before(box, line)).toBe(true);
+  });
+
+  it("says nothing of the kind on a paid debate, even when the person's plan is Free today", async () => {
     harness.planTier = "free";
     harness.freePublicNotice = true;
     await mountMap();
     await openPath(PATHS.renew);
     await click(buttonNamed(CATALOG["v4.suggest.ownView"]!, panel()));
-    const box = panel().querySelector<HTMLTextAreaElement>(".v4SugEditor textarea")!;
-    const line = panel().querySelector<HTMLElement>(".v4SugPublic")!;
-    expect(line.textContent).toBe(CATALOG["v4.publicMark.willBePublic"]);
-    expect(box.getAttribute("aria-describedby")).toBe(line.id);
-    expect(before(box, line)).toBe(true);
-  });
-
-  it("says nothing of the kind on a paid plan", async () => {
-    await mountMap();
-    await openPath(PATHS.renew);
-    await click(buttonNamed(CATALOG["v4.suggest.ownView"]!, panel()));
     expect(panel().querySelector(".v4SugPublic")).toBeNull();
     expect(panel().textContent).not.toContain(CATALOG["v4.publicMark.willBePublic"]);
+    expect(panel().textContent).not.toContain(CATALOG["v4.suggest.ownViewPublic"]);
   });
 
   it("labels a picked open question 'Open question' and the person's text 'Your view'", async () => {

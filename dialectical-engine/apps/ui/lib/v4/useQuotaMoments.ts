@@ -9,6 +9,9 @@ import type { DigView } from "./types.js";
  * (lib/v4/quotaPulse.ts) at the moments quota is used: when the question's answer arrives after the page saw it running
  * (the wait), when a dig starts (it appears among the page's digs once sent), and when a dig finishes or fails. A debate
  * already answered when the page opened, and digs already done then, are not a moment. Nothing is kept anywhere.
+ * The wave-2 review (4 Nov): the page's digs arrive over several reads (the records, the question list, each dig's state,
+ * shown meanwhile as working), so the first digs are taken as the starting point only once the page has read them all
+ * (`settled`); an old dig found late is then never "a dig that just started" nor "a dig that just finished".
  */
 
 function finished(state: DigView["state"]): boolean {
@@ -30,8 +33,10 @@ export function useQuotaMoments(input: Readonly<{
   running: boolean;
   served: boolean;
   digs: readonly DigView[];
+  /** The page has read every dig it knows of (records, question list, each dig's state). */
+  settled: boolean;
 }>): void {
-  const { running, served, digs } = input;
+  const { running, served, digs, settled } = input;
   const sawRunning = useRef(false);
   const wasServed = useRef(served);
   const seen = useRef<ReadonlyMap<string, DigView["state"]> | null>(null);
@@ -40,9 +45,9 @@ export function useQuotaMoments(input: Readonly<{
     let moment = served && !wasServed.current && sawRunning.current;
     wasServed.current = served;
     const now = new Map(digs.map((dig) => [dig.link.childRunId, dig.state] as const));
-    // The first digs the page reads are where it starts from, not a moment.
+    // The first digs the page has read in full are where it starts from, not a moment.
     if (seen.current !== null && quotaMomentBetween(seen.current, digs)) moment = true;
-    if (served) seen.current = now;
+    if (served && (seen.current !== null || settled)) seen.current = now;
     if (moment) quotaChanged();
-  }, [running, served, digs]);
+  }, [running, served, digs, settled]);
 }

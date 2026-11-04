@@ -1,11 +1,13 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { V4Header } from "@/components/v4/V4Header";
 import { validateSession } from "@/lib/api";
+import type { MessageCatalog } from "@/lib/i18n/translate";
 
 /*
  * public-f13 (owner screen review, 3 Nov): one sign-in check for the whole public page. The page reads the session once,
- * here, and every part that offers something (Dig into this, Write a report, Report a problem) reads that one answer, so
+ * here, and every part that offers something (Dig here, Write a report, Report a problem) reads that one answer, so
  * nothing pops in at a different moment. A part mounted without this provider (a test, the publication review) reads it
  * itself. Nothing is kept in the browser.
  */
@@ -36,6 +38,19 @@ export function usePublicSignedIn(readSession: () => Promise<unknown> = validate
   const shared = useContext(PublicSessionContext);
   const own = useSessionRead(readSession, shared !== undefined);
   return shared === undefined ? own : shared.signedIn;
+}
+
+/**
+ * The public page's V4 header (ask-d6 A): its account button reads the page's one session answer above (public-f13), so the page reads the session once
+ * (the wave-2 review, 4 Nov). journey-f19 (review F8): no quota on a public page, and none is read.
+ */
+export function V4PublicHeader({ catalog, children }: Readonly<{ catalog: MessageCatalog; children?: ReactNode }>) {
+  const signedIn = usePublicSignedIn();
+  return (
+    <V4Header catalog={catalog} readingLevel={null} showQuota={false} session={signedIn === null ? "CHECKING" : signedIn ? "IN" : "OUT"}>
+      {children}
+    </V4Header>
+  );
 }
 
 /** The query names of the way back to one path's dig box: `?dig=<path>` and, under a dig, `&under=<that dig's reference>`. */

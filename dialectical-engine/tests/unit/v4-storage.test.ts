@@ -52,7 +52,9 @@ describe("no browser storage (Decision A, S01-R17)", () => {
       "mapShelf.ts",
       // Wave 2 (dig-f4, dig-f9): where picks are dug, and the queue that runs a dig's checks at its click, keep nothing in the
       // browser.
-      "digDock.ts", "useDigQueue.tsx"]) {
+      "digDock.ts", "useDigQueue.tsx",
+      // The wave-2 review fixes (4 Nov): the one click-time check a map dig and a public page's dig share keeps nothing either.
+      "useDigClickCheck.ts"]) {
       const source = readFileSync(resolve(here, "../../apps/ui/lib/v4", file), "utf8");
       expect(source, file).not.toMatch(/\.setItem\(|localStorage|sessionStorage|document\.cookie/);
     }

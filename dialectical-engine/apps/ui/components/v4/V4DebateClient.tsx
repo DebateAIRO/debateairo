@@ -8,8 +8,7 @@ import {
   type AnswerStory,
   type DigLinks,
   type DigSuggestion,
-  type RunProjection,
-  type UsageBorrow
+  type RunProjection
 } from "@debateai/contract";
 import { AuthGate } from "@/components/AuthGate";
 import { TAB_PREFIX_ATTRIBUTE } from "@/components/DocumentTitle";
@@ -33,7 +32,8 @@ import { V4Outline } from "@/components/v4/V4Outline";
 import { V4Panel } from "@/components/v4/V4Panel";
 import { useQuestionShare, V4QuestionShareLine, V4TopLine } from "@/components/v4/V4QuestionShare";
 import { V4PublicMark } from "@/components/v4/V4PublicMark";
-import { typedGoesPublic, usePublicStage } from "@/lib/v4/publicState";
+import { usePublicStage } from "@/lib/v4/publicState";
+import { typedPublicNotes } from "@/lib/v4/publicNotes";
 import type { V4ResearchedPress } from "@/components/v4/V4Sources";
 import { V4ChangedSince } from "@/components/v4/V4PathRewrite";
 import { V4AnswerCard, type V4ReportAnswer } from "@/components/v4/V4AnswerCard";
@@ -44,6 +44,8 @@ import { useMapView } from "@/components/v4/useMapView";
 import { V4Steps } from "@/components/v4/V4Steps";
 import { useV4Ready } from "@/components/v4/useV4Ready";
 import { useMapReport } from "@/components/v4/useMapReport";
+import { digAboutLine } from "@/components/v4/digAbout";
+import { phoneBarJob, picksPlaceOf, showChoices, type PhoneTarget } from "@/components/v4/mapDigHelpers";
 import { isNotFound } from "@/lib/api";
 import { isSignedOut, signInHrefHere } from "@/lib/signInWayBack";
 import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
@@ -72,13 +74,12 @@ import {
   continueRun,
   limitLine,
   monthPauseOf,
-  readBorrowed,
   type ContinueOutcome,
   type MoneyLine
 } from "@/lib/v4/money";
 import { clock24 } from "@/lib/v4/clock";
 import type { V4DigQuota } from "@/lib/v4/digQuota";
-import { useQuotaRefresh } from "@/lib/v4/quotaPulse";
+import { useBorrowed } from "@/lib/v4/useBorrowed";
 import { useDigQuota } from "@/lib/v4/useDigQuota";
 import { useQuotaMoments } from "@/lib/v4/useQuotaMoments";
 import { pausedDigCount, pauseOfDig, pauseOfRun } from "@/lib/v4/monthPause";
@@ -267,9 +268,6 @@ function linkKeyOf(links: readonly DigLink[]): string {
   return links.map((link) => link.childRunId).join("|");
 }
 
-/** What the phone's pinned dig button digs into, and whether it reads "Dig here too" (a dig is already there). */
-type PhoneTarget = Readonly<{ target: DigTarget; again: boolean }>;
-
 /**
  * What the phone's pinned "Dig deeper here" digs into: the person's picks when there are some (dig-f4, 3 Nov: a phone has
  * no tray, so the pinned button carries them on whichever screen is open), else a path or one open question (never the
@@ -289,67 +287,6 @@ function targetOf(map: V4Map, digs: readonly DigView[], selection: V4Selection, 
     return question === undefined ? null : { target: { kind: "open", questions: [question] }, again: digFor(question, digs) !== null };
   }
   return null;
-}
-
-/**
- * journey-d3 / dig-f31 (owner's screen review, 3 Nov): the phone's pinned bar. On a path with nothing picked on it,
- * "Choose what to dig ›" takes the person to the path's choices first, so a whole path is never dug before they have
- * seen them and the share; once shown (`choicesSeen`), the bar digs the whole path ("Dig here · up to 4%"). With picks
- * there, it digs them ("Dig into your pick · up to 3%"); an open question's own screen digs that one question. While new
- * digs wait for a reset the button stays, greyed with the reset time, and pressing it shows the line that says why.
- */
-function phoneBarJob(phone: PhoneTarget, quota: V4DigQuota, catalog: MessageCatalog, onDig: () => void,
-  show: (place: "choices" | "dig") => void, choicesSeen: boolean): V4BarJob {
-  if (phone.target.kind === "path" && !choicesSeen) {
-    return { kind: "choose", label: t(catalog, "v4.dig.chooseWhat"), onChoose: () => show("choices") };
-  }
-  return quota.waitLine === null
-    ? { kind: "dig", label: quota.label(phone.target), onDig }
-    : { kind: "dig", label: quota.label(phone.target), onDig: () => show("dig"), waiting: true };
-}
-
-/** dig-f5: the place the person's picks wait on, named, and the way to it; null while nothing is picked. */
-function picksPlaceOf(map: V4Map, draft: V4DigDraft, catalog: MessageCatalog,
-  select: (selection: V4Selection, viaKeyboard: boolean) => void): Pick<V4DigChoice, "picksPlace"> | null {
-  if (draft.picks.length === 0) return null;
-  const path = draft.group === null ? null : map.paths.find((candidate) => candidate.id === draft.group) ?? null;
-  if (draft.group !== null && path === null) return null;
-  const title = path === null ? { text: t(catalog, "v4.nest.trailRoot"), ai: false } : pathTitle(path, catalog, 40);
-  return { picksPlace: { title, onGo: () => select(path === null ? "root" : `path:${path.id}`, false) } };
-}
-
-/**
- * dig-f31: brings the place's choices (a path's "Choose what to dig") or its dig block into view at once, moves focus there
- * and gives it the shared 1-second highlight (app/v4/v4-base.css). Nothing is dug.
- */
-function showChoices(column: HTMLElement | null, place: "choices" | "dig"): void {
-  const choices = place === "choices" ? column?.querySelector<HTMLElement>(".v4Sugs") ?? null : null;
-  const target = choices ?? column?.querySelector<HTMLElement>(".v4PanelDig") ?? null;
-  if (target === null) return;
-  if (typeof target.scrollIntoView === "function") target.scrollIntoView({ block: "start" });
-  if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
-  target.focus({ preventScroll: true });
-  target.classList.remove("v4Highlight");
-  void target.offsetWidth;
-  target.classList.add("v4Highlight");
-}
-
-/** Stands in for the dug place's words while the sentence around them is read from the catalogue (they are AI text). */
-const PLACE_SLOT = "\u0000place\u0000";
-
-/**
- * dig-f9: "About your dig on “Mostly renewables”:", said first on the question check's screen when it answers a sent dig.
- * The place is the dig's path (its label), or its first open question; only those words are marked as AI text.
- */
-function digAboutLine(target: DigTarget, catalog: MessageCatalog): ReactNode {
-  const path = target.kind === "open" ? null : target.path;
-  const place = path !== null
-    ? pathTitle(path, catalog, 70)
-    : target.kind === "open" && target.questions[0] !== undefined
-      ? { text: shortText(target.questions[0].text), ai: true, more: 0 }
-      : { text: t(catalog, "v4.panel.crumbRoot"), ai: false, more: 0 };
-  const [before = "", after = ""] = t(catalog, "v4.dig.checkAbout", { path: PLACE_SLOT }).split(PLACE_SLOT);
-  return <>{before}<span data-ai-generated={place.ai ? "true" : undefined}>{place.text}</span>{after}</>;
 }
 
 /**
@@ -726,28 +663,10 @@ function V4Debate({
   });
   // map-f9: "This question: 11% of today", when the run read says it (an optional server field), read again on each moment.
   const questionShare = useQuestionShare(servedRunId);
-  // dig-f31: the phone place whose choices "Choose what to dig ›" has shown (its bar then digs the whole path).
-  const [choicesShownFor, setChoicesShownFor] = useState<V4Selection | null>(null);
 
   // ── The money rule (owner, 31 Oct): what running work borrowed from tomorrow or next week; map-f9: read again ─────
-  // after each quota moment and when the person comes back to the tab.
-  const [borrowed, setBorrowed] = useState<readonly UsageBorrow[]>([]);
-  const borrowReads = useRef(0);
-  const readBorrowedNow = useCallback(() => {
-    borrowReads.current += 1;
-    const mine = borrowReads.current;
-    void readBorrowed().then((next) => {
-      if (mine === borrowReads.current) setBorrowed(next);
-    });
-  }, []);
-  useEffect(() => {
-    if (!hasLoad) return undefined;
-    readBorrowedNow();
-    return () => {
-      borrowReads.current += 1;
-    };
-  }, [hasLoad, readBorrowedNow]);
-  useQuotaRefresh(readBorrowedNow, hasLoad);
+  // after each quota moment and when the person comes back to the tab (lib/v4/useBorrowed.ts).
+  const borrowed = useBorrowed(hasLoad);
 
   // ── Digs: the ones started in this visit (memory) merged with the recorded ones and the ones found by text ──────
   const [visitLinks, setVisitLinks] = useState<readonly DigLink[]>(() => [...startedThisVisit.values()].map((entry) => entry.link));
@@ -797,7 +716,8 @@ function V4Debate({
     digsLiveRef.current = links.some((link) => !isFinal(statuses.get(link.childRunId))) || below.busy;
   }, [links, statuses, below.busy]);
   // wait-f22 / map-f9: the answer arriving, a dig starting and a dig finishing are quota moments: the figures read again.
-  useQuotaMoments({ running: load?.kind === "RUN" && served === null, served: served !== null, digs });
+  const digsSettled = indexSettled && recordsSettled && links.every((link) => isSettled(statuses.get(link.childRunId)));
+  useQuotaMoments({ running: load?.kind === "RUN" && served === null, served: served !== null, digs, settled: digsSettled });
 
   // One loop per debate, one round of reads in flight; a new link "kicks" it instead of starting a second loop.
   const digLoop = useRef<Readonly<{ kick: () => void; seenKey: () => string }> | null>(null);
@@ -973,10 +893,15 @@ function V4Debate({
   // someone else's public page (its own note says what became of it).
   const publicStage = usePublicStage(served === null || served.answer.contribution !== undefined ? null
     : isDigMap ? (trail?.complete === true ? trail.steps[0]?.runId ?? null : null) : servedRunId, answerVersion);
-  // One line wherever the person types something that will be public (journey-f20): when the debate's public state says
-  // so, or, while the server does not say that yet, on a Free debate the server named as public (dig-f26: useV4Ask's
-  // freePublicNotice).
-  const publicLine = typedGoesPublic(publicStage) || ask.freePublicNotice ? t(catalog, "v4.publicMark.willBePublic") : null;
+  // Where the person types something that may go public (lib/v4/publicNotes.ts): the debate's own state decides, never the
+  // person's plan today (the wave-2 review, 4 Nov: a Free person's private debate never says it will be public).
+  const publicNotes = typedPublicNotes({
+    stage: publicStage,
+    ranOnFree: map?.webNote === "FREE",
+    ownDebate: served !== null && served.answer.contribution === undefined,
+    catalog
+  });
+  const publicLine = publicNotes.ownView;
 
   // ── The report's answer (R22 W5-1, owner Q-D11), and its ready moment (journey-f17) ─────────────────────────────
   // V4 screen review (3 Nov 2026), report-d1 / report-d2 / report-f15: the report is asked for and waited for on the map,
@@ -1153,7 +1078,6 @@ function V4Debate({
       .filter((link) => !startedThisVisit.has(link.childRunId) && !(`dig:${link.childRunId}` in known))
       .map((link) => link.childRunId));
   }, [links]);
-  const digsSettled = indexSettled && recordsSettled && links.every((link) => isSettled(statuses.get(link.childRunId)));
   const liveReady = map !== null && digsSettled && lastVisit.status !== "PENDING";
   // dig-f1: the main answer is an item of the page's snapshot too (news at the question, never kept by the account).
   const mainItems = useMemo(() => mainAnswerItems(served?.answer), [served]);
@@ -1421,22 +1345,23 @@ function V4Debate({
   // dig-f17 / dig-f29 (the map track): the slim report line follows the page's report moment, the corrected rule.
   const goodTime = moment === "GOOD";
   // journey-d3: the pinned bar's one job. A place whose dig waits has its Undo in the note above the bar instead.
-  // journey-d3 / dig-f31: the bar's dig job ("Choose what to dig ›" first on a whole path, then "Dig here · up to 4%"; with
-  // picks "Dig into your pick · up to 3%"), greyed with the reset time while new digs wait (dig-f11). A paused dig open in
-  // the panel gives the bar its Continue instead. report-d2: while the report waits or is written, the bar says so where
-  // the dig button lives (digging rests).
-  const phoneJob: V4BarJob = report.barStatus !== null
-    ? { kind: "status", ...report.barStatus }
-    : pausedBar !== null
-      ? pausedBar
-      : phoneTarget !== null
-        ? waitingDigFor(waitingDigs, servedRunId, phoneTarget.target) === null
-          ? phoneBarJob(phoneTarget, digQuota.quota, catalog, () => startDig(phoneTarget.target), (place) => {
-            showChoices(panelColRef.current, place);
-            if (place === "choices") setChoicesShownFor(shownSelection);
-          }, choicesShownFor === shownSelection)
-          : { kind: "none" }
-        : goodTime ? { kind: "report", href: reportHref } : { kind: "none" };
+  // journey-d3 / dig-f31: the bar's dig job (the record's two states: "Choose what to dig ›" on a whole path, "Dig into
+  // your pick · up to 3%" with picks; mapDigHelpers.ts). journey-f14 / dig-f11 / report-d2: while new digs wait for a reset
+  // or the report waits or is written, the dig button stays where it is, greyed, and pressing it shows the line that says
+  // why. A paused dig open in the panel gives the bar its Continue; a screen with no dig button says the report's state.
+  const digRest = report.digsRest ? report.restReason : null;
+  const phoneDig: V4BarJob | null = phoneTarget !== null && waitingDigFor(waitingDigs, servedRunId, phoneTarget.target) === null
+    ? phoneBarJob(phoneTarget, digQuota.quota, catalog, () => startDig(phoneTarget.target), (place) => showChoices(panelColRef.current, place), digRest)
+    : null;
+  const phoneJob: V4BarJob = digRest !== null && phoneDig !== null
+    ? phoneDig
+    : report.barStatus !== null
+      ? { kind: "status", ...report.barStatus }
+      : pausedBar !== null
+        ? pausedBar
+        : phoneTarget !== null
+          ? phoneDig ?? { kind: "none" }
+          : goodTime ? { kind: "report", href: reportHref } : { kind: "none" };
 
   const rail = (variant: "column" | "strip" | "marks" | "notes" | "steps") => (
     <V4Rail
@@ -1477,7 +1402,9 @@ function V4Debate({
       mainAnswer={served?.answer.main_answer}
       reportAnswer={reportAnswer}
       answeredAt={served?.answer.as_of ?? null}
-      canDigNow={canDig && startsWait === null}
+      // Phase A review F10 / WHOLE-5: "You can dig or write your report now." only where a dig can start now (not while the
+      // report waits for digs or is written: digging rests then).
+      canDigNow={canDig && startsWait === null && !report.digsRest}
       folded={answerFolded}
       onUnfold={() => (layout === "phone" && !rootShown ? select("root", false) : setAnswerUnfolded(true))}
       {...(answerUnfolded ? { onFold: () => setAnswerUnfolded(false) } : {})}
@@ -1498,7 +1425,7 @@ function V4Debate({
       money={money}
       quota={digQuota.quota}
       rest={report.digsRest ? report.restReason : null}
-      publicNote={publicLine === null ? null : t(catalog, "v4.publicMark.addsToPublic")}
+      publicNote={publicNotes.tray}
       withDig={!panelDigsPicks(shownSelection, draft, rootPanelOpen(view, digs), view.paths)}
       onDig={() => startDig(picksTarget)}
       onClear={clearPicks}
@@ -1514,7 +1441,7 @@ function V4Debate({
         planTier={planTier}
         onClear={clearPicks}
         clearRef={trayClearRef}
-        publicNote={publicLine === null ? null : t(catalog, "v4.publicMark.addsToPublic")}
+        publicNote={publicNotes.tray}
         catalog={catalog}
       />
     )

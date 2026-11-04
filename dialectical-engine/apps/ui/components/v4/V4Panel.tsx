@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from "react";
 import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { addedLines, ownWords } from "@/lib/v4/askText";
 import type { DigProgress } from "@/lib/v4/digProgress";
 import { findOpenQuestion, isFinishedRewrite } from "@/lib/v4/mapModel";
 import { digWords, type V4DigQuota } from "@/lib/v4/digQuota";
 import { rootPicksTarget } from "@/lib/v4/digDock";
+import { placeOf } from "@/components/v4/mapDigHelpers";
 import type { MoneyLine } from "@/lib/v4/money";
 import { pauseOfDig } from "@/lib/v4/monthPause";
 import { draftTarget } from "@/lib/v4/suggestions";
@@ -439,29 +440,40 @@ function SkipToDig(props: Readonly<{ targetId: string; catalog: MessageCatalog }
  * here too" is gone); the period named once, by the switch (public-d3 A); one hint under each choice (read-f20); a changed
  * share in grey for 2 seconds (journey-f8). While new digs wait for a reset the button stays, greyed, with the reset time
  * on it, the line beside it says why and from when, and an open question offers "Add to tray" (dig-f11, journey-f14).
+ * journey-f14 (the wave-2 review, 4 Nov): one pattern for every reason a dig cannot start now, the reset wait and the
+ * report's rest alike: the button stays focusable (aria-disabled), points at the visible line that says why, and a press
+ * gives that line the highlight again; "Add to tray" keeps the choice in both cases.
  */
 function DigBlock(props: Readonly<{ target: DigTarget; panel: PanelProps; again?: boolean; id?: string; startingAbove?: boolean }>) {
   const { panel } = props;
   const waitId = useId();
+  const restId = useId();
   const [replay, setReplay] = useState(0);
-  if (panel.choice !== undefined && !panel.choice.canDig) return <DeepestLine catalog={panel.catalog} />;
+  const button = useRef<HTMLButtonElement | null>(null);
+  const block = useRef<HTMLElement | null>(null);
+  const shown = panel.choice === undefined || panel.choice.canDig;
+  usePinRoom(block, shown);
+  if (!shown) return <DeepestLine catalog={panel.catalog} />;
   const quota = panel.digQuota;
   const label = quota === undefined ? digWords(props.target, panel.catalog, panel.locale) : quota.label(props.target);
   const waitLine = quota?.waitLine ?? null;
   const waiting = waitLine !== null;
+  const resting = panel.digRest !== null && panel.digRest !== undefined;
   // dig-f11: the line beside the greyed button says the same as the reset line, so that one is not said twice here.
   const money = waiting ? (panel.money ?? []).filter((line) => !/^v4\.money\.startsWait\./u.test(line.key)) : panel.money ?? [];
   // journey-f14: an open question that cannot be dug now can still be kept, in the tray (the person's picks).
-  const keep = waiting && props.target.kind === "open" && props.target.questions.length === 1
+  const keep = (waiting || resting) && props.target.kind === "open" && props.target.questions.length === 1
     && !panel.picked.has(props.target.questions[0]!.id) ? props.target.questions[0]! : null;
   // dig-f7: a place whose dig waits keeps its button focusable (aria-disabled), so focus can come back to it after Undo.
   const starting = panel.digStarting?.(props.target) ?? null;
   // public-d3 A: the period by the switch, only where this button names a share.
   const period = quota === undefined || quota.share(props.target) === null ? null : quota.periodLine;
-  const resting = panel.digRest !== null && panel.digRest !== undefined;
+  const describedBy = resting ? restId : waiting ? waitId : undefined;
+  // journey-f8: the change mark is for this place's share only (another place's button is not a change of this one).
+  const subject = placeOf(props.target);
   return (
     // dig-f24: `id` is where "Skip to the dig button" lands (the block itself takes focus only when its button cannot).
-    <section className="v4PanelDig" {...(props.id === undefined ? {} : { id: props.id, tabIndex: -1 })}>
+    <section ref={block} className="v4PanelDig" {...(props.id === undefined ? {} : { id: props.id, tabIndex: -1 })}>
       {panel.showDigModes === false ? null : (
         <div className="v4PanelModes" role="group" aria-label={t(panel.catalog, "v4.panel.modeLabel")}>
           {DIG_MODES.map((mode) => (
@@ -483,38 +495,70 @@ function DigBlock(props: Readonly<{ target: DigTarget; panel: PanelProps; again?
       {period === null ? null : <p className="v4PanelHint v4DigPeriod v4Muted">{period}</p>}
       <div className="v4DigBtnRow">
         <button
+          ref={button}
           type="button"
-          className={`v4Btn v4BtnPrimary v4PanelDigBtn${waiting ? " v4DigWaiting" : ""}`}
-          // report-d2: while the report waits for digs or is written, digging rests, with its reason below.
-          disabled={panel.digBusy || resting}
-          aria-disabled={starting !== null || waiting ? "true" : undefined}
-          aria-describedby={waiting ? waitId : undefined}
+          className={`v4Btn v4BtnPrimary v4PanelDigBtn${waiting || resting ? " v4DigWaiting" : ""}`}
+          disabled={panel.digBusy}
+          // report-d2 / journey-f14: while the report waits for digs or is written, digging rests, with its reason below.
+          aria-disabled={starting !== null || waiting || resting ? "true" : undefined}
+          aria-describedby={describedBy}
           onClick={() => {
-            // public-d4 A: pressing a greyed button explains the wait: its line takes the highlight again.
-            if (waiting) setReplay((count) => count + 1);
+            // public-d4 A: pressing a greyed button explains why: its line takes the highlight again.
+            if (waiting || resting) setReplay((count) => count + 1);
             else if (starting === null) panel.onDig(props.target);
           }}
         >
           {label}
         </button>
-        <V4ShareChange share={quota?.share(props.target) ?? null} />
+        <V4ShareChange share={quota?.share(props.target) ?? null} subject={subject} />
       </div>
-      {waiting ? (
+      {waiting && !resting ? (
         <p key={replay} id={waitId} className={`v4PanelHint v4DigWaitLine${replay > 0 ? " v4Highlight" : ""}`} role="note">{waitLine}</p>
       ) : null}
       {keep === null ? null : (
-        <button type="button" className="v4Btn v4DigAddTray" onClick={() => panel.onTogglePick(keep.id)}>
+        <button type="button" className="v4Btn v4DigAddTray" onClick={() => {
+          panel.onTogglePick(keep.id);
+          // ACCESS-5: this button goes once the question is in the tray, so focus stays at the dig button in the same place
+          // (or the block, where a phone hides that button).
+          button.current?.focus();
+          if (document.activeElement !== button.current) {
+            if (block.current !== null && !block.current.hasAttribute("tabindex")) block.current.setAttribute("tabindex", "-1");
+            block.current?.focus();
+          }
+        }}>
           {t(panel.catalog, "v4.dig.addToTray")}
         </button>
       )}
       {starting !== null
         ? (props.startingAbove === true ? null : starting)
-        : resting ? <p className="v4PanelHint v4Muted" data-dig-rest="">{panel.digRest}</p>
+        : resting ? (
+          <p key={replay} id={restId} className={`v4PanelHint v4Muted${replay > 0 ? " v4Highlight" : ""}`} data-dig-rest="">{panel.digRest}</p>
+        )
           : panel.digBusy ? <p className="v4PanelHint v4Muted">{t(panel.catalog, "v4.panel.digBusy")}</p> : null}
       <V4MoneyLines lines={money} catalog={panel.catalog} />
       {panel.roomNotice ?? null}
     </section>
   );
+}
+
+/**
+ * ACCESS-2 (the wave-2 review, 4 Nov): the pinned dig block's real height on its panel column (--v4-pin-room), so the
+ * column's scroll padding keeps a control the keyboard reaches clear of it (v4-debate.css). Nothing is kept anywhere.
+ */
+function usePinRoom(block: RefObject<HTMLElement | null>, shown: boolean): void {
+  useEffect(() => {
+    const element = block.current;
+    const column = element?.closest<HTMLElement>(".v4DebPanelCol") ?? null;
+    if (!shown || element === null || column === null) return undefined;
+    const set = (): void => column.style.setProperty("--v4-pin-room", `${Math.ceil(element.getBoundingClientRect().height)}px`);
+    set();
+    const observer = typeof ResizeObserver === "function" ? new ResizeObserver(set) : null;
+    observer?.observe(element);
+    return () => {
+      observer?.disconnect();
+      column.style.removeProperty("--v4-pin-room");
+    };
+  }, [block, shown]);
 }
 
 function TrustSection(props: Readonly<{
@@ -555,7 +599,9 @@ function RootBody(props: Readonly<{ panel: PanelProps }>) {
   // map-f16 + r2-11 (review F10): "You can dig or write your report now." only where a dig can start now: not at the deepest
   // level, and not while new questions and digs wait for the quota's reset. Elsewhere the approved line stops after "You
   // don't need to wait."
-  const canDigNow = panel.choice?.canDig !== false && !(panel.money ?? []).some((line) => /^v4\.money\.startsWait\./u.test(line.key));
+  // WHOLE-5 (the wave-2 review): nor while the report waits for digs or is written (report-d2: digging rests).
+  const canDigNow = panel.choice?.canDig !== false && !(panel.money ?? []).some((line) => /^v4\.money\.startsWait\./u.test(line.key))
+    && (panel.digRest === null || panel.digRest === undefined);
   const missingKey = canDigNow ? (fallback.length > 0 ? "v4.panel.fallbackMissing" : "v4.panel.storyMissing") : "v4.panel.noShortAnswerNoDig";
   const firstAnswer = (
     <>

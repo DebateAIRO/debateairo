@@ -67,6 +67,7 @@ function choiceOf(extra: Partial<V4DigChoice> = {}): V4DigChoice {
 
 type Extra = Partial<{
   digs: readonly DigView[]; choice: V4DigChoice | null; digBusy: boolean; onSelect: (selection: V4Selection) => void; money: readonly MoneyLine[];
+  digRest: string;
 }>;
 
 function element(map: V4Map, selected: V4Selection, extra: Extra = {}) {
@@ -86,6 +87,7 @@ function element(map: V4Map, selected: V4Selection, extra: Extra = {}) {
       digBusy={extra.digBusy ?? false}
       {...(choice === null ? {} : { choice })}
       {...(extra.money === undefined ? {} : { money: extra.money })}
+      {...(extra.digRest === undefined ? {} : { digRest: extra.digRest })}
       headingRef={createRef<HTMLHeadingElement>()}
       catalog={catalog}
       locale="en"
@@ -328,7 +330,9 @@ describe("map-f16 + r2-11: the missing short answer's line says only what is tru
   });
 
   it("at the deepest level, or while new questions and digs wait for the quota's reset, it stops after \"You don't need to wait.\"", () => {
-    for (const [name, extra] of [["deepest", { choice: choiceOf({ canDig: false }) }], ["quota", { money: [monthUsed] }]] as const) {
+    // WHOLE-5 (the wave-2 review): nor while the report waits for digs or is written (report-d2: digging rests).
+    for (const [name, extra] of [["deepest", { choice: choiceOf({ canDig: false }) }], ["quota", { money: [monthUsed] }],
+      ["report", { digRest: t(catalog, "v4.reportWait.digsRest") }]] as const) {
       for (const fallback of [null, "First part."]) {
         const text = render(noShort(fallback), "root", extra).textContent ?? "";
         expect(text, `${name} ${fallback}`).toContain(t(catalog, "v4.panel.noShortAnswerNoDig"));

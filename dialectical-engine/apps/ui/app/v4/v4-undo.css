@@ -78,6 +78,10 @@
   gap: 0; max-height: 25vh; max-height: 25dvh; background: var(--surface);
   border-top: 1px solid var(--line-strong); box-shadow: var(--shadow-chrome); pointer-events: auto;
 }
+/* report-d1 / ACCESS-1 (the wave-2 review, 4 Nov): while the report's strip is open in the stack it says what the report
+   covers, that digging stops and, on Free, that the report will be public too, before Write it: the stack grows to show it
+   whole (it closes again with the strip). */
+.v4StackPhone:has(.v4RepStrip-bottom) { max-height: 85vh; max-height: 85dvh; }
 .v4StackTop {
   flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
   display: flex; flex-direction: column; gap: 6px; padding: 0 var(--v4-gutter);

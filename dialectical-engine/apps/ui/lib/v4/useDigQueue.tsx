@@ -11,6 +11,7 @@ import {
 } from "./digUndo.js";
 import type { V4DigQuota } from "./digQuota.js";
 import { firstByOf } from "./mapLooks.js";
+import { useDigClickCheck } from "./useDigClickCheck.js";
 import { sharePeriodOf } from "./money.js";
 import { askParentOf, placesOf, removePick } from "./suggestions.js";
 import type { DigLink, DigMode, DigTarget, PendingDig, V4DigDraft, V4Map } from "./types.js";
@@ -156,25 +157,9 @@ export function useDigQueue(input: Readonly<{
     sendRef.current = send;
   });
 
-  // One consent question at a time: a second press while it is open waits for the same answer.
-  const askRef = useRef(ask);
-  useEffect(() => {
-    askRef.current = ask;
-  });
-  const consentAsk = useRef<Promise<boolean> | null>(null);
-  const askConsent = useCallback((): Promise<boolean> => {
-    const pending = consentAsk.current;
-    if (pending !== null) return pending;
-    const asked = Promise.resolve().then(() => askRef.current.ensureConsent()).catch(() => false);
-    consentAsk.current = asked;
-    void asked.then(() => {
-      if (consentAsk.current === asked) consentAsk.current = null;
-    });
-    return asked;
-  }, []);
-
-  /** The places whose consent is open right now (a second press there does nothing more). */
-  const checking = useRef(new Set<string>());
+  // dig-f9: the crisis check and the one-time consent at the press (lib/v4/useDigClickCheck.ts, shared with a public
+  // page's dig box): one consent question at a time, and a second press on the same place while it is open does nothing.
+  const clickCheck = useDigClickCheck({ ensureConsent: ask.ensureConsent, offerCrisisHelp: ask.offerCrisisHelp });
 
   const queueDig = useCallback((dig: PendingDig): void => {
     // W3-4: nothing is dug from the deepest level (the page offers no button there; this holds it). report-d2: nor while
@@ -183,20 +168,15 @@ export function useDigQueue(input: Readonly<{
     // One waiting dig per place: its buttons say it is starting, with its Undo, instead of starting a second one. The live
     // list is read (not this render's copy), so a quick second press never starts a second dig.
     if (waitingDigFor(readDigUndo(), servedRunId, dig.target) !== null) return;
-    const key = digTargetKey(dig.target);
-    if (checking.current.has(key)) return;
     // dig-f11: while new digs wait for a reset, nothing starts (the buttons say so, greyed, with the reset time).
     if (digQuotaRef.current.quota.waitLine !== null) return;
     const parentRunId = servedRunId;
     const parentQuestionLine = servedQuestionLine;
     // V, 2026-09-30: the person's own views read as a person in crisis: useV4Ask's help screen now, and no dig. The words
-    // checked are exactly the ones the send reads (askParentOf, crisisWordsOf).
-    if (askRef.current.offerCrisisHelp(crisisWordsOf("dig", "", askParentOf(parentRunId, dig.target, dig.mode)))) return;
-    // V, 2026-09-29 (dig-f9): the one-time consent, asked while this page can show it; the 10 seconds start from its yes.
+    // checked are exactly the ones the send reads (askParentOf, crisisWordsOf). V, 2026-09-29 (dig-f9): the one-time
+    // consent, asked while this page can show it; the 10 seconds start from its yes.
     const delay = Math.max(0, dig.sendsAt - Date.now());
-    checking.current.add(key);
-    void askConsent().then((agreed) => {
-      checking.current.delete(key);
+    void clickCheck(digTargetKey(dig.target), crisisWordsOf("dig", "", askParentOf(parentRunId, dig.target, dig.mode))).then((agreed) => {
       if (!agreed) return;
       // The same holds after the answer: one waiting dig per place, nothing while new digs wait or the report is written.
       if (restRef.current || waitingDigFor(readDigUndo(), parentRunId, dig.target) !== null) return;
@@ -221,7 +201,7 @@ export function useDigQueue(input: Readonly<{
         alive: () => mounted.current
       });
     });
-  }, [map, canDig, servedRunId, servedQuestionLine, aboveRunIds, digQuotaRef, planTier, catalog, askConsent, digsRest]);
+  }, [map, canDig, servedRunId, servedQuestionLine, aboveRunIds, digQuotaRef, planTier, catalog, clickCheck, digsRest]);
 
   const startDig = useCallback((target: DigTarget): void => {
     queueDig({ target, mode: sentDigMode, sendsAt: Date.now() + DIG_UNDO_MS });

@@ -161,6 +161,29 @@ describe("report-d1: \"Write my report\" turns into a short strip in the same sp
     expect(reports.written).toEqual([]);
   });
 
+  it("ACCESS-6: while the press is on its way Write it stays focusable; a press that finds a finished report gives focus back to the button", async () => {
+    const runId = crypto.randomUUID();
+    reports.load = async () => investigation(runId, "OPEN", [], 1);
+    let answer: (result: WriteReportResult) => void = () => undefined;
+    reports.write = () => new Promise<WriteReportResult>((resolve) => { answer = resolve; });
+    await mountMap(1600, runId);
+    await click(topButton()!);
+    const write = buttonNamed(CATALOG["v4.reportStrip.write"]!, strip()!);
+    await click(write);
+    expect(write.getAttribute("aria-disabled")).toBe("true");
+    expect(document.activeElement).toBe(write);
+    // A second press meanwhile sends nothing more.
+    await click(write);
+    expect(reports.written).toEqual([runId]);
+    // Asked from elsewhere meanwhile: the reply finds a finished report, so no waiting card comes, and focus goes back.
+    reports.load = async () => investigation(runId, "CLOSED", [finished(1)], 1);
+    await act(async () => { answer({ kind: "CLOSED" }); });
+    await settle(200);
+    expect(strip()).toBeNull();
+    expect(document.activeElement).not.toBe(document.body);
+    expect(header().contains(document.activeElement)).toBe(true);
+  });
+
   it("says what the digs found when there are digs, and the report's share of today once the server says it", async () => {
     const runId = crypto.randomUUID();
     reports.load = async () => investigation(runId, "OPEN", [], 2, { report_share_percent: 5 });
@@ -206,11 +229,17 @@ describe("report-d1: \"Write my report\" turns into a short strip in the same sp
     expect(railStep()!.querySelector(".v4WaitDot-PULSE")).not.toBeNull();
     expect(topButton()).toBeNull();
     expect(header().querySelector("a.v4DebReportLink")!.getAttribute("href")).toBe(`/v4/debate/${runId}/report?level=background`);
-    // Dig buttons rest, with the reason under them.
+    // Dig buttons rest, with the reason under them. journey-f14 (the wave-2 review): one pattern with the quota wait, so the
+    // button stays focusable, points at the visible reason, and a press gives that line the highlight again.
     await openPath(PATHS.renew);
     const dig = panel().querySelector<HTMLButtonElement>(".v4PanelDigBtn")!;
-    expect(dig.disabled).toBe(true);
-    expect(flat(panel().querySelector("[data-dig-rest]"))).toBe(CATALOG["v4.reportWait.digsRest"]);
+    expect(dig.getAttribute("aria-disabled")).toBe("true");
+    const rest = panel().querySelector<HTMLElement>("[data-dig-rest]")!;
+    expect(flat(rest)).toBe(CATALOG["v4.reportWait.digsRest"]);
+    expect(dig.getAttribute("aria-describedby")).toBe(rest.id);
+    await click(dig);
+    expect(panel().querySelector<HTMLElement>("[data-dig-rest]")!.classList.contains("v4Highlight")).toBe(true);
+    expect(page().querySelectorAll(".v4Undo")).toHaveLength(0);
     expect(harness.submit).not.toHaveBeenCalled();
 
     // Ready: the map's one ready moment, and digging opens again.
@@ -219,7 +248,7 @@ describe("report-d1: \"Write my report\" turns into a short strip in the same sp
     await settle(200);
     expect(note()!.textContent).toContain(CATALOG["v4.ready.report"]);
     expect(waitCard()).toBeNull();
-    expect(panel().querySelector<HTMLButtonElement>(".v4PanelDigBtn")!.disabled).toBe(false);
+    expect(panel().querySelector<HTMLButtonElement>(".v4PanelDigBtn")!.getAttribute("aria-disabled")).toBeNull();
   });
 
   it("a press that cannot be confirmed says so and checks the versions: writing found shows the wait, else Try again", async () => {
@@ -367,7 +396,7 @@ describe("report-d2: waiting for the report on the map", () => {
     expect(flat(topButton())).toBe(CATALOG["v4.investigation.writeAgain"]);
     // Digging is open: only a report being written makes it rest.
     await openPath(PATHS.renew);
-    expect(panel().querySelector<HTMLButtonElement>(".v4PanelDigBtn")!.disabled).toBe(false);
+    expect(panel().querySelector<HTMLButtonElement>(".v4PanelDigBtn")!.getAttribute("aria-disabled")).toBeNull();
   });
 
   it("a report that stands with nothing reopened: no strip and no good-time note; the button leads to the report", async () => {

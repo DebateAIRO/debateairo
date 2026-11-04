@@ -6,6 +6,8 @@
 
 /* ---- The header's pill (V4QuotaPill) ---- */
 .v4HdrQuota { position: relative; }
+/* ask-f16 (the wave-2 review, 4 Nov): the pill's place, held empty until the first usage read answers, about one pill wide. */
+.v4HdrQuotaHold { display: inline-block; inline-size: 13em; max-inline-size: 100%; block-size: 1.5em; visibility: hidden; }
 .v4HdrQuotaButton {
   display: inline-flex; align-items: center; min-height: 44px; cursor: pointer; font: inherit; font-size: var(--t-meta);
 }

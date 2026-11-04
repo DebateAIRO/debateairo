@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { PublicDebateSchema, type Answer, type RunProjection } from "../../packages/contract/src/index.js";
 import { ContractHttpError } from "../../packages/contract/src/client.js";
 import {
-  newWordMarks, progressOfAnswer, progressSettled, publicDigAnchor, publicDigParentKey, publicDigShareLine, publicPathAnchor, publicSuggestionsFor,
+  newWordMarks, progressOfAnswer, progressSettled, publicDigAnchor, publicDigParentKey, publicDigShare, publicPathAnchor, publicSuggestionsFor,
   readPublicDigProgress, stopsReached, waitingPublicDig
 } from "../../apps/ui/lib/v4/publicDig.js";
 import { publicPageHref, publicStageOf, readPublicStage, stageMayChange, typedGoesPublic } from "../../apps/ui/lib/v4/publicState.js";
@@ -36,13 +36,12 @@ describe("a public page's place in the site's one Undo list (public-f11)", () =>
     expect(waitingPublicDig([entry("COUNTING")], PUBLIC_REF, { ref: "p-fares", digRef: PUBLIC_UPDATE_REF })).toBeNull();
   });
 
-  it("the share before the press is the room read's own share for a dig, never a new question's; Free's says the month", () => {
-    expect(publicDigShareLine(null, "premium")).toBeNull();
+  it("the share before the press is the room read's own share for a dig, never a new question's (its window is the server's, digPeriodLine)", () => {
+    expect(publicDigShare(null)).toBeNull();
     // Today a public page's room read is a new question's: its share is never shown as the dig's.
-    expect(publicDigShareLine({ start_share_percent: 10 } as Loose, "premium")).toBeNull();
-    expect(publicDigShareLine({ dig_share_percent: 0 } as Loose, "premium")).toBeNull();
-    expect(publicDigShareLine({ dig_share_percent: 5 } as Loose, "premium")).toEqual({ key: "v4.public.dig.shareToday", values: { percent: 5 } });
-    expect(publicDigShareLine({ dig_share_percent: 5 } as Loose, "free")).toEqual({ key: "v4.public.dig.shareMonth", values: { percent: 5 } });
+    expect(publicDigShare({ start_share_percent: 10 } as Loose)).toBeNull();
+    expect(publicDigShare({ dig_share_percent: 0 } as Loose)).toBeNull();
+    expect(publicDigShare({ dig_share_percent: 5 } as Loose)).toBe(5);
   });
 });
 

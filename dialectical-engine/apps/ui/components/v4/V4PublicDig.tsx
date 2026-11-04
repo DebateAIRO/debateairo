@@ -63,7 +63,7 @@ function shortDay(day: string, locale: string): string {
 }
 
 /** public-d2: the path's own suggestions as chips. Tapped chips go into the dig; a dug one opens that result instead. */
-export function PublicDigChips({ chips, chosen, full, onToggle, locked, pathAnchor, catalog, locale, firstRef }: Readonly<{
+export function PublicDigChips({ chips, chosen, full, onToggle, locked, pathAnchor, catalog, locale, firstRef, fullLineId }: Readonly<{
   chips: readonly PublicDigSuggestion[];
   /** The path's own place on the page: a dug chip opens it when that dig shows no paths of its own. */
   pathAnchor: string;
@@ -76,6 +76,8 @@ export function PublicDigChips({ chips, chosen, full, onToggle, locked, pathAnch
   catalog: MessageCatalog;
   locale: string;
   firstRef?: (element: HTMLButtonElement | null) => void;
+  /** ACCESS-17 (journey-f14): the visible line saying why a chip cannot be added now (the plan's cap), for the greyed chips. */
+  fullLineId?: string;
 }>) {
   return (
     <div className="v4PubChips" role="group" aria-label={t(catalog, "v4.public.dig.chipsLabel")}>
@@ -96,6 +98,7 @@ export function PublicDigChips({ chips, chosen, full, onToggle, locked, pathAnch
         return (
           <button key={id} ref={ref} type="button" className="v4Chip v4PubChip" aria-pressed={picked}
             aria-disabled={locked || (!picked && full) ? "true" : undefined}
+            aria-describedby={!locked && !picked && full && fullLineId !== undefined ? fullLineId : undefined}
             onClick={() => {
               if (!locked && (picked || !full)) onToggle(chip.suggestion);
             }}>
