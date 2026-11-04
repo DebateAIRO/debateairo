@@ -8,10 +8,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AskRoom } from "../../apps/ui/lib/billing/room.js";
 import { addDig, readDigUndo, type DigUndoResult } from "../../apps/ui/lib/v4/digUndo.js";
 import type { V4AskOutcome } from "../../apps/ui/lib/v4/useV4Ask.js";
-import type { V4Path } from "../../apps/ui/lib/v4/types.js";
+import { buildV4Map } from "../../apps/ui/lib/v4/mapModel.js";
+import type { DigLink, DigView, V4Path } from "../../apps/ui/lib/v4/types.js";
 import {
-  advance, branch, buttonNamed, buttonsNamed, CATALOG, click, harness, mountMap, openPath, page, panel, PATHS, resetHarness,
-  settle, typeInto, unmountMap
+  advance, branch, buttonNamed, buttonsNamed, CATALOG, click, expandBranch, harness, mountMap, openPath, page, panel, PATHS,
+  resetHarness, seededAnswer, seededStory, settle, typeInto, unmountMap
 } from "./v4-debate-harness.js";
 
 vi.mock("@/components/AuthGate", async () => (await import("./v4-debate-harness.js")).authGateMock);
@@ -133,6 +134,8 @@ describe("the note's words and keys (dig-f7, dig-f8, journey-f21)", () => {
     expect(note).not.toMatch(/\(\d+\)/u);
     expect(page().querySelector(".v4UndoLineFill")).not.toBeNull();
     await click(noteUndos()[0]!);
+    // map-f22 (the map track): a path that is not open keeps its suggestions behind "+N more".
+    await expandBranch(PATHS.renew);
     await click(branch(PATHS.renew).querySelector<HTMLInputElement>(".v4MapLeafSuggestion input[type=checkbox]")!);
     expect(page().querySelector(".v4DebTray")?.textContent).not.toContain(CATALOG["v4.digMode.quick"]);
   });
@@ -270,18 +273,37 @@ describe("a phone's one bottom stack (journey-d3, dig-f16, dig-f17)", () => {
     await click(toggle);
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
     const tray = stack()!.querySelector<HTMLElement>(".v4DebTray")!;
-    expect(tray.textContent).toContain(word("v4.dig.trayPicked.one", { count: 1 }));
+    // journey-f23 (the wait-card track): the picks show as chips, never as "1 picked".
+    expect(tray.querySelectorAll(".v4ChoiceChip")).toHaveLength(1);
     expect(buttonsNamed(CATALOG["v4.panel.dig"]!, tray)).toHaveLength(0);
     expect(buttonsNamed(CATALOG["v4.dig.trayClear"]!, tray)).toHaveLength(1);
     expect(stack()!.querySelector(".v4DebPhoneDig")?.textContent).toBe(CATALOG["v4.debate.digHere"]);
   });
 
-  it("shows the slim 'Good time to write your report' line above the bar when the rule fires, and × hides it", async () => {
+  it("after a single dig of a path the slim line does not claim a good time (dig-f29, the map track's report rule)", async () => {
     await mountMap(375, crypto.randomUUID(), "n-smr");
     expect(stack()!.querySelector(".v4StackGoodTime")).toBeNull();
     await press(stack()!.querySelector<HTMLButtonElement>(".v4DebPhoneDig")!);
     await advance(10_100);
     await settle(16_000);
+    expect(harness.submit).toHaveBeenCalledTimes(1);
+    expect(stack()!.querySelector(".v4StackGoodTime")).toBeNull();
+  });
+
+  it("shows the slim 'Good time to write your report' line above the bar when the rule fires, and × hides it", async () => {
+    // dig-f29: every open question was looked into and held, so nothing open is left.
+    const runId = crypto.randomUUID();
+    const map = buildV4Map({ runId, answer: seededAnswer(runId), story: seededStory() });
+    const places = [...new Set([...map.open, ...map.paths.flatMap((path) => path.open)].map((question) => question.id))];
+    harness.records = {
+      parent: null,
+      children: [{ parent_run_id: runId, child_run_id: crypto.randomUUID(), places, mode: "quick", created_at: "2026-10-30T10:00:00.000Z" }]
+    };
+    harness.digView = (link: DigLink): DigView => ({
+      link, state: "DONE", headline: null, counts: { SURE: 1, SURE_FOR_CASE: 0, STILL_ARGUED: 0, DIDNT_HOLD: 0 }, rewrite: null,
+      points: [{ id: "d1", text: "Checked.", trust: "SURE", basis: null, reasons: [], answeredBy: null, asOf: null }]
+    });
+    await mountMap(375, runId, "n-smr");
     const line = stack()!.querySelector<HTMLElement>(".v4StackGoodTime");
     expect(line?.textContent).toContain(CATALOG["v4.bar.goodTime"]);
     expect(line?.querySelector("a")?.textContent).toBe(CATALOG["v4.rail.writeReport"]);
