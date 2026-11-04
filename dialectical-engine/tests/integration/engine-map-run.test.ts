@@ -14,7 +14,7 @@ import { engineContractHash } from "../../apps/runner/src/engine-contracts.js";
 
 let database: TestDatabase;
 const stubClosers: (() => Promise<void>)[] = [];
-const harness = previewDebateHarness({ pool: () => database.pool, stubClosers });
+const harness = previewDebateHarness({ pool: () => database.pool, database: () => database, stubClosers });
 beforeAll(async () => { database = await startTestDatabase(); await migrate(database.pool); }, 600_000);
 afterEach(async () => { await Promise.all(stubClosers.splice(0).map((close) => close())); });
 afterAll(async () => { await database?.stop(); });

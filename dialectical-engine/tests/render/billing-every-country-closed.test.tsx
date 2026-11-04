@@ -62,7 +62,7 @@ afterAll(() => {
 
 describe("NETOPIA's check: billing on with every country closed for payment, on the website", () => {
   const PAGES: ReadonlyArray<readonly [string, () => Promise<JSX.Element>]> = [
-    ["/pricing", PricingPage], ["/withdraw", WithdrawPage], ["/cancel", CancelPage], ["/terms", () => TermsPage({})]
+    ["/pricing", () => PricingPage({})], ["/withdraw", WithdrawPage], ["/cancel", CancelPage], ["/terms", () => TermsPage({})]
   ];
 
   for (const [path, render] of PAGES) {
@@ -79,7 +79,7 @@ describe("NETOPIA's check: billing on with every country closed for payment, on 
   }
 
   it("billing on with every country closed: /pricing shows the four plans with their prices and the way to each", async () => {
-    const document = await page(PricingPage);
+    const document = await page(() => PricingPage({}));
     expect([...document.querySelectorAll("[data-plan]")].map((card) => card.getAttribute("data-plan"))).toEqual(["FREE", "PLUS", "PRO", "MAX"]);
     const plus = document.querySelector('[data-plan="PLUS"]')!;
     expect(plus.textContent).toContain("$23.80 a month");

@@ -88,7 +88,7 @@ async function engineNumbers(pool: Pool, runId: string, answerId: string): Promi
 
 describe("an engine-1 debate's numbers stay as recorded at Task A1 (spec §15)", () => {
   it("today's shape, four makers, depth 2: reductions, selection rules and final strengths", async () => {
-    const harness = previewDebateHarness({ pool: () => database.pool, stubClosers });
+    const harness = previewDebateHarness({ pool: () => database.pool, database: () => database, stubClosers });
     const debate = await harness.admittedRun("golden", { panelRefs: PANEL_REFS, depth: 2, question: QUESTION });
     const gates = await harness.startGates({}, undefined, answersOf(debate.question));
     const composed = await harness.previewRunner(gates, "resend");

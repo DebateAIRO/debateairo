@@ -79,7 +79,7 @@ afterAll(async () => database?.stop());
  */
 const {
   startGates, fixtureSettings, previewRunner, admittedRun, modelCalls, completedRun, disclosureOf, bodyFactsOf, servedAnswer
-} = previewDebateHarness({ pool: () => database.pool, stubClosers });
+} = previewDebateHarness({ pool: () => database.pool, database: () => database, stubClosers });
 
 describe("a preview debate admitted without busy GLM runs to an answer and a story (spec 2026-10-11 busy model)", () => {
   it("four makers, depth 2: the pinned writer's [409, OK] claim probe keeps it, and GLM is never sent a byte", async () => {

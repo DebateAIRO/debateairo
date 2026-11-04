@@ -165,13 +165,14 @@ async function migrateCallers(): Promise<string[]> {
 
 describe("row-level security S01 FIX p1b: migrate()'s pool has no cross-account target (SEC-N4)", () => {
   /**
-   * Seven callers (measured at fce5c2d4c). The two UNRESOLVED ones take a harness's pool, traced by hand: runPesS01-
+   * Seven callers (measured at fce5c2d4c), and the upload check's driver (tools/upload-check, 2026-11-02), which migrates
+   * its own throwaway cluster on a createPool pool with no target: eight. The two UNRESOLVED ones take a harness's pool, traced by hand: runPesS01-
    * PublishSetAcceptance hands `seedVersion4` the pool of `startTestDatabase` (tests/support/testDatabase.ts:71,
    * `createPool(connectionString)`), and `startPracticeDatabase` builds its pools as `createPool(url)`
    * (tools/preview-practice/practice-throwaway-db.ts:61) — neither with a target. A new caller, or a caller whose pool
    * changes shape, changes this list.
    */
-  it("SEC-N4 every product call of migrate(<pool>) in apps, packages, tools and acceptance receives a pool built by createPool with no crossAccount option and never given a target — 7 callers, 2 through a harness pool", async () => {
+  it("SEC-N4 every product call of migrate(<pool>) in apps, packages, tools and acceptance receives a pool built by createPool with no crossAccount option and never given a target — 8 callers, 2 through a harness pool", async () => {
     expect(await migrateCallers()).toEqual([
       "acceptance/pes-accept-publish-set.ts migrate(pool as Pool) UNRESOLVED (parameter pool)",
       "acceptance/standing-db.ts migrate(existingPool) <- createPool no target",
@@ -179,7 +180,8 @@ describe("row-level security S01 FIX p1b: migrate()'s pool has no cross-account 
       "apps/runner/src/migrate-cli.ts migrate(pool) <- createPool no target",
       "tools/preview-practice/practice-debate.ts migrate(pool) UNRESOLVED (database.pool)",
       "tools/rls/proof.ts migrate(adminPool) <- createPool no target",
-      "tools/rls/proof.ts migrate(superuser) <- createPool no target"
+      "tools/rls/proof.ts migrate(superuser) <- createPool no target",
+      "tools/upload-check/start-checks-driver.ts migrate(adminPool) <- createPool no target"
     ]);
   });
 });
