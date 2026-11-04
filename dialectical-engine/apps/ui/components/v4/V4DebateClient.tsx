@@ -272,6 +272,12 @@ function targetOf(map: V4Map, digs: readonly DigView[], selection: V4Selection, 
     const question = uniqueOpenQuestions(map).find((candidate) => `open:${candidate.id}` === selection);
     return question === undefined ? null : { target: { kind: "open", questions: [question] }, again: digFor(question, digs) !== null };
   }
+  // journey-d3: on the main question, the bar digs the person's picks among its own open questions (the main question is
+  // never dug whole), so the dig is the bar's one job and not buried in the folded "Your picks" above it.
+  if (selection === "root" && choice.draft.group === null) {
+    const mine = draftTarget(choice.draft, map.paths);
+    return mine === null ? null : { target: mine, again: false };
+  }
   return null;
 }
 
@@ -1137,8 +1143,8 @@ function V4Debate({
   // link is made above, with the ready moments.
   const askHref = levelHref("/v4", chosenLevel);
   // wait-f23 (owner's screen review): while the question waits, "Open in the classic view" shows once, at the bottom of
-  // the waiting card, and not in the header too.
-  const waitingCard = map === null && load?.kind === "RUN" && load.run.state !== "FAILED";
+  // the waiting card, and not in the header too. The same for the paused and the failed screens, which carry it as well.
+  const waitingCard = map === null && load?.kind === "RUN";
   // map-f6: no reading level shows until the saved one is known; the map waits for it behind its outline (not forever).
   const levelSettled = useLevelSettled(levelKnown, map !== null);
   // journey-d3 / dig-f16: this page draws the dig notes in its own bottom stack once its map shows (and not while the

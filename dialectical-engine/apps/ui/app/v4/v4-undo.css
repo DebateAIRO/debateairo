@@ -65,6 +65,10 @@
 /* A computer: the notes bottom-left, then the tray, in one column (never on top of each other). */
 .v4StackWide { align-items: flex-start; padding: 0 var(--v4-gutter) calc(16px + var(--safe-b)); }
 .v4StackWide > .v4DebTray { align-self: center; }
+/* Beside the side panel (computer and laptop), the tray centres over the map column, never on top of the panel's
+   words and buttons: the panel's width and the grid's 20 px gap are kept free on the end side. */
+.v4DebLayout-desktop .v4StackWide { padding-inline-end: calc(var(--v4-gutter) + 380px + 20px); }
+.v4DebLayout-laptop .v4StackWide { padding-inline-end: calc(var(--v4-gutter) + 360px + 20px); }
 /* The page's bottom room is the stack's real height (dig-f16), on the page and inside the desktop panel's own scroll. */
 .appShell:has(.v4Stack) { padding-bottom: var(--v4-stack-room, 0px); }
 .v4DebLayout-desktop .v4DebPanelCol, .v4DebLayout-mid .v4DebPanelCol { padding-bottom: var(--v4-stack-room, 0px); }
@@ -90,11 +94,12 @@
 /* dig-f17: the slim report line just above the bar. */
 .v4StackGoodTime {
   display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0;
-  padding: 4px 4px 4px 12px; border-radius: var(--r-btn); background: var(--ok-bg); border: 1px solid var(--ok-border);
+  padding-block: 4px; padding-inline: 12px 4px; border-radius: var(--r-btn); background: var(--ok-bg); border: 1px solid var(--ok-border);
 }
-.v4StackGoodText { margin: 0; flex: 1 1 140px; min-width: 0; font-size: var(--t-ui); font-weight: 600; color: var(--ok-text); }
-.v4StackGoodReport { text-decoration: none; min-height: 44px; }
-.v4StackGoodClose { flex: none; min-width: 44px; min-height: 44px; background: none; border: 0; cursor: pointer; font-size: 20px; color: var(--text-2); }
+/* The words and the × share the first row; [Write my report] takes the next one, so the × never sits alone on a row. */
+.v4StackGoodText { margin: 0; flex: 1 1 calc(100% - 64px); min-width: 0; font-size: var(--t-ui); font-weight: 600; color: var(--ok-text); }
+.v4StackGoodReport { order: 2; text-decoration: none; min-height: 44px; }
+.v4StackGoodClose { order: 1;  flex: none; min-width: 44px; min-height: 44px; background: none; border: 0; cursor: pointer; font-size: 20px; color: var(--text-2); }
 /* journey-d3: the picks folded to one line, "Your picks ▸", which opens them. */
 .v4StackPicks { display: flex; flex-direction: column; min-width: 0; }
 .v4StackPicksToggle {

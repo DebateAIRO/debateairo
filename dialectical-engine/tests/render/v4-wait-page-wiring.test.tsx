@@ -100,4 +100,13 @@ describe("Open in the classic view while the question waits (wait-f23)", () => {
     await settle();
     expect(seen.headerLinks.at(-1)).toBe(`/debate/${runId}`);
   });
+
+  it("the failed page carries it once too: the header leaves it out", async () => {
+    const runId = crypto.randomUUID();
+    harness.run = { ...running(runId), state: "FAILED", terminal_reason: "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM" };
+    await mountMap(1600, runId);
+    expect(page().textContent).toContain(CATALOG["v4.debate.failedTitle"]);
+    expect(seen.headerLinks.at(-1)).toBeNull();
+    expect(classicLinks()).toHaveLength(1);
+  });
 });

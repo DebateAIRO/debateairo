@@ -14,7 +14,9 @@
 .v4BarCounts { font-size: var(--t-ui); color: var(--text-2); }
 
 /* ---------- shared marks ---------- */
-.v4MapNote { display: inline-flex; align-items: center; gap: 6px; font-size: var(--t-meta); color: var(--text-2); }
+/* A card's note row wraps whole words onto a new line in a narrow card ("Open · A good place to start · Could change
+   the answer"), never one word per line. */
+.v4MapNote { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; font-size: var(--t-meta); color: var(--text-2); }
 .v4MapStar { color: var(--gold); font-size: 15px; line-height: 1; }
 .v4MapNew { display: inline-flex; align-items: center; gap: 5px; font-size: var(--t-meta); font-weight: 700; color: var(--con-text); }
 .v4MapNewDot { width: 8px; height: 8px; border-radius: var(--r-dot); background: var(--accent); flex: none; }

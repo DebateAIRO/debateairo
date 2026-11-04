@@ -94,6 +94,9 @@
 .v4AskActions .v4BtnPrimary { padding: 0 26px; font-size: 16px; }
 .v4AskJust { font-size: var(--t-ui); min-height: 44px; text-align: start; }
 .v4AskJust[disabled] { color: var(--text-3); cursor: not-allowed; }
+/* ask-d1, signed out: the grey sign-in line sits on its own row under Next and "Just answer it" at every width,
+   never squeezed between the two on a wide screen. */
+.v4AskSignInFirst { flex-basis: 100%; order: 1; }
 .v4AskRefusal {
   margin: 0; padding: 10px 14px; border-radius: var(--r-btn);
   background: var(--dispute-bg); border: 1px solid var(--dispute-border); color: var(--dispute-text); font-size: var(--t-ui);
