@@ -85,10 +85,12 @@ function HeaderMenu({ buttonLabel, buttonText, title, className, children }: Rea
   );
 }
 
-export function V4ReportHeader({ catalog, backHref, level, onLevel, share, status }: Readonly<{
+export function V4ReportHeader({ catalog, backHref, backKey = "v4.report.backToMap", level, onLevel, share, status }: Readonly<{
   catalog: MessageCatalog;
   /** null: there is no map to go back to (a report that cannot be found). */
   backHref: string | null;
+  /** The back link's words: "Back to the map", or "Back to your question" for a debate that did not finish (map-f30). */
+  backKey?: "v4.report.backToMap" | "v4.report.backToQuestion";
   level: ReadingLevel;
   onLevel: (level: ReadingLevel) => void;
   /** The Share choices in their order; none: no Share button. */
@@ -102,7 +104,7 @@ export function V4ReportHeader({ catalog, backHref, level, onLevel, share, statu
         {backHref === null ? <span className="v4RepHdrSpacer" /> : (
           <Link className="v4RepHdrBack" href={backHref}>
             <span className="v4RepHdrArrow" aria-hidden="true">←</span>
-            <span className="v4RepHdrBackText">{t(catalog, "v4.report.backToMap")}</span>
+            <span className="v4RepHdrBackText">{t(catalog, backKey)}</span>
           </Link>
         )}
         <HeaderMenu

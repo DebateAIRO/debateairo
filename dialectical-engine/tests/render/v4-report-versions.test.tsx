@@ -465,16 +465,21 @@ describe("the report page's address and states", () => {
     expect(buttonOf(node, "Try again")).not.toBeNull();
   });
 
-  it("f10: a failed debate offers Ask a new question, with the classic view small under it", async () => {
+  it("f10: a failed debate offers Ask a new question, with the classic view small under it (after map-f30's way back)", async () => {
     const runId = crypto.randomUUID();
     harness.run = { run_ref: runId, question_line: "Q?", state: "FAILED", terminal_reason: "RUNNER_FAILED", hold_until: null } as RunProjection;
     const node = await mountReport(runId);
     const state = node.querySelector(".v4RepState")!;
     expect(state.textContent).toContain(word("v4.report.failed"));
     const links = [...state.querySelectorAll("a")];
-    expect(links.map((link) => link.textContent)).toEqual([CATALOG["v4.debate.askNew"], CATALOG["v4.common.classicView"]]);
+    // map-f30 first: back to the debate's own page, where "Ask this again" is; then report-f10's two.
+    expect(links.map((link) => link.textContent)).toEqual([
+      CATALOG["v4.report.backToQuestion"], CATALOG["v4.debate.askNew"], CATALOG["v4.common.classicView"]
+    ]);
     expect(links[0]!.className).toContain("v4BtnPrimary");
-    expect(links[1]!.getAttribute("href")).toBe(`/debate/${runId}`);
+    expect(links[1]!.getAttribute("href")).toMatch(/^\/v4(?:\?|$)/u);
+    expect(links[2]!.getAttribute("href")).toBe(`/debate/${runId}`);
+    expect(links[2]!.className).not.toContain("v4Btn");
   });
 });
 

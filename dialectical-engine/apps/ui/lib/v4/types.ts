@@ -277,6 +277,26 @@ export type DigView = Readonly<{
   points?: readonly V4Point[];
   /** W4-6 (the money rule): the dig's own run is paused at the month wall until this time (ISO); absent when it is not. */
   pausedUntil?: string;
+  /**
+   * Owner review 3 Nov (wait-f2, public-f16): paused at the month wall, and the server says it may continue now (its
+   * `month_pause.can_continue`). Absent when the dig is not paused.
+   */
+  canContinue?: boolean;
+  /**
+   * Owner review 3 Nov (wait-f18): FAILED, the reason its own run stored (a code: the page shows only the plain sentence
+   * chosen from it, lib/v3/runFailure.ts). Absent when it was not read (a dig whose run is gone, a dig read before this).
+   */
+  terminalReason?: string | null;
+  /**
+   * Owner review 3 Nov (dig-f12): FAILED, the question its own run was asked with (the site's text for the AIs, never shown),
+   * so a dig rebuilt from its link is tried again only when it would ask exactly the same. Absent when it was not read.
+   */
+  questionLine?: string;
+  /**
+   * Owner review 3 Nov (wait-f18): FAILED, and the server confirmed that nothing was taken from the person's quota for it
+   * (lib/v4/failedRun.ts). Absent: the server did not say, so the page says nothing about the quota.
+   */
+  quotaUntouched?: true;
 }>;
 
 /** What the panel shows: the question itself, one path, one open question or one dig. */

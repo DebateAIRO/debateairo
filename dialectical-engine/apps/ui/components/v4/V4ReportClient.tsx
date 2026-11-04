@@ -483,6 +483,9 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
   const mapHref = levelHref(`/v4/debate/${encodeURIComponent(target)}`, chosenLevel);
   const classicHref = `/debate/${encodeURIComponent(target)}`;
   const askHref = levelHref("/v4", chosenLevel);
+  // Owner review 3 Nov (map-f30): a debate that did not finish has no map; the way back is to its page, which offers
+  // "Ask this again".
+  const failed = load.kind === "NOT_READY" && load.failed;
 
   // R22 decision 17: whether the current version's PDF can be made. report-f11: the choice is drawn only once the check
   // has answered; a check that fails offers it (the download then says if it cannot be made); only a clear 404 hides it.
@@ -547,6 +550,7 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
     <V4ReportHeader
       catalog={catalog}
       backHref={load.kind === "NOT_FOUND" ? null : mapHref}
+      backKey={failed ? "v4.report.backToQuestion" : "v4.report.backToMap"}
       level={level}
       onLevel={chooseLevel}
       share={share}
@@ -581,7 +585,10 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
           {load.kind === "NOT_READY" && load.failed ? (
             <>
               <p className="v4RepProse">{t(catalog, "v4.report.failed")}</p>
-              <Link className="v4Btn v4BtnPrimary" href={askHref}>{t(catalog, "v4.debate.askNew")}</Link>
+              {/* map-f30: back to the debate's own page, where "Ask this again" is; report-f10: Ask a new question, and the
+                  classic view small under it. */}
+              <Link className="v4Btn v4BtnPrimary" href={mapHref}>{t(catalog, "v4.report.backToQuestion")}</Link>
+              <Link className="v4Btn" href={askHref}>{t(catalog, "v4.debate.askNew")}</Link>
               <Link className="v4Link v4RepSmallLink" href={classicHref}>{t(catalog, "v4.common.classicView")}</Link>
             </>
           ) : null}

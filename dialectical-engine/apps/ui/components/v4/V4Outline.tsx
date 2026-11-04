@@ -5,6 +5,7 @@ import { t } from "@/lib/i18n/translate";
 import { ownWords } from "@/lib/v4/askText";
 import type { DigView, V4OpenQuestion, V4Selection } from "@/lib/v4/types";
 import {
+  DigPauseDot,
   digNote,
   digsUnder,
   digTitle,
@@ -85,7 +86,8 @@ function DigRow(props: Readonly<{ dig: DigView; pieces: MapPiecesProps; selected
         <TitleText className="v4OutTitle" title={digTitle(dig, pieces.catalog)} catalog={pieces.catalog} />
         <span className="v4MapNote">
           {working ? <span className="v4MapPulse" aria-hidden="true" /> : null}
-          {digNote(dig, pieces.catalog)}
+          <DigPauseDot dig={dig} />
+          {digNote(dig, pieces.catalog, pieces.locale)}
         </span>
         {dig.state === "DONE" && dig.counts !== null ? <V4TrustBar counts={dig.counts} catalog={pieces.catalog} /> : null}
         {selected ? <span className="v4OutHere">{t(pieces.catalog, "v4.outline.here")}</span> : null}

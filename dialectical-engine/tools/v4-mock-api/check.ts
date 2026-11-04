@@ -460,6 +460,16 @@ await step("a debate paused at the month wall, then Continue", async () => {
   await mock("/__mock/set?pause=UNTIL_RESET");
   return `paused until ${before.month_pause?.until ?? ready.month_pause.until}; Continue refused early, then resumed`;
 }, (value: string) => value);
+// Owner review 3 Nov (wait-f11, wait-f18): a failed run's `quota_used` (on the draft view until the contract carries it), and
+// the switch that makes new digs fail or pause, for the click-test of "Try this dig again" and the paused dig.
+await step("a failed debate's quota_used, and the dig= switch", async () => {
+  const today: Loose = await client.readRun(RUNS.failed);
+  must(today.state === "FAILED" && (today.quota_used === undefined || today.quota_used === "NONE"), "today's run read stays valid");
+  const draft: Loose = await mock(`/__mock/draft/v1/runs/${RUNS.failed}`);
+  must(draft.quota_used === "NONE", "the draft view says nothing was taken");
+  for (const dig of ["FAIL", "PAUSE", "SETTLE"]) must((await mock(`/__mock/set?dig=${dig}`)).dig === dig, `dig=${dig} is taken`);
+  return `draft quota_used ${String(draft.quota_used)}; dig= FAIL, PAUSE, SETTLE`;
+}, (value: string) => value);
 
 // Owner's screen review, 3 Nov 2026 (journey-d2, journey-f16, wait-f7): when a question started, for "Started 14:31" on any
 // device. A DRAFT field: on the draft view now; the website gets it only once the contract's run read knows `started_at`.

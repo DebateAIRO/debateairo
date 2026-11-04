@@ -12,14 +12,18 @@ import type { ReadingLevel } from "@/lib/v4/types";
  * questions and digs the person can see on the map.
  */
 
-export type V4DigCounts = Readonly<{ running: number; done: number; failed: number }>;
+/**
+ * Owner review 3 Nov (wait-f2): `paused` counts the digs paused at the month wall, apart from the running ones (absent:
+ * none). A paused dig is not running, but it has not finished either.
+ */
+export type V4DigCounts = Readonly<{ running: number; done: number; failed: number; paused?: number }>;
 
 /**
  * Decision 8, first version (the engine has no "little is left" rule yet): nothing open is left without a dig, or at
- * least one dig is done and none is still running.
+ * least one dig is done and none is still running (or paused: it has not finished, as before it was counted apart).
  */
 export function goodTimeForReport(openLeft: number, digs: V4DigCounts): boolean {
-  return openLeft === 0 || (digs.done > 0 && digs.running === 0);
+  return openLeft === 0 || (digs.done > 0 && digs.running === 0 && (digs.paused ?? 0) === 0);
 }
 
 export function V4Rail(props: Readonly<{
@@ -51,7 +55,10 @@ export function V4Rail(props: Readonly<{
   const usageNotes = props.usageNotes ?? [];
   const mapStep = showReadStep ? 3 : 2;
   const reportHref = levelHref(`/v4/debate/${encodeURIComponent(runId)}/report`, level);
-  const anyDig = digs.running + digs.done + digs.failed > 0;
+  const paused = digs.paused ?? 0;
+  const anyDig = digs.running + paused + digs.done + digs.failed > 0;
+  // A round with digs still running shows the working mark; one whose only open digs are paused, the still pause dot.
+  const roundOpen = digs.running > 0 || paused > 0;
   const goodTime = goodTimeForReport(openLeft, digs);
   return (
     <nav className={`v4DebRail v4DebRail-${variant}`} aria-label={t(catalog, "v4.rail.label")}>
@@ -87,12 +94,15 @@ export function V4Rail(props: Readonly<{
             <span>{t(catalog, "v4.rail.round1")}</span>
           </li>
           {anyDig ? (
-            <li className={digs.running === 0 ? "v4DebRailDone" : undefined}>
-              <span className="v4DebRailMark" aria-hidden="true">{digs.running === 0 ? "✓" : "●"}</span>
+            <li className={roundOpen ? undefined : "v4DebRailDone"}>
+              <span className="v4DebRailMark" aria-hidden="true">
+                {digs.running > 0 ? "●" : paused > 0 ? <span className="v4PauseDot" /> : "✓"}
+              </span>
               <span>
                 {t(catalog, "v4.rail.round2")}
                 <span className="v4DebRailNote">
                   {tPlural(catalog, "v4.rail.digsRunning", digs.running, locale)}
+                  {paused > 0 ? <>{" · "}{tPlural(catalog, "v4.rail.digsPaused", paused, locale)}</> : null}
                   {" · "}
                   {tPlural(catalog, "v4.rail.digsDone", digs.done, locale)}
                   {digs.failed > 0 ? <>{" · "}{tPlural(catalog, "v4.rail.digsFailed", digs.failed, locale)}</> : null}

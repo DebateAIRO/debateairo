@@ -4,6 +4,7 @@ import { V4AllMaps } from "@/components/v4/V4AllMaps";
 import { readCrisisCountryHint } from "@/lib/crisisLines";
 import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
 import { loadNamespace } from "@/lib/i18n/server";
+import { askAgainRunId } from "@/lib/v4/failedRun";
 import { parseReadingLevel } from "@/lib/v4/storage";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +25,7 @@ function firstParam(value: string | string[] | undefined): string | undefined {
 export default async function V4AskPage({
   searchParams = Promise.resolve({})
 }: {
-  searchParams?: Promise<{ topic?: string | string[]; level?: string | string[]; maps?: string | string[] }>;
+  searchParams?: Promise<{ topic?: string | string[]; level?: string | string[]; maps?: string | string[]; again?: string | string[] }>;
 }) {
   const requestedLocale = (await cookies()).get(LOCALE_COOKIE)?.value;
   const locale = isLocale(requestedLocale) ? requestedLocale : "en";
@@ -51,6 +52,8 @@ export default async function V4AskPage({
       crisisCountryHint={readCrisisCountryHint(await headers())}
       initialQuestion={initialQuestion}
       initialLevel={parseReadingLevel(firstParam(query.level))}
+      // Owner review 3 Nov (wait-f11): "Ask this again" names only the debate; its words are read back from the server.
+      againRunId={askAgainRunId(firstParam(query.again))}
     />
   );
 }

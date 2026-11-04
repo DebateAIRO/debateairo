@@ -4,6 +4,7 @@ import { useState, type MouseEvent, type ReactNode } from "react";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { ownWords } from "@/lib/v4/askText";
 import { findOpenQuestion, uniqueOpenQuestions } from "@/lib/v4/mapModel";
+import { digPauseCardLine, pauseOfDig } from "@/lib/v4/monthPause";
 import type { DigView, V4Map, V4OpenQuestion, V4Path, V4Selection } from "@/lib/v4/types";
 import type { PickRefusal } from "@/lib/v4/suggestions";
 import { DigHereTooLeaf, refusalLine, SuggestionLeaves, type V4DigChoice } from "./V4DigSuggest";
@@ -200,12 +201,16 @@ export function openNote(question: V4OpenQuestion, picked: boolean, catalog: Mes
  * The dig card's line (draft 5.5): waiting, still being looked into, didn't finish, or once done what became of its
  * rewrite of the path it came from; a dig of an open question under the main question (no rewrite) and a dig from before
  * R22 (read by its story) are "done". W4-6 (the money rule): a dig whose own run is paused at the month wall says so.
+ * Owner review 3 Nov (wait-f2): with the page's `locale`, a paused dig reads "Dig · paused until 1 Dec", then "Dig ·
+ * ready to continue" once the server says its month has reset (without it, the older undated line).
  */
-export function digNote(dig: DigView, catalog: MessageCatalog): string {
+export function digNote(dig: DigView, catalog: MessageCatalog, locale?: string): string {
   if (dig.state === "FAILED") return t(catalog, "v4.rewrite.digCard.FAILED");
   if (dig.state === "WAITING") return t(catalog, "v4.rewrite.digCard.WAITING");
   if (dig.state === "RUNNING") {
-    return t(catalog, dig.pausedUntil === undefined ? "v4.rewrite.digCard.RUNNING" : "v4.rewrite.digCard.PAUSED");
+    const pause = pauseOfDig(dig);
+    if (pause === null) return t(catalog, "v4.rewrite.digCard.RUNNING");
+    return locale === undefined && !pause.canContinue ? t(catalog, "v4.rewrite.digCard.PAUSED") : digPauseCardLine(pause, catalog, locale ?? "en");
   }
   const rewrite = dig.rewrite ?? null;
   if (rewrite === null) return t(catalog, "v4.rewrite.digCard.DONE");
@@ -217,6 +222,11 @@ export function digNote(dig: DigView, catalog: MessageCatalog): string {
 /** A dig still at work: waiting, running, or (W4-6) rewriting the path it came from. */
 export function digWorking(dig: DigView): boolean {
   return dig.state === "WAITING" || dig.state === "RUNNING" || (dig.state === "DONE" && dig.rewrite?.state === "WRITING");
+}
+
+/** Owner review 3 Nov (public-f17): a dig paused at the month wall shows a still, hollow dot where a working dig pulses. */
+export function DigPauseDot(props: Readonly<{ dig: DigView }>) {
+  return pauseOfDig(props.dig) === null ? null : <span className="v4PauseDot" aria-hidden="true" />;
 }
 
 /**
@@ -300,7 +310,8 @@ function DigCard(props: Readonly<{ dig: DigView; pieces: MapPiecesProps; selecte
       <TitleText className="v4MapDigTitle" title={digTitle(dig, pieces.catalog)} catalog={pieces.catalog} />
       <span className="v4MapNote">
         {working ? <span className="v4MapPulse" aria-hidden="true" /> : null}
-        {digNote(dig, pieces.catalog)}
+        <DigPauseDot dig={dig} />
+        {digNote(dig, pieces.catalog, pieces.locale)}
       </span>
       {dig.state === "DONE" && dig.counts !== null
         ? <V4TrustBar counts={dig.counts} catalog={pieces.catalog} />

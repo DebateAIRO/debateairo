@@ -22,6 +22,7 @@ import { pathToFileURL } from "node:url";
 import { createSeed, SEED_NODE_IDS, type StoryStatus } from "./seed.js";
 import {
   answerDraftProblems, answerIndexDraftProblems, contractOrDraft, DraftAskParentSchema, DraftInvestigationSchema, DraftMonthPauseSchema, DraftNodeWebSchema,
+  DraftRunQuotaUsedSchema,
   DraftRoomPartSchema, DraftRoomQueryPartSchema, DraftRunContinuedSchema, DraftRunContinueRefusedSchema, DraftRunContinueRequestSchema,
   DraftRunStartedAtSchema, DraftUsageBorrowsSchema, splitAsk, splitRoomQuery, stripAnswer, stripNode, stripRoom,
   stripAnswerIndex, stripRun, stripUsage, type DraftAskParent
@@ -94,6 +95,9 @@ type UsageMode = (typeof USAGE_MODES)[number];
 /** W2-7 (money rule): the paused debate waits for the month reset (UNTIL_RESET), or the new month has started (CAN_CONTINUE). */
 const PAUSE_MODES = ["UNTIL_RESET", "CAN_CONTINUE"] as const;
 type PauseMode = (typeof PAUSE_MODES)[number];
+/** Owner review 3 Nov 2026: how a NEW dig ends — it finishes (default), fails once its run time is up, or pauses at the month wall. */
+const DIG_END_MODES = ["SETTLE", "FAIL", "PAUSE"] as const;
+type DigEndMode = (typeof DIG_END_MODES)[number];
 
 function choice<T extends string>(name: string, raw: string | undefined, allowed: readonly T[], fallback: T): T {
   if (raw === undefined || raw.trim() === "") return fallback;
@@ -175,6 +179,9 @@ const PUBLIC_REPORT_MS = 8_000;
 /** W4-4: how long the mock's readers take over a page added to researched. */
 const RESEARCHED_READ_MS = 6_000;
 let pauseMode: PauseMode = choice("MOCK_PAUSE", process.env.MOCK_PAUSE, PAUSE_MODES, "UNTIL_RESET");
+let digEndMode: DigEndMode = choice("MOCK_DIG", process.env.MOCK_DIG, DIG_END_MODES, "SETTLE");
+/** Owner review 3 Nov: what a dig that fails under `dig=FAIL` stored ("stopped partway", one of the website's fixed sentences). */
+const DIG_FAILED_REASON = "RUNNER_EXECUTION_FAILED:CALL_BUDGET_EXHAUSTED";
 /** R22 W5-1: whether the next report written comes out finished (OK) or failed (FAIL), and how long the mock's writer takes. */
 const REPORT_MODES = ["OK", "FAIL"] as const;
 type ReportMode = (typeof REPORT_MODES)[number];
@@ -238,6 +245,12 @@ type MockRun = {
    * `started_at` on open runs (DraftShelfRowPartSchema).
    */
   startedAt?: number;
+  /** Owner review 3 Nov: a run with `failedReason` fails only from this moment (a new dig under `dig=FAIL`); absent: failed from the start. */
+  failsAt?: number;
+  /** Owner review 3 Nov (draft field): what a FAILED run took from the person's quota, on its draft view only. */
+  quotaUsed?: "NONE" | "SOME";
+  /** Owner review 3 Nov: a dig paused under `dig=PAUSE` finishes its run time once Continue is pressed. */
+  settlesAfterContinue?: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   answer?: any;
 };
@@ -294,6 +307,8 @@ addRun({ runRef: RUN_RUNNING, seq: 5, startedAt: T0 - 4 * 60_000, question: "Is 
 addRun({ runRef: RUN_WAITING, seq: 3, waiting: true, question: "Should my town close the old centre to cars at weekends?" });
 addRun({
   runRef: RUN_FAILED, seq: 1, failedReason: FAILED_REASON,
+  // Owner review 3 Nov (draft): the models were gone when it was claimed, so it never began and nothing was taken.
+  quotaUsed: "NONE",
   question: "Will AI tutors replace homework help from teachers within five years?"
 });
 settledRun({
@@ -363,7 +378,7 @@ for (const [at, seeded] of SEEDED_CONTRIBUTION_DIGS.entries()) {
 type RunState = "QUEUED" | "WAITING" | "CLAIMED" | "RUNNING" | "HOLDING" | "SETTLED" | "FAILED";
 
 function stateOf(run: MockRun, now = Date.now()): RunState {
-  if (run.failedReason !== undefined) return "FAILED";
+  if (run.failedReason !== undefined && (run.failsAt === undefined || now >= run.failsAt)) return "FAILED";
   if (run.waiting === true) return "WAITING";
   if (run.settleAt === undefined || now < run.settleAt) return "RUNNING";
   return "SETTLED";
@@ -520,7 +535,9 @@ function runProjection(run: MockRun, now = Date.now()) {
     waits_until: state === "WAITING" ? waitsUntil(now) : null,
     waits_for: null,
     // W2-7 (money rule, draft): paused at the month wall until the next month; Continue once it has started.
-    ...(run.monthPaused === true && state === "RUNNING" ? { month_pause: monthPause(nextUtcMonth(now), pauseMode === "CAN_CONTINUE") } : {})
+    ...(run.monthPaused === true && state === "RUNNING" ? { month_pause: monthPause(nextUtcMonth(now), pauseMode === "CAN_CONTINUE") } : {}),
+    // Owner review 3 Nov (draft, web-draft.ts DraftRunQuotaUsedSchema): what a failed run took from the quota.
+    ...(state === "FAILED" && run.quotaUsed !== undefined ? { quota_used: run.quotaUsed } : {})
   };
 }
 
@@ -797,7 +814,15 @@ const draftPart = (key: string, schema: { safeParse: (body: unknown) => { succes
     return value === undefined ? { success: true } : schema.safeParse(value);
   }
 });
-const runDraftSchema = draftPart("month_pause", DraftMonthPauseSchema);
+const runPauseDraft = draftPart("month_pause", DraftMonthPauseSchema);
+const runQuotaDraft = draftPart("quota_used", DraftRunQuotaUsedSchema);
+/** A run read's draft parts: its month pause (W2-7) and, on a failed run, its `quota_used` (owner review 3 Nov). */
+const runDraftSchema = {
+  safeParse: (body: unknown) => {
+    const pause = runPauseDraft.safeParse(body);
+    return pause.success ? runQuotaDraft.safeParse(body) : pause;
+  }
+};
 const runStartDraftSchema = draftPart("started_at", DraftRunStartedAtSchema);
 const usageDraftSchema = draftPart("borrowed", DraftUsageBorrowsSchema);
 
@@ -1036,7 +1061,8 @@ function streamEvents(req: IncomingMessage, res: ServerResponse, run: MockRun): 
     if (settle !== null) clearTimeout(settle);
     openStreams.delete(res);
   };
-  if (state === "RUNNING" && run.settleAt !== undefined) {
+  // A dig paused under dig=PAUSE settles only after Continue (its far time would overflow the timer, so none is set).
+  if (state === "RUNNING" && run.settleAt !== undefined && run.monthPaused !== true) {
     settle = setTimeout(() => {
       emit("run.terminal", { state: "SETTLED" });
       close();
@@ -1208,6 +1234,15 @@ async function postAsk(req: IncomingMessage, res: ServerResponse): Promise<void>
     sendJson(req, res, 202, askAccepted(run, true), C.AskAcceptedSchema);
     return;
   }
+  // Owner review 3 Nov (dig=FAIL): a new dig runs its time, then fails "stopped partway" (and its draft view says it took
+  // some quota), so the click-test can try it again and see a second failure.
+  if (parent !== null && digEndMode === "FAIL") {
+    const run = addRun({ runRef, question, seq, failedReason: DIG_FAILED_REASON, failsAt: now + RUN_SECONDS * 1000, quotaUsed: "SOME" });
+    join(runRef);
+    log("QUEUED_DIG_WILL_FAIL", runRef);
+    sendJson(req, res, 202, askAccepted(run, false), C.AskAcceptedSchema);
+    return;
+  }
   const settleAt = now + RUN_SECONDS * 1000;
   // Free never searches; "#webfail" in the question plays a debate whose search failed.
   const web: WebCase = ask.plan_tier === "free" ? "FREE" : /#webfail/iu.test(question) ? "FAILED" : "PAID";
@@ -1220,6 +1255,13 @@ async function postAsk(req: IncomingMessage, res: ServerResponse): Promise<void>
     ...(publicParent === undefined ? {} : { dig: digPartOf({ parent_run_id: RUN_SETTLED, places: publicParent.places, mode: publicParent.mode, picks: publicParent.picks } as DraftAskParent, 1) })
   });
   if (publicParent !== undefined) startPublicCheck(run, publicParent, question, settleAt);
+  // Owner review 3 Nov (dig=PAUSE): a new dig reaches the month wall at once; Continue (once pause=CAN_CONTINUE) lets it finish.
+  if (parent !== null && digEndMode === "PAUSE") {
+    run.monthPaused = true;
+    // Paused: it does not finish until Continue (a far, valid time; the state read says RUNNING until then).
+    run.settleAt = Date.UTC(2100, 0, 1);
+    run.settlesAfterContinue = true;
+  }
   join(runRef);
   log(parent === null ? "QUEUED" : "QUEUED_DIG", runRef);
   sendJson(req, res, 202, askAccepted(run, false), C.AskAcceptedSchema);
@@ -1237,6 +1279,7 @@ function mockState() {
     plan: planMode,
     usage: usageMode,
     pause: pauseMode,
+    dig: digEndMode,
     public: publicMode,
     report: reportMode,
     session: sessionOut ? "OUT" : "IN",
@@ -1318,7 +1361,9 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
         const pause = url.searchParams.get("pause");
         const publicSetting = url.searchParams.get("public");
         const reportSetting = url.searchParams.get("report");
+        const digSetting = url.searchParams.get("dig");
         if (reportSetting !== null) reportMode = choice("report", reportSetting, REPORT_MODES, reportMode);
+        if (digSetting !== null) digEndMode = choice("dig", digSetting, DIG_END_MODES, digEndMode);
         if (room !== null) roomMode = choice("room", room, ROOM_MODES, roomMode);
         if (ask !== null) askMode = choice("ask", ask, ASK_MODES, askMode);
         if (plan !== null) planMode = choice("plan", plan, PLAN_MODES, planMode);
@@ -1334,7 +1379,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       } catch (failure) {
         // The detail goes to the mock's log, never into the reply (CodeQL js/stack-trace-exposure, PR #224).
         process.stderr.write(`[mock] setting refused: ${failure instanceof Error ? failure.message : String(failure)}\n`);
-        return sendJson(req, res, 400, { error: "MOCK_SETTING_INVALID", message: "Unknown value for room, ask, plan, usage, pause or public; see the mock's log." });
+        return sendJson(req, res, 400, { error: "MOCK_SETTING_INVALID", message: "Unknown value for room, ask, plan, usage, pause, dig or public; see the mock's log." });
       }
       return sendJson(req, res, 200, mockState());
     }
@@ -1526,6 +1571,12 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
         return sendJson(req, res, 409, { error: "RUN_PAUSED_UNTIL_RESET", message: "RUN_PAUSED_UNTIL_RESET", until: nextUtcMonth() }, DraftRunContinueRefusedSchema);
       }
       run.monthPaused = false;
+      // A dig paused under `dig=PAUSE` then runs its time and finishes, so the click-test sees it through.
+      if (run.settlesAfterContinue === true) {
+        run.settleAt = Date.now() + RUN_SECONDS * 1000;
+        run.storyReadyAt = run.settleAt;
+        run.settlesAfterContinue = false;
+      }
       return sendJson(req, res, 200, { state: "CONTINUING" }, DraftRunContinuedSchema);
     }
     if (parts[3] === "researched") {

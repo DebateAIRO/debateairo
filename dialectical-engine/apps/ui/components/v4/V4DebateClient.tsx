@@ -17,6 +17,8 @@ import { V4ChangesBar } from "@/components/v4/V4ChangesBar";
 import { V4PickChips } from "@/components/v4/V4ChoiceChips";
 import { V4MoneyLines, type V4DigChoice } from "@/components/v4/V4DigSuggest";
 import { V4DigToast, type V4DigNotice } from "@/components/v4/V4DigToast";
+import type { V4FailedDigs } from "@/components/v4/V4DigFailed";
+import { V4FailedScreen } from "@/components/v4/V4FailedScreen";
 import { V4Header } from "@/components/v4/V4Header";
 import { V4ContributionNote } from "@/components/v4/V4ContributionNote";
 import { V4LevelTrail } from "@/components/v4/V4LevelTrail";
@@ -29,6 +31,8 @@ import { V4Panel } from "@/components/v4/V4Panel";
 import type { V4ResearchedPress } from "@/components/v4/V4Sources";
 import { V4ChangedSince } from "@/components/v4/V4PathRewrite";
 import { V4MainAnswer } from "@/components/v4/V4MainAnswer";
+import { V4MonthPause } from "@/components/v4/V4MonthPause";
+import { V4PausedScreen } from "@/components/v4/V4PausedScreen";
 import { V4Rail, type V4DigCounts } from "@/components/v4/V4Rail";
 import { isNotFound } from "@/lib/api";
 import { isSignedOut, signInHrefHere } from "@/lib/signInWayBack";
@@ -38,6 +42,8 @@ import { digQuestion, digTargetQuestions, ownWords, parseDigQuestion } from "@/l
 import { mergeDigLinks, readDigRecords, readLastVisit, recordDig, recordLastVisit, storableItems } from "@/lib/v4/accountMemory";
 import { diffSnapshots, isRewriteWord, rewriteNewsOf, selectionForChange, snapshotItems } from "@/lib/v4/changes";
 import { effectiveDigMode } from "@/lib/v4/askConfig";
+import { digRetryOf, retryPending } from "@/lib/v4/digRetry";
+import { askAgainHref } from "@/lib/v4/failedRun";
 import { digLinksFor, digParentOf, mergeIndex, readQuestionIndex, type IndexEntry } from "@/lib/v4/digIndex";
 import {
   addToResearched, currentReportVersion, loadAnswer, loadDigTrail, loadDigView, loadInvestigation, loadStory, loadV4, storyReadFailed, type DigTrail, type V4Load
@@ -46,14 +52,13 @@ import { researchedWaiting } from "@/lib/v4/web";
 import { buildV4Map, rewriteByDig, rewriteWaiting, uniqueOpenQuestions } from "@/lib/v4/mapModel";
 import {
   borrowLines,
-  continueRun,
   digShareLine,
   monthPauseOf,
   readBorrowed,
   startsWaitLine,
-  type ContinueOutcome,
   type MoneyLine
 } from "@/lib/v4/money";
+import { pausedDigCount, pauseOfDig, pauseOfRun } from "@/lib/v4/monthPause";
 import {
   addPick,
   askParentOf,
@@ -85,6 +90,7 @@ import type {
   V4Map,
   V4Selection
 } from "@/lib/v4/types";
+import { sentDigOf, useSentDigMemory } from "@/lib/v4/useSentDigs";
 import { useV4Ask, type V4AskOutcome } from "@/lib/v4/useV4Ask";
 import { useWaitPolling } from "@/lib/v4/useWaitPolling";
 import { useLeaveLinkGuard, useTypedWords } from "@/lib/v4/useLeaveGuard";
@@ -1056,6 +1062,29 @@ function V4Debate({
     return () => window.clearTimeout(timer);
   }, [pending, servedRunId, servedQuestionLine]);
 
+  // ── A dig that did not finish (owner review 3 Nov, dig-f12/wait-f18): its reason, and "Try this dig again" ──────────
+  // The digs this visit sends are remembered as sent (memory only), so a retry digs exactly the same picks; the retry goes
+  // through the same 10-second Undo note as any dig, with the failed dig's own Quick/Thorough choice.
+  useSentDigMemory(pending, visitLinks);
+  const failedDigs = useMemo<V4FailedDigs | undefined>(() => {
+    if (map === null) return undefined;
+    // A dig rebuilt from its link is offered only when it would ask exactly what the failed one asked.
+    const asked = (line: string): string => line.replace(/\s+/gu, " ").trim();
+    const retryOf = (dig: DigView) => digRetryOf(dig, digs, map, sentDigOf(dig.link.childRunId), (target) =>
+      servedQuestionLine !== null && dig.questionLine !== undefined
+        && asked(digQuestion(target, servedQuestionLine, catalog, locale)) === asked(dig.questionLine));
+    return {
+      retryOf,
+      onRetry: (dig: DigView) => {
+        const retry = retryOf(dig);
+        if (retry.kind !== "OFFER" || digBusy || !canDig) return;
+        setNotice(null);
+        setPending(retryPending(retry, effectiveDigMode(retry.mode ?? digMode, planTier), Date.now(), UNDO_MS));
+      },
+      reasonText: (reason) => runFailureMessage(reason, homeCatalog)
+    };
+  }, [map, digs, digBusy, canDig, digMode, planTier, homeCatalog, servedQuestionLine, catalog, locale]);
+
   // ── What changed since your last visit and while you were here (D4, fix wave 1, N7) ─────────────────────────────
   // The first complete load (map + every dig read once + the question list and dig records read once + the last visit
   // read) is the baseline; when the account kept a last visit, what differs from it is the first news ("since your last
@@ -1303,7 +1332,28 @@ function V4Debate({
               catalog={catalog}
             />
           ) : load.run.state === "FAILED" ? (
-            <FailedScreen run={load.run} classicHref={classicHref} askHref={askHref} catalog={catalog} homeCatalog={homeCatalog} />
+            // Owner review 3 Nov (wait-f11, map-f30): "Ask this again" fills the ask step from this debate; a dig leads back to its map.
+            <V4FailedScreen
+              run={load.run}
+              askAgainHref={levelHref(askAgainHref(runId), chosenLevel)}
+              askHref={askHref}
+              classicHref={classicHref}
+              dig={isDigPage || recordParent !== null
+                ? { backHref: parent === null ? null : levelHref(`/v4/debate/${encodeURIComponent(parent.runId)}`, chosenLevel) }
+                : null}
+              catalog={catalog}
+              homeCatalog={homeCatalog}
+            />
+          ) : pauseOfRun(load.run) !== null ? (
+            // Owner review 3 Nov (wait-f5, public-f17): paused at the month wall, the pause is said once, with a still mark.
+            <V4PausedScreen
+              run={load.run}
+              runId={runId}
+              reconnecting={loadProblem === "UNREACHABLE"}
+              classicHref={classicHref}
+              catalog={catalog}
+              locale={locale}
+            />
           ) : (
             <ProgressScreen
               run={load.run}
@@ -1321,8 +1371,10 @@ function V4Debate({
     );
   }
 
+  // Owner review 3 Nov (wait-f2): a dig paused at the month wall is counted as paused, not as running.
   const dugCounts: V4DigCounts = {
-    running: digs.filter(isRunning).length,
+    running: digs.filter((dig) => isRunning(dig) && pauseOfDig(dig) === null).length,
+    paused: pausedDigCount(digs),
     done: digs.filter((dig) => dig.state === "DONE").length,
     failed: digs.filter((dig) => dig.state === "FAILED").length
   };
@@ -1493,6 +1545,7 @@ function V4Debate({
                 digPathLine={trail?.steps.at(-1)?.line ?? null}
                 reportAnswer={reportAnswer}
                 {...(choice === undefined ? {} : { choice })}
+                {...(failedDigs === undefined ? {} : { failedDigs })}
                 headingRef={headingRef}
                 catalog={catalog}
                 locale={locale}
@@ -1565,42 +1618,6 @@ function StatusScreen({ problem, onRetry, askHref, catalog }: Readonly<{
   return <V4LoadingOutline catalog={catalog} />;
 }
 
-function FailedScreen({ run, classicHref, askHref, catalog, homeCatalog }: Readonly<{
-  run: RunProjection;
-  classicHref: string;
-  askHref: string;
-  catalog: MessageCatalog;
-  homeCatalog: MessageCatalog;
-}>) {
-  return (
-    <section className="v4Card v4DebStatus">
-      <p className="v4Eyebrow">{t(catalog, "v4.debate.yourQuestion")}</p>
-      <p className="v4Serif v4DebStatusQuestion" data-ai-generated="true">{ownWords(run.question_line)}</p>
-      <h1 className="v4DebStatusTitle">{t(catalog, "v4.debate.failedTitle")}</h1>
-      <p>{runFailureMessage(run.terminal_reason, homeCatalog)}</p>
-      {/* Decision 12: what the AIs found before an update stopped this debate stays readable here. */}
-      {run.found === undefined || run.found.length === 0 ? null : (
-        <section>
-          <h2>{t(catalog, "v4.debate.foundTitle")}</h2>
-          <ul>
-            {run.found.map((page) => (
-              <li key={page.url}>
-                <a className="v4Link" href={page.url} rel="noopener noreferrer" target="_blank">{page.title}</a>
-                {page.note === null ? null : <p data-ai-generated="true">{page.note}</p>}
-                {page.quotes.map((quote) => <blockquote key={quote}>{quote}</blockquote>)}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-      <div className="v4DebStatusActions">
-        <Link className="v4Btn v4BtnPrimary" href={askHref}>{t(catalog, "v4.debate.askNew")}</Link>
-        <Link className="v4Link" href={classicHref}>{t(catalog, "v4.common.classicView")}</Link>
-      </div>
-    </section>
-  );
-}
-
 /** RULES-4: QUEUED and CLAIMED say "Starting"; only a run that really waits for a spot says so. */
 function stateLine(run: RunProjection, catalog: MessageCatalog, locale: string): string {
   // W3-4 (the money rule): at the month wall the debate's planned calls and searches pause until the month resets.
@@ -1627,37 +1644,15 @@ function stateLine(run: RunProjection, catalog: MessageCatalog, locale: string):
 }
 
 /**
- * W3-4 (the money rule, owner 31 Oct): a debate paused at the month wall. Continue resumes it once the month has reset
- * (true resume: what is done is not paid for again); pressed too early, nothing changes and the page says from when.
+ * W3-4 (the money rule, owner 31 Oct): a debate paused at the month wall. Owner review 3 Nov (wait-f2): it is the one
+ * pause block (V4MonthPause). The page shows a paused run on V4PausedScreen, so this stays only for ProgressScreen's
+ * own reference until the start-step's wait view takes the block in.
  */
 function MonthPaused({ run, runId, catalog, locale }: Readonly<{
   run: RunProjection; runId: string; catalog: MessageCatalog; locale: string;
 }>) {
-  const pause = monthPauseOf(run);
-  const [pressing, setPressing] = useState(false);
-  const [outcome, setOutcome] = useState<ContinueOutcome | null>(null);
-  if (pause === null) return null;
-  const date = (iso: string): string => formatDate(locale, iso, { dateStyle: "medium" });
-  const press = async (): Promise<void> => {
-    setPressing(true);
-    const next = await continueRun(runId);
-    setOutcome(next);
-    setPressing(false);
-  };
-  const continuing = pressing || outcome?.kind === "CONTINUING";
-  return (
-    <div className="v4DebPaused">
-      <p>{pause.can_continue ? t(catalog, "v4.money.pausedReady") : t(catalog, "v4.money.paused", { date: date(pause.until) })}</p>
-      <button type="button" className="v4Btn v4BtnPrimary" disabled={continuing} onClick={() => void press()}>
-        {continuing ? t(catalog, "v4.money.continuing") : t(catalog, "v4.money.continue")}
-      </button>
-      <p className="v4Muted">{t(catalog, "v4.money.continueNote")}</p>
-      {outcome?.kind === "TOO_EARLY" ? (
-        <p role="status">{t(catalog, "v4.money.continueTooEarly", { date: date(outcome.until) })}</p>
-      ) : null}
-      {outcome?.kind === "FAILED" ? <p role="status">{t(catalog, "v4.money.continueFailed")}</p> : null}
-    </div>
-  );
+  const pause = pauseOfRun(run);
+  return pause === null ? null : <V4MonthPause runId={runId} pause={pause} catalog={catalog} locale={locale} />;
 }
 
 function ProgressScreen({ run, runId, startedAt, now, reconnecting, classicHref, catalog, locale }: Readonly<{

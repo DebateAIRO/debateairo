@@ -25,6 +25,7 @@ import {
   type V4Goal,
   type V4GoalAnswer
 } from "@/lib/v4/types";
+import { useAskAgain } from "@/lib/v4/useAskAgain";
 import { useAskClarify } from "@/lib/v4/useAskClarify";
 import { useLeaveSiteGuard } from "@/lib/v4/useLeaveGuard";
 import { useV4Ask } from "@/lib/v4/useV4Ask";
@@ -139,7 +140,8 @@ export function V4AskClient({
   locale,
   crisisCountryHint,
   initialQuestion,
-  initialLevel
+  initialLevel,
+  againRunId = null
 }: Readonly<{
   catalog: MessageCatalog;
   homeCatalog: MessageCatalog;
@@ -150,6 +152,8 @@ export function V4AskClient({
   initialQuestion: string;
   /** The level the address carried (`?level=`), or null: then D1 offers the chips. */
   initialLevel: ReadingLevel | null;
+  /** Owner review 3 Nov (wait-f11): "Ask this again" names the debate (`?again=`) whose question fills the box; null: none. */
+  againRunId?: string | null;
 }>) {
   // ask-d1 D / ask-f16: the real page from the first frame, signed in or not; the session is learnt beside it (V4AskGate).
   // The accept screen reads newDebate.* keys, as on /new.
@@ -165,6 +169,7 @@ export function V4AskClient({
         initialQuestion={initialQuestion}
         initialLevel={initialLevel}
         session={session}
+        againRunId={againRunId}
       />
     )}</V4AskGate>
   );
@@ -179,7 +184,8 @@ function V4AskForm({
   crisisCountryHint,
   initialQuestion,
   initialLevel,
-  session
+  session,
+  againRunId
 }: Readonly<{
   catalog: MessageCatalog;
   homeCatalog: MessageCatalog;
@@ -192,6 +198,8 @@ function V4AskForm({
   initialLevel: ReadingLevel | null;
   /** Whether the visitor is signed in (CHECKING until the session read answers). */
   session: V4Session;
+  /** Owner review 3 Nov (wait-f11): the debate whose question fills the box (`?again=`); null: none. */
+  againRunId: string | null;
 }>) {
   const router = useRouter();
   // N7: a level the person chose before (on any device) comes back from the account; until that read has answered the
@@ -220,6 +228,13 @@ function V4AskForm({
   // journey-d4 A: before Next, the browser's own "Leave site?" protects typed words (a reload or a closed tab); words a
   // reload brings back from the address are not at risk.
   useLeaveSiteGuard(() => step === "ask" && question.trim().length > 0 && question.trim() !== initialQuestion.trim());
+  // Owner review 3 Nov (wait-f11): "Ask this again" fills the box with the earlier question, read back from the server, as
+  // long as the person has not started typing; nothing starts by itself. Read once the person is known to be signed in.
+  const againQuestion = useAskAgain(session === "IN" ? againRunId : null, catalog);
+  useEffect(() => {
+    if (againQuestion === null) return;
+    setQuestion((current) => (current === initialQuestion ? againQuestion : current));
+  }, [againQuestion, initialQuestion]);
 
   const ask = useV4Ask({
     catalog,
