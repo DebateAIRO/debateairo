@@ -28,10 +28,10 @@ describe("Region list against the country rules", () => {
     expect(fromExample.defaultRule.signup).toBe(false);
   });
 
-  it("R4 covers the two that went missing: Iceland offered, Liechtenstein sign-up only", () => {
+  it("R4 covers the two that went missing: Iceland and Liechtenstein, both offered", () => {
     expect(servedBy(fromCode)).toEqual(expect.arrayContaining(["IS", "LI"]));
     expect(fromCode.countries.IS).toMatchObject({ signup: true, pay: true });
-    expect(fromCode.countries.LI).toMatchObject({ signup: true, pay: false });
+    expect(fromCode.countries.LI).toMatchObject({ signup: true, pay: true });
     expect(listed.has("IS") && listed.has("LI")).toBe(true);
   });
 });

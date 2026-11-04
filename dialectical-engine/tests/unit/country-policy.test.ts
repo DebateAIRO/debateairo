@@ -22,8 +22,8 @@ const EU27 = ["AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", 
 const GROUPS = [
   { codes: [...EU27, "NO", "IS"], rule: { signup: true, pay: true, reason: "OFFERED", blocked: false } },
   { codes: ["US", "CA", "AU", "NZ", "SG", "JP"], rule: { signup: true, pay: true, reason: "OFFERED", blocked: false } },
-  { codes: ["LI"], rule: { signup: true, pay: false, reason: "TAX_NOT_READY", blocked: false } },
-  { codes: ["KR", "CH", "TW", "MD"], rule: { signup: true, pay: false, reason: "TAX_NOT_READY", blocked: false } },
+  { codes: ["LI", "CH"], rule: { signup: true, pay: true, reason: "OFFERED", blocked: false } },
+  { codes: ["KR", "TW", "MD"], rule: { signup: true, pay: false, reason: "TAX_NOT_READY", blocked: false } },
   { codes: ["GB", "UA"], rule: { signup: false, pay: false, reason: "NOT_OFFERED", blocked: false } },
   { codes: ["TR", "BR", "ID", "SA", "IN", "AE", "MX", "AR", "CO", "CL", "TH", "PH", "IL"], rule: { signup: false, pay: false, reason: "TERMS_EXCLUDED", blocked: false } },
   { codes: ["RU", "BY", "KP"], rule: { signup: false, pay: false, reason: "SANCTIONS", blocked: true } },
@@ -152,14 +152,22 @@ describe("countryPolicy v1 (paid plans G2, spec §1.5 and §2.3.3)", () => {
       expect(decideAsk(policy, { ipCountry: country }), country).toEqual({ kind: "ALLOW" });
     }
     expect(decideSignup(policy, { ipCountry: "KR", tor: false })).toEqual({ kind: "ALLOW" });
-    // Owner's amendment of 1 October 2026: Switzerland, Taiwan and Moldova open for sign-up;
+    // Owner's amendment of 1 October 2026: Taiwan and Moldova open for sign-up;
     // payment stays off until each country's tax registration is checked.
-    for (const country of ["CH", "TW", "MD"]) {
+    for (const country of ["TW", "MD"]) {
       expect(decideSignup(policy, { ipCountry: country, tor: false }), country).toEqual({ kind: "ALLOW" });
       expect(countryRule(policy, country), country)
         .toEqual({ signup: true, pay: false, reason: "TAX_NOT_READY", blocked: false });
       expect(decidePayment(policy, { ipCountry: country, tor: false, declaredCountry: country }), country)
         .toEqual({ kind: "REFUSE", code: "COUNTRY_PAYMENT_UNAVAILABLE" });
+    }
+    // Owner's amendment of 4 November 2026: Switzerland and Liechtenstein open for sign-up and payment.
+    for (const country of ["CH", "LI"]) {
+      expect(decideSignup(policy, { ipCountry: country, tor: false }), country).toEqual({ kind: "ALLOW" });
+      expect(countryRule(policy, country), country)
+        .toEqual({ signup: true, pay: true, reason: "OFFERED", blocked: false });
+      expect(decidePayment(policy, { ipCountry: country, tor: false, declaredCountry: country }), country)
+        .toEqual({ kind: "ALLOW" });
     }
     expect(decideSignup(policy, { ipCountry: "RO", tor: true })).toEqual({ kind: "REFUSE", code: "TOR_REFUSED" });
     expect(decideSignup(policy, { ipCountry: "XX", tor: true })).toEqual({ kind: "REFUSE", code: "TOR_REFUSED" });
@@ -170,7 +178,7 @@ describe("countryPolicy v1 (paid plans G2, spec §1.5 and §2.3.3)", () => {
       decidePayment(policy, { ipCountry, tor, declaredCountry });
     // 1. the declared country's pay switch is off — even over Tor and an unknown address
     expect(pay("RO", "GB")).toEqual({ kind: "REFUSE", code: "COUNTRY_PAYMENT_UNAVAILABLE" });
-    expect(pay("XX", "LI", true)).toEqual({ kind: "REFUSE", code: "COUNTRY_PAYMENT_UNAVAILABLE" });
+    expect(pay("XX", "TW", true)).toEqual({ kind: "REFUSE", code: "COUNTRY_PAYMENT_UNAVAILABLE" });
     // 2. unknown address, or Tor (Tor wins when both)
     expect(pay("XX", "RO")).toEqual({ kind: "REFUSE", code: "COUNTRY_UNKNOWN" });
     expect(pay("DE", "RO", true)).toEqual({ kind: "REFUSE", code: "TOR_REFUSED" });
