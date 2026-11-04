@@ -49,6 +49,13 @@ export function commandArguments(label) {
   return [...COMMANDS[label]];
 }
 
+// The owner's early allowances that apply at <now>: none before their day, and each only until its seven days are up.
+// The pre-upload checker prints them, so the owner sees whether today's website build can meet the package-rule fault.
+export function earlyUseInForce(now) {
+  if (!Number.isFinite(now) || now < EARLY_USE_FROM) return [];
+  return EARLY_USE.filter(({ expiry }) => expiry > now).map((allowance) => ({ pin: pinOf(allowance), until: new Date(allowance.expiry).toISOString() }));
+}
+
 export function childEnvironment({ environment, now, workspace, lock }) {
   if (!Number.isFinite(now)
     || [...workspace.matchAll(/^minimumReleaseAge:[ \t]*(\d+)[ \t]*$/gm)].map((m) => m[1]).join() !== "10080"

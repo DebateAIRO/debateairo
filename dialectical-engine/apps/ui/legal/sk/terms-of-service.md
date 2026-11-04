@@ -334,7 +334,7 @@ Hlavná časť týchto Podmienok je určená pre vás. Ďalej platí: konanie m�
 
 ### A.3 Kanada a Quebec
 
-Našou zodpovednou osobou pre ochranu osobných údajov a v Quebecu osobou zodpovednou za ochranu osobných informácií je náš konateľ, s ktorým sa možno skontaktovať na adrese privacy@dezbatere.ro. Vaše údaje upravuje príloha B.3 našich Zásad ochrany osobných údajov. **Quebec:** tieto Podmienky sú dostupné vo francúzštine; francúzštinu si zvolíte v prepínači jazykov; nastavenia, ktoré zachovávajú súkromie vašich debát, sú predvolene zapnuté; môžete požiadať o odstránenie osobných údajov, ktoré sa vás týkajú, z výsledkov vyhľadávania.
+Našou zodpovednou osobou pre ochranu osobných údajov a v Quebecu osobou zodpovednou za ochranu osobných informácií je náš konateľ, s ktorým sa možno skontaktovať na adrese privacy@dezbatere.ro. Vaše údaje upravuje príloha B.3 našich Zásad ochrany osobných údajov. **Quebec:** tieto Podmienky sú dostupné vo francúzštine; ak pri registrácii zvolíte Kanadu, zobrazia sa vám najprv vo francúzštine a namiesto toho si môžete zvoliť angličtinu; nastavenia, ktoré zachovávajú súkromie vašich debát, sú predvolene zapnuté; môžete požiadať o odstránenie osobných údajov, ktoré sa vás týkajú, z výsledkov vyhľadávania.
 
 ### A.4 Austrália a Nový Zéland
 

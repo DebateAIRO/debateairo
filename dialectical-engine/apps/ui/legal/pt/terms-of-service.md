@@ -335,7 +335,7 @@ O corpo destes Termos foi redigido para si. Adicionalmente: pode intentar açõe
 
 ### A.3 Canadá e Quebeque
 
-O nosso responsável pela privacidade e, no Quebeque, a pessoa responsável pela proteção das informações pessoais é o nosso administrador, contactável em privacy@dezbatere.ro. O Anexo B.3 da nossa Política de Privacidade abrange os seus dados. **Quebeque:** estes Termos estão disponíveis em francês; escolha francês no seletor de idioma; as definições que mantêm os seus debates privados estão ativadas por predefinição; pode pedir a desindexação de informações pessoais a seu respeito.
+O nosso responsável pela privacidade e, no Quebeque, a pessoa responsável pela proteção das informações pessoais é o nosso administrador, contactável em privacy@dezbatere.ro. O Anexo B.3 da nossa Política de Privacidade abrange os seus dados. **Quebeque:** estes Termos estão disponíveis em francês; se escolher o Canadá ao registar-se, recebe-os primeiro em francês e pode escolher o inglês em alternativa; as definições que mantêm os seus debates privados estão ativadas por predefinição; pode pedir a desindexação de informações pessoais a seu respeito.
 
 ### A.4 Austrália e Nova Zelândia
 

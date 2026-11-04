@@ -82,7 +82,7 @@ let database: TestDatabase;
 let runtime: Pool;
 let funding: ReturnType<typeof internalFundingFixture>;
 const stubClosers: (() => Promise<void>)[] = [];
-const harness = previewDebateHarness({ pool: () => database.pool, stubClosers });
+const harness = previewDebateHarness({ pool: () => database.pool, database: () => database, stubClosers });
 
 const OBSERVATION = { nodeVersion: "v26.8.2", pnpmVersion: "11.20.0", sourceRevision: "a".repeat(40), sourceTree: "b".repeat(40),
   operatorSha256: "c".repeat(64), observedAt: "2026-10-23T08:00:00.000Z" };

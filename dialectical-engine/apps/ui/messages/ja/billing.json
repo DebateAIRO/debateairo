@@ -77,6 +77,7 @@
   "billing.checkout.priceCleared": "入力内容を変更したため、料金が表示されなくなりました。続けるには、合計金額をもう一度表示してください。",
   "billing.checkout.countryUnavailable": "お住まいの国では、有料プランはまだご利用いただけません。無料プランは引き続きご利用いただけます。",
   "billing.checkout.regionUnavailable": "お住まいの地域では、有料プランはまだご利用いただけません。無料プランは引き続きご利用いただけます。",
+  "billing.checkout.regionTermsExcluded": "テネシー州ではDialectical Engineを提供していないため、この住所でのお支払いはお受けできません。",
   "billing.checkout.confirmCountry": "接続元は {ipCountry} のようです。{declaredCountry} にお住まいですか？",
   "billing.checkout.confirmCountryYes": "はい、そこに住んでいます",
   "billing.checkout.confirmCountryRequired": "お住まいの国を確認してから、続けてください。",

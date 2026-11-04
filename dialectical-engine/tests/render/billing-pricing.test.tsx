@@ -64,7 +64,8 @@ const NO_COUNTRY = answer("USD", { country: null, postal_code: null, status: "CO
 const CURRENCY_NOTE = billingEnglish["billing.pricing.currencyNote"];
 
 async function renderPricing(searchParams?: Record<string, string | string[]>): Promise<Document> {
-  const page = await PricingPage(searchParams === undefined ? undefined : { searchParams: Promise.resolve(searchParams) });
+  // Next.js always passes the page its props object (a page whose props may be undefined fails `next build`).
+  const page = await PricingPage(searchParams === undefined ? {} : { searchParams: Promise.resolve(searchParams) });
   return new JSDOM(renderToStaticMarkup(page)).window.document;
 }
 const paidCards = (document: Document) => ["PLUS", "PRO", "MAX"].map((id) => document.querySelector(`[data-plan="${id}"]`)!);
@@ -222,7 +223,7 @@ describe("P18 /pricing", () => {
 
   it("is not found when billing is off, and says so plainly when the plans cannot be read", async () => {
     mocks.getBillingPlans.mockRejectedValue(new ContractHttpError("NOT_FOUND", 404, "Not found"));
-    await expect(PricingPage()).rejects.toThrow("NEXT_NOT_FOUND");
+    await expect(PricingPage({})).rejects.toThrow("NEXT_NOT_FOUND");
     mocks.getBillingPlans.mockRejectedValue(new ContractHttpError("SERVER_FAILURE", 503, "Unavailable"));
     const document = await renderPricing();
     expect(document.body.textContent).toContain("The plans can't be shown right now. Please try again in a minute.");

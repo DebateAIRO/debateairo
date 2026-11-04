@@ -337,7 +337,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kanada és Québec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Adatvédelmi tisztviselőnk, Québecben pedig a személyes adatok védelméért felelős személy: az ügyvezetőnk, elérhető a privacy@dezbatere.ro címen. Adatait Adatvédelmi szabályzatunk B.3 pontja szabályozza. Québec: e Feltételek francia nyelven is elérhetők; a franciát a nyelvválasztóban választhatja ki; vitáinak bizalmasságát biztosító beállítások alapértelmezés szerint aktívak; Ön kérheti az Önre vonatkozó személyes adatok keresőmotorok találati listájáról való eltávolítását." }
+      { kind: "p", text: "Adatvédelmi tisztviselőnk, Québecben pedig a személyes adatok védelméért felelős személy: az ügyvezetőnk, elérhető a privacy@dezbatere.ro címen. Adatait Adatvédelmi szabályzatunk B.3 pontja szabályozza. Québec: e Feltételek francia nyelven is elérhetők; ha a regisztrációkor Kanadát választja, először franciául kapja meg őket, és helyette az angolt is választhatja; vitáinak bizalmasságát biztosító beállítások alapértelmezés szerint aktívak; Ön kérheti az Önre vonatkozó személyes adatok keresőmotorok találati listájáról való eltávolítását." }
     ]
   },
   {
@@ -377,7 +377,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.14",
-  sha256: "8bc791e6ef5a121a1607a38f161a1f875857f1931beb1a388fc6dd2376d696fb",
+  sha256: "4e0221e85e5cec7dae609778769dc270d5b8a05bd1292690bd102a809b7eb660",
   eyebrow: "SZOLGÁLTATÁSI FELTÉTELEK · v2.14 · HATÁLYOS 2026. NOVEMBER 1.",
   title: "Amit Ön elfogad",
   lede: "Az Ön és a DMS Merchandise Shop S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.",

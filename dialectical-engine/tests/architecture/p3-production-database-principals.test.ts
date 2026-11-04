@@ -1357,6 +1357,14 @@ describe("P3-01 production database-principal manifest", () => {
     "EXECUTE ON FUNCTION identity.mark_dig_tree_settled(uuid)",
     "EXECUTE ON FUNCTION identity.dig_is_settled(uuid)"
   ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0155_owner_answer_writes.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION core.record_owned_investigation_request(uuid,uuid,uuid,text,uuid,text,text,text,jsonb,bytea)",
+    "EXECUTE ON FUNCTION memory.unlink_owned_memory_link(uuid,uuid,text,text)"
+  ]
 }
 ]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))

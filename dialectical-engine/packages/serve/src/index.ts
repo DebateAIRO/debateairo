@@ -3494,44 +3494,18 @@ export class ServeRepository {
       this.pool, candidate.run_id, "core.investigation_request", requestRef,
       { userInput: input.userInput }
     );
-    return withWriteTransaction(this.pool, async (client) => {
-      const locked = await client.query<{ run_id: string }>(
-        `SELECT run_id FROM core.run WHERE run_id=$1 FOR UPDATE`, [candidate.run_id]
-      );
-      if (locked.rows[0] === undefined) return null;
-      // Separate post-lock statement: a concurrent owner-event insert takes the
-      // same run lock, so this is the authoritative mutation decision.
-      const owned = await client.query<{ owned: boolean }>(
-        `SELECT core.run_is_owned_by($1,$2,$3) AS owned`,
-        [candidate.run_id, access.ownerRef, access.legacyAskerId]
-      );
-      if (owned.rows[0]?.owned !== true) return null;
-      const answer = (await client.query<{ answer_version: number; run_id: string }>(
-        `SELECT answer.answer_version,answer.run_id
-         FROM serve.answer AS answer
-         WHERE answer.answer_id=$1 AND answer.run_id=$2
-           AND EXISTS (
-             SELECT 1 FROM core.run_progress_event AS event
-             WHERE event.run_id=answer.run_id AND event.kind='honesty.investigation_gap_opened'
-               AND event.value_json->>'gap_ref'=$3
-           )
-         ORDER BY answer.answer_version DESC LIMIT 1`,
-        [input.answerId, candidate.run_id, input.gapRef]
-      )).rows[0];
-      if (answer === undefined) return null;
-      if (answer.run_id !== candidate.run_id) return null;
-      await client.query(
-        `INSERT INTO core.investigation_request (
-           investigation_request_id, run_id, answer_id, answer_version, gap_ref,
-           user_input, input_kind, status, replay_handle, at_seq, content_ciphertext,content_attestation
-         ) VALUES ($1,$2,$3,$4,$5,$6,'HUMAN_STEER','RECORDED',$7,$8,$9::jsonb,$10)`,
-        [requestRef, answer.run_id, input.answerId, answer.answer_version, input.gapRef,
-          content === null ? input.userInput : CONTENT_CIPHERTEXT_SENTINEL,
-          replayHandle, await allocateSequence(client),
-          content === null ? null : JSON.stringify(content.envelope),content?.attestation ?? null]
-      );
-      return Object.freeze({ request_ref: requestRef, status: "RECORDED" as const, replay_handle: replayHandle });
-    });
+    // The runtime login may neither lock core.run nor insert core.investigation_request itself. 0155's definer locks
+    // the run only when the caller owns it and its private content is live, checks the owner again after the lock (a
+    // concurrent owner-event insert takes the same run lock), and writes the row. It answers NULL for every refusal, so
+    // a foreign answer, an absent one and a missing gap all look the same.
+    const recorded = await this.pool.query<{ request_ref: string | null }>(
+      `SELECT core.record_owned_investigation_request($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10) AS request_ref`,
+      [requestRef, candidate.run_id, input.answerId, input.gapRef, access.ownerRef, access.legacyAskerId,
+        content === null ? input.userInput : CONTENT_CIPHERTEXT_SENTINEL, replayHandle,
+        content === null ? null : JSON.stringify(content.envelope), content?.attestation ?? null]
+    );
+    if ((recorded.rows[0]?.request_ref ?? null) === null) return null;
+    return Object.freeze({ request_ref: requestRef, status: "RECORDED" as const, replay_handle: replayHandle });
     });
   }
 

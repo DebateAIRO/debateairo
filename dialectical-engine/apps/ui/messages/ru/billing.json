@@ -77,6 +77,7 @@
   "billing.checkout.priceCleared": "Вы изменили свои данные, поэтому цена была убрана. Покажите полную цену снова, чтобы продолжить.",
   "billing.checkout.countryUnavailable": "Платные тарифы пока недоступны в вашей стране. Вы можете и дальше пользоваться бесплатным тарифом.",
   "billing.checkout.regionUnavailable": "Платные тарифы пока недоступны в вашем регионе. Вы можете и дальше пользоваться бесплатным тарифом.",
+  "billing.checkout.regionTermsExcluded": "Мы не предлагаем Dialectical Engine в штате Теннесси, поэтому не можем принять оплату для этого адреса.",
   "billing.checkout.confirmCountry": "Похоже, вы подключаетесь из этой страны: {ipCountry}. Вы живёте в этой стране: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Да, я живу там",
   "billing.checkout.confirmCountryRequired": "Подтвердите страну проживания, затем продолжите.",

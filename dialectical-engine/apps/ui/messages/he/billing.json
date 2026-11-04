@@ -77,6 +77,7 @@
   "billing.checkout.priceCleared": "שיניתם את הפרטים, ולכן המחיר הוסר. הציגו שוב את המחיר המלא כדי להמשיך.",
   "billing.checkout.countryUnavailable": "תוכניות בתשלום עדיין אינן זמינות במדינה שלכם. אפשר להמשיך להשתמש בתוכנית החינם.",
   "billing.checkout.regionUnavailable": "תוכניות בתשלום עדיין אינן זמינות באזור שלכם. אפשר להמשיך להשתמש בתוכנית החינם.",
+  "billing.checkout.regionTermsExcluded": "איננו מציעים את Dialectical Engine בטנסי, ולכן איננו יכולים לקבל תשלום עבור הכתובת הזו.",
   "billing.checkout.confirmCountry": "נראה שהחיבור שלכם מגיע מהמדינה הזו: {ipCountry}. האם אתם גרים במדינה הזו: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "כן, אני גר/ה שם",
   "billing.checkout.confirmCountryRequired": "אשרו את מדינת המגורים שלכם, ואז המשיכו.",

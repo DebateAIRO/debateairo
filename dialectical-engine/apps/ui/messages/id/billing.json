@@ -77,6 +77,7 @@
   "billing.checkout.priceCleared": "Anda mengubah data Anda, jadi harganya dihapus. Tampilkan harga lengkap lagi untuk melanjutkan.",
   "billing.checkout.countryUnavailable": "Paket berbayar belum tersedia di negara Anda. Anda tetap dapat menggunakan paket Gratis.",
   "billing.checkout.regionUnavailable": "Paket berbayar belum tersedia di wilayah Anda. Anda tetap dapat menggunakan paket Gratis.",
+  "billing.checkout.regionTermsExcluded": "Kami tidak menyediakan Dialectical Engine di Tennessee, jadi kami tidak dapat menerima pembayaran untuk alamat ini.",
   "billing.checkout.confirmCountry": "Koneksi Anda tampaknya berasal dari {ipCountry}. Apakah Anda tinggal di {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Ya, saya tinggal di sana",
   "billing.checkout.confirmCountryRequired": "Konfirmasikan negara tempat Anda tinggal, lalu lanjutkan.",

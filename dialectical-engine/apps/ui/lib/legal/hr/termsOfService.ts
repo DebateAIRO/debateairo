@@ -337,7 +337,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kanada i Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Naš službenik za privatnost, a u Quebecu osoba odgovorna za zaštitu osobnih podataka, jest naš direktor, dostupan na privacy@dezbatere.ro. Vaše podatke uređuje Prilog B.3 naših Pravila o privatnosti. Quebec: ovi su Uvjeti dostupni na francuskom jeziku; odaberite francuski u izborniku jezika; postavke kojima se vaše rasprave zadržavaju privatnima uključene su prema zadanom; možete zatražiti uklanjanje osobnih informacija o sebi iz rezultata pretraživanja." }
+      { kind: "p", text: "Naš službenik za privatnost, a u Quebecu osoba odgovorna za zaštitu osobnih podataka, jest naš direktor, dostupan na privacy@dezbatere.ro. Vaše podatke uređuje Prilog B.3 naših Pravila o privatnosti. Quebec: ovi su Uvjeti dostupni na francuskom jeziku; ako pri registraciji odaberete Kanadu, najprije ćete ih dobiti na francuskom, a umjesto toga možete odabrati engleski; postavke kojima se vaše rasprave zadržavaju privatnima uključene su prema zadanom; možete zatražiti uklanjanje osobnih informacija o sebi iz rezultata pretraživanja." }
     ]
   },
   {
@@ -377,7 +377,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.14",
-  sha256: "741b19ab2de9d502721298284079c162c3ca3594da481fb0aeb8429f428a29b2",
+  sha256: "1b74774d5f5cf4f0808a3f40f4a6f4b70cb99ce8752b47a3d2abd94e63428135",
   eyebrow: "UVJETI KORIŠTENJA · v2.14 · NA SNAZI OD 1. STUDENOGA 2026.",
   title: "Na što pristajete",
   lede: "Ugovor između vas i društva DMS Merchandise Shop S.R.L., jednostavnim jezikom. Devetnaest odjeljaka i Prilog A — pomaknite se do kraja.",

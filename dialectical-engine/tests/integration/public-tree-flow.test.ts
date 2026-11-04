@@ -10,11 +10,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { CostEnvelopeGuard, PostgresModelSpendStore } from "@debateai/budget";
 import { PublicDebateSchema, StoryBodySchema, type Answer, type PublicDebate } from "@debateai/contract";
 import {
-  ContentCipher, FileRunContentKeyStore, FileUserDekStore, MemoryPublicationKeyStore, PublicationCipher, generateDek, loadKek
+  ContentCipher, FileRunContentKeyStore, FileUserDekStore, MemoryPublicationKeyStore, PublicationCipher, generateDek, generateVerificationToken, hashToken, loadKek
 } from "../../packages/crypto/src/index.js";
 import {
-  MAIN_ANSWER_UPDATE_CARRIER, PATH_REWRITE_CARRIER, PUBLIC_REPORT_CARRIER, PostgresTreeUpdateRunnerRepository, encryptAttestedContentForRun, PostgresPublicDebateRepository, PostgresPublicDebateRunnerRepository, PostgresPublicPageRepository, PostgresPublicTreeRepository,
-  PostgresInvestigationRepository, PostgresPublicFlagRepository, PostgresPublicReviewRepository, PostgresPublicTreeRunnerRepository, PostgresPublicationRepository, PostgresTreeUpdateRepository, configureContentEncryption, createPool,
+  MAIN_ANSWER_UPDATE_CARRIER, PATH_REWRITE_CARRIER, PUBLIC_MATERIAL_CARRIER, PUBLIC_REPORT_CARRIER, PostgresTreeUpdateRunnerRepository, encryptAttestedContentForRun, PostgresPublicDebateRepository, PostgresPublicDebateRunnerRepository, PostgresPublicPageRepository, PostgresPublicTreeRepository,
+  PostgresInvestigationRepository, PostgresPublicFlagRepository, PostgresPublicReviewRepository, PostgresPublicTreeRunnerRepository, PostgresPublicationRepository, PostgresTreeUpdateRepository, configureContentEncryption, contentCipherFor, createPool,
   decryptContentForRun, migrate, withRunContentLease, type Pool, type PublicFlagLimits
 } from "@debateai/db";
 import { createPostgresProviderGateway } from "@debateai/runner";
@@ -32,7 +32,7 @@ import { runDigPathRewrite } from "../../apps/runner/src/path-rewrite.js";
 import { composePublicReport, sweepPublicTree } from "../../apps/runner/src/public-contribution.js";
 import { DIG_NODES, SATISFIED, digSnapshot, fieldsOf, fittingRewrite, isChecker } from "../support/path-rewrite-world.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
-import { provisionRlsLogins, type RlsLogins } from "../support/rls-logins.js";
+import { inAccountRequest, provisionRlsLogins, type RlsLogins } from "../support/rls-logins.js";
 import { canonicalPublicFlagBinding, pressPublicFlag, sweepPublicReviewPurge } from "../../apps/api/src/public-flag.js";
 import { canonicalPublicReviewBinding } from "../../apps/api/src/staff/public-review.js";
 import { drainTeamLimitNotices } from "../../apps/api/src/staff/team-limit.js";
@@ -553,6 +553,31 @@ describe("a report on a public debate", () => {
     // The writer's name goes on their erasure; the report stays.
     await database.pool.query('DELETE FROM identity."user" WHERE user_id=$1', [eve.userId]);
     expect((await page(debate.ref)).reports![0]!.writer).toBeNull();
+  });
+
+  // Upload check Task 9 (R22 path 9): every other press in this file runs outside a request, on api-system, which sees
+  // every account's runs. The site presses inside the stranger's own request, on the API's runtime login, where row
+  // security shows them only their own runs; there the seal under the author's run once failed PRIVATE_CONTENT_ERASED.
+  it("a stranger's press inside their own request, on the API's runtime login, seals the copy under the debate's run", async () => {
+    const [ana, eve] = [await account(), await account()];
+    const debate = await publishedDebate(ana);
+    // Eve's live session, so the runtime login derives her account from the request (rls-logins.ts seedSessionAccount's shape).
+    const token = generateVerificationToken();
+    await database.pool.query(`INSERT INTO identity.session(session_id,user_id,token_hash,csrf_token_hash,binding_context,created_at,last_seen_at,idle_expires_at,absolute_expires_at,last_mfa_at)
+      VALUES ($1,$2,$3,$4,'{}'::jsonb,now(),now(),now()+interval '1 hour',now()+interval '2 hours',now())`,
+    [randomUUID(), eve.userId, hashToken("session", token), hashToken("csrf", generateVerificationToken())]);
+    // The API's runtime pool as main.ts wires it: the runtime login, api-system its cross-account target, the content cipher on it.
+    const runtime = logins!.apiPools().runtime;
+    if (contentCipherFor(runtime) === undefined) configureContentEncryption(runtime, contentCipherFor(api)!);
+    const reportId = randomUUID();
+    const press = await inAccountRequest(token, () => pressPublicReport({ ownerRef: eve.ownerRef, publicationRef: debate.ref, reportId, free: false, now: new Date(), pool: runtime,
+      tree: new PostgresPublicTreeRepository(runtime), readPublicDebate: (ref) => application().readPublicDebate(ref) }));
+    expect(press).toEqual({ kind: "WRITING", reportVersion: 1 });
+    // The copy the runner reads is recorded under the carrier, the author's run, and opens under its key.
+    const material = await new PostgresPublicTreeRunnerRepository(runner).readMaterial(reportId);
+    expect(material).toMatchObject({ run_id: debate.root, kind: "REPORT", publication_ref: debate.ref });
+    const copy = await withRunContentLease(runner, [debate.root], () => decryptContentForRun<{ question?: string }>(runner, debate.root, PUBLIC_MATERIAL_CARRIER, reportId, material!.content, {}));
+    expect(copy.question).toBe(QUESTION);
   });
 });
 

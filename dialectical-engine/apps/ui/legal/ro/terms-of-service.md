@@ -335,7 +335,7 @@ Corpul acestor Termeni este redactat pentru dumneavoastră. În plus: puteți in
 
 ### A.3 Canada și Quebec
 
-Responsabilul nostru cu protecția vieții private, iar în Quebec persoana responsabilă cu protecția informațiilor cu caracter personal, este administratorul nostru, care poate fi contactat la privacy@dezbatere.ro. Politica noastră de confidențialitate, Anexa B.3, se referă la datele dumneavoastră. **Quebec:** acești Termeni sunt disponibili în limba franceză; alegeți limba franceză din selectorul de limbă; setările care vă mențin dezbaterile private sunt activate în mod implicit; puteți solicita dezindexarea informațiilor cu caracter personal despre dumneavoastră.
+Responsabilul nostru cu protecția vieții private, iar în Quebec persoana responsabilă cu protecția informațiilor cu caracter personal, este administratorul nostru, care poate fi contactat la privacy@dezbatere.ro. Politica noastră de confidențialitate, Anexa B.3, se referă la datele dumneavoastră. **Quebec:** acești Termeni sunt disponibili în limba franceză; dacă alegeți Canada la înregistrare, îi primiți mai întâi în limba franceză și puteți alege în schimb limba engleză; setările care vă mențin dezbaterile private sunt activate în mod implicit; puteți solicita dezindexarea informațiilor cu caracter personal despre dumneavoastră.
 
 ### A.4 Australia și Noua Zeelandă
 

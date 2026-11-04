@@ -55,7 +55,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 let database: TestDatabase;
 let owner: StoryEncryptedOwner | undefined;
 const stubClosers: (() => Promise<void>)[] = [];
-const harness = previewDebateHarness({ pool: () => database.pool, stubClosers });
+const harness = previewDebateHarness({ pool: () => database.pool, database: () => database, stubClosers });
 
 beforeAll(async () => {
   database = await startTestDatabase();

@@ -9,10 +9,19 @@
  *   `production()` call, on their own `debateai` database as tests/integration/production-database-principals.test.ts
  *   does, and handed out pointed at the harness database: roles are cluster-wide, and the harness database grants the
  *   same capability roles. Lazily, so a file that needs only the dev logins (every C5 file) pays for one provisioner.
- * - `apiTestPools(database, testFile, overrides)` is the R21 mode switch: the login pools when
- *   DEBATEAI_TEST_API_LOGINS=1, the harness superuser pool in every field otherwise. In login mode it appends one
- *   report line per field to $DEBATEAI_TEST_API_LOGINS_REPORT and patches pg.Client.prototype.query once, so a query on
- *   a client connected as the harness superuser throws R21_SUPERUSER_POOL_IN_REQUEST inside a request scope.
+ * - Login mode is the default (upload check Task 7, 2026-11-03); DEBATEAI_TEST_API_LOGINS=0 turns it off for a run.
+ * - `apiTestPools(database, testFile, overrides)` is the R21 mode switch: the login pools in login mode, the harness
+ *   superuser pool in every field when it is off or the file is on tests/support/master-key-files.txt (the master-key
+ *   list, `DEBATEAI_TEST_MASTER_KEY_FILES`). In login mode it appends one report line per field to
+ *   $DEBATEAI_TEST_API_LOGINS_REPORT and arms the R21 guard (tests/support/master-key-guard.ts), so a query on a client
+ *   connected as the harness superuser throws R21_SUPERUSER_POOL_IN_REQUEST inside a request scope.
+ * - What is guarded (upload check Task 8): every test file that uses a database. The guard arms where the test
+ *   database starts (`startTestDatabase`, and the acceptance tests' `startStandingDatabase`), keyed on the test file,
+ *   so a file that builds API pieces on the superuser pool by hand is guarded too, unless it is on the master-key list.
+ *   What stays outside it is named in tests/support/master-key-guard.ts and in the list's header.
+ * - `runnerTestPool(database, budget)` is the runner's side of the same switch: in login mode a pool on the production
+ *   runner login, debateai_prod_runner_runtime, the login the server's runner uses; otherwise nothing, and the caller
+ *   keeps the superuser pool it always used.
  */
 import { randomBytes, randomUUID } from "node:crypto";
 import { appendFileSync } from "node:fs";
@@ -20,7 +29,6 @@ import { appendFile, chmod, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import pg from "pg";
 import {
   createEmailBlindIndex,
   encrypt,
@@ -29,7 +37,8 @@ import {
   hashToken
 } from "@debateai/crypto";
 import {
-  API_DATABASE_POOLS, createPool, migrate, requestScopeActive, runInRequestScope, setRequestCredential, type Pool
+  API_DATABASE_POOLS, configureContentEncryption, contentCipherFor, createPool, migrate, requestScopeActive,
+  RUNNER_DATABASE_POOLS, runInRequestScope, setRequestCredential, type Pool
 } from "@debateai/db";
 import { provisionDevelopmentDatabasePrincipals } from "../../apps/runner/src/dev-database-principals.js";
 import {
@@ -37,7 +46,14 @@ import {
   provisionProductionDatabasePrincipals
 } from "../../apps/runner/src/production-database-principals.js";
 import type { TestHttpIdentity } from "./httpSession.js";
-import type { TestDatabase } from "./testDatabase.js";
+import {
+  callingTestFile, callingTestLine, DEBATEAI_TEST_MASTER_KEY_FILES, enterApiPoolMode, loginModeOff, loginOf,
+  readMasterKeyFiles
+} from "./master-key-guard.js";
+import { beforeTestDatabaseStops, type TestDatabase } from "./testDatabase.js";
+
+// The master-key list and the guard live in master-key-guard.ts (Task 8); these stay importable from here.
+export { DEBATEAI_TEST_MASTER_KEY_FILES, enterApiPoolMode, readMasterKeyFiles };
 
 const PRODUCT_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const PRODUCTION_MANIFEST_PATH = join(PRODUCT_ROOT,
@@ -61,8 +77,15 @@ const DEV_PRINCIPAL_KEYS: readonly DevPrincipalKey[] = Object.freeze([
   "API_AUTHORIZATION_SYSTEM_DATABASE_URL", "RUNNER_DATABASE_URL"
 ]);
 
-/** The production principals a test reaches: the two API T1 logins and their system twins (P3-01 ids). */
-export type RlsProductionPrincipalId = "api-runtime" | "api-authorization" | "api-system" | "api-authorization-system";
+/** The production principals a test reaches: the two API T1 logins, their system twins and the runner (P3-01 ids). */
+export type RlsProductionPrincipalId =
+  | "api-runtime" | "api-authorization" | "api-system" | "api-authorization-system" | "runner-runtime";
+
+/**
+ * What the logins need of a database: its superuser pool and its URL. A TestDatabase has both, and so does the
+ * acceptance harness's standing database (acceptance/standing-db.ts), whose runner the runner pool below also serves.
+ */
+type RlsDatabase = Pick<TestDatabase, "pool" | "connectionString">;
 
 /** The API's pools, field for field as apps/api/src/main.ts builds them (PLAN §0.3). */
 export type ApiTestPools = Readonly<{
@@ -138,7 +161,7 @@ type RlsLoginsState = {
   readonly track: (pool: Pool) => Pool;
 };
 
-const provisioned = new WeakMap<TestDatabase, Promise<RlsLoginsState>>();
+const provisioned = new WeakMap<RlsDatabase, Promise<RlsLoginsState>>();
 
 function poolOptions(field: ApiPoolField, target?: Pool): Parameters<typeof createPool>[1] {
   return target === undefined ? API_DATABASE_POOLS[field] : { ...API_DATABASE_POOLS[field], crossAccount: target };
@@ -157,7 +180,7 @@ function readEnvironmentFile(source: string): ReadonlyMap<string, string> {
   }));
 }
 
-async function provisionProduction(database: TestDatabase, track: (pool: Pool) => Pool,
+async function provisionProduction(database: RlsDatabase, track: (pool: Pool) => Pool,
   directories: string[]): Promise<RlsProductionLogins> {
   const harness = new URL(database.connectionString);
   const adminPassword = randomBytes(32).toString("base64url");
@@ -231,7 +254,7 @@ async function provisionProduction(database: TestDatabase, track: (pool: Pool) =
   }
 }
 
-async function provision(database: TestDatabase): Promise<RlsLoginsState> {
+async function provision(database: RlsDatabase): Promise<RlsLoginsState> {
   const pools: Pool[] = [];
   const directories: string[] = [];
   const track = (pool: Pool): Pool => { pools.push(pool); return pool; };
@@ -278,12 +301,14 @@ async function provision(database: TestDatabase): Promise<RlsLoginsState> {
   return { logins, track };
 }
 
-function provisionedState(database: TestDatabase): Promise<RlsLoginsState> {
+function provisionedState(database: RlsDatabase): Promise<RlsLoginsState> {
   let state = provisioned.get(database);
   if (state === undefined) {
     state = provision(database);
     provisioned.set(database, state);
     state.catch(() => { if (provisioned.get(database) === state) provisioned.delete(database); });
+    // The logins end before the cluster stops, also in a file that never ends them itself (testDatabase.ts).
+    beforeTestDatabaseStops(database, () => endProvisionedRlsLogins(database));
   }
   return state;
 }
@@ -293,41 +318,72 @@ export async function provisionRlsLogins(database: TestDatabase): Promise<RlsLog
   return (await provisionedState(database)).logins;
 }
 
+/**
+ * Upload check Task 6 (2026-11-02): the runner's pool in login mode. The server's runner reaches the database on the
+ * production login debateai_prod_runner_runtime (P3-01's runner-runtime row: debateai_runtime and
+ * debateai_rls_all_accounts, no superuser, no row-security bypass), but the tests always ran it on the harness
+ * superuser, so a fault in the runner's roles (the start check of 2 Nov) never showed in a test.
+ *
+ * - Login mode (the default since Task 7): a pool on that login, sized as apps/runner/src/main.ts sizes the `budget`
+ *   pool (RUNNER_DATABASE_POOLS), pointed at the harness database. The production logins are provisioned on the first
+ *   call for `database` (memoised, as `production()` above), and `endProvisionedRlsLogins(database)` ends the pool.
+ * - DEBATEAI_TEST_API_LOGINS=0: `undefined`, and the caller uses the superuser pool it always used, unchanged.
+ *
+ * The runner runs outside any request scope, so the R21 superuser guard never fires on its work.
+ */
+export async function runnerTestPool(
+  database: RlsDatabase,
+  budget: keyof typeof RUNNER_DATABASE_POOLS = "runtime"
+): Promise<Pool | undefined> {
+  if (loginModeOff()) return undefined;
+  // Read before the first wait, while the calling test file is still on the stack.
+  const file = callingTestFile();
+  const state = await provisionedState(database);
+  const production = await state.logins.production();
+  const url = production.url("runner-runtime");
+  const report = process.env.DEBATEAI_TEST_API_LOGINS_REPORT;
+  if (report !== undefined && report !== "") await appendFile(report, `${file}\trunner:${budget}\t${loginOf(url)}\n`);
+  return state.track(createPool(url, RUNNER_DATABASE_POOLS[budget]));
+}
+
+/**
+ * Upload check Task 7 (R21): the pool a test hands to the runner it builds itself, and to the runner's gateways and
+ * story writer. In login mode the runner login's pool from `runnerTestPool`, carrying `superuser`'s content cipher if
+ * that pool has one; otherwise `superuser` itself (by default the harness superuser pool), exactly as before.
+ */
+export async function runnerPoolOrSuperuser(
+  database: RlsDatabase,
+  superuser: Pool = database.pool,
+  budget: keyof typeof RUNNER_DATABASE_POOLS = "runtime"
+): Promise<Pool> {
+  const login = await runnerTestPool(database, budget);
+  return login === undefined ? superuser : shareContentCipher(superuser, login);
+}
+
+/**
+ * Gives `login` the content cipher `superuser` carries, if it carries one and `login` has none yet, so the runner on
+ * its own login reads and writes the same encrypted rows. Returns `login`.
+ */
+export function shareContentCipher(superuser: Pool, login: Pool): Pool {
+  const cipher = contentCipherFor(superuser);
+  if (cipher !== undefined && contentCipherFor(login) === undefined) configureContentEncryption(login, cipher);
+  return login;
+}
+
+/**
+ * Ends the logins of `database` (their pools and their credential folders) if something above provisioned them, before
+ * the caller stops the database. Provisions nothing: with login mode off it does nothing.
+ */
+export async function endProvisionedRlsLogins(database: RlsDatabase): Promise<void> {
+  const state = provisioned.get(database);
+  if (state === undefined) return;
+  const settled = await state.catch(() => undefined);
+  await settled?.logins.end();
+}
+
 /** The login pools whatever DEBATEAI_TEST_API_LOGINS says (S4.1, S8.2). */
 export async function loginApiPools(database: TestDatabase): Promise<ApiTestPools> {
   return (await provisionRlsLogins(database)).apiPools();
-}
-
-const R21_GUARD = Symbol.for("debateai.rls.r21-superuser-guard.v1");
-type GuardedClientPrototype = { query: (...args: unknown[]) => unknown; [R21_GUARD]?: Set<string> };
-
-/**
- * Login mode (D55): a query on a client whose `user` (pg/lib/client.js:55) is a guarded superuser fails while a request
- * scope is active — `database.pool` and every pool a file builds from the harness URL — instead of passing silently.
- */
-function guardSuperuserInRequests(superuser: string): void {
-  const prototype = pg.Client.prototype as unknown as GuardedClientPrototype;
-  const guarded = prototype[R21_GUARD];
-  if (guarded !== undefined) { guarded.add(superuser); return; }
-  const users = new Set([superuser]);
-  const original = prototype.query;
-  prototype.query = function guardedQuery(this: pg.Client, ...args: unknown[]): unknown {
-    if (users.has(this.user ?? "") && requestScopeActive()) {
-      const failure = new TypeError("R21_SUPERUSER_POOL_IN_REQUEST");
-      const callback = args.at(-1);
-      if (typeof callback === "function") {
-        process.nextTick(() => (callback as (error: Error) => void)(failure));
-        return undefined;
-      }
-      return Promise.reject(failure);
-    }
-    return original.apply(this, args);
-  };
-  Object.defineProperty(prototype, R21_GUARD, { value: users });
-}
-
-function loginOf(url: string): string {
-  return decodeURIComponent(new URL(url).username);
 }
 
 /**
@@ -347,19 +403,6 @@ const ROUTED_OBSERVED = Symbol.for("debateai.rls.routed-call-report.v1");
 /** The T1 fields of ApiTestPools: the pools main.ts gives a system target (runtime, legacyAskAdmission, authorization). */
 const T1_FIELDS: readonly ApiPoolField[] = Object.freeze(API_POOL_WIRING.filter(({ target }) => target !== undefined)
   .map(({ field }) => field));
-
-/** The first stack frame in a test file (not tests/support), as `<path from the product root>:<line>`. */
-function callingTestLine(): string {
-  const limit = Error.stackTraceLimit;
-  Error.stackTraceLimit = 60;
-  const stack = new Error().stack ?? "";
-  Error.stackTraceLimit = limit;
-  for (const frame of stack.split("\n").slice(1)) {
-    const found = /(\/[^\s():]+\.test\.tsx?):(\d+):\d+/u.exec(frame);
-    if (found !== null && !found[1]!.includes("/tests/support/")) return `${relative(PRODUCT_ROOT, found[1]!)}:${found[2]}`;
-  }
-  return "no-test-frame";
-}
 
 /**
  * PRD-N2 (t_283643c4), login mode with $DEBATEAI_TEST_API_LOGINS_ROUTED_REPORT set: a query or checkout on a T1 pool
@@ -389,18 +432,19 @@ function reportRoutedCalls(pools: ApiTestPools, file: string, report: string): v
 }
 
 /**
- * The R21 mode switch (S5.x): the login pools when DEBATEAI_TEST_API_LOGINS=1, the harness superuser pool in every field
- * otherwise. A field named in `overrides` is, in both modes, a pool on that URL (a login the file made itself) wired as
- * main.ts wires that field: runtime and legacyAskAdmission with the `system` pool (or overrides.system) as target,
- * authorization with `authorizationSystem` (or overrides.authorizationSystem); a target the overrides do not name is the
- * dev system login, so overrides on those fields provision the dev logins in superuser mode too.
+ * The R21 mode switch (S5.x): the login pools in login mode (the default), the harness superuser pool in every field
+ * when DEBATEAI_TEST_API_LOGINS=0 or `testFile` is on the master-key list. A field named in `overrides` is, in both
+ * modes, a pool on that URL (a login the file made itself) wired as main.ts wires that field: runtime and
+ * legacyAskAdmission with the `system` pool (or overrides.system) as target, authorization with `authorizationSystem`
+ * (or overrides.authorizationSystem); a target the overrides do not name is the dev system login, so overrides on those
+ * fields provision the dev logins in superuser mode too.
  */
 export async function apiTestPools(
-  database: TestDatabase,
+  database: RlsDatabase,
   testFile: string,
   overrides: Partial<Record<ApiPoolField, string>> = {}
 ): Promise<ApiTestPools> {
-  const loginMode = process.env.DEBATEAI_TEST_API_LOGINS === "1";
+  const loginMode = enterApiPoolMode(testFile, database.connectionString) === "logins";
   const fields = API_POOL_WIRING.map(({ field }) => field);
   const overridden = fields.filter((field) => overrides[field] !== undefined);
   if (!loginMode && overridden.length === 0) {
@@ -425,7 +469,6 @@ export async function apiTestPools(
   }
   const pools = Object.freeze(built as ApiTestPools);
   if (loginMode) {
-    guardSuperuserInRequests(loginOf(database.connectionString));
     const report = process.env.DEBATEAI_TEST_API_LOGINS_REPORT;
     if (report !== undefined && report !== "") {
       const file = relative(PRODUCT_ROOT, fileURLToPath(testFile));

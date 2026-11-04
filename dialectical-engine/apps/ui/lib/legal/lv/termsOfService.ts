@@ -337,7 +337,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kanāda un Kvebeka",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Mūsu privātuma speciālists, bet Kvebekā — persona, kas atbild par personas informācijas aizsardzību, ir mūsu direktors, sasniedzams privacy@dezbatere.ro. Jūsu datiem piemēro mūsu Privātuma politikas B.3 pielikumu. Kvebeka: šie Noteikumi ir pieejami franču valodā; izvēlieties franču valodu ar valodas pārslēgu; iestatījumi, kas saglabā jūsu debates privātas, ir ieslēgti pēc noklusējuma; jūs varat pieprasīt par jums esošās personas informācijas izņemšanu no indeksiem." }
+      { kind: "p", text: "Mūsu privātuma speciālists, bet Kvebekā — persona, kas atbild par personas informācijas aizsardzību, ir mūsu direktors, sasniedzams privacy@dezbatere.ro. Jūsu datiem piemēro mūsu Privātuma politikas B.3 pielikumu. Kvebeka: šie Noteikumi ir pieejami franču valodā; ja reģistrējoties izvēlaties Kanādu, tos vispirms saņemat franču valodā, un tās vietā varat izvēlēties angļu valodu; iestatījumi, kas saglabā jūsu debates privātas, ir ieslēgti pēc noklusējuma; jūs varat pieprasīt par jums esošās personas informācijas izņemšanu no indeksiem." }
     ]
   },
   {
@@ -377,7 +377,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.14",
-  sha256: "3d7cfaeab5fbefd4fd317ac7beab053968d4997c0b2af536e9b47255484ab534",
+  sha256: "7185daf01b5d379297a533e3a70995585037fc90583964174668aac043d65783",
   eyebrow: "PAKALPOJUMA NOTEIKUMI · v2.14 · SPĒKĀ NO 2026. GADA 1. NOVEMBRA",
   title: "Kam jūs piekrītat",
   lede: "Līgums starp jums un DMS Merchandise Shop S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.",

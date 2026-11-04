@@ -337,7 +337,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kanada ja Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Tietosuojavastaavamme, joka Quebecissa on myös henkilötietojen suojaamisesta vastaava henkilö, on toimitusjohtajamme, tavoitettavissa osoitteessa privacy@dezbatere.ro. Tietojasi käsitellään tietosuojakäytäntömme liitteessä B.3. Quebec: nämä käyttöehdot ovat saatavilla ranskaksi; valitse ranska kielivalitsimesta; väittelysi yksityisinä pitävät asetukset ovat oletusarvoisesti käytössä; voit pyytää sinua koskevien henkilötietojen poistamista hakemistosta." }
+      { kind: "p", text: "Tietosuojavastaavamme, joka Quebecissa on myös henkilötietojen suojaamisesta vastaava henkilö, on toimitusjohtajamme, tavoitettavissa osoitteessa privacy@dezbatere.ro. Tietojasi käsitellään tietosuojakäytäntömme liitteessä B.3. Quebec: nämä käyttöehdot ovat saatavilla ranskaksi; jos valitset rekisteröityessäsi Kanadan, saat ne ensin ranskaksi ja voit valita sen sijaan englannin; väittelysi yksityisinä pitävät asetukset ovat oletusarvoisesti käytössä; voit pyytää sinua koskevien henkilötietojen poistamista hakemistosta." }
     ]
   },
   {
@@ -377,7 +377,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.14",
-  sha256: "99dd6e909fedaebc4eded7ce83fd99d1abcc64b762758465b372ee719d9e887e",
+  sha256: "426270c974b34600a6ca04dc7c35dd303f0cad0e07b15adc25ca769985f19590",
   eyebrow: "KÄYTTÖEHDOT · v2.14 · VOIMASSA 1. MARRASKUUTA 2026 ALKAEN",
   title: "Mihin sitoudut",
   lede: "Sinun ja DMS Merchandise Shop S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.",

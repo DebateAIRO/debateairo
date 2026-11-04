@@ -42,7 +42,7 @@ let database: TestDatabase;
 /** A connection to the cluster's maintenance database, for making and dropping the per-run copies below. */
 let admin: Pool;
 const stubClosers: (() => Promise<void>)[] = [];
-const harness = previewDebateHarness({ pool: () => database.pool, stubClosers });
+const harness = previewDebateHarness({ pool: () => database.pool, database: () => database, stubClosers });
 
 /** The migrated database every per-run copy is made from (nothing but the migrations in it). */
 const MIGRATED_COPY = "parallel_calls_migrated";

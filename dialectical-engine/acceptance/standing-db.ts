@@ -2,6 +2,7 @@ import { access } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import EmbeddedPostgres from "embedded-postgres";
 import { createPool, migrate, type Pool } from "@debateai/db";
+import { armSuperuserGuardForTestFile, currentTestFile } from "../tests/support/master-key-guard.js";
 
 const DEFAULT_DATA_DIRECTORY = fileURLToPath(new URL("./.pgdata", import.meta.url));
 const DATABASE_USER = "debateai";
@@ -29,12 +30,19 @@ async function isInitialised(dataDirectory: string): Promise<boolean> {
   }
 }
 
+/**
+ * Starts (or reuses) the acceptance database. Upload check Task 8: inside a vitest test file it also arms the R21
+ * master-key guard for that file (tests/support/master-key-guard.ts), as startTestDatabase does; run from the
+ * acceptance command line (run-acceptance.ts, dual-maker-proof.ts outside vitest) it arms nothing.
+ */
 export async function startStandingDatabase(options: StandingDatabaseOptions): Promise<StandingDatabase> {
   if (!Number.isInteger(options.port) || options.port < 1 || options.port > 65_535) {
     throw new TypeError("ACCEPTANCE_DATABASE_PORT_INVALID");
   }
   const dataDirectory = options.dataDirectory ?? DEFAULT_DATA_DIRECTORY;
   const connectionString = `postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@127.0.0.1:${options.port}/${DATABASE_NAME}`;
+  // Before the first wait, so the stack fallback still sees the calling test file.
+  armSuperuserGuardForTestFile(connectionString, currentTestFile());
   const existingPool = createPool(connectionString);
   let alreadyRunning = false;
   try {

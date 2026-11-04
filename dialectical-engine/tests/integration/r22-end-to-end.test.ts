@@ -4,11 +4,7 @@
 // Integration suites are skipped by the CI gate: run this file by hand, alone.
 import { PREVIEW_UNFINISHED_RUNS_SQL } from "../../apps/api/src/preview-budget-estimate.js";
 import { createHash, randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { AskParent, PublicDigParent, PurposeLines } from "@debateai/contract";
-import { COOKIE_SESSION_MARKER, createDebate } from "../../apps/ui/lib/api.js";
 import { loadV4, loadInvestigation, writeReport, reopenInvestigation, currentReportVersion, loadDigTrail } from "../../apps/ui/lib/v4/load.js";
 import { buildV4Map } from "../../apps/ui/lib/v4/mapModel.js";
 import { pathWebOf, sourcesOf } from "../../apps/ui/lib/v4/web.js";
@@ -16,7 +12,7 @@ import { askParentOf, ownViewPick, pathSuggestionsOf, suggestionPick } from "../
 import { digQuestion } from "../../apps/ui/lib/v4/askText.js";
 import type { DigTarget, V4Path } from "../../apps/ui/lib/v4/types.js";
 import { stubJudgement } from "../support/preview-gate-stubs.js";
-import { pressPublicReport, publicDigAsk, publicPathViews } from "../../apps/ui/lib/v4/publicPage.js";
+import { publicDigAsk, publicPathViews } from "../../apps/ui/lib/v4/publicPage.js";
 import { composeQuestion, purposeLinesOfGoal } from "../../apps/ui/lib/v4/askText.js";
 import { canonicalPublicReviewBinding } from "../../apps/api/src/staff/public-review.js";
 import { PostgresPublicReviewRepository } from "@debateai/db";
@@ -26,31 +22,16 @@ import { canonicalTeamLimitActionBinding } from "../../apps/api/src/staff/team-l
 import { authorizeStaffAlertFixture } from "../support/staffAlertReadiness.js";
 import { internalFundingFixture } from "../support/internalFundingFixture.js";
 import { startR22World, type R22Account, type R22Script, type R22World } from "../support/r22-world.js";
+import { ask, FREE, newDebateCatalog, panelAgrees, PREMIUM, v4Catalog, type V4AskSettings } from "../support/r22-pages.js";
 
-// These two use the website's own "@/" paths and modules, which only the website's typecheck resolves (as apps/ui/lib/v4/load.ts says of lib/v3): loaded by name, typed here. Vitest resolves them as the page does.
-type V4AskSettings = Readonly<{ planTier: "free" | "premium"; shapeSettings: boolean; lengthSettings: boolean; settingsVersion?: number }>;
+// This one uses the website's own "@/" paths and modules, which only the website's typecheck resolves (as apps/ui/lib/v4/load.ts says of lib/v3): loaded by name, typed here. Vitest resolves it as the page does.
 const websiteModule = async <T>(path: string): Promise<T> => import(/* @vite-ignore */ new URL(path, import.meta.url).href) as Promise<T>;
-const { v4AskConfig } = await websiteModule<{ v4AskConfig: (mode: "quick" | "thorough", level: "plain", settings: V4AskSettings, at: Date, catalog: Record<string, string>) => Record<string, unknown> }>("../../apps/ui/lib/v4/askConfig.ts");
 const { handleInvestigationReportRequest } = await websiteModule<{ handleInvestigationReportRequest: (input: unknown) => Promise<Response> }>("../../apps/ui/lib/report/reportRoute.ts");
-
-const messages = resolve(import.meta.dirname, "../../apps/ui/messages/en");
-const catalogOf = (...names: readonly string[]) => Object.assign({}, ...names.map((name) => JSON.parse(readFileSync(resolve(messages, `${name}.json`), "utf8")) as object)) as Record<string, string>;
-const newDebateCatalog = catalogOf("newDebate", "compose");
 
 let world: R22World;
 const lines: string[] = [];
 beforeAll(async () => { world = await startR22World({ log: (line) => { lines.push(line); } }); }, 900_000);
 afterAll(async () => { await world?.stop(); });
-
-const PREMIUM: V4AskSettings = { planTier: "premium", shapeSettings: false, lengthSettings: false };
-const FREE: V4AskSettings = { planTier: "free", shapeSettings: false, lengthSettings: false };
-
-/** What the V4 ask page sends for a question (useV4Ask's submit, without its dialogs). */
-async function ask(who: R22Account, question: string, options: Readonly<{ settings?: V4AskSettings; mode?: "quick" | "thorough"; parent?: AskParent; purposeLines?: PurposeLines;
-  publicLane?: Readonly<{ publicParent?: PublicDigParent; freePublicNotice?: true }> }> = {}) {
-  const config = v4AskConfig(options.mode ?? "quick", "plain", options.settings ?? PREMIUM, new Date(), newDebateCatalog);
-  return createDebate(question, config, COOKIE_SESSION_MARKER, who.client, undefined, options.parent, options.purposeLines, options.publicLane);
-}
 
 /** The debate page's first read and its map, with the page's own code. */
 async function readPage(who: R22Account, runId: string) {
@@ -79,9 +60,6 @@ const webReplies: R22Script = (contract, request, _chat, field) => {
   return null;
 };
 
-/** A panel that agrees with the writers, so no scripted point falls under the site's hidden-score line (the stand-in's own panel scores 0). */
-const panelAgrees: R22Script = (_contract, request) => request.kind !== "PANEL" ? null : { content: JSON.stringify({ steelman: { summary: "A fair reading of the point.", fidelity: 0.72 },
-  critic: { summary: "A plain objection to the point.", counterargumentStrength: 0.28, basis: "PLAUSIBLE_COUNTER" }, evidence: { quality: 0.72, relevance: 0.72 }, context: { fit: 0.72, ambiguityFlags: [] }, fallacy: { severity: 0.28, fatalFlags: [] } }) };
 const both = (...scripts: readonly R22Script[]): R22Script => (contract, request, chat, field) => {
   for (const script of scripts) { const reply = script(contract, request, chat, field); if (reply !== null) return reply; }
   return null;
@@ -395,20 +373,9 @@ describe("R22 on the real API", () => {
     saw("8", `allowed: ${String(contributions)} contribution under ${dan.pseudonym}, line "${after[0]!.line}", the digger's run paid ${String(await spendOf(allowed.id))} micros; refused: page unchanged; the digger's own page has their rewrite and the kept-private line, no story; earlier no word of the refusal (no dig part, story WRITING)`);
   }, 300_000);
 
-  it("path 9: a report by a stranger on a public debate", async () => {
-    world.setScript(panelAgrees);
-    const before = await spendOf(publicRun());
-    const press = await pressPublicReport(publicRef, { catalog: v4Catalog, room: null, locale: "en" }, dan.client);
-    expect(press.kind).toBe("WRITING");
-    await world.settle();
-    const page = await world.stranger.readPublicDebate(publicRef);
-    const sources = (await world.database.pool.query<{ spend_source: string }>("SELECT DISTINCT spend_source FROM ledger.model_spend WHERE run_id=$1", [publicRun()])).rows.map((row) => row.spend_source);
-    expect(sources).toContain("PUBLIC_REPORT");
-    expect(page.reports?.length).toBe(1);
-    saw("9", `report version ${String(page.reports![0]!.report_version)} on the public page under ${page.reports![0]!.writer!}; ${String(await spendOf(publicRun()) - before)} micros booked on the carrier as PUBLIC_REPORT, charged to the writer (tests/integration/public-tree-flow.test.ts holds who pays)`);
-  }, 300_000);
+  // Path 9, a stranger's report on a public debate, is tests/integration/r22-public-report.test.ts (owner, 3 Nov), on the
+  // product's own logins since upload check Task 9 fixed the fault it met there.
   const publicRunIds = new Map<string, string>();
-  function publicRun(): string { return publicRunIds.get(publicRef) ?? "00000000-0000-4000-8000-000000000000"; }
 
   // Paths 10 and 11: the team's side, with tests/integration/public-tree-flow.test.ts's seam: a real elevated staff row and a stored action proof, no passkey and no staff HTTP route.
   let owner: Actor;
@@ -424,7 +391,7 @@ describe("R22 on the real API", () => {
     await q.query("INSERT INTO staff.subject(staff_id,user_id,capabilities) VALUES($1,$2,$3)", [staffId, userId, ["TEAM_READ", "AUDIT_READ", "EMERGENCY_DISABLE", "PUBLICATION_REVIEW", "THREAT_REPORT"]]);
     await q.query(`INSERT INTO staff.privilege_session(privilege_session_id,staff_id,user_id,ordinary_session_id,token_hash,csrf_token_hash,security_epoch,account_security_epoch,grant_revision,idle_expires_at,absolute_expires_at) VALUES($1,$2,$3,$4,$5,$6,0,0,0,now()+interval '15 minutes',now()+interval '2 hours')`, [privilegeId, staffId, userId, sessionId, hash(privilegeId), hash("staff-csrf" + privilegeId)]);
     await q.query("INSERT INTO staff.team_limit_holder(staff_id,granted_by_staff_id,granted_operation_id) VALUES($1,$1,$2)", [staffId, randomUUID()]);
-    const context = (await world.apiPool.query("SELECT staff.read_context($1,$2,$3) AS context", [userId, sessionId, hash(privilegeId)])).rows[0].context as Record<string, unknown>;
+    const context = (await world.fixtureSuperuserPool.query("SELECT staff.read_context($1,$2,$3) AS context", [userId, sessionId, hash(privilegeId)])).rows[0].context as Record<string, unknown>;
     return { userId, sessionId, staffId, privilegeId, context };
   }
   type Piece = Readonly<{ kind?: "SNAPSHOT" | "UPDATE"; id?: string; pointer?: string; text?: string }>;
@@ -441,7 +408,7 @@ describe("R22 on the real API", () => {
     await authorizeStaffAlertFixture(q, operationId);
     const alert = { schema: "staff-alert-v1", event: "PUBLIC_REVIEW_CHANGED", operationId, envelope: { v: 1, keyId: "fixture-key", nonce: "AAAAAAAAAAAAAAAA", tag: "AAAAAAAAAAAAAAAAAAAAAA==", ct: "YQ==" } };
     const content = piece.text === undefined ? null : await world.withReviewKey(debate.ref, debate.root, (cipher) => cipher.encrypt({ text: piece.text }));
-    return new PostgresPublicReviewRepository(world.apiPool).act({ actor: actor.context as never, proof: { proofId, binding } as never, step, publicationRef: debate.ref, pieceKind: piece.kind ?? null, pieceId: piece.id ?? null,
+    return new PostgresPublicReviewRepository(world.fixtureSuperuserPool).act({ actor: actor.context as never, proof: { proofId, binding } as never, step, publicationRef: debate.ref, pieceKind: piece.kind ?? null, pieceId: piece.id ?? null,
       pointer: piece.pointer ?? null, textSha256: textSha, content, expectedRevision: revision, operationId, alertIntent: alert as never });
   }
   async function freePublic(who: R22Account, question: string): Promise<Readonly<{ ref: string; root: string }>> {
@@ -500,11 +467,11 @@ describe("R22 on the real API", () => {
     expect(answers.at(-1)).toBe("NOT_FOUND");
     saw("11", `AGREE: HIDDEN, 410, row HIDDEN/AGREE; after re-publish WITH_A_PERSON, still public; NOT_FOUND answer: "${v4Catalog[`v4.public.flag.${notFound.state}`]!}"; second report WITH_A_PERSON, nothing hidden; ${String(limit)} an hour, then NOT_FOUND. The judge's reply is scripted; the mail is not sent here`);
   }, 300_000);
-  class PostgresFlagLimit { async personHour(): Promise<number> { return (await readAbuseLimits(world.apiPool, world.nextVersion)).publicFlag.personHour; } }
+  class PostgresFlagLimit { async personHour(): Promise<number> { return (await readAbuseLimits(world.fixtureSuperuserPool, world.nextVersion)).publicFlag.personHour; } }
 
   it("path 12: the team limit and an allowance: a funded question waits with no limit set, starts under the limit, and runs with the top plan's features", async () => {
     world.setScript(webScript);
-    const fixture = internalFundingFixture(world.database.pool, world.apiPool);
+    const fixture = internalFundingFixture(world.database.pool, world.fixtureSuperuserPool);
     const actor = await fixture.fundedActor();
     const command = fixture.configureCommand(actor, { amountMicros: 1_000_000 });
     await fixture.configure(actor, command);
@@ -515,7 +482,7 @@ describe("R22 on the real API", () => {
       const binding = canonicalTeamLimitActionBinding({ action: "TEAM_LIMIT_SET", amount_micros: amount, current_micros: current, expected_revision: now.r, operation_id: operationId }, actor.staffId, { currentMicros: current, expectedRevision: now.r });
       const stored = await fixture.storeProof(actor, binding as never);
       await authorizeStaffAlertFixture(world.database.pool, operationId);
-      await world.apiPool.query("SELECT staff.set_team_limit($1::jsonb,$2::uuid,$3::jsonb,$4::jsonb,$5::jsonb)", [actor.context, stored.proofId, binding,
+      await world.fixtureSuperuserPool.query("SELECT staff.set_team_limit($1::jsonb,$2::uuid,$3::jsonb,$4::jsonb,$5::jsonb)", [actor.context, stored.proofId, binding,
         { targetId: actor.staffId, amountMicros: amount, currentMicros: current, expectedRevision: now.r, operationId, reason: { code: "FUNDING_APPROVAL" } }, { ...stored.alert, event: "TEAM_LIMIT_CHANGED" }]);
     };
     // With no limit set a funded question waits, naming the team's month and no amount.
@@ -531,8 +498,7 @@ describe("R22 on the real API", () => {
     await world.settle();
     const page = await readPage(member, started.id);
     expect(world.search.counts().searches).toBeGreaterThan(searched);
-    await expect(readWebRunPlan(world.apiPool, started.id)).resolves.toBe(TEAM_FEATURE_PLAN_ID);
+    await expect(readWebRunPlan(world.fixtureSuperuserPool, started.id)).resolves.toBe(TEAM_FEATURE_PLAN_ID);
     saw("12", `no limit: WAITING with no amount; limit set: a funded ask started, searched the web, ${String(page.map.paths.length)} paths. The owner's team page, its passkey and the waiter's later start (tests/integration/team-limit-admission.test.ts) are not walked here`);
   }, 300_000);
 });
-const v4Catalog = catalogOf("v4");

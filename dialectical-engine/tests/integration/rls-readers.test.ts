@@ -55,6 +55,7 @@ import {
   RunWaitRepository,
   runInRequestScope,
   setRequestCredential,
+  withRunContentLease,
   type Pool
 } from "@debateai/db";
 import { PostgresModelSpendStore, PostgresRecentRunUsageSource } from "@debateai/budget";
@@ -859,6 +860,17 @@ describe("row-level security S01 C7: every cross-account reader still sees both 
       }
     })));
     expect(sightings("X28", login, seen)).toEqual([]);
+  });
+
+  it("S7.1-X29 a report press's seal inside crossAccount(\"X29\") (apps/api/src/public-tree.ts, pressPublicReport: withRunContentLease on the carrier) on debateai_dev_api_system leases the runs of A and of B", async () => {
+    // Upload check Task 9 (R22 path 9): inside a stranger's request (here A's session) the report on a public debate is
+    // sealed under the debate's own run, another account's. The seal's content lease reads each account's run row.
+    const { pool, login } = reader(api.runtime, "debateai_dev_api_system");
+    const runs = [...await runsOf("a"), ...await runsOf("b")];
+    const { seen } = await record(() => inRequest(A.token, () => crossAccount("X29", async () => {
+      for (const runId of runs) await withRunContentLease(pool, [runId], async () => undefined).catch(() => undefined);
+    })));
+    expect(sightings("X29", login, seen)).toEqual([]);
   });
 
   it("S7.1-X16 PostgresPasswordResetRepository.prepare (packages/db/src/password-reset.ts:74, identity.password_reset_prepare owned by debateai_password_reset_owner; wired on the runtime pool at apps/api/src/main.ts:1054) on debateai_dev_runtime sees rows of A and of B", async () => {

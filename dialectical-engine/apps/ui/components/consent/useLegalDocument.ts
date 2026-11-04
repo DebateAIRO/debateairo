@@ -172,9 +172,10 @@ const documentCache: Partial<Record<CatalogLocaleCode, Partial<Record<LegalDocum
   en: ENGLISH_DOCUMENTS
 };
 
-export function useLegalDocument(key: LegalDocumentKey): LegalDocument {
+/** `override` replaces the page language: sign-up in Canada shows both documents in French first (canadaLegalLanguage.ts). */
+export function useLegalDocument(key: LegalDocumentKey, override?: CatalogLocaleCode): LegalDocument {
   const { locale } = useChromeI18n();
-  const documentLocale = legalLocale(locale);
+  const documentLocale = override ?? legalLocale(locale);
   const provided = useContext(LegalDocumentsContext);
   const serverDocument = provided !== null && legalLocale(provided.locale) === documentLocale ? provided[key] : undefined;
   const [document, setDocument] = useState<LegalDocument>(

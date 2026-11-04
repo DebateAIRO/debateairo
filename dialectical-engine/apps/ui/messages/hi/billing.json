@@ -77,6 +77,7 @@
   "billing.checkout.priceCleared": "आपने अपनी जानकारी बदली, इसलिए कीमत हटा दी गई। आगे बढ़ने के लिए पूरी कीमत फिर से दिखाएँ।",
   "billing.checkout.countryUnavailable": "सशुल्क योजनाएँ अभी आपके देश में उपलब्ध नहीं हैं। आप निःशुल्क योजना का उपयोग जारी रख सकते हैं।",
   "billing.checkout.regionUnavailable": "सशुल्क योजनाएँ अभी आपके क्षेत्र में उपलब्ध नहीं हैं। आप निःशुल्क योजना का उपयोग जारी रख सकते हैं।",
+  "billing.checkout.regionTermsExcluded": "हम टेनेसी में Dialectical Engine उपलब्ध नहीं कराते, इसलिए हम इस पते के लिए भुगतान स्वीकार नहीं कर सकते।",
   "billing.checkout.confirmCountry": "आपका कनेक्शन इस देश से लगता है: {ipCountry}। क्या आप इस देश में रहते हैं: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "हाँ, मैं वहीं रहता/रहती हूँ",
   "billing.checkout.confirmCountryRequired": "कृपया वह देश पुष्टि करें जहाँ आप रहते हैं, फिर आगे बढ़ें।",

@@ -77,6 +77,7 @@
   "billing.checkout.priceCleared": "لقد غيّرت بياناتك، لذا أُزيل السعر. اعرض السعر الكامل مرة أخرى للمتابعة.",
   "billing.checkout.countryUnavailable": "الخطط المدفوعة غير متاحة في بلدك بعد. يمكنك الاستمرار في استخدام الخطة المجانية.",
   "billing.checkout.regionUnavailable": "الخطط المدفوعة غير متاحة في منطقتك بعد. يمكنك الاستمرار في استخدام الخطة المجانية.",
+  "billing.checkout.regionTermsExcluded": "لا نقدّم Dialectical Engine في ولاية تينيسي، لذا لا يمكننا قبول الدفع لهذا العنوان.",
   "billing.checkout.confirmCountry": "يبدو أن اتصالك من هذا البلد: {ipCountry}. هل تقيم في هذا البلد: {declaredCountry}؟",
   "billing.checkout.confirmCountryYes": "نعم، أقيم هناك",
   "billing.checkout.confirmCountryRequired": "يُرجى تأكيد بلد إقامتك، ثم المتابعة.",

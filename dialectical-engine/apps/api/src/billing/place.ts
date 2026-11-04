@@ -110,7 +110,7 @@ export function placeRefusal(place: Extract<PaymentPlace, { kind: "REFUSE" }>, a
 
 export type PaymentRegionDecision =
   | Readonly<{ kind: "ALLOW" }>
-  | Readonly<{ kind: "REFUSE"; code: "REGION_PAYMENT_UNAVAILABLE"; region: PaymentRegionId }>
+  | Readonly<{ kind: "REFUSE"; code: "REGION_PAYMENT_UNAVAILABLE" | "REGION_TERMS_EXCLUDED"; region: PaymentRegionId }>
   | Readonly<{ kind: "POSTCODE_INVALID" }>;
 
 const REGION_ALLOW: PaymentRegionDecision = Object.freeze({ kind: "ALLOW" });
@@ -120,9 +120,11 @@ const REGION_POSTCODE_INVALID: PaymentRegionDecision = Object.freeze({ kind: "PO
  * Payment region blocks (spec 2026-10-20 §6, §8): may a buyer at this billing address pay? A region refuses when its
  * rule says `pay: false` for all buyers, or for business buyers and the location has a company; `pay: true` is open,
  * like no rule. Preflight ruling R1's order: a refusing region among the address's regions refuses, even when the
- * postal code doesn't fit (several: the first in sorted order); else a postal code that doesn't fit is sent back
- * for correction when `postcodeMustFit`, and only in a country the policy closes somewhere (where it could hide a
- * closed region); else ALLOW.
+ * postal code doesn't fit (several: one the Terms exclude first, then the first in sorted order); else a postal code
+ * that doesn't fit is sent back for correction when `postcodeMustFit`, and only in a country the policy closes
+ * somewhere (where it could hide a closed region); else ALLOW. A region whose rule's reason is TERMS_EXCLUDED
+ * (Tennessee, Terms §2 and Annex A.2) refuses with its own code, REGION_TERMS_EXCLUDED (the owner's choice of
+ * 3 November 2026); every other closed region with REGION_PAYMENT_UNAVAILABLE.
  */
 export function decidePaymentRegion(input: Readonly<{
   policy: CountryPolicy;
@@ -131,12 +133,14 @@ export function decidePaymentRegion(input: Readonly<{
 }>): PaymentRegionDecision {
   const { policy, location } = input;
   const geography = paymentRegionsOf(location);
-  const refused = [...geography.regions].sort().find((region) => {
+  const refusing = [...geography.regions].sort().flatMap((region) => {
     const rule = regionRule(policy, region);
-    return rule !== null && !rule.pay && (rule.buyers === "all" || location.company !== null);
+    return rule !== null && !rule.pay && (rule.buyers === "all" || location.company !== null) ? [{ region, rule }] : [];
   });
+  const refused = refusing.find(({ rule }) => rule.reason === "TERMS_EXCLUDED") ?? refusing[0];
   if (refused !== undefined) {
-    return Object.freeze({ kind: "REFUSE", code: "REGION_PAYMENT_UNAVAILABLE", region: refused });
+    const code = refused.rule.reason === "TERMS_EXCLUDED" ? "REGION_TERMS_EXCLUDED" : "REGION_PAYMENT_UNAVAILABLE";
+    return Object.freeze({ kind: "REFUSE", code, region: refused.region });
   }
   const prefix = `${location.country.trim().toUpperCase()}-`;
   const closesInCountry = Object.entries(policy.regions).some(([region, rule]) => !rule.pay && region.startsWith(prefix));

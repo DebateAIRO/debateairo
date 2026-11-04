@@ -32,6 +32,8 @@ import {
   httpIdentityFor,
   loginApiPools,
   provisionRlsLogins,
+  runnerPoolOrSuperuser,
+  runnerTestPool,
   seedSessionAccount,
   type RlsLogins,
   type RlsTestAccount
@@ -596,7 +598,7 @@ describe("row-level security S01 C3: the verified account context on the product
     try {
       for (const mode of ["superuser", "login"] as const) {
         const pools = await withEnvironment({
-          DEBATEAI_TEST_API_LOGINS: mode === "login" ? "1" : undefined, DEBATEAI_TEST_API_LOGINS_REPORT: report
+          DEBATEAI_TEST_API_LOGINS: mode === "login" ? "1" : "0", DEBATEAI_TEST_API_LOGINS_REPORT: report
         }, () => apiTestPools(database, import.meta.url, { runtime: fixtureUrl.toString() }));
         expect({ mode, inside: await asA(() => sessionUser(pools.runtime)) }).toEqual({ mode, inside: fixtureName });
         expect({ mode, outside: await sessionUser(pools.runtime) }).toEqual({ mode, outside: "debateai_dev_api_system" });
@@ -619,6 +621,29 @@ describe("row-level security S01 C3: the verified account context on the product
       const twinned = await apiTestPools(database, import.meta.url, { runtime: fixtureUrl.toString(), system: twinUrl });
       expect(await sessionUser(twinned.runtime)).toBe(twinName);
       expect(await asA(() => sessionUser(twinned.runtime))).toBe(fixtureName);
+    } finally {
+      await rm(reportDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it("Task 7: in login mode runnerTestPool() is a pool on this database as debateai_prod_runner_runtime, neither superuser nor row-security bypass, and reports it; with login mode off it is undefined and runnerPoolOrSuperuser() is the harness pool", async () => {
+    const reportDirectory = await mkdtemp(join(tmpdir(), "rls-c3-report-"));
+    const report = join(reportDirectory, "report.tsv");
+    try {
+      const off = { DEBATEAI_TEST_API_LOGINS: "0", DEBATEAI_TEST_API_LOGINS_REPORT: report };
+      expect(await withEnvironment(off, () => runnerTestPool(database))).toBeUndefined();
+      expect(await withEnvironment(off, () => runnerPoolOrSuperuser(database))).toBe(database.pool);
+      const runner = await withEnvironment({ DEBATEAI_TEST_API_LOGINS: "1", DEBATEAI_TEST_API_LOGINS_REPORT: report },
+        () => runnerTestPool(database));
+      if (runner === undefined) throw new Error("expected the runner login's pool in login mode");
+      const facts = (await runner.query(`SELECT current_user::text AS login, current_database()::text AS database,
+          r.rolsuper AS superuser, r.rolbypassrls AS bypass FROM pg_roles r WHERE r.rolname=current_user`)).rows[0];
+      expect(facts).toEqual({
+        login: "debateai_prod_runner_runtime", database: new URL(database.connectionString).pathname.slice(1),
+        superuser: false, bypass: false
+      });
+      const lines = (await readFile(report, "utf8")).split("\n").filter((line) => line !== "");
+      expect(lines).toEqual([`${THIS_FILE}\trunner:runtime\tdebateai_prod_runner_runtime`]);
     } finally {
       await rm(reportDirectory, { recursive: true, force: true });
     }

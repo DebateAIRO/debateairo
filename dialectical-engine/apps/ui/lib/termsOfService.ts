@@ -337,7 +337,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Canada and Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Our privacy officer, and in Quebec the person in charge of the protection of personal information, is our director, reachable at privacy@dezbatere.ro. Our Privacy Policy, Annex B.3, covers your data. Quebec: these Terms are available in French; choose French with the language switcher; the settings that keep your debates private are on by default; you may request de-indexing of personal information about you." }
+      { kind: "p", text: "Our privacy officer, and in Quebec the person in charge of the protection of personal information, is our director, reachable at privacy@dezbatere.ro. Our Privacy Policy, Annex B.3, covers your data. Quebec: these Terms are available in French; if you choose Canada when you sign up, you get them in French first and can choose English instead; the settings that keep your debates private are on by default; you may request de-indexing of personal information about you." }
     ]
   },
   {
@@ -377,7 +377,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.14",
-  sha256: "9d8d0f5c42dd344919f9e8afb1237e69ed4016fa8447457661e5241141462163",
+  sha256: "94474fdb20bed511a590b6bc1c07750ed4e67b1c3dfb328d31638daaf233f6a7",
   eyebrow: "TERMS OF SERVICE · v2.14 · EFFECTIVE 1 NOVEMBER 2026",
   title: "What you agree to",
   lede: "The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.",

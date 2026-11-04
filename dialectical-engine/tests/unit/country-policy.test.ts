@@ -246,14 +246,16 @@ describe("countryPolicy v1 (paid plans G2, spec §1.5 and §2.3.3)", () => {
 });
 
 /**
- * Payment region blocks (spec 2026-10-20 §2 and §7): the owner's launch list of 20 October 2026, spelled out here
- * on purpose (never derived from the code), so a changed code row fails this test.
+ * Payment region blocks (spec 2026-10-20 §2 and §7): the owner's launch list of 20 October 2026, and Tennessee, which
+ * the Terms exclude (section 2, Annex A.2; the owner's amendment of 8 October 2026), spelled out here on purpose
+ * (never derived from the code), so a changed code row fails this test.
  */
 const CLOSED = { pay: false, reason: "TAX_NOT_READY" } as const;
 const LAUNCH_REGIONS = {
   "CA-SK": CLOSED, "CA-MB": CLOSED,
   "US-DC": CLOSED, "US-HI": CLOSED, "US-MD": CLOSED, "US-RI": CLOSED, "US-VT": CLOSED, "US-WV": CLOSED, "US-NJ": CLOSED,
   "US-OH": { pay: false, reason: "TAX_NOT_READY", buyers: "business" },
+  "US-TN": { pay: false, reason: "TERMS_EXCLUDED" },
   "ES-CN": CLOSED, "ES-CE": CLOSED, "ES-ML": CLOSED,
   "FR-971": CLOSED, "FR-972": CLOSED, "FR-973": CLOSED, "FR-974": CLOSED, "FR-976": CLOSED,
   "FI-01": CLOSED, "GR-69": CLOSED, "IT-LIVIGNO": CLOSED, "IT-CAMPIONE": CLOSED, "DE-HELGOLAND": CLOSED, "DE-BUESINGEN": CLOSED
@@ -264,9 +266,9 @@ function invalidRegions(regions: unknown): string | undefined {
 }
 
 describe("countryPolicy regions (payment region blocks, spec 2026-10-20 §7)", () => {
-  it("carries exactly the owner's launch list of 20 October 2026, every id a known region", () => {
+  it("carries exactly the owner's launch list of 20 October 2026 and Tennessee, every id a known region", () => {
     expect(COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value.regions).toEqual(LAUNCH_REGIONS);
-    expect(Object.keys(LAUNCH_REGIONS)).toHaveLength(24);
+    expect(Object.keys(LAUNCH_REGIONS)).toHaveLength(25);
     for (const id of Object.keys(LAUNCH_REGIONS)) expect(PAYMENT_REGION_IDS, id).toContain(id);
   });
 
@@ -277,6 +279,8 @@ describe("countryPolicy regions (payment region blocks, spec 2026-10-20 §7)", (
     expect(regionRule(policy, "CA-SK")).toEqual(closed);
     expect(regionRule(policy, "ES-CN")).toEqual(closed);
     expect(regionRule(policy, "US-OH")).toEqual({ pay: false, reason: "TAX_NOT_READY", buyers: "business" });
+    // Tennessee is closed by the Terms, not by tax, and for every buyer.
+    expect(regionRule(policy, "US-TN")).toEqual({ pay: false, reason: "TERMS_EXCLUDED", buyers: "all" });
     // An open region, and a string that is no region id at all, have no rule: the country's rule decides.
     expect(regionRule(policy, "US-TX")).toBeNull();
     expect(regionRule(policy, "CA-ON")).toBeNull();

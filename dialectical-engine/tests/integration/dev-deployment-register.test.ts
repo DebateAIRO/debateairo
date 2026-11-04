@@ -62,6 +62,7 @@ import {
 import { createInitialBatteryRows, WorkItemRepository } from "../../packages/battery/src/index.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { observeProviderTarget } from "../../packages/providers/src/index.js";
+import { runnerPoolOrSuperuser } from "../support/rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
 import {
@@ -709,10 +710,12 @@ describe("DEV-05 complete development deployment register", () => {
     const workItemId = await new WorkItemRepository(database.pool).enqueue({
       runId, batteryRowId: "Q1", nodeSet: [], commandKey: `t3c:${runId}`
     });
-    const unreachable = (model: string) => createPostgresProviderGateway(database.pool, {
+    // Upload check Task 7 (R21): the runner on its production login in login mode.
+    const runnerPool = await runnerPoolOrSuperuser(database);
+    const unreachable = (model: string) => createPostgresProviderGateway(runnerPool, {
       endpoint: "http://127.0.0.1:9", model, maker: model
     });
-    const runner = new WalkingSkeletonRunner(database.pool, unreachable("maker:primary"), {
+    const runner = new WalkingSkeletonRunner(runnerPool, unreachable("maker:primary"), {
       // The claim must cover the dev policy's own call deadlines and cooldown
       // holds, or CLAIM_BOUND_MISMATCH fires BEFORE the panel gate and this test
       // would pass while proving nothing (it did, on the first attempt).
@@ -843,10 +846,12 @@ describe("DEV-05 complete development deployment register", () => {
       { providerRef: "provider:test-layer", maker: "maker:1", baseUrl: "http://127.0.0.1:9", model: "model:1" },
       { providerRef: "provider:test-layer:secondary", maker: "maker:2", baseUrl: "http://127.0.0.1:9", model: "model:2" }
     ] as const;
-    const gateway = (model: string) => createPostgresProviderGateway(database.pool, {
+    // Upload check Task 7 (R21): the runner on its production login in login mode.
+    const runnerPool = await runnerPoolOrSuperuser(database);
+    const gateway = (model: string) => createPostgresProviderGateway(runnerPool, {
       endpoint: "http://127.0.0.1:9", model, maker: model
     });
-    const runner = new WalkingSkeletonRunner(database.pool, gateway("maker:1"), {
+    const runner = new WalkingSkeletonRunner(runnerPool, gateway("maker:1"), {
       workerId: "runner:t3c-f34", claimMs: 2_000_000, claimMarginMs: 1_000,
       judgeBound: policy.bounds.JUDGE, composerBound: policy.bounds.COMPOSER,
       conformanceBound: policy.bounds.CONFORMANCE,
