@@ -212,6 +212,7 @@
   "public.report.investigation.stillOpen": "Τι μένει ανοιχτό",
   "public.report.investigation.sources": "Πηγές",
   "public.report.investigation.shortened": "Η διερεύνηση ήταν πολύ μεγάλη, οπότε η αναφορά γράφτηκε από μια συντομευμένη εκδοχή της.",
+  "public.report.investigation.notOnWeb": "Δεν ελέγχθηκε στο διαδίκτυο.",
   "public.report.investigation.followUp": "Επόμενη συζήτηση",
   "public.report.investigation.ownView": "Η προσωπική άποψη",
   "public.report.investigation.viewHelped": "Βοήθησε.",

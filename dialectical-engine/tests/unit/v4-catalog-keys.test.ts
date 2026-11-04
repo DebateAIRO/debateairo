@@ -170,13 +170,40 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.investigation.versions",
   "v4.investigation.versionCurrent",
   "v4.investigation.version",
-  "v4.investigation.writing",
   "v4.investigation.waitingDigs.one",
   "v4.investigation.waitingDigs.other",
   "v4.investigation.failed",
   "v4.investigation.keepDigging",
   "v4.investigation.fromReport",
-  "v4.investigation.firstAnswer"
+  "v4.investigation.firstAnswer",
+  // The owner's screen review of 3 Nov (OWNER-PICKS-2026-11-03.md, "report"): the report page's states and presses, drafted
+  // from the approved fix texts for the click-test. No time is promised that nobody measured (the old "5 to 10 minutes" went).
+  "v4.report.share",
+  "v4.report.shareButton",
+  "v4.report.copyLink",
+  "v4.report.linkCopied",
+  "v4.report.copyFailed",
+  "v4.report.pdfMaking",
+  "v4.report.pdfFailed",
+  "v4.report.notFound",
+  "v4.report.loadingReport",
+  "v4.report.notWrittenYet",
+  "v4.report.firstAnswerNotReport",
+  "v4.investigation.versionWritten",
+  "v4.investigation.heading.paths",
+  "v4.investigation.onlyAnswer",
+  "v4.investigation.loadFailed",
+  "v4.investigation.startUnconfirmed",
+  "v4.investigation.reopenUnconfirmed",
+  "v4.investigation.writingSince",
+  "v4.investigation.waitingDig",
+  "v4.investigation.versionWriting",
+  "v4.investigation.downloadVersion",
+  "v4.investigation.slow",
+  "v4.investigation.checkAgain",
+  "v4.investigation.writeAgain",
+  "v4.investigation.digMore",
+  "v4.web.freeOnPaper"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {
@@ -283,6 +310,18 @@ describe("V4 catalogue keys", () => {
     for (const key of levelLabels) expect(catalog[key], key).toContain(String(DIG_LEVEL_MAX));
   });
 
+  it("the report page (screen review, 3 Nov): no unmeasured time, no count of points, Free's paper line is the honest half", () => {
+    // report-f7, f8 and the record's code facts: no "minutes" figure until a timing run measures one.
+    const report = Object.entries(catalog).filter(([key]) => key.startsWith("v4.report.") || key.startsWith("v4.investigation."));
+    expect(report.filter(([, value]) => /\b\d+\s*(?:to|-|–)\s*\d+\s*minutes?\b|\bminutes?\b/iu.test(value))).toEqual([]);
+    // report-f18: the checking sentence counts nothing.
+    expect(catalog["v4.report.checkedSecondAi"]).toBe("A second AI checked each point. Points it did not check are shown in grey.");
+    expect(Object.keys(catalog).filter((key) => key.startsWith("v4.report.pathUnchecked"))).toEqual([]);
+    // Round 2 r2-13 (A): on paper and in the PDF, Free's web line is the first, honest half of the approved E3b line.
+    expect(catalog["v4.web.free"]!.startsWith(catalog["v4.web.freeOnPaper"]!.replace(/\.$/u, ""))).toBe(true);
+    expect(catalog["v4.web.freeOnPaper"]).toBe("Not checked on the web.");
+  });
+
   it("W5-1: the final report's approved headings, F13 and N14 lines are in the catalogue word for word", () => {
     expect(Object.fromEntries(Object.keys(APPROVED_REPORT_LINES).map((key) => [key, catalog[key]]))).toEqual(APPROVED_REPORT_LINES);
     // N14 is the same approved sentence the debate's own report says when its story could not be written.
@@ -342,7 +381,7 @@ describe("the owner's 3 Nov screen review", () => {
   });
 
   it("wait-f3 / map-f3: no wait names a figure before it is measured, and the question's wait says where to find it", () => {
-    for (const key of ["v4.debate.usually", "v4.investigation.writing"]) {
+    for (const key of ["v4.debate.usually", "v4.investigation.writingSince"]) {
       expect(catalog[key], key).not.toMatch(/\d|minute|hour|usually|few/iu);
       expect(catalog[key], key).toMatch(/This takes a while\./u);
     }

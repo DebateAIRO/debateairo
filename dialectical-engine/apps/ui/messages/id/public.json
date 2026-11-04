@@ -212,6 +212,7 @@
   "public.report.investigation.stillOpen": "Apa yang masih terbuka",
   "public.report.investigation.sources": "Sumber",
   "public.report.investigation.shortened": "Penyelidikan ini sangat besar, jadi laporan ditulis dari versi yang dipersingkat.",
+  "public.report.investigation.notOnWeb": "Tidak diperiksa di web.",
   "public.report.investigation.followUp": "Debat lanjutan",
   "public.report.investigation.ownView": "Pandangan pribadi penanya",
   "public.report.investigation.viewHelped": "Membantu.",

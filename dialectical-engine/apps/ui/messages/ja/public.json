@@ -212,6 +212,7 @@
   "public.report.investigation.stillOpen": "まだ残っている問い",
   "public.report.investigation.sources": "出典",
   "public.report.investigation.shortened": "調査が非常に大規模だったため、短縮版をもとにレポートを作成しました。",
+  "public.report.investigation.notOnWeb": "ウェブでは確認していません。",
   "public.report.investigation.followUp": "掘り下げ討論",
   "public.report.investigation.ownView": "質問者自身の見解",
   "public.report.investigation.viewHelped": "役立ちました。",

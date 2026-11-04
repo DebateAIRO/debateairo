@@ -212,6 +212,7 @@
   "public.report.investigation.stillOpen": "Что остаётся открытым",
   "public.report.investigation.sources": "Источники",
   "public.report.investigation.shortened": "Исследование было очень большим, поэтому отчёт написан по его сокращённой версии.",
+  "public.report.investigation.notOnWeb": "Не проверено в интернете.",
   "public.report.investigation.followUp": "Последующие дебаты",
   "public.report.investigation.ownView": "Собственное мнение спрашивающего",
   "public.report.investigation.viewHelped": "Помогло.",

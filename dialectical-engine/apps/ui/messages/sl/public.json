@@ -212,6 +212,7 @@
   "public.report.investigation.stillOpen": "Kaj ostaja odprto",
   "public.report.investigation.sources": "Viri",
   "public.report.investigation.shortened": "Preiskava je bila zelo obsežna, zato je bilo poročilo napisano iz njene skrajšane različice.",
+  "public.report.investigation.notOnWeb": "Ni preverjeno na spletu.",
   "public.report.investigation.followUp": "Nadaljnja razprava",
   "public.report.investigation.ownView": "Lastno mnenje spraševalca",
   "public.report.investigation.viewHelped": "Pomagalo je.",

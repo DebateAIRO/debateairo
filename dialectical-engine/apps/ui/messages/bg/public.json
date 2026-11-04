@@ -212,6 +212,7 @@
   "public.report.investigation.stillOpen": "Какво остава открито",
   "public.report.investigation.sources": "Източници",
   "public.report.investigation.shortened": "Проучването беше много голямо, затова докладът е написан по съкратен негов вариант.",
+  "public.report.investigation.notOnWeb": "Не е проверено в интернет.",
   "public.report.investigation.followUp": "Последващ дебат",
   "public.report.investigation.ownView": "Собственото мнение на питащия",
   "public.report.investigation.viewHelped": "Помогна.",

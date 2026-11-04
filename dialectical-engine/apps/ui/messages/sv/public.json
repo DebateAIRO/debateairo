@@ -212,6 +212,7 @@
   "public.report.investigation.stillOpen": "Vad som fortfarande är öppet",
   "public.report.investigation.sources": "Källor",
   "public.report.investigation.shortened": "Undersökningen var mycket stor, så rapporten skrevs utifrån en förkortad version av den.",
+  "public.report.investigation.notOnWeb": "Inte kontrollerat på webben.",
   "public.report.investigation.followUp": "Uppföljande debatt",
   "public.report.investigation.ownView": "Frågeställarens egen åsikt",
   "public.report.investigation.viewHelped": "Den hjälpte.",

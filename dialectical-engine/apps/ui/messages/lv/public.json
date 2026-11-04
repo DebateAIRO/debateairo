@@ -212,6 +212,7 @@
   "public.report.investigation.stillOpen": "Kas vēl ir atklāts",
   "public.report.investigation.sources": "Avoti",
   "public.report.investigation.shortened": "Izpēte bija ļoti apjomīga, tāpēc ziņojums uzrakstīts no tās saīsinātas versijas.",
+  "public.report.investigation.notOnWeb": "Nav pārbaudīts tīmeklī.",
   "public.report.investigation.followUp": "Turpmākās debates",
   "public.report.investigation.ownView": "Jautātāja paša viedoklis",
   "public.report.investigation.viewHelped": "Palīdzēja.",

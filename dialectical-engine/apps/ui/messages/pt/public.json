@@ -212,6 +212,7 @@
   "public.report.investigation.stillOpen": "O que continua em aberto",
   "public.report.investigation.sources": "Fontes",
   "public.report.investigation.shortened": "A investigação era muito extensa, por isso o relatório foi escrito a partir de uma versão abreviada.",
+  "public.report.investigation.notOnWeb": "Não verificado na web.",
   "public.report.investigation.followUp": "Debate seguinte",
   "public.report.investigation.ownView": "A opinião própria de quem perguntou",
   "public.report.investigation.viewHelped": "Ajudou.",

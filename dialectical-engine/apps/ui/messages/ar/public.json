@@ -212,6 +212,7 @@
   "public.report.investigation.stillOpen": "ما زال مفتوحًا",
   "public.report.investigation.sources": "المصادر",
   "public.report.investigation.shortened": "كان التحقيق كبيرًا جدًا، لذلك كُتب التقرير من نسخة مختصرة منه.",
+  "public.report.investigation.notOnWeb": "لم يُتحقَّق منه على الويب.",
   "public.report.investigation.followUp": "نقاش لاحق",
   "public.report.investigation.ownView": "الرأي الشخصي للسائل",
   "public.report.investigation.viewHelped": "ساعد ذلك.",

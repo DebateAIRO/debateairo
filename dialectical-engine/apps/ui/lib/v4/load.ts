@@ -28,7 +28,14 @@ export type V4Load =
    * `story` is never null from loadV4 for a first debate (fix wave 1: a failed read is an UNAVAILABLE record); it is null
    * for a dig's answer, which has no story (W4-6, Q-D13).
    */
-  | Readonly<{ kind: "SERVED"; runId: string; answer: Answer; story: AnswerStory | null }>;
+  | Readonly<{
+    kind: "SERVED"; runId: string; answer: Answer; story: AnswerStory | null;
+    /**
+     * report-f14: the language the question was argued in (the run's BCP-47 tag), so AI text can be marked with it. Absent
+     * when unknown: an answer id opened directly, a database without the tag, or "und".
+     */
+    language?: string;
+  }>;
 
 type StoryClient = Pick<ContractClient, "readAnswerStory">;
 type LoadClient = Pick<ContractClient, "readRun" | "readRunAnswer" | "readAnswer" | "readAnswerStory">;
@@ -104,7 +111,14 @@ export async function loadV4(id: string, client: LoadClient = contractClient): P
     if (isNotFound(failure)) return { kind: "RUN", runId: id, run };
     throw failure;
   }
-  return { kind: "SERVED", runId: id, answer, story: await storyFor(answer, client) };
+  const language = argumentLanguage(run);
+  return { kind: "SERVED", runId: id, answer, story: await storyFor(answer, client), ...(language === null ? {} : { language }) };
+}
+
+/** The run's question language as a usable tag: "und" (detection not confident) and a missing tag are unknown. */
+function argumentLanguage(run: RunProjection): string | null {
+  const tag = run.argument_language?.tag ?? null;
+  return tag === null || tag === "und" ? null : tag;
 }
 
 /**

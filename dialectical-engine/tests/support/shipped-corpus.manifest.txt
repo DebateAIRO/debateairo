@@ -706,6 +706,7 @@ apps/ui/components/v4/V4PublicFlag.tsx
 apps/ui/components/v4/V4PublicLane.tsx
 apps/ui/components/v4/V4Rail.tsx
 apps/ui/components/v4/V4ReportClient.tsx
+apps/ui/components/v4/V4ReportHeader.tsx
 apps/ui/components/v4/V4Sources.tsx
 apps/ui/components/v4/V4TrustBar.tsx
 apps/ui/content-security-policy.d.mts
@@ -868,6 +869,7 @@ apps/ui/lib/report/ReportDocument.tsx
 apps/ui/lib/report/ReportTable.tsx
 apps/ui/lib/report/fonts.test.mjs
 apps/ui/lib/report/investigationReportModel.ts
+apps/ui/lib/report/pathTrust.ts
 apps/ui/lib/report/pointNumbers.ts
 apps/ui/lib/report/renderReport.ts
 apps/ui/lib/report/reportCharts.ts
