@@ -14,7 +14,7 @@ import { V4Steps } from "./V4Steps";
  * questions and digs the person can see on the map.
  * V4 screen review (3 Nov):
  *   - map-f28: the one approved count is "Open questions that could still change the answer", said as one line; the
- *     rounds name their state instead of counting digs ("Looking into it", "Done").
+ *     rounds name their state instead of counting digs ("Looking into it", journey-f22's "Ready").
  *   - map-f26 / dig-f29: the page works out the count and the report moment (lib/v4/mapLooks.ts): a question leaves the
  *     count only when a dig comes back Confirmed or Corrected, and "Good time to write your report" follows that rule; a
  *     dig done without it gets the neutral "Your dig is done. Keep digging, or write your report."
