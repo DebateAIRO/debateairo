@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { shortText } from "../../apps/ui/components/v4/V4MapTree.js";
 import * as fixture from "../../apps/ui/lib/v3/storyFixture.js";
 import { snapshotItems } from "../../apps/ui/lib/v4/changes.js";
+import { cardLabel } from "../../apps/ui/lib/v4/mapLooks.js";
 import { buildV4Map } from "../../apps/ui/lib/v4/mapModel.js";
 import type { DigLink, DigView } from "../../apps/ui/lib/v4/types.js";
 import {
@@ -338,7 +339,9 @@ describe("since the last visit (journey-f17, map-f19)", () => {
     harness.answer = answerWith(runId, { paths: [{ position_ref: "n-smr", current: (ready as Extract<PathRewrite, { state: "READY" }>).text, history: [ready] }], changed_since: { count: 0, since_report_version: null } });
     await mountMap(1600, runId);
     expect(noticeNews()!.textContent).toContain(CATALOG["v4.changes.sinceLastVisit"]);
-    expect(noticeNews()!.textContent).toContain(word("v4.digsDid.news.HOLDS", { line: shortText(STORY_LINES["n-smr"]!, 80) }));
+    // map-f25 / r2-20 A: the notice names the path by its short label, never with its outcome words ("set aside").
+    expect(noticeNews()!.textContent).toContain(word("v4.digsDid.news.HOLDS", { line: shortText(cardLabel(STORY_LINES["n-smr"]!), 80) }));
+    expect(noticeNews()!.textContent).not.toMatch(/set aside/iu);
     // Every dig confirmed its path: the win sentence.
     expect(notice()!.querySelector(".v4DigsDidHolds")!.textContent).toBe(CATALOG["v4.digsDid.holds"]);
     expect(tabPrefix()).toBe(word("v4.ready.tab.changed.one", { count: 1 }));

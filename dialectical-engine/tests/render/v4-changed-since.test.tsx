@@ -2,6 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AnswerSchema, type Answer, type AnswerPathRewrites, type PathRewrite } from "../../packages/contract/src/index.js";
+import { cardLabel } from "../../apps/ui/lib/v4/mapLooks.js";
 import { DIG_RUNS, PATH_REWRITES } from "../../tools/v4-mock-api/rewrite-seed.js";
 import { advance, CATALOG, harness, mountMap, page, resetHarness, seededAnswer, settle, unmountMap } from "./v4-debate-harness.js";
 
@@ -37,9 +38,10 @@ function answerWith(runId: string, rewrites: AnswerPathRewrites): Answer {
     other_pages: path.other_pages.filter((page) => page.researched?.state !== "READING") })) } };
 }
 
+/** A changed path as the line names it: its short label (map-f25 / r2-20 A), never its outcome words. */
 const lineOf = (positionRef: string): string => {
   const rewrite = ROOT.paths.find((path) => path.position_ref === positionRef)!.history[0]!;
-  return (rewrite as Extract<PathRewrite, { state: "READY" }>).text.line;
+  return cardLabel((rewrite as Extract<PathRewrite, { state: "READY" }>).text.line);
 };
 
 beforeEach(() => {
@@ -117,7 +119,7 @@ describe("after a report", () => {
     expect(strip()).toBeNull();
     const done: PathRewrite = {
       ...writing, state: "READY", rewritten_at: "2026-10-31T10:02:00.000Z", changed: true,
-      text: { line: "Wait for small reactors: set aside, and the first ones are years late.", summary: "Still years away.", fate: "SET_ASIDE" },
+      text: { line: "Wait for small reactors: set aside. The first ones are years late.", summary: "Still years away.", fate: "SET_ASIDE" },
       what_changed: ["The dig found that the first small reactors are years behind plan."], fate_before: "SET_ASIDE", view: null, dig_paths: []
     };
     harness.fresh = answerWith(runId, {
@@ -130,7 +132,8 @@ describe("after a report", () => {
     await advance(1_100);
     await settle();
     expect(strip()!.querySelector(".v4ChangedSinceText")!.textContent).toBe(CATALOG["v4.rewrite.reportOlder"]);
-    expect(named()).toEqual(["Wait for small reactors: set aside, and the first ones are years late."]);
+    // map-f25 / r2-20 A: the path is named by its short label, with no outcome words ("set aside").
+    expect(named()).toEqual(["Wait for small reactors"]);
     // Nothing is being rewritten any more, so it stops reading.
     const reads = harness.loadAnswer.mock.calls.length;
     await advance(60_000);

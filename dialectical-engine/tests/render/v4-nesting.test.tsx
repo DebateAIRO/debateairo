@@ -69,9 +69,10 @@ describe("the breadcrumb on a dig's map", () => {
     expect(parts.map((part) => part.textContent)).toEqual([
       CATALOG["v4.nest.trailRoot"],
       // 1111's n-renew, as 8888 rewrote it; 8888's n-renew, as d200 rewrote it; d200's own n-nuclear (its rewrite's line).
-      shortText(ready(DIG_ANSWERS[DIG_RUNS.levelOne]!.rewrite).text.line, 40),
-      shortText(ready(DIG_ANSWERS[DIG_RUNS.levelTwo]!.rewrite).text.line, 40),
-      shortText(ready(DIG_ANSWERS[DIG_RUNS.levelTwo]!.rewrite).dig_paths.find((path) => path.position_ref === "n-nuclear")!.line, 40)
+      // Each path by its short label (map-f25 / r2-20 A): no outcome words such as "partly held".
+      shortText(cardLabel(ready(DIG_ANSWERS[DIG_RUNS.levelOne]!.rewrite).text.line), 40),
+      shortText(cardLabel(ready(DIG_ANSWERS[DIG_RUNS.levelTwo]!.rewrite).text.line), 40),
+      shortText(cardLabel(ready(DIG_ANSWERS[DIG_RUNS.levelTwo]!.rewrite).dig_paths.find((path) => path.position_ref === "n-nuclear")!.line), 40)
     ]);
     expect(parts.map((part) => part.getAttribute("href"))).toEqual([
       `/v4/debate/${DIG_RUNS.root}?level=background`,

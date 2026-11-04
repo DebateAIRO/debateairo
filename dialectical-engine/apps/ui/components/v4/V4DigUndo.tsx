@@ -14,7 +14,7 @@ import {
   waitingDigsOf,
   type DigUndoEntry
 } from "@/lib/v4/digUndo";
-import { firstByOf } from "@/lib/v4/mapLooks";
+import { cardLabel, firstByOf } from "@/lib/v4/mapLooks";
 import { clockText } from "@/lib/v4/stateWords";
 import type { DigTarget } from "@/lib/v4/types";
 import { V4UndoNote, V4UndoNotes, type V4UndoNoteState } from "./V4UndoNote";
@@ -50,9 +50,12 @@ function firstIsAi(target: DigTarget): boolean {
   return firstByOf(target) === "AI";
 }
 
-/** The first thing a dig looks into, shortened, with its AI mark when the AIs wrote it. */
+/**
+ * The first thing a dig looks into, shortened, with its AI mark when the AIs wrote it. A whole path is named by its short
+ * label ("Digging into “Mostly renewables”", dig-f8), never by its whole line with its outcome words (map-f25, r2-20 A).
+ */
 export function DigFirstQuestion(props: Readonly<{ target: DigTarget }>) {
-  const first = shorten(digTargetQuestions(props.target)[0] ?? "");
+  const first = shorten(props.target.kind === "path" ? cardLabel(props.target.path.line) : digTargetQuestions(props.target)[0] ?? "");
   return <span data-ai-generated={firstIsAi(props.target) ? "true" : undefined}>{first}</span>;
 }
 

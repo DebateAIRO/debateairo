@@ -2,6 +2,7 @@
 
 import { useId, type MouseEvent } from "react";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import { cardLabel } from "@/lib/v4/mapLooks";
 import { answerHolds, type NewsHeadline, type PathResult } from "@/lib/v4/readyMoment";
 import { readyText, ReadyWords, type ReadyNoteText } from "./V4ReadyNote";
 import { shortText } from "./V4MapTree";
@@ -20,15 +21,20 @@ import { shortText } from "./V4MapTree";
 
 const SHORT_LINE = 80;
 
+/** A path as these lines name it: its short label (map-f25, r2-20 A), so no outcome words ("held up") reach the notice. */
+function pathName(line: string): string {
+  return shortText(cardLabel(line), SHORT_LINE);
+}
+
 /** The finished-dig notice's sentence, as the notice and the ready note both say it. */
 export function newsHeadlineText(catalog: MessageCatalog, headline: NewsHeadline): ReadyNoteText {
   if (headline.kind === "CHANGED" || headline.kind === "HOLDS") {
-    return readyText(catalog, `v4.digsDid.news.${headline.kind}`, shortText(headline.path.line, SHORT_LINE));
+    return readyText(catalog, `v4.digsDid.news.${headline.kind}`, pathName(headline.path.line));
   }
   if (headline.kind === "FAILED") {
     return headline.path === null
       ? readyText(catalog, "v4.digsDid.news.FAILED.noLine")
-      : readyText(catalog, "v4.digsDid.news.FAILED", shortText(headline.path.line, SHORT_LINE));
+      : readyText(catalog, "v4.digsDid.news.FAILED", pathName(headline.path.line));
   }
   return readyText(catalog, `v4.digsDid.news.${headline.kind}`);
 }
@@ -75,7 +81,7 @@ export function V4ChangesBar(props: Readonly<{
           <ul className="v4DigsDidList">
             {results.map((entry) => (
               <li key={entry.path.id} className={`v4DigsDidLine v4DigsDid-${entry.result}`}>
-                <ReadyWords text={readyText(catalog, `v4.digsDid.line.${entry.result}`, shortText(entry.path.line, SHORT_LINE))} />
+                <ReadyWords text={readyText(catalog, `v4.digsDid.line.${entry.result}`, pathName(entry.path.line))} />
               </li>
             ))}
           </ul>

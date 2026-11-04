@@ -8,6 +8,7 @@ import { shortText } from "../../apps/ui/components/v4/V4MapTree.js";
 import { V4PointOfView } from "../../apps/ui/components/v4/V4PathRewrite.js";
 import { formatDate } from "../../apps/ui/lib/i18n/translate.js";
 import { snapshotItems } from "../../apps/ui/lib/v4/changes.js";
+import { cardLabel } from "../../apps/ui/lib/v4/mapLooks.js";
 import { buildV4Map } from "../../apps/ui/lib/v4/mapModel.js";
 import type { DigLink, DigView } from "../../apps/ui/lib/v4/types.js";
 import {
@@ -345,7 +346,7 @@ describe("news (draft 5.5; V4 screen review 3 Nov 2026, dig-f3 / journey-f10: \"
     await mountMap(1600, runId);
     const news = page().querySelector<HTMLElement>(".v4DigsDidNews")!;
     expect(news.querySelector(".v4DebChangesText")!.textContent)
-      .toBe(`${CATALOG["v4.changes.sinceLastVisit"]} ${word("v4.digsDid.news.HOLDS", { line: shortText(STORY_LINES["n-smr"]!, 80) })}`);
+      .toBe(`${CATALOG["v4.changes.sinceLastVisit"]} ${word("v4.digsDid.news.HOLDS", { line: shortText(cardLabel(STORY_LINES["n-smr"]!), 80) })}`);
   });
 });
 

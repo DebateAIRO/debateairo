@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useId, useState, type ReactNode } from "react";
 import type { PathRewrite, PathsChangedSince, PointOfViewVerdict } from "@debateai/contract";
 import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
-import { pathHolds, pathOutcome, type DigOutcome } from "@/lib/v4/mapLooks";
+import { cardLabel, pathHolds, pathOutcome, type DigOutcome } from "@/lib/v4/mapLooks";
 import { isFinishedRewrite, rewriteStateOf } from "@/lib/v4/mapModel";
 import { servedRewriteWords } from "@/lib/v4/trust";
 import { levelHref } from "@/lib/v4/storage";
@@ -331,7 +331,8 @@ export function V4ChangedSince(props: Readonly<{
         <div className="v4ChangedSincePaths">
           <p className="v4ChangedSinceLead v4Muted">{t(catalog, "v4.rewrite.changedSinceYourReport")}</p>
           <ul className="v4ChangedSinceList">
-            {named.map((path) => <li key={path.id} data-ai-generated="true">{path.line}</li>)}
+            {/* map-f25 / r2-20 A: each path by its short label, so no outcome words ("held up") show; the panel has the whole line. */}
+            {named.map((path) => <li key={path.id} data-ai-generated="true"><span dir="auto">{cardLabel(path.line)}</span></li>)}
           </ul>
         </div>
       )}

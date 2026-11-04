@@ -277,6 +277,22 @@ describe("the note travels with the person (dig-d3 A)", () => {
     await advance(10_100);
     expect(hostEl.textContent).toBe("");
   });
+
+  it("a whole path is named by its short label, never with its outcome words (dig-f8, map-f25)", async () => {
+    const { V4ReportDigWait } = await import("../../apps/ui/components/v4/V4DigUndo.js");
+    const path = { id: "n-nuclear", line: "Nuclear first: did not hold. Recent reactors in Europe ran years late." } as unknown as V4Path;
+    addDig({
+      parentRunId: "run-1", runIds: ["root-run"], dig: { target: { kind: "path", path }, mode: "quick", sendsAt: Date.now() + 10_000 },
+      sharePercent: null, showMode: true, send: async (): Promise<DigUndoResult> => ({ kind: "STOPPED" }), failedLine: "Not started."
+    });
+    hostEl = document.createElement("div");
+    document.body.append(hostEl);
+    hostRoot = createRoot(hostEl);
+    await act(async () => hostRoot?.render(<V4ReportDigWait runId="root-run" catalog={CATALOG} />));
+    expect(hostEl.textContent).toBe(word("v4.report.digWait", { question: "Nuclear first" }));
+    expect(hostEl.textContent).not.toMatch(/did not hold/u);
+    await advance(10_100);
+  });
 });
 
 describe("a phone's one bottom stack (journey-d3, dig-f16, dig-f17)", () => {
