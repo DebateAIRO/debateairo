@@ -1,12 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import type { ReportMoment } from "@/lib/v4/mapLooks";
 import type { MoneyLine } from "@/lib/v4/money";
 import { levelHref } from "@/lib/v4/storage";
 import type { ReadingLevel } from "@/lib/v4/types";
 import { NewDot } from "./V4MapTree";
+import { V4Steps } from "./V4Steps";
 
 /*
  * V4 initial (2026-10-28), D3 rail ("when"): the steps, the rounds, how many open questions could still change the
@@ -22,6 +22,8 @@ import { NewDot } from "./V4MapTree";
  *   - map-d3 / map-f23: the rail also comes as a 56 px strip of four marks (laptops, "marks"), as the line above the map
  *     that carries the count and the notes ("notes"), and as the steps alone on one line (the foot of the phone's map,
  *     "steps").
+ *   - journey-f18 / read-f25: the steps are the one step marker every V4 page shows (V4Steps), always all four, "Your
+ *     question · What we'll look into · The map · Your report"; a dig's page shows the four too.
  */
 
 /**
@@ -47,10 +49,10 @@ type RailProps = Readonly<{
    */
   level: ReadingLevel | null;
   /**
-   * R2RULES-8: the "How we read it" step, ticked. A dig never went through that screen, so its page leaves the row
-   * out (the later steps renumber).
+   * No longer read: journey-f18 / read-f25 (3 Nov) show the same four steps on every page, a dig's included. Kept optional
+   * so callers that still pass it need no change.
    */
-  showReadStep: boolean;
+  showReadStep?: boolean;
   /** Open questions that could still change the answer (map-f26: only a Confirmed or Corrected dig takes one off). */
   openLeft: number;
   digs: V4DigCounts;
@@ -76,46 +78,16 @@ type RailProps = Readonly<{
 }>;
 
 function Steps(props: Readonly<{ rail: RailProps; reportHref: string; marksOnly: boolean }>) {
-  const { showReadStep, catalog } = props.rail;
-  const mapStep = showReadStep ? 3 : 2;
+  const { catalog } = props.rail;
   // The marks strip names only the step the person is on, under its mark; the others say their names to screen readers.
-  const name = (key: string, here: boolean) => (props.marksOnly && !here
-    ? <span className="v4SrOnly">{t(catalog, key)}</span>
-    : <span className="v4DebRailStepName">{t(catalog, key)}</span>);
   return (
-    <ol className="v4DebRailSteps">
-      <li className="v4DebRailStep v4DebRailDone">
-        <span className="v4DebRailMark" aria-hidden="true">✓</span>
-        {name("v4.rail.stepQuestion", false)}
-      </li>
-      {showReadStep ? (
-        <li className="v4DebRailStep v4DebRailDone">
-          <span className="v4DebRailMark" aria-hidden="true">✓</span>
-          {name("v4.rail.stepRead", false)}
-        </li>
-      ) : null}
-      <li className="v4DebRailStep v4DebRailHere" aria-current="step">
-        <span className="v4DebRailMark" aria-hidden="true">{props.marksOnly ? "●" : mapStep}</span>
-        <span>
-          {t(catalog, "v4.rail.stepMap")}
-          {props.marksOnly ? null : <span className="v4DebRailNote">{t(catalog, "v4.rail.youAreHere")}</span>}
-        </span>
-      </li>
-      {props.marksOnly ? (
-        <li className="v4DebRailStep">
-          <Link className="v4DebRailMarkLink" href={props.reportHref}>
-            <span className="v4DebRailMark" aria-hidden="true">○</span>
-            <span className="v4SrOnly">{t(catalog, "v4.rail.stepReport")}</span>
-          </Link>
-        </li>
-      ) : (
-        <li className="v4DebRailStep">
-          <span className="v4DebRailMark" aria-hidden="true">{mapStep + 1}</span>
-          <Link className="v4Link" href={props.reportHref}>{t(catalog, "v4.rail.stepReport")}</Link>
-          {props.rail.reportReady === true ? <NewDot catalog={catalog} /> : null}
-        </li>
-      )}
-    </ol>
+    <V4Steps
+      current="map"
+      shape={props.marksOnly ? "marks" : "list"}
+      hrefs={{ report: props.reportHref }}
+      reportMark={props.rail.reportReady === true ? <NewDot catalog={catalog} /> : null}
+      catalog={catalog}
+    />
   );
 }
 

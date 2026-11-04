@@ -10,7 +10,7 @@ import { askQuestionMaxBytes } from "@debateai/contract";
 /*
  * The ask page's step 1 after the owner's screen review (3 Nov 2026): ask-d1 D (a signed-out visitor sees the real page,
  * "Sign in" at the end of the header (drawn by the header itself since ask-d6 A), the promise line, the seed of the map on
- * a first visit), ask-f14 / read-f18 (a
+ * a first visit), journey-f18 / read-f25 (the four steps above the title), ask-f14 / read-f18 (a
  * visible reason, read out with both buttons, and the red line cleared by new words), ask-f15 (one choice of three),
  * ask-f16 (the level's place held), ask-f18 / ask-d4 C (the used-up line above the box) and ask-d5 B (the "Your maps"
  * shelf with its state words and digs). The session, the ask hook and the server are stood in.
@@ -129,6 +129,19 @@ describe("a signed-out visitor (ask-d1 D)", () => {
     expect(host!.querySelector(".v4Hdr a")).toBeNull();
     // Nothing of the account is read for a stranger.
     expect(server.readAnswerIndex).not.toHaveBeenCalled();
+  });
+
+  it("journey-f18 / read-f25: step 1 shows the four steps, with Your question marked", async () => {
+    await mount();
+    const steps = host!.querySelector("nav.v4Steps-line")!;
+    expect(steps.getAttribute("aria-label")).toBe(CATALOG["v4.rail.label"]);
+    expect([...steps.querySelectorAll(".v4StepsName")].map((name) => name.textContent)).toEqual(
+      ["Your question", "What we'll look into", "The map", "Your report"]);
+    expect(steps.querySelector("[aria-current=step]")?.textContent).toBe("Your question");
+    // Nothing ahead of step 1 is a link: the steps after it are not open yet.
+    expect(steps.querySelector("a")).toBeNull();
+    // It sits above the title, on step 1 only.
+    expect(steps.compareDocumentPosition(host!.querySelector("h1")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("gets the seed of the map, whose solid card mirrors the words as they are typed", async () => {

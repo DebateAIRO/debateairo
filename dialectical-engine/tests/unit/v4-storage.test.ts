@@ -63,9 +63,9 @@ describe("no browser storage (Decision A, S01-R17)", () => {
       "V4ReportClient.tsx", "V4ReportHeader.tsx",
       // The owner's screen review (3 Nov): the ask page's session, the seed of the map, "Your maps" and "All my maps".
       "V4AskGate.tsx", "V4MapSeed.tsx", "V4MapShelf.tsx", "V4AllMaps.tsx",
-      // ask-d6 A: the header's account menu (the language and the mode are the site's existing choices, changed by the site's
-      // own LanguageSwitcher and ModeToggle).
-      "V4AccountMenu.tsx"]) {
+      // ask-d6 A / journey-f18: the header's account menu (the language and the mode are the site's existing choices, changed
+      // by the site's own LanguageSwitcher and ModeToggle) and the one step marker.
+      "V4AccountMenu.tsx", "V4Steps.tsx"]) {
       const source = readFileSync(resolve(here, "../../apps/ui/components/v4", file), "utf8");
       expect(source, file).not.toMatch(/\.setItem\(|localStorage|sessionStorage|indexedDB|document\.cookie/);
     }

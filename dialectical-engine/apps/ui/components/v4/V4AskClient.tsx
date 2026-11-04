@@ -7,6 +7,7 @@ import { RoomNotice } from "@/components/billing/RoomNotice";
 import { V4AskGate, type V4Session } from "@/components/v4/V4AskGate";
 import { V4MoneyLines } from "@/components/v4/V4DigSuggest";
 import { V4Header } from "@/components/v4/V4Header";
+import { V4Steps } from "@/components/v4/V4Steps";
 import { V4MapSeed } from "@/components/v4/V4MapSeed";
 import { SHELF_MAX, useMapShelf, V4MapShelf } from "@/components/v4/V4MapShelf";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
@@ -424,6 +425,8 @@ function V4AskForm({
       {header}
       {step === "ask" ? (
         <div className="v4AskMain">
+          {/* journey-f18 / read-f25: the four steps, this one marked. */}
+          <V4Steps current="question" shape="line" catalog={catalog} />
           <div className="v4AskQuestion">
             <h1 id={`${ids}-title`} className="v4AskTitle v4Serif">
               <label htmlFor={`${ids}-q`}>{t(catalog, "v4.ask.title")}</label>

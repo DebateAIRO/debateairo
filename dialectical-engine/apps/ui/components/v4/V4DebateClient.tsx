@@ -37,6 +37,7 @@ import { swipeTarget, usePositionFlash, useShortWindow, useSideSwipe, V4PathList
 import { V4MonthPause } from "@/components/v4/V4MonthPause";
 import { V4PausedScreen } from "@/components/v4/V4PausedScreen";
 import { V4Rail, type V4DigCounts } from "@/components/v4/V4Rail";
+import { V4Steps } from "@/components/v4/V4Steps";
 import { useV4Ready } from "@/components/v4/useV4Ready";
 import { isNotFound } from "@/lib/api";
 import type { AskRoom } from "@/lib/billing/room";
@@ -1442,6 +1443,8 @@ function V4Debate({
       <div className="v4DebPage" {...tabPrefix}>
         {ready.announcer}
         {header}
+        {/* journey-f18 / read-f25: the waiting, paused and failed screens are on the map's step of the four. */}
+        {load?.kind === "RUN" ? <div className="v4StepsTop"><V4Steps current="map" shape="line" catalog={catalog} /></div> : null}
         {/* UI-4: the layout already holds the page's one <main>. */}
         <div className="v4DebCentre">
           {load === null || load.kind !== "RUN" ? (
@@ -1526,7 +1529,6 @@ function V4Debate({
     <V4Rail
       runId={runId}
       level={chosenLevel}
-      showReadStep={!isDigPage && recordParent === null}
       openLeft={openLeft}
       digs={dugCounts}
       variant={variant}
@@ -1659,6 +1661,8 @@ function V4Debate({
             onSelect={select}
             onOpenMap={openSheet}
             position={position}
+            // journey-f18: on a phone the four steps are small dots in the pinned top, beside the breadcrumb.
+            steps={<V4Steps current="map" shape="dots" hrefs={{ report: reportHref }} catalog={catalog} />}
             catalog={catalog}
           />
         ) : null}
