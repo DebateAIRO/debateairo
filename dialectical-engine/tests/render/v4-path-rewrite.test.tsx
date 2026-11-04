@@ -308,8 +308,8 @@ describe("the verdict lines (draft 5.3, approved)", () => {
     });
 });
 
-describe("news (draft 5.5)", () => {
-  it("a rewrite that finishes while the person is here is news, told by name", async () => {
+describe("news (draft 5.5; V4 screen review 3 Nov 2026, dig-f3 / journey-f10: \"What your digs did\")", () => {
+  it("a rewrite that finishes while the person is here is news, told by name as a result", async () => {
     const runId = crypto.randomUUID();
     const writing: AnswerPathRewrites = { paths: [FOUR_STATES.paths[1]!], changed_since: { count: 0, since_report_version: null } };
     harness.answer = answerWith(runId, writing);
@@ -326,16 +326,16 @@ describe("news (draft 5.5)", () => {
     harness.digView = (link) => doneDig(link, ready);
     await advance(15_100);
     await settle();
-    const bar = page().querySelector<HTMLElement>(".v4DebChanges")!;
-    expect(bar.getAttribute("aria-label")).toBe(CATALOG["v4.changes.label"]);
-    expect(bar.querySelector(".v4DebChangesRewrites")!.textContent)
-      .toBe(word("v4.changes.digChanged", { line: "Renewables and storage alone: partly held; batteries cover hours." }));
-    // The tour stops at the path the dig rewrote.
-    await click(buttonNamed(CATALOG["v4.changes.show"]!));
+    const bar = page().querySelector<HTMLElement>(".v4DigsDid")!;
+    expect(bar.querySelector("h2")!.textContent).toBe(CATALOG["v4.digsDid.title"]);
+    expect(bar.querySelector(".v4DigsDidNews .v4DebChangesText")!.textContent)
+      .toBe(word("v4.digsDid.news.CHANGED", { line: "Renewables and storage alone: partly held; batteries cover hours." }));
+    // "See it" opens the path the dig rewrote.
+    await click(buttonNamed(CATALOG["v4.ready.seeIt"]!, bar));
     expect(panel().querySelector(".v4RewriteREWRITTEN")).not.toBeNull();
   });
 
-  it("a rewrite that finished since the last visit is news too; one that changed nothing says so", async () => {
+  it("a rewrite that finished since the last visit is news too; one that changed nothing says the path holds", async () => {
     const runId = crypto.randomUUID();
     const done: AnswerPathRewrites = { paths: [FOUR_STATES.paths[3]!], changed_since: { count: 0, since_report_version: null } };
     const writing: AnswerPathRewrites = { paths: [{ ...FOUR_STATES.paths[1]!, position_ref: "n-smr" }], changed_since: { count: 0, since_report_version: null } };
@@ -343,9 +343,9 @@ describe("news (draft 5.5)", () => {
     harness.lastVisit = { at: "2026-10-30T12:00:00.000Z", items: snapshotItems(before, []) };
     harness.answer = answerWith(runId, done);
     await mountMap(1600, runId);
-    const bar = page().querySelector<HTMLElement>(".v4DebChanges")!;
-    expect(bar.getAttribute("aria-label")).toBe(CATALOG["v4.changes.labelLastVisit"]);
-    expect(bar.querySelector(".v4DebChangesRewrites")!.textContent).toBe(word("v4.changes.digNoChange", { line: shortText(STORY_LINES["n-smr"]!, 80) }));
+    const news = page().querySelector<HTMLElement>(".v4DigsDidNews")!;
+    expect(news.querySelector(".v4DebChangesText")!.textContent)
+      .toBe(`${CATALOG["v4.changes.sinceLastVisit"]} ${word("v4.digsDid.news.HOLDS", { line: shortText(STORY_LINES["n-smr"]!, 80) })}`);
   });
 });
 

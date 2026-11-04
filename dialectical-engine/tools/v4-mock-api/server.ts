@@ -27,7 +27,9 @@ import {
   DraftRunStartedAtSchema, DraftUsageBorrowsSchema, splitAsk, splitRoomQuery, stripAnswer, stripNode, stripRoom,
   stripAnswerIndex, stripRun, stripUsage, type DraftAskParent
 } from "./web-draft.js";
-import { ARABIC_RUN, borrowNotice, DEEPEST_DIG, DIG_ANSWERS, DIG_RUNS, monthPause, PATH_REWRITES, reportVersionBody, RUN_PAUSED, SEEDED_NEW_DIGS } from "./rewrite-seed.js";
+import {
+  ARABIC_RUN, borrowNotice, DEEPEST_DIG, DIG_ANSWERS, DIG_RUNS, mainAnswerAt, monthPause, PATH_REWRITES, reportVersionBody, RUN_PAUSED, SEEDED_NEW_DIGS
+} from "./rewrite-seed.js";
 import type { WebCase } from "./web-seed.js";
 import { paymentRegionsOf } from "../../packages/kernel/src/payment-regions.js";
 import { BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, priceCurrencyFor } from "../../packages/register/src/billing-plans.js";
@@ -124,6 +126,8 @@ const HOST = "127.0.0.1";
 const RUN_SECONDS = seconds("MOCK_RUN_SECONDS", 25);
 const STORY_WRITING_SECONDS = seconds("MOCK_STORY_WRITING_SECONDS", 40);
 const POSTED_STORY_SECONDS = seconds("MOCK_POSTED_STORY_SECONDS", 10);
+/** dig-f1 (V4 screen review, 3 Nov 2026): how long the first debate's main answer is still being rewritten after the mock starts. */
+const MAIN_ANSWER_SECONDS = seconds("MOCK_MAIN_ANSWER_SECONDS", 45);
 const QUIET = process.env.MOCK_QUIET === "1";
 let roomMode: RoomMode = choice("MOCK_ROOM", process.env.MOCK_ROOM, ROOM_MODES, "FITS");
 let askMode: AskMode = choice("MOCK_ASK", process.env.MOCK_ASK, ASK_MODES, "AUTO");
@@ -251,6 +255,8 @@ type MockRun = {
   quotaUsed?: "NONE" | "SOME";
   /** Owner review 3 Nov: a dig paused under `dig=PAUSE` finishes its run time once Continue is pressed. */
   settlesAfterContinue?: boolean;
+  /** dig-f1: its main answer is still being rewritten until this moment, then has its newest version (rewrite-seed.ts mainAnswerAt). */
+  mainAnswerReadyAt?: number;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   answer?: any;
 };
@@ -263,6 +269,12 @@ function addRun(run: MockRun): MockRun {
   runs.set(run.runRef, run);
   if (run.answerId !== undefined) runsByAnswer.set(run.answerId, run);
   return run;
+}
+
+/** A run's answer as it stands now: dig-f1, the first debate's main answer is rewritten a little after the mock starts. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function answerNow(run: MockRun, now = Date.now()): any {
+  return run.mainAnswerReadyAt === undefined ? run.answer : { ...run.answer, main_answer: mainAnswerAt(now, run.mainAnswerReadyAt) };
 }
 
 function settledRun(input: Readonly<{
@@ -302,7 +314,7 @@ settledRun({
   runRef: RUN_SETTLED, answerId: ANSWER_SETTLED, seq: 2,
   question: "Should countries build new nuclear power, or put the money into renewables and storage?",
   askedAt: Date.parse("2026-10-27T15:12:00.000Z"), settleAt: Date.parse("2026-10-27T15:40:00.000Z"), storyReadyAt: 0, web: "PAID"
-});
+}).mainAnswerReadyAt = T0 + MAIN_ANSWER_SECONDS * 1000;
 addRun({ runRef: RUN_RUNNING, seq: 5, startedAt: T0 - 4 * 60_000, question: "Is a four-day work week good for productivity and for workers?" });
 addRun({ runRef: RUN_WAITING, seq: 3, waiting: true, question: "Should my town close the old centre to cars at weekends?" });
 addRun({
@@ -912,6 +924,11 @@ function startupCheck(): number {
     const problems = checkAnswerDraft(run.answer);
     if (problems.length > 0) throw new Error(`MOCK_SEED_INVALID: GET /v1/answers/${run.answerId} draft fields:\n${problems.join("\n")}`);
     check(`GET /v1/answers/${run.answerId}`, C.AnswerSchema, contractOrDraft(C.AnswerSchema, run.answer, stripAnswer).body);
+    if (run.mainAnswerReadyAt !== undefined) {
+      for (const at of [run.mainAnswerReadyAt - 1, run.mainAnswerReadyAt]) {
+        check(`GET /v1/answers/${run.answerId} (main answer at ${iso(at)})`, C.AnswerSchema, contractOrDraft(C.AnswerSchema, answerNow(run, at), stripAnswer).body);
+      }
+    }
     for (const status of ["WRITING", "READY", "READY_WITH_RESERVATION", "UNAVAILABLE"] as const) {
       check(`GET /v1/answers/${run.answerId}/story (${status})`, C.AnswerStorySchema, seed.story(run.answerId!, status, iso(T0)));
     }
@@ -1537,7 +1554,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const version = url.searchParams.get("version");
     if (version !== null && version !== "1") return notFound(req, res, "ANSWER_VERSION_NOT_FOUND", "Only version 1 exists.");
     const sub = parts.slice(3).join("/");
-    if (sub === "") return sendDraftable(run.answer, C.AnswerSchema, stripAnswer, checkAnswerDraft);
+    if (sub === "") return sendDraftable(answerNow(run), C.AnswerSchema, stripAnswer, checkAnswerDraft);
     if (sub === "story") return sendJson(req, res, 200, storyRead(run), C.AnswerStorySchema);
     if (sub === "map") return notFound(req, res, "MAP_VIEW_NOT_FOUND", "This debate has no map view (the debate-shape row was off).");
     if (sub === "disclosure") return sendJson(req, res, 200, seed.disclosure(run.answerId!), C.AnswerDisclosureSchema);
@@ -1665,7 +1682,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     }
     if (sub === "answer") {
       if (stateOf(run) !== "SETTLED" || run.answer === undefined) return notFound(req, res, "ANSWER_NOT_FOUND", "This run has no answer yet.");
-      return sendDraftable(run.answer, C.AnswerSchema, stripAnswer, checkAnswerDraft);
+      return sendDraftable(answerNow(run), C.AnswerSchema, stripAnswer, checkAnswerDraft);
     }
     if (sub === "last-visit") return sendJson(req, res, 200, lastVisits.get(run.runRef) ?? { seen_at: null, items: null }, C.LastVisitSchema);
     if (sub === "dig-links") return sendJson(req, res, 200, digLinksOf(run.runRef), C.DigLinksSchema);

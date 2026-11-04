@@ -6,6 +6,7 @@ import type { ReportMoment } from "@/lib/v4/mapLooks";
 import type { MoneyLine } from "@/lib/v4/money";
 import { levelHref } from "@/lib/v4/storage";
 import type { ReadingLevel } from "@/lib/v4/types";
+import { NewDot } from "./V4MapTree";
 
 /*
  * V4 initial (2026-10-28), D3 rail ("when"): the steps, the rounds, how many open questions could still change the
@@ -65,6 +66,11 @@ type RailProps = Readonly<{
   usageNotes?: readonly MoneyLine[];
   /** dig-f29: the report moment as the page works it out; absent: decision 8's first version (goodTimeForReport). */
   moment?: ReportMoment;
+  /**
+   * V4 screen review (3 Nov 2026), journey-f17: the report this page saw being written is ready and not opened yet; its
+   * step carries the "New" dot until it is.
+   */
+  reportReady?: boolean;
   catalog: MessageCatalog;
   locale: string;
 }>;
@@ -106,6 +112,7 @@ function Steps(props: Readonly<{ rail: RailProps; reportHref: string; marksOnly:
         <li className="v4DebRailStep">
           <span className="v4DebRailMark" aria-hidden="true">{mapStep + 1}</span>
           <Link className="v4Link" href={props.reportHref}>{t(catalog, "v4.rail.stepReport")}</Link>
+          {props.rail.reportReady === true ? <NewDot catalog={catalog} /> : null}
         </li>
       )}
     </ol>

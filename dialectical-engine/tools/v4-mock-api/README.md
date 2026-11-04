@@ -14,6 +14,8 @@ On 31 Oct 2026 (R22 decision 29) it gained dynamic step 2: `POST /v1/asks/clarif
 
 On 1 Nov 2026 (R22, for the owner's click-test) it gained the final report as the website reads it: `GET /v1/runs/:id/investigation` serves report versions (the older shape stays at `/__mock/draft/v1/runs/:id/investigation`), `POST /v1/runs/:id/report` ("Write my report": about 8 seconds of "being written", then finished; `report=FAIL` makes it fail) and `POST /v1/runs/:id/reopen` ("Keep digging"). So the current version's PDF can be made against the mock, once the browser has the sign-in cookie. And a debate in Arabic, `a2000000-0000-4000-8000-000000000001`: its question and report are in Arabic (the rest of its map is the English seed), so the page offers Print in place of the PDF.
 
+On 4 Nov 2026 (V4 screen review, dig-f1) the first debate gained its main answer, rewritten after its digs: version 1 while a change is still being written into it (45 seconds after the mock starts, `MOCK_MAIN_ANSWER_SECONDS`), then version 2.
+
 ## Files
 
 | File | What it is |
@@ -73,7 +75,7 @@ All the answers carry the same English debate: *"Should countries build new nucl
 
 | Run id | What you see | Web case | Investigation |
 |---|---|---|---|
-| `11111111-1111-4111-8111-111111111111` | **Finished**, the nuclear question, story ready. Answer id `aaaa1111-…`. | paid, searched | **open** (reopened by its dig 8888; report version 1 kept as an earlier version) |
+| `11111111-1111-4111-8111-111111111111` | **Finished**, the nuclear question, story ready. Answer id `aaaa1111-…`. Its main answer (rewritten after its digs) is still being rewritten for the first 45 seconds, then shows version 2: the map shows it without a reload, as news at the question. | paid, searched | **open** (reopened by its dig 8888; report version 1 kept as an earlier version) |
 | `22222222-2222-4222-8222-222222222222` | **Running forever** ("Is a four-day work week good for productivity and for workers?"). | – | open |
 | `33333333-3333-4333-8333-333333333333` | **Waiting in line**. It is expected to start 20 minutes after the mock started. | – | open |
 | `44444444-4444-4444-8444-444444444444` | **Failed** with `RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM` (the website's "the AI models it needs were unavailable" sentence). Its draft view says `quota_used: "NONE"` (owner review 3 Nov). Its page offers "Ask this again", which opens `/v4?again=4444…` with the question filled in. | – | none |
@@ -182,6 +184,7 @@ Set these when starting the mock, or change them live by opening `http://127.0.0
 | `MOCK_RUN_SECONDS` | default `25` | How long a new debate "runs". |
 | `MOCK_STORY_WRITING_SECONDS` | default `40` | How long run 5555's story says "still writing". |
 | `MOCK_POSTED_STORY_SECONDS` | default `10` | How long a new debate's story says "still writing" after it finishes. |
+| `MOCK_MAIN_ANSWER_SECONDS` | default `45` | How long run 1111's main answer says a change is still being written into it, before version 2 shows. |
 | `MOCK_QUIET=1` | | Hides the per-request lines. |
 | `MOCK_ENGINE_DIR` | path | Where `dialectical-engine` is. Not needed when the mock runs from this folder. |
 

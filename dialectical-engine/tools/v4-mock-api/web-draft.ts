@@ -182,7 +182,8 @@ export function stripNode<T extends Json>(node: T): T {
 }
 
 export function stripAnswer<T extends Json>(answer: T): T {
-  const { web: _web, path_rewrites: _rewrites, dig: _dig, ...rest } = answer;
+  // dig-f1 (V4 screen review, 3 Nov 2026): the first debate's main answer (decision 3 of 31 Oct) is held back too.
+  const { web: _web, path_rewrites: _rewrites, dig: _dig, main_answer: _main, ...rest } = answer;
   const nodes = Array.isArray(rest.nodes) ? (rest.nodes as Json[]).map(stripNode) : rest.nodes;
   return { ...rest, nodes } as unknown as T;
 }
