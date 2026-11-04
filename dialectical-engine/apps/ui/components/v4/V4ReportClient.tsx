@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import type { Answer, AnswerStory, DigLinks, InvestigationReports, InvestigationReportVersion } from "@debateai/contract";
 import { AuthGate } from "@/components/AuthGate";
 import { V4ReportDigWait } from "@/components/v4/V4DigUndo";
+import { V4PublicMarkFor } from "@/components/v4/V4PublicMark";
 import { V4ReportHeader, type ReportShareItem } from "@/components/v4/V4ReportHeader";
 import { V4OtherPages, V4SearchNote, V4SourceList, V4WebNoteLine } from "@/components/v4/V4Sources";
 import { V4TrustBar } from "@/components/v4/V4TrustBar";
@@ -637,6 +638,8 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
             <span {...ai}>{ownQuestion}</span>
           </h1>
         </header>
+        {/* journey-f20: a debate with a public page says so under its question, with its link (not on paper). */}
+        <V4PublicMarkFor runId={elsewhere ? null : load.runId} catalog={catalog} />
 
         {/* dig-d3 A, ruling F7: a dig still in its 10 seconds (pressed on the map just before) is waited for. */}
         <V4ReportDigWait runId={load.runId} catalog={catalog} />

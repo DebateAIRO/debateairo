@@ -47,6 +47,11 @@ export type V4DigChoice = Readonly<{
    * page while the person moves between questions. Left out: they last only while this part is on screen, as before.
    */
   typed?: TypedWords;
+  /**
+   * journey-f20: what the person types here goes on the debate's public page: one grey line under the own-view box
+   * ("This will be public."). Left out: a private debate (or one whose state the page does not know).
+   */
+  publicLine?: string;
 }>;
 
 /** On the tree and the outline, at most this many suggestions per path; the panel lists them all. */
@@ -268,6 +273,7 @@ function OwnView(props: Readonly<{ path: V4Path; choice: V4DigChoice; catalog: M
         rows={3}
         onChange={(event) => setText(event.target.value)}
       />
+      {choice.publicLine === undefined ? null : <p className="v4PanelHint v4Muted" data-public-will-be>{choice.publicLine}</p>}
       {problem !== null ? <p className="v4SugProblem" role="alert">{refusalLine(problem, choice.planTier, catalog)}</p> : null}
       <div className="v4SugEditorActions">
         <button type="button" className="v4Btn" onClick={add}>{t(catalog, "v4.suggest.ownViewAdd")}</button>

@@ -30,6 +30,8 @@ import { V4PicksClearedNote } from "@/components/v4/V4PicksClearedNote";
 import { digFor, digsUnder, openCount, pathTitle, resolveSelection, selectionIdOf, TitleText, V4MapTree } from "@/components/v4/V4MapTree";
 import { V4Outline } from "@/components/v4/V4Outline";
 import { V4Panel } from "@/components/v4/V4Panel";
+import { V4PublicMark } from "@/components/v4/V4PublicMark";
+import { typedGoesPublic, usePublicStage } from "@/lib/v4/publicState";
 import type { V4ResearchedPress } from "@/components/v4/V4Sources";
 import { V4ChangedSince } from "@/components/v4/V4PathRewrite";
 import { V4AnswerCard, type V4ReportAnswer } from "@/components/v4/V4AnswerCard";
@@ -908,6 +910,13 @@ function V4Debate({
     };
   }, [trailKey]);
 
+  // public-f26 / journey-f20 (lib/v4/publicState.ts): the public state of the debate this map belongs to (the top one, under
+  // a dig), for the globe line under the question and "This will be public." where the person types. Not on a dig made from
+  // someone else's public page (its own note says what became of it).
+  const publicStage = usePublicStage(served === null || served.answer.contribution !== undefined ? null
+    : isDigMap ? (trail?.complete === true ? trail.steps[0]?.runId ?? null : null) : servedRunId, answerVersion);
+  const publicLine = typedGoesPublic(publicStage) ? t(catalog, "v4.publicMark.willBePublic") : null;
+
   // ── The report's answer (R22 W5-1, owner Q-D11), and its ready moment (journey-f17) ─────────────────────────────
   const isDig = servedDig !== null;
   const reportReady = useRef<() => void>(() => undefined);
@@ -995,9 +1004,10 @@ function V4Debate({
       },
       onRemovePick: (key: string) => commitDraft(removePick(draftRef.current, key)),
       onClear: clearPicks,
-      typed
+      typed,
+      ...(publicLine === null ? {} : { publicLine })
     };
-  }, [map, draft, planTier, canDig, isDigMap, digs, commitDraft, clearPicks, typed]);
+  }, [map, draft, planTier, canDig, isDigMap, digs, commitDraft, clearPicks, typed, publicLine]);
   // dig-d3: the digs still in their 10 seconds, on any V4 page (lib/v4/digUndo.ts, memory only).
   const waitingDigs = useDigUndo();
   const trayTarget = map === null || !canDig ? null : draftTarget(draft, map.paths);
@@ -1598,6 +1608,7 @@ function V4Debate({
         {planTier === "free" ? <>{" "}{t(catalog, "v4.suggest.freeCap", { count: picksMax("free") })}</> : null}
       </p>
       <V4MoneyLines lines={money} catalog={catalog} />
+      {publicLine === null ? null : <p className="v4DebTrayPublic">{t(catalog, "v4.publicMark.addsToPublic")}</p>}
       <div className="v4DebTrayActions">
         {withDig ? (
           <button
@@ -1678,6 +1689,7 @@ function V4Debate({
           {map.dig !== null && map.dig !== undefined ? (
             <V4LevelTrail level={map.dig.level} trail={trail} linkLevel={chosenLevel} catalog={catalog} />
           ) : null}
+          <V4PublicMark stage={publicStage} catalog={catalog} />
           <V4ContributionNote contribution={served?.answer.contribution} catalog={catalog} />
           {answerCard}
           {/* dig-f19 / map-f17: once a report exists and the map moved on, the paths it does not have yet, named. */}
