@@ -45,3 +45,30 @@
   border-radius: var(--r-pill); border: 1px solid var(--line-strong); background: var(--surface-2);
   font-size: var(--t-ui); overflow-wrap: anywhere;
 }
+
+/* Owner's screen review, 3 Nov 2026 (dig-d1 B, dig-f32): a running dig's own panel (components/v4/V4DigRunning.tsx): the
+   waiting card inline, the steps the server reports, "Checked so far" and "This path says now". Logical properties only, so
+   the steps run right to left in Arabic and wrap into two rows on a phone. Motion: a finding that arrives while the panel is
+   open flies in (the shared v4FlyIn and --v4-move-fly, v4-map-looks.css and v4-base.css) with the 1-second highlight; under
+   reduced motion the fly is instant (the token is 0.01ms) and the highlight stays. No other move. */
+.v4DigLive { display: flex; flex-direction: column; gap: 14px; min-width: 0; margin-block-end: 8px; }
+.v4DigSteps { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; font-size: var(--t-ui); }
+.v4DigStep { display: inline-flex; align-items: center; gap: 4px; color: var(--text-2); border-radius: var(--r-btn); padding-inline: 4px; }
+.v4DigStep + .v4DigStep::before { content: "›"; color: var(--text-3); padding-inline: 2px 6px; }
+.v4DigStep:dir(rtl) + .v4DigStep:dir(rtl)::before { content: "‹"; }
+.v4DigStep-DONE { color: var(--text); }
+.v4DigStep-NOW { color: var(--text-strong); font-weight: 700; }
+.v4DigStepTick { color: var(--accent); font-weight: 700; }
+.v4DigFound { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.v4DigFound .v4PanelH3 { margin: 0; }
+.v4DigFindings { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.v4DigFinding {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 10px 12px; min-width: 0;
+  border: 1px solid var(--line-2); border-radius: var(--r-card); background: var(--surface);
+}
+.v4DigFindingText { margin: 0; overflow-wrap: anywhere; unicode-bidi: plaintext; }
+.v4DigFindingNew {
+  animation: v4FlyIn var(--v4-move-fly) var(--v4-ease-move) 1, v4Highlight var(--v4-highlight-time) ease-out 1;
+}
+.v4DigPathNow > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 600; }
+.v4DigPathNow > p { margin: 0; overflow-wrap: anywhere; }

@@ -203,7 +203,11 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.investigation.checkAgain",
   "v4.investigation.writeAgain",
   "v4.investigation.digMore",
-  "v4.web.freeOnPaper"
+  "v4.web.freeOnPaper",
+  // The owner's screen review of 3 Nov (dig-d1 B): the two words a running dig's steps need that the record does not give,
+  // the list's name for screen readers and the hidden word after a step that is done.
+  "v4.digLive.stepsLabel",
+  "v4.digLive.stepDone"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {
