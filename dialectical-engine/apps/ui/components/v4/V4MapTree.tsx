@@ -21,6 +21,7 @@ import { useMapKeys } from "@/lib/v4/useMapKeys";
 import type { DigView, V4Map, V4OpenQuestion, V4Path, V4Selection } from "@/lib/v4/types";
 import type { PickRefusal } from "@/lib/v4/suggestions";
 import { DigHereTooLeaf, refusalLine, SuggestionLeaves, type V4DigChoice } from "./V4DigSuggest";
+import { V4DigSeedLeaves } from "./V4DigSeed";
 import { V4RewriteCardNote } from "./V4PathRewrite";
 import { V4TrustBar } from "./V4TrustBar";
 
@@ -657,6 +658,8 @@ function Leaves(props: Readonly<{
           </li>
         ))}
       {extra}
+      {/* dig-d3 B: a dig still in its 10 seconds grows a dashed "Your dig · … · starting" card here (V4DigSeed.tsx). */}
+      <V4DigSeedLeaves runId={pieces.map.runId} groupKey={plan.key} catalog={pieces.catalog} />
       {toggle ? (
         <li className="v4MapLeaf v4MapLeafMore">
           <button

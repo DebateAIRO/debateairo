@@ -362,7 +362,8 @@ const NO_WAIT = "You don't need to wait. You can dig or write your report now.";
 const REVIEW_LINES: Readonly<Record<string, string>> = Object.freeze({
   "v4.ask.continue": "Next",
   "v4.suggest.edit": "Change the wording",
-  "v4.dig.started": "Started. It's open now.",
+  // dig-f10 (the undo-bottom track): the person stays where they are; the note says when it started, with its own [See it].
+  "v4.dig.started": "Started {time} · You can leave this page.",
   "v4.debate.state.HOLDING": "Taking a short break · continues about {time}",
   "v4.debate.state.HOLDING.noTime": "Taking a short break",
   // map-f16: the approved N14 sentence (the report's own), then r2-11 A's line.

@@ -136,7 +136,8 @@ describe("a dig that did not finish (wait-f18, dig-f12)", () => {
     expect(panel().textContent).not.toContain(CATALOG["v4.digFailed.nothingTaken"]);
     // The page's own switch says Quick; the failed dig was Thorough, and is tried again as it was.
     await click(buttonNamed(CATALOG["v4.digFailed.retry"]!, panel()));
-    expect(page().querySelector(".v4DebToast")!.textContent).toContain(CATALOG["v4.dig.undo"]);
+    // The shared dig Undo note (the undo-bottom track's V4UndoNote, journey-f21): the same note as any dig.
+    expect(page().querySelector(".v4Undo-counting")!.textContent).toContain(CATALOG["v4.dig.undo"]);
     await advance(9_500);
     expect(harness.submit).not.toHaveBeenCalled();
     await advance(600);

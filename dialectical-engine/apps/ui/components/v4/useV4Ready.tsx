@@ -115,7 +115,7 @@ export function useV4Ready(input: V4ReadyInput): V4Ready {
     const targets: Element[] = [];
     const card = document.querySelector(".v4DebMapCol [aria-current='true']");
     const heading = document.querySelector(".v4PanelH2");
-    const main = flash.stop === "root" ? document.querySelector(".v4MainAnswer") : null;
+    const main = flash.stop === "root" ? document.querySelector(".v4AnswerCard") : null;
     for (const target of [main, card, heading]) {
       if (target === null) continue;
       targets.push(target);

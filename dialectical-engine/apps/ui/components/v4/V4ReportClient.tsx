@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Answer, AnswerStory, DigLinks, InvestigationReports, InvestigationReportVersion } from "@debateai/contract";
 import { AuthGate } from "@/components/AuthGate";
+import { V4ReportDigWait } from "@/components/v4/V4DigUndo";
 import { V4ReportHeader, type ReportShareItem } from "@/components/v4/V4ReportHeader";
 import { V4OtherPages, V4SearchNote, V4SourceList, V4WebNoteLine } from "@/components/v4/V4Sources";
 import { V4TrustBar } from "@/components/v4/V4TrustBar";
@@ -18,6 +19,7 @@ import {
 } from "@/lib/v4/load";
 import { buildV4Map } from "@/lib/v4/mapModel";
 import { mergeDigLinks, readDigRecords } from "@/lib/v4/accountMemory";
+import { waitForDigs } from "@/lib/v4/digUndo";
 import { levelHref, useReadingLevel } from "@/lib/v4/storage";
 import {
   basisKey, TRUST_WORDS, type DigLink, type DigView, type ReadingLevel, type TrustCounts, type TrustWord, type V4Map, type V4Path, type V4WebNote
@@ -636,6 +638,8 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
           </h1>
         </header>
 
+        {/* dig-d3 A, ruling F7: a dig still in its 10 seconds (pressed on the map just before) is waited for. */}
+        <V4ReportDigWait runId={load.runId} catalog={catalog} />
         <ReportArea
           runId={load.runId}
           investigation={investigation}
@@ -963,6 +967,10 @@ function ReportArea({ runId, investigation, runningDig, webNote, pdfRefused, map
   const press = async (kind: PressKind): Promise<void> => {
     setBusy(true);
     setNote(null);
+    // dig-d3 A, ruling F7: "Your report will wait for it." A dig still in its 10 seconds is not on the server yet, so the
+    // report is asked for only once it has been sent (or undone).
+    if (kind === "write") await waitForDigs(runId);
+    if (!alive.current) return;
     const result = kind === "write" ? await writeReport(runId) : await reopenInvestigation(runId);
     if (!alive.current) return;
     if (result.kind === "FAILED") {

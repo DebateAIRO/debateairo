@@ -289,10 +289,10 @@ describe("a dig finishing while the person is here (dig-f3, journey-f10, journey
     harness.digView = (link) => doneDig(link, link.childRunId === DIG_A ? readyA : readyB);
     await advance(15_100);
     await settle(200);
-    // The note sits in the dock, above the pinned bar.
-    const dock = page().querySelector<HTMLElement>(".v4DebDockPhone")!;
+    // The note sits in the phone's one bottom stack (the undo-bottom track's V4BottomStack), above the pinned bar.
+    const dock = page().querySelector<HTMLElement>(".v4StackPhone")!;
     expect(dock.contains(note())).toBe(true);
-    expect(dock.firstElementChild).toBe(note());
+    expect(note()!.closest(".v4StackTop")).not.toBeNull();
     await click(buttonNamed(CATALOG["v4.ready.showMe"]!, noticeNews()!));
     const bar = tourBar()!;
     expect(dock.contains(bar)).toBe(true);

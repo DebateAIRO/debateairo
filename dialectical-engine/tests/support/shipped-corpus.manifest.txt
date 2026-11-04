@@ -696,13 +696,15 @@ apps/ui/components/v4/V4AllMaps.tsx
 apps/ui/components/v4/V4AnswerCard.tsx
 apps/ui/components/v4/V4AskClient.tsx
 apps/ui/components/v4/V4AskGate.tsx
+apps/ui/components/v4/V4BottomStack.tsx
 apps/ui/components/v4/V4ChangesBar.tsx
 apps/ui/components/v4/V4ChoiceChips.tsx
 apps/ui/components/v4/V4ContributionNote.tsx
 apps/ui/components/v4/V4DebateClient.tsx
 apps/ui/components/v4/V4DigFailed.tsx
+apps/ui/components/v4/V4DigSeed.tsx
 apps/ui/components/v4/V4DigSuggest.tsx
-apps/ui/components/v4/V4DigToast.tsx
+apps/ui/components/v4/V4DigUndo.tsx
 apps/ui/components/v4/V4FailedScreen.tsx
 apps/ui/components/v4/V4Header.tsx
 apps/ui/components/v4/V4LeaveQuestion.tsx
@@ -729,6 +731,7 @@ apps/ui/components/v4/V4ReportHeader.tsx
 apps/ui/components/v4/V4Sources.tsx
 apps/ui/components/v4/V4TourBar.tsx
 apps/ui/components/v4/V4TrustBar.tsx
+apps/ui/components/v4/V4UndoNote.tsx
 apps/ui/components/v4/V4WaitCard.tsx
 apps/ui/components/v4/useV4Ready.tsx
 apps/ui/content-security-policy.d.mts
@@ -957,6 +960,7 @@ apps/ui/lib/v4/askText.ts
 apps/ui/lib/v4/changes.ts
 apps/ui/lib/v4/digIndex.ts
 apps/ui/lib/v4/digRetry.ts
+apps/ui/lib/v4/digUndo.ts
 apps/ui/lib/v4/failedRun.ts
 apps/ui/lib/v4/load.ts
 apps/ui/lib/v4/mapLooks.ts

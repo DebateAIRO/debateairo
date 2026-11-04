@@ -65,17 +65,9 @@
 .v4DebLayout-desktop .v4DebPanelCol, .v4DebLayout-mid .v4DebPanelCol {
   position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; overscroll-behavior: contain;
 }
-/* UI-9: a desktop/mid tray floats over the bottom of the screen; leave room so the panel's end (the Dig button and the
-   room note) can scroll above it. */
-.v4DebHasTray:not(.v4DebLayout-phone) .v4DebPanelCol { padding-bottom: 96px; }
-.v4DebHasTray:not(.v4DebLayout-phone) .v4DebMain { padding-bottom: calc(110px + var(--safe-b)); }
-
-/* UI-1: the pinned phone bar (and the tray above it) must not hide the end of the page, the site footer or the cookie
-   bar. This page only: the shell gets room at the bottom and the cookie bar sits above the dock. */
-.appShell:has(.v4DebLayout-phone) { padding-bottom: calc(66px + var(--safe-b)); }
-.appShell:has(.v4DebLayout-phone.v4DebHasTray) { padding-bottom: calc(150px + var(--safe-b)); }
-.appShell:has(.v4DebLayout-phone) .consentBar { bottom: calc(78px + var(--safe-b)); }
-.appShell:has(.v4DebLayout-phone.v4DebHasTray) .consentBar { bottom: calc(162px + var(--safe-b)); }
+/* UI-1 / UI-9, dig-f16 (owner picks 3 Nov): the bottom stack (V4BottomStack.tsx: notes, tray, and the phone's pinned bar)
+   measures itself, and the page's bottom room is its real height (--v4-stack-room), so neither the panel's end nor the site
+   footer hides behind it. The rules live in v4-undo.css with the stack's own. */
 .appShell:has(.v4DebSheetOpen) { padding-bottom: 0; }
 
 /* ---------- the rail (when) ---------- */
@@ -122,21 +114,12 @@
 .v4DebRail-strip .v4DebRailOpenCount { font-size: 20px; }
 .v4DebRail-strip .v4DebRailGoodTime { flex-direction: row; flex-wrap: wrap; align-items: center; padding: 6px 10px; }
 
-/* ---------- the dock: the tray and the phone bar ---------- */
-.v4DebDock {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; pointer-events: none;
-  display: flex; flex-direction: column; align-items: center; gap: 8px;
-  padding: 0 var(--v4-gutter) calc(16px + var(--safe-b));
-}
-.v4DebDock > * { pointer-events: auto; }
-.v4DebDock:empty { display: none; }
-.v4DebDockPhone { padding-bottom: 0; gap: 0; padding-left: 0; padding-right: 0; }
+/* ---------- the tray and the phone bar (placed by the bottom stack, v4-undo.css) ---------- */
 .v4DebTray {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px;
   width: 100%; max-width: 640px; padding: 10px 14px; border-radius: var(--r-card);
   background: var(--surface); border: 1px solid var(--line-strong); box-shadow: var(--shadow-pop);
 }
-.v4DebDockPhone .v4DebTray { max-width: none; border-radius: var(--r-card) var(--r-card) 0 0; box-shadow: none; border-bottom: 0; }
 .v4DebTrayText { margin: 0; min-width: 0; }
 .v4DebTrayActions { display: flex; align-items: center; gap: 14px; }
 .v4DebTrayClear { min-height: 44px; }
@@ -174,16 +157,7 @@
   max-width: none; border-radius: 0; box-shadow: none; border-width: 1px 0 0;
 }
 
-/* ---------- the dig note ---------- */
-.v4DebToast { flex-wrap: wrap; }
-.v4DebToastText { min-width: 0; overflow-wrap: anywhere; }
-.v4DebToastMode { color: var(--gold-bg); }
-.v4DebToastLifted { bottom: calc(150px + var(--safe-b)); }
-/* The phone bar is hidden while the map is open; the note then sits just above the sheet's tray. */
-.v4DebSheetOpen .v4DebToastLifted { bottom: calc(96px + var(--safe-b)); }
-@media (min-width: 768px) {
-  .v4DebToastLifted { bottom: calc(96px + var(--safe-b)); }
-}
+/* The dig note is the shared Undo note (V4UndoNote.tsx), styled in v4-undo.css. */
 
 /* Perplexity plan W3-4: the tray's one-path line and money lines, the deepest-level note, the month pause with Continue,
    and the rail's borrow notice. No fixed widths; text wraps at 375px. */
@@ -306,7 +280,8 @@
   display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; width: max-content; max-width: min(560px, 100%);
   background: var(--ink); color: var(--surface); border-radius: var(--r-btn); padding: 6px 8px 6px 16px; box-shadow: var(--shadow-pop);
 }
-.v4DebDockPhone .v4ReadyNote { margin: 0 var(--v4-gutter) 8px; max-width: calc(100% - 2 * var(--v4-gutter)); }
+/* journey-d3: on a phone the note sits in the bottom stack, above the pinned bar (V4BottomStack). */
+.v4StackPhone .v4ReadyNote { width: 100%; max-width: none; box-shadow: none; }
 .v4DebSheetFoot .v4ReadyNote { margin: 8px var(--v4-gutter); }
 .v4ReadyNoteText { min-width: 0; flex: 1 1 200px; overflow-wrap: anywhere; }
 .v4ReadyNoteAct {
@@ -330,7 +305,7 @@
 }
 /* On a computer it sits under the where-you-are line and stays there while the panel scrolls. */
 .v4Panel .v4TourBar { position: sticky; top: 0; z-index: 2; margin: 6px 0; }
-.v4DebDockPhone .v4TourBar { width: 100%; border-radius: var(--r-card) var(--r-card) 0 0; border-bottom: 0; padding: 8px var(--v4-gutter); }
+.v4StackPhone .v4TourBar { flex: none; width: 100%; border-radius: var(--r-card) var(--r-card) 0 0; border-bottom: 0; padding: 8px var(--v4-gutter); }
 
 .v4PanelSince { margin: 4px 0 6px; font-size: var(--t-ui); font-weight: 600; color: var(--text); }
 .v4PanelFullAnswer { margin-top: 8px; font-size: var(--t-ui); }

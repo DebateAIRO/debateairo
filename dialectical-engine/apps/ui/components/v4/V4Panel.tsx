@@ -92,6 +92,14 @@ type PanelProps = Readonly<{
   showDigModes?: boolean;
   onDig: (target: DigTarget) => void;
   digBusy: boolean;
+  /**
+   * dig-d3 / dig-f8: the line for a dig of this place still in its 10 seconds ("Your dig starts in a few seconds. You can
+   * still undo it. [Undo]"), or null when none waits there. While it shows, this place's dig button does nothing more.
+   * Absent: as before.
+   */
+  digStarting?: (target: DigTarget) => ReactNode | null;
+  /** dig-d3 B (phone): a path's starting line sits under the path's text, at the top of its screen, not by the button. */
+  digStartingAtTop?: boolean;
   roomNotice?: ReactNode;
   /** W4-4: "Add to researched" on one of a path's other pages; absent where it is not offered (Free, new starts waiting for a reset). */
   onAddResearched?: (pathId: string, pageRef: string) => void;
@@ -383,13 +391,15 @@ function SkipToDig(props: Readonly<{ targetId: string; catalog: MessageCatalog }
  * exists (and on every path of a dig's own map); the person's picks name how many they are; the money lines before the
  * dig; at the deepest level the "deepest level" line instead of all of it.
  */
-function DigBlock(props: Readonly<{ target: DigTarget; panel: PanelProps; again?: boolean; id?: string }>) {
+function DigBlock(props: Readonly<{ target: DigTarget; panel: PanelProps; again?: boolean; id?: string; startingAbove?: boolean }>) {
   const { panel } = props;
   if (panel.choice !== undefined && !panel.choice.canDig) return <DeepestLine catalog={panel.catalog} />;
   // Several picks: "Dig into {count} together" (today's tray words); one, or a whole path: as before, or "Dig here too".
   const label = props.target.kind === "picks" && props.target.picks.length >= 2
     ? tPlural(panel.catalog, "v4.dig.trayDig", props.target.picks.length, panel.locale)
     : t(panel.catalog, props.again === true ? "v4.nest.digHereToo" : "v4.panel.dig");
+  // dig-f7: a place whose dig waits keeps its button focusable (aria-disabled), so focus can come back to it after Undo.
+  const starting = panel.digStarting?.(props.target) ?? null;
   return (
     // dig-f24: `id` is where "Skip to the dig button" lands (the block itself takes focus only when its button cannot).
     <section className="v4PanelDig" {...(props.id === undefined ? {} : { id: props.id, tabIndex: -1 })}>
@@ -415,11 +425,16 @@ function DigBlock(props: Readonly<{ target: DigTarget; panel: PanelProps; again?
         type="button"
         className="v4Btn v4BtnPrimary v4PanelDigBtn"
         disabled={panel.digBusy}
-        onClick={() => panel.onDig(props.target)}
+        aria-disabled={starting !== null ? "true" : undefined}
+        onClick={() => {
+          if (starting === null) panel.onDig(props.target);
+        }}
       >
         {label}
       </button>
-      {panel.digBusy ? <p className="v4PanelHint v4Muted">{t(panel.catalog, "v4.panel.digBusy")}</p> : null}
+      {starting !== null
+        ? (props.startingAbove === true ? null : starting)
+        : panel.digBusy ? <p className="v4PanelHint v4Muted">{t(panel.catalog, "v4.panel.digBusy")}</p> : null}
       <V4MoneyLines lines={panel.money ?? []} catalog={panel.catalog} />
       {panel.roomNotice ?? null}
     </section>
@@ -579,10 +594,12 @@ function PathBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolve
   // nothing can be dug, so the plain "nothing is left" line.
   const emptyKey = suggestions.length > 0 ? null : panel.choice?.canDig === false ? "v4.panel.noOpenRoot" : "v4.panel.noOpenPath";
   const skip = suggestions.length >= SKIP_TO_DIG_FROM;
+  const startingTop = panel.digStartingAtTop === true ? panel.digStarting?.(pathTarget(path, panel)) ?? null : null;
   return (
     <>
       <Section title={t(panel.catalog, "v4.panel.answerHere")}>
         <AnswerSoFar line={more ? line : null} catalog={panel.catalog} />
+        {startingTop}
       </Section>
       <V4PathRewrite
         path={path}
@@ -624,6 +641,7 @@ function PathBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolve
         panel={panel}
         again={panel.choice?.digHereToo(path.id) === true}
         {...(skip ? { id: digId } : {})}
+        startingAbove={startingTop !== null}
       />
     </>
   );
@@ -740,7 +758,7 @@ function WaitingLine(props: Readonly<{ startedAt: string | null; catalog: Messag
     const timer = window.setTimeout(() => setWaited(true), waitLeft(startedAt, Date.now()));
     return () => window.clearTimeout(timer);
   }, [waited, startedAt]);
-  return <>{t(props.catalog, waited ? "v4.panel.digState.WAITING" : "v4.panel.digStarting")}</>;
+  return <>{t(props.catalog, waited ? "v4.panel.digState.WAITING" : "v4.undo.sendingDig")}</>;
 }
 
 function DigBody(props: Readonly<{ panel: PanelProps; resolved: Extract<ResolvedSelection, { kind: "dig" }> }>) {
@@ -770,7 +788,7 @@ function DigBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolved
         {pause !== null ? (
           <>
             <V4MonthPause runId={dig.link.childRunId} pause={pause} catalog={panel.catalog} locale={panel.locale} className="v4PanelPause" />
-            {dig.link.mode !== null ? <p className="v4PanelText"><span className="v4PanelModeTag">{t(panel.catalog, `v4.digMode.${dig.link.mode}`)}</span></p> : null}
+            {dig.link.mode !== null && panel.showDigModes !== false ? <p className="v4PanelText"><span className="v4PanelModeTag">{t(panel.catalog, `v4.digMode.${dig.link.mode}`)}</span></p> : null}
           </>
         ) : (
           <p className="v4PanelText">
@@ -780,7 +798,8 @@ function DigBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolved
               : dig.state === "WAITING"
                 ? <WaitingLine key={dig.link.childRunId} startedAt={dig.link.startedAt} catalog={panel.catalog} />
                 : t(panel.catalog, `v4.panel.digState.${dig.state}`)}
-            {dig.link.mode !== null
+            {/* dig-f8: Free has no Quick look / Thorough choice, so its digs carry no mode word. */}
+            {dig.link.mode !== null && panel.showDigModes !== false
               ? <> <span className="v4PanelModeTag">{t(panel.catalog, `v4.digMode.${dig.link.mode}`)}</span></>
               : null}
           </p>
