@@ -118,6 +118,7 @@ The shapes are task W1-6's (`packages/contract/src/web.ts`). W1-6 merged (`76e93
 | `POST /v1/asks` | `parent` | a dig names its parent run, the places it was dug from, its mode, and its picks (suggestions as sent, edited or not, and the person's own view) |
 | `GET /v1/runs/:id/investigation` | (new route; W1-6 names no route yet) | the investigation the run belongs to: state `OPEN`/`CLOSED`, its digs (the 0131 link records), and every closing with its report version |
 | `POST /v1/runs/:id/investigation/close` | (new route) | "Write my report": closes it and adds a report version |
+| `GET /v1/answers` (each row) | `started_at`, `map_bar`, `changed_since_visit`, `dug_from` | the ask page's "Your maps" (owner's screen review, 3 Nov 2026): when an open question started ("Being looked into, started 14:00"), an answer's four-shade bar (`sure`, `sure_for_case`, `still_argued`, `didnt_hold`), whether its map changed since the person last opened it (here: no last visit recorded yet; the "New" dot), and the debate a dig was dug from (null for a first question). **The contract's rows are strict and do not name these yet, so the website never receives them**: the page shows the calm fallback (no time, no bar, no dot, and it reads each row's dig links). See them at `/__mock/draft/v1/answers?limit=50&offset=0`. |
 
 How they are sent:
 
@@ -197,7 +198,7 @@ A wrong value stops the start with a clear message, for example `MOCK_ROOM_INVAL
 | `POST /v1/asks` | See above. |
 | `GET /v1/billing/usage` | Day 14%, week 31%, month 9%; with `usage=BORROWED`, day 104% with a borrow notice. |
 | `GET /v1/billing/plans` | The register's default plans (Free, Plus $20, Pro $50, Max $200). With no `?country=` there is no place yet, so no paid price is shown (the page asks for the country). With `?country=` the plans come in that country's currency (lei in Romania, euro in the euro countries, dollars elsewhere, as the register says) and each total includes its tax: each EU country's standard VAT (21% in Romania, 19% in Germany, 21% in the Czech Republic, 25% in Croatia, and so on), none added outside the EU. The US and Canada also need `?postal_code=` (a Texas ZIP such as 75201 adds 6.25%); a missing one, or one that does not fit the country's format (the kernel's own check), is asked for again. |
-| `GET /v1/answers?limit=&offset=` | Finished debates, plus the open runs (running, waiting, failed). |
+| `GET /v1/answers?limit=&offset=` | Finished debates, plus the open runs (running, waiting, failed). Draft: the shelf's row parts (see "Draft fields"). |
 | `GET /v1/answers/:id[?version=1]` | The answer (version 1 only). Draft: sources and path research. |
 | `GET /v1/answers/:id/story` | WRITING or READY, as described above. |
 | `GET /v1/answers/:id/map` | 404, as for a debate made without the debate-shape setting. The website treats this as "no map view". |

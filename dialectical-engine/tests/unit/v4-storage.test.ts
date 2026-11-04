@@ -47,7 +47,9 @@ describe("no browser storage (Decision A, S01-R17)", () => {
       // Perplexity plan W3-4: choosing what to dig and the money lines keep nothing in the browser either.
       "suggestions.ts", "money.ts",
       // Dig model revision W4-6: the rewrites, the dig trail and the news of a finished rewrite keep nothing in the browser.
-      "mapModel.ts", "changes.ts", "load.ts", "types.ts"]) {
+      "mapModel.ts", "changes.ts", "load.ts", "types.ts",
+      // The owner's screen review (3 Nov): the "Your maps" shelf keeps its dig links in memory only.
+      "mapShelf.ts"]) {
       const source = readFileSync(resolve(here, "../../apps/ui/lib/v4", file), "utf8");
       expect(source, file).not.toMatch(/\.setItem\(|localStorage|sessionStorage|document\.cookie/);
     }
@@ -58,7 +60,9 @@ describe("no browser storage (Decision A, S01-R17)", () => {
       // W4-6: a path's rewrites, the top of the map, a dig's trail and the news bar.
       "V4PathRewrite.tsx", "V4LevelTrail.tsx", "V4ChangesBar.tsx", "V4Header.tsx",
       // The owner's screen review (3 Nov): the report page, its own header and Share keep nothing in the browser either.
-      "V4ReportClient.tsx", "V4ReportHeader.tsx"]) {
+      "V4ReportClient.tsx", "V4ReportHeader.tsx",
+      // The owner's screen review (3 Nov): the ask page's session, the seed of the map, "Your maps" and "All my maps".
+      "V4AskGate.tsx", "V4MapSeed.tsx", "V4MapShelf.tsx", "V4AllMaps.tsx"]) {
       const source = readFileSync(resolve(here, "../../apps/ui/components/v4", file), "utf8");
       expect(source, file).not.toMatch(/\.setItem\(|localStorage|sessionStorage|indexedDB|document\.cookie/);
     }

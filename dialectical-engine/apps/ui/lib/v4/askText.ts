@@ -464,6 +464,25 @@ export function parseDigQuestion(questionLine: string, catalog: MessageCatalog):
 }
 
 /**
+ * dig-f30: what a dig looked into, in the person's own words: its picks with the site's framing ("Look deeper into this
+ * part of the answer: …", "Does this hold up, and when? …", the "together" heading, "1. ") taken off. Also for a dig
+ * whose text carries no context line (one the account knows only by its dig link): its first part, read the same way.
+ * Never empty: at worst the dig's first part as it was sent.
+ */
+export function digPicksOf(questionLine: string, catalog: MessageCatalog): readonly string[] {
+  const detail = parseDigDetail(questionLine, catalog);
+  if (detail !== null && detail.items.length > 0) return detail.items;
+  const together = t(catalog, "v4.digText.together").trim();
+  const lines = ownWords(questionLine).split("\n").map((line) => line.trim()).filter((line) => line.length > 0 && line !== together);
+  const listed = lines.length > 1;
+  const items = lines
+    .map((line) => (listed ? line.replace(NUMBERED, "") : line))
+    .map((line) => itemText(line, catalog).text.trim())
+    .filter((text) => text.length > 0);
+  return Object.freeze(items.length > 0 ? items : [ownWords(questionLine)]);
+}
+
+/**
  * Whether `shown` is `full`, once spaces are closed up, or `full` cut to fit the API's limit: "…" at the end, `full`
  * strictly longer, and at least `floor` characters of `full` kept (less only the spaces the cut trims). R2DIG-8: a
  * question that really ends in "…" is then not read as a cut of a longer one.

@@ -32,21 +32,23 @@
 }
 .v4HdrLevelButton:hover { background: var(--surface-sunken); }
 .v4HdrLevelList {
-  position: absolute; z-index: 50; top: calc(100% + 6px); left: 0; min-width: 230px; max-width: calc(100vw - 32px);
+  position: absolute; z-index: 50; top: calc(100% + 6px); inset-inline-start: 0; min-width: 230px; max-width: calc(100vw - 32px);
   display: flex; flex-direction: column; gap: 2px; padding: 8px;
   background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-btn); box-shadow: var(--shadow-pop);
 }
 .v4HdrLevelTitle { margin: 2px 8px 6px; font-size: var(--t-meta); color: var(--text-3); }
 .v4HdrLevelOption {
-  display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 10px; text-align: left;
+  display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 10px; text-align: start;
   border: 0; border-radius: 8px; background: none; cursor: pointer; font-size: var(--t-ui);
 }
 .v4HdrLevelOption:hover { background: var(--surface-2); }
 .v4HdrLevelOption[aria-pressed="true"] { font-weight: 700; background: var(--con-bg); }
 .v4HdrLevelCheck { width: 14px; color: var(--accent); }
+/* ask-d1: a signed-out visitor's "Sign in", at the end of the header. */
+.v4HdrSignIn { font-size: var(--t-ui); font-weight: 600; display: inline-flex; align-items: center; min-height: 44px; }
 @media (min-width: 768px) {
   .v4Hdr { padding: 12px 32px; }
-  .v4HdrLevelList { left: auto; right: 0; }
+  .v4HdrLevelList { inset-inline-start: auto; inset-inline-end: 0; }
 }
 
 /* ---- /v4 page ---- */
@@ -90,22 +92,101 @@
 
 .v4AskActions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
 .v4AskActions .v4BtnPrimary { padding: 0 26px; font-size: 16px; }
-.v4AskJust { font-size: var(--t-ui); min-height: 44px; text-align: left; }
+.v4AskJust { font-size: var(--t-ui); min-height: 44px; text-align: start; }
 .v4AskJust[disabled] { color: var(--text-3); cursor: not-allowed; }
 .v4AskRefusal {
   margin: 0; padding: 10px 14px; border-radius: var(--r-btn);
   background: var(--dispute-bg); border: 1px solid var(--dispute-border); color: var(--dispute-text); font-size: var(--t-ui);
 }
 
-.v4AskRecent { border-top: 1px solid var(--line-2); padding-top: 20px; }
-.v4AskRecentTitle { margin: 0 0 10px; font-size: var(--t-ui); font-weight: 700; color: var(--text-2); }
-.v4AskRecentList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-.v4AskRecentLink {
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-  padding: 10px 0; min-height: 44px; border-bottom: 1px solid var(--line);
-  color: var(--link); text-decoration: none; overflow-wrap: anywhere;
+/* ---- Step 1 (owner picks of 3 Nov: ask-d1 D, ask-f14..f16, ask-f18, ask-f19, read-f18) ---- */
+.v4AskPromise { margin: 0; font-size: 16px; line-height: 1.5; max-width: 62ch; }
+/* ask-f18 / ask-d4 C: the used-up line above the box (a plain notice, not an error: nothing went wrong). */
+.v4AskUsedUp {
+  margin: 0; padding: 10px 14px; border-radius: var(--r-btn);
+  background: var(--surface-2); border-inline-start: 3px solid var(--line-strong); color: var(--text); font-size: var(--t-ui);
 }
-.v4AskRecentLink:hover { color: var(--ink); text-decoration: underline; }
+/* ask-f19: 3 lines to about 8 (line-height 1.35, padding 2 x 16px, border 2 x 1.5px), then the words scroll inside. */
+.v4AskFieldGrow { resize: none; overflow-y: auto; min-height: calc(4.05em + 35px); max-height: calc(10.8em + 35px); }
+/* ask-f15: the level chips are native radios; the circle hides, the chip shows the choice and the keyboard focus. */
+.v4AskLevelChip { position: relative; }
+.v4AskLevelChip[data-checked="true"] { background: var(--con-bg); border-color: var(--accent); }
+.v4AskLevelInput { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.v4AskLevelChip:has(.v4AskLevelInput:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* ask-f16: the held place of the level choice, a faint shape of about its height, gone at once when not needed. */
+.v4AskLevelsHold {
+  min-height: 220px; border-radius: var(--r-btn);
+  background: linear-gradient(var(--surface-2), var(--surface-2)) 0 0 / 46% 18px no-repeat,
+    linear-gradient(var(--surface-2), var(--surface-2)) 0 36px / 72% 44px no-repeat,
+    linear-gradient(var(--surface-2), var(--surface-2)) 0 96px / 100% 72px no-repeat;
+  opacity: .7;
+}
+
+/* ask-d1 D: the seed of the map (first visits). Nothing in it moves. */
+.v4Seed { margin: 0; display: flex; flex-direction: column; gap: 12px; max-width: 520px; }
+.v4SeedPicture { display: flex; flex-direction: column; align-items: stretch; }
+.v4SeedRoot {
+  position: relative; display: flex; flex-direction: column; gap: 4px; padding: 12px 14px;
+  background: var(--surface); border: 1.5px solid var(--line-strong); border-radius: var(--r-card); box-shadow: var(--shadow-card);
+}
+.v4SeedLabel { color: var(--text-3); }
+.v4SeedWords {
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+  font-family: var(--font-display); font-size: 17px; line-height: 1.35; color: var(--ink); overflow-wrap: anywhere;
+}
+.v4SeedWordsEmpty { min-height: 1.35em; }
+.v4SeedBranches { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding-top: 18px; }
+.v4SeedBranches::before {
+  content: ""; position: absolute; top: 0; inset-inline: 16.6% 16.6%; height: 9px;
+  border: 1px dashed var(--line-strong); border-bottom: 0; border-radius: 6px 6px 0 0; opacity: .7;
+}
+.v4SeedOpen {
+  display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 52px; min-width: 0;
+  border: 1.5px dashed var(--line-strong); border-radius: var(--r-card); color: var(--text-3); opacity: .75; font-weight: 700;
+}
+.v4SeedStar { color: var(--gold); }
+.v4SeedCaption { font-size: var(--t-ui); }
+
+/* ---- "Your maps" (ask-d5 B, ask-f10, ask-f20, wait-f13, map-f34, dig-f30) ---- */
+.v4Shelf { border-top: 1px solid var(--line-2); padding-top: 20px; display: flex; flex-direction: column; gap: 12px; }
+.v4ShelfTitle { margin: 0; font-size: var(--t-ui); font-weight: 700; color: var(--text-2); }
+.v4ShelfList {
+  list-style: none; margin: 0; padding: 0; display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); align-items: start;
+}
+.v4ShelfItem { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.v4ShelfCard {
+  display: flex; flex-direction: column; gap: 10px; min-height: 44px; padding: 12px 14px;
+  background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-card);
+  color: var(--ink); text-decoration: none;
+}
+.v4ShelfCard:hover { border-color: var(--line-strong); background: var(--surface-2); }
+/* ask-f20: the cut sits on the text alone (no padding on the clamped box), so it ends cleanly after two lines with "…". */
+.v4ShelfQuestion {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  line-height: 1.4; max-height: 2.8em; font-weight: 600; overflow-wrap: anywhere;
+}
+.v4ShelfMeta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: var(--t-meta); color: var(--text-2); }
+/* The one slow pulse of a place being worked on (the approved "working places" pulse); none with reduced motion. */
+.v4ShelfPulse {
+  display: inline-block; flex: none; width: 8px; height: 8px; border-radius: var(--r-dot); background: var(--accent);
+  animation: v4ShelfPulse 2.4s ease-in-out infinite;
+}
+@keyframes v4ShelfPulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .v4ShelfPulse { animation: none; } }
+.v4ShelfNew { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; color: var(--con-text); }
+.v4ShelfNewDot { width: 8px; height: 8px; border-radius: var(--r-dot); background: var(--accent); }
+.v4ShelfDigs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.v4ShelfDig {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; min-height: 44px; padding: 8px 12px;
+  margin-inline-start: 14px; border-inline-start: 2px solid var(--line-2);
+  color: var(--link); text-decoration: none; font-size: var(--t-ui);
+}
+.v4ShelfDig:hover .v4ShelfDigText { text-decoration: underline; }
+.v4ShelfDigText { min-width: 0; flex: 1 1 12em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v4ShelfDigState { font-size: var(--t-meta); color: var(--text-2); }
+.v4ShelfAll { align-self: flex-start; display: inline-flex; align-items: center; min-height: 44px; font-size: var(--t-ui); }
+.v4MapsMain { gap: 20px; }
 
 /* D2 */
 .v4AskMainRead { gap: 16px; padding-bottom: 0; }

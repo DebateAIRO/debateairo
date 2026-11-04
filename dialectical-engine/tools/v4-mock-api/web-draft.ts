@@ -201,6 +201,44 @@ export function stripUsage<T extends Json>(usage: T): T {
   return rest as unknown as T;
 }
 
+/**
+ * The owner's screen review (3 Nov 2026, "Your maps", ask-d5 B / map-f34): what the ask page's shelf reads from a row of
+ * GET /v1/answers once the server says it (the API and the contract do not yet): when an open run started (`started_at`),
+ * its map's four-shade bar (`map_bar`), whether the map changed since the person last opened it (`changed_since_visit`)
+ * and the debate it was dug from (`dug_from`, null for a first question). The contract's rows are strict, so these are
+ * held back from the website until the contract names them; /__mock/draft/v1/answers shows them.
+ */
+const SHELF_ROW_KEYS = ["started_at", "map_bar", "changed_since_visit", "dug_from"] as const;
+export const DraftShelfRowPartSchema = z.object({
+  started_at: z.iso.datetime().optional(),
+  map_bar: z.object({
+    sure: z.number().int().nonnegative(), sure_for_case: z.number().int().nonnegative(),
+    still_argued: z.number().int().nonnegative(), didnt_hold: z.number().int().nonnegative()
+  }).strict().optional(),
+  changed_since_visit: z.boolean().optional(),
+  dug_from: z.uuid().nullable().optional()
+});
+
+/** The shelf's draft parts of an answer list (each row's), for checking against DraftShelfRowPartSchema. */
+export function answerIndexDraftProblems(index: Json): string[] {
+  const rows = [...((index.items as Json[] | undefined) ?? []), ...((index.open_runs as Json[] | undefined) ?? [])];
+  return rows.flatMap((row) => {
+    const part = Object.fromEntries(SHELF_ROW_KEYS.filter((key) => key in row).map((key) => [key, row[key]]));
+    const result = DraftShelfRowPartSchema.safeParse(part);
+    return result.success ? [] : [`${String(row.run_ref)}: ${JSON.stringify(result.error.issues)}`];
+  });
+}
+
+/** Without the shelf's parts, an answer list is today's. */
+export function stripAnswerIndex<T extends Json>(index: T): T {
+  const strip = (row: Json): Json => Object.fromEntries(Object.entries(row).filter(([key]) => !(SHELF_ROW_KEYS as readonly string[]).includes(key)));
+  return {
+    ...index,
+    items: ((index.items as Json[] | undefined) ?? []).map(strip),
+    open_runs: ((index.open_runs as Json[] | undefined) ?? []).map(strip)
+  } as unknown as T;
+}
+
 /** A room query split into today's query and its draft dig part. */
 export function splitRoomQuery(query: Readonly<Record<string, string>>): { query: Record<string, string>; dig: Record<string, string> } {
   const today: Record<string, string> = {};

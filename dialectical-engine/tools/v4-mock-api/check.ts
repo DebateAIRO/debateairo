@@ -623,5 +623,24 @@ await step("the Arabic debate says its language, and its report is in Arabic", a
   return read.versions[0].story.short_answer;
 }, (value: string) => value);
 
+// ---- The owner's screen review (3 Nov): "Your maps" on the ask page, read by the website's own shelf reader ----
+await step("Your maps: digs left out by their dig links and hung under their question; the server's extra parts held back", async () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const shelfModule: any = await import(pathToFileURL(join(UI, "lib", "v4", "mapShelf.ts")).href);
+  const { readFileSync } = await import("node:fs");
+  const v4Catalog = JSON.parse(readFileSync(join(UI, "messages", "en", "v4.json"), "utf8"));
+  const shelf: Loose = await shelfModule.readMapShelf(5, v4Catalog, { client });
+  const seededDigs = [RUNS.dig, RUNS.digOwnView, RUNS.digLevelTwo, RUNS.digLevelThree, RUNS.digFailed, RUNS.digNoChange, RUNS.deepest];
+  must(shelf.maps.length === 5 && shelf.maps.every((map: Loose) => !seededDigs.includes(map.runId)), "five real questions, no dig among them");
+  const first: Loose = shelf.maps.find((map: Loose) => map.runId === RUNS.settled);
+  must(first === undefined || first.digs.length > 0, "the first debate carries its digs");
+  must(shelf.maps.every((map: Loose) => map.bar === null && map.startedAt === null), "the draft parts are held back from today's contract");
+  const draft: Loose = await mock("/__mock/draft/v1/answers?limit=50&offset=0");
+  must(draft.open_runs.some((run: Loose) => typeof run.started_at === "string"), "a running question says when it started");
+  must(draft.items.some((item: Loose) => item.map_bar !== undefined && typeof item.changed_since_visit === "boolean"), "an answer carries its bar and its New dot");
+  must(draft.items.some((item: Loose) => item.run_ref === RUNS.dig && item.dug_from === RUNS.settled), "a dig names the debate it was dug from");
+  return shelf.maps.map((map: Loose) => `${map.state}${map.digs.length > 0 ? ` (+digs)` : ""}`).join(", ");
+}, (value: string) => value);
+
 console.log(failures === 0 ? "\nALL CHECKS PASSED" : `\n${failures} CHECK(S) FAILED`);
 process.exit(failures === 0 ? 0 : 1);
