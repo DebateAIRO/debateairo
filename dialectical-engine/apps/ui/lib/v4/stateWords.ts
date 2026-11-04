@@ -72,10 +72,23 @@ function validDate(value: string | number | Date): Date | null {
   return Number.isNaN(when.getTime()) ? null : when;
 }
 
-/** "14:31" in the page's language (the same form as the reset times of lib/v4/money.ts), or null when unreadable. */
+/**
+ * journey-f15 / journey-f16: THE way a V4 page writes a time of day, a 24-hour clock in the page's language ("after
+ * 08:00", "Started 14:02"), never "02:14 PM" on one card and "after 02:00" on the next. Every V4 time goes through these
+ * options (clockText here, the reset times of lib/v4/money.ts, the shelf, the dig note, the waiting card).
+ */
+export const CLOCK_OPTIONS: Readonly<Intl.DateTimeFormatOptions> = Object.freeze({ hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+
+/** "14:31" in the page's language (the one clock form, CLOCK_OPTIONS), or null when unreadable. */
 export function clockText(value: string | number | Date, locale: string): string | null {
   const when = validDate(value);
-  return when === null ? null : formatDate(locale, when, { hour: "2-digit", minute: "2-digit" });
+  return when === null ? null : formatDate(locale, when, CLOCK_OPTIONS);
+}
+
+/** "3 Nov 2026, 14:31": a date with the one clock form (a week's or a month's reset), or null when unreadable. */
+export function dateClockText(value: string | number | Date, locale: string): string | null {
+  const when = validDate(value);
+  return when === null ? null : formatDate(locale, when, { dateStyle: "medium", timeStyle: "short", hourCycle: "h23" });
 }
 
 /**
@@ -86,7 +99,7 @@ export function whenText(value: string | number | Date, locale: string, now: num
   const when = validDate(value);
   if (when === null) return null;
   if (when.toDateString() === new Date(now).toDateString()) return clockText(when, locale);
-  return formatDate(locale, when, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  return formatDate(locale, when, { day: "numeric", month: "short", ...CLOCK_OPTIONS });
 }
 
 /** "1 December": the day the month's pause ends, in the page's language. */

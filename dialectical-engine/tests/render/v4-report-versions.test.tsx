@@ -63,7 +63,7 @@ const word = (key: string, values: Record<string, string | number> = {}): string
   Object.entries(values).reduce((line, [name, value]) => line.replaceAll(`{${name}}`, String(value)), CATALOG[key]!);
 const DIG = "22222222-2222-4222-8222-222222222222";
 const date = (iso: string, style: "medium" | "long" = "medium") => new Intl.DateTimeFormat("en", { dateStyle: style }).format(new Date(iso));
-const clock = (iso: string) => new Intl.DateTimeFormat("en", { timeStyle: "short" }).format(new Date(iso));
+const clock = (iso: string) => new Intl.DateTimeFormat("en", { timeStyle: "short", hourCycle: "h23" }).format(new Date(iso));
 const css = readFileSync(resolve(import.meta.dirname, "../../apps/ui/app/v4/v4-report.css"), "utf8");
 
 const STORY = {

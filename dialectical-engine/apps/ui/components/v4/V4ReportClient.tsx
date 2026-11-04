@@ -925,7 +925,8 @@ const versionDate = (version: Exclude<InvestigationReportVersion, { state: "WRIT
 /** report-f7: a clock time ("Started 14:02"), with the day when it is not today; nothing ticks. */
 function clockTime(locale: string, at: number): string {
   const sameDay = new Date(at).toDateString() === new Date().toDateString();
-  return formatDate(locale, at, sameDay ? { timeStyle: "short" } : { dateStyle: "medium", timeStyle: "short" });
+  // journey-f15 / f16: the one V4 clock form, a 24-hour time (lib/v4/stateWords.ts CLOCK_OPTIONS).
+  return formatDate(locale, at, sameDay ? { timeStyle: "short", hourCycle: "h23" } : { dateStyle: "medium", timeStyle: "short", hourCycle: "h23" });
 }
 
 type PressKind = "write" | "reopen";

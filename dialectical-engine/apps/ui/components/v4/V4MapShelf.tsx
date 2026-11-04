@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { V4TrustBar } from "@/components/v4/V4TrustBar";
-import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
+import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { readMapShelf, type DigLinkCache, type ShelfDig, type ShelfMap, type ShelfRead, type ShelfState } from "@/lib/v4/mapShelf";
+import { whenText } from "@/lib/v4/stateWords";
 import { levelHref } from "@/lib/v4/storage";
 import type { ReadingLevel } from "@/lib/v4/types";
 
@@ -61,13 +62,9 @@ export function useMapShelf(input: Readonly<{ enabled: boolean; want: number; ca
   return { load, busy, retry };
 }
 
-/** A clock time ("14:00"), with the day in front when it is not today. */
+/** A clock time ("14:00"), with the day in front when it is not today: the one V4 clock form (lib/v4/stateWords.ts). */
 function startedText(iso: string, locale: string): string {
-  const time: Intl.DateTimeFormatOptions = { hour: "2-digit", minute: "2-digit", hourCycle: "h23" };
-  const started = new Date(iso);
-  const today = new Date();
-  const sameDay = started.getFullYear() === today.getFullYear() && started.getMonth() === today.getMonth() && started.getDate() === today.getDate();
-  return formatDate(locale, iso, sameDay ? time : { ...time, day: "numeric", month: "short" });
+  return whenText(iso, locale) ?? "";
 }
 
 /** The one state word (wait-f13, map-f34): "Being looked into, started 14:00", "Waiting", "Answer ready", "Didn't finish". */

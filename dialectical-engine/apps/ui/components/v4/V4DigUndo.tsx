@@ -15,6 +15,7 @@ import {
   type DigUndoEntry
 } from "@/lib/v4/digUndo";
 import { firstByOf } from "@/lib/v4/mapLooks";
+import { clockText } from "@/lib/v4/stateWords";
 import type { DigTarget } from "@/lib/v4/types";
 import { V4UndoNote, V4UndoNotes, type V4UndoNoteState } from "./V4UndoNote";
 
@@ -61,16 +62,12 @@ function withQuestion(sentence: string, target: DigTarget): ReactNode {
   return <>{before}<DigFirstQuestion target={target} />{after}</>;
 }
 
+/** journey-f15 / f16: one way to write a time on every V4 page ("Started 14:31"). */
 function clock(iso: string, locale: string): string {
-  const when = new Date(iso);
-  try {
-    return new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(when);
-  } catch {
-    return new Intl.DateTimeFormat("en", { hour: "2-digit", minute: "2-digit" }).format(when);
-  }
+  return clockText(iso, locale) ?? "";
 }
 
-/** "Digging into “…” and 1 more · Thorough · up to 4% of today". */
+/** "Digging into “…” and 1 more · Thorough · up to 4% of today" (journey-f8: "of this month" on Free). */
 function digLabel(entry: DigUndoEntry, catalog: MessageCatalog, locale: string): ReactNode {
   const { target, mode } = entry.dig;
   const more = digTargetQuestions(target).length - 1;

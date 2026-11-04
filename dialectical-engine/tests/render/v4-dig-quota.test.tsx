@@ -86,7 +86,7 @@ describe("new starts wait for the reset (new_starts: BLOCKED_UNTIL_RESET)", () =
     harness.room = room({ room: "FULL", scope: "PERSON_DAY", resets_at: RESET, new_starts: "BLOCKED_UNTIL_RESET", dig_share_percent: 20 });
     await mountMap();
     await openPath(PATHS.smr);
-    const time = formatDate("en", RESET, { hour: "2-digit", minute: "2-digit" });
+    const time = formatDate("en", RESET, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
     expect(panel().textContent).toContain(word("v4.money.startsWait.PERSON_DAY", { time }));
     expect(reportLinks().length).toBeGreaterThan(0);
   });
@@ -95,7 +95,7 @@ describe("new starts wait for the reset (new_starts: BLOCKED_UNTIL_RESET)", () =
     harness.room = room({ room: "FULL", scope: "PERSON_MONTH", resets_at: NEXT_MONTH, new_starts: "BLOCKED_UNTIL_RESET" });
     await mountMap();
     await openPath(PATHS.smr);
-    const time = formatDate("en", NEXT_MONTH, { dateStyle: "medium", timeStyle: "short" });
+    const time = formatDate("en", NEXT_MONTH, { dateStyle: "medium", timeStyle: "short", hourCycle: "h23" });
     expect(panel().textContent).toContain(word("v4.money.startsWait.PERSON_MONTH", { time }));
     expect(CATALOG["v4.money.startsWait.PERSON_MONTH"]).toContain("You can still write your report.");
   });
