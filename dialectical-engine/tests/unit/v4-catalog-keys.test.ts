@@ -217,7 +217,19 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.public.digFromAnother",
   "v4.public.flag.thanks",
   "v4.public.flag.whereMore",
-  "v4.public.flag.claimMore"
+  "v4.public.flag.claimMore",
+  // The wave-1 review fixes (4 Nov 2026), drafted where the owner's record has no words: the grey line under Next for a
+  // signed-out visitor until the start-step's sign-in panel lands (the record's "Your question stays here." is true only
+  // with that panel), a dig still starting after a minute, a dig sent after its map was closed that met a screen nobody
+  // saw, a dig whose start could not be confirmed, the outline's fold button, and the sideways-scroll hint without a side
+  // (right-to-left pages).
+  "v4.ask.signInFirst",
+  "v4.undo.sendingSlow",
+  "v4.dig.notStartedAway",
+  "v4.dig.unconfirmed",
+  "v4.outline.fold",
+  "v4.outline.unfold",
+  "v4.map.scrollHint"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {
@@ -358,7 +370,10 @@ describe("V4 catalogue keys", () => {
     const cards = ["WAITING", "RUNNING", "PAUSED", "FAILED", "DONE", "REWRITING", "CHANGED", "NO_CHANGE", "REWRITE_FAILED"]
       .map((state) => `v4.rewrite.digCard.${state}`);
     expect(cards.filter((key) => !(key in catalog))).toEqual([]);
-    for (const key of cards) expect(catalog[key], key).toMatch(/^Dig · /u);
+    // V4 screen review (3 Nov), journey-f2 / journey-f22: a dig at work says the one state word "Looking into it" (its card
+    // already carries what is being dug); the other card lines keep their "Dig · " start.
+    expect(catalog["v4.rewrite.digCard.RUNNING"]).toBe("Looking into it");
+    for (const key of cards.filter((card) => card !== "v4.rewrite.digCard.RUNNING")) expect(catalog[key], key).toMatch(/^Dig · /u);
     // The new lines say what happened in plain words: no score, no state code, no reviewer or checker name.
     const fresh = DRAFTED_UNTIL_CLICK_TEST.filter((key) => key.startsWith("v4.rewrite.") || key.startsWith("v4.nest.")).map((key) => catalog[key]!);
     expect(fresh.filter((line) => /\b(?:score|strength|threshold|READY|WRITING|FAILED|checker|GLM|Haiku)\b/u.test(line))).toEqual([]);
@@ -373,7 +388,8 @@ const NO_WAIT = "You don't need to wait. You can dig or write your report now.";
 const REVIEW_LINES: Readonly<Record<string, string>> = Object.freeze({
   "v4.ask.continue": "Next",
   "v4.suggest.edit": "Change the wording",
-  "v4.dig.started": "Started. It's open now.",
+  // dig-f10 (the undo-bottom track): the person stays where they are; the note says when it started, with its own [See it].
+  "v4.dig.started": "Started {time} · You can leave this page.",
   "v4.debate.state.HOLDING": "Taking a short break · continues about {time}",
   "v4.debate.state.HOLDING.noTime": "Taking a short break",
   // map-f16: the approved N14 sentence (the report's own), then r2-11 A's line.
@@ -395,8 +411,10 @@ describe("the owner's 3 Nov screen review", () => {
     expect(Object.entries(catalog).filter(([, value]) => /allowance/iu.test(value))).toEqual([]);
     const shares = ["v4.header.used.PERSON_DAY", "v4.header.used.PERSON_WEEK", "v4.header.used.PERSON_MONTH", "v4.header.used.PERSON_GRANT",
       "v4.panel.modeHint.thorough", "v4.money.borrowed.PERSON_DAY", "v4.money.borrowed.PERSON_WEEK",
-      "v4.money.startsWait.PERSON_MONTH", "v4.money.paused", "v4.money.pausedReady"];
+      "v4.money.startsWait.PERSON_MONTH", "v4.money.paused"];
     for (const key of shares) expect(catalog[key], key).toMatch(/\bquota\b/u);
+    // wait-f5 (fail-pause track): after the reset the pause block says only "Your new month has started." with Continue.
+    expect(catalog["v4.money.pausedReady"]).toBe("Your new month has started.");
   });
 
   it("wait-f3 / map-f3: no wait names a figure before it is measured, and the question's wait says where to find it", () => {
@@ -404,11 +422,17 @@ describe("the owner's 3 Nov screen review", () => {
       expect(catalog[key], key).not.toMatch(/\d|minute|hour|usually|few/iu);
       expect(catalog[key], key).toMatch(/This takes a while\./u);
     }
-    expect(catalog["v4.debate.usually"]).toContain(`“${catalog["v4.recent.title"]}”`);
+    // ask-d5 B (the step-1 track): the list on the first page is "Your maps" now.
+    expect(catalog["v4.debate.usually"]).toContain(`“${catalog["v4.maps.title"]}”`);
   });
 
   it("wait-f20: 'Paused' is the month wall's word only", () => {
     const paused = Object.entries(catalog).filter(([, value]) => /\bpaused\b/iu.test(value)).map(([key]) => key).sort();
-    expect(paused).toEqual(["v4.debate.state.PAUSED_MONTH", "v4.money.paused", "v4.money.pausedReady", "v4.rewrite.digCard.PAUSED"].sort());
+    // Every one of these is the month's quota (fail-pause's dig card, phone bar and rail words; the waiting card's state words).
+    expect(paused).toEqual([
+      "v4.debate.state.PAUSED_MONTH", "v4.money.paused", "v4.pause.digCard", "v4.pause.phoneBar", "v4.rail.digsPaused.one",
+      "v4.rail.digsPaused.other", "v4.rewrite.digCard.PAUSED", "v4.state.PAUSED", "v4.state.PAUSED.noDate"
+    ].sort());
+    expect(catalog["v4.state.SHORT_BREAK"]).not.toMatch(/\bpaused\b/iu);
   });
 });

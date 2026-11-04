@@ -21,12 +21,15 @@ import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createSeed, SEED_NODE_IDS, type StoryStatus } from "./seed.js";
 import {
-  answerDraftProblems, contractOrDraft, DraftAskParentSchema, DraftInvestigationSchema, DraftMonthPauseSchema, DraftNodeWebSchema,
+  answerDraftProblems, answerIndexDraftProblems, contractOrDraft, DraftAskParentSchema, DraftInvestigationSchema, DraftMonthPauseSchema, DraftNodeWebSchema,
+  DraftRunQuotaUsedSchema,
   DraftRoomPartSchema, DraftRoomQueryPartSchema, DraftRunContinuedSchema, DraftRunContinueRefusedSchema, DraftRunContinueRequestSchema,
-  DraftUsageBorrowsSchema, splitAsk, splitRoomQuery, stripAnswer, stripNode, stripRoom,
-  stripRun, stripUsage, type DraftAskParent
+  DraftRunStartedAtSchema, DraftUsageBorrowsSchema, splitAsk, splitRoomQuery, stripAnswer, stripNode, stripRoom,
+  stripAnswerIndex, stripRun, stripUsage, type DraftAskParent
 } from "./web-draft.js";
-import { ARABIC_RUN, borrowNotice, DEEPEST_DIG, DIG_ANSWERS, DIG_RUNS, monthPause, PATH_REWRITES, reportVersionBody, RUN_PAUSED, SEEDED_NEW_DIGS } from "./rewrite-seed.js";
+import {
+  ARABIC_RUN, borrowNotice, DEEPEST_DIG, DIG_ANSWERS, DIG_RUNS, mainAnswerAt, monthPause, PATH_REWRITES, reportVersionBody, RUN_PAUSED, SEEDED_NEW_DIGS
+} from "./rewrite-seed.js";
 import type { WebCase } from "./web-seed.js";
 import { paymentRegionsOf } from "../../packages/kernel/src/payment-regions.js";
 import { BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, priceCurrencyFor } from "../../packages/register/src/billing-plans.js";
@@ -94,6 +97,9 @@ type UsageMode = (typeof USAGE_MODES)[number];
 /** W2-7 (money rule): the paused debate waits for the month reset (UNTIL_RESET), or the new month has started (CAN_CONTINUE). */
 const PAUSE_MODES = ["UNTIL_RESET", "CAN_CONTINUE"] as const;
 type PauseMode = (typeof PAUSE_MODES)[number];
+/** Owner review 3 Nov 2026: how a NEW dig ends — it finishes (default), fails once its run time is up, or pauses at the month wall. */
+const DIG_END_MODES = ["SETTLE", "FAIL", "PAUSE"] as const;
+type DigEndMode = (typeof DIG_END_MODES)[number];
 
 function choice<T extends string>(name: string, raw: string | undefined, allowed: readonly T[], fallback: T): T {
   if (raw === undefined || raw.trim() === "") return fallback;
@@ -120,6 +126,8 @@ const HOST = "127.0.0.1";
 const RUN_SECONDS = seconds("MOCK_RUN_SECONDS", 25);
 const STORY_WRITING_SECONDS = seconds("MOCK_STORY_WRITING_SECONDS", 40);
 const POSTED_STORY_SECONDS = seconds("MOCK_POSTED_STORY_SECONDS", 10);
+/** dig-f1 (V4 screen review, 3 Nov 2026): how long the first debate's main answer is still being rewritten after the mock starts. */
+const MAIN_ANSWER_SECONDS = seconds("MOCK_MAIN_ANSWER_SECONDS", 45);
 const QUIET = process.env.MOCK_QUIET === "1";
 let roomMode: RoomMode = choice("MOCK_ROOM", process.env.MOCK_ROOM, ROOM_MODES, "FITS");
 let askMode: AskMode = choice("MOCK_ASK", process.env.MOCK_ASK, ASK_MODES, "AUTO");
@@ -175,6 +183,9 @@ const PUBLIC_REPORT_MS = 8_000;
 /** W4-4: how long the mock's readers take over a page added to researched. */
 const RESEARCHED_READ_MS = 6_000;
 let pauseMode: PauseMode = choice("MOCK_PAUSE", process.env.MOCK_PAUSE, PAUSE_MODES, "UNTIL_RESET");
+let digEndMode: DigEndMode = choice("MOCK_DIG", process.env.MOCK_DIG, DIG_END_MODES, "SETTLE");
+/** Owner review 3 Nov: what a dig that fails under `dig=FAIL` stored ("stopped partway", one of the website's fixed sentences). */
+const DIG_FAILED_REASON = "RUNNER_EXECUTION_FAILED:CALL_BUDGET_EXHAUSTED";
 /** R22 W5-1: whether the next report written comes out finished (OK) or failed (FAIL), and how long the mock's writer takes. */
 const REPORT_MODES = ["OK", "FAIL"] as const;
 type ReportMode = (typeof REPORT_MODES)[number];
@@ -232,6 +243,20 @@ type MockRun = {
   language?: Readonly<{ tag: string; name: string }>;
   /** W2-7 (money rule): its planned calls and searches paused at the month wall, until Continue (POST /v1/runs/{id}/continue). */
   monthPaused?: boolean;
+  /**
+   * Draft (journey-d2, and the shelf's cards, owner's screen review 3 Nov): when it started; absent while it waits to
+   * start. One time for both draft reads: the run read's `started_at` (DraftRunStartedAtSchema) and the answer list's
+   * `started_at` on open runs (DraftShelfRowPartSchema).
+   */
+  startedAt?: number;
+  /** Owner review 3 Nov: a run with `failedReason` fails only from this moment (a new dig under `dig=FAIL`); absent: failed from the start. */
+  failsAt?: number;
+  /** Owner review 3 Nov (draft field): what a FAILED run took from the person's quota, on its draft view only. */
+  quotaUsed?: "NONE" | "SOME";
+  /** Owner review 3 Nov: a dig paused under `dig=PAUSE` finishes its run time once Continue is pressed. */
+  settlesAfterContinue?: boolean;
+  /** dig-f1: its main answer is still being rewritten until this moment, then has its newest version (rewrite-seed.ts mainAnswerAt). */
+  mainAnswerReadyAt?: number;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   answer?: any;
 };
@@ -244,6 +269,12 @@ function addRun(run: MockRun): MockRun {
   runs.set(run.runRef, run);
   if (run.answerId !== undefined) runsByAnswer.set(run.answerId, run);
   return run;
+}
+
+/** A run's answer as it stands now: dig-f1, the first debate's main answer is rewritten a little after the mock starts. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function answerNow(run: MockRun, now = Date.now()): any {
+  return run.mainAnswerReadyAt === undefined ? run.answer : { ...run.answer, main_answer: mainAnswerAt(now, run.mainAnswerReadyAt) };
 }
 
 function settledRun(input: Readonly<{
@@ -259,6 +290,7 @@ function settledRun(input: Readonly<{
     question: input.question,
     seq: input.seq,
     settleAt: input.settleAt,
+    startedAt: input.askedAt,
     answerId: input.answerId,
     storyReadyAt: input.storyReadyAt,
     web: input.web,
@@ -282,11 +314,13 @@ settledRun({
   runRef: RUN_SETTLED, answerId: ANSWER_SETTLED, seq: 2,
   question: "Should countries build new nuclear power, or put the money into renewables and storage?",
   askedAt: Date.parse("2026-10-27T15:12:00.000Z"), settleAt: Date.parse("2026-10-27T15:40:00.000Z"), storyReadyAt: 0, web: "PAID"
-});
-addRun({ runRef: RUN_RUNNING, seq: 5, question: "Is a four-day work week good for productivity and for workers?" });
+}).mainAnswerReadyAt = T0 + MAIN_ANSWER_SECONDS * 1000;
+addRun({ runRef: RUN_RUNNING, seq: 5, startedAt: T0 - 4 * 60_000, question: "Is a four-day work week good for productivity and for workers?" });
 addRun({ runRef: RUN_WAITING, seq: 3, waiting: true, question: "Should my town close the old centre to cars at weekends?" });
 addRun({
   runRef: RUN_FAILED, seq: 1, failedReason: FAILED_REASON,
+  // Owner review 3 Nov (draft): the models were gone when it was claimed, so it never began and nothing was taken.
+  quotaUsed: "NONE",
   question: "Will AI tutors replace homework help from teachers within five years?"
 });
 settledRun({
@@ -319,7 +353,7 @@ for (const dig of SEEDED_NEW_DIGS) {
     askedAt: Date.parse(dig.askedAt), settleAt: Date.parse(dig.settledAt), storyReadyAt: 0
   });
 }
-addRun({ runRef: RUN_PAUSED, seq: 12, monthPaused: true, question: "Should my region build a hydrogen pipeline or more power lines?" });
+addRun({ runRef: RUN_PAUSED, seq: 12, monthPaused: true, startedAt: T0 - 40 * 60_000, question: "Should my region build a hydrogen pipeline or more power lines?" });
 // W3-4: a dig at the deepest level (10), whose map offers no dig anywhere (rewrite-seed.ts DEEPEST_DIG).
 settledRun({
   runRef: DEEPEST_DIG.runRef, answerId: DEEPEST_DIG.answerId, seq: DEEPEST_DIG.seq, web: "PAID", question: DEEPEST_DIG.question,
@@ -356,7 +390,7 @@ for (const [at, seeded] of SEEDED_CONTRIBUTION_DIGS.entries()) {
 type RunState = "QUEUED" | "WAITING" | "CLAIMED" | "RUNNING" | "HOLDING" | "SETTLED" | "FAILED";
 
 function stateOf(run: MockRun, now = Date.now()): RunState {
-  if (run.failedReason !== undefined) return "FAILED";
+  if (run.failedReason !== undefined && (run.failsAt === undefined || now >= run.failsAt)) return "FAILED";
   if (run.waiting === true) return "WAITING";
   if (run.settleAt === undefined || now < run.settleAt) return "RUNNING";
   return "SETTLED";
@@ -513,8 +547,22 @@ function runProjection(run: MockRun, now = Date.now()) {
     waits_until: state === "WAITING" ? waitsUntil(now) : null,
     waits_for: null,
     // W2-7 (money rule, draft): paused at the month wall until the next month; Continue once it has started.
-    ...(run.monthPaused === true && state === "RUNNING" ? { month_pause: monthPause(nextUtcMonth(now), pauseMode === "CAN_CONTINUE") } : {})
+    ...(run.monthPaused === true && state === "RUNNING" ? { month_pause: monthPause(nextUtcMonth(now), pauseMode === "CAN_CONTINUE") } : {}),
+    // Owner review 3 Nov (draft, web-draft.ts DraftRunQuotaUsedSchema): what a failed run took from the quota.
+    ...(state === "FAILED" && run.quotaUsed !== undefined ? { quota_used: run.quotaUsed } : {})
   };
+}
+
+/**
+ * Draft (owner's screen review, journey-d2 / journey-f16 / wait-f7): the run read with when the question started, so the
+ * waiting card can say "Started 14:31" on any device. Sent on the draft view, and on the normal view only once the
+ * contract's own (strict) RunProjection schema accepts it; never while the question waits to start.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function withStartedAt(body: any, run: MockRun, draftView: boolean, now = Date.now()) {
+  if (run.startedAt === undefined || stateOf(run, now) === "WAITING") return body;
+  const full = { ...body, started_at: iso(run.startedAt) };
+  return draftView || C.RunProjectionSchema.safeParse(full).success ? full : body;
 }
 
 function nextUtcMonth(now = Date.now()): string {
@@ -526,6 +574,19 @@ function storyRead(run: MockRun, now = Date.now()) {
   const status = storyStatusOf(run, now);
   const writtenAt = iso(Math.max(run.storyReadyAt ?? 0, run.settleAt ?? 0));
   return seed.story(run.answerId!, status, writtenAt);
+}
+
+/**
+ * The shelf's draft parts of a row (web-draft.ts DraftShelfRowPartSchema, owner's screen review 3 Nov): the debate it was
+ * dug from (the account's dig link; null for a first question), and for an answer the seeded map's four-shade bar and
+ * whether its map changed since the person last opened it (here: no last visit recorded yet).
+ */
+const SEEDED_MAP_BAR = Object.freeze({ sure: 4, sure_for_case: 5, still_argued: 2, didnt_hold: 1 });
+function shelfPart(run: MockRun, served: boolean, now: number) {
+  const dugFrom = digLinks.find((record) => record.child_run_id === run.runRef)?.parent_run_id ?? null;
+  if (served) return { map_bar: { ...SEEDED_MAP_BAR }, changed_since_visit: !lastVisits.has(run.runRef), dug_from: dugFrom };
+  const working = !["WAITING", "FAILED"].includes(stateOf(run, now));
+  return { ...(working && run.startedAt !== undefined ? { started_at: iso(run.startedAt) } : {}), dug_from: dugFrom };
 }
 
 function answerIndex(limit: number, offset: number, now = Date.now()) {
@@ -544,7 +605,8 @@ function answerIndex(limit: number, offset: number, now = Date.now()) {
       staleness_state: "FRESH",
       builds_on_previous: false,
       created_at_sequence: run.seq,
-      models: [...MODELS]
+      models: [...MODELS],
+      ...shelfPart(run, true, now)
     })),
     open_runs: open.map((run) => {
       const projection = runProjection(run, now);
@@ -553,7 +615,8 @@ function answerIndex(limit: number, offset: number, now = Date.now()) {
         question_line: run.question,
         state: projection.state,
         terminal_reason: projection.terminal_reason,
-        created_at_sequence: run.seq
+        created_at_sequence: run.seq,
+        ...shelfPart(run, false, now)
       };
     }),
     limit,
@@ -763,7 +826,16 @@ const draftPart = (key: string, schema: { safeParse: (body: unknown) => { succes
     return value === undefined ? { success: true } : schema.safeParse(value);
   }
 });
-const runDraftSchema = draftPart("month_pause", DraftMonthPauseSchema);
+const runPauseDraft = draftPart("month_pause", DraftMonthPauseSchema);
+const runQuotaDraft = draftPart("quota_used", DraftRunQuotaUsedSchema);
+/** A run read's draft parts: its month pause (W2-7) and, on a failed run, its `quota_used` (owner review 3 Nov). */
+const runDraftSchema = {
+  safeParse: (body: unknown) => {
+    const pause = runPauseDraft.safeParse(body);
+    return pause.success ? runQuotaDraft.safeParse(body) : pause;
+  }
+};
+const runStartDraftSchema = draftPart("started_at", DraftRunStartedAtSchema);
 const usageDraftSchema = draftPart("borrowed", DraftUsageBorrowsSchema);
 
 function investigationBody(investigation: Investigation) {
@@ -836,7 +908,11 @@ function startupCheck(): number {
   for (const [country, postal] of [["DE", null], ["RO", null], ["US", "75201"], ["US", null], ["CA", "D1A 1A1"], ["JP", null]] as const) {
     check(`GET /v1/billing/plans?country=${country}`, C.BillingPlansResponseSchema, billingPlans(country, postal));
   }
-  check("GET /v1/answers", C.AnswerIndexSchema, answerIndex(50, 0));
+  // The shelf's draft parts (owner's screen review, 3 Nov) pass their draft schema, and today's contract once held back.
+  const index = answerIndex(50, 0);
+  const shelfProblems = answerIndexDraftProblems(index);
+  if (shelfProblems.length > 0) throw new Error(`MOCK_SEED_INVALID: GET /v1/answers draft fields:\n${shelfProblems.join("\n")}`);
+  check("GET /v1/answers", C.AnswerIndexSchema, contractOrDraft(C.AnswerIndexSchema, index, stripAnswerIndex).body);
   for (const run of runs.values()) {
     checkDraft(`GET /v1/runs/${run.runRef}`, C.RunProjectionSchema, runProjection(run), stripRun, runDraftSchema);
     check(`GET /v1/runs/${run.runRef}/visibility`, C.PublicationTransitionSchema, { state: "PRIVATE", public_ref: null });
@@ -848,6 +924,11 @@ function startupCheck(): number {
     const problems = checkAnswerDraft(run.answer);
     if (problems.length > 0) throw new Error(`MOCK_SEED_INVALID: GET /v1/answers/${run.answerId} draft fields:\n${problems.join("\n")}`);
     check(`GET /v1/answers/${run.answerId}`, C.AnswerSchema, contractOrDraft(C.AnswerSchema, run.answer, stripAnswer).body);
+    if (run.mainAnswerReadyAt !== undefined) {
+      for (const at of [run.mainAnswerReadyAt - 1, run.mainAnswerReadyAt]) {
+        check(`GET /v1/answers/${run.answerId} (main answer at ${iso(at)})`, C.AnswerSchema, contractOrDraft(C.AnswerSchema, answerNow(run, at), stripAnswer).body);
+      }
+    }
     for (const status of ["WRITING", "READY", "READY_WITH_RESERVATION", "UNAVAILABLE"] as const) {
       check(`GET /v1/answers/${run.answerId}/story (${status})`, C.AnswerStorySchema, seed.story(run.answerId!, status, iso(T0)));
     }
@@ -997,7 +1078,8 @@ function streamEvents(req: IncomingMessage, res: ServerResponse, run: MockRun): 
     if (settle !== null) clearTimeout(settle);
     openStreams.delete(res);
   };
-  if (state === "RUNNING" && run.settleAt !== undefined) {
+  // A dig paused under dig=PAUSE settles only after Continue (its far time would overflow the timer, so none is set).
+  if (state === "RUNNING" && run.settleAt !== undefined && run.monthPaused !== true) {
     settle = setTimeout(() => {
       emit("run.terminal", { state: "SETTLED" });
       close();
@@ -1169,6 +1251,15 @@ async function postAsk(req: IncomingMessage, res: ServerResponse): Promise<void>
     sendJson(req, res, 202, askAccepted(run, true), C.AskAcceptedSchema);
     return;
   }
+  // Owner review 3 Nov (dig=FAIL): a new dig runs its time, then fails "stopped partway" (and its draft view says it took
+  // some quota), so the click-test can try it again and see a second failure.
+  if (parent !== null && digEndMode === "FAIL") {
+    const run = addRun({ runRef, question, seq, failedReason: DIG_FAILED_REASON, failsAt: now + RUN_SECONDS * 1000, quotaUsed: "SOME" });
+    join(runRef);
+    log("QUEUED_DIG_WILL_FAIL", runRef);
+    sendJson(req, res, 202, askAccepted(run, false), C.AskAcceptedSchema);
+    return;
+  }
   const settleAt = now + RUN_SECONDS * 1000;
   // Free never searches; "#webfail" in the question plays a debate whose search failed.
   const web: WebCase = ask.plan_tier === "free" ? "FREE" : /#webfail/iu.test(question) ? "FAILED" : "PAID";
@@ -1181,6 +1272,13 @@ async function postAsk(req: IncomingMessage, res: ServerResponse): Promise<void>
     ...(publicParent === undefined ? {} : { dig: digPartOf({ parent_run_id: RUN_SETTLED, places: publicParent.places, mode: publicParent.mode, picks: publicParent.picks } as DraftAskParent, 1) })
   });
   if (publicParent !== undefined) startPublicCheck(run, publicParent, question, settleAt);
+  // Owner review 3 Nov (dig=PAUSE): a new dig reaches the month wall at once; Continue (once pause=CAN_CONTINUE) lets it finish.
+  if (parent !== null && digEndMode === "PAUSE") {
+    run.monthPaused = true;
+    // Paused: it does not finish until Continue (a far, valid time; the state read says RUNNING until then).
+    run.settleAt = Date.UTC(2100, 0, 1);
+    run.settlesAfterContinue = true;
+  }
   join(runRef);
   log(parent === null ? "QUEUED" : "QUEUED_DIG", runRef);
   sendJson(req, res, 202, askAccepted(run, false), C.AskAcceptedSchema);
@@ -1198,6 +1296,7 @@ function mockState() {
     plan: planMode,
     usage: usageMode,
     pause: pauseMode,
+    dig: digEndMode,
     public: publicMode,
     report: reportMode,
     session: sessionOut ? "OUT" : "IN",
@@ -1210,7 +1309,8 @@ function mockState() {
       answer: draftServed(C.AnswerSchema, runs.get(RUN_SETTLED)!.answer, stripAnswer),
       room: draftServed(C.AskRoomResponseSchema, roomRead(roomMode, now), stripRoom),
       run: draftServed(C.RunProjectionSchema, runProjection(runs.get(RUN_PAUSED)!, now), stripRun),
-      usage: draftServed(C.BillingUsageResponseSchema, billingUsage(now, planMode, "BORROWED"), stripUsage)
+      usage: draftServed(C.BillingUsageResponseSchema, billingUsage(now, planMode, "BORROWED"), stripUsage),
+      answer_index: draftServed(C.AnswerIndexSchema, answerIndex(50, 0, now), stripAnswerIndex)
     },
     investigations: [...investigations.values()].map(investigationBody),
     dig_links: digLinks.map((record) => ({ ...record })),
@@ -1278,7 +1378,9 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
         const pause = url.searchParams.get("pause");
         const publicSetting = url.searchParams.get("public");
         const reportSetting = url.searchParams.get("report");
+        const digSetting = url.searchParams.get("dig");
         if (reportSetting !== null) reportMode = choice("report", reportSetting, REPORT_MODES, reportMode);
+        if (digSetting !== null) digEndMode = choice("dig", digSetting, DIG_END_MODES, digEndMode);
         if (room !== null) roomMode = choice("room", room, ROOM_MODES, roomMode);
         if (ask !== null) askMode = choice("ask", ask, ASK_MODES, askMode);
         if (plan !== null) planMode = choice("plan", plan, PLAN_MODES, planMode);
@@ -1294,7 +1396,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       } catch (failure) {
         // The detail goes to the mock's log, never into the reply (CodeQL js/stack-trace-exposure, PR #224).
         process.stderr.write(`[mock] setting refused: ${failure instanceof Error ? failure.message : String(failure)}\n`);
-        return sendJson(req, res, 400, { error: "MOCK_SETTING_INVALID", message: "Unknown value for room, ask, plan, usage, pause or public; see the mock's log." });
+        return sendJson(req, res, 400, { error: "MOCK_SETTING_INVALID", message: "Unknown value for room, ask, plan, usage, pause, dig or public; see the mock's log." });
       }
       return sendJson(req, res, 200, mockState());
     }
@@ -1315,6 +1417,14 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   // ---- session, gates, public reads ----
   // Decision 13: `session=OUT` shows a public page as a stranger sees it (a sign-in link in place of each press).
   if (path === "/v1/session" && isGet && sessionOut) return sendJson(req, res, 401, { error: "SESSION_REQUIRED" });
+  // V4 screen review (wait-f1): with `session=OUT` the asker's own debates are refused as an ended sign-in is (401
+  // SESSION_REQUIRED), so a page opened while signed in shows "Please sign in again to see your question." on its next read.
+  if (sessionOut && isGet && (parts[1] === "runs" || parts[1] === "answers")) return sendJson(req, res, 401, { error: "SESSION_REQUIRED" });
+  // A stranger has no quota and no account: the room and usage reads and the account reads are signed-in only in the
+  // real API (auth "user"), so the ask page shows no "% of your quota used" and no share line to someone signed out.
+  if (sessionOut && isGet && (path === "/v1/asks/room" || path === "/v1/billing/usage" || parts[1] === "account")) {
+    return sendJson(req, res, 401, { error: "SESSION_REQUIRED" });
+  }
   if (path === "/v1/session" && isGet) return sendJson(req, res, 200, SESSION, C.SessionSchema);
   if (path === "/v1/auth/age-confirmation" && isGet) return sendJson(req, res, 200, { status: "confirmed" }, C.AgeConfirmationStatusSchema);
   if (path === "/v1/account/sensitive-data-consent" && (isGet || method === "POST")) {
@@ -1439,7 +1549,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (limit === null || limit < 1 || offset === null) {
       return sendJson(req, res, 400, { error: "MALFORMED_REQUEST", message: "limit and offset must be whole numbers (limit at least 1)." });
     }
-    return sendJson(req, res, 200, answerIndex(limit, offset), C.AnswerIndexSchema);
+    return sendDraftable(answerIndex(limit, offset), C.AnswerIndexSchema, stripAnswerIndex, answerIndexDraftProblems);
   }
   if (parts[1] === "answers" && parts.length >= 3 && isGet) {
     const run = runsByAnswer.get(parts[2]!);
@@ -1449,7 +1559,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const version = url.searchParams.get("version");
     if (version !== null && version !== "1") return notFound(req, res, "ANSWER_VERSION_NOT_FOUND", "Only version 1 exists.");
     const sub = parts.slice(3).join("/");
-    if (sub === "") return sendDraftable(run.answer, C.AnswerSchema, stripAnswer, checkAnswerDraft);
+    if (sub === "") return sendDraftable(answerNow(run), C.AnswerSchema, stripAnswer, checkAnswerDraft);
     if (sub === "story") return sendJson(req, res, 200, storyRead(run), C.AnswerStorySchema);
     if (sub === "map") return notFound(req, res, "MAP_VIEW_NOT_FOUND", "This debate has no map view (the debate-shape row was off).");
     if (sub === "disclosure") return sendJson(req, res, 200, seed.disclosure(run.answerId!), C.AnswerDisclosureSchema);
@@ -1483,6 +1593,12 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
         return sendJson(req, res, 409, { error: "RUN_PAUSED_UNTIL_RESET", message: "RUN_PAUSED_UNTIL_RESET", until: nextUtcMonth() }, DraftRunContinueRefusedSchema);
       }
       run.monthPaused = false;
+      // A dig paused under `dig=PAUSE` then runs its time and finishes, so the click-test sees it through.
+      if (run.settlesAfterContinue === true) {
+        run.settleAt = Date.now() + RUN_SECONDS * 1000;
+        run.storyReadyAt = run.settleAt;
+        run.settlesAfterContinue = false;
+      }
       return sendJson(req, res, 200, { state: "CONTINUING" }, DraftRunContinuedSchema);
     }
     if (parts[3] === "researched") {
@@ -1564,10 +1680,14 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (run === undefined) return notFound(req, res, "RUN_NOT_FOUND", "No run with this id.");
     const sub = parts.slice(3).join("/");
     // W2-7 (draft): a debate paused at the month wall says so once the contract knows `month_pause`.
-    if (sub === "") return sendDraftable(runProjection(run), C.RunProjectionSchema, stripRun, issuesOf(runDraftSchema));
+    // Draft (journey-d2): the start time rides along on the draft view, and on the normal view once the contract knows it.
+    if (sub === "") {
+      return sendDraftable(withStartedAt(runProjection(run), run, draftView), C.RunProjectionSchema, stripRun,
+        (body: unknown) => [...issuesOf(runDraftSchema)(body), ...issuesOf(runStartDraftSchema)(body)]);
+    }
     if (sub === "answer") {
       if (stateOf(run) !== "SETTLED" || run.answer === undefined) return notFound(req, res, "ANSWER_NOT_FOUND", "This run has no answer yet.");
-      return sendDraftable(run.answer, C.AnswerSchema, stripAnswer, checkAnswerDraft);
+      return sendDraftable(answerNow(run), C.AnswerSchema, stripAnswer, checkAnswerDraft);
     }
     if (sub === "last-visit") return sendJson(req, res, 200, lastVisits.get(run.runRef) ?? { seen_at: null, items: null }, C.LastVisitSchema);
     if (sub === "dig-links") return sendJson(req, res, 200, digLinksOf(run.runRef), C.DigLinksSchema);

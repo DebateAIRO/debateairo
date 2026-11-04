@@ -14,6 +14,8 @@ On 31 Oct 2026 (R22 decision 29) it gained dynamic step 2: `POST /v1/asks/clarif
 
 On 1 Nov 2026 (R22, for the owner's click-test) it gained the final report as the website reads it: `GET /v1/runs/:id/investigation` serves report versions (the older shape stays at `/__mock/draft/v1/runs/:id/investigation`), `POST /v1/runs/:id/report` ("Write my report": about 8 seconds of "being written", then finished; `report=FAIL` makes it fail) and `POST /v1/runs/:id/reopen` ("Keep digging"). So the current version's PDF can be made against the mock, once the browser has the sign-in cookie. And a debate in Arabic, `a2000000-0000-4000-8000-000000000001`: its question and report are in Arabic (the rest of its map is the English seed), so the page offers Print in place of the PDF.
 
+On 4 Nov 2026 (V4 screen review, dig-f1) the first debate gained its main answer, rewritten after its digs: version 1 while a change is still being written into it (45 seconds after the mock starts, `MOCK_MAIN_ANSWER_SECONDS`), then version 2.
+
 ## Files
 
 | File | What it is |
@@ -73,10 +75,10 @@ All the answers carry the same English debate: *"Should countries build new nucl
 
 | Run id | What you see | Web case | Investigation |
 |---|---|---|---|
-| `11111111-1111-4111-8111-111111111111` | **Finished**, the nuclear question, story ready. Answer id `aaaa1111-…`. | paid, searched | **open** (reopened by its dig 8888; report version 1 kept as an earlier version) |
+| `11111111-1111-4111-8111-111111111111` | **Finished**, the nuclear question, story ready. Answer id `aaaa1111-…`. Its main answer (rewritten after its digs) is still being rewritten for the first 45 seconds, then shows version 2: the map shows it without a reload, as news at the question. | paid, searched | **open** (reopened by its dig 8888; report version 1 kept as an earlier version) |
 | `22222222-2222-4222-8222-222222222222` | **Running forever** ("Is a four-day work week good for productivity and for workers?"). | – | open |
 | `33333333-3333-4333-8333-333333333333` | **Waiting in line**. It is expected to start 20 minutes after the mock started. | – | open |
-| `44444444-4444-4444-8444-444444444444` | **Failed** with `RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM` (the website's "the AI models it needs were unavailable" sentence). | – | none |
+| `44444444-4444-4444-8444-444444444444` | **Failed** with `RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM` (the website's "the AI models it needs were unavailable" sentence). Its draft view says `quota_used: "NONE"` (owner review 3 Nov). Its page offers "Ask this again", which opens `/v4?again=4444…` with the question filled in. | – | none |
 | `55555555-5555-4555-8555-555555555555` | **Finished**, but its story says "still writing" for the first 40 seconds after the mock starts. Answer id `aaaa5555-…`. | paid, searched | open |
 | `66666666-6666-4666-8666-666666666666` | **Finished**, asked on the **Free** plan. Answer id `aaaa6666-…`. | Free: not on this plan | closed (report version 1) |
 | `77777777-7777-4777-8777-777777777777` | **Finished**, but its **web search failed**. Answer id `aaaa7777-…`. | failed | open |
@@ -118,6 +120,7 @@ The shapes are task W1-6's (`packages/contract/src/web.ts`). W1-6 merged (`76e93
 | `POST /v1/asks` | `parent` | a dig names its parent run, the places it was dug from, its mode, and its picks (suggestions as sent, edited or not, and the person's own view) |
 | `GET /v1/runs/:id/investigation` | (new route; W1-6 names no route yet) | the investigation the run belongs to: state `OPEN`/`CLOSED`, its digs (the 0131 link records), and every closing with its report version |
 | `POST /v1/runs/:id/investigation/close` | (new route) | "Write my report": closes it and adds a report version |
+| `GET /v1/answers` (each row) | `started_at`, `map_bar`, `changed_since_visit`, `dug_from` | the ask page's "Your maps" (owner's screen review, 3 Nov 2026): when an open question started ("Being looked into, started 14:00"), an answer's four-shade bar (`sure`, `sure_for_case`, `still_argued`, `didnt_hold`), whether its map changed since the person last opened it (here: no last visit recorded yet; the "New" dot), and the debate a dig was dug from (null for a first question). **The contract's rows are strict and do not name these yet, so the website never receives them**: the page shows the calm fallback (no time, no bar, no dot, and it reads each row's dig links). See them at `/__mock/draft/v1/answers?limit=50&offset=0`. |
 
 How they are sent:
 
@@ -144,7 +147,10 @@ The shapes are the contract's (`packages/contract/src/web.ts`, merged in W2-7), 
 | `GET /v1/asks/room` | `start_share_percent`, `new_starts` | a new question's share of today (15% in the mock); `BLOCKED_UNTIL_RESET` when the day is used up (switch `room=WAIT_RESET`) |
 | `GET /v1/billing/usage` | `borrowed` | with `usage=BORROWED`: the day reads 104% and running work used 4% of tomorrow's allowance |
 | `GET /v1/runs/:id` | `month_pause` | on run `e100…`: `until` (the next month) and `can_continue` |
+| `GET /v1/runs/:id` | `quota_used` (owner review 3 Nov; NOT in the contract yet) | on a failed run: `NONE` (nothing was taken from the person's quota) or `SOME`. Only the draft view shows it; the website says "Nothing was taken" once the contract carries it |
 | `POST /v1/runs/:id/continue` | (draft route) | 409 `RUN_PAUSED_UNTIL_RESET` before the month reset, 200 `{"state":"CONTINUING"}` after it (switch `pause=CAN_CONTINUE`); setting `pause=` again pauses the run again |
+
+**The waiting card's start time (owner's screen review, 3 Nov 2026, journey-d2):** `GET /v1/runs/:id` may carry `started_at`, when the question started (ISO), so the card says "Started 14:31" on any device and after a reload. It is NOT in the contract yet (the run read's schema is strict), so today it is sent only on the draft view (`/__mock/draft/v1/runs/:id`), and on the normal view only once the contract's own schema accepts it. Seeded: the running run `2222…` (started 4 minutes before the mock), the paused run `e100…`, every settled run and every new ask that runs; a run waiting to start (`3333…`) has none.
 
 Every dig keeps its points and its answer text (owner Q-D13). The mock's digs still have a story, but since task W4-6 the website never reads a dig's story: a dig's map is drawn from its rewrite's own paths (each with its line and fate), or from the positions it argued while its rewrite is still being written.
 
@@ -172,11 +178,13 @@ Set these when starting the mock, or change them live by opening `http://127.0.0
 | `MOCK_PAUSE` / `pause=` | `UNTIL_RESET` (default), `CAN_CONTINUE` | Whether the paused debate `e100…` may continue yet (W2-7). Setting it pauses that debate again. |
 | `MOCK_ASK` / `ask=` | `AUTO` (default), `ACCEPT`, `WAITING`, `ALREADY_WAITING`, `LANGUAGE_CHOICE` | What a new ask gets. `AUTO` follows the room: FULL, BLOCKED or WAIT_RESET makes asks wait in line, ALREADY_WAITING refuses with 422, anything else accepts. |
 | `MOCK_REPORT` / `report=` | `OK` (default), `FAIL` | Whether the next report written comes out finished or failed. |
+| `MOCK_DIG` / `dig=` | `SETTLE` (default), `FAIL`, `PAUSE` | How a NEW dig ends (owner review 3 Nov): it finishes; it runs its time and then fails "stopped partway" (its draft view says `quota_used: "SOME"`), so "Try this dig again" and, after a second failure, "This keeps failing" can be seen; or it pauses at the month wall at once (its card reads "Dig · paused until …", and once `pause=CAN_CONTINUE` its panel's Continue lets it finish). |
 | `MOCK_REPORT_SECONDS` | default `8` | How long "Write my report" reads as being written. |
 | `MOCK_PORT` | default `4011` | Port (always on 127.0.0.1). |
 | `MOCK_RUN_SECONDS` | default `25` | How long a new debate "runs". |
 | `MOCK_STORY_WRITING_SECONDS` | default `40` | How long run 5555's story says "still writing". |
 | `MOCK_POSTED_STORY_SECONDS` | default `10` | How long a new debate's story says "still writing" after it finishes. |
+| `MOCK_MAIN_ANSWER_SECONDS` | default `45` | How long run 1111's main answer says a change is still being written into it, before version 2 shows. |
 | `MOCK_QUIET=1` | | Hides the per-request lines. |
 | `MOCK_ENGINE_DIR` | path | Where `dialectical-engine` is. Not needed when the mock runs from this folder. |
 
@@ -195,7 +203,7 @@ A wrong value stops the start with a clear message, for example `MOCK_ROOM_INVAL
 | `POST /v1/asks` | See above. |
 | `GET /v1/billing/usage` | Day 14%, week 31%, month 9%; with `usage=BORROWED`, day 104% with a borrow notice. |
 | `GET /v1/billing/plans` | The register's default plans (Free, Plus $20, Pro $50, Max $200). With no `?country=` there is no place yet, so no paid price is shown (the page asks for the country). With `?country=` the plans come in that country's currency (lei in Romania, euro in the euro countries, dollars elsewhere, as the register says) and each total includes its tax: each EU country's standard VAT (21% in Romania, 19% in Germany, 21% in the Czech Republic, 25% in Croatia, and so on), none added outside the EU. The US and Canada also need `?postal_code=` (a Texas ZIP such as 75201 adds 6.25%); a missing one, or one that does not fit the country's format (the kernel's own check), is asked for again. |
-| `GET /v1/answers?limit=&offset=` | Finished debates, plus the open runs (running, waiting, failed). |
+| `GET /v1/answers?limit=&offset=` | Finished debates, plus the open runs (running, waiting, failed). Draft: the shelf's row parts (see "Draft fields"). |
 | `GET /v1/answers/:id[?version=1]` | The answer (version 1 only). Draft: sources and path research. |
 | `GET /v1/answers/:id/story` | WRITING or READY, as described above. |
 | `GET /v1/answers/:id/map` | 404, as for a debate made without the debate-shape setting. The website treats this as "no map view". |
@@ -230,7 +238,8 @@ Made-up debates from `public-seed.ts`, read at `GET /v1/public/debates/:id`. The
 - **The Report button (decision 35)**: on `/public/debate/<ref>`, a claim with "hide" in it hides (the pretend check), one with "#person" goes to a person, anything else gets the "didn't find this" line. The queue shows on the team panel.
 - **A debate under review (decision 33)**: the team page's panel reads from the mock, but a passkey cannot be pressed here, so `/__mock/review?ref=<public ref>&step=HIDE` does what Confirm does (then `step=REMOVE_DIG`, `step=CORRECT&pointer=/story_short/summary&text=New words`, `step=REPUBLISH`). `/public/debate/<ref>` shows the plain under-review line while hidden, then the page with its "changed after review" line and the Report link.
 - **Refusals**: `/__mock/set?public=ONGOING` (a report waits), `public=REPORT_WRITING` and `public=TOO_DEEP` (a dig is refused), `public=OPEN` (back to normal), `room=FULL` (a used-up limit), more than three views with `plan=FREE`.
-- **A stranger**: `/__mock/set?session=OUT` shows a sign-in link in place of each press; `session=IN` to go back. The V4 pages then send you to sign in, as they do for a stranger.
+- **A stranger**: `/__mock/set?session=OUT` shows a sign-in link in place of each press; `session=IN` to go back. The V4 pages then send you to sign in, as they do for a stranger, with the way back to the same page (`/login?next=…`). The room read, the usage read and the account reads are refused (401) as the real API refuses them, so the ask page shows a stranger no quota share and no "% of your quota used".
+- **A sign-in that ended during a wait** (wait-f1): open a debate that is still running while signed in, then `/__mock/set?session=OUT`. Its reads are now refused (401), and the waiting card says "Please sign in again to see your question." with a Sign in button that comes back to the same question.
 
 **The Free notice**: `/__mock/set?plan=FREE`, then open `/v4` or `/new`: the notice shows before each Start press, and an ask that showed it sends `free_public_notice` (`/__mock/state` counts them as `free_notices`). Any paid plan shows no notice.
 

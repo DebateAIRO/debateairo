@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DIG_LEVEL_MAX } from "../../packages/contract/src/index.js";
 import {
-  advance, branch, buttonNamed, buttonsNamed, CATALOG, click, digPart, harness, mountMap, openPath, panel, PATHS, resetHarness,
+  advance, branch, buttonNamed, buttonsNamed, CATALOG, click, digPart, expandBranch, harness, mountMap, openPath, panel, PATHS, resetHarness,
   seededAnswer, text, tray, typeInto, unmountMap, page
 } from "./v4-debate-harness.js";
 
@@ -32,6 +32,8 @@ const word = (key: string, values: Record<string, string | number> = {}): string
 const treeBoxes = (index: number): HTMLInputElement[] =>
   [...branch(index).querySelectorAll<HTMLInputElement>(".v4MapLeafSuggestion input[type=checkbox]")];
 const panelBoxes = (): HTMLInputElement[] => [...panel().querySelectorAll<HTMLInputElement>(".v4Sugs input[type=checkbox]")];
+/** journey-f23 (owner's screen review, 3 Nov): the tray shows the picks as chips, never as "N picked". */
+const trayChips = (): HTMLElement[] => [...(tray()?.querySelectorAll<HTMLElement>(".v4ChoiceChip") ?? [])];
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -46,11 +48,16 @@ afterEach(async () => {
 describe("a path's dig suggestions, by kind", () => {
   it("the tree shows each path's first suggestions with their kind and a pick box; the panel lists them all by kind", async () => {
     await mountMap();
+    // map-f22: about 12 cards at once; a path's suggestions wait behind its "+N more" until it is opened or unfolded.
+    expect(treeBoxes(PATHS.renew)).toHaveLength(0);
+    expect(branch(PATHS.renew).querySelector(".v4MapMore[aria-expanded=\"false\"]")).not.toBeNull();
+    await expandBranch(PATHS.mix);
     expect(treeBoxes(PATHS.mix)).toHaveLength(2);
-    expect(treeBoxes(PATHS.renew)).toHaveLength(2);
-    expect(branch(PATHS.renew).textContent).toContain(word("v4.suggest.more", { count: 1 }));
     expect(branch(PATHS.mix).textContent).toContain(CATALOG["v4.suggest.kind.HELPS_MAIN_QUESTION.FOR"]);
     await openPath(PATHS.renew);
+    // The opened path shows its own leaves in full.
+    expect(treeBoxes(PATHS.renew)).toHaveLength(2);
+    expect(branch(PATHS.renew).textContent).toContain(word("v4.suggest.more", { count: 1 }));
     expect(panel().textContent).toContain(CATALOG["v4.suggest.heading"]);
     expect(panel().textContent).toContain(CATALOG["v4.suggest.onePath"]);
     const heads = [...panel().querySelectorAll(".v4SugGroup .v4PanelSmallHead")].map((node) => node.textContent);
@@ -71,12 +78,16 @@ describe("pick, combine, edit and add your own view", () => {
     await openPath(PATHS.renew);
     const [first, second] = panelBoxes();
     await click(first!);
-    expect(tray()?.textContent).toContain(word("v4.dig.trayPicked.one", { count: 1 }));
+    expect(trayChips()).toHaveLength(1);
     await click(second!);
     // The still-argued point under the same path is picked from the tree.
     const openBox = branch(PATHS.renew).querySelector<HTMLInputElement>(".v4MapLeafOpen input[type=checkbox]")!;
     await click(openBox);
-    expect(tray()?.textContent).toContain(word("v4.dig.trayPicked.other", { count: 3 }));
+    expect(trayChips()).toHaveLength(3);
+    expect(tray()!.querySelector(".v4ChoiceChips")!.getAttribute("aria-label")).toBe(CATALOG["v4.map.picked"]);
+    expect(tray()!.textContent).not.toMatch(/\bpicked\b/iu);
+    // The panel names no count either: the picks are marked where they are.
+    expect(panel().textContent).not.toMatch(/\d+ picked/iu);
     expect(buttonsNamed(word("v4.dig.trayDig.other", { count: 3 }), tray()!)).toHaveLength(1);
     // Picks shown on the tree too.
     expect(treeBoxes(PATHS.renew).filter((box) => box.checked)).toHaveLength(2);
@@ -105,17 +116,43 @@ describe("pick, combine, edit and add your own view", () => {
     await click(buttonNamed(CATALOG["v4.suggest.ownViewAdd"]!, panel()));
     expect(panel().textContent).toContain(CATALOG["v4.suggest.ownViewTag"]);
     expect(panel().textContent).toContain("Pumped hydro in the mountains could carry a windless week.");
-    expect(tray()?.textContent).toContain(word("v4.dig.trayPicked.other", { count: 2 }));
+    expect(trayChips()).toHaveLength(2);
     // Remove takes the own view out again.
     await click(buttonNamed(CATALOG["v4.suggest.remove"]!, panel()));
-    expect(tray()?.textContent).toContain(word("v4.dig.trayPicked.one", { count: 1 }));
+    expect(trayChips()).toHaveLength(1);
+  });
+
+  it("dig-f20: the tray's chips mark only the AIs' words as AI text, never the person's own view or their own wording", async () => {
+    await mountMap();
+    await openPath(PATHS.renew);
+    // An unedited suggestion, then the first one in the person's own wording, then their own view.
+    await click(panelBoxes()[1]!);
+    await click(buttonsNamed(CATALOG["v4.suggest.edit"]!, panel())[0]!);
+    await typeInto(panel().querySelector<HTMLTextAreaElement>(".v4SugEditor textarea")!, "My own wording of the battery point.");
+    await click(buttonNamed(CATALOG["v4.suggest.editDone"]!, panel()));
+    await click(buttonNamed(CATALOG["v4.suggest.ownView"]!, panel()));
+    await typeInto(panel().querySelector<HTMLTextAreaElement>(".v4SugEditor textarea")!, "Pumped hydro could carry a windless week.");
+    await click(buttonNamed(CATALOG["v4.suggest.ownViewAdd"]!, panel()));
+    const chips = trayChips();
+    expect(chips).toHaveLength(3);
+    const marked = (words: string): string | null => chips.find((chip) => chip.textContent?.includes(words))!.getAttribute("data-ai-generated");
+    expect(marked("My own wording")).toBeNull();
+    expect(marked("Pumped hydro")).toBeNull();
+    expect(chips.filter((chip) => chip.getAttribute("data-ai-generated") === "true")).toHaveLength(1);
+    expect(chips.every((chip) => chip.getAttribute("dir") === "auto")).toBe(true);
+    // journey-f13 / journey-f23: the tray's button counts nothing.
+    expect(buttonsNamed(CATALOG["v4.dig.trayDig.other"]!, tray()!)).toHaveLength(1);
+    expect(tray()!.textContent).not.toMatch(/\b3\b/u);
   });
 });
 
 describe("picks stay on one path (owner Q-D1)", () => {
   it("refuses a pick from a second path, says so plainly, and lets the person clear and start again", async () => {
     await mountMap();
+    await expandBranch(PATHS.renew);
     await click(treeBoxes(PATHS.renew)[0]!);
+    await expandBranch(PATHS.mix);
+    await expandBranch(PATHS.smr);
     // Every pick box of another path is closed (suggestions and open questions alike), and says why to a screen reader.
     for (const box of treeBoxes(PATHS.mix)) expect(box.disabled).toBe(true);
     const smrOpen = branch(PATHS.smr).querySelector<HTMLInputElement>(".v4MapLeafOpen input[type=checkbox]")!;
@@ -123,7 +160,7 @@ describe("picks stay on one path (owner Q-D1)", () => {
     expect(branch(PATHS.mix).textContent).toContain(CATALOG["v4.suggest.otherPath"]);
     await click(treeBoxes(PATHS.mix)[0]!);
     await click(smrOpen);
-    expect(tray()?.textContent).toContain(word("v4.dig.trayPicked.one", { count: 1 }));
+    expect(trayChips()).toHaveLength(1);
     expect(treeBoxes(PATHS.mix).some((box) => box.checked)).toBe(false);
     // The other path's panel says it in words and offers Clear, and no own view or edit there.
     await openPath(PATHS.mix);
@@ -134,13 +171,14 @@ describe("picks stay on one path (owner Q-D1)", () => {
     expect(tray()).toBeNull();
     for (const box of treeBoxes(PATHS.mix)) expect(box.disabled).toBe(false);
     await click(treeBoxes(PATHS.mix)[0]!);
-    expect(tray()?.textContent).toContain(word("v4.dig.trayPicked.one", { count: 1 }));
+    expect(trayChips()).toHaveLength(1);
   });
 });
 
 describe("Undo sends nothing", () => {
   it("a dig undone within 10 seconds is never sent, and the picks wait in the tray", async () => {
     await mountMap();
+    await expandBranch(PATHS.renew);
     await click(treeBoxes(PATHS.renew)[0]!);
     await click(treeBoxes(PATHS.renew)[1]!);
     await click(buttonNamed(word("v4.dig.trayDig.other", { count: 2 }), tray()!));
@@ -149,7 +187,7 @@ describe("Undo sends nothing", () => {
     await click(page().querySelector<HTMLButtonElement>(`button[aria-label="${CATALOG["v4.dig.undoLabel"]}"]`)!);
     await advance(20_000);
     expect(harness.submit).not.toHaveBeenCalled();
-    expect(tray()?.textContent).toContain(word("v4.dig.trayPicked.other", { count: 2 }));
+    expect(trayChips()).toHaveLength(2);
   });
 });
 
@@ -167,13 +205,13 @@ describe("Free combines at most 3 picks (owner Q19)", () => {
     await click(buttonNamed(CATALOG["v4.suggest.ownView"]!, panel()));
     await typeInto(panel().querySelector<HTMLTextAreaElement>(".v4SugEditor textarea")!, "My own view.");
     await click(buttonNamed(CATALOG["v4.suggest.ownViewAdd"]!, panel()));
-    expect(tray()?.textContent).toContain(word("v4.dig.trayPicked.other", { count: 3 }));
+    expect(trayChips()).toHaveLength(3);
     expect(panelBoxes()[2]!.disabled).toBe(true);
     expect(buttonsNamed(CATALOG["v4.suggest.ownView"]!, panel())).toHaveLength(0);
     const openBox = branch(PATHS.renew).querySelector<HTMLInputElement>(".v4MapLeafOpen input[type=checkbox]")!;
     expect(openBox.disabled).toBe(true);
     await click(panelBoxes()[2]!);
-    expect(tray()?.textContent).toContain(word("v4.dig.trayPicked.other", { count: 3 }));
+    expect(trayChips()).toHaveLength(3);
     expect(tray()?.textContent).toContain(word("v4.suggest.freeCap", { count: 3 }));
   });
 });
@@ -185,7 +223,9 @@ describe("\"Dig here too\" (nesting) and the deepest level", () => {
       parent: null,
       children: [{ parent_run_id: runId, child_run_id: crypto.randomUUID(), places: ["path:n-mix"], mode: "quick", created_at: "2026-10-30T10:00:00.000Z" }]
     };
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
+    await expandBranch(PATHS.mix);
+    await expandBranch(PATHS.renew);
     expect(buttonsNamed(CATALOG["v4.nest.digHereToo"]!, branch(PATHS.mix))).toHaveLength(1);
     expect(buttonsNamed(CATALOG["v4.nest.digHereToo"]!, branch(PATHS.renew))).toHaveLength(0);
     await click(buttonNamed(CATALOG["v4.nest.digHereToo"]!, branch(PATHS.mix)));
@@ -198,8 +238,9 @@ describe("\"Dig here too\" (nesting) and the deepest level", () => {
   it("is offered on every path of a dig's own map", async () => {
     const runId = crypto.randomUUID();
     harness.answer = seededAnswer(runId, { dig: digPart(crypto.randomUUID(), 3) });
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     for (const index of Object.values(PATHS)) {
+      await expandBranch(index);
       expect(buttonsNamed(CATALOG["v4.nest.digHereToo"]!, branch(index)), `path ${index}`).toHaveLength(1);
     }
   });
@@ -207,7 +248,7 @@ describe("\"Dig here too\" (nesting) and the deepest level", () => {
   it("at level 10 it is replaced by the deepest-level line: nothing can be picked or dug", async () => {
     const runId = crypto.randomUUID();
     harness.answer = seededAnswer(runId, { dig: digPart(crypto.randomUUID(), DIG_LEVEL_MAX) });
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     expect(text()).toContain(CATALOG["v4.nest.deepest"]);
     expect(buttonsNamed(CATALOG["v4.nest.digHereToo"]!)).toHaveLength(0);
     expect(page().querySelectorAll(".v4MapLeafSuggestion")).toHaveLength(0);
@@ -229,7 +270,7 @@ describe("phone width (375px)", () => {
     const box = page().querySelector<HTMLInputElement>(".v4OutSuggestion input[type=checkbox]")!;
     await click(box);
     // The tray sits in the sheet's footer while the map is open.
-    expect(page().querySelector(".v4DebSheetFoot .v4DebTray")?.textContent).toContain(word("v4.dig.trayPicked.one", { count: 1 }));
+    expect(page().querySelectorAll(".v4DebSheetFoot .v4DebTray .v4ChoiceChip")).toHaveLength(1);
     // Tapping a suggestion opens its path in the panel (the sheet closes), where it can be edited.
     await click(page().querySelector<HTMLButtonElement>(".v4OutSuggestion .v4SugMain")!);
     expect(page().querySelector(".v4DebSheet")).toBeNull();

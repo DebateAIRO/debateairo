@@ -22,7 +22,6 @@
 .v4DebStatusActions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin-top: 4px; }
 .v4DebStatus .v4Link { align-self: flex-start; min-height: 44px; display: inline-flex; align-items: center; }
 .v4DebStatusActions .v4Link { align-self: center; }
-.v4DebLoading { margin: 0; }
 .v4DebProgressState { display: flex; align-items: center; gap: 10px; font-weight: 600; color: var(--text); }
 .v4DebPulse {
   flex: none; width: 10px; height: 10px; border-radius: var(--r-dot); background: var(--accent);
@@ -66,17 +65,9 @@
 .v4DebLayout-desktop .v4DebPanelCol, .v4DebLayout-mid .v4DebPanelCol {
   position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; overscroll-behavior: contain;
 }
-/* UI-9: a desktop/mid tray floats over the bottom of the screen; leave room so the panel's end (the Dig button and the
-   room note) can scroll above it. */
-.v4DebHasTray:not(.v4DebLayout-phone) .v4DebPanelCol { padding-bottom: 96px; }
-.v4DebHasTray:not(.v4DebLayout-phone) .v4DebMain { padding-bottom: calc(110px + var(--safe-b)); }
-
-/* UI-1: the pinned phone bar (and the tray above it) must not hide the end of the page, the site footer or the cookie
-   bar. This page only: the shell gets room at the bottom and the cookie bar sits above the dock. */
-.appShell:has(.v4DebLayout-phone) { padding-bottom: calc(66px + var(--safe-b)); }
-.appShell:has(.v4DebLayout-phone.v4DebHasTray) { padding-bottom: calc(150px + var(--safe-b)); }
-.appShell:has(.v4DebLayout-phone) .consentBar { bottom: calc(78px + var(--safe-b)); }
-.appShell:has(.v4DebLayout-phone.v4DebHasTray) .consentBar { bottom: calc(162px + var(--safe-b)); }
+/* UI-1 / UI-9, dig-f16 (owner picks 3 Nov): the bottom stack (V4BottomStack.tsx: notes, tray, and the phone's pinned bar)
+   measures itself, and the page's bottom room is its real height (--v4-stack-room), so neither the panel's end nor the site
+   footer hides behind it. The rules live in v4-undo.css with the stack's own. */
 .appShell:has(.v4DebSheetOpen) { padding-bottom: 0; }
 
 /* ---------- the rail (when) ---------- */
@@ -123,21 +114,12 @@
 .v4DebRail-strip .v4DebRailOpenCount { font-size: 20px; }
 .v4DebRail-strip .v4DebRailGoodTime { flex-direction: row; flex-wrap: wrap; align-items: center; padding: 6px 10px; }
 
-/* ---------- the dock: the tray and the phone bar ---------- */
-.v4DebDock {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; pointer-events: none;
-  display: flex; flex-direction: column; align-items: center; gap: 8px;
-  padding: 0 var(--v4-gutter) calc(16px + var(--safe-b));
-}
-.v4DebDock > * { pointer-events: auto; }
-.v4DebDock:empty { display: none; }
-.v4DebDockPhone { padding-bottom: 0; gap: 0; padding-left: 0; padding-right: 0; }
+/* ---------- the tray and the phone bar (placed by the bottom stack, v4-undo.css) ---------- */
 .v4DebTray {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px;
   width: 100%; max-width: 640px; padding: 10px 14px; border-radius: var(--r-card);
   background: var(--surface); border: 1px solid var(--line-strong); box-shadow: var(--shadow-pop);
 }
-.v4DebDockPhone .v4DebTray { max-width: none; border-radius: var(--r-card) var(--r-card) 0 0; box-shadow: none; border-bottom: 0; }
 .v4DebTrayText { margin: 0; min-width: 0; }
 .v4DebTrayActions { display: flex; align-items: center; gap: 14px; }
 .v4DebTrayClear { min-height: 44px; }
@@ -175,16 +157,7 @@
   max-width: none; border-radius: 0; box-shadow: none; border-width: 1px 0 0;
 }
 
-/* ---------- the dig note ---------- */
-.v4DebToast { flex-wrap: wrap; }
-.v4DebToastText { min-width: 0; overflow-wrap: anywhere; }
-.v4DebToastMode { color: var(--gold-bg); }
-.v4DebToastLifted { bottom: calc(150px + var(--safe-b)); }
-/* The phone bar is hidden while the map is open; the note then sits just above the sheet's tray. */
-.v4DebSheetOpen .v4DebToastLifted { bottom: calc(96px + var(--safe-b)); }
-@media (min-width: 768px) {
-  .v4DebToastLifted { bottom: calc(96px + var(--safe-b)); }
-}
+/* The dig note is the shared Undo note (V4UndoNote.tsx), styled in v4-undo.css. */
 
 /* Perplexity plan W3-4: the tray's one-path line and money lines, the deepest-level note, the month pause with Continue,
    and the rail's borrow notice. No fixed widths; text wraps at 375px. */
@@ -194,6 +167,23 @@
 .v4DebPaused { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
 .v4DebPaused p { margin: 0; }
 .v4DebPaused .v4Btn { min-height: 44px; }
+/* Owner review 3 Nov (wait-f2, wait-f5, map-f31): the one pause block. Its dot and sentence on one line; before the month
+   resets a plain grey label where Continue will be (not a button); after it, Continue. Motion (journey-d1 A): nothing
+   moves; a block that changes on screen gets the shared 1-second highlight (.v4Highlight, v4-base.css), kept as is with
+   reduced motion. */
+.v4Pause { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; border-radius: var(--r-card); min-width: 0; }
+.v4Pause p { margin: 0; }
+.v4PauseLine { display: flex; align-items: baseline; gap: 10px; font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+.v4PauseLine .v4PauseDot { align-self: center; }
+.v4PauseUntil {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border-radius: var(--r-pill);
+  border: 1px dashed var(--line-strong); color: var(--text-2); font-weight: 600; font-size: var(--t-ui);
+}
+.v4PauseContinue { min-height: 44px; }
+/* Owner review 3 Nov (wait-f11, map-f30): the failed page's way on: "Ask this again" with its grey line, then small links. */
+.v4DebFailedAgain { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 4px; }
+.v4DebFailedNote { font-size: var(--t-meta); max-width: 52ch; }
+.v4DebFailedNew { font-size: var(--t-ui); }
 /* public-f23: the side line follows the reading direction (it sits on the right in Arabic and Hebrew). */
 .v4DebRailUsage { border-inline-start: 3px solid var(--gold); padding-inline-start: 10px; }
 .v4DebRailUsageNote { margin: 0; font-size: var(--t-ui); overflow-wrap: anywhere; }
@@ -225,3 +215,75 @@
 .v4TrailParts .v4Link { min-height: 44px; display: inline-flex; align-items: center; }
 .v4TrailLevel { margin: 0; font-weight: 700; color: var(--text); }
 .v4DebChangesRewrites { flex: 1 1 100%; margin: 0; padding-left: 1.2em; min-width: 0; overflow-wrap: anywhere; }
+
+/* V4 screen review, 3 Nov (map-f6): the page's grey outline while it loads: an empty header bar, an empty answer card and
+   a few empty question cards. It stands still (no shimmer) and is replaced at once when the page is there. */
+.v4DebOutline { display: flex; flex-direction: column; gap: 14px; width: 100%; min-width: 0; }
+.v4DebOutlineBrand { display: block; width: 180px; max-width: 50%; height: 44px; border-radius: var(--r-btn); background: var(--surface-2); }
+.v4DebOutlineAnswer {
+  display: flex; flex-direction: column; gap: 10px; min-height: 132px; padding: 16px;
+  border: 1px solid var(--line-2); border-radius: var(--r-card); background: var(--surface);
+}
+.v4DebOutlineLine { display: block; width: 100%; height: 12px; border-radius: var(--r-pill); background: var(--surface-2); }
+.v4DebOutlineLineShort { width: 32%; }
+.v4DebOutlineLineMid { width: 64%; }
+.v4DebOutlineCards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 12px; }
+.v4DebOutlineCard { display: block; height: 88px; border: 1px solid var(--line-2); border-radius: var(--r-card); background: var(--surface-2); }
+
+/* dig-f23: the page's own question before a link would lose typed words. It appears at once, above everything. */
+.v4LeaveBackdrop {
+  position: fixed; inset: 0; z-index: 70; display: flex; align-items: center; justify-content: center;
+  padding: 16px var(--v4-gutter); background: rgba(0, 0, 0, .35);
+}
+.v4Leave { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 14px; padding: 20px; box-shadow: var(--shadow-pop); }
+.v4LeaveTitle { margin: 0; font-weight: 600; color: var(--text-strong); overflow-wrap: anywhere; }
+.v4LeaveActions { display: flex; flex-wrap: wrap; gap: 10px; }
+
+/* ---------- V4 screen review (owner picks 3 Nov 2026): the ready moment, "What your digs did", the tour bar ----------
+   journey-f17 / wait-f4: the small ready note (in the bottom stack, above the phone's pinned bar); journey-f10 / dig-f3: the
+   notice above the map; dig-f18: the pinned "Next change › · Done"; map-f19: "Since you last looked"; map-f21: the long
+   answer folded while the short one is written; dig-f19 / map-f17: "Your report is older than the map".
+   Motion (journey-d1): nothing here moves. What changes shows at once with the shared 1-second highlight (.v4Highlight,
+   v4-base.css); it is a colour, not a movement, so it stays under reduced motion as the owner's rule asks. No fixed
+   widths: everything wraps at 375px. */
+
+.v4ReadyNote {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; width: max-content; max-width: min(560px, 100%);
+  background: var(--ink); color: var(--surface); border-radius: var(--r-btn); padding: 6px 8px 6px 16px; box-shadow: var(--shadow-pop);
+}
+/* journey-d3: on a phone the note sits in the bottom stack, above the pinned bar (V4BottomStack). */
+.v4StackPhone .v4ReadyNote { width: 100%; max-width: none; box-shadow: none; }
+.v4DebSheetFoot .v4ReadyNote { margin: 8px var(--v4-gutter); }
+.v4ReadyNoteText { min-width: 0; flex: 1 1 200px; overflow-wrap: anywhere; }
+.v4ReadyNoteAct {
+  display: inline-flex; align-items: center; min-height: 44px; background: none; border: 0; padding: 0 4px; cursor: pointer;
+  color: var(--gold-bg); font-weight: 700; text-decoration: underline; text-underline-offset: 3px;
+}
+.v4ReadyNoteClose {
+  display: inline-flex; align-items: center; justify-content: center; width: 44px; min-height: 44px;
+  background: none; border: 0; color: var(--surface); cursor: pointer;
+}
+
+.v4DigsDid { flex-direction: column; align-items: stretch; gap: 8px; min-width: 0; }
+.v4DigsDidTitle { margin: 0; font-size: var(--t-ui); font-weight: 700; }
+.v4DigsDidNews { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; min-width: 0; }
+.v4DigsDidHolds { margin: 0; font-weight: 600; }
+.v4DigsDidList { margin: 0; padding-inline-start: 1.2em; min-width: 0; overflow-wrap: anywhere; font-size: var(--t-ui); }
+
+.v4TourBar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; min-width: 0;
+  padding: 8px 10px; border: 1px solid var(--con-border); border-radius: var(--r-card); background: var(--con-bg);
+}
+/* On a computer it sits under the where-you-are line and stays there while the panel scrolls. */
+.v4Panel .v4TourBar { position: sticky; top: 0; z-index: 2; margin: 6px 0; }
+.v4StackPhone .v4TourBar { flex: none; width: 100%; border-radius: var(--r-card) var(--r-card) 0 0; border-bottom: 0; padding: 8px var(--v4-gutter); }
+
+.v4PanelSince { margin: 4px 0 6px; font-size: var(--t-ui); font-weight: 600; color: var(--text); }
+.v4PanelFullAnswer { margin-top: 8px; font-size: var(--t-ui); }
+.v4PanelFullAnswer summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--link); }
+.v4PanelFullAnswer .v4PanelFallback { font-size: var(--t-body); }
+
+.v4ChangedSincePaths { flex: 1 1 100%; min-width: 0; }
+.v4ChangedSinceLead, .v4ChangedSinceWait { margin: 0; font-size: var(--t-ui); }
+.v4ChangedSinceWait { flex: 1 1 100%; }
+.v4ChangedSinceList { margin: 4px 0 0; padding-inline-start: 1.2em; overflow-wrap: anywhere; font-size: var(--t-ui); }

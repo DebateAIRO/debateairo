@@ -6,8 +6,8 @@ import type { AskRoom } from "../../apps/ui/lib/billing/room.js";
 import type * as Money from "../../apps/ui/lib/v4/money.js";
 import { DIG_LEVEL_MAX, type RunProjection } from "../../packages/contract/src/index.js";
 import {
-  branch, buttonNamed, CATALOG, click, digPart, harness, mountMap, openPath, page, panel, PATHS, resetHarness, seededAnswer,
-  text, tray, unmountMap
+  advance, branch, buttonNamed, buttonsNamed, CATALOG, click, digPart, expandBranch, harness, mountMap, openPath, page, panel, PATHS,
+  resetHarness, seededAnswer, text, tray, unmountMap
 } from "./v4-debate-harness.js";
 
 vi.mock("@/components/AuthGate", async () => (await import("./v4-debate-harness.js")).authGateMock);
@@ -62,6 +62,8 @@ describe("before a dig: its share of today", () => {
     await mountMap();
     const line = word("v4.dig.quotaShare", { percent: 20 });
     expect(line).toBe("This dig uses about 20% of today. After it you can still finish your report.");
+    // map-f22: the path's suggestions show once its leaves are unfolded (about 12 cards at once).
+    await expandBranch(PATHS.renew);
     await click(branch(PATHS.renew).querySelector<HTMLInputElement>(".v4MapLeafSuggestion input[type=checkbox]")!);
     expect(tray()?.textContent).toContain(line);
     await openPath(PATHS.renew);
@@ -84,7 +86,7 @@ describe("new starts wait for the reset (new_starts: BLOCKED_UNTIL_RESET)", () =
     harness.room = room({ room: "FULL", scope: "PERSON_DAY", resets_at: RESET, new_starts: "BLOCKED_UNTIL_RESET", dig_share_percent: 20 });
     await mountMap();
     await openPath(PATHS.smr);
-    const time = formatDate("en", RESET, { hour: "2-digit", minute: "2-digit" });
+    const time = formatDate("en", RESET, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
     expect(panel().textContent).toContain(word("v4.money.startsWait.PERSON_DAY", { time }));
     expect(reportLinks().length).toBeGreaterThan(0);
   });
@@ -93,7 +95,7 @@ describe("new starts wait for the reset (new_starts: BLOCKED_UNTIL_RESET)", () =
     harness.room = room({ room: "FULL", scope: "PERSON_MONTH", resets_at: NEXT_MONTH, new_starts: "BLOCKED_UNTIL_RESET" });
     await mountMap();
     await openPath(PATHS.smr);
-    const time = formatDate("en", NEXT_MONTH, { dateStyle: "medium", timeStyle: "short" });
+    const time = formatDate("en", NEXT_MONTH, { dateStyle: "medium", timeStyle: "short", hourCycle: "h23" });
     expect(panel().textContent).toContain(word("v4.money.startsWait.PERSON_MONTH", { time }));
     expect(CATALOG["v4.money.startsWait.PERSON_MONTH"]).toContain("You can still write your report.");
   });
@@ -121,37 +123,64 @@ describe("the borrowed notice in the usage area", () => {
 });
 
 describe("a debate paused at the month wall", () => {
-  it("says 'paused until {date}', and Continue before the reset is refused with nothing changed", async () => {
+  // Owner review 3 Nov (wait-f5, map-f31, public-f17): the pause is said once, with a still mark; before the reset nothing
+  // looks pressable ("Continues on …" is a plain label); after it, Continue.
+  it("says it once, with a still mark and no Continue button before the reset", async () => {
     const runId = crypto.randomUUID();
     harness.run = paused(runId, false);
-    harness.continueRun = vi.fn(async () => ({ kind: "TOO_EARLY" as const, until: NEXT_MONTH }));
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     const date = formatDate("en", NEXT_MONTH, { dateStyle: "medium" });
-    expect(text()).toContain(word("v4.debate.state.PAUSED_MONTH", { date }));
+    const day = formatDate("en", NEXT_MONTH, { day: "numeric", month: "short" });
     expect(text()).toContain(word("v4.money.paused", { date }));
+    expect(text()).not.toContain(word("v4.debate.state.PAUSED_MONTH", { date }));
+    expect(text()).toContain(word("v4.pause.continuesOn", { date: day }));
     expect(text()).toContain(CATALOG["v4.money.continueNote"]);
-    await click(buttonNamed(CATALOG["v4.money.continue"]!));
-    expect(harness.continueRun).toHaveBeenCalledWith(runId);
-    expect(text()).toContain(word("v4.money.continueTooEarly", { date }));
-    expect(buttonNamed(CATALOG["v4.money.continue"]!).disabled).toBe(false);
+    expect(text()).not.toContain(CATALOG["v4.debate.usually"]);
+    expect(buttonsNamed(CATALOG["v4.money.continue"]!)).toEqual([]);
+    expect(page().querySelector(".v4DebPulse")).toBeNull();
+    expect(page().querySelector(".v4PauseDot")).not.toBeNull();
   });
 
   it("once the month has reset, Continue resumes it", async () => {
     const runId = crypto.randomUUID();
     harness.run = paused(runId, true);
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     expect(text()).toContain(CATALOG["v4.money.pausedReady"]);
     await click(buttonNamed(CATALOG["v4.money.continue"]!));
+    expect(harness.continueRun).toHaveBeenCalledWith(runId);
     expect(buttonNamed(CATALOG["v4.money.continuing"]!).disabled).toBe(true);
+  });
+
+  it("a Continue the server still refuses as too early says from when, and nothing changed", async () => {
+    const runId = crypto.randomUUID();
+    harness.run = paused(runId, true);
+    harness.continueRun = vi.fn(async () => ({ kind: "TOO_EARLY" as const, until: NEXT_MONTH }));
+    await mountMap(1600, runId);
+    await click(buttonNamed(CATALOG["v4.money.continue"]!));
+    expect(text()).toContain(word("v4.money.continueTooEarly", { date: formatDate("en", NEXT_MONTH, { dateStyle: "medium" }) }));
+    expect(buttonNamed(CATALOG["v4.money.continue"]!).disabled).toBe(false);
   });
 
   it("a failed Continue says so plainly", async () => {
     const runId = crypto.randomUUID();
     harness.run = paused(runId, true);
     harness.continueRun = vi.fn(async () => ({ kind: "FAILED" as const }));
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     await click(buttonNamed(CATALOG["v4.money.continue"]!));
     expect(text()).toContain(CATALOG["v4.money.continueFailed"]);
+  });
+
+  it("when the new month starts while the page is open, the block changes at once with the 1-second highlight", async () => {
+    const runId = crypto.randomUUID();
+    harness.run = paused(runId, false);
+    await mountMap(1600, runId);
+    expect(page().querySelector(".v4Pause.v4Highlight")).toBeNull();
+    harness.run = paused(runId, true);
+    await advance(5_000);
+    expect(text()).toContain(CATALOG["v4.money.pausedReady"]);
+    expect(page().querySelector(".v4Pause.v4Highlight")).not.toBeNull();
+    await advance(1_000);
+    expect(page().querySelector(".v4Pause.v4Highlight")).toBeNull();
   });
 });
 
@@ -176,7 +205,7 @@ describe("\"Write my report\" is always there", () => {
   it("at the deepest level too (where nothing more can be dug)", async () => {
     const runId = crypto.randomUUID();
     harness.answer = seededAnswer(runId, { dig: digPart(crypto.randomUUID(), DIG_LEVEL_MAX) });
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     expect(reportLinks().length).toBeGreaterThan(0);
   });
 });

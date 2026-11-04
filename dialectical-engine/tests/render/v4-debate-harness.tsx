@@ -6,8 +6,9 @@ import { vi } from "vitest";
 import * as fixture from "../../apps/ui/lib/v3/storyFixture.js";
 import type { AskRoom } from "../../apps/ui/lib/billing/room.js";
 import type { ContinueOutcome } from "../../apps/ui/lib/v4/money.js";
+import { resetDigUndo } from "../../apps/ui/lib/v4/digUndo.js";
 import type { DigTrail } from "../../apps/ui/lib/v4/load.js";
-import type { DigLink, DigView, SeenSnapshot } from "../../apps/ui/lib/v4/types.js";
+import type { DigLink, DigView, ReadingLevel, SeenSnapshot } from "../../apps/ui/lib/v4/types.js";
 import type { V4AskOutcome } from "../../apps/ui/lib/v4/useV4Ask.js";
 import type { Answer, AnswerStory, AskParent, DigLinks, InvestigationReports, RunProjection, UsageBorrow } from "../../packages/contract/src/index.js";
 import { createSeed } from "../../tools/v4-mock-api/seed.js";
@@ -55,6 +56,8 @@ export const harness = {
   planTier: "premium" as "free" | "premium",
   room: null as AskRoom | null,
   submit: vi.fn<Submit>(),
+  /** The one-time data consent's answer at a dig's press. */
+  ensureConsent: vi.fn<() => Promise<boolean>>(),
   /** Every `dig` the page handed useV4Ask (its room read), newest last. */
   digRooms: [] as unknown[],
   answer: null as Answer | null,
@@ -76,13 +79,24 @@ export const harness = {
   loadStory: vi.fn(),
   loadAnswer: vi.fn(),
   /** W4-4: "Add to researched"'s press. */
-  addToResearched: vi.fn<(runId: string, pathId: string, pageRef: string) => Promise<"READING" | "WAITS_FOR_RESET" | "TRY_AGAIN">>()
+  addToResearched: vi.fn<(runId: string, pathId: string, pageRef: string) => Promise<"READING" | "WAITS_FOR_RESET" | "TRY_AGAIN">>(),
+  /** V4 screen review: the page's address after `/v4/debate/<id>` when it is mounted ("?path=…&pick=…"; "" none). */
+  search: "",
+  /** wait-f1: what reading the debate throws (null: it reads as above). */
+  loadError: null as unknown,
+  /** map-f6: the debate's read never answers (the page shows its outline). */
+  loadPending: false,
+  /** map-f6: the account's reading level (null: none kept); a promise that never settles keeps it unknown. */
+  accountLevel: null as Promise<ReadingLevel | null> | null
 };
 
 export function resetHarness(): void {
+  // dig-d3: the waiting digs live in the page's memory across pages; each test starts with none.
+  resetDigUndo();
   harness.planTier = "premium";
   harness.room = null;
   harness.submit = vi.fn<Submit>(async () => ({ kind: "STARTED", runId: crypto.randomUUID() }));
+  harness.ensureConsent = vi.fn(async () => true);
   harness.digRooms = [];
   harness.answer = null;
   harness.story = seededStory();
@@ -98,6 +112,10 @@ export function resetHarness(): void {
   harness.loadStory = vi.fn(async () => harness.story);
   harness.loadAnswer = vi.fn(async (runId: string) => harness.fresh ?? harness.answer ?? seededAnswer(runId));
   harness.addToResearched = vi.fn(async () => "READING" as const);
+  harness.search = "";
+  harness.loadError = null;
+  harness.loadPending = false;
+  harness.accountLevel = null;
 }
 resetHarness();
 
@@ -115,6 +133,8 @@ export const useV4AskMock = {
     return {
       planTier: harness.planTier,
       submit: (...args: Parameters<Submit>) => harness.submit(...args),
+      // The one-time data consent, asked at a dig's press (lib/v4/useDigQueue.tsx): given, unless a test says otherwise.
+      ensureConsent: () => harness.ensureConsent(),
       flagsCrisis: () => false,
       room: harness.room,
       submitting: false,
@@ -125,9 +145,13 @@ export const useV4AskMock = {
 export function loadMock(original: Record<string, unknown>) {
   return {
     ...original,
-    loadV4: async (id: string) => harness.run !== null
-      ? { kind: "RUN", runId: id, run: harness.run }
-      : { kind: "SERVED", runId: id, answer: harness.answer ?? seededAnswer(id), story: harness.story },
+    loadV4: async (id: string) => {
+      if (harness.loadPending) return new Promise(() => undefined);
+      if (harness.loadError !== null) throw harness.loadError;
+      return harness.run !== null
+        ? { kind: "RUN", runId: id, run: harness.run }
+        : { kind: "SERVED", runId: id, answer: harness.answer ?? seededAnswer(id), story: harness.story };
+    },
     loadStory: (...args: unknown[]) => harness.loadStory(...args),
     loadAnswer: (runId: string) => harness.loadAnswer(runId),
     addToResearched: (runId: string, pathId: string, pageRef: string) => harness.addToResearched(runId, pathId, pageRef),
@@ -152,6 +176,8 @@ export function accountMemoryMock(original: Record<string, unknown>) {
   return {
     ...original,
     readDigRecords: async () => harness.records,
+    readAccountLevel: () => harness.accountLevel ?? Promise.resolve(null),
+    saveAccountLevel: async () => true,
     readLastVisit: async () => harness.lastVisit,
     recordLastVisit: async () => true,
     recordDig: async () => true
@@ -167,8 +193,13 @@ export function moneyMock(original: Record<string, unknown>) {
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;
 
-/** The page's layout queries: phone (< 768 px) or desktop. */
-function stubWidth(width: 375 | 1280): void {
+/**
+ * The page's layout queries: phone (< 768 px), tablet (768-1099 px), laptop (1100-1439 px, map-d3: only the opened path
+ * unfolds) or the wide desktop (the whole tree, as before map-d3).
+ */
+export type MapWidth = 375 | 800 | 1280 | 1600;
+
+function stubWidth(width: MapWidth): void {
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
     value: (query: string) => {
@@ -194,15 +225,22 @@ export async function advance(ms: number): Promise<void> {
   });
 }
 
-/** Mounts the map page of a fresh run id at `width`; returns the run id. W4-6: `initialPath` as `?path=` names it. */
-export async function mountMap(width: 375 | 1280 = 1280, runId: string = crypto.randomUUID(), initialPath: string | null = null): Promise<string> {
+/**
+ * Mounts the map page of a fresh run id at `width` (the wide desktop by default); returns the run id. W4-6: `initialPath`
+ * as `?path=` names it; map-f6: `initialLevel` is the level the address carries.
+ */
+export async function mountMap(width: MapWidth = 1600, runId: string = crypto.randomUUID(), initialPath: string | null = null,
+  initialLevel: ReadingLevel | null = "background"): Promise<string> {
   stubWidth(width);
+  // The page reads (and writes) its question and picks in the address: each test starts from its own page address.
+  const query = harness.search !== "" ? harness.search : initialPath === null ? "" : `?path=${encodeURIComponent(initialPath)}`;
+  window.history.replaceState(null, "", `/v4/debate/${runId}${query}`);
   const { V4DebateClient } = await import("../../apps/ui/components/v4/V4DebateClient.js");
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
   await act(async () => root?.render(
-    <V4DebateClient id={runId} initialPath={initialPath} initialLevel="background" catalog={CATALOG} homeCatalog={{}} newDebateCatalog={{}}
+    <V4DebateClient id={runId} initialPath={initialPath} initialLevel={initialLevel} catalog={CATALOG} homeCatalog={{}} newDebateCatalog={{}}
       billingCatalog={{}} locale="en" crisisCountryHint={null} />
   ));
   await settle();
@@ -255,6 +293,15 @@ export function branch(index: number): HTMLElement {
   const found = page().querySelectorAll<HTMLElement>(".v4MapBranch")[index];
   if (found === undefined) throw new Error(`no branch ${index}`);
   return found;
+}
+
+/**
+ * map-f22: the tree shows about 12 cards at once and folds the rest behind "+N more" (a visible sign); this unfolds one
+ * path's leaves (its open questions, digs and suggestions), as the person would. Nothing happens when nothing is folded.
+ */
+export async function expandBranch(index: number): Promise<void> {
+  const more = branch(index).querySelector<HTMLButtonElement>(":scope > .v4MapLeaves > .v4MapLeafMore > .v4MapMore[aria-expanded=\"false\"]");
+  if (more !== null) await click(more);
 }
 
 /** Opens a path in the panel by its tree card. */

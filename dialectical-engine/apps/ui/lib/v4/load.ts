@@ -10,6 +10,7 @@ import {
   type RunProjection
 } from "@debateai/contract";
 import { contractClient, isNotFound } from "../api.js";
+import { quotaUntouched } from "./failedRun.js";
 import { buildV4Map, isFinishedRewrite } from "./mapModel.js";
 import type { DigLink, DigView } from "./types.js";
 
@@ -134,9 +135,19 @@ export async function loadAnswer(runId: string, client: AnswerClient = contractC
 }
 
 function digView(link: DigLink, state: DigView["state"], run?: RunProjection): DigView {
-  // W4-6 (the money rule): a dig whose own run reached the month wall says it is paused, on its card.
-  const pausedUntil = run?.month_pause?.until;
-  return { link, state, headline: null, counts: null, ...(pausedUntil === undefined ? {} : { pausedUntil }) };
+  // W4-6 (the money rule): a dig whose own run reached the month wall says it is paused, on its card. Owner review 3 Nov
+  // (wait-f2, public-f16): with the server's answer whether it may continue now, so its panel can offer Continue.
+  const pause = run?.month_pause;
+  // wait-f18: a dig that did not finish keeps its run's reason (the panel shows only its plain sentence) and, when the
+  // server confirmed it, that nothing was taken from the quota for it.
+  const failed = state === "FAILED" && run !== undefined
+    ? { terminalReason: run.terminal_reason, questionLine: run.question_line, ...(quotaUntouched(run) ? { quotaUntouched: true as const } : {}) }
+    : {};
+  return {
+    link, state, headline: null, counts: null,
+    ...(pause === undefined ? {} : { pausedUntil: pause.until, canContinue: pause.can_continue }),
+    ...failed
+  };
 }
 
 /** What a dig's follow-up debate has become (row D decision 1: digs show on the map while they run). */
@@ -158,7 +169,7 @@ export async function loadDigView(link: DigLink, client: DigClient = contractCli
     case "HOLDING":
       return digView(link, "RUNNING", run);
     case "FAILED":
-      return digView(link, "FAILED");
+      return digView(link, "FAILED", run);
     case "SETTLED":
       break;
   }
@@ -172,7 +183,9 @@ export async function loadDigView(link: DigLink, client: DigClient = contractCli
   // W4-6 (Q-D13): a dig of the new model writes no story: it rewrites the path it came from, and keeps its points.
   if (answer.dig !== undefined) {
     const own = buildV4Map({ runId: link.childRunId, answer, story: null });
-    return { link, state: "DONE", headline: null, counts: own.counts, rewrite: answer.dig.rewrite, points: own.points };
+    // map-f29 / dig-f20: what it looked into, in its own words and by whom, titles the dig on the map above.
+    const picks = answer.dig.picks.map((pick) => ({ text: pick.text, by: pick.by }));
+    return { link, state: "DONE", headline: null, counts: own.counts, rewrite: answer.dig.rewrite, points: own.points, picks };
   }
   // A failed story read leaves the dig DONE without a headline; the page reads it again later (TIME-5, TIME-8).
   const story = await loadStory(answer.answer_id, client, answer.answer_version);

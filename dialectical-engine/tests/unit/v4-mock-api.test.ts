@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import * as fixture from "../../apps/ui/lib/v3/storyFixture.js";
 import {
   AnswerDigSchema, AnswerPathRewritesSchema, AnswerSchema, AnswerWebSchema, AskParentSchema, AskRoomResponseSchema, AskRequestSchema,
-  AskRoomQuerySchema, BillingUsageResponseSchema, cutQuoteAtWordEdge, DebateInvestigationSchema, DIG_LEVEL_MAX, DigSuggestionSchema,
+  AnswerIndexSchema, AskRoomQuerySchema, BillingUsageResponseSchema, cutQuoteAtWordEdge, DebateInvestigationSchema, DIG_LEVEL_MAX, DigSuggestionSchema,
   InvestigationReportsSchema, MonthPauseSchema, NodeSchema, RunProjectionSchema, UsageBorrowSchema, WebOtherPageSchema, WebPathSchema, WebSourceSchema
 } from "../../packages/contract/src/index.js";
 import { createSeed, SEED_NODE_IDS } from "../../tools/v4-mock-api/seed.js";
@@ -12,10 +12,11 @@ import {
   answerDraftProblems, contractOrDraft, cutQuote, DraftAnswerWebSchema, DraftAskParentSchema, DraftDigSuggestionSchema,
   DraftInvestigationSchema, DraftOtherPageSchema, DraftRoomPartSchema, DraftSourceSchema, DraftWebPathSchema,
   DraftRoomQueryPartSchema, READ_DEPTHS, RESEARCHED_STATES, splitAsk, splitRoomQuery, stripAnswer, stripRoom, stripRun, stripUsage,
-  SUGGESTION_KINDS, SUGGESTION_SIDES, DraftPathRewritesSchema, DraftAnswerDigSchema, DraftMonthPauseSchema, DraftUsageBorrowsSchema
+  SUGGESTION_KINDS, SUGGESTION_SIDES, DraftPathRewritesSchema, DraftAnswerDigSchema, DraftMonthPauseSchema, DraftRunQuotaUsedSchema,
+  DraftUsageBorrowsSchema, DraftRunStartedAtSchema, answerIndexDraftProblems, DraftShelfRowPartSchema, stripAnswerIndex
 } from "../../tools/v4-mock-api/web-draft.js";
 import {
-  borrowNotice, DEEPEST_DIG, DIG_ANSWERS, DIG_FINISHED_AT, DIG_RUNS, monthPause, PATH_REWRITES, reportVersionBody, SEEDED_NEW_DIGS
+  borrowNotice, DEEPEST_DIG, DIG_ANSWERS, DIG_FINISHED_AT, DIG_RUNS, mainAnswerAt, monthPause, PATH_REWRITES, reportVersionBody, SEEDED_NEW_DIGS
 } from "../../tools/v4-mock-api/rewrite-seed.js";
 import { WEB_CASES, type WebCase } from "../../tools/v4-mock-api/web-seed.js";
 
@@ -313,6 +314,28 @@ describe("V4 mock API: the new dig model and the money rule", () => {
     expect(Date.parse(DEEPEST_DIG.settledAt)).toBeGreaterThan(Date.parse(DEEPEST_DIG.askedAt));
   });
 
+  it("dig-f1: the first debate's main answer is still being rewritten, then has its newest version; both pass the contract", () => {
+    const readyAt = Date.parse("2026-11-04T10:00:00.000Z");
+    const writing = mainAnswerAt(readyAt - 1, readyAt);
+    const done = mainAnswerAt(readyAt, readyAt);
+    expect(writing.writing).toBe(true);
+    expect(writing.current!.version).toBe(1);
+    expect(done.writing).toBeUndefined();
+    expect(done.current!.version).toBe(2);
+    expect(done.history.map((version) => version.version)).toEqual([1, 2]);
+    // Each version names a path a seeded dig rewrote, and came after that dig finished.
+    for (const version of done.history) {
+      const path = PATH_REWRITES[DIG_RUNS.root]!.paths.find((candidate) => candidate.position_ref === version.position_ref)!;
+      expect(Date.parse(version.updated_at)).toBeGreaterThan(Date.parse(path.history[0]!.dig_finished_at));
+    }
+    for (const main of [writing, done]) {
+      const answer = { ...answerOf("PAID"), path_rewrites: PATH_REWRITES[DIG_RUNS.root], main_answer: main };
+      expect(AnswerSchema.safeParse(answer).success).toBe(true);
+      // An older contract gets the answer without it.
+      expect(Object.keys(stripAnswer(answer))).not.toContain("main_answer");
+    }
+  });
+
   it("a paused debate, the borrow notice and a room whose new starts wait fall back to today's reads", () => {
     const run = { run_ref: DIG_RUNS.root, question_line: "Should I move?", state: "RUNNING", terminal_reason: null, hold_until: null };
     const paused = { ...run, month_pause: monthPause("2026-11-01T00:00:00.000Z", false) };
@@ -336,13 +359,72 @@ describe("V4 mock API: the new dig model and the money rule", () => {
     expect(Object.keys(stripRoom(wait))).not.toContain("new_starts");
   });
 
+  it("the waiting card's draft start time (journey-d2) is an ISO time, held back with the pause from a contract that lacks it", () => {
+    expect(DraftRunStartedAtSchema.safeParse("2026-11-04T09:31:00.000Z").success).toBe(true);
+    expect(DraftRunStartedAtSchema.safeParse("14:31").success).toBe(false);
+    const run = { run_ref: DIG_RUNS.root, question_line: "Should I move?", state: "RUNNING", terminal_reason: null, hold_until: null };
+    const started = { ...run, started_at: "2026-11-04T09:31:00.000Z" };
+    // Today's run read has no `started_at`: the website never receives it until the contract knows it.
+    expect(stripRun(started)).toEqual(run);
+    expect(stripRun({ ...started, month_pause: monthPause("2026-12-01T00:00:00.000Z", false) })).toEqual(run);
+    expect(RunProjectionSchema.safeParse(stripRun(started)).success).toBe(true);
+  });
+
+  it("a failed run's quota_used (owner review 3 Nov) passes its draft schema and falls back to today's run read", () => {
+    const run = {
+      run_ref: "44444444-4444-4444-8444-444444444444", question_line: "Will AI tutors replace homework help?", state: "FAILED",
+      terminal_reason: "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM", hold_until: null
+    };
+    for (const quota of ["NONE", "SOME"] as const) {
+      expect(DraftRunQuotaUsedSchema.safeParse(quota).success).toBe(true);
+      const full = { ...run, quota_used: quota };
+      expect(stripRun(full)).toEqual(run);
+      expect(RunProjectionSchema.safeParse(contractOrDraft(RunProjectionSchema, full, stripRun).body).success).toBe(true);
+    }
+    expect(DraftRunQuotaUsedSchema.safeParse("ALL").success).toBe(false);
+    expect(["v4.debate.failedNothingTaken", "v4.digFailed.nothingTaken", "v4.digFailed.retry", "v4.digFailed.keepsFailing",
+      "v4.pause.digCard", "v4.pause.digCardReady"].filter((key) => !(key in catalog))).toEqual([]);
+  });
+
   it("every dig-model and money-rule word the mock plays has its English line in the V4 catalogue", () => {
     const words = [
       "v4.view.heading", "v4.view.HELPED.MAIN_QUESTION", "v4.view.DID_NOT_HELP.PATH", "v4.view.asYours", "v4.view.why",
       "v4.rewrite.whatChanged", "v4.rewrite.changedSince.other", "v4.rewrite.changedSinceReport", "v4.rewrite.changedBelow",
+      // V4 screen review (3 Nov 2026): the first debate's report is older than its map (dig-f19), and its main answer is rewritten (dig-f1).
+      "v4.rewrite.reportOlder", "v4.rewrite.updateReport", "v4.rewrite.changedSinceYourReport", "v4.mainAnswer.writing", "v4.digsDid.news.ANSWER",
       "v4.rewrite.state.WRITING", "v4.nest.level", "v4.nest.digHereToo", "v4.room.startShare", "v4.money.startsWait.PERSON_DAY",
       "v4.money.borrowed.PERSON_DAY", "v4.money.paused", "v4.money.pausedReady", "v4.money.continue", "v4.debate.state.PAUSED_MONTH"
     ];
     expect(words.filter((key) => !(key in catalog))).toEqual([]);
+  });
+});
+
+describe("V4 mock API: the shelf's draft parts of the answer list (owner's screen review, 3 Nov)", () => {
+  const item = {
+    answer_id: "aaaa1111-1111-4111-8111-111111111111", run_ref: "11111111-1111-4111-8111-111111111111", answer_version: 1,
+    question_line: "Should countries build new nuclear power?", verdict_state: null, abstention: null, serve_state: "COMPOSED",
+    staleness_state: "FRESH", builds_on_previous: false, created_at_sequence: 2
+  };
+  const open = {
+    run_ref: "22222222-2222-4222-8222-222222222222", question_line: "Is a four-day week good?", state: "RUNNING",
+    terminal_reason: null, created_at_sequence: 5
+  };
+  const full = {
+    items: [{ ...item, map_bar: { sure: 4, sure_for_case: 5, still_argued: 2, didnt_hold: 1 }, changed_since_visit: true, dug_from: null }],
+    open_runs: [{ ...open, started_at: "2026-11-04T14:00:00.000Z", dug_from: null }],
+    limit: 50, offset: 0, total: 1
+  };
+
+  it("pass their draft schema, and today's contract once they are held back", () => {
+    expect(answerIndexDraftProblems(full)).toEqual([]);
+    expect(stripAnswerIndex(full)).toEqual({ items: [item], open_runs: [open], limit: 50, offset: 0, total: 1 });
+    expect(AnswerIndexSchema.safeParse(stripAnswerIndex(full)).success).toBe(true);
+  });
+
+  it("a broken part is caught before it is sent", () => {
+    expect(DraftShelfRowPartSchema.safeParse({ map_bar: { sure: 1 } }).success).toBe(false);
+    expect(DraftShelfRowPartSchema.safeParse({ started_at: "at two" }).success).toBe(false);
+    expect(DraftShelfRowPartSchema.safeParse({ dug_from: "not-a-run" }).success).toBe(false);
+    expect(answerIndexDraftProblems({ ...full, items: [{ ...item, changed_since_visit: "yes" }] })).toHaveLength(1);
   });
 });

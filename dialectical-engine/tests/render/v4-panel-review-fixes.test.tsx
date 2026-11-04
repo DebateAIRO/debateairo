@@ -245,12 +245,14 @@ describe("dig-f24: Skip to the dig button", () => {
 describe("dig-f28: a dig waiting for a free spot", () => {
   const waitingWords = t(catalog, "v4.panel.digState.WAITING");
 
+  // dig-f8 (the undo-bottom track): "Starting your dig…" is the shared note's sending line, used here for a sent dig's first
+  // 10 seconds; the panel's own v4.panel.digStarting is dig-f8's countdown line ("Your dig starts in a few seconds…").
   it("says it is starting for its first 10 seconds, then that it waits, starts on its own and the page may close", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-11-04T10:00:03.000Z"));
     expect(waitingWords).toBe("Waiting for a free spot. It starts on its own. You can close this page.");
     const page = await mount(mapWith([]), "dig:d1", { digs: [dig("d1", "WAITING", ["path:a"], "2026-11-04T10:00:00.000Z")] });
-    expect(page.textContent).toContain(t(catalog, "v4.panel.digStarting"));
+    expect(page.textContent).toContain(t(catalog, "v4.undo.sendingDig"));
     expect(page.textContent).not.toContain(waitingWords);
     await act(async () => {
       vi.advanceTimersByTime(6_900);
@@ -260,7 +262,7 @@ describe("dig-f28: a dig waiting for a free spot", () => {
       vi.advanceTimersByTime(200);
     });
     expect(page.textContent).toContain(waitingWords);
-    expect(page.textContent).not.toContain(t(catalog, "v4.panel.digStarting"));
+    expect(page.textContent).not.toContain(t(catalog, "v4.undo.sendingDig"));
   });
 
   it("says it waits at once when it was sent long ago, or when its start is not known", () => {
@@ -274,7 +276,7 @@ describe("dig-f28: a dig waiting for a free spot", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-11-04T10:00:00.000Z"));
     const page = await mount(mapWith([]), "dig:d1", { digs: [dig("d1", "WAITING", ["path:a"], "2026-11-04T10:05:00.000Z")] });
-    expect(page.textContent).toContain(t(catalog, "v4.panel.digStarting"));
+    expect(page.textContent).toContain(t(catalog, "v4.undo.sendingDig"));
     await act(async () => {
       vi.advanceTimersByTime(10_000);
     });

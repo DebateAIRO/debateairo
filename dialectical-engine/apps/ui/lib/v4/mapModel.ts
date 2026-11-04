@@ -8,8 +8,8 @@ import {
   type StoryFate
 } from "@debateai/contract";
 import { pathSuggestionsOf } from "./suggestions.js";
-import { countTrust, pointsOf, servedRewriteCounts } from "./trust.js";
-import type { RewriteState, V4Map, V4OpenQuestion, V4Path, V4PathRewrites, V4PathWeb, V4Point } from "./types.js";
+import { countTrust, pointsOf, servedRewriteCounts, servedRewriteWords } from "./trust.js";
+import type { RewriteState, TrustWord, V4Map, V4OpenQuestion, V4Path, V4PathRewrites, V4PathWeb, V4Point } from "./types.js";
 import { pathWebOf, webNoteOf } from "./web.js";
 
 /*
@@ -234,8 +234,19 @@ function placePaths(answer: Answer, specs: ReadonlyArray<PathSpec & { rewrites?:
     // its newest rewrite rests on); a path no dig rewrote, or one served without them, keeps its own points' counts.
     const served = servedRewriteCounts(spec.rewrites?.history);
     return { ...path, ...(served === null ? {} : served), positionRef: spec.positionRef,
+      trust: pathTrustOf(spec, byId),
       ...(spec.rewrites === undefined ? {} : { rewrites: spec.rewrites }) };
   });
+}
+
+/**
+ * Owner r2-20 A: a path's one trust word — the word of the point it stands for (its position). For a rewritten path the
+ * word the server worked out for that point wins (W4-8), else the page's own (which already reads the path's fate now).
+ */
+function pathTrustOf(spec: PathSpec & { rewrites?: V4PathRewrites }, byId: ReadonlyMap<string, V4Point>): TrustWord | null {
+  const served = servedRewriteWords(spec.rewrites?.history);
+  if (served.has(spec.positionRef)) return served.get(spec.positionRef) ?? null;
+  return byId.get(spec.positionRef)?.trust ?? null;
 }
 
 type TurningPoint = Readonly<{ text: string | null; alt: string | null }>;
@@ -296,6 +307,34 @@ function firstUnder(paths: readonly V4Path[], accept: (path: V4Path) => boolean)
 
 function starred(list: readonly V4OpenQuestion[], target: V4OpenQuestion): V4OpenQuestion[] {
   return list.map((question) => (question === target ? { ...question, star: true } : question));
+}
+
+function unstarred(list: readonly V4OpenQuestion[]): V4OpenQuestion[] {
+  return list.map((question) => (question.star ? { ...question, star: false } : question));
+}
+
+/**
+ * map-f5 / journey-f12 (3 Nov): exactly one star, on an open question no dig covers yet, chosen in the same order as the
+ * first star (what would change the answer, then objections, then points under paths that held). When the starred
+ * question is dug, the star moves on to the next one; with nothing left undug there is no star. `dug` names the open
+ * questions a dig that did not fail covers. The map comes back unchanged when its star already sits there.
+ */
+export function restarMap(map: V4Map, dug: ReadonlySet<string>): V4Map {
+  const free = (list: readonly V4OpenQuestion[]): V4OpenQuestion[] => list.filter((question) => !dug.has(question.id));
+  const root = unstarred(map.open);
+  const paths = map.paths.map((path) => (path.open.some((question) => question.star) ? { ...path, open: unstarred(path.open) } : path));
+  const star = pickStar(free(root), paths.map((path) => ({ ...path, open: free(path.open) })));
+  const before = [...map.open.map((question) => ({ question, pathIndex: null as number | null })),
+    ...map.paths.flatMap((path, pathIndex) => path.open.map((question) => ({ question, pathIndex })))]
+    .filter((entry) => entry.question.star);
+  const same = star === null
+    ? before.length === 0
+    : before.length === 1 && before[0]!.question.id === star.question.id && before[0]!.pathIndex === star.pathIndex;
+  if (same) return map;
+  if (star === null) return { ...map, open: root, paths };
+  if (star.pathIndex === null) return { ...map, open: starred(root, star.question), paths };
+  const index = star.pathIndex;
+  return { ...map, open: root, paths: paths.map((path, at) => (at === index ? { ...path, open: starred(path.open, star.question) } : path)) };
 }
 
 /** DATA-2: V3's toStoryView fallback — today's composed answer, null when nothing was composed (e.g. COMPONENTS_ONLY). */

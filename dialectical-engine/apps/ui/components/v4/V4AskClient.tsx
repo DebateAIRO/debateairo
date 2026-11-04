@@ -1,19 +1,20 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { askQuestionMaxBytes, type ClarifyQuestion } from "@debateai/contract";
-import { AuthGate } from "@/components/AuthGate";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { askQuestionMaxBytes, detectCrisis, type ClarifyQuestion } from "@debateai/contract";
 import { RoomNotice } from "@/components/billing/RoomNotice";
+import { V4AskGate, type V4Session } from "@/components/v4/V4AskGate";
 import { V4MoneyLines } from "@/components/v4/V4DigSuggest";
 import { V4Header } from "@/components/v4/V4Header";
-import { contractClient } from "@/lib/api";
+import { V4MapSeed } from "@/components/v4/V4MapSeed";
+import { SHELF_MAX, useMapShelf, V4MapShelf } from "@/components/v4/V4MapShelf";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import { currentReturnPath, signInHrefFor } from "@/lib/signInWayBack";
 import {
-  answersStillAsked, clarifyingQuestions, composeQuestion, FREE_GOAL_CHOICES_MAX, goalChoiceCount, goalWithinPlan, ownWords, purposeLinesOfGoal
+  answersStillAsked, clarifyingQuestions, composeQuestion, FREE_GOAL_CHOICES_MAX, goalChoiceCount, goalWithinPlan, purposeLinesOfGoal
 } from "@/lib/v4/askText";
-import { startShareLine, startsWaitLine, type MoneyLine } from "@/lib/v4/money";
+import { startShareLine, startsWaitLine, usedUpLine, type MoneyLine } from "@/lib/v4/money";
 import { levelHref, useReadingLevel } from "@/lib/v4/storage";
 import {
   DIG_MODES,
@@ -24,7 +25,9 @@ import {
   type V4Goal,
   type V4GoalAnswer
 } from "@/lib/v4/types";
+import { useAskAgain } from "@/lib/v4/useAskAgain";
 import { useAskClarify } from "@/lib/v4/useAskClarify";
+import { useLeaveSiteGuard } from "@/lib/v4/useLeaveGuard";
 import { useV4Ask } from "@/lib/v4/useV4Ask";
 
 /*
@@ -41,8 +44,6 @@ const QUESTION_MIN = 7;
 const OTHER_MAX = 120;
 /** D2 "Add your own angle": at most five (V4Goal.angles). */
 const ANGLES_MAX = 5;
-/** Recent questions: this many from the account, at most. */
-const RECENT_MAX = 5;
 
 /** Owner N6b (2026-10-29): what each level shows, in plain words (the earlier example sentences are gone). */
 const SHOWS_KEYS: Readonly<Record<ReadingLevel, string>> = Object.freeze({
@@ -52,41 +53,23 @@ const SHOWS_KEYS: Readonly<Record<ReadingLevel, string>> = Object.freeze({
 });
 
 type Step = "ask" | "read";
-type Recent = Readonly<{ runId: string; question: string; sequence: number }>;
 
 function byteLength(text: string): number {
   return new TextEncoder().encode(text).length;
 }
 
+/** useLayoutEffect in the browser (no frame at the old height), useEffect on the server (which has no layout). */
+const useBrowserLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
 /**
- * "Your recent questions": the account's latest answers and open asks (both asker-scoped), newest first, each shown by
- * the person's own words (ownWords). Quiet when there are none or the read fails. Nothing comes from this browser.
+ * ask-f19: the question box grows with the words, from 3 lines to about 8 (the CSS bounds), then scrolls inside; no
+ * drag handle. The height follows the words' own height, borders included.
  */
-function useRecentQuestions(): readonly Recent[] {
-  const [recent, setRecent] = useState<readonly Recent[]>([]);
-  useEffect(() => {
-    let active = true;
-    contractClient.readAnswerIndex(RECENT_MAX, 0).then(
-      (index) => {
-        if (!active) return;
-        const byRun = new Map<string, Recent>();
-        const rows = [
-          ...index.open_runs.map((run) => ({ runId: run.run_ref, line: run.question_line, sequence: run.created_at_sequence })),
-          ...index.items.map((item) => ({ runId: item.run_ref, line: item.question_line, sequence: item.created_at_sequence }))
-        ];
-        for (const row of rows) {
-          const question = ownWords(row.line);
-          const known = byRun.get(row.runId);
-          if (question.length === 0 || (known !== undefined && known.sequence >= row.sequence)) continue;
-          byRun.set(row.runId, { runId: row.runId, question, sequence: row.sequence });
-        }
-        setRecent([...byRun.values()].sort((a, b) => b.sequence - a.sequence).slice(0, RECENT_MAX));
-      },
-      () => { /* quiet: a failed read shows no list */ }
-    );
-    return () => { active = false; };
-  }, []);
-  return recent;
+function growToWords(field: HTMLTextAreaElement | null): void {
+  if (field === null) return;
+  field.style.height = "auto";
+  const borders = field.offsetHeight - field.clientHeight;
+  field.style.height = `${field.scrollHeight + Math.max(0, borders)}px`;
 }
 
 /** Decision 29: one clarifying question, in the look the fixed buttons had: its label, its answers as chips, then "Other" with a line to type on. */
@@ -157,7 +140,8 @@ export function V4AskClient({
   locale,
   crisisCountryHint,
   initialQuestion,
-  initialLevel
+  initialLevel,
+  againRunId = null
 }: Readonly<{
   catalog: MessageCatalog;
   homeCatalog: MessageCatalog;
@@ -168,10 +152,13 @@ export function V4AskClient({
   initialQuestion: string;
   /** The level the address carried (`?level=`), or null: then D1 offers the chips. */
   initialLevel: ReadingLevel | null;
+  /** Owner review 3 Nov (wait-f11): "Ask this again" names the debate (`?again=`) whose question fills the box; null: none. */
+  againRunId?: string | null;
 }>) {
-  // AuthGate reads newDebate.* keys (checking session / redirecting), as on /new.
+  // ask-d1 D / ask-f16: the real page from the first frame, signed in or not; the session is learnt beside it (V4AskGate).
+  // The accept screen reads newDebate.* keys, as on /new.
   return (
-    <AuthGate catalog={newDebateCatalog}>{() => (
+    <V4AskGate catalog={newDebateCatalog} locale={locale}>{(session) => (
       <V4AskForm
         catalog={catalog}
         homeCatalog={homeCatalog}
@@ -181,8 +168,10 @@ export function V4AskClient({
         crisisCountryHint={crisisCountryHint}
         initialQuestion={initialQuestion}
         initialLevel={initialLevel}
+        session={session}
+        againRunId={againRunId}
       />
-    )}</AuthGate>
+    )}</V4AskGate>
   );
 }
 
@@ -194,7 +183,9 @@ function V4AskForm({
   locale,
   crisisCountryHint,
   initialQuestion,
-  initialLevel
+  initialLevel,
+  session,
+  againRunId
 }: Readonly<{
   catalog: MessageCatalog;
   homeCatalog: MessageCatalog;
@@ -205,6 +196,10 @@ function V4AskForm({
   initialQuestion: string;
   /** The level the address carried (`?level=`), or null: then D1 offers the chips. */
   initialLevel: ReadingLevel | null;
+  /** Whether the visitor is signed in (CHECKING until the session read answers). */
+  session: V4Session;
+  /** Owner review 3 Nov (wait-f11): the debate whose question fills the box (`?again=`); null: none. */
+  againRunId: string | null;
 }>) {
   const router = useRouter();
   // N7: a level the person chose before (on any device) comes back from the account; until that read has answered the
@@ -228,7 +223,20 @@ function V4AskForm({
   const questionField = useRef<HTMLTextAreaElement>(null);
   const shownStep = useRef<Step>(step);
   const ids = useId();
-  const recent = useRecentQuestions();
+  // ask-d5 B: "Your maps", read once the person is known to be signed in.
+  const shelf = useMapShelf({ enabled: session === "IN", want: SHELF_MAX, catalog });
+  // Owner review 3 Nov (wait-f11): "Ask this again" fills the box with the earlier question, read back from the server, as
+  // long as the person has not started typing; nothing starts by itself. Read once the person is known to be signed in.
+  const againQuestion = useAskAgain(session === "IN" ? againRunId : null, catalog);
+  useEffect(() => {
+    if (againQuestion === null) return;
+    setQuestion((current) => (current === initialQuestion ? againQuestion : current));
+  }, [againQuestion, initialQuestion]);
+  // journey-d4 A: before Next, the browser's own "Leave site?" protects typed words (a reload or a closed tab); words a
+  // reload brings back by themselves (from the address, or "Ask this again" from the server) are not at risk.
+  const filledByItself = againQuestion ?? initialQuestion;
+  useLeaveSiteGuard(() => step === "ask" && question.trim().length > 0 && question.trim() !== filledByItself.trim()
+    && question.trim() !== initialQuestion.trim());
 
   const ask = useV4Ask({
     catalog,
@@ -286,6 +294,48 @@ function V4AskForm({
     ? <p className="v4AskPublicNotice" role="note">{t(newDebateCatalog, "newDebate.freePublicNotice")}</p>
     : null;
 
+  // Step 1's own lines. ask-f14 / read-f18: the one reason line under the box says why a step-1 button cannot be pressed
+  // yet (an empty box, a few letters, a question too long to send), and both buttons are described by it, so screen
+  // readers hear it too. ask-f18 / ask-d4 C: when new questions wait for a reset, one line above the box names the
+  // window and the time; the box keeps the words. Below the buttons stay the share and the room notice (late parts,
+  // ask-f16), the reset line no longer among them.
+  const quickTooLong = byteLength(quickLine) > askQuestionMaxBytes();
+  const reasonKey = trimmed.length === 0 ? "v4.ask.typeFirst" : shortHint ? "v4.ask.tooShort" : quickTooLong ? "v4.ask.tooLong" : null;
+  const usedUp = usedUpLine(ask.room, locale);
+  const stepOneWhy = [usedUp === null ? null : `${ids}-usedup`, reasonKey === null ? null : `${ids}-why`]
+    .filter((id): id is string => id !== null).join(" ") || undefined;
+  const startShare = startShareLine(ask.room);
+  const stepOneRoomLines = (
+    <>
+      <V4MoneyLines lines={startShare === null ? [] : [startShare]} catalog={catalog} />
+      {startsWait === null ? <RoomNotice room={ask.room} catalog={{ ...newDebateCatalog, ...billingCatalog }} locale={locale} /> : null}
+    </>
+  );
+  // ask-d1 D: the seed of the map, for a first visit only (signed out, or an account with no debate yet).
+  const firstVisit = session === "OUT" || (session === "IN" && shelf.load.status === "READ" && !shelf.load.read.anyRows);
+  // ask-d1 A (in D): the promise line too is for first visits only; returning people never see it. Until the account
+  // says which (ask-f16), its place is held, then closed at once for a returning person.
+  const promise: "SHOW" | "HOLD" | "NONE" = firstVisit ? "SHOW"
+    : session === "CHECKING" || (session === "IN" && shelf.load.status === "LOADING") ? "HOLD" : "NONE";
+  // ask-d1: sign-in sends the person back to this page, its address as it is (the one rule of lib/signInWayBack.ts, which
+  // keeps only an allowed way back), with the level they chose. Worked out once mounted: the server has no window.
+  const [signInHref, setSignInHref] = useState("/login");
+  useEffect(() => {
+    setSignInHref(signInHrefFor(levelHref(currentReturnPath(), savedLevel)));
+  }, [savedLevel]);
+  // ask-d1 A: the sign-in panel at Next is the start-step session's. Until it lands, a signed-out visitor's Next and "Just
+  // answer it" go to sign in (with the way back), and a grey line under Next says so; nothing reaches the consent screen or
+  // step 2 without a session. While the session is unknown both wait.
+  const signedOut = session === "OUT";
+  const sessionUnknown = session === "CHECKING";
+  // V, 2026-09-30 (ask-f3: "even signed out"): words of a person in crisis get the help numbers before any sign-in step.
+  // The page stays and nothing is sent: useV4Ask's own first check opens the help screen and stops there.
+  const helpBeforeSignIn = (event: MouseEvent<HTMLAnchorElement>): void => {
+    if (trimmed.length === 0 || !detectCrisis(trimmed).crisis) return;
+    event.preventDefault();
+    void ask.submit(trimmed, "quick", "ask");
+  };
+
   // Changing step moves focus to the new step's heading or the question, and back to the top.
   useEffect(() => {
     if (shownStep.current === step) return;
@@ -293,6 +343,18 @@ function V4AskForm({
     window.scrollTo({ top: 0 });
     if (step === "read") readHeading.current?.focus();
     else questionField.current?.focus();
+  }, [step]);
+
+  // ask-f19: the step-1 box follows the words' height (and the width the page now has).
+  useBrowserLayoutEffect(() => {
+    if (step !== "ask") return;
+    growToWords(questionField.current);
+  }, [question, step]);
+  useEffect(() => {
+    if (step !== "ask") return;
+    const regrow = () => growToWords(questionField.current);
+    window.addEventListener("resize", regrow);
+    return () => window.removeEventListener("resize", regrow);
   }, [step]);
 
   function keepLevel() {
@@ -376,8 +438,12 @@ function V4AskForm({
     addAngle();
   }
 
+  // ask-d1: a signed-out visitor reads "Sign in" at the end of the header (the way back is this page). A plain link (W11):
+  // /login may send a signed-in visitor on as a full page load, and the browser's own "Leave site?" guards typed words.
   const header = (
-    <V4Header catalog={catalog} readingLevel={savedLevel} onReadingLevel={chooseLevelNow} classicHref="/new" />
+    <V4Header catalog={catalog} readingLevel={savedLevel} onReadingLevel={chooseLevelNow} classicHref="/new">
+      {signedOut ? <a className="v4Link v4HdrSignIn" href={signInHref}>{t(catalog, "v4.ask.signIn")}</a> : null}
+    </V4Header>
   );
   const refusalAlert = refusal === null ? null : <p className="v4AskRefusal" role="alert">{refusal}</p>;
 
@@ -391,36 +457,56 @@ function V4AskForm({
             <h1 id={`${ids}-title`} className="v4AskTitle v4Serif">
               <label htmlFor={`${ids}-q`}>{t(catalog, "v4.ask.title")}</label>
             </h1>
+            {/* ask-d1: the one grey promise line under the title, for first visits only (its place held until known). */}
+            {promise === "NONE" ? null : (
+              <p
+                className="v4AskPromise v4Muted"
+                {...(promise === "HOLD" ? { "aria-hidden": "true" as const, style: { visibility: "hidden" as const } } : {})}
+              >
+                {t(catalog, "v4.ask.promise")}
+              </p>
+            )}
+            {usedUp === null ? null : (
+              <p id={`${ids}-usedup`} className="v4AskUsedUp" role="status">{t(catalog, usedUp.key, usedUp.values)}</p>
+            )}
             <textarea
               ref={questionField}
               id={`${ids}-q`}
-              className="v4AskField"
+              className="v4AskField v4AskFieldGrow"
               rows={3}
+              dir="auto"
               value={question}
-              onChange={(event) => setQuestion(event.target.value)}
+              onChange={(event) => {
+                setQuestion(event.target.value);
+                // ask-f14: the red "nothing was started" line was about the words before; new words clear it.
+                if (refusal !== null) setRefusal(null);
+              }}
               placeholder={t(catalog, "v4.ask.questionPlaceholder")}
               aria-labelledby={`${ids}-title`}
-              aria-describedby={shortHint ? `${ids}-short` : undefined}
+              aria-describedby={stepOneWhy}
             />
-            {shortHint ? (
-              <p id={`${ids}-short`} className="v4AskHint v4Muted">{t(catalog, "v4.ask.tooShort")}</p>
-            ) : null}
+            {reasonKey === null ? null : (
+              <p id={`${ids}-why`} className="v4AskHint v4Muted v4AskWhy">{t(catalog, reasonKey)}</p>
+            )}
           </div>
 
           {savedLevel === null && levelKnown ? (
             <fieldset className="v4AskLevels">
               <legend className="v4AskLegend">{t(catalog, "v4.ask.levelLegend")}</legend>
+              {/* ask-f15: one choice of three (native radios: arrow keys move and choose, in either writing direction). */}
               <div className="v4AskChips">
                 {READING_LEVELS.map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    className="v4Chip"
-                    aria-pressed={option === draftLevel}
-                    onClick={() => setDraftLevel(option)}
-                  >
-                    {t(catalog, `v4.readingLevel.${option}`)}
-                  </button>
+                  <label key={option} className="v4Chip v4AskLevelChip" data-checked={option === draftLevel}>
+                    <input
+                      type="radio"
+                      className="v4AskLevelInput"
+                      name={`${ids}-level`}
+                      value={option}
+                      checked={option === draftLevel}
+                      onChange={() => setDraftLevel(option)}
+                    />
+                    <span>{t(catalog, `v4.readingLevel.${option}`)}</span>
+                  </label>
                 ))}
               </div>
               <p className="v4AskSample" aria-live="polite">
@@ -430,43 +516,53 @@ function V4AskForm({
               <p className="v4AskHint v4Muted">{t(catalog, "v4.ask.levelNote")}</p>
               <p className="v4AskHint v4Muted">{t(catalog, "v4.ask.levelHonest")}</p>
             </fieldset>
-          ) : null}
+          ) : levelKnown ? null : (
+            // ask-f16: the level choice's place is held (a faint shape) until the account says whether it is needed.
+            <div className="v4AskLevelsHold" aria-hidden="true" />
+          )}
 
           {publicNotice}
           <div className="v4AskActions">
-            <button type="button" className="v4Btn v4BtnPrimary" onClick={() => void goOn()} disabled={!canGoOn || busy}>
-              {t(catalog, "v4.ask.continue")}
-            </button>
-            <button
-              type="button"
-              className="v4Link v4AskJust"
-              onClick={() => void start(quickLine, "quick", "quick", plain)}
-              disabled={!canGoOn || busy || byteLength(quickLine) > askQuestionMaxBytes()}
-              aria-busy={pressed === "quick"}
-            >
-              {pressed === "quick" ? t(catalog, "v4.ask.starting") : t(catalog, "v4.ask.justAnswer")}
-            </button>
+            {signedOut ? (
+              // ask-d1 A, until the start-step's sign-in panel: both go to sign in, with the way back to this page.
+              <>
+                <a className="v4Btn v4BtnPrimary" href={signInHref} aria-describedby={`${ids}-signin`} onClick={helpBeforeSignIn}>
+                  {t(catalog, "v4.ask.continue")}
+                </a>
+                <p id={`${ids}-signin`} className="v4AskHint v4Muted v4AskSignInFirst">{t(catalog, "v4.ask.signInFirst")}</p>
+                <a className="v4Link v4AskJust" href={signInHref} aria-describedby={`${ids}-signin`} onClick={helpBeforeSignIn}>
+                  {t(catalog, "v4.ask.justAnswer")}
+                </a>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="v4Btn v4BtnPrimary"
+                  onClick={() => void goOn()}
+                  disabled={!canGoOn || busy || sessionUnknown}
+                  aria-describedby={stepOneWhy}
+                >
+                  {t(catalog, "v4.ask.continue")}
+                </button>
+                <button
+                  type="button"
+                  className="v4Link v4AskJust"
+                  onClick={() => void start(quickLine, "quick", "quick", plain)}
+                  disabled={!canGoOn || busy || quickTooLong || sessionUnknown}
+                  aria-busy={pressed === "quick"}
+                  aria-describedby={stepOneWhy}
+                >
+                  {pressed === "quick" ? t(catalog, "v4.ask.starting") : t(catalog, "v4.ask.justAnswer")}
+                </button>
+              </>
+            )}
           </div>
-          {roomLines}
+          {stepOneRoomLines}
           {refusalAlert}
 
-          {recent.length === 0 ? null : (
-            <section className="v4AskRecent" aria-labelledby={`${ids}-recent`}>
-              <h2 id={`${ids}-recent`} className="v4AskRecentTitle">{t(catalog, "v4.recent.title")}</h2>
-              <ul className="v4AskRecentList">
-                {recent.map((entry) => (
-                  <li key={entry.runId}>
-                    <Link
-                      className="v4AskRecentLink"
-                      href={levelHref(`/v4/debate/${encodeURIComponent(entry.runId)}`, savedLevel)}
-                    >
-                      <span data-ai-generated="true">{entry.question}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
+          {firstVisit ? <V4MapSeed question={question} catalog={catalog} /> : null}
+          <V4MapShelf load={shelf.load} catalog={catalog} locale={locale} level={savedLevel} />
         </div>
       ) : (
         <div className="v4AskMain v4AskMainRead">

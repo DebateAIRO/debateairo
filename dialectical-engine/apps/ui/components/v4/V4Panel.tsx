@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useEffect, useId, useState, type ReactNode, type RefObject } from "react";
 import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
-import { addedLines, ownWords, startsWithLabel } from "@/lib/v4/askText";
-import { findOpenQuestion, openQuestionsOf } from "@/lib/v4/mapModel";
+import { addedLines, ownWords } from "@/lib/v4/askText";
+import { findOpenQuestion, isFinishedRewrite, openQuestionsOf } from "@/lib/v4/mapModel";
 import type { MoneyLine } from "@/lib/v4/money";
+import { pauseOfDig } from "@/lib/v4/monthPause";
 import { draftTarget } from "@/lib/v4/suggestions";
 import { levelHref } from "@/lib/v4/storage";
 import { countTrust } from "@/lib/v4/trust";
@@ -21,15 +22,19 @@ import {
   type TrustWord,
   type V4Map,
   type V4OpenQuestion,
+  type V4Path,
   type V4Point,
   type V4Selection
 } from "@/lib/v4/types";
+import { cardLabel, groundClass } from "@/lib/v4/mapLooks";
 import {
   digFor,
+  DigPauseDot,
   digNote,
   digsUnder,
   digTitle,
   digWorking,
+  OpenWord,
   openNote,
   pathTitle,
   PickBox,
@@ -41,7 +46,10 @@ import {
   type ResolvedSelection,
   type Title
 } from "./V4MapTree";
+import { V4FullAnswerFold } from "./V4AnswerCard";
+import { V4DigFailed, type V4FailedDigs } from "./V4DigFailed";
 import { V4DigCompose, V4MoneyLines, type V4DigChoice } from "./V4DigSuggest";
+import { V4MonthPause } from "./V4MonthPause";
 import { V4DigPageIntro, V4PathRewrite, V4WhatChanged } from "./V4PathRewrite";
 import { V4OtherPages, V4SearchNote, V4SourceList, V4WebNoteLine, type V4ResearchedPress } from "./V4Sources";
 import { V4TrustBar } from "./V4TrustBar";
@@ -60,6 +68,8 @@ import { V4TrustBar } from "./V4TrustBar";
  * Screen review fixes (owner picks, 3 Nov): the first group with points opens (map-f1); a long suggestion list gets "Skip
  * to the dig button" (dig-f24); "Nothing is open here" goes when suggestions follow (dig-f33); a dig's way back to its path
  * names the path and waits until the dig is done (dig-f13); a waiting dig says so only after 10 seconds (dig-f28).
+ * Owner review 3 Nov (wait-f2, public-f16, wait-f18, dig-f12): a paused dig's panel shows the one pause block (with
+ * Continue once the server says its month has reset), and a dig that did not finish its reason and "Try this dig again".
  */
 
 type PanelProps = Readonly<{
@@ -82,6 +92,14 @@ type PanelProps = Readonly<{
   showDigModes?: boolean;
   onDig: (target: DigTarget) => void;
   digBusy: boolean;
+  /**
+   * dig-d3 / dig-f8: the line for a dig of this place still in its 10 seconds ("Your dig starts in a few seconds. You can
+   * still undo it. [Undo]"), or null when none waits there. While it shows, this place's dig button does nothing more.
+   * Absent: as before.
+   */
+  digStarting?: (target: DigTarget) => ReactNode | null;
+  /** dig-d3 B (phone): a path's starting line sits under the path's text, at the top of its screen, not by the button. */
+  digStartingAtTop?: boolean;
   roomNotice?: ReactNode;
   /** W4-4: "Add to researched" on one of a path's other pages; absent where it is not offered (Free, new starts waiting for a reset). */
   onAddResearched?: (pathId: string, pageRef: string) => void;
@@ -98,7 +116,22 @@ type PanelProps = Readonly<{
    * debate's answer, which stays one click away. Absent or null: no finished report yet.
    */
   reportAnswer?: Readonly<{ version: number; segments: readonly string[] }> | null;
+  /**
+   * Owner review 3 Nov (wait-f18, dig-f12): what a dig that did not finish says and offers (its reason, "Try this dig
+   * again", "This keeps failing…"). Absent: its panel says only that it did not finish, as before.
+   */
+  failedDigs?: V4FailedDigs;
+  /**
+   * map-d1 (3 Nov): the answer stands in its own card above the map (V4AnswerCard), so the panel of "Your question" shows
+   * the evidence, not a second copy of the answer. Absent or false: the panel shows the answer as before.
+   */
+  answerOnTop?: boolean;
   headingRef: RefObject<HTMLHeadingElement | null>;
+  /**
+   * V4 screen review (3 Nov 2026): what sits right under the where-you-are line — map-f19's "Since you last looked:
+   * Confirmed" and, on a computer, dig-f18's pinned "Next change › · Done" during the changes tour. Absent: nothing.
+   */
+  underCrumbs?: ReactNode;
   catalog: MessageCatalog;
   locale: string;
 }>;
@@ -186,7 +219,7 @@ function PointGroups(props: Readonly<{ points: readonly V4Point[]; level: Readin
 }
 
 /** Breadcrumb: every part but the last can be clicked. */
-function Crumbs(props: Readonly<{ resolved: ResolvedSelection; onSelect: PanelProps["onSelect"]; catalog: MessageCatalog }>) {
+function Crumbs(props: Readonly<{ resolved: ResolvedSelection; map: V4Map; onSelect: PanelProps["onSelect"]; catalog: MessageCatalog }>) {
   const { resolved, onSelect, catalog } = props;
   const parts: { id: V4Selection; title: Title }[] = [
     { id: "root", title: { text: t(catalog, "v4.panel.crumbRoot"), ai: false, more: 0 } }
@@ -200,7 +233,7 @@ function Crumbs(props: Readonly<{ resolved: ResolvedSelection; onSelect: PanelPr
     if (resolved.home.path !== null) {
       parts.push({ id: `path:${resolved.home.path.id}`, title: pathTitle(resolved.home.path, catalog, 40) });
     }
-    parts.push({ id: `dig:${resolved.dig.link.childRunId}`, title: digTitle(resolved.dig, catalog, 40) });
+    parts.push({ id: `dig:${resolved.dig.link.childRunId}`, title: digTitle(resolved.dig, catalog, 40, props.map) });
   }
   return (
     <nav className="v4PanelCrumbs" aria-label={t(catalog, "v4.panel.crumbsLabel")}>
@@ -237,7 +270,7 @@ function Section(props: Readonly<{ title: string; children: ReactNode; className
   );
 }
 
-function DigLinkRow(props: Readonly<{ dig: DigView; onSelect: PanelProps["onSelect"]; catalog: MessageCatalog }>) {
+function DigLinkRow(props: Readonly<{ dig: DigView; map: V4Map; onSelect: PanelProps["onSelect"]; catalog: MessageCatalog; locale: string }>) {
   const { dig } = props;
   const working = digWorking(dig) && dig.pausedUntil === undefined;
   return (
@@ -247,10 +280,11 @@ function DigLinkRow(props: Readonly<{ dig: DigView; onSelect: PanelProps["onSele
         className="v4PanelRowBtn"
         onClick={(event) => props.onSelect(`dig:${dig.link.childRunId}`, viaKeyboard(event))}
       >
-        <TitleText className="v4PanelRowTitle" title={digTitle(dig, props.catalog)} catalog={props.catalog} />
+        <TitleText className="v4PanelRowTitle" title={digTitle(dig, props.catalog, 70, props.map)} catalog={props.catalog} />
         <span className="v4MapNote">
           {working ? <span className="v4MapPulse" aria-hidden="true" /> : null}
-          {digNote(dig, props.catalog)}
+          <DigPauseDot dig={dig} />
+          {digNote(dig, props.catalog, props.locale)}
         </span>
       </button>
     </li>
@@ -279,7 +313,7 @@ function WhereToDig(props: Readonly<{
             {props.open.map((question) => {
               const picked = panel.picked.has(question.id);
               return (
-                <li key={`${question.pathId ?? "root"}/${question.id}`} className="v4PanelOpenRow">
+                <li key={`${question.pathId ?? "root"}/${question.id}`} className={`v4PanelOpenRow ${groundClass("OPEN")}`}>
                   <PickBox
                     question={question}
                     picked={picked}
@@ -298,8 +332,9 @@ function WhereToDig(props: Readonly<{
                       <span data-ai-generated="true">{shortText(question.text, 120)}</span>
                     </span>
                     <span className="v4MapNote">
-                      {question.star ? `${t(panel.catalog, "v4.map.starHint")} · ` : null}
-                      {openNote(question, picked, panel.catalog)}
+                      <OpenWord catalog={panel.catalog} />
+                      {question.star ? <span className="v4MapStarWords">{t(panel.catalog, "v4.map.starHint")}</span> : null}
+                      <span>{openNote(question, picked, panel.catalog)}</span>
                     </span>
                   </button>
                 </li>
@@ -313,7 +348,7 @@ function WhereToDig(props: Readonly<{
             <h4 className="v4PanelSmallHead">{t(panel.catalog, "v4.panel.digsHere")}</h4>
             <ul className="v4PanelRows">
               {props.digs.map((dig) => (
-                <DigLinkRow key={dig.link.childRunId} dig={dig} onSelect={panel.onSelect} catalog={panel.catalog} />
+                <DigLinkRow key={dig.link.childRunId} dig={dig} map={panel.map} onSelect={panel.onSelect} catalog={panel.catalog} locale={panel.locale} />
               ))}
             </ul>
           </>
@@ -353,16 +388,18 @@ function SkipToDig(props: Readonly<{ targetId: string; catalog: MessageCatalog }
 
 /**
  * Quick look / Thorough, then "Dig deeper here" (row D decisions 1 and 5). W3-4: "Dig here too" where a dig already
- * exists (and on every path of a dig's own map); the person's picks name how many they are; the money lines before the
+ * exists (and on every path of a dig's own map); several picks read "Dig into these" (no count); the money lines before the
  * dig; at the deepest level the "deepest level" line instead of all of it.
  */
-function DigBlock(props: Readonly<{ target: DigTarget; panel: PanelProps; again?: boolean; id?: string }>) {
+function DigBlock(props: Readonly<{ target: DigTarget; panel: PanelProps; again?: boolean; id?: string; startingAbove?: boolean }>) {
   const { panel } = props;
   if (panel.choice !== undefined && !panel.choice.canDig) return <DeepestLine catalog={panel.catalog} />;
-  // Several picks: "Dig into {count} together" (today's tray words); one, or a whole path: as before, or "Dig here too".
+  // Several picks: "Dig into these" (the tray's words; journey-f23: no count); one, or a whole path: as before, or "Dig here too".
   const label = props.target.kind === "picks" && props.target.picks.length >= 2
     ? tPlural(panel.catalog, "v4.dig.trayDig", props.target.picks.length, panel.locale)
     : t(panel.catalog, props.again === true ? "v4.nest.digHereToo" : "v4.panel.dig");
+  // dig-f7: a place whose dig waits keeps its button focusable (aria-disabled), so focus can come back to it after Undo.
+  const starting = panel.digStarting?.(props.target) ?? null;
   return (
     // dig-f24: `id` is where "Skip to the dig button" lands (the block itself takes focus only when its button cannot).
     <section className="v4PanelDig" {...(props.id === undefined ? {} : { id: props.id, tabIndex: -1 })}>
@@ -388,11 +425,16 @@ function DigBlock(props: Readonly<{ target: DigTarget; panel: PanelProps; again?
         type="button"
         className="v4Btn v4BtnPrimary v4PanelDigBtn"
         disabled={panel.digBusy}
-        onClick={() => panel.onDig(props.target)}
+        aria-disabled={starting !== null ? "true" : undefined}
+        onClick={() => {
+          if (starting === null) panel.onDig(props.target);
+        }}
       >
         {label}
       </button>
-      {panel.digBusy ? <p className="v4PanelHint v4Muted">{t(panel.catalog, "v4.panel.digBusy")}</p> : null}
+      {starting !== null
+        ? (props.startingAbove === true ? null : starting)
+        : panel.digBusy ? <p className="v4PanelHint v4Muted">{t(panel.catalog, "v4.panel.digBusy")}</p> : null}
       <V4MoneyLines lines={panel.money ?? []} catalog={panel.catalog} />
       {panel.roomNotice ?? null}
     </section>
@@ -424,7 +466,6 @@ function RootBody(props: Readonly<{ panel: PanelProps }>) {
   const { map, catalog } = panel;
   const headline = map.headline?.trim() ?? "";
   const summary = map.summary?.trim() ?? "";
-  const confidence = map.confidence?.trim() ?? "";
   const star = openQuestionsOf(map).find((question) => question.star && question.pathId !== null);
   const open = undugOpen(star === undefined ? map.open : [...map.open, star], panel.digs);
   // DATA-2: with no short answer yet, the whole composed answer is shown, so there is always an answer to read.
@@ -449,18 +490,21 @@ function RootBody(props: Readonly<{ panel: PanelProps }>) {
             {map.reservation ? <p className="v4PanelHint v4Muted">{t(catalog, "v4.story.reservation")}</p> : null}
           </>
         )
-        : fallback.length > 0
-          ? (
-            <>
-              <div className="v4PanelFallback" data-ai-generated="true">
-                {fallback.map((paragraph, index) => <p key={index} className="v4PanelText">{paragraph}</p>)}
-              </div>
-              {noStory ? null : (
-                <p className="v4PanelHint v4Muted">{t(catalog, writing ? "v4.panel.fallbackWriting" : missingKey)}</p>
-              )}
-            </>
-          )
-          : noStory ? null : <p className="v4Muted">{t(catalog, writing ? "v4.panel.storyWriting" : missingKey)}</p>}
+        : fallback.length > 0 && writing
+          // V4 screen review (3 Nov 2026), map-f21 / wait-f9: while the short answer is written, one line says so and the
+          // long answer waits under "Read the full answer" (below), so nothing swaps under the reader's eyes.
+          ? <p className="v4PanelHint v4Muted">{t(catalog, "v4.panel.fallbackWriting")}</p>
+          : fallback.length > 0
+            ? (
+              <>
+                <div className="v4PanelFallback" data-ai-generated="true">
+                  {fallback.map((paragraph, index) => <p key={index} className="v4PanelText">{paragraph}</p>)}
+                </div>
+                {noStory ? null : <p className="v4PanelHint v4Muted">{t(catalog, missingKey)}</p>}
+              </>
+            )
+            : noStory ? null : <p className="v4Muted">{t(catalog, writing ? "v4.panel.storyWriting" : missingKey)}</p>}
+      <V4FullAnswerFold paragraphs={writing ? fallback : []} catalog={catalog} />
     </>
   );
   return (
@@ -481,8 +525,9 @@ function RootBody(props: Readonly<{ panel: PanelProps }>) {
           catalog={catalog}
         />
       ) : null}
-      {/* R22 W5-1 (Q-D11): the current report version's answer first; the first debate's answer one click away. */}
-      {panel.reportAnswer !== null && panel.reportAnswer !== undefined ? (
+      {/* R22 W5-1 (Q-D11): the current report version's answer first; the first debate's answer one click away.
+          map-d1: with the answer card above the map, this panel shows the evidence only. */}
+      {panel.answerOnTop === true ? null : panel.reportAnswer !== null && panel.reportAnswer !== undefined ? (
         <Section title={t(catalog, "v4.investigation.fromReport", { n: panel.reportAnswer.version })} className="v4PanelReportAnswer">
           <div data-ai-generated="true">
             {panel.reportAnswer.segments.map((segment, index) => <p key={index} className="v4PanelText">{segment}</p>)}
@@ -510,27 +555,42 @@ function RootBody(props: Readonly<{ panel: PanelProps }>) {
           </Section>
         )
         : null}
-      {panel.readingLevel === "expert" && confidence.length > 0
-        ? (
-          <p className="v4PanelText">
-            {startsWithLabel(confidence, t(catalog, "v4.panel.confidence"))
-              ? null
-              : <><b>{t(catalog, "v4.panel.confidence")}</b>{" "}</>}
-            <span data-ai-generated="true">{confidence}</span>
-          </p>
-        )
-        : null}
       <WhereToDig open={open} digs={digsUnder(map, panel.digs, null)} emptyKey="v4.panel.noOpenRoot" panel={panel} />
     </>
   );
+}
+
+/**
+ * "The answer here so far" for one path. map-f8: each chosen path's own answer so far comes with the start step (its
+ * path outcome); until then this slot holds the path's whole line when the heading shows only its short label (map-f25:
+ * the line may name the path's outcome in a sentence; the card never does). The "How sure" line is under the bar.
+ */
+function AnswerSoFar(props: Readonly<{ line: string | null; catalog: MessageCatalog }>) {
+  return props.line === null
+    ? <p className="v4Muted">{t(props.catalog, "v4.panel.pathNoMore")}</p>
+    : <p className="v4PanelText" data-ai-generated="true">{props.line}</p>;
+}
+
+/**
+ * dig-d4 A: what the dig behind the path's newest finished rewrite looked into, in its own words ("You asked: …"); null
+ * when that dig is not on this map, or when only the site's own words could title it (a whole-path dig).
+ */
+function askedTitle(path: V4Path, panel: PanelProps): ReactNode {
+  const latest = (path.rewrites?.history ?? []).filter(isFinishedRewrite).at(-1);
+  const dig = latest === undefined ? undefined : panel.digs.find((candidate) => candidate.link.childRunId === latest.dig_run_id);
+  if (dig === undefined) return null;
+  const title = digTitle(dig, panel.catalog, HEADING_MAX, panel.map);
+  const siteWords = [t(panel.catalog, "v4.map.digWholePath"), t(panel.catalog, "v4.map.digUntitled")];
+  if (!title.ai && siteWords.includes(title.text)) return null;
+  return <TitleText title={title} catalog={panel.catalog} />;
 }
 
 function PathBody(props: Readonly<{ panel: PanelProps; resolved: Extract<ResolvedSelection, { kind: "path" }> }>) {
   const { panel } = props;
   const { path } = props.resolved;
   const line = path.line.replace(/\s+/g, " ").trim();
-  // The heading shows the short title; the full line is repeated here only when the title had to be cut.
-  const cut = line.length > 0 && shortText(line) !== line;
+  // The heading shows the path's label in full; the whole line is said here only when it says more than the heading.
+  const more = line.length > 0 && cardLabel(line) !== line;
   const addResearched = panel.onAddResearched;
   const digId = useId();
   // The suggestions "Choose what to dig" lists (none at the deepest level, where it is not shown).
@@ -539,14 +599,12 @@ function PathBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolve
   // nothing can be dug, so the plain "nothing is left" line.
   const emptyKey = suggestions.length > 0 ? null : panel.choice?.canDig === false ? "v4.panel.noOpenRoot" : "v4.panel.noOpenPath";
   const skip = suggestions.length >= SKIP_TO_DIG_FROM;
+  const startingTop = panel.digStartingAtTop === true ? panel.digStarting?.(pathTarget(path, panel)) ?? null : null;
   return (
     <>
       <Section title={t(panel.catalog, "v4.panel.answerHere")}>
-        {path.fate !== null
-          ? <p className="v4PanelText"><span className={`v4MapFate v4MapFate${path.fate}`}>{t(panel.catalog, `v4.fate.${path.fate}`)}</span></p>
-          : null}
-        {cut ? <p className="v4PanelText" data-ai-generated="true">{line}</p> : null}
-        {!cut && path.fate === null ? <p className="v4Muted">{t(panel.catalog, "v4.panel.pathNoMore")}</p> : null}
+        <AnswerSoFar line={more ? line : null} catalog={panel.catalog} />
+        {startingTop}
       </Section>
       <V4PathRewrite
         path={path}
@@ -554,6 +612,7 @@ function PathBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolve
         linkLevel={panel.linkLevel === undefined ? panel.readingLevel : panel.linkLevel}
         catalog={panel.catalog}
         locale={panel.locale}
+        asked={askedTitle(path, panel)}
       />
       {path.web !== undefined
         ? <V4SearchNote search={path.web.search} catalog={panel.catalog} />
@@ -587,6 +646,7 @@ function PathBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolve
         panel={panel}
         again={panel.choice?.digHereToo(path.id) === true}
         {...(skip ? { id: digId } : {})}
+        startingAbove={startingTop !== null}
       />
     </>
   );
@@ -703,7 +763,7 @@ function WaitingLine(props: Readonly<{ startedAt: string | null; catalog: Messag
     const timer = window.setTimeout(() => setWaited(true), waitLeft(startedAt, Date.now()));
     return () => window.clearTimeout(timer);
   }, [waited, startedAt]);
-  return <>{t(props.catalog, waited ? "v4.panel.digState.WAITING" : "v4.panel.digStarting")}</>;
+  return <>{t(props.catalog, waited ? "v4.panel.digState.WAITING" : "v4.undo.sendingDig")}</>;
 }
 
 function DigBody(props: Readonly<{ panel: PanelProps; resolved: Extract<ResolvedSelection, { kind: "dig" }> }>) {
@@ -716,7 +776,8 @@ function DigBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolved
   const finished = rewrite !== undefined && rewrite !== null && (rewrite.state === "READY" || rewrite.state === "READY_WITH_RESERVATION")
     ? rewrite
     : null;
-  const paused = dig.pausedUntil;
+  // Owner review 3 Nov (wait-f2): one pause block, the same as the waiting card's, with Continue once the month has reset.
+  const pause = pauseOfDig(dig);
   return (
     <>
       {more.length > 0
@@ -729,19 +790,28 @@ function DigBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolved
         )
         : null}
       <Section title={t(panel.catalog, "v4.panel.answerHere")}>
-        <p className="v4PanelText">
-          {digWorking(dig) && paused === undefined ? <span className="v4MapPulse" aria-hidden="true" /> : null}
-          {paused !== undefined
-            ? t(panel.catalog, "v4.money.paused", { date: formatDate(panel.locale, paused, { dateStyle: "medium" }) })
-            : rewrite !== undefined && dig.state === "DONE"
-              ? digNote(dig, panel.catalog)
+        {pause !== null ? (
+          <>
+            <V4MonthPause runId={dig.link.childRunId} pause={pause} catalog={panel.catalog} locale={panel.locale} className="v4PanelPause" />
+            {dig.link.mode !== null && panel.showDigModes !== false ? <p className="v4PanelText"><span className="v4PanelModeTag">{t(panel.catalog, `v4.digMode.${dig.link.mode}`)}</span></p> : null}
+          </>
+        ) : (
+          <p className="v4PanelText">
+            {digWorking(dig) ? <span className="v4MapPulse" aria-hidden="true" /> : null}
+            {rewrite !== undefined && dig.state === "DONE"
+              ? digNote(dig, panel.catalog, panel.locale)
               : dig.state === "WAITING"
                 ? <WaitingLine key={dig.link.childRunId} startedAt={dig.link.startedAt} catalog={panel.catalog} />
                 : t(panel.catalog, `v4.panel.digState.${dig.state}`)}
-          {dig.link.mode !== null
-            ? <> <span className="v4PanelModeTag">{t(panel.catalog, `v4.digMode.${dig.link.mode}`)}</span></>
-            : null}
-        </p>
+            {/* dig-f8: Free has no Quick look / Thorough choice, so its digs carry no mode word. */}
+            {dig.link.mode !== null && panel.showDigModes !== false
+              ? <> <span className="v4PanelModeTag">{t(panel.catalog, `v4.digMode.${dig.link.mode}`)}</span></>
+              : null}
+          </p>
+        )}
+        {panel.failedDigs !== undefined
+          ? <V4DigFailed dig={dig} failed={panel.failedDigs} digBusy={panel.digBusy} catalog={panel.catalog} />
+          : null}
         {dig.state === "DONE" && rewrite === undefined
           ? (headline.length > 0
             ? <p className="v4PanelHeadline v4Serif" data-ai-generated="true">{headline}</p>
@@ -774,16 +844,16 @@ function DigBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolved
   );
 }
 
+/** A heading is shown whole (map-f11): long enough for any title the map gives. */
+const HEADING_MAX = 2_000;
+
 /** The panel heading; the site's own fallback words are not marked as AI text (RULES-14). */
 function headingOf(resolved: ResolvedSelection, map: V4Map, catalog: MessageCatalog): Title {
-  if (resolved.kind === "path") return pathTitle(resolved.path, catalog);
+  // map-f25: a path's heading is its own label, uncut; its whole line (outcome words and all) is in "The answer here so far".
+  if (resolved.kind === "path") return pathTitle(resolved.path, catalog, HEADING_MAX);
   if (resolved.kind === "open") return { text: resolved.question.text, ai: true, more: 0 };
-  if (resolved.kind === "dig") {
-    const first = resolved.dig.link.questions[0];
-    return first !== undefined && first.trim().length > 0
-      ? { text: first, ai: true, more: 0 }
-      : { text: t(catalog, "v4.map.digUntitled"), ai: false, more: 0 };
-  }
+  // map-f29 / dig-f20: what the dig looked into, in its own words, marked as AI text only when an AI wrote them.
+  if (resolved.kind === "dig") return { ...digTitle(resolved.dig, catalog, HEADING_MAX, map), more: 0 };
   // The person's own words; the lines added from their choices sit in "What we asked the AIs".
   return { text: ownWords(map.question), ai: true, more: 0 };
 }
@@ -794,7 +864,8 @@ export function V4Panel(props: PanelProps) {
   const heading = headingOf(resolved, map, catalog);
   return (
     <div className={`v4Panel v4Panel-${resolved.kind}`}>
-      <Crumbs resolved={resolved} onSelect={props.onSelect} catalog={catalog} />
+      <Crumbs resolved={resolved} map={map} onSelect={props.onSelect} catalog={catalog} />
+      {props.underCrumbs ?? null}
       <span className="v4Eyebrow">{t(catalog, `v4.panel.kind.${resolved.kind}`)}</span>
       <h2 className="v4PanelH2" ref={props.headingRef} tabIndex={-1} data-ai-generated={heading.ai ? "true" : undefined}>
         {heading.text}

@@ -1,0 +1,148 @@
+/* V4 UX fixes (owner picks 3 Nov 2026): the shared Undo note (V4UndoNote.tsx, journey-f21, r2-22 A), the map page's
+   self-measuring bottom stack (V4BottomStack.tsx, journey-d3 A, dig-f16, dig-f17), the site-wide dig note holder
+   (V4DigUndo.tsx) and the dashed seed card on the map (V4DigSeed.tsx, dig-d3 B). Site tokens and the V4 tokens only.
+   Motion: the countdown line (r2-22 A, the Undo's own 10 seconds), the seed's fly-in and its way back out, and the picks
+   arrow's fold, each on the shared motion tokens of v4-base.css (--v4-move-fly, --v4-move-fold, --v4-ease-move); with
+   reduced motion every move is instant and words say what the line said. No fixed widths: everything wraps at 375 px. */
+
+/* ---------- the note ---------- */
+.v4UndoNotes {
+  display: flex; flex-direction: column; gap: 6px; min-width: 0;
+  width: max-content; max-width: min(560px, calc(100vw - 32px));
+}
+.v4Undo {
+  position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; min-width: 0;
+  background: var(--ink); color: var(--surface); border-radius: var(--r-btn); padding: 8px 16px 12px;
+  box-shadow: var(--shadow-pop); overflow: hidden;
+}
+.v4Undo-cancelled, .v4Undo-done, .v4Undo-sending, .v4UndoFolded { padding-bottom: 8px; }
+.v4UndoText { margin: 0; flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; font-size: var(--t-ui); }
+.v4UndoMode { color: var(--gold-bg); }
+.v4UndoSending { color: var(--gold-bg); }
+.v4UndoBtn, .v4UndoMore, .v4UndoLink {
+  background: none; border: 0; padding: 0 4px; color: var(--gold-bg); font-weight: 700; cursor: pointer; min-height: 44px;
+  font: inherit; font-weight: 700;
+}
+.v4UndoLink { display: inline-flex; align-items: center; text-decoration: underline; text-underline-offset: 3px; }
+.v4UndoMore {
+  align-self: flex-start; padding: 0 12px; border-radius: var(--r-btn); background: var(--ink); box-shadow: var(--shadow-pop);
+}
+/* r2-22 A: a thin line under the words shrinks over the 10 seconds; no number. */
+.v4UndoLine { position: absolute; inset-inline: 0; bottom: 0; height: 3px; background: color-mix(in srgb, var(--surface) 18%, transparent); }
+.v4UndoLineFill {
+  display: block; height: 100%; background: var(--accent); transform-origin: left center;
+  animation-name: v4UndoShrink; animation-timing-function: linear; animation-fill-mode: forwards;
+}
+[dir="rtl"] .v4UndoLineFill { transform-origin: right center; }
+@keyframes v4UndoShrink { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+/* With reduced motion the line stands still and the words say it ("Starts in a few seconds"). */
+.v4UndoStill { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .v4UndoLineFill { animation: none; }
+  .v4UndoStill { display: inline; }
+}
+/* dig-f23: "Picks cleared [Undo]" is this same note (V4PicksClearedNote), sized like the dig notes beside it. */
+.v4PicksCleared { width: max-content; max-width: min(560px, calc(100vw - 32px)); min-width: 0; }
+.v4StackPhone .v4PicksCleared, .v4DebSheetFoot .v4PicksCleared { width: 100%; max-width: none; }
+/* An older note on a phone: one line, its words and its Undo. */
+.v4UndoFolded .v4UndoText {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; line-clamp: 1; overflow: hidden;
+}
+
+/* The site-wide holder (report, ask page, a page still loading): bottom-left on a computer, between the gutters on a phone. */
+.v4UndoHost {
+  position: fixed; inset-inline-start: var(--v4-gutter); bottom: calc(16px + var(--safe-b)); z-index: 60;
+  max-width: calc(100vw - 2 * var(--v4-gutter));
+}
+
+/* ---------- the map page's bottom stack ---------- */
+.v4Stack {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; pointer-events: none;
+  display: flex; flex-direction: column; gap: 8px; min-width: 0;
+}
+.v4Stack > *, .v4StackTop > * { pointer-events: auto; }
+.v4Stack:empty { display: none; }
+/* A computer: the notes bottom-left, then the tray, in one column (never on top of each other). */
+.v4StackWide { align-items: flex-start; padding: 0 var(--v4-gutter) calc(16px + var(--safe-b)); }
+.v4StackWide > .v4DebTray { align-self: center; }
+/* Beside the side panel (computer and laptop), the tray centres over the map column, never on top of the panel's
+   words and buttons: the panel's width and the grid's 20 px gap are kept free on the end side. */
+.v4DebLayout-desktop .v4StackWide { padding-inline-end: calc(var(--v4-gutter) + 380px + 20px); }
+.v4DebLayout-laptop .v4StackWide { padding-inline-end: calc(var(--v4-gutter) + 360px + 20px); }
+/* The page's bottom room is the stack's real height (dig-f16), on the page and inside the desktop panel's own scroll. */
+.appShell:has(.v4Stack) { padding-bottom: var(--v4-stack-room, 0px); }
+.v4DebLayout-desktop .v4DebPanelCol, .v4DebLayout-mid .v4DebPanelCol { padding-bottom: var(--v4-stack-room, 0px); }
+
+/* A phone: one surface, never more than about a quarter of the screen; the bar always shows, what is above it scrolls. */
+.v4StackPhone {
+  gap: 0; max-height: 25vh; max-height: 25dvh; background: var(--surface);
+  border-top: 1px solid var(--line-strong); box-shadow: var(--shadow-chrome); pointer-events: auto;
+}
+.v4StackTop {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: 6px; padding: 0 var(--v4-gutter);
+}
+.v4StackTop:empty { display: none; }
+.v4StackTop > :first-child { margin-top: 8px; }
+.v4StackPhone .v4UndoNotes { width: 100%; max-width: none; }
+.v4StackPhone .v4Undo { box-shadow: none; }
+.v4StackPhone .v4DebPhoneBar { flex: none; border-top: 0; box-shadow: none; }
+/* wait-f2: the bar's "Paused · Continue" job: still words, no pulse. */
+.v4DebPhonePaused { flex: 1 1 auto; min-width: 0; margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: var(--t-ui); }
+.v4DebPhonePausedWord { font-weight: 700; }
+.v4StackPhone .v4DebTray { max-width: none; box-shadow: none; padding: 8px 0; border: 0; border-radius: 0; }
+/* dig-f17: the slim report line just above the bar. */
+.v4StackGoodTime {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0;
+  padding-block: 4px; padding-inline: 12px 4px; border-radius: var(--r-btn); background: var(--ok-bg); border: 1px solid var(--ok-border);
+}
+/* The words and the × share the first row; [Write my report] takes the next one, so the × never sits alone on a row. */
+.v4StackGoodText { margin: 0; flex: 1 1 calc(100% - 64px); min-width: 0; font-size: var(--t-ui); font-weight: 600; color: var(--ok-text); }
+.v4StackGoodReport { order: 2; text-decoration: none; min-height: 44px; }
+.v4StackGoodClose { order: 1;  flex: none; min-width: 44px; min-height: 44px; background: none; border: 0; cursor: pointer; font-size: 20px; color: var(--text-2); }
+/* journey-d3: the picks folded to one line, "Your picks ▸", which opens them. */
+.v4StackPicks { display: flex; flex-direction: column; min-width: 0; }
+.v4StackPicksToggle {
+  display: flex; align-items: center; gap: 8px; min-height: 44px; min-width: 0; width: 100%;
+  background: none; border: 0; padding: 0; cursor: pointer; font-weight: 700; text-align: start;
+}
+.v4StackPicksArrow { display: inline-block; transition: transform var(--v4-move-fold) var(--v4-ease-move); }
+.v4StackPicksOpen .v4StackPicksArrow { transform: rotate(90deg); }
+[dir="rtl"] .v4StackPicksArrow { transform: scaleX(-1); }
+[dir="rtl"] .v4StackPicksOpen .v4StackPicksArrow { transform: rotate(90deg); }
+.v4StackPicksPath { min-width: 0; font-weight: 400; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .v4StackPicksArrow { transition: none; } }
+/* dig-f16: while a text box has the keyboard, the stack steps aside. */
+.v4StackAside { visibility: hidden; pointer-events: none; transform: translateY(100%); }
+.v4StackAside * { pointer-events: none; }
+/* journey-d3: while the cookie bar shows, the stack sits in the page (at its end) instead of over it. */
+.appShell:has(.consentBar) .v4StackPhone { position: static; max-height: none; }
+.appShell:has(.consentBar):has(.v4StackPhone) { padding-bottom: 0; }
+.v4DebPhoneReport { text-decoration: none; }
+
+/* ---------- the place being dug (panel), the report's wait line ---------- */
+.v4DigStarting { display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px; color: var(--text); }
+.v4DigStartingUndo { min-height: 44px; font-weight: 700; }
+.v4RepDigWait { display: flex; flex-direction: column; gap: 6px; margin: 0 0 12px; }
+
+/* ---------- the seed on the map (dig-d3 B) ---------- */
+.v4DigSeed {
+  display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 8px 12px; border-radius: 12px;
+  background: var(--con-bg); border: 1.5px dashed var(--accent); color: var(--text); font-size: var(--t-ui); line-height: 1.35;
+  transform-origin: left top; animation: v4SeedIn var(--v4-move-fly) var(--v4-ease-move);
+}
+.v4DigSeedTitle { min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
+.v4DigSeedLeaving { animation: v4SeedOut var(--v4-move-fly) var(--v4-ease-move) forwards; }
+@keyframes v4SeedIn { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: scale(1); } }
+@keyframes v4SeedOut { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(0.6); } }
+[dir="rtl"] .v4DigSeed { transform-origin: right top; }
+@media (prefers-reduced-motion: reduce) {
+  /* Instant, with the shared 1-second highlight (v4-base.css) and its written "starting" line. */
+  .v4DigSeed { animation: v4Highlight var(--v4-highlight-time) ease-out 1; }
+  .v4MapLeafSeedLeaving { display: none; }
+}
+
+/* Paper and PDF never show a waiting note or the pinned bar. */
+@media print {
+  .v4UndoHost, .v4Stack { display: none; }
+}

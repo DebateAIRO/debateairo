@@ -21,9 +21,10 @@
 .v4RepHdrBackShort { display: none; }
 .v4RepHdrBack:hover .v4RepHdrBackShort { text-decoration: underline; text-underline-offset: 3px; }
 /* Browser check (4 Nov): below 480px the full words no longer fit beside the level and Share ("Back to the m…"), so the
-   short word shows; the link's name (aria-label) is the full sentence on every screen. */
+   short word shows; the link's name (aria-label) is the full sentence on every screen. Only words that have a short
+   form (.v4RepHdrBackWide) step aside: "Back to your question" (a debate that did not finish, no Share) stays. */
 @media (max-width: 479px) {
-  .v4RepHdrBackText { display: none; }
+  .v4RepHdrBackWide { display: none; }
   .v4RepHdrBackShort { display: inline; }
 }
 .v4RepHdrArrow { flex: none; }

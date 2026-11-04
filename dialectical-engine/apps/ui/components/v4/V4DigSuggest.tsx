@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import type { DigSuggestion } from "@debateai/contract";
-import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
+import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import type { MoneyLine } from "@/lib/v4/money";
 import {
   isEdited,
@@ -14,6 +14,7 @@ import {
   type V4PlanTier
 } from "@/lib/v4/suggestions";
 import type { V4DigDraft, V4DigPick, V4Path } from "@/lib/v4/types";
+import type { TypedWords } from "@/lib/v4/useLeaveGuard";
 
 /*
  * Perplexity plan W3-4 and the dig model revision (2026-10-30/31): choosing what to dig on the map. A path's dig
@@ -41,6 +42,11 @@ export type V4DigChoice = Readonly<{
   onAddOwnView: (pathId: string, text: string) => PickRefusal | null;
   onRemovePick: (key: string) => void;
   onClear: () => void;
+  /**
+   * V4 screen review (dig-f23): words typed here and not added yet (an own view, a wording being edited), kept by the
+   * page while the person moves between questions. Left out: they last only while this part is on screen, as before.
+   */
+  typed?: TypedWords;
 }>;
 
 /** On the tree and the outline, at most this many suggestions per path; the panel lists them all. */
@@ -127,7 +133,7 @@ export function SuggestionLeaves(props: Readonly<{
           className={tree ? "v4MapLeaf v4MapLeafSuggestion" : "v4OutRow v4OutSuggestion"}
         >
           <div className={`v4Sug${picked.has(suggestion.suggestion_id) ? " v4SugPicked" : ""}`}>
-            <button type="button" className="v4SugMain" onClick={props.onOpenPath}>
+            <button type="button" className="v4SugMain" data-row={`suggestion:${suggestion.suggestion_id}@path:${path.id}`} onClick={props.onOpenPath}>
               <KindTag suggestion={suggestion} catalog={catalog} />
               <span className="v4SugText" data-ai-generated="true">{shortLine(suggestion.text)}</span>
             </button>
@@ -137,7 +143,7 @@ export function SuggestionLeaves(props: Readonly<{
       ))}
       {more > 0 ? (
         <li className={tree ? "v4MapLeaf v4MapLeafSuggestion" : "v4OutRow v4OutSuggestion"}>
-          <button type="button" className="v4MapMore" onClick={props.onOpenPath}>
+          <button type="button" className="v4MapMore" data-row={`suggestions-more@path:${path.id}`} onClick={props.onOpenPath}>
             {t(catalog, "v4.suggest.more", { count: more })}
           </button>
         </li>
@@ -147,10 +153,21 @@ export function SuggestionLeaves(props: Readonly<{
 }
 
 /** "Dig here too" on the tree and the outline: opens the path in the panel, where the person chooses what to dig. */
-export function DigHereTooLeaf(props: Readonly<{ onOpenPath: () => void; variant: "tree" | "outline"; catalog: MessageCatalog }>) {
+export function DigHereTooLeaf(props: Readonly<{
+  onOpenPath: () => void;
+  variant: "tree" | "outline";
+  catalog: MessageCatalog;
+  /** The path it hangs under: its row keeps one id on the map's arrow keys (map-f10). */
+  pathId?: string;
+}>) {
   return (
     <li className={props.variant === "tree" ? "v4MapLeaf v4MapLeafSuggestion" : "v4OutRow v4OutSuggestion"}>
-      <button type="button" className="v4MapMore v4SugAgain" onClick={props.onOpenPath}>
+      <button
+        type="button"
+        className="v4MapMore v4SugAgain"
+        {...(props.pathId === undefined ? {} : { "data-row": `dig-here-too@path:${props.pathId}` })}
+        onClick={props.onOpenPath}
+      >
         {t(props.catalog, "v4.nest.digHereToo")}
       </button>
     </li>
@@ -163,18 +180,28 @@ function PanelSuggestion(props: Readonly<{ path: V4Path; suggestion: DigSuggesti
   const id = useId();
   const key = `suggestion:${suggestion.suggestion_id}`;
   const pick = choice.draft.picks.find((candidate) => candidate.key === key);
-  const [editing, setEditing] = useState<string | null>(null);
+  // dig-f23: a wording being edited stays in the page while the person looks at another question.
+  const typedKey = `edit:${suggestion.suggestion_id}`;
+  const [editing, setEditingNow] = useState<string | null>(() => choice.typed?.get(typedKey) ?? null);
   const [problem, setProblem] = useState<PickRefusal | null>(null);
   const refusal = pick !== undefined ? null : choice.refusalFor(path.id);
   const editedText = pick?.kind === "SUGGESTION" && isEdited(pick) ? pick.text : null;
+  const startText = pick?.kind === "SUGGESTION" ? pick.text : suggestion.text;
+  // The wording the box starts with is not "typed words": only a change is kept as worth asking about.
+  const setEditing = (text: string | null): void => {
+    setEditingNow(text);
+    choice.typed?.set(typedKey, text, startText);
+  };
   const startEdit = (): void => {
     // Editing a suggestion picks it, so the wording the person writes is what is sent.
     if (pick === undefined) choice.onToggleSuggestion(path.id, suggestion);
     setProblem(null);
-    setEditing(pick?.kind === "SUGGESTION" ? pick.text : suggestion.text);
+    setEditing(startText);
   };
   const saveEdit = (): void => {
     if (editing === null) return;
+    // Picks cleared while the wording waited in the page: editing picks it again, as starting the edit did.
+    if (pick === undefined) choice.onToggleSuggestion(path.id, suggestion);
     const refused = choice.onEditPick(key, editing);
     setProblem(refused);
     if (refused === null) setEditing(null);
@@ -220,7 +247,13 @@ function PanelSuggestion(props: Readonly<{ path: V4Path; suggestion: DigSuggesti
 function OwnView(props: Readonly<{ path: V4Path; choice: V4DigChoice; catalog: MessageCatalog }>) {
   const { path, choice, catalog } = props;
   const id = useId();
-  const [text, setText] = useState<string | null>(null);
+  // dig-f23: an own view typed but not added yet stays in the page while the person looks at another question.
+  const typedKey = `own:${path.id}`;
+  const [text, setTextNow] = useState<string | null>(() => choice.typed?.get(typedKey) ?? null);
+  const setText = (next: string | null): void => {
+    setTextNow(next);
+    choice.typed?.set(typedKey, next);
+  };
   const [problem, setProblem] = useState<PickRefusal | null>(null);
   const refusal = choice.refusalFor(path.id);
   if (text === null) {
@@ -335,9 +368,7 @@ export function V4DigCompose(props: Readonly<{ path: V4Path; choice: V4DigChoice
       <OtherPicks picks={mine} choice={choice} catalog={catalog} />
       {elsewhere ? null : <OwnView key={`own/${path.id}`} path={path} choice={choice} catalog={catalog} />}
       {full && choice.planTier !== "free" ? <p className="v4PanelHint v4Muted">{t(catalog, "v4.suggest.full")}</p> : null}
-      {mine.length > 0 ? (
-        <p className="v4PanelHint">{tPlural(catalog, "v4.dig.trayPicked", mine.length, props.locale)}</p>
-      ) : null}
+      {/* journey-f23 (owner's screen review): no "N picked" count; the picks are marked above and shown as chips in the tray. */}
     </section>
   );
 }

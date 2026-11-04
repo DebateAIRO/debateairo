@@ -74,7 +74,7 @@ const word = (key: string, values: Record<string, string | number> = {}): string
   Object.entries(values).reduce((line, [name, value]) => line.replaceAll(`{${name}}`, String(value)), CATALOG[key]!);
 const DIG = "22222222-2222-4222-8222-222222222222";
 const date = (iso: string, style: "medium" | "long" = "medium") => new Intl.DateTimeFormat("en", { dateStyle: style }).format(new Date(iso));
-const clock = (iso: string) => new Intl.DateTimeFormat("en", { timeStyle: "short" }).format(new Date(iso));
+const clock = (iso: string) => new Intl.DateTimeFormat("en", { timeStyle: "short", hourCycle: "h23" }).format(new Date(iso));
 const css = readFileSync(resolve(import.meta.dirname, "../../apps/ui/app/v4/v4-report.css"), "utf8");
 
 const STORY = {
@@ -583,16 +583,21 @@ describe("the report page's address and states", () => {
     expect(buttonOf(node, "Try again")).not.toBeNull();
   });
 
-  it("f10: a failed debate offers Ask a new question, with the classic view small under it", async () => {
+  it("f10: a failed debate offers Ask a new question, with the classic view small under it (after map-f30's way back)", async () => {
     const runId = crypto.randomUUID();
     harness.run = { run_ref: runId, question_line: "Q?", state: "FAILED", terminal_reason: "RUNNER_FAILED", hold_until: null } as RunProjection;
     const node = await mountReport(runId);
     const state = node.querySelector(".v4RepState")!;
     expect(state.textContent).toContain(word("v4.report.failed"));
     const links = [...state.querySelectorAll("a")];
-    expect(links.map((link) => link.textContent)).toEqual([CATALOG["v4.debate.askNew"], CATALOG["v4.common.classicView"]]);
+    // map-f30 first: back to the debate's own page, where "Ask this again" is; then report-f10's two.
+    expect(links.map((link) => link.textContent)).toEqual([
+      CATALOG["v4.report.backToQuestion"], CATALOG["v4.debate.askNew"], CATALOG["v4.common.classicView"]
+    ]);
     expect(links[0]!.className).toContain("v4BtnPrimary");
-    expect(links[1]!.getAttribute("href")).toBe(`/debate/${runId}`);
+    expect(links[1]!.getAttribute("href")).toMatch(/^\/v4(?:\?|$)/u);
+    expect(links[2]!.getAttribute("href")).toBe(`/debate/${runId}`);
+    expect(links[2]!.className).not.toContain("v4Btn");
   });
 });
 
@@ -845,25 +850,29 @@ describe("the report's digs (review F6, F7)", () => {
   });
 });
 
-describe("the map's answer (owner Q-D11)", () => {
+describe("the map's answer (owner Q-D11; map-d1 and map-f2 of 3 Nov: one answer card, the newest answer current)", () => {
   it("shows the current version's answer, labelled with its version, and the first debate's answer one click away", async () => {
     const runId = crypto.randomUUID();
     reports.load = vi.fn(async () => investigation(runId, "OPEN", [finished(1, "2026-10-29T10:00:00.000Z"), finished(2, "2026-10-31T10:00:00.000Z")]));
-    await mountMap(1280, runId);
-    const section = page().querySelector<HTMLElement>(".v4PanelReportAnswer")!;
-    expect(section.querySelector("h3")!.textContent).toBe("From your report, version 2");
-    expect(section.textContent).toContain("The made-up answer of version 2.");
-    const first = section.querySelector<HTMLDetailsElement>("details.v4PanelFirstAnswer")!;
-    expect(first.open).toBe(false);
-    expect(first.querySelector("summary")!.textContent).toBe("See the first debate's answer");
-    expect(first.textContent).toContain("Our answer: put most new money into renewables and storage");
+    await mountMap(1600, runId);
+    const card = page().querySelector<HTMLElement>(".v4AnswerCard")!;
+    expect(card.querySelector(".v4Eyebrow")!.textContent).toBe("From your report, version 2");
+    expect(card.textContent).toContain("The made-up answer of version 2.");
+    const earlier = card.querySelector<HTMLDetailsElement>("details.v4AnswerEarlier")!;
+    expect(earlier.open).toBe(false);
+    expect(earlier.querySelector("summary")!.textContent).toBe(CATALOG["v4.mainAnswer.earlier"]);
+    expect(earlier.textContent).toContain("Our answer: put most new money into renewables and storage");
+    // The panel shows the evidence, not a second copy of either answer.
+    expect(page().querySelector(".v4PanelReportAnswer")).toBeNull();
   });
 
   it("before any finished version the map shows the first debate's answer as before", async () => {
     const runId = crypto.randomUUID();
     reports.load = vi.fn(async () => investigation(runId, "CLOSED", [writing(1, 0)]));
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     expect(page().querySelector(".v4PanelReportAnswer")).toBeNull();
-    expect(page().textContent).toContain(CATALOG["v4.panel.answerRoot"]);
+    const card = page().querySelector<HTMLElement>(".v4AnswerCard")!;
+    expect(card.querySelector(".v4Eyebrow")!.textContent).toBe(CATALOG["v4.panel.answerRoot"]);
+    expect(card.querySelector("details.v4AnswerEarlier")).toBeNull();
   });
 });

@@ -17,6 +17,8 @@
  * new starts waiting for the reset, the borrow notice and the debate paused at the month wall with Continue.
  * Task W4-6: it draws the first debate's map with its four rewrite states, and a dig's map from its rewrite's own paths
  * with no story, through the website's own map builder.
+ *
+ * Owner's screen review (3 Nov 2026, journey-d2): it reads the draft start time of a running question (`started_at`).
  */
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -127,6 +129,16 @@ for (const [name, id] of Object.entries(RUNS)) {
       `${r.state}${r.terminal_reason ? ` (${r.terminal_reason})` : ""}${r.waits_until ? ` waits until ${r.waits_until}` : ""}`);
 }
 await expectCode("run answer of the running run", () => client.readRunAnswer(RUNS.running), "NOT_FOUND");
+// V4 screen review (wait-f1): a sign-in that ended reads as SESSION_REQUIRED (the page then asks to sign in again).
+await fetch(`${MOCK}/__mock/set?session=OUT`);
+try {
+  await expectCode("a debate read after the sign-in ended", () => client.readRun(RUNS.running), "SESSION_REQUIRED");
+  // A stranger has no quota: the room and usage reads are signed-in only, as in the real API.
+  await expectCode("the room read of a stranger", () => client.getAskRoom({ plan_tier: "premium", composition_budget_tier: "medium", depth: 2, answer_length: "standard" }), "SESSION_REQUIRED");
+  await expectCode("the usage read of a stranger", () => client.getBillingUsage(), "SESSION_REQUIRED");
+} finally {
+  await fetch(`${MOCK}/__mock/set?session=IN`);
+}
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const answer: any = await step("run answer (settled)", () => client.readRunAnswer(RUNS.settled), (a: { answer_id: string; nodes: unknown[] }) => `${a.answer_id}, ${a.nodes.length} points`);
 if (answer !== undefined) {
@@ -451,6 +463,28 @@ await step("a debate paused at the month wall, then Continue", async () => {
   await mock("/__mock/set?pause=UNTIL_RESET");
   return `paused until ${before.month_pause?.until ?? ready.month_pause.until}; Continue refused early, then resumed`;
 }, (value: string) => value);
+// Owner review 3 Nov (wait-f11, wait-f18): a failed run's `quota_used` (on the draft view until the contract carries it), and
+// the switch that makes new digs fail or pause, for the click-test of "Try this dig again" and the paused dig.
+await step("a failed debate's quota_used, and the dig= switch", async () => {
+  const today: Loose = await client.readRun(RUNS.failed);
+  must(today.state === "FAILED" && (today.quota_used === undefined || today.quota_used === "NONE"), "today's run read stays valid");
+  const draft: Loose = await mock(`/__mock/draft/v1/runs/${RUNS.failed}`);
+  must(draft.quota_used === "NONE", "the draft view says nothing was taken");
+  for (const dig of ["FAIL", "PAUSE", "SETTLE"]) must((await mock(`/__mock/set?dig=${dig}`)).dig === dig, `dig=${dig} is taken`);
+  return `draft quota_used ${String(draft.quota_used)}; dig= FAIL, PAUSE, SETTLE`;
+}, (value: string) => value);
+
+// Owner's screen review, 3 Nov 2026 (journey-d2, journey-f16, wait-f7): when a question started, for "Started 14:31" on any
+// device. A DRAFT field: on the draft view now; the website gets it only once the contract's run read knows `started_at`.
+await step("when a question started (draft started_at)", async () => {
+  const draft: Loose = await mock(`/__mock/draft/v1/runs/${RUNS.running}`);
+  must(typeof draft.started_at === "string" && !Number.isNaN(Date.parse(draft.started_at)), "the draft view says when it started");
+  const waiting: Loose = await mock(`/__mock/draft/v1/runs/${RUNS.waiting}`);
+  must(waiting.state === "WAITING" && waiting.started_at === undefined, "a question waiting to start has no start time");
+  const today: Loose = await client.readRun(RUNS.running);
+  must(today.started_at === undefined || today.started_at === draft.started_at, "the website gets the same time, once the contract knows it");
+  return `started ${draft.started_at}${today.started_at === undefined ? " (held back from the website until the contract knows it)" : ""}`;
+}, (value: string) => value);
 
 // Decision 13: the public-debates lane. It runs last among the asks: it adds two digs and one report to the mock.
 const PUBLIC = { debate: "f1000000-0000-4000-8000-000000000001", authorGone: "f1000000-0000-4000-8000-000000000002", update: "f2000000-0000-4000-8000-000000000001" };
@@ -607,6 +641,25 @@ await step("the Arabic debate says its language, and its report is in Arabic", a
   const read: Loose = await client.readInvestigation(ref);
   must(/[\u0600-\u06FF]/u.test(read.versions[0].story.short_answer), "the report's words");
   return read.versions[0].story.short_answer;
+}, (value: string) => value);
+
+// ---- The owner's screen review (3 Nov): "Your maps" on the ask page, read by the website's own shelf reader ----
+await step("Your maps: digs left out by their dig links and hung under their question; the server's extra parts held back", async () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const shelfModule: any = await import(pathToFileURL(join(UI, "lib", "v4", "mapShelf.ts")).href);
+  const { readFileSync } = await import("node:fs");
+  const v4Catalog = JSON.parse(readFileSync(join(UI, "messages", "en", "v4.json"), "utf8"));
+  const shelf: Loose = await shelfModule.readMapShelf(5, v4Catalog, { client });
+  const seededDigs = [RUNS.dig, RUNS.digOwnView, RUNS.digLevelTwo, RUNS.digLevelThree, RUNS.digFailed, RUNS.digNoChange, RUNS.deepest];
+  must(shelf.maps.length === 5 && shelf.maps.every((map: Loose) => !seededDigs.includes(map.runId)), "five real questions, no dig among them");
+  const first: Loose = shelf.maps.find((map: Loose) => map.runId === RUNS.settled);
+  must(first === undefined || first.digs.length > 0, "the first debate carries its digs");
+  must(shelf.maps.every((map: Loose) => map.bar === null && map.startedAt === null), "the draft parts are held back from today's contract");
+  const draft: Loose = await mock("/__mock/draft/v1/answers?limit=50&offset=0");
+  must(draft.open_runs.some((run: Loose) => typeof run.started_at === "string"), "a running question says when it started");
+  must(draft.items.some((item: Loose) => item.map_bar !== undefined && typeof item.changed_since_visit === "boolean"), "an answer carries its bar and its New dot");
+  must(draft.items.some((item: Loose) => item.run_ref === RUNS.dig && item.dug_from === RUNS.settled), "a dig names the debate it was dug from");
+  return shelf.maps.map((map: Loose) => `${map.state}${map.digs.length > 0 ? ` (+digs)` : ""}`).join(", ");
 }, (value: string) => value);
 
 console.log(failures === 0 ? "\nALL CHECKS PASSED" : `\n${failures} CHECK(S) FAILED`);

@@ -8,6 +8,7 @@ import {
 import { contractClient } from "../api.js";
 import type { AskRoom } from "../billing/room.js";
 import { formatDate } from "../i18n/translate.js";
+import { clockText, dateClockText } from "./stateWords.js";
 
 /*
  * The money rule (owner, 31 Oct 2026; dig model revision, "The money rule"), as the V4 pages say it. Users see shares
@@ -31,13 +32,16 @@ function personScope(scope: string | null): PersonScope | null {
   return (PERSON_SCOPES as readonly string[]).includes(scope ?? "") ? (scope as PersonScope) : null;
 }
 
-/** A reset as people read it: the time of day for a day's reset, the date and time for a week's or a month's. */
+/**
+ * A reset as people read it: the time of day for a day's reset, the date and time for a week's or a month's. journey-f15:
+ * every time in the one clock form of lib/v4/stateWords.ts ("after 08:00").
+ */
 export function resetText(iso: string, scope: PersonScope | "MONTH_PAUSE", locale: string): string {
   return scope === "PERSON_DAY"
-    ? formatDate(locale, iso, { hour: "2-digit", minute: "2-digit" })
+    ? clockText(iso, locale) ?? formatDate(locale, iso, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
     : scope === "MONTH_PAUSE"
       ? formatDate(locale, iso, { dateStyle: "medium" })
-      : formatDate(locale, iso, { dateStyle: "medium", timeStyle: "short" });
+      : dateClockText(iso, locale) ?? formatDate(locale, iso, { dateStyle: "medium" });
 }
 
 /** Before a dig: "This dig uses about {percent}% of today. …" (approved), when the room read for the dig says a share. */
@@ -58,6 +62,22 @@ export function startsWaitLine(room: AskRoom | null, locale: string): MoneyLine 
   const scope = personScope(room.scope);
   if (scope === null) return null;
   return Object.freeze({ key: `v4.money.startsWait.${scope}`, values: { time: resetText(room.resets_at, scope, locale) } });
+}
+
+/**
+ * The ask page's step 1 (ask-f18, ask-d4 C): when new questions wait for a reset, the ONE line above the question box,
+ * naming the window that binds — "You've used today's quota. New questions start after 08:00." (a clock time), or this
+ * week's or this month's quota (Free counts by the month) "… start on 1 December." (a date). null otherwise. The box keeps
+ * the person's words; holding Next and "Just answer it" until then is the step-1 buttons' own rule.
+ */
+export function usedUpLine(room: AskRoom | null, locale: string): MoneyLine | null {
+  if (room === null || room.new_starts !== "BLOCKED_UNTIL_RESET" || room.resets_at === null) return null;
+  const scope = personScope(room.scope);
+  if (scope === null) return null;
+  const values: MoneyLine["values"] = scope === "PERSON_DAY"
+    ? { time: resetText(room.resets_at, scope, locale) }
+    : { date: formatDate(locale, room.resets_at, { day: "numeric", month: "long" }) };
+  return Object.freeze({ key: `v4.ask.usedUp.${scope}`, values });
 }
 
 /** The usage area's borrow notices: what running work used of tomorrow's or next week's allowance, day first. */

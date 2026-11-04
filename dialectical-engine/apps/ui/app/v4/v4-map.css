@@ -14,7 +14,9 @@
 .v4BarCounts { font-size: var(--t-ui); color: var(--text-2); }
 
 /* ---------- shared marks ---------- */
-.v4MapNote { display: inline-flex; align-items: center; gap: 6px; font-size: var(--t-meta); color: var(--text-2); }
+/* A card's note row wraps whole words onto a new line in a narrow card ("Open · A good place to start · Could change
+   the answer"), never one word per line. */
+.v4MapNote { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; font-size: var(--t-meta); color: var(--text-2); }
 .v4MapStar { color: var(--gold); font-size: 15px; line-height: 1; }
 .v4MapNew { display: inline-flex; align-items: center; gap: 5px; font-size: var(--t-meta); font-weight: 700; color: var(--con-text); }
 .v4MapNewDot { width: 8px; height: 8px; border-radius: var(--r-dot); background: var(--accent); flex: none; }
@@ -24,6 +26,12 @@
 }
 @keyframes v4MapPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.7); } }
 @media (prefers-reduced-motion: reduce) { .v4MapPulse { animation: none; } }
+/* Owner review 3 Nov (wait-f5, public-f17): the still pause mark. A hollow dot that never moves, where a working dig or
+   debate pulses; the same on the map, the outline, the panel, the rail and the waiting card. */
+.v4PauseDot {
+  display: inline-block; flex: none; width: 9px; height: 9px; border-radius: var(--r-dot);
+  border: 2px solid var(--text-2); background: transparent; box-sizing: border-box;
+}
 .v4MapFate {
   display: inline-block; align-self: flex-start; font-size: var(--t-micro); font-weight: 700; letter-spacing: .02em;
   border-radius: var(--r-pill); padding: 1px 8px; border: 1px solid var(--line-strong); color: var(--text-2);
@@ -308,6 +316,12 @@
 .v4PanelSkip:not(:focus) { position: absolute; width: 1px; height: 1px; min-height: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 /* dig-f13: the way back to a dig's path names the path, so its label may wrap. */
 .v4PanelGoDig { padding-top: 8px; padding-bottom: 8px; }
+/* Owner review 3 Nov (wait-f2, wait-f18, dig-f12): a paused dig's pause block and a failed dig's reason and retry. */
+.v4Panel .v4PauseDot { margin-inline-end: 6px; vertical-align: middle; }
+.v4PanelPause { margin-bottom: 4px; }
+.v4DigFailed { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 8px; }
+.v4DigFailedRetry { min-height: 44px; }
+.v4DebRailMark .v4PauseDot { width: 10px; height: 10px; }
 
 /* Perplexity plan W2-6: sources under a point, a path's search note and its other pages (V4Sources.tsx). Phone first:
    nothing here has a fixed width, long titles and addresses wrap, and buttons keep the 44px touch height. */

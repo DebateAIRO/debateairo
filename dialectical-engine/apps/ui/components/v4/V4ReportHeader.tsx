@@ -85,10 +85,12 @@ function HeaderMenu({ buttonLabel, buttonText, title, className, children }: Rea
   );
 }
 
-export function V4ReportHeader({ catalog, backHref, level, onLevel, share, status }: Readonly<{
+export function V4ReportHeader({ catalog, backHref, backKey = "v4.report.backToMap", level, onLevel, share, status }: Readonly<{
   catalog: MessageCatalog;
   /** null: there is no map to go back to (a report that cannot be found). */
   backHref: string | null;
+  /** The back link's words: "Back to the map", or "Back to your question" for a debate that did not finish (map-f30). */
+  backKey?: "v4.report.backToMap" | "v4.report.backToQuestion";
   level: ReadingLevel;
   onLevel: (level: ReadingLevel) => void;
   /** The Share choices in their order; none: no Share button. */
@@ -101,11 +103,16 @@ export function V4ReportHeader({ catalog, backHref, level, onLevel, share, statu
       <header className="v4RepHdr">
         {backHref === null ? <span className="v4RepHdrSpacer" /> : (
           // Browser check (4 Nov): on a phone the full words were cut to "Back to the m…" (and "…ck to the map" right to
-          // left), so narrow screens show the short "Map"; the link's name stays "Back to the map" on every screen.
-          <Link className="v4RepHdrBack" href={backHref} aria-label={t(catalog, "v4.report.backToMap")}>
+          // left), so narrow screens show the short "Map"; the link's name stays the full words on every screen. "Back to
+          // your question" (map-f30) has no short form in the record, so it keeps its full words on a phone too.
+          <Link className="v4RepHdrBack" href={backHref} aria-label={t(catalog, backKey)}>
             <span className="v4RepHdrArrow" aria-hidden="true">←</span>
-            <span className="v4RepHdrBackText">{t(catalog, "v4.report.backToMap")}</span>
-            <span className="v4RepHdrBackShort" aria-hidden="true">{t(catalog, "v4.report.backToMapShort")}</span>
+            <span className={backKey === "v4.report.backToMap" ? "v4RepHdrBackText v4RepHdrBackWide" : "v4RepHdrBackText"}>
+              {t(catalog, backKey)}
+            </span>
+            {backKey === "v4.report.backToMap" ? (
+              <span className="v4RepHdrBackShort" aria-hidden="true">{t(catalog, "v4.report.backToMapShort")}</span>
+            ) : null}
           </Link>
         )}
         <HeaderMenu

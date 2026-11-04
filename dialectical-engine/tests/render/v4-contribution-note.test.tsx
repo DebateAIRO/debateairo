@@ -33,7 +33,7 @@ afterEach(async () => { await unmountMap(); vi.useRealTimers(); });
 describe("the digger's view of a dig on a public debate", () => {
   it("CHECKING says the check is on and reads the answer again; once it passed, it says so with a link to the public page", async () => {
     harness.answer = dig("CHECKING");
-    await mountMap(1280, RUN);
+    await mountMap(1600, RUN);
     expect(note()!.textContent).toBe("An AI is checking this before it can change the public page.");
     expect(note()!.querySelector("a")).toBeNull();
 
@@ -52,7 +52,7 @@ describe("the digger's view of a dig on a public debate", () => {
 
   it("a dig on a public debate, with no `dig` part (as the API serves it): its rewrite, its state, and no story being written or waited for", async () => {
     harness.answer = dig("KEPT_PRIVATE", REWRITE, {});
-    await mountMap(1280, RUN);
+    await mountMap(1600, RUN);
     expect(note()!.textContent).toBe(CATALOG["v4.contribution.KEPT_PRIVATE"]);
     const rewrite = page().querySelector<HTMLElement>("[data-contribution-rewrite=READY]")!;
     expect(rewrite.textContent).toContain("Your rewrite of this path");
@@ -63,29 +63,29 @@ describe("the digger's view of a dig on a public debate", () => {
 
   it("while it is checked with no rewrite yet it says it is being written; on the page it links; removed says so, with no rewrite", async () => {
     harness.answer = dig("CHECKING", null, {});
-    await mountMap(1280, RUN);
+    await mountMap(1600, RUN);
     expect(page().querySelector("[data-contribution-rewrite=WRITING]")!.textContent).toBe("Your rewrite is still being written.");
     await unmountMap();
     harness.answer = dig("ON_THE_PAGE", REWRITE, {});
-    await mountMap(1280, RUN);
+    await mountMap(1600, RUN);
     expect(note()!.querySelector("a")!.getAttribute("href")).toBe(`/public/debate/${PUBLIC_REF}`);
     await unmountMap();
     harness.answer = dig("REMOVED_AFTER_REVIEW", null, {});
-    await mountMap(1280, RUN);
+    await mountMap(1600, RUN);
     expect(note()!.textContent).toBe(CATALOG["v4.contribution.REMOVED_AFTER_REVIEW"]);
     expect(page().querySelector("[data-contribution-rewrite]")).toBeNull();
   });
 
   it("KEPT_PRIVATE says it stayed private and only they see it, with no reason and no link", async () => {
     harness.answer = dig("KEPT_PRIVATE");
-    await mountMap(1280, RUN);
+    await mountMap(1600, RUN);
     expect(note()!.textContent).toBe("This stayed private: it did not pass the check, so the public page is unchanged. Only you can see it.");
     expect(note()!.querySelector("a")).toBeNull();
     expect(CATALOG["v4.contribution.KEPT_PRIVATE"]).toBe(note()!.textContent);
   });
 
   it("a debate that is no dig on a public page shows nothing", async () => {
-    await mountMap(1280, RUN);
+    await mountMap(1600, RUN);
     expect(note()).toBeNull();
   });
 });
