@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { V4TrustBar } from "@/components/v4/V4TrustBar";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
-import { readMapShelf, type DigLinkCache, type ShelfDig, type ShelfMap, type ShelfRead, type ShelfState } from "@/lib/v4/mapShelf";
-import { whenText } from "@/lib/v4/stateWords";
+import { readMapShelf, type DigLinkCache, type ShelfDig, type ShelfMap, type ShelfPause, type ShelfRead, type ShelfState } from "@/lib/v4/mapShelf";
+import { dayText, whenText } from "@/lib/v4/stateWords";
 import { levelHref } from "@/lib/v4/storage";
 import type { ReadingLevel } from "@/lib/v4/types";
 
@@ -67,9 +67,19 @@ function startedText(iso: string, locale: string): string {
   return whenText(iso, locale) ?? "";
 }
 
-/** The one state word (wait-f13, map-f34): "Being looked into, started 14:00", "Waiting", "Answer ready", "Didn't finish". */
-export function shelfStateText(state: ShelfState, startedAt: string | null, catalog: MessageCatalog, locale: string): string {
+/**
+ * The one state word (wait-f13, map-f34, journey-f22): "Looking into it · started 14:00", "Waiting", "Paused until
+ * 1 December" (the month wall; "Ready to continue" once the new month has started), "Ready", "Didn't finish".
+ */
+export function shelfStateText(
+  state: ShelfState, startedAt: string | null, catalog: MessageCatalog, locale: string, pause: ShelfPause | null = null
+): string {
   switch (state) {
+    case "PAUSED": {
+      if (pause?.canContinue === true) return t(catalog, "v4.state.PAUSED.canContinue");
+      const date = pause === null ? null : dayText(pause.until, locale);
+      return date === null ? t(catalog, "v4.state.PAUSED.noDate") : t(catalog, "v4.state.PAUSED", { date });
+    }
     case "WORKING":
       return startedAt === null
         ? t(catalog, "v4.maps.state.working")
@@ -94,7 +104,7 @@ function DigLine({ dig, catalog, locale, level }: Readonly<{ dig: ShelfDig; cata
         <span className="v4ShelfDigText" dir="auto" data-ai-generated="true">
           {t(catalog, dig.more ? "v4.maps.digMore" : "v4.maps.dig", { pick: dig.pick })}
         </span>
-        <span className="v4ShelfDigState">{shelfStateText(dig.state, null, catalog, locale)}</span>
+        <span className="v4ShelfDigState">{shelfStateText(dig.state, null, catalog, locale, dig.pause)}</span>
       </Link>
     </li>
   );
@@ -110,7 +120,9 @@ function MapCard({ map, catalog, locale, level, digsMax }: Readonly<{
         {map.bar === null ? null : <V4TrustBar counts={map.bar} catalog={catalog} />}
         <span className="v4ShelfMeta">
           {map.state === "WORKING" ? <span className="v4ShelfPulse" aria-hidden="true" /> : null}
-          <span className="v4ShelfState">{shelfStateText(map.state, map.startedAt, catalog, locale)}</span>
+          {/* public-f17: a question paused at the month wall has the still pause mark, never the pulse. */}
+          {map.state === "PAUSED" ? <span className="v4PauseDot" aria-hidden="true" /> : null}
+          <span className="v4ShelfState">{shelfStateText(map.state, map.startedAt, catalog, locale, map.pause)}</span>
           {map.changed ? (
             <span className="v4ShelfNew"><span className="v4ShelfNewDot" aria-hidden="true" />{t(catalog, "v4.maps.new")}</span>
           ) : null}

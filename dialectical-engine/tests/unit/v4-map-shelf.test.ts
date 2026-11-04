@@ -3,8 +3,9 @@ import { resolve } from "node:path";
 import type { AnswerIndex, DigLinks } from "@debateai/contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { digPicksOf } from "../../apps/ui/lib/v4/askText.js";
-import { mergeShelfRows, readMapShelf, shelfExtrasOf, type ShelfClient } from "../../apps/ui/lib/v4/mapShelf.js";
+import { digPicksOf, digQuestion } from "../../apps/ui/lib/v4/askText.js";
+import { mergeShelfRows, readMapShelf, shelfExtrasOf, shelfPicksOf, type ShelfClient } from "../../apps/ui/lib/v4/mapShelf.js";
+import type { DigTarget, V4Path } from "../../apps/ui/lib/v4/types.js";
 import { usedUpLine } from "../../apps/ui/lib/v4/money.js";
 
 /*
@@ -100,7 +101,7 @@ describe("readMapShelf", () => {
     expect(shelf.maps.every((map) => map.state === "READY")).toBe(true);
     // Every dig hangs under the question it came from, newest first, in the person's words.
     expect(shelf.maps[0]!.digs).toHaveLength(30);
-    expect(shelf.maps[0]!.digs[0]).toEqual({ runId: id(100), pick: "Could storage cover week 0?", more: false, state: "READY" });
+    expect(shelf.maps[0]!.digs[0]).toEqual({ runId: id(100), pick: "Could storage cover week 0?", more: false, state: "READY", pause: null });
     expect(shelf.maps.slice(1).every((map) => map.digs.length === 0)).toBe(true);
     expect(shelf.more).toBe(true);
     expect(shelf.anyRows).toBe(true);
@@ -116,8 +117,8 @@ describe("readMapShelf", () => {
     expect(shelf.maps).toHaveLength(1);
     expect(shelf.maps[0]!.question).toBe("Should Romania build new nuclear plants?");
     expect(shelf.maps[0]!.digs).toEqual([
-      { runId: id(3), pick: "Is storage cheap enough for a two-week lull?", more: true, state: "READY" },
-      { runId: id(2), pick: "Batteries can cover multi-day lulls.", more: false, state: "READY" }
+      { runId: id(3), pick: "Is storage cheap enough for a two-week lull?", more: true, state: "READY", pause: null },
+      { runId: id(2), pick: "Batteries can cover multi-day lulls.", more: false, state: "READY", pause: null }
     ]);
     expect(shelf.more).toBe(false);
   });
@@ -133,7 +134,7 @@ describe("readMapShelf", () => {
     ]);
     const shelf = await readMapShelf(5, CATALOG, { client: client(readAnswerIndex, digLinks({}, [id(3)])) });
     expect(shelf.maps.map((map) => map.runId)).toEqual([id(2), id(1)]);
-    expect(shelf.maps[1]!.digs).toEqual([{ runId: id(3), pick: "Shops lose trade.", more: false, state: "READY" }]);
+    expect(shelf.maps[1]!.digs).toEqual([{ runId: id(3), pick: "Shops lose trade.", more: false, state: "READY", pause: null }]);
   });
 
   it("the open runs say their state; a failed dig-link read leaves the row a question", async () => {
@@ -145,6 +146,30 @@ describe("readMapShelf", () => {
     const shelf = await readMapShelf(5, CATALOG, { client: client(readAnswerIndex, digLinks({}, [id(4)])) });
     expect(shelf.maps.map((map) => [map.runId, map.state, map.startedAt])).toEqual([
       [id(2), "WORKING", "2026-11-04T14:00:00.000Z"], [id(3), "WAITING", null], [id(4), "FAILED", null], [id(1), "READY", null]
+    ]);
+  });
+
+  it("a question the list calls running but is paused at the month wall reads paused, from its own run read (journey-f22)", async () => {
+    const readAnswerIndex = answerList([{ run: id(1), seq: 10 }], [
+      { run: id(2), seq: 40, state: "RUNNING" },
+      { run: id(3), seq: 30, state: "RUNNING" },
+      { run: id(4), seq: 20, state: "RUNNING" }
+    ]);
+    const readRun = vi.fn(async (runId: string) => {
+      if (runId === id(4)) throw new Error("UNREACHABLE");
+      return {
+        run_ref: runId, question_line: "Q?", state: "RUNNING", terminal_reason: null, hold_until: null,
+        ...(runId === id(2) ? { month_pause: { until: "2026-12-01T00:00:00.000Z", can_continue: false } } : {})
+      };
+    });
+    const shelf = await readMapShelf(5, CATALOG, {
+      client: { ...client(readAnswerIndex, digLinks({})), readRun } as unknown as ShelfClient
+    });
+    // Only what shows as being looked into is read again; a failed read keeps "Looking into it".
+    expect(readRun.mock.calls.map(([runId]) => runId).sort()).toEqual([id(2), id(3), id(4)]);
+    expect(shelf.maps.map((map) => [map.runId, map.state, map.pause])).toEqual([
+      [id(2), "PAUSED", { until: "2026-12-01T00:00:00.000Z", canContinue: false }],
+      [id(3), "WORKING", null], [id(4), "WORKING", null], [id(1), "READY", null]
     ]);
   });
 
@@ -160,6 +185,22 @@ describe("readMapShelf", () => {
     expect(shelf.maps).toHaveLength(1);
     expect(shelf.maps[0]).toMatchObject({ bar: { SURE: 1, SURE_FOR_CASE: 2, STILL_ARGUED: 1, DIDNT_HOLD: 1 }, changed: true });
     expect(shelf.maps[0]!.digs.map((dig) => dig.runId)).toEqual([id(2)]);
+  });
+
+  it("a dig is named by its picks: never by the path line a dig of picks names first, a whole path by its short label", () => {
+    const parent = "Should countries build new nuclear power?";
+    const path = { id: "n-nuclear", line: "Nuclear first: did not hold. Recent reactors in Europe ran years late." } as unknown as V4Path;
+    const whole: DigTarget = { kind: "path", path };
+    expect(shelfPicksOf(digQuestion(whole, parent, CATALOG, "en"), CATALOG)).toEqual(["Nuclear first"]);
+    const picks: DigTarget = {
+      kind: "picks", path,
+      picks: [
+        { kind: "OWN_VIEW", key: "own:n-nuclear:1", group: "n-nuclear", text: "Small reactors could be built faster." },
+        { kind: "OWN_VIEW", key: "own:n-nuclear:2", group: "n-nuclear", text: "Costs fall with each reactor built." }
+      ]
+    };
+    expect(shelfPicksOf(digQuestion(picks, parent, CATALOG, "en"), CATALOG))
+      .toEqual(["Small reactors could be built faster.", "Costs fall with each reactor built."]);
   });
 
   it("an account with no debate at all is a first visit; the dig links read once are kept for the next read", async () => {

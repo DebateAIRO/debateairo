@@ -3,6 +3,7 @@ import { contractClient } from "../api.js";
 import type { MessageCatalog } from "../i18n/translate.js";
 import { digPicksOf, ownWords, parseDigDetail } from "./askText.js";
 import { digParentOf, type IndexEntry } from "./digIndex.js";
+import { cardLabel } from "./mapLooks.js";
 import { TRUST_WORDS, type TrustCounts, type TrustWord } from "./types.js";
 
 /*
@@ -24,10 +25,17 @@ import { TRUST_WORDS, type TrustCounts, type TrustWord } from "./types.js";
  *  - `changed_since_visit` (true): the "New" dot (the map changed since the person last opened it); without it, none;
  *  - `dug_from` (a run id, or null for a first question): the dig link, so no per-row read is needed; without it, read.
  * The contract's answer-list rows are strict today, so these arrive only once the contract names them.
+ *
+ * journey-f22 / public-f17: the answer list says "running" for a question paused at the month wall too, so each map or dig
+ * the shelf shows as being looked into is read once more (GET /v1/runs/{id}, its `month_pause`): a paused one reads
+ * "Paused until 1 December" with the still pause mark, never "Looking into it" with a pulse. A failed read keeps the word.
  */
 
-/** One state word per map: being looked into, waiting to start, answer ready, didn't finish. */
-export type ShelfState = "WORKING" | "WAITING" | "READY" | "FAILED";
+/** One state word per map: being looked into, waiting to start, paused at the month wall, answer ready, didn't finish. */
+export type ShelfState = "WORKING" | "WAITING" | "PAUSED" | "READY" | "FAILED";
+
+/** A run paused at the month wall: until when, and whether the new month has started (it can continue). */
+export type ShelfPause = Readonly<{ until: string; canContinue: boolean }>;
 
 /** One row of the account's answer list, with what the server may add to it. */
 export type ShelfRow = Readonly<{
@@ -45,13 +53,15 @@ export type ShelfRow = Readonly<{
   dugFrom: string | null | undefined;
 }>;
 
-export type ShelfDig = Readonly<{ runId: string; pick: string; more: boolean; state: ShelfState }>;
+export type ShelfDig = Readonly<{ runId: string; pick: string; more: boolean; state: ShelfState; pause: ShelfPause | null }>;
 
 export type ShelfMap = Readonly<{
   runId: string;
   /** The person's own words (askText.ownWords). */
   question: string;
   state: ShelfState;
+  /** Set when state is PAUSED. */
+  pause: ShelfPause | null;
   startedAt: string | null;
   bar: TrustCounts | null;
   changed: boolean;
@@ -69,7 +79,7 @@ export type ShelfRead = Readonly<{
 
 /** A run id → the run it was dug from (null: not a dig), or FAILED when its dig links could not be read. */
 export type DigLinkCache = Map<string, string | null | "FAILED">;
-export type ShelfClient = Pick<ContractClient, "readAnswerIndex" | "readDigLinks">;
+export type ShelfClient = Pick<ContractClient, "readAnswerIndex" | "readDigLinks"> & Partial<Pick<ContractClient, "readRun">>;
 
 /** Rows per page of GET /v1/answers (1..128). */
 const SHELF_PAGE = 32;
@@ -151,6 +161,22 @@ export function mergeShelfRows(known: readonly ShelfRow[], page: Pick<AnswerInde
 /** Where a row goes: a card of its own, or under the run it was dug from (null: no known parent). */
 export type ShelfPlace = Readonly<{ kind: "QUESTION" }> | Readonly<{ kind: "DIG"; parent: string | null }>;
 
+/**
+ * dig-f30: what a dig looked into, as its shelf line names it. A dig of picks on a path also names the path's line first
+ * (W3-4); that line is the path, not a pick, so it is left out. A dig of a whole path is named by the path's short label
+ * (map-f25, r2-20 A), never by its whole line with its outcome words ("Nuclear first: did not hold. …").
+ */
+export function shelfPicksOf(questionLine: string, catalog: MessageCatalog): readonly string[] {
+  const detail = parseDigDetail(questionLine, catalog);
+  if (detail !== null) {
+    const picks = detail.items.filter((_, at) => detail.kinds[at] !== "PATH");
+    if (picks.length > 0) return picks;
+    const path = detail.items.find((_, at) => detail.kinds[at] === "PATH");
+    if (path !== undefined && cardLabel(path).length > 0) return Object.freeze([cardLabel(path)]);
+  }
+  return digPicksOf(questionLine, catalog);
+}
+
 function entryOf(row: ShelfRow): IndexEntry {
   return { runId: row.runId, questionLine: row.questionLine, createdAtSequence: row.sequence, firstSequence: row.firstSequence };
 }
@@ -178,8 +204,14 @@ export function buildShelf(
   rows: readonly ShelfRow[],
   places: ReadonlyMap<string, ShelfPlace>,
   catalog: MessageCatalog,
-  want: number
+  want: number,
+  /** Runs the answer list calls running that are paused at the month wall (read from each run). */
+  pauses: ReadonlyMap<string, ShelfPause> = new Map()
 ): readonly ShelfMap[] {
+  const stateOf = (row: ShelfRow): Readonly<{ state: ShelfState; pause: ShelfPause | null }> => {
+    const pause = row.state === "WORKING" ? pauses.get(row.runId) ?? null : null;
+    return pause === null ? { state: row.state, pause: null } : { state: "PAUSED", pause };
+  };
   const rootOf = (runId: string): string | null => {
     let at = runId;
     const seen = new Set<string>();
@@ -200,9 +232,9 @@ export function buildShelf(
     if (places.get(row.runId)?.kind !== "DIG") continue;
     const root = rootOf(row.runId);
     if (root === null) continue;
-    const picks = digPicksOf(row.questionLine, catalog);
+    const picks = shelfPicksOf(row.questionLine, catalog);
     const list = digsOf.get(root) ?? [];
-    list.push(Object.freeze({ runId: row.runId, pick: picks[0]!, more: picks.length > 1, state: row.state }));
+    list.push(Object.freeze({ runId: row.runId, pick: picks[0]!, more: picks.length > 1, ...stateOf(row) }));
     digsOf.set(root, list);
   }
   const maps: ShelfMap[] = [];
@@ -212,11 +244,23 @@ export function buildShelf(
     const question = ownWords(row.questionLine);
     if (question.length === 0) continue;
     maps.push(Object.freeze({
-      runId: row.runId, question, state: row.state, startedAt: row.startedAt, bar: row.bar, changed: row.changed,
+      runId: row.runId, question, ...stateOf(row), startedAt: row.startedAt, bar: row.bar, changed: row.changed,
       digs: Object.freeze(digsOf.get(row.runId) ?? [])
     }));
   }
   return Object.freeze(maps);
+}
+
+/** The month pause of a run the list calls running, or null (not paused, or the read failed: the word stays). */
+async function readPause(runId: string, client: ShelfClient): Promise<ShelfPause | null> {
+  if (client.readRun === undefined) return null;
+  try {
+    const run = await Promise.resolve().then(() => client.readRun!(runId));
+    const pause = run.month_pause;
+    return run.state === "RUNNING" && pause !== undefined ? Object.freeze({ until: pause.until, canContinue: pause.can_continue }) : null;
+  } catch {
+    return null;
+  }
 }
 
 async function readLink(runId: string, client: ShelfClient): Promise<string | null | "FAILED"> {
@@ -277,8 +321,16 @@ export async function readMapShelf(want: number, catalog: MessageCatalog, option
   }
   const placedQuestions = rows.filter((row) => places.get(row.runId)?.kind === "QUESTION").length;
   const unplaced = rows.some((row) => !places.has(row.runId));
+  const shown = buildShelf(rows, places, catalog, want);
+  // journey-f22: read again only what the shelf shows as being looked into (a few open runs at most).
+  const working = shown.flatMap((map) => [map, ...map.digs]).filter((item) => item.state === "WORKING").map((item) => item.runId);
+  const pauses = new Map<string, ShelfPause>();
+  await Promise.all(working.map(async (runId) => {
+    const pause = await readPause(runId, client);
+    if (pause !== null) pauses.set(runId, pause);
+  }));
   return Object.freeze({
-    maps: buildShelf(rows, places, catalog, want),
+    maps: pauses.size === 0 ? shown : buildShelf(rows, places, catalog, want, pauses),
     more: placedQuestions > want || unplaced || !ended,
     anyRows: rows.length > 0
   });
