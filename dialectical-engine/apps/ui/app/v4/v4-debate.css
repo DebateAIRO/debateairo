@@ -134,6 +134,22 @@
    pinned bar has none there. */
 .v4DebLayout-phone .v4Panel-path .v4PanelDigBtn,
 .v4DebLayout-phone .v4Panel-open .v4PanelDigBtn { display: none; }
+/* dig-f4 / map-f14 (3 Nov): "Your question" digs the picks it lists with its own button on a computer; on the phone the
+   pinned bar carries the picks, so that button is left out there too. */
+.v4DebLayout-phone .v4Panel-root .v4PanelDigBtn { display: none; }
+
+/* map-d4 A (3 Nov): in the panel column's own scroll (computer, laptop and tablet) the dig block stays pinned to the
+   panel's foot, so the evidence comes first and the button never needs a scroll; the page's background behind it so
+   nothing shows through. dig-f4: from the second pick the tray docks under it, at the very foot of the column, and the
+   block sits right above it (--v4-dock-room is the tray's measured height, V4DigTray.tsx). */
+.v4DebLayout-desktop .v4DebPanelCol .v4PanelDig,
+.v4DebLayout-laptop .v4DebPanelCol .v4PanelDig,
+.v4DebLayout-mid .v4DebPanelCol .v4PanelDig {
+  position: sticky; bottom: var(--v4-dock-room, 0px); z-index: 1; background: var(--bg); padding-bottom: 12px;
+}
+.v4DebPanelCol > .v4DebTrayDock {
+  position: sticky; bottom: 0; z-index: 1; max-width: none; margin-top: 12px; box-shadow: none;
+}
 
 /* ---------- the phone map sheet (D7) ---------- */
 .v4DebSheet {
@@ -150,7 +166,8 @@
   flex: 1; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 20px;
   padding: 16px var(--v4-gutter) 24px;
 }
-/* UI-6: the tray lives inside the sheet while it is open (D7 doubles as the tray), pinned under the outline. */
+/* UI-6 / dig-f4: the picks with Clear live inside the sheet while it is open (D7 doubles as the tray), pinned under the
+   outline. */
 .v4DebSheetFoot { flex: none; padding-bottom: var(--safe-b); background: var(--surface); }
 .v4DebSheetFoot:empty { display: none; }
 .v4DebSheetFoot .v4DebTray {

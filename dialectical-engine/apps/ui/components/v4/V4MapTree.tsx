@@ -15,12 +15,14 @@ import {
   type DigOutcome,
   type DigResult
 } from "@/lib/v4/mapLooks";
-import { findOpenQuestion, isFinishedRewrite } from "@/lib/v4/mapModel";
+import { findOpenQuestion, isFinishedRewrite, openQuestionsOf } from "@/lib/v4/mapModel";
 import { digPauseCardLine, pauseOfDig } from "@/lib/v4/monthPause";
 import { useMapKeys } from "@/lib/v4/useMapKeys";
 import type { DigView, V4Map, V4OpenQuestion, V4Path, V4Selection } from "@/lib/v4/types";
 import type { PickRefusal } from "@/lib/v4/suggestions";
-import { DigHereTooLeaf, refusalLine, SuggestionLeaves, type V4DigChoice } from "./V4DigSuggest";
+import {
+  DigHereTooLeaf, pickReasonPlaces, refusalLine, SuggestionLeaves, V4PickReason, type PickGroup, type PickReasonPlace, type V4DigChoice
+} from "./V4DigSuggest";
 import { useDigSeeds, V4DigSeedLeaves } from "./V4DigSeed";
 import { V4RewriteCardNote } from "./V4PathRewrite";
 import { V4TrustBar } from "./V4TrustBar";
@@ -116,6 +118,15 @@ export function selectionIdOf(resolved: ResolvedSelection): V4Selection {
 export function undugOpen(list: readonly V4OpenQuestion[], digs: readonly DigView[]): readonly V4OpenQuestion[] {
   const open = list.filter((question) => digFor(question, digs) === null);
   return [...open.filter((question) => question.star), ...open.filter((question) => !question.star)];
+}
+
+/**
+ * What the main question's panel lists under "Where to dig from here": its own open questions, and the starred one when
+ * it sits on a path (map-f14 / dig-f4: that panel's pinned button digs the picks only when it lists every one of them).
+ */
+export function rootPanelOpen(map: V4Map, digs: readonly DigView[]): readonly V4OpenQuestion[] {
+  const star = openQuestionsOf(map).find((question) => question.star && question.pathId !== null);
+  return undugOpen(star === undefined ? map.open : [...map.open, star], digs);
 }
 
 /**
@@ -624,6 +635,20 @@ function planGroups(groups: ReadonlyArray<Readonly<{ key: string; row: string; p
   });
 }
 
+/**
+ * dig-f22: the visible reason line as one row of a leaves column, placed right above the first box it explains (a list
+ * item of its own, with no card lines and no keyboard stop).
+ */
+export function PickReasonRow(props: Readonly<{ place: PickReasonPlace; pieces: MapPiecesProps; className: string }>) {
+  const { pieces } = props;
+  if (pieces.choice === undefined) return null;
+  return (
+    <li className={props.className}>
+      <V4PickReason reason={props.place.reason} choice={pieces.choice} paths={pieces.map.paths} catalog={pieces.catalog} />
+    </li>
+  );
+}
+
 /** One column of open questions and digs, with "+N more" to show the rest and "Show fewer" to fold them again. */
 function Leaves(props: Readonly<{
   plan: GroupPlan;
@@ -631,6 +656,8 @@ function Leaves(props: Readonly<{
   selectedId: V4Selection;
   level: number;
   onToggle: () => void;
+  /** dig-f22: where this column's reason line goes (absent: it has none). */
+  reason?: PickReasonPlace;
 }>) {
   const { plan, pieces, selectedId } = props;
   const shown = plan.leaves.filter((leaf) => plan.shown.has(leaf.key));
@@ -639,15 +666,19 @@ function Leaves(props: Readonly<{
   // dig-d3 B: a whole-path dig on a path with nothing else under it still grows its seed here.
   const seeds = useDigSeeds(pieces.map.runId, plan.key);
   if (shown.length === 0 && extra === null && !toggle && seeds.length === 0) return null;
+  const reasonRow = (before: string): ReactNode => (props.reason?.before === before
+    ? <PickReasonRow key={`reason/${plan.key}`} place={props.reason} pieces={pieces} className="v4MapLeafReason" />
+    : null);
   return (
     <ul className={`v4MapLeaves${plan.folded ? " v4MapLeavesFolded" : ""}`} data-group={plan.row}>
-      {shown.map((leaf) => leaf.kind === "open"
-        ? (
+      {shown.flatMap((leaf) => leaf.kind === "open"
+        ? [
+          reasonRow(leaf.question.id),
           <li key={`${plan.key}/${leaf.key}`} className="v4MapLeaf v4MapLeafOpen">
             <OpenCard question={leaf.question} pieces={pieces} selectedId={selectedId} group={plan.row} level={props.level} />
           </li>
-        )
-        : (
+        ]
+        : [
           <li key={leaf.key} className="v4MapLeaf v4MapLeafDig">
             <DigCard dig={leaf.dig} pieces={pieces} selectedId={selectedId} group={plan.row} level={props.level} />
             <DigSproutList
@@ -658,7 +689,8 @@ function Leaves(props: Readonly<{
               level={props.level + 1}
             />
           </li>
-        ))}
+        ])}
+      {extra === null ? null : reasonRow("suggestions")}
       {extra}
       {/* dig-d3 B: a dig still in its 10 seconds grows a dashed "Your dig · … · starting" card here (V4DigSeed.tsx). */}
       <V4DigSeedLeaves runId={pieces.map.runId} groupKey={plan.key} catalog={pieces.catalog} />
@@ -771,6 +803,17 @@ export function V4MapTree(props: MapPiecesProps) {
   ];
   const plans = planGroups(groups, props, expanded, unfolded, 1 + map.paths.length, openPathId);
   const rootPlan = plans[0]!;
+  // dig-f22: a visible line above the first box greyed for each reason (each box still says it to screen readers).
+  const reasons = pickReasonPlaces(plans.map((plan, at): PickGroup => ({
+    key: plan.key,
+    path: groups[at]!.path,
+    open: plan.leaves.flatMap((leaf) => (leaf.kind === "open" && plan.shown.has(leaf.key) ? [leaf.question] : [])),
+    suggestions: plan.showExtras
+  })), props.picked, props.choice);
+  const reasonOf = (key: string) => {
+    const place = reasons.get(key);
+    return place === undefined ? {} : { reason: place };
+  };
   return (
     <div className={`v4Map${fold ? " v4MapFold" : ""}`}>
       <div className={`v4MapScroll${overflows ? " v4MapScrollMore" : ""}`} ref={setScrollBox}>
@@ -797,7 +840,7 @@ export function V4MapTree(props: MapPiecesProps) {
                 <LevelWords level={1} catalog={catalog} />
               </button>
               <div className="v4MapRootLeaves">
-                <Leaves plan={rootPlan} pieces={props} selectedId={selectedId} level={2} onToggle={() => toggle("root")} />
+                <Leaves plan={rootPlan} pieces={props} selectedId={selectedId} level={2} onToggle={() => toggle("root")} {...reasonOf(rootPlan.key)} />
               </div>
             </div>
             {map.paths.length === 0
@@ -840,7 +883,7 @@ export function V4MapTree(props: MapPiecesProps) {
                           {news && marks.tag === null ? <NewDot catalog={catalog} /> : null}
                           <LevelWords level={2} catalog={catalog} />
                         </button>
-                        <Leaves plan={plan} pieces={props} selectedId={selectedId} level={3} onToggle={() => toggle(path.id)} />
+                        <Leaves plan={plan} pieces={props} selectedId={selectedId} level={3} onToggle={() => toggle(path.id)} {...reasonOf(plan.key)} />
                       </li>
                     );
                   })}

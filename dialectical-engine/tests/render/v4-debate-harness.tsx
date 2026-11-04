@@ -10,7 +10,7 @@ import { resetDigUndo } from "../../apps/ui/lib/v4/digUndo.js";
 import type { DigTrail } from "../../apps/ui/lib/v4/load.js";
 import type { DigLink, DigView, ReadingLevel, SeenSnapshot } from "../../apps/ui/lib/v4/types.js";
 import type { V4AskOutcome } from "../../apps/ui/lib/v4/useV4Ask.js";
-import type { Answer, AnswerStory, AskParent, DigLinks, InvestigationReports, RunProjection, UsageBorrow } from "../../packages/contract/src/index.js";
+import { detectCrisis, type Answer, type AnswerStory, type AskParent, type DigLinks, type InvestigationReports, type RunProjection, type UsageBorrow } from "../../packages/contract/src/index.js";
 import { createSeed } from "../../tools/v4-mock-api/seed.js";
 
 /*
@@ -50,7 +50,8 @@ export function digPart(parentRunId: string, level: number): Answer["dig"] {
   return { parent_run_id: parentRunId, position_ref: "n-mix", places: ["path:n-mix"], level, picks: [], rewrite: null };
 }
 
-type Submit = (questionLine: string, mode: string, origin?: string, parent?: AskParent | null) => Promise<V4AskOutcome>;
+type Submit = (questionLine: string, mode: string, origin?: string, parent?: AskParent | null, purposeLines?: unknown,
+  about?: ReactNode) => Promise<V4AskOutcome>;
 
 export const harness = {
   planTier: "premium" as "free" | "premium",
@@ -99,7 +100,14 @@ export const harness = {
   /** How many times the dig's room read was asked again (each quota moment, each return to the tab). */
   roomAgainReads: 0,
   /** map-f9: the run read's "This question" share (null: the server does not say it). */
-  questionShare: null as QuestionShare | null
+  questionShare: null as QuestionShare | null,
+  /**
+   * dig-f9: useV4Ask's crisis check, run at a dig's press on its own views (true: the help screen opened). By default
+   * the real patterns decide, as useV4Ask's own check does.
+   */
+  offerCrisisHelp: vi.fn<(words: readonly string[]) => boolean>(),
+  /** dig-f26: the server named the plan Free, so the debate is public (useV4Ask's freePublicNotice). */
+  freePublicNotice: false
 };
 
 export function resetHarness(): void {
@@ -133,6 +141,8 @@ export function resetHarness(): void {
   harness.roomAgain = null;
   harness.roomAgainReads = 0;
   harness.questionShare = null;
+  harness.offerCrisisHelp = vi.fn((words: readonly string[]) => words.some((text) => detectCrisis(text).crisis));
+  harness.freePublicNotice = false;
 }
 resetHarness();
 
@@ -152,6 +162,8 @@ export const useV4AskMock = {
       submit: (...args: Parameters<Submit>) => harness.submit(...args),
       // The one-time data consent, asked at a dig's press (lib/v4/useDigQueue.tsx): given, unless a test says otherwise.
       ensureConsent: () => harness.ensureConsent(),
+      offerCrisisHelp: (words: readonly string[]) => harness.offerCrisisHelp(words),
+      freePublicNotice: harness.freePublicNotice,
       flagsCrisis: () => false,
       room: harness.room,
       submitting: false,

@@ -62,9 +62,11 @@ describe("before a dig: its share, on its own button (owner's screen review, 3 N
     await mountMap();
     // map-f22: the path's suggestions show once its leaves are unfolded (about 12 cards at once).
     await expandBranch(PATHS.renew);
-    await click(branch(PATHS.renew).querySelector<HTMLInputElement>(".v4MapLeafSuggestion input[type=checkbox]")!);
-    const picked = `${CATALOG["v4.dig.yourPicks.one"]} · ${word("v4.undo.barShare", { percent: 20 })}`;
-    expect(buttonsNamed(picked, tray()!)).toHaveLength(1);
+    // dig-f4: the tray shows from the second pick; its button carries the picks' share ("Dig into these · up to 20%").
+    for (const box of branch(PATHS.renew).querySelectorAll<HTMLInputElement>(".v4MapLeafSuggestion input[type=checkbox]")) await click(box);
+    expect(buttonsNamed(`${CATALOG["v4.dig.trayDigThese"]} · ${word("v4.undo.barShare", { percent: 20 })}`, tray()!)).toHaveLength(1);
+    // On the picks' own path the panel's pinned button digs them, with the same share (dig-f5: "Dig into your picks").
+    const picked = `${CATALOG["v4.dig.yourPicks.other"]} · ${word("v4.undo.barShare", { percent: 20 })}`;
     await openPath(PATHS.renew);
     const block = panel().querySelector<HTMLElement>(".v4PanelDig")!;
     expect(buttonsNamed(picked, block)).toHaveLength(1);

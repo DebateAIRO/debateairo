@@ -84,12 +84,20 @@ export function useV4Ask(input: Readonly<{
   /**
    * W3-4: a dig sends its `parent` (the debate it digs, its places, mode and picks); a new question sends none.
    * Decision 13: a dig on a public page sends a `public_parent` the same way (the page's own reference, never a run id).
+   * dig-f9 (screen review, 3 Nov): `about` names the dig the question check's screen is about, when that screen opens for
+   * a dig carrying the person's own view ("About your dig on “Mostly renewables”:"); absent, the screen is as before.
    */
-  submit(questionLine: string, mode: DigMode, origin?: V4AskOrigin, parent?: AskParent | PublicDigParent | null, purposeLines?: PurposeLines): Promise<V4AskOutcome>;
+  submit(questionLine: string, mode: DigMode, origin?: V4AskOrigin, parent?: AskParent | PublicDigParent | null, purposeLines?: PurposeLines,
+    about?: React.ReactNode): Promise<V4AskOutcome>;
   /** Decision 29: the one-time sensitive-data consent, asked before the question goes to step 2's AI. The dialog is in `dialogs`. */
   ensureConsent(): Promise<boolean>;
   /** ASK-3: whether this text reads as a person in crisis (the page enables Start for it even when it is short). */
   flagsCrisis(text: string): boolean;
+  /**
+   * dig-f9 (screen review, 3 Nov): the crisis check on a dig's own views at its click, before its 10 seconds start: true
+   * when any of `words` reads as a person in crisis, and the help screen (in `dialogs`, the same one the send uses) opened.
+   */
+  offerCrisisHelp(words: readonly string[]): boolean;
   room: AskRoom | null;
   planTier: "free" | "premium";
   /**
@@ -188,7 +196,7 @@ export function useV4Ask(input: Readonly<{
   });
 
   const submit = React.useCallback(async (questionLine: string, askMode: DigMode, origin: V4AskOrigin = "ask",
-    parent: AskParent | PublicDigParent | null = null, purposeLines?: PurposeLines): Promise<V4AskOutcome> => {
+    parent: AskParent | PublicDigParent | null = null, purposeLines?: PurposeLines, about?: React.ReactNode): Promise<V4AskOutcome> => {
     if (submitFlight.current) return STOPPED;
     const now = live.current;
     const question = questionLine.trim();
@@ -317,7 +325,8 @@ export function useV4Ask(input: Readonly<{
         if (dig && crisisWordsOf(origin, question, parent).length === 0) {
           return refused(t(now.catalog, checkAnswer === "UNAVAILABLE" ? "v4.ask.failed" : "v4.digError.cannotFollow"));
         }
-        now.questionRefusal.offer(exc);
+        // dig-f9: a dig's screen opens about 10 seconds after its click, so it names the dig it is about.
+        now.questionRefusal.offer(exc, dig ? about : undefined);
         // ASK-5: a rewrite accepted before the screen opened sticks for the next Start, as after a refusal.
         return acceptedRewrite === undefined ? STOPPED : { kind: "STOPPED", acceptedQuestion: acceptedRewrite };
       }
@@ -370,5 +379,7 @@ export function useV4Ask(input: Readonly<{
   );
 
   const ensureConsent = React.useCallback(() => live.current.consent.ensureConsent(), []);
-  return { submit, ensureConsent, flagsCrisis, room, planTier, freePublicNotice, submitting, dialogs };
+  // dig-f9: the send's own crisis check (the same patterns and help screen), run on a dig's own views at its click.
+  const offerCrisisHelp = React.useCallback((words: readonly string[]) => words.some((text) => live.current.crisis.offerIfCrisis(text)), []);
+  return { submit, ensureConsent, flagsCrisis, offerCrisisHelp, room, planTier, freePublicNotice, submitting, dialogs };
 }

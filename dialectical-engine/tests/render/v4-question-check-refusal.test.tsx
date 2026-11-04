@@ -193,5 +193,46 @@ describe("a dig the question check refuses gets a plain sentence, no pop-up", ()
     await act(async () => { outcome = await submit!("What would the tram line cost each year to run?", "quick", "dig", own); });
     expect(outcome).toEqual({ kind: "STOPPED" });
     expect(host!.querySelector('[data-dialog="question-refusal"]')).not.toBeNull();
+    // Nothing names a dig that the page did not name.
+    expect(host!.querySelector('[data-part="about"]')).toBeNull();
+  });
+
+  // Wave 2, dig-f9 (3 Nov): that screen opens about 10 seconds after the click, so it names the dig it is about, first,
+  // and the dialog's name includes it; the crisis check on the dig's own views runs at the click with the same help screen.
+  it("names the dig it is about when the page says which dig it was", async () => {
+    server.createDebate.mockRejectedValue(notStarted({ kind: "DRUGS", screen: "REFUSE", emergencyNumber: false }));
+    let submit: ReturnType<typeof useV4Ask>["submit"] | null = null;
+    function MapPage(): ReactNode {
+      const ask = useV4Ask({ catalog: CATALOG, homeCatalog: HOME, newDebateCatalog: NEW_DEBATE, locale: "en", crisisCountryHint: null,
+        mode: "quick", readingLevel: "plain", dig: { parentRunId: PARENT.parent_run_id, picks: 1 } });
+      submit = ask.submit;
+      return <>{ask.dialogs}</>;
+    }
+    await render(<MapPage />);
+    const own: AskParent = { ...PARENT, picks: [{ kind: "OWN_VIEW", suggestion_id: null, place: "made-up-place", text: "My own view on it, in my words" }] };
+    const about = CATALOG["v4.dig.checkAbout"]!.replace("{path}", "Mostly renewables");
+    await act(async () => { await submit!("What would the tram line cost each year to run?", "quick", "dig", own, undefined, about); });
+    const dialog = host!.querySelector('[data-dialog="question-refusal"]')!;
+    expect(dialog.querySelector('[data-part="about"]')?.textContent).toBe("About your dig on “Mostly renewables”:");
+    expect(dialog.getAttribute("aria-labelledby")).toBe("question-refusal-about question-refusal-title");
+  });
+
+  it("offers the help screen for a dig's own view at the click, before anything is sent", async () => {
+    let offer: ReturnType<typeof useV4Ask>["offerCrisisHelp"] | null = null;
+    function MapPage(): ReactNode {
+      const ask = useV4Ask({ catalog: CATALOG, homeCatalog: HOME, newDebateCatalog: NEW_DEBATE, locale: "en", crisisCountryHint: null,
+        mode: "quick", readingLevel: "plain", dig: { parentRunId: PARENT.parent_run_id, picks: 1 } });
+      offer = ask.offerCrisisHelp;
+      return <>{ask.dialogs}</>;
+    }
+    await render(<MapPage />);
+    let tripped = true;
+    await act(async () => { tripped = offer!(["Nuclear plants take long to build."]); });
+    expect(tripped).toBe(false);
+    expect(host!.querySelector('[data-dialog="crisis-support"]')).toBeNull();
+    await act(async () => { tripped = offer!(["A calm first view.", "Should I kill myself?"]); });
+    expect(tripped).toBe(true);
+    expect(host!.querySelector('[data-dialog="crisis-support"]')).not.toBeNull();
+    expect(server.createDebate).not.toHaveBeenCalled();
   });
 });

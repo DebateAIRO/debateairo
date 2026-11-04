@@ -104,6 +104,40 @@ export function V4SourceList(props: Readonly<{ sources: readonly WebSource[] | u
   );
 }
 
+/** map-d4 A: at most this many sites are named on a point's folded source line; the rest are "and N more". */
+const SITES_NAMED = 2;
+
+/** The folded line's words: "From iea.org and oecd-nea.org", or "From iea.org, oecd-nea.org and 1 more" (no count of pages). */
+function sourcesLine(sources: readonly WebSource[], catalog: MessageCatalog, locale: string): string {
+  const sites = [...new Set(sources.map((source) => source.site.trim()).filter((site) => site.length > 0))];
+  if (sites.length > SITES_NAMED) {
+    return t(catalog, "v4.web.sourcesFromMore", { sites: sites.slice(0, SITES_NAMED).join(", "), count: sites.length - SITES_NAMED });
+  }
+  let named: string;
+  try {
+    named = new Intl.ListFormat(locale, { style: "long", type: "conjunction" }).format(sites);
+  } catch {
+    named = sites.join(", ");
+  }
+  return t(catalog, "v4.web.sourcesFrom", { sites: named });
+}
+
+/**
+ * map-d4 A (owner pick, 3 Nov): under each point its sources are folded into one grey line naming their sites; opening it
+ * shows each page as V4SourceList does (reader 1's line, the quote, the link). Evidence stays one tap away, so the panel
+ * is short enough that the dig button is never far. Nothing when the point has no sources.
+ */
+export function V4SourcesFold(props: Readonly<{ sources: readonly WebSource[] | undefined; catalog: MessageCatalog; locale: string }>) {
+  const sources = props.sources ?? [];
+  if (sources.length === 0) return null;
+  return (
+    <details className="v4SourcesFold">
+      <summary className="v4SourcesFoldLine">{sourcesLine(sources, props.catalog, props.locale)}</summary>
+      <V4SourceList sources={sources} catalog={props.catalog} locale={props.locale} />
+    </details>
+  );
+}
+
 /** What became of a page the person added to the researched part (the AIs read it at once, owner Q7). */
 function ResearchedLine(props: Readonly<{ researched: WebResearched; catalog: MessageCatalog; locale: string }>) {
   const { researched } = props;

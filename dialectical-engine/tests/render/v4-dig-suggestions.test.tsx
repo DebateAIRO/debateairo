@@ -73,12 +73,14 @@ describe("a path's dig suggestions, by kind", () => {
 });
 
 describe("pick, combine, edit and add your own view", () => {
-  it("picks two suggestions and an open question of one path; the tray digs them together", async () => {
+  it("picks two suggestions and an open question of one path; they are dug together", async () => {
     await mountMap();
     await openPath(PATHS.renew);
     const [first, second] = panelBoxes();
     await click(first!);
-    expect(trayChips()).toHaveLength(1);
+    // dig-f4: one pick shows no tray; the panel's own button reads "Dig into your pick" (dig-f5, dig-f31).
+    expect(tray()).toBeNull();
+    expect(buttonsNamed(CATALOG["v4.dig.yourPicks.one"]!, panel())).toHaveLength(1);
     await click(second!);
     // The still-argued point under the same path is picked from the tree.
     const openBox = branch(PATHS.renew).querySelector<HTMLInputElement>(".v4MapLeafOpen input[type=checkbox]")!;
@@ -88,8 +90,10 @@ describe("pick, combine, edit and add your own view", () => {
     expect(tray()!.textContent).not.toMatch(/\bpicked\b/iu);
     // The panel names no count either: the picks are marked where they are.
     expect(panel().textContent).not.toMatch(/\d+ picked/iu);
-    // journey-f13 (owner's screen review): the tray's one button, "Dig into these" (no count; its share when known).
-    expect(buttonsNamed(CATALOG["v4.dig.trayDigThese"]!, tray()!)).toHaveLength(1);
+    // One dig button for the picks: the panel's pinned one on their own path ("Dig into your picks", dig-f5; no count);
+    // the docked tray offers no second one ("Dig into these", journey-f13, only where the panel does not dig them).
+    expect(buttonsNamed(CATALOG["v4.dig.yourPicks.other"]!, panel())).toHaveLength(1);
+    expect(buttonsNamed(CATALOG["v4.dig.trayDigThese"]!, tray()!)).toHaveLength(0);
     // Picks shown on the tree too.
     expect(treeBoxes(PATHS.renew).filter((box) => box.checked)).toHaveLength(2);
   });
@@ -118,9 +122,10 @@ describe("pick, combine, edit and add your own view", () => {
     expect(panel().textContent).toContain(CATALOG["v4.suggest.ownViewTag"]);
     expect(panel().textContent).toContain("Pumped hydro in the mountains could carry a windless week.");
     expect(trayChips()).toHaveLength(2);
-    // Remove takes the own view out again.
+    // Remove takes the own view out again; one pick left, so the tray goes (dig-f4).
     await click(buttonNamed(CATALOG["v4.suggest.remove"]!, panel()));
-    expect(trayChips()).toHaveLength(1);
+    expect(tray()).toBeNull();
+    expect(buttonsNamed(CATALOG["v4.dig.yourPicks.one"]!, panel())).toHaveLength(1);
   });
 
   it("dig-f20: the tray's chips mark only the AIs' words as AI text, never the person's own view or their own wording", async () => {
@@ -141,8 +146,9 @@ describe("pick, combine, edit and add your own view", () => {
     expect(marked("Pumped hydro")).toBeNull();
     expect(chips.filter((chip) => chip.getAttribute("data-ai-generated") === "true")).toHaveLength(1);
     expect(chips.every((chip) => chip.getAttribute("dir") === "auto")).toBe(true);
-    // journey-f13 / journey-f23: the tray's button counts nothing.
-    expect(buttonsNamed(CATALOG["v4.dig.trayDigThese"]!, tray()!)).toHaveLength(1);
+    // journey-f13 / journey-f23: the dig button counts nothing. On the picks' own path it is the panel's pinned one
+    // ("Dig into your picks", dig-f5), and the docked tray offers no second (dig-f4).
+    expect(buttonsNamed(CATALOG["v4.dig.yourPicks.other"]!, panel())).toHaveLength(1);
     expect(tray()!.textContent).not.toMatch(/\b3\b/u);
   });
 });
@@ -161,7 +167,7 @@ describe("picks stay on one path (owner Q-D1)", () => {
     expect(branch(PATHS.mix).textContent).toContain(CATALOG["v4.suggest.otherPath"]);
     await click(treeBoxes(PATHS.mix)[0]!);
     await click(smrOpen);
-    expect(trayChips()).toHaveLength(1);
+    expect(treeBoxes(PATHS.renew).filter((box) => box.checked)).toHaveLength(1);
     expect(treeBoxes(PATHS.mix).some((box) => box.checked)).toBe(false);
     // The other path's panel says it in words (dig-f5: where the picks wait, with [Go to them] [Clear them]), and no own
     // view or edit there.
@@ -172,9 +178,10 @@ describe("picks stay on one path (owner Q-D1)", () => {
     expect(buttonsNamed(CATALOG["v4.suggest.edit"]!, panel())).toHaveLength(0);
     await click(buttonNamed(CATALOG["v4.suggest.clearPicks"]!, panel()));
     expect(tray()).toBeNull();
+    expect(treeBoxes(PATHS.renew).some((box) => box.checked)).toBe(false);
     for (const box of treeBoxes(PATHS.mix)) expect(box.disabled).toBe(false);
     await click(treeBoxes(PATHS.mix)[0]!);
-    expect(trayChips()).toHaveLength(1);
+    expect(treeBoxes(PATHS.mix).filter((box) => box.checked)).toHaveLength(1);
   });
 });
 

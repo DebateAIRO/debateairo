@@ -73,8 +73,10 @@ describe("dig-f5: each dig button carries its own share", () => {
     expect(buttonsNamed(`${CATALOG["v4.dig.yourPicks.one"]} · ${share(6)}`, panel())).toHaveLength(1);
     await openPath(PATHS.smr);
     expect(buttonsNamed(`${CATALOG["v4.panel.dig"]} · ${share(4)}`, panel())).toHaveLength(1);
-    // The tray's button is the picks' too.
-    expect(buttonsNamed(`${CATALOG["v4.dig.yourPicks.one"]} · ${share(6)}`, tray()!)).toHaveLength(1);
+    // dig-f4: one pick has no tray; this other path's panel says where the picks wait, with [Go to them] (dig-f5, below).
+    expect(tray()).toBeNull();
+    expect(buttonsNamed(`${CATALOG["v4.dig.yourPicks.one"]} · ${share(6)}`, panel())).toHaveLength(0);
+    expect(buttonsNamed(CATALOG["v4.suggest.goToPicks"]!, panel())).toHaveLength(1);
   });
 
   it("with picks on another path: 'Your picks are waiting on “…”', and [Go to them] opens that path, [Clear them] clears", async () => {

@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useEffect, useId, useState, type ReactNode, type RefObject } from "react";
 import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { addedLines, ownWords } from "@/lib/v4/askText";
-import { findOpenQuestion, isFinishedRewrite, openQuestionsOf } from "@/lib/v4/mapModel";
+import { findOpenQuestion, isFinishedRewrite } from "@/lib/v4/mapModel";
 import { digWords, type V4DigQuota } from "@/lib/v4/digQuota";
+import { rootPicksTarget } from "@/lib/v4/digDock";
 import type { MoneyLine } from "@/lib/v4/money";
 import { pauseOfDig } from "@/lib/v4/monthPause";
 import { draftTarget } from "@/lib/v4/suggestions";
@@ -40,6 +41,7 @@ import {
   pathTitle,
   PickBox,
   resolveSelection,
+  rootPanelOpen,
   shortText,
   TitleText,
   undugOpen,
@@ -49,11 +51,11 @@ import {
 } from "./V4MapTree";
 import { V4FullAnswerFold } from "./V4AnswerCard";
 import { V4DigFailed, type V4FailedDigs } from "./V4DigFailed";
-import { V4DigCompose, V4MoneyLines, type V4DigChoice } from "./V4DigSuggest";
+import { pickReasonPlaces, V4DigCompose, V4MoneyLines, V4PickReason, type V4DigChoice } from "./V4DigSuggest";
 import { V4MonthPause } from "./V4MonthPause";
 import { V4ShareChange } from "./V4ShareChange";
 import { V4DigPageIntro, V4PathRewrite, V4WhatChanged } from "./V4PathRewrite";
-import { V4OtherPages, V4SearchNote, V4SourceList, V4WebNoteLine, type V4ResearchedPress } from "./V4Sources";
+import { V4OtherPages, V4SearchNote, V4SourcesFold, V4WebNoteLine, type V4ResearchedPress } from "./V4Sources";
 import { V4TrustBar } from "./V4TrustBar";
 
 /*
@@ -72,6 +74,9 @@ import { V4TrustBar } from "./V4TrustBar";
  * names the path and waits until the dig is done (dig-f13); a waiting dig says so only after 10 seconds (dig-f28).
  * Owner review 3 Nov (wait-f2, public-f16, wait-f18, dig-f12): a paused dig's panel shows the one pause block (with
  * Continue once the server says its month has reset), and a dig that did not finish its reason and "Try this dig again".
+ * Wave 2 (map-d4 A, map-f14, dig-f22): evidence first, each finding's sources folded into one line and "Other pages found"
+ * folded; "Skip to the dig button" near the top; the dig block pinned to the panel's foot on a computer; one pick reads
+ * "Dig into your pick", and "Your question" digs the picks it lists; a greyed pick box has its reason right above it.
  */
 
 type PanelProps = Readonly<{
@@ -173,7 +178,8 @@ function PointItem(props: Readonly<{ point: V4Point; word: TrustWord; level: Rea
             </div>
           )
           : null}
-        <V4SourceList sources={point.sources} catalog={catalog} locale={props.locale} />
+        {/* map-d4 A: the sources folded into one line under the point; open, each page in full. */}
+        <V4SourcesFold sources={point.sources} catalog={catalog} locale={props.locale} />
         {level === "expert" && word === "DIDNT_HOLD" && point.answeredBy !== null
           ? (
             <p className="v4PanelBasis">
@@ -199,6 +205,8 @@ function PointGroups(props: Readonly<{ points: readonly V4Point[]; level: Readin
   const opened = groups.find((group) => group.word !== "DIDNT_HOLD")?.word ?? null;
   return (
     <div className="v4PanelGroups">
+      {/* map-d4 A (the drawn option): the findings come first under one heading, "What we found". */}
+      <h3 className="v4PanelH3">{t(props.catalog, "v4.panel.found")}</h3>
       {groups.map((group) => (
         <details key={group.word} className={`v4PanelGroup v4PanelGroup${group.word}`} open={group.word === opened}>
           <summary>
@@ -311,15 +319,26 @@ function WhereToDig(props: Readonly<{
 }>) {
   const { panel, emptyKey } = props;
   if (props.open.length === 0 && props.digs.length === 0 && emptyKey === null) return null;
+  // dig-f22: the visible reason sits right above the first box greyed for it (each question is its own group here, since
+  // the main question's list can hold the starred question of a path beside its own).
+  const reasons = pickReasonPlaces(
+    props.open.map((question) => ({ key: question.id, path: null, open: [question], suggestions: false })), panel.picked, panel.choice
+  );
   return (
     <Section title={t(panel.catalog, "v4.panel.whereToDig")}>
       {props.open.length === 0
         ? (emptyKey === null ? null : <p className="v4Muted">{t(panel.catalog, emptyKey)}</p>)
         : (
           <ul className="v4PanelRows">
-            {props.open.map((question) => {
+            {props.open.flatMap((question) => {
               const picked = panel.picked.has(question.id);
-              return (
+              const reason = reasons.get(question.id);
+              return [
+                reason === undefined || panel.choice === undefined ? null : (
+                  <li key={`reason/${question.id}`} className="v4PanelReasonRow">
+                    <V4PickReason reason={reason.reason} choice={panel.choice} paths={panel.map.paths} catalog={panel.catalog} />
+                  </li>
+                ),
                 <li key={`${question.pathId ?? "root"}/${question.id}`} className={`v4PanelOpenRow ${groundClass("OPEN")}`}>
                   <PickBox
                     question={question}
@@ -345,7 +364,7 @@ function WhereToDig(props: Readonly<{
                     </span>
                   </button>
                 </li>
-              );
+              ];
             })}
           </ul>
         )}
@@ -370,13 +389,12 @@ function DeepestLine(props: Readonly<{ catalog: MessageCatalog }>) {
   return <p className="v4PanelHint v4PanelDeepest" role="note">{t(props.catalog, "v4.nest.deepest")}</p>;
 }
 
-/** dig-f24: from this many suggestions on (each a pick box and a wording link), the list gets "Skip to the dig button". */
-const SKIP_TO_DIG_FROM = 3;
-
 /**
- * dig-f24: "Skip to the dig button" above a long suggestion list, so a keyboard user need not Tab through every pick box
- * and wording link. It moves focus only (never the address): to the dig button, or to its block when the button cannot
- * take focus (busy, or hidden on the phone, where the pinned bar carries it; map-f18). Seen only while it has focus.
+ * dig-f24 / map-d4 A: "Skip to the dig button" near the top of a panel that has one, above the findings and any long
+ * suggestion list, so a keyboard user reaches the pinned button in about two presses instead of Tabbing through every
+ * source line, pick box and wording link. It moves focus only (never the address): to the dig button, or to its block
+ * when the button cannot take focus (busy, or hidden on the phone, where the pinned bar carries it; map-f18). Seen only
+ * while it has focus.
  */
 function SkipToDig(props: Readonly<{ targetId: string; catalog: MessageCatalog }>) {
   const jump = (): void => {
@@ -395,7 +413,9 @@ function SkipToDig(props: Readonly<{ targetId: string; catalog: MessageCatalog }
 
 /**
  * Quick look / Thorough, then the dig button (row D decisions 1 and 5). W3-4: the person's picks (journey-f23: no count);
- * the money lines before the dig; at the deepest level the "deepest level" line instead of all of it.
+ * the money lines before the dig; at the deepest level the "deepest level" line instead of all of it. map-d4 A: on a
+ * computer the block is pinned to the panel's foot (v4-debate.css), so the evidence comes first and the button is never
+ * out of view.
  * Owner's screen review (3 Nov), with `digQuota` (lib/v4/digQuota.ts): one dig button, "Dig here · up to 3%" or "Dig into
  * your picks · up to 6%", its share from its own check (journey-f13, dig-f5; `again` no longer changes the words: "Dig
  * here too" is gone); the period named once, by the switch (public-d3 A); one hint under each choice (read-f20); a changed
@@ -501,8 +521,11 @@ function RootBody(props: Readonly<{ panel: PanelProps }>) {
   const { map, catalog } = panel;
   const headline = map.headline?.trim() ?? "";
   const summary = map.summary?.trim() ?? "";
-  const star = openQuestionsOf(map).find((question) => question.star && question.pathId !== null);
-  const open = undugOpen(star === undefined ? map.open : [...map.open, star], panel.digs);
+  const open = rootPanelOpen(map, panel.digs);
+  // map-f14 / dig-f4: the tray shows only from two picks, so a pick made here is dug by this panel's own pinned button
+  // ("Dig into your pick"), offered only when the panel lists every pick.
+  const picksTarget = panel.choice?.canDig === true ? rootPicksTarget(open, panel.choice.draft, map.paths) : null;
+  const digId = useId();
   // DATA-2: with no short answer yet, the whole composed answer is shown, so there is always an answer to read.
   const fallback = (map.fallbackText ?? "").split(/\n\s*\n/).map((paragraph) => paragraph.trim()).filter((paragraph) => paragraph.length > 0);
   const writing = map.storyState === "WRITING";
@@ -579,6 +602,7 @@ function RootBody(props: Readonly<{ panel: PanelProps }>) {
           {firstAnswer}
         </Section>
       )}
+      {picksTarget !== null ? <SkipToDig targetId={digId} catalog={catalog} /> : null}
       <V4WebNoteLine note={map.webNote} catalog={catalog} />
       <TrustSection counts={map.counts} points={map.points} unchecked={map.unchecked} panel={panel} />
       {panel.readingLevel === "expert" && map.why.length > 0
@@ -591,6 +615,7 @@ function RootBody(props: Readonly<{ panel: PanelProps }>) {
         )
         : null}
       <WhereToDig open={open} digs={digsUnder(map, panel.digs, null)} emptyKey="v4.panel.noOpenRoot" panel={panel} />
+      {picksTarget !== null ? <DigBlock target={picksTarget} panel={panel} id={digId} /> : null}
     </>
   );
 }
@@ -633,7 +658,8 @@ function PathBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolve
   // dig-f33: "Nothing is open here. You can still dig deeper…" only when no suggestion follows it; at the deepest level
   // nothing can be dug, so the plain "nothing is left" line.
   const emptyKey = suggestions.length > 0 ? null : panel.choice?.canDig === false ? "v4.panel.noOpenRoot" : "v4.panel.noOpenPath";
-  const skip = suggestions.length >= SKIP_TO_DIG_FROM;
+  // map-d4 A (with dig-f24): the way past the findings and the suggestions to the pinned button, wherever there is one.
+  const skip = panel.choice === undefined || panel.choice.canDig;
   const startingTop = panel.digStartingAtTop === true ? panel.digStarting?.(pathTarget(path, panel)) ?? null : null;
   return (
     <>
@@ -649,13 +675,16 @@ function PathBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolve
         locale={panel.locale}
         asked={askedTitle(path, panel)}
       />
+      {skip ? <SkipToDig targetId={digId} catalog={panel.catalog} /> : null}
       {path.web !== undefined
         ? <V4SearchNote search={path.web.search} catalog={panel.catalog} />
         : <V4WebNoteLine note={panel.map.webNote} catalog={panel.catalog} />}
       <TrustSection counts={path.counts} points={path.points} unchecked={path.unchecked} panel={panel} />
       {path.web !== undefined && path.web.otherPages.length > 0
         ? (
-          <Section title={t(panel.catalog, "v4.web.otherPages")}>
+          // map-d4 A: "Other pages found ▸", folded, after the findings (paid plans only: Free searches nothing).
+          <details className="v4PanelOtherPages">
+            <summary className="v4PanelOtherPagesHead">{t(panel.catalog, "v4.web.otherPages")}</summary>
             <V4OtherPages
               pages={path.web.otherPages}
               catalog={panel.catalog}
@@ -665,7 +694,7 @@ function PathBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolve
               {...(addResearched === undefined ? {} : { onAddResearched: (pageRef: string) => addResearched(path.id, pageRef) })}
               {...(panel.researchedPresses === undefined ? {} : { presses: panel.researchedPresses })}
             />
-          </Section>
+          </details>
         )
         : null}
       <WhereToDig
@@ -674,7 +703,6 @@ function PathBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolve
         emptyKey={emptyKey}
         panel={panel}
       />
-      {skip ? <SkipToDig targetId={digId} catalog={panel.catalog} /> : null}
       {panel.choice !== undefined ? <V4DigCompose path={path} choice={panel.choice} catalog={panel.catalog} locale={panel.locale} /> : null}
       <DigBlock
         target={pathTarget(path, panel)}

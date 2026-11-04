@@ -340,6 +340,27 @@
 .v4SourceLink { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
 .v4SourceSite, .v4SourceDate { color: var(--text-2); }
 .v4SourceFlag { margin: 0; font-size: var(--t-meta); color: var(--text-2); }
+/* map-d4 A: under each point its sources fold into one grey line naming their sites; open, each page in full. */
+.v4SourcesFold { min-width: 0; }
+.v4SourcesFoldLine {
+  display: flex; align-items: center; gap: 6px; min-height: 44px; cursor: pointer; list-style: none;
+  font-size: var(--t-ui); color: var(--text-2); overflow-wrap: anywhere;
+}
+.v4SourcesFoldLine::-webkit-details-marker { display: none; }
+.v4SourcesFoldLine::after { content: "▸"; color: var(--text-3); }
+.v4SourcesFoldLine:dir(rtl)::after { content: "◂"; }
+.v4SourcesFold[open] > .v4SourcesFoldLine::after { content: "▾"; }
+/* map-d4 A: "Other pages found ▸", folded after the findings. */
+.v4PanelOtherPages { min-width: 0; }
+.v4PanelOtherPages > .v4OtherPages { margin-top: 4px; }
+.v4PanelOtherPagesHead {
+  display: flex; align-items: center; min-height: 44px; cursor: pointer; list-style: none;
+  font-family: var(--font-mono); font-size: var(--t-micro); letter-spacing: .14em; text-transform: uppercase; color: var(--con-text);
+}
+.v4PanelOtherPagesHead::-webkit-details-marker { display: none; }
+.v4PanelOtherPagesHead::before { content: "▸"; margin-inline-end: 8px; color: var(--text-3); }
+.v4PanelOtherPagesHead:dir(rtl)::before { content: "◂"; }
+.v4PanelOtherPages[open] > .v4PanelOtherPagesHead::before { content: "▾"; }
 .v4OtherPages { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .v4OtherPage { background: var(--surface); }
 .v4OtherPageAdd { align-self: flex-start; min-height: 44px; }
@@ -396,6 +417,16 @@
 }
 .v4SugElsewhere .v4Btn { align-self: flex-start; min-height: 44px; }
 .v4MoneyLine { margin: 0; color: var(--text); }
+/* dig-f22: the visible reason above the first greyed pick box (map, phone outline and panel), never colour alone. */
+.v4PickReason {
+  margin: 0; padding-block: 6px; padding-inline: 10px; font-size: var(--t-ui); color: var(--text); min-width: 0;
+  overflow-wrap: anywhere; border-inline-start: 3px solid var(--gold); background: var(--gold-bg);
+  border-radius: 10px; border-start-start-radius: 0; border-end-start-radius: 0;
+}
+.v4MapLeafReason, .v4PanelReasonRow { list-style: none; min-width: 0; }
+.v4OutReason { padding-block: 4px; }
+/* dig-f26: the Free line under the own-view box. */
+.v4SugPublic { color: var(--text-2); }
 .v4PanelDeepest { margin: 0; padding: 10px 12px; border-inline-start: 3px solid var(--line-strong); color: var(--text); }
 .v4MapPick input:disabled, .v4OutPick input:disabled, .v4PanelPick input:disabled { cursor: not-allowed; opacity: 0.45; }
 

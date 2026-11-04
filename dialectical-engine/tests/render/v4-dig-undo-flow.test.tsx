@@ -104,29 +104,33 @@ describe("several digs, each with its own Undo (dig-d3 A)", () => {
   });
 });
 
-describe("the screens a dig may need are asked at the press (the review of 4 Nov)", () => {
+describe("the screens a dig may need are asked at the press (the review of 4 Nov; dig-f9: before its 10 seconds)", () => {
   it("an own view in a person's crisis words gets the help numbers at the press; nothing waits or is sent (V, 2026-09-30)", async () => {
     await mountMap();
     await openPath(PATHS.renew);
     await click(buttonNamed(CATALOG["v4.suggest.ownView"]!, panel()));
     await typeInto(panel().querySelector<HTMLTextAreaElement>(".v4SugEditor textarea")!, "Should I kill myself?");
     await click(buttonNamed(CATALOG["v4.suggest.ownViewAdd"]!, panel()));
-    const trayDig = page().querySelector<HTMLButtonElement>(".v4DebTray .v4BtnPrimary")!;
-    await press(trayDig);
-    expect(document.querySelector(".crisisSupport[role=dialog]")).not.toBeNull();
+    // dig-f4: one pick has no tray; the path's own pinned button digs it.
+    await press(buttonNamed(CATALOG["v4.dig.yourPicks.one"]!, panel()));
+    // useV4Ask's own crisis check and help screen (the one the send uses; no second crisis text) took the press.
+    expect(harness.offerCrisisHelp).toHaveBeenCalledWith(["Should I kill myself?"]);
+    expect(harness.offerCrisisHelp).toHaveLastReturnedWith(true);
     expect(readDigUndo()).toEqual([]);
     expect(harness.ensureConsent).not.toHaveBeenCalled();
     await advance(20_000);
     expect(harness.submit).not.toHaveBeenCalled();
   });
 
-  it("the one-time consent is asked at the press; No cancels the dig in its note, and nothing is sent (V, 2026-09-29)", async () => {
+  it("the one-time consent is asked at the press, before the 10 seconds; No starts nothing and sends nothing (V, 2026-09-29)", async () => {
     harness.ensureConsent = vi.fn(async () => false);
     await mountMap();
     await openPath(PATHS.smr);
     await press(buttonNamed(CATALOG["v4.panel.dig"]!, panel()));
     expect(harness.ensureConsent).toHaveBeenCalledTimes(1);
-    expect(notes()[0]!.textContent).toContain(CATALOG["v4.undo.cancelled"]);
+    // dig-f9: the 10 seconds start only from a yes, so a No leaves no note behind.
+    expect(notes()).toHaveLength(0);
+    expect(readDigUndo()).toEqual([]);
     await advance(20_000);
     expect(harness.submit).not.toHaveBeenCalled();
   });
@@ -177,7 +181,9 @@ describe("the note's words and keys (dig-f7, dig-f8, journey-f21)", () => {
     await click(noteUndos()[0]!);
     // map-f22 (the map track): a path that is not open keeps its suggestions behind "+N more".
     await expandBranch(PATHS.renew);
-    await click(branch(PATHS.renew).querySelector<HTMLInputElement>(".v4MapLeafSuggestion input[type=checkbox]")!);
+    // dig-f4: the tray shows from the second pick.
+    for (const box of branch(PATHS.renew).querySelectorAll<HTMLInputElement>(".v4MapLeafSuggestion input[type=checkbox]")) await click(box);
+    expect(page().querySelector(".v4DebTray")).not.toBeNull();
     expect(page().querySelector(".v4DebTray")?.textContent).not.toContain(CATALOG["v4.digMode.quick"]);
   });
 
@@ -329,22 +335,36 @@ describe("a phone's one bottom stack (journey-d3, dig-f16, dig-f17)", () => {
     expect(document.activeElement).toBe(back);
   });
 
-  it("picks fold into 'Your picks ▸', which opens them; the bar digs them, so the folded tray has no second button", async () => {
+  it("picks fold into 'Your picks ▸', which opens the Map sheet listing them with Clear; the bar digs them (dig-f4)", async () => {
     await mountMap(375, crypto.randomUUID(), "n-renew");
     await click(panel().querySelector<HTMLInputElement>(".v4Sugs input[type=checkbox]")!);
     const toggle = stack()!.querySelector<HTMLButtonElement>(".v4StackPicksToggle")!;
     expect(toggle.textContent).toContain(CATALOG["v4.bar.yourPicks"]);
-    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(toggle.getAttribute("aria-haspopup")).toBe("dialog");
+    // A phone has no tray: nothing of the kind in the stack, and the pinned bar carries the pick (dig-f31: "Dig into your
+    // pick").
     expect(stack()!.querySelector(".v4DebTray")).toBeNull();
-    await click(toggle);
-    expect(toggle.getAttribute("aria-expanded")).toBe("true");
-    const tray = stack()!.querySelector<HTMLElement>(".v4DebTray")!;
-    // journey-f23 (the wait-card track): the picks show as chips, never as "1 picked".
-    expect(tray.querySelectorAll(".v4ChoiceChip")).toHaveLength(1);
-    expect(buttonsNamed(CATALOG["v4.panel.dig"]!, tray)).toHaveLength(0);
-    expect(buttonsNamed(CATALOG["v4.dig.trayClear"]!, tray)).toHaveLength(1);
-    // dig-f5 / dig-f31: with one pick on this path, the bar digs it: "Dig into your pick" (no share known here).
     expect(stack()!.querySelector(".v4DebPhoneDig")?.textContent).toBe(CATALOG["v4.dig.yourPicks.one"]);
+    await click(toggle);
+    const list = page().querySelector<HTMLElement>(".v4DebSheet .v4DebSheetFoot .v4DebTray")!;
+    // journey-f23 (the wait-card track): the picks show as chips, never as "1 picked".
+    expect(list.querySelectorAll(".v4ChoiceChip")).toHaveLength(1);
+    expect([...list.querySelectorAll("button")].map((button) => button.textContent)).toEqual([CATALOG["v4.dig.trayClear"]]);
+  });
+
+  it("the pinned bar carries the picks on any screen, the main question's too (dig-f4)", async () => {
+    await mountMap(375, crypto.randomUUID(), "n-renew");
+    const boxes = [...panel().querySelectorAll<HTMLInputElement>(".v4Sugs input[type=checkbox]")];
+    await click(boxes[0]!);
+    await click(boxes[1]!);
+    await click(buttonNamed(CATALOG["v4.panel.crumbRoot"]!, panel()));
+    expect(panel().classList.contains("v4Panel-root")).toBe(true);
+    const job = stack()!.querySelector<HTMLButtonElement>(".v4DebPhoneDig")!;
+    expect(job.textContent).toBe(CATALOG["v4.dig.yourPicks.other"]);
+    await press(job);
+    await advance(10_100);
+    expect(harness.submit).toHaveBeenCalledTimes(1);
+    expect((harness.submit.mock.calls[0]![3] as { picks?: unknown[] }).picks).toHaveLength(2);
   });
 
   it("after a single dig of a path the slim line does not claim a good time (dig-f29, the map track's report rule)", async () => {

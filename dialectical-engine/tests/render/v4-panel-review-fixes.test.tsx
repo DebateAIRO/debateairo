@@ -212,13 +212,16 @@ describe("dig-f24: Skip to the dig button", () => {
   const withSuggestions = (count: number) =>
     mapWith([], [path("a", { suggestions: Array.from({ length: count }, (_, at) => suggestion(`s${String(at)}`)) })]);
 
-  it("sits above a long suggestion list (3 or more), and not above a short one or at the deepest level", () => {
+  // Wave 2, map-d4 A: the link sits near the top of every path that can be dug (above the findings and any suggestion
+  // list), so the pinned button is about two presses away; there is one link, never a second above the list.
+  it("sits above a long suggestion list, and above a short one too (map-d4 A), once; not at the deepest level", () => {
     const page = render(withSuggestions(3), "path:a");
-    const [skip] = buttonsNamed(page, skipWords);
+    const [skip, ...others] = buttonsNamed(page, skipWords);
     expect(skip).toBeDefined();
+    expect(others).toHaveLength(0);
     const list = page.querySelector(".v4Sugs")!;
     expect(skip!.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(buttonsNamed(render(withSuggestions(2), "path:a"), skipWords)).toHaveLength(0);
+    expect(buttonsNamed(render(withSuggestions(2), "path:a"), skipWords)).toHaveLength(1);
     expect(buttonsNamed(render(withSuggestions(5), "path:a", { choice: choiceOf({ canDig: false }) }), skipWords)).toHaveLength(0);
   });
 

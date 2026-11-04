@@ -255,7 +255,11 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.report.backToMapShort",
   // ask-d6 A (owner's screen review, 3 Nov): the round account button's name for screen readers (and its menu's). The menu's
   // own words ("My maps", "Language", "Light or dark", "Settings", "Sign out") are the record's; this one is not.
-  "v4.header.account"
+  "v4.header.account",
+  // V4 screen review (3 Nov), map-d4 A: a point's sources folded into one line. The drawn option said "From 3 pages: …";
+  // journey-f23 says nothing counts sources, so the line names the sites only (an owner question until the click-test).
+  "v4.web.sourcesFrom",
+  "v4.web.sourcesFromMore"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {
@@ -420,7 +424,19 @@ const REVIEW_LINES: Readonly<Record<string, string>> = Object.freeze({
   "v4.debate.state.HOLDING.noTime": "Taking a short break",
   // map-f16: the approved N14 sentence (the report's own), then r2-11 A's line.
   "v4.panel.storyMissing": `${APPROVED_REPORT_LINES["v4.investigation.noStory"]} ${NO_WAIT}`,
-  "v4.panel.fallbackMissing": `${APPROVED_REPORT_LINES["v4.investigation.noStory"]} ${NO_WAIT}`
+  "v4.panel.fallbackMissing": `${APPROVED_REPORT_LINES["v4.investigation.noStory"]} ${NO_WAIT}`,
+  // Wave 2, the panel and choosing what to dig: dig-f9 (the question check names the dig), dig-f22 (the visible reason
+  // over greyed boxes), dig-f26 (Free's line under the own-view box), dig-f34 (the two labels). One pick's button reads
+  // dig-f5 / dig-f31's "Dig into your pick" (QUOTA_RECORD_LINES below), the one dig-button helper of lib/v4/digQuota.ts;
+  // map-f14's "Dig into this" is an owner question.
+  // map-d4 A, as drawn on the page the owner picked from: the findings' heading.
+  "v4.panel.found": "What we found",
+  "v4.dig.checkAbout": "About your dig on “{path}”:",
+  "v4.suggest.picksOn": "Your picks are on “{path}”.",
+  "v4.suggest.freeCap": "On the Free plan a dig combines up to {count} picks.",
+  "v4.suggest.ownViewPublic": "Free debates are public, so your view may be shown on this public page.",
+  "v4.suggest.openTag": "Open question",
+  "v4.suggest.ownViewTag": "Your view"
 });
 
 /**
