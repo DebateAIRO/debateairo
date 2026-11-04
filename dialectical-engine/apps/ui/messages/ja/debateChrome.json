@@ -289,7 +289,7 @@
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "コーディネーターがリクエストを拒否しました。このプランに必要なモデルが現在利用できません。後でもう一度試すか、別のプランを選択してください。",
   "requestFailure.kind.ALREADY_WAITING": "待機できる質問は一度に一つだけです。待機中のディベートが始まってから、この質問を送ってください。",
   "requestFailure.kind.UNCLASSIFIED": "応答を受信する前に失敗したため、結果は不明です。これはコーディネーターによる判断ではありません。",
-  "debateChrome.error.fundingEnded": "この待機中の議論の内部資金が終了しました。現在の利用枠を使うには、もう一度質問してください。",
+  "debateChrome.error.fundingEnded": "この待機中のディベートのためにチームから付与された利用枠は終了しました。現在の利用枠を使うには、もう一度質問してください。",
   "runFailure.NOT_STARTED": "このディベートが始まる前に、こちら側で問題が発生しました。もう一度ご質問ください。",
   "runFailure.MODELS_UNAVAILABLE": "必要なAIモデルが利用できなかったため、このディベートを開始できませんでした。しばらくしてから、もう一度お試しください。",
   "runFailure.RUN_LIMIT_REACHED": "このディベートは、回答を出す前に上限に達しました。",

@@ -303,7 +303,7 @@
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinators pieprasījumu noraidīja: kāds no šim plānam nepieciešamajiem modeļiem pašlaik nav pieejams. Mēģiniet vēlreiz vēlāk vai izvēlieties otru plānu.",
   "requestFailure.kind.ALREADY_WAITING": "Vienlaikus gaidīt var tikai viens jautājums. Uzdodiet šo jautājumu, kad būs sākušās jūsu gaidošās debates.",
   "requestFailure.kind.UNCLASSIFIED": "Darbība neizdevās, pirms tika saņemta atbilde, tāpēc iznākums nav zināms. Koordinators šādu lēmumu nepieņēma.",
-  "debateChrome.error.fundingEnded": "Šīs gaidošās diskusijas iekšējais finansējums ir beidzies. Uzdodiet jautājumu vēlreiz, lai izmantotu pašreizējo kvotu.",
+  "debateChrome.error.fundingEnded": "Komandas jums piešķirtā kvota šīm gaidošajām debatēm ir beigusies. Uzdodiet jautājumu vēlreiz, lai izmantotu pašreizējo kvotu.",
   "runFailure.NOT_STARTED": "Pirms šo debašu sākuma mūsu pusē radās problēma. Lūdzu, jautājiet vēlreiz.",
   "runFailure.MODELS_UNAVAILABLE": "Šīs debates nevarēja sākties, jo tām nepieciešamie MI modeļi nebija pieejami. Lūdzu, pēc brīža mēģiniet vēlreiz.",
   "runFailure.RUN_LIMIT_REACHED": "Šīs debates sasniedza savu ierobežojumu, pirms spēja sniegt atbildi.",
