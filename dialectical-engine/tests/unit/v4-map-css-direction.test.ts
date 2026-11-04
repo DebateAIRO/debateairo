@@ -43,6 +43,16 @@ describe("the V4 map's styles follow the reading direction (map-f13)", () => {
     expect(rules.indexOf(".v4PanelGroup[open] > summary::before")).toBeGreaterThan(rules.indexOf(".v4PanelGroup > summary:dir(rtl)::before"));
   });
 
+  it("give the answer card's folds the same arrows (the browser check, 4 Nov: a flex summary draws no marker of its own)", () => {
+    const looks = readFileSync(resolve(import.meta.dirname, "../../apps/ui/app/v4/v4-map-looks.css"), "utf8").replace(/\/\*[\s\S]*?\*\//gu, "");
+    expect(looks).toMatch(/\.v4AnswerMore > summary \{[^}]*display: flex;/u);
+    expect(looks).toMatch(/\.v4AnswerMore > summary::-webkit-details-marker \{ display: none; \}/u);
+    expect(looks).toMatch(/\.v4AnswerMore > summary::before \{ content: "▸";/u);
+    expect(looks).toMatch(/\.v4AnswerMore > summary:dir\(rtl\)::before \{ content: "◂"; \}/u);
+    expect(looks).toMatch(/\.v4AnswerMore\[open\] > summary::before \{ content: "▾"; \}/u);
+    expect(looks.indexOf(".v4AnswerMore[open] > summary::before")).toBeGreaterThan(looks.indexOf(".v4AnswerMore > summary:dir(rtl)::before"));
+  });
+
   it("break and hyphenate long words inside every map card and the phone outline, in the page's language", () => {
     expect(rule(".v4MapRoot, .v4MapPath, .v4MapOpenMain, .v4MapDig")).toMatch(/overflow-wrap: break-word; hyphens: auto;/u);
     expect(rule(".v4MapHeads")).toMatch(/overflow-wrap: break-word; hyphens: auto;/u);

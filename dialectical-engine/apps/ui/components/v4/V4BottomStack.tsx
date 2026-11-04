@@ -103,6 +103,8 @@ export function V4BottomStack(props: Readonly<{
    * them with Clear (the outline is also the tray), while the pinned bar carries their dig. Absent: no picks line.
    */
   onOpenPicks?: () => void;
+  /** Phone: "Your picks ▸", so closing the Map sheet it opened gives focus back to it (lib/v4/useSheetFocusReturn.ts). */
+  picksButtonRef?: RefObject<HTMLButtonElement | null>;
   /** Phone: the pinned bar. */
   mapButtonRef?: RefObject<HTMLButtonElement | null>;
   jobRef?: RefObject<HTMLElement | null>;
@@ -171,7 +173,7 @@ export function V4BottomStack(props: Readonly<{
         {props.notes}
         {props.onOpenPicks !== undefined ? (
           <div className="v4StackPicks">
-            <button type="button" className="v4StackPicksToggle" aria-haspopup="dialog" onClick={props.onOpenPicks}>
+            <button ref={props.picksButtonRef} type="button" className="v4StackPicksToggle" aria-haspopup="dialog" onClick={props.onOpenPicks}>
               <span>{t(catalog, "v4.bar.yourPicks")}</span>
               <span className="v4StackPicksArrow" aria-hidden="true">▸</span>
               {props.trayTitle === undefined ? null : <span className="v4StackPicksPath">{props.trayTitle}</span>}

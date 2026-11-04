@@ -164,6 +164,17 @@
 .v4DebLayout-mid .v4DebPanelCol {
   scroll-padding-block-end: calc(var(--v4-pin-room, 0px) + var(--v4-dock-room, 0px) + 8px);
 }
+/* The browser check (4 Nov): the site's cookie bar (.consentBar, fixed at the bottom, above this page) covered the pinned
+   dig block and the docked tray, so Dig could not be pressed. While it shows, both sit in the panel's flow instead (as the
+   ask bar and the phone stack do: v4-ask.css C4, v4-undo.css journey-d3), and the panel column gets room at its end so the
+   block and the tray scroll clear of the cookie bar; a control the keyboard reaches is scrolled clear of it too. */
+.appShell:has(.consentBar) .v4DebPanelCol .v4PanelDig,
+.appShell:has(.consentBar) .v4DebPanelCol > .v4DebTrayDock { position: static; }
+.appShell:has(.consentBar) .v4DebLayout-desktop .v4DebPanelCol,
+.appShell:has(.consentBar) .v4DebLayout-laptop .v4DebPanelCol,
+.appShell:has(.consentBar) .v4DebLayout-mid .v4DebPanelCol {
+  padding-bottom: calc(180px + var(--v4-stack-room, 0px)); scroll-padding-block-end: 188px;
+}
 
 /* ---------- the phone map sheet (D7) ---------- */
 .v4DebSheet {

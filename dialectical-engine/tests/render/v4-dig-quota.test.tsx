@@ -139,10 +139,33 @@ describe("new starts wait for the reset (new_starts: BLOCKED_UNTIL_RESET)", () =
     // The tray's one button waits too, with the reset time on it.
     const time = formatDate("en", RESET, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
     const trayDig = buttonNamed(`${CATALOG["v4.dig.yourPicks.one"]} · ${word("v4.dig.after", { time })}`, tray()!);
-    expect(tray()!.textContent).toContain(word("v4.dig.quotaDayUsed", { time }));
+    // The browser check (4 Nov): the reason is said once, by the panel's pinned dig block right above the docked tray, never
+    // a second time in the tray.
+    const said = [...page().querySelectorAll<HTMLElement>("p")].filter((line) => line.textContent === word("v4.dig.quotaDayUsed", { time }));
+    expect(said).toHaveLength(1);
+    expect(panel().contains(said[0]!)).toBe(true);
+    expect(tray()!.textContent).not.toContain(word("v4.dig.quotaDayUsed", { time }));
     // dig-f11 / journey-f14 (CODE-5): greyed but focusable, pointing at the visible reason; a press gives it the highlight again.
     expect(trayDig.getAttribute("aria-disabled")).toBe("true");
     const reason = document.getElementById(trayDig.getAttribute("aria-describedby")!)!;
+    expect(reason).toBe(said[0]);
+    expect(reason.classList.contains("v4Highlight")).toBe(false);
+    await click(trayDig);
+    expect(document.getElementById(trayDig.getAttribute("aria-describedby")!)!.classList.contains("v4Highlight")).toBe(true);
+    expect(harness.submit).not.toHaveBeenCalled();
+  });
+
+  it("the browser check (4 Nov): with no reason above it (the main question's panel), the tray says why itself", async () => {
+    harness.room = room({ room: "FULL", scope: "PERSON_DAY", resets_at: RESET, new_starts: "BLOCKED_UNTIL_RESET" });
+    await mountMap();
+    await expandBranch(PATHS.renew);
+    await click(branch(PATHS.renew).querySelector<HTMLInputElement>(".v4MapLeafSuggestion input[type=checkbox]")!);
+    expect(panel().classList.contains("v4Panel-root")).toBe(true);
+    const time = formatDate("en", RESET, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+    expect(panel().textContent).not.toContain(word("v4.dig.quotaDayUsed", { time }));
+    const trayDig = [...tray()!.querySelectorAll<HTMLButtonElement>("button")].find((button) => button.getAttribute("aria-disabled") === "true")!;
+    const reason = document.getElementById(trayDig.getAttribute("aria-describedby")!)!;
+    expect(tray()!.contains(reason)).toBe(true);
     expect(reason.textContent).toBe(word("v4.dig.quotaDayUsed", { time }));
     await click(trayDig);
     expect(document.getElementById(trayDig.getAttribute("aria-describedby")!)!.classList.contains("v4Highlight")).toBe(true);

@@ -233,6 +233,12 @@
 .v4AnswerSure { display: flex; }
 .v4AnswerMore { border-top: 1px solid var(--line-2); padding-top: 4px; }
 .v4AnswerMore > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-size: var(--t-ui); font-weight: 600; color: var(--text-2); }
+/* The browser check (4 Nov): "Read the whole answer" and "Earlier versions of the answer" show that they fold (a flex
+   summary draws no marker of its own); the same arrow as the panel's other folds (v4-map.css .v4PanelGroup). */
+.v4AnswerMore > summary::-webkit-details-marker { display: none; }
+.v4AnswerMore > summary::before { content: "▸"; margin-inline-end: 8px; color: var(--text-3); }
+.v4AnswerMore > summary:dir(rtl)::before { content: "◂"; }
+.v4AnswerMore[open] > summary::before { content: "▾"; }
 .v4AnswerMoreBody { display: flex; flex-direction: column; gap: 10px; padding-bottom: 6px; }
 .v4AnswerSectionTitle { margin: 0 0 4px; font-size: var(--t-ui); font-weight: 700; }
 .v4AnswerVersion { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 1px solid var(--line); min-width: 0; }

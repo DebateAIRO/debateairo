@@ -117,6 +117,7 @@ import { useLeaveLinkGuard, useTypedWords } from "@/lib/v4/useLeaveGuard";
 import { useLevelSettled } from "@/lib/v4/useLevelSettled";
 import { usePicksUndo } from "@/lib/v4/usePicksUndo";
 import { useAddressPicks, useQuestionAddress } from "@/lib/v4/useQuestionAddress";
+import { useSheetFocusReturn } from "@/lib/v4/useSheetFocusReturn";
 
 /*
  * V4 initial (2026-10-28), the map page shell (D3 map, D4 what changed, D6/D7 phone). It loads the debate over
@@ -956,17 +957,11 @@ function V4Debate({
     if (focusRequest > 0) headingRef.current?.focus();
   }, [focusRequest]);
 
-  // R2TIME-4/R2REG-4: closing the phone map puts focus back on the Map button, unless a row already moved it on to
-  // the panel heading (the effect above runs first in the same commit). The button is a new one by then, so the ref
-  // points at the one on screen.
-  const mapButtonRef = useRef<HTMLButtonElement | null>(null);
-  const sheetWasOpen = useRef(false);
-  useEffect(() => {
-    if (sheetWasOpen.current && !sheetOpen && (document.activeElement === document.body || document.activeElement === null)) {
-      mapButtonRef.current?.focus();
-    }
-    sheetWasOpen.current = sheetOpen;
-  }, [sheetOpen]);
+  // R2TIME-4/R2REG-4, the wave-2 browser check (4 Nov): closing the phone map puts focus back on what opened it (the Map
+  // button, "Your picks ▸" or the minimap), unless a row already moved it on to the panel heading (the effect above runs
+  // first in the same commit). lib/v4/useSheetFocusReturn.ts.
+  const sheetFocus = useSheetFocusReturn(sheetOpen, openSheet);
+  const { mapButtonRef } = sheetFocus;
 
   // UI-5: the side panel scrolls on its own; a new question starts at its top, not where the last one was left.
   useEffect(() => {
@@ -1501,7 +1496,7 @@ function V4Debate({
             digs={digs}
             selected={shownSelection}
             onSelect={select}
-            onOpenMap={openSheet}
+            onOpenMap={sheetFocus.openFromHere}
             position={position}
             // journey-f18: on a phone the four steps are small dots in the pinned top, beside the breadcrumb.
             steps={<V4Steps current="map" shape="dots" hrefs={{ report: reportHref }} catalog={catalog} />}
@@ -1642,13 +1637,14 @@ function V4Debate({
           pinned={ready.phoneTourBar}
           // dig-f4: the tray is docked in the panel column on a computer; a phone's "Your picks ▸" opens the Map sheet.
           tray={null}
-          {...(picksList === null ? {} : { onOpenPicks: openSheet })}
+          {...(picksList === null ? {} : { onOpenPicks: sheetFocus.openFromPicks })}
+          picksButtonRef={sheetFocus.picksButtonRef}
           trayTitle={picksTarget !== null && picksTarget.path !== null
             ? <TitleText title={pathTitle(picksTarget.path, catalog, 40)} catalog={catalog} />
             : undefined}
           mapButtonRef={mapButtonRef}
           jobRef={barJobRef}
-          onMap={openSheet}
+          onMap={sheetFocus.openFromMap}
           job={phoneJob}
           goodTime={goodTime}
           reportHref={reportHref}
@@ -1815,7 +1811,8 @@ function OutlineSheet({ onClose, footer, catalog, children }: Readonly<{
 }>) {
   const sheetRef = useRef<HTMLDivElement | null>(null);
   const closeRef = useRef<HTMLButtonElement | null>(null);
-  // Focus goes back to the Map button from the page (R2TIME-4): the button is re-mounted when the sheet closes.
+  // Focus goes back to what opened the sheet from the page (R2TIME-4, lib/v4/useSheetFocusReturn.ts): the bottom stack's
+  // buttons are re-mounted when the sheet closes.
   useEffect(() => {
     closeRef.current?.focus();
   }, []);

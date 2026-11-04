@@ -200,6 +200,17 @@ describe("map-d4 A: evidence first, sources folded, Skip to the dig button, the 
     // Not on the phone: there the pinned bar is the dig button.
     expect(rules).not.toMatch(/\.v4DebLayout-phone[^{]*\.v4PanelDig \{[^}]*sticky/u);
   });
+
+  it("the browser check (4 Nov): while the cookie bar shows, the block and the tray sit in the panel's flow, clear of it", () => {
+    const rules = css("v4-debate.css");
+    // As the ask bar and the phone stack do (v4-ask.css C4, v4-undo.css journey-d3): the cookie bar, fixed at the bottom,
+    // covered the pinned block and the docked tray, so Dig could not be pressed.
+    expect(rules).toMatch(/\.appShell:has\(\.consentBar\) \.v4DebPanelCol \.v4PanelDig,\s*\.appShell:has\(\.consentBar\) \.v4DebPanelCol > \.v4DebTrayDock \{ position: static; \}/u);
+    // The panel column gets room at its end so both scroll clear of the cookie bar, keyboard focus included.
+    expect(rules).toMatch(/\.appShell:has\(\.consentBar\) \.v4DebLayout-desktop \.v4DebPanelCol,\s*\.appShell:has\(\.consentBar\) \.v4DebLayout-laptop \.v4DebPanelCol,\s*\.appShell:has\(\.consentBar\) \.v4DebLayout-mid \.v4DebPanelCol \{\s*padding-bottom: calc\(180px \+ var\(--v4-stack-room, 0px\)\); scroll-padding-block-end: 188px;/u);
+    // It comes after the pinned rules, so it wins while the cookie bar shows.
+    expect(rules.indexOf(".appShell:has(.consentBar) .v4DebPanelCol .v4PanelDig")).toBeGreaterThan(rules.indexOf("scroll-padding-block-end: calc(var(--v4-pin-room"));
+  });
 });
 
 describe("dig-f9: the consent and the crisis help run at the click, before the 10 seconds", () => {

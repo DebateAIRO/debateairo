@@ -355,6 +355,27 @@ describe("a phone's one bottom stack (journey-d3, dig-f16, dig-f17)", () => {
     expect([...list.querySelectorAll("button")].map((button) => button.textContent)).toEqual([CATALOG["v4.dig.trayClear"]]);
   });
 
+  it("closing the Map sheet gives focus back to what opened it: 'Your picks ▸', the Map button (the browser check, 4 Nov)", async () => {
+    await mountMap(375, crypto.randomUUID(), "n-renew");
+    await click(panel().querySelector<HTMLInputElement>(".v4Sugs input[type=checkbox]")!);
+    await press(stack()!.querySelector<HTMLButtonElement>(".v4StackPicksToggle")!);
+    expect(page().querySelector(".v4DebSheet")).not.toBeNull();
+    await escape();
+    expect(page().querySelector(".v4DebSheet")).toBeNull();
+    // The stack was drawn again, so this is the new "Your picks ▸", never the Map button.
+    expect(document.activeElement).toBe(stack()!.querySelector(".v4StackPicksToggle"));
+    await press(stack()!.querySelector<HTMLButtonElement>(".v4DebPhoneMap")!);
+    await escape();
+    expect(document.activeElement).toBe(stack()!.querySelector(".v4DebPhoneMap"));
+    // Picks cleared in the sheet: "Your picks ▸" is gone, so focus goes to the Map button, as before.
+    await press(stack()!.querySelector<HTMLButtonElement>(".v4StackPicksToggle")!);
+    await press(buttonNamed(CATALOG["v4.dig.trayClear"]!, page().querySelector<HTMLElement>(".v4DebSheet")!));
+    await press(page().querySelector<HTMLButtonElement>(".v4DebSheetClose")!);
+    expect(page().querySelector(".v4DebSheet")).toBeNull();
+    expect(stack()!.querySelector(".v4StackPicksToggle")).toBeNull();
+    expect(document.activeElement).toBe(stack()!.querySelector(".v4DebPhoneMap"));
+  });
+
   it("the pinned bar carries the picks on any screen, the main question's too (dig-f4)", async () => {
     await mountMap(375, crypto.randomUUID(), "n-renew");
     const boxes = [...panel().querySelectorAll<HTMLInputElement>(".v4Sugs input[type=checkbox]")];

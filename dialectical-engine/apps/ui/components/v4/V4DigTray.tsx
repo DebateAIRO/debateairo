@@ -50,6 +50,39 @@ function useDockRoom(ref: RefObject<HTMLElement | null>): void {
   }, [ref]);
 }
 
+/**
+ * The browser check (4 Nov): while new digs wait for a reset, or digging rests while the report is written, the panel's
+ * pinned dig block right above the docked tray already says why, in the same words. The tray then leaves its own line out
+ * and its greyed button points at that visible line instead (journey-f14: a greyed button points at the line that says
+ * why). Null: no such line above (the panel shows a dig, or the deepest level), so the tray shows its own. Read again after
+ * each of the tray's renders: the page draws the panel and the tray together, so a change of panel redraws the tray too.
+ */
+function useReasonAbove(ref: RefObject<HTMLElement | null>, reason: string | null): string | null {
+  const [above, setAbove] = useState<string | null>(null);
+  useEffect(() => {
+    const column = ref.current?.parentElement ?? null;
+    const line = reason === null || column === null ? undefined
+      : [...column.querySelectorAll<HTMLElement>(".v4PanelDig > p[id]")].find((element) => element.textContent === reason);
+    const id = line?.id ?? null;
+    setAbove((previous) => (previous === id ? previous : id));
+  });
+  return above;
+}
+
+/**
+ * A press of a greyed tray button gives the line above that says why the shared highlight again (public-d4 A), as
+ * glowOnPage does (V4PublicDig.tsx), without moving focus or the page.
+ */
+function replayHighlight(id: string): void {
+  const line = document.getElementById(id);
+  if (line === null) return;
+  line.classList.remove("v4Highlight");
+  // Re-read the layout so the highlight plays again when it is put on again.
+  void line.offsetWidth;
+  line.classList.add("v4Highlight");
+  line.addEventListener("animationend", () => line.classList.remove("v4Highlight"), { once: true });
+}
+
 /** The path the picks are on, then the mode word (left out on Free, which has no Quick look / Thorough choice). */
 function TrayText(props: Readonly<{ target: PicksTarget; planTier: V4PlanTier; mode: DigMode | null; catalog: MessageCatalog }>) {
   const { target, catalog } = props;
@@ -98,6 +131,7 @@ export function V4DigTray(props: Readonly<{
   const reasonId = useId();
   const [replay, setReplay] = useState(0);
   const greyed = waiting || rest !== null;
+  const reasonAbove = useReasonAbove(ref, !props.withDig ? null : rest ?? (waiting ? quota.waitLine : null));
   return (
     <section ref={ref} className="v4DebTray v4DebTrayDock v4Highlight" aria-label={t(catalog, "v4.dig.trayLabel")}>
       <V4PickChips picks={target.picks} label={t(catalog, "v4.map.picked")} />
@@ -110,7 +144,7 @@ export function V4DigTray(props: Readonly<{
           button carries the reset time and this line says why. */}
       {props.withDig
         ? waiting && rest === null
-          ? <p key={replay} id={reasonId} className={`v4PanelHint v4DigWaitLine${replay > 0 ? " v4Highlight" : ""}`} role="note">{quota.waitLine}</p>
+          ? reasonAbove !== null ? null : <p key={replay} id={reasonId} className={`v4PanelHint v4DigWaitLine${replay > 0 ? " v4Highlight" : ""}`} role="note">{quota.waitLine}</p>
           : waiting ? null : <V4MoneyLines lines={props.money} catalog={catalog} />
         : null}
       {props.publicNote === null || props.publicNote === undefined ? null : <p className="v4DebTrayPublic">{props.publicNote}</p>}
@@ -121,9 +155,10 @@ export function V4DigTray(props: Readonly<{
               type="button"
               className={`v4Btn v4BtnPrimary${greyed ? " v4DigWaiting" : ""}`}
               aria-disabled={greyed ? "true" : undefined}
-              aria-describedby={greyed ? reasonId : undefined}
+              aria-describedby={greyed ? reasonAbove ?? reasonId : undefined}
               onClick={() => {
-                if (greyed) setReplay((count) => count + 1);
+                if (greyed && reasonAbove !== null) replayHighlight(reasonAbove);
+                else if (greyed) setReplay((count) => count + 1);
                 else props.onDig();
               }}
             >
@@ -136,7 +171,7 @@ export function V4DigTray(props: Readonly<{
           {t(catalog, "v4.dig.trayClear")}
         </button>
       </div>
-      {props.withDig && rest !== null ? (
+      {props.withDig && rest !== null && reasonAbove === null ? (
         <p key={replay} id={reasonId} className={`v4DebTrayHint v4Muted${replay > 0 ? " v4Highlight" : ""}`} data-dig-rest="">{rest}</p>
       ) : null}
     </section>
