@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -65,6 +65,17 @@ describe("no browser storage (Decision A, S01-R17)", () => {
       "V4AskGate.tsx", "V4MapSeed.tsx", "V4MapShelf.tsx", "V4AllMaps.tsx"]) {
       const source = readFileSync(resolve(here, "../../apps/ui/components/v4", file), "utf8");
       expect(source, file).not.toMatch(/\.setItem\(|localStorage|sessionStorage|indexedDB|document\.cookie/);
+    }
+  });
+
+  it("no file of the V4 pages writes browser storage or cookies (every file, not a hand-kept list: the review of 4 Nov)", () => {
+    const roots = ["lib/v4", "components/v4", "app/v4"].map((folder) => resolve(here, "../../apps/ui", folder));
+    const files = roots.flatMap((root) => readdirSync(root, { recursive: true, encoding: "utf8" })
+      .filter((name) => /\.(ts|tsx|js|mjs)$/u.test(name))
+      .map((name) => resolve(root, name)));
+    expect(files.length).toBeGreaterThan(50);
+    for (const file of files) {
+      expect(readFileSync(file, "utf8"), file).not.toMatch(/\.setItem\(|localStorage|sessionStorage|indexedDB|document\.cookie/);
     }
   });
 });

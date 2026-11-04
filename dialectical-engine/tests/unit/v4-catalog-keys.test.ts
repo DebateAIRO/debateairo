@@ -203,7 +203,19 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.investigation.checkAgain",
   "v4.investigation.writeAgain",
   "v4.investigation.digMore",
-  "v4.web.freeOnPaper"
+  "v4.web.freeOnPaper",
+  // The wave-1 review fixes (4 Nov 2026), drafted where the owner's record has no words: the grey line under Next for a
+  // signed-out visitor until the start-step's sign-in panel lands (the record's "Your question stays here." is true only
+  // with that panel), a dig still starting after a minute, a dig sent after its map was closed that met a screen nobody
+  // saw, a dig whose start could not be confirmed, the outline's fold button, and the sideways-scroll hint without a side
+  // (right-to-left pages).
+  "v4.ask.signInFirst",
+  "v4.undo.sendingSlow",
+  "v4.dig.notStartedAway",
+  "v4.dig.unconfirmed",
+  "v4.outline.fold",
+  "v4.outline.unfold",
+  "v4.map.scrollHint"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {
