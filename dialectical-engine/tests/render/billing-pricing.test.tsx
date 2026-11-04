@@ -82,8 +82,11 @@ describe("P18 /pricing", () => {
     const cards = [...document.querySelectorAll("[data-plan]")];
     expect(cards.map((card) => card.getAttribute("data-plan"))).toEqual(["FREE", "PLUS", "PRO", "MAX"]);
     const plus = document.querySelector('[data-plan="PLUS"]')!;
-    expect(plus.textContent).toContain("$20.00 a month");
-    expect(plus.textContent).toContain("+ Sales tax (6.25%, United States): $21.25 a month in total");
+    // Price + VAT (Terms §12): the price before tax and its tax apart, then the total a month right under it.
+    expect(plus.querySelector(".pricingPrice")?.textContent).toBe("$20.00 + $1.25 Sales tax");
+    expect(plus.querySelector(".pricingTotal")?.textContent).toBe("$21.25 a month in total (6.25%, United States)");
+    // The tax is counted in whole cents: 53.13 − 50.00 is exactly 3.13.
+    expect(document.querySelector('[data-plan="PRO"] .pricingPrice')?.textContent).toBe("$50.00 + $3.13 Sales tax");
     expect(plus.textContent).toContain("The Plus allowance");
     expect(plus.querySelector("a")?.getAttribute("href")).toBe("/checkout?plan=PLUS");
     expect(plus.querySelector("a")?.textContent).toBe("Choose Plus");
@@ -101,7 +104,7 @@ describe("P18 /pricing", () => {
     mocks.getBillingPlans.mockResolvedValue(ROMANIA);
     const document = await renderPricing();
     const plus = document.querySelector('[data-plan="PLUS"]')!;
-    expect(plus.textContent).toContain(`${formatMoney("en", "100.00", "RON")} a month`);
+    expect(plus.textContent).toContain(`${formatMoney("en", "100.00", "RON")} + ${formatMoney("en", "21.00", "RON")} VAT`);
     expect(plus.textContent).not.toContain("$");
     expect(document.querySelector('[data-plan="PRO"]')?.textContent).toContain(formatMoney("en", "250.00", "RON"));
     expect(document.body.textContent).toContain(CURRENCY_NOTE);
@@ -114,16 +117,16 @@ describe("P18 /pricing", () => {
     mocks.getBillingPlans.mockResolvedValue(GERMANY);
     const document = await renderPricing();
     const plus = document.querySelector('[data-plan="PLUS"]')!;
-    expect(plus.textContent).toContain(`${formatMoney("en", "20.00", "EUR")} a month`);
-    expect(plus.textContent).toContain(`+ MwSt. (19%, Germany): ${formatMoney("en", "23.80", "EUR")} a month in total`);
+    expect(plus.querySelector(".pricingPrice")?.textContent).toBe(`${formatMoney("en", "20.00", "EUR")} + ${formatMoney("en", "3.80", "EUR")} MwSt.`);
+    expect(plus.querySelector(".pricingTotal")?.textContent).toBe(`${formatMoney("en", "23.80", "EUR")} a month in total (19%, Germany)`);
     const pro = document.querySelector('[data-plan="PRO"]')?.textContent;
-    expect(pro).toContain(`${formatMoney("en", "50.00", "EUR")} a month`);
+    expect(pro).toContain(`${formatMoney("en", "50.00", "EUR")} + ${formatMoney("en", "9.50", "EUR")} MwSt.`);
     expect(pro).toContain(`${formatMoney("en", "59.50", "EUR")} a month in total`);
     const max = document.querySelector('[data-plan="MAX"]')?.textContent;
-    expect(max).toContain(`${formatMoney("en", "200.00", "EUR")} a month`);
+    expect(max).toContain(`${formatMoney("en", "200.00", "EUR")} + ${formatMoney("en", "38.00", "EUR")} MwSt.`);
     expect(max).toContain(`${formatMoney("en", "238.00", "EUR")} a month in total`);
     // The free plan has no tax line at all.
-    expect(document.querySelector('[data-plan="FREE"]')?.textContent).not.toMatch(/MwSt\.|in total|No tax added|where it applies/u);
+    expect(document.querySelector('[data-plan="FREE"]')?.textContent).not.toMatch(/MwSt\.|in total|No tax added|where it applies|\+/u);
     expect(document.body.textContent).toContain(billingEnglish["billing.pricing.faqTaxQuestionIncluded"]);
     expect(document.body.textContent).toContain(billingEnglish["billing.pricing.faqTaxAnswerAdded"]);
     // The place form (sign-up's region picker) shows the country the cards are priced for, and asks no postal code
@@ -135,7 +138,7 @@ describe("P18 /pricing", () => {
     expect(document.querySelector("[data-pricing-place]")?.getAttribute("action")).toBe("/pricing");
     // A fractional rate keeps its decimals, as the checkout's tax label does.
     mocks.getBillingPlans.mockResolvedValue({ ...GERMANY, tax: { ...GERMANY.tax!, tax_rate_bp: 887.5 } });
-    expect((await renderPricing()).querySelector('[data-plan="PLUS"]')?.textContent).toContain("+ MwSt. (8.875%, Germany)");
+    expect((await renderPricing()).querySelector('[data-plan="PLUS"]')?.textContent).toContain("a month in total (8.875%, Germany)");
   });
 
   it("says no tax is added where the place adds none", async () => {
@@ -244,8 +247,9 @@ describe("P18 /pricing", () => {
     expect(document.querySelector("h1")?.textContent).not.toBe("Choose how much you debate");
     expect(document.body.textContent).toContain(billingRomanian["billing.pricing.currencyNote"]);
     const plus = document.querySelector('[data-plan="PLUS"]')!;
-    expect(plus.textContent).toContain(formatMoney("ro", "100.00", "RON"));
-    expect(plus.textContent).toContain(`+ VAT (21%, România): ${formatMoney("ro", "121.00", "RON")} pe lună în total`);
+    expect(plus.querySelector(".pricingPrice")?.textContent)
+      .toBe(`${formatMoney("ro", "100.00", "RON")} + ${formatMoney("ro", "21.00", "RON")} VAT`);
+    expect(plus.querySelector(".pricingTotal")?.textContent).toBe(`${formatMoney("ro", "121.00", "RON")} pe lună în total (21%, România)`);
     expect(document.body.textContent).toContain(billingRomanian["billing.pricing.faqTaxAnswerAdded"]);
     expect(document.querySelector('label[for="pricing-region-trigger"]')?.textContent).toBe(billingRomanian["billing.checkout.country"]);
   });

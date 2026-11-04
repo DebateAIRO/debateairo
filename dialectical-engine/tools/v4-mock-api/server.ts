@@ -29,7 +29,8 @@ import {
 import { ARABIC_RUN, borrowNotice, DEEPEST_DIG, DIG_ANSWERS, DIG_RUNS, monthPause, PATH_REWRITES, reportVersionBody, RUN_PAUSED, SEEDED_NEW_DIGS } from "./rewrite-seed.js";
 import type { WebCase } from "./web-seed.js";
 import { paymentRegionsOf } from "../../packages/kernel/src/payment-regions.js";
-import { BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, priceCurrencyFor } from "../../packages/register/src/billing-plans.js";
+import { BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, priceCurrencyFor, type PlanId } from "../../packages/register/src/billing-plans.js";
+import { quadernoPricingFromKeyFile, type QuadernoPriced } from "./quaderno-tax.js";
 import { contributionOf, PUBLIC_MODES, PUBLIC_REF, seedPublicDebates, writtenReport, type PublicMode } from "./public-seed.js";
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -648,12 +649,18 @@ const MOCK_TAX_RATES: Readonly<Record<string, Readonly<{ name: string; basisPoin
 /** The register's own plans row, for the currency each country pays in (RO: lei; the euro countries: euro; else dollars). */
 const REGISTER_PLANS = billingPlansFromValue(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value, BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.sourceRef);
 
+/** With MOCK_QUADERNO_API_KEY_PATH, every country's tax comes from Quaderno (the sandbox by default); else the table. */
+const QUADERNO = quadernoPricingFromKeyFile({
+  plans: REGISTER_PLANS, keyPath: process.env.MOCK_QUADERNO_API_KEY_PATH, baseUrl: process.env.MOCK_QUADERNO_BASE_URL,
+  log: (line) => process.stderr.write(line)
+});
+
 /**
  * Terms §12, as GET /v1/billing/plans answers: the plans priced for the place asked (?country=, and in the US and
  * Canada ?postal_code=, checked by the kernel's own format as the API does), in that place's currency, each with its
  * total including that place's tax, and no price at all until the place is known.
  */
-function billingPlans(countryParam: string | null, postalParam: string | null) {
+function billingPlans(countryParam: string | null, postalParam: string | null, quaderno?: QuadernoPriced | null) {
   const country = (countryParam ?? "").trim().toUpperCase();
   if (!/^[A-Z]{2}$/u.test(country)) return BILLING_PLANS;
   const currency = priceCurrencyFor(REGISTER_PLANS, country);
@@ -665,6 +672,14 @@ function billingPlans(countryParam: string | null, postalParam: string | null) {
     if (typed === "") return unpriced("POSTAL_CODE_NEEDED");
     if (paymentRegionsOf({ country, postalCode: typed, region: null }).kind === "POSTCODE_INVALID") return unpriced("POSTAL_CODE_INVALID");
     postalCode = country === "US" ? typed.slice(0, 5) : `${typed.slice(0, 3)} ${typed.slice(3)}`;
+  }
+  if (quaderno !== undefined) {
+    // Quaderno's own answer for the place; none yet is no price, as the API's TAX_UNAVAILABLE.
+    if (quaderno === null) return { ...BILLING_PLANS, currency, place: { country, postal_code: postalCode, status: "TAX_UNAVAILABLE" } };
+    return {
+      currency, place: { country, postal_code: postalCode, status: "PRICED" }, tax: quaderno.tax,
+      plans: BILLING_PLANS.plans.map((plan) => ({ ...plan, total_price: quaderno.totals[plan.plan_id as PlanId] }))
+    };
   }
   const rate = country === "US"
     ? (postalCode !== null && /^7[5-9]/u.test(postalCode) ? { name: "Sales tax", basisPoints: 625 } : undefined)
@@ -1429,7 +1444,14 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     return sendDraftable(billingUsage(), C.BillingUsageResponseSchema, stripUsage, issuesOf(usageDraftSchema));
   }
   if (path === "/v1/billing/plans" && isGet) {
-    return sendJson(req, res, 200, billingPlans(url.searchParams.get("country"), url.searchParams.get("postal_code")), C.BillingPlansResponseSchema);
+    const countryParam = url.searchParams.get("country");
+    const postalParam = url.searchParams.get("postal_code");
+    const table = billingPlans(countryParam, postalParam);
+    // With a Quaderno key, a place the table would price is priced by Quaderno instead (MOCK_QUADERNO_API_KEY_PATH).
+    if (QUADERNO === null || table.place.status !== "PRICED") return sendJson(req, res, 200, table, C.BillingPlansResponseSchema);
+    const place = { country: table.place.country!, postalCode: table.place.postal_code };
+    const priced = await QUADERNO(place).catch(() => null);
+    return sendJson(req, res, 200, billingPlans(countryParam, postalParam, priced), C.BillingPlansResponseSchema);
   }
 
   // ---- answers ----
@@ -1614,6 +1636,7 @@ server.listen(PORT, HOST, () => {
     room: roomMode,
     ask: askMode,
     plan: planMode,
+    plans_tax: QUADERNO === null ? "TABLE" : "QUADERNO",
     draft_fields_sent: draftServed(C.AnswerSchema, runs.get(RUN_SETTLED)!.answer, stripAnswer),
     seed_runs: {
       settled: RUN_SETTLED, running: RUN_RUNNING, waiting: RUN_WAITING, failed: RUN_FAILED, story_writing: RUN_STORY_WRITING,

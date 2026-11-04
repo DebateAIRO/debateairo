@@ -15,8 +15,19 @@ export function formatMoney(locale: string, decimal: string, currency: BillingCu
 }
 
 /**
+ * The tax inside a price the API sent with its net ("24.20" and "20.00" give "4.20"), counted in whole cents so no
+ * float rounding can show; null when either is not a plain decimal price or the total is below the net.
+ */
+export function taxInPrice(total: string, net: string): string | null {
+  if (!DECIMAL_PRICE.test(total) || !DECIMAL_PRICE.test(net)) return null;
+  const cents = (decimal: string): number => Number(decimal.replace(".", ""));
+  const tax = cents(total) - cents(net);
+  return tax < 0 ? null : `${Math.trunc(tax / 100)}.${String(tax % 100).padStart(2, "0")}`;
+}
+
+/**
  * Terms §12: "Our prices are shown before tax, as price + VAT". How a plans list's tax stands toward its prices, which
- * are always the net ones. ADDED: the place's tax is added at checkout (a card also names it and the total with it);
+ * are always the net ones. ADDED: the place's tax is added at checkout (a card also shows it apart and the total with it);
  * NONE: that place adds none, so the net prices are final; UNPRICED: no place's tax is known yet (no country, a US or
  * Canadian postal code still needed, or the tax service not answering), so a card says tax is added where it applies.
  * `== null`: an answer without the fields (only a hand-made one: the contract client requires them) is UNPRICED.
