@@ -1,5 +1,5 @@
 import { useEffect, useSyncExternalStore } from "react";
-import type { DigTarget, PendingDig } from "./types";
+import type { DigTarget, PendingDig } from "./types.js";
 
 /*
  * V4 UX fixes (owner picks 3 Nov, dig-d3 B and journey-f21): the digs waiting out their 10-second Undo belong to the
