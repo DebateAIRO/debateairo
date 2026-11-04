@@ -46,6 +46,7 @@ import {
   type ResolvedSelection,
   type Title
 } from "./V4MapTree";
+import { V4FullAnswerFold } from "./V4AnswerCard";
 import { V4DigFailed, type V4FailedDigs } from "./V4DigFailed";
 import { V4DigCompose, V4MoneyLines, type V4DigChoice } from "./V4DigSuggest";
 import { V4MonthPause } from "./V4MonthPause";
@@ -445,29 +446,6 @@ function TrustSection(props: Readonly<{
   );
 }
 
-/**
- * V4 screen review (3 Nov 2026), map-f21: the long answer under "Read the full answer" while the short one is written. It
- * keeps what it was given, so when the short answer arrives (and the long one is no longer the fallback) a reader who
- * opened it goes on reading in the same place; the short answer fills the empty place above it.
- */
-function FullAnswerFold(props: Readonly<{ paragraphs: readonly string[]; catalog: MessageCatalog }>) {
-  const text = props.paragraphs.join("\n\n");
-  const [held, setHeld] = useState(text);
-  useEffect(() => {
-    if (text !== "") setHeld(text);
-  }, [text]);
-  const shown = text !== "" ? text : held;
-  if (shown === "") return null;
-  return (
-    <details className="v4PanelFullAnswer">
-      <summary>{t(props.catalog, "v4.panel.readFullAnswer")}</summary>
-      <div className="v4PanelFallback" data-ai-generated="true">
-        {shown.split("\n\n").map((paragraph, index) => <p key={index} className="v4PanelText">{paragraph}</p>)}
-      </div>
-    </details>
-  );
-}
-
 function RootBody(props: Readonly<{ panel: PanelProps }>) {
   const { panel } = props;
   const { map, catalog } = panel;
@@ -506,7 +484,7 @@ function RootBody(props: Readonly<{ panel: PanelProps }>) {
               </>
             )
             : noStory ? null : <p className="v4Muted">{t(catalog, writing ? "v4.panel.storyWriting" : "v4.panel.storyMissing")}</p>}
-      <FullAnswerFold paragraphs={writing ? fallback : []} catalog={catalog} />
+      <V4FullAnswerFold paragraphs={writing ? fallback : []} catalog={catalog} />
     </>
   );
   return (

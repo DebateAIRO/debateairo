@@ -94,6 +94,8 @@ const notice = (): HTMLElement | null => page().querySelector<HTMLElement>(".v4D
 const noticeNews = (): HTMLElement | null => page().querySelector<HTMLElement>(".v4DigsDidNews");
 const announced = (): string => page().querySelector("p.v4SrOnly[aria-atomic='true']")?.textContent ?? "";
 const tourBar = (): HTMLElement | null => page().querySelector<HTMLElement>(".v4TourBar");
+/** map-d1 (the map track): the answer card above the map. */
+const card = (): HTMLElement => page().querySelector<HTMLElement>(".v4AnswerCard")!;
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -147,8 +149,9 @@ describe("the first arrival is not news (wait-f15, map-f21)", () => {
     harness.answer = answerWith(runId, null);
     harness.story = seed.story(ANSWER_ID, "WRITING", "2026-10-27T15:41:00.000Z") as AnswerStory;
     await mountMap(1600, runId);
-    expect(panel().textContent).toContain(CATALOG["v4.panel.fallbackWriting"]);
-    const fold = panel().querySelector<HTMLDetailsElement>("details.v4PanelFullAnswer")!;
+    // map-d1 (the map track): the answer stands in its card above the map, so the line and the fold are there.
+    expect(card().textContent).toContain(CATALOG["v4.panel.fallbackWriting"]);
+    const fold = card().querySelector<HTMLDetailsElement>("details.v4PanelFullAnswer")!;
     expect(fold.querySelector("summary")!.textContent).toBe(CATALOG["v4.panel.readFullAnswer"]);
     expect(fold.open).toBe(false);
     fold.open = true;
@@ -158,11 +161,11 @@ describe("the first arrival is not news (wait-f15, map-f21)", () => {
     harness.story = seededStory();
     await advance(10_100);
     await settle();
-    expect(panel().querySelector(".v4PanelHeadline")).not.toBeNull();
-    const kept = panel().querySelector<HTMLDetailsElement>("details.v4PanelFullAnswer")!;
+    expect(card().querySelector(".v4AnswerHeadline")).not.toBeNull();
+    const kept = card().querySelector<HTMLDetailsElement>("details.v4PanelFullAnswer")!;
     expect(kept).toBe(fold);
     expect(kept.open).toBe(true);
-    expect(panel().textContent).not.toContain(CATALOG["v4.panel.fallbackWriting"]);
+    expect(card().textContent).not.toContain(CATALOG["v4.panel.fallbackWriting"]);
     expect(notice()).toBeNull();
     expect(note()).toBeNull();
     expect(page().querySelector(".v4MapNew")).toBeNull();
@@ -194,7 +197,8 @@ describe("a dig finishing while the person is here (dig-f3, journey-f10, journey
     expect(note()!.textContent).toContain(sentence);
     expect(announced()).toBe(sentence);
     expect(tabPrefix()).toBe(word("v4.ready.tab.changed.one", { count: 1 }));
-    expect(branch(PATHS.renew).querySelector(".v4MapNew")).not.toBeNull();
+    // map-d5 (the map track): a path's news mark is its result tag ("Added to"); the New dot only when it has none.
+    expect(branch(PATHS.renew).querySelector(".v4MapNew, .v4ResultTag")).not.toBeNull();
     // journey-f10: the list says what the dig made of the path.
     expect([...notice()!.querySelectorAll(".v4DigsDidList li")].map((item) => item.textContent))
       .toEqual([word("v4.digsDid.line.ADDED_TO", { line: RENEW_LINE })]);
@@ -208,7 +212,7 @@ describe("a dig finishing while the person is here (dig-f3, journey-f10, journey
     expect(notice()!.querySelector(".v4DigsDidList")).not.toBeNull();
     expect(note()).toBeNull();
     expect(tabPrefix()).toBeNull();
-    expect(branch(PATHS.renew).querySelector(".v4MapNew")).toBeNull();
+    expect(branch(PATHS.renew).querySelector(".v4MapNew, .v4ResultTag")).toBeNull();
   });
 
   it("two digs finishing together are one note, which opens the tour with its pinned \"Next change › · Done\"", async () => {
@@ -310,7 +314,7 @@ describe("the main answer rewritten after a dig (dig-f1)", () => {
     expect(page().textContent).not.toContain("The rewritten main answer.");
     await advance(1_100);
     await settle(200);
-    expect(page().querySelector(".v4MainAnswer")!.textContent).toContain("The rewritten main answer.");
+    expect(card().textContent).toContain("The rewritten main answer.");
     expect(noticeNews()!.textContent).toContain(CATALOG["v4.digsDid.news.ANSWER"]);
     expect(note()!.textContent).toContain(CATALOG["v4.digsDid.news.ANSWER"]);
     // Nothing is being written any more, so the reads stop.
@@ -377,7 +381,7 @@ describe("the report's ready moment (journey-f17)", () => {
     expect(link.getAttribute("href")).toBe(`/v4/debate/${runId}/report?level=background`);
     expect(tabPrefix()).toBe(CATALOG["v4.ready.tab.ready"]);
     expect(page().querySelector(".v4DebRail .v4MapNew")).not.toBeNull();
-    // The panel's answer is the report's now.
-    expect(panel().textContent).toContain("The report's answer.");
+    // The answer above the map is the report's now (map-d1, map-f2: the newest version is the current one).
+    expect(card().textContent).toContain("The report's answer.");
   });
 });

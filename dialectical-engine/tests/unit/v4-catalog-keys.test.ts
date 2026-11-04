@@ -379,8 +379,10 @@ describe("the owner's 3 Nov screen review", () => {
     expect(Object.entries(catalog).filter(([, value]) => /allowance/iu.test(value))).toEqual([]);
     const shares = ["v4.header.used.PERSON_DAY", "v4.header.used.PERSON_WEEK", "v4.header.used.PERSON_MONTH", "v4.header.used.PERSON_GRANT",
       "v4.panel.modeHint.thorough", "v4.money.borrowed.PERSON_DAY", "v4.money.borrowed.PERSON_WEEK",
-      "v4.money.startsWait.PERSON_MONTH", "v4.money.paused", "v4.money.pausedReady"];
+      "v4.money.startsWait.PERSON_MONTH", "v4.money.paused"];
     for (const key of shares) expect(catalog[key], key).toMatch(/\bquota\b/u);
+    // wait-f5 (fail-pause track): after the reset the pause block says only "Your new month has started." with Continue.
+    expect(catalog["v4.money.pausedReady"]).toBe("Your new month has started.");
   });
 
   it("wait-f3 / map-f3: no wait names a figure before it is measured, and the question's wait says where to find it", () => {
@@ -388,11 +390,17 @@ describe("the owner's 3 Nov screen review", () => {
       expect(catalog[key], key).not.toMatch(/\d|minute|hour|usually|few/iu);
       expect(catalog[key], key).toMatch(/This takes a while\./u);
     }
-    expect(catalog["v4.debate.usually"]).toContain(`“${catalog["v4.recent.title"]}”`);
+    // ask-d5 B (the step-1 track): the list on the first page is "Your maps" now.
+    expect(catalog["v4.debate.usually"]).toContain(`“${catalog["v4.maps.title"]}”`);
   });
 
   it("wait-f20: 'Paused' is the month wall's word only", () => {
     const paused = Object.entries(catalog).filter(([, value]) => /\bpaused\b/iu.test(value)).map(([key]) => key).sort();
-    expect(paused).toEqual(["v4.debate.state.PAUSED_MONTH", "v4.money.paused", "v4.money.pausedReady", "v4.rewrite.digCard.PAUSED"].sort());
+    // Every one of these is the month's quota (fail-pause's dig card, phone bar and rail words; the waiting card's state words).
+    expect(paused).toEqual([
+      "v4.debate.state.PAUSED_MONTH", "v4.money.paused", "v4.pause.digCard", "v4.pause.phoneBar", "v4.rail.digsPaused.one",
+      "v4.rail.digsPaused.other", "v4.rewrite.digCard.PAUSED", "v4.state.PAUSED", "v4.state.PAUSED.noDate"
+    ].sort());
+    expect(catalog["v4.state.SHORT_BREAK"]).not.toMatch(/\bpaused\b/iu);
   });
 });

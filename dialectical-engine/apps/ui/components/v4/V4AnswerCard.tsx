@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import type { AnswerMainAnswer } from "@debateai/contract";
 import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
 import { cardLabel } from "@/lib/v4/mapLooks";
@@ -65,6 +65,30 @@ export function answerVersions(input: Readonly<{
   return [...later.sort((a, b) => time(b.at) - time(a.at) || rank[b.kind] - rank[a.kind]), first!];
 }
 
+/**
+ * V4 screen review (3 Nov 2026), map-f21: the long answer under "Read the full answer" while the short one is written. It
+ * keeps what it was given, so when the short answer arrives (and the long one is no longer the fallback) a reader who
+ * opened it goes on reading in the same place; the short answer fills the empty place above it. Shared by the answer card
+ * above the map (map-d1) and the panel of "Your question" when the card is not shown.
+ */
+export function V4FullAnswerFold(props: Readonly<{ paragraphs: readonly string[]; catalog: MessageCatalog }>) {
+  const text = props.paragraphs.join("\n\n");
+  const [held, setHeld] = useState(text);
+  useEffect(() => {
+    if (text !== "") setHeld(text);
+  }, [text]);
+  const shown = text !== "" ? text : held;
+  if (shown === "") return null;
+  return (
+    <details className="v4PanelFullAnswer">
+      <summary>{t(props.catalog, "v4.panel.readFullAnswer")}</summary>
+      <div className="v4PanelFallback" data-ai-generated="true">
+        {shown.split("\n\n").map((paragraph, index) => <p key={index} className="v4PanelText">{paragraph}</p>)}
+      </div>
+    </details>
+  );
+}
+
 /** The first answer's words: the story's short answer, else the whole composed answer (DATA-2). */
 function FirstAnswer(props: Readonly<{ map: V4Map; catalog: MessageCatalog; lead: boolean }>) {
   const { map, catalog } = props;
@@ -73,8 +97,8 @@ function FirstAnswer(props: Readonly<{ map: V4Map; catalog: MessageCatalog; lead
   const fallback = (map.fallbackText ?? "").split(/\n\s*\n/).map((paragraph) => paragraph.trim()).filter((paragraph) => paragraph.length > 0);
   const writing = map.storyState === "WRITING";
   const noStory = map.storyState === "NONE";
-  if (headline.length > 0 || summary.length > 0) {
-    return (
+  const words = headline.length > 0 || summary.length > 0
+    ? (
       <>
         <div data-ai-generated="true">
           {headline.length > 0 ? <p className={props.lead ? "v4AnswerHeadline v4Serif" : "v4AnswerText"}>{headline}</p> : null}
@@ -82,19 +106,27 @@ function FirstAnswer(props: Readonly<{ map: V4Map; catalog: MessageCatalog; lead
         </div>
         {map.reservation ? <p className="v4AnswerNote v4Muted">{t(catalog, "v4.story.reservation")}</p> : null}
       </>
-    );
-  }
-  if (fallback.length > 0) {
-    return (
-      <>
-        <div className="v4AnswerFallback" data-ai-generated="true">
-          {fallback.map((paragraph, index) => <p key={index} className="v4AnswerText">{paragraph}</p>)}
-        </div>
-        {noStory ? null : <p className="v4AnswerNote v4Muted">{t(catalog, writing ? "v4.panel.fallbackWriting" : "v4.panel.fallbackMissing")}</p>}
-      </>
-    );
-  }
-  return noStory ? null : <p className="v4Muted">{t(catalog, writing ? "v4.panel.storyWriting" : "v4.panel.storyMissing")}</p>;
+    )
+    : fallback.length > 0 && writing
+      // map-f21 / wait-f9 (the ready-digs track): while the short answer is written, one line says so and the long answer
+      // waits under "Read the full answer" (below), so nothing swaps under the reader's eyes.
+      ? <p className="v4AnswerNote v4Muted">{t(catalog, "v4.panel.fallbackWriting")}</p>
+      : fallback.length > 0
+        ? (
+          <>
+            <div className="v4AnswerFallback" data-ai-generated="true">
+              {fallback.map((paragraph, index) => <p key={index} className="v4AnswerText">{paragraph}</p>)}
+            </div>
+            {noStory ? null : <p className="v4AnswerNote v4Muted">{t(catalog, "v4.panel.fallbackMissing")}</p>}
+          </>
+        )
+        : noStory ? null : <p className="v4Muted">{t(catalog, writing ? "v4.panel.storyWriting" : "v4.panel.storyMissing")}</p>;
+  return (
+    <>
+      {words}
+      <V4FullAnswerFold paragraphs={writing ? fallback : []} catalog={catalog} />
+    </>
+  );
 }
 
 function Segments(props: Readonly<{ segments: readonly string[]; lead: boolean }>) {

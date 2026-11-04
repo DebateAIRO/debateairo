@@ -196,7 +196,8 @@ describe("a dig paused at the month wall (wait-f2, public-f16, public-f17)", () 
     expect(card.querySelector(".v4PauseDot")).not.toBeNull();
     const rail = page().querySelector(".v4DebRail")!.textContent ?? "";
     expect(rail).toContain(word("v4.rail.digsPaused.one", { count: 1 }));
-    expect(rail).toContain(word("v4.rail.digsRunning.other", { count: 0 }));
+    // map-f28 (the map track): the rounds name their state instead of counting digs; a paused dig is not "looking into it".
+    expect(rail).not.toContain(word("v4.rail.digsRunning.one", { count: 1 }));
     await openDig(PATHS.mix);
     expect(panel().textContent).toContain(word("v4.money.paused", { date }));
     expect(panel().textContent).toContain(word("v4.pause.continuesOn", { date: day }));

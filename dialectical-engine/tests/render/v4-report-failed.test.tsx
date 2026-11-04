@@ -38,6 +38,13 @@ function links(name: string): string[] {
   return [...(host?.querySelectorAll("a") ?? [])].filter((link) => link.textContent?.trim() === name).map((link) => link.getAttribute("href") ?? "");
 }
 
+/** The report's own header (t4 report track): its back link's words and address. */
+function headerBack(): { text: string; href: string } | null {
+  const back = host?.querySelector<HTMLAnchorElement>("a.v4RepHdrBack");
+  return back === null || back === undefined ? null
+    : { text: back.querySelector(".v4RepHdrBackText")?.textContent ?? "", href: back.getAttribute("href") ?? "" };
+}
+
 function run(runId: string, state: RunProjection["state"]): RunProjection {
   return { run_ref: runId, question_line: "Will AI tutors replace homework help?", state,
     terminal_reason: state === "FAILED" ? "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM" : null, hold_until: null };
@@ -62,7 +69,9 @@ describe("the report page of a debate that did not finish (map-f30)", () => {
     harness.run = run(runId, "FAILED");
     await mountReport(runId);
     expect(host!.textContent).toContain(CATALOG["v4.report.failed"]);
-    expect(links(CATALOG["v4.report.backToQuestion"]!)).toEqual([`/v4/debate/${runId}?level=background`, `/v4/debate/${runId}?level=background`]);
+    // Under the line, and in the report's own header (t4: V4ReportHeader's arrow link).
+    expect(links(CATALOG["v4.report.backToQuestion"]!)).toEqual([`/v4/debate/${runId}?level=background`]);
+    expect(headerBack()).toEqual({ text: CATALOG["v4.report.backToQuestion"], href: `/v4/debate/${runId}?level=background` });
     expect(links(CATALOG["v4.report.backToMap"]!)).toEqual([]);
     // report-f10 (t4 report track): Ask a new question, and the classic view only as the small link under it.
     expect(links(CATALOG["v4.debate.askNew"]!)).toEqual(["/v4?level=background"]);
@@ -74,7 +83,8 @@ describe("the report page of a debate that did not finish (map-f30)", () => {
     harness.run = run(runId, "RUNNING");
     await mountReport(runId);
     expect(host!.textContent).toContain(CATALOG["v4.report.notReady"]);
-    expect(links(CATALOG["v4.report.backToMap"]!).length).toBe(2);
+    expect(links(CATALOG["v4.report.backToMap"]!).length).toBe(1);
+    expect(headerBack()?.text).toBe(CATALOG["v4.report.backToMap"]);
     expect(links(CATALOG["v4.report.backToQuestion"]!)).toEqual([]);
   });
 });

@@ -34,6 +34,8 @@ const selectedCard = (): string | null => page().querySelector(".v4MapPath[aria-
 const pathTitleAt = (index: number): string => branch(index).querySelector(".v4MapPathTitle")!.textContent!;
 const panelHeading = (): string => panel().querySelector(".v4PanelH2")?.textContent ?? "";
 const panelBoxes = (): HTMLInputElement[] => [...panel().querySelectorAll<HTMLInputElement>(".v4Sugs input[type=checkbox]")];
+/** journey-f23 (w1-wait-card): the tray shows the picks as chips, never as "N picked". */
+const trayChips = (): HTMLElement[] => [...(tray()?.querySelectorAll<HTMLElement>(".v4ChoiceChip") ?? [])];
 
 /** What the browser does on Back or Forward: the address becomes `href`, then popstate. */
 async function traverseTo(href: string): Promise<void> {
@@ -136,14 +138,14 @@ describe("picks and typed words are not lost (dig-f23)", () => {
     await click(buttonNamed(CATALOG["v4.suggest.ownView"]!, panel()));
     await typeInto(panel().querySelector<HTMLTextAreaElement>(".v4SugEditor textarea")!, "My private view about my street");
     await click(buttonNamed(CATALOG["v4.suggest.ownViewAdd"]!, panel()));
-    expect(tray()?.textContent).toContain(CATALOG["v4.dig.trayPicked.other"]!.replace("{count}", "2"));
+    expect(trayChips()).toHaveLength(2);
     expect(window.location.href).not.toMatch(/private|street/iu);
     expect(params().getAll("pick")).toEqual(ticks);
     const search = window.location.search;
     await unmountMap();
     harness.search = search;
     await mountMap();
-    expect(tray()?.textContent).toContain(CATALOG["v4.dig.trayPicked.one"]!.replace("{count}", "1"));
+    expect(trayChips()).toHaveLength(1);
     expect(panelBoxes().filter((box) => box.checked)).toHaveLength(1);
   });
 
@@ -212,7 +214,7 @@ describe("picks and typed words are not lost (dig-f23)", () => {
     expect(text()).toContain(CATALOG["v4.dig.picksCleared"]);
     expect(params().getAll("pick")).toEqual([]);
     await click(page().querySelector<HTMLButtonElement>(".v4PicksClearedUndo")!);
-    expect(tray()?.textContent).toContain(CATALOG["v4.dig.trayPicked.other"]!.replace("{count}", "2"));
+    expect(trayChips()).toHaveLength(2);
     expect(params().getAll("pick")).toHaveLength(2);
     expect(text()).not.toContain(CATALOG["v4.dig.picksCleared"]);
     // Cleared again: after 10 seconds the offer ends and the picks stay cleared.

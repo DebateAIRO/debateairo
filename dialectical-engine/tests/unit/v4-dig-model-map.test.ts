@@ -173,7 +173,8 @@ describe("the reads", () => {
     expect(view.points!.length).toBeGreaterThan(0);
     expect(reads.calls.some((call) => call.startsWith("readAnswerStory"))).toBe(false);
     const paused = await loadDigView(link, client({}, run("RUNNING", { month_pause: { until: "2026-11-01T00:00:00.000Z", can_continue: false } })));
-    expect(paused).toEqual({ link, state: "RUNNING", headline: null, counts: null, pausedUntil: "2026-11-01T00:00:00.000Z" });
+    // Owner review 3 Nov (wait-f2): the view keeps whether the server says it may continue now.
+    expect(paused).toEqual({ link, state: "RUNNING", headline: null, counts: null, pausedUntil: "2026-11-01T00:00:00.000Z", canContinue: false });
   });
 
   it("loadAnswer reads the run's answer again, and never throws", async () => {
