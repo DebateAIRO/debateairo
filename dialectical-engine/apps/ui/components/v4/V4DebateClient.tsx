@@ -38,6 +38,7 @@ import { V4MonthPause } from "@/components/v4/V4MonthPause";
 import { V4PausedScreen } from "@/components/v4/V4PausedScreen";
 import { V4Rail, type V4DigCounts } from "@/components/v4/V4Rail";
 import { useV4Ready } from "@/components/v4/useV4Ready";
+import { useMapReport } from "@/components/v4/useMapReport";
 import { isNotFound } from "@/lib/api";
 import type { AskRoom } from "@/lib/billing/room";
 import { isSignedOut, signInHrefHere } from "@/lib/signInWayBack";
@@ -50,7 +51,6 @@ import {
   firstAnswerArriving, laterNewsOnly, mainAnswerItems, mainAnswerWriting, pathResults, pathsChangedSinceReport, stopsOfChanges, unseenIdsOf,
   visitItemsToKeep
 } from "@/lib/v4/readyMoment";
-import { useReportVersions } from "@/lib/v4/useReportVersions";
 import { effectiveDigMode } from "@/lib/v4/askConfig";
 import { digRetryOf, retryPending } from "@/lib/v4/digRetry";
 import { askAgainHref } from "@/lib/v4/failedRun";
@@ -909,9 +909,17 @@ function V4Debate({
   }, [trailKey]);
 
   // ── The report's answer (R22 W5-1, owner Q-D11), and its ready moment (journey-f17) ─────────────────────────────
+  // V4 screen review (3 Nov 2026), report-d1 / report-d2 / report-f15: the report is asked for and waited for on the map,
+  // the first question's report on a dig's map too (components/v4/useMapReport.tsx).
   const isDig = servedDig !== null;
   const reportReady = useRef<() => void>(() => undefined);
-  const reportAnswer = useReportVersions(servedRunId, isDig, () => reportReady.current());
+  const barJobRef = useRef<HTMLElement | null>(null);
+  const report = useMapReport({
+    runId, servedRunId, isDig, answer: served?.answer,
+    free: map?.webNote === "FREE" || planTier === "free", sharesShown: planTier !== "free",
+    digsKey: linkKey, level: chosenLevel, onReady: () => reportReady.current(), barJobRef, catalog, locale
+  });
+  const reportAnswer = report.answer;
 
   // ── Selection ───────────────────────────────────────────────────────────────────────────────────────────────────
   // W4-6: a link back from a dig names the path it dug (`?path=`); the panel opens there (a path gone: the question).
@@ -1015,8 +1023,9 @@ function V4Debate({
 
   /** Puts a dig in its 10 seconds, in the site-wide list (a dig pressed here, or a failed dig tried again, dig-f12). */
   const queueDig = useCallback((dig: PendingDig): void => {
-    // W3-4: nothing is dug from the deepest level (the page offers no button there; this holds it).
-    if (map === null || !canDig || servedRunId === null || servedQuestionLine === null) return;
+    // W3-4: nothing is dug from the deepest level (the page offers no button there; this holds it). report-d2: nor while
+    // the report waits for digs or is written (its buttons rest).
+    if (map === null || !canDig || servedRunId === null || servedQuestionLine === null || report.digsRest) return;
     // One waiting dig per place: its buttons say it is starting, with its Undo, instead of starting a second one. The live
     // list is read (not this render's copy), so a quick second press never starts a second dig.
     if (waitingDigFor(readDigUndo(), servedRunId, dig.target) !== null) return;
@@ -1032,7 +1041,7 @@ function V4Debate({
       send: (waiting) => sendRef.current(waiting, parentRunId, parentQuestionLine),
       failedLine: t(catalog, "v4.dig.failed")
     });
-  }, [map, canDig, servedRunId, servedQuestionLine, aboveRunIds, ask.room, planTier, catalog]);
+  }, [map, canDig, servedRunId, servedQuestionLine, aboveRunIds, ask.room, planTier, catalog, report.digsRest]);
 
   const startDig = useCallback((target: DigTarget): void => {
     queueDig({ target, mode: sentDigMode, sendsAt: Date.now() + UNDO_MS });
@@ -1116,7 +1125,6 @@ function V4Debate({
 
   // journey-d3 / dig-f16: this page draws the dig notes in its own bottom stack once its map shows.
   useClaimDigNotes(map !== null);
-  const barJobRef = useRef<HTMLElement | null>(null);
 
   // ── A dig that did not finish (owner review 3 Nov, dig-f12/wait-f18): its reason, and "Try this dig again" ──────────
   // The digs this visit sends are remembered as sent (memory only), so a retry digs exactly the same picks; the retry goes
@@ -1297,7 +1305,8 @@ function V4Debate({
   }, [unseenKey, lastVisit.status, servedRunId, scheduleVisitSave]);
 
   // ── The ready moments and the changes tour (V4 screen review, 3 Nov 2026: journey-f17, wait-f4, dig-f3, dig-f18) ──
-  const reportHref = levelHref(`/v4/debate/${encodeURIComponent(runId)}/report`, chosenLevel);
+  // report-f9: every report link leads to the first question's report.
+  const reportHref = report.href;
   const ready = useV4Ready({
     map,
     waiting: map === null && load?.kind === "RUN" && load.run.state !== "FAILED",
@@ -1379,7 +1388,7 @@ function V4Debate({
     select(next.selection, false);
     if (next.n > 0) flashPosition({ n: next.n, total: next.total });
   }, [shownMap, digs, shownSelection, select, flashPosition]));
-  const moment = map === null ? null : reportMoment(map, digs, firstStarId);
+  const moment = map === null || !report.momentAllowed ? null : reportMoment(map, digs, firstStarId);
 
   // ── Layout ──────────────────────────────────────────────────────────────────────────────────────────────────────
   const classicHref = `/debate/${encodeURIComponent(runId)}`;
@@ -1399,15 +1408,10 @@ function V4Debate({
       onReadingLevel={chooseLevel}
       classicHref={waitingCard ? null : classicHref}
     >
-      {served !== null ? (
-        // W3-4: "Write my report" is always there once the answer is served (the owner's money rule keeps it possible).
-        // map-f15: it is the page's one report button; dig-f29's "Good time" is a small mark on it, with the words.
-        <Link className={`v4Btn v4BtnPrimary v4DebReportLink${moment === "GOOD" ? " v4DebReportGood" : ""}`} href={reportHref}>
-          {moment === "GOOD" ? <span className="v4DebReportMark" aria-hidden="true" /> : null}
-          {t(catalog, "v4.rail.writeReport")}
-          {moment === "GOOD" ? <span className="v4SrOnly">{` · ${t(catalog, "v4.rail.goodTimeTitle")}`}</span> : null}
-        </Link>
-      ) : null}
+      {/* W3-4: "Write my report" is always there once the answer is served (the owner's money rule keeps it possible).
+          map-f15: it is the page's one report button; dig-f29's "Good time" is a small mark on it, with the words.
+          report-d1: while a report can be asked for, it opens the short strip in its place. */}
+      {served !== null ? report.headerItem(moment === "GOOD") : null}
     </V4Header>
   );
 
@@ -1516,7 +1520,10 @@ function V4Debate({
   // dig-f17 / dig-f29 (the map track): the slim report line follows the page's report moment, the corrected rule.
   const goodTime = moment === "GOOD";
   // journey-d3: the pinned bar's one job. A place whose dig waits has its Undo in the note above the bar instead.
-  const phoneJob: V4BarJob = phoneTarget !== null
+  // report-d2: while the report waits or is written, the bar says so where the dig button lives (digging rests).
+  const phoneJob: V4BarJob = report.barStatus !== null
+    ? { kind: "status", ...report.barStatus }
+    : phoneTarget !== null
     ? waitingDigFor(waitingDigs, servedRunId, phoneTarget.target) === null
       ? { kind: "dig", label: barDigLabel(phoneTarget, shareFor(phoneTarget.target, draft, room), catalog), onDig: () => startDig(phoneTarget.target) }
       : { kind: "none" }
@@ -1533,6 +1540,8 @@ function V4Debate({
       usageNotes={borrowLines(borrowed)}
       moment={moment}
       reportReady={ready.reportDot}
+      {...(report.rail === undefined ? {} : { report: report.rail })}
+      reportHref={reportHref}
       catalog={catalog}
       locale={locale}
     />
@@ -1603,6 +1612,7 @@ function V4Debate({
           <button
             type="button"
             className="v4Btn v4BtnPrimary"
+            disabled={report.digsRest}
             onClick={() => startDig(trayTarget)}
           >
             {trayTarget.picks.length >= 2
@@ -1614,6 +1624,7 @@ function V4Debate({
           {t(catalog, "v4.dig.trayClear")}
         </button>
       </div>
+      {withDig && report.digsRest ? <p className="v4DebTrayHint v4Muted" data-dig-rest="">{report.restReason}</p> : null}
     </section>
   ) : null);
   const tray = trayOf(true);
@@ -1680,6 +1691,8 @@ function V4Debate({
           ) : null}
           <V4ContributionNote contribution={served?.answer.contribution} catalog={catalog} />
           {answerCard}
+          {/* report-d2: the report waiting for digs, being written or not written, in the shared waiting card. */}
+          {report.waitCard}
           {/* dig-f19 / map-f17: once a report exists and the map moved on, the paths it does not have yet, named. */}
           <V4ChangedSince
             changedSince={map.changedSince}
@@ -1743,6 +1756,7 @@ function V4Debate({
                 onDig={startDig}
                 // dig-d3: other dig buttons stay active while a dig waits; the place being dug says it is starting.
                 digBusy={false}
+                digRest={report.digsRest ? report.restReason : null}
                 digStarting={(target) => {
                   const entry = waitingDigFor(waitingDigs, servedRunId, target);
                   return entry === null ? null : <V4DigStartingLine entry={entry} onUndo={undoDig} catalog={catalog} />;
@@ -1786,6 +1800,8 @@ function V4Debate({
           job={phoneJob}
           goodTime={goodTime}
           reportHref={reportHref}
+          {...(report.writeFromBar === undefined ? {} : { onWriteReport: report.writeFromBar })}
+          strip={layout === "phone" ? report.bottomStrip : null}
           catalog={catalog}
         />
       )}

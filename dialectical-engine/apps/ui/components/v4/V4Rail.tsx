@@ -71,9 +71,30 @@ type RailProps = Readonly<{
    * step carries the "New" dot until it is.
    */
   reportReady?: boolean;
+  /**
+   * V4 screen review (3 Nov 2026), report-d2: the report waits for digs, is being written ("Being written · Started 14:02",
+   * with the working dot) or could not be written; its step says so. Absent: nothing waits.
+   */
+  report?: V4RailReport;
+  /** report-f9: the first question's report page (a dig's map links there too). Absent: this debate's own, as before. */
+  reportHref?: string;
   catalog: MessageCatalog;
   locale: string;
 }>;
+
+/** report-d2: the "Your report" step's state line, in the shared state words (lib/v4/stateWords.ts), and whether it works. */
+export type V4RailReport = Readonly<{ text: string; working: boolean }>;
+
+function ReportState(props: Readonly<{ report: V4RailReport | undefined }>) {
+  const { report } = props;
+  if (report === undefined) return null;
+  return (
+    <span className="v4DebRailNote v4DebRailReportState" data-report-state="">
+      {report.working ? <span className="v4WaitDot v4WaitDot-PULSE" aria-hidden="true" /> : null}
+      {report.text}
+    </span>
+  );
+}
 
 function Steps(props: Readonly<{ rail: RailProps; reportHref: string; marksOnly: boolean }>) {
   const { showReadStep, catalog } = props.rail;
@@ -104,15 +125,23 @@ function Steps(props: Readonly<{ rail: RailProps; reportHref: string; marksOnly:
       {props.marksOnly ? (
         <li className="v4DebRailStep">
           <Link className="v4DebRailMarkLink" href={props.reportHref}>
-            <span className="v4DebRailMark" aria-hidden="true">○</span>
-            <span className="v4SrOnly">{t(catalog, "v4.rail.stepReport")}</span>
+            <span className="v4DebRailMark" aria-hidden="true">
+              {props.rail.report?.working === true ? <span className="v4WaitDot v4WaitDot-PULSE" /> : "○"}
+            </span>
+            <span className="v4SrOnly">
+              {t(catalog, "v4.rail.stepReport")}
+              {props.rail.report === undefined ? null : ` · ${props.rail.report.text}`}
+            </span>
           </Link>
         </li>
       ) : (
         <li className="v4DebRailStep">
           <span className="v4DebRailMark" aria-hidden="true">{mapStep + 1}</span>
-          <Link className="v4Link" href={props.reportHref}>{t(catalog, "v4.rail.stepReport")}</Link>
-          {props.rail.reportReady === true ? <NewDot catalog={catalog} /> : null}
+          <span>
+            <Link className="v4Link" href={props.reportHref}>{t(catalog, "v4.rail.stepReport")}</Link>
+            {props.rail.reportReady === true ? <NewDot catalog={catalog} /> : null}
+            <ReportState report={props.rail.report} />
+          </span>
         </li>
       )}
     </ol>
@@ -202,7 +231,7 @@ function ReportNote(props: Readonly<{ rail: RailProps }>) {
 
 export function V4Rail(props: RailProps) {
   const { runId, level, variant, catalog } = props;
-  const reportHref = levelHref(`/v4/debate/${encodeURIComponent(runId)}/report`, level);
+  const reportHref = props.reportHref ?? levelHref(`/v4/debate/${encodeURIComponent(runId)}/report`, level);
   if (variant === "marks" || variant === "steps") {
     return (
       <nav className={`v4DebRail v4DebRail-${variant}`} aria-label={t(catalog, "v4.rail.label")}>

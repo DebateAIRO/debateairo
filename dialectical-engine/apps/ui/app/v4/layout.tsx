@@ -9,6 +9,7 @@ import "./v4-map.css";
 import "./v4-debate.css";
 import "./v4-wait.css";
 import "./v4-report.css";
+import "./v4-report-map.css";
 import "./v4-map-looks.css";
 import "./v4-undo.css";
 
