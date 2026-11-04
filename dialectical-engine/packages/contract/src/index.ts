@@ -21,7 +21,10 @@ import { StartCheckSchema, StartPathsSchema } from "./start-paths.js";
 export * from "./path-outcome.js";
 // V4 start step, Task 16: Answer.branches, the run read's and the public snapshot's paths.
 export * from "./branches.js";
-import { AnswerBranchesSchema, PublicBranchesSchema } from "./branches.js";
+import { ANSWER_BRANCH_LIMITS, AnswerBranchesSchema, PublicBranchesSchema } from "./branches.js";
+// V4 start step, Task 57a: the run read's progress of each path and the carry-on part.
+export * from "./run-paths.js";
+import { CARRY_ON_PARTS, RunPathProgressSchema } from "./run-paths.js";
 import { SessionSchema, LegalDocumentPairSchema } from "./auth-shared.js";
 export * from "./auth-shared.js";
 import { ConsumerAuthenticationCredentialSchema, consumerAuthContractSchemas } from "./consumer-auth.js";
@@ -998,7 +1001,11 @@ export const RunProjectionSchema = z.object({
   // Decision 12: only on a debate that an update set aside: what the AIs found stays readable.
   found: z.array(RunFoundPageSchema).max(64).optional(),
   // V4 start step, Task 16: a path debate's paths as they stand while it runs; absent on every R22 run.
-  branches: AnswerBranchesSchema.optional()
+  branches: AnswerBranchesSchema.optional(),
+  // V4 start step, Task 57a (./run-paths.ts), last: each path's step line, dots and findings, in the paths' order ([] while the AIs
+  // are still choosing the paths), and the part a carry-on debate is running. Both absent on every R22 run.
+  path_progress: z.array(RunPathProgressSchema).max(ANSWER_BRANCH_LIMITS.pathsMax).optional(),
+  carry_on_part: z.enum(CARRY_ON_PARTS).optional()
 }).strict().superRefine((run, context) => {
   if (run.found !== undefined && run.state !== "FAILED") {
     context.addIssue({ code: "custom", message: "only a debate that stopped lists what was found so far" });
@@ -1020,6 +1027,23 @@ export const RunProjectionSchema = z.object({
   }
   if ((run.state === "WAITING") !== (run.waits_until !== undefined && run.waits_until !== null)) {
     context.addIssue({ code: "custom", message: "WAITING requires waits_until and other states forbid it" });
+  }
+  // V4 start step, Task 57a: the progress follows the paths one for one; none while the paths are being chosen; the carry-on part
+  // only on a path debate whose carry-on box is ticked.
+  const progress = run.path_progress;
+  const paths = run.branches?.paths;
+  if (progress !== undefined && paths !== undefined
+    && (progress.length !== paths.length || progress.some((entry, index) => entry.path_id !== paths[index]?.path_id))) {
+    context.addIssue({ code: "custom", path: ["path_progress"], message: "the paths and their progress name the same paths" });
+  }
+  if (progress !== undefined && progress.length === 0 && run.branches !== undefined) {
+    context.addIssue({ code: "custom", path: ["path_progress"], message: "a path debate still choosing its paths has none to show" });
+  }
+  if (run.carry_on_part !== undefined && progress === undefined) {
+    context.addIssue({ code: "custom", path: ["carry_on_part"], message: "only a path debate carries the carry-on part" });
+  }
+  if (run.carry_on_part !== undefined && run.branches?.carry_on_to_report !== true) {
+    context.addIssue({ code: "custom", path: ["carry_on_part"], message: "the carry-on part needs the box ticked" });
   }
 });
 export type RunProjection = z.infer<typeof RunProjectionSchema>;
@@ -1826,7 +1850,10 @@ export const AnswerSchema = z.object({
   purpose_lines: PurposeLinesSchema.optional(),
   contribution: AnswerContributionSchema.optional(),
   // V4 start step, Task 16: a path debate's paths (each its own branch); absent on every R22 answer.
-  branches: AnswerBranchesSchema.optional()
+  branches: AnswerBranchesSchema.optional(),
+  // V4 start step, Task 57a (./run-paths.ts), last: the part a carry-on debate is running once its answer is served (digs, then the
+  // report); absent on every R22 answer.
+  carry_on_part: z.enum(CARRY_ON_PARTS).optional()
 }).strict().superRefine((answer, context) => {
   // W1-6: the server's checked flag stands only on a looked-up point whose locator is one of its own sources.
   for (const node of answer.nodes) {
@@ -1843,6 +1870,10 @@ export const AnswerSchema = z.object({
   }
   if (answer.verdict_unavailable !== null && answer.confidence_band !== null) {
     context.addIssue({ code: "custom", message: "an unavailable verdict cannot carry a confidence band" });
+  }
+  // V4 start step, Task 57a: the carry-on part only on a path debate whose carry-on box is ticked.
+  if (answer.carry_on_part !== undefined && answer.branches?.carry_on_to_report !== true) {
+    context.addIssue({ code: "custom", path: ["carry_on_part"], message: "the carry-on part needs the box ticked" });
   }
 });
 export type Answer = z.infer<typeof AnswerSchema>;
