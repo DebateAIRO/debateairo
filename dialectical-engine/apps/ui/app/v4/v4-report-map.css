@@ -17,8 +17,15 @@
 .v4RepStripActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: 2px; }
 .v4RepStripNotYet { min-height: 44px; font-size: var(--t-ui); font-weight: 600; }
 .v4RepStrip .v4RepDigWait { margin: 0; }
-/* In the top bar: its own row at the end side, as wide as a short paragraph. */
-.v4RepStrip-top { flex: 1 1 100%; width: min(30rem, 100%); max-width: 30rem; margin-inline-start: auto; }
+/* In the top bar: its own row at the end side, as wide as a short paragraph. The browser check (4 Nov): its long lines
+   made the bar's right side as wide as all of them together, so the level menu, the share and the account button left the
+   brand's row and the strip sat between them. Its own width no longer counts (contain), so they keep their row, and it comes
+   after them (order), under them at the end side; the bar's items keep to its top. */
+.v4RepStrip-top {
+  flex: 1 1 100%; order: 1; contain: inline-size; width: min(30rem, 100%); max-width: 30rem; margin-inline-start: auto;
+}
+.v4Hdr:has(> .v4HdrRight > .v4RepStrip-top) { align-items: flex-start; }
+.v4HdrRight:has(> .v4RepStrip-top) { justify-content: flex-end; }
 /* In the phone's pinned bar: full width, "Write it" 48 px tall across it, "Not yet" under it. */
 .v4RepStrip-bottom { width: 100%; }
 .v4RepStrip-bottom .v4RepStripActions { flex-direction: column; align-items: stretch; gap: 4px; }

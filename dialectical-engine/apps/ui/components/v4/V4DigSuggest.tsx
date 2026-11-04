@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type RefObject } from "react";
 import type { DigSuggestion } from "@debateai/contract";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { cardLabel } from "@/lib/v4/mapLooks";
@@ -284,6 +284,32 @@ function WaitingOn(props: Readonly<{ title: Readonly<{ text: string; ai: boolean
   );
 }
 
+/**
+ * The browser check (4 Nov): "Change the wording" and "Add your own view" go away when pressed, and so do the box's own
+ * buttons when it closes, so focus fell to the page. It now moves into the box when it opens and back to the button that
+ * opened it when it closes (or, where that button is not shown, to the pick box in `row`). Nothing is kept anywhere.
+ */
+function useBoxFocus(row?: RefObject<HTMLElement | null>): Readonly<{
+  box: RefObject<HTMLTextAreaElement | null>;
+  opener: RefObject<HTMLButtonElement | null>;
+  focusBox: () => void;
+  focusOpener: () => void;
+}> {
+  const box = useRef<HTMLTextAreaElement | null>(null);
+  const opener = useRef<HTMLButtonElement | null>(null);
+  const [request, setRequest] = useState<Readonly<{ to: "box" | "opener"; count: number }> | null>(null);
+  useEffect(() => {
+    if (request === null) return;
+    const target = request.to === "box"
+      ? box.current
+      : opener.current ?? row?.current?.querySelector<HTMLInputElement>("input[type=checkbox]") ?? null;
+    target?.focus();
+  }, [request, row]);
+  const focusBox = useCallback((): void => setRequest((last) => ({ to: "box", count: (last?.count ?? 0) + 1 })), []);
+  const focusOpener = useCallback((): void => setRequest((last) => ({ to: "opener", count: (last?.count ?? 0) + 1 })), []);
+  return { box, opener, focusBox, focusOpener };
+}
+
 /** One suggestion in the panel: its pick box, its text (or the person's wording), and "Edit this path". */
 function PanelSuggestion(props: Readonly<{ path: V4Path; suggestion: DigSuggestion; choice: V4DigChoice; catalog: MessageCatalog }>) {
   const { path, suggestion, choice, catalog } = props;
@@ -309,6 +335,8 @@ function PanelSuggestion(props: Readonly<{ path: V4Path; suggestion: DigSuggesti
     choice.typed?.set(tickedKey, ticked ? "yes" : null, "yes");
   };
   const [tickedByEdit, setTickedByEditNow] = useState(() => choice.typed?.get(tickedKey) === "yes");
+  const row = useRef<HTMLLIElement | null>(null);
+  const focus = useBoxFocus(row);
   const startEdit = (): void => {
     // Editing a suggestion picks it, so the wording the person writes is what is sent.
     const ticks = pick === undefined;
@@ -317,6 +345,7 @@ function PanelSuggestion(props: Readonly<{ path: V4Path; suggestion: DigSuggesti
     setTickedByEdit(ticks);
     setProblem(null);
     setEditing(startText);
+    focus.focusBox();
   };
   const saveEdit = (): void => {
     if (editing === null) return;
@@ -328,6 +357,7 @@ function PanelSuggestion(props: Readonly<{ path: V4Path; suggestion: DigSuggesti
       setEditing(null);
       setTickedByEditNow(false);
       setTickedByEdit(false);
+      focus.focusOpener();
     }
   };
   const cancelEdit = (): void => {
@@ -337,9 +367,10 @@ function PanelSuggestion(props: Readonly<{ path: V4Path; suggestion: DigSuggesti
     setTickedByEdit(false);
     setProblem(null);
     setEditing(null);
+    focus.focusOpener();
   };
   return (
-    <li className={`v4SugRow${pick !== undefined ? " v4SugPicked" : ""}`}>
+    <li ref={row} className={`v4SugRow${pick !== undefined ? " v4SugPicked" : ""}`}>
       <div className="v4SugRowHead">
         <SuggestionBox path={path} suggestion={suggestion} choice={choice} catalog={catalog} className="v4PanelPick" />
         <p className="v4SugRowText">
@@ -352,12 +383,13 @@ function PanelSuggestion(props: Readonly<{ path: V4Path; suggestion: DigSuggesti
       </div>
       {editing === null ? (
         refusal === null ? (
-          <button type="button" className="v4Link v4SugEdit" onClick={startEdit}>{t(catalog, "v4.suggest.edit")}</button>
+          <button ref={focus.opener} type="button" className="v4Link v4SugEdit" onClick={startEdit}>{t(catalog, "v4.suggest.edit")}</button>
         ) : null
       ) : (
         <div className="v4SugEditor">
           <label className="v4SrOnly" htmlFor={`${id}-edit`}>{t(catalog, "v4.suggest.editLabel")}</label>
           <textarea
+            ref={focus.box}
             id={`${id}-edit`}
             className="v4SugInput"
             dir="auto"
@@ -390,9 +422,10 @@ function OwnView(props: Readonly<{ path: V4Path; choice: V4DigChoice; catalog: M
   };
   const [problem, setProblem] = useState<PickRefusal | null>(null);
   const refusal = choice.refusalFor(path.id);
+  const focus = useBoxFocus();
   if (text === null) {
     return refusal === null ? (
-      <button type="button" className="v4Btn v4SugOwnOpen" onClick={() => { setProblem(null); setText(""); }}>
+      <button ref={focus.opener} type="button" className="v4Btn v4SugOwnOpen" onClick={() => { setProblem(null); setText(""); focus.focusBox(); }}>
         {t(catalog, "v4.suggest.ownView")}
       </button>
     ) : null;
@@ -400,7 +433,10 @@ function OwnView(props: Readonly<{ path: V4Path; choice: V4DigChoice; catalog: M
   const add = (): void => {
     const refused = choice.onAddOwnView(path.id, text);
     setProblem(refused);
-    if (refused === null) setText(null);
+    if (refused === null) {
+      setText(null);
+      focus.focusOpener();
+    }
   };
   // journey-f20 / dig-f26: one line under the box when what is typed here will be public.
   const shownPublicly = choice.publicLine !== undefined;
@@ -408,6 +444,7 @@ function OwnView(props: Readonly<{ path: V4Path; choice: V4DigChoice; catalog: M
     <div className="v4SugEditor">
       <label className="v4SugLabel" htmlFor={`${id}-own`}>{t(catalog, "v4.suggest.ownViewLabel")}</label>
       <textarea
+        ref={focus.box}
         id={`${id}-own`}
         className="v4SugInput"
         dir="auto"
@@ -421,7 +458,7 @@ function OwnView(props: Readonly<{ path: V4Path; choice: V4DigChoice; catalog: M
       {problem !== null ? <p className="v4SugProblem" role="alert">{refusalLine(problem, choice.planTier, catalog)}</p> : null}
       <div className="v4SugEditorActions">
         <button type="button" className="v4Btn" onClick={add}>{t(catalog, "v4.suggest.ownViewAdd")}</button>
-        <button type="button" className="v4Link" onClick={() => setText(null)}>{t(catalog, "v4.suggest.cancel")}</button>
+        <button type="button" className="v4Link" onClick={() => { setText(null); focus.focusOpener(); }}>{t(catalog, "v4.suggest.cancel")}</button>
       </div>
     </div>
   );
@@ -431,13 +468,32 @@ function OwnView(props: Readonly<{ path: V4Path; choice: V4DigChoice; catalog: M
  * The person's own views and the open questions picked on this path (the suggestions show their own boxes). dig-f34:
  * each says what it is, "Open question" or "Your view", so a picked open question never looks like the person's view.
  */
-function OtherPicks(props: Readonly<{ picks: readonly V4DigPick[]; choice: V4DigChoice; catalog: MessageCatalog }>) {
-  const { catalog } = props;
+function OtherPicks(props: Readonly<{
+  picks: readonly V4DigPick[];
+  choice: V4DigChoice;
+  /** The choosing section, where focus goes once the last of these is removed. */
+  section: RefObject<HTMLElement | null>;
+  catalog: MessageCatalog;
+}>) {
+  const { catalog, section } = props;
+  const list = useRef<HTMLUListElement | null>(null);
+  // The browser check (4 Nov): Remove takes its own row away, so focus fell to the page. It goes to the next pick's Remove
+  // (or the one before), else to "Add your own view", else to the first pick box that can be pressed.
+  const [removed, setRemoved] = useState<Readonly<{ index: number; count: number }> | null>(null);
+  useEffect(() => {
+    if (removed === null) return;
+    const left = [...(list.current?.querySelectorAll<HTMLButtonElement>("button") ?? [])];
+    const target = left[Math.min(removed.index, left.length - 1)]
+      ?? section.current?.querySelector<HTMLElement>(".v4SugOwnOpen")
+      ?? section.current?.querySelector<HTMLElement>("input[type=checkbox]:not(:disabled)")
+      ?? null;
+    target?.focus();
+  }, [removed, section]);
   const shown = props.picks.filter((pick) => pick.kind !== "SUGGESTION");
   if (shown.length === 0) return null;
   return (
-    <ul className="v4SugList">
-      {shown.map((pick) => (
+    <ul ref={list} className="v4SugList">
+      {shown.map((pick, index) => (
         <li key={pick.key} className="v4SugRow v4SugRowPlain v4SugPicked">
           <p className="v4SugRowText">
             {pick.kind === "OWN_VIEW"
@@ -447,7 +503,10 @@ function OtherPicks(props: Readonly<{ picks: readonly V4DigPick[]; choice: V4Dig
                 ? <><span className="v4SugTag">{t(catalog, "v4.suggest.openTag")}</span> <span data-ai-generated="true">{shortLine(pick.question.text, 120)}</span></>
                 : null}
           </p>
-          <button type="button" className="v4Link" onClick={() => props.choice.onRemovePick(pick.key)}>
+          <button type="button" className="v4Link" onClick={() => {
+            props.choice.onRemovePick(pick.key);
+            setRemoved((last) => ({ index, count: (last?.count ?? 0) + 1 }));
+          }}>
             {t(catalog, "v4.suggest.remove")}
           </button>
         </li>
@@ -474,13 +533,14 @@ export function V4MoneyLines(props: Readonly<{ lines: readonly MoneyLine[]; cata
  */
 export function V4DigCompose(props: Readonly<{ path: V4Path; choice: V4DigChoice; catalog: MessageCatalog; locale: string }>) {
   const { path, choice, catalog } = props;
+  const section = useRef<HTMLElement | null>(null);
   if (!choice.canDig) return null;
   const suggestions = path.suggestions ?? [];
   const mine = choice.draft.group === path.id ? choice.draft.picks : [];
   const elsewhere = choice.draft.picks.length > 0 && choice.draft.group !== path.id;
   const full = !elsewhere && choice.refusalFor(path.id) === "FULL";
   return (
-    <section className="v4PanelSection v4Sugs" aria-labelledby={`v4-sug-${path.id}`}>
+    <section ref={section} className="v4PanelSection v4Sugs" aria-labelledby={`v4-sug-${path.id}`}>
       <h3 className="v4PanelH3" id={`v4-sug-${path.id}`}>{t(catalog, "v4.suggest.heading")}</h3>
       <p className="v4PanelHint v4Muted">{t(catalog, "v4.suggest.onePath")}</p>
       {choice.planTier === "free" ? (
@@ -524,7 +584,7 @@ export function V4DigCompose(props: Readonly<{ path: V4Path; choice: V4DigChoice
             </ul>
           </div>
         ))}
-      <OtherPicks picks={mine} choice={choice} catalog={catalog} />
+      <OtherPicks picks={mine} choice={choice} section={section} catalog={catalog} />
       {elsewhere ? null : <OwnView key={`own/${path.id}`} path={path} choice={choice} catalog={catalog} />}
       {/* journey-f23 (owner's screen review): no "N picked" count; the picks are marked above and shown as chips in the tray. */}
     </section>

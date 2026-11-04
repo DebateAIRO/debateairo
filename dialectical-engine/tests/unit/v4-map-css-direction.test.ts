@@ -149,4 +149,11 @@ describe("the wave-2 review's layout rules (4 Nov)", () => {
   it("ACCESS-1: the phone's stack grows while the report's strip is open in it, so its lines show before Write it", () => {
     expect(read("v4-undo.css")).toMatch(/\.v4StackPhone:has\(\.v4RepStrip-bottom\) \{ max-height: 85vh; max-height: 85dvh; \}/u);
   });
+  it("the browser check: the top bar's strip takes its own row at the end side, and the bar's other items keep theirs", () => {
+    const css = read("v4-report-map.css");
+    // Its long lines no longer widen the bar's right side (contain), and it comes after the account button (order).
+    expect(css).toMatch(/\.v4RepStrip-top \{\s*flex: 1 1 100%; order: 1; contain: inline-size; width: min\(30rem, 100%\); max-width: 30rem; margin-inline-start: auto;\s*\}/u);
+    expect(css).toMatch(/\.v4HdrRight:has\(> \.v4RepStrip-top\) \{ justify-content: flex-end; \}/u);
+    expect(css).toMatch(/\.v4Hdr:has\(> \.v4HdrRight > \.v4RepStrip-top\) \{ align-items: flex-start; \}/u);
+  });
 });

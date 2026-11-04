@@ -310,6 +310,36 @@ describe("dig-f14: Cancel on a wording puts the tick back as it was", () => {
   });
 });
 
+describe("the browser check (4 Nov): focus follows the wording and own-view boxes, never falling to the page", () => {
+  it("moves into a box when it opens, back to its button when it closes, and after Remove to the next control", async () => {
+    await mountMap();
+    await openPath(PATHS.renew);
+    await click(buttonsNamed(CATALOG["v4.suggest.edit"]!, panel())[0]!);
+    expect(document.activeElement).toBe(panel().querySelector(".v4SugEditor textarea"));
+    await click(buttonNamed(CATALOG["v4.suggest.cancel"]!, panel()));
+    expect(document.activeElement).toBe(buttonsNamed(CATALOG["v4.suggest.edit"]!, panel())[0]);
+    // Done on a wording: back to its button too.
+    await click(buttonsNamed(CATALOG["v4.suggest.edit"]!, panel())[1]!);
+    await click(buttonNamed(CATALOG["v4.suggest.editDone"]!, panel()));
+    expect(document.activeElement).toBe(buttonsNamed(CATALOG["v4.suggest.edit"]!, panel())[1]);
+    await click(panelBoxes()[1]!);
+
+    await click(buttonNamed(CATALOG["v4.suggest.ownView"]!, panel()));
+    const own = panel().querySelector<HTMLTextAreaElement>(".v4SugEditor textarea")!;
+    expect(document.activeElement).toBe(own);
+    await typeInto(own, "Grid links between countries matter more than batteries.");
+    await click(buttonNamed(CATALOG["v4.suggest.ownViewAdd"]!, panel()));
+    expect(document.activeElement).toBe(buttonNamed(CATALOG["v4.suggest.ownView"]!, panel()));
+    // Remove takes its own row away: focus goes on to "Add your own view", never to the page.
+    await click(buttonNamed(CATALOG["v4.suggest.remove"]!, panel()));
+    expect(panel().querySelector(".v4SugRowPlain")).toBeNull();
+    expect(document.activeElement).toBe(buttonNamed(CATALOG["v4.suggest.ownView"]!, panel()));
+    await click(buttonNamed(CATALOG["v4.suggest.ownView"]!, panel()));
+    await click(buttonNamed(CATALOG["v4.suggest.cancel"]!, panel()));
+    expect(document.activeElement).toBe(buttonNamed(CATALOG["v4.suggest.ownView"]!, panel()));
+  });
+});
+
 describe("dig-f21: the person's words keep the direction they were typed in", () => {
   it("the wording and own-view boxes, the person's own words and the picks' chips follow what is typed", async () => {
     await mountMap();
