@@ -1,4 +1,4 @@
-import { createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewProbeControls, PREVIEW_GLM_DEADLINE_MS, providerCompaniesOfTargets, previewModelRow, previewProviderSocket } from "@debateai/providers";
+import { createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewProbeControls, PREVIEW_GLM_DEADLINE_MS, providerCompaniesOfTargets, previewModelRow, previewProviderSocket, previewTargetChargePrice, providerTargetPrice } from "@debateai/providers";
 import { type QuestionLanguagePolicy } from "@debateai/register";
 import { questionLanguageSiteRoute } from "./question-language/boot.js";
 import { questionLanguageReferenceKeyFrom } from "./question-language/reference.js";
@@ -31,6 +31,11 @@ import { PostgresPublicDebateRepository, PostgresPublicDebateRunnerRepository, P
 import { investigationReportContentOpener } from "./investigation-report.js";
 import { postgresPurposeLines, readPurposeLinesOf } from "./purpose-lines.js";
 import { ASK_CLARIFY_ROUTE_POLICY, askClarifyTransportFor, createAskClarify } from "./ask-clarify.js";
+// V4 start step, Task 31: the step before Start (Tasks 26–30), composed below on the preview route.
+import { createStartCharges } from "./start-step/charge.js";
+import { startStepKeyFrom } from "./start-step/signing.js";
+import { createStartStep, startStepRouteOf } from "./start-step/step.js";
+import { createStartTransport } from "./start-step/transport.js";
 import { continuedRunWake, runHandoverOf } from "./month-pause.js";
 import { ConsumerWebAuthnService } from "./consumer-webauthn.js";
 import { PostgresConsumerAuthRepository } from "@debateai/db";
@@ -117,7 +122,9 @@ import {
   recordAskClarifyCharge,
   questionCheckSpendWriterPresent,
   recordLanguageCheckSpend,
-  recordQuestionCheckSpend
+  recordQuestionCheckSpend,
+  preStartChargeWriterPresent,
+  recordPreStartCharge
 } from "@debateai/budget";
 import { BillingPersonAllowanceSource } from "@debateai/billing-core";
 import { FundingAwarePersonAllowanceSource } from "@debateai/billing-core";
@@ -713,6 +720,15 @@ const askClarify = await boot.run("ask-clarify", async () => createAskClarify({
   clock: () => new Date(),
   report: (line) => console.error(JSON.stringify(line))
 }));
+/**
+ * V4 start step, Task 31 (spec 2026-11-03 §3 and §4.1): the calls before Start go out only on the preview, and only where every
+ * one of them can be charged to the person: a preview gate AND 0156's writer, asked of this login as step 2's writer is above
+ * (never keyed on the deployment mode: the test site runs in hosted mode). The references are signed with a key derived from
+ * the blind-index key, as the question-language key is, so every API process of this deployment verifies the others'.
+ */
+const preStartWriter = await boot.run("pre-start-writer", () => onOwnConnections(() => preStartChargeWriterPresent(pool)));
+const startStepKey = startStepKeyFrom(blindIndexKey);
+const startStepRoute = startStepRouteOf({ previewGate, writerPresent: preStartWriter });
 // Side-by-side spec §13 API point 2: every other version is loaded once, on first use, and kept (sealed versions never
 // change); the site version is served from the boot's load.
 const admissionCache = createAdmissionSettingsCache({
@@ -1772,6 +1788,32 @@ const admission = new AdmissionLimiter(admissionPolicy);
 // principal holds debateai_billing_runtime (the only role granted them); each function checks run ownership itself.
 const accountMemory = accountMemoryStoreFrom((text, values) => pool.query(text, values));
 const investigations = new PostgresInvestigationRepository(pool);
+/**
+ * V4 start step, Task 31 (spec 2026-11-03 §4.1; owner answers Q2 and Q8 of 4 Nov): THE STEP BEFORE START, behind POST
+ * /v1/asks/paths/lists, …/merge, …/combine and …/fit. Each call runs on the settings of the version it is asked under, from the
+ * one admission cache (the switch, the line-up, the language port); the question check is Start's own. On the preview route it
+ * sends through the gate's guarded fetch, which settles the money there, and each call is the person's charge through 0156's
+ * writer, at the price the runner charges the same target at (F4). Off the preview route there is no transport, and every
+ * call answers none OFF. Nothing it logs carries the question, a list or a person.
+ */
+const startStep = createStartStep({
+  route: startStepRoute,
+  key: startStepKey,
+  settingsFor: (version) => admissionCache.admissionSettingsFor(version),
+  questionCheck,
+  transport: startStepRoute === "PREVIEW" && previewFetch !== undefined
+    ? createStartTransport({ fetch: previewFetch, targets: declaredProviderTargets }) : null,
+  charges: createStartCharges({
+    record: (entry) => recordPreStartCharge(pool, entry),
+    priceOf: (providerRef) => {
+      const target = declaredProviderTargets.find((declared) => declared.providerRef === providerRef);
+      return target === undefined ? null : previewTargetChargePrice(previewGate !== undefined, target, providerTargetPrice(target));
+    },
+    clock: () => new Date(),
+    report: (line) => console.error(JSON.stringify(line))
+  }),
+  report: (line) => console.error(JSON.stringify(line))
+});
 const api = buildApi({
   questionCheck,
   // Addition D16 / ruling R25: keyed on the env's gate part; the configuration is the site version's composed one (its
@@ -1822,6 +1864,10 @@ const api = buildApi({
     readPublicDebate: (publicationRef: string) => publications.readPublicDebate(publicationRef)
   } }),
   askClarify,
+  // V4 start step, Task 31: the step and the key it signs with, together (Task 30: the merge verifies with this key before its
+  // stream opens; without it the four calls answer none OFF). The streams keep START_STEP_TIMING's heartbeat and longest life.
+  startStep,
+  startStepKey,
   ...(askRoom === undefined ? {} : { monthRoom: askRoom }),
   // R22 W3-8: after Continue, the paused debate's released work item goes back to its own release's runner through the
   // routed dispatcher (a failed send is only logged: the runner's lapsed re-send takes it within five minutes anyway).
