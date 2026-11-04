@@ -1,8 +1,10 @@
 /**
  * V4 start step, Task 4 (spec 2026-11-03 §5): the start-of-debate estimate prices a v2 run's final writers by the same
  * rule the call policy sends (previewFinalWriterAsk), each body at the end-of-debate line (195,904 bytes = 65,984
- * tokens at the estimate's 3 bytes per token). A v1 run keeps R22.1's own terms, byte for byte. Until Task 40 prices a
- * v2 receipt's shape, previewCallShares refuses one (PREVIEW_SHAPE_V2_UNPRICED) and admission answers "unavailable".
+ * tokens at the estimate's 3 bytes per token). A v1 run keeps R22.1's own terms, byte for byte. Task 40 prices a v2
+ * receipt's shape (tests/unit/preview-estimate-v2.test.ts) and removed this task's bridge (PREVIEW_SHAPE_V2_UNPRICED); a
+ * receipt that only names v2 is still never priced on a v1 reading: the strict reader refuses it, and admission answers
+ * "unavailable".
  */
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -110,9 +112,9 @@ describe("the estimate prices v2 final writers by the rule the call policy sends
     expect(realisticWorstCasePricer(OUTPUT, "high", null)(row(HAIKU), "ANSWER_WRITER")).toBe(66_252_800n);
   });
 
-  it("refuses to share out a v2 receipt's calls until its shape is priced, and admission answers unavailable", async () => {
+  it("never shares out a receipt that names v2 over a v1 shape (the strict reader refuses it), and admission answers unavailable", async () => {
     expect(() => previewCallShares({ ...SHARE_INPUT, basis: { ...shapedV1Basis, formula_version: "DR-185-shape-v2" } }))
-      .toThrow("PREVIEW_SHAPE_V2_UNPRICED");
+      .toThrow(expect.objectContaining({ code: "ASK_MODEL_ASSIGNMENT_INVALID" }));
     const quiet = vi.spyOn(console, "error").mockImplementation(() => undefined);
     try {
       await expect(assertPreviewBudgetAdmits(GATE, { basis: v2Like, panel: PANEL })).rejects.toBeInstanceOf(PreviewGateUnavailableRefusal);
