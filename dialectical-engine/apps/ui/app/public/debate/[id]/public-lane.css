@@ -15,6 +15,9 @@
 .v4PubLabel { margin: 0; color: var(--text-2); font-size: 12px; font-weight: 700; }
 .v4PubDigFieldHead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
 .v4PubRemove { font-size: 12.5px; }
+/* Browser check (4 Nov): the box is a column, so "Add another view" stretched to its full width with the words centred
+   under the boxes; it sits on the start side, as wide as its words, like the box's other links. */
+.v4PubAddView { align-self: flex-start; }
 .v4PubHow summary { cursor: pointer; color: var(--text-2); font-size: 13px; }
 .v4PubHow[open] summary { margin-bottom: 4px; }
 /* public-f10: a dig that runs privately is a calm grey note, never the red refusal box. */

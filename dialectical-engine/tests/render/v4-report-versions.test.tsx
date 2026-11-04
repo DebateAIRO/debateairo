@@ -412,6 +412,22 @@ describe("the report page's versions", () => {
     expect(document.activeElement).toBe(node.querySelector(".v4RepStatusBox"));
   });
 
+  it("browser check: a newer version that failed offers \"Write it again\" with its line, above the earlier version shown", async () => {
+    vi.setSystemTime(new Date("2026-10-31T09:30:00.000Z"));
+    const runId = crypto.randomUUID();
+    reports.load = vi.fn(async () => investigation(runId, "CLOSED", [finished(1, "2026-10-30T09:20:00.000Z"), failed(2)]));
+    const node = versionSection(await mountReport(runId))!;
+    const status = node.querySelector(".v4RepStatusBox")!;
+    expect(status.textContent).toContain(word("v4.investigation.failed"));
+    const again = buttonOf(node, "Write it again");
+    expect(again).not.toBeNull();
+    expect(status.contains(again)).toBe(true);
+    // Only once, and before the earlier version's body.
+    expect([...node.querySelectorAll("button")].filter((button) => button.textContent?.trim() === "Write it again")).toHaveLength(1);
+    const body = node.querySelector(".v4RepVersionBody")!;
+    expect(again!.compareDocumentPosition(body) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("f6: a press whose answer is lost says it could not confirm, reads again, and shows the waiting state if it did start", async () => {
     vi.setSystemTime(new Date("2026-10-31T09:02:00.000Z"));
     const runId = crypto.randomUUID();
@@ -596,7 +612,10 @@ describe("the report's own header (f12) and its PDF (f5, f11)", () => {
     const node = await mountReport(runId);
     const row = node.querySelector(".v4RepHdr")!;
     expect([...row.children].map((child) => child.className)).toEqual(["v4RepHdrBack", "v4RepMenu v4RepLevel", "v4RepMenu v4RepShare"]);
-    expect(text(row.querySelector(".v4RepHdrBack"))).toBe(`←${CATALOG["v4.report.backToMap"]}`);
+    // Browser check (4 Nov): the full words, and the short word a phone shows instead; the name is the full sentence.
+    expect(text(row.querySelector(".v4RepHdrBack"))).toBe(`←${CATALOG["v4.report.backToMap"]}${CATALOG["v4.report.backToMapShort"]}`);
+    expect(row.querySelector(".v4RepHdrBack")!.getAttribute("aria-label")).toBe(CATALOG["v4.report.backToMap"]);
+    expect(row.querySelector(".v4RepHdrBackShort")!.getAttribute("aria-hidden")).toBe("true");
     expect(text(row.querySelector(".v4RepLevel .v4RepMenuButton"))).toBe(`${CATALOG["v4.readingLevel.background"]}▾`);
     expect(node.textContent).not.toMatch(/allowance|quota|% used/u);
     expect(row.querySelector(`a[href="/debate/${runId}"]`)).toBeNull();

@@ -17,7 +17,15 @@
   color: var(--text); text-decoration: none; font-size: var(--t-ui); font-weight: 600;
 }
 .v4RepHdrBack:hover .v4RepHdrBackText { text-decoration: underline; text-underline-offset: 3px; }
-.v4RepHdrBackText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v4RepHdrBackText, .v4RepHdrBackShort { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v4RepHdrBackShort { display: none; }
+.v4RepHdrBack:hover .v4RepHdrBackShort { text-decoration: underline; text-underline-offset: 3px; }
+/* Browser check (4 Nov): below 480px the full words no longer fit beside the level and Share ("Back to the m…"), so the
+   short word shows; the link's name (aria-label) is the full sentence on every screen. */
+@media (max-width: 479px) {
+  .v4RepHdrBackText { display: none; }
+  .v4RepHdrBackShort { display: inline; }
+}
 .v4RepHdrArrow { flex: none; }
 :dir(rtl) .v4RepHdrArrow { transform: scaleX(-1); }
 .v4RepHdrSpacer { margin-inline-end: auto; }

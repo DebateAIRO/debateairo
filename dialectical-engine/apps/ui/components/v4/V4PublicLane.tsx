@@ -287,7 +287,7 @@ function DigBox({ path, catalog }: Readonly<{ path: PublicPathView; catalog: Mes
         );
       })}
       {room > 0 ? (
-        <button type="button" className="v4Link" onClick={add}>{t(catalog, "v4.public.dig.addView")}</button>
+        <button type="button" className="v4Link v4PubAddView" onClick={add}>{t(catalog, "v4.public.dig.addView")}</button>
       ) : <p className="v4PubHint">{t(catalog, "v4.public.dig.viewsFull")}</p>}
       <div className="v4PubDigActions">
         <button type="button" className="v4Btn v4BtnPrimary" disabled={!written || actions.busy} aria-busy={actions.busy} onClick={() => void start()}>

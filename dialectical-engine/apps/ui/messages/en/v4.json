@@ -31,6 +31,7 @@
   "v4.common.classicView": "Open in the classic view",
   "v4.common.back": "Back",
   "v4.report.backToMap": "Back to the map",
+  "v4.report.backToMapShort": "Map",
   "v4.report.print": "Print",
   "v4.report.eyebrow": "Report · {level}",
   "v4.report.answerHeading": "The answer",

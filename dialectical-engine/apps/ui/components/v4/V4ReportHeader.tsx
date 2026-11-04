@@ -100,9 +100,12 @@ export function V4ReportHeader({ catalog, backHref, level, onLevel, share, statu
     <div className="v4RepChrome">
       <header className="v4RepHdr">
         {backHref === null ? <span className="v4RepHdrSpacer" /> : (
-          <Link className="v4RepHdrBack" href={backHref}>
+          // Browser check (4 Nov): on a phone the full words were cut to "Back to the m…" (and "…ck to the map" right to
+          // left), so narrow screens show the short "Map"; the link's name stays "Back to the map" on every screen.
+          <Link className="v4RepHdrBack" href={backHref} aria-label={t(catalog, "v4.report.backToMap")}>
             <span className="v4RepHdrArrow" aria-hidden="true">←</span>
             <span className="v4RepHdrBackText">{t(catalog, "v4.report.backToMap")}</span>
+            <span className="v4RepHdrBackShort" aria-hidden="true">{t(catalog, "v4.report.backToMapShort")}</span>
           </Link>
         )}
         <HeaderMenu

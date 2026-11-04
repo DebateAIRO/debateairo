@@ -1115,6 +1115,9 @@ function ReportArea({ runId, investigation, runningDig, webNote, pdfRefused, map
       ) : null}
     </div>
   ) : null;
+  // Browser check (4 Nov): a failed newer version's line says "You can write it again", so "Write it again" sits with
+  // that line, not under the whole earlier version shown below it.
+  const actionsWithFailure = statusVersion?.state === "FAILED";
 
   if (read.versions.length === 0) {
     return (
@@ -1155,6 +1158,7 @@ function ReportArea({ runId, investigation, runningDig, webNote, pdfRefused, map
           ? <VersionStatus version={statusVersion} investigation={investigation} runningDig={runningDig} locale={locale} language={language} catalog={catalog} />
           : null}
         {noteLine}
+        {actionsWithFailure ? actions : null}
       </div>
       {shown !== null && finishedVersion(shown) ? (
         <ReportVersion version={shown} isCurrent={shown.report_version === current} webNote={webNote} locale={locale} language={language} catalog={catalog} />
@@ -1162,7 +1166,7 @@ function ReportArea({ runId, investigation, runningDig, webNote, pdfRefused, map
       {pdfRefused && current !== null
         ? <p className="v4RepNote v4RepNoPrint" role="status">{t(catalog, "v4.investigation.pdfUnavailable")}</p>
         : null}
-      {actions}
+      {actionsWithFailure ? null : actions}
       {/* report-f17: digging goes on from the map; this version stays as it is. */}
       {canKeepDigging ? (
         <div className="v4RepDigMore v4RepNoPrint">
