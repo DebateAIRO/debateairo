@@ -66,7 +66,11 @@ const NOT_ANSWERED_BY_DEFAULT: Readonly<Record<string, string>> = Object.freeze(
   "evaluator.consumer-aggregate.v1": "the dormant evaluator lane's add-on",
   // V4 start step (Task 47 review): until Task 52 gives the stand-in its PATH_GAP kind. Task 52 removes this line: the no-stale-row
   // check below fails while a name here is one the stand-in answers.
-  "map.gap-paths.v1": "the gap round after Start: a draft no runner asks yet (Task 53 wires it); Task 52 adds its PATH_GAP kind"
+  "map.gap-paths.v1": "the gap round after Start: a draft no runner asks yet (Task 53 wires it); Task 52 adds its PATH_GAP kind",
+  // V4 start step (Task 51): the same until Task 52 gives the stand-in its STORY_PATHS and STORY_PATHS_CHECK kinds; Task 52
+  // removes these two lines.
+  "story.paths.v5": "the path run's story: a draft no runner asks yet (Task 54 wires it); Task 52 adds its STORY_PATHS kind",
+  "story.paths-check.v5": "the path run's story check: a draft no runner asks yet (Task 54 wires it); Task 52 adds its STORY_PATHS_CHECK kind"
 });
 
 const chatOf = (contract: PromptContract, material: readonly FramedMaterialField[]): string =>

@@ -6,8 +6,10 @@ import {
   type QuestionLanguage, type ReadingLevel
 } from "@debateai/kernel";
 import {
+  ANTHROPIC_TOKEN_COUNT,
   buildFramedPrompt,
   buildFramedRepairPrompt,
+  buildFramedRevisionPrompt,
   rememberingAcceptedReply,
   schemaFailureLocator,
   type CallBound,
@@ -16,9 +18,11 @@ import {
   type ModelJsonRepair,
   type ModelReplyFacts,
   type PromptContract,
+  type PromptPacket,
   type ProviderCallRequest,
   type ProviderCallResult,
   type ProviderGateway,
+  type RejectedProviderContent,
   type TypedRole
 } from "@debateai/providers";
 import type { EngineSettings, LengthGuidance, StoryPolicy } from "@debateai/register";
@@ -71,19 +75,32 @@ import {
   toChartsPromptMaterial,
   toCheckerPromptMaterial,
   toStoryPromptMaterial,
+  type FramedRevision,
   type StoryMaterial,
   type StoryNodeEnrichment,
   type StoryRunSnapshot
 } from "./material.js";
 import { storyShapeOf, type StoryPack, type StoryV4Options } from "./pack.js";
+import {
+  STORY_PATHS_CHECK_PROMPT_CONTRACT,
+  STORY_PATHS_LIMITS,
+  STORY_PATHS_PROMPT_CONTRACT,
+  storyPathsGuard,
+  storyPathsMaterial,
+  storyPathsPointsOf,
+  storyPathsStoryIndex,
+  type StoryPathsInput
+} from "./path-final.js";
 import { StoryRepository, isPrivateContentErased, type StoryRecordInput } from "./repository.js";
 import {
   STORY_BODY_PROSE,
   STORY_CHECKER_PROSE,
   classifyCheckerContent,
   classifyStoryContent,
+  classifyStoryPathsCheckContent,
   parseCheckerVerdict,
-  parseStoryBody
+  parseStoryBody,
+  parseStoryPathsCheckVerdict
 } from "./validate.js";
 
 /**
@@ -261,6 +278,23 @@ export type StoryWriteInput = StoryRunSnapshot & {
    * Read only under v4. Absent: the makers are read from the candidates alone.
    */
   readonly backupMakers?: readonly StoryBackupMaker[];
+  /**
+   * V4 start step, Task 51 (story v5): a path run's paths, main answer and gap points, set by the runner only on a path run.
+   * With it the story is v5 (story.paths.v5 and its check, path-final.ts): one `short.paths` entry per path, in the person's
+   * order, node refs from the points only. Absent: today's story, byte for byte, and the two members below are not read.
+   */
+  readonly paths?: StoryPathsInput;
+  /**
+   * Story v5 only: the story's one fence source (the runner's `closingRandomBytes(seed)`, one seed per story), so every round of
+   * the storyteller and the check is framed under one fence and reads the shared fields from the cache. Absent: a fresh fence
+   * per call.
+   */
+  readonly randomBytes?: (size: number) => Buffer;
+  /**
+   * Story v5 only: the ladder step the runner's real count stopped at (`fitStoryPathsToTokenLine`); the writer's own material
+   * starts there (`storyPathsMaterial(…, { fromStep })`), never again at step 1. Absent: step 1.
+   */
+  readonly pathsFromStep?: number;
 };
 
 /** R2: the one v4 shape, from the comparing judges' question kinds (majority; a tie or none: the pack's default). */
@@ -387,12 +421,27 @@ function storyCallRequest(input: {
    * Its repair packet is the same revision packet with the rejection's machine fields, under the same fence.
    */
   readonly revision?: StoryRevisionTurn;
+  /**
+   * Story v5 (Task 51): the story's one fence source, so every call and round of one story is framed under one fence, its
+   * revision included; and how many first fields are shared with the other step's calls (read from the cache, F5). Both
+   * absent on every other story: a fresh fence per call, today's request.
+   */
+  readonly randomBytes?: (size: number) => Buffer;
+  readonly sharedFirstFieldCount?: number;
+  /**
+   * Story v5 (review of Task 51): the guard every packet of this call passes as it leaves (`storyPathsGuard`, as the gateway's
+   * `vendorPacketOf`: the first attempt, each repair and the revision), and the gateway's own 100K line on each sent form
+   * (`sentInputTokensBelow`, R22 decision 28), as the report's and the path rewrite's calls carry. Absent on every other story:
+   * today's request.
+   */
+  readonly sentLine?: (packet: PromptPacket) => PromptPacket;
 }): ProviderCallRequest {
   const turn = input.revision ?? null;
-  const revision = turn === null ? null : buildStoryRevisionPrompt({
-    contract: input.contract, material: input.material, ownDraft: turn.ownDraft, problems: turn.problems
+  const fence = input.randomBytes === undefined ? {} : { randomBytes: input.randomBytes };
+  const revision = turn === null ? null : storyRevisionUnderFence({
+    contract: input.contract, material: input.material, ownDraft: turn.ownDraft, problems: turn.problems, ...fence
   });
-  const framed = revision === null ? buildFramedPrompt({ contract: input.contract, material: input.material }) : revision.framed;
+  const framed = revision === null ? buildFramedPrompt({ contract: input.contract, material: input.material, ...fence }) : revision.framed;
   const request: ProviderCallRequest = {
     runId: input.story.runId,
     subjectItemId: input.story.workItemId,
@@ -410,9 +459,30 @@ function storyCallRequest(input: {
       ? (rejected) => buildFramedRepairPrompt(framed, schemaFailureLocator(rejected))
       : revision.buildRepairPacket,
     ...(input.guidedWords === undefined ? {} : { guidedWords: input.guidedWords }),
-    ...(input.actualWordsOf === undefined ? {} : { actualWordsOf: input.actualWordsOf })
+    ...(input.actualWordsOf === undefined ? {} : { actualWordsOf: input.actualWordsOf }),
+    ...(input.sharedFirstFieldCount === undefined ? {} : { sharedFirstFieldCount: input.sharedFirstFieldCount }),
+    ...(input.sentLine === undefined ? {} : { vendorPacketOf: input.sentLine, sentInputTokensBelow: ANTHROPIC_TOKEN_COUNT.line })
   };
   return Object.freeze(request);
+}
+
+/**
+ * A round-2 request (`buildStoryRevisionPrompt`'s), framed under the story's one fence when it has one (story v5): the same
+ * revision turn, its full re-ask under that fence. Without one, `buildStoryRevisionPrompt` itself: a fresh fence (v4's rule).
+ */
+function storyRevisionUnderFence(input: Readonly<{
+  contract: PromptContract; material: readonly FramedMaterialField[]; ownDraft: string; problems: string;
+  randomBytes?: (size: number) => Buffer;
+}>): FramedRevision {
+  const randomBytes = input.randomBytes;
+  if (randomBytes === undefined) return buildStoryRevisionPrompt(input);
+  const framed = buildFramedPrompt({ contract: input.contract, material: input.material, randomBytes });
+  return Object.freeze({
+    framed,
+    packet: buildFramedRevisionPrompt(framed.packet, input.ownDraft, input.problems),
+    buildRepairPacket: (rejected: RejectedProviderContent): PromptPacket =>
+      buildFramedRevisionPrompt(framed.packet, input.ownDraft, input.problems, schemaFailureLocator(rejected))
+  });
 }
 
 /** Length guidance (LG-D, v4 only): the `length` field after the material (and after candidate_story), before the language field. */
@@ -428,6 +498,37 @@ function withLengthField(material: readonly FramedMaterialField[], length: Frame
 function storyLanguageTag(input: StoryWriteInput): string | null {
   const tag = input.argumentLanguage?.tag ?? null;
   return tag !== null && StoryLanguageTagSchema.safeParse(tag).success ? tag : null;
+}
+
+/**
+ * Engine money rule, Task M7 (spec §14.4.6): one story call, with the
+ * run's cost fallback when the runner handed one over. Each try is one
+ * provider call, so each takes its own short step lease. The ROLE rule
+ * is untouched: an absent role never reaches here, so a maker is only
+ * ever substituted for money — or, on the preview (run resilience, spec
+ * 2026-10-12 fix (a)), because the runner's fallback found the planned maker
+ * sitting out the rest of the run (the runner's own move rule, handed over
+ * inside `costFallback`; this writer is unchanged). Story v5 (Task 51) calls through the same function.
+ */
+type StoryRoleCall = (
+  planned: StoryRoleMaker,
+  request: ProviderCallRequest,
+  preferNot: string | null,
+  /**
+   * R1d (pre-flight PF-D6.2; spec §7.2 items 8 and 11): the backup storyteller's calls and a v4 revision keep their
+   * maker. They never go through the cost fallback, which could move them to the first storyteller's or the checker's
+   * maker; a money refusal there is today's money stop (the loop's STORY_ENVELOPE_EXHAUSTED), never a silent move.
+   */
+  keepMaker?: boolean
+) => Promise<Readonly<{ result: ProviderCallResult; servedBy: StoryRoleMaker }>>;
+
+function storyRoleCaller(input: StoryWriteInput, stepLease: StoryStepLease): StoryRoleCall {
+  return async (planned, request, preferNot, keepMaker = false) => {
+    const send = (maker: StoryRoleMaker, sent: ProviderCallRequest) => stepLease(() => maker.provider.call(sent));
+    const costFallback = input.costFallback;
+    if (costFallback === undefined || keepMaker) return { result: await send(planned, request), servedBy: planned };
+    return costFallback({ planned, preferNot, request, refusedForMoney: isStoryMoneyRefusal, call: send });
+  };
 }
 
 /** A readiness refusal: nothing ran, so no lineage, no artifact and no point numbers. */
@@ -482,7 +583,12 @@ function recordFromOutcome(
   refMap: ReadonlyMap<string, string>,
   storytellerRepairs: number,
   backup: StoryBackupRecord | null,
-  blocks: StoryBlocks = NO_BLOCKS
+  blocks: StoryBlocks = NO_BLOCKS,
+  /**
+   * The map the stored body's refs are restored with; the point numbers are always `refMap`'s. Story v5 (Task 51): the
+   * point refs plus each path's id to itself, so `position_ref` stays the path's id. Absent: `refMap` (today).
+   */
+  restoreMap: ReadonlyMap<string, string> = refMap
 ): StoryRecordInput {
   const { charts, tables } = blocks;
   // The lineage is the SERVED round's: under the earlier-draft fallback that is
@@ -526,7 +632,7 @@ function recordFromOutcome(
   // which is what the site's tree and the PDF appendix number. An unknown ref
   // cannot reach here (the classifier checked every ref against the index), and
   // if one did, STORY_REF_UNMAPPED becomes STORY_UNEXPECTED_ERROR upstream.
-  const body = restoreStoryRefs(outcome.body, refMap);
+  const body = restoreStoryRefs(outcome.body, restoreMap);
   const written: StoryRecordInput = {
     ...shared,
     outcome: outcome.outcome,
@@ -682,6 +788,11 @@ export class StoryWriter {
         judgeArtifactRef: input.judgeArtifactRefs.get(node.nodeId) ?? null
       }))
     }));
+    // V4 start step, Task 51: a path run's story is v5, told from its paths (path-final.ts). Every other story goes on below,
+    // exactly as before.
+    if (input.paths !== undefined) {
+      return this.#composePaths(input, input.paths, { pack, policy, storyteller, checker, enrichment, stepLease });
+    }
     // Engine redesign R1d (spec 2026-10-15 §7; INTERFACE §5.1; R1d decision 1): story v4 exactly when the run's receipt
     // carries engine 2 AND its length table — `input.engine?.engine === 2 && input.lengthGuidance !== undefined`. The
     // length table alone keeps the v3 story: today's contracts, no `length` field, today's bounds, no guided words (the
@@ -746,32 +857,7 @@ export class StoryWriter {
       actualWordsOf: (content: string) => storyActualWords(content, guidance.charactersPerWord)
     };
     const checkerWords = guidance === null ? {} : { guidedWords: guidance.steps.story_checker };
-    /**
-     * Engine money rule, Task M7 (spec §14.4.6): one story call, with the
-     * run's cost fallback when the runner handed one over. Each try is one
-     * provider call, so each takes its own short step lease. The ROLE rule
-     * above is untouched: an absent role never reaches here, so a maker is only
-     * ever substituted for money — or, on the preview (run resilience, spec
-     * 2026-10-12 fix (a)), because the runner's fallback found the planned maker
-     * sitting out the rest of the run (the runner's own move rule, handed over
-     * inside `costFallback`; this writer is unchanged).
-     */
-    const callStoryRole = async (
-      planned: StoryRoleMaker,
-      request: ProviderCallRequest,
-      preferNot: string | null,
-      /**
-       * R1d (pre-flight PF-D6.2; spec §7.2 items 8 and 11): the backup storyteller's calls and a v4 revision keep their
-       * maker. They never go through the cost fallback, which could move them to the first storyteller's or the checker's
-       * maker; a money refusal there is today's money stop (the loop's STORY_ENVELOPE_EXHAUSTED), never a silent move.
-       */
-      keepMaker = false
-    ): Promise<Readonly<{ result: ProviderCallResult; servedBy: StoryRoleMaker }>> => {
-      const send = (maker: StoryRoleMaker, sent: ProviderCallRequest) => stepLease(() => maker.provider.call(sent));
-      const costFallback = input.costFallback;
-      if (costFallback === undefined || keepMaker) return { result: await send(planned, request), servedBy: planned };
-      return costFallback({ planned, preferNot, request, refusedForMoney: isStoryMoneyRefusal, call: send });
-    };
+    const callStoryRole = storyRoleCaller(input, stepLease);
     /** Who actually wrote each round's draft: its checker prefers another maker. */
     const draftWriterByRound = new Map<number, string>();
     /** R1d (PF-D6.2): who wrote each round's draft, as a role maker. A v4 revision revises ITS OWN draft, so it goes there. */
@@ -958,6 +1044,119 @@ export class StoryWriter {
       call: (planned, request) => callStoryRole(planned, request, null)
     });
     return recordFromOutcome(input, pack, served, built.refMap, repairedRounds.size, backup, blocks);
+  }
+
+  /**
+   * V4 start step, Task 51 (story v5): a path run's story. The material is built from the write (`storyPathsMaterial`), its
+   * points from the snapshot's nodes with the enrichment's disputes, from the runner's ladder step on (`pathsFromStep`);
+   * the storyteller (story.paths.v5) and the check (story.paths-check.v5) run v4's rounds (only a misleading problem starts
+   * round 2, which revises its own draft), every call under the story's one fence (`randomBytes`) with the shared fields
+   * marked for the cache. The reader sentence and the language line are added as for every story. The shape is code's
+   * (`storyV4ShapeId`); each path's id stays its `position_ref`, the node refs are mapped back to node ids. No backup
+   * storyteller and no chart call: the first refusal of round 1 ends the story FAILED, as v3's does.
+   */
+  async #composePaths(input: StoryWriteInput, paths: StoryPathsInput, args: Readonly<{
+    pack: StoryPack;
+    policy: StoryPolicy;
+    storyteller: StoryRoleMaker;
+    checker: StoryRoleMaker;
+    enrichment: ReadonlyMap<string, StoryNodeEnrichment>;
+    stepLease: StoryStepLease;
+  }>): Promise<StoryRecordInput> {
+    const { pack, policy, storyteller, checker, stepLease } = args;
+    const disputed = new Set([...args.enrichment].filter(([, entry]) => entry.reviewOutcome === "dispute").map(([nodeId]) => nodeId));
+    const { points, refMap } = storyPathsPointsOf(input.nodes, disputed);
+    const languageName = input.argumentLanguage?.name ?? null;
+    const languageTag = input.argumentLanguage?.tag ?? null;
+    const lock = input.languageLocked === true && input.argumentLanguage !== null
+      ? questionLanguageFromRun(input.argumentLanguage.tag, input.argumentLanguage.name)
+      : null;
+    const readingLevel = input.readingLevel ?? null;
+    const guidance = input.lengthGuidance ?? null;
+    const materialInput = {
+      ...paths, points, questionLine: input.questionLine, readingLevel, language: lock,
+      length: guidance === null ? null : storyLengthField(guidance.story, languageTag, guidance.charactersPerWord)
+    };
+    const built = storyPathsMaterial(materialInput, input.pathsFromStep === undefined ? {} : { fromStep: input.pathsFromStep });
+    if (!built.fits) {
+      this.#log("STORY_MATERIAL_TOO_LARGE", () => ({
+        answerId: input.answerId, bytes: built.bodyBytes + STORY_PATHS_LIMITS.roundTwoRoomBytes, budgetBytes: STORY_PATHS_LIMITS.bodyMaxBytes
+      }));
+      return failedRecord(input, "STORY_MATERIAL_TOO_LARGE", pack);
+    }
+    const index = storyPathsStoryIndex(materialInput, built, new Set(pack.shapes.map((shape) => shape.id)), storyV4ShapeId(input, pack));
+    const storytellerContract = storyContractInArgumentLanguage(
+      storyContractForReader(STORY_PATHS_PROMPT_CONTRACT, readingLevel, "STORYTELLER"), languageName, lock);
+    const checkerContract = storyContractInArgumentLanguage(
+      storyContractForReader(STORY_PATHS_CHECK_PROMPT_CONTRACT, readingLevel, "CHECKER"), languageName, lock);
+    const storytellerHash = storyContractHash(storytellerContract);
+    const checkerHash = storyContractHash(checkerContract);
+    const storytellerBound = storyGuidedBound(policy.storytellerBound, "STORYTELLER", guidance);
+    const checkerBound = storyGuidedBound(policy.checkerBound, "CHECKER", guidance);
+    const storytellerWords = guidance === null ? {} : {
+      guidedWords: storyGuidedWords(guidance.story),
+      actualWordsOf: (content: string) => storyActualWords(content, guidance.charactersPerWord)
+    };
+    const checkerWords = guidance === null ? {} : { guidedWords: guidance.steps.story_checker };
+    // Every packet of the story leaves under the line the material was fitted to (review of Task 51): a draft longer than the
+    // round-two room is refused before it is sent, never sent past it.
+    const framing = {
+      ...(input.randomBytes === undefined ? {} : { randomBytes: input.randomBytes }), sharedFirstFieldCount: built.sharedFieldCount, sentLine: storyPathsGuard
+    };
+    const callStoryRole = storyRoleCaller(input, stepLease);
+    const draftWriterByRound = new Map<number, string>();
+    const draftTellerByRound = new Map<number, StoryRoleMaker>();
+    const repairedRounds = new Set<number>();
+    const storyInQuestionLanguage = replyLanguageCheckFor(input.questionLine, lock, STORY_BODY_PROSE);
+    const checkerInQuestionLanguage = replyLanguageCheckFor(input.questionLine, lock, STORY_CHECKER_PROSE);
+    const writeStory: StoryLoopDependencies["writeStory"] = async ({ round, priorObjection, priorDraft }) => {
+      const reading = rememberingAcceptedReply((content, reply) => classifyStoryContent(content, index, reply, storyInQuestionLanguage));
+      const revision: StoryRevisionTurn | null = priorDraft !== null && priorObjection !== null
+        ? Object.freeze({ ownDraft: storyDraftText(priorDraft), problems: priorObjection })
+        : null;
+      // A revision goes to the maker that wrote the draft it revises, never through the cost fallback (v4's rule).
+      const author = revision === null ? storyteller : (draftTellerByRound.get(round - 1) ?? storyteller);
+      const request = storyCallRequest({
+        story: input, site: "STORYTELLER", round, providerRef: author.providerRef, bound: storytellerBound,
+        contract: storytellerContract, contractHash: storytellerHash, material: built.fields, classifyContent: reading.classifyContent,
+        ...(revision === null ? {} : { revision }), ...storytellerWords, ...framing
+      });
+      const { result, servedBy } = await callStoryRole(author, request, null, revision !== null);
+      draftWriterByRound.set(round, servedBy.providerRef);
+      draftTellerByRound.set(round, servedBy);
+      const accepted = reading.acceptedAs(result.content);
+      const body: StoryBody = parseStoryBody(result.content, index, accepted.reply);
+      this.#logRepair("STORYTELLER", round, accepted.repairs, input);
+      if ((result.repairAttempts ?? 0) > 0) repairedRounds.add(round);
+      return { artifactRef: result.rawArtifactRef, callSiteKey: request.callSiteKey, lineage: lineageOf(result, servedBy.providerRef), body };
+    };
+    const checkStory: StoryLoopDependencies["checkStory"] = async ({ round, candidate }) => {
+      const reading = rememberingAcceptedReply((content, reply) => classifyStoryPathsCheckContent(content, reply, checkerInQuestionLanguage));
+      const request = storyCallRequest({
+        story: input, site: "CHECKER", round, providerRef: checker.providerRef, bound: checkerBound, contract: checkerContract,
+        contractHash: checkerHash, material: built.checkerOf(candidate), classifyContent: reading.classifyContent, ...checkerWords, ...framing
+      });
+      const { result, servedBy } = await callStoryRole(checker, request, draftWriterByRound.get(round) ?? null);
+      const accepted = reading.acceptedAs(result.content);
+      const verdict = parseStoryPathsCheckVerdict(result.content, accepted.reply);
+      this.#logRepair("CHECKER", round, accepted.repairs, input);
+      return {
+        artifactRef: result.rawArtifactRef,
+        callSiteKey: request.callSiteKey,
+        lineage: lineageOf(result, servedBy.providerRef),
+        verdict: { satisfied: verdict.satisfied, objection: verdict.objection, misleading: verdict.misleading }
+      };
+    };
+    const outcome = await runStoryLoop({ maxRounds: policy.loopMaxRounds, v4: true }, { writeStory, checkStory });
+    this.#logLoopOutcome(outcome, input);
+    for (const round of outcome.rounds) {
+      if (round.checker !== null && !round.satisfied && round.misleading === false) {
+        this.#log("STORY_WORDING_NOTE_ONLY", () => ({ answerId: input.answerId, answerVersion: input.answerVersion, round: round.round }));
+      }
+    }
+    // Each path's id stays its position_ref; the point refs become node ids, and they alone are the story's point numbers.
+    const restoreMap = new Map([...refMap, ...paths.paths.map((path) => [path.pathId, path.pathId] as const)]);
+    return recordFromOutcome(input, pack, outcome, refMap, repairedRounds.size, null, NO_BLOCKS, restoreMap);
   }
 
   /**

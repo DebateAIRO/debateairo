@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
 import { ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND, ANTHROPIC_TOKEN_COUNT, buildFramedPrompt, createAnthropicTokenCounter, type PromptContract, type PromptPacket, type TokenCounter } from "@debateai/providers";
-import { PATH_REWRITE_WRITER_V2_PROMPT_CONTRACT, REPORT_STORY_PROMPT_CONTRACT, type ReportAnswerDraft, type ReportCallMaterial } from "@debateai/story";
+import {
+  PATH_REWRITE_WRITER_V2_PROMPT_CONTRACT, REPORT_STORY_PROMPT_CONTRACT, STORY_PATHS_LADDER, STORY_PATHS_LIMITS, STORY_PATHS_PROMPT_CONTRACT, storyPathsBodyBytes,
+  storyPathsMaterial, type ReportAnswerDraft, type ReportCallMaterial
+} from "@debateai/story";
 import {
   INVESTIGATION_REPORT_ASK_ROOM_BYTES, INVESTIGATION_REPORT_ROUND_TWO_ROOM_BYTES, buildInvestigationDossier, type DossierBuilt, type DossierInput
 } from "./investigation-dossier.js";
@@ -83,6 +86,28 @@ export async function fitRewriteToTokenLine(input: PathRewriteMaterialInput, tok
     if (real === null || real + roomTokens(PATH_REWRITE_ROUND_TWO_ROOM_BYTES) < ANTHROPIC_TOKEN_COUNT.line) return built;
     log("PATH_REWRITE_OVER_THE_TOKEN_LINE", { ladderStep: built.ladderStep });
     built = buildPathRewriteMaterial(input, { fromStep: built.ladderStep + 1 });
+  }
+  return built;
+}
+
+/**
+ * V4 start step, Task 51: a path run's story material, on the first ladder step whose storyteller packet (the larger of its two first
+ * packets) the real count also lets through with the round-two room, counted with its shared fields first as they are sent. The step
+ * found goes to the story writer as `pathsFromStep`, so the writer never starts again at step 1. The last step has nothing below it,
+ * so it is not counted.
+ */
+export async function fitStoryPathsToTokenLine(input: Parameters<typeof storyPathsMaterial>[0], tokenCount: TokenCounter | undefined,
+  log: Log): Promise<ReturnType<typeof storyPathsMaterial>> {
+  let built = storyPathsMaterial(input);
+  if (tokenCount === undefined) return built;
+  const room = STORY_PATHS_LIMITS.roundTwoRoomBytes;
+  while (built.ladderStep < STORY_PATHS_LADDER.length) {
+    const packet = countedPacket(STORY_PATHS_PROMPT_CONTRACT, built.fields);
+    if (packet === null || !looksClose(storyPathsBodyBytes(packet) + room)) return built;
+    const real = await tokenCount({ packet, sharedFirstFieldCount: built.sharedFieldCount });
+    if (real === null || real + roomTokens(room) < ANTHROPIC_TOKEN_COUNT.line) return built;
+    log("STORY_PATHS_OVER_THE_TOKEN_LINE", { ladderStep: built.ladderStep });
+    built = storyPathsMaterial(input, { fromStep: built.ladderStep + 1 });
   }
   return built;
 }

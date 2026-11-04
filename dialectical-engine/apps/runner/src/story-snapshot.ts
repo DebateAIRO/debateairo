@@ -11,6 +11,7 @@ import {
   type StoryBackupCandidate,
   type StoryBackupMaker,
   type StoryCostFallback,
+  type StoryPathsInput,
   type StoryRoleMaker,
   type StoryRoleResolver,
   type StoryRunRoleMakers,
@@ -197,6 +198,40 @@ export interface StorySnapshotSource {
    * makers even when their refs are not candidates. Handed over only for an engine-2 debate.
    */
   readonly backupMakers?: readonly StoryBackupMaker[];
+  /**
+   * V4 start step, Task 51: a path run's paths, main answer and gap points (`StoryPathsInput`); with them the story is v5, one
+   * entry per path. `pathsFromStep` is the ladder step the runner's real count stopped at (`fitStoryPathsToTokenLine`) and
+   * `randomBytes` the story's one fence source (`closingRandomBytes(seed)`, one seed per story). Without paths neither of the two
+   * is handed on: today's story.
+   */
+  readonly paths?: StoryPathsInput | undefined;
+  readonly pathsFromStep?: number | undefined;
+  readonly randomBytes?: ((size: number) => Buffer) | undefined;
+}
+
+/**
+ * Task 51: the path run's story input, with node ids cleared from what the models wrote after the debate (each path's answer so
+ * far, the main answer, the gap points), as every free text here is. The paths' titles and questions were written before the
+ * debate had a node, and the person's own words are theirs: both pass as they are.
+ */
+function storyPathsFrom(paths: StoryPathsInput): StoryPathsInput {
+  return Object.freeze({
+    paths: Object.freeze(paths.paths.map((path) => {
+      const outcome = path.outcome;
+      return Object.freeze({
+        ...path,
+        outcome: outcome === null ? null : Object.freeze({
+          ...outcome,
+          text: outcome.text === null ? null : Object.freeze({ ...outcome.text, line: withoutNodeIds(outcome.text.line),
+            summary: withoutNodeIds(outcome.text.summary) }),
+          what_changed: outcome.what_changed.map(withoutNodeIds)
+        })
+      });
+    })),
+    mainAnswer: Object.freeze(paths.mainAnswer.map(withoutNodeIds)),
+    mainTrust: paths.mainTrust,
+    alsoRaised: Object.freeze(paths.alsoRaised.map(withoutNodeIds))
+  });
 }
 
 /**
@@ -441,6 +476,12 @@ export function buildStoryRunSnapshot(source: StorySnapshotSource): StoryWriteIn
     // R1d: the receipt's engine and the backup storytellers, only when the runner handed them over (an engine-2 debate).
     ...(source.engine === undefined || source.engine === null ? {} : { engine: source.engine }),
     ...(source.backupCandidates === undefined ? {} : { backupCandidates: Object.freeze([...source.backupCandidates]) }),
-    ...(source.backupMakers === undefined ? {} : { backupMakers: Object.freeze([...source.backupMakers]) })
+    ...(source.backupMakers === undefined ? {} : { backupMakers: Object.freeze([...source.backupMakers]) }),
+    // Task 51: story v5 only with the paths; its step and its fence source are never handed on without them.
+    ...(source.paths === undefined ? {} : {
+      paths: storyPathsFrom(source.paths),
+      ...(source.pathsFromStep === undefined ? {} : { pathsFromStep: source.pathsFromStep }),
+      ...(source.randomBytes === undefined ? {} : { randomBytes: source.randomBytes })
+    })
   });
 }
