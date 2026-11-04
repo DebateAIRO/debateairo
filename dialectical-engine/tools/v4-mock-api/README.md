@@ -23,9 +23,10 @@ On 1 Nov 2026 (R22, for the owner's click-test) it gained the final report as th
 | `web-draft.ts` | The shapes of the web search, dig suggestions and investigations, imported from the contract (W1-6), and how they would be held back from a contract that does not know them. See "Draft fields" below. |
 | `web-seed.ts` | The made-up web pages of the seeded debates (all on `.example` sites; no real article is quoted). |
 | `rewrite-seed.ts` | The new dig model's seeded rewrites, digs and dig trail, and the money rule's paused debate and borrow notice (task W2-7). |
+| `quaderno-tax.ts` | Prices `GET /v1/billing/plans` through Quaderno itself when `MOCK_QUADERNO_API_KEY_PATH` is set: the API's own tax reader (`DisplayedTaxReader`) over the production Quaderno client. See "Tax from Quaderno" below. |
 | `check.ts` | Self-check. It reads every endpoint through the website's own code: the `/api` proxy, the typed client, and the V4 map builder. |
 
-The unit test `tests/unit/v4-mock-api.test.ts` checks the seed and the draft shapes without starting anything.
+The unit test `tests/unit/v4-mock-api.test.ts` checks the seed and the draft shapes without starting anything. `tests/unit/v4-mock-quaderno.test.ts` checks the Quaderno pricing against the acceptance fake of Quaderno.
 
 ## 1. Start the mock
 
@@ -177,10 +178,33 @@ Set these when starting the mock, or change them live by opening `http://127.0.0
 | `MOCK_RUN_SECONDS` | default `25` | How long a new debate "runs". |
 | `MOCK_STORY_WRITING_SECONDS` | default `40` | How long run 5555's story says "still writing". |
 | `MOCK_POSTED_STORY_SECONDS` | default `10` | How long a new debate's story says "still writing" after it finishes. |
+| `MOCK_QUADERNO_API_KEY_PATH` | path | A file holding a Quaderno API key: every country's tax on the pricing page then comes from Quaderno. See "Tax from Quaderno" below. Unset: the mock's own table. |
+| `MOCK_QUADERNO_BASE_URL` | default `https://sandbox-quadernoapp.com/api` | Which Quaderno it asks. |
 | `MOCK_QUIET=1` | | Hides the per-request lines. |
 | `MOCK_ENGINE_DIR` | path | Where `dialectical-engine` is. Not needed when the mock runs from this folder. |
 
 A wrong value stops the start with a clear message, for example `MOCK_ROOM_INVALID: bogus (allowed: FITS, CLOSE, FULL, ALREADY_WAITING, BLOCKED)`.
+
+## Tax from Quaderno
+
+Without a key, the pricing page's tax comes from the mock's own table: each EU country's standard VAT and Texas's sales tax, and "No tax added" everywhere else. With a Quaderno key, every country the page asks for is priced by Quaderno itself, exactly as the real API does it: the API's own tax reader (`apps/api/src/billing/displayed-tax.ts`) over the production Quaderno client (`packages/tax-quaderno`), once per paid plan, in that country's currency, with the postal code in the US and Canada. An answer is kept for six hours; a place Quaderno cannot price shows no price ("The plans can't be shown right now") and is asked again after a minute.
+
+1. In your Quaderno **sandbox** account, copy the private API key (Settings, API keys).
+2. Put it in a file of its own, kept as the API keeps its keys (one line, the file `0600`, its folder `0700`, both yours):
+
+   ```sh
+   mkdir -m 700 ~/.quaderno-sandbox && (umask 077 && pbpaste > ~/.quaderno-sandbox/api-key)
+   ```
+
+3. Start the mock with it:
+
+   ```sh
+   cd dialectical-engine && MOCK_QUADERNO_API_KEY_PATH=~/.quaderno-sandbox/api-key node_modules/.bin/tsx tools/v4-mock-api/server.ts
+   ```
+
+   The ready line then says `"plans_tax":"QUADERNO"` (else `"TABLE"`). A key file it cannot read stops the start with `MOCK_QUADERNO_API_KEY_PATH_INVALID`.
+
+Quaderno adds a country's tax only where the account has a tax registration there (Settings, Tax jurisdictions); everywhere else it answers "not registered" and the card says "No tax added". So the page shows what that account would charge, not every country's rate. A failed answer is logged on the mock's error output as `billing.plans.tax_unavailable` with Quaderno's code.
 
 ## Endpoints it serves
 
@@ -194,7 +218,7 @@ A wrong value stops the start with a clear message, for example `MOCK_ROOM_INVAL
 | `GET /v1/asks/room?…` | The plan (`PLUS` or `FREE`), settings version 20, answer length offered, word targets 300/700/1500. The debate-shape switch is left out (the contract allows only "on" or absent). The query is checked like the real API checks it. Draft: `reserve`, `dig_share_percent`. |
 | `POST /v1/asks` | See above. |
 | `GET /v1/billing/usage` | Day 14%, week 31%, month 9%; with `usage=BORROWED`, day 104% with a borrow notice. |
-| `GET /v1/billing/plans` | The register's default plans (Free, Plus $20, Pro $50, Max $200). With no `?country=` there is no place yet, so no paid price is shown (the page asks for the country). With `?country=` the plans come in that country's currency (lei in Romania, euro in the euro countries, dollars elsewhere, as the register says) and each total includes its tax: each EU country's standard VAT (21% in Romania, 19% in Germany, 21% in the Czech Republic, 25% in Croatia, and so on), none added outside the EU. The US and Canada also need `?postal_code=` (a Texas ZIP such as 75201 adds 6.25%); a missing one, or one that does not fit the country's format (the kernel's own check), is asked for again. |
+| `GET /v1/billing/plans` | The register's default plans (Free, Plus $20, Pro $50, Max $200). With no `?country=` there is no place yet, so no paid price is shown (the page asks for the country). With `?country=` the plans come in that country's currency (lei in Romania, euro in the euro countries, dollars elsewhere, as the register says) and each total includes its tax: each EU country's standard VAT (21% in Romania, 19% in Germany, 21% in the Czech Republic, 25% in Croatia, and so on), none added outside the EU (with `MOCK_QUADERNO_API_KEY_PATH`, whatever Quaderno answers instead). The US and Canada also need `?postal_code=` (a Texas ZIP such as 75201 adds 6.25%); a missing one, or one that does not fit the country's format (the kernel's own check), is asked for again. |
 | `GET /v1/answers?limit=&offset=` | Finished debates, plus the open runs (running, waiting, failed). |
 | `GET /v1/answers/:id[?version=1]` | The answer (version 1 only). Draft: sources and path research. |
 | `GET /v1/answers/:id/story` | WRITING or READY, as described above. |
