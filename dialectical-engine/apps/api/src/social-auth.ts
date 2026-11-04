@@ -3,7 +3,7 @@ import { SocialLoginStatusRequestSchema, SocialLoginStatusResponseSchema, type S
 import { createEmailBlindIndex, hashToken } from '@debateai/crypto';
 import type { AuthSourceContext, PostgresSocialIdentityRepository, PostgresConsumerSecurityRepository } from '@debateai/db';
 import type { AuthPolicy } from '@debateai/register';
-import { consumerPasswordUsable, consumerSecuritySession, parseConsumerSecurityInput, refuseWithdrawalWithoutPassword } from './consumer-security.js';
+import { consumerPasswordUsable, consumerSecuritySession, parseConsumerSecurityInput } from './consumer-security.js';
 import { AuthFlowError, type AuthSourceAdmission, type RegistrationService, type RegistrationSource, type SocialRegistrationResult } from './registration.js';
 import type { AuthenticatedSession, ConsumerSessionProducer } from './sessions.js';
 import { SocialProviders, socialAuthorizationUrl, type SocialProvider, type SocialProviderConfiguration } from './social-providers/provider.js';
@@ -68,9 +68,7 @@ export class SocialAuthService implements SocialAuthApplication {
     async beginStepUp(provider: SocialProvider, input: unknown, source: AuthSourceContext, session: AuthenticatedSession) { return this.beginFlow(provider, input, source, session, true); }
     async begin(provider: SocialProvider, input: unknown, source: AuthSourceContext, session?: AuthenticatedSession) { return this.beginFlow(provider, input, source, session, false); }
     private async beginFlow(provider: SocialProvider, input: unknown, source: AuthSourceContext, session: AuthenticatedSession | undefined, stepUp: boolean) {
-        const stepUpRequest = stepUp ? parseConsumerSecurityInput(BeginSocialStepUpRequestSchema, input) : undefined;
-        if (stepUpRequest !== undefined) refuseWithdrawalWithoutPassword(stepUpRequest.authorization);
-        const parsed = stepUpRequest ?? (session ? parseConsumerSecurityInput(BeginSocialLinkRequestSchema, input) : parseConsumerSecurityInput(BeginSocialLoginRequestSchema, input));
+        const parsed = stepUp ? parseConsumerSecurityInput(BeginSocialStepUpRequestSchema, input) : session ? parseConsumerSecurityInput(BeginSocialLinkRequestSchema, input) : parseConsumerSecurityInput(BeginSocialLoginRequestSchema, input);
         const admission = await this.sessions.admit('SOCIAL_BEGIN', session?.userId ?? 'discoverable', source), config = await this.configured(provider);
         const state = random(), flowCookie = random(), nonce = this.derived('nonce', state), verifier = this.derived('pkce', state);
         const authorization_url = socialAuthorizationUrl(config, state, nonce, verifier);

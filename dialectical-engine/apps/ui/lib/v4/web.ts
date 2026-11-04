@@ -24,7 +24,7 @@ function shownPage<T extends Readonly<{ link: string }>>(page: T): boolean {
  * A point's sources as the page shows them: at most the contract's 8, each quote cut again to 120 characters at a word
  * edge (the cut is idempotent, so a served quote stays as it is), a source without a plain web link left out.
  */
-export function sourcesOf(node: AnswerNode): readonly WebSource[] {
+export function sourcesOf(node: Pick<AnswerNode, "sources">): readonly WebSource[] {
   const sources = node.sources ?? [];
   return Object.freeze(sources
     .filter(shownPage)

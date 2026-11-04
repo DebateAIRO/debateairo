@@ -17,6 +17,10 @@
  * new starts waiting for the reset, the borrow notice and the debate paused at the month wall with Continue.
  * Task W4-6: it draws the first debate's map with its four rewrite states, and a dig's map from its rewrite's own paths
  * with no story, through the website's own map builder.
+ *
+ * Owner's screen review (3 Nov 2026, journey-d2): it reads the draft start time of a running question (`started_at`).
+ * dig-d1 B and dig-f2: a running dig's draft progress read through the website's own reader (switch live=), and the played
+ * climb of the seeded level-3 dig up to the first debate (switch climb=; it waits 31 s for it).
  */
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -111,6 +115,8 @@ function must(condition: boolean, message: string): void {
 }
 
 await step("session", () => client.readSession(), (s: { asker_id: string }) => s.asker_id);
+// ask-d6 A: the V4 header's round account button reads the account's address for its initial.
+await step("account address (the header's initial)", () => client.readAccountEmail(), (a: { email: string }) => a.email.slice(0, 1).toUpperCase());
 await step("age confirmation", () => client.readAgeConfirmation(), (s: { status: string }) => s.status);
 await step("sensitive-data consent", () => client.readSensitiveDataConsent(), (s: { status: string }) => s.status);
 await step("legal status", () => client.getLegalStatus("en"), (s: { must_accept: unknown[] }) => `must_accept=${s.must_accept.length}`);
@@ -127,6 +133,19 @@ for (const [name, id] of Object.entries(RUNS)) {
       `${r.state}${r.terminal_reason ? ` (${r.terminal_reason})` : ""}${r.waits_until ? ` waits until ${r.waits_until}` : ""}`);
 }
 await expectCode("run answer of the running run", () => client.readRunAnswer(RUNS.running), "NOT_FOUND");
+// V4 screen review (wait-f1): a sign-in that ended reads as SESSION_REQUIRED (the page then asks to sign in again).
+await fetch(`${MOCK}/__mock/set?session=OUT`);
+try {
+  await expectCode("a debate read after the sign-in ended", () => client.readRun(RUNS.running), "SESSION_REQUIRED");
+  // A stranger has no quota: the room and usage reads are signed-in only, as in the real API.
+  await expectCode("the room read of a stranger", () => client.getAskRoom({ plan_tier: "premium", composition_budget_tier: "medium", depth: 2, answer_length: "standard" }), "SESSION_REQUIRED");
+  await expectCode("the usage read of a stranger", () => client.getBillingUsage(), "SESSION_REQUIRED");
+  await expectCode("the subscription read of a stranger", () => client.getBillingSubscription(), "SESSION_REQUIRED");
+  await expectCode("the invoices read of a stranger", () => client.getBillingInvoices(), "SESSION_REQUIRED");
+  await expectCode("the withdrawal of a stranger", () => client.withdrawSubscription(), "SESSION_REQUIRED");
+} finally {
+  await fetch(`${MOCK}/__mock/set?session=IN`);
+}
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const answer: any = await step("run answer (settled)", () => client.readRunAnswer(RUNS.settled), (a: { answer_id: string; nodes: unknown[] }) => `${a.answer_id}, ${a.nodes.length} points`);
 if (answer !== undefined) {
@@ -451,6 +470,40 @@ await step("a debate paused at the month wall, then Continue", async () => {
   await mock("/__mock/set?pause=UNTIL_RESET");
   return `paused until ${before.month_pause?.until ?? ready.month_pause.until}; Continue refused early, then resumed`;
 }, (value: string) => value);
+// Owner review 3 Nov (wait-f11, wait-f18): a failed run's `quota_used` (on the draft view until the contract carries it), and
+// the switch that makes new digs fail or pause, for the click-test of "Try this dig again" and the paused dig.
+await step("a failed debate's quota_used, and the dig= switch", async () => {
+  const today: Loose = await client.readRun(RUNS.failed);
+  must(today.state === "FAILED" && (today.quota_used === undefined || today.quota_used === "NONE"), "today's run read stays valid");
+  const draft: Loose = await mock(`/__mock/draft/v1/runs/${RUNS.failed}`);
+  must(draft.quota_used === "NONE", "the draft view says nothing was taken");
+  for (const dig of ["FAIL", "PAUSE", "SETTLE"]) must((await mock(`/__mock/set?dig=${dig}`)).dig === dig, `dig=${dig} is taken`);
+  return `draft quota_used ${String(draft.quota_used)}; dig= FAIL, PAUSE, SETTLE`;
+}, (value: string) => value);
+
+// Owner's screen review, 3 Nov 2026 (journey-d2, journey-f16, wait-f7): when a question started, for "Started 14:31" on any
+// device. A DRAFT field: on the draft view now; the website gets it only once the contract's run read knows `started_at`.
+await step("when a question started (draft started_at)", async () => {
+  const draft: Loose = await mock(`/__mock/draft/v1/runs/${RUNS.running}`);
+  must(typeof draft.started_at === "string" && !Number.isNaN(Date.parse(draft.started_at)), "the draft view says when it started");
+  const waiting: Loose = await mock(`/__mock/draft/v1/runs/${RUNS.waiting}`);
+  must(waiting.state === "WAITING" && waiting.started_at === undefined, "a question waiting to start has no start time");
+  const today: Loose = await client.readRun(RUNS.running);
+  must(today.started_at === undefined || today.started_at === draft.started_at, "the website gets the same time, once the contract knows it");
+  return `started ${draft.started_at}${today.started_at === undefined ? " (held back from the website until the contract knows it)" : ""}`;
+}, (value: string) => value);
+
+// Owner's screen review, 3 Nov 2026 (read-f19, public-f14, map-f33, map-f9): the window a share is of, and what a question
+// has used of it. DRAFT fields: on the draft view now; the website reads them once the contract's reads know them.
+await step("the quota's windows (draft share_scope and question_share)", async () => {
+  const room: Loose = await mock(`/__mock/draft/v1/asks/room?plan_tier=premium&composition_budget_tier=medium&depth=1&answer_length=short&dig_parent=${RUNS.settled}&dig_mode=quick`);
+  must(room.share_scope === "PERSON_DAY" || room.share_scope === "PERSON_MONTH", "a dig's room read names the window of its share");
+  const run: Loose = await mock(`/__mock/draft/v1/runs/${RUNS.settled}`);
+  must(run.question_share !== undefined && Number.isInteger(run.question_share.percent), "a settled run says what it used");
+  const today: Loose = await client.readRun(RUNS.settled);
+  must(today.month_pause === undefined || typeof today.month_pause === "object", "the website's run read stays valid");
+  return `share of ${String(room.share_scope)}; this question ${String(run.question_share.percent)}% of ${String(run.question_share.scope)}`;
+}, (value: string) => value);
 
 // Decision 13: the public-debates lane. It runs last among the asks: it adds two digs and one report to the mock.
 const PUBLIC = { debate: "f1000000-0000-4000-8000-000000000001", authorGone: "f1000000-0000-4000-8000-000000000002", update: "f2000000-0000-4000-8000-000000000001" };
@@ -468,7 +521,10 @@ await step("a public debate with one contribution, a changed main answer, one re
   must(debate.reports.length >= 1 && debate.reports[0].writer !== null, "one report, with its writer as a reference");
   const gone: Loose = await client.readPublicDebate(PUBLIC.authorGone);
   must(gone.author_name_gone === true, "the author's name went");
-  return `${String(debate.contributions.length)} contribution(s), ${String(debate.reports.length)} report(s)`;
+  // public-d1 A: the tree is published, so the page has each path's trust word and bar; every point carries a review, one rests on a checked page.
+  must(debate.answer.tree_included === true && debate.answer.nodes.every((node: Loose) => node.review !== null), "a published tree, every point reviewed");
+  must(debate.answer.nodes.some((node: Loose) => node.looked_up_checked === true), "one point on a checked page");
+  return `${String(debate.contributions.length)} contribution(s), ${String(debate.reports.length)} report(s), ${String(debate.answer.nodes.length)} points`;
 }, (value: string) => value);
 await expectCode("a public debate nobody published", () => client.readPublicDebate("f1000000-0000-4000-8000-00000000ffff"), "NOT_FOUND");
 await step("the digger's four states", async () => {
@@ -506,6 +562,24 @@ await step("the Free notice: a Free room says so, and an ask that showed it is c
   }
   return "counted";
 }, (value: string) => value);
+// Owner screen review (public-f26, public-d2 A): the public state of the asker's own debate, and the chips' draft field.
+await step("the public state of your debate: PUBLISHED with its page; the stages before it on the draft view only", async () => {
+  try {
+    await mock("/__mock/set?publicstate=PUBLISHED");
+    const published: Loose = await client.readRunVisibility(RUNS.settled);
+    must(published.state === "PUBLISHED" && published.public_ref === PUBLIC.debate, `published: ${JSON.stringify(published)}`);
+    await mock("/__mock/set?publicstate=BEING_CHECKED");
+    const checking: Loose = await client.readRunVisibility(RUNS.settled);
+    must(checking.state === "PRIVATE" && checking.public_ref === null, `the website's read: ${JSON.stringify(checking)}`);
+    const draft: Loose = await mock(`/__mock/draft/v1/runs/${RUNS.settled}/visibility`);
+    must(draft.public_stage === "BEING_CHECKED", `draft: ${JSON.stringify(draft)}`);
+  } finally {
+    await mock("/__mock/set?publicstate=PRIVATE");
+  }
+  const page: Loose = await mock(`/__mock/draft/v1/public/debates/${PUBLIC.debate}`);
+  must(Array.isArray(page.dig_suggestions) && page.dig_suggestions.length === 2, `draft chips: ${JSON.stringify(page.dig_suggestions)}`);
+  return "PUBLISHED, BEING_CHECKED (draft), chips (draft)";
+}, (value: string) => value);
 await step("Write a report: 202 and its refusals", async () => {
   const noCarrier: Loose = await client.writePublicReport(PUBLIC.authorGone);
   must(noCarrier.error === "PUBLIC_DEBATE_NO_CARRIER", `author gone: ${JSON.stringify(noCarrier)}`);
@@ -526,6 +600,19 @@ await step("Write a report: 202 and its refusals", async () => {
   const accepted: Loose = await client.writePublicReport(PUBLIC.debate);
   must(accepted.state === "WRITING" && accepted.report_version >= 2, `written: ${JSON.stringify(accepted)}`);
   return `version ${String(accepted.report_version)} writing`;
+}, (value: string) => value);
+// public-f9: a report the click-test can watch wait: accepted, and its version never arrives.
+await step("Write a report that never arrives (public=REPORT_STUCK)", async () => {
+  await mock("/__mock/set?public=REPORT_STUCK");
+  try {
+    const stuck: Loose = await client.writePublicReport(PUBLIC.debate);
+    must(stuck.state === "WRITING", `accepted: ${JSON.stringify(stuck)}`);
+    const page: Loose = await client.readPublicDebate(PUBLIC.debate);
+    must(!(page.reports ?? []).some((report: Loose) => report.report_version >= stuck.report_version), "its version is not on the page");
+    return `version ${String(stuck.report_version)} stays being written`;
+  } finally {
+    await mock("/__mock/set?public=OPEN");
+  }
 }, (value: string) => value);
 // Decision 35: the Report button, through the website's own client, and the queue through the contract's schema. It hides the first public debate, so it reads the 410 and puts it back.
 await step("Report: not found, with a person, hidden (the page answers 410), and the queue holds them", async () => {
@@ -607,6 +694,73 @@ await step("the Arabic debate says its language, and its report is in Arabic", a
   const read: Loose = await client.readInvestigation(ref);
   must(/[\u0600-\u06FF]/u.test(read.versions[0].story.short_answer), "the report's words");
   return read.versions[0].story.short_answer;
+}, (value: string) => value);
+
+// ---- The owner's screen review (3 Nov): "Your maps" on the ask page, read by the website's own shelf reader ----
+await step("Your maps: digs left out by their dig links and hung under their question; the server's extra parts held back", async () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const shelfModule: any = await import(pathToFileURL(join(UI, "lib", "v4", "mapShelf.ts")).href);
+  const { readFileSync } = await import("node:fs");
+  const v4Catalog = JSON.parse(readFileSync(join(UI, "messages", "en", "v4.json"), "utf8"));
+  const shelf: Loose = await shelfModule.readMapShelf(5, v4Catalog, { client });
+  const seededDigs = [RUNS.dig, RUNS.digOwnView, RUNS.digLevelTwo, RUNS.digLevelThree, RUNS.digFailed, RUNS.digNoChange, RUNS.deepest];
+  must(shelf.maps.length === 5 && shelf.maps.every((map: Loose) => !seededDigs.includes(map.runId)), "five real questions, no dig among them");
+  const first: Loose = shelf.maps.find((map: Loose) => map.runId === RUNS.settled);
+  must(first === undefined || first.digs.length > 0, "the first debate carries its digs");
+  must(shelf.maps.every((map: Loose) => map.bar === null && map.startedAt === null), "the draft parts are held back from today's contract");
+  const draft: Loose = await mock("/__mock/draft/v1/answers?limit=50&offset=0");
+  must(draft.open_runs.some((run: Loose) => typeof run.started_at === "string"), "a running question says when it started");
+  must(draft.items.some((item: Loose) => item.map_bar !== undefined && typeof item.changed_since_visit === "boolean"), "an answer carries its bar and its New dot");
+  must(draft.items.some((item: Loose) => item.run_ref === RUNS.dig && item.dug_from === RUNS.settled), "a dig names the debate it was dug from");
+  return shelf.maps.map((map: Loose) => `${map.state}${map.digs.length > 0 ? ` (+digs)` : ""}`).join(", ");
+}, (value: string) => value);
+
+// ---- The owner's screen review (3 Nov): a running dig's progress read (dig-d1 B) and the played climb (dig-f2), drafts ----
+await step("a running dig's steps and findings: none with live=OFF (as today's API), read by the website with live=ON", async () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const loadModule: any = await import(pathToFileURL(join(UI, "lib", "v4", "load.ts")).href);
+  const sent: Loose = await client.submitAsk({
+    ...ask, question_line: "Does this hold up? Pumped hydro could carry a windless week.",
+    parent: { parent_run_id: RUNS.settled, places: ["path:n-renew"], mode: "quick" }
+  });
+  await fetch(`${MOCK}/__mock/set?live=OFF`);
+  must((await loadModule.loadDigProgress(sent.run_ref, viaProxy)).kind === "ABSENT", "no progress read with live=OFF");
+  await fetch(`${MOCK}/__mock/set?live=ON`);
+  const on: Loose = await loadModule.loadDigProgress(sent.run_ref, viaProxy);
+  must(on.kind === "SHOWN" && on.progress.steps[0] === "FINDING_SOURCES" && on.progress.now !== null, "the web steps, one working now");
+  must((await loadModule.loadDigProgress(RUNS.settled, viaProxy)).kind === "ABSENT", "a first debate has none");
+  await fetch(`${MOCK}/__mock/set?live=OFF`);
+  return `${String(on.progress.now)}, ${String(on.progress.findings.length)} finding(s) so far`;
+}, (value: string) => value);
+await step("the played climb of the level-3 dig reaches the first debate (climb=PLAY)", async () => {
+  await fetch(`${MOCK}/__mock/set?climb=PLAY`);
+  await new Promise((done) => setTimeout(done, 31_000));
+  const renew: Loose = (await client.readRunAnswer(RUNS.settled)).path_rewrites.paths.find((path: Loose) => path.position_ref === "n-renew");
+  must(renew.history.at(-1).dig_run_id === RUNS.digLevelThree && renew.history.at(-1).state === "READY", "the climbed row is done on the first debate");
+  must((await client.readRunAnswer(RUNS.digLevelThree)).dig.rewrite.state === "READY", "the level-3 dig's own rewrite is done");
+  await fetch(`${MOCK}/__mock/set?climb=SEED`);
+  return `${String(renew.history.at(-1).cause)} row on n-renew`;
+}, (value: string) => value);
+
+// ---- The owner's screen review (3 Nov): the report from the map (report-d1 A, report-f15) ----
+await step("the report's share of today is held back from the website; a Free question reads public", async () => {
+  // An open paid investigation (5555) says the report's share on the draft view only; the website's read has no share.
+  const draft: Loose = await mock(`/__mock/draft/v1/runs/${RUNS.storyWriting}/investigation?shape=reports`);
+  const read: Loose = await client.readInvestigation(RUNS.storyWriting);
+  must(draft.report_share_percent === 5, "the draft view says the report's share");
+  must(!("report_share_percent" in read), "the strict contract's read carries no share");
+  // On Free, no share (its report comes from the reserve); a finished Free question (6666) is public.
+  await mock("/__mock/set?plan=FREE");
+  try {
+    const free: Loose = await mock(`/__mock/draft/v1/runs/${RUNS.storyWriting}/investigation?shape=reports`);
+    must(!("report_share_percent" in free), "no share on Free");
+  } finally {
+    await mock("/__mock/set?plan=PLUS");
+  }
+  const visibility: Loose = await client.readRunVisibility(RUNS.free);
+  must(visibility.state === "PUBLISHED" && typeof visibility.public_ref === "string", "the Free question is public");
+  must((await client.readRunVisibility(RUNS.settled)).state === "PRIVATE", "a paid question stays private");
+  return `share ${draft.report_share_percent}% (draft only), Free question ${visibility.state}`;
 }, (value: string) => value);
 
 console.log(failures === 0 ? "\nALL CHECKS PASSED" : `\n${failures} CHECK(S) FAILED`);

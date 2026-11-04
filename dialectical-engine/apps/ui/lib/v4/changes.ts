@@ -1,6 +1,6 @@
 import type { PathRewrite } from "@debateai/contract";
 import { rewriteByDig, rewriteStateOf, uniqueOpenQuestions } from "./mapModel.js";
-import type { DigView, RewriteState, SeenSnapshot, V4Change, V4Map, V4Path, V4Selection } from "./types.js";
+import type { DigView, RewriteState, SeenSnapshot, V4Change, V4Map, V4Selection } from "./types.js";
 
 /*
  * V4 initial (2026-10-28), D4: what the page saw, item by item, and what changed since. Fix wave 1 (Decision A): the
@@ -28,8 +28,6 @@ const REWRITE_WORDS: Readonly<Record<RewriteState, string>> = Object.freeze({
   FAILED: "REWRITE_FAILED"
 });
 const REWRITE_WORD_SET: ReadonlySet<string> = new Set(Object.values(REWRITE_WORDS));
-/** The words of a finished rewrite: told as "A dig changed the path …" or "A dig didn't change the path …". */
-const FINISHED_WORDS: ReadonlyMap<string, boolean> = new Map([["CHANGED", true], ["NO_CHANGE", false]]);
 
 function rewriteWord(rewrite: PathRewrite): string {
   return REWRITE_WORDS[rewriteStateOf(rewrite)!];
@@ -96,22 +94,4 @@ export function selectionForChange(map: V4Map, change: V4Change): V4Selection {
     return path === undefined ? "root" : `path:${path.id}`;
   }
   return "root";
-}
-
-/** W4-6: one finished rewrite told in the news: the path it rewrote and whether the dig changed it. */
-export type RewriteNews = Readonly<{ path: V4Path; changed: boolean }>;
-
-/** W4-6: the finished rewrites among these changes, each path once (the newest word wins), in the order they came. */
-export function rewriteNewsOf(map: V4Map, changes: readonly V4Change[]): readonly RewriteNews[] {
-  const byPath = new Map<string, RewriteNews>();
-  for (const change of changes) {
-    if (!change.id.startsWith("dig:")) continue;
-    const changed = FINISHED_WORDS.get(change.now);
-    if (changed === undefined) continue;
-    const rewritten = rewriteByDig(map, change.id.slice("dig:".length));
-    if (rewritten === null) continue;
-    byPath.delete(rewritten.path.id);
-    byPath.set(rewritten.path.id, { path: rewritten.path, changed });
-  }
-  return [...byPath.values()];
 }

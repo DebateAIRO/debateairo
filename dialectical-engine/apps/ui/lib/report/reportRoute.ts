@@ -1,4 +1,4 @@
-import { ContractHttpError, type Answer, type AnswerDisclosure, type AnswerStory, type ContractClient } from "@debateai/contract";
+import { ContractHttpError, webRanOnFree, type Answer, type AnswerDisclosure, type AnswerStory, type ContractClient } from "@debateai/contract";
 import publicEnglish from "../../messages/en/public.json" with { type: "json" };
 import { DEFAULT_LOCALE, isLocale, LOCALE_COOKIE, type LocaleCode } from "../i18n/locales.js";
 import { questionLocale } from "../i18n/questionLocale.js";
@@ -396,6 +396,7 @@ export type InvestigationReportRenderer = (input: Readonly<{
   question: string;
   version: FinishedInvestigationReport;
   catalogs: ReportCatalogs;
+  free: boolean;
 }>) => Promise<Buffer>;
 
 export type InvestigationReportRequestInput = Readonly<{
@@ -418,6 +419,8 @@ interface ReadyInvestigationReport {
   readonly version: FinishedInvestigationReport;
   readonly questionTag: string | null;
   readonly locale: LocaleCode;
+  /** r2-13: the first debate ran on Free (never looked up on the web). */
+  readonly free: boolean;
 }
 
 /**
@@ -430,6 +433,7 @@ async function prepareInvestigationReport(input: InvestigationReportRequestInput
   if (session === null) return refuse(401, input.interfaceLocale, signInLine);
   let question: string;
   let questionTag: string | null;
+  let free: boolean;
   let version: FinishedInvestigationReport | undefined;
   try {
     const client = input.client();
@@ -437,6 +441,7 @@ async function prepareInvestigationReport(input: InvestigationReportRequestInput
     const read = await client.readInvestigation(answer.run_ref);
     const rootAnswer = read.root_run_id.toLowerCase() === answer.run_ref.toLowerCase() ? answer : await client.readRunAnswer(read.root_run_id);
     question = ownWords(rootAnswer.question_line);
+    free = webRanOnFree(rootAnswer.web);
     questionTag = (await client.readRun(read.root_run_id)).argument_language?.tag ?? null;
     version = read.versions.find((entry): entry is FinishedInvestigationReport => entry.report_version === read.current
       && (entry.state === "READY" || entry.state === "READY_WITH_RESERVATION"));
@@ -446,7 +451,7 @@ async function prepareInvestigationReport(input: InvestigationReportRequestInput
   const locale = questionLocale(questionTag, input.interfaceLocale);
   if (version === undefined) return refuse(404, locale, notAvailableLine);
   if (!(input.supported ?? reportSupportedForLocale)(locale)) return refuse(404, locale, unsupportedLine);
-  return { kind: "ready", session, question, version, questionTag, locale };
+  return { kind: "ready", session, question, version, questionTag, locale, free };
 }
 
 /** GET: made in memory in the question's language, through the same gate as the debate's own report; nothing is stored. */
@@ -469,7 +474,7 @@ export async function handleInvestigationReportRequest(input: InvestigationRepor
   let pdf: Buffer;
   try {
     if (input.signal?.aborted === true) return busyResponse(503, gate, catalogs);
-    pdf = await (input.render ?? renderInvestigationReportPdf)({ question: prepared.question, version: prepared.version, catalogs });
+    pdf = await (input.render ?? renderInvestigationReportPdf)({ question: prepared.question, version: prepared.version, catalogs, free: prepared.free });
   } catch {
     console.error("[INVESTIGATION_REPORT_RENDER_FAILED]");
     return textResponse(500, tryAgainLine(catalogs.publicCatalog));

@@ -15,7 +15,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const tier = vi.hoisted(() => ({ value: "free" as "free" | "premium" }));
 const submitted = vi.hoisted(() => ({ calls: [] as unknown[][] }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
-vi.mock("@/components/AuthGate", () => ({ AuthGate: ({ children }: { children: (token: string) => React.ReactNode }) => children("token") }));
+// The ask page learns the session beside the page (ask-d1 D): a signed-in person here.
+vi.mock("@/components/v4/V4AskGate", () => ({ V4AskGate: ({ children }: { children: (session: "IN") => React.ReactNode }) => children("IN") }));
 vi.mock("@/components/billing/RoomNotice", () => ({ RoomNotice: () => null }));
 vi.mock("@/components/v4/V4Header", () => ({ V4Header: () => null }));
 const clarify = vi.hoisted(() => ({ asked: [] as string[], answer: (_text: string, _signal?: AbortSignal): Promise<unknown> => Promise.resolve({ source: "NONE" }), consent: true }));

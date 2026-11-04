@@ -372,17 +372,24 @@ describe("the report (V4ReportClient) shows the same", () => {
   it("drops the old 'no web yet' line for the Free note, shown once above the paths", async () => {
     const node = await report(webAnswer(FREE_PATHS), "background");
     expect(node.textContent).not.toContain("does not search the web");
-    const notes = [...node.querySelectorAll(".v4WebNote")].map((note) => note.textContent);
-    expect(notes).toEqual(["Not checked on the web; paid plans look things up."]);
-    expect(node.querySelector(".v4RepPaths")!.previousElementSibling!.textContent).toBe(notes[0]);
-    // "How this was checked" says what "Sure" means now, in the approved words of its basis.
-    const sure = [...node.querySelectorAll(".v4RepWord")].find((item) => item.querySelector("b")!.textContent === t(catalog, "v4.trust.SURE"))!;
-    expect(sure.querySelector("span")!.textContent).toBe("A second AI agreed, and the point rests on a page we looked up.");
+    // Round 2 r2-13: the screen keeps the full line; paper prints only its first, honest half.
+    const notes = [...node.querySelectorAll(".v4WebNote")];
+    expect(notes.map((note) => note.querySelector(".v4RepScreenOnly")?.textContent)).toEqual(["Not checked on the web; paid plans look things up."]);
+    expect(notes.map((note) => note.querySelector(".v4RepPrintOnly")?.textContent)).toEqual(["Not checked on the web."]);
+    expect(node.querySelector(".v4RepPaths")!.previousElementSibling).toBe(notes[0]);
+    // report-f15 (owner's screen review, 3 Nov): on Free "How this was checked" explains only the words that can appear
+    // there. Free never looks anything up, so "Sure" (a page we looked up) is not explained.
+    const words = [...node.querySelectorAll(".v4RepWord b")].map((item) => item.textContent);
+    expect(words).toEqual(["SURE_FOR_CASE", "STILL_ARGUED", "DIDNT_HOLD"].map((word) => t(catalog, `v4.trust.${word}`)));
+    expect(node.textContent).toContain(t(catalog, "v4.report.checkedWordsIntroFree"));
   });
 
   it("at the expert level: each point's sources, each path's note and other pages, with no buttons", async () => {
     const node = await report(webAnswer(PAID_PATHS), "expert");
     expect(node.textContent).not.toContain("does not search the web");
+    // "How this was checked" says what "Sure" means now, in the approved words of its basis.
+    const sure = [...node.querySelectorAll(".v4RepWord")].find((item) => item.querySelector("b")!.textContent === t(catalog, "v4.trust.SURE"))!;
+    expect(sure.querySelector("span")!.textContent).toBe("A second AI agreed, and the point rests on a page we looked up.");
     expect([...node.querySelectorAll(".v4RepPoint blockquote")].map((quote) => quote.textContent)).toEqual([
       "The offer is about a third above the current pay after tax.", "A made-up line from page S2-2."
     ]);

@@ -120,12 +120,10 @@ describe("the public debate page", () => {
     }
   });
 
-  it("keeps 'not found' for every other refusal", async () => {
-    for (const failure of [
-      ({ ContractHttpError }: typeof import("@debateai/contract")) => new ContractHttpError("NOT_FOUND", 404, "x"),
-      () => new Error("network")
-    ]) {
-      await expect(publicPage(failure)).rejects.toThrow("NEXT_NOT_FOUND");
-    }
+  it("keeps 'not found' for a debate that does not exist; a lost connection is not 'not found' (public-f7)", async () => {
+    await expect(publicPage(({ ContractHttpError }) => new ContractHttpError("NOT_FOUND", 404, "x"))).rejects.toThrow("NEXT_NOT_FOUND");
+    const html = await publicPage(() => new Error("network"));
+    expect(html).toContain("We couldn&#x27;t load this debate just now.");
+    expect(html).not.toContain(MADE_BY_NEWER);
   });
 });

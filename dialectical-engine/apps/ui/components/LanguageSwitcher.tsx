@@ -8,7 +8,8 @@ import {
   useMemo,
   useRef,
   useState,
-  type KeyboardEvent
+  type KeyboardEvent,
+  type RefObject
 } from "react";
 import {
   filterLocales,
@@ -25,7 +26,18 @@ import {
   languageSwitcherCaret
 } from "./languageSwitcherState";
 
-export function LanguageSwitcher() {
+/**
+ * V4 screen review (ask-d6 A, 3 Nov 2026): the V4 header opens the language list from its account menu's "Language" item,
+ * so the switcher can be opened from another control, with no button of its own. The panel then sits under `anchor`, and
+ * on closing `onClose(true)` asks the opener to take focus back (the opener owns it). Without `opener` nothing changes.
+ */
+export type LanguageSwitcherOpener = Readonly<{
+  open: boolean;
+  onClose: (returnFocus: boolean) => void;
+  anchor: RefObject<HTMLElement | null>;
+}>;
+
+export function LanguageSwitcher({ opener }: Readonly<{ opener?: LanguageSwitcherOpener }> = {}) {
   const { locale, catalog } = useChromeI18n();
   const current = getLocale(locale);
   const panelId = useId();
@@ -35,7 +47,8 @@ export function LanguageSwitcher() {
   const [position, setPosition] = useState({ top: 0, left: 12, width: 470 });
   const buttonRef = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  const [open, setOpen] = useState(false);
+  const [ownOpen, setOwnOpen] = useState(false);
+  const open = opener === undefined ? ownOpen : opener.open;
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => filterLocales(query), [query]);
   const filteredCodes = useMemo(() => filtered.map(({ code }) => code as LocaleCode), [filtered]);
@@ -43,17 +56,23 @@ export function LanguageSwitcher() {
   // A pointer press is under way: the blur it causes is the person's own click, never a focus loss to repair.
   const pressed = useRef(false);
 
+  const onOpenerClose = opener?.onClose;
   const close = useCallback((returnFocus = false): void => {
-    setOpen(false);
     setQuery("");
     setHighlightedCode(locale);
+    if (onOpenerClose !== undefined) {
+      onOpenerClose(returnFocus);
+      return;
+    }
+    setOwnOpen(false);
     if (returnFocus) queueMicrotask(() => buttonRef.current?.focus());
-  }, [locale]);
+  }, [locale, onOpenerClose]);
+  const anchorRef = opener?.anchor ?? buttonRef;
 
   useEffect(() => {
     if (!open) return;
     const place = () => {
-      const rect = buttonRef.current?.getBoundingClientRect(); if (!rect) return;
+      const rect = anchorRef.current?.getBoundingClientRect(); if (!rect) return;
       const width = Math.min(470, window.innerWidth - 24);
       const height = panelRef.current?.offsetHeight ?? 424;
       setPosition({ top: Math.max(12, Math.min(rect.bottom + 8, window.innerHeight - height - 12)), left: Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12)), width });
@@ -69,7 +88,7 @@ export function LanguageSwitcher() {
     const release = () => { pressed.current = false; };
     document.addEventListener("pointerdown", onPointerDown); document.addEventListener("pointerup", release); document.addEventListener("pointercancel", release);
     return () => { document.removeEventListener("pointerdown", onPointerDown); document.removeEventListener("pointerup", release); document.removeEventListener("pointercancel", release); window.removeEventListener("resize", place); window.removeEventListener("scroll", place, true); };
-  }, [close, open]);
+  }, [anchorRef, close, open]);
 
   useEffect(() => {
     if (filteredCodes.length === 0) return;
@@ -87,8 +106,12 @@ export function LanguageSwitcher() {
     if (event.key === "Tab" && panelRef.current?.contains(event.target as Node)) {
       // The panel sits at the end of <body>, so Tab out of it would leave the page: it closes and the step starts
       // from the trigger instead (Tab then moves on past it; Shift+Tab stays on it, the panel's place in the order).
-      close(false);
-      buttonRef.current?.focus();
+      if (opener === undefined) {
+        close(false);
+        buttonRef.current?.focus();
+      } else {
+        close(true);
+      }
       if (event.shiftKey) event.preventDefault();
       return;
     }
@@ -122,7 +145,7 @@ export function LanguageSwitcher() {
         close(open && next === null && !pressed.current);
       }}
     >
-      <button
+      {opener === undefined ? <button
         ref={buttonRef}
         type="button"
         className="languageSwitcherButton"
@@ -136,7 +159,7 @@ export function LanguageSwitcher() {
           if (open) close(false);
           else {
             setHighlightedCode(locale);
-            setOpen(true);
+            setOwnOpen(true);
           }
         }}
       >
@@ -144,7 +167,7 @@ export function LanguageSwitcher() {
         {/* The button's description: the language in use, named in that language. */}
         <span id={`${panelId}-current`} className="srOnly" lang={current.code}>{current.nativeName}</span>
         <span className="languageSwitcherCaret" aria-hidden>{languageSwitcherCaret(open)}</span>
-      </button>
+      </button> : null}
 
       {open ? createPortal(
         <div

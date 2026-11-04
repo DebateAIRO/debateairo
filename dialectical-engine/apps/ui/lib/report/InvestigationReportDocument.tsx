@@ -15,6 +15,7 @@ import type { InvestigationReportPdfModel, InvestigationReportPdfPath } from "./
  * The only links leaving the file are the sources' own addresses, printed in full, since a printed link cannot be followed.
  * Decision 27: a path carries its points, each with its trust word beside it; a dig's first path opens with what was dug. A big tree
  * flows across pages: a row may break between pages, each row keeps a little of itself ahead, and a deep path stops moving in at four steps.
+ * Round 2 r2-20 (owner, 3 Nov 2026): the column beside a path holds its one trust word, never an outcome tag.
  */
 const INK = "#29261F";
 const STRONG = "#1A1613";
@@ -24,7 +25,8 @@ const LINE = "#D9D3C8";
 const ACCENT = "#C15F3C";
 const LINK = "#3D5A80";
 const BODY = 10.5;
-const FATE_COLUMN = 92;
+/** The path's one trust word (r2-20), beside its line. */
+const PATH_WORD_COLUMN = 92;
 const FATE_GUTTER = 12;
 /** The trust word beside each point. */
 const TRUST_COLUMN = 76;
@@ -46,7 +48,7 @@ const styles = StyleSheet.create({
   paragraph: { fontSize: BODY, lineHeight: 1.6, marginBottom: 9 },
   note: { fontSize: 9, lineHeight: 1.5, color: MUTED, marginBottom: 9 },
   pathRow: { flexDirection: "row", marginTop: 3, marginBottom: 2 },
-  pathFate: { width: FATE_COLUMN, paddingRight: FATE_GUTTER, paddingTop: 2.5, fontWeight: 700, fontSize: 8, lineHeight: 1.35, letterSpacing: 0.6, color: MUTED },
+  pathWord: { width: PATH_WORD_COLUMN, paddingRight: FATE_GUTTER, paddingTop: 2.5, fontWeight: 700, fontSize: 8, lineHeight: 1.35, letterSpacing: 0.6, color: MUTED },
   pathBody: { flex: 1 },
   pathLine: { fontSize: BODY, lineHeight: 1.5 },
   pathSummary: { marginTop: 2, fontSize: 9.5, lineHeight: 1.5, color: TEXT_2 },
@@ -172,15 +174,15 @@ function PathRow({ look, path }: { look: Look; path: InvestigationReportPdfPath 
   const indent = LEVEL_INDENT * Math.min(path.level, LEVEL_INDENT_STEPS);
   const rtl = look.layout.markerSide === "right";
   const inward = rtl ? { marginRight: indent } : { marginLeft: indent };
-  // A point sits under its path's words, past the fate column.
-  const under = rtl ? { marginRight: indent + FATE_COLUMN } : { marginLeft: indent + FATE_COLUMN };
+  // A point sits under its path's words, past the path's word column.
+  const under = rtl ? { marginRight: indent + PATH_WORD_COLUMN } : { marginLeft: indent + PATH_WORD_COLUMN };
   return (
     <>
       {path.dig === null ? null : <View style={inward}><Dig look={look} dig={path.dig} /></View>}
       <View style={[styles.pathRow, look.row, inward]} minPresenceAhead={path.points.length === 0 ? 0 : 36}>
-        {path.fateWords === null
-          ? <View style={[styles.pathFate, look.fate]} />
-          : <Words look={look} style={[styles.pathFate, look.tracked, look.fate]} text={capitals(look, path.fateWords)} />}
+        {path.trustWords === null
+          ? <View style={[styles.pathWord, look.fate]} />
+          : <Words look={look} style={[styles.pathWord, look.tracked, look.fate]} text={capitals(look, path.trustWords)} />}
         <View style={styles.pathBody}>
           <Words look={look} style={styles.pathLine} text={path.line} />
           {path.summary === null ? null : <Words look={look} style={styles.pathSummary} text={path.summary} />}
@@ -231,6 +233,7 @@ export function InvestigationReportDocument({ model }: { model: InvestigationRep
         <Words look={look} style={styles.question} text={model.question} />
         <Words look={look} style={styles.meta} text={model.versionLine} />
         <Words look={look} style={styles.meta} text={model.disclosure} />
+        {model.webNote === null ? null : <Words look={look} style={styles.meta} text={model.webNote} />}
         {model.shortened === null ? null : <Words look={look} style={styles.meta} text={model.shortened} />}
 
         <Heading look={look} title={model.pointsTo.title} />

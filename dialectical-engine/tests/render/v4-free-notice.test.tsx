@@ -15,7 +15,8 @@ const server = vi.hoisted(() => ({
   createDebate: vi.fn(async (..._args: unknown[]) => ({ id: "11111111-1111-4111-8111-111111111111" }))
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
-vi.mock("@/components/AuthGate", () => ({ AuthGate: ({ children }: { children: (token: string) => ReactNode }) => children("token") }));
+// The ask page learns the session beside the page (ask-d1 D): a signed-in person here.
+vi.mock("@/components/v4/V4AskGate", () => ({ V4AskGate: ({ children }: { children: (session: "IN") => ReactNode }) => children("IN") }));
 vi.mock("@/components/billing/RoomNotice", () => ({ RoomNotice: () => null }));
 vi.mock("@/components/v4/V4Header", () => ({ V4Header: () => null }));
 vi.mock("@/components/SensitiveDataConsent", () => ({

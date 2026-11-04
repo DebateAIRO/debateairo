@@ -58,10 +58,35 @@ describe("the public page's words", () => {
     "v4.public.report.ongoing": "Something is still being added to this debate. Try again when it is finished.",
     "v4.public.report.noCarrier": "This debate's first author has left and no dig is on it yet, so a report can't be written. Dig into a path first.",
     "v4.public.report.write": "Write a report",
-    "v4.public.dig.open": "Dig into this",
-    "v4.public.addedBy": "Added to by {name} on {date}",
+    // journey-f13 (owner's screen review, 3 Nov): "Dig here" on every page, own and public, in place of decision 22's "Dig into this";
+    // the box's Start reads as the map's picks button ("Dig into your pick · up to 3%", lib/v4/digQuota.ts).
+    "v4.public.dig.open": "Dig here",
+    // Round 2, r2-17 (owner, 3 Nov): a whole sentence, "Quiet Heron added to this on 2 November".
+    "v4.public.addedBy": "{name} added to this on {date}",
+    "v4.public.addedByGone": "A contributor added to this on {date}",
+    // r2-14, r2-15, r2-16 and r2-21 (owner, 3 Nov), word for word.
+    "v4.public.report": "Report a problem",
+    "v4.public.flag.NOT_FOUND": "An automatic check didn't find this. You can report again with more details, and a person will read it. You can also write to support@dezbatere.ro.",
+    "v4.public.dig.terms": "This uses your own quota. An AI checks it before it can change this public page.",
+    "v4.public.dig.howItWorks": "How this works",
+    "v4.public.signedOut.createAccount": "Create a free account",
+    "v4.public.signedOut.signIn": "Sign in",
     "v4.public.report.writtenBy": "Report written by {name}",
-    "v4.public.aContributor": "a contributor"
+    "v4.public.aContributor": "a contributor",
+    // The owner's screen review of 3 Nov (public-d2 A, journey-f20, public-f26): the record's own words, word for word.
+    "v4.public.dig.writeOwn": "Or write your own",
+    "v4.public.dig.dugNear": "Someone dug near here on {date}",
+    "v4.public.digCard.stopDone": "Dig done",
+    "v4.public.digCard.stopChecked": "Checked",
+    "v4.public.digCard.onPage": "On the public page",
+    "v4.public.digCard.seeOnPage": "See it on the page",
+    "v4.public.digCard.keptPrivate": "Kept with you: the public page is unchanged.",
+    // journey-f10: the public dig's win sentence is the map's own "What your digs did" line, one key (WHOLE-8).
+    "v4.digsDid.holds": "Confirmed: the answer holds.",
+    "v4.publicMark.public": "Public",
+    "v4.publicMark.seePage": "See its page",
+    "v4.publicMark.copyLink": "Copy link",
+    "v4.publicMark.willBePublic": "This will be public."
   };
   it("the briefed sentences, word for word", () => {
     for (const [key, words] of Object.entries(OWNER_WORDS)) expect(CATALOG[key], key).toBe(words);
@@ -151,6 +176,19 @@ describe("what a dig on a public page sends", () => {
   });
   it("an empty box sends nothing", () => {
     expect(publicDigAsk({ publicRef: PUBLIC_REF, question: "Q?", path, views: ["  "], catalog: CATALOG, locale: "en" })).toBeNull();
+  });
+  it("owner screen review (public-f11, public-d2 A): Thorough when chosen, and the path's own suggestions the person tapped, first", () => {
+    const chip = { suggestion_id: "pub-fares-drivers", kind: "CONTRADICTING" as const, side: null, text: "Did any city see many drivers switch?", places: ["path:p-fares"] };
+    const sent = publicDigAsk({ publicRef: PUBLIC_REF, question: "Q?", path, views: ["Mine."], chips: [chip], mode: "thorough", catalog: CATALOG, locale: "en" })!;
+    expect(sent.parent).toEqual({ public_ref: PUBLIC_REF, places: ["path:p-fares"], mode: "thorough", picks: [
+      { kind: "CONTRADICTING", suggestion_id: "pub-fares-drivers", place: "path:p-fares", text: "Did any city see many drivers switch?" },
+      { kind: "OWN_VIEW", suggestion_id: null, place: "path:p-fares", text: "Mine." }
+    ] });
+    // The dig as the site's one Undo list keeps it: the path's picks, under the path.
+    expect(sent.target).toMatchObject({ kind: "picks", path: { id: "p-fares", line: path.line } });
+    expect(sent.questionLine).toContain("Did any city see many drivers switch?");
+    // Tapped chips alone are a dig too; with no mode named it is a quick look.
+    expect(publicDigAsk({ publicRef: PUBLIC_REF, question: "Q?", path, views: [], chips: [chip], catalog: CATALOG, locale: "en" })!.parent.mode).toBe("quick");
   });
 });
 

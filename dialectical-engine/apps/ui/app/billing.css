@@ -10,6 +10,8 @@
 .pricingCard { display: flex; flex-direction: column; gap: 10px; padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--core); }
 .pricingCard h2 { margin: 0; font-family: var(--font-display); font-size: 24px; }
 .pricingPrice { margin: 0; font-size: 20px; font-weight: 600; }
+/* Terms §12: the total stays as plain to read as the price and its tax above it. */
+.pricingTotal { margin: -4px 0 0; font-size: 16px; font-weight: 600; }
 .pricingNote,
 .billingNote { margin: 0; color: var(--muted); font-size: 13px; }
 .pricingCard .btn { margin-top: auto; text-align: center; }
@@ -27,4 +29,3 @@
 /* Terms §12: the place the cards are priced for (the country, and the US or Canadian postal code). */
 .pricingPlace { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-top: 24px; }
 .pricingPlace .billingField { margin-top: 0; min-width: min(100%, 220px); }
-.pricingUnpriced { font-size: 15px; font-weight: 500; color: var(--muted); }

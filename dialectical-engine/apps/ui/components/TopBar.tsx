@@ -29,6 +29,11 @@ const SCREEN_TITLES: Record<string, string> = {
 
 const AUTH_PATHS = new Set(["/login", "/sign-up", "/verify-email", "/enroll-mfa"]);
 
+/** The V4 pages: the ask page (/v4) and everything under it (a debate's map, its report). */
+export function isV4Page(pathname: string | null): boolean {
+  return pathname === "/v4" || (pathname?.startsWith("/v4/") ?? false);
+}
+
 export function BrandMark({
   href = "/",
   homeNavigationAvailable = true
@@ -71,6 +76,9 @@ export function TopBar() {
   // is that same view, so the public route suppresses this bar for the same
   // reason the private one does.
   if (pathname?.startsWith("/debate/") || pathname?.startsWith("/public/debate/")) return null;
+  // V4 screen review (ask-f5, 3 Nov 2026): the V4 pages have one header row, their own (V4Header, with the account menu);
+  // the cookie and legal links stay in the footer.
+  if (isV4Page(pathname)) return null;
 
   if (pathname !== null && AUTH_PATHS.has(pathname)) {
     return (

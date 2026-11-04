@@ -23,19 +23,23 @@ export function useQuestionRefusal({ catalog, locale, countryHint = null }: Read
   catalog: MessageCatalog;
   locale: string;
   countryHint?: string | null;
-}>): Readonly<{ offer(failure: unknown): boolean; dialog: React.ReactNode }> {
+}>): Readonly<{ offer(failure: unknown, about?: React.ReactNode): boolean; dialog: React.ReactNode }> {
   const [screen, setScreen] = React.useState<RefusalScreen | null>(null);
+  const [about, setAbout] = React.useState<React.ReactNode>(null);
   const [helpOpen, setHelpOpen] = React.useState(false);
-  const offer = (failure: unknown): boolean => {
+  // V4 screen review (dig-f9, 3 Nov): `about` names what the screen is about when it opens a while after the press that
+  // led to it (a V4 dig is sent 10 seconds after its click). Absent: the screen is as before.
+  const offer = (failure: unknown, aboutLine?: React.ReactNode): boolean => {
     const refusal = questionRefusalOf(failure);
     if (refusal === null) return false;
     setHelpOpen(false);
+    setAbout(aboutLine ?? null);
     setScreen(refusal);
     return true;
   };
   const dialog = helpOpen ? <CrisisSupportDialog catalog={catalog} locale={locale} countryHint={countryHint} onBack={() => setHelpOpen(false)} />
     : screen !== null ? <QuestionRefusalDialog
-      catalog={catalog} locale={locale} countryHint={countryHint} screen={screen}
+      catalog={catalog} locale={locale} countryHint={countryHint} screen={screen} about={about}
       onBack={() => setScreen(null)} onHelpNumbers={() => { setScreen(null); setHelpOpen(true); }}
     /> : null;
   return { offer, dialog };
@@ -49,11 +53,13 @@ function browserLanguages(): readonly string[] {
   return navigator.languages?.length ? navigator.languages : [navigator.language].filter(Boolean);
 }
 
-function QuestionRefusalDialog({ catalog, locale, countryHint, screen, onBack, onHelpNumbers }: Readonly<{
+function QuestionRefusalDialog({ catalog, locale, countryHint, screen, about = null, onBack, onHelpNumbers }: Readonly<{
   catalog: MessageCatalog;
   locale: string;
   countryHint: string | null;
   screen: RefusalScreen;
+  /** What the screen is about, said first (null: nothing, as before). */
+  about?: React.ReactNode;
   onBack: () => void;
   onHelpNumbers: () => void;
 }>): React.ReactElement {
@@ -70,11 +76,12 @@ function QuestionRefusalDialog({ catalog, locale, countryHint, screen, onBack, o
     ? resolveCrisisCountry({ hint: countryHint, browserLanguages: browserLanguages(), locale }) : null;
   return <div className="policyScrim">
     <div className="policyBezel questionRefusal" role="dialog" aria-modal="true"
-      aria-labelledby="question-refusal-title" data-dialog="question-refusal"
+      aria-labelledby={about !== null ? "question-refusal-about question-refusal-title" : "question-refusal-title"} data-dialog="question-refusal"
       ref={(node) => { dialogRef.current = node; }}>
       <div className="policyCore">
         <span className="policyTab" aria-hidden="true" />
         <div className="policyHead"><div className="policyHeadText">
+          {about !== null ? <p id="question-refusal-about" className="crisisSupportLede" data-part="about">{about}</p> : null}
           <h2 id="question-refusal-title" className="policyTitle" tabIndex={-1}
             ref={(node) => { titleRef.current = node; }}>{title}</h2>
           <p className="crisisSupportLede" data-part="not-started">{t(catalog, "home.questionRefusal.notStarted")}</p>

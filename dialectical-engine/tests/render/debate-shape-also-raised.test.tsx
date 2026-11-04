@@ -62,6 +62,9 @@ vi.mock("@/components/AuthGate", () => ({
   AuthGate: ({ children }: { children: (token: string) => ReactNode }) => children("t".repeat(43))
 }));
 vi.mock("@/components/support/SupportWidget", () => ({ SupportWidget: () => null }));
+// ask-d6 A: the public page's V4 header ends in the account button, which reads the session and the account's address; its
+// own test is v4-header-account, so here it stands in (as in the other suites that render the real V4 header).
+vi.mock("@/components/v4/V4AccountMenu", () => ({ V4AccountMenu: () => null }));
 vi.mock("next/link", () => ({
   default: ({ children, ...props }: { children: ReactNode; href: string }) => <a {...props}>{children}</a>
 }));
@@ -176,16 +179,6 @@ function publicPage(): ReactElement {
   );
 }
 
-/** Open one of the page's reading views by its button (the published page lands on the overview). */
-async function openView(container: HTMLElement, label: string): Promise<void> {
-  const button = [...container.querySelectorAll<HTMLButtonElement>(
-    `[role="group"][aria-label="${chromeEnglish["chrome.view"]}"] > button`
-  )].find((candidate) => candidate.textContent === label);
-  expect(button, label).not.toBeUndefined();
-  await act(async () => button!.click());
-  await flush();
-}
-
 /** Who raised a point, how many did, or a position's number: none of it may reach the list. */
 const WHO_OR_HOW_MANY = ["OpenAI", "Anthropic", "xAI", "Google", "raised by", "raised_by", "P1", "P2"];
 function expectNoWhoOrHowMany(text: string): void {
@@ -255,15 +248,21 @@ describe("debate shape P2c — the public overview's also-raised list", () => {
   });
 });
 
+/*
+ * Owner's screen review, 3 Nov 2026 (public-d1 A): the published page is V4's answer-first page, read like the person's own map. It has no classic
+ * Thread or Tree view, so the position titles those views drew are not on it; what was raised but not debated stays, in the question's language, with
+ * only the claims.
+ */
 describe("debate shape P2c — the published debate page", () => {
-  it("titles each position from the snapshot's map view and nodes, in the question's language", async () => {
+  it("lists what was raised but not debated, in the question's language, and shows no classic view or position number", async () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     const container = await mount(publicPage());
-    for (const view of [chromeEnglish["chrome.thread"], chromeEnglish["chrome.tree"]]) {
-      await openView(container, view);
-      expect(titlesIn(container).sort(), view).toEqual([...TITLES].sort());
-      for (const title of container.querySelectorAll(".positionTitle")) expect(title.getAttribute("lang"), view).toBe("ro");
-    }
+    expect(container.querySelectorAll(`[role="group"][aria-label="${chromeEnglish["chrome.view"]}"] > button`)).toHaveLength(0);
+    const section = container.querySelector<HTMLElement>("section.alsoRaised");
+    expect(section?.getAttribute("lang")).toBe("ro");
+    expect([...section!.querySelectorAll(".alsoRaisedItem")].map((item) => item.textContent)).toEqual(VIEW.also_raised);
+    expectNoWhoOrHowMany(section!.textContent ?? "");
+    expect(container.querySelector(".positionTitle")).toBeNull();
   });
 });
 

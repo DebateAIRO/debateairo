@@ -18,12 +18,12 @@ describe("P18 billing formatting helpers", () => {
     expect(formatMoney("en", "20", "USD")).toBe("20");
   });
 
-  it("names plans from the catalogue and words the allowance as a multiple, never as credit", () => {
+  it("names plans from the catalogue and words the quota as a multiple, never as credit", () => {
     expect(planName(billingEnglish, "PRO")).toBe("Pro");
-    expect(allowanceText(billingEnglish, "en", "FREE", "0.04")).toBe("A small monthly allowance");
-    expect(allowanceText(billingEnglish, "en", "PLUS", "1")).toBe("The Plus allowance");
-    expect(allowanceText(billingEnglish, "en", "PRO", "4")).toBe("4× the Plus allowance");
-    expect(allowanceText(billingEnglish, "en", "MAX", "30")).toBe("30× the Plus allowance");
+    expect(allowanceText(billingEnglish, "en", "FREE", "0.04")).toBe("A small monthly quota");
+    expect(allowanceText(billingEnglish, "en", "PLUS", "1")).toBe("The Plus quota");
+    expect(allowanceText(billingEnglish, "en", "PRO", "4")).toBe("4× the Plus quota");
+    expect(allowanceText(billingEnglish, "en", "MAX", "30")).toBe("30× the Plus quota");
   });
 
   it("builds the tax label from its parts, the amount first as spec §1.3 shows it, and handles the untaxed cases", () => {

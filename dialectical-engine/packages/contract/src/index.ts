@@ -659,8 +659,9 @@ export type BillingPrices = z.infer<typeof BillingPricesSchema>;
 const BillingIso2Schema = z.string().regex(/^[A-Z]{2}$/);
 
 /**
- * Terms §12: "Prices include VAT, GST or sales tax, which depends on where you live". The tax the connection's country
- * adds to every plan, as the tax engine the quote asks answers it for that country alone (no address yet).
+ * Terms §12: "Our prices are shown before tax, as price + VAT (or GST or sales tax, depending on where you live)". The
+ * tax the connection's country adds to every plan, as the tax engine the quote asks answers it for that country alone
+ * (no address yet).
  */
 export const BillingPlansTaxSchema = z.object({
   country: BillingIso2Schema,
@@ -908,8 +909,8 @@ export const BillingUpgradePendingErrorSchema = z.object({
 }).strict();
 /** What `upgradeSubscription` resolves to for that 409, beside NETOPIA's page. */
 export type BillingUpgradePendingResponse = Readonly<{ state: "PENDING"; charge_ref: string }>;
-/** P12d: the step-up grant for WITHDRAW_SUBSCRIPTION (the same 43-character token every step-up grant is). */
-export const BillingWithdrawRequestSchema = z.object({ step_up_grant: z.string().regex(/^[A-Za-z0-9_-]{43}$/u) }).strict();
+/** OUG 34/2014 art. 11^1 (owner ruling 2026-11-04): the signed-in session withdraws; the body is empty, no step-up grant. */
+export const BillingWithdrawRequestSchema = z.object({}).strict();
 /**
  * `refund`: what goes back to the card. Null when a refund made in NETOPIA's admin already touched a payment:
  * the plan has ended, and the owner settles what is still due and writes (P14c; M8 follows).

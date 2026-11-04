@@ -14,6 +14,8 @@ On 31 Oct 2026 (R22 decision 29) it gained dynamic step 2: `POST /v1/asks/clarif
 
 On 1 Nov 2026 (R22, for the owner's click-test) it gained the final report as the website reads it: `GET /v1/runs/:id/investigation` serves report versions (the older shape stays at `/__mock/draft/v1/runs/:id/investigation`), `POST /v1/runs/:id/report` ("Write my report": about 8 seconds of "being written", then finished; `report=FAIL` makes it fail) and `POST /v1/runs/:id/reopen` ("Keep digging"). So the current version's PDF can be made against the mock, once the browser has the sign-in cookie. And a debate in Arabic, `a2000000-0000-4000-8000-000000000001`: its question and report are in Arabic (the rest of its map is the English seed), so the page offers Print in place of the PDF.
 
+On 4 Nov 2026 (V4 screen review, dig-f1) the first debate gained its main answer, rewritten after its digs: version 1 while a change is still being written into it (45 seconds after the mock starts, `MOCK_MAIN_ANSWER_SECONDS`), then version 2.
+
 ## Files
 
 | File | What it is |
@@ -23,9 +25,12 @@ On 1 Nov 2026 (R22, for the owner's click-test) it gained the final report as th
 | `web-draft.ts` | The shapes of the web search, dig suggestions and investigations, imported from the contract (W1-6), and how they would be held back from a contract that does not know them. See "Draft fields" below. |
 | `web-seed.ts` | The made-up web pages of the seeded debates (all on `.example` sites; no real article is quoted). |
 | `rewrite-seed.ts` | The new dig model's seeded rewrites, digs and dig trail, and the money rule's paused debate and borrow notice (task W2-7). |
+| `live-seed.ts` | Draft (owner review 3 Nov, dig-d1 B): a running dig's steps and checked findings, for `GET /v1/runs/:id/progress` (switch `live=ON`). |
+| `climb-seed.ts` | Draft (owner review 3 Nov, dig-f2): the played climb of the seeded level-3 dig up to the first debate (switch `climb=PLAY`). |
+| `quaderno-tax.ts` | Prices `GET /v1/billing/plans` through Quaderno itself when `MOCK_QUADERNO_API_KEY_PATH` is set: the API's own tax reader (`DisplayedTaxReader`) over the production Quaderno client. See "Tax from Quaderno" below. |
 | `check.ts` | Self-check. It reads every endpoint through the website's own code: the `/api` proxy, the typed client, and the V4 map builder. |
 
-The unit test `tests/unit/v4-mock-api.test.ts` checks the seed and the draft shapes without starting anything.
+The unit test `tests/unit/v4-mock-api.test.ts` checks the seed and the draft shapes without starting anything. `tests/unit/v4-mock-quaderno.test.ts` checks the Quaderno pricing against the acceptance fake of Quaderno.
 
 ## 1. Start the mock
 
@@ -73,17 +78,17 @@ All the answers carry the same English debate: *"Should countries build new nucl
 
 | Run id | What you see | Web case | Investigation |
 |---|---|---|---|
-| `11111111-1111-4111-8111-111111111111` | **Finished**, the nuclear question, story ready. Answer id `aaaa1111-…`. | paid, searched | **open** (reopened by its dig 8888; report version 1 kept as an earlier version) |
+| `11111111-1111-4111-8111-111111111111` | **Finished**, the nuclear question, story ready. Answer id `aaaa1111-…`. Its main answer (rewritten after its digs) is still being rewritten for the first 45 seconds, then shows version 2: the map shows it without a reload, as news at the question. | paid, searched | **open** (reopened by its dig 8888; report version 1 kept as an earlier version) |
 | `22222222-2222-4222-8222-222222222222` | **Running forever** ("Is a four-day work week good for productivity and for workers?"). | – | open |
 | `33333333-3333-4333-8333-333333333333` | **Waiting in line**. It is expected to start 20 minutes after the mock started. | – | open |
-| `44444444-4444-4444-8444-444444444444` | **Failed** with `RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM` (the website's "the AI models it needs were unavailable" sentence). | – | none |
+| `44444444-4444-4444-8444-444444444444` | **Failed** with `RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM` (the website's "the AI models it needs were unavailable" sentence). Its draft view says `quota_used: "NONE"` (owner review 3 Nov). Its page offers "Ask this again", which opens `/v4?again=4444…` with the question filled in. | – | none |
 | `55555555-5555-4555-8555-555555555555` | **Finished**, but its story says "still writing" for the first 40 seconds after the mock starts. Answer id `aaaa5555-…`. | paid, searched | open |
 | `66666666-6666-4666-8666-666666666666` | **Finished**, asked on the **Free** plan. Answer id `aaaa6666-…`. | Free: not on this plan | closed (report version 1) |
 | `77777777-7777-4777-8777-777777777777` | **Finished**, but its **web search failed**. Answer id `aaaa7777-…`. | failed | open |
 | `88888888-8888-4888-8888-888888888888` | **Finished dig** of 1111, from the still-argued point `p:n-renew-storage`, quick look. Answer id `aaaa8888-…`. **Level 1**; it rewrote 1111's path n-renew (an AI suggestion, so no verdict). | paid, searched | member of 1111's |
 | `d1000000-0000-4000-8000-000000000001` | **Finished dig** of 1111's path n-mix with the person's **own view** and their **edit** of a suggestion. Level 1. Answer id `aaaad100-…`. Its rewrite carries the verdict "helped this path and the main question". | paid, searched | member of 1111's |
 | `d2000000-0000-4000-8000-000000000002` | **Finished dig of the dig** 8888 (its path n-renew), with the person's own view. **Level 2**. Answer id `aaaad200-…`. Verdict "did not help this path"; 1111's n-renew is marked "a dig further down changed part of this". | paid, searched | member of 1111's |
-| `d3000000-0000-4000-8000-000000000003` | **Finished dig** of d200's path n-nuclear, thorough. **Level 3**. Answer id `aaaad300-…`. Its rewrite is **still writing**. | paid, searched | member of 1111's |
+| `d3000000-0000-4000-8000-000000000003` | **Finished dig** of d200's path n-nuclear, thorough. **Level 3**. Answer id `aaaad300-…`. Its rewrite is **still writing**, so the first debate's map keeps reading its answer every 15 s (dig-f2) until the switch `climb=PLAY` plays the rest of the climb up to it. | paid, searched | member of 1111's |
 | `d4000000-0000-4000-8000-000000000004` | **Finished dig** of 1111's path n-nuclear (task W4-6). Level 1. Answer id `aaaad400-…`. Its rewrite **failed**: the path keeps its text, and the page says the dig's points and sources are below. | paid, searched | member of 1111's |
 | `d5000000-0000-4000-8000-000000000005` | **Finished dig** of 1111's path n-smr (task W4-6). Level 1. Answer id `aaaad500-…`. Its rewrite is ready but **changed nothing** ("The dig didn't change this path."). | paid, searched | member of 1111's |
 | `d1000000-0000-4000-8000-000000000010` | **Finished dig at the deepest level (10)**, hung under d300 (task W3-4). Answer id `aaaad110-…`. The six digs between levels 3 and 10 are not seeded: only its own answer says level 10, so its map offers no dig anywhere and shows the "deepest level" line. | paid, searched | member of 1111's |
@@ -118,6 +123,8 @@ The shapes are task W1-6's (`packages/contract/src/web.ts`). W1-6 merged (`76e93
 | `POST /v1/asks` | `parent` | a dig names its parent run, the places it was dug from, its mode, and its picks (suggestions as sent, edited or not, and the person's own view) |
 | `GET /v1/runs/:id/investigation` | (new route; W1-6 names no route yet) | the investigation the run belongs to: state `OPEN`/`CLOSED`, its digs (the 0131 link records), and every closing with its report version |
 | `POST /v1/runs/:id/investigation/close` | (new route) | "Write my report": closes it and adds a report version |
+| `GET /v1/answers` (each row) | `started_at`, `map_bar`, `changed_since_visit`, `dug_from` | the ask page's "Your maps" (owner's screen review, 3 Nov 2026): when an open question started ("Being looked into, started 14:00"), an answer's four-shade bar (`sure`, `sure_for_case`, `still_argued`, `didnt_hold`), whether its map changed since the person last opened it (here: no last visit recorded yet; the "New" dot), and the debate a dig was dug from (null for a first question). **The contract's rows are strict and do not name these yet, so the website never receives them**: the page shows the calm fallback (no time, no bar, no dot, and it reads each row's dig links). See them at `/__mock/draft/v1/answers?limit=50&offset=0`. |
+| `GET /v1/runs/:id/investigation` | `report_share_percent` | the owner's screen review (3 Nov 2026, report-d1 A): roughly what share of today's quota writing the report uses, a whole percent in the dig share's steps of 5 (here always 5%), while a report can be asked for on a paid plan (nothing being written, and no finished version since the investigation was last reopened); never on Free, whose report comes from the small reserve. **The contract's read is strict and does not name it yet, so the website never receives it**: the strip "Write my report" turns into leaves the share line out. See it at `/__mock/draft/v1/runs/<id>/investigation?shape=reports` (the draft address without `?shape=reports` keeps the older shape). |
 
 How they are sent:
 
@@ -144,7 +151,17 @@ The shapes are the contract's (`packages/contract/src/web.ts`, merged in W2-7), 
 | `GET /v1/asks/room` | `start_share_percent`, `new_starts` | a new question's share of today (15% in the mock); `BLOCKED_UNTIL_RESET` when the day is used up (switch `room=WAIT_RESET`) |
 | `GET /v1/billing/usage` | `borrowed` | with `usage=BORROWED`: the day reads 104% and running work used 4% of tomorrow's allowance |
 | `GET /v1/runs/:id` | `month_pause` | on run `e100…`: `until` (the next month) and `can_continue` |
+| `GET /v1/runs/:id` | `quota_used` (owner review 3 Nov; NOT in the contract yet) | on a failed run: `NONE` (nothing was taken from the person's quota) or `SOME`. Only the draft view shows it; the website says "Nothing was taken" once the contract carries it |
 | `POST /v1/runs/:id/continue` | (draft route) | 409 `RUN_PAUSED_UNTIL_RESET` before the month reset, 200 `{"state":"CONTINUING"}` after it (switch `pause=CAN_CONTINUE`); setting `pause=` again pauses the run again |
+
+**The quota's windows (owner's screen review, 3 Nov 2026: read-f19, public-f14, map-f33, map-f9):** two more fields that are NOT in the contract yet, so, like `started_at`, they are sent on the draft view (`/__mock/draft/v1/…`) and on the normal view only once the contract's own (strict) schema accepts them (they never make a read fall back and lose its shares or its month pause):
+
+| Where | Field | What it holds |
+|---|---|---|
+| `GET /v1/asks/room` | `share_scope` | the window the read's share (`start_share_percent` or `dig_share_percent`) is measured against, the one that will actually stop the person: `PERSON_MONTH` on Free (`plan=FREE`), `PERSON_DAY` otherwise. The website then says "of this month" / "of this week"; without it, it says what the server measures today (Free: the month, else today) |
+| `GET /v1/runs/:id` | `question_share` | on a running or settled run: `{ scope, percent }`, what this question (with its digs) has used of that window (11% in the mock), for the map's "This question: 11% of today" |
+
+**The waiting card's start time (owner's screen review, 3 Nov 2026, journey-d2):** `GET /v1/runs/:id` may carry `started_at`, when the question started (ISO), so the card says "Started 14:31" on any device and after a reload. It is NOT in the contract yet (the run read's schema is strict), so today it is sent only on the draft view (`/__mock/draft/v1/runs/:id`), and on the normal view only once the contract's own schema accepts it. Seeded: the running run `2222…` (started 4 minutes before the mock), the paused run `e100…`, every settled run and every new ask that runs; a run waiting to start (`3333…`) has none.
 
 Every dig keeps its points and its answer text (owner Q-D13). The mock's digs still have a story, but since task W4-6 the website never reads a dig's story: a dig's map is drawn from its rewrite's own paths (each with its line and fate), or from the positions it argued while its rewrite is still being written.
 
@@ -172,21 +189,54 @@ Set these when starting the mock, or change them live by opening `http://127.0.0
 | `MOCK_PAUSE` / `pause=` | `UNTIL_RESET` (default), `CAN_CONTINUE` | Whether the paused debate `e100…` may continue yet (W2-7). Setting it pauses that debate again. |
 | `MOCK_ASK` / `ask=` | `AUTO` (default), `ACCEPT`, `WAITING`, `ALREADY_WAITING`, `LANGUAGE_CHOICE` | What a new ask gets. `AUTO` follows the room: FULL, BLOCKED or WAIT_RESET makes asks wait in line, ALREADY_WAITING refuses with 422, anything else accepts. |
 | `MOCK_REPORT` / `report=` | `OK` (default), `FAIL` | Whether the next report written comes out finished or failed. |
+| `MOCK_DIG` / `dig=` | `SETTLE` (default), `FAIL`, `PAUSE` | How a NEW dig ends (owner review 3 Nov): it finishes; it runs its time and then fails "stopped partway" (its draft view says `quota_used: "SOME"`), so "Try this dig again" and, after a second failure, "This keeps failing" can be seen; or it pauses at the month wall at once (its card reads "Dig · paused until …", and once `pause=CAN_CONTINUE` its panel's Continue lets it finish). |
+| `MOCK_LIVE` / `live=` | `OFF` (default), `ON` | Draft (owner review 3 Nov, dig-d1 B): `ON` serves a running dig's steps and checked findings at `GET /v1/runs/:id/progress` (`live-seed.ts`), so a dig's panel shows "Finding sources › Reading › Checking › Writing what changed" and each finding as it passes; `OFF` answers 404 there, as today's API does, and the panel shows the one calm line. |
+| `MOCK_CLIMB` / `climb=` | `SEED` (default), `PLAY` | Draft (owner review 3 Nov, dig-f2; `climb-seed.ts`): `PLAY` plays, from that moment, the rest of the climb of the seeded level-3 dig `d300…` up to the first debate (each level 10 s: d300's own rewrite, then 8888's path, then 1111's `n-renew`). The first debate's map shows the change without a reload, and stops reading again once it has landed. Setting `PLAY` again plays it again from now. |
+| `MOCK_PUBLIC` / `public=` | `OPEN` (default), `ONGOING`, `REPORT_WRITING`, `TOO_DEEP`, `REPORT_STUCK` | What a public debate's presses get: see "Public debates" (Refusals, and "A report that never arrives"). |
+| `MOCK_PUBLIC_STATE` / `publicstate=` | `PRIVATE` (default), `WILL_BE_PUBLIC`, `BEING_CHECKED`, `PUBLISHED`, `KEPT_PRIVATE` | Every question's public state (its visibility read): see "Public debates" ("The globe line on your own map"). |
+| `MOCK_PUBLIC_DIG_SHARE` / `publicdigshare=` | `OFF` (default), `ON` | Draft (public-d3 A, public-f11): `ON` makes a room read with no dig parent carry a quick dig's share (`dig_share_percent`, 20%) instead of a new question's, so a public page's dig box shows "Dig here · up to 20%" and its period line ("of today · you can still finish your report"). The real API cannot say a dig's share on someone else's public debate yet (server need). While it is `ON`, the ask page shows no share of its own (one estimate per read). |
+| `session=` | `IN` (default), `OUT` | A stranger (`OUT`): see "Public debates" ("A stranger", and "A sign-in that ended during a wait"). |
+| `subscription=RESET` | | Puts the Plus subscription back inside its 14 days after a withdrawal, so the withdrawal can be clicked again. |
 | `MOCK_REPORT_SECONDS` | default `8` | How long "Write my report" reads as being written. |
 | `MOCK_PORT` | default `4011` | Port (always on 127.0.0.1). |
 | `MOCK_RUN_SECONDS` | default `25` | How long a new debate "runs". |
 | `MOCK_STORY_WRITING_SECONDS` | default `40` | How long run 5555's story says "still writing". |
 | `MOCK_POSTED_STORY_SECONDS` | default `10` | How long a new debate's story says "still writing" after it finishes. |
+| `MOCK_MAIN_ANSWER_SECONDS` | default `45` | How long run 1111's main answer says a change is still being written into it, before version 2 shows. |
+| `MOCK_QUADERNO_API_KEY_PATH` | path | A file holding a Quaderno API key: every country's tax on the pricing page then comes from Quaderno. See "Tax from Quaderno" below. Unset: the mock's own table. |
+| `MOCK_QUADERNO_BASE_URL` | default `https://sandbox-quadernoapp.com/api` | Which Quaderno it asks. |
 | `MOCK_QUIET=1` | | Hides the per-request lines. |
 | `MOCK_ENGINE_DIR` | path | Where `dialectical-engine` is. Not needed when the mock runs from this folder. |
 
 A wrong value stops the start with a clear message, for example `MOCK_ROOM_INVALID: bogus (allowed: FITS, CLOSE, FULL, ALREADY_WAITING, BLOCKED)`.
+
+## Tax from Quaderno
+
+Without a key, the pricing page's tax comes from the mock's own table: each EU country's standard VAT and Texas's sales tax, and "No tax added" everywhere else. With a Quaderno key, every country the page asks for is priced by Quaderno itself, exactly as the real API does it: the API's own tax reader (`apps/api/src/billing/displayed-tax.ts`) over the production Quaderno client (`packages/tax-quaderno`), once per paid plan, in that country's currency, with the postal code in the US and Canada. An answer is kept for six hours; a place Quaderno cannot price shows the price before tax with "+ tax where it applies" and is asked again after a minute.
+
+1. In your Quaderno **sandbox** account, copy the private API key (Settings, API keys).
+2. Put it in a file of its own, kept as the API keeps its keys (one line, the file `0600`, its folder `0700`, both yours):
+
+   ```sh
+   mkdir -m 700 ~/.quaderno-sandbox && (umask 077 && pbpaste > ~/.quaderno-sandbox/api-key)
+   ```
+
+3. Start the mock with it:
+
+   ```sh
+   cd dialectical-engine && MOCK_QUADERNO_API_KEY_PATH=~/.quaderno-sandbox/api-key node_modules/.bin/tsx tools/v4-mock-api/server.ts
+   ```
+
+   The ready line then says `"plans_tax":"QUADERNO"` (else `"TABLE"`). A key file it cannot read stops the start with `MOCK_QUADERNO_API_KEY_PATH_INVALID`.
+
+Quaderno adds a country's tax only where the account has a tax registration there (Settings, Tax jurisdictions); everywhere else it answers "not registered" and the card says "No tax added". So the page shows what that account would charge, not every country's rate. A failed answer is logged on the mock's error output as `billing.plans.tax_unavailable` with Quaderno's code.
 
 ## Endpoints it serves
 
 | Endpoint | Reply |
 |---|---|
 | `GET /v1/session` | Signed in. |
+| `GET /v1/account/email` | `maria@example.com`: the V4 header's round account button shows "M" (401 with `session=OUT`). |
 | `GET /v1/auth/age-confirmation` | `confirmed` (the age check is not asked). |
 | `GET`/`POST /v1/account/sensitive-data-consent` | `given` (no consent pop-up). |
 | `GET /v1/account/legal-status`, `POST /v1/account/legal-accept` | Nothing to accept / 204. |
@@ -194,18 +244,21 @@ A wrong value stops the start with a clear message, for example `MOCK_ROOM_INVAL
 | `GET /v1/asks/room?…` | The plan (`PLUS` or `FREE`), settings version 20, answer length offered, word targets 300/700/1500. The debate-shape switch is left out (the contract allows only "on" or absent). The query is checked like the real API checks it. Draft: `reserve`, `dig_share_percent`. |
 | `POST /v1/asks` | See above. |
 | `GET /v1/billing/usage` | Day 14%, week 31%, month 9%; with `usage=BORROWED`, day 104% with a borrow notice. |
-| `GET /v1/billing/plans` | The register's default plans (Free, Plus $20, Pro $50, Max $200). With no `?country=` there is no place yet, so no paid price is shown (the page asks for the country). With `?country=` the plans come in that country's currency (lei in Romania, euro in the euro countries, dollars elsewhere, as the register says) and each total includes its tax: each EU country's standard VAT (21% in Romania, 19% in Germany, 21% in the Czech Republic, 25% in Croatia, and so on), none added outside the EU. The US and Canada also need `?postal_code=` (a Texas ZIP such as 75201 adds 6.25%); a missing one, or one that does not fit the country's format (the kernel's own check), is asked for again. |
-| `GET /v1/answers?limit=&offset=` | Finished debates, plus the open runs (running, waiting, failed). |
+| `GET /v1/billing/plans` | The register's default plans (Free, Plus $20, Pro $50, Max $200). With no `?country=` there is no place yet, so the paid cards show the price before tax and ask for the country. With `?country=` the plans come in that country's currency (lei in Romania, euro in the euro countries, dollars elsewhere, as the register says) and each total includes its tax: each EU country's standard VAT (21% in Romania, 19% in Germany, 21% in the Czech Republic, 25% in Croatia, and so on), none added outside the EU (with `MOCK_QUADERNO_API_KEY_PATH`, whatever Quaderno answers instead). The US and Canada also need `?postal_code=` (a Texas ZIP such as 75201 adds 6.25%); a missing one, or one that does not fit the country's format (the kernel's own check), is asked for again. |
+| `GET /v1/billing/subscription`, `GET /v1/billing/invoices` | Plus in euro, subscribed four days ago, inside its 14-day withdrawal window (none on `plan=FREE`); no invoices. After a withdrawal it reads WITHDRAWN. |
+| `POST /v1/billing/subscription/withdraw` | The signed-in session withdraws with an empty body, no step-up (OUG 34/2014 art. 11^1, owner ruling 2026-11-04): a €18.00 refund, once; again, 409 `NOT_SUBSCRIBED`. A body with anything in it gets 400 `MALFORMED_REQUEST`. |
+| `GET /v1/answers?limit=&offset=` | Finished debates, plus the open runs (running, waiting, failed). Draft: the shelf's row parts (see "Draft fields"). |
 | `GET /v1/answers/:id[?version=1]` | The answer (version 1 only). Draft: sources and path research. |
 | `GET /v1/answers/:id/story` | WRITING or READY, as described above. |
 | `GET /v1/answers/:id/map` | 404, as for a debate made without the debate-shape setting. The website treats this as "no map view". |
 | `GET /v1/answers/:id/disclosure` | A normal record (the planned AIs wrote and checked it, nothing was cut short). |
 | `GET /v1/answers/:id/inspection`, `/ledger-digest`, `/nodes/:nodeId` | Simple valid replies (the classic debate page reads them). |
-| `GET /v1/runs/:id`, `/answer`, `/visibility` | The run. Its answer appears once it is finished (404 before). It is private. |
+| `GET /v1/runs/:id`, `/answer`, `/visibility` | The run. Its answer appears once it is finished (404 before). It is private, except a finished Free question (6666, and new asks with `plan_tier: "free"`), which is public (`PUBLISHED`, as a Free debate is once its check passed), so the report's "This question is public, so your report will be public too." can be seen (report-f15); `#private` in a Free question plays one its check kept private. `/__mock/set?publicstate=…` (see "Public debates") sets every question's public state for the click-test and wins while it is not `PRIVATE`. |
 | `GET`/`POST /v1/runs/:id/last-visit` | The last visit (0131): both null before a first visit. |
 | `GET`/`POST /v1/runs/:id/dig-links` | The dig links (0131): the parent this debate was dug from, and the digs made from it. A child already dug from another debate gets 409 `DIG_LINK_CONFLICT`. |
 | `GET /v1/runs/:id/investigation`, `POST …/investigation/close` | Draft routes, see "Draft fields". |
 | `POST /v1/runs/:id/continue` | Draft route (W2-7): Continue on the month-paused debate. |
+| `GET /v1/runs/:id/progress` | Draft route (owner review 3 Nov, dig-d1 B): a dig's steps and the findings that passed their checks, `{run_ref, steps, now, findings: [{finding_id, text, trust, passed_at}]}`. Only with `live=ON`, only for a dig, never for one that failed; otherwise 404, as today's API (which has no such route). With a web search: Finding sources, Reading, Checking, Writing what changed; on Free or after a failed search: Arguing for and against, Checking, Writing what changed (and never "Sure" on Free). |
 | `GET /v1/runs/:id/events` | A live event stream. For a finished or failed run it replays three events and closes. For an open run it stays open with a keep-alive every 15 s, and a new debate's stream sends "finished" after 25 s. |
 | `GET /v1/geo/availability`, `/v1/public/ai-providers`, `/v1/public/debates`, `/v1/deployment` | Simple valid replies. |
 | `POST /v1/auth/logout` | 204. The mock still says "signed in" afterwards. |
@@ -213,7 +266,7 @@ A wrong value stops the start with a clear message, for example `MOCK_ROOM_INVAL
 
 An unknown run id gets 404 on every run route, as the real API answers a debate that is not yours.
 
-Anything else gets a 404 `NOT_MOCKED` reply. The mock also prints a line like `[mock] GET /v1/billing/subscription 404 <- NOT MOCKED`, so you can see at once what the website asked for that is missing.
+Anything else gets a 404 `NOT_MOCKED` reply. The mock also prints a line like `[mock] POST /v1/billing/checkout 404 <- NOT MOCKED`, so you can see at once what the website asked for that is missing.
 
 ## Public debates (decisions 13, 16 and 22)
 
@@ -224,19 +277,24 @@ Made-up debates from `public-seed.ts`, read at `GET /v1/public/debates/:id`. The
 | `/public/debate/f1000000-0000-4000-8000-000000000001` | A changed main answer (the first answer one click away), one contribution by "Quiet Heron" on a path, the dig's own path under it, one report. |
 | `/public/debate/f1000000-0000-4000-8000-000000000002` | The author's name went ("a contributor"), no dig on it: "Write a report" is refused (the first author has left). |
 
-- **Dig into this** (a path, or the dig's own path): `POST /v1/asks` with `public_parent`. It goes to the dig's own page, which says "checking" and about 10 seconds after the run finishes either changes the public page, or, with `#refuse` in the view, stays private.
+- **Dig here** (a path, or the dig's own path): `POST /v1/asks` with `public_parent`, sent only after the site's 10-second Undo (owner screen review, public-f11). The person stays on the page; a card under the path says the dig is running (public-d2 A). The dig's own page says "checking", and about 10 seconds after the run finishes either it changes the public page (the dig's answer then carries its new text as `contribution.rewrite`, so the card shows before and after, new words underlined), or, with `#refuse` in the view, it stays private, or, with `#confirm` in the view, it goes on the page and changes nothing ("Confirmed: the answer holds."). The card reads it again when you come back to the tab.
+- **The path's own suggestions as chips** (public-d2 A, DRAFT field `dig_suggestions`): `/__mock/draft/v1/public/debates/f1000000-0000-4000-8000-000000000001` carries two for "Free fares for everyone" (one dug near on 28 Oct, which opens that dig's result) and one for "Better service first". The contract's public read is strict and does not name the field yet, so the website does not receive it and its dig box shows no chips.
+- **The globe line on your own map** (public-f26, journey-f20): `/__mock/set?publicstate=PUBLISHED` makes every debate of yours answer its visibility read as public (the first public debate's page), so the map and the report show "Public · See its page · Copy link", and the own-view box and the tray say what goes public. `WILL_BE_PUBLIC`, `BEING_CHECKED` and `KEPT_PRIVATE` are DRAFT stages (`public_stage`, at `/__mock/draft/v1/runs/<id>/visibility` only); the website gets PRIVATE for them and shows nothing. `PRIVATE` (the default) goes back.
 - **Write a report**: `POST /v1/public/debates/:id/report` answers 202; the new version appears on the page about 8 seconds later.
 - **The digger's states**, seeded: `c1000000-0000-4000-8000-000000000001` CHECKING, `…002` ON_THE_PAGE, `…003` KEPT_PRIVATE, `…004` REMOVED_AFTER_REVIEW, at `/v4/debate/<id>`.
 - **The Report button (decision 35)**: on `/public/debate/<ref>`, a claim with "hide" in it hides (the pretend check), one with "#person" goes to a person, anything else gets the "didn't find this" line. The queue shows on the team panel.
 - **A debate under review (decision 33)**: the team page's panel reads from the mock, but a passkey cannot be pressed here, so `/__mock/review?ref=<public ref>&step=HIDE` does what Confirm does (then `step=REMOVE_DIG`, `step=CORRECT&pointer=/story_short/summary&text=New words`, `step=REPUBLISH`). `/public/debate/<ref>` shows the plain under-review line while hidden, then the page with its "changed after review" line and the Report link.
 - **Refusals**: `/__mock/set?public=ONGOING` (a report waits), `public=REPORT_WRITING` and `public=TOO_DEEP` (a dig is refused), `public=OPEN` (back to normal), `room=FULL` (a used-up limit), more than three views with `plan=FREE`.
-- **A stranger**: `/__mock/set?session=OUT` shows a sign-in link in place of each press; `session=IN` to go back. The V4 pages then send you to sign in, as they do for a stranger.
+- **A report that never arrives** (public-f9): `/__mock/set?public=REPORT_STUCK`, then "Write a report": the press is accepted, the "Being written" card stays, its checks slow down and pause in a hidden tab, and after 10 minutes it says it is taking longer than usual, with "Check again". A report that could not be written cannot be shown yet: the public debate's contract is strict and has no field for it (server need, `report_writing`).
+- **The answer-first page** (public-d1): the first debate's tree is published, so each path shows its trust word and bar, a row unfolds its findings (one with a checked page and its source), "For" and "Against" show the strongest point on each side, the still-argued point is the star, and "Explore the map" opens the own map read-only.
+- **A stranger**: `/__mock/set?session=OUT` shows a sign-in link in place of each press; `session=IN` to go back. The V4 pages then send you to sign in, as they do for a stranger, with the way back to the same page (`/login?next=…`). The room read, the usage read, the account reads, the subscription and invoice reads and the withdrawal are refused (401) as the real API refuses them, so the ask page shows a stranger no quota share and no "% of your quota used".
+- **A sign-in that ended during a wait** (wait-f1): open a debate that is still running while signed in, then `/__mock/set?session=OUT`. Its reads are now refused (401), and the waiting card says "Please sign in again to see your question." with a Sign in button that comes back to the same question.
 
 **The Free notice**: `/__mock/set?plan=FREE`, then open `/v4` or `/new`: the notice shows before each Start press, and an ask that showed it sends `free_public_notice` (`/__mock/state` counts them as `free_notices`). Any paid plan shows no notice.
 
 ## Not mocked (the website may call these)
 
-- **Billing pages**: subscription, invoices, charge status, card details and card change, checkout, quote, upgrade, downgrade, cancel, withdraw (`/settings`, `/pricing` buying, `/checkout`, `/settings/card`, `/cancel`, `/withdraw`).
+- **Billing pages**: charge status, card details and card change, checkout, quote, upgrade, downgrade, cancel (`/pricing` buying, `/checkout`, `/settings/card`, `/cancel`). The subscription, invoices and the withdrawal in Settings are mocked.
 - **Account and security settings**: sessions list, sign-in methods, social links, email change, recovery email, phone, data export, account erasure (`/settings`, `/settings/security`, `/export`).
 - **Signing in and up for real**: login, register, password reset, MFA, social sign-in, age check (`/login`, `/sign-up`, `/recover`, …). The mock just says "signed in"; use `/api/__mock/sign-in` for the cookie.
 - **Publishing**: publish, the list of public debates, deleting a private debate. The public debate page itself is mocked (see "Public debates").

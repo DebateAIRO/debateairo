@@ -32,7 +32,7 @@ import WithdrawPage from "../../apps/ui/app/withdraw/page.js";
 
 /**
  * GET /v1/billing/plans as the API answers it with every country closed (the integration suite's answer for a German
- * connection: that stack prices every country in US dollars, with Germany's 19 % in each paid price, Terms §12).
+ * connection: that stack prices every country in US dollars, with Germany's 19 % added to each paid price, Terms §12).
  */
 const PLANS = Object.freeze({
   currency: "USD" as const,
@@ -82,11 +82,11 @@ describe("NETOPIA's check: billing on with every country closed for payment, on 
     const document = await page(() => PricingPage({}));
     expect([...document.querySelectorAll("[data-plan]")].map((card) => card.getAttribute("data-plan"))).toEqual(["FREE", "PLUS", "PRO", "MAX"]);
     const plus = document.querySelector('[data-plan="PLUS"]')!;
-    expect(plus.textContent).toContain("$23.80 a month");
-    expect(plus.textContent).toContain("Tax included (19%, Germany)");
+    expect(plus.textContent).toContain("$20.00 + $3.80 MwSt.");
+    expect(plus.textContent).toContain("$23.80 a month in total (19%, Germany)");
     expect(plus.querySelector("a")?.getAttribute("href")).toBe("/checkout?plan=PLUS");
-    expect(document.querySelector('[data-plan="PRO"]')?.textContent).toContain("$59.50 a month");
-    expect(document.querySelector('[data-plan="MAX"]')?.textContent).toContain("$238.00 a month");
+    expect(document.querySelector('[data-plan="PRO"]')?.textContent).toContain("$50.00 + $9.50 MwSt.");
+    expect(document.querySelector('[data-plan="MAX"]')?.textContent).toContain("$200.00 + $38.00 MwSt.");
     expect(document.body.textContent).not.toContain("The plans can't be shown right now.");
   });
 

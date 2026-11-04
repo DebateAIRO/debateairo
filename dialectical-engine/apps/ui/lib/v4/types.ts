@@ -116,6 +116,12 @@ export type V4Path = Readonly<{
   positionRef?: string;
   /** W4-6: what digs did to this path (Answer.path_rewrites); absent when no dig rewrote it or changed anything below it. */
   rewrites?: V4PathRewrites;
+  /**
+   * Owner r2-20 A (3 Nov): the path's one trust word, shown with its bar in place of the outcome tags ("Held up",
+   * "Partly held", "Set aside"): the word of the point the path stands for (its position), as the server worked it out
+   * for a rewritten path, else as the page places it. null: that point has no word yet; absent: the stand-in path.
+   */
+  trust?: TrustWord | null;
 }>;
 
 /**
@@ -222,6 +228,12 @@ export type DigLink = Readonly<{
   mode: DigMode | null;
   /** ISO time; null when unknown (a dig found again from the account's question list by text; a recorded dig knows it). */
   startedAt: string | null;
+  /**
+   * dig-f20: who wrote the first thing the dig looked into, when the page knows it (a dig started in this visit): "AI" for
+   * an AI suggestion as written, an open question or a whole path; "PERSON" for the person's own view or their edit of a
+   * suggestion. Absent: unknown (the dig's own answer tells once it is done).
+   */
+  firstBy?: "AI" | "PERSON";
 }>;
 
 /**
@@ -277,6 +289,31 @@ export type DigView = Readonly<{
   points?: readonly V4Point[];
   /** W4-6 (the money rule): the dig's own run is paused at the month wall until this time (ISO); absent when it is not. */
   pausedUntil?: string;
+  /**
+   * Owner review 3 Nov (wait-f2, public-f16): paused at the month wall, and the server says it may continue now (its
+   * `month_pause.can_continue`). Absent when the dig is not paused.
+   */
+  canContinue?: boolean;
+  /**
+   * Owner review 3 Nov (wait-f18): FAILED, the reason its own run stored (a code: the page shows only the plain sentence
+   * chosen from it, lib/v3/runFailure.ts). Absent when it was not read (a dig whose run is gone, a dig read before this).
+   */
+  terminalReason?: string | null;
+  /**
+   * Owner review 3 Nov (dig-f12): FAILED, the question its own run was asked with (the site's text for the AIs, never shown),
+   * so a dig rebuilt from its link is tried again only when it would ask exactly the same. Absent when it was not read.
+   */
+  questionLine?: string;
+  /**
+   * Owner review 3 Nov (wait-f18): FAILED, and the server confirmed that nothing was taken from the person's quota for it
+   * (lib/v4/failedRun.ts). Absent: the server did not say, so the page says nothing about the quota.
+   */
+  quotaUntouched?: true;
+  /**
+   * map-f29 / dig-f20: DONE, a new-model dig: what it looked into, as its own answer names it (`Answer.dig.picks`: each
+   * pick's words and who wrote them). Absent: not read yet, or a dig from before R22.
+   */
+  picks?: readonly Readonly<{ text: string; by: "AI_SUGGESTION" | "PERSON_EDITED" | "PERSON_OWN_VIEW" }>[];
 }>;
 
 /** What the panel shows: the question itself, one path, one open question or one dig. */

@@ -6,8 +6,8 @@ import type { AskRoom } from "../../apps/ui/lib/billing/room.js";
 import type * as Money from "../../apps/ui/lib/v4/money.js";
 import { DIG_LEVEL_MAX, type RunProjection } from "../../packages/contract/src/index.js";
 import {
-  branch, buttonNamed, CATALOG, click, digPart, harness, mountMap, openPath, page, panel, PATHS, resetHarness, seededAnswer,
-  text, tray, unmountMap
+  advance, branch, buttonNamed, buttonsNamed, CATALOG, click, digPart, expandBranch, harness, mountMap, openPath, page, panel, PATHS,
+  resetHarness, seededAnswer, settle, text, tray, unmountMap
 } from "./v4-debate-harness.js";
 
 vi.mock("@/components/AuthGate", async () => (await import("./v4-debate-harness.js")).authGateMock);
@@ -56,51 +56,144 @@ afterEach(async () => {
   vi.useRealTimers();
 });
 
-describe("before a dig: its share of today", () => {
-  it("the approved line, word for word, in the tray and beside the dig button", async () => {
+describe("before a dig: its share, on its own button (owner's screen review, 3 Nov: journey-f13, public-d3 A, dig-f5)", () => {
+  it("the share is on the tray's and the panel's dig button, the period once by the switch, and in no other line", async () => {
     harness.room = room({ dig_share_percent: 20 });
     await mountMap();
-    const line = word("v4.dig.quotaShare", { percent: 20 });
-    expect(line).toBe("This dig uses about 20% of today. After it you can still finish your report.");
-    await click(branch(PATHS.renew).querySelector<HTMLInputElement>(".v4MapLeafSuggestion input[type=checkbox]")!);
-    expect(tray()?.textContent).toContain(line);
+    // map-f22: the path's suggestions show once its leaves are unfolded (about 12 cards at once).
+    await expandBranch(PATHS.renew);
+    // dig-f4: the tray shows from the second pick; its button carries the picks' share ("Dig into these · up to 20%").
+    for (const box of branch(PATHS.renew).querySelectorAll<HTMLInputElement>(".v4MapLeafSuggestion input[type=checkbox]")) await click(box);
+    expect(buttonsNamed(`${CATALOG["v4.dig.trayDigThese"]} · ${word("v4.undo.barShare", { percent: 20 })}`, tray()!)).toHaveLength(1);
+    // On the picks' own path the panel's pinned button digs them, with the same share (dig-f5: "Dig into your picks").
+    const picked = `${CATALOG["v4.dig.yourPicks.other"]} · ${word("v4.undo.barShare", { percent: 20 })}`;
     await openPath(PATHS.renew);
-    expect(panel().querySelector(".v4PanelDig")?.textContent).toContain(line);
-    // A share only: never a price (the AIs' own text may name money; the page's money lines never do).
-    const lines = [...page().querySelectorAll(".v4MoneyLine")].map((node) => node.textContent ?? "");
-    expect(lines.length).toBeGreaterThan(0);
-    for (const line of lines) expect(line).not.toMatch(/[$€£¢]|\bcents?\b|\bdollars?\b/iu);
+    const block = panel().querySelector<HTMLElement>(".v4PanelDig")!;
+    expect(buttonsNamed(picked, block)).toHaveLength(1);
+    // public-d3 A: "of today · you can still finish your report", once, by the Quick look / Thorough switch.
+    expect(block.querySelector(".v4DigPeriod")?.textContent).toBe(CATALOG["v4.dig.period.PERSON_DAY"]);
+    expect(page().querySelectorAll(".v4DigPeriod")).toHaveLength(1);
+    // dig-f5: the share is said once, on the button; the old sentence under it is gone.
+    expect(text()).not.toContain("This dig uses about");
+    // A share only: never a price (the AIs' own text may name money; the dig buttons never do).
+    for (const button of page().querySelectorAll(".v4PanelDigBtn, .v4DebTray button")) {
+      expect(button.textContent ?? "").not.toMatch(/[$€£¢]|\bcents?\b|\bdollars?\b/iu);
+    }
   });
 
-  it("says nothing when the room read names no share", async () => {
+  it("says nothing of a share when the room read names none: the button's words alone, and no period", async () => {
     await mountMap();
     await openPath(PATHS.renew);
     expect(text()).not.toContain("This dig uses about");
+    expect(buttonsNamed(CATALOG["v4.panel.dig"]!, panel())).toHaveLength(1);
+    expect(panel().querySelector(".v4DigPeriod")).toBeNull();
+  });
+
+  it("public-f14: on Free the period is the month's", async () => {
+    harness.planTier = "free";
+    harness.room = room({ plan_id: "FREE", dig_share_percent: 20 });
+    await mountMap();
+    await openPath(PATHS.smr);
+    expect(panel().querySelector(".v4DigPeriod")?.textContent).toBe(CATALOG["v4.dig.period.PERSON_MONTH"]);
+    expect(buttonsNamed(`${CATALOG["v4.panel.dig"]} · ${word("v4.undo.barShare", { percent: 20 })}`, panel())).toHaveLength(1);
   });
 });
 
 describe("new starts wait for the reset (new_starts: BLOCKED_UNTIL_RESET)", () => {
-  it("the day: the line with the reset time; running work goes on, and the report can still be written", async () => {
+  // dig-f11 / journey-f14 / journey-f15 (owner's screen review, 3 Nov): the button stays, greyed, with the reset time on
+  // it in one 24-hour form; the approved line beside it says why and from when; pressing it starts nothing.
+  it("the day: a greyed 'Dig here · after 00:00' with the approved line; nothing starts; the report can still be written", async () => {
     harness.room = room({ room: "FULL", scope: "PERSON_DAY", resets_at: RESET, new_starts: "BLOCKED_UNTIL_RESET", dig_share_percent: 20 });
     await mountMap();
     await openPath(PATHS.smr);
-    const time = formatDate("en", RESET, { hour: "2-digit", minute: "2-digit" });
-    expect(panel().textContent).toContain(word("v4.money.startsWait.PERSON_DAY", { time }));
+    const time = formatDate("en", RESET, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+    expect(time).toMatch(/^\d{2}:\d{2}$/u);
+    const button = panel().querySelector<HTMLButtonElement>(".v4PanelDigBtn")!;
+    expect(button.textContent).toBe(`${CATALOG["v4.panel.dig"]} · ${word("v4.dig.after", { time })}`);
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    const reason = panel().querySelector<HTMLElement>(".v4DigWaitLine")!;
+    expect(reason.textContent).toBe(word("v4.dig.quotaDayUsed", { time }));
+    expect(button.getAttribute("aria-describedby")).toBe(reason.id);
+    // The same reset is not said twice beside the button, and no share or period shows while digs wait.
+    expect(panel().textContent).not.toContain(word("v4.money.startsWait.PERSON_DAY", { time }));
+    expect(panel().querySelector(".v4DigPeriod")).toBeNull();
+    await click(button);
+    await advance(11_000);
+    expect(harness.submit).not.toHaveBeenCalled();
+    expect(page().querySelectorAll(".v4Undo")).toHaveLength(0);
     expect(reportLinks().length).toBeGreaterThan(0);
   });
 
-  it("the month: its own line, which says the report can still be written", async () => {
+  it("journey-f14: an open question that cannot be dug now can still be kept: 'Add to tray' picks it", async () => {
+    harness.room = room({ room: "FULL", scope: "PERSON_DAY", resets_at: RESET, new_starts: "BLOCKED_UNTIL_RESET" });
+    await mountMap();
+    await expandBranch(PATHS.renew);
+    await click(branch(PATHS.renew).querySelector<HTMLButtonElement>(".v4MapLeafOpen .v4MapOpenMain")!);
+    expect(panel().classList.contains("v4Panel-open")).toBe(true);
+    const add = buttonNamed(CATALOG["v4.dig.addToTray"]!, panel());
+    await click(add);
+    expect(tray()).not.toBeNull();
+    expect(buttonsNamed(CATALOG["v4.dig.addToTray"]!, panel())).toHaveLength(0);
+    // ACCESS-5: the pressed button went, so focus stays at the dig button in the same place, never on the page's body.
+    expect(document.activeElement).toBe(panel().querySelector(".v4PanelDigBtn"));
+    // The tray's one button waits too, with the reset time on it.
+    const time = formatDate("en", RESET, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+    const trayDig = buttonNamed(`${CATALOG["v4.dig.yourPicks.one"]} · ${word("v4.dig.after", { time })}`, tray()!);
+    // The browser check (4 Nov): the reason is said once, by the panel's pinned dig block right above the docked tray, never
+    // a second time in the tray.
+    const said = [...page().querySelectorAll<HTMLElement>("p")].filter((line) => line.textContent === word("v4.dig.quotaDayUsed", { time }));
+    expect(said).toHaveLength(1);
+    expect(panel().contains(said[0]!)).toBe(true);
+    expect(tray()!.textContent).not.toContain(word("v4.dig.quotaDayUsed", { time }));
+    // dig-f11 / journey-f14 (CODE-5): greyed but focusable, pointing at the visible reason; a press gives it the highlight again.
+    expect(trayDig.getAttribute("aria-disabled")).toBe("true");
+    const reason = document.getElementById(trayDig.getAttribute("aria-describedby")!)!;
+    expect(reason).toBe(said[0]);
+    expect(reason.classList.contains("v4Highlight")).toBe(false);
+    await click(trayDig);
+    expect(document.getElementById(trayDig.getAttribute("aria-describedby")!)!.classList.contains("v4Highlight")).toBe(true);
+    expect(harness.submit).not.toHaveBeenCalled();
+  });
+
+  it("the browser check (4 Nov): with no reason above it (the main question's panel), the tray says why itself", async () => {
+    harness.room = room({ room: "FULL", scope: "PERSON_DAY", resets_at: RESET, new_starts: "BLOCKED_UNTIL_RESET" });
+    await mountMap();
+    await expandBranch(PATHS.renew);
+    await click(branch(PATHS.renew).querySelector<HTMLInputElement>(".v4MapLeafSuggestion input[type=checkbox]")!);
+    expect(panel().classList.contains("v4Panel-root")).toBe(true);
+    const time = formatDate("en", RESET, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+    expect(panel().textContent).not.toContain(word("v4.dig.quotaDayUsed", { time }));
+    const trayDig = [...tray()!.querySelectorAll<HTMLButtonElement>("button")].find((button) => button.getAttribute("aria-disabled") === "true")!;
+    const reason = document.getElementById(trayDig.getAttribute("aria-describedby")!)!;
+    expect(tray()!.contains(reason)).toBe(true);
+    expect(reason.textContent).toBe(word("v4.dig.quotaDayUsed", { time }));
+    await click(trayDig);
+    expect(document.getElementById(trayDig.getAttribute("aria-describedby")!)!.classList.contains("v4Highlight")).toBe(true);
+    expect(harness.submit).not.toHaveBeenCalled();
+  });
+
+  it("the month: its own line, which says the report can still be written, and 'on {date}' on the button", async () => {
     harness.room = room({ room: "FULL", scope: "PERSON_MONTH", resets_at: NEXT_MONTH, new_starts: "BLOCKED_UNTIL_RESET" });
     await mountMap();
     await openPath(PATHS.smr);
-    const time = formatDate("en", NEXT_MONTH, { dateStyle: "medium", timeStyle: "short" });
-    expect(panel().textContent).toContain(word("v4.money.startsWait.PERSON_MONTH", { time }));
+    const date = formatDate("en", NEXT_MONTH, { day: "numeric", month: "long" });
+    expect(panel().textContent).toContain(word("v4.money.startsWait.PERSON_MONTH", { date }));
     expect(CATALOG["v4.money.startsWait.PERSON_MONTH"]).toContain("You can still write your report.");
+    expect(panel().querySelector(".v4PanelDigBtn")?.textContent).toBe(`${CATALOG["v4.panel.dig"]} · ${word("v4.dig.on", { date })}`);
+  });
+
+  it("public-f24: a full person window reads the same V4 line under the older server switch (no new_starts)", async () => {
+    harness.room = room({ room: "FULL", scope: "PERSON_DAY", resets_at: RESET });
+    await mountMap();
+    await openPath(PATHS.smr);
+    const time = formatDate("en", RESET, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+    expect(panel().querySelector(".v4DigWaitLine")?.textContent).toBe(word("v4.dig.quotaDayUsed", { time }));
+    expect(panel().querySelector(".v4PanelDigBtn")?.getAttribute("aria-disabled")).toBe("true");
   });
 });
 
 describe("the borrowed notice in the usage area", () => {
-  it("tells the person that running work used part of tomorrow's and next week's allowance", async () => {
+  it("tells the person that running work used part of tomorrow's and next week's quota", async () => {
     harness.borrowed = [
       { scope: "PERSON_WEEK", run_ref: "run-b", percent: 2, next_window_starts_at: "2026-11-02T00:00:00.000Z" },
       { scope: "PERSON_DAY", run_ref: "run-a", percent: 4, next_window_starts_at: RESET },
@@ -121,37 +214,80 @@ describe("the borrowed notice in the usage area", () => {
 });
 
 describe("a debate paused at the month wall", () => {
-  it("says 'paused until {date}', and Continue before the reset is refused with nothing changed", async () => {
+  // Owner review 3 Nov (wait-f5, map-f31, public-f17): the pause is said once, with a still mark; before the reset nothing
+  // looks pressable ("Continues on …" is a plain label); after it, Continue.
+  it("says it once, with a still mark and no Continue button before the reset", async () => {
     const runId = crypto.randomUUID();
     harness.run = paused(runId, false);
-    harness.continueRun = vi.fn(async () => ({ kind: "TOO_EARLY" as const, until: NEXT_MONTH }));
-    await mountMap(1280, runId);
-    const date = formatDate("en", NEXT_MONTH, { dateStyle: "medium" });
-    expect(text()).toContain(word("v4.debate.state.PAUSED_MONTH", { date }));
+    await mountMap(1600, runId);
+    // journey-f22 / journey-f15 (the wave-2 checks): the month pause's one date form, in a sentence and on a label alike.
+    const date = formatDate("en", NEXT_MONTH, { day: "numeric", month: "long" });
+    const day = date;
     expect(text()).toContain(word("v4.money.paused", { date }));
+    expect(text()).not.toContain(word("v4.debate.state.PAUSED_MONTH", { date }));
+    expect(text()).toContain(word("v4.pause.continuesOn", { date: day }));
     expect(text()).toContain(CATALOG["v4.money.continueNote"]);
-    await click(buttonNamed(CATALOG["v4.money.continue"]!));
-    expect(harness.continueRun).toHaveBeenCalledWith(runId);
-    expect(text()).toContain(word("v4.money.continueTooEarly", { date }));
-    expect(buttonNamed(CATALOG["v4.money.continue"]!).disabled).toBe(false);
+    expect(text()).not.toContain(CATALOG["v4.debate.usually"]);
+    expect(buttonsNamed(CATALOG["v4.money.continue"]!)).toEqual([]);
+    expect(page().querySelector(".v4DebPulse")).toBeNull();
+    expect(page().querySelector(".v4PauseDot")).not.toBeNull();
   });
 
   it("once the month has reset, Continue resumes it", async () => {
     const runId = crypto.randomUUID();
     harness.run = paused(runId, true);
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     expect(text()).toContain(CATALOG["v4.money.pausedReady"]);
+    const press = buttonNamed(CATALOG["v4.money.continue"]!);
+    press.focus();
+    await click(press);
+    expect(harness.continueRun).toHaveBeenCalledWith(runId);
+    // W2L-4 (the wave-2 checks): it keeps its focus while the run continues (aria-disabled and aria-busy, never native).
+    const continuing = buttonNamed(CATALOG["v4.money.continuing"]!);
+    expect(continuing.disabled).toBe(false);
+    expect(continuing.getAttribute("aria-disabled")).toBe("true");
+    expect(continuing.getAttribute("aria-busy")).toBe("true");
+    expect(document.activeElement).toBe(continuing);
+    await click(continuing);
+    expect(harness.continueRun).toHaveBeenCalledTimes(1);
+    // The run reads as running again: the pause card goes, and focus goes on to the progress screen's question.
+    harness.run = { ...paused(runId, true), month_pause: undefined } as typeof harness.run;
+    await advance(5_000);
+    await settle(10);
+    expect(page().querySelector(".v4Pause")).toBeNull();
+    expect(document.activeElement).toBe(page().querySelector(".v4DebProgress .v4DebStatusQuestion"));
+  });
+
+  it("a Continue the server still refuses as too early says from when, and nothing changed", async () => {
+    const runId = crypto.randomUUID();
+    harness.run = paused(runId, true);
+    harness.continueRun = vi.fn(async () => ({ kind: "TOO_EARLY" as const, until: NEXT_MONTH }));
+    await mountMap(1600, runId);
     await click(buttonNamed(CATALOG["v4.money.continue"]!));
-    expect(buttonNamed(CATALOG["v4.money.continuing"]!).disabled).toBe(true);
+    expect(text()).toContain(word("v4.money.continueTooEarly", { date: formatDate("en", NEXT_MONTH, { day: "numeric", month: "long" }) }));
+    expect(buttonNamed(CATALOG["v4.money.continue"]!).disabled).toBe(false);
   });
 
   it("a failed Continue says so plainly", async () => {
     const runId = crypto.randomUUID();
     harness.run = paused(runId, true);
     harness.continueRun = vi.fn(async () => ({ kind: "FAILED" as const }));
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     await click(buttonNamed(CATALOG["v4.money.continue"]!));
     expect(text()).toContain(CATALOG["v4.money.continueFailed"]);
+  });
+
+  it("when the new month starts while the page is open, the block changes at once with the 1-second highlight", async () => {
+    const runId = crypto.randomUUID();
+    harness.run = paused(runId, false);
+    await mountMap(1600, runId);
+    expect(page().querySelector(".v4Pause.v4Highlight")).toBeNull();
+    harness.run = paused(runId, true);
+    await advance(5_000);
+    expect(text()).toContain(CATALOG["v4.money.pausedReady"]);
+    expect(page().querySelector(".v4Pause.v4Highlight")).not.toBeNull();
+    await advance(1_000);
+    expect(page().querySelector(".v4Pause.v4Highlight")).toBeNull();
   });
 });
 
@@ -176,7 +312,7 @@ describe("\"Write my report\" is always there", () => {
   it("at the deepest level too (where nothing more can be dug)", async () => {
     const runId = crypto.randomUUID();
     harness.answer = seededAnswer(runId, { dig: digPart(crypto.randomUUID(), DIG_LEVEL_MAX) });
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     expect(reportLinks().length).toBeGreaterThan(0);
   });
 });

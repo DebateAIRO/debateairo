@@ -4,19 +4,24 @@ import type { PricedTax } from "@/lib/billing/format";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
 /* The document's closing CTA: centred, with the pro/rule/con motif above it.
-   The pricing line carries the id the nav points at. Terms §12: it names a price
-   only with the visitor's country's tax in it (or none to add); with no priced
-   place it says the plans are priced with your tax, never a price before tax. */
-const PRICING_COPY: Readonly<Record<Exclude<PricedTax, "UNPRICED">, string>> = Object.freeze({
-  INCLUDED: "home.pricingCopyTaxIncluded", NONE: "home.pricingCopyNoTax"
+   The pricing line carries the id the nav points at. Terms §12 ("Our prices are
+   shown before tax, as price + VAT"): it names the lowest price before tax, with
+   the visitor's tax by name, none to add, or tax added where it applies. */
+const PRICING_COPY: Readonly<Record<PricedTax, string>> = Object.freeze({
+  ADDED: "home.pricingCopyPlusTax", NONE: "home.pricingCopyNoTax", UNPRICED: "home.pricingCopyChoose"
 });
 
 export function LandingPricing({
   catalog,
   lowestPaidPrice,
   tax = "UNPRICED",
+  taxName = null,
   billingOn = lowestPaidPrice !== null
-}: { catalog: MessageCatalog; lowestPaidPrice: string | null; tax?: PricedTax; billingOn?: boolean }): JSX.Element {
+}: {
+  catalog: MessageCatalog; lowestPaidPrice: string | null; tax?: PricedTax; taxName?: string | null; billingOn?: boolean;
+}): JSX.Element {
+  // ADDED names the tax; an answer without its name (only a hand-made one) says it is added where it applies.
+  const copy = tax === "ADDED" && taxName === null ? "UNPRICED" : tax;
   return (
     <section
       id="start"
@@ -36,7 +41,7 @@ export function LandingPricing({
         {t(catalog, "home.closingLede")}
       </p>
       <div style={{ display: "flex", justifyContent: "center", marginTop: "52px" }}>
-        <a className="lpCta lpCtaClosing" href="/login?next=%2Fnew">
+        <a className="lpCta lpCtaClosing" href="/login?next=%2Fv4">
           {t(catalog, "chrome.startRound")}
           <span className="lpArrow" aria-hidden="true">
             →
@@ -46,9 +51,9 @@ export function LandingPricing({
       <p id="pricing" className="lpPricing">
         {!billingOn ? t(catalog, "home.pricingCopyFree") : (
           <>
-            {lowestPaidPrice === null || tax === "UNPRICED"
-              ? t(catalog, "home.pricingCopyChoose")
-              : t(catalog, PRICING_COPY[tax], { price: lowestPaidPrice })}{" "}
+            {lowestPaidPrice === null
+              ? t(catalog, "home.pricingCopyFree")
+              : t(catalog, PRICING_COPY[copy], { price: lowestPaidPrice, taxName: taxName ?? "" })}{" "}
             <a href="/pricing">{t(catalog, "home.pricingLink")}</a>
           </>
         )}

@@ -112,6 +112,20 @@ export const DraftPathRewritesSchema = AnswerPathRewritesSchema;
 export const DraftAnswerDigSchema = AnswerDigSchema;
 export const DraftMonthPauseSchema = MonthPauseSchema;
 export const DraftUsageBorrowsSchema = UsageBorrowsSchema;
+/**
+ * Owner's screen review, 3 Nov 2026 (journey-d2, journey-f16, wait-f7): when a question started, so the waiting card says
+ * "Started 14:31" on every device and after a reload. DRAFT: the contract's RunProjection has no `started_at` yet (its
+ * schema is strict), so the mock sends it only on the draft view, or once the contract's own schema accepts it. Absent
+ * while the question waits to start.
+ */
+export const DraftRunStartedAtSchema = z.iso.datetime();
+/**
+ * Owner review 3 Nov 2026 (wait-f11, map-f30, wait-f18): a FAILED run's `quota_used` ("NONE": nothing was taken from the
+ * person's quota for it; "SOME": some was). NOT in the contract yet: the mock shows it only on its draft view, and the
+ * website says "Nothing was taken" only once the run read carries it (apps/ui/lib/v4/failedRun.ts).
+ */
+export const DraftRunQuotaUsedSchema = z.enum(["NONE", "SOME"]);
+export type DraftRunQuotaUsed = z.infer<typeof DraftRunQuotaUsedSchema>;
 /** W2-7: Continue on a month-paused debate (no route in the contract yet; the mock serves POST /v1/runs/{id}/continue). */
 export const DraftRunContinueRequestSchema = RunContinueRequestSchema;
 export const DraftRunContinuedSchema = RunContinuedSchema;
@@ -122,6 +136,13 @@ export const DraftRunContinueRefusedSchema = RunContinueRefusedSchema;
  * names a full person window and its reset); the rest of the room read is the contract's AskRoomResponseSchema.
  */
 const PERSON_SCOPES = new Set(["PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]);
+/**
+ * The owner's screen review (3 Nov 2026: read-f19, public-f14, map-f33, map-f9): the person window a share is measured
+ * against, the one that will actually stop this person ("of this month" on Free, "of this week" when the week binds).
+ */
+export const DraftShareScopeSchema = z.enum(["PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]);
+/** map-f9: what this question (the debate with its digs) has used of that window, for "This question: 11% of today". */
+export const DraftQuestionShareSchema = z.object({ scope: DraftShareScopeSchema, percent: z.number().int().min(0).max(110) }).strict();
 export const DraftRoomPartSchema = z.looseObject({
   room: z.enum(["FITS", "CLOSE", "FULL", "ALREADY_WAITING"]),
   scope: z.string().nullable(),
@@ -129,7 +150,9 @@ export const DraftRoomPartSchema = z.looseObject({
   dig_share_percent: DigSharePercentSchema.optional(),
   // W2-7 (money rule): a new question's share of today, and new starts waiting for the reset.
   start_share_percent: DigSharePercentSchema.optional(),
-  new_starts: RoomNewStartsSchema.optional()
+  new_starts: RoomNewStartsSchema.optional(),
+  // Owner's screen review (3 Nov): the window the share above is of (DraftShareScopeSchema).
+  share_scope: DraftShareScopeSchema.optional()
 }).superRefine((room, context) => {
   if (room.reserve === "BLOCKED" && (room.room !== "FULL" || !PERSON_SCOPES.has(room.scope ?? ""))) {
     context.addIssue({ code: "custom", message: "BLOCKED names a full person window and its reset" });
@@ -139,6 +162,9 @@ export const DraftRoomPartSchema = z.looseObject({
   }
   if (room.start_share_percent !== undefined && room.dig_share_percent !== undefined) {
     context.addIssue({ code: "custom", message: "a room read estimates a new question or a dig, not both" });
+  }
+  if (room.share_scope !== undefined && room.start_share_percent === undefined && room.dig_share_percent === undefined) {
+    context.addIssue({ code: "custom", message: "share_scope names the window of a share the read carries" });
   }
 });
 
@@ -168,7 +194,8 @@ export function stripNode<T extends Json>(node: T): T {
 }
 
 export function stripAnswer<T extends Json>(answer: T): T {
-  const { web: _web, path_rewrites: _rewrites, dig: _dig, ...rest } = answer;
+  // dig-f1 (V4 screen review, 3 Nov 2026): the first debate's main answer (decision 3 of 31 Oct) is held back too.
+  const { web: _web, path_rewrites: _rewrites, dig: _dig, main_answer: _main, ...rest } = answer;
   const nodes = Array.isArray(rest.nodes) ? (rest.nodes as Json[]).map(stripNode) : rest.nodes;
   return { ...rest, nodes } as unknown as T;
 }
@@ -178,13 +205,16 @@ export function stripAnswer<T extends Json>(answer: T): T {
  * "new starts wait" room is today's FULL (a question waits for that reset).
  */
 export function stripRoom<T extends Json>(room: T): T {
-  const { reserve: _reserve, dig_share_percent: _share, start_share_percent: _start, new_starts: _starts, ...rest } = room;
+  const { reserve: _reserve, dig_share_percent: _share, start_share_percent: _start, new_starts: _starts, share_scope: _scope, ...rest } = room;
   return rest as unknown as T;
 }
 
-/** W2-7: without its month pause, a paused debate reads as today's RUNNING. */
+/**
+ * W2-7: without its month pause, a paused debate reads as today's RUNNING; the draft start time (journey-d2) goes too; without
+ * `quota_used`, a failed run says nothing of the quota; without `question_share` (map-f9), the map shows no "This question".
+ */
 export function stripRun<T extends Json>(run: T): T {
-  const { month_pause: _pause, ...rest } = run;
+  const { month_pause: _pause, started_at: _started, quota_used: _quota, question_share: _share, ...rest } = run;
   return rest as unknown as T;
 }
 
@@ -192,6 +222,68 @@ export function stripRun<T extends Json>(run: T): T {
 export function stripUsage<T extends Json>(usage: T): T {
   const { borrowed: _borrowed, ...rest } = usage;
   return rest as unknown as T;
+}
+
+/**
+ * The owner's screen review (3 Nov 2026, "Your maps", ask-d5 B / map-f34): what the ask page's shelf reads from a row of
+ * GET /v1/answers once the server says it (the API and the contract do not yet): when an open run started (`started_at`),
+ * its map's four-shade bar (`map_bar`), whether the map changed since the person last opened it (`changed_since_visit`)
+ * and the debate it was dug from (`dug_from`, null for a first question). The contract's rows are strict, so these are
+ * held back from the website until the contract names them; /__mock/draft/v1/answers shows them.
+ */
+const SHELF_ROW_KEYS = ["started_at", "map_bar", "changed_since_visit", "dug_from"] as const;
+export const DraftShelfRowPartSchema = z.object({
+  started_at: z.iso.datetime().optional(),
+  map_bar: z.object({
+    sure: z.number().int().nonnegative(), sure_for_case: z.number().int().nonnegative(),
+    still_argued: z.number().int().nonnegative(), didnt_hold: z.number().int().nonnegative()
+  }).strict().optional(),
+  changed_since_visit: z.boolean().optional(),
+  dug_from: z.uuid().nullable().optional()
+});
+
+/**
+ * The owner's screen review (3 Nov 2026, report-d1 A): before "Write it", the strip on the map says roughly what share of
+ * today's quota writing the report uses ("Your report uses about 5% of today."), the way a dig's share comes from the room
+ * read. The investigation read (GET /v1/runs/{id}/investigation) carries it as `report_share_percent` while a report can
+ * be asked for on a paid plan (never on Free: its report comes from the small reserve). The contract's read is strict and
+ * does not name it yet, so the website never receives it (the strip leaves the line out); the mock shows it at
+ * /__mock/draft/v1/runs/<id>/investigation?shape=reports.
+ */
+export const REPORT_SHARE_KEY = "report_share_percent" as const;
+export const DraftReportSharePartSchema = z.object({ report_share_percent: DigSharePercentSchema.min(5).optional() }).strict();
+
+/** The report share's draft part of an investigation read, for checking against DraftReportSharePartSchema. */
+export function reportShareProblems(reports: Json): string[] {
+  const part = REPORT_SHARE_KEY in reports ? { [REPORT_SHARE_KEY]: reports[REPORT_SHARE_KEY] } : {};
+  const result = DraftReportSharePartSchema.safeParse(part);
+  return result.success ? [] : [JSON.stringify(result.error.issues)];
+}
+
+/** Without the report's share, an investigation read is today's. */
+export function stripReportShare<T extends Json>(reports: T): T {
+  const { [REPORT_SHARE_KEY]: _share, ...rest } = reports;
+  return rest as unknown as T;
+}
+
+/** The shelf's draft parts of an answer list (each row's), for checking against DraftShelfRowPartSchema. */
+export function answerIndexDraftProblems(index: Json): string[] {
+  const rows = [...((index.items as Json[] | undefined) ?? []), ...((index.open_runs as Json[] | undefined) ?? [])];
+  return rows.flatMap((row) => {
+    const part = Object.fromEntries(SHELF_ROW_KEYS.filter((key) => key in row).map((key) => [key, row[key]]));
+    const result = DraftShelfRowPartSchema.safeParse(part);
+    return result.success ? [] : [`${String(row.run_ref)}: ${JSON.stringify(result.error.issues)}`];
+  });
+}
+
+/** Without the shelf's parts, an answer list is today's. */
+export function stripAnswerIndex<T extends Json>(index: T): T {
+  const strip = (row: Json): Json => Object.fromEntries(Object.entries(row).filter(([key]) => !(SHELF_ROW_KEYS as readonly string[]).includes(key)));
+  return {
+    ...index,
+    items: ((index.items as Json[] | undefined) ?? []).map(strip),
+    open_runs: ((index.open_runs as Json[] | undefined) ?? []).map(strip)
+  } as unknown as T;
 }
 
 /** A room query split into today's query and its draft dig part. */

@@ -196,13 +196,8 @@ describe("P23 paid plans, end to end on the fake stack", () => {
     const paidCents = Number(paid.rows[0]!.total_micros) / 10_000;
     await stack.spend(person, 3_300_000);              // 10% of Pro's made-up month (testBillingPlans)
     stack.advanceDays(2);                               // 2 days of a 28–31-day period: under 10%
-    const stepped = await stack.post(person, "/v1/auth/step-up", {
-      password: "not-checked-by-the-stack", code: "000000", authorization: { action: "WITHDRAW_SUBSCRIPTION" }
-    });
-    expect(stepped.status).toBe(200);
-    expect(stepped.body.step_up_grant).toMatchObject({ action: "WITHDRAW_SUBSCRIPTION" });
-    const grant = (stepped.body.step_up_grant as { token: string }).token;
-    const withdrawn = await stack.post(person, "/v1/billing/subscription/withdraw", { step_up_grant: grant });
+    // OUG 34/2014 art. 11^1 (owner ruling 2026-11-04): the signed-in person withdraws with no step-up.
+    const withdrawn = await stack.post(person, "/v1/billing/subscription/withdraw", {});
     expect(withdrawn.status).toBe(200);
     const expectedCents = Math.floor(paidCents * 0.9);
     expect(withdrawn.body.refund).toBe((expectedCents / 100).toFixed(2));
@@ -225,15 +220,9 @@ describe("P23 paid plans, end to end on the fake stack", () => {
     expect(ids(stack.mailsTo(person.email)).filter((id) => id === "M8_RECEIVED" || id === "M8")).toEqual(["M8_RECEIVED", "M8"]);
     const m8 = stack.mailsTo(person.email).find((mail) => mail.templateId === "M8")!;
     expect(m8.params.refundAmount).toBe((expectedCents / 100).toFixed(2));
-    // The plan is already withdrawn, so a replay is refused before its grant is read. The grant itself was spent
-    // inside the withdrawal's own transaction by billing.consume_withdrawal_grant (P12a).
-    const replay = await stack.post(person, "/v1/billing/subscription/withdraw", { step_up_grant: grant });
+    // The plan is already withdrawn, so a replay is refused and nothing is written twice.
+    const replay = await stack.post(person, "/v1/billing/subscription/withdraw", {});
     expect([replay.status, replay.body.error]).toEqual([409, "NOT_SUBSCRIBED"]);
-    const spent = await stack.database.pool.query<{ spent: boolean }>(
-      "SELECT consumed_at IS NOT NULL AS spent FROM identity.step_up_grant WHERE session_id = $1 AND action = 'WITHDRAW_SUBSCRIPTION'",
-      [person.identity.authenticated.session.session_id]
-    );
-    expect(spent.rows.map((row) => row.spent)).toEqual([true]);
   });
 
   it("the emailed cancel link cancels only on its button, once, and the plan ends at the period end", async () => {

@@ -26,7 +26,7 @@ function single(value: string | string[] | undefined): string | undefined {
 }
 
 /**
- * The plans for a place (Terms §12: the prices include its tax): the country the visitor chose on this page, and in
+ * The plans for a place (Terms §12: the prices before tax, and the tax it adds to them): the country the visitor chose on this page, and in
  * the US and Canada the postal code, else the connection's country; with the currency that place pays in (spec
  * 2026-10-05 §2.16.1).
  */
@@ -56,7 +56,7 @@ async function readPlans(params: PlaceParams): Promise<Readonly<{
 }
 
 const FAQ_TAX_ANSWER = Object.freeze({
-  INCLUDED: "billing.pricing.faqTaxAnswerIncluded",
+  ADDED: "billing.pricing.faqTaxAnswerAdded",
   NONE: "billing.pricing.faqTaxAnswerNoTax",
   UNPRICED: "billing.pricing.faqTaxAnswerChoose"
 });

@@ -1,14 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import type { PathRewrite, PathsChangedSince, PointOfViewVerdict } from "@debateai/contract";
 import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
+import { cardLabel, digOutcome, pathHolds, pathOutcome, type DigOutcome } from "@/lib/v4/mapLooks";
 import { isFinishedRewrite, rewriteStateOf } from "@/lib/v4/mapModel";
 import { servedRewriteWords } from "@/lib/v4/trust";
 import { levelHref } from "@/lib/v4/storage";
 import type { DigView, ReadingLevel, RewriteState, TrustWord, V4Map, V4Path, V4Point } from "@/lib/v4/types";
-import { V4SourceList } from "./V4Sources";
+import { V4SourcesFold } from "./V4Sources";
 
 /*
  * Dig model revision W4-6 (plan 2026-10-30-dig-model-revision.md; owner answers of 30-31 Oct): what a dig did to a path.
@@ -63,13 +64,21 @@ export function rewrittenLine(path: V4Path, catalog: MessageCatalog, locale: str
     : t(catalog, "v4.rewrite.rewrittenMany", { count: changed.length, date });
 }
 
-/** The one line a path's card on the map carries about its rewrites (the panel shows the rest). */
-function cardLine(path: V4Path, catalog: MessageCatalog, locale: string): string | null {
+/**
+ * The one line a path's card on the map carries about its rewrites (the panel shows the rest). map-d5 / journey-f11: a
+ * dig that changed nothing says what it found ("Confirmed: the answer holds", or that nothing new was found), never only
+ * that nothing changed, when the page can tell.
+ */
+function cardLine(path: V4Path, digs: readonly DigView[], catalog: MessageCatalog, locale: string): string | null {
   switch (pathRewriteState(path)) {
     case "REWRITING":
       return t(catalog, "v4.rewrite.state.WRITING");
-    case "NO_CHANGE":
+    case "NO_CHANGE": {
+      const outcome = pathOutcome(path, digs)?.outcome ?? null;
+      if (outcome === "CONFIRMED") return t(catalog, "v4.result.card.CONFIRMED");
+      if (outcome === "NOTHING_NEW") return t(catalog, "v4.result.card.NOTHING_NEW");
       return t(catalog, "v4.rewrite.state.NO_CHANGE");
+    }
     case "FAILED":
       return t(catalog, "v4.rewrite.card.FAILED");
     case "REWRITTEN":
@@ -83,9 +92,9 @@ function cardLine(path: V4Path, catalog: MessageCatalog, locale: string): string
  * On a path's card (the desktop tree, the phone outline): one line about its rewrites, and the "changed further down"
  * mark. Plain spans: the card is a button, so nothing in it may be a control of its own.
  */
-export function V4RewriteCardNote(props: Readonly<{ path: V4Path; catalog: MessageCatalog; locale: string }>) {
+export function V4RewriteCardNote(props: Readonly<{ path: V4Path; catalog: MessageCatalog; locale: string; digs?: readonly DigView[] }>) {
   const { path, catalog } = props;
-  const line = cardLine(path, catalog, props.locale);
+  const line = cardLine(path, props.digs ?? [], catalog, props.locale);
   const below = path.rewrites?.changedBelow === true;
   if (line === null && !below) return null;
   const state = pathRewriteState(path);
@@ -163,7 +172,8 @@ function DigPoints(props: Readonly<{ points: readonly V4Point[]; served: Readonl
             <div className="v4PanelPointBody">
               <span className="v4RewritePointWord">{t(catalog, `v4.trust.${point.trust}`)}</span>
               <p className="v4PanelPointText" data-ai-generated="true">{point.text}</p>
-              <V4SourceList sources={point.sources} catalog={catalog} locale={props.locale} />
+              {/* map-d4 A: a finding's sources folded into one line, as in the panel's own findings. */}
+              <V4SourcesFold sources={point.sources} catalog={catalog} locale={props.locale} />
             </div>
           </li>
         ))}
@@ -171,6 +181,57 @@ function DigPoints(props: Readonly<{ points: readonly V4Point[]; served: Readonl
       {unchecked > 0 ? <p className="v4PanelUnchecked v4Muted">{tPlural(catalog, "v4.panel.unchecked", unchecked, props.locale)}</p> : null}
     </div>
   );
+}
+
+const RESULT_BOX_KEYS: Readonly<Record<Exclude<DigOutcome, "CONFIRMED">, string>> = Object.freeze({
+  CORRECTED: "v4.result.tag.CORRECTED",
+  ADDED_TO: "v4.result.tag.ADDED_TO",
+  NOTHING_NEW: "v4.result.box.NOTHING_NEW"
+});
+const RESULT_BOX_SHAPES: Readonly<Record<DigOutcome, string>> = Object.freeze({ CORRECTED: "↻", ADDED_TO: "▲", CONFIRMED: "✓", NOTHING_NEW: "" });
+
+/**
+ * dig-d4 A (3 Nov): what the newest finished dig found, first in the panel: "Corrected" or "Added to" (the sentences of
+ * what changed follow), "Confirmed" with its sentence (the path holds, or the dig found nothing that changes it), or
+ * "Nothing new was found. This path stays as it was."
+ */
+export function V4RewriteResult(props: Readonly<{ path: V4Path; digs: readonly DigView[]; catalog: MessageCatalog }>) {
+  const { path, catalog } = props;
+  const outcome = pathOutcome(path, props.digs)?.outcome ?? null;
+  if (outcome === null) return null;
+  return <ResultBox outcome={outcome} holds={pathHolds(path)} catalog={catalog} />;
+}
+
+/** The result box itself: its shape and its one sentence (a confirmed path that holds says so). */
+function ResultBox(props: Readonly<{ outcome: DigOutcome; holds: boolean; catalog: MessageCatalog }>) {
+  const { outcome, catalog } = props;
+  const key = outcome === "CONFIRMED"
+    ? props.holds ? "v4.result.box.CONFIRMED_HOLDS" : "v4.result.box.CONFIRMED"
+    : RESULT_BOX_KEYS[outcome];
+  return (
+    <p className={`v4RewriteResult v4RewriteResult${outcome}`} role="status">
+      {RESULT_BOX_SHAPES[outcome].length > 0 ? <span className="v4RewriteResultShape" aria-hidden="true">{RESULT_BOX_SHAPES[outcome]}</span> : null}
+      {t(catalog, key)}
+    </p>
+  );
+}
+
+/**
+ * dig-f32 (3 Nov): a finished dig's own panel opens with the same result box as the path it rewrote (dig-d4): what THIS
+ * dig found ("Corrected", "Added to", "Confirmed: this path holds…", or nothing new). Only for a dig whose rewrite of a
+ * path is finished and whose path is on this map; null otherwise (its panel then reads as before).
+ */
+export function V4DigResult(props: Readonly<{ dig: DigView; path: V4Path | null; catalog: MessageCatalog }>) {
+  const outcome = digResultOf(props.dig, props.path);
+  if (outcome === null || props.path === null) return null;
+  return <ResultBox outcome={outcome} holds={pathHolds(props.path)} catalog={props.catalog} />;
+}
+
+/** What V4DigResult shows for a dig (null: no box, as for a dig still at work or one that rewrote no path here). */
+export function digResultOf(dig: DigView, path: V4Path | null): DigOutcome | null {
+  const rewrite = dig.rewrite ?? null;
+  if (dig.state !== "DONE" || path === null || rewrite === null || !isFinishedRewrite(rewrite)) return null;
+  return digOutcome(dig);
 }
 
 const STATE_KEYS: Readonly<Partial<Record<RewriteState, string>>> = Object.freeze({
@@ -190,6 +251,11 @@ export function V4PathRewrite(props: Readonly<{
   linkLevel: ReadingLevel | null;
   catalog: MessageCatalog;
   locale: string;
+  /**
+   * dig-d4 A (3 Nov): what the newest finished dig looked into, in its own words (the panel renders the title, AI text
+   * marked only when an AI wrote it); shown as "You asked: …" under the result. Absent or null: no line.
+   */
+  asked?: ReactNode;
 }>) {
   const { path, catalog, locale } = props;
   const state = pathRewriteState(path);
@@ -204,11 +270,18 @@ export function V4PathRewrite(props: Readonly<{
   const digPoints = dig?.points ?? null;
   // Draft 5.5: a failed rewrite says the dig's points and sources "are below", so they start open there.
   const showPoints = pointsOpen ?? state === "FAILED";
-  const stateKey = state === null ? undefined : STATE_KEYS[state];
+  // dig-d4 A: a finished dig's result is said first; "The dig didn't change this path." only when the page cannot tell it.
+  const result = pathOutcome(path, props.digs);
+  const stateKey = state === null || (state === "NO_CHANGE" && result !== null) ? undefined : STATE_KEYS[state];
   const rewritten = rewrittenLine(path, catalog, locale);
   const summary = state === "REWRITTEN" && latest !== null ? latest.text.summary.trim() : "";
+  const asked = around(catalog, "v4.rewrite.youAsked", "question");
   return (
     <section className={`v4Rewrite${state === null ? "" : ` v4Rewrite${state}`}`} aria-label={t(catalog, "v4.rewrite.whatChanged")}>
+      {result === null ? null : <V4RewriteResult path={path} digs={props.digs} catalog={catalog} />}
+      {props.asked === undefined || props.asked === null || latest === null ? null : (
+        <p className="v4RewriteAsked">{asked.before}{props.asked}{asked.after}</p>
+      )}
       {stateKey === undefined ? null : <p className="v4RewriteState" role="status">{t(catalog, stateKey)}</p>}
       {rewritten === null ? null : <p className="v4RewriteWhen v4Muted">{rewritten}</p>}
       {summary.length > 0 ? <p className="v4PanelText" data-ai-generated="true">{summary}</p> : null}
@@ -252,24 +325,43 @@ export function V4PathRewrite(props: Readonly<{
 }
 
 /**
- * The top of the map (owner Q-D11): how many paths digs changed since the answer was written, or since the latest report
- * (version n), with "Write my report". Hidden when nothing changed since.
+ * The top of the map. Owner Q-D11 counted the paths digs changed since the answer (or the latest report) was written. V4
+ * screen review (owner picks 3 Nov 2026), dig-f19 / map-f17: since the 31 Oct ruling the main answer updates itself after
+ * each change, so a line shows only once a report exists and the map has moved on since it: "Your report is older than
+ * the map." with [Update my report], the changed paths named under it (never a count), and while a dig runs "It will
+ * wait for your running dig." (ruling F7). Hidden before any report, and when nothing changed since it.
  */
 export function V4ChangedSince(props: Readonly<{
   changedSince: PathsChangedSince | null | undefined;
   reportHref: string;
   catalog: MessageCatalog;
   locale: string;
+  /** dig-f19: the paths that changed since the report (lib/v4/readyMoment.ts pathsChangedSinceReport), in the map's order. */
+  changedPaths?: readonly V4Path[];
+  /** A dig is still running: the report it writes will wait for it. */
+  digRunning?: boolean;
 }>) {
   const { changedSince, catalog } = props;
-  if (changedSince === null || changedSince === undefined || changedSince.count === 0) return null;
-  const line = changedSince.since_report_version === null
-    ? tPlural(catalog, "v4.rewrite.changedSince", changedSince.count, props.locale)
-    : t(catalog, "v4.rewrite.changedSinceReport", { n: changedSince.since_report_version, count: changedSince.count });
+  const titleId = useId();
+  if (changedSince === null || changedSince === undefined || changedSince.since_report_version === null || changedSince.count === 0) {
+    return null;
+  }
+  const named = props.changedPaths ?? [];
   return (
-    <section className="v4ChangedSince" aria-label={line}>
-      <p className="v4ChangedSinceText">{line}</p>
-      <Link className="v4Btn v4BtnPrimary v4ChangedSinceReport" href={props.reportHref}>{t(catalog, "v4.rail.writeReport")}</Link>
+    <section className="v4ChangedSince" aria-labelledby={titleId}>
+      <p id={titleId} className="v4ChangedSinceText">{t(catalog, "v4.rewrite.reportOlder")}</p>
+      {/* map-f15: the one "Write my report" button is in the top bar; this line's [Update my report] is a plain link to the same place. */}
+      <Link className="v4Link v4ChangedSinceReport" href={props.reportHref}>{t(catalog, "v4.rewrite.updateReport")}</Link>
+      {named.length === 0 ? null : (
+        <div className="v4ChangedSincePaths">
+          <p className="v4ChangedSinceLead v4Muted">{t(catalog, "v4.rewrite.changedSinceYourReport")}</p>
+          <ul className="v4ChangedSinceList">
+            {/* map-f25 / r2-20 A: each path by its short label, so no outcome words ("held up") show; the panel has the whole line. */}
+            {named.map((path) => <li key={path.id} data-ai-generated="true"><span dir="auto">{cardLabel(path.line)}</span></li>)}
+          </ul>
+        </div>
+      )}
+      {props.digRunning === true ? <p className="v4ChangedSinceWait v4Muted">{t(catalog, "v4.rewrite.waitsForDig")}</p> : null}
     </section>
   );
 }

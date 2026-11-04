@@ -42,12 +42,25 @@ export function fellPositionsOf(story: AnswerStory | null): ReadonlySet<string> 
  */
 export function pointsOf(answer: Answer, story: AnswerStory | null = null, fellPositions?: ReadonlySet<string>): ReadonlyMap<string, V4Point> {
   const fell = fellPositions ?? fellPositionsOf(story);
-  const free = ranOnFree(answer);
+  return pointsOfNodes(answer.nodes, { free: ranOnFree(answer), fell });
+}
+
+/** A node as the trust rule and the page read it: an answer's node, or a public snapshot's (its review carries the same outcome and reasons). */
+export type PointNode = Pick<Answer["nodes"][number],
+  "node_id" | "claim" | "way_of_knowing" | "staleness_state" | "relevant_as_of" | "sources" | "looked_up_checked">
+  & Readonly<{ review: Readonly<{ outcome: string; reasons: readonly string[] }> | null }>;
+
+/**
+ * The same points from any list of nodes, keyed by node id in their order (first copy of an id wins): the own map's
+ * answer above, and a public debate's published tree (public-d1 A, owner review 3 Nov), so both pages word a point by
+ * one rule and show its sources the same way. `free`: the debate ran on Free; `fell`: the positions of paths that FELL.
+ */
+export function pointsOfNodes(nodes: readonly PointNode[], where: Readonly<{ free: boolean; fell: ReadonlySet<string> }>): ReadonlyMap<string, V4Point> {
   const points = new Map<string, V4Point>();
-  for (const node of answer.nodes) {
+  for (const node of nodes) {
     if (points.has(node.node_id)) continue;
     const reasons = node.review === null ? [] : [...node.review.reasons];
-    const placed = trustOfPoint(node, { free, fell: fell.has(node.node_id) });
+    const placed = trustOfPoint(node, { free: where.free, fell: where.fell.has(node.node_id) });
     points.set(node.node_id, {
       id: node.node_id,
       text: node.claim,

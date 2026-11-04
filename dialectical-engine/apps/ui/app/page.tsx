@@ -26,11 +26,13 @@ import type { SiteFooterBilling } from "@/lib/billing/footerBilling";
 
 export const dynamic = "force-dynamic";
 
-type LandingPlans = Readonly<{ lowestPaidPrice: string | null; tax: PricedTax; footer: SiteFooterBilling }>;
+type LandingPlans = Readonly<{
+  lowestPaidPrice: string | null; tax: PricedTax; taxName: string | null; footer: SiteFooterBilling;
+}>;
 
 /**
- * The landing's one plans read: the lowest paid price for the price line (with the connection country's tax, Terms
- * §12; with no priced place, no price at all), and whether billing is on for the footer. Only the route's 404 means
+ * The landing's one plans read: the lowest paid price before tax for the price line, with the connection country's
+ * tax by name (Terms §12: price + VAT), and whether billing is on for the footer. Only the route's 404 means
  * off (local mode, or hosted before the switch), exactly as billingIsOn() decides.
  */
 async function landingPlans(locale: string, headerStore: Headers): Promise<LandingPlans> {
@@ -40,19 +42,20 @@ async function landingPlans(locale: string, headerStore: Headers): Promise<Landi
       fetch, undefined, headerStore.get("user-agent") ?? undefined, readTrustedClientIp(headerStore)
     ).getBillingPlans();
     const paid = answer.plans.filter((plan) => plan.plan_id !== "FREE");
-    // `!= null`: an answer without the fields (only a hand-made one: the contract client requires them) is UNPRICED.
-    const tax = paid.every((plan) => plan.total_price != null) ? pricedTax(answer) : "UNPRICED";
-    const lowest = tax === "UNPRICED" ? undefined : paid
+    const tax = pricedTax(answer);
+    const lowest = paid
       // Spec 2026-10-05 §2.16.1: in the currency the visitor's connection pays in.
-      .flatMap((plan) => plan.total_price ?? [])
+      .map((plan) => plan.net_prices[answer.currency])
       .sort((left, right) => Number(left) - Number(right))[0];
     return Object.freeze({
       lowestPaidPrice: lowest === undefined ? null : formatMoney(locale, lowest, answer.currency),
-      tax: paid.length === 0 ? "UNPRICED" : tax, footer: footer(true)
+      tax: paid.length === 0 ? "UNPRICED" : tax,
+      // `?? null`: an answer without the field (only a hand-made one: the contract client requires it) names no tax.
+      taxName: tax === "ADDED" ? answer.tax?.tax_name ?? null : null, footer: footer(true)
     });
   } catch (failure) {
     return Object.freeze({
-      lowestPaidPrice: null, tax: "UNPRICED",
+      lowestPaidPrice: null, tax: "UNPRICED", taxName: null,
       footer: footer(!(failure instanceof ContractHttpError && failure.status === 404))
     });
   }
@@ -81,7 +84,8 @@ export default async function HomePage({
   if (token === null) {
     const plans = await landingPlans(locale, await headers());
     return <><LandingPage
-      catalog={catalog} lowestPaidPrice={plans.lowestPaidPrice} tax={plans.tax} footerBilling={plans.footer}
+      catalog={catalog} lowestPaidPrice={plans.lowestPaidPrice} tax={plans.tax} taxName={plans.taxName}
+      footerBilling={plans.footer}
     /><SupportWidget /></>;
   }
   const requestedTab = (await searchParams).tab;
