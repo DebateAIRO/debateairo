@@ -6,6 +6,7 @@ import type { Answer, AnswerStory, DigLinks, InvestigationReports, Investigation
 import { AuthGate } from "@/components/AuthGate";
 import { V4ReportDigWait } from "@/components/v4/V4DigUndo";
 import { V4ReportHeader, type ReportShareItem } from "@/components/v4/V4ReportHeader";
+import { useQuestionPublic } from "@/components/v4/V4ReportStrip";
 import { V4OtherPages, V4SearchNote, V4SourceList, V4WebNoteLine } from "@/components/v4/V4Sources";
 import { V4TrustBar } from "@/components/v4/V4TrustBar";
 import { isNotFound } from "@/lib/api";
@@ -405,6 +406,10 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
 
   const runId = load.kind === "SERVED" ? load.runId : null;
   const investigation = useInvestigation(runId);
+  // report-f15: on Free, "This question is public, so your report will be public too." before writing (unless the
+  // question's check kept it private: the visibility read then says PRIVATE).
+  const free = map?.webNote === "FREE";
+  const publicToo = useQuestionPublic(runId, free);
   const read = investigation.state.kind === "READ" ? investigation.state.read : null;
   // report-f9: every report address leads to the first question's report. A dig's moves there, and the address follows.
   const rootRunId = read?.root_run_id ?? null;
@@ -645,6 +650,7 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
           investigation={investigation}
           runningDig={runningDig}
           webNote={map.webNote}
+          publicToo={publicToo}
           pdfRefused={pdfCheck === "REFUSED"}
           mapHref={mapHref}
           locale={locale}
@@ -659,7 +665,7 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
           </section>
         )}
 
-        <CheckedSection catalog={catalog} />
+        <CheckedSection free={free} catalog={catalog} />
 
         {firstFolded ? (
           <details className="v4RepFirst">
@@ -801,15 +807,19 @@ function FirstAnswer({ map, level, chosenLevel, locale, catalog, language, digs,
   );
 }
 
-/** "How this was checked": what the four words mean. report-f18: no counts, in words only. */
-function CheckedSection({ catalog }: Readonly<{ catalog: MessageCatalog }>) {
+/**
+ * "How this was checked": what the four words mean. report-f18: no counts, in words only. report-f15: on Free only the
+ * words that can appear there (Free never looks anything up, so its best word is "Sure, for the case named").
+ */
+function CheckedSection({ free, catalog }: Readonly<{ free: boolean; catalog: MessageCatalog }>) {
+  const words = free ? TRUST_WORDS.filter((word) => word !== "SURE") : TRUST_WORDS;
   return (
     <section className="v4RepSection" aria-labelledby="v4-report-checked">
       <h2 id="v4-report-checked" className="v4RepH2">{t(catalog, "v4.report.checkedHeading")}</h2>
       <p className="v4RepProse">{t(catalog, "v4.report.checkedSecondAi")}</p>
-      <p className="v4RepProse">{t(catalog, "v4.report.checkedWordsIntro")}</p>
+      <p className="v4RepProse">{t(catalog, free ? "v4.report.checkedWordsIntroFree" : "v4.report.checkedWordsIntro")}</p>
       <ul className="v4RepWords">
-        {TRUST_WORDS.map((word) => (
+        {words.map((word) => (
           <li key={word} className="v4RepWord">
             <b>{t(catalog, `v4.trust.${word}`)}</b>
             {/* W2-6: "Sure" now means a page this debate looked up, in the owner-approved words of its basis. */}
@@ -936,11 +946,13 @@ type PressNote = Readonly<{ kind: PressKind; checking: boolean }>;
  * R22 W5-1: the report over the investigation: its versions, the one shown, and "Write my report" / "Keep digging".
  * report-f2: a read that fails says so in this place, with Try again, and keeps Write my report.
  */
-function ReportArea({ runId, investigation, runningDig, webNote, pdfRefused, mapHref, locale, language, catalog }: Readonly<{
+function ReportArea({ runId, investigation, runningDig, webNote, publicToo, pdfRefused, mapHref, locale, language, catalog }: Readonly<{
   runId: string;
   investigation: Investigation;
   runningDig: string | null;
   webNote: V4WebNote | null | undefined;
+  /** report-f15: a Free question that is public: said before writing. */
+  publicToo: boolean;
   pdfRefused: boolean;
   mapHref: string;
   locale: string;
@@ -1004,6 +1016,10 @@ function ReportArea({ runId, investigation, runningDig, webNote, pdfRefused, map
   const writeButton = (label: string) => (
     <button type="button" className="v4Btn v4BtnPrimary v4RepWrite" disabled={busy} onClick={() => void press("write")}>{label}</button>
   );
+  // report-f15: said before writing, right above the button.
+  const publicLine = publicToo
+    ? <p className="v4RepNote v4RepPublicToo v4RepNoPrint" data-report-public="">{t(catalog, "v4.report.publicToo")}</p>
+    : null;
 
   const { state } = investigation;
   if (state.kind !== "READ") {
@@ -1012,6 +1028,7 @@ function ReportArea({ runId, investigation, runningDig, webNote, pdfRefused, map
       <div className="v4RepCard v4RepNoPrint" ref={statusRef} tabIndex={-1}>
         <p className="v4RepCardTitle" role="alert">{t(catalog, "v4.investigation.loadFailed")}</p>
         {noteLine}
+        {publicLine}
         <div className="v4RepActions">
           <button type="button" className="v4Btn" onClick={investigation.retry}>{t(catalog, "v4.common.retry")}</button>
           {writeButton(t(catalog, "v4.rail.writeReport"))}
@@ -1032,14 +1049,17 @@ function ReportArea({ runId, investigation, runningDig, webNote, pdfRefused, map
   const canWrite = read.state === "OPEN" || newest?.state === "FAILED";
   const canKeepDigging = read.state === "CLOSED" && finishedVersion(newest);
   const actions = canWrite || canKeepDigging ? (
-    <div className="v4RepActions v4RepNoPrint">
-      {canWrite ? writeButton(t(catalog, newest?.state === "FAILED" ? "v4.investigation.writeAgain" : "v4.rail.writeReport")) : null}
-      {canKeepDigging ? (
-        <button type="button" className="v4Btn v4RepKeepDigging" disabled={busy} onClick={() => void press("reopen")}>
-          {t(catalog, "v4.investigation.keepDigging")}
-        </button>
-      ) : null}
-    </div>
+    <>
+      {canWrite ? publicLine : null}
+      <div className="v4RepActions v4RepNoPrint">
+        {canWrite ? writeButton(t(catalog, newest?.state === "FAILED" ? "v4.investigation.writeAgain" : "v4.rail.writeReport")) : null}
+        {canKeepDigging ? (
+          <button type="button" className="v4Btn v4RepKeepDigging" disabled={busy} onClick={() => void press("reopen")}>
+            {t(catalog, "v4.investigation.keepDigging")}
+          </button>
+        ) : null}
+      </div>
+    </>
   ) : null;
 
   if (read.versions.length === 0) {
