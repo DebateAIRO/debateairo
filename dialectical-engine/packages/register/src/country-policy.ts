@@ -139,16 +139,18 @@ const COUNTRY_GROUPS: ReadonlyArray<readonly [readonly string[], RuleValue]> = O
 /**
  * The owner's decision of 20 October 2026 (the research is in the payment region blocks spec, 2026-10-20 §2):
  * payment is closed, until the company registers for tax there, in Saskatchewan and Manitoba; in DC, Hawaii,
- * Maryland, Rhode Island, Vermont, West Virginia and New Jersey; in Ohio for business buyers only (Ohio taxes
- * SaaS only when it is bought for business use); and in the EU territories outside the EU VAT area: the Canary
- * Islands, Ceuta, Melilla, the five French overseas departments, Åland, Mount Athos, Livigno, Campione d'Italia,
- * Heligoland and Büsingen. Sign-up is open in all of them. Opening one is publishing a version without its entry.
+ * Maryland, Rhode Island, Vermont and West Virginia; in Ohio for business buyers only (Ohio taxes SaaS only when it
+ * is bought for business use); and in the EU territories outside the EU VAT area: the Canary Islands, Ceuta,
+ * Melilla, the five French overseas departments, Åland, Mount Athos, Livigno, Campione d'Italia, Heligoland and
+ * Büsingen. Sign-up is open in all of them. Opening one is publishing a version without its entry.
+ * New Jersey was on that list too until the owner's amendment of 4 November 2026 opened it: its bulletin TB-72 treats
+ * SaaS as a service it does not tax, and a seller with no taxable sales there need not register.
  * Tennessee is closed for payment too, for every buyer, because the Terms exclude it (section 2, Annex A.2; the
  * owner's amendment of 8 October 2026, see US_STATE_GROUPS): sign-up refuses a person who declares Tennessee, and this
  * entry refuses a Tennessee billing address, so a person who declared another state still cannot pay from there.
  */
 const REGION_GROUPS: ReadonlyArray<readonly [readonly PaymentRegionId[], RegionRuleValue]> = Object.freeze([
-  [["CA-SK", "CA-MB", "US-DC", "US-HI", "US-MD", "US-RI", "US-VT", "US-WV", "US-NJ",
+  [["CA-SK", "CA-MB", "US-DC", "US-HI", "US-MD", "US-RI", "US-VT", "US-WV",
     "ES-CN", "ES-CE", "ES-ML", "FR-971", "FR-972", "FR-973", "FR-974", "FR-976", "FI-01", "GR-69",
     "IT-LIVIGNO", "IT-CAMPIONE", "DE-HELGOLAND", "DE-BUESINGEN"], REGION_TAX_NOT_READY],
   [["US-OH"], REGION_TAX_NOT_READY_FOR_BUSINESS],
@@ -159,7 +161,7 @@ export const COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
   rowKey: COUNTRY_POLICY_ROW_KEY,
   sourceRef: "Paid plans spec 2026-09-29 §1.5 country switches (owner decisions 29 September 2026, amended 1, 2, 8 and 9 October and 4 November 2026):"
     + " the Terms Annex A, sanctions and the AI providers' country lists; payment region blocks spec 2026-10-20 §2"
-    + " (owner decision 20 October 2026): the regions closed for payment",
+    + " (owner decision 20 October 2026, amended 4 November 2026): the regions closed for payment",
   value: Object.freeze({
     kind: "COUNTRY_POLICY" as const,
     default_rule: NOT_YET,

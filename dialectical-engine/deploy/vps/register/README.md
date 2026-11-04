@@ -90,8 +90,8 @@ buyer types (the postal code, or the state or province), not from the internet a
 region blocks spec, `docs/superpowers/specs/2026-10-20-payment-region-blocks-design.md`), and Tennessee:
 
 - Canada: Saskatchewan (`CA-SK`), Manitoba (`CA-MB`);
-- United States: `US-DC`, `US-HI`, `US-MD`, `US-RI`, `US-VT`, `US-WV`, `US-NJ`, and Ohio (`US-OH`) for
-  business buyers only;
+- United States: `US-DC`, `US-HI`, `US-MD`, `US-RI`, `US-VT`, `US-WV`, and Ohio (`US-OH`) for business buyers
+  only. New Jersey (`US-NJ`) was on the list too until the owner opened it on 4 November 2026;
 - the EU places outside the EU VAT area: `ES-CN` (Canary Islands), `ES-CE` (Ceuta), `ES-ML` (Melilla),
   `FR-971` (Guadeloupe, with Saint-Martin and Saint-Barthélemy), `FR-972` (Martinique), `FR-973` (French
   Guiana), `FR-974` (Réunion), `FR-976` (Mayotte), `FI-01` (Åland), `GR-69` (Mount Athos), `IT-LIVIGNO`,
